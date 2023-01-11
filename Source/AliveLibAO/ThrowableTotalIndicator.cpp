@@ -9,135 +9,15 @@
 #include "Math.hpp"
 #include "../relive_lib/Primitives.hpp"
 
+namespace AO {
+    #include "../relive_lib/ThrowableIndicatorsVectorData.hpp"
+}; //todo make linker less angry so you can drop namespace
 
 namespace AO {
 
 u16 gThrowableIndicatorExists = 0;
-static const s16 kNumber_0[17] = {
-    4,
-    -3, -4, 3, -4,
-    3, -3, 3, 3,
-    3, 4, -3, 4,
-    -3, 3, -3, -3};
 
-static const s16 kNumber_1[5] = {
-    1,
-    2, -4, 2, 4};
-
-static const s16 kNumber_2[21] = {
-    5,
-    -5, -4, 5, -4,
-    5, -3, 5, -1,
-    5, 0, -5, 0,
-    -5, 1, -5, 3,
-    -5, 4, 5, 4};
-
-static const s16 kNumber_3[17] = {
-    4,
-    -5,
-    -4,
-    5,
-    -4,
-    5,
-    -3,
-    5,
-    3,
-    5,
-    4,
-    -5,
-    4,
-    -4,
-    0,
-    4,
-    0,
-};
-
-static const s16 kNumber_4[13] = {
-    3,
-    -5, -4, -5, -1,
-    -5, 0, 4, 0,
-    5, -4, 5, 4};
-
-static const s16 kNumber_5[21] = {
-    5,
-    5, -4, -5, -4,
-    -5, -3, -5, -1,
-    -5, 0, 5, 0,
-    5, 1, 5, 3,
-    5, 4, -5, 4};
-
-static const s16 kNumber_6[21] = {
-    5,
-    5, -4, -5, -4, -5,
-    -3, -5, 3, -5, 4,
-    5, 4, 5, 3, 5,
-    1, 5, 0, -4, 0};
-
-static const s16 kNumber_7[9] = {
-    2,
-    -5, -4, 5, -4,
-    5, -3, 0, 4};
-
-static const s16 kNumber_8[21] = {
-    5,
-    -5, -4, 5, -4,
-    5, -3, 5, 3,
-    5, 4, -5, 4,
-    -5, 3, -5, -3,
-    -4, 0, 4, 0};
-
-static const s16 kNumber_9[17] = {
-    4,
-    5, 4, 5, -3,
-    5, -4, -5, -4,
-    -5, -3, -5, -1,
-    -5, 0, 4, 0};
-
-static const s16 kInfinity[25] = {
-    6,
-    -3, -2, -5, 0,
-    -5, 1, -3, 3,
-    -2, 3, 2, -2,
-    3, -2, 5, 0,
-    5, 1, 3, 3,
-    2, 3, -2, -2};
-
-static const s16 kCheckpoint[36] = {
-    8, 0, -6, 1,
-    -6,
-    12,
-    0,
-    13,
-    0,
-    0,
-    6,
-    1,
-    6,
-    -11,
-    0,
-    -12,
-    0,
-    2,
-    -5,
-    11,
-    -1,
-    11,
-    1,
-    2,
-    5,
-    -1,
-    5,
-    -10,
-    1,
-    -10,
-    -1,
-    -1,
-    -5,
-    0,
-    0,
-    0};
-
-static const s16* kNumbersArray[12] = {
+static const double* kNumbersArray[12] = {
     kNumber_0,
     kNumber_1,
     kNumber_2,
@@ -149,7 +29,11 @@ static const s16* kNumbersArray[12] = {
     kNumber_8,
     kNumber_9,
     kInfinity,
-    kCheckpoint};
+    kCheckpoint
+};
+
+
+s16 mmNumToShow = 0;
 
 ThrowableTotalIndicator::ThrowableTotalIndicator(FP xpos, FP ypos, Layer layer, FP /*scale*/, s32 count, bool bFade)
     : BaseGameObject(true, 0)
@@ -205,6 +89,10 @@ ThrowableTotalIndicator::ThrowableTotalIndicator(FP xpos, FP ypos, Layer layer, 
     {
         gThrowableIndicatorExists++;
     }
+
+    mmNumToShow++;
+    posOffset.x += 0.5;
+    if(mmNumToShow > 11) mmNumToShow = 0;
 }
 
 ThrowableTotalIndicator::~ThrowableTotalIndicator()
@@ -288,6 +176,7 @@ void ThrowableTotalIndicator::VUpdate()
 
 void ThrowableTotalIndicator::VRender(PrimHeader** ppOt)
 {
+    mNumToShow = mmNumToShow; //todo hack
     if (*kNumbersArray[mNumToShow] <= 0)
     {
         return;
@@ -305,10 +194,10 @@ void ThrowableTotalIndicator::VRender(PrimHeader** ppOt)
         xpos = FP_GetExponent(mXPos - camX);
         ypos = FP_GetExponent(mYPos - camY);
 
-        const FP x0 = FP_FromInteger(kNumbersArray[mNumToShow][(4 * counter) + 1]) * mSpriteScale;
-        const FP y0 = FP_FromInteger(kNumbersArray[mNumToShow][(4 * counter) + 2]) * mSpriteScale;
-        const FP x1 = FP_FromInteger(kNumbersArray[mNumToShow][(4 * counter) + 3]) * mSpriteScale;
-        const FP y1 = FP_FromInteger(kNumbersArray[mNumToShow][(4 * counter) + 4]) * mSpriteScale;
+        const FP x0 = FP_FromDouble(kNumbersArray[mNumToShow][(4 * counter) + 1]) * mSpriteScale;
+        const FP y0 = FP_FromDouble(kNumbersArray[mNumToShow][(4 * counter) + 2]) * mSpriteScale;
+        const FP x1 = FP_FromDouble(kNumbersArray[mNumToShow][(4 * counter) + 3]) * mSpriteScale;
+        const FP y1 = FP_FromDouble(kNumbersArray[mNumToShow][(4 * counter) + 4]) * mSpriteScale;
 
         s16 primBaseX = 0;
         s16 primVertX = 0;

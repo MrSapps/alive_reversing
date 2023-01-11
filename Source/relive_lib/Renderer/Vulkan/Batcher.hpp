@@ -81,6 +81,8 @@ public:
 
     RenderBatch& PushCAM(const Poly_FT4& poly, std::shared_ptr<TextureType>& texture);
 
+    RenderBatch& PushLineG2(const Line_G2& line);
+
     RenderBatch& PushFont(const Poly_FT4& poly, u32 palIndex, std::shared_ptr<TextureType>& texture);
 
     RenderBatch& PushAnim(const Poly_FT4& poly, u32 palIndex, std::shared_ptr<TextureType>& texture);

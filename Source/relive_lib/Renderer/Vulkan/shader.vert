@@ -17,6 +17,8 @@ layout(location = 5) in uint inDrawType;
 layout(location = 6) in uint inisShaded;
 layout(location = 7) in uint inblendMode;
 layout(location = 8) in uint inisSemiTrans;
+layout(location = 9) in vec2 vsLineStart;
+layout(location = 10) in vec2 vsLineEnd;
 
 // Shader outputs
 layout(location = 0) out vec3 fragColor;
@@ -27,6 +29,8 @@ layout(location = 4) flat out uint outDrawType;
 layout(location = 5) flat out uint outisShaded;
 layout(location = 6) flat out uint outblendMode;
 layout(location = 7) flat out uint outisSemiTrans;
+layout(location = 8) out vec2 fsLineStart;
+layout(location = 9) out vec2 fsLineEnd;
 
 void main() {
     gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition, 0.0, 1.0);
@@ -38,4 +42,7 @@ void main() {
     outisShaded = inisShaded;
     outblendMode = inblendMode;
     outisSemiTrans = inisSemiTrans;
+
+    fsLineStart = vsLineStart;
+    fsLineEnd = vsLineEnd;
 }

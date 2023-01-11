@@ -5,99 +5,11 @@
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
 #include "stdlib.hpp"
+#include "../relive_lib/ThrowableIndicatorsVectorData.hpp"
 
 u16 gThrowableIndicatorExists = 0;
 
-static const s16 kNumber_0[17] = {
-    4,
-    -3, -4, 3, -4,
-    3, -3, 3, 3,
-    3, 4, -3, 4,
-    -3, 3, -3, -3};
-
-static const s16 kNumber_1[5] = {
-    1,
-    2, -4, 2, 4};
-
-static const s16 kNumber_2[21] = {
-    5,
-    -5, -4, 5, -4,
-    5, -3, 5, -1,
-    5, 0, -5, 0,
-    -5, 1, -5, 3,
-    -5, 4, 5, 4};
-
-static const s16 kNumber_3[17] = {
-    4,
-    -5,
-    -4,
-    5,
-    -4,
-    5,
-    -3,
-    5,
-    3,
-    5,
-    4,
-    -5,
-    4,
-    -4,
-    0,
-    4,
-    0,
-};
-
-static const s16 kNumber_4[13] = {
-    3,
-    -5, -4, -5, -1,
-    -5, 0, 4, 0,
-    5, -4, 5, 4};
-
-static const s16 kNumber_5[21] = {
-    5,
-    5, -4, -5, -4,
-    -5, -3, -5, -1,
-    -5, 0, 5, 0,
-    5, 1, 5, 3,
-    5, 4, -5, 4};
-
-static const s16 kNumber_6[21] = {
-    5,
-    5, -4, -5, -4, -5,
-    -3, -5, 3, -5, 4,
-    5, 4, 5, 3, 5,
-    1, 5, 0, -4, 0};
-
-static const s16 kNumber_7[9] = {
-    2,
-    -5, -4, 5, -4,
-    5, -3, 0, 4};
-
-static const s16 kNumber_8[21] = {
-    5,
-    -5, -4, 5, -4,
-    5, -3, 5, 3,
-    5, 4, -5, 4,
-    -5, 3, -5, -3,
-    -4, 0, 4, 0};
-
-static const s16 kNumber_9[17] = {
-    4,
-    5, 4, 5, -3,
-    5, -4, -5, -4,
-    -5, -3, -5, -1,
-    -5, 0, 4, 0};
-
-static const s16 kInfinity[25] = {
-    6,
-    -3, -2, -5, 0,
-    -5, 1, -3, 3,
-    -2, 3, 2, -2,
-    3, -2, 5, 0,
-    5, 1, 3, 3,
-    2, 3, -2, -2};
-
-static const s16* kNumbersArray[11] = {
+static const double* kNumbersArray[11] = {
     kNumber_0,
     kNumber_1,
     kNumber_2,
@@ -108,7 +20,8 @@ static const s16* kNumbersArray[11] = {
     kNumber_7,
     kNumber_8,
     kNumber_9,
-    kInfinity};
+    kInfinity
+};
 
 ThrowableTotalIndicator::ThrowableTotalIndicator(FP xpos, FP ypos, Layer layer, FP /*scale*/, s32 count, bool bFade)
     : BaseGameObject(true, 0)

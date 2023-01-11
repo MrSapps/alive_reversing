@@ -1721,9 +1721,10 @@ void VulkanRenderer::Draw(Prim_GasEffect& /*gasEffect*/)
     // TODO
 }
 
-void VulkanRenderer::Draw(Line_G2& /*line*/)
+void VulkanRenderer::Draw(Line_G2& line)
 {
-    // TODO
+    auto& batch = mBatcher[mCurrentFrame].PushLineG2(line);
+    batch.mPipeline = PipelineIndex::eAddBlending;
 }
 
 void VulkanRenderer::Draw(Line_G4& /*line*/)

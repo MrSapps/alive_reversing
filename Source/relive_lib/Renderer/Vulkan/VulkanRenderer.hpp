@@ -333,6 +333,8 @@ private:
         u32 mIsShaded;
         u32 mBlendMode;
         u32 mIsSemiTrans;
+        glm::vec2 line1 = {0, 0};
+        glm::vec2 line2 = {0, 0};
 
         static vk::VertexInputBindingDescription getBindingDescription()
         {
@@ -344,9 +346,9 @@ private:
             return bindingDescription;
         }
 
-        static std::array<vk::VertexInputAttributeDescription, 9> getAttributeDescriptions()
+        static std::array<vk::VertexInputAttributeDescription, 11> getAttributeDescriptions()
         {
-            std::array<vk::VertexInputAttributeDescription, 9> attributeDescriptions{};
+            std::array<vk::VertexInputAttributeDescription, 11> attributeDescriptions{};
 
             attributeDescriptions[0].binding = 0;
             attributeDescriptions[0].location = 0;
@@ -392,6 +394,16 @@ private:
             attributeDescriptions[8].location = 8;
             attributeDescriptions[8].format = vk::Format::eR32Uint;
             attributeDescriptions[8].offset = offsetof(Vertex, mIsSemiTrans);
+
+            attributeDescriptions[9].binding = 0;
+            attributeDescriptions[9].location = 9;
+            attributeDescriptions[9].format = vk::Format::eR32G32Sfloat;
+            attributeDescriptions[9].offset = offsetof(Vertex, line1);
+
+            attributeDescriptions[10].binding = 0;
+            attributeDescriptions[10].location = 10;
+            attributeDescriptions[10].format = vk::Format::eR32G32Sfloat;
+            attributeDescriptions[10].offset = offsetof(Vertex, line2);
 
             return attributeDescriptions;
         }

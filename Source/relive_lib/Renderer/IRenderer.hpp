@@ -151,7 +151,8 @@ public: // TODO: Make protected later
         DefaultFT4 = 1,
         Camera = 2,
         FG1 = 3,
-        Gas = 4
+        Gas = 4,
+        ShaderLines = 5
     };
 
 protected:

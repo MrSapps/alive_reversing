@@ -300,11 +300,28 @@ void OpenGLRenderer::Draw(Line_G2& line)
     bool isShaded = true;
     u32 blendMode = GetTPageBlendMode(mGlobalTPage);
 
-    PsxVertexData verts[2] = {
-        { static_cast<f32>(X0(&line)), static_cast<f32>(Y0(&line)), static_cast<f32>(R0(&line)), static_cast<f32>(G0(&line)), static_cast<f32>(B0(&line)), 0.0f, 0.0f, static_cast<u32>(PsxDrawMode::Flat), isSemiTrans, isShaded, blendMode, 0, 0},
-        { static_cast<f32>(X1(&line)), static_cast<f32>(Y1(&line)), static_cast<f32>(R1(&line)), static_cast<f32>(G1(&line)), static_cast<f32>(B1(&line)), 0.0f, 0.0f, static_cast<u32>(PsxDrawMode::Flat), isSemiTrans, isShaded, blendMode, 0, 0}};
+    const f32 r = R0(&line);
+    const f32 g = G0(&line);
+    const f32 b = B0(&line);
 
-    PushLines(verts, 2);
+    const auto minX = 0;//std::min(X0(&line), X1(&line)); //todo
+    const auto minY = 0;//std::min(Y0(&line), Y1(&line));
+    const auto maxX = 640;//std::max(X0(&line), X1(&line));
+    const auto maxY = 240;//std::max(Y0(&line), Y1(&line));
+
+    auto line1x = static_cast<f32>(X0(&line));
+    auto line1y = static_cast<f32>(Y0(&line));
+    auto line2x = static_cast<f32>(X1(&line));
+    auto line2y = static_cast<f32>(Y1(&line));
+
+    PsxVertexData triangleVerts[4] = {
+        {maxX, maxY, r, g, b, 0.0f, 0.0f, static_cast<u32>(PsxDrawMode::ShaderLines), isSemiTrans, isShaded, blendMode, 0, 0, line1x, line1y, line2x, line2y },
+        {minX, maxY, r, g, b, 0.0f, 0.0f, static_cast<u32>(PsxDrawMode::ShaderLines), isSemiTrans, isShaded, blendMode, 0, 0, line1x, line1y, line2x, line2y },
+        {maxX, minY, r, g, b, 0.0f, 0.0f, static_cast<u32>(PsxDrawMode::ShaderLines), isSemiTrans, isShaded, blendMode, 0, 0, line1x, line1y, line2x, line2y },
+        {minX, minY, r, g, b, 0.0f, 0.0f, static_cast<u32>(PsxDrawMode::ShaderLines), isSemiTrans, isShaded, blendMode, 0, 0, line1x, line1y, line2x, line2y }
+    };
+
+    PushVertexData(triangleVerts, 4);
 }
 
 void OpenGLRenderer::Draw(Line_G4& line)
@@ -322,7 +339,8 @@ void OpenGLRenderer::Draw(Line_G4& line)
         { static_cast<f32>(X0(&line)), static_cast<f32>(Y0(&line)), static_cast<f32>(R0(&line)), static_cast<f32>(G0(&line)), static_cast<f32>(B0(&line)), 0.0f, 0.0f, static_cast<u32>(PsxDrawMode::Flat), isSemiTrans, isShaded, blendMode, 0, 0},
         { static_cast<f32>(X1(&line)), static_cast<f32>(Y1(&line)), static_cast<f32>(R1(&line)), static_cast<f32>(G1(&line)), static_cast<f32>(B1(&line)), 0.0f, 0.0f, static_cast<u32>(PsxDrawMode::Flat), isSemiTrans, isShaded, blendMode, 0, 0},
         { static_cast<f32>(X2(&line)), static_cast<f32>(Y2(&line)), static_cast<f32>(R2(&line)), static_cast<f32>(G2(&line)), static_cast<f32>(B2(&line)), 0.0f, 0.0f, static_cast<u32>(PsxDrawMode::Flat), isSemiTrans, isShaded, blendMode, 0, 0},
-        { static_cast<f32>(X3(&line)), static_cast<f32>(Y3(&line)), static_cast<f32>(R3(&line)), static_cast<f32>(G3(&line)), static_cast<f32>(B3(&line)), 0.0f, 0.0f, static_cast<u32>(PsxDrawMode::Flat), isSemiTrans, isShaded, blendMode, 0, 0}};
+        { static_cast<f32>(X3(&line)), static_cast<f32>(Y3(&line)), static_cast<f32>(R3(&line)), static_cast<f32>(G3(&line)), static_cast<f32>(B3(&line)), 0.0f, 0.0f, static_cast<u32>(PsxDrawMode::Flat), isSemiTrans, isShaded, blendMode, 0, 0}
+    };
 
     PushLines(verts, 4);
 }
@@ -581,10 +599,10 @@ void OpenGLRenderer::PushLines(const PsxVertexData* vertices, int count)
         Quad2D quad = LineToQuad(Point2D(vertA.x, vertA.y), Point2D(vertB.x, vertB.y));
 
         PsxVertexData triangleVerts[4] = {
-            {quad.verts[0].x, quad.verts[0].y, vertA.r, vertA.g, vertA.b, 0.0f, 0.0f, vertA.drawMode, vertA.isSemiTrans, vertA.isShaded, vertA.blendMode, 0, 0},
-            {quad.verts[1].x, quad.verts[1].y, vertA.r, vertA.g, vertA.b, 0.0f, 0.0f, vertA.drawMode, vertA.isSemiTrans, vertA.isShaded, vertA.blendMode, 0, 0},
-            {quad.verts[2].x, quad.verts[2].y, vertB.r, vertB.g, vertB.b, 0.0f, 0.0f, vertB.drawMode, vertB.isSemiTrans, vertB.isShaded, vertB.blendMode, 0, 0},
-            {quad.verts[3].x, quad.verts[3].y, vertB.r, vertB.g, vertB.b, 0.0f, 0.0f, vertB.drawMode, vertB.isSemiTrans, vertB.isShaded, vertB.blendMode, 0, 0}};
+            {quad.verts[0].x, quad.verts[0].y, vertA.r, vertA.g, vertA.b, 0.0f, 0.0f, vertA.drawMode, vertA.isSemiTrans, vertA.isShaded, vertA.blendMode, 0, 0, vertA.line1x, vertA.line1y, vertA.line2x, vertA.line2y },
+            {quad.verts[1].x, quad.verts[1].y, vertA.r, vertA.g, vertA.b, 0.0f, 0.0f, vertA.drawMode, vertA.isSemiTrans, vertA.isShaded, vertA.blendMode, 0, 0, vertA.line1x, vertA.line1y, vertA.line2x, vertA.line2y },
+            {quad.verts[2].x, quad.verts[2].y, vertB.r, vertB.g, vertB.b, 0.0f, 0.0f, vertB.drawMode, vertB.isSemiTrans, vertB.isShaded, vertB.blendMode, 0, 0, vertA.line1x, vertA.line1y, vertA.line2x, vertA.line2y },
+            {quad.verts[3].x, quad.verts[3].y, vertB.r, vertB.g, vertB.b, 0.0f, 0.0f, vertB.drawMode, vertB.isSemiTrans, vertB.isShaded, vertB.blendMode, 0, 0, vertA.line1x, vertA.line1y, vertA.line2x, vertA.line2y }};
 
         PushVertexData(triangleVerts, 4);
     }
@@ -875,6 +893,12 @@ void OpenGLRenderer::InvalidateBatch()
     GL_VERIFY(glEnableVertexAttribArray(4));
     GL_VERIFY(glVertexAttribIPointer(4, 2, GL_UNSIGNED_INT, sizeof(PsxVertexData), (void*) offsetof(PsxVertexData, paletteIndex)));
 
+    GL_VERIFY(glEnableVertexAttribArray(5));
+    GL_VERIFY(glVertexAttribPointer(5, 2, GL_FLOAT, GL_FALSE, sizeof(PsxVertexData), (void*) offsetof(PsxVertexData, line1x)));
+    GL_VERIFY(glEnableVertexAttribArray(6));
+    GL_VERIFY(glVertexAttribPointer(6, 2, GL_FLOAT, GL_FALSE, sizeof(PsxVertexData), (void*) offsetof(PsxVertexData, line2x)));
+    
+
     // Inform our internal resolution
     mPsxShader.UniformVec2("vsViewportSize", kPsxFramebufferWidth, kPsxFramebufferHeight);
 
@@ -939,6 +963,9 @@ void OpenGLRenderer::InvalidateBatch()
     GL_VERIFY(glDisableVertexAttribArray(2));
     GL_VERIFY(glDisableVertexAttribArray(3));
     GL_VERIFY(glDisableVertexAttribArray(4));
+    GL_VERIFY(glDisableVertexAttribArray(5));
+    GL_VERIFY(glDisableVertexAttribArray(6));
+
 
     // Do not clear gas here - it's released later
     mCurFG1Textures.clear();

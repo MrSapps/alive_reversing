@@ -11,11 +11,16 @@ layout (location = 1) in vec3 vsShadeColor;
 layout (location = 2) in vec2 vsUV;
 layout (location = 3) in uvec4 vsFlags;
 layout (location = 4) in uvec2 vsTexIndexing;
+layout (location = 5) in vec2 vsLineStart;
+layout (location = 6) in vec2 vsLineEnd;
 
 out vec3  fsShadeColor;
 out vec2  fsUV;
 flat out uvec4 fsFlags;
 flat out uvec2 fsTexIndexing;
+
+out vec2 fsLineStart;
+out vec2 fsLineEnd;
 
 uniform vec2 vsViewportSize;
 
@@ -31,6 +36,9 @@ void main()
     fsShadeColor = vsShadeColor;
     fsFlags = vsFlags;
     fsTexIndexing = vsTexIndexing;
+
+    fsLineStart = vsLineStart;
+    fsLineEnd = vsLineEnd;
 }
 )";
 
@@ -41,6 +49,9 @@ in vec3 fsShadeColor;
 in vec2 fsUV;
 flat in uvec4 fsFlags;
 flat in uvec2 fsTexIndexing;
+
+in vec2 fsLineStart;
+in vec2 fsLineEnd;
 
 out vec4 outColor;
 
@@ -62,6 +73,7 @@ const int DRAW_DEFAULT_FT4 = 1;
 const int DRAW_CAM         = 2;
 const int DRAW_FG1         = 3;
 const int DRAW_GAS         = 4;
+const int DRAW_LINE        = 5;
 
 const vec2 frameSize = vec2(640.0, 240.0);
 
@@ -247,6 +259,45 @@ void draw_gas()
     }
 }
 
+#define resolution vec2(640.0, 240.0)
+
+//Stolen from https://www.shadertoy.com/view/4ljfRD
+#define pi 3.14159265
+float drawLine(vec2 p1, vec2 p2, vec2 uv, float a)
+{
+    float r = 0.;
+    float one_px = 1 / resolution.x; //not really one px
+    
+    // get dist between points
+    float d = distance(p1, p2);
+    
+    // get dist between current pixel and p1
+    float duv = distance(p1, uv);
+
+    //if point is on line, according to dist, it should match current uv 
+    r = 1.-floor(1.-(a*one_px)+distance (mix(p1, p2, clamp(duv/d, 0., 1.)),  uv));
+        
+    return r;
+}
+
+void draw_line()
+{
+    vec2 flippedStartPos = vec2(fsLineStart.x, 240 - fsLineStart.y);
+    vec2 flippedEndPos = vec2(fsLineEnd.x, 240 - fsLineEnd.y);
+    float one_pxX = 1. / resolution.x;
+    float one_pxY = 1. / resolution.y;
+
+    vec2 translator = vec2(one_pxX, one_pxY);
+    if(drawLine(flippedStartPos * translator + vec2(one_pxX / 2, one_pxY / 2), flippedEndPos * translator + vec2(one_pxX / 2, one_pxY / 2), gl_FragCoord.xy / resolution.xy , 1.) > 0.0)
+    {
+        outColor = handle_final_color(vec4(fsShadeColor.xyz / 255.0, 1), true);
+    }
+    else
+    {
+        outColor = handle_final_color(vec4(0, 0, 0, 0), false);
+    }
+}
+
 void main()
 {
     int drawMode = int(fsFlags.x);
@@ -271,6 +322,10 @@ void main()
 
         case DRAW_GAS:
             draw_gas();
+            break;
+
+        case DRAW_LINE:
+            draw_line();
             break;
     }
 }

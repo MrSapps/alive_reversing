@@ -14,6 +14,8 @@ layout(location = 4) flat in uint drawType;
 layout(location = 5) flat in uint isShaded;
 layout(location = 6) flat in uint blendMode;
 layout(location = 7) flat in uint isSemiTrans;
+layout(location = 8) in vec2 fsLineStart;
+layout(location = 9) in vec2 fsLineEnd;
 
 // Output
 layout(location = 0) out vec4 outColor;
@@ -30,6 +32,7 @@ const int DRAW_DEFAULT_FT4 = 1;
 const int DRAW_CAM         = 2;
 const int DRAW_FG1         = 3;
 const int DRAW_GAS         = 4;
+const int DRAW_LINE        = 5;
 
 vec4 PixelToPalette(float v)
 {
@@ -199,6 +202,43 @@ vec4 draw_gas()
     return texelGas;
 }
 
+#define resolution vec2(640.0, 240.0)
+
+//Stolen from https://www.shadertoy.com/view/4ljfRD
+#define pi 3.14159265
+float drawLine(vec2 p1, vec2 p2, vec2 uv, float a)
+{
+    float r = 0.;
+    float one_px = 1. / resolution.x; //not really one px
+    
+    // get dist between points
+    float d = distance(p1, p2);
+    
+    // get dist between current pixel and p1
+    float duv = distance(p1, uv);
+
+    //if point is on line, according to dist, it should match current uv 
+    r = 1.-floor(1.-(a*one_px)+distance (mix(p1, p2, clamp(duv/d, 0., 1.)),  uv));
+        
+    return r;
+}
+
+vec4 draw_line()
+{
+    float one_pxX = 1. / resolution.x;
+    float one_pxY = 1. / resolution.y;
+
+    vec2 translator = vec2(one_pxX, one_pxY);
+    if(drawLine(fsLineStart * translator + vec2(one_pxX / 2, one_pxY / 2), fsLineEnd * translator + vec2(one_pxX / 2, one_pxY / 2), gl_FragCoord.xy / resolution.xy , 1.) > 0.0)
+    {
+        return handle_final_color(vec4(fragColor.xyz / 255.0, 1), true);
+    }
+    else
+    {
+        return handle_final_color(vec4(0, 0, 0, 0), false);
+    }
+}
+
 
 void main()
 {
@@ -222,6 +262,10 @@ void main()
 
         case DRAW_GAS:
             outColor = draw_gas();
+            break;
+
+        case DRAW_LINE:
+            outColor = draw_line();
             break;
     }
 }

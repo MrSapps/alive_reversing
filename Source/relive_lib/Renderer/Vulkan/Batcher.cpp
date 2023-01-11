@@ -142,6 +142,57 @@ typename Batcher<TextureType, RenderBatchType, VertexType>::RenderBatch& Batcher
 }
 
 template <typename TextureType, typename RenderBatchType, typename VertexType>
+typename Batcher<TextureType, RenderBatchType, VertexType>::RenderBatch& Batcher<TextureType, RenderBatchType, VertexType>::PushLineG2(const Line_G2& line)
+{
+    const u8 r = R0(&line);
+    const u8 g = G0(&line);
+    const u8 b = B0(&line);
+
+    bool isSemiTrans = GetPolyIsSemiTrans(&line);
+    bool isShaded = true;
+    u32 blendMode = GetTPageBlendMode(0);//mGlobalTPage);
+
+    const auto minX = 0;//std::min(X0(&line), X1(&line));
+    const auto minY = 0;//std::min(Y0(&line), Y1(&line));
+    const auto maxX = 640;//std::max(X0(&line), X1(&line));
+    const auto maxY = 240;//std::max(Y0(&line), Y1(&line));
+
+    auto line1x = static_cast<f32>(X0(&line));
+    auto line1y = static_cast<f32>(Y0(&line));
+    auto line2x = static_cast<f32>(X1(&line));
+    auto line2y = static_cast<f32>(Y1(&line));
+
+    const auto lineDrawMode = IRenderer::PsxDrawMode::ShaderLines;
+
+    mVertices.push_back({{maxX, maxY}, {r, g, b}, {0, 0}, 0, 0, lineDrawMode, isShaded, blendMode, isSemiTrans, {line1x, line1y},{line2x, line2y} });
+    mVertices.push_back({{minX, maxY}, {r, g, b}, {0, 0}, 0, 0, lineDrawMode, isShaded, blendMode, isSemiTrans, {line1x, line1y},{line2x, line2y} });
+    mVertices.push_back({{maxX, minY}, {r, g, b}, {0, 0}, 0, 0, lineDrawMode, isShaded, blendMode, isSemiTrans, {line1x, line1y},{line2x, line2y} });
+    mVertices.push_back({{minX, minY}, {r, g, b}, {0, 0}, 0, 0, lineDrawMode, isShaded, blendMode, isSemiTrans, {line1x, line1y},{line2x, line2y} });
+
+    mIndices.emplace_back((u16) (mIndexBufferIndex + 1));
+    mIndices.emplace_back((u16) (mIndexBufferIndex + 0));
+    mIndices.emplace_back((u16) (mIndexBufferIndex + 3));
+    mIndices.emplace_back((u16) (mIndexBufferIndex + 3));
+    mIndices.emplace_back((u16) (mIndexBufferIndex + 0));
+    mIndices.emplace_back((u16) (mIndexBufferIndex + 2));
+    mIndexBufferIndex += 4;
+
+    mConstructingBatch.mNumTrisToDraw += 2;
+    mBatchInProgress = true;
+
+    RenderBatch& addedTo = mConstructingBatch;
+
+    // Over the texture limit or changed to/from subtractive blending
+    const bool bNewBatch = (mConstructingBatch.mTexturesInBatch == kTextureBatchSize);
+    if (bNewBatch)
+    {
+        NewBatch();
+    }
+
+    return addedTo;
+}
+
+template <typename TextureType, typename RenderBatchType, typename VertexType>
 typename Batcher<TextureType, RenderBatchType, VertexType>::RenderBatch& Batcher<TextureType, RenderBatchType, VertexType>::PushFont(const Poly_FT4& poly, u32 palIndex, std::shared_ptr<TextureType>& texture)
 {
     FontContext* fontRes = poly.mFont;
