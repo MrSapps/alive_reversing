@@ -116,7 +116,7 @@ private:
 
     bool mFrameStarted = false;
 
-    bool mFramebufferFilter = true;
+    bool mFramebufferFilter = false;
     u16 mGlobalTPage = 0;
 
     struct BatchData
