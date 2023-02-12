@@ -249,7 +249,7 @@ void BirdPortal::CreateDovesAndShrykullNumber()
         {
             indicatorLayer = Layer::eLayer_8;
         }
-        mThrowableTotalIndicator = relive_new ThrowableTotalIndicator(
+        mThrowableTotalIndicator = relive_new ::ThrowableTotalIndicator(
             mXPos,
             mYPos + FP_FromInteger(10),
             indicatorLayer,

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../relive_lib/GameObjects/BaseGameObject.hpp"
-#include "../relive_lib/Layer.hpp"
-#include "../relive_lib/Primitives.hpp"
+#include "GameObjects/BaseGameObject.hpp"
+#include "Layer.hpp"
+#include "Primitives.hpp"
 
 enum class ThrowableTotalIndicatorState : s16
 {
@@ -21,6 +21,7 @@ public:
     virtual void VUpdate() override;
     virtual void VRender(PrimHeader** ppOt) override;
 
+
 private:
     FP mStartXPos = {};
     FP mStartYPos = {};
@@ -37,6 +38,8 @@ private:
     Prim_SetTPage mTPage[2] = {};
     ThrowableTotalIndicatorState mState = ThrowableTotalIndicatorState::eCreated;
     s16 mFade = 0;
-};
 
-extern u16 gThrowableIndicatorExists;
+public:
+    static u16 mThrowableIndicatorExists;
+    static bool IsExists();
+};

@@ -3,6 +3,7 @@
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
 #include "../relive_lib/DynamicArray.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
+#include "../relive_lib/ThrowableTotalIndicator.hpp"
 
 enum class EReliveLevelIds : s16;
 
@@ -106,7 +107,7 @@ public:
     s16 mExitCamera = 0;
     s16 mMudCountForShrykull = 0;
     s16 mReceivedDovesCount = 0;
-    ThrowableTotalIndicator* mThrowableTotalIndicator = nullptr;
+    ::ThrowableTotalIndicator* mThrowableTotalIndicator = nullptr;
     OrbWhirlWind* mOrbWhirlWind = nullptr;
     EReliveLevelIds mCurrentLevel = EReliveLevelIds::eNone;
     s16 mCurrentPath = 0;
