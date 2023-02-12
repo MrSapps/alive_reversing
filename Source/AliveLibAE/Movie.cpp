@@ -315,8 +315,8 @@ s8 DDV_Play_Impl(const char_type* pMovieName)
             {
                 // This clears the pressed state to avoid the above check stopping the FMV too early.
                 // E.g user presses return before FMV starts, then after 15 frames it would quit without this call clearing the pressed flag.
-                Input_IsVKPressed_4EDD40(VK_ESCAPE);
-                Input_IsVKPressed_4EDD40(VK_RETURN);
+                Input_IsVKPressed_4EDD40(VK::eESCAPE);
+                Input_IsVKPressed_4EDD40(VK::eRETURN);
             }
 
             Render_DDV_Frame(&polyFT4);
@@ -504,6 +504,6 @@ bool AreMovieSkippingInputsHeld()
     }
     else
     {
-        return Input_IsVKPressed_4EDD40(VK_ESCAPE) || Input_IsVKPressed_4EDD40(VK_RETURN);
+        return Input_IsVKPressed_4EDD40(VK::eESCAPE) || Input_IsVKPressed_4EDD40(VK::eRETURN);
     }
 }

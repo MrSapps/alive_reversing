@@ -1,8 +1,149 @@
 #pragma once
 
 #include "../relive_lib/Function.hpp"
+#include "Types.hpp"
 
 typedef s32 (*t_InputCallback)();
+
+
+enum VK : u32
+{
+    eNone,
+    eNUMPAD0,
+    eNUMPAD1,
+    eNUMPAD2,
+    eNUMPAD3,
+    eNUMPAD4,
+    eNUMPAD5,
+    eNUMPAD6,
+    eNUMPAD7,
+    eNUMPAD8,
+    ea,
+    eNUMPAD9,
+    eb,
+    ec,
+    ed,
+    ee,
+    ef,
+    eg,
+    eh,
+    ei,
+    ej,
+    ek,
+    el,
+    em,
+    en,
+    eo,
+    ep,
+    eq,
+    er,
+    es,
+    et,
+    eu,
+    ev,
+    ew,
+    ex,
+    ey,
+    ez,
+    eA,
+    eB,
+    eC,
+    eD,
+    eE,
+    eF,
+    eG,
+    eH,
+    eI,
+    eJ,
+    eK,
+    eL,
+    eM,
+    eN,
+    eO,
+    eP,
+    eQ,
+    eR,
+    eS,
+    eT,
+    eU,
+    eV,
+    eW,
+    eX,
+    eY,
+    eZ,
+    e0,
+    e1,
+    e2,
+    e3,
+    e4,
+    e5,
+    e6,
+    e7,
+    e8,
+    e9,
+    eF1,
+    eF2,
+    eF3,
+    eF4,
+    eF5,
+    eF6,
+    eF7,
+    eF8,
+    eF9,
+    eF10,
+    eF11,
+    eF12,
+    ePRINT,
+    eSCROLL,
+    ePAUSE,
+    eLSUPER,
+    eRSUPER,
+    eESCAPE,
+    eTAB,
+    eLEFT,
+    eRIGHT,
+    eUP,
+    eDOWN,
+    eBACK,
+    eINSERT,
+    eHOME,
+    eDELETE,
+    eEND,
+    ePRIOR,
+    eNEXT,
+    eSPACE,
+    eCOMMA,
+    ePERIOD,
+    eRETURN,
+    eLALT,
+    eLSHIFT,
+    eLCONTROL,
+    eRALT,
+    eRSHIFT,
+    eRCONTROL,
+    eSUBTRACT,
+    eCAPSLOCK,
+    eEXCLAMATION,
+
+    eCONTROL,
+    eSHIFT,
+    eALT
+};
+
+enum VKMOD : u32
+{
+    eNoMod,
+    eVKMOD_LCTRL,
+    eVKMOD_RCTRL,
+    eVKMOD_LSHIFT,
+    eKMOD_RSHIFT,
+    eKMOD_LALT,
+    eKMOD_RALT,
+    eKMOD_CTRL = eVKMOD_LCTRL | eVKMOD_RCTRL,
+    eKMOD_SHIFT = eVKMOD_LSHIFT | eKMOD_RSHIFT,
+    eKMOD_ALT = eKMOD_LALT | eKMOD_RALT,
+    eKMOD_CAPS
+};
 
 u8 Input_GetInputEnabled_4EDDE0();
 void Input_EnableInput_4EDDD0();
@@ -13,7 +154,7 @@ void Input_DisableInputForPauseMenuAndDebug_4EDDC0();
 void Input_Init();
 void Input_SetKeyState(s32 key, s8 bIsDown);
 bool Input_IsVKPressed_4EDD40(s32 key);
-u32 Input_GetLastPressedKey_492610();
+VK Input_GetLastPressedKey_492610();
 void Input_Reset_492660();
 u32 Input_IsChanting();
 void Input_Pads_Reset_4FA960();
@@ -177,6 +318,7 @@ InputObject& Input();
 
 extern InputObject sInputObject;
 extern u16 sCurrentControllerIndex;
-extern u32 sLastPressedKey;
+extern VK sLastPressedKey;
 extern s32 sIsAKeyDown;
 extern s16 bLongerTimeoutToNextDemo;
+

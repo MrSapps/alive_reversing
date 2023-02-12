@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/Function.hpp"
+#include "../AliveLibAE/Input.hpp"
 
 class BaseGameAutoPlayer;
 
@@ -114,7 +115,7 @@ s32 Input_Remap(InputCommands inputCmd);
 
 s32 Input_SaveSettingsIni();
 
-s8 Input_GetLastPressedKey();
+::VK Input_GetLastPressedKey();
 
 void Input_Reset();
 

@@ -1,7 +1,6 @@
 #include "stdafx_ao.h"
 #include "Input.hpp"
 #include "Game.hpp"
-#include "../AliveLibAE/Input.hpp"
 #include "../relive_lib/BitField.hpp"
 #include "../relive_lib/BaseGameAutoPlayer.hpp"
 
@@ -9,8 +8,6 @@ namespace AO {
 
 InputObject sInputObject = {};
 u16 sCurrentControllerIndex = 0;
-u8 sInputEnabled = 0;
-u32 sLastPressedKey = 0;
 
 void InputObject::InitPad(u32 /*padCount*/)
 {
@@ -503,37 +500,19 @@ s32 Input_Remap(InputCommands inputCmd)
     return Input_Remap_492680(static_cast<::InputCommands>(AOInputCommandsToAEInputCommands(MakeAOInputBits(inputCmd)).Raw().all));
 }
 
-s8 Input_GetLastPressedKey()
+::VK Input_GetLastPressedKey()
 {
-    // AE impl
-    return static_cast<s8>(::Input_GetLastPressedKey_492610());
-
-    // AO impl
-    //if (!Sys_IsAnyKeyDown())
-    //{
-    //    return 0;
-    //}
-
-    //const s8 result = static_cast<s8>(sLastPressedKey);
-    //sIsAKeyDown = 0;
-    //sLastPressedKey = 0;
-    //return result;
+    return ::Input_GetLastPressedKey_492610();
 }
 
 s32 Input_Enable_48E6A0()
 {
-    // AE impl
     ::Input_EnableInput_4EDDD0();
     return 0;
-
-    // AO impl
-    //sInputEnabled = 1;
-    //return 0;
 }
 
 void Input_Reset()
 {
-    // Funcs below call AE impls in standalone
     Input_Enable_48E6A0();
     Input_InitKeyStateArray();
 }

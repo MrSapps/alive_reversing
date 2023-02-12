@@ -667,20 +667,20 @@ void PauseMenu::Page_Save_Update()
     else if (mSaveState == SaveState::ReadingInput_0)
     {
 #if ORIGINAL_PS1_BEHAVIOR // OG Change - Exit save menu using controller
-        u32 lastPressed = Input_GetLastPressedKey_492610();
+        VK lastPressed = Input_GetLastPressedKey_492610();
 
-        if (lastPressed == VK_ESCAPE || lastPressed == VK_RETURN) // Keyboard ESC or ENTER
+        if (lastPressed == VK::eESCAPE || lastPressed == VK::eRETURN) // Keyboard ESC or ENTER
         {
             setSaveMenuOpen(false);
         }
         else if (Input().IsAnyPressed(InputCommands::eBack)) // Triangle
         {
-            lastPressed = VK_ESCAPE;
+            lastPressed = VK::eESCAPE;
             setSaveMenuOpen(false);
         }
         else if (Input().IsAnyPressed(InputCommands::eUnPause_OrConfirm)) // Cross or START
         {
-            lastPressed = VK_RETURN;
+            lastPressed = VK::eRETURN;
             setSaveMenuOpen(false);
         }
 #else
@@ -699,17 +699,17 @@ void PauseMenu::Page_Save_Update()
 
         switch (lastPressed)
         {
-            case VK_SHIFT:
+            case VK::eLSHIFT:
                 return;
             // Escape - cancel
-            case VK_ESCAPE:
+            case VK::eESCAPE:
                 SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
                 mActiveMenu = sMainMenuPage;
                 Input_Reset_492660();
                 return;
 
             // Enter - save
-            case VK_RETURN:
+            case VK::eRETURN:
                 if (stringLen > 1)
                 {
                     // Replace arrow with null terminator
@@ -723,7 +723,7 @@ void PauseMenu::Page_Save_Update()
                 return;
 
             // Backspace - delete
-            case VK_BACK:
+            case VK::eBACK:
                 if (stringLen > 1)
                 {
                     // Replace last s8 with arrow

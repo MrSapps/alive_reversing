@@ -209,10 +209,10 @@ s8 Display_Full_Screen_Message_Blocking(s32 /*not_used*/, MessageType messageTyp
     if (GetGameAutoPlayer().SysGetTicks() < displayForMsecs)
     {
         bool waitReturn = true;
-        while (!Input_IsVKPressed_4EDD40(VK_RETURN))
+        while (!Input_IsVKPressed_4EDD40(VK::eRETURN))
         {
             // User quit
-            if (messageType != MessageType::eLongTitle_0 && Input_IsVKPressed_4EDD40(VK_ESCAPE))
+            if (messageType != MessageType::eLongTitle_0 && Input_IsVKPressed_4EDD40(VK::eESCAPE))
             {
                 bQuitViaEnterOrTimeOut = 0; // Nope, quitting via escape key
 
@@ -220,7 +220,7 @@ s8 Display_Full_Screen_Message_Blocking(s32 /*not_used*/, MessageType messageTyp
                 //dword_55C128 = sLevelId_dword_5CA408;
 
                 // Wait for escape to come back up
-                while (Input_IsVKPressed_4EDD40(VK_ESCAPE))
+                while (Input_IsVKPressed_4EDD40(VK::eESCAPE))
                 {
                     SYS_EventsPump();
                 }
@@ -242,7 +242,7 @@ s8 Display_Full_Screen_Message_Blocking(s32 /*not_used*/, MessageType messageTyp
             // Wait for return to come back up, as we can only be here if it was pressed, didn't time out or escape wasn't pressed
             if (!GetGameAutoPlayer().IsRecording() && !GetGameAutoPlayer().IsPlaying())
             {
-                while (Input_IsVKPressed_4EDD40(VK_RETURN))
+                while (Input_IsVKPressed_4EDD40(VK::eRETURN))
                 {
                     SYS_EventsPump();
                 }

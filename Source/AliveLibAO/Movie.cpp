@@ -383,7 +383,7 @@ void Movie::VUpdate()
         if (fmv_num_read_frames > 15)
         {
             // TODO: Not complete
-            if (Input_IsVKPressed_4EDD40(VK_ESCAPE) || Input_IsVKPressed_4EDD40(VK_RETURN))
+            if (Input_IsVKPressed_4EDD40(::VK::eESCAPE) || Input_IsVKPressed_4EDD40(::VK::eRETURN))
             {
                 break;
             }
@@ -392,8 +392,8 @@ void Movie::VUpdate()
         {
             // This clears the pressed state to avoid the above check stopping the FMV too early.
             // E.g user presses return before FMV starts, then after 15 frames it would quit without this call clearing the pressed flag.
-            Input_IsVKPressed_4EDD40(VK_ESCAPE);
-            Input_IsVKPressed_4EDD40(VK_RETURN);
+            Input_IsVKPressed_4EDD40(::VK::eESCAPE);
+            Input_IsVKPressed_4EDD40(::VK::eRETURN);
         }
 
         Render_Str_Frame();

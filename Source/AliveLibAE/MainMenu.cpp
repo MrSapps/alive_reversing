@@ -1806,7 +1806,7 @@ MainMenuNextCam MainMenuController::BackStory_Or_NewGame_Update_4D1C60(u32 input
 
             if (!GetGameAutoPlayer().IsRecording() && !GetGameAutoPlayer().IsPlaying())
             {
-                while (Input_IsVKPressed_4EDD40(VK_RETURN))
+                while (Input_IsVKPressed_4EDD40(VK::eRETURN))
                 {
                     SYS_EventsPump();
                 }
@@ -3017,7 +3017,7 @@ s32 MainMenuController::ChangeScreenAndIntroLogic_4CF640()
                 // Find the record for GTILOGO.DDV
                 if (!GetGameAutoPlayer().IsRecording() && !GetGameAutoPlayer().IsPlaying())
                 {
-                    while (Input_IsVKPressed_4EDD40(VK_RETURN))
+                    while (Input_IsVKPressed_4EDD40(VK::eRETURN))
                     {
                         SYS_EventsPump();
                     }
@@ -3041,7 +3041,7 @@ s32 MainMenuController::ChangeScreenAndIntroLogic_4CF640()
 
                 if (!GetGameAutoPlayer().IsRecording() && !GetGameAutoPlayer().IsPlaying())
                 {
-                    while (Input_IsVKPressed_4EDD40(VK_RETURN))
+                    while (Input_IsVKPressed_4EDD40(VK::eRETURN))
                     {
                         SYS_EventsPump();
                     }

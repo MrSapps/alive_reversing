@@ -9,6 +9,7 @@
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
 #include "Sound.hpp"
 #include "../AliveLibAE/stdlib.hpp"
+#include "../AliveLibAE/Input.hpp"
 #include "Sfx.hpp"
 #include "../relive_lib/Sys.hpp"
 #include "Map.hpp"
@@ -298,18 +299,18 @@ void PauseMenu::VUpdate()
                     char_type lastPressedKeyNT[2] = {last_pressed, 0};
 
 #if ORIGINAL_PS1_BEHAVIOR // OG Change - Exit save menu using controller
-                    if (last_pressed == VK_ESCAPE || last_pressed == VK_RETURN) // Keyboard ESC or ENTER
+                    if (last_pressed == ::VK::eESCAPE || last_pressed == ::VK::eRETURN) // Keyboard ESC or ENTER
                     {
                         setSaveMenuOpen(false);
                     }
                     else if (Input().IsAnyPressed(InputCommands::eBack)) // Triangle
                     {
-                        last_pressed = VK_ESCAPE;
+                        last_pressed = ::VK::eESCAPE;
                         setSaveMenuOpen(false);
                     }
                     else if (Input().IsAnyPressed(InputCommands::eUnPause_OrConfirm)) // Cross or Start
                     {
-                        last_pressed = VK_RETURN;
+                        last_pressed = ::VK::eRETURN;
                         setSaveMenuOpen(false);
                     }
 #endif
@@ -321,14 +322,14 @@ void PauseMenu::VUpdate()
                     auto string_len_no_nullterminator = strlen(&saveNameBuffer_5080C6.characters[2]);
                     switch (last_pressed)
                     {
-                        case VK_ESCAPE:
+                        case ::VK::eESCAPE:
                         {
                             SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
                             field_126_page = 0;
                             Input_Reset();
                             break;
                         }
-                        case VK_RETURN:
+                        case ::VK::eRETURN:
                         {
                             if (string_len_no_nullterminator <= 1)
                             {
@@ -342,7 +343,7 @@ void PauseMenu::VUpdate()
                             Input_Reset();
                             break;
                         }
-                        case VK_BACK:
+                        case ::VK::eBACK:
                         {
                             if (string_len_no_nullterminator <= 1)
                             {
