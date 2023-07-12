@@ -42,7 +42,7 @@ jobs:
         mkdir Frameworks
         cp /usr/local/lib/libSDL2.dylib ./Frameworks/libSDL2.dylib
         cp /usr/local/lib/libMoltenVK.dylib ./Frameworks/libMoltenVK.dylib
-        cmake -DBUILD_NUMBER=$(Build.BuildId) -DCI_PROVIDER="AzureDevOps" -G"Unix Makefiles" ..
+        cmake -DQt5_DIR=$(brew --prefix qt5)/lib/cmake/Qt5 -DBUILD_NUMBER=$(Build.BuildId) -DCI_PROVIDER="AzureDevOps" -G"Unix Makefiles" ..
         make -j4
         cpack -G DragNDrop
         ctest
@@ -68,15 +68,13 @@ jobs:
         aqt install-qt windows desktop 5.15.2 win32_msvc2019
         mkdir build
         cd build
-        dir $(Build.SourcesDirectory)\Qt\5.15.2\msvc2019
         set QT_DIR=$(Build.SourcesDirectory)\Qt\5.15.2\msvc2019\lib\cmake\Qt5
-        dir %QT_DIR$
         set path=%path%;$(Build.SourcesDirectory)\Qt\5.15.2\msvc2019
-        cmake .. -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON -DBUILD_NUMBER=$(Build.BuildId) -DCI_PROVIDER="AzureDevOps" -DQt5_DIR="$(Build.SourcesDirectory)\Qt\5.15.2\msvc2019\lib\cmake\Qt5" -DSDL2_DIR=C:\Temp\SDL2-2.0.22 -G "Visual Studio 16 2019" -A Win32
+        cmake -S ../../ -B . -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON -DBUILD_NUMBER=$(Build.BuildId) -DCI_PROVIDER="AzureDevOps" -DQt5_DIR=$ENV{QT_DIR} -DSDL2_DIR=C:\Temp\SDL2-2.0.22 -G "Visual Studio 16 2019" -A Win32
         cmake --build .
         cpack.exe -G ZIP -C Debug
         ctest
-  - publish: $(System.DefaultWorkingDirectory)/build/relive-0.1-win32.zip
+  - publish: $(System.DefaultWorkingDirectory)/Qt/build/relive-0.1-win32.zip
     artifact: RELIVE-Windows32.zip
 - job: Windows64
   pool:
@@ -98,13 +96,11 @@ jobs:
         aqt install-qt windows desktop 5.15.2 win64_msvc2019_64
         mkdir build
         cd build
-        dir $(Build.SourcesDirectory)\Qt\5.15.2\msvc2019_64
         set QT_DIR=$(Build.SourcesDirectory)\Qt\5.15.2\msvc2019_64\lib\cmake\Qt5
-        dir %QT_DIR$
         set path=%path%;$(Build.SourcesDirectory)\Qt\5.15.2\msvc2019_64
-        cmake .. -DBUILD_NUMBER=$(Build.BuildId) -DCI_PROVIDER="AzureDevOps" -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON -DQt5_DIR="$(Build.SourcesDirectory)\Qt\5.15.2\msvc2019_64\lib\cmake\Qt5" -DSDL2_DIR=C:\Temp\SDL2-2.0.22 -G "Visual Studio 16 2019" -A x64
+        cmake -S ../../ -B . -DBUILD_NUMBER=$(Build.BuildId) -DCI_PROVIDER="AzureDevOps" -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON -DQt5_DIR=$ENV{QT_DIR} -DSDL2_DIR=C:\Temp\SDL2-2.0.22 -G "Visual Studio 16 2019" -A x64
         cmake --build .
         cpack.exe -G ZIP -C Debug
         ctest
-  - publish: $(System.DefaultWorkingDirectory)/build/relive-0.1-win64.zip
+  - publish: $(System.DefaultWorkingDirectory)/Qt/build/relive-0.1-win64.zip
     artifact: RELIVE-Windows64.zip
