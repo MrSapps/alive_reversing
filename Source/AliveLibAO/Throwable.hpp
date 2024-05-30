@@ -4,8 +4,6 @@
 
 namespace AO {
 
-extern const AOTypes gThrowableFromOverlayId[];
-
 class BaseThrowable;
 
 BaseThrowable* Make_Throwable(FP xpos, FP ypos, s16 count);
@@ -28,9 +26,14 @@ public:
     virtual void VOnAbeInteraction() override;
 
     void BaseAddToPlatform();
+
 protected:
     s16 mBaseThrowableCount = 0;
     s16 mBaseThrowableDead = 0;
 };
 
 } // namespace AO
+
+extern bool gInfiniteThrowables;
+extern const AOTypes gThrowableFromOverlayIdAO[54];
+extern const AETypes gThrowableFromOverlayIdAE[252];

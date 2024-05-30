@@ -10,11 +10,19 @@
 #include "../relive_lib/GameObjects/PlatformBase.hpp"
 #include "Game.hpp"
 #include "Map.hpp"
+#include "../relive_lib/GameType.hpp"
 
 bool gInfiniteThrowables = false;
 
-// Overlay to throwable type table ??
-const AETypes gThrowableFromOverlayId[252] = {
+const AOTypes gThrowableFromOverlayIdAO[54] = {
+    AOTypes::eNone_0, AOTypes::eNone_0, AOTypes::eNone_0, AOTypes::eGrenade_40, AOTypes::eNone_0, AOTypes::eNone_0, AOTypes::eRock_70, AOTypes::eNone_0, AOTypes::eRock_70, AOTypes::eRock_70,
+    AOTypes::eNone_0, AOTypes::eRock_70, AOTypes::eNone_0, AOTypes::eRock_70, AOTypes::eNone_0, AOTypes::eRock_70, AOTypes::eNone_0, AOTypes::eNone_0, AOTypes::eRock_70, AOTypes::eNone_0,
+    AOTypes::eMeat_54, AOTypes::eNone_0, AOTypes::eMeat_54, AOTypes::eNone_0, AOTypes::eRock_70, AOTypes::eNone_0, AOTypes::eRock_70, AOTypes::eRock_70, AOTypes::eRock_70, AOTypes::eNone_0,
+    AOTypes::eRock_70, AOTypes::eNone_0, AOTypes::eRock_70, AOTypes::eNone_0, AOTypes::eRock_70, AOTypes::eNone_0, AOTypes::eRock_70, AOTypes::eNone_0, AOTypes::eNone_0, AOTypes::eGrenade_40,
+    AOTypes::eNone_0, AOTypes::eGrenade_40, AOTypes::eGrenade_40, AOTypes::eGrenade_40, AOTypes::eGrenade_40, AOTypes::eGrenade_40, AOTypes::eGrenade_40, AOTypes::eGrenade_40, AOTypes::eNone_0, AOTypes::eGrenade_40,
+    AOTypes::eNone_0, AOTypes::eNone_0, AOTypes::eNone_0, AOTypes::eNone_0};
+
+const AETypes gThrowableFromOverlayIdAE[252] = {
     AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eRock_105, AETypes::eRock_105, AETypes::eRock_105, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0,
     AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eRock_105, AETypes::eNone_0,
     AETypes::eNone_0, AETypes::eNone_0, AETypes::eRock_105, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eRock_105, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0,
@@ -42,9 +50,24 @@ const AETypes gThrowableFromOverlayId[252] = {
     AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0,
     AETypes::eNone_0, AETypes::eNone_0};
 
-BaseThrowable* Make_Throwable(FP xpos, FP ypos, s16 count)
+static BaseThrowable* Make_Throwable_AO(FP xpos, FP ypos, s16 count)
 {
-    switch (gThrowableFromOverlayId[gMap.mOverlayId])
+    switch (gThrowableFromOverlayIdAO[gMap.mOverlayId])
+    {
+        case AOTypes::eGrenade_40:
+            return relive_new Grenade(xpos, ypos, count);
+        case AOTypes::eMeat_54:
+            return relive_new Meat(xpos, ypos, count);
+        case AOTypes::eRock_70:
+            return relive_new Rock(xpos, ypos, count);
+        default:
+            return nullptr;
+    }
+}
+
+static BaseThrowable* Make_Throwable_AE(FP xpos, FP ypos, s16 count)
+{
+    switch (gThrowableFromOverlayIdAE[gMap.mOverlayId])
     {
         case AETypes::eBone_11:
             return relive_new Bone(xpos, ypos, count);
@@ -61,17 +84,43 @@ BaseThrowable* Make_Throwable(FP xpos, FP ypos, s16 count)
     }
 }
 
-BaseThrowable::BaseThrowable(s16 resourceArraySize)
-    : BaseAliveGameObject(resourceArraySize)
+BaseThrowable* Make_Throwable(FP xpos, FP ypos, s16 count)
+{
+    if (GetGameType() == GameType::eAo)
+    {
+        return Make_Throwable_AO(xpos, ypos, count);
+    }
+    else
+    {
+        return Make_Throwable_AE(xpos, ypos, count);
+    }
+}
+
+BaseThrowable::BaseThrowable()
+    : BaseAliveGameObject(0)
 {
 
 }
 
-void BaseThrowable::BaseAddToPlatform(BaseThrowable::FnTypeMatcher cb)
+void BaseThrowable::BaseAddToPlatform()
 {
     FP hitX = {};
     FP hitY = {};
     PathLine* pLine = nullptr;
+
+    CollisionMask fgMask;
+    CollisionMask bgMask;
+    if (GetGameType() == GameType::eAo)
+    {
+        fgMask = kFgWallsOrFloor;
+        bgMask = kBgWallsOrFloor;
+    }
+    else
+    {
+        // todo: mouze check me 0x10F changed to 0x0F
+        fgMask = kFgFloorCeilingOrWalls;
+        bgMask = kBgFloorCeilingOrWalls;
+    }
     if (gCollisions->Raycast(
             mXPos,
             mYPos - FP_FromInteger(20),
@@ -80,7 +129,7 @@ void BaseThrowable::BaseAddToPlatform(BaseThrowable::FnTypeMatcher cb)
             &pLine,
             &hitX,
             &hitY,
-            GetScale() == Scale::Fg ? kFgFloorCeilingOrWalls : kBgFloorCeilingOrWalls)) // todo: mouze check me 0x10F changed to 0x0F
+            PerGameScale() == Scale::Fg ? fgMask : bgMask))
     {
         if (pLine->mLineType == eLineTypes::eDynamicCollision_32 ||
             pLine->mLineType == eLineTypes::eBackgroundDynamicCollision_36)
@@ -95,7 +144,8 @@ void BaseThrowable::BaseAddToPlatform(BaseThrowable::FnTypeMatcher cb)
                         break;
                     }
 
-                    if (cb(pObjIter->Type()))
+                    // NOTE: meat in AE didn't check the trap door for some reason
+                    if (pObjIter->Type() == ReliveTypes::eLiftPoint || pObjIter->Type() == ReliveTypes::eTrapDoor)
                     {
                         auto pPlatformBase = static_cast<PlatformBase*>(pObjIter);
 
