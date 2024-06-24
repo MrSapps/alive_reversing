@@ -1,6 +1,5 @@
 #include "../stdafx.h"
 #include "SDLSoundBuffer.hpp"
-#include <atomic>
 
 #define MAX_VOICE_COUNT 1024
 

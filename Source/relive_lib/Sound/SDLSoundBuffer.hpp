@@ -3,6 +3,7 @@
 #include "Sound.hpp"
 #include "SoundSDL.hpp"
 #include <mutex>
+#include <atomic>
 
 #define MAX_VOICE_COUNT 1024
 extern std::atomic<SDLSoundBuffer*> sAE_ActiveVoices[MAX_VOICE_COUNT];
