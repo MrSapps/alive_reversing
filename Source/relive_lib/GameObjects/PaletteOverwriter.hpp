@@ -3,10 +3,12 @@
 #include "BaseGameObject.hpp"
 #include "../data_conversion/AnimationConverter.hpp"
 
+struct RGBA32;
+
 class PalleteOverwriter final : public BaseGameObject
 {
 public:
-    PalleteOverwriter(AnimationPal& pal, s16 colour);
+    PalleteOverwriter(AnimationPal& pal, const RGBA32& colour);
     ~PalleteOverwriter();
 
     virtual void VScreenChanged() override;
@@ -14,12 +16,13 @@ public:
     virtual void VUpdate() override;
 
 private:
-    AnimationPal mPal;
-    s16 mPalBuffer[8] = {};
-    s16 mPalXIndex = 0;
-    s16 mPalW = 0;
+    AnimationPal& mPal;
+    RGBA32 mColour = {};
+    s16 mCurPalIndex = 0;
+    s16 mNumEntriesToOverwrite = 0;
     bool mFirstUpdate = false;
-
+    u32 mColoursToUpdatePerIteration = 0;
+    u32 mPalDepth = 0;
 public:
     bool mDone = false;
 };
