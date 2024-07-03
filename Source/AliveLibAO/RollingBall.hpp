@@ -9,9 +9,9 @@ namespace relive
     struct Path_RollingBall;
 }
 
-namespace AO {
-
 class RollingBallShaker;
+
+namespace AO {
 
 class RollingBall final : public ::BaseAliveGameObject
 {
@@ -26,7 +26,7 @@ public:
     void Accelerate();
     void CrushThingsInTheWay();
 
-    Guid field_10C_tlvInfo;
+    Guid mTlvInfo;
     u16 mReleaseSwitchId = 0;
     enum class States : s16
     {

@@ -3,7 +3,7 @@
 #include "RollingBall.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "../relive_lib/Collisions.hpp"
-#include "RollingBallShaker.hpp"
+#include "../relive_lib/GameObjects/RollingBallShaker.hpp"
 #include "../relive_lib/Shadow.hpp"
 #include "../relive_lib/SwitchStates.hpp"
 #include "../relive_lib/GameObjects/ParticleBurst.hpp"
@@ -31,11 +31,11 @@ RollingBall::~RollingBall()
 {
     if (mState != States::eInactive)
     {
-        Path::TLV_Delete(field_10C_tlvInfo);
+        Path::TLV_Delete(mTlvInfo);
     }
     else
     {
-        Path::TLV_Reset(field_10C_tlvInfo);
+        Path::TLV_Reset(mTlvInfo);
     }
 
     KillRollingBallShaker();
@@ -96,7 +96,7 @@ RollingBall::RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId)
     }
 
     MapFollowMe(true);
-    field_10C_tlvInfo = tlvId;
+    mTlvInfo = tlvId;
     mState = States::eInactive;
     mRollingBallShakerId = {};
 
