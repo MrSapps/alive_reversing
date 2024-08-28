@@ -5296,7 +5296,7 @@ eSligMotions Slig::GetNextMotionIncGameSpeak(s32 input)
         }
         else if (input & InputCommands::eGameSpeak3)
         {
-            if (Input().Is_Demo_Playing_45F220() != 0)
+            if (Input().IsDemoPlaying() != 0)
             {
                 mNextMotion = eSligMotions::Motion_23_SpeakGetHim;
             }
@@ -5307,7 +5307,7 @@ eSligMotions Slig::GetNextMotionIncGameSpeak(s32 input)
         }
         else if (input & InputCommands::eGameSpeak4)
         {
-            if (Input().Is_Demo_Playing_45F220() != 0)
+            if (Input().IsDemoPlaying() != 0)
             {
                 mNextMotion = eSligMotions::Motion_22_SpeakFreeze;
             }

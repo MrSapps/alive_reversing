@@ -984,7 +984,8 @@ void Menu::MainScreen_Update()
         SFX_Play_Pitch(relive::SoundEffects::MenuNavigation, 45, 400);
         bSmallerTimeout = sDemoPlay;
     }
-    const s32 idleMax = bSmallerTimeout != 0 ? 300 : 1500;
+    //const s32 idleMax = bSmallerTimeout != 0 ? 300 : 1500;
+    const s32 idleMax = 90;
     if (Input().IsAnyPressed(InputObject::PadIndex::First, (InputCommands::eThrowItem | InputCommands::eUnPause_OrConfirm | InputCommands::eDoAction | InputCommands::eCheatMode | InputCommands::eBack)) || mIdleInputCounter > idleMax)
     {
         if (mIdleInputCounter <= idleMax)
@@ -1046,6 +1047,7 @@ void Menu::MainScreen_Update()
 
             char_type fileNameBuf[20] = {};
             sprintf(fileNameBuf, "PLAYBK%02d.JOY", gJoyResId);
+            sprintf(gActiveDemoName, "PLAYBK%02d.JOY", gJoyResId);
             //ResourceManager::LoadResourceFile_4551E0(fileNameBuf, 0, 0, 0);
 
             auto pMenuTrans = sObjectIds.Find_Impl(mMenuTransId);
@@ -1627,7 +1629,8 @@ void Menu::FMV_Or_Level_Select_Back_Update()
 
 void Menu::Loading_Update()
 {
-    if (!gAttract)
+    // TODO: need another way of knowing if we're loading into a demo
+    if (!gAttract /*|| ResourceManager::GetLoadedResource_4554F0(ResourceManager::Resource_Plbk, sJoyResId_50769C, 0, 0)*/)
     {
         auto pMenuTrans = static_cast<MainMenuTransition*>(sObjectIds.Find_Impl(mMenuTransId));
         if (pMenuTrans)
@@ -1693,8 +1696,7 @@ void Menu::NewGameStart()
         const bool oldDeathReset = GetSurviveDeathReset();
         SetSurviveDeathReset(true);
         // TODO: The ctor of the playback should load the demo res itself
-        u8** ppRes = nullptr; //ResourceManager::GetLoadedResource(ResourceManager::Resource_Plbk, gJoyResId, 1, 0);
-        relive_new DemoPlayback(ppRes);
+        relive_new DemoPlayback();
         SetSurviveDeathReset(oldDeathReset);
     }
     else

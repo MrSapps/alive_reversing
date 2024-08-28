@@ -22,6 +22,7 @@
 #include "Collisions.hpp"
 #include "AnimConversionInfo.hpp"
 #include "PNGFile.hpp"
+#include "AOSaveConverter.hpp"
 #include "AESaveConverter.hpp"
 #include "../BinaryPath.hpp"
 #include "../../relive_lib/ResourceManagerWrapper.hpp"
@@ -31,6 +32,8 @@
 #include "TLVConverter.hpp"
 #include "CollisionLineConverter.hpp"
 #include "PathDataExtensionsTypes.hpp"
+#include "../../AliveLibAO/DemoPlayback.hpp"
+#include "AOSaveSerialization.hpp"
 
 static bool ReadLvlFileInto(ReliveAPI::LvlReader& archive, const char_type* fileName, std::vector<u8>& fileBuffer)
 {
@@ -173,40 +176,54 @@ static void ConvertDemo(const char_type* pFileName, const FileSystem::Path& data
 
     nlohmann::json commandsArray = nlohmann::json::array();
 
-    u32 defaultDemoCommandIdx;
+    const u32* pData = reinterpret_cast<const u32*>(fileBuffer.data() + sizeof(ReliveAPI::ResourceHeader));
+
+    u32 idx;
     if (isAo)
     {
-        defaultDemoCommandIdx = 2051; // skip save game data in demo file + random seed?
+        auto pSaveData = reinterpret_cast<const AO::AOData::SaveData*>(fileBuffer.data() + sizeof(ReliveAPI::ResourceHeader));
+        AOSaveConverter saveConverter;
+        auto convSave = saveConverter.Convert(*pSaveData);
+
+        nlohmann::json saveJson;
+        to_json(saveJson, convSave);
+
+        std::string fileName(pFileName);
+        u32 demoId = std::stoi(fileName.substr(6, 2));
+
+        char_type name[32];
+        sprintf(name, "ATTR%04d.SAV.json", demoId);
+        SaveJson(saveJson, fs, name);
+        idx = 2051; // skip save game data in demo file + random seed?
     }
     else
     {
-        defaultDemoCommandIdx = 2; // skip random seed data?
+        idx = 2; // skip random seed data?
     }
 
-    const u32* pData = reinterpret_cast<const u32*>(fileBuffer.data());
 
-    u32 idx = defaultDemoCommandIdx;
     for (;;)
     {
         if (idx >= fileBuffer.size())
         {
-            ALIVE_FATAL("Trying to read demo playback file buffer out of bounds. (expected command & 0x8000 before end)");
+            ALIVE_FATAL("Trying to read demo playback file buffer out of bounds. (expected tmp & 0x8000 before end)");
         }
 
         nlohmann::json commandObj = nlohmann::json::object();
 
         u32 tmp = pData[idx++];
 
-        u32 command = tmp >> 16;
+        u32 commandBits = tmp >> 16;
         u32 commandDuration = tmp & 0xFFFF;
 
-        commandObj["command_bits"] = command;
+        commandObj["command_bits"] = commandBits;
         commandObj["command_duration"] = commandDuration;
 
         commandsArray.push_back(commandObj);
 
         // End demo/quit command
-        if (command & 0x8000)
+        // Important: this needs to be tmp and can't be command or else we exit the loop too early! 
+        if (tmp & 0x8000)
         {
             break;
         }
@@ -217,7 +234,7 @@ static void ConvertDemo(const char_type* pFileName, const FileSystem::Path& data
         {"commands", commandsArray}
     };
 
-    SaveJson(j, fs, filePath);
+    SaveJson(j, fs, pFileName);
 }
 
 template <typename LevelIdType>
@@ -830,7 +847,7 @@ static void ConvertFilesInLvl(ThreadPool& tp, const FileSystem::Path& dataDir, F
             }
 
             // Remove the resource header
-            fileBuffer.erase(fileBuffer.begin(), fileBuffer.begin() + 16);
+            fileBuffer.erase(fileBuffer.begin(), fileBuffer.begin() + sizeof(ReliveAPI::ResourceHeader));
 
             // TODO: Actually convert at some later point
             AESaveConverter saveConverter;
