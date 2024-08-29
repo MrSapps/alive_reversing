@@ -1682,8 +1682,8 @@ void InputObject::Update(BaseGameAutoPlayer& autoPlayer)
         if (sGnFrame >= mCommandDuration)
         {
             const auto& command = sDemoData["commands"][mDemoCommandIndex];
-            mCommand = command["command_bits"];
-            mCommandDuration = sGnFrame + command["command_duration"];
+            mCommand = command["command_bits"].template get<u32>();
+            mCommandDuration = sGnFrame + command["command_duration"].template get<u32>();
 
             // End demo/quit command
             if (++mDemoCommandIndex > sDemoData["commands"].size() - 1)
