@@ -26,32 +26,28 @@ DemoPlayback::DemoPlayback()
     SetSurviveDeathReset(true);
     SetType(ReliveTypes::eDemoPlayback);
     gDDCheat_FlyingEnabled = false;
+    mSaveData = relive_new SaveData();
     if (gAttract == 0)
     {
-        mSaveData = relive_new SaveData();
         if (!mSaveData)
         {
             SetDead(false);
         }
         SaveGame::SaveToMemory(mSaveData);
     }
-    else
-    {
-        mSaveData = nullptr;
-    }
 
     //auto pd = reinterpret_cast<PlaybackData*>(*ppPlaybackData);
 
-    SaveData saveData;
     FileSystem fs;
     char_type fileName[32];
     sprintf(fileName, "ATTR%04d.SAV.json", gJoyResId);
     auto jsonStr = fs.LoadToString(fileName);
 
     nlohmann::json j = nlohmann::json::parse(jsonStr);
-    from_json(j, saveData);
-    SaveGame::LoadFromMemory(&saveData, 1);
-    //sRandomSeed = pd->randomSeed; // TODO
+    from_json(j, *mSaveData);
+    SaveGame::LoadFromMemory(mSaveData, 1);
+    // TODO: can probably be removed since rng in relive won't be in sync with OG anyway?
+    //sRandomSeed = pd->randomSeed;
     mState = States::eInit_0;
     SetUpdateDelay(1);
 }

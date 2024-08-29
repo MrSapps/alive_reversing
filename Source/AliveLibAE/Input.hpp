@@ -148,7 +148,7 @@ public:
     void UnsetDemoPlaying();
     void InitDemo(const char_type* pDemoFileName);
     void Update(BaseGameAutoPlayer& gameAutoPlayer);
-    static u32 PsxButtonsToKeyboardInput_45EE40(u32 cmd);
+    static u32 PsxButtonsToKeyboardInput(u32 cmd);
     static s8 KeyboardInputToPsxButtons_45EF70(s32 cmd);
     void ShutDown_45F020();
 

@@ -3016,7 +3016,7 @@ inline void from_json(const nlohmann::json& j, Path_SlamDoor& p)
 inline void to_json(nlohmann::json& j, const Path_Slurg& p)
 {
     j = nlohmann::json{
-        {"tlv_type", "annoying_slurg"},
+        {"tlv_type", "slurg"},
         {"base", ToBase(p)},
         {"moving_timer", p.mMovingTimer},
         {"facing", p.mFacing},

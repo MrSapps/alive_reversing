@@ -1695,7 +1695,7 @@ void InputObject::Update(BaseGameAutoPlayer& autoPlayer)
         // Will do nothing if we hit the end command..
         if (IsDemoPlaying())
         {
-            mPads[0].mRawInput = PsxButtonsToKeyboardInput_45EE40(mCommand);
+            mPads[0].mRawInput = PsxButtonsToKeyboardInput(mCommand);
         }
     }
 
@@ -1710,7 +1710,7 @@ void InputObject::Update(BaseGameAutoPlayer& autoPlayer)
     mPads[1].mDir = directionTable_545A4C[mPads[1].mRawInput & 0xF];
 }
 
-u32 InputObject::PsxButtonsToKeyboardInput_45EE40(u32 cmd)
+u32 InputObject::PsxButtonsToKeyboardInput(u32 cmd)
 {
     u32 shoulderButtonsPressedCount = 0;
 

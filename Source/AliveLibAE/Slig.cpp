@@ -711,7 +711,7 @@ void Slig::CreateFromSaveState(SerializedObjectData& pBuffer)
         pSlig->mReturnToPreviousMotion = pState->mReturnToPreviousMotion;
         pSlig->mCheckedIfOffScreen = pState->mCheckedIfOffScreen;
 
-        pSlig->mInput = InputObject::PsxButtonsToKeyboardInput_45EE40(pState->field_50_input);
+        pSlig->mInput = InputObject::PsxButtonsToKeyboardInput(pState->field_50_input);
 
         pSlig->field_12C_timer = pState->field_54_timer;
         pSlig->mFallingVelxScaleFactor = pState->mFallingVelxScaleFactor;

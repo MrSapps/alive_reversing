@@ -984,8 +984,8 @@ void Menu::MainScreen_Update()
         SFX_Play_Pitch(relive::SoundEffects::MenuNavigation, 45, 400);
         bSmallerTimeout = sDemoPlay;
     }
-    //const s32 idleMax = bSmallerTimeout != 0 ? 300 : 1500;
-    const s32 idleMax = 90;
+
+    const s32 idleMax = bSmallerTimeout != 0 ? 300 : 1500;
     if (Input().IsAnyPressed(InputObject::PadIndex::First, (InputCommands::eThrowItem | InputCommands::eUnPause_OrConfirm | InputCommands::eDoAction | InputCommands::eCheatMode | InputCommands::eBack)) || mIdleInputCounter > idleMax)
     {
         if (mIdleInputCounter <= idleMax)
@@ -1629,37 +1629,33 @@ void Menu::FMV_Or_Level_Select_Back_Update()
 
 void Menu::Loading_Update()
 {
-    // TODO: need another way of knowing if we're loading into a demo
-    if (!gAttract /*|| ResourceManager::GetLoadedResource_4554F0(ResourceManager::Resource_Plbk, sJoyResId_50769C, 0, 0)*/)
+    auto pMenuTrans = static_cast<MainMenuTransition*>(sObjectIds.Find_Impl(mMenuTransId));
+    if (pMenuTrans)
     {
-        auto pMenuTrans = static_cast<MainMenuTransition*>(sObjectIds.Find_Impl(mMenuTransId));
-        if (pMenuTrans)
+        if (pMenuTrans->field_16_bDone)
         {
-            if (pMenuTrans->field_16_bDone)
+            if (gAttract)
             {
-                if (gAttract)
-                {
-                    char_type buffer[92] = {};
-                    sprintf(buffer, "loading Joy # %d\n", gJoyResId);
-                    // Never used ??
-                    LOG_INFO(buffer);
-                }
-
-                pMenuTrans->SetDead(true);
-                mMenuTransId = Guid{};
-
-                /*
-                if (!field_E4_res_array[0])
-                {
-                    ProgressInProgressFilesLoading();
-                }*/
-
-                GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Idle));
-                //ResourceManager::FreeResource_455550(field_E4_res_array[0]);
-                //field_E4_res_array[0] = nullptr;
-                //ResourceManager::Reclaim_Memory_455660(0);
-                mFnUpdate = &Menu::NewGameStart;
+                char_type buffer[92] = {};
+                sprintf(buffer, "loading Joy # %d\n", gJoyResId);
+                // Never used ??
+                LOG_INFO(buffer);
             }
+
+            pMenuTrans->SetDead(true);
+            mMenuTransId = Guid{};
+
+            /*
+            if (!field_E4_res_array[0])
+            {
+                ProgressInProgressFilesLoading();
+            }*/
+
+            GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Idle));
+            //ResourceManager::FreeResource_455550(field_E4_res_array[0]);
+            //field_E4_res_array[0] = nullptr;
+            //ResourceManager::Reclaim_Memory_455660(0);
+            mFnUpdate = &Menu::NewGameStart;
         }
     }
 }

@@ -185,6 +185,10 @@ static void ConvertDemo(const char_type* pFileName, const FileSystem::Path& data
         AOSaveConverter saveConverter;
         auto convSave = saveConverter.Convert(*pSaveData);
 
+        // Zero out bly data because it is no longer in sync with OG's path tlv's since we removed all unused ones.
+        // NOTE: Some demo's crash! Figure out if it has something to do with this or if it's caused by something else.
+        memset(convSave.field_2B0_pSaveBuffer + sizeof(gSwitchStates.mData), 0, sizeof(convSave.field_2B0_pSaveBuffer) - sizeof(gSwitchStates.mData));
+
         nlohmann::json saveJson;
         to_json(saveJson, convSave);
 
