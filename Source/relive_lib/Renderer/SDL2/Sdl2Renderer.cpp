@@ -278,6 +278,7 @@ Sdl2Texture& Sdl2Renderer::GetActiveFbTexture()
 
 std::shared_ptr<Sdl2Texture> Sdl2Renderer::PrepareTextureFromPoly(const Poly_FT4& poly)
 {
+    static u32 fg1CamId = 0;
     static u32 lastTouchedCamId = 0;
 
     std::shared_ptr<Sdl2Texture> texture;
@@ -288,7 +289,7 @@ std::shared_ptr<Sdl2Texture> Sdl2Renderer::PrepareTextureFromPoly(const Poly_FT4
         // FIXME: kCamLifetime should be in IRenderer ?
         texture = mTextureCache.GetCachedTexture(poly.mFg1->mUniqueId.Id(), 1);
 
-        if (!texture)
+        if (!texture || fg1CamId != lastTouchedCamId)
         {
             std::shared_ptr<Sdl2Texture> camRefTex = mTextureCache.GetCachedTexture(lastTouchedCamId, 1);
             std::shared_ptr<Sdl2Texture> fg1Tex = Sdl2Texture::FromMask(mContext, camRefTex, poly.mFg1->mImage.mPixels->data());
@@ -299,6 +300,8 @@ std::shared_ptr<Sdl2Texture> Sdl2Renderer::PrepareTextureFromPoly(const Poly_FT4
                     1,
                     fg1Tex
                 );
+
+            fg1CamId = lastTouchedCamId;
 
             LOG("SDL2 FG1 cache miss %u", poly.mFg1->mUniqueId.Id());
         }
