@@ -197,9 +197,9 @@ SDL_Texture* Sdl2Texture::GetTextureUsePalette(const std::shared_ptr<AnimationPa
         }
         else
         {
-            pixelsTarget[r] = colour.r / 2;
-            pixelsTarget[g] = colour.g / 2;
-            pixelsTarget[b] = colour.b / 2;
+            pixelsTarget[r] = colour.r;
+            pixelsTarget[g] = colour.g;
+            pixelsTarget[b] = colour.b;
             pixelsTarget[a] = 0;
         }
     }

@@ -100,14 +100,11 @@ void Sdl2Renderer::Draw(const Poly_G3& poly)
         { { static_cast<f32>(poly.X2()), static_cast<f32>(poly.Y2()) }, { poly.R2(), poly.G2(), poly.B2(), 255 }, { 0, 0 } },
     };
 
-    DrawVertices(vertices, NULL, 0, poly.mSemiTransparent, poly.mBlendMode);
+    DrawVertices(vertices, NULL, 0, NULL, poly.mSemiTransparent, poly.mBlendMode);
 }
 
 void Sdl2Renderer::Draw(const Poly_FT4& poly)
 {
-    //
-    // FIXME: Obviously unfinished (no blending, etc.)
-    //
     SDL_Texture* tex = NULL;
 
     constexpr s32 indexList[6] = { 0, 1, 2, 1, 2 , 3 };
@@ -117,8 +114,6 @@ void Sdl2Renderer::Draw(const Poly_FT4& poly)
         { { static_cast<f32>(poly.X2()), static_cast<f32>(poly.Y2()) }, { 255, 255, 255, 255 }, { 0, 1 } },
         { { static_cast<f32>(poly.X3()), static_cast<f32>(poly.Y3()) }, { 255, 255, 255, 255 }, { 1, 1 } },
     };
-
-    ScaleVertices(vertices);
 
     if (poly.mFg1)
     {
@@ -234,7 +229,7 @@ void Sdl2Renderer::Draw(const Poly_FT4& poly)
         // TODO: Implement this
     }
 
-    SDL_RenderGeometry(mContext.GetRenderer(), tex, vertices.data(), 4, indexList, 6);
+    DrawVertices(vertices, indexList, 6, tex, poly.mSemiTransparent, poly.mBlendMode);
 }
 
 void Sdl2Renderer::Draw(const Poly_G4& poly)
@@ -302,7 +297,7 @@ void Sdl2Renderer::StartFrame()
     mContext.UseTextureFramebuffer(mPsxFbTexture[0].GetTexture());
 }
 
-void Sdl2Renderer::DrawVertices(std::vector<SDL_Vertex>& vertices, const s32* indices, s32 num_indices, bool isSemiTrans, relive::TBlendModes blendMode)
+void Sdl2Renderer::DrawVertices(std::vector<SDL_Vertex>& vertices, const s32* indices, s32 num_indices, SDL_Texture* texture, bool isSemiTrans, relive::TBlendModes blendMode)
 {
     std::vector<SDL_Vertex> dstVertices = vertices;
 
@@ -319,11 +314,14 @@ void Sdl2Renderer::DrawVertices(std::vector<SDL_Vertex>& vertices, const s32* in
                 for (u32 i = 0; i < vertices.size(); i++)
                 {
                     dstVertices[i].color = { 128, 128, 128, 255 };
-                    vertices[i].color.a = 128;
+                    vertices[i].color.a = 255;
                 }
 
-                SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_MOD);
-                SDL_RenderGeometry(mContext.GetRenderer(), NULL, dstVertices.data(), dstVertices.size(), indices, num_indices);
+                if (!texture)
+                {
+                    SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_MOD);
+                    SDL_RenderGeometry(mContext.GetRenderer(), NULL, dstVertices.data(), dstVertices.size(), indices, num_indices);
+                }
 
                 SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_ADD);
                 break;
@@ -357,7 +355,7 @@ void Sdl2Renderer::DrawVertices(std::vector<SDL_Vertex>& vertices, const s32* in
         }
     }
 
-    SDL_RenderGeometry(mContext.GetRenderer(), NULL, vertices.data(), vertices.size(), indices, num_indices);
+    SDL_RenderGeometry(mContext.GetRenderer(), texture, vertices.data(), vertices.size(), indices, num_indices);
     SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_NONE);
 }
 
