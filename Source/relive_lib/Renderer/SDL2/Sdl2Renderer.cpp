@@ -94,7 +94,7 @@ void Sdl2Renderer::Draw(const Poly_G3& poly)
 {
     LOG("%s", "SDL2: Draw Poly_G3");
 
-    // FIXME: Obviously unfinished (no blending, etc.)
+    // FIXME: Tidy up
     std::vector<SDL_Vertex> vertices = {
         { { static_cast<f32>(poly.X0()), static_cast<f32>(poly.Y0()) }, { poly.R0(), poly.G0(), poly.B0(), 255 }, { 0, 0 } },
         { { static_cast<f32>(poly.X1()), static_cast<f32>(poly.Y1()) }, { poly.R1(), poly.G1(), poly.B1(), 255 }, { 0, 0 } },
@@ -103,7 +103,64 @@ void Sdl2Renderer::Draw(const Poly_G3& poly)
 
     ScaleVertices(vertices);
 
+    if (poly.mSemiTransparent)
+    {
+        std::vector<SDL_Vertex> dstVertices = {
+            { { static_cast<f32>(poly.X0()), static_cast<f32>(poly.Y0()) }, { 0, 0, 0, 255 }, { 0, 0 } },
+            { { static_cast<f32>(poly.X1()), static_cast<f32>(poly.Y1()) }, { 0, 0, 0, 255 }, { 0, 0 } },
+            { { static_cast<f32>(poly.X2()), static_cast<f32>(poly.Y2()) }, { 0, 0, 0, 255 }, { 0, 0 } },
+        };
+
+        SDL_BlendMode blendMode;
+
+        switch (poly.mBlendMode)
+        {
+            case relive::TBlendModes::None:
+            case relive::TBlendModes::eBlend_0:
+                dstVertices[0].color = { 128, 128, 128, 255 };
+                dstVertices[1].color = { 128, 128, 128, 255 };
+                dstVertices[2].color = { 128, 128, 128, 255 };
+
+                SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_MOD);
+                SDL_RenderGeometry(mContext.GetRenderer(), NULL, dstVertices.data(), 3, NULL, 0);
+
+                vertices[0].color.a = 128;
+                vertices[1].color.a = 128;
+                vertices[2].color.a = 128;
+
+                SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_ADD);
+                break;
+
+            case relive::TBlendModes::eBlend_1:
+                SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_ADD);
+                break;
+
+            case relive::TBlendModes::eBlend_2:
+                blendMode =
+                    SDL_ComposeCustomBlendMode(
+                        SDL_BLENDFACTOR_ONE,
+                        SDL_BLENDFACTOR_ONE,
+                        SDL_BLENDOPERATION_SUBTRACT,
+                        SDL_BLENDFACTOR_ZERO,
+                        SDL_BLENDFACTOR_ONE,
+                        SDL_BLENDOPERATION_ADD
+                    );
+
+                SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), blendMode);
+                break;
+
+            case relive::TBlendModes::eBlend_3:
+                vertices[0].color.a = 64;
+                vertices[1].color.a = 64;
+                vertices[2].color.a = 64;
+
+                SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_ADD);
+                break;
+        }
+    }
+
     SDL_RenderGeometry(mContext.GetRenderer(), NULL, vertices.data(), 3, NULL, 0);
+    SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_NONE);
 }
 
 void Sdl2Renderer::Draw(const Poly_FT4& poly)
