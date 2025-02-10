@@ -1,4 +1,5 @@
 #include "../../../relive_lib/Primitives.hpp"
+#include "../../../AliveLibAE/Font.hpp"
 #include "FatalError.hpp"
 #include "Sdl2Renderer.hpp"
 
@@ -192,9 +193,42 @@ void Sdl2Renderer::Draw(const Poly_FT4& poly)
     }
     else if (poly.mFont)
     {
+        RGBA32 shading = {
+            poly.R0(),
+            poly.G0(),
+            poly.B0(),
+            255
+        };
+
         LOG("%s", "SDL2: Draw Poly_FT4 (Font)");
 
-        // TODO: Implement this
+        std::shared_ptr<PngData> pPng = poly.mFont->mFntResource.mPngPtr;
+
+        f32 u0 = poly.U0() / static_cast<f32>(pPng->mWidth);
+        f32 v0 = poly.V0() / static_cast<f32>(pPng->mHeight);
+
+        f32 u1 = poly.U3() / static_cast<f32>(pPng->mWidth);
+        f32 v1 = poly.V3() / static_cast<f32>(pPng->mHeight);
+
+        tex =
+            PrepareTextureFromPoly(poly)->GetTextureUsePalette(
+                poly.mFont->mFntResource.mCurPal,
+                shading,
+                poly.mSemiTransparent,
+                poly.mBlendMode
+            );
+
+        vertices[0].tex_coord.x = u0;
+        vertices[0].tex_coord.y = v0;
+
+        vertices[1].tex_coord.x = u1;
+        vertices[1].tex_coord.y = v0;
+
+        vertices[2].tex_coord.x = u0;
+        vertices[2].tex_coord.y = v1;
+
+        vertices[3].tex_coord.x = u1;
+        vertices[3].tex_coord.y = v1;
     }
     else // Assume ScreenWave!
     {
@@ -364,7 +398,31 @@ std::shared_ptr<Sdl2Texture> Sdl2Renderer::PrepareTextureFromPoly(const Poly_FT4
     }
     else if (poly.mFont)
     {
-        // TODO: Implement this
+        // FIXME: Temp bump amount
+        texture = mTextureCache.GetCachedTexture(poly.mFont->mFntResource.mUniqueId.Id(), 255);
+
+        if (!texture)
+        {
+            std::shared_ptr<PngData> pPng = poly.mFont->mFntResource.mPngPtr;
+
+            auto fontTex =
+                std::make_shared<Sdl2Texture>(
+                    mContext,
+                    pPng->mWidth,
+                    pPng->mHeight,
+                    SDL_PIXELFORMAT_INDEX8,
+                    SDL_TEXTUREACCESS_STREAMING
+                );
+
+            fontTex->Update(NULL, pPng->mPixels.data());
+
+            texture =
+                mTextureCache.Add(
+                    poly.mFont->mFntResource.mUniqueId.Id(),
+                    255,
+                    fontTex
+                );
+        }
     }
 
     return texture;
