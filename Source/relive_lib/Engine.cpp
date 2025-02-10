@@ -61,6 +61,12 @@ void Engine::CmdLineRenderInit()
             LOG_INFO("Command line set renderer to opengl3");
             rendererToCreate = IRenderer::Renderers::OpenGL;
         }
+
+        if (strcmpi(renderer, "sdl") == 0)
+        {
+            LOG_INFO("Command line set renderer to sdl");
+            rendererToCreate = IRenderer::Renderers::Sdl2;
+        }
     }
 
     if (mGameType == GameType::eAe)
