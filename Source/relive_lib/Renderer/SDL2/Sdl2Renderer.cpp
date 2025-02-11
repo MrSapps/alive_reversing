@@ -304,33 +304,40 @@ void Sdl2Renderer::DrawVertices(std::vector<SDL_Vertex>& vertices, const s32* in
 
     ScaleVertices(vertices);
 
-    if (isSemiTrans)
+    // This blend mode stuff is only needed for untextured polys, textures
+    // have their own blend modes set up in Sdl2Texture
+    if (!texture && isSemiTrans)
     {
         SDL_BlendMode customBlendMode;
 
         switch (blendMode)
         {
-            case relive::TBlendModes::None:
+            // 50% DST + 50% SRC
+            //
+            // In order to achieve the desired result, we draw an identical set
+            // of vertices as the input, but with the colours set to 128 and
+            // then draw with BLENDMODE_MOD - this results in 50% dst colour
+            //
+            // Then the input vertices can be drawn as normal for 50% src
             case relive::TBlendModes::eBlend_0:
                 for (u32 i = 0; i < vertices.size(); i++)
                 {
                     dstVertices[i].color = { 128, 128, 128, 255 };
-                    vertices[i].color.a = 255;
+                    vertices[i].color.a = 128;
                 }
 
-                if (!texture)
-                {
-                    SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_MOD);
-                    SDL_RenderGeometry(mContext.GetRenderer(), NULL, dstVertices.data(), dstVertices.size(), indices, num_indices);
-                }
+                SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_MOD);
+                SDL_RenderGeometry(mContext.GetRenderer(), NULL, dstVertices.data(), dstVertices.size(), indices, num_indices);
 
                 SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_ADD);
                 break;
 
+            // 100% DST + 100% SRC
             case relive::TBlendModes::eBlend_1:
                 SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_ADD);
                 break;
 
+            // 100% DST - 100% SRC
             case relive::TBlendModes::eBlend_2:
                 customBlendMode =
                     SDL_ComposeCustomBlendMode(
@@ -351,6 +358,7 @@ void Sdl2Renderer::DrawVertices(std::vector<SDL_Vertex>& vertices, const s32* in
                 }
                 break;
 
+            // 100% DST + 25% SRC
             case relive::TBlendModes::eBlend_3:
                 for (u32 i = 0; i < vertices.size(); i++)
                 {
@@ -358,6 +366,10 @@ void Sdl2Renderer::DrawVertices(std::vector<SDL_Vertex>& vertices, const s32* in
                 }
 
                 SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_ADD);
+                break;
+
+            default:
+                ALIVE_FATAL("Unknown blend mode.");
                 break;
         }
     }
