@@ -266,7 +266,7 @@ void Sdl2Renderer::SetClip(const Prim_ScissorRect& clipper)
 {
     LOG("%s", "SDL2: Set viewport clip");
 
-    // FIXME: Implement this
+    // FIXME: Dedupe with GL render, move to IRenderer?
     SDL_Rect rect;
 
     rect.x = clipper.mRect.x;
@@ -274,7 +274,13 @@ void Sdl2Renderer::SetClip(const Prim_ScissorRect& clipper)
     rect.w = clipper.mRect.w;
     rect.h = clipper.mRect.h;
 
-    SDL_SetClipRect(SDL_GetWindowSurface(mWindow), &rect);
+    if (rect.x == 0 && rect.y == 0 && rect.w == 1 && rect.h == 1)
+    {
+        // No scissor
+        rect = {};
+    }
+
+    SDL_RenderSetClipRect(mContext.GetRenderer(), &rect);
 }
 
 void Sdl2Renderer::StartFrame()
