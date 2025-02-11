@@ -236,20 +236,15 @@ void Sdl2Renderer::Draw(const Poly_G4& poly)
 {
     LOG("%s", "SDL2: Draw Poly_G4");
 
-    // FIXME: Obviously unfinished (no blending, etc.)
+    constexpr s32 indexList[6] = { 0, 1, 2, 1, 2 , 3 };
     std::vector<SDL_Vertex> vertices = {
         { { static_cast<f32>(poly.X0()), static_cast<f32>(poly.Y0()) }, { poly.R0(), poly.G0(), poly.B0(), 255 }, { 0, 0 } },
-        { { static_cast<f32>(poly.X1()), static_cast<f32>(poly.Y1()) }, { poly.R1(), poly.G1(), poly.B1(), 255 }, { 0, 0 } },
-        { { static_cast<f32>(poly.X2()), static_cast<f32>(poly.Y2()) }, { poly.R2(), poly.G2(), poly.B2(), 255 }, { 0, 0 } },
-
         { { static_cast<f32>(poly.X1()), static_cast<f32>(poly.Y1()) }, { poly.R1(), poly.G1(), poly.B1(), 255 }, { 0, 0 } },
         { { static_cast<f32>(poly.X2()), static_cast<f32>(poly.Y2()) }, { poly.R2(), poly.G2(), poly.B2(), 255 }, { 0, 0 } },
         { { static_cast<f32>(poly.X3()), static_cast<f32>(poly.Y3()) }, { poly.R3(), poly.G3(), poly.B3(), 255 }, { 0, 0 } },
     };
 
-    ScaleVertices(vertices);
-
-    SDL_RenderGeometry(mContext.GetRenderer(), NULL, vertices.data(), 6, NULL, 0);
+    DrawVertices(vertices, indexList, 6, NULL, poly.mSemiTransparent, poly.mBlendMode);
 }
 
 void Sdl2Renderer::EndFrame()
@@ -335,13 +330,19 @@ void Sdl2Renderer::DrawVertices(std::vector<SDL_Vertex>& vertices, const s32* in
                     SDL_ComposeCustomBlendMode(
                         SDL_BLENDFACTOR_ONE,
                         SDL_BLENDFACTOR_ONE,
-                        SDL_BLENDOPERATION_SUBTRACT,
+                        SDL_BLENDOPERATION_REV_SUBTRACT,
                         SDL_BLENDFACTOR_ZERO,
                         SDL_BLENDFACTOR_ONE,
                         SDL_BLENDOPERATION_ADD
                     );
 
-                SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), customBlendMode);
+                if (SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), customBlendMode) < 0)
+                {
+                    // Not ideal... fallback to MOD, it's kind of close-ish, since the game
+                    // mainly uses this blend mode to darken stuff uniformly, so MOD roughly ends
+                    // up with a similar result
+                    SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_MOD);
+                }
                 break;
 
             case relive::TBlendModes::eBlend_3:
