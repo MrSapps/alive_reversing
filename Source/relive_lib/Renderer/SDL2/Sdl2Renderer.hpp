@@ -24,11 +24,11 @@ public:
     void StartFrame() override;
 
 private:
-    void DrawVertices(std::vector<SDL_Vertex>& vertices, const s32* indices, s32 num_indices, SDL_Texture* texture, bool isSemiTrans, relive::TBlendModes blendMode);
+    void DrawVertices(SDL_Vertex vertices[], s32 numVertices, const s32 indices[], s32 numIndices, SDL_Texture* texture, bool isSemiTrans, relive::TBlendModes blendMode);
     Sdl2Texture& GetActiveFbTexture();
     std::shared_ptr<Sdl2Texture> PrepareTextureFromPoly(const Poly_FT4& poly);
     SDL_FPoint PointToViewport(const SDL_FPoint& point);
-    void ScaleVertices(std::vector<SDL_Vertex>& vertices);
+    void ScaleVertices(SDL_Vertex vertices[], s32 numVertices);
 
 private:
     Sdl2Context mContext;

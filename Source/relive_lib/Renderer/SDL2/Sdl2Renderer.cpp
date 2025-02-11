@@ -50,7 +50,7 @@ void Sdl2Renderer::Draw(const Prim_GasEffect& gasEffect)
 
     SDL_Color c = { 255, 255, 0, 127 };
 
-    std::vector<SDL_Vertex> gasVerts = {
+    SDL_Vertex gasVerts[] = {
         { {x, y}, c, { 0, 0 } },
         { {w, y}, c, { 0, 0 } },
         { {x, h}, c, { 0, 0 } },
@@ -60,9 +60,9 @@ void Sdl2Renderer::Draw(const Prim_GasEffect& gasEffect)
         { {w, h}, c, { 0, 0 } },
     };
 
-    ScaleVertices(gasVerts);
+    ScaleVertices(gasVerts, 6);
 
-    SDL_RenderGeometry(mContext.GetRenderer(), NULL, gasVerts.data(), 6, NULL, 0);
+    SDL_RenderGeometry(mContext.GetRenderer(), nullptr, gasVerts, 6, nullptr, 0);
 }
 
 void Sdl2Renderer::Draw(const Line_G2& line)
@@ -94,21 +94,21 @@ void Sdl2Renderer::Draw(const Poly_G3& poly)
 {
     LOG("%s", "SDL2: Draw Poly_G3");
 
-    std::vector<SDL_Vertex> vertices = {
+    SDL_Vertex vertices[] = {
         { { static_cast<f32>(poly.X0()), static_cast<f32>(poly.Y0()) }, { poly.R0(), poly.G0(), poly.B0(), 255 }, { 0, 0 } },
         { { static_cast<f32>(poly.X1()), static_cast<f32>(poly.Y1()) }, { poly.R1(), poly.G1(), poly.B1(), 255 }, { 0, 0 } },
         { { static_cast<f32>(poly.X2()), static_cast<f32>(poly.Y2()) }, { poly.R2(), poly.G2(), poly.B2(), 255 }, { 0, 0 } },
     };
 
-    DrawVertices(vertices, NULL, 0, NULL, poly.mSemiTransparent, poly.mBlendMode);
+    DrawVertices(vertices, 3, nullptr, 0, nullptr, poly.mSemiTransparent, poly.mBlendMode);
 }
 
 void Sdl2Renderer::Draw(const Poly_FT4& poly)
 {
-    SDL_Texture* tex = NULL;
+    SDL_Texture* tex = nullptr;
 
     constexpr s32 indexList[6] = { 0, 1, 2, 1, 2 , 3 };
-    std::vector<SDL_Vertex> vertices = {
+    SDL_Vertex vertices[] = {
         { { static_cast<f32>(poly.X0()), static_cast<f32>(poly.Y0()) }, { 255, 255, 255, 255 }, { 0, 0 } },
         { { static_cast<f32>(poly.X1()), static_cast<f32>(poly.Y1()) }, { 255, 255, 255, 255 }, { 1, 0 } },
         { { static_cast<f32>(poly.X2()), static_cast<f32>(poly.Y2()) }, { 255, 255, 255, 255 }, { 0, 1 } },
@@ -229,7 +229,7 @@ void Sdl2Renderer::Draw(const Poly_FT4& poly)
         // TODO: Implement this
     }
 
-    DrawVertices(vertices, indexList, 6, tex, poly.mSemiTransparent, poly.mBlendMode);
+    DrawVertices(vertices, 4, indexList, 6, tex, poly.mSemiTransparent, poly.mBlendMode);
 }
 
 void Sdl2Renderer::Draw(const Poly_G4& poly)
@@ -237,14 +237,14 @@ void Sdl2Renderer::Draw(const Poly_G4& poly)
     LOG("%s", "SDL2: Draw Poly_G4");
 
     constexpr s32 indexList[6] = { 0, 1, 2, 1, 2 , 3 };
-    std::vector<SDL_Vertex> vertices = {
+    SDL_Vertex vertices[4] = {
         { { static_cast<f32>(poly.X0()), static_cast<f32>(poly.Y0()) }, { poly.R0(), poly.G0(), poly.B0(), 255 }, { 0, 0 } },
         { { static_cast<f32>(poly.X1()), static_cast<f32>(poly.Y1()) }, { poly.R1(), poly.G1(), poly.B1(), 255 }, { 0, 0 } },
         { { static_cast<f32>(poly.X2()), static_cast<f32>(poly.Y2()) }, { poly.R2(), poly.G2(), poly.B2(), 255 }, { 0, 0 } },
         { { static_cast<f32>(poly.X3()), static_cast<f32>(poly.Y3()) }, { poly.R3(), poly.G3(), poly.B3(), 255 }, { 0, 0 } },
     };
 
-    DrawVertices(vertices, indexList, 6, NULL, poly.mSemiTransparent, poly.mBlendMode);
+    DrawVertices(vertices, 4, indexList, 6, nullptr, poly.mSemiTransparent, poly.mBlendMode);
 }
 
 void Sdl2Renderer::EndFrame()
@@ -257,7 +257,7 @@ void Sdl2Renderer::EndFrame()
 
     // FIXME: Just drawing the whole thing for now - handle this properly
     //        with screen offset + aspect ratio (centred)
-    SDL_RenderCopy(mContext.GetRenderer(), GetActiveFbTexture().GetTexture(), NULL, NULL);
+    SDL_RenderCopy(mContext.GetRenderer(), GetActiveFbTexture().GetTexture(), nullptr, nullptr);
 
     mContext.Present();
 }
@@ -298,18 +298,14 @@ void Sdl2Renderer::StartFrame()
     mContext.UseTextureFramebuffer(mPsxFbTexture[0].GetTexture());
 }
 
-void Sdl2Renderer::DrawVertices(std::vector<SDL_Vertex>& vertices, const s32* indices, s32 num_indices, SDL_Texture* texture, bool isSemiTrans, relive::TBlendModes blendMode)
+void Sdl2Renderer::DrawVertices(SDL_Vertex vertices[], s32 numVertices, const s32 indices[], s32 numIndices, SDL_Texture* texture, bool isSemiTrans, relive::TBlendModes blendMode)
 {
-    std::vector<SDL_Vertex> dstVertices = vertices;
-
-    ScaleVertices(vertices);
+    ScaleVertices(vertices, numVertices);
 
     // This blend mode stuff is only needed for untextured polys, textures
     // have their own blend modes set up in Sdl2Texture
     if (!texture && isSemiTrans)
     {
-        SDL_BlendMode customBlendMode;
-
         switch (blendMode)
         {
             // 50% DST + 50% SRC
@@ -320,17 +316,24 @@ void Sdl2Renderer::DrawVertices(std::vector<SDL_Vertex>& vertices, const s32* in
             //
             // Then the input vertices can be drawn as normal for 50% src
             case relive::TBlendModes::eBlend_0:
-                for (u32 i = 0; i < vertices.size(); i++)
+            {
+                std::vector<SDL_Vertex> dstVertices;
+
+                dstVertices.reserve(numVertices);
+
+                for (s32 i = 0; i < numVertices; i++)
                 {
+                    dstVertices.push_back(vertices[i]);
                     dstVertices[i].color = { 128, 128, 128, 255 };
                     vertices[i].color.a = 128;
                 }
 
                 SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_MOD);
-                SDL_RenderGeometry(mContext.GetRenderer(), NULL, dstVertices.data(), dstVertices.size(), indices, num_indices);
+                SDL_RenderGeometry(mContext.GetRenderer(), nullptr, dstVertices.data(), numVertices, indices, numIndices);
 
                 SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_ADD);
                 break;
+            }
 
             // 100% DST + 100% SRC
             case relive::TBlendModes::eBlend_1:
@@ -339,7 +342,8 @@ void Sdl2Renderer::DrawVertices(std::vector<SDL_Vertex>& vertices, const s32* in
 
             // 100% DST - 100% SRC
             case relive::TBlendModes::eBlend_2:
-                customBlendMode =
+            {
+                SDL_BlendMode customBlendMode =
                     SDL_ComposeCustomBlendMode(
                         SDL_BLENDFACTOR_ONE,
                         SDL_BLENDFACTOR_ONE,
@@ -357,10 +361,11 @@ void Sdl2Renderer::DrawVertices(std::vector<SDL_Vertex>& vertices, const s32* in
                     SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_MOD);
                 }
                 break;
+            }
 
             // 100% DST + 25% SRC
             case relive::TBlendModes::eBlend_3:
-                for (u32 i = 0; i < vertices.size(); i++)
+                for (s32 i = 0; i < numVertices; i++)
                 {
                     vertices[i].color.a = 64;
                 }
@@ -374,7 +379,7 @@ void Sdl2Renderer::DrawVertices(std::vector<SDL_Vertex>& vertices, const s32* in
         }
     }
 
-    SDL_RenderGeometry(mContext.GetRenderer(), texture, vertices.data(), vertices.size(), indices, num_indices);
+    SDL_RenderGeometry(mContext.GetRenderer(), texture, vertices, numVertices, indices, numIndices);
     SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_NONE);
 }
 
@@ -431,7 +436,7 @@ std::shared_ptr<Sdl2Texture> Sdl2Renderer::PrepareTextureFromPoly(const Poly_FT4
                     SDL_TEXTUREACCESS_STATIC
                 );
 
-            camTex->Update(NULL, poly.mCam->mData.mPixels->data());
+            camTex->Update(nullptr, poly.mCam->mData.mPixels->data());
 
             texture =
                 mTextureCache.Add(
@@ -459,7 +464,7 @@ std::shared_ptr<Sdl2Texture> Sdl2Renderer::PrepareTextureFromPoly(const Poly_FT4
                     SDL_TEXTUREACCESS_STREAMING
                 );
 
-            animTex->Update(NULL, poly.mAnim->mAnimRes.mPngPtr->mPixels.data());
+            animTex->Update(nullptr, poly.mAnim->mAnimRes.mPngPtr->mPixels.data());
 
             texture =
                 mTextureCache.Add(
@@ -487,7 +492,7 @@ std::shared_ptr<Sdl2Texture> Sdl2Renderer::PrepareTextureFromPoly(const Poly_FT4
                     SDL_TEXTUREACCESS_STREAMING
                 );
 
-            fontTex->Update(NULL, pPng->mPixels.data());
+            fontTex->Update(nullptr, pPng->mPixels.data());
 
             texture =
                 mTextureCache.Add(
@@ -517,9 +522,9 @@ SDL_FPoint Sdl2Renderer::PointToViewport(const SDL_FPoint& point)
     return scaledPoint;
 }
 
-void Sdl2Renderer::ScaleVertices(std::vector<SDL_Vertex>& vertices)
+void Sdl2Renderer::ScaleVertices(SDL_Vertex vertices[], s32 numVertices)
 {
-    for (u8 i = 0; i < vertices.size(); i++)
+    for (u8 i = 0; i < numVertices; i++)
     {
         vertices[i].position = PointToViewport(vertices[i].position);
     }
