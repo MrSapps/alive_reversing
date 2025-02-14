@@ -117,14 +117,14 @@ SDL_Texture* Sdl2Texture::GetTextureUsePalette(const std::shared_ptr<AnimationPa
             mLastShadeColor.ToU32() == shading.ToU32()
         )
         {
-            LOG("%s", "SDL2 palette tex cache hit");
+            //LOG("%s", "SDL2 palette tex cache hit");
             return mTexture;
         }
 
         SDL_DestroyTexture(mTexture);
     }
 
-    LOG("%s", "SDL2 palette tex cache miss");
+    //LOG("%s", "SDL2 palette tex cache miss");
     mTexture = SDL_CreateTexture(mContext.GetRenderer(), SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, mWidth, mHeight);
 
     // Lock target texture, all the per-pixel ops are handled here - sampling
