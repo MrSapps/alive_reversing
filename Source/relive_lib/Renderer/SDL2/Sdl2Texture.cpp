@@ -245,6 +245,11 @@ SDL_Texture* Sdl2Texture::GetTextureUsePalette(const std::shared_ptr<AnimationPa
     return mTexture;
 }
 
+void Sdl2Texture::SetTextureBlendMode(SDL_BlendMode blendMode)
+{
+    SDL_SetTextureBlendMode(mTexture, blendMode);
+}
+
 void Sdl2Texture::Update(const SDL_Rect* rect, const void* pixels)
 {
     if (mFormat == SDL_PIXELFORMAT_INDEX8)
@@ -261,12 +266,21 @@ void Sdl2Texture::Update(const SDL_Rect* rect, const void* pixels)
                 pitch = mWidth * 4;
                 break;
 
+            case SDL_PIXELFORMAT_RGB565:
+            {
+                pitch = rect ? rect->w * 2 : mWidth * 2;
+                break;
+            }
+
             default:
                 ALIVE_FATAL("SDL2 - Unsupported texture format %d", mFormat);
                 break;
         }
 
-        SDL_UpdateTexture(mTexture, rect, pixels, pitch);
+        if (SDL_UpdateTexture(mTexture, rect, pixels, pitch) < 0)
+        {
+            ALIVE_FATAL(SDL_GetError());
+        }
     }
 }
 

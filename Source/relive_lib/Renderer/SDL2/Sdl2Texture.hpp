@@ -14,6 +14,7 @@ public:
 
     SDL_Texture* GetTexture();
     SDL_Texture* GetTextureUsePalette(const std::shared_ptr<AnimationPal>& palette, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode);
+    void SetTextureBlendMode(SDL_BlendMode blendMode);
     void Update(const SDL_Rect* rect, const void* pixels);
 
 private:

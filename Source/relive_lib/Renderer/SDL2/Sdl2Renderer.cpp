@@ -9,8 +9,13 @@ Sdl2Renderer::Sdl2Renderer(TWindowHandleType window)
     mPsxFbTexture{
         Sdl2Texture(mContext, kPsxFramebufferWidth, kPsxFramebufferHeight, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET),
         Sdl2Texture(mContext, kPsxFramebufferWidth, kPsxFramebufferHeight, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET)
-    }
+    },
+    mGasTexture(mContext, kPsxFramebufferWidth, kPsxFramebufferHeight, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING)
 {
+    // Set up the gas blend mode
+    //
+    mGasTexture.SetTextureBlendMode(SDL_BLENDMODE_ADD);
+
     // Render target support is required for things like FG1 mask and
     // framebuffer textures
     if (!mContext.IsRenderTargetSupported())
@@ -45,24 +50,27 @@ void Sdl2Renderer::Draw(const Prim_GasEffect& gasEffect)
     const f32 w = static_cast<f32>(gasEffect.w);
     const f32 h = static_cast<f32>(gasEffect.h);
 
-    //const f32 gasWidth = std::floor(static_cast<f32>(gasEffect.w - gasEffect.x) / 4);
-    //const f32 gasHeight = std::floor(static_cast<f32>(gasEffect.h - gasEffect.y) / 2);
+    const f32 gasWidth = std::floor(static_cast<f32>(gasEffect.w - gasEffect.x) / 4);
+    const f32 gasHeight = std::floor(static_cast<f32>(gasEffect.h - gasEffect.y) / 2);
 
-    SDL_Color c = { 255, 255, 0, 127 };
+    const SDL_Rect gasRect = { 0, 0, static_cast<s32>(gasWidth), static_cast<s32>(gasHeight) };
 
+    mGasTexture.Update(&gasRect, gasEffect.pGasPixels);
+
+    SDL_Color c = { 127, 127, 127, 255 };
+
+    f32 u1 = gasWidth / kPsxFramebufferWidth;
+    f32 v1 = gasHeight / kPsxFramebufferHeight;
+
+    constexpr s32 indexList[6] = { 0, 1, 2, 1, 2 , 3 };
     SDL_Vertex gasVerts[] = {
-        { {x, y}, c, { 0, 0 } },
-        { {w, y}, c, { 0, 0 } },
-        { {x, h}, c, { 0, 0 } },
-
-        { {x, h}, c, { 0, 0 } },
-        { {w, y}, c, { 0, 0 } },
-        { {w, h}, c, { 0, 0 } },
+        { {x, y}, c, { 0,   0 } },
+        { {w, y}, c, { u1,  0 } },
+        { {x, h}, c, { 0,  v1 } },
+        { {w, h}, c, { u1, v1 } },
     };
 
-    ScaleVertices(gasVerts, 6);
-
-    SDL_RenderGeometry(mContext.GetRenderer(), nullptr, gasVerts, 6, nullptr, 0);
+    DrawVertices(gasVerts, 4, indexList, 6, mGasTexture.GetTexture(), false, relive::TBlendModes::eBlend_0);
 }
 
 void Sdl2Renderer::Draw(const Line_G2& line)

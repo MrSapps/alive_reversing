@@ -36,5 +36,6 @@ private:
     u8 mActiveFbTexture = 0;
     Sdl2Texture mPsxFbTexture[2];
 
+    Sdl2Texture mGasTexture;
     TextureCache<std::shared_ptr<Sdl2Texture>> mTextureCache;
 };
