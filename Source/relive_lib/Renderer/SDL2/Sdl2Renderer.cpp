@@ -119,7 +119,12 @@ void Sdl2Renderer::Draw(const Poly_FT4& poly)
     {
         LOG("%s", "SDL2: Draw Poly_FT4 (FG1)");
 
-        tex = PrepareTextureFromPoly(poly)->GetTexture();
+        std::shared_ptr<Sdl2Texture> texFG1 = PrepareTextureFromPoly(poly);
+
+        if (texFG1)
+        {
+            tex = texFG1->GetTexture();
+        }
     }
     else if (poly.mCam)
     {
@@ -404,18 +409,24 @@ std::shared_ptr<Sdl2Texture> Sdl2Renderer::PrepareTextureFromPoly(const Poly_FT4
         if (!texture || fg1CamId != lastTouchedCamId)
         {
             std::shared_ptr<Sdl2Texture> camRefTex = mTextureCache.GetCachedTexture(lastTouchedCamId, 1);
-            std::shared_ptr<Sdl2Texture> fg1Tex = Sdl2Texture::FromMask(mContext, camRefTex, poly.mFg1->mImage.mPixels->data());
 
-            texture =
-                mTextureCache.Add(
+            if (camRefTex)
+            {
+                std::shared_ptr<Sdl2Texture> fg1Tex = Sdl2Texture::FromMask(mContext, camRefTex, poly.mFg1->mImage.mPixels->data());
+
+                texture = mTextureCache.Add(
                     poly.mFg1->mUniqueId.Id(),
                     1,
-                    fg1Tex
-                );
+                    fg1Tex);
 
-            fg1CamId = lastTouchedCamId;
+                fg1CamId = lastTouchedCamId;
 
-            LOG("SDL2 FG1 cache miss %u", poly.mFg1->mUniqueId.Id());
+                LOG("SDL2 FG1 cache miss %u", poly.mFg1->mUniqueId.Id());
+            }
+            else
+            {
+                LOG("SDL2 FG1 with no CAM");
+            }
         }
     }
     else if (poly.mCam)
