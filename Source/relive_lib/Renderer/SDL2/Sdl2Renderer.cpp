@@ -44,7 +44,6 @@ void Sdl2Renderer::Draw(const Prim_GasEffect& gasEffect)
 {
     LOG("%s", "SDL2: Draw Prim_GasEffect");
 
-    // TODO: Implement this
     const f32 x = static_cast<f32>(gasEffect.x);
     const f32 y = static_cast<f32>(gasEffect.y);
     const f32 w = static_cast<f32>(gasEffect.w);
@@ -77,25 +76,40 @@ void Sdl2Renderer::Draw(const Line_G2& line)
 {
     LOG("%s", "SDL2: Draw Line_G2");
 
-    // FIXME: Handle thickness, and colour correctly (aka use a quad)
-    SDL_SetRenderDrawColor(mContext.GetRenderer(), line.R0(), line.G0(), line.B0(), 255);
-    SDL_RenderDrawLine(mContext.GetRenderer(), line.X0(), line.Y0(), line.X1(), line.Y1());
+    const IRenderer::Point2D points[] = {
+        IRenderer::Point2D(line.X0(), line.Y0()),
+        IRenderer::Point2D(line.X1(), line.Y1())
+    };
+
+    RGBA32 color;
+
+    color.r = line.R0();
+    color.g = line.G0();
+    color.b = line.B0();
+    color.a = 255;
+
+    DrawLines(points, 2, color, line.mSemiTransparent ? line.mBlendMode : relive::TBlendModes::None);
 }
 
 void Sdl2Renderer::Draw(const Line_G4& line)
 {
     LOG("%s", "SDL2: Draw Line_G4");
 
-    // FIXME: Handle thickness, and colour correctly (aka use a quad)
-    SDL_Point points[] = {
-        { line.X0(), line.Y0() },
-        { line.X1(), line.Y1() },
-        { line.X2(), line.Y2() },
-        { line.X3(), line.Y3() },
+    const IRenderer::Point2D points[] = {
+        IRenderer::Point2D(line.X0(), line.Y0()),
+        IRenderer::Point2D(line.X1(), line.Y1()),
+        IRenderer::Point2D(line.X2(), line.Y2()),
+        IRenderer::Point2D(line.X3(), line.Y3())
     };
 
-    SDL_SetRenderDrawColor(mContext.GetRenderer(), line.R0(), line.G0(), line.B0(), 255);
-    SDL_RenderDrawLines(mContext.GetRenderer(), points, 4);
+    RGBA32 color;
+
+    color.r = line.R0();
+    color.g = line.G0();
+    color.b = line.B0();
+    color.a = 255;
+
+    DrawLines(points, 4, color, line.mSemiTransparent ? line.mBlendMode : relive::TBlendModes::None);
 }
 
 void Sdl2Renderer::Draw(const Poly_G3& poly)
@@ -309,6 +323,28 @@ void Sdl2Renderer::StartFrame()
 
     // Default back to render target
     mContext.UseTextureFramebuffer(mPsxFbTexture[0].GetTexture());
+}
+
+void Sdl2Renderer::DrawLines(const IRenderer::Point2D points[], s32 numPoints, RGBA32 color, relive::TBlendModes blendMode)
+{
+    constexpr s32 indexList[6] = { 0, 1, 2, 1, 2 , 3 };
+
+    for (s32 i = 1; i < numPoints; i++)
+    {
+        const IRenderer::Point2D pointA = points[i - 1];
+        const IRenderer::Point2D pointB = points[i];
+
+        const IRenderer::Quad2D quad = IRenderer::LineToQuad(pointA, pointB);
+
+        SDL_Vertex vertices[4] = {
+            { { quad.verts[0].x, quad.verts[0].y }, {color.r, color.g, color.b, 255 }, { 0, 0 } },
+            { { quad.verts[1].x, quad.verts[1].y }, {color.r, color.g, color.b, 255 }, { 0, 0 } },
+            { { quad.verts[2].x, quad.verts[2].y }, {color.r, color.g, color.b, 255 }, { 0, 0 } },
+            { { quad.verts[3].x, quad.verts[3].y }, {color.r, color.g, color.b, 255 }, { 0, 0 } },
+        };
+
+        DrawVertices(vertices, 4, indexList, 6, nullptr, blendMode != relive::TBlendModes::None, blendMode);
+    }
 }
 
 void Sdl2Renderer::DrawVertices(SDL_Vertex vertices[], s32 numVertices, const s32 indices[], s32 numIndices, SDL_Texture* texture, bool isSemiTrans, relive::TBlendModes blendMode)

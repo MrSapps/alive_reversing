@@ -24,6 +24,7 @@ public:
     void StartFrame() override;
 
 private:
+    void DrawLines(const IRenderer::Point2D points[], s32 numPoints, RGBA32 color, relive::TBlendModes blendMode);
     void DrawVertices(SDL_Vertex vertices[], s32 numVertices, const s32 indices[], s32 numIndices, SDL_Texture* texture, bool isSemiTrans, relive::TBlendModes blendMode);
     Sdl2Texture& GetActiveFbTexture();
     std::shared_ptr<Sdl2Texture> PrepareTextureFromPoly(const Poly_FT4& poly);
