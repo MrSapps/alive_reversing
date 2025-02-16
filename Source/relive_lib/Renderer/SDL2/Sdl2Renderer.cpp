@@ -468,6 +468,18 @@ void Sdl2Renderer::DrawVertices(SDL_Vertex vertices[], s32 numVertices, const s3
                     // mainly uses this blend mode to darken stuff uniformly, so MOD roughly ends
                     // up with a similar result
                     SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_MOD);
+
+                    // We must invert the colours of the vertices, because otherwise when the
+                    // game tries to draw black (RGB all 255), it will end up doing (dst * 1.0)
+                    // instead of the intended (dst - 1.0)
+                    //
+                    // Inverting (1 - src) should solve the problem, so black is still black
+                    for (s32 i = 0; i < numVertices; i++)
+                    {
+                        vertices[i].color.r = 255 - vertices[i].color.r;
+                        vertices[i].color.g = 255 - vertices[i].color.g;
+                        vertices[i].color.b = 255 - vertices[i].color.b;
+                    }
                 }
                 break;
             }
