@@ -188,7 +188,7 @@ void Sdl2Renderer::Draw(const Poly_FT4& poly)
 
         tex =
             PrepareTextureFromPoly(poly)->GetTextureUsePalette(
-                poly.mAnim->mAnimRes.mPngPtr->mPal,
+                poly.mAnim->mAnimRes.mCurPal,
                 shading,
                 poly.mSemiTransparent,
                 poly.mBlendMode
