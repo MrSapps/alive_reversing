@@ -32,12 +32,24 @@ void Sdl2Renderer::Clear(u8 r, u8 g, u8 b)
 {
     LOG("%s", "SDL2: Clear viewport");
 
+    // Check and store the renderer's clipping state
+    SDL_Rect clipRect;
+
+    SDL_RenderGetClipRect(mContext.GetRenderer(), &clipRect);
+
+    // Perform the clear now
     mContext.UseScreenFramebuffer();
 
     SDL_SetRenderDrawColor(mContext.GetRenderer(), r, g, b, 255);
     SDL_RenderClear(mContext.GetRenderer());
 
     mContext.UseTextureFramebuffer(GetActiveFbTexture().GetTexture());
+
+    // Restore clip rect if needed
+    if (clipRect.x != 0 || clipRect.y != 0 || clipRect.w != 0 || clipRect.h != 0)
+    {
+        SDL_RenderSetClipRect(mContext.GetRenderer(), &clipRect);
+    }
 }
 
 void Sdl2Renderer::Draw(const Prim_GasEffect& gasEffect)
@@ -303,11 +315,12 @@ void Sdl2Renderer::SetClip(const Prim_ScissorRect& clipper)
 
     if (rect.x == 0 && rect.y == 0 && rect.w == 1 && rect.h == 1)
     {
-        // No scissor
-        rect = {};
+        SDL_RenderSetClipRect(mContext.GetRenderer(), nullptr);
     }
-
-    SDL_RenderSetClipRect(mContext.GetRenderer(), &rect);
+    else
+    {
+        SDL_RenderSetClipRect(mContext.GetRenderer(), &rect);
+    }
 }
 
 void Sdl2Renderer::StartFrame()
