@@ -265,7 +265,53 @@ void Sdl2Renderer::Draw(const Poly_FT4& poly)
     {
         LOG("%s", "SDL2: Draw Poly_FT4 (ScreenWave)");
 
-        // TODO: Implement this
+        f32 u0 = (poly.uBase + poly.U0()) / kPsxFramebufferWidth;
+        f32 v0 = (poly.vBase + poly.V0()) / kPsxFramebufferHeight;
+
+        f32 u1 = (poly.uBase + poly.U1()) / kPsxFramebufferWidth;
+        f32 v1 = (poly.vBase + poly.V1()) / kPsxFramebufferHeight;
+
+        f32 u2 = (poly.uBase + poly.U2()) / kPsxFramebufferWidth;
+        f32 v2 = (poly.vBase + poly.V2()) / kPsxFramebufferHeight;
+
+        f32 u3 = (poly.uBase + poly.U3()) / kPsxFramebufferWidth;
+        f32 v3 = (poly.vBase + poly.V3()) / kPsxFramebufferHeight;
+
+        vertices[0].tex_coord.x = u0;
+        vertices[0].tex_coord.y = v0;
+
+        vertices[1].tex_coord.x = u1;
+        vertices[1].tex_coord.y = v1;
+
+        vertices[2].tex_coord.x = u2;
+        vertices[2].tex_coord.y = v2;
+
+        vertices[3].tex_coord.x = u3;
+        vertices[3].tex_coord.y = v3;
+
+        // First, draw to the secondary framebuffer, and then draw again from
+        // that back to the primary framebuffer
+        SDL_Texture* fbSrcTex = GetActiveFbTexture().GetTexture();
+
+        SwitchActiveFbTexture();
+
+        // Extra thingy, have we copied the framebuffer over this frame? If not,
+        // do so now - reason being because the edges of the textured polys can
+        // carry some bleed-through (so on first draw, there might be some black
+        // edges on the triangles)
+        //
+        // 'Resolve' this problem by copying the contents over entirely, so the
+        // issue isn't noticable
+        if (!mCopiedFbThisFrame)
+        {
+            SDL_RenderCopy(mContext.GetRenderer(), fbSrcTex, nullptr, nullptr);
+            mCopiedFbThisFrame = true;
+        }
+
+        DrawVertices(vertices, 4, indexList, 6, fbSrcTex, poly.mSemiTransparent, poly.mBlendMode);
+        tex = GetActiveFbTexture().GetTexture();
+
+        SwitchActiveFbTexture();
     }
 
     DrawVertices(vertices, 4, indexList, 6, tex, poly.mSemiTransparent, poly.mBlendMode);
@@ -290,6 +336,7 @@ void Sdl2Renderer::EndFrame()
 {
     LOG("%s", "SDL2: End frame");
 
+    mCopiedFbThisFrame = false;
     mTextureCache.DecreaseResourceLifetimes();
 
     mContext.UseScreenFramebuffer();
@@ -596,4 +643,11 @@ void Sdl2Renderer::ScaleVertices(SDL_Vertex vertices[], s32 numVertices)
     {
         vertices[i].position = PointToViewport(vertices[i].position);
     }
+}
+
+void Sdl2Renderer::SwitchActiveFbTexture()
+{
+    mActiveFbTexture = mActiveFbTexture == 0 ? 1 : 0;
+
+    SDL_SetRenderTarget(mContext.GetRenderer(), GetActiveFbTexture().GetTexture());
 }
