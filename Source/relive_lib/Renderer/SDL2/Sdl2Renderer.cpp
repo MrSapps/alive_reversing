@@ -359,10 +359,10 @@ void Sdl2Renderer::SetClip(const Prim_ScissorRect& clipper)
     f32 factorW = static_cast<f32>(GetActiveFbTexture().GetWidth()) / kPsxFramebufferWidth;
     f32 factorH = static_cast<f32>(GetActiveFbTexture().GetHeight()) / kPsxFramebufferHeight;
 
-    rect.x = clipper.mRect.x * factorW;
-    rect.y = clipper.mRect.y * factorH;
-    rect.w = clipper.mRect.w * factorW;
-    rect.h = clipper.mRect.h * factorH;
+    rect.x = static_cast<s32>(clipper.mRect.x * factorW);
+    rect.y = static_cast<s32>(clipper.mRect.y * factorH);
+    rect.w = static_cast<s32>(clipper.mRect.w * factorW);
+    rect.h = static_cast<s32>(clipper.mRect.h * factorH);
 
     if (clipper.mRect.x == 0 && clipper.mRect.y == 0 && clipper.mRect.w == 1 && clipper.mRect.h == 1)
     {
