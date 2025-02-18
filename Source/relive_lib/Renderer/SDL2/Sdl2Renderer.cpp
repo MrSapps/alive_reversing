@@ -353,15 +353,17 @@ void Sdl2Renderer::SetClip(const Prim_ScissorRect& clipper)
 {
     LOG("%s", "SDL2: Set viewport clip");
 
-    // FIXME: Dedupe with GL render, move to IRenderer?
-    SDL_Rect rect;
+    SDL_Rect rect = {};
 
-    rect.x = clipper.mRect.x;
-    rect.y = clipper.mRect.y;
-    rect.w = clipper.mRect.w;
-    rect.h = clipper.mRect.h;
+    f32 factorW = static_cast<f32>(GetActiveFbTexture().GetWidth()) / kPsxFramebufferWidth;
+    f32 factorH = static_cast<f32>(GetActiveFbTexture().GetHeight()) / kPsxFramebufferHeight;
 
-    if (rect.x == 0 && rect.y == 0 && rect.w == 1 && rect.h == 1)
+    rect.x = clipper.mRect.x * factorW;
+    rect.y = clipper.mRect.y * factorH;
+    rect.w = clipper.mRect.w * factorW;
+    rect.h = clipper.mRect.h * factorH;
+
+    if (clipper.mRect.x == 0 && clipper.mRect.y == 0 && clipper.mRect.w == 1 && clipper.mRect.h == 1)
     {
         SDL_RenderSetClipRect(mContext.GetRenderer(), nullptr);
     }
@@ -380,7 +382,20 @@ void Sdl2Renderer::StartFrame()
     mOffsetX = 0;
     mOffsetY = 0;
 
-    // FIXME: Need to check if framebuffer textures require resizing here!
+    // Resize framebuffers if needed
+    SDL_Rect desiredFbSize = GetFramebufferRect();
+
+    u32 desiredW = static_cast<u32>(desiredFbSize.w);
+    u32 desiredH = static_cast<u32>(desiredFbSize.h);
+
+    if (
+        mPsxFbTexture[0].GetWidth() != desiredW ||
+        mPsxFbTexture[0].GetHeight() != desiredH
+    )
+    {
+        mPsxFbTexture[0].Resize(desiredW, desiredH);
+        mPsxFbTexture[1].Resize(desiredW, desiredH);
+    }
 
     // Default back to render target
     mContext.UseTextureFramebuffer(mPsxFbTexture[0].GetTexture());
@@ -641,10 +656,12 @@ SDL_FPoint Sdl2Renderer::PointToViewport(const SDL_FPoint& point)
         return point;
     }
 
-    SDL_Rect   wndRect     = GetTargetDrawRect();
+    f32 factorW = static_cast<f32>(GetActiveFbTexture().GetWidth()) / kPsxFramebufferWidth;
+    f32 factorH = static_cast<f32>(GetActiveFbTexture().GetHeight()) / kPsxFramebufferHeight;
+
     SDL_FPoint scaledPoint = {
-        point.x * (wndRect.w / kPsxFramebufferWidth),
-        point.y * (wndRect.h / kPsxFramebufferHeight)
+        point.x * factorW,
+        point.y * factorH
     };
 
     return scaledPoint;

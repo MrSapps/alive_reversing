@@ -4,7 +4,7 @@
 #include "data_conversion/AnimationConverter.hpp"
 
 Sdl2Texture::Sdl2Texture(Sdl2Context& context, u32 width, u32 height, SDL_PixelFormatEnum format, SDL_TextureAccess access)
-    : mContext(context), mFormat(format), mHeight(height), mWidth(width)
+    : mContext(context), mFormat(format), mTextureAccess(access), mHeight(height), mWidth(width)
 {
     // SDL2 does not support palette textures, if we want to store indexed
     // colour we have to handle that internally (using mIndexedPixels)
@@ -14,7 +14,7 @@ Sdl2Texture::Sdl2Texture(Sdl2Context& context, u32 width, u32 height, SDL_PixelF
     }
     else
     {
-        mTexture = SDL_CreateTexture(mContext.GetRenderer(), mFormat, access, mWidth, mHeight);
+        mTexture = SDL_CreateTexture(mContext.GetRenderer(), mFormat, mTextureAccess, mWidth, mHeight);
 
         if (!mTexture)
         {
@@ -88,6 +88,16 @@ std::shared_ptr<Sdl2Texture> Sdl2Texture::FromMask(Sdl2Context& context, std::sh
     SDL_DestroyTexture(maskTex);
 
     return resultTex;
+}
+
+u32 Sdl2Texture::GetHeight()
+{
+    return mHeight;
+}
+
+u32 Sdl2Texture::GetWidth()
+{
+    return mWidth;
 }
 
 SDL_Texture* Sdl2Texture::GetTexture()
@@ -243,6 +253,24 @@ SDL_Texture* Sdl2Texture::GetTextureUsePalette(const std::shared_ptr<AnimationPa
     mLastShadeColor = shading;
 
     return mTexture;
+}
+
+void Sdl2Texture::Resize(u32 width, u32 height)
+{
+    if (mTexture)
+    {
+        SDL_DestroyTexture(mTexture);
+    }
+
+    mWidth = width;
+    mHeight = height;
+
+    mTexture = SDL_CreateTexture(mContext.GetRenderer(), mFormat, mTextureAccess, mWidth, mHeight);
+
+    if (!mTexture)
+    {
+        ALIVE_FATAL("%s", SDL_GetError());
+    }
 }
 
 void Sdl2Texture::SetTextureBlendMode(SDL_BlendMode blendMode)

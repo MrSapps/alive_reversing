@@ -12,8 +12,11 @@ public:
 
     static std::shared_ptr<Sdl2Texture> FromMask(Sdl2Context& context, std::shared_ptr<Sdl2Texture> srcTex, const u8* maskPixels);
 
+    u32 GetHeight();
+    u32 GetWidth();
     SDL_Texture* GetTexture();
     SDL_Texture* GetTextureUsePalette(const std::shared_ptr<AnimationPal>& palette, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode);
+    void Resize(u32 width, u32 height);
     void SetTextureBlendMode(SDL_BlendMode blendMode);
     void Update(const SDL_Rect* rect, const void* pixels);
 
@@ -24,6 +27,7 @@ private:
     Sdl2Context& mContext;
     SDL_PixelFormatEnum mFormat;
     SDL_Texture* mTexture = 0;
+    SDL_TextureAccess mTextureAccess;
     u32 mHeight = 0;
     u32 mWidth = 0;
 

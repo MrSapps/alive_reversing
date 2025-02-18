@@ -183,6 +183,7 @@ protected:
     static constexpr s32 kTargetFramebufferWidth = 640;
 
 protected:
+    SDL_Rect GetFramebufferRect();
     SDL_Rect GetTargetDrawRect();
 
 protected:
