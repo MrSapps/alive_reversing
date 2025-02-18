@@ -197,8 +197,8 @@ void Sdl2Renderer::Draw(const Poly_FT4& poly)
         // Fiddle with UVs...
         f32 u0 = static_cast<f32>(pHeader->mSpriteSheetX) / pPng->mWidth;
         f32 v0 = static_cast<f32>(pHeader->mSpriteSheetY) / pPng->mHeight;
-        f32 u1 = u0 + (static_cast<f32>(pHeader->mSpriteWidth) / pPng->mWidth);
-        f32 v1 = v0 + (static_cast<f32>(pHeader->mSpriteHeight) / pPng->mHeight);
+        f32 u1 = u0 + (static_cast<f32>(pHeader->mSpriteWidth - 1) / pPng->mWidth);
+        f32 v1 = v0 + (static_cast<f32>(pHeader->mSpriteHeight - 1) / pPng->mHeight);
 
         if (poly.mFlipX)
         {
