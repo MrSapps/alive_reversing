@@ -141,34 +141,15 @@ void OpenGLRenderer::StartFrame()
 
     // Check if we need to recreate the framebuffers if the viewport has
     // changed size
-    s32 desiredW = kPsxFramebufferWidth;
-    s32 desiredH = kPsxFramebufferHeight;
-
-    if (!mUseOriginalResolution)
-    {
-        // If we're maintaining aspect ratio, then the framebuffer needs
-        // to be equal to the size of the rect otherwise the result will
-        // be a warped image
-        if (mKeepAspectRatio)
-        {
-            SDL_Rect r = GetTargetDrawRect();
-
-            desiredW = r.w;
-            desiredH = r.h;
-        }
-        else
-        {
-            SDL_GL_GetDrawableSize(mWindow, &desiredW, &desiredH);
-        }
-    }
+    SDL_Rect desiredFbSize = GetFramebufferRect();
 
     if (
-        mPsxFramebuffer[0].GetWidth() != desiredW ||
-        mPsxFramebuffer[0].GetHeight() != desiredH
+        mPsxFramebuffer[0].GetWidth() != desiredFbSize.w ||
+        mPsxFramebuffer[0].GetHeight() != desiredFbSize.h
     )
     {
-        mPsxFramebuffer[0].Resize(desiredW, desiredH);
-        mPsxFramebuffer[1].Resize(desiredW, desiredH);
+        mPsxFramebuffer[0].Resize(desiredFbSize.w, desiredFbSize.h);
+        mPsxFramebuffer[1].Resize(desiredFbSize.w, desiredFbSize.h);
     }
 
     // Ensure bound to destination framebuffer
