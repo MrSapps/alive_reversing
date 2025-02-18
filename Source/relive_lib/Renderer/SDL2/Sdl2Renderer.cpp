@@ -1,5 +1,6 @@
 #include "../../../relive_lib/Primitives.hpp"
 #include "../../../AliveLibAE/Font.hpp"
+#include "Clamp.hpp"
 #include "FatalError.hpp"
 #include "Sdl2Renderer.hpp"
 
@@ -494,9 +495,9 @@ void Sdl2Renderer::DrawVertices(SDL_Vertex vertices[], s32 numVertices, const s3
                     // Inverting (1 - src) should solve the problem, so black is still black
                     for (s32 i = 0; i < numVertices; i++)
                     {
-                        vertices[i].color.r = 255 - vertices[i].color.r;
-                        vertices[i].color.g = 255 - vertices[i].color.g;
-                        vertices[i].color.b = 255 - vertices[i].color.b;
+                        vertices[i].color.r = ClampedSub((u8)127, vertices[i].color.r);
+                        vertices[i].color.g = ClampedSub((u8)127, vertices[i].color.g);
+                        vertices[i].color.b = ClampedSub((u8)127, vertices[i].color.b);
                     }
                 }
                 break;
