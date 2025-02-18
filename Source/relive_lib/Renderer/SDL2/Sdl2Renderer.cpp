@@ -341,9 +341,10 @@ void Sdl2Renderer::EndFrame()
 
     mContext.UseScreenFramebuffer();
 
-    // FIXME: Just drawing the whole thing for now - handle this properly
-    //        with screen offset + aspect ratio (centred)
-    SDL_RenderCopy(mContext.GetRenderer(), GetActiveFbTexture().GetTexture(), nullptr, nullptr);
+    // Copy framebuffer to screen
+    SDL_Rect drawRect = GetTargetDrawRect();
+
+    SDL_RenderCopy(mContext.GetRenderer(), GetActiveFbTexture().GetTexture(), nullptr, &drawRect);
 
     mContext.Present();
 }
