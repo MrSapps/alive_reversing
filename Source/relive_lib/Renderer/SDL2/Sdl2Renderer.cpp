@@ -397,6 +397,8 @@ void Sdl2Renderer::StartFrame()
         mPsxFbTexture[1].Resize(desiredW, desiredH);
     }
 
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, mFramebufferFilter ? "linear" : "nearest");
+
     // Default back to render target
     mContext.UseTextureFramebuffer(mPsxFbTexture[0].GetTexture());
 }
