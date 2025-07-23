@@ -127,6 +127,37 @@ void IRenderer::SetScreenOffset(const Prim_ScreenOffset& offset)
     mOffsetY = offset.field_E_yoff;
 }
 
+SDL_Rect IRenderer::GetFramebufferRect()
+{
+    SDL_Rect rect = {};
+
+    s32 desiredW = kPsxFramebufferWidth;
+    s32 desiredH = kPsxFramebufferHeight;
+
+    if (!mUseOriginalResolution)
+    {
+        // If we're maintaining aspect ratio, then the framebuffer needs
+        // to be equal to the size of the rect otherwise the result will
+        // be a warped image
+        if (mKeepAspectRatio)
+        {
+            SDL_Rect r = GetTargetDrawRect();
+
+            desiredW = r.w;
+            desiredH = r.h;
+        }
+        else
+        {
+            SDL_GL_GetDrawableSize(mWindow, &desiredW, &desiredH);
+        }
+    }
+
+    rect.w = desiredW;
+    rect.h = desiredH;
+
+    return rect;
+}
+
 SDL_Rect IRenderer::GetTargetDrawRect()
 {
     SDL_Rect rect = {};

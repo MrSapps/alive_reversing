@@ -8,28 +8,37 @@ template<class T> T Clamp(T val, T lowerBound, T upperBound)
     return val > upperBound ? upperBound : val < lowerBound ? lowerBound : val;
 }
 
-template<class T> T ClampedAdd(T val, s64 operand)
+template<class T> T ClampedAdd(T val, T operand)
 {
     if (operand == 0)
     {
         return val;
     }
 
-    T newVal = val + static_cast<T>(operand);
-
-    if (operand < 0 && newVal > val)
-    {
-        return std::numeric_limits<T>().min();
-    }
-    else if (operand > 0 && newVal < val)
+    if (std::numeric_limits<T>().max() - operand < val)
     {
         return std::numeric_limits<T>().max();
     }
 
-    return newVal;
+    return val + operand;
 }
 
-template<class T> T ClampedAdd(T val, s64 operand, T lowerBound, T upperBound)
+template<class T> T ClampedSub(T val, T operand)
+{
+    if (operand == 0)
+    {
+        return val;
+    }
+
+    if (std::numeric_limits<T>().min() + operand > val)
+    {
+        return std::numeric_limits<T>().min();
+    }
+
+    return val - operand;
+}
+
+template<class T> T ClampedAdd(T val, T operand, T lowerBound, T upperBound)
 {
     return Clamp(ClampedAdd(val, operand), lowerBound, upperBound);
 }

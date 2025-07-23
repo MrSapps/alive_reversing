@@ -24,16 +24,21 @@ public:
     void StartFrame() override;
 
 private:
+    void DrawLines(const IRenderer::Point2D points[], s32 numPoints, RGBA32 color, relive::TBlendModes blendMode);
+    void DrawVertices(SDL_Vertex vertices[], s32 numVertices, const s32 indices[], s32 numIndices, SDL_Texture* texture, bool isSemiTrans, relive::TBlendModes blendMode);
     Sdl2Texture& GetActiveFbTexture();
     std::shared_ptr<Sdl2Texture> PrepareTextureFromPoly(const Poly_FT4& poly);
     SDL_FPoint PointToViewport(const SDL_FPoint& point);
-    void ScaleVertices(std::vector<SDL_Vertex>& vertices);
+    void ScaleVertices(SDL_Vertex vertices[], s32 numVertices);
+    void SwitchActiveFbTexture();
 
 private:
     Sdl2Context mContext;
 
     u8 mActiveFbTexture = 0;
+    bool mCopiedFbThisFrame;
     Sdl2Texture mPsxFbTexture[2];
 
+    Sdl2Texture mGasTexture;
     TextureCache<std::shared_ptr<Sdl2Texture>> mTextureCache;
 };
