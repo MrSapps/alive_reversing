@@ -4081,8 +4081,8 @@ bool Scrab::LineOfSightTo(Scrab* pThis, BaseAliveGameObject* pObj)
                &pLine,
                &hitX,
                &hitY,
-               pThis->GetScale() == Scale::Fg ? kFgFloorWallOrCeiling
-               : kBgFloorWallOrCeiling)
+               pThis->GetScale() == Scale::Fg ? kFgFloorCeilingOrWalls
+                                              : kBgFloorCeilingOrWalls)
         != 1;
 } 
 

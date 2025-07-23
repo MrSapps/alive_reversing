@@ -2104,7 +2104,7 @@ bool FlyingSlig::IsWallBetween(BaseAliveGameObject* pThis, BaseAliveGameObject* 
                &pLine,
                &hitX,
                &hitY,
-               pThis->GetScale() == Scale::Fg ? kFgFloorWallOrCeiling : kBgFloorWallOrCeiling)
+               pThis->GetScale() == Scale::Fg ? kFgFloorCeilingOrWalls : kBgFloorCeilingOrWalls)
         != 1;
 }
 
