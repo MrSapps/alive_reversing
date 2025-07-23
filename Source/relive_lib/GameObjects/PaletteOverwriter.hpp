@@ -18,8 +18,8 @@ public:
 private:
     AnimationPal& mPal;
     RGBA32 mColour = {};
-    s16 mCurPalIndex = 0;
-    s16 mNumEntriesToOverwrite = 0;
+    u32 mCurPalIndex = 0;
+    u32 mNumEntriesToOverwrite = 0;
     bool mFirstUpdate = false;
     u32 mColoursToUpdatePerIteration = 0;
     u32 mPalDepth = 0;
