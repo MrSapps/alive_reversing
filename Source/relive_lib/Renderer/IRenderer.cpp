@@ -1,18 +1,12 @@
 #include "../stdafx.h"
 #include "IRenderer.hpp"
-#include "DirectX9/DirectX9Renderer.hpp"
 #include "OpenGL3/OpenGLRenderer.hpp"
 #include "SDL2/Sdl2Renderer.hpp"
-#include "Vulkan/VulkanRenderer.hpp"
 
 #include "../../relive_lib/FatalError.hpp"
 #include "../../relive_lib/Sys.hpp"
 
 static IRenderer* gRenderer = nullptr;
-
-#ifdef __APPLE__
-static std::unique_ptr<class VulkanLib> gVulkanLib;
-#endif
 
 IRenderer* IRenderer::GetRenderer()
 {
@@ -61,12 +55,8 @@ bool IRenderer::CreateRenderer(Renderers type, const std::string& windowTitle)
     }
 
     std::vector<Renderers> creationOrder{type};
-    AddRenderer(creationOrder, Renderers::Vulkan);
-#ifdef _WIN32
-    AddRenderer(creationOrder, Renderers::DirectX9);
-#endif
-    AddRenderer(creationOrder, Renderers::OpenGL);
     AddRenderer(creationOrder, Renderers::Sdl2);
+    AddRenderer(creationOrder, Renderers::OpenGL);
 
     for (Renderers typeToCreate : creationOrder)
     {
@@ -81,23 +71,6 @@ bool IRenderer::CreateRenderer(Renderers type, const std::string& windowTitle)
                 LOG_INFO("Create OpenGL renderer");
                 MakeRenderer<OpenGLRenderer>(windowTitle + " [OpenGL3]", SDL_WINDOW_OPENGL);
                 break;
-
-            case Renderers::Vulkan:
-                LOG_INFO("Create Vulkan renderer");
-                #ifdef __APPLE__
-                // We need to manually load the moltenvk dylib from the app bundle BEFORE we create the window
-                gVulkanLib = std::make_unique<VulkanLib>();
-                #endif
-                MakeRenderer<VulkanRenderer>(windowTitle + " [Vulkan]", SDL_WINDOW_VULKAN);
-                break;
-
-#ifdef _WIN32
-            // Windows only
-            case Renderers::DirectX9:
-                LOG_INFO("Create DirectX9 renderer");
-                MakeRenderer<DirectX9Renderer>(windowTitle + " [DirectX9]", 0);
-                break;
-#endif
 
             default:
                 ALIVE_FATAL("Unknown or unsupported renderer type");
@@ -116,9 +89,6 @@ void IRenderer::FreeRenderer()
 {
     delete gRenderer;
     gRenderer = nullptr;
-#ifdef __APPLE__
-    gVulkanLib = nullptr;
-#endif
 }
 
 void IRenderer::SetScreenOffset(const Prim_ScreenOffset& offset)
