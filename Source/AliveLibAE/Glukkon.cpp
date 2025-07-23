@@ -2908,8 +2908,8 @@ bool Glukkon::IsLineOfSightBetween(Glukkon* pGlukkon, BaseAliveGameObject* pOthe
                &pathLine,
                &hitX,
                &hitY,
-               pGlukkon->GetScale() == Scale::Fg ? kFgFloorWallOrCeiling
-               : kBgFloorWallOrCeiling)
+               pGlukkon->GetScale() == Scale::Fg ? kFgFloorCeilingOrWalls
+                                                 : kBgFloorCeilingOrWalls)
         != 1;
 }
 
