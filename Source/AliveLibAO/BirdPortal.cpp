@@ -56,6 +56,9 @@ BirdPortal::BirdPortal(relive::Path_BirdPortal* pTlv, const Guid& tlvId)
 
     PathLine* pLine = nullptr;
     FP hitX = {};
+
+    // IMPORTANT: In AO we need to include all masks otherwise the BirdPortal in E2P02C02 won't detect a collision.
+    // This is because the BirdPortal object does not touch the floor but still collides with the right wall.
     gCollisions->Raycast(
         FP_FromInteger(pTlv->mTopLeftX),
         FP_FromInteger(pTlv->mTopLeftY),
@@ -64,7 +67,7 @@ BirdPortal::BirdPortal(relive::Path_BirdPortal* pTlv, const Guid& tlvId)
         &pLine,
         &hitX,
         &mHitY,
-        mSpriteScale > FP_FromDouble(0.5) ? kFgFloor : kBgFloor);
+        mSpriteScale > FP_FromDouble(0.5) ? kFgFloorCeilingOrWalls : kBgFloorCeilingOrWalls);
 
     mXPos = FP_FromInteger(pTlv->mTopLeftX);
     mYPos = mHitY - (FP_FromInteger(55) * mSpriteScale);
