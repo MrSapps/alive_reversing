@@ -74,11 +74,12 @@ void Engine::Run()
     GetGameAutoPlayer().ProcessCommandLine(mClp);
     CmdLineRenderInit();
 
-    // Moved from PsxDisplay init to prevent desync
-    PSX_PutDispEnv_4F5890();
-
     // Another hack till refactor branch replaces master
     GetGameAutoPlayer().Pause(true);
+    GetGameAutoPlayer().DisableRecorder();
+
+    // Moved from PsxDisplay init to prevent desync
+    PSX_PutDispEnv_4F5890();
 
     // TODO: HACK mini loop till Game.cpp is merged
     DataConversionUI dcu(mGameType);
@@ -101,6 +102,7 @@ void Engine::Run()
     }
 
     GetGameAutoPlayer().Pause(false);
+    GetGameAutoPlayer().EnableRecorder();
 
     if (mGameType == GameType::eAe)
     {

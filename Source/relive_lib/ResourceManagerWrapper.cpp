@@ -427,14 +427,8 @@ void ResourceManagerWrapper::LoadingLoop(bool bShowLoadingIcon)
         const u32 k1Second = 1000; // Show loading icon after 1 second of loading
         if (bShowLoadingIcon && !bHideLoadingIcon && SYS_GetTicks() > startTime + k1Second)
         {
-            // master branch never hits the below code path so don't let the playback hit it
-            // if it does hit the loading icon Particle object will bump the object list count
-            // by 1 and desync the playback.
-            if (!GetGameAutoPlayer().IsPlaying())
-            {
-                // Render everything in the ordering table including the loading icon
-                ResourceManagerWrapper::ShowLoadingIcon();
-            }
+            // Render everything in the ordering table including the loading icon
+            ResourceManagerWrapper::ShowLoadingIcon();
         }
     }
 

@@ -1852,7 +1852,6 @@ void Fleech::ToIdle()
     mVelY = FP_FromInteger(0);
     mCurrentMotion = eFleechMotions::Motion_3_Idle;
     mNextMotion = eFleechMotions::eNone_m1;
-    sFleechRandomIdx_5BC20C++; // NOTE: unused variable removed - don't desync on RNG
 }
 
 const relive::SfxDefinition& getSfxDef(FleechSound effectId)

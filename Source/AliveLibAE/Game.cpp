@@ -401,20 +401,9 @@ void Game_Run()
 
     AnimationBase::CreateAnimationArray();
 
-    if (GetGameAutoPlayer().IsPlaying())
-    {
-        // temp de-sync fix
-        Init_Sound_DynamicArrays_And_Others();
-        Input_Init();
-    }
-    else
-    {
-        // NOTE: We need to call Input_Init() before Init_Sound_DynamicArrays_And_Others() because of gLatencyHack
-        // which can be configured from the ini
-        Input_Init();
-        Init_Sound_DynamicArrays_And_Others();
-    }
-
+    Input_Init();
+    Init_Sound_DynamicArrays_And_Others();
+    
     // Not technically needed yet but will de-sync if not instantiated here
     CamResource nullCamRes;
     gScreenManager = relive_new ScreenManager(nullCamRes, &gMap.mCameraOffset);

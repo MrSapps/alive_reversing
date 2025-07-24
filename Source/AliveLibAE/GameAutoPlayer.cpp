@@ -81,13 +81,6 @@ bool Player::ValidateObjectStates()
 
         BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
 
-        // hack fix - OG forgot to set the type of the throwable array in the ctor but it gets
-        // set in the VGetSaveState function so we assume that this is the case here to avoid desyncing.
-        if (pObj->Type() == ReliveTypes::eThrowableArray && reliveObjType == ReliveTypes::eNone)
-        {
-            continue;
-        }
-
         if (pObj->Type() != reliveObjType)
         {
             LOG_ERROR("Got %d type but expected %d", static_cast<s16>(BaseGameObject::ToAE(pObj->Type())), objType);
