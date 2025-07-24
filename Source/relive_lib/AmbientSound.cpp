@@ -73,18 +73,8 @@ void Start_Sounds_for_TLV(CameraPos direction, relive::Path_TLV* pTlv)
             break;
 
         case CameraPos::eCamLeft_3:
-        {
-            if (GetGameType() == GameType::eAo)
-            {
-                // TODO: this is supposed to be sLeftAmbiance but it will desync the recording
-                pAmbianceTbl = sRightAmbiance.mArray;
-            }
-            else
-            {
-                pAmbianceTbl = sLeftAmbiance.mArray;
-            }
+            pAmbianceTbl = sLeftAmbiance.mArray;
             break;
-        }
 
         case CameraPos::eCamRight_4:
             pAmbianceTbl = sRightAmbiance.mArray;

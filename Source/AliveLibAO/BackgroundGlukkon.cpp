@@ -136,7 +136,6 @@ void BackgroundGlukkon::VUpdate()
     {
         case BackgroundGlukkon::State::eToSetSpeakPauseTimer:
             mState = BackgroundGlukkon::State::eSetSpeakPauseTimer;
-            MakeTimer(Math_RandomRange(20, 40)); // TODO: remove and make a new recording
             break;
 
         case BackgroundGlukkon::State::eSetSpeakPauseTimer:
