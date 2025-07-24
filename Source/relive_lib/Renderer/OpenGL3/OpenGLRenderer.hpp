@@ -21,7 +21,7 @@
 #include "GLShaderProgram.hpp"
 #include "GLTexture2D.hpp"
 
-#include "../Vulkan/Batcher.hpp"
+#include "Batcher.hpp"
 
 enum class AnimId;
 

@@ -25,10 +25,14 @@ public:
     s16 mTargetBlue = 0;
 
 private:
+    void KillPalOverwriters();
+    bool DeElectrocuteTarget();
+
     bool mExtraOverwriter = false;
     bool mKillTarget = false;
     s16 mPalOverwritersCount = 0;
     PalleteOverwriter* mPalOverwriters[3] = {};
+    AnimationPal mOldPalData;
     AnimationPal mPalData;
     enum class States
     {

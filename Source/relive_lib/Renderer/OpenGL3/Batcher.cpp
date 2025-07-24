@@ -1,7 +1,5 @@
 #include "Batcher.hpp"
-#include "VulkanRenderer.hpp"
-#include "../OpenGL3/OpenGLRenderer.hpp"
-#include "../DirectX9/DirectX9Renderer.hpp"
+#include "OpenGLRenderer.hpp"
 #include "../../Primitives.hpp"
 #include "../../FG1.hpp"
 #include "../../Animation.hpp"
@@ -470,9 +468,5 @@ void Batcher<TextureType, RenderBatchType, kTextureBatchSize>::PushAnim(const Po
     PushVertexData(verts, ALIVE_COUNTOF(verts), texture, animRes.mUniqueId.Id());
 }
 
-template class Batcher<VulkanRenderer::Texture, VulkanRenderer::BatchData, 13>;
 template class Batcher<GLTexture2D, OpenGLRenderer::BatchData, 12>;
 
-#ifdef _WIN32
-template class Batcher<ATL::CComPtr<IDirect3DTexture9>, DirectX9Renderer::BatchData, 1>;
-#endif

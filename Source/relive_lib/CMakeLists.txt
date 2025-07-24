@@ -392,14 +392,10 @@ SET(AliveLibAESrc
 SET(renderer_src
     Renderer/IRenderer.hpp
     Renderer/IRenderer.cpp
-    Renderer/Vulkan/VulkanRenderer.hpp
-    Renderer/Vulkan/VulkanRenderer.cpp
-    Renderer/Vulkan/Batcher.hpp
-    Renderer/Vulkan/Batcher.cpp
-    Renderer/DirectX9/DirectX9Renderer.hpp
-    Renderer/DirectX9/DirectX9Renderer.cpp
     Renderer/PaletteCache.hpp
     Renderer/TextureCache.hpp
+    Renderer/OpenGL3/Batcher.hpp
+    Renderer/OpenGL3/Batcher.cpp
     Renderer/OpenGL3/GLContext.hpp
     Renderer/OpenGL3/GLContext.cpp
     Renderer/OpenGL3/GLDebug.hpp
@@ -715,7 +711,6 @@ target_include_directories(relive_lib PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/3rdParty/aom>"
     "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/3rdParty/aom/third_party/libwebm>"
     "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/3rdParty/json/single_include>"
-    "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/3rdParty/DX9_SDK_Aug09/Include>"
     "$<INSTALL_INTERFACE:include>"
     PRIVATE src ${CMAKE_BINARY_DIR})
 
@@ -760,18 +755,8 @@ target_link_libraries(relive_lib
     libglew_static
     imgui
     glm
-    volk
-    Vulkan::Headers
     ${WIN32_LIBS}
     ${SDL2_LIBRARIES}
     )
-
-if (WIN32)
-    if (CMAKE_SIZEOF_VOID_P EQUAL 4)
-        target_link_libraries(relive_lib ${CMAKE_CURRENT_SOURCE_DIR}/../../3rdParty/DX9_SDK_Aug09/Lib/x86/D3dx9.lib)
-    else()
-        target_link_libraries(relive_lib ${CMAKE_CURRENT_SOURCE_DIR}/../../3rdParty/DX9_SDK_Aug09/Lib/x64/D3dx9.lib)
-    endif()
-endif()
 
 export(TARGETS relive_lib FILE relive_lib.cmake)

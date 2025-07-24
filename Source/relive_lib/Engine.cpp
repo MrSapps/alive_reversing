@@ -36,26 +36,12 @@ void Engine::CmdLineRenderInit()
     gDDCheatOn = mClp.SwitchExists("-ddcheat") || mClp.SwitchExists("-it_is_me_your_father");
 #endif
 
-    IRenderer::Renderers rendererToCreate = IRenderer::Renderers::Vulkan;
-    LOG_INFO("Default renderer is vulkan");
+    IRenderer::Renderers rendererToCreate = IRenderer::Renderers::Sdl2;
+    LOG_INFO("Default renderer is Sdl2");
 
     char renderer[256] = {};
     if (mClp.ExtractNamePairArgument(renderer, "-renderer="))
     {
-        #ifdef _WIN32
-        if (strcmpi(renderer, "dx") == 0 || strcmpi(renderer, "dx9") == 0 || strcmpi(renderer, "directx") == 0 || strcmpi(renderer, "directx9") == 0)
-        {
-            LOG_INFO("Command line set renderer to directx9");
-            rendererToCreate = IRenderer::Renderers::DirectX9;
-        }
-        #endif
-
-        if (strcmpi(renderer, "vk") == 0 || strcmpi(renderer, "vulkan") == 0)
-        {
-            LOG_INFO("Command line set renderer to vulkan");
-            rendererToCreate = IRenderer::Renderers::Vulkan;
-        }
-
         if (strcmpi(renderer, "gl") == 0 || strcmpi(renderer, "gl3") == 0 || strcmpi(renderer, "opengl") == 0 || strcmpi(renderer, "opengl3") == 0)
         {
             LOG_INFO("Command line set renderer to opengl3");
