@@ -191,22 +191,19 @@ Gibs::Gibs(GibType gibType, FP xpos, FP ypos, FP xOff, FP yOff, FP scale, bool b
     mMakeSmaller = bMakeSmaller;
     mVelX = xOff + GibRand(scale);
 
-    // OG Bug? WTF?? Looks like somehow they didn't condition this param correctly
-    // because mVelY and mDz are always overwritten
-    
-    // NOTE: we don't want to desync the AE recording due to different
-    // RNG values so we keep this for now
-    if (!mMakeSmaller && GetGameType() == GameType::eAe)
-    {
-        mVelY = yOff + GibRand(scale);
-        mDz = FP_Abs(GibRand(scale) / FP_FromInteger(2));
-    }
-
     if (GetGameType() == GameType::eAe)
     {
         sGibRandom = 12;
-        mVelY = (yOff + GibRand(scale)) / FP_FromInteger(2);
-        mDz = FP_Abs(GibRand(scale) / FP_FromInteger(4));
+        if (!mMakeSmaller)
+        {
+            mVelY = yOff + GibRand(scale);
+            mDz = FP_Abs(GibRand(scale) / FP_FromInteger(2));
+        }
+        else
+        {
+            mVelY = (yOff + GibRand(scale)) / FP_FromInteger(2);
+            mDz = FP_Abs(GibRand(scale) / FP_FromInteger(4));
+        }
     }
     else
     {

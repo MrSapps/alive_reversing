@@ -4832,23 +4832,8 @@ void Slig::ShouldStillBeAlive()
 
                 if (!anyPointInCamera)
                 {
-                    // TODO: Remove me when making a new recording
-                    if (gMap.Is_Point_In_Current_Camera(
-                            mCurrentLevel,
-                            mCurrentPath,
-                            FP_FromInteger(field_290_points_count),
-                            FP_FromInteger(mPreventDepossession),
-                            0))
-
-                    {
-                        anyPointInCamera = true;
-                    }
-
-                    if (!anyPointInCamera)
-                    {
-                        // No patrol points in current camera
-                        SetDead(true);
-                    }
+                    // No patrol points in current camera
+                    SetDead(true);
                 }
             }
         }
