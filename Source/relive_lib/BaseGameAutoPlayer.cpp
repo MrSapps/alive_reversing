@@ -53,7 +53,10 @@ void BaseRecorder::SaveBuffer(const std::vector<u8>& buffer)
     mFile.Write(RecordTypes::Buffer);
     const u32 len = static_cast<u32>(buffer.size());
     mFile.Write(len);
-    mFile.Write(buffer);
+    if (len > 0)
+    {
+        mFile.Write(buffer);
+    }
 }
 
 void BasePlayer::Init(const char* pFileName)
@@ -130,8 +133,11 @@ std::vector<u8> BasePlayer::ReadBuffer()
 
     const u32 len = mFile.ReadU32();
     std::vector<u8> tmp;
-    tmp.resize(len);
-    mFile.Read(tmp);
+    if (len > 0)
+    {
+        tmp.resize(len);
+        mFile.Read(tmp);
+    }
     return tmp;
 }
 

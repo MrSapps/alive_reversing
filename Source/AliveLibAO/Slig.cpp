@@ -1018,14 +1018,6 @@ void Slig::ToZShoot()
     mNextMotion = eSligMotions::Motion_0_StandIdle;
     field_114_timer = sGnFrame + field_174_tlv->mData.mZShootDelay;
     SetBrain(&Slig::Brain_ZSpottedEnemy);
-
-    // don't desync playbacks - this saved the result but never used it
-    // TODO: remove when we have a new AO recording without this math call
-    if (GetGameAutoPlayer().IsPlaying())
-    {
-        Math_RandomRange(3, 5);
-    }
-
     MusicController::static_PlayMusic(MusicController::MusicTypes::eSlogChase_5, this, 0, 0);
 }
 

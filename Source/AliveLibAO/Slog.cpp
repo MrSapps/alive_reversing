@@ -531,10 +531,6 @@ void Slog::ToIdle()
     mVelY = FP_FromInteger(0);
     mCurrentMotion = eSlogMotions::Motion_0_Idle;
     mNextMotion = eSlogMotions::None_m1;
-
-    // NOTE: unused field removed - keep the random call to prevent
-    // playbacks from desyncing on RNG
-    Slog_NextRandom();
 }
 
 void Slog::ToJump()
