@@ -193,17 +193,17 @@ Gibs::Gibs(GibType gibType, FP xpos, FP ypos, FP xOff, FP yOff, FP scale, bool b
 
     if (GetGameType() == GameType::eAe)
     {
-        // OG Bug? WTF?? Looks like somehow they didn't condition this param correctly
-        // because mVelY and mDz are always overwritten
+        sGibRandom = 12;
         if (!mMakeSmaller)
         {
             mVelY = yOff + GibRand(scale);
             mDz = FP_Abs(GibRand(scale) / FP_FromInteger(2));
         }
-
-        sGibRandom = 12;
-        mVelY = (yOff + GibRand(scale)) / FP_FromInteger(2);
-        mDz = FP_Abs(GibRand(scale) / FP_FromInteger(4));
+        else
+        {
+            mVelY = (yOff + GibRand(scale)) / FP_FromInteger(2);
+            mDz = FP_Abs(GibRand(scale) / FP_FromInteger(4));
+        }
     }
     else
     {
