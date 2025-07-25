@@ -33,6 +33,9 @@
 #include "stdlib.hpp"
 #include "DemoPlayback.hpp"
 
+constexpr s32 kShortDemoTimer = 300;
+constexpr s32 kLongDemoTimer = 1500;
+
 MainMenuController* MainMenuController::gMainMenuController = nullptr;
 
 s32 sMainMenuObjectCounter_BB4400 = 0;
@@ -1529,7 +1532,7 @@ MainMenuNextCam MainMenuController::Page_Front_Update_4D0720(u32 input)
     }
 
     // Go to loading a demo screen if no input after time out, after one demo plays the next time out is lower if input isn't pressed
-    if (field_1F8_page_timeout > (bLongerTimeoutToNextDemo ? 300 : 1500))
+    if (field_1F8_page_timeout > (bLongerTimeoutToNextDemo ? kShortDemoTimer : kLongDemoTimer))
     {
         bLongerTimeoutToNextDemo = 1;
         field_1FC_button_index = 0;
@@ -1942,7 +1945,7 @@ MainMenuNextCam MainMenuController::LoadDemo_Update_4D1040(u32)
 
         char_type file[32] = {};
         sprintf(file, "ATTR%04d.SAV.json", sDemos_5617F0[demoId].demoId);
-        sprintf(gActiveDemoName, "PLAYBK%02d.JOY", sDemos_5617F0[demoId].demoId);
+        sprintf(gActiveDemoName, "PLAYBK%02d.JOY.json", sDemos_5617F0[demoId].demoId);
 
         FileSystem fs;
         std::string jsonStr = fs.LoadToString(file);

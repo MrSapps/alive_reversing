@@ -163,16 +163,16 @@ static std::vector<std::string> ConvertBSQ(const FileSystem::Path& dataDir, cons
 }
 
 template <typename LevelIdType>
-static void ConvertDemo(const char_type* pFileName, const FileSystem::Path& dataDir, ReliveAPI::LvlReader& lvlReader, LevelIdType lvlIdxAsLvl, std::vector<u8>& fileBuffer, bool isAo)
+static void ConvertDemo(const std::string& fileName, const FileSystem::Path& dataDir, ReliveAPI::LvlReader& lvlReader, LevelIdType lvlIdxAsLvl, std::vector<u8>& fileBuffer, bool isAo)
 {
-    ReadLvlFileInto(lvlReader, pFileName, fileBuffer);
+    ReadLvlFileInto(lvlReader, fileName.c_str(), fileBuffer);
 
     FileSystem::Path filePath = dataDir;
     filePath.Append(ToString(lvlIdxAsLvl));
 
     FileSystem fs;
     fs.CreateDirectory(filePath);
-    filePath.Append(pFileName);
+    filePath.Append(fileName);
 
     nlohmann::json commandsArray = nlohmann::json::array();
 
@@ -192,7 +192,6 @@ static void ConvertDemo(const char_type* pFileName, const FileSystem::Path& data
         nlohmann::json saveJson;
         to_json(saveJson, convSave);
 
-        std::string fileName(pFileName);
         u32 demoId = std::stoi(fileName.substr(6, 2));
 
         char_type name[32];
@@ -233,12 +232,12 @@ static void ConvertDemo(const char_type* pFileName, const FileSystem::Path& data
         }
     }
 
-    nlohmann::json j =
+    nlohmann::json playbackJson =
     {
         {"commands", commandsArray}
     };
 
-    SaveJson(j, fs, pFileName);
+    SaveJson(playbackJson, fs, (fileName + ".json").c_str());
 }
 
 template <typename LevelIdType>
@@ -877,7 +876,7 @@ static void ConvertFilesInLvl(ThreadPool& tp, const FileSystem::Path& dataDir, F
             }
             else if (bConvertDemos)
             {
-                ConvertDemo(fileName.c_str(), dataDir, lvlReader, lvlIdxAsLvl, fileBuffer, isAo);
+                ConvertDemo(fileName, dataDir, lvlReader, lvlIdxAsLvl, fileBuffer, isAo);
             }
             else if (bConvertPaths)
             {
@@ -1167,7 +1166,7 @@ void DataConversion::DataVersions::Save(const FileSystem::Path& dataDir) const
         {"camera_version", mCameraVersion},
         {"save_file_version", mSaveFileVersion},
         {"font_file_version", mFontFileVersion},
-        {"demo_file_version", 0 /* mDemoFileVersion*/},
+        {"demo_file_version", mDemoFileVersion},
     };
     FileSystem fs;
     FileSystem::Path fileName = dataDir;

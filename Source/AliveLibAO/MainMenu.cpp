@@ -32,6 +32,9 @@
 
 namespace AO {
 
+constexpr s32 kShortDemoTimer = 300;
+constexpr s32 kLongDemoTimer = 1500;
+
 static const AnimId sButtonAnimIds[4] = {
     AnimId::MenuHighlight_Circle,
     AnimId::MenuHighlight_Square,
@@ -985,7 +988,7 @@ void Menu::MainScreen_Update()
         bSmallerTimeout = sDemoPlay;
     }
 
-    const s32 idleMax = bSmallerTimeout != 0 ? 300 : 1500;
+    const s32 idleMax = bSmallerTimeout != 0 ? kShortDemoTimer : kLongDemoTimer;
     if (Input().IsAnyPressed(InputObject::PadIndex::First, (InputCommands::eThrowItem | InputCommands::eUnPause_OrConfirm | InputCommands::eDoAction | InputCommands::eCheatMode | InputCommands::eBack)) || mIdleInputCounter > idleMax)
     {
         if (mIdleInputCounter <= idleMax)
