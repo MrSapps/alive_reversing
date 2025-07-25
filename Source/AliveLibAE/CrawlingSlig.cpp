@@ -1911,8 +1911,8 @@ void CrawlingSlig::PlatformCollide()
     xy.y += 5;
     wh.y += 5;
 
-    OnCollisionWith(
+    CheckPlatformCollision(
         xy,
         wh,
-        gPlatformsArray);
+        PlatformBase::Platforms());
 }

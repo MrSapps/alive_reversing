@@ -4,7 +4,7 @@
 #include "data_conversion/AnimationConverter.hpp"
 
 Sdl2Texture::Sdl2Texture(Sdl2Context& context, u32 width, u32 height, SDL_PixelFormatEnum format, SDL_TextureAccess access)
-    : mContext(context), mFormat(format), mHeight(height), mWidth(width)
+    : mContext(context), mFormat(format), mTextureAccess(access), mHeight(height), mWidth(width)
 {
     // SDL2 does not support palette textures, if we want to store indexed
     // colour we have to handle that internally (using mIndexedPixels)
@@ -14,7 +14,7 @@ Sdl2Texture::Sdl2Texture(Sdl2Context& context, u32 width, u32 height, SDL_PixelF
     }
     else
     {
-        mTexture = SDL_CreateTexture(mContext.GetRenderer(), mFormat, access, mWidth, mHeight);
+        mTexture = SDL_CreateTexture(mContext.GetRenderer(), mFormat, mTextureAccess, mWidth, mHeight);
 
         if (!mTexture)
         {
@@ -90,6 +90,16 @@ std::shared_ptr<Sdl2Texture> Sdl2Texture::FromMask(Sdl2Context& context, std::sh
     return resultTex;
 }
 
+u32 Sdl2Texture::GetHeight()
+{
+    return mHeight;
+}
+
+u32 Sdl2Texture::GetWidth()
+{
+    return mWidth;
+}
+
 SDL_Texture* Sdl2Texture::GetTexture()
 {
     if (mFormat == SDL_PIXELFORMAT_INDEX8)
@@ -117,14 +127,14 @@ SDL_Texture* Sdl2Texture::GetTextureUsePalette(const std::shared_ptr<AnimationPa
             mLastShadeColor.ToU32() == shading.ToU32()
         )
         {
-            LOG("%s", "SDL2 palette tex cache hit");
+            //LOG("%s", "SDL2 palette tex cache hit");
             return mTexture;
         }
 
         SDL_DestroyTexture(mTexture);
     }
 
-    LOG("%s", "SDL2 palette tex cache miss");
+    //LOG("%s", "SDL2 palette tex cache miss");
     mTexture = SDL_CreateTexture(mContext.GetRenderer(), SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, mWidth, mHeight);
 
     // Lock target texture, all the per-pixel ops are handled here - sampling
@@ -197,9 +207,9 @@ SDL_Texture* Sdl2Texture::GetTextureUsePalette(const std::shared_ptr<AnimationPa
         }
         else
         {
-            pixelsTarget[r] = colour.r / 2;
-            pixelsTarget[g] = colour.g / 2;
-            pixelsTarget[b] = colour.b / 2;
+            pixelsTarget[r] = colour.r;
+            pixelsTarget[g] = colour.g;
+            pixelsTarget[b] = colour.b;
             pixelsTarget[a] = 0;
         }
     }
@@ -245,6 +255,29 @@ SDL_Texture* Sdl2Texture::GetTextureUsePalette(const std::shared_ptr<AnimationPa
     return mTexture;
 }
 
+void Sdl2Texture::Resize(u32 width, u32 height)
+{
+    if (mTexture)
+    {
+        SDL_DestroyTexture(mTexture);
+    }
+
+    mWidth = width;
+    mHeight = height;
+
+    mTexture = SDL_CreateTexture(mContext.GetRenderer(), mFormat, mTextureAccess, mWidth, mHeight);
+
+    if (!mTexture)
+    {
+        ALIVE_FATAL("%s", SDL_GetError());
+    }
+}
+
+void Sdl2Texture::SetTextureBlendMode(SDL_BlendMode blendMode)
+{
+    SDL_SetTextureBlendMode(mTexture, blendMode);
+}
+
 void Sdl2Texture::Update(const SDL_Rect* rect, const void* pixels)
 {
     if (mFormat == SDL_PIXELFORMAT_INDEX8)
@@ -261,12 +294,21 @@ void Sdl2Texture::Update(const SDL_Rect* rect, const void* pixels)
                 pitch = mWidth * 4;
                 break;
 
+            case SDL_PIXELFORMAT_RGB565:
+            {
+                pitch = rect ? rect->w * 2 : mWidth * 2;
+                break;
+            }
+
             default:
                 ALIVE_FATAL("SDL2 - Unsupported texture format %d", mFormat);
                 break;
         }
 
-        SDL_UpdateTexture(mTexture, rect, pixels, pitch);
+        if (SDL_UpdateTexture(mTexture, rect, pixels, pitch) < 0)
+        {
+            ALIVE_FATAL(SDL_GetError());
+        }
     }
 }
 

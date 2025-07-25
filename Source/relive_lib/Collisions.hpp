@@ -134,10 +134,6 @@ inline constexpr CollisionMask kBgCeiling(eBackgroundCeiling_7);
 inline constexpr CollisionMask kFgFloorOrCeiling(eFloor_0, eDynamicCollision_32, eCeiling_3);
 inline constexpr CollisionMask kBgFloorOrCeiling(eBackgroundFloor_4, eBackgroundDynamicCollision_36, eBackgroundCeiling_7);
 
-
-inline constexpr CollisionMask kFgFloorWallOrCeiling(eFloor_0, eDynamicCollision_32, eWallLeft_1, eWallRight_2, eCeiling_3);
-inline constexpr CollisionMask kBgFloorWallOrCeiling(eBackgroundFloor_4, eBackgroundDynamicCollision_36, eBackgroundWallLeft_5, eBackgroundWallRight_6, eBackgroundCeiling_7);
-
 inline constexpr CollisionMask kFgWallsOrFloor(eFloor_0, eDynamicCollision_32, eWallLeft_1, eWallRight_2);
 inline constexpr CollisionMask kBgWallsOrFloor(eBackgroundFloor_4, eBackgroundDynamicCollision_36, eBackgroundWallLeft_5, eBackgroundWallRight_6);
 

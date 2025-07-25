@@ -21,23 +21,18 @@ Electrocute::Electrocute(BaseAliveGameObject* pTargetObj, bool bExtraOverwriter,
         pTargetObj->Type() == ReliveTypes::eAbe ||
         (pTargetObj->Type() == ReliveTypes::eSlig && GetGameType() == GameType::eAe))
     {
+        // TODO: This probably isn't working, idea is that we take 2 copies of the pal
+        // set the animation to be using one of these copies that that overwrite updates
+        // then at the end set back the pal to be one we didn't mess with
+        mOldPalData = *pTargetObj->GetAnimation().mAnimRes.mPngPtr->mPal;
         mPalData = *pTargetObj->GetAnimation().mAnimRes.mPngPtr->mPal;
-    }
-
-    // Note: Real game may leave a ptr un-inited depending on the count
-    // we just do them all because its easier and safer.
-    for (auto& pPalOverwriter : mPalOverwriters)
-    {
-        pPalOverwriter = nullptr;
+        *pTargetObj->GetAnimation().mAnimRes.mCurPal = mPalData;
     }
 }
 
 Electrocute::~Electrocute()
 {
-    for (auto& pPalOverwriter : mPalOverwriters)
-    {
-        relive_delete pPalOverwriter;
-    }
+    KillPalOverwriters();
 }
 
 void Electrocute::VScreenChanged()
@@ -50,10 +45,14 @@ void Electrocute::VScreenChanged()
     }
 }
 
-// TODO all these need changing to RGB32
-u32 Pal_Make_Colour(u8 r, u8 g, u8 b, s16 bOpaque)
+static RGBA32 Pal_Make_Colour(u8 r, u8 g, u8 b, bool bOpaque)
 {
-    return (bOpaque != 0 ? 0x8000 : 0) + ((u32) r >> 3) + 4 * ((g & 0xF8) + 32 * (b & 0xF8));
+    RGBA32 rgba;
+    rgba.r = r;
+    rgba.g = g;
+    rgba.b = b;
+    rgba.a = bOpaque ? 254 : 0; // TODO: Wrong ?
+    return rgba;
 }
 
 void Electrocute::VUpdate()
@@ -89,12 +88,12 @@ void Electrocute::VUpdate()
 
         case States::eAlphaFadeout:
             mPalOverwriters[0] = relive_new PalleteOverwriter(
-                *pTargetObj->GetAnimation().mAnimRes.mPngPtr->mPal,
-                static_cast<s16>(Pal_Make_Colour(255u, 255, 255, 1)));
+                mPalData,
+                Pal_Make_Colour(255u, 255, 255, true));
 
             mPalOverwriters[1] = relive_new PalleteOverwriter(
-                *pTargetObj->GetAnimation().mAnimRes.mPngPtr->mPal,
-                static_cast<s16>(Pal_Make_Colour(64u, 64, 255, 1)));
+                mPalData,
+                Pal_Make_Colour(64u, 64, 255, true));
             if (mPalOverwriters[1])
             {
                 mPalOverwriters[1]->SetUpdateDelay(4);
@@ -102,8 +101,8 @@ void Electrocute::VUpdate()
 
             if (mExtraOverwriter)
             {
-                mPalOverwriters[2] = relive_new PalleteOverwriter(*pTargetObj->GetAnimation().mAnimRes.mPngPtr->mPal,
-                    static_cast<s16>(Pal_Make_Colour(0, 0, 0, 0)));
+                mPalOverwriters[2] = relive_new PalleteOverwriter(mPalData,
+                    Pal_Make_Colour(0, 0, 0, false));
                 if (mPalOverwriters[2])
                 {
                     mPalOverwriters[2]->SetUpdateDelay(8);
@@ -127,24 +126,8 @@ void Electrocute::VUpdate()
                     pTargetObj->GetAnimation().SetRender(false);
                 }
 
-                if (pTargetObj->Type() == ReliveTypes::eAbe && GetGameType() == GameType::eAo ||
-                    GetGameType() == GameType::eAe)
+                if (DeElectrocuteTarget())
                 {
-                    /* TODO: update the pal
-                    if (field_40_pPalData)
-                    {
-                        Pal_Set(
-                            pTargetObj->mAnim.mPalVramXY,
-                            pTargetObj->mAnim.mPalDepth,
-                            reinterpret_cast<const u8*>(field_40_pPalData),
-                            &field_4C_pal_rect);
-                    }*/
-
-                    // Restore the previous rgb values before the target was electrocuted
-                    pTargetObj->mRGB.SetRGB(mTargetRed, mTargetGreen, mTargetBlue);
-                    pTargetObj->SetElectrocuting(false);
-
-                    mTargetObjId = Guid{};
                     mState = States::eKillElectrocute;
                 }
             }
@@ -170,34 +153,42 @@ void Electrocute::VUpdate()
 
 void Electrocute::Stop()
 {
+    KillPalOverwriters();
+
+    SetDead(true);
+
+    DeElectrocuteTarget();
+}
+
+void Electrocute::KillPalOverwriters()
+{
     for (auto& pPalOverwriter : mPalOverwriters)
     {
         relive_delete pPalOverwriter;
         pPalOverwriter = nullptr;
     }
+}
 
-    SetDead(true);
-
+bool Electrocute::DeElectrocuteTarget()
+{
     auto pTarget = static_cast<BaseAliveGameObject*>(sObjectIds.Find_Impl(mTargetObjId));
     if (pTarget)
     {
         if (GetGameType() == GameType::eAo && pTarget->Type() == ReliveTypes::eAbe ||
             GetGameType() == GameType::eAe)
         {
-            /* TODO: Update pal
-            Pal_Set(
-                pTarget->mAnim.mPalVramXY,
-                pTarget->mAnim.mPalDepth,
-                reinterpret_cast<const u8*>(field_40_pPalData),
-                &field_4C_pal_rect);
-            */
+            // Restore old pal
+            *pTarget->GetAnimation().mAnimRes.mPngPtr->mPal = mOldPalData;
+
             pTarget->mRGB.SetRGB(mTargetRed, mTargetGreen, mTargetBlue);
             pTarget->SetElectrocuting(false);
         }
 
         pTarget->VTakeDamage(this);
         mTargetObjId = Guid{};
+        return true;
     }
+    return false;
 }
 
 bool Electrocute::IsLastOverwriterFinished()

@@ -745,10 +745,10 @@ void Fleech::Motion_9_Fall()
                 if (BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eDynamicCollision_32 || BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eBackgroundDynamicCollision_36)
                 {
                     const PSX_RECT bRect = VGetBoundingRect();
-                    OnCollisionWith(
+                    CheckPlatformCollision(
                         {bRect.x, static_cast<s16>(bRect.y + 5)},
                         {bRect.w, static_cast<s16>(FP_GetExponent(mYPos) + 5)},
-                        gPlatformsArray);
+                        PlatformBase::Platforms());
                 }
                 if (mYPos - BaseAliveGameObjectLastLineYPos <= FP_FromInteger((GetSpriteScale() >= FP_FromInteger(1) ? 20 : 10)) * FP_FromInteger(15))
                 {
@@ -1852,7 +1852,6 @@ void Fleech::ToIdle()
     mVelY = FP_FromInteger(0);
     mCurrentMotion = eFleechMotions::Motion_3_Idle;
     mNextMotion = eFleechMotions::eNone_m1;
-    sFleechRandomIdx_5BC20C++; // NOTE: unused variable removed - don't desync on RNG
 }
 
 const relive::SfxDefinition& getSfxDef(FleechSound effectId)
@@ -2349,7 +2348,7 @@ void Fleech::MoveAlongFloor()
                 const PSX_RECT bRect = VGetBoundingRect();
                 const PSX_Point xy = {bRect.x, static_cast<s16>(bRect.y + 5)};
                 const PSX_Point wh = {bRect.w, static_cast<s16>(bRect.h + 5)};
-                OnCollisionWith(xy, wh, gPlatformsArray);
+                CheckPlatformCollision(xy, wh, PlatformBase::Platforms());
             }
         }
         else if (!BrainIs(IFleechBrain::EBrainTypes::Patrol))

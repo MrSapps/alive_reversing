@@ -311,16 +311,10 @@ PauseMenu::~PauseMenu()
 
 void PauseMenu::Init()
 {
-    if (mMudIconAnim.Init(GetAnimRes(AnimId::NormalMudIcon), this))
-    {
-        mMudIconAnim.SetRenderLayer(GetAnimation().GetRenderLayer());
-        mMudIconAnim.SetSpriteScale(GetSpriteScale());
-        mMudIconAnim.SetRGB(127, 127, 127);
-    }
-    else
-    {
-        SetListAddFailed(true);
-    }
+    mMudIconAnim.Init(GetAnimRes(AnimId::NormalMudIcon), this);
+    mMudIconAnim.SetRenderLayer(GetAnimation().GetRenderLayer());
+    mMudIconAnim.SetSpriteScale(GetSpriteScale());
+    mMudIconAnim.SetRGB(127, 127, 127);
 }
 
 void PauseMenu::VRender(OrderingTable& ot)

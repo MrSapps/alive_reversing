@@ -29,6 +29,7 @@
 #include "MainMenuTransition.hpp"
 #include "../relive_lib/ObjectIds.hpp"
 #include "../AliveLibAE/Game.hpp"
+#include "GameEnderController.hpp"
 
 namespace AO {
 
@@ -441,8 +442,8 @@ Menu::Menu(relive::Path_TLV* /*pTlv*/, const Guid& tlvId)
     gEnableCheatLevelSelect = false;
     gKilledMudokons = 0;
     gRescuedMudokons = 0;
-    gRestartRuptureFarmsKilledMuds = 0;
-    gRestartRuptureFarmsSavedMuds = 0;
+    GameEnderController::gRestartRuptureFarmsKilledMuds = 0;
+    GameEnderController::gRestartRuptureFarmsSavedMuds = 0;
 
     // 30 = fmv select
     if (gMap.mCurrentCamera == 30)

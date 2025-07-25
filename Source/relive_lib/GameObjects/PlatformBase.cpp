@@ -6,6 +6,29 @@
 #include "../FixedPoint.hpp"
 #include "../data_conversion/relive_tlvs.hpp"
 #include "../GameType.hpp"
+#include "FatalError.hpp"
+DynamicArrayT<BaseGameObject>* PlatformBase::sPlatformsArray = nullptr;
+
+void PlatformBase::MakeArray()
+{
+    FreeArray();
+    sPlatformsArray = relive_new DynamicArrayT<BaseGameObject>(20); // For trap doors/dynamic platforms
+}
+
+void PlatformBase::FreeArray()
+{
+    relive_delete sPlatformsArray;
+    sPlatformsArray = nullptr;
+}
+
+DynamicArrayT<BaseGameObject>& PlatformBase::Platforms()
+{
+    if (!sPlatformsArray)
+    {
+        ALIVE_FATAL("sPlatformsArray is null");
+    }
+    return *sPlatformsArray;
+}
 
 PlatformBase::PlatformBase()
     : BaseAliveGameObject(0)
@@ -74,15 +97,12 @@ void PlatformBase::AddDynamicCollision(AnimId animId, relive::Path_TLV* pTlv, co
     mPlatformBaseYOffset = FP_GetExponent(FP_FromInteger(pTlv->mTopLeftY) - mYPos);
     mPlatformBaseHeightOffset = FP_GetExponent(FP_FromInteger(pTlv->mTopLeftY) - mYPos);
 
-    if (!gPlatformsArray->Push_Back(this))
-    {
-        SetListAddFailed(true);
-    }
+    PlatformBase::Platforms().Push_Back(this);
 }
 
 PlatformBase::~PlatformBase()
 {
-    gPlatformsArray->Remove_Item(this);
+    PlatformBase::Platforms().Remove_Item(this);
 
     if (mPlatformBaseCollisionLine)
     {

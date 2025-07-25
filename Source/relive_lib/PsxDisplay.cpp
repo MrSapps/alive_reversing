@@ -67,13 +67,13 @@ struct DebugTexts final
 static s32 sFntCount = 0;
 static DebugTexts sDebugTexts[4] = {};
 
-void DebugFont_Reset_4F8B40()
+static void DebugFont_Reset_4F8B40()
 {
     memset(sDebugTexts, 0, sizeof(DebugTexts) * 4); // 8240u
     sFntCount = 0;
 }
 
-void DebugFont_Update_Text_4F8BE0(s32 idx)
+static void DebugFont_Update_Text_4F8BE0(s32 idx)
 {
     if (idx >= 0 && idx <= 3)
     {
@@ -87,7 +87,7 @@ bool gDebugFontLoaded = false;
 static s32 sDebugTextIdx = 0;
 
 
-s32 DebugFont_Open_4F8AB0(u8 xMargin, u8 yMargin, u8 displayWidth, u8 displayHeight, u32 maxLenChars)
+static s32 DebugFont_Open_4F8AB0(u8 xMargin, u8 yMargin, u8 displayWidth, u8 displayHeight, u32 maxLenChars)
 {
     const s32 idx = sFntCount;
     if (sFntCount == 4)
@@ -113,7 +113,7 @@ s32 DebugFont_Open_4F8AB0(u8 xMargin, u8 yMargin, u8 displayWidth, u8 displayHei
     return idx;
 }
 
-s32 DebugFont_Init() // Font
+s32 DebugFont::DebugFont_Init()
 {
     if (!gDebugFontLoaded)
     {
@@ -122,11 +122,18 @@ s32 DebugFont_Init() // Font
     DebugFont_Reset_4F8B40();
     sDebugTextIdx = DebugFont_Open_4F8AB0(8, 16, static_cast<u8>(gPsxDisplay.mWidth), 200, 600u);
     sDebugFontTmpBuffer[0] = 0;
+
+    mDebugFontContext.LoadFontType(FontType::Debug);
+
+    PalResource palRes;
+    palRes.mPal = mDebugFontContext.mFntResource.mCurPal;
+    mDebugFont.Load(512,  palRes, &mDebugFontContext);         
+
     return 0;
 }
 
 
-s32 DebugFont_Printf(s32 idx, const char_type* formatStr, ...)
+s32 DebugFont::DebugFont_Printf(s32 idx, const char_type* formatStr, ...)
 {
     va_list va;
     va_start(va, formatStr);
@@ -141,35 +148,33 @@ s32 DebugFont_Printf(s32 idx, const char_type* formatStr, ...)
     return static_cast<s32>(strlen(sDebugTexts[idx].mText.mSrcTxt));
 }
 
-void DebugFont_Flush()
+void DebugFont::DebugFont_Flush()
 {
     DebugFont_Printf(sDebugTextIdx, sDebugFontTmpBuffer);
     DebugFont_Update_Text_4F8BE0(sDebugTextIdx);
     sDebugFontTmpBuffer[0] = 0;
 }
 
-void PSX_DrawDebugTextBuffers()
+void DebugFont::PSX_DrawDebugTextBuffers(OrderingTable& ot)
 {
     if (sFntCount <= 0)
     {
         return;
     }
 
-    //if (pBmp)
+    s32 polyOffset = 0;
+    for (s32 i = 0; i < sFntCount; i++)
     {
-        /*
-        const LONG fontHeight = BMP_Get_Font_Height_4F21F0(pBmp);
-        for (s32 i = 0; i < sFntCount; i++)
+        DebugTexts* pRecord = &sDebugTexts[i];
+        const s32 xpos = pRecord->mMarginX;
+        s16 ypos = pRecord->mMarginY;
+        for (char_type* j = strtok(pRecord->mText.mDstTxt, "\n\r"); j; j = strtok(0, "\n\r"))
         {
-            DebugTexts* pRecord = &sDebugTexts[i];
-            const s32 xpos = rect.left + pRecord->mMarginX;
-            s32 ypos = rect.top + pRecord->mMarginY;
-            for (char_type* j = strtok(pRecord->mText.mDstTxt, "\n\r"); j; j = strtok(0, "\n\r"))
-            {
-                BMP_Draw_String_4F2230(pBmp, xpos, ypos, j);
-                ypos += fontHeight;
-            }
-        }*/
+            gFontDrawScreenSpace = true;
+            polyOffset += mDebugFont.DrawString(ot, j, xpos, ypos, relive::TBlendModes::eBlend_0, 0, 0, Layer::eLayer_Text_42, 127, 127, 127, polyOffset, FP_FromInteger(1), 640, 0);
+            gFontDrawScreenSpace = false;
+            ypos += 9;
+        }
     }
 }
 
@@ -181,6 +186,8 @@ void PsxDisplay::Init()
     mHeight = 240;
 
     mDrawEnv.mOrderingTable.Clear();
+
+    mDebugFont.DebugFont_Init();
 
     PSX_VSync(VSyncMode::UncappedFps);
 }
@@ -194,6 +201,13 @@ void PsxDisplay::RenderOrderingTable()
 {
     // Single buffered rendering
     PSX_Calc_FrameSkip();
+
+    if (!gTurnOffRendering)
+    {
+        // Done here as it adds to the OT
+        mDebugFont.PSX_DrawDebugTextBuffers(mDrawEnv.mOrderingTable);
+    }
+
     if (gCommandLine_NoFrameSkip)
     {
         PSX_DrawOTag(mDrawEnv.mOrderingTable);
@@ -210,6 +224,8 @@ void PsxDisplay::RenderOrderingTable()
         }
         PSX_VSync(VSyncMode::LimitTo30Fps);
     }
-    PSX_PutDispEnv_4F58E0();
+    
+    PSX_PutDispEnv_4F5890();
+
     mDrawEnv.mOrderingTable.Clear();
 }

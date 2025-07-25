@@ -104,22 +104,8 @@ void AirExplosion::VUpdate()
 
         case 3:
         {
-            // TODO: AE has a rev bug and should've done what AO does
-            // in the else block but we have to keep the bug until we do a new
-            // recording for AE
-            if (GetGameType() == GameType::eAe)
-            {
-                rect.x = FP_GetExponent(FP_FromInteger(-60) * mExplosionScale);
-                rect.w = FP_GetExponent(FP_FromInteger(60) * mExplosionScale);
-                rect.y = FP_GetExponent(FP_FromInteger(-60) * mExplosionScale);
-                rect.h = FP_GetExponent(FP_FromInteger(30) * mExplosionScale);
-                DealBlastDamage(&rect);
-            }
-            else
-            {
-                relive_new ParticleBurst(mXPos, mYPos, mSmallExplosion ? 6 : 20, mParticleBurstScale, BurstType::eBigRedSparks, mSmallExplosion ? 11 : 13, false);
-                relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, relive::TBlendModes::eBlend_3, 1);
-            }
+            relive_new ParticleBurst(mXPos, mYPos, mSmallExplosion ? 6 : 20, mParticleBurstScale, BurstType::eBigRedSparks, mSmallExplosion ? 11 : 13, false);
+            relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, relive::TBlendModes::eBlend_3, 1);
             break;
         }
 
@@ -173,11 +159,6 @@ void AirExplosion::VUpdate()
 
         if (pParticle)
         {
-            if (pParticle->GetListAddFailed())
-            {
-                pParticle->SetDead(true);
-            }
-
             pParticle->SetApplyShadowZoneColour(false);
             pParticle->GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_1);
 
@@ -194,20 +175,9 @@ void AirExplosion::VUpdate()
 
 void AirExplosion::VScreenChanged()
 {
-    // TODO: check if AE can do gMap.LevelChanged() || gMap.PathChanged() without desyncing
-    if (GetGameType() == GameType::eAe)
+    if (GetMap().LevelChanged() || GetMap().PathChanged())
     {
-        if (GetMap().mOverlayId != GetMap().GetOverlayId())
-        {
-            SetDead(true);
-        }
-    }
-    else
-    {
-        if (GetMap().LevelChanged() || GetMap().PathChanged())
-        {
-            SetDead(true);
-        }
+        SetDead(true);
     }
 }
 

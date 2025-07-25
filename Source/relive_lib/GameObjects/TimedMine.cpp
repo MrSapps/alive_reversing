@@ -207,19 +207,13 @@ void TimedMine::VRender(OrderingTable& ot)
 
 void TimedMine::InitTickAnimation()
 {
-    if (mTickAnim.Init(GetAnimRes(AnimId::Bomb_RedGreenTick), this))
-    {
-        mTickAnim.SetRenderLayer(GetAnimation().GetRenderLayer());
-        mTickAnim.SetSemiTrans(true);
-        mTickAnim.SetBlending(true);
-        mTickAnim.SetSpriteScale(GetSpriteScale());
-        mTickAnim.SetRGB(128, 128, 128);
-        mTickAnim.SetBlendMode(relive::TBlendModes::eBlend_1);
-    }
-    else
-    {
-        SetListAddFailed(true);
-    }
+    mTickAnim.Init(GetAnimRes(AnimId::Bomb_RedGreenTick), this);
+    mTickAnim.SetRenderLayer(GetAnimation().GetRenderLayer());
+    mTickAnim.SetSemiTrans(true);
+    mTickAnim.SetBlending(true);
+    mTickAnim.SetSpriteScale(GetSpriteScale());
+    mTickAnim.SetRGB(128, 128, 128);
+    mTickAnim.SetBlendMode(relive::TBlendModes::eBlend_1);
 }
 
 void TimedMine::StickToLiftPoint()
@@ -249,29 +243,25 @@ void TimedMine::StickToLiftPoint()
             &hitY,
             usedMask))
     {
-        if (pLine->mLineType == eLineTypes::eDynamicCollision_32 ||
-            pLine->mLineType == eLineTypes::eBackgroundDynamicCollision_36)
+        if (pLine->mLineType == eLineTypes::eDynamicCollision_32 || pLine->mLineType == eLineTypes::eBackgroundDynamicCollision_36)
         {
-            if (gPlatformsArray)
+            for (s32 i = 0; i < PlatformBase::Platforms().Size(); i++)
             {
-                for (s32 i = 0; i < gPlatformsArray->Size(); i++)
+                BaseGameObject* pObj = PlatformBase::Platforms().ItemAt(i);
+                if (!pObj)
                 {
-                    BaseGameObject* pObj = gPlatformsArray->ItemAt(i);
-                    if (!pObj)
-                    {
-                        break;
-                    }
+                    break;
+                }
 
-                    if (pObj->Type() == ReliveTypes::eLiftPoint)
+                if (pObj->Type() == ReliveTypes::eLiftPoint)
+                {
+                    PlatformBase* pLiftPoint = static_cast<PlatformBase*>(pObj);
+                    const PSX_RECT bRect = pLiftPoint->VGetBoundingRect();
+                    if (FP_GetExponent(mXPos) > bRect.x && FP_GetExponent(mXPos) < bRect.w && FP_GetExponent(mYPos) < bRect.h)
                     {
-                        auto pLiftPoint = static_cast<AO::LiftPoint*>(pObj);
-                        const PSX_RECT bRect = pLiftPoint->VGetBoundingRect();
-                        if (FP_GetExponent(mXPos) > bRect.x && FP_GetExponent(mXPos) < bRect.w && FP_GetExponent(mYPos) < bRect.h)
-                        {
-                            pLiftPoint->VAdd(this);
-                            BaseAliveGameObject_PlatformId = pObj->mBaseGameObjectId;
-                            return;
-                        }
+                        pLiftPoint->VAdd(this);
+                        BaseAliveGameObject_PlatformId = pObj->mBaseGameObjectId;
+                        return;
                     }
                 }
             }

@@ -198,20 +198,14 @@ UXB::UXB(relive::Path_UXB* pTlv, const Guid& tlvId)
 
 void UXB::InitBlinkAnim(Animation* pAnimation)
 {
-    if (pAnimation->Init(GetAnimRes(AnimId::Bomb_RedGreenTick), this))
-    {
-        pAnimation->SetSemiTrans(true);
-        pAnimation->SetBlending(true);
+    pAnimation->Init(GetAnimRes(AnimId::Bomb_RedGreenTick), this);
+    pAnimation->SetSemiTrans(true);
+    pAnimation->SetBlending(true);
 
-        pAnimation->SetRenderLayer(GetAnimation().GetRenderLayer());
-        pAnimation->SetSpriteScale(GetSpriteScale());
-        pAnimation->SetRGB(128, 128, 128);
-        pAnimation->SetBlendMode(relive::TBlendModes::eBlend_1);
-    }
-    else
-    {
-        SetListAddFailed(true);
-    }
+    pAnimation->SetRenderLayer(GetAnimation().GetRenderLayer());
+    pAnimation->SetSpriteScale(GetSpriteScale());
+    pAnimation->SetRGB(128, 128, 128);
+    pAnimation->SetBlendMode(relive::TBlendModes::eBlend_1);
 }
 
 void UXB::VOnAbeInteraction()

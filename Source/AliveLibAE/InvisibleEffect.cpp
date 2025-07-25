@@ -128,19 +128,19 @@ void InvisibleEffect::VUpdate()
                         // Red
                         if (mPal2.mPal->mPal[idx].r)
                         {
-                            mPal2.mPal->mPal[idx].r = ClampedAdd(mPal2.mPal->mPal[idx].r, -8);
+                            mPal2.mPal->mPal[idx].r = ClampedSub(mPal2.mPal->mPal[idx].r, (u8)8);
                         }
 
                         // Green
                         if (mPal2.mPal->mPal[idx].g)
                         {
-                            mPal2.mPal->mPal[idx].g = ClampedAdd(mPal2.mPal->mPal[idx].g, -8);
+                            mPal2.mPal->mPal[idx].g = ClampedSub(mPal2.mPal->mPal[idx].g, (u8)8);
                         }
 
                         // Blue
                         if (mPal2.mPal->mPal[idx].b)
                         {
-                            mPal2.mPal->mPal[idx].b = ClampedAdd(mPal2.mPal->mPal[idx].b, -8);
+                            mPal2.mPal->mPal[idx].b = ClampedSub(mPal2.mPal->mPal[idx].b, (u8)8);
                         }
 
                         // Semi trans

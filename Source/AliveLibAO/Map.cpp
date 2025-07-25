@@ -930,9 +930,9 @@ void Map::GoTo_Camera()
                 }
             }
 
-            if (gPlatformsArray->Size() > 0)
+            if (PlatformBase::Platforms().Size() > 0)
             {
-                ALIVE_FATAL("%d Platforms have been leaked!", gPlatformsArray->Size());
+                ALIVE_FATAL("%d Platforms have been leaked!", PlatformBase::Platforms().Size());
             }
 
             relive_delete gCollisions;

@@ -31,7 +31,6 @@ private:
 
     FontContext mFontContext;
     AliveFont mFont;
-    PalResource mFontPal;
 
     u32 mTimer = 0;
     std::string mCurMessage;

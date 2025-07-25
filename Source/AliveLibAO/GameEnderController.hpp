@@ -25,6 +25,9 @@ public:
 
     s32 mTimer = 0;
     GameEnderControllerStates mState = GameEnderControllerStates::eInit_0;
+
+    static s16 gRestartRuptureFarmsKilledMuds;
+    static s16 gRestartRuptureFarmsSavedMuds;
 };
 
 } // namespace AO

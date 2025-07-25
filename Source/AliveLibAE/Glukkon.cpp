@@ -2100,7 +2100,7 @@ void Glukkon::VUpdate()
                 xy.y += 5;
                 wh.y += 5;
 
-                OnCollisionWith(xy, wh, gPlatformsArray);
+                CheckPlatformCollision(xy, wh, PlatformBase::Platforms());
             }
         }
         mFadeId = BaseGameObject::RefreshId(mFadeId);
@@ -2687,10 +2687,10 @@ void Glukkon::FollowLine()
 
 void Glukkon::GetOnPlatforms()
 {
-    OnCollisionWith(
+    CheckPlatformCollision(
         {FP_GetExponent(mXPos - FP_FromInteger(5)), FP_GetExponent(mYPos - FP_FromInteger(5))},
         {FP_GetExponent(mXPos + FP_FromInteger(5)), FP_GetExponent(mYPos + FP_FromInteger(5))},
-        gPlatformsArray);
+        PlatformBase::Platforms());
 }
 
 const relive::SfxDefinition stepSfx_554840[3] = {
@@ -2908,8 +2908,8 @@ bool Glukkon::IsLineOfSightBetween(Glukkon* pGlukkon, BaseAliveGameObject* pOthe
                &pathLine,
                &hitX,
                &hitY,
-               pGlukkon->GetScale() == Scale::Fg ? kFgFloorWallOrCeiling
-               : kBgFloorWallOrCeiling)
+               pGlukkon->GetScale() == Scale::Fg ? kFgFloorCeilingOrWalls
+                                                 : kBgFloorCeilingOrWalls)
         != 1;
 }
 

@@ -383,10 +383,10 @@ void Slog::MoveOnLine()
                     PSX_RECT rect = VGetBoundingRect();
                     rect.y += 5;
                     rect.h += 5;
-                    OnCollisionWith(
+                    CheckPlatformCollision(
                         {rect.x, rect.y},
                         {rect.w, rect.h},
-                        gPlatformsArray);
+                        PlatformBase::Platforms());
                 }
             }
         }
@@ -531,10 +531,6 @@ void Slog::ToIdle()
     mVelY = FP_FromInteger(0);
     mCurrentMotion = eSlogMotions::Motion_0_Idle;
     mNextMotion = eSlogMotions::None_m1;
-
-    // NOTE: unused field removed - keep the random call to prevent
-    // playbacks from desyncing on RNG
-    Slog_NextRandom();
 }
 
 void Slog::ToJump()
@@ -1051,10 +1047,10 @@ void Slog::Motion_4_Fall()
                     PSX_RECT bRect = VGetBoundingRect();
                     bRect.y += 5;
                     bRect.h = FP_GetExponent(mYPos) + 5;
-                    OnCollisionWith(
+                    CheckPlatformCollision(
                         {bRect.x, bRect.y},
                         {bRect.w, bRect.h},
-                        gPlatformsArray);
+                        PlatformBase::Platforms());
                 }
                 mCurrentMotion = eSlogMotions::Motion_11_Land;
                 break;

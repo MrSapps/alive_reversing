@@ -425,7 +425,7 @@ void Bone::VUpdate()
             const s16 offset = GetScale() == Scale::Fg ? 5 : 0;
             const PSX_Point xy{bRect.x, static_cast<s16>(bRect.y + offset)};
             const PSX_Point wh{bRect.w, static_cast<s16>(bRect.h + offset)};
-            OnCollisionWith(xy, wh, gBaseGameObjects);
+            CheckPlatformCollision(xy, wh, *gBaseGameObjects);
 
             if (WallHit(FP_FromInteger(5), mVelX))
             {
@@ -505,7 +505,7 @@ void Bone::VUpdate()
             const s16 offset = GetScale() == Scale::Fg ? 5 : 0;
             const PSX_Point xy{bRect.x, static_cast<s16>(bRect.y + offset)};
             const PSX_Point wh{bRect.w, static_cast<s16>(bRect.h + offset)};
-            OnCollisionWith(xy, wh, gBaseGameObjects);
+            CheckPlatformCollision(xy, wh, *gBaseGameObjects);
 
             if (mYPos > FP_FromInteger(gMap.mPathData->field_6_bBottom))
             {

@@ -118,6 +118,13 @@ void Animation::VRender(s32 xpos, s32 ypos, OrderingTable& ot, s16 width, s32 he
         scaled_height *= mSpriteScale;
         scaled_width  *= mSpriteScale;
 
+        // (AE) Add 1 if half scale
+        if (GetGameType() == GameType::eAe && mSpriteScale == FP_FromDouble(0.5))
+        {
+            scaled_height += FP_FromDouble(1.0);
+            scaled_width  += FP_FromDouble(1.0);
+        }
+
         // Apply scale to x/y offset
         xOffset_scaled = (xOffset_scaled * mSpriteScale);
         yOffset_scaled = (yOffset_scaled * mSpriteScale) - FP_FromInteger(1);
@@ -342,7 +349,7 @@ s16 Animation::Set_Animation_Data(AnimResource& pAnimRes)
     return 1;
 }
 
-s16 Animation::Init(const AnimResource& ppAnimData, BaseGameObject* pGameObj)
+void Animation::Init(const AnimResource& ppAnimData, BaseGameObject* pGameObj)
 {
     // TODO extra - init to 0's first - this may be wrong if any bits are explicitly set before this is called
     SetAnimate(false);
@@ -381,19 +388,13 @@ s16 Animation::Init(const AnimResource& ppAnimData, BaseGameObject* pGameObj)
     mSpriteScale = FP_FromInteger(1);
 
     // NOTE: OG bug or odd compiler code gen? Why isn't it using the passed in list which appears to always be this anyway ??
-    if (!AnimationBase::gAnimations->Push_Back(this))
-    {
-        LOG_ERROR("AnimationBase::gAnimations->Push_Back(this) returned 0 but shouldn't");
-        return 0;
-    }
+    AnimationBase::gAnimations->Push_Back(this);
 
     // Get first frame decompressed/into VRAM
     VDecode();
 
     SetFrameChangeCounter(1);
     SetCurrentFrame(-1);
-
-    return 1;
 }
 
 void Animation::SetFrame(s32 newFrame)

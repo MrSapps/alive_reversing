@@ -169,6 +169,7 @@ enum class FontType
     None,
     PauseMenu,
     LcdFont,
+    Debug,
 };
 
 class FontResource final

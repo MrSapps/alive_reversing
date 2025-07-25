@@ -81,16 +81,13 @@ BaseAnimatedWithPhysicsGameObject::BaseAnimatedWithPhysicsGameObject(s16 resourc
 
 BaseAnimatedWithPhysicsGameObject::~BaseAnimatedWithPhysicsGameObject()
 {
-    if (!GetListAddFailed())
+    if (GetDrawable())
     {
-        if (GetDrawable())
-        {
-            gObjListDrawables->Remove_Item(this);
-            GetAnimation().VCleanUp();
-        }
-
-        delete GetShadow();
+        gObjListDrawables->Remove_Item(this);
+        GetAnimation().VCleanUp();
     }
+
+    delete GetShadow();
 }
 
 void BaseAnimatedWithPhysicsGameObject::VRender(OrderingTable& ot)
@@ -149,36 +146,22 @@ void BaseAnimatedWithPhysicsGameObject::VRender(OrderingTable& ot)
 
 void BaseAnimatedWithPhysicsGameObject::Animation_Init(const AnimResource& res)
 {
-    if (GetAnimation().Init(res, this))
-    {
-        if (GetSpriteScale() == FP_FromInteger(1))
-        {
-            GetAnimation().SetRenderLayer(Layer::eLayer_27);
-        }
-        else
-        {
-            GetAnimation().SetRenderLayer(Layer::eLayer_8);
-            SetScale(Scale::Bg);
-        }
+    GetAnimation().Init(res, this);
 
-        const bool added = gObjListDrawables->Push_Back(this) ? true : false;
-        if (added)
-        {
-            GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_0);
-            GetAnimation().SetBlending(false);
-            GetAnimation().SetSemiTrans(true);
-        }
-        else
-        {
-            SetDead(true);
-            SetListAddFailed(true);
-        }
+    if (GetSpriteScale() == FP_FromInteger(1))
+    {
+        GetAnimation().SetRenderLayer(Layer::eLayer_27);
     }
     else
     {
-        SetListAddFailed(true);
-        SetDead(true);
+        GetAnimation().SetRenderLayer(Layer::eLayer_8);
+        SetScale(Scale::Bg);
     }
+
+    gObjListDrawables->Push_Back(this);
+    GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_0);
+    GetAnimation().SetBlending(false);
+    GetAnimation().SetSemiTrans(true);
 }
 
 CameraPos BaseAnimatedWithPhysicsGameObject::Is_In_Current_Camera()

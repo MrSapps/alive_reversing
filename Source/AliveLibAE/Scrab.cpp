@@ -3346,7 +3346,7 @@ void Scrab::PlatformCollide()
     const PSX_RECT bRect = VGetBoundingRect();
     const PSX_Point xy = {bRect.x, static_cast<s16>(bRect.y + 5)};
     const PSX_Point wh = {bRect.w, static_cast<s16>(bRect.h + 5)};
-    OnCollisionWith(xy, wh, gPlatformsArray);
+    CheckPlatformCollision(xy, wh, PlatformBase::Platforms());
 }
 
 BaseAliveGameObject* Scrab::Find_Fleech()
@@ -4081,8 +4081,8 @@ bool Scrab::LineOfSightTo(Scrab* pThis, BaseAliveGameObject* pObj)
                &pLine,
                &hitX,
                &hitY,
-               pThis->GetScale() == Scale::Fg ? kFgFloorWallOrCeiling
-               : kBgFloorWallOrCeiling)
+               pThis->GetScale() == Scale::Fg ? kFgFloorCeilingOrWalls
+                                              : kBgFloorCeilingOrWalls)
         != 1;
 } 
 

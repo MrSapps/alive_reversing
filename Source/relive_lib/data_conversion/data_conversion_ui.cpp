@@ -18,43 +18,14 @@ DataConversionUI::DataConversionUI(GameType gameType)
     mPoly.SetRGB2(0, 0, 255);
     mPoly.SetRGB3(255, 0, 255);
 
-    /*
-    mFontContext.LoadFontType(FontType::LcdFont);
-    mFontPal.mPal = mFontContext.mFntResource.mPngPtr->mPal;
-    mFont.Load(512, mFontPal, &mFontContext);
-    */
 
-    mFontContext.mAtlasArray = sDebugFontAtlas;
+    mFontContext.LoadFontType(FontType::Debug);
 
-    mFontPal.mPal = std::make_shared<AnimationPal>();
+    PalResource palRes;
+    palRes.mPal = mFontContext.mFntResource.mCurPal;
+    mFont.Load(512,  palRes, &mFontContext);
     
-    auto fontFile = reinterpret_cast<File_Font*>(sDebugFont);
-    for (s32 i = 0; i < fontFile->mPaletteSize; i++)
-    {
-        mFontPal.mPal->mPal[i] = RGBConversion::RGBA555ToRGBA888Components(fontFile->mPalette[i]);
-    }
 
-    std::vector<u8> newData(fontFile->mWidth * fontFile->mHeight); // TODO *2 was out of bounds?
-
-    // Expand 4bit to 8bit
-    std::size_t src = 0;
-    std::size_t dst = 0;
-    while (dst < newData.size())
-    {
-        newData[dst++] = (fontFile->mPixelBuffer[src] & 0xF);
-        newData[dst++] = ((fontFile->mPixelBuffer[src++] & 0xF0) >> 4);
-    }
-
-    mFontContext.mFntResource.mCurPal = mFontPal.mPal;
-    mFontContext.mFntResource.mPngPtr = std::make_shared<PngData>();
-    mFontContext.mFntResource.mPngPtr->mWidth = fontFile->mWidth;
-    mFontContext.mFntResource.mPngPtr->mHeight = fontFile->mHeight;
-
-    mFontContext.mFntResource.mPngPtr->mPixels.resize(fontFile->mWidth * fontFile->mHeight);
-    mFontContext.mFntResource.mPngPtr->mPixels = newData;
-    mFontContext.mFntResource.mCurPal = mFontContext.mFntResource.mPngPtr->mPal;
-    mFont.Load(512, mFontPal, &mFontContext);
-    
     /*
     BaseAnimatedWithPhysicsGameObject::MakeArray();
     gBaseGameObjects = relive_new DynamicArrayT<BaseGameObject>(90);

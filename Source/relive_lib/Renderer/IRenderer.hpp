@@ -86,10 +86,8 @@ public: // TODO: Make protected later
 public:
     enum class Renderers
     {
-        Vulkan,
-        DirectX9,
-        OpenGL,
-        Sdl2
+        Sdl2,
+        OpenGL
     };
 
     static IRenderer* GetRenderer();
@@ -183,6 +181,7 @@ protected:
     static constexpr s32 kTargetFramebufferWidth = 640;
 
 protected:
+    SDL_Rect GetFramebufferRect();
     SDL_Rect GetTargetDrawRect();
 
 protected:

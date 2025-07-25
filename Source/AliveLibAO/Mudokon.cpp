@@ -311,10 +311,10 @@ Mudokon::Mudokon(relive::Path_TLV* pTlv, const Guid& tlvId)
         if (BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eDynamicCollision_32 || BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eBackgroundDynamicCollision_36)
         {
             const PSX_RECT bRect = VGetBoundingRect();
-            OnCollisionWith(
+            CheckPlatformCollision(
                 PSX_Point{bRect.x, static_cast<s16>(bRect.y + 5)},
                 PSX_Point{bRect.w, static_cast<s16>(bRect.h + 5)},
-                gPlatformsArray);
+                PlatformBase::Platforms());
         }
     }
 
@@ -963,10 +963,10 @@ void Mudokon::MoveOnLine()
                 BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eBackgroundDynamicCollision_36)
             {
                 const PSX_RECT bRect = VGetBoundingRect();
-                OnCollisionWith(
+                CheckPlatformCollision(
                     PSX_Point{bRect.x, static_cast<s16>(bRect.y + 5)},
                     PSX_Point{bRect.w, static_cast<s16>(bRect.h + 5)},
-                    gPlatformsArray);
+                    PlatformBase::Platforms());
             }
         }
     }
@@ -2361,10 +2361,10 @@ void Mudokon::Motion_51_Fall()
                 wh.x = FP_GetExponent(mXPos + FP_FromInteger(10));
                 wh.y = FP_GetExponent(mYPos + FP_FromInteger(10));
 
-                OnCollisionWith(
+                CheckPlatformCollision(
                     xy,
                     wh,
-                    gPlatformsArray);
+                    PlatformBase::Platforms());
                 break;
 
             case eLineTypes::eWallLeft_1:

@@ -26,7 +26,6 @@ BaseGameObject::BaseGameObject(s16 bAddToObjectList, s16 resourceArraySize)
 
     SetType(ReliveTypes::eNone);
 
-    mListAddFailed = false;
     mDead = false;
     mIsBaseAnimatedWithPhysicsObj = false;
     mIsBaseAliveGameObject = false;
@@ -39,10 +38,7 @@ BaseGameObject::BaseGameObject(s16 bAddToObjectList, s16 resourceArraySize)
 
     if (bAddToObjectList)
     {
-        if (!gBaseGameObjects->Push_Back(this))
-        {
-            SetListAddFailed(true);
-        }
+        gBaseGameObjects->Push_Back(this);
     }
 
     Guid nextId = Guid::NewGuid();

@@ -14,11 +14,6 @@ extern u16 gAttract; // AE var
 namespace AO {
 
 
-
-extern s16 gRestartRuptureFarmsKilledMuds;
-extern s16 gRestartRuptureFarmsSavedMuds;
-
-
 void Init_GameStates();
 
 void Game_Main();

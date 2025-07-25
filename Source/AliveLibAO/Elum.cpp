@@ -371,10 +371,10 @@ void Elum::MoveOnLine(s16 xLookAhead)
         else if (BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eDynamicCollision_32)
         {
             const PSX_RECT bRect = VGetBoundingRect();
-            OnCollisionWith(
+            CheckPlatformCollision(
                 {bRect.x, static_cast<s16>(bRect.y + 5)},
                 {bRect.w, static_cast<s16>(bRect.h + 5)},
-                gPlatformsArray);
+                PlatformBase::Platforms());
         }
     }
     else
@@ -2258,10 +2258,10 @@ void Elum::Motion_21_Land()
                 wh.x = FP_GetExponent(mXPos + FP_FromInteger(10));
                 wh.y = FP_GetExponent(mYPos + FP_FromInteger(10));
 
-                OnCollisionWith(
+                CheckPlatformCollision(
                     xy,
                     wh,
-                    gPlatformsArray);
+                    PlatformBase::Platforms());
                 break;
             }
 
@@ -2546,10 +2546,10 @@ void Elum::Motion_32_HopLand()
     {
         const PSX_RECT bRect = VGetBoundingRect();
 
-        OnCollisionWith(
+        CheckPlatformCollision(
             {bRect.x, static_cast<s16>(bRect.y + 5)},
             {bRect.w, static_cast<s16>(bRect.h + 5)},
-            gPlatformsArray);
+            PlatformBase::Platforms());
 
         MapFollowMe(true);
 
@@ -2613,10 +2613,10 @@ void Elum::Motion_35_RunJumpLand()
     {
         const PSX_RECT bRect = VGetBoundingRect();
 
-        OnCollisionWith(
+        CheckPlatformCollision(
             {bRect.x, static_cast<s16>(bRect.y + 5)},
             {bRect.w, static_cast<s16>(bRect.h + 5)},
-            gPlatformsArray);
+            PlatformBase::Platforms());
 
         if (sControlledCharacter == this)
         {
@@ -2929,10 +2929,10 @@ void Elum::Motion_42_RunToWalk()
 
         PSX_Point xy{FP_GetExponent(mXPos - FP_FromInteger(10)), FP_GetExponent(mYPos - FP_FromInteger(10))};
         PSX_Point wh{FP_GetExponent(mXPos + FP_FromInteger(10)), FP_GetExponent(mYPos + FP_FromInteger(10))};
-        OnCollisionWith(
+        CheckPlatformCollision(
             xy,
             wh,
-            gPlatformsArray);
+            PlatformBase::Platforms());
 
         FP offX = {};
         if (GetAnimation().GetFlipX())
@@ -2989,10 +2989,10 @@ void Elum::Motion_43_MidRunToWalk()
         PSX_Point xy{FP_GetExponent(mXPos - FP_FromInteger(10)), FP_GetExponent(mYPos - FP_FromInteger(10))};
         PSX_Point wh{FP_GetExponent(mXPos + FP_FromInteger(10)), FP_GetExponent(mYPos + FP_FromInteger(10))};
 
-        OnCollisionWith(
+        CheckPlatformCollision(
             xy,
             wh,
-            gPlatformsArray);
+            PlatformBase::Platforms());
 
         FP offX = {};
         if (GetAnimation().GetFlipX())
@@ -3292,10 +3292,10 @@ void Elum::VUpdate()
 
             const PSX_RECT bRect = VGetBoundingRect();
 
-            OnCollisionWith(
+            CheckPlatformCollision(
                 {bRect.x, static_cast<s16>(bRect.y + 5)},
                 {bRect.w, static_cast<s16>(bRect.h + 5)},
-                gPlatformsArray);
+                PlatformBase::Platforms());
 
             if (BaseAliveGameObject_PlatformId != Guid{})
             {

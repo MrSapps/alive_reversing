@@ -12,7 +12,7 @@ public:
     DynamicArray(const DynamicArray& rhs) = delete;
     DynamicArray& operator=(const DynamicArray& rhs) const = delete;
 
-    s16 Expand(s16 expandSize);
+    void Expand(s32 expandSize);
 
     bool IsEmpty() const
     {
@@ -35,18 +35,18 @@ public:
     }
 
 public:
-    s16 Push_Back(void* pValue);
+    void Push_Back(void* pValue);
 
 protected:
     void Remove_Item(void* pItemToRemove);
     void** mArray = nullptr;
 
 public:
-    s16 mUsedSize = 0;
+    s32 mUsedSize = 0;
 
 private:
-    s16 mMaxSize = 0;
-    s16 mExpandSizeBy = 0;
+    s32 mMaxSize = 0;
+    s32 mExpandSizeBy = 0;
 };
 
 // Typed wrapper for DynamicArray
@@ -56,9 +56,9 @@ class DynamicArrayT final : public DynamicArray
 public:
     using DynamicArray::DynamicArray;
 
-    s16 Push_Back(T* pValue)
+    void Push_Back(T* pValue)
     {
-        return DynamicArray::Push_Back(pValue);
+        DynamicArray::Push_Back(pValue);
     }
 
     void Remove_Item(T* pItemToRemove)

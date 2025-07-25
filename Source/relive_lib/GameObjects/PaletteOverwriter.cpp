@@ -1,36 +1,40 @@
 #include "PaletteOverwriter.hpp"
 
-#define kPalDepth 64
-
 // Overwrites a pallete 8 colours at a time one per update
-PalleteOverwriter::PalleteOverwriter(AnimationPal& pal, s16 colour)
-    : BaseGameObject(false, 0)
+PalleteOverwriter::PalleteOverwriter(AnimationPal& pal, const RGBA32& colour)
+    : BaseGameObject(false, 0), mPal(pal)
 {
     SetType(ReliveTypes::ePalOverwriter);
 
     gObjListDrawables->Push_Back(this);
 
-    mPal = pal;
+    //mPal = pal;
 
-    u32 palDepth = 1; // account for the first array index which is 0
+    mPalDepth = 1; // account for the first array index which is 0
     for (u32 i = 0; i < ALIVE_COUNTOF(mPal.mPal); i++)
     {
         if (*(reinterpret_cast<u32*>(&mPal.mPal[i])) != 0)
         {
-            palDepth++;
+            mPalDepth++;
         }
     }
-    LOG_INFO("pal depth %d", palDepth);
+    LOG_INFO("pal depth %d", mPalDepth);
+
+
+    // This object was only ever given 64 color pals in the past, since the VUpdate would overwrite
+    // 8 entries per loop it took 64/8=8 calls to VUpdate to complete the overwrite.
+    // No matter what we have the pal depth set to we have to complete the overwrite in 8 updates, hence
+    // we divide the depth by 8 in order to know how many colours to overwrite per VUpdate to finish in 8 iterations.
+    // The reason we stick to 8 ticks is to keep the gaming logic timing the same without it being changed depending
+    // on what assets are being used.
+    mColoursToUpdatePerIteration = mPalDepth / 8;
 
     SetDrawable(true);
 
-    for (auto& palBufferEntry : mPalBuffer)
-    {
-        palBufferEntry = colour;
-    }
+    mColour = colour;
 
-    mPalW = 8;
-    mPalXIndex = 1;
+    mNumEntriesToOverwrite = mColoursToUpdatePerIteration;
+    mCurPalIndex = 1;
     mFirstUpdate = true;
     mDone = false;
 }
@@ -49,16 +53,10 @@ void PalleteOverwriter::VRender(OrderingTable& /*ot*/)
 {
     if (!mDone)
     {
-        // TODO: FIX ME - abstraction break, the x value is used as an offset as to how much to overwrite, the width isn't isn't the pal depth in this case
-        /*
-        const IRenderer::PalRecord palRec{ static_cast<s16>(field_20_pal_xy.x + mPalXIndex), field_20_pal_xy.y, mPalW};
-
-        IRenderer::GetRenderer()->PalSetData(palRec, reinterpret_cast<u8*>(&mPalBuffer[0]));
-        */
-
-        // TODO: Copy in the 8 new entries
-
-        // TODO: Actually set this pal back on the anim
+        for (u32 i = mCurPalIndex; i < mCurPalIndex + mNumEntriesToOverwrite; i++)
+        {
+            mPal.mPal[i] = mColour;
+        }
     }
 }
 
@@ -71,23 +69,25 @@ void PalleteOverwriter::VUpdate()
     }
     else
     {
-        if (mPalXIndex == kPalDepth - 1)
+        if (mCurPalIndex == mPalDepth - 1)
         {
             // Got to the end
             mDone = true;
         }
         else
         {
-            mPalXIndex += 8;
+            mCurPalIndex += mColoursToUpdatePerIteration;
 
-            if (mPalXIndex >= kPalDepth - 1)
+            // Don't go out of bounds (overflow)
+            if (mCurPalIndex >= mPalDepth - 1)
             {
-                mPalXIndex = kPalDepth - 1;
+                mCurPalIndex = mPalDepth - 1;
             }
 
-            if (mPalXIndex + mPalW >= kPalDepth - 1)
+            // Don't let the amount of entries to overwrite go out of bounds (overflow)
+            if (mCurPalIndex + mNumEntriesToOverwrite >= mPalDepth - 1)
             {
-                mPalW = kPalDepth - mPalXIndex;
+                mNumEntriesToOverwrite = mPalDepth - mCurPalIndex;
             }
         }
     }

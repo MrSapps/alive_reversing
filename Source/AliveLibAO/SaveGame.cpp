@@ -13,6 +13,7 @@
 #include "../relive_lib/data_conversion/AOSaveSerialization.hpp"
 #include "../relive_lib/data_conversion/data_conversion.hpp"
 #include "Map.hpp"
+#include "GameEnderController.hpp"
 
 namespace AO {
 
@@ -82,8 +83,8 @@ void SaveGame::LoadFromMemory(SaveData* pData, s32 bKillObjects)
     gRescuedMudokons = pData->mRescuedMudokons;
     gKilledMudokons = pData->mKilledMudokons;
 
-    gRestartRuptureFarmsSavedMuds = pData->field_2A4_restartRuptureFarmsSavedMudokons;
-    gRestartRuptureFarmsKilledMuds = pData->mRestartRuptureFarmsKilledMuds;
+    GameEnderController::gRestartRuptureFarmsSavedMuds = pData->field_2A4_restartRuptureFarmsSavedMudokons;
+    GameEnderController::gRestartRuptureFarmsKilledMuds = pData->mRestartRuptureFarmsKilledMuds;
 
     gAbe->mHealth = FP_FromInteger(1);
     gAbe->field_11C_regen_health_timer = sGnFrame;
@@ -213,12 +214,12 @@ void SaveGame::SaveToMemory(SaveData* pSaveData)
     pSaveData->mAbe_ContinuePointSpriteScale = gAbe->mContinuePointSpriteScale;
     pSaveData->mRescuedMudokons = gRescuedMudokons;
     pSaveData->mAbe_SavedHaveShrykull = gAbe->field_154_bSavedHaveShrykull;
-    pSaveData->field_2A4_restartRuptureFarmsSavedMudokons = gRestartRuptureFarmsSavedMuds;
+    pSaveData->field_2A4_restartRuptureFarmsSavedMudokons = GameEnderController::gRestartRuptureFarmsSavedMuds;
     pSaveData->mAbe_HaveShrykull = gAbe->mHaveShrykull;
     pSaveData->mCurrentPath = gMap.mCurrentPath;
     pSaveData->mKilledMudokons = gKilledMudokons;
     pSaveData->mCurrentCamera = gMap.mCurrentCamera;
-    pSaveData->mRestartRuptureFarmsKilledMuds = gRestartRuptureFarmsKilledMuds;
+    pSaveData->mRestartRuptureFarmsKilledMuds = GameEnderController::gRestartRuptureFarmsKilledMuds;
     pSaveData->mAbe_CurrentFrame = static_cast<u16>(gAbe->GetAnimation().GetCurrentFrame());
     pSaveData->mAbe_CurrentMotion = gAbe->mCurrentMotion;
     pSaveData->mAbe_XPos = FP_GetExponent(gAbe->mXPos);

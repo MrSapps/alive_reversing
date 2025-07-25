@@ -4618,10 +4618,10 @@ void Slig::VUpdate()
                 if (BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eDynamicCollision_32 || BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eBackgroundDynamicCollision_36)
                 {
                     const PSX_RECT bRect = VGetBoundingRect();
-                    OnCollisionWith(
+                    CheckPlatformCollision(
                         {bRect.x, static_cast<s16>(bRect.y + 5)},
                         {bRect.w, static_cast<s16>(bRect.h + 5)},
-                        gPlatformsArray);
+                        PlatformBase::Platforms());
                 }
             }
         }
@@ -4832,23 +4832,8 @@ void Slig::ShouldStillBeAlive()
 
                 if (!anyPointInCamera)
                 {
-                    // TODO: Remove me when making a new recording
-                    if (gMap.Is_Point_In_Current_Camera(
-                            mCurrentLevel,
-                            mCurrentPath,
-                            FP_FromInteger(field_290_points_count),
-                            FP_FromInteger(mPreventDepossession),
-                            0))
-
-                    {
-                        anyPointInCamera = true;
-                    }
-
-                    if (!anyPointInCamera)
-                    {
-                        // No patrol points in current camera
-                        SetDead(true);
-                    }
+                    // No patrol points in current camera
+                    SetDead(true);
                 }
             }
         }
@@ -5536,7 +5521,7 @@ void Slig::PlatformCollide()
     wh.x = FP_GetExponent(mXPos + FP_FromInteger(5));
     wh.y = FP_GetExponent(mYPos + FP_FromInteger(5));
 
-    OnCollisionWith(xy, wh, gPlatformsArray);
+    CheckPlatformCollision(xy, wh, PlatformBase::Platforms());
 }
 
 void Slig::ToKnockBack()
