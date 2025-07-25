@@ -18,6 +18,9 @@
 
 namespace AO {
 
+s16 GameEnderController::gRestartRuptureFarmsKilledMuds = 0;
+s16 GameEnderController::gRestartRuptureFarmsSavedMuds = 0;
+
 void GameEnderController::CreateGameEnderController()
 {
     relive_new GameEnderController();

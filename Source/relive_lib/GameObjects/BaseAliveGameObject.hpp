@@ -32,7 +32,7 @@ public:
         return 0;
     }
 
-    void OnCollisionWith(PSX_Point xy, PSX_Point wh, DynamicArrayT<BaseGameObject>* pObjList);
+    void CheckPlatformCollision(PSX_Point xy, PSX_Point wh, DynamicArrayT<BaseGameObject>& pObjList);
 
     void SetActiveCameraDelayedFromDir();
     Scale PerGameScale() const;

@@ -11,12 +11,15 @@ class Map;
 class PlatformBase : public BaseAliveGameObject
 {
 public:
+    static void MakeArray();
+    static void FreeArray();
+    static DynamicArrayT<BaseGameObject>& Platforms();
+
     PlatformBase();
     ~PlatformBase();
 
     virtual void VAdd(BaseAliveGameObject* pObj);
     virtual void VRemove(BaseAliveGameObject* pObj);
-
 protected:
     void AddDynamicCollision(AnimId animId, relive::Path_TLV* pTlv, const Guid& tlvId);
     void SyncCollisionLinePosition();
@@ -29,6 +32,8 @@ protected:
     s16 mPlatformBaseHeightOffset = 0;
     PathLine* mPlatformBaseCollisionLine = nullptr;
     Guid mPlatformBaseTlvInfo;
+
+private:
+    static DynamicArrayT<BaseGameObject>* sPlatformsArray;
 };
 
-extern DynamicArrayT<BaseGameObject>* gPlatformsArray;

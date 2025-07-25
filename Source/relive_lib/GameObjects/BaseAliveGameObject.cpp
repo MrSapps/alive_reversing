@@ -13,6 +13,7 @@
 #include "../../AliveLibAE/Map.hpp"
 #include "../FatalError.hpp"
 #include "../../AliveLibAE/Abe.hpp"
+#include "PlatformBase.hpp"
 
 DynamicArrayT<BaseAliveGameObject>* gBaseAliveGameObjects = nullptr;
 
@@ -58,33 +59,30 @@ void BaseAliveGameObject::VOnTrapDoorOpen()
     // Empty
 }
 
-void BaseAliveGameObject::OnCollisionWith(PSX_Point xy, PSX_Point wh, DynamicArrayT<BaseGameObject>* pObjList)
+void BaseAliveGameObject::CheckPlatformCollision(PSX_Point xy, PSX_Point wh, DynamicArrayT<BaseGameObject>& pObjList)
 {
-    if (pObjList)
+    for (s32 i = 0; i < pObjList.Size(); i++)
     {
-        for (s32 i = 0; i < pObjList->Size(); i++)
+        BaseGameObject* pObjIter = pObjList.ItemAt(i);
+        if (!pObjIter)
         {
-            BaseGameObject* pObjIter = pObjList->ItemAt(i);
-            if (!pObjIter)
-            {
-                break;
-            }
+            break;
+        }
 
-            if (pObjIter->GetIsBaseAnimatedWithPhysicsObj())
+        if (pObjIter->GetIsBaseAnimatedWithPhysicsObj())
+        {
+            if (pObjIter->GetDrawable())
             {
-                if (pObjIter->GetDrawable())
+                BaseAnimatedWithPhysicsGameObject* pObj = static_cast<BaseAnimatedWithPhysicsGameObject*>(pObjIter);
+                const PSX_RECT bRect = pObj->VGetBoundingRect();
+                if (xy.x <= bRect.w && wh.x >= bRect.x && wh.y >= bRect.y && xy.y <= bRect.h)
                 {
-                    BaseAnimatedWithPhysicsGameObject* pObj = static_cast<BaseAnimatedWithPhysicsGameObject*>(pObjIter);
-                    const PSX_RECT bRect = pObj->VGetBoundingRect();
-                    if (xy.x <= bRect.w && wh.x >= bRect.x && wh.y >= bRect.y && xy.y <= bRect.h)
+                    // NOTE: AO ignored scale here
+                    if (GetGameType() == GameType::eAo || (GetGameType() == GameType::eAe && GetScale() == pObj->GetScale()))
                     {
-                        // NOTE: AO ignored scale here
-                        if (GetGameType() == GameType::eAo || (GetGameType() == GameType::eAe && GetScale() == pObj->GetScale()))
+                        if (!VOnPlatformIntersection(pObj))
                         {
-                            if (!VOnPlatformIntersection(pObj))
-                            {
-                                break;
-                            }
+                            break;
                         }
                     }
                 }
@@ -265,8 +263,7 @@ bool BaseAliveGameObject::IsInInvisibleZone(BaseAliveGameObject* pObj)
         bRect.y,
         bRect.w,
         bRect.h,
-        ReliveTypes::eInvisibleZone
-    );
+        ReliveTypes::eInvisibleZone);
 
     while (pTlv)
     {
@@ -283,10 +280,10 @@ bool BaseAliveGameObject::IsInInvisibleZone(BaseAliveGameObject* pObj)
 
         // Check for stacked/overlaping TLV's
         pTlv = GetMap().TLV_Get_At(pTlv,
-                                     FP_FromInteger(bRect.x),
-                                     FP_FromInteger(bRect.y),
-                                     FP_FromInteger(bRect.w),
-                                     FP_FromInteger(bRect.h));
+                                   FP_FromInteger(bRect.x),
+                                   FP_FromInteger(bRect.y),
+                                   FP_FromInteger(bRect.w),
+                                   FP_FromInteger(bRect.h));
     }
     return false;
 }
@@ -539,7 +536,7 @@ void BaseAliveGameObject::VCheckCollisionLineStillValid(s32 distance)
             xy.y += 5;
             wh.y += 5;
 
-            OnCollisionWith(xy, wh, gPlatformsArray);
+            CheckPlatformCollision(xy, wh, PlatformBase::Platforms());
         }
     }
     else
@@ -1149,7 +1146,7 @@ bool BaseAliveGameObject::VOnPlatformIntersection(BaseAnimatedWithPhysicsGameObj
     }
 
     // OG bug fix, when we call VCheckCollisionLineStillValid it can place us on a new lift
-    // but then we call OnCollisionWith which can sometimes add us to the same lift again
+    // but then we call CheckPlatformCollision which can sometimes add us to the same lift again
     // result in the lift being leaked and then memory corruption/crash later.
     BaseAliveGameObject* pCurrentPlatform = static_cast<BaseAliveGameObject*>(sObjectIds.Find_Impl(BaseAliveGameObject_PlatformId));
     if (pCurrentPlatform != pPlatform)

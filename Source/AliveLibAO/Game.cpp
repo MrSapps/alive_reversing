@@ -34,6 +34,7 @@
 #include "../AliveLibAE/VGA.hpp"
 #include "../relive_lib/GameObjects/GasCountDown.hpp"
 #include "../relive_lib/GameObjects/PlatformBase.hpp"
+#include "GameEnderController.hpp"
 
 // Note: Using AE var
 //bool gDDCheatOn = false;
@@ -42,15 +43,11 @@ extern bool gBreakGameLoop; // AE var
 
 namespace AO {
 
-// TODO: Move to game ender controller for AO sync
-s16 gRestartRuptureFarmsKilledMuds = 0;
-s16 gRestartRuptureFarmsSavedMuds = 0;
-
 
 void Init_GameStates()
 {
-    gKilledMudokons = gRestartRuptureFarmsKilledMuds;
-    gRescuedMudokons = gRestartRuptureFarmsSavedMuds;
+    gKilledMudokons = GameEnderController::gRestartRuptureFarmsKilledMuds;
+    gRescuedMudokons = GameEnderController::gRestartRuptureFarmsSavedMuds;
 
     gDeathGasOn = false;
     gDeathGasTimer = 0;
@@ -61,16 +58,13 @@ void Init_GameStates()
 
 void Init_Sound_DynamicArrays_And_Others()
 {
-    DebugFont_Init();
-
     gPauseMenu = nullptr;
     gAbe = nullptr;
     sControlledCharacter = nullptr;
     gNumCamSwappers = 0;
     sGnFrame = 0;
 
-    gPlatformsArray = relive_new DynamicArrayT<BaseGameObject>(20); // For trap doors/dynamic platforms
-
+    PlatformBase::MakeArray();
     ShadowZone::MakeArray();
 
     gBaseAliveGameObjects = relive_new DynamicArrayT<::BaseAliveGameObject>(20);
@@ -196,7 +190,7 @@ void Game_Loop()
         }
         GetGameAutoPlayer().SyncPoint(SyncPoints::DrawAllEnd);
 
-        DebugFont_Flush();
+        gPsxDisplay.mDebugFont.DebugFont_Flush();
         gScreenManager->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
         SYS_EventsPump(); // Exit checking?
 
@@ -317,7 +311,7 @@ void Game_Run()
     AnimationBase::FreeAnimationArray();
     BaseAnimatedWithPhysicsGameObject::FreeArray();
     relive_delete gBaseGameObjects;
-    relive_delete gPlatformsArray;
+    PlatformBase::FreeArray();
     relive_delete gBaseAliveGameObjects;
 
     MusicController::Shutdown();

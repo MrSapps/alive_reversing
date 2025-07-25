@@ -32,11 +32,9 @@
 #include "../relive_lib/GameObjects/GasCountDown.hpp"
 #include "../relive_lib/SwitchStates.hpp"
 #include "../relive_lib/Collisions.hpp"
+#include "../relive_lib/GameObjects/PlatformBase.hpp"
 
 u32 sGnFrame = 0;
-
-// Arrays of things
-DynamicArrayT<BaseGameObject>* gPlatformsArray = nullptr;
 
 bool gBreakGameLoop = false;
 s16 gNumCamSwappers = 0;
@@ -52,6 +50,7 @@ s32 sFrameCount_5CA300 = 0;
 
 u16 gAttract = 0;
 
+// QuickSave load/Restart path calls this
 void DestroyObjects()
 {
     ResourceManagerWrapper::LoadingLoop(false);
@@ -159,32 +158,29 @@ void Alive_Show_ErrorMsg(const char_type* fmt, ...)
 
 void Init_GameStates()
 {
-    gKilledMudokons = gFeeco_Restart_KilledMudCount;
+    gKilledMudokons = gFeeco_Restart_KilledMudCount; // DDCheat
     gRescuedMudokons = gFeecoRestart_SavedMudCount;
 
-    gDeathGasOn = false;
+    gDeathGasOn = false; // GasCountDown
     gDeathGasTimer = 0;
 
-    gbDrawMeterCountDown = false;
+    gbDrawMeterCountDown = false; // ColourfulMeter
     gTotalMeterBars = 0;
 
-    gAbeInvincible = false;
+    gAbeInvincible = false; // Abe
 
-    SwitchStates_ClearRange(2u, 255u);
+    SwitchStates_ClearRange(0, 255);
 }
 
 void Init_Sound_DynamicArrays_And_Others()
 {
-    DebugFont_Init();
-
-    gPauseMenu = nullptr;
+    gPauseMenu = nullptr; // PauseMenu
     gAbe = nullptr;
     sControlledCharacter = nullptr;
-    gNumCamSwappers = 0;
+    gNumCamSwappers = 0; // TODO: Move
     sGnFrame = 0;
 
-    gPlatformsArray = relive_new DynamicArrayT<BaseGameObject>(20); // For trap doors/dynamic platforms
-
+    PlatformBase::MakeArray();
     ShadowZone::MakeArray();
 
     gBaseAliveGameObjects = relive_new DynamicArrayT<BaseAliveGameObject>(20);
@@ -305,7 +301,7 @@ void Game_Loop()
         }
         GetGameAutoPlayer().SyncPoint(SyncPoints::DrawAllEnd);
 
-        DebugFont_Flush();
+        gPsxDisplay.mDebugFont.DebugFont_Flush();
         gScreenManager->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
         SYS_EventsPump(); // Exit checking?
 
@@ -372,7 +368,7 @@ void Game_Loop()
         if (pObjToKill->GetDead())
         {
             i = gBaseGameObjects->RemoveAt(i);
-            delete pObjToKill;
+            relive_delete pObjToKill;
         }
     }
 }
@@ -404,10 +400,6 @@ void Game_Run()
     Input_Init();
     Init_Sound_DynamicArrays_And_Others();
     
-    // Not technically needed yet but will de-sync if not instantiated here
-    CamResource nullCamRes;
-    gScreenManager = relive_new ScreenManager(nullCamRes, &gMap.mCameraOffset);
-
     gMap.Init(EReliveLevelIds::eMenu, 1, 25, CameraSwapEffects::eInstantChange_0, 0, 0);
 
     DDCheat_Allocate();
@@ -431,7 +423,7 @@ void Game_Run()
     AnimationBase::FreeAnimationArray();
     BaseAnimatedWithPhysicsGameObject::FreeArray();
     relive_delete gBaseGameObjects;
-    relive_delete gPlatformsArray;
+    PlatformBase::FreeArray();
     ShadowZone::FreeArray();
     relive_delete gBaseAliveGameObjects;
     relive_delete gCollisions;

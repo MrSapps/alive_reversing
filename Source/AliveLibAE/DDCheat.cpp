@@ -207,7 +207,7 @@ void DDCheat::DebugStr(const char_type* pFormatStr, ...)
 
     va_start(va, pFormatStr);
     vsprintf(buffer, pFormatStr, va);
-    DebugFont_Printf(0, buffer);
+    gPsxDisplay.mDebugFont.DebugFont_Printf(0, buffer);
 }
 
 void DDCheat::VUpdate()
@@ -271,7 +271,7 @@ void DDCheat::VUpdate()
     if (gDDCheat_FlyingEnabled || gDDCheat_ShowAI_Info || sDDCheat_AlwaysShow)
     {
         DebugStr(
-            "\n%sP%dC%d gnframe=%5d",
+            "\n%sP%dC%d gnframe=%d",
             Path_Get_Lvl_Name(gMap.mCurrentLevel),
             gMap.mCurrentPath,
             gMap.mCurrentCamera,

@@ -18,7 +18,6 @@ enum class VSyncMode
 
 void PSX_VSync(VSyncMode mode);
 void PSX_PutDispEnv_4F5890();
-void PSX_PutDispEnv_4F58E0();
 void PSX_EMU_SetCallBack_4F9430(TPsxEmuCallBack fnPtr);
 
 bool PSX_Rects_overlap_no_adjustment(const PSX_RECT* pRect1, const PSX_RECT* pRect2);

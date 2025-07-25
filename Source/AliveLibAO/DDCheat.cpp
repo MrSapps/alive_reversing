@@ -428,7 +428,7 @@ s32 DDCheat::DebugFont_Printf(s32 idx, const char_type* formatStr, ...)
     char_type buffer[1024] = {};
     vsprintf(buffer, formatStr, va);
 
-    return ::DebugFont_Printf(idx, buffer);
+    return gPsxDisplay.mDebugFont.DebugFont_Printf(idx, buffer);
 }
 
 s32 DDCheat::DebugStr(const char_type* pStr, ...)
