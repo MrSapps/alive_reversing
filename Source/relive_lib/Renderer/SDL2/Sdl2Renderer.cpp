@@ -31,8 +31,6 @@ Sdl2Renderer::~Sdl2Renderer()
 
 void Sdl2Renderer::Clear(u8 r, u8 g, u8 b)
 {
-    LOG("%s", "SDL2: Clear viewport");
-
     // Check and store the renderer's clipping state
     SDL_Rect clipRect;
 
@@ -55,8 +53,6 @@ void Sdl2Renderer::Clear(u8 r, u8 g, u8 b)
 
 void Sdl2Renderer::Draw(const Prim_GasEffect& gasEffect)
 {
-    LOG("%s", "SDL2: Draw Prim_GasEffect");
-
     const f32 x = static_cast<f32>(gasEffect.x);
     const f32 y = static_cast<f32>(gasEffect.y);
     const f32 w = static_cast<f32>(gasEffect.w);
@@ -87,8 +83,6 @@ void Sdl2Renderer::Draw(const Prim_GasEffect& gasEffect)
 
 void Sdl2Renderer::Draw(const Line_G2& line)
 {
-    LOG("%s", "SDL2: Draw Line_G2");
-
     const IRenderer::Point2D points[] = {
         IRenderer::Point2D(line.X0(), line.Y0()),
         IRenderer::Point2D(line.X1(), line.Y1())
@@ -106,8 +100,6 @@ void Sdl2Renderer::Draw(const Line_G2& line)
 
 void Sdl2Renderer::Draw(const Line_G4& line)
 {
-    LOG("%s", "SDL2: Draw Line_G4");
-
     const IRenderer::Point2D points[] = {
         IRenderer::Point2D(line.X0(), line.Y0()),
         IRenderer::Point2D(line.X1(), line.Y1()),
@@ -127,8 +119,6 @@ void Sdl2Renderer::Draw(const Line_G4& line)
 
 void Sdl2Renderer::Draw(const Poly_G3& poly)
 {
-    LOG("%s", "SDL2: Draw Poly_G3");
-
     SDL_Vertex vertices[] = {
         { { static_cast<f32>(poly.X0()), static_cast<f32>(poly.Y0()) }, { poly.R0(), poly.G0(), poly.B0(), 255 }, { 0, 0 } },
         { { static_cast<f32>(poly.X1()), static_cast<f32>(poly.Y1()) }, { poly.R1(), poly.G1(), poly.B1(), 255 }, { 0, 0 } },
@@ -152,8 +142,6 @@ void Sdl2Renderer::Draw(const Poly_FT4& poly)
 
     if (poly.mFg1)
     {
-        LOG("%s", "SDL2: Draw Poly_FT4 (FG1)");
-
         std::shared_ptr<Sdl2Texture> texFG1 = PrepareTextureFromPoly(poly);
 
         if (texFG1)
@@ -163,14 +151,10 @@ void Sdl2Renderer::Draw(const Poly_FT4& poly)
     }
     else if (poly.mCam)
     {
-        LOG("%s", "SDL2: Draw Poly_FT4 (CAM)");
-
         tex = PrepareTextureFromPoly(poly)->GetTexture();
     }
     else if (poly.mAnim)
     {
-        LOG("%s", "SDL2: Draw Poly_FT4 (ANIM)");
-
         RGBA32 shading = {
             poly.R0(),
             poly.G0(),
@@ -232,8 +216,6 @@ void Sdl2Renderer::Draw(const Poly_FT4& poly)
             255
         };
 
-        LOG("%s", "SDL2: Draw Poly_FT4 (Font)");
-
         std::shared_ptr<PngData> pPng = poly.mFont->mFntResource.mPngPtr;
 
         f32 u0 = poly.U0() / static_cast<f32>(pPng->mWidth);
@@ -264,8 +246,6 @@ void Sdl2Renderer::Draw(const Poly_FT4& poly)
     }
     else // Assume ScreenWave!
     {
-        LOG("%s", "SDL2: Draw Poly_FT4 (ScreenWave)");
-
         f32 u0 = (poly.uBase + poly.U0()) / kPsxFramebufferWidth;
         f32 v0 = (poly.vBase + poly.V0()) / kPsxFramebufferHeight;
 
@@ -320,8 +300,6 @@ void Sdl2Renderer::Draw(const Poly_FT4& poly)
 
 void Sdl2Renderer::Draw(const Poly_G4& poly)
 {
-    LOG("%s", "SDL2: Draw Poly_G4");
-
     constexpr s32 indexList[6] = { 0, 1, 2, 1, 2 , 3 };
     SDL_Vertex vertices[4] = {
         { { static_cast<f32>(poly.X0()), static_cast<f32>(poly.Y0()) }, { poly.R0(), poly.G0(), poly.B0(), 255 }, { 0, 0 } },
@@ -335,8 +313,6 @@ void Sdl2Renderer::Draw(const Poly_G4& poly)
 
 void Sdl2Renderer::EndFrame()
 {
-    LOG("%s", "SDL2: End frame");
-
     mCopiedFbThisFrame = false;
     mTextureCache.DecreaseResourceLifetimes();
 
@@ -352,8 +328,6 @@ void Sdl2Renderer::EndFrame()
 
 void Sdl2Renderer::SetClip(const Prim_ScissorRect& clipper)
 {
-    LOG("%s", "SDL2: Set viewport clip");
-
     SDL_Rect rect = {};
 
     f32 factorW = static_cast<f32>(GetActiveFbTexture().GetWidth()) / kPsxFramebufferWidth;
@@ -376,8 +350,6 @@ void Sdl2Renderer::SetClip(const Prim_ScissorRect& clipper)
 
 void Sdl2Renderer::StartFrame()
 {
-    LOG("%s", "SDL2: Start frame");
-
     IRenderer::StartFrame();
 
     mOffsetX = 0;

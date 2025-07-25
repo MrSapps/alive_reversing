@@ -684,11 +684,6 @@ void LiftPoint::MoveObjectsOnLift(FP xVelocity)
 
 void LiftPoint::VScreenChanged()
 {
-    if (!mHasPulley)
-    {
-        CreatePulleyIfExists(0, -1);
-    }
-
     if (gMap.LevelChanged())
     {
         SetDead(true);
