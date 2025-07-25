@@ -402,10 +402,6 @@ void Game_Run()
     Input_Init();
     Init_Sound_DynamicArrays_And_Others();
     
-    // Not technically needed yet but will de-sync if not instantiated here
-    CamResource nullCamRes;
-    gScreenManager = relive_new ScreenManager(nullCamRes, &gMap.mCameraOffset);
-
     gMap.Init(EReliveLevelIds::eMenu, 1, 25, CameraSwapEffects::eInstantChange_0, 0, 0);
 
     DDCheat_Allocate();

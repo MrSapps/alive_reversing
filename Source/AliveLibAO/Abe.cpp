@@ -60,6 +60,7 @@
 #include "../relive_lib/Psx.hpp"
 #include "Path.hpp"
 #include "../relive_lib/data_conversion/PathTlvsAO.hpp"
+#include "GameEnderController.hpp"
 
 namespace AO {
 
@@ -2334,10 +2335,10 @@ void Abe::VOnTlvCollision(relive::Path_TLV* pTlv)
                 mContinuePointPath = gMap.mCurrentPath;
                 mContinuePointCamera = gMap.mCurrentCamera;
 
-                if (gRestartRuptureFarmsSavedMuds == 0 && gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn && gMap.mCurrentPath == 19 && gMap.mCurrentCamera == 3)
+                if (GameEnderController::gRestartRuptureFarmsSavedMuds == 0 && gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn && gMap.mCurrentPath == 19 && gMap.mCurrentCamera == 3)
                 {
-                    gRestartRuptureFarmsKilledMuds = gKilledMudokons;
-                    gRestartRuptureFarmsSavedMuds = gRescuedMudokons;
+                    GameEnderController::gRestartRuptureFarmsKilledMuds = gKilledMudokons;
+                    GameEnderController::gRestartRuptureFarmsSavedMuds = gRescuedMudokons;
                 }
 
                 SaveGame::SaveToMemory(&gSaveBuffer);

@@ -34,6 +34,7 @@
 #include "../AliveLibAE/VGA.hpp"
 #include "../relive_lib/GameObjects/GasCountDown.hpp"
 #include "../relive_lib/GameObjects/PlatformBase.hpp"
+#include "GameEnderController.hpp"
 
 // Note: Using AE var
 //bool gDDCheatOn = false;
@@ -42,15 +43,11 @@ extern bool gBreakGameLoop; // AE var
 
 namespace AO {
 
-// TODO: Move to game ender controller for AO sync
-s16 gRestartRuptureFarmsKilledMuds = 0;
-s16 gRestartRuptureFarmsSavedMuds = 0;
-
 
 void Init_GameStates()
 {
-    gKilledMudokons = gRestartRuptureFarmsKilledMuds;
-    gRescuedMudokons = gRestartRuptureFarmsSavedMuds;
+    gKilledMudokons = GameEnderController::gRestartRuptureFarmsKilledMuds;
+    gRescuedMudokons = GameEnderController::gRestartRuptureFarmsSavedMuds;
 
     gDeathGasOn = false;
     gDeathGasTimer = 0;
