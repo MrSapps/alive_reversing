@@ -167,7 +167,7 @@ void DebugFont::PSX_DrawDebugTextBuffers(OrderingTable& ot)
     {
         DebugTexts* pRecord = &sDebugTexts[i];
         const s32 xpos = pRecord->mMarginX;
-        s32 ypos = pRecord->mMarginY;
+        s16 ypos = pRecord->mMarginY;
         for (char_type* j = strtok(pRecord->mText.mDstTxt, "\n\r"); j; j = strtok(0, "\n\r"))
         {
             gFontDrawScreenSpace = true;
