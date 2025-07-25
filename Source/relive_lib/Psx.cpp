@@ -26,24 +26,10 @@ static void PSX_PutDispEnv_Impl_4F5640()
 
     if (!gTurnOffRendering)
     {
-        PSX_DrawDebugTextBuffers();
         VGA_EndFrame();
     }
 
     SsSeqCalledTbyT();
-}
-
-void PSX_PutDispEnv_4F58E0()
-{
-    if (!sPsxEmu_put_disp_env_callback_C1D184 || !sPsxEmu_put_disp_env_callback_C1D184(0))
-    {
-        PSX_PutDispEnv_Impl_4F5640();
-
-        if (sPsxEmu_put_disp_env_callback_C1D184)
-        {
-            sPsxEmu_put_disp_env_callback_C1D184(1);
-        }
-    }
 }
 
 void PSX_PutDispEnv_4F5890()
@@ -57,6 +43,7 @@ void PSX_PutDispEnv_4F5890()
     }
 
     PSX_PutDispEnv_Impl_4F5640();
+
     if (sPsxEmu_put_disp_env_callback_C1D184)
     {
         sPsxEmu_put_disp_env_callback_C1D184(1);

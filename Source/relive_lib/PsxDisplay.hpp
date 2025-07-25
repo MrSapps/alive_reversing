@@ -3,6 +3,7 @@
 #include "pch_shared.h"
 #include "FixedPoint.hpp"
 #include "../AliveLibAE/PsxRender.hpp"
+#include "../AliveLibAE/Font.hpp"
 
 // 368*40/23 =640
 // This seems to convert from PSX coordinate space to PC coordinate space
@@ -31,6 +32,19 @@ public:
     OrderingTable mOrderingTable;
 };
 
+class DebugFont final
+{
+public:
+    void DebugFont_Flush();
+    s32 DebugFont_Printf(s32 idx, const char_type* formatStr, ...);
+    s32 DebugFont_Init();
+
+    void PSX_DrawDebugTextBuffers(OrderingTable& ot);
+private:
+    FontContext mDebugFontContext;
+    AliveFont mDebugFont;
+};
+
 class PsxDisplay final
 {
 public:
@@ -41,15 +55,13 @@ public:
 	s16 mWidth = 0;
 	s16 mHeight = 0;
     PSX_Display_Buffer mDrawEnv = {};
+    DebugFont mDebugFont;
 };
+
+
 
 extern PsxDisplay gPsxDisplay;
 extern bool gCommandLine_NoFrameSkip;
 extern bool gDebugFontLoaded;
 extern bool gDisplayRenderFrame;
 
-void DebugFont_Flush();
-s32 DebugFont_Printf(s32 idx, const char_type* formatStr, ...);
-s32 DebugFont_Init();
-
-void PSX_DrawDebugTextBuffers();

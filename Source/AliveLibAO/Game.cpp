@@ -58,8 +58,6 @@ void Init_GameStates()
 
 void Init_Sound_DynamicArrays_And_Others()
 {
-    DebugFont_Init();
-
     gPauseMenu = nullptr;
     gAbe = nullptr;
     sControlledCharacter = nullptr;
@@ -192,7 +190,7 @@ void Game_Loop()
         }
         GetGameAutoPlayer().SyncPoint(SyncPoints::DrawAllEnd);
 
-        DebugFont_Flush();
+        gPsxDisplay.mDebugFont.DebugFont_Flush();
         gScreenManager->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
         SYS_EventsPump(); // Exit checking?
 

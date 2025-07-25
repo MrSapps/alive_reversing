@@ -6,6 +6,8 @@
 #include "../relive_lib/GameType.hpp"
 #include "../relive_lib/Primitives.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
+#include "Resources.hpp"
+#include "../relive_lib/data_conversion/AnimationConverter.hpp"
 
 bool gDisableFontFlicker = false;
 bool gFontDrawScreenSpace = false;
@@ -812,6 +814,41 @@ const char_type* AliveFont::SliceText(const char_type* text, s32 left, FP scale,
 
 void FontContext::LoadFontType(FontType resourceID)
 {
+    if (resourceID == FontType::Debug)
+    {
+        mAtlasArray = sDebugFontAtlas;
+
+        mFntResource.mId = resourceID;
+        mFntResource.mPngPtr = std::make_shared<PngData>();
+        mFntResource.mPngPtr->mPal = std::make_shared<AnimationPal>();
+
+        auto fontFile = reinterpret_cast<File_Font*>(sDebugFont);
+        for (s32 i = 0; i < fontFile->mPaletteSize; i++)
+        {
+            mFntResource.mPngPtr->mPal->mPal[i] = RGBConversion::RGBA555ToRGBA888Components(fontFile->mPalette[i]);
+        }
+    
+        std::vector<u8> newData(fontFile->mWidth * fontFile->mHeight); // TODO *2 was out of bounds?
+    
+        // Expand 4bit to 8bit
+        std::size_t src = 0;
+        std::size_t dst = 0;
+        while (dst < newData.size())
+        {
+            newData[dst++] = (fontFile->mPixelBuffer[src] & 0xF);
+            newData[dst++] = ((fontFile->mPixelBuffer[src++] & 0xF0) >> 4);
+        }
+        mFntResource.mPngPtr->mPixels = newData;
+
+        mFntResource.mPngPtr->mWidth = fontFile->mWidth;
+        mFntResource.mPngPtr->mHeight = fontFile->mHeight;
+        mFntResource.mPngPtr->mPixels.resize(fontFile->mWidth * fontFile->mHeight);
+    
+        mFntResource.mCurPal = mFntResource.mPngPtr->mPal;
+        return;
+    }
+
+
     FontResource fontRes = ResourceManagerWrapper::LoadFont(resourceID);
     mFntResource = fontRes;
 

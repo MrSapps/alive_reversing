@@ -158,28 +158,26 @@ void Alive_Show_ErrorMsg(const char_type* fmt, ...)
 
 void Init_GameStates()
 {
-    gKilledMudokons = gFeeco_Restart_KilledMudCount;
+    gKilledMudokons = gFeeco_Restart_KilledMudCount; // DDCheat
     gRescuedMudokons = gFeecoRestart_SavedMudCount;
 
-    gDeathGasOn = false;
+    gDeathGasOn = false; // GasCountDown
     gDeathGasTimer = 0;
 
-    gbDrawMeterCountDown = false;
+    gbDrawMeterCountDown = false; // ColourfulMeter
     gTotalMeterBars = 0;
 
-    gAbeInvincible = false;
+    gAbeInvincible = false; // Abe
 
     SwitchStates_ClearRange(0, 255);
 }
 
 void Init_Sound_DynamicArrays_And_Others()
 {
-    DebugFont_Init();
-
-    gPauseMenu = nullptr;
+    gPauseMenu = nullptr; // PauseMenu
     gAbe = nullptr;
     sControlledCharacter = nullptr;
-    gNumCamSwappers = 0;
+    gNumCamSwappers = 0; // TODO: Move
     sGnFrame = 0;
 
     PlatformBase::MakeArray();
@@ -303,7 +301,7 @@ void Game_Loop()
         }
         GetGameAutoPlayer().SyncPoint(SyncPoints::DrawAllEnd);
 
-        DebugFont_Flush();
+        gPsxDisplay.mDebugFont.DebugFont_Flush();
         gScreenManager->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
         SYS_EventsPump(); // Exit checking?
 
