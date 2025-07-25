@@ -2242,7 +2242,7 @@ struct Path_Slurg : public Path_TLV
     reliveXDirection mFacing = reliveXDirection::eRight;
     reliveScale mScale = reliveScale::eFull;
     s16 mSlurgSwitchId = 0;
-    static constexpr char kClassName[] = "annoying_slurg";
+    static constexpr char kClassName[] = "slurg";
     static constexpr ReliveTypes kReliveType = ReliveTypes::eSlurg;
 };
 
