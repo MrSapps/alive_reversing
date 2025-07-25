@@ -132,29 +132,26 @@ void BaseThrowable::BaseAddToPlatform()
     {
         if (pLine->mLineType == eLineTypes::eDynamicCollision_32 || pLine->mLineType == eLineTypes::eBackgroundDynamicCollision_36)
         {
-            if (gPlatformsArray)
+            for (s32 idx = 0; idx < PlatformBase::Platforms().Size(); idx++)
             {
-                for (s32 idx = 0; idx < gPlatformsArray->Size(); idx++)
+                BaseGameObject* pObjIter = PlatformBase::Platforms().ItemAt(idx);
+                if (!pObjIter)
                 {
-                    BaseGameObject* pObjIter = gPlatformsArray->ItemAt(idx);
-                    if (!pObjIter)
+                    break;
+                }
+
+                // NOTE: meat in AE didn't check the trap door for some reason
+                if (pObjIter->Type() == ReliveTypes::eLiftPoint || pObjIter->Type() == ReliveTypes::eTrapDoor)
+                {
+                    PlatformBase* pPlatformBase = static_cast<PlatformBase*>(pObjIter);
+
+                    const PSX_RECT bRect = pPlatformBase->VGetBoundingRect();
+
+                    if (FP_GetExponent(mXPos) > bRect.x && FP_GetExponent(mXPos) < bRect.w && FP_GetExponent(mYPos) < bRect.h)
                     {
-                        break;
-                    }
-
-                    // NOTE: meat in AE didn't check the trap door for some reason
-                    if (pObjIter->Type() == ReliveTypes::eLiftPoint || pObjIter->Type() == ReliveTypes::eTrapDoor)
-                    {
-                        auto pPlatformBase = static_cast<PlatformBase*>(pObjIter);
-
-                        const PSX_RECT bRect = pPlatformBase->VGetBoundingRect();
-
-                        if (FP_GetExponent(mXPos) > bRect.x && FP_GetExponent(mXPos) < bRect.w && FP_GetExponent(mYPos) < bRect.h)
-                        {
-                            pPlatformBase->VAdd(this);
-                            BaseAliveGameObject_PlatformId = pPlatformBase->mBaseGameObjectId;
-                            return;
-                        }
+                        pPlatformBase->VAdd(this);
+                        BaseAliveGameObject_PlatformId = pPlatformBase->mBaseGameObjectId;
+                        return;
                     }
                 }
             }

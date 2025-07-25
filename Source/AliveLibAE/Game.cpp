@@ -32,11 +32,9 @@
 #include "../relive_lib/GameObjects/GasCountDown.hpp"
 #include "../relive_lib/SwitchStates.hpp"
 #include "../relive_lib/Collisions.hpp"
+#include "../relive_lib/GameObjects/PlatformBase.hpp"
 
 u32 sGnFrame = 0;
-
-// Arrays of things
-DynamicArrayT<BaseGameObject>* gPlatformsArray = nullptr;
 
 bool gBreakGameLoop = false;
 s16 gNumCamSwappers = 0;
@@ -52,6 +50,7 @@ s32 sFrameCount_5CA300 = 0;
 
 u16 gAttract = 0;
 
+// QuickSave load/Restart path calls this
 void DestroyObjects()
 {
     ResourceManagerWrapper::LoadingLoop(false);
@@ -170,7 +169,7 @@ void Init_GameStates()
 
     gAbeInvincible = false;
 
-    SwitchStates_ClearRange(2u, 255u);
+    SwitchStates_ClearRange(0, 255);
 }
 
 void Init_Sound_DynamicArrays_And_Others()
@@ -183,8 +182,7 @@ void Init_Sound_DynamicArrays_And_Others()
     gNumCamSwappers = 0;
     sGnFrame = 0;
 
-    gPlatformsArray = relive_new DynamicArrayT<BaseGameObject>(20); // For trap doors/dynamic platforms
-
+    PlatformBase::MakeArray();
     ShadowZone::MakeArray();
 
     gBaseAliveGameObjects = relive_new DynamicArrayT<BaseAliveGameObject>(20);
@@ -372,7 +370,7 @@ void Game_Loop()
         if (pObjToKill->GetDead())
         {
             i = gBaseGameObjects->RemoveAt(i);
-            delete pObjToKill;
+            relive_delete pObjToKill;
         }
     }
 }
@@ -431,7 +429,7 @@ void Game_Run()
     AnimationBase::FreeAnimationArray();
     BaseAnimatedWithPhysicsGameObject::FreeArray();
     relive_delete gBaseGameObjects;
-    relive_delete gPlatformsArray;
+    PlatformBase::FreeArray();
     ShadowZone::FreeArray();
     relive_delete gBaseAliveGameObjects;
     relive_delete gCollisions;

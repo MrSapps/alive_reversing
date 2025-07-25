@@ -664,10 +664,10 @@ void Paramite::MoveOnLine()
             {
                 const PSX_RECT bRect = VGetBoundingRect();
 
-                OnCollisionWith(
+                CheckPlatformCollision(
                     {bRect.x, static_cast<s16>(bRect.y + 5)},
                     {bRect.w, static_cast<s16>(bRect.h + 5)},
-                    gPlatformsArray);
+                    PlatformBase::Platforms());
             }
         }
     }
@@ -2896,10 +2896,10 @@ void Paramite::Motion_6_Hop()
                     PSX_RECT bRect = VGetBoundingRect();
                     bRect.y += 5;
                     bRect.h += 5;
-                    OnCollisionWith(
+                    CheckPlatformCollision(
                         {bRect.x, bRect.y},
                         {bRect.y, bRect.h},
-                        gPlatformsArray);
+                        PlatformBase::Platforms());
                     mXPos = hitX;
                     mYPos = hitY;
                     return;
@@ -3139,10 +3139,10 @@ void Paramite::Motion_12_Falling()
                 bRect.y += 5;
                 bRect.h += 5;
 
-                OnCollisionWith(
+                CheckPlatformCollision(
                     {bRect.x, bRect.y},
                     {bRect.w, bRect.h},
-                    gPlatformsArray);
+                    PlatformBase::Platforms());
 
                 mXPos = hitX;
                 mYPos = hitY;
@@ -3425,10 +3425,10 @@ void Paramite::Motion_18_RunningAttack()
                 r.y += 5;
                 r.h += 5;
 
-                OnCollisionWith(
+                CheckPlatformCollision(
                     {r.x, r.y},
                     {r.w, r.h},
-                    gPlatformsArray);
+                    PlatformBase::Platforms());
             }
             mYPos = hitY;
             BaseAliveGameObjectCollisionLine = pLine;
@@ -3488,10 +3488,10 @@ void Paramite::Motion_20_SurpriseWeb()
             bRect.y += 5;
             bRect.h += 5;
 
-            OnCollisionWith(
+            CheckPlatformCollision(
                 {bRect.x, bRect.y},
                 {bRect.w, bRect.h},
-                gPlatformsArray);
+                PlatformBase::Platforms());
         }
     }
     else

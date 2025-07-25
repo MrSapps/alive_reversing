@@ -69,8 +69,7 @@ void Init_Sound_DynamicArrays_And_Others()
     gNumCamSwappers = 0;
     sGnFrame = 0;
 
-    gPlatformsArray = relive_new DynamicArrayT<BaseGameObject>(20); // For trap doors/dynamic platforms
-
+    PlatformBase::MakeArray();
     ShadowZone::MakeArray();
 
     gBaseAliveGameObjects = relive_new DynamicArrayT<::BaseAliveGameObject>(20);
@@ -317,7 +316,7 @@ void Game_Run()
     AnimationBase::FreeAnimationArray();
     BaseAnimatedWithPhysicsGameObject::FreeArray();
     relive_delete gBaseGameObjects;
-    relive_delete gPlatformsArray;
+    PlatformBase::FreeArray();
     relive_delete gBaseAliveGameObjects;
 
     MusicController::Shutdown();

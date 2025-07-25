@@ -1214,10 +1214,10 @@ void Abe::MoveForward()
             bRect.h += 5;
             bRect.w += 5; // TODO: Seems wrong - same in AE
 
-            OnCollisionWith(
+            CheckPlatformCollision(
                 {bRect.x, bRect.y},
                 {bRect.w, bRect.h},
-                gPlatformsArray);
+                PlatformBase::Platforms());
         }
     }
     else
@@ -3671,10 +3671,10 @@ void Abe::Motion_3_Fall()
 
                 PSX_Point xy{FP_GetExponent(mXPos - FP_FromInteger(25)), FP_GetExponent(mYPos - FP_FromInteger(25))};
                 PSX_Point wh{FP_GetExponent(mXPos + FP_FromInteger(25)), FP_GetExponent(mYPos + FP_FromInteger(25))};
-                OnCollisionWith(
+                CheckPlatformCollision(
                     xy,
                     wh,
-                    gPlatformsArray);
+                    PlatformBase::Platforms());
                 break;
             }
             case eLineTypes::eWallLeft_1:
@@ -3948,10 +3948,10 @@ void Abe::Motion_17_HoistIdle()
                 rect.y += 5;
                 rect.h += 5;
 
-                OnCollisionWith(
+                CheckPlatformCollision(
                     {rect.x, rect.y},
                     {rect.w, rect.h},
-                    gPlatformsArray);
+                    PlatformBase::Platforms());
                 break;
             }
         }
@@ -4022,10 +4022,10 @@ void Abe::Motion_17_HoistIdle()
                             rect.y += 5;
                             rect.h += 5;
 
-                            OnCollisionWith(
+                            CheckPlatformCollision(
                                 {rect.x, rect.y},
                                 {rect.w, rect.h},
-                                gPlatformsArray);
+                                PlatformBase::Platforms());
                         }
                     }
                     GetShadow()->mShadowAtBottom = true;
@@ -4701,10 +4701,10 @@ void Abe::Motion_30_HopMid()
                         rect.y += 5;
                         rect.h += 5;
 
-                        OnCollisionWith(
+                        CheckPlatformCollision(
                             {rect.x, rect.y},
                             {rect.w, rect.h},
-                            gPlatformsArray);
+                            PlatformBase::Platforms());
                         mXPos = hitX;
                         mYPos = hitY;
                         mVelX = FP_FromInteger(0);
@@ -4857,10 +4857,10 @@ void Abe::Motion_33_RunJumpMid()
 
                 if (pLine->mLineType == eLineTypes::eDynamicCollision_32)
                 {
-                    OnCollisionWith(
+                    CheckPlatformCollision(
                         {rect.x, rect.y},
                         {rect.w, rect.h},
-                        gPlatformsArray);
+                        PlatformBase::Platforms());
                 }
                 mNextMotion = eAbeMotions::Motion_0_Idle;
                 return;
@@ -4934,10 +4934,10 @@ void Abe::Motion_33_RunJumpMid()
                         rect.y += 5;
                         rect.h += 5;
 
-                        OnCollisionWith(
+                        CheckPlatformCollision(
                             {rect.x, rect.y},
                             {rect.w, rect.h},
-                            gPlatformsArray);
+                            PlatformBase::Platforms());
                     }
                 }
             }
@@ -6504,10 +6504,10 @@ void Abe::Motion_67_ToOffScreenHoist()
                 bRect.y += 5;
                 bRect.h += 5;
 
-                OnCollisionWith(
+                CheckPlatformCollision(
                     {bRect.x, bRect.y},
                     {bRect.w, bRect.h},
-                    gPlatformsArray);
+                    PlatformBase::Platforms());
             }
         }
         mCurrentMotion = eAbeMotions::Motion_66_LedgeHang;
@@ -8154,10 +8154,10 @@ void Abe::Motion_138_ElumUnmountEnd()
                 PSX_RECT bRect = VGetBoundingRect();
                 bRect.y += 5;
                 bRect.h += 5;
-                OnCollisionWith(
+                CheckPlatformCollision(
                     {bRect.x, bRect.y},
                     {bRect.w, bRect.h},
-                    gPlatformsArray);
+                    PlatformBase::Platforms());
             }
         }
         sControlledCharacter = gAbe;

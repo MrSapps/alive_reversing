@@ -304,7 +304,7 @@ void TrapDoor::Open()
 
     Rect_Clear(&mPlatformBaseCollisionLine->mRect);
     mPlatformBaseCollisionLine = nullptr;
-    gPlatformsArray->Remove_Item(this);
+    PlatformBase::Platforms().Remove_Item(this);
 }
 
 bool TrapDoor::InIndustrialLevel()
@@ -419,7 +419,7 @@ void TrapDoor::Add_To_Collisions_Array()
         mPlatformBaseCollisionLine->mLineType = eLineTypes::eBackgroundDynamicCollision_36;
     }
 
-    gPlatformsArray->Push_Back(this);
+    PlatformBase::Platforms().Push_Back(this);
 }
 
 void TrapDoor::CreateFromSaveState(SerializedObjectData& pData)
