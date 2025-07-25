@@ -150,94 +150,87 @@ LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId)
     mPlatformBaseXOffset -= xMovedBy;
     mPlatformBaseWidthOffset -= xMovedBy;
 
-    if (mLiftWheelAnim.Init(
-            GetAnimRes(sLiftPointAnimIds[lvl_idx].mLiftBottomWheelAnimId),
-            this))
+    mLiftWheelAnim.Init(GetAnimRes(sLiftPointAnimIds[lvl_idx].mLiftBottomWheelAnimId), this);
+
+    if (pTlv->mScale == relive::reliveScale::eHalf)
     {
-        if (pTlv->mScale == relive::reliveScale::eHalf)
-        {
-            mLiftWheelAnim.SetRenderLayer(Layer::eLayer_BeforeShadow_Half_6);
-        }
-        else
-        {
-            mLiftWheelAnim.SetRenderLayer(Layer::eLayer_BeforeShadow_25);
-        }
-
-        mLiftWheelAnim.SetSpriteScale(GetSpriteScale());
-
-        mMoveToFloorLevel = false;
-        mBottomFloor = false;
-        mMiddleFloor = false;
-        mTopFloor = false;
-
-        mLiftWheelAnim.SetSemiTrans(false);
-        mLiftWheelAnim.SetBlending(false);
-        mLiftWheelAnim.SetAnimate(false);
-
-        mMoving = false;
-        mVelX = FP_FromInteger(0);
-        mLiftWheelAnim.SetRGB(128, 128, 128);
-        mLiftWheelAnim.SetBlendMode(relive::TBlendModes::eBlend_0);
-
-        mVelY = FP_FromInteger(0);
-        mLiftPointStopType = relive::Path_LiftPoint::LiftPointStopType::eStartPointOnly;
-
-        auto pRopeMem = relive_new Rope(
-            FP_GetExponent(mXPos + (FP_FromInteger(13) * GetSpriteScale()) + FP_FromInteger(sRopeOffsets[lvl_idx].field_4)),
-            0,
-            FP_GetExponent(mYPos + (FP_FromInteger(25) * GetSpriteScale())),
-            GetSpriteScale());
-        if (pRopeMem)
-        {
-            mRope1 = pRopeMem->mBaseGameObjectId;
-        }
-
-        auto pRopeMem2 = relive_new Rope(
-            FP_GetExponent(mXPos + (FP_FromInteger(-10) * GetSpriteScale()) + FP_FromInteger(sRopeOffsets[lvl_idx].field_0)),
-            0,
-            FP_GetExponent(mYPos + (FP_FromInteger(25) * GetSpriteScale())),
-            GetSpriteScale());;
-        if (pRopeMem2)
-        {
-            mRope2 = pRopeMem2->mBaseGameObjectId;
-        }
-
-        pRopeMem2->mBottom = FP_GetExponent((FP_FromInteger(25) * GetSpriteScale()) + FP_FromInteger(mPlatformBaseCollisionLine->mRect.y));
-        pRopeMem->mBottom = FP_GetExponent((FP_FromInteger(25) * GetSpriteScale()) + FP_FromInteger(mPlatformBaseCollisionLine->mRect.y));
-
-        const FP v29 = FP_FromRaw(FP_GetExponent((mYPos * FP_FromDouble(1.5)) * GetSpriteScale()) % FP_FromInteger(pRopeMem2->mRopeLength).fpValue);
-        pRopeMem2->mYPos = FP_NoFractional(mYPos + v29 + (FP_FromInteger(25) * GetSpriteScale()) + FP_FromInteger(pRopeMem2->mRopeLength));
-        pRopeMem->mYPos = FP_NoFractional(mYPos + v29 - (FP_FromInteger(25) * GetSpriteScale()) + FP_FromInteger(pRopeMem->mRopeLength));
-
-        mHasPulley = false;
-
-        CreatePulleyIfExists(0, 0);
-
-        mLiftPointId = pTlv->mLiftPointId;
-        mLiftPointStopType = pTlv->mLiftPointStopType;
-
-        switch (mLiftPointStopType)
-        {
-            case relive::Path_LiftPoint::LiftPointStopType::eTopFloor:
-                mTopFloor = true;
-                break;
-
-            case relive::Path_LiftPoint::LiftPointStopType::eBottomFloor:
-                mBottomFloor = true;
-                break;
-
-            case relive::Path_LiftPoint::LiftPointStopType::eMiddleFloor:
-                mMiddleFloor = true;
-                break;
-        }
-
-        mKeepOnMiddleFloor = false;
-        mIgnoreLiftMover = true;
+        mLiftWheelAnim.SetRenderLayer(Layer::eLayer_BeforeShadow_Half_6);
     }
     else
     {
-        SetListAddFailed(true);
+        mLiftWheelAnim.SetRenderLayer(Layer::eLayer_BeforeShadow_25);
     }
+
+    mLiftWheelAnim.SetSpriteScale(GetSpriteScale());
+
+    mMoveToFloorLevel = false;
+    mBottomFloor = false;
+    mMiddleFloor = false;
+    mTopFloor = false;
+
+    mLiftWheelAnim.SetSemiTrans(false);
+    mLiftWheelAnim.SetBlending(false);
+    mLiftWheelAnim.SetAnimate(false);
+
+    mMoving = false;
+    mVelX = FP_FromInteger(0);
+    mLiftWheelAnim.SetRGB(128, 128, 128);
+    mLiftWheelAnim.SetBlendMode(relive::TBlendModes::eBlend_0);
+
+    mVelY = FP_FromInteger(0);
+    mLiftPointStopType = relive::Path_LiftPoint::LiftPointStopType::eStartPointOnly;
+
+    auto pRopeMem = relive_new Rope(
+        FP_GetExponent(mXPos + (FP_FromInteger(13) * GetSpriteScale()) + FP_FromInteger(sRopeOffsets[lvl_idx].field_4)),
+        0,
+        FP_GetExponent(mYPos + (FP_FromInteger(25) * GetSpriteScale())),
+        GetSpriteScale());
+    if (pRopeMem)
+    {
+        mRope1 = pRopeMem->mBaseGameObjectId;
+    }
+
+    auto pRopeMem2 = relive_new Rope(
+        FP_GetExponent(mXPos + (FP_FromInteger(-10) * GetSpriteScale()) + FP_FromInteger(sRopeOffsets[lvl_idx].field_0)),
+        0,
+        FP_GetExponent(mYPos + (FP_FromInteger(25) * GetSpriteScale())),
+        GetSpriteScale());;
+    if (pRopeMem2)
+    {
+        mRope2 = pRopeMem2->mBaseGameObjectId;
+    }
+
+    pRopeMem2->mBottom = FP_GetExponent((FP_FromInteger(25) * GetSpriteScale()) + FP_FromInteger(mPlatformBaseCollisionLine->mRect.y));
+    pRopeMem->mBottom = FP_GetExponent((FP_FromInteger(25) * GetSpriteScale()) + FP_FromInteger(mPlatformBaseCollisionLine->mRect.y));
+
+    const FP v29 = FP_FromRaw(FP_GetExponent((mYPos * FP_FromDouble(1.5)) * GetSpriteScale()) % FP_FromInteger(pRopeMem2->mRopeLength).fpValue);
+    pRopeMem2->mYPos = FP_NoFractional(mYPos + v29 + (FP_FromInteger(25) * GetSpriteScale()) + FP_FromInteger(pRopeMem2->mRopeLength));
+    pRopeMem->mYPos = FP_NoFractional(mYPos + v29 - (FP_FromInteger(25) * GetSpriteScale()) + FP_FromInteger(pRopeMem->mRopeLength));
+
+    mHasPulley = false;
+
+    CreatePulleyIfExists(0, 0);
+
+    mLiftPointId = pTlv->mLiftPointId;
+    mLiftPointStopType = pTlv->mLiftPointStopType;
+
+    switch (mLiftPointStopType)
+    {
+        case relive::Path_LiftPoint::LiftPointStopType::eTopFloor:
+            mTopFloor = true;
+            break;
+
+        case relive::Path_LiftPoint::LiftPointStopType::eBottomFloor:
+            mBottomFloor = true;
+            break;
+
+        case relive::Path_LiftPoint::LiftPointStopType::eMiddleFloor:
+            mMiddleFloor = true;
+            break;
+    }
+
+    mKeepOnMiddleFloor = false;
+    mIgnoreLiftMover = true;
 }
 
 void LiftPoint::Move(FP xSpeed, FP ySpeed)
@@ -752,11 +745,6 @@ void LiftPoint::CreatePulleyIfExists(s16 camX, s16 camY)
 
 LiftPoint::~LiftPoint()
 {
-    if (GetListAddFailed())
-    {
-        return;
-    }
-
     auto pRope1 = static_cast<Rope*>(sObjectIds.Find_Impl(mRope1));
     auto pRope2 = static_cast<Rope*>(sObjectIds.Find_Impl(mRope2));
 

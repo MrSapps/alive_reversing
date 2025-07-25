@@ -108,25 +108,19 @@ ParamiteWebLine::ParamiteWebLine(relive::Path_ParamiteWebLine* pTlv, const Guid&
     field_104_wobble_idx = 0;
     field_106_wobble_pos = field_F8_top;
 
-    if (field_108_anim_flare.Init(GetAnimRes(AnimId::ChantOrb_Particle), this))
-    {
-        field_108_anim_flare.SetRGB(100, 100, 100);
+    field_108_anim_flare.Init(GetAnimRes(AnimId::ChantOrb_Particle), this);
+    field_108_anim_flare.SetRGB(100, 100, 100);
 
-        field_108_anim_flare.SetRenderLayer(GetAnimation().GetRenderLayer());
-        field_108_anim_flare.SetSpriteScale(FP_FromDouble(0.3));
-        field_108_anim_flare.SetBlendMode(relive::TBlendModes::eBlend_1);
+    field_108_anim_flare.SetRenderLayer(GetAnimation().GetRenderLayer());
+    field_108_anim_flare.SetSpriteScale(FP_FromDouble(0.3));
+    field_108_anim_flare.SetBlendMode(relive::TBlendModes::eBlend_1);
 
-        field_108_anim_flare.SetSemiTrans(false);
-        field_108_anim_flare.SetBlending(false);
-        field_108_anim_flare.SetSwapXY(true);
+    field_108_anim_flare.SetSemiTrans(false);
+    field_108_anim_flare.SetBlending(false);
+    field_108_anim_flare.SetSwapXY(true);
 
-        field_1A0_pulse_position = field_F8_top;
-        field_1A4_delay_counter = Math_RandomRange(0, 10);
-    }
-    else
-    {
-        SetListAddFailed(true);
-    }
+    field_1A0_pulse_position = field_F8_top;
+    field_1A4_delay_counter = Math_RandomRange(0, 10);
 }
 
 void ParamiteWebLine::Wobble(s16 ypos)

@@ -30,11 +30,6 @@ Particle::Particle(FP xpos, FP ypos, AnimResource& res, bool explosionSizeHack)
          Animation_Init(res); // Temp fix - don't crush
     }
 
-    if (GetListAddFailed())
-    {
-        SetDead(true);
-    }
-
     mXPos = xpos;
     mYPos = ypos;
     mScaleAmount = FP_FromInteger(0);

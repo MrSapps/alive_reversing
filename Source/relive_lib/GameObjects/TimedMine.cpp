@@ -207,19 +207,13 @@ void TimedMine::VRender(OrderingTable& ot)
 
 void TimedMine::InitTickAnimation()
 {
-    if (mTickAnim.Init(GetAnimRes(AnimId::Bomb_RedGreenTick), this))
-    {
-        mTickAnim.SetRenderLayer(GetAnimation().GetRenderLayer());
-        mTickAnim.SetSemiTrans(true);
-        mTickAnim.SetBlending(true);
-        mTickAnim.SetSpriteScale(GetSpriteScale());
-        mTickAnim.SetRGB(128, 128, 128);
-        mTickAnim.SetBlendMode(relive::TBlendModes::eBlend_1);
-    }
-    else
-    {
-        SetListAddFailed(true);
-    }
+    mTickAnim.Init(GetAnimRes(AnimId::Bomb_RedGreenTick), this);
+    mTickAnim.SetRenderLayer(GetAnimation().GetRenderLayer());
+    mTickAnim.SetSemiTrans(true);
+    mTickAnim.SetBlending(true);
+    mTickAnim.SetSpriteScale(GetSpriteScale());
+    mTickAnim.SetRGB(128, 128, 128);
+    mTickAnim.SetBlendMode(relive::TBlendModes::eBlend_1);
 }
 
 void TimedMine::StickToLiftPoint()

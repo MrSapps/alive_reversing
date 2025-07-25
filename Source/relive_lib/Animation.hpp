@@ -20,7 +20,7 @@ public:
     virtual void VCleanUp() override;
 
     s16 Set_Animation_Data(AnimResource& pAnimRes);
-    s16 Init(const AnimResource& ppAnimData, BaseGameObject* pGameObj);
+    void Init(const AnimResource& ppAnimData, BaseGameObject* pGameObj);
 
     void SetFrame(s32 newFrame);
     u32 Get_Frame_Count();

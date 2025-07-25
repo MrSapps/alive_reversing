@@ -3106,7 +3106,7 @@ static void write_object_state(const nlohmann::json& j, SerializedObjectData& ob
 
 static void WriteObjectStateFromJson(const nlohmann::json& j, SerializedObjectData& object_states)
 {
-    const auto& type = j["type"];
+    const std::string type = j["type"].template get<std::string>();
     if (type == "slig_spawner")
     {
         write_object_state<SligSpawnerSaveState>(j, object_states);
@@ -3253,7 +3253,7 @@ static void WriteObjectStateFromJson(const nlohmann::json& j, SerializedObjectDa
     }
     else
     {
-        ALIVE_FATAL("over");
+        ALIVE_FATAL("Unknown object type %s", type.c_str());
     }
 }
 

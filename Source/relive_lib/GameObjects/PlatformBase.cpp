@@ -97,10 +97,7 @@ void PlatformBase::AddDynamicCollision(AnimId animId, relive::Path_TLV* pTlv, co
     mPlatformBaseYOffset = FP_GetExponent(FP_FromInteger(pTlv->mTopLeftY) - mYPos);
     mPlatformBaseHeightOffset = FP_GetExponent(FP_FromInteger(pTlv->mTopLeftY) - mYPos);
 
-    if (!PlatformBase::Platforms().Push_Back(this))
-    {
-        SetListAddFailed(true);
-    }
+    PlatformBase::Platforms().Push_Back(this);
 }
 
 PlatformBase::~PlatformBase()

@@ -140,24 +140,18 @@ MeatSaw::MeatSaw(relive::Path_MeatSaw* pTlv, const Guid& tlvId)
         mRenderYOffset = pTlv->mYTravelDistance + pTlv->mSwitchSpeed - pTlv->mYTravelDistance % pTlv->mSwitchSpeed;
     }
 
-    if (mMotorAnim.Init(GetAnimRes(AnimId::MeatSawMotor), this))
-    {
-        mMotorAnim.SetRenderLayer(GetAnimation().GetRenderLayer());
-        mMotorAnim.SetSpriteScale(GetSpriteScale());
+    mMotorAnim.Init(GetAnimRes(AnimId::MeatSawMotor), this);
+    mMotorAnim.SetRenderLayer(GetAnimation().GetRenderLayer());
+    mMotorAnim.SetSpriteScale(GetSpriteScale());
 
-        mMotorAnim.SetRGB(mRGB.r, mRGB.g, mRGB.b);
+    mMotorAnim.SetRGB(mRGB.r, mRGB.g, mRGB.b);
 
-        mMotorAnim.SetBlendMode(relive::TBlendModes::eBlend_0);
+    mMotorAnim.SetBlendMode(relive::TBlendModes::eBlend_0);
 
-        mMotorAnim.SetBlending(false);
-        mMotorAnim.SetSemiTrans(true);
+    mMotorAnim.SetBlending(false);
+    mMotorAnim.SetSemiTrans(true);
 
-        CreateShadow();
-    }
-    else
-    {
-        SetListAddFailed(true);
-    }
+    CreateShadow();
 }
 
 void MeatSaw::VScreenChanged()

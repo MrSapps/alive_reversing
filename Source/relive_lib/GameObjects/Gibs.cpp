@@ -159,11 +159,6 @@ Gibs::Gibs(GibType gibType, FP xpos, FP ypos, FP xOff, FP yOff, FP scale, bool b
     // The base class renders the head gib
     Animation_Init(GetAnimRes(headGib));
 
-    if (GetListAddFailed())
-    {
-        return;
-    }
-
     SetSpriteScale(scale);
     mXPos = xpos;
     mYPos = ypos + FP_FromInteger(2);
@@ -252,22 +247,12 @@ Gibs::Gibs(GibType gibType, FP xpos, FP ypos, FP xOff, FP yOff, FP scale, bool b
         if (i < 2)
         {
             // 2 arm parts
-            if (!pPart->mAnimation.Init(GetAnimRes(armGib), this))
-            {
-                mPartsUsedCount = i;
-                SetDead(true);
-                return;
-            }
+            pPart->mAnimation.Init(GetAnimRes(armGib), this);
         }
         else
         {
             // 2 body parts
-            if (!pPart->mAnimation.Init(GetAnimRes(bodyGib), this))
-            {
-                mPartsUsedCount = i;
-                SetDead(true);
-                return;
-            }
+            pPart->mAnimation.Init(GetAnimRes(bodyGib), this);
         }
 
         pPart->mAnimation.SetRenderLayer(GetAnimation().GetRenderLayer());
