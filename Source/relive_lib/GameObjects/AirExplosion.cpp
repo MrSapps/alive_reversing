@@ -159,11 +159,6 @@ void AirExplosion::VUpdate()
 
         if (pParticle)
         {
-            if (pParticle->GetListAddFailed())
-            {
-                pParticle->SetDead(true);
-            }
-
             pParticle->SetApplyShadowZoneColour(false);
             pParticle->GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_1);
 

@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "DynamicArray.hpp"
+#include "FatalError.hpp"
 
 DynamicArray::DynamicArray(s32 startingSize)
 {
@@ -14,7 +15,7 @@ DynamicArray::DynamicArray(s32 startingSize)
 
     if (mArray)
     {
-        mMaxSize = static_cast<s16>(startingSize);
+        mMaxSize = startingSize;
         mExpandSizeBy = 8;
     }
 }
@@ -24,24 +25,20 @@ DynamicArray::~DynamicArray()
     delete[] mArray;
 }
 
-s16 DynamicArray::Push_Back(void* pValue)
+void DynamicArray::Push_Back(void* pValue)
 {
     if (!mArray)
     {
-        return 0;
+        ALIVE_FATAL("DynamicArray can't be null!");
     }
 
     // If we have no more elements then expand the array
     if (mUsedSize == mMaxSize)
     {
-        if (!Expand(mExpandSizeBy))
-        {
-            return 0;
-        }
+        Expand(mExpandSizeBy);
     }
 
     mArray[mUsedSize++] = pValue;
-    return 1;
 }
 
 void DynamicArray::Remove_Item(void* pItemToRemove)
@@ -62,14 +59,14 @@ void DynamicArray::Remove_Item(void* pItemToRemove)
     }
 }
 
-s16 DynamicArray::Expand(s16 expandSize)
+void DynamicArray::Expand(s32 expandSize)
 {
     // Calculate new size and allocate buffer
-    const s16 newSize = mMaxSize + expandSize;
+    const s32 newSize = mMaxSize + expandSize;
     void** pNewBuffer = new (std::nothrow) void*[newSize];
     if (!pNewBuffer)
     {
-        return 0;
+        ALIVE_FATAL("Couldn't allocate buffer for DynamicArray!");
     }
 
     // Copy in the used elements into the new buffer
@@ -85,6 +82,4 @@ s16 DynamicArray::Expand(s16 expandSize)
     // Update max size and array pointer
     mMaxSize = newSize;
     mArray = pNewBuffer;
-
-    return 1;
 }

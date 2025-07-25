@@ -144,109 +144,101 @@ LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId)
 
     GetAnimation().SetSemiTrans(true);
 
-
     const LiftPointData& rLiftWheelData = sLiftPointAnimIds[static_cast<s32>(MapWrapper::ToAE(gMap.mCurrentLevel))];
-    if (mLiftWheelAnim.Init(
-            GetAnimRes(rLiftWheelData.mLiftBottomWheelAnimId),
-            this))
+    mLiftWheelAnim.Init(GetAnimRes(rLiftWheelData.mLiftBottomWheelAnimId), this);
+
+    if (pTlv->mScale == relive::reliveScale::eHalf)
     {
-        if (pTlv->mScale == relive::reliveScale::eHalf)
-        {
-            mLiftWheelAnim.SetRenderLayer(Layer::eLayer_BeforeShadow_Half_6);
-            mLiftWheelAnim.SetSpriteScale(GetSpriteScale());
-        }
-        else
-        {
-            mLiftWheelAnim.SetRenderLayer(Layer::eLayer_BeforeShadow_25);
-            mLiftWheelAnim.SetSpriteScale(GetSpriteScale());
-        }
-
-        mLiftWheelAnim.SetAnimate(false);
-        mLiftWheelAnim.SetSemiTrans(false);
-        mLiftWheelAnim.SetBlending(false);
-
-        mMoving = false;
-        mTopFloor = false;
-        mMiddleFloor = false;
-        mBottomFloor = false;
-        mMoveToFloorLevel = false;
-
-        // TODO: red is set to blue and vice versa - fix me
-        //mLiftWheelAnim.mGreen = static_cast<u8>(mRGB.g);
-        //mLiftWheelAnim.mRed = static_cast<u8>(mRGB.b);
-        //mLiftWheelAnim.mBlue = static_cast<u8>(mRGB.r);
-
-        mLiftWheelAnim.SetRGB(mRGB.r, mRGB.g, mRGB.b);
-        mLiftWheelAnim.SetBlendMode(relive::TBlendModes::eBlend_0);
-
-        mVelX = FP_FromInteger(0);
-        mVelY = FP_FromInteger(0);
-
-        const FP k25 = FP_FromInteger(25);
-        const FP k13 = FP_FromInteger(13);
-        const FP km10 = FP_FromInteger(-10);
-
-
-        auto pRope1 = relive_new Rope(FP_GetExponent((k13 * GetSpriteScale() + mXPos)),
-                                   0, // Start at the very top of the screen
-                                   FP_GetExponent((k25 * GetSpriteScale()) + mYPos),
-                                   GetSpriteScale());
-        if (pRope1)
-        {
-            mRopeId1 = pRope1->mBaseGameObjectId;
-        }
-
-        auto pRope2 = relive_new Rope(FP_GetExponent((km10 * GetSpriteScale()) + mXPos),
-                                   0, // Start at the very top of the screen
-                                   FP_GetExponent((k25 * GetSpriteScale()) + mYPos),
-                                   GetSpriteScale());
-        if (pRope2)
-        {
-            mRopeId2 = pRope2->mBaseGameObjectId;
-        }
-
-        pRope2->mBottom = FP_GetExponent((k25 * GetSpriteScale()) + FP_FromInteger(mPlatformBaseCollisionLine->mRect.y));
-        pRope1->mBottom = FP_GetExponent((k25 * GetSpriteScale()) + FP_FromInteger(mPlatformBaseCollisionLine->mRect.y));
-
-        const FP v28 = mYPos * FP_FromDouble(1.5);
-        const FP v29 = FP_FromRaw(FP_GetExponent(v28 * GetSpriteScale()) % FP_FromInteger(pRope2->mRopeLength).fpValue);
-
-        pRope2->mYPos = FP_FromInteger(FP_GetExponent(v29 + (k25 * GetSpriteScale()) + mYPos + FP_FromInteger(pRope2->mRopeLength)));
-        pRope1->mYPos = FP_FromInteger(FP_GetExponent((k25 * GetSpriteScale()) + mYPos + FP_FromInteger(pRope1->mRopeLength) - v29));
-
-        mHasPulley = false;
-        CreatePulleyIfExists();
-
-        mLiftPointId = static_cast<s8>(pTlv->mLiftPointId);
-        mLiftPointStopType = pTlv->mLiftPointStopType;
-
-        switch (mLiftPointStopType)
-        {
-            case relive::Path_LiftPoint::LiftPointStopType::eTopFloor:
-                mTopFloor = true;
-                break;
-
-            case relive::Path_LiftPoint::LiftPointStopType::eBottomFloor:
-                mBottomFloor = true;
-                break;
-
-            case relive::Path_LiftPoint::LiftPointStopType::eMiddleFloor:
-                mMiddleFloor = true;
-                break;
-
-            default:
-            case relive::Path_LiftPoint::LiftPointStopType::eMiddleLockFloor: // Not used ??
-            case relive::Path_LiftPoint::LiftPointStopType::eStartPointOnly:
-                mLiftPointStopType = relive::Path_LiftPoint::LiftPointStopType::eStartPointOnly;
-                break;
-        }
-
-        mKeepOnMiddleFloor = false;
+        mLiftWheelAnim.SetRenderLayer(Layer::eLayer_BeforeShadow_Half_6);
+        mLiftWheelAnim.SetSpriteScale(GetSpriteScale());
     }
     else
     {
-        SetListAddFailed(true);
+        mLiftWheelAnim.SetRenderLayer(Layer::eLayer_BeforeShadow_25);
+        mLiftWheelAnim.SetSpriteScale(GetSpriteScale());
     }
+
+    mLiftWheelAnim.SetAnimate(false);
+    mLiftWheelAnim.SetSemiTrans(false);
+    mLiftWheelAnim.SetBlending(false);
+
+    mMoving = false;
+    mTopFloor = false;
+    mMiddleFloor = false;
+    mBottomFloor = false;
+    mMoveToFloorLevel = false;
+
+    // TODO: red is set to blue and vice versa - fix me
+    //mLiftWheelAnim.mGreen = static_cast<u8>(mRGB.g);
+    //mLiftWheelAnim.mRed = static_cast<u8>(mRGB.b);
+    //mLiftWheelAnim.mBlue = static_cast<u8>(mRGB.r);
+
+    mLiftWheelAnim.SetRGB(mRGB.r, mRGB.g, mRGB.b);
+    mLiftWheelAnim.SetBlendMode(relive::TBlendModes::eBlend_0);
+
+    mVelX = FP_FromInteger(0);
+    mVelY = FP_FromInteger(0);
+
+    const FP k25 = FP_FromInteger(25);
+    const FP k13 = FP_FromInteger(13);
+    const FP km10 = FP_FromInteger(-10);
+
+
+    auto pRope1 = relive_new Rope(FP_GetExponent((k13 * GetSpriteScale() + mXPos)),
+                                0, // Start at the very top of the screen
+                                FP_GetExponent((k25 * GetSpriteScale()) + mYPos),
+                                GetSpriteScale());
+    if (pRope1)
+    {
+        mRopeId1 = pRope1->mBaseGameObjectId;
+    }
+
+    auto pRope2 = relive_new Rope(FP_GetExponent((km10 * GetSpriteScale()) + mXPos),
+                                0, // Start at the very top of the screen
+                                FP_GetExponent((k25 * GetSpriteScale()) + mYPos),
+                                GetSpriteScale());
+    if (pRope2)
+    {
+        mRopeId2 = pRope2->mBaseGameObjectId;
+    }
+
+    pRope2->mBottom = FP_GetExponent((k25 * GetSpriteScale()) + FP_FromInteger(mPlatformBaseCollisionLine->mRect.y));
+    pRope1->mBottom = FP_GetExponent((k25 * GetSpriteScale()) + FP_FromInteger(mPlatformBaseCollisionLine->mRect.y));
+
+    const FP v28 = mYPos * FP_FromDouble(1.5);
+    const FP v29 = FP_FromRaw(FP_GetExponent(v28 * GetSpriteScale()) % FP_FromInteger(pRope2->mRopeLength).fpValue);
+
+    pRope2->mYPos = FP_FromInteger(FP_GetExponent(v29 + (k25 * GetSpriteScale()) + mYPos + FP_FromInteger(pRope2->mRopeLength)));
+    pRope1->mYPos = FP_FromInteger(FP_GetExponent((k25 * GetSpriteScale()) + mYPos + FP_FromInteger(pRope1->mRopeLength) - v29));
+
+    mHasPulley = false;
+    CreatePulleyIfExists();
+
+    mLiftPointId = static_cast<s8>(pTlv->mLiftPointId);
+    mLiftPointStopType = pTlv->mLiftPointStopType;
+
+    switch (mLiftPointStopType)
+    {
+        case relive::Path_LiftPoint::LiftPointStopType::eTopFloor:
+            mTopFloor = true;
+            break;
+
+        case relive::Path_LiftPoint::LiftPointStopType::eBottomFloor:
+            mBottomFloor = true;
+            break;
+
+        case relive::Path_LiftPoint::LiftPointStopType::eMiddleFloor:
+            mMiddleFloor = true;
+            break;
+
+        default:
+        case relive::Path_LiftPoint::LiftPointStopType::eMiddleLockFloor: // Not used ??
+        case relive::Path_LiftPoint::LiftPointStopType::eStartPointOnly:
+            mLiftPointStopType = relive::Path_LiftPoint::LiftPointStopType::eStartPointOnly;
+            break;
+    }
+
+    mKeepOnMiddleFloor = false;
 }
 
 void LiftPoint::Move(FP xSpeed, FP ySpeed)

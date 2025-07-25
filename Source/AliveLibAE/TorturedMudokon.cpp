@@ -45,32 +45,20 @@ TorturedMudokon::TorturedMudokon(relive::Path_TorturedMudokon* pTlv, const Guid&
 
 void TorturedMudokon::SetupTearsAnimation(Animation* pAnim)
 {
-    if (pAnim->Init(GetAnimRes(AnimId::Tortured_Mudokon_Tears), this))
-    {
-        pAnim->SetRenderLayer(GetAnimation().GetRenderLayer());
-        pAnim->SetSpriteScale(GetSpriteScale());
-        pAnim->SetRGB(128, 128, 128);
-    }
-    else
-    {
-        SetListAddFailed(true);
-    }
+    pAnim->Init(GetAnimRes(AnimId::Tortured_Mudokon_Tears), this);
+    pAnim->SetRenderLayer(GetAnimation().GetRenderLayer());
+    pAnim->SetSpriteScale(GetSpriteScale());
+    pAnim->SetRGB(128, 128, 128);
 }
 
 void TorturedMudokon::SetupZapAnimation(Animation* pAnim)
 {
-    if (pAnim->Init(GetAnimRes(AnimId::Electric_Wall), this))
-    {
-        // TODO: clean this up
-        const s32 layerM1 = static_cast<s32>(GetAnimation().GetRenderLayer()) - 1;
-        pAnim->SetRenderLayer(static_cast<Layer>(layerM1));
-        pAnim->SetSpriteScale(GetSpriteScale());
-        pAnim->SetRGB(128, 128, 128);
-    }
-    else
-    {
-        SetListAddFailed(true);
-    }
+    pAnim->Init(GetAnimRes(AnimId::Electric_Wall), this);
+    // TODO: clean this up
+    const s32 layerM1 = static_cast<s32>(GetAnimation().GetRenderLayer()) - 1;
+    pAnim->SetRenderLayer(static_cast<Layer>(layerM1));
+    pAnim->SetSpriteScale(GetSpriteScale());
+    pAnim->SetRGB(128, 128, 128);
 }
 
 void TorturedMudokon::VScreenChanged()

@@ -54,8 +54,6 @@ public:
 
     PalResource& GetPalRes(PalId palId);
 
-    bool GetListAddFailed() const { return mListAddFailed; }
-    void SetListAddFailed(bool val) { mListAddFailed = val; }
     bool GetUpdatable() const { return mUpdatable; }
     void SetUpdatable(bool val) { mUpdatable = val; }
     bool GetDead() const { return mDead; }
@@ -101,7 +99,6 @@ private:
     ReliveTypes mBaseGameObjectTypeId = ReliveTypes::eNone;
     s32 mBaseGameObjectUpdateDelay = 0;
 
-    bool mListAddFailed = false;
     bool mUpdatable = false;
     bool mDead = false;
     bool mDrawable = false;

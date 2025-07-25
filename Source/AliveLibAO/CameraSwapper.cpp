@@ -99,10 +99,10 @@ void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)
     if (gNumCamSwappers != 1)
     {
         SetUpdatable(false);
-        SetListAddFailed(true);
         SetDead(true);
 
         // There can only be 1 active at a time
+        ALIVE_FATAL("This can't happen?");
         return;
     }
 

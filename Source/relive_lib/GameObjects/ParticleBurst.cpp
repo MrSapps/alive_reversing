@@ -59,144 +59,130 @@ ParticleBurst::ParticleBurst(FP xpos, FP ypos, u32 particleCount, FP scale, Burs
     mFadeout = bFadeOut;
 
     mParticleItems = relive_new ParticleBurst_Item[particleCount];
-    if (mParticleItems)
+    mType = type;
+    switch (mType)
     {
-        mType = type;
-        switch (mType)
+        case BurstType::eRocks:
         {
-            case BurstType::eRocks:
-            {
-                mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Explosion_Rock));
-                Animation_Init(GetAnimRes(AnimId::Explosion_Rock));
-                GetAnimation().SetSemiTrans(false);
-                GetAnimation().SetBlending(true);
-                break;
-            }
-
-            case BurstType::eSticks:
-            {
-                mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Explosion_Stick));
-                Animation_Init(GetAnimRes(AnimId::Explosion_Stick));
-                if (GetGameType() == GameType::eAo)
-                {
-                    scale = FP_FromDouble(0.4) * scale;
-                }
-                GetAnimation().SetSemiTrans(false);
-                GetAnimation().SetBlending(true);
-                break;
-            }
-
-            case BurstType::eBigPurpleSparks:
-            {
-                mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::DeathFlare_2));
-                Animation_Init(GetAnimRes(AnimId::DeathFlare_2));
-                GetAnimation().SetSemiTrans(true);
-                GetAnimation().SetBlending(true);
-                GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_1);
-                break;
-            }
-
-            case BurstType::eBigRedSparks:
-            case BurstType::eGreenSparks:
-            case BurstType::eSmallPurpleSparks:
-            {
-                mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::DeathFlare_2));
-                Animation_Init(GetAnimRes(AnimId::DeathFlare_2));
-                GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_1);
-                GetAnimation().SetSemiTrans(true);
-                GetAnimation().SetBlending(false);
-
-                if (mType == BurstType::eBigRedSparks)
-                {
-                    GetAnimation().SetRGB(254, 148, 18);
-                }
-                else if (mType == BurstType::eSmallPurpleSparks)
-                {
-                    GetAnimation().SetRGB(127, 127, 127);
-                }
-                else
-                {
-                    GetAnimation().SetRGB(0, 255, 32);
-                }
-                break;
-            }
-
-            case BurstType::eMeat:
-            {
-                mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Meat_Gib));
-                Animation_Init(GetAnimRes(AnimId::Meat_Gib));
-                GetAnimation().SetSemiTrans(false);
-                GetAnimation().SetBlending(true);
-                break;
-            }
-
-            default:
-                break;
+            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Explosion_Rock));
+            Animation_Init(GetAnimRes(AnimId::Explosion_Rock));
+            GetAnimation().SetSemiTrans(false);
+            GetAnimation().SetBlending(true);
+            break;
         }
 
-        if (GetListAddFailed())
+        case BurstType::eSticks:
         {
-            SetDead(true);
-        }
-        else
-        {
-            if (GetSpriteScale() == FP_FromInteger(1))
+            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Explosion_Stick));
+            Animation_Init(GetAnimRes(AnimId::Explosion_Stick));
+            if (GetGameType() == GameType::eAo)
             {
-                SetScale(Scale::Fg);
-                GetAnimation().SetRenderLayer(Layer::eLayer_Above_FG1_39);
+                scale = FP_FromDouble(0.4) * scale;
+            }
+            GetAnimation().SetSemiTrans(false);
+            GetAnimation().SetBlending(true);
+            break;
+        }
+
+        case BurstType::eBigPurpleSparks:
+        {
+            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::DeathFlare_2));
+            Animation_Init(GetAnimRes(AnimId::DeathFlare_2));
+            GetAnimation().SetSemiTrans(true);
+            GetAnimation().SetBlending(true);
+            GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_1);
+            break;
+        }
+
+        case BurstType::eBigRedSparks:
+        case BurstType::eGreenSparks:
+        case BurstType::eSmallPurpleSparks:
+        {
+            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::DeathFlare_2));
+            Animation_Init(GetAnimRes(AnimId::DeathFlare_2));
+            GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_1);
+            GetAnimation().SetSemiTrans(true);
+            GetAnimation().SetBlending(false);
+
+            if (mType == BurstType::eBigRedSparks)
+            {
+                GetAnimation().SetRGB(254, 148, 18);
+            }
+            else if (mType == BurstType::eSmallPurpleSparks)
+            {
+                GetAnimation().SetRGB(127, 127, 127);
             }
             else
             {
-                SetScale(Scale::Bg);
-                GetAnimation().SetRenderLayer(Layer::eLayer_Above_FG1_Half_20);
+                GetAnimation().SetRGB(0, 255, 32);
             }
-
-            mParticleCount = static_cast<s16>(particleCount);
-            mAliveTimer = MakeTimer(91);
-            mXPos = xpos;
-            mYPos = ypos;
-
-            for (u32 i = 0; i < particleCount; i++)
-            {
-                mParticleItems[i].field_18_animation.mAnimPtr = &GetAnimation();
-                mParticleItems[i].field_18_animation.SetRenderLayer(GetAnimation().GetRenderLayer());
-                mParticleItems[i].field_18_animation.mSpriteScale = FP_FromDouble(0.95) * GetSpriteScale();
-
-                mParticleItems[i].field_18_animation.SetRender(true);
-
-                mParticleItems[i].field_18_animation.SetSemiTrans(GetAnimation().GetSemiTrans());
-
-                mParticleItems[i].field_18_animation.SetBlending(GetAnimation().GetBlending());
-
-                if (type == BurstType::eBigPurpleSparks)
-                {
-                    if (i % 2)
-                    {
-                        mParticleItems[i].field_18_animation.SetBlending(true);
-                    }
-                }
-
-                mParticleItems[i].field_18_animation.SetRGB(GetAnimation().GetRgb());
-
-                mParticleItems[i].x = mXPos;
-                mParticleItems[i].y = mYPos;
-                mParticleItems[i].field_8_z = FP_FromInteger(0);
-
-                mParticleItems[i].field_C_x_speed = Random_Speed(scale);
-                mParticleItems[i].field_10_y_speed = GetGameType() == GameType::eAo ? -Random_Speed(scale) : Random_Speed(scale);
-                // OG bug sign could be wrong here as it called random again to Abs() it!
-                mParticleItems[i].field_14_z_speed = -FP_Abs(Random_Speed(scale));
-
-                if (GetMap().mCurrentLevel == EReliveLevelIds::eStockYards || GetMap().mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
-                {
-                    mRGB.SetRGB(60, 60, 60);
-                }
-            }
+            break;
         }
+
+        case BurstType::eMeat:
+        {
+            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Meat_Gib));
+            Animation_Init(GetAnimRes(AnimId::Meat_Gib));
+            GetAnimation().SetSemiTrans(false);
+            GetAnimation().SetBlending(true);
+            break;
+        }
+
+        default:
+            break;
+    }
+
+    if (GetSpriteScale() == FP_FromInteger(1))
+    {
+        SetScale(Scale::Fg);
+        GetAnimation().SetRenderLayer(Layer::eLayer_Above_FG1_39);
     }
     else
     {
-        SetDead(true);
+        SetScale(Scale::Bg);
+        GetAnimation().SetRenderLayer(Layer::eLayer_Above_FG1_Half_20);
+    }
+
+    mParticleCount = static_cast<s16>(particleCount);
+    mAliveTimer = MakeTimer(91);
+    mXPos = xpos;
+    mYPos = ypos;
+
+    for (u32 i = 0; i < particleCount; i++)
+    {
+        mParticleItems[i].field_18_animation.mAnimPtr = &GetAnimation();
+        mParticleItems[i].field_18_animation.SetRenderLayer(GetAnimation().GetRenderLayer());
+        mParticleItems[i].field_18_animation.mSpriteScale = FP_FromDouble(0.95) * GetSpriteScale();
+
+        mParticleItems[i].field_18_animation.SetRender(true);
+
+        mParticleItems[i].field_18_animation.SetSemiTrans(GetAnimation().GetSemiTrans());
+
+        mParticleItems[i].field_18_animation.SetBlending(GetAnimation().GetBlending());
+
+        if (type == BurstType::eBigPurpleSparks)
+        {
+            if (i % 2)
+            {
+                mParticleItems[i].field_18_animation.SetBlending(true);
+            }
+        }
+
+        mParticleItems[i].field_18_animation.SetRGB(GetAnimation().GetRgb());
+
+        mParticleItems[i].x = mXPos;
+        mParticleItems[i].y = mYPos;
+        mParticleItems[i].field_8_z = FP_FromInteger(0);
+
+        mParticleItems[i].field_C_x_speed = Random_Speed(scale);
+        mParticleItems[i].field_10_y_speed = GetGameType() == GameType::eAo ? -Random_Speed(scale) : Random_Speed(scale);
+        // OG bug sign could be wrong here as it called random again to Abs() it!
+        mParticleItems[i].field_14_z_speed = -FP_Abs(Random_Speed(scale));
+
+        if (GetMap().mCurrentLevel == EReliveLevelIds::eStockYards || GetMap().mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+        {
+            mRGB.SetRGB(60, 60, 60);
+        }
     }
 }
 

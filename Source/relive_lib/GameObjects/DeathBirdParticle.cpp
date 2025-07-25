@@ -23,30 +23,23 @@ DeathBirdParticle::DeathBirdParticle(FP xpos, FP ypos, s32 startTimer, bool play
 
     Animation_Init(GetAnimRes(AnimId::DeathFlare_1));
 
-    if (GetListAddFailed())
+    SetApplyShadowZoneColour(false);
+    GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_1);
+    SetSpriteScale(scale);
+    GetAnimation().SetSpriteScale(scale);
+
+    if (scale <= FP_FromDouble(0.5))
     {
-        SetDead(true);
+        GetAnimation().SetRenderLayer(Layer::eLayer_Foreground_Half_17);
     }
     else
     {
-        SetApplyShadowZoneColour(false);
-        GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_1);
-        SetSpriteScale(scale);
-        GetAnimation().SetSpriteScale(scale);
-
-        if (scale <= FP_FromDouble(0.5))
-        {
-            GetAnimation().SetRenderLayer(Layer::eLayer_Foreground_Half_17);
-        }
-        else
-        {
-            GetAnimation().SetRenderLayer(Layer::eLayer_Above_FG1_39);
-        }
-
-        mXPos = xpos;
-        mYPos = ypos;
-        mRandom = Math_NextRandom();
+        GetAnimation().SetRenderLayer(Layer::eLayer_Above_FG1_39);
     }
+
+    mXPos = xpos;
+    mYPos = ypos;
+    mRandom = Math_NextRandom();
 }
 
 void DeathBirdParticle::VUpdate()

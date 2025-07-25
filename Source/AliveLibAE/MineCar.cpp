@@ -252,17 +252,11 @@ void MineCar::CreateFromSaveState(SerializedObjectData& pBuffer)
 
 void MineCar::LoadAnimation(Animation* pAnim)
 {
-    if (pAnim->Init(GetAnimRes(AnimId::Mine_Car_Tread_Idle), this))
-    {
-        pAnim->SetRenderLayer(GetAnimation().GetRenderLayer());
-        pAnim->SetBlending(false);
-        pAnim->SetSpriteScale(GetSpriteScale());
-        pAnim->SetRGB(128, 128, 128);
-    }
-    else
-    {
-        SetListAddFailed(true);
-    }
+    pAnim->Init(GetAnimRes(AnimId::Mine_Car_Tread_Idle), this);
+    pAnim->SetRenderLayer(GetAnimation().GetRenderLayer());
+    pAnim->SetBlending(false);
+    pAnim->SetSpriteScale(GetSpriteScale());
+    pAnim->SetRGB(128, 128, 128);
 }
 
 void MineCar::VStopAudio()

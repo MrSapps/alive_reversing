@@ -45,10 +45,8 @@ HoistRocksEffect::HoistRocksEffect(relive::Path_Hoist* pTlv, const Guid& tlvId)
         mSpriteScale = FP_FromDouble(1.0);
     }
 
-    if (gObjListDrawables->Push_Back(this))
-    {
-        SetDrawable(true);
-    }
+    gObjListDrawables->Push_Back(this);
+    SetDrawable(true);
 
     for (HoistRockParticle& particle : mRocks)
     {
