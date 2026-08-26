@@ -12,11 +12,11 @@ public:
 
     void LoadAnimations();
 
-    bool vIsOpen();
-    void vOpen();
-    void vClose();
-    void vSetOpen();
-    void vSetClosed();
+    bool IsOpen();
+    void Open();
+    void Close();
+    void SetOpen();
+    void SetClosed();
     void PlaySound();
 
     virtual void VScreenChanged() override;

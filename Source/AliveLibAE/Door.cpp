@@ -359,20 +359,12 @@ Door::Door(relive::Path_Door* pTlv, const Guid& tlvId)
     SetDoPurpleLightEffect(true);
 }
 
-bool Door::vIsOpen()
+bool Door::IsOpen()
 {
     return mCurrentState == relive::Path_Door::DoorStates::eOpen;
 }
 
-void Door::vOpen()
-{
-    if (mCurrentState != relive::Path_Door::DoorStates::eOpen)
-    {
-        mCurrentState = relive::Path_Door::DoorStates::eOpening;
-    }
-}
-
-void Door::vClose()
+void Door::Close()
 {
     if (mCurrentState != relive::Path_Door::DoorStates::eClosed)
     {
@@ -383,12 +375,20 @@ void Door::vClose()
     }
 }
 
-void Door::vSetOpen()
+void Door::Open()
+{
+    if (mCurrentState != relive::Path_Door::DoorStates::eOpen)
+    {
+        mCurrentState = relive::Path_Door::DoorStates::eOpening;
+    }
+}
+
+void Door::SetOpen()
 {
     mCurrentState = relive::Path_Door::DoorStates::eOpen;
 }
 
-void Door::vSetClosed()
+void Door::SetClosed()
 {
     mCurrentState = relive::Path_Door::DoorStates::eClosed;
 }
@@ -412,6 +412,11 @@ void Door::PlaySound()
 Door::~Door()
 {
     Path::TLV_Reset(mTlvId);
+}
+
+void Door::VScreenChanged()
+{
+    SetDead(true);
 }
 
 void Door::VUpdate()
@@ -528,10 +533,6 @@ void Door::VUpdate()
     }
 }
 
-void Door::VScreenChanged()
-{
-    SetDead(true);
-}
 
 // ================================================================================================
 
