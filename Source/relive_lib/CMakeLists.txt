@@ -545,6 +545,8 @@ SET(game_objects_src
     GameObjects/Door.hpp
     GameObjects/BaseAbe.cpp
     GameObjects/BaseAbe.hpp
+    GameObjects/Menu.cpp
+    GameObjects/Menu.hpp
 )
 
 SET(data_conversion_src
@@ -700,6 +702,8 @@ SET(relive_lib_src
     OrbWhirlWindParticle.cpp
     Grid.hpp
     Grid.cpp
+    MenuConfig.hpp
+    MenuConfig.cpp
     Factory.hpp
     Factory.cpp
 )

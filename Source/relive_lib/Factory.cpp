@@ -24,6 +24,7 @@
 #include "../relive_lib/GameObjects/Dove.hpp"
 #include "../relive_lib/GameObjects/GasCountDown.hpp"
 #include "../relive_lib/GameObjects/Door.hpp"
+#include "../relive_lib/GameObjects/Menu.hpp"
 
 #include "../AliveLibAO/Game.hpp"
 #include "../AliveLibAO/Abe.hpp"
@@ -1667,6 +1668,7 @@ static void Factory_MainMenuController(relive::Path_TLV* pTlv, const Guid& tlvId
     {
         if (loadmode == relive::LoadMode::LoadResourceFromList_1 || loadmode == relive::LoadMode::LoadResource_2)
         {
+            /*
             for (const auto& info : MainMenuController::sMainMenuFrameTable_561CC8)
             {
                 if (info.field_0_animation != AnimId::None)
@@ -1683,10 +1685,12 @@ static void Factory_MainMenuController(relive::Path_TLV* pTlv, const Guid& tlvId
 
             // Originally loaded in Game_Init_LoadingIcon()
             ResourceManagerWrapper::PendAnimation(AnimId::Loading_Icon2);
+            */
         }
         else
         {
-            relive_new MainMenuController(pTlv, tlvId);
+//            relive_new MainMenuController(pTlv, tlvId);
+            relive_new relive::Menu(pTlv, tlvId);
         }
     }
 }
