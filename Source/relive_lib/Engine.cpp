@@ -181,11 +181,6 @@ static s32 Game_End_Frame(u32 flags)
 
 void Engine::CmdLineRenderInit()
 {
-    IO_Init_494230();
-
-    sCommandLine_ShowFps = mClp.SwitchExists("-ddfps");
-    gCommandLine_NoFrameSkip = mClp.SwitchExists("-ddnoskip");
-
 #if FORCE_DDCHEAT
     gDDCheatOn = true;
 #else
@@ -211,12 +206,6 @@ void Engine::CmdLineRenderInit()
         }
     }
 
-
-    std::string modName;
-    if (mClp.ExtractNamePairArgument(modName, "-mod="))
-    {
-        LOG_INFO("Set active mod to be %s", modName.c_str());
-    }
 
     if (mGameType == GameType::eAe)
     {
@@ -629,8 +618,20 @@ void Engine::Run()
     gPsxDisplay.Init();
 
     GetGameAutoPlayer().ProcessCommandLine(mClp);
+
+    IO_Init_494230();
+
+    sCommandLine_ShowFps = mClp.SwitchExists("-ddfps");
+    gCommandLine_NoFrameSkip = mClp.SwitchExists("-ddnoskip");
+
     CmdLineRenderInit();
 
+    std::string modName;
+    if (mClp.ExtractNamePairArgument(modName, "-mod="))
+    {
+        LOG_INFO("Set active mod to be %s", modName.c_str());
+    }
+        
     // Another hack till refactor branch replaces master
     GetGameAutoPlayer().Pause(true);
     GetGameAutoPlayer().DisableRecorder();
