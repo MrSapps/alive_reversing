@@ -19,5 +19,5 @@ private:
     GameType mGameType = GameType::eAe;
     FileSystem& mFs;
     CommandLineParser& mClp;
-    std::unique_ptr<relive::IIpcInterface> mIpcInterface; 
+    std::unique_ptr<relive::IIpcInterface> mIpcInterface;
 };

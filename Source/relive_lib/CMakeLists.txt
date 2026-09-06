@@ -702,6 +702,8 @@ SET(relive_lib_src
     Grid.cpp
     Factory.hpp
     Factory.cpp
+    Mods.hpp
+    Mods.cpp
 )
 add_library(relive_lib ${relive_lib_src})
 
