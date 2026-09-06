@@ -1,12 +1,12 @@
 #include "stdafx.h"
 #include "CheatController.hpp"
 #include "Function.hpp"
-#include "../AliveLibAE/Game.hpp"
 #include "MapWrapper.hpp"
 #include "../AliveLibAE/QuikSave.hpp"
 #include "data_conversion/file_system.hpp"
 #include "data_conversion/AESaveSerialization.hpp"
 #include "GameType.hpp"
+#include "Engine.hpp"
 
 CheatController* gCheatController = nullptr;
 

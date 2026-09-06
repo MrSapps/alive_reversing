@@ -10,12 +10,3 @@ extern u32 sGnFrame; // NOTE: Points to AE copy till moved to common lib
 extern bool gDDCheatOn;
 extern bool gBreakGameLoop; // AE var
 extern u16 gAttract; // AE var
-
-namespace AO {
-
-
-void Init_GameStates();
-
-void Game_Main(EReliveLevelIds startLevel, s32 startPath, s32 startCamera);
-
-} // namespace AO

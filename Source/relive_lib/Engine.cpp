@@ -1,4 +1,5 @@
 #include "Engine.hpp"
+#include "GameType.hpp"
 #include "data_conversion/data_conversion_ui.hpp"
 #include "../AliveLibAE/Game.hpp"
 #include "../AliveLibAO/Game.hpp"
@@ -123,6 +124,62 @@ Engine::~Engine()
     mIpcInterface.reset();
 }
 
+
+static f64 sFps_55EFDC = 0.0;
+static s32 sFrameDiff_5CA4DC = 0;
+static s32 sFrameCount_5CA300 = 0;
+
+static f64 Calculate_FPS_495250(s32 frameCount)
+{
+    static u32 sLastTime_5CA338 = SYS_GetTicks() - 500;
+    const u32 curTime = SYS_GetTicks();
+    const s32 timeDiff = curTime - sLastTime_5CA338;
+
+    if (static_cast<s32>((curTime - sLastTime_5CA338)) < 500)
+    {
+        return sFps_55EFDC;
+    }
+
+    const s32 diffFrames = frameCount - sFrameDiff_5CA4DC;
+    sFps_55EFDC = static_cast<f64>(diffFrames) * 1000.0 / static_cast<f64>(timeDiff);
+
+    sLastTime_5CA338 = curTime;
+    sFrameDiff_5CA4DC = frameCount;
+    return sFps_55EFDC;
+}
+
+static void DrawFps_4952F0(f32 fps)
+{
+    char_type strBuffer[125] = {};
+    snprintf(strBuffer, sizeof(strBuffer), "%02.1f fps ", static_cast<f64>(fps));
+    gPsxDisplay.mDebugFont.DebugFont_Printf(0, strBuffer);
+}
+
+
+static s32 Game_End_Frame(u32 flags)
+{
+    if (flags & 1)
+    {
+        gTurnOffRendering = false;
+        return 0;
+    }
+
+    const f64 fps = Calculate_FPS_495250(sFrameCount_5CA300);
+    if (sCommandLine_ShowFps)
+    {
+        DrawFps_4952F0(static_cast<f32>(fps));
+    }
+
+    ++sFrameCount_5CA300;
+
+    if (Sys_PumpMessages())
+    {
+        exit(0);
+    }
+    return 0;
+}
+
+
 void Engine::CmdLineRenderInit()
 {
     IO_Init_494230();
@@ -199,60 +256,6 @@ void DestroyObjects()
     }
 }
 
-static f64 sFps_55EFDC = 0.0;
-static s32 sFrameDiff_5CA4DC = 0;
-static s32 sFrameCount_5CA300 = 0;
-
-static f64 Calculate_FPS_495250(s32 frameCount)
-{
-    static u32 sLastTime_5CA338 = SYS_GetTicks() - 500;
-    const u32 curTime = SYS_GetTicks();
-    const s32 timeDiff = curTime - sLastTime_5CA338;
-
-    if (static_cast<s32>((curTime - sLastTime_5CA338)) < 500)
-    {
-        return sFps_55EFDC;
-    }
-
-    const s32 diffFrames = frameCount - sFrameDiff_5CA4DC;
-    sFps_55EFDC = static_cast<f64>(diffFrames) * 1000.0 / static_cast<f64>(timeDiff);
-
-    sLastTime_5CA338 = curTime;
-    sFrameDiff_5CA4DC = frameCount;
-    return sFps_55EFDC;
-}
-
-static void DrawFps_4952F0(f32 fps)
-{
-    char_type strBuffer[125] = {};
-    snprintf(strBuffer, sizeof(strBuffer), "%02.1f fps ", static_cast<f64>(fps));
-    gPsxDisplay.mDebugFont.DebugFont_Printf(0, strBuffer);
-}
-
-
-s32 Game_End_Frame(u32 flags)
-{
-    if (flags & 1)
-    {
-        gTurnOffRendering = false;
-        return 0;
-    }
-
-    const f64 fps = Calculate_FPS_495250(sFrameCount_5CA300);
-    if (sCommandLine_ShowFps)
-    {
-        DrawFps_4952F0(static_cast<f32>(fps));
-    }
-
-    ++sFrameCount_5CA300;
-
-    if (Sys_PumpMessages())
-    {
-        exit(0);
-    }
-    return 0;
-}
-
 void SYS_EventsPump()
 {
     if (Sys_PumpMessages())
@@ -279,11 +282,18 @@ void Alive_Show_ErrorMsg(const char_type* fmt, ...)
     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, ("R.E.L.I.V.E. " + BuildString()).c_str(), buf, nullptr);
 }
 
-
-void Init_GameStates()
+void Engine::Init_GameStates()
 {
-    gKilledMudokons = gFeeco_Restart_KilledMudCount; // DDCheat
-    gRescuedMudokons = gFeecoRestart_SavedMudCount;
+    if (GetGameType() == GameType::eAo)
+    {
+        gKilledMudokons = AO::GameEnderController::gRestartRuptureFarmsKilledMuds;
+        gRescuedMudokons = AO::GameEnderController::gRestartRuptureFarmsSavedMuds;
+    }
+    else
+    {
+        gKilledMudokons = gFeeco_Restart_KilledMudCount;
+        gRescuedMudokons = gFeecoRestart_SavedMudCount;
+    }
 
     gDeathGasOn = false; // GasCountDown
     gDeathGasTimer = 0;
@@ -296,10 +306,12 @@ void Init_GameStates()
     SwitchStates_ClearRange(0, 255);
 }
 
-static void Init_Sound_DynamicArrays_And_Others()
+void Engine::Init_Sound_DynamicArrays_And_Others()
 {
     gPauseMenu = nullptr; // PauseMenu
     gAbe = nullptr;
+    AO::gPauseMenu = nullptr;
+    AO::gAbe = nullptr;
     sControlledCharacter = nullptr;
     gNumCamSwappers = 0; // TODO: Move
     sGnFrame = 0;
@@ -309,11 +321,20 @@ static void Init_Sound_DynamicArrays_And_Others()
 
     gBaseAliveGameObjects = relive_new DynamicArrayT<BaseAliveGameObject>(20);
 
-    SND_Init();
-    SND_Init_Ambiance();
-    MusicController::Create();
-
+    if (mGameType == GameType::eAe)
+    {
+        SND_Init();
+        SND_Init_Ambiance();
+        MusicController::Create();
+    }
+    else
+    {
+        AO::SND_Init();
+        SND_Init_Ambiance();
+        AO::MusicController::Create();
+    }
     Init_GameStates(); // Init other vars + switch states
+
 }
 
 static void Game_Init_LoadingIcon()
@@ -359,7 +380,7 @@ void Game_Loop()
 
         EventsResetActive();
         Slurg::Clear_Slurg_Step_Watch_Points();
-        gSkipGameObjectUpdates = false;
+        gSkipGameObjectUpdates = false; // Used by quick save
 
         // Update objects
         GetGameAutoPlayer().SyncPoint(SyncPoints::ObjectsUpdateStart);
@@ -459,8 +480,16 @@ void Game_Loop()
 
         bPauseMenuObjectFound = false;
 
-        gMap.ScreenChange();
-        Input().Update(GetGameAutoPlayer());
+        if (GetGameType() == GameType::eAe)
+        {
+            gMap.ScreenChange();
+            Input().Update(GetGameAutoPlayer());
+        }
+        else
+        {
+            AO::gMap.ScreenChange();
+            AO::Input().Update(GetGameAutoPlayer());
+        }
 
         if (gNumCamSwappers == 0)
         {
@@ -497,7 +526,7 @@ void Game_Loop()
     }
 }
 
-void Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera)
+void Engine::Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera)
 {
     // Begin start up
     SYS_EventsPump();
@@ -507,8 +536,7 @@ void Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera)
     SYS_EventsPump();
 
     gPsxDisplay.Init();
-    Input_Pads_Reset_4FA960(); // starts card/pads on psx ver
-    Input_EnableInput_4EDDD0();
+    AO::Input().InitPad(1);
 
     gBaseGameObjects = relive_new DynamicArrayT<BaseGameObject>(90);
 
@@ -516,18 +544,39 @@ void Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera)
 
     AnimationBase::CreateAnimationArray();
 
-    Input_Init();
+    if (mGameType == GameType::eAe)
+    {
+        Input_Init();
+    }
+    else
+    {
+        AO::Input_Init();
+    }
+
     Init_Sound_DynamicArrays_And_Others();
     
-    relive_new DDCheat();
-
-    gEventSystem = relive_new GameSpeak();
-
+    if (mGameType == GameType::eAe)
+    {
+        relive_new DDCheat();
+        gEventSystem = relive_new GameSpeak();
+    }
+    else
+    {
+        relive_new AO::DDCheat();
+        AO::gEventSystem = relive_new AO::GameSpeak();
+    }
     gCheatController = relive_new CheatController();
 
     Game_Init_LoadingIcon();
 
-    gMap.Init(startLevel, static_cast<s16>(startPath), static_cast<s16>(startCamera), CameraSwapEffects::eInstantChange_0, 0, 0);
+    if (mGameType == GameType::eAe)
+    {
+        gMap.Init(startLevel, static_cast<s16>(startPath), static_cast<s16>(startCamera), CameraSwapEffects::eInstantChange_0, 0, 0);
+    }
+    else
+    {
+        AO::gMap.Init(startLevel, static_cast<s16>(startPath), static_cast<s16>(startCamera), CameraSwapEffects::eInstantChange_0, 0, 0);
+    }
 
     // Main loop start
     Game_Loop();
@@ -535,9 +584,16 @@ void Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera)
     // Shut down start
     Game_Free_LoadingIcon();
 
-    DDCheat::ClearProperties();
-
-    gMap.Shutdown();
+    if (mGameType == GameType::eAe)
+    {
+        DDCheat::ClearProperties();
+        gMap.Shutdown();
+    }
+    else
+    {
+        AO::DDCheat::ClearProperties();
+        AO::gMap.Shutdown();       
+    }
 
     AnimationBase::FreeAnimationArray();
     BaseAnimatedWithPhysicsGameObject::FreeArray();
@@ -547,304 +603,27 @@ void Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera)
     relive_delete gBaseAliveGameObjects;
     relive_delete gCollisions;
 
-    MusicController::Shutdown();
+    if (mGameType == GameType::eAe)
+    {
+        MusicController::Shutdown();
+    }
+    else
+    {
+        AO::MusicController::Shutdown();
+    }
 
     SND_Reset_Ambiance();
     SND_Shutdown();
     Input().ShutDown_45F020();
 }
 
-void Game_Main(EReliveLevelIds startLevel, s32 startPath, s32 startCamera)
+void Engine::Game_Main(EReliveLevelIds startLevel, s32 startPath, s32 startCamera)
 {
     // Only returns once the engine is shutting down
     Game_Run(startLevel, startPath, startCamera);
 
     Game_Shutdown();
 }
-
-namespace AO {
-
-
-void Init_GameStates()
-{
-    gKilledMudokons = GameEnderController::gRestartRuptureFarmsKilledMuds;
-    gRescuedMudokons = GameEnderController::gRestartRuptureFarmsSavedMuds;
-
-    gDeathGasOn = false;
-    gDeathGasTimer = 0;
-
-    gSwitchStates = {};
-}
-
-
-void Init_Sound_DynamicArrays_And_Others()
-{
-    gPauseMenu = nullptr;
-    gAbe = nullptr;
-    sControlledCharacter = nullptr;
-    gNumCamSwappers = 0;
-    sGnFrame = 0;
-
-    PlatformBase::MakeArray();
-    ShadowZone::MakeArray();
-
-    gBaseAliveGameObjects = relive_new DynamicArrayT<::BaseAliveGameObject>(20);
-
-    SND_Init();
-    SND_Init_Ambiance();
-    MusicController::Create();
-
-    Init_GameStates(); // Init other vars + switch states
-
-    // TODO: The switch state clearing is done in Init_GameStates in AE
-    // check this is not an AO bug
-    SwitchStates_ClearRange(0, 255);
-}
-
-void Game_Init_LoadingIcon()
-{
-    ResourceManagerWrapper::PendAnimation(AnimId::Loading_Icon2);
-    ResourceManagerWrapper::LoadingLoop2();
-
-    /*
-    u8** ppRes = ResourceManager::GetLoadedResource(ResourceManager::Resource_Animation, AOResourceID::kLoadingAOResID, 1, 0);
-    if (!ppRes)
-    {
-        ResourceManager::LoadResourceFile_455270("LOADING.BAN", nullptr);
-        ppRes = ResourceManager::GetLoadedResource(ResourceManager::Resource_Animation, AOResourceID::kLoadingAOResID, 1, 0);
-    }
-    ResourceManager::Set_Header_Flags_4557D0(ppRes, ResourceManager::ResourceHeaderFlags::eNeverFree);
-    */
-}
-
-void Game_Free_LoadingIcon()
-{
-    /*
-    u8** ppRes = ResourceManager::GetLoadedResource(ResourceManager::Resource_Animation, AOResourceID::kLoadingAOResID, 0, 0);
-    if (ppRes)
-    {
-        ResourceManager::FreeResource_455550(ppRes);
-    }
-    */
-}
-
-
-void Game_Loop()
-{
-    gBreakGameLoop = false;
-    bool bPauseMenuObjectFound = false;
-    while (!gBaseGameObjects->IsEmpty())
-    {
-        GetGameAutoPlayer().SyncPoint(SyncPoints::MainLoopStart);
-
-        EventsResetActive();
-
-        // Update objects
-        GetGameAutoPlayer().SyncPoint(SyncPoints::ObjectsUpdateStart);
-        for (s32 baseObjIdx = 0; baseObjIdx < gBaseGameObjects->Size(); baseObjIdx++)
-        {
-            BaseGameObject* pBaseGameObject = gBaseGameObjects->ItemAt(baseObjIdx);
-
-            if (!pBaseGameObject)
-            {
-                break;
-            }
-
-            if (pBaseGameObject->GetUpdatable()
-			    && !pBaseGameObject->GetDead() 
-                && (gNumCamSwappers == 0 || pBaseGameObject->GetUpdateDuringCamSwap()))
-            {
-                const s32 updateDelay = pBaseGameObject->UpdateDelay();
-                if (updateDelay <= 0)
-                {
-                    if (pBaseGameObject == gPauseMenu)
-                    {
-                        bPauseMenuObjectFound = true;
-                    }
-                    else
-                    {
-                        pBaseGameObject->VUpdate();
-                    }
-                }
-                else
-                {
-                    pBaseGameObject->SetUpdateDelay(updateDelay - 1);
-                }
-            }
-        }
-        GetGameAutoPlayer().SyncPoint(SyncPoints::ObjectsUpdateEnd);
-
-        // Animate everything
-        if (gNumCamSwappers <= 0)
-        {
-            GetGameAutoPlayer().SyncPoint(SyncPoints::AnimateAll);
-            AnimationBase::AnimateAll(AnimationBase::gAnimations);
-        }
-
-        // Render objects
-        GetGameAutoPlayer().SyncPoint(SyncPoints::DrawAllStart);
-        for (s32 i = 0; i < gObjListDrawables->Size(); i++)
-        {
-            BaseGameObject* pDrawable = gObjListDrawables->ItemAt(i);
-            if (!pDrawable)
-            {
-                break;
-            }
-
-            if (pDrawable->GetDead())
-            {
-                pDrawable->SetCantKill(false);
-            }
-            else if (pDrawable->GetDrawable())
-            {
-                pDrawable->SetCantKill(true);
-                pDrawable->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
-            }
-        }
-        GetGameAutoPlayer().SyncPoint(SyncPoints::DrawAllEnd);
-
-        gPsxDisplay.mDebugFont.DebugFont_Flush();
-        gScreenManager->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
-        SYS_EventsPump(); // Exit checking?
-
-        GetGameAutoPlayer().SyncPoint(SyncPoints::RenderOT);
-        gPsxDisplay.RenderOrderingTable();
-        
-        GetGameAutoPlayer().SyncPoint(SyncPoints::RenderStart);
-
-        // Destroy objects with certain flags
-        for (s32 idx = 0; idx < gBaseGameObjects->Size(); idx++)
-        {
-            BaseGameObject* pObj = gBaseGameObjects->ItemAt(idx);
-            if (!pObj)
-            {
-                break;
-            }
-
-            if (pObj->GetDead() && pObj->mChaseCounter == 0)
-            {
-                idx = gBaseGameObjects->RemoveAt(idx);
-                relive_delete pObj;
-            }
-        }
-
-        GetGameAutoPlayer().SyncPoint(SyncPoints::RenderEnd);
-
-        if (bPauseMenuObjectFound && gPauseMenu)
-        {
-            gPauseMenu->VUpdate();
-        }
-
-        bPauseMenuObjectFound = false;
-
-        gMap.ScreenChange();
-        Input().Update(GetGameAutoPlayer());
-
-        if (gNumCamSwappers == 0)
-        {
-            GetGameAutoPlayer().SyncPoint(SyncPoints::IncrementFrame);
-            sGnFrame++;
-        }
-
-        if (gBreakGameLoop)
-        {
-            GetGameAutoPlayer().SyncPoint(SyncPoints::MainLoopExit);
-            break;
-        }
-
-        GetGameAutoPlayer().ValidateObjectStates();
-
-    } // Main loop end
-
-    PSX_VSync(VSyncMode::UncappedFps);
-
-    // Destroy all game objects
-    for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
-    {
-        BaseGameObject* pObjToKill = gBaseGameObjects->ItemAt(i);
-        if (!pObjToKill)
-        {
-            break;
-        }
-
-        if (pObjToKill->GetDead())
-        {
-            i = gBaseGameObjects->RemoveAt(i);
-            relive_delete pObjToKill;
-        }
-    }
-}
-
-void DDCheat_Allocate()
-{
-    relive_new DDCheat();
-}
-
-void Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera)
-{
-    // Begin start up
-    SYS_EventsPump();
-
-    gAttract = 0;
-
-    SYS_EventsPump();
-
-    gPsxDisplay.Init();
-    Input().InitPad(1);
-
-    gBaseGameObjects = relive_new DynamicArrayT<BaseGameObject>(90);
-
-    BaseAnimatedWithPhysicsGameObject::MakeArray(); // Makes drawables
-
-    AnimationBase::CreateAnimationArray();
-
-    Input_Init();
-    Init_Sound_DynamicArrays_And_Others();
-    
-    DDCheat_Allocate();
-
-    gEventSystem = relive_new GameSpeak();
-
-    gCheatController = relive_new CheatController();
-
-    Game_Init_LoadingIcon();
-
-    gMap.Init(startLevel, static_cast<s16>(startPath), static_cast<s16>(startCamera), CameraSwapEffects::eInstantChange_0, 0, 0);
-
-    // Main loop start
-    Game_Loop();
-
-    // Shut down start
-    Game_Free_LoadingIcon();
-
-    DDCheat::ClearProperties();
-
-    gMap.Shutdown();
-
-    AnimationBase::FreeAnimationArray();
-    BaseAnimatedWithPhysicsGameObject::FreeArray();
-    relive_delete gBaseGameObjects;
-    PlatformBase::FreeArray();
-    relive_delete gBaseAliveGameObjects;
-
-    MusicController::Shutdown();
-
-    SND_Reset_Ambiance();
-    SND_Shutdown();
-    InputObject::Shutdown();
-}
-
-
-void Game_Main(EReliveLevelIds startLevel, s32 startPath, s32 startCamera)
-{
-    // Only returns once the engine is shutting down
-    AO::Game_Run(startLevel, startPath, startCamera);
-
-    Game_Shutdown();
-}
-
-} // namespace AO
-
 
 void Engine::Run()
 {
@@ -856,9 +635,6 @@ void Engine::Run()
     // Another hack till refactor branch replaces master
     GetGameAutoPlayer().Pause(true);
     GetGameAutoPlayer().DisableRecorder();
-
-    // Moved from PsxDisplay init to prevent desync
-    PSX_PutDispEnv_4F5890();
 
     // TODO: HACK mini loop till Game.cpp is merged
     DataConversionUI dcu(mGameType);
@@ -892,6 +668,6 @@ void Engine::Run()
     else
     {
         LOG_INFO("AO standalone starting...");
-        AO::Game_Main(EReliveLevelIds::eMenu, 1, 10);
+        Game_Main(EReliveLevelIds::eMenu, 1, 10);
     }
 }

@@ -16,7 +16,7 @@
 #include "LiftPoint.hpp"
 #include "../relive_lib/Shadow.hpp"
 #include "Game.hpp"
-#include "../AliveLibAE/stdlib.hpp"
+#include "../relive_lib/Engine.hpp"
 #include "Midi.hpp"
 #include "Movie.hpp"
 #include "../relive_lib/GameObjects/CircularFade.hpp"
@@ -527,7 +527,8 @@ Abe::Abe()
 {
     SetType(ReliveTypes::eAbe);
     SetSurviveDeathReset(true);
-    Init_GameStates();
+    
+    Engine::Init_GameStates();
 
     LoadAnimations();
     Animation_Init(GetAnimRes(AnimId::Mudokon_Walk));

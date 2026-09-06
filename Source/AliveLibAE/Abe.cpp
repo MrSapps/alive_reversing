@@ -45,6 +45,7 @@
 #include "../relive_lib/GameObjects/Electrocute.hpp"
 #include "BirdPortal.hpp"
 #include "../relive_lib/GameObjects/BoomMachine.hpp"
+#include "../relive_lib/Engine.hpp"
 #include "Shrykull.hpp"
 #include "Bullet.hpp"
 #include "../relive_lib/GameObjects/Spark.hpp"
@@ -433,7 +434,7 @@ Abe::Abe() :
     // Set the well level to the current level for the path start quick save
     mDstWellLevel = gMap.mCurrentLevel;
 
-    Init_GameStates();
+    Engine::Init_GameStates();
 
     LoadAnimations();
     Animation_Init(GetAnimRes(AnimId::Mudokon_Idle));

@@ -23,6 +23,7 @@
 #include "SlapLock.hpp"
 #include "SlapLockWhirlWind.hpp"
 #include "../relive_lib/GameObjects/AbilityRing.hpp"
+#include "../relive_lib/Engine.hpp"
 #include "Slurg.hpp"
 #include "../relive_lib/GameObjects/GasCountDown.hpp"
 #include "Rock.hpp"

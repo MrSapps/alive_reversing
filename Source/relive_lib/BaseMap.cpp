@@ -1,7 +1,7 @@
 #include "BinaryPath.hpp"
 #include "stdafx.h"
 #include "BaseMap.hpp"
-#include "../AliveLibAE/Game.hpp" // DestroyObjects
+#include "../relive_lib/Engine.hpp"// DestroyObjects
 #include "../AliveLibAE/Map.hpp"
 #include "../AliveLibAO/Map.hpp"
 #include "GameObjects/BaseAliveGameObject.hpp"

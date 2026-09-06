@@ -5,6 +5,9 @@
 
 class FileSystem;
 class CommandLineParser;
+enum class EReliveLevelIds : s16;
+
+void DestroyObjects();
 
 class Engine final
 {
@@ -12,9 +15,14 @@ public:
     Engine(GameType gameType, FileSystem& fs, CommandLineParser& clp);
     ~Engine();
     void Run();
-
+    static void Init_GameStates();
 private:
     void CmdLineRenderInit();
+
+    void Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera);
+    void Game_Main(EReliveLevelIds startLevel, s32 startPath, s32 startCamera);
+
+    void Init_Sound_DynamicArrays_And_Others();
 
     GameType mGameType = GameType::eAe;
     FileSystem& mFs;
