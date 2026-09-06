@@ -1,7 +1,6 @@
 #include "Engine.hpp"
 #include "GameType.hpp"
 #include "data_conversion/data_conversion_ui.hpp"
-#include "../relive_lib/Engine.hpp"
 #include "PsxDisplay.hpp"
 #include "../AliveLibAE/VGA.hpp"
 #include "BaseGameAutoPlayer.hpp"
@@ -80,6 +79,7 @@
 #include "../relive_lib/GameObjects/GasCountDown.hpp"
 #include "../relive_lib/GameObjects/PlatformBase.hpp"
 #include "../AliveLibAO/GameEnderController.hpp"
+#include "../relive_lib/Mods.hpp"
 
 u32 sGnFrame = 0;
 bool gBreakGameLoop = false;
@@ -630,8 +630,19 @@ void Engine::Run()
     if (mClp.ExtractNamePairArgument(modName, "-mod="))
     {
         LOG_INFO("Set active mod to be %s", modName.c_str());
+
+        relive::Mods mods(mFs);
+//        mods.EnumerateMods();
+
+        const relive::Mod* pMod =  mods.FindByDirOrModName(modName);
+        if (pMod)
+        {
+            // TODO: Add resource path as primary path in resource manager
+            // TODO: Include mod name in window title
+            // TODO: Fail if mod isn't for the active game type
+        }
     }
-        
+
     // Another hack till refactor branch replaces master
     GetGameAutoPlayer().Pause(true);
     GetGameAutoPlayer().DisableRecorder();
