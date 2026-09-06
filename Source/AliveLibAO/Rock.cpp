@@ -7,7 +7,7 @@
 #include "../relive_lib/Events.hpp"
 #include "Sfx.hpp"
 #include "../relive_lib/Collisions.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "../relive_lib/GameObjects/Particle.hpp"
 #include "../relive_lib/Grid.hpp"
 #include "Map.hpp"

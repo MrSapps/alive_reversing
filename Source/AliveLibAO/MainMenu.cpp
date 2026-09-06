@@ -4,7 +4,7 @@
 #include "../AliveLibAE/stdlib.hpp"
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
 #include "Map.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "../relive_lib/Sfx.hpp"
 #include "DDCheat.hpp"
 #include "../relive_lib/GameObjects/CheatController.hpp"
@@ -28,7 +28,7 @@
 #include "../relive_lib/Psx.hpp"
 #include "MainMenuTransition.hpp"
 #include "../relive_lib/ObjectIds.hpp"
-#include "../AliveLibAE/Game.hpp"
+#include "../relive_lib/Engine.hpp"
 #include "GameEnderController.hpp"
 
 namespace AO {

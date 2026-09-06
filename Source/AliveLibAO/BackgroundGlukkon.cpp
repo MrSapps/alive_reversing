@@ -7,7 +7,7 @@
 #include "Sfx.hpp"
 #include "Abe.hpp"
 #include "../relive_lib/Events.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "../relive_lib/FatalError.hpp"
 #include "Path.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"

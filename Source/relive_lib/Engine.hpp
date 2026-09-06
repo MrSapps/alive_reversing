@@ -7,6 +7,14 @@ class FileSystem;
 class CommandLineParser;
 enum class EReliveLevelIds : s16;
 
+
+extern u32 sGnFrame;
+extern bool gDDCheatOn;
+extern u16 gAttract;
+extern bool gSkipGameObjectUpdates;
+extern s16 gNumCamSwappers;
+extern bool gBreakGameLoop;
+
 void DestroyObjects();
 
 class Engine final

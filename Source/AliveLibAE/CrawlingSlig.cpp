@@ -27,7 +27,7 @@
 #include "../relive_lib/Grid.hpp"
 #include "Path.hpp"
 #include "../relive_lib/FixedPoint.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "../relive_lib/FatalError.hpp"
 #include "QuikSave.hpp"
 #include "../relive_lib/data_conversion/AnimationConverter.hpp"

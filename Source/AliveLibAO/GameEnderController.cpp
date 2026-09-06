@@ -11,7 +11,7 @@
 #include "Input.hpp"
 #include "DDCheat.hpp"
 #include "PauseMenu.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "../relive_lib/GameObjects/Grenade.hpp"
 #include "../relive_lib/GameObjects/GasCountDown.hpp"
 #include "PathDataExtensions.hpp"

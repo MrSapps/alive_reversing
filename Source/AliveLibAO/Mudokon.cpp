@@ -5,7 +5,7 @@
 #include "../relive_lib/Shadow.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "../relive_lib/Collisions.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "Abe.hpp"
 #include "Midi.hpp"
 #include "BirdPortal.hpp"
@@ -31,7 +31,7 @@
 #include "../relive_lib/FatalError.hpp"
 #include "../relive_lib/ObjectIds.hpp"
 #include "Path.hpp"
-#include "../AliveLibAE/Game.hpp"
+#include "../relive_lib/Engine.hpp"
 
 namespace AO {
 

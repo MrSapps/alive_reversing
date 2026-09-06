@@ -5,7 +5,7 @@
 #include "MusicController.hpp"
 #include "Midi.hpp"
 #include "Math.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "../relive_lib/Collisions.hpp"
 #include "../relive_lib/GameObjects/Blood.hpp"
 #include "Sfx.hpp"
@@ -23,7 +23,7 @@
 #include "AnimationCallBacks.hpp"
 #include "../relive_lib/ObjectIds.hpp"
 #include "Path.hpp"
-#include "../AliveLibAE/Game.hpp"
+#include "../relive_lib/Engine.hpp"
 #include "Map.hpp"
 
 namespace AO {

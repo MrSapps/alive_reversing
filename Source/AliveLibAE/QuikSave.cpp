@@ -49,7 +49,7 @@
 #include "../relive_lib/BinaryPath.hpp"
 #include "FlyingSligSpawner.hpp"
 #include "Scrab.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "MainMenu.hpp" // only for global gSavedKilledMudsPerZulag
 
 #include "nlohmann/json.hpp" // TODO: temp

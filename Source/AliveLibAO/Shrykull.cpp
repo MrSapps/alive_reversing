@@ -14,7 +14,7 @@
 #include "../relive_lib/GameObjects/Electrocute.hpp"
 #include "../relive_lib/GameObjects/AbilityRing.hpp"
 #include "Math.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 
 namespace AO {
 

@@ -5,7 +5,7 @@
 #include "../../AliveLibAE/stdlib.hpp"
 #include "../Primitives.hpp"
 #include "../GameType.hpp"
-#include "../../AliveLibAE/Game.hpp"
+#include "../../relive_lib/Engine.hpp"
 
 CircularFade::CircularFade(FP xpos, FP ypos, FP scale, bool fadeIn, s8 destroyOnDone)
     : BaseAnimatedWithPhysicsGameObject(0)

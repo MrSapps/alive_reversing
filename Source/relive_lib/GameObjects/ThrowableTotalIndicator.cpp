@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "ThrowableTotalIndicator.hpp"
-#include "../../AliveLibAE/Game.hpp"
+#include "../../relive_lib/Engine.hpp"
 #include "../relive_lib/Events.hpp"
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
 #include "../relive_lib/PsxDisplay.hpp"

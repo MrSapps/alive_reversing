@@ -15,7 +15,7 @@
 #include "../relive_lib/GameObjects/Flash.hpp"
 #include "LiftPoint.hpp"
 #include "../relive_lib/Shadow.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "../relive_lib/Engine.hpp"
 #include "Midi.hpp"
 #include "Movie.hpp"

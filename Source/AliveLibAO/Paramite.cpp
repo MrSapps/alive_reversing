@@ -13,7 +13,7 @@
 #include "../relive_lib/GameObjects/PlatformBase.hpp"
 #include "../relive_lib/GameObjects/Gibs.hpp"
 #include "../relive_lib/GameObjects/Blood.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "../relive_lib/Events.hpp"
 #include "DDCheat.hpp"
 #include "Meat.hpp"
@@ -24,7 +24,7 @@
 #include "../relive_lib/ObjectIds.hpp"
 #include "Path.hpp"
 #include "../relive_lib/FixedPoint.hpp"
-#include "../AliveLibAE/Game.hpp"
+#include "../relive_lib/Engine.hpp"
 
 namespace AO {
 

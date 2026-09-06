@@ -15,7 +15,7 @@
 #include "../relive_lib/FatalError.hpp"
 #include "../relive_lib/Sys.hpp"
 #include "../relive_lib/BaseGameAutoPlayer.hpp"
-#include "../AliveLibAE/Game.hpp"
+#include "../relive_lib/Engine.hpp"
 
 namespace AO {
 

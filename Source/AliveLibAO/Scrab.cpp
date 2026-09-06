@@ -13,7 +13,7 @@
 #include "Sfx.hpp"
 #include "CameraSwapper.hpp"
 #include "LiftPoint.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "../relive_lib/GameObjects/Gibs.hpp"
 #include "Midi.hpp"
 #include "../relive_lib/SwitchStates.hpp"
@@ -22,7 +22,7 @@
 #include "../relive_lib/FixedPoint.hpp"
 #include "Path.hpp"
 #include "Abe.hpp"
-#include "../AliveLibAE/Game.hpp"
+#include "../relive_lib/Engine.hpp"
 
 namespace AO {
 

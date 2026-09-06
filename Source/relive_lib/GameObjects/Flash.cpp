@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "Flash.hpp"
-#include "../AliveLibAE/Game.hpp"
+#include "../relive_lib/Engine.hpp"
 
 Flash::Flash(Layer layer, s32 r, s32 g, s32 b, relive::TBlendModes abr, s32 time)
     : EffectBase(layer, abr)

@@ -6,7 +6,7 @@
 #include "../relive_lib/ObjectIds.hpp"
 #include "../relive_lib/GameObjects/ZapLine.hpp"
 #include "Sfx.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "../relive_lib/GameObjects/ParticleBurst.hpp"
 #include "../relive_lib/GameObjects/Flash.hpp"
 #include "../relive_lib/GameObjects/PossessionFlicker.hpp"

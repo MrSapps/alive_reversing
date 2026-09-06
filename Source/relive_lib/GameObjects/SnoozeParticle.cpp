@@ -8,7 +8,7 @@
 #include "ScreenManager.hpp"
 #include "Sfx.hpp"
 #include "../Primitives.hpp"
-#include "../../AliveLibAE/Game.hpp"
+#include "../../relive_lib/Engine.hpp"
 #include "../GameType.hpp"
 
 static const s16 xPositionDeltaEntries[36] = {

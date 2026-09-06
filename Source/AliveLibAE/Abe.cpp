@@ -56,7 +56,7 @@
 #include "../relive_lib/FatalError.hpp"
 #include "../relive_lib/Camera.hpp"
 #include "Path.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
 #include "../relive_lib/Collisions.hpp"

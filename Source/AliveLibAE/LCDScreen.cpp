@@ -6,7 +6,7 @@
 #include "StringFormatters.hpp"
 #include "../relive_lib/Events.hpp"
 #include "Sfx.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "../relive_lib/PathDataExtensionsTypes.hpp"
 #include "Map.hpp"
 #include "Path.hpp"

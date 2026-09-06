@@ -11,7 +11,7 @@
 #include "MapWrapper.hpp"
 #include "../Grid.hpp"
 #include "../PsxDisplay.hpp"
-#include "../../AliveLibAE/Game.hpp"
+#include "../../relive_lib/Engine.hpp"
 #include "../../AliveLibAE/Sfx.hpp"
 #include "BaseMap.hpp"
 

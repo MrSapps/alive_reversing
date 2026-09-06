@@ -11,7 +11,7 @@
 #include "Elum.hpp"
 #include "../relive_lib/Events.hpp"
 #include "MusicController.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "DDCheat.hpp"
 #include "Input.hpp"
 #include "../relive_lib/GameObjects/Particle.hpp"
@@ -40,7 +40,7 @@
 #include "../relive_lib/FixedPoint.hpp"
 #include "Path.hpp"
 #include "ScopedSeq.hpp"
-#include "../AliveLibAE/Game.hpp"
+#include "../relive_lib/Engine.hpp"
 
 // TODO: fix
 #undef max

@@ -16,7 +16,7 @@
 #include "Map.hpp"
 #include "Path.hpp"
 #include "../relive_lib/FatalError.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 
 MotionDetectorLaser::MotionDetectorLaser(FP xpos, FP ypos, FP scale, Layer layer)
     : BaseAnimatedWithPhysicsGameObject(0)

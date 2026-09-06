@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "CreditsController.hpp"
 #include "stdlib.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "Map.hpp"
 
 s16 gCreditsControllerExists = false;

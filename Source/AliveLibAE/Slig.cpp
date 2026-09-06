@@ -38,7 +38,7 @@
 #include "Input.hpp"
 #include "Path.hpp"
 #include "../relive_lib/SwitchStates.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "QuikSave.hpp"
 #include "Glukkon.hpp"
 

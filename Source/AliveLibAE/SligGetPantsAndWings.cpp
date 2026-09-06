@@ -2,7 +2,7 @@
 #include "SligGetPantsAndWings.hpp"
 #include "../relive_lib/Events.hpp"
 #include "stdlib.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "Sfx.hpp"
 #include "Path.hpp"
 

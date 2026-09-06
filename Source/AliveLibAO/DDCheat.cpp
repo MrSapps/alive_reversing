@@ -7,7 +7,7 @@
 #include "Slig.hpp"
 #include "Input.hpp"
 #include "Elum.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
 

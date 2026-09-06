@@ -25,7 +25,7 @@
 #include "../relive_lib/Function.hpp"
 #include "AnimationCallBacks.hpp"
 #include "Path.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "QuikSave.hpp"
 
 s16 sSlogCount = 0;

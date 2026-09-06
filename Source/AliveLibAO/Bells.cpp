@@ -4,7 +4,7 @@
 #include "../AliveLibAE/stdlib.hpp"
 #include "ScreenWave.hpp"
 #include "../relive_lib/GameObjects/ZapSpark.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "Math.hpp"
 #include "Sfx.hpp"
 

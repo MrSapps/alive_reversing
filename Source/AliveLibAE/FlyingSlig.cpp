@@ -4,7 +4,7 @@
 #include "../relive_lib/Collisions.hpp"
 #include "../relive_lib/Shadow.hpp"
 #include "stdlib.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "Math.hpp"
 #include "../relive_lib/ObjectIds.hpp"
 #include "../relive_lib/SwitchStates.hpp"

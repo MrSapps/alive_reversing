@@ -6,7 +6,7 @@
 #include "../MapWrapper.hpp"
 #include "../FixedPoint.hpp"
 #include "../GameType.hpp"
-#include "../../AliveLibAE/Game.hpp"
+#include "../../relive_lib/Engine.hpp"
 #include "BaseMap.hpp"
 
 static const TintEntry sAbeTintTable[21] = {

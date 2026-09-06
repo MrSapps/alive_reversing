@@ -12,7 +12,7 @@
 #include "../relive_lib/GameObjects/OrbWhirlWind.hpp"
 #include "../relive_lib/GameObjects/Particle.hpp"
 #include "../relive_lib/Events.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "Math.hpp"
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
 #include "Sfx.hpp"

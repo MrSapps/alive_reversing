@@ -3,7 +3,7 @@
 #include "Map.hpp"
 #include "../relive_lib/Events.hpp"
 #include "../relive_lib/SwitchStates.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "stdlib.hpp"
 #include "Path.hpp"
 

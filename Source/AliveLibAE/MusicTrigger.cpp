@@ -5,7 +5,7 @@
 #include "Map.hpp"
 #include "../relive_lib/Events.hpp"
 #include "Abe.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 
 MusicTrigger::MusicTrigger(relive::Path_MusicTrigger* pTlv, const Guid& tlvId)
     : BaseGameObject(true, 0)

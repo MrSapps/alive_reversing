@@ -25,7 +25,7 @@
 #include "../relive_lib/GameObjects/GasCountDown.hpp"
 #include "../relive_lib/GameObjects/Door.hpp"
 
-#include "../AliveLibAO/Game.hpp"
+#include "../relive_lib/Engine.hpp"
 #include "../AliveLibAO/Abe.hpp"
 #include "../AliveLibAO/Elum.hpp"
 #include "../AliveLibAO/PauseMenu.hpp"
@@ -145,7 +145,7 @@
 #include "../AliveLibAE/ColourfulMeter.hpp"
 #include "../AliveLibAE/SecurityDoor.hpp"
 #include "../AliveLibAE/LaughingGas.hpp"
-#include "../AliveLibAE/Game.hpp"
+#include "../relive_lib/Engine.hpp"
 #include "../AliveLibAE/MeatSack.hpp"
 #include "../AliveLibAE/BoneBag.hpp"
 #include "../AliveLibAE/RollingBall.hpp"

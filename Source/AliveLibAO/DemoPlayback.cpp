@@ -2,7 +2,7 @@
 #include "DDCheat.hpp"
 #include "DemoPlayback.hpp"
 #include "../relive_lib/Function.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "SaveGame.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "Input.hpp"

@@ -6,7 +6,7 @@
 #include "../relive_lib/SwitchStates.hpp"
 #include "../relive_lib/ObjectIds.hpp"
 #include "../relive_lib/Sound/Midi.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
 #include "Sfx.hpp"
 #include "Map.hpp"

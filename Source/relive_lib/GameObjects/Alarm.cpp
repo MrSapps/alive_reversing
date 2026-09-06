@@ -4,7 +4,7 @@
 #include "../Events.hpp"
 #include "Sfx.hpp"
 #include "../GameType.hpp"
-#include "../../AliveLibAE/Game.hpp"
+#include "../../relive_lib/Engine.hpp"
 #include "BaseMap.hpp"
 
 s16 gAlarmInstanceCount = 0;

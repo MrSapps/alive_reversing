@@ -12,7 +12,7 @@
 #include "../relive_lib/GameObjects/PossessionFlicker.hpp"
 #include "../relive_lib/GameObjects/ScreenShake.hpp"
 #include "../relive_lib/GameObjects/Flash.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "../relive_lib/Events.hpp"
 #include "../relive_lib/FixedPoint.hpp"
 #include "Path.hpp"

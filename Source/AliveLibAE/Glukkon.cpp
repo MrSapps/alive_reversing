@@ -5,7 +5,7 @@
 #include "stdlib.hpp"
 #include "../relive_lib/Events.hpp"
 #include "../relive_lib/Collisions.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "../relive_lib/Shadow.hpp"
 #include "MusicController.hpp"
 #include "../relive_lib/SwitchStates.hpp"

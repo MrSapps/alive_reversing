@@ -11,7 +11,7 @@
 #include "../relive_lib/Sound/Sound.hpp"
 #include "VGA.hpp"
 #include "GameAutoPlayer.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "../relive_lib/Renderer/IRenderer.hpp"
 #include "../relive_lib/data_conversion/rgb_conversion.hpp"
 

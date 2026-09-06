@@ -5,7 +5,7 @@
 #include "../AliveLibAE/stdlib.hpp"
 #include "../relive_lib/Shadow.hpp"
 #include "Abe.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "Sfx.hpp"
 #include "../relive_lib/Events.hpp"
 #include "Math.hpp"

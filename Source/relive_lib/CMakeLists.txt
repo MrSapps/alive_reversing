@@ -13,8 +13,6 @@ SET(AliveLibSrcAO
    ../AliveLibAO/GameAutoPlayer.hpp
    ../AliveLibAO/PathDataExtensions.hpp
    ../AliveLibAO/PathDataExtensions.cpp
-   ../AliveLibAO/Game.hpp
-   ../AliveLibAO/Game.cpp
    ../AliveLibAO/Map.hpp
    ../AliveLibAO/Map.cpp
    ../AliveLibAO/Sound.hpp
@@ -191,8 +189,6 @@ SET(AliveLibAESrc
     ../AliveLibAE/DDCheat.cpp
     ../AliveLibAE/Sfx.hpp
     ../AliveLibAE/Sfx.cpp
-    ../AliveLibAE/Game.cpp
-    ../AliveLibAE/Game.hpp
     ../AliveLibAE/stdlib.cpp
     ../AliveLibAE/stdlib.hpp
     ../AliveLibAE/CreditsController.cpp

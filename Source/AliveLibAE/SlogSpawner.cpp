@@ -4,7 +4,7 @@
 #include "stdlib.hpp"
 #include "../relive_lib/Events.hpp"
 #include "../relive_lib/SwitchStates.hpp"
-#include "Game.hpp"
+#include "Engine.hpp"
 #include "Slog.hpp"
 #include "Sfx.hpp"
 #include "Path.hpp"
