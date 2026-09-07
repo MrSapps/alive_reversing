@@ -612,7 +612,7 @@ static void LoadWalkingSligResourcesAO(Factory::LoadMode loadMode, BitField16<AO
 void Factory::SligAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     auto pSligTlv = static_cast<Path_Slig*>(pTlv);
-    LoadWalkingSligResourcesAO(loadMode, pSligTlv->mData.mDisabledResourcesAO, mResourceManager);
+    LoadWalkingSligResourcesAO(loadMode, pSligTlv->mDisabledResourcesAO, mResourceManager);
 
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1011,7 +1011,7 @@ static TlvIterator FindMatchingSligTLVAO(TlvIterator pTlvIter, Path_SligBound* p
 {
     while (pTlvIter.GetTlv())
     {
-        if (pTlvIter.GetTlv()->mTlvType == ReliveTypes::eSlig && pTlv->mSligBoundId == pTlvIter.GetTlv<Path_Slig>()->mData.mSligBoundId && !pTlvIter.GetTlv()->mTlvFlags.Get(TlvFlags::eBit2_Destroyed))
+        if (pTlvIter.GetTlv()->mTlvType == ReliveTypes::eSlig && pTlv->mSligBoundId == pTlvIter.GetTlv<Path_Slig>()->mSligBoundId && !pTlvIter.GetTlv()->mTlvFlags.Get(TlvFlags::eBit2_Destroyed))
         {
             return pTlvIter;
         }
@@ -1115,8 +1115,8 @@ void Factory::MotionDetectorAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadM
 
 void Factory::SligSpawnerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
-    auto pSligTlv = static_cast<Path_SligSpawner*>(pTlv);
-    LoadWalkingSligResourcesAO(loadMode, pSligTlv->mData.mDisabledResourcesAO, mResourceManager);
+    auto pSligTlv = static_cast<Path_Slig*>(pTlv);
+    LoadWalkingSligResourcesAO(loadMode, pSligTlv->mDisabledResourcesAO, mResourceManager);
 
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1124,7 +1124,7 @@ void Factory::SligSpawnerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     }
     else
     {
-        relive_new AO::SligSpawner(pTlv, &pSligTlv->mData, tlvId, mResourceManager);
+        relive_new AO::SligSpawner(pTlv, pSligTlv, tlvId, mResourceManager);
     }
 }
 
@@ -2186,7 +2186,7 @@ static TlvIterator FindMatchingSligTLVAE(TlvIterator pTlvIter, Path_SligBound* p
 {
     while (pTlvIter.GetTlv())
     {
-        if (pTlvIter.GetTlv()->mTlvType == ReliveTypes::eSlig && pTlv->mSligBoundId == pTlvIter.GetTlv<Path_Slig>()->mData.mSligBoundId && !pTlvIter.GetTlv()->mTlvFlags.Get(TlvFlags::eBit2_Destroyed))
+        if (pTlvIter.GetTlv()->mTlvType == ReliveTypes::eSlig && pTlv->mSligBoundId == pTlvIter.GetTlv<Path_Slig>()->mSligBoundId && !pTlvIter.GetTlv()->mTlvFlags.Get(TlvFlags::eBit2_Destroyed))
         {
             return pTlvIter;
         }

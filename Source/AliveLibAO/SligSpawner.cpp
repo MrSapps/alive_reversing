@@ -10,7 +10,7 @@
 
 namespace AO {
 
-SligSpawner::SligSpawner(relive::Path_TLV* pTlv, relive::Path_Slig_Data* pTlvData, const Guid& tlvId, ResourceManagerWrapper& resMan)
+SligSpawner::SligSpawner(relive::Path_TLV* pTlv, relive::Path_Slig* pTlvData, const Guid& tlvId, ResourceManagerWrapper& resMan)
     : BaseGameObject(true, 0, resMan)
 {
     SetType(ReliveTypes::eSligSpawner);

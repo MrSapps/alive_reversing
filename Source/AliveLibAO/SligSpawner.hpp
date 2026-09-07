@@ -2,6 +2,7 @@
 
 #include "../relive_lib/GameObjects/BaseGameObject.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
+#include "ResourceManagerWrapper.hpp"
 
 namespace AO {
 
@@ -10,7 +11,7 @@ struct Path_Slig;
 class SligSpawner final : public ::BaseGameObject
 {
 public:
-    SligSpawner(relive::Path_TLV* pTlv, relive::Path_Slig_Data* pTlvData, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    SligSpawner(relive::Path_TLV* pTlv, relive::Path_Slig* pTlvData, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~SligSpawner();
 
     virtual void VUpdate() override;
