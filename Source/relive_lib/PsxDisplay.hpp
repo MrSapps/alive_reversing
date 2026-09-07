@@ -43,6 +43,8 @@ public:
 private:
     FontContext mDebugFontContext;
     AliveFont mDebugFont;
+    char_type mDebugFontTmpBuffer[600] = {};
+    s32 mDebugTextIdx = 0;
 };
 
 class PsxDisplay final
@@ -62,6 +64,5 @@ public:
 
 extern PsxDisplay gPsxDisplay;
 extern bool gCommandLine_NoFrameSkip;
-extern bool gDebugFontLoaded;
 extern bool gDisplayRenderFrame;
 

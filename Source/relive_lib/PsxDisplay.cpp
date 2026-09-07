@@ -82,11 +82,6 @@ static void DebugFont_Update_Text_4F8BE0(s32 idx)
     }
 }
 
-static char_type sDebugFontTmpBuffer[600] = {};
-bool gDebugFontLoaded = false;
-static s32 sDebugTextIdx = 0;
-
-
 static s32 DebugFont_Open_4F8AB0(u8 xMargin, u8 yMargin, u8 displayWidth, u8 displayHeight, u32 maxLenChars)
 {
     const s32 idx = sFntCount;
@@ -115,13 +110,9 @@ static s32 DebugFont_Open_4F8AB0(u8 xMargin, u8 yMargin, u8 displayWidth, u8 dis
 
 s32 DebugFont::DebugFont_Init()
 {
-    if (!gDebugFontLoaded)
-    {
-        gDebugFontLoaded = true;
-    }
     DebugFont_Reset_4F8B40();
-    sDebugTextIdx = DebugFont_Open_4F8AB0(8, 16, static_cast<u8>(gPsxDisplay.mWidth), 200, 600u);
-    sDebugFontTmpBuffer[0] = 0;
+    mDebugTextIdx = DebugFont_Open_4F8AB0(8, 16, static_cast<u8>(gPsxDisplay.mWidth), 200, 600u);
+    mDebugFontTmpBuffer[0] = 0;
 
     mDebugFontContext.LoadFontType(FontType::Debug);
 
@@ -153,9 +144,9 @@ s32 DebugFont::DebugFont_Printf(s32 idx, const char_type* formatStr, ...)
 
 void DebugFont::DebugFont_Flush()
 {
-    DebugFont_Printf(sDebugTextIdx, sDebugFontTmpBuffer);
-    DebugFont_Update_Text_4F8BE0(sDebugTextIdx);
-    sDebugFontTmpBuffer[0] = 0;
+    DebugFont_Printf(mDebugTextIdx, mDebugFontTmpBuffer);
+    DebugFont_Update_Text_4F8BE0(mDebugTextIdx);
+    mDebugFontTmpBuffer[0] = 0;
 }
 
 void DebugFont::PSX_DrawDebugTextBuffers(OrderingTable& ot)
