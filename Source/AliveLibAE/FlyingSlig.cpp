@@ -871,7 +871,7 @@ bool FlyingSlig::VTakeDamage(BaseGameObject* pFrom)
                 return true;
             }
             BlowUp();
-            auto pExplosion = relive_new AirExplosion(mXPos, mYPos - (GetSpriteScale() * FP_FromInteger(5)), GetSpriteScale(), 1);
+            auto pExplosion = relive_new AirExplosion(mXPos, mYPos - (GetSpriteScale() * FP_FromInteger(5)), GetSpriteScale(), 1, mResMan);
             if (!pExplosion)
             {
                 return true;
@@ -1140,7 +1140,7 @@ void FlyingSlig::Brain_14_DePossession()
                 xOff + mXPos,
                 yOff + mYPos,
                 GetSpriteScale(),
-                Layer::eLayer_0);
+                Layer::eLayer_0, mResMan);
         }
     }
     else
@@ -2121,7 +2121,7 @@ void FlyingSlig::ThrowGrenade()
         grenadeXVel = -grenadeXVel;
     }
 
-    auto pGrenade = relive_new Grenade(grenadeXPos + mXPos, grenadeYPos + mYPos, 0, 1, this);
+    auto pGrenade = relive_new Grenade(grenadeXPos + mXPos, grenadeYPos + mYPos, 0, 1, this, mResMan);
     if (pGrenade)
     {
         pGrenade->SetSpriteScale(GetSpriteScale());
@@ -2129,7 +2129,7 @@ void FlyingSlig::ThrowGrenade()
         pGrenade->VThrow(grenadeXVel, grenadeYVel);
     }
 
-    New_ShootingFire_Particle(xpos + mXPos, ypos + mYPos, GetAnimation().GetFlipX(), GetSpriteScale());
+    New_ShootingFire_Particle(xpos + mXPos, ypos + mYPos, GetAnimation().GetFlipX(), GetSpriteScale(), mResMan);
     Slig_SoundEffect(SligSfx::eThrowGrenade_8, this);
     EventBroadcast(Event::kEventShooting, this);
     EventBroadcast(Event::kEventLoudNoise, this);
@@ -2153,11 +2153,11 @@ void FlyingSlig::BlowUp()
 {
     MusicController::static_PlayMusic(MusicController::MusicTypes::eNone_0, this, 0, 0);
 
-    relive_new Gibs(GibType::eSlig, mXPos, mYPos, mVelX, mVelY, GetSpriteScale(), 0);
+    relive_new Gibs(GibType::eSlig, mXPos, mYPos, mVelX, mVelY, GetSpriteScale(), 0, mResMan);
 
-    relive_new Blood(mXPos, mYPos - (FP_FromInteger(30) * GetSpriteScale()), FP_FromInteger(0), FP_FromInteger(0), GetSpriteScale(), 20);
+    relive_new Blood(mXPos, mYPos - (FP_FromInteger(30) * GetSpriteScale()), FP_FromInteger(0), FP_FromInteger(0), GetSpriteScale(), 20, mResMan);
 
-    New_Smoke_Particles(mXPos, mYPos - (FP_FromInteger(30) * GetSpriteScale()), GetSpriteScale(), 3, RGB16{ 128, 128, 128 });
+    New_Smoke_Particles(mXPos, mYPos - (FP_FromInteger(30) * GetSpriteScale()), GetSpriteScale(), 3, RGB16{ 128, 128, 128 }, mResMan);
     SfxPlayMono(relive::SoundEffects::KillEffect, 128, GetSpriteScale());
     SfxPlayMono(relive::SoundEffects::FallingItemHit, 90, GetSpriteScale());
 
@@ -2892,7 +2892,7 @@ s16 FlyingSlig::CollisionUp(FP velY)
                 hitY + (FP_FromInteger(7) * GetSpriteScale()),
                 5u,
                 GetSpriteScale(),
-                BurstType::eSmallPurpleSparks,
+                BurstType::eSmallPurpleSparks, mResMan,
                 9, true);
         }
 
@@ -3046,7 +3046,7 @@ s16 FlyingSlig::CollisionLeftRight(FP velX)
         {
             Slig_GameSpeak_SFX(sGnFrame & 1 ? SligSpeak::eOuch2_14 : SligSpeak::eOuch1_13, 127, Math_RandomRange(256, 512), this);
             field_154_collision_reaction_timer = (Math_NextRandom() & 3) + MakeTimer(10);
-            relive_new ParticleBurst(sparkX, hitY + (FP_FromInteger(16) * GetSpriteScale()), 5u, GetSpriteScale(), BurstType::eSmallPurpleSparks, 9, true);
+            relive_new ParticleBurst(sparkX, hitY + (FP_FromInteger(16) * GetSpriteScale()), 5u, GetSpriteScale(), BurstType::eSmallPurpleSparks, mResMan, 9, true);
         }
         mXPos += velX + hitX - xOff;
         return 1;

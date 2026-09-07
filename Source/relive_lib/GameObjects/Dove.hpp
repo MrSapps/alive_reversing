@@ -5,8 +5,8 @@
 class Dove final : public ::BaseAnimatedWithPhysicsGameObject
 {
 public:
-    Dove(AnimId animId, const Guid& tlvId, FP scale);
-    Dove(AnimId animId, FP xpos, FP ypos, FP scale);
+    Dove(AnimId animId, const Guid& tlvId, FP scale, ResourceManagerWrapper& resMan);
+    Dove(AnimId animId, FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan);
     ~Dove();
 
     void LoadAnimations();

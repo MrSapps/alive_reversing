@@ -489,7 +489,7 @@ void SpawnBrain::VUpdate()
             New_DestroyOrCreateObject_Particle(
                 mSlingMudokon.mXPos,
                 (mSlingMudokon.GetSpriteScale() * FP_FromInteger(20)) + mSlingMudokon.mYPos,
-                mSlingMudokon.GetSpriteScale());
+                mSlingMudokon.GetSpriteScale(), mSlingMudokon.mResMan);
             mSlingMudokon.field_140_timer = BaseGameObject::MakeTimer(2);
             mBrainState = EState::CreateFlash;
             return;
@@ -501,7 +501,7 @@ void SpawnBrain::VUpdate()
                 mSlingMudokon.GetAnimation().SetRender(true);
                 mSlingMudokon.mCurrentMotion = eSlingMudMotions::Motion_0_Idle;
 
-                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 255u);
+                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 255u, mSlingMudokon.mResMan);
 
                 if (mSlingMudokon.mXPos > gAbe->mXPos)
                 {
@@ -607,7 +607,7 @@ void SpawnBrain::VUpdate()
                         AnimId::Dove_Flying,
                         mSlingMudokon.mXPos + FP_FromInteger(Math_NextRandom() % 16),
                         mSlingMudokon.mYPos - FP_FromInteger(Math_NextRandom() % 16),
-                        mSlingMudokon.GetSpriteScale());
+                        mSlingMudokon.GetSpriteScale(), mSlingMudokon.mResMan);
                     if (pDove)
                     {
                         if (pDove->GetAnimation().GetFlipX())
@@ -628,9 +628,9 @@ void SpawnBrain::VUpdate()
                 mSlingMudokon.mDontSetDestroyed = !mSlingMudokon.mCodeMatches;
 
                 mSlingMudokon.SetDead(true);
-                New_DestroyOrCreateObject_Particle(mSlingMudokon.mXPos, (mSlingMudokon.GetSpriteScale() * FP_FromInteger(20)) + mSlingMudokon.mYPos, mSlingMudokon.GetSpriteScale());
+                New_DestroyOrCreateObject_Particle(mSlingMudokon.mXPos, (mSlingMudokon.GetSpriteScale() * FP_FromInteger(20)) + mSlingMudokon.mYPos, mSlingMudokon.GetSpriteScale(), mSlingMudokon.mResMan);
 
-                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 255u);
+                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 255u, mSlingMudokon.mResMan);
             }
             return;
 
@@ -661,7 +661,7 @@ void AskForPasswordBrain::VUpdate()
             New_DestroyOrCreateObject_Particle(
                 mSlingMudokon.mXPos,
                 (mSlingMudokon.GetSpriteScale() * FP_FromInteger(20)) + mSlingMudokon.mYPos,
-                mSlingMudokon.GetSpriteScale());
+                mSlingMudokon.GetSpriteScale(), mSlingMudokon.mResMan);
 
             mSlingMudokon.field_140_timer = BaseGameObject::MakeTimer(2);
             mBrainState = EState::Unknown_2;
@@ -673,7 +673,7 @@ void AskForPasswordBrain::VUpdate()
                 mSlingMudokon.GetAnimation().SetAnimate(true);
                 mSlingMudokon.GetAnimation().SetRender(true);
 
-                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 255u);
+                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 255u, mSlingMudokon.mResMan);
 
                 mSlingMudokon.field_140_timer = BaseGameObject::MakeTimer(30);
 
@@ -852,7 +852,7 @@ void AskForPasswordBrain::VUpdate()
                         AnimId::Dove_Flying,
                         mSlingMudokon.mXPos + FP_FromInteger(Math_NextRandom() % 16),
                         mSlingMudokon.mYPos - FP_FromInteger(Math_NextRandom() % 16),
-                        mSlingMudokon.GetSpriteScale());;
+                        mSlingMudokon.GetSpriteScale(), mSlingMudokon.mResMan);;
                     if (pDove)
                     {
                         if (pDove->GetAnimation().GetFlipX())
@@ -873,9 +873,9 @@ void AskForPasswordBrain::VUpdate()
                 mSlingMudokon.mDontSetDestroyed = !mSlingMudokon.mCodeMatches;
 
                 mSlingMudokon.SetDead(true);
-                New_DestroyOrCreateObject_Particle(mSlingMudokon.mXPos, (mSlingMudokon.GetSpriteScale() * FP_FromInteger(20)) + mSlingMudokon.mYPos, mSlingMudokon.GetSpriteScale());
+                New_DestroyOrCreateObject_Particle(mSlingMudokon.mXPos, (mSlingMudokon.GetSpriteScale() * FP_FromInteger(20)) + mSlingMudokon.mYPos, mSlingMudokon.GetSpriteScale(), mSlingMudokon.mResMan);
 
-                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 255u);
+                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 255u, mSlingMudokon.mResMan);
             }
             return;
 

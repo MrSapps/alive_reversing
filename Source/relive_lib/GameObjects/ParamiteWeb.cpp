@@ -10,8 +10,8 @@
 #include "../GameType.hpp"
 #include "BaseMap.hpp"
 
-ParamiteWeb::ParamiteWeb(FP xpos, s32 bottom, s32 top, FP scale)
-    : BaseAnimatedWithPhysicsGameObject(0)
+ParamiteWeb::ParamiteWeb(FP xpos, s32 bottom, s32 top, FP scale, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eRope);
 

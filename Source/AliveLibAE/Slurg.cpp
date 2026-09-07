@@ -175,7 +175,7 @@ void Slurg::Burst()
                                 FP_FromInteger(0),
                                 FP_FromInteger(5),
                                 mSlurgSpriteScale,
-                                20);
+                                20, mResMan);
 
     EventBroadcast(Event::kEventLoudNoise, this);
     SfxPlayMono(relive::SoundEffects::SlurgKill, 127, mSlurgSpriteScale);

@@ -13,7 +13,7 @@ enum class BoomMachinePipeStates
 class BoomMachinePipe final : public ::BaseAnimatedWithPhysicsGameObject
 {
 public:
-    BoomMachinePipe(FP xpos, FP ypos, FP scale, s16 numGrenades);
+    BoomMachinePipe(FP xpos, FP ypos, FP scale, s16 numGrenades, ResourceManagerWrapper& resMan);
 
     void LoadAnimations();
     void DropGrenadeAnimation();

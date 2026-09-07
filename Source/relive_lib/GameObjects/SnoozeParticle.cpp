@@ -67,8 +67,8 @@ static const s16 zVerts[8] = {
     4,
     4};
 
-SnoozeParticle::SnoozeParticle(FP xpos, FP ypos, Layer layer, FP scale)
-    : BaseGameObject(true, 0)
+SnoozeParticle::SnoozeParticle(FP xpos, FP ypos, Layer layer, FP scale, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     SetDrawable(true);
 

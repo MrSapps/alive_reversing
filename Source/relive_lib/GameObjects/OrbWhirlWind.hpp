@@ -15,7 +15,7 @@ public:
         eActive = 2
     };
 
-    OrbWhirlWind(FP xpos, FP ypos, FP scale, bool bIsMudokonSpirit);
+    OrbWhirlWind(FP xpos, FP ypos, FP scale, bool bIsMudokonSpirit, ResourceManagerWrapper& resMan);
     ~OrbWhirlWind();
 
     virtual void VUpdate() override;

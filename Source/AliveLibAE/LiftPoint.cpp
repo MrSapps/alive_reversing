@@ -177,14 +177,14 @@ LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId, ResourceMa
         FP_GetExponent((k13 * GetSpriteScale() + mXPos)),
         0, // Start at the very top of the screen
         FP_GetExponent((k25 * GetSpriteScale()) + mYPos),
-        GetSpriteScale());
+        GetSpriteScale(), resMan);
     mRopeId1 = pRope1->mBaseGameObjectId;
 
     auto pRope2 = relive_new Rope(
         FP_GetExponent((km10 * GetSpriteScale()) + mXPos),
         0, // Start at the very top of the screen
         FP_GetExponent((k25 * GetSpriteScale()) + mYPos),
-        GetSpriteScale());
+        GetSpriteScale(), resMan);
     mRopeId2 = pRope2->mBaseGameObjectId;
 
     pRope2->mBottom = FP_GetExponent((k25 * GetSpriteScale()) + FP_FromInteger(mPlatformBaseCollisionLine->mRect.y));

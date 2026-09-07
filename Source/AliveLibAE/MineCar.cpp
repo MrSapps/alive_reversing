@@ -1524,7 +1524,7 @@ void MineCar::State_3_Falling()
                 sControlledCharacter->mYPos - ((mineCarHeight + kGridSize) * FP_FromDouble(0.5)),
                 4u,
                 GetSpriteScale(),
-                BurstType::eBigRedSparks,
+                BurstType::eBigRedSparks, mResMan,
                 9, true
             );
 
@@ -1546,7 +1546,7 @@ void MineCar::State_3_Falling()
                 sControlledCharacter->mYPos - ((mineCarHeight + kGridSize) * FP_FromDouble(0.5)),
                 4u,
                 GetSpriteScale(),
-                BurstType::eBigRedSparks,
+                BurstType::eBigRedSparks, mResMan,
                 9, true
             );
 
@@ -1569,7 +1569,7 @@ void MineCar::State_3_Falling()
             sControlledCharacter->mYPos,
             5u,
             FP_FromInteger(1),
-            BurstType::eBigRedSparks,
+            BurstType::eBigRedSparks, mResMan,
             9, true
         );
 
@@ -1578,7 +1578,7 @@ void MineCar::State_3_Falling()
             SFX_Play_Pitch(relive::SoundEffects::MinecarStop, 127, 0, GetSpriteScale());
             SFX_Play_Pitch(relive::SoundEffects::FallingItemHit, 127, 0, GetSpriteScale());
 
-            relive_new ScreenShake(false, false);
+            relive_new ScreenShake(false, false, mResMan);
         }
 
         field_1C2_falling_counter = 0;

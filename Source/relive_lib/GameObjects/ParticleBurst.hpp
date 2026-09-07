@@ -18,7 +18,7 @@ enum class BurstType
 class ParticleBurst final : public ::BaseAnimatedWithPhysicsGameObject
 {
 public:
-    ParticleBurst(FP xpos, FP ypos, u32 particleCount, FP scale, BurstType type, s32 fineScale = 13, bool bFadeOut = false);
+    ParticleBurst(FP xpos, FP ypos, u32 particleCount, FP scale, BurstType type, ResourceManagerWrapper& resMan, s32 fineScale = 13, bool bFadeOut = false);
     ~ParticleBurst();
 
     virtual void VUpdate() override;

@@ -12,7 +12,7 @@
 class DataConversionUI final : public BaseGameObject
 {
 public:
-    explicit DataConversionUI(GameType gameType);
+    explicit DataConversionUI(GameType gameType, ResourceManagerWrapper& resMan);
     ~DataConversionUI();
 
     void VUpdate() override;

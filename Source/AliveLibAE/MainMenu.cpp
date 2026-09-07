@@ -695,7 +695,7 @@ MainMenuNextCam MainMenuController::AbeSpeak_Update_4D2D20(u32 input_held)
             FP ypos = gScreenManager->CamYPos() + FP_FromDouble(randY);
             ypos.fpValue += 0x44D60C; // TODO: 68.83 ??
             Particle* pParticle = relive_new Particle(xpos,
-                    ypos, GetAnimRes(AnimId::OptionChantOrb_Particle));
+                    ypos, GetAnimRes(AnimId::OptionChantOrb_Particle), mResMan);
 
             if (pParticle)
             {

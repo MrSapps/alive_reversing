@@ -174,7 +174,7 @@ bool TimedMine::VTakeDamage(BaseGameObject* pFrom)
         case ReliveTypes::eShrykull:
         {
             SetDead(true);
-            relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale());
+            relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan);
             mSlappedMine = true;
             mExplosionTimer = sGnFrame;
             return true;
@@ -314,7 +314,7 @@ void TimedMine::VUpdate()
 
         if (sGnFrame >= mExplosionTimer)
         {
-            relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale());
+            relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan);
             SetDead(true);
         }
     }
@@ -322,7 +322,7 @@ void TimedMine::VUpdate()
 
 void TimedMine::VOnThrowableHit(BaseGameObject* /*pHitBy*/)
 {
-    relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale());
+    relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan);
 
     SetDead(true);
     mSlappedMine = true;

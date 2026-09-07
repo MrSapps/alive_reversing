@@ -8,7 +8,7 @@ struct RGBA32;
 class PalleteOverwriter final : public BaseGameObject
 {
 public:
-    PalleteOverwriter(AnimationPal& pal, const RGBA32& colour);
+    PalleteOverwriter(AnimationPal& pal, const RGBA32& colour, ResourceManagerWrapper& resMan);
     ~PalleteOverwriter();
 
     virtual void VScreenChanged() override;

@@ -58,7 +58,7 @@ void ZzzSpawner::VUpdate()
             }
         }
 
-        relive_new SnoozeParticle(mXPos, mYPos, snoozeLayer, mSpriteScale);
+        relive_new SnoozeParticle(mXPos, mYPos, snoozeLayer, mSpriteScale, mResMan);
 
         mTimer = MakeTimer(mZzzInterval);
     }

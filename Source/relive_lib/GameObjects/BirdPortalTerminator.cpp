@@ -9,8 +9,8 @@ void BirdPortalTerminator::LoadAnimations()
     mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BirdPortal_TerminatorGrow));
 }
 
-BirdPortalTerminator::BirdPortalTerminator(FP xpos, FP ypos, FP scale, relive::Path_BirdPortal::PortalType /*portalType*/)
-    : BaseAnimatedWithPhysicsGameObject(0)
+BirdPortalTerminator::BirdPortalTerminator(FP xpos, FP ypos, FP scale, relive::Path_BirdPortal::PortalType /*portalType*/, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     // TODO: sort this out
     if (GetGameType() == GameType::eAe)

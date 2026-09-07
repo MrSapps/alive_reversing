@@ -696,7 +696,7 @@ bool Slig::VTakeDamage(BaseGameObject* pFrom)
                         xOff,
                         yOff,
                         GetSpriteScale(),
-                        12);
+                        12, mResMan);
                 }
 
                 {
@@ -709,7 +709,7 @@ bool Slig::VTakeDamage(BaseGameObject* pFrom)
                         xPos,
                         FP_FromInteger(0),
                         GetSpriteScale(),
-                        8);
+                        8, mResMan);
                 }
             }
 
@@ -765,7 +765,7 @@ bool Slig::VTakeDamage(BaseGameObject* pFrom)
                     mVelX,
                     mVelY,
                     GetSpriteScale(),
-                    false);
+                    false, mResMan);
 
                 mHealth = FP_FromInteger(0);
                 SfxPlayMono(relive::SoundEffects::FallingItemHit, 90);
@@ -3159,7 +3159,7 @@ void Slig::Motion_33_Sleeping()
                         + ((GetAnimation().GetFlipX()) != 0 ? FP_FromInteger(20) : FP_FromInteger(-20)),
                     mYPos - FP_FromInteger(10),
                     GetAnimation().GetRenderLayer(),
-                    GetAnimation().GetSpriteScale());
+                    GetAnimation().GetSpriteScale(), mResMan);
                 return;
             }
         }
@@ -3180,7 +3180,7 @@ void Slig::Motion_33_Sleeping()
                     + ((GetAnimation().GetFlipX()) != 0 ? FP_FromInteger(20) : FP_FromInteger(-20)),
                 mYPos - FP_FromInteger(10),
                 GetAnimation().GetRenderLayer(),
-                GetAnimation().GetSpriteScale());
+                GetAnimation().GetSpriteScale(), mResMan);
             return;
         }
     }
@@ -3392,7 +3392,7 @@ void Slig::Motion_37_Depossessing()
                 mXPos + (GetSpriteScale() * xRand),
                 mYPos - (GetSpriteScale() * yRand),
                 GetSpriteScale(),
-                Layer::eLayer_0);
+                Layer::eLayer_0, mResMan);
         }
 
         if (static_cast<s32>(sGnFrame) > field_128_timer)
@@ -3430,14 +3430,14 @@ void Slig::Motion_38_Possess()
                 xOff,
                 FP_FromInteger(0),
                 GetSpriteScale(),
-                false);
+                false, mResMan);
 
             New_Smoke_Particles(
                 mXPos,
                 mYPos - (FP_FromInteger(30) * GetSpriteScale()),
                 GetSpriteScale(),
                 3,
-                RGB16{128, 128, 128});
+                RGB16{128, 128, 128}, mResMan);
 
             if (GetSpriteScale() == FP_FromDouble(0.5))
             {
@@ -3578,7 +3578,7 @@ void Slig::Motion_43_ShootZ()
         New_ShootingZFire_Particle(
             mXPos,
             mYPos - FP_FromInteger(12),
-            GetSpriteScale());
+            GetSpriteScale(), mResMan);
 
         if (GetSpriteScale() == FP_FromDouble(0.5))
         {
@@ -4347,7 +4347,7 @@ s16 Slig::Brain_DeathDropDeath()
 
             Environment_SFX(EnvironmentSfx::eFallingDeathScreamHitGround_15, 0, 32767, this);
 
-            relive_new ScreenShake(false, false);
+            relive_new ScreenShake(false, false, mResMan);
             field_114_timer = MakeTimer(30);
             return Brain_DeathDropDeath::eSwitchCamToAbe_2;
         }
@@ -5383,7 +5383,7 @@ void Slig::BlowToGibs()
         mVelX,
         mVelY,
         GetSpriteScale(),
-        false);
+        false, mResMan);
 
     relive_new Blood(
         mXPos,
@@ -5391,14 +5391,14 @@ void Slig::BlowToGibs()
         FP_FromInteger(0),
         FP_FromInteger(0),
         GetSpriteScale(),
-        20);
+        20, mResMan);
 
     New_Smoke_Particles(
         mXPos,
         mYPos - (FP_FromInteger(30) * GetSpriteScale()),
         GetSpriteScale(),
         3,
-        RGB16{128, 128, 128});
+        RGB16{128, 128, 128}, mResMan);
 
     if (GetSpriteScale() == FP_FromDouble(0.5))
     {

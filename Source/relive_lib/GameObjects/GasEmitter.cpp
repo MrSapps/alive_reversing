@@ -73,23 +73,23 @@ void GasEmitter::VUpdate()
         switch (mGasColour)
         {
             case relive::Path_GasEmitter::GasColour::eYellow:
-                New_Smoke_Particles(mEmitterXPos, mEmitterYPos, mSmokeScale, mParticleCount, RGB16{128, 128, 32});
+                New_Smoke_Particles(mEmitterXPos, mEmitterYPos, mSmokeScale, mParticleCount, RGB16{128, 128, 32}, mResMan);
                 break;
 
             case relive::Path_GasEmitter::GasColour::eRed:
-                New_Smoke_Particles(mEmitterXPos, mEmitterYPos, mSmokeScale, mParticleCount, RGB16{128, 32, 32});
+                New_Smoke_Particles(mEmitterXPos, mEmitterYPos, mSmokeScale, mParticleCount, RGB16{128, 32, 32}, mResMan);
                 break;
 
             case relive::Path_GasEmitter::GasColour::eGreen:
-                New_Smoke_Particles(mEmitterXPos, mEmitterYPos, mSmokeScale, mParticleCount, RGB16{32, 128, 32});
+                New_Smoke_Particles(mEmitterXPos, mEmitterYPos, mSmokeScale, mParticleCount, RGB16{32, 128, 32}, mResMan);
                 break;
 
             case relive::Path_GasEmitter::GasColour::eBlue:
-                New_Smoke_Particles(mEmitterXPos, mEmitterYPos, mSmokeScale, mParticleCount, RGB16{32, 32, 128});
+                New_Smoke_Particles(mEmitterXPos, mEmitterYPos, mSmokeScale, mParticleCount, RGB16{32, 32, 128}, mResMan);
                 break;
 
             case relive::Path_GasEmitter::GasColour::eWhite:
-                New_Smoke_Particles(mEmitterXPos, mEmitterYPos, mSmokeScale, mParticleCount, RGB16{128, 128, 128});
+                New_Smoke_Particles(mEmitterXPos, mEmitterYPos, mSmokeScale, mParticleCount, RGB16{128, 128, 128}, mResMan);
                 break;
 
             default:

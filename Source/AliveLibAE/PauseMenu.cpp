@@ -431,7 +431,7 @@ void PauseMenu::RestartPath()
 
         if (!gThrowableArray)
         {
-            gThrowableArray = relive_new ThrowableArray();
+            gThrowableArray = relive_new ThrowableArray(mResMan);
         }
 
         gThrowableArray->Add(gAbe->mBaseThrowableCount);

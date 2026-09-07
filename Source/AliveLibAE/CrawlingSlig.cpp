@@ -1042,7 +1042,7 @@ void PossessedBrain::VUpdate()
                     New_TintChant_Particle(
                         x, y,
                         mCrawlingSlig.GetSpriteScale(),
-                        Layer::eLayer_0);
+                        Layer::eLayer_0, mCrawlingSlig.mResMan);
                 }
 
                 if (static_cast<s32>(sGnFrame) <= mCrawlingSlig.mMultiUseTimer && gAbe->mHealth > FP_FromInteger(0))
@@ -1141,7 +1141,7 @@ void GetKilledBrain::VUpdate()
                 mCrawlingSlig.mVelX,
                 mCrawlingSlig.mVelY,
                 mCrawlingSlig.GetSpriteScale(),
-                0);
+                0, mCrawlingSlig.mResMan);
 
             relive_new Blood(
                 mCrawlingSlig.mXPos,
@@ -1149,14 +1149,14 @@ void GetKilledBrain::VUpdate()
                 FP_FromInteger(0),
                 FP_FromInteger(0),
                 mCrawlingSlig.GetSpriteScale(),
-                20);
+                20, mCrawlingSlig.mResMan);
 
             New_Smoke_Particles(
                 mCrawlingSlig.mXPos,
                 mCrawlingSlig.mYPos - (FP_FromInteger(30) * mCrawlingSlig.GetSpriteScale()),
                 mCrawlingSlig.GetSpriteScale(),
                 3,
-                RGB16{128, 128, 128});
+                RGB16{128, 128, 128}, mCrawlingSlig.mResMan);
 
             SfxPlayMono(relive::SoundEffects::KillEffect, 128, mCrawlingSlig.GetSpriteScale());
             SfxPlayMono(relive::SoundEffects::FallingItemHit, 90, mCrawlingSlig.GetSpriteScale());
@@ -1211,7 +1211,7 @@ void GetKilledBrain::VUpdate()
             else
             {
                 Environment_SFX(EnvironmentSfx::eFallingDeathScreamHitGround_15, 0, 0x7FFF, &mCrawlingSlig);
-                relive_new ScreenShake(false, false);
+                relive_new ScreenShake(false, false, mCrawlingSlig.mResMan);
                 mCrawlingSlig.mMultiUseTimer = BaseGameObject::MakeTimer(30);
                 mBrainState = EState::eSetDead;
                 return;
@@ -1269,7 +1269,7 @@ void CrawlingSlig::Motion_1_UsingButton()
             New_DestroyOrCreateObject_Particle(
                 mXPos,
                 (GetSpriteScale() * FP_FromInteger(45)) + mYPos,
-                GetSpriteScale());
+                GetSpriteScale(), mResMan);
         }
         else if (static_cast<s32>(sGnFrame) > mMultiUseTimer)
         {
@@ -1564,7 +1564,7 @@ void CrawlingSlig::Motion_9_Snoozing()
                 mXPos + xOff,
                 mYPos + yOff,
                 GetAnimation().GetRenderLayer(),
-                GetAnimation().GetSpriteScale());
+                GetAnimation().GetSpriteScale(), mResMan);
         }
     }
 }

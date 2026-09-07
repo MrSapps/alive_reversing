@@ -30,7 +30,7 @@ public:
     virtual void VScreenChanged() override;
 
 private:
-    static Electrocute* Create_ElectrocuteEffect();
+    static Electrocute* Create_ElectrocuteEffect(ResourceManagerWrapper& resMan);
     void SpawnRingSparks(Relive_Path_Teleporter_Data* pTlvData);
 
     Guid mTlvId;

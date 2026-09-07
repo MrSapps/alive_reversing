@@ -27,7 +27,7 @@ void IBirdPortal::CreateDovesAndShrykullNumber()
 {
     for (u8 i = 0; i < ALIVE_COUNTOF(mDoveIds); i++)
     {
-        auto pDove = relive_new Dove(AnimId::Dove_Flying, mXPos, mYPos, mSpriteScale);
+        auto pDove = relive_new Dove(AnimId::Dove_Flying, mXPos, mYPos, mSpriteScale, mResMan);
 
         mDovesExist = true;
         if (mPortalType == relive::Path_BirdPortal::PortalType::eAbe)
@@ -51,7 +51,8 @@ void IBirdPortal::CreateDovesAndShrykullNumber()
             indicatorLayer,
             mSpriteScale,
             mMudCountForShrykull,
-            0);
+            0,
+            mResMan);
         if (pIndicator)
         {
             mThrowableTotalIndicator = pIndicator->mBaseGameObjectId;
@@ -159,13 +160,13 @@ void IBirdPortal::MudSaved()
 
 void IBirdPortal::CreateTerminators()
 {
-    auto pTerminator1 = relive_new BirdPortalTerminator(mXPos, mYPos, mSpriteScale, mPortalType);
+    auto pTerminator1 = relive_new BirdPortalTerminator(mXPos, mYPos, mSpriteScale, mPortalType, mResMan);
     if (pTerminator1)
     {
         mTerminatorId1 = pTerminator1->mBaseGameObjectId;
     }
 
-    auto pTerminator2 = relive_new BirdPortalTerminator(mXPos, mYPos, mSpriteScale, mPortalType);
+    auto pTerminator2 = relive_new BirdPortalTerminator(mXPos, mYPos, mSpriteScale, mPortalType, mResMan);
     if (pTerminator2)
     {
         mTerminatorId2 = pTerminator2->mBaseGameObjectId;
@@ -206,7 +207,7 @@ bool IBirdPortal::ClipPortal(bool bIgnoreClipping)
     }
 
     // Clip objects entering portal?
-    auto pClipper1 = relive_new ScreenClipper(xy, wh, Layer::eLayer_0);
+    auto pClipper1 = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan);
     if (pClipper1)
     {
         mScreenClipperId1 = pClipper1->mBaseGameObjectId;
@@ -221,7 +222,7 @@ bool IBirdPortal::ClipPortal(bool bIgnoreClipping)
     }
 
     // Clip whole screen when "in" the portal?
-    auto pClipper2 = relive_new ScreenClipper(PSX_Point{0, 0}, PSX_Point{640, 240}, Layer::eLayer_0);
+    auto pClipper2 = relive_new ScreenClipper(PSX_Point{0, 0}, PSX_Point{640, 240}, Layer::eLayer_0, mResMan);
     if (pClipper2)
     {
         mScreenClipperId2 = pClipper2->mBaseGameObjectId;

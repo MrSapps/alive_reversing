@@ -135,7 +135,7 @@ void MeatSack::VUpdate()
             }
             else
             {
-                gThrowableArray = relive_new ThrowableArray();
+                gThrowableArray = relive_new ThrowableArray(mResMan);
             }
 
             gThrowableArray->Add(mMeatAmount);

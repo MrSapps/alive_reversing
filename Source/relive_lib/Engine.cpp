@@ -315,13 +315,13 @@ void Engine::Init_Sound_DynamicArrays_And_Others()
     {
         SND_Init();
         SND_Init_Ambiance();
-        MusicController::Create();
+        MusicController::Create(mResMan);
     }
     else
     {
         AO::SND_Init();
         SND_Init_Ambiance();
-        AO::MusicController::Create();
+        AO::MusicController::Create(mResMan);
     }
     Init_GameStates(); // Init other vars + switch states
 
@@ -557,15 +557,15 @@ void Engine::Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera
     
     if (mGameType == GameType::eAe)
     {
-        relive_new DDCheat();
-        gEventSystem = relive_new GameSpeak();
+        relive_new DDCheat(mResMan);
+        gEventSystem = relive_new GameSpeak(mResMan);
     }
     else
     {
-        relive_new AO::DDCheat();
-        AO::gEventSystem = relive_new AO::GameSpeak();
+        relive_new AO::DDCheat(mResMan);
+        AO::gEventSystem = relive_new AO::GameSpeak(mResMan);
     }
-    gCheatController = relive_new CheatController();
+    gCheatController = relive_new CheatController(mResMan);
 
     Game_Init_LoadingIcon();
 
@@ -666,7 +666,7 @@ void Engine::Run()
     GetGameAutoPlayer().DisableRecorder();
 
     // TODO: HACK mini loop till Game.cpp is merged
-    DataConversionUI dcu(mGameType);
+    DataConversionUI dcu(mGameType, mResMan);
     if (dcu.ConversionRequired())
     {
         do

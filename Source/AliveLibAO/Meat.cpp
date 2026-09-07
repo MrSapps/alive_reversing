@@ -279,7 +279,7 @@ void Meat::VUpdate()
                         mXPos + GetSpriteScale(),
                         mYPos + (GetSpriteScale() * FP_FromInteger(-7)),
                         FP_FromDouble(0.3),
-                        Layer::eLayer_Foreground_36);
+                        Layer::eLayer_Foreground_36, mResMan);
                     mShimmerTimer = Math_NextRandom() % 16 + MakeTimer(60);
                 }
                 if (mDeadTimer < static_cast<s32>(sGnFrame))

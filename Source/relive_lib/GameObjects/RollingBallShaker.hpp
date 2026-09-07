@@ -6,7 +6,7 @@
 class RollingBallShaker final : public ::BaseGameObject
 {
 public:
-    RollingBallShaker();
+    RollingBallShaker(ResourceManagerWrapper& resMan);
     ~RollingBallShaker();
 
     virtual void VUpdate() override;

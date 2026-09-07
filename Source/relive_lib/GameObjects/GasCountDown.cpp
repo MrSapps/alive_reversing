@@ -55,7 +55,7 @@ GasCountDown::GasCountDown(relive::Path_GasCountDown* pTlv, const Guid& tlvInfo,
                 mGasTimeLeftSecs = 0;
             }
 
-            relive_new Alarm(mGasCountdownTimer, 0, 0, Layer::eLayer_Above_FG1_39);
+            relive_new Alarm(mGasCountdownTimer, 0, 0, Layer::eLayer_Above_FG1_39, mResMan);
         }
         else
         {
@@ -96,7 +96,7 @@ void GasCountDown::VUpdate()
     if (!gDeathGasTimer && SwitchStates_Get(mStartTimerSwitchId) && !SwitchStates_Get(mStopTimerSwitchId))
     {
         gDeathGasTimer = sGnFrame;
-        relive_new Alarm(mGasCountdownTimer, 0, 0, Layer::eLayer_Above_FG1_39);
+        relive_new Alarm(mGasCountdownTimer, 0, 0, Layer::eLayer_Above_FG1_39, mResMan);
     }
 
     if (!gDeathGasTimer)
@@ -163,7 +163,7 @@ void GasCountDown::DealDamage()
         gDeathGasOn = true;
         if (!gDeathGasCount)
         {
-            relive_new DeathGas(Layer::eLayer_Above_FG1_39, 2);
+            relive_new DeathGas(Layer::eLayer_Above_FG1_39, 2, mResMan);
         }
     }
 }

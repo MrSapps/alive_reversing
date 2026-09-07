@@ -179,7 +179,7 @@ void Shrykull::VUpdate()
                             FP_FromInteger((objRect.x + objRect.w) / 2),
                             FP_FromInteger((objRect.y + objRect.h) / 2),
                             0, ZapLineType::eThin_1,
-                            Layer::eLayer_ZapLinesElumMuds_28);
+                            Layer::eLayer_ZapLinesElumMuds_28, mResMan);
                         if (pZapLine)
                         {
                             mZapLineId = pZapLine->mBaseGameObjectId;
@@ -189,7 +189,7 @@ void Shrykull::VUpdate()
                     mCanElectrocute = CanElectrocute(pObj);
                     if (mCanElectrocute)
                     {
-                        relive_new Electrocute(pObj, false, true);
+                        relive_new Electrocute(pObj, false, true, mResMan);
                         mFlashTimer = MakeTimer(3);
 
                         if (pObj->Type() == ReliveTypes::eBackgroundGlukkon)
@@ -204,7 +204,7 @@ void Shrykull::VUpdate()
                         FP_FromInteger((objRect.x + objRect.w) / 2),
                         FP_FromInteger((objRect.y + objRect.h) / 2),
                         RingTypes::eShrykull_Pulse_Large_5,
-                        FP_FromInteger(1));
+                        FP_FromInteger(1), mResMan);
 
                     relive_new PossessionFlicker(this, 8, 255, 255, 255, mResMan);
 
@@ -212,7 +212,7 @@ void Shrykull::VUpdate()
                         FP_FromInteger((ourRect.x + ourRect.w) / 2),
                         FP_FromInteger((ourRect.y + ourRect.h) / 2),
                         RingTypes::eShrykull_Pulse_Large_5,
-                        FP_FromInteger(1));
+                        FP_FromInteger(1), mResMan);
 
                     pObj->SetZappedByShrykull(true);
 
@@ -286,9 +286,9 @@ void Shrykull::VUpdate()
                             FP_FromInteger((zapRect.y + zapRect.h) / 2),
                             20,
                             GetSpriteScale(),
-                            BurstType::eBigPurpleSparks);
+                            BurstType::eBigPurpleSparks, mResMan);
 
-                       relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255);
+                       relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, mResMan);
                     }
                     pExistingZapLine->CalculateSourceAndDestinationPositions(
                         FP_FromInteger((ourRect.x + ourRect.w) / 2),

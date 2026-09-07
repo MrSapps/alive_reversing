@@ -488,7 +488,7 @@ void Bone::VUpdate()
                     mXPos + (GetSpriteScale() * FP_FromInteger(1)),
                     (GetSpriteScale() * FP_FromInteger(-7)) + mYPos,
                     FP_FromDouble(0.3),
-                    Layer::eLayer_Foreground_36);
+                    Layer::eLayer_Foreground_36, mResMan);
 
                 mShimmerTimer = (Math_NextRandom() % 16) + MakeTimer(60);
             }

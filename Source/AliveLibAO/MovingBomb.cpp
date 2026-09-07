@@ -152,7 +152,7 @@ bool MovingBomb::VTakeDamage(BaseGameObject* pFrom)
         mXPos,
         mYPos,
         GetSpriteScale(),
-        false);
+        false, mResMan);
 
     relive_new Gibs(
         GibType::eMetal,
@@ -161,7 +161,7 @@ bool MovingBomb::VTakeDamage(BaseGameObject* pFrom)
         FP_FromInteger(0),
         FP_FromInteger(5),
         GetSpriteScale(),
-        false);
+        false, mResMan);
 
     mState = States::eKillMovingBomb_7;
     GetAnimation().SetRender(false);
@@ -422,7 +422,7 @@ void MovingBomb::VUpdate()
                     mXPos,
                     mYPos,
                     GetSpriteScale(),
-                    false);
+                    false, mResMan);
 
                 relive_new Gibs(
                     GibType::eMetal,
@@ -431,7 +431,7 @@ void MovingBomb::VUpdate()
                     FP_FromInteger(0),
                     FP_FromInteger(5),
                     GetSpriteScale(),
-                    false);
+                    false, mResMan);
 
                 mState = States::eKillMovingBomb_7;
                 GetAnimation().SetRender(false);

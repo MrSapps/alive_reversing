@@ -518,7 +518,7 @@ s32 ResourceManagerWrapper::SEQ_HashName(const char_type* seqFileName)
 void ResourceManagerWrapper::ShowLoadingIcon()
 {
     AnimResource res = LoadAnimation(AnimId::Loading_Icon2);
-    auto pParticle = relive_new Particle(FP_FromInteger(0), FP_FromInteger(0), res);
+    auto pParticle = relive_new Particle(FP_FromInteger(0), FP_FromInteger(0), res, *this);
     if (pParticle)
     {
         pParticle->GetAnimation().SetSemiTrans(false);

@@ -18,8 +18,8 @@ void ZapSpark::LoadAnimationsAE()
     mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::AE_ZapSpark));
 }
 
-ZapSpark::ZapSpark(FP xpos, FP ypos, FP scale)
-    : BaseAnimatedWithPhysicsGameObject(0)
+ZapSpark::ZapSpark(FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eZapSpark);
 

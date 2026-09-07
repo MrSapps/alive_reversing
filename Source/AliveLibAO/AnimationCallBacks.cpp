@@ -53,13 +53,13 @@ void Animation_OnFrame_Slig(::BaseGameObject* pObj, u32&, const IndexedPoint& pD
             pSlig->mXPos - xOff,
             pSlig->mYPos + yOff,
             1,
-            pSlig->GetSpriteScale());
+            pSlig->GetSpriteScale(), resMan);
 
         relive_new BulletShell(
             pSlig->mXPos,
             pSlig->mYPos + yOff,
             0,
-            pSlig->GetSpriteScale());
+            pSlig->GetSpriteScale(), resMan);
     }
     else
     {
@@ -77,13 +77,13 @@ void Animation_OnFrame_Slig(::BaseGameObject* pObj, u32&, const IndexedPoint& pD
             pSlig->mXPos + xOff,
             pSlig->mYPos + yOff,
             0,
-            pSlig->GetSpriteScale());
+            pSlig->GetSpriteScale(), resMan);
 
         relive_new BulletShell(
             pSlig->mXPos,
             pSlig->mYPos + yOff,
             1,
-            pSlig->GetSpriteScale());
+            pSlig->GetSpriteScale(), resMan);
     }
 
     if (pSlig->GetSpriteScale() == FP_FromDouble(0.5))
@@ -137,7 +137,7 @@ void Slog_OnFrame(::BaseGameObject* pObj, u32&, const IndexedPoint& pData, Resou
                         (pSlog->mVelX * FP_FromInteger(2)),
                         FP_FromInteger(0),
                         pSlog->GetSpriteScale(),
-                        50);
+                        50, resMan);
 
                     pSlog->mBitingTarget = 1;
 

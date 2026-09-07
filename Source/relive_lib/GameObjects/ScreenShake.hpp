@@ -6,7 +6,7 @@
 class ScreenShake final : public BaseGameObject
 {
 public:
-    ScreenShake(bool enableShakeEvent, bool softerShakes);
+    ScreenShake(bool enableShakeEvent, bool softerShakes, ResourceManagerWrapper& resMan);
     ~ScreenShake();
 
     virtual void VUpdate() override;

@@ -4,8 +4,8 @@
 #include "../Function.hpp"
 #include "BaseAnimatedWithPhysicsGameObject.hpp"
 
-OrbWhirlWind::OrbWhirlWind(FP xpos, FP ypos, FP scale, bool bIsMudokonSpirit)
-    : BaseGameObject(true, 0)
+OrbWhirlWind::OrbWhirlWind(FP xpos, FP ypos, FP scale, bool bIsMudokonSpirit, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     SetType(ReliveTypes::eNone);
 

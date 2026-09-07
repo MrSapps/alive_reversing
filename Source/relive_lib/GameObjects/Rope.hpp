@@ -7,7 +7,7 @@ class AnimationUnknown;
 class Rope final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    Rope(s32 left, s32 top, s32 bottom, FP scale);
+    Rope(s32 left, s32 top, s32 bottom, FP scale, ResourceManagerWrapper& resMan);
     ~Rope();
 
     virtual void VUpdate() override;

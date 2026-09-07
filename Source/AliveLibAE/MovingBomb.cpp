@@ -182,9 +182,9 @@ bool MovingBomb::VTakeDamage(BaseGameObject* pFrom)
         case ReliveTypes::eShrykull:
         {
             mHealth = FP_FromInteger(0);
-            relive_new AirExplosion(mXPos, mYPos, GetSpriteScale(), 0);
+            relive_new AirExplosion(mXPos, mYPos, GetSpriteScale(), 0, mResMan);
 
-            relive_new Gibs(GibType::eMetal, mXPos, mYPos, FP_FromInteger(0), FP_FromInteger(5), GetSpriteScale(), 0);
+            relive_new Gibs(GibType::eMetal, mXPos, mYPos, FP_FromInteger(0), FP_FromInteger(5), GetSpriteScale(), 0, mResMan);
 
             mState = States::eKillMovingBomb_7;
 
@@ -407,7 +407,7 @@ void MovingBomb::VUpdate()
                     mXPos,
                     mYPos,
                     GetSpriteScale(),
-                    0);
+                    0, mResMan);
 
                 relive_new Gibs(
                     GibType::eMetal,
@@ -416,7 +416,7 @@ void MovingBomb::VUpdate()
                     FP_FromInteger(0),
                     FP_FromInteger(5),
                     GetSpriteScale(),
-                    0);
+                    0, mResMan);
 
                 mState = States::eKillMovingBomb_7;
                 GetAnimation().SetRender(false);

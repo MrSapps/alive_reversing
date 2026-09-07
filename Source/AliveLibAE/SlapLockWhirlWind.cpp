@@ -64,7 +64,7 @@ SlapLockWhirlWind::SlapLockWhirlWind(s16 doorNumber, s16 switchId, FP xpos, FP y
 
     if (bFoundTarget)
     {
-        auto pWhirlWind = relive_new OrbWhirlWind(xpos, ypos, scale, 1);
+        auto pWhirlWind = relive_new OrbWhirlWind(xpos, ypos, scale, 1, resMan);
         if (pWhirlWind)
         {
             mOrbWhirlWindId = pWhirlWind->mBaseGameObjectId;

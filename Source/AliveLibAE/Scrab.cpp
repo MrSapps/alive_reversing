@@ -719,7 +719,7 @@ void Scrab::VUpdate()
                         particleVelY,
                         GetSpriteScale(),
                         Layer::eLayer_0,
-                        RGB16{255, 0, 0});
+                        RGB16{255, 0, 0}, mResMan);
                 }
             }
 
@@ -3003,7 +3003,7 @@ void Scrab::Motion_28_GetDepossessedBegin()
             const FP yRnd = FP_FromInteger(Math_RandomRange(20, 50));
             const FP ypos = mYPos - (GetSpriteScale() * yRnd);
             const FP xpos = (GetSpriteScale() * xRnd) + mXPos;
-            New_TintChant_Particle(xpos, ypos, GetSpriteScale(), Layer::eLayer_0);
+            New_TintChant_Particle(xpos, ypos, GetSpriteScale(), Layer::eLayer_0, mResMan);
         }
 
         if (static_cast<s32>(sGnFrame) > field_130_depossession_timer || gAbe->mHealth <= FP_FromInteger(0))

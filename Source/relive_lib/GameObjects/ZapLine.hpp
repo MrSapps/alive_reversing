@@ -25,7 +25,7 @@ enum class ZapLineType : s16
 class ZapLine final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    ZapLine(FP xPosSource, FP yPosSource, FP xPosDest, FP yPosDest, s32 aliveTime, ZapLineType type, Layer layer);
+    ZapLine(FP xPosSource, FP yPosSource, FP xPosDest, FP yPosDest, s32 aliveTime, ZapLineType type, Layer layer, ResourceManagerWrapper& resMan);
     ~ZapLine();
 
     virtual void VUpdate() override;

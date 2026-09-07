@@ -140,7 +140,7 @@ void Well::VUpdate()
                                           mLeafY,
                                           FP_FromInteger(2),
                                           FP_FromInteger(-20),
-                                          mLeafScale);
+                                          mLeafScale, mResMan);
             }
         }
     }

@@ -1,8 +1,8 @@
 #include "PaletteOverwriter.hpp"
 
 // Overwrites a pallete 8 colours at a time one per update
-PalleteOverwriter::PalleteOverwriter(AnimationPal& pal, const RGBA32& colour)
-    : BaseGameObject(false, 0), mPal(pal)
+PalleteOverwriter::PalleteOverwriter(AnimationPal& pal, const RGBA32& colour, ResourceManagerWrapper& resMan)
+    : BaseGameObject(false, 0, resMan), mPal(pal)
 {
     SetType(ReliveTypes::ePalOverwriter);
 

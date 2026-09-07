@@ -365,7 +365,8 @@ void Factory::DoveAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
             auto pDove = relive_new Dove(
                 AnimId::Dove_Idle,
                 tlvId,
-                pDoveTlv->mScale != reliveScale::eFull ? FP_FromDouble(0.5) : FP_FromInteger(1));
+                pDoveTlv->mScale != reliveScale::eFull ? FP_FromDouble(0.5) : FP_FromInteger(1),
+                mResourceManager);
 
             if (pDove)
             {
@@ -771,12 +772,12 @@ void Factory::AbeStartAO(Path_TLV* pTlv, const Guid& /*tlvId*/, LoadMode loadMod
     {
         if (!AO::gPauseMenu)
         {
-            AO::gPauseMenu = relive_new AO::PauseMenu();
+            AO::gPauseMenu = relive_new AO::PauseMenu(mResourceManager);
         }
 
         if (!AO::gAbe)
         {
-            AO::gAbe = relive_new AO::Abe();
+            AO::gAbe = relive_new AO::Abe(mResourceManager);
             if (AO::gAbe)
             {
                 AO::gAbe->mXPos = FP_FromInteger(pTlv->mTopLeftX + 12);
@@ -1175,7 +1176,7 @@ void Factory::ElumAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
     }
     else
     {
-        AO::Elum::Spawn(tlvId);
+        AO::Elum::Spawn(tlvId, mResourceManager);
         AO::gElum->mXPos = FP_FromInteger(pTlv->mTopLeftX);
         AO::gElum->mYPos = FP_FromInteger(pTlv->mTopLeftY);
     }
@@ -1864,7 +1865,8 @@ void Factory::DoveAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
             auto pDove = relive_new Dove(
                 AnimId::Dove_Idle,
                 tlvId,
-                pDoveTlv->mScale != reliveScale::eFull ? FP_FromDouble(0.5) : FP_FromInteger(1));
+                pDoveTlv->mScale != reliveScale::eFull ? FP_FromDouble(0.5) : FP_FromInteger(1),
+                mResourceManager);
 
             s16 ypos = 0;
             if (pDoveTlv->mPixelPerfect)
@@ -2040,12 +2042,12 @@ void Factory::AbeStartAE(Path_TLV* pTlv,  const Guid& /*tlvId*/, LoadMode loadmo
     {
         if (!gPauseMenu)
         {
-            gPauseMenu = relive_new PauseMenu();
+            gPauseMenu = relive_new PauseMenu(mResourceManager);
         }
 
         if (!gAbe)
         {
-            gAbe = relive_new Abe();
+            gAbe = relive_new Abe(mResourceManager);
             if (gAbe)
             {
                 gAbe->mXPos = FP_FromInteger(pTlv->mTopLeftX + 12);
@@ -2731,7 +2733,7 @@ void Factory::DemoSpawnPointAE(Path_TLV*,  const Guid& /*tlvId*/, LoadMode loadM
         {
             if (!gActiveDemoPlayback)
             {
-                relive_new DemoPlayback();
+                relive_new DemoPlayback(mResourceManager);
             }
         }
     }
@@ -2870,7 +2872,7 @@ void Factory::ExplosionSetAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
         if (!gExplosionSet)
         {
             // gExplosionSet is assigned in the ctor (OWI programming)
-            relive_new ExplosionSet();
+            relive_new ExplosionSet(mResourceManager);
         }
         gExplosionSet->Init(static_cast<Path_ExplosionSet*>(pTlv));
         Path::TLV_Reset(tlvId);

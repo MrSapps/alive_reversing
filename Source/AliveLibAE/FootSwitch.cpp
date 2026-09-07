@@ -153,7 +153,7 @@ void FootSwitch::VUpdate()
                                                             mYPos + FP_FromInteger(10),
                                                             3,
                                                             GetSpriteScale(),
-                                                            BurstType::eBigRedSparks,
+                                                            BurstType::eBigRedSparks, mResMan,
                                                             9, true);
 
                 if (gMap->mCurrentLevel == EReliveLevelIds::eMines || gMap->mCurrentLevel == EReliveLevelIds::eBonewerkz || gMap->mCurrentLevel == EReliveLevelIds::eFeeCoDepot || gMap->mCurrentLevel == EReliveLevelIds::eBarracks || gMap->mCurrentLevel == EReliveLevelIds::eBrewery)
@@ -181,13 +181,13 @@ void FootSwitch::VUpdate()
                                             10,
                                             100,
                                             255,
-                                            SparkType::eSmallChantParticle_0);
+                                            SparkType::eSmallChantParticle_0, mResMan);
 
                 relive_new ParticleBurst(mXPos,
                                                             mYPos + (GetSpriteScale() * FP_FromInteger(10)),
                                                             1,
                                                             GetSpriteScale(),
-                                                            BurstType::eBigRedSparks,
+                                                            BurstType::eBigRedSparks, mResMan,
                                                             9, true);
 
                 mCreateSparks = false;

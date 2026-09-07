@@ -309,7 +309,7 @@ void Animation::Invoke_CallBacks()
             break;
         }
         // NOTE: the call back can alter "i"
-        pFnCallBack(mGameObj, i, pFrameHeaderCopy->mPoints[i]);
+        pFnCallBack(mGameObj, i, pFrameHeaderCopy->mPoints[i], GetResourceManager());
     }
 }
 

@@ -108,7 +108,7 @@ PullRingRope::PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId, R
         FP_GetExponent(mXPos + FP_FromInteger((lvl_x_off + 1))),
         FP_GetExponent(mYPos) - pTlv->mRopeLength,
         FP_GetExponent(mYPos + (FP_FromInteger(mYOffset))),
-        GetSpriteScale());
+        GetSpriteScale(), mResMan);
     if (pRope)
     {
         mRopeId = pRope->mBaseGameObjectId;

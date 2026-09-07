@@ -184,13 +184,13 @@ void ElectricWall::VUpdate()
                             if (!pObj->GetElectrocuted() /*&& (!IsAbe(pObj) || !gAbeInvincible)*/)
                             {
                                 pObj->SetElectrocuted(true);
-                                relive_new Electrocute(pObj, true, true);
+                                relive_new Electrocute(pObj, true, true, mResMan);
 
                                 pObj->VTakeDamage(this);
 
                                 SFX_Play_Camera(relive::SoundEffects::ElectricZap, 127, soundDirection, GetSpriteScale());
 
-                                relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, relive::TBlendModes::eBlend_3, 1);
+                                relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, mResMan, relive::TBlendModes::eBlend_3, 1);
                             }
                         }
                     }

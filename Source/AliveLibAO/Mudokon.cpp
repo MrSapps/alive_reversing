@@ -552,7 +552,7 @@ bool Mudokon::VTakeDamage(BaseGameObject* pFrom)
                     FP_FromInteger(0),
                     FP_FromInteger(0),
                     GetSpriteScale(),
-                    false);
+                    false, mResMan);
 
                 relive_new Gibs(
                     GibType::eMud,
@@ -561,7 +561,7 @@ bool Mudokon::VTakeDamage(BaseGameObject* pFrom)
                     FP_FromInteger(0),
                     FP_FromInteger(0),
                     GetSpriteScale(),
-                    false);
+                    false, mResMan);
 
                 SetDead(true);
                 EventBroadcast(Event::kEventMudokonDead, gAbe);
@@ -592,7 +592,7 @@ bool Mudokon::VTakeDamage(BaseGameObject* pFrom)
                     bloodXOff,
                     FP_FromInteger(0),
                     GetSpriteScale(),
-                    50);
+                    50, mResMan);
 
                 EventBroadcast(Event::kEventMudokonDead, gAbe);
                 EventBroadcast(Event::kEventMudokonDead, gAbe);
@@ -2391,7 +2391,7 @@ void Mudokon::Motion_52_Chant()
             mXPos + (GetSpriteScale() * rndX),
             mYPos - (GetSpriteScale() * rndY),
             GetSpriteScale(),
-            Layer::eLayer_0);
+            Layer::eLayer_0, mResMan);
     }
 
     if (!SND_SsIsEos_DeInlined(SeqId::eMudokonChant_12))
@@ -2485,7 +2485,7 @@ void Mudokon::Motion_59_CrouchChant()
             mXPos + (GetSpriteScale() * rndX),
             mYPos - (GetSpriteScale() * rndY),
             GetSpriteScale(),
-            Layer::eLayer_0);
+            Layer::eLayer_0, mResMan);
     }
 
     if (!SND_SsIsEos_DeInlined(SeqId::eMudokonChant_12))
@@ -3047,7 +3047,7 @@ s16 Mudokon::Brain_7_GiveRings()
                         FP_FromInteger((ourRect.w + ourRect.x) / 2),
                         FP_FromInteger((ourRect.h + ourRect.y) / 2),
                         RingTypes::eExplosive_Emit_Effect_2,
-                        FP_FromInteger(1));
+                        FP_FromInteger(1), mResMan);
 
                 const PSX_RECT heroRect = gAbe->VGetBoundingRect();
 
@@ -3055,7 +3055,7 @@ s16 Mudokon::Brain_7_GiveRings()
                     FP_FromInteger((heroRect.w + heroRect.x) / 2),
                     FP_FromInteger((heroRect.h + heroRect.y) / 2),
                     RingTypes::eExplosive_Give_3,
-                    FP_FromInteger(1));
+                    FP_FromInteger(1), mResMan);
                 if (pAbeRing)
                 {
                     pAbeRing->SetTarget(gAbe);
@@ -3888,14 +3888,14 @@ s16 Mudokon::Brain_10_ListeningToAbe()
                     const FP fart_scale = (FP_FromDouble(0.5) * GetSpriteScale());
                     const FP fart_y = mYPos - (FP_FromInteger(24) * GetSpriteScale());
                     const FP fart_x = (FP_FromInteger(12) * GetSpriteScale()) + mXPos;
-                    New_Smoke_Particles(fart_x, fart_y, fart_scale, 3, RGB16{32, 128, 32});
+                    New_Smoke_Particles(fart_x, fart_y, fart_scale, 3, RGB16{32, 128, 32}, mResMan);
                 }
                 else
                 {
                     const FP fart_scale = (FP_FromDouble(0.5) * GetSpriteScale());
                     const FP fart_y = mYPos - (FP_FromInteger(24) * GetSpriteScale());
                     const FP fart_x = mXPos - (FP_FromInteger(12) * GetSpriteScale());
-                    New_Smoke_Particles(fart_x, fart_y, fart_scale, 3, RGB16{32, 128, 32});
+                    New_Smoke_Particles(fart_x, fart_y, fart_scale, 3, RGB16{32, 128, 32}, mResMan);
                 }
                 return field_1B0;
             }
@@ -4111,7 +4111,7 @@ s16 Mudokon::Brain_13_FallAndSmackDeath()
             if (static_cast<s32>(sGnFrame) > field_1C0_timer)
             {
                 Environment_SFX(EnvironmentSfx::eFallingDeathScreamHitGround_15, 0, 0x7FFF, this);
-                relive_new ScreenShake(false, false);
+                relive_new ScreenShake(false, false, mResMan);
                 SetDead(true);
             }
         }

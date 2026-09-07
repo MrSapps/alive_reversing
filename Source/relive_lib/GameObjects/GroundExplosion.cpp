@@ -13,8 +13,8 @@
 #include "../GameType.hpp"
 #include "../../AliveLibAO/Midi.hpp"
 
-GroundExplosion::GroundExplosion(FP xpos, FP ypos, FP scale)
-    : BaseAnimatedWithPhysicsGameObject(0)
+GroundExplosion::GroundExplosion(FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eGroundExplosion);
 
@@ -44,14 +44,15 @@ GroundExplosion::GroundExplosion(FP xpos, FP ypos, FP scale)
     mXPos = xpos;
     mYPos = ypos;
 
-    relive_new ScreenShake(true, false);
+    relive_new ScreenShake(true, false, mResMan);
 
     relive_new ParticleBurst(
         mXPos,
         mYPos,
         35,
         mBombSpriteScale,
-        BurstType::eRocks);
+        BurstType::eRocks,
+        mResMan);
 
     PSX_RECT damageRect = {
         FP_GetExponent(FP_FromInteger(-10) * mBombSpriteScale),
@@ -116,9 +117,10 @@ void GroundExplosion::VUpdate()
                 mYPos,
                 20,
                 GetSpriteScale(),
-                BurstType::eBigRedSparks);
+                BurstType::eBigRedSparks,
+                mResMan);
 
-            relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255);
+            relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, mResMan);
 
             rect.x = FP_GetExponent(FP_FromInteger(-113) * mBombSpriteScale);
             rect.w = FP_GetExponent(FP_FromInteger(113) * mBombSpriteScale);
@@ -130,7 +132,7 @@ void GroundExplosion::VUpdate()
 
         case 4:
         {
-            relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, relive::TBlendModes::eBlend_1, 1);
+            relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, mResMan, relive::TBlendModes::eBlend_1, 1);
             break;
         }
 
@@ -141,9 +143,10 @@ void GroundExplosion::VUpdate()
                 mYPos,
                 20,
                 GetSpriteScale(),
-                BurstType::eBigRedSparks);
+                BurstType::eBigRedSparks,
+                mResMan);
 
-            relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255);
+            relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, mResMan);
             break;
         }
 
@@ -156,7 +159,8 @@ void GroundExplosion::VUpdate()
         Particle* pParticle = relive_new Particle(
             mXPos,
             mYPos,
-            GetAnimRes(AnimId::GroundExplosion));
+            GetAnimRes(AnimId::GroundExplosion),
+            mResMan);
         if (pParticle)
         {
             pParticle->GetAnimation().SetFlipX(true);

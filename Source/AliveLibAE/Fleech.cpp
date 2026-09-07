@@ -466,7 +466,7 @@ void Fleech::Motion_0_Sleeping()
                     {
                         xOff = (GetSpriteScale() * FP_FromInteger(10));
                     }
-                    relive_new SnoozeParticle(xOff + mXPos, yPos, GetAnimation().GetRenderLayer(), GetAnimation().GetSpriteScale());
+                    relive_new SnoozeParticle(xOff + mXPos, yPos, GetAnimation().GetRenderLayer(), GetAnimation().GetSpriteScale(), mResMan);
                 }
             }
         }
@@ -1004,7 +1004,7 @@ void Fleech::Motion_16_DeathByFalling()
 {
     if (mHealth > FP_FromInteger(0))
     {
-        relive_new Blood(mXPos, mYPos - FP_FromInteger(8), FP_FromInteger(0), -FP_FromInteger(5), GetSpriteScale(), 50);
+        relive_new Blood(mXPos, mYPos - FP_FromInteger(8), FP_FromInteger(0), -FP_FromInteger(5), GetSpriteScale(), 50, mResMan);
 
         Sound(FleechSound::DeathByHeight_12);
         Sound(FleechSound::Scared_7);
@@ -1045,7 +1045,7 @@ void Fleech::Motion_17_SleepingWithTongue()
                     {
                         xOff = (GetSpriteScale() * FP_FromInteger(10));
                     }
-                    relive_new SnoozeParticle(xOff + mXPos, yPos, GetAnimation().GetRenderLayer(), GetAnimation().GetSpriteScale());
+                    relive_new SnoozeParticle(xOff + mXPos, yPos, GetAnimation().GetRenderLayer(), GetAnimation().GetSpriteScale(), mResMan);
                 }
             }
         }
@@ -1077,7 +1077,7 @@ void Fleech::Motion_18_Consume()
                 AnimId::Dove_Flying,
                 mXPos,
                 mYPos + FP_FromInteger(10),
-                GetSpriteScale());
+                GetSpriteScale(), mResMan);
 
             if (GetAnimation().GetFlipX())
             {
@@ -1717,7 +1717,7 @@ void Fleech::TongueUpdate()
                                 FP_FromInteger(mEnemyYPos),
                                 GetAnimation().GetFlipX() != 0 ? FP_FromInteger(2) : FP_FromInteger(-2),
                                 FP_FromInteger(1),
-                                GetSpriteScale(), 20);
+                                GetSpriteScale(), 20, mResMan);
                             break;
                         }
 
@@ -2075,7 +2075,7 @@ bool Fleech::VTakeDamage(BaseGameObject* pFrom)
             Sound(FleechSound::Scared_7);
             mHealth = FP_FromInteger(0);
 
-            relive_new Gibs(GibType::eFleech, mXPos, mYPos, mVelX, mVelY, GetSpriteScale(), 0);
+            relive_new Gibs(GibType::eFleech, mXPos, mYPos, mVelX, mVelY, GetSpriteScale(), 0, mResMan);
 
             const PSX_RECT bRect = VGetBoundingRect();
             relive_new Blood(
@@ -2083,7 +2083,7 @@ bool Fleech::VTakeDamage(BaseGameObject* pFrom)
                 FP_FromInteger((bRect.y + bRect.h) / 2),
                 FP_FromInteger(0),
                 FP_FromInteger(0),
-                GetSpriteScale(), 50);
+                GetSpriteScale(), 50, mResMan);
 
             SetDead(true);
         }
@@ -2107,15 +2107,15 @@ bool Fleech::VTakeDamage(BaseGameObject* pFrom)
 
         case ReliveTypes::eScrab:
         {
-            relive_new Gibs(GibType::eFleech, mXPos, mYPos, mVelX, mVelY, GetSpriteScale(), 0);
+            relive_new Gibs(GibType::eFleech, mXPos, mYPos, mVelX, mVelY, GetSpriteScale(), 0, mResMan);
 
             if (static_cast<BaseAliveGameObject*>(pFrom)->GetAnimation().GetFlipX())
             {
-                relive_new Blood(mXPos, mYPos - FP_FromInteger(8), -FP_FromInteger(5), -FP_FromInteger(5), GetSpriteScale(), 50);
+                relive_new Blood(mXPos, mYPos - FP_FromInteger(8), -FP_FromInteger(5), -FP_FromInteger(5), GetSpriteScale(), 50, mResMan);
             }
             else
             {
-                relive_new Blood(mXPos, mYPos - FP_FromInteger(8), FP_FromInteger(5), -FP_FromInteger(5), GetSpriteScale(), 50);
+                relive_new Blood(mXPos, mYPos - FP_FromInteger(8), FP_FromInteger(5), -FP_FromInteger(5), GetSpriteScale(), 50, mResMan);
             }
 
             if (!mScaredSound)

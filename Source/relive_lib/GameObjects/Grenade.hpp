@@ -51,7 +51,7 @@ struct GrenadeSaveState final : public SaveStateBase
 class Grenade final : public BaseThrowable
 {
 public:
-    Grenade(FP xpos, FP ypos, s16 numGrenades, bool bBlowUpOnCollision, BaseGameObject* pOwner);
+    Grenade(FP xpos, FP ypos, s16 numGrenades, bool bBlowUpOnCollision, BaseGameObject* pOwner, ResourceManagerWrapper& resMan);
     ~Grenade();
 
     virtual void VScreenChanged() override;

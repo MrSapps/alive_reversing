@@ -11,8 +11,8 @@
 
 static s16 sShellCount = 0;
 
-BulletShell::BulletShell(FP xpos, FP ypos, bool flipX, FP scale)
-    : BaseAnimatedWithPhysicsGameObject(0)
+BulletShell::BulletShell(FP xpos, FP ypos, bool flipX, FP scale, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     sShellCount++;
 

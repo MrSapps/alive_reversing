@@ -12,7 +12,7 @@ enum class FadeOptions
 class Fade final : public EffectBase
 {
 public:
-    Fade(Layer layer, FadeOptions fade, bool destroyOnDone, s32 speed, relive::TBlendModes abr);
+    Fade(Layer layer, FadeOptions fade, bool destroyOnDone, s32 speed, relive::TBlendModes abr, ResourceManagerWrapper& resMan);
     ~Fade();
     void Init(Layer layer, FadeOptions fade, bool destroyOnDone, s32 speed);
     virtual void VScreenChanged() override;

@@ -84,7 +84,7 @@ PullRingRope::PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId, R
     auto pRope = relive_new Rope(FP_GetExponent(mXPos + FP_FromInteger(2)),
                               FP_GetExponent(mYPos) - pTlv->mRopeLength,
                               FP_GetExponent(mYPos),
-                              GetSpriteScale());
+                              GetSpriteScale(), resMan);
     if (pRope)
     {
         mRopeId = pRope->mBaseGameObjectId;

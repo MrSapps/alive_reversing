@@ -228,7 +228,7 @@ void SlapLock::VUpdate()
                         mXPos,
                         mYPos - (FP_FromInteger(40) * GetSpriteScale()),
                         RingTypes::eInvisible_Pulse_Large_8,
-                        GetSpriteScale());
+                        GetSpriteScale(), mResMan);
                 }
             }
 
@@ -258,7 +258,7 @@ void SlapLock::VUpdate()
                         mXPos,
                         mYPos - (FP_FromInteger(40) * GetSpriteScale()),
                         RingTypes::eInvisible_Pulse_Large_8,
-                        GetSpriteScale());
+                        GetSpriteScale(), mResMan);
                 }
             }
 
@@ -307,7 +307,7 @@ void SlapLock::VUpdate()
             New_TintShiny_Particle(
                 x, y,
                 FP_FromDouble(0.3),
-                GetAnimation().GetRenderLayer());
+                GetAnimation().GetRenderLayer(), mResMan);
 
             mShinyParticleTimer = Math_RandomRange(-30, 30) + MakeTimer(60);
             return;
@@ -329,7 +329,7 @@ void SlapLock::VUpdate()
                         mXPos,
                         mYPos - (FP_FromInteger(40) * GetSpriteScale()),
                         RingTypes::eInvisible_Pulse_Large_8,
-                        GetSpriteScale());
+                        GetSpriteScale(), mResMan);
                     mTimer1 = Math_RandomRange(1, 10) + MakeTimer(55);
                 }
                 else
@@ -349,7 +349,7 @@ void SlapLock::VUpdate()
             New_TintShiny_Particle(
                 x, y,
                 FP_FromDouble(0.3),
-                GetAnimation().GetRenderLayer());
+                GetAnimation().GetRenderLayer(), mResMan);
 
             mShinyParticleTimer = Math_RandomRange(-30, 30) + MakeTimer(60);
             return;
@@ -408,7 +408,7 @@ void SlapLock::SetInvisibilityTarget()
         mXPos,
         mYPos - (FP_FromInteger(40) * GetSpriteScale()),
         RingTypes::eInvisible_Pulse_Emit_9,
-        GetSpriteScale());
+        GetSpriteScale(), mResMan);
 
     const PSX_RECT bRect = gAbe->VGetBoundingRect();
 
@@ -416,7 +416,7 @@ void SlapLock::SetInvisibilityTarget()
         FP_FromInteger((bRect.x + bRect.w) / 2),
         FP_FromInteger((bRect.y + bRect.h) / 2),
         RingTypes::eInvisible_Pulse_Give_10,
-        gAbe->GetSpriteScale());
+        gAbe->GetSpriteScale(), mResMan);
 
     pRing->mBaseGameObjectTlvInfo = mBaseGameObjectTlvInfo;
     mAbilityRingId = pRing->mBaseGameObjectId;
@@ -479,7 +479,7 @@ bool SlapLock::VTakeDamage(BaseGameObject* pFrom)
         mYPos - (FP_FromInteger(40) * GetSpriteScale()),
         15,
         GetSpriteScale(),
-        BurstType::eGreenSparks,
+        BurstType::eGreenSparks, mResMan,
         11, false);
 
     GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::SlapLock_Punched));

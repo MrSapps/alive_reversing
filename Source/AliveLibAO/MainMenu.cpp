@@ -2231,7 +2231,7 @@ void Menu::GameSpeak_Update()
             auto pParticle = relive_new Particle(
                 x,
                 y,
-                GetAnimRes(AnimId::OptionChantOrb_Particle));
+                GetAnimRes(AnimId::OptionChantOrb_Particle), mResMan);
             if (pParticle)
             {
                 pParticle->GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_1);

@@ -538,7 +538,7 @@ void Drill::EmitSparks()
                                              6u,
                                              50,
                                              205,
-                                             SparkType::eSmallChantParticle_0);
+                                             SparkType::eSmallChantParticle_0, mResMan);
 
                 relive_new Spark(mXPos + (GetSpriteScale() * FP_FromInteger(17)) + FP_FromInteger(speed),
                                              mYPos - (GetSpriteScale() * FP_FromInteger(12)),
@@ -546,7 +546,7 @@ void Drill::EmitSparks()
                                              6u,
                                              50,
                                              205,
-                                             SparkType::eSmallChantParticle_0);
+                                             SparkType::eSmallChantParticle_0, mResMan);
             }
             else if (mDrillDirection == relive::Path_Drill::DrillDirection::eLeft)
             {
@@ -556,7 +556,7 @@ void Drill::EmitSparks()
                                              6u,
                                              50,
                                              205,
-                                             SparkType::eSmallChantParticle_0);
+                                             SparkType::eSmallChantParticle_0, mResMan);
 
                 relive_new Spark(mXPos - (GetSpriteScale() * FP_FromInteger(17)) - FP_FromInteger(speed),
                                              mYPos - (GetSpriteScale() * FP_FromInteger(12)),
@@ -564,7 +564,7 @@ void Drill::EmitSparks()
                                              6u,
                                              50,
                                              205,
-                                             SparkType::eSmallChantParticle_0);
+                                             SparkType::eSmallChantParticle_0, mResMan);
             }
             else if (mDrillDirection == relive::Path_Drill::DrillDirection::eDown)
             {
@@ -574,7 +574,7 @@ void Drill::EmitSparks()
                                              6u,
                                              50,
                                              205,
-                                             SparkType::eSmallChantParticle_0);
+                                             SparkType::eSmallChantParticle_0, mResMan);
 
                 relive_new Spark(mXPos,
                                              mYPos + (GetSpriteScale() * FP_FromInteger(4)) - FP_FromInteger(speed),
@@ -582,7 +582,7 @@ void Drill::EmitSparks()
                                              6u,
                                              50,
                                              205,
-                                             SparkType::eSmallChantParticle_0);
+                                             SparkType::eSmallChantParticle_0, mResMan);
             }
         }
     }
@@ -644,7 +644,7 @@ s16 Drill::DamageTouchingObjects()
                                 FP_FromInteger(-5),
                                 FP_FromInteger(5),
                                 GetSpriteScale(),
-                                50);
+                                50, mResMan);
 
 
     relive_new Blood(pFound->mXPos,
@@ -652,14 +652,14 @@ s16 Drill::DamageTouchingObjects()
                                  FP_FromInteger(0),
                                  FP_FromInteger(5),
                                  GetSpriteScale(),
-                                 50);
+                                 50, mResMan);
 
     relive_new Blood(pFound->mXPos,
                                  FP_FromInteger(drillRect.h - 10),
                                  FP_FromInteger(5),
                                  FP_FromInteger(5),
                                  GetSpriteScale(),
-                                 50);
+                                 50, mResMan);
 
     SFX_Play_Pitch(relive::SoundEffects::DrillCollision, 127, -500);
     SfxPlayMono(relive::SoundEffects::KillEffect, 127);

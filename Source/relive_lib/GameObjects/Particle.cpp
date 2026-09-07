@@ -156,36 +156,36 @@ Particle* New_Orb_Particle(FP xpos, FP ypos, FP velX, FP velY, FP scale, Layer l
     return pParticle;
 }
 
-Particle* New_TintShiny_Particle(FP xpos, FP ypos, FP scale, Layer layer)
+Particle* New_TintShiny_Particle(FP xpos, FP ypos, FP scale, Layer layer, ResourceManagerWrapper& resMan)
 {
-    return New_Orb_Particle(xpos, ypos, FP_FromInteger(0), FP_FromInteger(0), scale, layer, RGB16{100, 100, 100});
+    return New_Orb_Particle(xpos, ypos, FP_FromInteger(0), FP_FromInteger(0), scale, layer, RGB16{100, 100, 100}, resMan);
 }
 
-Particle* New_TintChant_Particle(FP xpos, FP ypos, FP scale, Layer layer)
+Particle* New_TintChant_Particle(FP xpos, FP ypos, FP scale, Layer layer, ResourceManagerWrapper& resMan)
 {
-    return New_Orb_Particle(xpos, ypos, FP_FromInteger(0), FP_FromInteger(0), scale, layer, RGB16{128, 128, 128});
+    return New_Orb_Particle(xpos, ypos, FP_FromInteger(0), FP_FromInteger(0), scale, layer, RGB16{128, 128, 128}, resMan);
 }
 
-void New_RandomizedChant_Particle(BaseAnimatedWithPhysicsGameObject* pObj)
+void New_RandomizedChant_Particle(BaseAnimatedWithPhysicsGameObject* pObj, ResourceManagerWrapper& resMan)
 {
 	if (GetGameType() == GameType::eAe)
 	{
 	    const FP xpos = (pObj->GetSpriteScale() * FP_FromInteger(Math_RandomRange(-20, 20))) + pObj->mXPos;
 	    const FP ypos = pObj->mYPos - (pObj->GetSpriteScale() * FP_FromInteger(Math_RandomRange(30, 60)));
-	    New_TintChant_Particle(xpos, ypos, pObj->GetSpriteScale(), Layer::eLayer_0);
+	    New_TintChant_Particle(xpos, ypos, pObj->GetSpriteScale(), Layer::eLayer_0, resMan);
 	}
 	else
 	{
 	 	const auto xpos = pObj->mXPos + pObj->GetSpriteScale() * FP_FromInteger(40 * Math_NextRandom() / 256 - 20);
 	    const auto ypos = pObj->mYPos - (pObj->GetSpriteScale() * FP_FromInteger(30 * Math_NextRandom() / 256 + 30));
-	    New_TintChant_Particle(xpos, ypos, pObj->GetSpriteScale(), Layer::eLayer_0);	
+	    New_TintChant_Particle(xpos, ypos, pObj->GetSpriteScale(), Layer::eLayer_0, resMan);	
 	}
 }
 
 void New_ShootingZFire_Particle(FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan)
 {
     AnimResource ppRes = GetResourceManager().LoadAnimation(AnimId::ShootingZFire_Particle);
-    auto pParticle = relive_new Particle(xpos, ypos, ppRes);
+    auto pParticle = relive_new Particle(xpos, ypos, ppRes, resMan);
     if (pParticle)
     {
         pParticle->SetApplyShadowZoneColour(false);
@@ -210,7 +210,7 @@ void New_ShootingZFire_Particle(FP xpos, FP ypos, FP scale, ResourceManagerWrapp
 void New_ShootingFire_Particle(FP xpos, FP ypos, s8 direction, FP scale, ResourceManagerWrapper& resMan)
 {
     AnimResource ppRes = GetResourceManager().LoadAnimation(AnimId::ShootingFire_Particle);
-    auto pParticle = relive_new Particle(xpos, ypos, ppRes);
+    auto pParticle = relive_new Particle(xpos, ypos, ppRes, resMan);
     if (pParticle)
     {
         pParticle->SetApplyShadowZoneColour(false);

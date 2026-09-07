@@ -171,7 +171,7 @@ void ExplosionSet::VUpdate()
         {
             const FP explodeX = FP_FromInteger(Math_RandomRange(mTlvRect.y + 20, mTlvRect.y + 230));
             const FP explodeY = FP_FromInteger(Math_RandomRange(mTlvRect.x, xpos));
-            relive_new AirExplosion(explodeY, explodeX, mSpriteScale, 0);
+            relive_new AirExplosion(explodeY, explodeX, mSpriteScale, 0, mResMan);
         }
     }
 }

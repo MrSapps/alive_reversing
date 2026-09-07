@@ -250,7 +250,7 @@ void Map::RemoveObjectsWithPurpleLight(s16 bMakeInvisible)
                             Particle* pPurpleLight = New_DestroyOrCreateObject_Particle(
                                 FP_FromInteger((objRect.x + objRect.w) / 2),
                                 FP_FromInteger((objRect.y + objRect.h) / 2) + k60Scaled,
-                                pBaseObj->GetSpriteScale());
+                                pBaseObj->GetSpriteScale(), GetResourceManager());
 
                             if (pPurpleLight)
                             {
@@ -651,7 +651,7 @@ void Map::GoTo_Camera()
             SND_Load_Seqs(gSeqData.mSeqs, mLoadedPaths[0]->GetSoundInfo());
 
             // TODO: Remove hard coded data
-            relive_new BackgroundMusic(Path_Get_BackGroundMusicId(mNextLevel));
+            relive_new BackgroundMusic(Path_Get_BackGroundMusicId(mNextLevel), mResourceManager);
         }
 
         if (!mForceLoad)
@@ -758,7 +758,7 @@ void Map::GoTo_Camera()
     // Create the screen manager if it hasn't already been done (probably should have always been done by this point though?)
     if (!gScreenManager)
     {
-        gScreenManager = relive_new ScreenManager(field_2C_camera_array[0]->mCamRes, &mCameraOffset);
+        gScreenManager = relive_new ScreenManager(field_2C_camera_array[0]->mCamRes, &mCameraOffset, GetResourceManager());
     }
 
     gPathInfo->Loader_4DB800(mCamIdxOnX, mCamIdxOnY, relive::Factory::LoadMode::ConstructObject_0, ReliveTypes::eNone, mResourceManager); // none = load all

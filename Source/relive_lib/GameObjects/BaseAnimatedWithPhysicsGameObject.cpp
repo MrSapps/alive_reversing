@@ -181,7 +181,8 @@ void BaseAnimatedWithPhysicsGameObject::DeathSmokeEffect(bool bPlaySound)
             mYPos - FP_FromInteger(6),
             GetSpriteScale() / FP_FromInteger(2),
             2,
-            RGB16{128, 128, 128});
+            RGB16{128, 128, 128},
+            mResMan);
 
         if (bPlaySound)
         {

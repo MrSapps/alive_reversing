@@ -293,7 +293,7 @@ bool Scrab::VTakeDamage(BaseGameObject* pFrom)
                     mVelX,
                     mVelY,
                     GetSpriteScale(),
-                    false);
+                    false, mResMan);
 
                 SetDead(true);
                 return true;

@@ -19,7 +19,7 @@ struct ThrowableArraySaveState final : public SaveStateBase
 class ThrowableArray final : public BaseGameObject
 {
 public:
-    ThrowableArray();
+    ThrowableArray(ResourceManagerWrapper& resMan);
     ~ThrowableArray();
 
     virtual void VUpdate() override;

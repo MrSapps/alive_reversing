@@ -798,7 +798,7 @@ void Abe::VUpdate()
                                 FP_FromInteger((bRect.w + bRect.x) / 2),
                                 FP_FromInteger((bRect.h + bRect.y) / 2),
                                 mHaveShrykull != 0 ? RingTypes::eShrykull_Pulse_Small_4 : RingTypes::eExplosive_Pulse_0,
-                                FP_FromInteger(1));
+                                FP_FromInteger(1), mResMan);
                             SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 25, 2650);
                         }
                     }
@@ -1404,7 +1404,7 @@ eAbeMotions Abe::DoGameSpeak(u16 input)
                     mYPos - (FP_FromInteger(24) * GetSpriteScale()),
                     FP_FromDouble(0.5) * GetSpriteScale(),
                     3,
-                    RGB16{ 32, 128, 32 });
+                    RGB16{ 32, 128, 32 }, mResMan);
             }
             field_130_say = 8;
             field_134_auto_say_timer = MakeTimer(15);
@@ -1637,7 +1637,7 @@ void Abe::PickUpThrowabe_Or_PressBomb(FP fpX, s32 fpY, s16 bStandToCrouch)
                         GetAnimation().GetRenderLayer(),
                         GetAnimation().GetSpriteScale(),
                         field_19C_throwable_count,
-                        1);
+                        1, mResMan);
                 }
                 tryToSlapOrCollect = true;
                 break;
@@ -1741,7 +1741,7 @@ void Abe::CrouchingGameSpeak()
                     mYPos - FP_FromDouble(6) * GetSpriteScale(),
                     GetSpriteScale() * FP_FromDouble(0.5),
                     3,
-                    RGB16{ 32, 128, 32 });
+                    RGB16{ 32, 128, 32 }, mResMan);
             }
             field_130_say = 8;
             mCurrentMotion = eAbeMotions::Motion_22_CrouchSpeak;
@@ -2009,7 +2009,7 @@ void Abe::BulletDamage(Bullet* pBullet)
                 bloodXOff,
                 FP_FromInteger(0),
                 GetSpriteScale(),
-                50);
+                50, mResMan);
 
             switch (shootKind)
             {
@@ -2121,7 +2121,7 @@ void Abe::BulletDamage(Bullet* pBullet)
                     FP_FromInteger(0),
                     FP_FromInteger(0),
                     FP_FromInteger(1),
-                    50);
+                    50, mResMan);
 
             break;
         }
@@ -2359,7 +2359,7 @@ void Abe::VOnTlvCollision(TlvIterator tlvIterator)
                 const FP indicator_ypos = mYPos + (GetSpriteScale() * FP_FromInteger(-50));
 
                 relive_new ThrowableTotalIndicator(indicator_xpos, indicator_ypos, GetAnimation().GetRenderLayer(),
-                                                                            GetAnimation().GetSpriteScale(), 11, 1);
+                                                                            GetAnimation().GetSpriteScale(), 11, 1, mResMan);
             }
         }
         else if (tlvIterator.GetTlv()->mTlvType == ReliveTypes::eDeathDrop)
@@ -2632,7 +2632,7 @@ bool Abe::VTakeDamage(BaseGameObject* pFrom)
                     FP_FromInteger(0),
                     FP_FromInteger(0),
                     GetSpriteScale(),
-                    false);
+                    false, mResMan);
 
                 GetAnimation().SetRender(false);
                 GetShadow()->mEnabled = false;
@@ -2646,7 +2646,7 @@ bool Abe::VTakeDamage(BaseGameObject* pFrom)
             // The zap makes Abe drop his stuff everywhere
             for (s32 i = 0; i < field_19C_throwable_count; i++)
             {
-                auto pThrowable = Make_Throwable(mXPos, mYPos - FP_FromInteger(30), 0);
+                auto pThrowable = Make_Throwable(mXPos, mYPos - FP_FromInteger(30), 0, mResMan);
                 mThrowable = pThrowable->mBaseGameObjectId;
 
                 const FP rand1 = FP_FromRaw((Math_NextRandom() - 127) << 11); // TODO: Wat?
@@ -2697,7 +2697,7 @@ bool Abe::VTakeDamage(BaseGameObject* pFrom)
                     FP_FromInteger(0),
                     FP_FromInteger(0),
                     GetSpriteScale(),
-                    false);
+                    false, mResMan);
 
                 relive_new Gibs(
                     GibType::eAbe,
@@ -2706,7 +2706,7 @@ bool Abe::VTakeDamage(BaseGameObject* pFrom)
                     FP_FromInteger(0),
                     FP_FromInteger(0),
                     GetSpriteScale(),
-                    false);
+                    false, mResMan);
 
                 GetAnimation().SetRender(false);
             }
@@ -2728,7 +2728,7 @@ bool Abe::VTakeDamage(BaseGameObject* pFrom)
                         FP_FromInteger(-24),
                         FP_FromInteger(0),
                         GetSpriteScale(),
-                        50);
+                        50, mResMan);
                 }
                 else
                 {
@@ -2738,7 +2738,7 @@ bool Abe::VTakeDamage(BaseGameObject* pFrom)
                         FP_FromInteger(24),
                         FP_FromInteger(0),
                         GetSpriteScale(),
-                        50);
+                        50, mResMan);
                 }
 
                 if (mCurrentMotion == eAbeMotions::Motion_64_LedgeAscend
@@ -3263,7 +3263,7 @@ void Abe::Motion_0_Idle()
                 auto pThrowable = Make_Throwable(
                     mXPos,
                     mYPos - FP_FromInteger(40),
-                    0);
+                    0, mResMan);
 
                 mThrowable = pThrowable->mBaseGameObjectId;
                     
@@ -3276,7 +3276,7 @@ void Abe::Motion_0_Idle()
                                                                                     GetAnimation().GetRenderLayer(),
                                                                                     GetAnimation().GetSpriteScale(),
                                                                                     field_19C_throwable_count,
-                                                                                    true);
+                                                                                    true, mResMan);
                 }
                 mCurrentMotion = eAbeMotions::Motion_142_RockThrowStandingHold;
 
@@ -4156,7 +4156,7 @@ void Abe::Motion_19_CrouchIdle()
                 auto pThrowable = Make_Throwable(
                     mXPos,
                     mYPos - FP_FromInteger(40),
-                    0);
+                    0, mResMan);
                 mThrowable = pThrowable->mBaseGameObjectId;
 
                 if (!gThrowableIndicatorExists)
@@ -4168,7 +4168,7 @@ void Abe::Motion_19_CrouchIdle()
                                                                              GetAnimation().GetRenderLayer(),
                                                                              GetAnimation().GetSpriteScale(),
                                                                              field_19C_throwable_count,
-                                                                             1);
+                                                                             1, mResMan);
                 }
 
                 mCurrentMotion = eAbeMotions::Motion_145_RockThrowCrouchingHold;
@@ -5874,7 +5874,7 @@ void Abe::Motion_59_DeathDropFall()
         {
             Environment_SFX(EnvironmentSfx::eFallingDeathScreamHitGround_15, 0, 0x7FFF, this);
 
-            relive_new ScreenShake(true, false);
+            relive_new ScreenShake(true, false, mResMan);
         }
         else if (static_cast<s32>(sGnFrame) >= field_118_timer)
         {
@@ -5920,7 +5920,7 @@ void Abe::Motion_60_Dead()
                 ypos,
                 (Math_NextRandom() % 8) + field_118_timer + aux,
                 true,
-                GetSpriteScale());
+                GetSpriteScale(), mResMan);
 
             return;
         }
@@ -5945,7 +5945,7 @@ void Abe::Motion_60_Dead()
                     ypos,
                     (Math_NextRandom() % 8) + field_118_timer + aux,
                     false,
-                    GetSpriteScale());
+                    GetSpriteScale(), mResMan);
             }
             SetSpriteScale(GetSpriteScale() - FP_FromDouble(0.008));
 
@@ -5986,7 +5986,7 @@ void Abe::Motion_60_Dead()
                 mFadeId = Guid{};
             }
 
-            pFade = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeIn, 0, 8, relive::TBlendModes::eBlend_2);
+            pFade = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeIn, 0, 8, relive::TBlendModes::eBlend_2, mResMan);
             if (pFade)
             {
                 mFadeId = pFade->mBaseGameObjectId;
@@ -6116,7 +6116,7 @@ void Abe::Motion_61_Respawn()
                     LoadRockTypes(gSaveBuffer.mCurrentLevel, gSaveBuffer.mCurrentPath);
                     if (!gThrowableArray)
                     {
-                        gThrowableArray = relive_new ThrowableArray();
+                        gThrowableArray = relive_new ThrowableArray(mResMan);
                     }
                     gThrowableArray->Add(field_19C_throwable_count);
                 }
@@ -6191,7 +6191,7 @@ void Abe::Motion_61_Respawn()
                         AnimId::Dove_Flying,
                         xDiff + FP_FromInteger(Math_NextRandom() * 2),
                         yDiff - FP_FromInteger(Math_NextRandom() % 32),
-                        GetSpriteScale());
+                        GetSpriteScale(), mResMan);
                     if (pDove)
                     {
                         pDove->AsJoin(
@@ -6217,7 +6217,7 @@ void Abe::Motion_61_Respawn()
                 New_DestroyOrCreateObject_Particle(
                     mXPos,
                     GetSpriteScale() * FP_FromInteger(25) + mYPos,
-                    GetSpriteScale());
+                    GetSpriteScale(), mResMan);
                 field_114_gnFrame = 4;
                 field_118_timer = MakeTimer(2);
             }
@@ -6235,7 +6235,7 @@ void Abe::Motion_61_Respawn()
                 SetDrawable(true);
                 mCurrentMotion = eAbeMotions::Motion_3_Fall;
 
-                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 255u);
+                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 255u, mResMan);
                 mbGotShot = false;
                 mShrivel = false;
                 field_114_gnFrame = sGnFrame;
@@ -6292,7 +6292,7 @@ void Abe::Motion_62_LoadedSaveSpawn()
             {
                 LoadRockTypes(gSaveBuffer.mCurrentLevel, gSaveBuffer.mCurrentPath);
 
-                gThrowableArray = relive_new ThrowableArray();
+                gThrowableArray = relive_new ThrowableArray(mResMan);
             }
             gThrowableArray->Add(gAbe->field_19C_throwable_count);
         }
@@ -6301,7 +6301,7 @@ void Abe::Motion_62_LoadedSaveSpawn()
             LoadRockTypes(EReliveLevelIds::eRuptureFarmsReturn, 19);
             if (!gThrowableArray)
             {
-                gThrowableArray = relive_new ThrowableArray();
+                gThrowableArray = relive_new ThrowableArray(mResMan);
             }
             gThrowableArray->Add(1);
             gInfiniteThrowables = true;
@@ -7144,7 +7144,7 @@ void Abe::Motion_86_FallLandDie()
     {
         SfxPlayMono(relive::SoundEffects::KillEffect, 85);
         SND_SEQ_Play(SeqId::eHitBottomOfDeathPit_10, 1, 95, 95);
-        relive_new ScreenShake(true, false);
+        relive_new ScreenShake(true, false, mResMan);
     }
 
     if (GetAnimation().GetIsLastFrame())
@@ -7179,7 +7179,7 @@ void Abe::Motion_88_HandstoneBegin()
                     mYPos,
                     GetSpriteScale(),
                     1,
-                    0);
+                    0, mResMan);
 
                 mCircularFadeId = pCircularFade->mBaseGameObjectId;
                 pCircularFade->GetAnimation().SetFlipX(GetAnimation().GetFlipX());
@@ -7302,7 +7302,7 @@ void Abe::Motion_88_HandstoneBegin()
                         field_16E_cameraIdx = 1;
                         pCircularFade->SetDead(true);
                         mCircularFadeId = Guid{};
-                        auto pFade = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeOut, 0, 8, relive::TBlendModes::eBlend_2);
+                        auto pFade = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeOut, 0, 8, relive::TBlendModes::eBlend_2, mResMan);
                         if (pFade)
                         {
                             mFadeId = pFade->mBaseGameObjectId;
@@ -7347,7 +7347,7 @@ void Abe::Motion_88_HandstoneBegin()
                     mYPos,
                     GetSpriteScale(),
                     0,
-                    0);
+                    0, mResMan);
                 mCircularFadeId = pCircularFade->mBaseGameObjectId;
                 pCircularFade->GetAnimation().SetFlipX(GetAnimation().GetFlipX());
             }
@@ -7431,7 +7431,7 @@ void Abe::Motion_88_HandstoneBegin()
                     pFade->SetDead(true);
                     field_110_state.stone = StoneStates::eWaitForInput_6;
                     field_16E_cameraIdx++;
-                    pFade = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeOut, 0, 8, relive::TBlendModes::eBlend_2);
+                    pFade = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeOut, 0, 8, relive::TBlendModes::eBlend_2, mResMan);
                     mFadeId = pFade->mBaseGameObjectId;
                     gMap->SetActiveCam(MapWrapper::FromAO(camera.level), camera.path, camera.camera, CameraSwapEffects::eInstantChange_0, 0, 0);
                 }
@@ -7454,7 +7454,7 @@ void Abe::Motion_88_HandstoneBegin()
             auto pFade = sObjectIds.Find<Fade>(mFadeId, ReliveTypes::eFade);
             pFade->SetDead(true);
 
-            auto pCircularFade = relive_new CircularFade(mXPos, mYPos, GetSpriteScale(), 0, 0);
+            auto pCircularFade = relive_new CircularFade(mXPos, mYPos, GetSpriteScale(), 0, 0, mResMan);
             mCircularFadeId = pCircularFade->mBaseGameObjectId;
             field_110_state.stone = StoneStates::eHandstoneEnd_5;
             pCircularFade->GetAnimation().SetFlipX(GetAnimation().GetFlipX());
@@ -8451,7 +8451,7 @@ void Abe::Motion_150_Chant()
                         FP_FromInteger((rect.w + rect.x) / 2),
                         FP_FromInteger((rect.h + rect.y) / 2),
                         RingTypes::eExplosive_Emit_1,
-                        FP_FromInteger(1));
+                        FP_FromInteger(1), mResMan);
                     mRingPulseTimer = 0;
                 }
             }
@@ -8470,7 +8470,7 @@ void Abe::Motion_150_Chant()
             }
             if (!(sGnFrame % 4))
             {
-                New_RandomizedChant_Particle(this);
+                New_RandomizedChant_Particle(this, mResMan);
             }
             if (static_cast<s32>(sGnFrame) >= field_114_gnFrame - 70)
             {
@@ -8491,7 +8491,7 @@ void Abe::Motion_150_Chant()
                             xPos,
                             mYPos - GetSpriteScale() * FP_FromInteger(38),
                             GetSpriteScale(),
-                            false);
+                            false, mResMan);
 
                         mOrbWhirlWindId = pOrbWhirlWind->mBaseGameObjectId;
                     }
@@ -8623,7 +8623,7 @@ void Abe::Motion_150_Chant()
         {
             if (!(sGnFrame % 4))
             {
-                New_RandomizedChant_Particle(this);
+                New_RandomizedChant_Particle(this, mResMan);
             }
             if (static_cast<s32>(sGnFrame) > field_114_gnFrame)
             {
@@ -8640,7 +8640,7 @@ void Abe::Motion_150_Chant()
             EventBroadcast(Event::kEventAbeOhm, this);
             if (!(sGnFrame % 4))
             {
-                New_RandomizedChant_Particle(this);
+                New_RandomizedChant_Particle(this, mResMan);
             }
 
             break;

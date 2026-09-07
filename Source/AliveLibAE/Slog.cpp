@@ -950,7 +950,7 @@ void Slog::Motion_15_Sleeping()
             }
             relive_new SnoozeParticle(xOff + mXPos,
                                                           (GetSpriteScale() * FP_FromInteger(-13)) + mYPos,
-                                                          GetAnimation().GetRenderLayer(), GetAnimation().GetSpriteScale());
+                                                          GetAnimation().GetRenderLayer(), GetAnimation().GetSpriteScale(), mResMan);
         }
     }
 }
@@ -1131,7 +1131,7 @@ void Slog::Motion_20_Eating()
         relive_new Blood(((GetAnimation().GetFlipX()) != 0 ? FP_FromInteger(-25) : FP_FromInteger(25)) * GetSpriteScale() + mXPos,
                       mYPos - (FP_FromInteger(4) * GetSpriteScale()),
                       FP_FromInteger(0), FP_FromInteger(0),
-                      GetSpriteScale(), 12);
+                      GetSpriteScale(), 12, mResMan);
     }
 
     if (GetAnimation().GetIsLastFrame())
@@ -3235,7 +3235,7 @@ bool Slog::VTakeDamage(BaseGameObject* pFrom)
                                                     pBullet->ypos(),
                                                     FP_FromInteger(-24),
                                                     FP_FromInteger(0),
-                                                    GetSpriteScale(), 50);
+                                                    GetSpriteScale(), 50, mResMan);
                     }
                     else
                     {
@@ -3243,7 +3243,7 @@ bool Slog::VTakeDamage(BaseGameObject* pFrom)
                                                     pBullet->ypos(),
                                                     FP_FromInteger(24),
                                                     FP_FromInteger(0),
-                                                    GetSpriteScale(), 50);
+                                                    GetSpriteScale(), 50, mResMan);
                     }
                     break;
 
@@ -3254,7 +3254,7 @@ bool Slog::VTakeDamage(BaseGameObject* pFrom)
                                                 mYPos - (FP_FromInteger(20) * GetSpriteScale()),
                                                 FP_FromInteger(0),
                                                 FP_FromInteger(0),
-                                                GetSpriteScale(), 50);
+                                                GetSpriteScale(), 50, mResMan);
                     break;
                 }
 
@@ -3280,14 +3280,14 @@ bool Slog::VTakeDamage(BaseGameObject* pFrom)
         {
             Sfx(SlogSound::DeathWhine_9);
             mHealth = FP_FromInteger(0);
-            relive_new Gibs(GibType::eSlog, mXPos, mYPos, mVelX, mVelY, GetSpriteScale(), 0);
+            relive_new Gibs(GibType::eSlog, mXPos, mYPos, mVelX, mVelY, GetSpriteScale(), 0, mResMan);
 
             const PSX_RECT bRect = VGetBoundingRect();
             relive_new Blood(FP_FromInteger((bRect.x + bRect.w) / 2),
                                         FP_FromInteger((bRect.y + bRect.h) / 2),
                                         FP_FromInteger(0),
                                         FP_FromInteger(0),
-                                        GetSpriteScale(), 50);
+                                        GetSpriteScale(), 50, mResMan);
 
             SetDead(true);
             break;

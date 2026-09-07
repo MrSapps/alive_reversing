@@ -8,8 +8,8 @@
 #include "../GameType.hpp"
 #include "BaseMap.hpp"
 
-Electrocute::Electrocute(BaseAliveGameObject* pTargetObj, bool bExtraOverwriter, bool bKillTarget)
-    : BaseGameObject(true, 0),
+Electrocute::Electrocute(BaseAliveGameObject* pTargetObj, bool bExtraOverwriter, bool bKillTarget, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan),
     mTargetObjId(pTargetObj->mBaseGameObjectId),
     mExtraOverwriter(bExtraOverwriter),
     mKillTarget(bKillTarget),
@@ -90,11 +90,13 @@ void Electrocute::VUpdate()
         case States::eAlphaFadeout:
             mPalOverwriters[0] = relive_new PalleteOverwriter(
                 *mPal.mPal,
-                Pal_Make_Colour(255u, 255, 255, true));
+                Pal_Make_Colour(255u, 255, 255, true),
+                mResMan);
 
             mPalOverwriters[1] = relive_new PalleteOverwriter(
                 *mPal.mPal,
-                Pal_Make_Colour(64u, 64, 255, true));
+                Pal_Make_Colour(64u, 64, 255, true),
+                mResMan);
             if (mPalOverwriters[1])
             {
                 mPalOverwriters[1]->SetUpdateDelay(4);
@@ -103,7 +105,8 @@ void Electrocute::VUpdate()
             if (mExtraOverwriter)
             {
                 mPalOverwriters[2] = relive_new PalleteOverwriter(*mPal.mPal,
-                    Pal_Make_Colour(0, 0, 0, false));
+                    Pal_Make_Colour(0, 0, 0, false),
+                    mResMan);
                 if (mPalOverwriters[2])
                 {
                     mPalOverwriters[2]->SetUpdateDelay(8);

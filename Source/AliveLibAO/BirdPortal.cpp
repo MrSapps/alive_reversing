@@ -274,7 +274,7 @@ void BirdPortal::VUpdate()
                     auto pParticle = relive_new Particle(
                         pTerminator2->mXPos,
                         (FP_FromInteger(10) * mSpriteScale) + pTerminator2->mYPos,
-                        GetAnimRes(AnimId::BirdPortal_Sparks));
+                        GetAnimRes(AnimId::BirdPortal_Sparks), mResMan);
 
                     if (pParticle)
                     {
@@ -302,12 +302,12 @@ void BirdPortal::VUpdate()
                         pTerminator1->mXPos,
                         pTerminator1->mYPos + FP_FromInteger(7),
                         RingTypes::eShrykull_Pulse_Orange_6,
-                        mSpriteScale);
+                        mSpriteScale, mResMan);
                     AbilityRing::Factory(
                         pTerminator2->mXPos,
                         pTerminator2->mYPos + FP_FromInteger(7),
                         RingTypes::eShrykull_Pulse_Orange_6,
-                        mSpriteScale);
+                        mSpriteScale, mResMan);
                 }
             }
             else
@@ -349,7 +349,7 @@ void BirdPortal::VUpdate()
                         AnimId::Dove_Flying,
                         mXPos + xOff,
                         mYPos + FP_FromInteger(Math_RandomRange(-scale32, scale32)),
-                        mSpriteScale);
+                        mSpriteScale, mResMan);
 
                     SfxPlayMono(relive::SoundEffects::Dove, 70, mSpriteScale);
                     pDove->SetSpriteScale(mSpriteScale);
@@ -392,7 +392,7 @@ void BirdPortal::VUpdate()
                 auto pParticle = relive_new Particle(
                     pTerminator2->mXPos,
                     pTerminator2->mYPos,
-                    GetAnimRes(AnimId::BirdPortal_Flash));
+                    GetAnimRes(AnimId::BirdPortal_Flash), mResMan);
 
                 pParticle->GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_1);
                 pParticle->SetApplyShadowZoneColour(false);
@@ -422,21 +422,21 @@ void BirdPortal::VUpdate()
 
         case PortalStates::CreateFlash1_12:
         {
-            relive_new Flash(Layer::eLayer_FadeFlash_40, 255, 255, 255, relive::TBlendModes::eBlend_3, 1);
+            relive_new Flash(Layer::eLayer_FadeFlash_40, 255, 255, 255, mResMan, relive::TBlendModes::eBlend_3, 1);
             mState = PortalStates::CreateFlash2_13;
         }
         break;
 
         case PortalStates::CreateFlash2_13:
         {
-            relive_new Flash(Layer::eLayer_FadeFlash_40, 255, 255, 255, relive::TBlendModes::eBlend_0, 1);
+            relive_new Flash(Layer::eLayer_FadeFlash_40, 255, 255, 255, mResMan, relive::TBlendModes::eBlend_0, 1);
             mState = PortalStates::CreateFlash3_14;
         }
         break;
 
         case PortalStates::CreateFlash3_14:
         {
-            relive_new Flash(Layer::eLayer_FadeFlash_40, 255, 255, 255, relive::TBlendModes::eBlend_0, 1);
+            relive_new Flash(Layer::eLayer_FadeFlash_40, 255, 255, 255, mResMan, relive::TBlendModes::eBlend_0, 1);
             mState = PortalStates::KillPortal_15;
             mTimer = MakeTimer(5);
         }
@@ -600,7 +600,7 @@ void BirdPortal::VGiveShrykull(s16 bPlaySound)
             gAbe->mXPos,
             gAbe->mYPos - (gAbe->GetSpriteScale() * FP_FromInteger(38)),
             gAbe->GetSpriteScale(),
-            false);
+            false, mResMan);
 
         if (gAbe->mCurrentMotion == eAbeMotions::Motion_150_Chant)
         {

@@ -198,7 +198,7 @@ bool Slog::VTakeDamage(BaseGameObject* pFrom)
                     -FP_FromInteger(24),
                     FP_FromInteger(0),
                     GetSpriteScale(),
-                    50);
+                    50, mResMan);
             }
             else
             {
@@ -208,7 +208,7 @@ bool Slog::VTakeDamage(BaseGameObject* pFrom)
                     FP_FromInteger(24),
                     FP_FromInteger(0),
                     GetSpriteScale(),
-                    50);
+                    50, mResMan);
             }
 
             Sfx(9);
@@ -237,7 +237,7 @@ bool Slog::VTakeDamage(BaseGameObject* pFrom)
                 mVelX,
                 mVelY,
                 GetSpriteScale(),
-                false);
+                false, mResMan);
 
             const PSX_RECT bRect = VGetBoundingRect();
             relive_new Blood(
@@ -246,7 +246,7 @@ bool Slog::VTakeDamage(BaseGameObject* pFrom)
                 FP_FromInteger(0),
                 FP_FromInteger(0),
                 GetSpriteScale(),
-                50);
+                50, mResMan);
             SetDead(true);
             return true;
         }
@@ -1369,7 +1369,7 @@ void Slog::Motion_16_Sleeping()
                 + ((GetAnimation().GetFlipX()) != 0 ? FP_FromInteger(-18) : FP_FromInteger(18)),
             mYPos - FP_FromInteger(13),
             GetAnimation().GetRenderLayer(),
-            GetAnimation().GetSpriteScale());
+            GetAnimation().GetSpriteScale(), mResMan);
     }
 }
 
@@ -1556,7 +1556,7 @@ void Slog::Motion_21_Eating()
                 FP_FromInteger(0),
                 FP_FromInteger(0),
                 GetSpriteScale(),
-                12);
+                12, mResMan);
         }
 
         if (GetAnimation().GetIsLastFrame())

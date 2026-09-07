@@ -173,7 +173,7 @@ bool SecurityClaw::VTakeDamage(BaseGameObject* pFrom)
                 mXPos,
                 mYPos - GetSpriteScale() * FP_FromInteger(5),
                 GetSpriteScale(),
-                false);
+                false, mResMan);
 
             relive_new Gibs(
                 GibType::eMetal,
@@ -182,7 +182,7 @@ bool SecurityClaw::VTakeDamage(BaseGameObject* pFrom)
                 FP_FromInteger(0),
                 FP_FromInteger(0),
                 GetSpriteScale(),
-                false);
+                false, mResMan);
         }
         else
         {
@@ -195,7 +195,7 @@ bool SecurityClaw::VTakeDamage(BaseGameObject* pFrom)
                 FP_FromInteger(0),
                 FP_FromInteger(0),
                 GetSpriteScale(),
-                false);
+                false, mResMan);
 
             relive_new Gibs(
                 GibType::eMetal,
@@ -204,7 +204,7 @@ bool SecurityClaw::VTakeDamage(BaseGameObject* pFrom)
                 FP_FromInteger(0),
                 FP_FromInteger(0),
                 GetSpriteScale(),
-                false);
+                false, mResMan);
 
             SetDead(true);
         }
@@ -331,7 +331,7 @@ void SecurityClaw::VUpdate()
                 const FP hero_mid_x = FP_FromInteger((rect.w + rect.x) / 2);
                 const FP hero_mid_y = FP_FromInteger((rect.h + rect.y) / 2);
 
-                relive_new ScreenShake(true, false);
+                relive_new ScreenShake(true, false, mResMan);
 
                 relive_new ZapLine(
                     mXPos - (FP_FromInteger(3) * GetSpriteScale()),
@@ -339,7 +339,7 @@ void SecurityClaw::VUpdate()
                     hero_mid_x,
                     hero_mid_y,
                     8, ZapLineType::eThick_0,
-                    Layer::eLayer_ZapLinesElumMuds_28);
+                    Layer::eLayer_ZapLinesElumMuds_28, mResMan);
 
                 relive_new PossessionFlicker(gAbe, 8, 255, 100, 100, mResMan);
 
@@ -348,7 +348,7 @@ void SecurityClaw::VUpdate()
                 auto pSpark = relive_new ZapSpark(
                     mXPos,
                     mYPos - (FP_FromInteger(8) * GetSpriteScale()),
-                    GetSpriteScale());
+                    GetSpriteScale(), mResMan);
                 if (pSpark)
                 {
                     pSpark->mRGB.SetRGB(255, 65, 65);
@@ -357,7 +357,7 @@ void SecurityClaw::VUpdate()
                 auto pSpark2 = relive_new ZapSpark(
                     mXPos,
                     mYPos - (FP_FromInteger(8) * GetSpriteScale()),
-                    GetSpriteScale());
+                    GetSpriteScale(), mResMan);
                 if (pSpark2)
                 {
                     pSpark2->mRGB.SetRGB(255, 65, 65);
@@ -368,7 +368,7 @@ void SecurityClaw::VUpdate()
                     auto pSpark3 = relive_new ZapSpark(
                         hero_mid_x,
                         hero_mid_y,
-                        GetSpriteScale());
+                        GetSpriteScale(), mResMan);
                     if (pSpark3)
                     {
                         pSpark3->mRGB.SetRGB(255, 65, 65);
@@ -383,12 +383,12 @@ void SecurityClaw::VUpdate()
         case SecurityClawStates::eAnimateClaw_DoFlashAndSound_3:
             if (static_cast<s32>(sGnFrame) == mTimer - 5 || static_cast<s32>(sGnFrame) == mTimer - 1)
             {
-                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 0);
+                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 0, mResMan);
             }
 
             if (static_cast<s32>(sGnFrame) == mTimer - 4)
             {
-                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 0, relive::TBlendModes::eBlend_1, 1);
+                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 0, mResMan, relive::TBlendModes::eBlend_1, 1);
             }
 
             if (mTimer - sGnFrame == 4)

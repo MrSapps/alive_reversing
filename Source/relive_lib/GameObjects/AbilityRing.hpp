@@ -56,7 +56,7 @@ enum class LevelIds : s16;
 class AbilityRing final : public BaseGameObject
 {
 public:
-    AbilityRing(FP xpos, FP ypos, RingTypes ringType, FP scale);
+    AbilityRing(FP xpos, FP ypos, RingTypes ringType, FP scale, ResourceManagerWrapper& resMan);
     ~AbilityRing();
 
     virtual void VUpdate() override;
@@ -64,7 +64,7 @@ public:
     virtual void VScreenChanged() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
 
-    static AbilityRing* Factory(FP xpos, FP ypos, RingTypes ringType, FP scale);
+    static AbilityRing* Factory(FP xpos, FP ypos, RingTypes ringType, FP scale, ResourceManagerWrapper& resMan);
     void SetTarget(BaseGameObject* pTarget);
     static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
 

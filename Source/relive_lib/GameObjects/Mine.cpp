@@ -153,7 +153,7 @@ bool Mine::VTakeDamage(BaseGameObject* pFrom)
         case ReliveTypes::eMudokon: // might cause issues in AO?
         case ReliveTypes::eShrykull:
         {
-            relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale());
+            relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan);
             SetDead(true);
             mDetonating = true;
             mExplosionTimer = sGnFrame;
@@ -167,7 +167,7 @@ bool Mine::VTakeDamage(BaseGameObject* pFrom)
 
 void Mine::VOnThrowableHit(BaseGameObject* /*pFrom*/)
 {
-    relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale());
+    relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan);
     if (GetGameType() == GameType::eAe)
     {
         SetDead(true);
@@ -219,7 +219,7 @@ void Mine::VUpdate()
     {
         if (mDetonating && sGnFrame >= mExplosionTimer)
         {
-            relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale());
+            relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan);
             SetDead(true);
         }
     }

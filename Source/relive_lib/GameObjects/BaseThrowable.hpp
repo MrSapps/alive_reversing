@@ -26,7 +26,7 @@ protected:
     s16 mBaseThrowableDead = 0;
 };
 
-BaseThrowable* Make_Throwable(FP xpos, FP ypos, s16 count);
+BaseThrowable* Make_Throwable(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan);
 
 extern bool gInfiniteThrowables; // AE
 extern const AOTypes gThrowableFromOverlayIdAO[54];

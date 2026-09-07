@@ -22,6 +22,6 @@ void Camera::CreateFG1()
     Fg1Resource fg1Res = GetResourceManager().LoadFg1(mLevel, mPath, mCameraNumber);
     if (fg1Res.Any())
     {
-        relive_new FG1(fg1Res, mCamRes);
+        relive_new FG1(fg1Res, mCamRes, GetResourceManager());
     }
 }

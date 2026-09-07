@@ -307,7 +307,7 @@ void FallingItem::VUpdate()
             mHitDrillOrMineCar = false;
             mState = State::eSmashed_4;
 
-            relive_new ScreenShake(false, GetSpriteScale() == FP_FromDouble(0.5));
+            relive_new ScreenShake(false, GetSpriteScale() == FP_FromDouble(0.5), mResMan);
 
             if (gMap->mCurrentLevel == EReliveLevelIds::eBonewerkz)
             {
@@ -315,12 +315,12 @@ void FallingItem::VUpdate()
                                                    mYPos,
                                                    20,
                                                    GetSpriteScale(),
-                                                   BurstType::eSticks,
+                                                   BurstType::eSticks, mResMan,
                                                    13, false);
 
                 auto pParticle = relive_new Particle(mXPos,
                                                   mYPos - (FP_FromInteger(15) * GetSpriteScale()),
-                                                  GetAnimRes(AnimId::AirExplosion));
+                                                  GetAnimRes(AnimId::AirExplosion), mResMan);
                 if (pParticle)
                 {
                     pParticle->GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_1);
@@ -333,7 +333,7 @@ void FallingItem::VUpdate()
                                                         mYPos,
                                                         25,
                                                         GetSpriteScale(),
-                                                        BurstType::eRocks,
+                                                        BurstType::eRocks, mResMan,
                                                         13, false);
             }
         }

@@ -52,7 +52,8 @@ BoomMachine::BoomMachine(relive::Path_BoomMachine* pTlv, const Guid& tlvId, Reso
         directedScale * FP_FromInteger(30) + mXPos,
         (GetSpriteScale() * FP_FromInteger(-30)) + mYPos,
         GetSpriteScale(),
-        pTlv->mGrenadeAmount);
+        pTlv->mGrenadeAmount,
+        mResMan);
     if (pPipe)
     {
         pPipe->GetAnimation().SetFlipX(pTlv->mPipeSide == relive::Path_BoomMachine::PipeSide::eLeft);

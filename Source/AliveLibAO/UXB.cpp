@@ -305,7 +305,7 @@ bool UXB::VTakeDamage(BaseGameObject* pFrom)
 
     SetDead(true);
 
-    relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale());
+    relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan);
 
     mCurrentState = UXBState::eExploding;
     mNextStateTimer = sGnFrame;
@@ -315,7 +315,7 @@ bool UXB::VTakeDamage(BaseGameObject* pFrom)
 
 void UXB::VOnThrowableHit(BaseGameObject* /*pFrom*/)
 {
-    relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale());
+    relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan);
     mCurrentState = UXBState::eExploding;
     SetDead(true);
     mNextStateTimer = sGnFrame;
@@ -397,7 +397,7 @@ void UXB::VUpdate()
         case UXBState::eExploding:
             if (sGnFrame >= mNextStateTimer)
             {
-                relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale());
+                relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan);
                 SetDead(true);
             }
             break;

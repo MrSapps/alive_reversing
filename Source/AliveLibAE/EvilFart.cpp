@@ -323,7 +323,7 @@ void EvilFart::VUpdate()
                     GetAnimation().GetRenderLayer(),
                     GetAnimation().GetSpriteScale(),
                     mPossessedAliveTimer / 50,
-                    1);
+                    1, mResMan);
 
                 mYPos = mYPos - (GetSpriteScale() * FP_FromInteger(50));
                 Mudokon_SFX(MudSounds::eFart_7, 0, 10 * (300 - mPossessedAliveTimer), this);
@@ -383,7 +383,7 @@ void EvilFart::VUpdate()
                         (mYPos - FP_FromInteger(55)) * GetSpriteScale(),
                         FP_FromDouble(0.5) * GetSpriteScale(),
                         3,
-                        RGB16{mRGB.r, mRGB.b, 32});
+                        RGB16{mRGB.r, mRGB.b, 32}, mResMan);
 
 
                     if (mSoundChannels)
@@ -513,7 +513,7 @@ void EvilFart::VUpdate()
                     xposOffset + mXPos,
                     yposOffset + mYPos - (GetSpriteScale() * FP_FromInteger(54)),
                     GetSpriteScale(),
-                    Layer::eLayer_0);
+                    Layer::eLayer_0, mResMan);
             }
 
             if (!mFartExploded && static_cast<s32>(sGnFrame) > mUnpossessionTimer)
@@ -535,7 +535,7 @@ void EvilFart::BlowUp()
     relive_new AirExplosion(mXPos,
         mYPos - (GetSpriteScale() * FP_FromInteger(50)),
         GetSpriteScale(),
-        0);
+        0, mResMan);
 }
 
 void EvilFart::CalculateFartColour()

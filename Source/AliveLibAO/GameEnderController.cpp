@@ -119,7 +119,7 @@ void GameEnderController::VUpdate()
 
                             if (!gThrowableArray)
                             {
-                                gThrowableArray = relive_new ThrowableArray();
+                                gThrowableArray = relive_new ThrowableArray(mResMan);
                                 if (gThrowableArray)
                                 {
                                     gThrowableArray->Add(1);

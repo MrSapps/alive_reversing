@@ -255,7 +255,7 @@ void Greeter::BlowUp()
         mXPos,
         mYPos - (GetSpriteScale() * FP_FromInteger(5)),
         GetSpriteScale(),
-        0);
+        0, mResMan);
 
     relive_new Gibs(
         GibType::eMetal,
@@ -264,7 +264,7 @@ void Greeter::BlowUp()
         FP_FromInteger(0),
         FP_FromInteger(0),
         GetSpriteScale(),
-        0);
+        0, mResMan);
 
     SetDead(true);
     field_12E_bDontSetDestroyed = 0;
@@ -421,7 +421,7 @@ void Greeter::VOnThrowableHit(BaseGameObject* /*pFrom*/)
 
 void Greeter::ZapTarget(FP xpos, FP ypos, BaseAliveGameObject* pTarget)
 {
-    relive_new ScreenShake(false, false);
+    relive_new ScreenShake(false, false, mResMan);
 
     relive_new ZapLine(
         mXPos,
@@ -430,7 +430,7 @@ void Greeter::ZapTarget(FP xpos, FP ypos, BaseAliveGameObject* pTarget)
         ypos,
         8,
         ZapLineType::eThick_0,
-        Layer::eLayer_ZapLinesElumMuds_28);
+        Layer::eLayer_ZapLinesElumMuds_28, mResMan);
 
     relive_new ZapLine(
         mXPos,
@@ -439,7 +439,7 @@ void Greeter::ZapTarget(FP xpos, FP ypos, BaseAliveGameObject* pTarget)
         ypos,
         8,
         ZapLineType::eThick_0,
-        Layer::eLayer_ZapLinesElumMuds_28);
+        Layer::eLayer_ZapLinesElumMuds_28, mResMan);
 
     relive_new ZapLine(
         mXPos,
@@ -448,14 +448,14 @@ void Greeter::ZapTarget(FP xpos, FP ypos, BaseAliveGameObject* pTarget)
         ypos,
         8,
         ZapLineType::eThick_0,
-        Layer::eLayer_ZapLinesElumMuds_28);
+        Layer::eLayer_ZapLinesElumMuds_28, mResMan);
 
     relive_new ParticleBurst(
         xpos,
         ypos,
         10,
         GetSpriteScale(),
-        BurstType::eBigRedSparks,
+        BurstType::eBigRedSparks, mResMan,
         11, false);
 
     relive_new ParticleBurst(
@@ -463,12 +463,12 @@ void Greeter::ZapTarget(FP xpos, FP ypos, BaseAliveGameObject* pTarget)
         mYPos - (FP_FromInteger(10) * GetSpriteScale()),
         10,
         GetSpriteScale(),
-        BurstType::eBigRedSparks,
+        BurstType::eBigRedSparks, mResMan,
         11, false);
 
     pTarget->SetElectrocuted(true);
 
-    relive_new Electrocute(pTarget, true, true);
+    relive_new Electrocute(pTarget, true, true, mResMan);
 
     pTarget->VTakeDamage(this);
 

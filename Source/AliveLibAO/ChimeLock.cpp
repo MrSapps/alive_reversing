@@ -601,7 +601,7 @@ void ChimeLock::VUpdate()
             New_TintChant_Particle(
                 x, y,
                 GetSpriteScale(),
-                Layer::eLayer_0);
+                Layer::eLayer_0, mResMan);
             return;
         }
 

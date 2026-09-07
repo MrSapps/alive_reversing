@@ -136,7 +136,7 @@ void Animation_OnFrame_Slig(BaseGameObject* pObj, u32&, const IndexedPoint& poin
         pBullet->SetUpdateDelay(1);
     }
 
-    New_ShootingFire_Particle(fireXpos, yOff + pSlig->mYPos, fireDirection, pSlig->GetSpriteScale());
+    New_ShootingFire_Particle(fireXpos, yOff + pSlig->mYPos, fireDirection, pSlig->GetSpriteScale(), resMan);
 
     if (pSlig->GetSpriteScale() == FP_FromDouble(0.5))
     {
@@ -144,7 +144,7 @@ void Animation_OnFrame_Slig(BaseGameObject* pObj, u32&, const IndexedPoint& poin
     }
     else
     {
-        relive_new BulletShell(pSlig->mXPos, yOff + pSlig->mYPos, shellDirection, pSlig->GetSpriteScale());
+        relive_new BulletShell(pSlig->mXPos, yOff + pSlig->mYPos, shellDirection, pSlig->GetSpriteScale(), resMan);
         SfxPlayMono(relive::SoundEffects::SligShoot, 0);
     }
 
@@ -1651,7 +1651,7 @@ void Slig::Motion_32_Sleeping()
                     xOff + mXPos,
                     mYPos + (GetSpriteScale() * FP_FromInteger(-10)),
                     GetAnimation().GetRenderLayer(),
-                    GetAnimation().GetSpriteScale());
+                    GetAnimation().GetSpriteScale(), mResMan);
             }
         }
     }
@@ -1680,7 +1680,7 @@ void Slig::Motion_32_Sleeping()
                 xOff + mXPos,
                 mYPos + (GetSpriteScale() * FP_FromInteger(-10)),
                 GetAnimation().GetRenderLayer(),
-                GetAnimation().GetSpriteScale());
+                GetAnimation().GetSpriteScale(), mResMan);
         }
     }
 }
@@ -1887,7 +1887,7 @@ void Slig::Motion_36_Depossessing()
                 (GetSpriteScale() * xRand) + mXPos,
                 mYPos - (GetSpriteScale() * yRand),
                 GetSpriteScale(),
-                Layer::eLayer_0);
+                Layer::eLayer_0, mResMan);
         }
 
         if (static_cast<s32>(sGnFrame) > field_12C_timer)
@@ -1925,14 +1925,14 @@ void Slig::Motion_37_Possess()
                 xOff,
                 FP_FromInteger(0),
                 GetSpriteScale(),
-                0);
+                0, mResMan);
 
             New_Smoke_Particles(
                 mXPos,
                 mYPos - (FP_FromInteger(30) * GetSpriteScale()),
                 GetSpriteScale(),
                 3,
-                RGB16{128, 128, 128});
+                RGB16{128, 128, 128}, mResMan);
 
             if (GetSpriteScale() == FP_FromDouble(0.5))
             {
@@ -2078,7 +2078,7 @@ void Slig::Motion_42_ShootZ()
             mSligTlv.mData.mNumTimesToShoot - field_158_num_times_to_shoot - 1,
             mResMan);
 
-        New_ShootingZFire_Particle(mXPos, mYPos - FP_FromInteger(12), GetSpriteScale());
+        New_ShootingZFire_Particle(mXPos, mYPos - FP_FromInteger(12), GetSpriteScale(), mResMan);
 
         if (GetSpriteScale() == FP_FromDouble(0.5))
         {
@@ -2548,7 +2548,7 @@ s16 Slig::Brain_3_DeathDropDeath()
 
             Environment_SFX(EnvironmentSfx::eFallingDeathScreamHitGround_15, 0, 0x7FFF, this);
 
-            relive_new ScreenShake(false, false);
+            relive_new ScreenShake(false, false, mResMan);
 
             field_120_timer = MakeTimer(30);
             return Brain_3_DeathDropDeath::eBrain3_SwitchCamToAbe_2;
@@ -4922,7 +4922,7 @@ void Slig::BlowToGibs()
         mVelX,
         mVelY,
         GetSpriteScale(),
-        0);
+        0, mResMan);
 
     relive_new Blood(
         mXPos,
@@ -4930,14 +4930,14 @@ void Slig::BlowToGibs()
         FP_FromInteger(0),
         FP_FromInteger(0),
         GetSpriteScale(),
-        20);
+        20, mResMan);
 
     New_Smoke_Particles(
         mXPos,
         mYPos - (FP_FromInteger(30) * GetSpriteScale()),
         GetSpriteScale(),
         3,
-        RGB16{128, 128, 128});
+        RGB16{128, 128, 128}, mResMan);
 
     if (GetSpriteScale() == FP_FromDouble(0.5))
     {
@@ -6345,14 +6345,14 @@ bool Slig::VTakeDamage(BaseGameObject* pFrom)
                         const FP xOff = ((pBullet->XDistance() <= FP_FromInteger(0) ? FP_FromInteger(-1) : FP_FromInteger(1)) * FP_FromInteger(Math_NextRandom() & 15)) + FP_FromInteger(16);
                         const FP yPos = mYPos - (FP_FromInteger(25) * GetSpriteScale());
                         const FP xPos = GetSpriteScale() * (pBullet->XDistance() <= FP_FromInteger(0) ? FP_FromInteger(-6) : FP_FromInteger(6));
-                        relive_new Blood(xPos + mXPos, yPos, xOff, yOff, GetSpriteScale(), 12);
+                        relive_new Blood(xPos + mXPos, yPos, xOff, yOff, GetSpriteScale(), 12, mResMan);
                     }
 
                     {
                         const FP xOff = pBullet->XDistance() <= FP_FromInteger(0) ? FP_FromInteger(-6) : FP_FromInteger(6);
                         const FP yPos = mYPos - (FP_FromInteger(25) * GetSpriteScale());
                         const FP xPos = GetSpriteScale() * (pBullet->XDistance() <= FP_FromInteger(0) ? FP_FromInteger(-12) : FP_FromInteger(12));
-                        relive_new Blood(xPos + mXPos, yPos, xOff, FP_FromInteger(0), GetSpriteScale(), 8);
+                        relive_new Blood(xPos + mXPos, yPos, xOff, FP_FromInteger(0), GetSpriteScale(), 8, mResMan);
                     }
                     break;
                 }
@@ -6387,7 +6387,7 @@ bool Slig::VTakeDamage(BaseGameObject* pFrom)
                         return false;
                     }
 
-                    relive_new Blood(mXPos, mYPos - (FP_FromInteger(25) * GetSpriteScale()), FP_FromInteger(0), FP_FromInteger(0), GetSpriteScale(), 25);
+                    relive_new Blood(mXPos, mYPos - (FP_FromInteger(25) * GetSpriteScale()), FP_FromInteger(0), FP_FromInteger(0), GetSpriteScale(), 25, mResMan);
                     break;
                 }
 
@@ -6438,7 +6438,7 @@ bool Slig::VTakeDamage(BaseGameObject* pFrom)
                 return true;
             }
 
-            relive_new Gibs(GibType::eSlig, mXPos, mYPos, mVelX, mVelY, GetSpriteScale(), 0);
+            relive_new Gibs(GibType::eSlig, mXPos, mYPos, mVelX, mVelY, GetSpriteScale(), 0, mResMan);
             mHealth = FP_FromInteger(0);
             SfxPlayMono(relive::SoundEffects::FallingItemHit, 90);
             GetAnimation().SetAnimate(false);

@@ -202,7 +202,7 @@ void Animation_OnFrame_Slog(BaseGameObject* pObjPtr, u32&, const IndexedPoint& p
         pSlog->mVelX * FP_FromInteger(2),
         FP_FromInteger(0),
         pSlog->GetSpriteScale(),
-        50);
+        50, resMan);
 
     pSlog->mBitingTarget = 1;
     SfxPlayMono(relive::SoundEffects::SlogBite, 0);

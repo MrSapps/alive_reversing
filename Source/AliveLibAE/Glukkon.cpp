@@ -1636,7 +1636,7 @@ s16 Glukkon::Brain_3_PlayerControlled()
                 gVisitedBonewerkz = true;
             }
 
-            auto pFadeMem = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeIn, 0, 8, relive::TBlendModes::eBlend_2);
+            auto pFadeMem = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeIn, 0, 8, relive::TBlendModes::eBlend_2, mResMan);
             if (pFadeMem)
             {
                 mFadeId = pFadeMem->mBaseGameObjectId;
@@ -1657,7 +1657,7 @@ s16 Glukkon::Brain_3_PlayerControlled()
                         (GetSpriteScale() * xRand) + mXPos,
                         mYPos - (GetSpriteScale() * yRand),
                         GetSpriteScale(),
-                        Layer::eLayer_0);
+                        Layer::eLayer_0, mResMan);
                 }
 
                 if (static_cast<s32>(sGnFrame) > field_1D4_timer || gAbe->mHealth <= FP_FromInteger(0))
@@ -1806,7 +1806,7 @@ s16 Glukkon::Brain_4_Death()
                 mVelX,
                 mVelY,
                 GetSpriteScale(),
-                0);
+                0, mResMan);
 
             relive_new Blood(
                 mXPos,
@@ -1814,14 +1814,14 @@ s16 Glukkon::Brain_4_Death()
                 FP_FromInteger(0),
                 FP_FromInteger(0),
                 GetSpriteScale(),
-                20);
+                20, mResMan);
 
             New_Smoke_Particles(
                 mXPos,
                 mYPos - (FP_FromInteger(30) * GetSpriteScale()),
                 GetSpriteScale(),
                 3,
-                RGB16{128, 128, 128});
+                RGB16{128, 128, 128}, mResMan);
 
             SfxPlayMono(relive::SoundEffects::KillEffect, 128, GetSpriteScale());
             SfxPlayMono(relive::SoundEffects::FallingItemHit, 90, GetSpriteScale());
@@ -1924,7 +1924,7 @@ s16 Glukkon::Brain_5_WaitToSpawn()
             {
                 const s16 sparkX = FP_GetExponent(FP_FromInteger(p.x) + mXPos + FP_FromInteger(13));
                 const s16 sparkY = FP_GetExponent(mYPos + FP_FromInteger(p.y) - FP_FromInteger(11));
-                relive_new Spark(FP_FromInteger(sparkX), FP_FromInteger(sparkY), FP_FromInteger(1), 9, -31, 159, SparkType::eBigChantParticle_1);
+                relive_new Spark(FP_FromInteger(sparkX), FP_FromInteger(sparkY), FP_FromInteger(1), 9, -31, 159, SparkType::eBigChantParticle_1, mResMan);
             }
 
             const PSX_RECT bRect = VGetBoundingRect();
@@ -1932,14 +1932,14 @@ s16 Glukkon::Brain_5_WaitToSpawn()
             New_DestroyOrCreateObject_Particle(
                 FP_FromInteger((bRect.x + bRect.w) / 2),
                 FP_FromInteger((bRect.y + bRect.h) / 2) + (GetSpriteScale() * FP_FromInteger(60)),
-                GetSpriteScale());
+                GetSpriteScale(), mResMan);
 
             relive_new ParticleBurst(
                 mXPos,
                 mYPos - FP_FromInteger(18),
                 6,
                 FP_FromInteger(1),
-                BurstType::eBigRedSparks,
+                BurstType::eBigRedSparks, mResMan,
                 9, true);
 
             Speak(GlukkonSpeak::Heh_5);
@@ -2996,7 +2996,7 @@ bool Glukkon::VTakeDamage(BaseGameObject* pFrom)
                             ((pBullet->XDistance() <= FP_FromInteger(0) ? -FP_FromInteger(1) : FP_FromInteger(1)) * xRand + FP_FromInteger(16)),
                             yRand,
                             GetSpriteScale(),
-                            12);
+                            12, mResMan);
                     }
 
                     {
@@ -3007,7 +3007,7 @@ bool Glukkon::VTakeDamage(BaseGameObject* pFrom)
                             pBullet->XDistance() <= FP_FromInteger(0) ? -FP_FromInteger(6) : FP_FromInteger(6),
                             FP_FromInteger(0),
                             GetSpriteScale(),
-                            8);
+                            8, mResMan);
                     }
                 }
                 break;
@@ -3021,7 +3021,7 @@ bool Glukkon::VTakeDamage(BaseGameObject* pFrom)
                         FP_FromInteger(0),
                         FP_FromInteger(0),
                         GetSpriteScale(),
-                        25);
+                        25, mResMan);
                 }
                 break;
 

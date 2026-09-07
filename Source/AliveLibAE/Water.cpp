@@ -443,7 +443,7 @@ void Water::VUpdate()
                         {
                             relive_new Particle(FP_NoFractional(pWaterRes->field_0_xpos) + gScreenManager->CamXPos(),
                                                               FP_NoFractional(pWaterRes->field_4_ypos) + gScreenManager->CamYPos() + FP_FromInteger(Math_NextRandom() % 4) - FP_FromInteger(2),
-                                                               GetAnimRes(AnimId::WaterSplash));
+                                                               GetAnimRes(AnimId::WaterSplash), mResMan);
                         }
                     }
                 }

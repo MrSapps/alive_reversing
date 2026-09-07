@@ -1922,7 +1922,7 @@ s16 Paramite::Brain_3_SurpriseWeb()
                 SetCanBePossessed(true);
                 GetAnimation().SetFlipX(false);
                 field_130_timer = MakeTimer(mSurpriseWebDelayTimer);
-                auto pNewWeb = relive_new ParamiteWeb(mXPos, FP_GetExponent(mYPos) - 20, FP_GetExponent(mYPos) - 10, GetSpriteScale());
+                auto pNewWeb = relive_new ParamiteWeb(mXPos, FP_GetExponent(mYPos) - 20, FP_GetExponent(mYPos) - 10, GetSpriteScale(), mResMan);
                 if (pNewWeb)
                 {
                     mWebGuid = pNewWeb->mBaseGameObjectId;
@@ -2413,7 +2413,7 @@ s16 Paramite::Brain_7_DeathDrop()
 
         Environment_SFX(EnvironmentSfx::eFallingDeathScreamHitGround_15, 0, 0x7FFF, this);
 
-        relive_new ScreenShake(false, false);
+        relive_new ScreenShake(false, false, mResMan);
         field_130_timer = MakeTimer(30);
         return 2;
     }
@@ -2885,7 +2885,7 @@ s16 Paramite::Brain_9_ParamiteSpawn()
                     mCurrentMotion = eParamiteMotions::Motion_33_SurpriseWeb;
                     auto pWeb = relive_new ParamiteWeb(mXPos, FP_GetExponent(mYPos) - 20,
                                                     FP_GetExponent(mYPos) - 10,
-                                                    GetSpriteScale());
+                                                    GetSpriteScale(), mResMan);
                     if (pWeb)
                     {
                         mWebGuid = pWeb->mBaseGameObjectId;
@@ -2926,7 +2926,7 @@ s16 Paramite::Brain_9_ParamiteSpawn()
                     mCurrentMotion = eParamiteMotions::Motion_33_SurpriseWeb;
                     auto pWeb = relive_new ParamiteWeb(mXPos, FP_GetExponent(mYPos) - 20,
                                                     FP_GetExponent(mYPos) - 10,
-                                                    GetSpriteScale());
+                                                    GetSpriteScale(), mResMan);
                     if (pWeb)
                     {
                         mWebGuid = pWeb->mBaseGameObjectId;
@@ -3738,7 +3738,7 @@ void Paramite::Motion_11_Falling()
                         mCurrentMotion = eParamiteMotions::Motion_41_Death;
                         field_130_timer = MakeTimer(90);
 
-                        relive_new Blood(mXPos, mYPos, FP_FromInteger(0), FP_FromInteger(5), GetSpriteScale(), 50);
+                        relive_new Blood(mXPos, mYPos, FP_FromInteger(0), FP_FromInteger(5), GetSpriteScale(), 50, mResMan);
                     }
                     break;
 
@@ -4329,7 +4329,7 @@ void Paramite::Motion_29_GetDepossessedBegin()
             New_TintChant_Particle(
                 x, y,
                 GetSpriteScale(),
-                Layer::eLayer_0);
+                Layer::eLayer_0, mResMan);
         }
 
         if (static_cast<s32>(sGnFrame) > field_138_depossession_timer)
@@ -4815,7 +4815,7 @@ void Paramite::Motion_40_Eating()
                 auto pSlurg = static_cast<BaseAliveGameObject*>(FindObjectOfType(ReliveTypes::eSlurg, gridBlock + mXPos, mYPos));
                 if (pSlurg)
                 {
-                    relive_new Blood(pSlurg->mXPos, pSlurg->mYPos, FP_FromInteger(0), FP_FromInteger(5), GetSpriteScale(), 30);
+                    relive_new Blood(pSlurg->mXPos, pSlurg->mYPos, FP_FromInteger(0), FP_FromInteger(5), GetSpriteScale(), 30, mResMan);
                     pSlurg->SetDead(true);
                 }
                 else
@@ -5147,7 +5147,7 @@ void Paramite::VUpdate()
             auto pWeb = relive_new ParamiteWeb(mXPos,
                                             FP_GetExponent(mYPos) - 20,
                                             FP_GetExponent(mYPos) - 10,
-                                            GetSpriteScale());
+                                            GetSpriteScale(), mResMan);
             if (pWeb)
             {
                 mWebGuid = pWeb->mBaseGameObjectId;
@@ -5338,7 +5338,7 @@ bool Paramite::VTakeDamage(BaseGameObject* pFrom)
         case ReliveTypes::eAirExplosion:
         {
             EventBroadcast(Event::kScrabOrParamiteDied, this);
-            relive_new Gibs(GibType::eSlog, mXPos, mYPos, mVelX, mVelY, GetSpriteScale(), 0);
+            relive_new Gibs(GibType::eSlog, mXPos, mYPos, mVelX, mVelY, GetSpriteScale(), 0, mResMan);
             mHealth = FP_FromInteger(0);
             SetDead(true);
             GetAnimation().SetRender(false);
@@ -5382,7 +5382,7 @@ bool Paramite::VTakeDamage(BaseGameObject* pFrom)
             mCurrentMotion = eParamiteMotions::Motion_41_Death;
             vUpdateAnim();
 
-            relive_new Blood(mXPos, mYPos, FP_FromInteger(0), FP_FromInteger(5), GetSpriteScale(), 50);
+            relive_new Blood(mXPos, mYPos, FP_FromInteger(0), FP_FromInteger(5), GetSpriteScale(), 50, mResMan);
 
             if (sControlledCharacter == this)
             {
@@ -5405,7 +5405,7 @@ bool Paramite::VTakeDamage(BaseGameObject* pFrom)
             mCurrentMotion = eParamiteMotions::Motion_41_Death;
             vUpdateAnim();
 
-            relive_new Blood(mXPos, mYPos, FP_FromInteger(0), FP_FromInteger(5), GetSpriteScale(), 50);
+            relive_new Blood(mXPos, mYPos, FP_FromInteger(0), FP_FromInteger(5), GetSpriteScale(), 50, mResMan);
 
             if (sControlledCharacter != this)
             {

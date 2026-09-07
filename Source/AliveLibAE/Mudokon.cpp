@@ -1236,7 +1236,7 @@ bool Mudokon::VTakeDamage(BaseGameObject* pFrom)
                         pBullet->XDistance() <= FP_FromInteger(0) ? FP_FromInteger(-24) : FP_FromInteger(24),
                         FP_FromInteger(0),
                         GetSpriteScale(),
-                        50);
+                        50, mResMan);
                     SetPal(Mud_Emotion::eNormal_0);
                     break;
                 }
@@ -1265,7 +1265,7 @@ bool Mudokon::VTakeDamage(BaseGameObject* pFrom)
                     FP_FromInteger(0),
                     FP_FromInteger(0),
                     GetSpriteScale(),
-                    50);
+                    50, mResMan);
 
                 SetPal(Mud_Emotion::eNormal_0);
                 // Fall though to other cases below
@@ -1320,7 +1320,7 @@ bool Mudokon::VTakeDamage(BaseGameObject* pFrom)
                 FP_FromInteger(0),
                 FP_FromInteger(0),
                 GetSpriteScale(),
-                0);
+                0, mResMan);
 
             relive_new Gibs(
                 mBlind ? GibType::eBlindMud : GibType::eMud,
@@ -1329,7 +1329,7 @@ bool Mudokon::VTakeDamage(BaseGameObject* pFrom)
                 FP_FromInteger(0),
                 FP_FromInteger(0),
                 GetSpriteScale(),
-                0);
+                0, mResMan);
 
             SetDead(true);
             SetPal(Mud_Emotion::eNormal_0);
@@ -1369,7 +1369,7 @@ bool Mudokon::VTakeDamage(BaseGameObject* pFrom)
                     mXPos - pFleech->mXPos < FP_FromInteger(0) ? FP_FromInteger(-24) : FP_FromInteger(24),
                     FP_FromInteger(0),
                     GetSpriteScale(),
-                    50);
+                    50, mResMan);
 
                 // TODO: Only set if pFrom->mXPos != mXPos ??
                 mCurrentMotion = eMudMotions::Motion_45_KnockForward;
@@ -1694,7 +1694,7 @@ s16 Mudokon::Brain_0_GiveRings()
                     FP_FromInteger((bRect.x + bRect.w) / 2),
                     FP_FromInteger((bRect.y + bRect.h) / 2),
                     field_168_ring_type,
-                    GetSpriteScale());
+                    GetSpriteScale(), mResMan);
 
                 // Create a ring that locks onto abe
                 const PSX_RECT bRectAbe = gAbe->VGetBoundingRect();
@@ -1709,7 +1709,7 @@ s16 Mudokon::Brain_0_GiveRings()
                     FP_FromInteger((bRectAbe.x + bRectAbe.w) / 2),
                     FP_FromInteger((bRectAbe.y + bRectAbe.h) / 2),
                     ringTypeToGive,
-                    gAbe->GetSpriteScale());
+                    gAbe->GetSpriteScale(), mResMan);
 
                 // Must set abe as the target to "lock on" to abe
                 if (pRing)
@@ -4784,7 +4784,7 @@ s16 Mudokon::Brain_7_FallAndSmackDeath()
         if (static_cast<s32>(sGnFrame) > field_194_timer)
         {
             Environment_SFX(EnvironmentSfx::eFallingDeathScreamHitGround_15, 0, 32767, this);
-            relive_new ScreenShake(false, false);
+            relive_new ScreenShake(false, false, mResMan);
             SetDead(true);
         }
     }
@@ -5207,7 +5207,7 @@ s16 Mudokon::Brain_9_Sick()
                     mXPos + (FP_FromInteger(12) * GetSpriteScale()),
                     mYPos - (FP_FromInteger(24) * GetSpriteScale()),
                     (FP_FromDouble(0.5) * GetSpriteScale()),
-                    3, RGB16{ 32, 128, 32 });
+                    3, RGB16{ 32, 128, 32 }, mResMan);
             }
             else
             {
@@ -5215,7 +5215,7 @@ s16 Mudokon::Brain_9_Sick()
                     mXPos - (FP_FromInteger(12) * GetSpriteScale()),
                     mYPos - (FP_FromInteger(24) * GetSpriteScale()),
                     (FP_FromDouble(0.5) * GetSpriteScale()),
-                    3, RGB16{ 32, 128, 32 });
+                    3, RGB16{ 32, 128, 32 }, mResMan);
             }
             return Brain_9_Sick::eBrain9_Farting_4;
 
@@ -5517,7 +5517,7 @@ void Mudokon::Motion_11_Chisel()
                     9,
                     0,
                     255,
-                    SparkType::eSmallChantParticle_0);
+                    SparkType::eSmallChantParticle_0, mResMan);
             }
         }
     }
@@ -6411,7 +6411,7 @@ void Mudokon::Motion_50_Chant()
 {
     if (!(static_cast<s32>(sGnFrame) % 4))
     {
-        New_RandomizedChant_Particle(this);
+        New_RandomizedChant_Particle(this, mResMan);
     }
 
     if (!SND_SsIsEos_DeInlined(11u))

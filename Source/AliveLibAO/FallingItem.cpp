@@ -232,7 +232,7 @@ void FallingItem::VUpdate()
                 mYPos = hitY;
                 mState = State::eSmashed_4;
 
-                relive_new ScreenShake(false, false);
+                relive_new ScreenShake(false, false, mResMan);
 
                 if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarms || gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
                 {
@@ -241,7 +241,7 @@ void FallingItem::VUpdate()
                         mYPos,
                         25,
                         GetSpriteScale(),
-                        BurstType::eMeat);
+                        BurstType::eMeat, mResMan);
                 }
                 else
                 {
@@ -250,7 +250,7 @@ void FallingItem::VUpdate()
                         mYPos,
                         25,
                         GetSpriteScale(),
-                        BurstType::eRocks);
+                        BurstType::eRocks, mResMan);
                 }
 
                 relive_new ParticleBurst(
@@ -258,7 +258,7 @@ void FallingItem::VUpdate()
                     mYPos,
                     25,
                     GetSpriteScale(),
-                    BurstType::eSticks);
+                    BurstType::eSticks, mResMan);
             }
             else
             {

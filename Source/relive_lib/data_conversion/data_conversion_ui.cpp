@@ -8,8 +8,8 @@
 #include "GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
 #include "AnimationConverter.hpp"
 
-DataConversionUI::DataConversionUI(GameType gameType)
-    : BaseGameObject(FALSE, 0)
+DataConversionUI::DataConversionUI(GameType gameType, ResourceManagerWrapper& resMan)
+    : BaseGameObject(FALSE, 0, resMan)
     , mGameType(gameType)
 {
     mPoly.SetXYWH(0, 0, 640, 240);

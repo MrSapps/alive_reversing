@@ -12,8 +12,8 @@ void DeathBirdParticle::LoadAnimations()
     mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::DeathFlare_1));
 }
 
-DeathBirdParticle::DeathBirdParticle(FP xpos, FP ypos, s32 startTimer, bool playSound, FP scale)
-    : BaseAnimatedWithPhysicsGameObject(0),
+DeathBirdParticle::DeathBirdParticle(FP xpos, FP ypos, s32 startTimer, bool playSound, FP scale, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan),
     mStartTimer(startTimer),
     mPlaySound(playSound)
 {
@@ -64,7 +64,8 @@ void DeathBirdParticle::VUpdate()
                     AnimId::Dove_Flying,
                     mXPos,
                     mYPos - FP_FromInteger(15),
-                    GetSpriteScale());
+                    GetSpriteScale(),
+                    mResMan);
 
                 if (pDove->GetAnimation().GetFlipX())
                 {

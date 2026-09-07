@@ -5,7 +5,7 @@
 class BackgroundMusic final : public BaseGameObject
 {
 public:
-    BackgroundMusic(s32 musicId);
+    BackgroundMusic(s32 musicId, ResourceManagerWrapper& resMan);
 
     virtual void VUpdate() override;
 

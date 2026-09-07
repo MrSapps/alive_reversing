@@ -11,9 +11,9 @@
 #include "../GameType.hpp"
 #include "BaseMap.hpp"
 
-AbilityRing* AbilityRing::Factory(FP xpos, FP ypos, RingTypes ringType, FP scale)
+AbilityRing* AbilityRing::Factory(FP xpos, FP ypos, RingTypes ringType, FP scale, ResourceManagerWrapper& resMan)
 {
-    return relive_new AbilityRing(xpos, ypos, ringType, scale);
+    return relive_new AbilityRing(xpos, ypos, ringType, scale, resMan);
 }
 
 static s32 MinDistance(s32 screenX, s32 screenY, s32 width1, s32 height1, s32 width2, s32 height2)
@@ -30,8 +30,8 @@ static s32 MinDistance(s32 screenX, s32 screenY, s32 width1, s32 height1, s32 wi
     }
 }
 
-AbilityRing::AbilityRing(FP xpos, FP ypos, RingTypes ringType, FP scale)
-    : BaseGameObject(true, 0),
+AbilityRing::AbilityRing(FP xpos, FP ypos, RingTypes ringType, FP scale, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan),
     mRingXPos(xpos),
     mRingYPos(ypos)
 {
@@ -433,7 +433,7 @@ void AbilityRing::VUpdate()
                 SfxPlayMono(relive::SoundEffects::IngameTransition, 0);
                 if (mRingType == RingTypes::eExplosive_Give_3)
                 {
-                    relive_new PossessionFlicker(GetAbe(), 8, 255, 128, 128);
+                    relive_new PossessionFlicker(GetAbe(), 8, 255, 128, 128, mResMan);
                 }
             }
             return;
@@ -570,7 +570,7 @@ void AbilityRing::VGetSaveState(SerializedObjectData& pSaveBuffer)
 void AbilityRing::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
 {
     const auto pState = pBuffer.ReadTmpPtr<AbilityRingSaveState>();
-    auto pRing = relive_new AbilityRing(pState->mRingXPos, pState->mRingYPos, pState->mRingType, pState->mRingScale);
+    auto pRing = relive_new AbilityRing(pState->mRingXPos, pState->mRingYPos, pState->mRingType, pState->mRingScale, resMan);
     if (pRing)
     {
         pRing->mRingRed = pState->mRingRed;

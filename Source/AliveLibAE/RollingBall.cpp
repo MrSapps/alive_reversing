@@ -115,11 +115,11 @@ bool RollingBall::CollideWithWalls()
             mYPos - FP_FromInteger(30),
             150,
             GetSpriteScale(),
-            BurstType::eRocks);
+            BurstType::eRocks, mResMan);
 
-        relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, relive::TBlendModes::eBlend_1, 1);
+        relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, mResMan, relive::TBlendModes::eBlend_1, 1);
 
-        relive_new ScreenShake(false, false);
+        relive_new ScreenShake(false, false, mResMan);
 
         SetDead(true);
 
@@ -164,7 +164,7 @@ void RollingBall::VUpdate()
                 mVelY = FP_FromDouble(2.5);
                 mState = States::eStartRolling;
                 GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::Stone_Ball_Rolling));
-                auto pRollingBallShaker = relive_new RollingBallShaker();
+                auto pRollingBallShaker = relive_new RollingBallShaker(mResMan);
                 if (pRollingBallShaker)
                 {
                     mRollingBallShakerId = pRollingBallShaker->mBaseGameObjectId;
@@ -266,7 +266,7 @@ void RollingBall::VUpdate()
             BaseAliveGameObjectLastLineYPos = mYPos;
             mVelY = (-mVelY * FP_FromDouble(0.8));
 
-            relive_new ScreenShake(false, false);
+            relive_new ScreenShake(false, false, mResMan);
 
             const CameraPos direction = gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
             SFX_Play_Camera(relive::SoundEffects::IngameTransition, 50, direction);

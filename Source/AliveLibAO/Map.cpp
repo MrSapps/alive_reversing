@@ -417,7 +417,7 @@ void Map::RemoveObjectsWithPurpleLight(s16 bMakeInvisible)
                             Particle* pPurpleLight = New_DestroyOrCreateObject_Particle(
                                 FP_FromInteger((objRect.x + objRect.w) / 2),
                                 FP_FromInteger((objRect.y + objRect.h) / 2) + k60Scaled,
-                                pBaseObj->GetSpriteScale());
+                                pBaseObj->GetSpriteScale(), mResourceManager);
 
                             if (pPurpleLight)
                             {
@@ -831,7 +831,7 @@ void Map::GoTo_Camera()
         SND_Load_VABS(mLoadedPaths[0]->GetSoundInfo(), AO::Path_Get_Reverb(mNextLevel)); // TODO: Remove hard coded data
         SND_Load_Seqs_477AB0(g_SeqTable_4C9E70, mLoadedPaths[0]->GetSoundInfo());
 
-        relive_new BackgroundMusic(AO::Path_Get_BackGroundMusicId(mNextLevel)); // TODO: Remove hard coded data
+        relive_new BackgroundMusic(AO::Path_Get_BackGroundMusicId(mNextLevel), mResourceManager); // TODO: Remove hard coded data
 
         // TODO: Re-add function
         for (s32 i = 0; i < 236; i++)
@@ -963,7 +963,7 @@ void Map::GoTo_Camera()
 
     if (!gScreenManager)
     {
-        gScreenManager = relive_new ScreenManager(field_2C_camera_array[0]->mCamRes, &mCameraOffset);
+        gScreenManager = relive_new ScreenManager(field_2C_camera_array[0]->mCamRes, &mCameraOffset, mResourceManager);
     }
 
     Loader(mCamIdxOnX, mCamIdxOnY, relive::Factory::LoadMode::ConstructObject_0, ReliveTypes::eNone); // none = load all

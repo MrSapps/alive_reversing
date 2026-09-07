@@ -8,7 +8,7 @@ extern s32 gDeathGasCount;
 class DeathGas final : public BaseGameObject
 {
 public:
-    DeathGas(Layer layer, s32 amount);
+    DeathGas(Layer layer, s32 amount, ResourceManagerWrapper& resMan);
     ~DeathGas();
 
     virtual void VScreenChanged() override;

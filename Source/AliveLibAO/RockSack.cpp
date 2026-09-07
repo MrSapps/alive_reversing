@@ -148,7 +148,7 @@ void RockSack::VUpdate()
             }
             else
             {
-                gThrowableArray = relive_new ThrowableArray();
+                gThrowableArray = relive_new ThrowableArray(mResMan);
             }
 
             gThrowableArray->Add(mRockAmount);

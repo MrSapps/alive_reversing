@@ -101,22 +101,22 @@ void Bullet::VUpdate()
                                 relive_new Spark(
                                     pShotObj->mXPos + (mSpriteScale * FP_FromInteger(30)) - FP_FromInteger(randomW),
                                     mYPos + FP_NoFractional(randomHeight),
-                                    mSpriteScale, 6, -76, 76, SparkType::eSmallChantParticle_0);
+                                    mSpriteScale, 6, -76, 76, SparkType::eSmallChantParticle_0, mResMan);
                                 New_Smoke_Particles(
                                     pShotObj->mXPos + (mSpriteScale * FP_FromInteger(30)) - FP_FromInteger(randomW),
                                     mYPos + FP_NoFractional(randomHeight),
-                                    mSpriteScale, 3, RGB16{ 128, 128, 128 });
+                                    mSpriteScale, 3, RGB16{ 128, 128, 128 }, mResMan);
                             }
                             else
                             {
                                 relive_new Spark(
                                     pShotObj->mXPos + FP_FromInteger(randomW) - (mSpriteScale * FP_FromInteger(30)),
                                     mYPos + FP_NoFractional(randomHeight),
-                                    mSpriteScale, 6, 50, 205, SparkType::eSmallChantParticle_0);
+                                    mSpriteScale, 6, 50, 205, SparkType::eSmallChantParticle_0, mResMan);
                                 New_Smoke_Particles(
                                     pShotObj->mXPos + FP_FromInteger(randomW) - (mSpriteScale * FP_FromInteger(30)),
                                     mYPos + FP_NoFractional(randomHeight),
-                                    mSpriteScale, 3, RGB16{ 128, 128, 128 });
+                                    mSpriteScale, 3, RGB16{ 128, 128, 128 }, mResMan);
                             }
 
                             if (Math_RandomRange(0, 100) < 90)
@@ -142,16 +142,16 @@ void Bullet::VUpdate()
                     relive_new Spark(
                         hitX - (mSpriteScale * FP_FromInteger(6)),
                         (FP_FromInteger(10) * mSpriteScale) + hitY,
-                        mSpriteScale, 6, -76, 76, SparkType::eSmallChantParticle_0);
-                    New_Smoke_Particles(hitX - (mSpriteScale * FP_FromInteger(6)), hitY, mSpriteScale, 3, RGB16{ 128, 128, 128 });
+                        mSpriteScale, 6, -76, 76, SparkType::eSmallChantParticle_0, mResMan);
+                    New_Smoke_Particles(hitX - (mSpriteScale * FP_FromInteger(6)), hitY, mSpriteScale, 3, RGB16{ 128, 128, 128 }, mResMan);
                 }
                 else
                 {
                     relive_new Spark(
                         hitX + (mSpriteScale * FP_FromInteger(7)),
                         (FP_FromInteger(10) * mSpriteScale) + hitY,
-                        mSpriteScale, 6, 50, 205, SparkType::eSmallChantParticle_0);
-                    New_Smoke_Particles(hitX + (mSpriteScale * FP_FromInteger(7)), hitY, mSpriteScale, 3, RGB16{ 128, 128, 128 });
+                        mSpriteScale, 6, 50, 205, SparkType::eSmallChantParticle_0, mResMan);
+                    New_Smoke_Particles(hitX + (mSpriteScale * FP_FromInteger(7)), hitY, mSpriteScale, 3, RGB16{ 128, 128, 128 }, mResMan);
                 }
 
                 if (Math_RandomRange(0, 100) < 90)
@@ -177,12 +177,12 @@ void Bullet::VUpdate()
                         relive_new Spark(
                             (mSpriteScale * FP_FromInteger(30)) + pShotObj->mXPos - FP_FromInteger(randomW),
                             mYPos + FP_NoFractional(randomHeight),
-                            mSpriteScale, 6, -76, 76, SparkType::eSmallChantParticle_0);
+                            mSpriteScale, 6, -76, 76, SparkType::eSmallChantParticle_0, mResMan);
 
                         New_Smoke_Particles(
                             (mSpriteScale * FP_FromInteger(30)) + pShotObj->mXPos - FP_FromInteger(randomW),
                             mYPos + FP_NoFractional(randomHeight),
-                            mSpriteScale, 3, RGB16{ 128, 128, 128 });
+                            mSpriteScale, 3, RGB16{ 128, 128, 128 }, mResMan);
                     }
                     else
                     {
@@ -190,13 +190,13 @@ void Bullet::VUpdate()
                         relive_new Spark(
                             FP_FromInteger(randomW) + pShotObj->mXPos - (mSpriteScale * FP_FromInteger(30)),
                             mYPos + FP_NoFractional(randomHeight),
-                            mSpriteScale, 6, 50, 205, SparkType::eSmallChantParticle_0);
+                            mSpriteScale, 6, 50, 205, SparkType::eSmallChantParticle_0, mResMan);
 
 
                         New_Smoke_Particles(
                             FP_FromInteger(randomW) + pShotObj->mXPos - (mSpriteScale * FP_FromInteger(30)),
                             mYPos + FP_NoFractional(randomHeight),
-                            mSpriteScale, 3, RGB16{ 128, 128, 128 });
+                            mSpriteScale, 3, RGB16{ 128, 128, 128 }, mResMan);
                     }
 
                     if (Math_RandomRange(0, 100) < 90)
@@ -256,8 +256,8 @@ void Bullet::VUpdate()
                     &mLine, &hitX, &hitY, CollisionMask(eBulletWall_10))
                 == 1)
             {
-                relive_new Spark(hitX, hitY, FP_FromInteger(1), 9, -31, 159, SparkType::eSmallChantParticle_0);
-                New_Smoke_Particles(hitX, hitY, FP_FromInteger(1), 3, RGB16{ 128, 128, 128 });
+                relive_new Spark(hitX, hitY, FP_FromInteger(1), 9, -31, 159, SparkType::eSmallChantParticle_0, mResMan);
+                New_Smoke_Particles(hitX, hitY, FP_FromInteger(1), 3, RGB16{ 128, 128, 128 }, mResMan);
             }
             SfxPlayMono(relive::RandomSfx(relive::SoundEffects::Bullet1, relive::SoundEffects::Bullet2), 75);
             SetDead(true);
@@ -302,8 +302,8 @@ void Bullet::VUpdate()
                         &mLine, &hitX, &hitY, CollisionMask(eBulletWall_10))
                     == 1)
                 {
-                    relive_new Spark(hitX, hitY, FP_FromInteger(1), 9, -31, 159, SparkType::eSmallChantParticle_0);
-                    New_Smoke_Particles(hitX, hitY, FP_FromInteger(1), 3, RGB16{ 128, 128, 128 });
+                    relive_new Spark(hitX, hitY, FP_FromInteger(1), 9, -31, 159, SparkType::eSmallChantParticle_0, mResMan);
+                    New_Smoke_Particles(hitX, hitY, FP_FromInteger(1), 3, RGB16{ 128, 128, 128 }, mResMan);
                 }
                 SfxPlayMono(relive::RandomSfx(relive::SoundEffects::Bullet1, relive::SoundEffects::Bullet2), 75);
             }

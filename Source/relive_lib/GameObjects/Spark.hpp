@@ -27,7 +27,7 @@ enum class SparkType : s16
 class Spark final : public BaseGameObject
 {
 public:
-    Spark(FP xpos, FP ypos, FP scale, s32 count, s32 minAngle, s32 maxAngle, SparkType type);
+    Spark(FP xpos, FP ypos, FP scale, s32 count, s32 minAngle, s32 maxAngle, SparkType type, ResourceManagerWrapper& resMan);
     ~Spark();
 
     virtual void VUpdate() override;

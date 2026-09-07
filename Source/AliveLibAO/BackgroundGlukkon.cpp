@@ -118,7 +118,7 @@ bool BackgroundGlukkon::VTakeDamage(BaseGameObject* pFrom)
             mXPos,
             mYPos - (GetSpriteScale() * FP_FromInteger(40)),
             GetSpriteScale(),
-            false);
+            false, mResMan);
 
         SetDead(true);
     }

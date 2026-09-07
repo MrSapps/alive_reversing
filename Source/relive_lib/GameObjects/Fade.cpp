@@ -6,8 +6,8 @@
 
 static bool sIsFadingOut = false;
 
-Fade::Fade(Layer layer, FadeOptions fade, bool destroyOnDone, s32 speed, relive::TBlendModes abr)
-    : EffectBase(layer, abr)
+Fade::Fade(Layer layer, FadeOptions fade, bool destroyOnDone, s32 speed, relive::TBlendModes abr, ResourceManagerWrapper& resMan)
+    : EffectBase(layer, abr, resMan)
 {
     // TODO: sort this out
     if (GetGameType() == GameType::eAe)

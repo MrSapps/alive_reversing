@@ -137,8 +137,8 @@ static const Glyph sGlyphs[] = {
 };
 
 
-ThrowableTotalIndicator::ThrowableTotalIndicator(FP xpos, FP ypos, Layer layer, FP /*scale*/, s32 count, bool bFade)
-    : BaseGameObject(true, 0)
+ThrowableTotalIndicator::ThrowableTotalIndicator(FP xpos, FP ypos, Layer layer, FP /*scale*/, s32 count, bool bFade, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     SetDrawable(true);
     SetType(ReliveTypes::eThrowableTotalIndicator);

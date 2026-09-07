@@ -169,7 +169,7 @@ bool Elum::VTakeDamage(BaseGameObject* pFrom)
                     mVelX,
                     mVelY,
                     GetSpriteScale(),
-                    false);
+                    false, mResMan);
 
                 mHealth = FP_FromInteger(0);
 

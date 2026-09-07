@@ -209,7 +209,7 @@ bool Paramite::VTakeDamage(BaseGameObject* pFrom)
                 mVelX,
                 mVelY,
                 GetSpriteScale(),
-                false);
+                false, mResMan);
 
             SetDead(true);
             GetAnimation().SetRender(false);
@@ -255,7 +255,7 @@ bool Paramite::VTakeDamage(BaseGameObject* pFrom)
                 FP_FromInteger(0),
                 FP_FromInteger(5),
                 GetSpriteScale(),
-                50);
+                50, mResMan);
             break;
         }
     }
@@ -1348,7 +1348,7 @@ s16 Paramite::Brain_1_SurpriseWeb()
                 mXPos,
                 FP_GetExponent(mYPos) - 20,
                 FP_GetExponent(mYPos) - 10,
-                GetSpriteScale());
+                GetSpriteScale(), mResMan);
             if (pWeb)
             {
                 mParamiteWeb = pWeb->mBaseGameObjectId;

@@ -130,7 +130,7 @@ void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)
             wh.x = gPsxDisplay.mWidth;
             wh.y = gPsxDisplay.mHeight;
 
-            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0);
+            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan);
             break;
 
         case CameraSwapEffects::eRightToLeft_2:
@@ -145,7 +145,7 @@ void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)
             wh.x = 0;
             wh.y = gPsxDisplay.mHeight;
 
-            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0);
+            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan);
             break;
 
         case CameraSwapEffects::eTopToBottom_3:
@@ -160,7 +160,7 @@ void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)
             wh.x = gPsxDisplay.mWidth;
             wh.y = gPsxDisplay.mHeight;
 
-            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0);
+            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan);
             break;
 
         case CameraSwapEffects::eBottomToTop_4:
@@ -175,7 +175,7 @@ void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)
             wh.x = gPsxDisplay.mWidth;
             wh.y = 0;
 
-            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0);
+            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan);
             break;
 
         case CameraSwapEffects::eVerticalSplit_6:
@@ -190,7 +190,7 @@ void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)
             wh.x = gPsxDisplay.mWidth / 2;
             wh.y = gPsxDisplay.mHeight;
 
-            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0);
+            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan);
             break;
 
         case CameraSwapEffects::eHorizontalSplit_7:
@@ -205,7 +205,7 @@ void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)
             wh.x = gPsxDisplay.mWidth;
             wh.y = gPsxDisplay.mHeight / 2;
 
-            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0);
+            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan);
             break;
 
         case CameraSwapEffects::eBoxOut_8:
@@ -242,7 +242,7 @@ void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)
             xy.x = gPsxDisplay.mWidth - 1;
             xy.y = gPsxDisplay.mHeight - 1;
 
-            mScreenClipper = relive_new ScreenClipper(xy, PSX_Point{ 1, 1 }, Layer::eLayer_0);
+            mScreenClipper = relive_new ScreenClipper(xy, PSX_Point{ 1, 1 }, Layer::eLayer_0, mResMan);
 
             // "Whoosh" door sound effect
             SfxPlayMono(relive::SoundEffects::IngameTransition, 127);
@@ -252,7 +252,7 @@ void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)
         case CameraSwapEffects::ePlay1FMV_5:
         case CameraSwapEffects::ePlay2FMVs_9:
         case CameraSwapEffects::ePlay3FMVs_10:
-            mScreenClipper = relive_new ScreenClipper(PSX_Point{ 0, 0 }, PSX_Point{ 1, 1 }, Layer::eLayer_0);
+            mScreenClipper = relive_new ScreenClipper(PSX_Point{ 0, 0 }, PSX_Point{ 1, 1 }, Layer::eLayer_0, mResMan);
             mCurrentSlice = 0;
             break;
 

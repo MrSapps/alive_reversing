@@ -312,7 +312,7 @@ void MeatSaw::GrindUpObjects()
                         FP_FromInteger(-5),
                         FP_FromInteger(5),
                         GetSpriteScale(),
-                        50);
+                        50, mResMan);
 
                     relive_new Blood(
                         pObjIter->mXPos,
@@ -320,7 +320,7 @@ void MeatSaw::GrindUpObjects()
                         FP_FromInteger(0),
                         FP_FromInteger(5),
                         GetSpriteScale(),
-                        50);
+                        50, mResMan);
 
                     relive_new Blood(
                         pObjIter->mXPos,
@@ -328,7 +328,7 @@ void MeatSaw::GrindUpObjects()
                         FP_FromInteger(5),
                         FP_FromInteger(5),
                         GetSpriteScale(),
-                        50);
+                        50, mResMan);
 
                     SfxPlayMono(relive::SoundEffects::KillEffect, 127);
                     SFX_Play_Pitch(relive::SoundEffects::KillEffect, 127, -700);

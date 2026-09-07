@@ -174,7 +174,7 @@ void Well::VUpdate()
                     mLeafY,
                     mLeafVelX,
                     mLeafVelY,
-                    mLeafScale);
+                    mLeafScale, mResMan);
 
                 if (mLeafVelY > FP_FromInteger(0))
                 {
