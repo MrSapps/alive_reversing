@@ -3,6 +3,7 @@
 #include "../relive_lib/MapWrapper.hpp"
 #include "../relive_lib/FixedPoint.hpp"
 #include "../relive_lib/BaseMap.hpp"
+#include "../relive_lib/Factory.hpp"
 
 enum class ReliveTypes : s16;
 class CamResource;
@@ -68,7 +69,7 @@ public:
 
     void GoTo_Camera();
 
-    void Loader(s16 camX, s16 camY, relive::LoadMode loadMode, ReliveTypes typeToLoad);
+    void Loader(s16 camX, s16 camY, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad);
 
     void RemoveObjectsWithPurpleLight(s16 bMakeInvisible);
 
@@ -89,7 +90,7 @@ public:
 
     void RestoreBlyData(const u8* pSaveData);
 
-    void Load_Path_Items(Camera* pCamera, relive::LoadMode loadMode);
+    void Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode);
 
     TlvIterator TLV_First_Of_Type_In_Camera(ReliveTypes type, s16 camX) override;
     TlvIterator VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind) override;

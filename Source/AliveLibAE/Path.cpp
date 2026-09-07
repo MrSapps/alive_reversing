@@ -50,24 +50,27 @@ void Path::Init(const PathData* pPathData, EReliveLevelIds level, s16 path, s16 
     mCamsOnY = (mPathData->field_6_bBottom - mPathData->field_2_bRight) / mPathData->field_C_grid_height;
 }
 
-void Path::Loader_4DB800(s16 xpos, s16 ypos, relive::LoadMode loadMode, ReliveTypes typeToLoad)
+void Path::Loader_4DB800(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad)
 {
+    // TODO: temp factory object for testing
+    relive::Factory factory;
+
     TlvIterator tlvIterator = mBinaryPath->TlvsForCamera(xpos, ypos);
     while(tlvIterator.GetTlv())
     {
         auto pPathTLV = tlvIterator.GetTlv();
         if (typeToLoad == ReliveTypes::eNone || typeToLoad == pPathTLV->mTlvType)
         {
-            if (loadMode != relive::LoadMode::ConstructObject_0 || !(pPathTLV->mTlvFlags.Get(relive::TlvFlags::eBit1_Created) || pPathTLV->mTlvFlags.Get(relive::TlvFlags::eBit2_Destroyed)))
+            if (loadMode != relive::Factory::LoadMode::ConstructObject_0 || !(pPathTLV->mTlvFlags.Get(relive::TlvFlags::eBit1_Created) || pPathTLV->mTlvFlags.Get(relive::TlvFlags::eBit2_Destroyed)))
             {
-                if (loadMode == relive::LoadMode::ConstructObject_0)
+                if (loadMode == relive::Factory::LoadMode::ConstructObject_0)
                 {
                     pPathTLV->mTlvFlags.Set(relive::TlvFlags::eBit1_Created);
                     pPathTLV->mTlvFlags.Set(relive::TlvFlags::eBit2_Destroyed);
                 }
 
                 // Call the factory to construct the item
-                relive::ConstructTLVObject(pPathTLV, pPathTLV->mId, loadMode);
+                factory.ConstructTLVObject(pPathTLV, pPathTLV->mId, loadMode);
             }
         }
 

@@ -953,19 +953,19 @@ void Map::GoTo_Camera()
         }
     }
 
-    Load_Path_Items(field_2C_camera_array[0], relive::LoadMode::ConstructObject_0);
+    Load_Path_Items(field_2C_camera_array[0], relive::Factory::LoadMode::ConstructObject_0);
     ResourceManagerWrapper::LoadingLoop(bShowLoadingIcon);
-    Load_Path_Items(field_2C_camera_array[3], relive::LoadMode::ConstructObject_0);
-    Load_Path_Items(field_2C_camera_array[4], relive::LoadMode::ConstructObject_0);
-    Load_Path_Items(field_2C_camera_array[1], relive::LoadMode::ConstructObject_0);
-    Load_Path_Items(field_2C_camera_array[2], relive::LoadMode::ConstructObject_0);
+    Load_Path_Items(field_2C_camera_array[3], relive::Factory::LoadMode::ConstructObject_0);
+    Load_Path_Items(field_2C_camera_array[4], relive::Factory::LoadMode::ConstructObject_0);
+    Load_Path_Items(field_2C_camera_array[1], relive::Factory::LoadMode::ConstructObject_0);
+    Load_Path_Items(field_2C_camera_array[2], relive::Factory::LoadMode::ConstructObject_0);
 
     if (!gScreenManager)
     {
         gScreenManager = relive_new ScreenManager(field_2C_camera_array[0]->mCamRes, &mCameraOffset);
     }
 
-    Loader(mCamIdxOnX, mCamIdxOnY, relive::LoadMode::ConstructObject_0, ReliveTypes::eNone); // none = load all
+    Loader(mCamIdxOnX, mCamIdxOnY, relive::Factory::LoadMode::ConstructObject_0, ReliveTypes::eNone); // none = load all
 
     if (old_current_path != mCurrentPath || old_current_level != mCurrentLevel)
     {
@@ -1459,7 +1459,7 @@ TlvIterator Map::TLV_First_Of_Type_In_Camera(ReliveTypes objectType, s16 camX)
     return TlvIterator::Invalid();
 }
 
-void Map::Load_Path_Items(Camera* pCamera, relive::LoadMode loadMode)
+void Map::Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode)
 {
     if (!pCamera)
     {
@@ -1469,7 +1469,7 @@ void Map::Load_Path_Items(Camera* pCamera, relive::LoadMode loadMode)
     // Is camera resource loaded check
     if (!pCamera->mCamResLoaded)
     {
-        if (loadMode == relive::LoadMode::ConstructObject_0)
+        if (loadMode == relive::Factory::LoadMode::ConstructObject_0)
         {
             // Async camera load
             /*
@@ -1480,7 +1480,7 @@ void Map::Load_Path_Items(Camera* pCamera, relive::LoadMode loadMode)
                 pCamera);*/
 
             pCamera->mCamRes = ResourceManagerWrapper::LoadCam(pCamera->mLevel, pCamera->mPath, pCamera->mCameraNumber);
-            Loader(pCamera->mCamXOff, pCamera->mCamYOff, relive::LoadMode::LoadResourceFromList_1, ReliveTypes::eNone); // none = load all
+            Loader(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResourceFromList_1, ReliveTypes::eNone); // none = load all
         }
         else
         {
@@ -1492,7 +1492,7 @@ void Map::Load_Path_Items(Camera* pCamera, relive::LoadMode loadMode)
 
             pCamera->mCamResLoaded = true;
 
-            Loader(pCamera->mCamXOff, pCamera->mCamYOff, relive::LoadMode::LoadResource_2, ReliveTypes::eNone); // none = load all
+            Loader(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResource_2, ReliveTypes::eNone); // none = load all
         }
     }
 }
@@ -1575,8 +1575,11 @@ void Map::ClearPathResourceBlocks()
 }
 
 
-void Map::Loader(s16 camX, s16 camY, relive::LoadMode loadMode, ReliveTypes typeToLoad)
+void Map::Loader(s16 camX, s16 camY, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad)
 {
+    // TODO: temp factory object
+    relive::Factory factory;
+
     // Get TLVs for this cam
     BinaryPath* pPathRes = GetPathResourceBlockPtr(mCurrentPath);
     TlvIterator tlvIterator = pPathRes->TlvsForCamera(camX, camY);
@@ -1585,12 +1588,12 @@ void Map::Loader(s16 camX, s16 camY, relive::LoadMode loadMode, ReliveTypes type
         auto pTlv = tlvIterator.GetTlv();
         if (typeToLoad == ReliveTypes::eNone || typeToLoad == pTlv->mTlvType)
         {
-            if (loadMode != relive::LoadMode::ConstructObject_0 || !(pTlv->mTlvFlags.Get(relive::TlvFlags::eBit1_Created) || pTlv->mTlvFlags.Get(relive::TlvFlags::eBit2_Destroyed)))
+            if (loadMode != relive::Factory::LoadMode::ConstructObject_0 || !(pTlv->mTlvFlags.Get(relive::TlvFlags::eBit1_Created) || pTlv->mTlvFlags.Get(relive::TlvFlags::eBit2_Destroyed)))
             {
                 // Call the factory to construct the item
-                relive::ConstructTLVObject(pTlv, pTlv->mId, loadMode);
+                factory.ConstructTLVObject(pTlv, pTlv->mId, loadMode);
 
-                if (loadMode == relive::LoadMode::ConstructObject_0)
+                if (loadMode == relive::Factory::LoadMode::ConstructObject_0)
                 {
                     pTlv->mTlvFlags.Set(relive::TlvFlags::eBit1_Created);
                     pTlv->mTlvFlags.Set(relive::TlvFlags::eBit2_Destroyed);
