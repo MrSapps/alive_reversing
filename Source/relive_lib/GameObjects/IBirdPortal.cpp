@@ -19,8 +19,8 @@ IBirdPortal::IBirdPortal(ResourceManagerWrapper& resMan)
 
 void IBirdPortal::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BirdPortal_Sparks));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BirdPortal_Flash));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::BirdPortal_Sparks));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::BirdPortal_Flash));
 }
 
 void IBirdPortal::CreateDovesAndShrykullNumber()

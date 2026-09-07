@@ -79,7 +79,8 @@ void OrbWhirlWind::VUpdate()
                 mXPos,
                 mYPos,
                 mScale,
-                mIsMudokonSpirit);
+                mIsMudokonSpirit,
+                mResMan);
             mOrbParticles[mParticleIdx++] = pParticle;
 
             if (mParticleIdx >= ALIVE_COUNTOF(mOrbParticles))

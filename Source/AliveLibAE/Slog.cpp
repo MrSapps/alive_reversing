@@ -126,7 +126,7 @@ void Slog::LoadAnimations()
 {
     for (auto& animId : sSlogAnimIdTable)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(animId));
     }
 }
 

@@ -22,7 +22,7 @@ Rock::Rock(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan)
 
     mBaseThrowableDead = 0;
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Rock));
+    mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::Rock));
     Animation_Init(GetAnimRes(AnimId::Rock));
 
     SetInteractive(false);
@@ -41,7 +41,7 @@ Rock::Rock(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan)
     mBaseThrowableCount = count;
     mState = RockStates::eNone_0;
 
-    mLoadedPals.push_back(GetResourceManager().LoadPal(PalId::BlueRock));
+    mLoadedPals.push_back(resMan.LoadPal(PalId::BlueRock));
 
     if (gMap->mCurrentLevel == EReliveLevelIds::eStockYards || gMap->mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
     {

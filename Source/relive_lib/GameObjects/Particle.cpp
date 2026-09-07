@@ -55,7 +55,7 @@ void Particle::VUpdate()
 
 Particle* New_DestroyOrCreateObject_Particle(FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan)
 {
-    AnimResource ppRes = GetResourceManager().LoadAnimation(AnimId::DeathFlare_2);
+    AnimResource ppRes = resMan.LoadAnimation(AnimId::DeathFlare_2);
 
     auto pParticle = relive_new Particle(xpos, ypos, ppRes, resMan);
 
@@ -89,7 +89,7 @@ void New_Smoke_Particles(FP xpos, FP ypos, FP scale, s16 count, const RGB16& rgb
     {
         FP randX = (FP_FromInteger(Math_RandomRange(-3, 3)) * scale) + xpos;
         FP particleY = (FP_FromInteger(6 * (i + 1) / 2 * (1 - 2 * (i % 2))) * scale) + ypos;
-        AnimResource ppRes = GetResourceManager().LoadAnimation(AnimId::SquibSmoke_Particle);
+        AnimResource ppRes = resMan.LoadAnimation(AnimId::SquibSmoke_Particle);
         auto pParticle = relive_new Particle(randX, particleY, ppRes, resMan);
         if (pParticle)
         {
@@ -126,7 +126,7 @@ void New_Smoke_Particles(FP xpos, FP ypos, FP scale, s16 count, const RGB16& rgb
 
 Particle* New_Orb_Particle(FP xpos, FP ypos, FP velX, FP velY, FP scale, Layer layer, const RGB16& rgb, ResourceManagerWrapper& resMan)
 {
-    AnimResource ppRes = GetResourceManager().LoadAnimation(AnimId::ChantOrb_Particle);
+    AnimResource ppRes = resMan.LoadAnimation(AnimId::ChantOrb_Particle);
     auto pParticle = relive_new Particle(xpos, ypos, ppRes, resMan);
     if (pParticle)
     {
@@ -184,7 +184,7 @@ void New_RandomizedChant_Particle(BaseAnimatedWithPhysicsGameObject* pObj, Resou
 
 void New_ShootingZFire_Particle(FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan)
 {
-    AnimResource ppRes = GetResourceManager().LoadAnimation(AnimId::ShootingZFire_Particle);
+    AnimResource ppRes = resMan.LoadAnimation(AnimId::ShootingZFire_Particle);
     auto pParticle = relive_new Particle(xpos, ypos, ppRes, resMan);
     if (pParticle)
     {
@@ -209,7 +209,7 @@ void New_ShootingZFire_Particle(FP xpos, FP ypos, FP scale, ResourceManagerWrapp
 
 void New_ShootingFire_Particle(FP xpos, FP ypos, s8 direction, FP scale, ResourceManagerWrapper& resMan)
 {
-    AnimResource ppRes = GetResourceManager().LoadAnimation(AnimId::ShootingFire_Particle);
+    AnimResource ppRes = resMan.LoadAnimation(AnimId::ShootingFire_Particle);
     auto pParticle = relive_new Particle(xpos, ypos, ppRes, resMan);
     if (pParticle)
     {

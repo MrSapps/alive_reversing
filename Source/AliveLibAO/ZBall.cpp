@@ -15,7 +15,7 @@ ZBall* gCenterZBall = nullptr;
 ZBall* gOutZBall = nullptr;
 
 // TODO: Pass the whole object because this decides to read 2 points as a rect
-void Animation_OnFrame_ZBallSmacker(::BaseGameObject* pObj, u32& idx, const IndexedPoint& points, ResourceManagerWrapper& resMan)
+void Animation_OnFrame_ZBallSmacker(::BaseGameObject* pObj, u32& idx, const IndexedPoint& points, ResourceManagerWrapper&)
 {
     auto pZBall = static_cast<ZBall*>(pObj);
     for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
@@ -61,21 +61,21 @@ ZBall::ZBall(relive::Path_ZBall* pTlv, const Guid& tlvId, ResourceManagerWrapper
     {
         case relive::Path_ZBall::Speed::eNormal:
         {
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Swinging_Ball_Normal));
+            mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::Swinging_Ball_Normal));
             Animation_Init(GetAnimRes(AnimId::Swinging_Ball_Normal));
             break;
         }
 
         case relive::Path_ZBall::Speed::eFast:
         {
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Swinging_Ball_Fast));
+            mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::Swinging_Ball_Fast));
             Animation_Init(GetAnimRes(AnimId::Swinging_Ball_Fast));
             break;
         }
 
         case relive::Path_ZBall::Speed::eSlow:
         {
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Swinging_Ball_Slow));
+            mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::Swinging_Ball_Slow));
             Animation_Init(GetAnimRes(AnimId::Swinging_Ball_Slow));
             break;
         }

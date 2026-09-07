@@ -42,10 +42,10 @@ static const FlintLockFireData sFlintLockFireData[] = {
 
 void FlintLockFire::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::FlintLock_Gourd));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::FlintLock_Hammers_Disabled));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::FlintLock_Hammers_Activating));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Fire));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::FlintLock_Gourd));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::FlintLock_Hammers_Disabled));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::FlintLock_Hammers_Activating));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Fire));
 }
 
 void FlintLockFire::VScreenChanged()

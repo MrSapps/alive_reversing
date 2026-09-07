@@ -47,7 +47,7 @@ void Drill::LoadAnimations()
 
     for (auto& animId : drillAnimIds)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(animId));
     }
 }
 

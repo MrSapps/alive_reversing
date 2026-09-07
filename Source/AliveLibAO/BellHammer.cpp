@@ -14,8 +14,8 @@ namespace AO {
 
 void BellHammer::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BellHammer_Idle));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BellHammer_Smashing));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::BellHammer_Idle));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::BellHammer_Smashing));
 }
 
 

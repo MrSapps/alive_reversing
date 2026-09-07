@@ -12,12 +12,12 @@ BrewMachine::BrewMachine(relive::Path_BrewMachine* pTlv, const Guid& tlvId, Reso
 {
     SetType(ReliveTypes::eBrewMachine);
 
-    mPal = GetResourceManager().LoadPal(PalId::LedFont_Red);
+    mPal = mResMan.LoadPal(PalId::LedFont_Red);
 
     mFontContext.LoadFontType(FontType::LcdFont);
     mFont.Load(3, mPal, &mFontContext);
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BrewMachine_Button));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::BrewMachine_Button));
     Animation_Init(GetAnimRes(AnimId::BrewMachine_Button));
 
     SetApplyShadowZoneColour(false);

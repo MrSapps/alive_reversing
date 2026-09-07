@@ -14,8 +14,8 @@
 
 void WorkWheel::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Work_Wheel_Idle));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Work_Wheel_Turning));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Work_Wheel_Idle));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Work_Wheel_Turning));
 }
 
 WorkWheel::WorkWheel(relive::Path_WorkWheel* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

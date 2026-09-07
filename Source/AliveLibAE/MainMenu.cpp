@@ -433,13 +433,13 @@ void MainMenuController::LoadAnimations()
     {
         if (info.field_0_animation != AnimId::None)
         {
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(info.field_0_animation));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(info.field_0_animation));
         }
     }
 
     for (const auto& animId : kMenuAnims)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(animId));
     }
 
 }
@@ -456,7 +456,7 @@ MainMenuController::MainMenuController(relive::Path_TLV* /*pTlv*/, const Guid& t
 
     mFontContext.LoadFontType(FontType::PauseMenu);
 
-    mPal = GetResourceManager().LoadPal(PalId::MainMenuFont_MainMenu);
+    mPal = mResMan.LoadPal(PalId::MainMenuFont_MainMenu);
     field_120_font.Load(240, mPal, &mFontContext);
 
     if (gMap->mCurrentCamera == MainMenuCams::eCheatMenu_SelectFMVCam)
@@ -546,7 +546,7 @@ MainMenuController::MainMenuController(relive::Path_TLV* /*pTlv*/, const Guid& t
 
     if (gMap->mCurrentCamera == MainMenuCams::eDemoSelectionCam)
     {
-        GetResourceManager().LoadingLoop(false);
+        mResMan.LoadingLoop(false);
         field_1FC_button_index = 0;
         field_250_selected_entry_index = sDemoIdChosenFromDemoMenu_5C1B9E;
         field_254 = FP_FromInteger(0);
@@ -812,13 +812,13 @@ MainMenuNextCam MainMenuController::SligSpeak_Update_4D3280(u32 input_held)
 void MainMenuController::SligSpeak_Unload_4D3170()
 {
     Unload_Resource(AnimId::MenuSligSpeak_Idle);
-    GetResourceManager().ShowLoadingIcon();
+    mResMan.ShowLoadingIcon();
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eAbe_Idle);
 }
 
 void MainMenuController::SligSpeak_Load_4D3090()
 {
-    GetResourceManager().ShowLoadingIcon();
+    mResMan.ShowLoadingIcon();
     GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuSligSpeak_Idle));
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eSlig_Idle);
 }
@@ -867,13 +867,13 @@ MainMenuNextCam MainMenuController::GlukkonSpeak_Update_4D3670(u32 input_held)
 
 void MainMenuController::GlukkonSpeak_Unload_4D3560()
 {
-    GetResourceManager().ShowLoadingIcon();
+    mResMan.ShowLoadingIcon();
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eAbe_Idle);
 }
 
 void MainMenuController::GlukkonSpeak_Load_4D3480()
 {
-    GetResourceManager().ShowLoadingIcon();
+    mResMan.ShowLoadingIcon();
     GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuGlukkonSpeak_Idle));
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eGlukkon_Idle);
 }
@@ -916,13 +916,13 @@ MainMenuNextCam MainMenuController::ScrabSpeak_Update_4D3A60(u32 input_held)
 
 void MainMenuController::ScrabSpeak_Unload_4D3950()
 {
-    GetResourceManager().ShowLoadingIcon();
+    mResMan.ShowLoadingIcon();
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eAbe_Idle);
 }
 
 void MainMenuController::ScrabSpeak_Load_4D3870()
 {
-    GetResourceManager().ShowLoadingIcon();
+    mResMan.ShowLoadingIcon();
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eScrab_Idle);
 }
 
@@ -973,13 +973,13 @@ MainMenuNextCam MainMenuController::ParamiteSpeak_Update_4D3D60(u32 input_held)
 
 void MainMenuController::ParamiteSpeak_Unload_4D3C50()
 {
-    GetResourceManager().ShowLoadingIcon();
+    mResMan.ShowLoadingIcon();
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eAbe_Idle);
 }
 
 void MainMenuController::ParamiteSpeak_Load_4D3B70()
 {
-    GetResourceManager().ShowLoadingIcon();
+    mResMan.ShowLoadingIcon();
     GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuParamiteSpeak_Idle));
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eParamite_Idle);
 }
@@ -1683,19 +1683,19 @@ MainMenuNextCam MainMenuController::LoadNewGame_Update_4D0920(u32 /*input*/)
 
     if (!gAbe)
     {
-        GetResourceManager().PendAnims(Abe::sAbeAnimIdTable);
-        GetResourceManager().PendAnimation(AnimId::ChantOrb_Particle);
-        GetResourceManager().PendAnimation(AnimId::ChantOrb_Particle_Small);
-        GetResourceManager().PendAnimation(AnimId::SquibSmoke_Particle);
-        GetResourceManager().PendAnimation(AnimId::Dust_Particle);
-        GetResourceManager().PendAnimation(AnimId::BloodDrop);
-        GetResourceManager().PendAnimation(AnimId::ObjectShadow);
-        GetResourceManager().PendAnimation(AnimId::DeathFlare_1);
-        GetResourceManager().PendAnimation(AnimId::DeathFlare_2);
-        GetResourceManager().PendAnimation(AnimId::Dove_Idle);
-        GetResourceManager().PendAnimation(AnimId::Dove_Flying);
-        GetResourceManager().PendAnimation(AnimId::SpotLight);
-        GetResourceManager().LoadingLoop2();
+        mResMan.PendAnims(Abe::sAbeAnimIdTable);
+        mResMan.PendAnimation(AnimId::ChantOrb_Particle);
+        mResMan.PendAnimation(AnimId::ChantOrb_Particle_Small);
+        mResMan.PendAnimation(AnimId::SquibSmoke_Particle);
+        mResMan.PendAnimation(AnimId::Dust_Particle);
+        mResMan.PendAnimation(AnimId::BloodDrop);
+        mResMan.PendAnimation(AnimId::ObjectShadow);
+        mResMan.PendAnimation(AnimId::DeathFlare_1);
+        mResMan.PendAnimation(AnimId::DeathFlare_2);
+        mResMan.PendAnimation(AnimId::Dove_Idle);
+        mResMan.PendAnimation(AnimId::Dove_Flying);
+        mResMan.PendAnimation(AnimId::SpotLight);
+        mResMan.LoadingLoop2();
         gAbe = relive_new Abe(mResMan);
     }
 
@@ -1805,7 +1805,7 @@ void MainMenuController::BackStory_Or_NewGame_Load_4D1BA0()
 
 void MainMenuController::BackStory_Or_NewGame_Unload_4D1BE0()
 {
-    GetResourceManager().LoadingLoop(false);
+    mResMan.LoadingLoop(false);
 }
 
 void MainMenuController::remove_ISO9660_Suffix_4D1660(char_type* out, const char_type* in)

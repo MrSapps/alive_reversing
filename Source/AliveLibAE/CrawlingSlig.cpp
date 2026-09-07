@@ -75,7 +75,7 @@ void CrawlingSlig::LoadAnimations()
 {
     for (auto& animId : sCrawlingSligAnimIdTable)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(animId));
     }
 }
 

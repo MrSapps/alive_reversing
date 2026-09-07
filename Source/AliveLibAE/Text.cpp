@@ -32,7 +32,7 @@ Text::Text(const char_type* pMessage, s32 renderCount, s32 bShadow, ResourceMana
     gObjListDrawables->Push_Back(this);
 
     mFontContext.LoadFontType(FontType::PauseMenu);
-    mPal = GetResourceManager().LoadPal(PalId::MainMenuFont_PauseMenu);
+    mPal = mResMan.LoadPal(PalId::MainMenuFont_PauseMenu);
     field_20_font.Load(static_cast<s32>((bShadow + 1) * strlen(pMessage)), mPal, &mFontContext);
 
     field_5C_xpos = static_cast<s16>(field_20_font.MeasureTextWidth(pMessage));

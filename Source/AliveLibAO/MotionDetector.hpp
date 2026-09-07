@@ -17,7 +17,7 @@ public:
     MotionDetectorLaser(ResourceManagerWrapper& resMan)
         : BaseAnimatedWithPhysicsGameObject(0, resMan)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MotionDetector_Laser));
+        mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::MotionDetector_Laser));
     }
 
     virtual void VScreenChanged() override

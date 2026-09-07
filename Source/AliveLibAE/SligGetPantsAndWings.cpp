@@ -8,8 +8,8 @@
 
 void SligGetPantsAndWings::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::CrawlingSligLocker_Closed));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::CrawlingSligLocker_Open));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::CrawlingSligLocker_Closed));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::CrawlingSligLocker_Open));
 }
 
 SligGetPantsAndWings::SligGetPantsAndWings(relive::Path_TLV* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

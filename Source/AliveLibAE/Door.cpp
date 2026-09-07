@@ -53,45 +53,45 @@ void Door::LoadAnimations()
         case EReliveLevelIds::eMudancheeVault:
         case EReliveLevelIds::eMudancheeVault_Ender:
         case EReliveLevelIds::eMudomoVault_Ender:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Temple_Closed));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Temple_Open));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Temple_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Temple_Open));
             break;
 
         case EReliveLevelIds::eFeeCoDepot:
         case EReliveLevelIds::eFeeCoDepot_Ender:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Feeco_Closed));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Feeco_Open));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Feeco_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Feeco_Open));
             break;
 
         case EReliveLevelIds::eBarracks:
         case EReliveLevelIds::eBarracks_Ender:
             if (gMap->mOverlayId == 108)
             {
-                mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_BarracksMetal_Closed));
-                mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_BarracksMetal_Open));
+                mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_BarracksMetal_Closed));
+                mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_BarracksMetal_Open));
             }
             else
             {
-                mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Barracks_Closed));
-                mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Barracks_Open));
+                mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Barracks_Closed));
+                mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Barracks_Open));
             }
             break;
 
         case EReliveLevelIds::eBonewerkz:
         case EReliveLevelIds::eBonewerkz_Ender:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Bonewerkz_Closed));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Bonewerkz_Open));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Bonewerkz_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Bonewerkz_Open));
             break;
 
         case EReliveLevelIds::eBrewery:
         case EReliveLevelIds::eBrewery_Ender:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Brewery_Closed));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Brewery_Open));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Brewery_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Brewery_Open));
             break;
 
         default:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Mines_Closed));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Mines_Open));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Mines_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Mines_Open));
             break;
     }
 }
@@ -540,7 +540,7 @@ void TrainDoor::LoadAnimations()
 {
     for (auto& animId : sTrainDoorAnimIds)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(animId));
     }
 }
 

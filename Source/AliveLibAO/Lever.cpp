@@ -46,37 +46,37 @@ void Lever::LoadAnimations()
         case EReliveLevelIds::eStockYardsReturn:
         case EReliveLevelIds::eBoardRoom:
         case EReliveLevelIds::eRuptureFarmsReturn:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RuptureFarms_Lever_Idle));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RuptureFarms_Lever_Pull_Left));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RuptureFarms_Lever_Pull_Release_Left));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RuptureFarms_Lever_Pull_Right));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RuptureFarms_Lever_Pull_Release_Right));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::RuptureFarms_Lever_Idle));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::RuptureFarms_Lever_Pull_Left));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::RuptureFarms_Lever_Pull_Release_Left));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::RuptureFarms_Lever_Pull_Right));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::RuptureFarms_Lever_Pull_Release_Right));
             break;
 
         case EReliveLevelIds::eLines:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lines_Lever_Idle));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lines_Lever_Pull_Left));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lines_Lever_Pull_Release_Left));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lines_Lever_Pull_Right));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lines_Lever_Pull_Release_Right));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lines_Lever_Idle));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lines_Lever_Pull_Left));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lines_Lever_Pull_Release_Left));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lines_Lever_Pull_Right));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lines_Lever_Pull_Release_Right));
             break;
 
         case EReliveLevelIds::eDesert:
         case EReliveLevelIds::eDesertTemple:
         case EReliveLevelIds::eDesertEscape:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Idle));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Left));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Release_Left));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Right));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Release_Right));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lever_Idle));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lever_Pull_Left));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lever_Pull_Release_Left));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lever_Pull_Right));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lever_Pull_Release_Right));
             break;
 
         default:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Idle));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Left));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Release_Left));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Right));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Release_Right));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lever_Idle));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lever_Pull_Left));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lever_Pull_Release_Left));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lever_Pull_Right));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lever_Pull_Release_Right));
             break;
     }
 }

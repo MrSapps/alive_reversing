@@ -182,7 +182,7 @@ void Fleech::LoadAnimations()
 {
     for (auto& animId : sFleechAnimFromMotion)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(animId));
     }
 }
 
@@ -1500,7 +1500,7 @@ const TintEntry kFleechTints_551844[16] = {
     {EReliveLevelIds::eBonewerkz_Ender, 127u, 127u, 127u},
     {EReliveLevelIds::eCredits, 127u, 127u, 127u}};
 
-void Animation_OnFrame_Fleech(BaseGameObject* pObj, u32&, const IndexedPoint& point, ResourceManagerWrapper& resMan)
+void Animation_OnFrame_Fleech(BaseGameObject* pObj, u32&, const IndexedPoint& point, ResourceManagerWrapper& )
 {
     reinterpret_cast<Fleech*>(pObj)->VOnFrame(point.mPoint);
 }

@@ -10,8 +10,8 @@
 
 void StatusLight::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Status_Light_Green));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Status_Light_Red));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Status_Light_Green));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Status_Light_Red));
 }
 
 StatusLight::StatusLight(relive::Path_StatusLight* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

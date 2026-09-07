@@ -48,8 +48,8 @@ DoorBlocker::~DoorBlocker()
 
 void DoorBlocker::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Lock_Open));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Lock_Idle));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Lock_Open));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Lock_Idle));
 }
 
 void DoorBlocker::VUpdate()

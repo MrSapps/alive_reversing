@@ -3455,7 +3455,7 @@ void Elum::LoadAnimations()
     {
         if (animId != AnimId::None)
         {
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(animId));
         }
     }
 }

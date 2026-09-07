@@ -16,7 +16,7 @@ DynamicArrayT<BaseGameObject>* gObjListDrawables;
 
 void BaseAnimatedWithPhysicsGameObject::CreateShadow()
 {
-    mShadow = relive_new Shadow();
+    mShadow = relive_new Shadow(mResMan);
 }
 
 void BaseAnimatedWithPhysicsGameObject::MakeArray()

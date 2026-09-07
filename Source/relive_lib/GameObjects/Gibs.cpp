@@ -62,9 +62,9 @@ static FP GibRand(FP scale)
 
 void Gibs::LoadAnimations(AnimId head, AnimId arm, AnimId body)
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(head));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(arm));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(body));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(head));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(arm));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(body));
 }
 
 Gibs::Gibs(GibType gibType, FP xpos, FP ypos, FP xOff, FP yOff, FP scale, bool bMakeSmaller, ResourceManagerWrapper& resMan)
@@ -152,7 +152,7 @@ Gibs::Gibs(GibType gibType, FP xpos, FP ypos, FP xOff, FP yOff, FP scale, bool b
     // TODO: It is assumed all 3 gib parts use the same pal - might not be true for mods
     if (headGibRec.mPalOverride == PalId::BlindMud)
     {
-        mLoadedPals.push_back(GetResourceManager().LoadPal(PalId::BlindMud));
+        mLoadedPals.push_back(mResMan.LoadPal(PalId::BlindMud));
     }
 
     LoadAnimations(headGib, armGib, bodyGib);
@@ -302,7 +302,7 @@ Gibs::Gibs(GibType gibType, FP xpos, FP ypos, FP xOff, FP yOff, FP scale, bool b
         }
         else if (gibPal != PalId::Default)
         {
-            mLoadedPals.push_back(GetResourceManager().LoadPal(gibPal));
+            mLoadedPals.push_back(mResMan.LoadPal(gibPal));
             pPart->mAnimation.LoadPal(GetPalRes(gibPal));
         }
 

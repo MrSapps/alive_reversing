@@ -29,11 +29,11 @@ BackgroundGlukkon::~BackgroundGlukkon()
 
 void BackgroundGlukkon::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Background_Glukkon_Dying));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Background_Glukkon_Idle));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Background_Glukkon_KillHim1));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Background_Glukkon_KillHim2));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Background_Glukkon_Laugh));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Background_Glukkon_Dying));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Background_Glukkon_Idle));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Background_Glukkon_KillHim1));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Background_Glukkon_KillHim2));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Background_Glukkon_Laugh));
 }
 
 BackgroundGlukkon::BackgroundGlukkon(relive::Path_BackgroundGlukkon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
@@ -74,7 +74,7 @@ BackgroundGlukkon::BackgroundGlukkon(relive::Path_BackgroundGlukkon* pTlv, const
         ALIVE_FATAL("Invalid background glukkon pal");
     }
 
-    mLoadedPals.push_back(GetResourceManager().LoadPal(pal));
+    mLoadedPals.push_back(resMan.LoadPal(pal));
     GetAnimation().LoadPal(GetPalRes(pal));
 
     mState = BackgroundGlukkon::State::eToSetSpeakPauseTimer;

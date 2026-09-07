@@ -57,7 +57,7 @@ void UXB::LoadAnimations()
 
     for (const auto& animId : kUxbAnims)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(animId));
     }
 }
 
@@ -81,7 +81,7 @@ UXB::UXB(relive::Path_UXB* pTlv, const Guid& tlvId, ResourceManagerWrapper& resM
 
     LoadAnimations();
     Animation_Init(GetAnimRes(AnimId::UXB_Active));
-    mLoadedPals.push_back(GetResourceManager().LoadPal(PalId::GreenFlash));
+    mLoadedPals.push_back(mResMan.LoadPal(PalId::GreenFlash));
 
     GetAnimation().SetSemiTrans(true);
     GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_0);

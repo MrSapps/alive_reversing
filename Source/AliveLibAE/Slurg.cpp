@@ -20,9 +20,9 @@ Slurg_Step_Watch_Points gSlurgStepWatchPoints[2] = {};
 
 void Slurg::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Slurg_Burst));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Slurg_Move));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Slurg_Turn_Around));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Slurg_Burst));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Slurg_Move));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Slurg_Turn_Around));
 }
 
 void Slurg::Clear_Slurg_Step_Watch_Points()

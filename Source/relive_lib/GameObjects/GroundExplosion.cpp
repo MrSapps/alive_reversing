@@ -18,7 +18,7 @@ GroundExplosion::GroundExplosion(FP xpos, FP ypos, FP scale, ResourceManagerWrap
 {
     SetType(ReliveTypes::eGroundExplosion);
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::GroundExplosion));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::GroundExplosion));
     Animation_Init(GetAnimRes(AnimId::GroundExplosion));
 
     GetAnimation().SetIsLastFrame(false); // Double Check

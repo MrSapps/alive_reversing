@@ -25,7 +25,7 @@ Rock::Rock(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan)
     // Note: Loaded check removed
     LoadRockTypes(mCurrentLevel, mCurrentPath);
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Rock));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Rock));
     Animation_Init(GetAnimRes(AnimId::Rock));
 
     SetInteractive(false);
@@ -45,7 +45,7 @@ Rock::Rock(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan)
     mState = RockStates::eNone_0;
 
      /*
-    mLoadedPals.push_back(GetResourceManager().LoadPal(PalId::BlueRock));
+    mLoadedPals.push_back(mResMan.LoadPal(PalId::BlueRock));
 
    
     // TODO: Don't know where this pal is, probably doesn't exist

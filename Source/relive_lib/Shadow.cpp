@@ -9,9 +9,9 @@
 #include "GameObjects/BaseAnimatedWithPhysicsGameObject.hpp" // only for the Scale enum
 #include "FixedPoint.hpp"
 
-Shadow::Shadow()
+Shadow::Shadow(ResourceManagerWrapper& resMan)
 {
-    AnimResource res = GetResourceManager().LoadAnimation(AnimId::ObjectShadow);
+    AnimResource res = resMan.LoadAnimation(AnimId::ObjectShadow);
     mAnim.Init(res, nullptr);
 
     mShadowAtBottom = false;

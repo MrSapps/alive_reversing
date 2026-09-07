@@ -32,8 +32,8 @@ Door::Door(ResourceManagerWrapper& resMan)
 
 void Door::LoadAnimations(const std::string& theme)
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Themed_Closed, theme));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Themed_Open, theme));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Themed_Closed, theme));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Themed_Open, theme));
 }
 
 Door::Door(relive::Path_Door* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
@@ -497,7 +497,7 @@ void TrainDoor::LoadAnimations()
 {
     for (auto& animId : sTrainDoorAnimIds)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(animId));
     }
 }
 

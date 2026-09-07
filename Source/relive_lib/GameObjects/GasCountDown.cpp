@@ -24,7 +24,7 @@ GasCountDown::GasCountDown(relive::Path_GasCountDown* pTlv, const Guid& tlvInfo,
     SetType(ReliveTypes::eGasCountDown);
     mTlvId = tlvInfo;
 
-    mPal = GetResourceManager().LoadPal(PalId::LedFont_Red);
+    mPal = mResMan.LoadPal(PalId::LedFont_Red);
     mFontContext.LoadFontType(FontType::LcdFont);
     mFont.Load(5, mPal, &mFontContext);
     SetDrawable(true);

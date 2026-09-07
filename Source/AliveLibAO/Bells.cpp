@@ -12,12 +12,12 @@ namespace AO {
 
 void Bells::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BigChime));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MediumChime));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::SmallChime));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BigChime_Moving));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MediumChime_Moving));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::SmallChime_Moving));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::BigChime));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::MediumChime));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::SmallChime));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::BigChime_Moving));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::MediumChime_Moving));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::SmallChime_Moving));
 }
 
 Bells::Bells(BellSize bellType, FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan)

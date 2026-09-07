@@ -13,8 +13,8 @@
 
 void SecurityDoor::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Security_Door_Speak));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Security_Door_Idle));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Security_Door_Speak));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Security_Door_Idle));
 }
 
 SecurityDoor::SecurityDoor(relive::Path_SecurityDoor* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

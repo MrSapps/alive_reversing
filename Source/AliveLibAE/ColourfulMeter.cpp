@@ -16,7 +16,7 @@ ColourfulMeter::ColourfulMeter(relive::Path_ColourfulMeter* pTlv, const Guid& tl
     mTlvInfo(tlvId),
     mTlvX(pTlv->mTopLeftX),
     mTlvY(pTlv->mTopLeftY),
-    mPal(GetResourceManager().LoadPal(PalId::LedFont_ColourfulMeter)),
+    mPal(mResMan.LoadPal(PalId::LedFont_ColourfulMeter)),
     mSwitchId(pTlv->mSwitchId),
     mNumberOfMeterBars(pTlv->mNumberOfMeterBars)
 {

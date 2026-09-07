@@ -41,10 +41,10 @@ static const TintEntry sTimedMineTint[19] = {
 
 void TimedMine::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Bomb_Flash));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Bomb_RedGreenTick));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::TimedMine_Idle));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::TimedMine_Activated));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Bomb_Flash));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Bomb_RedGreenTick));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::TimedMine_Idle));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::TimedMine_Activated));
 }
 
 TimedMine::TimedMine(relive::Path_TimedMine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

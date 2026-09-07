@@ -12,8 +12,8 @@ namespace AO {
 
 void FootSwitch::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Foot_Switch_Temple));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Foot_Switch_Temple_Pressed));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Foot_Switch_Temple));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Foot_Switch_Temple_Pressed));
 }
 
 FootSwitch::FootSwitch(relive::Path_FootSwitch* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

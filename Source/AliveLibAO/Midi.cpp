@@ -918,11 +918,11 @@ void SsVabTransBody(VabBodyRecord* pVabBody, s16 vabId)
 s16 SND_VAB_Load_476CB0(PathSoundInfo& pSoundBlockInfo)
 {
     // Find the VH file record
-    pSoundBlockInfo.mVhFileData = GetResourceManager().LoadFile(pSoundBlockInfo.mVhFile.c_str(), GetMap().mNextLevel);
+    pSoundBlockInfo.mVhFileData = GetMap().GetResourceManager().LoadFile(pSoundBlockInfo.mVhFile.c_str(), GetMap().mNextLevel);
     pSoundBlockInfo.mVabId = AO::SsVabOpenHead(reinterpret_cast<VabHeader*>(pSoundBlockInfo.mVhFileData.data()));
 
     // Load the VB file data
-    std::vector<u8> vbFileData = GetResourceManager().LoadFile(pSoundBlockInfo.mVbFile.c_str(), GetMap().mNextLevel);
+    std::vector<u8> vbFileData = GetMap().GetResourceManager().LoadFile(pSoundBlockInfo.mVbFile.c_str(), GetMap().mNextLevel);
 
     SsVabTransBody(reinterpret_cast<VabBodyRecord*>(vbFileData.data()), static_cast<s16>(pSoundBlockInfo.mVabId));
     SsVabTransCompleted(SS_WAIT_COMPLETED);

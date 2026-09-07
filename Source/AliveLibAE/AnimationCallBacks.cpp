@@ -14,12 +14,12 @@
 #include "../relive_lib/FixedPoint.hpp"
 #include "../relive_lib/Collisions.hpp"
 
-void Animation_OnFrame_Common_Null(BaseGameObject*, u32&, const IndexedPoint&, ResourceManagerWrapper& resMan)
+void Animation_OnFrame_Common_Null(BaseGameObject*, u32&, const IndexedPoint&, ResourceManagerWrapper&)
 {
 
 }
 
-void Animation_OnFrame_Null(BaseGameObject*, u32&, const IndexedPoint&, ResourceManagerWrapper& resMan)
+void Animation_OnFrame_Null(BaseGameObject*, u32&, const IndexedPoint&, ResourceManagerWrapper&)
 {
 
 }
@@ -27,7 +27,7 @@ void Animation_OnFrame_Null(BaseGameObject*, u32&, const IndexedPoint&, Resource
 void Animation_OnFrame_Common(BaseGameObject* pObjPtr, u32&, const IndexedPoint& point, ResourceManagerWrapper& resMan)
 {
     auto pObj = static_cast<BaseAliveGameObject*>(pObjPtr);
-    AnimResource ppAnimData = GetResourceManager().LoadAnimation(AnimId::Dust_Particle);
+    AnimResource ppAnimData = resMan.LoadAnimation(AnimId::Dust_Particle);
 
     FP xOff = {};
     if (pObj->GetAnimation().GetFlipX())

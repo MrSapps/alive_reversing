@@ -117,7 +117,7 @@ s16 BaseAliveGameObject::SetBaseAnimPaletteTint(const TintEntry* pTintArray, ERe
 
     if (palId != PalId::Default)
     {
-        PalResource res = GetResourceManager().LoadPal(palId);
+        PalResource res = mResMan.LoadPal(palId);
         GetAnimation().LoadPal(res);
     }
     return 1;

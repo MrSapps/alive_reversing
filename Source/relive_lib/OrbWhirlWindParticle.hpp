@@ -8,7 +8,7 @@ class BaseGameObject;
 class OrbWhirlWindParticle final
 {
 public:
-    OrbWhirlWindParticle(FP xpos, FP ypos, FP scale, bool isMudokonSpirit);
+    OrbWhirlWindParticle(FP xpos, FP ypos, FP scale, bool isMudokonSpirit, ResourceManagerWrapper& resMan);
     ~OrbWhirlWindParticle();
 
     s32 IsActive();

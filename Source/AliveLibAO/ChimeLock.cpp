@@ -31,7 +31,7 @@ ChimeLock::ChimeLock(relive::Path_ChimeLock* pTlv, const Guid& tlvId, ResourceMa
 
     mTlvId = tlvId;
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Chime_Ball));
+    mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::Chime_Ball));
     Animation_Init(GetAnimRes(AnimId::Chime_Ball));
 
     GetAnimation().SetRenderLayer(Layer::eLayer_FG1_37);

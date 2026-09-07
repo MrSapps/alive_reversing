@@ -27,7 +27,7 @@ LCDStatusBoard::LCDStatusBoard(relive::Path_LCDStatusBoard* pTlv, const Guid& tl
     mTlvId = tlvId;
     mFontContext.LoadFontType(FontType::LcdFont);
 
-    mPal = GetResourceManager().LoadPal(PalId::LedFont_Red);
+    mPal = resMan.LoadPal(PalId::LedFont_Red);
 
     mKilledMudsFont.Load(3, mPal, &mFontContext);
     mRescuedMudsFont.Load(3, mPal, &mFontContext);

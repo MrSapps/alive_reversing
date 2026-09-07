@@ -29,11 +29,11 @@ static const TintEntry kLeverTints[16] = {
 
 void Lever::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Release_Left));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Release_Right));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Idle));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Left));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Right));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lever_Pull_Release_Left));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lever_Pull_Release_Right));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lever_Idle));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lever_Pull_Left));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lever_Pull_Right));
 }
 
 Lever::Lever(relive::Path_Lever* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

@@ -21,8 +21,8 @@
 
 void RollingBall::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Stone_Ball));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Stone_Ball_Rolling));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Stone_Ball));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Stone_Ball_Rolling));
 }
 
 RollingBall::~RollingBall()

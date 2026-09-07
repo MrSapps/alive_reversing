@@ -13,8 +13,8 @@
 
 void BoomMachine::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BoomMachine_Button_Off));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BoomMachine_Button_On));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::BoomMachine_Button_Off));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::BoomMachine_Button_On));
 }
 
 BoomMachine::BoomMachine(relive::Path_BoomMachine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

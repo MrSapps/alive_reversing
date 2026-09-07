@@ -26,7 +26,7 @@ MotionDetector::MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tl
 {
     SetType(ReliveTypes::eMotionDetector);
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MotionDetector_Flare));
+    mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::MotionDetector_Flare));
     Animation_Init(GetAnimRes(AnimId::MotionDetector_Flare));
 
     GetAnimation().SetSwapXY(true);

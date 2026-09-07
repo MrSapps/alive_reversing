@@ -389,7 +389,7 @@ void QuikSave::RestoreBlyData(Quicksave& pSaveData, ResourceManagerWrapper& resM
             }
         }
     }
-    GetResourceManager().LoadingLoop(false);
+    resMan.LoadingLoop(false);
 }
 
 void Quicksave_LoadFromMemory_4C95A0()
@@ -412,7 +412,7 @@ void Quicksave_LoadFromMemory_4C95A0()
 
 void QuikSave::LoadActive()
 {
-    GetResourceManager().ShowLoadingIcon();
+    GetMap().GetResourceManager().ShowLoadingIcon();
     Quicksave_LoadFromMemory_4C95A0();
 }
 
@@ -504,7 +504,7 @@ void QuikSave::SaveToMemory_4C91A0(Quicksave& pSave)
 
 void QuikSave::DoQuicksave()
 {
-    GetResourceManager().ShowLoadingIcon();
+    GetMap().GetResourceManager().ShowLoadingIcon();
     QuikSave::SaveToMemory_4C91A0(gActiveQuicksaveData);
 }
 

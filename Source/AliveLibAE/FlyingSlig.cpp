@@ -103,11 +103,11 @@ void FlyingSlig::LoadAnimations()
 {
     for (auto& animId : sFlyingSligAnimIdTable)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(animId));
     }
 
     // used in Animation_OnFrame_FlyingSlig
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Vaporize_Particle));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Vaporize_Particle));
 }
 
 FlyingSlig::FlyingSlig(relive::Path_FlyingSlig* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

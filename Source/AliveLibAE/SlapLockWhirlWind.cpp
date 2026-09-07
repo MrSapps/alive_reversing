@@ -11,7 +11,7 @@
 #include "Path.hpp"
 #include "QuikSave.hpp"
 
-void SlapLockWhirlWind::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
+void SlapLockWhirlWind::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& /*resMan*/)
 {
     const auto pSaveState = pBuffer.ReadTmpPtr<SlapLockWhirlWindSaveState>();
     

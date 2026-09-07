@@ -22,7 +22,7 @@ Blood::Blood(FP xpos, FP ypos, FP xOff, FP yOff, FP scale, s32 count, ResourceMa
 {
     SetSpriteScale(scale);
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BloodDrop));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::BloodDrop));
     Animation_Init(GetAnimRes(AnimId::BloodDrop));
 
     GetAnimation().SetSemiTrans(false);

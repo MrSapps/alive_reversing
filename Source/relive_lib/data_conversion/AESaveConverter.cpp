@@ -70,7 +70,7 @@ bool AESaveConverter::Convert(const std::vector<u8>& savData, const char_type* p
     {
         // Reload cache
         cache.mLvlId = reliveLvlId;
-        cache.mPaths = GetResourceManager().LoadPaths(reliveLvlId);
+        cache.mPaths = mResMan.LoadPaths(reliveLvlId);
     }
 
     // Skip the u32 type 0 entry that marks the end of the object stave states data

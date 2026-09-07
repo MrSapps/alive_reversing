@@ -176,8 +176,8 @@ LCDScreen::LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId, ResourceMa
 
     mFontContext.LoadFontType(FontType::LcdFont);
 
-    mPal1 = GetResourceManager().LoadPal(PalId::LedFont_1);
-    mPal2 = GetResourceManager().LoadPal(PalId::LedFont_2);
+    mPal1 = mResMan.LoadPal(PalId::LedFont_1);
+    mPal2 = mResMan.LoadPal(PalId::LedFont_2);
 
     mFont.Load(60, mPal1, &mFontContext);
 

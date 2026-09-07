@@ -71,34 +71,34 @@ void LiftPoint::LoadAnimations()
         case EReliveLevelIds::eRuptureFarms:
         case EReliveLevelIds::eBoardRoom:
         case EReliveLevelIds::eRuptureFarmsReturn:;
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftPlatform_RuptureFarms));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftBottomWheel_RuptureFarms));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftTopWheel_RuptureFarms));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftPlatform_RuptureFarms));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftBottomWheel_RuptureFarms));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftTopWheel_RuptureFarms));
             break;
 
         case EReliveLevelIds::eLines:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftPlatform_Lines));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftBottomWheel_Lines));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftTopWheel_Lines));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftPlatform_Lines));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftBottomWheel_Lines));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftTopWheel_Lines));
             break;
 
         case EReliveLevelIds::eDesert:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftPlatform_Desert));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftBottomWheel_Desert));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftTopWheel_Desert));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftPlatform_Desert));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftBottomWheel_Desert));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftTopWheel_Desert));
             break;
 
         case EReliveLevelIds::eDesertTemple:
         case EReliveLevelIds::eDesertEscape:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftPlatform_Desert2));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftBottomWheel_Desert2));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftTopWheel_Desert2));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftPlatform_Desert2));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftBottomWheel_Desert2));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftTopWheel_Desert2));
             break;
 
         default:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftPlatform_Forest));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftBottomWheel_Forest));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftTopWheel_Forest));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftPlatform_Forest));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftBottomWheel_Forest));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftTopWheel_Forest));
             break;
     }
 }

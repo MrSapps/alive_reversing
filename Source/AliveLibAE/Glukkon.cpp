@@ -255,7 +255,7 @@ void Glukkon::LoadAnimations(relive::Path_Glukkon::GlukkonTypes glukkonType)
             for (s32 i = 0; i < 25; i++)
             {
                 const auto& anim = Glukkon::sGlukkonsAnimIdTable[1][i];
-                mLoadedAnims.push_back(GetResourceManager().LoadAnimation(anim));
+                mLoadedAnims.push_back(mResMan.LoadAnimation(anim));
             }
             break;
 
@@ -263,7 +263,7 @@ void Glukkon::LoadAnimations(relive::Path_Glukkon::GlukkonTypes glukkonType)
             for (s32 i = 0; i < 25; i++)
             {
                 const auto& anim = Glukkon::sGlukkonsAnimIdTable[2][i];
-                mLoadedAnims.push_back(GetResourceManager().LoadAnimation(anim));
+                mLoadedAnims.push_back(mResMan.LoadAnimation(anim));
             }
             break;
 
@@ -271,7 +271,7 @@ void Glukkon::LoadAnimations(relive::Path_Glukkon::GlukkonTypes glukkonType)
             for (s32 i = 0; i < 25; i++)
             {
                 const auto& anim = Glukkon::sGlukkonsAnimIdTable[3][i];
-                mLoadedAnims.push_back(GetResourceManager().LoadAnimation(anim));
+                mLoadedAnims.push_back(mResMan.LoadAnimation(anim));
             }
             break;
 
@@ -279,7 +279,7 @@ void Glukkon::LoadAnimations(relive::Path_Glukkon::GlukkonTypes glukkonType)
             for (s32 i = 0; i < 25; i++)
             {
                 const auto& anim = Glukkon::sGlukkonsAnimIdTable[0][i];
-                mLoadedAnims.push_back(GetResourceManager().LoadAnimation(anim));
+                mLoadedAnims.push_back(mResMan.LoadAnimation(anim));
             }
             break;
     }

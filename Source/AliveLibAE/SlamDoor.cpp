@@ -66,14 +66,14 @@ void SlamDoor::LoadAnimations()
         case EReliveLevelIds::eMudancheeVault:
         case EReliveLevelIds::eMudancheeVault_Ender:
         case EReliveLevelIds::eMudomoVault_Ender:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Slam_Door_Vault_Closing));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Slam_Door_Vault_Closed));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Slam_Door_Vault_Opening));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Slam_Door_Vault_Closing));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Slam_Door_Vault_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Slam_Door_Vault_Opening));
             break;
         default:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Slam_Door_Industrial_Closing));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Slam_Door_Industrial_Closed));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Slam_Door_Industrial_Opening));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Slam_Door_Industrial_Closing));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Slam_Door_Industrial_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Slam_Door_Industrial_Opening));
             break;
     }
 }

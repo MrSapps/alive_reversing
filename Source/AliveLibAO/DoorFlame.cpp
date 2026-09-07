@@ -27,7 +27,7 @@ public:
     {
         SetType(ReliveTypes::eNone);
 
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_FireBackgroundGlow));
+        mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::Door_FireBackgroundGlow));
         Animation_Init(GetAnimRes(AnimId::Door_FireBackgroundGlow));
 
         SetApplyShadowZoneColour(true);
@@ -128,7 +128,7 @@ public:
     {
         SetType(ReliveTypes::eNone);
 
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::ChantOrb_Particle_Small));
+        mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::ChantOrb_Particle_Small));
         Animation_Init(GetAnimRes(AnimId::ChantOrb_Particle_Small));
 
         GetAnimation().SetSemiTrans(true);
@@ -270,7 +270,7 @@ DoorFlame::DoorFlame(relive::Path_DoorFlame* pTlv, const Guid& tlvId, ResourceMa
     SetType(ReliveTypes::eNone);
     mTlvInfo = tlvId;
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Fire));
+    mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::Fire));
     Animation_Init(GetAnimRes(AnimId::Fire));
 
     GetAnimation().SetSemiTrans(true);

@@ -14,7 +14,7 @@ RollingBallStopper::RollingBallStopper(relive::Path_RollingBallStopper* pTlv, co
 {
     SetType(ReliveTypes::eRollingBallStopper);
     
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Stone_Ball_Stopper));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Stone_Ball_Stopper));
     Animation_Init(GetAnimRes(AnimId::Stone_Ball_Stopper));
 
     GetAnimation().SetRenderLayer(Layer::eLayer_FG1_37);

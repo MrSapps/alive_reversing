@@ -11,7 +11,7 @@ class Camera final // TODO: May actually just be "ResourceList" ?
 public:
     Camera();
     ~Camera();
-    void CreateFG1();
+    void CreateFG1(ResourceManagerWrapper& resMan);
 
 public:
     static void On_Loaded(Camera* pCamera);

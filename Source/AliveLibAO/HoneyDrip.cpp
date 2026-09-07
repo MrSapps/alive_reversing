@@ -10,7 +10,7 @@ HoneyDrip::HoneyDrip(FP xpos, FP ypos, ResourceManagerWrapper& resMan)
 {
     mRGB.SetRGB(128, 128, 128);
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Honey_Drip));
+    mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::Honey_Drip));
     Animation_Init(GetAnimRes(AnimId::Honey_Drip));
     mYPos = ypos;
     mXPos = xpos;

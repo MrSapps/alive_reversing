@@ -5,9 +5,9 @@
 #include "GameType.hpp"
 #include <algorithm>
 
-OrbWhirlWindParticle::OrbWhirlWindParticle(FP xpos, FP ypos, FP scale, bool isMudokonSpirit)
+OrbWhirlWindParticle::OrbWhirlWindParticle(FP xpos, FP ypos, FP scale, bool isMudokonSpirit, ResourceManagerWrapper& resMan)
 {
-    mAnim.Init(GetResourceManager().LoadAnimation(AnimId::ChantOrb_Particle), nullptr);
+    mAnim.Init(resMan.LoadAnimation(AnimId::ChantOrb_Particle), nullptr);
 
     mAnim.SetSemiTrans(true);
 

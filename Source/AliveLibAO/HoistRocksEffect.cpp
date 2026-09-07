@@ -23,7 +23,7 @@ HoistParticle::HoistParticle(FP xpos, FP ypos, FP scale, AnimId animId, Resource
     }
     */
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+    mLoadedAnims.push_back(resMan.LoadAnimation(animId));
     Animation_Init(GetAnimRes(animId));
     // TODO: Add way to override anim height
     //Animation_Init(frameTableOffset, maxW, 4, ppRes);

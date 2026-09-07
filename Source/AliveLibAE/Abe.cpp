@@ -366,7 +366,7 @@ static const FP_Point sThrowVelocities[9] = {
     {FP_FromInteger(0), FP_FromInteger(0)}};
 
 
-void Animation_OnFrame_Abe(BaseGameObject* pPtr, u32&, const IndexedPoint& point, ResourceManagerWrapper& resMan)
+void Animation_OnFrame_Abe(BaseGameObject* pPtr, u32&, const IndexedPoint& point, ResourceManagerWrapper& )
 {
     auto pAbe = static_cast<Abe*>(pPtr);
 
@@ -420,7 +420,7 @@ void Abe::LoadAnimations()
 {
     for (auto& animId : sAbeAnimIdTable)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(animId));
     }
 }
 

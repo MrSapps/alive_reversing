@@ -18,9 +18,9 @@
 
 void SlapLock::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::SlapLock_Initiate));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::SlapLock_Punched));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::SlapLock_Shaking));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::SlapLock_Initiate));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::SlapLock_Punched));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::SlapLock_Shaking));
 }
 
 SlapLock::SlapLock(relive::Path_SlapLock* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

@@ -44,8 +44,8 @@ void FallingItem::LoadAnimations()
     {
         case EReliveLevelIds::eRuptureFarms:
         case EReliveLevelIds::eRuptureFarmsReturn:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::FallingMeat_Waiting));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::FallingMeat_Falling));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::FallingMeat_Waiting));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::FallingMeat_Falling));
             break;
 
         case EReliveLevelIds::eLines:
@@ -54,13 +54,13 @@ void FallingItem::LoadAnimations()
         case EReliveLevelIds::eDesert:
         case EReliveLevelIds::eDesertTemple:
         case EReliveLevelIds::eDesertEscape:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::AO_FallingRock_Falling));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::AO_FallingRock_Waiting));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::AO_FallingRock_Falling));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::AO_FallingRock_Waiting));
             break;
 
         default:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::AO_FallingRock_Falling));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::AO_FallingRock_Waiting));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::AO_FallingRock_Falling));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::AO_FallingRock_Waiting));
             break;
     }
 }

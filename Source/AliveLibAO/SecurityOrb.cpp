@@ -25,7 +25,7 @@ SecurityOrb::SecurityOrb(relive::Path_SecurityOrb* pTlv, const Guid& tlvId, Reso
     SetType(ReliveTypes::eSecurityOrb);
     SetCanExplode(true);
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Security_Orb));
+    mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::Security_Orb));
     Animation_Init(GetAnimRes(AnimId::Security_Orb));
 
     mXPos = FP_FromInteger(pTlv->mTopLeftX);

@@ -14,8 +14,8 @@ namespace AO
 
 void MeatSack::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MeatSack_Hit));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MeatSack_Idle));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::MeatSack_Hit));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::MeatSack_Idle));
 }
 
 MeatSack::MeatSack(relive::Path_MeatSack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
@@ -158,7 +158,7 @@ Meat::Meat(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan)
 
     SetType(ReliveTypes::eMeat);
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Meat));
+    mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::Meat));
     Animation_Init(GetAnimRes(AnimId::Meat));
 
     mXPos = xpos;

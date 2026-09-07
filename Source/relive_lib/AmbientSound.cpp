@@ -7,6 +7,7 @@
 #include "../AliveLibAE/Path.hpp"
 #include "GameType.hpp"
 #include "../AliveLibAO/MusicTrigger.hpp"
+#include "BaseMap.hpp"
 
 static Sound_Ambiance_Array sTopBottomAmbiance = {};
 static Sound_Ambiance_Array sRightAmbiance = {};
@@ -172,7 +173,7 @@ void Start_Sounds_for_TLV(CameraPos direction, relive::Path_TLV* pTlv)
 
     if (bDangerMusic && GetGameType() == GameType::eAo)
     {
-        relive_new AO::MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eDrumAmbience, relive::Path_MusicTrigger::TriggeredBy::eTouching, 0, 40, GetResourceManager());
+        relive_new AO::MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eDrumAmbience, relive::Path_MusicTrigger::TriggeredBy::eTouching, 0, 40, GetMap().GetResourceManager());
     }
 }
 

@@ -22,7 +22,7 @@ ElectricWall::ElectricWall(relive::Path_ElectricWall* pTlv, const Guid& tlvId, R
 {
     SetType(ReliveTypes::eElectricWall);
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Electric_Wall));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Electric_Wall));
     Animation_Init(GetAnimRes(AnimId::Electric_Wall));
 
     GetAnimation().SetSemiTrans(true);

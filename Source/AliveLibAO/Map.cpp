@@ -1045,7 +1045,7 @@ TlvIterator Map::Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx
 void Map::Create_FG1s()
 {
     Camera* pCamera = field_2C_camera_array[0];
-    pCamera->CreateFG1();
+    pCamera->CreateFG1(mResourceManager);
 }
 
 void Map::SaveBlyData(u8* pSaveBuffer)

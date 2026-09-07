@@ -26,7 +26,7 @@ SaveData gSaveBuffer = {};
 
 void Kill_Objects()
 {
-    GetResourceManager().LoadingLoop(0);
+    GetMap().GetResourceManager().LoadingLoop(0);
 
     for (s32 i = 0; i < 2; i++)
     {

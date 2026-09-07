@@ -131,11 +131,11 @@ void SND_Reset()
 s16 SND_VAB_Load_4C9FE0(PathSoundInfo& pSoundBlockInfo)
 {
     // Load the VH file data
-    pSoundBlockInfo.mVhFileData = GetResourceManager().LoadFile(pSoundBlockInfo.mVhFile.c_str(), GetMap().mNextLevel);
+    pSoundBlockInfo.mVhFileData = GetMap().GetResourceManager().LoadFile(pSoundBlockInfo.mVhFile.c_str(), GetMap().mNextLevel);
     //GetMidiVars()->LoadingLoop(0);
 
     // Load the VB file data
-    std::vector<u8> vbFileData = GetResourceManager().LoadFile(pSoundBlockInfo.mVbFile.c_str(), GetMap().mNextLevel);
+    std::vector<u8> vbFileData = GetMap().GetResourceManager().LoadFile(pSoundBlockInfo.mVbFile.c_str(), GetMap().mNextLevel);
 
     // Convert the records in the header to internal representation
     pSoundBlockInfo.mVabId = SsVabOpenHead(reinterpret_cast<VabHeader*>(pSoundBlockInfo.mVhFileData.data()));
@@ -677,7 +677,7 @@ void SND_Load_Seqs_Impl(OpenSeqHandle* pSeqTable, PathSoundInfo& info)
         // Get a pointer to each SEQ
         for (const auto& seqName : info.mSeqFiles)
         {
-            auto buffer = GetResourceManager().LoadFile(seqName.c_str(), GetMap().mNextLevel);
+            auto buffer = GetMap().GetResourceManager().LoadFile(seqName.c_str(), GetMap().mNextLevel);
 
             // We have to insert into the table at the position that matches the file name
             GetMidiVars()->sSeqDataTable()[GetTableIdxForName(seqName.c_str())].field_C_ppSeq_Data = buffer;

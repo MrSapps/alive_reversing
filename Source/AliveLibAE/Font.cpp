@@ -8,6 +8,7 @@
 #include "../relive_lib/PsxDisplay.hpp"
 #include "Resources.hpp"
 #include "../relive_lib/data_conversion/AnimationConverter.hpp"
+#include "../relive_lib/BaseMap.hpp"
 
 bool gDisableFontFlicker = false;
 bool gFontDrawScreenSpace = false;
@@ -849,7 +850,7 @@ void FontContext::LoadFontType(FontType resourceID)
     }
 
 
-    FontResource fontRes = GetResourceManager().LoadFont(resourceID);
+    FontResource fontRes = GetMap().GetResourceManager().LoadFont(resourceID);
     mFntResource = fontRes;
 
     // TODO: Will get moved to a json file in FontResource

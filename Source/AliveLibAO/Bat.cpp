@@ -18,9 +18,9 @@ namespace AO {
 
 void Bat::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Bat));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Bat_Flying));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Bat_Unknown));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Bat));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Bat_Flying));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Bat_Unknown));
 }
 
 Bat::Bat(relive::Path_Bat* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

@@ -72,31 +72,31 @@ void TrapDoor::LoadAnimationsAO()
         case EReliveLevelIds::eRuptureFarms:
         case EReliveLevelIds::eBoardRoom:
         case EReliveLevelIds::eRuptureFarmsReturn:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::R1_TrapDoor_Open));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::R1_TrapDoor_Closed));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::R1_TrapDoor_Opening));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::R1_TrapDoor_Closing));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::R1_TrapDoor_Open));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::R1_TrapDoor_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::R1_TrapDoor_Opening));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::R1_TrapDoor_Closing));
             break;
         case EReliveLevelIds::eLines:
         case EReliveLevelIds::eStockYards:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lines_TrapDoor_Open));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lines_TrapDoor_Closed));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lines_TrapDoor_Opening));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lines_TrapDoor_Closing));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lines_TrapDoor_Open));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lines_TrapDoor_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lines_TrapDoor_Opening));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lines_TrapDoor_Closing));
             break;
         case EReliveLevelIds::eDesert:
         case EReliveLevelIds::eDesertTemple:
         case EReliveLevelIds::eDesertEscape:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Desert_TrapDoor_Open));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Desert_TrapDoor_Closed));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Desert_TrapDoor_Opening));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Desert_TrapDoor_Closing));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Desert_TrapDoor_Open));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Desert_TrapDoor_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Desert_TrapDoor_Opening));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Desert_TrapDoor_Closing));
             break;
         default:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lines_TrapDoor_Open));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lines_TrapDoor_Closed));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lines_TrapDoor_Opening));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lines_TrapDoor_Closing));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lines_TrapDoor_Open));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lines_TrapDoor_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lines_TrapDoor_Opening));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lines_TrapDoor_Closing));
             break;
     }
 }
@@ -109,17 +109,17 @@ void TrapDoor::LoadAnimationsAE()
         case EReliveLevelIds::eMudancheeVault:
         case EReliveLevelIds::eMudancheeVault_Ender:
         case EReliveLevelIds::eMudomoVault_Ender:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Trap_Door_Tribal_Open));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Trap_Door_Tribal_Closed));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Trap_Door_Tribal_Opening));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Trap_Door_Tribal_Closing));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Trap_Door_Tribal_Open));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Trap_Door_Tribal_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Trap_Door_Tribal_Opening));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Trap_Door_Tribal_Closing));
             break;
 
         default:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Trap_Door_Open));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Trap_Door_Closed));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Trap_Door_Opening));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Trap_Door_Closing));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Trap_Door_Open));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Trap_Door_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Trap_Door_Opening));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Trap_Door_Closing));
             break;
     }
 }

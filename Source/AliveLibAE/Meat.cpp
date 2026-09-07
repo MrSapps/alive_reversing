@@ -26,7 +26,7 @@ Meat::Meat(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan)
 
     SetType(ReliveTypes::eMeat);
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Meat));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Meat));
     Animation_Init(GetAnimRes(AnimId::Meat));
 
     GetAnimation().SetSemiTrans(false);

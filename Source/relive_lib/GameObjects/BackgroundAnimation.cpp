@@ -31,7 +31,7 @@ BackgroundAnimation::BackgroundAnimation(relive::Path_BackgroundAnimation* pTlv,
     mObjectYPos = FP_FromInteger(pTlv->mTopLeftY);
 
     const AnimRecord& anim = PerGameBgAnimRec(pTlv->mAnimId);
-    AnimResource res = GetResourceManager().LoadAnimation(anim.mId);
+    AnimResource res = mResMan.LoadAnimation(anim.mId);
 
     Animation_Init(res);
 

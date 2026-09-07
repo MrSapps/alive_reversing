@@ -64,7 +64,7 @@ static u8 HintFly_NextRandom()
 HintFly::HintFly(relive::Path_HintFly* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
     : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HintFly));
+    mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::HintFly));
     Animation_Init(GetAnimRes(AnimId::HintFly));
 
     GetAnimation().SetSemiTrans(false);

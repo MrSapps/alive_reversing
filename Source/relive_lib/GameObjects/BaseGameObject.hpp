@@ -54,6 +54,8 @@ public:
 
     PalResource& GetPalRes(PalId palId);
 
+    ResourceManagerWrapper& GetResMan() const { return mResMan; }
+
     bool GetUpdatable() const { return mUpdatable; }
     void SetUpdatable(bool val) { mUpdatable = val; }
     bool GetDead() const { return mDead; }

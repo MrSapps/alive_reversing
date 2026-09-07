@@ -21,8 +21,8 @@ static s16 sAbePortalDirection = 0;
 
 void Dove::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Dove_Flying));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Dove_Idle));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Dove_Flying));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Dove_Idle));
 }
 
 static inline void PlayAmbientSeq()
@@ -105,7 +105,7 @@ Dove::Dove(AnimId animId, FP xpos, FP ypos, FP scale, ResourceManagerWrapper& re
 {
     SetType(ReliveTypes::eDove);
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(animId));
     Animation_Init(GetAnimRes(animId));
 
     GetAnimation().SetSemiTrans(false);

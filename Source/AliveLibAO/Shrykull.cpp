@@ -40,9 +40,9 @@ void Shrykull::VScreenChanged()
 
 void Shrykull::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::ShrykullStart));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::ShrykullTransform));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::ShrykullDetransform));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::ShrykullStart));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::ShrykullTransform));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::ShrykullDetransform));
 }
 
 Shrykull::Shrykull(ResourceManagerWrapper& resMan)

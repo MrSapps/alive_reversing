@@ -519,11 +519,11 @@ Mudokon::Mudokon(relive::Path_Mudokon* pTlv, const Guid& tlvId, ResourceManagerW
         mBrainState = Mud_Brain_State::Brain_4_ListeningToAbe;
     }
 
-    mLoadedPals.push_back(GetResourceManager().LoadPal(PalId::BlindMud));
-    mLoadedPals.push_back(GetResourceManager().LoadPal(PalId::AngryMud));
-    mLoadedPals.push_back(GetResourceManager().LoadPal(PalId::SadMud));
-    mLoadedPals.push_back(GetResourceManager().LoadPal(PalId::WiredMud));
-    mLoadedPals.push_back(GetResourceManager().LoadPal(PalId::SickMud));
+    mLoadedPals.push_back(mResMan.LoadPal(PalId::BlindMud));
+    mLoadedPals.push_back(mResMan.LoadPal(PalId::AngryMud));
+    mLoadedPals.push_back(mResMan.LoadPal(PalId::SadMud));
+    mLoadedPals.push_back(mResMan.LoadPal(PalId::WiredMud));
+    mLoadedPals.push_back(mResMan.LoadPal(PalId::SickMud));
 
     if (mBlind)
     {
@@ -625,7 +625,7 @@ void Mudokon::LoadAnimations()
 {
     for (auto& animId : kMudMotionAnimIds)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(animId));
     }
 }
 

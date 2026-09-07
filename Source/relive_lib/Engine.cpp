@@ -96,7 +96,6 @@ Engine::Engine(GameType gameType, FileSystem& fs, CommandLineParser& clp)
     , mFs(fs)
     , mClp(clp)
 {
-    SetResourceManager(mResMan);
 
     mIpcInterface = relive::MakeIpcInterface();
     mIpcInterface->Listen([&](relive::PacketTypes packetType, const std::vector<unsigned char>& buffer)
@@ -225,7 +224,7 @@ void Engine::CmdLineRenderInit()
 // QuickSave load/Restart path calls this
 void DestroyObjects()
 {
-    GetResourceManager().LoadingLoop(false);
+    GetMap().GetResourceManager().LoadingLoop(false);
     for (s32 iterations = 0; iterations < 2; iterations++)
     {
         for (s32 idx = 0;idx < gBaseGameObjects->Size(); idx++)

@@ -66,10 +66,10 @@ Paramite::Paramite(relive::Path_Paramite* pTlv, const Guid& tlvId, ResourceManag
 
     for (auto& animId : sParamiteMotionAnimIds)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+        mLoadedAnims.push_back(resMan.LoadAnimation(animId));
     }
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::ParamiteWeb));
+    mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::ParamiteWeb));
 
     mBaseGameObjectTlvInfo = tlvId;
     Animation_Init(GetAnimRes(AnimId::Paramite_Idle));

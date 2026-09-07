@@ -14,9 +14,9 @@
 
 void RockSack::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RockSack_Idle));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RockSack_SoftHit));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RockSack_HardHit));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::RockSack_Idle));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::RockSack_SoftHit));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::RockSack_HardHit));
 }
 
 RockSack::RockSack(relive::Path_RockSack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

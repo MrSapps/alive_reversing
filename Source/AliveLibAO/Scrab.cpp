@@ -41,7 +41,7 @@ Scrab::Scrab(relive::Path_Scrab* pTlv, const Guid& tlvId, ResourceManagerWrapper
 
     for (const auto& animId : sScrabMotionAnimIds)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+        mLoadedAnims.push_back(resMan.LoadAnimation(animId));
     }
 
     Animation_Init(GetAnimRes(AnimId::Scrab_Idle));

@@ -28,7 +28,7 @@ ZapLine::ZapLine(FP xPosSource, FP yPosSource, FP xPosDest, FP yPosDest, s32 ali
         // Creates thin blue zap lines.
         mNumberOfPiecesPerSegment = 20;
         mNumberOfSegments = 12;
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Zap_Line_Blue));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Zap_Line_Blue));
         Animation_Init(GetAnimRes(AnimId::Zap_Line_Blue));
         blendMode = relive::TBlendModes::eBlend_3;
     }
@@ -37,7 +37,7 @@ ZapLine::ZapLine(FP xPosSource, FP yPosSource, FP xPosDest, FP yPosDest, s32 ali
         // Creates thick red zap lines.
         mNumberOfPiecesPerSegment = 10;
         mNumberOfSegments = 28;
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Zap_Line_Red));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Zap_Line_Red));
         Animation_Init(GetAnimRes(AnimId::Zap_Line_Red));
         blendMode = relive::TBlendModes::eBlend_1;
     }

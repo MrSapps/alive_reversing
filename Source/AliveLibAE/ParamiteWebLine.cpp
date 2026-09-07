@@ -13,7 +13,7 @@
 
 void ParamiteWebLine::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::ChantOrb_Particle));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::ChantOrb_Particle));
 }
 
 ParamiteWebLine::ParamiteWebLine(relive::Path_ParamiteWebLine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
@@ -24,7 +24,7 @@ ParamiteWebLine::ParamiteWebLine(relive::Path_ParamiteWebLine* pTlv, const Guid&
 
     LoadAnimations();
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::ParamiteWeb));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::ParamiteWeb));
     Animation_Init(GetAnimRes(AnimId::ParamiteWeb));
 
     if (pTlv->mScale != relive::reliveScale::eFull)

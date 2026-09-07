@@ -20,22 +20,22 @@ void PullRingRope::LoadAnimations()
         case EReliveLevelIds::eRuptureFarms:
         case EReliveLevelIds::eBoardRoom:
         case EReliveLevelIds::eRuptureFarmsReturn:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Pullring_Farms_Idle));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Pullring_Farms_UseBegin));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Pullring_Farms_UseEnd));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Pullring_Farms_Idle));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Pullring_Farms_UseBegin));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Pullring_Farms_UseEnd));
             break;
 
         case EReliveLevelIds::eDesert:
         case EReliveLevelIds::eDesertTemple:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Pullring_Desert_Idle));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Pullring_Desert_UseBegin));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Pullring_Desert_UseEnd));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Pullring_Desert_Idle));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Pullring_Desert_UseBegin));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Pullring_Desert_UseEnd));
             break;
 
         default:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Pullring_Desert_Idle));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Pullring_Desert_UseBegin));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Pullring_Desert_UseEnd));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Pullring_Desert_Idle));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Pullring_Desert_UseBegin));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Pullring_Desert_UseEnd));
             break;
     }
 }

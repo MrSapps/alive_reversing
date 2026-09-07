@@ -26,7 +26,7 @@ ParamiteWeb::ParamiteWeb(FP xpos, s32 bottom, s32 top, FP scale, ResourceManager
         mSegmentLength = 7;
     }
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::ParamiteWeb));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::ParamiteWeb));
     Animation_Init(GetAnimRes(AnimId::ParamiteWeb));
 
     if (scale == FP_FromInteger(1))

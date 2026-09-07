@@ -20,9 +20,9 @@ const static s16 sRndValues[12] = {5, 0, 10, 0, 30, 0, 5, 0, 0, 0, 0, 0};
 
 void HoistRocksEffect::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HoistRock1));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HoistRock2));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HoistRock3));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::HoistRock1));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::HoistRock2));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::HoistRock3));
 }
 
 HoistRocksEffect::HoistRocksEffect(relive::Path_Hoist* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

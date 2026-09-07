@@ -17,11 +17,11 @@ void Camera::On_Loaded(Camera* /*pCamera*/)
 
 }
 
-void Camera::CreateFG1()
+void Camera::CreateFG1(ResourceManagerWrapper& resMan)
 {
-    Fg1Resource fg1Res = GetResourceManager().LoadFg1(mLevel, mPath, mCameraNumber);
+    Fg1Resource fg1Res = resMan.LoadFg1(mLevel, mPath, mCameraNumber);
     if (fg1Res.Any())
     {
-        relive_new FG1(fg1Res, mCamRes, GetResourceManager());
+        relive_new FG1(fg1Res, mCamRes, resMan);
     }
 }

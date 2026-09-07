@@ -31,8 +31,8 @@ static const TintEntry kMeatSackTints[16] = {
 
 void MeatSack::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MeatSack_Hit));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MeatSack_Idle));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::MeatSack_Hit));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::MeatSack_Idle));
 }
 
 MeatSack::MeatSack(relive::Path_MeatSack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

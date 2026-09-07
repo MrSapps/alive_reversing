@@ -48,7 +48,7 @@ void Grenade::Init(FP xpos, FP ypos)
 {
     SetType(ReliveTypes::eGrenade);
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Grenade));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Grenade));
     Animation_Init(GetAnimRes(AnimId::Grenade));
 
     SetInteractive(false);

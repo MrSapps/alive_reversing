@@ -26,7 +26,7 @@ Bone::Bone(FP xpos, FP ypos, s16 countId, ResourceManagerWrapper& resMan) :
 {
     SetType(ReliveTypes::eBone);
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Bone));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Bone));
     Animation_Init(GetAnimRes(AnimId::Bone));
 
     GetAnimation().SetSemiTrans(false);

@@ -69,9 +69,9 @@ void LiftPoint::LoadAnimations()
         case EReliveLevelIds::eMudomoVault_Ender:
         case EReliveLevelIds::eMudancheeVault:
         case EReliveLevelIds::eMudancheeVault_Ender:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftPlatform_Necrum));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftBottomWheel_Necrum));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftTopWheel_Necrum));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftPlatform_Necrum));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftBottomWheel_Necrum));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftTopWheel_Necrum));
             break;
 
         case EReliveLevelIds::eFeeCoDepot:
@@ -82,15 +82,15 @@ void LiftPoint::LoadAnimations()
         case EReliveLevelIds::eBonewerkz_Ender:
         case EReliveLevelIds::eBrewery:
         case EReliveLevelIds::eBrewery_Ender:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftPlatform_Mines));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftBottomWheel_Mines));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftTopWheel_Mines));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftPlatform_Mines));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftBottomWheel_Mines));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftTopWheel_Mines));
             break;
 
         default:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftPlatform_Mines));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftBottomWheel_Mines));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftTopWheel_Mines));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftPlatform_Mines));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftBottomWheel_Mines));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::LiftTopWheel_Mines));
             break;
     }
 }

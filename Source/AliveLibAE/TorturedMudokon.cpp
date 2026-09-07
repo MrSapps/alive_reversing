@@ -14,11 +14,11 @@
 
 void TorturedMudokon::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Tortured_Mudokon));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Tortured_Mudokon_Released));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Tortured_Mudokon_Tears));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Tortured_Mudokon_Zap));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Electric_Wall));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Tortured_Mudokon));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Tortured_Mudokon_Released));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Tortured_Mudokon_Tears));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Tortured_Mudokon_Zap));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Electric_Wall));
 }
 
 TorturedMudokon::TorturedMudokon(relive::Path_TorturedMudokon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

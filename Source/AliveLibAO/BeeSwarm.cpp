@@ -40,7 +40,7 @@ BeeSwarm::BeeSwarm(FP xpos, FP ypos, FP speed, s32 numBees, s32 totalChaseTime, 
         numBeesToUse = 1;
     }
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Bee_Swarm));
+    mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::Bee_Swarm));
     Animation_Init(GetAnimRes(AnimId::Bee_Swarm));
 
     if (numBeesToUse <= 25)

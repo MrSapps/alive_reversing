@@ -85,7 +85,7 @@ void Scrab::LoadAnimations()
 {
     for (auto& animId : sScrabMotionAnimIds)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(animId));
     }
 }
 

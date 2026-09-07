@@ -73,7 +73,7 @@ Spark::Spark(FP xpos, FP ypos, FP scale, s32 count, s32 minAngle, s32 maxAngle, 
         else
         {
             // Normal drill type sparks
-            AnimResource ppRes = GetResourceManager().LoadAnimation(AnimId::ChantOrb_Particle_Small);
+            AnimResource ppRes = mResMan.LoadAnimation(AnimId::ChantOrb_Particle_Small);
 
             // subtract 4 in AO for some reason
             const FP particleYPos = GetGameType() == GameType::eAo ? mYPos - FP_FromInteger(4) : mYPos;

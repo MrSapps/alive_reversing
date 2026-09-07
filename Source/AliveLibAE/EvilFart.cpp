@@ -30,7 +30,7 @@ EvilFart::EvilFart(ResourceManagerWrapper& resMan)
 {
     SetType(ReliveTypes::eEvilFart);
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Fart));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Fart));
     Animation_Init(GetAnimRes(AnimId::Fart));
 
     SetApplyShadowZoneColour(false);

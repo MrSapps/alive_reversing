@@ -46,7 +46,7 @@ MovingBomb::MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, Resourc
 
     SetType(ReliveTypes::eTimedMine_or_MovingBomb);
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MovingBomb));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::MovingBomb));
     Animation_Init(GetAnimRes(AnimId::MovingBomb));
 
     GetAnimation().SetSemiTrans(true);

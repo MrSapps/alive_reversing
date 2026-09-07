@@ -22,7 +22,7 @@ MotionDetectorLaser::MotionDetectorLaser(FP xpos, FP ypos, FP scale, Layer layer
     : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eRedLaser);
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MotionDetector_Laser));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::MotionDetector_Laser));
     Animation_Init(GetAnimRes(AnimId::MotionDetector_Laser));
     GetAnimation().SetRenderLayer(layer);
     mXPos = xpos;
@@ -38,7 +38,7 @@ MotionDetector::MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tl
 {
     SetType(ReliveTypes::eGreeterBody);
 
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MotionDetector_Flare));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::MotionDetector_Flare));
     Animation_Init(GetAnimRes(AnimId::MotionDetector_Flare));
 
     GetAnimation().SetSemiTrans(true);

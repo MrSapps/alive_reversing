@@ -31,26 +31,6 @@ ResourceManagerWrapper::ResourceManagerWrapper()
 // Out of line so unique_ptr<ThreadPool> can be destroyed with an incomplete ThreadPool type
 ResourceManagerWrapper::~ResourceManagerWrapper() = default;
 
-static ResourceManagerWrapper* sResourceManager = nullptr;
-
-void SetResourceManager(ResourceManagerWrapper& resMan)
-{
-    sResourceManager = &resMan;
-}
-
-// TODO: remove after passing the res man to all objects
-ResourceManagerWrapper& GetResourceManager()
-{
-    // If nothing has been registered yet (e.g. conversion tools which don't use the game engine)
-    // then just use a local fallback instance
-    if (!sResourceManager)
-    {
-        static ResourceManagerWrapper fallback;
-        return fallback;
-    }
-    return *sResourceManager;
-}
-
 static FileSystem::Path BasePath(bool invertGame = false)
 {
     FileSystem::Path filePath;

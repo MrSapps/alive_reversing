@@ -7,7 +7,7 @@ enum class Scale : s16;
 class Shadow final
 {
 public:
-    Shadow();
+    Shadow(ResourceManagerWrapper& resMan);
     ~Shadow();
 
     void Calculate_Position(FP xpos, FP ypos, PSX_RECT* frameRect, FP spriteScale, Scale scale);

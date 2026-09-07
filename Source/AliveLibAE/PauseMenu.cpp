@@ -268,9 +268,9 @@ static PauseMenuPageEntry* sAllControlEntries[6] =
 
 void PauseMenu::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::NormalMudIcon));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::AngryMudIcon));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HappyMudIcon));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::NormalMudIcon));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::AngryMudIcon));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::HappyMudIcon));
 }
 
 PauseMenu::PauseMenu(ResourceManagerWrapper& resMan)
@@ -294,7 +294,7 @@ PauseMenu::PauseMenu(ResourceManagerWrapper& resMan)
     mSaveState = SaveState::ReadingInput_0;
 
     mFontContext.LoadFontType(FontType::PauseMenu);
-    mPal = GetResourceManager().LoadPal(PalId::MainMenuFont_PauseMenu);
+    mPal = mResMan.LoadPal(PalId::MainMenuFont_PauseMenu);
     mFont.Load(256, mPal, &mFontContext);
 
     Init();

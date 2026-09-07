@@ -38,11 +38,11 @@ static const TintEntry sUXBTints[16] = {
 
 void UXB::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Bomb_RedGreenTick));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::UXB_Disabled));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::UXB_Toggle));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::UXB_Active));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Bomb_Flash));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Bomb_RedGreenTick));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::UXB_Disabled));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::UXB_Toggle));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::UXB_Active));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Bomb_Flash));
 }
 
 void UXB::PlaySFX(relive::SoundEffects sfxIdx)
@@ -65,7 +65,7 @@ UXB::UXB(relive::Path_UXB* pTlv, const Guid& tlvId, ResourceManagerWrapper& resM
 
     LoadAnimations();
     Animation_Init(GetAnimRes(AnimId::UXB_Active));
-    mLoadedPals.push_back(GetResourceManager().LoadPal(PalId::GreenFlash));
+    mLoadedPals.push_back(resMan.LoadPal(PalId::GreenFlash));
 
     GetAnimation().SetSemiTrans(true);
     GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_0);

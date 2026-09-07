@@ -35,21 +35,21 @@ DoorLight::DoorLight(relive::Path_LightEffect* pTlv, const Guid& tlvId, Resource
     {
         case relive::Path_LightEffect::Type::GoldGlow:
         {
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::GoldGlow));
+            mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::GoldGlow));
             Animation_Init(GetAnimRes(AnimId::GoldGlow));
             break;
         }
 
         case relive::Path_LightEffect::Type::GreenGlow:
         {
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::GreenGlow));
+            mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::GreenGlow));
             Animation_Init(GetAnimRes(AnimId::GreenGlow));
             break;
         }
 
         case relive::Path_LightEffect::Type::FlintGlow:
         {
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::FlintGlow));
+            mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::FlintGlow));
             Animation_Init(GetAnimRes(AnimId::FlintGlow));
             mHasSwitchId = true;
             break;
@@ -61,12 +61,12 @@ DoorLight::DoorLight(relive::Path_LightEffect* pTlv, const Guid& tlvId, Resource
             mHeight = 0;
             if (SwitchStates_Get(pTlv->mSwitchId))
             {
-                mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::GreenDoorLight));
+                mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::GreenDoorLight));
                 Animation_Init(GetAnimRes(AnimId::GreenDoorLight));
             }
             else
             {
-                mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RedDoorLight));
+                mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::RedDoorLight));
                 Animation_Init(GetAnimRes(AnimId::RedDoorLight));
                 xOff = 6;
             }
@@ -79,12 +79,12 @@ DoorLight::DoorLight(relive::Path_LightEffect* pTlv, const Guid& tlvId, Resource
             mHeight = 0;
             if (SwitchStates_Get(pTlv->mSwitchId))
             {
-                mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::GreenHubLight));
+                mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::GreenHubLight));
                 Animation_Init(GetAnimRes(AnimId::GreenHubLight));
             }
             else
             {
-                mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RedHubLight));
+                mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::RedHubLight));
                 Animation_Init(GetAnimRes(AnimId::RedHubLight));
             }
             break;

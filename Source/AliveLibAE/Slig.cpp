@@ -308,7 +308,7 @@ void Slig::LoadAnimations()
 {
     for (auto& animId : sSligAnimIdTable)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(animId));
     }
 }
 

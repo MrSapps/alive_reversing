@@ -84,7 +84,7 @@ void Paramite::LoadAnimations()
 {
     for (auto& animId : sParamiteMotionAnimIds)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(animId));
     }
 }
 

@@ -852,7 +852,7 @@ void Map::GoTo_Camera()
 void Map::Create_FG1s()
 {
     Camera* pCamera = field_2C_camera_array[0];
-    pCamera->CreateFG1();
+    pCamera->CreateFG1(mResourceManager);
 }
 
 void Map::TLV_Reset(const Guid& tlvId, s16 hiFlags)

@@ -196,7 +196,7 @@ public:
 class ThreadPool;
 
 // Temp adapter interface
-class ResourceManagerWrapper
+class ResourceManagerWrapper final
 {
 public:
     ResourceManagerWrapper();
@@ -305,8 +305,3 @@ private:
     std::unique_ptr<ThreadPool> mThreadPool;
 };
 
-// TODO: This accessor exists until all usages have been migrated to receive the
-// engine owned instance through constructors/getters. The engine registers its
-// instance via SetResourceManager().
-ResourceManagerWrapper& GetResourceManager();
-void SetResourceManager(ResourceManagerWrapper& resMan);

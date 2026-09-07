@@ -28,7 +28,7 @@ PauseMenu::PauseMenu(ResourceManagerWrapper& resMan)
     SetSurviveDeathReset(true);
 
     gObjListDrawables->Push_Back(this);
-    mPal = GetResourceManager().LoadPal(PalId::MainMenuFont_PauseMenu);
+    mPal = resMan.LoadPal(PalId::MainMenuFont_PauseMenu);
     mFontContext.LoadFontType(FontType::PauseMenu);
     field_E4_font.Load(175, mPal, &mFontContext);
     field_11C = 0;

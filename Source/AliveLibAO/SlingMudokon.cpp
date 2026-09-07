@@ -38,7 +38,7 @@ void SlingMudokon::LoadAnimations()
 {
     for (auto& animId : sSlingMudMotionAnimIds)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(animId));
     }
 }
 

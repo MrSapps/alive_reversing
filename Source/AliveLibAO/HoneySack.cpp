@@ -17,10 +17,10 @@ namespace AO {
 
 void HoneySack::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HoneySack_Hanging));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HoneySack_OnGround));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HoneySack_Falling));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HoneySack_FallingToSmashed));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::HoneySack_Hanging));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::HoneySack_OnGround));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::HoneySack_Falling));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::HoneySack_FallingToSmashed));
 }
 
 HoneySack::HoneySack(relive::Path_HoneySack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

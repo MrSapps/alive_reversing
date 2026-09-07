@@ -16,8 +16,8 @@
 Water::Water(relive::Path_Water* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
     : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::WaterDrop));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::WaterSplash));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::WaterDrop));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::WaterSplash));
 
     Animation_Init(GetAnimRes(AnimId::WaterDrop));
     // mAnim.mFlags.Set(AnimFlags::eBit25_bDecompressDone);

@@ -25,13 +25,13 @@ const FP mineCarWidthUnscaled = FP_FromInteger(12);
 
 void MineCar::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Mine_Car_Closed));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Mine_Car_Open));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Mine_Car_Shake_A));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Mine_Car_Shake_B));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Mine_Car_Tread_Idle));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Mine_Car_Tread_Move_A));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Mine_Car_Tread_Move_B));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Mine_Car_Closed));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Mine_Car_Open));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Mine_Car_Shake_A));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Mine_Car_Shake_B));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Mine_Car_Tread_Idle));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Mine_Car_Tread_Move_A));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Mine_Car_Tread_Move_B));
 }
 
 MineCar::MineCar(relive::Path_MineCar* pTlv, const Guid& tlvId, s32 /*a4*/, s32 /*a5*/, s32 /*a6*/, ResourceManagerWrapper& resMan)

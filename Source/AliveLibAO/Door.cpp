@@ -46,33 +46,33 @@ void Door::LoadAnimations()
         case EReliveLevelIds::eRuptureFarms:
         case EReliveLevelIds::eBoardRoom:
         case EReliveLevelIds::eRuptureFarmsReturn:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_RuptureFarms_Open));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_RuptureFarms_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_RuptureFarms_Open));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_RuptureFarms_Closed));
             break;
 
         case EReliveLevelIds::eLines:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Lines_Open));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Lines_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Lines_Open));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Lines_Closed));
             break;
 
         case EReliveLevelIds::eDesert:
         case EReliveLevelIds::eDesertTemple:
         case EReliveLevelIds::eDesertEscape:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Desert_Open));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Desert_Closed));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HubDoor_Desert_Open));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HubDoor_Desert_Closed));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::FinalTestDoor_Desert_Open));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::FinalTestDoor_Desert_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Desert_Open));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Desert_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::HubDoor_Desert_Open));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::HubDoor_Desert_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::FinalTestDoor_Desert_Open));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::FinalTestDoor_Desert_Closed));
             break;
 
         default:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Forest_Open));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Forest_Closed));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HubDoor_Forest_Open));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HubDoor_Forest_Closed));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::FinalTestDoor_Forest_Open));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::FinalTestDoor_Forest_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Forest_Open));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Forest_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::HubDoor_Forest_Open));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::HubDoor_Forest_Closed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::FinalTestDoor_Forest_Open));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::FinalTestDoor_Forest_Closed));
             break;
     }
 }

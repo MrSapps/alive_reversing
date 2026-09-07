@@ -27,8 +27,8 @@ static const ButtonSfxEntry sButtonSfxInfo[8] = {
 
 void CrawlingSligButton::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::CrawlingSligButton));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::CrawlingSligButtonUse));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::CrawlingSligButton));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::CrawlingSligButtonUse));
 }
 
 CrawlingSligButton::CrawlingSligButton(relive::Path_CrawlingSligButton* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

@@ -54,7 +54,7 @@ void Well::InitBgAnim(s16 bgAnimId)
     {
         const AnimRecord& anim = AO::BgAnimRec(bgAnimId);
 
-        Animation_Init(GetResourceManager().LoadAnimation(anim.mId));
+        Animation_Init(mResMan.LoadAnimation(anim.mId));
 
         GetAnimation().SetSemiTrans(false);
         SetApplyShadowZoneColour(false);

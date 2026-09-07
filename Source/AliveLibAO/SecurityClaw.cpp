@@ -41,7 +41,7 @@ Claw::Claw(ResourceManagerWrapper& resMan)
 {
     SetType(ReliveTypes::eClawOrBirdPortalTerminator);
     
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Security_Claw_Lower_Idle));
+    mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::Security_Claw_Lower_Idle));
     Animation_Init(GetAnimRes(AnimId::Security_Claw_Lower_Idle));
 }
 
@@ -53,10 +53,10 @@ void Claw::VScreenChanged()
 
 void SecurityClaw::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Security_Claw_Upper_Rotating));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Security_Claw_Upper_NoRotation));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Security_Claw_Lower_Open));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Security_Claw_Lower_Close));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Security_Claw_Upper_Rotating));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Security_Claw_Upper_NoRotation));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Security_Claw_Lower_Open));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Security_Claw_Lower_Close));
 }
 
 SecurityClaw::SecurityClaw(relive::Path_SecurityClaw* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

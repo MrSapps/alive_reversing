@@ -32,9 +32,9 @@ MeatSaw::~MeatSaw()
 
 void MeatSaw::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MeatSawMotor));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MeatSaw_Idle));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MeatSaw_Moving));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::MeatSawMotor));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::MeatSaw_Idle));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::MeatSaw_Moving));
 }
 
 MeatSaw::MeatSaw(relive::Path_MeatSaw* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

@@ -25,12 +25,12 @@
 
 void Greeter::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Greeter_Turn));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Greeter_Hit));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Greeter_Speak));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Greeter_Moving));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Greeter_Chase));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Greeter_Falling));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Greeter_Turn));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Greeter_Hit));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Greeter_Speak));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Greeter_Moving));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Greeter_Chase));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Greeter_Falling));
 }
 
 Greeter::Greeter(relive::Path_Greeter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

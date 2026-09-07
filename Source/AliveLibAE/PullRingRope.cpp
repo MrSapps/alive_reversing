@@ -33,9 +33,9 @@ static const TintEntry sPullRingRopeTints[16] = {
 
 void PullRingRope::LoadAnimations()
 {
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::PullRingRope_Idle));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::PullRingRope_UseBegin));
-    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::PullRingRope_UseEnd));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::PullRingRope_Idle));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::PullRingRope_UseBegin));
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::PullRingRope_UseEnd));
 }
 
 PullRingRope::PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)

@@ -39,7 +39,7 @@ void BoneBag::LoadAnimations()
 
     for (auto& animId : sBoneBagAnimIds)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(animId));
     }
 }
 

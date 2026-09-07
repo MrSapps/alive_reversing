@@ -41,14 +41,14 @@ void FallingItem::LoadAnimations()
 {
     if (gMap->mCurrentLevel == EReliveLevelIds::eBonewerkz)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::FallingCrate_Falling));
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::FallingCrate_Waiting));
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::AirExplosion));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::FallingCrate_Falling));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::FallingCrate_Waiting));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::AirExplosion));
     }
     else
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::AE_FallingRock_Falling));
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::AE_FallingRock_Waiting));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::AE_FallingRock_Falling));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::AE_FallingRock_Waiting));
     }
 }
 

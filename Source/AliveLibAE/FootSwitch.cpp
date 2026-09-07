@@ -59,16 +59,16 @@ void FootSwitch::LoadAnimations()
         case EReliveLevelIds::eMudancheeVault:
         case EReliveLevelIds::eMudancheeVault_Ender:
         case EReliveLevelIds::eMudomoVault_Ender:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Foot_Switch_Vault_Idle));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Foot_Switch_Vault_Pressed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Foot_Switch_Vault_Idle));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Foot_Switch_Vault_Pressed));
             break;
         case EReliveLevelIds::eBonewerkz:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Foot_Switch_Bonewerkz_Idle));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Foot_Switch_Bonewerkz_Pressed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Foot_Switch_Bonewerkz_Idle));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Foot_Switch_Bonewerkz_Pressed));
             break;
         default:
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Foot_Switch_Industrial_Idle));
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Foot_Switch_Industrial_Pressed));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Foot_Switch_Industrial_Idle));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Foot_Switch_Industrial_Pressed));
             break;
     }
 }

@@ -296,7 +296,7 @@ void MainMenuFade::LoadAnimations()
     {
         if (animId != AnimId::None)
         {
-            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+            mLoadedAnims.push_back(mResMan.LoadAnimation(animId));
         }
     }
 }
@@ -373,7 +373,7 @@ void Menu::LoadAnimations()
 {
     for (auto& animId : kAnims)
     {
-        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
+        mLoadedAnims.push_back(mResMan.LoadAnimation(animId));
     }
 }
 
@@ -381,12 +381,12 @@ Menu::Menu(relive::Path_TLV* /*pTlv*/, const Guid& tlvId, ResourceManagerWrapper
     : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     LoadAnimations();
-    mLoadedPals.push_back(GetResourceManager().LoadPal(PalId::WhiteHighlite));
+    mLoadedPals.push_back(resMan.LoadPal(PalId::WhiteHighlite));
 
     gMainMenuInstanceCount++;
 
     mFontContext.LoadFontType(FontType::PauseMenu);
-    mPal = GetResourceManager().LoadPal(PalId::MainMenuFont_MainMenu);
+    mPal = resMan.LoadPal(PalId::MainMenuFont_MainMenu);
     mFont.Load(240, mPal, &mFontContext);
     
     // 30 = fmv select
@@ -1669,24 +1669,24 @@ void Menu::NewGameStart()
 {
     if (!gAbe)
     {
-        GetResourceManager().PendAnims(Abe::sAbeMotionAnimIds);
+        mResMan.PendAnims(Abe::sAbeMotionAnimIds);
         // TODO: Hack - should be part of abes anim array
         // These animations were originally loaded in the abe ctor in OG
-        GetResourceManager().PendAnimation(AnimId::ChantOrb_Particle);
-        GetResourceManager().PendAnimation(AnimId::ChantOrb_Particle_Small);
-        GetResourceManager().PendAnimation(AnimId::SquibSmoke_Particle);
-        GetResourceManager().PendAnimation(AnimId::BloodDrop);
-        GetResourceManager().PendAnimation(AnimId::ObjectShadow);
-        GetResourceManager().PendAnimation(AnimId::DeathFlare_1);
-        GetResourceManager().PendAnimation(AnimId::DeathFlare_2);
-        GetResourceManager().PendAnimation(AnimId::Dove_Idle);
-        GetResourceManager().PendAnimation(AnimId::Dove_Flying);
+        mResMan.PendAnimation(AnimId::ChantOrb_Particle);
+        mResMan.PendAnimation(AnimId::ChantOrb_Particle_Small);
+        mResMan.PendAnimation(AnimId::SquibSmoke_Particle);
+        mResMan.PendAnimation(AnimId::BloodDrop);
+        mResMan.PendAnimation(AnimId::ObjectShadow);
+        mResMan.PendAnimation(AnimId::DeathFlare_1);
+        mResMan.PendAnimation(AnimId::DeathFlare_2);
+        mResMan.PendAnimation(AnimId::Dove_Idle);
+        mResMan.PendAnimation(AnimId::Dove_Flying);
 
         // Required after abe gets back from both temples and gets the ring from big face
-        GetResourceManager().PendAnimation(AnimId::ShrykullStart);
-        GetResourceManager().PendAnimation(AnimId::ShrykullTransform);
-        GetResourceManager().PendAnimation(AnimId::ShrykullDetransform);
-        GetResourceManager().LoadingLoop2();
+        mResMan.PendAnimation(AnimId::ShrykullStart);
+        mResMan.PendAnimation(AnimId::ShrykullTransform);
+        mResMan.PendAnimation(AnimId::ShrykullDetransform);
+        mResMan.LoadingLoop2();
         gAbe = relive_new Abe(mResMan);
     }
 
