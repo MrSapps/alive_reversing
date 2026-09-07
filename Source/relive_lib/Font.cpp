@@ -6,6 +6,7 @@
 #include "../relive_lib/GameType.hpp"
 #include "../relive_lib/Primitives.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
+#include "../relive_lib/BaseMap.hpp"
 #include "../relive_lib/data_conversion/AnimationConverter.hpp"
 #include "FontResources.hpp"
 
@@ -308,7 +309,7 @@ void FontContext::LoadFontType(FontType resourceID)
     }
 
 
-    FontResource fontRes = ResourceManagerWrapper::LoadFont(resourceID);
+    FontResource fontRes = GetMap().GetResourceManager().LoadFont(resourceID);
     mFntResource = fontRes;
 
     // TODO: Will get moved to a json file in FontResource

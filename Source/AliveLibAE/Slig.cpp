@@ -2075,7 +2075,8 @@ void Slig::Motion_42_ShootZ()
             mYPos - FP_FromInteger(12),
             FP_FromInteger(640),
             GetSpriteScale(),
-            mSligTlv.mNumTimesToShoot - field_158_num_times_to_shoot - 1);
+            mSligTlv.mNumTimesToShoot - field_158_num_times_to_shoot - 1,
+            mResMan);
 
         New_ShootingZFire_Particle(mXPos, mYPos - FP_FromInteger(12), GetSpriteScale(), mResMan);
 
@@ -4137,11 +4138,7 @@ s16 Slig::Brain_29_Shooting()
             return 111;
         }
 
-<<<<<<< HEAD
-        if (!gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) && mSligTlv.mData.mChaseAbeWhenSpotted)
-=======
-        if (!gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) && mSligTlv.mChaseAbeWhenSpotted)
->>>>>>> upstream/beta
+        if (!gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) && mSligTlv.mChaseAbeWhenSpotted)
         {
             ToChase();
             return 111;
@@ -4257,13 +4254,8 @@ s16 Slig::Brain_34_Sleeping()
             pEvent = pNoise;
         }
 
-<<<<<<< HEAD
-        const FP wakeUpDistance = ScaleToGridSize(GetSpriteScale()) * FP_FromInteger(mSligTlv.mData.mNoiseWakeUpDistance);
-        if (VIsObjNearby(wakeUpDistance, static_cast<BaseAnimatedWithPhysicsGameObject*>(pEvent)) && field_120_timer <= static_cast<s32>(sGnFrame) && gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) && !EventGet(Event::kEventResetting))
-=======
         const FP wakeUpDistance = ScaleToGridSize(GetSpriteScale()) * FP_FromInteger(mSligTlv.mNoiseWakeUpDistance);
-        if (VIsObjNearby(wakeUpDistance, static_cast<BaseAnimatedWithPhysicsGameObject*>(pEvent)) && field_120_timer <= static_cast<s32>(sGnFrame) && gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) && !EventGet(Event::kEventResetting))
->>>>>>> upstream/beta
+        if (VIsObjNearby(wakeUpDistance, static_cast<BaseAnimatedWithPhysicsGameObject*>(pEvent)) && field_120_timer <= static_cast<s32>(sGnFrame) && gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) && !EventGet(Event::kEventResetting))
         {
             WakeUp();
             return 102;

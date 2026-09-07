@@ -3572,7 +3572,8 @@ void Slig::Motion_43_ShootZ()
             mYPos - FP_FromInteger(12),
             FP_FromInteger(640),
             GetSpriteScale(),
-            field_174_tlv->mNumTimesToShoot - mShootCount - 1);
+            field_174_tlv->mNumTimesToShoot - mShootCount - 1,
+            mResMan);
 
         New_ShootingZFire_Particle(
             mXPos,
@@ -4090,7 +4091,7 @@ s16 Slig::Brain_Sleeping()
         {
             const auto kScaleGrid = ScaleToGridSize(GetSpriteScale());
             const auto wake_up_dist_scaled = kScaleGrid * FP_FromInteger(field_174_tlv->mNoiseWakeUpDistance);
-            if (VIsObjNearby(wake_up_dist_scaled, pEvent) && field_114_timer <= static_cast<s32>(sGnFrame) && gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) && !EventGet(Event::kEventResetting))
+            if (VIsObjNearby(wake_up_dist_scaled, pEvent) && field_114_timer <= static_cast<s32>(sGnFrame) && gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) && !EventGet(Event::kEventResetting))
             {
                 WakeUp();
                 return 102;
