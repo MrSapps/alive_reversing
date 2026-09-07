@@ -17,6 +17,7 @@ namespace relive
 }
 
 class Camera;
+class ResourceManagerWrapper;
 
 extern const CameraSwapEffects kPathChangeEffectToInternalScreenChangeEffect[10];
 
@@ -54,7 +55,7 @@ namespace CameraIds::Menu
 class Map final : public BaseMap
 {
 public:
-    Map();
+    explicit Map(ResourceManagerWrapper& resMan);
 
     void Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange);
 
@@ -141,7 +142,7 @@ public:
 };
 
 
-extern Map gMap;
+extern Map* gMap;
 
 s32 MaxGridBlocks(FP scale);
 

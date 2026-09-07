@@ -19,7 +19,7 @@ enum buttonType : u16
 class MainMenuFade final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    MainMenuFade(s32 xpos, s32 ypos, buttonType buttonType, s32 bDestroyOnDone);
+    MainMenuFade(s32 xpos, s32 ypos, buttonType buttonType, s32 bDestroyOnDone, ResourceManagerWrapper& resMan);
 
     void LoadAnimations();
 
@@ -127,7 +127,7 @@ public:
         AnimId::MenuAbeSpeak_Goodbye,
         AnimId::OptionChantOrb_Particle};
 
-    Menu(relive::Path_TLV* pTlv, const Guid& tlvId);
+    Menu(relive::Path_TLV* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~Menu();
 
     void LoadAnimations();

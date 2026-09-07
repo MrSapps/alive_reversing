@@ -11,7 +11,7 @@
 
 Shadow::Shadow()
 {
-    AnimResource res = ResourceManagerWrapper::LoadAnimation(AnimId::ObjectShadow);
+    AnimResource res = GetResourceManager().LoadAnimation(AnimId::ObjectShadow);
     mAnim.Init(res, nullptr);
 
     mShadowAtBottom = false;

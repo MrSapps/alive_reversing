@@ -11,7 +11,7 @@ namespace relive
 class GlukkonSwitch final : public ::BaseAnimatedWithPhysicsGameObject
 {
 public:
-    GlukkonSwitch(relive::Path_GlukkonSwitch* pTlv, const Guid& tlvId);
+    GlukkonSwitch(relive::Path_GlukkonSwitch* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~GlukkonSwitch();
 
     void LoadAnimations();

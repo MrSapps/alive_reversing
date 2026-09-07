@@ -13,8 +13,8 @@
 ExplosionSet* gExplosionSet = nullptr;
 bool gExplosionSetEnabled = false;
 
-ExplosionSet::ExplosionSet()
-    : BaseGameObject(true, 0)
+ExplosionSet::ExplosionSet(ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     SetType(ReliveTypes::eExplosionSet);
 
@@ -73,7 +73,7 @@ ExplosionSet::~ExplosionSet()
 
 void ExplosionSet::VScreenChanged()
 {
-    if (!gMap.LevelChanged() && !gMap.PathChanged())
+    if (!gMap->LevelChanged() && !gMap->PathChanged())
     {
         mActive = false;
     }
@@ -162,12 +162,12 @@ void ExplosionSet::VUpdate()
             }
         }
 
-        relive_new FallingItem(xpos, mTlvRect.y, mSpriteScale < FP_FromInteger(1), 0, 0, 1, 0);
+        relive_new FallingItem(xpos, mTlvRect.y, mSpriteScale < FP_FromInteger(1), 0, 0, 1, 0, mResMan);
 
         mSpacingMultiplicator++;
         mStartDelay = mAssetInterval;
 
-        if (gMap.mCurrentLevel == EReliveLevelIds::eMines && Math_RandomRange(1, 5) >= 4)
+        if (gMap->mCurrentLevel == EReliveLevelIds::eMines && Math_RandomRange(1, 5) >= 4)
         {
             const FP explodeX = FP_FromInteger(Math_RandomRange(mTlvRect.y + 20, mTlvRect.y + 230));
             const FP explodeY = FP_FromInteger(Math_RandomRange(mTlvRect.x, xpos));

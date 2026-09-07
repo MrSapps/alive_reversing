@@ -24,7 +24,7 @@ BulletShell::BulletShell(FP xpos, FP ypos, bool flipX, FP scale)
     else
     {
         SetType(ReliveTypes::eNone);
-        mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Bullet_Shell));
+        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Bullet_Shell));
         Animation_Init(GetAnimRes(AnimId::Bullet_Shell));
 
         SetSpriteScale(scale);

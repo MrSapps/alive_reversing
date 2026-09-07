@@ -19,12 +19,12 @@ static DoorFlame* sFlameControllingTheSound = nullptr;
 class FireBackgroundGlow final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    FireBackgroundGlow(FP xpos, FP ypos, FP scale)
-        : BaseAnimatedWithPhysicsGameObject(0)
+    FireBackgroundGlow(FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan)
+        : BaseAnimatedWithPhysicsGameObject(0, resMan)
     {
         SetType(ReliveTypes::eNone);
 
-        mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Door_FireBackgroundGlow));
+        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_FireBackgroundGlow));
         Animation_Init(GetAnimRes(AnimId::Door_FireBackgroundGlow));
 
         SetApplyShadowZoneColour(false);
@@ -116,12 +116,12 @@ ALIVE_ASSERT_SIZEOF(FlameSpark, 0x84);
 class FlameSparks final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    FlameSparks(FP xpos, FP ypos)
-        : BaseAnimatedWithPhysicsGameObject(0)
+    FlameSparks(FP xpos, FP ypos, ResourceManagerWrapper& resMan)
+        : BaseAnimatedWithPhysicsGameObject(0, resMan)
     {
         SetType(ReliveTypes::eNone);
 
-        mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::ChantOrb_Particle_Small));
+        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::ChantOrb_Particle_Small));
         Animation_Init(GetAnimRes(AnimId::ChantOrb_Particle_Small));
 
         GetAnimation().SetSemiTrans(true);
@@ -171,7 +171,7 @@ private:
     {
         // HACK/WTF this seems to move the base animation off screen so it can never been seen??
         PSX_RECT rect = {};
-        gMap.Get_Camera_World_Rect(CameraPos::eCamCurrent_0, &rect);
+        gMap->Get_Camera_World_Rect(CameraPos::eCamCurrent_0, &rect);
         mXPos = FP_FromInteger(rect.w + 16);
         mYPos = FP_FromInteger(rect.y - 16);
 
@@ -257,14 +257,14 @@ private:
     FP mStartYPos;
 };
 
-DoorFlame::DoorFlame(relive::Path_DoorFlame* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0),
+DoorFlame::DoorFlame(relive::Path_DoorFlame* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan),
     mTlvInfo(tlvId),
     mSwitchId(pTlv->mSwitchId)
 {
     SetType(ReliveTypes::eNone);
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Fire));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Fire));
     Animation_Init(GetAnimRes(AnimId::Fire));
 
     GetAnimation().SetSemiTrans(true);
@@ -294,7 +294,7 @@ DoorFlame::DoorFlame(relive::Path_DoorFlame* pTlv, const Guid& tlvId)
     
     mRandom = Math_NextRandom() % 2;
 
-    auto pFlameSparks = relive_new FlameSparks(mXPos, mYPos);
+    auto pFlameSparks = relive_new FlameSparks(mXPos, mYPos, resMan);
     if (pFlameSparks)
     {
         mFlameSparksId = pFlameSparks->mBaseGameObjectId;
@@ -413,7 +413,8 @@ void DoorFlame::VUpdate()
             {
                 pFireBackgroundGlow = relive_new FireBackgroundGlow(mXPos,
                                                                  mYPos,
-                                                                 GetSpriteScale());
+                                                                 GetSpriteScale(),
+                                                                 mResMan);
                 if (pFireBackgroundGlow)
                 {
                     mFireBackgroundGlowId = pFireBackgroundGlow->mBaseGameObjectId;
@@ -425,7 +426,7 @@ void DoorFlame::VUpdate()
             break;
     }
 
-    if (!gMap.Is_Point_In_Current_Camera(
+    if (!gMap->Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,

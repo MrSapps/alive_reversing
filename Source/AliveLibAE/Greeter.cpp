@@ -25,16 +25,16 @@
 
 void Greeter::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Greeter_Turn));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Greeter_Hit));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Greeter_Speak));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Greeter_Moving));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Greeter_Chase));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Greeter_Falling));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Greeter_Turn));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Greeter_Hit));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Greeter_Speak));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Greeter_Moving));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Greeter_Chase));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Greeter_Falling));
 }
 
-Greeter::Greeter(relive::Path_Greeter* pTlv, const Guid& tlvId)
-    : BaseAliveGameObject(0)
+Greeter::Greeter(relive::Path_Greeter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(0, resMan)
 {
     SetType(ReliveTypes::eGreeter);
 
@@ -91,7 +91,7 @@ Greeter::Greeter(relive::Path_Greeter* pTlv, const Guid& tlvId)
         mYPos = hitY;
     }
 
-    auto pMotionDetctor = relive_new MotionDetector(nullptr, Guid{}, this);
+    auto pMotionDetctor = relive_new MotionDetector(nullptr, Guid{}, this, mResMan);
     if (pMotionDetctor)
     {
         field_11C_motionDetectorId = pMotionDetctor->mBaseGameObjectId;
@@ -110,12 +110,12 @@ Greeter::Greeter(relive::Path_Greeter* pTlv, const Guid& tlvId)
     mChasing = false;
 }
 
-void Greeter::CreateFromSaveState(SerializedObjectData& pBuffer)
+void Greeter::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
 {
     const auto pState = pBuffer.ReadTmpPtr<GreeterSaveState>();
     auto pTlv = static_cast<relive::Path_Greeter*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv());
 
-    auto pGreeter = relive_new Greeter(pTlv, pState->mTlvId);
+    auto pGreeter = relive_new Greeter(pTlv, pState->mTlvId, resMan);
     if (pGreeter)
     {
         pGreeter->mXPos = pState->field_C_xpos;
@@ -296,7 +296,7 @@ void Greeter::BounceBackFromShot()
 
     GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::Greeter_Hit));
 
-    const CameraPos soundDirection = gMap.GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
+    const CameraPos soundDirection = gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
     SFX_Play_Camera(relive::SoundEffects::GreeterKnockback, 0, soundDirection, GetSpriteScale());
 }
 
@@ -472,7 +472,7 @@ void Greeter::ZapTarget(FP xpos, FP ypos, BaseAliveGameObject* pTarget)
 
     pTarget->VTakeDamage(this);
 
-    const CameraPos soundDirection = gMap.GetDirection(
+    const CameraPos soundDirection = gMap->GetDirection(
         mCurrentLevel,
         mCurrentPath,
         mXPos,
@@ -564,7 +564,7 @@ void Greeter::VUpdate()
         case GreeterBrainStates::eBrain_0_Patrol:
             if (!((sGnFrame - field_124_last_turn_time) % 14))
             {
-                const CameraPos soundDirection = gMap.GetDirection(
+                const CameraPos soundDirection = gMap->GetDirection(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -652,7 +652,7 @@ void Greeter::VUpdate()
         {
             if (!(sGnFrame % 8))
             {
-                const CameraPos soundDirection2 = gMap.GetDirection(
+                const CameraPos soundDirection2 = gMap->GetDirection(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -732,7 +732,7 @@ void Greeter::VUpdate()
                 mYPos = hitY;
                 BaseAliveGameObjectLastLineYPos = hitY;
 
-                const CameraPos soundDirection3 = gMap.GetDirection(
+                const CameraPos soundDirection3 = gMap->GetDirection(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,

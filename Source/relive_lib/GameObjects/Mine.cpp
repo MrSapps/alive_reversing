@@ -16,12 +16,12 @@ static Mine* sMinePlayingSound = nullptr;
 
 void Mine::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Mine_Flash));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Mine));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Mine_Flash));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Mine));
 }
 
-Mine::Mine(relive::Path_Mine* pTlv, const Guid& tlvId)
-    : BaseAliveGameObject(0)
+Mine::Mine(relive::Path_Mine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(0, resMan)
 {
     SetType(ReliveTypes::eMine);
 

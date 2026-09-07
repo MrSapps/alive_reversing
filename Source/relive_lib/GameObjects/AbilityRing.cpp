@@ -567,7 +567,7 @@ void AbilityRing::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void AbilityRing::CreateFromSaveState(SerializedObjectData& pBuffer)
+void AbilityRing::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
 {
     const auto pState = pBuffer.ReadTmpPtr<AbilityRingSaveState>();
     auto pRing = relive_new AbilityRing(pState->mRingXPos, pState->mRingYPos, pState->mRingType, pState->mRingScale);

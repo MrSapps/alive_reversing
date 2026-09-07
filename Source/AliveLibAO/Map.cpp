@@ -36,7 +36,7 @@ class BaseGameObject;
 
 namespace AO {
 
-Map gMap = {};
+Map* gMap = nullptr;
 s32 sSoundChannelsMask = 0;
 
 OpenSeqHandle g_SeqTable_4C9E70[165] = {
@@ -240,7 +240,8 @@ void Map::ScreenChange_Common()
     sSoundChannelsMask = 0;
 }
 
-Map::Map()
+Map::Map(ResourceManagerWrapper& resMan)
+    : BaseMap(resMan)
 {
     Reset();
 }
@@ -787,7 +788,7 @@ void Map::GoTo_Camera()
     {
         if (LevelChanged() || (PathChanged() && mCameraSwapEffect == CameraSwapEffects::ePlay1FMV_5))
         {
-            ResourceManagerWrapper::ShowLoadingIcon();
+            mResourceManager.ShowLoadingIcon();
         }
     }
 
@@ -798,7 +799,7 @@ void Map::GoTo_Camera()
 
     if (LevelChanged())
     {
-        ResourceManagerWrapper::LoadingLoop(bShowLoadingIcon);
+        mResourceManager.LoadingLoop(bShowLoadingIcon);
 
         // Free all cameras
         for (s32 i = 0; i < ALIVE_COUNTOF(field_2C_camera_array); i++)
@@ -820,11 +821,11 @@ void Map::GoTo_Camera()
 
         }
 
-        ResourceManagerWrapper::LoadingLoop(bShowLoadingIcon);
+        mResourceManager.LoadingLoop(bShowLoadingIcon);
 
         if (LevelChanged())
         {
-            mLoadedPaths = ResourceManagerWrapper::LoadPaths(mNextLevel);
+            mLoadedPaths = mResourceManager.LoadPaths(mNextLevel);
         }
 
         SND_Load_VABS(mLoadedPaths[0]->GetSoundInfo(), AO::Path_Get_Reverb(mNextLevel)); // TODO: Remove hard coded data
@@ -941,7 +942,7 @@ void Map::GoTo_Camera()
         }
     }
 
-    ResourceManagerWrapper::LoadingLoop(bShowLoadingIcon);
+    mResourceManager.LoadingLoop(bShowLoadingIcon);
 
     // Free each camera itself
     for (s32 i = 0; i < ALIVE_COUNTOF(field_40_stru_5); i++)
@@ -954,7 +955,7 @@ void Map::GoTo_Camera()
     }
 
     Load_Path_Items(field_2C_camera_array[0], relive::Factory::LoadMode::ConstructObject_0);
-    ResourceManagerWrapper::LoadingLoop(bShowLoadingIcon);
+    mResourceManager.LoadingLoop(bShowLoadingIcon);
     Load_Path_Items(field_2C_camera_array[3], relive::Factory::LoadMode::ConstructObject_0);
     Load_Path_Items(field_2C_camera_array[4], relive::Factory::LoadMode::ConstructObject_0);
     Load_Path_Items(field_2C_camera_array[1], relive::Factory::LoadMode::ConstructObject_0);
@@ -1008,17 +1009,18 @@ void Map::GoTo_Camera()
             const auto ypos = gScreenManager->mCamYOff + doorIterator.GetTlv()->mTopLeftY - FP_GetExponent(pCamPos->y);
             relive_new CameraSwapper(
                 field_2C_camera_array[0]->mCamRes,
+                mResourceManager,
                 mCameraSwapEffect,
                 static_cast<s16>(xpos),
                 static_cast<s16>(ypos));
         }
         else
         {
-            relive_new CameraSwapper(field_2C_camera_array[0]->mCamRes, mCameraSwapEffect, 184, 120);
+            relive_new CameraSwapper(field_2C_camera_array[0]->mCamRes, mResourceManager, mCameraSwapEffect, 184, 120);
         }
     }
-    ResourceManagerWrapper::bHideLoadingIcon = 0;
-    ResourceManagerWrapper::loading_ticks = 0;
+    mResourceManager.bHideLoadingIcon = 0;
+    mResourceManager.loading_ticks = 0;
 }
 
 s16 Map::GetOverlayId()
@@ -1479,7 +1481,7 @@ void Map::Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode)
                 pCamera,
                 pCamera);*/
 
-            pCamera->mCamRes = ResourceManagerWrapper::LoadCam(pCamera->mLevel, pCamera->mPath, pCamera->mCameraNumber);
+            pCamera->mCamRes = mResourceManager.LoadCam(pCamera->mLevel, pCamera->mPath, pCamera->mCameraNumber);
             Loader(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResourceFromList_1, ReliveTypes::eNone); // none = load all
         }
         else
@@ -1577,8 +1579,7 @@ void Map::ClearPathResourceBlocks()
 
 void Map::Loader(s16 camX, s16 camY, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad)
 {
-    // TODO: temp factory object
-    relive::Factory factory;
+    relive::Factory factory(mResourceManager);
 
     // Get TLVs for this cam
     BinaryPath* pPathRes = GetPathResourceBlockPtr(mCurrentPath);
@@ -1631,6 +1632,7 @@ CameraSwapper* Map::FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLev
 
         return relive_new CameraSwapper(
             ppBits,
+            pMap->mResourceManager,
             pFmvRec1->field_A == 1,
             pFmvRec1->field_0_pName,
             pFmvRec2->field_A == 1,
@@ -1651,6 +1653,7 @@ CameraSwapper* Map::FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLev
 
         return relive_new CameraSwapper(
             ppBits,
+            pMap->mResourceManager,
             pFmvRec1->field_A == 1,
             pFmvRec1->field_0_pName,
             pFmvRec2->field_A == 1,
@@ -1668,6 +1671,7 @@ CameraSwapper* Map::FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLev
 
         return relive_new CameraSwapper(
             ppBits,
+            pMap->mResourceManager,
             pFmvRecord->field_A == 1,
             pFmvRecord->field_0_pName);
     }

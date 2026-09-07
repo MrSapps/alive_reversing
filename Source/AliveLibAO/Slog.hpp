@@ -76,8 +76,8 @@ public:
         AnimId::Slog_Scratch,
         AnimId::Slog_Growl};
 
-    Slog(relive::Path_Slog* pTlv, const Guid& tlvId);
-    Slog(FP xpos, FP ypos, FP scale);
+    Slog(relive::Path_Slog* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    Slog(FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan);
     ~Slog();
 
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;

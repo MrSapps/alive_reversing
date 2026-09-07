@@ -13,8 +13,8 @@ static void SetData(const relive::Path_SlurgSpawner& tlv, Slurg_Spawner_Path_Dat
     data.mSwitchId = tlv.mSpawnerSwitchId;
 }
 
-SlurgSpawner::SlurgSpawner(relive::Path_SlurgSpawner* pTlv, const Guid& tlvId)
-    : BaseGameObject(true, 0)
+SlurgSpawner::SlurgSpawner(relive::Path_SlurgSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     SetType(ReliveTypes::eSlurgSpawner);
     mTlvInfo = tlvId;
@@ -44,7 +44,7 @@ void SlurgSpawner::VUpdate()
         {
             mSpawnCounter = 0;
             mSpawnedCount++;
-            relive_new Slurg(mSlurgTlv, Guid{});
+            relive_new Slurg(mSlurgTlv, Guid{}, mResMan);
         }
     }
 }

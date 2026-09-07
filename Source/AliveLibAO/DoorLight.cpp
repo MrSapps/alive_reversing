@@ -18,8 +18,8 @@ namespace AO {
 static s32 sNextDoorLightUpdate = -1;
 static s32 sDoorLightUpdateTimer = 0;
 
-DoorLight::DoorLight(relive::Path_LightEffect* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0)
+DoorLight::DoorLight(relive::Path_LightEffect* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     mTlvId = tlvId;
     mWidth = pTlv->mSize;
@@ -35,21 +35,21 @@ DoorLight::DoorLight(relive::Path_LightEffect* pTlv, const Guid& tlvId)
     {
         case relive::Path_LightEffect::Type::GoldGlow:
         {
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::GoldGlow));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::GoldGlow));
             Animation_Init(GetAnimRes(AnimId::GoldGlow));
             break;
         }
 
         case relive::Path_LightEffect::Type::GreenGlow:
         {
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::GreenGlow));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::GreenGlow));
             Animation_Init(GetAnimRes(AnimId::GreenGlow));
             break;
         }
 
         case relive::Path_LightEffect::Type::FlintGlow:
         {
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::FlintGlow));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::FlintGlow));
             Animation_Init(GetAnimRes(AnimId::FlintGlow));
             mHasSwitchId = true;
             break;
@@ -61,12 +61,12 @@ DoorLight::DoorLight(relive::Path_LightEffect* pTlv, const Guid& tlvId)
             mHeight = 0;
             if (SwitchStates_Get(pTlv->mSwitchId))
             {
-                mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::GreenDoorLight));
+                mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::GreenDoorLight));
                 Animation_Init(GetAnimRes(AnimId::GreenDoorLight));
             }
             else
             {
-                mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::RedDoorLight));
+                mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RedDoorLight));
                 Animation_Init(GetAnimRes(AnimId::RedDoorLight));
                 xOff = 6;
             }
@@ -79,12 +79,12 @@ DoorLight::DoorLight(relive::Path_LightEffect* pTlv, const Guid& tlvId)
             mHeight = 0;
             if (SwitchStates_Get(pTlv->mSwitchId))
             {
-                mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::GreenHubLight));
+                mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::GreenHubLight));
                 Animation_Init(GetAnimRes(AnimId::GreenHubLight));
             }
             else
             {
-                mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::RedHubLight));
+                mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RedHubLight));
                 Animation_Init(GetAnimRes(AnimId::RedHubLight));
             }
             break;
@@ -170,7 +170,7 @@ void DoorLight::VUpdate()
 
                     if (sControlledCharacter == gAbe)
                     {
-                        relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eSecretAreaShort, relive::Path_MusicTrigger::TriggeredBy::eTouching, 0, 15);
+                        relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eSecretAreaShort, relive::Path_MusicTrigger::TriggeredBy::eTouching, 0, 15, mResMan);
                     }
                     else
                     {

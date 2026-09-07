@@ -12,7 +12,7 @@ namespace relive
 class TimedMine final : public BaseAliveGameObject
 {
 public:
-    TimedMine(relive::Path_TimedMine* pTlv, const Guid& tlvId);
+    TimedMine(relive::Path_TimedMine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~TimedMine();
 
     void LoadAnimations();

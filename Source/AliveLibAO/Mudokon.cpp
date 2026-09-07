@@ -136,8 +136,8 @@ static const TintEntry sMudTints_4CD320[] = {
 s16 sAlertedMudCount_507B90 = 0;
 s16 sMudRunningToPortalCount_507B94 = 0;
 
-Mudokon::Mudokon(relive::Path_TLV* pTlv, const Guid& tlvId)
-    : ::BaseAliveGameObject(0)
+Mudokon::Mudokon(relive::Path_TLV* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : ::BaseAliveGameObject(0, resMan)
 {
     field_13E = -1;
     mNextMotion = eMudMotions::None_m1;
@@ -440,7 +440,7 @@ void Mudokon::VUpdate()
 
     if (oldX != mXPos || oldY != mYPos)
     {
-        BaseAliveGameObjectPathTLV = gMap.TLV_Get_At(
+        BaseAliveGameObjectPathTLV = gMap->TLV_Get_At(
             TlvIterator::Invalid(),
             mXPos,
             mYPos,
@@ -479,7 +479,7 @@ void Mudokon::LoadAnimations()
     {
         if (animId != AnimId::None)
         {
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(animId));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
         }
     }
 }
@@ -492,7 +492,7 @@ void Mudokon::VUpdateResBlock()
 void Mudokon::VScreenChanged()
 {
     // Map/overlay changed or mud shouldn't persist
-    if (gMap.LevelChanged() || !mPersist)
+    if (gMap->LevelChanged() || !mPersist)
     {
         SetDead(true);
         KillBirdPortal();
@@ -500,10 +500,10 @@ void Mudokon::VScreenChanged()
         return;
     }
 
-    if (gMap.PathChanged())
+    if (gMap->PathChanged())
     {
         // See if we need to go to the next path
-        auto tlvIterator = gMap.TLV_Get_At(TlvIterator::Invalid(), mXPos, mYPos, mXPos, mYPos);
+        auto tlvIterator = gMap->TLV_Get_At(TlvIterator::Invalid(), mXPos, mYPos, mXPos, mYPos);
         while (tlvIterator.GetTlv())
         {
             if (tlvIterator.GetTlv()->mTlvType == ReliveTypes::eMudokonPathTrans)
@@ -512,7 +512,7 @@ void Mudokon::VScreenChanged()
                 field_1C4_bDoPathTrans = true;
                 return;
             }
-            tlvIterator = gMap.TLV_Get_At(tlvIterator, mXPos, mYPos, mXPos, mYPos);
+            tlvIterator = gMap->TLV_Get_At(tlvIterator, mXPos, mYPos, mXPos, mYPos);
         }
 
         // Wasn't a path trans and path changed, die
@@ -781,7 +781,7 @@ u8** Mudokon::GetResBlockForMotion(s16 motion)
 void Mudokon::DoPathTrans()
 {
     PSX_Point camCoords = {};
-    gMap.GetCurrentCamCoords(&camCoords);
+    gMap->GetCurrentCamCoords(&camCoords);
 
     if (gAbe->GetAnimation().GetFlipX())
     {
@@ -835,8 +835,8 @@ void Mudokon::DoPathTrans()
         }
     }
     SetUpdateDelay(20);
-    mCurrentLevel = gMap.mCurrentLevel;
-    mCurrentPath = gMap.mCurrentPath;
+    mCurrentLevel = gMap->mCurrentLevel;
+    mCurrentPath = gMap->mCurrentPath;
 }
 
 void Mudokon::ToStand()
@@ -1026,7 +1026,7 @@ s16 Mudokon::FacingBirdPortal(BirdPortal* pTarget)
 
 GameSpeakEvents Mudokon::LastGameSpeak()
 {
-    if (!gMap.Is_Point_In_Current_Camera(
+    if (!gMap->Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1128,7 +1128,7 @@ void Mudokon::VOnTlvCollision(TlvIterator tlvIterator)
                 break;
             }
         }
-        tlvIterator = gMap.TLV_Get_At(tlvIterator, mXPos, mYPos, mXPos, mYPos);
+        tlvIterator = gMap->TLV_Get_At(tlvIterator, mXPos, mYPos, mXPos, mYPos);
     }
 }
 
@@ -1453,7 +1453,7 @@ void Mudokon::Motion_15_LeverUse()
 
 void Mudokon::Motion_16_StandScrubLoop()
 {
-    if (gMap.Is_Point_In_Current_Camera(
+    if (gMap->Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1536,7 +1536,7 @@ void Mudokon::Motion_21_StandScrubToIdle()
 
 void Mudokon::Motion_22_CrouchScrub()
 {
-    if (gMap.Is_Point_In_Current_Camera(
+    if (gMap->Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -2156,7 +2156,7 @@ void Mudokon::Motion_44_RunJumpMid()
         SND_SEQ_Play(SeqId::eSaveTriggerMusic_45, 1, 127, 127);
 
 
-        relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eChime, relive::Path_MusicTrigger::TriggeredBy::eTimer, 0, 300);
+        relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eChime, relive::Path_MusicTrigger::TriggeredBy::eTimer, 0, 300, mResMan);
 
         gRescuedMudokons++;
 
@@ -2203,9 +2203,9 @@ void Mudokon::Motion_46_FallLandDie()
         Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 0x7FFF, this);
     }
 
-    if ((gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms
-         || gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn
-         || gMap.mCurrentLevel == EReliveLevelIds::eBoardRoom)
+    if ((gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarms
+         || gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn
+         || gMap->mCurrentLevel == EReliveLevelIds::eBoardRoom)
         && GetAnimation().GetCurrentFrame() == 7)
     {
         Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this);
@@ -2225,9 +2225,9 @@ void Mudokon::Motion_47_Knockback()
     EventBroadcast(Event::kEventNoise, this);
     EventBroadcast(Event::kEventSuspiciousNoise, this);
 
-    if ((gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms
-         || gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn
-         || gMap.mCurrentLevel == EReliveLevelIds::eBoardRoom)
+    if ((gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarms
+         || gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn
+         || gMap->mCurrentLevel == EReliveLevelIds::eBoardRoom)
         && GetAnimation().GetCurrentFrame() == 7)
     {
         Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this);
@@ -3032,7 +3032,7 @@ s16 Mudokon::Brain_7_GiveRings()
         case 1:
             if (static_cast<s32>(sGnFrame) > field_1C0_timer)
             {
-                relive_new PossessionFlicker(this, 10, 255, 128, 128);
+                relive_new PossessionFlicker(this, 10, 255, 128, 128, mResMan);
                 field_1C0_timer = MakeTimer(15);
                 return 2;
             }
@@ -3473,7 +3473,7 @@ s16 Mudokon::Brain_10_ListeningToAbe()
                     }
 
                     if (EventGet(Event::kEventMudokonComfort)
-                        && gMap.Is_Point_In_Current_Camera(
+                        && gMap->Is_Point_In_Current_Camera(
                             mCurrentLevel,
                             mCurrentPath,
                             mXPos,
@@ -3713,7 +3713,7 @@ s16 Mudokon::Brain_10_ListeningToAbe()
             field_1B4_idle_time++;
 
             if (field_1B4_idle_time <= 150
-                && gMap.Is_Point_In_Current_Camera(
+                && gMap->Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -3728,7 +3728,7 @@ s16 Mudokon::Brain_10_ListeningToAbe()
                 }
 
                 if (EventGet(Event::kEventMudokonComfort)
-                    && gMap.Is_Point_In_Current_Camera(
+                    && gMap->Is_Point_In_Current_Camera(
                         mCurrentLevel,
                         mCurrentPath,
                         mXPos,

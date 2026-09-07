@@ -21,7 +21,7 @@ enum class UXBState : u16
 class UXB final : public ::BaseAliveGameObject
 {
 public:
-    UXB(relive::Path_UXB* pTlv, const Guid& tlvId);
+    UXB(relive::Path_UXB* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~UXB();
 
     void LoadAnimations();

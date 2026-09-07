@@ -23,8 +23,8 @@ namespace AO {
 
 void RollingBall::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Stone_Ball));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Stone_Ball_Rolling));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Stone_Ball));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Stone_Ball_Rolling));
 }
 
 RollingBall::~RollingBall()
@@ -41,8 +41,8 @@ RollingBall::~RollingBall()
     KillRollingBallShaker();
 }
 
-RollingBall::RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId)
-    : ::BaseAliveGameObject(0)
+RollingBall::RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : ::BaseAliveGameObject(0, resMan)
 {
     SetType(ReliveTypes::eRollingBall);
     
@@ -107,7 +107,7 @@ RollingBall::RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId)
         return;
     }
 
-    if (gMap.mCurrentLevel == EReliveLevelIds::eForestTemple && gMap.mCurrentPath == 2)
+    if (gMap->mCurrentLevel == EReliveLevelIds::eForestTemple && gMap->mCurrentPath == 2)
     {
         GetAnimation().SetAnimate(false);
         mXPos = FP_FromInteger(2522);
@@ -133,7 +133,7 @@ void RollingBall::VUpdate()
                     mRollingBallShakerId = pRollingBallShaker->mBaseGameObjectId;
                 }
             }
-            else if (!gMap.Is_Point_In_Current_Camera(
+            else if (!gMap->Is_Point_In_Current_Camera(
                          mCurrentLevel,
                          mCurrentPath,
                          mXPos,
@@ -229,7 +229,7 @@ void RollingBall::VUpdate()
 
                 SetDead(true);
 
-                const CameraPos direction = gMap.GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
+                const CameraPos direction = gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
                 SFX_Play_Camera(relive::SoundEffects::IngameTransition, 50, direction);
 
                 switch (direction)
@@ -271,8 +271,8 @@ void RollingBall::VUpdate()
             {
                 if (mYPos - BaseAliveGameObjectLastLineYPos > FP_FromInteger(240))
                 {
-                    if (gMap.mCurrentLevel == EReliveLevelIds::eForestTemple
-                        && gMap.mCurrentPath == 2
+                    if (gMap->mCurrentLevel == EReliveLevelIds::eForestTemple
+                        && gMap->mCurrentPath == 2
                         && !gAbe->mShrivel)
                     {
                         GetAnimation().SetAnimate(false);
@@ -295,7 +295,7 @@ void RollingBall::VUpdate()
 
             relive_new ScreenShake(false, false);
 
-            const CameraPos direction = gMap.GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
+            const CameraPos direction = gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
             SFX_Play_Camera(relive::SoundEffects::IngameTransition, 50, direction);
 
             switch (direction)
@@ -329,7 +329,7 @@ void RollingBall::VUpdate()
         }
 
         case States::eCrushedBees:
-            if (mCurrentLevel != gMap.mCurrentLevel || mCurrentPath != gMap.mCurrentPath || EventGet(Event::kEventDeathReset))
+            if (mCurrentLevel != gMap->mCurrentLevel || mCurrentPath != gMap->mCurrentPath || EventGet(Event::kEventDeathReset))
             {
                 SetDead(true);
             }

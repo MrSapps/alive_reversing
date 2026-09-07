@@ -11,7 +11,7 @@ namespace relive
 class ParamiteWebLine final : public ::BaseAnimatedWithPhysicsGameObject
 {
 public:
-    ParamiteWebLine(relive::Path_ParamiteWebLine* pTlv, const Guid& tlvId);
+    ParamiteWebLine(relive::Path_ParamiteWebLine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~ParamiteWebLine();
 
     void LoadAnimations();

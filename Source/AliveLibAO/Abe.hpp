@@ -483,7 +483,7 @@ public:
 
     void LoadAnimations();
 
-    Abe();
+    Abe(ResourceManagerWrapper& resMan);
     ~Abe();
 
     virtual void VUpdate() override;

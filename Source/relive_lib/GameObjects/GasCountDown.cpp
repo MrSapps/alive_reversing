@@ -18,13 +18,13 @@ bool gDeathGasOn = false;
 constexpr u32 kGasCountDownSwitchIdAO = 70;
 constexpr u32 kGasCountdownTimeAO = 3600;
 
-GasCountDown::GasCountDown(relive::Path_GasCountDown* pTlv, const Guid& tlvInfo)
-    : BaseGameObject(true, 0)
+GasCountDown::GasCountDown(relive::Path_GasCountDown* pTlv, const Guid& tlvInfo, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     SetType(ReliveTypes::eGasCountDown);
     mTlvId = tlvInfo;
 
-    mPal = ResourceManagerWrapper::LoadPal(PalId::LedFont_Red);
+    mPal = GetResourceManager().LoadPal(PalId::LedFont_Red);
     mFontContext.LoadFontType(FontType::LcdFont);
     mFont.Load(5, mPal, &mFontContext);
     SetDrawable(true);

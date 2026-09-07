@@ -177,7 +177,7 @@ public:
         AnimId::Slig_Beat,
         AnimId::None};
 
-    Slig(relive::Path_Slig* pTlv, const Guid& tlvId);
+    Slig(relive::Path_Slig* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~Slig();
 
     void LoadAnimations();

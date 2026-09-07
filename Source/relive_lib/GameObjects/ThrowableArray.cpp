@@ -110,7 +110,7 @@ void ThrowableArray::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void ThrowableArray::CreateFromSaveState(SerializedObjectData& pBuffer)
+void ThrowableArray::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
 {
     const auto pState = pBuffer.ReadTmpPtr<ThrowableArraySaveState>();
     LoadRockTypes(GetMap().mCurrentLevel, GetMap().mCurrentPath);

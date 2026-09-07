@@ -36,7 +36,7 @@ public:
     static void MakeArray();
     static void FreeArray();
 
-    explicit BaseAnimatedWithPhysicsGameObject(s16 resourceArraySize);
+    explicit BaseAnimatedWithPhysicsGameObject(s16 resourceArraySize, ResourceManagerWrapper& resMan);
     ~BaseAnimatedWithPhysicsGameObject();
 
     virtual void VRender(OrderingTable& ot) override;

@@ -18,13 +18,13 @@
 
 void SlapLock::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::SlapLock_Initiate));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::SlapLock_Punched));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::SlapLock_Shaking));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::SlapLock_Initiate));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::SlapLock_Punched));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::SlapLock_Shaking));
 }
 
-SlapLock::SlapLock(relive::Path_SlapLock* pTlv, const Guid& tlvId)
-    : BaseAliveGameObject(0)
+SlapLock::SlapLock(relive::Path_SlapLock* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(0, resMan)
 {
     SetType(ReliveTypes::eSlapLock);
     mTlvInfo = tlvId;
@@ -104,13 +104,13 @@ SlapLock::~SlapLock()
     Path::TLV_Reset(mTlvInfo);
 }
 
-void SlapLock::CreateFromSaveState(SerializedObjectData& pBuffer)
+void SlapLock::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
 {
     const auto pState = pBuffer.ReadTmpPtr<SlapLockSaveState>();
 
     auto pTlv = static_cast<relive::Path_SlapLock*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mTlvInfo).GetTlv());
 
-    auto pSlapLock = relive_new SlapLock(pTlv, pState->mTlvInfo);
+    auto pSlapLock = relive_new SlapLock(pTlv, pState->mTlvInfo, resMan);
     if (pSlapLock)
     {
         pSlapLock->GetAnimation().SetRender(pState->mAnimRender & 1);
@@ -316,7 +316,7 @@ void SlapLock::VUpdate()
         {
             if (static_cast<s32>(sGnFrame) > mTimer1)
             {
-                if (!gMap.Is_Point_In_Current_Camera(
+                if (!gMap->Is_Point_In_Current_Camera(
                         gAbe->mCurrentLevel,
                         gAbe->mCurrentPath,
                         gAbe->mXPos,
@@ -367,7 +367,7 @@ void SlapLock::VUpdate()
             }
             else
             {
-                auto pFlicker = relive_new PossessionFlicker(gAbe, 8, 128, 255, 128);
+                auto pFlicker = relive_new PossessionFlicker(gAbe, 8, 128, 255, 128, mResMan);
                 if (pFlicker)
                 {
                     mPossessionFlickerId = pFlicker->mBaseGameObjectId;
@@ -461,7 +461,7 @@ bool SlapLock::VTakeDamage(BaseGameObject* pFrom)
             pSlapLockTlv->mTargetTombSwitchId2,
             mXPos,
             mYPos - (FP_FromInteger(40) * GetSpriteScale()),
-            GetSpriteScale());
+            GetSpriteScale(), mResMan);
     }
 
     if (pSlapLockTlv->mGiveInvisibilityPowerup)

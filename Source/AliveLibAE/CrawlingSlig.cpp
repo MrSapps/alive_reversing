@@ -75,12 +75,12 @@ void CrawlingSlig::LoadAnimations()
 {
     for (auto& animId : sCrawlingSligAnimIdTable)
     {
-        mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(animId));
+        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
     }
 }
 
-CrawlingSlig::CrawlingSlig(relive::Path_CrawlingSlig* pTlv, const Guid& guid)
-    : BaseAliveGameObject(2),
+CrawlingSlig::CrawlingSlig(relive::Path_CrawlingSlig* pTlv, const Guid& guid, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(2, resMan),
     field_11C_mPal(std::make_shared<AnimationPal>()),
     mGuid(guid),
     mTlv(*pTlv),
@@ -96,7 +96,7 @@ CrawlingSlig::CrawlingSlig(relive::Path_CrawlingSlig* pTlv, const Guid& guid)
     LoadAnimations();
     Animation_Init(GetAnimRes(AnimId::CrawlingSlig_Idle));
 
-    SetTint(&kCrawlingSligTints[0], gMap.mCurrentLevel);
+    SetTint(&kCrawlingSligTints[0], gMap->mCurrentLevel);
 
     SetCanBePossessed(true);
 
@@ -169,13 +169,13 @@ void CrawlingSlig::VRender(OrderingTable& ot)
     renderWithGlowingEyes(ot, this, field_11C_mPal, 64, field_1A4_r, field_1A6_g, field_1A8_b, &eyeIndices[0], ALIVE_COUNTOF(eyeIndices));
 }
 
-void CrawlingSlig::CreateFromSaveState(SerializedObjectData& pBuffer)
+void CrawlingSlig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
 {
     const auto pState = pBuffer.ReadTmpPtr<CrawlingSligSaveState>();
 
     auto pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mCrawlingSligTlvId).GetTlv<relive::Path_CrawlingSlig>();
 
-    auto pCrawlingSlig = relive_new CrawlingSlig(pTlv, pState->mCrawlingSligTlvId);
+    auto pCrawlingSlig = relive_new CrawlingSlig(pTlv, pState->mCrawlingSligTlvId, resMan);
     if (pCrawlingSlig)
     {
         pCrawlingSlig->mBaseGameObjectTlvInfo = pState->mBaseTlvId;
@@ -326,9 +326,9 @@ void CrawlingSlig::VPossessed()
     SetBrain(ICrawlingSligBrain::EBrainTypes::Possessed);
     mPossessedBrain.SetState(PossessedBrain::EState::eStartPossession);
     mMultiUseTimer = MakeTimer(35);
-    mAbeLevel = gMap.mCurrentLevel;
-    mAbePath = gMap.mCurrentPath;
-    mAbeCamera = gMap.mCurrentCamera;
+    mAbeLevel = gMap->mCurrentLevel;
+    mAbePath = gMap->mCurrentPath;
+    mAbeCamera = gMap->mCurrentCamera;
 }
 
 void CrawlingSlig::Set_AnimAndMotion(CrawlingSligMotion currentMotion, s16 bClearNextMotion)
@@ -653,9 +653,9 @@ CrawlingSlig::~CrawlingSlig()
     {
         sControlledCharacter = gAbe;
         MusicController::static_PlayMusic(MusicController::MusicTypes::eNone_0, this, 0, 0);
-        if (gMap.mNextLevel != EReliveLevelIds::eMenu)
+        if (gMap->mNextLevel != EReliveLevelIds::eMenu)
         {
-            gMap.SetActiveCam(
+            gMap->SetActiveCam(
                 mAbeLevel,
                 mAbePath,
                 mAbeCamera,
@@ -690,7 +690,7 @@ void CrawlingSlig::ToIdle()
 
 void SleepingBrain::VUpdate()
 {
-    if (gMap.GetDirection(
+    if (gMap->GetDirection(
             mCrawlingSlig.mCurrentLevel,
             mCrawlingSlig.mCurrentPath,
             mCrawlingSlig.mXPos,
@@ -745,7 +745,7 @@ void SleepingBrain::VUpdate()
 
 void IdleBrain::VUpdate()
 {
-    if (gMap.GetDirection(
+    if (gMap->GetDirection(
             mCrawlingSlig.mCurrentLevel,
             mCrawlingSlig.mCurrentPath,
             mCrawlingSlig.mXPos,
@@ -764,7 +764,7 @@ void IdleBrain::VUpdate()
 
 void PanicGetALockerBrain::VUpdate()
 {
-    if (gMap.GetDirection(
+    if (gMap->GetDirection(
             mCrawlingSlig.mCurrentLevel,
             mCrawlingSlig.mCurrentPath,
             mCrawlingSlig.mXPos,
@@ -1000,7 +1000,7 @@ void PanicGetALockerBrain::VUpdate()
 
 void PossessedBrain::VUpdate()
 {
-    if (gMap.GetDirection(
+    if (gMap->GetDirection(
             mCrawlingSlig.mCurrentLevel,
             mCrawlingSlig.mCurrentPath,
             mCrawlingSlig.mXPos,
@@ -1052,7 +1052,7 @@ void PossessedBrain::VUpdate()
 
                 sControlledCharacter = gAbe;
                 mCrawlingSlig.SetPossessed(false);
-                gMap.SetActiveCam(mCrawlingSlig.mAbeLevel, mCrawlingSlig.mAbePath, mCrawlingSlig.mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+                gMap->SetActiveCam(mCrawlingSlig.mAbeLevel, mCrawlingSlig.mAbePath, mCrawlingSlig.mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
                 mCrawlingSlig.SetBrain(ICrawlingSligBrain::EBrainTypes::GetKilled);
                 mCrawlingSlig.mGetKilledBrain.SetState(GetKilledBrain::eGibsDeath);
                 MusicController::static_PlayMusic(MusicController::MusicTypes::eNone_0, &mCrawlingSlig, 0, 0);
@@ -1092,7 +1092,7 @@ void PossessedBrain::VUpdate()
 
 void GetKilledBrain::VUpdate()
 {
-    if (gMap.GetDirection(
+    if (gMap->GetDirection(
             mCrawlingSlig.mCurrentLevel,
             mCrawlingSlig.mCurrentPath,
             mCrawlingSlig.mXPos,
@@ -1226,7 +1226,7 @@ void GetKilledBrain::VUpdate()
 void TransformedBrain::VUpdate()
 {
     BaseGameObject* pObj = sObjectIds.Find_Impl(mCrawlingSlig.mTransformedSligId);
-    if (gMap.GetDirection(
+    if (gMap->GetDirection(
             mCrawlingSlig.mCurrentLevel,
             mCrawlingSlig.mCurrentPath,
             mCrawlingSlig.mXPos,
@@ -1279,7 +1279,7 @@ void CrawlingSlig::Motion_1_UsingButton()
 
                 SfxPlayMono(relive::SoundEffects::SligSpawn, 0);
 
-                auto pWalkingSlig = relive_new Slig(static_cast<relive::Path_Slig*>(mTlvHeader), gPathInfo->TLVInfo_From_TLVPtr(mTlvHeader));
+                auto pWalkingSlig = relive_new Slig(static_cast<relive::Path_Slig*>(mTlvHeader), gPathInfo->TLVInfo_From_TLVPtr(mTlvHeader), mResMan);
                 if (pWalkingSlig)
                 {
                     mTransformedSligId = pWalkingSlig->mBaseGameObjectId;
@@ -1308,7 +1308,7 @@ void CrawlingSlig::Motion_1_UsingButton()
 
                 SfxPlayMono(relive::SoundEffects::FlyingSligSpawn, 0);
 
-                auto pFlyingSlig = relive_new FlyingSlig(static_cast<relive::Path_FlyingSlig*>(mTlvHeader), gPathInfo->TLVInfo_From_TLVPtr(mTlvHeader));
+                auto pFlyingSlig = relive_new FlyingSlig(static_cast<relive::Path_FlyingSlig*>(mTlvHeader), gPathInfo->TLVInfo_From_TLVPtr(mTlvHeader), mResMan);
                 if (pFlyingSlig)
                 {
                     mTransformedSligId = pFlyingSlig->mBaseGameObjectId;
@@ -1512,7 +1512,7 @@ void CrawlingSlig::Motion_8_Speaking()
 {
     if (GetAnimation().GetCurrentFrame() == 2 && mSpeak != SligSpeak::eNone)
     {
-        if (gMap.mCurrentPath == mCurrentPath && gMap.mCurrentLevel == mCurrentLevel && Is_In_Current_Camera() == CameraPos::eCamCurrent_0)
+        if (gMap->mCurrentPath == mCurrentPath && gMap->mCurrentLevel == mCurrentLevel && Is_In_Current_Camera() == CameraPos::eCamCurrent_0)
         {
             Slig_GameSpeak_SFX(mSpeak, 0, 0, this);
         }
@@ -1542,7 +1542,7 @@ void CrawlingSlig::Motion_9_Snoozing()
             Slig_SoundEffect(SligSfx::eSnooze2_4, this);
         }
 
-        if (gMap.Is_Point_In_Current_Camera(
+        if (gMap->Is_Point_In_Current_Camera(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,

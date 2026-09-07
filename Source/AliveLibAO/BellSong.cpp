@@ -62,8 +62,8 @@ void BellSong::VUpdate()
     }
 }
 
-BellSong::BellSong(relive::Path_BellsongStone::BellsongTypes type, u32 code)
-    : BaseGameObject(true, 0)
+BellSong::BellSong(relive::Path_BellsongStone::BellsongTypes type, u32 code, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     mType = type;
     mCode = code;

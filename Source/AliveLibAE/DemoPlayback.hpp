@@ -5,7 +5,7 @@
 class DemoPlayback final : public BaseGameObject
 {
 public:
-    DemoPlayback();
+    DemoPlayback(ResourceManagerWrapper& resMan);
     ~DemoPlayback();
     
     virtual void VUpdate() override;

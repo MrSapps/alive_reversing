@@ -14,7 +14,7 @@ class Bells;
 class ChimeLock final : public ::BaseAliveGameObject
 {
 public:
-    ChimeLock(relive::Path_ChimeLock* pTlv, const Guid& tlvId);
+    ChimeLock(relive::Path_ChimeLock* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~ChimeLock();
 
     virtual void VUpdate() override;

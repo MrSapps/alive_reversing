@@ -41,38 +41,38 @@ static const AnimId sDoorAnimdIdTable[16][6] = {
 
 void Door::LoadAnimations()
 {
-    switch (gMap.mCurrentLevel)
+    switch (gMap->mCurrentLevel)
     {
         case EReliveLevelIds::eRuptureFarms:
         case EReliveLevelIds::eBoardRoom:
         case EReliveLevelIds::eRuptureFarmsReturn:
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Door_RuptureFarms_Open));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Door_RuptureFarms_Closed));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_RuptureFarms_Open));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_RuptureFarms_Closed));
             break;
 
         case EReliveLevelIds::eLines:
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Door_Lines_Open));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Door_Lines_Closed));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Lines_Open));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Lines_Closed));
             break;
 
         case EReliveLevelIds::eDesert:
         case EReliveLevelIds::eDesertTemple:
         case EReliveLevelIds::eDesertEscape:
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Door_Desert_Open));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Door_Desert_Closed));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::HubDoor_Desert_Open));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::HubDoor_Desert_Closed));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::FinalTestDoor_Desert_Open));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::FinalTestDoor_Desert_Closed));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Desert_Open));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Desert_Closed));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HubDoor_Desert_Open));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HubDoor_Desert_Closed));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::FinalTestDoor_Desert_Open));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::FinalTestDoor_Desert_Closed));
             break;
 
         default:
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Door_Forest_Open));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Door_Forest_Closed));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::HubDoor_Forest_Open));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::HubDoor_Forest_Closed));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::FinalTestDoor_Forest_Open));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::FinalTestDoor_Forest_Closed));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Forest_Open));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Forest_Closed));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HubDoor_Forest_Open));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HubDoor_Forest_Closed));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::FinalTestDoor_Forest_Open));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::FinalTestDoor_Forest_Closed));
             break;
     }
 }
@@ -106,7 +106,7 @@ Door::Door(relive::Path_Door* pTlv, const Guid& tlvId)
         mCurrentState = relive::Path_Door::DoorStates::eOpen;
     }
 
-    const s32 idx = static_cast<s32>(MapWrapper::ToAO(gMap.mCurrentLevel));
+    const s32 idx = static_cast<s32>(MapWrapper::ToAO(gMap->mCurrentLevel));
 
     FP scale = {};
     PathLine* pLine = nullptr;
@@ -151,7 +151,7 @@ Door::Door(relive::Path_Door* pTlv, const Guid& tlvId)
                         GetSpriteScale() != FP_FromDouble(0.5) ? kFgWallsOrFloor : kBgWallsOrFloor))
                 {
                     mYPos -= (FP_FromInteger(12) * GetSpriteScale());
-                    gMap.GetCurrentCamCoords(&mapCoords);
+                    gMap->GetCurrentCamCoords(&mapCoords);
                     auto aux = SnapToXGrid_AO(GetSpriteScale(), FP_GetExponent(mXPos) - mapCoords.x);
                     mXPos = FP_FromInteger((aux)+mapCoords.x);
                 }
@@ -169,7 +169,7 @@ Door::Door(relive::Path_Door* pTlv, const Guid& tlvId)
 
         case relive::Path_Door::DoorTypes::eTrialDoor:
         {
-            if (gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+            if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
             {
                 GetAnimation().SetRenderLayer(Layer::eLayer_BeforeShadow_25);
                 scale = FP_FromInteger(1);
@@ -207,7 +207,7 @@ Door::Door(relive::Path_Door* pTlv, const Guid& tlvId)
                     scale != FP_FromDouble(0.5) ? kFgWallsOrFloor : kBgWallsOrFloor))
             {
                 mYPos += FP_FromInteger(4);
-                gMap.GetCurrentCamCoords(&mapCoords);
+                gMap->GetCurrentCamCoords(&mapCoords);
                 mXPos = FP_FromInteger(SnapToXGrid_AO(scale, FP_GetExponent(mXPos) - mapCoords.x) + mapCoords.x);
             }
             else
@@ -235,7 +235,7 @@ Door::Door(relive::Path_Door* pTlv, const Guid& tlvId)
 
                 GetAnimation().SetRenderLayer(Layer::eLayer_BeforeShadow_Half_6);
 
-                if (gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn || gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms)
+                if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn || gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarms)
                 {
                     if (gCollisions->Raycast(
                         FP_FromInteger(pTlv->mTopLeftX + (pTlv->Width()) / 2),
@@ -248,7 +248,7 @@ Door::Door(relive::Path_Door* pTlv, const Guid& tlvId)
                         kFgWallsOrFloor)) // ?? only check bg for some reason
                     {
                         mYPos -= (FP_FromInteger(12) * GetSpriteScale());
-                        gMap.GetCurrentCamCoords(&mapCoords);
+                        gMap->GetCurrentCamCoords(&mapCoords);
                         mXPos = FP_FromInteger(SnapToXGrid_AO(FP_FromInteger(1), FP_GetExponent(mXPos) - mapCoords.x) + mapCoords.x);
                     }
                     else
@@ -333,7 +333,7 @@ void Door::PlaySound()
 {
     s16 volume = 0;
 
-    if (gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms || gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+    if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarms || gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
     {
         volume = GetSpriteScale() != FP_FromDouble(0.5) ? 90 : 127;
         SND_SEQ_Play(SeqId::eHitBottomOfDeathPit_10, 1, 75, 75);
@@ -394,7 +394,7 @@ void Door::VUpdate()
             }
         }
 
-        const s32 lvl = static_cast<s32>(MapWrapper::ToAO(gMap.mCurrentLevel));
+        const s32 lvl = static_cast<s32>(MapWrapper::ToAO(gMap->mCurrentLevel));
 
         switch (mCurrentState)
         {

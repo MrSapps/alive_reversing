@@ -14,12 +14,12 @@
 
 void GlukkonSwitch::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Security_Door_Speak));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Security_Door_Idle));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Security_Door_Speak));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Security_Door_Idle));
 }
 
-GlukkonSwitch::GlukkonSwitch(relive::Path_GlukkonSwitch* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0)
+GlukkonSwitch::GlukkonSwitch(relive::Path_GlukkonSwitch* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eHelpPhone);
 

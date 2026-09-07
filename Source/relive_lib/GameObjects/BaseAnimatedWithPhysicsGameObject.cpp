@@ -30,8 +30,8 @@ void BaseAnimatedWithPhysicsGameObject::FreeArray()
     gObjListDrawables = nullptr;
 }
 
-BaseAnimatedWithPhysicsGameObject::BaseAnimatedWithPhysicsGameObject(s16 resourceArraySize)
-    : BaseGameObject(true, resourceArraySize)
+BaseAnimatedWithPhysicsGameObject::BaseAnimatedWithPhysicsGameObject(s16 resourceArraySize, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, resourceArraySize, resMan)
 {
     mDoPurpleLightEffect = false;
     mApplyShadowZoneColour = true;

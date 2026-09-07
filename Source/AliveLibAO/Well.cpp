@@ -19,8 +19,8 @@ static s16 Well_NextRandom()
     return gRandomBytes[sWellRndSeed++];
 }
 
-Well::Well(relive::Path_WellBase* pTlv, FP xpos, FP ypos, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0)
+Well::Well(relive::Path_WellBase* pTlv, FP xpos, FP ypos, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     mTlvInfo = tlvId;
     SetType(ReliveTypes::eWell);
@@ -54,7 +54,7 @@ void Well::InitBgAnim(s16 bgAnimId)
     {
         const AnimRecord& anim = AO::BgAnimRec(bgAnimId);
 
-        Animation_Init(ResourceManagerWrapper::LoadAnimation(anim.mId));
+        Animation_Init(GetResourceManager().LoadAnimation(anim.mId));
 
         GetAnimation().SetSemiTrans(false);
         SetApplyShadowZoneColour(false);

@@ -12,7 +12,7 @@ namespace AO {
 class BackgroundGlukkon final : public ::BaseAliveGameObject
 {
 public:
-    BackgroundGlukkon(relive::Path_BackgroundGlukkon* pTlv, const Guid& tlvId);
+    BackgroundGlukkon(relive::Path_BackgroundGlukkon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~BackgroundGlukkon();
 
     void LoadAnimations();

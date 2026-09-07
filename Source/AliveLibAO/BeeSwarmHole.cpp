@@ -11,8 +11,8 @@
 
 namespace AO {
 
-BeeSwarmHole::BeeSwarmHole(relive::Path_BeeSwarmHole* pTlv, const Guid& tlvId)
-    : BaseGameObject(true, 0)
+BeeSwarmHole::BeeSwarmHole(relive::Path_BeeSwarmHole* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     mTlvId = tlvId;
     SetType(ReliveTypes::eSligSpawner);
@@ -35,7 +35,7 @@ BeeSwarmHole::BeeSwarmHole(relive::Path_BeeSwarmHole* pTlv, const Guid& tlvId)
 
 void BeeSwarmHole::VUpdate()
 {
-    if (gMap.Rect_Location_Relative_To_Active_Camera(&field_14_rect, 0) != CameraPos::eCamCurrent_0)
+    if (gMap->Rect_Location_Relative_To_Active_Camera(&field_14_rect, 0) != CameraPos::eCamCurrent_0)
     {
         SetDead(true);
         Path::TLV_Reset(mTlvId);
@@ -80,7 +80,8 @@ void BeeSwarmHole::VUpdate()
             FP_FromInteger(field_14_rect.y),
             speed,
             field_26_bees_amount,
-            field_28_chase_time);
+            field_28_chase_time,
+            mResMan);
         if (pSwarm)
         {
             switch (mMovementType)

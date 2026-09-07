@@ -14,15 +14,15 @@
 
 const static s16 sElecticWallFrames[6] = {0, 6, 10, 18, 22, 0};
 
-ElectricWall::ElectricWall(relive::Path_ElectricWall* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0),
+ElectricWall::ElectricWall(relive::Path_ElectricWall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan),
     mTlvInfo(tlvId),
     mSwitchId(pTlv->mSwitchId),
     mStartState(pTlv->mStartState)
 {
     SetType(ReliveTypes::eElectricWall);
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Electric_Wall));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Electric_Wall));
     Animation_Init(GetAnimRes(AnimId::Electric_Wall));
 
     GetAnimation().SetSemiTrans(true);

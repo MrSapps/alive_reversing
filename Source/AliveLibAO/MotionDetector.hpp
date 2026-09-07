@@ -14,10 +14,10 @@ namespace AO {
 class MotionDetectorLaser final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    MotionDetectorLaser()
-        : BaseAnimatedWithPhysicsGameObject(0)
+    MotionDetectorLaser(ResourceManagerWrapper& resMan)
+        : BaseAnimatedWithPhysicsGameObject(0, resMan)
     {
-        mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::MotionDetector_Laser));
+        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MotionDetector_Laser));
     }
 
     virtual void VScreenChanged() override
@@ -29,7 +29,7 @@ public:
 class MotionDetector final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tlvId);
+    MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~MotionDetector();
 
     virtual void VScreenChanged() override;

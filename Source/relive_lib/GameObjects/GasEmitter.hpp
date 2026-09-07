@@ -7,7 +7,7 @@
 class GasEmitter final : public BaseGameObject
 {
 public:
-    GasEmitter(relive::Path_GasEmitter* pTlv, const Guid& tlvId);
+    GasEmitter(relive::Path_GasEmitter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~GasEmitter();
 
     virtual void VStopAudio() override;

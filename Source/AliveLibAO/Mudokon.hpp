@@ -162,7 +162,7 @@ public:
         AnimId::Mudokon_PoisonGasDeath,
         AnimId::None};
 
-    Mudokon(relive::Path_TLV* pTlv, const Guid& tlvId);
+    Mudokon(relive::Path_TLV* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~Mudokon();
 
     void LoadAnimations();

@@ -101,8 +101,8 @@ static u8 Fleech_NextRandom()
     return gRandomBytes[sFleechRandomIdx_5BC20C++];
 }
 
-Fleech::Fleech(relive::Path_Fleech* pTlv, const Guid& tlvId)
-    : BaseAliveGameObject(2),
+Fleech::Fleech(relive::Path_Fleech* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(2, resMan),
     mTlvInfo(tlvId),
     mAttackAngerIncreaser(pTlv->mAttackAngerIncreaser + 2),
     mWakeUpSwitchId(pTlv->mWakeUpSwitchId),
@@ -182,17 +182,17 @@ void Fleech::LoadAnimations()
 {
     for (auto& animId : sFleechAnimFromMotion)
     {
-        mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(animId));
+        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
     }
 }
 
-void Fleech::CreateFromSaveState(SerializedObjectData& pBuffer)
+void Fleech::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
 {
     const auto pState = pBuffer.ReadTmpPtr<FleechSaveState>();
 
     auto pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mTlvInfo).GetTlv<relive::Path_Fleech>();
 
-    auto pFleech = relive_new Fleech(pTlv, pState->mTlvInfo);
+    auto pFleech = relive_new Fleech(pTlv, pState->mTlvInfo, resMan);
     if (pFleech)
     {
         pFleech->mBaseGameObjectTlvInfo = pState->field_4_obj_id;
@@ -454,7 +454,7 @@ void Fleech::Motion_0_Sleeping()
             {
                 Sound(FleechSound::SleepingExhale_4);
 
-                if (gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+                if (gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
                 {
                     const FP yPos = (GetSpriteScale() * FP_FromInteger(-20)) + mYPos;
                     FP xOff = {};
@@ -1033,7 +1033,7 @@ void Fleech::Motion_17_SleepingWithTongue()
             if (GetAnimation().GetCurrentFrame() == 4 && !(sGnFrame & 3))
             {
                 Sound(FleechSound::SleepingExhale_4);
-                if (gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+                if (gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
                 {
                     const FP yPos = (GetSpriteScale() * FP_FromInteger(-20)) + mYPos;
                     FP xOff = {};
@@ -1384,7 +1384,7 @@ void Fleech::RenderEx(OrderingTable& ot)
 
 void Fleech::VScreenChanged()
 {
-    if (gMap.LevelChanged() || gMap.PathChanged())
+    if (gMap->LevelChanged() || gMap->PathChanged())
     {
         SetDead(true);
         mFoodObjId = Guid{};
@@ -1500,7 +1500,7 @@ const TintEntry kFleechTints_551844[16] = {
     {EReliveLevelIds::eBonewerkz_Ender, 127u, 127u, 127u},
     {EReliveLevelIds::eCredits, 127u, 127u, 127u}};
 
-void Animation_OnFrame_Fleech(BaseGameObject* pObj, u32&, const IndexedPoint& point)
+void Animation_OnFrame_Fleech(BaseGameObject* pObj, u32&, const IndexedPoint& point, ResourceManagerWrapper& resMan)
 {
     reinterpret_cast<Fleech*>(pObj)->VOnFrame(point.mPoint);
 }
@@ -1529,7 +1529,7 @@ void Fleech::Init()
     mScrabOrParamite = Guid{};
     field_15E_lost_target_timer = 0;
 
-    SetTint(&kFleechTints_551844[0], gMap.mCurrentLevel);
+    SetTint(&kFleechTints_551844[0], gMap->mCurrentLevel);
 
     if (GetSpriteScale() == FP_FromInteger(1))
     {
@@ -1631,7 +1631,7 @@ void Fleech::TongueHangingFromWall(s16 target_x, s16 target_y)
 void Fleech::TongueUpdate()
 {
     auto pTarget = static_cast<BaseAliveGameObject*>(sObjectIds.Find_Impl(mFoodObjId));
-    if (!gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+    if (!gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
     {
         mRenderTongue = false;
     }
@@ -1889,14 +1889,14 @@ s32 Fleech::Sound(FleechSound soundId)
 
     s16 volumeLeft = 0;
     s16 volumeRight = defaultSndIdxVol;
-    const CameraPos direction = gMap.GetDirection(
+    const CameraPos direction = gMap->GetDirection(
         mCurrentLevel,
         mCurrentPath,
         mXPos,
         mYPos);
 
     PSX_RECT pRect = {};
-    gMap.Get_Camera_World_Rect(direction, &pRect);
+    gMap->Get_Camera_World_Rect(direction, &pRect);
     switch (direction)
     {
         case CameraPos::eCamCurrent_0:
@@ -2169,7 +2169,7 @@ void Fleech::SetTongueState1()
 
 void Fleech::IncreaseAnger()
 {
-    if (gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+    if (gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
     {
         BaseAnimatedWithPhysicsGameObject* pEvent = IsEventInRange(Event::kEventSpeaking, mXPos, mYPos, AsEventScale(GetScale()));
 
@@ -2185,7 +2185,7 @@ void Fleech::IncreaseAnger()
 
         if (pEvent)
         {
-            if ((!IsAbe(pEvent) || !gAbe->GetInvisible()) && gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, pEvent->mXPos, pEvent->mYPos, 0))
+            if ((!IsAbe(pEvent) || !gAbe->GetInvisible()) && gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, pEvent->mXPos, pEvent->mYPos, 0))
             {
                 mCurrentAnger += mAttackAngerIncreaser;
                 if (VOnSameYLevel(static_cast<BaseAnimatedWithPhysicsGameObject*>(pEvent)))
@@ -2207,7 +2207,7 @@ void Fleech::IncreaseAnger()
         {
             if (VIsObjNearby(ScaleToGridSize(GetSpriteScale()) * FP_FromInteger(6),static_cast<BaseAnimatedWithPhysicsGameObject*>(pEvent)))
             {
-                if ((!IsAbe(pEvent) || !gAbe->GetInvisible()) && gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, pEvent->mXPos, pEvent->mYPos, 0))
+                if ((!IsAbe(pEvent) || !gAbe->GetInvisible()) && gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, pEvent->mXPos, pEvent->mYPos, 0))
                 {
                     mCurrentAnger += mMaxAnger;
                 }
@@ -2561,7 +2561,7 @@ void PatrolBrain::VUpdate()
         pTarget = nullptr;
     }
 
-    if (gMap.Is_Point_In_Current_Camera(mFleech.mCurrentLevel, mFleech.mCurrentPath, mFleech.mXPos, mFleech.mYPos, 0))
+    if (gMap->Is_Point_In_Current_Camera(mFleech.mCurrentLevel, mFleech.mCurrentPath, mFleech.mXPos, mFleech.mYPos, 0))
     {
         MusicController::static_PlayMusic(sPatrolBrainMusicTypes[mBrainState], &mFleech, 0, 0);
     }
@@ -2831,7 +2831,7 @@ PatrolBrain::EState PatrolBrain::Brain_Patrol_State_4(BaseAliveGameObject* pTarg
 
     if (pTarget)
     {
-        if (!pTarget->GetInvisible() && mFleech.VOnSameYLevel(pTarget) && gMap.Is_Point_In_Current_Camera(mFleech.mCurrentLevel, mFleech.mCurrentPath, pTarget->mXPos, pTarget->mYPos, 0) && gMap.Is_Point_In_Current_Camera(mFleech.mCurrentLevel, mFleech.mCurrentPath, mFleech.mXPos, mFleech.mYPos, 0) && !mFleech.WallHit(FP_FromInteger(mFleech.GetSpriteScale() >= FP_FromInteger(1) ? 10 : 5), pTarget->mXPos - mFleech.mXPos))
+        if (!pTarget->GetInvisible() && mFleech.VOnSameYLevel(pTarget) && gMap->Is_Point_In_Current_Camera(mFleech.mCurrentLevel, mFleech.mCurrentPath, pTarget->mXPos, pTarget->mYPos, 0) && gMap->Is_Point_In_Current_Camera(mFleech.mCurrentLevel, mFleech.mCurrentPath, mFleech.mXPos, mFleech.mYPos, 0) && !mFleech.WallHit(FP_FromInteger(mFleech.GetSpriteScale() >= FP_FromInteger(1) ? 10 : 5), pTarget->mXPos - mFleech.mXPos))
         {
             mFleech.mCurrentAnger = mFleech.mAttackAngerIncreaser + 1;
             return EState::eAlertedByAbe;
@@ -2965,7 +2965,7 @@ PatrolBrain::EState PatrolBrain::Brain_Patrol_State_4(BaseAliveGameObject* pTarg
         }
     }
 
-    if (!mFleech.mGoesToSleep || (mFleech.mCurrentAnger >= mFleech.mMaxAnger && gMap.Is_Point_In_Current_Camera(mFleech.mCurrentLevel, mFleech.mCurrentPath, mFleech.mXPos, mFleech.mYPos, 0)))
+    if (!mFleech.mGoesToSleep || (mFleech.mCurrentAnger >= mFleech.mMaxAnger && gMap->Is_Point_In_Current_Camera(mFleech.mCurrentLevel, mFleech.mCurrentPath, mFleech.mXPos, mFleech.mYPos, 0)))
     {
         if ((Fleech_NextRandom() % 64) || mFleech.GetCurrentMotion() != eFleechMotions::Motion_3_Idle)
         {
@@ -3091,7 +3091,7 @@ void ChasingAbeBrain::VUpdate()
         }
     }
 
-    if (gMap.Is_Point_In_Current_Camera(mFleech.mCurrentLevel, mFleech.mCurrentPath, mFleech.mXPos, mFleech.mYPos, 0))
+    if (gMap->Is_Point_In_Current_Camera(mFleech.mCurrentLevel, mFleech.mCurrentPath, mFleech.mXPos, mFleech.mYPos, 0))
     {
         MusicController::static_PlayMusic(MusicController::MusicTypes::eIntenseChase_7, &mFleech, 0, 0);
     }
@@ -3171,8 +3171,8 @@ void ChasingAbeBrain::VUpdate()
 
             if (IsAbe(pObj) &&
                 mFleech.VOnSameYLevel(gAbe) &&
-                gMap.Is_Point_In_Current_Camera(mFleech.mCurrentLevel, mFleech.mCurrentPath, gAbe->mXPos, gAbe->mYPos, 0) &&
-                gMap.Is_Point_In_Current_Camera(mFleech.mCurrentLevel, mFleech.mCurrentPath, mFleech.mXPos, mFleech.mYPos, 0) &&
+                gMap->Is_Point_In_Current_Camera(mFleech.mCurrentLevel, mFleech.mCurrentPath, gAbe->mXPos, gAbe->mYPos, 0) &&
+                gMap->Is_Point_In_Current_Camera(mFleech.mCurrentLevel, mFleech.mCurrentPath, mFleech.mXPos, mFleech.mYPos, 0) &&
                 !mFleech.WallHit(FP_FromInteger((mFleech.GetSpriteScale() >= FP_FromInteger(1) ? 10 : 5)), gAbe->mXPos - mFleech.mXPos))
             {
                 mBrainState = EState::eChasingAbe_1;
@@ -3618,7 +3618,7 @@ ChasingAbeBrain::EState ChasingAbeBrain::Brain_ChasingAbe_State_1(BaseAliveGameO
                 mFleech.VIsFacingMe(pObj) &&
                 !mFleech.WallHit(FP_FromInteger(mFleech.GetSpriteScale() >= FP_FromInteger(1) ? 10 : 5), pObj->mXPos - mFleech.mXPos) &&
                 mFleech.GotNoTarget() &&
-                gMap.Is_Point_In_Current_Camera(mFleech.mCurrentLevel, mFleech.mCurrentPath, mFleech.mXPos, mFleech.mYPos, 0))
+                gMap->Is_Point_In_Current_Camera(mFleech.mCurrentLevel, mFleech.mCurrentPath, mFleech.mXPos, mFleech.mYPos, 0))
             {
                 mFleech.SetTarget();
                 mFleech.mNextMotion = eFleechMotions::Motion_14_ExtendTongueFromEnemy;
@@ -3635,7 +3635,7 @@ ChasingAbeBrain::EState ChasingAbeBrain::Brain_ChasingAbe_State_1(BaseAliveGameO
             if (mFleech.VIsObjNearby(ScaleToGridSize(mFleech.GetSpriteScale()) * FP_FromInteger(2), pObj))
             {
                 if (pObj->GetSpriteScale() == mFleech.GetSpriteScale()
-                    && mFleech.VIsFacingMe(pObj) && !mFleech.WallHit(FP_FromInteger(mFleech.GetSpriteScale() >= FP_FromInteger(1) ? 10 : 5), pObj->mXPos - mFleech.mXPos) && mFleech.GotNoTarget() && gMap.Is_Point_In_Current_Camera(mFleech.mCurrentLevel, mFleech.mCurrentPath, mFleech.mXPos, mFleech.mYPos, 0))
+                    && mFleech.VIsFacingMe(pObj) && !mFleech.WallHit(FP_FromInteger(mFleech.GetSpriteScale() >= FP_FromInteger(1) ? 10 : 5), pObj->mXPos - mFleech.mXPos) && mFleech.GotNoTarget() && gMap->Is_Point_In_Current_Camera(mFleech.mCurrentLevel, mFleech.mCurrentPath, mFleech.mXPos, mFleech.mYPos, 0))
                 {
                     mFleech.SetTarget();
                     mFleech.mNextMotion = eFleechMotions::Motion_14_ExtendTongueFromEnemy;
@@ -3842,7 +3842,7 @@ void ScaredBrain::VUpdate()
         }
     }
 
-    if (gMap.Is_Point_In_Current_Camera(mFleech.mCurrentLevel, mFleech.mCurrentPath, mFleech.mXPos, mFleech.mYPos, 0))
+    if (gMap->Is_Point_In_Current_Camera(mFleech.mCurrentLevel, mFleech.mCurrentPath, mFleech.mXPos, mFleech.mYPos, 0))
     {
         MusicController::static_PlayMusic(sScaredBrainMusicTypes[mBrainState], &mFleech, 0, 0);
     }

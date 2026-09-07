@@ -69,9 +69,9 @@ void LiftPoint::LoadAnimations()
         case EReliveLevelIds::eMudomoVault_Ender:
         case EReliveLevelIds::eMudancheeVault:
         case EReliveLevelIds::eMudancheeVault_Ender:
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::LiftPlatform_Necrum));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::LiftBottomWheel_Necrum));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::LiftTopWheel_Necrum));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftPlatform_Necrum));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftBottomWheel_Necrum));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftTopWheel_Necrum));
             break;
 
         case EReliveLevelIds::eFeeCoDepot:
@@ -82,20 +82,21 @@ void LiftPoint::LoadAnimations()
         case EReliveLevelIds::eBonewerkz_Ender:
         case EReliveLevelIds::eBrewery:
         case EReliveLevelIds::eBrewery_Ender:
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::LiftPlatform_Mines));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::LiftBottomWheel_Mines));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::LiftTopWheel_Mines));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftPlatform_Mines));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftBottomWheel_Mines));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftTopWheel_Mines));
             break;
 
         default:
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::LiftPlatform_Mines));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::LiftBottomWheel_Mines));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::LiftTopWheel_Mines));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftPlatform_Mines));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftBottomWheel_Mines));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::LiftTopWheel_Mines));
             break;
     }
 }
 
-LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId)
+LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : PlatformBase(resMan)
 {
     mBaseGameObjectTlvInfo = tlvId;
     SetType(ReliveTypes::eLiftPoint);
@@ -117,7 +118,7 @@ LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId)
         SetScale(Scale::Fg);
     }
 
-    const LiftPointData& rPlatformData = sLiftPointAnimIds[static_cast<u32>(MapWrapper::ToAE(gMap.mCurrentLevel))];
+    const LiftPointData& rPlatformData = sLiftPointAnimIds[static_cast<u32>(MapWrapper::ToAE(gMap->mCurrentLevel))];
     AddDynamicCollision(
         rPlatformData.mPlatformAnimId,
         pTlv,
@@ -133,7 +134,7 @@ LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId)
         mPlatformBaseCollisionLine->mLineType = eLineTypes::eBackgroundDynamicCollision_36;
     }
 
-    SetTint(sLiftTints, gMap.mCurrentLevel);
+    SetTint(sLiftTints, gMap->mCurrentLevel);
 
     const FP oldX = mXPos;
     MapFollowMe(true);
@@ -726,9 +727,9 @@ void LiftPoint::CreatePulleyIfExists()
     // If we are in the top row of cameras then there can't be a pulley in the screen above because there are no more screens above!
     while (yCamIdx >= 0)
     {
-        const s16 xCamIdx = (FP_GetExponent(mXPos) / pPathData->field_A_grid_width) - gMap.mCamIdxOnX;
+        const s16 xCamIdx = (FP_GetExponent(mXPos) / pPathData->field_A_grid_width) - gMap->mCamIdxOnX;
         // Keep looking up 1 camera for any camera that has TLVs in it.
-        TlvIterator tlvIter = gPathInfo->Get_First_TLV_For_Offsetted_Camera(xCamIdx, yCamIdx - gMap.mCamIdxOnY);
+        TlvIterator tlvIter = gPathInfo->Get_First_TLV_For_Offsetted_Camera(xCamIdx, yCamIdx - gMap->mCamIdxOnY);
         while (tlvIter.GetTlv())
         {
             if (tlvIter.GetTlv()->mTlvType == ReliveTypes::ePulley)
@@ -769,7 +770,7 @@ void LiftPoint::CreatePulleyIfExists()
     mPulleyXPos = FP_GetExponent(((kM10_scaled + k13_scaled) / FP_FromInteger(2)) + FP_NoFractional(mXPos));
     mPulleyYPos = pFound->mTopLeftY;
 
-    const LiftPointData& data = sLiftPointAnimIds[static_cast<s32>(MapWrapper::ToAE(gMap.mCurrentLevel))];
+    const LiftPointData& data = sLiftPointAnimIds[static_cast<s32>(MapWrapper::ToAE(gMap->mCurrentLevel))];
     mPulleyAnim.Init(
         GetAnimRes(data.mLiftTopWheelAnimId),
         this);
@@ -855,13 +856,13 @@ void LiftPoint::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void LiftPoint::CreateFromSaveState(SerializedObjectData& pData)
+void LiftPoint::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan)
 {
     const auto pState = pData.ReadTmpPtr<LiftPointSaveState>();
 
     relive::Path_LiftPoint* pTlv = static_cast<relive::Path_LiftPoint*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mPlatformId).GetTlv());
 
-    auto pLiftPoint = relive_new LiftPoint(pTlv, pState->mPlatformId);
+    auto pLiftPoint = relive_new LiftPoint(pTlv, pState->mPlatformId, resMan);
     if (pLiftPoint)
     {
         pLiftPoint->mXPos = pState->mXPos;

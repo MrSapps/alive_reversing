@@ -5,8 +5,8 @@
 #include "FixedPoint.hpp"
 
 // TODO: Make this the only ctor
-Particle::Particle(FP xpos, FP ypos, AnimResource& res, bool explosionSizeHack)
-    : BaseAnimatedWithPhysicsGameObject(0)
+Particle::Particle(FP xpos, FP ypos, AnimResource& res, ResourceManagerWrapper& resMan, bool explosionSizeHack)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eParticle);
 
@@ -53,11 +53,11 @@ void Particle::VUpdate()
     }
 }
 
-Particle* New_DestroyOrCreateObject_Particle(FP xpos, FP ypos, FP scale)
+Particle* New_DestroyOrCreateObject_Particle(FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan)
 {
-    AnimResource ppRes = ResourceManagerWrapper::LoadAnimation(AnimId::DeathFlare_2);
+    AnimResource ppRes = GetResourceManager().LoadAnimation(AnimId::DeathFlare_2);
 
-    auto pParticle = relive_new Particle(xpos, ypos, ppRes);
+    auto pParticle = relive_new Particle(xpos, ypos, ppRes, resMan);
 
     if (!pParticle)
     {
@@ -82,15 +82,15 @@ Particle* New_DestroyOrCreateObject_Particle(FP xpos, FP ypos, FP scale)
 }
 
 // Fart/dust cloud particle spawner
-void New_Smoke_Particles(FP xpos, FP ypos, FP scale, s16 count, const RGB16& rgb)
+void New_Smoke_Particles(FP xpos, FP ypos, FP scale, s16 count, const RGB16& rgb, ResourceManagerWrapper& resMan)
 {
     FP velYCounter = {};
     for (s32 i = 0; i < count; i++)
     {
         FP randX = (FP_FromInteger(Math_RandomRange(-3, 3)) * scale) + xpos;
         FP particleY = (FP_FromInteger(6 * (i + 1) / 2 * (1 - 2 * (i % 2))) * scale) + ypos;
-        AnimResource ppRes = ResourceManagerWrapper::LoadAnimation(AnimId::SquibSmoke_Particle);
-        auto pParticle = relive_new Particle(randX, particleY, ppRes);
+        AnimResource ppRes = GetResourceManager().LoadAnimation(AnimId::SquibSmoke_Particle);
+        auto pParticle = relive_new Particle(randX, particleY, ppRes, resMan);
         if (pParticle)
         {
             pParticle->SetApplyShadowZoneColour(false);
@@ -124,10 +124,10 @@ void New_Smoke_Particles(FP xpos, FP ypos, FP scale, s16 count, const RGB16& rgb
     }
 }
 
-Particle* New_Orb_Particle(FP xpos, FP ypos, FP velX, FP velY, FP scale, Layer layer, const RGB16& rgb)
+Particle* New_Orb_Particle(FP xpos, FP ypos, FP velX, FP velY, FP scale, Layer layer, const RGB16& rgb, ResourceManagerWrapper& resMan)
 {
-    AnimResource ppRes = ResourceManagerWrapper::LoadAnimation(AnimId::ChantOrb_Particle);
-    auto pParticle = relive_new Particle(xpos, ypos, ppRes);
+    AnimResource ppRes = GetResourceManager().LoadAnimation(AnimId::ChantOrb_Particle);
+    auto pParticle = relive_new Particle(xpos, ypos, ppRes, resMan);
     if (pParticle)
     {
         pParticle->SetApplyShadowZoneColour(false);
@@ -182,9 +182,9 @@ void New_RandomizedChant_Particle(BaseAnimatedWithPhysicsGameObject* pObj)
 	}
 }
 
-void New_ShootingZFire_Particle(FP xpos, FP ypos, FP scale)
+void New_ShootingZFire_Particle(FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan)
 {
-    AnimResource ppRes = ResourceManagerWrapper::LoadAnimation(AnimId::ShootingZFire_Particle);
+    AnimResource ppRes = GetResourceManager().LoadAnimation(AnimId::ShootingZFire_Particle);
     auto pParticle = relive_new Particle(xpos, ypos, ppRes);
     if (pParticle)
     {
@@ -207,9 +207,9 @@ void New_ShootingZFire_Particle(FP xpos, FP ypos, FP scale)
     }
 }
 
-void New_ShootingFire_Particle(FP xpos, FP ypos, s8 direction, FP scale)
+void New_ShootingFire_Particle(FP xpos, FP ypos, s8 direction, FP scale, ResourceManagerWrapper& resMan)
 {
-    AnimResource ppRes = ResourceManagerWrapper::LoadAnimation(AnimId::ShootingFire_Particle);
+    AnimResource ppRes = GetResourceManager().LoadAnimation(AnimId::ShootingFire_Particle);
     auto pParticle = relive_new Particle(xpos, ypos, ppRes);
     if (pParticle)
     {

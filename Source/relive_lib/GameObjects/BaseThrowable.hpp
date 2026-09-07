@@ -7,7 +7,7 @@
 class BaseThrowable : public BaseAliveGameObject
 {
 public:
-    BaseThrowable();
+    BaseThrowable(ResourceManagerWrapper& resMan);
 
     // New virtuals for throwables
     virtual void VThrow(FP velX, FP velY) = 0;

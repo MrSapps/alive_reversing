@@ -59,7 +59,7 @@ enum class GameSpeakMatch : s16
 class GameSpeak final : public BaseGameObject
 {
 public:
-    GameSpeak();
+    GameSpeak(ResourceManagerWrapper& resMan);
     ~GameSpeak();
 
     virtual void VUpdate() override;

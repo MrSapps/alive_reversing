@@ -15,7 +15,8 @@
 #include "../relive_lib/FixedPoint.hpp"
 #include "QuikSave.hpp"
 
-Rock::Rock(FP xpos, FP ypos, s16 count)
+Rock::Rock(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan)
+    : BaseThrowable(resMan)
 {
     SetType(ReliveTypes::eRock);
 
@@ -24,7 +25,7 @@ Rock::Rock(FP xpos, FP ypos, s16 count)
     // Note: Loaded check removed
     LoadRockTypes(mCurrentLevel, mCurrentPath);
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Rock));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Rock));
     Animation_Init(GetAnimRes(AnimId::Rock));
 
     SetInteractive(false);
@@ -44,7 +45,7 @@ Rock::Rock(FP xpos, FP ypos, s16 count)
     mState = RockStates::eNone_0;
 
      /*
-    mLoadedPals.push_back(ResourceManagerWrapper::LoadPal(PalId::BlueRock));
+    mLoadedPals.push_back(GetResourceManager().LoadPal(PalId::BlueRock));
 
    
     // TODO: Don't know where this pal is, probably doesn't exist
@@ -189,7 +190,7 @@ void Rock::VUpdate()
             mVelY += FP_FromDouble(1.01);
             mXPos += mVelX;
             mYPos += mVelY;
-            if (!gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) && !gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos + FP_FromInteger(240), 0))
+            if (!gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) && !gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos + FP_FromInteger(240), 0))
             {
                 SetDead(true);
             }
@@ -205,8 +206,8 @@ void Rock::VTimeToExplodeRandom()
 //TODO Identical to AO - merge
 void Rock::VScreenChanged()
 {
-    if (gMap.PathChanged()
-        || gMap.LevelChanged())
+    if (gMap->PathChanged()
+        || gMap->LevelChanged())
     {
         SetDead(true);
     }
@@ -279,7 +280,7 @@ void Rock::InTheAir()
                     break;
                 }
 
-                if (!gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+                if (!gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
                 {
                     return;
                 }
@@ -454,11 +455,11 @@ void Rock::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void Rock::CreateFromSaveState(SerializedObjectData& pData)
+void Rock::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan)
 {
     const auto pState = pData.ReadTmpPtr<RockSaveState>();
 
-    auto pRock = relive_new Rock(pState->mXPos, pState->mYPos, pState->mThrowableCount);
+    auto pRock = relive_new Rock(pState->mXPos, pState->mYPos, pState->mThrowableCount, resMan);
 
     pRock->mBaseGameObjectTlvInfo = pState->mTlvId;
 

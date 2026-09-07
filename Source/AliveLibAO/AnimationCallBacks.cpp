@@ -16,7 +16,7 @@
 
 namespace AO {
 
-void Animation_OnFrame_Slig(::BaseGameObject* pObj, u32&, const IndexedPoint& pData)
+void Animation_OnFrame_Slig(::BaseGameObject* pObj, u32&, const IndexedPoint& pData, ResourceManagerWrapper& resMan)
 {
     auto pSlig = static_cast<Slig*>(pObj);
     if (pSlig->UpdateDelay() != 0)
@@ -46,7 +46,8 @@ void Animation_OnFrame_Slig(::BaseGameObject* pObj, u32&, const IndexedPoint& pD
             yOff + pSlig->mYPos,
             FP_FromInteger(-640),
             pSlig->GetSpriteScale(),
-            0);
+            0,
+            resMan);
 
         New_ShootingFire_Particle(
             pSlig->mXPos - xOff,
@@ -69,7 +70,8 @@ void Animation_OnFrame_Slig(::BaseGameObject* pObj, u32&, const IndexedPoint& pD
             yOff + pSlig->mYPos,
             FP_FromInteger(640),
             pSlig->GetSpriteScale(),
-            0);
+            0,
+            resMan);
 
         New_ShootingFire_Particle(
             pSlig->mXPos + xOff,
@@ -99,9 +101,9 @@ void Animation_OnFrame_Slig(::BaseGameObject* pObj, u32&, const IndexedPoint& pD
     Dove::All_FlyAway(false);
 }
 
-void Animation_OnFrame_ZBallSmacker(::BaseGameObject* pObj, u32& idx, const IndexedPoint& pData);
+void Animation_OnFrame_ZBallSmacker(::BaseGameObject* pObj, u32& idx, const IndexedPoint& pData, ResourceManagerWrapper& resMan);
 
-void Slog_OnFrame(::BaseGameObject* pObj, u32&, const IndexedPoint& pData)
+void Slog_OnFrame(::BaseGameObject* pObj, u32&, const IndexedPoint& pData, ResourceManagerWrapper& resMan)
 {
     auto pSlog = static_cast<Slog*>(pObj);
 
@@ -154,7 +156,7 @@ static const FP_Point sThrowVelocities[6] = {
     {FP_FromInteger(10), FP_FromInteger(-4)},
     {FP_FromInteger(4), FP_FromInteger(-3)}};
 
-void Abe_OnFrame(::BaseGameObject* pObj, u32&, const IndexedPoint& pData)
+void Abe_OnFrame(::BaseGameObject* pObj, u32&, const IndexedPoint& pData, ResourceManagerWrapper& resMan)
 {
     auto pAbe = static_cast<Abe*>(pObj);
 

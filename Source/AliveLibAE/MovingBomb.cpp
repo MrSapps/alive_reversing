@@ -39,14 +39,14 @@ static const TintEntry kMovingBombTints[16] = {
 
 static MovingBomb* sMovingBomb = nullptr;
 
-MovingBomb::MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId)
-    : BaseAliveGameObject(0)
+MovingBomb::MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(0, resMan)
 {
     SetCanExplode(true);
 
     SetType(ReliveTypes::eTimedMine_or_MovingBomb);
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::MovingBomb));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MovingBomb));
     Animation_Init(GetAnimRes(AnimId::MovingBomb));
 
     GetAnimation().SetSemiTrans(true);
@@ -82,7 +82,7 @@ MovingBomb::MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId)
         GetAnimation().SetRender(false);
     }
 
-    SetTint(kMovingBombTints, gMap.mCurrentLevel);
+    SetTint(kMovingBombTints, gMap->mCurrentLevel);
 
     FP hitX = {};
     FP hitY = {};

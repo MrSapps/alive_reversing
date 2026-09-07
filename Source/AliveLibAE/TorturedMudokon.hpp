@@ -17,7 +17,7 @@ enum class TorturedMudokonState : s16
 class TorturedMudokon final : public ::BaseAnimatedWithPhysicsGameObject
 {
 public:
-    TorturedMudokon(relive::Path_TorturedMudokon* pTlv, const Guid& tlvId);
+    TorturedMudokon(relive::Path_TorturedMudokon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~TorturedMudokon();
     
     void LoadAnimations();

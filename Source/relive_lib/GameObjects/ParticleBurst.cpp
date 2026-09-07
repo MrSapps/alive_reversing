@@ -65,7 +65,7 @@ ParticleBurst::ParticleBurst(FP xpos, FP ypos, u32 particleCount, FP scale, Burs
     {
         case BurstType::eRocks:
         {
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Explosion_Rock));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Explosion_Rock));
             Animation_Init(GetAnimRes(AnimId::Explosion_Rock));
             GetAnimation().SetSemiTrans(false);
             GetAnimation().SetBlending(true);
@@ -74,7 +74,7 @@ ParticleBurst::ParticleBurst(FP xpos, FP ypos, u32 particleCount, FP scale, Burs
 
         case BurstType::eSticks:
         {
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Explosion_Stick));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Explosion_Stick));
             Animation_Init(GetAnimRes(AnimId::Explosion_Stick));
             if (GetGameType() == GameType::eAo)
             {
@@ -87,7 +87,7 @@ ParticleBurst::ParticleBurst(FP xpos, FP ypos, u32 particleCount, FP scale, Burs
 
         case BurstType::eBigPurpleSparks:
         {
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::DeathFlare_2));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::DeathFlare_2));
             Animation_Init(GetAnimRes(AnimId::DeathFlare_2));
             GetAnimation().SetSemiTrans(true);
             GetAnimation().SetBlending(true);
@@ -99,7 +99,7 @@ ParticleBurst::ParticleBurst(FP xpos, FP ypos, u32 particleCount, FP scale, Burs
         case BurstType::eGreenSparks:
         case BurstType::eSmallPurpleSparks:
         {
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::DeathFlare_2));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::DeathFlare_2));
             Animation_Init(GetAnimRes(AnimId::DeathFlare_2));
             GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_1);
             GetAnimation().SetSemiTrans(true);
@@ -122,7 +122,7 @@ ParticleBurst::ParticleBurst(FP xpos, FP ypos, u32 particleCount, FP scale, Burs
 
         case BurstType::eMeat:
         {
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Meat_Gib));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Meat_Gib));
             Animation_Init(GetAnimRes(AnimId::Meat_Gib));
             GetAnimation().SetSemiTrans(false);
             GetAnimation().SetBlending(true);

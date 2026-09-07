@@ -21,9 +21,35 @@
 
 u32 UniqueResId::mGlobalId = 1;
 
-std::unique_ptr<ThreadPool> ResourceManagerWrapper::mThreadPool = std::make_unique<ThreadPool>();
-std::mutex ResourceManagerWrapper::mLoadedAnimationsMutex;
-std::map<ResourceManagerWrapper::AnimCacheKey, ResourceManagerWrapper::AnimCache> ResourceManagerWrapper::mLoadedAnimations;
+ResourceManagerWrapper::ResourceManagerWrapper()
+    : mThreadPool(std::make_unique<ThreadPool>())
+{
+    bHideLoadingIcon = 0;
+    loading_ticks = 0;
+}
+
+// Out of line so unique_ptr<ThreadPool> can be destroyed with an incomplete ThreadPool type
+ResourceManagerWrapper::~ResourceManagerWrapper() = default;
+
+static ResourceManagerWrapper* sResourceManager = nullptr;
+
+void SetResourceManager(ResourceManagerWrapper& resMan)
+{
+    sResourceManager = &resMan;
+}
+
+// TODO: remove after passing the res man to all objects
+ResourceManagerWrapper& GetResourceManager()
+{
+    // If nothing has been registered yet (e.g. conversion tools which don't use the game engine)
+    // then just use a local fallback instance
+    if (!sResourceManager)
+    {
+        static ResourceManagerWrapper fallback;
+        return fallback;
+    }
+    return *sResourceManager;
+}
 
 static FileSystem::Path BasePath(bool invertGame = false)
 {
@@ -65,8 +91,8 @@ private:
     }
 
 public:
-    explicit AnimationLoaderJob(AnimId anim, const std::string& themeName)
-        : mAnimId(anim), mThemeName(themeName)
+    explicit AnimationLoaderJob(ResourceManagerWrapper* pResMan, AnimId anim, const std::string& themeName)
+        : mResMan(pResMan), mAnimId(anim), mThemeName(themeName)
     {
 
     }
@@ -105,9 +131,9 @@ public:
         newRes.mPngPtr = pPngData;
         newRes.mCurPal = newRes.mPngPtr->mPal;
 
-        std::unique_lock<std::mutex> lock(ResourceManagerWrapper::mLoadedAnimationsMutex);
+        std::unique_lock<std::mutex> lock(mResMan->mLoadedAnimationsMutex);
 
-        ResourceManagerWrapper::mLoadedAnimations[std::make_pair(mThemeName, mAnimId)] = {pAnimationAttributesAndFrames, pPngData, {}};
+        mResMan->mLoadedAnimations[std::make_pair(mThemeName, mAnimId)] = {pAnimationAttributesAndFrames, pPngData, {}};
     }
 
 private:
@@ -174,14 +200,11 @@ AnimationAttributesAndFrames::AnimationAttributesAndFrames(const std::string& js
     from_json(j["attributes"], mAttributes);
 }
 
-s16 ResourceManagerWrapper::bHideLoadingIcon = 0;
-s32 ResourceManagerWrapper::loading_ticks = 0;
-
 void ResourceManagerWrapper::PendAnimation(AnimId animId, const std::string& theme)
 {
     if (!Exists(animId, theme))
     {
-        auto job = std::make_unique<AnimationLoaderJob>(animId, theme);
+        auto job = std::make_unique<AnimationLoaderJob>(this, animId, theme);
         mThreadPool->AddJob(std::move(job));
     }
 }
@@ -196,7 +219,7 @@ AnimResource ResourceManagerWrapper::LoadAnimation(AnimId anim, const std::strin
             LOG_ERROR("Animation %d wasn't loaded async before calling LoadAnimation, or didn't wait for async loading to finish", static_cast<s32>(anim));
         }
 
-        AnimationLoaderJob hack(anim, themeName);
+        AnimationLoaderJob hack(this, anim, themeName);
         hack.Execute();
     }
 
@@ -437,7 +460,7 @@ void ResourceManagerWrapper::LoadingLoop(bool bShowLoadingIcon)
         if (bShowLoadingIcon && !bHideLoadingIcon && SYS_GetTicks() > startTime + k1Second)
         {
             // Render everything in the ordering table including the loading icon
-            ResourceManagerWrapper::ShowLoadingIcon();
+            ShowLoadingIcon();
         }
     }
 
@@ -494,7 +517,7 @@ s32 ResourceManagerWrapper::SEQ_HashName(const char_type* seqFileName)
 
 void ResourceManagerWrapper::ShowLoadingIcon()
 {
-    AnimResource res = ResourceManagerWrapper::LoadAnimation(AnimId::Loading_Icon2);
+    AnimResource res = LoadAnimation(AnimId::Loading_Icon2);
     auto pParticle = relive_new Particle(FP_FromInteger(0), FP_FromInteger(0), res);
     if (pParticle)
     {
@@ -510,13 +533,13 @@ void ResourceManagerWrapper::ShowLoadingIcon()
 
         PSX_PutDispEnv_4F5890();
         pParticle->SetDead(true);
-        ResourceManagerWrapper::bHideLoadingIcon = true;
+        bHideLoadingIcon = true;
     }
 }
 
 bool ResourceManagerWrapper::Exists(AnimId animId, const std::string& theme)
 {
-    std::unique_lock<std::mutex> lock(ResourceManagerWrapper::mLoadedAnimationsMutex);
+    std::unique_lock<std::mutex> lock(mLoadedAnimationsMutex);
 
     auto it = mLoadedAnimations.find(std::make_pair(theme, animId));
     if (it == std::end(mLoadedAnimations))
@@ -528,7 +551,7 @@ bool ResourceManagerWrapper::Exists(AnimId animId, const std::string& theme)
 
 ResourceManagerWrapper::AnimCache ResourceManagerWrapper::LookUp(AnimId animId, const std::string& theme)
 {
-    std::unique_lock<std::mutex> lock(ResourceManagerWrapper::mLoadedAnimationsMutex);
+    std::unique_lock<std::mutex> lock(mLoadedAnimationsMutex);
 
     auto it = mLoadedAnimations.find(std::make_pair(theme, animId));
     if (it == std::end(mLoadedAnimations))

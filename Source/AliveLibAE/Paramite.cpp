@@ -84,12 +84,12 @@ void Paramite::LoadAnimations()
 {
     for (auto& animId : sParamiteMotionAnimIds)
     {
-        mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(animId));
+        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
     }
 }
 
-Paramite::Paramite(relive::Path_Paramite* pTlv, const Guid& tlvId)
-    : BaseAliveGameObject(16)
+Paramite::Paramite(relive::Path_Paramite* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(16, resMan)
 {
     SetType(ReliveTypes::eParamite);
 
@@ -98,7 +98,7 @@ Paramite::Paramite(relive::Path_Paramite* pTlv, const Guid& tlvId)
     LoadAnimations();
     Animation_Init(GetAnimRes(AnimId::Paramite_Idle));
 
-    SetTint(&kParamiteTints_55D73C[0], gMap.mCurrentLevel);
+    SetTint(&kParamiteTints_55D73C[0], gMap->mCurrentLevel);
 
     SetCanBePossessed(true);
     SetCanSetOffExplosives(true);
@@ -216,12 +216,12 @@ Paramite::Paramite(relive::Path_Paramite* pTlv, const Guid& tlvId)
     CreateShadow();
 }
 
-void Paramite::CreateFromSaveState(SerializedObjectData& pBuffer)
+void Paramite::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
 {
     const auto pState = pBuffer.ReadTmpPtr<ParamiteSaveState>();
     auto pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(pState->field_3C_tlvInfo).GetTlv<relive::Path_Paramite>();
 
-    auto pParamite = relive_new Paramite(pTlv, pState->field_3C_tlvInfo);
+    auto pParamite = relive_new Paramite(pTlv, pState->field_3C_tlvInfo, resMan);
 
     if (pState->mControlled)
     {
@@ -514,7 +514,7 @@ s16 Paramite::Brain_0_Patrol()
         mTargetGuid = Guid{};
     }
 
-    if (gMap.GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
+    if (gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
     {
         MusicController::static_PlayMusic(MusicController::MusicTypes::eTension_4, this, 0, 0);
     }
@@ -730,7 +730,7 @@ s16 Paramite::Brain_Patrol_State_12_Idle(BaseAliveGameObject* pObj)
 
     if (field_138_depossession_timer > static_cast<s32>(sGnFrame))
     {
-        if (!mSpawned || gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+        if (!mSpawned || gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
         {
             return mBrainSubState;
         }
@@ -1265,13 +1265,13 @@ s16 Paramite::Brain_1_Death()
         if (field_130_timer < static_cast<s32>(sGnFrame))
         {
             sControlledCharacter = gAbe;
-            gMap.SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+            gMap->SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
         }
     }
 
     if (sControlledCharacter != this)
     {
-        if (!gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+        if (!gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
         {
             SetDead(true);
         }
@@ -1298,7 +1298,7 @@ s16 Paramite::Brain_2_ChasingAbe()
     {
         if (field_148_timer > static_cast<s32>(sGnFrame) || (VOnSameYLevel(pObj) && GetSpriteScale() == pObj->GetSpriteScale()))
         {
-            if (gMap.GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
+            if (gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
             {
                 MusicController::static_PlayMusic(MusicController::MusicTypes::eSoftChase_8, this, 0, 0);
             }
@@ -2044,7 +2044,7 @@ s16 Paramite::Brain_5_SpottedMeat()
         }
     }
 
-    if (gMap.GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
+    if (gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
     {
         MusicController::static_PlayMusic(MusicController::MusicTypes::eTension_4, this, 0, 0);
     }
@@ -2361,7 +2361,7 @@ s16 Paramite::Brain_6_Possessed()
 {
     if (mBrainSubState == 1)
     {
-        if (gMap.GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
+        if (gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
         {
             MusicController::static_PlayMusic(MusicController::MusicTypes::ePossessed_9, this, 0, 0);
         }
@@ -2427,7 +2427,7 @@ s16 Paramite::Brain_7_DeathDrop()
         if (sControlledCharacter == this)
         {
             sControlledCharacter = gAbe;
-            gMap.SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+            gMap->SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
         }
 
         SetDead(true);
@@ -4339,8 +4339,8 @@ void Paramite::Motion_29_GetDepossessedBegin()
             mCurrentMotion = eParamiteMotions::Motion_30_GetDepossessedEnd;
             SetBrain(&Paramite::Brain_0_Patrol);
             mBrainSubState = 0;
-            gMap.SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
-            if (mAbeCamera != gMap.mCurrentCamera)
+            gMap->SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+            if (mAbeCamera != gMap->mCurrentCamera)
             {
                 if (mSpawned)
                 {
@@ -4960,9 +4960,9 @@ Paramite::~Paramite()
     if (sControlledCharacter == this)
     {
         sControlledCharacter = gAbe;
-        if (gMap.mNextLevel != EReliveLevelIds::eMenu)
+        if (gMap->mNextLevel != EReliveLevelIds::eMenu)
         {
-            gMap.SetActiveCam(
+            gMap->SetActiveCam(
                 mAbeLevel,
                 mAbePath,
                 mAbeCamera,
@@ -5032,7 +5032,7 @@ void Paramite::HandleDDCheat()
 
         // Keep in map bounds
         PSX_Point mapBounds = {};
-        gMap.Get_map_size(&mapBounds);
+        gMap->Get_map_size(&mapBounds);
         if (mXPos < FP_FromInteger(0))
         {
             mXPos = FP_FromInteger(0);
@@ -5156,7 +5156,7 @@ void Paramite::VUpdate()
     }
 
     if (mHealth > FP_FromInteger(0)
-        && gMap.Is_Point_In_Current_Camera(
+        && gMap->Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -5235,7 +5235,7 @@ s16 Paramite::Find_Paramite()
             break;
         }
 
-        if (pObj->Type() == ReliveTypes::eParamite && pObj != this && gMap.Is_Point_In_Current_Camera(pObj->mCurrentLevel, pObj->mCurrentPath, pObj->mXPos, pObj->mYPos, 0))
+        if (pObj->Type() == ReliveTypes::eParamite && pObj != this && gMap->Is_Point_In_Current_Camera(pObj->mCurrentLevel, pObj->mCurrentPath, pObj->mXPos, pObj->mYPos, 0))
         {
             return 1;
         }
@@ -5263,7 +5263,7 @@ Meat* Paramite::FindMeat()
             auto pMeat = static_cast<Meat*>(pObj);
             if (pMeat->VCanEatMe())
             {
-                if (gMap.Is_Point_In_Current_Camera(pMeat->mCurrentLevel, pMeat->mCurrentPath, pMeat->mXPos, pMeat->mYPos, 0) && !WallHit(mYPos, pMeat->mXPos - mXPos))
+                if (gMap->Is_Point_In_Current_Camera(pMeat->mCurrentLevel, pMeat->mCurrentPath, pMeat->mXPos, pMeat->mYPos, 0) && !WallHit(mYPos, pMeat->mXPos - mXPos))
                 {
                     if (!pMeat->mPathLine)
                     {
@@ -5317,9 +5317,9 @@ void Paramite::VPossessed()
     mNextMotion = eParamiteMotions::Motion_0_Idle;
     mBrainSubState = 0;
     field_130_timer = MakeTimer(30);
-    mAbeLevel = gMap.mCurrentLevel;
-    mAbePath = gMap.mCurrentPath;
-    mAbeCamera = gMap.mCurrentCamera;
+    mAbeLevel = gMap->mCurrentLevel;
+    mAbePath = gMap->mCurrentPath;
+    mAbeCamera = gMap->mCurrentCamera;
 }
 
 bool Paramite::VTakeDamage(BaseGameObject* pFrom)
@@ -5487,7 +5487,7 @@ s16 Paramite::AnotherParamiteNear()
         if (pObj->Type() == ReliveTypes::eParamite && pObj != this)
         {
             auto pOther = static_cast<Paramite*>(pObj);
-            if (pOther->GetSpriteScale() == GetSpriteScale() && gMap.Is_Point_In_Current_Camera(pOther->mCurrentLevel, pOther->mCurrentPath, pOther->mXPos, pOther->mYPos, 0) && gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) && IsNear(pOther))
+            if (pOther->GetSpriteScale() == GetSpriteScale() && gMap->Is_Point_In_Current_Camera(pOther->mCurrentLevel, pOther->mCurrentPath, pOther->mXPos, pOther->mYPos, 0) && gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) && IsNear(pOther))
             {
                 if (pOther->BrainIs(&Paramite::Brain_0_Patrol) || pOther->BrainIs(&Paramite::Brain_2_ChasingAbe))
                 {
@@ -5569,7 +5569,7 @@ s16 Paramite::CanIAcceptAGameSpeakCommand()
                 return 0;
             }
 
-            if (!pParamite->BrainIs(&Paramite::Brain_8_ControlledByGameSpeak) && gMap.Is_Point_In_Current_Camera(pParamite->mCurrentLevel, pParamite->mCurrentPath, pParamite->mXPos, pParamite->mYPos, 0))
+            if (!pParamite->BrainIs(&Paramite::Brain_8_ControlledByGameSpeak) && gMap->Is_Point_In_Current_Camera(pParamite->mCurrentLevel, pParamite->mCurrentPath, pParamite->mXPos, pParamite->mYPos, 0))
             {
                 if (sControlledCharacter->VIsFacingMe(pParamite) && !sControlledCharacter->VIsFacingMe(this))
                 {
@@ -6091,7 +6091,7 @@ const relive::SfxDefinition paramite_stru_55D7C0[12] = {
 
 void Paramite::Sound(ParamiteSpeak soundId, s16 pitch_min)
 {
-    const CameraPos direction = gMap.GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
+    const CameraPos direction = gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
 
     s16 volRight = 0;
     if (soundId == ParamiteSpeak::Howdy_5)
@@ -6117,7 +6117,7 @@ void Paramite::Sound(ParamiteSpeak soundId, s16 pitch_min)
     }
 
     PSX_RECT pRect = {};
-    gMap.Get_Camera_World_Rect(direction, &pRect);
+    gMap->Get_Camera_World_Rect(direction, &pRect);
 
     s16 volLeft = 0;
     switch (direction)
@@ -6190,7 +6190,7 @@ GameSpeakEvents Paramite::LastSpeak()
 {
     const GameSpeakEvents ret = mListener.Get(*gEventSystem);
 
-    if (gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 1))
+    if (gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 1))
     {
         return ret;
     }

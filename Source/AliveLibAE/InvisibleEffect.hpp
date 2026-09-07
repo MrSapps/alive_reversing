@@ -19,7 +19,7 @@ public:
         eSetDead_6 = 6
     };
 
-    explicit InvisibleEffect(BaseAliveGameObject* pTarget);
+    explicit InvisibleEffect(BaseAliveGameObject* pTarget, ResourceManagerWrapper& resMan);
     ~InvisibleEffect();
 
     virtual void VUpdate() override;

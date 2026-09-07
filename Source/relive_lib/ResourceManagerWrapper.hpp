@@ -199,6 +199,8 @@ class ThreadPool;
 class ResourceManagerWrapper
 {
 public:
+    ResourceManagerWrapper();
+    ~ResourceManagerWrapper();
 
     // TODO: Remove/unify when both games resource managers are merged into one object
     enum ResourceType : u32
@@ -237,36 +239,37 @@ public:
 
 
     // TODO: needs to be async like og
-    static void PendAnimation(AnimId anim, const std::string& theme = "");
-    static AnimResource LoadAnimation(AnimId anim, const std::string& themeName = "");
+    void PendAnimation(AnimId anim, const std::string& theme = "");
+    AnimResource LoadAnimation(AnimId anim, const std::string& themeName = "");
 
-    static PalResource LoadPal(PalId pal);
+    PalResource LoadPal(PalId pal);
 
-    static CamResource LoadCam(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber);
-    static Fg1Resource LoadFg1(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber);
+    CamResource LoadCam(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber);
+    Fg1Resource LoadFg1(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber);
 
-    static FontResource LoadFont(FontType fontId);
+    FontResource LoadFont(FontType fontId);
 
-    static std::vector<std::unique_ptr<BinaryPath>> LoadPaths(EReliveLevelIds lvlId);
+    std::vector<std::unique_ptr<BinaryPath>> LoadPaths(EReliveLevelIds lvlId);
 
     // TODO: Used only for vh/vb/bsq loading, will be changed when these file formats are updated
-    static std::vector<u8> LoadFile(const char_type* pFileName, EReliveLevelIds lvlId);
+    std::vector<u8> LoadFile(const char_type* pFileName, EReliveLevelIds lvlId);
 
-    static void LoadingLoop(bool bShowLoadingIcon);
+    void LoadingLoop(bool bShowLoadingIcon);
 
     // TODO: Call LoadingLoop after master/engine merge, LoadingLoop will
     // cause a de-sync due to calling sound funcs
-    static void LoadingLoop2();
+    void LoadingLoop2();
 
+    // Stateless helper, no instance state is used
     static s32 SEQ_HashName(const char_type* seqFileName);
 
-    static s16 bHideLoadingIcon;
-    static s32 loading_ticks;
+    s16 bHideLoadingIcon = 0;
+    s32 loading_ticks = 0;
 
-    static void ShowLoadingIcon();
+    void ShowLoadingIcon();
 
     template <typename T, int size>
-    static void PendAnims(const T (&anims)[size])
+    void PendAnims(const T (&anims)[size])
     {
         for (const auto& anim : anims)
         {
@@ -287,17 +290,23 @@ private:
         UniqueResId mAnimUniqueId;
     };
 
-    static bool Exists(AnimId animId, const std::string& theme);
-    static AnimCache LookUp(AnimId animId, const std::string& theme);
+    bool Exists(AnimId animId, const std::string& theme);
+    AnimCache LookUp(AnimId animId, const std::string& theme);
 
 public:
-    static std::mutex mLoadedAnimationsMutex;
+    std::mutex mLoadedAnimationsMutex;
     // TODO: Remove dead entries at some point
 
     using AnimCacheKey = std::pair<std::string, AnimId>;
-    static std::map<AnimCacheKey, AnimCache> mLoadedAnimations;
+    std::map<AnimCacheKey, AnimCache> mLoadedAnimations;
 
 private:
     // unique_ptr to avoid bringing the header in
-    static std::unique_ptr<ThreadPool> mThreadPool;
+    std::unique_ptr<ThreadPool> mThreadPool;
 };
+
+// TODO: This accessor exists until all usages have been migrated to receive the
+// engine owned instance through constructors/getters. The engine registers its
+// instance via SetResourceManager().
+ResourceManagerWrapper& GetResourceManager();
+void SetResourceManager(ResourceManagerWrapper& resMan);

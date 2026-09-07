@@ -41,14 +41,14 @@ static const TintEntry sTimedMineTint[19] = {
 
 void TimedMine::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Bomb_Flash));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Bomb_RedGreenTick));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::TimedMine_Idle));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::TimedMine_Activated));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Bomb_Flash));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Bomb_RedGreenTick));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::TimedMine_Idle));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::TimedMine_Activated));
 }
 
-TimedMine::TimedMine(relive::Path_TimedMine* pTlv, const Guid& tlvId)
-    : BaseAliveGameObject(0)
+TimedMine::TimedMine(relive::Path_TimedMine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(0, resMan)
 {
     if (GetGameType() == GameType::eAe)
     {

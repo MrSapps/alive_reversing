@@ -12,7 +12,7 @@ enum class MessageType : s32
 class Text final : public BaseGameObject
 {
 public:
-    Text(const char_type* pMessage, s32 renderCount, s32 bShadow);
+    Text(const char_type* pMessage, s32 renderCount, s32 bShadow, ResourceManagerWrapper& resMan);
     ~Text();
 
     virtual void VUpdate() override;
@@ -34,4 +34,4 @@ private:
     char_type field_68_txt_buffer[60] = {};
 };
 
-s8 Display_Full_Screen_Message_Blocking(MessageType messageType);
+s8 Display_Full_Screen_Message_Blocking(MessageType messageType, ResourceManagerWrapper& resMan);

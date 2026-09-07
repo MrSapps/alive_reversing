@@ -11,7 +11,7 @@ namespace relive
 class BrewMachine final : public ::BaseAnimatedWithPhysicsGameObject
 {
 public:
-    BrewMachine(relive::Path_BrewMachine* pTlv, const Guid& tlvId);
+    BrewMachine(relive::Path_BrewMachine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~BrewMachine();
     
     virtual void VUpdate() override;

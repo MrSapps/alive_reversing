@@ -13,7 +13,7 @@ namespace AO {
 class MusicController final : public ::BaseGameObject
 {
 public:
-    static s16 Create();
+    static s16 Create(ResourceManagerWrapper& resMan);
     static void SetBaseTimeStamp();
     static void UpdateMusicTime();
     static s32 GetMusicTime();
@@ -40,7 +40,7 @@ public:
         eSecretAreaLong_16 = 16,
     };
 
-    MusicController();
+    MusicController(ResourceManagerWrapper& resMan);
     ~MusicController();
 
     virtual void VScreenChanged() override;

@@ -8,8 +8,8 @@
 #include "../GameType.hpp"
 #include "BaseMap.hpp"
 
-ZzzSpawner::ZzzSpawner(relive::Path_ZzzSpawner* pTlv, const Guid& tlvId)
-    : BaseGameObject(true, 0)
+ZzzSpawner::ZzzSpawner(relive::Path_ZzzSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     mXPos = FP_FromInteger(pTlv->mTopLeftX);
     mYPos = FP_FromInteger(pTlv->mTopLeftY);

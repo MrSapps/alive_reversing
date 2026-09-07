@@ -9,13 +9,13 @@
 
 void ZapSpark::LoadAnimationsAO()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::ChantOrb_Particle_Small));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::ChantOrb_Particle));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::ChantOrb_Particle_Small));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::ChantOrb_Particle));
 }
 
 void ZapSpark::LoadAnimationsAE()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::AE_ZapSpark));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::AE_ZapSpark));
 }
 
 ZapSpark::ZapSpark(FP xpos, FP ypos, FP scale)

@@ -12,7 +12,7 @@ namespace AO {
 class LightEffect final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    LightEffect(relive::Path_LightEffect* pTlv, const Guid& tlvId);
+    LightEffect(relive::Path_LightEffect* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~LightEffect();
 
     virtual void VRender(OrderingTable& ot) override;

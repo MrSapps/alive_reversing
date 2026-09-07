@@ -19,8 +19,8 @@ void ShadowZone::FreeArray()
     sShadowZoneArray = nullptr;
 }
 
-ShadowZone::ShadowZone(relive::Path_ShadowZone* pTlv, const Guid& tlvId)
-    : BaseGameObject(true, 0)
+ShadowZone::ShadowZone(relive::Path_ShadowZone* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     sShadowZoneArray->Push_Back(this);
 

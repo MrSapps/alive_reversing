@@ -9,8 +9,8 @@
 #include "Path.hpp"
 #include "QuikSave.hpp"
 
-LiftMover::LiftMover(relive::Path_LiftMover* pTlv, const Guid& tlvId)
-    : BaseGameObject(true, 0)
+LiftMover::LiftMover(relive::Path_LiftMover* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     mTlvId = tlvId;
     mTargetLiftId = Guid{};
@@ -216,12 +216,12 @@ void LiftMover::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void LiftMover::CreateFromSaveState(SerializedObjectData& pData)
+void LiftMover::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan)
 {
     const auto pState = pData.ReadTmpPtr<LiftMoverSaveState>();
 
     relive::Path_LiftMover* pTlv = static_cast<relive::Path_LiftMover*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv());
-    auto pLiftMover = relive_new LiftMover(pTlv, pState->mTlvId);
+    auto pLiftMover = relive_new LiftMover(pTlv, pState->mTlvId, resMan);
     if (pLiftMover)
     {
         if (pState->mState != LiftMoverStates::eInactive_0)

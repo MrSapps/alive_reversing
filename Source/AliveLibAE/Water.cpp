@@ -13,11 +13,11 @@
 #include "Map.hpp"
 #include "Path.hpp"
 
-Water::Water(relive::Path_Water* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0)
+Water::Water(relive::Path_Water* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::WaterDrop));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::WaterSplash));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::WaterDrop));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::WaterSplash));
 
     Animation_Init(GetAnimRes(AnimId::WaterDrop));
     // mAnim.mFlags.Set(AnimFlags::eBit25_bDecompressDone);
@@ -159,7 +159,7 @@ void Water::VScreenChanged()
         field_144_sound_channels = 0;
     }
 
-    if (gMap.LevelChanged() || gMap.PathChanged())
+    if (gMap->LevelChanged() || gMap->PathChanged())
     {
         SetDead(true);
     }
@@ -225,7 +225,7 @@ void Water::VUpdate()
         SetDead(true);
     }
 
-    if (gMap.Is_Point_In_Current_Camera(
+    if (gMap->Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -241,7 +241,7 @@ void Water::VUpdate()
 
     if (field_13C_not_in_camera_count <= 90)
     {
-        const CameraPos soundDir = gMap.GetDirection(
+        const CameraPos soundDir = gMap->GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -454,7 +454,7 @@ void Water::VUpdate()
 
 void Water::VRender(OrderingTable& ot)
 {
-    if (gMap.Is_Point_In_Current_Camera(
+    if (gMap->Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,

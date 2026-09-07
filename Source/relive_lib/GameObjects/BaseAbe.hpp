@@ -5,7 +5,7 @@
 class BaseAbe : public ::BaseAliveGameObject
 {
 public:
-    explicit BaseAbe(s16 resourceArraySize);
+    explicit BaseAbe(s16 resourceArraySize, ResourceManagerWrapper& resMan);
     virtual bool IsEnteringOrExitingDoor() const = 0;
     virtual s32 DoorId() const = 0;
 };

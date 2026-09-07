@@ -25,8 +25,8 @@ BoomMachinePipe::BoomMachinePipe(FP xpos, FP ypos, FP scale, s16 numGrenades)
 
 void BoomMachinePipe::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::BoomMachine_Pipe_DropGrenade));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::BoomMachine_Pipe_Idle));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BoomMachine_Pipe_DropGrenade));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BoomMachine_Pipe_Idle));
 }
 
 void BoomMachinePipe::DropGrenadeAnimation()

@@ -150,8 +150,8 @@ public:
 };
 static LCDMessages gLCDMessages;
 
-LCDScreen::LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId)
-    : BaseGameObject(true, 0)
+LCDScreen::LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     mBaseGameObjectTlvInfo = tlvId;
 
@@ -166,14 +166,14 @@ LCDScreen::LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId)
 
     mFontContext.LoadFontType(FontType::LcdFont);
 
-    mPal1 = ResourceManagerWrapper::LoadPal(PalId::LedFont_1);
-    mPal2 = ResourceManagerWrapper::LoadPal(PalId::LedFont_2);
+    mPal1 = GetResourceManager().LoadPal(PalId::LedFont_1);
+    mPal2 = GetResourceManager().LoadPal(PalId::LedFont_2);
 
     mFont.Load(60, mPal1, &mFontContext);
 
     if (Input().IsJoyStickEnabled() || mMessageId1 != 62)
     {
-        String_FormatString(gLCDMessages.GetMessage(gMap.mCurrentLevel, gMap.mCurrentPath, mMessageId1), mMessageBuffer);
+        String_FormatString(gLCDMessages.GetMessage(gMap->mCurrentLevel, gMap->mCurrentPath, mMessageId1), mMessageBuffer);
     }
     else
     {
@@ -230,7 +230,7 @@ void LCDScreen::VUpdate()
 
                 if (Input().IsJoyStickEnabled() || rangedRandom != 62)
                 {
-                    String_FormatString(gLCDMessages.GetMessage(gMap.mCurrentLevel, gMap.mCurrentPath, rangedRandom), mMessageBuffer);
+                    String_FormatString(gLCDMessages.GetMessage(gMap->mCurrentLevel, gMap->mCurrentPath, rangedRandom), mMessageBuffer);
                 }
                 else
                 {
@@ -249,7 +249,7 @@ void LCDScreen::VUpdate()
                 if (Input().IsJoyStickEnabled() || mMessageId1 != 62)
                 {
                     String_FormatString(
-                        gLCDMessages.GetMessage(gMap.mCurrentLevel, gMap.mCurrentPath, mMessageId1),
+                        gLCDMessages.GetMessage(gMap->mCurrentLevel, gMap->mCurrentPath, mMessageId1),
                         mMessageBuffer);
                 }
                 else

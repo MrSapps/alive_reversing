@@ -38,16 +38,16 @@ static const TintEntry sUXBTints[16] = {
 
 void UXB::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Bomb_RedGreenTick));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::UXB_Disabled));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::UXB_Toggle));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::UXB_Active));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Bomb_Flash));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Bomb_RedGreenTick));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::UXB_Disabled));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::UXB_Toggle));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::UXB_Active));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Bomb_Flash));
 }
 
 void UXB::PlaySFX(relive::SoundEffects sfxIdx)
 {
-    if (gMap.Is_Point_In_Current_Camera(
+    if (gMap->Is_Point_In_Current_Camera(
             this->mCurrentLevel,
             this->mCurrentPath,
             this->mXPos,
@@ -58,21 +58,21 @@ void UXB::PlaySFX(relive::SoundEffects sfxIdx)
     }
 }
 
-UXB::UXB(relive::Path_UXB* pTlv, const Guid& tlvId)
-    : BaseAliveGameObject(0)
+UXB::UXB(relive::Path_UXB* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(0, resMan)
 {
     SetType(ReliveTypes::eUXB);
 
     LoadAnimations();
     Animation_Init(GetAnimRes(AnimId::UXB_Active));
-    mLoadedPals.push_back(ResourceManagerWrapper::LoadPal(PalId::GreenFlash));
+    mLoadedPals.push_back(GetResourceManager().LoadPal(PalId::GreenFlash));
 
     GetAnimation().SetSemiTrans(true);
     GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_0);
 
     if (GetGameType() == GameType::eAe)
     {
-        SetTint(sUXBTints, gMap.mCurrentLevel);
+        SetTint(sUXBTints, gMap->mCurrentLevel);
     }
 
     SetInteractive(true);
@@ -258,7 +258,7 @@ UXB::~UXB()
 
 void UXB::VScreenChanged()
 {
-    if (gMap.LevelChanged() || gMap.PathChanged())
+    if (gMap->LevelChanged() || gMap->PathChanged())
     {
         if (mStartingState == UXBState::eDeactivated && mCurrentState != UXBState::eDeactivated)
         {
@@ -460,7 +460,7 @@ void UXB::VRender(OrderingTable& ot)
 {
     if (GetAnimation().GetRender())
     {
-        if (gMap.Is_Point_In_Current_Camera(
+        if (gMap->Is_Point_In_Current_Camera(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,

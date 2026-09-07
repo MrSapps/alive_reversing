@@ -26,7 +26,7 @@ struct LiftPointSaveState final : public SaveStateBase
 class LiftPoint final : public PlatformBase
 {
 public:
-    LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId);
+    LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~LiftPoint();
     
     void LoadAnimations();
@@ -36,7 +36,7 @@ public:
     virtual void VScreenChanged() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
 
-    static void CreateFromSaveState(SerializedObjectData& pData);
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan);
 
     void KeepOnMiddleFloor();
     bool MovingToFloorLevel() const;

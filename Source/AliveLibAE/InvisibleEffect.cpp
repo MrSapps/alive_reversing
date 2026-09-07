@@ -11,8 +11,8 @@
 
 #define TRANSITION_FRAMECOUNT 24
 
-InvisibleEffect::InvisibleEffect(BaseAliveGameObject* pTarget)
-    : BaseGameObject(true, 0)
+InvisibleEffect::InvisibleEffect(BaseAliveGameObject* pTarget, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
      SetType(ReliveTypes::eInvisibleEffect);
 
@@ -243,7 +243,7 @@ void InvisibleEffect::VUpdate()
             pTarget->SetInvisible(false);
 
             SetUpdateDelay(1);
-            relive_new PossessionFlicker(pTarget, 16, 255, 128, 128);
+            relive_new PossessionFlicker(pTarget, 16, 255, 128, 128, mResMan);
             mState = InvisibleState::eSetDead_6;
             break;
         }

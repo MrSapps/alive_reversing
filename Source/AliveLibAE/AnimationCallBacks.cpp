@@ -14,20 +14,20 @@
 #include "../relive_lib/FixedPoint.hpp"
 #include "../relive_lib/Collisions.hpp"
 
-void Animation_OnFrame_Common_Null(BaseGameObject*, u32&, const IndexedPoint&)
+void Animation_OnFrame_Common_Null(BaseGameObject*, u32&, const IndexedPoint&, ResourceManagerWrapper& resMan)
 {
 
 }
 
-void Animation_OnFrame_Null(BaseGameObject*, u32&, const IndexedPoint&)
+void Animation_OnFrame_Null(BaseGameObject*, u32&, const IndexedPoint&, ResourceManagerWrapper& resMan)
 {
 
 }
 
-void Animation_OnFrame_Common(BaseGameObject* pObjPtr, u32&, const IndexedPoint& point)
+void Animation_OnFrame_Common(BaseGameObject* pObjPtr, u32&, const IndexedPoint& point, ResourceManagerWrapper& resMan)
 {
     auto pObj = static_cast<BaseAliveGameObject*>(pObjPtr);
-    AnimResource ppAnimData = ResourceManagerWrapper::LoadAnimation(AnimId::Dust_Particle);
+    AnimResource ppAnimData = GetResourceManager().LoadAnimation(AnimId::Dust_Particle);
 
     FP xOff = {};
     if (pObj->GetAnimation().GetFlipX())
@@ -76,7 +76,7 @@ void Animation_OnFrame_Common(BaseGameObject* pObjPtr, u32&, const IndexedPoint&
         ypos -= FP_FromInteger(5);
     }
 
-    auto pPartical = relive_new Particle(xpos, ypos, ppAnimData);
+    auto pPartical = relive_new Particle(xpos, ypos, ppAnimData, resMan);
     if (pPartical)
     {
         pPartical->GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_1);
@@ -114,7 +114,7 @@ void Animation_OnFrame_Common(BaseGameObject* pObjPtr, u32&, const IndexedPoint&
     return;
 }
 
-void Animation_OnFrame_FlyingSlig(BaseGameObject* pObjPtr, u32&, const IndexedPoint& point)
+void Animation_OnFrame_FlyingSlig(BaseGameObject* pObjPtr, u32&, const IndexedPoint& point, ResourceManagerWrapper& resMan)
 {
     auto pObj = static_cast<BaseAliveGameObject*>(pObjPtr);
 
@@ -147,7 +147,7 @@ void Animation_OnFrame_FlyingSlig(BaseGameObject* pObjPtr, u32&, const IndexedPo
         pObj->SetDead(true);
     }
 
-    auto pParticle = relive_new Particle(xpos, ypos, pObj->GetAnimRes(AnimId::Vaporize_Particle));
+    auto pParticle = relive_new Particle(xpos, ypos, pObj->GetAnimRes(AnimId::Vaporize_Particle), resMan);
     if (pParticle)
     {
         pParticle->GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_1);
@@ -157,7 +157,7 @@ void Animation_OnFrame_FlyingSlig(BaseGameObject* pObjPtr, u32&, const IndexedPo
     }
 }
 
-void Animation_OnFrame_Slog(BaseGameObject* pObjPtr, u32&, const IndexedPoint& point)
+void Animation_OnFrame_Slog(BaseGameObject* pObjPtr, u32&, const IndexedPoint& point, ResourceManagerWrapper& resMan)
 {
     auto pSlog = static_cast<Slog*>(pObjPtr);
     auto pTarget = static_cast<BaseAliveGameObject*>(sObjectIds.Find_Impl(pSlog->mTargetId));

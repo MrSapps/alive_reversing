@@ -10,7 +10,7 @@ const AnimRecord PerGameAnimRec(AnimId id);
 const AnimRecord PerGameBgAnimRec(s32 toFindResId);
 class BaseGameObject;
 
-using TFrameCallBackType = void(*)(BaseGameObject*, u32& pointIdx, const IndexedPoint&);
+using TFrameCallBackType = void(*)(BaseGameObject*, u32& pointIdx, const IndexedPoint&, ResourceManagerWrapper& resMan);
 
 class Animation final : public AnimationBase
 {

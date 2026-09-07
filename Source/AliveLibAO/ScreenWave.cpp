@@ -28,8 +28,8 @@ struct ScreenWave_Data final
 };
 ALIVE_ASSERT_SIZEOF(ScreenWave_Data, 0x3700);
 
-ScreenWave::ScreenWave(FP xpos, FP ypos, Layer layer, FP width, FP speed, s32 radius)
-    : BaseGameObject(true, 0)
+ScreenWave::ScreenWave(FP xpos, FP ypos, Layer layer, FP width, FP speed, s32 radius, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     SetType(ReliveTypes::eScreenWave);
     gObjListDrawables->Push_Back(this);
@@ -46,8 +46,8 @@ ScreenWave::ScreenWave(FP xpos, FP ypos, Layer layer, FP width, FP speed, s32 ra
     field_1C_ypos = ypos;
     field_30_speed = speed;
 
-    field_3C_path = gMap.mCurrentPath;
-    field_3A_level = gMap.mCurrentLevel;
+    field_3C_path = gMap->mCurrentPath;
+    field_3A_level = gMap->mCurrentLevel;
 
     SetDrawable(true);
     field_18_xpos = xpos;
@@ -116,7 +116,7 @@ ScreenWave::~ScreenWave()
 
 void ScreenWave::VScreenChanged()
 {
-    if (gMap.LevelChanged() || gMap.PathChanged())
+    if (gMap->LevelChanged() || gMap->PathChanged())
     {
         SetDead(true);
     }
@@ -150,7 +150,7 @@ void ScreenWave::VUpdate()
 
 void ScreenWave::VRender(OrderingTable& ot)
 {
-    if (!gMap.Is_Point_In_Current_Camera(
+    if (!gMap->Is_Point_In_Current_Camera(
             field_3A_level,
             field_3C_path,
             field_18_xpos,

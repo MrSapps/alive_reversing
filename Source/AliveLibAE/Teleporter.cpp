@@ -31,8 +31,8 @@ static void SetData(Relive_Path_Teleporter_Data& tlvData, const relive::Path_Tel
     tlvData.mElectricY = tlv.mElectricY;
 }
 
-Teleporter::Teleporter(relive::Path_Teleporter* pTlv, const Guid& tlvId)
-    : BaseGameObject(true, 0)
+Teleporter::Teleporter(relive::Path_Teleporter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     SetData(mTlvData, *pTlv);
     mTlvId = tlvId;
@@ -53,7 +53,7 @@ Teleporter::~Teleporter()
 
 void Teleporter::VScreenChanged()
 {
-    if (gMap.LevelChanged())
+    if (gMap->LevelChanged())
     {
         SetDead(true);
     }
@@ -202,7 +202,7 @@ void Teleporter::VUpdate()
 
             sControlledCharacter->GetAnimation().SetRender(false);
 
-            gMap.mTeleporterTransition = 1;
+            gMap->mTeleporterTransition = 1;
 
             const CameraSwapEffects effect = kPathChangeEffectToInternalScreenChangeEffect[mTlvData.mWipeEffect];
             s16 bForceChange = 0;
@@ -211,7 +211,7 @@ void Teleporter::VUpdate()
                 bForceChange = 1;
             }
 
-            gMap.SetActiveCam(
+            gMap->SetActiveCam(
                 mTlvData.mDestLevel,
                 mTlvData.mDestPath,
                 mTlvData.mDestCamera,
@@ -227,7 +227,7 @@ void Teleporter::VUpdate()
 
         case TeleporterState::eTeleporting_2:
         {
-            gMap.mTeleporterTransition = 0;
+            gMap->mTeleporterTransition = 0;
 
             Relive_Path_Teleporter_Data tlvData = {};
             relive::Path_Teleporter* pTeleporterTlv = nullptr;

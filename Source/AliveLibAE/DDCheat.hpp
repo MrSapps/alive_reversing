@@ -51,7 +51,7 @@ struct DDCheatProperty final
 class DDCheat final : public BaseGameObject
 {
 public:
-    DDCheat();
+    DDCheat(ResourceManagerWrapper& resMan);
 
     virtual void VUpdate() override;
     virtual void VScreenChanged() override

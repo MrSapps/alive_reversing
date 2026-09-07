@@ -57,13 +57,13 @@ void UXB::LoadAnimations()
 
     for (const auto& animId : kUxbAnims)
     {
-        mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(animId));
+        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
     }
 }
 
 void UXB::PlaySFX(relive::SoundEffects sfxIdx)
 {
-    if (gMap.Is_Point_In_Current_Camera(
+    if (gMap->Is_Point_In_Current_Camera(
             this->mCurrentLevel,
             this->mCurrentPath,
             this->mXPos,
@@ -74,21 +74,21 @@ void UXB::PlaySFX(relive::SoundEffects sfxIdx)
     }
 }
 
-UXB::UXB(relive::Path_UXB* pTlv, const Guid& tlvId)
-    : BaseAliveGameObject(0)
+UXB::UXB(relive::Path_UXB* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(0, resMan)
 {
     SetType(ReliveTypes::eUXB);
 
     LoadAnimations();
     Animation_Init(GetAnimRes(AnimId::UXB_Active));
-    mLoadedPals.push_back(ResourceManagerWrapper::LoadPal(PalId::GreenFlash));
+    mLoadedPals.push_back(GetResourceManager().LoadPal(PalId::GreenFlash));
 
     GetAnimation().SetSemiTrans(true);
     GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_0);
 
     if (GetGameType() == GameType::eAe)
     {
-        SetTint(sUXBTints, gMap.mCurrentLevel);
+        SetTint(sUXBTints, gMap->mCurrentLevel);
     }
 
     SetInteractive(true);
@@ -477,7 +477,7 @@ void UXB::VRender(OrderingTable& ot)
 {
     if (GetAnimation().GetRender())
     {
-        if (gMap.Is_Point_In_Current_Camera(
+        if (gMap->Is_Point_In_Current_Camera(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,
@@ -522,13 +522,13 @@ void UXB::VGetSaveState(SerializedObjectData& __pSaveBuffer)
     __pSaveBuffer.Write(data);
 }
 
-void UXB::CreateFromSaveState(SerializedObjectData& __pSaveState)
+void UXB::CreateFromSaveState(SerializedObjectData& __pSaveState, ResourceManagerWrapper& resMan)
 {
     const auto pSaveState = __pSaveState.ReadTmpPtr<UXBSaveState>();
 
     relive::Path_UXB* uxbPath = reinterpret_cast<relive::Path_UXB*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pSaveState->mTlvInfo).GetTlv());
 
-    UXB* pUXB = relive_new UXB(uxbPath, pSaveState->mTlvInfo);
+    UXB* pUXB = relive_new UXB(uxbPath, pSaveState->mTlvInfo, resMan);
 
     if (pSaveState->mCurrentState == UXBState::eDeactivated)
     {

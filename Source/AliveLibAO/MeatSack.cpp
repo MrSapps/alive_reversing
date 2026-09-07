@@ -14,12 +14,12 @@ namespace AO
 
 void MeatSack::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::MeatSack_Hit));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::MeatSack_Idle));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MeatSack_Hit));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MeatSack_Idle));
 }
 
-MeatSack::MeatSack(relive::Path_MeatSack* pTlv, const Guid& tlvId)
-    : ::BaseAliveGameObject(0)
+MeatSack::MeatSack(relive::Path_MeatSack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : ::BaseAliveGameObject(0, resMan)
 {
     SetType(ReliveTypes::eMeatSack);
 
@@ -128,7 +128,8 @@ void MeatSack::VUpdate()
             auto pMeat = relive_new Meat(
                 mXPos,
                 mYPos - FP_FromInteger(30),
-                mMeatAmount);
+                mMeatAmount,
+                mResMan);
             if (pMeat)
             {
                 pMeat->VThrow(mTlvVelX, mTlvVelY);
@@ -150,14 +151,14 @@ void MeatSack::VScreenChanged()
     SetDead(true);
 }
 
-Meat::Meat(FP xpos, FP ypos, s16 count)
-    : BaseThrowable()
+Meat::Meat(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan)
+    : BaseThrowable(resMan)
 {
     mBaseThrowableDead = 0;
 
     SetType(ReliveTypes::eMeat);
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Meat));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Meat));
     Animation_Init(GetAnimRes(AnimId::Meat));
 
     mXPos = xpos;

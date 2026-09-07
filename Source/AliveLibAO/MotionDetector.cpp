@@ -21,12 +21,12 @@ namespace AO {
 #undef min
 #undef max
 
-MotionDetector::MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0)
+MotionDetector::MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eMotionDetector);
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::MotionDetector_Flare));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MotionDetector_Flare));
     Animation_Init(GetAnimRes(AnimId::MotionDetector_Flare));
 
     GetAnimation().SetSwapXY(true);
@@ -62,7 +62,7 @@ MotionDetector::MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tl
     if (pTlv->mInitialMoveDirection == relive::Path_MotionDetector::InitialMoveDirection::eRight)
     {
         mState = States::eMoveRight_0;
-        pMotionDetectors = relive_new MotionDetectorLaser();
+        pMotionDetectors = relive_new MotionDetectorLaser(resMan);
         if (pMotionDetectors)
         {
             pMotionDetectors->SetType(ReliveTypes::eRedLaser);
@@ -83,7 +83,7 @@ MotionDetector::MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tl
     else if (pTlv->mInitialMoveDirection == relive::Path_MotionDetector::InitialMoveDirection::eLeft)
     {
         mState = States::eMoveLeft_2;
-        pMotionDetectors = relive_new MotionDetectorLaser();
+        pMotionDetectors = relive_new MotionDetectorLaser(resMan);
         if (pMotionDetectors)
         {
             pMotionDetectors->SetType(ReliveTypes::eRedLaser);
@@ -215,7 +215,8 @@ void MotionDetector::VUpdate()
                                     mAlarmDuration,
                                     mAlarmSwitchId,
                                     0,
-                                    Layer::eLayer_Above_FG1_39);
+                                    Layer::eLayer_Above_FG1_39,
+                                    mResMan);
 
                                 if (pObj == gAbe)
                                 {

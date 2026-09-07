@@ -296,13 +296,13 @@ void MainMenuFade::LoadAnimations()
     {
         if (animId != AnimId::None)
         {
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(animId));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
         }
     }
 }
 
-MainMenuFade::MainMenuFade(s32 xpos, s32 ypos, buttonType buttonType, s32 bDestroyOnDone)
-    : BaseAnimatedWithPhysicsGameObject(0)
+MainMenuFade::MainMenuFade(s32 xpos, s32 ypos, buttonType buttonType, s32 bDestroyOnDone, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::MainMenuFade);
 
@@ -373,24 +373,24 @@ void Menu::LoadAnimations()
 {
     for (auto& animId : kAnims)
     {
-        mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(animId));
+        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
     }
 }
 
-Menu::Menu(relive::Path_TLV* /*pTlv*/, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0)
+Menu::Menu(relive::Path_TLV* /*pTlv*/, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     LoadAnimations();
-    mLoadedPals.push_back(ResourceManagerWrapper::LoadPal(PalId::WhiteHighlite));
+    mLoadedPals.push_back(GetResourceManager().LoadPal(PalId::WhiteHighlite));
 
     gMainMenuInstanceCount++;
 
     mFontContext.LoadFontType(FontType::PauseMenu);
-    mPal = ResourceManagerWrapper::LoadPal(PalId::MainMenuFont_MainMenu);
+    mPal = GetResourceManager().LoadPal(PalId::MainMenuFont_MainMenu);
     mFont.Load(240, mPal, &mFontContext);
     
     // 30 = fmv select
-    if (gMap.mCurrentCamera == 30)
+    if (gMap->mCurrentCamera == 30)
     {
         Animation_Init(GetAnimRes(AnimId::MenuAbeSpeak_Idle));
     }
@@ -421,7 +421,7 @@ Menu::Menu(relive::Path_TLV* /*pTlv*/, const Guid& tlvId)
 
 
     // 1 == abe hello screen
-    if (gMap.mCurrentCamera == 1)
+    if (gMap->mCurrentCamera == 1)
     {
         mFnUpdate = &Menu::WaitForDoorToOpen;
         field_204_flags |= 2;
@@ -447,7 +447,7 @@ Menu::Menu(relive::Path_TLV* /*pTlv*/, const Guid& tlvId)
     GameEnderController::gRestartRuptureFarmsSavedMuds = 0;
 
     // 30 = fmv select
-    if (gMap.mCurrentCamera == 30)
+    if (gMap->mCurrentCamera == 30)
     {
         field_204_flags &= ~2u;
         mToFmvSelect = true;
@@ -582,19 +582,19 @@ void Menu::AbePopThroughDoor()
 
 void Menu::CopyRight_Update()
 {
-    if (gMap.mCurrentCamera == 23)
+    if (gMap->mCurrentCamera == 23)
     {
         if (static_cast<s32>(sGnFrame) > field_1D8_timer)
         {
             field_1D8_timer = MakeTimer(150);
-            gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eCopyright_10, CameraSwapEffects::eInstantChange_0, 0, 0);
+            gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eCopyright_10, CameraSwapEffects::eInstantChange_0, 0, 0);
         }
     }
     else
     {
-        if (static_cast<s32>(sGnFrame) > field_1D8_timer || gMap.mCurrentCamera != 10)
+        if (static_cast<s32>(sGnFrame) > field_1D8_timer || gMap->mCurrentCamera != 10)
         {
-            gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::ePlay1FMV_5, 30102, 0);
+            gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::ePlay1FMV_5, 30102, 0);
             mFnUpdate = &Menu::WaitForDoorToOpen;
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuDoor));
         }
@@ -637,7 +637,7 @@ void Menu::FMV_Select_Update()
             }
             else
             {
-                pMenuTrans = relive_new MainMenuTransition(Layer::eLayer_FadeFlash_40, 1, 0, 16, relive::TBlendModes::eBlend_1);
+                pMenuTrans = relive_new MainMenuTransition(Layer::eLayer_FadeFlash_40, 1, 0, 16, relive::TBlendModes::eBlend_1, mResMan);
                 mMenuTransId = pMenuTrans->mBaseGameObjectId;
             }
             mFnUpdate = &Menu::FMV_Or_Level_Select_To_Back_Update;
@@ -652,7 +652,7 @@ void Menu::FMV_Select_Update()
                     SND_StopAll();
 
                     const FmvInfo* pFmvRec = Path_Get_FMV_Record(sActiveList[mSelectedButtonIndex.raw].mLevel, sActiveList[mSelectedButtonIndex.raw].mFmvId);
-                    relive_new Movie(pFmvRec->field_0_pName);
+                    relive_new Movie(pFmvRec->field_0_pName, mResMan);
 
                     while (Movie::gMovieRefCount)
                     {
@@ -678,7 +678,7 @@ void Menu::FMV_Select_Update()
                     }
 
                     gPsxDisplay.PutCurrentDispEnv();
-                    gScreenManager->DecompressCameraToVRam(gMap.field_2C_camera_array[0]->mCamRes);
+                    gScreenManager->DecompressCameraToVRam(gMap->field_2C_camera_array[0]->mCamRes);
                     gScreenManager->EnableRendering();
                     SND_Restart();
                 }
@@ -689,7 +689,7 @@ void Menu::FMV_Select_Update()
 
                     // The credits are re-done in this class rather than using CreditsController... go to the Sherry credit screen
                     mCurrentCreditsCamera = 1;
-                    gMap.SetActiveCam(EReliveLevelIds::eCredits, 1, static_cast<s16>(mCurrentCreditsCamera), CameraSwapEffects::eInstantChange_0, 0, 0);
+                    gMap->SetActiveCam(EReliveLevelIds::eCredits, 1, static_cast<s16>(mCurrentCreditsCamera), CameraSwapEffects::eInstantChange_0, 0, 0);
                     mFnUpdate = &Menu::To_Credits_Update;
                     mFnRender = &Menu::Empty_Render;
                 }
@@ -1062,7 +1062,7 @@ void Menu::MainScreen_Update()
                 mMenuTransId = Guid{};
             }
 
-            pMenuTrans = relive_new MainMenuTransition(Layer::eLayer_FadeFlash_40, 1, 0, 16, relive::TBlendModes::eBlend_1);
+            pMenuTrans = relive_new MainMenuTransition(Layer::eLayer_FadeFlash_40, 1, 0, 16, relive::TBlendModes::eBlend_1, mResMan);
             if (pMenuTrans)
             {
                 mMenuTransId = pMenuTrans->mBaseGameObjectId;
@@ -1167,14 +1167,14 @@ void Menu::GoToSelectedMenuPage()
     {
         if (mToFmvSelect)
         {
-            gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eFmvSelect_30, CameraSwapEffects::eInstantChange_0, 0, 0);
+            gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eFmvSelect_30, CameraSwapEffects::eInstantChange_0, 0, 0);
             mFnUpdate = &Menu::ToNextMenuPage;
             return;
         }
 
         if (mToLevelSelect)
         {
-            gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eLvlSelect_31, CameraSwapEffects::eInstantChange_0, 0, 0);
+            gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eLvlSelect_31, CameraSwapEffects::eInstantChange_0, 0, 0);
             mFnUpdate = &Menu::ToNextMenuPage;
             return;
         }
@@ -1188,11 +1188,11 @@ void Menu::GoToSelectedMenuPage()
                 // Diff cam depending on input method ?
                 if (Input().IsJoyStickEnabled())
                 {
-                    gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eGamespeakGamepad_3, CameraSwapEffects::eInstantChange_0, 0, 0);
+                    gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eGamespeakGamepad_3, CameraSwapEffects::eInstantChange_0, 0, 0);
                 }
                 else
                 {
-                    gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eGamespeakKeyboard_33, CameraSwapEffects::eInstantChange_0, 0, 0);
+                    gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eGamespeakKeyboard_33, CameraSwapEffects::eInstantChange_0, 0, 0);
                 }
 
                 mFnUpdate = &Menu::ToNextMenuPage;
@@ -1213,13 +1213,13 @@ void Menu::GoToSelectedMenuPage()
 
             // Load
             case MainMenuOptions::eLoad_3:
-                gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eLoad_6, CameraSwapEffects::eInstantChange_0, 0, 0);
+                gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eLoad_6, CameraSwapEffects::eInstantChange_0, 0, 0);
                 mFnUpdate = &Menu::ToNextMenuPage;
                 break;
 
             // Options
             case MainMenuOptions::eOptions_4:
-                gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eOptions_2, CameraSwapEffects::eInstantChange_0, 0, 0);
+                gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eOptions_2, CameraSwapEffects::eInstantChange_0, 0, 0);
                 mFnUpdate = &Menu::ToNextMenuPage;
                 break;
 
@@ -1242,7 +1242,7 @@ void Menu::WaitForSpeakFinishAndStartChangeEffect()
         }
         else
         {
-            pMenuTrans = relive_new MainMenuTransition(Layer::eLayer_FadeFlash_40, 1, 0, 16, relive::TBlendModes::eBlend_1);
+            pMenuTrans = relive_new MainMenuTransition(Layer::eLayer_FadeFlash_40, 1, 0, 16, relive::TBlendModes::eBlend_1, mResMan);
             if (pMenuTrans)
             {
                 mMenuTransId = pMenuTrans->mBaseGameObjectId;
@@ -1323,7 +1323,7 @@ void Menu::ToLoading()
         if (pMenuTrans->field_16_bDone)
         {
             pMenuTrans->StartTrans_436560(Layer::eLayer_FadeFlash_40, 0, 0, 16);
-            gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eLoading_21, CameraSwapEffects::eInstantChange_0, 0, 0);
+            gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eLoading_21, CameraSwapEffects::eInstantChange_0, 0, 0);
             field_204_flags &= ~2u;
             mFnUpdate = &Menu::Loading_Update;
             mFnRender = &Menu::Empty_Render;
@@ -1349,13 +1349,13 @@ void Menu::ToGameSpeak_Update()
 void Menu::GameSpeak_Render(OrderingTable& ot)
 {
 #if AUTO_SWITCH_CONTROLLER // OG Change - Automatically switch between Gamepad/Keyboard GameSpeak Menu if joystick is added/removed
-    if (Input().IsJoyStickEnabled() && gMap.mNextCamera == CameraIds::Menu::eGamespeakKeyboard_33)
+    if (Input().IsJoyStickEnabled() && gMap->mNextCamera == CameraIds::Menu::eGamespeakKeyboard_33)
     {
-        gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eGamespeakGamepad_3, CameraSwapEffects::eInstantChange_0, 0, 0);
+        gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eGamespeakGamepad_3, CameraSwapEffects::eInstantChange_0, 0, 0);
     }
-    else if (!Input().IsJoyStickEnabled() && gMap.mNextCamera == CameraIds::Menu::eGamespeakGamepad_3)
+    else if (!Input().IsJoyStickEnabled() && gMap->mNextCamera == CameraIds::Menu::eGamespeakGamepad_3)
     {
-        gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eGamespeakKeyboard_33, CameraSwapEffects::eInstantChange_0, 0, 0);
+        gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eGamespeakKeyboard_33, CameraSwapEffects::eInstantChange_0, 0, 0);
     }
 #endif
 
@@ -1669,25 +1669,25 @@ void Menu::NewGameStart()
 {
     if (!gAbe)
     {
-        ResourceManagerWrapper::PendAnims(Abe::sAbeMotionAnimIds);
+        GetResourceManager().PendAnims(Abe::sAbeMotionAnimIds);
         // TODO: Hack - should be part of abes anim array
         // These animations were originally loaded in the abe ctor in OG
-        ResourceManagerWrapper::PendAnimation(AnimId::ChantOrb_Particle);
-        ResourceManagerWrapper::PendAnimation(AnimId::ChantOrb_Particle_Small);
-        ResourceManagerWrapper::PendAnimation(AnimId::SquibSmoke_Particle);
-        ResourceManagerWrapper::PendAnimation(AnimId::BloodDrop);
-        ResourceManagerWrapper::PendAnimation(AnimId::ObjectShadow);
-        ResourceManagerWrapper::PendAnimation(AnimId::DeathFlare_1);
-        ResourceManagerWrapper::PendAnimation(AnimId::DeathFlare_2);
-        ResourceManagerWrapper::PendAnimation(AnimId::Dove_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::Dove_Flying);
+        GetResourceManager().PendAnimation(AnimId::ChantOrb_Particle);
+        GetResourceManager().PendAnimation(AnimId::ChantOrb_Particle_Small);
+        GetResourceManager().PendAnimation(AnimId::SquibSmoke_Particle);
+        GetResourceManager().PendAnimation(AnimId::BloodDrop);
+        GetResourceManager().PendAnimation(AnimId::ObjectShadow);
+        GetResourceManager().PendAnimation(AnimId::DeathFlare_1);
+        GetResourceManager().PendAnimation(AnimId::DeathFlare_2);
+        GetResourceManager().PendAnimation(AnimId::Dove_Idle);
+        GetResourceManager().PendAnimation(AnimId::Dove_Flying);
 
         // Required after abe gets back from both temples and gets the ring from big face
-        ResourceManagerWrapper::PendAnimation(AnimId::ShrykullStart);
-        ResourceManagerWrapper::PendAnimation(AnimId::ShrykullTransform);
-        ResourceManagerWrapper::PendAnimation(AnimId::ShrykullDetransform);
-        ResourceManagerWrapper::LoadingLoop2();
-        gAbe = relive_new Abe();
+        GetResourceManager().PendAnimation(AnimId::ShrykullStart);
+        GetResourceManager().PendAnimation(AnimId::ShrykullTransform);
+        GetResourceManager().PendAnimation(AnimId::ShrykullDetransform);
+        GetResourceManager().LoadingLoop2();
+        gAbe = relive_new Abe(mResMan);
     }
 
     if (gAttract)
@@ -1697,20 +1697,20 @@ void Menu::NewGameStart()
         const bool oldDeathReset = GetSurviveDeathReset();
         SetSurviveDeathReset(true);
         // TODO: The ctor of the playback should load the demo res itself
-        relive_new DemoPlayback();
+        relive_new DemoPlayback(mResMan);
         SetSurviveDeathReset(oldDeathReset);
     }
     else
     {
         if (!gPauseMenu)
         {
-            gPauseMenu = relive_new PauseMenu();
+            gPauseMenu = relive_new PauseMenu(mResMan);
         }
 
         if (mUsingLvlSelectCheat)
         {
             mUsingLvlSelectCheat = false;
-            gMap.SetActiveCam(mLvlSelectCheatLevel, mLvlSelectCheatPath, mLvlSelectCheatCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+            gMap->SetActiveCam(mLvlSelectCheatLevel, mLvlSelectCheatPath, mLvlSelectCheatCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
             gAbe->mXPos = FP_FromInteger(mLvlSelectCheatAbeSpawnX);
             gAbe->mYPos = FP_FromInteger(mLvlSelectCheatAbeSpawnY);
         }
@@ -1718,7 +1718,7 @@ void Menu::NewGameStart()
         {
             // Start the game in the biggest meat processing plant
             gInfiniteThrowables = false;
-            gMap.SetActiveCam(EReliveLevelIds::eRuptureFarms, 15, 1, CameraSwapEffects::ePlay1FMV_5, 102, 0);
+            gMap->SetActiveCam(EReliveLevelIds::eRuptureFarms, 15, 1, CameraSwapEffects::ePlay1FMV_5, 102, 0);
 
             // What if someone made a level editor and wanted to change where abe spawns on the first map? Well... hard luck pal
             gAbe->mXPos = FP_FromInteger(1378);
@@ -1831,17 +1831,17 @@ void Menu::Option_GoTo_Selected_Update()
             {
                 // Controller
                 case OptionsMenuOptions::eController_0:
-                    gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eController_40, CameraSwapEffects::eInstantChange_0, 0, 0);
+                    gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eController_40, CameraSwapEffects::eInstantChange_0, 0, 0);
                     break;
 
                 // Sound
                 case OptionsMenuOptions::eSound_1:
-                    gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eSound_5, CameraSwapEffects::eInstantChange_0, 0, 0);
+                    gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eSound_5, CameraSwapEffects::eInstantChange_0, 0, 0);
                     break;
 
                 // Back to main menu screen
                 case OptionsMenuOptions::eMainMenu_2:
-                    gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, 0, 0);
+                    gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, 0, 0);
                     break;
 
                 default:
@@ -2185,7 +2185,7 @@ void Menu::Options_WaitForScreenTrans_Update()
     {
         if (pMenuTrans->field_16_bDone)
         {
-            gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eOptions_2, CameraSwapEffects::eInstantChange_0, 0, 0);
+            gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eOptions_2, CameraSwapEffects::eInstantChange_0, 0, 0);
             mFnUpdate = &Menu::To_MainOptions_Screen_After_Camera_Change_Update;
         }
     }
@@ -2290,12 +2290,12 @@ void Menu::GameSpeak_Update()
         {
             if (Input().IsJoyStickEnabled())
             {
-                pMenuFade1 = relive_new MainMenuFade(sGameSpeakButtons[8].xpos, sGameSpeakButtons[8].ypos + 36, buttonType::eCircle_0, 0);
+                pMenuFade1 = relive_new MainMenuFade(sGameSpeakButtons[8].xpos, sGameSpeakButtons[8].ypos + 36, buttonType::eCircle_0, 0, mResMan);
 
             }
             else
             {
-                pMenuFade1 = relive_new MainMenuFade(181, sGameSpeakButtons[8].ypos + 36, buttonType::eCircle_0, 0);
+                pMenuFade1 = relive_new MainMenuFade(181, sGameSpeakButtons[8].ypos + 36, buttonType::eCircle_0, 0, mResMan);
             }
 
             mMenuFadeId1 = pMenuFade1->mBaseGameObjectId;
@@ -2308,7 +2308,7 @@ void Menu::GameSpeak_Update()
 
         if (Input().IsJoyStickEnabled())
         {
-            pMenuFade2 = relive_new MainMenuFade(sGameSpeakButtons[11].xpos, sGameSpeakButtons[11].ypos + 36, buttonType::eCircle_0, 0);
+            pMenuFade2 = relive_new MainMenuFade(sGameSpeakButtons[11].xpos, sGameSpeakButtons[11].ypos + 36, buttonType::eCircle_0, 0, mResMan);
             mMenuFadeId2 = pMenuFade2->mBaseGameObjectId;
         }
         else
@@ -2332,7 +2332,7 @@ void Menu::GameSpeak_Update()
         }
         else if (Input().IsJoyStickEnabled())
         {
-            pMenuFade2 = relive_new MainMenuFade(sGameSpeakButtons[10].xpos, sGameSpeakButtons[10].ypos + 36, buttonType::eCircle_0, 0);
+            pMenuFade2 = relive_new MainMenuFade(sGameSpeakButtons[10].xpos, sGameSpeakButtons[10].ypos + 36, buttonType::eCircle_0, 0, mResMan);
             mMenuFadeId2 = pMenuFade2->mBaseGameObjectId;
         }
 
@@ -2342,7 +2342,7 @@ void Menu::GameSpeak_Update()
             field_204_flags |= 1u;
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_FollowMe));
             mSelectedButtonIndex.gamespeak_menu = GameSpeakOptions::eFollowMe_2;
-            relive_new MainMenuFade(sGameSpeakButtons[2].xpos, sGameSpeakButtons[2].ypos + 36, buttonType::eCircle_0, 1);
+            relive_new MainMenuFade(sGameSpeakButtons[2].xpos, sGameSpeakButtons[2].ypos + 36, buttonType::eCircle_0, 1, mResMan);
         }
         else if (Input().IsAnyPressed(InputObject::PadIndex::First, InputCommands::eGameSpeak4))
         {
@@ -2350,7 +2350,7 @@ void Menu::GameSpeak_Update()
             field_204_flags |= 1u;
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Wait));
             mSelectedButtonIndex.gamespeak_menu = GameSpeakOptions::eWait_0;
-            relive_new MainMenuFade(sGameSpeakButtons[0].xpos, sGameSpeakButtons[0].ypos + 36, buttonType::eCircle_0, 1);
+            relive_new MainMenuFade(sGameSpeakButtons[0].xpos, sGameSpeakButtons[0].ypos + 36, buttonType::eCircle_0, 1, mResMan);
         }
         else if (Input().IsAnyPressed(InputObject::PadIndex::First, InputCommands::eGameSpeak1))
         {
@@ -2358,7 +2358,7 @@ void Menu::GameSpeak_Update()
             field_204_flags |= 1u;
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Hello));
             mSelectedButtonIndex.gamespeak_menu = GameSpeakOptions::eHello_1;
-            relive_new MainMenuFade(sGameSpeakButtons[1].xpos, sGameSpeakButtons[1].ypos + 36, buttonType::eCircle_0, 1);
+            relive_new MainMenuFade(sGameSpeakButtons[1].xpos, sGameSpeakButtons[1].ypos + 36, buttonType::eCircle_0, 1, mResMan);
         }
         else if (Input().IsAnyHeld(InputObject::PadIndex::First, InputCommands::eGameSpeak3))
         {
@@ -2366,7 +2366,7 @@ void Menu::GameSpeak_Update()
             field_204_flags |= 1u;
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Anger));
             mSelectedButtonIndex.gamespeak_menu = GameSpeakOptions::eAngry_3;
-            relive_new MainMenuFade(sGameSpeakButtons[3].xpos, sGameSpeakButtons[3].ypos + 36, buttonType::eCircle_0, 1);
+            relive_new MainMenuFade(sGameSpeakButtons[3].xpos, sGameSpeakButtons[3].ypos + 36, buttonType::eCircle_0, 1, mResMan);
         }
         CycleGameSpeakIdleAnims();
         return;
@@ -2385,7 +2385,7 @@ void Menu::GameSpeak_Update()
         }
         else if (Input().IsJoyStickEnabled())
         {
-            pMenuFade2 = relive_new MainMenuFade(sGameSpeakButtons[12].xpos, sGameSpeakButtons[12].ypos + 36, buttonType::eCircle_0, 0);
+            pMenuFade2 = relive_new MainMenuFade(sGameSpeakButtons[12].xpos, sGameSpeakButtons[12].ypos + 36, buttonType::eCircle_0, 0, mResMan);
             mMenuFadeId2 = pMenuFade2->mBaseGameObjectId;
         }
 
@@ -2395,7 +2395,7 @@ void Menu::GameSpeak_Update()
             field_204_flags |= 1u;
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_WhistleHigh));
             mSelectedButtonIndex.gamespeak_menu = GameSpeakOptions::eWhistleHigh_4;
-            relive_new MainMenuFade(sGameSpeakButtons[4].xpos, sGameSpeakButtons[4].ypos + 36, buttonType::eCircle_0, 1);
+            relive_new MainMenuFade(sGameSpeakButtons[4].xpos, sGameSpeakButtons[4].ypos + 36, buttonType::eCircle_0, 1, mResMan);
         }
         else if (Input().IsAnyPressed(InputObject::PadIndex::First, InputCommands::eGameSpeak5))
         {
@@ -2403,7 +2403,7 @@ void Menu::GameSpeak_Update()
             field_204_flags |= 1u;
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_WhistleLow));
             mSelectedButtonIndex.gamespeak_menu = GameSpeakOptions::eWhistleLow_5;
-            relive_new MainMenuFade(sGameSpeakButtons[5].xpos, sGameSpeakButtons[5].ypos + 36, buttonType::eCircle_0, 1);
+            relive_new MainMenuFade(sGameSpeakButtons[5].xpos, sGameSpeakButtons[5].ypos + 36, buttonType::eCircle_0, 1, mResMan);
         }
         else if (Input().IsAnyPressed(InputObject::PadIndex::First, InputCommands::eGameSpeak8))
         {
@@ -2411,7 +2411,7 @@ void Menu::GameSpeak_Update()
             field_204_flags |= 1u;
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Laugh));
             mSelectedButtonIndex.gamespeak_menu = GameSpeakOptions::eLaugh_6;
-            relive_new MainMenuFade(sGameSpeakButtons[6].xpos, sGameSpeakButtons[6].ypos + 36, buttonType::eCircle_0, 1);
+            relive_new MainMenuFade(sGameSpeakButtons[6].xpos, sGameSpeakButtons[6].ypos + 36, buttonType::eCircle_0, 1, mResMan);
         }
         else if (Input().IsAnyPressed(InputObject::PadIndex::First, InputCommands::eGameSpeak7))
         {
@@ -2419,7 +2419,7 @@ void Menu::GameSpeak_Update()
             field_204_flags |= 1u;
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Fart));
             mSelectedButtonIndex.gamespeak_menu = GameSpeakOptions::eFart_7;
-            relive_new MainMenuFade(sGameSpeakButtons[7].xpos, sGameSpeakButtons[7].ypos + 36, buttonType::eCircle_0, 1);
+            relive_new MainMenuFade(sGameSpeakButtons[7].xpos, sGameSpeakButtons[7].ypos + 36, buttonType::eCircle_0, 1, mResMan);
         }
         CycleGameSpeakIdleAnims();
         return;
@@ -2442,7 +2442,7 @@ void Menu::GameSpeak_Update()
     GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Goodbye));
     mSelectedButtonIndex.gamespeak_menu = GameSpeakOptions::eMainMenu_9;
 
-    relive_new MainMenuFade(sGameSpeakButtons[9].xpos, sGameSpeakButtons[9].ypos + 36, buttonType::eCircle_0, 1);
+    relive_new MainMenuFade(sGameSpeakButtons[9].xpos, sGameSpeakButtons[9].ypos + 36, buttonType::eCircle_0, 1, mResMan);
 
     mFnUpdate = &Menu::GameSpeakBack_WaitForAbeGoodbye_Update;
 
@@ -2493,7 +2493,7 @@ void Menu::FMV_Or_Level_Select_To_Back_Update()
     auto pMenuTrans = static_cast<MainMenuTransition*>(sObjectIds.Find_Impl(mMenuTransId));
     if (pMenuTrans->field_16_bDone)
     {
-        gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, 0, 0);
+        gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, 0, 0);
         mFnUpdate = &Menu::FMV_Or_Level_Select_Back_Update;
     }
 }
@@ -2561,12 +2561,12 @@ void Menu::GoTo_ControllerConfigure_Or_Back_AfterScreenTrans_Update()
             {
                 // Goto controller configuration
                 case 0:
-                    gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eControllerConfig_41, CameraSwapEffects::eInstantChange_0, 0, 0);
+                    gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eControllerConfig_41, CameraSwapEffects::eInstantChange_0, 0, 0);
                     break;
 
                 // Back to main options (sound/controller)
                 case 1:
-                    gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eOptions_2, CameraSwapEffects::eInstantChange_0, 0, 0);
+                    gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eOptions_2, CameraSwapEffects::eInstantChange_0, 0, 0);
                     break;
             }
 
@@ -2940,13 +2940,13 @@ void Menu::LoadSave_Update()
 
     if (!gPauseMenu)
     {
-        gPauseMenu = relive_new PauseMenu();
+        gPauseMenu = relive_new PauseMenu(mResMan);
     }
 
 
     if (!gAbe)
     {
-        gAbe = relive_new Abe();
+        gAbe = relive_new Abe(mResMan);
     }
 
     if (!SaveGame::LoadFromFile(sSaveNames_9F1DD8[mSelectedButtonIndex.raw].field_0_mName))
@@ -3018,7 +3018,7 @@ void Menu::To_ShowAbeMotions_ChangeCamera_Update()
         {
             if (field_230_bGoBack == 9)
             {
-                gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMotions_4, CameraSwapEffects::eInstantChange_0, 0, 0);
+                gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMotions_4, CameraSwapEffects::eInstantChange_0, 0, 0);
                 mFnUpdate = &Menu::To_ShowAbeMotions_SaveSettings_Update;
             }
         }
@@ -3062,14 +3062,14 @@ void Menu::Credits_Update()
         if (mCurrentCreditsCamera > 24)
         {
             // Credits done
-            gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eFmvSelect_30, CameraSwapEffects::eInstantChange_0, 0, 0);
+            gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eFmvSelect_30, CameraSwapEffects::eInstantChange_0, 0, 0);
             mFnUpdate = &Menu::CreditsEnd_BackTo_FMV_Or_Level_List_Update;
             gCreditsControllerExists = 0;
         }
         else
         {
             // Next credits screen
-            gMap.SetActiveCam(EReliveLevelIds::eCredits, 1, static_cast<s16>(mCurrentCreditsCamera), CameraSwapEffects::eTopToBottom_3, 0, 0);
+            gMap->SetActiveCam(EReliveLevelIds::eCredits, 1, static_cast<s16>(mCurrentCreditsCamera), CameraSwapEffects::eTopToBottom_3, 0, 0);
             field_1D8_timer = MakeTimer(60);
         }
     }
@@ -3232,11 +3232,11 @@ void Menu::ToggleMotions_Update()
         {
             if (Input().IsJoyStickEnabled())
             {
-                gMap.SetActiveCameraDelayed(MapDirections::eMapBottom_3, 0, -1);
+                gMap->SetActiveCameraDelayed(MapDirections::eMapBottom_3, 0, -1);
             }
             else
             {
-                gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMotionsGamespeakKeyboard_37, CameraSwapEffects::eTopToBottom_3, 0, 0);
+                gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMotionsGamespeakKeyboard_37, CameraSwapEffects::eTopToBottom_3, 0, 0);
             }
 
             // Go to game speak toggle
@@ -3275,11 +3275,11 @@ void Menu::Toggle_Motions_Screens_Update()
         {
             if (Input().IsJoyStickEnabled())
             {
-                gMap.SetActiveCameraDelayed(MapDirections::eMapTop_2, 0, -1);
+                gMap->SetActiveCameraDelayed(MapDirections::eMapTop_2, 0, -1);
             }
             else
             {
-                gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMotions_4, CameraSwapEffects::eBottomToTop_4, 0, 0);
+                gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMotions_4, CameraSwapEffects::eBottomToTop_4, 0, 0);
             }
 
             mFnUpdate = &Menu::ToggleMotions_Update;
@@ -3306,7 +3306,7 @@ void Menu::MotionsScreen_Back_Update()
     {
         if (pMenuTrans->field_16_bDone)
         {
-            gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eOptions_2, CameraSwapEffects::eInstantChange_0, 0, 0);
+            gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eOptions_2, CameraSwapEffects::eInstantChange_0, 0, 0);
             mFnUpdate = &Menu::Motions_ToOptions_Update;
         }
     }
@@ -3357,11 +3357,11 @@ void Menu::Load_BackToMainScreen_Update()
         {
             if (!mLoadSave)
             {
-                gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, 0, 0);
+                gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, 0, 0);
             }
             else
             {
-                gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eLoading_21, CameraSwapEffects::eInstantChange_0, 0, 0);
+                gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eLoading_21, CameraSwapEffects::eInstantChange_0, 0, 0);
             }
             mFnUpdate = &Menu::To_MainScreenOrLoad_Update;
         }
@@ -3387,7 +3387,7 @@ void Menu::GamespeakBack_WaitForScreenTrans_Update()
         if (pMenuTrans->field_16_bDone)
         {
             field_204_flags &= ~1u;
-            gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, 0, 0);
+            gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, 0, 0);
             mFnUpdate = &Menu::GameSpeak_To_MainScreen_Update;
         }
     }

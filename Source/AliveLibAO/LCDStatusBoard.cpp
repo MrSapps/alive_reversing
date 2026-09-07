@@ -21,13 +21,13 @@ LCDStatusBoard::~LCDStatusBoard()
     Path::TLV_Reset(mTlvId);
 }
 
-LCDStatusBoard::LCDStatusBoard(relive::Path_LCDStatusBoard* pTlv, const Guid& tlvId)
-    : BaseGameObject(true, 0)
+LCDStatusBoard::LCDStatusBoard(relive::Path_LCDStatusBoard* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     mTlvId = tlvId;
     mFontContext.LoadFontType(FontType::LcdFont);
 
-    mPal = ResourceManagerWrapper::LoadPal(PalId::LedFont_Red);
+    mPal = GetResourceManager().LoadPal(PalId::LedFont_Red);
 
     mKilledMudsFont.Load(3, mPal, &mFontContext);
     mRescuedMudsFont.Load(3, mPal, &mFontContext);
@@ -51,7 +51,7 @@ void LCDStatusBoard::VUpdate()
 void LCDStatusBoard::VRender(OrderingTable& ot)
 {
     char_type text[12] = {};
-    sprintf(text, "%02d", Path_GetTotalMuds(gMap.mCurrentLevel, gMap.mCurrentPath) - gRescuedMudokons - gKilledMudokons);
+    sprintf(text, "%02d", Path_GetTotalMuds(gMap->mCurrentLevel, gMap->mCurrentPath) - gRescuedMudokons - gKilledMudokons);
 
     const s16 w1 = static_cast<s16>(mEmployeesFont.MeasureTextWidth(text));
     const s16 colourRange = gDisableFontFlicker ? 0 : 50;

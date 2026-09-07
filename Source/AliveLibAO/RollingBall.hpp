@@ -16,7 +16,7 @@ namespace AO {
 class RollingBall final : public ::BaseAliveGameObject
 {
 public:
-    RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId);
+    RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~RollingBall();
 
     void LoadAnimations();

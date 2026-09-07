@@ -433,19 +433,19 @@ void MainMenuController::LoadAnimations()
     {
         if (info.field_0_animation != AnimId::None)
         {
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(info.field_0_animation));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(info.field_0_animation));
         }
     }
 
     for (const auto& animId : kMenuAnims)
     {
-        mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(animId));
+        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
     }
 
 }
 
-MainMenuController::MainMenuController(relive::Path_TLV* /*pTlv*/, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0)
+MainMenuController::MainMenuController(relive::Path_TLV* /*pTlv*/, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     sMainMenuObjectCounter_BB4400++;
     SetUpdateDuringCamSwap(true);
@@ -456,10 +456,10 @@ MainMenuController::MainMenuController(relive::Path_TLV* /*pTlv*/, const Guid& t
 
     mFontContext.LoadFontType(FontType::PauseMenu);
 
-    mPal = ResourceManagerWrapper::LoadPal(PalId::MainMenuFont_MainMenu);
+    mPal = GetResourceManager().LoadPal(PalId::MainMenuFont_MainMenu);
     field_120_font.Load(240, mPal, &mFontContext);
 
-    if (gMap.mCurrentCamera == MainMenuCams::eCheatMenu_SelectFMVCam)
+    if (gMap->mCurrentCamera == MainMenuCams::eCheatMenu_SelectFMVCam)
     {
         Animation_Init(GetAnimRes(AnimId::MenuAbeSpeak_Idle));
     }
@@ -484,7 +484,7 @@ MainMenuController::MainMenuController(relive::Path_TLV* /*pTlv*/, const Guid& t
     field_200_highlite_glow_speed = -8;
     mTlvId = tlvId;
 
-    field_214_page_index = static_cast<s16>(GetPageIndexFromCam_4D05A0(gMap.mCurrentCamera));
+    field_214_page_index = static_cast<s16>(GetPageIndexFromCam_4D05A0(gMap->mCurrentCamera));
     field_21C_camSwapEffectState = camTransEffectState::eConstructed_1;
     field_21E_changeScreenState = 0;
     field_1F8_page_timeout = 0;
@@ -502,7 +502,7 @@ MainMenuController::MainMenuController(relive::Path_TLV* /*pTlv*/, const Guid& t
     mGameSpeakPlaying = false;
     mChantSeqPlaying = false;
 
-    if (gMap.mCurrentCamera == MainMenuCams::eMainMenuCam)
+    if (gMap->mCurrentCamera == MainMenuCams::eMainMenuCam)
     {
         MainMenuController::Set_Anim_4D05E0(eAbe_EnterThroughDoor, 0);
         mDisableChangingSelection = true;
@@ -530,7 +530,7 @@ MainMenuController::MainMenuController(relive::Path_TLV* /*pTlv*/, const Guid& t
     gFeeco_Restart_KilledMudCount = 0;
     gFeecoRestart_SavedMudCount = 0;
 
-    if (gMap.mCurrentCamera == MainMenuCams::eCheatMenu_SelectFMVCam)
+    if (gMap->mCurrentCamera == MainMenuCams::eCheatMenu_SelectFMVCam)
     {
         field_1FC_button_index = 0;
         field_250_selected_entry_index = 0;
@@ -544,9 +544,9 @@ MainMenuController::MainMenuController(relive::Path_TLV* /*pTlv*/, const Guid& t
         return;
     }
 
-    if (gMap.mCurrentCamera == MainMenuCams::eDemoSelectionCam)
+    if (gMap->mCurrentCamera == MainMenuCams::eDemoSelectionCam)
     {
-        ResourceManagerWrapper::LoadingLoop(false);
+        GetResourceManager().LoadingLoop(false);
         field_1FC_button_index = 0;
         field_250_selected_entry_index = sDemoIdChosenFromDemoMenu_5C1B9E;
         field_254 = FP_FromInteger(0);
@@ -812,13 +812,13 @@ MainMenuNextCam MainMenuController::SligSpeak_Update_4D3280(u32 input_held)
 void MainMenuController::SligSpeak_Unload_4D3170()
 {
     Unload_Resource(AnimId::MenuSligSpeak_Idle);
-    ResourceManagerWrapper::ShowLoadingIcon();
+    GetResourceManager().ShowLoadingIcon();
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eAbe_Idle);
 }
 
 void MainMenuController::SligSpeak_Load_4D3090()
 {
-    ResourceManagerWrapper::ShowLoadingIcon();
+    GetResourceManager().ShowLoadingIcon();
     GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuSligSpeak_Idle));
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eSlig_Idle);
 }
@@ -867,13 +867,13 @@ MainMenuNextCam MainMenuController::GlukkonSpeak_Update_4D3670(u32 input_held)
 
 void MainMenuController::GlukkonSpeak_Unload_4D3560()
 {
-    ResourceManagerWrapper::ShowLoadingIcon();
+    GetResourceManager().ShowLoadingIcon();
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eAbe_Idle);
 }
 
 void MainMenuController::GlukkonSpeak_Load_4D3480()
 {
-    ResourceManagerWrapper::ShowLoadingIcon();
+    GetResourceManager().ShowLoadingIcon();
     GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuGlukkonSpeak_Idle));
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eGlukkon_Idle);
 }
@@ -916,13 +916,13 @@ MainMenuNextCam MainMenuController::ScrabSpeak_Update_4D3A60(u32 input_held)
 
 void MainMenuController::ScrabSpeak_Unload_4D3950()
 {
-    ResourceManagerWrapper::ShowLoadingIcon();
+    GetResourceManager().ShowLoadingIcon();
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eAbe_Idle);
 }
 
 void MainMenuController::ScrabSpeak_Load_4D3870()
 {
-    ResourceManagerWrapper::ShowLoadingIcon();
+    GetResourceManager().ShowLoadingIcon();
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eScrab_Idle);
 }
 
@@ -973,13 +973,13 @@ MainMenuNextCam MainMenuController::ParamiteSpeak_Update_4D3D60(u32 input_held)
 
 void MainMenuController::ParamiteSpeak_Unload_4D3C50()
 {
-    ResourceManagerWrapper::ShowLoadingIcon();
+    GetResourceManager().ShowLoadingIcon();
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eAbe_Idle);
 }
 
 void MainMenuController::ParamiteSpeak_Load_4D3B70()
 {
-    ResourceManagerWrapper::ShowLoadingIcon();
+    GetResourceManager().ShowLoadingIcon();
     GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuParamiteSpeak_Idle));
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eParamite_Idle);
 }
@@ -1381,7 +1381,7 @@ MainMenuNextCam MainMenuController::Page_FMV_Level_Update_4D4AB0(u32 input_held)
         {
             FmvInfo* pFmvRecord = Path_Get_FMV_Record(pMenuFMV->field_4_level_id, pMenuFMV->field_A_fmv_id);
 
-            auto pMovie = relive_new Movie(pFmvRecord->field_0_pName);
+            auto pMovie = relive_new Movie(pFmvRecord->field_0_pName, mResMan);
 
             while (Movie::gMovieRefCount)
             {
@@ -1394,7 +1394,7 @@ MainMenuNextCam MainMenuController::Page_FMV_Level_Update_4D4AB0(u32 input_held)
                 }
             }
             gPsxDisplay.PutCurrentDispEnv();
-            gScreenManager->DecompressCameraToVRam(gMap.field_2C_camera_array[0]->mCamRes);
+            gScreenManager->DecompressCameraToVRam(gMap->field_2C_camera_array[0]->mCamRes);
             gScreenManager->EnableRendering();
             GetSoundAPI().mSND_Restart();
         }
@@ -1403,7 +1403,7 @@ MainMenuNextCam MainMenuController::Page_FMV_Level_Update_4D4AB0(u32 input_held)
             gCreditsControllerExists = 1;
             field_240_credits_current_cam = 1;
             field_1F4_credits_next_frame = MakeTimer(160);
-            gMap.SetActiveCam(EReliveLevelIds::eCredits, 1, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
+            gMap->SetActiveCam(EReliveLevelIds::eCredits, 1, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
         }
         return MainMenuNextCam(MainMenuCams::eNoChange);
     }
@@ -1624,12 +1624,12 @@ MainMenuNextCam MainMenuController::LoadNewGame_Update_4D0920(u32 /*input*/)
 
             if (!gPauseMenu)
             {
-                gPauseMenu = relive_new PauseMenu();
+                gPauseMenu = relive_new PauseMenu(mResMan);
             }
 
             if (!gAbe)
             {
-                gAbe = relive_new Abe();
+                gAbe = relive_new Abe(mResMan);
             }
 
             if (field_208_transition_obj)
@@ -1678,25 +1678,25 @@ MainMenuNextCam MainMenuController::LoadNewGame_Update_4D0920(u32 /*input*/)
 
     if (!gPauseMenu)
     {
-        gPauseMenu = relive_new PauseMenu();
+        gPauseMenu = relive_new PauseMenu(mResMan);
     }
 
     if (!gAbe)
     {
-        ResourceManagerWrapper::PendAnims(Abe::sAbeAnimIdTable);
-        ResourceManagerWrapper::PendAnimation(AnimId::ChantOrb_Particle);
-        ResourceManagerWrapper::PendAnimation(AnimId::ChantOrb_Particle_Small);
-        ResourceManagerWrapper::PendAnimation(AnimId::SquibSmoke_Particle);
-        ResourceManagerWrapper::PendAnimation(AnimId::Dust_Particle);
-        ResourceManagerWrapper::PendAnimation(AnimId::BloodDrop);
-        ResourceManagerWrapper::PendAnimation(AnimId::ObjectShadow);
-        ResourceManagerWrapper::PendAnimation(AnimId::DeathFlare_1);
-        ResourceManagerWrapper::PendAnimation(AnimId::DeathFlare_2);
-        ResourceManagerWrapper::PendAnimation(AnimId::Dove_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::Dove_Flying);
-        ResourceManagerWrapper::PendAnimation(AnimId::SpotLight);
-        ResourceManagerWrapper::LoadingLoop2();
-        gAbe = relive_new Abe();
+        GetResourceManager().PendAnims(Abe::sAbeAnimIdTable);
+        GetResourceManager().PendAnimation(AnimId::ChantOrb_Particle);
+        GetResourceManager().PendAnimation(AnimId::ChantOrb_Particle_Small);
+        GetResourceManager().PendAnimation(AnimId::SquibSmoke_Particle);
+        GetResourceManager().PendAnimation(AnimId::Dust_Particle);
+        GetResourceManager().PendAnimation(AnimId::BloodDrop);
+        GetResourceManager().PendAnimation(AnimId::ObjectShadow);
+        GetResourceManager().PendAnimation(AnimId::DeathFlare_1);
+        GetResourceManager().PendAnimation(AnimId::DeathFlare_2);
+        GetResourceManager().PendAnimation(AnimId::Dove_Idle);
+        GetResourceManager().PendAnimation(AnimId::Dove_Flying);
+        GetResourceManager().PendAnimation(AnimId::SpotLight);
+        GetResourceManager().LoadingLoop2();
+        gAbe = relive_new Abe(mResMan);
     }
 
     if (mCheatLevelSelectLoading)
@@ -1704,7 +1704,7 @@ MainMenuNextCam MainMenuController::LoadNewGame_Update_4D0920(u32 /*input*/)
         mCheatLevelSelectLoading = false;
 
         gAbe->SetUpdateDelay(1);
-        gMap.SetActiveCam(field_244_lvl_id, field_246_path_id, field_248_camera, CameraSwapEffects::eInstantChange_0, 0, 0);
+        gMap->SetActiveCam(field_244_lvl_id, field_246_path_id, field_248_camera, CameraSwapEffects::eInstantChange_0, 0, 0);
 
         const PathBlyRec* pPathData = Path_Get_Bly_Record(field_244_lvl_id, field_246_path_id);
         gAbe->mXPos = FP_FromInteger(field_24A_abeXOff - pPathData->field_4_pPathData->field_1A_abe_start_xpos);
@@ -1725,7 +1725,7 @@ MainMenuNextCam MainMenuController::LoadNewGame_Update_4D0920(u32 /*input*/)
     }
     else
     {
-        gMap.SetActiveCam(EReliveLevelIds::eMines, 1, 4, CameraSwapEffects::ePlay1FMV_5, 12402, 0);
+        gMap->SetActiveCam(EReliveLevelIds::eMines, 1, 4, CameraSwapEffects::ePlay1FMV_5, 12402, 0);
         gAbe->mXPos = FP_FromInteger(837);
         gAbe->mYPos = FP_FromInteger(1300);
         gAbe->BaseAliveGameObjectLastLineYPos = FP_FromInteger(1400);
@@ -1762,7 +1762,7 @@ MainMenuNextCam MainMenuController::BackStory_Or_NewGame_Update_4D1C60(u32 input
                 }
             }
 
-            auto pMovie = relive_new Movie(pFmvRecord->field_0_pName);
+            auto pMovie = relive_new Movie(pFmvRecord->field_0_pName, mResMan);
 
             while (Movie::gMovieRefCount)
             {
@@ -1776,7 +1776,7 @@ MainMenuNextCam MainMenuController::BackStory_Or_NewGame_Update_4D1C60(u32 input
             }
 
             gPsxDisplay.PutCurrentDispEnv();
-            gScreenManager->DecompressCameraToVRam(gMap.field_2C_camera_array[0]->mCamRes);
+            gScreenManager->DecompressCameraToVRam(gMap->field_2C_camera_array[0]->mCamRes);
             gScreenManager->EnableRendering();
             GetSoundAPI().mSND_Restart();
             field_1FC_button_index = 1; // Select start game
@@ -1805,7 +1805,7 @@ void MainMenuController::BackStory_Or_NewGame_Load_4D1BA0()
 
 void MainMenuController::BackStory_Or_NewGame_Unload_4D1BE0()
 {
-    ResourceManagerWrapper::LoadingLoop(false);
+    GetResourceManager().LoadingLoop(false);
 }
 
 void MainMenuController::remove_ISO9660_Suffix_4D1660(char_type* out, const char_type* in)
@@ -1871,7 +1871,7 @@ MainMenuNextCam MainMenuController::LoadDemo_Update_4D1040(u32)
 
         while (!MainMenuController::checkIfDemoFileExists_4D1430(lvFilenameNoPrefix) && !MainMenuController::checkIfDemoFileExists_4D1430(lvFilename))
         {
-            if (!Display_Full_Screen_Message_Blocking(MessageType::eSkipDemo_2))
+            if (!Display_Full_Screen_Message_Blocking(MessageType::eSkipDemo_2, mResMan))
             {
                 field_1F8_page_timeout = 0;
                 if (gIsDemoStartedManually)
@@ -1899,7 +1899,7 @@ MainMenuNextCam MainMenuController::LoadDemo_Update_4D1040(u32)
 
         if (!gAbe)
         {
-            auto abe = relive_new Abe();
+            auto abe = relive_new Abe(mResMan);
             if (abe)
             {
                 gAbe = abe;
@@ -2656,7 +2656,7 @@ void MainMenuController::HandleCreditsControllerUpdate()
     if (Input().IsAnyPressed(InputCommands::eBack))
     {
         gCreditsControllerExists = 0;
-        gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 6, CameraSwapEffects::eInstantChange_0, 0, 0);
+        gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, 6, CameraSwapEffects::eInstantChange_0, 0, 0);
         return;
     }
 
@@ -2665,16 +2665,16 @@ void MainMenuController::HandleCreditsControllerUpdate()
         const auto currentCam = field_240_credits_current_cam + 1;
         field_240_credits_current_cam = currentCam;
         field_1F4_credits_next_frame = MakeTimer(160);
-        if (gMap.mCurrentPath == 2)
+        if (gMap->mCurrentPath == 2)
         {
             if (currentCam > 22)
             {
                 field_240_credits_current_cam = 1;
-                gMap.SetActiveCam(EReliveLevelIds::eCredits, 1, static_cast<s16>(field_240_credits_current_cam), CameraSwapEffects::eTopToBottom_3, 0, 0);
+                gMap->SetActiveCam(EReliveLevelIds::eCredits, 1, static_cast<s16>(field_240_credits_current_cam), CameraSwapEffects::eTopToBottom_3, 0, 0);
             }
             else
             {
-                gMap.SetActiveCam(EReliveLevelIds::eCredits, 2, static_cast<s16>(currentCam), CameraSwapEffects::eTopToBottom_3, 0, 0);
+                gMap->SetActiveCam(EReliveLevelIds::eCredits, 2, static_cast<s16>(currentCam), CameraSwapEffects::eTopToBottom_3, 0, 0);
             }
         }
         else
@@ -2682,10 +2682,10 @@ void MainMenuController::HandleCreditsControllerUpdate()
             if (currentCam > 36)
             {
                 gCreditsControllerExists = 0;
-                gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 6, CameraSwapEffects::eInstantChange_0, 0, 0);
+                gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, 6, CameraSwapEffects::eInstantChange_0, 0, 0);
                 return;
             }
-            gMap.SetActiveCam(EReliveLevelIds::eCredits, 1, static_cast<s16>(field_240_credits_current_cam), CameraSwapEffects::eTopToBottom_3, 0, 0);
+            gMap->SetActiveCam(EReliveLevelIds::eCredits, 1, static_cast<s16>(field_240_credits_current_cam), CameraSwapEffects::eTopToBottom_3, 0, 0);
         }
     }
 }
@@ -2693,11 +2693,11 @@ void MainMenuController::HandleCreditsControllerUpdate()
 // Todo: needs cleanup
 void MainMenuController::HandleMainMenuUpdate()
 {
-    if (gMap.mCurrentCamera == MainMenuCams::eRemapInputsCam || gMap.mCurrentCamera == MainMenuCams::eDummyBlankCam || gMap.mCurrentCamera == MainMenuCams::eLoadGameMenuCam)
+    if (gMap->mCurrentCamera == MainMenuCams::eRemapInputsCam || gMap->mCurrentCamera == MainMenuCams::eDummyBlankCam || gMap->mCurrentCamera == MainMenuCams::eLoadGameMenuCam)
     {
         MusicController::static_PlayMusic(MusicController::MusicTypes::eTension_4, this, 0, 0);
     }
-    else if (gMap.mCurrentCamera == MainMenuCams::eBackstory_Or_NewGameCam || gMap.mCurrentCamera == MainMenuCams::eGameIsLoading_ShaddapCam)
+    else if (gMap->mCurrentCamera == MainMenuCams::eBackstory_Or_NewGameCam || gMap->mCurrentCamera == MainMenuCams::eGameIsLoading_ShaddapCam)
     {
         MusicController::static_PlayMusic(MusicController::MusicTypes::eSoftChase_8, this, 0, 0);
     }
@@ -2812,7 +2812,7 @@ void MainMenuController::HandleMainMenuUpdate()
 
         const MainMenuNextCam pageUpdateReturnedCam = (this->*(pPage->field_10_fn_update))(pressed);
 
-        if (pageUpdateReturnedCam.page_update_camera == MainMenuCams::eNoChange || pageUpdateReturnedCam.page_update_camera == gMap.mCurrentCamera)
+        if (pageUpdateReturnedCam.page_update_camera == MainMenuCams::eNoChange || pageUpdateReturnedCam.page_update_camera == gMap->mCurrentCamera)
         {
             // stay on the same screen
             return;
@@ -2924,7 +2924,7 @@ s32 MainMenuController::ChangeScreenAndIntroLogic_4CF640()
                     return 1;
                 }
 
-                field_208_transition_obj = relive_new MainMenuTransition(Layer::eLayer_FadeFlash_40, 1, 0, 16, relive::TBlendModes::eBlend_2);
+                field_208_transition_obj = relive_new MainMenuTransition(Layer::eLayer_FadeFlash_40, 1, 0, 16, relive::TBlendModes::eBlend_2, mResMan);
                 if (field_208_transition_obj)
                 {
                     field_21E_changeScreenState = 2;
@@ -2940,7 +2940,7 @@ s32 MainMenuController::ChangeScreenAndIntroLogic_4CF640()
                     return 1;
                 }
 
-                field_208_transition_obj = relive_new MainMenuTransition(Layer::eLayer_FadeFlash_40, 1, 0, 16, relive::TBlendModes::eBlend_1);
+                field_208_transition_obj = relive_new MainMenuTransition(Layer::eLayer_FadeFlash_40, 1, 0, 16, relive::TBlendModes::eBlend_1, mResMan);
                 if (field_208_transition_obj)
                 {
                     field_21E_changeScreenState = 2;
@@ -2963,7 +2963,7 @@ s32 MainMenuController::ChangeScreenAndIntroLogic_4CF640()
                     }
                 }
 
-                auto pMovie = relive_new Movie("GTILOGO.DDV");
+                auto pMovie = relive_new Movie("GTILOGO.DDV", mResMan);
 
                 // Run the movie till its done
                 while (Movie::gMovieRefCount > 0)
@@ -2986,7 +2986,7 @@ s32 MainMenuController::ChangeScreenAndIntroLogic_4CF640()
                 }
 
                 // Create movie object for the DD logo
-                pMovie = relive_new Movie("DDLOGO.DDV");
+                pMovie = relive_new Movie("DDLOGO.DDV", mResMan);
 
                 // Run the movie till its done
                 while (Movie::gMovieRefCount > 0)
@@ -3002,7 +3002,7 @@ s32 MainMenuController::ChangeScreenAndIntroLogic_4CF640()
 
                 gPsxDisplay.PutCurrentDispEnv();
 
-                gMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 1, CameraSwapEffects::ePlay1FMV_5, 10502, 0);
+                gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, 1, CameraSwapEffects::ePlay1FMV_5, 10502, 0);
                 GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuDoor));
                 Load_Anim_Pal_4D06A0(&GetAnimation());
 
@@ -3043,7 +3043,7 @@ s32 MainMenuController::ChangeScreenAndIntroLogic_4CF640()
                 break;
             }
 
-            gMap.SetActiveCam(
+            gMap->SetActiveCam(
                 EReliveLevelIds::eMenu,
                 1,
                 sMainMenuPages_561960[field_218_target_page_index].field_0_cam_id,

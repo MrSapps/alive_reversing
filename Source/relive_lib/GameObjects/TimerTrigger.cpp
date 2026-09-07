@@ -7,8 +7,8 @@
 #include "../../AliveLibAE/QuikSave.hpp"
 #include "BaseMap.hpp"
 
-TimerTrigger::TimerTrigger(relive::Path_TimerTrigger* pTlv, const Guid& tlvId)
-    : BaseGameObject(true, 0)
+TimerTrigger::TimerTrigger(relive::Path_TimerTrigger* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     mTlvInfo = tlvId;
     SetType(ReliveTypes::eTimerTrigger);
@@ -95,12 +95,12 @@ TimerTrigger::~TimerTrigger()
     GetMap().TLV_Reset(mTlvInfo);
 }
 
-void TimerTrigger::CreateFromSaveState(SerializedObjectData& pData)
+void TimerTrigger::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan)
 {
     const auto pState = pData.ReadTmpPtr<TimerTriggerSaveState>();
 
     relive::Path_TimerTrigger* pTlv = GetMap().TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv<relive::Path_TimerTrigger>();
-    auto pTimerTrigger = relive_new TimerTrigger(pTlv, pState->mTlvId);
+    auto pTimerTrigger = relive_new TimerTrigger(pTlv, pState->mTlvId, resMan);
     if (pTimerTrigger)
     {
         pTimerTrigger->mState = pState->mState;

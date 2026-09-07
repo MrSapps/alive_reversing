@@ -173,7 +173,7 @@ public:
     static void RestoreWorldInfo(const Quicksave_WorldInfo& rInfo);
     static void SaveWorldInfo(Quicksave_WorldInfo* pInfo);
     static void FindSaves();
-    static void RestoreBlyData(Quicksave& pSaveData);
+    static void RestoreBlyData(Quicksave& pSaveData, ResourceManagerWrapper& resMan);
 
 public:
     static SaveFileRec gSaveFileRecords[128];

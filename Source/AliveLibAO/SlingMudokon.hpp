@@ -140,7 +140,7 @@ public:
         AnimId::Mudokon_Sling_ShootEnd,
         AnimId::Mudokon_Sling_AngryToIdle};
 
-    SlingMudokon(relive::Path_SlingMudokon* pTlv, const Guid& tlvId);
+    SlingMudokon(relive::Path_SlingMudokon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~SlingMudokon();
 
     void LoadAnimations();

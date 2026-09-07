@@ -26,7 +26,7 @@ enum class LiftMoverStates : s16
 class LiftMover final : public ::BaseGameObject
 {
 public:
-    LiftMover(relive::Path_LiftMover* pTlv, const Guid& tlvId);
+    LiftMover(relive::Path_LiftMover* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~LiftMover();
     
     virtual void VUpdate() override;

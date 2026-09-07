@@ -20,9 +20,9 @@ Slurg_Step_Watch_Points gSlurgStepWatchPoints[2] = {};
 
 void Slurg::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Slurg_Burst));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Slurg_Move));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Slurg_Turn_Around));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Slurg_Burst));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Slurg_Move));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Slurg_Turn_Around));
 }
 
 void Slurg::Clear_Slurg_Step_Watch_Points()
@@ -54,8 +54,8 @@ static const TintEntry sSlurgTints[16] = {
     {EReliveLevelIds::eBonewerkz_Ender, 102u, 127u, 118u},
     {EReliveLevelIds::eCredits, 102u, 127u, 118u}};
 
-Slurg::Slurg(relive::Path_Slurg* pTlv, const Guid& tlvId)
-    : BaseAliveGameObject(0)
+Slurg::Slurg(relive::Path_Slurg* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(0, resMan)
 {
     LoadAnimations();
 
@@ -86,7 +86,7 @@ Slurg::Slurg(relive::Path_Slurg* pTlv, const Guid& tlvId)
     mMovingTimer = pTlv->mMovingTimer;
     mRngForMovingTimer = pTlv->mMovingTimer;
 
-    SetTint(&sSlurgTints[0], gMap.mCurrentLevel);
+    SetTint(&sSlurgTints[0], gMap->mCurrentLevel);
 
     FP hitX = {};
     FP hitY = {};
@@ -119,12 +119,12 @@ Slurg::Slurg(relive::Path_Slurg* pTlv, const Guid& tlvId)
     CreateShadow();
 }
 
-void Slurg::CreateFromSaveState(SerializedObjectData& pData)
+void Slurg::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan)
 {
     const auto pState = pData.ReadTmpPtr<SlurgSaveState>();
     auto pTlv = static_cast<relive::Path_Slurg*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv());
 
-    auto pSlurg = relive_new Slurg(pTlv, pState->mTlvId);
+    auto pSlurg = relive_new Slurg(pTlv, pState->mTlvId, resMan);
 
     pSlurg->mXPos = pState->mXPos;
     pSlurg->mYPos = pState->mYPos;
@@ -239,7 +239,7 @@ void Slurg::VUpdate()
         case SlurgStates::ePausing_1:
             mVelX = FP_FromInteger(0);
             if (GetAnimation().GetCurrentFrame() == 0
-                && gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+                && gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
             {
                 SfxPlayMono(relive::SoundEffects::SlurgPause, 0);
             }

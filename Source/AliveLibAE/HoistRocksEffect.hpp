@@ -20,7 +20,7 @@ struct HoistRockParticle final
 class HoistRocksEffect final : public BaseGameObject
 {
 public:
-    HoistRocksEffect(relive::Path_Hoist* pTlv, const Guid& tlvId);
+    HoistRocksEffect(relive::Path_Hoist* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~HoistRocksEffect();
 
     virtual void VUpdate() override;

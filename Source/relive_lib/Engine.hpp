@@ -2,6 +2,7 @@
 
 #include "GameType.hpp"
 #include "Ipc/Ipc.hpp"
+#include "ResourceManagerWrapper.hpp"
 
 class FileSystem;
 class CommandLineParser;
@@ -36,4 +37,5 @@ private:
     FileSystem& mFs;
     CommandLineParser& mClp;
     std::unique_ptr<relive::IIpcInterface> mIpcInterface;
+    ResourceManagerWrapper mResMan;
 };

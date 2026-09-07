@@ -30,10 +30,10 @@ public:
         eSecretAreaLong_13 = 13,
     };
 
-    MusicController();
+    MusicController(ResourceManagerWrapper& resMan);
     ~MusicController();
 
-    static s32 Create();
+    static s32 Create(ResourceManagerWrapper& resMan);
     static void SetBaseTimeStamp();
     static void Shutdown();
     static void UpdateMusicTime();

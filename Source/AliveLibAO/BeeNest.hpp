@@ -23,7 +23,7 @@ class BeeSwarm;
 class BeeNest final : public ::BaseGameObject
 {
 public:
-    BeeNest(relive::Path_BeeNest* pTlv, const Guid& tlvId);
+    BeeNest(relive::Path_BeeNest* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~BeeNest();
 
     virtual void VScreenChanged() override;

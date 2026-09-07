@@ -10,8 +10,8 @@
 
 namespace AO {
 
-BeeNest::BeeNest(relive::Path_BeeNest* pTlv, const Guid& tlvId)
-    : BaseGameObject(true, 0)
+BeeNest::BeeNest(relive::Path_BeeNest* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     SetType(ReliveTypes::eBeeNest);
 
@@ -30,7 +30,7 @@ BeeNest::BeeNest(relive::Path_BeeNest* pTlv, const Guid& tlvId)
     mState = BeeNestStates::eWaitForTrigger_0;
 
     // The "idle" swarm that hovers around the nest
-    relive_new BeeSwarm(mBeeSwarmX, mBeeSwarmY, FP_FromInteger(0), pTlv->mBeesAmount, 0);
+    relive_new BeeSwarm(mBeeSwarmX, mBeeSwarmY, FP_FromInteger(0), pTlv->mBeesAmount, 0, resMan);
 }
 
 BeeNest::~BeeNest()
@@ -40,7 +40,7 @@ BeeNest::~BeeNest()
 
 void BeeNest::VScreenChanged()
 {
-    if (gMap.LevelChanged() || gMap.PathChanged() || !mBeeSwarm.IsValid())
+    if (gMap->LevelChanged() || gMap->PathChanged() || !mBeeSwarm.IsValid())
     {
         Path::TLV_Reset(mTlvInfo);
         mBeeSwarm = Guid{};
@@ -60,7 +60,8 @@ void BeeNest::VUpdate()
                     mBeeSwarmY,
                     mSpeed,
                     mSwarmSize,
-                    mTotalChaseTime);
+                    mTotalChaseTime,
+                    mResMan);
 
                 mBeeSwarm = pBeeSwarm->mBaseGameObjectId;
                 if (pBeeSwarm)

@@ -19,13 +19,14 @@
 #include "Math.hpp"
 #include "QuikSave.hpp"
 
-Bone::Bone(FP xpos, FP ypos, s16 countId) :
+Bone::Bone(FP xpos, FP ypos, s16 countId, ResourceManagerWrapper& resMan) :
+    BaseThrowable(resMan),
     mPreviousXPos(xpos),
     mPreviousYPos(ypos)
 {
     SetType(ReliveTypes::eBone);
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Bone));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Bone));
     Animation_Init(GetAnimRes(AnimId::Bone));
 
     GetAnimation().SetSemiTrans(false);
@@ -47,11 +48,11 @@ void Bone::VTimeToExplodeRandom()
     // Empty
 }
 
-void Bone::CreateFromSaveState(SerializedObjectData& pData)
+void Bone::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan)
 {
     const auto pState = pData.ReadTmpPtr<BoneSaveState>();
     
-    auto pBone = relive_new Bone(pState->mXPos, pState->mYPos, pState->mThrowableCount);
+    auto pBone = relive_new Bone(pState->mXPos, pState->mYPos, pState->mThrowableCount, resMan);
 
     pBone->mBaseGameObjectTlvInfo = pState->mBaseTlvId;
 
@@ -205,7 +206,7 @@ bool Bone::OnCollision(BaseAnimatedWithPhysicsGameObject* pObj)
 
 void Bone::VScreenChanged()
 {
-    if (gMap.PathChanged() || gMap.LevelChanged())
+    if (gMap->PathChanged() || gMap->LevelChanged())
     {
         SetDead(true);
     }
@@ -475,7 +476,7 @@ void Bone::VUpdate()
             return;
 
         case BoneStates::eOnGround_3:
-            if (gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+            if (gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
             {
                 mDeadTimer = MakeTimer(300);
             }
@@ -507,7 +508,7 @@ void Bone::VUpdate()
             const PSX_Point wh{bRect.w, static_cast<s16>(bRect.h + offset)};
             CheckPlatformCollision(xy, wh, *gBaseGameObjects);
 
-            if (mYPos > FP_FromInteger(gMap.mPathData->field_6_bBottom))
+            if (mYPos > FP_FromInteger(gMap->mPathData->field_6_bBottom))
             {
                 SetDead(true);
             }
@@ -518,7 +519,7 @@ void Bone::VUpdate()
             mVelY += FP_FromInteger(1);
             mXPos += mVelX;
             mYPos = mVelY + mYPos;
-            if (!gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+            if (!gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
             {
                 SetDead(true);
             }

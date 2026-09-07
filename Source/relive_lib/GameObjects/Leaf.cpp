@@ -13,7 +13,7 @@ Leaf::Leaf(FP xpos, FP ypos, FP xVel, FP yVel, FP scale)
 {
     mRGB.SetRGB(100, 100, 100);
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Well_Leaf));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Well_Leaf));
     Animation_Init(GetAnimRes(AnimId::Well_Leaf));
 
     SetSpriteScale(scale);

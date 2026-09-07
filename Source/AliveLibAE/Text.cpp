@@ -21,8 +21,8 @@ void Text::VScreenChanged()
     // Empty
 }
 
-Text::Text(const char_type* pMessage, s32 renderCount, s32 bShadow)
-    : BaseGameObject(true, 0)
+Text::Text(const char_type* pMessage, s32 renderCount, s32 bShadow, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     SetSurviveDeathReset(true);
     SetDrawable(true);
@@ -32,7 +32,7 @@ Text::Text(const char_type* pMessage, s32 renderCount, s32 bShadow)
     gObjListDrawables->Push_Back(this);
 
     mFontContext.LoadFontType(FontType::PauseMenu);
-    mPal = ResourceManagerWrapper::LoadPal(PalId::MainMenuFont_PauseMenu);
+    mPal = GetResourceManager().LoadPal(PalId::MainMenuFont_PauseMenu);
     field_20_font.Load(static_cast<s32>((bShadow + 1) * strlen(pMessage)), mPal, &mFontContext);
 
     field_5C_xpos = static_cast<s16>(field_20_font.MeasureTextWidth(pMessage));
@@ -135,7 +135,7 @@ void Text::VRender(OrderingTable& ot)
 // MainMenuController::ChangeScreenAndIntroLogic_4CF640 will call with type 3 (Shown on boot, says Abe's Exoddus).
 
 // TODO: When above functions are reversed clean up this function to remove strange dead cases..
-s8 Display_Full_Screen_Message_Blocking(MessageType messageType)
+s8 Display_Full_Screen_Message_Blocking(MessageType messageType, ResourceManagerWrapper& resMan)
 {
     // TODO: Why doesn't this go into the switch ??
     if (messageType == MessageType::eSkipMovie_1)
@@ -143,14 +143,14 @@ s8 Display_Full_Screen_Message_Blocking(MessageType messageType)
         return 0;
     }
 
-    auto pTextObj = relive_new Text("       Oddworld Abe's Exoddus        ", 1, 0);
+    auto pTextObj = relive_new Text("       Oddworld Abe's Exoddus        ", 1, 0, resMan);
 
     Text* pTextObj2 = nullptr;
     switch (messageType)
     {
         // Dead due to early return ??
         case MessageType::eSkipMovie_1:
-            pTextObj2 = relive_new Text("or esc to skip the movie", 1, 0);
+            pTextObj2 = relive_new Text("or esc to skip the movie", 1, 0, resMan);
             if (pTextObj2)
             {
                 pTextObj2->SetYPos(0, 30);
@@ -158,7 +158,7 @@ s8 Display_Full_Screen_Message_Blocking(MessageType messageType)
             break;
 
         case MessageType::eSkipDemo_2:
-            pTextObj2 = relive_new Text("or esc to skip the demo", 1, 0);
+            pTextObj2 = relive_new Text("or esc to skip the demo", 1, 0, resMan);
             if (pTextObj2)
             {
                 pTextObj2->SetYPos(0, 30);

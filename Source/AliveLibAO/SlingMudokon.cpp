@@ -38,12 +38,12 @@ void SlingMudokon::LoadAnimations()
 {
     for (auto& animId : sSlingMudMotionAnimIds)
     {
-        mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(animId));
+        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
     }
 }
 
-SlingMudokon::SlingMudokon(relive::Path_SlingMudokon* pTlv, const Guid& tlvId)
-    : BaseAliveGameObject(0),
+SlingMudokon::SlingMudokon(relive::Path_SlingMudokon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(0, resMan),
     mGiveCodeBrain(*this),
     mSpawnBrain(*this),
     mAskForPasswordBrain(*this)
@@ -149,7 +149,7 @@ void SlingMudokon::VUpdate()
 
     if (old_x != mXPos || old_y != mYPos)
     {
-        BaseAliveGameObjectPathTLV = gMap.TLV_Get_At(
+        BaseAliveGameObjectPathTLV = gMap->TLV_Get_At(
             TlvIterator::Invalid(),
             mXPos,
             mYPos,
@@ -169,7 +169,7 @@ void SlingMudokon::VUpdate()
 
 void SlingMudokon::VCallBrain()
 {
-    if (gMap.Is_Point_In_Current_Camera(
+    if (gMap->Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -275,7 +275,8 @@ void SlingMudokon::Motion_3_ShootStart()
                 mYPos - FP_FromInteger(24),
                 xDistance,
                 GetSpriteScale(),
-                0);
+                0,
+                mResMan);
             mCurrentMotion = eSlingMudMotions::Motion_4_ShootEnd;
         }
     }

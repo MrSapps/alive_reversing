@@ -6,8 +6,8 @@
 #include "stdlib.hpp"
 #include "Path.hpp"
 
-DoorBlocker::DoorBlocker(relive::Path_DoorBlocker* pTlv, const Guid& tlvId)
-    : BaseAliveGameObject(0),
+DoorBlocker::DoorBlocker(relive::Path_DoorBlocker* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(0, resMan),
     mTlvId(tlvId),
     mSwitchId(pTlv->mSwitchId)
 {
@@ -48,8 +48,8 @@ DoorBlocker::~DoorBlocker()
 
 void DoorBlocker::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Door_Lock_Open));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Door_Lock_Idle));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Lock_Open));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Lock_Idle));
 }
 
 void DoorBlocker::VUpdate()

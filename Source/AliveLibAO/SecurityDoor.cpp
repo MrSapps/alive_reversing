@@ -17,8 +17,8 @@ namespace AO {
 
 void SecurityDoor::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Security_Door_Speak));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Security_Door_Idle));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Security_Door_Speak));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Security_Door_Idle));
 }
 
 SecurityDoor::~SecurityDoor()
@@ -30,8 +30,8 @@ SecurityDoor::~SecurityDoor()
     Path::TLV_Reset(mTlvId, mState + 1);
 }
 
-SecurityDoor::SecurityDoor(relive::Path_SecurityDoor* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0)
+SecurityDoor::SecurityDoor(relive::Path_SecurityDoor* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     LoadAnimations();
 

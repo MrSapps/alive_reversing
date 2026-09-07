@@ -15,7 +15,7 @@ enum class State : s16
 class SligGetPantsAndWings final : public ::BaseAnimatedWithPhysicsGameObject
 {
 public:
-    SligGetPantsAndWings(relive::Path_TLV* pTlv, const Guid& tlvId);
+    SligGetPantsAndWings(relive::Path_TLV* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~SligGetPantsAndWings();
 
     void LoadAnimations();

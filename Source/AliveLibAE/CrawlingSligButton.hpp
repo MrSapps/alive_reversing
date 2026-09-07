@@ -8,7 +8,7 @@ enum class SwitchOp : s16;
 class CrawlingSligButton final : public ::BaseAnimatedWithPhysicsGameObject
 {
 public:
-    CrawlingSligButton(relive::Path_CrawlingSligButton* pTlv, const Guid& tlvId);
+    CrawlingSligButton(relive::Path_CrawlingSligButton* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~CrawlingSligButton();
 
     void LoadAnimations();

@@ -12,16 +12,16 @@ namespace AO {
 
 void Bells::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::BigChime));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::MediumChime));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::SmallChime));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::BigChime_Moving));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::MediumChime_Moving));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::SmallChime_Moving));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BigChime));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MediumChime));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::SmallChime));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BigChime_Moving));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MediumChime_Moving));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::SmallChime_Moving));
 }
 
-Bells::Bells(BellSize bellType, FP xpos, FP ypos, FP scale)
-    : BaseAnimatedWithPhysicsGameObject(0)
+Bells::Bells(BellSize bellType, FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetCanExplode(false);
 
@@ -96,7 +96,7 @@ void Bells::VUpdate()
                 yOff = FP_FromInteger(36);
                 const FP wave_ypos = mYPos + FP_FromInteger(36);
                 const FP wave_xpos = mXPos - FP_FromInteger(35);
-                relive_new ScreenWave(wave_xpos, wave_ypos, Layer::eLayer_FG1_37, FP_FromInteger(18), FP_FromInteger(12), 0);
+                relive_new ScreenWave(wave_xpos, wave_ypos, Layer::eLayer_FG1_37, FP_FromInteger(18), FP_FromInteger(12), 0, mResMan);
             }
             else if (mBellPitch == BellPitch::eHighPitch)
             {
@@ -104,7 +104,7 @@ void Bells::VUpdate()
                 yOff = FP_FromInteger(32);
                 const FP wave_ypos = mYPos + FP_FromInteger(32);
                 const FP wave_xpos = mXPos + FP_FromInteger(37);
-                relive_new ScreenWave(wave_xpos, wave_ypos, Layer::eLayer_FG1_37, FP_FromInteger(12), FP_FromInteger(12), 0);
+                relive_new ScreenWave(wave_xpos, wave_ypos, Layer::eLayer_FG1_37, FP_FromInteger(12), FP_FromInteger(12), 0, mResMan);
             }
             else if (mBellPitch == BellPitch::eMediumPitch)
             {
@@ -112,7 +112,7 @@ void Bells::VUpdate()
                 yOff = FP_FromInteger(24);
                 const FP wave_ypos = mYPos + FP_FromInteger(24);
                 const FP wave_xpos = mXPos - FP_FromInteger(4);
-                relive_new ScreenWave(wave_xpos, wave_ypos, Layer::eLayer_FG1_37, FP_FromInteger(14), FP_FromInteger(12), 0);
+                relive_new ScreenWave(wave_xpos, wave_ypos, Layer::eLayer_FG1_37, FP_FromInteger(14), FP_FromInteger(12), 0, mResMan);
             }
 
             for (s32 i = 0; i < 4; i++)

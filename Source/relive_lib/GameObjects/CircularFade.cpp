@@ -36,7 +36,7 @@ CircularFade::CircularFade(FP xpos, FP ypos, FP scale, bool fadeIn, s8 destroyOn
     const u8 fade_rgb = static_cast<u8>((mFadeColour * 60) / 100);
     mRGB.SetRGB(fade_rgb, fade_rgb, fade_rgb);
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(anim));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(anim));
     Animation_Init(GetAnimRes(anim));
 
     SetApplyShadowZoneColour(false);

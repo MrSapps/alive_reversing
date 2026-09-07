@@ -84,8 +84,8 @@ static const relive::SfxDefinition sSlogSFXList[19] = {
     {0u, 12u, 33u, 40u, -127, 0},
 };
 
-Slog::Slog(FP xpos, FP ypos, FP scale, s16 bListenToSligs, s16 chaseDelay)
-    : BaseAliveGameObject(5)
+Slog::Slog(FP xpos, FP ypos, FP scale, s16 bListenToSligs, s16 chaseDelay, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(5, resMan)
 {
     LoadAnimations();
 
@@ -126,12 +126,12 @@ void Slog::LoadAnimations()
 {
     for (auto& animId : sSlogAnimIdTable)
     {
-        mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(animId));
+        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
     }
 }
 
-Slog::Slog(relive::Path_Slog* pTlv, const Guid& tlvId)
-    : BaseAliveGameObject(5)
+Slog::Slog(relive::Path_Slog* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(5, resMan)
 {
     LoadAnimations();
 
@@ -298,7 +298,7 @@ void Slog::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void Slog::CreateFromSaveState(SerializedObjectData& pBuffer)
+void Slog::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
 {
     const auto pState = pBuffer.ReadTmpPtr<SlogSaveState>();
     auto pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mSlogTlvId).GetTlv<relive::Path_Slog>();
@@ -308,7 +308,8 @@ void Slog::CreateFromSaveState(SerializedObjectData& pBuffer)
     {
         pSlog = relive_new Slog(pState->mXPos,
                                   pState->mYPos,
-                                  pState->mSpriteScale, pState->mListenToSligs, pState->mChaseDelay);
+                                  pState->mSpriteScale, pState->mListenToSligs, pState->mChaseDelay,
+                                  resMan);
 
         if (pSlog)
         {
@@ -317,7 +318,7 @@ void Slog::CreateFromSaveState(SerializedObjectData& pBuffer)
     }
     else
     {
-        pSlog = relive_new Slog(pTlv, pState->mSlogTlvId);
+        pSlog = relive_new Slog(pTlv, pState->mSlogTlvId, resMan);
     }
 
     if (pSlog)
@@ -406,12 +407,12 @@ void Slog::Motion_0_Idle()
         {
             if (mCurrentMotion == eSlogMotions::Motion_0_Idle)
             {
-                if (gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+                if (gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
                 {
                     SND_SEQ_PlaySeq(SeqId::Empty_13, 1, 0);
                 }
 
-                if (gMap.GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
+                if (gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
                 {
                     if (MusicController::static_GetMusicType(0, 0, 0) == MusicController::MusicTypes::eSlogChaseTension_6)
                     {
@@ -539,7 +540,7 @@ const FP sSlogRunVelXTable_547634[8] = {
 
 void Slog::Motion_2_Run()
 {
-    if (gMap.GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
+    if (gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
     {
         MusicController::static_PlayMusic(MusicController::MusicTypes::eIntenseChase_7, this, 0, 0);
     }
@@ -936,7 +937,7 @@ void Slog::Motion_15_Sleeping()
 
     if (createParticle)
     {
-        if (gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+        if (gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
         {
             FP xOff = {};
             if (GetAnimation().GetFlipX())
@@ -994,7 +995,7 @@ void Slog::Motion_17_WakeUp()
         }
     }
 
-    if (gMap.GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
+    if (gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
     {
         MusicController::static_PlayMusic(MusicController::MusicTypes::eSlogTension_5, this, 0, 0);
     }
@@ -1087,7 +1088,7 @@ void Slog::Motion_19_JumpUpwards()
         }
     }
 
-    if (gMap.GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
+    if (gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
     {
         MusicController::static_PlayMusic(MusicController::MusicTypes::eSlogChaseTension_6, this, 0, 0);
     }
@@ -2705,7 +2706,7 @@ void Slog::Init()
     mListeningToSligId = Guid{};
     mTargetId = Guid{};
     mBoneId = Guid{};
-    SetTint(&sSlogTints_560A48[0], gMap.mCurrentLevel);
+    SetTint(&sSlogTints_560A48[0], gMap->mCurrentLevel);
     GetAnimation().SetRenderLayer(Layer::eLayer_SlogFleech_34);
 
     if (GetSpriteScale() == FP_FromInteger(1))
@@ -2869,13 +2870,13 @@ void Slog::Sfx(SlogSound effectId)
     const relive::SfxDefinition& effectDef = getSfxDef(effectId);
 
 
-    const CameraPos direction = gMap.GetDirection(
+    const CameraPos direction = gMap->GetDirection(
         mCurrentLevel,
         mCurrentPath,
         mXPos,
         mYPos);
     PSX_RECT pRect = {};
-    gMap.Get_Camera_World_Rect(direction, &pRect);
+    gMap->Get_Camera_World_Rect(direction, &pRect);
 
     const s16 defaultSndIdxVol = effectDef.mDefaultVolume;
     volumeRight = defaultSndIdxVol;
@@ -2943,7 +2944,7 @@ void Slog::ToJump()
 
     Sfx(SlogSound::AttackGrowl_8);
 
-    if (gMap.GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
+    if (gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
     {
         MusicController::static_PlayMusic(MusicController::MusicTypes::eIntenseChase_7, this, 0, 0);
     }
@@ -3063,7 +3064,7 @@ Bone* Slog::FindBone()
             auto pBone = static_cast<Bone*>(pObj);
             if (pBone->VCanThrow())
             {
-                if (gMap.Is_Point_In_Current_Camera(pBone->mCurrentLevel, pBone->mCurrentPath, pBone->mXPos, pBone->mYPos, 0) && pBone->GetScale() == GetScale())
+                if (gMap->Is_Point_In_Current_Camera(pBone->mCurrentLevel, pBone->mCurrentPath, pBone->mXPos, pBone->mYPos, 0) && pBone->GetScale() == GetScale())
                 {
                     if (FP_Abs(mYPos - pBone->mYPos) <= FP_FromInteger(50) || pBone->VCanBeEaten())
                     {

@@ -14,7 +14,7 @@ class BeeSwarm;
 class HoneySack final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    HoneySack(relive::Path_HoneySack* pTlv, const Guid& tlvId);
+    HoneySack(relive::Path_HoneySack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~HoneySack();
 
     void LoadAnimations();

@@ -27,7 +27,7 @@ public:
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
     virtual void VScreenChanged() override;
 
-    static void CreateFromSaveState(SerializedObjectData& pState);
+    static void CreateFromSaveState(SerializedObjectData& pState, ResourceManagerWrapper& resMan);
 
     void Remove(s16 count);
     void Add(s16 count);

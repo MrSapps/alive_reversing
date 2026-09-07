@@ -96,6 +96,8 @@ Engine::Engine(GameType gameType, FileSystem& fs, CommandLineParser& clp)
     , mFs(fs)
     , mClp(clp)
 {
+    SetResourceManager(mResMan);
+
     mIpcInterface = relive::MakeIpcInterface();
     mIpcInterface->Listen([&](relive::PacketTypes packetType, const std::vector<unsigned char>& buffer)
     {
@@ -223,7 +225,7 @@ void Engine::CmdLineRenderInit()
 // QuickSave load/Restart path calls this
 void DestroyObjects()
 {
-    ResourceManagerWrapper::LoadingLoop(false);
+    GetResourceManager().LoadingLoop(false);
     for (s32 iterations = 0; iterations < 2; iterations++)
     {
         for (s32 idx = 0;idx < gBaseGameObjects->Size(); idx++)
@@ -470,12 +472,12 @@ void Game_Loop()
 
         if (GetGameType() == GameType::eAe)
         {
-            gMap.ScreenChange();
+            gMap->ScreenChange();
             Input().Update(GetGameAutoPlayer());
         }
         else
         {
-            AO::gMap.ScreenChange();
+            AO::gMap->ScreenChange();
             AO::Input().Update(GetGameAutoPlayer());
         }
 
@@ -523,6 +525,16 @@ void Engine::Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera
 
     SYS_EventsPump();
 
+    // TODO: both have to exist for the game to work due to AE map access in Path.cpp
+    //if (mGameType == GameType::eAe)
+    {
+        gMap = relive_new Map(mResMan);
+    }
+    //else
+    {
+        AO::gMap = relive_new AO::Map(mResMan);
+    }
+
     gPsxDisplay.Init();
     AO::Input().InitPad(1);
 
@@ -559,11 +571,11 @@ void Engine::Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera
 
     if (mGameType == GameType::eAe)
     {
-        gMap.Init(startLevel, static_cast<s16>(startPath), static_cast<s16>(startCamera), CameraSwapEffects::eInstantChange_0, 0, 0);
+        gMap->Init(startLevel, static_cast<s16>(startPath), static_cast<s16>(startCamera), CameraSwapEffects::eInstantChange_0, 0, 0);
     }
     else
     {
-        AO::gMap.Init(startLevel, static_cast<s16>(startPath), static_cast<s16>(startCamera), CameraSwapEffects::eInstantChange_0, 0, 0);
+        AO::gMap->Init(startLevel, static_cast<s16>(startPath), static_cast<s16>(startCamera), CameraSwapEffects::eInstantChange_0, 0, 0);
     }
 
     // Main loop start
@@ -572,15 +584,21 @@ void Engine::Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera
     // Shut down start
     Game_Free_LoadingIcon();
 
+    gMap->Shutdown();
+    relive_delete gMap;
+    gMap = nullptr;
+
+    AO::gMap->Shutdown();
+    relive_delete AO::gMap;
+    AO::gMap = nullptr;
+
     if (mGameType == GameType::eAe)
     {
         DDCheat::ClearProperties();
-        gMap.Shutdown();
     }
     else
     {
         AO::DDCheat::ClearProperties();
-        AO::gMap.Shutdown();       
     }
 
     AnimationBase::FreeAnimationArray();

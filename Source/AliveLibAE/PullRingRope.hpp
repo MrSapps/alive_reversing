@@ -6,7 +6,7 @@
 class PullRingRope final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId);
+    PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~PullRingRope();
 
     void LoadAnimations();

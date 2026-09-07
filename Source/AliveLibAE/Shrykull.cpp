@@ -29,7 +29,7 @@ Shrykull::~Shrykull()
 
 void Shrykull::VScreenChanged()
 {
-    if (gMap.LevelChanged() || gMap.PathChanged())
+    if (gMap->LevelChanged() || gMap->PathChanged())
     {
         SetDead(true);
     }
@@ -37,13 +37,13 @@ void Shrykull::VScreenChanged()
 
 void Shrykull::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::ShrykullStart));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::ShrykullTransform));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::ShrykullDetransform));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::ShrykullStart));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::ShrykullTransform));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::ShrykullDetransform));
 }
 
-Shrykull::Shrykull()
-    : BaseAliveGameObject(0)
+Shrykull::Shrykull(ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(0, resMan)
 {
     SetType(ReliveTypes::eShrykull);
 
@@ -76,7 +76,7 @@ bool Shrykull::CanKill(BaseAnimatedWithPhysicsGameObject* pObj)
 {
     return (
                pObj->Type() == ReliveTypes::eTimedMine_or_MovingBomb || pObj->Type() == ReliveTypes::eMine || pObj->Type() == ReliveTypes::eUXB || pObj->Type() == ReliveTypes::eSlig || pObj->Type() == ReliveTypes::eFlyingSlig || pObj->Type() == ReliveTypes::eCrawlingSlig || pObj->Type() == ReliveTypes::eSlog || pObj->Type() == ReliveTypes::eGlukkon || pObj->Type() == ReliveTypes::eSecurityClaw || pObj->Type() == ReliveTypes::eSecurityOrb)
-        && pObj->GetAnimation().GetRender() && !pObj->GetDead() && gMap.Is_Point_In_Current_Camera(pObj->mCurrentLevel, pObj->mCurrentPath, pObj->mXPos, pObj->mYPos, 0);
+        && pObj->GetAnimation().GetRender() && !pObj->GetDead() && gMap->Is_Point_In_Current_Camera(pObj->mCurrentLevel, pObj->mCurrentPath, pObj->mXPos, pObj->mYPos, 0);
 }
 
 
@@ -184,13 +184,13 @@ void Shrykull::VUpdate()
                         }
                     }
 
-                    relive_new PossessionFlicker(pObj, 8, 255, 255, 255);
+                    relive_new PossessionFlicker(pObj, 8, 255, 255, 255, mResMan);
                     AbilityRing::Factory(
                         FP_FromInteger((objRect.x + objRect.w) / 2),
                         FP_FromInteger((objRect.y + objRect.h) / 2),
                         RingTypes::eShrykull_Pulse_Large_5, pObj->GetSpriteScale());
 
-                    relive_new PossessionFlicker(this, 8, 255, 255, 255);
+                    relive_new PossessionFlicker(this, 8, 255, 255, 255, mResMan);
                     AbilityRing::Factory(
                         FP_FromInteger((ourRect.x + ourRect.w) / 2),
                         FP_FromInteger((ourRect.y + ourRect.h) / 2),

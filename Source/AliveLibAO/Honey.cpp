@@ -10,14 +10,14 @@ void Honey::VUpdate()
     // Empty
 }
 
-Honey::Honey(FP xpos, FP ypos)
-    : BaseAnimatedWithPhysicsGameObject(0)
+Honey::Honey(FP xpos, FP ypos, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eHoney);
 
     mRGB.SetRGB(128, 128, 128);
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Honey));
+    mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::Honey));
     Animation_Init(GetAnimRes(AnimId::Honey));
 
     mYPos = ypos;

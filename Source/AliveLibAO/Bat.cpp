@@ -18,13 +18,13 @@ namespace AO {
 
 void Bat::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Bat));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Bat_Flying));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Bat_Unknown));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Bat));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Bat_Flying));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Bat_Unknown));
 }
 
-Bat::Bat(relive::Path_Bat* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0)
+Bat::Bat(relive::Path_Bat* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eBat);
 

@@ -37,16 +37,16 @@ static const TintEntry sSecurityOrbTints[16] = {
     {EReliveLevelIds::eCredits, 127u, 127u, 127u}};
 
 
-SecurityOrb::SecurityOrb(relive::Path_SecurityOrb* pTlv, const Guid& tlvId)
-    : BaseAliveGameObject(0)
+SecurityOrb::SecurityOrb(relive::Path_SecurityOrb* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(0, resMan)
 {
     SetType(ReliveTypes::eSecurityOrb);
     SetCanExplode(true);
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Security_Orb));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Security_Orb));
     Animation_Init(GetAnimRes(AnimId::Security_Orb));
 
-    SetTint(sSecurityOrbTints, gMap.mCurrentLevel);
+    SetTint(sSecurityOrbTints, gMap->mCurrentLevel);
 
     mXPos = FP_FromInteger(pTlv->mTopLeftX);
     mYPos = FP_FromInteger(pTlv->mTopLeftY);
@@ -188,7 +188,7 @@ void SecurityOrb::VUpdate()
                     ZapLineType::eThick_0,
                     Layer::eLayer_ZapLinesElumMuds_28);
 
-                relive_new PossessionFlicker(gAbe, 8, 255, 100, 100);
+                relive_new PossessionFlicker(gAbe, 8, 255, 100, 100, mResMan);
 
                 if (gAbe->mHealth > FP_FromInteger(0))
                 {

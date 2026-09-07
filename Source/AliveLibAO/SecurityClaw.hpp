@@ -13,7 +13,7 @@ namespace AO {
 class Claw final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    Claw();
+    Claw(ResourceManagerWrapper& resMan);
 
     void VScreenChanged() override;
 };
@@ -31,7 +31,7 @@ enum class SecurityClawStates : s16
 class SecurityClaw final : public ::BaseAliveGameObject
 {
 public:
-    SecurityClaw(relive::Path_SecurityClaw* pTlv, const Guid& tlvId);
+    SecurityClaw(relive::Path_SecurityClaw* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~SecurityClaw();
 
     void LoadAnimations();

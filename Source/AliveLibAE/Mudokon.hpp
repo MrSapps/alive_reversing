@@ -247,7 +247,7 @@ public:
         AnimId::Mudokon_TurnWheel,
         AnimId::Mudokon_TurnWheelEnd};
 
-    Mudokon(relive::Path_Mudokon* pTlv, const Guid& tlvId);
+    Mudokon(relive::Path_Mudokon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~Mudokon();
     
     void LoadAnimations();
@@ -280,7 +280,7 @@ public:
         }
     }
 
-    static void CreateFromSaveState(SerializedObjectData& pBuffer);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
 
 
 private:

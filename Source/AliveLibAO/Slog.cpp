@@ -78,12 +78,12 @@ void Slog::LoadAnimations()
 {
     for (auto& animId : sSlogMotionAnimIds)
     {
-        mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(animId));
+        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
     }
 }
 
-Slog::Slog(relive::Path_Slog* pTlv, const Guid& tlvId)
-    : BaseAliveGameObject(0)
+Slog::Slog(relive::Path_Slog* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(0, resMan)
 {
     LoadAnimations();
     mXPos = FP_FromInteger(pTlv->mTopLeftX);
@@ -125,8 +125,8 @@ Slog::Slog(relive::Path_Slog* pTlv, const Guid& tlvId)
     }
 }
 
-Slog::Slog(FP xpos, FP ypos, FP scale)
-    : BaseAliveGameObject(0)
+Slog::Slog(FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(0, resMan)
 {
     LoadAnimations();
     mXPos = xpos;
@@ -296,7 +296,7 @@ void Slog::VOnTlvCollision(TlvIterator tlvIterator)
             mHealth = FP_FromInteger(0);
             break;
         }
-        tlvIterator = gMap.TLV_Get_At(tlvIterator, mXPos, mYPos, mXPos, mYPos);
+        tlvIterator = gMap->TLV_Get_At(tlvIterator, mXPos, mYPos, mXPos, mYPos);
     }
 }
 
@@ -327,7 +327,7 @@ void Slog::VUpdate()
 
     if (old_x != mXPos || old_y != mYPos)
     {
-        BaseAliveGameObjectPathTLV = gMap.TLV_Get_At(
+        BaseAliveGameObjectPathTLV = gMap->TLV_Get_At(
             TlvIterator::Invalid(),
             mXPos,
             mYPos,
@@ -433,7 +433,7 @@ void Slog::Init()
 
     mShot = 0;
 
-    SetTint(sSlogTints_4CFE10, gMap.mCurrentLevel);
+    SetTint(sSlogTints_4CFE10, gMap->mCurrentLevel);
 
     if (GetSpriteScale() == FP_FromInteger(1))
     {
@@ -556,7 +556,7 @@ void Slog::ToJump()
 
     Sfx(8);
 
-    if (gMap.GetDirection(
+    if (gMap->GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -605,13 +605,13 @@ void Slog::Sfx(s32 soundId)
         volumeRight = defaultSndIdxVol / 2;
     }
 
-    CameraPos direction = gMap.GetDirection(
+    CameraPos direction = gMap->GetDirection(
         mCurrentLevel,
         mCurrentPath,
         mXPos,
         mYPos);
     PSX_RECT worldRect;
-    gMap.Get_Camera_World_Rect(direction, &worldRect);
+    gMap->Get_Camera_World_Rect(direction, &worldRect);
     volumeLeft = volumeRight;
     switch (direction)
     {
@@ -737,7 +737,7 @@ s16 Slog::HandleEnemyStopper()
         xpos = mXPos - (ScaleToGridSize(GetSpriteScale()) * FP_FromInteger(2));
     }
 
-    auto pStopper = gMap.VTLV_Get_At_Of_Type(
+    auto pStopper = gMap->VTLV_Get_At_Of_Type(
         FP_GetExponent(xpos),
         FP_GetExponent(mYPos),
         FP_GetExponent(xpos),
@@ -784,7 +784,7 @@ void Slog::Motion_0_Idle()
         {
             if (mCurrentMotion != eSlogMotions::Motion_0_Idle)
             {
-                if (gMap.Is_Point_In_Current_Camera(
+                if (gMap->Is_Point_In_Current_Camera(
                         mCurrentLevel,
                         mCurrentPath,
                         mXPos,
@@ -794,13 +794,13 @@ void Slog::Motion_0_Idle()
                     SND_SEQ_PlaySeq(SeqId::Unknown_17, 1, 0);
                 }
 
-                if (gMap.GetDirection(
+                if (gMap->GetDirection(
                         mCurrentLevel,
                         mCurrentPath,
                         mXPos,
                         mYPos)
                         >= CameraPos::eCamCurrent_0
-                    && gMap.GetDirection(
+                    && gMap->GetDirection(
                            mCurrentLevel,
                            mCurrentPath,
                            mXPos,
@@ -927,7 +927,7 @@ const FP sSlogRunVelXTable_4BCC70[9] = {
 
 void Slog::Motion_2_Run()
 {
-    if (gMap.GetDirection(
+    if (gMap->GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1337,7 +1337,7 @@ void Slog::Motion_16_Sleeping()
         if (!((sGnFrame - 20) % 60))
         {
             Sfx(11);
-            if (gMap.Is_Point_In_Current_Camera(
+            if (gMap->Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -1351,7 +1351,7 @@ void Slog::Motion_16_Sleeping()
     else
     {
         Sfx(10);
-        if (gMap.Is_Point_In_Current_Camera(
+        if (gMap->Is_Point_In_Current_Camera(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,
@@ -1413,7 +1413,7 @@ void Slog::Motion_18_WakeUp()
         }
     }
 
-    if (gMap.GetDirection(
+    if (gMap->GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1516,7 +1516,7 @@ void Slog::Motion_19_JumpForwards()
 
 void Slog::Motion_20_JumpUpwards()
 {
-    if (gMap.GetDirection(
+    if (gMap->GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,

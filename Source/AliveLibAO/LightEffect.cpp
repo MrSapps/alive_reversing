@@ -9,13 +9,13 @@
 
 namespace AO {
 
-LightEffect::LightEffect(relive::Path_LightEffect* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0)
+LightEffect::LightEffect(relive::Path_LightEffect* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eNone);
     mTlvId = tlvId;
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Star));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Star));
     Animation_Init(GetAnimRes(AnimId::Star));
 
     mRnd1 = MakeTimer(Math_RandomRange(2, 8));

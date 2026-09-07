@@ -117,7 +117,7 @@ s16 BaseAliveGameObject::SetBaseAnimPaletteTint(const TintEntry* pTintArray, ERe
 
     if (palId != PalId::Default)
     {
-        PalResource res = ResourceManagerWrapper::LoadPal(palId);
+        PalResource res = GetResourceManager().LoadPal(palId);
         GetAnimation().LoadPal(res);
     }
     return 1;
@@ -347,8 +347,8 @@ IBirdPortal* BaseAliveGameObject::VIntoBirdPortal(s16 numGridBlocks)
     return nullptr;
 }
 
-BaseAliveGameObject::BaseAliveGameObject(s16 resourceArraySize)
-    : BaseAnimatedWithPhysicsGameObject(resourceArraySize)
+BaseAliveGameObject::BaseAliveGameObject(s16 resourceArraySize, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(resourceArraySize, resMan)
 {
     SetCanBePossessed(false);
     SetPossessed(false);
@@ -772,7 +772,7 @@ void BaseAliveGameObject::OnPathTransitionAO(s32 camWorldX, s32 camWorldY, Camer
     }
 
     PSX_Point camLoc = {};
-    AO::gMap.GetCurrentCamCoords(&camLoc);
+    AO::gMap->GetCurrentCamCoords(&camLoc);
 
     mXPos = FP_FromInteger((BaseAliveGameObjectPathTLV.GetTlv()->mBottomRightX + BaseAliveGameObjectPathTLV.GetTlv()->mTopLeftX) / 2);
     mYPos = FP_FromInteger(BaseAliveGameObjectPathTLV.GetTlv()->mTopLeftY);
@@ -880,7 +880,7 @@ bool BaseAliveGameObject::MapFollowMe(bool snapToGrid)
 bool BaseAliveGameObject::MapFollowMeAO(bool snapToGrid)
 {
     PSX_Point currentCamCoords = {};
-    AO::gMap.GetCurrentCamCoords(&currentCamCoords);
+    AO::gMap->GetCurrentCamCoords(&currentCamCoords);
 
     // Are we "in" the current camera X bounds?
     if (mCurrentLevel == GetMap().mCurrentLevel && mCurrentPath == GetMap().mCurrentPath && mXPos > FP_FromInteger(currentCamCoords.x) && mXPos < FP_FromInteger(currentCamCoords.x + 1024))
@@ -929,7 +929,7 @@ bool BaseAliveGameObject::MapFollowMeAO(bool snapToGrid)
                 const s32 x_i = abs(FP_GetExponent(mXPos));
                 const s32 camXIndex = x_i % 1024;
 
-                AO::gMap.Get_map_size(&currentCamCoords);
+                AO::gMap->Get_map_size(&currentCamCoords);
                 if (x_i < (currentCamCoords.x - 1024))
                 {
                     UsePathTransScale();
@@ -972,7 +972,7 @@ bool BaseAliveGameObject::MapFollowMeAO(bool snapToGrid)
         // In the right camera void and moving right?
         else if (camXIndex > 624 && mVelX > FP_FromInteger(0)) // Never hit as velx is < 0
         {
-            AO::gMap.Get_map_size(&currentCamCoords);
+            AO::gMap->Get_map_size(&currentCamCoords);
             if (x_i < (currentCamCoords.x - 1024))
             {
                 UsePathTransScale();
@@ -992,7 +992,7 @@ bool BaseAliveGameObject::MapFollowMeAO(bool snapToGrid)
 bool BaseAliveGameObject::MapFollowMeAE(bool snapToGrid)
 {
     PSX_Point currentCamCoords = {};
-    gMap.GetCurrentCamCoords(&currentCamCoords);
+    gMap->GetCurrentCamCoords(&currentCamCoords);
 
     const s32 xposSnapped = SnapToXGrid_AE(GetSpriteScale(), FP_GetExponent(mXPos));
     if (snapToGrid)
@@ -1003,20 +1003,20 @@ bool BaseAliveGameObject::MapFollowMeAE(bool snapToGrid)
     // Gone off the left edge of the current screen
     if (xposSnapped < currentCamCoords.x && (GetAnimation().GetFlipX() || mVelX < FP_FromInteger(0)))
     {
-        if (sControlledCharacter == this && gMap.SetActiveCameraDelayed(MapDirections::eMapLeft_0, this, -1))
+        if (sControlledCharacter == this && gMap->SetActiveCameraDelayed(MapDirections::eMapLeft_0, this, -1))
         {
-            mCurrentLevel = gMap.mCurrentLevel;
-            mCurrentPath = gMap.mCurrentPath;
+            mCurrentLevel = gMap->mCurrentLevel;
+            mCurrentPath = gMap->mCurrentPath;
             return true;
         }
     }
     // Gone off the right edge of the current screen
     else if (xposSnapped > currentCamCoords.x + 368 && (!(GetAnimation().GetFlipX()) || mVelX > FP_FromInteger(0)))
     {
-        if (sControlledCharacter == this && gMap.SetActiveCameraDelayed(MapDirections::eMapRight_1, this, -1))
+        if (sControlledCharacter == this && gMap->SetActiveCameraDelayed(MapDirections::eMapRight_1, this, -1))
         {
-            mCurrentLevel = gMap.mCurrentLevel;
-            mCurrentPath = gMap.mCurrentPath;
+            mCurrentLevel = gMap->mCurrentLevel;
+            mCurrentPath = gMap->mCurrentPath;
             return true;
         }
     }

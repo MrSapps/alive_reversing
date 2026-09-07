@@ -42,10 +42,10 @@ static const FlintLockFireData sFlintLockFireData[] = {
 
 void FlintLockFire::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::FlintLock_Gourd));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::FlintLock_Hammers_Disabled));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::FlintLock_Hammers_Activating));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Fire));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::FlintLock_Gourd));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::FlintLock_Hammers_Disabled));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::FlintLock_Hammers_Activating));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Fire));
 }
 
 void FlintLockFire::VScreenChanged()
@@ -67,7 +67,7 @@ FlintLockFire::~FlintLockFire()
     Path::TLV_Reset(mTlvId);
     mGourdAnim.VCleanUp();
 
-    if (sFlintLockFireData[static_cast<s32>(MapWrapper::ToAO(gMap.mCurrentLevel))].mIsFire)
+    if (sFlintLockFireData[static_cast<s32>(MapWrapper::ToAO(gMap->mCurrentLevel))].mIsFire)
     {
         mFire1Anim.VCleanUp();
         mFire2Anim.VCleanUp();
@@ -78,14 +78,14 @@ FlintLockFire::~FlintLockFire()
     }
 }
 
-FlintLockFire::FlintLockFire(relive::Path_FlintLockFire* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0)
+FlintLockFire::FlintLockFire(relive::Path_FlintLockFire* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eFlintLockFire);
 
     LoadAnimations();
 
-    const s32 cur_lvl = static_cast<s32>(MapWrapper::ToAO(gMap.mCurrentLevel));
+    const s32 cur_lvl = static_cast<s32>(MapWrapper::ToAO(gMap->mCurrentLevel));
 
     Animation_Init(GetAnimRes(sFlintLockFireData[cur_lvl].mHammersDisabledAnimId));
     GetAnimation().SetSemiTrans(true);
@@ -174,7 +174,7 @@ void FlintLockFire::VUpdate()
         SetDead(true);
     }
 
-    const s32 cur_lvl = static_cast<s32>(MapWrapper::ToAO(gMap.mCurrentLevel));
+    const s32 cur_lvl = static_cast<s32>(MapWrapper::ToAO(gMap->mCurrentLevel));
 
     switch (mState)
     {
@@ -212,7 +212,7 @@ void FlintLockFire::VUpdate()
                     mFireSound = SfxPlayMono(relive::SoundEffects::Fire, 0);
                 }
 
-                relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eSecretAreaShort, relive::Path_MusicTrigger::TriggeredBy::eTouching, 0, 15);
+                relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eSecretAreaShort, relive::Path_MusicTrigger::TriggeredBy::eTouching, 0, 15, mResMan);
             }
             break;
 
@@ -235,7 +235,7 @@ void FlintLockFire::VRender(OrderingTable& ot)
 {
     if (Is_In_Current_Camera() == CameraPos::eCamCurrent_0)
     {
-        const s32 cur_lvl = static_cast<s32>(MapWrapper::ToAO(gMap.mCurrentLevel));
+        const s32 cur_lvl = static_cast<s32>(MapWrapper::ToAO(gMap->mCurrentLevel));
         GetAnimation().SetSpriteScale(GetSpriteScale());
         mGourdAnim.SetSpriteScale(GetSpriteScale());
 

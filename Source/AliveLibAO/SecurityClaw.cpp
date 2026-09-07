@@ -36,12 +36,12 @@ static const TintEntry kClawTints[3] = {
     {EReliveLevelIds::eStockYardsReturn, 80u, 55u, 55u},
     {EReliveLevelIds::eNone, 127u, 127u, 127u}};
 
-Claw::Claw()
-    : BaseAnimatedWithPhysicsGameObject(0)
+Claw::Claw(ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eClawOrBirdPortalTerminator);
     
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Security_Claw_Lower_Idle));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Security_Claw_Lower_Idle));
     Animation_Init(GetAnimRes(AnimId::Security_Claw_Lower_Idle));
 }
 
@@ -53,14 +53,14 @@ void Claw::VScreenChanged()
 
 void SecurityClaw::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Security_Claw_Upper_Rotating));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Security_Claw_Upper_NoRotation));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Security_Claw_Lower_Open));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Security_Claw_Lower_Close));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Security_Claw_Upper_Rotating));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Security_Claw_Upper_NoRotation));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Security_Claw_Lower_Open));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Security_Claw_Lower_Close));
 }
 
-SecurityClaw::SecurityClaw(relive::Path_SecurityClaw* pTlv, const Guid& tlvId)
-    : ::BaseAliveGameObject(0)
+SecurityClaw::SecurityClaw(relive::Path_SecurityClaw* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : ::BaseAliveGameObject(0, resMan)
 {
     SetType(ReliveTypes::eSecurityClaw);
 
@@ -91,7 +91,7 @@ SecurityClaw::SecurityClaw(relive::Path_SecurityClaw* pTlv, const Guid& tlvId)
 
     mXPos = mClawX + ((Math_Sine(0) * GetSpriteScale()) * FP_FromInteger(8)) * FP_FromDouble(0.25);
     mYPos = mClawY + ((Math_Cosine(0) * GetSpriteScale()) * FP_FromInteger(8));
-    SetTint(&kSecurityClawTints[0], gMap.mCurrentLevel);
+    SetTint(&kSecurityClawTints[0], gMap->mCurrentLevel);
 
     mTlvTopLeft.x = pTlv->mTopLeftX;
     mTlvTopLeft.y = pTlv->mTopLeftY;
@@ -103,7 +103,7 @@ SecurityClaw::SecurityClaw(relive::Path_SecurityClaw* pTlv, const Guid& tlvId)
 
     mState = SecurityClawStates::eInit_0;
 
-    auto pClaw = relive_new Claw();
+    auto pClaw = relive_new Claw(resMan);
     if (pClaw)
     {
         pClaw->SetSpriteScale(GetSpriteScale());
@@ -111,7 +111,7 @@ SecurityClaw::SecurityClaw(relive::Path_SecurityClaw* pTlv, const Guid& tlvId)
 
         pClaw->mXPos = mClawX;
         pClaw->mYPos = mClawY;
-        pClaw->SetTint(&kClawTints[0], gMap.mCurrentLevel);
+        pClaw->SetTint(&kClawTints[0], gMap->mCurrentLevel);
         mClawId = pClaw->mBaseGameObjectId;
     }
 
@@ -319,7 +319,7 @@ void SecurityClaw::VUpdate()
             {
                 if (!gAlarmInstanceCount)
                 {
-                    relive_new Alarm(mAlarmDuration, mAlarmSwitchId, 30, Layer::eLayer_Above_FG1_39);
+                    relive_new Alarm(mAlarmDuration, mAlarmSwitchId, 30, Layer::eLayer_Above_FG1_39, mResMan);
                 }
             }
             break;
@@ -341,7 +341,7 @@ void SecurityClaw::VUpdate()
                     8, ZapLineType::eThick_0,
                     Layer::eLayer_ZapLinesElumMuds_28);
 
-                relive_new PossessionFlicker(gAbe, 8, 255, 100, 100);
+                relive_new PossessionFlicker(gAbe, 8, 255, 100, 100, mResMan);
 
                 gAbe->VTakeDamage(this);
 

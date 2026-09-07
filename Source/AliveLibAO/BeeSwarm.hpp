@@ -30,7 +30,7 @@ struct BeeSwarmParticles final
 class BeeSwarm final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    BeeSwarm(FP xpos, FP ypos, FP speed, s32 numBees, s32 totalChaseTime);
+    BeeSwarm(FP xpos, FP ypos, FP speed, s32 numBees, s32 totalChaseTime, ResourceManagerWrapper& resMan);
     ~BeeSwarm();
 
     virtual void VUpdate() override;

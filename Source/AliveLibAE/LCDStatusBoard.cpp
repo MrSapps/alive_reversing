@@ -14,14 +14,14 @@
 s16 gMudokonsInArea = 0;
 s8 gZulagNumber = 0;
 
-LCDStatusBoard::LCDStatusBoard(relive::Path_LCDStatusBoard* pTlv, const Guid& tlvId)
-    : BaseGameObject(true, 0)
+LCDStatusBoard::LCDStatusBoard(relive::Path_LCDStatusBoard* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     mTlvId = tlvId;
 
     mFontContext.LoadFontType(FontType::LcdFont);
 
-    mPal = ResourceManagerWrapper::LoadPal(PalId::LedFont_Red);
+    mPal = GetResourceManager().LoadPal(PalId::LedFont_Red);
 
     mKilledMudsFont.Load(3, mPal, &mFontContext);
     mRescuedMudsFont.Load(3, mPal, &mFontContext);
@@ -61,7 +61,7 @@ void LCDStatusBoard::VRender(OrderingTable& ot)
     if (!mHideBoard)
     {
         char_type text[12] = {};
-        sprintf(text, "%3d", Path_GetMudsInLevel(gMap.mCurrentLevel, gMap.mCurrentPath));
+        sprintf(text, "%3d", Path_GetMudsInLevel(gMap->mCurrentLevel, gMap->mCurrentPath));
         s32 maxWidth = mMudsInLevelFont.MeasureTextWidth(text);
 
         s16 flickerAmount = 50; // ax

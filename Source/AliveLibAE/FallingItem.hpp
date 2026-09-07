@@ -10,8 +10,8 @@ namespace relive
 class FallingItem final : public BaseAliveGameObject
 {
 public:
-    FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId);
-    FallingItem(s32 xpos, s32 ypos, s32 scale, s32 id, s32 fallInterval, s32 numItems, s32 bResetIdAfterUse);
+    FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    FallingItem(s32 xpos, s32 ypos, s32 scale, s32 id, s32 fallInterval, s32 numItems, s32 bResetIdAfterUse, ResourceManagerWrapper& resMan);
     ~FallingItem();
 
     void LoadAnimations();

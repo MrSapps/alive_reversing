@@ -19,13 +19,14 @@
 #include "QuikSave.hpp"
 #include "../relive_lib/Collisions.hpp"
 
-Meat::Meat(FP xpos, FP ypos, s16 count)
+Meat::Meat(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan)
+    : BaseThrowable(resMan)
 {
     mBaseThrowableDead = 0;
 
     SetType(ReliveTypes::eMeat);
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Meat));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Meat));
     Animation_Init(GetAnimRes(AnimId::Meat));
 
     GetAnimation().SetSemiTrans(false);
@@ -51,11 +52,11 @@ Meat::Meat(FP xpos, FP ypos, s16 count)
     CreateShadow();
 }
 
-void Meat::CreateFromSaveState(SerializedObjectData& pBuffer)
+void Meat::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
 {
     const auto pState = pBuffer.ReadTmpPtr<MeatSaveState>();
 
-    auto pMeat = relive_new Meat(pState->mXPos, pState->mYPos, pState->mThrowableCount);
+    auto pMeat = relive_new Meat(pState->mXPos, pState->mYPos, pState->mThrowableCount, resMan);
 
     pMeat->mBaseGameObjectTlvInfo = pState->mTlvId;
 
@@ -102,7 +103,7 @@ void Meat::VTimeToExplodeRandom()
 
 void Meat::VScreenChanged()
 {
-    if (gMap.PathChanged() || gMap.LevelChanged())
+    if (gMap->PathChanged() || gMap->LevelChanged())
     {
         SetDead(true);
     }
@@ -313,7 +314,7 @@ void Meat::VUpdate()
                     *gBaseGameObjects);
 
                 // TODO: OG bug - why only checking for out of the bottom of the map?? Nades check for death object - probably should check both
-                if (mYPos > FP_FromInteger(gMap.mPathData->field_6_bBottom))
+                if (mYPos > FP_FromInteger(gMap->mPathData->field_6_bBottom))
                 {
                     SetDead(true);
                 }
@@ -359,7 +360,7 @@ void Meat::VUpdate()
                 break;
 
             case MeatStates::eWaitForPickUp_4:
-                if (gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+                if (gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
                 {
                     mDeadTimer = MakeTimer(600);
                 }
@@ -384,7 +385,7 @@ void Meat::VUpdate()
                 mVelY += FP_FromInteger(1);
                 mXPos += mVelX;
                 mYPos = mVelY + mYPos;
-                if (!gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+                if (!gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
                 {
                     SetDead(true);
                 }

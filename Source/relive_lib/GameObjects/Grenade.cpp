@@ -47,7 +47,7 @@ void Grenade::Init(FP xpos, FP ypos)
 {
     SetType(ReliveTypes::eGrenade);
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Grenade));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Grenade));
     Animation_Init(GetAnimRes(AnimId::Grenade));
 
     SetInteractive(false);
@@ -591,7 +591,7 @@ bool Grenade::OnCollision_InstantExplode(BaseGameObject* pHit)
     return true;
 }
 
-void Grenade::CreateFromSaveState(SerializedObjectData& pBuffer)
+void Grenade::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
 {
     const auto pState = pBuffer.ReadTmpPtr<GrenadeSaveState>();
     auto pGrenade = relive_new Grenade(pState->mXPos, pState->mYPos, pState->mThrowableCount, 0, nullptr);

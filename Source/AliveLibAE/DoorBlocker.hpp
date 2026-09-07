@@ -10,7 +10,7 @@ namespace relive
 class DoorBlocker final : public BaseAliveGameObject
 {
 public:
-    DoorBlocker(relive::Path_DoorBlocker* pTlv, const Guid& tlvId);
+    DoorBlocker(relive::Path_DoorBlocker* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~DoorBlocker();
 
     void LoadAnimations();

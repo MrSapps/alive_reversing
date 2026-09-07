@@ -7,8 +7,8 @@
 #include "stdlib.hpp"
 #include "Path.hpp"
 
-MultiSwitchController::MultiSwitchController(relive::Path_MultiSwitchController* pTlv, const Guid& tlvId)
-    : BaseGameObject(true, 0)
+MultiSwitchController::MultiSwitchController(relive::Path_MultiSwitchController* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     mIsOn = false;
     mBaseGameObjectTlvInfo = tlvId;
@@ -39,7 +39,7 @@ MultiSwitchController::~MultiSwitchController()
 
 void MultiSwitchController::VScreenChanged()
 {
-    if (gMap.LevelChanged() || gMap.PathChanged())
+    if (gMap->LevelChanged() || gMap->PathChanged())
     {
         SetDead(true);
     }

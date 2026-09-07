@@ -25,12 +25,12 @@ struct Colour final
 constexpr Colour greenFart = {32, 128, 32};
 constexpr Colour redFart = {128, 38, 32};
 
-EvilFart::EvilFart()
-    : BaseAliveGameObject(0)
+EvilFart::EvilFart(ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(0, resMan)
 {
     SetType(ReliveTypes::eEvilFart);
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Fart));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Fart));
     Animation_Init(GetAnimRes(AnimId::Fart));
 
     SetApplyShadowZoneColour(false);
@@ -86,11 +86,11 @@ EvilFart::EvilFart()
     mPossessedAliveTimer = 220;
 }
 
-void EvilFart::CreateFromSaveState(SerializedObjectData& pBuffer)
+void EvilFart::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
 {
     const auto pState = pBuffer.ReadTmpPtr<EvilFartSaveState>();
 
-    auto pFart = relive_new EvilFart();
+    auto pFart = relive_new EvilFart(resMan);
 
     if (pState->mControlled)
     {
@@ -241,9 +241,9 @@ void EvilFart::VPossessed()
 
     GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_1);
 
-    mAbeLevel = gMap.mCurrentLevel;
-    mAbePath = gMap.mCurrentPath;
-    mAbeCamera = gMap.mCurrentCamera;
+    mAbeLevel = gMap->mCurrentLevel;
+    mAbePath = gMap->mCurrentPath;
+    mAbeCamera = gMap->mCurrentCamera;
 
     sControlledCharacter = this;
 
@@ -307,7 +307,7 @@ void EvilFart::VUpdate()
     {
         sControlledCharacter = gAbe;
         SetDead(true);
-        gMap.SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+        gMap->SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
     }
 
     // Show the count to the boom

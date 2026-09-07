@@ -18,11 +18,11 @@
 #include "../relive_lib/FatalError.hpp"
 #include "Engine.hpp"
 
-MotionDetectorLaser::MotionDetectorLaser(FP xpos, FP ypos, FP scale, Layer layer)
-    : BaseAnimatedWithPhysicsGameObject(0)
+MotionDetectorLaser::MotionDetectorLaser(FP xpos, FP ypos, FP scale, Layer layer, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eRedLaser);
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::MotionDetector_Laser));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MotionDetector_Laser));
     Animation_Init(GetAnimRes(AnimId::MotionDetector_Laser));
     GetAnimation().SetRenderLayer(layer);
     mXPos = xpos;
@@ -33,12 +33,12 @@ MotionDetectorLaser::MotionDetectorLaser(FP xpos, FP ypos, FP scale, Layer layer
 
 // =====================================================================================
 
-MotionDetector::MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tlvId, BaseAnimatedWithPhysicsGameObject* pOwner)
-    : BaseAnimatedWithPhysicsGameObject(0)
+MotionDetector::MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tlvId, BaseAnimatedWithPhysicsGameObject* pOwner, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eGreeterBody);
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::MotionDetector_Flare));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MotionDetector_Flare));
     Animation_Init(GetAnimRes(AnimId::MotionDetector_Flare));
 
     GetAnimation().SetSemiTrans(true);
@@ -87,12 +87,12 @@ MotionDetector::MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tl
         if (pTlv->mInitialMoveDirection == relive::Path_MotionDetector::InitialMoveDirection::eLeft)
         {
             mState = States::eMoveLeft_2;
-            pLaser = relive_new MotionDetectorLaser(mBottomRightX, mBottomRightY, GetSpriteScale(), Layer::eLayer_Foreground_36);
+            pLaser = relive_new MotionDetectorLaser(mBottomRightX, mBottomRightY, GetSpriteScale(), Layer::eLayer_Foreground_36, resMan);
         }
         else if (pTlv->mInitialMoveDirection == relive::Path_MotionDetector::InitialMoveDirection::eRight)
         {
             mState = States::eMoveRight_0;
-            pLaser = relive_new MotionDetectorLaser(mTopLeftX, mBottomRightY, GetSpriteScale(), Layer::eLayer_Foreground_36);
+            pLaser = relive_new MotionDetectorLaser(mTopLeftX, mBottomRightY, GetSpriteScale(), Layer::eLayer_Foreground_36, resMan);
         }
         else
         {
@@ -135,7 +135,7 @@ MotionDetector::MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tl
     mSpeed = FP_FromInteger(2);
     mState = States::eMoveRight_0;
 
-    auto pLaserMem = relive_new MotionDetectorLaser(pOwner->mXPos, pOwner->mYPos, GetSpriteScale(), Layer::eLayer_Foreground_36);
+    auto pLaserMem = relive_new MotionDetectorLaser(pOwner->mXPos, pOwner->mYPos, GetSpriteScale(), Layer::eLayer_Foreground_36, resMan);
     if (pLaserMem)
     {
         mLaserId = pLaserMem->mBaseGameObjectId;
@@ -288,7 +288,7 @@ void MotionDetector::VUpdate()
                             // Trigger alarms if its not already blasting
                             if (gAlarmInstanceCount == 0)
                             {
-                                relive_new Alarm(mAlarmDuration, mAlarmSwitchId, 0, Layer::eLayer_Above_FG1_39);
+                                relive_new Alarm(mAlarmDuration, mAlarmSwitchId, 0, Layer::eLayer_Above_FG1_39, mResMan);
 
                                 if (IsAbe(pObj) && pObj->mHealth > FP_FromInteger(0))
                                 {
@@ -350,7 +350,7 @@ void MotionDetector::VUpdate()
                 {
                     mState = States::eWaitThenMoveLeft_1;
                     mPauseTimer = MakeTimer(15);
-                    const CameraPos soundDirection = gMap.GetDirection(
+                    const CameraPos soundDirection = gMap->GetDirection(
                         mCurrentLevel,
                         mCurrentPath,
                         mXPos,
@@ -375,7 +375,7 @@ void MotionDetector::VUpdate()
                 {
                     mState = States::eWaitThenMoveRight_3;
                     mPauseTimer = MakeTimer(15);
-                    const CameraPos soundDirection = gMap.GetDirection(
+                    const CameraPos soundDirection = gMap->GetDirection(
                         mCurrentLevel,
                         mCurrentPath,
                         mXPos,

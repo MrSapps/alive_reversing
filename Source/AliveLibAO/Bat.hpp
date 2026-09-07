@@ -14,7 +14,7 @@ namespace AO {
 class Bat final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    Bat(relive::Path_Bat* pTlv, const Guid& tlvId);
+    Bat(relive::Path_Bat* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~Bat();
     
     void LoadAnimations();

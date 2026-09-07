@@ -24,14 +24,14 @@ namespace AO {
 // TODO: Index is always >=1 so first entry is redundant ??
 const s32 dword_4C5054[11] = {0, 1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000};
 
-ChimeLock::ChimeLock(relive::Path_ChimeLock* pTlv, const Guid& tlvId)
-    : ::BaseAliveGameObject(0)
+ChimeLock::ChimeLock(relive::Path_ChimeLock* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : ::BaseAliveGameObject(0, resMan)
 {
     SetType(ReliveTypes::eChimeLock);
 
     mTlvId = tlvId;
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Chime_Ball));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Chime_Ball));
     Animation_Init(GetAnimRes(AnimId::Chime_Ball));
 
     GetAnimation().SetRenderLayer(Layer::eLayer_FG1_37);
@@ -50,7 +50,8 @@ ChimeLock::ChimeLock(relive::Path_ChimeLock* pTlv, const Guid& tlvId)
         BellSize::eBig,
         FP_FromInteger(pTlv->mTopLeftX),
         FP_FromInteger(pTlv->mTopLeftY),
-        scale);
+        scale,
+        mResMan);
     if (pLeftBell)
     {
         mLeftBell = pLeftBell->mBaseGameObjectId;
@@ -60,7 +61,8 @@ ChimeLock::ChimeLock(relive::Path_ChimeLock* pTlv, const Guid& tlvId)
         BellSize::eMedium,
         FP_FromInteger(pTlv->mTopLeftX),
         FP_FromInteger(pTlv->mTopLeftY),
-        scale);
+        scale,
+        mResMan);
     if (pCenterBell)
     {
         mCenterBell = pCenterBell->mBaseGameObjectId;
@@ -70,7 +72,8 @@ ChimeLock::ChimeLock(relive::Path_ChimeLock* pTlv, const Guid& tlvId)
         BellSize::eSmall,
         FP_FromInteger(pTlv->mTopLeftX),
         FP_FromInteger(pTlv->mTopLeftY),
-        scale);
+        scale,
+        mResMan);
     if (pRightBell)
     {
         mRightBell = pRightBell->mBaseGameObjectId;
@@ -399,7 +402,7 @@ void ChimeLock::VUpdate()
                     mChimeLockState = ChimeLockStates::eNeverRead_6;
                     SwitchStates_Do_Operation(mSolveSwitchId, relive::reliveSwitchOp::eSetTrue);
                     VUnPosses();
-                    relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eSecretAreaShort, relive::Path_MusicTrigger::TriggeredBy::eTouching, 0, 15);
+                    relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eSecretAreaShort, relive::Path_MusicTrigger::TriggeredBy::eTouching, 0, 15, mResMan);
                     return;
                 }
             }

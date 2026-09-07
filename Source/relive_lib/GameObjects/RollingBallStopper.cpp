@@ -9,12 +9,12 @@
 
 // NOTE: this is the AO code and hasn't been compared since it's unused in original AE levels
 
-RollingBallStopper::RollingBallStopper(relive::Path_RollingBallStopper* pTlv, const Guid& tlvId)
-    : ::BaseAliveGameObject(0)
+RollingBallStopper::RollingBallStopper(relive::Path_RollingBallStopper* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : ::BaseAliveGameObject(0, resMan)
 {
     SetType(ReliveTypes::eRollingBallStopper);
     
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Stone_Ball_Stopper));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Stone_Ball_Stopper));
     Animation_Init(GetAnimRes(AnimId::Stone_Ball_Stopper));
 
     GetAnimation().SetRenderLayer(Layer::eLayer_FG1_37);

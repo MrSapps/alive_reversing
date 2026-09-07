@@ -23,8 +23,8 @@ namespace AO {
 s16 gBeeInstanceCount = 0;
 s16 gBeesNearAbe = 0;
 
-BeeSwarm::BeeSwarm(FP xpos, FP ypos, FP speed, s32 numBees, s32 totalChaseTime)
-    : BaseAnimatedWithPhysicsGameObject(0)
+BeeSwarm::BeeSwarm(FP xpos, FP ypos, FP speed, s32 numBees, s32 totalChaseTime, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eBeeSwarm);
 
@@ -40,7 +40,7 @@ BeeSwarm::BeeSwarm(FP xpos, FP ypos, FP speed, s32 numBees, s32 totalChaseTime)
         numBeesToUse = 1;
     }
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Bee_Swarm));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Bee_Swarm));
     Animation_Init(GetAnimRes(AnimId::Bee_Swarm));
 
     if (numBeesToUse <= 25)
@@ -88,7 +88,7 @@ BeeSwarm::~BeeSwarm()
 
 void BeeSwarm::VScreenChanged()
 {
-    if (gMap.LevelChanged() || gMap.PathChanged())
+    if (gMap->LevelChanged() || gMap->PathChanged())
     {
         SetDead(true);
     }
@@ -181,7 +181,7 @@ void BeeSwarm::VUpdate()
     switch (mSwarmState)
     {
         case BeeSwarmStates::eIdle_0:
-            if (!gMap.Is_Point_In_Current_Camera(
+            if (!gMap->Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,

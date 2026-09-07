@@ -114,15 +114,15 @@ void DDCheat::Teleport()
     }
     else if (mInputPressed & InputCommands::eSneak)
     {
-        sTeleport_Level = static_cast<s32>(gMap.mCurrentLevel);
-        sTeleport_Path = gMap.mCurrentPath;
-        sTeleport_Cam = gMap.mCurrentCamera;
+        sTeleport_Level = static_cast<s32>(gMap->mCurrentLevel);
+        sTeleport_Path = gMap->mCurrentPath;
+        sTeleport_Cam = gMap->mCurrentCamera;
     }
     else if (mInputPressed & InputCommands::eUnPause_OrConfirm)
     {
         gDDCheat_FlyingEnabled = true;
 
-        gMap.SetActiveCam(MapWrapper::FromAE(static_cast<LevelIds>(sTeleport_Level)), sTeleport_Path, sTeleport_Cam, CameraSwapEffects::eInstantChange_0, 0, 0);
+        gMap->SetActiveCam(MapWrapper::FromAE(static_cast<LevelIds>(sTeleport_Level)), sTeleport_Path, sTeleport_Cam, CameraSwapEffects::eInstantChange_0, 0, 0);
         mTeleporting = true;
     }
 }
@@ -138,27 +138,27 @@ void DDCheat::Menu_Movies()
         sDDCheat_MovieSelectIdx++;
     }
 
-    if (Path_Get_FMV_Record(gMap.mCurrentLevel, sDDCheat_MovieSelectIdx)->field_4_id <= 0)
+    if (Path_Get_FMV_Record(gMap->mCurrentLevel, sDDCheat_MovieSelectIdx)->field_4_id <= 0)
     {
         sDDCheat_MovieSelectIdx = 1;
     }
 
     if (mInputPressed & InputCommands::eDown)
     {
-        Path_Get_FMV_Record(gMap.mCurrentLevel, sDDCheat_MovieSelectIdx)->field_4_id--;
+        Path_Get_FMV_Record(gMap->mCurrentLevel, sDDCheat_MovieSelectIdx)->field_4_id--;
     }
     if (mInputPressed & InputCommands::eUp)
     {
-        FmvInfo* movieToPlayInfo = Path_Get_FMV_Record(gMap.mCurrentLevel, sDDCheat_MovieSelectIdx);
-        relive_new Movie(movieToPlayInfo->field_0_pName);
+        FmvInfo* movieToPlayInfo = Path_Get_FMV_Record(gMap->mCurrentLevel, sDDCheat_MovieSelectIdx);
+        relive_new Movie(movieToPlayInfo->field_0_pName, mResMan);
     }
 
-    const FmvInfo* fmvInfo = Path_Get_FMV_Record(gMap.mCurrentLevel, sDDCheat_MovieSelectIdx);
+    const FmvInfo* fmvInfo = Path_Get_FMV_Record(gMap->mCurrentLevel, sDDCheat_MovieSelectIdx);
     DDCheat::DebugStr("\n<- Movie -> %d %d %s \n", sDDCheat_MovieSelectIdx, fmvInfo->field_4_id, fmvInfo->field_0_pName);
 }
 
-DDCheat::DDCheat()
-    : BaseGameObject(true, 0)
+DDCheat::DDCheat(ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     SetSurviveDeathReset(true);
     SetUpdateDuringCamSwap(true);
@@ -225,7 +225,7 @@ void DDCheat::VUpdate()
     {
         mTeleporting = false;
         PSX_Point pos;
-        gMap.GetCurrentCamCoords(&pos);
+        gMap->GetCurrentCamCoords(&pos);
         gAbe->mXPos = FP_FromInteger(pos.x + 184);
         gAbe->mYPos = FP_FromInteger(pos.y + 60);
         gAbe->mCurrentMotion = eAbeMotions::Motion_3_Fall_459B60;
@@ -238,7 +238,7 @@ void DDCheat::VUpdate()
         mUnknown1 = false;
     }
 
-    if ((gMap.mCurrentLevel != EReliveLevelIds::eMenu && gMap.mCurrentLevel != EReliveLevelIds::eNone) && activePadPressed & InputCommands::eCheatMode)
+    if ((gMap->mCurrentLevel != EReliveLevelIds::eMenu && gMap->mCurrentLevel != EReliveLevelIds::eNone) && activePadPressed & InputCommands::eCheatMode)
     {
         switch (sControlledCharacter->Type())
         {
@@ -274,9 +274,9 @@ void DDCheat::VUpdate()
     {
         DebugStr(
             "\n%sP%dC%d gnframe=%d",
-            Path_Get_Lvl_Name(gMap.mCurrentLevel),
-            gMap.mCurrentPath,
-            gMap.mCurrentCamera,
+            Path_Get_Lvl_Name(gMap->mCurrentLevel),
+            gMap->mCurrentPath,
+            gMap->mCurrentCamera,
             sGnFrame);
 
         DebugStr(

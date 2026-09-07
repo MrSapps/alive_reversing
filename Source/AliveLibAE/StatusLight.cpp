@@ -10,12 +10,12 @@
 
 void StatusLight::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Status_Light_Green));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Status_Light_Red));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Status_Light_Green));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Status_Light_Red));
 }
 
-StatusLight::StatusLight(relive::Path_StatusLight* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0)
+StatusLight::StatusLight(relive::Path_StatusLight* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     LoadAnimations();
 

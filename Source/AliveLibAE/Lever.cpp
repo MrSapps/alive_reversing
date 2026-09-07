@@ -29,15 +29,15 @@ static const TintEntry kLeverTints[16] = {
 
 void Lever::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Lever_Pull_Release_Left));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Lever_Pull_Release_Right));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Lever_Idle));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Lever_Pull_Left));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Lever_Pull_Right));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Release_Left));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Release_Right));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Idle));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Left));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Right));
 }
 
-Lever::Lever(relive::Path_Lever* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0)
+Lever::Lever(relive::Path_Lever* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eLever);
 
@@ -62,7 +62,7 @@ Lever::Lever(relive::Path_Lever* pTlv, const Guid& tlvId)
         SetScale(Scale::Fg);
     }
 
-    SetTint(&kLeverTints[0], gMap.mCurrentLevel);
+    SetTint(&kLeverTints[0], gMap->mCurrentLevel);
     mXPos = FP_FromInteger((pTlv->mTopLeftX + pTlv->mBottomRightX) / 2);
     mXPos = FP_FromInteger(SnapToXGrid_AE(GetSpriteScale(), FP_GetExponent(mXPos)));
     mYPos = FP_FromInteger(pTlv->mTopLeftY);
@@ -99,7 +99,7 @@ Lever::~Lever()
 
 void Lever::VScreenChanged()
 {
-    if (!mPersistOffscreen || gMap.LevelChanged() || gMap.PathChanged())
+    if (!mPersistOffscreen || gMap->LevelChanged() || gMap->PathChanged())
     {
         SetDead(true);
     }
@@ -121,15 +121,15 @@ void Lever::VUpdate()
 
         if (GetAnimation().GetIsLastFrame())
         {
-            if (gMap.mCurrentLevel == EReliveLevelIds::eMines
-                || gMap.mCurrentLevel == EReliveLevelIds::eBonewerkz
-                || gMap.mCurrentLevel == EReliveLevelIds::eBonewerkz_Ender
-                || gMap.mCurrentLevel == EReliveLevelIds::eFeeCoDepot
-                || gMap.mCurrentLevel == EReliveLevelIds::eFeeCoDepot_Ender
-                || gMap.mCurrentLevel == EReliveLevelIds::eBarracks
-                || gMap.mCurrentLevel == EReliveLevelIds::eBarracks_Ender
-                || gMap.mCurrentLevel == EReliveLevelIds::eBrewery
-                || gMap.mCurrentLevel == EReliveLevelIds::eBrewery_Ender)
+            if (gMap->mCurrentLevel == EReliveLevelIds::eMines
+                || gMap->mCurrentLevel == EReliveLevelIds::eBonewerkz
+                || gMap->mCurrentLevel == EReliveLevelIds::eBonewerkz_Ender
+                || gMap->mCurrentLevel == EReliveLevelIds::eFeeCoDepot
+                || gMap->mCurrentLevel == EReliveLevelIds::eFeeCoDepot_Ender
+                || gMap->mCurrentLevel == EReliveLevelIds::eBarracks
+                || gMap->mCurrentLevel == EReliveLevelIds::eBarracks_Ender
+                || gMap->mCurrentLevel == EReliveLevelIds::eBrewery
+                || gMap->mCurrentLevel == EReliveLevelIds::eBrewery_Ender)
             {
                 SFX_Play_Pitch(relive::SoundEffects::IndustrialTrigger, 30, 400);
             }

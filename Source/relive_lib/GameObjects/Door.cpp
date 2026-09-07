@@ -25,19 +25,19 @@ static const AnimId sTrainDoorAnimIds[2] =
     AnimId::Door_Train_Closing
 };
 
-Door::Door()
-    : BaseAnimatedWithPhysicsGameObject(0)
+Door::Door(ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
 }
 
 void Door::LoadAnimations(const std::string& theme)
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Door_Themed_Closed, theme));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Door_Themed_Open, theme));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Themed_Closed, theme));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Door_Themed_Open, theme));
 }
 
-Door::Door(relive::Path_Door* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0),
+Door::Door(relive::Path_Door* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan),
     mTlvId(tlvId),
     mDoorType(pTlv->mDoorType),
     mStartState(pTlv->mStartState),
@@ -497,11 +497,12 @@ void TrainDoor::LoadAnimations()
 {
     for (auto& animId : sTrainDoorAnimIds)
     {
-        mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(animId));
+        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
     }
 }
 
-TrainDoor::TrainDoor(relive::Path_TrainDoor* pTlv, const Guid& tlvId)
+TrainDoor::TrainDoor(relive::Path_TrainDoor* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : Door(resMan)
 {
     SetType(ReliveTypes::eDoor);
     mTlvId = tlvId;

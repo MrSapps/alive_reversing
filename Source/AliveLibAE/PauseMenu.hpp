@@ -31,7 +31,7 @@ class PauseMenu final : public ::BaseAnimatedWithPhysicsGameObject
 public:
     struct PauseMenuPage;
 
-    PauseMenu();
+    PauseMenu(ResourceManagerWrapper& resMan);
     ~PauseMenu();
 
     void LoadAnimations();

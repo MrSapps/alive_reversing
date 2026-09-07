@@ -33,10 +33,10 @@ struct LiftMoverSaveState final : public SaveStateBase
 class LiftMover final : public BaseGameObject
 {
 public:
-    LiftMover(relive::Path_LiftMover* pTlv, const Guid& tlvId);
+    LiftMover(relive::Path_LiftMover* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~LiftMover();
 
-    static void CreateFromSaveState(SerializedObjectData& pData);
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan);
     
     virtual void VUpdate() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;

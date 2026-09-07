@@ -13,8 +13,8 @@
 namespace AO {
 
 
-InvisibleSwitch::InvisibleSwitch(relive::Path_InvisibleSwitch* pTlv, const Guid& tlvId)
-    : BaseGameObject(true, 0)
+InvisibleSwitch::InvisibleSwitch(relive::Path_InvisibleSwitch* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     mTlvId = tlvId;
     mSwitchId = pTlv->mSwitchId;
@@ -91,7 +91,7 @@ void InvisibleSwitch::VUpdate()
                 // Fire alarm if set
                 if (mSetOffAlarm)
                 {
-                    relive_new Alarm(150, 0, 30, Layer::eLayer_Above_FG1_39);
+                    relive_new Alarm(150, 0, 30, Layer::eLayer_Above_FG1_39, mResMan);
                 }
 
                 // Go back to waiting for trigger

@@ -23,7 +23,7 @@ enum class BulletType : s16
 class Bullet final : public ::BaseGameObject
 {
 public:
-    Bullet(::BaseAliveGameObject* pParent, BulletType type, FP xpos, FP ypos, FP xDist, FP scale, s32 numberOfBullets);
+    Bullet(::BaseAliveGameObject* pParent, BulletType type, FP xpos, FP ypos, FP xDist, FP scale, s32 numberOfBullets, ResourceManagerWrapper& resMan);
 
     virtual void VUpdate() override;
 

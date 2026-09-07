@@ -15,16 +15,16 @@
 
 namespace AO {
 
-Bullet::Bullet(BaseAliveGameObject* pParent, BulletType type, FP xpos, FP ypos, FP xDist, FP scale, s32 numberOfBullets)
-    : BaseGameObject(true, 0)
+Bullet::Bullet(BaseAliveGameObject* pParent, BulletType type, FP xpos, FP ypos, FP xDist, FP scale, s32 numberOfBullets, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     SetType(ReliveTypes::eBullet);
     mBulletType = type;
     mXPos = xpos;
     mYPos = ypos;
-    mBulletPath = gMap.mCurrentPath;
+    mBulletPath = gMap->mCurrentPath;
     mBulletParent = pParent;
-    mBulletLevel = gMap.mCurrentLevel;
+    mBulletLevel = gMap->mCurrentLevel;
     mSpriteScale = scale;
     mNumberOfBullets = static_cast<s16>(numberOfBullets);
     mXDistance = xDist;
@@ -32,7 +32,7 @@ Bullet::Bullet(BaseAliveGameObject* pParent, BulletType type, FP xpos, FP ypos, 
 
 void Bullet::VUpdate()
 {
-    if (!gMap.Is_Point_In_Current_Camera(
+    if (!gMap->Is_Point_In_Current_Camera(
             mBulletLevel,
             mBulletPath,
             mXPos,
@@ -203,7 +203,7 @@ bool Bullet::InZBulletCover(FP xpos, FP ypos, const PSX_RECT& objRect)
     while (1)
     {
         // Go to the next entry (or first if first call).
-        zCoverIterator = gMap.TLV_Get_At(
+        zCoverIterator = gMap->TLV_Get_At(
             zCoverIterator,
             xpos,
             ypos,

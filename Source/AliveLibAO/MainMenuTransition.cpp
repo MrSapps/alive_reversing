@@ -50,7 +50,7 @@ const MainMenu_TransitionData stru_55C038[24] = // 3 x 8's ?
 
 void MainMenuTransition::VScreenChanged()
 {
-    if (gMap.LevelChanged() || gMap.PathChanged())
+    if (gMap->LevelChanged() || gMap->PathChanged())
     {
         SetDead(true);
     }
@@ -78,8 +78,8 @@ void MainMenuTransition::VUpdate()
     }
 }
 
-MainMenuTransition::MainMenuTransition(Layer layer, s32 fadeDirection, s32 bKillWhenDone, s32 speed, relive::TBlendModes blendMode)
-    : BaseGameObject(true, 0)
+MainMenuTransition::MainMenuTransition(Layer layer, s32 fadeDirection, s32 bKillWhenDone, s32 speed, relive::TBlendModes blendMode, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     SetType(ReliveTypes::eFade);
 

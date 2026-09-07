@@ -39,56 +39,56 @@ static const Lever_Data sLeverData[16] = {
 
 void Lever::LoadAnimations()
 {
-    switch (gMap.mCurrentLevel)
+    switch (gMap->mCurrentLevel)
     {
         case EReliveLevelIds::eRuptureFarms:
         case EReliveLevelIds::eStockYards:
         case EReliveLevelIds::eStockYardsReturn:
         case EReliveLevelIds::eBoardRoom:
         case EReliveLevelIds::eRuptureFarmsReturn:
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::RuptureFarms_Lever_Idle));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::RuptureFarms_Lever_Pull_Left));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::RuptureFarms_Lever_Pull_Release_Left));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::RuptureFarms_Lever_Pull_Right));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::RuptureFarms_Lever_Pull_Release_Right));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RuptureFarms_Lever_Idle));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RuptureFarms_Lever_Pull_Left));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RuptureFarms_Lever_Pull_Release_Left));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RuptureFarms_Lever_Pull_Right));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RuptureFarms_Lever_Pull_Release_Right));
             break;
 
         case EReliveLevelIds::eLines:
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Lines_Lever_Idle));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Lines_Lever_Pull_Left));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Lines_Lever_Pull_Release_Left));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Lines_Lever_Pull_Right));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Lines_Lever_Pull_Release_Right));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lines_Lever_Idle));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lines_Lever_Pull_Left));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lines_Lever_Pull_Release_Left));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lines_Lever_Pull_Right));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lines_Lever_Pull_Release_Right));
             break;
 
         case EReliveLevelIds::eDesert:
         case EReliveLevelIds::eDesertTemple:
         case EReliveLevelIds::eDesertEscape:
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Lever_Idle));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Lever_Pull_Left));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Lever_Pull_Release_Left));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Lever_Pull_Right));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Lever_Pull_Release_Right));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Idle));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Left));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Release_Left));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Right));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Release_Right));
             break;
 
         default:
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Lever_Idle));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Lever_Pull_Left));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Lever_Pull_Release_Left));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Lever_Pull_Right));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Lever_Pull_Release_Right));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Idle));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Left));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Release_Left));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Right));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Lever_Pull_Release_Right));
             break;
     }
 }
 
-Lever::Lever(relive::Path_Lever* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0)
+Lever::Lever(relive::Path_Lever* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eLever);
 
     LoadAnimations();
 
-    const s32 lvl_idx = static_cast<s32>(MapWrapper::ToAO(gMap.mCurrentLevel));
+    const s32 lvl_idx = static_cast<s32>(MapWrapper::ToAO(gMap->mCurrentLevel));
     Animation_Init(GetAnimRes(sLeverData[lvl_idx].mIdleAnimId));
 
     GetAnimation().SetSemiTrans(true);
@@ -150,10 +150,10 @@ void Lever::VUpdate()
         {
             EventBroadcast(Event::kEventNoise, this);
             EventBroadcast(Event::kEventSuspiciousNoise, this);
-            const s32 lvl_idx = static_cast<s32>(MapWrapper::ToAO(gMap.mCurrentLevel));
-            if (gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms
-                || gMap.mCurrentLevel == EReliveLevelIds::eBoardRoom
-                || gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+            const s32 lvl_idx = static_cast<s32>(MapWrapper::ToAO(gMap->mCurrentLevel));
+            if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarms
+                || gMap->mCurrentLevel == EReliveLevelIds::eBoardRoom
+                || gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
             {
                 SfxPlayMono(relive::SoundEffects::IndustrialTrigger, 60);
             }
@@ -251,7 +251,7 @@ void Lever::VUpdate()
         {
             mState = LeverState::eWaiting_0;
             GetAnimation().Set_Animation_Data(
-                GetAnimRes(sLeverData[static_cast<s32>(MapWrapper::ToAO(gMap.mCurrentLevel))].mIdleAnimId));
+                GetAnimRes(sLeverData[static_cast<s32>(MapWrapper::ToAO(gMap->mCurrentLevel))].mIdleAnimId));
         }
     }
 }
@@ -263,7 +263,7 @@ s32 Lever::VPull(s16 bLeftDirection)
 {
     if (mState == LeverState::eWaiting_0)
     {
-        const s32 lvl_idx = static_cast<s32>(MapWrapper::ToAO(gMap.mCurrentLevel));
+        const s32 lvl_idx = static_cast<s32>(MapWrapper::ToAO(gMap->mCurrentLevel));
         mState = LeverState::ePulled_1;
         if (bLeftDirection)
         {

@@ -16,7 +16,7 @@ class OrderingTable;
 class [[nodiscard]] BaseGameObject
 {
 public:
-    BaseGameObject(s16 bAddToObjectList, s16 resourceArraySize);
+    BaseGameObject(s16 bAddToObjectList, s16 resourceArraySize, ResourceManagerWrapper& resMan);
 
 
     virtual ~BaseGameObject();
@@ -109,6 +109,9 @@ private:
     bool mSurviveDeathReset = false;
     bool mUpdateDuringCamSwap = false;
     bool mCantKill = false;
+
+protected:
+    ResourceManagerWrapper& mResMan;
 };
 
 class BaseMap& GetMap();

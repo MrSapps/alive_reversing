@@ -6,6 +6,7 @@
 class Guid;
 struct PSX_RECT;
 class Camera;
+class ResourceManagerWrapper;
 
 enum class ReliveTypes : s16;
 
@@ -36,6 +37,17 @@ enum class CameraSwapEffects : s16
 class BaseMap
 {
 public:
+    explicit BaseMap(ResourceManagerWrapper& resMan)
+        : mResourceManager(resMan)
+    {
+
+    }
+
+    ResourceManagerWrapper& GetResourceManager()
+    {
+        return mResourceManager;
+    }
+
     enum class CamChangeStates : s16
     {
         eInactive_0 = 0,
@@ -114,4 +126,7 @@ public:
     Camera* field_40_stru_5[5] = {};
 
     std::vector<std::unique_ptr<BinaryPath>> mLoadedPaths;
+
+protected:
+    ResourceManagerWrapper& mResourceManager;
 };

@@ -19,13 +19,13 @@ namespace AO {
 
 void RockSack::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::RockSack_Idle));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::RockSack_SoftHit));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::RockSack_HardHit));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RockSack_Idle));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RockSack_SoftHit));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RockSack_HardHit));
 }
 
-RockSack::RockSack(relive::Path_RockSack* pTlv, const Guid& tlvId)
-    : ::BaseAliveGameObject(0)
+RockSack::RockSack(relive::Path_RockSack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : ::BaseAliveGameObject(0, resMan)
 {
     SetType(ReliveTypes::eRockSack);
 
@@ -63,9 +63,9 @@ RockSack::RockSack(relive::Path_RockSack* pTlv, const Guid& tlvId)
     mPlayWobbleSound = true;
     mForceWobbleSound = true;
 
-    if (gMap.mCurrentLevel == EReliveLevelIds::eStockYards || gMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+    if (gMap->mCurrentLevel == EReliveLevelIds::eStockYards || gMap->mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
     {
-        mLoadedPals.push_back(ResourceManagerWrapper::LoadPal(PalId::BlueRockSack));
+        mLoadedPals.push_back(GetResourceManager().LoadPal(PalId::BlueRockSack));
         GetAnimation().LoadPal(GetPalRes(PalId::BlueRockSack));
     }
 
@@ -153,7 +153,7 @@ void RockSack::VUpdate()
 
             gThrowableArray->Add(mRockAmount);
 
-            auto pRock = relive_new Rock(mXPos, mYPos - FP_FromInteger(30), mRockAmount);
+            auto pRock = relive_new Rock(mXPos, mYPos - FP_FromInteger(30), mRockAmount, mResMan);
             if (pRock)
             {
                 pRock->VThrow(mTlvVelX, mTlvVelY);

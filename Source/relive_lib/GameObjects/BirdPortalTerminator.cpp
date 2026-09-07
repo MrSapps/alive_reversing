@@ -4,9 +4,9 @@
 
 void BirdPortalTerminator::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::BirdPortal_TerminatorIdle));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::BirdPortal_TerminatorShrink));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::BirdPortal_TerminatorGrow));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BirdPortal_TerminatorIdle));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BirdPortal_TerminatorShrink));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BirdPortal_TerminatorGrow));
 }
 
 BirdPortalTerminator::BirdPortalTerminator(FP xpos, FP ypos, FP scale, relive::Path_BirdPortal::PortalType /*portalType*/)

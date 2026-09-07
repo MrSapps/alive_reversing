@@ -5,12 +5,12 @@
 
 namespace AO {
 
-HoneyDrip::HoneyDrip(FP xpos, FP ypos)
-    : BaseAnimatedWithPhysicsGameObject(0)
+HoneyDrip::HoneyDrip(FP xpos, FP ypos, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     mRGB.SetRGB(128, 128, 128);
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Honey_Drip));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Honey_Drip));
     Animation_Init(GetAnimRes(AnimId::Honey_Drip));
     mYPos = ypos;
     mXPos = xpos;

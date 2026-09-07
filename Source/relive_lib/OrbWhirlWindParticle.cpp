@@ -7,7 +7,7 @@
 
 OrbWhirlWindParticle::OrbWhirlWindParticle(FP xpos, FP ypos, FP scale, bool isMudokonSpirit)
 {
-    mAnim.Init(ResourceManagerWrapper::LoadAnimation(AnimId::ChantOrb_Particle), nullptr);
+    mAnim.Init(GetResourceManager().LoadAnimation(AnimId::ChantOrb_Particle), nullptr);
 
     mAnim.SetSemiTrans(true);
 

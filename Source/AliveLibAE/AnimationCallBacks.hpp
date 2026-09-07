@@ -3,7 +3,7 @@
 class BaseGameObject;
 struct IndexedPoint;
 
-using TFrameCallBackType = void(*)(BaseGameObject*, u32& pointIdx, const IndexedPoint&);
+using TFrameCallBackType = void(*)(BaseGameObject*, u32& pointIdx, const IndexedPoint&, ResourceManagerWrapper& resMan);
 
 extern TFrameCallBackType gAbe_Anim_Frame_Fns[5];
 extern TFrameCallBackType gSlig_Anim_Frame_Fns[4];

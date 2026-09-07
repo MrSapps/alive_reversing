@@ -11,16 +11,16 @@
 #include "../FatalError.hpp"
 #include "../AliveLibAE/QuikSave.hpp"
 
-IBirdPortal::IBirdPortal()
-    : BaseGameObject(true, 0)
+IBirdPortal::IBirdPortal(ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
 
 }
 
 void IBirdPortal::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::BirdPortal_Sparks));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::BirdPortal_Flash));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BirdPortal_Sparks));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BirdPortal_Flash));
 }
 
 void IBirdPortal::CreateDovesAndShrykullNumber()

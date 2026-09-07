@@ -158,8 +158,8 @@ public:
 };
 static LCDMessages gLCDMessages;
 
-LCDScreen::LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId)
-    : BaseGameObject(true, 0)
+LCDScreen::LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     mBaseGameObjectTlvInfo = tlvId;
 
@@ -176,18 +176,18 @@ LCDScreen::LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId)
 
     mFontContext.LoadFontType(FontType::LcdFont);
 
-    mPal1 = ResourceManagerWrapper::LoadPal(PalId::LedFont_1);
-    mPal2 = ResourceManagerWrapper::LoadPal(PalId::LedFont_2);
+    mPal1 = GetResourceManager().LoadPal(PalId::LedFont_1);
+    mPal2 = GetResourceManager().LoadPal(PalId::LedFont_2);
 
     mFont.Load(60, mPal1, &mFontContext);
 
     if (SwitchStates_Get(mToggleMessageSwitchId))
     {
-        mActiveMessage = gLCDMessages.GetMessage(gMap.mCurrentLevel, gMap.mCurrentPath, mMessageId2);
+        mActiveMessage = gLCDMessages.GetMessage(gMap->mCurrentLevel, gMap->mCurrentPath, mMessageId2);
     }
     else
     {
-        mActiveMessage = gLCDMessages.GetMessage(gMap.mCurrentLevel, gMap.mCurrentPath, mMessageId1);
+        mActiveMessage = gLCDMessages.GetMessage(gMap->mCurrentLevel, gMap->mCurrentPath, mMessageId1);
     }
 
     String_FormatString(mActiveMessage, mMessageBuffer, 1);
@@ -234,7 +234,7 @@ void LCDScreen::VUpdate()
             if (mShowRandomMessage)
             {
                 mShowRandomMessage = false;
-                mActiveMessage = gLCDMessages.GetMessage(gMap.mCurrentLevel, gMap.mCurrentPath, Math_RandomRange(mMessageRandMinId, mMessageRandMaxId));
+                mActiveMessage = gLCDMessages.GetMessage(gMap->mCurrentLevel, gMap->mCurrentPath, Math_RandomRange(mMessageRandMinId, mMessageRandMaxId));
 
                 // Change pal
                 mFont.mFontContext->mFntResource.mCurPal = mPal2.mPal;
@@ -244,11 +244,11 @@ void LCDScreen::VUpdate()
                 mShowRandomMessage = true;
                 if (SwitchStates_Get(mToggleMessageSwitchId))
                 {
-                    mActiveMessage = gLCDMessages.GetMessage(gMap.mCurrentLevel, gMap.mCurrentPath, mMessageId2);
+                    mActiveMessage = gLCDMessages.GetMessage(gMap->mCurrentLevel, gMap->mCurrentPath, mMessageId2);
                 }
                 else
                 {
-                    mActiveMessage = gLCDMessages.GetMessage(gMap.mCurrentLevel, gMap.mCurrentPath, mMessageId1);
+                    mActiveMessage = gLCDMessages.GetMessage(gMap->mCurrentLevel, gMap->mCurrentPath, mMessageId1);
                 }
 
                 // Change pal

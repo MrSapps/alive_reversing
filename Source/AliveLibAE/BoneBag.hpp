@@ -10,7 +10,7 @@ namespace relive
 class BoneBag final : public BaseAliveGameObject
 {
 public:
-    BoneBag(relive::Path_BoneBag* pTlv, const Guid& tlvId);
+    BoneBag(relive::Path_BoneBag* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~BoneBag();
 
     void LoadAnimations();

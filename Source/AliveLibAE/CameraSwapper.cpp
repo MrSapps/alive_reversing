@@ -14,8 +14,8 @@
 #include "../relive_lib/GameObjects/ScreenClipper.hpp"
 #include "../relive_lib/FatalError.hpp"
 
-CameraSwapper::CameraSwapper(CamResource& camRes, bool bPutDispEnv1, const char_type* pFmv1, bool bPutDispEnv2, const char_type* pFmv2, bool bPutDispEnv3, const char_type* pFmv3)
-    : BaseGameObject(true, 0),
+CameraSwapper::CameraSwapper(CamResource& camRes, ResourceManagerWrapper& resMan, bool bPutDispEnv1, const char_type* pFmv1, bool bPutDispEnv2, const char_type* pFmv2, bool bPutDispEnv3, const char_type* pFmv3)
+    : BaseGameObject(true, 0, resMan),
     mFmvs{ pFmv1, pFmv2, pFmv3 },
     mPutDispEnv{ bPutDispEnv1, bPutDispEnv2, bPutDispEnv3 }
 {
@@ -32,13 +32,13 @@ CameraSwapper::CameraSwapper(CamResource& camRes, bool bPutDispEnv1, const char_
         Init(camRes, CameraSwapEffects::ePlay1FMV_5);
     }
 
-    relive_new Movie(mFmvs[0]);
+    relive_new Movie(mFmvs[0], resMan);
 
     mMoviePutDispEnv = mPutDispEnv[0];
 }
 
-CameraSwapper::CameraSwapper(CamResource& camRes, CameraSwapEffects changeEffect, s32 xpos, s32 ypos)
-    : BaseGameObject(true, 0),
+CameraSwapper::CameraSwapper(CamResource& camRes, ResourceManagerWrapper& resMan, CameraSwapEffects changeEffect, s32 xpos, s32 ypos)
+    : BaseGameObject(true, 0, resMan),
     mXPosConverted(static_cast<s16>(PsxToPCX(xpos))),
     mYPosConverted(static_cast<s16>(ypos))
 {
@@ -56,7 +56,7 @@ CameraSwapper::~CameraSwapper()
 
     if (gMap_bDoPurpleLightEffect)
     {
-        gMap.RemoveObjectsWithPurpleLight(0);
+        gMap->RemoveObjectsWithPurpleLight(0);
         gMap_bDoPurpleLightEffect = 0;
     }
 
@@ -392,7 +392,7 @@ void CameraSwapper::VUpdate()
             // When no movie is playing start the next one
             if (Movie::gMovieRefCount == 0)
             {
-                relive_new Movie(mFmvs[1]);
+                relive_new Movie(mFmvs[1], mResMan);
                 mCamChangeEffect = CameraSwapEffects::ePlay1FMV_5;
                 mMoviePutDispEnv = mPutDispEnv[1]; 
             }
@@ -407,7 +407,7 @@ void CameraSwapper::VUpdate()
             // When no movie is playing start the next one
             if (Movie::gMovieRefCount == 0)
             {
-                relive_new Movie(mFmvs[2]);
+                relive_new Movie(mFmvs[2], mResMan);
                 mCamChangeEffect = CameraSwapEffects::ePlay2FMVs_9;
                 mMoviePutDispEnv = mPutDispEnv[1]; // TODO another master branch bug
             }

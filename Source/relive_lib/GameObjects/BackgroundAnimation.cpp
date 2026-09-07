@@ -18,8 +18,8 @@ void BackgroundAnimation::VStopAudio()
     }
 }
 
-BackgroundAnimation::BackgroundAnimation(relive::Path_BackgroundAnimation* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0), 
+BackgroundAnimation::BackgroundAnimation(relive::Path_BackgroundAnimation* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan),
     mTlvId(tlvId)
 {
     SetType(ReliveTypes::eBackgroundAnimation);
@@ -31,7 +31,7 @@ BackgroundAnimation::BackgroundAnimation(relive::Path_BackgroundAnimation* pTlv,
     mObjectYPos = FP_FromInteger(pTlv->mTopLeftY);
 
     const AnimRecord& anim = PerGameBgAnimRec(pTlv->mAnimId);
-    AnimResource res = ResourceManagerWrapper::LoadAnimation(anim.mId);
+    AnimResource res = GetResourceManager().LoadAnimation(anim.mId);
 
     Animation_Init(res);
 

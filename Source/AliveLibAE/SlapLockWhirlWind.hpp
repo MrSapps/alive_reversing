@@ -15,11 +15,11 @@ struct SlapLockWhirlWindSaveState final : public SaveStateBase
 class SlapLockWhirlWind final : public BaseGameObject
 {
 public:
-    SlapLockWhirlWind(s16 doorNumber, s16 switchId, FP xpos, FP ypos, FP scale);
+    SlapLockWhirlWind(s16 doorNumber, s16 switchId, FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan);
     
     virtual void VUpdate() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
 
     s16 SwitchId() const;
 

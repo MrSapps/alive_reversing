@@ -24,8 +24,8 @@ static s16 Well_NextRandom()
     return curRand;
 }
 
-Well::Well(relive::Path_WellBase* pTlv, FP xpos, FP ypos, const Guid& tlvId)
-    : BaseGameObject(true, 0)
+Well::Well(relive::Path_WellBase* pTlv, FP xpos, FP ypos, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     mTlvInfo = tlvId;
     SetType(ReliveTypes::eWell);

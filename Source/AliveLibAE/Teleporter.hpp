@@ -23,7 +23,7 @@ struct Relive_Path_Teleporter_Data
 class Teleporter final : public BaseGameObject
 {
 public:
-    Teleporter(relive::Path_Teleporter* pTlv, const Guid& tlvId);
+    Teleporter(relive::Path_Teleporter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~Teleporter();
 
     virtual void VUpdate() override;

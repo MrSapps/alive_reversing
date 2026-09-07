@@ -25,17 +25,17 @@ const FP mineCarWidthUnscaled = FP_FromInteger(12);
 
 void MineCar::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Mine_Car_Closed));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Mine_Car_Open));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Mine_Car_Shake_A));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Mine_Car_Shake_B));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Mine_Car_Tread_Idle));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Mine_Car_Tread_Move_A));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Mine_Car_Tread_Move_B));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Mine_Car_Closed));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Mine_Car_Open));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Mine_Car_Shake_A));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Mine_Car_Shake_B));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Mine_Car_Tread_Idle));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Mine_Car_Tread_Move_A));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Mine_Car_Tread_Move_B));
 }
 
-MineCar::MineCar(relive::Path_MineCar* pTlv, const Guid& tlvId, s32 /*a4*/, s32 /*a5*/, s32 /*a6*/)
-    : BaseAliveGameObject(0)
+MineCar::MineCar(relive::Path_MineCar* pTlv, const Guid& tlvId, s32 /*a4*/, s32 /*a5*/, s32 /*a6*/, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(0, resMan)
 {
     SetType(ReliveTypes::eMineCar);
 
@@ -96,8 +96,8 @@ MineCar::MineCar(relive::Path_MineCar* pTlv, const Guid& tlvId, s32 /*a4*/, s32 
     // can travel "up" then we set this key to "up" such that holding down "right" automatically moves the car up.
     field_1D6_continue_move_input = static_cast<s16>(InputCommands::eThrowItem);
 
-    field_1CC_spawned_path = gMap.mCurrentPath;
-    field_1CE_spawned_camera = gMap.mCurrentCamera;
+    field_1CC_spawned_path = gMap->mCurrentPath;
+    field_1CE_spawned_camera = gMap->mCurrentCamera;
     field_1D0_sound_channels_mask = 0;
     field_1C4_velx_index = 0;
 }
@@ -111,12 +111,12 @@ const AnimId sMineCarAnimIdTable[7] = {
     AnimId::Mine_Car_Tread_Move_A,
     AnimId::Mine_Car_Tread_Move_B};
 
-void MineCar::CreateFromSaveState(SerializedObjectData& pBuffer)
+void MineCar::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
 {
     const auto pState = pBuffer.ReadTmpPtr<MineCarSaveState>();
     auto pTlv = static_cast<relive::Path_MineCar*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pState->field_4C_tlvInfo).GetTlv());
 
-    auto pMineCar = relive_new MineCar(pTlv, pState->field_4C_tlvInfo, 0, 0, 0);
+    auto pMineCar = relive_new MineCar(pTlv, pState->field_4C_tlvInfo, 0, 0, 0, resMan);
     if (pMineCar)
     {
         if (pState->field_5A_bAbeInCar)
@@ -361,7 +361,7 @@ void MineCar::VRender(OrderingTable& ot)
 
         mTreadAnim.SetRGB(r, g, b);
 
-        if (gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos + FP_FromInteger(30), mYPos, 0) || gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos - (GetSpriteScale() * FP_FromInteger(60)), 0) || gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos - FP_FromInteger(30), mYPos, 0))
+        if (gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos + FP_FromInteger(30), mYPos, 0) || gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos - (GetSpriteScale() * FP_FromInteger(60)), 0) || gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos - FP_FromInteger(30), mYPos, 0))
         {
             mTreadAnim.VRender(
                 FP_GetExponent(mXPos - gScreenManager->CamXPos()),
@@ -920,8 +920,8 @@ void MineCar::State_1_ParkedWithAbe()
         GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::Mine_Car_Open));
 
         sControlledCharacter = gAbe;
-        field_1CC_spawned_path = gMap.mCurrentPath;
-        field_1CE_spawned_camera = gMap.mCurrentCamera;
+        field_1CC_spawned_path = gMap->mCurrentPath;
+        field_1CE_spawned_camera = gMap->mCurrentCamera;
 
         gAbe->VCheckCollisionLineStillValid(10);
 

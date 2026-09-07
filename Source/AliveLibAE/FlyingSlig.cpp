@@ -103,15 +103,15 @@ void FlyingSlig::LoadAnimations()
 {
     for (auto& animId : sFlyingSligAnimIdTable)
     {
-        mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(animId));
+        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(animId));
     }
 
     // used in Animation_OnFrame_FlyingSlig
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Vaporize_Particle));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Vaporize_Particle));
 }
 
-FlyingSlig::FlyingSlig(relive::Path_FlyingSlig* pTlv, const Guid& tlvId)
-    : BaseAliveGameObject(9)
+FlyingSlig::FlyingSlig(relive::Path_FlyingSlig* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(9, resMan)
 {
     LoadAnimations();
 
@@ -228,13 +228,13 @@ FlyingSlig::FlyingSlig(relive::Path_FlyingSlig* pTlv, const Guid& tlvId)
     CreateShadow();
 }
 
-void FlyingSlig::CreateFromSaveState(SerializedObjectData& pBuffer)
+void FlyingSlig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
 {
     const auto pSaveState = pBuffer.ReadTmpPtr<FlyingSligSaveState>();
 
     auto pTlv = static_cast<relive::Path_FlyingSlig*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pSaveState->field_3C_tlvInfo).GetTlv());
 
-    auto pFlyingSlig = relive_new FlyingSlig(pTlv, pSaveState->field_3C_tlvInfo);
+    auto pFlyingSlig = relive_new FlyingSlig(pTlv, pSaveState->field_3C_tlvInfo, resMan);
     if (pFlyingSlig)
     {
         pFlyingSlig->BaseAliveGameObjectPathTLV = TlvIterator::Invalid();
@@ -453,9 +453,9 @@ FlyingSlig::~FlyingSlig()
     {
         sControlledCharacter = gAbe;
         MusicController::static_PlayMusic(MusicController::MusicTypes::eNone_0, this, 0, 0);
-        if (gMap.mNextLevel != EReliveLevelIds::eMenu)
+        if (gMap->mNextLevel != EReliveLevelIds::eMenu)
         {
-            gMap.SetActiveCam(
+            gMap->SetActiveCam(
                 mAbeLevel,
                 mAbePath,
                 mAbeCamera,
@@ -484,7 +484,7 @@ FlyingSlig::~FlyingSlig()
 
 void FlyingSlig::VScreenChanged()
 {
-    if (gMap.LevelChanged() || (gMap.PathChanged() && (this != sControlledCharacter || mPersistant)))
+    if (gMap->LevelChanged() || (gMap->PathChanged() && (this != sControlledCharacter || mPersistant)))
     {
         SetDead(true);
     }
@@ -957,7 +957,7 @@ void FlyingSlig::Brain_4_ChasingEnemy()
 {
     mUnknown1 = false;
 
-    if (EventGet(Event::kEventHeroDying) && gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+    if (EventGet(Event::kEventHeroDying) && gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
     {
         ToAbeDead();
         return;
@@ -1889,7 +1889,7 @@ s16 FlyingSlig::IsPossessed()
 
 s16 FlyingSlig::CanChase(BaseAliveGameObject* pObj)
 {
-    if (!gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) || !gMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) || EventGet(Event::kEventResetting) || IsAbeEnteringDoor(pObj) || gAbe->GetSpriteScale() != GetSpriteScale() || !IsWallBetween(this, pObj))
+    if (!gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) || !gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) || EventGet(Event::kEventResetting) || IsAbeEnteringDoor(pObj) || gAbe->GetSpriteScale() != GetSpriteScale() || !IsWallBetween(this, pObj))
     {
         return 0;
     }
@@ -2508,9 +2508,9 @@ void FlyingSlig::VPossessed()
     SetPossessed(true);
     mSpeaking1 = true;
 
-    mAbeLevel = gMap.mCurrentLevel;
-    mAbePath = gMap.mCurrentPath;
-    mAbeCamera = gMap.mCurrentCamera;
+    mAbeLevel = gMap->mCurrentLevel;
+    mAbePath = gMap->mCurrentPath;
+    mAbeCamera = gMap->mCurrentCamera;
 
     field_2A8_max_x_speed = FP_FromDouble(5.5) * GetSpriteScale();
     field_2AC_up_vel = FP_FromDouble(-5.5) * GetSpriteScale();

@@ -8,8 +8,8 @@
 #include "Map.hpp"
 #include "stdlib.hpp"
 
-LevelLoader::LevelLoader(relive::Path_LevelLoader* pTlv, const Guid& tlvId)
-    : BaseGameObject(true, 0)
+LevelLoader::LevelLoader(relive::Path_LevelLoader* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     mBaseGameObjectTlvInfo = tlvId;
     mSwitchId = pTlv->mSwitchId;
@@ -48,7 +48,7 @@ void LevelLoader::VUpdate()
             {
                 if (mMovieId)
                 {
-                    gMap.SetActiveCam(
+                    gMap->SetActiveCam(
                         mDestLevel,
                         mDestPath,
                         mDestCamera,
@@ -58,7 +58,7 @@ void LevelLoader::VUpdate()
                 }
                 else
                 {
-                    gMap.SetActiveCam(
+                    gMap->SetActiveCam(
                         mDestLevel,
                         mDestPath,
                         mDestCamera,

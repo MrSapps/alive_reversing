@@ -11,8 +11,8 @@
 #include "Path.hpp"
 #include "QuikSave.hpp"
 
-SligSpawner::SligSpawner(relive::Path_Slig* pTlv, const Guid& tlvId)
-    : BaseGameObject(true, 0)
+SligSpawner::SligSpawner(relive::Path_Slig* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     SetType(ReliveTypes::eSligSpawner);
 
@@ -46,7 +46,7 @@ SligSpawner::~SligSpawner()
 
 void SligSpawner::VScreenChanged()
 {
-    if (gMap.LevelChanged() || gMap.PathChanged() || mState == SpawnerStates::eInactive_0)
+    if (gMap->LevelChanged() || gMap->PathChanged() || mState == SpawnerStates::eInactive_0)
     {
         SetDead(true);
     }
@@ -100,7 +100,7 @@ void SligSpawner::VUpdate()
             TlvIterator sligSpawnerIterator = gPathInfo->VTLV_Get_At_Of_Type(mPathTlv.mTopLeftX, mPathTlv.mTopLeftY, mPathTlv.mTopLeftX, mPathTlv.mTopLeftY, ReliveTypes::eSligSpawner);
             if (sligSpawnerIterator.GetTlv())
             {
-                auto pSlig = relive_new Slig(sligSpawnerIterator.GetTlv<relive::Path_Slig>(), mTlvInfo);
+                auto pSlig = relive_new Slig(sligSpawnerIterator.GetTlv<relive::Path_Slig>(), mTlvInfo, mResMan);
                 if (pSlig)
                 {
                     mSpawnedSligId = pSlig->mBaseGameObjectId;
@@ -136,11 +136,11 @@ void SligSpawner::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void SligSpawner::CreateFromSaveState(SerializedObjectData& pBuffer)
+void SligSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
 {
     const auto pState = pBuffer.ReadTmpPtr<SligSpawnerSaveState>();
     auto pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv<relive::Path_Slig>();
-    auto pSpawner = relive_new SligSpawner(pTlv, pState->mTlvId);
+    auto pSpawner = relive_new SligSpawner(pTlv, pState->mTlvId, resMan);
     if (pSpawner)
     {
         pSpawner->mState = pState->mState;

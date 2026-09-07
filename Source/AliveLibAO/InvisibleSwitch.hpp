@@ -11,7 +11,7 @@ enum class SwitchOp : s16;
 class InvisibleSwitch final : public BaseGameObject
 {
 public:
-    InvisibleSwitch(relive::Path_InvisibleSwitch* pTlv, const Guid& tlvId);
+    InvisibleSwitch(relive::Path_InvisibleSwitch* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~InvisibleSwitch();
 
     virtual void VUpdate() override;

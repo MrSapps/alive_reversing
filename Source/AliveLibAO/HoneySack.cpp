@@ -17,14 +17,14 @@ namespace AO {
 
 void HoneySack::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::HoneySack_Hanging));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::HoneySack_OnGround));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::HoneySack_Falling));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::HoneySack_FallingToSmashed));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HoneySack_Hanging));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HoneySack_OnGround));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HoneySack_Falling));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HoneySack_FallingToSmashed));
 }
 
-HoneySack::HoneySack(relive::Path_HoneySack* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0)
+HoneySack::HoneySack(relive::Path_HoneySack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eHoneySack);
 
@@ -69,7 +69,7 @@ HoneySack::HoneySack(relive::Path_HoneySack* pTlv, const Guid& tlvId)
         mState = State::eDripHoney_0;
         mTimer = MakeTimer(90);
 
-        auto pBeeSwarm = relive_new BeeSwarm(mXPos, mYPos, FP_FromInteger(0), 5, 0);
+        auto pBeeSwarm = relive_new BeeSwarm(mXPos, mYPos, FP_FromInteger(0), 5, 0, mResMan);
         mBeeSwarm = pBeeSwarm->mBaseGameObjectId;
         if (pBeeSwarm)
         {
@@ -79,7 +79,7 @@ HoneySack::HoneySack(relive::Path_HoneySack* pTlv, const Guid& tlvId)
         mDripTargetX = FP_FromInteger(0);
         mDripTargetY = FP_FromInteger(0);
 
-        relive::Path_TLV* pHoneyDripTarget = gMap.TLV_First_Of_Type_In_Camera(ReliveTypes::eHoneyDripTarget, 0).GetTlv();
+        relive::Path_TLV* pHoneyDripTarget = gMap->TLV_First_Of_Type_In_Camera(ReliveTypes::eHoneyDripTarget, 0).GetTlv();
         if (pHoneyDripTarget)
         {
             mDripTargetX = FP_FromInteger(pHoneyDripTarget->mTopLeftX);
@@ -106,7 +106,7 @@ HoneySack::~HoneySack()
 
 void HoneySack::VScreenChanged()
 {
-    if (gMap.LevelChanged() || gMap.PathChanged())
+    if (gMap->LevelChanged() || gMap->PathChanged())
     {
         SetDead(true);
     }
@@ -136,11 +136,11 @@ void HoneySack::VUpdate()
         case State::eDripHoney_0:
             if (static_cast<s32>(sGnFrame) > mTimer)
             {
-                relive_new HoneyDrip(mDripTargetX, mDripTargetY);
+                relive_new HoneyDrip(mDripTargetX, mDripTargetY, mResMan);
 
                 mTimer = MakeTimer(90);
             }
-            if (!gMap.Is_Point_In_Current_Camera(
+            if (!gMap->Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -202,7 +202,8 @@ void HoneySack::VUpdate()
                     mYPos,
                     FP_FromInteger(0),
                     24,
-                    mChaseTime);
+                    mChaseTime,
+                    mResMan);
                 if (pNewBee)
                 {
                     pNewBee->Chase(gAbe);
@@ -253,7 +254,7 @@ void HoneySack::VUpdate()
                 }
             }
 
-            if (!gMap.Is_Point_In_Current_Camera(
+            if (!gMap->Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,

@@ -10,7 +10,7 @@ namespace relive
 class RockSack final : public BaseAliveGameObject
 {
 public:
-    RockSack(relive::Path_RockSack* pTlv, const Guid& tlvId);
+    RockSack(relive::Path_RockSack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~RockSack();
 
     void LoadAnimations();

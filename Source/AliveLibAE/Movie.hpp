@@ -13,7 +13,7 @@ public:
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;
 
-    explicit Movie(const char_type* pName);
+    explicit Movie(const char_type* pName, ResourceManagerWrapper& resMan);
     
     static s32 gMovieRefCount;
 private:

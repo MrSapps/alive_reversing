@@ -14,7 +14,7 @@ public:
     static void MakeArray();
     static void FreeArray();
 
-    ShadowZone(relive::Path_ShadowZone* pTlv, const Guid& tlvId);
+    ShadowZone(relive::Path_ShadowZone* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~ShadowZone();
 
     virtual void VScreenChanged() override;

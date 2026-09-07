@@ -8,7 +8,7 @@ namespace AO {
 class PauseMenu final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    PauseMenu();
+    PauseMenu(ResourceManagerWrapper& resMan);
     ~PauseMenu();
 
     virtual void VScreenChanged() override;

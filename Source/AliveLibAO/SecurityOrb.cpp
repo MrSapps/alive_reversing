@@ -19,13 +19,13 @@
 
 namespace AO {
 
-SecurityOrb::SecurityOrb(relive::Path_SecurityOrb* pTlv, const Guid& tlvId)
-    : ::BaseAliveGameObject(0)
+SecurityOrb::SecurityOrb(relive::Path_SecurityOrb* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : ::BaseAliveGameObject(0, resMan)
 {
     SetType(ReliveTypes::eSecurityOrb);
     SetCanExplode(true);
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Security_Orb));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Security_Orb));
     Animation_Init(GetAnimRes(AnimId::Security_Orb));
 
     mXPos = FP_FromInteger(pTlv->mTopLeftX);
@@ -161,7 +161,7 @@ void SecurityOrb::VUpdate()
                     ZapLineType::eThick_0,
                     Layer::eLayer_ZapLinesElumMuds_28);
 
-                relive_new PossessionFlicker(gAbe, 8, 255, 100, 100);
+                relive_new PossessionFlicker(gAbe, 8, 255, 100, 100, mResMan);
 
                 gAbe->VTakeDamage(this);
                 mTimer = MakeTimer(8);

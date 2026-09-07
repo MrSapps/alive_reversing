@@ -32,13 +32,13 @@ MeatSaw::~MeatSaw()
 
 void MeatSaw::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::MeatSawMotor));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::MeatSaw_Idle));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::MeatSaw_Moving));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MeatSawMotor));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MeatSaw_Idle));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::MeatSaw_Moving));
 }
 
-MeatSaw::MeatSaw(relive::Path_MeatSaw* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0)
+MeatSaw::MeatSaw(relive::Path_MeatSaw* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eMeatSaw);
 
@@ -156,7 +156,7 @@ MeatSaw::MeatSaw(relive::Path_MeatSaw* pTlv, const Guid& tlvId)
 
 void MeatSaw::VScreenChanged()
 {
-    if (gMap.LevelChanged() || gMap.PathChanged() || !sControlledCharacter || // Can be nullptr during the game ender
+    if (gMap->LevelChanged() || gMap->PathChanged() || !sControlledCharacter || // Can be nullptr during the game ender
         FP_Abs(sControlledCharacter->mXPos - mXPos) > FP_FromInteger(1024))
     {
         SetDead(true);
@@ -172,7 +172,7 @@ void MeatSaw::VUpdate()
 
     GrindUpObjects();
 
-    const CameraPos direction = gMap.GetDirection(
+    const CameraPos direction = gMap->GetDirection(
         mCurrentLevel,
         mCurrentPath,
         mXPos,

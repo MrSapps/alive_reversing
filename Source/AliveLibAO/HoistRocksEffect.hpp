@@ -11,7 +11,7 @@ namespace AO {
 class HoistParticle final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    HoistParticle(FP xpos, FP ypos, FP scale, AnimId animId);
+    HoistParticle(FP xpos, FP ypos, FP scale, AnimId animId, ResourceManagerWrapper& resMan);
 
     virtual void VUpdate() override;
 
@@ -21,7 +21,7 @@ public:
 class HoistRocksEffect final : public ::BaseGameObject
 {
 public:
-    HoistRocksEffect(relive::Path_Hoist* pTlv, const Guid& tlvInfo);
+    HoistRocksEffect(relive::Path_Hoist* pTlv, const Guid& tlvInfo, ResourceManagerWrapper& resMan);
     ~HoistRocksEffect();
 
     virtual void VUpdate() override;

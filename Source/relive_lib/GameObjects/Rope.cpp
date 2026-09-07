@@ -47,14 +47,14 @@ void Rope::InitRopeAnimation()
             case EReliveLevelIds::eRuptureFarmsReturn:
             case EReliveLevelIds::eDesertEscape:
             {
-                mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Rope_R1));
+                mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Rope_R1));
                 Animation_Init(GetAnimRes(AnimId::Rope_R1));
                 break;
             }
 
             default:
             {
-                mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Rope_Lines));
+                mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Rope_Lines));
                 Animation_Init(GetAnimRes(AnimId::Rope_Lines));
                 break;
             }
@@ -62,7 +62,7 @@ void Rope::InitRopeAnimation()
     }
     else
     {
-        mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::AE_Rope));
+        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::AE_Rope));
         Animation_Init(GetAnimRes(AnimId::AE_Rope));
     }
 }

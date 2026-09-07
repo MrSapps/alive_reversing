@@ -12,8 +12,9 @@
 
 DynamicArrayT<BaseGameObject>* gBaseGameObjects = nullptr;
 
-BaseGameObject::BaseGameObject(s16 bAddToObjectList, s16 resourceArraySize)
-    : mBaseGameObjectResArray(resourceArraySize)
+BaseGameObject::BaseGameObject(s16 bAddToObjectList, s16 resourceArraySize, ResourceManagerWrapper& resMan)
+    : mBaseGameObjectResArray(resourceArraySize),
+    mResMan(resMan)
 {
     // Pre-allocate the array with nullptr entries so that it can be
     // used like a fixed size array in the derived type.
@@ -68,11 +69,11 @@ BaseMap& GetMap()
 {
     if (GetGameType() == GameType::eAe)
     {
-        return gMap;
+        return *gMap;
     }
     else
     {
-        return AO::gMap;
+        return *AO::gMap;
     }
 }
 

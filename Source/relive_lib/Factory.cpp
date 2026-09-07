@@ -3,6 +3,7 @@
 #include "stdafx.h"
 #include "Factory.hpp"
 
+#include "ResourceManagerWrapper.hpp"
 #include "GameType.hpp"
 
 #include "../AliveLibAE/stdlib.hpp"
@@ -175,19 +176,19 @@ void Factory::HoistAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        switch (AO::gMap.mCurrentLevel)
+        switch (AO::gMap->mCurrentLevel)
         {
             case EReliveLevelIds::eRuptureFarms:
             case EReliveLevelIds::eRuptureFarmsReturn:
-                ResourceManagerWrapper::PendAnimation(AnimId::RuptureFarms_HoistRock1);
-                ResourceManagerWrapper::PendAnimation(AnimId::RuptureFarms_HoistRock2);
-                ResourceManagerWrapper::PendAnimation(AnimId::RuptureFarms_HoistRock3);
+                mResourceManager.PendAnimation(AnimId::RuptureFarms_HoistRock1);
+                mResourceManager.PendAnimation(AnimId::RuptureFarms_HoistRock2);
+                mResourceManager.PendAnimation(AnimId::RuptureFarms_HoistRock3);
                 break;
 
             default:
-                ResourceManagerWrapper::PendAnimation(AnimId::AO_HoistRock1);
-                ResourceManagerWrapper::PendAnimation(AnimId::AO_HoistRock2);
-                ResourceManagerWrapper::PendAnimation(AnimId::AO_HoistRock3);
+                mResourceManager.PendAnimation(AnimId::AO_HoistRock1);
+                mResourceManager.PendAnimation(AnimId::AO_HoistRock2);
+                mResourceManager.PendAnimation(AnimId::AO_HoistRock3);
                 break;
         }
     }
@@ -196,7 +197,7 @@ void Factory::HoistAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
         auto pHoistTlv = static_cast<Path_Hoist*>(pTlv);
         if (pHoistTlv->mHoistType == Path_Hoist::Type::eOffScreen)
         {
-            relive_new AO::HoistRocksEffect(pHoistTlv, tlvId);
+            relive_new AO::HoistRocksEffect(pHoistTlv, tlvId, mResourceManager);
             // OG issue, no reset on failure ??
         }
         else
@@ -222,7 +223,7 @@ void Factory::ShadowZoneAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
-        relive_new ShadowZone(static_cast<Path_ShadowZone*>(pTlv), tlvId);
+        relive_new ShadowZone(static_cast<Path_ShadowZone*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -230,44 +231,44 @@ void Factory::LiftPointAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        switch (AO::gMap.mCurrentLevel)
+        switch (AO::gMap->mCurrentLevel)
         {
             case EReliveLevelIds::eRuptureFarms:
             case EReliveLevelIds::eBoardRoom:
             case EReliveLevelIds::eRuptureFarmsReturn:
-                ResourceManagerWrapper::PendAnimation(AnimId::Rope_R1);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftPlatform_RuptureFarms);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftBottomWheel_RuptureFarms);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftTopWheel_RuptureFarms);
+                mResourceManager.PendAnimation(AnimId::Rope_R1);
+                mResourceManager.PendAnimation(AnimId::LiftPlatform_RuptureFarms);
+                mResourceManager.PendAnimation(AnimId::LiftBottomWheel_RuptureFarms);
+                mResourceManager.PendAnimation(AnimId::LiftTopWheel_RuptureFarms);
                 break;
 
             case EReliveLevelIds::eLines:
-                ResourceManagerWrapper::PendAnimation(AnimId::Rope_Lines);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftPlatform_Lines);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftBottomWheel_Lines);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftTopWheel_Lines);
+                mResourceManager.PendAnimation(AnimId::Rope_Lines);
+                mResourceManager.PendAnimation(AnimId::LiftPlatform_Lines);
+                mResourceManager.PendAnimation(AnimId::LiftBottomWheel_Lines);
+                mResourceManager.PendAnimation(AnimId::LiftTopWheel_Lines);
                 break;
 
             case EReliveLevelIds::eDesert:
-                ResourceManagerWrapper::PendAnimation(AnimId::Rope_R1);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftPlatform_Desert);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftBottomWheel_Desert);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftTopWheel_Desert);
+                mResourceManager.PendAnimation(AnimId::Rope_R1);
+                mResourceManager.PendAnimation(AnimId::LiftPlatform_Desert);
+                mResourceManager.PendAnimation(AnimId::LiftBottomWheel_Desert);
+                mResourceManager.PendAnimation(AnimId::LiftTopWheel_Desert);
                 break;
 
             case EReliveLevelIds::eDesertTemple:
             case EReliveLevelIds::eDesertEscape:
-                ResourceManagerWrapper::PendAnimation(AnimId::Rope_R1);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftPlatform_Desert2);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftBottomWheel_Desert2);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftTopWheel_Desert2);
+                mResourceManager.PendAnimation(AnimId::Rope_R1);
+                mResourceManager.PendAnimation(AnimId::LiftPlatform_Desert2);
+                mResourceManager.PendAnimation(AnimId::LiftBottomWheel_Desert2);
+                mResourceManager.PendAnimation(AnimId::LiftTopWheel_Desert2);
                 break;
 
             default:
-                ResourceManagerWrapper::PendAnimation(AnimId::Rope_Lines);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftPlatform_Forest);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftBottomWheel_Forest);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftTopWheel_Forest);
+                mResourceManager.PendAnimation(AnimId::Rope_Lines);
+                mResourceManager.PendAnimation(AnimId::LiftPlatform_Forest);
+                mResourceManager.PendAnimation(AnimId::LiftBottomWheel_Forest);
+                mResourceManager.PendAnimation(AnimId::LiftTopWheel_Forest);
                 break;
         }
     }
@@ -288,8 +289,8 @@ void Factory::LiftPointAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
                 const s16 xpos_i = FP_GetExponent(pLiftObj->mXPos);
                 if (pTlv->mTopLeftX <= xpos_i
                     && xpos_i <= pTlv->mBottomRightX
-                    && pLiftObj->mCurrentLevel == AO::gMap.mCurrentLevel
-                    && pLiftObj->mCurrentPath == AO::gMap.mCurrentPath)
+                    && pLiftObj->mCurrentLevel == AO::gMap->mCurrentLevel
+                    && pLiftObj->mCurrentPath == AO::gMap->mCurrentPath)
                 {
                     Path::TLV_Reset(tlvId);
                     return;
@@ -299,7 +300,7 @@ void Factory::LiftPointAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 
         if (pTlv->mTlvSpecificMeaning & 2 || (pTlv->mTlvSpecificMeaning == 0 && static_cast<Path_LiftPoint*>(pTlv)->mIsStartPoint))
         {
-            relive_new AO::LiftPoint(static_cast<Path_LiftPoint*>(pTlv), tlvId);
+            relive_new AO::LiftPoint(static_cast<Path_LiftPoint*>(pTlv), tlvId, mResourceManager);
         }
         else
         {
@@ -307,7 +308,7 @@ void Factory::LiftPointAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
             s16 pointNumber = 1;
             while (pointNumber < 8)
             {
-                tlvIterator = AO::gMap.Get_First_TLV_For_Offsetted_Camera(
+                tlvIterator = AO::gMap->Get_First_TLV_For_Offsetted_Camera(
                     0,
                     pointNumber / 2 * (pointNumber % 2 != 0 ? -1 : 1));
                 while (tlvIterator.GetTlv())
@@ -320,7 +321,7 @@ void Factory::LiftPointAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
                         {
                             if (tlvIterator.GetTlv()->mTlvSpecificMeaning & 2 || (tlvIterator.GetTlv()->mTlvSpecificMeaning == 0 && tlvIterator.GetTlv<Path_LiftPoint>()->mIsStartPoint))
                             {
-                                relive_new AO::LiftPoint(tlvIterator.GetTlv<Path_LiftPoint>(), tlvId);
+                                relive_new AO::LiftPoint(tlvIterator.GetTlv<Path_LiftPoint>(), tlvId, mResourceManager);
                                 return;
                             }
                         }
@@ -330,7 +331,7 @@ void Factory::LiftPointAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
                 pointNumber++;
             }
 
-            relive_new AO::LiftPoint(static_cast<Path_LiftPoint*>(pTlv), tlvId);
+            relive_new AO::LiftPoint(static_cast<Path_LiftPoint*>(pTlv), tlvId, mResourceManager);
         }
     }
 }
@@ -339,13 +340,13 @@ void Factory::WellAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Well_Leaf);
+        mResourceManager.PendAnimation(AnimId::Well_Leaf);
     }
     else
     {
         const FP xpos = FP_FromInteger(pTlv->mTopLeftX);
         const FP ypos = FP_FromInteger(pTlv->mTopLeftY);
-        relive_new AO::Well(static_cast<Path_WellBase*>(pTlv), xpos, ypos, tlvId);
+        relive_new AO::Well(static_cast<Path_WellBase*>(pTlv), xpos, ypos, tlvId, mResourceManager);
     }
 }
 
@@ -386,8 +387,8 @@ void Factory::DoveAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
     }
     else
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Dove_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::Dove_Flying);
+        mResourceManager.PendAnimation(AnimId::Dove_Idle);
+        mResourceManager.PendAnimation(AnimId::Dove_Flying);
     }
 }
 
@@ -395,18 +396,18 @@ void Factory::RockSackAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Rock);
-        ResourceManagerWrapper::PendAnimation(AnimId::RockSack_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::RockSack_SoftHit);
-        ResourceManagerWrapper::PendAnimation(AnimId::RockSack_HardHit);
+        mResourceManager.PendAnimation(AnimId::Rock);
+        mResourceManager.PendAnimation(AnimId::RockSack_Idle);
+        mResourceManager.PendAnimation(AnimId::RockSack_SoftHit);
+        mResourceManager.PendAnimation(AnimId::RockSack_HardHit);
 
-        if (AO::gMap.mCurrentLevel == EReliveLevelIds::eStockYards || AO::gMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+        if (AO::gMap->mCurrentLevel == EReliveLevelIds::eStockYards || AO::gMap->mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
         {
         }
     }
     else
     {
-        relive_new AO::RockSack(static_cast<Path_RockSack*>(pTlv), tlvId);
+        relive_new AO::RockSack(static_cast<Path_RockSack*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -414,13 +415,13 @@ void Factory::ZBallAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Swinging_Ball_Fast);
-        ResourceManagerWrapper::PendAnimation(AnimId::Swinging_Ball_Normal);
-        ResourceManagerWrapper::PendAnimation(AnimId::Swinging_Ball_Slow);
+        mResourceManager.PendAnimation(AnimId::Swinging_Ball_Fast);
+        mResourceManager.PendAnimation(AnimId::Swinging_Ball_Normal);
+        mResourceManager.PendAnimation(AnimId::Swinging_Ball_Slow);
     }
     else
     {
-        relive_new AO::ZBall(static_cast<Path_ZBall*>(pTlv), tlvId);
+        relive_new AO::ZBall(static_cast<Path_ZBall*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -428,14 +429,14 @@ void Factory::FallingItemAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Explosion_Stick);
-        switch (AO::gMap.mCurrentLevel)
+        mResourceManager.PendAnimation(AnimId::Explosion_Stick);
+        switch (AO::gMap->mCurrentLevel)
         {
             case EReliveLevelIds::eRuptureFarms:
             case EReliveLevelIds::eRuptureFarmsReturn:
-                ResourceManagerWrapper::PendAnimation(AnimId::FallingMeat_Waiting);
-                ResourceManagerWrapper::PendAnimation(AnimId::FallingMeat_Falling);
-                ResourceManagerWrapper::PendAnimation(AnimId::Meat_Gib);
+                mResourceManager.PendAnimation(AnimId::FallingMeat_Waiting);
+                mResourceManager.PendAnimation(AnimId::FallingMeat_Falling);
+                mResourceManager.PendAnimation(AnimId::Meat_Gib);
                 break;
 
             case EReliveLevelIds::eLines:
@@ -444,21 +445,21 @@ void Factory::FallingItemAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
             case EReliveLevelIds::eDesert:
             case EReliveLevelIds::eDesertTemple:
             case EReliveLevelIds::eDesertEscape:
-                ResourceManagerWrapper::PendAnimation(AnimId::AO_FallingRock_Falling);
-                ResourceManagerWrapper::PendAnimation(AnimId::AO_FallingRock_Waiting);
-                ResourceManagerWrapper::PendAnimation(AnimId::Explosion_Rock);
+                mResourceManager.PendAnimation(AnimId::AO_FallingRock_Falling);
+                mResourceManager.PendAnimation(AnimId::AO_FallingRock_Waiting);
+                mResourceManager.PendAnimation(AnimId::Explosion_Rock);
                 break;
 
             default:
-                ResourceManagerWrapper::PendAnimation(AnimId::AO_FallingRock_Falling);
-                ResourceManagerWrapper::PendAnimation(AnimId::AO_FallingRock_Waiting);
-                ResourceManagerWrapper::PendAnimation(AnimId::Explosion_Rock);
+                mResourceManager.PendAnimation(AnimId::AO_FallingRock_Falling);
+                mResourceManager.PendAnimation(AnimId::AO_FallingRock_Waiting);
+                mResourceManager.PendAnimation(AnimId::Explosion_Rock);
                 break;
         }
     }
     else
     {
-        relive_new AO::FallingItem(static_cast<Path_FallingItem*>(pTlv), tlvId);
+        relive_new AO::FallingItem(static_cast<Path_FallingItem*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -466,36 +467,36 @@ void Factory::PullRingRopeAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        switch (AO::gMap.mCurrentLevel)
+        switch (AO::gMap->mCurrentLevel)
         {
             case EReliveLevelIds::eRuptureFarms:
             case EReliveLevelIds::eBoardRoom:
             case EReliveLevelIds::eRuptureFarmsReturn:
-                ResourceManagerWrapper::PendAnimation(AnimId::Rope_R1);
-                ResourceManagerWrapper::PendAnimation(AnimId::Pullring_Farms_Idle);
-                ResourceManagerWrapper::PendAnimation(AnimId::Pullring_Farms_UseBegin);
-                ResourceManagerWrapper::PendAnimation(AnimId::Pullring_Farms_UseEnd);
+                mResourceManager.PendAnimation(AnimId::Rope_R1);
+                mResourceManager.PendAnimation(AnimId::Pullring_Farms_Idle);
+                mResourceManager.PendAnimation(AnimId::Pullring_Farms_UseBegin);
+                mResourceManager.PendAnimation(AnimId::Pullring_Farms_UseEnd);
                 break;
 
             case EReliveLevelIds::eDesert:
             case EReliveLevelIds::eDesertTemple:
-                ResourceManagerWrapper::PendAnimation(AnimId::Rope_R1);
-                ResourceManagerWrapper::PendAnimation(AnimId::Pullring_Desert_Idle);
-                ResourceManagerWrapper::PendAnimation(AnimId::Pullring_Desert_UseBegin);
-                ResourceManagerWrapper::PendAnimation(AnimId::Pullring_Desert_UseEnd);
+                mResourceManager.PendAnimation(AnimId::Rope_R1);
+                mResourceManager.PendAnimation(AnimId::Pullring_Desert_Idle);
+                mResourceManager.PendAnimation(AnimId::Pullring_Desert_UseBegin);
+                mResourceManager.PendAnimation(AnimId::Pullring_Desert_UseEnd);
                 break;
 
             default:
-                ResourceManagerWrapper::PendAnimation(AnimId::Rope_Lines);
-                ResourceManagerWrapper::PendAnimation(AnimId::Pullring_Desert_Idle);
-                ResourceManagerWrapper::PendAnimation(AnimId::Pullring_Desert_UseBegin);
-                ResourceManagerWrapper::PendAnimation(AnimId::Pullring_Desert_UseEnd);
+                mResourceManager.PendAnimation(AnimId::Rope_Lines);
+                mResourceManager.PendAnimation(AnimId::Pullring_Desert_Idle);
+                mResourceManager.PendAnimation(AnimId::Pullring_Desert_UseBegin);
+                mResourceManager.PendAnimation(AnimId::Pullring_Desert_UseEnd);
                 break;
         }
     }
     else
     {
-        relive_new AO::PullRingRope(static_cast<Path_PullRingRope*>(pTlv), tlvId);
+        relive_new AO::PullRingRope(static_cast<Path_PullRingRope*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -504,8 +505,8 @@ void Factory::BackgroundAnimationAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode 
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
         auto pBgAnim = static_cast<Path_BackgroundAnimation*>(pTlv);
-        //ResourceManagerWrapper::PendAnimation(static_cast<AnimId>(pBgAnim->mAnimId));
-        relive_new BackgroundAnimation(pBgAnim, tlvId);
+        //mResourceManager.PendAnimation(static_cast<AnimId>(pBgAnim->mAnimId));
+        relive_new BackgroundAnimation(pBgAnim, tlvId, mResourceManager);
     }
 }
 
@@ -513,8 +514,8 @@ void Factory::HoneyAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Honey);
-        ResourceManagerWrapper::PendAnimation(AnimId::Honey_Drip);
+        mResourceManager.PendAnimation(AnimId::Honey);
+        mResourceManager.PendAnimation(AnimId::Honey_Drip);
     }
     else
     {
@@ -522,7 +523,7 @@ void Factory::HoneyAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
         const auto midPoint = pTlv->Width() / 2;
         auto pHoney = relive_new AO::Honey(
             FP_FromInteger(midPoint + pTlv->mTopLeftX),
-            FP_FromInteger(pTlv->mTopLeftY + 24));
+            FP_FromInteger(pTlv->mTopLeftY + 24), mResourceManager);
         if (pHoney)
         {
             pHoney->mTlvInfo = tlvId;
@@ -535,38 +536,38 @@ void Factory::TimedMineAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
     auto pTimedMineTlv = static_cast<Path_TimedMine*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnims(kAbeGibs);
-        ResourceManagerWrapper::PendAnims(kSlogGibs);
-        ResourceManagerWrapper::PendAnims(kElumGibs);
-        ResourceManagerWrapper::PendAnimation(AnimId::TimedMine_Activated);
-        ResourceManagerWrapper::PendAnimation(AnimId::TimedMine_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::Bomb_Flash);
-        ResourceManagerWrapper::PendAnimation(AnimId::Bomb_RedGreenTick);
-        ResourceManagerWrapper::PendAnimation(AnimId::Explosion_Rock);
-        ResourceManagerWrapper::PendAnimation(AnimId::GroundExplosion);
-        if (AO::gMap.mCurrentLevel == EReliveLevelIds::eStockYards || AO::gMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+        mResourceManager.PendAnims(kAbeGibs);
+        mResourceManager.PendAnims(kSlogGibs);
+        mResourceManager.PendAnims(kElumGibs);
+        mResourceManager.PendAnimation(AnimId::TimedMine_Activated);
+        mResourceManager.PendAnimation(AnimId::TimedMine_Idle);
+        mResourceManager.PendAnimation(AnimId::Bomb_Flash);
+        mResourceManager.PendAnimation(AnimId::Bomb_RedGreenTick);
+        mResourceManager.PendAnimation(AnimId::Explosion_Rock);
+        mResourceManager.PendAnimation(AnimId::GroundExplosion);
+        if (AO::gMap->mCurrentLevel == EReliveLevelIds::eStockYards || AO::gMap->mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
         {
         }
 
     }
     else
     {
-        relive_new TimedMine(pTimedMineTlv, tlvId);
+        relive_new TimedMine(pTimedMineTlv, tlvId, mResourceManager);
     }
 }
 
-static void LoadWalkingSligResourcesAO(Factory::LoadMode loadMode, BitField16<AO::SligFlags_DisabledRes> disabledResources)
+static void LoadWalkingSligResourcesAO(Factory::LoadMode loadMode, BitField16<AO::SligFlags_DisabledRes> disabledResources, ResourceManagerWrapper& resMan)
 {
     if (loadMode == Factory::LoadMode::LoadResourceFromList_1 || loadMode == Factory::LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnims(AO::Slig::sSligMotionAnimIds);
-        ResourceManagerWrapper::PendAnims(kSligGibs);
-        ResourceManagerWrapper::PendAnimation(AnimId::ObjectShadow);
-        ResourceManagerWrapper::PendAnimation(AnimId::ShootingZFire_Particle);
-        ResourceManagerWrapper::PendAnimation(AnimId::ShootingFire_Particle);
-        ResourceManagerWrapper::PendAnimation(AnimId::Bullet_Shell);
+        resMan.PendAnims(AO::Slig::sSligMotionAnimIds);
+        resMan.PendAnims(kSligGibs);
+        resMan.PendAnimation(AnimId::ObjectShadow);
+        resMan.PendAnimation(AnimId::ShootingZFire_Particle);
+        resMan.PendAnimation(AnimId::ShootingFire_Particle);
+        resMan.PendAnimation(AnimId::Bullet_Shell);
         
-        if (AO::gMap.mCurrentLevel == EReliveLevelIds::eStockYards || AO::gMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+        if (AO::gMap->mCurrentLevel == EReliveLevelIds::eStockYards || AO::gMap->mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
         {
         }
     }
@@ -610,7 +611,7 @@ static void LoadWalkingSligResourcesAO(Factory::LoadMode loadMode, BitField16<AO
 void Factory::SligAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     auto pSligTlv = static_cast<Path_Slig*>(pTlv);
-    LoadWalkingSligResourcesAO(loadMode, pSligTlv->mData.mDisabledResourcesAO);
+    LoadWalkingSligResourcesAO(loadMode, pSligTlv->mData.mDisabledResourcesAO, mResourceManager);
 
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -618,7 +619,7 @@ void Factory::SligAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
     }
     else
     {
-        relive_new AO::Slig(pSligTlv, tlvId);
+        relive_new AO::Slig(pSligTlv, tlvId, mResourceManager);
     }
 }
 
@@ -627,11 +628,11 @@ void Factory::SlogAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnims(AO::Slog::sSlogMotionAnimIds);
+        mResourceManager.PendAnims(AO::Slog::sSlogMotionAnimIds);
     }
     else
     {
-        relive_new AO::Slog(static_cast<Path_Slog*>(pTlv), tlvId);
+        relive_new AO::Slog(static_cast<Path_Slog*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -639,50 +640,50 @@ void Factory::LeverAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        switch (AO::gMap.mCurrentLevel)
+        switch (AO::gMap->mCurrentLevel)
         {
             case EReliveLevelIds::eRuptureFarms:
             case EReliveLevelIds::eStockYards:
             case EReliveLevelIds::eStockYardsReturn:
             case EReliveLevelIds::eBoardRoom:
             case EReliveLevelIds::eRuptureFarmsReturn:
-                ResourceManagerWrapper::PendAnimation(AnimId::RuptureFarms_Lever_Idle);
-                ResourceManagerWrapper::PendAnimation(AnimId::RuptureFarms_Lever_Pull_Left);
-                ResourceManagerWrapper::PendAnimation(AnimId::RuptureFarms_Lever_Pull_Release_Left);
-                ResourceManagerWrapper::PendAnimation(AnimId::RuptureFarms_Lever_Pull_Right);
-                ResourceManagerWrapper::PendAnimation(AnimId::RuptureFarms_Lever_Pull_Release_Right);
+                mResourceManager.PendAnimation(AnimId::RuptureFarms_Lever_Idle);
+                mResourceManager.PendAnimation(AnimId::RuptureFarms_Lever_Pull_Left);
+                mResourceManager.PendAnimation(AnimId::RuptureFarms_Lever_Pull_Release_Left);
+                mResourceManager.PendAnimation(AnimId::RuptureFarms_Lever_Pull_Right);
+                mResourceManager.PendAnimation(AnimId::RuptureFarms_Lever_Pull_Release_Right);
                 break;
 
             case EReliveLevelIds::eLines:
-                ResourceManagerWrapper::PendAnimation(AnimId::Lines_Lever_Idle);
-                ResourceManagerWrapper::PendAnimation(AnimId::Lines_Lever_Pull_Left);
-                ResourceManagerWrapper::PendAnimation(AnimId::Lines_Lever_Pull_Release_Left);
-                ResourceManagerWrapper::PendAnimation(AnimId::Lines_Lever_Pull_Right);
-                ResourceManagerWrapper::PendAnimation(AnimId::Lines_Lever_Pull_Release_Right);
+                mResourceManager.PendAnimation(AnimId::Lines_Lever_Idle);
+                mResourceManager.PendAnimation(AnimId::Lines_Lever_Pull_Left);
+                mResourceManager.PendAnimation(AnimId::Lines_Lever_Pull_Release_Left);
+                mResourceManager.PendAnimation(AnimId::Lines_Lever_Pull_Right);
+                mResourceManager.PendAnimation(AnimId::Lines_Lever_Pull_Release_Right);
                 break;
 
             case EReliveLevelIds::eDesert:
             case EReliveLevelIds::eDesertTemple:
             case EReliveLevelIds::eDesertEscape:
-                ResourceManagerWrapper::PendAnimation(AnimId::Lever_Idle);
-                ResourceManagerWrapper::PendAnimation(AnimId::Lever_Pull_Left);
-                ResourceManagerWrapper::PendAnimation(AnimId::Lever_Pull_Release_Left);
-                ResourceManagerWrapper::PendAnimation(AnimId::Lever_Pull_Right);
-                ResourceManagerWrapper::PendAnimation(AnimId::Lever_Pull_Release_Right);
+                mResourceManager.PendAnimation(AnimId::Lever_Idle);
+                mResourceManager.PendAnimation(AnimId::Lever_Pull_Left);
+                mResourceManager.PendAnimation(AnimId::Lever_Pull_Release_Left);
+                mResourceManager.PendAnimation(AnimId::Lever_Pull_Right);
+                mResourceManager.PendAnimation(AnimId::Lever_Pull_Release_Right);
                 break;
 
             default:
-                ResourceManagerWrapper::PendAnimation(AnimId::Lever_Idle);
-                ResourceManagerWrapper::PendAnimation(AnimId::Lever_Pull_Left);
-                ResourceManagerWrapper::PendAnimation(AnimId::Lever_Pull_Release_Left);
-                ResourceManagerWrapper::PendAnimation(AnimId::Lever_Pull_Right);
-                ResourceManagerWrapper::PendAnimation(AnimId::Lever_Pull_Release_Right);
+                mResourceManager.PendAnimation(AnimId::Lever_Idle);
+                mResourceManager.PendAnimation(AnimId::Lever_Pull_Left);
+                mResourceManager.PendAnimation(AnimId::Lever_Pull_Release_Left);
+                mResourceManager.PendAnimation(AnimId::Lever_Pull_Right);
+                mResourceManager.PendAnimation(AnimId::Lever_Pull_Release_Right);
                 break;
         }
     }
     else
     {
-        relive_new AO::Lever(static_cast<Path_Lever*>(pTlv), tlvId);
+        relive_new AO::Lever(static_cast<Path_Lever*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -690,13 +691,13 @@ void Factory::BellHammerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
-        relive_new AO::BellHammer(static_cast<Path_BellHammer*>(pTlv), tlvId);
+        relive_new AO::BellHammer(static_cast<Path_BellHammer*>(pTlv), tlvId, mResourceManager);
     }
     else
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::BellHammer_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::BellHammer_Smashing);
-        ResourceManagerWrapper::PendAnims(AO::Elum::gElumMotionAnimIds);
+        mResourceManager.PendAnimation(AnimId::BellHammer_Idle);
+        mResourceManager.PendAnimation(AnimId::BellHammer_Smashing);
+        mResourceManager.PendAnims(AO::Elum::gElumMotionAnimIds);
     }
 }
 
@@ -705,18 +706,18 @@ void Factory::SecurityOrbAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     auto pSecurityOrbTlv = static_cast<Path_SecurityOrb*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Security_Orb);
-        ResourceManagerWrapper::PendAnimation(AnimId::Zap_Line_Blue);
-        ResourceManagerWrapper::PendAnimation(AnimId::Zap_Line_Red);
-        ResourceManagerWrapper::PendAnims(kAbeGibs);
-        ResourceManagerWrapper::PendAnims(kSlogGibs);
-        ResourceManagerWrapper::PendAnims(kElumGibs);
-        ResourceManagerWrapper::PendAnimation(AnimId::Metal_Gib);
-        ResourceManagerWrapper::PendAnimation(AnimId::AirExplosion);
+        mResourceManager.PendAnimation(AnimId::Security_Orb);
+        mResourceManager.PendAnimation(AnimId::Zap_Line_Blue);
+        mResourceManager.PendAnimation(AnimId::Zap_Line_Red);
+        mResourceManager.PendAnims(kAbeGibs);
+        mResourceManager.PendAnims(kSlogGibs);
+        mResourceManager.PendAnims(kElumGibs);
+        mResourceManager.PendAnimation(AnimId::Metal_Gib);
+        mResourceManager.PendAnimation(AnimId::AirExplosion);
     }
     else
     {
-        relive_new AO::SecurityOrb(pSecurityOrbTlv, tlvId);
+        relive_new AO::SecurityOrb(pSecurityOrbTlv, tlvId, mResourceManager);
     }
 }
 
@@ -724,11 +725,11 @@ void Factory::LiftMudAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnims(AO::Mudokon::sMudMotionAnimIds);
+        mResourceManager.PendAnims(AO::Mudokon::sMudMotionAnimIds);
     }
     else
     {
-        relive_new AO::Mudokon(pTlv, tlvId);
+        relive_new AO::Mudokon(pTlv, tlvId, mResourceManager);
     }
 }
 
@@ -736,14 +737,14 @@ void Factory::BeeSwarmHoleAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Bee_Swarm);
-        if (AO::gMap.mCurrentLevel == EReliveLevelIds::eForest || AO::gMap.mCurrentLevel == EReliveLevelIds::eDesert)
+        mResourceManager.PendAnimation(AnimId::Bee_Swarm);
+        if (AO::gMap->mCurrentLevel == EReliveLevelIds::eForest || AO::gMap->mCurrentLevel == EReliveLevelIds::eDesert)
         {
         }
     }
     else
     {
-        relive_new AO::BeeSwarmHole(static_cast<Path_BeeSwarmHole*>(pTlv), tlvId);
+        relive_new AO::BeeSwarmHole(static_cast<Path_BeeSwarmHole*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -751,16 +752,16 @@ void Factory::HoneySackAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Honey);
-        ResourceManagerWrapper::PendAnimation(AnimId::Honey_Drip);
-        ResourceManagerWrapper::PendAnimation(AnimId::HoneySack_Hanging);
-        ResourceManagerWrapper::PendAnimation(AnimId::HoneySack_OnGround);
-        ResourceManagerWrapper::PendAnimation(AnimId::HoneySack_Falling);
-        ResourceManagerWrapper::PendAnimation(AnimId::HoneySack_FallingToSmashed);
+        mResourceManager.PendAnimation(AnimId::Honey);
+        mResourceManager.PendAnimation(AnimId::Honey_Drip);
+        mResourceManager.PendAnimation(AnimId::HoneySack_Hanging);
+        mResourceManager.PendAnimation(AnimId::HoneySack_OnGround);
+        mResourceManager.PendAnimation(AnimId::HoneySack_Falling);
+        mResourceManager.PendAnimation(AnimId::HoneySack_FallingToSmashed);
     }
     else
     {
-        relive_new AO::HoneySack(static_cast<Path_HoneySack*>(pTlv), tlvId);
+        relive_new AO::HoneySack(static_cast<Path_HoneySack*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -785,7 +786,7 @@ void Factory::AbeStartAO(Path_TLV* pTlv, const Guid& /*tlvId*/, LoadMode loadMod
     }
     else
     {
-        ResourceManagerWrapper::PendAnims(AO::Abe::sAbeMotionAnimIds);
+        mResourceManager.PendAnims(AO::Abe::sAbeMotionAnimIds);
     }
 }
 
@@ -804,11 +805,11 @@ void Factory::SlingMudAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
-        relive_new AO::SlingMudokon(static_cast<Path_SlingMudokon*>(pTlv), tlvId);
+        relive_new AO::SlingMudokon(static_cast<Path_SlingMudokon*>(pTlv), tlvId, mResourceManager);
     }
     else
     {
-        ResourceManagerWrapper::PendAnims(AO::SlingMudokon::sSlingMudMotionAnimIds);
+        mResourceManager.PendAnims(AO::SlingMudokon::sSlingMudMotionAnimIds);
         // kSparksAOResID was loaded but there is no AnimId entry for it?...
     }
 }
@@ -817,11 +818,11 @@ void Factory::BeeNestAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Bee_Swarm);
+        mResourceManager.PendAnimation(AnimId::Bee_Swarm);
     }
     else
     {
-        relive_new AO::BeeNest(static_cast<Path_BeeNest*>(pTlv), tlvId);
+        relive_new AO::BeeNest(static_cast<Path_BeeNest*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -831,20 +832,20 @@ void Factory::MineAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnims(kAbeGibs);
-        ResourceManagerWrapper::PendAnims(kSlogGibs);
-        ResourceManagerWrapper::PendAnims(kElumGibs);
-        ResourceManagerWrapper::PendAnimation(AnimId::Mine);
-        ResourceManagerWrapper::PendAnimation(AnimId::Mine_Flash);
-        ResourceManagerWrapper::PendAnimation(AnimId::Explosion_Rock);
-        ResourceManagerWrapper::PendAnimation(AnimId::GroundExplosion);
-        if (AO::gMap.mCurrentLevel == EReliveLevelIds::eStockYards || AO::gMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+        mResourceManager.PendAnims(kAbeGibs);
+        mResourceManager.PendAnims(kSlogGibs);
+        mResourceManager.PendAnims(kElumGibs);
+        mResourceManager.PendAnimation(AnimId::Mine);
+        mResourceManager.PendAnimation(AnimId::Mine_Flash);
+        mResourceManager.PendAnimation(AnimId::Explosion_Rock);
+        mResourceManager.PendAnimation(AnimId::GroundExplosion);
+        if (AO::gMap->mCurrentLevel == EReliveLevelIds::eStockYards || AO::gMap->mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
         {
         }
     }
     else
     {
-        relive_new Mine(pMineTlv, tlvId);
+        relive_new Mine(pMineTlv, tlvId, mResourceManager);
     }
 }
 
@@ -854,23 +855,23 @@ void Factory::UXBAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnims(kAbeGibs);
-        ResourceManagerWrapper::PendAnims(kSlogGibs);
-        ResourceManagerWrapper::PendAnims(kElumGibs);
-        ResourceManagerWrapper::PendAnimation(AnimId::UXB_Active);
-        ResourceManagerWrapper::PendAnimation(AnimId::UXB_Toggle);
-        ResourceManagerWrapper::PendAnimation(AnimId::UXB_Disabled);
-        ResourceManagerWrapper::PendAnimation(AnimId::Bomb_Flash);
-        ResourceManagerWrapper::PendAnimation(AnimId::Bomb_RedGreenTick);
-        ResourceManagerWrapper::PendAnimation(AnimId::Explosion_Rock);
-        ResourceManagerWrapper::PendAnimation(AnimId::GroundExplosion);
-        if (AO::gMap.mCurrentLevel == EReliveLevelIds::eStockYards || AO::gMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+        mResourceManager.PendAnims(kAbeGibs);
+        mResourceManager.PendAnims(kSlogGibs);
+        mResourceManager.PendAnims(kElumGibs);
+        mResourceManager.PendAnimation(AnimId::UXB_Active);
+        mResourceManager.PendAnimation(AnimId::UXB_Toggle);
+        mResourceManager.PendAnimation(AnimId::UXB_Disabled);
+        mResourceManager.PendAnimation(AnimId::Bomb_Flash);
+        mResourceManager.PendAnimation(AnimId::Bomb_RedGreenTick);
+        mResourceManager.PendAnimation(AnimId::Explosion_Rock);
+        mResourceManager.PendAnimation(AnimId::GroundExplosion);
+        if (AO::gMap->mCurrentLevel == EReliveLevelIds::eStockYards || AO::gMap->mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
         {
         }
     }
     else
     {
-        relive_new AO::UXB(pUxbTlv, tlvId);
+        relive_new AO::UXB(pUxbTlv, tlvId, mResourceManager);
     }
 }
 
@@ -878,24 +879,24 @@ void Factory::ParamiteAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnims(Paramite::sParamiteMotionAnimIds);
-        ResourceManagerWrapper::PendAnimation(AnimId::ParamiteWeb);
+        mResourceManager.PendAnims(Paramite::sParamiteMotionAnimIds);
+        mResourceManager.PendAnimation(AnimId::ParamiteWeb);
         return;
     }
-    relive_new AO::Paramite(static_cast<Path_Paramite*>(pTlv), tlvId);
+    relive_new AO::Paramite(static_cast<Path_Paramite*>(pTlv), tlvId, mResourceManager);
 }
 
 void Factory::BatAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Bat_Flying);
-        ResourceManagerWrapper::PendAnimation(AnimId::Bat);
-        ResourceManagerWrapper::PendAnimation(AnimId::Bat_Unknown);
+        mResourceManager.PendAnimation(AnimId::Bat_Flying);
+        mResourceManager.PendAnimation(AnimId::Bat);
+        mResourceManager.PendAnimation(AnimId::Bat_Unknown);
     }
     else
     {
-        relive_new AO::Bat(static_cast<Path_Bat*>(pTlv), tlvId);
+        relive_new AO::Bat(static_cast<Path_Bat*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -903,11 +904,11 @@ void Factory::RingMudAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnims(AO::Mudokon::sMudMotionAnimIds);
+        mResourceManager.PendAnims(AO::Mudokon::sMudMotionAnimIds);
     }
     else
     {
-        relive_new AO::Mudokon(pTlv, tlvId);
+        relive_new AO::Mudokon(pTlv, tlvId, mResourceManager);
     }
 }
 
@@ -916,25 +917,25 @@ void Factory::BirdPortalAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
     auto pBirdPortalTlv = static_cast<Path_BirdPortal*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::BirdPortal_TerminatorShrink);
-        ResourceManagerWrapper::PendAnimation(AnimId::BirdPortal_TerminatorIdle);
-        ResourceManagerWrapper::PendAnimation(AnimId::BirdPortal_TerminatorGrow);
-        ResourceManagerWrapper::PendAnimation(AnimId::BirdPortal_TerminatorShrink);
-        ResourceManagerWrapper::PendAnimation(AnimId::BirdPortal_Sparks);
-        ResourceManagerWrapper::PendAnimation(AnimId::BirdPortal_Flash);
+        mResourceManager.PendAnimation(AnimId::BirdPortal_TerminatorShrink);
+        mResourceManager.PendAnimation(AnimId::BirdPortal_TerminatorIdle);
+        mResourceManager.PendAnimation(AnimId::BirdPortal_TerminatorGrow);
+        mResourceManager.PendAnimation(AnimId::BirdPortal_TerminatorShrink);
+        mResourceManager.PendAnimation(AnimId::BirdPortal_Sparks);
+        mResourceManager.PendAnimation(AnimId::BirdPortal_Flash);
 
         if (pBirdPortalTlv->mPortalType == Path_BirdPortal::PortalType::eShrykull)
         {
-            ResourceManagerWrapper::PendAnimation(AnimId::ShrykullStart);
-            ResourceManagerWrapper::PendAnimation(AnimId::ShrykullTransform);
-            ResourceManagerWrapper::PendAnimation(AnimId::ShrykullDetransform);
-            ResourceManagerWrapper::PendAnimation(AnimId::Zap_Line_Blue);
-            ResourceManagerWrapper::PendAnimation(AnimId::Zap_Line_Red);
+            mResourceManager.PendAnimation(AnimId::ShrykullStart);
+            mResourceManager.PendAnimation(AnimId::ShrykullTransform);
+            mResourceManager.PendAnimation(AnimId::ShrykullDetransform);
+            mResourceManager.PendAnimation(AnimId::Zap_Line_Blue);
+            mResourceManager.PendAnimation(AnimId::Zap_Line_Red);
         }
     }
     else
     {
-        relive_new AO::BirdPortal(pBirdPortalTlv, tlvId);
+        relive_new AO::BirdPortal(pBirdPortalTlv, tlvId, mResourceManager);
     }
 }
 
@@ -951,42 +952,42 @@ void Factory::TrapDoorAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        switch (AO::gMap.mCurrentLevel)
+        switch (AO::gMap->mCurrentLevel)
         {
             case EReliveLevelIds::eRuptureFarms:
             case EReliveLevelIds::eBoardRoom:
             case EReliveLevelIds::eRuptureFarmsReturn:
-                ResourceManagerWrapper::PendAnimation(AnimId::R1_TrapDoor_Open);
-                ResourceManagerWrapper::PendAnimation(AnimId::R1_TrapDoor_Closed);
-                ResourceManagerWrapper::PendAnimation(AnimId::R1_TrapDoor_Opening);
-                ResourceManagerWrapper::PendAnimation(AnimId::R1_TrapDoor_Closing);
+                mResourceManager.PendAnimation(AnimId::R1_TrapDoor_Open);
+                mResourceManager.PendAnimation(AnimId::R1_TrapDoor_Closed);
+                mResourceManager.PendAnimation(AnimId::R1_TrapDoor_Opening);
+                mResourceManager.PendAnimation(AnimId::R1_TrapDoor_Closing);
                 break;
             case EReliveLevelIds::eLines:
             case EReliveLevelIds::eStockYards:
-                ResourceManagerWrapper::PendAnimation(AnimId::Lines_TrapDoor_Open);
-                ResourceManagerWrapper::PendAnimation(AnimId::Lines_TrapDoor_Closed);
-                ResourceManagerWrapper::PendAnimation(AnimId::Lines_TrapDoor_Opening);
-                ResourceManagerWrapper::PendAnimation(AnimId::Lines_TrapDoor_Closing);
+                mResourceManager.PendAnimation(AnimId::Lines_TrapDoor_Open);
+                mResourceManager.PendAnimation(AnimId::Lines_TrapDoor_Closed);
+                mResourceManager.PendAnimation(AnimId::Lines_TrapDoor_Opening);
+                mResourceManager.PendAnimation(AnimId::Lines_TrapDoor_Closing);
                 break;
             case EReliveLevelIds::eDesert:
             case EReliveLevelIds::eDesertTemple:
             case EReliveLevelIds::eDesertEscape:
-                ResourceManagerWrapper::PendAnimation(AnimId::Desert_TrapDoor_Open);
-                ResourceManagerWrapper::PendAnimation(AnimId::Desert_TrapDoor_Closed);
-                ResourceManagerWrapper::PendAnimation(AnimId::Desert_TrapDoor_Opening);
-                ResourceManagerWrapper::PendAnimation(AnimId::Desert_TrapDoor_Closing);
+                mResourceManager.PendAnimation(AnimId::Desert_TrapDoor_Open);
+                mResourceManager.PendAnimation(AnimId::Desert_TrapDoor_Closed);
+                mResourceManager.PendAnimation(AnimId::Desert_TrapDoor_Opening);
+                mResourceManager.PendAnimation(AnimId::Desert_TrapDoor_Closing);
                 break;
             default:
-                ResourceManagerWrapper::PendAnimation(AnimId::Lines_TrapDoor_Open);
-                ResourceManagerWrapper::PendAnimation(AnimId::Lines_TrapDoor_Closed);
-                ResourceManagerWrapper::PendAnimation(AnimId::Lines_TrapDoor_Opening);
-                ResourceManagerWrapper::PendAnimation(AnimId::Lines_TrapDoor_Closing);
+                mResourceManager.PendAnimation(AnimId::Lines_TrapDoor_Open);
+                mResourceManager.PendAnimation(AnimId::Lines_TrapDoor_Closed);
+                mResourceManager.PendAnimation(AnimId::Lines_TrapDoor_Opening);
+                mResourceManager.PendAnimation(AnimId::Lines_TrapDoor_Closing);
                 break;
         }
     }
     else
     {
-        relive_new TrapDoor(static_cast<Path_TrapDoor*>(pTlv), tlvId);
+        relive_new TrapDoor(static_cast<Path_TrapDoor*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -995,13 +996,13 @@ void Factory::RollingBallAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Stone_Ball);
-        ResourceManagerWrapper::PendAnimation(AnimId::Stone_Ball_Rolling);
-        ResourceManagerWrapper::PendAnimation(AnimId::Explosion_Rock);
+        mResourceManager.PendAnimation(AnimId::Stone_Ball);
+        mResourceManager.PendAnimation(AnimId::Stone_Ball_Rolling);
+        mResourceManager.PendAnimation(AnimId::Explosion_Rock);
     }
     else
     {
-        relive_new AO::RollingBall(static_cast<Path_RollingBall*>(pTlv), tlvId);
+        relive_new AO::RollingBall(static_cast<Path_RollingBall*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1021,7 +1022,7 @@ static TlvIterator FindMatchingSligTLVAO(TlvIterator pTlvIter, Path_SligBound* p
 void Factory::SligBoundLeftAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     auto pBound = static_cast<Path_SligBound*>(pTlv);
-    LoadWalkingSligResourcesAO(loadMode, pBound->mDisabledResourcesAO);
+    LoadWalkingSligResourcesAO(loadMode, pBound->mDisabledResourcesAO, mResourceManager);
 
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1034,14 +1035,14 @@ void Factory::SligBoundLeftAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMo
 
         for (s16 camX_idx = -2; camX_idx < 3; camX_idx++)
         {
-            TlvIterator pTlvIter = AO::gMap.Get_First_TLV_For_Offsetted_Camera(camX_idx, 0);
+            TlvIterator pTlvIter = AO::gMap->Get_First_TLV_For_Offsetted_Camera(camX_idx, 0);
             Path_TLV* pSligTlv = FindMatchingSligTLVAO(pTlvIter, pBound).GetTlv();
             if (pSligTlv)
             {
                 pSligTlv->mTlvFlags.Set(TlvFlags::eBit1_Created);
                 pSligTlv->mTlvFlags.Set(TlvFlags::eBit2_Destroyed);
                 // AO OG bug tlvId not recalculated??
-                relive_new AO::Slig(static_cast<Path_Slig*>(pSligTlv), tlvId);
+                relive_new AO::Slig(static_cast<Path_Slig*>(pSligTlv), tlvId, mResourceManager);
                 return;
             }
         }
@@ -1052,11 +1053,11 @@ void Factory::RollingBallStopperAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode l
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Stone_Ball_Stopper);
+        mResourceManager.PendAnimation(AnimId::Stone_Ball_Stopper);
     }
     else
     {
-        relive_new RollingBallStopper(static_cast<Path_RollingBallStopper*>(pTlv), tlvId);
+        relive_new RollingBallStopper(static_cast<Path_RollingBallStopper*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1064,12 +1065,12 @@ void Factory::FootSwitchAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Foot_Switch_Temple);
-        ResourceManagerWrapper::PendAnimation(AnimId::Foot_Switch_Temple_Pressed);
+        mResourceManager.PendAnimation(AnimId::Foot_Switch_Temple);
+        mResourceManager.PendAnimation(AnimId::Foot_Switch_Temple_Pressed);
     }
     else
     {
-        relive_new AO::FootSwitch(static_cast<Path_FootSwitch*>(pTlv), tlvId);
+        relive_new AO::FootSwitch(static_cast<Path_FootSwitch*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1078,22 +1079,22 @@ void Factory::SecurityClawAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
     auto pSecurityClawTlv = static_cast<Path_SecurityClaw*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Security_Claw_Lower_Open);
-        ResourceManagerWrapper::PendAnimation(AnimId::Security_Claw_Lower_Close);
-        ResourceManagerWrapper::PendAnimation(AnimId::Security_Claw_Lower_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::Security_Claw_Upper_Rotating);
-        ResourceManagerWrapper::PendAnimation(AnimId::Security_Claw_Upper_NoRotation);
-        ResourceManagerWrapper::PendAnimation(AnimId::Zap_Line_Blue);
-        ResourceManagerWrapper::PendAnimation(AnimId::Zap_Line_Red);
-        ResourceManagerWrapper::PendAnims(kAbeGibs);
-        ResourceManagerWrapper::PendAnims(kSlogGibs);
-        ResourceManagerWrapper::PendAnims(kElumGibs);
-        ResourceManagerWrapper::PendAnimation(AnimId::Metal_Gib);
-        ResourceManagerWrapper::PendAnimation(AnimId::AirExplosion);
+        mResourceManager.PendAnimation(AnimId::Security_Claw_Lower_Open);
+        mResourceManager.PendAnimation(AnimId::Security_Claw_Lower_Close);
+        mResourceManager.PendAnimation(AnimId::Security_Claw_Lower_Idle);
+        mResourceManager.PendAnimation(AnimId::Security_Claw_Upper_Rotating);
+        mResourceManager.PendAnimation(AnimId::Security_Claw_Upper_NoRotation);
+        mResourceManager.PendAnimation(AnimId::Zap_Line_Blue);
+        mResourceManager.PendAnimation(AnimId::Zap_Line_Red);
+        mResourceManager.PendAnims(kAbeGibs);
+        mResourceManager.PendAnims(kSlogGibs);
+        mResourceManager.PendAnims(kElumGibs);
+        mResourceManager.PendAnimation(AnimId::Metal_Gib);
+        mResourceManager.PendAnimation(AnimId::AirExplosion);
     }
     else
     {
-        relive_new AO::SecurityClaw(pSecurityClawTlv, tlvId);
+        relive_new AO::SecurityClaw(pSecurityClawTlv, tlvId, mResourceManager);
     }
 }
 
@@ -1102,19 +1103,19 @@ void Factory::MotionDetectorAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadM
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
-        relive_new AO::MotionDetector(static_cast<Path_MotionDetector*>(pTlv), tlvId);
+        relive_new AO::MotionDetector(static_cast<Path_MotionDetector*>(pTlv), tlvId, mResourceManager);
     }
     else
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::MotionDetector_Flare);
-        ResourceManagerWrapper::PendAnimation(AnimId::MotionDetector_Laser);
+        mResourceManager.PendAnimation(AnimId::MotionDetector_Flare);
+        mResourceManager.PendAnimation(AnimId::MotionDetector_Laser);
     }
 }
 
 void Factory::SligSpawnerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     auto pSligTlv = static_cast<Path_SligSpawner*>(pTlv);
-    LoadWalkingSligResourcesAO(loadMode, pSligTlv->mData.mDisabledResourcesAO);
+    LoadWalkingSligResourcesAO(loadMode, pSligTlv->mData.mDisabledResourcesAO, mResourceManager);
 
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1122,7 +1123,7 @@ void Factory::SligSpawnerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     }
     else
     {
-        relive_new AO::SligSpawner(pTlv, &pSligTlv->mData, tlvId);
+        relive_new AO::SligSpawner(pTlv, &pSligTlv->mData, tlvId, mResourceManager);
     }
 }
 
@@ -1130,11 +1131,11 @@ void Factory::ElectricWallAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
-        relive_new ElectricWall(static_cast<Path_ElectricWall*>(pTlv), tlvId);
+        relive_new ElectricWall(static_cast<Path_ElectricWall*>(pTlv), tlvId, mResourceManager);
     }
     else
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Electric_Wall);
+        mResourceManager.PendAnimation(AnimId::Electric_Wall);
     }
 }
 
@@ -1143,7 +1144,7 @@ void Factory::LiftMoverAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
-        relive_new AO::LiftMover(static_cast<Path_LiftMover*>(pTlv), tlvId);
+        relive_new AO::LiftMover(static_cast<Path_LiftMover*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1152,17 +1153,17 @@ void Factory::ChimeLockAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
-        relive_new AO::ChimeLock(static_cast<Path_ChimeLock*>(pTlv), tlvId);
+        relive_new AO::ChimeLock(static_cast<Path_ChimeLock*>(pTlv), tlvId, mResourceManager);
     }
     else
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Chime_Ball);
-        ResourceManagerWrapper::PendAnimation(AnimId::BigChime);
-        ResourceManagerWrapper::PendAnimation(AnimId::MediumChime);
-        ResourceManagerWrapper::PendAnimation(AnimId::SmallChime);
-        ResourceManagerWrapper::PendAnimation(AnimId::BigChime_Moving);
-        ResourceManagerWrapper::PendAnimation(AnimId::MediumChime_Moving);
-        ResourceManagerWrapper::PendAnimation(AnimId::SmallChime_Moving);
+        mResourceManager.PendAnimation(AnimId::Chime_Ball);
+        mResourceManager.PendAnimation(AnimId::BigChime);
+        mResourceManager.PendAnimation(AnimId::MediumChime);
+        mResourceManager.PendAnimation(AnimId::SmallChime);
+        mResourceManager.PendAnimation(AnimId::BigChime_Moving);
+        mResourceManager.PendAnimation(AnimId::MediumChime_Moving);
+        mResourceManager.PendAnimation(AnimId::SmallChime_Moving);
     }
 }
 
@@ -1170,7 +1171,7 @@ void Factory::ElumAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnims(AO::Elum::gElumMotionAnimIds);
+        mResourceManager.PendAnims(AO::Elum::gElumMotionAnimIds);
     }
     else
     {
@@ -1185,13 +1186,13 @@ void Factory::MeatSackAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Meat);
-        ResourceManagerWrapper::PendAnimation(AnimId::MeatSack_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::MeatSack_Hit);
+        mResourceManager.PendAnimation(AnimId::Meat);
+        mResourceManager.PendAnimation(AnimId::MeatSack_Idle);
+        mResourceManager.PendAnimation(AnimId::MeatSack_Hit);
     }
     else
     {
-        relive_new AO::MeatSack(static_cast<Path_MeatSack*>(pTlv), tlvId);
+        relive_new AO::MeatSack(static_cast<Path_MeatSack*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1200,10 +1201,10 @@ void Factory::ScrabAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnims(Scrab::sScrabMotionAnimIds);
+        mResourceManager.PendAnims(Scrab::sScrabMotionAnimIds);
         return;
     }
-    relive_new AO::Scrab(static_cast<Path_Scrab*>(pTlv), tlvId);
+    relive_new AO::Scrab(static_cast<Path_Scrab*>(pTlv), tlvId, mResourceManager);
 }
 
 
@@ -1211,14 +1212,14 @@ void Factory::FlintLockFireAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMo
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Fire);
-        ResourceManagerWrapper::PendAnimation(AnimId::FlintLock_Gourd);
-        ResourceManagerWrapper::PendAnimation(AnimId::FlintLock_Hammers_Disabled);
-        ResourceManagerWrapper::PendAnimation(AnimId::FlintLock_Hammers_Activating);
+        mResourceManager.PendAnimation(AnimId::Fire);
+        mResourceManager.PendAnimation(AnimId::FlintLock_Gourd);
+        mResourceManager.PendAnimation(AnimId::FlintLock_Hammers_Disabled);
+        mResourceManager.PendAnimation(AnimId::FlintLock_Hammers_Activating);
     }
     else
     {
-        relive_new AO::FlintLockFire(static_cast<Path_FlintLockFire*>(pTlv), tlvId);
+        relive_new AO::FlintLockFire(static_cast<Path_FlintLockFire*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1231,7 +1232,7 @@ void Factory::InvisibleSwitchAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode load
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
-        relive_new InvisibleSwitch(static_cast<Path_InvisibleSwitch*>(pTlv), tlvId);
+        relive_new InvisibleSwitch(static_cast<Path_InvisibleSwitch*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1249,11 +1250,11 @@ void Factory::WorkerMudokonAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMo
                 break;
         }
 
-        relive_new AO::Mudokon(pTlv, tlvId);
+        relive_new AO::Mudokon(pTlv, tlvId, mResourceManager);
     }
     else
     {
-        ResourceManagerWrapper::PendAnims(AO::Mudokon::sMudMotionAnimIds);
+        mResourceManager.PendAnims(AO::Mudokon::sMudMotionAnimIds);
         switch (pMudTlv->mJob)
         {
             case Path_Mudokon::MudJobs::eStandScrub:
@@ -1278,12 +1279,12 @@ void Factory::DoorFlameAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Fire);
-        ResourceManagerWrapper::PendAnimation(AnimId::Door_FireBackgroundGlow);
+        mResourceManager.PendAnimation(AnimId::Fire);
+        mResourceManager.PendAnimation(AnimId::Door_FireBackgroundGlow);
     }
     else
     {
-        relive_new AO::DoorFlame(static_cast<Path_DoorFlame*>(pTlv), tlvId);
+        relive_new AO::DoorFlame(static_cast<Path_DoorFlame*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1293,19 +1294,19 @@ void Factory::MovingBombAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::MovingBomb);
-        ResourceManagerWrapper::PendAnimation(AnimId::AirExplosion);
-        ResourceManagerWrapper::PendAnimation(AnimId::Metal_Gib);
-        ResourceManagerWrapper::PendAnims(kAbeGibs);
-        ResourceManagerWrapper::PendAnims(kElumGibs);
+        mResourceManager.PendAnimation(AnimId::MovingBomb);
+        mResourceManager.PendAnimation(AnimId::AirExplosion);
+        mResourceManager.PendAnimation(AnimId::Metal_Gib);
+        mResourceManager.PendAnims(kAbeGibs);
+        mResourceManager.PendAnims(kElumGibs);
 
-        if (AO::gMap.mCurrentLevel == EReliveLevelIds::eStockYards || AO::gMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+        if (AO::gMap->mCurrentLevel == EReliveLevelIds::eStockYards || AO::gMap->mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
         {
         }
     }
     else
     {
-        relive_new MovingBomb(pMovingBombTlv, tlvId);
+        relive_new AO::MovingBomb(pMovingBombTlv, tlvId, mResourceManager);
     }
 }
 
@@ -1313,14 +1314,14 @@ void Factory::MeatSawAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::MeatSawMotor);
-        ResourceManagerWrapper::PendAnimation(AnimId::MeatSaw_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::MeatSaw_Moving);
-        ResourceManagerWrapper::PendAnims(kAbeGibs);
+        mResourceManager.PendAnimation(AnimId::MeatSawMotor);
+        mResourceManager.PendAnimation(AnimId::MeatSaw_Idle);
+        mResourceManager.PendAnimation(AnimId::MeatSaw_Moving);
+        mResourceManager.PendAnims(kAbeGibs);
     }
     else
     {
-        relive_new AO::MeatSaw(static_cast<Path_MeatSaw*>(pTlv), tlvId);
+        relive_new AO::MeatSaw(static_cast<Path_MeatSaw*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1330,11 +1331,11 @@ void Factory::MainMenuControllerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode l
     {
         if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
         {
-            ResourceManagerWrapper::PendAnims(AO::Menu::kAnims);
+            mResourceManager.PendAnims(AO::Menu::kAnims);
         }
         else
         {
-            relive_new AO::Menu(pTlv, tlvId);
+            relive_new AO::Menu(pTlv, tlvId, mResourceManager);
         }
     }
 }
@@ -1343,11 +1344,11 @@ void Factory::HintFlyAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
-        relive_new AO::HintFly(static_cast<Path_HintFly*>(pTlv), tlvId);
+        relive_new AO::HintFly(static_cast<Path_HintFly*>(pTlv), tlvId, mResourceManager);
     }
     else
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::HintFly);
+        mResourceManager.PendAnimation(AnimId::HintFly);
     }
 }
 
@@ -1355,7 +1356,7 @@ void Factory::TimerTriggerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
-        relive_new TimerTrigger(static_cast<Path_TimerTrigger*>(pTlv), tlvId);
+        relive_new TimerTrigger(static_cast<Path_TimerTrigger*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1364,12 +1365,12 @@ void Factory::SecurityDoorAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Security_Door_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::Security_Door_Speak);
+        mResourceManager.PendAnimation(AnimId::Security_Door_Idle);
+        mResourceManager.PendAnimation(AnimId::Security_Door_Speak);
     }
     else
     {
-        relive_new AO::SecurityDoor(static_cast<Path_SecurityDoor*>(pTlv), tlvId);
+        relive_new AO::SecurityDoor(static_cast<Path_SecurityDoor*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1378,19 +1379,19 @@ void Factory::BoomMachineAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     auto pBoomMachineTlv = static_cast<Path_BoomMachine*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Grenade);
-        ResourceManagerWrapper::PendAnimation(AnimId::AirExplosion);
-        ResourceManagerWrapper::PendAnims(kAbeGibs);
-        ResourceManagerWrapper::PendAnimation(AnimId::Metal_Gib);
-        ResourceManagerWrapper::PendAnims(kSlogGibs);
-        ResourceManagerWrapper::PendAnimation(AnimId::BoomMachine_Pipe_DropGrenade);
-        ResourceManagerWrapper::PendAnimation(AnimId::BoomMachine_Pipe_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::BoomMachine_Button_Off);
-        ResourceManagerWrapper::PendAnimation(AnimId::BoomMachine_Button_On);
+        mResourceManager.PendAnimation(AnimId::Grenade);
+        mResourceManager.PendAnimation(AnimId::AirExplosion);
+        mResourceManager.PendAnims(kAbeGibs);
+        mResourceManager.PendAnimation(AnimId::Metal_Gib);
+        mResourceManager.PendAnims(kSlogGibs);
+        mResourceManager.PendAnimation(AnimId::BoomMachine_Pipe_DropGrenade);
+        mResourceManager.PendAnimation(AnimId::BoomMachine_Pipe_Idle);
+        mResourceManager.PendAnimation(AnimId::BoomMachine_Button_Off);
+        mResourceManager.PendAnimation(AnimId::BoomMachine_Button_On);
         return;
     }
 
-    relive_new BoomMachine(pBoomMachineTlv, tlvId);
+    relive_new BoomMachine(pBoomMachineTlv, tlvId, mResourceManager);
 }
 
 
@@ -1401,7 +1402,7 @@ void Factory::LCDScreenAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
     }
     else
     {
-        relive_new AO::LCDScreen(static_cast<Path_LCDScreen*>(pTlv), tlvId);
+        relive_new AO::LCDScreen(static_cast<Path_LCDScreen*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1409,7 +1410,7 @@ void Factory::HandStoneAO(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode loadMo
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Circular_Fade);
+        mResourceManager.PendAnimation(AnimId::Circular_Fade);
     }
     else
     {
@@ -1424,7 +1425,7 @@ void Factory::CreditsControllerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode lo
     {
         if (!AO::gCreditsControllerExists)
         {
-            relive_new AO::CreditsController(static_cast<Path_CreditsController*>(pTlv), tlvId);
+            relive_new AO::CreditsController(static_cast<Path_CreditsController*>(pTlv), tlvId, mResourceManager);
         }
     }
 }
@@ -1436,7 +1437,7 @@ void Factory::LCDStatusBoardAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadM
     }
     else
     {
-        relive_new AO::LCDStatusBoard(static_cast<Path_LCDStatusBoard*>(pTlv), tlvId);
+        relive_new AO::LCDStatusBoard(static_cast<Path_LCDStatusBoard*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1446,7 +1447,7 @@ void Factory::SwitchStateBooleanLogicAO(Path_TLV* /*pTlv*/, const Guid& /*tlvId*
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
         LOG_WARNING("Factory_SwitchStateBooleanLogic_487B80 tlv converter not implemented");
-        //relive_new SwitchStateBooleanLogic(static_cast<Path_SwitchStateBooleanLogic*>(pTlv), tlvId);
+        //relive_new SwitchStateBooleanLogic(static_cast<Path_SwitchStateBooleanLogic*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1454,7 +1455,7 @@ void Factory::MusicTriggerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
-        relive_new AO::MusicTrigger(static_cast<Path_MusicTrigger*>(pTlv), tlvId);
+        relive_new AO::MusicTrigger(static_cast<Path_MusicTrigger*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1466,29 +1467,29 @@ void Factory::LightEffectAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
         switch (pPathLightTlv->mType)
         {
             case Path_LightEffect::Type::Star:
-                ResourceManagerWrapper::PendAnimation(AnimId::Star);
+                mResourceManager.PendAnimation(AnimId::Star);
                 break;
 
             case Path_LightEffect::Type::GoldGlow:
-                ResourceManagerWrapper::PendAnimation(AnimId::GoldGlow);
+                mResourceManager.PendAnimation(AnimId::GoldGlow);
                 break;
 
             case Path_LightEffect::Type::GreenGlow:
-                ResourceManagerWrapper::PendAnimation(AnimId::GreenGlow);
+                mResourceManager.PendAnimation(AnimId::GreenGlow);
                 break;
 
             case Path_LightEffect::Type::FlintGlow:
-                ResourceManagerWrapper::PendAnimation(AnimId::FlintGlow);
+                mResourceManager.PendAnimation(AnimId::FlintGlow);
                 break;
 
             case Path_LightEffect::Type::Switchable_RedGreenDoorLights:
-                ResourceManagerWrapper::PendAnimation(AnimId::RedDoorLight);
-                ResourceManagerWrapper::PendAnimation(AnimId::GreenDoorLight);
+                mResourceManager.PendAnimation(AnimId::RedDoorLight);
+                mResourceManager.PendAnimation(AnimId::GreenDoorLight);
                 break;
 
             case Path_LightEffect::Type::Switchable_RedGreenHubLight:
-                ResourceManagerWrapper::PendAnimation(AnimId::RedHubLight);
-                ResourceManagerWrapper::PendAnimation(AnimId::GreenHubLight);
+                mResourceManager.PendAnimation(AnimId::RedHubLight);
+                mResourceManager.PendAnimation(AnimId::GreenHubLight);
                 break;
 
             default:
@@ -1501,32 +1502,32 @@ void Factory::LightEffectAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
         {
             case Path_LightEffect::Type::Star:
             {
-                relive_new AO::LightEffect(pPathLightTlv, tlvId);
+                relive_new AO::LightEffect(pPathLightTlv, tlvId, mResourceManager);
                 break;
             }
 
             case Path_LightEffect::Type::GoldGlow:
             {
-                relive_new AO::DoorLight(pPathLightTlv, tlvId);
+                relive_new AO::DoorLight(pPathLightTlv, tlvId, mResourceManager);
                 break;
             }
 
             case Path_LightEffect::Type::GreenGlow:
             {
-                relive_new AO::DoorLight(pPathLightTlv, tlvId);
+                relive_new AO::DoorLight(pPathLightTlv, tlvId, mResourceManager);
                 break;
             }
 
             case Path_LightEffect::Type::FlintGlow:
             {
-                relive_new AO::DoorLight(pPathLightTlv, tlvId);
+                relive_new AO::DoorLight(pPathLightTlv, tlvId, mResourceManager);
                 break;
             }
 
             case Path_LightEffect::Type::Switchable_RedGreenDoorLights:
             case Path_LightEffect::Type::Switchable_RedGreenHubLight:
             {
-                relive_new AO::DoorLight(pPathLightTlv, tlvId);
+                relive_new AO::DoorLight(pPathLightTlv, tlvId, mResourceManager);
                 break;
             }
 
@@ -1541,11 +1542,11 @@ void Factory::SlogSpawnerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnims(AO::Slog::sSlogMotionAnimIds);
+        mResourceManager.PendAnims(AO::Slog::sSlogMotionAnimIds);
     }
     else
     {
-        relive_new AO::SlogSpawner(static_cast<Path_SlogSpawner*>(pTlv), tlvId);
+        relive_new AO::SlogSpawner(static_cast<Path_SlogSpawner*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1557,7 +1558,7 @@ void Factory::GasCountDownAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
     }
     else
     {
-        relive_new GasCountDown(static_cast<Path_GasCountDown*>(pTlv), tlvId);
+        relive_new GasCountDown(static_cast<Path_GasCountDown*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1594,7 +1595,7 @@ void Factory::GasEmitterAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
-        relive_new GasEmitter(static_cast<Path_GasEmitter*>(pTlv), tlvId);
+        relive_new GasEmitter(static_cast<Path_GasEmitter*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1603,7 +1604,7 @@ void Factory::ZzzSpawnerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
-        relive_new ZzzSpawner(static_cast<Path_ZzzSpawner*>(pTlv), tlvId);
+        relive_new ZzzSpawner(static_cast<Path_ZzzSpawner*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1612,17 +1613,17 @@ void Factory::BackgroundGlukkonAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode lo
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Background_Glukkon_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::Background_Glukkon_Laugh);
-        ResourceManagerWrapper::PendAnimation(AnimId::Background_Glukkon_KillHim1);
-        ResourceManagerWrapper::PendAnimation(AnimId::Background_Glukkon_KillHim2);
-        ResourceManagerWrapper::PendAnimation(AnimId::Background_Glukkon_Dying);
-        ResourceManagerWrapper::PendAnims(kSlogGibs);
-        ResourceManagerWrapper::PendAnimation(AnimId::AirExplosion);
+        mResourceManager.PendAnimation(AnimId::Background_Glukkon_Idle);
+        mResourceManager.PendAnimation(AnimId::Background_Glukkon_Laugh);
+        mResourceManager.PendAnimation(AnimId::Background_Glukkon_KillHim1);
+        mResourceManager.PendAnimation(AnimId::Background_Glukkon_KillHim2);
+        mResourceManager.PendAnimation(AnimId::Background_Glukkon_Dying);
+        mResourceManager.PendAnims(kSlogGibs);
+        mResourceManager.PendAnimation(AnimId::AirExplosion);
     }
     else
     {
-        relive_new AO::BackgroundGlukkon(static_cast<Path_BackgroundGlukkon*>(pTlv), tlvId);
+        relive_new AO::BackgroundGlukkon(static_cast<Path_BackgroundGlukkon*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1655,22 +1656,22 @@ void Factory::MainMenuControllerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode l
             {
                 if (info.field_0_animation != AnimId::None)
                 {
-                    ResourceManagerWrapper::PendAnimation(info.field_0_animation);
+                    mResourceManager.PendAnimation(info.field_0_animation);
                 }
             }
-            ResourceManagerWrapper::PendAnims(MainMenuController::kMenuAnims);
+            mResourceManager.PendAnims(MainMenuController::kMenuAnims);
 
             // Originally loaded in the PauseMenu::Init()
-            ResourceManagerWrapper::PendAnimation(AnimId::NormalMudIcon);
-            ResourceManagerWrapper::PendAnimation(AnimId::AngryMudIcon);
-            ResourceManagerWrapper::PendAnimation(AnimId::HappyMudIcon);
+            mResourceManager.PendAnimation(AnimId::NormalMudIcon);
+            mResourceManager.PendAnimation(AnimId::AngryMudIcon);
+            mResourceManager.PendAnimation(AnimId::HappyMudIcon);
 
             // Originally loaded in Game_Init_LoadingIcon()
-            ResourceManagerWrapper::PendAnimation(AnimId::Loading_Icon2);
+            mResourceManager.PendAnimation(AnimId::Loading_Icon2);
         }
         else
         {
-            relive_new MainMenuController(pTlv, tlvId);
+            relive_new MainMenuController(pTlv, tlvId, mResourceManager);
         }
     }
 }
@@ -1680,14 +1681,14 @@ void Factory::HoistAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode)
     Path_Hoist* pHoistTlv = static_cast<Path_Hoist*>(pTlv);
     if (loadmode == LoadMode::LoadResourceFromList_1 || loadmode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::HoistRock1);
-        ResourceManagerWrapper::PendAnimation(AnimId::HoistRock2);
-        ResourceManagerWrapper::PendAnimation(AnimId::HoistRock3);
+        mResourceManager.PendAnimation(AnimId::HoistRock1);
+        mResourceManager.PendAnimation(AnimId::HoistRock2);
+        mResourceManager.PendAnimation(AnimId::HoistRock3);
     }
     else if (pHoistTlv->mHoistType == Path_Hoist::Type::eOffScreen)
     {
         // Its an off screen hoist so create the falling rocks effect
-        relive_new HoistRocksEffect(pHoistTlv, tlvId);
+        relive_new HoistRocksEffect(pHoistTlv, tlvId, mResourceManager);
     }
     else
     {
@@ -1712,12 +1713,12 @@ void Factory::DoorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode)
     if (loadmode == LoadMode::LoadResourceFromList_1 || loadmode == LoadMode::LoadResource_2)
     {
         auto pDoorTlv = static_cast<Path_Door*>(pTlv);
-        ResourceManagerWrapper::PendAnimation(AnimId::Door_Themed_Closed, pDoorTlv->mTheme);
-        ResourceManagerWrapper::PendAnimation(AnimId::Door_Themed_Open, pDoorTlv->mTheme);
+        mResourceManager.PendAnimation(AnimId::Door_Themed_Closed, pDoorTlv->mTheme);
+        mResourceManager.PendAnimation(AnimId::Door_Themed_Open, pDoorTlv->mTheme);
     }
     else
     {
-        relive_new Door(static_cast<Path_Door*>(pTlv), tlvId);
+        relive_new Door(static_cast<Path_Door*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1725,7 +1726,7 @@ void Factory::ShadowZoneAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode)
 {
     if (loadmode != LoadMode::LoadResourceFromList_1 && loadmode != LoadMode::LoadResource_2)
     {
-        relive_new ShadowZone(static_cast<Path_ShadowZone*>(pTlv), tlvId);
+        relive_new ShadowZone(static_cast<Path_ShadowZone*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1733,17 +1734,17 @@ void Factory::LiftPointAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::AE_Rope);
-        switch (gMap.mCurrentLevel)
+        mResourceManager.PendAnimation(AnimId::AE_Rope);
+        switch (gMap->mCurrentLevel)
         {
             case EReliveLevelIds::eNecrum:
             case EReliveLevelIds::eMudomoVault:
             case EReliveLevelIds::eMudomoVault_Ender:
             case EReliveLevelIds::eMudancheeVault:
             case EReliveLevelIds::eMudancheeVault_Ender:
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftPlatform_Necrum);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftBottomWheel_Necrum);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftTopWheel_Necrum);
+                mResourceManager.PendAnimation(AnimId::LiftPlatform_Necrum);
+                mResourceManager.PendAnimation(AnimId::LiftBottomWheel_Necrum);
+                mResourceManager.PendAnimation(AnimId::LiftTopWheel_Necrum);
                 break;
 
             case EReliveLevelIds::eFeeCoDepot:
@@ -1754,15 +1755,15 @@ void Factory::LiftPointAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
             case EReliveLevelIds::eBonewerkz_Ender:
             case EReliveLevelIds::eBrewery:
             case EReliveLevelIds::eBrewery_Ender:
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftPlatform_Mines);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftBottomWheel_Mines);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftTopWheel_Mines);
+                mResourceManager.PendAnimation(AnimId::LiftPlatform_Mines);
+                mResourceManager.PendAnimation(AnimId::LiftBottomWheel_Mines);
+                mResourceManager.PendAnimation(AnimId::LiftTopWheel_Mines);
                 break;
 
             default:
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftPlatform_Mines);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftBottomWheel_Mines);
-                ResourceManagerWrapper::PendAnimation(AnimId::LiftTopWheel_Mines);
+                mResourceManager.PendAnimation(AnimId::LiftPlatform_Mines);
+                mResourceManager.PendAnimation(AnimId::LiftBottomWheel_Mines);
+                mResourceManager.PendAnimation(AnimId::LiftTopWheel_Mines);
                 break;
         }
     }
@@ -1782,7 +1783,7 @@ void Factory::LiftPointAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
                 // Is there already an existing LiftPoint object for this TLV?
                 LiftPoint* pLiftPoint = static_cast<LiftPoint*>(pObj);
                 const s16 xpos = FP_GetExponent(pLiftPoint->mXPos);
-                if (pTlv->mTopLeftX <= xpos && xpos <= pTlv->mBottomRightX && pLiftPoint->mLiftPointId == pLiftTlv->mLiftPointId && pLiftPoint->mCurrentLevel == gMap.mCurrentLevel && pLiftPoint->mCurrentPath == gMap.mCurrentPath)
+                if (pTlv->mTopLeftX <= xpos && xpos <= pTlv->mBottomRightX && pLiftPoint->mLiftPointId == pLiftTlv->mLiftPointId && pLiftPoint->mCurrentLevel == gMap->mCurrentLevel && pLiftPoint->mCurrentPath == gMap->mCurrentPath)
                 {
                     // Yes so just reset its data
                     Path::TLV_Reset(tlvId);
@@ -1794,7 +1795,7 @@ void Factory::LiftPointAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
         // TODO: Meaning of the data in mTlvSpecificMeaning for lift point
         if (pLiftTlv->mTlvSpecificMeaning & 2 || (pLiftTlv->mTlvSpecificMeaning == 0 && pLiftTlv->mIsStartPoint))
         {
-            relive_new LiftPoint(pLiftTlv, tlvId);
+            relive_new LiftPoint(pLiftTlv, tlvId, mResourceManager);
             return;
         }
         else
@@ -1818,7 +1819,7 @@ void Factory::LiftPointAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 
                         if (absX < 5 && pLiftPointIter->mLiftPointId == pLiftTlv->mLiftPointId && (pLiftPointIter->mTlvSpecificMeaning & 2 || pLiftPointIter->mTlvSpecificMeaning == 0) && pLiftPointIter->mIsStartPoint)
                         {
-                            relive_new LiftPoint(pLiftPointIter, tlvId);
+                            relive_new LiftPoint(pLiftPointIter, tlvId, mResourceManager);
                             return;
                         }
                     }
@@ -1829,7 +1830,7 @@ void Factory::LiftPointAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
             }
 
             // Default to original
-            relive_new LiftPoint(pLiftTlv, tlvId);
+            relive_new LiftPoint(pLiftTlv, tlvId, mResourceManager);
         }
     }
 }
@@ -1838,14 +1839,14 @@ void Factory::WellAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode)
 {
     if (loadmode == LoadMode::LoadResourceFromList_1 || loadmode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Well_Leaf);
+        mResourceManager.PendAnimation(AnimId::Well_Leaf);
     }
     else
     {
         Path_WellBase* pWellTlv = static_cast<Path_WellBase*>(pTlv);
         const FP xpos = FP_FromInteger(pWellTlv->mTopLeftX);
         const FP ypos = FP_FromInteger(pWellTlv->mTopLeftY + 5);
-        relive_new Well(pWellTlv, xpos, ypos, tlvId);
+        relive_new Well(pWellTlv, xpos, ypos, tlvId, mResourceManager);
     }
 }
 
@@ -1885,14 +1886,14 @@ void Factory::RockSackAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Rock);
-        ResourceManagerWrapper::PendAnimation(AnimId::RockSack_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::RockSack_SoftHit);
-        ResourceManagerWrapper::PendAnimation(AnimId::RockSack_HardHit);
+        mResourceManager.PendAnimation(AnimId::Rock);
+        mResourceManager.PendAnimation(AnimId::RockSack_Idle);
+        mResourceManager.PendAnimation(AnimId::RockSack_SoftHit);
+        mResourceManager.PendAnimation(AnimId::RockSack_HardHit);
     }
     else
     {
-        relive_new RockSack(static_cast<Path_RockSack*>(pTlv), tlvId);
+        relive_new RockSack(static_cast<Path_RockSack*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1900,24 +1901,24 @@ void Factory::FallingItemAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode
 {
     if (loadmode == LoadMode::LoadResourceFromList_1 || loadmode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Explosion_Stick);
-        ResourceManagerWrapper::PendAnimation(AnimId::ObjectShadow);
-        ResourceManagerWrapper::PendAnimation(AnimId::Explosion_Rock);
-        if (gMap.mCurrentLevel == EReliveLevelIds::eBonewerkz)
+        mResourceManager.PendAnimation(AnimId::Explosion_Stick);
+        mResourceManager.PendAnimation(AnimId::ObjectShadow);
+        mResourceManager.PendAnimation(AnimId::Explosion_Rock);
+        if (gMap->mCurrentLevel == EReliveLevelIds::eBonewerkz)
         {
-            ResourceManagerWrapper::PendAnimation(AnimId::FallingCrate_Falling);
-            ResourceManagerWrapper::PendAnimation(AnimId::FallingCrate_Waiting);
-            ResourceManagerWrapper::PendAnimation(AnimId::AirExplosion);
+            mResourceManager.PendAnimation(AnimId::FallingCrate_Falling);
+            mResourceManager.PendAnimation(AnimId::FallingCrate_Waiting);
+            mResourceManager.PendAnimation(AnimId::AirExplosion);
         }
         else
         {
-            ResourceManagerWrapper::PendAnimation(AnimId::AE_FallingRock_Falling);
-            ResourceManagerWrapper::PendAnimation(AnimId::AE_FallingRock_Waiting);
+            mResourceManager.PendAnimation(AnimId::AE_FallingRock_Falling);
+            mResourceManager.PendAnimation(AnimId::AE_FallingRock_Waiting);
         }
     }
     else
     {
-        relive_new FallingItem(static_cast<Path_FallingItem*>(pTlv), tlvId);
+        relive_new FallingItem(static_cast<Path_FallingItem*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1925,14 +1926,14 @@ void Factory::PullRingRopeAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmod
 {
     if (loadmode == LoadMode::LoadResourceFromList_1 || loadmode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::AE_Rope);
-        ResourceManagerWrapper::PendAnimation(AnimId::PullRingRope_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::PullRingRope_UseBegin);
-        ResourceManagerWrapper::PendAnimation(AnimId::PullRingRope_UseEnd);
+        mResourceManager.PendAnimation(AnimId::AE_Rope);
+        mResourceManager.PendAnimation(AnimId::PullRingRope_Idle);
+        mResourceManager.PendAnimation(AnimId::PullRingRope_UseBegin);
+        mResourceManager.PendAnimation(AnimId::PullRingRope_UseEnd);
     }
     else
     {
-        relive_new PullRingRope(static_cast<Path_PullRingRope*>(pTlv), tlvId);
+        relive_new PullRingRope(static_cast<Path_PullRingRope*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -1942,29 +1943,29 @@ void Factory::TimedMineAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode)
 
     if (loadmode == LoadMode::LoadResourceFromList_1 || loadmode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnims(kAbeGibs);
-        ResourceManagerWrapper::PendAnims(kSlogGibs);
-        ResourceManagerWrapper::PendAnimation(AnimId::TimedMine_Activated);
-        ResourceManagerWrapper::PendAnimation(AnimId::TimedMine_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::Bomb_Flash);
-        ResourceManagerWrapper::PendAnimation(AnimId::Bomb_RedGreenTick);
-        ResourceManagerWrapper::PendAnimation(AnimId::Explosion_Rock);
-        ResourceManagerWrapper::PendAnimation(AnimId::GroundExplosion);
+        mResourceManager.PendAnims(kAbeGibs);
+        mResourceManager.PendAnims(kSlogGibs);
+        mResourceManager.PendAnimation(AnimId::TimedMine_Activated);
+        mResourceManager.PendAnimation(AnimId::TimedMine_Idle);
+        mResourceManager.PendAnimation(AnimId::Bomb_Flash);
+        mResourceManager.PendAnimation(AnimId::Bomb_RedGreenTick);
+        mResourceManager.PendAnimation(AnimId::Explosion_Rock);
+        mResourceManager.PendAnimation(AnimId::GroundExplosion);
     }
     else
     {
-        relive_new TimedMine(mine_tlv, tlvId);
+        relive_new TimedMine(mine_tlv, tlvId, mResourceManager);
     }
 }
 
-static void LoadWalkingSligResourcesAE()
+static void LoadWalkingSligResourcesAE(ResourceManagerWrapper& resMan)
 {
-    ResourceManagerWrapper::PendAnims(Slig::sSligAnimIdTable);
-    ResourceManagerWrapper::PendAnimation(AnimId::ShootingZFire_Particle);
-    ResourceManagerWrapper::PendAnimation(AnimId::ShootingFire_Particle);
-    ResourceManagerWrapper::PendAnimation(AnimId::Bullet_Shell);
-    ResourceManagerWrapper::PendAnims(kSligGibs);
-    ResourceManagerWrapper::PendAnimation(AnimId::ObjectShadow);
+    resMan.PendAnims(Slig::sSligAnimIdTable);
+    resMan.PendAnimation(AnimId::ShootingZFire_Particle);
+    resMan.PendAnimation(AnimId::ShootingFire_Particle);
+    resMan.PendAnimation(AnimId::Bullet_Shell);
+    resMan.PendAnims(kSligGibs);
+    resMan.PendAnimation(AnimId::ObjectShadow);
 }
 
 void Factory::SligAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
@@ -1972,28 +1973,28 @@ void Factory::SligAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
     auto pSligTlv = static_cast<Path_Slig*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        LoadWalkingSligResourcesAE();
+        LoadWalkingSligResourcesAE(mResourceManager);
     }
     else
     {
-        relive_new Slig(pSligTlv, tlvId);
+        relive_new Slig(pSligTlv, tlvId, mResourceManager);
     }
 }
 
-static void LoadSlogResourcesAE()
+static void LoadSlogResourcesAE(ResourceManagerWrapper& resMan)
 {
-    ResourceManagerWrapper::PendAnims(Slog::sSlogAnimIdTable);
+    resMan.PendAnims(Slog::sSlogAnimIdTable);
 }
 
 void Factory::SlogAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        LoadSlogResourcesAE();
+        LoadSlogResourcesAE(mResourceManager);
     }
     else
     {
-        relive_new Slog(static_cast<Path_Slog*>(pTlv), tlvId);
+        relive_new Slog(static_cast<Path_Slog*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2001,15 +2002,15 @@ void Factory::LeverAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode)
 {
     if (loadmode == LoadMode::LoadResourceFromList_1 || loadmode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Lever_Pull_Release_Left);
-        ResourceManagerWrapper::PendAnimation(AnimId::Lever_Pull_Release_Right);
-        ResourceManagerWrapper::PendAnimation(AnimId::Lever_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::Lever_Pull_Left);
-        ResourceManagerWrapper::PendAnimation(AnimId::Lever_Pull_Right);
+        mResourceManager.PendAnimation(AnimId::Lever_Pull_Release_Left);
+        mResourceManager.PendAnimation(AnimId::Lever_Pull_Release_Right);
+        mResourceManager.PendAnimation(AnimId::Lever_Idle);
+        mResourceManager.PendAnimation(AnimId::Lever_Pull_Left);
+        mResourceManager.PendAnimation(AnimId::Lever_Pull_Right);
     }
     else
     {
-        relive_new Lever(static_cast<Path_Lever*>(pTlv), tlvId);
+        relive_new Lever(static_cast<Path_Lever*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2018,18 +2019,18 @@ void Factory::SecurityOrbAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     Path_SecurityOrb* pSecurityOrbTlv = static_cast<Path_SecurityOrb*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Security_Orb);
-        ResourceManagerWrapper::PendAnimation(AnimId::Zap_Line_Blue);
-        ResourceManagerWrapper::PendAnimation(AnimId::Zap_Line_Red);
-        ResourceManagerWrapper::PendAnimation(AnimId::AE_ZapSpark);
-        ResourceManagerWrapper::PendAnims(kAbeGibs);
-        ResourceManagerWrapper::PendAnims(kSlogGibs);
-        ResourceManagerWrapper::PendAnimation(AnimId::Metal_Gib);
-        ResourceManagerWrapper::PendAnimation(AnimId::AirExplosion);
+        mResourceManager.PendAnimation(AnimId::Security_Orb);
+        mResourceManager.PendAnimation(AnimId::Zap_Line_Blue);
+        mResourceManager.PendAnimation(AnimId::Zap_Line_Red);
+        mResourceManager.PendAnimation(AnimId::AE_ZapSpark);
+        mResourceManager.PendAnims(kAbeGibs);
+        mResourceManager.PendAnims(kSlogGibs);
+        mResourceManager.PendAnimation(AnimId::Metal_Gib);
+        mResourceManager.PendAnimation(AnimId::AirExplosion);
     }
     else
     {
-        relive_new SecurityOrb(pSecurityOrbTlv, tlvId);
+        relive_new SecurityOrb(pSecurityOrbTlv, tlvId, mResourceManager);
     }
 }
 
@@ -2060,16 +2061,16 @@ void Factory::MineAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode)
 
     if (loadmode == LoadMode::LoadResourceFromList_1 || loadmode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnims(kAbeGibs);
-        ResourceManagerWrapper::PendAnims(kSlogGibs);
-        ResourceManagerWrapper::PendAnimation(AnimId::Mine);
-        ResourceManagerWrapper::PendAnimation(AnimId::Mine_Flash);
-        ResourceManagerWrapper::PendAnimation(AnimId::Explosion_Rock);
-        ResourceManagerWrapper::PendAnimation(AnimId::GroundExplosion);
+        mResourceManager.PendAnims(kAbeGibs);
+        mResourceManager.PendAnims(kSlogGibs);
+        mResourceManager.PendAnimation(AnimId::Mine);
+        mResourceManager.PendAnimation(AnimId::Mine_Flash);
+        mResourceManager.PendAnimation(AnimId::Explosion_Rock);
+        mResourceManager.PendAnimation(AnimId::GroundExplosion);
     }
     else
     {
-        relive_new Mine(mine_tlv, tlvId);
+        relive_new Mine(mine_tlv, tlvId, mResourceManager);
     }
 }
 
@@ -2078,19 +2079,19 @@ void Factory::UXBAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
     auto uxb_tlv = static_cast<Path_UXB*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnims(kAbeGibs);
-        ResourceManagerWrapper::PendAnims(kSlogGibs);
-        ResourceManagerWrapper::PendAnimation(AnimId::UXB_Active);
-        ResourceManagerWrapper::PendAnimation(AnimId::UXB_Toggle);
-        ResourceManagerWrapper::PendAnimation(AnimId::UXB_Disabled);
-        ResourceManagerWrapper::PendAnimation(AnimId::Bomb_Flash);
-        ResourceManagerWrapper::PendAnimation(AnimId::Bomb_RedGreenTick);
-        ResourceManagerWrapper::PendAnimation(AnimId::Explosion_Rock);
-        ResourceManagerWrapper::PendAnimation(AnimId::GroundExplosion);
+        mResourceManager.PendAnims(kAbeGibs);
+        mResourceManager.PendAnims(kSlogGibs);
+        mResourceManager.PendAnimation(AnimId::UXB_Active);
+        mResourceManager.PendAnimation(AnimId::UXB_Toggle);
+        mResourceManager.PendAnimation(AnimId::UXB_Disabled);
+        mResourceManager.PendAnimation(AnimId::Bomb_Flash);
+        mResourceManager.PendAnimation(AnimId::Bomb_RedGreenTick);
+        mResourceManager.PendAnimation(AnimId::Explosion_Rock);
+        mResourceManager.PendAnimation(AnimId::GroundExplosion);
     }
     else
     {
-        relive_new UXB(uxb_tlv, tlvId);
+        relive_new UXB(uxb_tlv, tlvId, mResourceManager);
     }
 }
 
@@ -2098,12 +2099,12 @@ void Factory::ParamiteAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnims(Paramite::sParamiteMotionAnimIds);
-        ResourceManagerWrapper::PendAnimation(AnimId::ParamiteWeb);
+        mResourceManager.PendAnims(Paramite::sParamiteMotionAnimIds);
+        mResourceManager.PendAnimation(AnimId::ParamiteWeb);
     }
     else
     {
-         relive_new Paramite(static_cast<Path_Paramite*>(pTlv), tlvId);
+         relive_new Paramite(static_cast<Path_Paramite*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2124,24 +2125,24 @@ void Factory::BirdPortalAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
     auto pBirdPortalTlv = static_cast<Path_BirdPortal*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::BirdPortal_TerminatorShrink);
-        ResourceManagerWrapper::PendAnimation(AnimId::BirdPortal_TerminatorIdle);
-        ResourceManagerWrapper::PendAnimation(AnimId::BirdPortal_TerminatorGrow);
-        ResourceManagerWrapper::PendAnimation(AnimId::BirdPortal_Sparks);
-        ResourceManagerWrapper::PendAnimation(AnimId::BirdPortal_Flash);
+        mResourceManager.PendAnimation(AnimId::BirdPortal_TerminatorShrink);
+        mResourceManager.PendAnimation(AnimId::BirdPortal_TerminatorIdle);
+        mResourceManager.PendAnimation(AnimId::BirdPortal_TerminatorGrow);
+        mResourceManager.PendAnimation(AnimId::BirdPortal_Sparks);
+        mResourceManager.PendAnimation(AnimId::BirdPortal_Flash);
 
         if (pBirdPortalTlv->mPortalType == Path_BirdPortal::PortalType::eShrykull)
         {
-            ResourceManagerWrapper::PendAnimation(AnimId::ShrykullStart);
-            ResourceManagerWrapper::PendAnimation(AnimId::ShrykullTransform);
-            ResourceManagerWrapper::PendAnimation(AnimId::ShrykullDetransform);
-            ResourceManagerWrapper::PendAnimation(AnimId::Zap_Line_Blue);
-            ResourceManagerWrapper::PendAnimation(AnimId::Zap_Line_Red);
+            mResourceManager.PendAnimation(AnimId::ShrykullStart);
+            mResourceManager.PendAnimation(AnimId::ShrykullTransform);
+            mResourceManager.PendAnimation(AnimId::ShrykullDetransform);
+            mResourceManager.PendAnimation(AnimId::Zap_Line_Blue);
+            mResourceManager.PendAnimation(AnimId::Zap_Line_Red);
         }
     }
     else if (SwitchStates_Get(pBirdPortalTlv->mCreatePortalSwitchId))
     {
-        relive_new BirdPortal(pBirdPortalTlv, tlvId);
+        relive_new BirdPortal(pBirdPortalTlv, tlvId, mResourceManager);
     }
     else
     {
@@ -2153,29 +2154,29 @@ void Factory::TrapDoorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode)
 {
     if (loadmode == LoadMode::LoadResourceFromList_1 || loadmode == LoadMode::LoadResource_2)
     {
-        switch (gMap.mCurrentLevel)
+        switch (gMap->mCurrentLevel)
         {
             case EReliveLevelIds::eMudomoVault:
             case EReliveLevelIds::eMudancheeVault:
             case EReliveLevelIds::eMudancheeVault_Ender:
             case EReliveLevelIds::eMudomoVault_Ender:
-                ResourceManagerWrapper::PendAnimation(AnimId::Trap_Door_Tribal_Closed);
-                ResourceManagerWrapper::PendAnimation(AnimId::Trap_Door_Tribal_Closing);
-                ResourceManagerWrapper::PendAnimation(AnimId::Trap_Door_Tribal_Open);
-                ResourceManagerWrapper::PendAnimation(AnimId::Trap_Door_Tribal_Opening);
+                mResourceManager.PendAnimation(AnimId::Trap_Door_Tribal_Closed);
+                mResourceManager.PendAnimation(AnimId::Trap_Door_Tribal_Closing);
+                mResourceManager.PendAnimation(AnimId::Trap_Door_Tribal_Open);
+                mResourceManager.PendAnimation(AnimId::Trap_Door_Tribal_Opening);
                 break;
 
             default:
-                ResourceManagerWrapper::PendAnimation(AnimId::Trap_Door_Open);
-                ResourceManagerWrapper::PendAnimation(AnimId::Trap_Door_Closed);
-                ResourceManagerWrapper::PendAnimation(AnimId::Trap_Door_Closing);
-                ResourceManagerWrapper::PendAnimation(AnimId::Trap_Door_Opening);
+                mResourceManager.PendAnimation(AnimId::Trap_Door_Open);
+                mResourceManager.PendAnimation(AnimId::Trap_Door_Closed);
+                mResourceManager.PendAnimation(AnimId::Trap_Door_Closing);
+                mResourceManager.PendAnimation(AnimId::Trap_Door_Opening);
                 break;
         }
     }
     else
     {
-        relive_new TrapDoor(static_cast<Path_TrapDoor*>(pTlv), tlvId);
+        relive_new TrapDoor(static_cast<Path_TrapDoor*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2197,7 +2198,7 @@ void Factory::SligBoundLeftAE(Path_TLV* pTlv,  const Guid& /*tlvId*/, LoadMode l
     auto pBound = static_cast<Path_SligBound*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        LoadWalkingSligResourcesAE();
+        LoadWalkingSligResourcesAE(mResourceManager);
     }
     else
     {
@@ -2212,7 +2213,7 @@ void Factory::SligBoundLeftAE(Path_TLV* pTlv,  const Guid& /*tlvId*/, LoadMode l
                 pTlvIter.GetTlv()->mTlvFlags.Set(TlvFlags::eBit1_Created);
                 pTlvIter.GetTlv()->mTlvFlags.Set(TlvFlags::eBit2_Destroyed);
 
-                relive_new Slig(pTlvIter.GetTlv<Path_Slig>(), pTlvIter.GetTlv()->mId); // id of the slig to spawn at the bound, not the bound itself
+                relive_new Slig(pTlvIter.GetTlv<Path_Slig>(), pTlvIter.GetTlv()->mId, mResourceManager); // id of the slig to spawn at the bound, not the bound itself
 
                 return;
             }
@@ -2224,28 +2225,28 @@ void Factory::FootSwitchAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode)
 {
     if (loadmode == LoadMode::LoadResourceFromList_1 || loadmode == LoadMode::LoadResource_2)
     {
-        switch (gMap.mCurrentLevel)
+        switch (gMap->mCurrentLevel)
         {
             case EReliveLevelIds::eMudomoVault:
             case EReliveLevelIds::eMudancheeVault:
             case EReliveLevelIds::eMudancheeVault_Ender:
             case EReliveLevelIds::eMudomoVault_Ender:
-                ResourceManagerWrapper::PendAnimation(AnimId::Foot_Switch_Vault_Idle);
-                ResourceManagerWrapper::PendAnimation(AnimId::Foot_Switch_Vault_Pressed);
+                mResourceManager.PendAnimation(AnimId::Foot_Switch_Vault_Idle);
+                mResourceManager.PendAnimation(AnimId::Foot_Switch_Vault_Pressed);
                 break;
             case EReliveLevelIds::eBonewerkz:
-                ResourceManagerWrapper::PendAnimation(AnimId::Foot_Switch_Bonewerkz_Idle);
-                ResourceManagerWrapper::PendAnimation(AnimId::Foot_Switch_Bonewerkz_Pressed);
+                mResourceManager.PendAnimation(AnimId::Foot_Switch_Bonewerkz_Idle);
+                mResourceManager.PendAnimation(AnimId::Foot_Switch_Bonewerkz_Pressed);
                 break;
             default:
-                ResourceManagerWrapper::PendAnimation(AnimId::Foot_Switch_Industrial_Idle);
-                ResourceManagerWrapper::PendAnimation(AnimId::Foot_Switch_Industrial_Pressed);
+                mResourceManager.PendAnimation(AnimId::Foot_Switch_Industrial_Idle);
+                mResourceManager.PendAnimation(AnimId::Foot_Switch_Industrial_Pressed);
                 break;
         }
     }
     else
     {
-        relive_new FootSwitch(static_cast<Path_FootSwitch*>(pTlv), tlvId);
+        relive_new FootSwitch(static_cast<Path_FootSwitch*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2260,12 +2261,12 @@ void Factory::MotionDetectorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadM
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
-        relive_new MotionDetector(static_cast<Path_MotionDetector*>(pTlv), tlvId, nullptr);
+        relive_new MotionDetector(static_cast<Path_MotionDetector*>(pTlv), tlvId, nullptr, mResourceManager);
     }
     else
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::MotionDetector_Flare);
-        ResourceManagerWrapper::PendAnimation(AnimId::MotionDetector_Laser);
+        mResourceManager.PendAnimation(AnimId::MotionDetector_Flare);
+        mResourceManager.PendAnimation(AnimId::MotionDetector_Laser);
     }
 }
 
@@ -2274,11 +2275,11 @@ void Factory::SligSpawnerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     auto pSligTlv = static_cast<Path_Slig*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        LoadWalkingSligResourcesAE();
+        LoadWalkingSligResourcesAE(mResourceManager);
     }
     else
     {
-        relive_new SligSpawner(pSligTlv, tlvId);
+        relive_new SligSpawner(pSligTlv, tlvId, mResourceManager);
     }
 }
 
@@ -2286,11 +2287,11 @@ void Factory::ElectricWallAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Electric_Wall);
+        mResourceManager.PendAnimation(AnimId::Electric_Wall);
     }
     else
     {
-        relive_new ElectricWall(static_cast<Path_ElectricWall*>(pTlv), tlvId);
+        relive_new ElectricWall(static_cast<Path_ElectricWall*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2298,7 +2299,7 @@ void Factory::LiftMoverAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode)
 {
     if (loadmode != LoadMode::LoadResourceFromList_1 && loadmode != LoadMode::LoadResource_2)
     {
-        relive_new LiftMover(static_cast<Path_LiftMover*>(pTlv), tlvId);
+        relive_new LiftMover(static_cast<Path_LiftMover*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2306,13 +2307,13 @@ void Factory::MeatSackAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Meat);
-        ResourceManagerWrapper::PendAnimation(AnimId::MeatSack_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::MeatSack_Hit);
+        mResourceManager.PendAnimation(AnimId::Meat);
+        mResourceManager.PendAnimation(AnimId::MeatSack_Idle);
+        mResourceManager.PendAnimation(AnimId::MeatSack_Hit);
     }
     else
     {
-        relive_new MeatSack(static_cast<Path_MeatSack*>(pTlv), tlvId);
+        relive_new MeatSack(static_cast<Path_MeatSack*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2320,11 +2321,11 @@ void Factory::ScrabAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnims(Scrab::sScrabMotionAnimIds);
+        mResourceManager.PendAnims(Scrab::sScrabMotionAnimIds);
     }
     else
     {
-        relive_new Scrab(static_cast<Path_Scrab*>(pTlv), tlvId, Path_ScrabSpawner::SpawnDirection::eNone);
+        relive_new Scrab(static_cast<Path_Scrab*>(pTlv), tlvId, Path_ScrabSpawner::SpawnDirection::eNone, mResourceManager);
     }
 }
 
@@ -2337,7 +2338,7 @@ void Factory::InvisibleSwitchAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode load
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
-        relive_new InvisibleSwitch(static_cast<Path_InvisibleSwitch*>(pTlv), tlvId);
+        relive_new InvisibleSwitch(static_cast<Path_InvisibleSwitch*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2346,12 +2347,12 @@ void Factory::MudokonAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
     auto pMudTlv = static_cast<Path_Mudokon*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnims(Mudokon::kMudMotionAnimIds);
-        ResourceManagerWrapper::PendAnimation(AnimId::ObjectShadow);
+        mResourceManager.PendAnims(Mudokon::kMudMotionAnimIds);
+        mResourceManager.PendAnimation(AnimId::ObjectShadow);
     }
     else
     {
-        relive_new Mudokon(pMudTlv, tlvId);
+        relive_new Mudokon(pMudTlv, tlvId, mResourceManager);
     }
 }
 
@@ -2359,12 +2360,12 @@ void Factory::DoorFlameAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Fire);
-        ResourceManagerWrapper::PendAnimation(AnimId::Door_FireBackgroundGlow);
+        mResourceManager.PendAnimation(AnimId::Fire);
+        mResourceManager.PendAnimation(AnimId::Door_FireBackgroundGlow);
     }
     else
     {
-        relive_new DoorFlame(static_cast<Path_DoorFlame*>(pTlv), tlvId);
+        relive_new DoorFlame(static_cast<Path_DoorFlame*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2373,14 +2374,14 @@ void Factory::MovingBombAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
     auto pMovingBombTlv = static_cast<Path_MovingBomb*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::MovingBomb);
-        ResourceManagerWrapper::PendAnimation(AnimId::AirExplosion);
-        ResourceManagerWrapper::PendAnimation(AnimId::Metal_Gib);
-        ResourceManagerWrapper::PendAnims(kAbeGibs);
+        mResourceManager.PendAnimation(AnimId::MovingBomb);
+        mResourceManager.PendAnimation(AnimId::AirExplosion);
+        mResourceManager.PendAnimation(AnimId::Metal_Gib);
+        mResourceManager.PendAnims(kAbeGibs);
     }
     else
     {
-        relive_new MovingBomb(pMovingBombTlv, tlvId);
+        relive_new MovingBomb(pMovingBombTlv, tlvId, mResourceManager);
     }
 }
 
@@ -2388,7 +2389,7 @@ void Factory::TimerTriggerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmod
 {
     if (loadmode == LoadMode::ConstructObject_0)
     {
-        relive_new TimerTrigger(static_cast<Path_TimerTrigger*>(pTlv), tlvId);
+        relive_new TimerTrigger(static_cast<Path_TimerTrigger*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2396,12 +2397,12 @@ void Factory::SecurityDoorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Security_Door_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::Security_Door_Speak);
+        mResourceManager.PendAnimation(AnimId::Security_Door_Idle);
+        mResourceManager.PendAnimation(AnimId::Security_Door_Speak);
     }
     else
     {
-        relive_new SecurityDoor(static_cast<Path_SecurityDoor*>(pTlv), tlvId);
+        relive_new SecurityDoor(static_cast<Path_SecurityDoor*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2410,19 +2411,19 @@ void Factory::BoomMachineAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     auto pTlvBooMachine = static_cast<Path_BoomMachine*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Grenade);
-        ResourceManagerWrapper::PendAnimation(AnimId::AirExplosion);
-        ResourceManagerWrapper::PendAnims(kAbeGibs);
-        ResourceManagerWrapper::PendAnimation(AnimId::Metal_Gib);
-        ResourceManagerWrapper::PendAnims(kSlogGibs);
-        ResourceManagerWrapper::PendAnimation(AnimId::BoomMachine_Pipe_DropGrenade);
-        ResourceManagerWrapper::PendAnimation(AnimId::BoomMachine_Pipe_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::BoomMachine_Button_Off);
-        ResourceManagerWrapper::PendAnimation(AnimId::BoomMachine_Button_On);
+        mResourceManager.PendAnimation(AnimId::Grenade);
+        mResourceManager.PendAnimation(AnimId::AirExplosion);
+        mResourceManager.PendAnims(kAbeGibs);
+        mResourceManager.PendAnimation(AnimId::Metal_Gib);
+        mResourceManager.PendAnims(kSlogGibs);
+        mResourceManager.PendAnimation(AnimId::BoomMachine_Pipe_DropGrenade);
+        mResourceManager.PendAnimation(AnimId::BoomMachine_Pipe_Idle);
+        mResourceManager.PendAnimation(AnimId::BoomMachine_Button_Off);
+        mResourceManager.PendAnimation(AnimId::BoomMachine_Button_On);
     }
     else
     {
-        relive_new BoomMachine(pTlvBooMachine, tlvId);
+        relive_new BoomMachine(pTlvBooMachine, tlvId, mResourceManager);
     }
 }
 
@@ -2430,7 +2431,7 @@ void Factory::BackgroundAnimationAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode 
 {
     if (loadmode != LoadMode::LoadResourceFromList_1 && loadmode != LoadMode::LoadResource_2)
     {
-        relive_new BackgroundAnimation(static_cast<Path_BackgroundAnimation*>(pTlv), tlvId);
+        relive_new BackgroundAnimation(static_cast<Path_BackgroundAnimation*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2442,14 +2443,14 @@ void Factory::LCDScreenAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode)
         return;
     }
 
-    relive_new LCDScreen(static_cast<Path_LCDScreen*>(pTlv), tlvId);
+    relive_new LCDScreen(static_cast<Path_LCDScreen*>(pTlv), tlvId, mResourceManager);
 }
 
 void Factory::HandStoneAE(Path_TLV*, const Guid& tlvId, LoadMode loadmode)
 {
     if (loadmode == LoadMode::LoadResourceFromList_1 || loadmode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::SpotLight);
+        mResourceManager.PendAnimation(AnimId::SpotLight);
     }
     else
     {
@@ -2461,7 +2462,7 @@ void Factory::CreditsControllerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode lo
 {
     if (loadmode != LoadMode::LoadResourceFromList_1 && loadmode != LoadMode::LoadResource_2 && !gCreditsControllerExists)
     {
-        relive_new CreditsController(pTlv, tlvId);
+        relive_new CreditsController(pTlv, tlvId, mResourceManager);
     }
 }
 
@@ -2473,14 +2474,14 @@ void Factory::LCDStatusBoardAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadm
         return;
     }
     
-    relive_new LCDStatusBoard(static_cast<Path_LCDStatusBoard*>(pTlv), tlvId);
+    relive_new LCDStatusBoard(static_cast<Path_LCDStatusBoard*>(pTlv), tlvId, mResourceManager);
 }
 
 void Factory::WheelSyncerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode)
 {
     if (loadmode != LoadMode::LoadResourceFromList_1 && loadmode != LoadMode::LoadResource_2)
     {
-        relive_new WheelSyncer(static_cast<Path_WheelSyncer*>(pTlv), tlvId);
+        relive_new WheelSyncer(static_cast<Path_WheelSyncer*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2488,7 +2489,7 @@ void Factory::MusicTriggerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmod
 {
     if (loadmode != LoadMode::LoadResourceFromList_1 && loadmode != LoadMode::LoadResource_2)
     {
-        relive_new MusicTrigger(static_cast<Path_MusicTrigger*>(pTlv), tlvId);
+        relive_new MusicTrigger(static_cast<Path_MusicTrigger*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2496,11 +2497,11 @@ void Factory::SlogSpawnerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        LoadSlogResourcesAE();
+        LoadSlogResourcesAE(mResourceManager);
     }
     else
     {
-        relive_new SlogSpawner(static_cast<Path_SlogSpawner*>(pTlv), tlvId);
+        relive_new SlogSpawner(static_cast<Path_SlogSpawner*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2508,12 +2509,12 @@ void Factory::GasCountDownAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        //gMap.LoadResource("LCDFONT.FNT", ResourceManager::Resource_Font, AEResourceID::kLcdfontResID, loadMode);
-        //gMap.LoadResource("ABEGAS.BAN", ResourceManager::Resource_Animation, AEResourceID::kAbegasResID, loadMode);
+        //gMap->LoadResource("LCDFONT.FNT", ResourceManager::Resource_Font, AEResourceID::kLcdfontResID, loadMode);
+        //gMap->LoadResource("ABEGAS.BAN", ResourceManager::Resource_Animation, AEResourceID::kAbegasResID, loadMode);
     }
     else
     {
-        relive_new GasCountDown(static_cast<Path_GasCountDown*>(pTlv), tlvId);
+        relive_new GasCountDown(static_cast<Path_GasCountDown*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2521,7 +2522,7 @@ void Factory::GasEmitterAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
-        relive_new GasEmitter(static_cast<Path_GasEmitter*>(pTlv), tlvId);
+        relive_new GasEmitter(static_cast<Path_GasEmitter*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2529,7 +2530,7 @@ void Factory::ZzzSpawnerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
-        relive_new ZzzSpawner(static_cast<Path_ZzzSpawner*>(pTlv), tlvId);
+        relive_new ZzzSpawner(static_cast<Path_ZzzSpawner*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2544,50 +2545,50 @@ void Factory::GlukkonAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
                 for (s32 i = 0; i < 25; i++)
                 {
                     const auto& anim = Glukkon::sGlukkonsAnimIdTable[1][i];
-                    ResourceManagerWrapper::PendAnimation(anim);
+                    mResourceManager.PendAnimation(anim);
                 }
-                ResourceManagerWrapper::PendAnimation(AnimId::Aslik_Head_Gib);
-                ResourceManagerWrapper::PendAnimation(AnimId::Aslik_Arm_Gib);
-                ResourceManagerWrapper::PendAnimation(AnimId::Aslik_Body_Gib);
+                mResourceManager.PendAnimation(AnimId::Aslik_Head_Gib);
+                mResourceManager.PendAnimation(AnimId::Aslik_Arm_Gib);
+                mResourceManager.PendAnimation(AnimId::Aslik_Body_Gib);
                 break;
 
             case Path_Glukkon::GlukkonTypes::eStoryDripik:
                 for (s32 i = 0; i < 25; i++)
                 {
                     const auto& anim = Glukkon::sGlukkonsAnimIdTable[2][i];
-                    ResourceManagerWrapper::PendAnimation(anim);
+                    mResourceManager.PendAnimation(anim);
                 }
-                ResourceManagerWrapper::PendAnimation(AnimId::Dripik_Head_Gib);
-                ResourceManagerWrapper::PendAnimation(AnimId::Dripik_Arm_Gib);
-                ResourceManagerWrapper::PendAnimation(AnimId::Dripik_Body_Gib);
+                mResourceManager.PendAnimation(AnimId::Dripik_Head_Gib);
+                mResourceManager.PendAnimation(AnimId::Dripik_Arm_Gib);
+                mResourceManager.PendAnimation(AnimId::Dripik_Body_Gib);
                 break;
 
             case Path_Glukkon::GlukkonTypes::eStoryPhleg:
                 for (s32 i = 0; i < 25; i++)
                 {
                     const auto& anim = Glukkon::sGlukkonsAnimIdTable[3][i];
-                    ResourceManagerWrapper::PendAnimation(anim);
+                    mResourceManager.PendAnimation(anim);
                 }
-                ResourceManagerWrapper::PendAnimation(AnimId::Phleg_Head_Gib);
-                ResourceManagerWrapper::PendAnimation(AnimId::Phleg_Arm_Gib);
-                ResourceManagerWrapper::PendAnimation(AnimId::Phleg_Body_Gib);
+                mResourceManager.PendAnimation(AnimId::Phleg_Head_Gib);
+                mResourceManager.PendAnimation(AnimId::Phleg_Arm_Gib);
+                mResourceManager.PendAnimation(AnimId::Phleg_Body_Gib);
                 break;
 
             case Path_Glukkon::GlukkonTypes::eNormal:
                 for (s32 i = 0; i < 25; i++)
                 {
                     const auto& anim = Glukkon::sGlukkonsAnimIdTable[0][i];
-                    ResourceManagerWrapper::PendAnimation(anim);
+                    mResourceManager.PendAnimation(anim);
                 }
-                ResourceManagerWrapper::PendAnimation(AnimId::Glukkon_Head_Gib);
-                ResourceManagerWrapper::PendAnimation(AnimId::Glukkon_Arm_Gib);
-                ResourceManagerWrapper::PendAnimation(AnimId::Glukkon_Body_Gib);
+                mResourceManager.PendAnimation(AnimId::Glukkon_Head_Gib);
+                mResourceManager.PendAnimation(AnimId::Glukkon_Arm_Gib);
+                mResourceManager.PendAnimation(AnimId::Glukkon_Body_Gib);
                 break;
         }
     }
     else
     {
-        relive_new Glukkon(pGlukkonTlv, tlvId);
+        relive_new Glukkon(pGlukkonTlv, tlvId, mResourceManager);
     }
 }
 
@@ -2595,12 +2596,12 @@ void Factory::WaterAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode)
 {
     if (loadmode == LoadMode::LoadResourceFromList_1 || loadmode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::WaterDrop);
-        ResourceManagerWrapper::PendAnimation(AnimId::WaterSplash);
+        mResourceManager.PendAnimation(AnimId::WaterDrop);
+        mResourceManager.PendAnimation(AnimId::WaterSplash);
     }
     else
     {
-        relive_new Water(static_cast<Path_Water*>(pTlv), tlvId);
+        relive_new Water(static_cast<Path_Water*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2608,20 +2609,20 @@ void Factory::WorkWheelAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode)
 {
     if (loadmode == LoadMode::LoadResourceFromList_1 || loadmode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Work_Wheel_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::Work_Wheel_Turning);
+        mResourceManager.PendAnimation(AnimId::Work_Wheel_Idle);
+        mResourceManager.PendAnimation(AnimId::Work_Wheel_Turning);
     }
     else
     {
-        relive_new WorkWheel(static_cast<Path_WorkWheel*>(pTlv), tlvId);
+        relive_new WorkWheel(static_cast<Path_WorkWheel*>(pTlv), tlvId, mResourceManager);
     }
 }
 
-static void Create_LaughingGasAE(Layer layer, Path_TLV* pTlv, const Guid& tlvId)
+static void Create_LaughingGasAE(Layer layer, Path_TLV* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
 {
     if (!gLaughingGasInstanceCount)
     {
-        relive_new LaughingGas(layer, static_cast<Path_LaughingGas*>(pTlv), tlvId);
+        relive_new LaughingGas(layer, static_cast<Path_LaughingGas*>(pTlv), tlvId, resMan);
     }
 }
 
@@ -2629,32 +2630,32 @@ void Factory::LaughingGasAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
-        Create_LaughingGasAE(Layer::eLayer_Above_FG1_39, pTlv, tlvId);
+        Create_LaughingGasAE(Layer::eLayer_Above_FG1_39, pTlv, tlvId, mResourceManager);
     }
 }
 
-static void LoadFlyingSligResourcesAE()
+static void LoadFlyingSligResourcesAE(ResourceManagerWrapper& resMan)
 {
-    ResourceManagerWrapper::PendAnims(FlyingSlig::sFlyingSligAnimIdTable);
-    ResourceManagerWrapper::PendAnims(kSligGibs);
-    ResourceManagerWrapper::PendAnimation(AnimId::Grenade);
-    ResourceManagerWrapper::PendAnimation(AnimId::AirExplosion_Small);
-    ResourceManagerWrapper::PendAnimation(AnimId::Metal_Gib);
-    ResourceManagerWrapper::PendAnims(kAbeGibs);
-    ResourceManagerWrapper::PendAnimation(AnimId::ShootingFire_Particle);
-    ResourceManagerWrapper::PendAnimation(AnimId::Vaporize_Particle);
-    ResourceManagerWrapper::PendAnims(kSlogGibs);
+    resMan.PendAnims(FlyingSlig::sFlyingSligAnimIdTable);
+    resMan.PendAnims(kSligGibs);
+    resMan.PendAnimation(AnimId::Grenade);
+    resMan.PendAnimation(AnimId::AirExplosion_Small);
+    resMan.PendAnimation(AnimId::Metal_Gib);
+    resMan.PendAnims(kAbeGibs);
+    resMan.PendAnimation(AnimId::ShootingFire_Particle);
+    resMan.PendAnimation(AnimId::Vaporize_Particle);
+    resMan.PendAnims(kSlogGibs);
 }
 
 void Factory::FlyingSligAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        LoadFlyingSligResourcesAE();
+        LoadFlyingSligResourcesAE(mResourceManager);
     }
     else
     {
-        relive_new FlyingSlig(static_cast<Path_FlyingSlig*>(pTlv), tlvId);
+        relive_new FlyingSlig(static_cast<Path_FlyingSlig*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2662,13 +2663,13 @@ void Factory::FleechAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnims(Fleech::sFleechAnimFromMotion);
-        ResourceManagerWrapper::PendAnimation(AnimId::Fleech_Head_Gib);
-        ResourceManagerWrapper::PendAnimation(AnimId::Fleech_Body_Gib);
+        mResourceManager.PendAnims(Fleech::sFleechAnimFromMotion);
+        mResourceManager.PendAnimation(AnimId::Fleech_Head_Gib);
+        mResourceManager.PendAnimation(AnimId::Fleech_Body_Gib);
     }
-    else if (gMap.mCurrentLevel != EReliveLevelIds::eMudancheeVault_Ender || gMap.mCurrentPath != 9 || gMap.mCurrentCamera != 4)
+    else if (gMap->mCurrentLevel != EReliveLevelIds::eMudancheeVault_Ender || gMap->mCurrentPath != 9 || gMap->mCurrentCamera != 4)
     {
-        relive_new Fleech(static_cast<Path_Fleech*>(pTlv), tlvId);
+        relive_new Fleech(static_cast<Path_Fleech*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2676,13 +2677,13 @@ void Factory::SlurgAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Slurg_Move);
-        ResourceManagerWrapper::PendAnimation(AnimId::Slurg_Burst);
-        ResourceManagerWrapper::PendAnimation(AnimId::Slurg_Turn_Around);
+        mResourceManager.PendAnimation(AnimId::Slurg_Move);
+        mResourceManager.PendAnimation(AnimId::Slurg_Burst);
+        mResourceManager.PendAnimation(AnimId::Slurg_Turn_Around);
     }
     else
     {
-        relive_new Slurg(static_cast<Path_Slurg*>(pTlv), tlvId);
+        relive_new Slurg(static_cast<Path_Slurg*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2690,27 +2691,27 @@ void Factory::SlamDoorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode)
 {
     if (loadmode == LoadMode::LoadResourceFromList_1 || loadmode == LoadMode::LoadResource_2)
     {
-        switch (gMap.mCurrentLevel)
+        switch (gMap->mCurrentLevel)
         {
             case EReliveLevelIds::eNecrum:
             case EReliveLevelIds::eMudomoVault:
             case EReliveLevelIds::eMudancheeVault:
             case EReliveLevelIds::eMudancheeVault_Ender:
             case EReliveLevelIds::eMudomoVault_Ender:
-                ResourceManagerWrapper::PendAnimation(AnimId::Slam_Door_Vault_Closed);
-                ResourceManagerWrapper::PendAnimation(AnimId::Slam_Door_Vault_Closing);
-                ResourceManagerWrapper::PendAnimation(AnimId::Slam_Door_Vault_Opening);
+                mResourceManager.PendAnimation(AnimId::Slam_Door_Vault_Closed);
+                mResourceManager.PendAnimation(AnimId::Slam_Door_Vault_Closing);
+                mResourceManager.PendAnimation(AnimId::Slam_Door_Vault_Opening);
                 break;
             default:
-                ResourceManagerWrapper::PendAnimation(AnimId::Slam_Door_Industrial_Closed);
-                ResourceManagerWrapper::PendAnimation(AnimId::Slam_Door_Industrial_Closing);
-                ResourceManagerWrapper::PendAnimation(AnimId::Slam_Door_Industrial_Opening);
+                mResourceManager.PendAnimation(AnimId::Slam_Door_Industrial_Closed);
+                mResourceManager.PendAnimation(AnimId::Slam_Door_Industrial_Closing);
+                mResourceManager.PendAnimation(AnimId::Slam_Door_Industrial_Opening);
                 break;
         }
     }
     else
     {
-        relive_new SlamDoor(static_cast<Path_SlamDoor*>(pTlv), tlvId);
+        relive_new SlamDoor(static_cast<Path_SlamDoor*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2718,7 +2719,7 @@ void Factory::LevelLoaderAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode
 {
     if (loadmode != LoadMode::LoadResourceFromList_1 && loadmode != LoadMode::LoadResource_2)
     {
-        relive_new LevelLoader(static_cast<Path_LevelLoader*>(pTlv), tlvId);
+        relive_new LevelLoader(static_cast<Path_LevelLoader*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2740,7 +2741,7 @@ void Factory::TeleporterAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode)
 {
     if (loadmode != LoadMode::LoadResourceFromList_1 && loadmode != LoadMode::LoadResource_2)
     {
-        relive_new Teleporter(static_cast<Path_Teleporter*>(pTlv), tlvId);
+        relive_new Teleporter(static_cast<Path_Teleporter*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2748,9 +2749,9 @@ void Factory::SlurgSpawnerAE(Path_TLV* /*pTlv*/,  const Guid& /*tlvId*/, LoadMod
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Slurg_Move);
-        ResourceManagerWrapper::PendAnimation(AnimId::Slurg_Burst);
-        ResourceManagerWrapper::PendAnimation(AnimId::Slurg_Turn_Around);
+        mResourceManager.PendAnimation(AnimId::Slurg_Move);
+        mResourceManager.PendAnimation(AnimId::Slurg_Burst);
+        mResourceManager.PendAnimation(AnimId::Slurg_Turn_Around);
     }
     else
     {
@@ -2759,7 +2760,7 @@ void Factory::SlurgSpawnerAE(Path_TLV* /*pTlv*/,  const Guid& /*tlvId*/, LoadMod
        // after you save when a slurg is spawned as it has no TLV.
        // Its only used to spawn 1 slurg in 1 screen of the game. Fix in abi_break
        // branch by converting to a normal slurg.
-        relive_new SlurgSpawner(static_cast<Path_SlurgSpawner*>(pTlv), tlvId);
+        relive_new SlurgSpawner(static_cast<Path_SlurgSpawner*>(pTlv), tlvId, mResourceManager);
         */
     }
 }
@@ -2768,16 +2769,16 @@ void Factory::DrillAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode)
 {
     if (loadmode == LoadMode::LoadResourceFromList_1 || loadmode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Drill_Horizontal_Off);
-        ResourceManagerWrapper::PendAnimation(AnimId::Drill_Horizontal_On);
-        ResourceManagerWrapper::PendAnimation(AnimId::Drill_Vertical_Off);
-        ResourceManagerWrapper::PendAnimation(AnimId::Drill_Vertical_On);
-        ResourceManagerWrapper::PendAnims(kAbeGibs);
-        ResourceManagerWrapper::PendAnims(kSlogGibs);
+        mResourceManager.PendAnimation(AnimId::Drill_Horizontal_Off);
+        mResourceManager.PendAnimation(AnimId::Drill_Horizontal_On);
+        mResourceManager.PendAnimation(AnimId::Drill_Vertical_Off);
+        mResourceManager.PendAnimation(AnimId::Drill_Vertical_On);
+        mResourceManager.PendAnims(kAbeGibs);
+        mResourceManager.PendAnims(kSlogGibs);
     }
     else
     {
-        relive_new Drill(static_cast<Path_Drill*>(pTlv), tlvId);
+        relive_new Drill(static_cast<Path_Drill*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2785,11 +2786,11 @@ void Factory::ColourfulMeterAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadM
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        //gMap.LoadResource("LCDFONT.FNT", ResourceManager::Resource_Font, AEResourceID::kLcdfontResID, loadMode);
+        //gMap->LoadResource("LCDFONT.FNT", ResourceManager::Resource_Font, AEResourceID::kLcdfontResID, loadMode);
     }
     else
     {
-        relive_new ColourfulMeter(static_cast<Path_ColourfulMeter*>(pTlv), tlvId);
+        relive_new ColourfulMeter(static_cast<Path_ColourfulMeter*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2797,11 +2798,11 @@ void Factory::FlyingSligSpawnerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode lo
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        LoadFlyingSligResourcesAE();
+        LoadFlyingSligResourcesAE(mResourceManager);
     }
     else
     {
-        relive_new FlyingSligSpawner(static_cast<Path_FlyingSligSpawner*>(pTlv), tlvId);
+        relive_new FlyingSligSpawner(static_cast<Path_FlyingSligSpawner*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2809,20 +2810,20 @@ void Factory::MineCarAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Mine_Car_Closed);
-        ResourceManagerWrapper::PendAnimation(AnimId::Mine_Car_Open);
-        ResourceManagerWrapper::PendAnimation(AnimId::Mine_Car_Shake_A);
-        ResourceManagerWrapper::PendAnimation(AnimId::Mine_Car_Shake_B);
-        ResourceManagerWrapper::PendAnimation(AnimId::Mine_Car_Tread_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::Mine_Car_Tread_Move_A);
-        ResourceManagerWrapper::PendAnimation(AnimId::Mine_Car_Tread_Move_B);
-        ResourceManagerWrapper::PendAnimation(AnimId::Metal_Gib);
-        ResourceManagerWrapper::PendAnimation(AnimId::AirExplosion);
-        ResourceManagerWrapper::PendAnims(kAbeGibs);
+        mResourceManager.PendAnimation(AnimId::Mine_Car_Closed);
+        mResourceManager.PendAnimation(AnimId::Mine_Car_Open);
+        mResourceManager.PendAnimation(AnimId::Mine_Car_Shake_A);
+        mResourceManager.PendAnimation(AnimId::Mine_Car_Shake_B);
+        mResourceManager.PendAnimation(AnimId::Mine_Car_Tread_Idle);
+        mResourceManager.PendAnimation(AnimId::Mine_Car_Tread_Move_A);
+        mResourceManager.PendAnimation(AnimId::Mine_Car_Tread_Move_B);
+        mResourceManager.PendAnimation(AnimId::Metal_Gib);
+        mResourceManager.PendAnimation(AnimId::AirExplosion);
+        mResourceManager.PendAnims(kAbeGibs);
     }
     else
     {
-        relive_new MineCar(static_cast<Path_MineCar*>(pTlv), tlvId, 0, 0, 0);
+        relive_new MineCar(static_cast<Path_MineCar*>(pTlv), tlvId, 0, 0, 0, mResourceManager);
     }
 }
 
@@ -2830,14 +2831,14 @@ void Factory::BoneBagAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::BoneBag_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::BoneBag_HardHit);
-        ResourceManagerWrapper::PendAnimation(AnimId::BoneBag_SoftHit);
-        ResourceManagerWrapper::PendAnimation(AnimId::Bone);
+        mResourceManager.PendAnimation(AnimId::BoneBag_Idle);
+        mResourceManager.PendAnimation(AnimId::BoneBag_HardHit);
+        mResourceManager.PendAnimation(AnimId::BoneBag_SoftHit);
+        mResourceManager.PendAnimation(AnimId::Bone);
     }
     else
     {
-        relive_new BoneBag(static_cast<Path_BoneBag*>(pTlv), tlvId);
+        relive_new BoneBag(static_cast<Path_BoneBag*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2846,23 +2847,23 @@ void Factory::ExplosionSetAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
 
-        if (gMap.mCurrentLevel == EReliveLevelIds::eBonewerkz)
+        if (gMap->mCurrentLevel == EReliveLevelIds::eBonewerkz)
         {
-            ResourceManagerWrapper::PendAnimation(AnimId::FallingCrate_Falling);
-            ResourceManagerWrapper::PendAnimation(AnimId::FallingCrate_Waiting);
+            mResourceManager.PendAnimation(AnimId::FallingCrate_Falling);
+            mResourceManager.PendAnimation(AnimId::FallingCrate_Waiting);
         }
         else
         {
-            ResourceManagerWrapper::PendAnimation(AnimId::AE_FallingRock_Falling);
-            ResourceManagerWrapper::PendAnimation(AnimId::AE_FallingRock_Waiting);
+            mResourceManager.PendAnimation(AnimId::AE_FallingRock_Falling);
+            mResourceManager.PendAnimation(AnimId::AE_FallingRock_Waiting);
         }
-        ResourceManagerWrapper::PendAnimation(AnimId::HoistRock1);
-        ResourceManagerWrapper::PendAnimation(AnimId::HoistRock2);
-        ResourceManagerWrapper::PendAnimation(AnimId::HoistRock3);
-        ResourceManagerWrapper::PendAnimation(AnimId::Explosion_Stick);
-        ResourceManagerWrapper::PendAnimation(AnimId::ObjectShadow);
-        ResourceManagerWrapper::PendAnimation(AnimId::Explosion_Rock);
-        ResourceManagerWrapper::PendAnimation(AnimId::AirExplosion);
+        mResourceManager.PendAnimation(AnimId::HoistRock1);
+        mResourceManager.PendAnimation(AnimId::HoistRock2);
+        mResourceManager.PendAnimation(AnimId::HoistRock3);
+        mResourceManager.PendAnimation(AnimId::Explosion_Stick);
+        mResourceManager.PendAnimation(AnimId::ObjectShadow);
+        mResourceManager.PendAnimation(AnimId::Explosion_Rock);
+        mResourceManager.PendAnimation(AnimId::AirExplosion);
     }
     else
     {
@@ -2880,7 +2881,7 @@ void Factory::MultiSwitchControllerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMod
 {
     if (loadmode != LoadMode::LoadResourceFromList_1 && loadmode != LoadMode::LoadResource_2)
     {
-        relive_new MultiSwitchController(static_cast<Path_MultiSwitchController*>(pTlv), tlvId);
+        relive_new MultiSwitchController(static_cast<Path_MultiSwitchController*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2888,12 +2889,12 @@ void Factory::StatusLightAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode
 {
     if (loadmode == LoadMode::LoadResourceFromList_1 || loadmode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Status_Light_Green);
-        ResourceManagerWrapper::PendAnimation(AnimId::Status_Light_Red);
+        mResourceManager.PendAnimation(AnimId::Status_Light_Green);
+        mResourceManager.PendAnimation(AnimId::Status_Light_Red);
     }
     else
     {
-        relive_new StatusLight(static_cast<Path_StatusLight*>(pTlv), tlvId);
+        relive_new StatusLight(static_cast<Path_StatusLight*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2901,13 +2902,13 @@ void Factory::SlapLockAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::SlapLock_Initiate);
-        ResourceManagerWrapper::PendAnimation(AnimId::SlapLock_Punched);
-        ResourceManagerWrapper::PendAnimation(AnimId::SlapLock_Shaking);
+        mResourceManager.PendAnimation(AnimId::SlapLock_Initiate);
+        mResourceManager.PendAnimation(AnimId::SlapLock_Punched);
+        mResourceManager.PendAnimation(AnimId::SlapLock_Shaking);
     }
     else
     {
-        relive_new SlapLock(static_cast<Path_SlapLock*>(pTlv), tlvId);
+        relive_new SlapLock(static_cast<Path_SlapLock*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2915,11 +2916,11 @@ void Factory::ParamiteWebLineAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode load
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::ParamiteWeb);
+        mResourceManager.PendAnimation(AnimId::ParamiteWeb);
     }
     else
     {
-        relive_new ParamiteWebLine(static_cast<Path_ParamiteWebLine*>(pTlv), tlvId);
+        relive_new ParamiteWebLine(static_cast<Path_ParamiteWebLine*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2927,7 +2928,7 @@ void Factory::AlarmAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode)
 {
     if (loadmode == LoadMode::ConstructObject_0)
     {
-        relive_new Alarm(static_cast<Path_Alarm*>(pTlv), tlvId);
+        relive_new Alarm(static_cast<Path_Alarm*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2935,15 +2936,15 @@ void Factory::BrewMachineAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode
 {
     if (loadmode == LoadMode::LoadResourceFromList_1 || loadmode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::BrewMachine_Button);
-        ResourceManagerWrapper::PendAnimation(AnimId::Fart);
-        ResourceManagerWrapper::PendAnimation(AnimId::AirExplosion);
-        ResourceManagerWrapper::PendAnims(kAbeGibs);
-        //gMap.LoadResource("LCDFONT.FNT", ResourceManager::Resource_Font, AEResourceID::kLcdfontResID, loadmode);
+        mResourceManager.PendAnimation(AnimId::BrewMachine_Button);
+        mResourceManager.PendAnimation(AnimId::Fart);
+        mResourceManager.PendAnimation(AnimId::AirExplosion);
+        mResourceManager.PendAnims(kAbeGibs);
+        //gMap->LoadResource("LCDFONT.FNT", ResourceManager::Resource_Font, AEResourceID::kLcdfontResID, loadmode);
     }
     else
     {
-        relive_new BrewMachine(static_cast<Path_BrewMachine*>(pTlv), tlvId);
+        relive_new BrewMachine(static_cast<Path_BrewMachine*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2951,11 +2952,11 @@ void Factory::ScrabSpawnerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnims(Scrab::sScrabMotionAnimIds);
+        mResourceManager.PendAnims(Scrab::sScrabMotionAnimIds);
     }
     else
     {
-        relive_new ScrabSpawner(static_cast<Path_ScrabSpawner*>(pTlv), tlvId);
+        relive_new ScrabSpawner(static_cast<Path_ScrabSpawner*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2963,19 +2964,19 @@ void Factory::CrawlingSligAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnims(CrawlingSlig::sCrawlingSligAnimIdTable);
-        ResourceManagerWrapper::PendAnims(kSligGibs);
-        ResourceManagerWrapper::PendAnimation(AnimId::Grenade);
-        ResourceManagerWrapper::PendAnimation(AnimId::AirExplosion_Small);
-        ResourceManagerWrapper::PendAnimation(AnimId::Metal_Gib);
-        ResourceManagerWrapper::PendAnims(kAbeGibs);
-        ResourceManagerWrapper::PendAnimation(AnimId::ShootingFire_Particle);
-        ResourceManagerWrapper::PendAnimation(AnimId::Vaporize_Particle);
-        ResourceManagerWrapper::PendAnims(kSlogGibs);
+        mResourceManager.PendAnims(CrawlingSlig::sCrawlingSligAnimIdTable);
+        mResourceManager.PendAnims(kSligGibs);
+        mResourceManager.PendAnimation(AnimId::Grenade);
+        mResourceManager.PendAnimation(AnimId::AirExplosion_Small);
+        mResourceManager.PendAnimation(AnimId::Metal_Gib);
+        mResourceManager.PendAnims(kAbeGibs);
+        mResourceManager.PendAnimation(AnimId::ShootingFire_Particle);
+        mResourceManager.PendAnimation(AnimId::Vaporize_Particle);
+        mResourceManager.PendAnims(kSlogGibs);
     }
     else
     {
-        relive_new CrawlingSlig(static_cast<Path_CrawlingSlig*>(pTlv), tlvId);
+        relive_new CrawlingSlig(static_cast<Path_CrawlingSlig*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -2983,13 +2984,13 @@ void Factory::SligGetPantsAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        LoadWalkingSligResourcesAE();
-        ResourceManagerWrapper::PendAnimation(AnimId::CrawlingSligLocker_Closed);
-        ResourceManagerWrapper::PendAnimation(AnimId::CrawlingSligLocker_Open);
+        LoadWalkingSligResourcesAE(mResourceManager);
+        mResourceManager.PendAnimation(AnimId::CrawlingSligLocker_Closed);
+        mResourceManager.PendAnimation(AnimId::CrawlingSligLocker_Open);
     }
     else
     {
-        relive_new SligGetPantsAndWings(pTlv, tlvId);
+        relive_new SligGetPantsAndWings(pTlv, tlvId, mResourceManager);
     }
 }
 
@@ -2997,13 +2998,13 @@ void Factory::SligGetWingsAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        LoadFlyingSligResourcesAE();
-        ResourceManagerWrapper::PendAnimation(AnimId::CrawlingSligLocker_Closed);
-        ResourceManagerWrapper::PendAnimation(AnimId::CrawlingSligLocker_Open);
+        LoadFlyingSligResourcesAE(mResourceManager);
+        mResourceManager.PendAnimation(AnimId::CrawlingSligLocker_Closed);
+        mResourceManager.PendAnimation(AnimId::CrawlingSligLocker_Open);
     }
     else
     {
-        relive_new SligGetPantsAndWings(pTlv, tlvId);
+        relive_new SligGetPantsAndWings(pTlv, tlvId, mResourceManager);
     }
 }
 
@@ -3011,23 +3012,23 @@ void Factory::GreeterAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::MotionDetector_Flare);
-        ResourceManagerWrapper::PendAnimation(AnimId::MotionDetector_Laser);
-        ResourceManagerWrapper::PendAnimation(AnimId::Greeter_Moving);
-        ResourceManagerWrapper::PendAnimation(AnimId::Greeter_Turn);
-        ResourceManagerWrapper::PendAnimation(AnimId::Greeter_Hit);
-        ResourceManagerWrapper::PendAnimation(AnimId::Greeter_Speak);
-        ResourceManagerWrapper::PendAnimation(AnimId::Greeter_Chase);
-        ResourceManagerWrapper::PendAnimation(AnimId::Greeter_Falling);
-        ResourceManagerWrapper::PendAnimation(AnimId::Zap_Line_Blue);
-        ResourceManagerWrapper::PendAnimation(AnimId::Zap_Line_Red);
-        ResourceManagerWrapper::PendAnimation(AnimId::Metal_Gib);
-        ResourceManagerWrapper::PendAnimation(AnimId::AirExplosion);
-        ResourceManagerWrapper::PendAnims(kAbeGibs);
+        mResourceManager.PendAnimation(AnimId::MotionDetector_Flare);
+        mResourceManager.PendAnimation(AnimId::MotionDetector_Laser);
+        mResourceManager.PendAnimation(AnimId::Greeter_Moving);
+        mResourceManager.PendAnimation(AnimId::Greeter_Turn);
+        mResourceManager.PendAnimation(AnimId::Greeter_Hit);
+        mResourceManager.PendAnimation(AnimId::Greeter_Speak);
+        mResourceManager.PendAnimation(AnimId::Greeter_Chase);
+        mResourceManager.PendAnimation(AnimId::Greeter_Falling);
+        mResourceManager.PendAnimation(AnimId::Zap_Line_Blue);
+        mResourceManager.PendAnimation(AnimId::Zap_Line_Red);
+        mResourceManager.PendAnimation(AnimId::Metal_Gib);
+        mResourceManager.PendAnimation(AnimId::AirExplosion);
+        mResourceManager.PendAnims(kAbeGibs);
     }
     else
     {
-        relive_new Greeter(static_cast<Path_Greeter*>(pTlv), tlvId);
+        relive_new Greeter(static_cast<Path_Greeter*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -3035,12 +3036,12 @@ void Factory::CrawlingSligButtonAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode l
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::CrawlingSligButton);
-        ResourceManagerWrapper::PendAnimation(AnimId::CrawlingSligButtonUse);
+        mResourceManager.PendAnimation(AnimId::CrawlingSligButton);
+        mResourceManager.PendAnimation(AnimId::CrawlingSligButtonUse);
     }
     else
     {
-        relive_new CrawlingSligButton(static_cast<Path_CrawlingSligButton*>(pTlv), tlvId);
+        relive_new CrawlingSligButton(static_cast<Path_CrawlingSligButton*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -3048,12 +3049,12 @@ void Factory::GlukkonSwitchAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMo
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Security_Door_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::Security_Door_Speak);
+        mResourceManager.PendAnimation(AnimId::Security_Door_Idle);
+        mResourceManager.PendAnimation(AnimId::Security_Door_Speak);
     }
     else
     {
-        relive_new GlukkonSwitch(static_cast<Path_GlukkonSwitch*>(pTlv), tlvId);
+        relive_new GlukkonSwitch(static_cast<Path_GlukkonSwitch*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -3061,12 +3062,12 @@ void Factory::DoorBlockerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Door_Lock_Idle);
-        ResourceManagerWrapper::PendAnimation(AnimId::Door_Lock_Open);
+        mResourceManager.PendAnimation(AnimId::Door_Lock_Idle);
+        mResourceManager.PendAnimation(AnimId::Door_Lock_Open);
     }
     else
     {
-        relive_new DoorBlocker(static_cast<Path_DoorBlocker*>(pTlv), tlvId);
+        relive_new DoorBlocker(static_cast<Path_DoorBlocker*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -3074,11 +3075,11 @@ void Factory::RollingBallStopperAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode l
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Stone_Ball_Stopper);
+        mResourceManager.PendAnimation(AnimId::Stone_Ball_Stopper);
     }
     else
     {
-        relive_new RollingBallStopper(static_cast<Path_RollingBallStopper*>(pTlv), tlvId);
+        relive_new RollingBallStopper(static_cast<Path_RollingBallStopper*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -3088,15 +3089,15 @@ void Factory::TorturedMudokonAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode load
     {
         if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
         {
-            ResourceManagerWrapper::PendAnimation(AnimId::Tortured_Mudokon);
-            ResourceManagerWrapper::PendAnimation(AnimId::Tortured_Mudokon_Released);
-            ResourceManagerWrapper::PendAnimation(AnimId::Tortured_Mudokon_Zap);
-            ResourceManagerWrapper::PendAnimation(AnimId::Tortured_Mudokon_Tears);
-            ResourceManagerWrapper::PendAnimation(AnimId::Electric_Wall);
+            mResourceManager.PendAnimation(AnimId::Tortured_Mudokon);
+            mResourceManager.PendAnimation(AnimId::Tortured_Mudokon_Released);
+            mResourceManager.PendAnimation(AnimId::Tortured_Mudokon_Zap);
+            mResourceManager.PendAnimation(AnimId::Tortured_Mudokon_Tears);
+            mResourceManager.PendAnimation(AnimId::Electric_Wall);
         }
         else
         {
-            relive_new TorturedMudokon(static_cast<Path_TorturedMudokon*>(pTlv), tlvId);
+            relive_new TorturedMudokon(static_cast<Path_TorturedMudokon*>(pTlv), tlvId, mResourceManager);
         }
     }
 }
@@ -3105,12 +3106,12 @@ void Factory::TrainDoorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Door_Train_Closed);
-        ResourceManagerWrapper::PendAnimation(AnimId::Door_Train_Closing);
+        mResourceManager.PendAnimation(AnimId::Door_Train_Closed);
+        mResourceManager.PendAnimation(AnimId::Door_Train_Closing);
     }
     else
     {
-        relive_new TrainDoor(static_cast<Path_TrainDoor*>(pTlv), tlvId);
+        relive_new TrainDoor(static_cast<Path_TrainDoor*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -3118,13 +3119,13 @@ void Factory::RollingBallAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        ResourceManagerWrapper::PendAnimation(AnimId::Stone_Ball);
-        ResourceManagerWrapper::PendAnimation(AnimId::Stone_Ball_Rolling);
-        ResourceManagerWrapper::PendAnimation(AnimId::Explosion_Rock);
+        mResourceManager.PendAnimation(AnimId::Stone_Ball);
+        mResourceManager.PendAnimation(AnimId::Stone_Ball_Rolling);
+        mResourceManager.PendAnimation(AnimId::Explosion_Rock);
     }
     else
     {
-        relive_new RollingBall(static_cast<Path_RollingBall*>(pTlv), tlvId);
+        relive_new RollingBall(static_cast<Path_RollingBall*>(pTlv), tlvId, mResourceManager);
     }
 }
 
@@ -3282,6 +3283,7 @@ void Factory::ConstructTLVObject(Path_TLV* pTlv, const Guid& tlvInfo, LoadMode l
             break;
         case ReliveTypes::eCreditsController:
             FACTORY(CreditsController, pTlv, tlvInfo, loadMode);
+            break;
         case ReliveTypes::eHandStone:
             FACTORY(HandStone, pTlv, tlvInfo, loadMode);
             break;

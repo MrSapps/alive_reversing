@@ -12,7 +12,7 @@ namespace relive
 class RollingBallStopper final : public ::BaseAliveGameObject
 {
 public:
-    RollingBallStopper(relive::Path_RollingBallStopper* pTlv, const Guid& tlvId);
+    RollingBallStopper(relive::Path_RollingBallStopper* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~RollingBallStopper();
 
     virtual void VUpdate() override;

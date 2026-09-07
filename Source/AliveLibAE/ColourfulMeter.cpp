@@ -11,12 +11,12 @@
 u8 gTotalMeterBars = 0;
 bool gbDrawMeterCountDown = false;
 
-ColourfulMeter::ColourfulMeter(relive::Path_ColourfulMeter* pTlv, const Guid& tlvId)
-    : BaseGameObject(true, 0),
+ColourfulMeter::ColourfulMeter(relive::Path_ColourfulMeter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan),
     mTlvInfo(tlvId),
     mTlvX(pTlv->mTopLeftX),
     mTlvY(pTlv->mTopLeftY),
-    mPal(ResourceManagerWrapper::LoadPal(PalId::LedFont_ColourfulMeter)),
+    mPal(GetResourceManager().LoadPal(PalId::LedFont_ColourfulMeter)),
     mSwitchId(pTlv->mSwitchId),
     mNumberOfMeterBars(pTlv->mNumberOfMeterBars)
 {
@@ -72,7 +72,7 @@ void ColourfulMeter::VScreenChanged()
 {
     SetDead(true);
 
-    if (gMap.LevelChanged() || gMap.PathChanged())
+    if (gMap->LevelChanged() || gMap->PathChanged())
     {
         gTotalMeterBars = 0;
     }
@@ -136,7 +136,7 @@ void ColourfulMeter::VUpdate()
         else if (!gbDrawMeterCountDown)
         {
             gbDrawMeterCountDown = true;
-            MinesAlarm::Create(30 * mMinesAlarmCountdown);
+            MinesAlarm::Create(30 * mMinesAlarmCountdown, mResMan);
         }
     }
 }

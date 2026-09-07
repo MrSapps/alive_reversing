@@ -10,8 +10,8 @@
 
 namespace AO {
 
-SligSpawner::SligSpawner(relive::Path_TLV* pTlv, relive::Path_Slig_Data* pTlvData, const Guid& tlvId)
-    : BaseGameObject(true, 0)
+SligSpawner::SligSpawner(relive::Path_TLV* pTlv, relive::Path_Slig_Data* pTlvData, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     SetType(ReliveTypes::eSligSpawner);
 
@@ -37,7 +37,7 @@ void SligSpawner::VUpdate()
 
     if (SwitchStates_Get(mSligSpawnerSwitchId))
     {
-        auto pTlv = gMap.VTLV_Get_At_Of_Type(
+        auto pTlv = gMap->VTLV_Get_At_Of_Type(
             mPathTlv.mTopLeftX,
             mPathTlv.mTopLeftY,
             mPathTlv.mTopLeftX,
@@ -46,7 +46,7 @@ void SligSpawner::VUpdate()
 
         if (pTlv)
         {
-            relive_new Slig(pTlv, {});
+            relive_new Slig(pTlv, {}, mResMan);
         }
 
         SetDead(true);

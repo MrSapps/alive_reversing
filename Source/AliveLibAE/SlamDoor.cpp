@@ -59,27 +59,27 @@ static const TintEntry sSlamDoorTints[16] = {
 
 void SlamDoor::LoadAnimations()
 {
-    switch (gMap.mCurrentLevel)
+    switch (gMap->mCurrentLevel)
     {
         case EReliveLevelIds::eNecrum:
         case EReliveLevelIds::eMudomoVault:
         case EReliveLevelIds::eMudancheeVault:
         case EReliveLevelIds::eMudancheeVault_Ender:
         case EReliveLevelIds::eMudomoVault_Ender:
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Slam_Door_Vault_Closing));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Slam_Door_Vault_Closed));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Slam_Door_Vault_Opening));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Slam_Door_Vault_Closing));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Slam_Door_Vault_Closed));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Slam_Door_Vault_Opening));
             break;
         default:
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Slam_Door_Industrial_Closing));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Slam_Door_Industrial_Closed));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Slam_Door_Industrial_Opening));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Slam_Door_Industrial_Closing));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Slam_Door_Industrial_Closed));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Slam_Door_Industrial_Opening));
             break;
     }
 }
 
-SlamDoor::SlamDoor(relive::Path_SlamDoor* pTlv, const Guid& tlvId)
-    : BaseAliveGameObject(0)
+SlamDoor::SlamDoor(relive::Path_SlamDoor* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(0, resMan)
 {
     LoadAnimations();
 
@@ -92,7 +92,7 @@ SlamDoor::SlamDoor(relive::Path_SlamDoor* pTlv, const Guid& tlvId)
     mSlamDoorFlipY = pTlv->mFlipY;
     mDelete = pTlv->mDelete;
 
-    const s32 currentLevelId = static_cast<s32>(MapWrapper::ToAE(gMap.mCurrentLevel));
+    const s32 currentLevelId = static_cast<s32>(MapWrapper::ToAE(gMap->mCurrentLevel));
 
     Animation_Init(GetAnimRes(sSlamDoorAnimIds[currentLevelId][2]));
 
@@ -136,7 +136,7 @@ SlamDoor::SlamDoor(relive::Path_SlamDoor* pTlv, const Guid& tlvId)
         mClosed = false;
     }
 
-    SetTint(sSlamDoorTints, gMap.mCurrentLevel);
+    SetTint(sSlamDoorTints, gMap->mCurrentLevel);
 
     FP hitX;
     FP hitY;
@@ -293,7 +293,7 @@ void SlamDoor::VUpdate()
         {
             GetAnimation().SetRender(true);
 
-            GetAnimation().Set_Animation_Data(GetAnimRes(sSlamDoorAnimIds[static_cast<s32>(MapWrapper::ToAE(gMap.mCurrentLevel))][2]));
+            GetAnimation().Set_Animation_Data(GetAnimRes(sSlamDoorAnimIds[static_cast<s32>(MapWrapper::ToAE(gMap->mCurrentLevel))][2]));
 
             if (GetSpriteScale() == FP_FromInteger(1))
             {
@@ -360,7 +360,7 @@ void SlamDoor::VUpdate()
         }
         else
         {
-            GetAnimation().Set_Animation_Data(GetAnimRes(sSlamDoorAnimIds[static_cast<s32>(MapWrapper::ToAE(gMap.mCurrentLevel))][0]));
+            GetAnimation().Set_Animation_Data(GetAnimRes(sSlamDoorAnimIds[static_cast<s32>(MapWrapper::ToAE(gMap->mCurrentLevel))][0]));
             Rect_Clear(&mCollisionLine1->mRect);
             mCollisionLine1 = nullptr;
 
@@ -441,9 +441,9 @@ void SlamDoor::ClearInsideSlamDoor(BaseAliveGameObject* pObj, s16 xPosition, s16
     }
 }
 
-void SlamDoor::CreateFromSaveState(SerializedObjectData& pData)
+void SlamDoor::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan)
 {
     const auto pSaveState = pData.ReadTmpPtr<SlamDoorSaveState>();
 
-    relive_new SlamDoor(static_cast<relive::Path_SlamDoor*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pSaveState->mTlvInfo).GetTlv()), pSaveState->mTlvInfo);
+    relive_new SlamDoor(static_cast<relive::Path_SlamDoor*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pSaveState->mTlvInfo).GetTlv()), pSaveState->mTlvInfo, resMan);
 }

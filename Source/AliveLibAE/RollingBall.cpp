@@ -21,8 +21,8 @@
 
 void RollingBall::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Stone_Ball));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Stone_Ball_Rolling));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Stone_Ball));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Stone_Ball_Rolling));
 }
 
 RollingBall::~RollingBall()
@@ -39,8 +39,8 @@ RollingBall::~RollingBall()
     KillRollingBallShaker();
 }
 
-RollingBall::RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId)
-    : ::BaseAliveGameObject(0)
+RollingBall::RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : ::BaseAliveGameObject(0, resMan)
 {
     SetType(ReliveTypes::eRollingBall);
 
@@ -123,7 +123,7 @@ bool RollingBall::CollideWithWalls()
 
         SetDead(true);
 
-        const CameraPos direction = gMap.GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
+        const CameraPos direction = gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
         SFX_Play_Camera(relive::SoundEffects::IngameTransition, 50, direction);
 
         switch (direction)
@@ -268,7 +268,7 @@ void RollingBall::VUpdate()
 
             relive_new ScreenShake(false, false);
 
-            const CameraPos direction = gMap.GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
+            const CameraPos direction = gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
             SFX_Play_Camera(relive::SoundEffects::IngameTransition, 50, direction);
 
             switch (direction)
@@ -302,7 +302,7 @@ void RollingBall::VUpdate()
         }
 
         case States::eCrushedBees:
-            if (mCurrentLevel != gMap.mCurrentLevel || mCurrentPath != gMap.mCurrentPath || EventGet(Event::kEventDeathReset))
+            if (mCurrentLevel != gMap->mCurrentLevel || mCurrentPath != gMap->mCurrentPath || EventGet(Event::kEventDeathReset))
             {
                 SetDead(true);
             }

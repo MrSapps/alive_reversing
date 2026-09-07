@@ -61,10 +61,10 @@ static u8 HintFly_NextRandom()
     return gRandomBytes[sHintFlyRndSeed_4C6AA4++];
 }
 
-HintFly::HintFly(relive::Path_HintFly* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0)
+HintFly::HintFly(relive::Path_HintFly* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::HintFly));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::HintFly));
     Animation_Init(GetAnimRes(AnimId::HintFly));
 
     GetAnimation().SetSemiTrans(false);

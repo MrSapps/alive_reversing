@@ -50,10 +50,9 @@ void Path::Init(const PathData* pPathData, EReliveLevelIds level, s16 path, s16 
     mCamsOnY = (mPathData->field_6_bBottom - mPathData->field_2_bRight) / mPathData->field_C_grid_height;
 }
 
-void Path::Loader_4DB800(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad)
+void Path::Loader_4DB800(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad, ResourceManagerWrapper& resMan)
 {
-    // TODO: temp factory object for testing
-    relive::Factory factory;
+    relive::Factory factory(resMan);
 
     TlvIterator tlvIterator = mBinaryPath->TlvsForCamera(xpos, ypos);
     while(tlvIterator.GetTlv())
@@ -85,15 +84,15 @@ void Path::Loader_4DB800(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode,
 
 TlvIterator Path::Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx)
 {
-    const s32 camY = cam_y_idx + gMap.mCamIdxOnY;
-    const s32 camX = cam_x_idx + gMap.mCamIdxOnX;
+    const s32 camY = cam_y_idx + gMap->mCamIdxOnY;
+    const s32 camX = cam_x_idx + gMap->mCamIdxOnX;
 
     if (camX >= mCamsOnX || camX < 0 || camY >= mCamsOnY || camY < 0)
     {
         return TlvIterator::Invalid();
     }
 
-    BinaryPath* pPathData = gMap.GetPathResourceBlockPtr(gMap.mCurrentPath);
+    BinaryPath* pPathData = gMap->GetPathResourceBlockPtr(gMap->mCurrentPath);
     return pPathData->TlvsForCamera(camX, camY);
 }
 
@@ -146,7 +145,7 @@ TlvIterator Path::VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height,
     const s32 grid_cell_x = (right + left) / (2 * mPathData->field_A_grid_width);
 
     // Get the offset to where the TLV list starts for this camera cell
-    BinaryPath* pBinPath = gMap.GetPathResourceBlockPtr(gMap.mCurrentPath);
+    BinaryPath* pBinPath = gMap->GetPathResourceBlockPtr(gMap->mCurrentPath);
     TlvIterator tlvIterator = pBinPath->TlvsForCamera(grid_cell_x, grid_cell_y);
     while(tlvIterator.GetTlv())
     {
@@ -199,7 +198,7 @@ TlvIterator Path::TLV_Get_At(TlvIterator tlvIterator, FP xpos, FP ypos, FP width
             return TlvIterator::Invalid();
         }
 
-        BinaryPath* pBinPath = gMap.GetPathResourceBlockPtr(gMap.mCurrentPath);
+        BinaryPath* pBinPath = gMap->GetPathResourceBlockPtr(gMap->mCurrentPath);
         tlvIterator =  pBinPath->TlvsForCamera(camX, camY);
         if (!tlvIterator.GetTlv())
         {
@@ -277,7 +276,7 @@ void Path::TLV_Delete(const Guid& tlvId, s16 hiFlags)
 
 void Path::Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed)
 {
-    auto& paths = gMap.GetLoadedPaths();
+    auto& paths = gMap->GetLoadedPaths();
     for (std::unique_ptr<BinaryPath>& pBinPath : paths)
     {
         if (pBinPath)
@@ -314,7 +313,7 @@ void Path::Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx
 
 void Path::Reset_TLVs(u16 pathId)
 {
-    BinaryPath* pPath = gMap.GetPathResourceBlockPtr(pathId);
+    BinaryPath* pPath = gMap->GetPathResourceBlockPtr(pathId);
     if (pPath)
     {
         for (auto& cam : pPath->GetCameras())

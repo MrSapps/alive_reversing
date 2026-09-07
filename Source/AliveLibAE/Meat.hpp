@@ -44,7 +44,7 @@ struct MeatSaveState final : public SaveStateBase
 class Meat final : public BaseThrowable
 {
 public:
-    Meat(FP xpos, FP ypos, s16 count);
+    Meat(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan);
     ~Meat();
     
     virtual void VUpdate() override;
@@ -58,7 +58,7 @@ public:
     virtual bool VCanEatMe();
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
 
-    static void CreateFromSaveState(SerializedObjectData& pBuffer);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
 
     virtual bool VOnPlatformIntersection(BaseAnimatedWithPhysicsGameObject* pPlatform) override
     {

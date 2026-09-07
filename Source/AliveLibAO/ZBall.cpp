@@ -15,7 +15,7 @@ ZBall* gCenterZBall = nullptr;
 ZBall* gOutZBall = nullptr;
 
 // TODO: Pass the whole object because this decides to read 2 points as a rect
-void Animation_OnFrame_ZBallSmacker(::BaseGameObject* pObj, u32& idx, const IndexedPoint& points)
+void Animation_OnFrame_ZBallSmacker(::BaseGameObject* pObj, u32& idx, const IndexedPoint& points, ResourceManagerWrapper& resMan)
 {
     auto pZBall = static_cast<ZBall*>(pObj);
     for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
@@ -50,8 +50,8 @@ void Animation_OnFrame_ZBallSmacker(::BaseGameObject* pObj, u32& idx, const Inde
     idx++;
 }
 
-ZBall::ZBall(relive::Path_ZBall* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0)
+ZBall::ZBall(relive::Path_ZBall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eZBall);
 
@@ -61,21 +61,21 @@ ZBall::ZBall(relive::Path_ZBall* pTlv, const Guid& tlvId)
     {
         case relive::Path_ZBall::Speed::eNormal:
         {
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Swinging_Ball_Normal));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Swinging_Ball_Normal));
             Animation_Init(GetAnimRes(AnimId::Swinging_Ball_Normal));
             break;
         }
 
         case relive::Path_ZBall::Speed::eFast:
         {
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Swinging_Ball_Fast));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Swinging_Ball_Fast));
             Animation_Init(GetAnimRes(AnimId::Swinging_Ball_Fast));
             break;
         }
 
         case relive::Path_ZBall::Speed::eSlow:
         {
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Swinging_Ball_Slow));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Swinging_Ball_Slow));
             Animation_Init(GetAnimRes(AnimId::Swinging_Ball_Slow));
             break;
         }
@@ -85,7 +85,7 @@ ZBall::ZBall(relive::Path_ZBall* pTlv, const Guid& tlvId)
     mXPos = FP_FromInteger(pTlv->mTopLeftX);
     mYPos = FP_FromInteger(pTlv->mTopLeftY);
 
-    if (gMap.mCurrentLevel == EReliveLevelIds::eForestTemple)
+    if (gMap->mCurrentLevel == EReliveLevelIds::eForestTemple)
     {
         switch (pTlv->mStartPos)
         {
@@ -165,7 +165,7 @@ void ZBall::VUpdate()
 
     mFrameAbove12 = GetAnimation().GetCurrentFrame() >= 13;
 
-    if (!gMap.Is_Point_In_Current_Camera(
+    if (!gMap->Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,

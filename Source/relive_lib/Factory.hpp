@@ -1,6 +1,7 @@
 #pragma once
 
 class Guid;
+class ResourceManagerWrapper;
 
 namespace relive
 {
@@ -9,6 +10,11 @@ namespace relive
     class Factory final
     {
         public:
+        explicit Factory(ResourceManagerWrapper& resMan)
+            : mResourceManager(resMan)
+        {
+        }
+
         enum class LoadMode : s16
         {
             ConstructObject_0 = 0,
@@ -178,5 +184,7 @@ namespace relive
         void RollingBallAE(relive::Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode);
 
         void ConstructTLVObject(Path_TLV* pTlv, const Guid& tlvInfo, LoadMode loadMode);
+
+        ResourceManagerWrapper& mResourceManager;
     };
 }

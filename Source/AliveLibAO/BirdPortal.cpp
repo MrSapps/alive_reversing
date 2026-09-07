@@ -26,7 +26,8 @@
 
 namespace AO {
 
-BirdPortal::BirdPortal(relive::Path_BirdPortal* pTlv, const Guid& tlvId)
+BirdPortal::BirdPortal(relive::Path_BirdPortal* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : IBirdPortal(resMan)
 {
     mPortalType = pTlv->mPortalType;
     mEnterSide = pTlv->mEnterSide;
@@ -51,8 +52,8 @@ BirdPortal::BirdPortal(relive::Path_BirdPortal* pTlv, const Guid& tlvId)
         mSpriteScale = FP_FromInteger(1);
     }
 
-    mCurrentPath = gMap.mCurrentPath;
-    mCurrentLevel = gMap.mCurrentLevel;
+    mCurrentPath = gMap->mCurrentPath;
+    mCurrentLevel = gMap->mCurrentLevel;
 
     PathLine* pLine = nullptr;
     FP hitX = {};
@@ -129,7 +130,7 @@ BirdPortal::~BirdPortal()
 
 void BirdPortal::VUpdate()
 {
-    const CameraPos direction = gMap.GetDirection(
+    const CameraPos direction = gMap->GetDirection(
         mCurrentLevel,
         mCurrentPath,
         mXPos,
@@ -624,8 +625,8 @@ void BirdPortal::VGiveShrykull(s16 bPlaySound)
 
 void BirdPortal::VExitPortal()
 {
-    mCurrentPath = gMap.mCurrentPath;
-    mCurrentLevel = gMap.mCurrentLevel;
+    mCurrentPath = gMap->mCurrentPath;
+    mCurrentLevel = gMap->mCurrentLevel;
 
     auto pPortalExitTlv = GetMap().TLV_First_Of_Type_In_Camera(ReliveTypes::eBirdPortalExit, 0).GetTlv<relive::Path_BirdPortalExit>();
     if (pPortalExitTlv)
@@ -664,8 +665,8 @@ void BirdPortal::VExitPortal()
         }
 
         gAbe->SetSpriteScale(mSpriteScale);
-        gAbe->mCurrentLevel = gMap.mCurrentLevel;
-        gAbe->mCurrentPath = gMap.mCurrentPath;
+        gAbe->mCurrentLevel = gMap->mCurrentLevel;
+        gAbe->mCurrentPath = gMap->mCurrentPath;
 
         mState = PortalStates::PortalExit_SetPosition_17;
     }

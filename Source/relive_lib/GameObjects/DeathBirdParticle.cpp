@@ -8,8 +8,8 @@
 
 void DeathBirdParticle::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::DeathFlare_2));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::DeathFlare_1));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::DeathFlare_2));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::DeathFlare_1));
 }
 
 DeathBirdParticle::DeathBirdParticle(FP xpos, FP ypos, s32 startTimer, bool playSound, FP scale)

@@ -14,13 +14,13 @@ namespace AO {
 
 void BellHammer::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::BellHammer_Idle));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::BellHammer_Smashing));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BellHammer_Idle));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::BellHammer_Smashing));
 }
 
 
-BellHammer::BellHammer(relive::Path_BellHammer* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0)
+BellHammer::BellHammer(relive::Path_BellHammer* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::eBellHammer);
 
@@ -117,10 +117,10 @@ void BellHammer::VUpdate()
     if (mSpawnElum)
     {
         mSpawnElum = false;
-        Elum::Spawn(mTlvInfo);
+        Elum::Spawn(mTlvInfo, mResMan);
 
         PSX_Point mapCoords = {};
-        gMap.GetCurrentCamCoords(&mapCoords);
+        gMap->GetCurrentCamCoords(&mapCoords);
 
         if (gElum)
         {

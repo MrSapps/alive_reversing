@@ -97,8 +97,8 @@ BaseThrowable* Make_Throwable(FP xpos, FP ypos, s16 count)
     }
 }
 
-BaseThrowable::BaseThrowable()
-    : BaseAliveGameObject(0)
+BaseThrowable::BaseThrowable(ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(0, resMan)
 {
 }
 

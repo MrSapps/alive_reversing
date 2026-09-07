@@ -10,8 +10,8 @@ OneShotSwitchIdSetter::~OneShotSwitchIdSetter()
     Path::TLV_Reset(mTlvId);
 }
 
-OneShotSwitchIdSetter::OneShotSwitchIdSetter(Path_OneShotSwitchIdSetter* pTlv, const Guid& tlvId)
-    : BaseGameObject(true, 0)
+OneShotSwitchIdSetter::OneShotSwitchIdSetter(Path_OneShotSwitchIdSetter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     mTlvId = tlvId;
 

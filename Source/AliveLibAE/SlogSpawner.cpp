@@ -10,8 +10,8 @@
 #include "Path.hpp"
 #include "Math.hpp"
 
-SlogSpawner::SlogSpawner(relive::Path_SlogSpawner* pTlv, const Guid& tlvId)
-    : BaseGameObject(true, 0)
+SlogSpawner::SlogSpawner(relive::Path_SlogSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseGameObject(true, 0, resMan)
 {
     mTlvInfo = tlvId;
     mScale = pTlv->mScale;
@@ -49,7 +49,7 @@ void SlogSpawner::VUpdate()
         {
             mSpawnTimer = (sGnFrame + mSlogSpawnInterval) + Math_NextRandom() % 8;
 
-            auto pSlog = relive_new Slog(mXPos, mYPos, mScale != relive::reliveScale::eFull ? FP_FromDouble(0.5) : FP_FromInteger(1), static_cast<s16>(mListenToSligs), mChaseDelay);
+            auto pSlog = relive_new Slog(mXPos, mYPos, mScale != relive::reliveScale::eFull ? FP_FromDouble(0.5) : FP_FromInteger(1), static_cast<s16>(mListenToSligs), mChaseDelay, mResMan);
             if (pSlog)
             {
                 pSlog->GetAnimation().SetFlipX(mStartDirection == relive::Path_SlogSpawner::StartDirection::eLeft);

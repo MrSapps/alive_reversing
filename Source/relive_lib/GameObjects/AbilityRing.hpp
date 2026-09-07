@@ -66,7 +66,7 @@ public:
 
     static AbilityRing* Factory(FP xpos, FP ypos, RingTypes ringType, FP scale);
     void SetTarget(BaseGameObject* pTarget);
-    static void CreateFromSaveState(SerializedObjectData& pBuffer);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
 
 private:
     void CollideWithObjects(bool bDealDamage);

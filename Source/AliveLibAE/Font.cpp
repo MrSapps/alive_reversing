@@ -849,7 +849,7 @@ void FontContext::LoadFontType(FontType resourceID)
     }
 
 
-    FontResource fontRes = ResourceManagerWrapper::LoadFont(resourceID);
+    FontResource fontRes = GetResourceManager().LoadFont(resourceID);
     mFntResource = fontRes;
 
     // TODO: Will get moved to a json file in FontResource

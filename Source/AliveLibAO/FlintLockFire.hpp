@@ -12,7 +12,7 @@ namespace AO {
 class FlintLockFire final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    FlintLockFire(relive::Path_FlintLockFire* pTlv, const Guid& tlvId);
+    FlintLockFire(relive::Path_FlintLockFire* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~FlintLockFire();
 
     void LoadAnimations();

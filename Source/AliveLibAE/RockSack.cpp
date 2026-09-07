@@ -14,13 +14,13 @@
 
 void RockSack::LoadAnimations()
 {
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::RockSack_Idle));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::RockSack_SoftHit));
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::RockSack_HardHit));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RockSack_Idle));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RockSack_SoftHit));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::RockSack_HardHit));
 }
 
-RockSack::RockSack(relive::Path_RockSack* pTlv, const Guid& tlvId)
-    : BaseAliveGameObject(0)
+RockSack::RockSack(relive::Path_RockSack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAliveGameObject(0, resMan)
 {
     SetType(ReliveTypes::eRockSack);
 
@@ -144,7 +144,7 @@ void RockSack::VUpdate()
 
             gThrowableArray->Add(mRockAmount);
 
-            auto pRock = relive_new Rock(mXPos, mYPos - FP_FromInteger(30), mRockAmount);
+            auto pRock = relive_new Rock(mXPos, mYPos - FP_FromInteger(30), mRockAmount, mResMan);
             if (pRock)
             {
                 pRock->VThrow(mTlvVelX, mTlvVelY);

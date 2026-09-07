@@ -10,7 +10,7 @@ namespace relive
 class MeatSack final : public BaseAliveGameObject
 {
 public:
-    MeatSack(relive::Path_MeatSack* pTlv, const Guid& tlvId);
+    MeatSack(relive::Path_MeatSack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~MeatSack();
 
     void LoadAnimations();

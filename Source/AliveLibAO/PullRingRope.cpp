@@ -15,40 +15,40 @@ namespace AO {
 
 void PullRingRope::LoadAnimations()
 {
-    switch (gMap.mCurrentLevel)
+    switch (gMap->mCurrentLevel)
     {
         case EReliveLevelIds::eRuptureFarms:
         case EReliveLevelIds::eBoardRoom:
         case EReliveLevelIds::eRuptureFarmsReturn:
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Pullring_Farms_Idle));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Pullring_Farms_UseBegin));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Pullring_Farms_UseEnd));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Pullring_Farms_Idle));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Pullring_Farms_UseBegin));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Pullring_Farms_UseEnd));
             break;
 
         case EReliveLevelIds::eDesert:
         case EReliveLevelIds::eDesertTemple:
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Pullring_Desert_Idle));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Pullring_Desert_UseBegin));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Pullring_Desert_UseEnd));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Pullring_Desert_Idle));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Pullring_Desert_UseBegin));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Pullring_Desert_UseEnd));
             break;
 
         default:
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Pullring_Desert_Idle));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Pullring_Desert_UseBegin));
-            mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Pullring_Desert_UseEnd));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Pullring_Desert_Idle));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Pullring_Desert_UseBegin));
+            mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Pullring_Desert_UseEnd));
             break;
     }
 }
 
-PullRingRope::PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId)
-    : BaseAnimatedWithPhysicsGameObject(0)
+PullRingRope::PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan)
 {
     SetType(ReliveTypes::ePullRingRope);
 
     LoadAnimations();
 
     s32 lvl_x_off = 0;
-    switch (gMap.mCurrentLevel)
+    switch (gMap->mCurrentLevel)
     {
         case EReliveLevelIds::eRuptureFarms:
         case EReliveLevelIds::eBoardRoom:
@@ -159,7 +159,7 @@ void PullRingRope::VUpdate()
                 mVelY = FP_FromInteger(0);
                 mState = States::eTriggerEvent_2;
 
-                if (gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms || gMap.mCurrentLevel == EReliveLevelIds::eBoardRoom || gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+                if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarms || gMap->mCurrentLevel == EReliveLevelIds::eBoardRoom || gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
                 {
                     SfxPlayMono(relive::SoundEffects::IndustrialTrigger, 0);
                 }
@@ -230,7 +230,7 @@ void PullRingRope::VUpdate()
 
             mStayInStateTicks = 3;
 
-            if (gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms || gMap.mCurrentLevel == EReliveLevelIds::eBoardRoom || gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+            if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarms || gMap->mCurrentLevel == EReliveLevelIds::eBoardRoom || gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
             {
                 GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::Pullring_Farms_UseEnd));
             }
@@ -248,7 +248,7 @@ void PullRingRope::VUpdate()
                 mVelY = FP_FromInteger(0);
                 mState = States::eIdle_0;
 
-                if (gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms || gMap.mCurrentLevel == EReliveLevelIds::eBoardRoom || gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+                if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarms || gMap->mCurrentLevel == EReliveLevelIds::eBoardRoom || gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
                 {
                     GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::Pullring_Farms_Idle));
                 }
@@ -293,7 +293,7 @@ s16 PullRingRope::Pull(BaseAliveGameObject* pFrom)
 
     SwitchStates_Do_Operation(mSwitchId, mAction);
 
-    if (gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms || gMap.mCurrentLevel == EReliveLevelIds::eBoardRoom || gMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+    if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarms || gMap->mCurrentLevel == EReliveLevelIds::eBoardRoom || gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
     {
         GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::Pullring_Farms_UseBegin));
     }

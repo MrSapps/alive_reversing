@@ -11,7 +11,7 @@ namespace AO {
 class MovingBomb final : public ::BaseAliveGameObject
 {
 public:
-    MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId);
+    MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
     ~MovingBomb();
 
     virtual void VUpdate() override;

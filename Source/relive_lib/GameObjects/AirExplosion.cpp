@@ -32,12 +32,12 @@ AirExplosion::AirExplosion(FP xpos, FP ypos, FP explosionScale, bool bSmall)
 
     if (mSmallExplosion)
     {
-        mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::AirExplosion_Small));
+        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::AirExplosion_Small));
         Animation_Init(GetAnimRes(AnimId::AirExplosion_Small));
     }
     else
     {
-        mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::AirExplosion));
+        mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::AirExplosion));
         Animation_Init(GetAnimRes(AnimId::AirExplosion));
     }
 

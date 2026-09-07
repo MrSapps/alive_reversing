@@ -15,13 +15,14 @@
 
 namespace AO {
 
-Rock::Rock(FP xpos, FP ypos, s16 count)
+Rock::Rock(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan)
+    : BaseThrowable(resMan)
 {
     SetType(ReliveTypes::eRock);
 
     mBaseThrowableDead = 0;
 
-    mLoadedAnims.push_back(ResourceManagerWrapper::LoadAnimation(AnimId::Rock));
+    mLoadedAnims.push_back(GetResourceManager().LoadAnimation(AnimId::Rock));
     Animation_Init(GetAnimRes(AnimId::Rock));
 
     SetInteractive(false);
@@ -40,9 +41,9 @@ Rock::Rock(FP xpos, FP ypos, s16 count)
     mBaseThrowableCount = count;
     mState = RockStates::eNone_0;
 
-    mLoadedPals.push_back(ResourceManagerWrapper::LoadPal(PalId::BlueRock));
+    mLoadedPals.push_back(GetResourceManager().LoadPal(PalId::BlueRock));
 
-    if (gMap.mCurrentLevel == EReliveLevelIds::eStockYards || gMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+    if (gMap->mCurrentLevel == EReliveLevelIds::eStockYards || gMap->mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
     {
         // TODO: I think this only existed in certain lvls, will need a way to know
         // which pal to use per lvl/path
@@ -169,7 +170,7 @@ void Rock::VUpdate()
             mVelY += FP_FromInteger(1);
             mXPos += mVelX;
             mYPos += mVelY;
-            if (!gMap.Is_Point_In_Current_Camera(
+            if (!gMap->Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -187,8 +188,8 @@ void Rock::VUpdate()
 //TODO Identical to AE - merge
 void Rock::VScreenChanged()
 {
-    if (gMap.PathChanged()
-        || gMap.LevelChanged())
+    if (gMap->PathChanged()
+        || gMap->LevelChanged())
     {
         SetDead(true);
     }
