@@ -11,15 +11,15 @@
 #include "Path.hpp"
 #include "QuikSave.hpp"
 
-void SlapLockWhirlWind::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& /*resMan*/)
+void SlapLockWhirlWind::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& /*resMan*/, BaseMap& /*map*/)
 {
     const auto pSaveState = pBuffer.ReadTmpPtr<SlapLockWhirlWindSaveState>();
     
     SwitchStates_Do_Operation(pSaveState->mSwitchId, relive::reliveSwitchOp::eSetTrue);
 }
 
-SlapLockWhirlWind::SlapLockWhirlWind(s16 doorNumber, s16 switchId, FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+SlapLockWhirlWind::SlapLockWhirlWind(s16 doorNumber, s16 switchId, FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eSlapLock_OrbWhirlWind);
 
@@ -31,8 +31,8 @@ SlapLockWhirlWind::SlapLockWhirlWind(s16 doorNumber, s16 switchId, FP xpos, FP y
         for (s16 x = 0; x < gPathInfo->mCamsOnX; x++)
         {
             TlvIterator doorTlvIterator = gPathInfo->Get_First_TLV_For_Offsetted_Camera(
-                x - gMap->mCamIdxOnX,
-                y - gMap->mCamIdxOnY);
+                x - GetMap().mCamIdxOnX,
+                y - GetMap().mCamIdxOnY);
             while (doorTlvIterator.GetTlv())
             {
                 if (doorTlvIterator.GetTlv()->mTlvType == ReliveTypes::eDoor)
@@ -65,7 +65,7 @@ SlapLockWhirlWind::SlapLockWhirlWind(s16 doorNumber, s16 switchId, FP xpos, FP y
 
     if (bFoundTarget)
     {
-        auto pWhirlWind = relive_new OrbWhirlWind(xpos, ypos, scale, 1, resMan);
+        auto pWhirlWind = relive_new OrbWhirlWind(xpos, ypos, scale, 1, resMan, map);
         if (pWhirlWind)
         {
             mOrbWhirlWindId = pWhirlWind->mBaseGameObjectId;

@@ -13,8 +13,8 @@
 ExplosionSet* gExplosionSet = nullptr;
 bool gExplosionSetEnabled = false;
 
-ExplosionSet::ExplosionSet(ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+ExplosionSet::ExplosionSet(ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eExplosionSet);
 
@@ -73,7 +73,7 @@ ExplosionSet::~ExplosionSet()
 
 void ExplosionSet::VScreenChanged()
 {
-    if (!gMap->LevelChanged() && !gMap->PathChanged())
+    if (!GetMap().LevelChanged() && !GetMap().PathChanged())
     {
         mActive = false;
     }
@@ -162,16 +162,16 @@ void ExplosionSet::VUpdate()
             }
         }
 
-        relive_new FallingItem(xpos, mTlvRect.y, mSpriteScale < FP_FromInteger(1), 0, 0, 1, 0, mResMan);
+        relive_new FallingItem(xpos, mTlvRect.y, mSpriteScale < FP_FromInteger(1), 0, 0, 1, 0, mResMan, mMap);
 
         mSpacingMultiplicator++;
         mStartDelay = mAssetInterval;
 
-        if (gMap->mCurrentLevel == EReliveLevelIds::eMines && Math_RandomRange(1, 5) >= 4)
+        if (GetMap().mCurrentLevel == EReliveLevelIds::eMines && Math_RandomRange(1, 5) >= 4)
         {
             const FP explodeX = FP_FromInteger(Math_RandomRange(mTlvRect.y + 20, mTlvRect.y + 230));
             const FP explodeY = FP_FromInteger(Math_RandomRange(mTlvRect.x, xpos));
-            relive_new AirExplosion(explodeY, explodeX, mSpriteScale, 0, mResMan);
+            relive_new AirExplosion(explodeY, explodeX, mSpriteScale, 0, mResMan, mMap);
         }
     }
 }

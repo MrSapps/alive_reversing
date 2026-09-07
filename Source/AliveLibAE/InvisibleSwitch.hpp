@@ -7,7 +7,7 @@
 class InvisibleSwitch final : public BaseGameObject
 {
 public:
-    InvisibleSwitch(relive::Path_InvisibleSwitch* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    InvisibleSwitch(relive::Path_InvisibleSwitch* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~InvisibleSwitch();
 
     virtual void VUpdate() override;

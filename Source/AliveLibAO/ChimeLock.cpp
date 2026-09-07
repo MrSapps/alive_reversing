@@ -24,8 +24,8 @@ namespace AO {
 // TODO: Index is always >=1 so first entry is redundant ??
 const s32 dword_4C5054[11] = {0, 1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000};
 
-ChimeLock::ChimeLock(relive::Path_ChimeLock* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : ::BaseAliveGameObject(0, resMan)
+ChimeLock::ChimeLock(relive::Path_ChimeLock* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : ::BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eChimeLock);
 
@@ -51,7 +51,7 @@ ChimeLock::ChimeLock(relive::Path_ChimeLock* pTlv, const Guid& tlvId, ResourceMa
         FP_FromInteger(pTlv->mTopLeftX),
         FP_FromInteger(pTlv->mTopLeftY),
         scale,
-        mResMan);
+        mResMan, mMap);
     if (pLeftBell)
     {
         mLeftBell = pLeftBell->mBaseGameObjectId;
@@ -62,7 +62,7 @@ ChimeLock::ChimeLock(relive::Path_ChimeLock* pTlv, const Guid& tlvId, ResourceMa
         FP_FromInteger(pTlv->mTopLeftX),
         FP_FromInteger(pTlv->mTopLeftY),
         scale,
-        mResMan);
+        mResMan, mMap);
     if (pCenterBell)
     {
         mCenterBell = pCenterBell->mBaseGameObjectId;
@@ -73,7 +73,7 @@ ChimeLock::ChimeLock(relive::Path_ChimeLock* pTlv, const Guid& tlvId, ResourceMa
         FP_FromInteger(pTlv->mTopLeftX),
         FP_FromInteger(pTlv->mTopLeftY),
         scale,
-        mResMan);
+        mResMan, mMap);
     if (pRightBell)
     {
         mRightBell = pRightBell->mBaseGameObjectId;
@@ -402,7 +402,7 @@ void ChimeLock::VUpdate()
                     mChimeLockState = ChimeLockStates::eNeverRead_6;
                     SwitchStates_Do_Operation(mSolveSwitchId, relive::reliveSwitchOp::eSetTrue);
                     VUnPosses();
-                    relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eSecretAreaShort, relive::Path_MusicTrigger::TriggeredBy::eTouching, 0, 15, mResMan);
+                    relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eSecretAreaShort, relive::Path_MusicTrigger::TriggeredBy::eTouching, 0, 15, mResMan, mMap);
                     return;
                 }
             }
@@ -601,7 +601,7 @@ void ChimeLock::VUpdate()
             New_TintChant_Particle(
                 x, y,
                 GetSpriteScale(),
-                Layer::eLayer_0, mResMan);
+                Layer::eLayer_0, mResMan, mMap);
             return;
         }
 

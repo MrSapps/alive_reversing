@@ -7,7 +7,7 @@ namespace AO {
 class Meat final : public ::BaseThrowable
 {
 public:
-    Meat(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan);
+    Meat(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Meat();
 
     virtual void VScreenChanged() override;

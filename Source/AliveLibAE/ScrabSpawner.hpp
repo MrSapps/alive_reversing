@@ -23,10 +23,10 @@ struct ScrabSpawnerSaveState final : public SaveStateBase
 class ScrabSpawner final : public BaseGameObject
 {
 public:
-    ScrabSpawner(relive::Path_ScrabSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    ScrabSpawner(relive::Path_ScrabSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~ScrabSpawner();
 
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
     
     virtual void VUpdate() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;

@@ -52,7 +52,7 @@ struct DDCheatProperty final
 class DDCheat final : public ::BaseGameObject
 {
 public:
-    DDCheat(ResourceManagerWrapper& resMan);
+    DDCheat(ResourceManagerWrapper& resMan, BaseMap& map);
 
     virtual void VScreenChanged() override;
 

@@ -32,8 +32,8 @@ static Data_Byte sByte2 = {};
 
 s32 gDeathGasCount = 0;
 
-DeathGas::DeathGas(Layer layer, s32 amount, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan),
+DeathGas::DeathGas(Layer layer, s32 amount, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map),
     mLayer(layer),
     mAmount(amount)
 {

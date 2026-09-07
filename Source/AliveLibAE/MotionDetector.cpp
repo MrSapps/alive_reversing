@@ -18,8 +18,8 @@
 #include "../relive_lib/FatalError.hpp"
 #include "Engine.hpp"
 
-MotionDetectorLaser::MotionDetectorLaser(FP xpos, FP ypos, FP scale, Layer layer, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+MotionDetectorLaser::MotionDetectorLaser(FP xpos, FP ypos, FP scale, Layer layer, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eRedLaser);
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::MotionDetector_Laser));
@@ -33,8 +33,8 @@ MotionDetectorLaser::MotionDetectorLaser(FP xpos, FP ypos, FP scale, Layer layer
 
 // =====================================================================================
 
-MotionDetector::MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tlvId, BaseAnimatedWithPhysicsGameObject* pOwner, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+MotionDetector::MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tlvId, BaseAnimatedWithPhysicsGameObject* pOwner, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eGreeterBody);
 
@@ -87,12 +87,12 @@ MotionDetector::MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tl
         if (pTlv->mInitialMoveDirection == relive::Path_MotionDetector::InitialMoveDirection::eLeft)
         {
             mState = States::eMoveLeft_2;
-            pLaser = relive_new MotionDetectorLaser(mBottomRightX, mBottomRightY, GetSpriteScale(), Layer::eLayer_Foreground_36, resMan);
+            pLaser = relive_new MotionDetectorLaser(mBottomRightX, mBottomRightY, GetSpriteScale(), Layer::eLayer_Foreground_36, resMan, map);
         }
         else if (pTlv->mInitialMoveDirection == relive::Path_MotionDetector::InitialMoveDirection::eRight)
         {
             mState = States::eMoveRight_0;
-            pLaser = relive_new MotionDetectorLaser(mTopLeftX, mBottomRightY, GetSpriteScale(), Layer::eLayer_Foreground_36, resMan);
+            pLaser = relive_new MotionDetectorLaser(mTopLeftX, mBottomRightY, GetSpriteScale(), Layer::eLayer_Foreground_36, resMan, map);
         }
         else
         {
@@ -135,7 +135,7 @@ MotionDetector::MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tl
     mSpeed = FP_FromInteger(2);
     mState = States::eMoveRight_0;
 
-    auto pLaserMem = relive_new MotionDetectorLaser(pOwner->mXPos, pOwner->mYPos, GetSpriteScale(), Layer::eLayer_Foreground_36, resMan);
+    auto pLaserMem = relive_new MotionDetectorLaser(pOwner->mXPos, pOwner->mYPos, GetSpriteScale(), Layer::eLayer_Foreground_36, resMan, map);
     if (pLaserMem)
     {
         mLaserId = pLaserMem->mBaseGameObjectId;
@@ -288,7 +288,7 @@ void MotionDetector::VUpdate()
                             // Trigger alarms if its not already blasting
                             if (gAlarmInstanceCount == 0)
                             {
-                                relive_new Alarm(mAlarmDuration, mAlarmSwitchId, 0, Layer::eLayer_Above_FG1_39, mResMan);
+                                relive_new Alarm(mAlarmDuration, mAlarmSwitchId, 0, Layer::eLayer_Above_FG1_39, mResMan, mMap);
 
                                 if (IsAbe(pObj) && pObj->mHealth > FP_FromInteger(0))
                                 {
@@ -350,7 +350,7 @@ void MotionDetector::VUpdate()
                 {
                     mState = States::eWaitThenMoveLeft_1;
                     mPauseTimer = MakeTimer(15);
-                    const CameraPos soundDirection = gMap->GetDirection(
+                    const CameraPos soundDirection = GetMap().GetDirection(
                         mCurrentLevel,
                         mCurrentPath,
                         mXPos,
@@ -375,7 +375,7 @@ void MotionDetector::VUpdate()
                 {
                     mState = States::eWaitThenMoveRight_3;
                     mPauseTimer = MakeTimer(15);
-                    const CameraPos soundDirection = gMap->GetDirection(
+                    const CameraPos soundDirection = GetMap().GetDirection(
                         mCurrentLevel,
                         mCurrentPath,
                         mXPos,

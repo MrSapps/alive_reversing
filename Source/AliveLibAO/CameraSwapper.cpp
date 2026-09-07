@@ -19,8 +19,8 @@
 
 namespace AO {
 
-CameraSwapper::CameraSwapper(CamResource& camRes, ResourceManagerWrapper& resMan,bool bPutDispEnv1, const char_type* pFmv1, bool bPutDispEnv2, const char_type* pFmv2, bool bPutDispEnv3, const char_type* pFmv3)
-    : BaseGameObject(true, 0, resMan)
+CameraSwapper::CameraSwapper(CamResource& camRes, ResourceManagerWrapper& resMan, BaseMap& map,bool bPutDispEnv1, const char_type* pFmv1, bool bPutDispEnv2, const char_type* pFmv2, bool bPutDispEnv3, const char_type* pFmv3)
+    : BaseGameObject(true, 0, resMan, map)
 {
     mFmvs[0] = pFmv1;
     mPutDispEnv[0] = bPutDispEnv1;
@@ -44,13 +44,13 @@ CameraSwapper::CameraSwapper(CamResource& camRes, ResourceManagerWrapper& resMan
         Init(camRes, CameraSwapEffects::ePlay1FMV_5);
     }
 
-    relive_new Movie(mFmvs[0], resMan);
+    relive_new Movie(mFmvs[0], resMan, map);
 
     mMoviePutDispEnv = mPutDispEnv[0];
 }
 
-CameraSwapper::CameraSwapper(CamResource& camRes, ResourceManagerWrapper& resMan, CameraSwapEffects changeEffect, s32 xpos, s32 ypos)
-    : BaseGameObject(true, 0, resMan)
+CameraSwapper::CameraSwapper(CamResource& camRes, ResourceManagerWrapper& resMan, BaseMap& map, CameraSwapEffects changeEffect, s32 xpos, s32 ypos)
+    : BaseGameObject(true, 0, resMan, map)
 {
     mYPosConverted = static_cast<s16>(ypos);
     mXPosConverted = static_cast<s16>(PsxToPCX(xpos));
@@ -68,13 +68,13 @@ CameraSwapper::~CameraSwapper()
 
     if (gMap_bDoPurpleLightEffect)
     {
-        gMap->RemoveObjectsWithPurpleLight(0);
+        GetMap().RemoveObjectsWithPurpleLight(0);
         gMap_bDoPurpleLightEffect = false;
     }
 
     BackgroundMusic::Play();
     MusicController::EnableMusic(1);
-    gMap->Start_Sounds_For_Objects_In_Near_Cameras();
+    GetMap().Start_Sounds_For_Objects_In_Near_Cameras();
 }
 
 void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)
@@ -130,7 +130,7 @@ void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)
             wh.x = gPsxDisplay.mWidth;
             wh.y = gPsxDisplay.mHeight;
 
-            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan);
+            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan, mMap);
             break;
 
         case CameraSwapEffects::eRightToLeft_2:
@@ -145,7 +145,7 @@ void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)
             wh.x = 0;
             wh.y = gPsxDisplay.mHeight;
 
-            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan);
+            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan, mMap);
             break;
 
         case CameraSwapEffects::eTopToBottom_3:
@@ -160,7 +160,7 @@ void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)
             wh.x = gPsxDisplay.mWidth;
             wh.y = gPsxDisplay.mHeight;
 
-            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan);
+            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan, mMap);
             break;
 
         case CameraSwapEffects::eBottomToTop_4:
@@ -175,7 +175,7 @@ void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)
             wh.x = gPsxDisplay.mWidth;
             wh.y = 0;
 
-            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan);
+            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan, mMap);
             break;
 
         case CameraSwapEffects::eVerticalSplit_6:
@@ -190,7 +190,7 @@ void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)
             wh.x = gPsxDisplay.mWidth / 2;
             wh.y = gPsxDisplay.mHeight;
 
-            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan);
+            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan, mMap);
             break;
 
         case CameraSwapEffects::eHorizontalSplit_7:
@@ -205,7 +205,7 @@ void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)
             wh.x = gPsxDisplay.mWidth;
             wh.y = gPsxDisplay.mHeight / 2;
 
-            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan);
+            mScreenClipper = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan, mMap);
             break;
 
         case CameraSwapEffects::eBoxOut_8:
@@ -242,7 +242,7 @@ void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)
             xy.x = gPsxDisplay.mWidth - 1;
             xy.y = gPsxDisplay.mHeight - 1;
 
-            mScreenClipper = relive_new ScreenClipper(xy, PSX_Point{ 1, 1 }, Layer::eLayer_0, mResMan);
+            mScreenClipper = relive_new ScreenClipper(xy, PSX_Point{ 1, 1 }, Layer::eLayer_0, mResMan, mMap);
 
             // "Whoosh" door sound effect
             SfxPlayMono(relive::SoundEffects::IngameTransition, 127);
@@ -252,7 +252,7 @@ void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)
         case CameraSwapEffects::ePlay1FMV_5:
         case CameraSwapEffects::ePlay2FMVs_9:
         case CameraSwapEffects::ePlay3FMVs_10:
-            mScreenClipper = relive_new ScreenClipper(PSX_Point{ 0, 0 }, PSX_Point{ 1, 1 }, Layer::eLayer_0, mResMan);
+            mScreenClipper = relive_new ScreenClipper(PSX_Point{ 0, 0 }, PSX_Point{ 1, 1 }, Layer::eLayer_0, mResMan, mMap);
             mCurrentSlice = 0;
             break;
 
@@ -413,7 +413,7 @@ void CameraSwapper::VUpdate()
             // When no movie is playing start the next one
             if (Movie::gMovieRefCount == 0)
             {
-                relive_new Movie(mFmvs[1], mResMan);
+                relive_new Movie(mFmvs[1], mResMan, mMap);
                 mCamChangeEffect = CameraSwapEffects::ePlay1FMV_5;
                 mMoviePutDispEnv = mPutDispEnv[2];
             }
@@ -432,7 +432,7 @@ void CameraSwapper::VUpdate()
             // When no movie is playing start the next one
             if (Movie::gMovieRefCount == 0)
             {
-                relive_new Movie(mFmvs[2], mResMan);
+                relive_new Movie(mFmvs[2], mResMan, mMap);
                 mCamChangeEffect = CameraSwapEffects::ePlay2FMVs_9;
                 mMoviePutDispEnv = mPutDispEnv[1];
             }

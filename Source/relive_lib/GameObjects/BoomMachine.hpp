@@ -10,7 +10,7 @@ namespace relive
 class BoomMachine final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    BoomMachine(relive::Path_BoomMachine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    BoomMachine(relive::Path_BoomMachine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~BoomMachine();
 
     virtual void VUpdate() override;

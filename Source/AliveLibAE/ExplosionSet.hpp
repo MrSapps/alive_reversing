@@ -11,7 +11,7 @@ namespace relive
 class ExplosionSet final : public BaseGameObject
 {
 public:
-    ExplosionSet(ResourceManagerWrapper& resMan);
+    ExplosionSet(ResourceManagerWrapper& resMan, BaseMap& map);
     ~ExplosionSet();
 
     

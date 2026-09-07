@@ -915,14 +915,14 @@ void SsVabTransBody(VabBodyRecord* pVabBody, s16 vabId)
     }
 }
 
-s16 SND_VAB_Load_476CB0(PathSoundInfo& pSoundBlockInfo)
+s16 SND_VAB_Load_476CB0(PathSoundInfo& pSoundBlockInfo, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     // Find the VH file record
-    pSoundBlockInfo.mVhFileData = GetMap().GetResourceManager().LoadFile(pSoundBlockInfo.mVhFile.c_str(), GetMap().mNextLevel);
+    pSoundBlockInfo.mVhFileData = resMan.LoadFile(pSoundBlockInfo.mVhFile.c_str(), map.mNextLevel);
     pSoundBlockInfo.mVabId = AO::SsVabOpenHead(reinterpret_cast<VabHeader*>(pSoundBlockInfo.mVhFileData.data()));
 
     // Load the VB file data
-    std::vector<u8> vbFileData = GetMap().GetResourceManager().LoadFile(pSoundBlockInfo.mVbFile.c_str(), GetMap().mNextLevel);
+    std::vector<u8> vbFileData = resMan.LoadFile(pSoundBlockInfo.mVbFile.c_str(), map.mNextLevel);
 
     SsVabTransBody(reinterpret_cast<VabBodyRecord*>(vbFileData.data()), static_cast<s16>(pSoundBlockInfo.mVabId));
     SsVabTransCompleted(SS_WAIT_COMPLETED);
@@ -931,10 +931,10 @@ s16 SND_VAB_Load_476CB0(PathSoundInfo& pSoundBlockInfo)
     return 1;
 }
 
-void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& pSoundBlockInfo, s32 reverb)
+void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& pSoundBlockInfo, s32 reverb, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     GetMidiVars()->sSnd_ReloadAbeResources() = false;
-    auto oldPtr = GetMidiVars()->sLastLoadedSoundBlockInfo().lock(); 
+    auto oldPtr = GetMidiVars()->sLastLoadedSoundBlockInfo().lock();
     if (oldPtr.get() != pSoundBlockInfo.get())
     {
         SsUtReverbOff_4FE350();
@@ -943,12 +943,12 @@ void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& pSoundBlockInfo, s32 reverb)
 
         if (GetMidiVars()->sMonkVh_Vb().mVabId < 0)
         {
-            SND_VAB_Load_476CB0(GetMidiVars()->sMonkVh_Vb());
+            SND_VAB_Load_476CB0(GetMidiVars()->sMonkVh_Vb(), resMan, map);
         }
 
         GetMidiVars()->sLastLoadedSoundBlockInfo() = pSoundBlockInfo;
 
-        SND_VAB_Load_476CB0(*pSoundBlockInfo);
+        SND_VAB_Load_476CB0(*pSoundBlockInfo, resMan, map);
 
         if (GetMidiVars()->sSnd_ReloadAbeResources())
         {
@@ -960,9 +960,9 @@ void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& pSoundBlockInfo, s32 reverb)
     }
 }
 
-void SND_Load_Seqs_477AB0(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& bsqFileName)
+void SND_Load_Seqs_477AB0(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& bsqFileName, ResourceManagerWrapper& resMan, BaseMap& map)
 {
-    SND_Load_Seqs_Impl(pSeqTable, *bsqFileName);
+    SND_Load_Seqs_Impl(pSeqTable, *bsqFileName, resMan, map);
 }
 
 s16 SND_SEQ_Play(SeqId idx, s32 repeatCount, s16 volLeft, s16 volRight)

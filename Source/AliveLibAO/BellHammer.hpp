@@ -18,7 +18,7 @@ enum class BellHammerStates : u16
 class BellHammer final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    BellHammer(relive::Path_BellHammer* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    BellHammer(relive::Path_BellHammer* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~BellHammer();
 
     void LoadAnimations();

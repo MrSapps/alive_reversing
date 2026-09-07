@@ -12,8 +12,8 @@
 namespace AO {
 
 
-SlogSpawner::SlogSpawner(relive::Path_SlogSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+SlogSpawner::SlogSpawner(relive::Path_SlogSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     mTlvInfo = tlvId;
     mScale = pTlv->mScale;
@@ -53,7 +53,7 @@ void SlogSpawner::VUpdate()
                     mXPos,
                     mYPos,
                     mScale != relive::reliveScale::eFull ? FP_FromDouble(0.5) : FP_FromInteger(1),
-                    mResMan);
+                    mResMan, mMap);
             if (pSlog)
             {
                 pSlog->GetAnimation().SetFlipX(mStartDirection == relive::Path_SlogSpawner::StartDirection::eLeft);

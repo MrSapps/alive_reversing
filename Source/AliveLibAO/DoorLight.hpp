@@ -12,7 +12,7 @@ namespace AO {
 class DoorLight final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    DoorLight(relive::Path_LightEffect* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    DoorLight(relive::Path_LightEffect* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~DoorLight();
     
     virtual void VScreenChanged() override;

@@ -10,8 +10,8 @@
 
 namespace AO {
 
-LiftMover::LiftMover(relive::Path_LiftMover* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+LiftMover::LiftMover(relive::Path_LiftMover* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     mTlvId = tlvId;
     SetType(ReliveTypes::eLiftMover);
@@ -70,11 +70,11 @@ void LiftMover::VUpdate()
                     {
                         // Load lift point objects (I guess in case for some reason it got unloaded ??)
                         // AE doesn't do this.
-                        for (s16 y = 0; y < gMap->mMaxCamsY; y++)
+                        for (s16 y = 0; y < GetMap().mMaxCamsY; y++)
                         {
-                            for (s16 x = 0; x < gMap->mMaxCamsX; x++)
+                            for (s16 x = 0; x < GetMap().mMaxCamsX; x++)
                             {
-                                gMap->Loader(x, y, relive::Factory::LoadMode::ConstructObject_0, ReliveTypes::eLiftPoint);
+                                GetMap().Loader(x, y, relive::Factory::LoadMode::ConstructObject_0, ReliveTypes::eLiftPoint);
                             }
                         }
 

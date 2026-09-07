@@ -8,8 +8,8 @@
 DemoPlayback* gActiveDemoPlayback = nullptr;
 char_type gActiveDemoName[32];
 
-DemoPlayback::DemoPlayback(ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+DemoPlayback::DemoPlayback(ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     if (gActiveDemoPlayback)
     {
@@ -54,15 +54,15 @@ void DemoPlayback::VUpdate()
         if (gIsDemoStartedManually)
         {
             // go back to the demo selection menu
-            gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, 30, CameraSwapEffects::eInstantChange_0, 0, 0);
+            GetMap().SetActiveCam(EReliveLevelIds::eMenu, 1, 30, CameraSwapEffects::eInstantChange_0, 0, 0);
         }
         else
         {
             // go back to the main screen
-            gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
+            GetMap().SetActiveCam(EReliveLevelIds::eMenu, 1, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
         }
 
-        gMap->mFreeAllAnimAndPalts = true;
+        GetMap().mFreeAllAnimAndPalts = true;
         SetDead(true);
     }
 }

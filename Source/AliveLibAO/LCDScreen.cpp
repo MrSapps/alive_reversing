@@ -150,8 +150,8 @@ public:
 };
 static LCDMessages gLCDMessages;
 
-LCDScreen::LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+LCDScreen::LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     mBaseGameObjectTlvInfo = tlvId;
 
@@ -164,7 +164,7 @@ LCDScreen::LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId, ResourceMa
     mMessageId1 = pTlv->mMessageId1;
     mTlvId = tlvId;
 
-    mFontContext.LoadFontType(FontType::LcdFont);
+    mFontContext.LoadFontType(FontType::LcdFont, mResMan);
 
     mPal1 = resMan.LoadPal(PalId::LedFont_1);
     mPal2 = resMan.LoadPal(PalId::LedFont_2);
@@ -173,7 +173,7 @@ LCDScreen::LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId, ResourceMa
 
     if (Input().IsJoyStickEnabled() || mMessageId1 != 62)
     {
-        String_FormatString(gLCDMessages.GetMessage(gMap->mCurrentLevel, gMap->mCurrentPath, mMessageId1), mMessageBuffer);
+        String_FormatString(gLCDMessages.GetMessage(GetMap().mCurrentLevel, GetMap().mCurrentPath, mMessageId1), mMessageBuffer);
     }
     else
     {
@@ -230,7 +230,7 @@ void LCDScreen::VUpdate()
 
                 if (Input().IsJoyStickEnabled() || rangedRandom != 62)
                 {
-                    String_FormatString(gLCDMessages.GetMessage(gMap->mCurrentLevel, gMap->mCurrentPath, rangedRandom), mMessageBuffer);
+                    String_FormatString(gLCDMessages.GetMessage(GetMap().mCurrentLevel, GetMap().mCurrentPath, rangedRandom), mMessageBuffer);
                 }
                 else
                 {
@@ -249,7 +249,7 @@ void LCDScreen::VUpdate()
                 if (Input().IsJoyStickEnabled() || mMessageId1 != 62)
                 {
                     String_FormatString(
-                        gLCDMessages.GetMessage(gMap->mCurrentLevel, gMap->mCurrentPath, mMessageId1),
+                        gLCDMessages.GetMessage(GetMap().mCurrentLevel, GetMap().mCurrentPath, mMessageId1),
                         mMessageBuffer);
                 }
                 else

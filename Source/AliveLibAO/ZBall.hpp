@@ -12,7 +12,7 @@ namespace AO {
 class ZBall final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    ZBall(relive::Path_ZBall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    ZBall(relive::Path_ZBall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
 
     virtual void VUpdate() override;
 

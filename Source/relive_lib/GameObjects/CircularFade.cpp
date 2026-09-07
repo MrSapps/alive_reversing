@@ -7,8 +7,8 @@
 #include "../GameType.hpp"
 #include "../../relive_lib/Engine.hpp"
 
-CircularFade::CircularFade(FP xpos, FP ypos, FP scale, bool fadeIn, s8 destroyOnDone, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+CircularFade::CircularFade(FP xpos, FP ypos, FP scale, bool fadeIn, s8 destroyOnDone, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     AnimId anim;
     if (GetGameType() == GameType::eAe)
@@ -218,9 +218,9 @@ s32 CircularFade::VDone()
     return mDone;
 }
 
-CircularFade* Make_Circular_Fade(FP xpos, FP ypos, FP scale, bool fadeIn, s8 destroyOnDone, bool surviveDeathReset, ResourceManagerWrapper& resMan)
+CircularFade* Make_Circular_Fade(FP xpos, FP ypos, FP scale, bool fadeIn, s8 destroyOnDone, bool surviveDeathReset, ResourceManagerWrapper& resMan, BaseMap& map)
 {
-    auto pCircularFade = relive_new CircularFade(xpos, ypos, scale, fadeIn, destroyOnDone, resMan);
+    auto pCircularFade = relive_new CircularFade(xpos, ypos, scale, fadeIn, destroyOnDone, resMan, map);
     if (!pCircularFade)
     {
         return nullptr;

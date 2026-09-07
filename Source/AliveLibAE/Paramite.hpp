@@ -196,7 +196,7 @@ public:
         AnimId::Paramite_Struggle,
         AnimId::Paramite_Attack};
 
-    Paramite(relive::Path_Paramite* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    Paramite(relive::Path_Paramite* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Paramite();
 
     void LoadAnimations();
@@ -225,7 +225,7 @@ public:
         }
     }
 
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
     void HandleDDCheat();
     void HandleBrainsAndMotions();

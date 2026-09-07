@@ -21,7 +21,7 @@ enum class Event : s16;
 class BirdPortal final : public IBirdPortal
 {
 public:
-    BirdPortal(relive::Path_BirdPortal* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    BirdPortal(relive::Path_BirdPortal* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~BirdPortal();
     
     virtual void VUpdate() override;
@@ -32,7 +32,7 @@ public:
     virtual void VExitPortal() override;
     virtual void VGetMapChange(EReliveLevelIds* level, u16* path, u16* camera, CameraSwapEffects* screenChangeEffect, u16* movieId) override;
 
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
 private:
     s16 IsScaredAway();

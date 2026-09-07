@@ -273,8 +273,8 @@ void PauseMenu::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::HappyMudIcon));
 }
 
-PauseMenu::PauseMenu(ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+PauseMenu::PauseMenu(ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     gQuicksave_SaveNextFrame = false;
     gQuicksave_LoadNextFrame = false;
@@ -293,7 +293,7 @@ PauseMenu::PauseMenu(ResourceManagerWrapper& resMan)
     mControlActionPageIndex = 0;
     mSaveState = SaveState::ReadingInput_0;
 
-    mFontContext.LoadFontType(FontType::PauseMenu);
+    mFontContext.LoadFontType(FontType::PauseMenu, mResMan);
     mPal = mResMan.LoadPal(PalId::MainMenuFont_PauseMenu);
     mFont.Load(256, mPal, &mFontContext);
 
@@ -342,7 +342,7 @@ void PauseMenu::VRender(OrderingTable& ot)
 
 void PauseMenu::VScreenChanged()
 {
-    if (gMap->mNextLevel == EReliveLevelIds::eCredits)
+    if (GetMap().mNextLevel == EReliveLevelIds::eCredits)
     {
         SetDead(true);
     }
@@ -407,14 +407,14 @@ void PauseMenu::Page_Base_Render(OrderingTable& ot, PauseMenu::PauseMenuPage* pP
 
 void PauseMenu::RestartPath()
 {
-    DestroyObjects();
+    DestroyObjects(mResMan);
 
     gSwitchStates = QuikSave::gActiveQuicksaveData.mRestartPathSwitchStates;
 
-    Abe::CreateFromSaveState(QuikSave::gActiveQuicksaveData.mRestartPathAbeState, mResMan);
+    Abe::CreateFromSaveState(QuikSave::gActiveQuicksaveData.mRestartPathAbeState, mResMan, mMap);
     QuikSave::RestoreWorldInfo(QuikSave::gActiveQuicksaveData.mRestartPathWorldInfo);
 
-    gMap->SetActiveCam(
+    GetMap().SetActiveCam(
         QuikSave::gActiveQuicksaveData.mRestartPathWorldInfo.mLevel,
         QuikSave::gActiveQuicksaveData.mRestartPathWorldInfo.mPath,
         QuikSave::gActiveQuicksaveData.mRestartPathWorldInfo.mCam,
@@ -422,7 +422,7 @@ void PauseMenu::RestartPath()
         1,
         1);
 
-    gMap->mForceLoad = true;
+    GetMap().mForceLoad = true;
     if (gAbe->mBaseThrowableCount)
     {
         LoadRockTypes(
@@ -431,7 +431,7 @@ void PauseMenu::RestartPath()
 
         if (!gThrowableArray)
         {
-            gThrowableArray = relive_new ThrowableArray(mResMan);
+            gThrowableArray = relive_new ThrowableArray(mResMan, mMap);
         }
 
         gThrowableArray->Add(gAbe->mBaseThrowableCount);
@@ -511,9 +511,9 @@ void PauseMenu::Page_Main_Update()
                 // Set the default save name to be the current level/path/camera
                 Path_Format_CameraName(
                     sSaveString,
-                    gMap->mCurrentLevel,
-                    gMap->mCurrentPath,
-                    gMap->mCurrentCamera);
+                    GetMap().mCurrentLevel,
+                    GetMap().mCurrentPath,
+                    GetMap().mCurrentCamera);
                 // Null terminate it
                 sSaveString[8] = 0;
                 // Append the editor arrow s8
@@ -598,8 +598,8 @@ void PauseMenu::Page_QuitConfirmation_Update()
         }
 
         gPauseMenu = nullptr;
-        gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
-        gMap->mFreeAllAnimAndPalts = true;
+        GetMap().SetActiveCam(EReliveLevelIds::eMenu, 1, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
+        GetMap().mFreeAllAnimAndPalts = true;
         sCurrentControllerIndex = 0;
     }
 }
@@ -1041,9 +1041,9 @@ void PauseMenu::VUpdate()
                 mSelectedGlowCounter = 8;
                 Path_Format_CameraName(
                     sScreenStringBuffer,
-                    gMap->mCurrentLevel,
-                    gMap->mCurrentPath,
-                    gMap->mCurrentCamera);
+                    GetMap().mCurrentLevel,
+                    GetMap().mCurrentPath,
+                    GetMap().mCurrentCamera);
 
                 for (size_t i = 0; i < strlen(sScreenStringBuffer); i++)
                 {
@@ -1065,7 +1065,7 @@ void PauseMenu::VUpdate()
                     }
                 }
 
-                sprintf(sSavedMudokonsText, "%d OF %d MUDOKONS", gRescuedMudokons, Path_GetTotalMuds(gMap->mCurrentLevel, gMap->mCurrentPath));
+                sprintf(sSavedMudokonsText, "%d OF %d MUDOKONS", gRescuedMudokons, Path_GetTotalMuds(GetMap().mCurrentLevel, GetMap().mCurrentPath));
                 sprintf(sTerminatedMudokonsText, "%d HA%s BEEN TERMINATED", gKilledMudokons, (gKilledMudokons != 1) ? "VE" : "S");
 
                 if (gAbe->mMood == Mud_Emotion::eNormal_0)

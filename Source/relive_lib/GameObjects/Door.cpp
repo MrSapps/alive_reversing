@@ -25,8 +25,8 @@ static const AnimId sTrainDoorAnimIds[2] =
     AnimId::Door_Train_Closing
 };
 
-Door::Door(ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+Door::Door(ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
 }
 
@@ -36,8 +36,8 @@ void Door::LoadAnimations(const std::string& theme)
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Themed_Open, theme));
 }
 
-Door::Door(relive::Path_Door* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan),
+Door::Door(relive::Path_Door* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map),
     mTlvId(tlvId),
     mDoorType(pTlv->mDoorType),
     mStartState(pTlv->mStartState),
@@ -422,7 +422,7 @@ void Door::VUpdate()
                 if (!SwitchStates_Get(mSwitchId) && mDoorType == relive::Path_Door::DoorTypes::eTasksDoorWithSecretMusic)
                 {
                     SND_SEQ_Play(SeqId::SecretMusic_32, 1, 127, 127);
-                    relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eChime, relive::Path_MusicTrigger::TriggeredBy::eTimer, 0, mResMan);
+                    relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eChime, relive::Path_MusicTrigger::TriggeredBy::eTimer, 0, mResMan, mMap);
                 }
                 SwitchStates_Do_Operation(mSwitchId, relive::reliveSwitchOp::eSetTrue);
             }
@@ -501,8 +501,8 @@ void TrainDoor::LoadAnimations()
     }
 }
 
-TrainDoor::TrainDoor(relive::Path_TrainDoor* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : Door(resMan)
+TrainDoor::TrainDoor(relive::Path_TrainDoor* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : Door(resMan, map)
 {
     SetType(ReliveTypes::eDoor);
     mTlvId = tlvId;

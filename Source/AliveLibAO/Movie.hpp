@@ -7,7 +7,7 @@ namespace AO {
 class Movie final : public ::BaseGameObject
 {
 public:
-    explicit Movie(const char_type* pFmvName, ResourceManagerWrapper& resMan);
+    explicit Movie(const char_type* pFmvName, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Movie();
 
     virtual void VScreenChanged() override;

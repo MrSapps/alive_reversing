@@ -9,8 +9,8 @@
 
 // NOTE: this is the AO code and hasn't been compared since it's unused in original AE levels
 
-RollingBallStopper::RollingBallStopper(relive::Path_RollingBallStopper* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : ::BaseAliveGameObject(0, resMan)
+RollingBallStopper::RollingBallStopper(relive::Path_RollingBallStopper* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : ::BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eRollingBallStopper);
     

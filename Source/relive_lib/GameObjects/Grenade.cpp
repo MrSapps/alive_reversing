@@ -16,8 +16,8 @@
 #include "../GameType.hpp"
 #include "BaseMap.hpp"
 
-Grenade::Grenade(FP xpos, FP ypos, s16 numGrenades, bool bBlowUpOnCollision, BaseGameObject* pOwner, ResourceManagerWrapper& resMan)
-    : BaseThrowable(resMan)
+Grenade::Grenade(FP xpos, FP ypos, s16 numGrenades, bool bBlowUpOnCollision, BaseGameObject* pOwner, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseThrowable(resMan, map)
 {
     mBaseThrowableDead = 0;
 
@@ -525,7 +525,7 @@ void Grenade::BlowUp(bool bSmallExplosion)
         mYPos - (GetSpriteScale() * FP_FromInteger(5)),
         GetSpriteScale(),
         bSmallExplosion,
-        mResMan);
+        mResMan, mMap);
     if (pExplosion)
     {
         mExplosionId = pExplosion->mBaseGameObjectId;
@@ -533,7 +533,7 @@ void Grenade::BlowUp(bool bSmallExplosion)
         mState = GrenadeStates::eWaitForExplodeEnd_6;
     }
 
-    relive_new Gibs(GibType::eMetal, mXPos, mYPos, FP_FromInteger(0), FP_FromInteger(5), GetSpriteScale(), bSmallExplosion, mResMan);
+    relive_new Gibs(GibType::eMetal, mXPos, mYPos, FP_FromInteger(0), FP_FromInteger(5), GetSpriteScale(), bSmallExplosion, mResMan, mMap);
 }
 
 bool Grenade::VCanThrow()
@@ -593,10 +593,10 @@ bool Grenade::OnCollision_InstantExplode(BaseGameObject* pHit)
     return true;
 }
 
-void Grenade::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
+void Grenade::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<GrenadeSaveState>();
-    auto pGrenade = relive_new Grenade(pState->mXPos, pState->mYPos, pState->mThrowableCount, 0, nullptr, resMan);
+    auto pGrenade = relive_new Grenade(pState->mXPos, pState->mYPos, pState->mThrowableCount, 0, nullptr, resMan, map);
 
     pGrenade->mBaseGameObjectTlvInfo = pState->mTlvInfo;
 

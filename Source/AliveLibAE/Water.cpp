@@ -13,8 +13,8 @@
 #include "Map.hpp"
 #include "Path.hpp"
 
-Water::Water(relive::Path_Water* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+Water::Water(relive::Path_Water* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::WaterDrop));
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::WaterSplash));
@@ -159,7 +159,7 @@ void Water::VScreenChanged()
         field_144_sound_channels = 0;
     }
 
-    if (gMap->LevelChanged() || gMap->PathChanged())
+    if (GetMap().LevelChanged() || GetMap().PathChanged())
     {
         SetDead(true);
     }
@@ -225,7 +225,7 @@ void Water::VUpdate()
         SetDead(true);
     }
 
-    if (gMap->Is_Point_In_Current_Camera(
+    if (GetMap().Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -241,7 +241,7 @@ void Water::VUpdate()
 
     if (field_13C_not_in_camera_count <= 90)
     {
-        const CameraPos soundDir = gMap->GetDirection(
+        const CameraPos soundDir = GetMap().GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -443,7 +443,7 @@ void Water::VUpdate()
                         {
                             relive_new Particle(FP_NoFractional(pWaterRes->field_0_xpos) + gScreenManager->CamXPos(),
                                                               FP_NoFractional(pWaterRes->field_4_ypos) + gScreenManager->CamYPos() + FP_FromInteger(Math_NextRandom() % 4) - FP_FromInteger(2),
-                                                               GetAnimRes(AnimId::WaterSplash), mResMan);
+                                                               GetAnimRes(AnimId::WaterSplash), mResMan, mMap);
                         }
                     }
                 }
@@ -454,7 +454,7 @@ void Water::VUpdate()
 
 void Water::VRender(OrderingTable& ot)
 {
-    if (gMap->Is_Point_In_Current_Camera(
+    if (GetMap().Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,

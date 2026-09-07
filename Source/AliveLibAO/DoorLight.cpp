@@ -18,8 +18,8 @@ namespace AO {
 static s32 sNextDoorLightUpdate = -1;
 static s32 sDoorLightUpdateTimer = 0;
 
-DoorLight::DoorLight(relive::Path_LightEffect* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+DoorLight::DoorLight(relive::Path_LightEffect* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     mTlvId = tlvId;
     mWidth = pTlv->mSize;
@@ -170,7 +170,7 @@ void DoorLight::VUpdate()
 
                     if (sControlledCharacter == gAbe)
                     {
-                        relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eSecretAreaShort, relive::Path_MusicTrigger::TriggeredBy::eTouching, 0, 15, mResMan);
+                        relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eSecretAreaShort, relive::Path_MusicTrigger::TriggeredBy::eTouching, 0, 15, mResMan, mMap);
                     }
                     else
                     {

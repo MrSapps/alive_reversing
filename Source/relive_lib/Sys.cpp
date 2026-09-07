@@ -718,7 +718,7 @@ static void QuitEvent(bool isRecordedEvent, bool isRecording)
     }
 }
 
-s8 Sys_PumpMessages()
+s8 Sys_PumpMessages(BaseMap* pMap)
 {
     GetGameAutoPlayer().SyncPoint(SyncPoints::PumpEventsStart);
 
@@ -861,7 +861,10 @@ s8 Sys_PumpMessages()
 
             LOG_INFO("Reload path event %s", t.c_str());
 
-            GetMap().ReloadPathJsonRequest(t);
+            if (pMap)
+            {
+                pMap->ReloadPathJsonRequest(t);
+            }
         }
     }
 

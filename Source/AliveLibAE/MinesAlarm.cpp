@@ -11,22 +11,22 @@
 static bool sAlarmExists = false;
 s32 gExplosionTimer = 0;
 
-void MinesAlarm::Create(s32 timer, ResourceManagerWrapper& resMan)
+void MinesAlarm::Create(s32 timer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     if (!sAlarmExists)
     {
-        relive_new MinesAlarm(timer, resMan);
+        relive_new MinesAlarm(timer, resMan, map);
     }
 }
 
-void MinesAlarm::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
+void MinesAlarm::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<MinesAlarmSaveState>();
-    relive_new MinesAlarm(pState->mExplosionTimer, resMan);
+    relive_new MinesAlarm(pState->mExplosionTimer, resMan, map);
 }
 
-MinesAlarm::MinesAlarm(s32 timer, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+MinesAlarm::MinesAlarm(s32 timer, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eMinesAlarm);
     gExplosionTimer = timer;
@@ -49,7 +49,7 @@ MinesAlarm::~MinesAlarm()
 
 void MinesAlarm::VScreenChanged()
 {
-    if (gMap->LevelChanged() || gMap->PathChanged())
+    if (GetMap().LevelChanged() || GetMap().PathChanged())
     {
         SetDead(true);
     }
@@ -73,7 +73,7 @@ void MinesAlarm::VUpdate()
     {
         if (!gExplosionSet)
         {
-            relive_new ExplosionSet(mResMan);
+            relive_new ExplosionSet(mResMan, mMap);
         }
         gExplosionSet->Start();
         SetUpdatable(false);

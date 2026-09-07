@@ -51,54 +51,54 @@ const AETypes gThrowableFromOverlayIdAE[252] = {
     AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0,
     AETypes::eNone_0, AETypes::eNone_0};
 
-static BaseThrowable* Make_Throwable_AO(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan)
+static BaseThrowable* Make_Throwable_AO(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan, BaseMap& map)
 {
-    switch (gThrowableFromOverlayIdAO[GetMap().mOverlayId])
+    switch (gThrowableFromOverlayIdAO[map.mOverlayId])
     {
         case AOTypes::eGrenade_40:
-            return relive_new Grenade(xpos, ypos, count, false, nullptr, resMan);
+            return relive_new Grenade(xpos, ypos, count, false, nullptr, resMan, map);
         case AOTypes::eMeat_54:
-            return relive_new AO::Meat(xpos, ypos, count, resMan);
+            return relive_new AO::Meat(xpos, ypos, count, resMan, map);
         case AOTypes::eRock_70:
-            return relive_new AO::Rock(xpos, ypos, count, resMan);
+            return relive_new AO::Rock(xpos, ypos, count, resMan, map);
         default:
             return nullptr;
     }
 }
 
-static BaseThrowable* Make_Throwable_AE(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan)
+static BaseThrowable* Make_Throwable_AE(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan, BaseMap& map)
 {
-    switch (gThrowableFromOverlayIdAE[GetMap().mOverlayId])
+    switch (gThrowableFromOverlayIdAE[map.mOverlayId])
     {
         case AETypes::eBone_11:
-            return relive_new Bone(xpos, ypos, count, resMan);
+            return relive_new Bone(xpos, ypos, count, resMan, map);
         case AETypes::eMetal_24:
-            return relive_new Grenade(xpos, ypos, count, false, nullptr, resMan);
+            return relive_new Grenade(xpos, ypos, count, false, nullptr, resMan, map);
         case AETypes::eGrenade_65:
-            return relive_new Grenade(xpos, ypos, count, false, nullptr, resMan);
+            return relive_new Grenade(xpos, ypos, count, false, nullptr, resMan, map);
         case AETypes::eMeat_84:
-            return relive_new Meat(xpos, ypos, count, resMan);
+            return relive_new Meat(xpos, ypos, count, resMan, map);
         case AETypes::eRock_105:
-            return relive_new Rock(xpos, ypos, count, resMan);
+            return relive_new Rock(xpos, ypos, count, resMan, map);
         default:
             return nullptr;
     }
 }
 
-BaseThrowable* Make_Throwable(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan)
+BaseThrowable* Make_Throwable(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     if (GetGameType() == GameType::eAo)
     {
-        return Make_Throwable_AO(xpos, ypos, count, resMan);
+        return Make_Throwable_AO(xpos, ypos, count, resMan, map);
     }
     else
     {
-        return Make_Throwable_AE(xpos, ypos, count, resMan);
+        return Make_Throwable_AE(xpos, ypos, count, resMan, map);
     }
 }
 
-BaseThrowable::BaseThrowable(ResourceManagerWrapper& resMan)
-    : BaseAliveGameObject(0, resMan)
+BaseThrowable::BaseThrowable(ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAliveGameObject(0, resMan, map)
 {
 }
 

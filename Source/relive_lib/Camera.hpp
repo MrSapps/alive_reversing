@@ -5,13 +5,14 @@
 #include "ResourceManagerWrapper.hpp"
 
 enum class LevelIds : s16;
+class BaseMap;
 
 class Camera final // TODO: May actually just be "ResourceList" ?
 {
 public:
     Camera();
     ~Camera();
-    void CreateFG1(ResourceManagerWrapper& resMan);
+    void CreateFG1(ResourceManagerWrapper& resMan, BaseMap& map);
 
 public:
     static void On_Loaded(Camera* pCamera);

@@ -5,7 +5,7 @@
 class CircularFade final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    CircularFade(FP xpos, FP ypos, FP scale, bool fadeIn, s8 destroyOnDone, ResourceManagerWrapper& resMan);
+    CircularFade(FP xpos, FP ypos, FP scale, bool fadeIn, s8 destroyOnDone, ResourceManagerWrapper& resMan, BaseMap& map);
     ~CircularFade();
 
     virtual void VScreenChanged() override;
@@ -28,4 +28,4 @@ private:
     s16 mSpeed = 0;
 };
 
-CircularFade* Make_Circular_Fade(FP xpos, FP ypos, FP scale, bool fadeIn, s8 destroyOnDone, bool surviveDeathReset, ResourceManagerWrapper& resMan);
+CircularFade* Make_Circular_Fade(FP xpos, FP ypos, FP scale, bool fadeIn, s8 destroyOnDone, bool surviveDeathReset, ResourceManagerWrapper& resMan, BaseMap& map);

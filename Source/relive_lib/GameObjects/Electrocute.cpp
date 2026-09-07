@@ -8,8 +8,8 @@
 #include "../GameType.hpp"
 #include "BaseMap.hpp"
 
-Electrocute::Electrocute(BaseAliveGameObject* pTargetObj, bool bExtraOverwriter, bool bKillTarget, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan),
+Electrocute::Electrocute(BaseAliveGameObject* pTargetObj, bool bExtraOverwriter, bool bKillTarget, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map),
     mTargetObjId(pTargetObj->mBaseGameObjectId),
     mExtraOverwriter(bExtraOverwriter),
     mKillTarget(bKillTarget),
@@ -91,12 +91,12 @@ void Electrocute::VUpdate()
             mPalOverwriters[0] = relive_new PalleteOverwriter(
                 *mPal.mPal,
                 Pal_Make_Colour(255u, 255, 255, true),
-                mResMan);
+                mResMan, mMap);
 
             mPalOverwriters[1] = relive_new PalleteOverwriter(
                 *mPal.mPal,
                 Pal_Make_Colour(64u, 64, 255, true),
-                mResMan);
+                mResMan, mMap);
             if (mPalOverwriters[1])
             {
                 mPalOverwriters[1]->SetUpdateDelay(4);
@@ -106,7 +106,7 @@ void Electrocute::VUpdate()
             {
                 mPalOverwriters[2] = relive_new PalleteOverwriter(*mPal.mPal,
                     Pal_Make_Colour(0, 0, 0, false),
-                    mResMan);
+                    mResMan, mMap);
                 if (mPalOverwriters[2])
                 {
                     mPalOverwriters[2]->SetUpdateDelay(8);

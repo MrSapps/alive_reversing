@@ -12,8 +12,8 @@ namespace AO {
 class CameraSwapper final : public ::BaseGameObject
 {
 public:
-    CameraSwapper(CamResource& camRes, ResourceManagerWrapper& resMan, bool bPutDispEnv1, const char_type* pFmv1, bool bPutDispEnv2 = false, const char_type* pFmv2 = nullptr, bool bPutDispEnv3 = false, const char_type* pFmv3 = nullptr);
-    CameraSwapper(CamResource& camRes, ResourceManagerWrapper& resMan, CameraSwapEffects changeEffect, s32 xpos, s32 ypos);
+    CameraSwapper(CamResource& camRes, ResourceManagerWrapper& resMan, BaseMap& map, bool bPutDispEnv1, const char_type* pFmv1, bool bPutDispEnv2 = false, const char_type* pFmv2 = nullptr, bool bPutDispEnv3 = false, const char_type* pFmv3 = nullptr);
+    CameraSwapper(CamResource& camRes, ResourceManagerWrapper& resMan, BaseMap& map, CameraSwapEffects changeEffect, s32 xpos, s32 ypos);
     ~CameraSwapper();
 
     virtual void VScreenChanged() override;

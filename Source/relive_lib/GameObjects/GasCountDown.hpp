@@ -11,7 +11,7 @@ namespace relive
 class GasCountDown final : public BaseGameObject
 {
 public:
-    GasCountDown(relive::Path_GasCountDown* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    GasCountDown(relive::Path_GasCountDown* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~GasCountDown();
     
     virtual void VScreenChanged() override;

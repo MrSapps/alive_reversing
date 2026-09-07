@@ -34,8 +34,8 @@ void MineCar::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Mine_Car_Tread_Move_B));
 }
 
-MineCar::MineCar(relive::Path_MineCar* pTlv, const Guid& tlvId, s32 /*a4*/, s32 /*a5*/, s32 /*a6*/, ResourceManagerWrapper& resMan)
-    : BaseAliveGameObject(0, resMan)
+MineCar::MineCar(relive::Path_MineCar* pTlv, const Guid& tlvId, s32 /*a4*/, s32 /*a5*/, s32 /*a6*/, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eMineCar);
 
@@ -96,8 +96,8 @@ MineCar::MineCar(relive::Path_MineCar* pTlv, const Guid& tlvId, s32 /*a4*/, s32 
     // can travel "up" then we set this key to "up" such that holding down "right" automatically moves the car up.
     field_1D6_continue_move_input = static_cast<s16>(InputCommands::eThrowItem);
 
-    field_1CC_spawned_path = gMap->mCurrentPath;
-    field_1CE_spawned_camera = gMap->mCurrentCamera;
+    field_1CC_spawned_path = GetMap().mCurrentPath;
+    field_1CE_spawned_camera = GetMap().mCurrentCamera;
     field_1D0_sound_channels_mask = 0;
     field_1C4_velx_index = 0;
 }
@@ -111,12 +111,12 @@ const AnimId sMineCarAnimIdTable[7] = {
     AnimId::Mine_Car_Tread_Move_A,
     AnimId::Mine_Car_Tread_Move_B};
 
-void MineCar::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
+void MineCar::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<MineCarSaveState>();
     auto pTlv = static_cast<relive::Path_MineCar*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pState->field_4C_tlvInfo).GetTlv());
 
-    auto pMineCar = relive_new MineCar(pTlv, pState->field_4C_tlvInfo, 0, 0, 0, resMan);
+    auto pMineCar = relive_new MineCar(pTlv, pState->field_4C_tlvInfo, 0, 0, 0, resMan, map);
     if (pMineCar)
     {
         if (pState->field_5A_bAbeInCar)
@@ -361,7 +361,7 @@ void MineCar::VRender(OrderingTable& ot)
 
         mTreadAnim.SetRGB(r, g, b);
 
-        if (gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos + FP_FromInteger(30), mYPos, 0) || gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos - (GetSpriteScale() * FP_FromInteger(60)), 0) || gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos - FP_FromInteger(30), mYPos, 0))
+        if (GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos + FP_FromInteger(30), mYPos, 0) || GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos - (GetSpriteScale() * FP_FromInteger(60)), 0) || GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos - FP_FromInteger(30), mYPos, 0))
         {
             mTreadAnim.VRender(
                 FP_GetExponent(mXPos - gScreenManager->CamXPos()),
@@ -920,8 +920,8 @@ void MineCar::State_1_ParkedWithAbe()
         GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::Mine_Car_Open));
 
         sControlledCharacter = gAbe;
-        field_1CC_spawned_path = gMap->mCurrentPath;
-        field_1CE_spawned_camera = gMap->mCurrentCamera;
+        field_1CC_spawned_path = GetMap().mCurrentPath;
+        field_1CE_spawned_camera = GetMap().mCurrentCamera;
 
         gAbe->VCheckCollisionLineStillValid(10);
 
@@ -1524,7 +1524,7 @@ void MineCar::State_3_Falling()
                 sControlledCharacter->mYPos - ((mineCarHeight + kGridSize) * FP_FromDouble(0.5)),
                 4u,
                 GetSpriteScale(),
-                BurstType::eBigRedSparks, mResMan,
+                BurstType::eBigRedSparks, mResMan, mMap,
                 9, true
             );
 
@@ -1546,7 +1546,7 @@ void MineCar::State_3_Falling()
                 sControlledCharacter->mYPos - ((mineCarHeight + kGridSize) * FP_FromDouble(0.5)),
                 4u,
                 GetSpriteScale(),
-                BurstType::eBigRedSparks, mResMan,
+                BurstType::eBigRedSparks, mResMan, mMap,
                 9, true
             );
 
@@ -1569,7 +1569,7 @@ void MineCar::State_3_Falling()
             sControlledCharacter->mYPos,
             5u,
             FP_FromInteger(1),
-            BurstType::eBigRedSparks, mResMan,
+            BurstType::eBigRedSparks, mResMan, mMap,
             9, true
         );
 
@@ -1578,7 +1578,7 @@ void MineCar::State_3_Falling()
             SFX_Play_Pitch(relive::SoundEffects::MinecarStop, 127, 0, GetSpriteScale());
             SFX_Play_Pitch(relive::SoundEffects::FallingItemHit, 127, 0, GetSpriteScale());
 
-            relive_new ScreenShake(false, false, mResMan);
+            relive_new ScreenShake(false, false, mResMan, mMap);
         }
 
         field_1C2_falling_counter = 0;

@@ -6,8 +6,8 @@
 class Door : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    Door(ResourceManagerWrapper& resMan); // Only exists for TrainDoor ctor
-    Door(relive::Path_Door* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    Door(ResourceManagerWrapper& resMan, BaseMap& map); // Only exists for TrainDoor ctor
+    Door(relive::Path_Door* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Door();
 
     void LoadAnimations(const std::string& theme);
@@ -42,7 +42,7 @@ public:
 class TrainDoor final : public Door
 {
 public:
-    TrainDoor(relive::Path_TrainDoor* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    TrainDoor(relive::Path_TrainDoor* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~TrainDoor();
 
     void LoadAnimations();

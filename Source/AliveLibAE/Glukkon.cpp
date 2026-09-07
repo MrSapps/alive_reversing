@@ -152,12 +152,12 @@ enum Brain_5_WaitToSpawn
     eBrain5_ToWalking2
 };
 
-void Glukkon::CreateFromSaveState(SerializedObjectData& pSaveBuffer, ResourceManagerWrapper& resMan)
+void Glukkon::CreateFromSaveState(SerializedObjectData& pSaveBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pSaveState = pSaveBuffer.ReadTmpPtr<GlukkonSaveState>();
     auto pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(pSaveState->mTlvId).GetTlv<relive::Path_Glukkon>();
 
-    auto pGlukkon = relive_new Glukkon(pTlv, pSaveState->mTlvId, resMan);
+    auto pGlukkon = relive_new Glukkon(pTlv, pSaveState->mTlvId, resMan, map);
     if (pGlukkon)
     {
         pGlukkon->SetType(pSaveState->mCurrentType);
@@ -285,8 +285,8 @@ void Glukkon::LoadAnimations(relive::Path_Glukkon::GlukkonTypes glukkonType)
     }
 }
 
-Glukkon::Glukkon(relive::Path_Glukkon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAliveGameObject(0, resMan)
+Glukkon::Glukkon(relive::Path_Glukkon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAliveGameObject(0, resMan, map)
 {
     mTlvData = *pTlv;
 
@@ -831,7 +831,7 @@ void Glukkon::Motion_11_Speak1()
 {
     if (GetAnimation().GetCurrentFrame() == 2 && mSpeak != GlukkonSpeak::None)
     {
-        if (gMap->Is_Point_In_Current_Camera(
+        if (GetMap().Is_Point_In_Current_Camera(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,
@@ -1025,7 +1025,7 @@ void Glukkon::Motion_24_EndSingleStep()
 
 s16 Glukkon::Brain_0_Calm_WalkAround()
 {
-    if (gMap->GetDirection(
+    if (GetMap().GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1327,7 +1327,7 @@ s16 Glukkon::Brain_0_Calm_WalkAround()
 
 s16 Glukkon::Brain_1_Panic()
 {
-    if (gMap->GetDirection(
+    if (GetMap().GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1475,7 +1475,7 @@ s16 Glukkon::Brain_1_Panic()
 
 s16 Glukkon::Brain_2_Slapped()
 {
-    if (gMap->GetDirection(
+    if (GetMap().GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1586,7 +1586,7 @@ s16 Glukkon::Brain_2_Slapped()
 s16 Glukkon::Brain_3_PlayerControlled()
 {
     auto pFade = static_cast<Fade*>(sObjectIds.Find_Impl(mFadeId));
-    if (gMap->GetDirection(
+    if (GetMap().GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1636,7 +1636,7 @@ s16 Glukkon::Brain_3_PlayerControlled()
                 gVisitedBonewerkz = true;
             }
 
-            auto pFadeMem = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeIn, 0, 8, relive::TBlendModes::eBlend_2, mResMan);
+            auto pFadeMem = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeIn, 0, 8, relive::TBlendModes::eBlend_2, mResMan, mMap);
             if (pFadeMem)
             {
                 mFadeId = pFadeMem->mBaseGameObjectId;
@@ -1657,7 +1657,7 @@ s16 Glukkon::Brain_3_PlayerControlled()
                         (GetSpriteScale() * xRand) + mXPos,
                         mYPos - (GetSpriteScale() * yRand),
                         GetSpriteScale(),
-                        Layer::eLayer_0, mResMan);
+                        Layer::eLayer_0, mResMan, mMap);
                 }
 
                 if (static_cast<s32>(sGnFrame) > field_1D4_timer || gAbe->mHealth <= FP_FromInteger(0))
@@ -1699,8 +1699,8 @@ s16 Glukkon::Brain_3_PlayerControlled()
         {
             gScreenManager->DisableRendering();
 
-            const FmvInfo* pFmvRec = Path_Get_FMV_Record(gMap->mCurrentLevel, mTlvData.mMovieId);
-            relive_new Movie(pFmvRec->field_0_pName, mResMan);
+            const FmvInfo* pFmvRec = Path_Get_FMV_Record(GetMap().mCurrentLevel, mTlvData.mMovieId);
+            relive_new Movie(pFmvRec->field_0_pName, mResMan, mMap);
         }
         return Brain_3_PlayerControlled::eBrain3_WaitForMovieToFinish5;
 
@@ -1710,7 +1710,7 @@ s16 Glukkon::Brain_3_PlayerControlled()
                 return mBrainSubState;
             }
             gPsxDisplay.PutCurrentDispEnv();
-            gScreenManager->DecompressCameraToVRam(gMap->field_2C_camera_array[0]->mCamRes);
+            gScreenManager->DecompressCameraToVRam(GetMap().field_2C_camera_array[0]->mCamRes);
             if (pFade)
             {
                 pFade->Init(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeOut, 1, 8);
@@ -1752,7 +1752,7 @@ static GibType AsGibType(relive::Path_Glukkon::GlukkonTypes glukkonType)
 
 s16 Glukkon::Brain_4_Death()
 {
-    if (gMap->GetDirection(
+    if (GetMap().GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1806,7 +1806,7 @@ s16 Glukkon::Brain_4_Death()
                 mVelX,
                 mVelY,
                 GetSpriteScale(),
-                0, mResMan);
+                0, mResMan, mMap);
 
             relive_new Blood(
                 mXPos,
@@ -1814,14 +1814,14 @@ s16 Glukkon::Brain_4_Death()
                 FP_FromInteger(0),
                 FP_FromInteger(0),
                 GetSpriteScale(),
-                20, mResMan);
+                20, mResMan, mMap);
 
             New_Smoke_Particles(
                 mXPos,
                 mYPos - (FP_FromInteger(30) * GetSpriteScale()),
                 GetSpriteScale(),
                 3,
-                RGB16{128, 128, 128}, mResMan);
+                RGB16{128, 128, 128}, mResMan, mMap);
 
             SfxPlayMono(relive::SoundEffects::KillEffect, 128, GetSpriteScale());
             SfxPlayMono(relive::SoundEffects::FallingItemHit, 90, GetSpriteScale());
@@ -1875,7 +1875,7 @@ static const PSX_Point sSpawnSparkOffsets[8] = {
 
 s16 Glukkon::Brain_5_WaitToSpawn()
 {
-    if (gMap->GetDirection(
+    if (GetMap().GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1924,7 +1924,7 @@ s16 Glukkon::Brain_5_WaitToSpawn()
             {
                 const s16 sparkX = FP_GetExponent(FP_FromInteger(p.x) + mXPos + FP_FromInteger(13));
                 const s16 sparkY = FP_GetExponent(mYPos + FP_FromInteger(p.y) - FP_FromInteger(11));
-                relive_new Spark(FP_FromInteger(sparkX), FP_FromInteger(sparkY), FP_FromInteger(1), 9, -31, 159, SparkType::eBigChantParticle_1, mResMan);
+                relive_new Spark(FP_FromInteger(sparkX), FP_FromInteger(sparkY), FP_FromInteger(1), 9, -31, 159, SparkType::eBigChantParticle_1, mResMan, mMap);
             }
 
             const PSX_RECT bRect = VGetBoundingRect();
@@ -1932,14 +1932,14 @@ s16 Glukkon::Brain_5_WaitToSpawn()
             New_DestroyOrCreateObject_Particle(
                 FP_FromInteger((bRect.x + bRect.w) / 2),
                 FP_FromInteger((bRect.y + bRect.h) / 2) + (GetSpriteScale() * FP_FromInteger(60)),
-                GetSpriteScale(), mResMan);
+                GetSpriteScale(), mResMan, mMap);
 
             relive_new ParticleBurst(
                 mXPos,
                 mYPos - FP_FromInteger(18),
                 6,
                 FP_FromInteger(1),
-                BurstType::eBigRedSparks, mResMan,
+                BurstType::eBigRedSparks, mResMan, mMap,
                 9, true);
 
             Speak(GlukkonSpeak::Heh_5);
@@ -1962,7 +1962,7 @@ void Glukkon::Init()
 
     SetDrawable(true);
 
-    SetTint(&kGlukkonTints[0], gMap->mCurrentLevel);
+    SetTint(&kGlukkonTints[0], GetMap().mCurrentLevel);
     mXPos = FP_FromInteger((mTlvData.mTopLeftX + mTlvData.mBottomRightX) / 2);
     mYPos = FP_FromInteger(mTlvData.mTopLeftY);
 
@@ -2160,9 +2160,9 @@ void Glukkon::VPossessed()
     SetBrain(&Glukkon::Brain_3_PlayerControlled);
     mBrainSubState = Brain_3_PlayerControlled::eBrain3_ToStand0;
     field_1D4_timer = MakeTimer(35);
-    mAbeLevel = gMap->mCurrentLevel;
-    mAbePath = gMap->mCurrentPath;
-    mAbeCamera = gMap->mCurrentCamera;
+    mAbeLevel = GetMap().mCurrentLevel;
+    mAbePath = GetMap().mCurrentPath;
+    mAbeCamera = GetMap().mCurrentCamera;
 }
 
 void Glukkon::Update_Slurg_WatchPoints()
@@ -2387,13 +2387,13 @@ s16 Glukkon::ShouldPanic(s16 panicEvenIfNotFacingMe)
         && !(sControlledCharacter->GetInvisible())
         && !BaseAliveGameObject::IsInInvisibleZone(sControlledCharacter)
         && !EventGet(Event::kEventResetting)
-        && gMap->Is_Point_In_Current_Camera(
+        && GetMap().Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
             mYPos,
             0)
-        && gMap->Is_Point_In_Current_Camera(
+        && GetMap().Is_Point_In_Current_Camera(
             sControlledCharacter->mCurrentLevel,
             sControlledCharacter->mCurrentPath,
             sControlledCharacter->mXPos,
@@ -2724,13 +2724,13 @@ void Glukkon::PlaySound(s32 sndIdx, Glukkon* pGlukkon)
         volumeRight = defaultSndIdxVol / 2;
     }
 
-    CameraPos direction = gMap->GetDirection(
+    CameraPos direction = GetMap().GetDirection(
         pGlukkon->mCurrentLevel,
         pGlukkon->mCurrentPath,
         pGlukkon->mXPos,
         pGlukkon->mYPos);
     PSX_RECT worldRect;
-    gMap->Get_Camera_World_Rect(direction, &worldRect);
+    GetMap().Get_Camera_World_Rect(direction, &worldRect);
     switch (direction)
     {
         case CameraPos::eCamCurrent_0:
@@ -2782,9 +2782,9 @@ void Glukkon::ToDead()
         sControlledCharacter = gAbe;
         MusicController::static_PlayMusic(MusicController::MusicTypes::eNone_0, this, 0, 0);
 
-        if (gMap->mNextLevel != EReliveLevelIds::eMenu)
+        if (GetMap().mNextLevel != EReliveLevelIds::eMenu)
         {
-            gMap->SetActiveCam(
+            GetMap().SetActiveCam(
                 mAbeLevel,
                 mAbePath,
                 mAbeCamera,
@@ -2996,7 +2996,7 @@ bool Glukkon::VTakeDamage(BaseGameObject* pFrom)
                             ((pBullet->XDistance() <= FP_FromInteger(0) ? -FP_FromInteger(1) : FP_FromInteger(1)) * xRand + FP_FromInteger(16)),
                             yRand,
                             GetSpriteScale(),
-                            12, mResMan);
+                            12, mResMan, mMap);
                     }
 
                     {
@@ -3007,7 +3007,7 @@ bool Glukkon::VTakeDamage(BaseGameObject* pFrom)
                             pBullet->XDistance() <= FP_FromInteger(0) ? -FP_FromInteger(6) : FP_FromInteger(6),
                             FP_FromInteger(0),
                             GetSpriteScale(),
-                            8, mResMan);
+                            8, mResMan, mMap);
                     }
                 }
                 break;
@@ -3021,7 +3021,7 @@ bool Glukkon::VTakeDamage(BaseGameObject* pFrom)
                         FP_FromInteger(0),
                         FP_FromInteger(0),
                         GetSpriteScale(),
-                        25, mResMan);
+                        25, mResMan, mMap);
                 }
                 break;
 

@@ -18,14 +18,14 @@ bool gDeathGasOn = false;
 constexpr u32 kGasCountDownSwitchIdAO = 70;
 constexpr u32 kGasCountdownTimeAO = 3600;
 
-GasCountDown::GasCountDown(relive::Path_GasCountDown* pTlv, const Guid& tlvInfo, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+GasCountDown::GasCountDown(relive::Path_GasCountDown* pTlv, const Guid& tlvInfo, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eGasCountDown);
     mTlvId = tlvInfo;
 
     mPal = mResMan.LoadPal(PalId::LedFont_Red);
-    mFontContext.LoadFontType(FontType::LcdFont);
+    mFontContext.LoadFontType(FontType::LcdFont, mResMan);
     mFont.Load(5, mPal, &mFontContext);
     SetDrawable(true);
     gObjListDrawables->Push_Back(this);
@@ -55,7 +55,7 @@ GasCountDown::GasCountDown(relive::Path_GasCountDown* pTlv, const Guid& tlvInfo,
                 mGasTimeLeftSecs = 0;
             }
 
-            relive_new Alarm(mGasCountdownTimer, 0, 0, Layer::eLayer_Above_FG1_39, mResMan);
+            relive_new Alarm(mGasCountdownTimer, 0, 0, Layer::eLayer_Above_FG1_39, mResMan, mMap);
         }
         else
         {
@@ -96,7 +96,7 @@ void GasCountDown::VUpdate()
     if (!gDeathGasTimer && SwitchStates_Get(mStartTimerSwitchId) && !SwitchStates_Get(mStopTimerSwitchId))
     {
         gDeathGasTimer = sGnFrame;
-        relive_new Alarm(mGasCountdownTimer, 0, 0, Layer::eLayer_Above_FG1_39, mResMan);
+        relive_new Alarm(mGasCountdownTimer, 0, 0, Layer::eLayer_Above_FG1_39, mResMan, mMap);
     }
 
     if (!gDeathGasTimer)
@@ -163,7 +163,7 @@ void GasCountDown::DealDamage()
         gDeathGasOn = true;
         if (!gDeathGasCount)
         {
-            relive_new DeathGas(Layer::eLayer_Above_FG1_39, 2, mResMan);
+            relive_new DeathGas(Layer::eLayer_Above_FG1_39, 2, mResMan, mMap);
         }
     }
 }

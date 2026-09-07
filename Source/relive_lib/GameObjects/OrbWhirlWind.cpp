@@ -4,8 +4,8 @@
 #include "../Function.hpp"
 #include "BaseAnimatedWithPhysicsGameObject.hpp"
 
-OrbWhirlWind::OrbWhirlWind(FP xpos, FP ypos, FP scale, bool bIsMudokonSpirit, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+OrbWhirlWind::OrbWhirlWind(FP xpos, FP ypos, FP scale, bool bIsMudokonSpirit, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eNone);
 
@@ -80,7 +80,7 @@ void OrbWhirlWind::VUpdate()
                 mYPos,
                 mScale,
                 mIsMudokonSpirit,
-                mResMan);
+                mResMan, mMap);
             mOrbParticles[mParticleIdx++] = pParticle;
 
             if (mParticleIdx >= ALIVE_COUNTOF(mOrbParticles))

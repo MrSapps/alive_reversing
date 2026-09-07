@@ -20,7 +20,7 @@ struct Slurg_Spawner_Path_Data final
 class SlurgSpawner final : public BaseGameObject
 {
 public:
-    SlurgSpawner(relive::Path_SlurgSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    SlurgSpawner(relive::Path_SlurgSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;

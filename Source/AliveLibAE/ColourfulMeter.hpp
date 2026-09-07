@@ -14,7 +14,7 @@ namespace relive
 class ColourfulMeter final : public BaseGameObject
 {
 public:
-    ColourfulMeter(relive::Path_ColourfulMeter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    ColourfulMeter(relive::Path_ColourfulMeter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~ColourfulMeter();
 
     virtual void VScreenChanged() override;

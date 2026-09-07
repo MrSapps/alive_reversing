@@ -17,8 +17,8 @@ void BoomMachine::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::BoomMachine_Button_On));
 }
 
-BoomMachine::BoomMachine(relive::Path_BoomMachine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan),
+BoomMachine::BoomMachine(relive::Path_BoomMachine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map),
     mTlvId(tlvId)
 {
     SetType(ReliveTypes::eBoomMachine);
@@ -53,7 +53,7 @@ BoomMachine::BoomMachine(relive::Path_BoomMachine* pTlv, const Guid& tlvId, Reso
         (GetSpriteScale() * FP_FromInteger(-30)) + mYPos,
         GetSpriteScale(),
         pTlv->mGrenadeAmount,
-        mResMan);
+        mResMan, mMap);
     if (pPipe)
     {
         pPipe->GetAnimation().SetFlipX(pTlv->mPipeSide == relive::Path_BoomMachine::PipeSide::eLeft);

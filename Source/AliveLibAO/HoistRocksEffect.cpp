@@ -10,14 +10,14 @@
 
 namespace AO {
 
-HoistParticle::HoistParticle(FP xpos, FP ypos, FP scale, AnimId animId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+HoistParticle::HoistParticle(FP xpos, FP ypos, FP scale, AnimId animId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     mXPos = xpos;
     mYPos = ypos;
 
     /*u16 maxW = 7;
-    if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarms || gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+    if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms || GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
     {
         maxW = 5;
     }
@@ -47,7 +47,7 @@ void HoistParticle::VUpdate()
 {
     if (mVelY >= (GetSpriteScale() * FP_FromInteger(10)))
     {
-        if (!gMap->Is_Point_In_Current_Camera(
+        if (!GetMap().Is_Point_In_Current_Camera(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,
@@ -97,8 +97,8 @@ HoistRocksEffect::~HoistRocksEffect()
     Path::TLV_Reset(mTlvId);
 }
 
-HoistRocksEffect::HoistRocksEffect(relive::Path_Hoist* pTlv, const Guid& tlvInfo, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan), mTlvId(tlvInfo)
+HoistRocksEffect::HoistRocksEffect(relive::Path_Hoist* pTlv, const Guid& tlvInfo, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map), mTlvId(tlvInfo)
 {
     mTlvXPos = FP_FromInteger(pTlv->mTopLeftX + 12);
     mTlvYPos = FP_FromInteger(pTlv->mTopLeftY);
@@ -112,7 +112,7 @@ void HoistRocksEffect::VUpdate()
         if (rnd == 1)
         {
             AnimId hoistRock = AnimId::AO_HoistRock2;
-            if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarms || gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+            if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms || GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
             {
                 hoistRock = AnimId::RuptureFarms_HoistRock2;
             }
@@ -123,14 +123,14 @@ void HoistRocksEffect::VUpdate()
                 x, y,
                 FP_FromInteger(1),
                 hoistRock,
-                mResMan);
+                mResMan, mMap);
 
             SetUpdateDelay(Math_RandomRange(30, 50));
         }
         else
         {
             AnimId hoistRock = AnimId::AO_HoistRock3;
-            if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarms || gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+            if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms || GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
             {
                 hoistRock = AnimId::RuptureFarms_HoistRock3;
             }
@@ -141,7 +141,7 @@ void HoistRocksEffect::VUpdate()
                 x, y,
                 FP_FromInteger(1),
                 hoistRock,
-                mResMan);
+                mResMan, mMap);
 
             SetUpdateDelay(Math_RandomRange(5, 10));
         }
@@ -149,7 +149,7 @@ void HoistRocksEffect::VUpdate()
     else
     {
         AnimId hoistRock = AnimId::AO_HoistRock1;
-        if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarms || gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+        if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms || GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
         {
             hoistRock = AnimId::RuptureFarms_HoistRock1;
         }
@@ -160,7 +160,7 @@ void HoistRocksEffect::VUpdate()
             x, y,
             FP_FromInteger(1),
             hoistRock,
-            mResMan);
+            mResMan, mMap);
 
         SetUpdateDelay(Math_RandomRange(10, 20));
     }

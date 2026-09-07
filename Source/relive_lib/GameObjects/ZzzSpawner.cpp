@@ -8,8 +8,8 @@
 #include "../GameType.hpp"
 #include "BaseMap.hpp"
 
-ZzzSpawner::ZzzSpawner(relive::Path_ZzzSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+ZzzSpawner::ZzzSpawner(relive::Path_ZzzSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     mXPos = FP_FromInteger(pTlv->mTopLeftX);
     mYPos = FP_FromInteger(pTlv->mTopLeftY);
@@ -58,7 +58,7 @@ void ZzzSpawner::VUpdate()
             }
         }
 
-        relive_new SnoozeParticle(mXPos, mYPos, snoozeLayer, mSpriteScale, mResMan);
+        relive_new SnoozeParticle(mXPos, mYPos, snoozeLayer, mSpriteScale, mResMan, mMap);
 
         mTimer = MakeTimer(mZzzInterval);
     }

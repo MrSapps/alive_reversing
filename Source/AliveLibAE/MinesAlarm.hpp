@@ -14,9 +14,9 @@ struct MinesAlarmSaveState final : public SaveStateBase
 class MinesAlarm final : public BaseGameObject
 {
 public:
-    static void Create(s32 timer, ResourceManagerWrapper& resMan);
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
-    MinesAlarm(s32 timer, ResourceManagerWrapper& resMan);
+    static void Create(s32 timer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    MinesAlarm(s32 timer, ResourceManagerWrapper& resMan, BaseMap& map);
     ~MinesAlarm();
 
     virtual void VScreenChanged() override;

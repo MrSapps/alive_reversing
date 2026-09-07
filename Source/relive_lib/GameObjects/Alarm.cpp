@@ -10,8 +10,8 @@
 s16 gAlarmInstanceCount = 0;
 Guid gAlarmObjId = Guid{}; // Only used in AE to kill the alarm in the last level
 
-Alarm::Alarm(relive::Path_Alarm* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : EffectBase(Layer::eLayer_Above_FG1_39, GetGameType() == GameType::eAo ? relive::TBlendModes::eBlend_1 : relive::TBlendModes::eBlend_3, resMan)
+Alarm::Alarm(relive::Path_Alarm* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : EffectBase(Layer::eLayer_Above_FG1_39, GetGameType() == GameType::eAo ? relive::TBlendModes::eBlend_1 : relive::TBlendModes::eBlend_3, resMan, map)
     , mAlarmTlvInfo(tlvId)
     , mAlarmState(States::eWaitForSwitchEnable)
     , mAlarmSwitchId(pTlv->mSwitchId) // This won't count as an alarm instance till this id is enabled
@@ -20,8 +20,8 @@ Alarm::Alarm(relive::Path_Alarm* pTlv, const Guid& tlvId, ResourceManagerWrapper
     SetType(ReliveTypes::eAlarm);
 }
 
-Alarm::Alarm(s32 durationTimer, u16 switchId, s32 pauseTimer, Layer layer, ResourceManagerWrapper& resMan)
-    : EffectBase(layer, GetGameType() == GameType::eAo ? relive::TBlendModes::eBlend_1 : relive::TBlendModes::eBlend_3, resMan),
+Alarm::Alarm(s32 durationTimer, u16 switchId, s32 pauseTimer, Layer layer, ResourceManagerWrapper& resMan, BaseMap& map)
+    : EffectBase(layer, GetGameType() == GameType::eAo ? relive::TBlendModes::eBlend_1 : relive::TBlendModes::eBlend_3, resMan, map),
     mAlarmTlvInfo(Guid{}),
     mAlarmState(States::eAfterConstructed),
     mAlarmSwitchId(switchId)

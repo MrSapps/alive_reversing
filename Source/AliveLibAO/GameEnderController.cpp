@@ -21,13 +21,13 @@ namespace AO {
 s16 GameEnderController::gRestartRuptureFarmsKilledMuds = 0;
 s16 GameEnderController::gRestartRuptureFarmsSavedMuds = 0;
 
-void GameEnderController::CreateGameEnderController(ResourceManagerWrapper& resMan)
+void GameEnderController::CreateGameEnderController(ResourceManagerWrapper& resMan, BaseMap& map)
 {
-    relive_new GameEnderController(resMan);
+    relive_new GameEnderController(resMan, map);
 }
 
-GameEnderController::GameEnderController(ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+GameEnderController::GameEnderController(ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eGameEnderController);
     mState = GameEnderControllerStates::eInit_0;
@@ -35,7 +35,7 @@ GameEnderController::GameEnderController(ResourceManagerWrapper& resMan)
 
 void GameEnderController::VScreenChanged()
 {
-    if (gMap->LevelChanged())
+    if (GetMap().LevelChanged())
     {
         SetDead(true);
     }
@@ -81,7 +81,7 @@ void GameEnderController::VUpdate()
                         }
                     }
 
-                    if (gRescuedMudokons >= Path_GoodEndingMuds(gMap->mCurrentLevel, gMap->mCurrentPath))
+                    if (gRescuedMudokons >= Path_GoodEndingMuds(GetMap().mCurrentLevel, GetMap().mCurrentPath))
                     {
                         // Stop the death timer
                         gDeathGasTimer = 0;
@@ -96,30 +96,30 @@ void GameEnderController::VUpdate()
                             gPauseMenu = nullptr;
                         }
 
-                        if (gRescuedMudokons >= Path_GetTotalMuds(gMap->mCurrentLevel, gMap->mCurrentPath))
+                        if (gRescuedMudokons >= Path_GetTotalMuds(GetMap().mCurrentLevel, GetMap().mCurrentPath))
                         {
                             // Perfect ending
                             gAbe->SetDead(true);
-                            gMap->SetActiveCam(EReliveLevelIds::eBoardRoom, 6, 11, CameraSwapEffects::eUnknown_11, 316, 0);
+                            GetMap().SetActiveCam(EReliveLevelIds::eBoardRoom, 6, 11, CameraSwapEffects::eUnknown_11, 316, 0);
                             mState = GameEnderControllerStates::ePerfectEnding_4;
                         }
                         else
                         {
                             // Meh good enough ending
-                            gMap->SetActiveCam(EReliveLevelIds::eCredits, 1, 1, CameraSwapEffects::eUnknown_11, 316, 0);
+                            GetMap().SetActiveCam(EReliveLevelIds::eCredits, 1, 1, CameraSwapEffects::eUnknown_11, 316, 0);
                             mState = GameEnderControllerStates::eFinish_2;
                         }
                     }
                     else
                     {
-                        if (gKilledMudokons >= Path_BadEndingMuds(gMap->mCurrentLevel, gMap->mCurrentPath))
+                        if (gKilledMudokons >= Path_BadEndingMuds(GetMap().mCurrentLevel, GetMap().mCurrentPath))
                         {
                             // Very bad ending
                             gInfiniteThrowables = true;
 
                             if (!gThrowableArray)
                             {
-                                gThrowableArray = relive_new ThrowableArray(mResMan);
+                                gThrowableArray = relive_new ThrowableArray(mResMan, mMap);
                                 if (gThrowableArray)
                                 {
                                     gThrowableArray->Add(1);
@@ -130,7 +130,7 @@ void GameEnderController::VUpdate()
                             gRescuedMudokons = gRestartRuptureFarmsSavedMuds;
                             gAbe->SetDead(true);
 
-                            gMap->SetActiveCam(EReliveLevelIds::eBoardRoom, 6, 9, CameraSwapEffects::eUnknown_11, 304, 0);
+                            GetMap().SetActiveCam(EReliveLevelIds::eBoardRoom, 6, 9, CameraSwapEffects::eUnknown_11, 304, 0);
 
                             mState = GameEnderControllerStates::eBadEnding_3;
                         }
@@ -141,7 +141,7 @@ void GameEnderController::VUpdate()
 
                             gInfiniteThrowables = false;
 
-                            gMap->SetActiveCam(EReliveLevelIds::eBoardRoom, 6, 10, CameraSwapEffects::eUnknown_11, 304, 0);
+                            GetMap().SetActiveCam(EReliveLevelIds::eBoardRoom, 6, 10, CameraSwapEffects::eUnknown_11, 304, 0);
                             mState = GameEnderControllerStates::eBadEnding_3;
                             gRescuedMudokons = gRestartRuptureFarmsSavedMuds;
                             gKilledMudokons = gRestartRuptureFarmsKilledMuds;
@@ -154,7 +154,7 @@ void GameEnderController::VUpdate()
         case GameEnderControllerStates::eBadEnding_3:
             if (Input().IsAnyPressed(InputCommands::eCrouchOrRoll))
             {
-                gMap->SetActiveCam(EReliveLevelIds::eRuptureFarmsReturn, 19, 3, CameraSwapEffects::eInstantChange_0, 0, 0);
+                GetMap().SetActiveCam(EReliveLevelIds::eRuptureFarmsReturn, 19, 3, CameraSwapEffects::eInstantChange_0, 0, 0);
                 mState = GameEnderControllerStates::eFinish_2;
             }
             break;
@@ -162,8 +162,8 @@ void GameEnderController::VUpdate()
         case GameEnderControllerStates::ePerfectEnding_4:
             if (Input().IsAnyPressed(InputCommands::eCrouchOrRoll))
             {
-                gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eFmvSelect_30, CameraSwapEffects::eInstantChange_0, 0, 0);
-                gMap->mFreeAllAnimAndPalts = true;
+                GetMap().SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eFmvSelect_30, CameraSwapEffects::eInstantChange_0, 0, 0);
+                GetMap().mFreeAllAnimAndPalts = true;
                 mState = GameEnderControllerStates::eFinish_2;
             }
             break;

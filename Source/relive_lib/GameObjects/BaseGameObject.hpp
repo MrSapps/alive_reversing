@@ -12,11 +12,12 @@ struct BasePrimitive;
 
 class SerializedObjectData;
 class OrderingTable;
+class BaseMap;
 
 class [[nodiscard]] BaseGameObject
 {
 public:
-    BaseGameObject(s16 bAddToObjectList, s16 resourceArraySize, ResourceManagerWrapper& resMan);
+    BaseGameObject(s16 bAddToObjectList, s16 resourceArraySize, ResourceManagerWrapper& resMan, BaseMap& map);
 
 
     virtual ~BaseGameObject();
@@ -55,6 +56,8 @@ public:
     PalResource& GetPalRes(PalId palId);
 
     ResourceManagerWrapper& GetResMan() const { return mResMan; }
+
+    BaseMap& GetMap() const { return mMap; }
 
     bool GetUpdatable() const { return mUpdatable; }
     void SetUpdatable(bool val) { mUpdatable = val; }
@@ -114,8 +117,7 @@ private:
 
 protected:
     ResourceManagerWrapper& mResMan;
+    BaseMap& mMap;
 };
-
-class BaseMap& GetMap();
 
 extern DynamicArrayT<BaseGameObject>* gBaseGameObjects;

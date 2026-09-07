@@ -16,7 +16,7 @@
 
 namespace AO {
 
-void Animation_OnFrame_Slig(::BaseGameObject* pObj, u32&, const IndexedPoint& pData, ResourceManagerWrapper& resMan)
+void Animation_OnFrame_Slig(::BaseGameObject* pObj, u32&, const IndexedPoint& pData, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     auto pSlig = static_cast<Slig*>(pObj);
     if (pSlig->UpdateDelay() != 0)
@@ -47,19 +47,19 @@ void Animation_OnFrame_Slig(::BaseGameObject* pObj, u32&, const IndexedPoint& pD
             FP_FromInteger(-640),
             pSlig->GetSpriteScale(),
             0,
-            resMan);
+            resMan, map);
 
         New_ShootingFire_Particle(
             pSlig->mXPos - xOff,
             pSlig->mYPos + yOff,
             1,
-            pSlig->GetSpriteScale(), resMan);
+            pSlig->GetSpriteScale(), resMan, map);
 
         relive_new BulletShell(
             pSlig->mXPos,
             pSlig->mYPos + yOff,
             0,
-            pSlig->GetSpriteScale(), resMan);
+            pSlig->GetSpriteScale(), resMan, map);
     }
     else
     {
@@ -71,19 +71,19 @@ void Animation_OnFrame_Slig(::BaseGameObject* pObj, u32&, const IndexedPoint& pD
             FP_FromInteger(640),
             pSlig->GetSpriteScale(),
             0,
-            resMan);
+            resMan, map);
 
         New_ShootingFire_Particle(
             pSlig->mXPos + xOff,
             pSlig->mYPos + yOff,
             0,
-            pSlig->GetSpriteScale(), resMan);
+            pSlig->GetSpriteScale(), resMan, map);
 
         relive_new BulletShell(
             pSlig->mXPos,
             pSlig->mYPos + yOff,
             1,
-            pSlig->GetSpriteScale(), resMan);
+            pSlig->GetSpriteScale(), resMan, map);
     }
 
     if (pSlig->GetSpriteScale() == FP_FromDouble(0.5))
@@ -101,9 +101,9 @@ void Animation_OnFrame_Slig(::BaseGameObject* pObj, u32&, const IndexedPoint& pD
     Dove::All_FlyAway(false);
 }
 
-void Animation_OnFrame_ZBallSmacker(::BaseGameObject* pObj, u32& idx, const IndexedPoint& pData, ResourceManagerWrapper& resMan);
+void Animation_OnFrame_ZBallSmacker(::BaseGameObject* pObj, u32& idx, const IndexedPoint& pData, ResourceManagerWrapper& resMan, BaseMap& map);
 
-void Slog_OnFrame(::BaseGameObject* pObj, u32&, const IndexedPoint& pData, ResourceManagerWrapper& resMan)
+void Slog_OnFrame(::BaseGameObject* pObj, u32&, const IndexedPoint& pData, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     auto pSlog = static_cast<Slog*>(pObj);
 
@@ -137,7 +137,7 @@ void Slog_OnFrame(::BaseGameObject* pObj, u32&, const IndexedPoint& pData, Resou
                         (pSlog->mVelX * FP_FromInteger(2)),
                         FP_FromInteger(0),
                         pSlog->GetSpriteScale(),
-                        50, resMan);
+                        50, resMan, map);
 
                     pSlog->mBitingTarget = 1;
 
@@ -156,7 +156,7 @@ static const FP_Point sThrowVelocities[6] = {
     {FP_FromInteger(10), FP_FromInteger(-4)},
     {FP_FromInteger(4), FP_FromInteger(-3)}};
 
-void Abe_OnFrame(::BaseGameObject* pObj, u32&, const IndexedPoint& pData, ResourceManagerWrapper& resMan)
+void Abe_OnFrame(::BaseGameObject* pObj, u32&, const IndexedPoint& pData, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     auto pAbe = static_cast<Abe*>(pObj);
 

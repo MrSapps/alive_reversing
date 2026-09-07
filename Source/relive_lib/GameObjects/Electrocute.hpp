@@ -9,7 +9,7 @@ class PalleteOverwriter;
 class Electrocute final : public BaseGameObject
 {
 public:
-    Electrocute(BaseAliveGameObject* pTargetObj, bool bExtraOverwriter, bool bKillTarget, ResourceManagerWrapper& resMan);
+    Electrocute(BaseAliveGameObject* pTargetObj, bool bExtraOverwriter, bool bKillTarget, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Electrocute();
 
     virtual void VUpdate() override;

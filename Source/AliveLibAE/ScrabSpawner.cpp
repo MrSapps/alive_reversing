@@ -10,8 +10,8 @@
 #include "Scrab.hpp"
 #include "QuikSave.hpp"
 
-ScrabSpawner::ScrabSpawner(relive::Path_ScrabSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+ScrabSpawner::ScrabSpawner(relive::Path_ScrabSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     mTlvId = tlvId;
     SetType(ReliveTypes::eScrabSpawner);
@@ -34,11 +34,11 @@ ScrabSpawner::ScrabSpawner(relive::Path_ScrabSpawner* pTlv, const Guid& tlvId, R
     field_40_bFindSpawnedScrab = 0;
 }
 
-void ScrabSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
+void ScrabSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<ScrabSpawnerSaveState>();
     auto pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(pState->field_4_tlvInfo).GetTlv<relive::Path_ScrabSpawner>();
-    auto pScrabSpawner = relive_new ScrabSpawner(pTlv, pState->field_4_tlvInfo, resMan);
+    auto pScrabSpawner = relive_new ScrabSpawner(pTlv, pState->field_4_tlvInfo, resMan, map);
     if (pScrabSpawner)
     {
         pScrabSpawner->field_38_state = pState->field_8_state;
@@ -122,7 +122,7 @@ void ScrabSpawner::VUpdate()
 
                 if (pTlv)
                 {
-                    auto pNewScrab = relive_new Scrab(pTlv, mTlvId, field_26_spawn_direction, mResMan);
+                    auto pNewScrab = relive_new Scrab(pTlv, mTlvId, field_26_spawn_direction, mResMan, mMap);
                     if (pNewScrab)
                     {
                         SfxPlayMono(relive::SoundEffects::ScrabSpawn, 0);

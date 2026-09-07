@@ -144,7 +144,7 @@ public:
         AnimId::FlyingSlig_TurnToHorizontalMovement,
     };
 
-    FlyingSlig(relive::Path_FlyingSlig* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    FlyingSlig(relive::Path_FlyingSlig* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~FlyingSlig();
 
     virtual void VUpdate() override;
@@ -169,7 +169,7 @@ public:
         }
     }
 
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
     void ToPlayerControlled();
     void SetBrain(TFlyingSligBrainFn fn);
     bool BrainIs(TFlyingSligBrainFn fn);

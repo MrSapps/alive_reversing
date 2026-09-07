@@ -103,8 +103,8 @@ void LiftPoint::LoadAnimations()
     }
 }
 
-LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : PlatformBase(resMan)
+LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : PlatformBase(resMan, map)
 {
     mBaseGameObjectTlvInfo = tlvId;
     SetType(ReliveTypes::eLiftPoint);
@@ -124,7 +124,7 @@ LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId, ResourceMa
         SetScale(Scale::Fg);
     }
 
-    const s32 lvl_idx = static_cast<s32>(MapWrapper::ToAO(gMap->mCurrentLevel));
+    const s32 lvl_idx = static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel));
     const LiftPointData& rPlatformData = sLiftPointAnimIds[lvl_idx];
     AddDynamicCollision(
         rPlatformData.mPlatformAnimId,
@@ -182,14 +182,14 @@ LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId, ResourceMa
         FP_GetExponent((k13 * GetSpriteScale()) + FP_FromInteger(sRopeOffsets[lvl_idx].field_4) + mXPos),
         0, // Start at the very top of the screen
         FP_GetExponent((k25 * GetSpriteScale()) + mYPos),
-        GetSpriteScale(), mResMan);
+        GetSpriteScale(), mResMan, mMap);
     mRopeId1 = pRope1->mBaseGameObjectId;
 
     auto pRope2 = relive_new Rope(
         FP_GetExponent((km10 * GetSpriteScale()) + FP_FromInteger(sRopeOffsets[lvl_idx].field_0) + mXPos),
         0, // Start at the very top of the screen
         FP_GetExponent((k25 * GetSpriteScale()) + mYPos),
-        GetSpriteScale(), mResMan);
+        GetSpriteScale(), mResMan, mMap);
     mRopeId2 = pRope2->mBaseGameObjectId;
 
     pRope2->mBottom = FP_GetExponent((k25 * GetSpriteScale()) + FP_FromInteger(mPlatformBaseCollisionLine->mRect.y));
@@ -662,7 +662,7 @@ void LiftPoint::VScreenChanged()
 
 void LiftPoint::CreatePulleyIfExists(s16 camX, s16 camY)
 {
-    auto tlvIterator = gMap->Get_First_TLV_For_Offsetted_Camera(camX, camY);
+    auto tlvIterator = GetMap().Get_First_TLV_For_Offsetted_Camera(camX, camY);
     if (tlvIterator.GetTlv())
     {
         while (1)
@@ -678,7 +678,7 @@ void LiftPoint::CreatePulleyIfExists(s16 camX, s16 camY)
                 }
             }
 
-            tlvIterator = gMap->TLV_Get_At(tlvIterator, FP_FromInteger(-1), FP_FromInteger(-1), FP_FromInteger(-1), FP_FromInteger(-1));
+            tlvIterator = GetMap().TLV_Get_At(tlvIterator, FP_FromInteger(-1), FP_FromInteger(-1), FP_FromInteger(-1), FP_FromInteger(-1));
             if (!tlvIterator.GetTlv())
             {
                 return;
@@ -692,7 +692,7 @@ void LiftPoint::CreatePulleyIfExists(s16 camX, s16 camY)
         mPulleyXPos = FP_GetExponent(((k13_scaled + kM10_scaled) / FP_FromInteger(2)) + FP_NoFractional(mXPos));
         // AE sets mPulleyYPos in the while loop.
 
-        const s32 lvl_idx = static_cast<s32>(MapWrapper::ToAO(gMap->mCurrentLevel));
+        const s32 lvl_idx = static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel));
 
         mPulleyAnim.Init(GetAnimRes(sLiftPointAnimIds[lvl_idx].mLiftTopWheelAnimId), this);
 

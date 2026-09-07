@@ -31,26 +31,26 @@ ALIVE_ASSERT_SIZEOF(CameraName, 8);
 class Map final : public BaseMap
 {
 public:
-    void ScreenChange();
+    void ScreenChange() override;
 
     void FreePathResourceBlocks();
     BinaryPath* GetPathResourceBlockPtr(u32 pathId);
     void ClearPathResourceBlocks();
 
-    void GoTo_Camera();
+    void GoTo_Camera() override;
     void RemoveObjectsWithPurpleLight(s16 a2);
     void Handle_PathTransition();
-    void Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange);
-    void Shutdown();
+    void Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange) override;
+    void Shutdown() override;
     void Reset();
     explicit Map(ResourceManagerWrapper& resMan);
     ~Map();
 
     void Get_map_size(PSX_Point* pPoint);
-    virtual void GetCurrentCamCoords(PSX_Point* pPoint) override;
+    void GetCurrentCamCoords(PSX_Point* pPoint) override;
     s16 GetOverlayId() override;
     void Create_FG1s();
-    virtual CameraPos Rect_Location_Relative_To_Active_Camera(const PSX_RECT* pRect, s16 width = 0) override;
+    CameraPos Rect_Location_Relative_To_Active_Camera(const PSX_RECT* pRect, s16 width = 0) override;
     static BaseGameObject* FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLevelIds lvlId);
     Camera* Create_Camera(s16 xpos, s16 ypos, s32 a4);
     void Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode);
@@ -58,7 +58,7 @@ public:
     void LoadResource(const char_type* pFileName, s32 type, s32 resourceId, relive::Factory::LoadMode loadMode, s16 bDontLoad = 0);
 
     s16 Is_Point_In_Current_Camera(EReliveLevelIds level, s32 path, FP xpos, FP ypos, s16 width) override;
-    virtual CameraPos GetDirection(EReliveLevelIds level, s32 path, FP xpos, FP ypos) override;
+    CameraPos GetDirection(EReliveLevelIds level, s32 path, FP xpos, FP ypos) override;
 
     s16 Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect);
     
@@ -67,9 +67,9 @@ public:
         return mLoadedPaths;
     }
 
-    virtual void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1) override;
-    virtual void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1) override;
-    virtual void TLV_Delete(const Guid& tlvId, s16 hiFlags = -1) override;
+    void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1) override;
+    void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1) override;
+    void TLV_Delete(const Guid& tlvId, s16 hiFlags = -1) override;
     void Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed) override;
 
     TlvIterator VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind) override;

@@ -64,7 +64,7 @@ struct MineCarSaveState final : public SaveStateBase
 class MineCar final : public BaseAliveGameObject
 {
 public:
-    MineCar(relive::Path_MineCar* pTlv, const Guid& tlvId, s32 a4, s32 a5, s32 a6, ResourceManagerWrapper& resMan);
+    MineCar(relive::Path_MineCar* pTlv, const Guid& tlvId, s32 a4, s32 a5, s32 a6, ResourceManagerWrapper& resMan, BaseMap& map);
     ~MineCar();
     
     void LoadAnimations();
@@ -76,7 +76,7 @@ public:
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
 
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
 private:
     void LoadAnimation(Animation* pAnim);

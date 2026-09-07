@@ -10,10 +10,10 @@ s16 gCreditsControllerExists = false;
 
 constexpr s32 kShowCreditScreenForTicks = 60;
 
-CreditsController::CreditsController(relive::Path_CreditsController* /*pTlv*/, const Guid& /*tlvId*/, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+CreditsController::CreditsController(relive::Path_CreditsController* /*pTlv*/, const Guid& /*tlvId*/, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
-    mCurrentCamera = gMap->mCurrentCamera;
+    mCurrentCamera = GetMap().mCurrentCamera;
     mNextCameraTimer = MakeTimer(kShowCreditScreenForTicks);
 
     gCreditsControllerExists = true;
@@ -33,12 +33,12 @@ void CreditsController::VUpdate()
         {
             mNextCameraTimer = MakeTimer(60);
             mCurrentCamera = 1;
-            gMap->SetActiveCam(EReliveLevelIds::eCredits, 1, 1, CameraSwapEffects::eTopToBottom_3, 0, 0);
+            GetMap().SetActiveCam(EReliveLevelIds::eCredits, 1, 1, CameraSwapEffects::eTopToBottom_3, 0, 0);
             gBreakGameLoop = true;
         }
         else
         {
-            gMap->SetActiveCam(EReliveLevelIds::eCredits, 1, mCurrentCamera, CameraSwapEffects::eTopToBottom_3, 0, 0);
+            GetMap().SetActiveCam(EReliveLevelIds::eCredits, 1, mCurrentCamera, CameraSwapEffects::eTopToBottom_3, 0, 0);
             mNextCameraTimer = MakeTimer(60);
         }
     }

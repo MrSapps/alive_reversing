@@ -11,7 +11,7 @@ namespace relive
 class LevelLoader final : public BaseGameObject
 {
 public:
-    LevelLoader(relive::Path_LevelLoader* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    LevelLoader(relive::Path_LevelLoader* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
 
     virtual void VUpdate() override;
 

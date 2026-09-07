@@ -47,8 +47,8 @@ void TimedMine::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::TimedMine_Activated));
 }
 
-TimedMine::TimedMine(relive::Path_TimedMine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAliveGameObject(0, resMan)
+TimedMine::TimedMine(relive::Path_TimedMine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAliveGameObject(0, resMan, map)
 {
     if (GetGameType() == GameType::eAe)
     {
@@ -174,7 +174,7 @@ bool TimedMine::VTakeDamage(BaseGameObject* pFrom)
         case ReliveTypes::eShrykull:
         {
             SetDead(true);
-            relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan);
+            relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan, mMap);
             mSlappedMine = true;
             mExplosionTimer = sGnFrame;
             return true;
@@ -314,7 +314,7 @@ void TimedMine::VUpdate()
 
         if (sGnFrame >= mExplosionTimer)
         {
-            relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan);
+            relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan, mMap);
             SetDead(true);
         }
     }
@@ -322,7 +322,7 @@ void TimedMine::VUpdate()
 
 void TimedMine::VOnThrowableHit(BaseGameObject* /*pHitBy*/)
 {
-    relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan);
+    relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan, mMap);
 
     SetDead(true);
     mSlappedMine = true;

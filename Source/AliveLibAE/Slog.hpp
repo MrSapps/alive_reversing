@@ -164,8 +164,8 @@ public:
         AnimId::Slog_Scratch,
         AnimId::Slog_Growl};
 
-    Slog(FP xpos, FP ypos, FP scale, s16 bListenToSligs, s16 chaseDelay, ResourceManagerWrapper& resMan);
-    Slog(relive::Path_Slog* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    Slog(FP xpos, FP ypos, FP scale, s16 bListenToSligs, s16 chaseDelay, ResourceManagerWrapper& resMan, BaseMap& map);
+    Slog(relive::Path_Slog* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Slog();
 
     void LoadAnimations();
@@ -189,7 +189,7 @@ public:
                 ALIVE_FATAL("Invalid motion type %d", static_cast<s32>(motionType));
         }
     }
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
 public:
     // Motions

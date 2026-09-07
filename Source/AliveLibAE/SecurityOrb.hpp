@@ -10,7 +10,7 @@ namespace relive
 class SecurityOrb final : public BaseAliveGameObject
 {
 public:
-    SecurityOrb(relive::Path_SecurityOrb* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    SecurityOrb(relive::Path_SecurityOrb* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~SecurityOrb();
 
     virtual void VUpdate() override;

@@ -11,7 +11,7 @@ namespace relive
 class ZzzSpawner final : public BaseGameObject
 {
 public:
-    ZzzSpawner(relive::Path_ZzzSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    ZzzSpawner(relive::Path_ZzzSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~ZzzSpawner();
 
     virtual void VUpdate() override;

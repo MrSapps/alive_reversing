@@ -46,7 +46,7 @@ s16 Calc_Slig_Sound_Direction(BaseAnimatedWithPhysicsGameObject* pObj, s16 defau
             yOff = FP_FromInteger(20); // 0xffec0000
         }
 
-        const CameraPos dir = gMap->GetDirection(
+        const CameraPos dir = GetMap().GetDirection(
             pObj->mCurrentLevel, pObj->mCurrentPath,
             pObj->mXPos, pObj->mYPos - yOff);
 
@@ -57,7 +57,7 @@ s16 Calc_Slig_Sound_Direction(BaseAnimatedWithPhysicsGameObject* pObj, s16 defau
         }
 
         PSX_RECT camRect = {};
-        gMap->Get_Camera_World_Rect(dir, &camRect);
+        GetMap().Get_Camera_World_Rect(dir, &camRect);
 
         const s32 volScaler = defaultVol / 3;
         switch (dir)

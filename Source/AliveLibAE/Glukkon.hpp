@@ -142,12 +142,12 @@ public:
          AnimId::Glukkon_Phleg_EndWalk, AnimId::Glukkon_Phleg_StandToJump, AnimId::Glukkon_Phleg_JumpToStand, AnimId::Glukkon_Phleg_WalkToJump, AnimId::Glukkon_Phleg_JumpToWalk,
          AnimId::Glukkon_Phleg_KnockBackStandBegin, AnimId::Glukkon_Phleg_GetShot, AnimId::Glukkon_Phleg_KnockBackStandEnd, AnimId::Glukkon_Phleg_Speak3, AnimId::Glukkon_Phleg_EndSingleStep}};
 
-    Glukkon(relive::Path_Glukkon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    Glukkon(relive::Path_Glukkon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Glukkon();
 
     void LoadAnimations(relive::Path_Glukkon::GlukkonTypes glukkonType);
 
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
     virtual void VUpdate() override;
     virtual void VRender(OrderingTable& ot) override;

@@ -18,7 +18,7 @@ ALIVE_ASSERT_SIZEOF(MainMenuTransition_Polys, 0x100);
 class MainMenuTransition final : public ::BaseGameObject
 {
 public:
-    MainMenuTransition(Layer layer, s32 fadeDirection, s32 bKillWhenDone, s32 speed, relive::TBlendModes blendMode, ResourceManagerWrapper& resMan);
+    MainMenuTransition(Layer layer, s32 fadeDirection, s32 bKillWhenDone, s32 speed, relive::TBlendModes blendMode, ResourceManagerWrapper& resMan, BaseMap& map);
     ~MainMenuTransition();
 
     virtual void VUpdate() override;

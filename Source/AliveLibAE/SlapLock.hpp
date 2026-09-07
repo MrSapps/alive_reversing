@@ -38,7 +38,7 @@ struct SlapLockSaveState final : public SaveStateBase
 class SlapLock final : public BaseAliveGameObject
 {
 public:
-    SlapLock(relive::Path_SlapLock* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    SlapLock(relive::Path_SlapLock* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~SlapLock();
 
     void LoadAnimations();
@@ -49,7 +49,7 @@ public:
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
 
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
 private:
     void GiveInvisibility();

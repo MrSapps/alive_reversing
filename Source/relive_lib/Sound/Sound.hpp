@@ -3,6 +3,8 @@
 #include "../../relive_lib/Function.hpp"
 #include "../../relive_lib/relive_config.h"
 
+class BaseMap;
+
 
 #if !USE_SDL3_SOUND
 //#include <mmeapi.h>
@@ -117,7 +119,7 @@ s32 SND_New(SoundEntry* pSnd, s32 sampleLength, s32 sampleRate, s32 bitsPerSampl
 s32 SND_Load(SoundEntry* pSnd, const void* pWaveData, s32 waveDataLen);
 const char_type* SND_HR_Err_To_String_4EEC70(HRESULT hr);
 s32 SND_Free_4EFA30(SoundEntry* pSnd);
-void SND_Restart_4CB0E0();
+void SND_Restart_4CB0E0(BaseMap& map);
 s32 SND_SetPrimarySoundBufferFormat_4EE990(s32 sampleRate, s32 bitsPerSample, u8 isStereo);
 void SND_InitVolumeTable_4EEF60();
 s8 SND_CreatePrimarySoundBuffer_4EEEC0(s32 sampleRate, s32 bitsPerSample, s32 isStereo);

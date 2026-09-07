@@ -15,7 +15,7 @@ enum class ThrowableTotalIndicatorState : s16
 class ThrowableTotalIndicator final : public BaseGameObject
 {
 public:
-    ThrowableTotalIndicator(FP xpos, FP ypos, Layer layer, FP scale, s32 count, bool bFade, ResourceManagerWrapper& resMan);
+    ThrowableTotalIndicator(FP xpos, FP ypos, Layer layer, FP scale, s32 count, bool bFade, ResourceManagerWrapper& resMan, BaseMap& map);
     ~ThrowableTotalIndicator();
 
     virtual void VScreenChanged() override;

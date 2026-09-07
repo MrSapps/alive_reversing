@@ -6,7 +6,7 @@
 class ElectricWall final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    ElectricWall(relive::Path_ElectricWall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    ElectricWall(relive::Path_ElectricWall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~ElectricWall();
 
     virtual void VUpdate() override;

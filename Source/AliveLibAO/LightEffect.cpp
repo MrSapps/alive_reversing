@@ -9,8 +9,8 @@
 
 namespace AO {
 
-LightEffect::LightEffect(relive::Path_LightEffect* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+LightEffect::LightEffect(relive::Path_LightEffect* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eNone);
     mTlvId = tlvId;

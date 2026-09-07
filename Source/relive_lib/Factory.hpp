@@ -2,6 +2,7 @@
 
 class Guid;
 class ResourceManagerWrapper;
+class BaseMap;
 
 namespace relive
 {
@@ -10,8 +11,9 @@ namespace relive
     class Factory final
     {
         public:
-        explicit Factory(ResourceManagerWrapper& resMan)
+        explicit Factory(ResourceManagerWrapper& resMan, BaseMap& map)
             : mResourceManager(resMan)
+            , mMap(map)
         {
         }
 
@@ -186,5 +188,6 @@ namespace relive
         void ConstructTLVObject(Path_TLV* pTlv, const Guid& tlvInfo, LoadMode loadMode);
 
         ResourceManagerWrapper& mResourceManager;
+        BaseMap& mMap;
     };
 }

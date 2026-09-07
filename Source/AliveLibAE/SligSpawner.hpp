@@ -23,10 +23,10 @@ struct SligSpawnerSaveState final : public SaveStateBase
 class SligSpawner final : public BaseGameObject
 {
 public:
-    SligSpawner(relive::Path_Slig* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    SligSpawner(relive::Path_Slig* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~SligSpawner();
 
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;

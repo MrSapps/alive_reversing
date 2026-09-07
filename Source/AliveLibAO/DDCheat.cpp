@@ -58,8 +58,8 @@ static const char_type* sTeleportLevelNameTable[16] = {
     "Desert Level Ender"
 };
 
-DDCheat::DDCheat(ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+DDCheat::DDCheat(ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     SetSurviveDeathReset(true);
     SetUpdateDuringCamSwap(true);
@@ -132,7 +132,7 @@ void DDCheat::VUpdate()
     {
         mTeleporting = 0;
         PSX_Point point = {};
-        gMap->GetCurrentCamCoords(&point);
+        GetMap().GetCurrentCamCoords(&point);
         cheat_enabled = true;
         gAbe->mXPos = FP_FromInteger(point.x + 448);
         gAbe->mYPos = FP_FromInteger(point.y + 180);
@@ -144,7 +144,7 @@ void DDCheat::VUpdate()
         field_18_backInputPressed = 0;
     }
 
-    if (gMap->mCurrentLevel != EReliveLevelIds::eMenu)
+    if (GetMap().mCurrentLevel != EReliveLevelIds::eMenu)
     {
         if (Input().IsAnyPressed(InputCommands::eCheatMode))
         {
@@ -200,9 +200,9 @@ void DDCheat::VUpdate()
     {
         DebugStr(
             "\n%sP%dC%d %6d",
-            AO::Path_Get_Lvl_Name(gMap->mCurrentLevel),
-            gMap->mCurrentPath,
-            gMap->mCurrentCamera,
+            AO::Path_Get_Lvl_Name(GetMap().mCurrentLevel),
+            GetMap().mCurrentPath,
+            GetMap().mCurrentCamera,
             sGnFrame);
 
         DebugStr(
@@ -311,9 +311,9 @@ void DDCheat::Teleport()
     }
     else if (input & InputCommands::eThrowItem)
     {
-        sTeleport_Path = gMap->mCurrentPath;
-        sTeleport_Level = static_cast<s32>(MapWrapper::ToAO(gMap->mCurrentLevel));
-        sTeleport_Cam = gMap->mCurrentCamera;
+        sTeleport_Path = GetMap().mCurrentPath;
+        sTeleport_Level = static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel));
+        sTeleport_Cam = GetMap().mCurrentCamera;
     }
     else if (input & InputCommands::eDoAction)
     {
@@ -325,7 +325,7 @@ void DDCheat::Teleport()
                 if (sTeleport_Cam <= 21)
                 {
                     gDDCheat_FlyingEnabled = true;
-                    gMap->SetActiveCam(
+                    GetMap().SetActiveCam(
                         MapWrapper::FromAO(static_cast<LevelIds>(sTeleport_Level)),
                         sTeleport_Path,
                         sTeleport_Cam,

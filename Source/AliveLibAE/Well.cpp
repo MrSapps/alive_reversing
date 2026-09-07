@@ -24,8 +24,8 @@ static s16 Well_NextRandom()
     return curRand;
 }
 
-Well::Well(relive::Path_WellBase* pTlv, FP xpos, FP ypos, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+Well::Well(relive::Path_WellBase* pTlv, FP xpos, FP ypos, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     mTlvInfo = tlvId;
     SetType(ReliveTypes::eWell);
@@ -140,7 +140,7 @@ void Well::VUpdate()
                                           mLeafY,
                                           FP_FromInteger(2),
                                           FP_FromInteger(-20),
-                                          mLeafScale, mResMan);
+                                          mLeafScale, mResMan, mMap);
             }
         }
     }

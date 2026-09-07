@@ -7,8 +7,8 @@
 #include "Abe.hpp"
 #include "Engine.hpp"
 
-MusicTrigger::MusicTrigger(relive::Path_MusicTrigger* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+MusicTrigger::MusicTrigger(relive::Path_MusicTrigger* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     Init(pTlv->mMusicType, pTlv->mTriggeredBy, pTlv->mMusicDelay);
     mTlvTopLeft.x = pTlv->mTopLeftX;
@@ -18,8 +18,8 @@ MusicTrigger::MusicTrigger(relive::Path_MusicTrigger* pTlv, const Guid& tlvId, R
     mTlvId = tlvId;
 }
 
-MusicTrigger::MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType musicType, relive::Path_MusicTrigger::TriggeredBy triggeredBy, s32 musicDelay, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+MusicTrigger::MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType musicType, relive::Path_MusicTrigger::TriggeredBy triggeredBy, s32 musicDelay, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     Init(musicType, triggeredBy, static_cast<s16>(musicDelay));
     mTlvTopLeft = {};
@@ -90,7 +90,7 @@ MusicTrigger::~MusicTrigger()
 
 void MusicTrigger::VScreenChanged()
 {
-    if (gMap->LevelChanged())
+    if (GetMap().LevelChanged())
     {
         SetDead(true);
     }

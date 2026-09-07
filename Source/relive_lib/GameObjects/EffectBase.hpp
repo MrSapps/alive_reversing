@@ -13,7 +13,7 @@ class EffectBase : public BaseGameObject
 {
 public:
     virtual void VRender(OrderingTable& ot) override;
-    EffectBase(Layer layer, relive::TBlendModes blendMode, ResourceManagerWrapper& resMan);
+    EffectBase(Layer layer, relive::TBlendModes blendMode, ResourceManagerWrapper& resMan, BaseMap& map);
     ~EffectBase();
 
 protected:

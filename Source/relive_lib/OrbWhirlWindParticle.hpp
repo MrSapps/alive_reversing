@@ -4,11 +4,12 @@
 #include "../relive_lib/FixedPoint.hpp"
 
 class BaseGameObject;
+class BaseMap;
 
 class OrbWhirlWindParticle final
 {
 public:
-    OrbWhirlWindParticle(FP xpos, FP ypos, FP scale, bool isMudokonSpirit, ResourceManagerWrapper& resMan);
+    OrbWhirlWindParticle(FP xpos, FP ypos, FP scale, bool isMudokonSpirit, ResourceManagerWrapper& resMan, BaseMap& map);
     ~OrbWhirlWindParticle();
 
     s32 IsActive();

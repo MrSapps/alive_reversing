@@ -9,8 +9,9 @@ struct AnimRecord;
 const AnimRecord PerGameAnimRec(AnimId id);
 const AnimRecord PerGameBgAnimRec(s32 toFindResId);
 class BaseGameObject;
+class BaseMap;
 
-using TFrameCallBackType = void(*)(BaseGameObject*, u32& pointIdx, const IndexedPoint&, ResourceManagerWrapper& resMan);
+using TFrameCallBackType = void(*)(BaseGameObject*, u32& pointIdx, const IndexedPoint&, ResourceManagerWrapper& resMan, BaseMap& map);
 
 class Animation final : public AnimationBase
 {

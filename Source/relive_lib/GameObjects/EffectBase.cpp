@@ -5,8 +5,8 @@
 #include "BaseAnimatedWithPhysicsGameObject.hpp"
 #include "BaseMap.hpp"
 
-EffectBase::EffectBase(Layer layer, relive::TBlendModes blendMode, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+EffectBase::EffectBase(Layer layer, relive::TBlendModes blendMode, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
     , mBlendMode(blendMode)
 {
     SetType(ReliveTypes::eEffectBase);

@@ -42,8 +42,8 @@ void SlingMudokon::LoadAnimations()
     }
 }
 
-SlingMudokon::SlingMudokon(relive::Path_SlingMudokon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAliveGameObject(0, resMan),
+SlingMudokon::SlingMudokon(relive::Path_SlingMudokon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAliveGameObject(0, resMan, map),
     mGiveCodeBrain(*this),
     mSpawnBrain(*this),
     mAskForPasswordBrain(*this)
@@ -149,7 +149,7 @@ void SlingMudokon::VUpdate()
 
     if (old_x != mXPos || old_y != mYPos)
     {
-        BaseAliveGameObjectPathTLV = gMap->TLV_Get_At(
+        BaseAliveGameObjectPathTLV = GetMap().TLV_Get_At(
             TlvIterator::Invalid(),
             mXPos,
             mYPos,
@@ -169,7 +169,7 @@ void SlingMudokon::VUpdate()
 
 void SlingMudokon::VCallBrain()
 {
-    if (gMap->Is_Point_In_Current_Camera(
+    if (GetMap().Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -276,7 +276,7 @@ void SlingMudokon::Motion_3_ShootStart()
                 xDistance,
                 GetSpriteScale(),
                 0,
-                mResMan);
+                mResMan, mMap);
             mCurrentMotion = eSlingMudMotions::Motion_4_ShootEnd;
         }
     }
@@ -489,7 +489,7 @@ void SpawnBrain::VUpdate()
             New_DestroyOrCreateObject_Particle(
                 mSlingMudokon.mXPos,
                 (mSlingMudokon.GetSpriteScale() * FP_FromInteger(20)) + mSlingMudokon.mYPos,
-                mSlingMudokon.GetSpriteScale(), mSlingMudokon.mResMan);
+                mSlingMudokon.GetSpriteScale(), mSlingMudokon.mResMan, mSlingMudokon.mMap);
             mSlingMudokon.field_140_timer = BaseGameObject::MakeTimer(2);
             mBrainState = EState::CreateFlash;
             return;
@@ -501,7 +501,7 @@ void SpawnBrain::VUpdate()
                 mSlingMudokon.GetAnimation().SetRender(true);
                 mSlingMudokon.mCurrentMotion = eSlingMudMotions::Motion_0_Idle;
 
-                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 255u, mSlingMudokon.mResMan);
+                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 255u, mSlingMudokon.mResMan, mSlingMudokon.mMap);
 
                 if (mSlingMudokon.mXPos > gAbe->mXPos)
                 {
@@ -607,7 +607,7 @@ void SpawnBrain::VUpdate()
                         AnimId::Dove_Flying,
                         mSlingMudokon.mXPos + FP_FromInteger(Math_NextRandom() % 16),
                         mSlingMudokon.mYPos - FP_FromInteger(Math_NextRandom() % 16),
-                        mSlingMudokon.GetSpriteScale(), mSlingMudokon.mResMan);
+                        mSlingMudokon.GetSpriteScale(), mSlingMudokon.mResMan, mSlingMudokon.mMap);
                     if (pDove)
                     {
                         if (pDove->GetAnimation().GetFlipX())
@@ -628,9 +628,9 @@ void SpawnBrain::VUpdate()
                 mSlingMudokon.mDontSetDestroyed = !mSlingMudokon.mCodeMatches;
 
                 mSlingMudokon.SetDead(true);
-                New_DestroyOrCreateObject_Particle(mSlingMudokon.mXPos, (mSlingMudokon.GetSpriteScale() * FP_FromInteger(20)) + mSlingMudokon.mYPos, mSlingMudokon.GetSpriteScale(), mSlingMudokon.mResMan);
+                New_DestroyOrCreateObject_Particle(mSlingMudokon.mXPos, (mSlingMudokon.GetSpriteScale() * FP_FromInteger(20)) + mSlingMudokon.mYPos, mSlingMudokon.GetSpriteScale(), mSlingMudokon.mResMan, mSlingMudokon.mMap);
 
-                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 255u, mSlingMudokon.mResMan);
+                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 255u, mSlingMudokon.mResMan, mSlingMudokon.mMap);
             }
             return;
 
@@ -661,7 +661,7 @@ void AskForPasswordBrain::VUpdate()
             New_DestroyOrCreateObject_Particle(
                 mSlingMudokon.mXPos,
                 (mSlingMudokon.GetSpriteScale() * FP_FromInteger(20)) + mSlingMudokon.mYPos,
-                mSlingMudokon.GetSpriteScale(), mSlingMudokon.mResMan);
+                mSlingMudokon.GetSpriteScale(), mSlingMudokon.mResMan, mSlingMudokon.mMap);
 
             mSlingMudokon.field_140_timer = BaseGameObject::MakeTimer(2);
             mBrainState = EState::Unknown_2;
@@ -673,7 +673,7 @@ void AskForPasswordBrain::VUpdate()
                 mSlingMudokon.GetAnimation().SetAnimate(true);
                 mSlingMudokon.GetAnimation().SetRender(true);
 
-                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 255u, mSlingMudokon.mResMan);
+                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 255u, mSlingMudokon.mResMan, mSlingMudokon.mMap);
 
                 mSlingMudokon.field_140_timer = BaseGameObject::MakeTimer(30);
 
@@ -852,7 +852,7 @@ void AskForPasswordBrain::VUpdate()
                         AnimId::Dove_Flying,
                         mSlingMudokon.mXPos + FP_FromInteger(Math_NextRandom() % 16),
                         mSlingMudokon.mYPos - FP_FromInteger(Math_NextRandom() % 16),
-                        mSlingMudokon.GetSpriteScale(), mSlingMudokon.mResMan);;
+                        mSlingMudokon.GetSpriteScale(), mSlingMudokon.mResMan, mSlingMudokon.mMap);;
                     if (pDove)
                     {
                         if (pDove->GetAnimation().GetFlipX())
@@ -873,9 +873,9 @@ void AskForPasswordBrain::VUpdate()
                 mSlingMudokon.mDontSetDestroyed = !mSlingMudokon.mCodeMatches;
 
                 mSlingMudokon.SetDead(true);
-                New_DestroyOrCreateObject_Particle(mSlingMudokon.mXPos, (mSlingMudokon.GetSpriteScale() * FP_FromInteger(20)) + mSlingMudokon.mYPos, mSlingMudokon.GetSpriteScale(), mSlingMudokon.mResMan);
+                New_DestroyOrCreateObject_Particle(mSlingMudokon.mXPos, (mSlingMudokon.GetSpriteScale() * FP_FromInteger(20)) + mSlingMudokon.mYPos, mSlingMudokon.GetSpriteScale(), mSlingMudokon.mResMan, mSlingMudokon.mMap);
 
-                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 255u, mSlingMudokon.mResMan);
+                relive_new Flash(Layer::eLayer_Above_FG1_39, 255u, 0, 255u, mSlingMudokon.mResMan, mSlingMudokon.mMap);
             }
             return;
 

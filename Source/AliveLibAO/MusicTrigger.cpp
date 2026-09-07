@@ -10,15 +10,15 @@
 
 namespace AO {
 
-MusicTrigger::MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType type, relive::Path_MusicTrigger::TriggeredBy triggeredBy, s32 switchId, s32 delay, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+MusicTrigger::MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType type, relive::Path_MusicTrigger::TriggeredBy triggeredBy, s32 switchId, s32 delay, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     Init(type, triggeredBy, static_cast<s16>(switchId), static_cast<s16>(delay));
     mTlvId = {};
 }
 
-MusicTrigger::MusicTrigger(relive::Path_MusicTrigger* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+MusicTrigger::MusicTrigger(relive::Path_MusicTrigger* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     Init(pTlv->mMusicType, pTlv->mTriggeredBy, pTlv->mSwitchId, pTlv->mMusicDelay);
     mTlvId = tlvId;
@@ -120,7 +120,7 @@ MusicTrigger::~MusicTrigger()
 
 void MusicTrigger::VScreenChanged()
 {
-    if (gMap->LevelChanged())
+    if (GetMap().LevelChanged())
     {
         SetDead(true);
     }

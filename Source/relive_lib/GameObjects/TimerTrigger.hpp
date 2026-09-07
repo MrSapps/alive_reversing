@@ -12,14 +12,14 @@ namespace relive
 class TimerTrigger final : public BaseGameObject
 {
 public:
-    TimerTrigger(relive::Path_TimerTrigger* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    TimerTrigger(relive::Path_TimerTrigger* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~TimerTrigger();
 
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;
 
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan);
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map);
 private:
     void ToggleAllIds();
 

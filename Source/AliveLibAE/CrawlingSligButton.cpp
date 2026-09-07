@@ -31,8 +31,8 @@ void CrawlingSligButton::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::CrawlingSligButtonUse));
 }
 
-CrawlingSligButton::CrawlingSligButton(relive::Path_CrawlingSligButton* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan),
+CrawlingSligButton::CrawlingSligButton(relive::Path_CrawlingSligButton* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map),
     mTlvId(tlvId),
     mSwitchId(pTlv->mSwitchId),
     mAction(pTlv->mAction),

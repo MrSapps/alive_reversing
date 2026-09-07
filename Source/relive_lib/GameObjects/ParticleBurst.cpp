@@ -31,8 +31,8 @@ FP ParticleBurst::Random_Speed(FP scale)
     return FP_FromRaw((static_cast<u32>(Math_NextRandom()) - 128) << mFineScale) * scale;
 }
 
-ParticleBurst::ParticleBurst(FP xpos, FP ypos, u32 particleCount, FP scale, BurstType type, ResourceManagerWrapper& resMan, s32 fineScale, bool bFadeOut)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+ParticleBurst::ParticleBurst(FP xpos, FP ypos, u32 particleCount, FP scale, BurstType type, ResourceManagerWrapper& resMan, BaseMap& map, s32 fineScale, bool bFadeOut)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eParticleBurst);
     SetSpriteScale(scale);

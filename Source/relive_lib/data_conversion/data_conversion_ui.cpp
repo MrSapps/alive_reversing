@@ -8,8 +8,8 @@
 #include "GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
 #include "AnimationConverter.hpp"
 
-DataConversionUI::DataConversionUI(GameType gameType, ResourceManagerWrapper& resMan)
-    : BaseGameObject(FALSE, 0, resMan)
+DataConversionUI::DataConversionUI(GameType gameType, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(FALSE, 0, resMan, map)
     , mGameType(gameType)
 {
     mPoly.SetXYWH(0, 0, 640, 240);
@@ -19,7 +19,7 @@ DataConversionUI::DataConversionUI(GameType gameType, ResourceManagerWrapper& re
     mPoly.SetRGB3(255, 0, 255);
 
 
-    mFontContext.LoadFontType(FontType::Debug);
+    mFontContext.LoadFontType(FontType::Debug, mResMan);
 
     PalResource palRes;
     palRes.mPal = mFontContext.mFntResource.mCurPal;
@@ -32,7 +32,7 @@ DataConversionUI::DataConversionUI(GameType gameType, ResourceManagerWrapper& re
     BaseAnimatedWithPhysicsGameObject::MakeArray(); // Makes drawables
     AnimationBase::CreateAnimationArray();
     CamResource nullCamRes;
-    gScreenManager = relive_new ScreenManager(nullCamRes, &gMap->mCameraOffset);
+    gScreenManager = relive_new ScreenManager(nullCamRes, &GetMap().mCameraOffset);
 
     mLcdScreenParams.mTopLeftX = 100;
     mLcdScreenParams.mBottomRightX = 300;

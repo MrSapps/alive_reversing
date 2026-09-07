@@ -67,7 +67,7 @@ static const InputCommands sCheatKeyArray_VoiceLocks[] = {
 
 static void CheatController_Cheat_MovieSelect()
 {
-    if (GetMap().mCurrentCamera == 1)
+    if (gCheatController->GetMap().mCurrentCamera == 1)
     {
         CheatController::gEnableCheatFMV = !CheatController::gEnableCheatFMV;
     }
@@ -75,7 +75,7 @@ static void CheatController_Cheat_MovieSelect()
 
 static void CheatController_Cheat_LevelSelect()
 {
-    if (GetMap().mCurrentCamera == 1)
+    if (gCheatController->GetMap().mCurrentCamera == 1)
     {
         CheatController::gEnableCheatLevelSelect = !CheatController::gEnableCheatLevelSelect;
     }
@@ -95,7 +95,7 @@ static void CheatController_Cheat_PathSkip()
 {
     char_type nameBuffer[20];
 
-    DestroyObjects();
+    DestroyObjects(gCheatController->GetResMan());
     sprintf(nameBuffer, "NXTP%04d.SAV.json", QuikSave::gActiveQuicksaveData.mWorldInfo.mSaveFileId);
 
     FileSystem fs;
@@ -133,8 +133,8 @@ static CheatEntry sCheatArray[] = {
     {EReliveLevelIds::eNone, GameType::eAo, ALIVE_COUNTOF(sCheatKeyArray_VoiceLocks), sCheatKeyArray_VoiceLocks, 0, &CheatController_Cheat_VoiceLocks},
     {EReliveLevelIds::eNone, GameType::eAe, ALIVE_COUNTOF(sCheatKeyArray_PathSkip), sCheatKeyArray_PathSkip, 0, &CheatController_Cheat_PathSkip}};
 
-CheatController::CheatController(ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+CheatController::CheatController(ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     SetSurviveDeathReset(true);
     SetType(ReliveTypes::eNone);

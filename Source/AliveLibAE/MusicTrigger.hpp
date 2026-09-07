@@ -8,8 +8,8 @@
 class MusicTrigger final : public BaseGameObject
 {
 public:
-    MusicTrigger(relive::Path_MusicTrigger* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
-    MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType musicType, relive::Path_MusicTrigger::TriggeredBy triggeredBy, s32 delay, ResourceManagerWrapper& resMan);
+    MusicTrigger(relive::Path_MusicTrigger* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType musicType, relive::Path_MusicTrigger::TriggeredBy triggeredBy, s32 delay, ResourceManagerWrapper& resMan, BaseMap& map);
     ~MusicTrigger();
 
     void Init(relive::Path_MusicTrigger::MusicTriggerMusicType musicType, relive::Path_MusicTrigger::TriggeredBy triggeredBy, s16 delay);

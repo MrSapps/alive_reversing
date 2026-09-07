@@ -93,7 +93,7 @@ public:
         AnimId::Scrab_LegKick,
         AnimId::Scrab_DeathBegin};
 
-    Scrab(relive::Path_Scrab* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    Scrab(relive::Path_Scrab* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Scrab();
 
     virtual void VRender(OrderingTable& ot) override;

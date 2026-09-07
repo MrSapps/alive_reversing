@@ -67,7 +67,7 @@ enum class GreeterSpeak : s16
 class Greeter final : public BaseAliveGameObject
 {
 public:
-    Greeter(relive::Path_Greeter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    Greeter(relive::Path_Greeter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Greeter();
     
     void LoadAnimations();
@@ -78,7 +78,7 @@ public:
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
 
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
 private:
     void BlowUp();

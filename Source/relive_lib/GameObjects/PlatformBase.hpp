@@ -15,7 +15,7 @@ public:
     static void FreeArray();
     static DynamicArrayT<BaseGameObject>& Platforms();
 
-    PlatformBase(ResourceManagerWrapper& resMan);
+    PlatformBase(ResourceManagerWrapper& resMan, BaseMap& map);
     ~PlatformBase();
 
     virtual void VAdd(BaseAliveGameObject* pObj);

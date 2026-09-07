@@ -25,8 +25,8 @@ void HoistRocksEffect::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::HoistRock3));
 }
 
-HoistRocksEffect::HoistRocksEffect(relive::Path_Hoist* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+HoistRocksEffect::HoistRocksEffect(relive::Path_Hoist* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     mTlvId = tlvId;
 
@@ -132,9 +132,9 @@ void HoistRocksEffect::VUpdate()
         {
             if (particle.mVelY >= FP_FromInteger(10))
             {
-                if (!gMap->Is_Point_In_Current_Camera(
-                        gMap->mCurrentLevel,
-                        gMap->mCurrentPath,
+                if (!GetMap().Is_Point_In_Current_Camera(
+                        GetMap().mCurrentLevel,
+                        GetMap().mCurrentPath,
                         particle.mXPos,
                         particle.mYPos,
                         0))

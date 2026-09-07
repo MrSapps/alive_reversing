@@ -108,13 +108,13 @@ static s32 DebugFont_Open_4F8AB0(u8 xMargin, u8 yMargin, u8 displayWidth, u8 dis
     return idx;
 }
 
-s32 DebugFont::DebugFont_Init()
+s32 DebugFont::DebugFont_Init(ResourceManagerWrapper& resMan)
 {
     DebugFont_Reset_4F8B40();
     mDebugTextIdx = DebugFont_Open_4F8AB0(8, 16, static_cast<u8>(gPsxDisplay.mWidth), 200, 600u);
     mDebugFontTmpBuffer[0] = 0;
 
-    mDebugFontContext.LoadFontType(FontType::Debug);
+    mDebugFontContext.LoadFontType(FontType::Debug, resMan);
 
     PalResource palRes;
     palRes.mPal = mDebugFontContext.mFntResource.mCurPal;
@@ -172,7 +172,7 @@ void DebugFont::PSX_DrawDebugTextBuffers(OrderingTable& ot)
     }
 }
 
-void PsxDisplay::Init()
+void PsxDisplay::Init(ResourceManagerWrapper& resMan)
 {
     PSX_VSync(VSyncMode::UncappedFps);
 
@@ -181,7 +181,7 @@ void PsxDisplay::Init()
 
     mDrawEnv.mOrderingTable.Clear();
 
-    mDebugFont.DebugFont_Init();
+    mDebugFont.DebugFont_Init(resMan);
 
     PSX_VSync(VSyncMode::UncappedFps);
 }

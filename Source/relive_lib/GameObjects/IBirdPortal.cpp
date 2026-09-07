@@ -11,8 +11,8 @@
 #include "../FatalError.hpp"
 #include "../AliveLibAE/QuikSave.hpp"
 
-IBirdPortal::IBirdPortal(ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+IBirdPortal::IBirdPortal(ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
 
 }
@@ -27,7 +27,7 @@ void IBirdPortal::CreateDovesAndShrykullNumber()
 {
     for (u8 i = 0; i < ALIVE_COUNTOF(mDoveIds); i++)
     {
-        auto pDove = relive_new Dove(AnimId::Dove_Flying, mXPos, mYPos, mSpriteScale, mResMan);
+        auto pDove = relive_new Dove(AnimId::Dove_Flying, mXPos, mYPos, mSpriteScale, mResMan, mMap);
 
         mDovesExist = true;
         if (mPortalType == relive::Path_BirdPortal::PortalType::eAbe)
@@ -52,7 +52,7 @@ void IBirdPortal::CreateDovesAndShrykullNumber()
             mSpriteScale,
             mMudCountForShrykull,
             0,
-            mResMan);
+            mResMan, mMap);
         if (pIndicator)
         {
             mThrowableTotalIndicator = pIndicator->mBaseGameObjectId;
@@ -160,13 +160,13 @@ void IBirdPortal::MudSaved()
 
 void IBirdPortal::CreateTerminators()
 {
-    auto pTerminator1 = relive_new BirdPortalTerminator(mXPos, mYPos, mSpriteScale, mPortalType, mResMan);
+    auto pTerminator1 = relive_new BirdPortalTerminator(mXPos, mYPos, mSpriteScale, mPortalType, mResMan, mMap);
     if (pTerminator1)
     {
         mTerminatorId1 = pTerminator1->mBaseGameObjectId;
     }
 
-    auto pTerminator2 = relive_new BirdPortalTerminator(mXPos, mYPos, mSpriteScale, mPortalType, mResMan);
+    auto pTerminator2 = relive_new BirdPortalTerminator(mXPos, mYPos, mSpriteScale, mPortalType, mResMan, mMap);
     if (pTerminator2)
     {
         mTerminatorId2 = pTerminator2->mBaseGameObjectId;
@@ -207,7 +207,7 @@ bool IBirdPortal::ClipPortal(bool bIgnoreClipping)
     }
 
     // Clip objects entering portal?
-    auto pClipper1 = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan);
+    auto pClipper1 = relive_new ScreenClipper(xy, wh, Layer::eLayer_0, mResMan, mMap);
     if (pClipper1)
     {
         mScreenClipperId1 = pClipper1->mBaseGameObjectId;
@@ -222,7 +222,7 @@ bool IBirdPortal::ClipPortal(bool bIgnoreClipping)
     }
 
     // Clip whole screen when "in" the portal?
-    auto pClipper2 = relive_new ScreenClipper(PSX_Point{0, 0}, PSX_Point{640, 240}, Layer::eLayer_0, mResMan);
+    auto pClipper2 = relive_new ScreenClipper(PSX_Point{0, 0}, PSX_Point{640, 240}, Layer::eLayer_0, mResMan, mMap);
     if (pClipper2)
     {
         mScreenClipperId2 = pClipper2->mBaseGameObjectId;

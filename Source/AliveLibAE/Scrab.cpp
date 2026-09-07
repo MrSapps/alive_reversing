@@ -89,8 +89,8 @@ void Scrab::LoadAnimations()
     }
 }
 
-Scrab::Scrab(relive::Path_Scrab* pTlv, const Guid& tlvId, relive::Path_ScrabSpawner::SpawnDirection spawnDirection, ResourceManagerWrapper& resMan)
-    : BaseAliveGameObject(14, resMan)
+Scrab::Scrab(relive::Path_Scrab* pTlv, const Guid& tlvId, relive::Path_ScrabSpawner::SpawnDirection spawnDirection, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAliveGameObject(14, resMan, map)
 {
     SetType(ReliveTypes::eScrab);
 
@@ -172,7 +172,7 @@ Scrab::Scrab(relive::Path_Scrab* pTlv, const Guid& tlvId, relive::Path_ScrabSpaw
         SetUpdateDelay(30);
     }
 
-    SetTint(&sScrabTints_560260[0], gMap->mCurrentLevel);
+    SetTint(&sScrabTints_560260[0], GetMap().mCurrentLevel);
 
     SetDoPurpleLightEffect(true);
 
@@ -223,13 +223,13 @@ void Scrab::VOnTlvCollision(TlvIterator tlvIterator)
     }
 }
 
-void Scrab::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
+void Scrab::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<ScrabSaveState>();
 
     auto pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(pState->field_44_tlvInfo).GetTlv<relive::Path_Scrab>();
 
-    auto pScrab = relive_new Scrab(pTlv, pState->field_44_tlvInfo, relive::Path_ScrabSpawner::SpawnDirection::eNone, resMan);
+    auto pScrab = relive_new Scrab(pTlv, pState->field_44_tlvInfo, relive::Path_ScrabSpawner::SpawnDirection::eNone, resMan, map);
     if (pScrab)
     {
         pScrab->mBaseGameObjectTlvInfo = pState->field_4_obj_id;
@@ -438,9 +438,9 @@ Scrab::~Scrab()
     if (sControlledCharacter == this)
     {
         sControlledCharacter = gAbe;
-        if (gMap->mNextLevel != EReliveLevelIds::eMenu)
+        if (GetMap().mNextLevel != EReliveLevelIds::eMenu)
         {
-            gMap->SetActiveCam(
+            GetMap().SetActiveCam(
                 mAbeLevel,
                 mAbePath,
                 mAbeCamera,
@@ -540,7 +540,7 @@ void Scrab::HandleDDCheat()
 
         // Keep in map bounds
         PSX_Point point = {};
-        gMap->Get_map_size(&point);
+        GetMap().Get_map_size(&point);
         if (mXPos < FP_FromInteger(0))
         {
             mXPos = FP_FromInteger(0);
@@ -626,7 +626,7 @@ void Scrab::VUpdate()
                 return;
             }
 
-            if (!gMap->Is_Point_In_Current_Camera(
+            if (!GetMap().Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -719,7 +719,7 @@ void Scrab::VUpdate()
                         particleVelY,
                         GetSpriteScale(),
                         Layer::eLayer_0,
-                        RGB16{255, 0, 0}, mResMan);
+                        RGB16{255, 0, 0}, mResMan, mMap);
                 }
             }
 
@@ -860,7 +860,7 @@ s16 Scrab::Brain_0_Patrol()
         return Scrab_Brain_0_Patrol::eBrain0_OnLift_6;
     }
 
-    if (gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
+    if (GetMap().GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
     {
         MusicController::static_PlayMusic(MusicController::MusicTypes::eTension_4, this, 0, 0);
     }
@@ -1143,7 +1143,7 @@ s16 Scrab::Brain_1_ChasingEnemy()
         return Brain_1_ChasingEnemy::eBrain1_Panic_4;
     }
 
-    if (gMap->GetDirection(
+    if (GetMap().GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1175,7 +1175,7 @@ s16 Scrab::Brain_1_ChasingEnemy()
 
             if (!VIsFacingMe(pObj))
             {
-                if (gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+                if (GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
                 {
                     mNextMotion = eScrabMotions::Motion_3_Turn;
                 }
@@ -1526,7 +1526,7 @@ s16 Scrab::Brain_ChasingEnemy_State_2_Running(BaseAliveGameObject* pObj)
     }
     else
     {
-        if (gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+        if (GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
         {
             mNextMotion = eScrabMotions::Motion_3_Turn;
         }
@@ -1579,7 +1579,7 @@ s16 Scrab::Brain_2_Fighting()
         }
     }
 
-    if (gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
+    if (GetMap().GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) >= CameraPos::eCamCurrent_0)
     {
         MusicController::static_PlayMusic(MusicController::MusicTypes::eSoftChase_8, this, 0, 0);
     }
@@ -1669,7 +1669,7 @@ s16 Scrab::Brain_2_Fighting()
             }
             if (!Handle_SlamDoor_or_EnemyStopper(mVelX, 0) && !Check_IsOnEndOfLine(sIsFlipped, 2) && VIsObjNearby(ScaleToGridSize(GetSpriteScale()) * FP_FromInteger(10), pTarget))
             {
-                if (gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, xPos, mYPos, 0))
+                if (GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, xPos, mYPos, 0))
                 {
                     return mBrainSubState;
                 }
@@ -1890,7 +1890,7 @@ s16 Scrab::Brain_5_Possessed()
         MusicController::static_PlayMusic(MusicController::MusicTypes::eNone_0, this, 0, 0);
         ToPatrol();
         mBrainSubState = Scrab_Brain_0_Patrol::eBrain0_ToMoving_0;
-        gMap->SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+        GetMap().SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
         return mBrainSubState;
     }
 
@@ -1905,7 +1905,7 @@ s16 Scrab::Brain_5_Possessed()
     }
     else
     {
-        if (mBrainSubState != 1 || gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) == CameraPos::eCamInvalid_m1)
+        if (mBrainSubState != 1 || GetMap().GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) == CameraPos::eCamInvalid_m1)
         {
             return mBrainSubState;
         }
@@ -3003,7 +3003,7 @@ void Scrab::Motion_28_GetDepossessedBegin()
             const FP yRnd = FP_FromInteger(Math_RandomRange(20, 50));
             const FP ypos = mYPos - (GetSpriteScale() * yRnd);
             const FP xpos = (GetSpriteScale() * xRnd) + mXPos;
-            New_TintChant_Particle(xpos, ypos, GetSpriteScale(), Layer::eLayer_0, mResMan);
+            New_TintChant_Particle(xpos, ypos, GetSpriteScale(), Layer::eLayer_0, mResMan, mMap);
         }
 
         if (static_cast<s32>(sGnFrame) > field_130_depossession_timer || gAbe->mHealth <= FP_FromInteger(0))
@@ -3015,7 +3015,7 @@ void Scrab::Motion_28_GetDepossessedBegin()
             mCurrentMotion = eScrabMotions::Motion_29_GetDepossessedEnd;
             ToPatrol();
             mBrainSubState = Scrab_Brain_0_Patrol::eBrain0_ToMoving_0;
-            gMap->SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+            GetMap().SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
         }
     }
 }
@@ -3373,7 +3373,7 @@ BaseAliveGameObject* Scrab::Find_Fleech()
                     {
                         if (pAliveObj->VIsFacingMe(pAliveObj))
                         {
-                            if (!WallHit(GetSpriteScale() * FP_FromInteger(45), pAliveObj->mXPos - mXPos) && gMap->Is_Point_In_Current_Camera(pAliveObj->mCurrentLevel, pAliveObj->mCurrentPath, pAliveObj->mXPos, pAliveObj->mYPos, 0) && gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+                            if (!WallHit(GetSpriteScale() * FP_FromInteger(45), pAliveObj->mXPos - mXPos) && GetMap().Is_Point_In_Current_Camera(pAliveObj->mCurrentLevel, pAliveObj->mCurrentPath, pAliveObj->mXPos, pAliveObj->mYPos, 0) && GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
                             {
                                 return pAliveObj;
                             }
@@ -3399,9 +3399,9 @@ void Scrab::VPossessed()
     mTargetGuid = Guid{};
     mFightTargetId = Guid{};
     field_12C_timer = MakeTimer(35);
-    mAbeLevel = gMap->mCurrentLevel;
-    mAbePath = gMap->mCurrentPath;
-    mAbeCamera = gMap->mCurrentCamera;
+    mAbeLevel = GetMap().mCurrentLevel;
+    mAbePath = GetMap().mCurrentPath;
+    mAbeCamera = GetMap().mCurrentCamera;
 }
 
 u8** Scrab::ResBlockForMotion(s16 /*motion*/)
@@ -3460,7 +3460,7 @@ u8** Scrab::ResBlockForMotion(s16 /*motion*/)
 
 void Scrab::VScreenChanged()
 {
-    if (gMap->LevelChanged() || gMap->PathChanged())
+    if (GetMap().LevelChanged() || GetMap().PathChanged())
     {
         SetDead(true);
     }
@@ -3826,7 +3826,7 @@ s32 Scrab::Scrab_SFX(ScrabSounds soundId, s32 vol, s32 pitch, s16 applyDirection
 {
     s16 volumeLeft = 0;
     s16 volumeRight = 0;
-    const CameraPos direction = gMap->GetDirection(
+    const CameraPos direction = GetMap().GetDirection(
         mCurrentLevel,
         mCurrentPath,
         mXPos,
@@ -3849,7 +3849,7 @@ s32 Scrab::Scrab_SFX(ScrabSounds soundId, s32 vol, s32 pitch, s16 applyDirection
     if (applyDirection)
     {
         PSX_RECT pRect = {};
-        gMap->Get_Camera_World_Rect(direction, &pRect);
+        GetMap().Get_Camera_World_Rect(direction, &pRect);
         switch (direction)
         {
             case CameraPos::eCamCurrent_0:
@@ -4111,7 +4111,7 @@ Scrab* Scrab::FindScrabToFight()
             {
                 if (VOnSameYLevel(pScrab))
                 {
-                    if (!WallHit(GetSpriteScale() * FP_FromInteger(45), pScrab->mXPos - mXPos) && gMap->Is_Point_In_Current_Camera(pScrab->mCurrentLevel, pScrab->mCurrentPath, pScrab->mXPos, pScrab->mYPos, 0) && gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+                    if (!WallHit(GetSpriteScale() * FP_FromInteger(45), pScrab->mXPos - mXPos) && GetMap().Is_Point_In_Current_Camera(pScrab->mCurrentLevel, pScrab->mCurrentPath, pScrab->mXPos, pScrab->mYPos, 0) && GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
                     {
                         if (pScrab->mFightTargetId == Guid{})
                         {
@@ -4223,7 +4223,7 @@ s16 Scrab::Handle_SlamDoor_or_EnemyStopper(FP velX, s16 bCheckLeftRightBounds)
 
 GameSpeakEvents Scrab::LastSpeak()
 {
-    if (!gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 1))
+    if (!GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 1))
     {
         return GameSpeakEvents::eNone;
     }

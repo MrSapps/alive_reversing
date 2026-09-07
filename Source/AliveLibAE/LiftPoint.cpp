@@ -95,8 +95,8 @@ void LiftPoint::LoadAnimations()
     }
 }
 
-LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : PlatformBase(resMan)
+LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : PlatformBase(resMan, map)
 {
     mBaseGameObjectTlvInfo = tlvId;
     SetType(ReliveTypes::eLiftPoint);
@@ -118,7 +118,7 @@ LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId, ResourceMa
         SetScale(Scale::Fg);
     }
 
-    const LiftPointData& rPlatformData = sLiftPointAnimIds[static_cast<u32>(MapWrapper::ToAE(gMap->mCurrentLevel))];
+    const LiftPointData& rPlatformData = sLiftPointAnimIds[static_cast<u32>(MapWrapper::ToAE(GetMap().mCurrentLevel))];
     AddDynamicCollision(
         rPlatformData.mPlatformAnimId,
         pTlv,
@@ -134,7 +134,7 @@ LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId, ResourceMa
         mPlatformBaseCollisionLine->mLineType = eLineTypes::eBackgroundDynamicCollision_36;
     }
 
-    SetTint(sLiftTints, gMap->mCurrentLevel);
+    SetTint(sLiftTints, GetMap().mCurrentLevel);
 
     const FP oldX = mXPos;
     MapFollowMe(true);
@@ -177,14 +177,14 @@ LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId, ResourceMa
         FP_GetExponent((k13 * GetSpriteScale() + mXPos)),
         0, // Start at the very top of the screen
         FP_GetExponent((k25 * GetSpriteScale()) + mYPos),
-        GetSpriteScale(), resMan);
+        GetSpriteScale(), resMan, map);
     mRopeId1 = pRope1->mBaseGameObjectId;
 
     auto pRope2 = relive_new Rope(
         FP_GetExponent((km10 * GetSpriteScale()) + mXPos),
         0, // Start at the very top of the screen
         FP_GetExponent((k25 * GetSpriteScale()) + mYPos),
-        GetSpriteScale(), resMan);
+        GetSpriteScale(), resMan, map);
     mRopeId2 = pRope2->mBaseGameObjectId;
 
     pRope2->mBottom = FP_GetExponent((k25 * GetSpriteScale()) + FP_FromInteger(mPlatformBaseCollisionLine->mRect.y));
@@ -727,9 +727,9 @@ void LiftPoint::CreatePulleyIfExists()
     // If we are in the top row of cameras then there can't be a pulley in the screen above because there are no more screens above!
     while (yCamIdx >= 0)
     {
-        const s16 xCamIdx = (FP_GetExponent(mXPos) / pPathData->field_A_grid_width) - gMap->mCamIdxOnX;
+        const s16 xCamIdx = (FP_GetExponent(mXPos) / pPathData->field_A_grid_width) - GetMap().mCamIdxOnX;
         // Keep looking up 1 camera for any camera that has TLVs in it.
-        TlvIterator tlvIter = gPathInfo->Get_First_TLV_For_Offsetted_Camera(xCamIdx, yCamIdx - gMap->mCamIdxOnY);
+        TlvIterator tlvIter = gPathInfo->Get_First_TLV_For_Offsetted_Camera(xCamIdx, yCamIdx - GetMap().mCamIdxOnY);
         while (tlvIter.GetTlv())
         {
             if (tlvIter.GetTlv()->mTlvType == ReliveTypes::ePulley)
@@ -770,7 +770,7 @@ void LiftPoint::CreatePulleyIfExists()
     mPulleyXPos = FP_GetExponent(((kM10_scaled + k13_scaled) / FP_FromInteger(2)) + FP_NoFractional(mXPos));
     mPulleyYPos = pFound->mTopLeftY;
 
-    const LiftPointData& data = sLiftPointAnimIds[static_cast<s32>(MapWrapper::ToAE(gMap->mCurrentLevel))];
+    const LiftPointData& data = sLiftPointAnimIds[static_cast<s32>(MapWrapper::ToAE(GetMap().mCurrentLevel))];
     mPulleyAnim.Init(
         GetAnimRes(data.mLiftTopWheelAnimId),
         this);
@@ -856,13 +856,13 @@ void LiftPoint::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void LiftPoint::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan)
+void LiftPoint::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pData.ReadTmpPtr<LiftPointSaveState>();
 
     relive::Path_LiftPoint* pTlv = static_cast<relive::Path_LiftPoint*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mPlatformId).GetTlv());
 
-    auto pLiftPoint = relive_new LiftPoint(pTlv, pState->mPlatformId, resMan);
+    auto pLiftPoint = relive_new LiftPoint(pTlv, pState->mPlatformId, resMan, map);
     if (pLiftPoint)
     {
         pLiftPoint->mXPos = pState->mXPos;

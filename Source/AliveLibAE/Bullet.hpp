@@ -22,7 +22,7 @@ enum class BulletType : s16
 class Bullet final : public BaseGameObject
 {
 public:
-    Bullet(BaseAliveGameObject* pParent, BulletType type, FP xpos, FP ypos, FP xDist, FP scale, s32 numberOfBullets, ResourceManagerWrapper& resMan);
+    Bullet(BaseAliveGameObject* pParent, BulletType type, FP xpos, FP ypos, FP xDist, FP scale, s32 numberOfBullets, ResourceManagerWrapper& resMan, BaseMap& map);
     
     virtual void VUpdate() override;
     static bool InZBulletCover(FP xpos, FP ypos, const PSX_RECT& objRect);

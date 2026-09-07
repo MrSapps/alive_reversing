@@ -23,8 +23,8 @@ namespace AO {
 s16 gBeeInstanceCount = 0;
 s16 gBeesNearAbe = 0;
 
-BeeSwarm::BeeSwarm(FP xpos, FP ypos, FP speed, s32 numBees, s32 totalChaseTime, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+BeeSwarm::BeeSwarm(FP xpos, FP ypos, FP speed, s32 numBees, s32 totalChaseTime, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eBeeSwarm);
 
@@ -88,7 +88,7 @@ BeeSwarm::~BeeSwarm()
 
 void BeeSwarm::VScreenChanged()
 {
-    if (gMap->LevelChanged() || gMap->PathChanged())
+    if (GetMap().LevelChanged() || GetMap().PathChanged())
     {
         SetDead(true);
     }
@@ -181,7 +181,7 @@ void BeeSwarm::VUpdate()
     switch (mSwarmState)
     {
         case BeeSwarmStates::eIdle_0:
-            if (!gMap->Is_Point_In_Current_Camera(
+            if (!GetMap().Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,

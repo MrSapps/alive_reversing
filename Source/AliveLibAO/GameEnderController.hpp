@@ -16,9 +16,9 @@ enum class GameEnderControllerStates : s16
 class GameEnderController final : public ::BaseGameObject
 {
 public:
-    static void CreateGameEnderController(ResourceManagerWrapper& resMan);
+    static void CreateGameEnderController(ResourceManagerWrapper& resMan, BaseMap& map);
 
-    GameEnderController(ResourceManagerWrapper& resMan);
+    GameEnderController(ResourceManagerWrapper& resMan, BaseMap& map);
 
     virtual void VScreenChanged() override;
     virtual void VUpdate() override;

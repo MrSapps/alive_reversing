@@ -1,5 +1,7 @@
 #pragma once
 
+class BaseMap;
+
 #include "../../relive_lib/Function.hpp"
 #include <memory>
 
@@ -41,7 +43,7 @@ void SetMidiApiVars(IMidiVars* pVars);
 using TReclaimMemoryFn = void(CC*)(u32);
 using TLoadResourceFileFn = s16(CC*)(const s8*, Camera*);
 using TGetLoadedResourceFn = u8**(CC*) (u32, u32, u16, u16);
-using TSNDRestart = void(CC*)();
+using TSNDRestart = void(CC*)(BaseMap&);
 using TSNDStopAll = void(CC*)();
 
 // So AO can redirect SND_StopAll_4CB060 to its own func when called from SYS_ funcs
@@ -51,7 +53,7 @@ void SND_StopAll_SetCallBack(TSNDStopAll cb);
 void SND_Restart_SetCallBack(TSNDRestart cb);
 
 
-void SND_Load_Seqs_Impl(OpenSeqHandle* pSeqTable, PathSoundInfo& info);
+void SND_Load_Seqs_Impl(OpenSeqHandle* pSeqTable, PathSoundInfo& info, ResourceManagerWrapper& resMan, BaseMap& map);
 
 void SND_Stop_All_Seqs();
 
@@ -60,8 +62,8 @@ void SND_Init();
 void SND_Shutdown();
 void SND_Stop_Channels_Mask(u32 bitMask);
 void SND_Reset();
-void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& info, s32 reverb);
-void SND_Load_Seqs(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& bsqFileName);
+void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& info, s32 reverb, ResourceManagerWrapper& resMan, BaseMap& map);
+void SND_Load_Seqs(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& bsqFileName, ResourceManagerWrapper& resMan, BaseMap& map);
 void SND_SEQ_Stop(u16 idx);
 s8 SND_Seq_Table_Valid();
 s16 SND_SEQ_PlaySeq(u16 idx, s16 repeatCount, s16 bDontStop);

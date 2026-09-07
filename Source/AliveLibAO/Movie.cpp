@@ -196,8 +196,8 @@ public:
 
 };
 
-Movie::Movie(const char_type* pFmvName, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+Movie::Movie(const char_type* pFmvName, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
     , mFmvName(pFmvName)
 {
     LOG_INFO("Create movie %s", mFmvName);

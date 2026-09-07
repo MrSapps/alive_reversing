@@ -9,7 +9,7 @@ namespace AO {
 class BeeSwarmHole final : public ::BaseGameObject
 {
 public:
-    BeeSwarmHole(relive::Path_BeeSwarmHole* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    BeeSwarmHole(relive::Path_BeeSwarmHole* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
 
     virtual void VUpdate() override;
 

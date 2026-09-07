@@ -25,8 +25,8 @@ struct Colour final
 constexpr Colour greenFart = {32, 128, 32};
 constexpr Colour redFart = {128, 38, 32};
 
-EvilFart::EvilFart(ResourceManagerWrapper& resMan)
-    : BaseAliveGameObject(0, resMan)
+EvilFart::EvilFart(ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eEvilFart);
 
@@ -86,11 +86,11 @@ EvilFart::EvilFart(ResourceManagerWrapper& resMan)
     mPossessedAliveTimer = 220;
 }
 
-void EvilFart::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
+void EvilFart::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<EvilFartSaveState>();
 
-    auto pFart = relive_new EvilFart(resMan);
+    auto pFart = relive_new EvilFart(resMan, map);
 
     if (pState->mControlled)
     {
@@ -241,9 +241,9 @@ void EvilFart::VPossessed()
 
     GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_1);
 
-    mAbeLevel = gMap->mCurrentLevel;
-    mAbePath = gMap->mCurrentPath;
-    mAbeCamera = gMap->mCurrentCamera;
+    mAbeLevel = GetMap().mCurrentLevel;
+    mAbePath = GetMap().mCurrentPath;
+    mAbeCamera = GetMap().mCurrentCamera;
 
     sControlledCharacter = this;
 
@@ -307,7 +307,7 @@ void EvilFart::VUpdate()
     {
         sControlledCharacter = gAbe;
         SetDead(true);
-        gMap->SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+        GetMap().SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
     }
 
     // Show the count to the boom
@@ -323,7 +323,7 @@ void EvilFart::VUpdate()
                     GetAnimation().GetRenderLayer(),
                     GetAnimation().GetSpriteScale(),
                     mPossessedAliveTimer / 50,
-                    1, mResMan);
+                    1, mResMan, mMap);
 
                 mYPos = mYPos - (GetSpriteScale() * FP_FromInteger(50));
                 Mudokon_SFX(MudSounds::eFart_7, 0, 10 * (300 - mPossessedAliveTimer), this);
@@ -383,7 +383,7 @@ void EvilFart::VUpdate()
                         (mYPos - FP_FromInteger(55)) * GetSpriteScale(),
                         FP_FromDouble(0.5) * GetSpriteScale(),
                         3,
-                        RGB16{mRGB.r, mRGB.b, 32}, mResMan);
+                        RGB16{mRGB.r, mRGB.b, 32}, mResMan, mMap);
 
 
                     if (mSoundChannels)
@@ -513,7 +513,7 @@ void EvilFart::VUpdate()
                     xposOffset + mXPos,
                     yposOffset + mYPos - (GetSpriteScale() * FP_FromInteger(54)),
                     GetSpriteScale(),
-                    Layer::eLayer_0, mResMan);
+                    Layer::eLayer_0, mResMan, mMap);
             }
 
             if (!mFartExploded && static_cast<s32>(sGnFrame) > mUnpossessionTimer)
@@ -535,7 +535,7 @@ void EvilFart::BlowUp()
     relive_new AirExplosion(mXPos,
         mYPos - (GetSpriteScale() * FP_FromInteger(50)),
         GetSpriteScale(),
-        0, mResMan);
+        0, mResMan, mMap);
 }
 
 void EvilFart::CalculateFartColour()

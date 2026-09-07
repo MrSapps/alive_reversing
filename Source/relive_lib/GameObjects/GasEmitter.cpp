@@ -12,8 +12,8 @@
 static GasEmitter* sMainGasEmitter = nullptr;
 static u32 sGasEmitterAudioMask = 0;
 
-GasEmitter::GasEmitter(relive::Path_GasEmitter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+GasEmitter::GasEmitter(relive::Path_GasEmitter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eNone);
 
@@ -73,23 +73,23 @@ void GasEmitter::VUpdate()
         switch (mGasColour)
         {
             case relive::Path_GasEmitter::GasColour::eYellow:
-                New_Smoke_Particles(mEmitterXPos, mEmitterYPos, mSmokeScale, mParticleCount, RGB16{128, 128, 32}, mResMan);
+                New_Smoke_Particles(mEmitterXPos, mEmitterYPos, mSmokeScale, mParticleCount, RGB16{128, 128, 32}, mResMan, mMap);
                 break;
 
             case relive::Path_GasEmitter::GasColour::eRed:
-                New_Smoke_Particles(mEmitterXPos, mEmitterYPos, mSmokeScale, mParticleCount, RGB16{128, 32, 32}, mResMan);
+                New_Smoke_Particles(mEmitterXPos, mEmitterYPos, mSmokeScale, mParticleCount, RGB16{128, 32, 32}, mResMan, mMap);
                 break;
 
             case relive::Path_GasEmitter::GasColour::eGreen:
-                New_Smoke_Particles(mEmitterXPos, mEmitterYPos, mSmokeScale, mParticleCount, RGB16{32, 128, 32}, mResMan);
+                New_Smoke_Particles(mEmitterXPos, mEmitterYPos, mSmokeScale, mParticleCount, RGB16{32, 128, 32}, mResMan, mMap);
                 break;
 
             case relive::Path_GasEmitter::GasColour::eBlue:
-                New_Smoke_Particles(mEmitterXPos, mEmitterYPos, mSmokeScale, mParticleCount, RGB16{32, 32, 128}, mResMan);
+                New_Smoke_Particles(mEmitterXPos, mEmitterYPos, mSmokeScale, mParticleCount, RGB16{32, 32, 128}, mResMan, mMap);
                 break;
 
             case relive::Path_GasEmitter::GasColour::eWhite:
-                New_Smoke_Particles(mEmitterXPos, mEmitterYPos, mSmokeScale, mParticleCount, RGB16{128, 128, 128}, mResMan);
+                New_Smoke_Particles(mEmitterXPos, mEmitterYPos, mSmokeScale, mParticleCount, RGB16{128, 128, 128}, mResMan, mMap);
                 break;
 
             default:

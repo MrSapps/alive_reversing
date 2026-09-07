@@ -43,8 +43,8 @@ void BoneBag::LoadAnimations()
     }
 }
 
-BoneBag::BoneBag(relive::Path_BoneBag* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAliveGameObject(0, resMan),
+BoneBag::BoneBag(relive::Path_BoneBag* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAliveGameObject(0, resMan, map),
     mTlvInfo(tlvId),
     mTlvVelX(FP_FromRaw(pTlv->mVelX << 8)),
     mTlvVelY(FP_FromRaw(-256 * pTlv->mVelY)), // TODO: << 8 negated ??
@@ -55,7 +55,7 @@ BoneBag::BoneBag(relive::Path_BoneBag* pTlv, const Guid& tlvId, ResourceManagerW
     LoadAnimations();
     Animation_Init(GetAnimRes(AnimId::BoneBag_Idle));
     GetAnimation().SetSemiTrans(false);
-    SetTint(&kBoneBagTints[0], gMap->mCurrentLevel);
+    SetTint(&kBoneBagTints[0], GetMap().mCurrentLevel);
 
     mXPos = FP_FromInteger((pTlv->mTopLeftX + pTlv->mBottomRightX) / 2);
     mYPos = FP_FromInteger(pTlv->mBottomRightY);
@@ -163,12 +163,12 @@ void BoneBag::VUpdate()
         }
         else
         {
-            gThrowableArray = relive_new ThrowableArray(mResMan);
+            gThrowableArray = relive_new ThrowableArray(mResMan, mMap);
         }
 
         gThrowableArray->Add(mBoneAmount);
 
-        auto pBone = relive_new Bone(mXPos, mYPos - FP_FromInteger(30), mBoneAmount, mResMan);
+        auto pBone = relive_new Bone(mXPos, mYPos - FP_FromInteger(30), mBoneAmount, mResMan, mMap);
 
         pBone->SetSpriteScale(GetSpriteScale());
         pBone->SetScale(GetScale());

@@ -61,7 +61,7 @@ void SND_Reset_Ambiance()
     }
 }
 
-void Start_Sounds_for_TLV(CameraPos direction, relive::Path_TLV* pTlv)
+void Start_Sounds_for_TLV(CameraPos direction, relive::Path_TLV* pTlv, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     bool bDangerMusic = false;
 
@@ -173,7 +173,7 @@ void Start_Sounds_for_TLV(CameraPos direction, relive::Path_TLV* pTlv)
 
     if (bDangerMusic && GetGameType() == GameType::eAo)
     {
-        relive_new AO::MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eDrumAmbience, relive::Path_MusicTrigger::TriggeredBy::eTouching, 0, 40, GetMap().GetResourceManager());
+        relive_new AO::MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eDrumAmbience, relive::Path_MusicTrigger::TriggeredBy::eTouching, 0, 40, resMan, map);
     }
 }
 

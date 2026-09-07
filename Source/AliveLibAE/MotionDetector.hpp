@@ -13,7 +13,7 @@ namespace relive
 class MotionDetectorLaser final : public ::BaseAnimatedWithPhysicsGameObject
 {
 public:
-    MotionDetectorLaser(FP xpos, FP ypos, FP scale, Layer layer, ResourceManagerWrapper& resMan);
+    MotionDetectorLaser(FP xpos, FP ypos, FP scale, Layer layer, ResourceManagerWrapper& resMan, BaseMap& map);
 
 };
 
@@ -21,7 +21,7 @@ public:
 class MotionDetector final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tlvId, BaseAnimatedWithPhysicsGameObject* pOwner, ResourceManagerWrapper& resMan);
+    MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tlvId, BaseAnimatedWithPhysicsGameObject* pOwner, ResourceManagerWrapper& resMan, BaseMap& map);
     ~MotionDetector();
 
     virtual void VUpdate() override;

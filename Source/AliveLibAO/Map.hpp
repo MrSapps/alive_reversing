@@ -57,12 +57,12 @@ class Map final : public BaseMap
 public:
     explicit Map(ResourceManagerWrapper& resMan);
 
-    void Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange);
+    void Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange) override;
 
-    void Shutdown();
+    void Shutdown() override;
     void Reset();
 
-    void ScreenChange();
+    void ScreenChange() override;
 
     void FreePathResourceBlocks();
     BinaryPath* GetPathResourceBlockPtr(u32 pathId);

@@ -18,8 +18,8 @@ void MeatSack::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::MeatSack_Idle));
 }
 
-MeatSack::MeatSack(relive::Path_MeatSack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : ::BaseAliveGameObject(0, resMan)
+MeatSack::MeatSack(relive::Path_MeatSack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : ::BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eMeatSack);
 
@@ -110,7 +110,7 @@ void MeatSack::VUpdate()
         {
             if (!gThrowableArray)
             {
-                gThrowableArray = relive_new ThrowableArray(mResMan);
+                gThrowableArray = relive_new ThrowableArray(mResMan, mMap);
             }
 
             if (gThrowableArray)
@@ -129,7 +129,7 @@ void MeatSack::VUpdate()
                 mXPos,
                 mYPos - FP_FromInteger(30),
                 mMeatAmount,
-                mResMan);
+                mResMan, mMap);
             if (pMeat)
             {
                 pMeat->VThrow(mTlvVelX, mTlvVelY);
@@ -151,8 +151,8 @@ void MeatSack::VScreenChanged()
     SetDead(true);
 }
 
-Meat::Meat(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan)
-    : BaseThrowable(resMan)
+Meat::Meat(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseThrowable(resMan, map)
 {
     mBaseThrowableDead = 0;
 

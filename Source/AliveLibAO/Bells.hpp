@@ -14,7 +14,7 @@ enum class BellSize : s16
 class Bells final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    Bells(BellSize bellSize, FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan);
+    Bells(BellSize bellSize, FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan, BaseMap& map);
 
     void LoadAnimations();
 

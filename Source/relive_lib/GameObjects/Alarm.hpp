@@ -11,8 +11,8 @@ namespace relive
 class Alarm final : public EffectBase
 {
 public:
-    Alarm(relive::Path_Alarm* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
-    Alarm(s32 durationTimer, u16 switchId, s32 pauseTimer, Layer layer, ResourceManagerWrapper& resMan);
+    Alarm(relive::Path_Alarm* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    Alarm(s32 durationTimer, u16 switchId, s32 pauseTimer, Layer layer, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Alarm();
 
     virtual void VRender(OrderingTable& ot) override;

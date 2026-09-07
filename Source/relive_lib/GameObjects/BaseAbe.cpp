@@ -4,8 +4,8 @@
 #include "../../AliveLibAE/Abe.hpp"
 #include "../../AliveLibAO/Abe.hpp"
 
-BaseAbe::BaseAbe(s16 resourceArraySize, ResourceManagerWrapper& resMan)
- : BaseAliveGameObject(resourceArraySize, resMan)
+BaseAbe::BaseAbe(s16 resourceArraySize, ResourceManagerWrapper& resMan, BaseMap& map)
+ : BaseAliveGameObject(resourceArraySize, resMan, map)
 {
 
 }

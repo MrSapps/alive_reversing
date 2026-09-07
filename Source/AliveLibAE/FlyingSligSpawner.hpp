@@ -22,9 +22,9 @@ struct FlyingSligSpawnerSaveState final : public SaveStateBase
 class FlyingSligSpawner final : public BaseGameObject
 {
 public:
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
-    FlyingSligSpawner(relive::Path_FlyingSligSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    FlyingSligSpawner(relive::Path_FlyingSligSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~FlyingSligSpawner();
     
     virtual void VUpdate() override;

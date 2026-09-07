@@ -21,8 +21,8 @@ void TorturedMudokon::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Electric_Wall));
 }
 
-TorturedMudokon::TorturedMudokon(relive::Path_TorturedMudokon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+TorturedMudokon::TorturedMudokon(relive::Path_TorturedMudokon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eTorturedMud);
     mTlvInfo = tlvId;
@@ -182,7 +182,7 @@ void TorturedMudokon::VUpdate()
 
     if (GetAnimation().GetCurrentFrame() == 6 && GetAnimation().GetFrameChangeCounter() == GetAnimation().GetFrameDelay())
     {
-        relive_new Flash(Layer::eLayer_Above_FG1_39, rgbBase + 50, rgbBase + 50, rgbBase + 110, mResMan, relive::TBlendModes::eBlend_1, 1);
+        relive_new Flash(Layer::eLayer_Above_FG1_39, rgbBase + 50, rgbBase + 50, rgbBase + 110, mResMan, mMap, relive::TBlendModes::eBlend_1, 1);
         mZapAnim.SetRender(true);
         SfxPlayMono(relive::SoundEffects::ElectricZap, 70);
         const s16 sndRnd = Math_RandomRange(0, 3) - 1;
@@ -201,7 +201,7 @@ void TorturedMudokon::VUpdate()
 
     if (GetAnimation().GetCurrentFrame() >= 7 && !Math_RandomRange(0, 10))
     {
-        relive_new Flash(Layer::eLayer_Above_FG1_39, rgbBase + 10, rgbBase + 10, rgbBase + 50, mResMan, relive::TBlendModes::eBlend_1, 1);
+        relive_new Flash(Layer::eLayer_Above_FG1_39, rgbBase + 10, rgbBase + 10, rgbBase + 50, mResMan, mMap, relive::TBlendModes::eBlend_1, 1);
     }
 
     if (SwitchStates_Get(mReleaseSwitchId))

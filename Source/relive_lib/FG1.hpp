@@ -6,7 +6,7 @@
 class FG1 final : public BaseGameObject
 {
 public:
-    FG1(Fg1Resource& pFg1Res, CamResource& camRes, ResourceManagerWrapper& resMan);
+    FG1(Fg1Resource& pFg1Res, CamResource& camRes, ResourceManagerWrapper& resMan, BaseMap& map);
     ~FG1();
 
     virtual void VRender(OrderingTable& ot) override;

@@ -158,8 +158,8 @@ public:
 };
 static LCDMessages gLCDMessages;
 
-LCDScreen::LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+LCDScreen::LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     mBaseGameObjectTlvInfo = tlvId;
 
@@ -174,7 +174,7 @@ LCDScreen::LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId, ResourceMa
     mToggleMessageSwitchId = static_cast<u16>(pTlv->mToggleMessageSwitchId);
     mTlvId = tlvId;
 
-    mFontContext.LoadFontType(FontType::LcdFont);
+    mFontContext.LoadFontType(FontType::LcdFont, mResMan);
 
     mPal1 = mResMan.LoadPal(PalId::LedFont_1);
     mPal2 = mResMan.LoadPal(PalId::LedFont_2);
@@ -183,11 +183,11 @@ LCDScreen::LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId, ResourceMa
 
     if (SwitchStates_Get(mToggleMessageSwitchId))
     {
-        mActiveMessage = gLCDMessages.GetMessage(gMap->mCurrentLevel, gMap->mCurrentPath, mMessageId2);
+        mActiveMessage = gLCDMessages.GetMessage(GetMap().mCurrentLevel, GetMap().mCurrentPath, mMessageId2);
     }
     else
     {
-        mActiveMessage = gLCDMessages.GetMessage(gMap->mCurrentLevel, gMap->mCurrentPath, mMessageId1);
+        mActiveMessage = gLCDMessages.GetMessage(GetMap().mCurrentLevel, GetMap().mCurrentPath, mMessageId1);
     }
 
     String_FormatString(mActiveMessage, mMessageBuffer, 1);
@@ -234,7 +234,7 @@ void LCDScreen::VUpdate()
             if (mShowRandomMessage)
             {
                 mShowRandomMessage = false;
-                mActiveMessage = gLCDMessages.GetMessage(gMap->mCurrentLevel, gMap->mCurrentPath, Math_RandomRange(mMessageRandMinId, mMessageRandMaxId));
+                mActiveMessage = gLCDMessages.GetMessage(GetMap().mCurrentLevel, GetMap().mCurrentPath, Math_RandomRange(mMessageRandMinId, mMessageRandMaxId));
 
                 // Change pal
                 mFont.mFontContext->mFntResource.mCurPal = mPal2.mPal;
@@ -244,11 +244,11 @@ void LCDScreen::VUpdate()
                 mShowRandomMessage = true;
                 if (SwitchStates_Get(mToggleMessageSwitchId))
                 {
-                    mActiveMessage = gLCDMessages.GetMessage(gMap->mCurrentLevel, gMap->mCurrentPath, mMessageId2);
+                    mActiveMessage = gLCDMessages.GetMessage(GetMap().mCurrentLevel, GetMap().mCurrentPath, mMessageId2);
                 }
                 else
                 {
-                    mActiveMessage = gLCDMessages.GetMessage(gMap->mCurrentLevel, gMap->mCurrentPath, mMessageId1);
+                    mActiveMessage = gLCDMessages.GetMessage(GetMap().mCurrentLevel, GetMap().mCurrentPath, mMessageId1);
                 }
 
                 // Change pal

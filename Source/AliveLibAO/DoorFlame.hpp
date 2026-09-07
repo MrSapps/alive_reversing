@@ -15,7 +15,7 @@ class FlameSparks;
 class DoorFlame final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    DoorFlame(relive::Path_DoorFlame* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    DoorFlame(relive::Path_DoorFlame* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~DoorFlame();
 
     virtual void VUpdate() override;

@@ -38,8 +38,8 @@ void PullRingRope::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::PullRingRope_UseEnd));
 }
 
-PullRingRope::PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+PullRingRope::PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::ePullRingRope);
 
@@ -47,7 +47,7 @@ PullRingRope::PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId, R
 
     Animation_Init(GetAnimRes(AnimId::PullRingRope_Idle));
 
-    SetTint(sPullRingRopeTints, gMap->mCurrentLevel);
+    SetTint(sPullRingRopeTints, GetMap().mCurrentLevel);
 
     GetAnimation().SetSemiTrans(true);
     mXPos = FP_FromInteger((pTlv->mTopLeftX + pTlv->mBottomRightX) / 2);
@@ -84,7 +84,7 @@ PullRingRope::PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId, R
     auto pRope = relive_new Rope(FP_GetExponent(mXPos + FP_FromInteger(2)),
                               FP_GetExponent(mYPos) - pTlv->mRopeLength,
                               FP_GetExponent(mYPos),
-                              GetSpriteScale(), resMan);
+                              GetSpriteScale(), resMan, map);
     if (pRope)
     {
         mRopeId = pRope->mBaseGameObjectId;
@@ -139,7 +139,7 @@ void PullRingRope::VUpdate()
                 mIsPulled = false;
                 mState = States::eTriggerEvent_2;
 
-                if (gMap->mCurrentLevel == EReliveLevelIds::eMines || gMap->mCurrentLevel == EReliveLevelIds::eBonewerkz || gMap->mCurrentLevel == EReliveLevelIds::eFeeCoDepot || gMap->mCurrentLevel == EReliveLevelIds::eBarracks || gMap->mCurrentLevel == EReliveLevelIds::eBrewery)
+                if (GetMap().mCurrentLevel == EReliveLevelIds::eMines || GetMap().mCurrentLevel == EReliveLevelIds::eBonewerkz || GetMap().mCurrentLevel == EReliveLevelIds::eFeeCoDepot || GetMap().mCurrentLevel == EReliveLevelIds::eBarracks || GetMap().mCurrentLevel == EReliveLevelIds::eBrewery)
                 {
                     SfxPlayMono(relive::SoundEffects::IndustrialTrigger, 0);
                 }

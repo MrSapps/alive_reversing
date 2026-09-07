@@ -7,7 +7,7 @@ class AnimationUnknown;
 class ParamiteWeb final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    ParamiteWeb(FP xpos, s32 bottom, s32 top, FP scale, ResourceManagerWrapper& resMan);
+    ParamiteWeb(FP xpos, s32 bottom, s32 top, FP scale, ResourceManagerWrapper& resMan, BaseMap& map);
     ~ParamiteWeb();
 
     virtual void VUpdate() override;

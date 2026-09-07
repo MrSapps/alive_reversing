@@ -4,8 +4,8 @@
 #include "ThrowableArray.hpp"
 #include "Sfx.hpp"
 
-BoomMachinePipe::BoomMachinePipe(FP xpos, FP ypos, FP scale, s16 numGrenades, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+BoomMachinePipe::BoomMachinePipe(FP xpos, FP ypos, FP scale, s16 numGrenades, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     LoadAnimations();
     Animation_Init(GetAnimRes(AnimId::BoomMachine_Pipe_Idle));
@@ -77,7 +77,7 @@ void BoomMachinePipe::VUpdate()
 
                 if (!gThrowableArray)
                 {
-                    gThrowableArray = relive_new ThrowableArray(mResMan);
+                    gThrowableArray = relive_new ThrowableArray(mResMan, mMap);
                 }
 
                 gThrowableArray->Add(mGrenadeCount);
@@ -97,7 +97,7 @@ void BoomMachinePipe::VUpdate()
                     mGrenadeCount,
                     false,
                     nullptr,
-                    mResMan);
+                    mResMan, mMap);
                 if (pGrenade)
                 {
                     pGrenade->VThrow(GetAnimation().GetFlipX() ? -FP_FromDouble(0.75) : FP_FromDouble(0.75), FP_FromInteger(3));

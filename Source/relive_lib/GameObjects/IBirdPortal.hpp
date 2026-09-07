@@ -38,7 +38,7 @@ class IBirdPortal : public BaseGameObject
 {
 public:
 
-    IBirdPortal(ResourceManagerWrapper& resMan);
+    IBirdPortal(ResourceManagerWrapper& resMan, BaseMap& map);
 
 private:
     virtual void VScreenChanged() override;

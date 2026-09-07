@@ -6,8 +6,8 @@
 
 class FileSystem;
 class CommandLineParser;
+class BaseMap;
 enum class EReliveLevelIds : s16;
-
 
 extern u32 sGnFrame;
 extern bool gDDCheatOn;
@@ -16,7 +16,7 @@ extern bool gSkipGameObjectUpdates;
 extern s16 gNumCamSwappers;
 extern bool gBreakGameLoop;
 
-void DestroyObjects();
+void DestroyObjects(ResourceManagerWrapper& resMan);
 
 class Engine final
 {
@@ -38,4 +38,5 @@ private:
     CommandLineParser& mClp;
     std::unique_ptr<relive::IIpcInterface> mIpcInterface;
     ResourceManagerWrapper mResMan;
+    std::unique_ptr<BaseMap> mMap;
 };

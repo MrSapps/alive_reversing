@@ -16,8 +16,8 @@
 #include "../../relive_lib/Engine.hpp"
 #include "BaseMap.hpp"
 
-Spark::Spark(FP xpos, FP ypos, FP scale, s32 count, s32 minAngle, s32 maxAngle, SparkType type, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+Spark::Spark(FP xpos, FP ypos, FP scale, s32 count, s32 minAngle, s32 maxAngle, SparkType type, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     SetDrawable(true);
 
@@ -68,7 +68,7 @@ Spark::Spark(FP xpos, FP ypos, FP scale, s32 count, s32 minAngle, s32 maxAngle, 
 
         if (mSparkType == SparkType::eBigChantParticle_1)
         {
-            New_TintChant_Particle(mXPos, mYPos - FP_FromInteger(4), scale, Layer::eLayer_0, mResMan);
+            New_TintChant_Particle(mXPos, mYPos - FP_FromInteger(4), scale, Layer::eLayer_0, mResMan, mMap);
         }
         else
         {
@@ -81,7 +81,7 @@ Spark::Spark(FP xpos, FP ypos, FP scale, s32 count, s32 minAngle, s32 maxAngle, 
                 mXPos,
                 particleYPos,
                 ppRes,
-                mResMan);
+                mResMan, mMap);
             if (pParticle)
             {
                 pParticle->GetAnimation().SetSemiTrans(true);

@@ -9,7 +9,7 @@ namespace AO {
 class Shrykull final : public ::BaseAliveGameObject
 {
 public:
-    Shrykull(ResourceManagerWrapper& resMan);
+    Shrykull(ResourceManagerWrapper& resMan, BaseMap& map);
     ~Shrykull();
 
     void LoadAnimations();

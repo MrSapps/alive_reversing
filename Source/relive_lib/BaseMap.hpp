@@ -107,6 +107,10 @@ public:
     virtual CameraPos GetDirection(EReliveLevelIds level, s32 path, FP xpos, FP ypos) = 0;
     virtual void GetCurrentCamCoords(PSX_Point* pPoint) = 0;
     virtual void GoTo_Camera() = 0;
+
+    virtual void ScreenChange() = 0;
+    virtual void Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange) = 0;
+    virtual void Shutdown() = 0;
     
     virtual TlvIterator VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind) = 0;
     virtual TlvIterator TLV_First_Of_Type_In_Camera(ReliveTypes objectType, s16 camX) = 0;

@@ -254,7 +254,7 @@ public:
     // TODO: Used only for vh/vb/bsq loading, will be changed when these file formats are updated
     std::vector<u8> LoadFile(const char_type* pFileName, EReliveLevelIds lvlId);
 
-    void LoadingLoop(bool bShowLoadingIcon);
+    void LoadingLoop(bool bShowLoadingIcon, class BaseMap* pMap = nullptr);
 
     // TODO: Call LoadingLoop after master/engine merge, LoadingLoop will
     // cause a de-sync due to calling sound funcs
@@ -266,7 +266,7 @@ public:
     s16 bHideLoadingIcon = 0;
     s32 loading_ticks = 0;
 
-    void ShowLoadingIcon();
+    void ShowLoadingIcon(class BaseMap& map);
 
     template <typename T, int size>
     void PendAnims(const T (&anims)[size])

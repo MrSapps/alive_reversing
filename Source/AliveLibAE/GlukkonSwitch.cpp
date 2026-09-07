@@ -18,8 +18,8 @@ void GlukkonSwitch::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Security_Door_Idle));
 }
 
-GlukkonSwitch::GlukkonSwitch(relive::Path_GlukkonSwitch* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+GlukkonSwitch::GlukkonSwitch(relive::Path_GlukkonSwitch* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eHelpPhone);
 

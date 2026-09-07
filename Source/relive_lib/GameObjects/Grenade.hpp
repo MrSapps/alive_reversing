@@ -51,7 +51,7 @@ struct GrenadeSaveState final : public SaveStateBase
 class Grenade final : public BaseThrowable
 {
 public:
-    Grenade(FP xpos, FP ypos, s16 numGrenades, bool bBlowUpOnCollision, BaseGameObject* pOwner, ResourceManagerWrapper& resMan);
+    Grenade(FP xpos, FP ypos, s16 numGrenades, bool bBlowUpOnCollision, BaseGameObject* pOwner, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Grenade();
 
     virtual void VScreenChanged() override;
@@ -64,7 +64,7 @@ public:
     virtual void VTimeToExplodeRandom() override;
 
 
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
     virtual bool VOnPlatformIntersection(BaseAnimatedWithPhysicsGameObject* pPlatform) override
     {

@@ -150,7 +150,7 @@ void BaseMap::ReloadPathJsonRequest(const std::string& pathJsonFileName)
             mNextLevel = oldCurrentLevel;
             mCurrentLevel = EReliveLevelIds::eNone;
             mCameraSwapEffect = CameraSwapEffects::eInstantChange_0; // prevent fmv playback
-            DestroyObjects();
+            DestroyObjects(mResourceManager);
             GoTo_Camera();
             return;
         }

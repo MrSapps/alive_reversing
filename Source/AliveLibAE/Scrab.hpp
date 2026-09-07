@@ -178,7 +178,7 @@ public:
         AnimId::Scrab_LegKick,
         AnimId::Scrab_DeathBegin};
 
-    Scrab(relive::Path_Scrab* pTlv, const Guid& tlvId, relive::Path_ScrabSpawner::SpawnDirection spawnDirection, ResourceManagerWrapper& resMan);
+    Scrab(relive::Path_Scrab* pTlv, const Guid& tlvId, relive::Path_ScrabSpawner::SpawnDirection spawnDirection, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Scrab();
 
     void LoadAnimations();
@@ -207,7 +207,7 @@ public:
         }
     }
 
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
 private:
     void HandleDDCheat();

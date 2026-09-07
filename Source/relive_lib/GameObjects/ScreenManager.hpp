@@ -16,7 +16,7 @@ class ScreenManager final : public BaseGameObject
 public:
     void DecompressCameraToVRam(CamResource& camRes);
 
-    ScreenManager(CamResource& camRes, FP_Point* pCameraOffset, ResourceManagerWrapper& resMan);
+    ScreenManager(CamResource& camRes, FP_Point* pCameraOffset, ResourceManagerWrapper& resMan, BaseMap& map);
 
     void Init(CamResource& camRes);
 

@@ -19,8 +19,8 @@ namespace AO {
 
 char_type gActiveDemoName[32];
 
-DemoPlayback::DemoPlayback(ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+DemoPlayback::DemoPlayback(ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     SetDrawable(false);
     SetSurviveDeathReset(true);
@@ -99,8 +99,8 @@ void DemoPlayback::VUpdate()
                     {
                         gJoyResId = 0;
                     }
-                    gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, 0, 0);
-                    gMap->mFreeAllAnimAndPalts = true;
+                    GetMap().SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, 0, 0);
+                    GetMap().mFreeAllAnimAndPalts = true;
                 }
                 else
                 {

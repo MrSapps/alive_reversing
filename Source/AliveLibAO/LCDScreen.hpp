@@ -19,7 +19,7 @@ void SetLcdMessagesForLvl(const StringTable& msgs, LevelIds lvl, u32 pathId);
 class LCDScreen final : public ::BaseGameObject
 {
 public:
-    LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~LCDScreen();
 
     virtual void VUpdate() override;

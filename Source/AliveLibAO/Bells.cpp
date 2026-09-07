@@ -20,8 +20,8 @@ void Bells::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::SmallChime_Moving));
 }
 
-Bells::Bells(BellSize bellType, FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+Bells::Bells(BellSize bellType, FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetCanExplode(false);
 
@@ -96,7 +96,7 @@ void Bells::VUpdate()
                 yOff = FP_FromInteger(36);
                 const FP wave_ypos = mYPos + FP_FromInteger(36);
                 const FP wave_xpos = mXPos - FP_FromInteger(35);
-                relive_new ScreenWave(wave_xpos, wave_ypos, Layer::eLayer_FG1_37, FP_FromInteger(18), FP_FromInteger(12), 0, mResMan);
+                relive_new ScreenWave(wave_xpos, wave_ypos, Layer::eLayer_FG1_37, FP_FromInteger(18), FP_FromInteger(12), 0, mResMan, mMap);
             }
             else if (mBellPitch == BellPitch::eHighPitch)
             {
@@ -104,7 +104,7 @@ void Bells::VUpdate()
                 yOff = FP_FromInteger(32);
                 const FP wave_ypos = mYPos + FP_FromInteger(32);
                 const FP wave_xpos = mXPos + FP_FromInteger(37);
-                relive_new ScreenWave(wave_xpos, wave_ypos, Layer::eLayer_FG1_37, FP_FromInteger(12), FP_FromInteger(12), 0, mResMan);
+                relive_new ScreenWave(wave_xpos, wave_ypos, Layer::eLayer_FG1_37, FP_FromInteger(12), FP_FromInteger(12), 0, mResMan, mMap);
             }
             else if (mBellPitch == BellPitch::eMediumPitch)
             {
@@ -112,14 +112,14 @@ void Bells::VUpdate()
                 yOff = FP_FromInteger(24);
                 const FP wave_ypos = mYPos + FP_FromInteger(24);
                 const FP wave_xpos = mXPos - FP_FromInteger(4);
-                relive_new ScreenWave(wave_xpos, wave_ypos, Layer::eLayer_FG1_37, FP_FromInteger(14), FP_FromInteger(12), 0, mResMan);
+                relive_new ScreenWave(wave_xpos, wave_ypos, Layer::eLayer_FG1_37, FP_FromInteger(14), FP_FromInteger(12), 0, mResMan, mMap);
             }
 
             for (s32 i = 0; i < 4; i++)
             {
                 const FP sparkx = mXPos + FP_FromInteger(Math_RandomRange(-2, 2)) + xOff;
                 const FP sparky = mYPos + FP_FromInteger(Math_RandomRange(-2, 2)) + yOff;
-                relive_new ZapSpark(sparkx, sparky, GetSpriteScale(), mResMan);
+                relive_new ZapSpark(sparkx, sparky, GetSpriteScale(), mResMan, mMap);
             }
         }
 

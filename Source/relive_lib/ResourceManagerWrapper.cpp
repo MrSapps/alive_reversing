@@ -423,7 +423,7 @@ std::vector<u8> ResourceManagerWrapper::LoadFile(const char_type* pFileName, ERe
 }
 
 
-void ResourceManagerWrapper::LoadingLoop(bool bShowLoadingIcon)
+void ResourceManagerWrapper::LoadingLoop(bool bShowLoadingIcon, BaseMap* pMap)
 {
     GetGameAutoPlayer().DisableRecorder();
 
@@ -440,7 +440,7 @@ void ResourceManagerWrapper::LoadingLoop(bool bShowLoadingIcon)
         if (bShowLoadingIcon && !bHideLoadingIcon && SYS_GetTicks() > startTime + k1Second)
         {
             // Render everything in the ordering table including the loading icon
-            ShowLoadingIcon();
+            ShowLoadingIcon(*pMap);
         }
     }
 
@@ -495,10 +495,10 @@ s32 ResourceManagerWrapper::SEQ_HashName(const char_type* seqFileName)
     return hashId;
 }
 
-void ResourceManagerWrapper::ShowLoadingIcon()
+void ResourceManagerWrapper::ShowLoadingIcon(BaseMap& map)
 {
     AnimResource res = LoadAnimation(AnimId::Loading_Icon2);
-    auto pParticle = relive_new Particle(FP_FromInteger(0), FP_FromInteger(0), res, *this);
+    auto pParticle = relive_new Particle(FP_FromInteger(0), FP_FromInteger(0), res, *this, map);
     if (pParticle)
     {
         pParticle->GetAnimation().SetSemiTrans(false);

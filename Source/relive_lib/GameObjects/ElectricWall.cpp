@@ -14,8 +14,8 @@
 
 const static s16 sElecticWallFrames[6] = {0, 6, 10, 18, 22, 0};
 
-ElectricWall::ElectricWall(relive::Path_ElectricWall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan),
+ElectricWall::ElectricWall(relive::Path_ElectricWall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map),
     mTlvInfo(tlvId),
     mSwitchId(pTlv->mSwitchId),
     mStartState(pTlv->mStartState)
@@ -184,13 +184,13 @@ void ElectricWall::VUpdate()
                             if (!pObj->GetElectrocuted() /*&& (!IsAbe(pObj) || !gAbeInvincible)*/)
                             {
                                 pObj->SetElectrocuted(true);
-                                relive_new Electrocute(pObj, true, true, mResMan);
+                                relive_new Electrocute(pObj, true, true, mResMan, mMap);
 
                                 pObj->VTakeDamage(this);
 
                                 SFX_Play_Camera(relive::SoundEffects::ElectricZap, 127, soundDirection, GetSpriteScale());
 
-                                relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, mResMan, relive::TBlendModes::eBlend_3, 1);
+                                relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, mResMan, mMap, relive::TBlendModes::eBlend_3, 1);
                             }
                         }
                     }

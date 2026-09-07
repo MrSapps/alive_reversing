@@ -19,8 +19,8 @@ static s16 Well_NextRandom()
     return gRandomBytes[sWellRndSeed++];
 }
 
-Well::Well(relive::Path_WellBase* pTlv, FP xpos, FP ypos, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+Well::Well(relive::Path_WellBase* pTlv, FP xpos, FP ypos, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     mTlvInfo = tlvId;
     SetType(ReliveTypes::eWell);
@@ -174,7 +174,7 @@ void Well::VUpdate()
                     mLeafY,
                     mLeafVelX,
                     mLeafVelY,
-                    mLeafScale, mResMan);
+                    mLeafScale, mResMan, mMap);
 
                 if (mLeafVelY > FP_FromInteger(0))
                 {

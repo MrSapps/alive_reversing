@@ -21,8 +21,8 @@ namespace AO {
 #undef min
 #undef max
 
-MotionDetector::MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+MotionDetector::MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eMotionDetector);
 
@@ -62,7 +62,7 @@ MotionDetector::MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tl
     if (pTlv->mInitialMoveDirection == relive::Path_MotionDetector::InitialMoveDirection::eRight)
     {
         mState = States::eMoveRight_0;
-        pMotionDetectors = relive_new MotionDetectorLaser(resMan);
+        pMotionDetectors = relive_new MotionDetectorLaser(resMan, map);
         if (pMotionDetectors)
         {
             pMotionDetectors->SetType(ReliveTypes::eRedLaser);
@@ -83,7 +83,7 @@ MotionDetector::MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tl
     else if (pTlv->mInitialMoveDirection == relive::Path_MotionDetector::InitialMoveDirection::eLeft)
     {
         mState = States::eMoveLeft_2;
-        pMotionDetectors = relive_new MotionDetectorLaser(resMan);
+        pMotionDetectors = relive_new MotionDetectorLaser(resMan, map);
         if (pMotionDetectors)
         {
             pMotionDetectors->SetType(ReliveTypes::eRedLaser);
@@ -216,7 +216,7 @@ void MotionDetector::VUpdate()
                                     mAlarmSwitchId,
                                     0,
                                     Layer::eLayer_Above_FG1_39,
-                                    mResMan);
+                                    mResMan, mMap);
 
                                 if (pObj == gAbe)
                                 {

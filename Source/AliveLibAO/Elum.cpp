@@ -112,9 +112,9 @@ void Elum::VOnTlvCollision(TlvIterator tlvIterator)
                 mContinuePointRect.w = pContinueTlv->mBottomRightX;
                 mContinuePointRect.h = pContinueTlv->mBottomRightY;
 
-                mContinuePointPath = gMap->mCurrentPath;
-                mContinueCamera = gMap->mCurrentCamera;
-                mContinuePointLevel = gMap->mCurrentLevel;
+                mContinuePointPath = GetMap().mCurrentPath;
+                mContinueCamera = GetMap().mCurrentCamera;
+                mContinuePointLevel = GetMap().mCurrentLevel;
                 mContinuePointSpriteScale = GetSpriteScale();
 
                 mRespawnOnDead = 1;
@@ -132,7 +132,7 @@ void Elum::VOnTlvCollision(TlvIterator tlvIterator)
             mHealth = FP_FromInteger(0);
         }
 
-        tlvIterator = gMap->TLV_Get_At(
+        tlvIterator = GetMap().TLV_Get_At(
             tlvIterator,
             mXPos,
             mYPos,
@@ -169,7 +169,7 @@ bool Elum::VTakeDamage(BaseGameObject* pFrom)
                     mVelX,
                     mVelY,
                     GetSpriteScale(),
-                    false, mResMan);
+                    false, mResMan, mMap);
 
                 mHealth = FP_FromInteger(0);
 
@@ -559,7 +559,7 @@ bool Elum::ToNextMotionAbeControlled()
 void Elum::HandleElumPathTrans()
 {
     PSX_Point camCoords = {};
-    gMap->GetCurrentCamCoords(&camCoords);
+    GetMap().GetCurrentCamCoords(&camCoords);
 
     if (gAbe->GetAnimation().GetFlipX())
     {
@@ -605,8 +605,8 @@ void Elum::HandleElumPathTrans()
         BaseAliveGameObjectCollisionLine = nullptr;
     }
 
-    mCurrentLevel = gMap->mCurrentLevel;
-    mCurrentPath = gMap->mCurrentPath;
+    mCurrentLevel = GetMap().mCurrentLevel;
+    mCurrentPath = GetMap().mCurrentPath;
 
     SetUpdateDelay(20);
 }
@@ -650,7 +650,7 @@ void Elum::Elum_SFX(ElumSounds soundId, BaseAliveGameObject* pObj)
             CameraPos dir = CameraPos::eCamCurrent_0;
             if (pObj)
             {
-                dir = gMap->GetDirection(
+                dir = GetMap().GetDirection(
                     pObj->mCurrentLevel,
                     pObj->mCurrentPath,
                     pObj->mXPos,
@@ -732,13 +732,13 @@ void Elum::FindHoney()
             if (pObjIter->Type() == ReliveTypes::eHoney)
             {
                 auto pHoney = static_cast<Honey*>(pObjIter);
-                if (gMap->Is_Point_In_Current_Camera(
+                if (GetMap().Is_Point_In_Current_Camera(
                         pHoney->mCurrentLevel,
                         pHoney->mCurrentPath,
                         pHoney->mXPos,
                         pHoney->mYPos,
                         0)
-                    && gMap->Is_Point_In_Current_Camera(
+                    && GetMap().Is_Point_In_Current_Camera(
                         mCurrentLevel,
                         mCurrentPath,
                         mXPos,
@@ -891,8 +891,8 @@ s16 Elum::Brain_0_WithoutAbe()
 
             if (last_event_v1 == GameSpeakEvents::eAbe_FollowMe)
             {
-                if (gMap->mCurrentLevel == mCurrentLevel
-                    && gMap->mCurrentPath == mCurrentPath)
+                if (GetMap().mCurrentLevel == mCurrentLevel
+                    && GetMap().mCurrentPath == mCurrentPath)
                 {
                     if (Is_In_Current_Camera() == CameraPos::eCamCurrent_0)
                     {
@@ -906,8 +906,8 @@ s16 Elum::Brain_0_WithoutAbe()
             }
 
             if (last_event_v1 == GameSpeakEvents::eAbe_Hello
-                && gMap->mCurrentLevel == mCurrentLevel
-                && gMap->mCurrentPath == mCurrentPath)
+                && GetMap().mCurrentLevel == mCurrentLevel
+                && GetMap().mCurrentPath == mCurrentPath)
             {
                 if (Is_In_Current_Camera() == CameraPos::eCamCurrent_0)
                 {
@@ -917,8 +917,8 @@ s16 Elum::Brain_0_WithoutAbe()
             }
 
             if (last_event_v1 == GameSpeakEvents::eAbe_Fart
-                && gMap->mCurrentLevel == mCurrentLevel
-                && gMap->mCurrentPath == mCurrentPath)
+                && GetMap().mCurrentLevel == mCurrentLevel
+                && GetMap().mCurrentPath == mCurrentPath)
             {
                 if (Is_In_Current_Camera() == CameraPos::eCamCurrent_0)
                 {
@@ -928,8 +928,8 @@ s16 Elum::Brain_0_WithoutAbe()
             }
 
             if (last_event_v1 == GameSpeakEvents::eAbe_Wait
-                && gMap->mCurrentLevel == mCurrentLevel
-                && gMap->mCurrentPath == mCurrentPath
+                && GetMap().mCurrentLevel == mCurrentLevel
+                && GetMap().mCurrentPath == mCurrentPath
                 && Is_In_Current_Camera() == CameraPos::eCamCurrent_0)
             {
                 mDontFollowAbe = 1;
@@ -1026,7 +1026,7 @@ s16 Elum::Brain_0_WithoutAbe()
                 return 16;
             }
 
-            if (last_event_v1 == GameSpeakEvents::eAbe_FollowMe && gMap->mCurrentLevel == mCurrentLevel && gMap->mCurrentPath == mCurrentPath)
+            if (last_event_v1 == GameSpeakEvents::eAbe_FollowMe && GetMap().mCurrentLevel == mCurrentLevel && GetMap().mCurrentPath == mCurrentPath)
             {
                 if (Is_In_Current_Camera() == CameraPos::eCamCurrent_0)
                 {
@@ -1042,8 +1042,8 @@ s16 Elum::Brain_0_WithoutAbe()
             }
 
             if (last_event_v1 == GameSpeakEvents::eAbe_Wait
-                && gMap->mCurrentLevel == mCurrentLevel
-                && gMap->mCurrentPath == mCurrentPath)
+                && GetMap().mCurrentLevel == mCurrentLevel
+                && GetMap().mCurrentPath == mCurrentPath)
             {
                 if (Is_In_Current_Camera() == CameraPos::eCamCurrent_0)
                 {
@@ -1054,8 +1054,8 @@ s16 Elum::Brain_0_WithoutAbe()
             }
 
             if (last_event_v1 == GameSpeakEvents::eAbe_Hello
-                && gMap->mCurrentLevel == mCurrentLevel
-                && gMap->mCurrentPath == mCurrentPath)
+                && GetMap().mCurrentLevel == mCurrentLevel
+                && GetMap().mCurrentPath == mCurrentPath)
             {
                 if (Is_In_Current_Camera() == CameraPos::eCamCurrent_0)
                 {
@@ -1065,8 +1065,8 @@ s16 Elum::Brain_0_WithoutAbe()
             }
 
             if (last_event_v1 == GameSpeakEvents::eAbe_Fart
-                && gMap->mCurrentLevel == mCurrentLevel
-                && gMap->mCurrentPath == mCurrentPath
+                && GetMap().mCurrentLevel == mCurrentLevel
+                && GetMap().mCurrentPath == mCurrentPath
                 && Is_In_Current_Camera() == CameraPos::eCamCurrent_0)
             {
                 field_114_respond_timer = MakeTimer(28);
@@ -1400,7 +1400,7 @@ s16 Elum::Brain_1_HoneyAddiction()
             mFoundHoney = false;
             mStungByBees = true;
 
-            mHoneyCamera = gMap->mCurrentCamera;
+            mHoneyCamera = GetMap().mCurrentCamera;
 
             mDontFollowAbe = 0;
 
@@ -2144,7 +2144,7 @@ void Elum::Motion_19_Dead()
             mBrainSubState = 6;
             mDontFollowAbe = 1;
 
-            if (!gMap->Is_Point_In_Current_Camera(mContinuePointLevel, mContinuePointPath, mXPos, mYPos, 0))
+            if (!GetMap().Is_Point_In_Current_Camera(mContinuePointLevel, mContinuePointPath, mXPos, mYPos, 0))
             {
                 Elum_SFX(ElumSounds::eHowl_2, this);
             }
@@ -2322,7 +2322,7 @@ void Elum::Motion_25_LickingHoney()
 
     if (GetAnimation().GetCurrentFrame() == 6)
     {
-        if (gMap->GetDirection(
+        if (GetMap().GetDirection(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,
@@ -3026,7 +3026,7 @@ void Elum::Motion_44_ScratchBegin()
     if (GetAnimation().GetIsLastFrame())
     {
         mCurrentMotion = eElumMotions::Motion_45_ScratchLoop;
-        if (gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) == CameraPos::eCamCurrent_0)
+        if (GetMap().GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) == CameraPos::eCamCurrent_0)
         {
             SND_SEQ_PlaySeq(SeqId::Unknown_15, 1, 1);
         }
@@ -3202,7 +3202,7 @@ void Elum::VUpdate()
             mYPos += mVelY;
 
             PSX_Point map_size = {};
-            gMap->Get_map_size(&map_size);
+            GetMap().Get_map_size(&map_size);
 
             if (mXPos < FP_FromInteger(0))
             {
@@ -3249,7 +3249,7 @@ void Elum::VUpdate()
         mChangedPathNotMounted = false;
     }
 
-    if (mCurrentMotion == eElumMotions::Motion_19_Dead || mCurrentPath == gMap->mCurrentPath)
+    if (mCurrentMotion == eElumMotions::Motion_19_Dead || mCurrentPath == GetMap().mCurrentPath)
     {
         PathLine* pLine = nullptr;
         if (mChangedPathMounted)
@@ -3312,7 +3312,7 @@ void Elum::VUpdate()
 
         if (old_x != mXPos || old_y != mYPos)
         {
-            BaseAliveGameObjectPathTLV = gMap->TLV_Get_At(
+            BaseAliveGameObjectPathTLV = GetMap().TLV_Get_At(
                 TlvIterator::Invalid(),
                 mXPos,
                 mYPos,
@@ -3382,8 +3382,8 @@ void Elum::VUpdate()
 
 void Elum::VRender(OrderingTable& ot)
 {
-    if (mCurrentLevel == gMap->mCurrentLevel
-        && mCurrentPath == gMap->mCurrentPath
+    if (mCurrentLevel == GetMap().mCurrentLevel
+        && mCurrentPath == GetMap().mCurrentPath
         && !UpdateDelay())
     {
         BaseAnimatedWithPhysicsGameObject::VRender(ot);
@@ -3392,23 +3392,23 @@ void Elum::VRender(OrderingTable& ot)
 
 void Elum::VScreenChanged()
 {
-    if (gMap->LevelChanged())
+    if (GetMap().LevelChanged())
     {
         SetDead(true);
     }
-    else if (gMap->PathChanged())
+    else if (GetMap().PathChanged())
     {
-        if (gMap->mCurrentLevel == EReliveLevelIds::eLines)
+        if (GetMap().mCurrentLevel == EReliveLevelIds::eLines)
         {
             SetDead(true);
         }
-        else if (gMap->mCurrentLevel == EReliveLevelIds::eDesert && gMap->mNextPath == 9)
+        else if (GetMap().mCurrentLevel == EReliveLevelIds::eDesert && GetMap().mNextPath == 9)
         {
             SetDead(true);
         }
-        else if (mCurrentPath == gMap->mCurrentPath)
+        else if (mCurrentPath == GetMap().mCurrentPath)
         {
-            auto pElumPathTrans = gMap->VTLV_Get_At_Of_Type(
+            auto pElumPathTrans = GetMap().VTLV_Get_At_Of_Type(
                 FP_GetExponent(mXPos),
                 FP_GetExponent(mYPos),
                 FP_GetExponent(mXPos),
@@ -3417,7 +3417,7 @@ void Elum::VScreenChanged()
 
             if (pElumPathTrans)
             {
-                if (mDontFollowAbe != 1 && sControlledCharacter != this && pElumPathTrans->mNextLevel == gMap->mNextLevel && pElumPathTrans->mNextPath == gMap->mNextPath)
+                if (mDontFollowAbe != 1 && sControlledCharacter != this && pElumPathTrans->mNextLevel == GetMap().mNextLevel && pElumPathTrans->mNextPath == GetMap().mNextPath)
                 {
                     mChangedPathNotMounted = true;
                 }
@@ -3444,9 +3444,9 @@ u32 dword_4C52F4 = 0x1C92C;
 u32 dword_4C52F8 = 0xC8;
 s16 word_4C52FA = 0;
 
-void Elum::Spawn(const Guid& tlvInfo, ResourceManagerWrapper& resMan)
+void Elum::Spawn(const Guid& tlvInfo, ResourceManagerWrapper& resMan, BaseMap& map)
 {
-    relive_new Elum(tlvInfo, resMan);
+    relive_new Elum(tlvInfo, resMan, map);
 }
 
 void Elum::LoadAnimations()
@@ -3460,8 +3460,8 @@ void Elum::LoadAnimations()
     }
 }
 
-Elum::Elum(const Guid& tlvInfo, ResourceManagerWrapper& resMan)
-    : ::BaseAliveGameObject(0, resMan)
+Elum::Elum(const Guid& tlvInfo, ResourceManagerWrapper& resMan, BaseMap& map)
+    : ::BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eElum);
 
@@ -3525,7 +3525,7 @@ Elum::Elum(const Guid& tlvInfo, ResourceManagerWrapper& resMan)
 
     mCanSpeak = false;
 
-    relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eSecretAreaShort, relive::Path_MusicTrigger::TriggeredBy::eTouching, 0, 30, mResMan);
+    relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eSecretAreaShort, relive::Path_MusicTrigger::TriggeredBy::eTouching, 0, 30, mResMan, mMap);
 
     CreateShadow();
 }

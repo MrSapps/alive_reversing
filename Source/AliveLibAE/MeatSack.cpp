@@ -35,15 +35,15 @@ void MeatSack::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::MeatSack_Idle));
 }
 
-MeatSack::MeatSack(relive::Path_MeatSack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAliveGameObject(0, resMan)
+MeatSack::MeatSack(relive::Path_MeatSack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eMeatSack);
 
     LoadAnimations();
 
     Animation_Init(GetAnimRes(AnimId::MeatSack_Idle));
-    SetTint(&kMeatSackTints[0], gMap->mCurrentLevel);
+    SetTint(&kMeatSackTints[0], GetMap().mCurrentLevel);
 
     SetApplyShadowZoneColour(false);
     mTlvId = tlvId;
@@ -135,12 +135,12 @@ void MeatSack::VUpdate()
             }
             else
             {
-                gThrowableArray = relive_new ThrowableArray(mResMan);
+                gThrowableArray = relive_new ThrowableArray(mResMan, mMap);
             }
 
             gThrowableArray->Add(mMeatAmount);
 
-            auto pMeat = relive_new Meat(mXPos, mYPos - FP_FromInteger(30), mMeatAmount, mResMan);
+            auto pMeat = relive_new Meat(mXPos, mYPos - FP_FromInteger(30), mMeatAmount, mResMan, mMap);
             pMeat->VThrow(mTlvVelX, mTlvVelY);
             pMeat->SetSpriteScale(GetSpriteScale());
 

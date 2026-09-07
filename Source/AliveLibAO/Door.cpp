@@ -41,7 +41,7 @@ static const AnimId sDoorAnimdIdTable[16][6] = {
 
 void Door::LoadAnimations()
 {
-    switch (gMap->mCurrentLevel)
+    switch (GetMap().mCurrentLevel)
     {
         case EReliveLevelIds::eRuptureFarms:
         case EReliveLevelIds::eBoardRoom:
@@ -106,7 +106,7 @@ Door::Door(relive::Path_Door* pTlv, const Guid& tlvId)
         mCurrentState = relive::Path_Door::DoorStates::eOpen;
     }
 
-    const s32 idx = static_cast<s32>(MapWrapper::ToAO(gMap->mCurrentLevel));
+    const s32 idx = static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel));
 
     FP scale = {};
     PathLine* pLine = nullptr;
@@ -151,7 +151,7 @@ Door::Door(relive::Path_Door* pTlv, const Guid& tlvId)
                         GetSpriteScale() != FP_FromDouble(0.5) ? kFgWallsOrFloor : kBgWallsOrFloor))
                 {
                     mYPos -= (FP_FromInteger(12) * GetSpriteScale());
-                    gMap->GetCurrentCamCoords(&mapCoords);
+                    GetMap().GetCurrentCamCoords(&mapCoords);
                     auto aux = SnapToXGrid_AO(GetSpriteScale(), FP_GetExponent(mXPos) - mapCoords.x);
                     mXPos = FP_FromInteger((aux)+mapCoords.x);
                 }
@@ -169,7 +169,7 @@ Door::Door(relive::Path_Door* pTlv, const Guid& tlvId)
 
         case relive::Path_Door::DoorTypes::eTrialDoor:
         {
-            if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+            if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
             {
                 GetAnimation().SetRenderLayer(Layer::eLayer_BeforeShadow_25);
                 scale = FP_FromInteger(1);
@@ -207,7 +207,7 @@ Door::Door(relive::Path_Door* pTlv, const Guid& tlvId)
                     scale != FP_FromDouble(0.5) ? kFgWallsOrFloor : kBgWallsOrFloor))
             {
                 mYPos += FP_FromInteger(4);
-                gMap->GetCurrentCamCoords(&mapCoords);
+                GetMap().GetCurrentCamCoords(&mapCoords);
                 mXPos = FP_FromInteger(SnapToXGrid_AO(scale, FP_GetExponent(mXPos) - mapCoords.x) + mapCoords.x);
             }
             else
@@ -235,7 +235,7 @@ Door::Door(relive::Path_Door* pTlv, const Guid& tlvId)
 
                 GetAnimation().SetRenderLayer(Layer::eLayer_BeforeShadow_Half_6);
 
-                if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn || gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarms)
+                if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn || GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms)
                 {
                     if (gCollisions->Raycast(
                         FP_FromInteger(pTlv->mTopLeftX + (pTlv->Width()) / 2),
@@ -248,7 +248,7 @@ Door::Door(relive::Path_Door* pTlv, const Guid& tlvId)
                         kFgWallsOrFloor)) // ?? only check bg for some reason
                     {
                         mYPos -= (FP_FromInteger(12) * GetSpriteScale());
-                        gMap->GetCurrentCamCoords(&mapCoords);
+                        GetMap().GetCurrentCamCoords(&mapCoords);
                         mXPos = FP_FromInteger(SnapToXGrid_AO(FP_FromInteger(1), FP_GetExponent(mXPos) - mapCoords.x) + mapCoords.x);
                     }
                     else
@@ -333,7 +333,7 @@ void Door::PlaySound()
 {
     s16 volume = 0;
 
-    if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarms || gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+    if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms || GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
     {
         volume = GetSpriteScale() != FP_FromDouble(0.5) ? 90 : 127;
         SND_SEQ_Play(SeqId::eHitBottomOfDeathPit_10, 1, 75, 75);
@@ -394,7 +394,7 @@ void Door::VUpdate()
             }
         }
 
-        const s32 lvl = static_cast<s32>(MapWrapper::ToAO(gMap->mCurrentLevel));
+        const s32 lvl = static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel));
 
         switch (mCurrentState)
         {

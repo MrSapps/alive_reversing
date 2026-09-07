@@ -17,7 +17,7 @@ ALIVE_ASSERT_SIZEOF(MainMenuTransition_Polys, 0x100);
 class MainMenuTransition final : public BaseGameObject
 {
 public:
-    MainMenuTransition(Layer layer, s32 fadeDirection, bool killWhenDone, s32 fadeSpeed, relive::TBlendModes blendMode, ResourceManagerWrapper& resMan);
+    MainMenuTransition(Layer layer, s32 fadeDirection, bool killWhenDone, s32 fadeSpeed, relive::TBlendModes blendMode, ResourceManagerWrapper& resMan, BaseMap& map);
     ~MainMenuTransition();
 
     void StartTrans(Layer layer, s16 fadeDirection, bool killWhenDone, s16 speed);

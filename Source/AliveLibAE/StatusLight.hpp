@@ -10,7 +10,7 @@ namespace relive
 class StatusLight final : public ::BaseAnimatedWithPhysicsGameObject
 {
 public:
-    StatusLight(relive::Path_StatusLight* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    StatusLight(relive::Path_StatusLight* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~StatusLight();
 
     void LoadAnimations();

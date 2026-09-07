@@ -13,7 +13,7 @@ namespace AO {
 class LCDStatusBoard final : public ::BaseGameObject
 {
 public:
-    LCDStatusBoard(relive::Path_LCDStatusBoard* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    LCDStatusBoard(relive::Path_LCDStatusBoard* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~LCDStatusBoard();
 
     virtual void VUpdate() override;

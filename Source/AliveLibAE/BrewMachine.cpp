@@ -5,8 +5,8 @@
 #include "Path.hpp"
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
 
-BrewMachine::BrewMachine(relive::Path_BrewMachine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan),
+BrewMachine::BrewMachine(relive::Path_BrewMachine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map),
     mTlvInfo(tlvId),
     mMaxBrewCount(pTlv->mBrewCount)
 {
@@ -14,7 +14,7 @@ BrewMachine::BrewMachine(relive::Path_BrewMachine* pTlv, const Guid& tlvId, Reso
 
     mPal = mResMan.LoadPal(PalId::LedFont_Red);
 
-    mFontContext.LoadFontType(FontType::LcdFont);
+    mFontContext.LoadFontType(FontType::LcdFont, mResMan);
     mFont.Load(3, mPal, &mFontContext);
 
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::BrewMachine_Button));
@@ -42,7 +42,7 @@ BrewMachine::BrewMachine(relive::Path_BrewMachine* pTlv, const Guid& tlvId, Reso
     mXPos = FP_FromInteger((pTlv->mTopLeftX + pTlv->mBottomRightX) / 2);
     mYPos = FP_FromInteger(pTlv->mTopLeftY);
 
-    mBrewMachineCamera = gMap->mCurrentCamera;
+    mBrewMachineCamera = GetMap().mCurrentCamera;
 }
 
 BrewMachine::~BrewMachine()
@@ -70,7 +70,7 @@ void BrewMachine::VUpdate()
 
 void BrewMachine::VRender(OrderingTable& ot)
 {
-    if (gMap->mCurrentCamera == mBrewMachineCamera)
+    if (GetMap().mCurrentCamera == mBrewMachineCamera)
     {
         char_type text[12] = {};
         sprintf(text, "%02d", mRemainingBrewCount);

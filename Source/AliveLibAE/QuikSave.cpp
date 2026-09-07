@@ -214,118 +214,118 @@ static void ConvertObjectSaveStateDataToJson(nlohmann::json& j, ReliveTypes type
 }
 
 
-static void RestoreObjectState(ReliveTypes type, SerializedObjectData& pData, ResourceManagerWrapper& resMan)
+static void RestoreObjectState(ReliveTypes type, SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     switch (type)
     {
         case ::ReliveTypes::eSligSpawner:
-            return SligSpawner::CreateFromSaveState(pData, resMan);
+            return SligSpawner::CreateFromSaveState(pData, resMan, map);
             
         case ::ReliveTypes::eLiftMover:
-            return LiftMover::CreateFromSaveState(pData, resMan);
+            return LiftMover::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eBone:
-            return Bone::CreateFromSaveState(pData, resMan);
+            return Bone::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eMinesAlarm:
-            return MinesAlarm::CreateFromSaveState(pData, resMan);
+            return MinesAlarm::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eCrawlingSlig:
-            return CrawlingSlig::CreateFromSaveState(pData, resMan);
+            return CrawlingSlig::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eDrill:
-            return Drill::CreateFromSaveState(pData, resMan);
+            return Drill::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eEvilFart:
-            return EvilFart::CreateFromSaveState(pData, resMan);
+            return EvilFart::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eFleech:
-            return Fleech::CreateFromSaveState(pData, resMan);
+            return Fleech::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eFlyingSlig:
-            return FlyingSlig::CreateFromSaveState(pData, resMan);
+            return FlyingSlig::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eFlyingSligSpawner:
-            return FlyingSligSpawner::CreateFromSaveState(pData, resMan);
+            return FlyingSligSpawner::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eGameEnderController:
-            return GameEnderController::CreateFromSaveState(pData, resMan);
+            return GameEnderController::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eSlapLock_OrbWhirlWind:
-            return SlapLockWhirlWind::CreateFromSaveState(pData, resMan);
+            return SlapLockWhirlWind::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eSlapLock:
-            return SlapLock::CreateFromSaveState(pData, resMan);
+            return SlapLock::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eGreeter:
-            return Greeter::CreateFromSaveState(pData, resMan);
+            return Greeter::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eGrenade:
-            return Grenade::CreateFromSaveState(pData, resMan);
+            return Grenade::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eGlukkon:
-            return Glukkon::CreateFromSaveState(pData, resMan);
+            return Glukkon::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eAbe:
-            return Abe::CreateFromSaveState(pData, resMan);
+            return Abe::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eLiftPoint:
-            return LiftPoint::CreateFromSaveState(pData, resMan);
+            return LiftPoint::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eMudokon:
         case ::ReliveTypes::eRingOrLiftMud:
-            return Mudokon::CreateFromSaveState(pData, resMan);
+            return Mudokon::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eMeat:
-            return Meat::CreateFromSaveState(pData, resMan);
+            return Meat::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eMineCar:
-            return MineCar::CreateFromSaveState(pData, resMan);
+            return MineCar::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eParamite:
-            return Paramite::CreateFromSaveState(pData, resMan);
+            return Paramite::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eBirdPortal:
-            return BirdPortal::CreateFromSaveState(pData, resMan);
+            return BirdPortal::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eThrowableArray:
-            return ThrowableArray::CreateFromSaveState(pData, resMan);
+            return ThrowableArray::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eAbilityRing:
-            return AbilityRing::CreateFromSaveState(pData, resMan);
+            return AbilityRing::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eRock:
-            return Rock::CreateFromSaveState(pData, resMan);
+            return Rock::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eScrab:
-            return Scrab::CreateFromSaveState(pData, resMan);
+            return Scrab::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eScrabSpawner:
-            return ScrabSpawner::CreateFromSaveState(pData, resMan);
+            return ScrabSpawner::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eSlamDoor:
-            return SlamDoor::CreateFromSaveState(pData, resMan);
+            return SlamDoor::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eSlig:
-            return Slig::CreateFromSaveState(pData, resMan);
+            return Slig::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eSlog:
-            return Slog::CreateFromSaveState(pData, resMan);
+            return Slog::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eSlurg:
-            return Slurg::CreateFromSaveState(pData, resMan);
+            return Slurg::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eTimerTrigger:
-            return TimerTrigger::CreateFromSaveState(pData, resMan);
+            return TimerTrigger::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eTrapDoor:
-            return TrapDoor::CreateFromSaveState(pData, resMan);
+            return TrapDoor::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eUXB:
-            return UXB::CreateFromSaveState(pData, resMan);
+            return UXB::CreateFromSaveState(pData, resMan, map);
 
         case ::ReliveTypes::eWorkWheel:
-            return WorkWheel::CreateFromSaveState(pData, resMan);
+            return WorkWheel::CreateFromSaveState(pData, resMan, map);
             
         default:
             ALIVE_FATAL("No create save state for type %d", static_cast<s32>(type));
@@ -343,20 +343,20 @@ void ConvertObjectsStatesToJson(nlohmann::json& j, const SerializedObjectData& p
     }
 }
 
-void QuikSave::RestoreBlyData(Quicksave& pSaveData, ResourceManagerWrapper& resMan)
+void QuikSave::RestoreBlyData(Quicksave& pSaveData, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     pSaveData.mObjectsStateData.ReadRewind();
     while (pSaveData.mObjectsStateData.CanRead())
     {
         const SaveStateBase* pSaveStateBase = pSaveData.mObjectsStateData.PeekTmpPtr<SaveStateBase>();
-        RestoreObjectState(pSaveStateBase->mType, pSaveData.mObjectsStateData, resMan);
+        RestoreObjectState(pSaveStateBase->mType, pSaveData.mObjectsStateData, resMan, map);
     }
 
     pSaveData.mObjectBlyData.ReadRewind();
 
     const u32 flagsTotal = pSaveData.mObjectBlyData.ReadU32();
     u32 readFlagsCount = 0;
-    for (auto& binaryPath : gMap->GetLoadedPaths())
+    for (auto& binaryPath : GetMap().GetLoadedPaths())
     {
         for (auto& cam : binaryPath->GetCameras())
         {
@@ -394,25 +394,25 @@ void QuikSave::RestoreBlyData(Quicksave& pSaveData, ResourceManagerWrapper& resM
 
 void Quicksave_LoadFromMemory_4C95A0()
 {
-    DestroyObjects();
+    DestroyObjects(GetMap().GetResourceManager());
     EventsReset();
     gSkipGameObjectUpdates = true;
     QuikSave::RestoreWorldInfo(QuikSave::gActiveQuicksaveData.mWorldInfo);
     gSwitchStates = QuikSave::gActiveQuicksaveData.mSwitchStates;
-    gMap->mRestoreMapObjectStates = true;
-    gMap->SetActiveCam(
+    GetMap().mRestoreMapObjectStates = true;
+    GetMap().SetActiveCam(
         QuikSave::gActiveQuicksaveData.mWorldInfo.mLevel,
         QuikSave::gActiveQuicksaveData.mWorldInfo.mPath,
         QuikSave::gActiveQuicksaveData.mWorldInfo.mCam,
         CameraSwapEffects::eInstantChange_0,
         0,
         1);
-    gMap->mForceLoad = 1;
+    GetMap().mForceLoad = 1;
 }
 
 void QuikSave::LoadActive()
 {
-    GetMap().GetResourceManager().ShowLoadingIcon();
+    GetMap().GetResourceManager().ShowLoadingIcon(*gMap);
     Quicksave_LoadFromMemory_4C95A0();
 }
 
@@ -426,7 +426,7 @@ static u32 Quicksave_SaveBlyData_CountOrSave(SerializedObjectData* pSaveBuffer)
 {
     u32 flagsTotal = 0;
 
-    for (auto& binaryPath : gMap->GetLoadedPaths())
+    for (auto& binaryPath : GetMap().GetLoadedPaths())
     {
         for (auto& cam : binaryPath->GetCameras())
         {
@@ -504,7 +504,7 @@ void QuikSave::SaveToMemory_4C91A0(Quicksave& pSave)
 
 void QuikSave::DoQuicksave()
 {
-    GetMap().GetResourceManager().ShowLoadingIcon();
+    GetMap().GetResourceManager().ShowLoadingIcon(*gMap);
     QuikSave::SaveToMemory_4C91A0(gActiveQuicksaveData);
 }
 
@@ -539,9 +539,9 @@ void QuikSave::SaveWorldInfo(Quicksave_WorldInfo* pInfo)
     const PSX_RECT rect = sControlledCharacter->VGetBoundingRect();
 
     pInfo->mGnFrame = sGnFrame;
-    pInfo->mLevel = gMap->mCurrentLevel;
-    pInfo->mPath = gMap->mCurrentPath;
-    pInfo->mCam = gMap->mCurrentCamera;
+    pInfo->mLevel = GetMap().mCurrentLevel;
+    pInfo->mPath = GetMap().mCurrentPath;
+    pInfo->mCam = GetMap().mCurrentCamera;
 
     for (s32 i = 0; i < ALIVE_COUNTOF(pInfo->field_18_saved_killed_muds_per_zulag); i++)
     {

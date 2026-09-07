@@ -999,8 +999,8 @@ void Movie::Init()
     ++Movie::gMovieRefCount;
 }
 
-Movie::Movie(const char_type* pName, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+Movie::Movie(const char_type* pName, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
     , mName(pName)
 {
     mName = "vision.ddv.webm";
@@ -1032,7 +1032,7 @@ void Movie::VUpdate()
                 break;
             }
 
-            if (!Display_Full_Screen_Message_Blocking(MessageType::eSkipMovie_1, mResMan))
+            if (!Display_Full_Screen_Message_Blocking(MessageType::eSkipMovie_1, mResMan, mMap))
             {
                 break;
             }

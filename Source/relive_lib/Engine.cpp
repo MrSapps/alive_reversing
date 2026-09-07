@@ -222,9 +222,9 @@ void Engine::CmdLineRenderInit()
 
 
 // QuickSave load/Restart path calls this
-void DestroyObjects()
+void DestroyObjects(ResourceManagerWrapper& resMan)
 {
-    GetMap().GetResourceManager().LoadingLoop(false);
+    resMan.LoadingLoop(false);
     for (s32 iterations = 0; iterations < 2; iterations++)
     {
         for (s32 idx = 0;idx < gBaseGameObjects->Size(); idx++)
@@ -314,13 +314,13 @@ void Engine::Init_Sound_DynamicArrays_And_Others()
     {
         SND_Init();
         SND_Init_Ambiance();
-        MusicController::Create(mResMan);
+        MusicController::Create(mResMan, *mMap);
     }
     else
     {
         AO::SND_Init();
         SND_Init_Ambiance();
-        AO::MusicController::Create(mResMan);
+        AO::MusicController::Create(mResMan, *mMap);
     }
     Init_GameStates(); // Init other vars + switch states
 
@@ -359,7 +359,7 @@ void Game_Shutdown()
     VGA_Shutdown();
 }
 
-void Game_Loop()
+void Game_Loop(BaseMap& map)
 {
     gBreakGameLoop = false;
     bool bPauseMenuObjectFound = false;
@@ -469,14 +469,14 @@ void Game_Loop()
 
         bPauseMenuObjectFound = false;
 
+        map.ScreenChange();
+
         if (GetGameType() == GameType::eAe)
         {
-            gMap->ScreenChange();
             Input().Update(GetGameAutoPlayer());
         }
         else
         {
-            AO::gMap->ScreenChange();
             AO::Input().Update(GetGameAutoPlayer());
         }
 
@@ -521,17 +521,7 @@ void Engine::Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera
     SYS_EventsPump();
 
     gAttract = 0;
-
-    // TODO: both have to exist for the game to work due to AE map access in Path.cpp
-    //if (mGameType == GameType::eAe)
-    {
-        gMap = relive_new Map(mResMan);
-    }
-    //else
-    {
-        AO::gMap = relive_new AO::Map(mResMan);
-    }
-
+ 
     AO::Input().InitPad(1);
 
     gBaseGameObjects = relive_new DynamicArrayT<BaseGameObject>(90);
@@ -550,43 +540,31 @@ void Engine::Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera
     }
 
     Init_Sound_DynamicArrays_And_Others();
-    
+
     if (mGameType == GameType::eAe)
     {
-        relive_new DDCheat(mResMan);
-        gEventSystem = relive_new GameSpeak(mResMan);
+        relive_new DDCheat(mResMan, *mMap);
+        gEventSystem = relive_new GameSpeak(mResMan, *mMap);
     }
     else
     {
-        relive_new AO::DDCheat(mResMan);
-        AO::gEventSystem = relive_new AO::GameSpeak(mResMan);
+        relive_new AO::DDCheat(mResMan, *mMap);
+        AO::gEventSystem = relive_new AO::GameSpeak(mResMan, *mMap);
     }
-    gCheatController = relive_new CheatController(mResMan);
+    gCheatController = relive_new CheatController(mResMan, *mMap);
 
     Game_Init_LoadingIcon();
 
-    if (mGameType == GameType::eAe)
-    {
-        gMap->Init(startLevel, static_cast<s16>(startPath), static_cast<s16>(startCamera), CameraSwapEffects::eInstantChange_0, 0, 0);
-    }
-    else
-    {
-        AO::gMap->Init(startLevel, static_cast<s16>(startPath), static_cast<s16>(startCamera), CameraSwapEffects::eInstantChange_0, 0, 0);
-    }
+    mMap->Init(startLevel, static_cast<s16>(startPath), static_cast<s16>(startCamera), CameraSwapEffects::eInstantChange_0, 0, 0);
 
     // Main loop start
-    Game_Loop();
+    Game_Loop(*mMap);
 
     // Shut down start
     Game_Free_LoadingIcon();
 
-    gMap->Shutdown();
-    relive_delete gMap;
-    gMap = nullptr;
-
-    AO::gMap->Shutdown();
-    relive_delete AO::gMap;
-    AO::gMap = nullptr;
+    mMap->Shutdown();
+    mMap.reset();
 
     if (mGameType == GameType::eAe)
     {
@@ -629,7 +607,16 @@ void Engine::Game_Main(EReliveLevelIds startLevel, s32 startPath, s32 startCamer
 
 void Engine::Run()
 {
-    gPsxDisplay.Init();
+    gPsxDisplay.Init(mResMan);
+
+    if (mGameType == GameType::eAe)
+    {
+        mMap = std::make_unique<Map>(mResMan);
+    }
+    else
+    {
+        mMap = std::make_unique<AO::Map>(mResMan);
+    }  
 
     GetGameAutoPlayer().ProcessCommandLine(mClp);
 
@@ -662,7 +649,7 @@ void Engine::Run()
     GetGameAutoPlayer().DisableRecorder();
 
     // TODO: HACK mini loop till Game.cpp is merged
-    DataConversionUI dcu(mGameType, mResMan);
+    DataConversionUI dcu(mGameType, mResMan, *mMap);
     if (dcu.ConversionRequired())
     {
         do

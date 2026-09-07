@@ -2,8 +2,8 @@
 #include "Flash.hpp"
 #include "../relive_lib/Engine.hpp"
 
-Flash::Flash(Layer layer, s32 r, s32 g, s32 b, ResourceManagerWrapper& resMan, relive::TBlendModes abr, s32 time)
-    : EffectBase(layer, abr, resMan)
+Flash::Flash(Layer layer, s32 r, s32 g, s32 b, ResourceManagerWrapper& resMan, BaseMap& map, relive::TBlendModes abr, s32 time)
+    : EffectBase(layer, abr, resMan, map)
 {
     SetType(ReliveTypes::eFlash);
     mEffectBaseRed = static_cast<s16>(r);

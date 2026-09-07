@@ -25,7 +25,7 @@ struct DrillSaveState final : public SaveStateBase
 class Drill final : public ::BaseAnimatedWithPhysicsGameObject
 {
 public:
-    Drill(relive::Path_Drill* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    Drill(relive::Path_Drill* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Drill();
 
     void LoadAnimations();
@@ -35,7 +35,7 @@ public:
     virtual void VStopAudio() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
 
-    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan);
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map);
 
 private:
     void EmitSparks();

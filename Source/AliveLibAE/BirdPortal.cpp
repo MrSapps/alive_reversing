@@ -27,8 +27,8 @@
 #include "QuikSave.hpp"
 #include "../relive_lib/GameObjects/BirdPortalTerminator.hpp"
 
-BirdPortal::BirdPortal(relive::Path_BirdPortal* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : IBirdPortal(resMan)
+BirdPortal::BirdPortal(relive::Path_BirdPortal* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : IBirdPortal(resMan, map)
 {
     mPortalType = pTlv->mPortalType;
     mEnterSide = pTlv->mEnterSide;
@@ -54,8 +54,8 @@ BirdPortal::BirdPortal(relive::Path_BirdPortal* pTlv, const Guid& tlvId, Resourc
         mSpriteScale = FP_FromInteger(1);
     }
 
-    mCurrentPath = gMap->mCurrentPath;
-    mCurrentLevel = gMap->mCurrentLevel;
+    mCurrentPath = GetMap().mCurrentPath;
+    mCurrentLevel = GetMap().mCurrentLevel;
 
     PathLine* pLine = nullptr;
     FP hitX = {};
@@ -138,7 +138,7 @@ BirdPortal::~BirdPortal()
 
 void BirdPortal::VUpdate()
 {
-    const CameraPos direction = gMap->GetDirection(
+    const CameraPos direction = GetMap().GetDirection(
         mCurrentLevel,
         mCurrentPath,
         mXPos,
@@ -276,7 +276,7 @@ void BirdPortal::VUpdate()
                         auto pParticle = relive_new Particle(
                             pTerminator2->mXPos,
                             (FP_FromInteger(10) * mSpriteScale) + pTerminator2->mYPos,
-                            GetAnimRes(AnimId::BirdPortal_Sparks), mResMan);
+                            GetAnimRes(AnimId::BirdPortal_Sparks), mResMan, mMap);
 
                         if (pParticle)
                         {
@@ -304,12 +304,12 @@ void BirdPortal::VUpdate()
                         pTerminator1->mXPos,
                         pTerminator1->mYPos,
                         RingTypes::eShrykull_Pulse_Orange_6,
-                        mSpriteScale, mResMan);
+                        mSpriteScale, mResMan, mMap);
                     AbilityRing::Factory(
                         pTerminator2->mXPos,
                         pTerminator2->mYPos,
                         RingTypes::eShrykull_Pulse_Orange_6,
-                        mSpriteScale, mResMan);
+                        mSpriteScale, mResMan, mMap);
                 }
             }
             else
@@ -351,7 +351,7 @@ void BirdPortal::VUpdate()
                         AnimId::Dove_Flying,
                         mXPos + xOff,
                         mYPos + FP_FromInteger(Math_RandomRange(-scale32, scale32)),
-                        mSpriteScale, mResMan);
+                        mSpriteScale, mResMan, mMap);
 
                     SfxPlayMono(relive::SoundEffects::Dove, 70, mSpriteScale);
                     pDove->SetSpriteScale(mSpriteScale);
@@ -395,7 +395,7 @@ void BirdPortal::VUpdate()
                 auto pParticle = relive_new Particle(
                     pTerminator2->mXPos,
                     pTerminator2->mYPos,
-                    GetAnimRes(AnimId::BirdPortal_Flash), mResMan);
+                    GetAnimRes(AnimId::BirdPortal_Flash), mResMan, mMap);
 
                 pParticle->GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_1);
                 pParticle->SetApplyShadowZoneColour(false);
@@ -425,21 +425,21 @@ void BirdPortal::VUpdate()
 
         case PortalStates::CreateFlash1_12:
         {
-            relive_new Flash(Layer::eLayer_FadeFlash_40, 255, 255, 255, mResMan, relive::TBlendModes::eBlend_3, 1);
+            relive_new Flash(Layer::eLayer_FadeFlash_40, 255, 255, 255, mResMan, mMap, relive::TBlendModes::eBlend_3, 1);
             mState = PortalStates::CreateFlash2_13;
         }
         break;
 
         case PortalStates::CreateFlash2_13:
         {
-            relive_new Flash(Layer::eLayer_FadeFlash_40, 255, 255, 255, mResMan, relive::TBlendModes::eBlend_0, 1);
+            relive_new Flash(Layer::eLayer_FadeFlash_40, 255, 255, 255, mResMan, mMap, relive::TBlendModes::eBlend_0, 1);
             mState = PortalStates::CreateFlash3_14;
         }
         break;
 
         case PortalStates::CreateFlash3_14:
         {
-            relive_new Flash(Layer::eLayer_FadeFlash_40, 255, 255, 255, mResMan, relive::TBlendModes::eBlend_0, 1);
+            relive_new Flash(Layer::eLayer_FadeFlash_40, 255, 255, 255, mResMan, mMap, relive::TBlendModes::eBlend_0, 1);
             mState = PortalStates::KillPortal_15;
             mTimer = MakeTimer(5);
         }
@@ -604,7 +604,7 @@ void BirdPortal::VGiveShrykull(s16 bPlaySound)
                 gAbe->mXPos,
                 gAbe->mYPos - (gAbe->GetSpriteScale() * FP_FromInteger(38)),
                 gAbe->GetSpriteScale(),
-                false, mResMan);
+                false, mResMan, mMap);
 
             if (gAbe->mCurrentMotion == eAbeMotions::Motion_112_Chant)
             {
@@ -630,8 +630,8 @@ void BirdPortal::VGiveShrykull(s16 bPlaySound)
 void BirdPortal::VExitPortal()
 {
     // If the bird port has changed us to another level/path update it
-    mCurrentPath = gMap->mCurrentPath;
-    mCurrentLevel = gMap->mCurrentLevel;
+    mCurrentPath = GetMap().mCurrentPath;
+    mCurrentLevel = GetMap().mCurrentLevel;
 
     auto pPortalExitTlv = GetMap().TLV_First_Of_Type_In_Camera(ReliveTypes::eBirdPortalExit, 0).GetTlv<relive::Path_BirdPortalExit>();
     if (pPortalExitTlv)
@@ -672,8 +672,8 @@ void BirdPortal::VExitPortal()
         }
 
         gAbe->SetSpriteScale(mSpriteScale);
-        gAbe->mCurrentLevel = gMap->mCurrentLevel;
-        gAbe->mCurrentPath = gMap->mCurrentPath;
+        gAbe->mCurrentLevel = GetMap().mCurrentLevel;
+        gAbe->mCurrentPath = GetMap().mCurrentPath;
 
         mState = PortalStates::PortalExit_SetPosition_17;
     }
@@ -767,7 +767,7 @@ void BirdPortal::VGetSaveState(SerializedObjectData& pBuffer)
     pBuffer.Write(data);
 }
 
-void BirdPortal::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
+void BirdPortal::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pSaveState = pBuffer.ReadTmpPtr<BirdPortalSaveState>();
     auto pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(pSaveState->mTlvInfo).GetTlv<relive::Path_BirdPortal>();
@@ -776,7 +776,7 @@ void BirdPortal::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMana
         return;
     }
 
-    auto pPortal = relive_new BirdPortal(pTlv, pSaveState->mTlvInfo, resMan);
+    auto pPortal = relive_new BirdPortal(pTlv, pSaveState->mTlvInfo, resMan, map);
     if (pPortal)
     {
         pPortal->SetUpdateDelay(1);

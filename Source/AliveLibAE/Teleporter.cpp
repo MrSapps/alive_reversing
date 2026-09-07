@@ -31,8 +31,8 @@ static void SetData(Relive_Path_Teleporter_Data& tlvData, const relive::Path_Tel
     tlvData.mElectricY = tlv.mElectricY;
 }
 
-Teleporter::Teleporter(relive::Path_Teleporter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+Teleporter::Teleporter(relive::Path_Teleporter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     SetData(mTlvData, *pTlv);
     mTlvId = tlvId;
@@ -53,16 +53,16 @@ Teleporter::~Teleporter()
 
 void Teleporter::VScreenChanged()
 {
-    if (gMap->LevelChanged())
+    if (GetMap().LevelChanged())
     {
         SetDead(true);
     }
     mDestroySelf = true;
 }
 
-Electrocute* Teleporter::Create_ElectrocuteEffect(ResourceManagerWrapper& resMan)
+Electrocute* Teleporter::Create_ElectrocuteEffect(ResourceManagerWrapper& resMan, BaseMap& map)
 {
-    return relive_new Electrocute(sControlledCharacter, true, false, resMan);
+    return relive_new Electrocute(sControlledCharacter, true, false, resMan, map);
 }
 
 static const PSX_Point kSparkOffs[8] = {
@@ -92,7 +92,7 @@ void Teleporter::SpawnRingSparks(Relive_Path_Teleporter_Data* pTlvData)
             sparkY = pTlvData->mElectricY + (sparkOffs.y);
         }
 
-        relive_new Spark(FP_FromInteger(sparkX), FP_FromInteger(sparkY), FP_FromInteger(1), 9, -31, 159, SparkType::eBigChantParticle_1, mResMan);
+        relive_new Spark(FP_FromInteger(sparkX), FP_FromInteger(sparkY), FP_FromInteger(1), 9, -31, 159, SparkType::eBigChantParticle_1, mResMan, mMap);
     }
 }
 
@@ -132,7 +132,7 @@ void Teleporter::VUpdate()
             }
 
             mState = TeleporterState::eIntoTeleporter_1;
-            mElectrocuteId = Teleporter::Create_ElectrocuteEffect(mResMan)->mBaseGameObjectId;
+            mElectrocuteId = Teleporter::Create_ElectrocuteEffect(mResMan, mMap)->mBaseGameObjectId;
 
             SFX_Play_Pitch(relive::SoundEffects::Zap1, 60, -400);
             sControlledCharacter->SetTeleporting(true);
@@ -165,13 +165,13 @@ void Teleporter::VUpdate()
                             sControlledCharacter->mYPos - FP_FromInteger(9), // 18/2
                             sControlledCharacter->GetSpriteScale(),
                             3,
-                            RGB16{ 128, 128, 128 }, mResMan);
+                            RGB16{ 128, 128, 128 }, mResMan, mMap);
 
                         relive_new ParticleBurst(sControlledCharacter->mXPos,
                                               sControlledCharacter->mYPos - FP_FromInteger(9), // 18/2
                                               9u,
                                               FP_FromDouble(0.5),
-                                              BurstType::eBigRedSparks, mResMan,
+                                              BurstType::eBigRedSparks, mResMan, mMap,
                                               9, true);
                     }
                     else
@@ -182,13 +182,13 @@ void Teleporter::VUpdate()
                             sControlledCharacter->mYPos - FP_FromInteger(18),
                             sControlledCharacter->GetSpriteScale(),
                             3,
-                            RGB16{128, 128, 128}, mResMan);
+                            RGB16{128, 128, 128}, mResMan, mMap);
 
                        relive_new ParticleBurst(sControlledCharacter->mXPos,
                                                                     sControlledCharacter->mYPos - FP_FromInteger(18),
                                                                     9u,
                                                                     FP_FromInteger(1),
-                                                                    BurstType::eBigRedSparks, mResMan,
+                                                                    BurstType::eBigRedSparks, mResMan, mMap,
                                                                     9, true);
                     }
                     mEffectsCreated = true;
@@ -202,7 +202,7 @@ void Teleporter::VUpdate()
 
             sControlledCharacter->GetAnimation().SetRender(false);
 
-            gMap->mTeleporterTransition = 1;
+            GetMap().mTeleporterTransition = 1;
 
             const CameraSwapEffects effect = kPathChangeEffectToInternalScreenChangeEffect[mTlvData.mWipeEffect];
             s16 bForceChange = 0;
@@ -211,7 +211,7 @@ void Teleporter::VUpdate()
                 bForceChange = 1;
             }
 
-            gMap->SetActiveCam(
+            GetMap().SetActiveCam(
                 mTlvData.mDestLevel,
                 mTlvData.mDestPath,
                 mTlvData.mDestCamera,
@@ -227,7 +227,7 @@ void Teleporter::VUpdate()
 
         case TeleporterState::eTeleporting_2:
         {
-            gMap->mTeleporterTransition = 0;
+            GetMap().mTeleporterTransition = 0;
 
             Relive_Path_Teleporter_Data tlvData = {};
             relive::Path_Teleporter* pTeleporterTlv = nullptr;
@@ -314,7 +314,7 @@ void Teleporter::VUpdate()
             New_DestroyOrCreateObject_Particle(
                 FP_FromInteger((bRect.x + bRect.w) / 2),
                 FP_FromInteger((bRect.y + bRect.h) / 2) + (sControlledCharacter->GetSpriteScale() * FP_FromInteger(60)),
-                sControlledCharacter->GetSpriteScale(), mResMan);
+                sControlledCharacter->GetSpriteScale(), mResMan, mMap);
 
             // Spawn the falling "red" sparks from Abe's feet that appear after you've arrived at the destination.
             if (sControlledCharacter->GetSpriteScale() == FP_FromDouble(0.5))
@@ -323,7 +323,7 @@ void Teleporter::VUpdate()
                                                             sControlledCharacter->mYPos - FP_FromInteger(9),
                                                             6u,
                                                             FP_FromDouble(0.5),
-                                                            BurstType::eBigRedSparks, mResMan,
+                                                            BurstType::eBigRedSparks, mResMan, mMap,
                                                             9, true);
             }
             else
@@ -332,7 +332,7 @@ void Teleporter::VUpdate()
                                                             sControlledCharacter->mYPos - FP_FromInteger(18),
                                                             6u,
                                                             FP_FromInteger(1),
-                                                            BurstType::eBigRedSparks, mResMan,
+                                                            BurstType::eBigRedSparks, mResMan, mMap,
                                                             9, true);
             }
 

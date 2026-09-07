@@ -15,7 +15,7 @@ ZBall* gCenterZBall = nullptr;
 ZBall* gOutZBall = nullptr;
 
 // TODO: Pass the whole object because this decides to read 2 points as a rect
-void Animation_OnFrame_ZBallSmacker(::BaseGameObject* pObj, u32& idx, const IndexedPoint& points, ResourceManagerWrapper&)
+void Animation_OnFrame_ZBallSmacker(::BaseGameObject* pObj, u32& idx, const IndexedPoint& points, ResourceManagerWrapper&, BaseMap&)
 {
     auto pZBall = static_cast<ZBall*>(pObj);
     for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
@@ -50,8 +50,8 @@ void Animation_OnFrame_ZBallSmacker(::BaseGameObject* pObj, u32& idx, const Inde
     idx++;
 }
 
-ZBall::ZBall(relive::Path_ZBall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+ZBall::ZBall(relive::Path_ZBall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eZBall);
 
@@ -85,7 +85,7 @@ ZBall::ZBall(relive::Path_ZBall* pTlv, const Guid& tlvId, ResourceManagerWrapper
     mXPos = FP_FromInteger(pTlv->mTopLeftX);
     mYPos = FP_FromInteger(pTlv->mTopLeftY);
 
-    if (gMap->mCurrentLevel == EReliveLevelIds::eForestTemple)
+    if (GetMap().mCurrentLevel == EReliveLevelIds::eForestTemple)
     {
         switch (pTlv->mStartPos)
         {
@@ -165,7 +165,7 @@ void ZBall::VUpdate()
 
     mFrameAbove12 = GetAnimation().GetCurrentFrame() >= 13;
 
-    if (!gMap->Is_Point_In_Current_Camera(
+    if (!GetMap().Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,

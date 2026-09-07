@@ -11,9 +11,9 @@
 #include "../GameType.hpp"
 #include "BaseMap.hpp"
 
-AbilityRing* AbilityRing::Factory(FP xpos, FP ypos, RingTypes ringType, FP scale, ResourceManagerWrapper& resMan)
+AbilityRing* AbilityRing::Factory(FP xpos, FP ypos, RingTypes ringType, FP scale, ResourceManagerWrapper& resMan, BaseMap& map)
 {
-    return relive_new AbilityRing(xpos, ypos, ringType, scale, resMan);
+    return relive_new AbilityRing(xpos, ypos, ringType, scale, resMan, map);
 }
 
 static s32 MinDistance(s32 screenX, s32 screenY, s32 width1, s32 height1, s32 width2, s32 height2)
@@ -30,8 +30,8 @@ static s32 MinDistance(s32 screenX, s32 screenY, s32 width1, s32 height1, s32 wi
     }
 }
 
-AbilityRing::AbilityRing(FP xpos, FP ypos, RingTypes ringType, FP scale, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan),
+AbilityRing::AbilityRing(FP xpos, FP ypos, RingTypes ringType, FP scale, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map),
     mRingXPos(xpos),
     mRingYPos(ypos)
 {
@@ -433,7 +433,7 @@ void AbilityRing::VUpdate()
                 SfxPlayMono(relive::SoundEffects::IngameTransition, 0);
                 if (mRingType == RingTypes::eExplosive_Give_3)
                 {
-                    relive_new PossessionFlicker(GetAbe(), 8, 255, 128, 128, mResMan);
+                    relive_new PossessionFlicker(GetAbe(), 8, 255, 128, 128, mResMan, mMap);
                 }
             }
             return;
@@ -567,10 +567,10 @@ void AbilityRing::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void AbilityRing::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
+void AbilityRing::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<AbilityRingSaveState>();
-    auto pRing = relive_new AbilityRing(pState->mRingXPos, pState->mRingYPos, pState->mRingType, pState->mRingScale, resMan);
+    auto pRing = relive_new AbilityRing(pState->mRingXPos, pState->mRingYPos, pState->mRingType, pState->mRingScale, resMan, map);
     if (pRing)
     {
         pRing->mRingRed = pState->mRingRed;

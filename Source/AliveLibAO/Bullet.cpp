@@ -15,16 +15,16 @@
 
 namespace AO {
 
-Bullet::Bullet(BaseAliveGameObject* pParent, BulletType type, FP xpos, FP ypos, FP xDist, FP scale, s32 numberOfBullets, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+Bullet::Bullet(BaseAliveGameObject* pParent, BulletType type, FP xpos, FP ypos, FP xDist, FP scale, s32 numberOfBullets, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eBullet);
     mBulletType = type;
     mXPos = xpos;
     mYPos = ypos;
-    mBulletPath = gMap->mCurrentPath;
+    mBulletPath = GetMap().mCurrentPath;
     mBulletParent = pParent;
-    mBulletLevel = gMap->mCurrentLevel;
+    mBulletLevel = GetMap().mCurrentLevel;
     mSpriteScale = scale;
     mNumberOfBullets = static_cast<s16>(numberOfBullets);
     mXDistance = xDist;
@@ -32,7 +32,7 @@ Bullet::Bullet(BaseAliveGameObject* pParent, BulletType type, FP xpos, FP ypos, 
 
 void Bullet::VUpdate()
 {
-    if (!gMap->Is_Point_In_Current_Camera(
+    if (!GetMap().Is_Point_In_Current_Camera(
             mBulletLevel,
             mBulletPath,
             mXPos,
@@ -90,13 +90,13 @@ void Bullet::VUpdate()
                 {
                     if (mXDistance <= FP_FromInteger(0))
                     {
-                        relive_new Spark(hitX, hitY, mSpriteScale, 6, -76, 76, SparkType::eSmallChantParticle_0, mResMan);
+                        relive_new Spark(hitX, hitY, mSpriteScale, 6, -76, 76, SparkType::eSmallChantParticle_0, mResMan, mMap);
                     }
                     else
                     {
-                        relive_new Spark(hitX, hitY, mSpriteScale, 6, 50, 205, SparkType::eSmallChantParticle_0, mResMan);
+                        relive_new Spark(hitX, hitY, mSpriteScale, 6, 50, 205, SparkType::eSmallChantParticle_0, mResMan, mMap);
                     }
-                    New_Smoke_Particles(hitX, hitY, mSpriteScale, 3, RGB16{128, 128, 128}, mResMan);
+                    New_Smoke_Particles(hitX, hitY, mSpriteScale, 3, RGB16{128, 128, 128}, mResMan, mMap);
                     if (Math_RandomRange(0, 100) < 90 || Math_RandomRange(0, 128) >= 64)
                     {
                         SfxPlayMono(relive::SoundEffects::Bullet2, volume);
@@ -180,8 +180,8 @@ void Bullet::VUpdate()
                     &hitY,
                     CollisionMask(eBulletWall_10)))
             {
-                relive_new Spark(hitX, hitY, FP_FromInteger(1), 9, -31, 159, SparkType::eSmallChantParticle_0, mResMan);
-                New_Smoke_Particles(hitX, hitY, FP_FromInteger(1), 3, RGB16{ 128, 128, 128 }, mResMan);
+                relive_new Spark(hitX, hitY, FP_FromInteger(1), 9, -31, 159, SparkType::eSmallChantParticle_0, mResMan, mMap);
+                New_Smoke_Particles(hitX, hitY, FP_FromInteger(1), 3, RGB16{ 128, 128, 128 }, mResMan, mMap);
             }
 
             if (Math_RandomRange(0, 128) < 64)
@@ -203,7 +203,7 @@ bool Bullet::InZBulletCover(FP xpos, FP ypos, const PSX_RECT& objRect)
     while (1)
     {
         // Go to the next entry (or first if first call).
-        zCoverIterator = gMap->TLV_Get_At(
+        zCoverIterator = GetMap().TLV_Get_At(
             zCoverIterator,
             xpos,
             ypos,

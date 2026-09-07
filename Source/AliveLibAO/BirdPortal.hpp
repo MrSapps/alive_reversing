@@ -13,7 +13,7 @@ namespace AO {
 class BirdPortal final : public IBirdPortal
 {
 public:
-    BirdPortal(relive::Path_BirdPortal* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    BirdPortal(relive::Path_BirdPortal* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~BirdPortal();
     
     virtual void VUpdate() override;

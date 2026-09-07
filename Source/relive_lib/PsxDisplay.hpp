@@ -5,6 +5,8 @@
 #include "../AliveLibAE/PsxRender.hpp"
 #include "Font.hpp"
 
+class ResourceManagerWrapper;
+
 // 368*40/23 =640
 // This seems to convert from PSX coordinate space to PC coordinate space
 // anywhere you see this calc replace it with this function
@@ -37,7 +39,7 @@ class DebugFont final
 public:
     void DebugFont_Flush();
     s32 DebugFont_Printf(s32 idx, const char_type* formatStr, ...);
-    s32 DebugFont_Init();
+    s32 DebugFont_Init(ResourceManagerWrapper& resMan);
 
     void PSX_DrawDebugTextBuffers(OrderingTable& ot);
 private:
@@ -50,7 +52,7 @@ private:
 class PsxDisplay final
 {
 public:
-    void Init();
+    void Init(ResourceManagerWrapper& resMan);
     void PutCurrentDispEnv();
     void RenderOrderingTable();
 

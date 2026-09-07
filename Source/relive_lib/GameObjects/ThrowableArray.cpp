@@ -13,8 +13,8 @@ void LoadRockTypes(EReliveLevelIds /*level*/, u16 /*path*/)
     
 }
 
-ThrowableArray::ThrowableArray(ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+ThrowableArray::ThrowableArray(ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eThrowableArray);
     SetUpdatable(false);
@@ -110,10 +110,10 @@ void ThrowableArray::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void ThrowableArray::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
+void ThrowableArray::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<ThrowableArraySaveState>();
-    LoadRockTypes(GetMap().mCurrentLevel, GetMap().mCurrentPath);
-    auto pArray = relive_new ThrowableArray(resMan);
+    LoadRockTypes(map.mCurrentLevel, map.mCurrentPath);
+    auto pArray = relive_new ThrowableArray(resMan, map);
     pArray->Add(pState->mCount);
 }

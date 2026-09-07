@@ -53,7 +53,7 @@ static const AnimId sFootSwitchAnimIds[15][2] = {
 
 void FootSwitch::LoadAnimations()
 {
-    switch (gMap->mCurrentLevel)
+    switch (GetMap().mCurrentLevel)
     {
         case EReliveLevelIds::eMudomoVault:
         case EReliveLevelIds::eMudancheeVault:
@@ -73,20 +73,20 @@ void FootSwitch::LoadAnimations()
     }
 }
 
-FootSwitch::FootSwitch(relive::Path_FootSwitch* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+FootSwitch::FootSwitch(relive::Path_FootSwitch* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eFootSwitch);
 
     LoadAnimations();
 
-    const s32 idx = static_cast<s32>(MapWrapper::ToAE(gMap->mCurrentLevel));
+    const s32 idx = static_cast<s32>(MapWrapper::ToAE(GetMap().mCurrentLevel));
 
     Animation_Init(GetAnimRes(sFootSwitchAnimIds[idx][0]));
 
     GetAnimation().SetRenderLayer(Layer::eLayer_BeforeShadow_25);
 
-    SetTint(sFootSwitchTints, gMap->mCurrentLevel);
+    SetTint(sFootSwitchTints, GetMap().mCurrentLevel);
 
     mSwitchId = pTlv->mSwitchId;
 
@@ -126,7 +126,7 @@ void FootSwitch::VUpdate()
         if (pLastStoodOnMe)
         {
             mStoodOnMeId = pLastStoodOnMe->mBaseGameObjectId;
-            GetAnimation().Set_Animation_Data(GetAnimRes(sFootSwitchAnimIds[static_cast<s32>(MapWrapper::ToAE(gMap->mCurrentLevel))][1]));
+            GetAnimation().Set_Animation_Data(GetAnimRes(sFootSwitchAnimIds[static_cast<s32>(MapWrapper::ToAE(GetMap().mCurrentLevel))][1]));
             mState = States::eWaitForGetOffMe;
         }
     }
@@ -147,16 +147,16 @@ void FootSwitch::VUpdate()
                 SwitchStates_Do_Operation(mSwitchId, mAction);
                 mState = States::eWaitForGetOffMe;
 
-                GetAnimation().Set_Animation_Data(GetAnimRes(sFootSwitchAnimIds[static_cast<s32>(MapWrapper::ToAE(gMap->mCurrentLevel))][1]));
+                GetAnimation().Set_Animation_Data(GetAnimRes(sFootSwitchAnimIds[static_cast<s32>(MapWrapper::ToAE(GetMap().mCurrentLevel))][1]));
 
                 relive_new ParticleBurst(mXPos,
                                                             mYPos + FP_FromInteger(10),
                                                             3,
                                                             GetSpriteScale(),
-                                                            BurstType::eBigRedSparks, mResMan,
+                                                            BurstType::eBigRedSparks, mResMan, mMap,
                                                             9, true);
 
-                if (gMap->mCurrentLevel == EReliveLevelIds::eMines || gMap->mCurrentLevel == EReliveLevelIds::eBonewerkz || gMap->mCurrentLevel == EReliveLevelIds::eFeeCoDepot || gMap->mCurrentLevel == EReliveLevelIds::eBarracks || gMap->mCurrentLevel == EReliveLevelIds::eBrewery)
+                if (GetMap().mCurrentLevel == EReliveLevelIds::eMines || GetMap().mCurrentLevel == EReliveLevelIds::eBonewerkz || GetMap().mCurrentLevel == EReliveLevelIds::eFeeCoDepot || GetMap().mCurrentLevel == EReliveLevelIds::eBarracks || GetMap().mCurrentLevel == EReliveLevelIds::eBrewery)
                 {
                     SFX_Play_Pitch(relive::SoundEffects::IndustrialTrigger, 30, 400);
                     SFX_Play_Pitch(relive::SoundEffects::IndustrialNoise1, 60, 800);
@@ -181,13 +181,13 @@ void FootSwitch::VUpdate()
                                             10,
                                             100,
                                             255,
-                                            SparkType::eSmallChantParticle_0, mResMan);
+                                            SparkType::eSmallChantParticle_0, mResMan, mMap);
 
                 relive_new ParticleBurst(mXPos,
                                                             mYPos + (GetSpriteScale() * FP_FromInteger(10)),
                                                             1,
                                                             GetSpriteScale(),
-                                                            BurstType::eBigRedSparks, mResMan,
+                                                            BurstType::eBigRedSparks, mResMan, mMap,
                                                             9, true);
 
                 mCreateSparks = false;
@@ -208,7 +208,7 @@ void FootSwitch::VUpdate()
             if (!pLastStoodOnMe || pLastStoodOnMe->mXPos < FP_FromInteger(bRect.x) || pLastStoodOnMe->mXPos > FP_FromInteger(bRect.w) || pLastStoodOnMe->GetDead())
             {
                 mState = States::eWaitForStepOnMe;
-                GetAnimation().Set_Animation_Data(GetAnimRes(sFootSwitchAnimIds[static_cast<s32>(MapWrapper::ToAE(gMap->mCurrentLevel))][0]));
+                GetAnimation().Set_Animation_Data(GetAnimRes(sFootSwitchAnimIds[static_cast<s32>(MapWrapper::ToAE(GetMap().mCurrentLevel))][0]));
                 mStoodOnMeId = Guid{};
             }
             break;

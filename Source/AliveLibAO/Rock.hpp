@@ -7,7 +7,7 @@ namespace AO {
 class Rock final : public ::BaseThrowable
 {
 public:
-    Rock(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan);
+    Rock(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Rock();
 
     virtual void VUpdate() override;

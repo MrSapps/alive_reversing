@@ -138,13 +138,13 @@ public:
         AnimId::Elum_Knockback,
         AnimId::None};
 
-    static void Spawn(const Guid& tlvInfo, ResourceManagerWrapper& resMan);
+    static void Spawn(const Guid& tlvInfo, ResourceManagerWrapper& resMan, BaseMap& map);
 
     virtual void VUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VScreenChanged() override;
 
-    Elum(const Guid& tlvInfo, ResourceManagerWrapper& resMan);
+    Elum(const Guid& tlvInfo, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Elum();
 
     void LoadAnimations();

@@ -3,11 +3,12 @@
 #include "Animation.hpp"
 
 enum class Scale : s16;
+class BaseMap;
 
 class Shadow final
 {
 public:
-    Shadow(ResourceManagerWrapper& resMan);
+    Shadow(ResourceManagerWrapper& resMan, BaseMap& map);
     ~Shadow();
 
     void Calculate_Position(FP xpos, FP ypos, PSX_RECT* frameRect, FP spriteScale, Scale scale);

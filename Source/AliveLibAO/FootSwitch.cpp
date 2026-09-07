@@ -16,8 +16,8 @@ void FootSwitch::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Foot_Switch_Temple_Pressed));
 }
 
-FootSwitch::FootSwitch(relive::Path_FootSwitch* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+FootSwitch::FootSwitch(relive::Path_FootSwitch* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eFootSwitch);
 

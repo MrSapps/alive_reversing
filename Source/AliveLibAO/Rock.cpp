@@ -15,8 +15,8 @@
 
 namespace AO {
 
-Rock::Rock(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan)
-    : BaseThrowable(resMan)
+Rock::Rock(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseThrowable(resMan, map)
 {
     SetType(ReliveTypes::eRock);
 
@@ -43,7 +43,7 @@ Rock::Rock(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan)
 
     mLoadedPals.push_back(resMan.LoadPal(PalId::BlueRock));
 
-    if (gMap->mCurrentLevel == EReliveLevelIds::eStockYards || gMap->mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+    if (GetMap().mCurrentLevel == EReliveLevelIds::eStockYards || GetMap().mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
     {
         // TODO: I think this only existed in certain lvls, will need a way to know
         // which pal to use per lvl/path
@@ -146,7 +146,7 @@ void Rock::VUpdate()
                     (GetSpriteScale() * FP_FromInteger(1)) + mXPos,
                     (GetSpriteScale() * FP_FromInteger(-7)) + mYPos,
                     FP_FromDouble(0.3),
-                    Layer::eLayer_Foreground_36, mResMan);
+                    Layer::eLayer_Foreground_36, mResMan, mMap);
                 mShimmerTimer = (Math_NextRandom() % 16) + MakeTimer(60);
             }
             return;
@@ -170,7 +170,7 @@ void Rock::VUpdate()
             mVelY += FP_FromInteger(1);
             mXPos += mVelX;
             mYPos += mVelY;
-            if (!gMap->Is_Point_In_Current_Camera(
+            if (!GetMap().Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -188,8 +188,8 @@ void Rock::VUpdate()
 //TODO Identical to AE - merge
 void Rock::VScreenChanged()
 {
-    if (gMap->PathChanged()
-        || gMap->LevelChanged())
+    if (GetMap().PathChanged()
+        || GetMap().LevelChanged())
     {
         SetDead(true);
     }

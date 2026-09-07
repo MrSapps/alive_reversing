@@ -22,8 +22,8 @@ static DoorFlame* sFlameControllingTheSound = nullptr;
 class FireBackgroundGlow final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    FireBackgroundGlow(FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan)
-        : BaseAnimatedWithPhysicsGameObject(0, resMan)
+    FireBackgroundGlow(FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan, BaseMap& map)
+        : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
     {
         SetType(ReliveTypes::eNone);
 
@@ -123,8 +123,8 @@ ALIVE_ASSERT_SIZEOF(FlameSpark, 0x84);
 class FlameSparks final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    FlameSparks(FP xpos, FP ypos, ResourceManagerWrapper& resMan)
-        : BaseAnimatedWithPhysicsGameObject(0, resMan)
+    FlameSparks(FP xpos, FP ypos, ResourceManagerWrapper& resMan, BaseMap& map)
+        : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
     {
         SetType(ReliveTypes::eNone);
 
@@ -173,7 +173,7 @@ private:
     {
 
         PSX_RECT rect = {};
-        gMap->Get_Camera_World_Rect(CameraPos::eCamCurrent_0, &rect);
+        GetMap().Get_Camera_World_Rect(CameraPos::eCamCurrent_0, &rect);
         mXPos = FP_FromInteger(rect.w + 16);
         mYPos = FP_FromInteger(rect.y - 16);
         if (mRender)
@@ -264,8 +264,8 @@ public:
     FP mStartYPos;
 };
 
-DoorFlame::DoorFlame(relive::Path_DoorFlame* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+DoorFlame::DoorFlame(relive::Path_DoorFlame* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eNone);
     mTlvInfo = tlvId;
@@ -323,7 +323,7 @@ DoorFlame::DoorFlame(relive::Path_DoorFlame* pTlv, const Guid& tlvId, ResourceMa
     GetAnimation().SetAnimate(true);
     mRandom = Math_NextRandom() & 1;
 
-    auto pFlameSparks = relive_new FlameSparks(mXPos, mYPos, mResMan);
+    auto pFlameSparks = relive_new FlameSparks(mXPos, mYPos, mResMan, mMap);
     if (pFlameSparks)
     {
         mFlameSparksId = pFlameSparks->mBaseGameObjectId;
@@ -422,7 +422,7 @@ void DoorFlame::VUpdate()
                 pFireBackgroundGlow = relive_new FireBackgroundGlow(mXPos,
                     mYPos + FP_FromInteger(4),
                     FP_FromDouble(0.5),
-                    mResMan);
+                    mResMan, mMap);
                 if (pFireBackgroundGlow)
                 {
                     mFireBackgroundGlowId = pFireBackgroundGlow->mBaseGameObjectId;
@@ -436,7 +436,7 @@ void DoorFlame::VUpdate()
             break;
     }
 
-    if (!gMap->Is_Point_In_Current_Camera(
+    if (!GetMap().Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,

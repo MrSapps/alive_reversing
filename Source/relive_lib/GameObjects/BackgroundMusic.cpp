@@ -7,8 +7,8 @@
 
 s16 gBackgroundMusicSeqId = -1;
 
-BackgroundMusic::BackgroundMusic(s32 musicId, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+BackgroundMusic::BackgroundMusic(s32 musicId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     mMusicId = static_cast<s16>(musicId);
     gBackgroundMusicSeqId = -1;

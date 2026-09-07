@@ -310,14 +310,14 @@ const MusicController_Record2 stru_55D008[118] = {
     {SeqId::MainMenuAmbient_0, 0u}};
 
 
-s32 MusicController::Create(ResourceManagerWrapper& resMan)
+s32 MusicController::Create(ResourceManagerWrapper& resMan, BaseMap& map)
 {
     if (gMusicController)
     {
         return 0;
     }
 
-    gMusicController = relive_new MusicController(resMan);
+    gMusicController = relive_new MusicController(resMan, map);
     if (gMusicController)
     {
         MusicController::SetBaseTimeStamp();
@@ -383,8 +383,8 @@ MusicController::MusicTypes MusicController::static_GetMusicType(u16* seq1, u16*
     return MusicTypes::eTypeNull;
 }
 
-MusicController::MusicController(ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+MusicController::MusicController(ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     SetSurviveDeathReset(true);
     field_40_flags_and_idx = -1;
@@ -551,7 +551,7 @@ void MusicController::VUpdate()
     {
         mScreenChanged = false;
 
-        if (gMap->mCurrentLevel != field_24_currentLevelID)
+        if (GetMap().mCurrentLevel != field_24_currentLevelID)
         {
             field_44 = 0;
             field_30_music_time = 0;
@@ -572,7 +572,7 @@ void MusicController::VUpdate()
                 field_40_flags_and_idx = -1;
             }
 
-            field_24_currentLevelID = gMap->mCurrentLevel;
+            field_24_currentLevelID = GetMap().mCurrentLevel;
 
             if (mMusicEnabled)
             {

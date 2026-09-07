@@ -3,7 +3,7 @@
 #include "../relive_lib/GameObjects/BaseGameObject.hpp"
 #include "../relive_lib/SaveStateBase.hpp"
 
-void CreateGameEnderController(ResourceManagerWrapper& resMan);
+void CreateGameEnderController(ResourceManagerWrapper& resMan, BaseMap& map);
 
 enum class GameEnderControllerStates : s16
 {
@@ -29,8 +29,8 @@ struct GameEnderControllerSaveState final : public SaveStateBase
 class GameEnderController final : public BaseGameObject
 {
 public:
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
-    GameEnderController(ResourceManagerWrapper& resMan);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    GameEnderController(ResourceManagerWrapper& resMan, BaseMap& map);
     
     virtual void VScreenChanged() override;
     virtual void VUpdate() override;

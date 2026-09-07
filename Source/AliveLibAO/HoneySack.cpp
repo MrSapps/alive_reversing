@@ -23,8 +23,8 @@ void HoneySack::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::HoneySack_FallingToSmashed));
 }
 
-HoneySack::HoneySack(relive::Path_HoneySack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+HoneySack::HoneySack(relive::Path_HoneySack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eHoneySack);
 
@@ -69,7 +69,7 @@ HoneySack::HoneySack(relive::Path_HoneySack* pTlv, const Guid& tlvId, ResourceMa
         mState = State::eDripHoney_0;
         mTimer = MakeTimer(90);
 
-        auto pBeeSwarm = relive_new BeeSwarm(mXPos, mYPos, FP_FromInteger(0), 5, 0, mResMan);
+        auto pBeeSwarm = relive_new BeeSwarm(mXPos, mYPos, FP_FromInteger(0), 5, 0, mResMan, mMap);
         mBeeSwarm = pBeeSwarm->mBaseGameObjectId;
         if (pBeeSwarm)
         {
@@ -79,7 +79,7 @@ HoneySack::HoneySack(relive::Path_HoneySack* pTlv, const Guid& tlvId, ResourceMa
         mDripTargetX = FP_FromInteger(0);
         mDripTargetY = FP_FromInteger(0);
 
-        relive::Path_TLV* pHoneyDripTarget = gMap->TLV_First_Of_Type_In_Camera(ReliveTypes::eHoneyDripTarget, 0).GetTlv();
+        relive::Path_TLV* pHoneyDripTarget = GetMap().TLV_First_Of_Type_In_Camera(ReliveTypes::eHoneyDripTarget, 0).GetTlv();
         if (pHoneyDripTarget)
         {
             mDripTargetX = FP_FromInteger(pHoneyDripTarget->mTopLeftX);
@@ -106,7 +106,7 @@ HoneySack::~HoneySack()
 
 void HoneySack::VScreenChanged()
 {
-    if (gMap->LevelChanged() || gMap->PathChanged())
+    if (GetMap().LevelChanged() || GetMap().PathChanged())
     {
         SetDead(true);
     }
@@ -136,11 +136,11 @@ void HoneySack::VUpdate()
         case State::eDripHoney_0:
             if (static_cast<s32>(sGnFrame) > mTimer)
             {
-                relive_new HoneyDrip(mDripTargetX, mDripTargetY, mResMan);
+                relive_new HoneyDrip(mDripTargetX, mDripTargetY, mResMan, mMap);
 
                 mTimer = MakeTimer(90);
             }
-            if (!gMap->Is_Point_In_Current_Camera(
+            if (!GetMap().Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -203,7 +203,7 @@ void HoneySack::VUpdate()
                     FP_FromInteger(0),
                     24,
                     mChaseTime,
-                    mResMan);
+                    mResMan, mMap);
                 if (pNewBee)
                 {
                     pNewBee->Chase(gAbe);
@@ -254,7 +254,7 @@ void HoneySack::VUpdate()
                 }
             }
 
-            if (!gMap->Is_Point_In_Current_Camera(
+            if (!GetMap().Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,

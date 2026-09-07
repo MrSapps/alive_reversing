@@ -18,8 +18,8 @@ namespace AO {
 
 PauseMenu* gPauseMenu = nullptr;
 
-PauseMenu::PauseMenu(ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+PauseMenu::PauseMenu(ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::ePauseMenu);
     SetUpdateDelay(25);
@@ -29,7 +29,7 @@ PauseMenu::PauseMenu(ResourceManagerWrapper& resMan)
 
     gObjListDrawables->Push_Back(this);
     mPal = resMan.LoadPal(PalId::MainMenuFont_PauseMenu);
-    mFontContext.LoadFontType(FontType::PauseMenu);
+    mFontContext.LoadFontType(FontType::PauseMenu, mResMan);
     field_E4_font.Load(175, mPal, &mFontContext);
     field_11C = 0;
     gDisableFontFlicker = false;
@@ -43,7 +43,7 @@ PauseMenu::~PauseMenu()
 
 void PauseMenu::VScreenChanged()
 {
-    if (gMap->mNextLevel == EReliveLevelIds::eCredits)
+    if (GetMap().mNextLevel == EReliveLevelIds::eCredits)
     {
         SetDead(true);
     }
@@ -209,11 +209,11 @@ void PauseMenu::VUpdate()
                                 field_12C = 0;
                                 field_134 = 1;
                                 SfxPlayMono(relive::SoundEffects::IngameTransition, 90);
-                                s32 tmp = static_cast<s32>(MapWrapper::ToAO(gMap->mCurrentLevel));
-                                if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+                                s32 tmp = static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel));
+                                if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
                                 {
                                     s16 row = 0;
-                                    auto pathId = SaveGame::GetPathId(gMap->mCurrentPath, &row);
+                                    auto pathId = SaveGame::GetPathId(GetMap().mCurrentPath, &row);
 
                                     if (pathId != -1)
                                     {
@@ -221,7 +221,7 @@ void PauseMenu::VUpdate()
                                     }
                                 }
 
-                                auto curPathId = gMap->mCurrentPath;
+                                auto curPathId = GetMap().mCurrentPath;
                                 char_type curPathIdNumBuf[12] = {};
 
                                 strncpy(&saveNameBuffer_5080C6.characters[2], gLevelNames_4CE1D4[tmp], 19);
@@ -431,8 +431,8 @@ void PauseMenu::VUpdate()
                             SetDead(true);
                         }
                         gPauseMenu = nullptr;
-                        gMap->SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, 0, 0);
-                        gMap->mFreeAllAnimAndPalts = true;
+                        GetMap().SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, 0, 0);
+                        GetMap().mFreeAllAnimAndPalts = true;
                         Input().SetCurrentController(InputObject::PadIndex::First);
                     }
                     break;
@@ -629,9 +629,9 @@ void PauseMenu::VRender(OrderingTable& ot)
             char_type cameraNameBuffer[48] = {};
             Path_Format_CameraName(
                 cameraNameBuffer,
-                gMap->mCurrentLevel,
-                gMap->mCurrentPath,
-                gMap->mCurrentCamera);
+                GetMap().mCurrentLevel,
+                GetMap().mCurrentPath,
+                GetMap().mCurrentCamera);
             cameraNameBuffer[8] = 0;
             if (strlen(cameraNameBuffer) != 0)
             {

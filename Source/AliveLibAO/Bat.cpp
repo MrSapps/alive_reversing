@@ -23,8 +23,8 @@ void Bat::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Bat_Unknown));
 }
 
-Bat::Bat(relive::Path_Bat* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+Bat::Bat(relive::Path_Bat* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eBat);
 

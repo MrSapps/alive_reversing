@@ -15,7 +15,7 @@ namespace AO {
 
 void PullRingRope::LoadAnimations()
 {
-    switch (gMap->mCurrentLevel)
+    switch (GetMap().mCurrentLevel)
     {
         case EReliveLevelIds::eRuptureFarms:
         case EReliveLevelIds::eBoardRoom:
@@ -40,15 +40,15 @@ void PullRingRope::LoadAnimations()
     }
 }
 
-PullRingRope::PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+PullRingRope::PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::ePullRingRope);
 
     LoadAnimations();
 
     s32 lvl_x_off = 0;
-    switch (gMap->mCurrentLevel)
+    switch (GetMap().mCurrentLevel)
     {
         case EReliveLevelIds::eRuptureFarms:
         case EReliveLevelIds::eBoardRoom:
@@ -108,7 +108,7 @@ PullRingRope::PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId, R
         FP_GetExponent(mXPos + FP_FromInteger((lvl_x_off + 1))),
         FP_GetExponent(mYPos) - pTlv->mRopeLength,
         FP_GetExponent(mYPos + (FP_FromInteger(mYOffset))),
-        GetSpriteScale(), mResMan);
+        GetSpriteScale(), mResMan, mMap);
     if (pRope)
     {
         mRopeId = pRope->mBaseGameObjectId;
@@ -159,7 +159,7 @@ void PullRingRope::VUpdate()
                 mVelY = FP_FromInteger(0);
                 mState = States::eTriggerEvent_2;
 
-                if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarms || gMap->mCurrentLevel == EReliveLevelIds::eBoardRoom || gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+                if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms || GetMap().mCurrentLevel == EReliveLevelIds::eBoardRoom || GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
                 {
                     SfxPlayMono(relive::SoundEffects::IndustrialTrigger, 0);
                 }
@@ -230,7 +230,7 @@ void PullRingRope::VUpdate()
 
             mStayInStateTicks = 3;
 
-            if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarms || gMap->mCurrentLevel == EReliveLevelIds::eBoardRoom || gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+            if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms || GetMap().mCurrentLevel == EReliveLevelIds::eBoardRoom || GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
             {
                 GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::Pullring_Farms_UseEnd));
             }
@@ -248,7 +248,7 @@ void PullRingRope::VUpdate()
                 mVelY = FP_FromInteger(0);
                 mState = States::eIdle_0;
 
-                if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarms || gMap->mCurrentLevel == EReliveLevelIds::eBoardRoom || gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+                if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms || GetMap().mCurrentLevel == EReliveLevelIds::eBoardRoom || GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
                 {
                     GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::Pullring_Farms_Idle));
                 }
@@ -293,7 +293,7 @@ s16 PullRingRope::Pull(BaseAliveGameObject* pFrom)
 
     SwitchStates_Do_Operation(mSwitchId, mAction);
 
-    if (gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarms || gMap->mCurrentLevel == EReliveLevelIds::eBoardRoom || gMap->mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+    if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms || GetMap().mCurrentLevel == EReliveLevelIds::eBoardRoom || GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
     {
         GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::Pullring_Farms_UseBegin));
     }

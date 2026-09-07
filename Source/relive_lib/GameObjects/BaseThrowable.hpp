@@ -7,7 +7,7 @@
 class BaseThrowable : public BaseAliveGameObject
 {
 public:
-    BaseThrowable(ResourceManagerWrapper& resMan);
+    BaseThrowable(ResourceManagerWrapper& resMan, BaseMap& map);
 
     // New virtuals for throwables
     virtual void VThrow(FP velX, FP velY) = 0;
@@ -26,7 +26,7 @@ protected:
     s16 mBaseThrowableDead = 0;
 };
 
-BaseThrowable* Make_Throwable(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan);
+BaseThrowable* Make_Throwable(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan, BaseMap& map);
 
 extern bool gInfiniteThrowables; // AE
 extern const AOTypes gThrowableFromOverlayIdAO[54];

@@ -253,7 +253,7 @@ public:
         AnimId::CrawlingSlig_IdleToPushingWall,
         AnimId::CrawlingSlig_EndPushingWall};
 
-    CrawlingSlig(relive::Path_CrawlingSlig* pTlv, const Guid& guid, ResourceManagerWrapper& resMan);
+    CrawlingSlig(relive::Path_CrawlingSlig* pTlv, const Guid& guid, ResourceManagerWrapper& resMan, BaseMap& map);
     ~CrawlingSlig();
 
     virtual void VUpdate() override;
@@ -277,7 +277,7 @@ public:
                 ALIVE_FATAL("Invalid motion type %d", static_cast<s32>(motionType));
         }
     }
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
     void Motion_0_Idle();
     void Motion_1_UsingButton();

@@ -18,7 +18,7 @@
 s16 gFeeco_Restart_KilledMudCount = 0;
 s16 gFeecoRestart_SavedMudCount = 0;
 
-void CreateGameEnderController(ResourceManagerWrapper& resMan)
+void CreateGameEnderController(ResourceManagerWrapper& resMan, BaseMap& map)
 {
     // Exit if it already exists
     for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
@@ -36,15 +36,15 @@ void CreateGameEnderController(ResourceManagerWrapper& resMan)
     }
 
     // Otherwise create one
-    relive_new GameEnderController(resMan);
+    relive_new GameEnderController(resMan, map);
 }
 
 
-void GameEnderController::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
+void GameEnderController::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     auto pState = pBuffer.ReadTmpPtr<GameEnderControllerSaveState>();
 
-    auto pGameEnderController = relive_new GameEnderController(resMan);
+    auto pGameEnderController = relive_new GameEnderController(resMan, map);
     if (pGameEnderController)
     {
         pGameEnderController->mBaseGameObjectTlvInfo = pState->mObjId;
@@ -53,8 +53,8 @@ void GameEnderController::CreateFromSaveState(SerializedObjectData& pBuffer, Res
     }
 }
 
-GameEnderController::GameEnderController(ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+GameEnderController::GameEnderController(ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eGameEnderController);
     mState = GameEnderControllerStates::eInit_0;
@@ -70,7 +70,7 @@ void GameEnderController::VScreenChanged()
         }
     }
 
-    if (gMap->LevelChanged())
+    if (GetMap().LevelChanged())
     {
         SetDead(true);
     }
@@ -120,7 +120,7 @@ void GameEnderController::VUpdate()
                     gAbe->SetDead(true);
 
                     // Good ending
-                    if (gRescuedMudokons >= Path_GoodEndingMuds(gMap->mCurrentLevel, gMap->mCurrentPath))
+                    if (gRescuedMudokons >= Path_GoodEndingMuds(GetMap().mCurrentLevel, GetMap().mCurrentPath))
                     {
                         gAbeInvincible = false;
                         gFeeco_Restart_KilledMudCount = 0;
@@ -132,33 +132,33 @@ void GameEnderController::VUpdate()
                             gPauseMenu = nullptr;
                         }
 
-                        if (gRescuedMudokons >= Path_GetTotalMuds(gMap->mCurrentLevel, gMap->mCurrentPath))
+                        if (gRescuedMudokons >= Path_GetTotalMuds(GetMap().mCurrentLevel, GetMap().mCurrentPath))
                         {
                             // Perfect ending
-                            gMap->SetActiveCam(EReliveLevelIds::eBrewery_Ender, 1, 17, CameraSwapEffects::eUnknown_11, 17, 0);
+                            GetMap().SetActiveCam(EReliveLevelIds::eBrewery_Ender, 1, 17, CameraSwapEffects::eUnknown_11, 17, 0);
                             mState = GameEnderControllerStates::eAngelicEnding_5;
                         }
                         else
                         {
                             // Good enough ending
-                            gMap->SetActiveCam(EReliveLevelIds::eBrewery_Ender, 1, 18, CameraSwapEffects::eUnknown_11, 17, 0);
+                            GetMap().SetActiveCam(EReliveLevelIds::eBrewery_Ender, 1, 18, CameraSwapEffects::eUnknown_11, 17, 0);
                             mState = GameEnderControllerStates::eGoodEnding_4;
                         }
                     }
                     else
                     {
-                        if (gKilledMudokons >= Path_BadEndingMuds(gMap->mCurrentLevel, gMap->mCurrentPath))
+                        if (gKilledMudokons >= Path_BadEndingMuds(GetMap().mCurrentLevel, GetMap().mCurrentPath))
                         {
                             // Very bad ending
                             gAbeInvincible = true;
-                            gMap->SetActiveCam(EReliveLevelIds::eBrewery_Ender, 1, 15, CameraSwapEffects::eUnknown_11, 18, 0);
+                            GetMap().SetActiveCam(EReliveLevelIds::eBrewery_Ender, 1, 15, CameraSwapEffects::eUnknown_11, 18, 0);
                             mState = GameEnderControllerStates::eBadEnding_3;
                         }
                         else
                         {
                             // Bad ending
                             gAbeInvincible = false;
-                            gMap->SetActiveCam(EReliveLevelIds::eBrewery_Ender, 1, 16, CameraSwapEffects::eUnknown_11, 18, 0);
+                            GetMap().SetActiveCam(EReliveLevelIds::eBrewery_Ender, 1, 16, CameraSwapEffects::eUnknown_11, 18, 0);
                             mState = GameEnderControllerStates::eBadEnding_3;
                             gRescuedMudokons = gFeecoRestart_SavedMudCount;
                             gKilledMudokons = gFeeco_Restart_KilledMudCount;
@@ -175,7 +175,7 @@ void GameEnderController::VUpdate()
         case GameEnderControllerStates::eBadEnding_3:
             if (Input().IsAnyPressed(InputCommands::eUnPause_OrConfirm) || Input().IsAnyPressed(InputCommands::eBack))
             {
-                gMap->SetActiveCam(EReliveLevelIds::eFeeCoDepot, 1, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
+                GetMap().SetActiveCam(EReliveLevelIds::eFeeCoDepot, 1, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
                 mState = GameEnderControllerStates::eFinish_2;
             }
             break;
@@ -183,7 +183,7 @@ void GameEnderController::VUpdate()
         case GameEnderControllerStates::eGoodEnding_4:
             if (Input().IsAnyPressed(InputCommands::eUnPause_OrConfirm) || Input().IsAnyPressed(InputCommands::eBack))
             {
-                gMap->SetActiveCam(EReliveLevelIds::eCredits, 1, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
+                GetMap().SetActiveCam(EReliveLevelIds::eCredits, 1, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
                 mState = GameEnderControllerStates::eFinish_2;
             }
             break;
@@ -191,7 +191,7 @@ void GameEnderController::VUpdate()
         case GameEnderControllerStates::eAngelicEnding_5:
             if (Input().IsAnyPressed(InputCommands::eUnPause_OrConfirm) || Input().IsAnyPressed(InputCommands::eBack))
             {
-                gMap->SetActiveCam(EReliveLevelIds::eBrewery_Ender, 1, 20, CameraSwapEffects::eInstantChange_0, 0, 0);
+                GetMap().SetActiveCam(EReliveLevelIds::eBrewery_Ender, 1, 20, CameraSwapEffects::eInstantChange_0, 0, 0);
                 mState = GameEnderControllerStates::eAngelicEndingCredits_6;
             }
             break;
@@ -199,8 +199,8 @@ void GameEnderController::VUpdate()
         case GameEnderControllerStates::eAngelicEndingCredits_6:
             if (Input().IsAnyPressed(InputCommands::eUnPause_OrConfirm) || Input().IsAnyPressed(InputCommands::eBack))
             {
-                gMap->SetActiveCam(EReliveLevelIds::eCredits, 2, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
-                gMap->mFreeAllAnimAndPalts = true;
+                GetMap().SetActiveCam(EReliveLevelIds::eCredits, 2, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
+                GetMap().mFreeAllAnimAndPalts = true;
                 mState = GameEnderControllerStates::eFinish_2;
             }
             break;

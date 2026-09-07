@@ -32,7 +32,7 @@ Shrykull::~Shrykull()
 
 void Shrykull::VScreenChanged()
 {
-    if (gMap->LevelChanged() || gMap->PathChanged())
+    if (GetMap().LevelChanged() || GetMap().PathChanged())
     {
         SetDead(true);
     }
@@ -45,8 +45,8 @@ void Shrykull::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::ShrykullDetransform));
 }
 
-Shrykull::Shrykull(ResourceManagerWrapper& resMan)
-    : BaseAliveGameObject(0, resMan)
+Shrykull::Shrykull(ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eShrykull);
 
@@ -87,7 +87,7 @@ bool Shrykull::CanKill(BaseAnimatedWithPhysicsGameObject* pObj)
             || pObj->Type() == ReliveTypes::eSecurityOrb)
         && pObj->GetAnimation().GetRender()
         && !pObj->GetDead()
-        && gMap->Is_Point_In_Current_Camera(
+        && GetMap().Is_Point_In_Current_Camera(
             pObj->mCurrentLevel,
             pObj->mCurrentPath,
             pObj->mXPos,
@@ -179,7 +179,7 @@ void Shrykull::VUpdate()
                             FP_FromInteger((objRect.x + objRect.w) / 2),
                             FP_FromInteger((objRect.y + objRect.h) / 2),
                             0, ZapLineType::eThin_1,
-                            Layer::eLayer_ZapLinesElumMuds_28, mResMan);
+                            Layer::eLayer_ZapLinesElumMuds_28, mResMan, mMap);
                         if (pZapLine)
                         {
                             mZapLineId = pZapLine->mBaseGameObjectId;
@@ -189,7 +189,7 @@ void Shrykull::VUpdate()
                     mCanElectrocute = CanElectrocute(pObj);
                     if (mCanElectrocute)
                     {
-                        relive_new Electrocute(pObj, false, true, mResMan);
+                        relive_new Electrocute(pObj, false, true, mResMan, mMap);
                         mFlashTimer = MakeTimer(3);
 
                         if (pObj->Type() == ReliveTypes::eBackgroundGlukkon)
@@ -198,21 +198,21 @@ void Shrykull::VUpdate()
                         }
                     }
 
-                    relive_new PossessionFlicker(pObj, 8, 255, 255, 255, mResMan);
+                    relive_new PossessionFlicker(pObj, 8, 255, 255, 255, mResMan, mMap);
 
                     relive_new AbilityRing(
                         FP_FromInteger((objRect.x + objRect.w) / 2),
                         FP_FromInteger((objRect.y + objRect.h) / 2),
                         RingTypes::eShrykull_Pulse_Large_5,
-                        FP_FromInteger(1), mResMan);
+                        FP_FromInteger(1), mResMan, mMap);
 
-                    relive_new PossessionFlicker(this, 8, 255, 255, 255, mResMan);
+                    relive_new PossessionFlicker(this, 8, 255, 255, 255, mResMan, mMap);
 
                     relive_new AbilityRing(
                         FP_FromInteger((ourRect.x + ourRect.w) / 2),
                         FP_FromInteger((ourRect.y + ourRect.h) / 2),
                         RingTypes::eShrykull_Pulse_Large_5,
-                        FP_FromInteger(1), mResMan);
+                        FP_FromInteger(1), mResMan, mMap);
 
                     pObj->SetZappedByShrykull(true);
 
@@ -286,9 +286,9 @@ void Shrykull::VUpdate()
                             FP_FromInteger((zapRect.y + zapRect.h) / 2),
                             20,
                             GetSpriteScale(),
-                            BurstType::eBigPurpleSparks, mResMan);
+                            BurstType::eBigPurpleSparks, mResMan, mMap);
 
-                       relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, mResMan);
+                       relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, mResMan, mMap);
                     }
                     pExistingZapLine->CalculateSourceAndDestinationPositions(
                         FP_FromInteger((ourRect.x + ourRect.w) / 2),

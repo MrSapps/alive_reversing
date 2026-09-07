@@ -13,7 +13,7 @@ enum class LeverState : s16
 class Lever final : public ::BaseAnimatedWithPhysicsGameObject
 {
 public:
-    Lever(relive::Path_Lever* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    Lever(relive::Path_Lever* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Lever();
 
     void LoadAnimations();

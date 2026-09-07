@@ -5,7 +5,7 @@
 #include "GameType.hpp"
 #include <algorithm>
 
-OrbWhirlWindParticle::OrbWhirlWindParticle(FP xpos, FP ypos, FP scale, bool isMudokonSpirit, ResourceManagerWrapper& resMan)
+OrbWhirlWindParticle::OrbWhirlWindParticle(FP xpos, FP ypos, FP scale, bool isMudokonSpirit, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     mAnim.Init(resMan.LoadAnimation(AnimId::ChantOrb_Particle), nullptr);
 

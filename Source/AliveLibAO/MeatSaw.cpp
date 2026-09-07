@@ -37,8 +37,8 @@ void MeatSaw::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::MeatSaw_Moving));
 }
 
-MeatSaw::MeatSaw(relive::Path_MeatSaw* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+MeatSaw::MeatSaw(relive::Path_MeatSaw* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eMeatSaw);
 
@@ -156,7 +156,7 @@ MeatSaw::MeatSaw(relive::Path_MeatSaw* pTlv, const Guid& tlvId, ResourceManagerW
 
 void MeatSaw::VScreenChanged()
 {
-    if (gMap->LevelChanged() || gMap->PathChanged() || !sControlledCharacter || // Can be nullptr during the game ender
+    if (GetMap().LevelChanged() || GetMap().PathChanged() || !sControlledCharacter || // Can be nullptr during the game ender
         FP_Abs(sControlledCharacter->mXPos - mXPos) > FP_FromInteger(1024))
     {
         SetDead(true);
@@ -172,7 +172,7 @@ void MeatSaw::VUpdate()
 
     GrindUpObjects();
 
-    const CameraPos direction = gMap->GetDirection(
+    const CameraPos direction = GetMap().GetDirection(
         mCurrentLevel,
         mCurrentPath,
         mXPos,
@@ -312,7 +312,7 @@ void MeatSaw::GrindUpObjects()
                         FP_FromInteger(-5),
                         FP_FromInteger(5),
                         GetSpriteScale(),
-                        50, mResMan);
+                        50, mResMan, mMap);
 
                     relive_new Blood(
                         pObjIter->mXPos,
@@ -320,7 +320,7 @@ void MeatSaw::GrindUpObjects()
                         FP_FromInteger(0),
                         FP_FromInteger(5),
                         GetSpriteScale(),
-                        50, mResMan);
+                        50, mResMan, mMap);
 
                     relive_new Blood(
                         pObjIter->mXPos,
@@ -328,7 +328,7 @@ void MeatSaw::GrindUpObjects()
                         FP_FromInteger(5),
                         FP_FromInteger(5),
                         GetSpriteScale(),
-                        50, mResMan);
+                        50, mResMan, mMap);
 
                     SfxPlayMono(relive::SoundEffects::KillEffect, 127);
                     SFX_Play_Pitch(relive::SoundEffects::KillEffect, 127, -700);

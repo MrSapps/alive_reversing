@@ -43,7 +43,7 @@ bool Sys_WindowClass_Register(const char_type* lpWindowName, s32 x, s32 y, s32 n
 TWindowHandleType Sys_GetWindowHandle();
 bool Sys_IsAnyKeyDown();
 bool Sys_IsAppActive();
-s8 Sys_PumpMessages();
+s8 Sys_PumpMessages(class BaseMap* pMap = nullptr);
 u32 Sys_BaseUserEventNumber();
 
 #if ORIGINAL_PS1_BEHAVIOR // OG Change - Allow for exiting save menu using controller

@@ -18,8 +18,8 @@ void WorkWheel::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Work_Wheel_Turning));
 }
 
-WorkWheel::WorkWheel(relive::Path_WorkWheel* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+WorkWheel::WorkWheel(relive::Path_WorkWheel* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eWorkWheel);
 
@@ -87,13 +87,13 @@ WorkWheel::~WorkWheel()
     Path::TLV_Reset(mTlvInfo);
 }
 
-void WorkWheel::CreateFromSaveState(SerializedObjectData& pState, ResourceManagerWrapper& resMan)
+void WorkWheel::CreateFromSaveState(SerializedObjectData& pState, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pData = pState.ReadTmpPtr<WorkWheelSaveState>();
 
     relive::Path_WorkWheel* pTlv = static_cast<relive::Path_WorkWheel*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pData->mTlvId).GetTlv());
 
-    auto pWheel = relive_new WorkWheel(pTlv, pData->mTlvId, resMan);
+    auto pWheel = relive_new WorkWheel(pTlv, pData->mTlvId, resMan, map);
     if (pWheel)
     {
         if (pData->mState == WheelStates::eTurning_1)
@@ -128,7 +128,7 @@ void WorkWheel::VUpdate()
         ++mTurningTime;
 
         if (!(mTurningTime % 10)
-            && gMap->Is_Point_In_Current_Camera(
+            && GetMap().Is_Point_In_Current_Camera(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,
@@ -148,9 +148,9 @@ void WorkWheel::VUpdate()
     {
         if (mTurningTime > mActivationTime)
         {
-            if (gMap->mCurrentLevel == EReliveLevelIds::eBrewery_Ender && mSwitchId == 100)
+            if (GetMap().mCurrentLevel == EReliveLevelIds::eBrewery_Ender && mSwitchId == 100)
             {
-                CreateGameEnderController(mResMan);
+                CreateGameEnderController(mResMan, mMap);
             }
 
             if (mTurnOffTime > 0 && mTurningTime > mTurnOffTime)
@@ -167,7 +167,7 @@ void WorkWheel::VUpdate()
 
 void WorkWheel::VScreenChanged()
 {
-    if (gMap->LevelChanged() || gMap->PathChanged() || mState == WheelStates::eIdle_0)
+    if (GetMap().LevelChanged() || GetMap().PathChanged() || mState == WheelStates::eIdle_0)
     {
         SetDead(true);
     }

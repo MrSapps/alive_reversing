@@ -20,8 +20,8 @@ void Mine::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Mine));
 }
 
-Mine::Mine(relive::Path_Mine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAliveGameObject(0, resMan)
+Mine::Mine(relive::Path_Mine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eMine);
 
@@ -153,7 +153,7 @@ bool Mine::VTakeDamage(BaseGameObject* pFrom)
         case ReliveTypes::eMudokon: // might cause issues in AO?
         case ReliveTypes::eShrykull:
         {
-            relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan);
+            relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan, mMap);
             SetDead(true);
             mDetonating = true;
             mExplosionTimer = sGnFrame;
@@ -167,7 +167,7 @@ bool Mine::VTakeDamage(BaseGameObject* pFrom)
 
 void Mine::VOnThrowableHit(BaseGameObject* /*pFrom*/)
 {
-    relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan);
+    relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan, mMap);
     if (GetGameType() == GameType::eAe)
     {
         SetDead(true);
@@ -219,7 +219,7 @@ void Mine::VUpdate()
     {
         if (mDetonating && sGnFrame >= mExplosionTimer)
         {
-            relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan);
+            relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan, mMap);
             SetDead(true);
         }
     }

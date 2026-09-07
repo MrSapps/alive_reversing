@@ -17,8 +17,8 @@ void SecurityDoor::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Security_Door_Idle));
 }
 
-SecurityDoor::SecurityDoor(relive::Path_SecurityDoor* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+SecurityDoor::SecurityDoor(relive::Path_SecurityDoor* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     LoadAnimations();
 

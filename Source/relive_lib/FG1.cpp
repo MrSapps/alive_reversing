@@ -11,8 +11,8 @@ FG1::~FG1()
     gObjListDrawables->Remove_Item(this);
 }
 
-FG1::FG1(Fg1Resource& pFg1Res, CamResource& camRes, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+FG1::FG1(Fg1Resource& pFg1Res, CamResource& camRes, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
     , mFG1Res(pFg1Res)
     , mCamRes(camRes)
 {

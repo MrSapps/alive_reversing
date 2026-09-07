@@ -110,8 +110,8 @@ void FlyingSlig::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Vaporize_Particle));
 }
 
-FlyingSlig::FlyingSlig(relive::Path_FlyingSlig* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAliveGameObject(9, resMan)
+FlyingSlig::FlyingSlig(relive::Path_FlyingSlig* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAliveGameObject(9, resMan, map)
 {
     LoadAnimations();
 
@@ -228,13 +228,13 @@ FlyingSlig::FlyingSlig(relive::Path_FlyingSlig* pTlv, const Guid& tlvId, Resourc
     CreateShadow();
 }
 
-void FlyingSlig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
+void FlyingSlig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pSaveState = pBuffer.ReadTmpPtr<FlyingSligSaveState>();
 
     auto pTlv = static_cast<relive::Path_FlyingSlig*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pSaveState->field_3C_tlvInfo).GetTlv());
 
-    auto pFlyingSlig = relive_new FlyingSlig(pTlv, pSaveState->field_3C_tlvInfo, resMan);
+    auto pFlyingSlig = relive_new FlyingSlig(pTlv, pSaveState->field_3C_tlvInfo, resMan, map);
     if (pFlyingSlig)
     {
         pFlyingSlig->BaseAliveGameObjectPathTLV = TlvIterator::Invalid();
@@ -453,9 +453,9 @@ FlyingSlig::~FlyingSlig()
     {
         sControlledCharacter = gAbe;
         MusicController::static_PlayMusic(MusicController::MusicTypes::eNone_0, this, 0, 0);
-        if (gMap->mNextLevel != EReliveLevelIds::eMenu)
+        if (GetMap().mNextLevel != EReliveLevelIds::eMenu)
         {
-            gMap->SetActiveCam(
+            GetMap().SetActiveCam(
                 mAbeLevel,
                 mAbePath,
                 mAbeCamera,
@@ -484,7 +484,7 @@ FlyingSlig::~FlyingSlig()
 
 void FlyingSlig::VScreenChanged()
 {
-    if (gMap->LevelChanged() || (gMap->PathChanged() && (this != sControlledCharacter || mPersistant)))
+    if (GetMap().LevelChanged() || (GetMap().PathChanged() && (this != sControlledCharacter || mPersistant)))
     {
         SetDead(true);
     }
@@ -871,7 +871,7 @@ bool FlyingSlig::VTakeDamage(BaseGameObject* pFrom)
                 return true;
             }
             BlowUp();
-            auto pExplosion = relive_new AirExplosion(mXPos, mYPos - (GetSpriteScale() * FP_FromInteger(5)), GetSpriteScale(), 1, mResMan);
+            auto pExplosion = relive_new AirExplosion(mXPos, mYPos - (GetSpriteScale() * FP_FromInteger(5)), GetSpriteScale(), 1, mResMan, mMap);
             if (!pExplosion)
             {
                 return true;
@@ -957,7 +957,7 @@ void FlyingSlig::Brain_4_ChasingEnemy()
 {
     mUnknown1 = false;
 
-    if (EventGet(Event::kEventHeroDying) && gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+    if (EventGet(Event::kEventHeroDying) && GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
     {
         ToAbeDead();
         return;
@@ -1140,7 +1140,7 @@ void FlyingSlig::Brain_14_DePossession()
                 xOff + mXPos,
                 yOff + mYPos,
                 GetSpriteScale(),
-                Layer::eLayer_0, mResMan);
+                Layer::eLayer_0, mResMan, mMap);
         }
     }
     else
@@ -1889,7 +1889,7 @@ s16 FlyingSlig::IsPossessed()
 
 s16 FlyingSlig::CanChase(BaseAliveGameObject* pObj)
 {
-    if (!gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) || !gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) || EventGet(Event::kEventResetting) || IsAbeEnteringDoor(pObj) || gAbe->GetSpriteScale() != GetSpriteScale() || !IsWallBetween(this, pObj))
+    if (!GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) || !GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) || EventGet(Event::kEventResetting) || IsAbeEnteringDoor(pObj) || gAbe->GetSpriteScale() != GetSpriteScale() || !IsWallBetween(this, pObj))
     {
         return 0;
     }
@@ -2121,7 +2121,7 @@ void FlyingSlig::ThrowGrenade()
         grenadeXVel = -grenadeXVel;
     }
 
-    auto pGrenade = relive_new Grenade(grenadeXPos + mXPos, grenadeYPos + mYPos, 0, 1, this, mResMan);
+    auto pGrenade = relive_new Grenade(grenadeXPos + mXPos, grenadeYPos + mYPos, 0, 1, this, mResMan, mMap);
     if (pGrenade)
     {
         pGrenade->SetSpriteScale(GetSpriteScale());
@@ -2129,7 +2129,7 @@ void FlyingSlig::ThrowGrenade()
         pGrenade->VThrow(grenadeXVel, grenadeYVel);
     }
 
-    New_ShootingFire_Particle(xpos + mXPos, ypos + mYPos, GetAnimation().GetFlipX(), GetSpriteScale(), mResMan);
+    New_ShootingFire_Particle(xpos + mXPos, ypos + mYPos, GetAnimation().GetFlipX(), GetSpriteScale(), mResMan, mMap);
     Slig_SoundEffect(SligSfx::eThrowGrenade_8, this);
     EventBroadcast(Event::kEventShooting, this);
     EventBroadcast(Event::kEventLoudNoise, this);
@@ -2153,11 +2153,11 @@ void FlyingSlig::BlowUp()
 {
     MusicController::static_PlayMusic(MusicController::MusicTypes::eNone_0, this, 0, 0);
 
-    relive_new Gibs(GibType::eSlig, mXPos, mYPos, mVelX, mVelY, GetSpriteScale(), 0, mResMan);
+    relive_new Gibs(GibType::eSlig, mXPos, mYPos, mVelX, mVelY, GetSpriteScale(), 0, mResMan, mMap);
 
-    relive_new Blood(mXPos, mYPos - (FP_FromInteger(30) * GetSpriteScale()), FP_FromInteger(0), FP_FromInteger(0), GetSpriteScale(), 20, mResMan);
+    relive_new Blood(mXPos, mYPos - (FP_FromInteger(30) * GetSpriteScale()), FP_FromInteger(0), FP_FromInteger(0), GetSpriteScale(), 20, mResMan, mMap);
 
-    New_Smoke_Particles(mXPos, mYPos - (FP_FromInteger(30) * GetSpriteScale()), GetSpriteScale(), 3, RGB16{ 128, 128, 128 }, mResMan);
+    New_Smoke_Particles(mXPos, mYPos - (FP_FromInteger(30) * GetSpriteScale()), GetSpriteScale(), 3, RGB16{ 128, 128, 128 }, mResMan, mMap);
     SfxPlayMono(relive::SoundEffects::KillEffect, 128, GetSpriteScale());
     SfxPlayMono(relive::SoundEffects::FallingItemHit, 90, GetSpriteScale());
 
@@ -2508,9 +2508,9 @@ void FlyingSlig::VPossessed()
     SetPossessed(true);
     mSpeaking1 = true;
 
-    mAbeLevel = gMap->mCurrentLevel;
-    mAbePath = gMap->mCurrentPath;
-    mAbeCamera = gMap->mCurrentCamera;
+    mAbeLevel = GetMap().mCurrentLevel;
+    mAbePath = GetMap().mCurrentPath;
+    mAbeCamera = GetMap().mCurrentCamera;
 
     field_2A8_max_x_speed = FP_FromDouble(5.5) * GetSpriteScale();
     field_2AC_up_vel = FP_FromDouble(-5.5) * GetSpriteScale();
@@ -2892,7 +2892,7 @@ s16 FlyingSlig::CollisionUp(FP velY)
                 hitY + (FP_FromInteger(7) * GetSpriteScale()),
                 5u,
                 GetSpriteScale(),
-                BurstType::eSmallPurpleSparks, mResMan,
+                BurstType::eSmallPurpleSparks, mResMan, mMap,
                 9, true);
         }
 
@@ -3046,7 +3046,7 @@ s16 FlyingSlig::CollisionLeftRight(FP velX)
         {
             Slig_GameSpeak_SFX(sGnFrame & 1 ? SligSpeak::eOuch2_14 : SligSpeak::eOuch1_13, 127, Math_RandomRange(256, 512), this);
             field_154_collision_reaction_timer = (Math_NextRandom() & 3) + MakeTimer(10);
-            relive_new ParticleBurst(sparkX, hitY + (FP_FromInteger(16) * GetSpriteScale()), 5u, GetSpriteScale(), BurstType::eSmallPurpleSparks, mResMan, 9, true);
+            relive_new ParticleBurst(sparkX, hitY + (FP_FromInteger(16) * GetSpriteScale()), 5u, GetSpriteScale(), BurstType::eSmallPurpleSparks, mResMan, mMap, 9, true);
         }
         mXPos += velX + hitX - xOff;
         return 1;

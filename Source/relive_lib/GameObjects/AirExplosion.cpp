@@ -23,8 +23,8 @@
 
 #include <algorithm>
 
-AirExplosion::AirExplosion(FP xpos, FP ypos, FP explosionScale, bool bSmall, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan),
+AirExplosion::AirExplosion(FP xpos, FP ypos, FP explosionScale, bool bSmall, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map),
     mExplosionScale(explosionScale),
     mSmallExplosion(bSmall)
 {
@@ -65,7 +65,7 @@ AirExplosion::AirExplosion(FP xpos, FP ypos, FP explosionScale, bool bSmall, Res
     mXPos = xpos;
     mYPos = ypos;
 
-    relive_new ScreenShake(gExplosionSetEnabled ? false : true, mSmallExplosion, mResMan);
+    relive_new ScreenShake(gExplosionSetEnabled ? false : true, mSmallExplosion, mResMan, mMap);
 
     PSX_RECT rect = {};
     rect.x = FP_GetExponent(FP_FromInteger(-10) * mExplosionScale);
@@ -105,14 +105,14 @@ void AirExplosion::VUpdate()
 
         case 3:
         {
-            relive_new ParticleBurst(mXPos, mYPos, mSmallExplosion ? 6 : 20, mParticleBurstScale, BurstType::eBigRedSparks, mResMan, mSmallExplosion ? 11 : 13, false);
-            relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, mResMan, relive::TBlendModes::eBlend_3, 1);
+            relive_new ParticleBurst(mXPos, mYPos, mSmallExplosion ? 6 : 20, mParticleBurstScale, BurstType::eBigRedSparks, mResMan, mMap, mSmallExplosion ? 11 : 13, false);
+            relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, mResMan, mMap, relive::TBlendModes::eBlend_3, 1);
             break;
         }
 
         case 4:
         {
-            relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, mResMan, relive::TBlendModes::eBlend_1, 1);
+            relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, mResMan, mMap, relive::TBlendModes::eBlend_1, 1);
             rect.x = FP_GetExponent(FP_FromInteger(-38) * mExplosionScale);
             rect.w = FP_GetExponent(FP_FromInteger(38) * mExplosionScale);
             rect.y = FP_GetExponent(FP_FromInteger(-38) * mExplosionScale);
@@ -131,8 +131,8 @@ void AirExplosion::VUpdate()
 
         case 8:
         {
-            relive_new ParticleBurst(mXPos, mYPos, mSmallExplosion ? 6 : 20, mParticleBurstScale, BurstType::eBigRedSparks, mResMan, mSmallExplosion ? 11 : 13, false);
-            relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, mResMan, relive::TBlendModes::eBlend_3, 1);
+            relive_new ParticleBurst(mXPos, mYPos, mSmallExplosion ? 6 : 20, mParticleBurstScale, BurstType::eBigRedSparks, mResMan, mMap, mSmallExplosion ? 11 : 13, false);
+            relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, mResMan, mMap, relive::TBlendModes::eBlend_3, 1);
             break;
         }
 
@@ -156,7 +156,7 @@ void AirExplosion::VUpdate()
     {
         const bool explosionSizeHack = GetGameType() == GameType::eAe;
         const AnimId explosionId = mSmallExplosion ? AnimId::AirExplosion_Small : AnimId::AirExplosion;
-        auto pParticle = relive_new Particle(mXPos, mYPos, GetAnimRes(explosionId), mResMan, explosionSizeHack);
+        auto pParticle = relive_new Particle(mXPos, mYPos, GetAnimRes(explosionId), mResMan, mMap, explosionSizeHack);
 
         if (pParticle)
         {
@@ -271,11 +271,11 @@ void AirExplosion::DealBlastDamage(PSX_RECT* pRect)
 
             if (dir == CameraPos::eCamLeft_3)
             {
-                relive_new Gibs(GibType::eSlig, mXPos + FP_FromInteger(656), mYPos, FP_FromInteger(0), FP_FromInteger(0), FP_FromInteger(1), false, mResMan);
+                relive_new Gibs(GibType::eSlig, mXPos + FP_FromInteger(656), mYPos, FP_FromInteger(0), FP_FromInteger(0), FP_FromInteger(1), false, mResMan, mMap);
             }
             else if (dir == CameraPos::eCamRight_4)
             {
-                relive_new Gibs(GibType::eSlig, mXPos - FP_FromInteger(656), mYPos, FP_FromInteger(0), FP_FromInteger(0), FP_FromInteger(1), false, mResMan);
+                relive_new Gibs(GibType::eSlig, mXPos - FP_FromInteger(656), mYPos, FP_FromInteger(0), FP_FromInteger(0), FP_FromInteger(1), false, mResMan, mMap);
             }
 
             Stop_slig_sounds(dir);

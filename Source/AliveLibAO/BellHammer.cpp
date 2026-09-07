@@ -19,8 +19,8 @@ void BellHammer::LoadAnimations()
 }
 
 
-BellHammer::BellHammer(relive::Path_BellHammer* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+BellHammer::BellHammer(relive::Path_BellHammer* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eBellHammer);
 
@@ -117,10 +117,10 @@ void BellHammer::VUpdate()
     if (mSpawnElum)
     {
         mSpawnElum = false;
-        Elum::Spawn(mTlvInfo, mResMan);
+        Elum::Spawn(mTlvInfo, mResMan, mMap);
 
         PSX_Point mapCoords = {};
-        gMap->GetCurrentCamCoords(&mapCoords);
+        GetMap().GetCurrentCamCoords(&mapCoords);
 
         if (gElum)
         {

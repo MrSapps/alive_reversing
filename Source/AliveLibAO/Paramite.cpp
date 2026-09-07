@@ -59,8 +59,8 @@ const TParamiteMotionFunction sParamiteMotionTable[] = {
     &Paramite::Motion_25_Death,
 };
 
-Paramite::Paramite(relive::Path_Paramite* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : ::BaseAliveGameObject(0, resMan)
+Paramite::Paramite(relive::Path_Paramite* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : ::BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eParamite);
 
@@ -209,7 +209,7 @@ bool Paramite::VTakeDamage(BaseGameObject* pFrom)
                 mVelX,
                 mVelY,
                 GetSpriteScale(),
-                false, mResMan);
+                false, mResMan, mMap);
 
             SetDead(true);
             GetAnimation().SetRender(false);
@@ -255,7 +255,7 @@ bool Paramite::VTakeDamage(BaseGameObject* pFrom)
                 FP_FromInteger(0),
                 FP_FromInteger(5),
                 GetSpriteScale(),
-                50, mResMan);
+                50, mResMan, mMap);
             break;
         }
     }
@@ -272,13 +272,13 @@ void Paramite::VOnTlvCollision(TlvIterator tlvIterator)
             mHealth = FP_FromInteger(0);
             break;
         }
-        tlvIterator = gMap->TLV_Get_At(tlvIterator, mXPos, mYPos, mXPos, mYPos);
+        tlvIterator = GetMap().TLV_Get_At(tlvIterator, mXPos, mYPos, mXPos, mYPos);
     }
 }
 
 void Paramite::VScreenChanged()
 {
-    if (gMap->LevelChanged() || gMap->PathChanged())
+    if (GetMap().LevelChanged() || GetMap().PathChanged())
     {
         SetDead(true);
     }
@@ -292,7 +292,7 @@ bool Paramite::VOnSameYLevel(BaseAnimatedWithPhysicsGameObject* pOther)
 void Paramite::VUpdate()
 {
     if (mHealth > FP_FromInteger(0)
-        && gMap->Is_Point_In_Current_Camera(
+        && GetMap().Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -315,7 +315,7 @@ void Paramite::VUpdate()
             if (pObjIter->Type() == ReliveTypes::eParamite && pObjIter != this)
             {
                 Paramite* pOther = static_cast<Paramite*>(pObjIter);
-                if (gMap->Is_Point_In_Current_Camera(
+                if (GetMap().Is_Point_In_Current_Camera(
                         pOther->mCurrentLevel,
                         pOther->mCurrentPath,
                         pOther->mXPos,
@@ -400,7 +400,7 @@ void Paramite::VUpdate()
 
         if (oldx != mXPos || oldy != mYPos)
         {
-            BaseAliveGameObjectPathTLV = gMap->TLV_Get_At(
+            BaseAliveGameObjectPathTLV = GetMap().TLV_Get_At(
                 TlvIterator::Invalid(),
                 mXPos,
                 mYPos,
@@ -544,13 +544,13 @@ s16 Paramite::AnotherParamiteNear()
         if (pObjIter->Type() == ReliveTypes::eParamite && pObjIter != this)
         {
             Paramite* pOther = static_cast<Paramite*>(pObjIter);
-            if (gMap->Is_Point_In_Current_Camera(
+            if (GetMap().Is_Point_In_Current_Camera(
                     pOther->mCurrentLevel,
                     pOther->mCurrentPath,
                     pOther->mXPos,
                     pOther->mYPos,
                     0)
-                && gMap->Is_Point_In_Current_Camera(
+                && GetMap().Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -608,7 +608,7 @@ Meat* Paramite::FindMeat()
             auto pMeat = static_cast<Meat*>(pObjIter);
             if (pMeat->VCanEatMe())
             {
-                if (gMap->Is_Point_In_Current_Camera(
+                if (GetMap().Is_Point_In_Current_Camera(
                         pMeat->mCurrentLevel,
                         pMeat->mCurrentPath,
                         pMeat->mXPos,
@@ -696,7 +696,7 @@ const relive::SfxDefinition stru_4CDD98[9] = {
 
 void Paramite::Sound(ParamiteSpeak idx)
 {
-    const CameraPos direction = gMap->GetDirection(
+    const CameraPos direction = GetMap().GetDirection(
         mCurrentLevel,
         mCurrentPath,
         mXPos,
@@ -706,7 +706,7 @@ void Paramite::Sound(ParamiteSpeak idx)
     s16 volLeft = 0;
 
     PSX_RECT rect = {};
-    gMap->Get_Camera_World_Rect(direction, &rect);
+    GetMap().Get_Camera_World_Rect(direction, &rect);
 
     switch (direction)
     {
@@ -748,7 +748,7 @@ void Paramite::Sound(ParamiteSpeak idx)
 
 void Paramite::SetMusic()
 {
-    if (gMap->GetDirection(
+    if (GetMap().GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -843,7 +843,7 @@ s16 Paramite::Brain_0_Patrol()
 
             // TODO: Inlined HandleEnemyStopper but the directional logic isn't quite the same
             // so can't use it.
-            BaseAliveGameObjectPathTLV = gMap->VTLV_Get_At_Of_Type(
+            BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
                 FP_GetExponent(mXPos),
                 FP_GetExponent(mYPos),
                 FP_GetExponent(mXPos),
@@ -1348,7 +1348,7 @@ s16 Paramite::Brain_1_SurpriseWeb()
                 mXPos,
                 FP_GetExponent(mYPos) - 20,
                 FP_GetExponent(mYPos) - 10,
-                GetSpriteScale(), mResMan);
+                GetSpriteScale(), mResMan, mMap);
             if (pWeb)
             {
                 mParamiteWeb = pWeb->mBaseGameObjectId;
@@ -1364,7 +1364,7 @@ s16 Paramite::Brain_1_SurpriseWeb()
         case Brain_1_SurpriseWeb::eBrain1_AppearingRight_1:
             if (gAbe->mXPos <= mXPos
                 || GetSpriteScale() != gAbe->GetSpriteScale()
-                || !gMap->Is_Point_In_Current_Camera(
+                || !GetMap().Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -1383,7 +1383,7 @@ s16 Paramite::Brain_1_SurpriseWeb()
         case Brain_1_SurpriseWeb::eBrain1_AppearingLeft_2:
             if (gAbe->mXPos >= mXPos
                 || GetSpriteScale() != gAbe->GetSpriteScale()
-                || !gMap->Is_Point_In_Current_Camera(
+                || !GetMap().Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -1833,7 +1833,7 @@ s16 Paramite::Brain_4_ChasingAbe()
 
             // TODO: Inlined HandleEnemyStopper but the directional logic isn't quite the same
             // so can't use it.
-            BaseAliveGameObjectPathTLV = gMap->VTLV_Get_At_Of_Type(
+            BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
                 FP_GetExponent(mXPos),
                 FP_GetExponent(mYPos),
                 FP_GetExponent(mXPos),
@@ -2457,7 +2457,7 @@ s16 Paramite::HandleEnemyStopper(s16 numGridBlocks, relive::Path_EnemyStopper::S
 {
     const FP kGridSize = ScaleToGridSize(GetSpriteScale());
     const FP numGridBlocksScaled = (kGridSize * FP_FromInteger(numGridBlocks));
-    BaseAliveGameObjectPathTLV = gMap->VTLV_Get_At_Of_Type(
+    BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos + numGridBlocksScaled),
         FP_GetExponent(mYPos),
         FP_GetExponent(mXPos + numGridBlocksScaled),
@@ -2485,7 +2485,7 @@ s16 Paramite::HandleEnemyStopper(s16 numGridBlocks, relive::Path_EnemyStopper::S
 void Paramite::Motion_0_Idle()
 {
     if (!ToNextMotion()
-        && gMap->GetDirection(
+        && GetMap().GetDirection(
                mCurrentLevel,
                mCurrentPath,
                mXPos,
@@ -2922,7 +2922,7 @@ void Paramite::Motion_6_Hop()
             mCurrentMotion = eParamiteMotions::Motion_12_Falling;
         }
 
-        if (gMap->GetDirection(
+        if (GetMap().GetDirection(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,
@@ -3191,7 +3191,7 @@ void Paramite::Motion_13_GameSpeakBegin()
         mCurrentMotion = eParamiteMotions::Motion_14_PreHiss;
     }
 
-    if (gMap->GetDirection(
+    if (GetMap().GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -3252,7 +3252,7 @@ void Paramite::Motion_14_PreHiss()
         mCurrentMotion = eParamiteMotions::Motion_17_GameSpeakEnd;
     }
 
-    if (gMap->GetDirection(
+    if (GetMap().GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -3448,7 +3448,7 @@ void Paramite::Motion_18_RunningAttack()
         ToIdle();
     }
 
-    if (gMap->GetDirection(
+    if (GetMap().GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -3505,7 +3505,7 @@ void Paramite::Motion_20_SurpriseWeb()
         Sound(ParamiteSpeak::ClimbingWeb_6);
     }
 
-    if (gMap->GetDirection(
+    if (GetMap().GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,

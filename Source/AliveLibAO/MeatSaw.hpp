@@ -19,7 +19,7 @@ enum class MeatSawStates : s16
 class MeatSaw final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    MeatSaw(relive::Path_MeatSaw* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    MeatSaw(relive::Path_MeatSaw* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~MeatSaw();
 
 

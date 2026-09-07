@@ -39,8 +39,8 @@ static const TintEntry kMovingBombTints[16] = {
 
 static MovingBomb* sMovingBomb = nullptr;
 
-MovingBomb::MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAliveGameObject(0, resMan)
+MovingBomb::MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAliveGameObject(0, resMan, map)
 {
     SetCanExplode(true);
 
@@ -82,7 +82,7 @@ MovingBomb::MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, Resourc
         GetAnimation().SetRender(false);
     }
 
-    SetTint(kMovingBombTints, gMap->mCurrentLevel);
+    SetTint(kMovingBombTints, GetMap().mCurrentLevel);
 
     FP hitX = {};
     FP hitY = {};
@@ -182,9 +182,9 @@ bool MovingBomb::VTakeDamage(BaseGameObject* pFrom)
         case ReliveTypes::eShrykull:
         {
             mHealth = FP_FromInteger(0);
-            relive_new AirExplosion(mXPos, mYPos, GetSpriteScale(), 0, mResMan);
+            relive_new AirExplosion(mXPos, mYPos, GetSpriteScale(), 0, mResMan, mMap);
 
-            relive_new Gibs(GibType::eMetal, mXPos, mYPos, FP_FromInteger(0), FP_FromInteger(5), GetSpriteScale(), 0, mResMan);
+            relive_new Gibs(GibType::eMetal, mXPos, mYPos, FP_FromInteger(0), FP_FromInteger(5), GetSpriteScale(), 0, mResMan, mMap);
 
             mState = States::eKillMovingBomb_7;
 
@@ -407,7 +407,7 @@ void MovingBomb::VUpdate()
                     mXPos,
                     mYPos,
                     GetSpriteScale(),
-                    0, mResMan);
+                    0, mResMan, mMap);
 
                 relive_new Gibs(
                     GibType::eMetal,
@@ -416,7 +416,7 @@ void MovingBomb::VUpdate()
                     FP_FromInteger(0),
                     FP_FromInteger(5),
                     GetSpriteScale(),
-                    0, mResMan);
+                    0, mResMan, mMap);
 
                 mState = States::eKillMovingBomb_7;
                 GetAnimation().SetRender(false);

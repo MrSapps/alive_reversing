@@ -8,8 +8,8 @@
 #include "Map.hpp"
 #include "stdlib.hpp"
 
-LevelLoader::LevelLoader(relive::Path_LevelLoader* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+LevelLoader::LevelLoader(relive::Path_LevelLoader* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     mBaseGameObjectTlvInfo = tlvId;
     mSwitchId = pTlv->mSwitchId;
@@ -33,7 +33,7 @@ void LevelLoader::VUpdate()
         {
             if (SwitchStates_Get(mSwitchId))
             {
-                auto pFade = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeIn, true, 32, relive::TBlendModes::eBlend_2, mResMan);
+                auto pFade = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeIn, true, 32, relive::TBlendModes::eBlend_2, mResMan, mMap);
                 if (pFade)
                 {
                     mState = States::eFadingOut_1;
@@ -48,7 +48,7 @@ void LevelLoader::VUpdate()
             {
                 if (mMovieId)
                 {
-                    gMap->SetActiveCam(
+                    GetMap().SetActiveCam(
                         mDestLevel,
                         mDestPath,
                         mDestCamera,
@@ -58,7 +58,7 @@ void LevelLoader::VUpdate()
                 }
                 else
                 {
-                    gMap->SetActiveCam(
+                    GetMap().SetActiveCam(
                         mDestLevel,
                         mDestPath,
                         mDestCamera,

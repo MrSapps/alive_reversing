@@ -6,8 +6,8 @@
 #include "stdlib.hpp"
 #include "Path.hpp"
 
-WheelSyncer::WheelSyncer(relive::Path_WheelSyncer* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+WheelSyncer::WheelSyncer(relive::Path_WheelSyncer* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     mTlvInfo = tlvId;
     mInputSwitchId1 = pTlv->mInputSwitchId1;
@@ -97,7 +97,7 @@ WheelSyncer::~WheelSyncer()
 
 void WheelSyncer::VScreenChanged()
 {
-    if (gMap->LevelChanged() || gMap->PathChanged())
+    if (GetMap().LevelChanged() || GetMap().PathChanged())
     {
         SetDead(true);
     }

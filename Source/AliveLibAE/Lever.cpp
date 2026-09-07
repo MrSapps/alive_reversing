@@ -36,8 +36,8 @@ void Lever::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Lever_Pull_Right));
 }
 
-Lever::Lever(relive::Path_Lever* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+Lever::Lever(relive::Path_Lever* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eLever);
 
@@ -62,7 +62,7 @@ Lever::Lever(relive::Path_Lever* pTlv, const Guid& tlvId, ResourceManagerWrapper
         SetScale(Scale::Fg);
     }
 
-    SetTint(&kLeverTints[0], gMap->mCurrentLevel);
+    SetTint(&kLeverTints[0], GetMap().mCurrentLevel);
     mXPos = FP_FromInteger((pTlv->mTopLeftX + pTlv->mBottomRightX) / 2);
     mXPos = FP_FromInteger(SnapToXGrid_AE(GetSpriteScale(), FP_GetExponent(mXPos)));
     mYPos = FP_FromInteger(pTlv->mTopLeftY);
@@ -99,7 +99,7 @@ Lever::~Lever()
 
 void Lever::VScreenChanged()
 {
-    if (!mPersistOffscreen || gMap->LevelChanged() || gMap->PathChanged())
+    if (!mPersistOffscreen || GetMap().LevelChanged() || GetMap().PathChanged())
     {
         SetDead(true);
     }
@@ -121,15 +121,15 @@ void Lever::VUpdate()
 
         if (GetAnimation().GetIsLastFrame())
         {
-            if (gMap->mCurrentLevel == EReliveLevelIds::eMines
-                || gMap->mCurrentLevel == EReliveLevelIds::eBonewerkz
-                || gMap->mCurrentLevel == EReliveLevelIds::eBonewerkz_Ender
-                || gMap->mCurrentLevel == EReliveLevelIds::eFeeCoDepot
-                || gMap->mCurrentLevel == EReliveLevelIds::eFeeCoDepot_Ender
-                || gMap->mCurrentLevel == EReliveLevelIds::eBarracks
-                || gMap->mCurrentLevel == EReliveLevelIds::eBarracks_Ender
-                || gMap->mCurrentLevel == EReliveLevelIds::eBrewery
-                || gMap->mCurrentLevel == EReliveLevelIds::eBrewery_Ender)
+            if (GetMap().mCurrentLevel == EReliveLevelIds::eMines
+                || GetMap().mCurrentLevel == EReliveLevelIds::eBonewerkz
+                || GetMap().mCurrentLevel == EReliveLevelIds::eBonewerkz_Ender
+                || GetMap().mCurrentLevel == EReliveLevelIds::eFeeCoDepot
+                || GetMap().mCurrentLevel == EReliveLevelIds::eFeeCoDepot_Ender
+                || GetMap().mCurrentLevel == EReliveLevelIds::eBarracks
+                || GetMap().mCurrentLevel == EReliveLevelIds::eBarracks_Ender
+                || GetMap().mCurrentLevel == EReliveLevelIds::eBrewery
+                || GetMap().mCurrentLevel == EReliveLevelIds::eBrewery_Ender)
             {
                 SFX_Play_Pitch(relive::SoundEffects::IndustrialTrigger, 30, 400);
             }

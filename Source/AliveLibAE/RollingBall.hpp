@@ -13,7 +13,7 @@ class RollingBallShaker;
 class RollingBall final : public ::BaseAliveGameObject
 {
 public:
-    RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~RollingBall();
 
     void LoadAnimations();

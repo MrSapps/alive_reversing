@@ -12,8 +12,8 @@
 #include "Path.hpp"
 #include "QuikSave.hpp"
 
-FlyingSligSpawner::FlyingSligSpawner(relive::Path_FlyingSligSpawner* pTlv, const Guid& tlvInfo, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+FlyingSligSpawner::FlyingSligSpawner(relive::Path_FlyingSligSpawner* pTlv, const Guid& tlvInfo, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eFlyingSligSpawner);
 
@@ -32,13 +32,13 @@ FlyingSligSpawner::FlyingSligSpawner(relive::Path_FlyingSligSpawner* pTlv, const
     field_24_spawned_slig_id = Guid{};
 }
 
-void FlyingSligSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
+void FlyingSligSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<FlyingSligSpawnerSaveState>();
 
     auto pTlv = static_cast<relive::Path_FlyingSligSpawner*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pState->field_4_tlvInfo).GetTlv());
 
-    auto pFlyingSligSpawner = relive_new FlyingSligSpawner(pTlv, pState->field_4_tlvInfo, resMan);
+    auto pFlyingSligSpawner = relive_new FlyingSligSpawner(pTlv, pState->field_4_tlvInfo, resMan, map);
     if (pFlyingSligSpawner)
     {
         pFlyingSligSpawner->field_3C_bSpawned = pState->field_8_bSpawned;
@@ -104,7 +104,7 @@ void FlyingSligSpawner::VUpdate()
                 return;
             }
 
-            auto pNewSlig = relive_new FlyingSlig(pFlyingSligTlv, mTlvId, mResMan);
+            auto pNewSlig = relive_new FlyingSlig(pFlyingSligTlv, mTlvId, mResMan, mMap);
             if (!pNewSlig)
             {
                 SetDead(true);

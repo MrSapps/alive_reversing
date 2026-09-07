@@ -51,8 +51,8 @@ void Drill::LoadAnimations()
     }
 }
 
-Drill::Drill(relive::Path_Drill* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan),
+Drill::Drill(relive::Path_Drill* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map),
     mTlvInfo(tlvId)
 {
     SetType(ReliveTypes::eDrill);
@@ -63,7 +63,7 @@ Drill::Drill(relive::Path_Drill* pTlv, const Guid& tlvId, ResourceManagerWrapper
     GetAnimation().SetSemiTrans(true);
     GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_0);
 
-    SetTint(kDrillTints, gMap->mCurrentLevel);
+    SetTint(kDrillTints, GetMap().mCurrentLevel);
     relive::Path_Drill tlvData = *pTlv;
 
     mStartOff = tlvData.mStartStateOn == true ? false : true;
@@ -94,7 +94,7 @@ Drill::Drill(relive::Path_Drill* pTlv, const Guid& tlvId, ResourceManagerWrapper
     {
         mState = mStartPosIsBottom ? DrillStates::eGoingUp_2 : DrillStates::eGoingDown_1;
 
-        const CameraPos direction = gMap->GetDirection(
+        const CameraPos direction = GetMap().GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -225,11 +225,11 @@ Drill::Drill(relive::Path_Drill* pTlv, const Guid& tlvId, ResourceManagerWrapper
     CreateShadow();
 }
 
-void Drill::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan)
+void Drill::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pData.ReadTmpPtr<DrillSaveState>();
     auto pTlv = static_cast<relive::Path_Drill*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mDrillTlvId).GetTlv());
-    auto pDrill = relive_new Drill(pTlv, pState->mDrillTlvId, resMan);
+    auto pDrill = relive_new Drill(pTlv, pState->mDrillTlvId, resMan, map);
 
     if (pState->mState != DrillStates::eRestartCycle_0)
     {
@@ -261,7 +261,7 @@ void Drill::VUpdate()
         SetDead(true);
     }
 
-    const CameraPos soundDirection = gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
+    const CameraPos soundDirection = GetMap().GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
 
     switch (mState)
     {
@@ -468,7 +468,7 @@ void Drill::VScreenChanged()
 
 void Drill::VRender(OrderingTable& ot)
 {
-    if (gMap->Is_Point_In_Current_Camera(
+    if (GetMap().Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -515,7 +515,7 @@ void Drill::VGetSaveState(SerializedObjectData& pSaveBuffer)
 
 void Drill::EmitSparks()
 {
-    if (gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+    if (GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
     {
         s32 speed = 0;
         if (mState == DrillStates::eGoingDown_1)
@@ -538,7 +538,7 @@ void Drill::EmitSparks()
                                              6u,
                                              50,
                                              205,
-                                             SparkType::eSmallChantParticle_0, mResMan);
+                                             SparkType::eSmallChantParticle_0, mResMan, mMap);
 
                 relive_new Spark(mXPos + (GetSpriteScale() * FP_FromInteger(17)) + FP_FromInteger(speed),
                                              mYPos - (GetSpriteScale() * FP_FromInteger(12)),
@@ -546,7 +546,7 @@ void Drill::EmitSparks()
                                              6u,
                                              50,
                                              205,
-                                             SparkType::eSmallChantParticle_0, mResMan);
+                                             SparkType::eSmallChantParticle_0, mResMan, mMap);
             }
             else if (mDrillDirection == relive::Path_Drill::DrillDirection::eLeft)
             {
@@ -556,7 +556,7 @@ void Drill::EmitSparks()
                                              6u,
                                              50,
                                              205,
-                                             SparkType::eSmallChantParticle_0, mResMan);
+                                             SparkType::eSmallChantParticle_0, mResMan, mMap);
 
                 relive_new Spark(mXPos - (GetSpriteScale() * FP_FromInteger(17)) - FP_FromInteger(speed),
                                              mYPos - (GetSpriteScale() * FP_FromInteger(12)),
@@ -564,7 +564,7 @@ void Drill::EmitSparks()
                                              6u,
                                              50,
                                              205,
-                                             SparkType::eSmallChantParticle_0, mResMan);
+                                             SparkType::eSmallChantParticle_0, mResMan, mMap);
             }
             else if (mDrillDirection == relive::Path_Drill::DrillDirection::eDown)
             {
@@ -574,7 +574,7 @@ void Drill::EmitSparks()
                                              6u,
                                              50,
                                              205,
-                                             SparkType::eSmallChantParticle_0, mResMan);
+                                             SparkType::eSmallChantParticle_0, mResMan, mMap);
 
                 relive_new Spark(mXPos,
                                              mYPos + (GetSpriteScale() * FP_FromInteger(4)) - FP_FromInteger(speed),
@@ -582,7 +582,7 @@ void Drill::EmitSparks()
                                              6u,
                                              50,
                                              205,
-                                             SparkType::eSmallChantParticle_0, mResMan);
+                                             SparkType::eSmallChantParticle_0, mResMan, mMap);
             }
         }
     }
@@ -644,7 +644,7 @@ s16 Drill::DamageTouchingObjects()
                                 FP_FromInteger(-5),
                                 FP_FromInteger(5),
                                 GetSpriteScale(),
-                                50, mResMan);
+                                50, mResMan, mMap);
 
 
     relive_new Blood(pFound->mXPos,
@@ -652,14 +652,14 @@ s16 Drill::DamageTouchingObjects()
                                  FP_FromInteger(0),
                                  FP_FromInteger(5),
                                  GetSpriteScale(),
-                                 50, mResMan);
+                                 50, mResMan, mMap);
 
     relive_new Blood(pFound->mXPos,
                                  FP_FromInteger(drillRect.h - 10),
                                  FP_FromInteger(5),
                                  FP_FromInteger(5),
                                  GetSpriteScale(),
-                                 50, mResMan);
+                                 50, mResMan, mMap);
 
     SFX_Play_Pitch(relive::SoundEffects::DrillCollision, 127, -500);
     SfxPlayMono(relive::SoundEffects::KillEffect, 127);

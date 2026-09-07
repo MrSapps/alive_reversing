@@ -46,7 +46,7 @@ struct BoneSaveState final : public SaveStateBase
 class Bone final : public BaseThrowable
 {
 public:
-    Bone(FP xpos, FP ypos, s16 countId, ResourceManagerWrapper& resMan);
+    Bone(FP xpos, FP ypos, s16 countId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Bone();
 
     virtual void VUpdate() override;
@@ -59,7 +59,7 @@ public:
     virtual bool VCanBeEaten();
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
     virtual s16 VGetCount() override;
-    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan);
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map);
 
     virtual bool VOnPlatformIntersection(BaseAnimatedWithPhysicsGameObject* pPlatform) override
     {

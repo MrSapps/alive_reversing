@@ -17,7 +17,7 @@ struct BloodParticle final
 class Blood final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    Blood(FP xpos, FP ypos, FP xOff, FP yOff, FP scale, s32 count, ResourceManagerWrapper& resMan);
+    Blood(FP xpos, FP ypos, FP xOff, FP yOff, FP scale, s32 count, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Blood();
 
     virtual void VUpdate() override;

@@ -47,7 +47,7 @@ void UXB::LoadAnimations()
 
 void UXB::PlaySFX(relive::SoundEffects sfxIdx)
 {
-    if (gMap->Is_Point_In_Current_Camera(
+    if (GetMap().Is_Point_In_Current_Camera(
             this->mCurrentLevel,
             this->mCurrentPath,
             this->mXPos,
@@ -58,8 +58,8 @@ void UXB::PlaySFX(relive::SoundEffects sfxIdx)
     }
 }
 
-UXB::UXB(relive::Path_UXB* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAliveGameObject(0, resMan)
+UXB::UXB(relive::Path_UXB* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eUXB);
 
@@ -72,7 +72,7 @@ UXB::UXB(relive::Path_UXB* pTlv, const Guid& tlvId, ResourceManagerWrapper& resM
 
     if (GetGameType() == GameType::eAe)
     {
-        SetTint(sUXBTints, gMap->mCurrentLevel);
+        SetTint(sUXBTints, GetMap().mCurrentLevel);
     }
 
     SetInteractive(true);
@@ -258,7 +258,7 @@ UXB::~UXB()
 
 void UXB::VScreenChanged()
 {
-    if (gMap->LevelChanged() || gMap->PathChanged())
+    if (GetMap().LevelChanged() || GetMap().PathChanged())
     {
         if (mStartingState == UXBState::eDeactivated && mCurrentState != UXBState::eDeactivated)
         {
@@ -305,7 +305,7 @@ bool UXB::VTakeDamage(BaseGameObject* pFrom)
 
     SetDead(true);
 
-    relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan);
+    relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan, mMap);
 
     mCurrentState = UXBState::eExploding;
     mNextStateTimer = sGnFrame;
@@ -315,7 +315,7 @@ bool UXB::VTakeDamage(BaseGameObject* pFrom)
 
 void UXB::VOnThrowableHit(BaseGameObject* /*pFrom*/)
 {
-    relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan);
+    relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan, mMap);
     mCurrentState = UXBState::eExploding;
     SetDead(true);
     mNextStateTimer = sGnFrame;
@@ -397,7 +397,7 @@ void UXB::VUpdate()
         case UXBState::eExploding:
             if (sGnFrame >= mNextStateTimer)
             {
-                relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan);
+                relive_new GroundExplosion(mXPos, mYPos, GetSpriteScale(), mResMan, mMap);
                 SetDead(true);
             }
             break;
@@ -460,7 +460,7 @@ void UXB::VRender(OrderingTable& ot)
 {
     if (GetAnimation().GetRender())
     {
-        if (gMap->Is_Point_In_Current_Camera(
+        if (GetMap().Is_Point_In_Current_Camera(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,

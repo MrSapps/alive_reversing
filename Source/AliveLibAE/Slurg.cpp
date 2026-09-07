@@ -54,8 +54,8 @@ static const TintEntry sSlurgTints[16] = {
     {EReliveLevelIds::eBonewerkz_Ender, 102u, 127u, 118u},
     {EReliveLevelIds::eCredits, 102u, 127u, 118u}};
 
-Slurg::Slurg(relive::Path_Slurg* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAliveGameObject(0, resMan)
+Slurg::Slurg(relive::Path_Slurg* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAliveGameObject(0, resMan, map)
 {
     LoadAnimations();
 
@@ -86,7 +86,7 @@ Slurg::Slurg(relive::Path_Slurg* pTlv, const Guid& tlvId, ResourceManagerWrapper
     mMovingTimer = pTlv->mMovingTimer;
     mRngForMovingTimer = pTlv->mMovingTimer;
 
-    SetTint(&sSlurgTints[0], gMap->mCurrentLevel);
+    SetTint(&sSlurgTints[0], GetMap().mCurrentLevel);
 
     FP hitX = {};
     FP hitY = {};
@@ -119,12 +119,12 @@ Slurg::Slurg(relive::Path_Slurg* pTlv, const Guid& tlvId, ResourceManagerWrapper
     CreateShadow();
 }
 
-void Slurg::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan)
+void Slurg::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pData.ReadTmpPtr<SlurgSaveState>();
     auto pTlv = static_cast<relive::Path_Slurg*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv());
 
-    auto pSlurg = relive_new Slurg(pTlv, pState->mTlvId, resMan);
+    auto pSlurg = relive_new Slurg(pTlv, pState->mTlvId, resMan, map);
 
     pSlurg->mXPos = pState->mXPos;
     pSlurg->mYPos = pState->mYPos;
@@ -175,7 +175,7 @@ void Slurg::Burst()
                                 FP_FromInteger(0),
                                 FP_FromInteger(5),
                                 mSlurgSpriteScale,
-                                20, mResMan);
+                                20, mResMan, mMap);
 
     EventBroadcast(Event::kEventLoudNoise, this);
     SfxPlayMono(relive::SoundEffects::SlurgKill, 127, mSlurgSpriteScale);
@@ -239,7 +239,7 @@ void Slurg::VUpdate()
         case SlurgStates::ePausing_1:
             mVelX = FP_FromInteger(0);
             if (GetAnimation().GetCurrentFrame() == 0
-                && gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+                && GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
             {
                 SfxPlayMono(relive::SoundEffects::SlurgPause, 0);
             }

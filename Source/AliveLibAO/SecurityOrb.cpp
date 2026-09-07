@@ -19,8 +19,8 @@
 
 namespace AO {
 
-SecurityOrb::SecurityOrb(relive::Path_SecurityOrb* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : ::BaseAliveGameObject(0, resMan)
+SecurityOrb::SecurityOrb(relive::Path_SecurityOrb* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : ::BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eSecurityOrb);
     SetCanExplode(true);
@@ -86,7 +86,7 @@ bool SecurityOrb::VTakeDamage(BaseGameObject* pFrom)
                 mXPos,
                 mYPos - (GetSpriteScale() * FP_FromInteger(5)),
                 GetSpriteScale(),
-                false, mResMan);
+                false, mResMan, mMap);
 
             relive_new Gibs(
                 GibType::eMetal,
@@ -95,7 +95,7 @@ bool SecurityOrb::VTakeDamage(BaseGameObject* pFrom)
                 FP_FromInteger(0),
                 FP_FromInteger(0),
                 GetSpriteScale(),
-                false, mResMan);
+                false, mResMan, mMap);
 
             mHealth = FP_FromInteger(0);
         }
@@ -159,23 +159,23 @@ void SecurityOrb::VUpdate()
                     ypos,
                     8,
                     ZapLineType::eThick_0,
-                    Layer::eLayer_ZapLinesElumMuds_28, mResMan);
+                    Layer::eLayer_ZapLinesElumMuds_28, mResMan, mMap);
 
-                relive_new PossessionFlicker(gAbe, 8, 255, 100, 100, mResMan);
+                relive_new PossessionFlicker(gAbe, 8, 255, 100, 100, mResMan, mMap);
 
                 gAbe->VTakeDamage(this);
                 mTimer = MakeTimer(8);
                 mState = States::eDoFlashAndSound_2;
 
-                relive_new ScreenShake(true, false, mResMan);
+                relive_new ScreenShake(true, false, mResMan, mMap);
 
-                auto pSpark1 = relive_new ZapSpark(mXPos, mYPos - (FP_FromInteger(8) * GetSpriteScale()), GetSpriteScale(), mResMan);
+                auto pSpark1 = relive_new ZapSpark(mXPos, mYPos - (FP_FromInteger(8) * GetSpriteScale()), GetSpriteScale(), mResMan, mMap);
                 if (pSpark1)
                 {
                     pSpark1->mRGB.SetRGB(255, 65, 65);
                 }
 
-                auto pSpark2 = relive_new ZapSpark(mXPos, mYPos - (FP_FromInteger(8) * GetSpriteScale()), GetSpriteScale(), mResMan);
+                auto pSpark2 = relive_new ZapSpark(mXPos, mYPos - (FP_FromInteger(8) * GetSpriteScale()), GetSpriteScale(), mResMan, mMap);
                 if (pSpark2)
                 {
                     pSpark2->mRGB.SetRGB(255, 65, 65);
@@ -183,7 +183,7 @@ void SecurityOrb::VUpdate()
 
                 for (s32 i = 0; i < 9; i++)
                 {
-                    auto pSpark3 = relive_new ZapSpark(xpos, ypos, GetSpriteScale(), mResMan);
+                    auto pSpark3 = relive_new ZapSpark(xpos, ypos, GetSpriteScale(), mResMan, mMap);
                     if (pSpark3)
                     {
                         pSpark3->mRGB.SetRGB(255, 65, 65);
@@ -195,12 +195,12 @@ void SecurityOrb::VUpdate()
         case States::eDoFlashAndSound_2:
             if (static_cast<s32>(sGnFrame) == mTimer - 5 || static_cast<s32>(sGnFrame) == mTimer - 1)
             {
-                relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 0, 0, mResMan);
+                relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 0, 0, mResMan, mMap);
             }
 
             if (static_cast<s32>(sGnFrame) == mTimer - 4)
             {
-                relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 0, 0, mResMan, relive::TBlendModes::eBlend_1, 1);
+                relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 0, 0, mResMan, mMap, relive::TBlendModes::eBlend_1, 1);
             }
 
             const s32 timerFrame = mTimer - sGnFrame;

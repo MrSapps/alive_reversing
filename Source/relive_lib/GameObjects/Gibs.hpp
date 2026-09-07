@@ -32,7 +32,7 @@ enum class GibType : s32
 class Gibs final : public ::BaseAnimatedWithPhysicsGameObject
 {
 public:
-    Gibs(GibType gibType, FP xpos, FP ypos, FP xOff, FP yOff, FP scale, bool bMakeSmaller, ResourceManagerWrapper& resMan);
+    Gibs(GibType gibType, FP xpos, FP ypos, FP xOff, FP yOff, FP scale, bool bMakeSmaller, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Gibs();
 
     void LoadAnimations(AnimId head, AnimId arm, AnimId body);

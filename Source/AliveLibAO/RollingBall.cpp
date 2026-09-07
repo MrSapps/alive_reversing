@@ -41,8 +41,8 @@ RollingBall::~RollingBall()
     KillRollingBallShaker();
 }
 
-RollingBall::RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : ::BaseAliveGameObject(0, resMan)
+RollingBall::RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : ::BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eRollingBall);
     
@@ -107,7 +107,7 @@ RollingBall::RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId, Reso
         return;
     }
 
-    if (gMap->mCurrentLevel == EReliveLevelIds::eForestTemple && gMap->mCurrentPath == 2)
+    if (GetMap().mCurrentLevel == EReliveLevelIds::eForestTemple && GetMap().mCurrentPath == 2)
     {
         GetAnimation().SetAnimate(false);
         mXPos = FP_FromInteger(2522);
@@ -127,13 +127,13 @@ void RollingBall::VUpdate()
                 mVelY = FP_FromDouble(2.5);
                 mState = States::eStartRolling;
                 GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::Stone_Ball_Rolling));
-                auto pRollingBallShaker = relive_new RollingBallShaker(mResMan);
+                auto pRollingBallShaker = relive_new RollingBallShaker(mResMan, mMap);
                 if (pRollingBallShaker)
                 {
                     mRollingBallShakerId = pRollingBallShaker->mBaseGameObjectId;
                 }
             }
-            else if (!gMap->Is_Point_In_Current_Camera(
+            else if (!GetMap().Is_Point_In_Current_Camera(
                          mCurrentLevel,
                          mCurrentPath,
                          mXPos,
@@ -221,15 +221,15 @@ void RollingBall::VUpdate()
                     mYPos - FP_FromInteger(30),
                     150,
                     GetSpriteScale(),
-                    BurstType::eRocks, mResMan);
+                    BurstType::eRocks, mResMan, mMap);
 
-                relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, mResMan, relive::TBlendModes::eBlend_1, 1);
+                relive_new Flash(Layer::eLayer_Above_FG1_39, 255, 255, 255, mResMan, mMap, relive::TBlendModes::eBlend_1, 1);
 
-                relive_new ScreenShake(false, false, mResMan);
+                relive_new ScreenShake(false, false, mResMan, mMap);
 
                 SetDead(true);
 
-                const CameraPos direction = gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
+                const CameraPos direction = GetMap().GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
                 SFX_Play_Camera(relive::SoundEffects::IngameTransition, 50, direction);
 
                 switch (direction)
@@ -271,8 +271,8 @@ void RollingBall::VUpdate()
             {
                 if (mYPos - BaseAliveGameObjectLastLineYPos > FP_FromInteger(240))
                 {
-                    if (gMap->mCurrentLevel == EReliveLevelIds::eForestTemple
-                        && gMap->mCurrentPath == 2
+                    if (GetMap().mCurrentLevel == EReliveLevelIds::eForestTemple
+                        && GetMap().mCurrentPath == 2
                         && !gAbe->mShrivel)
                     {
                         GetAnimation().SetAnimate(false);
@@ -293,9 +293,9 @@ void RollingBall::VUpdate()
             BaseAliveGameObjectLastLineYPos = mYPos;
             mVelY = (-mVelY * FP_FromDouble(0.8));
 
-            relive_new ScreenShake(false, false, mResMan);
+            relive_new ScreenShake(false, false, mResMan, mMap);
 
-            const CameraPos direction = gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
+            const CameraPos direction = GetMap().GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
             SFX_Play_Camera(relive::SoundEffects::IngameTransition, 50, direction);
 
             switch (direction)
@@ -329,7 +329,7 @@ void RollingBall::VUpdate()
         }
 
         case States::eCrushedBees:
-            if (mCurrentLevel != gMap->mCurrentLevel || mCurrentPath != gMap->mCurrentPath || EventGet(Event::kEventDeathReset))
+            if (mCurrentLevel != GetMap().mCurrentLevel || mCurrentPath != GetMap().mCurrentPath || EventGet(Event::kEventDeathReset))
             {
                 SetDead(true);
             }

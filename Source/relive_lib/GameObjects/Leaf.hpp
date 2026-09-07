@@ -5,7 +5,7 @@
 class Leaf final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    Leaf(FP xpos, FP ypos, FP xVel, FP yVel, FP scale, ResourceManagerWrapper& resMan);
+    Leaf(FP xpos, FP ypos, FP xVel, FP yVel, FP scale, ResourceManagerWrapper& resMan, BaseMap& map);
 
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;

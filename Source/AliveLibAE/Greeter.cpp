@@ -33,8 +33,8 @@ void Greeter::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Greeter_Falling));
 }
 
-Greeter::Greeter(relive::Path_Greeter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAliveGameObject(0, resMan)
+Greeter::Greeter(relive::Path_Greeter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eGreeter);
 
@@ -91,7 +91,7 @@ Greeter::Greeter(relive::Path_Greeter* pTlv, const Guid& tlvId, ResourceManagerW
         mYPos = hitY;
     }
 
-    auto pMotionDetctor = relive_new MotionDetector(nullptr, Guid{}, this, mResMan);
+    auto pMotionDetctor = relive_new MotionDetector(nullptr, Guid{}, this, mResMan, mMap);
     if (pMotionDetctor)
     {
         field_11C_motionDetectorId = pMotionDetctor->mBaseGameObjectId;
@@ -110,12 +110,12 @@ Greeter::Greeter(relive::Path_Greeter* pTlv, const Guid& tlvId, ResourceManagerW
     mChasing = false;
 }
 
-void Greeter::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan)
+void Greeter::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<GreeterSaveState>();
     auto pTlv = static_cast<relive::Path_Greeter*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv());
 
-    auto pGreeter = relive_new Greeter(pTlv, pState->mTlvId, resMan);
+    auto pGreeter = relive_new Greeter(pTlv, pState->mTlvId, resMan, map);
     if (pGreeter)
     {
         pGreeter->mXPos = pState->field_C_xpos;
@@ -255,7 +255,7 @@ void Greeter::BlowUp()
         mXPos,
         mYPos - (GetSpriteScale() * FP_FromInteger(5)),
         GetSpriteScale(),
-        0, mResMan);
+        0, mResMan, mMap);
 
     relive_new Gibs(
         GibType::eMetal,
@@ -264,7 +264,7 @@ void Greeter::BlowUp()
         FP_FromInteger(0),
         FP_FromInteger(0),
         GetSpriteScale(),
-        0, mResMan);
+        0, mResMan, mMap);
 
     SetDead(true);
     field_12E_bDontSetDestroyed = 0;
@@ -296,7 +296,7 @@ void Greeter::BounceBackFromShot()
 
     GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::Greeter_Hit));
 
-    const CameraPos soundDirection = gMap->GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
+    const CameraPos soundDirection = GetMap().GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
     SFX_Play_Camera(relive::SoundEffects::GreeterKnockback, 0, soundDirection, GetSpriteScale());
 }
 
@@ -421,7 +421,7 @@ void Greeter::VOnThrowableHit(BaseGameObject* /*pFrom*/)
 
 void Greeter::ZapTarget(FP xpos, FP ypos, BaseAliveGameObject* pTarget)
 {
-    relive_new ScreenShake(false, false, mResMan);
+    relive_new ScreenShake(false, false, mResMan, mMap);
 
     relive_new ZapLine(
         mXPos,
@@ -430,7 +430,7 @@ void Greeter::ZapTarget(FP xpos, FP ypos, BaseAliveGameObject* pTarget)
         ypos,
         8,
         ZapLineType::eThick_0,
-        Layer::eLayer_ZapLinesElumMuds_28, mResMan);
+        Layer::eLayer_ZapLinesElumMuds_28, mResMan, mMap);
 
     relive_new ZapLine(
         mXPos,
@@ -439,7 +439,7 @@ void Greeter::ZapTarget(FP xpos, FP ypos, BaseAliveGameObject* pTarget)
         ypos,
         8,
         ZapLineType::eThick_0,
-        Layer::eLayer_ZapLinesElumMuds_28, mResMan);
+        Layer::eLayer_ZapLinesElumMuds_28, mResMan, mMap);
 
     relive_new ZapLine(
         mXPos,
@@ -448,14 +448,14 @@ void Greeter::ZapTarget(FP xpos, FP ypos, BaseAliveGameObject* pTarget)
         ypos,
         8,
         ZapLineType::eThick_0,
-        Layer::eLayer_ZapLinesElumMuds_28, mResMan);
+        Layer::eLayer_ZapLinesElumMuds_28, mResMan, mMap);
 
     relive_new ParticleBurst(
         xpos,
         ypos,
         10,
         GetSpriteScale(),
-        BurstType::eBigRedSparks, mResMan,
+        BurstType::eBigRedSparks, mResMan, mMap,
         11, false);
 
     relive_new ParticleBurst(
@@ -463,16 +463,16 @@ void Greeter::ZapTarget(FP xpos, FP ypos, BaseAliveGameObject* pTarget)
         mYPos - (FP_FromInteger(10) * GetSpriteScale()),
         10,
         GetSpriteScale(),
-        BurstType::eBigRedSparks, mResMan,
+        BurstType::eBigRedSparks, mResMan, mMap,
         11, false);
 
     pTarget->SetElectrocuted(true);
 
-    relive_new Electrocute(pTarget, true, true, mResMan);
+    relive_new Electrocute(pTarget, true, true, mResMan, mMap);
 
     pTarget->VTakeDamage(this);
 
-    const CameraPos soundDirection = gMap->GetDirection(
+    const CameraPos soundDirection = GetMap().GetDirection(
         mCurrentLevel,
         mCurrentPath,
         mXPos,
@@ -564,7 +564,7 @@ void Greeter::VUpdate()
         case GreeterBrainStates::eBrain_0_Patrol:
             if (!((sGnFrame - field_124_last_turn_time) % 14))
             {
-                const CameraPos soundDirection = gMap->GetDirection(
+                const CameraPos soundDirection = GetMap().GetDirection(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -652,7 +652,7 @@ void Greeter::VUpdate()
         {
             if (!(sGnFrame % 8))
             {
-                const CameraPos soundDirection2 = gMap->GetDirection(
+                const CameraPos soundDirection2 = GetMap().GetDirection(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -732,7 +732,7 @@ void Greeter::VUpdate()
                 mYPos = hitY;
                 BaseAliveGameObjectLastLineYPos = hitY;
 
-                const CameraPos soundDirection3 = gMap->GetDirection(
+                const CameraPos soundDirection3 = GetMap().GetDirection(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,

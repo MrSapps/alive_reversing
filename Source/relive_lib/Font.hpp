@@ -34,7 +34,7 @@ public:
     const Font_AtlasEntry* mAtlasArray = nullptr;
     FontResource mFntResource;
 
-    void LoadFontType(FontType resourceID);
+    void LoadFontType(FontType resourceID, ResourceManagerWrapper& resMan);
 
 };
 

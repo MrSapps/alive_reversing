@@ -5,7 +5,7 @@
 class CheatController final : public BaseGameObject
 {
 public:
-    CheatController(ResourceManagerWrapper& resMan);
+    CheatController(ResourceManagerWrapper& resMan, BaseMap& map);
     ~CheatController();
 
     virtual void VUpdate() override;

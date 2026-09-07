@@ -36,8 +36,8 @@ void BackgroundGlukkon::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Background_Glukkon_Laugh));
 }
 
-BackgroundGlukkon::BackgroundGlukkon(relive::Path_BackgroundGlukkon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : ::BaseAliveGameObject(0, resMan)
+BackgroundGlukkon::BackgroundGlukkon(relive::Path_BackgroundGlukkon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : ::BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eBackgroundGlukkon);
 
@@ -118,7 +118,7 @@ bool BackgroundGlukkon::VTakeDamage(BaseGameObject* pFrom)
             mXPos,
             mYPos - (GetSpriteScale() * FP_FromInteger(40)),
             GetSpriteScale(),
-            false, mResMan);
+            false, mResMan, mMap);
 
         SetDead(true);
     }

@@ -272,11 +272,11 @@ s32 Environment_SFX(EnvironmentSfx sfxId, s32 volume, s32 pitchMin, BaseAliveGam
             break;
 
         case EnvironmentSfx::eKnockback_13:
-            if (gMap->mCurrentLevel == EReliveLevelIds::eMines
-                || gMap->mCurrentLevel == EReliveLevelIds::eBonewerkz
-                || gMap->mCurrentLevel == EReliveLevelIds::eFeeCoDepot
-                || gMap->mCurrentLevel == EReliveLevelIds::eBarracks
-                || gMap->mCurrentLevel == EReliveLevelIds::eBrewery)
+            if (GetMap().mCurrentLevel == EReliveLevelIds::eMines
+                || GetMap().mCurrentLevel == EReliveLevelIds::eBonewerkz
+                || GetMap().mCurrentLevel == EReliveLevelIds::eFeeCoDepot
+                || GetMap().mCurrentLevel == EReliveLevelIds::eBarracks
+                || GetMap().mCurrentLevel == EReliveLevelIds::eBrewery)
             {
                 sndIndex = 2;
             }
@@ -317,7 +317,7 @@ s32 Environment_SFX(EnvironmentSfx sfxId, s32 volume, s32 pitchMin, BaseAliveGam
 
     if (!IsAbe(pAliveObj))
     {
-        switch (gMap->GetDirection(
+        switch (GetMap().GetDirection(
             pAliveObj->mCurrentLevel,
             pAliveObj->mCurrentPath,
             pAliveObj->mXPos,
@@ -366,7 +366,7 @@ static const FP_Point sThrowVelocities[9] = {
     {FP_FromInteger(0), FP_FromInteger(0)}};
 
 
-void Animation_OnFrame_Abe(BaseGameObject* pPtr, u32&, const IndexedPoint& point, ResourceManagerWrapper& )
+void Animation_OnFrame_Abe(BaseGameObject* pPtr, u32&, const IndexedPoint& point, ResourceManagerWrapper&, BaseMap&)
 {
     auto pAbe = static_cast<Abe*>(pPtr);
 
@@ -424,15 +424,15 @@ void Abe::LoadAnimations()
     }
 }
 
-Abe::Abe(ResourceManagerWrapper& resMan) :
-    BaseAbe(kResourceArraySize, resMan)
+Abe::Abe(ResourceManagerWrapper& resMan, BaseMap& map) :
+    BaseAbe(kResourceArraySize, resMan, map)
 {
     SetType(ReliveTypes::eAbe);
 
     SetSurviveDeathReset(true);
 
     // Set the well level to the current level for the path start quick save
-    mDstWellLevel = gMap->mCurrentLevel;
+    mDstWellLevel = GetMap().mCurrentLevel;
 
     Engine::Init_GameStates();
 
@@ -442,7 +442,7 @@ Abe::Abe(ResourceManagerWrapper& resMan) :
     GetAnimation().SetFnPtrArray(gAbe_Anim_Frame_Fns);
 
     PSX_Point point = {};
-    gMap->GetCurrentCamCoords(&point);
+    GetMap().GetCurrentCamCoords(&point);
 
     mXPos = FP_FromInteger(point.x + XGrid_Index_To_XPos_AE(GetSpriteScale(), 4));
     mYPos = FP_FromInteger(point.y + 120);
@@ -455,7 +455,7 @@ Abe::Abe(ResourceManagerWrapper& resMan) :
     SetCanSetOffExplosives(true);
 
     // Changes Abe's "default" colour depending on the level we are in
-    SetTint(&sAbeTintTable[0], gMap->mCurrentLevel);
+    SetTint(&sAbeTintTable[0], GetMap().mCurrentLevel);
 
     GetAnimation().SetSemiTrans(true);
     GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_0);
@@ -538,18 +538,18 @@ Abe::~Abe()
 }
 
 
-void Abe::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan)
+void Abe::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const AbeSaveState* pSaveState = pData.ReadTmpPtr<AbeSaveState>();
-    Abe::CreateFromSaveState(*pSaveState, resMan);
+    Abe::CreateFromSaveState(*pSaveState, resMan, map);
 }
 
-void Abe::CreateFromSaveState(const AbeSaveState& pData, ResourceManagerWrapper& resMan)
+void Abe::CreateFromSaveState(const AbeSaveState& pData, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     Abe* pAbe = gAbe;
     if (!gAbe)
     {
-        pAbe = relive_new Abe(resMan);
+        pAbe = relive_new Abe(resMan, map);
         gAbe = pAbe;
     }
 
@@ -606,7 +606,7 @@ void Abe::CreateFromSaveState(const AbeSaveState& pData, ResourceManagerWrapper&
     */
     gAbe->GetAnimation().ReloadPal();
 
-    gAbe->SetTint(sAbeTintTable, gMap->mCurrentLevel);
+    gAbe->SetTint(sAbeTintTable, GetMap().mCurrentLevel);
     gAbe->GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_0);
     gAbe->GetAnimation().SetSemiTrans(true);
     gAbe->GetAnimation().SetBlending(false);
@@ -759,7 +759,7 @@ void Abe::HandleDDCheat()
 
         // Keep within map max bounds
         PSX_Point mapSize = {};
-        gMap->Get_map_size(&mapSize);
+        GetMap().Get_map_size(&mapSize);
 
         FP mapWidth = FP_FromInteger(mapSize.x);
         if (mXPos >= mapWidth)
@@ -826,7 +826,7 @@ void Abe::VUpdate()
                 mInvisibilityTimer = MakeTimer(2);
             }
 
-            auto pInvisibleEffect = relive_new InvisibleEffect(this, mResMan);
+            auto pInvisibleEffect = relive_new InvisibleEffect(this, mResMan, mMap);
             mInvisibleEffectId = pInvisibleEffect->mBaseGameObjectId;
             pInvisibleEffect->InstantInvisibility();
         }
@@ -925,7 +925,7 @@ void Abe::VUpdate()
 
         if (mSay != MudSounds::eNone && static_cast<s32>(sGnFrame) >= mAutoSayTimer)
         {
-            if (!gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0)
+            if (!GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0)
                 || (mCurrentMotion == eAbeMotions::Motion_112_Chant)
                 || mCurrentMotion == eAbeMotions::Motion_7_Speak_45B140
                 || mCurrentMotion == eAbeMotions::Motion_8_Speak_45B160
@@ -1014,7 +1014,7 @@ void Abe::VUpdate()
         {
             if (GetAnimation().GetRender())
             {
-                if (gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+                if (GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
                 {
                     if (mRingPulseTimer > static_cast<s32>(sGnFrame))
                     {
@@ -1038,7 +1038,7 @@ void Abe::VUpdate()
                             AbilityRing::Factory(
                                 FP_FromInteger((rect.x + rect.w) / 2),
                                 FP_FromInteger((rect.y + rect.h) / 2),
-                                ringType, GetSpriteScale(), mResMan);
+                                ringType, GetSpriteScale(), mResMan, mMap);
 
                             SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 25, 2650);
                         }
@@ -1071,7 +1071,7 @@ void Abe::VUpdate()
         {
             if (mMudomoDone)
             {
-                if (gMap->mCurrentLevel == EReliveLevelIds::eNecrum)
+                if (GetMap().mCurrentLevel == EReliveLevelIds::eNecrum)
                 {
                     mRingPulseTimer = MakeTimer(200000);
                     mHaveShrykull = 0;
@@ -1088,7 +1088,7 @@ void Abe::VUpdate()
             mSay = MudSounds::eOops_14;
             mAutoSayTimer = MakeTimer(Math_RandomRange(22, 30));
 
-            relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eDeathDrumShort, relive::Path_MusicTrigger::TriggeredBy::eTimer, 0, mResMan);
+            relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eDeathDrumShort, relive::Path_MusicTrigger::TriggeredBy::eTimer, 0, mResMan, mMap);
         }
 
         if (EventGet(Event::kEventMudokonComfort))
@@ -1230,24 +1230,24 @@ void Abe::VScreenChanged()
 {
     if (sControlledCharacter == this)
     {
-        mCurrentLevel = gMap->mNextLevel;
-        mCurrentPath = gMap->mNextPath;
+        mCurrentLevel = GetMap().mNextLevel;
+        mCurrentPath = GetMap().mNextPath;
     }
 
     // Level has changed?
-    if (gMap->LevelChanged())
+    if (GetMap().LevelChanged())
     {
         // Hack to make Abe mSay hello in the first screen of the mines
-        if (gMap->mNextLevel == EReliveLevelIds::eMines && !gAttract)
+        if (GetMap().mNextLevel == EReliveLevelIds::eMines && !gAttract)
         {
             mSay = MudSounds::eHelloNeutral_3;
             mAutoSayTimer = MakeTimer(35);
         }
 
         // Set the correct tint for this map
-        SetTint(sAbeTintTable, gMap->mNextLevel);
+        SetTint(sAbeTintTable, GetMap().mNextLevel);
 
-        if (gMap->mCurrentLevel != EReliveLevelIds::eNone)
+        if (GetMap().mCurrentLevel != EReliveLevelIds::eNone)
         {
             if (mBaseThrowableCount > 0)
             {
@@ -1267,20 +1267,20 @@ void Abe::VScreenChanged()
             mRingPulseTimer = 0;
         }
 
-        if (gMap->mNextLevel == EReliveLevelIds::eNecrum)
+        if (GetMap().mNextLevel == EReliveLevelIds::eNecrum)
         {
-            if (gMap->mCurrentLevel == EReliveLevelIds::eMudancheeVault_Ender)
+            if (GetMap().mCurrentLevel == EReliveLevelIds::eMudancheeVault_Ender)
             {
                 mMudancheeDone = true;
             }
 
-            if (gMap->mCurrentLevel == EReliveLevelIds::eMudomoVault_Ender)
+            if (GetMap().mCurrentLevel == EReliveLevelIds::eMudomoVault_Ender)
             {
                 mMudomoDone = true;
             }
         }
 
-        if (gMap->mNextLevel == EReliveLevelIds::eCredits || gMap->mNextLevel == EReliveLevelIds::eMenu)
+        if (GetMap().mNextLevel == EReliveLevelIds::eCredits || GetMap().mNextLevel == EReliveLevelIds::eMenu)
         {
             // Remove Abe for menu/credits levels?
             SetDead(true);
@@ -1288,16 +1288,16 @@ void Abe::VScreenChanged()
     }
 
     // If level or path changed then kill rings and farts
-    if (gMap->LevelChanged() || gMap->PathChanged())
+    if (GetMap().LevelChanged() || GetMap().PathChanged())
     {
         mRingPulseTimer = 0;
-        if (gMap->mCurrentLevel != EReliveLevelIds::eNone)
+        if (GetMap().mCurrentLevel != EReliveLevelIds::eNone)
         {
             mHasEvilFart = false;
         }
     }
 
-    if (gMap->LevelChanged() && !(GetRestoredFromQuickSave()))
+    if (GetMap().LevelChanged() && !(GetRestoredFromQuickSave()))
     {
         for (s8& val : gSavedKilledMudsPerZulag.mData)
         {
@@ -1627,7 +1627,7 @@ bool Abe::VTakeDamage(BaseGameObject* pFrom)
                 FP_FromInteger(0),
                 FP_FromInteger(0),
                 GetSpriteScale(),
-                false, mResMan);
+                false, mResMan, mMap);
 
             relive_new Gibs(GibType::eAbe,
                 mXPos,
@@ -1635,7 +1635,7 @@ bool Abe::VTakeDamage(BaseGameObject* pFrom)
                 FP_FromInteger(0),
                 FP_FromInteger(0),
                 GetSpriteScale(),
-                false, mResMan);
+                false, mResMan, mMap);
 
             GetAnimation().SetRender(false);
         }
@@ -1667,7 +1667,7 @@ bool Abe::VTakeDamage(BaseGameObject* pFrom)
                     FP_FromInteger(0),
                     FP_FromInteger(0),
                     GetSpriteScale(),
-                    0, mResMan);
+                    0, mResMan, mMap);
                 GetAnimation().SetRender(false);
                 GetShadow()->mEnabled = false;
             }
@@ -1689,7 +1689,7 @@ bool Abe::VTakeDamage(BaseGameObject* pFrom)
                 BaseThrowable* pThrowable = Make_Throwable(
                     mXPos,
                     mYPos - FP_FromInteger(30),
-                    0, mResMan);
+                    0, mResMan, mMap);
 
                 // Random explode time ?
                 const FP rand1 = FP_FromRaw((Math_NextRandom() - 127) << 11); // TODO: Wat?
@@ -1752,7 +1752,7 @@ bool Abe::VTakeDamage(BaseGameObject* pFrom)
                     FP_FromInteger((mXPos - pAliveObj->mXPos < FP_FromInteger(0)) ? -24 : 24),
                     FP_FromInteger(0),
                     GetSpriteScale(),
-                    50, mResMan);
+                    50, mResMan, mMap);
 
                 if (ForceDownIfHoisting_44BA30())
                 {
@@ -1823,7 +1823,7 @@ bool Abe::VTakeDamage(BaseGameObject* pFrom)
                     (pAliveObj->mVelX <= FP_FromInteger(0)) ? FP_FromInteger(-24) : FP_FromInteger(24),
                     FP_FromInteger(0),
                     GetSpriteScale(),
-                    50, mResMan);
+                    50, mResMan, mMap);
 
                 if (ForceDownIfHoisting_44BA30())
                 {
@@ -1993,7 +1993,7 @@ void Abe::VOnTlvCollision(TlvIterator tlvIterator)
         }
         else if (tlvIterator.GetTlv()->mTlvType == ReliveTypes::eDeathDrop)
         {
-            if (sControlledCharacter->Type() != ReliveTypes::eMineCar || gMap->mCurrentLevel != EReliveLevelIds::eMines)
+            if (sControlledCharacter->Type() != ReliveTypes::eMineCar || GetMap().mCurrentLevel != EReliveLevelIds::eMines)
             {
                 Mudokon_SFX(MudSounds::eDeathDropScream_15, 0, 0, this);
                 EventBroadcast(Event::kEventNoise, this);
@@ -2350,7 +2350,7 @@ void Abe::Motion_0_Idle_44EEB0()
         {
             // An evil fart
             mHasEvilFart = false;
-            Create_Fart_421D20(mResMan);
+            Create_Fart_421D20(mResMan, mMap);
         }
         else
         {
@@ -2368,7 +2368,7 @@ void Abe::Motion_0_Idle_44EEB0()
                 fartXPos = mXPos - (FP_FromInteger(12) * GetSpriteScale());
             }
 
-            New_Smoke_Particles(fartXPos, fartYPos, fartScale, 3, RGB16{ 32, 128, 32 }, mResMan);
+            New_Smoke_Particles(fartXPos, fartYPos, fartScale, 3, RGB16{ 32, 128, 32 }, mResMan, mMap);
         }
 
         mCurrentMotion = eAbeMotions::Motion_10_Fart_45B1A0;
@@ -2575,7 +2575,7 @@ void Abe::Motion_0_Idle_44EEB0()
                 mThrowableId = Make_Throwable(
                                              mXPos,
                                              mYPos - FP_FromInteger(40),
-                                             0, mResMan)
+                                             0, mResMan, mMap)
                                              ->mBaseGameObjectId;
 
                 if (!gThrowableIndicatorExists)
@@ -2587,7 +2587,7 @@ void Abe::Motion_0_Idle_44EEB0()
                         GetAnimation().GetRenderLayer(),
                         GetAnimation().GetSpriteScale(),
                         mBaseThrowableCount,
-                        true, mResMan);
+                        true, mResMan, mMap);
                 }
 
                 mCurrentMotion = eAbeMotions::Motion_104_RockThrowStandingHold;
@@ -3213,7 +3213,7 @@ void Abe::Motion_14_HoistIdle_452440()
         {
             if (pHoist->mHoistType == relive::Path_Hoist::Type::eOffScreen)
             {
-                if (gMap->SetActiveCameraDelayed(MapDirections::eMapTop_2, this, -1))
+                if (GetMap().SetActiveCameraDelayed(MapDirections::eMapTop_2, this, -1))
                 {
                     PSX_Prevent_Rendering();
                     mCurrentMotion = eAbeMotions::Motion_68_ToOffScreenHoist_454B80;
@@ -3403,7 +3403,7 @@ void Abe::Motion_17_CrouchIdle_456BC0()
         && mCurrentMotion == eAbeMotions::Motion_17_CrouchIdle_456BC0
         && (mBaseThrowableCount > 0 || gInfiniteThrowables))
     {
-        mThrowableId = Make_Throwable(mXPos, mYPos - FP_FromInteger(40), 0, mResMan)->mBaseGameObjectId;
+        mThrowableId = Make_Throwable(mXPos, mYPos - FP_FromInteger(40), 0, mResMan, mMap)->mBaseGameObjectId;
         if (!gThrowableIndicatorExists)
         {
             const FP yOff = mYPos + (GetSpriteScale() * FP_FromInteger(-30));
@@ -3414,7 +3414,7 @@ void Abe::Motion_17_CrouchIdle_456BC0()
                 GetAnimation().GetRenderLayer(),
                 GetAnimation().GetSpriteScale(),
                 mBaseThrowableCount,
-                1, mResMan);
+                1, mResMan, mMap);
         }
 
         mCurrentMotion = eAbeMotions::Motion_107_RockThrowCrouchingHold;
@@ -3443,7 +3443,7 @@ void Abe::Motion_17_CrouchIdle_456BC0()
             if (mHasEvilFart)
             {
                 mHasEvilFart = false;
-                Create_Fart_421D20(mResMan);
+                Create_Fart_421D20(mResMan, mMap);
 
                 if (mBaseGameObjectResArray.ItemAt(22))
                 {
@@ -3463,7 +3463,7 @@ void Abe::Motion_17_CrouchIdle_456BC0()
                 {
                     xpos = mXPos - (FP_FromInteger(10) * GetSpriteScale());
                 }
-                New_Smoke_Particles(xpos, ypos, scale, 3, RGB16{ 32, 128, 32 }, mResMan);
+                New_Smoke_Particles(xpos, ypos, scale, 3, RGB16{ 32, 128, 32 }, mResMan, mMap);
             }
 
             mCurrentMotion = eAbeMotions::Motion_20_CrouchSpeak_454550;
@@ -4846,7 +4846,7 @@ void Abe::Motion_56_DeathDropFall_4591F0()
         else if (static_cast<s32>(sGnFrame) == field_0_abe_timer - 24)
         {
             SfxPlayMono(relive::SoundEffects::KillEffect, 85);
-            relive_new ScreenShake(true, false, mResMan);
+            relive_new ScreenShake(true, false, mResMan, mMap);
         }
         else if (static_cast<s32>(sGnFrame) >= field_0_abe_timer)
         {
@@ -4895,7 +4895,7 @@ void Abe::Motion_57_Dead_4589A0()
                     ypos,
                     (Math_NextRandom() % 8) + field_0_abe_timer + 60,
                     1,
-                    GetSpriteScale(), mResMan);
+                    GetSpriteScale(), mResMan, mMap);
             }
             else
             {
@@ -4906,7 +4906,7 @@ void Abe::Motion_57_Dead_4589A0()
                     ypos,
                     (Math_NextRandom() % 8) + field_0_abe_timer + 15,
                     1,
-                    GetSpriteScale(), mResMan);
+                    GetSpriteScale(), mResMan, mMap);
             }
             return;
 
@@ -4923,7 +4923,7 @@ void Abe::Motion_57_Dead_4589A0()
                         ypos,
                         (Math_NextRandom() % 8) + field_0_abe_timer + 60,
                         0,
-                        GetSpriteScale(), mResMan);
+                        GetSpriteScale(), mResMan, mMap);
                 }
                 else
                 {
@@ -4934,7 +4934,7 @@ void Abe::Motion_57_Dead_4589A0()
                         ypos,
                         (Math_NextRandom() % 8) + field_0_abe_timer + 15,
                         0,
-                        GetSpriteScale(), mResMan);
+                        GetSpriteScale(), mResMan, mMap);
                 }
             }
 
@@ -4974,7 +4974,7 @@ void Abe::Motion_57_Dead_4589A0()
                 pFade_1->SetDead(true);
                 mFadeId = Guid{};
             }
-            auto pFade = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeIn, false, 8, relive::TBlendModes::eBlend_2, mResMan);
+            auto pFade = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeIn, false, 8, relive::TBlendModes::eBlend_2, mResMan, mMap);
             if (pFade)
             {
                 mFadeId = pFade->mBaseGameObjectId;
@@ -5016,7 +5016,7 @@ void Abe::Motion_57_Dead_4589A0()
                 QuikSave::gActiveQuicksaveData.mWorldInfo.mControlledCharScale != 0 ? FP_FromDouble(1.0) : FP_FromDouble(0.5),
                 0,
                 true,
-                true, mResMan);
+                true, mResMan, mMap);
             QuikSave::LoadActive();
             return;
         default:
@@ -5400,11 +5400,11 @@ void Abe::Motion_71_Knockback_455090()
 
             MoveWithVelocity_450FA0(FP_FromDouble(0.67));
 
-            if ((gMap->mCurrentLevel == EReliveLevelIds::eMines
-                 || gMap->mCurrentLevel == EReliveLevelIds::eBonewerkz
-                 || gMap->mCurrentLevel == EReliveLevelIds::eFeeCoDepot
-                 || gMap->mCurrentLevel == EReliveLevelIds::eBarracks
-                 || gMap->mCurrentLevel == EReliveLevelIds::eBrewery)
+            if ((GetMap().mCurrentLevel == EReliveLevelIds::eMines
+                 || GetMap().mCurrentLevel == EReliveLevelIds::eBonewerkz
+                 || GetMap().mCurrentLevel == EReliveLevelIds::eFeeCoDepot
+                 || GetMap().mCurrentLevel == EReliveLevelIds::eBarracks
+                 || GetMap().mCurrentLevel == EReliveLevelIds::eBrewery)
                 && GetAnimation().GetCurrentFrame() == 7)
             {
                 Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this);
@@ -5779,17 +5779,17 @@ void Abe::Motion_82_InsideWellExpress_45CC80()
     field_8_x_vel_slow_by = FP_FromInteger(0);
     BaseAliveGameObjectLastLineYPos = mYPos;
 
-    if (mDstWellLevel != gMap->mCurrentLevel || mDstWellPath != gMap->mCurrentPath || mDstWellCamera != gMap->mCurrentCamera)
+    if (mDstWellLevel != GetMap().mCurrentLevel || mDstWellPath != GetMap().mCurrentPath || mDstWellCamera != GetMap().mCurrentCamera)
     {
         field_124_timer = 1;
 
         if (pExpressWell->mMovieId)
         {
-            gMap->SetActiveCam(mDstWellLevel, mDstWellPath, mDstWellCamera, CameraSwapEffects::ePlay1FMV_5, pExpressWell->mMovieId, 0);
+            GetMap().SetActiveCam(mDstWellLevel, mDstWellPath, mDstWellCamera, CameraSwapEffects::ePlay1FMV_5, pExpressWell->mMovieId, 0);
         }
         else
         {
-            gMap->SetActiveCam(mDstWellLevel, mDstWellPath, mDstWellCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+            GetMap().SetActiveCam(mDstWellLevel, mDstWellPath, mDstWellCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
         }
 
         // FeeCo hack!
@@ -5843,8 +5843,8 @@ void Abe::Motion_83_WellExpressShotOut_45CF70()
         tlvIter = tlvIter.Next_TLV();
     }
 
-    mCurrentLevel = gMap->mCurrentLevel;
-    mCurrentPath = gMap->mCurrentPath;
+    mCurrentLevel = GetMap().mCurrentLevel;
+    mCurrentPath = GetMap().mCurrentPath;
 
     if (pWell)
     {
@@ -5870,7 +5870,7 @@ void Abe::Motion_83_WellExpressShotOut_45CF70()
     {
         // Shoot out of the same well if target not found
         PSX_Point camPos = {};
-        gMap->GetCurrentCamCoords(&camPos);
+        GetMap().GetCurrentCamCoords(&camPos);
         mXPos = FP_FromInteger(camPos.x + 184);
         mYPos = FP_FromInteger(camPos.y + 80);
         mVelX = GetSpriteScale() * FP_FromDouble(-2.68);
@@ -5887,7 +5887,7 @@ void Abe::Motion_84_FallLandDie_45A420()
     {
         SfxPlayMono(relive::SoundEffects::KillEffect, 85);
         SND_SEQ_Play(SeqId::HitBottomOfDeathPit_9, 1, 95, 95);
-        relive_new ScreenShake(true, false, mResMan);
+        relive_new ScreenShake(true, false, mResMan, mMap);
     }
 
     if (GetAnimation().GetIsLastFrame())
@@ -5922,7 +5922,7 @@ void Abe::Motion_86_HandstoneBegin()
                     GetSpriteScale(),
                     1,
                     false,
-                    false, mResMan);
+                    false, mResMan, mMap);
 
                 if (GetAnimation().GetFlipX())
                 {
@@ -6003,9 +6003,9 @@ void Abe::Motion_86_HandstoneBegin()
                 {
                     gScreenManager->EnableRendering();
 
-                    FmvInfo* pFmvRec = Path_Get_FMV_Record(gMap->mCurrentLevel, mFmvId);
+                    FmvInfo* pFmvRec = Path_Get_FMV_Record(GetMap().mCurrentLevel, mFmvId);
 
-                    relive_new Movie(pFmvRec->field_0_pName, mResMan);
+                    relive_new Movie(pFmvRec->field_0_pName, mResMan, mMap);
                     field_120_state.stone = StoneStates::eHandstoneMovieDone_2;
                 }
                 else if (mHandStoneType == ReliveTypes::eHandStone)
@@ -6015,14 +6015,14 @@ void Abe::Motion_86_HandstoneBegin()
                     field_120_state.stone = StoneStates::eWaitForInput_4;
                     pCircularFade->SetDead(true);
                     mCircularFadeId = Guid{};
-                    Fade* pFade33 = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeOut, 0, 8, relive::TBlendModes::eBlend_2, mResMan);
+                    Fade* pFade33 = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeOut, 0, 8, relive::TBlendModes::eBlend_2, mResMan, mMap);
                     if (pFade33)
                     {
                         mFadeId = pFade33->mBaseGameObjectId;
                     }
 
-                    mDstWellCamera = gMap->mCurrentCamera;
-                    gMap->SetActiveCam(mCurrentLevel, mCurrentPath, mHandStoneCams[0], CameraSwapEffects::eInstantChange_0, 0, 0);
+                    mDstWellCamera = GetMap().mCurrentCamera;
+                    GetMap().SetActiveCam(mCurrentLevel, mCurrentPath, mHandStoneCams[0], CameraSwapEffects::eInstantChange_0, 0, 0);
                 }
             }
             break;
@@ -6031,7 +6031,7 @@ void Abe::Motion_86_HandstoneBegin()
             if (Movie::gMovieRefCount == 0)
             {
                 gPsxDisplay.PutCurrentDispEnv();
-                gScreenManager->DecompressCameraToVRam(gMap->field_2C_camera_array[0]->mCamRes);
+                gScreenManager->DecompressCameraToVRam(GetMap().field_2C_camera_array[0]->mCamRes);
                 gScreenManager->EnableRendering();
                 pCircularFade->VFadeIn(0, 0);
                 field_120_state.stone = StoneStates::eHandstoneEnd_3;
@@ -6075,13 +6075,13 @@ void Abe::Motion_86_HandstoneBegin()
                     field_120_state.stone = StoneStates::eWaitForInput_4;
 
                     pFade->SetDead(true);
-                    pFade = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeOut, 0, 8, relive::TBlendModes::eBlend_2, mResMan);
+                    pFade = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeOut, 0, 8, relive::TBlendModes::eBlend_2, mResMan, mMap);
                     if (pFade)
                     {
                         mFadeId = pFade->mBaseGameObjectId;
                     }
 
-                    gMap->SetActiveCam(
+                    GetMap().SetActiveCam(
                         mCurrentLevel,
                         mCurrentPath,
                         mHandStoneCams[mHandStoneCamIdx++],
@@ -6101,7 +6101,7 @@ void Abe::Motion_86_HandstoneBegin()
             {
                 GetAnimation().SetRender(true);
                 field_120_state.stone = StoneStates::eCircularFadeExit_7;
-                gMap->SetActiveCam(
+                GetMap().SetActiveCam(
                     mCurrentLevel,
                     mCurrentPath,
                     mDstWellCamera,
@@ -6116,7 +6116,7 @@ void Abe::Motion_86_HandstoneBegin()
             pFade->SetDead(true);
             mFadeId = Guid{};
 
-            CircularFade* pCircularFade2 = Make_Circular_Fade(mXPos, mYPos, GetSpriteScale(), 0, false, false, mResMan);
+            CircularFade* pCircularFade2 = Make_Circular_Fade(mXPos, mYPos, GetSpriteScale(), 0, false, false, mResMan, mMap);
             if (GetAnimation().GetFlipX())
             {
                 pCircularFade2->GetAnimation().SetFlipX(true);
@@ -6531,7 +6531,7 @@ void Abe::Motion_109_ZShotRolling()
         mYPos += (GetSpriteScale() * FP_FromInteger(4));
     }
 
-    if (!gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+    if (!GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
     {
         if (GetAnimation().GetForwardLoopCompleted())
         {
@@ -6567,7 +6567,7 @@ void Abe::Motion_110_ZShot()
         mYPos += (GetSpriteScale() * FP_FromInteger(4));
     }
 
-    if (!gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+    if (!GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
     {
         mYPos += FP_FromInteger(240);
         Mudokon_SFX(MudSounds::eDeathDropScream_15, 0, 0, this);
@@ -6633,7 +6633,7 @@ void Abe::Motion_112_Chant()
                         FP_FromInteger((bRect.x + bRect.w) / 2),
                         FP_FromInteger((bRect.y + bRect.h) / 2),
                         RingTypes::eExplosive_Emit_1,
-                        GetSpriteScale(), mResMan);
+                        GetSpriteScale(), mResMan, mMap);
 
                     mRingPulseTimer = 0;
                 }
@@ -6658,7 +6658,7 @@ void Abe::Motion_112_Chant()
                     InvisibleEffect* pInvisible = static_cast<InvisibleEffect*>(sObjectIds.Find_Impl(mInvisibleEffectId));
                     if (!pInvisible || pInvisible->GetDead())
                     {
-                        pInvisible = relive_new InvisibleEffect(this, mResMan);
+                        pInvisible = relive_new InvisibleEffect(this, mResMan, mMap);
                         mInvisibleEffectId = pInvisible->mBaseGameObjectId;
                     }
                     pInvisible->BecomeInvisible();
@@ -6697,7 +6697,7 @@ void Abe::Motion_112_Chant()
                                 FP_FromInteger((bRect.x + bRect.w) / 2),
                                 FP_FromInteger((bRect.y + bRect.h) / 2),
                                 RingTypes::eHealing_Emit_12,
-                                GetSpriteScale(), mResMan);
+                                GetSpriteScale(), mResMan, mMap);
 
                             mHaveHealing = false;
                             mRingPulseTimer = 0;
@@ -6721,7 +6721,7 @@ void Abe::Motion_112_Chant()
 
             if (!(sGnFrame % 4))
             {
-                New_RandomizedChant_Particle(this, mResMan);
+                New_RandomizedChant_Particle(this, mResMan, mMap);
             }
 
             if (static_cast<s32>(sGnFrame) >= field_124_timer - 70)
@@ -6736,7 +6736,7 @@ void Abe::Motion_112_Chant()
                             xOff + mXPos,
                             yPos,
                             GetSpriteScale(),
-                            0, mResMan);
+                            0, mResMan, mMap);
 
                         mOrbWhirlWindId = pOrbWhirlWind->mBaseGameObjectId;
                     }
@@ -6776,7 +6776,7 @@ void Abe::Motion_112_Chant()
                 pObj->GetSpriteScale(),
                 pObj);
 
-            relive_new PossessionFlicker(gAbe, 30, 128, 255, 255, mResMan);
+            relive_new PossessionFlicker(gAbe, 30, 128, 255, 255, mResMan, mMap);
         }
             return;
 
@@ -6845,7 +6845,7 @@ void Abe::Motion_112_Chant()
                 mLaughAtChantEnd = true;
             }
 
-            relive_new PossessionFlicker(sControlledCharacter, 60, 128, 255, 255, mResMan);
+            relive_new PossessionFlicker(sControlledCharacter, 60, 128, 255, 255, mResMan, mMap);
 
             SND_SEQ_Stop(SeqId::MudokonChant1_10);
             SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 70, 400);
@@ -6860,7 +6860,7 @@ void Abe::Motion_112_Chant()
                 return;
             }
 
-            relive_new PossessionFlicker(sControlledCharacter, 15, 128, 255, 255, mResMan);
+            relive_new PossessionFlicker(sControlledCharacter, 15, 128, 255, 255, mResMan, mMap);
 
             field_120_state.chant = ChantStates::eUnpossessing_4;
             field_124_timer = MakeTimer(15);
@@ -6871,7 +6871,7 @@ void Abe::Motion_112_Chant()
         {
             if (!(sGnFrame % 4))
             {
-                New_RandomizedChant_Particle(this, mResMan);
+                New_RandomizedChant_Particle(this, mResMan, mMap);
             }
 
             if (static_cast<s32>(sGnFrame) <= field_124_timer)
@@ -6892,7 +6892,7 @@ void Abe::Motion_112_Chant()
             EventBroadcast(Event::kEventAbeOhm, this);
             if (!(sGnFrame % 4))
             {
-                New_RandomizedChant_Particle(this, mResMan);
+                New_RandomizedChant_Particle(this, mResMan, mMap);
             }
         }
             return;
@@ -6970,16 +6970,16 @@ void Abe::Motion_114_DoorEnter()
 
             // An OWI hack. When both Mudomo and Mundanchee are done, force back to Necrum Mines.
             bool hackChange = false;
-            if (gMap->mCurrentLevel == EReliveLevelIds::eMudomoVault_Ender)
+            if (GetMap().mCurrentLevel == EReliveLevelIds::eMudomoVault_Ender)
             {
-                if (gMap->mCurrentPath == 13 && gMap->mCurrentCamera == 14 && mMudancheeDone)
+                if (GetMap().mCurrentPath == 13 && GetMap().mCurrentCamera == 14 && mMudancheeDone)
                 {
                     hackChange = true;
                 }
             }
-            else if (gMap->mCurrentLevel == EReliveLevelIds::eMudancheeVault_Ender)
+            else if (GetMap().mCurrentLevel == EReliveLevelIds::eMudancheeVault_Ender)
             {
-                if (gMap->mCurrentPath == 11 && gMap->mCurrentCamera == 2 && mMudomoDone)
+                if (GetMap().mCurrentPath == 11 && GetMap().mCurrentCamera == 2 && mMudomoDone)
                 {
                     hackChange = true;
                 }
@@ -6989,7 +6989,7 @@ void Abe::Motion_114_DoorEnter()
             {
                 // Plays FMV where the weirdos give Abe the drunk mud healing power and then dumps Abe at the portal that leads
                 // back to Necrum mines.
-                gMap->SetActiveCam(EReliveLevelIds::eNecrum, 3, 10, CameraSwapEffects::ePlay1FMV_5, 22, 0);
+                GetMap().SetActiveCam(EReliveLevelIds::eNecrum, 3, 10, CameraSwapEffects::ePlay1FMV_5, 22, 0);
                 mVelY = FP_FromInteger(0);
                 mVelX = FP_FromInteger(0);
                 mXPos = FP_FromInteger(2287);
@@ -7003,7 +7003,7 @@ void Abe::Motion_114_DoorEnter()
                 return;
             }
 
-            gMap->mDoorTransition = 1;
+            GetMap().mDoorTransition = 1;
             s16 bForceChange = 0;
             const CameraSwapEffects effect = kPathChangeEffectToInternalScreenChangeEffect[pDoorTlv->mWipeEffect];
             if (effect == CameraSwapEffects::ePlay1FMV_5 || effect == CameraSwapEffects::eUnknown_11)
@@ -7011,7 +7011,7 @@ void Abe::Motion_114_DoorEnter()
                 bForceChange = 1;
             }
 
-            gMap->SetActiveCam(
+            GetMap().SetActiveCam(
                 pDoorTlv->mNextLevel,
                 pDoorTlv->mNextPath,
                 pDoorTlv->mNextCamera,
@@ -7026,9 +7026,9 @@ void Abe::Motion_114_DoorEnter()
 
         case AbeDoorStates::eSetNewAbePosition_5:
         {
-            gMap->mDoorTransition = 0;
-            mCurrentLevel = gMap->mCurrentLevel;
-            mCurrentPath = gMap->mCurrentPath;
+            GetMap().mDoorTransition = 0;
+            mCurrentLevel = GetMap().mCurrentLevel;
+            mCurrentPath = GetMap().mCurrentPath;
 
             TlvIterator doorTlvIterator = gPathInfo->TLV_First_Of_Type_In_Camera(ReliveTypes::eDoor, 0);
             while (doorTlvIterator.GetTlv<relive::Path_Door>()->mDoorId != field_1A0_door_id)
@@ -7250,7 +7250,7 @@ void Abe::Motion_119_ToShrykull()
 
             field_120_state.raw = 1;
 
-            relive_new Shrykull(mResMan);
+            relive_new Shrykull(mResMan, mMap);
         }
     }
 }
@@ -7367,7 +7367,7 @@ void Abe::Motion_127_TurnWheelLoop()
         {
             field_120_state.wheel = WorkWheelStates::eMapChanging_2;
             SND_SEQ_Play(SeqId::SaveTriggerMusic_31, 1, 127, 127);
-            relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eChime, relive::Path_MusicTrigger::TriggeredBy::eTimer, 0, mResMan);
+            relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eChime, relive::Path_MusicTrigger::TriggeredBy::eTimer, 0, mResMan, mMap);
             return;
         }
         else
@@ -7394,7 +7394,7 @@ void Abe::Motion_127_TurnWheelLoop()
     else if (field_120_state.wheel == WorkWheelStates::eMapChanging_2)
     {
         // This happens for the Mines Tunnel 1 ender.
-        if (!gMap->Is_Point_In_Current_Camera(
+        if (!GetMap().Is_Point_In_Current_Camera(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,
@@ -7571,7 +7571,7 @@ void Abe::PickUpThrowabe_Or_PressBomb_454090(FP fpX, s32 fpY, s32 bStandToCrouch
                         GetAnimation().GetRenderLayer(),
                         GetAnimation().GetSpriteScale(),
                         mBaseThrowableCount,
-                        1, mResMan);
+                        1, mResMan, mMap);
                 }
                 trySlapOrCollect = true;
                 break;
@@ -7691,9 +7691,9 @@ void Abe::TryHoist_44ED30()
     }
 }
 
-void Abe::Create_Fart_421D20(ResourceManagerWrapper& resMan)
+void Abe::Create_Fart_421D20(ResourceManagerWrapper& resMan, BaseMap& map)
 {
-    relive_new EvilFart(resMan);
+    relive_new EvilFart(resMan, map);
 }
 
 s16 Abe::TryEnterMineCar_4569E0()
@@ -8455,8 +8455,8 @@ void Abe::BulletDamage_44C980(Bullet* pBullet)
         {
             if (pBullet->mBulletType != BulletType::ePossessedSligZBullet_1 && pBullet->mBulletType != BulletType::eZBullet_3)
             {
-                relive_new Spark(hitX, hitY, GetSpriteScale(), 9, -31, 159, SparkType::eSmallChantParticle_0, mResMan);
-                New_Smoke_Particles(hitX, hitY, GetSpriteScale(), 3, RGB16{ 128, 128, 128 }, mResMan);
+                relive_new Spark(hitX, hitY, GetSpriteScale(), 9, -31, 159, SparkType::eSmallChantParticle_0, mResMan, mMap);
+                New_Smoke_Particles(hitX, hitY, GetSpriteScale(), 3, RGB16{ 128, 128, 128 }, mResMan, mMap);
             }
         }
         return;
@@ -8485,7 +8485,7 @@ void Abe::BulletDamage_44C980(Bullet* pBullet)
                 bloodXOffset,
                 FP_FromInteger(0),
                 GetSpriteScale(),
-                50, mResMan);
+                50, mResMan, mMap);
 
             switch (shootKind)
             {
@@ -8542,7 +8542,7 @@ void Abe::BulletDamage_44C980(Bullet* pBullet)
             }
 
             const FP boundsY = FP_FromInteger(rect.y);
-            if (Bullet::InZBulletCover(mXPos, boundsY, rect) || !gMap->Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, boundsY, 0))
+            if (Bullet::InZBulletCover(mXPos, boundsY, rect) || !GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, boundsY, 0))
             {
                 mbGotShot = false;
                 mHealth = FP_FromInteger(1);
@@ -8569,7 +8569,7 @@ void Abe::BulletDamage_44C980(Bullet* pBullet)
                 mNextMotion = eAbeMotions::Motion_109_ZShotRolling;
             }
 
-            relive_new Blood(mXPos, yOffset + mYPos, FP_FromInteger(0), FP_FromInteger(0), FP_FromInteger(1), 50, mResMan);
+            relive_new Blood(mXPos, yOffset + mYPos, FP_FromInteger(0), FP_FromInteger(0), FP_FromInteger(1), 50, mResMan, mMap);
             break;
         }
 
@@ -8665,7 +8665,7 @@ void Abe::IntoPortalStates_451990()
                     u16 movieId = 0;
 
                     pBirdPortal->VGetMapChange(&level, &path, &camera, &screenChangeEffect, &movieId);
-                    gMap->SetActiveCam(level, path, camera, screenChangeEffect, movieId, false);
+                    GetMap().SetActiveCam(level, path, camera, screenChangeEffect, movieId, false);
                     mBirdPortalSubState = PortalSubStates::eSetNewAbePosition_4;
                 }
                 break;
@@ -8983,7 +8983,7 @@ void Mudokon_SFX(MudSounds idx, s16 volume, s32 pitch, BaseAliveGameObject* pHer
         }
         case MudSounds::eGiggle_8:
         {
-            if (IsAbe(pHero) && gMap->mCurrentLevel == EReliveLevelIds::eBrewery_Ender)
+            if (IsAbe(pHero) && GetMap().mCurrentLevel == EReliveLevelIds::eBrewery_Ender)
             {
                 idx = MudSounds::eLaugh_10;
             }
@@ -9016,7 +9016,7 @@ void Mudokon_SFX(MudSounds idx, s16 volume, s32 pitch, BaseAliveGameObject* pHer
                 return;
             }
 
-            switch (gMap->GetDirection(
+            switch (GetMap().GetDirection(
                 pHero->mCurrentLevel,
                 pHero->mCurrentPath,
                 pHero->mXPos,

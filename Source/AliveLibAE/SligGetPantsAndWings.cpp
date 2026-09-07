@@ -12,8 +12,8 @@ void SligGetPantsAndWings::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::CrawlingSligLocker_Open));
 }
 
-SligGetPantsAndWings::SligGetPantsAndWings(relive::Path_TLV* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan)
+SligGetPantsAndWings::SligGetPantsAndWings(relive::Path_TLV* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eSligGetPantsOrWings);
     mTlvInfo = tlvId;

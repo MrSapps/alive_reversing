@@ -279,14 +279,14 @@ const MusicController_Record2 rec2s_4CD5A8[124] = {
     {SeqId::Unknown_163, 220},
     {SeqId::Unknown_0, 0}};
 
-s16 MusicController::Create(ResourceManagerWrapper& resMan)
+s16 MusicController::Create(ResourceManagerWrapper& resMan, BaseMap& map)
 {
     if (pMusicController_507B98)
     {
         return 0;
     }
 
-    pMusicController_507B98 = relive_new MusicController(resMan);
+    pMusicController_507B98 = relive_new MusicController(resMan, map);
     if (pMusicController_507B98)
     {
         MusicController::SetBaseTimeStamp();
@@ -328,8 +328,8 @@ s32 MusicController::GetMusicTime()
     return sMusicTime_507B9C;
 }
 
-MusicController::MusicController(ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+MusicController::MusicController(ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     SetSurviveDeathReset(true);
     SetType(ReliveTypes::eNone);
@@ -385,7 +385,7 @@ void MusicController::VUpdate()
     {
         field_16_bScreenChanged = false;
 
-        if (gMap->mCurrentLevel != field_18_level)
+        if (GetMap().mCurrentLevel != field_18_level)
         {
             field_3C_music_seq_duration = 0;
             field_34_sync_after_beats = 1;
@@ -407,7 +407,7 @@ void MusicController::VUpdate()
                 field_38_music_seq = SeqId::None_M1;
             }
 
-            field_18_level = gMap->mCurrentLevel;
+            field_18_level = GetMap().mCurrentLevel;
 
             if (field_10_bEnableMusic)
             {
@@ -777,7 +777,7 @@ void MusicController::UpdateMusic()
                 break;
 
             case MusicTypes::eIntenseChase_8:
-                if (gMap->mCurrentLevel == EReliveLevelIds::eBoardRoom)
+                if (GetMap().mCurrentLevel == EReliveLevelIds::eBoardRoom)
                 {
                     idx = 102;
                     field_34_sync_after_beats = 1;

@@ -12,7 +12,7 @@ namespace AO {
 class LiftPoint final : public ::PlatformBase
 {
 public:
-    LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~LiftPoint();
 
     void LoadAnimations();

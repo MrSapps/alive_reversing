@@ -18,7 +18,7 @@ struct FallingItem_Data final
 class FallingItem final : public ::BaseAliveGameObject
 {
 public:
-    FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~FallingItem();
 
     void LoadAnimations();

@@ -89,7 +89,7 @@ public:
         AnimId::Paramite_Death,
         AnimId::Paramite_Struggle};
 
-    Paramite(relive::Path_Paramite* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    Paramite(relive::Path_Paramite* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Paramite();
 
     virtual void VRender(OrderingTable& ot) override;

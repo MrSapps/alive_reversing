@@ -10,7 +10,7 @@ namespace AO {
 class FootSwitch final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    FootSwitch(relive::Path_FootSwitch* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    FootSwitch(relive::Path_FootSwitch* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~FootSwitch();
 
     void LoadAnimations();

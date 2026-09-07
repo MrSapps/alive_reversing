@@ -6,6 +6,8 @@ struct SfxDefinition;
 
 struct PathSoundInfo;
 struct OpenSeqHandle;
+class ResourceManagerWrapper;
+class BaseMap;
 
 namespace AO {
 
@@ -184,11 +186,11 @@ void SsUtAllKeyOff(s32 mode);
 
 void SND_Reset_476BA0();
 
-void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& pSoundBlockInfo, s32 reverb);
+void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& pSoundBlockInfo, s32 reverb, ResourceManagerWrapper& resMan, BaseMap& map);
 
 void SND_Stop_Channels_Mask(s32 mask);
 
-void SND_Load_Seqs_477AB0(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& bsqFileName);
+void SND_Load_Seqs_477AB0(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& bsqFileName, ResourceManagerWrapper& resMan, BaseMap& map);
 
 s16 SND_SEQ_PlaySeq(SeqId idx, s32 repeatCount, s16 bDontStop);
 

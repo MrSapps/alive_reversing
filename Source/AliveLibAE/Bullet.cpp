@@ -15,8 +15,8 @@
 #include "Math.hpp"
 #include "Path.hpp"
 
-Bullet::Bullet(BaseAliveGameObject* pParent, BulletType type, FP xpos, FP ypos, FP xDist, FP scale, s32 numberOfBullets, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan),
+Bullet::Bullet(BaseAliveGameObject* pParent, BulletType type, FP xpos, FP ypos, FP xDist, FP scale, s32 numberOfBullets, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map),
     mBulletType(type),
     mXPos(xpos),
     mYPos(ypos),
@@ -26,13 +26,13 @@ Bullet::Bullet(BaseAliveGameObject* pParent, BulletType type, FP xpos, FP ypos, 
     mXDistance(xDist)
 {
     SetType(ReliveTypes::eBullet);
-    mBulletPath = gMap->mCurrentPath;
-    mBulletLevel = gMap->mCurrentLevel;
+    mBulletPath = GetMap().mCurrentPath;
+    mBulletLevel = GetMap().mCurrentLevel;
 }
 
 void Bullet::VUpdate()
 {
-    if (!gMap->Is_Point_In_Current_Camera(mBulletLevel, mBulletPath, mXPos, mYPos, 0) && !gMap->Is_Point_In_Current_Camera(mBulletLevel, mBulletPath, mXPos + FP_FromInteger(10), mYPos, 0) && !gMap->Is_Point_In_Current_Camera(mBulletLevel, mBulletPath, mXPos - FP_FromInteger(10), mYPos, 0))
+    if (!GetMap().Is_Point_In_Current_Camera(mBulletLevel, mBulletPath, mXPos, mYPos, 0) && !GetMap().Is_Point_In_Current_Camera(mBulletLevel, mBulletPath, mXPos + FP_FromInteger(10), mYPos, 0) && !GetMap().Is_Point_In_Current_Camera(mBulletLevel, mBulletPath, mXPos - FP_FromInteger(10), mYPos, 0))
     {
         SetDead(true);
         return;
@@ -101,22 +101,22 @@ void Bullet::VUpdate()
                                 relive_new Spark(
                                     pShotObj->mXPos + (mSpriteScale * FP_FromInteger(30)) - FP_FromInteger(randomW),
                                     mYPos + FP_NoFractional(randomHeight),
-                                    mSpriteScale, 6, -76, 76, SparkType::eSmallChantParticle_0, mResMan);
+                                    mSpriteScale, 6, -76, 76, SparkType::eSmallChantParticle_0, mResMan, mMap);
                                 New_Smoke_Particles(
                                     pShotObj->mXPos + (mSpriteScale * FP_FromInteger(30)) - FP_FromInteger(randomW),
                                     mYPos + FP_NoFractional(randomHeight),
-                                    mSpriteScale, 3, RGB16{ 128, 128, 128 }, mResMan);
+                                    mSpriteScale, 3, RGB16{ 128, 128, 128 }, mResMan, mMap);
                             }
                             else
                             {
                                 relive_new Spark(
                                     pShotObj->mXPos + FP_FromInteger(randomW) - (mSpriteScale * FP_FromInteger(30)),
                                     mYPos + FP_NoFractional(randomHeight),
-                                    mSpriteScale, 6, 50, 205, SparkType::eSmallChantParticle_0, mResMan);
+                                    mSpriteScale, 6, 50, 205, SparkType::eSmallChantParticle_0, mResMan, mMap);
                                 New_Smoke_Particles(
                                     pShotObj->mXPos + FP_FromInteger(randomW) - (mSpriteScale * FP_FromInteger(30)),
                                     mYPos + FP_NoFractional(randomHeight),
-                                    mSpriteScale, 3, RGB16{ 128, 128, 128 }, mResMan);
+                                    mSpriteScale, 3, RGB16{ 128, 128, 128 }, mResMan, mMap);
                             }
 
                             if (Math_RandomRange(0, 100) < 90)
@@ -142,16 +142,16 @@ void Bullet::VUpdate()
                     relive_new Spark(
                         hitX - (mSpriteScale * FP_FromInteger(6)),
                         (FP_FromInteger(10) * mSpriteScale) + hitY,
-                        mSpriteScale, 6, -76, 76, SparkType::eSmallChantParticle_0, mResMan);
-                    New_Smoke_Particles(hitX - (mSpriteScale * FP_FromInteger(6)), hitY, mSpriteScale, 3, RGB16{ 128, 128, 128 }, mResMan);
+                        mSpriteScale, 6, -76, 76, SparkType::eSmallChantParticle_0, mResMan, mMap);
+                    New_Smoke_Particles(hitX - (mSpriteScale * FP_FromInteger(6)), hitY, mSpriteScale, 3, RGB16{ 128, 128, 128 }, mResMan, mMap);
                 }
                 else
                 {
                     relive_new Spark(
                         hitX + (mSpriteScale * FP_FromInteger(7)),
                         (FP_FromInteger(10) * mSpriteScale) + hitY,
-                        mSpriteScale, 6, 50, 205, SparkType::eSmallChantParticle_0, mResMan);
-                    New_Smoke_Particles(hitX + (mSpriteScale * FP_FromInteger(7)), hitY, mSpriteScale, 3, RGB16{ 128, 128, 128 }, mResMan);
+                        mSpriteScale, 6, 50, 205, SparkType::eSmallChantParticle_0, mResMan, mMap);
+                    New_Smoke_Particles(hitX + (mSpriteScale * FP_FromInteger(7)), hitY, mSpriteScale, 3, RGB16{ 128, 128, 128 }, mResMan, mMap);
                 }
 
                 if (Math_RandomRange(0, 100) < 90)
@@ -177,12 +177,12 @@ void Bullet::VUpdate()
                         relive_new Spark(
                             (mSpriteScale * FP_FromInteger(30)) + pShotObj->mXPos - FP_FromInteger(randomW),
                             mYPos + FP_NoFractional(randomHeight),
-                            mSpriteScale, 6, -76, 76, SparkType::eSmallChantParticle_0, mResMan);
+                            mSpriteScale, 6, -76, 76, SparkType::eSmallChantParticle_0, mResMan, mMap);
 
                         New_Smoke_Particles(
                             (mSpriteScale * FP_FromInteger(30)) + pShotObj->mXPos - FP_FromInteger(randomW),
                             mYPos + FP_NoFractional(randomHeight),
-                            mSpriteScale, 3, RGB16{ 128, 128, 128 }, mResMan);
+                            mSpriteScale, 3, RGB16{ 128, 128, 128 }, mResMan, mMap);
                     }
                     else
                     {
@@ -190,13 +190,13 @@ void Bullet::VUpdate()
                         relive_new Spark(
                             FP_FromInteger(randomW) + pShotObj->mXPos - (mSpriteScale * FP_FromInteger(30)),
                             mYPos + FP_NoFractional(randomHeight),
-                            mSpriteScale, 6, 50, 205, SparkType::eSmallChantParticle_0, mResMan);
+                            mSpriteScale, 6, 50, 205, SparkType::eSmallChantParticle_0, mResMan, mMap);
 
 
                         New_Smoke_Particles(
                             FP_FromInteger(randomW) + pShotObj->mXPos - (mSpriteScale * FP_FromInteger(30)),
                             mYPos + FP_NoFractional(randomHeight),
-                            mSpriteScale, 3, RGB16{ 128, 128, 128 }, mResMan);
+                            mSpriteScale, 3, RGB16{ 128, 128, 128 }, mResMan, mMap);
                     }
 
                     if (Math_RandomRange(0, 100) < 90)
@@ -256,8 +256,8 @@ void Bullet::VUpdate()
                     &mLine, &hitX, &hitY, CollisionMask(eBulletWall_10))
                 == 1)
             {
-                relive_new Spark(hitX, hitY, FP_FromInteger(1), 9, -31, 159, SparkType::eSmallChantParticle_0, mResMan);
-                New_Smoke_Particles(hitX, hitY, FP_FromInteger(1), 3, RGB16{ 128, 128, 128 }, mResMan);
+                relive_new Spark(hitX, hitY, FP_FromInteger(1), 9, -31, 159, SparkType::eSmallChantParticle_0, mResMan, mMap);
+                New_Smoke_Particles(hitX, hitY, FP_FromInteger(1), 3, RGB16{ 128, 128, 128 }, mResMan, mMap);
             }
             SfxPlayMono(relive::RandomSfx(relive::SoundEffects::Bullet1, relive::SoundEffects::Bullet2), 75);
             SetDead(true);
@@ -302,8 +302,8 @@ void Bullet::VUpdate()
                         &mLine, &hitX, &hitY, CollisionMask(eBulletWall_10))
                     == 1)
                 {
-                    relive_new Spark(hitX, hitY, FP_FromInteger(1), 9, -31, 159, SparkType::eSmallChantParticle_0, mResMan);
-                    New_Smoke_Particles(hitX, hitY, FP_FromInteger(1), 3, RGB16{ 128, 128, 128 }, mResMan);
+                    relive_new Spark(hitX, hitY, FP_FromInteger(1), 9, -31, 159, SparkType::eSmallChantParticle_0, mResMan, mMap);
+                    New_Smoke_Particles(hitX, hitY, FP_FromInteger(1), 3, RGB16{ 128, 128, 128 }, mResMan, mMap);
                 }
                 SfxPlayMono(relive::RandomSfx(relive::SoundEffects::Bullet1, relive::SoundEffects::Bullet2), 75);
             }
@@ -366,7 +366,7 @@ BaseAliveGameObject* Bullet::ShootObject(PSX_RECT* pRect)
         {
             if (pObj->GetAnimation().GetRender())
             {
-                if (gMap->Is_Point_In_Current_Camera(mBulletLevel, mBulletPath, pObj->mXPos, pObj->mYPos, 1))
+                if (GetMap().Is_Point_In_Current_Camera(mBulletLevel, mBulletPath, pObj->mXPos, pObj->mYPos, 1))
                 {
                     if (((mBulletType == BulletType::eSligPossessedOrUnderGlukkonCommand_0 || mBulletType == BulletType::ePossessedSligZBullet_1) && ((pObj->Type() == ReliveTypes::eSlig && static_cast<Slig*>(pObj)->mCurrentMotion != eSligMotions::Motion_37_Possess) || pObj->Type() == ReliveTypes::eFlyingSlig || pObj->Type() == ReliveTypes::eCrawlingSlig || pObj->Type() == ReliveTypes::eGlukkon || pObj->Type() == ReliveTypes::eMudokon || pObj->Type() == ReliveTypes::eAbe || pObj->Type() == ReliveTypes::eSlog || pObj->Type() == ReliveTypes::eGreeter)) ||
 

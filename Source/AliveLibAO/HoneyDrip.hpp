@@ -7,7 +7,7 @@ namespace AO {
 class HoneyDrip final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    HoneyDrip(FP xpos, FP ypos, ResourceManagerWrapper& resMan);
+    HoneyDrip(FP xpos, FP ypos, ResourceManagerWrapper& resMan, BaseMap& map);
 
     virtual void VUpdate() override;
 

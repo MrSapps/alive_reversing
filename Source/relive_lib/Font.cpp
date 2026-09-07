@@ -272,7 +272,7 @@ const char_type* AliveFont::SliceText(const char_type* text, s32 left, FP scale,
     return text;
 }
 
-void FontContext::LoadFontType(FontType resourceID)
+void FontContext::LoadFontType(FontType resourceID, ResourceManagerWrapper& resMan)
 {
     if (resourceID == FontType::Debug)
     {
@@ -309,7 +309,7 @@ void FontContext::LoadFontType(FontType resourceID)
     }
 
 
-    FontResource fontRes = GetMap().GetResourceManager().LoadFont(resourceID);
+    FontResource fontRes = resMan.LoadFont(resourceID);
     mFntResource = fontRes;
 
     // TODO: Will get moved to a json file in FontResource

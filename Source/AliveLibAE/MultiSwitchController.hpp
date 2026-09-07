@@ -6,7 +6,7 @@
 class MultiSwitchController final : public BaseGameObject
 {
 public:
-    MultiSwitchController(relive::Path_MultiSwitchController* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    MultiSwitchController(relive::Path_MultiSwitchController* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~MultiSwitchController();
 
     virtual void VUpdate() override;

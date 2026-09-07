@@ -26,8 +26,8 @@ static s32 gas_rand()
     return static_cast<s32>((random_seed >> 16) & 0x7FFF);
 }
 
-LaughingGas::LaughingGas(Layer layer, relive::Path_LaughingGas* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, 0, resMan)
+LaughingGas::LaughingGas(Layer layer, relive::Path_LaughingGas* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
     gLaughingGasInstanceCount++;
 

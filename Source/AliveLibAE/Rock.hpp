@@ -45,7 +45,7 @@ struct RockSaveState final : public SaveStateBase
 class Rock final : public BaseThrowable
 {
 public:
-    Rock(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan);
+    Rock(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Rock();
     
     virtual void VUpdate() override;
@@ -56,7 +56,7 @@ public:
     virtual bool VIsFalling() override;
     virtual void VTimeToExplodeRandom() override;
 
-    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan);
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map);
 
     virtual bool VOnPlatformIntersection(BaseAnimatedWithPhysicsGameObject* pPlatform) override
     {

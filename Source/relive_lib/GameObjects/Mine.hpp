@@ -12,7 +12,7 @@ namespace relive
 class Mine final : public BaseAliveGameObject
 {
 public:
-    Mine(relive::Path_Mine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    Mine(relive::Path_Mine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Mine();
 
     void LoadAnimations();

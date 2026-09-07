@@ -19,7 +19,7 @@ struct SlamDoorSaveState final : public SaveStateBase
 class SlamDoor final : public BaseAliveGameObject
 {
 public:
-    SlamDoor(relive::Path_SlamDoor* tlv_params, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    SlamDoor(relive::Path_SlamDoor* tlv_params, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~SlamDoor();
 
     void LoadAnimations();
@@ -31,7 +31,7 @@ public:
         // Empty
     }
 
-    static void CreateFromSaveState(SerializedObjectData&, ResourceManagerWrapper& resMan);
+    static void CreateFromSaveState(SerializedObjectData&, ResourceManagerWrapper& resMan, BaseMap& map);
 
 private:
     void ClearInsideSlamDoor(BaseAliveGameObject* pObj, s16 xPosition, s16 width);

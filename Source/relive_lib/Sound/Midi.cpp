@@ -128,14 +128,14 @@ void SND_Reset()
 }
 
 
-s16 SND_VAB_Load_4C9FE0(PathSoundInfo& pSoundBlockInfo)
+s16 SND_VAB_Load_4C9FE0(PathSoundInfo& pSoundBlockInfo, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     // Load the VH file data
-    pSoundBlockInfo.mVhFileData = GetMap().GetResourceManager().LoadFile(pSoundBlockInfo.mVhFile.c_str(), GetMap().mNextLevel);
+    pSoundBlockInfo.mVhFileData = resMan.LoadFile(pSoundBlockInfo.mVhFile.c_str(), map.mNextLevel);
     //GetMidiVars()->LoadingLoop(0);
 
     // Load the VB file data
-    std::vector<u8> vbFileData = GetMap().GetResourceManager().LoadFile(pSoundBlockInfo.mVbFile.c_str(), GetMap().mNextLevel);
+    std::vector<u8> vbFileData = resMan.LoadFile(pSoundBlockInfo.mVbFile.c_str(), map.mNextLevel);
 
     // Convert the records in the header to internal representation
     pSoundBlockInfo.mVabId = SsVabOpenHead(reinterpret_cast<VabHeader*>(pSoundBlockInfo.mVhFileData.data()));
@@ -199,7 +199,7 @@ void SND_Shutdown()
 }
 
 
-void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& info, s32 reverb)
+void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& info, s32 reverb, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     GetMidiVars()->sSnd_ReloadAbeResources() = false;
     auto oldPtr = GetMidiVars()->sLastLoadedSoundBlockInfo().lock();
@@ -212,12 +212,12 @@ void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& info, s32 reverb)
         if (GetMidiVars()->sMonkVh_Vb().mVabId < 0)
         {
             // TODO: Fix me
-            SND_VAB_Load_4C9FE0(GetMidiVars()->sMonkVh_Vb());
+            SND_VAB_Load_4C9FE0(GetMidiVars()->sMonkVh_Vb(), resMan, map);
         }
 
         GetMidiVars()->sLastLoadedSoundBlockInfo() = info;
 
-        SND_VAB_Load_4C9FE0(*info);
+        SND_VAB_Load_4C9FE0(*info, resMan, map);
 
         // Put abes resources back if we had to unload them to fit the VB in memory
         /*
@@ -654,7 +654,7 @@ static u32 GetTableIdxForName(const char_type* pName)
     ALIVE_FATAL("Couldn't find seq name in the table");
 }
 
-void SND_Load_Seqs_Impl(OpenSeqHandle* pSeqTable, PathSoundInfo& info)
+void SND_Load_Seqs_Impl(OpenSeqHandle* pSeqTable, PathSoundInfo& info, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     if (pSeqTable)
     {
@@ -677,7 +677,7 @@ void SND_Load_Seqs_Impl(OpenSeqHandle* pSeqTable, PathSoundInfo& info)
         // Get a pointer to each SEQ
         for (const auto& seqName : info.mSeqFiles)
         {
-            auto buffer = GetMap().GetResourceManager().LoadFile(seqName.c_str(), GetMap().mNextLevel);
+            auto buffer = resMan.LoadFile(seqName.c_str(), map.mNextLevel);
 
             // We have to insert into the table at the position that matches the file name
             GetMidiVars()->sSeqDataTable()[GetTableIdxForName(seqName.c_str())].field_C_ppSeq_Data = buffer;
@@ -685,9 +685,9 @@ void SND_Load_Seqs_Impl(OpenSeqHandle* pSeqTable, PathSoundInfo& info)
     }
 }
 
-void SND_Load_Seqs(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& bsqFileName)
+void SND_Load_Seqs(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& bsqFileName, ResourceManagerWrapper& resMan, BaseMap& map)
 {
-    SND_Load_Seqs_Impl(pSeqTable, *bsqFileName);
+    SND_Load_Seqs_Impl(pSeqTable, *bsqFileName, resMan, map);
 }
 
 s8 SND_Seq_Table_Valid()
@@ -737,17 +737,17 @@ void SND_Restart_SetCallBack(TSNDRestart cb)
     sSNDRestartCallBack = cb;
 }
 
-void SND_Restart_4CB0E0()
+void SND_Restart_4CB0E0(BaseMap& map)
 {
     if (sSNDRestartCallBack)
     {
-        sSNDRestartCallBack();
+        sSNDRestartCallBack(map);
     }
     else
     {
         MusicController::static_EnableMusic(true);
         BackgroundMusic::Play();
-        Start_Sounds_For_Objects_In_Near_Cameras();
+        Start_Sounds_For_Objects_In_Near_Cameras(map);
     }
 }
 

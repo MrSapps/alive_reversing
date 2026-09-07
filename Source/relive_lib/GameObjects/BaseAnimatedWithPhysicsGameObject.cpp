@@ -16,7 +16,7 @@ DynamicArrayT<BaseGameObject>* gObjListDrawables;
 
 void BaseAnimatedWithPhysicsGameObject::CreateShadow()
 {
-    mShadow = relive_new Shadow(mResMan);
+    mShadow = relive_new Shadow(mResMan, mMap);
 }
 
 void BaseAnimatedWithPhysicsGameObject::MakeArray()
@@ -30,8 +30,8 @@ void BaseAnimatedWithPhysicsGameObject::FreeArray()
     gObjListDrawables = nullptr;
 }
 
-BaseAnimatedWithPhysicsGameObject::BaseAnimatedWithPhysicsGameObject(s16 resourceArraySize, ResourceManagerWrapper& resMan)
-    : BaseGameObject(true, resourceArraySize, resMan)
+BaseAnimatedWithPhysicsGameObject::BaseAnimatedWithPhysicsGameObject(s16 resourceArraySize, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, resourceArraySize, resMan, map)
 {
     mDoPurpleLightEffect = false;
     mApplyShadowZoneColour = true;
@@ -182,7 +182,7 @@ void BaseAnimatedWithPhysicsGameObject::DeathSmokeEffect(bool bPlaySound)
             GetSpriteScale() / FP_FromInteger(2),
             2,
             RGB16{128, 128, 128},
-            mResMan);
+            mResMan, mMap);
 
         if (bPlaySound)
         {

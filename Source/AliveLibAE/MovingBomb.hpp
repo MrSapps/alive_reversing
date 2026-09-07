@@ -10,7 +10,7 @@ namespace relive
 class MovingBomb final : public BaseAliveGameObject
 {
 public:
-    MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~MovingBomb();
     
     virtual void VUpdate() override;

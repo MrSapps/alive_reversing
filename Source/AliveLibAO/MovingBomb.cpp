@@ -30,8 +30,8 @@ static const TintEntry kMovingBombTints[4] = {
 
 static MovingBomb* sMovingBomb = nullptr;
 
-MovingBomb::MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan)
-    : ::BaseAliveGameObject(0, resMan)
+MovingBomb::MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+    : ::BaseAliveGameObject(0, resMan, map)
 {
     SetCanExplode(true);
     SetType(ReliveTypes::eTimedMine);
@@ -73,7 +73,7 @@ MovingBomb::MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, Resourc
         GetAnimation().SetRender(false);
     }
 
-    SetTint(kMovingBombTints, gMap->mCurrentLevel);
+    SetTint(kMovingBombTints, GetMap().mCurrentLevel);
 
     FP hitX = {};
     FP hitY = {};
@@ -126,7 +126,7 @@ MovingBomb::~MovingBomb()
 
 void MovingBomb::VScreenChanged()
 {
-    if (!mPersistOffscreen || gMap->LevelChanged() || gMap->PathChanged())
+    if (!mPersistOffscreen || GetMap().LevelChanged() || GetMap().PathChanged())
     {
         SetDead(true);
     }
@@ -152,7 +152,7 @@ bool MovingBomb::VTakeDamage(BaseGameObject* pFrom)
         mXPos,
         mYPos,
         GetSpriteScale(),
-        false, mResMan);
+        false, mResMan, mMap);
 
     relive_new Gibs(
         GibType::eMetal,
@@ -161,7 +161,7 @@ bool MovingBomb::VTakeDamage(BaseGameObject* pFrom)
         FP_FromInteger(0),
         FP_FromInteger(5),
         GetSpriteScale(),
-        false, mResMan);
+        false, mResMan, mMap);
 
     mState = States::eKillMovingBomb_7;
     GetAnimation().SetRender(false);
@@ -357,7 +357,7 @@ void MovingBomb::VUpdate()
 
             FollowLine();
 
-            BaseAliveGameObjectPathTLV = gMap->VTLV_Get_At_Of_Type(
+            BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
                 FP_GetExponent(mXPos),
                 FP_GetExponent(mYPos),
                 FP_GetExponent(mXPos),
@@ -399,7 +399,7 @@ void MovingBomb::VUpdate()
 
             FollowLine();
 
-            BaseAliveGameObjectPathTLV = gMap->VTLV_Get_At_Of_Type(
+            BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
                 FP_GetExponent(mXPos),
                 FP_GetExponent(mYPos),
                 FP_GetExponent(mXPos),
@@ -422,7 +422,7 @@ void MovingBomb::VUpdate()
                     mXPos,
                     mYPos,
                     GetSpriteScale(),
-                    false, mResMan);
+                    false, mResMan, mMap);
 
                 relive_new Gibs(
                     GibType::eMetal,
@@ -431,7 +431,7 @@ void MovingBomb::VUpdate()
                     FP_FromInteger(0),
                     FP_FromInteger(5),
                     GetSpriteScale(),
-                    false, mResMan);
+                    false, mResMan, mMap);
 
                 mState = States::eKillMovingBomb_7;
                 GetAnimation().SetRender(false);

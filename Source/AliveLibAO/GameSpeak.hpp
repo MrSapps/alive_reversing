@@ -38,7 +38,7 @@ enum class GameSpeakMatch : s16
 class GameSpeak final : public ::BaseGameObject
 {
 public:
-    GameSpeak(ResourceManagerWrapper& resMan);
+    GameSpeak(ResourceManagerWrapper& resMan, BaseMap& map);
     ~GameSpeak();
 
     virtual void VUpdate() override;

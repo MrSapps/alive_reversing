@@ -9,7 +9,7 @@ namespace AO {
 class SlogSpawner final : public ::BaseGameObject
 {
 public:
-    SlogSpawner(relive::Path_SlogSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan);
+    SlogSpawner(relive::Path_SlogSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
 
     virtual void VScreenChanged() override;
     virtual void VUpdate() override;
