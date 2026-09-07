@@ -136,5 +136,5 @@ BoomMachine::~BoomMachine()
     {
         pObj->SetDead(true);
     }
-    GetMap().TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }

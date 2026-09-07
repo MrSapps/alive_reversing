@@ -53,7 +53,7 @@ Teleporter::~Teleporter()
 
 void Teleporter::VScreenChanged()
 {
-    if (GetMap().LevelChanged())
+    if (mMap.LevelChanged())
     {
         SetDead(true);
     }
@@ -202,7 +202,7 @@ void Teleporter::VUpdate()
 
             sControlledCharacter->GetAnimation().SetRender(false);
 
-            GetMap().mTeleporterTransition = 1;
+            mMap.mTeleporterTransition = 1;
 
             const CameraSwapEffects effect = kPathChangeEffectToInternalScreenChangeEffect[mTlvData.mWipeEffect];
             s16 bForceChange = 0;
@@ -211,7 +211,7 @@ void Teleporter::VUpdate()
                 bForceChange = 1;
             }
 
-            GetMap().SetActiveCam(
+            mMap.SetActiveCam(
                 mTlvData.mDestLevel,
                 mTlvData.mDestPath,
                 mTlvData.mDestCamera,
@@ -227,7 +227,7 @@ void Teleporter::VUpdate()
 
         case TeleporterState::eTeleporting_2:
         {
-            GetMap().mTeleporterTransition = 0;
+            mMap.mTeleporterTransition = 0;
 
             Relive_Path_Teleporter_Data tlvData = {};
             relive::Path_Teleporter* pTeleporterTlv = nullptr;

@@ -459,7 +459,7 @@ MainMenuController::MainMenuController(relive::Path_TLV* /*pTlv*/, const Guid& t
     mPal = mResMan.LoadPal(PalId::MainMenuFont_MainMenu);
     field_120_font.Load(240, mPal, &mFontContext);
 
-    if (GetMap().mCurrentCamera == MainMenuCams::eCheatMenu_SelectFMVCam)
+    if (mMap.mCurrentCamera == MainMenuCams::eCheatMenu_SelectFMVCam)
     {
         Animation_Init(GetAnimRes(AnimId::MenuAbeSpeak_Idle));
     }
@@ -484,7 +484,7 @@ MainMenuController::MainMenuController(relive::Path_TLV* /*pTlv*/, const Guid& t
     field_200_highlite_glow_speed = -8;
     mTlvId = tlvId;
 
-    field_214_page_index = static_cast<s16>(GetPageIndexFromCam_4D05A0(GetMap().mCurrentCamera));
+    field_214_page_index = static_cast<s16>(GetPageIndexFromCam_4D05A0(mMap.mCurrentCamera));
     field_21C_camSwapEffectState = camTransEffectState::eConstructed_1;
     field_21E_changeScreenState = 0;
     field_1F8_page_timeout = 0;
@@ -502,7 +502,7 @@ MainMenuController::MainMenuController(relive::Path_TLV* /*pTlv*/, const Guid& t
     mGameSpeakPlaying = false;
     mChantSeqPlaying = false;
 
-    if (GetMap().mCurrentCamera == MainMenuCams::eMainMenuCam)
+    if (mMap.mCurrentCamera == MainMenuCams::eMainMenuCam)
     {
         MainMenuController::Set_Anim_4D05E0(eAbe_EnterThroughDoor, 0);
         mDisableChangingSelection = true;
@@ -530,7 +530,7 @@ MainMenuController::MainMenuController(relive::Path_TLV* /*pTlv*/, const Guid& t
     gFeeco_Restart_KilledMudCount = 0;
     gFeecoRestart_SavedMudCount = 0;
 
-    if (GetMap().mCurrentCamera == MainMenuCams::eCheatMenu_SelectFMVCam)
+    if (mMap.mCurrentCamera == MainMenuCams::eCheatMenu_SelectFMVCam)
     {
         field_1FC_button_index = 0;
         field_250_selected_entry_index = 0;
@@ -544,7 +544,7 @@ MainMenuController::MainMenuController(relive::Path_TLV* /*pTlv*/, const Guid& t
         return;
     }
 
-    if (GetMap().mCurrentCamera == MainMenuCams::eDemoSelectionCam)
+    if (mMap.mCurrentCamera == MainMenuCams::eDemoSelectionCam)
     {
         mResMan.LoadingLoop(false);
         field_1FC_button_index = 0;
@@ -1394,7 +1394,7 @@ MainMenuNextCam MainMenuController::Page_FMV_Level_Update_4D4AB0(u32 input_held)
                 }
             }
             gPsxDisplay.PutCurrentDispEnv();
-            gScreenManager->DecompressCameraToVRam(GetMap().field_2C_camera_array[0]->mCamRes);
+            gScreenManager->DecompressCameraToVRam(mMap.field_2C_camera_array[0]->mCamRes);
             gScreenManager->EnableRendering();
             GetSoundAPI().mSND_Restart();
         }
@@ -1403,7 +1403,7 @@ MainMenuNextCam MainMenuController::Page_FMV_Level_Update_4D4AB0(u32 input_held)
             gCreditsControllerExists = 1;
             field_240_credits_current_cam = 1;
             field_1F4_credits_next_frame = MakeTimer(160);
-            GetMap().SetActiveCam(EReliveLevelIds::eCredits, 1, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
+            mMap.SetActiveCam(EReliveLevelIds::eCredits, 1, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
         }
         return MainMenuNextCam(MainMenuCams::eNoChange);
     }
@@ -1704,7 +1704,7 @@ MainMenuNextCam MainMenuController::LoadNewGame_Update_4D0920(u32 /*input*/)
         mCheatLevelSelectLoading = false;
 
         gAbe->SetUpdateDelay(1);
-        GetMap().SetActiveCam(field_244_lvl_id, field_246_path_id, field_248_camera, CameraSwapEffects::eInstantChange_0, 0, 0);
+        mMap.SetActiveCam(field_244_lvl_id, field_246_path_id, field_248_camera, CameraSwapEffects::eInstantChange_0, 0, 0);
 
         const PathBlyRec* pPathData = Path_Get_Bly_Record(field_244_lvl_id, field_246_path_id);
         gAbe->mXPos = FP_FromInteger(field_24A_abeXOff - pPathData->field_4_pPathData->field_1A_abe_start_xpos);
@@ -1725,7 +1725,7 @@ MainMenuNextCam MainMenuController::LoadNewGame_Update_4D0920(u32 /*input*/)
     }
     else
     {
-        GetMap().SetActiveCam(EReliveLevelIds::eMines, 1, 4, CameraSwapEffects::ePlay1FMV_5, 12402, 0);
+        mMap.SetActiveCam(EReliveLevelIds::eMines, 1, 4, CameraSwapEffects::ePlay1FMV_5, 12402, 0);
         gAbe->mXPos = FP_FromInteger(837);
         gAbe->mYPos = FP_FromInteger(1300);
         gAbe->BaseAliveGameObjectLastLineYPos = FP_FromInteger(1400);
@@ -1776,7 +1776,7 @@ MainMenuNextCam MainMenuController::BackStory_Or_NewGame_Update_4D1C60(u32 input
             }
 
             gPsxDisplay.PutCurrentDispEnv();
-            gScreenManager->DecompressCameraToVRam(GetMap().field_2C_camera_array[0]->mCamRes);
+            gScreenManager->DecompressCameraToVRam(mMap.field_2C_camera_array[0]->mCamRes);
             gScreenManager->EnableRendering();
             GetSoundAPI().mSND_Restart();
             field_1FC_button_index = 1; // Select start game
@@ -2656,7 +2656,7 @@ void MainMenuController::HandleCreditsControllerUpdate()
     if (Input().IsAnyPressed(InputCommands::eBack))
     {
         gCreditsControllerExists = 0;
-        GetMap().SetActiveCam(EReliveLevelIds::eMenu, 1, 6, CameraSwapEffects::eInstantChange_0, 0, 0);
+        mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 6, CameraSwapEffects::eInstantChange_0, 0, 0);
         return;
     }
 
@@ -2665,16 +2665,16 @@ void MainMenuController::HandleCreditsControllerUpdate()
         const auto currentCam = field_240_credits_current_cam + 1;
         field_240_credits_current_cam = currentCam;
         field_1F4_credits_next_frame = MakeTimer(160);
-        if (GetMap().mCurrentPath == 2)
+        if (mMap.mCurrentPath == 2)
         {
             if (currentCam > 22)
             {
                 field_240_credits_current_cam = 1;
-                GetMap().SetActiveCam(EReliveLevelIds::eCredits, 1, static_cast<s16>(field_240_credits_current_cam), CameraSwapEffects::eTopToBottom_3, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eCredits, 1, static_cast<s16>(field_240_credits_current_cam), CameraSwapEffects::eTopToBottom_3, 0, 0);
             }
             else
             {
-                GetMap().SetActiveCam(EReliveLevelIds::eCredits, 2, static_cast<s16>(currentCam), CameraSwapEffects::eTopToBottom_3, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eCredits, 2, static_cast<s16>(currentCam), CameraSwapEffects::eTopToBottom_3, 0, 0);
             }
         }
         else
@@ -2682,10 +2682,10 @@ void MainMenuController::HandleCreditsControllerUpdate()
             if (currentCam > 36)
             {
                 gCreditsControllerExists = 0;
-                GetMap().SetActiveCam(EReliveLevelIds::eMenu, 1, 6, CameraSwapEffects::eInstantChange_0, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 6, CameraSwapEffects::eInstantChange_0, 0, 0);
                 return;
             }
-            GetMap().SetActiveCam(EReliveLevelIds::eCredits, 1, static_cast<s16>(field_240_credits_current_cam), CameraSwapEffects::eTopToBottom_3, 0, 0);
+            mMap.SetActiveCam(EReliveLevelIds::eCredits, 1, static_cast<s16>(field_240_credits_current_cam), CameraSwapEffects::eTopToBottom_3, 0, 0);
         }
     }
 }
@@ -2693,11 +2693,11 @@ void MainMenuController::HandleCreditsControllerUpdate()
 // Todo: needs cleanup
 void MainMenuController::HandleMainMenuUpdate()
 {
-    if (GetMap().mCurrentCamera == MainMenuCams::eRemapInputsCam || GetMap().mCurrentCamera == MainMenuCams::eDummyBlankCam || GetMap().mCurrentCamera == MainMenuCams::eLoadGameMenuCam)
+    if (mMap.mCurrentCamera == MainMenuCams::eRemapInputsCam || mMap.mCurrentCamera == MainMenuCams::eDummyBlankCam || mMap.mCurrentCamera == MainMenuCams::eLoadGameMenuCam)
     {
         MusicController::static_PlayMusic(MusicController::MusicTypes::eTension_4, this, 0, 0);
     }
-    else if (GetMap().mCurrentCamera == MainMenuCams::eBackstory_Or_NewGameCam || GetMap().mCurrentCamera == MainMenuCams::eGameIsLoading_ShaddapCam)
+    else if (mMap.mCurrentCamera == MainMenuCams::eBackstory_Or_NewGameCam || mMap.mCurrentCamera == MainMenuCams::eGameIsLoading_ShaddapCam)
     {
         MusicController::static_PlayMusic(MusicController::MusicTypes::eSoftChase_8, this, 0, 0);
     }
@@ -2812,7 +2812,7 @@ void MainMenuController::HandleMainMenuUpdate()
 
         const MainMenuNextCam pageUpdateReturnedCam = (this->*(pPage->field_10_fn_update))(pressed);
 
-        if (pageUpdateReturnedCam.page_update_camera == MainMenuCams::eNoChange || pageUpdateReturnedCam.page_update_camera == GetMap().mCurrentCamera)
+        if (pageUpdateReturnedCam.page_update_camera == MainMenuCams::eNoChange || pageUpdateReturnedCam.page_update_camera == mMap.mCurrentCamera)
         {
             // stay on the same screen
             return;
@@ -3002,7 +3002,7 @@ s32 MainMenuController::ChangeScreenAndIntroLogic_4CF640()
 
                 gPsxDisplay.PutCurrentDispEnv();
 
-                GetMap().SetActiveCam(EReliveLevelIds::eMenu, 1, 1, CameraSwapEffects::ePlay1FMV_5, 10502, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 1, CameraSwapEffects::ePlay1FMV_5, 10502, 0);
                 GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuDoor));
                 Load_Anim_Pal_4D06A0(&GetAnimation());
 
@@ -3043,7 +3043,7 @@ s32 MainMenuController::ChangeScreenAndIntroLogic_4CF640()
                 break;
             }
 
-            GetMap().SetActiveCam(
+            mMap.SetActiveCam(
                 EReliveLevelIds::eMenu,
                 1,
                 sMainMenuPages_561960[field_218_target_page_index].field_0_cam_id,

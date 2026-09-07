@@ -61,7 +61,7 @@ void LCDStatusBoard::VRender(OrderingTable& ot)
     if (!mHideBoard)
     {
         char_type text[12] = {};
-        sprintf(text, "%3d", Path_GetMudsInLevel(GetMap().mCurrentLevel, GetMap().mCurrentPath));
+        sprintf(text, "%3d", Path_GetMudsInLevel(mMap.mCurrentLevel, mMap.mCurrentPath));
         s32 maxWidth = mMudsInLevelFont.MeasureTextWidth(text);
 
         s16 flickerAmount = 50; // ax

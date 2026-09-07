@@ -79,7 +79,7 @@ HoneySack::HoneySack(relive::Path_HoneySack* pTlv, const Guid& tlvId, ResourceMa
         mDripTargetX = FP_FromInteger(0);
         mDripTargetY = FP_FromInteger(0);
 
-        relive::Path_TLV* pHoneyDripTarget = GetMap().TLV_First_Of_Type_In_Camera(ReliveTypes::eHoneyDripTarget, 0).GetTlv();
+        relive::Path_TLV* pHoneyDripTarget = mMap.TLV_First_Of_Type_In_Camera(ReliveTypes::eHoneyDripTarget, 0).GetTlv();
         if (pHoneyDripTarget)
         {
             mDripTargetX = FP_FromInteger(pHoneyDripTarget->mTopLeftX);
@@ -106,7 +106,7 @@ HoneySack::~HoneySack()
 
 void HoneySack::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || GetMap().PathChanged())
+    if (mMap.LevelChanged() || mMap.PathChanged())
     {
         SetDead(true);
     }
@@ -140,7 +140,7 @@ void HoneySack::VUpdate()
 
                 mTimer = MakeTimer(90);
             }
-            if (!GetMap().Is_Point_In_Current_Camera(
+            if (!mMap.Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -254,7 +254,7 @@ void HoneySack::VUpdate()
                 }
             }
 
-            if (!GetMap().Is_Point_In_Current_Camera(
+            if (!mMap.Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,

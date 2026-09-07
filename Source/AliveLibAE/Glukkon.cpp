@@ -831,7 +831,7 @@ void Glukkon::Motion_11_Speak1()
 {
     if (GetAnimation().GetCurrentFrame() == 2 && mSpeak != GlukkonSpeak::None)
     {
-        if (GetMap().Is_Point_In_Current_Camera(
+        if (mMap.Is_Point_In_Current_Camera(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,
@@ -1025,7 +1025,7 @@ void Glukkon::Motion_24_EndSingleStep()
 
 s16 Glukkon::Brain_0_Calm_WalkAround()
 {
-    if (GetMap().GetDirection(
+    if (mMap.GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1327,7 +1327,7 @@ s16 Glukkon::Brain_0_Calm_WalkAround()
 
 s16 Glukkon::Brain_1_Panic()
 {
-    if (GetMap().GetDirection(
+    if (mMap.GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1475,7 +1475,7 @@ s16 Glukkon::Brain_1_Panic()
 
 s16 Glukkon::Brain_2_Slapped()
 {
-    if (GetMap().GetDirection(
+    if (mMap.GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1586,7 +1586,7 @@ s16 Glukkon::Brain_2_Slapped()
 s16 Glukkon::Brain_3_PlayerControlled()
 {
     auto pFade = static_cast<Fade*>(sObjectIds.Find_Impl(mFadeId));
-    if (GetMap().GetDirection(
+    if (mMap.GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1699,7 +1699,7 @@ s16 Glukkon::Brain_3_PlayerControlled()
         {
             gScreenManager->DisableRendering();
 
-            const FmvInfo* pFmvRec = Path_Get_FMV_Record(GetMap().mCurrentLevel, mTlvData.mMovieId);
+            const FmvInfo* pFmvRec = Path_Get_FMV_Record(mMap.mCurrentLevel, mTlvData.mMovieId);
             relive_new Movie(pFmvRec->field_0_pName, mResMan, mMap);
         }
         return Brain_3_PlayerControlled::eBrain3_WaitForMovieToFinish5;
@@ -1710,7 +1710,7 @@ s16 Glukkon::Brain_3_PlayerControlled()
                 return mBrainSubState;
             }
             gPsxDisplay.PutCurrentDispEnv();
-            gScreenManager->DecompressCameraToVRam(GetMap().field_2C_camera_array[0]->mCamRes);
+            gScreenManager->DecompressCameraToVRam(mMap.field_2C_camera_array[0]->mCamRes);
             if (pFade)
             {
                 pFade->Init(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeOut, 1, 8);
@@ -1752,7 +1752,7 @@ static GibType AsGibType(relive::Path_Glukkon::GlukkonTypes glukkonType)
 
 s16 Glukkon::Brain_4_Death()
 {
-    if (GetMap().GetDirection(
+    if (mMap.GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1875,7 +1875,7 @@ static const PSX_Point sSpawnSparkOffsets[8] = {
 
 s16 Glukkon::Brain_5_WaitToSpawn()
 {
-    if (GetMap().GetDirection(
+    if (mMap.GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1962,7 +1962,7 @@ void Glukkon::Init()
 
     SetDrawable(true);
 
-    SetTint(&kGlukkonTints[0], GetMap().mCurrentLevel);
+    SetTint(&kGlukkonTints[0], mMap.mCurrentLevel);
     mXPos = FP_FromInteger((mTlvData.mTopLeftX + mTlvData.mBottomRightX) / 2);
     mYPos = FP_FromInteger(mTlvData.mTopLeftY);
 
@@ -2160,9 +2160,9 @@ void Glukkon::VPossessed()
     SetBrain(&Glukkon::Brain_3_PlayerControlled);
     mBrainSubState = Brain_3_PlayerControlled::eBrain3_ToStand0;
     field_1D4_timer = MakeTimer(35);
-    mAbeLevel = GetMap().mCurrentLevel;
-    mAbePath = GetMap().mCurrentPath;
-    mAbeCamera = GetMap().mCurrentCamera;
+    mAbeLevel = mMap.mCurrentLevel;
+    mAbePath = mMap.mCurrentPath;
+    mAbeCamera = mMap.mCurrentCamera;
 }
 
 void Glukkon::Update_Slurg_WatchPoints()
@@ -2387,13 +2387,13 @@ s16 Glukkon::ShouldPanic(s16 panicEvenIfNotFacingMe)
         && !(sControlledCharacter->GetInvisible())
         && !BaseAliveGameObject::IsInInvisibleZone(sControlledCharacter)
         && !EventGet(Event::kEventResetting)
-        && GetMap().Is_Point_In_Current_Camera(
+        && mMap.Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
             mYPos,
             0)
-        && GetMap().Is_Point_In_Current_Camera(
+        && mMap.Is_Point_In_Current_Camera(
             sControlledCharacter->mCurrentLevel,
             sControlledCharacter->mCurrentPath,
             sControlledCharacter->mXPos,
@@ -2724,13 +2724,13 @@ void Glukkon::PlaySound(s32 sndIdx, Glukkon* pGlukkon)
         volumeRight = defaultSndIdxVol / 2;
     }
 
-    CameraPos direction = GetMap().GetDirection(
+    CameraPos direction = mMap.GetDirection(
         pGlukkon->mCurrentLevel,
         pGlukkon->mCurrentPath,
         pGlukkon->mXPos,
         pGlukkon->mYPos);
     PSX_RECT worldRect;
-    GetMap().Get_Camera_World_Rect(direction, &worldRect);
+    mMap.Get_Camera_World_Rect(direction, &worldRect);
     switch (direction)
     {
         case CameraPos::eCamCurrent_0:
@@ -2782,9 +2782,9 @@ void Glukkon::ToDead()
         sControlledCharacter = gAbe;
         MusicController::static_PlayMusic(MusicController::MusicTypes::eNone_0, this, 0, 0);
 
-        if (GetMap().mNextLevel != EReliveLevelIds::eMenu)
+        if (mMap.mNextLevel != EReliveLevelIds::eMenu)
         {
-            GetMap().SetActiveCam(
+            mMap.SetActiveCam(
                 mAbeLevel,
                 mAbePath,
                 mAbeCamera,

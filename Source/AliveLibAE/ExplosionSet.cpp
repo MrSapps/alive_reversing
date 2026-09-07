@@ -73,7 +73,7 @@ ExplosionSet::~ExplosionSet()
 
 void ExplosionSet::VScreenChanged()
 {
-    if (!GetMap().LevelChanged() && !GetMap().PathChanged())
+    if (!mMap.LevelChanged() && !mMap.PathChanged())
     {
         mActive = false;
     }
@@ -167,7 +167,7 @@ void ExplosionSet::VUpdate()
         mSpacingMultiplicator++;
         mStartDelay = mAssetInterval;
 
-        if (GetMap().mCurrentLevel == EReliveLevelIds::eMines && Math_RandomRange(1, 5) >= 4)
+        if (mMap.mCurrentLevel == EReliveLevelIds::eMines && Math_RandomRange(1, 5) >= 4)
         {
             const FP explodeX = FP_FromInteger(Math_RandomRange(mTlvRect.y + 20, mTlvRect.y + 230));
             const FP explodeY = FP_FromInteger(Math_RandomRange(mTlvRect.x, xpos));

@@ -40,7 +40,7 @@ void Electrocute::VScreenChanged()
 {
     BaseAliveGameObject* pTargetObj = static_cast<BaseAliveGameObject*>(sObjectIds.Find_Impl(mTargetObjId));
     // If the map has changed or target we are tracking has died then..
-    if (GetMap().LevelChanged() || GetMap().PathChanged() || (pTargetObj && pTargetObj->GetDead()))
+    if (mMap.LevelChanged() || mMap.PathChanged() || (pTargetObj && pTargetObj->GetDead()))
     {
         Stop();
     }

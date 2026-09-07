@@ -84,7 +84,7 @@ void TimerTrigger::VUpdate()
 
 void TimerTrigger::VScreenChanged()
 {
-    if (mState == TimerTriggerStates::eWaitForEnabled_0 || mState == TimerTriggerStates::eCheckForStartAgain_2 || GetMap().LevelChanged() || GetMap().PathChanged())
+    if (mState == TimerTriggerStates::eWaitForEnabled_0 || mState == TimerTriggerStates::eCheckForStartAgain_2 || mMap.LevelChanged() || mMap.PathChanged())
     {
         SetDead(true);
     }
@@ -92,7 +92,7 @@ void TimerTrigger::VScreenChanged()
 
 TimerTrigger::~TimerTrigger()
 {
-    GetMap().TLV_Reset(mTlvInfo);
+    mMap.TLV_Reset(mTlvInfo);
 }
 
 void TimerTrigger::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)

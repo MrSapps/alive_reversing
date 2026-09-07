@@ -37,7 +37,7 @@ void SligSpawner::VUpdate()
 
     if (SwitchStates_Get(mSligSpawnerSwitchId))
     {
-        auto pTlv = GetMap().VTLV_Get_At_Of_Type(
+        auto pTlv = mMap.VTLV_Get_At_Of_Type(
             mPathTlv.mTopLeftX,
             mPathTlv.mTopLeftY,
             mPathTlv.mTopLeftX,

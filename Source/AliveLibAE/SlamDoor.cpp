@@ -59,7 +59,7 @@ static const TintEntry sSlamDoorTints[16] = {
 
 void SlamDoor::LoadAnimations()
 {
-    switch (GetMap().mCurrentLevel)
+    switch (mMap.mCurrentLevel)
     {
         case EReliveLevelIds::eNecrum:
         case EReliveLevelIds::eMudomoVault:
@@ -92,7 +92,7 @@ SlamDoor::SlamDoor(relive::Path_SlamDoor* pTlv, const Guid& tlvId, ResourceManag
     mSlamDoorFlipY = pTlv->mFlipY;
     mDelete = pTlv->mDelete;
 
-    const s32 currentLevelId = static_cast<s32>(MapWrapper::ToAE(GetMap().mCurrentLevel));
+    const s32 currentLevelId = static_cast<s32>(MapWrapper::ToAE(mMap.mCurrentLevel));
 
     Animation_Init(GetAnimRes(sSlamDoorAnimIds[currentLevelId][2]));
 
@@ -136,7 +136,7 @@ SlamDoor::SlamDoor(relive::Path_SlamDoor* pTlv, const Guid& tlvId, ResourceManag
         mClosed = false;
     }
 
-    SetTint(sSlamDoorTints, GetMap().mCurrentLevel);
+    SetTint(sSlamDoorTints, mMap.mCurrentLevel);
 
     FP hitX;
     FP hitY;
@@ -293,7 +293,7 @@ void SlamDoor::VUpdate()
         {
             GetAnimation().SetRender(true);
 
-            GetAnimation().Set_Animation_Data(GetAnimRes(sSlamDoorAnimIds[static_cast<s32>(MapWrapper::ToAE(GetMap().mCurrentLevel))][2]));
+            GetAnimation().Set_Animation_Data(GetAnimRes(sSlamDoorAnimIds[static_cast<s32>(MapWrapper::ToAE(mMap.mCurrentLevel))][2]));
 
             if (GetSpriteScale() == FP_FromInteger(1))
             {
@@ -360,7 +360,7 @@ void SlamDoor::VUpdate()
         }
         else
         {
-            GetAnimation().Set_Animation_Data(GetAnimRes(sSlamDoorAnimIds[static_cast<s32>(MapWrapper::ToAE(GetMap().mCurrentLevel))][0]));
+            GetAnimation().Set_Animation_Data(GetAnimRes(sSlamDoorAnimIds[static_cast<s32>(MapWrapper::ToAE(mMap.mCurrentLevel))][0]));
             Rect_Clear(&mCollisionLine1->mRect);
             mCollisionLine1 = nullptr;
 

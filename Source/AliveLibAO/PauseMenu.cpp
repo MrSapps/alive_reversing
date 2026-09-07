@@ -43,7 +43,7 @@ PauseMenu::~PauseMenu()
 
 void PauseMenu::VScreenChanged()
 {
-    if (GetMap().mNextLevel == EReliveLevelIds::eCredits)
+    if (mMap.mNextLevel == EReliveLevelIds::eCredits)
     {
         SetDead(true);
     }
@@ -209,11 +209,11 @@ void PauseMenu::VUpdate()
                                 field_12C = 0;
                                 field_134 = 1;
                                 SfxPlayMono(relive::SoundEffects::IngameTransition, 90);
-                                s32 tmp = static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel));
-                                if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+                                s32 tmp = static_cast<s32>(MapWrapper::ToAO(mMap.mCurrentLevel));
+                                if (mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
                                 {
                                     s16 row = 0;
-                                    auto pathId = SaveGame::GetPathId(GetMap().mCurrentPath, &row);
+                                    auto pathId = SaveGame::GetPathId(mMap.mCurrentPath, &row);
 
                                     if (pathId != -1)
                                     {
@@ -221,7 +221,7 @@ void PauseMenu::VUpdate()
                                     }
                                 }
 
-                                auto curPathId = GetMap().mCurrentPath;
+                                auto curPathId = mMap.mCurrentPath;
                                 char_type curPathIdNumBuf[12] = {};
 
                                 strncpy(&saveNameBuffer_5080C6.characters[2], gLevelNames_4CE1D4[tmp], 19);
@@ -431,8 +431,8 @@ void PauseMenu::VUpdate()
                             SetDead(true);
                         }
                         gPauseMenu = nullptr;
-                        GetMap().SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, 0, 0);
-                        GetMap().mFreeAllAnimAndPalts = true;
+                        mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, 0, 0);
+                        mMap.mFreeAllAnimAndPalts = true;
                         Input().SetCurrentController(InputObject::PadIndex::First);
                     }
                     break;
@@ -629,9 +629,9 @@ void PauseMenu::VRender(OrderingTable& ot)
             char_type cameraNameBuffer[48] = {};
             Path_Format_CameraName(
                 cameraNameBuffer,
-                GetMap().mCurrentLevel,
-                GetMap().mCurrentPath,
-                GetMap().mCurrentCamera);
+                mMap.mCurrentLevel,
+                mMap.mCurrentPath,
+                mMap.mCurrentCamera);
             cameraNameBuffer[8] = 0;
             if (strlen(cameraNameBuffer) != 0)
             {

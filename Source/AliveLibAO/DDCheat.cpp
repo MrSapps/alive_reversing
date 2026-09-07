@@ -132,7 +132,7 @@ void DDCheat::VUpdate()
     {
         mTeleporting = 0;
         PSX_Point point = {};
-        GetMap().GetCurrentCamCoords(&point);
+        mMap.GetCurrentCamCoords(&point);
         cheat_enabled = true;
         gAbe->mXPos = FP_FromInteger(point.x + 448);
         gAbe->mYPos = FP_FromInteger(point.y + 180);
@@ -144,7 +144,7 @@ void DDCheat::VUpdate()
         field_18_backInputPressed = 0;
     }
 
-    if (GetMap().mCurrentLevel != EReliveLevelIds::eMenu)
+    if (mMap.mCurrentLevel != EReliveLevelIds::eMenu)
     {
         if (Input().IsAnyPressed(InputCommands::eCheatMode))
         {
@@ -200,9 +200,9 @@ void DDCheat::VUpdate()
     {
         DebugStr(
             "\n%sP%dC%d %6d",
-            AO::Path_Get_Lvl_Name(GetMap().mCurrentLevel),
-            GetMap().mCurrentPath,
-            GetMap().mCurrentCamera,
+            AO::Path_Get_Lvl_Name(mMap.mCurrentLevel),
+            mMap.mCurrentPath,
+            mMap.mCurrentCamera,
             sGnFrame);
 
         DebugStr(
@@ -311,9 +311,9 @@ void DDCheat::Teleport()
     }
     else if (input & InputCommands::eThrowItem)
     {
-        sTeleport_Path = GetMap().mCurrentPath;
-        sTeleport_Level = static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel));
-        sTeleport_Cam = GetMap().mCurrentCamera;
+        sTeleport_Path = mMap.mCurrentPath;
+        sTeleport_Level = static_cast<s32>(MapWrapper::ToAO(mMap.mCurrentLevel));
+        sTeleport_Cam = mMap.mCurrentCamera;
     }
     else if (input & InputCommands::eDoAction)
     {
@@ -325,7 +325,7 @@ void DDCheat::Teleport()
                 if (sTeleport_Cam <= 21)
                 {
                     gDDCheat_FlyingEnabled = true;
-                    GetMap().SetActiveCam(
+                    mMap.SetActiveCam(
                         MapWrapper::FromAO(static_cast<LevelIds>(sTeleport_Level)),
                         sTeleport_Path,
                         sTeleport_Cam,

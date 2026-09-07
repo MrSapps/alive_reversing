@@ -132,9 +132,9 @@ void HoistRocksEffect::VUpdate()
         {
             if (particle.mVelY >= FP_FromInteger(10))
             {
-                if (!GetMap().Is_Point_In_Current_Camera(
-                        GetMap().mCurrentLevel,
-                        GetMap().mCurrentPath,
+                if (!mMap.Is_Point_In_Current_Camera(
+                        mMap.mCurrentLevel,
+                        mMap.mCurrentPath,
                         particle.mXPos,
                         particle.mYPos,
                         0))

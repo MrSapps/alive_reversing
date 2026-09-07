@@ -356,7 +356,7 @@ void QuikSave::RestoreBlyData(Quicksave& pSaveData, ResourceManagerWrapper& resM
 
     const u32 flagsTotal = pSaveData.mObjectBlyData.ReadU32();
     u32 readFlagsCount = 0;
-    for (auto& binaryPath : GetMap().GetLoadedPaths())
+    for (auto& binaryPath : mMap.GetLoadedPaths())
     {
         for (auto& cam : binaryPath->GetCameras())
         {
@@ -394,25 +394,25 @@ void QuikSave::RestoreBlyData(Quicksave& pSaveData, ResourceManagerWrapper& resM
 
 void Quicksave_LoadFromMemory_4C95A0()
 {
-    DestroyObjects(GetMap().GetResourceManager());
+    DestroyObjects(mMap.GetResourceManager());
     EventsReset();
     gSkipGameObjectUpdates = true;
     QuikSave::RestoreWorldInfo(QuikSave::gActiveQuicksaveData.mWorldInfo);
     gSwitchStates = QuikSave::gActiveQuicksaveData.mSwitchStates;
-    GetMap().mRestoreMapObjectStates = true;
-    GetMap().SetActiveCam(
+    mMap.mRestoreMapObjectStates = true;
+    mMap.SetActiveCam(
         QuikSave::gActiveQuicksaveData.mWorldInfo.mLevel,
         QuikSave::gActiveQuicksaveData.mWorldInfo.mPath,
         QuikSave::gActiveQuicksaveData.mWorldInfo.mCam,
         CameraSwapEffects::eInstantChange_0,
         0,
         1);
-    GetMap().mForceLoad = 1;
+    mMap.mForceLoad = 1;
 }
 
 void QuikSave::LoadActive()
 {
-    GetMap().GetResourceManager().ShowLoadingIcon(*gMap);
+    mMap.GetResourceManager().ShowLoadingIcon(*gMap);
     Quicksave_LoadFromMemory_4C95A0();
 }
 
@@ -426,7 +426,7 @@ static u32 Quicksave_SaveBlyData_CountOrSave(SerializedObjectData* pSaveBuffer)
 {
     u32 flagsTotal = 0;
 
-    for (auto& binaryPath : GetMap().GetLoadedPaths())
+    for (auto& binaryPath : mMap.GetLoadedPaths())
     {
         for (auto& cam : binaryPath->GetCameras())
         {
@@ -504,7 +504,7 @@ void QuikSave::SaveToMemory_4C91A0(Quicksave& pSave)
 
 void QuikSave::DoQuicksave()
 {
-    GetMap().GetResourceManager().ShowLoadingIcon(*gMap);
+    mMap.GetResourceManager().ShowLoadingIcon(*gMap);
     QuikSave::SaveToMemory_4C91A0(gActiveQuicksaveData);
 }
 
@@ -539,9 +539,9 @@ void QuikSave::SaveWorldInfo(Quicksave_WorldInfo* pInfo)
     const PSX_RECT rect = sControlledCharacter->VGetBoundingRect();
 
     pInfo->mGnFrame = sGnFrame;
-    pInfo->mLevel = GetMap().mCurrentLevel;
-    pInfo->mPath = GetMap().mCurrentPath;
-    pInfo->mCam = GetMap().mCurrentCamera;
+    pInfo->mLevel = mMap.mCurrentLevel;
+    pInfo->mPath = mMap.mCurrentPath;
+    pInfo->mCam = mMap.mCurrentCamera;
 
     for (s32 i = 0; i < ALIVE_COUNTOF(pInfo->field_18_saved_killed_muds_per_zulag); i++)
     {

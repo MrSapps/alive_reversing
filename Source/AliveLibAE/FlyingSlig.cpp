@@ -453,9 +453,9 @@ FlyingSlig::~FlyingSlig()
     {
         sControlledCharacter = gAbe;
         MusicController::static_PlayMusic(MusicController::MusicTypes::eNone_0, this, 0, 0);
-        if (GetMap().mNextLevel != EReliveLevelIds::eMenu)
+        if (mMap.mNextLevel != EReliveLevelIds::eMenu)
         {
-            GetMap().SetActiveCam(
+            mMap.SetActiveCam(
                 mAbeLevel,
                 mAbePath,
                 mAbeCamera,
@@ -484,7 +484,7 @@ FlyingSlig::~FlyingSlig()
 
 void FlyingSlig::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || (GetMap().PathChanged() && (this != sControlledCharacter || mPersistant)))
+    if (mMap.LevelChanged() || (mMap.PathChanged() && (this != sControlledCharacter || mPersistant)))
     {
         SetDead(true);
     }
@@ -957,7 +957,7 @@ void FlyingSlig::Brain_4_ChasingEnemy()
 {
     mUnknown1 = false;
 
-    if (EventGet(Event::kEventHeroDying) && GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+    if (EventGet(Event::kEventHeroDying) && mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
     {
         ToAbeDead();
         return;
@@ -1889,7 +1889,7 @@ s16 FlyingSlig::IsPossessed()
 
 s16 FlyingSlig::CanChase(BaseAliveGameObject* pObj)
 {
-    if (!GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) || !GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) || EventGet(Event::kEventResetting) || IsAbeEnteringDoor(pObj) || gAbe->GetSpriteScale() != GetSpriteScale() || !IsWallBetween(this, pObj))
+    if (!mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) || !mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) || EventGet(Event::kEventResetting) || IsAbeEnteringDoor(pObj) || gAbe->GetSpriteScale() != GetSpriteScale() || !IsWallBetween(this, pObj))
     {
         return 0;
     }
@@ -2508,9 +2508,9 @@ void FlyingSlig::VPossessed()
     SetPossessed(true);
     mSpeaking1 = true;
 
-    mAbeLevel = GetMap().mCurrentLevel;
-    mAbePath = GetMap().mCurrentPath;
-    mAbeCamera = GetMap().mCurrentCamera;
+    mAbeLevel = mMap.mCurrentLevel;
+    mAbePath = mMap.mCurrentPath;
+    mAbeCamera = mMap.mCurrentCamera;
 
     field_2A8_max_x_speed = FP_FromDouble(5.5) * GetSpriteScale();
     field_2AC_up_vel = FP_FromDouble(-5.5) * GetSpriteScale();

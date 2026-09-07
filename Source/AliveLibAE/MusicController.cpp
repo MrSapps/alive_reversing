@@ -551,7 +551,7 @@ void MusicController::VUpdate()
     {
         mScreenChanged = false;
 
-        if (GetMap().mCurrentLevel != field_24_currentLevelID)
+        if (mMap.mCurrentLevel != field_24_currentLevelID)
         {
             field_44 = 0;
             field_30_music_time = 0;
@@ -572,7 +572,7 @@ void MusicController::VUpdate()
                 field_40_flags_and_idx = -1;
             }
 
-            field_24_currentLevelID = GetMap().mCurrentLevel;
+            field_24_currentLevelID = mMap.mCurrentLevel;
 
             if (mMusicEnabled)
             {

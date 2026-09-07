@@ -161,7 +161,7 @@ void Spark::VRender(OrderingTable& ot)
         abePath = AO::gAbe->mCurrentPath;
     }
 
-    if (GetMap().Is_Point_In_Current_Camera(
+    if (mMap.Is_Point_In_Current_Camera(
             abeLevel,
             abePath,
             mXPos,

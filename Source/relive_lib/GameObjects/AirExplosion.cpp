@@ -176,7 +176,7 @@ void AirExplosion::VUpdate()
 
 void AirExplosion::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || GetMap().PathChanged())
+    if (mMap.LevelChanged() || mMap.PathChanged())
     {
         SetDead(true);
     }
@@ -250,7 +250,7 @@ void AirExplosion::DealBlastDamage(PSX_RECT* pRect)
         }
     }
 
-    auto pTlv = GetMap().VTLV_Get_At_Of_Type(
+    auto pTlv = mMap.VTLV_Get_At_Of_Type(
         expandedRect.x,
         expandedRect.y,
         expandedRect.w,
@@ -263,9 +263,9 @@ void AirExplosion::DealBlastDamage(PSX_RECT* pRect)
         {
             pTlv->mTlvFlags.Set(relive::TlvFlags::eBit2_Destroyed);
 
-            const CameraPos dir = GetMap().GetDirection(
-                GetMap().mCurrentLevel,
-                GetMap().mCurrentPath,
+            const CameraPos dir = mMap.GetDirection(
+                mMap.mCurrentLevel,
+                mMap.mCurrentPath,
                 FP_FromInteger(pTlv->mTopLeftX),
                 FP_FromInteger(pTlv->mTopLeftY));
 

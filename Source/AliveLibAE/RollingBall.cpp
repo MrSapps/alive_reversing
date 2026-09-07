@@ -123,7 +123,7 @@ bool RollingBall::CollideWithWalls()
 
         SetDead(true);
 
-        const CameraPos direction = GetMap().GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
+        const CameraPos direction = mMap.GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
         SFX_Play_Camera(relive::SoundEffects::IngameTransition, 50, direction);
 
         switch (direction)
@@ -268,7 +268,7 @@ void RollingBall::VUpdate()
 
             relive_new ScreenShake(false, false, mResMan, mMap);
 
-            const CameraPos direction = GetMap().GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
+            const CameraPos direction = mMap.GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
             SFX_Play_Camera(relive::SoundEffects::IngameTransition, 50, direction);
 
             switch (direction)
@@ -302,7 +302,7 @@ void RollingBall::VUpdate()
         }
 
         case States::eCrushedBees:
-            if (mCurrentLevel != GetMap().mCurrentLevel || mCurrentPath != GetMap().mCurrentPath || EventGet(Event::kEventDeathReset))
+            if (mCurrentLevel != mMap.mCurrentLevel || mCurrentPath != mMap.mCurrentPath || EventGet(Event::kEventDeathReset))
             {
                 SetDead(true);
             }

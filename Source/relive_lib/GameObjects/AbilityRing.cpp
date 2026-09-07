@@ -193,9 +193,9 @@ AbilityRing::AbilityRing(FP xpos, FP ypos, RingTypes ringType, FP scale, Resourc
         break;
     }
 
-    mRingPath = GetMap().mCurrentPath;
+    mRingPath = mMap.mCurrentPath;
     mRingLayer = Layer::eLayer_Above_FG1_39;
-    mRingLevel = GetMap().mCurrentLevel;
+    mRingLevel = mMap.mCurrentLevel;
 
     if (mRingType == RingTypes::eShrykull_Pulse_Orange_6 && scale == FP_FromDouble(0.5))
     {
@@ -229,7 +229,7 @@ AbilityRing::~AbilityRing()
 
 void AbilityRing::VRender(OrderingTable& ot)
 {
-    if (GetMap().Is_Point_In_Current_Camera(
+    if (mMap.Is_Point_In_Current_Camera(
             mRingLevel,
             mRingPath,
             mRingXPos,

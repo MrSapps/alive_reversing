@@ -350,7 +350,7 @@ void MotionDetector::VUpdate()
                 {
                     mState = States::eWaitThenMoveLeft_1;
                     mPauseTimer = MakeTimer(15);
-                    const CameraPos soundDirection = GetMap().GetDirection(
+                    const CameraPos soundDirection = mMap.GetDirection(
                         mCurrentLevel,
                         mCurrentPath,
                         mXPos,
@@ -375,7 +375,7 @@ void MotionDetector::VUpdate()
                 {
                     mState = States::eWaitThenMoveRight_3;
                     mPauseTimer = MakeTimer(15);
-                    const CameraPos soundDirection = GetMap().GetDirection(
+                    const CameraPos soundDirection = mMap.GetDirection(
                         mCurrentLevel,
                         mCurrentPath,
                         mXPos,

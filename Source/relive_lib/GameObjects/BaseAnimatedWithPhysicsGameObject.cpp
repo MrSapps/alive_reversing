@@ -36,8 +36,8 @@ BaseAnimatedWithPhysicsGameObject::BaseAnimatedWithPhysicsGameObject(s16 resourc
     mDoPurpleLightEffect = false;
     mApplyShadowZoneColour = true;
 
-    mCurrentPath = GetMap().mCurrentPath;
-    mCurrentLevel = GetMap().mCurrentLevel;
+    mCurrentPath = mMap.mCurrentPath;
+    mCurrentLevel = mMap.mCurrentLevel;
 	
     mVelX = FP_FromInteger(0);
     mVelY = FP_FromInteger(0);
@@ -96,8 +96,8 @@ void BaseAnimatedWithPhysicsGameObject::VRender(OrderingTable& ot)
     if (GetAnimation().GetRender())
     {
         // Only render if in the active level, path and camera
-        if (GetMap().mCurrentPath == mCurrentPath
-            && GetMap().mCurrentLevel == mCurrentLevel
+        if (mMap.mCurrentPath == mCurrentPath
+            && mMap.mCurrentLevel == mCurrentLevel
             && Is_In_Current_Camera() == CameraPos::eCamCurrent_0)
         {
             GetAnimation().SetSpriteScale(GetSpriteScale());
@@ -168,7 +168,7 @@ void BaseAnimatedWithPhysicsGameObject::Animation_Init(const AnimResource& res)
 CameraPos BaseAnimatedWithPhysicsGameObject::Is_In_Current_Camera()
 {
     const PSX_RECT rect = VGetBoundingRect();
-    return GetMap().Rect_Location_Relative_To_Active_Camera(&rect);
+    return mMap.Rect_Location_Relative_To_Active_Camera(&rect);
 }
 
 void BaseAnimatedWithPhysicsGameObject::DeathSmokeEffect(bool bPlaySound)

@@ -225,7 +225,7 @@ void Scrab::VUpdate()
 
         if (old_x != mXPos || old_y != mYPos)
         {
-            BaseAliveGameObjectPathTLV = GetMap().TLV_Get_At(
+            BaseAliveGameObjectPathTLV = mMap.TLV_Get_At(
                 TlvIterator::Invalid(),
                 mXPos,
                 mYPos,
@@ -328,7 +328,7 @@ void Scrab::VOnTlvCollision(TlvIterator tlvIterator)
             break;
         }
 
-        tlvIterator = GetMap().TLV_Get_At(
+        tlvIterator = mMap.TLV_Get_At(
             tlvIterator,
             mXPos,
             mYPos,
@@ -339,7 +339,7 @@ void Scrab::VOnTlvCollision(TlvIterator tlvIterator)
 
 void Scrab::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || GetMap().PathChanged())
+    if (mMap.LevelChanged() || mMap.PathChanged())
     {
         SetTarget(nullptr);
         SetFightTarget(nullptr);
@@ -532,13 +532,13 @@ s32 Scrab::Scrab_SFX(ScrabSounds soundId, s32 /*vol*/, s32 pitch, s16 applyDirec
         volumeRight = defaultSndIdxVol / 2;
     }
 
-    CameraPos direction = GetMap().GetDirection(
+    CameraPos direction = mMap.GetDirection(
         mCurrentLevel,
         mCurrentPath,
         mXPos,
         mYPos);
     PSX_RECT worldRect;
-    GetMap().Get_Camera_World_Rect(direction, &worldRect);
+    mMap.Get_Camera_World_Rect(direction, &worldRect);
     volumeLeft = volumeRight;
     if (applyDirection)
     {
@@ -704,13 +704,13 @@ Scrab* Scrab::FindScrabToFight()
             if (pOther != this
                 && !pOther->BrainIs(&Scrab::Brain_Death)
                 && VOnSameYLevel(pOther)
-                && GetMap().Is_Point_In_Current_Camera(
+                && mMap.Is_Point_In_Current_Camera(
                     pOther->mCurrentLevel,
                     pOther->mCurrentPath,
                     pOther->mXPos,
                     pOther->mYPos,
                     0)
-                && GetMap().Is_Point_In_Current_Camera(
+                && mMap.Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -793,7 +793,7 @@ void Scrab::Motion_1_Stand()
 {
     ToNextMotion();
 
-    if (GetMap().GetDirection(
+    if (mMap.GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -900,7 +900,7 @@ void Scrab::Motion_2_Walk()
             field_188_flags &= ~2u;
         }
 
-        if (GetMap().GetDirection(
+        if (mMap.GetDirection(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,
@@ -1024,7 +1024,7 @@ void Scrab::Motion_3_Run()
                 }
             }
 
-            if (GetMap().GetDirection(
+            if (mMap.GetDirection(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -1540,7 +1540,7 @@ void Scrab::Motion_13_RunJumpBegin()
             mCurrentMotion = eScrabMotions::Motion_9_JumpToFall;
         }
 
-        if (GetMap().GetDirection(
+        if (mMap.GetDirection(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,
@@ -1613,7 +1613,7 @@ void Scrab::Motion_16_Stamp()
         ToNextMotion();
     }
 
-    if (GetMap().GetDirection(
+    if (mMap.GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1652,7 +1652,7 @@ void Scrab::Motion_19_Unused()
         }
     }
 
-    if (GetMap().GetDirection(
+    if (mMap.GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1678,7 +1678,7 @@ void Scrab::Motion_20_HowlBegin()
         }
     }
 
-    if (GetMap().GetDirection(
+    if (mMap.GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1712,7 +1712,7 @@ void Scrab::Motion_22_Shriek()
         }
     }
 
-    if (GetMap().GetDirection(
+    if (mMap.GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1735,7 +1735,7 @@ void Scrab::Motion_23_ScrabBattleAnim()
         ToNextMotion();
     }
 
-    if (GetMap().GetDirection(
+    if (mMap.GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1762,7 +1762,7 @@ void Scrab::Motion_24_FeedToGulp()
         }
     }
 
-    if (GetMap().GetDirection(
+    if (mMap.GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -1874,7 +1874,7 @@ void Scrab::Motion_27_AttackLunge()
         ToStand();
     }
 
-    if (GetMap().GetDirection(
+    if (mMap.GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -2072,7 +2072,7 @@ s16 Scrab::Brain_Fighting()
                 xpos = mXPos + FP_FromInteger(50);
             }
 
-            if (GetMap().Is_Point_In_Current_Camera(
+            if (mMap.Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     xpos,
@@ -2354,7 +2354,7 @@ s16 Scrab::Brain_ChasingEnemy()
         || (field_13C_spotting_timer <= static_cast<s32>(sGnFrame)
             && !CanSeeAbe(pTarget)
             && pTarget->mHealth > FP_FromInteger(0)
-            && GetMap().Is_Point_In_Current_Camera(
+            && mMap.Is_Point_In_Current_Camera(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,
@@ -2414,7 +2414,7 @@ s16 Scrab::Brain_ChasingEnemy()
         case 1:
         {
             if ((!CanSeeAbe(pTarget)
-                 && GetMap().Is_Point_In_Current_Camera(
+                 && mMap.Is_Point_In_Current_Camera(
                      mCurrentLevel,
                      mCurrentPath,
                      mXPos,
@@ -2435,7 +2435,7 @@ s16 Scrab::Brain_ChasingEnemy()
 
             if (!VIsFacingMe(pTarget))
             {
-                if (GetMap().Is_Point_In_Current_Camera(
+                if (mMap.Is_Point_In_Current_Camera(
                         mCurrentLevel,
                         mCurrentPath,
                         mXPos,
@@ -2470,7 +2470,7 @@ s16 Scrab::Brain_ChasingEnemy()
             TlvIterator tlvIterator = TlvIterator::Invalid();
             if (GetAnimation().GetFlipX())
             {
-                tlvIterator = GetMap().VTLV_Get_At_Of_Type(
+                tlvIterator = mMap.VTLV_Get_At_Of_Type(
                     FP_GetExponent(mXPos - kGridSize),
                     FP_GetExponent(mYPos),
                     FP_GetExponent(mXPos - kGridSize),
@@ -2479,7 +2479,7 @@ s16 Scrab::Brain_ChasingEnemy()
             }
             else
             {
-                tlvIterator = GetMap().VTLV_Get_At_Of_Type(
+                tlvIterator = mMap.VTLV_Get_At_Of_Type(
                     FP_GetExponent(mXPos + kGridSize),
                     FP_GetExponent(mYPos),
                     FP_GetExponent(mXPos + kGridSize),
@@ -2489,7 +2489,7 @@ s16 Scrab::Brain_ChasingEnemy()
 
             if (!tlvIterator.GetTlv())
             {
-                tlvIterator = GetMap().VTLV_Get_At_Of_Type(
+                tlvIterator = mMap.VTLV_Get_At_Of_Type(
                     FP_GetExponent(mXPos),
                     FP_GetExponent(mYPos),
                     FP_GetExponent(mXPos),
@@ -2555,7 +2555,7 @@ s16 Scrab::Brain_ChasingEnemy()
                 if (abs(xSnapped - x_exp) < 6 && Check_IsOnEndOfLine(0, 1))
                 {
                     if (pTarget->mYPos - mYPos < FP_FromInteger(5)
-                        || GetMap().VTLV_Get_At_Of_Type(
+                        || mMap.VTLV_Get_At_Of_Type(
                             FP_GetExponent(mXPos + kGridSize),
                             FP_GetExponent(mYPos + FP_FromInteger(10)),
                             FP_GetExponent(mXPos + kGridSize),
@@ -2571,7 +2571,7 @@ s16 Scrab::Brain_ChasingEnemy()
                     }
                 }
 
-                BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+                BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                     FP_GetExponent(mXPos + (kGridSize * FP_FromInteger(2))),
                     FP_GetExponent(mYPos),
                     FP_GetExponent(mXPos + (kGridSize * FP_FromInteger(2))),
@@ -2598,7 +2598,7 @@ s16 Scrab::Brain_ChasingEnemy()
                 if (abs(xSnapped - x_exp) < 6 && Check_IsOnEndOfLine(1, 1))
                 {
                     if ((pTarget->mYPos - mYPos < FP_FromInteger(5))
-                        || GetMap().VTLV_Get_At_Of_Type(
+                        || mMap.VTLV_Get_At_Of_Type(
                             FP_GetExponent(mXPos - kGridSize),
                             FP_GetExponent(mYPos + FP_FromInteger(10)),
                             FP_GetExponent(mXPos - kGridSize),
@@ -2614,7 +2614,7 @@ s16 Scrab::Brain_ChasingEnemy()
                     }
                 }
 
-                BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+                BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                     FP_GetExponent(mXPos - (kGridSize * FP_FromInteger(2))),
                     FP_GetExponent(mYPos),
                     FP_GetExponent(mXPos - (kGridSize * FP_FromInteger(2))),
@@ -2637,7 +2637,7 @@ s16 Scrab::Brain_ChasingEnemy()
 
             if (!VIsFacingMe(pTarget))
             {
-                if (GetMap().Is_Point_In_Current_Camera(
+                if (mMap.Is_Point_In_Current_Camera(
                         mCurrentLevel,
                         mCurrentPath,
                         mXPos,
@@ -2716,7 +2716,7 @@ s16 Scrab::Brain_ChasingEnemy()
         case 8:
         {
             if (!CanSeeAbe(pTarget)
-                && GetMap().Is_Point_In_Current_Camera(
+                && mMap.Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -2760,7 +2760,7 @@ s16 Scrab::Brain_ChasingEnemy()
                 return mBrainSubState;
             }
 
-            BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+            BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                 FP_GetExponent(mXPos),
                 FP_GetExponent(mYPos),
                 FP_GetExponent(mXPos),
@@ -2855,7 +2855,7 @@ s16 Scrab::Brain_ChasingEnemy()
 
         case 11:
             if (!CanSeeAbe(pTarget)
-                && GetMap().Is_Point_In_Current_Camera(
+                && mMap.Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -3064,7 +3064,7 @@ s16 Scrab::Brain_Patrol()
                 }
             }
 
-            BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+            BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                 FP_GetExponent(mXPos),
                 FP_GetExponent(mYPos),
                 FP_GetExponent(mXPos),
@@ -3097,7 +3097,7 @@ s16 Scrab::Brain_Patrol()
 
             if (GetAnimation().GetFlipX())
             {
-                BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+                BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                     FP_GetExponent(mXPos),
                     FP_GetExponent(mYPos),
                     FP_GetExponent(mXPos),
@@ -3112,7 +3112,7 @@ s16 Scrab::Brain_Patrol()
             }
             else
             {
-                BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+                BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                     FP_GetExponent(mXPos),
                     FP_GetExponent(mYPos),
                     FP_GetExponent(mXPos),
@@ -3141,7 +3141,7 @@ s16 Scrab::Brain_Patrol()
                 }
             }
 
-            if (GetMap().VTLV_Get_At_Of_Type(
+            if (mMap.VTLV_Get_At_Of_Type(
                     FP_GetExponent(mXPos - ScaleToGridSize(GetSpriteScale())),
                     FP_GetExponent(mYPos),
                     FP_GetExponent(mXPos - ScaleToGridSize(GetSpriteScale())),
@@ -3218,7 +3218,7 @@ s16 Scrab::Brain_Patrol()
                 }
             }
 
-            if (GetMap().VTLV_Get_At_Of_Type(
+            if (mMap.VTLV_Get_At_Of_Type(
                     FP_GetExponent(ScaleToGridSize(GetSpriteScale()) + mXPos),
                     FP_GetExponent(mYPos),
                     FP_GetExponent(ScaleToGridSize(GetSpriteScale()) + mXPos),
@@ -3408,7 +3408,7 @@ s16 Scrab::Brain_WalkAround()
 
             if (GetAnimation().GetFlipX())
             {
-                BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+                BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                     FP_GetExponent(mXPos),
                     FP_GetExponent(mYPos),
                     FP_GetExponent(mXPos),
@@ -3435,7 +3435,7 @@ s16 Scrab::Brain_WalkAround()
             }
             else
             {
-                BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+                BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                     FP_GetExponent(mXPos),
                     FP_GetExponent(mYPos),
                     FP_GetExponent(mXPos),
@@ -3466,7 +3466,7 @@ s16 Scrab::Brain_WalkAround()
 
         case 2:
         {            
-            BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+            BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                 FP_GetExponent(mXPos),
                 FP_GetExponent(mYPos),
                 FP_GetExponent(mXPos),
@@ -3521,7 +3521,7 @@ s16 Scrab::Brain_WalkAround()
 
         case 3:
         {
-            BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+            BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                 FP_GetExponent(mXPos),
                 FP_GetExponent(mYPos),
                 FP_GetExponent(mXPos),
@@ -3682,7 +3682,7 @@ void Scrab::SetTarget(BaseAliveGameObject* pTarget)
 
 s16 Scrab::HandleRunning()
 {
-    BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+    BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos),
         FP_GetExponent(mYPos),
         FP_GetExponent(mXPos),

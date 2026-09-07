@@ -296,7 +296,7 @@ void Greeter::BounceBackFromShot()
 
     GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::Greeter_Hit));
 
-    const CameraPos soundDirection = GetMap().GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
+    const CameraPos soundDirection = mMap.GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
     SFX_Play_Camera(relive::SoundEffects::GreeterKnockback, 0, soundDirection, GetSpriteScale());
 }
 
@@ -472,7 +472,7 @@ void Greeter::ZapTarget(FP xpos, FP ypos, BaseAliveGameObject* pTarget)
 
     pTarget->VTakeDamage(this);
 
-    const CameraPos soundDirection = GetMap().GetDirection(
+    const CameraPos soundDirection = mMap.GetDirection(
         mCurrentLevel,
         mCurrentPath,
         mXPos,
@@ -564,7 +564,7 @@ void Greeter::VUpdate()
         case GreeterBrainStates::eBrain_0_Patrol:
             if (!((sGnFrame - field_124_last_turn_time) % 14))
             {
-                const CameraPos soundDirection = GetMap().GetDirection(
+                const CameraPos soundDirection = mMap.GetDirection(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -652,7 +652,7 @@ void Greeter::VUpdate()
         {
             if (!(sGnFrame % 8))
             {
-                const CameraPos soundDirection2 = GetMap().GetDirection(
+                const CameraPos soundDirection2 = mMap.GetDirection(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -732,7 +732,7 @@ void Greeter::VUpdate()
                 mYPos = hitY;
                 BaseAliveGameObjectLastLineYPos = hitY;
 
-                const CameraPos soundDirection3 = GetMap().GetDirection(
+                const CameraPos soundDirection3 = mMap.GetDirection(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,

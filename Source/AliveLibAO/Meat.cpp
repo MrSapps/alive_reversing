@@ -25,7 +25,7 @@ namespace AO {
 
 void Meat::VScreenChanged()
 {
-    if (GetMap().PathChanged() || GetMap().LevelChanged())
+    if (mMap.PathChanged() || mMap.LevelChanged())
     {
         SetDead(true);
     }
@@ -223,7 +223,7 @@ void Meat::VUpdate()
 
                 CheckPlatformCollision(xy, wh, *gBaseGameObjects);
 
-                if (mYPos > FP_FromInteger(GetMap().mPathData->field_A_bBottom))
+                if (mYPos > FP_FromInteger(mMap.mPathData->field_A_bBottom))
                 {
                     SetDead(true);
                 }
@@ -268,7 +268,7 @@ void Meat::VUpdate()
                 break;
 
             case 4:
-                if (GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+                if (mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
                 {
                     mDeadTimer = MakeTimer(600);
                 }
@@ -293,7 +293,7 @@ void Meat::VUpdate()
                 mXPos += mVelX;
                 mYPos += mVelY;
 
-                if (!GetMap().Is_Point_In_Current_Camera(
+                if (!mMap.Is_Point_In_Current_Camera(
                         mCurrentLevel,
                         mCurrentPath,
                         mXPos,

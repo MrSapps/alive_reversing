@@ -44,7 +44,7 @@ Alarm::Alarm(s32 durationTimer, u16 switchId, s32 pauseTimer, Layer layer, Resou
     }
 
     // Disable red screen flashing in the stock yards
-    if (GetMap().mCurrentLevel == EReliveLevelIds::eStockYards || GetMap().mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+    if (mMap.mCurrentLevel == EReliveLevelIds::eStockYards || mMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
     {
         gObjListDrawables->Remove_Item(this);
         SetDrawable(false);
@@ -72,7 +72,7 @@ Alarm::~Alarm()
     }
     else
     {
-        GetMap().TLV_Reset(mAlarmTlvInfo);
+        mMap.TLV_Reset(mAlarmTlvInfo);
     }
 }
 
@@ -98,7 +98,7 @@ void Alarm::VUpdate()
         // TODO: check if this can be removed
         if (GetGameType() == GameType::eAo)
         {
-            if (mEffectBasePathId != GetMap().mCurrentPath || mEffectBaseLevelId != GetMap().mCurrentLevel)
+            if (mEffectBasePathId != mMap.mCurrentPath || mEffectBaseLevelId != mMap.mCurrentLevel)
             {
                 SetDead(true);
                 return;

@@ -20,7 +20,7 @@ void SND_Restart()
     {
         SND_SEQ_PlaySeq(static_cast<SeqId>(gBackgroundMusicSeqId), 0, 0);
     }
-    GetMap().Start_Sounds_For_Objects_In_Near_Cameras();
+    mMap.Start_Sounds_For_Objects_In_Near_Cameras();
 }
 
 } // namespace AO

@@ -90,7 +90,7 @@ MusicTrigger::~MusicTrigger()
 
 void MusicTrigger::VScreenChanged()
 {
-    if (GetMap().LevelChanged())
+    if (mMap.LevelChanged())
     {
         SetDead(true);
     }

@@ -85,7 +85,7 @@ ZBall::ZBall(relive::Path_ZBall* pTlv, const Guid& tlvId, ResourceManagerWrapper
     mXPos = FP_FromInteger(pTlv->mTopLeftX);
     mYPos = FP_FromInteger(pTlv->mTopLeftY);
 
-    if (GetMap().mCurrentLevel == EReliveLevelIds::eForestTemple)
+    if (mMap.mCurrentLevel == EReliveLevelIds::eForestTemple)
     {
         switch (pTlv->mStartPos)
         {
@@ -165,7 +165,7 @@ void ZBall::VUpdate()
 
     mFrameAbove12 = GetAnimation().GetCurrentFrame() >= 13;
 
-    if (!GetMap().Is_Point_In_Current_Camera(
+    if (!mMap.Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,

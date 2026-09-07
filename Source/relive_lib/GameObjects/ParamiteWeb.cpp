@@ -100,7 +100,7 @@ void ParamiteWeb::VUpdate()
 
 void ParamiteWeb::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || GetMap().PathChanged())
+    if (mMap.LevelChanged() || mMap.PathChanged())
     {
         SetDead(true);
     }
@@ -109,8 +109,8 @@ void ParamiteWeb::VScreenChanged()
 void ParamiteWeb::VRender(OrderingTable& ot)
 {
     PSX_Point camCoords = {};
-    GetMap().GetCurrentCamCoords(&camCoords);
-    if (mCurrentLevel == GetMap().mCurrentLevel && mCurrentPath == GetMap().mCurrentPath)
+    mMap.GetCurrentCamCoords(&camCoords);
+    if (mCurrentLevel == mMap.mCurrentLevel && mCurrentPath == mMap.mCurrentPath)
     {
         if (mXPos >= FP_FromInteger(camCoords.x) && mXPos <= FP_FromInteger(camCoords.x + 1024))
         {

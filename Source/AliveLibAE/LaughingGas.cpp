@@ -67,7 +67,7 @@ LaughingGas::LaughingGas(Layer layer, relive::Path_LaughingGas* pTlv, const Guid
 
 LaughingGas::~LaughingGas()
 {
-    GetMap().TLV_Reset(mTlvInfo);
+    mMap.TLV_Reset(mTlvInfo);
     gObjListDrawables->Remove_Item(this);
     gLaughingGasOn = false;
     gLaughingGasInstanceCount--;

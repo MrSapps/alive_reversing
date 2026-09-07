@@ -91,7 +91,7 @@ SecurityClaw::SecurityClaw(relive::Path_SecurityClaw* pTlv, const Guid& tlvId, R
 
     mXPos = mClawX + ((Math_Sine(0) * GetSpriteScale()) * FP_FromInteger(8)) * FP_FromDouble(0.25);
     mYPos = mClawY + ((Math_Cosine(0) * GetSpriteScale()) * FP_FromInteger(8));
-    SetTint(&kSecurityClawTints[0], GetMap().mCurrentLevel);
+    SetTint(&kSecurityClawTints[0], mMap.mCurrentLevel);
 
     mTlvTopLeft.x = pTlv->mTopLeftX;
     mTlvTopLeft.y = pTlv->mTopLeftY;
@@ -111,7 +111,7 @@ SecurityClaw::SecurityClaw(relive::Path_SecurityClaw* pTlv, const Guid& tlvId, R
 
         pClaw->mXPos = mClawX;
         pClaw->mYPos = mClawY;
-        pClaw->SetTint(&kClawTints[0], GetMap().mCurrentLevel);
+        pClaw->SetTint(&kClawTints[0], mMap.mCurrentLevel);
         mClawId = pClaw->mBaseGameObjectId;
     }
 

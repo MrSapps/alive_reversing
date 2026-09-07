@@ -23,7 +23,7 @@ void Path::TLV_Delete(const Guid& tlvId, s16 hiFlags)
 
 void Path::Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed)
 {
-    auto& paths = GetMap().GetLoadedPaths();
+    auto& paths = mMap.GetLoadedPaths();
     for (std::unique_ptr<BinaryPath>& pBinPath : paths)
     if (pBinPath)
     {

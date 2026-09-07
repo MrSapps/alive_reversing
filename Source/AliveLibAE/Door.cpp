@@ -46,7 +46,7 @@ Door::Door()
 
 void Door::LoadAnimations()
 {
-    switch (GetMap().mCurrentLevel)
+    switch (mMap.mCurrentLevel)
     {
         case EReliveLevelIds::eNecrum:
         case EReliveLevelIds::eMudomoVault:
@@ -65,7 +65,7 @@ void Door::LoadAnimations()
 
         case EReliveLevelIds::eBarracks:
         case EReliveLevelIds::eBarracks_Ender:
-            if (GetMap().mOverlayId == 108)
+            if (mMap.mOverlayId == 108)
             {
                 mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_BarracksMetal_Closed));
                 mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_BarracksMetal_Open));
@@ -121,7 +121,7 @@ Door::Door(relive::Path_Door* pTlv, const Guid& tlvId)
         mSwitchId = 0;
     }
 
-    if (GetMap().mCurrentLevel == EReliveLevelIds::eFeeCoDepot)
+    if (mMap.mCurrentLevel == EReliveLevelIds::eFeeCoDepot)
     {
         switch (mDoorId)
         {
@@ -252,8 +252,8 @@ Door::Door(relive::Path_Door* pTlv, const Guid& tlvId)
         mHubIds[7] = pTlv->mHub8;
     }
 
-    const AnimId closedDoor = sDoorAnimIdTable[static_cast<s32>(MapWrapper::ToAE(GetMap().mCurrentLevel))][0];
-    const AnimId openDoor = sDoorAnimIdTable[static_cast<s32>(MapWrapper::ToAE(GetMap().mCurrentLevel))][1];
+    const AnimId closedDoor = sDoorAnimIdTable[static_cast<s32>(MapWrapper::ToAE(mMap.mCurrentLevel))][0];
+    const AnimId openDoor = sDoorAnimIdTable[static_cast<s32>(MapWrapper::ToAE(mMap.mCurrentLevel))][1];
 
     const AnimRecord& openRec = AnimRec(openDoor);
     if (openRec.mFrameTableOffset == 0)
@@ -265,7 +265,7 @@ Door::Door(relive::Path_Door* pTlv, const Guid& tlvId)
 
     if (mCurrentState == relive::Path_Door::DoorStates::eOpen)
     {
-        if (GetMap().mOverlayId == 108)
+        if (mMap.mOverlayId == 108)
         {
             Animation_Init(GetAnimRes(AnimId::Door_BarracksMetal_Open));
         }
@@ -276,7 +276,7 @@ Door::Door(relive::Path_Door* pTlv, const Guid& tlvId)
     }
     else
     {
-        if (GetMap().mOverlayId == 108)
+        if (mMap.mOverlayId == 108)
         {
             Animation_Init(GetAnimRes(AnimId::Door_BarracksMetal_Closed));
         }
@@ -337,9 +337,9 @@ Door::Door(relive::Path_Door* pTlv, const Guid& tlvId)
 
     // Another OWI special
     FP yAdjustHack = {};
-    if ((GetMap().mCurrentLevel != EReliveLevelIds::eBarracks && GetMap().mCurrentLevel != EReliveLevelIds::eBarracks_Ender) || GetMap().mOverlayId == 108)
+    if ((mMap.mCurrentLevel != EReliveLevelIds::eBarracks && mMap.mCurrentLevel != EReliveLevelIds::eBarracks_Ender) || mMap.mOverlayId == 108)
     {
-        if (GetMap().mCurrentLevel == EReliveLevelIds::eBonewerkz || GetMap().mCurrentLevel == EReliveLevelIds::eBonewerkz_Ender)
+        if (mMap.mCurrentLevel == EReliveLevelIds::eBonewerkz || mMap.mCurrentLevel == EReliveLevelIds::eBonewerkz_Ender)
         {
             yAdjustHack = FP_FromInteger(10) * GetSpriteScale();
         }
@@ -469,13 +469,13 @@ void Door::VUpdate()
                     || (mStartState == relive::Path_Door::DoorStates::eClosed && !SwitchStates_Get(mSwitchId)))
                 {
                     mCurrentState = relive::Path_Door::DoorStates::eClosing;
-                    if (GetMap().mOverlayId == 108)
+                    if (mMap.mOverlayId == 108)
                     {
                         GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::Door_BarracksMetal_Open));
                     }
                     else
                     {
-                        GetAnimation().Set_Animation_Data(GetAnimRes(sDoorAnimIdTable[static_cast<s32>(MapWrapper::ToAE(GetMap().mCurrentLevel))][1]));
+                        GetAnimation().Set_Animation_Data(GetAnimRes(sDoorAnimIdTable[static_cast<s32>(MapWrapper::ToAE(mMap.mCurrentLevel))][1]));
                     }
 
                     GetAnimation().SetLoopBackwards(false);
@@ -490,13 +490,13 @@ void Door::VUpdate()
                 if ((mStartState == relive::Path_Door::DoorStates::eClosed && SwitchStates_Get(mSwitchId)) || (mStartState == relive::Path_Door::DoorStates::eOpen && !SwitchStates_Get(mSwitchId)))
                 {
                     mCurrentState = relive::Path_Door::DoorStates::eOpening;
-                    if (GetMap().mOverlayId == 108)
+                    if (mMap.mOverlayId == 108)
                     {
                         GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::Door_BarracksMetal_Open));
                     }
                     else
                     {
-                        GetAnimation().Set_Animation_Data(GetAnimRes(sDoorAnimIdTable[static_cast<s32>(MapWrapper::ToAE(GetMap().mCurrentLevel))][1]));
+                        GetAnimation().Set_Animation_Data(GetAnimRes(sDoorAnimIdTable[static_cast<s32>(MapWrapper::ToAE(mMap.mCurrentLevel))][1]));
                     }
 
                     GetAnimation().SetFrame(3);

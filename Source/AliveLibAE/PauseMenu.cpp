@@ -342,7 +342,7 @@ void PauseMenu::VRender(OrderingTable& ot)
 
 void PauseMenu::VScreenChanged()
 {
-    if (GetMap().mNextLevel == EReliveLevelIds::eCredits)
+    if (mMap.mNextLevel == EReliveLevelIds::eCredits)
     {
         SetDead(true);
     }
@@ -414,7 +414,7 @@ void PauseMenu::RestartPath()
     Abe::CreateFromSaveState(QuikSave::gActiveQuicksaveData.mRestartPathAbeState, mResMan, mMap);
     QuikSave::RestoreWorldInfo(QuikSave::gActiveQuicksaveData.mRestartPathWorldInfo);
 
-    GetMap().SetActiveCam(
+    mMap.SetActiveCam(
         QuikSave::gActiveQuicksaveData.mRestartPathWorldInfo.mLevel,
         QuikSave::gActiveQuicksaveData.mRestartPathWorldInfo.mPath,
         QuikSave::gActiveQuicksaveData.mRestartPathWorldInfo.mCam,
@@ -422,7 +422,7 @@ void PauseMenu::RestartPath()
         1,
         1);
 
-    GetMap().mForceLoad = true;
+    mMap.mForceLoad = true;
     if (gAbe->mBaseThrowableCount)
     {
         LoadRockTypes(
@@ -511,9 +511,9 @@ void PauseMenu::Page_Main_Update()
                 // Set the default save name to be the current level/path/camera
                 Path_Format_CameraName(
                     sSaveString,
-                    GetMap().mCurrentLevel,
-                    GetMap().mCurrentPath,
-                    GetMap().mCurrentCamera);
+                    mMap.mCurrentLevel,
+                    mMap.mCurrentPath,
+                    mMap.mCurrentCamera);
                 // Null terminate it
                 sSaveString[8] = 0;
                 // Append the editor arrow s8
@@ -598,8 +598,8 @@ void PauseMenu::Page_QuitConfirmation_Update()
         }
 
         gPauseMenu = nullptr;
-        GetMap().SetActiveCam(EReliveLevelIds::eMenu, 1, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
-        GetMap().mFreeAllAnimAndPalts = true;
+        mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
+        mMap.mFreeAllAnimAndPalts = true;
         sCurrentControllerIndex = 0;
     }
 }
@@ -1041,9 +1041,9 @@ void PauseMenu::VUpdate()
                 mSelectedGlowCounter = 8;
                 Path_Format_CameraName(
                     sScreenStringBuffer,
-                    GetMap().mCurrentLevel,
-                    GetMap().mCurrentPath,
-                    GetMap().mCurrentCamera);
+                    mMap.mCurrentLevel,
+                    mMap.mCurrentPath,
+                    mMap.mCurrentCamera);
 
                 for (size_t i = 0; i < strlen(sScreenStringBuffer); i++)
                 {
@@ -1065,7 +1065,7 @@ void PauseMenu::VUpdate()
                     }
                 }
 
-                sprintf(sSavedMudokonsText, "%d OF %d MUDOKONS", gRescuedMudokons, Path_GetTotalMuds(GetMap().mCurrentLevel, GetMap().mCurrentPath));
+                sprintf(sSavedMudokonsText, "%d OF %d MUDOKONS", gRescuedMudokons, Path_GetTotalMuds(mMap.mCurrentLevel, mMap.mCurrentPath));
                 sprintf(sTerminatedMudokonsText, "%d HA%s BEEN TERMINATED", gKilledMudokons, (gKilledMudokons != 1) ? "VE" : "S");
 
                 if (gAbe->mMood == Mud_Emotion::eNormal_0)

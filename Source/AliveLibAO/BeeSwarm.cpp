@@ -88,7 +88,7 @@ BeeSwarm::~BeeSwarm()
 
 void BeeSwarm::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || GetMap().PathChanged())
+    if (mMap.LevelChanged() || mMap.PathChanged())
     {
         SetDead(true);
     }
@@ -181,7 +181,7 @@ void BeeSwarm::VUpdate()
     switch (mSwarmState)
     {
         case BeeSwarmStates::eIdle_0:
-            if (!GetMap().Is_Point_In_Current_Camera(
+            if (!mMap.Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,

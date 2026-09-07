@@ -67,7 +67,7 @@ static const TintEntry sTrapDoorTints[16] = {
 
 void TrapDoor::LoadAnimationsAO()
 {
-    switch (GetMap().mCurrentLevel)
+    switch (mMap.mCurrentLevel)
     {
         case EReliveLevelIds::eRuptureFarms:
         case EReliveLevelIds::eBoardRoom:
@@ -103,7 +103,7 @@ void TrapDoor::LoadAnimationsAO()
 
 void TrapDoor::LoadAnimationsAE()
 {
-    switch (GetMap().mCurrentLevel)
+    switch (mMap.mCurrentLevel)
     {
         case EReliveLevelIds::eMudomoVault:
         case EReliveLevelIds::eMudancheeVault:
@@ -128,12 +128,12 @@ TrapDoor_Data TrapDoor::GetTrapDoorData() const
 {
     if (GetGameType() == GameType::eAo)
     {
-        const s32 levelIdx = static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel));
+        const s32 levelIdx = static_cast<s32>(MapWrapper::ToAO(mMap.mCurrentLevel));
         return sTrapDoorDataAO[levelIdx];
     }
     else
     {
-        const s32 levelIdx = static_cast<s32>(MapWrapper::ToAE(GetMap().mCurrentLevel));
+        const s32 levelIdx = static_cast<s32>(MapWrapper::ToAE(mMap.mCurrentLevel));
         return sTrapDoorDataAE[levelIdx];
     }
 }
@@ -232,7 +232,7 @@ TrapDoor::TrapDoor(relive::Path_TrapDoor* pTlv, const Guid& tlvId, ResourceManag
 
     if (GetGameType() == GameType::eAe)
     {
-        SetTint(sTrapDoorTints, GetMap().mCurrentLevel);
+        SetTint(sTrapDoorTints, mMap.mCurrentLevel);
         SetDoPurpleLightEffect(true);
     }
 }
@@ -256,7 +256,7 @@ void TrapDoor::VAdd(BaseAliveGameObject* pObj)
 
 void TrapDoor::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || GetMap().PathChanged())
+    if (mMap.LevelChanged() || mMap.PathChanged())
     {
         SetDead(true);
         if (mSelfClosing)
@@ -273,7 +273,7 @@ PSX_RECT TrapDoor::VGetBoundingRect()
 
 TrapDoor::~TrapDoor()
 {
-    GetMap().TLV_Reset(mPlatformBaseTlvInfo);
+    mMap.TLV_Reset(mPlatformBaseTlvInfo);
 }
 
 void TrapDoor::Open()
@@ -311,18 +311,18 @@ void TrapDoor::Open()
 
 bool TrapDoor::InIndustrialLevel()
 {
-    return GetMap().mCurrentLevel == EReliveLevelIds::eMines ||
-           GetMap().mCurrentLevel == EReliveLevelIds::eBonewerkz ||
-           GetMap().mCurrentLevel == EReliveLevelIds::eBonewerkz_Ender ||
-           GetMap().mCurrentLevel == EReliveLevelIds::eFeeCoDepot ||
-           GetMap().mCurrentLevel == EReliveLevelIds::eFeeCoDepot_Ender ||
-           GetMap().mCurrentLevel == EReliveLevelIds::eBarracks ||
-           GetMap().mCurrentLevel == EReliveLevelIds::eBarracks_Ender ||
-           GetMap().mCurrentLevel == EReliveLevelIds::eBrewery ||
-           GetMap().mCurrentLevel == EReliveLevelIds::eBrewery_Ender ||
-           GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms ||
-           GetMap().mCurrentLevel == EReliveLevelIds::eBoardRoom ||
-           GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn;
+    return mMap.mCurrentLevel == EReliveLevelIds::eMines ||
+           mMap.mCurrentLevel == EReliveLevelIds::eBonewerkz ||
+           mMap.mCurrentLevel == EReliveLevelIds::eBonewerkz_Ender ||
+           mMap.mCurrentLevel == EReliveLevelIds::eFeeCoDepot ||
+           mMap.mCurrentLevel == EReliveLevelIds::eFeeCoDepot_Ender ||
+           mMap.mCurrentLevel == EReliveLevelIds::eBarracks ||
+           mMap.mCurrentLevel == EReliveLevelIds::eBarracks_Ender ||
+           mMap.mCurrentLevel == EReliveLevelIds::eBrewery ||
+           mMap.mCurrentLevel == EReliveLevelIds::eBrewery_Ender ||
+           mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms ||
+           mMap.mCurrentLevel == EReliveLevelIds::eBoardRoom ||
+           mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn;
 }
 
 void TrapDoor::VUpdate()
@@ -332,7 +332,7 @@ void TrapDoor::VUpdate()
         SetDead(true);
     }
 
-    const CameraPos direction = GetMap().GetDirection(mCurrentLevel, mCurrentPath, mTrapDoorX, mTrapDoorY);
+    const CameraPos direction = mMap.GetDirection(mCurrentLevel, mCurrentPath, mTrapDoorX, mTrapDoorY);
 
     switch (mState)
     {

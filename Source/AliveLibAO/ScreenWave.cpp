@@ -46,8 +46,8 @@ ScreenWave::ScreenWave(FP xpos, FP ypos, Layer layer, FP width, FP speed, s32 ra
     field_1C_ypos = ypos;
     field_30_speed = speed;
 
-    field_3C_path = GetMap().mCurrentPath;
-    field_3A_level = GetMap().mCurrentLevel;
+    field_3C_path = mMap.mCurrentPath;
+    field_3A_level = mMap.mCurrentLevel;
 
     SetDrawable(true);
     field_18_xpos = xpos;
@@ -116,7 +116,7 @@ ScreenWave::~ScreenWave()
 
 void ScreenWave::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || GetMap().PathChanged())
+    if (mMap.LevelChanged() || mMap.PathChanged())
     {
         SetDead(true);
     }
@@ -150,7 +150,7 @@ void ScreenWave::VUpdate()
 
 void ScreenWave::VRender(OrderingTable& ot)
 {
-    if (!GetMap().Is_Point_In_Current_Camera(
+    if (!mMap.Is_Point_In_Current_Camera(
             field_3A_level,
             field_3C_path,
             field_18_xpos,

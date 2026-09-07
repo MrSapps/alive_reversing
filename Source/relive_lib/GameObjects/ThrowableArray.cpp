@@ -42,7 +42,7 @@ void ThrowableArray::VUpdate()
 {
     if (mThrowableTypeChanged)
     {
-        LoadRockTypes(GetMap().mCurrentLevel, GetMap().mCurrentPath);
+        LoadRockTypes(mMap.mCurrentLevel, mMap.mCurrentPath);
         Add(0);
         mThrowableTypeChanged = false;
         SetUpdatable(false);
@@ -51,16 +51,16 @@ void ThrowableArray::VUpdate()
 
 void ThrowableArray::VScreenChanged()
 {
-    if (GetMap().mNextLevel != EReliveLevelIds::eMenu && GetMap().mNextLevel != EReliveLevelIds::eCredits)
+    if (mMap.mNextLevel != EReliveLevelIds::eMenu && mMap.mNextLevel != EReliveLevelIds::eCredits)
     {
         bool typeChanged = false;
         if (GetGameType() == GameType::eAo)
         {
-            typeChanged = gThrowableFromOverlayIdAO[GetMap().mOverlayId] != gThrowableFromOverlayIdAO[GetMap().GetOverlayId()];
+            typeChanged = gThrowableFromOverlayIdAO[mMap.mOverlayId] != gThrowableFromOverlayIdAO[mMap.GetOverlayId()];
         }
         else
         {
-            typeChanged = gThrowableFromOverlayIdAE[GetMap().mOverlayId] != gThrowableFromOverlayIdAE[GetMap().GetOverlayId()];
+            typeChanged = gThrowableFromOverlayIdAE[mMap.mOverlayId] != gThrowableFromOverlayIdAE[mMap.GetOverlayId()];
         }
 
         if (typeChanged)

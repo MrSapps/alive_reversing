@@ -67,7 +67,7 @@ FlintLockFire::~FlintLockFire()
     Path::TLV_Reset(mTlvId);
     mGourdAnim.VCleanUp();
 
-    if (sFlintLockFireData[static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel))].mIsFire)
+    if (sFlintLockFireData[static_cast<s32>(MapWrapper::ToAO(mMap.mCurrentLevel))].mIsFire)
     {
         mFire1Anim.VCleanUp();
         mFire2Anim.VCleanUp();
@@ -85,7 +85,7 @@ FlintLockFire::FlintLockFire(relive::Path_FlintLockFire* pTlv, const Guid& tlvId
 
     LoadAnimations();
 
-    const s32 cur_lvl = static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel));
+    const s32 cur_lvl = static_cast<s32>(MapWrapper::ToAO(mMap.mCurrentLevel));
 
     Animation_Init(GetAnimRes(sFlintLockFireData[cur_lvl].mHammersDisabledAnimId));
     GetAnimation().SetSemiTrans(true);
@@ -174,7 +174,7 @@ void FlintLockFire::VUpdate()
         SetDead(true);
     }
 
-    const s32 cur_lvl = static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel));
+    const s32 cur_lvl = static_cast<s32>(MapWrapper::ToAO(mMap.mCurrentLevel));
 
     switch (mState)
     {
@@ -235,7 +235,7 @@ void FlintLockFire::VRender(OrderingTable& ot)
 {
     if (Is_In_Current_Camera() == CameraPos::eCamCurrent_0)
     {
-        const s32 cur_lvl = static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel));
+        const s32 cur_lvl = static_cast<s32>(MapWrapper::ToAO(mMap.mCurrentLevel));
         GetAnimation().SetSpriteScale(GetSpriteScale());
         mGourdAnim.SetSpriteScale(GetSpriteScale());
 

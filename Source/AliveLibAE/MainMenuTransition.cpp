@@ -49,7 +49,7 @@ const MainMenu_TransitionData stru_55C038[24] = // 3 x 8's ?
 
 void MainMenuTransition::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || GetMap().PathChanged())
+    if (mMap.LevelChanged() || mMap.PathChanged())
     {
         SetDead(true);
     }

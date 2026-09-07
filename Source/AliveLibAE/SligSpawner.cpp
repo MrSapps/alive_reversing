@@ -46,7 +46,7 @@ SligSpawner::~SligSpawner()
 
 void SligSpawner::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || GetMap().PathChanged() || mState == SpawnerStates::eInactive_0)
+    if (mMap.LevelChanged() || mMap.PathChanged() || mState == SpawnerStates::eInactive_0)
     {
         SetDead(true);
     }

@@ -17,7 +17,7 @@ HoistParticle::HoistParticle(FP xpos, FP ypos, FP scale, AnimId animId, Resource
     mYPos = ypos;
 
     /*u16 maxW = 7;
-    if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms || GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+    if (mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms || mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
     {
         maxW = 5;
     }
@@ -47,7 +47,7 @@ void HoistParticle::VUpdate()
 {
     if (mVelY >= (GetSpriteScale() * FP_FromInteger(10)))
     {
-        if (!GetMap().Is_Point_In_Current_Camera(
+        if (!mMap.Is_Point_In_Current_Camera(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,
@@ -112,7 +112,7 @@ void HoistRocksEffect::VUpdate()
         if (rnd == 1)
         {
             AnimId hoistRock = AnimId::AO_HoistRock2;
-            if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms || GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+            if (mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms || mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
             {
                 hoistRock = AnimId::RuptureFarms_HoistRock2;
             }
@@ -130,7 +130,7 @@ void HoistRocksEffect::VUpdate()
         else
         {
             AnimId hoistRock = AnimId::AO_HoistRock3;
-            if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms || GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+            if (mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms || mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
             {
                 hoistRock = AnimId::RuptureFarms_HoistRock3;
             }
@@ -149,7 +149,7 @@ void HoistRocksEffect::VUpdate()
     else
     {
         AnimId hoistRock = AnimId::AO_HoistRock1;
-        if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms || GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+        if (mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms || mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
         {
             hoistRock = AnimId::RuptureFarms_HoistRock1;
         }

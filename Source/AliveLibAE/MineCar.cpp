@@ -96,8 +96,8 @@ MineCar::MineCar(relive::Path_MineCar* pTlv, const Guid& tlvId, s32 /*a4*/, s32 
     // can travel "up" then we set this key to "up" such that holding down "right" automatically moves the car up.
     field_1D6_continue_move_input = static_cast<s16>(InputCommands::eThrowItem);
 
-    field_1CC_spawned_path = GetMap().mCurrentPath;
-    field_1CE_spawned_camera = GetMap().mCurrentCamera;
+    field_1CC_spawned_path = mMap.mCurrentPath;
+    field_1CE_spawned_camera = mMap.mCurrentCamera;
     field_1D0_sound_channels_mask = 0;
     field_1C4_velx_index = 0;
 }
@@ -361,7 +361,7 @@ void MineCar::VRender(OrderingTable& ot)
 
         mTreadAnim.SetRGB(r, g, b);
 
-        if (GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos + FP_FromInteger(30), mYPos, 0) || GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos - (GetSpriteScale() * FP_FromInteger(60)), 0) || GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos - FP_FromInteger(30), mYPos, 0))
+        if (mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos + FP_FromInteger(30), mYPos, 0) || mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos - (GetSpriteScale() * FP_FromInteger(60)), 0) || mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos - FP_FromInteger(30), mYPos, 0))
         {
             mTreadAnim.VRender(
                 FP_GetExponent(mXPos - gScreenManager->CamXPos()),
@@ -920,8 +920,8 @@ void MineCar::State_1_ParkedWithAbe()
         GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::Mine_Car_Open));
 
         sControlledCharacter = gAbe;
-        field_1CC_spawned_path = GetMap().mCurrentPath;
-        field_1CE_spawned_camera = GetMap().mCurrentCamera;
+        field_1CC_spawned_path = mMap.mCurrentPath;
+        field_1CE_spawned_camera = mMap.mCurrentCamera;
 
         gAbe->VCheckCollisionLineStillValid(10);
 

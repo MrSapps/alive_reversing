@@ -96,7 +96,7 @@ CrawlingSlig::CrawlingSlig(relive::Path_CrawlingSlig* pTlv, const Guid& guid, Re
     LoadAnimations();
     Animation_Init(GetAnimRes(AnimId::CrawlingSlig_Idle));
 
-    SetTint(&kCrawlingSligTints[0], GetMap().mCurrentLevel);
+    SetTint(&kCrawlingSligTints[0], mMap.mCurrentLevel);
 
     SetCanBePossessed(true);
 
@@ -326,9 +326,9 @@ void CrawlingSlig::VPossessed()
     SetBrain(ICrawlingSligBrain::EBrainTypes::Possessed);
     mPossessedBrain.SetState(PossessedBrain::EState::eStartPossession);
     mMultiUseTimer = MakeTimer(35);
-    mAbeLevel = GetMap().mCurrentLevel;
-    mAbePath = GetMap().mCurrentPath;
-    mAbeCamera = GetMap().mCurrentCamera;
+    mAbeLevel = mMap.mCurrentLevel;
+    mAbePath = mMap.mCurrentPath;
+    mAbeCamera = mMap.mCurrentCamera;
 }
 
 void CrawlingSlig::Set_AnimAndMotion(CrawlingSligMotion currentMotion, s16 bClearNextMotion)
@@ -653,9 +653,9 @@ CrawlingSlig::~CrawlingSlig()
     {
         sControlledCharacter = gAbe;
         MusicController::static_PlayMusic(MusicController::MusicTypes::eNone_0, this, 0, 0);
-        if (GetMap().mNextLevel != EReliveLevelIds::eMenu)
+        if (mMap.mNextLevel != EReliveLevelIds::eMenu)
         {
-            GetMap().SetActiveCam(
+            mMap.SetActiveCam(
                 mAbeLevel,
                 mAbePath,
                 mAbeCamera,
@@ -690,7 +690,7 @@ void CrawlingSlig::ToIdle()
 
 void SleepingBrain::VUpdate()
 {
-    if (GetMap().GetDirection(
+    if (mMap.GetDirection(
             mCrawlingSlig.mCurrentLevel,
             mCrawlingSlig.mCurrentPath,
             mCrawlingSlig.mXPos,
@@ -745,7 +745,7 @@ void SleepingBrain::VUpdate()
 
 void IdleBrain::VUpdate()
 {
-    if (GetMap().GetDirection(
+    if (mMap.GetDirection(
             mCrawlingSlig.mCurrentLevel,
             mCrawlingSlig.mCurrentPath,
             mCrawlingSlig.mXPos,
@@ -764,7 +764,7 @@ void IdleBrain::VUpdate()
 
 void PanicGetALockerBrain::VUpdate()
 {
-    if (GetMap().GetDirection(
+    if (mMap.GetDirection(
             mCrawlingSlig.mCurrentLevel,
             mCrawlingSlig.mCurrentPath,
             mCrawlingSlig.mXPos,
@@ -1000,7 +1000,7 @@ void PanicGetALockerBrain::VUpdate()
 
 void PossessedBrain::VUpdate()
 {
-    if (GetMap().GetDirection(
+    if (mMap.GetDirection(
             mCrawlingSlig.mCurrentLevel,
             mCrawlingSlig.mCurrentPath,
             mCrawlingSlig.mXPos,
@@ -1052,7 +1052,7 @@ void PossessedBrain::VUpdate()
 
                 sControlledCharacter = gAbe;
                 mCrawlingSlig.SetPossessed(false);
-                GetMap().SetActiveCam(mCrawlingSlig.mAbeLevel, mCrawlingSlig.mAbePath, mCrawlingSlig.mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+                mMap.SetActiveCam(mCrawlingSlig.mAbeLevel, mCrawlingSlig.mAbePath, mCrawlingSlig.mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
                 mCrawlingSlig.SetBrain(ICrawlingSligBrain::EBrainTypes::GetKilled);
                 mCrawlingSlig.mGetKilledBrain.SetState(GetKilledBrain::eGibsDeath);
                 MusicController::static_PlayMusic(MusicController::MusicTypes::eNone_0, &mCrawlingSlig, 0, 0);
@@ -1092,7 +1092,7 @@ void PossessedBrain::VUpdate()
 
 void GetKilledBrain::VUpdate()
 {
-    if (GetMap().GetDirection(
+    if (mMap.GetDirection(
             mCrawlingSlig.mCurrentLevel,
             mCrawlingSlig.mCurrentPath,
             mCrawlingSlig.mXPos,
@@ -1226,7 +1226,7 @@ void GetKilledBrain::VUpdate()
 void TransformedBrain::VUpdate()
 {
     BaseGameObject* pObj = sObjectIds.Find_Impl(mCrawlingSlig.mTransformedSligId);
-    if (GetMap().GetDirection(
+    if (mMap.GetDirection(
             mCrawlingSlig.mCurrentLevel,
             mCrawlingSlig.mCurrentPath,
             mCrawlingSlig.mXPos,
@@ -1512,7 +1512,7 @@ void CrawlingSlig::Motion_8_Speaking()
 {
     if (GetAnimation().GetCurrentFrame() == 2 && mSpeak != SligSpeak::eNone)
     {
-        if (GetMap().mCurrentPath == mCurrentPath && GetMap().mCurrentLevel == mCurrentLevel && Is_In_Current_Camera() == CameraPos::eCamCurrent_0)
+        if (mMap.mCurrentPath == mCurrentPath && mMap.mCurrentLevel == mCurrentLevel && Is_In_Current_Camera() == CameraPos::eCamCurrent_0)
         {
             Slig_GameSpeak_SFX(mSpeak, 0, 0, this);
         }
@@ -1542,7 +1542,7 @@ void CrawlingSlig::Motion_9_Snoozing()
             Slig_SoundEffect(SligSfx::eSnooze2_4, this);
         }
 
-        if (GetMap().Is_Point_In_Current_Camera(
+        if (mMap.Is_Point_In_Current_Camera(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,

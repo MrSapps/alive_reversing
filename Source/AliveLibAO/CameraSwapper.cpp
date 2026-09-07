@@ -68,13 +68,13 @@ CameraSwapper::~CameraSwapper()
 
     if (gMap_bDoPurpleLightEffect)
     {
-        GetMap().RemoveObjectsWithPurpleLight(0);
+        mMap.RemoveObjectsWithPurpleLight(0);
         gMap_bDoPurpleLightEffect = false;
     }
 
     BackgroundMusic::Play();
     MusicController::EnableMusic(1);
-    GetMap().Start_Sounds_For_Objects_In_Near_Cameras();
+    mMap.Start_Sounds_For_Objects_In_Near_Cameras();
 }
 
 void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)

@@ -49,7 +49,7 @@ MinesAlarm::~MinesAlarm()
 
 void MinesAlarm::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || GetMap().PathChanged())
+    if (mMap.LevelChanged() || mMap.PathChanged())
     {
         SetDead(true);
     }

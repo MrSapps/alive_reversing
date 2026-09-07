@@ -133,28 +133,28 @@ void BaseAliveGameObject::SetActiveCameraDelayedFromDir()
             case CameraPos::eCamTop_1:
                 if (mVelY < FP_FromInteger(0))
                 {
-                    GetMap().SetActiveCameraDelayed(MapDirections::eMapTop_2, this, -1);
+                    mMap.SetActiveCameraDelayed(MapDirections::eMapTop_2, this, -1);
                 }
                 break;
 
             case CameraPos::eCamBottom_2:
                 if (mVelY > FP_FromInteger(0))
                 {
-                    GetMap().SetActiveCameraDelayed(MapDirections::eMapBottom_3, this, -1);
+                    mMap.SetActiveCameraDelayed(MapDirections::eMapBottom_3, this, -1);
                 }
                 break;
 
             case CameraPos::eCamLeft_3:
                 if (mVelX < FP_FromInteger(0))
                 {
-                    GetMap().SetActiveCameraDelayed(MapDirections::eMapLeft_0, this, -1);
+                    mMap.SetActiveCameraDelayed(MapDirections::eMapLeft_0, this, -1);
                 }
                 break;
 
             case CameraPos::eCamRight_4:
                 if (mVelX > FP_FromInteger(0))
                 {
-                    GetMap().SetActiveCameraDelayed(MapDirections::eMapRight_1, this, -1);
+                    mMap.SetActiveCameraDelayed(MapDirections::eMapRight_1, this, -1);
                 }
                 break;
 
@@ -259,7 +259,7 @@ bool BaseAliveGameObject::IsInInvisibleZone(BaseAliveGameObject* pObj)
 
     const PSX_RECT bRect = pObj->VGetBoundingRect();
 
-    TlvIterator tlvIterator = pObj->GetMap().VTLV_Get_At_Of_Type(
+    TlvIterator tlvIterator = pObj->mMap.VTLV_Get_At_Of_Type(
         bRect.x,
         bRect.y,
         bRect.w,
@@ -280,7 +280,7 @@ bool BaseAliveGameObject::IsInInvisibleZone(BaseAliveGameObject* pObj)
         }
 
         // Check for stacked/overlaping TLV's
-        tlvIterator = pObj->GetMap().TLV_Get_At(tlvIterator,
+        tlvIterator = pObj->mMap.TLV_Get_At(tlvIterator,
                                    FP_FromInteger(bRect.x),
                                    FP_FromInteger(bRect.y),
                                    FP_FromInteger(bRect.w),
@@ -377,7 +377,7 @@ void BaseAliveGameObject::VSetXSpawn(s16 camWorldX, s32 screenXPos)
 
     mXPos = FP_FromInteger(camWorldX + XGrid_Index_To_XPos_AO(GetSpriteScale(), screenXPos));
 
-    BaseAliveGameObjectPathTLV = GetMap().TLV_Get_At(TlvIterator::Invalid(), mXPos, old_y, mXPos, old_y);
+    BaseAliveGameObjectPathTLV = mMap.TLV_Get_At(TlvIterator::Invalid(), mXPos, old_y, mXPos, old_y);
 
     if (pLiftPoint)
     {
@@ -410,7 +410,7 @@ void BaseAliveGameObject::VSetXSpawn(s16 camWorldX, s32 screenXPos)
             }
             else
             {
-                BaseAliveGameObjectPathTLV = GetMap().TLV_First_Of_Type_In_Camera(ReliveTypes::eStartController, 0);
+                BaseAliveGameObjectPathTLV = mMap.TLV_First_Of_Type_In_Camera(ReliveTypes::eStartController, 0);
                 if (BaseAliveGameObjectPathTLV.GetTlv()
                     && gCollisions->Raycast(
                         mXPos,
@@ -468,7 +468,7 @@ void BaseAliveGameObject::VSetYSpawn(s32 camWorldY, s16 bLeft)
         mYPos = FP_FromInteger(camWorldY + 124);
     }
 
-    BaseAliveGameObjectPathTLV = GetMap().TLV_Get_At(
+    BaseAliveGameObjectPathTLV = mMap.TLV_Get_At(
         TlvIterator::Invalid(),
         mXPos,
         mYPos,
@@ -544,7 +544,7 @@ void BaseAliveGameObject::VCheckCollisionLineStillValid(s32 distance)
     {
         BaseAliveGameObjectCollisionLine = nullptr;
 
-        BaseAliveGameObjectPathTLV = GetMap().TLV_First_Of_Type_In_Camera(ReliveTypes::eStartController, 0);
+        BaseAliveGameObjectPathTLV = mMap.TLV_First_Of_Type_In_Camera(ReliveTypes::eStartController, 0);
         if (BaseAliveGameObjectPathTLV.GetTlv())
         {
             if (gCollisions->Raycast(
@@ -619,7 +619,7 @@ void BaseAliveGameObject::OnPathTransitionAE(s32 camWorldX, s32 camWorldY, Camer
         pAbe = static_cast<Abe*>(this);
     }
 
-    if (pAbe && GetMap().mCurrentLevel == EReliveLevelIds::eNecrum && GetMap().mCurrentPath == 2 && (pAbe->mCurrentMotion == eAbeMotions::Motion_23_RollLoop_453A90 || pAbe->mCurrentMotion == eAbeMotions::Motion_17_CrouchIdle_456BC0))
+    if (pAbe && mMap.mCurrentLevel == EReliveLevelIds::eNecrum && mMap.mCurrentPath == 2 && (pAbe->mCurrentMotion == eAbeMotions::Motion_23_RollLoop_453A90 || pAbe->mCurrentMotion == eAbeMotions::Motion_17_CrouchIdle_456BC0))
     {
         // Yummy OWI hack - hard code Abe's location when path change to Necrum's first path after the Mines :)
         BaseAliveGameObjectCollisionLine = nullptr;
@@ -752,11 +752,11 @@ void BaseAliveGameObject::OnPathTransitionAO(s32 camWorldX, s32 camWorldY, Camer
     }
 
     // Find the start controller at the position we will be at in the new map
-    BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(static_cast<s16>(xpos), static_cast<s16>(ypos), static_cast<s16>(width), static_cast<s16>(height), ReliveTypes::eStartController);
+    BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(static_cast<s16>(xpos), static_cast<s16>(ypos), static_cast<s16>(width), static_cast<s16>(height), ReliveTypes::eStartController);
 
     if (!BaseAliveGameObjectPathTLV.GetTlv())
     {
-        BaseAliveGameObjectPathTLV = GetMap().TLV_First_Of_Type_In_Camera(ReliveTypes::eStartController, 0);
+        BaseAliveGameObjectPathTLV = mMap.TLV_First_Of_Type_In_Camera(ReliveTypes::eStartController, 0);
         LOG_INFO("Flip direction after the path trans as we are not touching the start controller");
         mVelX = -mVelX;
         GetAnimation().ToggleFlipX();
@@ -772,7 +772,7 @@ void BaseAliveGameObject::OnPathTransitionAO(s32 camWorldX, s32 camWorldY, Camer
     }
 
     PSX_Point camLoc = {};
-    AO::GetMap().GetCurrentCamCoords(&camLoc);
+    AO::mMap.GetCurrentCamCoords(&camLoc);
 
     mXPos = FP_FromInteger((BaseAliveGameObjectPathTLV.GetTlv()->mBottomRightX + BaseAliveGameObjectPathTLV.GetTlv()->mTopLeftX) / 2);
     mYPos = FP_FromInteger(BaseAliveGameObjectPathTLV.GetTlv()->mTopLeftY);
@@ -880,10 +880,10 @@ bool BaseAliveGameObject::MapFollowMe(bool snapToGrid)
 bool BaseAliveGameObject::MapFollowMeAO(bool snapToGrid)
 {
     PSX_Point currentCamCoords = {};
-    AO::GetMap().GetCurrentCamCoords(&currentCamCoords);
+    AO::mMap.GetCurrentCamCoords(&currentCamCoords);
 
     // Are we "in" the current camera X bounds?
-    if (mCurrentLevel == GetMap().mCurrentLevel && mCurrentPath == GetMap().mCurrentPath && mXPos > FP_FromInteger(currentCamCoords.x) && mXPos < FP_FromInteger(currentCamCoords.x + 1024))
+    if (mCurrentLevel == mMap.mCurrentLevel && mCurrentPath == mMap.mCurrentPath && mXPos > FP_FromInteger(currentCamCoords.x) && mXPos < FP_FromInteger(currentCamCoords.x + 1024))
     {
         // Snapped XPos in camera space
         const s32 snappedXLocalCoords = SnapToXGrid_AO(GetSpriteScale(), FP_GetExponent(mXPos - FP_FromInteger(currentCamCoords.x)));
@@ -891,10 +891,10 @@ bool BaseAliveGameObject::MapFollowMeAO(bool snapToGrid)
         // In the left camera void and moving left?
         if (snappedXLocalCoords < 256 && mVelX < FP_FromInteger(0))
         {
-            if (sControlledCharacter == this && GetMap().SetActiveCameraDelayed(MapDirections::eMapLeft_0, this, -1))
+            if (sControlledCharacter == this && mMap.SetActiveCameraDelayed(MapDirections::eMapLeft_0, this, -1))
             {
-                mCurrentPath = GetMap().mCurrentPath;
-                mCurrentLevel = GetMap().mCurrentLevel;
+                mCurrentPath = mMap.mCurrentPath;
+                mCurrentLevel = mMap.mCurrentLevel;
                 return true;
             }
             else
@@ -918,10 +918,10 @@ bool BaseAliveGameObject::MapFollowMeAO(bool snapToGrid)
         else if (snappedXLocalCoords > 624 && mVelX > FP_FromInteger(0))
         {
             // Go to the right camera in under player control
-            if (sControlledCharacter == this && GetMap().SetActiveCameraDelayed(MapDirections::eMapRight_1, this, -1))
+            if (sControlledCharacter == this && mMap.SetActiveCameraDelayed(MapDirections::eMapRight_1, this, -1))
             {
-                mCurrentLevel = GetMap().mCurrentLevel;
-                mCurrentPath = GetMap().mCurrentPath;
+                mCurrentLevel = mMap.mCurrentLevel;
+                mCurrentPath = mMap.mCurrentPath;
                 return true;
             }
             else
@@ -929,7 +929,7 @@ bool BaseAliveGameObject::MapFollowMeAO(bool snapToGrid)
                 const s32 x_i = abs(FP_GetExponent(mXPos));
                 const s32 camXIndex = x_i % 1024;
 
-                AO::GetMap().Get_map_size(&currentCamCoords);
+                AO::mMap.Get_map_size(&currentCamCoords);
                 if (x_i < (currentCamCoords.x - 1024))
                 {
                     UsePathTransScale();
@@ -972,7 +972,7 @@ bool BaseAliveGameObject::MapFollowMeAO(bool snapToGrid)
         // In the right camera void and moving right?
         else if (camXIndex > 624 && mVelX > FP_FromInteger(0)) // Never hit as velx is < 0
         {
-            AO::GetMap().Get_map_size(&currentCamCoords);
+            AO::mMap.Get_map_size(&currentCamCoords);
             if (x_i < (currentCamCoords.x - 1024))
             {
                 UsePathTransScale();
@@ -992,7 +992,7 @@ bool BaseAliveGameObject::MapFollowMeAO(bool snapToGrid)
 bool BaseAliveGameObject::MapFollowMeAE(bool snapToGrid)
 {
     PSX_Point currentCamCoords = {};
-    GetMap().GetCurrentCamCoords(&currentCamCoords);
+    mMap.GetCurrentCamCoords(&currentCamCoords);
 
     const s32 xposSnapped = SnapToXGrid_AE(GetSpriteScale(), FP_GetExponent(mXPos));
     if (snapToGrid)
@@ -1003,20 +1003,20 @@ bool BaseAliveGameObject::MapFollowMeAE(bool snapToGrid)
     // Gone off the left edge of the current screen
     if (xposSnapped < currentCamCoords.x && (GetAnimation().GetFlipX() || mVelX < FP_FromInteger(0)))
     {
-        if (sControlledCharacter == this && GetMap().SetActiveCameraDelayed(MapDirections::eMapLeft_0, this, -1))
+        if (sControlledCharacter == this && mMap.SetActiveCameraDelayed(MapDirections::eMapLeft_0, this, -1))
         {
-            mCurrentLevel = GetMap().mCurrentLevel;
-            mCurrentPath = GetMap().mCurrentPath;
+            mCurrentLevel = mMap.mCurrentLevel;
+            mCurrentPath = mMap.mCurrentPath;
             return true;
         }
     }
     // Gone off the right edge of the current screen
     else if (xposSnapped > currentCamCoords.x + 368 && (!(GetAnimation().GetFlipX()) || mVelX > FP_FromInteger(0)))
     {
-        if (sControlledCharacter == this && GetMap().SetActiveCameraDelayed(MapDirections::eMapRight_1, this, -1))
+        if (sControlledCharacter == this && mMap.SetActiveCameraDelayed(MapDirections::eMapRight_1, this, -1))
         {
-            mCurrentLevel = GetMap().mCurrentLevel;
-            mCurrentPath = GetMap().mCurrentPath;
+            mCurrentLevel = mMap.mCurrentLevel;
+            mCurrentPath = mMap.mCurrentPath;
             return true;
         }
     }
@@ -1165,7 +1165,7 @@ bool BaseAliveGameObject::VOnPlatformIntersection(BaseAnimatedWithPhysicsGameObj
 // AO
 void BaseAliveGameObject::UsePathTransScale()
 {
-    auto pPathTrans = GetMap().VTLV_Get_At_Of_Type(
+    auto pPathTrans = mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos),
         FP_GetExponent(mYPos),
         FP_GetExponent(mXPos),

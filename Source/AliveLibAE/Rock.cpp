@@ -190,7 +190,7 @@ void Rock::VUpdate()
             mVelY += FP_FromDouble(1.01);
             mXPos += mVelX;
             mYPos += mVelY;
-            if (!GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) && !GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos + FP_FromInteger(240), 0))
+            if (!mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) && !mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos + FP_FromInteger(240), 0))
             {
                 SetDead(true);
             }
@@ -206,8 +206,8 @@ void Rock::VTimeToExplodeRandom()
 //TODO Identical to AO - merge
 void Rock::VScreenChanged()
 {
-    if (GetMap().PathChanged()
-        || GetMap().LevelChanged())
+    if (mMap.PathChanged()
+        || mMap.LevelChanged())
     {
         SetDead(true);
     }
@@ -280,7 +280,7 @@ void Rock::InTheAir()
                     break;
                 }
 
-                if (!GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+                if (!mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
                 {
                     return;
                 }

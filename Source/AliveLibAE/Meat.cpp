@@ -103,7 +103,7 @@ void Meat::VTimeToExplodeRandom()
 
 void Meat::VScreenChanged()
 {
-    if (GetMap().PathChanged() || GetMap().LevelChanged())
+    if (mMap.PathChanged() || mMap.LevelChanged())
     {
         SetDead(true);
     }
@@ -314,7 +314,7 @@ void Meat::VUpdate()
                     *gBaseGameObjects);
 
                 // TODO: OG bug - why only checking for out of the bottom of the map?? Nades check for death object - probably should check both
-                if (mYPos > FP_FromInteger(GetMap().mPathData->field_6_bBottom))
+                if (mYPos > FP_FromInteger(mMap.mPathData->field_6_bBottom))
                 {
                     SetDead(true);
                 }
@@ -360,7 +360,7 @@ void Meat::VUpdate()
                 break;
 
             case MeatStates::eWaitForPickUp_4:
-                if (GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+                if (mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
                 {
                     mDeadTimer = MakeTimer(600);
                 }
@@ -385,7 +385,7 @@ void Meat::VUpdate()
                 mVelY += FP_FromInteger(1);
                 mXPos += mVelX;
                 mYPos = mVelY + mYPos;
-                if (!GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+                if (!mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
                 {
                     SetDead(true);
                 }

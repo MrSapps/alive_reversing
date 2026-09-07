@@ -3,7 +3,7 @@
 #include "FatalError.hpp"
 
 // TODO: add stockyards uxb pal
-//if (GetMap().mCurrentLevel == EReliveLevelIds::eStockYards || GetMap().mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+//if (mMap.mCurrentLevel == EReliveLevelIds::eStockYards || mMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
 //ResourceManager::LoadResource_446C90("TBMBPAL.BAN", ResourceManager::Resource_Palt, AOResourceID::kUXBAOResID, loadMode);
 
 constexpr PalDetails kNullPalDetails = {};

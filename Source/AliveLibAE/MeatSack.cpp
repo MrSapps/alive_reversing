@@ -43,7 +43,7 @@ MeatSack::MeatSack(relive::Path_MeatSack* pTlv, const Guid& tlvId, ResourceManag
     LoadAnimations();
 
     Animation_Init(GetAnimRes(AnimId::MeatSack_Idle));
-    SetTint(&kMeatSackTints[0], GetMap().mCurrentLevel);
+    SetTint(&kMeatSackTints[0], mMap.mCurrentLevel);
 
     SetApplyShadowZoneColour(false);
     mTlvId = tlvId;

@@ -87,7 +87,7 @@ Mine::Mine(relive::Path_Mine* pTlv, const Guid& tlvId, ResourceManagerWrapper& r
 
     mPersistOffscreen = pTlv->mPersistOffscreen;
 
-    if (GetMap().mCurrentLevel == EReliveLevelIds::eStockYards || GetMap().mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+    if (mMap.mCurrentLevel == EReliveLevelIds::eStockYards || mMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
     {
         mRGB.SetRGB(50, 50, 50);
         // TODO: Set the pal
@@ -112,11 +112,11 @@ Mine::~Mine()
 {
     if (mDetonating)
     {
-        GetMap().TLV_Delete(mTlvId);
+        mMap.TLV_Delete(mTlvId);
     }
     else
     {
-        GetMap().TLV_Reset(mTlvId);
+        mMap.TLV_Reset(mTlvId);
     }
 
     mFlashAnim.VCleanUp();
@@ -130,7 +130,7 @@ Mine::~Mine()
 
 void Mine::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || GetMap().PathChanged() || !mPersistOffscreen)
+    if (mMap.LevelChanged() || mMap.PathChanged() || !mPersistOffscreen)
     {
         SetDead(true);
     }
@@ -188,7 +188,7 @@ void Mine::VRender(OrderingTable& ot)
 {
     if (GetAnimation().GetRender())
     {
-        if (GetMap().Is_Point_In_Current_Camera(
+        if (mMap.Is_Point_In_Current_Camera(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,
@@ -208,7 +208,7 @@ void Mine::VRender(OrderingTable& ot)
 
 void Mine::VUpdate()
 {
-    const s16 bInCamera = GetMap().Is_Point_In_Current_Camera(
+    const s16 bInCamera = mMap.Is_Point_In_Current_Camera(
         mCurrentLevel,
         mCurrentPath,
         mXPos,
@@ -245,7 +245,7 @@ void Mine::VUpdate()
     }
     if (!mDetonating)
     {
-        if (EventGet(Event::kEventDeathReset) || mCurrentLevel != GetMap().mCurrentLevel || mCurrentPath != GetMap().mCurrentPath)
+        if (EventGet(Event::kEventDeathReset) || mCurrentLevel != mMap.mCurrentLevel || mCurrentPath != mMap.mCurrentPath)
         {
             SetDead(true);
         }

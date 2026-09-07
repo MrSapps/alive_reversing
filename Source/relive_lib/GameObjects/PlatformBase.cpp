@@ -108,7 +108,7 @@ PlatformBase::~PlatformBase()
 
     if (mPlatformBaseCollisionLine)
     {
-        if (GetMap().mCurrentLevel == mCurrentLevel && GetMap().mCurrentPath == mCurrentPath)
+        if (mMap.mCurrentLevel == mCurrentLevel && mMap.mCurrentPath == mCurrentPath)
         {
             Rect_Clear(&mPlatformBaseCollisionLine->mRect);
         }

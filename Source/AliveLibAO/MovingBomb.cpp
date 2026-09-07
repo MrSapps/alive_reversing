@@ -73,7 +73,7 @@ MovingBomb::MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, Resourc
         GetAnimation().SetRender(false);
     }
 
-    SetTint(kMovingBombTints, GetMap().mCurrentLevel);
+    SetTint(kMovingBombTints, mMap.mCurrentLevel);
 
     FP hitX = {};
     FP hitY = {};
@@ -126,7 +126,7 @@ MovingBomb::~MovingBomb()
 
 void MovingBomb::VScreenChanged()
 {
-    if (!mPersistOffscreen || GetMap().LevelChanged() || GetMap().PathChanged())
+    if (!mPersistOffscreen || mMap.LevelChanged() || mMap.PathChanged())
     {
         SetDead(true);
     }
@@ -357,7 +357,7 @@ void MovingBomb::VUpdate()
 
             FollowLine();
 
-            BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+            BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                 FP_GetExponent(mXPos),
                 FP_GetExponent(mYPos),
                 FP_GetExponent(mXPos),
@@ -399,7 +399,7 @@ void MovingBomb::VUpdate()
 
             FollowLine();
 
-            BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+            BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                 FP_GetExponent(mXPos),
                 FP_GetExponent(mYPos),
                 FP_GetExponent(mXPos),

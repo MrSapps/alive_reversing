@@ -63,7 +63,7 @@ Drill::Drill(relive::Path_Drill* pTlv, const Guid& tlvId, ResourceManagerWrapper
     GetAnimation().SetSemiTrans(true);
     GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_0);
 
-    SetTint(kDrillTints, GetMap().mCurrentLevel);
+    SetTint(kDrillTints, mMap.mCurrentLevel);
     relive::Path_Drill tlvData = *pTlv;
 
     mStartOff = tlvData.mStartStateOn == true ? false : true;
@@ -94,7 +94,7 @@ Drill::Drill(relive::Path_Drill* pTlv, const Guid& tlvId, ResourceManagerWrapper
     {
         mState = mStartPosIsBottom ? DrillStates::eGoingUp_2 : DrillStates::eGoingDown_1;
 
-        const CameraPos direction = GetMap().GetDirection(
+        const CameraPos direction = mMap.GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -261,7 +261,7 @@ void Drill::VUpdate()
         SetDead(true);
     }
 
-    const CameraPos soundDirection = GetMap().GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
+    const CameraPos soundDirection = mMap.GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos);
 
     switch (mState)
     {
@@ -468,7 +468,7 @@ void Drill::VScreenChanged()
 
 void Drill::VRender(OrderingTable& ot)
 {
-    if (GetMap().Is_Point_In_Current_Camera(
+    if (mMap.Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -515,7 +515,7 @@ void Drill::VGetSaveState(SerializedObjectData& pSaveBuffer)
 
 void Drill::EmitSparks()
 {
-    if (GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+    if (mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
     {
         s32 speed = 0;
         if (mState == DrillStates::eGoingDown_1)

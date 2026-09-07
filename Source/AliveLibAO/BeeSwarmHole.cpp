@@ -35,7 +35,7 @@ BeeSwarmHole::BeeSwarmHole(relive::Path_BeeSwarmHole* pTlv, const Guid& tlvId, R
 
 void BeeSwarmHole::VUpdate()
 {
-    if (GetMap().Rect_Location_Relative_To_Active_Camera(&field_14_rect, 0) != CameraPos::eCamCurrent_0)
+    if (mMap.Rect_Location_Relative_To_Active_Camera(&field_14_rect, 0) != CameraPos::eCamCurrent_0)
     {
         SetDead(true);
         Path::TLV_Reset(mTlvId);

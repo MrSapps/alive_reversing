@@ -18,9 +18,9 @@ void BackgroundMusic::VUpdate()
 {
     if (mMusicId >= 0)
     {
-        if (GetMap().mCurrentLevel != EReliveLevelIds::eNone
-            || GetMap().mCurrentPath != 1
-            || GetMap().mCurrentCamera != 10)
+        if (mMap.mCurrentLevel != EReliveLevelIds::eNone
+            || mMap.mCurrentPath != 1
+            || mMap.mCurrentCamera != 10)
         {
             SND_SEQ_PlaySeq(mMusicId, 0, 0);
         }

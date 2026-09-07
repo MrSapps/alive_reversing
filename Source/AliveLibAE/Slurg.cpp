@@ -86,7 +86,7 @@ Slurg::Slurg(relive::Path_Slurg* pTlv, const Guid& tlvId, ResourceManagerWrapper
     mMovingTimer = pTlv->mMovingTimer;
     mRngForMovingTimer = pTlv->mMovingTimer;
 
-    SetTint(&sSlurgTints[0], GetMap().mCurrentLevel);
+    SetTint(&sSlurgTints[0], mMap.mCurrentLevel);
 
     FP hitX = {};
     FP hitY = {};
@@ -239,7 +239,7 @@ void Slurg::VUpdate()
         case SlurgStates::ePausing_1:
             mVelX = FP_FromInteger(0);
             if (GetAnimation().GetCurrentFrame() == 0
-                && GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+                && mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
             {
                 SfxPlayMono(relive::SoundEffects::SlurgPause, 0);
             }

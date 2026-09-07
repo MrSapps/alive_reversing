@@ -215,7 +215,7 @@ Gibs::Gibs(GibType gibType, FP xpos, FP ypos, FP xOff, FP yOff, FP scale, bool b
     }
 
     PalId gibPal = PalId::Default;
-    if (GetMap().mCurrentLevel == EReliveLevelIds::eStockYards || GetMap().mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+    if (mMap.mCurrentLevel == EReliveLevelIds::eStockYards || mMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
     {
         if (gibType == GibType::eAbe || gibType == GibType::eMud)
         {
@@ -229,11 +229,11 @@ Gibs::Gibs(GibType gibType, FP xpos, FP ypos, FP xOff, FP yOff, FP scale, bool b
 
     if (gibType == GibType::eAbe)
     {
-        SetTint(sAbeTintTable, GetMap().mCurrentLevel);
+        SetTint(sAbeTintTable, mMap.mCurrentLevel);
     }
     else if (gibType == GibType::eMud)
     {
-        SetTint(sMudGibTints, GetMap().mCurrentLevel);
+        SetTint(sMudGibTints, mMap.mCurrentLevel);
     }
     else if (gibType == GibType::eBlindMud)
     {

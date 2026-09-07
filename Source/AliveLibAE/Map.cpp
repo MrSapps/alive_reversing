@@ -84,7 +84,7 @@ void Map::Reset()
 
 void Map::Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange)
 {
-    gPathInfo = relive_new Path();
+    gPathInfo = relive_new Path(*this);
 
     for (s32 i = 0; i < ALIVE_COUNTOF(field_2C_camera_array); i++)
     {

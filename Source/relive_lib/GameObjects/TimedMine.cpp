@@ -111,7 +111,7 @@ TimedMine::TimedMine(relive::Path_TimedMine* pTlv, const Guid& tlvId, ResourceMa
 
     mTlvInfo = tlvId;
     mExplosionTimer = sGnFrame;
-    SetBaseAnimPaletteTint(sTimedMineTint, GetMap().mCurrentLevel, PalId::Default); // TODO: Bomb pal removed, check correct
+    SetBaseAnimPaletteTint(sTimedMineTint, mMap.mCurrentLevel, PalId::Default); // TODO: Bomb pal removed, check correct
 
     SetInteractive(true);
 
@@ -128,11 +128,11 @@ TimedMine::~TimedMine()
     auto pPlatform = static_cast<AO::LiftPoint*>(sObjectIds.Find_Impl(BaseAliveGameObject_PlatformId));
     if (!mSlappedMine || sGnFrame < mExplosionTimer)
     {
-        GetMap().TLV_Reset(mTlvInfo);
+        mMap.TLV_Reset(mTlvInfo);
     }
     else
     {
-        GetMap().TLV_Delete(mTlvInfo);
+        mMap.TLV_Delete(mTlvInfo);
     }
 
     mTickAnim.VCleanUp();
@@ -148,7 +148,7 @@ TimedMine::~TimedMine()
 
 void TimedMine::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || GetMap().PathChanged())
+    if (mMap.LevelChanged() || mMap.PathChanged())
     {
         SetDead(true);
     }
@@ -187,7 +187,7 @@ bool TimedMine::VTakeDamage(BaseGameObject* pFrom)
 
 void TimedMine::VRender(OrderingTable& ot)
 {
-    if (GetMap().Is_Point_In_Current_Camera(
+    if (mMap.Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -295,7 +295,7 @@ void TimedMine::VUpdate()
         if (sGnFrame > (mOldGnFrame + mSingleTickTimer))
         {
             mOldGnFrame = sGnFrame;
-            const CameraPos soundDir = GetMap().GetDirection(
+            const CameraPos soundDir = mMap.GetDirection(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,

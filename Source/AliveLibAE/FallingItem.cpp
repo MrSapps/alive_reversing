@@ -39,7 +39,7 @@ static FallingItem* sPrimaryFallingItem = nullptr;
 
 void FallingItem::LoadAnimations()
 {
-    if (GetMap().mCurrentLevel == EReliveLevelIds::eBonewerkz)
+    if (mMap.mCurrentLevel == EReliveLevelIds::eBonewerkz)
     {
         mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::FallingCrate_Falling));
         mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::FallingCrate_Waiting));
@@ -67,7 +67,7 @@ FallingItem::FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, Reso
 
     SetType(ReliveTypes::eRockSpawner);
 
-    const s32 lvlIdx = static_cast<s32>(MapWrapper::ToAE(GetMap().mCurrentLevel));
+    const s32 lvlIdx = static_cast<s32>(MapWrapper::ToAE(mMap.mCurrentLevel));
 
     LoadAnimations();
     Animation_Init(GetAnimRes(sFallingItemData[lvlIdx][0]));
@@ -120,7 +120,7 @@ FallingItem::FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, Reso
 
     SetCanExplode(true);
 
-    const s32 lvlIdx = static_cast<s32>(MapWrapper::ToAE(GetMap().mCurrentLevel));
+    const s32 lvlIdx = static_cast<s32>(MapWrapper::ToAE(mMap.mCurrentLevel));
     LoadAnimations();
     Animation_Init(GetAnimRes(sFallingItemData[lvlIdx][0]));
 
@@ -165,8 +165,8 @@ FallingItem::~FallingItem()
 
 void FallingItem::VScreenChanged()
 {
-    if (GetMap().LevelChanged() 
-	|| GetMap().PathChanged() 
+    if (mMap.LevelChanged()
+	|| mMap.PathChanged()
         || mState != State::eFalling_3)
     {
         SetDead(true);
@@ -218,7 +218,7 @@ void FallingItem::VUpdate()
                 mVelX = FP_FromInteger(0);
                 mVelY = FP_FromInteger(0);
 
-                GetAnimation().Set_Animation_Data(GetAnimRes(sFallingItemData[static_cast<s32>(MapWrapper::ToAE(GetMap().mCurrentLevel))][1]));
+                GetAnimation().Set_Animation_Data(GetAnimRes(sFallingItemData[static_cast<s32>(MapWrapper::ToAE(mMap.mCurrentLevel))][1]));
 
                 mFallIntervalTimer = MakeTimer(mFallInterval);
             }
@@ -232,7 +232,7 @@ void FallingItem::VUpdate()
             mVelX = FP_FromInteger(0);
             mVelY = FP_FromInteger(0);
 
-            GetAnimation().Set_Animation_Data(GetAnimRes(sFallingItemData[static_cast<s32>(MapWrapper::ToAE(GetMap().mCurrentLevel))][1]));
+            GetAnimation().Set_Animation_Data(GetAnimRes(sFallingItemData[static_cast<s32>(MapWrapper::ToAE(mMap.mCurrentLevel))][1]));
 
             mFallIntervalTimer = MakeTimer(mFallInterval);
             break;
@@ -309,7 +309,7 @@ void FallingItem::VUpdate()
 
             relive_new ScreenShake(false, GetSpriteScale() == FP_FromDouble(0.5), mResMan, mMap);
 
-            if (GetMap().mCurrentLevel == EReliveLevelIds::eBonewerkz)
+            if (mMap.mCurrentLevel == EReliveLevelIds::eBonewerkz)
             {
                 relive_new ParticleBurst(mXPos,
                                                    mYPos,
@@ -368,13 +368,13 @@ void FallingItem::VUpdate()
 
             --mRemainingFallingItems;
 
-            if ((mMaxFallingItems > 0 && mRemainingFallingItems <= 0) || !GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mTlvXPos, mTlvYPos, 0))
+            if ((mMaxFallingItems > 0 && mRemainingFallingItems <= 0) || !mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mTlvXPos, mTlvYPos, 0))
             {
                 SetDead(true);
             }
             else
             {
-                GetAnimation().Set_Animation_Data(GetAnimRes(sFallingItemData[static_cast<s32>(MapWrapper::ToAE(GetMap().mCurrentLevel))][0]));
+                GetAnimation().Set_Animation_Data(GetAnimRes(sFallingItemData[static_cast<s32>(MapWrapper::ToAE(mMap.mCurrentLevel))][0]));
                 SetCanExplode(true);
                 mVelY = FP_FromInteger(0);
                 mVelX = FP_FromInteger(0);

@@ -109,7 +109,7 @@ void Leaf::VUpdate()
     }
 
     // Out of the camera, die
-    if (!GetMap().Is_Point_In_Current_Camera(
+    if (!mMap.Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,

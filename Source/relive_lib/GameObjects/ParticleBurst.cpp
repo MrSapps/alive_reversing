@@ -180,7 +180,7 @@ ParticleBurst::ParticleBurst(FP xpos, FP ypos, u32 particleCount, FP scale, Burs
         // OG bug sign could be wrong here as it called random again to Abs() it!
         mParticleItems[i].field_14_z_speed = -FP_Abs(Random_Speed(scale));
 
-        if (GetMap().mCurrentLevel == EReliveLevelIds::eStockYards || GetMap().mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+        if (mMap.mCurrentLevel == EReliveLevelIds::eStockYards || mMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
         {
             mRGB.SetRGB(60, 60, 60);
         }
@@ -232,9 +232,9 @@ void ParticleBurst::VUpdate()
 
             if (mType == BurstType::eMeat)
             {
-                if (GetMap().Is_Point_In_Current_Camera(
-                        GetMap().mCurrentLevel,
-                        GetMap().mCurrentPath,
+                if (mMap.Is_Point_In_Current_Camera(
+                        mMap.mCurrentLevel,
+                        mMap.mCurrentPath,
                         pItem->x,
                         pItem->y,
                         0))

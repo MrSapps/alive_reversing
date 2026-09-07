@@ -40,7 +40,7 @@ static const FallingItem_Data sFallingItemData[16] = {
 
 void FallingItem::LoadAnimations()
 {
-    switch (GetMap().mCurrentLevel)
+    switch (mMap.mCurrentLevel)
     {
         case EReliveLevelIds::eRuptureFarms:
         case EReliveLevelIds::eRuptureFarmsReturn:
@@ -76,11 +76,11 @@ FallingItem::FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, Reso
 
     mTlvId = tlvId;
 
-    const s32 lvlIdx = static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel));
+    const s32 lvlIdx = static_cast<s32>(MapWrapper::ToAO(mMap.mCurrentLevel));
     Animation_Init(GetAnimRes(sFallingItemData[lvlIdx].mFallingAnimId));
 
     GetAnimation().SetRenderLayer(Layer::eLayer_FallingItemDoorFlameRollingBallPortalClip_Half_31);
-    if (GetMap().mCurrentLevel == EReliveLevelIds::eLines)
+    if (mMap.mCurrentLevel == EReliveLevelIds::eLines)
     {
         mRGB.SetRGB(77, 120, 190);
     }
@@ -116,7 +116,7 @@ FallingItem::FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, Reso
     mAirStreamSndChannels = 0;
 
     // Not sure why this rupture farms primary item hack is required
-    if (!sPrimaryFallingItem && (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms || GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn))
+    if (!sPrimaryFallingItem && (mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms || mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn))
     {
         sPrimaryFallingItem = this;
         mCreatedGnFrame = sGnFrame;
@@ -136,8 +136,8 @@ FallingItem::~FallingItem()
 
 void FallingItem::VScreenChanged()
 {
-    if (GetMap().LevelChanged()
-        || GetMap().PathChanged()
+    if (mMap.LevelChanged()
+        || mMap.PathChanged()
         || mState != State::eFalling_3)
     {
         SetDead(true);
@@ -181,7 +181,7 @@ void FallingItem::VUpdate()
             mVelX = FP_FromInteger(0);
             mVelY = FP_FromInteger(0);
 
-            GetAnimation().Set_Animation_Data(GetAnimRes(sFallingItemData[static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel))].mWaitingAnimId));
+            GetAnimation().Set_Animation_Data(GetAnimRes(sFallingItemData[static_cast<s32>(MapWrapper::ToAO(mMap.mCurrentLevel))].mWaitingAnimId));
 
             mFallIntervalTimer = MakeTimer(mFallInterval);
             break;
@@ -234,7 +234,7 @@ void FallingItem::VUpdate()
 
                 relive_new ScreenShake(false, false, mResMan, mMap);
 
-                if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms || GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+                if (mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms || mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
                 {
                     relive_new ParticleBurst(
                         mXPos,
@@ -275,9 +275,9 @@ void FallingItem::VUpdate()
                 mAirStreamSndChannels = 0;
             }
 
-            if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms || GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+            if (mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms || mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
             {
-                if (GetMap().Is_Point_In_Current_Camera(
+                if (mMap.Is_Point_In_Current_Camera(
                         mCurrentLevel,
                         mCurrentPath,
                         mXPos,
@@ -311,13 +311,13 @@ void FallingItem::VUpdate()
 
             mRemainingFallingItems--;
 
-            if ((mMaxFallingItems && mRemainingFallingItems <= 0) || !GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mTlvXPos, mTlvYPos, 0))
+            if ((mMaxFallingItems && mRemainingFallingItems <= 0) || !mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mTlvXPos, mTlvYPos, 0))
             {
                 SetDead(true);
             }
             else
             {
-                GetAnimation().Set_Animation_Data(GetAnimRes(sFallingItemData[static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel))].mFallingAnimId));
+                GetAnimation().Set_Animation_Data(GetAnimRes(sFallingItemData[static_cast<s32>(MapWrapper::ToAO(mMap.mCurrentLevel))].mFallingAnimId));
                 SetCanExplode(true);
                 mVelY = FP_FromInteger(0);
                 mVelX = FP_FromInteger(0);

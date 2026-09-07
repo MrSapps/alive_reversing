@@ -62,7 +62,7 @@ void IBirdPortal::CreateDovesAndShrykullNumber()
 
 void IBirdPortal::VScreenChanged()
 {
-    if (mState <= PortalStates::IdlePortal_1 || mState >= PortalStates::KillPortalClipper_21 || ((GetMap().LevelChanged() || GetMap().PathChanged()) && (mState != PortalStates::AbeInsidePortal_16 || mPortalType != relive::Path_BirdPortal::PortalType::eAbe || GetMap().mNextLevel != mExitLevel || GetMap().mNextPath != mExitPath)))
+    if (mState <= PortalStates::IdlePortal_1 || mState >= PortalStates::KillPortalClipper_21 || ((mMap.LevelChanged() || mMap.PathChanged()) && (mState != PortalStates::AbeInsidePortal_16 || mPortalType != relive::Path_BirdPortal::PortalType::eAbe || mMap.mNextLevel != mExitLevel || mMap.mNextPath != mExitPath)))
     {
         SetDead(true);
     }

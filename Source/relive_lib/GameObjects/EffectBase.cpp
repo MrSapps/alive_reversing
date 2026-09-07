@@ -12,8 +12,8 @@ EffectBase::EffectBase(Layer layer, relive::TBlendModes blendMode, ResourceManag
     SetType(ReliveTypes::eEffectBase);
     gObjListDrawables->Push_Back(this);
     SetDrawable(true);
-    mEffectBasePathId = GetMap().mCurrentPath;
-    mEffectBaseLevelId = GetMap().mCurrentLevel;
+    mEffectBasePathId = mMap.mCurrentPath;
+    mEffectBaseLevelId = mMap.mCurrentLevel;
     mEffectBaseLayer = layer;
     mSemiTrans = 1;
 }

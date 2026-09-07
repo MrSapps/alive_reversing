@@ -22,9 +22,9 @@ Bullet::Bullet(BaseAliveGameObject* pParent, BulletType type, FP xpos, FP ypos, 
     mBulletType = type;
     mXPos = xpos;
     mYPos = ypos;
-    mBulletPath = GetMap().mCurrentPath;
+    mBulletPath = mMap.mCurrentPath;
     mBulletParent = pParent;
-    mBulletLevel = GetMap().mCurrentLevel;
+    mBulletLevel = mMap.mCurrentLevel;
     mSpriteScale = scale;
     mNumberOfBullets = static_cast<s16>(numberOfBullets);
     mXDistance = xDist;
@@ -32,7 +32,7 @@ Bullet::Bullet(BaseAliveGameObject* pParent, BulletType type, FP xpos, FP ypos, 
 
 void Bullet::VUpdate()
 {
-    if (!GetMap().Is_Point_In_Current_Camera(
+    if (!mMap.Is_Point_In_Current_Camera(
             mBulletLevel,
             mBulletPath,
             mXPos,
@@ -203,7 +203,7 @@ bool Bullet::InZBulletCover(FP xpos, FP ypos, const PSX_RECT& objRect)
     while (1)
     {
         // Go to the next entry (or first if first call).
-        zCoverIterator = GetMap().TLV_Get_At(
+        zCoverIterator = mMap.TLV_Get_At(
             zCoverIterator,
             xpos,
             ypos,

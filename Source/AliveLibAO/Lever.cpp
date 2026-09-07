@@ -39,7 +39,7 @@ static const Lever_Data sLeverData[16] = {
 
 void Lever::LoadAnimations()
 {
-    switch (GetMap().mCurrentLevel)
+    switch (mMap.mCurrentLevel)
     {
         case EReliveLevelIds::eRuptureFarms:
         case EReliveLevelIds::eStockYards:
@@ -88,7 +88,7 @@ Lever::Lever(relive::Path_Lever* pTlv, const Guid& tlvId, ResourceManagerWrapper
 
     LoadAnimations();
 
-    const s32 lvl_idx = static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel));
+    const s32 lvl_idx = static_cast<s32>(MapWrapper::ToAO(mMap.mCurrentLevel));
     Animation_Init(GetAnimRes(sLeverData[lvl_idx].mIdleAnimId));
 
     GetAnimation().SetSemiTrans(true);
@@ -150,10 +150,10 @@ void Lever::VUpdate()
         {
             EventBroadcast(Event::kEventNoise, this);
             EventBroadcast(Event::kEventSuspiciousNoise, this);
-            const s32 lvl_idx = static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel));
-            if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms
-                || GetMap().mCurrentLevel == EReliveLevelIds::eBoardRoom
-                || GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+            const s32 lvl_idx = static_cast<s32>(MapWrapper::ToAO(mMap.mCurrentLevel));
+            if (mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms
+                || mMap.mCurrentLevel == EReliveLevelIds::eBoardRoom
+                || mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
             {
                 SfxPlayMono(relive::SoundEffects::IndustrialTrigger, 60);
             }
@@ -251,7 +251,7 @@ void Lever::VUpdate()
         {
             mState = LeverState::eWaiting_0;
             GetAnimation().Set_Animation_Data(
-                GetAnimRes(sLeverData[static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel))].mIdleAnimId));
+                GetAnimRes(sLeverData[static_cast<s32>(MapWrapper::ToAO(mMap.mCurrentLevel))].mIdleAnimId));
         }
     }
 }
@@ -263,7 +263,7 @@ s32 Lever::VPull(s16 bLeftDirection)
 {
     if (mState == LeverState::eWaiting_0)
     {
-        const s32 lvl_idx = static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel));
+        const s32 lvl_idx = static_cast<s32>(MapWrapper::ToAO(mMap.mCurrentLevel));
         mState = LeverState::ePulled_1;
         if (bLeftDirection)
         {

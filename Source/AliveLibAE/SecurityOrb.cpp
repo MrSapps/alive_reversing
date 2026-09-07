@@ -46,7 +46,7 @@ SecurityOrb::SecurityOrb(relive::Path_SecurityOrb* pTlv, const Guid& tlvId, Reso
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Security_Orb));
     Animation_Init(GetAnimRes(AnimId::Security_Orb));
 
-    SetTint(sSecurityOrbTints, GetMap().mCurrentLevel);
+    SetTint(sSecurityOrbTints, mMap.mCurrentLevel);
 
     mXPos = FP_FromInteger(pTlv->mTopLeftX);
     mYPos = FP_FromInteger(pTlv->mTopLeftY);

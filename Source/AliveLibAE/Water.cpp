@@ -159,7 +159,7 @@ void Water::VScreenChanged()
         field_144_sound_channels = 0;
     }
 
-    if (GetMap().LevelChanged() || GetMap().PathChanged())
+    if (mMap.LevelChanged() || mMap.PathChanged())
     {
         SetDead(true);
     }
@@ -225,7 +225,7 @@ void Water::VUpdate()
         SetDead(true);
     }
 
-    if (GetMap().Is_Point_In_Current_Camera(
+    if (mMap.Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -241,7 +241,7 @@ void Water::VUpdate()
 
     if (field_13C_not_in_camera_count <= 90)
     {
-        const CameraPos soundDir = GetMap().GetDirection(
+        const CameraPos soundDir = mMap.GetDirection(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -454,7 +454,7 @@ void Water::VUpdate()
 
 void Water::VRender(OrderingTable& ot)
 {
-    if (GetMap().Is_Point_In_Current_Camera(
+    if (mMap.Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,

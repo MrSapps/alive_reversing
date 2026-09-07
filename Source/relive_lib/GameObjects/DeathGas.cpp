@@ -87,7 +87,7 @@ void DeathGas::VScreenChanged()
 {
     // TODO: remove after abe merge
     void* abePtr = GetGameType() == GameType::eAe ? static_cast<void*>(gAbe) : static_cast<void*>(AO::gAbe);
-    if (GetMap().LevelChanged() || GetMap().PathChanged() || !abePtr)
+    if (mMap.LevelChanged() || mMap.PathChanged() || !abePtr)
     {
         SetDead(true);
     }

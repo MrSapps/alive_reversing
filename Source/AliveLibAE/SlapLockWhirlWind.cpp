@@ -31,8 +31,8 @@ SlapLockWhirlWind::SlapLockWhirlWind(s16 doorNumber, s16 switchId, FP xpos, FP y
         for (s16 x = 0; x < gPathInfo->mCamsOnX; x++)
         {
             TlvIterator doorTlvIterator = gPathInfo->Get_First_TLV_For_Offsetted_Camera(
-                x - GetMap().mCamIdxOnX,
-                y - GetMap().mCamIdxOnY);
+                x - mMap.mCamIdxOnX,
+                y - mMap.mCamIdxOnY);
             while (doorTlvIterator.GetTlv())
             {
                 if (doorTlvIterator.GetTlv()->mTlvType == ReliveTypes::eDoor)

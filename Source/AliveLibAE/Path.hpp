@@ -220,7 +220,7 @@ namespace relive
 class Path
 {
 public:
-    Path();
+    Path(BaseMap& map);
     ~Path();
     void Free();
     void Init(const PathData* pPathData, EReliveLevelIds level, s16 path, s16 cameraId, BinaryPath* ppPathRes);
@@ -253,6 +253,7 @@ public:
     u16 mCamsOnY = 0;
     const PathData* mPathData = nullptr;
     BinaryPath* mBinaryPath = nullptr; // Non owning ptr
+    BaseMap& mMap;
 };
 
 enum class CameraPos : s16;

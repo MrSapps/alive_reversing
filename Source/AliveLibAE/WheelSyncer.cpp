@@ -97,7 +97,7 @@ WheelSyncer::~WheelSyncer()
 
 void WheelSyncer::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || GetMap().PathChanged())
+    if (mMap.LevelChanged() || mMap.PathChanged())
     {
         SetDead(true);
     }

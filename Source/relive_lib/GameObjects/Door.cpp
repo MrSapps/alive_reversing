@@ -64,7 +64,7 @@ Door::Door(relive::Path_Door* pTlv, const Guid& tlvId, ResourceManagerWrapper& r
         mSwitchId = 0;
     }
 
-    if (GetMap().mCurrentLevel == EReliveLevelIds::eFeeCoDepot)
+    if (mMap.mCurrentLevel == EReliveLevelIds::eFeeCoDepot)
     {
         HandleFeeCoDepotSwitches();
     }
@@ -264,7 +264,7 @@ void Door::SetDoorPosition(relive::Path_Door* pTlv)
     FP tlvXMid = FP_FromInteger(pTlv->MidPointX());
     
     PSX_Point cam;
-    GetMap().GetCurrentCamCoords(&cam);
+    mMap.GetCurrentCamCoords(&cam);
     
     // Bottom of *this* camera in world space
     s32 screenHeight = 260 + 240; // cam starts at off y=240 in AO 
@@ -309,15 +309,15 @@ void Door::SetDoorPosition(relive::Path_Door* pTlv)
 
     FP yAdjustHack = FP_FromInteger(0);
 
-    if ((GetMap().mCurrentLevel == EReliveLevelIds::eBarracks ||
-        GetMap().mCurrentLevel== EReliveLevelIds::eBarracks_Ender) &&
-        GetMap().mOverlayId != 108)
+    if ((mMap.mCurrentLevel == EReliveLevelIds::eBarracks ||
+        mMap.mCurrentLevel== EReliveLevelIds::eBarracks_Ender) &&
+        mMap.mOverlayId != 108)
     {
         // Barracks 14 (unless overlay 108)
         yAdjustHack = FP_FromInteger(14) * GetSpriteScale();
     }
-    else if (GetMap().mCurrentLevel == EReliveLevelIds::eBonewerkz ||
-            GetMap().mCurrentLevel == EReliveLevelIds::eBonewerkz_Ender)
+    else if (mMap.mCurrentLevel == EReliveLevelIds::eBonewerkz ||
+            mMap.mCurrentLevel == EReliveLevelIds::eBonewerkz_Ender)
     {
         // Bonewerkz 10
         yAdjustHack = FP_FromInteger(10) * GetSpriteScale();
@@ -346,8 +346,8 @@ void Door::PlaySound()
     s16 volume = 0;
 
     const bool isRuptureFarms =
-        GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms ||
-        GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn;
+        mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms ||
+        mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn;
 
     if (isRuptureFarms)
     {

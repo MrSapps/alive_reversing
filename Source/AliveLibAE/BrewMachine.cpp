@@ -42,7 +42,7 @@ BrewMachine::BrewMachine(relive::Path_BrewMachine* pTlv, const Guid& tlvId, Reso
     mXPos = FP_FromInteger((pTlv->mTopLeftX + pTlv->mBottomRightX) / 2);
     mYPos = FP_FromInteger(pTlv->mTopLeftY);
 
-    mBrewMachineCamera = GetMap().mCurrentCamera;
+    mBrewMachineCamera = mMap.mCurrentCamera;
 }
 
 BrewMachine::~BrewMachine()
@@ -70,7 +70,7 @@ void BrewMachine::VUpdate()
 
 void BrewMachine::VRender(OrderingTable& ot)
 {
-    if (GetMap().mCurrentCamera == mBrewMachineCamera)
+    if (mMap.mCurrentCamera == mBrewMachineCamera)
     {
         char_type text[12] = {};
         sprintf(text, "%02d", mRemainingBrewCount);

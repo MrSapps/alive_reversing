@@ -48,7 +48,7 @@ void LevelLoader::VUpdate()
             {
                 if (mMovieId)
                 {
-                    GetMap().SetActiveCam(
+                    mMap.SetActiveCam(
                         mDestLevel,
                         mDestPath,
                         mDestCamera,
@@ -58,7 +58,7 @@ void LevelLoader::VUpdate()
                 }
                 else
                 {
-                    GetMap().SetActiveCam(
+                    mMap.SetActiveCam(
                         mDestLevel,
                         mDestPath,
                         mDestCamera,

@@ -47,7 +47,7 @@ PullRingRope::PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId, R
 
     Animation_Init(GetAnimRes(AnimId::PullRingRope_Idle));
 
-    SetTint(sPullRingRopeTints, GetMap().mCurrentLevel);
+    SetTint(sPullRingRopeTints, mMap.mCurrentLevel);
 
     GetAnimation().SetSemiTrans(true);
     mXPos = FP_FromInteger((pTlv->mTopLeftX + pTlv->mBottomRightX) / 2);
@@ -139,7 +139,7 @@ void PullRingRope::VUpdate()
                 mIsPulled = false;
                 mState = States::eTriggerEvent_2;
 
-                if (GetMap().mCurrentLevel == EReliveLevelIds::eMines || GetMap().mCurrentLevel == EReliveLevelIds::eBonewerkz || GetMap().mCurrentLevel == EReliveLevelIds::eFeeCoDepot || GetMap().mCurrentLevel == EReliveLevelIds::eBarracks || GetMap().mCurrentLevel == EReliveLevelIds::eBrewery)
+                if (mMap.mCurrentLevel == EReliveLevelIds::eMines || mMap.mCurrentLevel == EReliveLevelIds::eBonewerkz || mMap.mCurrentLevel == EReliveLevelIds::eFeeCoDepot || mMap.mCurrentLevel == EReliveLevelIds::eBarracks || mMap.mCurrentLevel == EReliveLevelIds::eBrewery)
                 {
                     SfxPlayMono(relive::SoundEffects::IndustrialTrigger, 0);
                 }

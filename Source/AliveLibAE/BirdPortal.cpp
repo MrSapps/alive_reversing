@@ -54,8 +54,8 @@ BirdPortal::BirdPortal(relive::Path_BirdPortal* pTlv, const Guid& tlvId, Resourc
         mSpriteScale = FP_FromInteger(1);
     }
 
-    mCurrentPath = GetMap().mCurrentPath;
-    mCurrentLevel = GetMap().mCurrentLevel;
+    mCurrentPath = mMap.mCurrentPath;
+    mCurrentLevel = mMap.mCurrentLevel;
 
     PathLine* pLine = nullptr;
     FP hitX = {};
@@ -138,7 +138,7 @@ BirdPortal::~BirdPortal()
 
 void BirdPortal::VUpdate()
 {
-    const CameraPos direction = GetMap().GetDirection(
+    const CameraPos direction = mMap.GetDirection(
         mCurrentLevel,
         mCurrentPath,
         mXPos,
@@ -630,10 +630,10 @@ void BirdPortal::VGiveShrykull(s16 bPlaySound)
 void BirdPortal::VExitPortal()
 {
     // If the bird port has changed us to another level/path update it
-    mCurrentPath = GetMap().mCurrentPath;
-    mCurrentLevel = GetMap().mCurrentLevel;
+    mCurrentPath = mMap.mCurrentPath;
+    mCurrentLevel = mMap.mCurrentLevel;
 
-    auto pPortalExitTlv = GetMap().TLV_First_Of_Type_In_Camera(ReliveTypes::eBirdPortalExit, 0).GetTlv<relive::Path_BirdPortalExit>();
+    auto pPortalExitTlv = mMap.TLV_First_Of_Type_In_Camera(ReliveTypes::eBirdPortalExit, 0).GetTlv<relive::Path_BirdPortalExit>();
     if (pPortalExitTlv)
     {
         // TODO: Clean up this hack by having a better way to match "any" type of line
@@ -672,8 +672,8 @@ void BirdPortal::VExitPortal()
         }
 
         gAbe->SetSpriteScale(mSpriteScale);
-        gAbe->mCurrentLevel = GetMap().mCurrentLevel;
-        gAbe->mCurrentPath = GetMap().mCurrentPath;
+        gAbe->mCurrentLevel = mMap.mCurrentLevel;
+        gAbe->mCurrentPath = mMap.mCurrentPath;
 
         mState = PortalStates::PortalExit_SetPosition_17;
     }

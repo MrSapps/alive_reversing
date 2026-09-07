@@ -149,7 +149,7 @@ void SlingMudokon::VUpdate()
 
     if (old_x != mXPos || old_y != mYPos)
     {
-        BaseAliveGameObjectPathTLV = GetMap().TLV_Get_At(
+        BaseAliveGameObjectPathTLV = mMap.TLV_Get_At(
             TlvIterator::Invalid(),
             mXPos,
             mYPos,
@@ -169,7 +169,7 @@ void SlingMudokon::VUpdate()
 
 void SlingMudokon::VCallBrain()
 {
-    if (GetMap().Is_Point_In_Current_Camera(
+    if (mMap.Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,

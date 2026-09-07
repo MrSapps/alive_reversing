@@ -9,7 +9,7 @@ namespace AO {
 
 void SwitchStateBooleanLogic::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || GetMap().PathChanged())
+    if (mMap.LevelChanged() || mMap.PathChanged())
     {
         SetDead(true);
     }

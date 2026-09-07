@@ -94,11 +94,11 @@ RollingBallStopper::~RollingBallStopper()
 {
     if (mState != States::eWaitForTrigger)
     {
-        GetMap().TLV_Reset(mTlvInfo, 1);
+        mMap.TLV_Reset(mTlvInfo, 1);
     }
     else
     {
-        GetMap().TLV_Reset(mTlvInfo, 0);
+        mMap.TLV_Reset(mTlvInfo, 0);
     }
 
     if (mCollisionLine)

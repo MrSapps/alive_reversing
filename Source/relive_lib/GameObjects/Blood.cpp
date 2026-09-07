@@ -138,7 +138,7 @@ void Blood::VUpdate()
 
 void Blood::VRender(OrderingTable& ot)
 {
-    if (GetMap().Is_Point_In_Current_Camera(
+    if (mMap.Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,

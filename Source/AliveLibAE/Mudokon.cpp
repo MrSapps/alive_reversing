@@ -1250,7 +1250,7 @@ bool Mudokon::VTakeDamage(BaseGameObject* pFrom)
                 const PSX_RECT v11 = VGetBoundingRect();
                 const FP tlvYPos = FP_FromInteger(v11.h);
 
-                if (Bullet::InZBulletCover(mXPos, tlvYPos, v11) || !GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, tlvYPos, 0))
+                if (Bullet::InZBulletCover(mXPos, tlvYPos, v11) || !mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, tlvYPos, 0))
                 {
                     // ZCover saved us, or somehow we've not in the current camera
                     mbGotShot = false;
@@ -1537,7 +1537,7 @@ s16 Mudokon::Brain_0_GiveRings()
     switch (mBrainSubState)
     {
         case Brain_0_GiveRings::eBrain0_Inactive_0:
-            if (GetMap().Is_Point_In_Current_Camera(
+            if (mMap.Is_Point_In_Current_Camera(
                     gAbe->mCurrentLevel,
                     gAbe->mCurrentPath,
                     gAbe->mXPos,
@@ -1575,7 +1575,7 @@ s16 Mudokon::Brain_0_GiveRings()
             break;
 
         case Brain_0_GiveRings::eBrain0_Idle_2:
-            if (mGiveRingWithoutPassword && GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) && GetMap().Is_Point_In_Current_Camera(gAbe->mCurrentLevel, gAbe->mCurrentPath, gAbe->mXPos, gAbe->mYPos, 0)
+            if (mGiveRingWithoutPassword && mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) && mMap.Is_Point_In_Current_Camera(gAbe->mCurrentLevel, gAbe->mCurrentPath, gAbe->mXPos, gAbe->mYPos, 0)
                 && !gAbe->mRingPulseTimer)
             {
                 field_194_timer = MudResponseDelay() + MakeTimer(20);
@@ -1798,11 +1798,11 @@ s16 Mudokon::Brain_1_Chisel()
     BaseAnimatedWithPhysicsGameObject* pDeadMudEvent = IsEventInRange(Event::kEventMudokonDied, mXPos, mYPos, AsEventScale(GetScale()));
     BaseAnimatedWithPhysicsGameObject* pLoudNoiseEvent = IsEventInRange(Event::kEventLoudNoise, mXPos, mYPos, AsEventScale(GetScale()));
 
-    const bool reactToAbused = (pAbuseEvent && pAbuseEvent != this && mBrainSubState != Brain_1_Chisle::eBrain1_StandUp_3 && GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0));
+    const bool reactToAbused = (pAbuseEvent && pAbuseEvent != this && mBrainSubState != Brain_1_Chisle::eBrain1_StandUp_3 && mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0));
 
-    const bool reactToDeadMud = (pDeadMudEvent && pDeadMudEvent != this && mBrainSubState != Brain_1_Chisle::eBrain1_StandUp_3 && GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0));
+    const bool reactToDeadMud = (pDeadMudEvent && pDeadMudEvent != this && mBrainSubState != Brain_1_Chisle::eBrain1_StandUp_3 && mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0));
 
-    const bool reactToLoudNoise = (pLoudNoiseEvent && pLoudNoiseEvent->Type() == ReliveTypes::eGlukkon && mBrainSubState != Brain_1_Chisle::eBrain1_StandUp_3 && GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0));
+    const bool reactToLoudNoise = (pLoudNoiseEvent && pLoudNoiseEvent->Type() == ReliveTypes::eGlukkon && mBrainSubState != Brain_1_Chisle::eBrain1_StandUp_3 && mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0));
 
     if (reactToAbused)
     {
@@ -2177,7 +2177,7 @@ s16 Mudokon::Brain_2_CrouchScrub()
         {
             if (mBrainSubState != Brain_2_CrouchScrub::eBrain2_StandUp_3
                 && mBrainSubState != Brain_2_CrouchScrub::eBrain2_DuckKnockback_7
-                && GetMap().Is_Point_In_Current_Camera(
+                && mMap.Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -2217,7 +2217,7 @@ s16 Mudokon::Brain_2_CrouchScrub()
         {
             if (mBrainSubState != Brain_2_CrouchScrub::eBrain2_StandUp_3
                 && mBrainSubState != Brain_2_CrouchScrub::eBrain2_DuckKnockback_7
-                && GetMap().Is_Point_In_Current_Camera(
+                && mMap.Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -2257,7 +2257,7 @@ s16 Mudokon::Brain_2_CrouchScrub()
         {
             if (mBrainSubState != Brain_2_CrouchScrub::eBrain2_StandUp_3
                 && mBrainSubState != Brain_2_CrouchScrub::eBrain2_DuckKnockback_7
-                && GetMap().Is_Point_In_Current_Camera(
+                && mMap.Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -2652,7 +2652,7 @@ s16 Mudokon::Brain_3_TurnWheel()
     {
         if (pMudAbuseEvent != this
             && mBrainSubState != Brain_3_TurnWheel::eBrain3_InterruptAction_2
-            && GetMap().Is_Point_In_Current_Camera(
+            && mMap.Is_Point_In_Current_Camera(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,
@@ -2690,7 +2690,7 @@ s16 Mudokon::Brain_3_TurnWheel()
     {
         if (pLoudNoiseEvent->Type() == ReliveTypes::eGlukkon
             && mBrainSubState != Brain_3_TurnWheel::eBrain3_InterruptAction_2
-            && GetMap().Is_Point_In_Current_Camera(
+            && mMap.Is_Point_In_Current_Camera(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,
@@ -3559,7 +3559,7 @@ s16 Mudokon::Brain_ListeningToAbe_State_5()
     const s32 v67 = WallHit(GetSpriteScale() * FP_FromInteger(50), v65);
     if (mBlind)
     {
-        if (!GetMap().Is_Point_In_Current_Camera(
+        if (!mMap.Is_Point_In_Current_Camera(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,
@@ -4894,7 +4894,7 @@ s16 Mudokon::Brain_8_AngryWorker()
                 return mBrainSubState;
             }
 
-            if (GetMap().mCurrentLevel == EReliveLevelIds::eBrewery_Ender)
+            if (mMap.mCurrentLevel == EReliveLevelIds::eBrewery_Ender)
             {
                 field_194_timer = MakeTimer(90);
             }
@@ -5017,7 +5017,7 @@ s16 Mudokon::Brain_9_Sick()
     // TODO: Lame hack, tortured muds make the "real" mud do nothing.
     // Sometimes this hack fails which makes AddAlerted underministic. With it disabled it just means that muds will respond to game speak which they sometimes did anyway when in a tear x-tractor.
     /*
-    if (FindObjectOfType(ReliveTypes::eTorturedMud, mXPos, mYPos - FP_FromInteger(50)) || !GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+    if (FindObjectOfType(ReliveTypes::eTorturedMud, mXPos, mYPos - FP_FromInteger(50)) || !mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
     {
         LastGameSpeak(); // TODO: Pointless call ??
         return mBrainSubState;
@@ -5068,7 +5068,7 @@ s16 Mudokon::Brain_9_Sick()
     }
 
     // Have Abe make a sad noise when he first sees sick Mudokons.
-    if (!mSeenWhileSick && GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+    if (!mSeenWhileSick && mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
     {
         if (gAbe->mSay == MudSounds::eNone)
         {
@@ -5489,7 +5489,7 @@ void Mudokon::Motion_11_Chisel()
 {
     CheckFloorGone();
 
-    if (GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+    if (mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
     {
         if (GetAnimation().GetIsLastFrame())
         {
@@ -5568,7 +5568,7 @@ void Mudokon::Motion_14_CrouchScrub()
 {
     CheckFloorGone();
 
-    if (GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+    if (mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
     {
         if (GetAnimation().GetCurrentFrame() == 2)
         {
@@ -6259,11 +6259,11 @@ void Mudokon::Motion_45_KnockForward()
         Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 32767, this);
     }
 
-    if ((GetMap().mCurrentLevel == EReliveLevelIds::eMines
-        || GetMap().mCurrentLevel == EReliveLevelIds::eBonewerkz
-        || GetMap().mCurrentLevel == EReliveLevelIds::eFeeCoDepot
-        || GetMap().mCurrentLevel == EReliveLevelIds::eBarracks
-        || GetMap().mCurrentLevel == EReliveLevelIds::eBrewery)
+    if ((mMap.mCurrentLevel == EReliveLevelIds::eMines
+        || mMap.mCurrentLevel == EReliveLevelIds::eBonewerkz
+        || mMap.mCurrentLevel == EReliveLevelIds::eFeeCoDepot
+        || mMap.mCurrentLevel == EReliveLevelIds::eBarracks
+        || mMap.mCurrentLevel == EReliveLevelIds::eBrewery)
         && GetAnimation().GetCurrentFrame() == 7)
     {
         Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this);
@@ -6285,7 +6285,7 @@ void Mudokon::Motion_46_Knockback()
 
     EventBroadcast(Event::kEventNoise, this);
 
-    if ((GetMap().mCurrentLevel == EReliveLevelIds::eMines || GetMap().mCurrentLevel == EReliveLevelIds::eBonewerkz || GetMap().mCurrentLevel == EReliveLevelIds::eFeeCoDepot || GetMap().mCurrentLevel == EReliveLevelIds::eBarracks || GetMap().mCurrentLevel == EReliveLevelIds::eBrewery) && GetAnimation().GetCurrentFrame() == 7)
+    if ((mMap.mCurrentLevel == EReliveLevelIds::eMines || mMap.mCurrentLevel == EReliveLevelIds::eBonewerkz || mMap.mCurrentLevel == EReliveLevelIds::eFeeCoDepot || mMap.mCurrentLevel == EReliveLevelIds::eBarracks || mMap.mCurrentLevel == EReliveLevelIds::eBrewery) && GetAnimation().GetCurrentFrame() == 7)
     {
         Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this);
     }
@@ -6661,12 +6661,12 @@ GameSpeakEvents Mudokon::LastGameSpeak()
 
 bool Mudokon::LaughingGasInCurrentScreen()
 {
-    return GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) ? gLaughingGasOn : false;
+    return mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0) ? gLaughingGasOn : false;
 }
 
 void Mudokon::MudEmotionSound(MudSounds idx)
 {
-    if (!GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+    if (!mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
     {
         if (field_180_emo_tbl != Mud_Emotion::eSick_7)
         {
@@ -6736,7 +6736,7 @@ s16 Mudokon::IAmNearestToAbe()
         if (pObj != this && pObj->GetSpriteScale() == gAbe->GetSpriteScale())
         {
             // Is it a mud who isn't currently talking to abe and is in the same screen?
-            if ((pObj->Type() == ReliveTypes::eRingOrLiftMud || pObj->Type() == ReliveTypes::eMudokon) && static_cast<Mudokon*>(pObj)->mBrainState != Mud_Brain_State::Brain_4_ListeningToAbe && GetMap().Is_Point_In_Current_Camera(pObj->mCurrentLevel, pObj->mCurrentPath, pObj->mXPos, pObj->mYPos, 0))
+            if ((pObj->Type() == ReliveTypes::eRingOrLiftMud || pObj->Type() == ReliveTypes::eMudokon) && static_cast<Mudokon*>(pObj)->mBrainState != Mud_Brain_State::Brain_4_ListeningToAbe && mMap.Is_Point_In_Current_Camera(pObj->mCurrentLevel, pObj->mCurrentPath, pObj->mXPos, pObj->mYPos, 0))
             {
                 if (gAbe->VIsFacingMe(pObj) && !gAbe->VIsFacingMe(this))
                 {
@@ -7076,7 +7076,7 @@ void Mudokon::HurtSoundPitchedToHealth()
 {
     const u8 random = Math_RandomRange(0, 127) >= 64 ? 16 : 9; // random hurt sound
     const s16 min = FP_GetExponent((FP_FromInteger(1) - mHealth) / FP_FromDouble(0.15));
-    const s16 bInCamera = GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0);
+    const s16 bInCamera = mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0);
     Mudokon_SFX(static_cast<MudSounds>(random), bInCamera ? 0 : 80, Math_RandomRange(200 * min, 40 * (5 * min + 5)), this);
 }
 

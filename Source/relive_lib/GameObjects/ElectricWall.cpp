@@ -69,12 +69,12 @@ ElectricWall::ElectricWall(relive::Path_ElectricWall* pTlv, const Guid& tlvId, R
 
 ElectricWall::~ElectricWall()
 {
-    GetMap().TLV_Reset(mTlvInfo);
+    mMap.TLV_Reset(mTlvInfo);
 }
 
 void ElectricWall::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || GetMap().PathChanged() || GetMap().GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) == CameraPos::eCamInvalid_m1)
+    if (mMap.LevelChanged() || mMap.PathChanged() || mMap.GetDirection(mCurrentLevel, mCurrentPath, mXPos, mYPos) == CameraPos::eCamInvalid_m1)
     {
         SetDead(true);
     }
@@ -82,7 +82,7 @@ void ElectricWall::VScreenChanged()
 
 void ElectricWall::VUpdate()
 {
-    const CameraPos soundDirection = GetMap().GetDirection(
+    const CameraPos soundDirection = mMap.GetDirection(
         mCurrentLevel,
         mCurrentPath,
         mXPos,

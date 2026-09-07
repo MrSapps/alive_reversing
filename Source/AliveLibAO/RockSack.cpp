@@ -63,7 +63,7 @@ RockSack::RockSack(relive::Path_RockSack* pTlv, const Guid& tlvId, ResourceManag
     mPlayWobbleSound = true;
     mForceWobbleSound = true;
 
-    if (GetMap().mCurrentLevel == EReliveLevelIds::eStockYards || GetMap().mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+    if (mMap.mCurrentLevel == EReliveLevelIds::eStockYards || mMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
     {
         mLoadedPals.push_back(resMan.LoadPal(PalId::BlueRockSack));
         GetAnimation().LoadPal(GetPalRes(PalId::BlueRockSack));

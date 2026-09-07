@@ -386,9 +386,9 @@ s32 Environment_SFX(EnvironmentSfx sfxId, s32 volume, s32 pitchMin, ::BaseAliveG
             sndIndex = 25;
             break;
         case EnvironmentSfx::eKnockback_13:
-            if (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms
-                || GetMap().mCurrentLevel == EReliveLevelIds::eBoardRoom
-                || GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+            if (mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms
+                || mMap.mCurrentLevel == EReliveLevelIds::eBoardRoom
+                || mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
             {
                 sndIndex = 2;
             }
@@ -439,7 +439,7 @@ s32 Mudokon_SFX(MudSounds idx, s32 volume, s32 pitch, ::BaseAliveGameObject* pHe
 {
     if (idx == MudSounds::eLaugh1_8
         && pHero == gAbe
-        && (GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn || GetMap().mCurrentLevel == EReliveLevelIds::eBoardRoom))
+        && (mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn || mMap.mCurrentLevel == EReliveLevelIds::eBoardRoom))
     {
         idx = MudSounds::eLaugh2_11;
     }
@@ -536,7 +536,7 @@ Abe::Abe(ResourceManagerWrapper& resMan, BaseMap& map)
     GetAnimation().SetFnPtrArray(gAbe_Anim_Frame_Fns);
 
     PSX_Point pPoint = {};
-    GetMap().GetCurrentCamCoords(&pPoint);
+    mMap.GetCurrentCamCoords(&pPoint);
     mXPos = FP_FromInteger(pPoint.x + XGrid_Index_To_XPos_AO(GetSpriteScale(), 4));
     mYPos = FP_FromInteger(pPoint.y + 240);
     BaseAliveGameObjectLastLineYPos = mYPos;
@@ -546,10 +546,10 @@ Abe::Abe(ResourceManagerWrapper& resMan, BaseMap& map)
     SetCanSetOffExplosives(true);
 
     mContinuePointSpriteScale = GetSpriteScale();
-    mContinuePointLevel = GetMap().mCurrentLevel;
+    mContinuePointLevel = mMap.mCurrentLevel;
 
     // Changes Abe's "default" colour depending on the level we are in
-    SetTint(sAbeTintTable, GetMap().mCurrentLevel);
+    SetTint(sAbeTintTable, mMap.mCurrentLevel);
 
     GetAnimation().SetSemiTrans(true);
     GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_0);
@@ -667,7 +667,7 @@ void Abe::VUpdate()
             mYPos += mVelY;
 
             PSX_Point mapSize = {};
-            GetMap().Get_map_size(&mapSize);
+            mMap.Get_map_size(&mapSize);
 
             if (mXPos < FP_FromInteger(0))
             {
@@ -722,7 +722,7 @@ void Abe::VUpdate()
             if (oldX != mXPos || oldY != mYPos || sControlledCharacter == gElum)
             {
                 // Get the TLV we are on
-                BaseAliveGameObjectPathTLV = GetMap().TLV_Get_At(
+                BaseAliveGameObjectPathTLV = mMap.TLV_Get_At(
                     TlvIterator::Invalid(),
                     mXPos,
                     mYPos,
@@ -818,7 +818,7 @@ void Abe::VUpdate()
 
             if (field_130_say >= 0 && static_cast<s32>(sGnFrame) >= field_134_auto_say_timer)
             {
-                if (GetMap().Is_Point_In_Current_Camera(
+                if (mMap.Is_Point_In_Current_Camera(
                         mCurrentLevel,
                         mCurrentPath,
                         mXPos,
@@ -859,7 +859,7 @@ void Abe::VUpdate()
 
             if (mParamoniaDone && mScrabaniaDone)
             {
-                if (!mGiveShrykullFromBigFace && GetMap().mNextLevel == EReliveLevelIds::eLines)
+                if (!mGiveShrykullFromBigFace && mMap.mNextLevel == EReliveLevelIds::eLines)
                 {
                     LOG_INFO("Set mGiveShrykullFromBigFace");
                     mGiveShrykullFromBigFace = true;
@@ -871,11 +871,11 @@ void Abe::VUpdate()
                 static bool bLogged = false;
                 if (!bLogged)
                 {
-                    LOG_INFO("Have mGiveShrykullFromBigFace %d", static_cast<s32>(GetMap().mCurrentLevel));
+                    LOG_INFO("Have mGiveShrykullFromBigFace %d", static_cast<s32>(mMap.mCurrentLevel));
                     bLogged = true;
                 }
 
-                if (!mGotShrykullFromBigFace && GetMap().mCurrentLevel == EReliveLevelIds::eLines)
+                if (!mGotShrykullFromBigFace && mMap.mCurrentLevel == EReliveLevelIds::eLines)
                 {
                     LOG_INFO("Set mHaveShrykull true");
                     mHaveShrykull = true;
@@ -1021,7 +1021,7 @@ s16 Abe::RunTryEnterWell()
         return 0;
     }
 
-    auto wellIterator = GetMap().VTLV_Get_At_Of_Type(
+    auto wellIterator = mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos),
         FP_GetExponent(mYPos),
         FP_GetExponent(mXPos),
@@ -1039,7 +1039,7 @@ s16 Abe::RunTryEnterWell()
         }
     }
 
-    auto wellExpressIterator = GetMap().VTLV_Get_At_Of_Type(
+    auto wellExpressIterator = mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos),
         FP_GetExponent(mYPos),
         FP_GetExponent(mXPos),
@@ -1956,7 +1956,7 @@ void Abe::BulletDamage(Bullet* pBullet)
         || mCurrentMotion == eAbeMotions::Motion_136_ElumMountEnd
         || mCurrentMotion == eAbeMotions::Motion_138_ElumUnmountEnd
         || mCurrentMotion == eAbeMotions::Motion_139_ElumMountBegin
-        || !GetMap().Is_Point_In_Current_Camera(
+        || !mMap.Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -2184,7 +2184,7 @@ s16 Abe::RunTryEnterDoor()
     }
 
     // Are we actually on a door?
-    TlvIterator doorIterator = GetMap().VTLV_Get_At_Of_Type(
+    TlvIterator doorIterator = mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos),
         FP_GetExponent(mYPos),
         FP_GetExponent(mXPos),
@@ -2275,17 +2275,17 @@ void Abe::VScreenChanged()
 {
     if (sControlledCharacter == this || sControlledCharacter == gElum)
     {
-        mCurrentLevel = GetMap().mNextLevel;
-        mCurrentPath = GetMap().mNextPath;
+        mCurrentLevel = mMap.mNextLevel;
+        mCurrentPath = mMap.mNextPath;
     }
 
     // Level has changed?
-    if (GetMap().LevelChanged())
+    if (mMap.LevelChanged())
     {
         // Set the correct tint for this map
-        SetTint(sAbeTintTable, GetMap().mNextLevel);
+        SetTint(sAbeTintTable, mMap.mNextLevel);
 
-        if (GetMap().mCurrentLevel != EReliveLevelIds::eMenu)
+        if (mMap.mCurrentLevel != EReliveLevelIds::eMenu)
         {
             if (field_19C_throwable_count > 0)
             {
@@ -2299,7 +2299,7 @@ void Abe::VScreenChanged()
             mRingPulseTimer = 0;
         }
 
-        if (GetMap().mNextLevel == EReliveLevelIds::eCredits || GetMap().mNextLevel == EReliveLevelIds::eMenu)
+        if (mMap.mNextLevel == EReliveLevelIds::eCredits || mMap.mNextLevel == EReliveLevelIds::eMenu)
         {
             // Remove Abe for menu/credits levels?
             SetDead(true);
@@ -2315,7 +2315,7 @@ void Abe::VOnTlvCollision(TlvIterator tlvIterator)
         {
             relive::Path_ContinuePoint* pContinuePointTlv = tlvIterator.GetTlv<relive::Path_ContinuePoint>();
 
-            if ((pContinuePointTlv->mZoneNumber != mContinuePointZoneNumber || mContinuePointLevel != GetMap().mCurrentLevel) && !GetElectrocuted() && mCurrentMotion != eAbeMotions::Motion_156_DoorEnter)
+            if ((pContinuePointTlv->mZoneNumber != mContinuePointZoneNumber || mContinuePointLevel != mMap.mCurrentLevel) && !GetElectrocuted() && mCurrentMotion != eAbeMotions::Motion_156_DoorEnter)
             {
                 mContinuePointZoneNumber = pContinuePointTlv->mZoneNumber;
                 mContinuePointClearFromId = pContinuePointTlv->mClearFromId;
@@ -2333,11 +2333,11 @@ void Abe::VOnTlvCollision(TlvIterator tlvIterator)
                 field_150_saved_ring_timer = bHaveShry < 0 ? 0 : bHaveShry;
                 field_154_bSavedHaveShrykull = mHaveShrykull;
 
-                mContinuePointLevel = GetMap().mCurrentLevel;
-                mContinuePointPath = GetMap().mCurrentPath;
-                mContinuePointCamera = GetMap().mCurrentCamera;
+                mContinuePointLevel = mMap.mCurrentLevel;
+                mContinuePointPath = mMap.mCurrentPath;
+                mContinuePointCamera = mMap.mCurrentCamera;
 
-                if (GameEnderController::gRestartRuptureFarmsSavedMuds == 0 && GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn && GetMap().mCurrentPath == 19 && GetMap().mCurrentCamera == 3)
+                if (GameEnderController::gRestartRuptureFarmsSavedMuds == 0 && mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn && mMap.mCurrentPath == 19 && mMap.mCurrentCamera == 3)
                 {
                     GameEnderController::gRestartRuptureFarmsKilledMuds = gKilledMudokons;
                     GameEnderController::gRestartRuptureFarmsSavedMuds = gRescuedMudokons;
@@ -2380,7 +2380,7 @@ void Abe::VOnTlvCollision(TlvIterator tlvIterator)
         }
 
         // To next TLV
-        tlvIterator = GetMap().TLV_Get_At(tlvIterator, mXPos, mYPos, mXPos, mYPos);
+        tlvIterator = mMap.TLV_Get_At(tlvIterator, mXPos, mYPos, mXPos, mYPos);
     }
 }
 
@@ -2392,7 +2392,7 @@ eAbeMotions Abe::HandleDoAction()
         return mountMotion;
     }
 
-    TlvIterator tlvIterator = GetMap().TLV_Get_At(
+    TlvIterator tlvIterator = mMap.TLV_Get_At(
         TlvIterator::Invalid(),
         mXPos,
         mYPos,
@@ -2475,7 +2475,7 @@ eAbeMotions Abe::HandleDoAction()
                 break;
         }
 
-        tlvIterator = GetMap().TLV_Get_At(
+        tlvIterator = mMap.TLV_Get_At(
             tlvIterator,
             mXPos,
             mYPos,
@@ -2984,7 +2984,7 @@ void Abe::TryHoist()
 {
     mCurrentMotion = eAbeMotions::Motion_16_HoistBegin;
 
-    auto hoistIterator = GetMap().VTLV_Get_At_Of_Type(
+    auto hoistIterator = mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos),
         FP_GetExponent(mYPos),
         FP_GetExponent(mXPos),
@@ -3087,7 +3087,7 @@ void Abe::Motion_0_Idle()
         }
 
 
-        const auto pHoist = GetMap().VTLV_Get_At_Of_Type(
+        const auto pHoist = mMap.VTLV_Get_At_Of_Type(
             FP_GetExponent(mXPos),
             FP_GetExponent(mYPos + FP_FromInteger(16)),
             FP_GetExponent(mXPos),
@@ -3155,7 +3155,7 @@ void Abe::Motion_0_Idle()
         {
             return;
         }
-        auto tlvIterator = GetMap().TLV_Get_At(
+        auto tlvIterator = mMap.TLV_Get_At(
             TlvIterator::Invalid(),
             mXPos,
             mYPos,
@@ -3240,7 +3240,7 @@ void Abe::Motion_0_Idle()
                     break;
             }
 
-            tlvIterator = GetMap().TLV_Get_At(
+            tlvIterator = mMap.TLV_Get_At(
                 tlvIterator,
                 mXPos,
                 mYPos,
@@ -3605,7 +3605,7 @@ void Abe::Motion_3_Fall()
     const s32 bCollision = InAirCollision(&pPathLine, &hitX, &hitY, FP_FromDouble(1.8));
     SetActiveCameraDelayedFromDir();
 
-    BaseAliveGameObjectPathTLV = GetMap().TLV_Get_At(
+    BaseAliveGameObjectPathTLV = mMap.TLV_Get_At(
         TlvIterator::Invalid(),
         mXPos,
         mYPos,
@@ -3650,7 +3650,7 @@ void Abe::Motion_3_Fall()
                     BaseAliveGameObjectLastLineYPos += FP_FromInteger(240);
                 }
 
-                relive::Path_SoftLanding* pSoftLanding = GetMap().VTLV_Get_At_Of_Type(
+                relive::Path_SoftLanding* pSoftLanding = mMap.VTLV_Get_At_Of_Type(
                     FP_GetExponent(mXPos),
                     FP_GetExponent(mYPos),
                     FP_GetExponent(mXPos),
@@ -3700,7 +3700,7 @@ void Abe::Motion_3_Fall()
     }
 
     bool tryToHang = false;
-    TlvIterator edgeIterator = GetMap().VTLV_Get_At_Of_Type(
+    TlvIterator edgeIterator = mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos),
         FP_GetExponent(mYPos - GetSpriteScale() * FP_FromInteger(80)),
         FP_GetExponent(mXPos),
@@ -3717,7 +3717,7 @@ void Abe::Motion_3_Fall()
     }
     else
     {
-        TlvIterator hoistIterator = GetMap().VTLV_Get_At_Of_Type(
+        TlvIterator hoistIterator = mMap.VTLV_Get_At_Of_Type(
             FP_GetExponent(mXPos),
             FP_GetExponent(mYPos - GetSpriteScale() * FP_FromInteger(20)),
             FP_GetExponent(mXPos),
@@ -3976,7 +3976,7 @@ void Abe::Motion_17_HoistIdle()
 
     if (mVelY >= FP_FromInteger(0))
     {
-        auto hoistIterator = GetMap().VTLV_Get_At_Of_Type(
+        auto hoistIterator = mMap.VTLV_Get_At_Of_Type(
             FP_GetExponent(mXPos),
             FP_GetExponent(mYPos),
             FP_GetExponent(mXPos),
@@ -3989,7 +3989,7 @@ void Abe::Motion_17_HoistIdle()
             {
                 if (hoistIterator.GetTlv<relive::Path_Hoist>()->mHoistType == relive::Path_Hoist::Type::eOffScreen)
                 {
-                    if (GetMap().SetActiveCameraDelayed(MapDirections::eMapTop_2, this, -1))
+                    if (mMap.SetActiveCameraDelayed(MapDirections::eMapTop_2, this, -1))
                     {
                         PSX_Prevent_Rendering();
                         mCurrentMotion = eAbeMotions::Motion_67_ToOffScreenHoist;
@@ -4041,7 +4041,7 @@ void Abe::Motion_17_HoistIdle()
         }
         else
         {
-            BaseAliveGameObjectPathTLV = GetMap().TLV_Get_At(
+            BaseAliveGameObjectPathTLV = mMap.TLV_Get_At(
                 TlvIterator::Invalid(),
                 mXPos,
                 mYPos,
@@ -4606,7 +4606,7 @@ void Abe::IntoPortalStates()
                 CameraSwapEffects screenChangeEffect = {};
                 u16 movieId = 0;
                 field_1A0_portal->VGetMapChange(&level, &path, &camera, &screenChangeEffect, &movieId);
-                GetMap().SetActiveCam(level, path, camera, screenChangeEffect, movieId, false);
+                mMap.SetActiveCam(level, path, camera, screenChangeEffect, movieId, false);
                 field_19E_portal_sub_state = PortalSubStates::eSetNewAbePosition_4;
             }
             break;
@@ -4660,7 +4660,7 @@ void Abe::Motion_30_HopMid()
         {
             EventBroadcast(Event::kEventNoise, this);
             EventBroadcast(Event::kEventSuspiciousNoise, this);
-            if (GetMap().VTLV_Get_At_Of_Type(
+            if (mMap.VTLV_Get_At_Of_Type(
                     FP_GetExponent(mVelX + mXPos),
                     FP_GetExponent(mYPos - GetSpriteScale() * FP_FromInteger(50)),
                     FP_GetExponent(mVelX + mXPos),
@@ -4819,7 +4819,7 @@ void Abe::Motion_33_RunJumpMid()
     }
     if (WallHit(GetSpriteScale() * FP_FromInteger(50), mVelX))
     {
-        if (GetMap().VTLV_Get_At_Of_Type(
+        if (mMap.VTLV_Get_At_Of_Type(
                 FP_GetExponent(mVelX + mXPos),
                 FP_GetExponent(mYPos - GetSpriteScale() * FP_FromInteger(50)),
                 FP_GetExponent(mVelX + mXPos),
@@ -4872,7 +4872,7 @@ void Abe::Motion_33_RunJumpMid()
     }
     else
     {
-        TlvIterator hoistIterator = GetMap().VTLV_Get_At_Of_Type(
+        TlvIterator hoistIterator = mMap.VTLV_Get_At_Of_Type(
             FP_GetExponent(mXPos - mVelX),
             FP_GetExponent(mYPos),
             FP_GetExponent(mXPos - mVelX),
@@ -4893,7 +4893,7 @@ void Abe::Motion_33_RunJumpMid()
         }
         else
         {
-            auto edgeIterator = GetMap().VTLV_Get_At_Of_Type(
+            auto edgeIterator = mMap.VTLV_Get_At_Of_Type(
                 FP_GetExponent(mXPos - mVelX),
                 FP_GetExponent(mYPos),
                 FP_GetExponent(mXPos - mVelX),
@@ -4948,7 +4948,7 @@ void Abe::Motion_33_RunJumpMid()
         }
         else
         {
-            BaseAliveGameObjectPathTLV = GetMap().TLV_Get_At(
+            BaseAliveGameObjectPathTLV = mMap.TLV_Get_At(
                 TlvIterator::Invalid(),
                 mXPos,
                 mYPos,
@@ -6101,12 +6101,12 @@ void Abe::Motion_61_Respawn()
                 }
                 if (mContinuePointCamera > 300u)
                 {
-                    mContinuePointCamera = GetMap().mCurrentCamera;
-                    mContinuePointPath = GetMap().mCurrentPath;
-                    mContinuePointLevel = GetMap().mCurrentLevel;
+                    mContinuePointCamera = mMap.mCurrentCamera;
+                    mContinuePointPath = mMap.mCurrentPath;
+                    mContinuePointLevel = mMap.mCurrentLevel;
 
                     PSX_Point camPos = {};
-                    GetMap().GetCurrentCamCoords(&camPos);
+                    mMap.GetCurrentCamCoords(&camPos);
                     mContinuePointTopLeft.x = camPos.x + 512;
                     mContinuePointTopLeft.y = camPos.y + 240;
                 }
@@ -6136,7 +6136,7 @@ void Abe::Motion_61_Respawn()
 
             GetAnimation().SetFlipX(mAbeRespawnFlipX);
             MapFollowMe(true);
-            SetTint(sAbeTintTable, GetMap().mCurrentLevel);
+            SetTint(sAbeTintTable, mMap.mCurrentLevel);
             if (gElum)
             {
                 gElum->SetSpriteScale(GetSpriteScale());
@@ -6614,9 +6614,9 @@ void Abe::Motion_70_Knockback()
 
             MoveWithVelocity(FP_FromDouble(0.7));
 
-            if ((GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarms
-                 || GetMap().mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn
-                 || GetMap().mCurrentLevel == EReliveLevelIds::eBoardRoom)
+            if ((mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms
+                 || mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn
+                 || mMap.mCurrentLevel == EReliveLevelIds::eBoardRoom)
                 && GetAnimation().GetCurrentFrame() == 7)
             {
                 Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this);
@@ -6750,7 +6750,7 @@ void Abe::Motion_77_WellBegin()
     {
         GetShadow()->mEnabled = false;
 
-        BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+        BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
             FP_GetExponent(mXPos),
             FP_GetExponent(mYPos),
             FP_GetExponent(mXPos),
@@ -6758,7 +6758,7 @@ void Abe::Motion_77_WellBegin()
             ReliveTypes::eWellLocal);
         if (!BaseAliveGameObjectPathTLV.GetTlv())
         {
-            BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+            BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                 FP_GetExponent(mXPos),
                 FP_GetExponent(mYPos),
                 FP_GetExponent(mXPos),
@@ -6833,7 +6833,7 @@ void Abe::Motion_78_InsideWellLocal()
 
     if (old_gnFrame == 0)
     {
-        BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+        BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
             FP_GetExponent(mXPos),
             FP_GetExponent(mYPos),
             FP_GetExponent(mXPos),
@@ -6842,7 +6842,7 @@ void Abe::Motion_78_InsideWellLocal()
 
         if (!BaseAliveGameObjectPathTLV.GetTlv())
         {
-            BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+            BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                 FP_GetExponent(mXPos),
                 FP_GetExponent(mYPos),
                 FP_GetExponent(mXPos),
@@ -6924,7 +6924,7 @@ void Abe::Motion_79_WellShotOut()
         mYPos += mVelY;
 
         SetActiveCameraDelayedFromDir();
-        BaseAliveGameObjectPathTLV = GetMap().TLV_Get_At(
+        BaseAliveGameObjectPathTLV = mMap.TLV_Get_At(
             TlvIterator::Invalid(),
             mXPos,
             mYPos,
@@ -6963,7 +6963,7 @@ void Abe::Motion_80_ToWellBegin()
 
 void Abe::Motion_81_InsideWellExpress()
 {
-    BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+    BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos),
         FP_GetExponent(mYPos),
         FP_GetExponent(mXPos),
@@ -6972,7 +6972,7 @@ void Abe::Motion_81_InsideWellExpress()
 
     if (!BaseAliveGameObjectPathTLV.GetTlv())
     {
-        BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+        BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
             FP_GetExponent(mXPos),
             FP_GetExponent(mYPos),
             FP_GetExponent(mXPos),
@@ -7004,7 +7004,7 @@ void Abe::Motion_81_InsideWellExpress()
 
     field_120_x_vel_slow_by = FP_FromInteger(0);
 
-    if (GetMap().mCurrentLevel == EReliveLevelIds::eLines)
+    if (mMap.mCurrentLevel == EReliveLevelIds::eLines)
     {
         if (field_190_level == EReliveLevelIds::eForest)
         {
@@ -7034,18 +7034,18 @@ void Abe::Motion_81_InsideWellExpress()
             mScrabaniaDone = true;
         }
     }
-    if (field_190_level != GetMap().mCurrentLevel
-        || field_192_path != GetMap().mCurrentPath
-        || field_194_camera != GetMap().mCurrentCamera)
+    if (field_190_level != mMap.mCurrentLevel
+        || field_192_path != mMap.mCurrentPath
+        || field_194_camera != mMap.mCurrentCamera)
     {
         field_114_gnFrame = 1;
         if (pExpressWell->mMovieId)
         {
-            GetMap().SetActiveCam(field_190_level, field_192_path, field_194_camera, CameraSwapEffects::ePlay1FMV_5, pExpressWell->mMovieId, 0);
+            mMap.SetActiveCam(field_190_level, field_192_path, field_194_camera, CameraSwapEffects::ePlay1FMV_5, pExpressWell->mMovieId, 0);
         }
         else
         {
-            GetMap().SetActiveCam(field_190_level, field_192_path, field_194_camera, CameraSwapEffects::eInstantChange_0, 0, 0);
+            mMap.SetActiveCam(field_190_level, field_192_path, field_194_camera, CameraSwapEffects::eInstantChange_0, 0, 0);
         }
         mCurrentMotion = eAbeMotions::Motion_82_WellExpressShotOut;
     }
@@ -7063,12 +7063,12 @@ void Abe::Motion_81_InsideWellExpress()
 void Abe::Motion_82_WellExpressShotOut()
 {
     PSX_Point camCoords = {};
-    GetMap().GetCurrentCamCoords(&camCoords);
+    mMap.GetCurrentCamCoords(&camCoords);
     TlvIterator wellIterator = TlvIterator::Invalid();
     TlvIterator tlvIterator = TlvIterator::Invalid();
     do
     {
-        tlvIterator = GetMap().TLV_Get_At(
+        tlvIterator = mMap.TLV_Get_At(
             tlvIterator,
             FP_FromInteger(camCoords.x + 256),
             FP_FromInteger(camCoords.y + 120),
@@ -7088,8 +7088,8 @@ void Abe::Motion_82_WellExpressShotOut()
     while (tlvIterator.GetTlv());
 
 
-    mCurrentLevel = GetMap().mCurrentLevel;
-    mCurrentPath = GetMap().mCurrentPath;
+    mCurrentLevel = mMap.mCurrentLevel;
+    mCurrentPath = mMap.mCurrentPath;
 
     if (wellIterator.GetTlv())
     {
@@ -7186,14 +7186,14 @@ void Abe::Motion_88_HandstoneBegin()
 
                 field_110_state.stone = StoneStates::eGetHandstoneType_1;
                 SfxPlayMono(relive::SoundEffects::IngameTransition, 90);
-                BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+                BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                     FP_GetExponent(mXPos),
                     FP_GetExponent(mYPos),
                     FP_GetExponent(mXPos),
                     FP_GetExponent(mYPos),
                     ReliveTypes::eDemoPlaybackStone);
                 if (!BaseAliveGameObjectPathTLV.GetTlv())
-                    BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+                    BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                         FP_GetExponent(mXPos),
                         FP_GetExponent(mYPos),
                         FP_GetExponent(mXPos),
@@ -7201,7 +7201,7 @@ void Abe::Motion_88_HandstoneBegin()
                         ReliveTypes::eBellSongStone);
                 if (!BaseAliveGameObjectPathTLV.GetTlv())
                 {
-                    BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+                    BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                         FP_GetExponent(mXPos),
                         FP_GetExponent(mYPos),
                         FP_GetExponent(mXPos),
@@ -7209,7 +7209,7 @@ void Abe::Motion_88_HandstoneBegin()
                         ReliveTypes::eMovieHandStone);
                     sAbeSound_507730 = SFX_Play_Pitch(relive::SoundEffects::HandstoneTransition, 127, -300);
                     if (!BaseAliveGameObjectPathTLV.GetTlv())
-                        BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+                        BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                             FP_GetExponent(mXPos),
                             FP_GetExponent(mYPos),
                             FP_GetExponent(mXPos),
@@ -7264,7 +7264,7 @@ void Abe::Motion_88_HandstoneBegin()
                     case ReliveTypes::eMovieHandStone:
                     {
                         auto pFmvInfo = Path_Get_FMV_Record(
-                            GetMap().mCurrentLevel,
+                            mMap.mCurrentLevel,
                             mMovieStone->mMovieId);
 
                         relive_new Movie(pFmvInfo->field_0_pName, mResMan, mMap);
@@ -7307,10 +7307,10 @@ void Abe::Motion_88_HandstoneBegin()
                         {
                             mFadeId = pFade->mBaseGameObjectId;
                         }
-                        field_190_level = GetMap().mCurrentLevel;
-                        field_192_path = GetMap().mCurrentPath;
-                        field_194_camera = GetMap().mCurrentCamera;
-                        GetMap().SetActiveCam(
+                        field_190_level = mMap.mCurrentLevel;
+                        field_192_path = mMap.mCurrentPath;
+                        field_194_camera = mMap.mCurrentCamera;
+                        mMap.SetActiveCam(
                             mHandStone->mLevel1,
                             mHandStone->mPath1,
                             mHandStone->mCameraId1,
@@ -7328,7 +7328,7 @@ void Abe::Motion_88_HandstoneBegin()
             if (Movie::gMovieRefCount == 0)
             {
                 gPsxDisplay.PutCurrentDispEnv();
-                gScreenManager->DecompressCameraToVRam(GetMap().field_2C_camera_array[0]->mCamRes);
+                gScreenManager->DecompressCameraToVRam(mMap.field_2C_camera_array[0]->mCamRes);
                 gScreenManager->EnableRendering();
                 auto pCircularFade = static_cast<CircularFade*>(sObjectIds.Find_Impl(mCircularFadeId));
                 pCircularFade->VFadeIn(0, 0);
@@ -7433,7 +7433,7 @@ void Abe::Motion_88_HandstoneBegin()
                     field_16E_cameraIdx++;
                     pFade = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeOut, 0, 8, relive::TBlendModes::eBlend_2, mResMan, mMap);
                     mFadeId = pFade->mBaseGameObjectId;
-                    GetMap().SetActiveCam(MapWrapper::FromAO(camera.level), camera.path, camera.camera, CameraSwapEffects::eInstantChange_0, 0, 0);
+                    mMap.SetActiveCam(MapWrapper::FromAO(camera.level), camera.path, camera.camera, CameraSwapEffects::eInstantChange_0, 0, 0);
                 }
             }
             break;
@@ -7445,7 +7445,7 @@ void Abe::Motion_88_HandstoneBegin()
             {
                 GetAnimation().SetRender(true);
                 field_110_state.stone = StoneStates::eCircularFadeExit_13;
-                GetMap().SetActiveCam(field_190_level, field_192_path, field_194_camera, CameraSwapEffects::eInstantChange_0, 0, 0);
+                mMap.SetActiveCam(field_190_level, field_192_path, field_194_camera, CameraSwapEffects::eInstantChange_0, 0, 0);
             }
             break;
         }
@@ -8354,7 +8354,7 @@ void Abe::Motion_147_ShotRolling()
         mYPos += (GetSpriteScale() * FP_FromInteger(4));
     }
 
-    if (!GetMap().Is_Point_In_Current_Camera(
+    if (!mMap.Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -8386,7 +8386,7 @@ void Abe::Motion_148_Shot()
         mYPos += (GetSpriteScale() * FP_FromInteger(4));
     }
 
-    if (!GetMap().Is_Point_In_Current_Camera(
+    if (!mMap.Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,
@@ -8730,7 +8730,7 @@ void Abe::Motion_156_DoorEnter()
             if (field_118_timer <= static_cast<s32>(sGnFrame))
             {
                 field_110_state.door = AbeDoorStates::eSetNewActiveCamera_4;
-                BaseAliveGameObjectPathTLV = GetMap().VTLV_Get_At_Of_Type(
+                BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                     FP_GetExponent(mXPos),
                     FP_GetExponent(mYPos),
                     FP_GetExponent(mXPos),
@@ -8751,7 +8751,7 @@ void Abe::Motion_156_DoorEnter()
                     }
                     if (pTlv->mClearObjects)
                     {
-                        GetMap().ResetPathObjects(pTlv->mPath);
+                        mMap.ResetPathObjects(pTlv->mPath);
                     }
                 }
             }
@@ -8759,21 +8759,21 @@ void Abe::Motion_156_DoorEnter()
         }
         case AbeDoorStates::eSetNewActiveCamera_4:
         {
-            auto doorIterator = GetMap().VTLV_Get_At_Of_Type(
+            auto doorIterator = mMap.VTLV_Get_At_Of_Type(
                 FP_GetExponent(mXPos),
                 FP_GetExponent(mYPos),
                 FP_GetExponent(mXPos),
                 FP_GetExponent(mYPos),
                 ReliveTypes::eDoor);
             BaseAliveGameObjectPathTLV = doorIterator;
-            GetMap().field_1E_door = 1;
+            mMap.field_1E_door = 1;
             const auto changeEffect = kPathChangeEffectToInternalScreenChangeEffect[doorIterator.GetTlv<relive::Path_Door>()->mWipeEffect];
             s16 flag = 0;
             if (changeEffect == CameraSwapEffects::ePlay1FMV_5 || changeEffect == CameraSwapEffects::eUnknown_11)
             {
                 flag = 1;
             }
-            GetMap().SetActiveCam(
+            mMap.SetActiveCam(
                 doorIterator.GetTlv<relive::Path_Door>()->mNextLevel,
                 doorIterator.GetTlv<relive::Path_Door>()->mNextPath,
                 doorIterator.GetTlv<relive::Path_Door>()->mNextCamera,
@@ -8786,10 +8786,10 @@ void Abe::Motion_156_DoorEnter()
         }
         case AbeDoorStates::eSetNewAbePosition_5:
         {
-            mCurrentLevel = GetMap().mCurrentLevel;
-            mCurrentPath = GetMap().mCurrentPath;
-            GetMap().field_1E_door = 0;
-            auto doorIterator = GetMap().TLV_First_Of_Type_In_Camera(ReliveTypes::eDoor, 0);
+            mCurrentLevel = mMap.mCurrentLevel;
+            mCurrentPath = mMap.mCurrentPath;
+            mMap.field_1E_door = 0;
+            auto doorIterator = mMap.TLV_First_Of_Type_In_Camera(ReliveTypes::eDoor, 0);
             BaseAliveGameObjectPathTLV = doorIterator;
 
             while (doorIterator.GetTlv<relive::Path_Door>()->mDoorId != field_196_door_id)
@@ -8820,7 +8820,7 @@ void Abe::Motion_156_DoorEnter()
             }
             else if (doorIterator.GetTlv<relive::Path_Door>()->mDoorType == relive::Path_Door::DoorTypes::eTrialDoor || doorIterator.GetTlv<relive::Path_Door>()->mDoorType == relive::Path_Door::DoorTypes::eHubDoor)
             {
-                if (GetMap().mCurrentLevel != EReliveLevelIds::eRuptureFarmsReturn)
+                if (mMap.mCurrentLevel != EReliveLevelIds::eRuptureFarmsReturn)
                 {
                     SetSpriteScale(FP_FromDouble(0.5));
                     SetScale(Scale::Bg);
@@ -8874,7 +8874,7 @@ void Abe::Motion_157_DoorExit()
 {
     if (GetAnimation().GetIsLastFrame())
     {
-        BaseAliveGameObjectPathTLV = GetMap().TLV_Get_At(
+        BaseAliveGameObjectPathTLV = mMap.TLV_Get_At(
             TlvIterator::Invalid(),
             mXPos,
             mYPos,

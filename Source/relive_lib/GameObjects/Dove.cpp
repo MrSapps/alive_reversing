@@ -83,7 +83,7 @@ Dove::Dove(AnimId animId, const Guid& tlvId, FP scale, ResourceManagerWrapper& r
     mVelY = FP_FromInteger(-4 - (Math_NextRandom() % 4));
     GetAnimation().SetFrame(Math_NextRandom() % 8);
 
-    if (GetMap().mCurrentLevel == EReliveLevelIds::eStockYards || GetMap().mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+    if (mMap.mCurrentLevel == EReliveLevelIds::eStockYards || mMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
     {
         mRGB.SetRGB(30, 30, 30);
     }
@@ -134,7 +134,7 @@ Dove::Dove(AnimId animId, FP xpos, FP ypos, FP scale, ResourceManagerWrapper& re
 
     GetAnimation().SetFrame(Math_NextRandom() % rndVal);
 
-    if (GetMap().mCurrentLevel == EReliveLevelIds::eStockYards || GetMap().mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+    if (mMap.mCurrentLevel == EReliveLevelIds::eStockYards || mMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
     {
         mRGB.SetRGB(30, 30, 30);
     }
@@ -154,7 +154,7 @@ Dove::~Dove()
         gDovesArray.Remove_Item(this);
         if (mTlvInfo.IsValid())
         {
-            GetMap().TLV_Reset(mTlvInfo);
+            mMap.TLV_Reset(mTlvInfo);
         }
     }
 
@@ -348,7 +348,7 @@ void Dove::VUpdate()
     }
     else
     {
-        if (!GetMap().Is_Point_In_Current_Camera(
+        if (!mMap.Is_Point_In_Current_Camera(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,

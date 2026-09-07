@@ -38,7 +38,7 @@ void Rope::InitRopeAnimation()
 {
     if (GetGameType() == GameType::eAo)
     {
-        switch (GetMap().mCurrentLevel)
+        switch (mMap.mCurrentLevel)
         {
             case EReliveLevelIds::eRuptureFarms:
             case EReliveLevelIds::eDesert:
@@ -140,9 +140,9 @@ void Rope::VUpdate()
 void Rope::VRender(OrderingTable& ot)
 {
     PSX_Point camPos = {};
-    GetMap().GetCurrentCamCoords(&camPos);
+    mMap.GetCurrentCamCoords(&camPos);
     // In the current level/map?
-    if (mCurrentLevel == GetMap().mCurrentLevel && mCurrentPath == GetMap().mCurrentPath)
+    if (mCurrentLevel == mMap.mCurrentLevel && mCurrentPath == mMap.mCurrentPath)
     {
         const s16 camXOffset = GetGameType() == GameType::eAo ? 1024 : 375;
 

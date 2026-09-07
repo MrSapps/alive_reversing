@@ -100,7 +100,7 @@ void Grenade::VThrow(FP velX, FP velY)
 
 void Grenade::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || GetMap().PathChanged())
+    if (mMap.LevelChanged() || mMap.PathChanged())
     {
         SetDead(true);
     }
@@ -315,7 +315,7 @@ bool Grenade::InTheAir(bool blowUpOnFloorTouch)
     }
 
     // Kill the nade if it hits a death drop
-    BaseAliveGameObjectPathTLV = GetMap().TLV_Get_At(
+    BaseAliveGameObjectPathTLV = mMap.TLV_Get_At(
         TlvIterator::Invalid(),
         mXPos,
         mYPos,
@@ -330,7 +330,7 @@ bool Grenade::InTheAir(bool blowUpOnFloorTouch)
             return true;
         }
 
-        BaseAliveGameObjectPathTLV = GetMap().TLV_Get_At(
+        BaseAliveGameObjectPathTLV = mMap.TLV_Get_At(
             BaseAliveGameObjectPathTLV,
             mXPos,
             mYPos,

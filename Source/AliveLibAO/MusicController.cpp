@@ -385,7 +385,7 @@ void MusicController::VUpdate()
     {
         field_16_bScreenChanged = false;
 
-        if (GetMap().mCurrentLevel != field_18_level)
+        if (mMap.mCurrentLevel != field_18_level)
         {
             field_3C_music_seq_duration = 0;
             field_34_sync_after_beats = 1;
@@ -407,7 +407,7 @@ void MusicController::VUpdate()
                 field_38_music_seq = SeqId::None_M1;
             }
 
-            field_18_level = GetMap().mCurrentLevel;
+            field_18_level = mMap.mCurrentLevel;
 
             if (field_10_bEnableMusic)
             {
@@ -777,7 +777,7 @@ void MusicController::UpdateMusic()
                 break;
 
             case MusicTypes::eIntenseChase_8:
-                if (GetMap().mCurrentLevel == EReliveLevelIds::eBoardRoom)
+                if (mMap.mCurrentLevel == EReliveLevelIds::eBoardRoom)
                 {
                     idx = 102;
                     field_34_sync_after_beats = 1;

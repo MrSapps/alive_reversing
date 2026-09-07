@@ -32,7 +32,7 @@ Shrykull::~Shrykull()
 
 void Shrykull::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || GetMap().PathChanged())
+    if (mMap.LevelChanged() || mMap.PathChanged())
     {
         SetDead(true);
     }
@@ -87,7 +87,7 @@ bool Shrykull::CanKill(BaseAnimatedWithPhysicsGameObject* pObj)
             || pObj->Type() == ReliveTypes::eSecurityOrb)
         && pObj->GetAnimation().GetRender()
         && !pObj->GetDead()
-        && GetMap().Is_Point_In_Current_Camera(
+        && mMap.Is_Point_In_Current_Camera(
             pObj->mCurrentLevel,
             pObj->mCurrentPath,
             pObj->mXPos,

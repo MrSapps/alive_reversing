@@ -43,7 +43,7 @@ Rock::Rock(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan, BaseMap&
 
     mLoadedPals.push_back(resMan.LoadPal(PalId::BlueRock));
 
-    if (GetMap().mCurrentLevel == EReliveLevelIds::eStockYards || GetMap().mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+    if (mMap.mCurrentLevel == EReliveLevelIds::eStockYards || mMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
     {
         // TODO: I think this only existed in certain lvls, will need a way to know
         // which pal to use per lvl/path
@@ -170,7 +170,7 @@ void Rock::VUpdate()
             mVelY += FP_FromInteger(1);
             mXPos += mVelX;
             mYPos += mVelY;
-            if (!GetMap().Is_Point_In_Current_Camera(
+            if (!mMap.Is_Point_In_Current_Camera(
                     mCurrentLevel,
                     mCurrentPath,
                     mXPos,
@@ -188,8 +188,8 @@ void Rock::VUpdate()
 //TODO Identical to AE - merge
 void Rock::VScreenChanged()
 {
-    if (GetMap().PathChanged()
-        || GetMap().LevelChanged())
+    if (mMap.PathChanged()
+        || mMap.LevelChanged())
     {
         SetDead(true);
     }

@@ -119,7 +119,7 @@ void BulletShell::VUpdate()
         }
     }
 
-    if (!GetMap().Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
+    if (!mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
     {
         SetDead(true);
     }

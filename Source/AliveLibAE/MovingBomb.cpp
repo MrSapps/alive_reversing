@@ -82,7 +82,7 @@ MovingBomb::MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, Resourc
         GetAnimation().SetRender(false);
     }
 
-    SetTint(kMovingBombTints, GetMap().mCurrentLevel);
+    SetTint(kMovingBombTints, mMap.mCurrentLevel);
 
     FP hitX = {};
     FP hitY = {};

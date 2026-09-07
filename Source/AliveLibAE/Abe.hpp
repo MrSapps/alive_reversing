@@ -225,7 +225,7 @@ union AllInternalStates
 enum class Mud_Emotion : s16;
 enum eLineTypes : s16;
 
-void Mudokon_SFX(MudSounds idx, s16 volume, s32 pitch, BaseAliveGameObject* pHero);
+void Mudokon_SFX(MudSounds idx, s16 volume, s32 pitch, BaseAliveGameObject* pHero, BaseMap& map);
 
 struct AbeSaveState final : public SaveStateBase
 {

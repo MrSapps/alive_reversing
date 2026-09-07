@@ -55,7 +55,7 @@ BoneBag::BoneBag(relive::Path_BoneBag* pTlv, const Guid& tlvId, ResourceManagerW
     LoadAnimations();
     Animation_Init(GetAnimRes(AnimId::BoneBag_Idle));
     GetAnimation().SetSemiTrans(false);
-    SetTint(&kBoneBagTints[0], GetMap().mCurrentLevel);
+    SetTint(&kBoneBagTints[0], mMap.mCurrentLevel);
 
     mXPos = FP_FromInteger((pTlv->mTopLeftX + pTlv->mBottomRightX) / 2);
     mYPos = FP_FromInteger(pTlv->mBottomRightY);

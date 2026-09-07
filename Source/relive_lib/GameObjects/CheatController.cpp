@@ -67,7 +67,7 @@ static const InputCommands sCheatKeyArray_VoiceLocks[] = {
 
 static void CheatController_Cheat_MovieSelect()
 {
-    if (gCheatController->GetMap().mCurrentCamera == 1)
+    if (gCheatController->mMap.mCurrentCamera == 1)
     {
         CheatController::gEnableCheatFMV = !CheatController::gEnableCheatFMV;
     }
@@ -75,7 +75,7 @@ static void CheatController_Cheat_MovieSelect()
 
 static void CheatController_Cheat_LevelSelect()
 {
-    if (gCheatController->GetMap().mCurrentCamera == 1)
+    if (gCheatController->mMap.mCurrentCamera == 1)
     {
         CheatController::gEnableCheatLevelSelect = !CheatController::gEnableCheatLevelSelect;
     }
@@ -164,7 +164,7 @@ void CheatController::VUpdate()
                 if (cheatEntry.mApplyToGame == GetGameType())
                 {
                     // None = apply to any level
-                    if (cheatEntry.mApplyToLevel == EReliveLevelIds::eNone || (GetMap().mCurrentLevel == cheatEntry.mApplyToLevel && cheatEntry.mApplyToLevel != EReliveLevelIds::eNone))
+                    if (cheatEntry.mApplyToLevel == EReliveLevelIds::eNone || (mMap.mCurrentLevel == cheatEntry.mApplyToLevel && cheatEntry.mApplyToLevel != EReliveLevelIds::eNone))
                     {
                         if (held == cheatEntry.mCheatCodeAry[cheatEntry.mSuccessIdx])
                         {

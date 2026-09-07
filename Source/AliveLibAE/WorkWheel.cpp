@@ -128,7 +128,7 @@ void WorkWheel::VUpdate()
         ++mTurningTime;
 
         if (!(mTurningTime % 10)
-            && GetMap().Is_Point_In_Current_Camera(
+            && mMap.Is_Point_In_Current_Camera(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,
@@ -148,7 +148,7 @@ void WorkWheel::VUpdate()
     {
         if (mTurningTime > mActivationTime)
         {
-            if (GetMap().mCurrentLevel == EReliveLevelIds::eBrewery_Ender && mSwitchId == 100)
+            if (mMap.mCurrentLevel == EReliveLevelIds::eBrewery_Ender && mSwitchId == 100)
             {
                 CreateGameEnderController(mResMan, mMap);
             }
@@ -167,7 +167,7 @@ void WorkWheel::VUpdate()
 
 void WorkWheel::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || GetMap().PathChanged() || mState == WheelStates::eIdle_0)
+    if (mMap.LevelChanged() || mMap.PathChanged() || mState == WheelStates::eIdle_0)
     {
         SetDead(true);
     }

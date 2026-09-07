@@ -26,13 +26,13 @@ Bullet::Bullet(BaseAliveGameObject* pParent, BulletType type, FP xpos, FP ypos, 
     mXDistance(xDist)
 {
     SetType(ReliveTypes::eBullet);
-    mBulletPath = GetMap().mCurrentPath;
-    mBulletLevel = GetMap().mCurrentLevel;
+    mBulletPath = mMap.mCurrentPath;
+    mBulletLevel = mMap.mCurrentLevel;
 }
 
 void Bullet::VUpdate()
 {
-    if (!GetMap().Is_Point_In_Current_Camera(mBulletLevel, mBulletPath, mXPos, mYPos, 0) && !GetMap().Is_Point_In_Current_Camera(mBulletLevel, mBulletPath, mXPos + FP_FromInteger(10), mYPos, 0) && !GetMap().Is_Point_In_Current_Camera(mBulletLevel, mBulletPath, mXPos - FP_FromInteger(10), mYPos, 0))
+    if (!mMap.Is_Point_In_Current_Camera(mBulletLevel, mBulletPath, mXPos, mYPos, 0) && !mMap.Is_Point_In_Current_Camera(mBulletLevel, mBulletPath, mXPos + FP_FromInteger(10), mYPos, 0) && !mMap.Is_Point_In_Current_Camera(mBulletLevel, mBulletPath, mXPos - FP_FromInteger(10), mYPos, 0))
     {
         SetDead(true);
         return;
@@ -366,7 +366,7 @@ BaseAliveGameObject* Bullet::ShootObject(PSX_RECT* pRect)
         {
             if (pObj->GetAnimation().GetRender())
             {
-                if (GetMap().Is_Point_In_Current_Camera(mBulletLevel, mBulletPath, pObj->mXPos, pObj->mYPos, 1))
+                if (mMap.Is_Point_In_Current_Camera(mBulletLevel, mBulletPath, pObj->mXPos, pObj->mYPos, 1))
                 {
                     if (((mBulletType == BulletType::eSligPossessedOrUnderGlukkonCommand_0 || mBulletType == BulletType::ePossessedSligZBullet_1) && ((pObj->Type() == ReliveTypes::eSlig && static_cast<Slig*>(pObj)->mCurrentMotion != eSligMotions::Motion_37_Possess) || pObj->Type() == ReliveTypes::eFlyingSlig || pObj->Type() == ReliveTypes::eCrawlingSlig || pObj->Type() == ReliveTypes::eGlukkon || pObj->Type() == ReliveTypes::eMudokon || pObj->Type() == ReliveTypes::eAbe || pObj->Type() == ReliveTypes::eSlog || pObj->Type() == ReliveTypes::eGreeter)) ||
 

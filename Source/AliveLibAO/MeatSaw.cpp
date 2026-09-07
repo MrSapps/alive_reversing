@@ -156,7 +156,7 @@ MeatSaw::MeatSaw(relive::Path_MeatSaw* pTlv, const Guid& tlvId, ResourceManagerW
 
 void MeatSaw::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || GetMap().PathChanged() || !sControlledCharacter || // Can be nullptr during the game ender
+    if (mMap.LevelChanged() || mMap.PathChanged() || !sControlledCharacter || // Can be nullptr during the game ender
         FP_Abs(sControlledCharacter->mXPos - mXPos) > FP_FromInteger(1024))
     {
         SetDead(true);
@@ -172,7 +172,7 @@ void MeatSaw::VUpdate()
 
     GrindUpObjects();
 
-    const CameraPos direction = GetMap().GetDirection(
+    const CameraPos direction = mMap.GetDirection(
         mCurrentLevel,
         mCurrentPath,
         mXPos,
@@ -341,7 +341,7 @@ void MeatSaw::GrindUpObjects()
 
 void MeatSaw::VRender(OrderingTable& ot)
 {
-    if (GetMap().Is_Point_In_Current_Camera(
+    if (mMap.Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,

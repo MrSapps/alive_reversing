@@ -67,13 +67,13 @@ GasCountDown::GasCountDown(relive::Path_GasCountDown* pTlv, const Guid& tlvInfo,
 GasCountDown::~GasCountDown()
 {
     gObjListDrawables->Remove_Item(this);
-    GetMap().TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 void GasCountDown::VScreenChanged()
 {
     SetDead(true);
-    if (GetMap().LevelChanged() || GetMap().PathChanged())
+    if (mMap.LevelChanged() || mMap.PathChanged())
     {
         gDeathGasTimer = 0;
     }

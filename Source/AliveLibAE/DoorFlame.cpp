@@ -171,7 +171,7 @@ private:
     {
         // HACK/WTF this seems to move the base animation off screen so it can never been seen??
         PSX_RECT rect = {};
-        GetMap().Get_Camera_World_Rect(CameraPos::eCamCurrent_0, &rect);
+        mMap.Get_Camera_World_Rect(CameraPos::eCamCurrent_0, &rect);
         mXPos = FP_FromInteger(rect.w + 16);
         mYPos = FP_FromInteger(rect.y - 16);
 
@@ -426,7 +426,7 @@ void DoorFlame::VUpdate()
             break;
     }
 
-    if (!GetMap().Is_Point_In_Current_Camera(
+    if (!mMap.Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             mXPos,

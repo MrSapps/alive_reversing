@@ -173,7 +173,7 @@ LCDScreen::LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId, ResourceMa
 
     if (Input().IsJoyStickEnabled() || mMessageId1 != 62)
     {
-        String_FormatString(gLCDMessages.GetMessage(GetMap().mCurrentLevel, GetMap().mCurrentPath, mMessageId1), mMessageBuffer);
+        String_FormatString(gLCDMessages.GetMessage(mMap.mCurrentLevel, mMap.mCurrentPath, mMessageId1), mMessageBuffer);
     }
     else
     {
@@ -230,7 +230,7 @@ void LCDScreen::VUpdate()
 
                 if (Input().IsJoyStickEnabled() || rangedRandom != 62)
                 {
-                    String_FormatString(gLCDMessages.GetMessage(GetMap().mCurrentLevel, GetMap().mCurrentPath, rangedRandom), mMessageBuffer);
+                    String_FormatString(gLCDMessages.GetMessage(mMap.mCurrentLevel, mMap.mCurrentPath, rangedRandom), mMessageBuffer);
                 }
                 else
                 {
@@ -249,7 +249,7 @@ void LCDScreen::VUpdate()
                 if (Input().IsJoyStickEnabled() || mMessageId1 != 62)
                 {
                     String_FormatString(
-                        gLCDMessages.GetMessage(GetMap().mCurrentLevel, GetMap().mCurrentPath, mMessageId1),
+                        gLCDMessages.GetMessage(mMap.mCurrentLevel, mMap.mCurrentPath, mMessageId1),
                         mMessageBuffer);
                 }
                 else

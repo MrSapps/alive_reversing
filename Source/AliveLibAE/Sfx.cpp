@@ -31,7 +31,7 @@ static const relive::SfxDefinition sSligGameSpeakEntries[21] = {
     {0u, 0u, 0u, 0u, 0, 0},
     {0u, 0u, 0u, 0u, 0, 0}};
 
-s16 Calc_Slig_Sound_Direction(BaseAnimatedWithPhysicsGameObject* pObj, s16 defaultVol, const relive::SfxDefinition& pSfx, s16* pLeftVol, s16* pRightVol)
+s16 Calc_Slig_Sound_Direction(BaseAnimatedWithPhysicsGameObject* pObj, s16 defaultVol, const relive::SfxDefinition& pSfx, s16* pLeftVol, s16* pRightVol, BaseMap& map)
 {
     if (defaultVol == 0)
     {
@@ -46,7 +46,7 @@ s16 Calc_Slig_Sound_Direction(BaseAnimatedWithPhysicsGameObject* pObj, s16 defau
             yOff = FP_FromInteger(20); // 0xffec0000
         }
 
-        const CameraPos dir = GetMap().GetDirection(
+        const CameraPos dir = map.GetDirection(
             pObj->mCurrentLevel, pObj->mCurrentPath,
             pObj->mXPos, pObj->mYPos - yOff);
 
@@ -57,7 +57,7 @@ s16 Calc_Slig_Sound_Direction(BaseAnimatedWithPhysicsGameObject* pObj, s16 defau
         }
 
         PSX_RECT camRect = {};
-        GetMap().Get_Camera_World_Rect(dir, &camRect);
+        map.Get_Camera_World_Rect(dir, &camRect);
 
         const s32 volScaler = defaultVol / 3;
         switch (dir)
@@ -109,7 +109,7 @@ s16 Calc_Slig_Sound_Direction(BaseAnimatedWithPhysicsGameObject* pObj, s16 defau
     }
 }
 
-void Slig_GameSpeak_SFX(SligSpeak effectId, s16 defaultVol, s16 pitch_min, BaseAnimatedWithPhysicsGameObject* pObj)
+void Slig_GameSpeak_SFX(SligSpeak effectId, s16 defaultVol, s16 pitch_min, BaseAnimatedWithPhysicsGameObject* pObj, BaseMap& map)
 {
     const s32 idx = static_cast<s32>(effectId);
     assert(idx < ALIVE_COUNTOF(sSligGameSpeakEntries));
@@ -117,7 +117,7 @@ void Slig_GameSpeak_SFX(SligSpeak effectId, s16 defaultVol, s16 pitch_min, BaseA
 
     s16 volLeft = 0;
     s16 volRight = 0;
-    if (Calc_Slig_Sound_Direction(pObj, defaultVol, pEffect, &volLeft, &volRight))
+    if (Calc_Slig_Sound_Direction(pObj, defaultVol, pEffect, &volLeft, &volRight, map))
     {
         SFX_SfxDefinition_Play_Stereo(pEffect, volLeft, volRight, pitch_min, pitch_min);
     }

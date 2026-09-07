@@ -66,7 +66,7 @@ static const LiftPointCoord sRopeOffsets[16] = {
 
 void LiftPoint::LoadAnimations()
 {
-    switch (GetMap().mCurrentLevel)
+    switch (mMap.mCurrentLevel)
     {
         case EReliveLevelIds::eRuptureFarms:
         case EReliveLevelIds::eBoardRoom:
@@ -124,7 +124,7 @@ LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId, ResourceMa
         SetScale(Scale::Fg);
     }
 
-    const s32 lvl_idx = static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel));
+    const s32 lvl_idx = static_cast<s32>(MapWrapper::ToAO(mMap.mCurrentLevel));
     const LiftPointData& rPlatformData = sLiftPointAnimIds[lvl_idx];
     AddDynamicCollision(
         rPlatformData.mPlatformAnimId,
@@ -334,7 +334,7 @@ void LiftPoint::VUpdate()
             const FP lineY = FP_FromInteger(mPlatformBaseCollisionLine->mRect.y);
 
             relive::Path_LiftPoint* pLiftTlv = nullptr;
-            TlvIterator pTlvIter = GetMap().TLV_Get_At(
+            TlvIterator pTlvIter = mMap.TLV_Get_At(
                 TlvIterator::Invalid(),
                 mXPos,
                 lineY,
@@ -350,7 +350,7 @@ void LiftPoint::VUpdate()
                     break;
                 }
 
-                pTlvIter = GetMap().TLV_Get_At(
+                pTlvIter = mMap.TLV_Get_At(
                     pTlvIter,
                     mXPos,
                     lineY,
@@ -538,7 +538,7 @@ void LiftPoint::VUpdate()
         }
     }
 
-    if (mCurrentLevel != GetMap().mCurrentLevel || mCurrentPath != GetMap().mCurrentPath || EventGet(Event::kEventDeathReset))
+    if (mCurrentLevel != mMap.mCurrentLevel || mCurrentPath != mMap.mCurrentPath || EventGet(Event::kEventDeathReset))
     {
         if (mPlatformBaseCount <= 0)
         {
@@ -552,7 +552,7 @@ void LiftPoint::RenderPulley(OrderingTable& ot)
     const FP pulleyXPos = FP_FromInteger(mPulleyXPos);
     const FP pulleyYPos = FP_FromInteger(mPulleyYPos);
 
-    if (GetMap().Is_Point_In_Current_Camera(
+    if (mMap.Is_Point_In_Current_Camera(
             mCurrentLevel,
             mCurrentPath,
             pulleyXPos,
@@ -587,11 +587,11 @@ void LiftPoint::VRender(OrderingTable& ot)
     // Renders the pulley, lift platform and lift platform wheel
 
     // In the current level/map?
-    if (mCurrentLevel == GetMap().mCurrentLevel && mCurrentPath == GetMap().mCurrentPath)
+    if (mCurrentLevel == mMap.mCurrentLevel && mCurrentPath == mMap.mCurrentPath)
     {
         // Within the current camera X bounds?
         PSX_Point camPos = {};
-        GetMap().GetCurrentCamCoords(&camPos);
+        mMap.GetCurrentCamCoords(&camPos);
 
         if (mXPos >= FP_FromInteger(camPos.x) && mXPos <= FP_FromInteger(camPos.x + 1024))
         {
@@ -654,7 +654,7 @@ void LiftPoint::MoveObjectsOnLift(FP xVelocity)
 
 void LiftPoint::VScreenChanged()
 {
-    if (GetMap().LevelChanged() || GetMap().PathChanged())
+    if (mMap.LevelChanged() || mMap.PathChanged())
     {
         SetDead(true);
     }
@@ -662,7 +662,7 @@ void LiftPoint::VScreenChanged()
 
 void LiftPoint::CreatePulleyIfExists(s16 camX, s16 camY)
 {
-    auto tlvIterator = GetMap().Get_First_TLV_For_Offsetted_Camera(camX, camY);
+    auto tlvIterator = mMap.Get_First_TLV_For_Offsetted_Camera(camX, camY);
     if (tlvIterator.GetTlv())
     {
         while (1)
@@ -678,7 +678,7 @@ void LiftPoint::CreatePulleyIfExists(s16 camX, s16 camY)
                 }
             }
 
-            tlvIterator = GetMap().TLV_Get_At(tlvIterator, FP_FromInteger(-1), FP_FromInteger(-1), FP_FromInteger(-1), FP_FromInteger(-1));
+            tlvIterator = mMap.TLV_Get_At(tlvIterator, FP_FromInteger(-1), FP_FromInteger(-1), FP_FromInteger(-1), FP_FromInteger(-1));
             if (!tlvIterator.GetTlv())
             {
                 return;
@@ -692,7 +692,7 @@ void LiftPoint::CreatePulleyIfExists(s16 camX, s16 camY)
         mPulleyXPos = FP_GetExponent(((k13_scaled + kM10_scaled) / FP_FromInteger(2)) + FP_NoFractional(mXPos));
         // AE sets mPulleyYPos in the while loop.
 
-        const s32 lvl_idx = static_cast<s32>(MapWrapper::ToAO(GetMap().mCurrentLevel));
+        const s32 lvl_idx = static_cast<s32>(MapWrapper::ToAO(mMap.mCurrentLevel));
 
         mPulleyAnim.Init(GetAnimRes(sLiftPointAnimIds[lvl_idx].mLiftTopWheelAnimId), this);
 
@@ -735,7 +735,7 @@ LiftPoint::~LiftPoint()
 
     Path::TLV_Reset(mPlatformBaseTlvInfo);
 
-    auto pLiftPointTlv = GetMap().VTLV_Get_At_Of_Type(
+    auto pLiftPointTlv = mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos),
         FP_GetExponent(FP_FromInteger(mPlatformBaseCollisionLine->mRect.y)),
         FP_GetExponent(mXPos),

@@ -316,7 +316,7 @@ void SlapLock::VUpdate()
         {
             if (static_cast<s32>(sGnFrame) > mTimer1)
             {
-                if (!GetMap().Is_Point_In_Current_Camera(
+                if (!mMap.Is_Point_In_Current_Camera(
                         gAbe->mCurrentLevel,
                         gAbe->mCurrentPath,
                         gAbe->mXPos,

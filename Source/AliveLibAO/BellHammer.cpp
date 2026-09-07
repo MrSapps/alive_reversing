@@ -120,7 +120,7 @@ void BellHammer::VUpdate()
         Elum::Spawn(mTlvInfo, mResMan, mMap);
 
         PSX_Point mapCoords = {};
-        GetMap().GetCurrentCamCoords(&mapCoords);
+        mMap.GetCurrentCamCoords(&mapCoords);
 
         if (gElum)
         {

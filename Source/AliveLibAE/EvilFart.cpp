@@ -241,9 +241,9 @@ void EvilFart::VPossessed()
 
     GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_1);
 
-    mAbeLevel = GetMap().mCurrentLevel;
-    mAbePath = GetMap().mCurrentPath;
-    mAbeCamera = GetMap().mCurrentCamera;
+    mAbeLevel = mMap.mCurrentLevel;
+    mAbePath = mMap.mCurrentPath;
+    mAbeCamera = mMap.mCurrentCamera;
 
     sControlledCharacter = this;
 
@@ -307,7 +307,7 @@ void EvilFart::VUpdate()
     {
         sControlledCharacter = gAbe;
         SetDead(true);
-        GetMap().SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+        mMap.SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
     }
 
     // Show the count to the boom

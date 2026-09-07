@@ -72,7 +72,7 @@ void ColourfulMeter::VScreenChanged()
 {
     SetDead(true);
 
-    if (GetMap().LevelChanged() || GetMap().PathChanged())
+    if (mMap.LevelChanged() || mMap.PathChanged())
     {
         gTotalMeterBars = 0;
     }

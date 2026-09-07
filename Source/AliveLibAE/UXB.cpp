@@ -63,7 +63,7 @@ void UXB::LoadAnimations()
 
 void UXB::PlaySFX(relive::SoundEffects sfxIdx)
 {
-    if (GetMap().Is_Point_In_Current_Camera(
+    if (mMap.Is_Point_In_Current_Camera(
             this->mCurrentLevel,
             this->mCurrentPath,
             this->mXPos,
@@ -88,7 +88,7 @@ UXB::UXB(relive::Path_UXB* pTlv, const Guid& tlvId, ResourceManagerWrapper& resM
 
     if (GetGameType() == GameType::eAe)
     {
-        SetTint(sUXBTints, GetMap().mCurrentLevel);
+        SetTint(sUXBTints, mMap.mCurrentLevel);
     }
 
     SetInteractive(true);
@@ -477,7 +477,7 @@ void UXB::VRender(OrderingTable& ot)
 {
     if (GetAnimation().GetRender())
     {
-        if (GetMap().Is_Point_In_Current_Camera(
+        if (mMap.Is_Point_In_Current_Camera(
                 mCurrentLevel,
                 mCurrentPath,
                 mXPos,
