@@ -1718,7 +1718,7 @@ s16 Glukkon::Brain_3_PlayerControlled()
             return Brain_3_PlayerControlled::eBrain3_AutoDepossessGlukkon6;
 
         case Brain_3_PlayerControlled::eBrain3_AutoDepossessGlukkon6:
-            GetSoundAPI().mSND_Restart();
+            GetSoundAPI().mSND_Restart(mMap);
             gScreenManager->EnableRendering();
             field_1D4_timer = MakeTimer(30);
             SfxPlayMono(relive::SoundEffects::PossessEffect, 0);
@@ -2724,13 +2724,13 @@ void Glukkon::PlaySound(s32 sndIdx, Glukkon* pGlukkon)
         volumeRight = defaultSndIdxVol / 2;
     }
 
-    CameraPos direction = mMap.GetDirection(
+    CameraPos direction = pGlukkon->mMap.GetDirection(
         pGlukkon->mCurrentLevel,
         pGlukkon->mCurrentPath,
         pGlukkon->mXPos,
         pGlukkon->mYPos);
     PSX_RECT worldRect;
-    mMap.Get_Camera_World_Rect(direction, &worldRect);
+    static_cast<Map&>(pGlukkon->mMap).Get_Camera_World_Rect(direction, &worldRect);
     switch (direction)
     {
         case CameraPos::eCamCurrent_0:
@@ -3114,7 +3114,7 @@ bool Glukkon::VTakeDamage(BaseGameObject* pFrom)
                 mHealth = FP_FromInteger(0);
                 SetBrain(&Glukkon::Brain_4_Death);
                 mBrainSubState = Brain_4_Death::eBrain4_ToVaporizeKilledBySlog5;
-                Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 32767, this);
+                Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 32767, this, mMap);
                 EventBroadcast(Event::kEventMudokonComfort, this);
                 if (!VIsFacingMe(static_cast<BaseAnimatedWithPhysicsGameObject*>(pFrom)))
                 {

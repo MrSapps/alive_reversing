@@ -17,7 +17,7 @@ void SwitchStateBooleanLogic::VScreenChanged()
 
 SwitchStateBooleanLogic::~SwitchStateBooleanLogic()
 {
-    Path::TLV_Reset(mTlvId);
+    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
 }
 
 SwitchStateBooleanLogic::SwitchStateBooleanLogic(Path_SwitchStateBooleanLogic* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)

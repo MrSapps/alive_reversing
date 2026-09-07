@@ -6,6 +6,7 @@
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
 #include "../relive_lib/FixedPoint.hpp"
 #include "Path.hpp"
+#include "Map.hpp"
 
 namespace AO {
 
@@ -40,7 +41,7 @@ LightEffect::LightEffect(relive::Path_LightEffect* pTlv, const Guid& tlvId, Reso
 
 LightEffect::~LightEffect()
 {
-    Path::TLV_Reset(mTlvId);
+    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
 }
 
 void LightEffect::VRender(OrderingTable& /*ot*/)

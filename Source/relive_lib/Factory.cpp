@@ -1,5 +1,6 @@
 #include "BinaryPath.hpp"
 #include "MapWrapper.hpp"
+#include "../AliveLibAO/Map.hpp"
 #include "stdafx.h"
 #include "Factory.hpp"
 
@@ -176,7 +177,7 @@ void Factory::HoistAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        switch (AO::mMap.mCurrentLevel)
+        switch (mMap.mCurrentLevel)
         {
             case EReliveLevelIds::eRuptureFarms:
             case EReliveLevelIds::eRuptureFarmsReturn:
@@ -231,7 +232,7 @@ void Factory::LiftPointAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        switch (AO::mMap.mCurrentLevel)
+        switch (mMap.mCurrentLevel)
         {
             case EReliveLevelIds::eRuptureFarms:
             case EReliveLevelIds::eBoardRoom:
@@ -289,8 +290,8 @@ void Factory::LiftPointAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
                 const s16 xpos_i = FP_GetExponent(pLiftObj->mXPos);
                 if (pTlv->mTopLeftX <= xpos_i
                     && xpos_i <= pTlv->mBottomRightX
-                    && pLiftObj->mCurrentLevel == AO::mMap.mCurrentLevel
-                    && pLiftObj->mCurrentPath == AO::mMap.mCurrentPath)
+                    && pLiftObj->mCurrentLevel == mMap.mCurrentLevel
+                    && pLiftObj->mCurrentPath == mMap.mCurrentPath)
                 {
                     Path::TLV_Reset(tlvId);
                     return;
@@ -308,7 +309,7 @@ void Factory::LiftPointAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
             s16 pointNumber = 1;
             while (pointNumber < 8)
             {
-                tlvIterator = AO::mMap.Get_First_TLV_For_Offsetted_Camera(
+                tlvIterator = static_cast<AO::Map&>(mMap).Get_First_TLV_For_Offsetted_Camera(
                     0,
                     pointNumber / 2 * (pointNumber % 2 != 0 ? -1 : 1));
                 while (tlvIterator.GetTlv())
@@ -402,7 +403,7 @@ void Factory::RockSackAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
         mResourceManager.PendAnimation(AnimId::RockSack_SoftHit);
         mResourceManager.PendAnimation(AnimId::RockSack_HardHit);
 
-        if (AO::mMap.mCurrentLevel == EReliveLevelIds::eStockYards || AO::mMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+        if (mMap.mCurrentLevel == EReliveLevelIds::eStockYards || mMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
         {
         }
     }
@@ -431,7 +432,7 @@ void Factory::FallingItemAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
         mResourceManager.PendAnimation(AnimId::Explosion_Stick);
-        switch (AO::mMap.mCurrentLevel)
+        switch (mMap.mCurrentLevel)
         {
             case EReliveLevelIds::eRuptureFarms:
             case EReliveLevelIds::eRuptureFarmsReturn:
@@ -468,7 +469,7 @@ void Factory::PullRingRopeAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        switch (AO::mMap.mCurrentLevel)
+        switch (mMap.mCurrentLevel)
         {
             case EReliveLevelIds::eRuptureFarms:
             case EReliveLevelIds::eBoardRoom:
@@ -546,7 +547,7 @@ void Factory::TimedMineAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
         mResourceManager.PendAnimation(AnimId::Bomb_RedGreenTick);
         mResourceManager.PendAnimation(AnimId::Explosion_Rock);
         mResourceManager.PendAnimation(AnimId::GroundExplosion);
-        if (AO::mMap.mCurrentLevel == EReliveLevelIds::eStockYards || AO::mMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+        if (mMap.mCurrentLevel == EReliveLevelIds::eStockYards || mMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
         {
         }
 
@@ -557,7 +558,7 @@ void Factory::TimedMineAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
     }
 }
 
-static void LoadWalkingSligResourcesAO(Factory::LoadMode loadMode, BitField16<AO::SligFlags_DisabledRes> disabledResources, ResourceManagerWrapper& resMan)
+static void LoadWalkingSligResourcesAO(Factory::LoadMode loadMode, BitField16<AO::SligFlags_DisabledRes> disabledResources, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     if (loadMode == Factory::LoadMode::LoadResourceFromList_1 || loadMode == Factory::LoadMode::LoadResource_2)
     {
@@ -567,8 +568,8 @@ static void LoadWalkingSligResourcesAO(Factory::LoadMode loadMode, BitField16<AO
         resMan.PendAnimation(AnimId::ShootingZFire_Particle);
         resMan.PendAnimation(AnimId::ShootingFire_Particle);
         resMan.PendAnimation(AnimId::Bullet_Shell);
-        
-        if (AO::mMap.mCurrentLevel == EReliveLevelIds::eStockYards || AO::mMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+
+        if (map.mCurrentLevel == EReliveLevelIds::eStockYards || map.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
         {
         }
     }
@@ -612,7 +613,7 @@ static void LoadWalkingSligResourcesAO(Factory::LoadMode loadMode, BitField16<AO
 void Factory::SligAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     auto pSligTlv = static_cast<Path_Slig*>(pTlv);
-    LoadWalkingSligResourcesAO(loadMode, pSligTlv->mDisabledResourcesAO, mResourceManager);
+    LoadWalkingSligResourcesAO(loadMode, pSligTlv->mDisabledResourcesAO, mResourceManager, mMap);
 
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -641,7 +642,7 @@ void Factory::LeverAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        switch (AO::mMap.mCurrentLevel)
+        switch (mMap.mCurrentLevel)
         {
             case EReliveLevelIds::eRuptureFarms:
             case EReliveLevelIds::eStockYards:
@@ -739,7 +740,7 @@ void Factory::BeeSwarmHoleAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
         mResourceManager.PendAnimation(AnimId::Bee_Swarm);
-        if (AO::mMap.mCurrentLevel == EReliveLevelIds::eForest || AO::mMap.mCurrentLevel == EReliveLevelIds::eDesert)
+        if (mMap.mCurrentLevel == EReliveLevelIds::eForest || mMap.mCurrentLevel == EReliveLevelIds::eDesert)
         {
         }
     }
@@ -840,7 +841,7 @@ void Factory::MineAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
         mResourceManager.PendAnimation(AnimId::Mine_Flash);
         mResourceManager.PendAnimation(AnimId::Explosion_Rock);
         mResourceManager.PendAnimation(AnimId::GroundExplosion);
-        if (AO::mMap.mCurrentLevel == EReliveLevelIds::eStockYards || AO::mMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+        if (mMap.mCurrentLevel == EReliveLevelIds::eStockYards || mMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
         {
         }
     }
@@ -866,7 +867,7 @@ void Factory::UXBAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
         mResourceManager.PendAnimation(AnimId::Bomb_RedGreenTick);
         mResourceManager.PendAnimation(AnimId::Explosion_Rock);
         mResourceManager.PendAnimation(AnimId::GroundExplosion);
-        if (AO::mMap.mCurrentLevel == EReliveLevelIds::eStockYards || AO::mMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+        if (mMap.mCurrentLevel == EReliveLevelIds::eStockYards || mMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
         {
         }
     }
@@ -953,7 +954,7 @@ void Factory::TrapDoorAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        switch (AO::mMap.mCurrentLevel)
+        switch (mMap.mCurrentLevel)
         {
             case EReliveLevelIds::eRuptureFarms:
             case EReliveLevelIds::eBoardRoom:
@@ -1023,7 +1024,7 @@ static TlvIterator FindMatchingSligTLVAO(TlvIterator pTlvIter, Path_SligBound* p
 void Factory::SligBoundLeftAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     auto pBound = static_cast<Path_SligBound*>(pTlv);
-    LoadWalkingSligResourcesAO(loadMode, pBound->mDisabledResourcesAO, mResourceManager);
+    LoadWalkingSligResourcesAO(loadMode, pBound->mDisabledResourcesAO, mResourceManager, mMap);
 
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1036,7 +1037,7 @@ void Factory::SligBoundLeftAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMo
 
         for (s16 camX_idx = -2; camX_idx < 3; camX_idx++)
         {
-            TlvIterator pTlvIter = AO::mMap.Get_First_TLV_For_Offsetted_Camera(camX_idx, 0);
+            TlvIterator pTlvIter = static_cast<AO::Map&>(mMap).Get_First_TLV_For_Offsetted_Camera(camX_idx, 0);
             Path_TLV* pSligTlv = FindMatchingSligTLVAO(pTlvIter, pBound).GetTlv();
             if (pSligTlv)
             {
@@ -1116,7 +1117,7 @@ void Factory::MotionDetectorAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadM
 void Factory::SligSpawnerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     auto pSligTlv = static_cast<Path_Slig*>(pTlv);
-    LoadWalkingSligResourcesAO(loadMode, pSligTlv->mDisabledResourcesAO, mResourceManager);
+    LoadWalkingSligResourcesAO(loadMode, pSligTlv->mDisabledResourcesAO, mResourceManager, mMap);
 
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1301,7 +1302,7 @@ void Factory::MovingBombAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
         mResourceManager.PendAnims(kAbeGibs);
         mResourceManager.PendAnims(kElumGibs);
 
-        if (AO::mMap.mCurrentLevel == EReliveLevelIds::eStockYards || AO::mMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
+        if (mMap.mCurrentLevel == EReliveLevelIds::eStockYards || mMap.mCurrentLevel == EReliveLevelIds::eStockYardsReturn)
         {
         }
     }

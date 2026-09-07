@@ -57,7 +57,7 @@ s16 Calc_Slig_Sound_Direction(BaseAnimatedWithPhysicsGameObject* pObj, s16 defau
         }
 
         PSX_RECT camRect = {};
-        map.Get_Camera_World_Rect(dir, &camRect);
+        static_cast<Map&>(map).Get_Camera_World_Rect(dir, &camRect);
 
         const s32 volScaler = defaultVol / 3;
         switch (dir)

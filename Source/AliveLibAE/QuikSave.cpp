@@ -356,7 +356,7 @@ void QuikSave::RestoreBlyData(Quicksave& pSaveData, ResourceManagerWrapper& resM
 
     const u32 flagsTotal = pSaveData.mObjectBlyData.ReadU32();
     u32 readFlagsCount = 0;
-    for (auto& binaryPath : mMap.GetLoadedPaths())
+    for (auto& binaryPath : map.GetLoadedPaths())
     {
         for (auto& cam : binaryPath->GetCameras())
         {
@@ -392,28 +392,28 @@ void QuikSave::RestoreBlyData(Quicksave& pSaveData, ResourceManagerWrapper& resM
     resMan.LoadingLoop(false);
 }
 
-void Quicksave_LoadFromMemory_4C95A0()
+void Quicksave_LoadFromMemory_4C95A0(Map& map)
 {
-    DestroyObjects(mMap.GetResourceManager());
+    DestroyObjects(map.GetResourceManager());
     EventsReset();
     gSkipGameObjectUpdates = true;
     QuikSave::RestoreWorldInfo(QuikSave::gActiveQuicksaveData.mWorldInfo);
     gSwitchStates = QuikSave::gActiveQuicksaveData.mSwitchStates;
-    mMap.mRestoreMapObjectStates = true;
-    mMap.SetActiveCam(
+    map.mRestoreMapObjectStates = true;
+    map.SetActiveCam(
         QuikSave::gActiveQuicksaveData.mWorldInfo.mLevel,
         QuikSave::gActiveQuicksaveData.mWorldInfo.mPath,
         QuikSave::gActiveQuicksaveData.mWorldInfo.mCam,
         CameraSwapEffects::eInstantChange_0,
         0,
         1);
-    mMap.mForceLoad = 1;
+    map.mForceLoad = 1;
 }
 
-void QuikSave::LoadActive()
+void QuikSave::LoadActive(Map& map)
 {
-    mMap.GetResourceManager().ShowLoadingIcon(*gMap);
-    Quicksave_LoadFromMemory_4C95A0();
+    map.GetResourceManager().ShowLoadingIcon(map);
+    Quicksave_LoadFromMemory_4C95A0(map);
 }
 
 static void WriteFlags(SerializedObjectData& pSaveBuffer, const relive::Path_TLV* pTlv, const BitField8<relive::TlvFlags>& flags)
@@ -422,11 +422,11 @@ static void WriteFlags(SerializedObjectData& pSaveBuffer, const relive::Path_TLV
     pSaveBuffer.WriteU8(pTlv->mTlvSpecificMeaning);
 }
 
-static u32 Quicksave_SaveBlyData_CountOrSave(SerializedObjectData* pSaveBuffer)
+static u32 Quicksave_SaveBlyData_CountOrSave(SerializedObjectData* pSaveBuffer, BaseMap& map)
 {
     u32 flagsTotal = 0;
 
-    for (auto& binaryPath : mMap.GetLoadedPaths())
+    for (auto& binaryPath : map.GetLoadedPaths())
     {
         for (auto& cam : binaryPath->GetCameras())
         {
@@ -466,21 +466,21 @@ static u32 Quicksave_SaveBlyData_CountOrSave(SerializedObjectData* pSaveBuffer)
 }
 
 
-void Quicksave_SaveBlyData_4C9660(SerializedObjectData& pSaveBuffer)
+void Quicksave_SaveBlyData_4C9660(SerializedObjectData& pSaveBuffer, BaseMap& map)
 {
     pSaveBuffer.WriteRewind();
 
-    const u32 flagsCount = Quicksave_SaveBlyData_CountOrSave(nullptr);
+    const u32 flagsCount = Quicksave_SaveBlyData_CountOrSave(nullptr, map);
     pSaveBuffer.WriteU32(flagsCount);
 
-    Quicksave_SaveBlyData_CountOrSave(&pSaveBuffer);
+    Quicksave_SaveBlyData_CountOrSave(&pSaveBuffer, map);
 }
 
-void QuikSave::SaveToMemory_4C91A0(Quicksave& pSave)
+void QuikSave::SaveToMemory_4C91A0(Quicksave& pSave, BaseMap& map)
 {
     if (gAbe->mHealth > FP_FromInteger(0))
     {
-        QuikSave::SaveWorldInfo(&pSave.mWorldInfo);
+        QuikSave::SaveWorldInfo(&pSave.mWorldInfo, map);
         pSave.mSwitchStates = gSwitchStates;
 
         pSave.mObjectsStateData.WriteRewind();
@@ -498,14 +498,14 @@ void QuikSave::SaveToMemory_4C91A0(Quicksave& pSave)
             }
         }
 
-        Quicksave_SaveBlyData_4C9660(pSave.mObjectBlyData);
+        Quicksave_SaveBlyData_4C9660(pSave.mObjectBlyData, map);
     }
 }
 
-void QuikSave::DoQuicksave()
+void QuikSave::DoQuicksave(BaseMap& map)
 {
-    mMap.GetResourceManager().ShowLoadingIcon(*gMap);
-    QuikSave::SaveToMemory_4C91A0(gActiveQuicksaveData);
+    map.GetResourceManager().ShowLoadingIcon(map);
+    QuikSave::SaveToMemory_4C91A0(gActiveQuicksaveData, map);
 }
 
 void QuikSave::RestoreWorldInfo(const Quicksave_WorldInfo& rInfo)
@@ -534,14 +534,14 @@ void QuikSave::RestoreWorldInfo(const Quicksave_WorldInfo& rInfo)
     sGnFrame = rInfo.mGnFrame;
 }
 
-void QuikSave::SaveWorldInfo(Quicksave_WorldInfo* pInfo)
+void QuikSave::SaveWorldInfo(Quicksave_WorldInfo* pInfo, BaseMap& map)
 {
     const PSX_RECT rect = sControlledCharacter->VGetBoundingRect();
 
     pInfo->mGnFrame = sGnFrame;
-    pInfo->mLevel = mMap.mCurrentLevel;
-    pInfo->mPath = mMap.mCurrentPath;
-    pInfo->mCam = mMap.mCurrentCamera;
+    pInfo->mLevel = map.mCurrentLevel;
+    pInfo->mPath = map.mCurrentPath;
+    pInfo->mCam = map.mCurrentCamera;
 
     for (s32 i = 0; i < ALIVE_COUNTOF(pInfo->field_18_saved_killed_muds_per_zulag); i++)
     {

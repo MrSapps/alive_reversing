@@ -747,7 +747,7 @@ void SND_Restart_4CB0E0(BaseMap& map)
     {
         MusicController::static_EnableMusic(true);
         BackgroundMusic::Play();
-        Start_Sounds_For_Objects_In_Near_Cameras(map);
+        Start_Sounds_For_Objects_In_Near_Cameras();
     }
 }
 

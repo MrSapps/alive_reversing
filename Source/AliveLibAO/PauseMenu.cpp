@@ -183,7 +183,7 @@ void PauseMenu::VUpdate()
                     {
                         field_11C = 0;
                         SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
-                        SND_Restart();
+                        SND_Restart(mMap);
                         break;
                     }
 
@@ -200,7 +200,7 @@ void PauseMenu::VUpdate()
                             {
                                 field_11C = 0;
                                 SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
-                                SND_Restart();
+                                SND_Restart(mMap);
                                 break;
                             }
                             case Page1Selectables::eSave_1:
@@ -288,7 +288,7 @@ void PauseMenu::VUpdate()
                         {
                             field_11C = 0;
                             SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
-                            SND_Restart();
+                            SND_Restart(mMap);
                         }
                         break;
                     }

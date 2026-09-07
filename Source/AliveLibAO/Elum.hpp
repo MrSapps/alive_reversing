@@ -241,7 +241,7 @@ private:
     bool ToNextMotion();
     bool ToNextMotionAbeControlled();
     void HandleElumPathTrans();
-    static void Elum_SFX(ElumSounds soundId, ::BaseAliveGameObject* pObj);
+    static void Elum_SFX(ElumSounds soundId, ::BaseAliveGameObject* pObj, BaseMap& map);
     void FindHoney();
     bool NearHoney();
 

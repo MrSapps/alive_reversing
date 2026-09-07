@@ -15,6 +15,7 @@
 #include "../relive_lib/FatalError.hpp"
 #include "../relive_lib/ObjectIds.hpp"
 #include "Path.hpp"
+#include "Map.hpp"
 
 namespace AO {
 
@@ -124,11 +125,11 @@ MotionDetector::~MotionDetector()
 {
     if (mDontComeBack)
     {
-        Path::TLV_Reset(mTlvId);
+        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
     }
     else
     {
-        Path::TLV_Delete(mTlvId);
+        Path::TLV_Delete(static_cast<Map&>(mMap), mTlvId);
     }
 
     BaseGameObject* pLaser = sObjectIds.Find_Impl(mLaserId);
@@ -220,7 +221,7 @@ void MotionDetector::VUpdate()
 
                                 if (pObj == gAbe)
                                 {
-                                    Mudokon_SFX(MudSounds::eOops_16, 0, 0, nullptr);
+                                    Mudokon_SFX(MudSounds::eOops_16, 0, 0, nullptr, mMap);
                                 }
                             }
                         }

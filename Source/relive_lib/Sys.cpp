@@ -638,7 +638,7 @@ static void KeyUpEvent(SDL_Scancode scanCode)
     sLastPressedKey = 0;
 }
 
-static void QuitEvent(bool isRecordedEvent, bool isRecording)
+static void QuitEvent(bool isRecordedEvent, bool isRecording, BaseMap* pMap)
 {
 #if USE_SDL3_SOUND
     SND_Pause_Audio();
@@ -689,9 +689,9 @@ static void QuitEvent(bool isRecordedEvent, bool isRecording)
         GetGameAutoPlayer().RecordEvent(recEvent);
     }
 
-    if (SND_Seq_Table_Valid())
+    if (SND_Seq_Table_Valid() && pMap)
     {
-        GetSoundAPI().mSND_Restart();
+        GetSoundAPI().mSND_Restart(*pMap);
     }
 
 #if !USE_SDL3_SOUND
@@ -746,7 +746,7 @@ s8 Sys_PumpMessages(BaseMap* pMap)
                 case 0:
                     // Hack for quit events, quit writes other events before the actual event data
                     // this is used to mark the start
-                    QuitEvent(true, false);
+                    QuitEvent(true, false, pMap);
                     break;
 
                 default:
@@ -846,7 +846,7 @@ s8 Sys_PumpMessages(BaseMap* pMap)
                 }
 
                 // Else alllow normal quit behaviour + record the result
-                QuitEvent(false, isRecording);
+                QuitEvent(false, isRecording, pMap);
             }
             else
             {

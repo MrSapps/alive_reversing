@@ -16,6 +16,7 @@
 #include "../relive_lib/Events.hpp"
 #include "../relive_lib/FixedPoint.hpp"
 #include "Path.hpp"
+#include "Map.hpp"
 
 namespace AO {
 
@@ -57,11 +58,11 @@ SecurityOrb::~SecurityOrb()
 
     if (mHealth > FP_FromInteger(0))
     {
-        Path::TLV_Reset(mTlvInfo);
+        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
     }
     else
     {
-        Path::TLV_Delete(mTlvInfo);
+        Path::TLV_Delete(static_cast<Map&>(mMap), mTlvInfo);
     }
 }
 

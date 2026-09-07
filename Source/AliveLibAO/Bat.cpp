@@ -13,6 +13,7 @@
 #include "Path.hpp"
 #include "../relive_lib/FixedPoint.hpp"
 #include "../relive_lib/ObjectIds.hpp"
+#include "Map.hpp"
 
 namespace AO {
 
@@ -82,7 +83,7 @@ Bat::~Bat()
     {
         pAttackTarget->mChaseCounter--;
     }
-    Path::TLV_Reset(mTlvInfo);
+    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
 }
 
 void Bat::VScreenChanged()

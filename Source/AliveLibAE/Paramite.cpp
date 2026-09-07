@@ -2411,7 +2411,7 @@ s16 Paramite::Brain_7_DeathDrop()
             return mBrainSubState;
         }
 
-        Environment_SFX(EnvironmentSfx::eFallingDeathScreamHitGround_15, 0, 0x7FFF, this);
+        Environment_SFX(EnvironmentSfx::eFallingDeathScreamHitGround_15, 0, 0x7FFF, this, mMap);
 
         relive_new ScreenShake(false, false, mResMan, mMap);
         field_130_timer = MakeTimer(30);
@@ -3268,7 +3268,7 @@ void Paramite::Motion_3_Running()
             else
             {
                 Sound(ParamiteSpeak::LoudStep_3, 0);
-                Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 50, 600, 0);
+                Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 50, 600, 0, mMap);
             }
 
             if (sControlledCharacter != this || mHealth <= FP_FromInteger(0))
@@ -3492,7 +3492,7 @@ void Paramite::Motion_5_Hop()
             else if (GetAnimation().GetCurrentFrame() == 12)
             {
                 Sound(ParamiteSpeak::LoudStep_3, 0);
-                Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 55, 500, 0);
+                Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 55, 500, 0, mMap);
             }
         }
     }
@@ -3899,7 +3899,7 @@ void Paramite::Motion_14_JumpUpLand()
     else if (GetAnimation().GetCurrentFrame() == 1)
     {
         Sound(ParamiteSpeak::LoudStep_3, 0);
-        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 55, 500, 0);
+        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 55, 500, 0, mMap);
     }
 }
 
@@ -4001,7 +4001,7 @@ void Paramite::Motion_19_Knockback()
         if (mCurrentMotion == eParamiteMotions::Motion_41_Death || mCurrentMotion == eParamiteMotions::Motion_17_Landing)
         {
             mCurrentMotion = eParamiteMotions::Motion_19_Knockback;
-            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this);
+            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this, mMap);
         }
     }
 
@@ -4042,7 +4042,7 @@ void Paramite::Motion_20_GameSpeakBegin()
                         if (pObj->mHealth > FP_FromInteger(0))
                         {
                             SfxPlayMono(relive::SoundEffects::KillEffect, 0);
-                            Mudokon_SFX(MudSounds::eHurt2_9, 0, 0, pObj);
+                            Mudokon_SFX(MudSounds::eHurt2_9, 0, 0, pObj, mMap);
                         }
                         pObj->VTakeDamage(this);
                     }
@@ -4481,7 +4481,7 @@ void Paramite::Motion_34_WebLeaveDown()
 {
     if (GetAnimation().GetCurrentFrame() == 2)
     {
-        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 50, 600, 0);
+        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 50, 600, 0, mMap);
         mXOffset = field_15C_paramite_xOffset;
     }
 
@@ -5032,7 +5032,7 @@ void Paramite::HandleDDCheat()
 
         // Keep in map bounds
         PSX_Point mapBounds = {};
-        mMap.Get_map_size(&mapBounds);
+        static_cast<Map&>(mMap).Get_map_size(&mapBounds);
         if (mXPos < FP_FromInteger(0))
         {
             mXPos = FP_FromInteger(0);
@@ -6117,7 +6117,7 @@ void Paramite::Sound(ParamiteSpeak soundId, s16 pitch_min)
     }
 
     PSX_RECT pRect = {};
-    mMap.Get_Camera_World_Rect(direction, &pRect);
+    static_cast<Map&>(mMap).Get_Camera_World_Rect(direction, &pRect);
 
     s16 volLeft = 0;
     switch (direction)

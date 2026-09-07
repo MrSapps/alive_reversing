@@ -66,7 +66,7 @@ void Slig_SoundEffect(SligSfx effect, BaseAliveGameObject* pObj)
     const relive::SfxDefinition& pEffect = kSfxInfoTable[static_cast<s32>(effect)];
     s16 vLeft = 0;
     s16 vRight = 0;
-    if (Calc_Slig_Sound_Direction(pObj, 0, pEffect, &vLeft, &vRight))
+    if (Calc_Slig_Sound_Direction(pObj, 0, pEffect, &vLeft, &vRight, pObj->GetMap()))
     {
         s16 pitch = 0;
         if (effect == SligSfx::ePropeller1_9 || effect == SligSfx::ePropeller2_10 || effect == SligSfx::ePropeller3_11)
@@ -425,7 +425,7 @@ void renderWithGlowingEyes(OrderingTable& ot, BaseAliveGameObject* actor, std::s
 {
     if (actor->GetAnimation().GetRender())
     {
-        if (mMap.mCurrentPath == actor->mCurrentPath && mMap.mCurrentLevel == actor->mCurrentLevel && actor->Is_In_Current_Camera() == CameraPos::eCamCurrent_0)
+        if (actor->GetMap().mCurrentPath == actor->mCurrentPath && actor->GetMap().mCurrentLevel == actor->mCurrentLevel && actor->Is_In_Current_Camera() == CameraPos::eCamCurrent_0)
         {
             actor->GetAnimation().SetSpriteScale(actor->GetSpriteScale());
             const PSX_RECT boundingRect = actor->VGetBoundingRect();
@@ -1306,7 +1306,7 @@ void Slig::Motion_8_SlidingToStand()
             }
             else if (GetAnimation().GetIsLastFrame())
             {
-                Environment_SFX(EnvironmentSfx::eSlideStop_0, 0, 0x7FFF, this);
+                Environment_SFX(EnvironmentSfx::eSlideStop_0, 0, 0x7FFF, this, mMap);
                 MapFollowMe(true);
                 MainMovement();
             }
@@ -1796,7 +1796,7 @@ void Slig::Motion_34_Knockback()
     EventBroadcast(Event::kEventNoise, this);
     if (GetAnimation().GetCurrentFrame() == 4)
     {
-        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this);
+        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this, mMap);
     }
 
     if (GetAnimation().GetForwardLoopCompleted())
@@ -2010,7 +2010,7 @@ void Slig::Motion_40_LandingSoft()
 {
     if (GetAnimation().GetCurrentFrame() == 0)
     {
-        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 0x7FFF, 0);
+        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 0x7FFF, 0, mMap);
     }
 
     if (GetAnimation().GetIsLastFrame())
@@ -2111,7 +2111,7 @@ void Slig::Motion_44_Smash()
     {
         if (GetAnimation().GetCurrentFrame() == 4)
         {
-            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this);
+            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this, mMap);
         }
     }
     else
@@ -2131,7 +2131,7 @@ void Slig::Motion_45_PullLever()
     {
         if (GetTeleporting())
         {
-            Slig_GameSpeak_SFX(SligSpeak::eBlurgh_11, 0, field_11E_pitch_min, this);
+            Slig_GameSpeak_SFX(SligSpeak::eBlurgh_11, 0, field_11E_pitch_min, this, mMap);
             mCurrentMotion = eSligMotions::Motion_31_Blurgh;
         }
         else
@@ -2419,7 +2419,7 @@ s16 Slig::Brain_2_Possessed()
     switch (mBrainSubState)
     {
         case Brain_2_Possessed::eBrain2_StartPossession_0:
-            Slig_GameSpeak_SFX(SligSpeak::eHelp_10, 0, field_11E_pitch_min, this);
+            Slig_GameSpeak_SFX(SligSpeak::eHelp_10, 0, field_11E_pitch_min, this, mMap);
             mBrainSubState = 1;
             mHealth = FP_FromInteger(0);
             mCurrentMotion = eSligMotions::Motion_37_Possess;
@@ -2448,13 +2448,13 @@ s16 Slig::Brain_2_Possessed()
                 {
                     field_120_timer = MakeTimer(20);
                     mCurrentMotion = eSligMotions::Motion_21_SpeakHi;
-                    Slig_GameSpeak_SFX(SligSpeak::eHi_0, 0, field_11E_pitch_min, this);
+                    Slig_GameSpeak_SFX(SligSpeak::eHi_0, 0, field_11E_pitch_min, this, mMap);
                 }
                 else
                 {
                     field_120_timer = MakeTimer(20);
                     mCurrentMotion = eSligMotions::Motion_24_SpeakLaugh;
-                    Slig_GameSpeak_SFX(SligSpeak::eLaugh_3, 0, field_11E_pitch_min, this);
+                    Slig_GameSpeak_SFX(SligSpeak::eLaugh_3, 0, field_11E_pitch_min, this, mMap);
                 }
                 mBrainSubState = Brain_2_Possessed::eBrain2_PossessionSpeak_3;
                 return mBrainSubState;
@@ -2521,7 +2521,7 @@ s16 Slig::Brain_3_DeathDropDeath()
     switch (mBrainSubState)
     {
         case Brain_3_DeathDropDeath::eBrain3_SayHelpOnce_0:
-            Slig_GameSpeak_SFX(SligSpeak::eHelp_10, 0, field_11E_pitch_min, this);
+            Slig_GameSpeak_SFX(SligSpeak::eHelp_10, 0, field_11E_pitch_min, this, mMap);
             field_120_timer = MakeTimer(60);
             return Brain_3_DeathDropDeath::eBrain3_SayHelpAndDie_1;
 
@@ -2535,7 +2535,7 @@ s16 Slig::Brain_3_DeathDropDeath()
                         SligSpeak::eHelp_10,
                         static_cast<s16>(2 * ((field_120_timer & 0xFFFF) - sGnFrame)),
                         field_11E_pitch_min,
-                        this);
+                        this, mMap);
                 }
 
                 if (static_cast<s32>(sGnFrame) == field_120_timer - 6)
@@ -2546,7 +2546,7 @@ s16 Slig::Brain_3_DeathDropDeath()
                 return mBrainSubState;
             }
 
-            Environment_SFX(EnvironmentSfx::eFallingDeathScreamHitGround_15, 0, 0x7FFF, this);
+            Environment_SFX(EnvironmentSfx::eFallingDeathScreamHitGround_15, 0, 0x7FFF, this, mMap);
 
             relive_new ScreenShake(false, false, mResMan, mMap);
 
@@ -4567,7 +4567,7 @@ void Slig::HandleDDCheat()
 
         // Keep in the map bounds
         PSX_Point mapBounds = {};
-        mMap.Get_map_size(&mapBounds);
+        static_cast<Map&>(mMap).Get_map_size(&mapBounds);
 
         if (mXPos < FP_FromInteger(0))
         {
@@ -5142,7 +5142,7 @@ void Slig::PullLever()
         return;
     }
 
-    Slig_GameSpeak_SFX(SligSpeak::eWhat_9, 0, field_11E_pitch_min, this);
+    Slig_GameSpeak_SFX(SligSpeak::eWhat_9, 0, field_11E_pitch_min, this, mMap);
     mCurrentMotion = eSligMotions::Motion_29_SpeakWhat;
 }
 
@@ -5245,14 +5245,14 @@ s16 Slig::HandlePlayerControlled()
 
         if (Input().IsAnyPressed(InputCommands::eUp))
         {
-            Slig_GameSpeak_SFX(SligSpeak::eWhat_9, 0, field_11E_pitch_min, this);
+            Slig_GameSpeak_SFX(SligSpeak::eWhat_9, 0, field_11E_pitch_min, this, mMap);
             mCurrentMotion = eSligMotions::Motion_29_SpeakWhat;
             return 1;
         }
     }
     else if (Input().IsAnyPressed(InputCommands::eFartOrRoll | InputCommands::eHop))
     {
-        Slig_GameSpeak_SFX(SligSpeak::eBlurgh_11, 0, field_11E_pitch_min, this);
+        Slig_GameSpeak_SFX(SligSpeak::eBlurgh_11, 0, field_11E_pitch_min, this, mMap);
         mCurrentMotion = eSligMotions::Motion_31_Blurgh;
         return 1;
     }
@@ -5402,7 +5402,7 @@ eSligMotions Slig::GetNextMotionIncGameSpeak(s32 input)
                 break;
         }
 
-        Slig_GameSpeak_SFX(speak, 0, field_11E_pitch_min, this);
+        Slig_GameSpeak_SFX(speak, 0, field_11E_pitch_min, this, mMap);
         mCurrentMotion = mNextMotion;
         mNextMotion = eSligMotions::eNone_m1;
         return mCurrentMotion;
@@ -5530,7 +5530,7 @@ void Slig::PlatformCollide()
 
 void Slig::ToKnockBack()
 {
-    Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 0x7FFF, this);
+    Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 0x7FFF, this, mMap);
 
     mXPos -= mVelX;
 
@@ -6452,7 +6452,7 @@ bool Slig::VTakeDamage(BaseGameObject* pFrom)
         }
 
         case ReliveTypes::eElectricWall:
-            Slig_GameSpeak_SFX(SligSpeak::eHelp_10, 0, field_11E_pitch_min, this);
+            Slig_GameSpeak_SFX(SligSpeak::eHelp_10, 0, field_11E_pitch_min, this, mMap);
             return true;
 
         case ReliveTypes::eAbe:
@@ -6506,7 +6506,7 @@ bool Slig::VTakeDamage(BaseGameObject* pFrom)
 
             SetBrain(&Slig::Brain_0_Death);
 
-            Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 0x7FFF, this);
+            Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 0x7FFF, this, mMap);
 
             EventBroadcast(Event::kEventMudokonComfort, this);
 

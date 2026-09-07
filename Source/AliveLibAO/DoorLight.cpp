@@ -12,6 +12,7 @@
 #include "../relive_lib/Engine.hpp"
 #include "Path.hpp"
 #include "../relive_lib/FixedPoint.hpp"
+#include "Map.hpp"
 
 namespace AO {
 
@@ -126,7 +127,7 @@ DoorLight::DoorLight(relive::Path_LightEffect* pTlv, const Guid& tlvId, Resource
 
 DoorLight::~DoorLight()
 {
-    Path::TLV_Reset(mTlvId);
+    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
 }
 
 void DoorLight::VScreenChanged()

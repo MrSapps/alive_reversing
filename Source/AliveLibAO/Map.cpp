@@ -36,7 +36,6 @@ class BaseGameObject;
 
 namespace AO {
 
-Map* gMap = nullptr;
 s32 sSoundChannelsMask = 0;
 
 OpenSeqHandle g_SeqTable_4C9E70[165] = {
@@ -1090,22 +1089,22 @@ void Map::SaveBlyData(u8* pSaveBuffer)
 
 void Map::TLV_Reset(const Guid& tlvId, s16 hiFlags)
 {
-    Path::TLV_Reset(tlvId, hiFlags);
+    Path::TLV_Reset(*this, tlvId, hiFlags);
 }
 
 void Map::TLV_Persist(const Guid& tlvId, s16 hiFlags)
 {
-    Path::TLV_Persist(tlvId, hiFlags);
+    Path::TLV_Persist(*this, tlvId, hiFlags);
 }
 
 void Map::TLV_Delete(const Guid& tlvId, s16 hiFlags)
 {
-    Path::TLV_Delete(tlvId, hiFlags);
+    Path::TLV_Delete(*this, tlvId, hiFlags);
 }
 
 void Map::Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed)
 {
-    Path::Set_TLVData(tlvId, hiFlags, bSetCreated, bSetDestroyed);
+    Path::Set_TLVData(*this, tlvId, hiFlags, bSetCreated, bSetDestroyed);
 }
 
 void Map::RestoreBlyData(const u8* pSaveData)
@@ -1166,7 +1165,7 @@ void Map::Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx,
             {
                 if (pTlv->mTopLeftY >= cam_y_grid_top && pTlv->mTopLeftY <= cam_y_grid_bottom && (!pTlv->mTlvFlags.Get(relive::eBit1_Created) && !pTlv->mTlvFlags.Get(relive::eBit2_Destroyed)))
                 {
-                    Start_Sounds_for_TLV(direction, pTlv.get(), mResourceManager);
+                    Start_Sounds_for_TLV(direction, pTlv.get(), mResourceManager, *this);
                 }
             }
 
@@ -1555,27 +1554,6 @@ Camera* Map::Create_Camera(s16 xpos, s16 ypos, s32 /*a4*/)
 }
 
 
-void Map::FreePathResourceBlocks()
-{
-    mLoadedPaths.clear();
-}
-
-BinaryPath* Map::GetPathResourceBlockPtr(u32 pathId)
-{
-    for (auto& loadedPath : mLoadedPaths)
-    {
-        if (loadedPath->GetPathId() == pathId)
-        {
-            return loadedPath.get();
-        }
-    }
-    return nullptr;
-}
-
-void Map::ClearPathResourceBlocks()
-{
-    mLoadedPaths.clear();
-}
 
 
 void Map::Loader(s16 camX, s16 camY, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad)

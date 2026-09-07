@@ -10,7 +10,7 @@
 
 Path* gPathInfo = nullptr;
 
-Path::Path(BaseMap& map) : mMap(map)
+Path::Path(Map& map) : mMap(map)
 {
     mPathData = nullptr;
     mBinaryPath = nullptr;
@@ -261,17 +261,17 @@ TlvIterator Path::TLV_Next_Of_Type(TlvIterator tlvIterator, ReliveTypes type)
 
 void Path::TLV_Reset(const Guid& tlvId, s16 hiFlags)
 {
-    Path::Set_TLVData(tlvId, hiFlags, 0, 0);
+    gPathInfo->Set_TLVData(tlvId, hiFlags, 0, 0);
 }
 
 void Path::TLV_Persist(const Guid& tlvId, s16 hiFlags)
 {
-    Path::Set_TLVData(tlvId, hiFlags, 1, 0);
+    gPathInfo->Set_TLVData(tlvId, hiFlags, 1, 0);
 }
 
 void Path::TLV_Delete(const Guid& tlvId, s16 hiFlags)
 {
-    Path::Set_TLVData(tlvId, hiFlags, 0, 1);
+    gPathInfo->Set_TLVData(tlvId, hiFlags, 0, 1);
 }
 
 void Path::Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed)
@@ -305,7 +305,7 @@ void Path::Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx
     {
         if (!(tlvIterator.GetTlv()->mTlvFlags.Get(relive::TlvFlags::eBit1_Created) || (tlvIterator.GetTlv()->mTlvFlags.Get(relive::TlvFlags::eBit2_Destroyed))))
         {
-            Start_Sounds_for_TLV(direction, tlvIterator.GetTlv(), mMap.GetResourceManager());
+            Start_Sounds_for_TLV(direction, tlvIterator.GetTlv(), mMap.GetResourceManager(), mMap);
         }
         tlvIterator = tlvIterator.Next_TLV();
     }

@@ -147,7 +147,7 @@ void SecurityDoor::VUpdate()
 
         case SecurityDoorStates::eSayingHi_2:
         {
-            Slig_GameSpeak_SFX(SligSpeak::eHi_0, 127, -200, 0);
+            Slig_GameSpeak_SFX(SligSpeak::eHi_0, 127, -200, 0, mMap);
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::Security_Door_Speak));
             mState = SecurityDoorStates::eListeningForHi_3;
             mTimer = MakeTimer(150);
@@ -197,15 +197,15 @@ void SecurityDoor::VUpdate()
             switch (code)
             {
                 case GameSpeakEvents::eSlig_BS:
-                    Slig_GameSpeak_SFX(SligSpeak::eBullshit_5, 127, -100, nullptr);
+                    Slig_GameSpeak_SFX(SligSpeak::eBullshit_5, 127, -100, nullptr, mMap);
                     break;
 
                 case GameSpeakEvents::eSlig_Laugh:
-                    Slig_GameSpeak_SFX(SligSpeak::eLaugh_3, 127, -100, nullptr);
+                    Slig_GameSpeak_SFX(SligSpeak::eLaugh_3, 127, -100, nullptr, mMap);
                     break;
 
                 case GameSpeakEvents::eSlig_BS2:
-                    Slig_GameSpeak_SFX(SligSpeak::eBullshit2_7, 127, -100, nullptr);
+                    Slig_GameSpeak_SFX(SligSpeak::eBullshit2_7, 127, -100, nullptr, mMap);
                     break;
             }
 

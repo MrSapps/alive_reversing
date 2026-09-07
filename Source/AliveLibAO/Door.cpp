@@ -290,7 +290,7 @@ Door::Door(relive::Path_Door* pTlv, const Guid& tlvId)
 
 Door::~Door()
 {
-    Path::TLV_Reset(mTlvInfo);
+    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
 }
 
 void Door::VScreenChanged()

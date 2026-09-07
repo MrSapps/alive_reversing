@@ -7,6 +7,7 @@
 #include "Abe.hpp"
 #include "Path.hpp"
 #include "../relive_lib/ObjectIds.hpp"
+#include "Map.hpp"
 
 namespace AO {
 
@@ -49,7 +50,7 @@ FootSwitch::FootSwitch(relive::Path_FootSwitch* pTlv, const Guid& tlvId, Resourc
 
 FootSwitch::~FootSwitch()
 {
-    Path::TLV_Reset(mTlvId);
+    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
 }
 
 void FootSwitch::VUpdate()

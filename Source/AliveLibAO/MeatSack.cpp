@@ -8,6 +8,7 @@
 #include "../relive_lib/GameObjects/ThrowableArray.hpp"
 #include "Abe.hpp"
 #include "Meat.hpp"
+#include "Map.hpp"
 
 namespace AO
 {
@@ -65,7 +66,7 @@ MeatSack::MeatSack(relive::Path_MeatSack* pTlv, const Guid& tlvId, ResourceManag
 
 MeatSack::~MeatSack()
 {
-    Path::TLV_Reset(mTlvId);
+    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
 }
 
 void MeatSack::VUpdate()
@@ -137,7 +138,7 @@ void MeatSack::VUpdate()
             }
 
             SfxPlayMono(relive::SoundEffects::SackHit, 0);
-            Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 0x7FFF, nullptr);
+            Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 0x7FFF, nullptr, mMap);
 
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MeatSack_Hit));
             mHasBeenHit = true;

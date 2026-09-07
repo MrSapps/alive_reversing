@@ -508,7 +508,7 @@ void Bone::VUpdate()
             const PSX_Point wh{bRect.w, static_cast<s16>(bRect.h + offset)};
             CheckPlatformCollision(xy, wh, *gBaseGameObjects);
 
-            if (mYPos > FP_FromInteger(mMap.mPathData->field_6_bBottom))
+            if (mYPos > FP_FromInteger(static_cast<Map&>(mMap).mPathData->field_6_bBottom))
             {
                 SetDead(true);
             }

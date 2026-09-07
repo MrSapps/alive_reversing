@@ -12,6 +12,7 @@
 #include "Path.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
 #include "../relive_lib/FixedPoint.hpp"
+#include "Map.hpp"
 
 namespace AO {
 
@@ -19,11 +20,11 @@ BackgroundGlukkon::~BackgroundGlukkon()
 {
     if (mHealth <= FP_FromInteger(0))
     {
-        Path::TLV_Delete(mTlvId);
+        Path::TLV_Delete(static_cast<Map&>(mMap), mTlvId);
     }
     else
     {
-        Path::TLV_Reset(mTlvId);
+        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
     }
 }
 

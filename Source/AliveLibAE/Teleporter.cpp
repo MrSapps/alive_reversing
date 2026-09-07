@@ -202,7 +202,7 @@ void Teleporter::VUpdate()
 
             sControlledCharacter->GetAnimation().SetRender(false);
 
-            mMap.mTeleporterTransition = 1;
+            static_cast<Map&>(mMap).mTeleporterTransition = 1;
 
             const CameraSwapEffects effect = kPathChangeEffectToInternalScreenChangeEffect[mTlvData.mWipeEffect];
             s16 bForceChange = 0;
@@ -227,7 +227,7 @@ void Teleporter::VUpdate()
 
         case TeleporterState::eTeleporting_2:
         {
-            mMap.mTeleporterTransition = 0;
+            static_cast<Map&>(mMap).mTeleporterTransition = 0;
 
             Relive_Path_Teleporter_Data tlvData = {};
             relive::Path_Teleporter* pTeleporterTlv = nullptr;

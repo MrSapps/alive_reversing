@@ -130,11 +130,11 @@ Scrab::~Scrab()
 
     if (mHealth <= FP_FromInteger(0))
     {
-        Path::TLV_Delete(field_134_tlvInfo);
+        Path::TLV_Delete(static_cast<Map&>(mMap), field_134_tlvInfo);
     }
     else
     {
-        Path::TLV_Reset(field_134_tlvInfo);
+        Path::TLV_Reset(static_cast<Map&>(mMap), field_134_tlvInfo);
     }
 
     MusicController::static_PlayMusic(MusicController::MusicTypes::eType0, this, 0, 0);
@@ -538,7 +538,7 @@ s32 Scrab::Scrab_SFX(ScrabSounds soundId, s32 /*vol*/, s32 pitch, s16 applyDirec
         mXPos,
         mYPos);
     PSX_RECT worldRect;
-    mMap.Get_Camera_World_Rect(direction, &worldRect);
+    static_cast<Map&>(mMap).Get_Camera_World_Rect(direction, &worldRect);
     volumeLeft = volumeRight;
     if (applyDirection)
     {
@@ -982,7 +982,7 @@ void Scrab::Motion_3_Run()
                         if (pTarget->VTakeDamage(this))
                         {
                             SfxPlayMono(relive::SoundEffects::KillEffect, 0);
-                            Mudokon_SFX(MudSounds::eKnockbackOuch_10, 0, 0, pTarget);
+                            Mudokon_SFX(MudSounds::eKnockbackOuch_10, 0, 0, pTarget, mMap);
                         }
                     }
                 }
@@ -1112,7 +1112,7 @@ void Scrab::Motion_5_RunToStand()
                     if (pTarget->VTakeDamage(this))
                     {
                         SfxPlayMono(relive::SoundEffects::KillEffect, 0);
-                        Mudokon_SFX(MudSounds::eKnockbackOuch_10, 0, 0, pTarget);
+                        Mudokon_SFX(MudSounds::eKnockbackOuch_10, 0, 0, pTarget, mMap);
                     }
                 }
             }
@@ -1856,7 +1856,7 @@ void Scrab::Motion_27_AttackLunge()
                 if (pTarget->VTakeDamage(this))
                 {
                     SfxPlayMono(relive::SoundEffects::KillEffect, 0);
-                    Mudokon_SFX(MudSounds::eKnockbackOuch_10, 0, 0, pTarget);
+                    Mudokon_SFX(MudSounds::eKnockbackOuch_10, 0, 0, pTarget, mMap);
                 }
 
                 pTarget->VTakeDamage(this);
@@ -2193,7 +2193,7 @@ s16 Scrab::Brain_Fighting()
 
             Scrab_SFX(ScrabSounds::eDeathHowl_1, 0, -1571, 1);
             Scrab_SFX(ScrabSounds::eYell_8, 0, -1571, 1);
-            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, -383, 0);
+            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, -383, 0, mMap);
             if (GetAnimation().GetRender())
             {
                 SetFightTarget(nullptr);

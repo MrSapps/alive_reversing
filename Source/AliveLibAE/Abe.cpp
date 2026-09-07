@@ -759,7 +759,7 @@ void Abe::HandleDDCheat()
 
         // Keep within map max bounds
         PSX_Point mapSize = {};
-        mMap.Get_map_size(&mapSize);
+        static_cast<Map&>(mMap).Get_map_size(&mapSize);
 
         FP mapWidth = FP_FromInteger(mapSize.x);
         if (mXPos >= mapWidth)
@@ -1107,10 +1107,10 @@ void Abe::VUpdate()
         {
             mDoQuicksave = false;
             QuikSave::gActiveQuicksaveData.mWorldInfo.mSaveFileId = mSaveFileId;
-            QuikSave::SaveWorldInfo(&QuikSave::gActiveQuicksaveData.mRestartPathWorldInfo);
+            QuikSave::SaveWorldInfo(&QuikSave::gActiveQuicksaveData.mRestartPathWorldInfo, mMap);
             GetSaveState(QuikSave::gActiveQuicksaveData.mRestartPathAbeState);
             QuikSave::gActiveQuicksaveData.mRestartPathSwitchStates = gSwitchStates;
-            QuikSave::DoQuicksave();
+            QuikSave::DoQuicksave(mMap);
         }
     }
 }
@@ -1189,7 +1189,7 @@ void Abe::ToKnockback_44E700(s16 bKnockbackSound, s16 bDelayedAnger)
         if (bKnockbackSound)
         {
             Mudokon_SFX(MudSounds::eHurt2_9, 0, Math_RandomRange(-127, 127), this, mMap);
-            Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 32767, this);
+            Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 32767, this, mMap);
         }
 
         mCurrentMotion = eAbeMotions::Motion_71_Knockback_455090;
@@ -1793,7 +1793,7 @@ bool Abe::VTakeDamage(BaseGameObject* pFrom)
             }
 
             Mudokon_SFX(MudSounds::eHurt2_9, 0, 0, this, mMap);
-            Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 0x7FFF, this);
+            Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 0x7FFF, this, mMap);
             mbGotShot = true;
             mKnockdownMotion = eAbeMotions::Motion_101_KnockForward;
             mNextMotion = eAbeMotions::Motion_101_KnockForward;
@@ -1881,7 +1881,7 @@ bool Abe::VTakeDamage(BaseGameObject* pFrom)
                     if (mHealth <= FP_FromInteger(0))
                     {
                         Mudokon_SFX(MudSounds::eHurt2_9, 0, 1000, this, mMap);
-                        Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 32767, this);
+                        Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 32767, this, mMap);
                         mHealth = FP_FromInteger(0);
                     }
                 }
@@ -2021,7 +2021,7 @@ void Abe::VOnTlvCollision(TlvIterator tlvIterator)
                 }
                 if (pResetSwitchRange->mClearObjects)
                 {
-                    Path::Reset_TLVs(pResetSwitchRange->mPath);
+                    gPathInfo->Reset_TLVs(pResetSwitchRange->mPath);
                 }
             }
         }
@@ -2644,7 +2644,7 @@ void Abe::Motion_1_WalkLoop_44FBA0()
             return;
         }
 
-        Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 32767, this);
+        Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 32767, this, mMap);
 
         MapFollowMe(true);
 
@@ -2759,7 +2759,7 @@ void Abe::Motion_2_StandingTurn_451830()
         // Play "turning" sound effect
         if (currentFrame == 0)
         {
-            Environment_SFX(EnvironmentSfx::eGenericMovement_9, 0, 32767, this);
+            Environment_SFX(EnvironmentSfx::eGenericMovement_9, 0, 32767, this, mMap);
         }
 
         if (GetAnimation().GetIsLastFrame())
@@ -3027,7 +3027,7 @@ void Abe::Motion_4_WalkToIdle_44FFC0()
     }
     else
     {
-        Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 32767, this);
+        Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 32767, this, mMap);
     }
 }
 
@@ -3220,7 +3220,7 @@ void Abe::Motion_14_HoistIdle_452440()
                     return;
                 }
 
-                Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 127, this);
+                Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 127, this, mMap);
 
                 if (FP_FromInteger(BaseAliveGameObjectPathTLV.GetTlv()->mBottomRightY - 1 * BaseAliveGameObjectPathTLV.GetTlv()->mTopLeftY)
                     >= GetSpriteScale() * FP_FromInteger(70))
@@ -3238,7 +3238,7 @@ void Abe::Motion_14_HoistIdle_452440()
             }
             else
             {
-                Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 127, this);
+                Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 127, this, mMap);
                 if (FP_FromInteger(BaseAliveGameObjectPathTLV.GetTlv()->mBottomRightY - 1 * BaseAliveGameObjectPathTLV.GetTlv()->mTopLeftY) >= GetSpriteScale() * FP_FromInteger(70))
                 {
                     mCurrentMotion = eAbeMotions::Motion_67_LedgeHang_454E20;
@@ -3303,11 +3303,11 @@ void Abe::Motion_15_HoistLand_452BA0()
     {
         if (mPreviousMotion == eAbeMotions::Motion_3_Fall_459B60)
         {
-            Environment_SFX(EnvironmentSfx::eLandingSoft_5, 0, 32767, this);
+            Environment_SFX(EnvironmentSfx::eLandingSoft_5, 0, 32767, this, mMap);
         }
         else
         {
-            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 32767, this);
+            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 32767, this, mMap);
         }
     }
 
@@ -3334,11 +3334,11 @@ void Abe::Motion_16_LandSoft_45A360()
         // Hitting the floor sounds.
         if (mPreviousMotion == eAbeMotions::Motion_3_Fall_459B60)
         {
-            Environment_SFX(EnvironmentSfx::eLandingSoft_5, 0, 0x7FFF, this);
+            Environment_SFX(EnvironmentSfx::eLandingSoft_5, 0, 0x7FFF, this, mMap);
         }
         else
         {
-            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 0x7FFF, this);
+            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 0x7FFF, this, mMap);
         }
 
         if (sControlledCharacter != this)
@@ -3632,7 +3632,7 @@ void Abe::Motion_23_RollLoop_453A90()
 
             if (GetAnimation().GetCurrentFrame() == 0 || GetAnimation().GetCurrentFrame() == 6)
             {
-                Environment_SFX(EnvironmentSfx::eRollingNoise_8, 0, 32767, this);
+                Environment_SFX(EnvironmentSfx::eRollingNoise_8, 0, 32767, this, mMap);
             }
         }
     }
@@ -3689,7 +3689,7 @@ void Abe::Motion_25_RunSlideStop_451330()
             {
                 if (GetAnimation().GetCurrentFrame() == 15)
                 {
-                    Environment_SFX(EnvironmentSfx::eSlideStop_0, 0, 32767, this);
+                    Environment_SFX(EnvironmentSfx::eSlideStop_0, 0, 32767, this, mMap);
                     MapFollowMe(true);
 
                     if (!ToLeftRightMovement_44E340())
@@ -3848,7 +3848,7 @@ void Abe::Motion_28_HopMid_451C50()
             case eLineTypes::eBackgroundFloor_4:
             case eLineTypes::eDynamicCollision_32:
             case eLineTypes::eBackgroundDynamicCollision_36:
-                Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 32767, this);
+                Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 32767, this, mMap);
                 BaseAliveGameObjectCollisionLine = pLine;
                 mXPos = hitX;
                 mYPos = FP_NoFractional(hitY + FP_FromDouble(0.5));
@@ -3970,7 +3970,7 @@ void Abe::Motion_30_RunJumpBegin_4532E0()
 
         if (GetAnimation().GetCurrentFrame() == 0)
         {
-            Environment_SFX(EnvironmentSfx::eRunJumpOrLedgeHoist_11, 0, 32767, this);
+            Environment_SFX(EnvironmentSfx::eRunJumpOrLedgeHoist_11, 0, 32767, this, mMap);
         }
 
         if (GetAnimation().GetIsLastFrame())
@@ -4161,7 +4161,7 @@ void Abe::Motion_32_RunJumpLand_453460()
 
     if (GetAnimation().GetIsLastFrame())
     {
-        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 32767, this);
+        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 32767, this, mMap);
 
         MapFollowMe(true);
 
@@ -4209,7 +4209,7 @@ void Abe::Motion_32_RunJumpLand_453460()
             {
                 mCurrentMotion = eAbeMotions::Motion_26_RunTurn_451500;
                 mVelX = ScaleToGridSize(GetSpriteScale()) / FP_FromInteger(4);
-                Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 0x7FFF, this);
+                Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 0x7FFF, this, mMap);
             }
         }
         else if (held & InputCommands::eRight)
@@ -4231,7 +4231,7 @@ void Abe::Motion_32_RunJumpLand_453460()
             {
                 mCurrentMotion = eAbeMotions::Motion_26_RunTurn_451500;
                 mVelX = -(ScaleToGridSize(GetSpriteScale()) / FP_FromInteger(4));
-                Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 32767, this);
+                Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 32767, this, mMap);
             }
             else if (held & InputCommands::eRun)
             {
@@ -4274,7 +4274,7 @@ void Abe::Motion_32_RunJumpLand_453460()
             {
                 mVelX = ScaleToGridSize(GetSpriteScale()) / FP_FromInteger(4);
             }
-            Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 32767, this);
+            Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 32767, this, mMap);
         }
     }
 }
@@ -4332,7 +4332,7 @@ void Abe::Motion_33_RunLoop_4508E0()
     }
     else if (GetAnimation().GetCurrentFrame() == 4 || GetAnimation().GetCurrentFrame() == 12)
     {
-        Environment_SFX(EnvironmentSfx::eRunningFootstep_2, 0, 32767, this);
+        Environment_SFX(EnvironmentSfx::eRunningFootstep_2, 0, 32767, this, mMap);
 
         MapFollowMe(true);
 
@@ -4341,7 +4341,7 @@ void Abe::Motion_33_RunLoop_4508E0()
         {
             mCurrentMotion = eAbeMotions::Motion_26_RunTurn_451500;
 
-            Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 32767, this);
+            Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 32767, this, mMap);
             mPrevInput = 0;
             return;
         }
@@ -4401,7 +4401,7 @@ void Abe::Motion_33_RunLoop_4508E0()
         {
             // No longer running or even moving, so slide stop
             mCurrentMotion = eAbeMotions::Motion_25_RunSlideStop_451330;
-            Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 32767, this);
+            Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 32767, this, mMap);
         }
 
         mPrevInput = 0;
@@ -4448,7 +4448,7 @@ void Abe::Motion_37_CrouchTurn_454390()
     }
     else
     {
-        Environment_SFX(EnvironmentSfx::eGenericMovement_9, 0, 32767, this);
+        Environment_SFX(EnvironmentSfx::eGenericMovement_9, 0, 32767, this, mMap);
     }
 }
 
@@ -4525,7 +4525,7 @@ void Abe::Motion_40_SneakLoop_450550()
             }
             else if (GetAnimation().GetCurrentFrame() == 6 || GetAnimation().GetCurrentFrame() == 16)
             {
-                Environment_SFX(EnvironmentSfx::eSneakFootstep_3, 0, 32767, this);
+                Environment_SFX(EnvironmentSfx::eSneakFootstep_3, 0, 32767, this, mMap);
                 MapFollowMe(true);
                 if ((InputCommands::eLeft | InputCommands::eRight) & held)
                 {
@@ -4656,7 +4656,7 @@ void Abe::Motion_46_SneakToIdle_450870()
 {
     if (GetAnimation().GetCurrentFrame() == 0)
     {
-        Environment_SFX(EnvironmentSfx::eSneakFootstep_3, 0, 32767, this);
+        Environment_SFX(EnvironmentSfx::eSneakFootstep_3, 0, 32767, this, mMap);
     }
 
     MoveForward_44E9A0();
@@ -5017,7 +5017,7 @@ void Abe::Motion_57_Dead_4589A0()
                 0,
                 true,
                 true, mResMan, mMap);
-            QuikSave::LoadActive();
+            QuikSave::LoadActive(static_cast<Map&>(mMap));
             return;
         default:
             return;
@@ -5178,11 +5178,11 @@ void Abe::Motion_65_LedgeAscend_4548E0()
     const s32 curFrameNum = GetAnimation().GetCurrentFrame();
     if (curFrameNum == 0)
     {
-        Environment_SFX(EnvironmentSfx::eExhaustingHoistNoise_10, 0, 32767, this);
+        Environment_SFX(EnvironmentSfx::eExhaustingHoistNoise_10, 0, 32767, this, mMap);
     }
     else if (curFrameNum == 4)
     {
-        Environment_SFX(EnvironmentSfx::eRunJumpOrLedgeHoist_11, 0, 32767, this);
+        Environment_SFX(EnvironmentSfx::eRunJumpOrLedgeHoist_11, 0, 32767, this, mMap);
         GetShadow()->mShadowAtBottom = false;
     }
     else if (GetAnimation().GetIsLastFrame())
@@ -5199,7 +5199,7 @@ void Abe::Motion_66_LedgeDescend_454970()
     const s32 curFrameNum = GetAnimation().GetCurrentFrame();
     if (curFrameNum == 2)
     {
-        Environment_SFX(EnvironmentSfx::eRunJumpOrLedgeHoist_11, 0, 32767, this);
+        Environment_SFX(EnvironmentSfx::eRunJumpOrLedgeHoist_11, 0, 32767, this, mMap);
         GetShadow()->mShadowAtBottom = true;
     }
     else if (curFrameNum == 21)
@@ -5320,7 +5320,7 @@ void Abe::Motion_69_LedgeHangWobble_454EF0()
         if (!mPlayLedgeGrabSounds)
         {
             mPlayLedgeGrabSounds = true;
-            Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 127, this);
+            Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 127, this, mMap);
         }
     }
     else
@@ -5407,7 +5407,7 @@ void Abe::Motion_71_Knockback_455090()
                  || mMap.mCurrentLevel == EReliveLevelIds::eBrewery)
                 && GetAnimation().GetCurrentFrame() == 7)
             {
-                Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this);
+                Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this, mMap);
                 EventBroadcast(Event::kEventNoise, this);
                 EventBroadcast(Event::kEventSuspiciousNoise, this);
             }
@@ -5430,7 +5430,7 @@ void Abe::Motion_71_Knockback_455090()
             else if (mCurrentMotion == eAbeMotions::Motion_16_LandSoft_45A360)
             {
                 mCurrentMotion = eAbeMotions::Motion_71_Knockback_455090;
-                Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this);
+                Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this, mMap);
             }
         }
     }
@@ -5470,7 +5470,7 @@ void Abe::Motion_73_PushWall_4553A0()
     {
         if (Math_NextRandom() <= 127)
         {
-            Environment_SFX(EnvironmentSfx::eExhaustingHoistNoise_10, 0, 32767, this);
+            Environment_SFX(EnvironmentSfx::eExhaustingHoistNoise_10, 0, 32767, this, mMap);
         }
     }
     if (GetAnimation().GetIsLastFrame())
@@ -7003,7 +7003,7 @@ void Abe::Motion_114_DoorEnter()
                 return;
             }
 
-            mMap.mDoorTransition = 1;
+            static_cast<Map&>(mMap).mDoorTransition = 1;
             s16 bForceChange = 0;
             const CameraSwapEffects effect = kPathChangeEffectToInternalScreenChangeEffect[pDoorTlv->mWipeEffect];
             if (effect == CameraSwapEffects::ePlay1FMV_5 || effect == CameraSwapEffects::eUnknown_11)
@@ -7026,7 +7026,7 @@ void Abe::Motion_114_DoorEnter()
 
         case AbeDoorStates::eSetNewAbePosition_5:
         {
-            mMap.mDoorTransition = 0;
+            static_cast<Map&>(mMap).mDoorTransition = 0;
             mCurrentLevel = mMap.mCurrentLevel;
             mCurrentPath = mMap.mCurrentPath;
 
@@ -7446,13 +7446,13 @@ void Abe::Motion_129_PoisonGasDeath()
             SFX_Play_Pitch(relive::SoundEffects::Choke, 127, 640);
             break;
         case 32:
-            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, 0, this);
+            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, 0, this, mMap);
             break;
         case 50:
-            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 100, -200, this);
+            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 100, -200, this, mMap);
             break;
         case 53:
-            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 50, -200, this);
+            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 50, -200, this, mMap);
             break;
         default:
             break;
@@ -7841,7 +7841,7 @@ void Abe::PushWall_44E890()
 {
     mVelX = FP_FromInteger(0);
     mCurrentMotion = eAbeMotions::Motion_73_PushWall_4553A0;
-    Environment_SFX(EnvironmentSfx::eGenericMovement_9, 0, 32767, this);
+    Environment_SFX(EnvironmentSfx::eGenericMovement_9, 0, 32767, this, mMap);
 }
 
 void Abe::MoveForward_44E9A0()
@@ -8582,9 +8582,9 @@ void Abe::BulletDamage_44C980(Bullet* pBullet)
         mKnockdownMotion = mNextMotion;
     }
 
-    Environment_SFX(EnvironmentSfx::eElumHitWall_14, 0, 32767, this);
+    Environment_SFX(EnvironmentSfx::eElumHitWall_14, 0, 32767, this, mMap);
     Mudokon_SFX(MudSounds::eHurt2_9, 127, 0, this, mMap);
-    Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 32767, this);
+    Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 32767, this, mMap);
     SFX_Play_Pitch(relive::SoundEffects::Eating1, 0, -500, GetSpriteScale());
     SfxPlayMono(relive::SoundEffects::KillEffect, 0, GetSpriteScale());
 }

@@ -9,6 +9,7 @@
 #include "../relive_lib/PsxDisplay.hpp"
 #include "DDCheat.hpp"
 #include "Path.hpp"
+#include "Map.hpp"
 
 namespace AO {
 
@@ -44,7 +45,7 @@ Well::~Well()
 {
     if (mTlvInfo.IsValid())
     {
-        Path::TLV_Reset(mTlvInfo);
+        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
     }
 }
 
@@ -158,7 +159,7 @@ void Well::VUpdate()
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);
-        Path::TLV_Reset(mTlvInfo);
+        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
     }
 
     if (mEmitLeaves)

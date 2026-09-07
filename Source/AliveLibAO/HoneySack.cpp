@@ -12,6 +12,7 @@
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
 #include "Path.hpp"
 #include "../relive_lib/ObjectIds.hpp"
+#include "Map.hpp"
 
 namespace AO {
 
@@ -94,11 +95,11 @@ HoneySack::~HoneySack()
 
     if (mState == State::eDripHoney_0)
     {
-        Path::TLV_Reset(mTlvInfo);
+        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
     }
     else
     {
-        Path::TLV_Reset(mTlvInfo, FP_GetExponent(mYPos - mObjectYPos));
+        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo, FP_GetExponent(mYPos - mObjectYPos));
     }
 
     mBeeSwarm = Guid{};
@@ -192,7 +193,7 @@ void HoneySack::VUpdate()
                     GetSpriteScale() == FP_FromInteger(1) ? kFgFloor : kBgFloor))
             {
                 SfxPlayMono(relive::SoundEffects::MountingElum, 90);
-                Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 90, -1000, nullptr);
+                Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 90, -1000, nullptr, mMap);
                 mYPos = hitY;
                 mState = State::eUpdateHoneySackOnGround_3;
                 GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::HoneySack_FallingToSmashed));

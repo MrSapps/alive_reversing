@@ -18,6 +18,7 @@
 #include "Path.hpp"
 #include "../relive_lib/FixedPoint.hpp"
 #include "../relive_lib/ObjectIds.hpp"
+#include "Map.hpp"
 
 namespace AO {
 
@@ -163,7 +164,7 @@ ChimeLock::~ChimeLock()
 {
     SetDeadAllBells();
 
-    Path::TLV_Reset(mTlvId);
+    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
 }
 
 void ChimeLock::VScreenChanged()

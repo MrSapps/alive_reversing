@@ -3,6 +3,7 @@
 #include "Function.hpp"
 #include "MapWrapper.hpp"
 #include "../AliveLibAE/QuikSave.hpp"
+#include "../AliveLibAE/Map.hpp"
 #include "data_conversion/file_system.hpp"
 #include "data_conversion/AESaveSerialization.hpp"
 #include "GameType.hpp"
@@ -65,33 +66,33 @@ static const InputCommands sCheatKeyArray_VoiceLocks[] = {
     InputCommands::eSneak // eCrouchOrRoll
 };
 
-static void CheatController_Cheat_MovieSelect()
+static void CheatController_Cheat_MovieSelect(BaseMap& map)
 {
-    if (gCheatController->mMap.mCurrentCamera == 1)
+    if (map.mCurrentCamera == 1)
     {
         CheatController::gEnableCheatFMV = !CheatController::gEnableCheatFMV;
     }
 }
 
-static void CheatController_Cheat_LevelSelect()
+static void CheatController_Cheat_LevelSelect(BaseMap& map)
 {
-    if (gCheatController->mMap.mCurrentCamera == 1)
+    if (map.mCurrentCamera == 1)
     {
         CheatController::gEnableCheatLevelSelect = !CheatController::gEnableCheatLevelSelect;
     }
 }
 
-static void CheatController_Cheat_FartGas()
+static void CheatController_Cheat_FartGas(BaseMap& /*map*/)
 {
     CheatController::gEnableFartGasCheat = !CheatController::gEnableFartGasCheat;
 }
 
-static void CheatController_Cheat_VoiceLocks()
+static void CheatController_Cheat_VoiceLocks(BaseMap& /*map*/)
 {
     CheatController::gVoiceCheat = !CheatController::gVoiceCheat;
 }
 
-static void CheatController_Cheat_PathSkip()
+static void CheatController_Cheat_PathSkip(BaseMap& map)
 {
     char_type nameBuffer[20];
 
@@ -111,7 +112,7 @@ static void CheatController_Cheat_PathSkip()
     QuikSave::gActiveQuicksaveData = {};
     from_json(j, QuikSave::gActiveQuicksaveData);
 
-    QuikSave::LoadActive();
+    QuikSave::LoadActive(static_cast<Map&>(map));
 }
 
 struct CheatEntry final
@@ -121,7 +122,7 @@ struct CheatEntry final
     s32 mCheatCodeLength;
     const InputCommands* mCheatCodeAry;
     s32 mSuccessIdx;
-    void (*mCallBack)(void);
+    void (*mCallBack)(BaseMap&);
 };
 
 static CheatEntry sCheatArray[] = {
@@ -174,7 +175,7 @@ void CheatController::VUpdate()
                             if (cheatEntry.mSuccessIdx >= cheatEntry.mCheatCodeLength)
                             {
                                 cheatEntry.mSuccessIdx = 0;
-                                cheatEntry.mCallBack();
+                                cheatEntry.mCallBack(mMap);
                             }
                         }
                         else

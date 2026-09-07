@@ -64,10 +64,6 @@ public:
 
     void ScreenChange() override;
 
-    void FreePathResourceBlocks();
-    BinaryPath* GetPathResourceBlockPtr(u32 pathId);
-    void ClearPathResourceBlocks();
-
     void GoTo_Camera();
 
     void Loader(s16 camX, s16 camY, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad);
@@ -118,31 +114,21 @@ public:
 
     void SaveBlyData(u8* pSaveBuffer);
 
-    std::vector<std::unique_ptr<BinaryPath>>& GetLoadedPaths()
-    {
-        return mLoadedPaths;
-    }
-
     virtual void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1) override;
     virtual void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1) override;
     virtual void TLV_Delete(const Guid& tlvId, s16 hiFlags = -1) override;
     void Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed) override;
 
     s16 field_1E_door = 0;
-    s16 mCamIdxOnX = 0;
-    s16 mCamIdxOnY = 0;
     u16 mMaxCamsX = 0;
     u16 mMaxCamsY = 0;
     FP_Point mCameraOffset = {};
 
     const PathData* mPathData = nullptr;
     s16 mMapChanged = 0;
-    bool mFreeAllAnimAndPalts = false;
     u8* mSaveData = nullptr;
 };
 
-
-extern Map* gMap;
 
 s32 MaxGridBlocks(FP scale);
 

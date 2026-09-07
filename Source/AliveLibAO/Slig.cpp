@@ -1,4 +1,5 @@
 #include "stdafx_ao.h"
+#include "Map.hpp"
 #include "AmbientSound.hpp"
 #include "../relive_lib/Function.hpp"
 #include "Slig.hpp"
@@ -155,7 +156,7 @@ void Slig::Slig_SoundEffect(SligSfx sfxIdx)
     {
         volRight = sSligSfxSounds[sfxIdxInt].mDefaultVolume / 2;
     }
-    mMap.Get_Camera_World_Rect(dir, &worldRect);
+    static_cast<Map&>(mMap).Get_Camera_World_Rect(dir, &worldRect);
     switch (dir)
     {
         case CameraPos::eCamCurrent_0:
@@ -427,7 +428,7 @@ void Slig::Init()
     {
         for (s16 xCam = -2; xCam < 3; xCam++)
         {
-            auto pTlvIter = mMap.Get_First_TLV_For_Offsetted_Camera(xCam, yCam);
+            auto pTlvIter = static_cast<Map&>(mMap).Get_First_TLV_For_Offsetted_Camera(xCam, yCam);
             while (pTlvIter.GetTlv())
             {
                 bool addPoint = false;
@@ -521,7 +522,7 @@ void Slig::VUpdate()
             mYPos += mVelY;
 
             PSX_Point mapSize = {};
-            mMap.Get_map_size(&mapSize);
+            static_cast<Map&>(mMap).Get_map_size(&mapSize);
 
             if (mXPos < FP_FromInteger(0))
             {
@@ -791,7 +792,7 @@ bool Slig::VTakeDamage(BaseGameObject* pFrom)
             mHealth = FP_FromInteger(0);
             SetBrain(&Slig::Brain_Death);
             mbGotShot = true;
-            Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 0x7FFF, this);
+            Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 0x7FFF, this, mMap);
             if (VIsFacingMe(static_cast<BaseAnimatedWithPhysicsGameObject*>(pFrom)))
             {
                 if (GetAnimation().GetFlipX())
@@ -1559,7 +1560,7 @@ void Slig::ToStand()
 s16 Slig::IsInZCover(BaseAnimatedWithPhysicsGameObject* pObj)
 {
     const PSX_RECT bRect = pObj->VGetBoundingRect();
-    return Bullet::InZBulletCover(FP_FromInteger(bRect.x), FP_FromInteger(bRect.y), bRect);
+    return Bullet::InZBulletCover(FP_FromInteger(bRect.x), FP_FromInteger(bRect.y), bRect, pObj->GetMap());
 }
 
 void Slig::CheckPlatformVanished()
@@ -2207,7 +2208,7 @@ s16 Slig::MainMovement()
 
 void Slig::ToKnockBack()
 {
-    Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 0x7FFF, this);
+    Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 0x7FFF, this, mMap);
 
     mXPos -= mVelX;
 
@@ -2827,7 +2828,7 @@ void Slig::Motion_9_SlidingToStand()
             {
                 if (GetAnimation().GetIsLastFrame())
                 {
-                    Environment_SFX(EnvironmentSfx::eSlideStop_0, 0, 0x7FFF, this);
+                    Environment_SFX(EnvironmentSfx::eSlideStop_0, 0, 0x7FFF, this, mMap);
                     MapFollowMe(1);
                     MainMovement();
                 }
@@ -3282,7 +3283,7 @@ void Slig::Motion_35_Knockback()
          || mMap.mCurrentLevel == EReliveLevelIds::eBoardRoom)
         && GetAnimation().GetCurrentFrame() == 4)
     {
-        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this);
+        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this, mMap);
     }
 
     if (GetAnimation().GetForwardLoopCompleted())
@@ -3524,7 +3525,7 @@ void Slig::Motion_41_LandingSoft()
 {
     if (!GetAnimation().GetCurrentFrame())
     {
-        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 0x7FFF, 0);
+        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 0x7FFF, 0, mMap);
     }
 
     if (GetAnimation().GetIsLastFrame())
@@ -3608,7 +3609,7 @@ void Slig::Motion_45_Smash()
     {
         if (GetAnimation().GetCurrentFrame() == 4)
         {
-            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this);
+            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this, mMap);
         }
     }
     else
@@ -4345,7 +4346,7 @@ s16 Slig::Brain_DeathDropDeath()
                 return mBrainSubState;
             }
 
-            Environment_SFX(EnvironmentSfx::eFallingDeathScreamHitGround_15, 0, 32767, this);
+            Environment_SFX(EnvironmentSfx::eFallingDeathScreamHitGround_15, 0, 32767, this, mMap);
 
             relive_new ScreenShake(false, false, mResMan, mMap);
             field_114_timer = MakeTimer(30);

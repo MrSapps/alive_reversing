@@ -45,6 +45,7 @@
 #include "../relive_lib/Collisions.hpp"
 #include "BirdPortal.hpp"
 #include "SaveGame.hpp"
+#include "Map.hpp"
 #include "BeeSwarm.hpp"
 #include "Shrykull.hpp"
 #include "Lever.hpp"
@@ -302,7 +303,7 @@ bool IsAbe(BaseGameObject* pObj)
     return false;
 }
 
-s32 Environment_SFX(EnvironmentSfx sfxId, s32 volume, s32 pitchMin, ::BaseAliveGameObject* pAliveObj)
+s32 Environment_SFX(EnvironmentSfx sfxId, s32 volume, s32 pitchMin, ::BaseAliveGameObject* pAliveObj, BaseMap& map)
 {
     s16 sndIndex = 0;
     switch (sfxId)
@@ -386,9 +387,9 @@ s32 Environment_SFX(EnvironmentSfx sfxId, s32 volume, s32 pitchMin, ::BaseAliveG
             sndIndex = 25;
             break;
         case EnvironmentSfx::eKnockback_13:
-            if (mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms
-                || mMap.mCurrentLevel == EReliveLevelIds::eBoardRoom
-                || mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
+            if (map.mCurrentLevel == EReliveLevelIds::eRuptureFarms
+                || map.mCurrentLevel == EReliveLevelIds::eBoardRoom
+                || map.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
             {
                 sndIndex = 2;
             }
@@ -435,11 +436,11 @@ s32 Environment_SFX(EnvironmentSfx sfxId, s32 volume, s32 pitchMin, ::BaseAliveG
     return SFX_SfxDefinition_Play_Mono(sSFXList_4C6638[sndIndex], volume, pitchMin, 0x7FFF);
 }
 
-s32 Mudokon_SFX(MudSounds idx, s32 volume, s32 pitch, ::BaseAliveGameObject* pHero)
+s32 Mudokon_SFX(MudSounds idx, s32 volume, s32 pitch, ::BaseAliveGameObject* pHero, BaseMap& map)
 {
     if (idx == MudSounds::eLaugh1_8
         && pHero == gAbe
-        && (mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn || mMap.mCurrentLevel == EReliveLevelIds::eBoardRoom))
+        && (map.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn || map.mCurrentLevel == EReliveLevelIds::eBoardRoom))
     {
         idx = MudSounds::eLaugh2_11;
     }
@@ -667,7 +668,7 @@ void Abe::VUpdate()
             mYPos += mVelY;
 
             PSX_Point mapSize = {};
-            mMap.Get_map_size(&mapSize);
+            static_cast<Map&>(mMap).Get_map_size(&mapSize);
 
             if (mXPos < FP_FromInteger(0))
             {
@@ -851,7 +852,7 @@ void Abe::VUpdate()
                         {
                             EventBroadcast(Event::kEventMudokonComfort, gAbe);
                         }
-                        Mudokon_SFX(static_cast<MudSounds>(field_130_say), 0, 0, this);
+                        Mudokon_SFX(static_cast<MudSounds>(field_130_say), 0, 0, this, mMap);
                     }
                 }
                 field_130_say = -1;
@@ -1136,8 +1137,8 @@ void Abe::ToKnockback(s16 bKnockbackSound, s16 bDelayedAnger)
 
         if (bKnockbackSound)
         {
-            Mudokon_SFX(MudSounds::eKnockbackOuch_10, 0, Math_RandomRange(-127, 127), this);
-            Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 0x7FFF, this);
+            Mudokon_SFX(MudSounds::eKnockbackOuch_10, 0, Math_RandomRange(-127, 127), this, mMap);
+            Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 0x7FFF, this, mMap);
         }
 
         if (mRidingElum)
@@ -1313,7 +1314,7 @@ eAbeMotions Abe::DoGameSpeak(u16 input)
         if (input & InputCommands::eGameSpeak2)
         {
             gEventSystem->PushEvent(GameSpeakEvents::eAbe_FollowMe);
-            Mudokon_SFX(MudSounds::eFollowMe_4, 0, 0, this);
+            Mudokon_SFX(MudSounds::eFollowMe_4, 0, 0, this, mMap);
             if (mCurrentMotion == eAbeMotions::Motion_14_Speak)
             {
                 mbMotionChanged = true;
@@ -1323,7 +1324,7 @@ eAbeMotions Abe::DoGameSpeak(u16 input)
         if (input & InputCommands::eGameSpeak4)
         {
             gEventSystem->PushEvent(GameSpeakEvents::eAbe_Wait);
-            Mudokon_SFX(MudSounds::eWait_6, 0, 0, this);
+            Mudokon_SFX(MudSounds::eWait_6, 0, 0, this, mMap);
             if (mCurrentMotion == eAbeMotions::Motion_14_Speak)
             {
                 mbMotionChanged = true;
@@ -1333,7 +1334,7 @@ eAbeMotions Abe::DoGameSpeak(u16 input)
         if (input & InputCommands::eGameSpeak1)
         {
             gEventSystem->PushEvent(GameSpeakEvents::eAbe_Hello);
-            Mudokon_SFX(MudSounds::eHello_3, 0, 0, this);
+            Mudokon_SFX(MudSounds::eHello_3, 0, 0, this, mMap);
             if (mCurrentMotion == eAbeMotions::Motion_9_Speak)
             {
                 mbMotionChanged = true;
@@ -1343,7 +1344,7 @@ eAbeMotions Abe::DoGameSpeak(u16 input)
         if (input & InputCommands::eGameSpeak3)
         {
             gEventSystem->PushEvent(GameSpeakEvents::eAbe_Anger);
-            Mudokon_SFX(MudSounds::eAngry_5, 0, 0, this);
+            Mudokon_SFX(MudSounds::eAngry_5, 0, 0, this, mMap);
             if (mCurrentMotion == eAbeMotions::Motion_10_Speak)
             {
                 mbMotionChanged = true;
@@ -1357,7 +1358,7 @@ eAbeMotions Abe::DoGameSpeak(u16 input)
         if (input & InputCommands::eGameSpeak6)
         {
             gEventSystem->PushEvent(GameSpeakEvents::eAbe_WhistleHigh);
-            Mudokon_SFX(MudSounds::eWhistleHigh_1, 0, 0, this);
+            Mudokon_SFX(MudSounds::eWhistleHigh_1, 0, 0, this, mMap);
             if (mCurrentMotion == eAbeMotions::Motion_9_Speak)
             {
                 mbMotionChanged = true;
@@ -1367,7 +1368,7 @@ eAbeMotions Abe::DoGameSpeak(u16 input)
         if (input & InputCommands::eGameSpeak5)
         {
             gEventSystem->PushEvent(GameSpeakEvents::eAbe_WhistleLow);
-            Mudokon_SFX(MudSounds::eWhistleLow_2, 0, 0, this);
+            Mudokon_SFX(MudSounds::eWhistleLow_2, 0, 0, this, mMap);
             if (mCurrentMotion == eAbeMotions::Motion_8_Speak)
             {
                 mbMotionChanged = true;
@@ -1377,7 +1378,7 @@ eAbeMotions Abe::DoGameSpeak(u16 input)
         if (input & InputCommands::eGameSpeak8)
         {
             gEventSystem->PushEvent(GameSpeakEvents::eAbe_Laugh);
-            Mudokon_SFX(MudSounds::eLaugh1_8, 0, 0, this);
+            Mudokon_SFX(MudSounds::eLaugh1_8, 0, 0, this, mMap);
             if (mCurrentMotion == eAbeMotions::Motion_12_Speak)
             {
                 mbMotionChanged = true;
@@ -1387,7 +1388,7 @@ eAbeMotions Abe::DoGameSpeak(u16 input)
         if (input & InputCommands::eGameSpeak7)
         {
             gEventSystem->PushEvent(GameSpeakEvents::eAbe_Fart);
-            Mudokon_SFX(MudSounds::eFart_7, 0, 0, this);
+            Mudokon_SFX(MudSounds::eFart_7, 0, 0, this, mMap);
             if (CheatController::gEnableFartGasCheat)
             {
                 FP xPos = mXPos;
@@ -1679,25 +1680,25 @@ void Abe::CrouchingGameSpeak()
         if (field_10C_prev_held & InputCommands::eGameSpeak2)
         {
             gEventSystem->PushEvent(GameSpeakEvents::eAbe_FollowMe);
-            Mudokon_SFX(MudSounds::eFollowMe_4, 0, 0, this);
+            Mudokon_SFX(MudSounds::eFollowMe_4, 0, 0, this, mMap);
             mCurrentMotion = eAbeMotions::Motion_22_CrouchSpeak;
         }
         else if (field_10C_prev_held & InputCommands::eGameSpeak4)
         {
             gEventSystem->PushEvent(GameSpeakEvents::eAbe_Wait);
-            Mudokon_SFX(MudSounds::eWait_6, 0, 0, this);
+            Mudokon_SFX(MudSounds::eWait_6, 0, 0, this, mMap);
             mCurrentMotion = eAbeMotions::Motion_23_CrouchSpeak;
         }
         else if (field_10C_prev_held & InputCommands::eGameSpeak1)
         {
             gEventSystem->PushEvent(GameSpeakEvents::eAbe_Hello);
-            Mudokon_SFX(MudSounds::eHello_3, 0, 0, this);
+            Mudokon_SFX(MudSounds::eHello_3, 0, 0, this, mMap);
             mCurrentMotion = eAbeMotions::Motion_22_CrouchSpeak;
         }
         else if (field_10C_prev_held & InputCommands::eGameSpeak3)
         {
             gEventSystem->PushEvent(GameSpeakEvents::eAbe_Anger);
-            Mudokon_SFX(MudSounds::eAngry_5, 0, 0, this);
+            Mudokon_SFX(MudSounds::eAngry_5, 0, 0, this, mMap);
             mCurrentMotion = eAbeMotions::Motion_23_CrouchSpeak;
         }
     }
@@ -1706,25 +1707,25 @@ void Abe::CrouchingGameSpeak()
         if (field_10C_prev_held & InputCommands::eGameSpeak6)
         {
             gEventSystem->PushEvent(GameSpeakEvents::eAbe_WhistleHigh);
-            Mudokon_SFX(MudSounds::eWhistleHigh_1, 0, 0, this);
+            Mudokon_SFX(MudSounds::eWhistleHigh_1, 0, 0, this, mMap);
             mCurrentMotion = eAbeMotions::Motion_23_CrouchSpeak;
         }
         else if (field_10C_prev_held & InputCommands::eGameSpeak5)
         {
             gEventSystem->PushEvent(GameSpeakEvents::eAbe_WhistleLow);
-            Mudokon_SFX(MudSounds::eWhistleLow_2, 0, 0, this);
+            Mudokon_SFX(MudSounds::eWhistleLow_2, 0, 0, this, mMap);
             mCurrentMotion = eAbeMotions::Motion_22_CrouchSpeak;
         }
         else if (field_10C_prev_held & InputCommands::eGameSpeak8)
         {
             gEventSystem->PushEvent(GameSpeakEvents::eAbe_Laugh);
-            Mudokon_SFX(MudSounds::eLaugh1_8, 0, 0, this);
+            Mudokon_SFX(MudSounds::eLaugh1_8, 0, 0, this, mMap);
             mCurrentMotion = eAbeMotions::Motion_23_CrouchSpeak;
         }
         else if (field_10C_prev_held & InputCommands::eGameSpeak7)
         {
             gEventSystem->PushEvent(GameSpeakEvents::eAbe_Fart);
-            Mudokon_SFX(MudSounds::eFart_7, 0, 0, this);
+            Mudokon_SFX(MudSounds::eFart_7, 0, 0, this, mMap);
             if (CheatController::gEnableFartGasCheat)
             {
                 FP xPos = {};
@@ -1824,7 +1825,7 @@ s16 Abe::ToLeftRightMovement()
         {
             mVelX = FP_FromInteger(0);
             mCurrentMotion = eAbeMotions::Motion_72_PushWall;
-            Environment_SFX(EnvironmentSfx::eGenericMovement_9, 0, 0x7FFF, this);
+            Environment_SFX(EnvironmentSfx::eGenericMovement_9, 0, 0x7FFF, this, mMap);
             return 0;
         }
 
@@ -2074,7 +2075,7 @@ void Abe::BulletDamage(Bullet* pBullet)
                 mHealth = FP_FromInteger(1);
                 return;
             }
-            if (Bullet::InZBulletCover(FP_FromInteger(rect.x), FP_FromInteger(rect.y), rect))
+            if (Bullet::InZBulletCover(FP_FromInteger(rect.x), FP_FromInteger(rect.y), rect, mMap))
             {
                 mbGotShot = false;
                 mHealth = FP_FromInteger(1);
@@ -2134,9 +2135,9 @@ void Abe::BulletDamage(Bullet* pBullet)
         field_112_prev_motion = mNextMotion;
     }
 
-    Environment_SFX(EnvironmentSfx::eElumHitWall_14, 0, 0x7FFF, this);
-    Mudokon_SFX(MudSounds::eKnockbackOuch_10, 127, 0, this);
-    Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 0x7FFF, this);
+    Environment_SFX(EnvironmentSfx::eElumHitWall_14, 0, 0x7FFF, this, mMap);
+    Mudokon_SFX(MudSounds::eKnockbackOuch_10, 127, 0, this, mMap);
+    Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 0x7FFF, this, mMap);
     SFX_Play_Pitch(relive::SoundEffects::Eating1, 0, -500, GetSpriteScale());
     SfxPlayMono(relive::SoundEffects::KillEffect, 0, GetSpriteScale());
 }
@@ -2343,7 +2344,7 @@ void Abe::VOnTlvCollision(TlvIterator tlvIterator)
                     GameEnderController::gRestartRuptureFarmsSavedMuds = gRescuedMudokons;
                 }
 
-                SaveGame::SaveToMemory(&gSaveBuffer);
+                SaveGame::SaveToMemory(&gSaveBuffer, static_cast<Map&>(mMap));
 
                 const FP camXPos = FP_NoFractional(gScreenManager->CamXPos());
 
@@ -2364,7 +2365,7 @@ void Abe::VOnTlvCollision(TlvIterator tlvIterator)
         }
         else if (tlvIterator.GetTlv()->mTlvType == ReliveTypes::eDeathDrop)
         {
-            Mudokon_SFX(MudSounds::eDeathDropScream_17, 0, 0, this);
+            Mudokon_SFX(MudSounds::eDeathDropScream_17, 0, 0, this, mMap);
 
             EventBroadcast(Event::kEventNoise, this);
             EventBroadcast(Event::kEventSuspiciousNoise, this);
@@ -2543,12 +2544,12 @@ bool Abe::VTakeDamage(BaseGameObject* pFrom)
                 mHealth -= FP_FromInteger(1);
                 if (mHealth > FP_FromInteger(0))
                 {
-                    Mudokon_SFX(MudSounds::eKnockbackOuch_10, 0, 0, this);
+                    Mudokon_SFX(MudSounds::eKnockbackOuch_10, 0, 0, this, mMap);
                 }
                 else
                 {
-                    Mudokon_SFX(MudSounds::eKnockbackOuch_10, 0, 0, this);
-                    Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 0x7FFF, this);
+                    Mudokon_SFX(MudSounds::eKnockbackOuch_10, 0, 0, this, mMap);
+                    Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 0x7FFF, this, mMap);
                     mHealth = FP_FromInteger(0);
                     mbGotShot = true;
                     field_112_prev_motion = eAbeMotions::Motion_128_KnockForward;
@@ -2608,7 +2609,7 @@ bool Abe::VTakeDamage(BaseGameObject* pFrom)
             break;
 
         case ReliveTypes::eElectricWall:
-            Mudokon_SFX(MudSounds::eOops_16, 0, 0, this);
+            Mudokon_SFX(MudSounds::eOops_16, 0, 0, this, mMap);
             break;
 
         case ReliveTypes::eGroundExplosion:
@@ -2882,12 +2883,12 @@ bool Abe::VTakeDamage(BaseGameObject* pFrom)
                     const auto rnd_sfx = Math_RandomRange(0, 127) >= 64 ? MudSounds::eBeesStruggle_18 : MudSounds::eKnockbackOuch_10;
                     const FP v16 = (FP_FromInteger(1) - gAbe->mHealth) / FP_FromDouble(0.15);
                     const s16 calc_pitch = Math_RandomRange(200 * FP_GetExponent(v16), 200 * FP_GetExponent(v16) + 1);
-                    Mudokon_SFX(rnd_sfx, 0, calc_pitch, this);
+                    Mudokon_SFX(rnd_sfx, 0, calc_pitch, this, mMap);
                 }
                 else
                 {
-                    Mudokon_SFX(MudSounds::eKnockbackOuch_10, 0, 1000, this);
-                    Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 0x7FFF, this);
+                    Mudokon_SFX(MudSounds::eKnockbackOuch_10, 0, 1000, this, mMap);
+                    Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 0x7FFF, this, mMap);
                     mHealth = FP_FromInteger(0);
                     mbGotShot = true;
                     field_112_prev_motion = eAbeMotions::Motion_128_KnockForward;
@@ -3429,7 +3430,7 @@ void Abe::Motion_1_WalkLoop()
                 return;
 
             case 5:
-                Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 0x7FFF, this);
+                Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 0x7FFF, this, mMap);
 
                 if (!mWalkToRun)
                 {
@@ -3448,7 +3449,7 @@ void Abe::Motion_1_WalkLoop()
                 break;
 
             case 14:
-                Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 0x7FFF, this);
+                Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 0x7FFF, this, mMap);
 
                 if (!mWalkToRun)
                 {
@@ -3502,7 +3503,7 @@ void Abe::Motion_2_StandingTurn()
 
     if (!GetAnimation().GetCurrentFrame())
     {
-        Environment_SFX(EnvironmentSfx::eGenericMovement_9, 0, 0x7FFF, this);
+        Environment_SFX(EnvironmentSfx::eGenericMovement_9, 0, 0x7FFF, this, mMap);
     }
 
     if (GetAnimation().GetIsLastFrame())
@@ -3798,7 +3799,7 @@ void Abe::Motion_4_WalkToIdle()
     }
     else
     {
-        Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 0x7FFF, this);
+        Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 0x7FFF, this, mMap);
     }
 }
 
@@ -3832,7 +3833,7 @@ void Abe::Motion_5_MidWalkToIdle()
     }
     else
     {
-        Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 0x7FFF, this);
+        Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 0x7FFF, this, mMap);
     }
 }
 
@@ -4000,7 +4001,7 @@ void Abe::Motion_17_HoistIdle()
                 }
 
                 mCurrentMotion = eAbeMotions::Motion_66_LedgeHang;
-                Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 127, this);
+                Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 127, this, mMap);
 
 
                 if (gCollisions->Raycast(
@@ -4062,11 +4063,11 @@ void Abe::Motion_18_HoistLand()
     {
         if (mPreviousMotion == eAbeMotions::Motion_3_Fall)
         {
-            Environment_SFX(EnvironmentSfx::eLandingSoft_5, 0, 0x7FFF, this);
+            Environment_SFX(EnvironmentSfx::eLandingSoft_5, 0, 0x7FFF, this, mMap);
         }
         else
         {
-            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 0x7FFF, this);
+            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 0x7FFF, this, mMap);
         }
 
         if (Input().IsAnyHeld(InputCommands::eHop))
@@ -4105,7 +4106,7 @@ void Abe::Motion_19_CrouchIdle()
 
     if (Input().IsAnyPressed(InputCommands::eLeftGameSpeak) && Input().IsAnyPressed(InputCommands::eRightGameSpeak))
     {
-        Mudokon_SFX(MudSounds::eDunno_15, 0, 0, this);
+        Mudokon_SFX(MudSounds::eDunno_15, 0, 0, this, mMap);
         mCurrentMotion = eAbeMotions::Motion_23_CrouchSpeak;
         return;
     }
@@ -4184,7 +4185,7 @@ void Abe::Motion_19_CrouchIdle()
 
         if (!field_19C_throwable_count && !gInfiniteThrowables)
         {
-            Mudokon_SFX(MudSounds::eDunno_15, 0, 0, this);
+            Mudokon_SFX(MudSounds::eDunno_15, 0, 0, this, mMap);
             mCurrentMotion = eAbeMotions::Motion_23_CrouchSpeak;
             return;
         }
@@ -4400,7 +4401,7 @@ void Abe::Motion_25_RollLoop()
 
             if (GetAnimation().GetCurrentFrame() == 0 || GetAnimation().GetCurrentFrame() == 6)
             {
-                Environment_SFX(EnvironmentSfx::eRollingNoise_8, 0, 0x7FFF, this);
+                Environment_SFX(EnvironmentSfx::eRollingNoise_8, 0, 0x7FFF, this, mMap);
             }
         }
     }
@@ -4452,7 +4453,7 @@ void Abe::Motion_27_RunSlideStop()
             {
                 if (GetAnimation().GetCurrentFrame() == 15)
                 {
-                    Environment_SFX(EnvironmentSfx::eSlideStop_0, 0, 0x7FFF, this);
+                    Environment_SFX(EnvironmentSfx::eSlideStop_0, 0, 0x7FFF, this, mMap);
                     MapFollowMe(1);
 
                     if (!ToLeftRightMovement())
@@ -4695,7 +4696,7 @@ void Abe::Motion_30_HopMid()
                     case eLineTypes::eDynamicCollision_32:
                     case eLineTypes::eBackgroundDynamicCollision_36:
                     {
-                        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 0x7FFF, this);
+                        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 0x7FFF, this, mMap);
                         BaseAliveGameObjectCollisionLine = pLine;
                         mVelY = FP_FromInteger(0);
                         mCurrentMotion = eAbeMotions::Motion_31_HopLand;
@@ -4780,7 +4781,7 @@ void Abe::Motion_32_RunJumpBegin()
         mXPos += mVelX;
         if (GetAnimation().GetCurrentFrame() == 0)
         {
-            Environment_SFX(EnvironmentSfx::eRunJumpOrLedgeHoist_11, 0, 0x7FFF, this);
+            Environment_SFX(EnvironmentSfx::eRunJumpOrLedgeHoist_11, 0, 0x7FFF, this, mMap);
         }
 
         if (GetAnimation().GetIsLastFrame())
@@ -4975,7 +4976,7 @@ void Abe::Motion_34_RunJumpLand()
 
     if (GetAnimation().GetIsLastFrame())
     {
-        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 0x7FFF, this);
+        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 0x7FFF, this, mMap);
         MapFollowMe(1);
 
         if (Input().IsAnyHeld(InputCommands::eLeft))
@@ -5007,7 +5008,7 @@ void Abe::Motion_34_RunJumpLand()
 
                 mCurrentMotion = eAbeMotions::Motion_28_RunTurn;
                 mVelX = (ScaleToGridSize(GetSpriteScale()) / FP_FromInteger(4));
-                Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 0x7FFF, this);
+                Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 0x7FFF, this, mMap);
                 return;
             }
 
@@ -5040,7 +5041,7 @@ void Abe::Motion_34_RunJumpLand()
             if (GetAnimation().GetFlipX())
             {
                 mCurrentMotion = eAbeMotions::Motion_28_RunTurn;
-                Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 0x7FFF, this);
+                Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 0x7FFF, this, mMap);
                 return;
             }
 
@@ -5071,12 +5072,12 @@ void Abe::Motion_34_RunJumpLand()
                 if (GetAnimation().GetFlipX())
                 {
                     mVelX = -(ScaleToGridSize(GetSpriteScale()) / FP_FromInteger(4));
-                    Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 0x7FFF, this);
+                    Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 0x7FFF, this, mMap);
                 }
                 else
                 {
                     mVelX = (ScaleToGridSize(GetSpriteScale()) / FP_FromInteger(4));
-                    Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 0x7FFF, this);
+                    Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 0x7FFF, this, mMap);
                 }
                 return;
             }
@@ -5142,7 +5143,7 @@ void Abe::Motion_35_RunLoop()
     }
     else if (GetAnimation().GetCurrentFrame() == 4 || GetAnimation().GetCurrentFrame() == 12)
     {
-        Environment_SFX(EnvironmentSfx::eRunningFootstep_2, 0, 0x7FFF, this);
+        Environment_SFX(EnvironmentSfx::eRunningFootstep_2, 0, 0x7FFF, this, mMap);
 
         // Snap
         if (!mWalkToRun)
@@ -5155,7 +5156,7 @@ void Abe::Motion_35_RunLoop()
         if ((mVelX > FP_FromInteger(0) && Input().IsAnyHeld(InputCommands::eLeft)) || (mVelX < FP_FromInteger(0) && Input().IsAnyHeld(InputCommands::eRight)))
         {
             mCurrentMotion = eAbeMotions::Motion_28_RunTurn;
-            Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 0x7FFF, this);
+            Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 0x7FFF, this, mMap);
             field_10C_prev_held = 0;
             return;
         }
@@ -5184,7 +5185,7 @@ void Abe::Motion_35_RunLoop()
         if (!Input().IsAnyHeld(InputCommands::eRight) && !Input().IsAnyHeld(InputCommands::eLeft))
         {
             mCurrentMotion = eAbeMotions::Motion_27_RunSlideStop;
-            Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 0x7FFF, this);
+            Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 0x7FFF, this, mMap);
             field_10C_prev_held = 0;
             return;
         }
@@ -5237,7 +5238,7 @@ void Abe::Motion_36_DunnoBegin()
 
     if (GetAnimation().GetIsLastFrame())
     {
-        Mudokon_SFX(MudSounds::eDunno_15, 0, 0, this);
+        Mudokon_SFX(MudSounds::eDunno_15, 0, 0, this, mMap);
 
         if (Input().IsAnyHeld(InputCommands::eDoAction | InputCommands::eThrowItem))
         {
@@ -5293,7 +5294,7 @@ void Abe::Motion_39_CrouchTurn()
     }
     else
     {
-        Environment_SFX(EnvironmentSfx::eGenericMovement_9, 0, 0x7FFF, this);
+        Environment_SFX(EnvironmentSfx::eGenericMovement_9, 0, 0x7FFF, this, mMap);
     }
 }
 
@@ -5386,7 +5387,7 @@ void Abe::Motion_42_SneakLoop()
 
         if (GetAnimation().GetCurrentFrame() == 6)
         {
-            Environment_SFX(EnvironmentSfx::eSneakFootstep_3, 0, 0x7FFF, this);
+            Environment_SFX(EnvironmentSfx::eSneakFootstep_3, 0, 0x7FFF, this, mMap);
             MapFollowMe(1);
 
             if (Input().IsAnyHeld(InputCommands::eRight | InputCommands::eLeft) && !Input().IsAnyHeld(InputCommands::eSneak))
@@ -5407,7 +5408,7 @@ void Abe::Motion_42_SneakLoop()
                 return;
             }
 
-            Environment_SFX(EnvironmentSfx::eSneakFootstep_3, 0, 0x7FFF, this);
+            Environment_SFX(EnvironmentSfx::eSneakFootstep_3, 0, 0x7FFF, this, mMap);
             MapFollowMe(1);
 
             if (Input().IsAnyHeld(InputCommands::eRight | InputCommands::eLeft))
@@ -5582,7 +5583,7 @@ void Abe::Motion_48_SneakToIdle()
 {
     if (GetAnimation().GetCurrentFrame() == 0)
     {
-        Environment_SFX(EnvironmentSfx::eSneakFootstep_3, 0, 0x7FFF, this);
+        Environment_SFX(EnvironmentSfx::eSneakFootstep_3, 0, 0x7FFF, this, mMap);
     }
 
     MoveForward();
@@ -5598,7 +5599,7 @@ void Abe::Motion_49_MidSneakToIdle()
 {
     if (!GetAnimation().GetCurrentFrame())
     {
-        Environment_SFX(EnvironmentSfx::eSneakFootstep_3, 0, 0x7FFF, this);
+        Environment_SFX(EnvironmentSfx::eSneakFootstep_3, 0, 0x7FFF, this, mMap);
     }
 
     MoveForward();
@@ -5872,7 +5873,7 @@ void Abe::Motion_59_DeathDropFall()
         }
         else if (static_cast<s32>(sGnFrame) == field_118_timer - 24)
         {
-            Environment_SFX(EnvironmentSfx::eFallingDeathScreamHitGround_15, 0, 0x7FFF, this);
+            Environment_SFX(EnvironmentSfx::eFallingDeathScreamHitGround_15, 0, 0x7FFF, this, mMap);
 
             relive_new ScreenShake(true, false, mResMan, mMap);
         }
@@ -6110,7 +6111,7 @@ void Abe::Motion_61_Respawn()
                     mContinuePointTopLeft.x = camPos.x + 512;
                     mContinuePointTopLeft.y = camPos.y + 240;
                 }
-                SaveGame::LoadFromMemory(&gSaveBuffer, 0);
+                SaveGame::LoadFromMemory(&gSaveBuffer, 0, static_cast<Map&>(mMap));
                 if (field_19C_throwable_count)
                 {
                     LoadRockTypes(gSaveBuffer.mCurrentLevel, gSaveBuffer.mCurrentPath);
@@ -6424,11 +6425,11 @@ void Abe::Motion_64_LedgeAscend()
 
     if (GetAnimation().GetCurrentFrame() == 0)
     {
-        Environment_SFX(EnvironmentSfx::eExhaustingHoistNoise_10, 0, 0x7FFF, this);
+        Environment_SFX(EnvironmentSfx::eExhaustingHoistNoise_10, 0, 0x7FFF, this, mMap);
     }
     if (GetAnimation().GetCurrentFrame() == 4)
     {
-        Environment_SFX(EnvironmentSfx::eRunJumpOrLedgeHoist_11, 0, 0x7FFF, this);
+        Environment_SFX(EnvironmentSfx::eRunJumpOrLedgeHoist_11, 0, 0x7FFF, this, mMap);
         GetShadow()->mShadowAtBottom = false;
     }
     else if (GetAnimation().GetIsLastFrame())
@@ -6444,7 +6445,7 @@ void Abe::Motion_65_LedgeDescend()
 
     if (GetAnimation().GetCurrentFrame() == 2)
     {
-        Environment_SFX(EnvironmentSfx::eRunJumpOrLedgeHoist_11, 0, 0x7FFF, this);
+        Environment_SFX(EnvironmentSfx::eRunJumpOrLedgeHoist_11, 0, 0x7FFF, this, mMap);
         GetShadow()->mShadowAtBottom = !GetShadow()->mShadowAtBottom;
     }
     else if (GetAnimation().GetIsLastFrame())
@@ -6529,7 +6530,7 @@ void Abe::Motion_68_LedgeHangWobble()
         if (!mSfxPlaying)
         {
             mSfxPlaying = true;
-            Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 127, this);
+            Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 127, this, mMap);
         }
     }
     else if (GetAnimation().GetCurrentFrame() == 2)
@@ -6537,7 +6538,7 @@ void Abe::Motion_68_LedgeHangWobble()
         if (!mSfxPlaying)
         {
             mSfxPlaying = true;
-            Mudokon_SFX(MudSounds::eBeesStruggle_18, 45, -200, this);
+            Mudokon_SFX(MudSounds::eBeesStruggle_18, 45, -200, this, mMap);
         }
     }
     else
@@ -6619,7 +6620,7 @@ void Abe::Motion_70_Knockback()
                  || mMap.mCurrentLevel == EReliveLevelIds::eBoardRoom)
                 && GetAnimation().GetCurrentFrame() == 7)
             {
-                Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this);
+                Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this, mMap);
                 EventBroadcast(Event::kEventNoise, this);
                 EventBroadcast(Event::kEventSuspiciousNoise, this);
             }
@@ -6632,7 +6633,7 @@ void Abe::Motion_70_Knockback()
             {
                 field_114_gnFrame = MakeTimer(10);
                 mCurrentMotion = eAbeMotions::Motion_70_Knockback;
-                Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this);
+                Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this, mMap);
             }
         }
     }
@@ -6681,7 +6682,7 @@ void Abe::Motion_72_PushWall()
     {
         if (Math_NextRandom() <= 127u)
         {
-            Environment_SFX(EnvironmentSfx::eExhaustingHoistNoise_10, 0, 0x7FFF, this);
+            Environment_SFX(EnvironmentSfx::eExhaustingHoistNoise_10, 0, 0x7FFF, this, mMap);
         }
     }
 
@@ -7592,11 +7593,11 @@ void Abe::Motion_98_LandSoft()
 
         if (mPreviousMotion == eAbeMotions::Motion_3_Fall)
         {
-            Environment_SFX(EnvironmentSfx::eLandingSoft_5, 0, 0x7FFF, this);
+            Environment_SFX(EnvironmentSfx::eLandingSoft_5, 0, 0x7FFF, this, mMap);
         }
         else
         {
-            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 0x7FFF, this);
+            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 0x7FFF, this, mMap);
         }
 
         if (Input().IsAnyHeld(InputCommands::eLeft | InputCommands::eRight))
@@ -7666,22 +7667,22 @@ void Abe::Motion_103_ElumIdle()
             if (Input().IsAnyPressed(InputCommands::eGameSpeak2))
             {
                 gEventSystem->PushEvent(GameSpeakEvents::eAbe_FollowMe);
-                Mudokon_SFX(MudSounds::eFollowMe_4, 0, 0, this);
+                Mudokon_SFX(MudSounds::eFollowMe_4, 0, 0, this, mMap);
             }
             else if (Input().IsAnyPressed(InputCommands::eGameSpeak4))
             {
                 gEventSystem->PushEvent(GameSpeakEvents::eAbe_Wait);
-                Mudokon_SFX(MudSounds::eWait_6, 0, 0, this);
+                Mudokon_SFX(MudSounds::eWait_6, 0, 0, this, mMap);
             }
             else if (Input().IsAnyPressed(InputCommands::eGameSpeak1))
             {
                 gEventSystem->PushEvent(GameSpeakEvents::eAbe_Hello);
-                Mudokon_SFX(MudSounds::eHello_3, 0, 0, this);
+                Mudokon_SFX(MudSounds::eHello_3, 0, 0, this, mMap);
             }
             else if (Input().IsAnyPressed(InputCommands::eGameSpeak3))
             {
                 gEventSystem->PushEvent(GameSpeakEvents::eAbe_Anger);
-                Mudokon_SFX(MudSounds::eAngry_5, 0, 0, this);
+                Mudokon_SFX(MudSounds::eAngry_5, 0, 0, this, mMap);
             }
         }
 
@@ -7690,22 +7691,22 @@ void Abe::Motion_103_ElumIdle()
             if (Input().IsAnyPressed(InputCommands::eGameSpeak6))
             {
                 gEventSystem->PushEvent(GameSpeakEvents::eAbe_WhistleHigh);
-                Mudokon_SFX(MudSounds::eWhistleHigh_1, 0, 0, this);
+                Mudokon_SFX(MudSounds::eWhistleHigh_1, 0, 0, this, mMap);
             }
             else if (Input().IsAnyPressed(InputCommands::eGameSpeak5))
             {
                 gEventSystem->PushEvent(GameSpeakEvents::eAbe_WhistleLow);
-                Mudokon_SFX(MudSounds::eWhistleLow_2, 0, 0, this);
+                Mudokon_SFX(MudSounds::eWhistleLow_2, 0, 0, this, mMap);
             }
             else if (Input().IsAnyPressed(InputCommands::eGameSpeak8))
             {
                 gEventSystem->PushEvent(GameSpeakEvents::eAbe_Laugh);
-                Mudokon_SFX(MudSounds::eLaugh1_8, 0, 0, this);
+                Mudokon_SFX(MudSounds::eLaugh1_8, 0, 0, this, mMap);
             }
             else if (Input().IsAnyPressed(InputCommands::eGameSpeak7))
             {
                 gEventSystem->PushEvent(GameSpeakEvents::eAbe_Fart);
-                Mudokon_SFX(MudSounds::eFart_7, 0, 0, this);
+                Mudokon_SFX(MudSounds::eFart_7, 0, 0, this, mMap);
             }
         }
     }
@@ -8049,7 +8050,7 @@ void Abe::Motion_136_ElumMountEnd()
             if (!mSfxPlaying)
             {
                 mSfxPlaying = true;
-                Environment_SFX(EnvironmentSfx::eExhaustingElumMount_16, 0, 0x7FFF, this);
+                Environment_SFX(EnvironmentSfx::eExhaustingElumMount_16, 0, 0x7FFF, this, mMap);
             }
             break;
 
@@ -8057,7 +8058,7 @@ void Abe::Motion_136_ElumMountEnd()
             if (!mSfxPlaying)
             {
                 mSfxPlaying = true;
-                Environment_SFX(EnvironmentSfx::eMountElumSmackNoise_17, 0, 0x7FFF, this);
+                Environment_SFX(EnvironmentSfx::eMountElumSmackNoise_17, 0, 0x7FFF, this, mMap);
                 SfxPlayMono(relive::SoundEffects::MountingElum, 0, GetSpriteScale());
             }
             break;
@@ -8066,7 +8067,7 @@ void Abe::Motion_136_ElumMountEnd()
             if (!mSfxPlaying)
             {
                 mSfxPlaying = true;
-                Environment_SFX(EnvironmentSfx::eElumGetMountedNoise_18, 0, 0x7FFF, this);
+                Environment_SFX(EnvironmentSfx::eElumGetMountedNoise_18, 0, 0x7FFF, this, mMap);
             }
             break;
 
@@ -8081,7 +8082,7 @@ void Abe::Motion_136_ElumMountEnd()
         sControlledCharacter = gElum;
         MusicController::static_PlayMusic(MusicController::MusicTypes::eAbeOnElum_1, nullptr, 0, 0);
         gAbe->GetShadow()->mEnabled = false;
-        Environment_SFX(EnvironmentSfx::eAbeMountedElumNoise_19, 0, 0x7FFF, this);
+        Environment_SFX(EnvironmentSfx::eAbeMountedElumNoise_19, 0, 0x7FFF, this, mMap);
     }
 }
 
@@ -8109,7 +8110,7 @@ void Abe::Motion_138_ElumUnmountEnd()
             if (!mSfxPlaying)
             {
                 mSfxPlaying = true;
-                Environment_SFX(EnvironmentSfx::eExhaustingElumMount_16, 0, 0x7FFF, this);
+                Environment_SFX(EnvironmentSfx::eExhaustingElumMount_16, 0, 0x7FFF, this, mMap);
             }
             break;
 
@@ -8117,7 +8118,7 @@ void Abe::Motion_138_ElumUnmountEnd()
             if (!mSfxPlaying)
             {
                 mSfxPlaying = true;
-                Environment_SFX(EnvironmentSfx::eElumGetMountedNoise_18, 0, 0x7FFF, this);
+                Environment_SFX(EnvironmentSfx::eElumGetMountedNoise_18, 0, 0x7FFF, this, mMap);
             }
             break;
 
@@ -8364,7 +8365,7 @@ void Abe::Motion_147_ShotRolling()
         if (GetAnimation().GetForwardLoopCompleted())
         {
             mYPos += FP_FromInteger(240);
-            Mudokon_SFX(MudSounds::eDeathDropScream_17, 0, 0, this);
+            Mudokon_SFX(MudSounds::eDeathDropScream_17, 0, 0, this, mMap);
             ToDeathDropFall();
         }
     }
@@ -8396,7 +8397,7 @@ void Abe::Motion_148_Shot()
         if (GetAnimation().GetForwardLoopCompleted())
         {
             mYPos += FP_FromInteger(240);
-            Mudokon_SFX(MudSounds::eDeathDropScream_17, 0, 0, this);
+            Mudokon_SFX(MudSounds::eDeathDropScream_17, 0, 0, this, mMap);
             ToDeathDropFall();
         }
     }
@@ -8661,7 +8662,7 @@ void Abe::Motion_151_ChantEnd()
         if (mLaughAtChantEnd)
         {
             mCurrentMotion = eAbeMotions::Motion_12_Speak;
-            Mudokon_SFX(MudSounds::eLaugh1_8, 0, 0, this);
+            Mudokon_SFX(MudSounds::eLaugh1_8, 0, 0, this, mMap);
             mLaughAtChantEnd = false;
         }
         else
@@ -8751,7 +8752,7 @@ void Abe::Motion_156_DoorEnter()
                     }
                     if (pTlv->mClearObjects)
                     {
-                        mMap.ResetPathObjects(pTlv->mPath);
+                        static_cast<Map&>(mMap).ResetPathObjects(pTlv->mPath);
                     }
                 }
             }
@@ -8766,7 +8767,7 @@ void Abe::Motion_156_DoorEnter()
                 FP_GetExponent(mYPos),
                 ReliveTypes::eDoor);
             BaseAliveGameObjectPathTLV = doorIterator;
-            mMap.field_1E_door = 1;
+            static_cast<Map&>(mMap).field_1E_door = 1;
             const auto changeEffect = kPathChangeEffectToInternalScreenChangeEffect[doorIterator.GetTlv<relive::Path_Door>()->mWipeEffect];
             s16 flag = 0;
             if (changeEffect == CameraSwapEffects::ePlay1FMV_5 || changeEffect == CameraSwapEffects::eUnknown_11)
@@ -8788,7 +8789,7 @@ void Abe::Motion_156_DoorEnter()
         {
             mCurrentLevel = mMap.mCurrentLevel;
             mCurrentPath = mMap.mCurrentPath;
-            mMap.field_1E_door = 0;
+            static_cast<Map&>(mMap).field_1E_door = 0;
             auto doorIterator = mMap.TLV_First_Of_Type_In_Camera(ReliveTypes::eDoor, 0);
             BaseAliveGameObjectPathTLV = doorIterator;
 
@@ -8935,7 +8936,7 @@ void Abe::Motion_163_ShrykullEnd()
     else if (GetAnimation().GetForwardLoopCompleted())
     {
         mCurrentMotion = eAbeMotions::Motion_9_Speak;
-        Mudokon_SFX(MudSounds::eLaugh1_8, 0, 0, this);
+        Mudokon_SFX(MudSounds::eLaugh1_8, 0, 0, this, mMap);
     }
 }
 
@@ -8953,13 +8954,13 @@ void Abe::Motion_164_PoisonGasDeath()
             SFX_Play_Pitch(relive::SoundEffects::Choke, 127, 640);
             break;
         case 32:
-            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, 0, this);
+            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, 0, this, mMap);
             break;
         case 50:
-            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 100, -200, this);
+            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 100, -200, this, mMap);
             break;
         case 53:
-            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 50, -200, this);
+            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 50, -200, this, mMap);
             break;
         default:
             break;

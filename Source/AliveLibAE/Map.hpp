@@ -33,10 +33,6 @@ class Map final : public BaseMap
 public:
     void ScreenChange() override;
 
-    void FreePathResourceBlocks();
-    BinaryPath* GetPathResourceBlockPtr(u32 pathId);
-    void ClearPathResourceBlocks();
-
     void GoTo_Camera() override;
     void RemoveObjectsWithPurpleLight(s16 a2);
     void Handle_PathTransition();
@@ -61,11 +57,6 @@ public:
     CameraPos GetDirection(EReliveLevelIds level, s32 path, FP xpos, FP ypos) override;
 
     s16 Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect);
-    
-    std::vector<std::unique_ptr<BinaryPath>>& GetLoadedPaths()
-    {
-        return mLoadedPaths;
-    }
 
     void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1) override;
     void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1) override;
@@ -88,16 +79,11 @@ public:
     s16 mTeleporterTransition = 0;
 
     FP_Point mCameraOffset = {};
-    bool mFreeAllAnimAndPalts = false;
-
-    s16 mCamIdxOnX = 0;
-    s16 mCamIdxOnY = 0;
 
     const PathData* mPathData = nullptr;
     bool mRestoreMapObjectStates = false;
 };
 
-extern Map* gMap;
 extern bool gMap_bDoPurpleLightEffect;
 extern const CameraSwapEffects kPathChangeEffectToInternalScreenChangeEffect[10];
 

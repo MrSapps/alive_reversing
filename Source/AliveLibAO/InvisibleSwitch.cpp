@@ -9,6 +9,7 @@
 #include "Engine.hpp"
 #include "Path.hpp"
 #include "../relive_lib/GameType.hpp"
+#include "Map.hpp"
 
 namespace AO {
 
@@ -31,7 +32,7 @@ InvisibleSwitch::InvisibleSwitch(relive::Path_InvisibleSwitch* pTlv, const Guid&
 
 InvisibleSwitch::~InvisibleSwitch()
 {
-    Path::TLV_Reset(mTlvId);
+    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
 }
 
 bool InvisibleSwitch::IsAbeUsingDoor() const

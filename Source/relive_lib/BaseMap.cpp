@@ -23,6 +23,28 @@ const CameraSwapEffects kPathChangeEffectToInternalScreenChangeEffect[10] = {
     CameraSwapEffects::eUnknown_11,
     CameraSwapEffects::eInstantChange_0};
 
+BinaryPath* BaseMap::GetPathResourceBlockPtr(u32 pathId)
+{
+    for (auto& loadedPath : mLoadedPaths)
+    {
+        if (loadedPath->GetPathId() == pathId)
+        {
+            return loadedPath.get();
+        }
+    }
+    return nullptr;
+}
+
+void BaseMap::FreePathResourceBlocks()
+{
+    mLoadedPaths.clear();
+}
+
+void BaseMap::ClearPathResourceBlocks()
+{
+    mLoadedPaths.clear();
+}
+
 s16 BaseMap::SetActiveCameraDelayed(MapDirections direction, BaseAliveGameObject* pObj, s16 swapEffect)
 {
     relive::Path_PathTransition* pPathChangeTLV = nullptr;

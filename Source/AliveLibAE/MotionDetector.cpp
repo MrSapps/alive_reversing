@@ -292,7 +292,7 @@ void MotionDetector::VUpdate()
 
                                 if (IsAbe(pObj) && pObj->mHealth > FP_FromInteger(0))
                                 {
-                                    Mudokon_SFX(MudSounds::eOops_14, 0, 0, 0);
+                                    Mudokon_SFX(MudSounds::eOops_14, 0, 0, 0, mMap);
                                 }
                             }
                         }

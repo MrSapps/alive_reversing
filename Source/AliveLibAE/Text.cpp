@@ -233,7 +233,7 @@ s8 Display_Full_Screen_Message_Blocking(MessageType messageType, ResourceManager
 
     if (SND_Seq_Table_Valid())
     {
-        GetSoundAPI().mSND_Restart();
+        GetSoundAPI().mSND_Restart(map);
     }
 
     SYS_EventsPump();

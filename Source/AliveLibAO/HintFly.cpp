@@ -167,7 +167,7 @@ void HintFly::VScreenChanged()
 HintFly::~HintFly()
 {
     relive_delete[] mHintFlyParticle;
-    Path::TLV_Reset(mTlvId);
+    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
 }
 
 void HintFly::FormWordAndAdvanceToNextWord()

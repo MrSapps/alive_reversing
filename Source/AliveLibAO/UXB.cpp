@@ -244,11 +244,11 @@ UXB::~UXB()
 {
     if (mCurrentState != UXBState::eExploding || sGnFrame < mNextStateTimer)
     {
-        Path::TLV_Reset(mTlvInfo);
+        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
     }
     else
     {
-        Path::TLV_Delete(mTlvInfo);
+        Path::TLV_Delete(static_cast<Map&>(mMap), mTlvInfo);
     }
 
     mFlashAnim.VCleanUp();
@@ -262,15 +262,15 @@ void UXB::VScreenChanged()
     {
         if (mStartingState == UXBState::eDeactivated && mCurrentState != UXBState::eDeactivated)
         {
-            Path::TLV_Persist(mTlvInfo, 1);
+            Path::TLV_Persist(static_cast<Map&>(mMap), mTlvInfo, 1);
         }
         else if (mStartingState != UXBState::eDelay || mCurrentState != UXBState::eDeactivated)
         {
-            Path::TLV_Persist(mTlvInfo, 0);
+            Path::TLV_Persist(static_cast<Map&>(mMap), mTlvInfo, 0);
         }
         else
         {
-            Path::TLV_Persist(mTlvInfo, 1);
+            Path::TLV_Persist(static_cast<Map&>(mMap), mTlvInfo, 1);
         }
         SetDead(true);
     }
@@ -411,16 +411,16 @@ void UXB::VUpdate()
             {
                 if (mStartingState != UXBState::eDelay || mCurrentState != UXBState::eDeactivated)
                 {
-                    Path::TLV_Persist(mTlvInfo, 0);
+                    Path::TLV_Persist(static_cast<Map&>(mMap), mTlvInfo, 0);
                 }
                 else
                 {
-                    Path::TLV_Persist(mTlvInfo, 1);
+                    Path::TLV_Persist(static_cast<Map&>(mMap), mTlvInfo, 1);
                 }
             }
             else
             {
-                Path::TLV_Persist(mTlvInfo, 1);
+                Path::TLV_Persist(static_cast<Map&>(mMap), mTlvInfo, 1);
             }
             SetDead(true);
         }

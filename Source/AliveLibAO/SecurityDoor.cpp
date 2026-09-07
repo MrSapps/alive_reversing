@@ -12,6 +12,7 @@
 #include "../relive_lib/SwitchStates.hpp"
 #include "../relive_lib/GameObjects/CheatController.hpp"
 #include "Path.hpp"
+#include "Map.hpp"
 
 namespace AO {
 
@@ -27,7 +28,7 @@ SecurityDoor::~SecurityDoor()
     {
         mState = SecurityDoorStates::eInactive_0;
     }
-    Path::TLV_Reset(mTlvId, mState + 1);
+    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId, mState + 1);
 }
 
 SecurityDoor::SecurityDoor(relive::Path_SecurityDoor* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)

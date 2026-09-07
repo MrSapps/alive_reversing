@@ -540,7 +540,7 @@ void Scrab::HandleDDCheat()
 
         // Keep in map bounds
         PSX_Point point = {};
-        mMap.Get_map_size(&point);
+        static_cast<Map&>(mMap).Get_map_size(&point);
         if (mXPos < FP_FromInteger(0))
         {
             mXPos = FP_FromInteger(0);
@@ -1750,7 +1750,7 @@ s16 Scrab::Brain_2_Fighting()
             field_160_sfx_bitmask = 0;
             Scrab_SFX(ScrabSounds::eDeathHowl_1, 0, -1571, 1);
             Scrab_SFX(ScrabSounds::eYell_8, 0, -1571, 1);
-            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, -383, 0);
+            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, -383, 0, mMap);
 
             if (!GetAnimation().GetRender())
             {
@@ -2466,7 +2466,7 @@ void Scrab::Motion_7_HopLand()
 {
     if (GetAnimation().GetCurrentFrame() == 0)
     {
-        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, 400, this);
+        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, 400, this, mMap);
         Scrab_SFX(ScrabSounds::eHitCollision_4, 0, 0x7FFF, 1);
     }
 
@@ -2818,7 +2818,7 @@ void Scrab::Motion_18_Knockback()
 
     if (GetAnimation().GetCurrentFrame() == 0)
     {
-        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, 400, this);
+        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, 400, this, mMap);
     }
 
     else if (GetAnimation().GetCurrentFrame() == 2)
@@ -2851,7 +2851,7 @@ void Scrab::Motion_20_Fall()
 {
     if (GetAnimation().GetIsLastFrame())
     {
-        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, 400, this);
+        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, 400, this, mMap);
         Scrab_SFX(ScrabSounds::eHitCollision_4, 0, 0x7FFF, 1);
         ToStand();
         mNextMotion = eScrabMotions::eNone_m1;
@@ -3849,7 +3849,7 @@ s32 Scrab::Scrab_SFX(ScrabSounds soundId, s32 vol, s32 pitch, s16 applyDirection
     if (applyDirection)
     {
         PSX_RECT pRect = {};
-        mMap.Get_Camera_World_Rect(direction, &pRect);
+        static_cast<Map&>(mMap).Get_Camera_World_Rect(direction, &pRect);
         switch (direction)
         {
             case CameraPos::eCamCurrent_0:
@@ -3957,7 +3957,7 @@ void Scrab::KillTarget(BaseAliveGameObject* pTarget)
                                                     SfxPlayMono(relive::SoundEffects::KillEffect, 0);
                                                     if (pObj->Type() == ReliveTypes::eAbe)
                                                     {
-                                                        Mudokon_SFX(MudSounds::eHurt2_9, 0, 0, gAbe);
+                                                        Mudokon_SFX(MudSounds::eHurt2_9, 0, 0, gAbe, mMap);
                                                     }
                                                 }
                                             }

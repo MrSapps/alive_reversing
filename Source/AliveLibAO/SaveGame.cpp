@@ -24,9 +24,9 @@ static SaveData sSaveToLoadBuffer = {};
 
 SaveData gSaveBuffer = {};
 
-void Kill_Objects()
+void Kill_Objects(Map& map)
 {
-    mMap.GetResourceManager().LoadingLoop(0);
+    map.GetResourceManager().LoadingLoop(0);
 
     for (s32 i = 0; i < 2; i++)
     {
@@ -52,7 +52,7 @@ void Kill_Objects()
     }
 }
 
-void SaveGame::LoadFromMemory(SaveData* pData, s32 bKillObjects)
+void SaveGame::LoadFromMemory(SaveData* pData, s32 bKillObjects, Map& map)
 {
     TRACE_ENTRYEXIT;
 
@@ -61,7 +61,7 @@ void SaveGame::LoadFromMemory(SaveData* pData, s32 bKillObjects)
 
     if (bKillObjects)
     {
-        Kill_Objects();
+        Kill_Objects(map);
     }
 
     sControlledCharacter = gAbe;
@@ -101,7 +101,7 @@ void SaveGame::LoadFromMemory(SaveData* pData, s32 bKillObjects)
 
     gAbe->GetAnimation().SetRender(false);
 
-    mMap.mSaveData = pData->field_2B0_pSaveBuffer;
+    map.mSaveData = pData->field_2B0_pSaveBuffer;
 
     if (gAbe->mRingPulseTimer)
     {
@@ -138,7 +138,7 @@ void SaveGame::LoadFromMemory(SaveData* pData, s32 bKillObjects)
 
     MusicController::static_PlayMusic(MusicController::MusicTypes::eType0, gAbe, 0, 0);
 
-    mMap.SetActiveCam(
+    map.SetActiveCam(
         pData->mCurrentLevel,
         pData->mCurrentPath,
         pData->mCurrentCamera,
@@ -198,9 +198,9 @@ s16 SaveGame::GetPathId(s16 pathToFind, s16* outFoundPathRow)
     return path_id;
 }
 
-void SaveGame::SaveToMemory(SaveData* pSaveData)
+void SaveGame::SaveToMemory(SaveData* pSaveData, Map& map)
 {
-    pSaveData->mCurrentLevel = mMap.mCurrentLevel;
+    pSaveData->mCurrentLevel = map.mCurrentLevel;
     pSaveData->mAbe_ContinuePointClearFromId = gAbe->mContinuePointClearFromId;
     pSaveData->mAbe_ContinuePointTopLeft = gAbe->mContinuePointTopLeft;
     pSaveData->mAbe_ContinuePointBottomRight = gAbe->mContinuePointBottomRight;
@@ -216,9 +216,9 @@ void SaveGame::SaveToMemory(SaveData* pSaveData)
     pSaveData->mAbe_SavedHaveShrykull = gAbe->field_154_bSavedHaveShrykull;
     pSaveData->field_2A4_restartRuptureFarmsSavedMudokons = GameEnderController::gRestartRuptureFarmsSavedMuds;
     pSaveData->mAbe_HaveShrykull = gAbe->mHaveShrykull;
-    pSaveData->mCurrentPath = mMap.mCurrentPath;
+    pSaveData->mCurrentPath = map.mCurrentPath;
     pSaveData->mKilledMudokons = gKilledMudokons;
-    pSaveData->mCurrentCamera = mMap.mCurrentCamera;
+    pSaveData->mCurrentCamera = map.mCurrentCamera;
     pSaveData->mRestartRuptureFarmsKilledMuds = GameEnderController::gRestartRuptureFarmsKilledMuds;
     pSaveData->mAbe_CurrentFrame = static_cast<u16>(gAbe->GetAnimation().GetCurrentFrame());
     pSaveData->mAbe_CurrentMotion = gAbe->mCurrentMotion;
@@ -292,11 +292,11 @@ void SaveGame::SaveToMemory(SaveData* pSaveData)
         pSaveData->mDeathGasTimer = 0;
     }
     pSaveData->mCurrentControllerIdx = Input().CurrentController() == InputObject::PadIndex::First ? 0 : 1;
-    mMap.SaveBlyData(pSaveData->field_2B0_pSaveBuffer);
+    map.SaveBlyData(pSaveData->field_2B0_pSaveBuffer);
 }
 
 
-s16 SaveGame::LoadFromFile(const char_type* name)
+s16 SaveGame::LoadFromFile(const char_type* name, Map& map)
 {
     char_type buffer[40] = {};
 
@@ -315,7 +315,7 @@ s16 SaveGame::LoadFromFile(const char_type* name)
     from_json(j, sSaveToLoadBuffer);
     gSaveBuffer = sSaveToLoadBuffer;
 
-    LoadFromMemory(&gSaveBuffer, 1);
+    LoadFromMemory(&gSaveBuffer, 1, map);
     gSaveBuffer.mCurrentCamera = gSaveBuffer.mAbe_ContinuePoint_Camera;
     Input().SetCurrentController(InputObject::PadIndex::First);
     gSaveBuffer.mCurrentLevel = gSaveBuffer.mAbe_ContinuePointLevel;

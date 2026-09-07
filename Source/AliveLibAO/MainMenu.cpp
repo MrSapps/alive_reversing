@@ -471,7 +471,7 @@ Menu::Menu(relive::Path_TLV* /*pTlv*/, const Guid& tlvId, ResourceManagerWrapper
 
 Menu::~Menu()
 {
-    Path::TLV_Reset(field_1D4_tlvInfo);
+    Path::TLV_Reset(static_cast<Map&>(mMap), field_1D4_tlvInfo);
     mButtonAnim.VCleanUp();
 
     /*
@@ -680,7 +680,7 @@ void Menu::FMV_Select_Update()
                     gPsxDisplay.PutCurrentDispEnv();
                     gScreenManager->DecompressCameraToVRam(mMap.field_2C_camera_array[0]->mCamRes);
                     gScreenManager->EnableRendering();
-                    SND_Restart();
+                    SND_Restart(mMap);
                 }
                 else
                 {
@@ -883,7 +883,7 @@ void Menu::SayHelloWaitForLoading()
         {
             ProgressInProgressFilesLoading();
         }*/
-        Mudokon_SFX(MudSounds::eHello_3, 0, 0, 0);
+        Mudokon_SFX(MudSounds::eHello_3, 0, 0, 0, mMap);
         GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Hello));
         mFnUpdate = &Menu::WaitForAbeSayHello;
     }
@@ -1002,13 +1002,13 @@ void Menu::MainScreen_Update()
                 if (mSelectedButtonIndex.mainmenu == MainMenuOptions::eBegin_1)
                 {
                     // Begin/new game
-                    Mudokon_SFX(MudSounds::eFollowMe_4, 0, 0, 0);
+                    Mudokon_SFX(MudSounds::eFollowMe_4, 0, 0, 0, mMap);
                     GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_FollowMe));
                 }
                 else if (mSelectedButtonIndex.mainmenu == MainMenuOptions::eQuit_2)
                 {
                     // Quit
-                    Mudokon_SFX(MudSounds::eGoodbye_12, 0, 0, 0);
+                    Mudokon_SFX(MudSounds::eGoodbye_12, 0, 0, 0, mMap);
                     GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Goodbye));
                 }
                 else
@@ -1016,7 +1016,7 @@ void Menu::MainScreen_Update()
                     // 0 = game speak,
                     // 3 = load
                     // 4 = options
-                    Mudokon_SFX(MudSounds::eOkay_13, 0, 0, 0);
+                    Mudokon_SFX(MudSounds::eOkay_13, 0, 0, 0, mMap);
                     GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Ok));
                 }
 
@@ -1079,7 +1079,7 @@ void Menu::MainScreen_Update()
         sListCount = ALIVE_COUNTOF(sFmvList);
        // if (field_E4_res_array[0])
         {
-            Mudokon_SFX(MudSounds::eOkay_13, 0, 0, 0);
+            Mudokon_SFX(MudSounds::eOkay_13, 0, 0, 0, mMap);
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Ok));
             mFnUpdate = &Menu::WaitForSpeakFinishAndStartChangeEffect;
         }
@@ -1113,7 +1113,7 @@ void Menu::MainScreen_Update()
         sListCount = ALIVE_COUNTOF(sLevelList);
        // if (field_E4_res_array[0])
         {
-            Mudokon_SFX(MudSounds::eOkay_13, 0, 0, 0);
+            Mudokon_SFX(MudSounds::eOkay_13, 0, 0, 0, mMap);
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Ok));
             mFnUpdate = &Menu::WaitForSpeakFinishAndStartChangeEffect;
         }
@@ -1774,7 +1774,7 @@ void Menu::Options_Update()
 
     if (Input().IsAnyPressed(InputObject::PadIndex::First, InputCommands::eUnPause_OrConfirm | InputCommands::eDoAction))
     {
-        Mudokon_SFX(MudSounds::eOkay_13, 0, 0, 0);
+        Mudokon_SFX(MudSounds::eOkay_13, 0, 0, 0, mMap);
         GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Ok));
         mFnUpdate = &Menu::Options_WaitForAbeSpeak_Update;
     }
@@ -1784,7 +1784,7 @@ void Menu::Options_Update()
         // Back to main menu
         mSelectedButtonIndex.options_menu = OptionsMenuOptions::eMainMenu_2;
         mButtonAnim.Set_Animation_Data(GetAnimRes(sOptionsButtons[2].animId));
-        Mudokon_SFX(MudSounds::eOkay_13, 0, 0, 0);
+        Mudokon_SFX(MudSounds::eOkay_13, 0, 0, 0, mMap);
         GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Ok));
         mFnUpdate = &Menu::Options_WaitForAbeSpeak_Update;
     }
@@ -2132,7 +2132,7 @@ void Menu::Options_Sound_Update()
             SND_Set_Stereo();
         }
 
-        Mudokon_SFX(MudSounds::eOkay_13, 0, 0, nullptr);
+        Mudokon_SFX(MudSounds::eOkay_13, 0, 0, nullptr, mMap);
 
         GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Ok));
         mFnUpdate = &Menu::Options_WaitForAbeSayOK_Update;
@@ -2142,7 +2142,7 @@ void Menu::Options_Sound_Update()
     {
         mSelectedButtonIndex.sound_menu = SoundOptions::eExit_2;
         mButtonAnim.Set_Animation_Data(GetAnimRes(sSoundOptionsButtons[2].animId));
-        Mudokon_SFX(MudSounds::eOkay_13, 0, 0, nullptr);
+        Mudokon_SFX(MudSounds::eOkay_13, 0, 0, nullptr, mMap);
         GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Ok));
         mFnUpdate = &Menu::Options_WaitForAbeSayOK_Update;
     }
@@ -2338,7 +2338,7 @@ void Menu::GameSpeak_Update()
 
         if (Input().IsAnyPressed(InputObject::PadIndex::First, InputCommands::eGameSpeak2))
         {
-            Mudokon_SFX(MudSounds::eFollowMe_4, 0, 0, 0);
+            Mudokon_SFX(MudSounds::eFollowMe_4, 0, 0, 0, mMap);
             field_204_flags |= 1u;
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_FollowMe));
             mSelectedButtonIndex.gamespeak_menu = GameSpeakOptions::eFollowMe_2;
@@ -2346,7 +2346,7 @@ void Menu::GameSpeak_Update()
         }
         else if (Input().IsAnyPressed(InputObject::PadIndex::First, InputCommands::eGameSpeak4))
         {
-            Mudokon_SFX(MudSounds::eWait_6, 0, 0, 0);
+            Mudokon_SFX(MudSounds::eWait_6, 0, 0, 0, mMap);
             field_204_flags |= 1u;
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Wait));
             mSelectedButtonIndex.gamespeak_menu = GameSpeakOptions::eWait_0;
@@ -2354,7 +2354,7 @@ void Menu::GameSpeak_Update()
         }
         else if (Input().IsAnyPressed(InputObject::PadIndex::First, InputCommands::eGameSpeak1))
         {
-            Mudokon_SFX(MudSounds::eHello_3, 0, 0, 0);
+            Mudokon_SFX(MudSounds::eHello_3, 0, 0, 0, mMap);
             field_204_flags |= 1u;
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Hello));
             mSelectedButtonIndex.gamespeak_menu = GameSpeakOptions::eHello_1;
@@ -2362,7 +2362,7 @@ void Menu::GameSpeak_Update()
         }
         else if (Input().IsAnyHeld(InputObject::PadIndex::First, InputCommands::eGameSpeak3))
         {
-            Mudokon_SFX(MudSounds::eAngry_5, 0, 0, 0);
+            Mudokon_SFX(MudSounds::eAngry_5, 0, 0, 0, mMap);
             field_204_flags |= 1u;
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Anger));
             mSelectedButtonIndex.gamespeak_menu = GameSpeakOptions::eAngry_3;
@@ -2391,7 +2391,7 @@ void Menu::GameSpeak_Update()
 
         if (Input().IsAnyPressed(InputObject::PadIndex::First, InputCommands::eGameSpeak6))
         {
-            Mudokon_SFX(MudSounds::eWhistleHigh_1, 0, 0, 0);
+            Mudokon_SFX(MudSounds::eWhistleHigh_1, 0, 0, 0, mMap);
             field_204_flags |= 1u;
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_WhistleHigh));
             mSelectedButtonIndex.gamespeak_menu = GameSpeakOptions::eWhistleHigh_4;
@@ -2399,7 +2399,7 @@ void Menu::GameSpeak_Update()
         }
         else if (Input().IsAnyPressed(InputObject::PadIndex::First, InputCommands::eGameSpeak5))
         {
-            Mudokon_SFX(MudSounds::eWhistleLow_2, 0, 0, 0);
+            Mudokon_SFX(MudSounds::eWhistleLow_2, 0, 0, 0, mMap);
             field_204_flags |= 1u;
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_WhistleLow));
             mSelectedButtonIndex.gamespeak_menu = GameSpeakOptions::eWhistleLow_5;
@@ -2407,7 +2407,7 @@ void Menu::GameSpeak_Update()
         }
         else if (Input().IsAnyPressed(InputObject::PadIndex::First, InputCommands::eGameSpeak8))
         {
-            Mudokon_SFX(MudSounds::eLaugh2_11, 0, 0, 0);
+            Mudokon_SFX(MudSounds::eLaugh2_11, 0, 0, 0, mMap);
             field_204_flags |= 1u;
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Laugh));
             mSelectedButtonIndex.gamespeak_menu = GameSpeakOptions::eLaugh_6;
@@ -2415,7 +2415,7 @@ void Menu::GameSpeak_Update()
         }
         else if (Input().IsAnyPressed(InputObject::PadIndex::First, InputCommands::eGameSpeak7))
         {
-            Mudokon_SFX(MudSounds::eFart_7, 0, 0, 0);
+            Mudokon_SFX(MudSounds::eFart_7, 0, 0, 0, mMap);
             field_204_flags |= 1u;
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Fart));
             mSelectedButtonIndex.gamespeak_menu = GameSpeakOptions::eFart_7;
@@ -2436,7 +2436,7 @@ void Menu::GameSpeak_Update()
         return;
     }
 
-    Mudokon_SFX(MudSounds::eGoodbye_12, 0, 0, 0);
+    Mudokon_SFX(MudSounds::eGoodbye_12, 0, 0, 0, mMap);
 
     field_204_flags |= 1u;
     GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Goodbye));
@@ -2949,7 +2949,7 @@ void Menu::LoadSave_Update()
         gAbe = relive_new Abe(mResMan, mMap);
     }
 
-    if (!SaveGame::LoadFromFile(sSaveNames_9F1DD8[mSelectedButtonIndex.raw].field_0_mName))
+    if (!SaveGame::LoadFromFile(sSaveNames_9F1DD8[mSelectedButtonIndex.raw].field_0_mName, static_cast<Map&>(mMap)))
     {
         mFnUpdate = &Menu::SaveLoadFailed_Update;
         mFnRender = &Menu::SaveLoadFailed_Render;

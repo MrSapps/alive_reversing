@@ -439,7 +439,7 @@ void PauseMenu::RestartPath()
 
     mPauseRenderLoop = false;
     SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 3400);
-    GetSoundAPI().mSND_Restart();
+    GetSoundAPI().mSND_Restart(mMap);
 }
 
 const char_type kArrowChar = 3;
@@ -471,7 +471,7 @@ void PauseMenu::Page_Main_Update()
     {
         mPauseRenderLoop = false;
         SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
-        GetSoundAPI().mSND_Restart();
+        GetSoundAPI().mSND_Restart(mMap);
     }
     else if (Input().IsAnyPressed(InputCommands::eUnPause_OrConfirm))
     {
@@ -480,14 +480,14 @@ void PauseMenu::Page_Main_Update()
             case MainPages::ePage_Continue_0:
                 mPauseRenderLoop = false;
                 SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
-                GetSoundAPI().mSND_Restart();
+                GetSoundAPI().mSND_Restart(mMap);
                 return;
 
             case MainPages::ePage_QuickSave_1:
                 mPauseRenderLoop = false;
                 SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
-                GetSoundAPI().mSND_Restart();
-                QuikSave::DoQuicksave();
+                GetSoundAPI().mSND_Restart(mMap);
+                QuikSave::DoQuicksave(mMap);
                 return;
 
             case MainPages::ePage_Controls_2:
@@ -507,7 +507,7 @@ void PauseMenu::Page_Main_Update()
                 mActiveMenu = sSaveMenuPage;
                 SfxPlayMono(relive::SoundEffects::IngameTransition, 90);
                 mSaveState = SaveState::ReadingInput_0;
-                QuikSave::DoQuicksave();
+                QuikSave::DoQuicksave(mMap);
                 // Set the default save name to be the current level/path/camera
                 Path_Format_CameraName(
                     sSaveString,
@@ -626,7 +626,7 @@ void PauseMenu::Page_Save_Update()
 
             mPauseRenderLoop = false;
             SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
-            GetSoundAPI().mSND_Restart();
+            GetSoundAPI().mSND_Restart(mMap);
         }
         else
         {
@@ -805,7 +805,7 @@ void PauseMenu::Page_Load_Update()
     // When F6 is pressed
     if (gQuicksave_LoadNextFrame)
     {
-        QuikSave::LoadActive();
+        QuikSave::LoadActive(static_cast<Map&>(mMap));
         gQuicksave_LoadNextFrame = false;
         mPauseRenderLoop = false;
     }
@@ -888,7 +888,7 @@ void PauseMenu::Page_Load_Update()
 
             gAbe->mXPos = FP_FromInteger(0);
             gAbe->mYPos = FP_FromInteger(0);
-            QuikSave::LoadActive();
+            QuikSave::LoadActive(static_cast<Map&>(mMap));
             mPauseRenderLoop = false;
             SfxPlayMono(relive::SoundEffects::IngameTransition, 90);
         }
@@ -986,7 +986,7 @@ void PauseMenu::VUpdate()
             {
                 if (gQuicksave_SaveNextFrame)
                 {
-                    QuikSave::DoQuicksave();
+                    QuikSave::DoQuicksave(mMap);
                     pHero = gAbe;
                     pControlledChar = sControlledCharacter;
                     gQuicksave_SaveNextFrame = false;
@@ -994,7 +994,7 @@ void PauseMenu::VUpdate()
                 }
                 else if (gQuicksave_LoadNextFrame)
                 {
-                    QuikSave::LoadActive();
+                    QuikSave::LoadActive(static_cast<Map&>(mMap));
                     SND_SEQ_Stop(SeqId::MudokonChant1_10);
                     pHero = gAbe;
                     pControlledChar = sControlledCharacter;

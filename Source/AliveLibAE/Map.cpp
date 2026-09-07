@@ -194,28 +194,6 @@ void Map::Shutdown()
     Reset();
 }
 
-void Map::FreePathResourceBlocks()
-{
-    mLoadedPaths.clear();
-}
-
-BinaryPath* Map::GetPathResourceBlockPtr(u32 pathId)
-{
-    for (auto& loadedPath : mLoadedPaths)
-    {
-        if (loadedPath->GetPathId() == pathId)
-        {
-            return loadedPath.get();
-        }
-    }
-    return nullptr;
-}
-
-void Map::ClearPathResourceBlocks()
-{
-    mLoadedPaths.clear();
-}
-
 void Map::RemoveObjectsWithPurpleLight(s16 bMakeInvisible)
 {
     auto pObjectsWithLightsArray = relive_new DynamicArrayT<BaseAnimatedWithPhysicsGameObject>(16);
@@ -872,7 +850,7 @@ void Map::TLV_Delete(const Guid& tlvId, s16 hiFlags)
 
 void Map::Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed)
 {
-    Path::Set_TLVData(tlvId, hiFlags, bSetCreated, bSetDestroyed);
+    gPathInfo->Set_TLVData(tlvId, hiFlags, bSetCreated, bSetDestroyed);
 }
 
 void Map::CreateScreenTransistionForTLV(relive::Path_TLV* pTlv)
@@ -1135,5 +1113,3 @@ TlvIterator Map::TLV_From_Offset_Lvl_Cam(const Guid& tlvId)
 {
     return gPathInfo->mBinaryPath->TlvById(tlvId);
 }
-
-Map* gMap = nullptr;

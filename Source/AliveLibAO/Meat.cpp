@@ -223,7 +223,7 @@ void Meat::VUpdate()
 
                 CheckPlatformCollision(xy, wh, *gBaseGameObjects);
 
-                if (mYPos > FP_FromInteger(mMap.mPathData->field_A_bBottom))
+                if (mYPos > FP_FromInteger(static_cast<Map&>(mMap).mPathData->field_A_bBottom))
                 {
                     SetDead(true);
                 }

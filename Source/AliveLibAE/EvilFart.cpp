@@ -326,7 +326,7 @@ void EvilFart::VUpdate()
                     1, mResMan, mMap);
 
                 mYPos = mYPos - (GetSpriteScale() * FP_FromInteger(50));
-                Mudokon_SFX(MudSounds::eFart_7, 0, 10 * (300 - mPossessedAliveTimer), this);
+                Mudokon_SFX(MudSounds::eFart_7, 0, 10 * (300 - mPossessedAliveTimer), this, mMap);
                 mYPos += GetSpriteScale() * FP_FromInteger(50);
             }
         }
@@ -391,7 +391,7 @@ void EvilFart::VUpdate()
                         SND_Stop_Channels_Mask(mSoundChannels);
                     }
 
-                    Mudokon_SFX(MudSounds::eFart_7, 50, FP_GetExponent(velocityToUse * FP_FromInteger(250)) - 2000, nullptr);
+                    Mudokon_SFX(MudSounds::eFart_7, 50, FP_GetExponent(velocityToUse * FP_FromInteger(250)) - 2000, nullptr, mMap);
                     mSoundChannels = 0; // TODO OG BUG ?? v32;
                 }
             }
@@ -404,7 +404,7 @@ void EvilFart::VUpdate()
                 }
                 if (!(sGnFrame % 30) && !Math_RandomRange(0, 1))
                 {
-                    Mudokon_SFX(MudSounds::eFart_7, 50, Math_RandomRange(-1500, -2000), nullptr);
+                    Mudokon_SFX(MudSounds::eFart_7, 50, Math_RandomRange(-1500, -2000), nullptr, mMap);
                 }
             }
 

@@ -6,6 +6,8 @@
 
 namespace AO {
 
+class Map;
+
 enum class TlvTypes : s16
 {
     None_m1 = -1,
@@ -192,10 +194,10 @@ ALIVE_ASSERT_SIZEOF_ALWAYS(Path_TLV, 0x18);
 class Path final
 {
 public:
-    static void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1);
-    static void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1);
-    static void TLV_Delete(const Guid& tlvId, s16 hiFlags = -1);
+    static void TLV_Reset(Map& map, const Guid& tlvId, s16 hiFlags = -1);
+    static void TLV_Persist(Map& map, const Guid& tlvId, s16 hiFlags = -1);
+    static void TLV_Delete(Map& map, const Guid& tlvId, s16 hiFlags = -1);
 
-    static void Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed);
+    static void Set_TLVData(Map& map, const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed);
 };
 } // namespace AO

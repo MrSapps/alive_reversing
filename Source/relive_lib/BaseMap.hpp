@@ -48,6 +48,15 @@ public:
         return mResourceManager;
     }
 
+    std::vector<std::unique_ptr<BinaryPath>>& GetLoadedPaths()
+    {
+        return mLoadedPaths;
+    }
+
+    BinaryPath* GetPathResourceBlockPtr(u32 pathId);
+    void FreePathResourceBlocks();
+    void ClearPathResourceBlocks();
+
     enum class CamChangeStates : s16
     {
         eInactive_0 = 0,
@@ -84,6 +93,11 @@ public:
     s16 mNextCamera = 0;
 
     s16 mForceLoad = 0;
+
+    s16 mCamIdxOnX = 0;
+    s16 mCamIdxOnY = 0;
+
+    bool mFreeAllAnimAndPalts = false;
 
     s16 mOverlayId = 0;
 

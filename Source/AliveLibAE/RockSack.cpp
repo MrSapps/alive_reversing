@@ -151,7 +151,7 @@ void RockSack::VUpdate()
             }
 
             SfxPlayMono(relive::SoundEffects::SackHit, 0);
-            Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 0x7FFF, 0);
+            Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 0x7FFF, 0, mMap);
 
             if (gAbe->mCurrentMotion == eAbeMotions::Motion_31_RunJumpMid_452C10)
             {

@@ -28,7 +28,7 @@ public:
     virtual void VUpdate() override;
 
     ::BaseAliveGameObject* ShootObject(PSX_RECT* pRect);
-    static bool InZBulletCover(FP xpos, FP ypos, const PSX_RECT& objRect);
+    static bool InZBulletCover(FP xpos, FP ypos, const PSX_RECT& objRect, BaseMap& map);
 
 private:
     void PlayBulletSounds(s16 volume);

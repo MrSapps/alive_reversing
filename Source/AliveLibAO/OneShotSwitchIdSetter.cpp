@@ -2,12 +2,13 @@
 #include "OneShotSwitchIdSetter.hpp"
 #include "../relive_lib/SwitchStates.hpp"
 #include "../AliveLibAE/stdlib.hpp"
+#include "Map.hpp"
 
 namespace AO {
 
 OneShotSwitchIdSetter::~OneShotSwitchIdSetter()
 {
-    Path::TLV_Reset(mTlvId);
+    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
 }
 
 OneShotSwitchIdSetter::OneShotSwitchIdSetter(Path_OneShotSwitchIdSetter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)

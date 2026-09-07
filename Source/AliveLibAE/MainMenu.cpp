@@ -1396,7 +1396,7 @@ MainMenuNextCam MainMenuController::Page_FMV_Level_Update_4D4AB0(u32 input_held)
             gPsxDisplay.PutCurrentDispEnv();
             gScreenManager->DecompressCameraToVRam(mMap.field_2C_camera_array[0]->mCamRes);
             gScreenManager->EnableRendering();
-            GetSoundAPI().mSND_Restart();
+            GetSoundAPI().mSND_Restart(mMap);
         }
         else
         {
@@ -1647,7 +1647,7 @@ MainMenuNextCam MainMenuController::LoadNewGame_Update_4D0920(u32 /*input*/)
             gAbe->mXPos = FP_FromInteger(0);
             gAbe->mYPos = FP_FromInteger(0);
 
-            QuikSave::LoadActive();
+            QuikSave::LoadActive(static_cast<Map&>(mMap));
 
             return MainMenuNextCam(MainMenuCams::eNoChange);
         }
@@ -1778,7 +1778,7 @@ MainMenuNextCam MainMenuController::BackStory_Or_NewGame_Update_4D1C60(u32 input
             gPsxDisplay.PutCurrentDispEnv();
             gScreenManager->DecompressCameraToVRam(mMap.field_2C_camera_array[0]->mCamRes);
             gScreenManager->EnableRendering();
-            GetSoundAPI().mSND_Restart();
+            GetSoundAPI().mSND_Restart(mMap);
             field_1FC_button_index = 1; // Select start game
             return MainMenuNextCam(MainMenuCams::eNoChange);
         }
@@ -1950,7 +1950,7 @@ MainMenuNextCam MainMenuController::LoadDemo_Update_4D1040(u32)
         nlohmann::json j = nlohmann::json::parse(jsonStr);
         QuikSave::gActiveQuicksaveData = {};
         from_json(j, QuikSave::gActiveQuicksaveData);
-        QuikSave::LoadActive();
+        QuikSave::LoadActive(static_cast<Map&>(mMap));
     }
     else
     {
@@ -3347,12 +3347,12 @@ void MainMenuController::AnimationAndSoundLogic_4CFE80()
                         {
                             case eAbeSpeak:
                             case eAbeSpeak2:
-                                Mudokon_SFX(static_cast<MudSounds>(sMainMenuFrameTable_561CC8[field_228_res_idx].field_6_sound), 0, 0, nullptr);
+                                Mudokon_SFX(static_cast<MudSounds>(sMainMenuFrameTable_561CC8[field_228_res_idx].field_6_sound), 0, 0, nullptr, mMap);
                                 mGameSpeakPlaying = true;
                                 break;
 
                             case eSligSpeak:
-                                Slig_GameSpeak_SFX(static_cast<SligSpeak>(sMainMenuFrameTable_561CC8[field_228_res_idx].field_6_sound), 0, 0, 0);
+                                Slig_GameSpeak_SFX(static_cast<SligSpeak>(sMainMenuFrameTable_561CC8[field_228_res_idx].field_6_sound), 0, 0, 0, mMap);
                                 mGameSpeakPlaying = true;
                                 break;
 

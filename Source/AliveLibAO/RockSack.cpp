@@ -74,7 +74,7 @@ RockSack::RockSack(relive::Path_RockSack* pTlv, const Guid& tlvId, ResourceManag
 
 RockSack::~RockSack()
 {
-    Path::TLV_Reset(mTlvId);
+    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
 }
 
 void RockSack::VScreenChanged()
@@ -160,7 +160,7 @@ void RockSack::VUpdate()
             }
 
             SfxPlayMono(relive::SoundEffects::SackHit, 0);
-            Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 0x7FFF, 0);
+            Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 0x7FFF, 0, mMap);
 
             if (gAbe->mCurrentMotion == eAbeMotions::Motion_33_RunJumpMid)
             {

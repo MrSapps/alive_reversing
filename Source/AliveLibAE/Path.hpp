@@ -7,6 +7,7 @@
 #include "../relive_lib/BinaryPath.hpp"
 
 class ResourceManagerWrapper;
+class Map;
 
 struct PathData;
 struct FixedPoint;
@@ -220,7 +221,7 @@ namespace relive
 class Path
 {
 public:
-    Path(BaseMap& map);
+    Path(Map& map);
     ~Path();
     void Free();
     void Init(const PathData* pPathData, EReliveLevelIds level, s16 path, s16 cameraId, BinaryPath* ppPathRes);
@@ -241,10 +242,10 @@ public:
     static void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1);
     static void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1);
     static void TLV_Delete(const Guid& tlvId, s16 hiFlags = -1);
-    static void Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed);
-    static void Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx);
+    void Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed);
+    void Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx);
 
-    static void Reset_TLVs(u16 pathId);
+    void Reset_TLVs(u16 pathId);
 
     EReliveLevelIds mLevelId = EReliveLevelIds::eNone;
     u16 mPathId = 0;

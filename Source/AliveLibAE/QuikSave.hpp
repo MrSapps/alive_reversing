@@ -5,6 +5,8 @@
 #include "Abe.hpp"
 
 class SerializedObjectData;
+class BaseMap;
+class Map;
 
 enum class EReliveLevelIds : s16;
 
@@ -168,10 +170,10 @@ struct SaveFileRec final
 class QuikSave final
 {
 public:
-    static void LoadActive();
-    static void DoQuicksave();
+    static void LoadActive(Map& map);
+    static void DoQuicksave(BaseMap& map);
     static void RestoreWorldInfo(const Quicksave_WorldInfo& rInfo);
-    static void SaveWorldInfo(Quicksave_WorldInfo* pInfo);
+    static void SaveWorldInfo(Quicksave_WorldInfo* pInfo, BaseMap& map);
     static void FindSaves();
     static void RestoreBlyData(Quicksave& pSaveData, ResourceManagerWrapper& resMan, BaseMap& map);
 
@@ -182,5 +184,5 @@ public:
     static s32 gTotalSaveFilesCount;
 
 private:
-    static void SaveToMemory_4C91A0(Quicksave& pSave);
+    static void SaveToMemory_4C91A0(Quicksave& pSave, BaseMap& map);
 };

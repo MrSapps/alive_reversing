@@ -1297,7 +1297,7 @@ bool Mudokon::VTakeDamage(BaseGameObject* pFrom)
             }
             else
             {
-                Mudokon_SFX(MudSounds::eHurt2_9, 0, Math_RandomRange(-127, 127), this);
+                Mudokon_SFX(MudSounds::eHurt2_9, 0, Math_RandomRange(-127, 127), this, mMap);
             }
             SetPal(Mud_Emotion::eNormal_0);
             return true;
@@ -1337,7 +1337,7 @@ bool Mudokon::VTakeDamage(BaseGameObject* pFrom)
             return true;
 
         case ReliveTypes::eElectricWall:
-            Mudokon_SFX(MudSounds::eDeathDropScream_15, 0, 0, this);
+            Mudokon_SFX(MudSounds::eDeathDropScream_15, 0, 0, this, mMap);
             EventBroadcast(Event::kEventMudokonDied, this);
             return true;
 
@@ -1351,7 +1351,7 @@ bool Mudokon::VTakeDamage(BaseGameObject* pFrom)
             if (mHealth <= FP_FromInteger(0))
             {
                 mHealth = FP_FromInteger(0);
-                Mudokon_SFX(MudSounds::eHurt1_16, 0, 1000, this);
+                Mudokon_SFX(MudSounds::eHurt1_16, 0, 1000, this, mMap);
                 mPersistAndResetOffscreen = false;
                 mBrainState = Mud_Brain_State::Brain_5_ShrivelDeath;
                 field_194_timer = MakeTimer(90);
@@ -4767,7 +4767,7 @@ s16 Mudokon::Brain_7_FallAndSmackDeath()
     if (mBrainSubState == 0)
     {
         // Wait for falling
-        Mudokon_SFX(MudSounds::eDeathDropScream_15, 0, 0, this);
+        Mudokon_SFX(MudSounds::eDeathDropScream_15, 0, 0, this, mMap);
         field_194_timer = MakeTimer(60);
         return 1;
     }
@@ -4783,7 +4783,7 @@ s16 Mudokon::Brain_7_FallAndSmackDeath()
         // Shake from ze floor slam & die
         if (static_cast<s32>(sGnFrame) > field_194_timer)
         {
-            Environment_SFX(EnvironmentSfx::eFallingDeathScreamHitGround_15, 0, 32767, this);
+            Environment_SFX(EnvironmentSfx::eFallingDeathScreamHitGround_15, 0, 32767, this, mMap);
             relive_new ScreenShake(false, false, mResMan, mMap);
             SetDead(true);
         }
@@ -5363,7 +5363,7 @@ void Mudokon::Motion_1_WalkLoop()
             }
             else if (GetAnimation().GetCurrentFrame() == 5 || GetAnimation().GetCurrentFrame() == 14)
             {
-                Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 32767, this);
+                Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 32767, this, mMap);
                 MapFollowMe(true);
                 if (mNextMotion == eMudMotions::Motion_21_RunLoop)
                 {
@@ -5401,7 +5401,7 @@ void Mudokon::Motion_2_StandingTurn()
 
     if (GetAnimation().GetCurrentFrame() == 0)
     {
-        Environment_SFX(EnvironmentSfx::eGenericMovement_9, 0, 32767, this);
+        Environment_SFX(EnvironmentSfx::eGenericMovement_9, 0, 32767, this, mMap);
     }
 
     if (GetAnimation().GetIsLastFrame())
@@ -5460,7 +5460,7 @@ void Mudokon::Motion_8_WalkToIdle()
 
         if (GetAnimation().GetCurrentFrame() == 0)
         {
-            Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 32767, this);
+            Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 32767, this, mMap);
             return;
         }
 
@@ -5712,7 +5712,7 @@ void Mudokon::Motion_21_RunLoop()
         }
         else if (GetAnimation().GetCurrentFrame() == 4 || GetAnimation().GetCurrentFrame() == 12)
         {
-            Environment_SFX(EnvironmentSfx::eRunningFootstep_2, 0, 32767, this);
+            Environment_SFX(EnvironmentSfx::eRunningFootstep_2, 0, 32767, this, mMap);
             MapFollowMe(true);
 
             switch (mNextMotion)
@@ -5732,13 +5732,13 @@ void Mudokon::Motion_21_RunLoop()
                 case eMudMotions::Motion_0_Idle:
                     mCurrentMotion = eMudMotions::Motion_24_RunSlideStop;
                     mNextMotion = eMudMotions::None_m1;
-                    Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 32767, this);
+                    Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 32767, this, mMap);
                     return;
 
                 case eMudMotions::Motion_25_RunSlideTurn:
                     mCurrentMotion = eMudMotions::Motion_25_RunSlideTurn;
                     mNextMotion = eMudMotions::None_m1;
-                    Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 32767, this);
+                    Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 32767, this, mMap);
                     return;
 
                 case eMudMotions::Motion_36_RunJumpMid:
@@ -5805,7 +5805,7 @@ void Mudokon::Motion_24_RunSlideStop()
         {
             if (GetAnimation().GetIsLastFrame())
             {
-                Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 32767, this);
+                Environment_SFX(EnvironmentSfx::eWalkingFootstep_1, 0, 32767, this, mMap);
                 MapFollowMe(true);
                 Mudokon::ToStand();
             }
@@ -5886,7 +5886,7 @@ void Mudokon::Motion_27_SneakLoop()
             }
             else if (GetAnimation().GetCurrentFrame() == 6 || GetAnimation().GetCurrentFrame() == 16)
             {
-                Environment_SFX(EnvironmentSfx::eSneakFootstep_3, 0, 32767, this);
+                Environment_SFX(EnvironmentSfx::eSneakFootstep_3, 0, 32767, this, mMap);
                 MapFollowMe(true);
 
                 if (mNextMotion == eMudMotions::Motion_1_WalkLoop)
@@ -6018,7 +6018,7 @@ void Mudokon::Motion_35_RunJumpBegin()
 
     if (!GetAnimation().GetCurrentFrame())
     {
-        Environment_SFX(EnvironmentSfx::eRunJumpOrLedgeHoist_11, 0, 32767, this);
+        Environment_SFX(EnvironmentSfx::eRunJumpOrLedgeHoist_11, 0, 32767, this, mMap);
     }
 
     if (GetAnimation().GetIsLastFrame())
@@ -6200,7 +6200,7 @@ void Mudokon::Motion_41_LandSoft1()
 {
     if (GetAnimation().GetCurrentFrame() == 2)
     {
-        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 32767, this);
+        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 32767, this, mMap);
     }
 
     if (GetAnimation().GetIsLastFrame())
@@ -6217,11 +6217,11 @@ void Mudokon::Motion_42_LandSoft2()
     {
         if (mPreviousMotion == eMudMotions::Motion_49_Fall)
         {
-            Environment_SFX(EnvironmentSfx::eLandingSoft_5, 0, 32767, this);
+            Environment_SFX(EnvironmentSfx::eLandingSoft_5, 0, 32767, this, mMap);
         }
         else
         {
-            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 32767, this);
+            Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 0, 32767, this, mMap);
         }
     }
 
@@ -6256,7 +6256,7 @@ void Mudokon::Motion_45_KnockForward()
 
     if (GetAnimation().GetCurrentFrame() == 4)
     {
-        Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 32767, this);
+        Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 32767, this, mMap);
     }
 
     if ((mMap.mCurrentLevel == EReliveLevelIds::eMines
@@ -6266,7 +6266,7 @@ void Mudokon::Motion_45_KnockForward()
         || mMap.mCurrentLevel == EReliveLevelIds::eBrewery)
         && GetAnimation().GetCurrentFrame() == 7)
     {
-        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this);
+        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this, mMap);
     }
 
     if (mNextMotion != eMudMotions::None_m1 && mHealth > FP_FromInteger(0))
@@ -6287,7 +6287,7 @@ void Mudokon::Motion_46_Knockback()
 
     if ((mMap.mCurrentLevel == EReliveLevelIds::eMines || mMap.mCurrentLevel == EReliveLevelIds::eBonewerkz || mMap.mCurrentLevel == EReliveLevelIds::eFeeCoDepot || mMap.mCurrentLevel == EReliveLevelIds::eBarracks || mMap.mCurrentLevel == EReliveLevelIds::eBrewery) && GetAnimation().GetCurrentFrame() == 7)
     {
-        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this);
+        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 80, -200, this, mMap);
     }
 
     if (!BaseAliveGameObjectCollisionLine)
@@ -6470,7 +6470,7 @@ void Mudokon::Motion_55_DuckKnockback()
 {
     if (GetAnimation().GetCurrentFrame() == 1)
     {
-        Environment_SFX(EnvironmentSfx::eGenericMovement_9, 0, 32767, this);
+        Environment_SFX(EnvironmentSfx::eGenericMovement_9, 0, 32767, this, mMap);
     }
 
     if (GetAnimation().GetIsLastFrame())
@@ -6497,8 +6497,8 @@ void Mudokon::Motion_56_SlapOwnHead()
     }
     else
     {
-        Mudokon_SFX(MudSounds::eHurt2_9, 0, 1000, this);
-        Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 0x7FFF, this);
+        Mudokon_SFX(MudSounds::eHurt2_9, 0, 1000, this, mMap);
+        Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 0x7FFF, this, mMap);
         EventBroadcast(Event::kEventMudokonDied, this);
         mPersistAndResetOffscreen = false;
         mHealth = FP_FromInteger(0);
@@ -6671,25 +6671,25 @@ void Mudokon::MudEmotionSound(MudSounds idx)
         if (field_180_emo_tbl != Mud_Emotion::eSick_7)
         {
             // TODO: Pass down the stronger types - assuming they map directly
-            Mudokon_SFX(idx, 80, field_13C_voice_pitch, this);
+            Mudokon_SFX(idx, 80, field_13C_voice_pitch, this, mMap);
             return;
         }
 
         if (idx != MudSounds::eSick_24)
         {
-            Mudokon_SFX(idx, 80, -field_13C_voice_pitch, this);
+            Mudokon_SFX(idx, 80, -field_13C_voice_pitch, this, mMap);
             return;
         }
 
         s16 pitch1 = Math_RandomRange(-5, 0);
         pitch1 *= 100;
         pitch1 = pitch1 - field_13C_voice_pitch;
-        Mudokon_SFX(MudSounds::eSick_24, Math_RandomRange(20, 50), pitch1, this);
+        Mudokon_SFX(MudSounds::eSick_24, Math_RandomRange(20, 50), pitch1, this, mMap);
 
         s16 pitch2 = Math_RandomRange(-5, 0);
         pitch2 *= 100;
         pitch2 = pitch2 - field_13C_voice_pitch;
-        Mudokon_SFX(MudSounds::eSadUgh_28, Math_RandomRange(20, 60), pitch2, this);
+        Mudokon_SFX(MudSounds::eSadUgh_28, Math_RandomRange(20, 60), pitch2, this, mMap);
         return;
     }
 
@@ -6700,19 +6700,19 @@ void Mudokon::MudEmotionSound(MudSounds idx)
             s16 pitch1 = Math_RandomRange(-5, 0);
             pitch1 *= 100;
             pitch1 = pitch1 - field_13C_voice_pitch;
-            Mudokon_SFX(MudSounds::eSick_24, Math_RandomRange(55, 90), pitch1, this);
+            Mudokon_SFX(MudSounds::eSick_24, Math_RandomRange(55, 90), pitch1, this, mMap);
 
             s16 pitch2 = Math_RandomRange(-5, 0);
             pitch2 *= 100;
             pitch2 = pitch2 - field_13C_voice_pitch;
-            Mudokon_SFX(MudSounds::eSadUgh_28, Math_RandomRange(60, 110), pitch2, this);
+            Mudokon_SFX(MudSounds::eSadUgh_28, Math_RandomRange(60, 110), pitch2, this, mMap);
             return;
         }
-        Mudokon_SFX(idx, 0, field_13C_voice_pitch, this);
+        Mudokon_SFX(idx, 0, field_13C_voice_pitch, this, mMap);
     }
     else
     {
-        Mudokon_SFX(idx, 0, field_13C_voice_pitch, this);
+        Mudokon_SFX(idx, 0, field_13C_voice_pitch, this, mMap);
     }
 }
 
@@ -6883,7 +6883,7 @@ void Mudokon::ToKnockback()
         field_158_wheel_id = Guid{};
     }
 
-    Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 32767, this);
+    Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 32767, this, mMap);
 
     if (mVelX > FP_FromInteger(0))
     {
@@ -6906,7 +6906,7 @@ void Mudokon::ToKnockback()
         mVelY = FP_FromInteger(0);
     }
 
-    Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 32767, this);
+    Environment_SFX(EnvironmentSfx::eKnockback_13, 0, 32767, this, mMap);
     mCurrentMotion = eMudMotions::Motion_46_Knockback;
 }
 
@@ -7077,7 +7077,7 @@ void Mudokon::HurtSoundPitchedToHealth()
     const u8 random = Math_RandomRange(0, 127) >= 64 ? 16 : 9; // random hurt sound
     const s16 min = FP_GetExponent((FP_FromInteger(1) - mHealth) / FP_FromDouble(0.15));
     const s16 bInCamera = mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0);
-    Mudokon_SFX(static_cast<MudSounds>(random), bInCamera ? 0 : 80, Math_RandomRange(200 * min, 40 * (5 * min + 5)), this);
+    Mudokon_SFX(static_cast<MudSounds>(random), bInCamera ? 0 : 80, Math_RandomRange(200 * min, 40 * (5 * min + 5)), this, mMap);
 }
 
 void Mudokon::TakeASlap(BaseGameObject* pFrom)
@@ -7120,8 +7120,8 @@ void Mudokon::TakeASlap(BaseGameObject* pFrom)
     }
     else
     {
-        Mudokon_SFX(MudSounds::eHurt2_9, 0, 1000, this);
-        Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 32767, this);
+        Mudokon_SFX(MudSounds::eHurt2_9, 0, 1000, this, mMap);
+        Environment_SFX(EnvironmentSfx::eDeathNoise_7, 0, 32767, this, mMap);
         EventBroadcast(Event::kEventMudokonDied, gAbe);
         mPersistAndResetOffscreen = false;
         mHealth = FP_FromInteger(0);

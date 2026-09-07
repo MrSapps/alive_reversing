@@ -772,7 +772,7 @@ void BaseAliveGameObject::OnPathTransitionAO(s32 camWorldX, s32 camWorldY, Camer
     }
 
     PSX_Point camLoc = {};
-    AO::mMap.GetCurrentCamCoords(&camLoc);
+    mMap.GetCurrentCamCoords(&camLoc);
 
     mXPos = FP_FromInteger((BaseAliveGameObjectPathTLV.GetTlv()->mBottomRightX + BaseAliveGameObjectPathTLV.GetTlv()->mTopLeftX) / 2);
     mYPos = FP_FromInteger(BaseAliveGameObjectPathTLV.GetTlv()->mTopLeftY);
@@ -880,7 +880,7 @@ bool BaseAliveGameObject::MapFollowMe(bool snapToGrid)
 bool BaseAliveGameObject::MapFollowMeAO(bool snapToGrid)
 {
     PSX_Point currentCamCoords = {};
-    AO::mMap.GetCurrentCamCoords(&currentCamCoords);
+    mMap.GetCurrentCamCoords(&currentCamCoords);
 
     // Are we "in" the current camera X bounds?
     if (mCurrentLevel == mMap.mCurrentLevel && mCurrentPath == mMap.mCurrentPath && mXPos > FP_FromInteger(currentCamCoords.x) && mXPos < FP_FromInteger(currentCamCoords.x + 1024))
@@ -929,7 +929,7 @@ bool BaseAliveGameObject::MapFollowMeAO(bool snapToGrid)
                 const s32 x_i = abs(FP_GetExponent(mXPos));
                 const s32 camXIndex = x_i % 1024;
 
-                AO::mMap.Get_map_size(&currentCamCoords);
+                static_cast<AO::Map&>(mMap).Get_map_size(&currentCamCoords);
                 if (x_i < (currentCamCoords.x - 1024))
                 {
                     UsePathTransScale();
@@ -972,7 +972,7 @@ bool BaseAliveGameObject::MapFollowMeAO(bool snapToGrid)
         // In the right camera void and moving right?
         else if (camXIndex > 624 && mVelX > FP_FromInteger(0)) // Never hit as velx is < 0
         {
-            AO::mMap.Get_map_size(&currentCamCoords);
+            static_cast<AO::Map&>(mMap).Get_map_size(&currentCamCoords);
             if (x_i < (currentCamCoords.x - 1024))
             {
                 UsePathTransScale();

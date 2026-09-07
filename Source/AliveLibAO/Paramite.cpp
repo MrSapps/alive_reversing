@@ -25,6 +25,7 @@
 #include "Path.hpp"
 #include "../relive_lib/FixedPoint.hpp"
 #include "../relive_lib/Engine.hpp"
+#include "Map.hpp"
 
 namespace AO {
 
@@ -164,11 +165,11 @@ Paramite::~Paramite()
 
     if (mHealth <= FP_FromInteger(0))
     {
-        Path::TLV_Delete(field_12C_tlvInfo);
+        Path::TLV_Delete(static_cast<Map&>(mMap), field_12C_tlvInfo);
     }
     else
     {
-        Path::TLV_Reset(field_12C_tlvInfo);
+        Path::TLV_Reset(static_cast<Map&>(mMap), field_12C_tlvInfo);
     }
 
     SND_SEQ_Stop(SeqId::eParamiteNearby_30);
@@ -706,7 +707,7 @@ void Paramite::Sound(ParamiteSpeak idx)
     s16 volLeft = 0;
 
     PSX_RECT rect = {};
-    mMap.Get_Camera_World_Rect(direction, &rect);
+    static_cast<Map&>(mMap).Get_Camera_World_Rect(direction, &rect);
 
     switch (direction)
     {
@@ -2749,7 +2750,7 @@ void Paramite::Motion_3_Running()
     if (GetAnimation().GetCurrentFrame() == 10)
     {
         Sound(ParamiteSpeak::LoudStep_3);
-        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 50, 600, 0);
+        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 50, 600, 0, mMap);
 
         if (mNextMotion == eParamiteMotions::Motion_2_Walking)
         {
@@ -3179,7 +3180,7 @@ void Paramite::Motion_13_GameSpeakBegin()
                 if (gAbe->mHealth > FP_FromInteger(0))
                 {
                     SfxPlayMono(relive::SoundEffects::KillEffect, 0);
-                    Mudokon_SFX(MudSounds::eKnockbackOuch_10, 0, 0, gAbe);
+                    Mudokon_SFX(MudSounds::eKnockbackOuch_10, 0, 0, gAbe, mMap);
                 }
                 gAbe->VTakeDamage(this);
             }
@@ -3520,7 +3521,7 @@ void Paramite::Motion_21_WebLeaveDown()
 {
     if (GetAnimation().GetCurrentFrame() == 2)
     {
-        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 50, 600, 0);
+        Environment_SFX(EnvironmentSfx::eHitGroundSoft_6, 50, 600, 0, mMap);
     }
 
     if (GetAnimation().GetIsLastFrame())

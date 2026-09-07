@@ -873,6 +873,6 @@ extern bool gAbeInvincible;
 
 extern const char_type* const sAbeMotionNames[130];
 
-s32 Environment_SFX(EnvironmentSfx sfxId, s32 volume, s32 pitchMin, BaseAliveGameObject* pAliveObj);
+s32 Environment_SFX(EnvironmentSfx sfxId, s32 volume, s32 pitchMin, BaseAliveGameObject* pAliveObj, BaseMap& map);
 
 void Animation_OnFrame_Abe(BaseGameObject* pPtr, u32&, const IndexedPoint& point, ResourceManagerWrapper& resMan, BaseMap& map);

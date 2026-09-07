@@ -159,11 +159,11 @@ Slog::~Slog()
     {
         if (mHealth <= FP_FromInteger(0))
         {
-            Path::TLV_Delete(mTlvId);
+            Path::TLV_Delete(static_cast<Map&>(mMap), mTlvId);
         }
         else
         {
-            Path::TLV_Reset(mTlvId);
+            Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
         }
     }
 
@@ -611,7 +611,7 @@ void Slog::Sfx(s32 soundId)
         mXPos,
         mYPos);
     PSX_RECT worldRect;
-    mMap.Get_Camera_World_Rect(direction, &worldRect);
+    static_cast<Map&>(mMap).Get_Camera_World_Rect(direction, &worldRect);
     volumeLeft = volumeRight;
     switch (direction)
     {

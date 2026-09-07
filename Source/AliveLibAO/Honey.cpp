@@ -2,6 +2,7 @@
 #include "Honey.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "Path.hpp"
+#include "Map.hpp"
 
 namespace AO {
 
@@ -27,7 +28,7 @@ Honey::Honey(FP xpos, FP ypos, ResourceManagerWrapper& resMan, BaseMap& map)
 void Honey::VScreenChanged()
 {
     SetDead(true);
-    Path::TLV_Reset(mTlvInfo);
+    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
 }
 
 } // namespace AO

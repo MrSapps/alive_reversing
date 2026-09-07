@@ -147,7 +147,7 @@ void TorturedMudokon::VUpdate()
             mZapAnim.SetRender(false);
             if (!Math_RandomRange(0, 8))
             {
-                Mudokon_SFX(MudSounds::eNoSad_22, 100, Math_RandomRange(mPainSoundPitch, mPainSoundPitch + 100), 0);
+                Mudokon_SFX(MudSounds::eNoSad_22, 100, Math_RandomRange(mPainSoundPitch, mPainSoundPitch + 100), 0, mMap);
             }
         }
     }
@@ -190,12 +190,12 @@ void TorturedMudokon::VUpdate()
         {
             if (sndRnd == 1)
             {
-                Mudokon_SFX(MudSounds::eHurt1_16, 127, Math_RandomRange(mPainSoundPitch, mPainSoundPitch + 100), 0);
+                Mudokon_SFX(MudSounds::eHurt1_16, 127, Math_RandomRange(mPainSoundPitch, mPainSoundPitch + 100), 0, mMap);
             }
         }
         else
         {
-            Mudokon_SFX(MudSounds::eHurt2_9, 127, Math_RandomRange(mPainSoundPitch, mPainSoundPitch + 100), 0);
+            Mudokon_SFX(MudSounds::eHurt2_9, 127, Math_RandomRange(mPainSoundPitch, mPainSoundPitch + 100), 0, mMap);
         }
     }
 

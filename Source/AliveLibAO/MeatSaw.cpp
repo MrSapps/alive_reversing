@@ -20,11 +20,11 @@ MeatSaw::~MeatSaw()
 {
     if (mResetOffscreen && SwitchStates_Get(mSwitchId) != field_F2_switch_value)
     {
-        Path::TLV_Reset(mTlvId, 1);
+        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId, 1);
     }
     else
     {
-        Path::TLV_Reset(mTlvId, 0);
+        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId, 0);
     }
 
     mMotorAnim.VCleanUp();

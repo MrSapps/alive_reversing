@@ -33,7 +33,7 @@ DemoPlayback::DemoPlayback(ResourceManagerWrapper& resMan, BaseMap& map)
         {
             SetDead(false);
         }
-        SaveGame::SaveToMemory(mSaveData);
+        SaveGame::SaveToMemory(mSaveData, static_cast<Map&>(map));
     }
 
     //auto pd = reinterpret_cast<PlaybackData*>(*ppPlaybackData);
@@ -45,7 +45,7 @@ DemoPlayback::DemoPlayback(ResourceManagerWrapper& resMan, BaseMap& map)
 
     nlohmann::json j = nlohmann::json::parse(jsonStr);
     from_json(j, *mSaveData);
-    SaveGame::LoadFromMemory(mSaveData, 1);
+    SaveGame::LoadFromMemory(mSaveData, 1, static_cast<Map&>(map));
     // TODO: can probably be removed since rng in relive won't be in sync with OG anyway?
     //sRandomSeed = pd->randomSeed;
     mState = States::eInit_0;
@@ -104,7 +104,7 @@ void DemoPlayback::VUpdate()
                 }
                 else
                 {
-                    SaveGame::LoadFromMemory(mSaveData, 1);
+                    SaveGame::LoadFromMemory(mSaveData, 1, static_cast<Map&>(mMap));
                 }
 
                 mState = States::eDone_2;

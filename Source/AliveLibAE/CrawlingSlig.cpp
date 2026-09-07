@@ -509,7 +509,7 @@ void CrawlingSlig::VOnTlvCollision(TlvIterator tlvIterator)
                 mVelY = FP_FromInteger(0);
                 mVelX = FP_FromInteger(0);
                 EventBroadcast(Event::kEventMudokonComfort, this);
-                Slig_GameSpeak_SFX(SligSpeak::eHelp_10, 0, 0, this);
+                Slig_GameSpeak_SFX(SligSpeak::eHelp_10, 0, 0, this, mMap);
                 mMultiUseTimer = MakeTimer(60);
                 break;
             }
@@ -546,7 +546,7 @@ bool CrawlingSlig::VTakeDamage(BaseGameObject* pFrom)
                 return true;
 
             case ReliveTypes::eElectricWall:
-                Slig_GameSpeak_SFX(SligSpeak::eHelp_10, 0, 0, this);
+                Slig_GameSpeak_SFX(SligSpeak::eHelp_10, 0, 0, this, mMap);
                 return true;
 
             case ReliveTypes::eSlig:
@@ -563,7 +563,7 @@ bool CrawlingSlig::VTakeDamage(BaseGameObject* pFrom)
                 }
 
                 Set_AnimAndMotion(CrawlingSligMotion::Motion_7_ToShakingToIdle, true);
-                Slig_GameSpeak_SFX(SligSpeak::eHelp_10, 0, 0, this);
+                Slig_GameSpeak_SFX(SligSpeak::eHelp_10, 0, 0, this, mMap);
 
                 if (BrainIs(ICrawlingSligBrain::EBrainTypes::PanicGetALocker))
                 {
@@ -690,7 +690,7 @@ void CrawlingSlig::ToIdle()
 
 void SleepingBrain::VUpdate()
 {
-    if (mMap.GetDirection(
+    if (mCrawlingSlig.mMap.GetDirection(
             mCrawlingSlig.mCurrentLevel,
             mCrawlingSlig.mCurrentPath,
             mCrawlingSlig.mXPos,
@@ -745,7 +745,7 @@ void SleepingBrain::VUpdate()
 
 void IdleBrain::VUpdate()
 {
-    if (mMap.GetDirection(
+    if (mCrawlingSlig.mMap.GetDirection(
             mCrawlingSlig.mCurrentLevel,
             mCrawlingSlig.mCurrentPath,
             mCrawlingSlig.mXPos,
@@ -764,7 +764,7 @@ void IdleBrain::VUpdate()
 
 void PanicGetALockerBrain::VUpdate()
 {
-    if (mMap.GetDirection(
+    if (mCrawlingSlig.mMap.GetDirection(
             mCrawlingSlig.mCurrentLevel,
             mCrawlingSlig.mCurrentPath,
             mCrawlingSlig.mXPos,
@@ -1000,7 +1000,7 @@ void PanicGetALockerBrain::VUpdate()
 
 void PossessedBrain::VUpdate()
 {
-    if (mMap.GetDirection(
+    if (mCrawlingSlig.mMap.GetDirection(
             mCrawlingSlig.mCurrentLevel,
             mCrawlingSlig.mCurrentPath,
             mCrawlingSlig.mXPos,
@@ -1052,7 +1052,7 @@ void PossessedBrain::VUpdate()
 
                 sControlledCharacter = gAbe;
                 mCrawlingSlig.SetPossessed(false);
-                mMap.SetActiveCam(mCrawlingSlig.mAbeLevel, mCrawlingSlig.mAbePath, mCrawlingSlig.mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+                mCrawlingSlig.mMap.SetActiveCam(mCrawlingSlig.mAbeLevel, mCrawlingSlig.mAbePath, mCrawlingSlig.mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
                 mCrawlingSlig.SetBrain(ICrawlingSligBrain::EBrainTypes::GetKilled);
                 mCrawlingSlig.mGetKilledBrain.SetState(GetKilledBrain::eGibsDeath);
                 MusicController::static_PlayMusic(MusicController::MusicTypes::eNone_0, &mCrawlingSlig, 0, 0);
@@ -1092,7 +1092,7 @@ void PossessedBrain::VUpdate()
 
 void GetKilledBrain::VUpdate()
 {
-    if (mMap.GetDirection(
+    if (mCrawlingSlig.mMap.GetDirection(
             mCrawlingSlig.mCurrentLevel,
             mCrawlingSlig.mCurrentPath,
             mCrawlingSlig.mXPos,
@@ -1199,7 +1199,7 @@ void GetKilledBrain::VUpdate()
                         // TODO: revisit the logic below
                         static_cast<s16>(2 * (mCrawlingSlig.mMultiUseTimer & (0xFFFF - sGnFrame))),
                         0,
-                        &mCrawlingSlig);
+                        &mCrawlingSlig, mCrawlingSlig.mMap);
                 }
 
                 if (static_cast<s32>(sGnFrame) == mCrawlingSlig.mMultiUseTimer - 6)
@@ -1210,7 +1210,7 @@ void GetKilledBrain::VUpdate()
             }
             else
             {
-                Environment_SFX(EnvironmentSfx::eFallingDeathScreamHitGround_15, 0, 0x7FFF, &mCrawlingSlig);
+                Environment_SFX(EnvironmentSfx::eFallingDeathScreamHitGround_15, 0, 0x7FFF, &mCrawlingSlig, mCrawlingSlig.mMap);
                 relive_new ScreenShake(false, false, mCrawlingSlig.mResMan, mCrawlingSlig.mMap);
                 mCrawlingSlig.mMultiUseTimer = BaseGameObject::MakeTimer(30);
                 mBrainState = EState::eSetDead;
@@ -1226,7 +1226,7 @@ void GetKilledBrain::VUpdate()
 void TransformedBrain::VUpdate()
 {
     BaseGameObject* pObj = sObjectIds.Find_Impl(mCrawlingSlig.mTransformedSligId);
-    if (mMap.GetDirection(
+    if (mCrawlingSlig.mMap.GetDirection(
             mCrawlingSlig.mCurrentLevel,
             mCrawlingSlig.mCurrentPath,
             mCrawlingSlig.mXPos,
@@ -1514,7 +1514,7 @@ void CrawlingSlig::Motion_8_Speaking()
     {
         if (mMap.mCurrentPath == mCurrentPath && mMap.mCurrentLevel == mCurrentLevel && Is_In_Current_Camera() == CameraPos::eCamCurrent_0)
         {
-            Slig_GameSpeak_SFX(mSpeak, 0, 0, this);
+            Slig_GameSpeak_SFX(mSpeak, 0, 0, this, mMap);
         }
         mSpeak = SligSpeak::eNone;
     }
@@ -1663,7 +1663,7 @@ void CrawlingSlig::Motion_16_IdleToPushingWall()
 {
     if (GetAnimation().GetIsLastFrame())
     {
-        Slig_GameSpeak_SFX(static_cast<SligSpeak>(Math_RandomRange(static_cast<s32>(SligSpeak::eOuch1_13), static_cast<s32>(SligSpeak::eOuch2_14))), 0, 0, this);
+        Slig_GameSpeak_SFX(static_cast<SligSpeak>(Math_RandomRange(static_cast<s32>(SligSpeak::eOuch1_13), static_cast<s32>(SligSpeak::eOuch2_14))), 0, 0, this, mMap);
         Set_AnimAndMotion(CrawlingSligMotion::Motion_10_PushingWall, true);
     }
 }
@@ -1855,7 +1855,7 @@ s16 CrawlingSlig::CanCrawl()
         Set_AnimAndMotion(CrawlingSligMotion::Motion_10_PushingWall, true);
         const s32 snappedX = SnapToXGrid_AE(GetSpriteScale(), FP_GetExponent(mXPos));
         mVelX = ((FP_FromInteger(snappedX) - mXPos) / FP_FromInteger(4));
-        Slig_GameSpeak_SFX(static_cast<SligSpeak>(Math_RandomRange(static_cast<s32>(SligSpeak::eOuch1_13), static_cast<s32>(SligSpeak::eOuch2_14))), 0, 0, this);
+        Slig_GameSpeak_SFX(static_cast<SligSpeak>(Math_RandomRange(static_cast<s32>(SligSpeak::eOuch1_13), static_cast<s32>(SligSpeak::eOuch2_14))), 0, 0, this, mMap);
         return false;
     }
     else

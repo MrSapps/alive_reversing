@@ -197,13 +197,13 @@ void Bullet::VUpdate()
     }
 }
 
-bool Bullet::InZBulletCover(FP xpos, FP ypos, const PSX_RECT& objRect)
+bool Bullet::InZBulletCover(FP xpos, FP ypos, const PSX_RECT& objRect, BaseMap& map)
 {
     TlvIterator zCoverIterator = TlvIterator::Invalid();
     while (1)
     {
         // Go to the next entry (or first if first call).
-        zCoverIterator = mMap.TLV_Get_At(
+        zCoverIterator = map.TLV_Get_At(
             zCoverIterator,
             xpos,
             ypos,

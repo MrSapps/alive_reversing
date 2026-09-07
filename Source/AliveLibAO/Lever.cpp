@@ -124,7 +124,7 @@ Lever::Lever(relive::Path_Lever* pTlv, const Guid& tlvId, ResourceManagerWrapper
 
 Lever::~Lever()
 {
-    Path::TLV_Reset(mTlvId);
+    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
 }
 
 void Lever::VScreenChanged()

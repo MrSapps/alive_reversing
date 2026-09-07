@@ -126,7 +126,7 @@ void Elum::VOnTlvCollision(TlvIterator tlvIterator)
             {
                 mDontFollowAbe = 0;
             }
-            Elum_SFX(ElumSounds::eHowl_2, this);
+            Elum_SFX(ElumSounds::eHowl_2, this, mMap);
             GetAnimation().SetRender(false);
             mCurrentMotion = eElumMotions::Motion_20_Fall;
             mHealth = FP_FromInteger(0);
@@ -150,7 +150,7 @@ bool Elum::VTakeDamage(BaseGameObject* pFrom)
         case ReliveTypes::eAirExplosion:
             if (mHealth > FP_FromInteger(0))
             {
-                Elum_SFX(ElumSounds::eExploding_7, 0);
+                Elum_SFX(ElumSounds::eExploding_7, 0, mMap);
                 SfxPlayMono(relive::SoundEffects::KillEffect, 75);
 
                 if (gAbe->mHealth > FP_FromInteger(0))
@@ -209,7 +209,7 @@ void Elum::ToKnockback()
         MoveOnLine(0);
     }
     MapFollowMe(true);
-    Environment_SFX(EnvironmentSfx::eKnockback_13, 95, -200, this);
+    Environment_SFX(EnvironmentSfx::eKnockback_13, 95, -200, this, mMap);
 }
 
 void Elum::VOnTrapDoorOpen()
@@ -453,7 +453,7 @@ bool Elum::ToNextMotion()
             return true;
 
         case eElumMotions::Motion_29_BeesStruggling:
-            Elum_SFX(ElumSounds::eBeesStruggle_3, 0);
+            Elum_SFX(ElumSounds::eBeesStruggle_3, 0, mMap);
             mCurrentMotion = eElumMotions::Motion_29_BeesStruggling;
             field_110_timer = MakeTimer(25);
             mNextMotion = eElumMotions::None_m1;
@@ -625,7 +625,7 @@ const relive::SfxDefinition sElumSfx_4C5398[12] = {
     {0, 5, 66, 60, -1, 1},
     {0, 21, 64, 60, -1, 1}};
 
-void Elum::Elum_SFX(ElumSounds soundId, BaseAliveGameObject* pObj)
+void Elum::Elum_SFX(ElumSounds soundId, BaseAliveGameObject* pObj, BaseMap& map)
 {
     switch (soundId)
     {
@@ -650,7 +650,7 @@ void Elum::Elum_SFX(ElumSounds soundId, BaseAliveGameObject* pObj)
             CameraPos dir = CameraPos::eCamCurrent_0;
             if (pObj)
             {
-                dir = mMap.GetDirection(
+                dir = pObj->GetMap().GetDirection(
                     pObj->mCurrentLevel,
                     pObj->mCurrentPath,
                     pObj->mXPos,
@@ -694,7 +694,7 @@ void Elum::Elum_SFX(ElumSounds soundId, BaseAliveGameObject* pObj)
             break;
 
         case ElumSounds::eRunSlide_5:
-            Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 0x7FFF, 0);
+            Environment_SFX(EnvironmentSfx::eRunSlide_4, 0, 0x7FFF, 0, map);
             break;
 
         case ElumSounds::eSpottedHoney_6:
@@ -1278,12 +1278,12 @@ s16 Elum::Brain_1_HoneyAddiction()
                     if (honey_xd >= (kGridSize * FP_FromInteger(2)))
                     {
                         mNextMotion = eElumMotions::Motion_3_WalkLoop;
-                        Elum_SFX(ElumSounds::eSpottedHoney_6, 0);
+                        Elum_SFX(ElumSounds::eSpottedHoney_6, 0, mMap);
                         return 2;
                     }
                     else
                     {
-                        Elum_SFX(ElumSounds::eSpottedHoney_6, 0);
+                        Elum_SFX(ElumSounds::eSpottedHoney_6, 0, mMap);
                         mNextMotion = eElumMotions::Motion_25_LickingHoney;
                         if (sControlledCharacter == this)
                         {
@@ -1302,12 +1302,12 @@ s16 Elum::Brain_1_HoneyAddiction()
                     if (honey_xd <= -(kGridSize * FP_FromInteger(2)))
                     {
                         mNextMotion = eElumMotions::Motion_3_WalkLoop;
-                        Elum_SFX(ElumSounds::eSpottedHoney_6, 0);
+                        Elum_SFX(ElumSounds::eSpottedHoney_6, 0, mMap);
                         return 2;
                     }
                     else
                     {
-                        Elum_SFX(ElumSounds::eSpottedHoney_6, 0);
+                        Elum_SFX(ElumSounds::eSpottedHoney_6, 0, mMap);
                         mNextMotion = eElumMotions::Motion_25_LickingHoney;
                         if (sControlledCharacter == this)
                         {
@@ -1335,7 +1335,7 @@ s16 Elum::Brain_1_HoneyAddiction()
             {
                 if (honey_xd_1 < (kGridSize * FP_FromInteger(2)))
                 {
-                    Elum_SFX(ElumSounds::eSpottedHoney_6, 0);
+                    Elum_SFX(ElumSounds::eSpottedHoney_6, 0, mMap);
                     mNextMotion = eElumMotions::Motion_25_LickingHoney;
                     if (sControlledCharacter == this)
                     {
@@ -1348,7 +1348,7 @@ s16 Elum::Brain_1_HoneyAddiction()
             {
                 if (honey_xd_1 > -(kGridSize * FP_FromInteger(2)))
                 {
-                    Elum_SFX(ElumSounds::eSpottedHoney_6, 0);
+                    Elum_SFX(ElumSounds::eSpottedHoney_6, 0, mMap);
                     mNextMotion = eElumMotions::Motion_25_LickingHoney;
                     if (sControlledCharacter == this)
                     {
@@ -1358,7 +1358,7 @@ s16 Elum::Brain_1_HoneyAddiction()
                 }
             }
             mNextMotion = eElumMotions::Motion_3_WalkLoop;
-            Elum_SFX(ElumSounds::eSpottedHoney_6, 0);
+            Elum_SFX(ElumSounds::eSpottedHoney_6, 0, mMap);
             return 2;
         }
 
@@ -1712,7 +1712,7 @@ void Elum::Motion_3_WalkLoop()
 
             if (sControlledCharacter != this)
             {
-                Elum_SFX(ElumSounds::eWalkingFootstep_0, 0);
+                Elum_SFX(ElumSounds::eWalkingFootstep_0, 0, mMap);
                 return;
             }
 
@@ -1722,7 +1722,7 @@ void Elum::Motion_3_WalkLoop()
             }
 
             field_10E_pressed = 0;
-            Elum_SFX(ElumSounds::eWalkingFootstep_0, 0);
+            Elum_SFX(ElumSounds::eWalkingFootstep_0, 0, mMap);
         }
         else if (GetAnimation().GetCurrentFrame() == 11)
         {
@@ -1782,7 +1782,7 @@ void Elum::Motion_3_WalkLoop()
 
             if (sControlledCharacter != this)
             {
-                Elum_SFX(ElumSounds::eWalkingFootstep_0, 0);
+                Elum_SFX(ElumSounds::eWalkingFootstep_0, 0, mMap);
                 return;
             }
 
@@ -1792,7 +1792,7 @@ void Elum::Motion_3_WalkLoop()
             }
 
             field_10E_pressed = 0;
-            Elum_SFX(ElumSounds::eWalkingFootstep_0, 0);
+            Elum_SFX(ElumSounds::eWalkingFootstep_0, 0, mMap);
         }
         else
         {
@@ -1807,7 +1807,7 @@ void Elum::Motion_4_Turn()
 
     if (!GetAnimation().GetCurrentFrame())
     {
-        Environment_SFX(EnvironmentSfx::eRollingNoise_8, 0, 0x7FFF, this);
+        Environment_SFX(EnvironmentSfx::eRollingNoise_8, 0, 0x7FFF, this, mMap);
     }
 
     if (GetAnimation().GetIsLastFrame())
@@ -1817,7 +1817,7 @@ void Elum::Motion_4_Turn()
 
         if (mNextMotion == eElumMotions::Motion_29_BeesStruggling)
         {
-            Elum_SFX(ElumSounds::eBeesStruggle_3, 0);
+            Elum_SFX(ElumSounds::eBeesStruggle_3, 0, mMap);
             mCurrentMotion = eElumMotions::Motion_29_BeesStruggling;
             mNextMotion = eElumMotions::None_m1;
             field_110_timer = MakeTimer(25);
@@ -1846,7 +1846,7 @@ void Elum::Motion_5_WalkToIdle()
 
     if (GetAnimation().GetCurrentFrame() == 0)
     {
-        Elum_SFX(ElumSounds::eWalkingFootstep_0, 0);
+        Elum_SFX(ElumSounds::eWalkingFootstep_0, 0, mMap);
     }
     else if (GetAnimation().GetIsLastFrame())
     {
@@ -1854,7 +1854,7 @@ void Elum::Motion_5_WalkToIdle()
 
         if (mNextMotion == eElumMotions::Motion_29_BeesStruggling)
         {
-            Elum_SFX(ElumSounds::eBeesStruggle_3, 0);
+            Elum_SFX(ElumSounds::eBeesStruggle_3, 0, mMap);
             mCurrentMotion = eElumMotions::Motion_29_BeesStruggling;
             field_110_timer = MakeTimer(25);
             mNextMotion = eElumMotions::None_m1;
@@ -1894,7 +1894,7 @@ void Elum::Motion_6_MidWalkToIdle()
 
     if (GetAnimation().GetCurrentFrame() == 0)
     {
-        Elum_SFX(ElumSounds::eWalkingFootstep_0, 0);
+        Elum_SFX(ElumSounds::eWalkingFootstep_0, 0, mMap);
     }
 
     if (GetAnimation().GetIsLastFrame())
@@ -1974,7 +1974,7 @@ void Elum::Motion_10_Yell()
     }
     else
     {
-        Elum_SFX(ElumSounds::eHowl_2, this);
+        Elum_SFX(ElumSounds::eHowl_2, this, mMap);
         mCanSpeak = false;
     }
 
@@ -1999,7 +1999,7 @@ void Elum::Motion_12_RunTurn()
 
     if (!GetAnimation().GetCurrentFrame())
     {
-        Elum_SFX(ElumSounds::eRunSlide_5, 0);
+        Elum_SFX(ElumSounds::eRunSlide_5, 0, mMap);
     }
 
     const FP offY = (sControlledCharacter == this) ? GetSpriteScale() * FP_FromInteger(40) : GetSpriteScale() * FP_FromInteger(25);
@@ -2017,7 +2017,7 @@ void Elum::Motion_12_RunTurn()
         }
         mVelX = FP_FromInteger(0);
         MapFollowMe(true);
-        Environment_SFX(EnvironmentSfx::eKnockback_13, 95, -200, this);
+        Environment_SFX(EnvironmentSfx::eKnockback_13, 95, -200, this, mMap);
         return;
     }
 
@@ -2058,7 +2058,7 @@ void Elum::Speak(EnvironmentSfx speak, bool setYellMotion)
 {
     if (GetAnimation().GetCurrentFrame() == 3 && mCanSpeak)
     {
-        Environment_SFX(speak, 75, 0, this);
+        Environment_SFX(speak, 75, 0, this, mMap);
         mCanSpeak = false;
     }
     else
@@ -2146,7 +2146,7 @@ void Elum::Motion_19_Dead()
 
             if (!mMap.Is_Point_In_Current_Camera(mContinuePointLevel, mContinuePointPath, mXPos, mYPos, 0))
             {
-                Elum_SFX(ElumSounds::eHowl_2, this);
+                Elum_SFX(ElumSounds::eHowl_2, this, mMap);
             }
 
             mStrugglingWithBees = false;
@@ -2235,7 +2235,7 @@ void Elum::Motion_21_Land()
             case eLineTypes::eDynamicCollision_32:
             case eLineTypes::eBackgroundDynamicCollision_36:
             {
-                Elum_SFX(ElumSounds::eHitGroundSoft_4, 0);
+                Elum_SFX(ElumSounds::eHitGroundSoft_4, 0, mMap);
                 BaseAliveGameObjectCollisionLine = pLine;
                 if (mYPos - BaseAliveGameObjectLastLineYPos >= FP_FromInteger(20))
                 {
@@ -2331,7 +2331,7 @@ void Elum::Motion_25_LickingHoney()
         {
             if (mCanSpeak)
             {
-                Elum_SFX(ElumSounds::eLickingHoney_8, 0);
+                Elum_SFX(ElumSounds::eLickingHoney_8, 0, mMap);
                 mCanSpeak = false;
             }
         }
@@ -2493,7 +2493,7 @@ void Elum::RunJumpMidAndHopMid(MidType midType)
                 case eLineTypes::eBackgroundFloor_4:
                 case eLineTypes::eDynamicCollision_32:
                 case eLineTypes::eBackgroundDynamicCollision_36:
-                    Elum_SFX(ElumSounds::eHitGroundSoft_4, 0);
+                    Elum_SFX(ElumSounds::eHitGroundSoft_4, 0, mMap);
 
                     switch (midType)
                     {
@@ -2692,7 +2692,7 @@ void Elum::Motion_36_RunLoop()
             return;
         }
 
-        Elum_SFX(ElumSounds::eRunningFootstep_1, 0);
+        Elum_SFX(ElumSounds::eRunningFootstep_1, 0, mMap);
 
         if (!field_10C_bFootStep2)
         {
@@ -2775,7 +2775,7 @@ void Elum::RunSlideStopKnockback()
     }
     mVelX = FP_FromInteger(0);
     MapFollowMe(true);
-    Environment_SFX(EnvironmentSfx::eKnockback_13, 95, -200, this);
+    Environment_SFX(EnvironmentSfx::eKnockback_13, 95, -200, this, mMap);
 }
 
 void Elum::Motion_37_RunSlideStop()
@@ -2785,7 +2785,7 @@ void Elum::Motion_37_RunSlideStop()
 
     if (GetAnimation().GetCurrentFrame() == 0)
     {
-        Elum_SFX(ElumSounds::eRunSlide_5, 0);
+        Elum_SFX(ElumSounds::eRunSlide_5, 0, mMap);
     }
 
     const FP offY = (sControlledCharacter == this) ? GetSpriteScale() * FP_FromInteger(40) : GetSpriteScale() * FP_FromInteger(25);
@@ -3077,7 +3077,7 @@ void Elum::Motion_46_ScratchEnd()
 
         if (mNextMotion == eElumMotions::Motion_29_BeesStruggling)
         {
-            Elum_SFX(ElumSounds::eBeesStruggle_3, 0);
+            Elum_SFX(ElumSounds::eBeesStruggle_3, 0, mMap);
             mCurrentMotion = eElumMotions::Motion_29_BeesStruggling;
             field_110_timer = MakeTimer(25);
             mNextMotion = eElumMotions::None_m1;
@@ -3202,7 +3202,7 @@ void Elum::VUpdate()
             mYPos += mVelY;
 
             PSX_Point map_size = {};
-            mMap.Get_map_size(&map_size);
+            static_cast<Map&>(mMap).Get_map_size(&map_size);
 
             if (mXPos < FP_FromInteger(0))
             {
