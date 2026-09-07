@@ -522,8 +522,6 @@ void Engine::Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera
 
     gAttract = 0;
 
-    SYS_EventsPump();
-
     // TODO: both have to exist for the game to work due to AE map access in Path.cpp
     //if (mGameType == GameType::eAe)
     {
@@ -534,7 +532,6 @@ void Engine::Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera
         AO::gMap = relive_new AO::Map(mResMan);
     }
 
-    gPsxDisplay.Init();
     AO::Input().InitPad(1);
 
     gBaseGameObjects = relive_new DynamicArrayT<BaseGameObject>(90);
