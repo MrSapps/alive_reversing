@@ -56,7 +56,7 @@ namespace CameraIds::Menu
 class Map final : public BaseMap
 {
 public:
-    explicit Map(ResourceManagerWrapper& resMan, relive::Factory& factory);
+    Map(ResourceManagerWrapper& resMan, relive::Factory& factory);
 
     void Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange) override;
 
@@ -65,7 +65,7 @@ public:
 
     void ScreenChange() override;
 
-    void GoTo_Camera();
+    void GoTo_Camera() override;
 
     void Loader(s16 camX, s16 camY, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad);
 
@@ -77,7 +77,7 @@ public:
 
     void Get_map_size(PSX_Point* pPoint);
 
-    virtual void GetCurrentCamCoords(PSX_Point* pPoint) override;
+    void GetCurrentCamCoords(PSX_Point* pPoint) override;
     s16 GetOverlayId() override;
 
     static CameraSwapper* FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLevelIds levelId);
@@ -97,7 +97,7 @@ public:
     void ResetPathObjects(u16 pathNum);
 
 
-    virtual CameraPos Rect_Location_Relative_To_Active_Camera(const PSX_RECT* pRect, s16 width = 0) override;
+    CameraPos Rect_Location_Relative_To_Active_Camera(const PSX_RECT* pRect, s16 width = 0) override;
 
     s16 Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect) override;
 
@@ -110,17 +110,16 @@ public:
     void Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx);
 
     // NOTE: Part of Path object in AE
-    TlvIterator Get_First_TLV_For_Offsetted_Camera(s16 camX, s16 camY);
+    TlvIterator Get_First_TLV_For_Offsetted_Camera(s16 camX, s16 camY) override;
 
     void SaveBlyData(u8* pSaveBuffer);
 
-    virtual void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1) override;
-    virtual void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1) override;
-    virtual void TLV_Delete(const Guid& tlvId, s16 hiFlags = -1) override;
+    void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1) override;
+    void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1) override;
+    void TLV_Delete(const Guid& tlvId, s16 hiFlags = -1) override;
     void Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed) override;
 
     s16 field_1E_door = 0;
-    FP_Point mCameraOffset = {};
 
     const PathData* mPathData = nullptr;
     s16 mMapChanged = 0;

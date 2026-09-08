@@ -40,7 +40,7 @@ public:
     void Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange) override;
     void Shutdown() override;
     void Reset();
-    explicit Map(ResourceManagerWrapper& resMan, relive::Factory& factory);
+    Map(ResourceManagerWrapper& resMan, relive::Factory& factory);
     ~Map();
 
     void Get_map_size(PSX_Point* pPoint);
@@ -80,8 +80,6 @@ public:
 
     s16 mDoorTransition = 0;
     s16 mTeleporterTransition = 0;
-
-    FP_Point mCameraOffset = {};
 
     bool mRestoreMapObjectStates = false;
 

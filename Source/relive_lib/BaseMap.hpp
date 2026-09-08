@@ -2,6 +2,7 @@
 
 #include "MapWrapper.hpp"
 #include "BinaryPath.hpp"
+#include "FixedPoint.hpp"
 
 class Guid;
 struct PSX_RECT;
@@ -155,6 +156,7 @@ public:
     Camera* field_40_stru_5[5] = {};
 
     std::vector<std::unique_ptr<BinaryPath>> mLoadedPaths;
+    FP_Point mCameraOffset = {};
 
 protected:
     ResourceManagerWrapper& mResourceManager;
