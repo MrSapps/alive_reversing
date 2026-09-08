@@ -554,7 +554,7 @@ void Map::GoTo_Camera()
                 while (teleporterIterator.GetTlv())
                 {
                     auto pTeleporterTlv = static_cast<relive::Path_Teleporter*>(teleporterIterator.GetTlv());
-                    if ((pTeleporterTlv->mTeleporterId == gAbe->field_1A0_door_id))
+                    if (pTeleporterTlv->mTeleporterId == gAbe->field_1A0_door_id)
                     {
                         CreateScreenTransistionForTLV(pTeleporterTlv);
                         break;
