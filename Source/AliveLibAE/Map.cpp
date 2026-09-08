@@ -121,13 +121,13 @@ void Map::ScreenChange()
 
 
 
-void Map::RemoveObjectsWithPurpleLight(s16 bMakeInvisible)
+s32 Map::VPurpleLightFrameCount(s16 /*bMakeInvisible*/)
 {
-    auto pObjectsWithLightsArray = relive_new DynamicArrayT<BaseAnimatedWithPhysicsGameObject>(16);
+    return 12;
+}
 
-    auto pPurpleLightArray = relive_new DynamicArrayT<Particle>(16);
-
-    bool bAddedALight = false;
+void Map::VCollectPurpleLightObjects(DynamicArrayT<BaseAnimatedWithPhysicsGameObject>& objects, DynamicArrayT<Particle>& lights)
+{
     for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
     {
         BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
@@ -150,117 +150,13 @@ void Map::RemoveObjectsWithPurpleLight(s16 bMakeInvisible)
                     {
                         if (!pBaseObj->GetDead() && pBaseObj != sControlledCharacter && Rect_Location_Relative_To_Active_Camera(&objRect) == CameraPos::eCamCurrent_0)
                         {
-                            pObjectsWithLightsArray->Push_Back(pBaseObj);
-                            const FP k60Scaled = pBaseObj->GetSpriteScale() * FP_FromInteger(60);
-                            Particle* pPurpleLight = New_DestroyOrCreateObject_Particle(
-                                FP_FromInteger((objRect.x + objRect.w) / 2),
-                                FP_FromInteger((objRect.y + objRect.h) / 2) + k60Scaled,
-                                pBaseObj->GetSpriteScale(), GetResourceManager(), *this);
-
-                            if (pPurpleLight)
-                            {
-                                pPurpleLightArray->Push_Back(pPurpleLight);
-                                bAddedALight = true;
-                            }
+                            AddPurpleLight(pBaseObj, objects, lights);
                         }
                     }
                 }
             }
         }
     }
-
-    if (bAddedALight)
-    {
-        SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
-
-        for (s32 counter = 0; counter < 12; counter++)
-        {
-            if (bMakeInvisible && counter == 4)
-            {
-                // Make all the objects that have lights invisible now that the lights have been rendered for a few frames
-                for (s32 i = 0; i < pObjectsWithLightsArray->Size(); i++)
-                {
-                    BaseAnimatedWithPhysicsGameObject* pObj = pObjectsWithLightsArray->ItemAt(i);
-                    if (!pObj)
-                    {
-                        break;
-                    }
-                    pObj->GetAnimation().SetRender(false);
-                }
-            }
-
-            for (s32 i = 0; i < pPurpleLightArray->Size(); i++)
-            {
-                Particle* pLight = pPurpleLightArray->ItemAt(i);
-                if (!pLight)
-                {
-                    break;
-                }
-
-                if (!pLight->GetDead())
-                {
-                    pLight->VUpdate();
-                }
-            }
-
-            // TODO/HACK what is the point of the f64 loop? Why not do both in 1 iteration ??
-            for (s32 i = 0; i < pPurpleLightArray->Size(); i++)
-            {
-                Particle* pLight = pPurpleLightArray->ItemAt(i);
-                if (!pLight)
-                {
-                    break;
-                }
-
-                if (!pLight->GetDead())
-                {
-                    pLight->GetAnimation().VDecode();
-                }
-            }
-
-            for (s32 i = 0; i < gObjListDrawables->Size(); i++)
-            {
-                BaseGameObject* pDrawable = gObjListDrawables->ItemAt(i);
-                if (!pDrawable)
-                {
-                    break;
-                }
-
-                if (!pDrawable->GetDead())
-                {
-                    // TODO: Seems strange to check this flag, how did it get in the drawable list if its not a drawable ??
-                    if (pDrawable->GetDrawable())
-                    {
-                        pDrawable->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
-                    }
-                }
-            }
-
-            gScreenManager->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
-            SYS_EventsPump();
-            gPsxDisplay.RenderOrderingTable();
-        }
-
-        if (bMakeInvisible)
-        {
-            // Make all the objects that had lights visible again
-            for (s32 i = 0; i < pObjectsWithLightsArray->Size(); i++)
-            {
-                BaseAnimatedWithPhysicsGameObject* pObj = pObjectsWithLightsArray->ItemAt(i);
-                if (!pObj)
-                {
-                    break;
-                }
-                pObj->GetAnimation().SetRender(true);
-            }
-        }
-    }
-
-    pObjectsWithLightsArray->mUsedSize = 0;
-    pPurpleLightArray->mUsedSize = 0;
-
-    relive_delete pObjectsWithLightsArray;
-    relive_delete pPurpleLightArray;
 }
 
 void Map::Handle_PathTransition()

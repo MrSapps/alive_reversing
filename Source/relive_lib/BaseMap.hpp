@@ -4,11 +4,14 @@
 #include "BinaryPath.hpp"
 #include "FixedPoint.hpp"
 #include "BasePath.hpp"
+#include "DynamicArray.hpp"
 
 class Guid;
 struct PSX_RECT;
 class Camera;
 class ResourceManagerWrapper;
+class Particle;
+class BaseAnimatedWithPhysicsGameObject;
 
 enum class ReliveTypes : s16;
 
@@ -143,6 +146,15 @@ public:
     void Shutdown();
     void Reset();
 
+    void RemoveObjectsWithPurpleLight(s16 bMakeInvisible);
+
+    // Which on screen objects get a purple light, and the light particles spawned
+    // for them. The two games scan different object lists and cull differently.
+    virtual void VCollectPurpleLightObjects(DynamicArrayT<BaseAnimatedWithPhysicsGameObject>& objects, DynamicArrayT<Particle>& lights) = 0;
+
+    // How many frames the purple light effect is rendered for.
+    virtual s32 VPurpleLightFrameCount(s16 bMakeInvisible) = 0;
+
     // A save restore is pending until the next GoTo_Camera consumes it. Each
     // game tracks that request differently, so clearing it is engine specific.
     virtual void VClearPendingSaveRestore() = 0;
@@ -169,6 +181,9 @@ public:
     FP_Point mCameraOffset = {};
 
 protected:
+    // Records an accepted object and spawns its light particle.
+    void AddPurpleLight(BaseAnimatedWithPhysicsGameObject* pObj, DynamicArrayT<BaseAnimatedWithPhysicsGameObject>& objects, DynamicArrayT<Particle>& lights);
+
     void Create_FG1s();
     void ScreenChange_Common();
 

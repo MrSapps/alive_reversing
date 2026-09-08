@@ -35,7 +35,8 @@ public:
     void ScreenChange() override;
 
     void GoTo_Camera() override;
-    void RemoveObjectsWithPurpleLight(s16 a2);
+    void VCollectPurpleLightObjects(DynamicArrayT<BaseAnimatedWithPhysicsGameObject>& objects, DynamicArrayT<Particle>& lights) override;
+    s32 VPurpleLightFrameCount(s16 bMakeInvisible) override;
     void Handle_PathTransition() override;
     Map(ResourceManagerWrapper& resMan, relive::Factory& factory);
     ~Map();

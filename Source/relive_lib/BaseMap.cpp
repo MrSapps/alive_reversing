@@ -10,6 +10,11 @@
 #include "Camera.hpp"
 #include "Sound/Midi.hpp"
 #include "GameObjects/ScreenManager.hpp"
+#include "GameObjects/Particle.hpp"
+#include "GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
+#include "PsxDisplay.hpp"
+#include "Sfx.hpp"
+#include "Sys.hpp"
 
 bool gMap_bDoPurpleLightEffect = false;
 
@@ -367,4 +372,125 @@ void BaseMap::Shutdown()
     GetPath().Free();
 
     Reset();
+}
+
+void BaseMap::AddPurpleLight(BaseAnimatedWithPhysicsGameObject* pObj, DynamicArrayT<BaseAnimatedWithPhysicsGameObject>& objects, DynamicArrayT<Particle>& lights)
+{
+    objects.Push_Back(pObj);
+
+    const PSX_RECT objRect = pObj->VGetBoundingRect();
+
+    const FP k60Scaled = pObj->GetSpriteScale() * FP_FromInteger(60);
+    Particle* pPurpleLight = New_DestroyOrCreateObject_Particle(
+        FP_FromInteger((objRect.x + objRect.w) / 2),
+        FP_FromInteger((objRect.y + objRect.h) / 2) + k60Scaled,
+        pObj->GetSpriteScale(), mResourceManager, *this);
+
+    if (pPurpleLight)
+    {
+        lights.Push_Back(pPurpleLight);
+    }
+}
+
+void BaseMap::RemoveObjectsWithPurpleLight(s16 bMakeInvisible)
+{
+    auto pObjectsWithLightsArray = relive_new DynamicArrayT<BaseAnimatedWithPhysicsGameObject>(16);
+
+    auto pPurpleLightArray = relive_new DynamicArrayT<Particle>(16);
+
+    VCollectPurpleLightObjects(*pObjectsWithLightsArray, *pPurpleLightArray);
+
+    if (!pPurpleLightArray->IsEmpty())
+    {
+        SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
+
+        const s32 kTotal = VPurpleLightFrameCount(bMakeInvisible);
+        for (s32 counter = 0; counter < kTotal; counter++)
+        {
+            if (bMakeInvisible && counter == 4)
+            {
+                // Make all the objects that have lights invisible now that the lights have been rendered for a few frames
+                for (s32 i = 0; i < pObjectsWithLightsArray->Size(); i++)
+                {
+                    BaseAnimatedWithPhysicsGameObject* pObj = pObjectsWithLightsArray->ItemAt(i);
+                    if (!pObj)
+                    {
+                        break;
+                    }
+                    pObj->GetAnimation().SetRender(false);
+                }
+            }
+
+            for (s32 i = 0; i < pPurpleLightArray->Size(); i++)
+            {
+                Particle* pLight = pPurpleLightArray->ItemAt(i);
+                if (!pLight)
+                {
+                    break;
+                }
+
+                if (!pLight->GetDead())
+                {
+                    pLight->VUpdate();
+                }
+            }
+
+            // TODO/HACK what is the point of the f64 loop? Why not do both in 1 iteration ??
+            for (s32 i = 0; i < pPurpleLightArray->Size(); i++)
+            {
+                Particle* pLight = pPurpleLightArray->ItemAt(i);
+                if (!pLight)
+                {
+                    break;
+                }
+
+                if (!pLight->GetDead())
+                {
+                    pLight->GetAnimation().VDecode();
+                }
+            }
+
+            for (s32 i = 0; i < gObjListDrawables->Size(); i++)
+            {
+                BaseGameObject* pDrawable = gObjListDrawables->ItemAt(i);
+                if (!pDrawable)
+                {
+                    break;
+                }
+
+                if (!pDrawable->GetDead())
+                {
+                    // TODO: Seems strange to check this flag, how did it get in the drawable list if its not a drawable ??
+                    if (pDrawable->GetDrawable())
+                    {
+                        pDrawable->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
+                    }
+                }
+            }
+
+            gScreenManager->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
+            SYS_EventsPump();
+            gPsxDisplay.RenderOrderingTable();
+        }
+
+        if (bMakeInvisible)
+        {
+            // Make all the objects that had lights visible again
+            for (s32 i = 0; i < pObjectsWithLightsArray->Size(); i++)
+            {
+                BaseAnimatedWithPhysicsGameObject* pObj = pObjectsWithLightsArray->ItemAt(i);
+                if (!pObj)
+                {
+                    break;
+                }
+                pObj->GetAnimation().SetRender(true);
+            }
+        }
+    }
+
+    pObjectsWithLightsArray->mUsedSize = 0;
+    pPurpleLightArray->mUsedSize = 0;
+
+    relive_delete pObjectsWithLightsArray;
+    relive_delete pPurpleLightArray;
 }

@@ -63,8 +63,8 @@ public:
     void GoTo_Camera() override;
 
     void Loader(s16 camX, s16 camY, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad);
-
-    void RemoveObjectsWithPurpleLight(s16 bMakeInvisible);
+    void VCollectPurpleLightObjects(DynamicArrayT<BaseAnimatedWithPhysicsGameObject>& objects, DynamicArrayT<Particle>& lights) override;
+    s32 VPurpleLightFrameCount(s16 bMakeInvisible) override;
 
     void Handle_PathTransition() override;
 
