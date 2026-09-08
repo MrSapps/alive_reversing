@@ -71,9 +71,7 @@ public:
 
     void RemoveObjectsWithPurpleLight(s16 bMakeInvisible);
 
-    void Handle_PathTransition();
-
-    void ScreenChange_Common();
+    void Handle_PathTransition() override;
 
     void Get_map_size(PSX_Point* pPoint);
 
@@ -82,17 +80,11 @@ public:
 
     static CameraSwapper* FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLevelIds levelId);
 
-    void Create_FG1s();
-
     Camera* Create_Camera(s16 xpos, s16 ypos, s32 a4);
 
     void RestoreBlyData(const u8* pSaveData);
 
     void Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode);
-
-    TlvIterator TLV_First_Of_Type_In_Camera(ReliveTypes type, s16 camX) override;
-    TlvIterator VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind) override;
-    TlvIterator TLV_Get_At(TlvIterator pTlv, FP xpos, FP ypos, FP width, FP height) override;
 
     void ResetPathObjects(u16 pathNum);
 
@@ -109,20 +101,17 @@ public:
     // NOTE: Part of Path object in AE
     void Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx);
 
-    // NOTE: Part of Path object in AE
-    TlvIterator Get_First_TLV_For_Offsetted_Camera(s16 camX, s16 camY) override;
-
     void SaveBlyData(u8* pSaveBuffer);
-
-    void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1) override;
-    void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1) override;
-    void TLV_Delete(const Guid& tlvId, s16 hiFlags = -1) override;
-    void Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed) override;
 
     s16 field_1E_door = 0;
 
     s16 mMapChanged = 0;
     u8* mSaveData = nullptr;
+
+    BasePath& GetPath() override
+    {
+        return mPath;
+    }
 
     Path mPath;
 };

@@ -27,7 +27,6 @@
 #include "../relive_lib/FatalError.hpp"
 #include "../relive_lib/BinaryPath.hpp"
 
-u32 sSoundChannelsMask = 0;
 
 
 s32 MaxGridBlocks(FP scale)
@@ -46,22 +45,6 @@ s32 MaxGridBlocks(FP scale)
     }
 }
 
-void Map::ScreenChange_Common()
-{
-    if (mCamState == CamChangeStates::eSliceCam_1)
-    {
-        Handle_PathTransition();
-    }
-    else if (mCamState == CamChangeStates::eInstantChange_2)
-    {
-        GoTo_Camera();
-    }
-
-    mCamState = CamChangeStates::eInactive_0;
-
-    SND_Stop_Channels_Mask(sSoundChannelsMask);
-    sSoundChannelsMask = 0;
-}
 
 Map::Map(ResourceManagerWrapper& resMan, relive::Factory& factory)
     : BaseMap(resMan, factory)
@@ -153,18 +136,18 @@ void Map::ScreenChange()
     {
         if (mNextLevel == EReliveLevelIds::eCredits)
         {
-            sSoundChannelsMask = 0;
+            mSoundChannelsMask = 0;
             ScreenChange_Common();
             return;
         }
     }
     else if (mCurrentLevel == EReliveLevelIds::eMenu)
     {
-        sSoundChannelsMask = 0;
+        mSoundChannelsMask = 0;
         ScreenChange_Common();
         return;
     }
-    sSoundChannelsMask = SND_MIDI(0, 0, 36, 70, 0, 0);
+    mSoundChannelsMask = SND_MIDI(0, 0, 36, 70, 0, 0);
     ScreenChange_Common();
 }
 
@@ -491,11 +474,11 @@ void Map::GoTo_Camera()
             }
         }
 
-        if (sSoundChannelsMask)
+        if (mSoundChannelsMask)
         {
-            SND_Stop_Channels_Mask(sSoundChannelsMask);
+            SND_Stop_Channels_Mask(mSoundChannelsMask);
         }
-        sSoundChannelsMask = SND_MIDI(0, 0, 36, 70, 0, 0);
+        mSoundChannelsMask = SND_MIDI(0, 0, 36, 70, 0, 0);
     }
 
     if (mCurrentLevel != EReliveLevelIds::eMenu && mCurrentLevel != EReliveLevelIds::eNone)
@@ -745,38 +728,17 @@ void Map::GoTo_Camera()
 
     mForceLoad = 0;
 
-    if (sSoundChannelsMask)
+    if (mSoundChannelsMask)
     {
-        SND_Stop_Channels_Mask(sSoundChannelsMask);
-        sSoundChannelsMask = 0;
+        SND_Stop_Channels_Mask(mSoundChannelsMask);
+        mSoundChannelsMask = 0;
     }
 }
 
-void Map::Create_FG1s()
-{
-    Camera* pCamera = field_2C_camera_array[0];
-    pCamera->CreateFG1(mResourceManager, *this);
-}
 
-void Map::TLV_Reset(const Guid& tlvId, s16 hiFlags)
-{
-    mPath.TLV_Reset(tlvId, hiFlags);
-}
 
-void Map::TLV_Persist(const Guid& tlvId, s16 hiFlags)
-{
-    mPath.TLV_Persist(tlvId, hiFlags);
-}
 
-void Map::TLV_Delete(const Guid& tlvId, s16 hiFlags)
-{
-    mPath.TLV_Delete(tlvId, hiFlags);
-}
 
-void Map::Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed)
-{
-    mPath.Set_TLVData(tlvId, hiFlags, bSetCreated, bSetDestroyed);
-}
 
 void Map::CreateScreenTransistionForTLV(relive::Path_TLV* pTlv)
 {
@@ -1019,30 +981,14 @@ void Map::LoadResource(const char_type* /*pFileName*/, s32 /*type*/, s32 /*resou
     }
 }
 
-TlvIterator Map::VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind)
-{
-    return mPath.VTLV_Get_At_Of_Type(xpos, ypos, width, height, typeToFind);
-}
 
-TlvIterator Map::TLV_First_Of_Type_In_Camera(ReliveTypes type, s16 camX)
-{
-    return mPath.TLV_First_Of_Type_In_Camera(type, camX);
-}
 
-TlvIterator Map::TLV_Get_At(TlvIterator pTlv, FP xpos, FP ypos, FP width, FP height)
-{
-    return mPath.TLV_Get_At(pTlv, xpos, ypos, width, height);
-}
 
 TlvIterator Map::TLV_From_Offset_Lvl_Cam(const Guid& tlvId)
 {
     return mPath.TLV_From_Offset_Lvl_Cam(tlvId);
 }
 
-TlvIterator Map::Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx)
-{
-    return mPath.Get_First_TLV_For_Offsetted_Camera(cam_x_idx, cam_y_idx);
-}
 
 void Map::Reset_TLVs(u16 pathId)
 {

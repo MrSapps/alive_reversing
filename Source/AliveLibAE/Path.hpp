@@ -230,16 +230,12 @@ public:
 
     void Loader_4DB800(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad, ResourceManagerWrapper& resMan, BaseMap& map);
 
-    TlvIterator VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes objectType);
-    TlvIterator TLV_Get_At(TlvIterator pTlv, FP xpos, FP ypos, FP w, FP h);
+    TlvIterator VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes objectType) override;
+    TlvIterator TLV_Get_At(TlvIterator pTlv, FP xpos, FP ypos, FP w, FP h) override;
     TlvIterator TLV_From_Offset_Lvl_Cam(const Guid& tlvId);
 
     static Guid TLVInfo_From_TLVPtr(relive::Path_TLV* pTlv);
 
-    void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1);
-    void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1);
-    void TLV_Delete(const Guid& tlvId, s16 hiFlags = -1);
-    void Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed);
     void Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx);
 
     void Reset_TLVs(u16 pathId);

@@ -3,6 +3,7 @@
 #include "MapWrapper.hpp"
 #include "BinaryPath.hpp"
 #include "FixedPoint.hpp"
+#include "BasePath.hpp"
 
 class Guid;
 struct PSX_RECT;
@@ -113,10 +114,13 @@ public:
 
     virtual s16 GetOverlayId() = 0;
 
-    virtual void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1) = 0;
-    virtual void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1) = 0;
-    virtual void TLV_Delete(const Guid& tlvId, s16 hiFlags = -1) = 0;
-    virtual void Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed) = 0;
+    // The engine specific Path object this map walks.
+    virtual BasePath& GetPath() = 0;
+
+    void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1);
+    void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1);
+    void TLV_Delete(const Guid& tlvId, s16 hiFlags = -1);
+    void Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed);
 
     virtual CameraPos Rect_Location_Relative_To_Active_Camera(const PSX_RECT* pRect, s16 width = 0) = 0;
     virtual s16 Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect) = 0;
@@ -134,14 +138,15 @@ public:
     virtual void GoTo_Camera() = 0;
 
     virtual void ScreenChange() = 0;
+    virtual void Handle_PathTransition() = 0;
     virtual void Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange) = 0;
     virtual void Shutdown() = 0;
     
-    virtual TlvIterator VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind) = 0;
-    virtual TlvIterator TLV_First_Of_Type_In_Camera(ReliveTypes objectType, s16 camX) = 0;
-    virtual TlvIterator TLV_Get_At(TlvIterator pTlv, FP xpos, FP ypos, FP width, FP height) = 0;
+    TlvIterator VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind);
+    TlvIterator TLV_First_Of_Type_In_Camera(ReliveTypes objectType, s16 camX);
+    TlvIterator TLV_Get_At(TlvIterator pTlv, FP xpos, FP ypos, FP width, FP height);
     virtual TlvIterator TLV_From_Offset_Lvl_Cam(const Guid& tlvId);
-    virtual TlvIterator Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx) = 0;
+    TlvIterator Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx);
 
     void ReloadPathJsonRequest(const std::string& pathJsonFileName);
 
@@ -159,6 +164,10 @@ public:
     FP_Point mCameraOffset = {};
 
 protected:
+    void Create_FG1s();
+    void ScreenChange_Common();
+
     ResourceManagerWrapper& mResourceManager;
     relive::Factory& mFactory;
+    u32 mSoundChannelsMask = 0;
 };

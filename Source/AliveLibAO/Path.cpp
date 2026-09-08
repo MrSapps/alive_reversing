@@ -20,40 +20,143 @@ void Path::Init(const PathData* pPathData, EReliveLevelIds level, u16 pathId, s1
     mBinaryPath = pBinaryPath;
 }
 
-void Path::TLV_Reset(const Guid& tlvId, s16 hiFlags)
-{
-    Set_TLVData(tlvId, hiFlags, 0, 0);
-}
 
-void Path::TLV_Persist(const Guid& tlvId, s16 hiFlags)
+TlvIterator Path::VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind)
 {
-    Set_TLVData(tlvId, hiFlags, 1, 0);
-}
-
-void Path::TLV_Delete(const Guid& tlvId, s16 hiFlags)
-{
-    Set_TLVData(tlvId, hiFlags, 0, 1);
-}
-
-void Path::Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed)
-{
-    auto& paths = mMap.GetLoadedPaths();
-    for (std::unique_ptr<BinaryPath>& pBinPath : paths)
-    if (pBinPath)
+    s32 right = 0;
+    s32 left = 0;
+    if (xpos >= width)
     {
-        relive::Path_TLV* pTlv = pBinPath->TlvById(tlvId).GetTlv();
-        if (pTlv)
-        {
-            pTlv->mTlvFlags.Set(relive::TlvFlags::eBit2_Destroyed, bSetDestroyed & 1);
-            pTlv->mTlvFlags.Set(relive::TlvFlags::eBit1_Created, bSetCreated & 1);
+        right = width;
+        left = xpos;
+    }
+    else
+    {
+        right = xpos;
+        left = width;
+    }
 
-            if (hiFlags != -1)
-            {
-                // Seems to be a blob per TLV specific bits
-                pTlv->mTlvSpecificMeaning = static_cast<u8>(hiFlags);
-            }
-            return;
+    s32 top = 0;
+    s32 bottom = 0;
+    if (ypos >= height)
+    {
+        top = height;
+        bottom = ypos;
+    }
+    else
+    {
+        top = ypos;
+        bottom = height;
+    }
+
+    const s32 grid_cell_y = top / mPathData->field_E_grid_height;
+    const s32 grid_cell_x = (right / mPathData->field_C_grid_width);
+
+    // Check within map bounds
+    if (grid_cell_x >= mMap.mCamsOnX)
+    {
+        return TlvIterator::Invalid();
+    }
+
+    if (grid_cell_y >= mMap.mCamsOnY)
+    {
+        return TlvIterator::Invalid();
+    }
+
+    // Get the offset to where the TLV list starts for this camera cell
+    BinaryPath* pBinPath = mMap.GetPathResourceBlockPtr(mMap.mCurrentPath);
+    TlvIterator tlvIterator = pBinPath->TlvsForCamera(grid_cell_x, grid_cell_y);
+    if (!tlvIterator.GetTlv())
+    {
+        return TlvIterator::Invalid();
+    }
+
+    while(tlvIterator.GetTlv())
+    {
+        auto pTlv = tlvIterator.GetTlv();
+        if (pTlv->mTlvType == typeToFind
+            && right <= pTlv->mBottomRightX
+            && left >= pTlv->mTopLeftX
+            && bottom >= pTlv->mTopLeftY
+            && top <= pTlv->mBottomRightY)
+        {
+            return tlvIterator;
+        }
+        tlvIterator = tlvIterator.Next_TLV();
+    }
+    return tlvIterator;
+}
+
+TlvIterator Path::TLV_Get_At(TlvIterator tlvIterator, FP xpos, FP ypos, FP width, FP height)
+{
+    
+    const auto xpos_converted = FP_GetExponent(xpos);
+    const auto ypos_converted = FP_GetExponent(ypos);
+    auto width_converted = FP_GetExponent(width);
+    auto height_converted = FP_GetExponent(height);
+    
+    bool bContinue = true;
+    if (xpos_converted < 0 || ypos_converted < 0)
+    {
+        bContinue = false;
+    }
+
+    if (width_converted < 0 || height_converted < 0)
+    {
+        width_converted = FP_GetExponent(xpos);
+        height_converted = FP_GetExponent(ypos);
+    }
+
+    if (!tlvIterator.GetTlv())
+    {
+        const PathData* pPathData = mPathData;
+
+        const auto camX = xpos_converted / pPathData->field_C_grid_width;
+        const auto camY = ypos_converted / pPathData->field_E_grid_height;
+
+        if (camX >= mMap.mCamsOnX || camY >= mMap.mCamsOnY)
+        {
+            return TlvIterator::Invalid();
+        }
+
+        if (camX < 0 || camY < 0)
+        {
+            return TlvIterator::Invalid();
+        }
+
+        BinaryPath* pBinPath = mMap.GetPathResourceBlockPtr(mMap.mCurrentPath);
+        tlvIterator =  pBinPath->TlvsForCamera(camX, camY);
+        if (!tlvIterator.GetTlv())
+        {
+            return TlvIterator::Invalid();
+        }
+
+        if (!bContinue || (xpos_converted <= tlvIterator.GetTlv()->mBottomRightX && width_converted >= tlvIterator.GetTlv()->mTopLeftX && height_converted >= tlvIterator.GetTlv()->mTopLeftY && ypos_converted <= tlvIterator.GetTlv()->mBottomRightY))
+        {
+            return tlvIterator;
         }
     }
+
+    if (tlvIterator.GetTlv()->mTlvFlags.Get(relive::eBit3_End_TLV_List))
+    {
+        return TlvIterator::Invalid();
+    }
+
+    while (1)
+    {
+        tlvIterator = tlvIterator.Next_TLV();
+
+        if (!bContinue || (xpos_converted <= tlvIterator.GetTlv()->mBottomRightX && width_converted >= tlvIterator.GetTlv()->mTopLeftX && height_converted >= tlvIterator.GetTlv()->mTopLeftY && ypos_converted <= tlvIterator.GetTlv()->mBottomRightY))
+        {
+            break;
+        }
+
+        if (tlvIterator.GetTlv()->mTlvFlags.Get(relive::eBit3_End_TLV_List))
+        {
+            return TlvIterator::Invalid();
+        }
+    }
+    return tlvIterator;
 }
+
 } // namespace AO

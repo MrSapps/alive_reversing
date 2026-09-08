@@ -7,6 +7,8 @@
 #include "GameObjects/BaseAliveGameObject.hpp"
 #include "data_conversion/relive_tlvs.hpp"
 #include "data_conversion/string_util.hpp"
+#include "Camera.hpp"
+#include "Sound/Midi.hpp"
 
 bool gMap_bDoPurpleLightEffect = false;
 
@@ -246,4 +248,67 @@ CameraPos BaseMap::GetDirection(EReliveLevelIds level, s32 path, FP xpos, FP ypo
         default:
             return CameraPos::eCamInvalid_m1;
     }
+}
+
+void BaseMap::Create_FG1s()
+{
+    Camera* pCamera = field_2C_camera_array[0];
+    pCamera->CreateFG1(mResourceManager, *this);
+}
+
+void BaseMap::ScreenChange_Common()
+{
+    if (mCamState == CamChangeStates::eSliceCam_1)
+    {
+        Handle_PathTransition();
+    }
+    else if (mCamState == CamChangeStates::eInstantChange_2)
+    {
+        GoTo_Camera();
+    }
+
+    mCamState = CamChangeStates::eInactive_0;
+
+    SND_Stop_Channels_Mask(mSoundChannelsMask);
+    mSoundChannelsMask = 0;
+}
+
+void BaseMap::TLV_Reset(const Guid& tlvId, s16 hiFlags)
+{
+    GetPath().TLV_Reset(tlvId, hiFlags);
+}
+
+void BaseMap::TLV_Persist(const Guid& tlvId, s16 hiFlags)
+{
+    GetPath().TLV_Persist(tlvId, hiFlags);
+}
+
+void BaseMap::TLV_Delete(const Guid& tlvId, s16 hiFlags)
+{
+    GetPath().TLV_Delete(tlvId, hiFlags);
+}
+
+void BaseMap::Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed)
+{
+    GetPath().Set_TLVData(tlvId, hiFlags, bSetCreated, bSetDestroyed);
+}
+
+TlvIterator BaseMap::VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind)
+{
+    return GetPath().VTLV_Get_At_Of_Type(xpos, ypos, width, height, typeToFind);
+}
+
+TlvIterator BaseMap::TLV_First_Of_Type_In_Camera(ReliveTypes objectType, s16 camX)
+{
+    return GetPath().TLV_First_Of_Type_In_Camera(objectType, camX);
+}
+
+TlvIterator BaseMap::TLV_Get_At(TlvIterator pTlv, FP xpos, FP ypos, FP width, FP height)
+{
+    return GetPath().TLV_Get_At(pTlv, xpos, ypos, width, height);
+}
+
+TlvIterator BaseMap::Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx)
+{
+    return GetPath().Get_First_TLV_For_Offsetted_Camera(cam_x_idx, cam_y_idx);
 }

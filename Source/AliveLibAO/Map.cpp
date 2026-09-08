@@ -36,7 +36,6 @@ class BaseGameObject;
 
 namespace AO {
 
-s32 sSoundChannelsMask = 0;
 
 OpenSeqHandle g_SeqTable_4C9E70[165] = {
     {"D1AMB.SEQ", 0, 0, 100, -1, {}},
@@ -222,22 +221,6 @@ s32 MaxGridBlocks(FP scale)
     }
 }
 
-void Map::ScreenChange_Common()
-{
-    if (mCamState == CamChangeStates::eSliceCam_1)
-    {
-        Handle_PathTransition();
-    }
-    else if (mCamState == CamChangeStates::eInstantChange_2)
-    {
-        GoTo_Camera();
-    }
-
-    mCamState = CamChangeStates::eInactive_0;
-
-    SND_Stop_Channels_Mask(sSoundChannelsMask);
-    sSoundChannelsMask = 0;
-}
 
 Map::Map(ResourceManagerWrapper& resMan, relive::Factory& factory)
     : BaseMap(resMan, factory)
@@ -338,12 +321,12 @@ void Map::ScreenChange()
         {
             if ((mNextLevel != EReliveLevelIds::eRuptureFarmsReturn && mNextLevel != EReliveLevelIds::eForestChase && mNextLevel != EReliveLevelIds::eDesertEscape) || (mNextLevel == EReliveLevelIds::eBoardRoom && mCurrentLevel == EReliveLevelIds::eBoardRoom))
             {
-                sSoundChannelsMask = 0;
+                mSoundChannelsMask = 0;
             }
         }
         else
         {
-            sSoundChannelsMask = 0;
+            mSoundChannelsMask = 0;
         }
     }
 
@@ -958,16 +941,7 @@ s16 Map::GetOverlayId()
     return AO::Path_Get_Bly_Record(mNextLevel, mNextPath)->mOverlayId;
 }
 
-TlvIterator Map::Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx)
-{
-    return mPath.Get_First_TLV_For_Offsetted_Camera(cam_x_idx, cam_y_idx);
-}
 
-void Map::Create_FG1s()
-{
-    Camera* pCamera = field_2C_camera_array[0];
-    pCamera->CreateFG1(mResourceManager, *this);
-}
 
 void Map::SaveBlyData(u8* pSaveBuffer)
 {
@@ -1008,25 +982,9 @@ void Map::SaveBlyData(u8* pSaveBuffer)
     }
 }
 
-void Map::TLV_Reset(const Guid& tlvId, s16 hiFlags)
-{
-    mPath.TLV_Reset(tlvId, hiFlags);
-}
 
-void Map::TLV_Persist(const Guid& tlvId, s16 hiFlags)
-{
-    mPath.TLV_Persist(tlvId, hiFlags);
-}
 
-void Map::TLV_Delete(const Guid& tlvId, s16 hiFlags)
-{
-    mPath.TLV_Delete(tlvId, hiFlags);
-}
 
-void Map::Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed)
-{
-    mPath.Set_TLVData(tlvId, hiFlags, bSetCreated, bSetDestroyed);
-}
 
 void Map::RestoreBlyData(const u8* pSaveData)
 {
@@ -1213,143 +1171,7 @@ CameraPos Map::Rect_Location_Relative_To_Active_Camera(const PSX_RECT* pRect, s1
     return CameraPos::eCamLeft_3;
 }
 
-TlvIterator Map::VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind)
-{
-    s32 right = 0;
-    s32 left = 0;
-    if (xpos >= width)
-    {
-        right = width;
-        left = xpos;
-    }
-    else
-    {
-        right = xpos;
-        left = width;
-    }
 
-    s32 top = 0;
-    s32 bottom = 0;
-    if (ypos >= height)
-    {
-        top = height;
-        bottom = ypos;
-    }
-    else
-    {
-        top = ypos;
-        bottom = height;
-    }
-
-    const s32 grid_cell_y = top / mPath.mPathData->field_E_grid_height;
-    const s32 grid_cell_x = (right / mPath.mPathData->field_C_grid_width);
-
-    // Check within map bounds
-    if (grid_cell_x >= mCamsOnX)
-    {
-        return TlvIterator::Invalid();
-    }
-
-    if (grid_cell_y >= mCamsOnY)
-    {
-        return TlvIterator::Invalid();
-    }
-
-    // Get the offset to where the TLV list starts for this camera cell
-    BinaryPath* pBinPath = GetPathResourceBlockPtr(mCurrentPath);
-    TlvIterator tlvIterator = pBinPath->TlvsForCamera(grid_cell_x, grid_cell_y);
-    if (!tlvIterator.GetTlv())
-    {
-        return TlvIterator::Invalid();
-    }
-
-    while(tlvIterator.GetTlv())
-    {
-        auto pTlv = tlvIterator.GetTlv();
-        if (pTlv->mTlvType == typeToFind
-            && right <= pTlv->mBottomRightX
-            && left >= pTlv->mTopLeftX
-            && bottom >= pTlv->mTopLeftY
-            && top <= pTlv->mBottomRightY)
-        {
-            return tlvIterator;
-        }
-        tlvIterator = tlvIterator.Next_TLV();
-    }
-    return tlvIterator;
-}
-
-TlvIterator Map::TLV_Get_At(TlvIterator tlvIterator, FP xpos, FP ypos, FP width, FP height)
-{
-    
-    const auto xpos_converted = FP_GetExponent(xpos);
-    const auto ypos_converted = FP_GetExponent(ypos);
-    auto width_converted = FP_GetExponent(width);
-    auto height_converted = FP_GetExponent(height);
-    
-    bool bContinue = true;
-    if (xpos_converted < 0 || ypos_converted < 0)
-    {
-        bContinue = false;
-    }
-
-    if (width_converted < 0 || height_converted < 0)
-    {
-        width_converted = FP_GetExponent(xpos);
-        height_converted = FP_GetExponent(ypos);
-    }
-
-    if (!tlvIterator.GetTlv())
-    {
-        const PathData* pPathData = mPath.mPathData;
-
-        const auto camX = xpos_converted / pPathData->field_C_grid_width;
-        const auto camY = ypos_converted / pPathData->field_E_grid_height;
-
-        if (camX >= mCamsOnX || camY >= mCamsOnY)
-        {
-            return TlvIterator::Invalid();
-        }
-
-        if (camX < 0 || camY < 0)
-        {
-            return TlvIterator::Invalid();
-        }
-
-        BinaryPath* pBinPath = GetPathResourceBlockPtr(mCurrentPath);
-        tlvIterator =  pBinPath->TlvsForCamera(camX, camY);
-        if (!tlvIterator.GetTlv())
-        {
-            return TlvIterator::Invalid();
-        }
-
-        if (!bContinue || (xpos_converted <= tlvIterator.GetTlv()->mBottomRightX && width_converted >= tlvIterator.GetTlv()->mTopLeftX && height_converted >= tlvIterator.GetTlv()->mTopLeftY && ypos_converted <= tlvIterator.GetTlv()->mBottomRightY))
-        {
-            return tlvIterator;
-        }
-    }
-
-    if (tlvIterator.GetTlv()->mTlvFlags.Get(relive::eBit3_End_TLV_List))
-    {
-        return TlvIterator::Invalid();
-    }
-
-    while (1)
-    {
-        tlvIterator = tlvIterator.Next_TLV();
-
-        if (!bContinue || (xpos_converted <= tlvIterator.GetTlv()->mBottomRightX && width_converted >= tlvIterator.GetTlv()->mTopLeftX && height_converted >= tlvIterator.GetTlv()->mTopLeftY && ypos_converted <= tlvIterator.GetTlv()->mBottomRightY))
-        {
-            break;
-        }
-
-        if (tlvIterator.GetTlv()->mTlvFlags.Get(relive::eBit3_End_TLV_List))
-        {
-            return TlvIterator::Invalid();
-        }
-    }
-    return tlvIterator;
-}
 
 void Map::ResetPathObjects(u16 pathNum)
 {
@@ -1368,10 +1190,6 @@ void Map::ResetPathObjects(u16 pathNum)
     }
 }
 
-TlvIterator Map::TLV_First_Of_Type_In_Camera(ReliveTypes objectType, s16 camX)
-{
-    return mPath.TLV_First_Of_Type_In_Camera(objectType, camX);
-}
 
 void Map::Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode)
 {

@@ -46,3 +46,41 @@ TlvIterator BasePath::TLV_Next_Of_Type(TlvIterator tlvIterator, ReliveTypes type
     }
     return TlvIterator::Invalid();
 }
+
+void BasePath::TLV_Reset(const Guid& tlvId, s16 hiFlags)
+{
+    Set_TLVData(tlvId, hiFlags, 0, 0);
+}
+
+void BasePath::TLV_Persist(const Guid& tlvId, s16 hiFlags)
+{
+    Set_TLVData(tlvId, hiFlags, 1, 0);
+}
+
+void BasePath::TLV_Delete(const Guid& tlvId, s16 hiFlags)
+{
+    Set_TLVData(tlvId, hiFlags, 0, 1);
+}
+
+void BasePath::Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed)
+{
+    for (std::unique_ptr<BinaryPath>& pBinPath : mMap.GetLoadedPaths())
+    {
+        if (pBinPath)
+        {
+            relive::Path_TLV* pTlv = pBinPath->TlvById(tlvId).GetTlv();
+            if (pTlv)
+            {
+                pTlv->mTlvFlags.Set(relive::TlvFlags::eBit2_Destroyed, bSetDestroyed & 1);
+                pTlv->mTlvFlags.Set(relive::TlvFlags::eBit1_Created, bSetCreated & 1);
+
+                if (hiFlags != -1)
+                {
+                    // Seems to be a blob per TLV specific bits
+                    pTlv->mTlvSpecificMeaning = static_cast<u8>(hiFlags);
+                }
+                break;
+            }
+        }
+    }
+}

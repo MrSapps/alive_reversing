@@ -36,7 +36,7 @@ public:
 
     void GoTo_Camera() override;
     void RemoveObjectsWithPurpleLight(s16 a2);
-    void Handle_PathTransition();
+    void Handle_PathTransition() override;
     void Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange) override;
     void Shutdown() override;
     void Reset();
@@ -46,7 +46,6 @@ public:
     void Get_map_size(PSX_Point* pPoint);
     void GetCurrentCamCoords(PSX_Point* pPoint) override;
     s16 GetOverlayId() override;
-    void Create_FG1s();
     CameraPos Rect_Location_Relative_To_Active_Camera(const PSX_RECT* pRect, s16 width = 0) override;
     static BaseGameObject* FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLevelIds lvlId);
     Camera* Create_Camera(s16 xpos, s16 ypos, s32 a4);
@@ -57,24 +56,13 @@ public:
     s16 Is_Point_In_Current_Camera(EReliveLevelIds level, s32 path, FP xpos, FP ypos, s16 width) override;
 
     s16 Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect) override;
-
-    void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1) override;
-    void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1) override;
-    void TLV_Delete(const Guid& tlvId, s16 hiFlags = -1) override;
-    void Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed) override;
-
-    TlvIterator VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind) override;
-    TlvIterator TLV_First_Of_Type_In_Camera(ReliveTypes type, s16 camX) override;
-    TlvIterator TLV_Get_At(TlvIterator pTlv, FP xpos, FP ypos, FP width, FP height) override;
     TlvIterator TLV_From_Offset_Lvl_Cam(const Guid& tlvId) override;
-    TlvIterator Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx) override;
 
     void Reset_TLVs(u16 pathId);
 
 private:
 
     void CreateScreenTransistionForTLV(relive::Path_TLV* pTlv);
-    void ScreenChange_Common();
 
 public:
 
@@ -82,6 +70,11 @@ public:
     s16 mTeleporterTransition = 0;
 
     bool mRestoreMapObjectStates = false;
+
+    BasePath& GetPath() override
+    {
+        return mPath;
+    }
 
     Path mPath;
 };
