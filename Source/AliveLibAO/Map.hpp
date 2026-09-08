@@ -89,8 +89,6 @@ public:
     // NOTE: Global func in AE
     void Start_Sounds_For_Objects_In_Near_Cameras();
 
-    s16 field_1E_door = 0;
-
     s16 mMapChanged = 0;
     u8* mSaveData = nullptr;
 

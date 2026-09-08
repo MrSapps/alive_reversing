@@ -403,7 +403,7 @@ void Map::GoTo_Camera()
 
     if (mCameraSwapEffect != CameraSwapEffects::ePlay1FMV_5 && mCameraSwapEffect != CameraSwapEffects::eUnknown_11)
     {
-        if (mDoorTransition)
+        if (mDoorTransitionPending)
         {
             // TODO: Add template helpers
 

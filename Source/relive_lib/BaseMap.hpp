@@ -176,6 +176,8 @@ public:
     BaseAliveGameObject* mAliveObj = nullptr;
     CamChangeStates mCamState = CamChangeStates::eInactive_0;
 
+    s16 mDoorTransitionPending = 0;
+
     Camera* field_2C_camera_array[5] = {};
     Camera* field_40_stru_5[5] = {};
 

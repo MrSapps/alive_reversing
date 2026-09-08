@@ -7003,7 +7003,7 @@ void Abe::Motion_114_DoorEnter()
                 return;
             }
 
-            static_cast<Map&>(mMap).mDoorTransition = 1;
+            mMap.mDoorTransitionPending = 1;
             s16 bForceChange = 0;
             const CameraSwapEffects effect = kPathChangeEffectToInternalScreenChangeEffect[pDoorTlv->mWipeEffect];
             if (effect == CameraSwapEffects::ePlay1FMV_5 || effect == CameraSwapEffects::eUnknown_11)
@@ -7026,7 +7026,7 @@ void Abe::Motion_114_DoorEnter()
 
         case AbeDoorStates::eSetNewAbePosition_5:
         {
-            static_cast<Map&>(mMap).mDoorTransition = 0;
+            mMap.mDoorTransitionPending = 0;
             mCurrentLevel = mMap.mCurrentLevel;
             mCurrentPath = mMap.mCurrentPath;
 

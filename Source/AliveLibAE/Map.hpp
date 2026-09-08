@@ -65,7 +65,6 @@ private:
     void CreateScreenTransistionForTLV(relive::Path_TLV* pTlv);
 
 public:
-    s16 mDoorTransition = 0;
     s16 mTeleporterTransition = 0;
 
     bool mRestoreMapObjectStates = false;
