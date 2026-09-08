@@ -162,10 +162,14 @@ s16 BaseMap::SetActiveCam(EReliveLevelIds level, s16 path, s16 cam, CameraSwapEf
     return 1;
 }
 
-TlvIterator BaseMap::TLV_From_Offset_Lvl_Cam(const Guid& /*tlvId*/)
+TlvIterator BaseMap::TLV_From_Offset_Lvl_Cam(const Guid& tlvId)
 {
-    LOG_WARNING("TLV_From_Offset_Lvl_Cam() not implmeneted in BaseMap");
-    return TlvIterator::Invalid();
+    return GetPath().TLV_From_Offset_Lvl_Cam(tlvId);
+}
+
+void BaseMap::Reset_TLVs(u16 pathId)
+{
+    GetPath().Reset_TLVs(pathId);
 }
 
 void BaseMap::ReloadPathJsonRequest(const std::string& pathJsonFileName)

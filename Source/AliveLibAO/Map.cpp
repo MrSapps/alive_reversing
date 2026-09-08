@@ -721,7 +721,7 @@ void Map::GoTo_Camera()
         gScreenManager = relive_new ScreenManager(field_2C_camera_array[0]->mCamRes, &mCameraOffset, mResourceManager, *this);
     }
 
-    Loader(mCamIdxOnX, mCamIdxOnY, relive::Factory::LoadMode::ConstructObject_0, ReliveTypes::eNone); // none = load all
+    mPath.Loader(mCamIdxOnX, mCamIdxOnY, relive::Factory::LoadMode::ConstructObject_0, ReliveTypes::eNone); // none = load all
 
     if (old_current_path != mCurrentPath || old_current_level != mCurrentLevel)
     {
@@ -867,37 +867,6 @@ void Map::RestoreBlyData(const u8* pSaveData)
     }
 }
 
-void Map::Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx)
-{
-    BinaryPath* pPathData = GetPathResourceBlockPtr(mCurrentPath);
-
-    // TODO: Shouldn't really need to depend on these
-    const s32 cam_global_left = mPath.mPathData->field_C_grid_width * cam_x_idx;
-    const s32 cam_global_right = cam_global_left + mPath.mPathData->field_C_grid_width;
-
-    const s32 cam_y_grid_top = mPath.mPathData->field_E_grid_height * cam_y_idx;
-    const s32 cam_y_grid_bottom = cam_y_grid_top + mPath.mPathData->field_E_grid_height;
-
-    for (auto& cam : pPathData->GetCameras())
-    {
-        // Enumerate the TLVs
-        for (auto& pTlv : cam->mTlvs.mTlvs)
-        {
-            if (pTlv->mTopLeftX >= cam_global_left && pTlv->mTopLeftX <= cam_global_right)
-            {
-                if (pTlv->mTopLeftY >= cam_y_grid_top && pTlv->mTopLeftY <= cam_y_grid_bottom && (!pTlv->mTlvFlags.Get(relive::eBit1_Created) && !pTlv->mTlvFlags.Get(relive::eBit2_Destroyed)))
-                {
-                    Start_Sounds_for_TLV(direction, pTlv.get(), mResourceManager, *this);
-                }
-            }
-
-            if (pTlv->mTlvFlags.Get(relive::eBit3_End_TLV_List))
-            {
-                break;
-            }
-        }
-    }
-}
 
 void Map::Start_Sounds_For_Objects_In_Near_Cameras()
 {
@@ -905,22 +874,22 @@ void Map::Start_Sounds_For_Objects_In_Near_Cameras()
 
     if (Get_Camera_World_Rect(CameraPos::eCamLeft_3, nullptr))
     {
-        Start_Sounds_For_Objects_In_Camera(CameraPos::eCamLeft_3, mCamIdxOnX - 1, mCamIdxOnY);
+        mPath.Start_Sounds_For_Objects_In_Camera(CameraPos::eCamLeft_3, mCamIdxOnX - 1, mCamIdxOnY);
     }
 
     if (Get_Camera_World_Rect(CameraPos::eCamRight_4, nullptr))
     {
-        Start_Sounds_For_Objects_In_Camera(CameraPos::eCamRight_4, mCamIdxOnX + 1, mCamIdxOnY);
+        mPath.Start_Sounds_For_Objects_In_Camera(CameraPos::eCamRight_4, mCamIdxOnX + 1, mCamIdxOnY);
     }
 
     if (Get_Camera_World_Rect(CameraPos::eCamTop_1, nullptr))
     {
-        Start_Sounds_For_Objects_In_Camera(CameraPos::eCamTop_1, mCamIdxOnX, mCamIdxOnY - 1);
+        mPath.Start_Sounds_For_Objects_In_Camera(CameraPos::eCamTop_1, mCamIdxOnX, mCamIdxOnY - 1);
     }
 
     if (Get_Camera_World_Rect(CameraPos::eCamBottom_2, nullptr))
     {
-        Start_Sounds_For_Objects_In_Camera(CameraPos::eCamBottom_2, mCamIdxOnX, mCamIdxOnY + 1);
+        mPath.Start_Sounds_For_Objects_In_Camera(CameraPos::eCamBottom_2, mCamIdxOnX, mCamIdxOnY + 1);
     }
 }
 
@@ -1016,22 +985,6 @@ CameraPos Map::Rect_Location_Relative_To_Active_Camera(const PSX_RECT* pRect, s1
 
 
 
-void Map::ResetPathObjects(u16 pathNum)
-{
-    BinaryPath* pPathRes = GetPathResourceBlockPtr(pathNum);
-    for (auto& cam : pPathRes->GetCameras())
-    {
-        for (auto& pTlv : cam->mTlvs.mTlvs)
-        {
-            pTlv->mTlvFlags.Clear(relive::TlvFlags::eBit1_Created);
-            pTlv->mTlvFlags.Clear(relive::TlvFlags::eBit2_Destroyed);
-            if (pTlv->mTlvFlags.Get(relive::TlvFlags::eBit3_End_TLV_List))
-            {
-                break;
-            }
-        }
-    }
-}
 
 
 void Map::Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode)
@@ -1055,7 +1008,7 @@ void Map::Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode)
                 pCamera);*/
 
             pCamera->mCamRes = mResourceManager.LoadCam(pCamera->mLevel, pCamera->mPath, pCamera->mCameraNumber);
-            Loader(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResourceFromList_1, ReliveTypes::eNone); // none = load all
+            mPath.Loader(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResourceFromList_1, ReliveTypes::eNone); // none = load all
         }
         else
         {
@@ -1067,7 +1020,7 @@ void Map::Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode)
 
             pCamera->mCamResLoaded = true;
 
-            Loader(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResource_2, ReliveTypes::eNone); // none = load all
+            mPath.Loader(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResource_2, ReliveTypes::eNone); // none = load all
         }
     }
 }
@@ -1129,37 +1082,6 @@ Camera* Map::Create_Camera(s16 xpos, s16 ypos, s32 /*a4*/)
 
 
 
-void Map::Loader(s16 camX, s16 camY, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad)
-{
-    // Get TLVs for this cam
-    BinaryPath* pPathRes = GetPathResourceBlockPtr(mCurrentPath);
-    TlvIterator tlvIterator = pPathRes->TlvsForCamera(camX, camY);
-    while(tlvIterator.GetTlv())
-    {
-        auto pTlv = tlvIterator.GetTlv();
-        if (typeToLoad == ReliveTypes::eNone || typeToLoad == pTlv->mTlvType)
-        {
-            if (loadMode != relive::Factory::LoadMode::ConstructObject_0 || !(pTlv->mTlvFlags.Get(relive::TlvFlags::eBit1_Created) || pTlv->mTlvFlags.Get(relive::TlvFlags::eBit2_Destroyed)))
-            {
-                // Call the factory to construct the item
-                mFactory.ConstructTLVObject(pTlv, pTlv->mId, loadMode, mResourceManager, *this);
-
-                if (loadMode == relive::Factory::LoadMode::ConstructObject_0)
-                {
-                    pTlv->mTlvFlags.Set(relive::TlvFlags::eBit1_Created);
-                    pTlv->mTlvFlags.Set(relive::TlvFlags::eBit2_Destroyed);
-                }
-            }
-        }
-
-        // End of TLV list for current camera
-        if (pTlv->mTlvFlags.Get(relive::TlvFlags::eBit3_End_TLV_List))
-        {
-            break;
-        }
-        tlvIterator = tlvIterator.Next_TLV();
-    }
-}
 
 CameraSwapper* Map::FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLevelIds levelId)
 {

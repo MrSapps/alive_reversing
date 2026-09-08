@@ -207,6 +207,10 @@ public:
 
     void Free() override;
 
+    void Loader(s16 camX, s16 camY, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad) override;
+    void Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx) override;
+    void Reset_TLVs(u16 pathId) override;
+
     TlvIterator VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind) override;
     TlvIterator TLV_Get_At(TlvIterator tlvIterator, FP xpos, FP ypos, FP width, FP height) override;
 

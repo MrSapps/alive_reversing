@@ -52,9 +52,6 @@ public:
     s16 Is_Point_In_Current_Camera(EReliveLevelIds level, s32 path, FP xpos, FP ypos, s16 width) override;
 
     s16 Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect) override;
-    TlvIterator TLV_From_Offset_Lvl_Cam(const Guid& tlvId) override;
-
-    void Reset_TLVs(u16 pathId);
 
 private:
 

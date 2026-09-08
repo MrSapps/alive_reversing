@@ -61,8 +61,6 @@ public:
     void ScreenChange() override;
 
     void GoTo_Camera() override;
-
-    void Loader(s16 camX, s16 camY, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad);
     void VCollectPurpleLightObjects(DynamicArrayT<BaseAnimatedWithPhysicsGameObject>& objects, DynamicArrayT<Particle>& lights) override;
     s32 VPurpleLightFrameCount(s16 bMakeInvisible) override;
 
@@ -81,8 +79,6 @@ public:
 
     void Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode);
 
-    void ResetPathObjects(u16 pathNum);
-
 
     CameraPos Rect_Location_Relative_To_Active_Camera(const PSX_RECT* pRect, s16 width = 0) override;
 
@@ -92,9 +88,6 @@ public:
 
     // NOTE: Global func in AE
     void Start_Sounds_For_Objects_In_Near_Cameras();
-
-    // NOTE: Part of Path object in AE
-    void Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx);
 
     void SaveBlyData(u8* pSaveBuffer);
 

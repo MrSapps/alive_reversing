@@ -489,7 +489,7 @@ void Map::GoTo_Camera()
         gScreenManager = relive_new ScreenManager(field_2C_camera_array[0]->mCamRes, &mCameraOffset, GetResourceManager(), *this);
     }
 
-    mPath.Loader_4DB800(mCamIdxOnX, mCamIdxOnY, relive::Factory::LoadMode::ConstructObject_0, ReliveTypes::eNone, mResourceManager, *this); // none = load all
+    mPath.Loader(mCamIdxOnX, mCamIdxOnY, relive::Factory::LoadMode::ConstructObject_0, ReliveTypes::eNone); // none = load all
 
     if (prevPathId != mCurrentPath || prevLevelId != mCurrentLevel)
     {
@@ -797,7 +797,7 @@ void Map::Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode)
             // Async camera load
             pCamera->mCamRes = mResourceManager.LoadCam(pCamera->mLevel, pCamera->mPath, pCamera->mCameraNumber);
 
-            mPath.Loader_4DB800(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResourceFromList_1, ReliveTypes::eNone, mResourceManager, *this); // none = load all
+            mPath.Loader(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResourceFromList_1, ReliveTypes::eNone); // none = load all
         }
         else
         {
@@ -806,19 +806,11 @@ void Map::Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode)
             pCamera->mCamResLoaded = true;
             // pCamera->mCamRes = mResourceManager.LoadCam(pCamera->mLevel, pCamera->mPath, pCamera->mCamera);
 
-            mPath.Loader_4DB800(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResource_2, ReliveTypes::eNone, mResourceManager, *this); // none = load all
+            mPath.Loader(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResource_2, ReliveTypes::eNone); // none = load all
         }
 
     }
 }
 
-TlvIterator Map::TLV_From_Offset_Lvl_Cam(const Guid& tlvId)
-{
-    return mPath.TLV_From_Offset_Lvl_Cam(tlvId);
-}
 
 
-void Map::Reset_TLVs(u16 pathId)
-{
-    mPath.Reset_TLVs(pathId);
-}

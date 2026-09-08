@@ -47,6 +47,16 @@ TlvIterator BasePath::TLV_Next_Of_Type(TlvIterator tlvIterator, ReliveTypes type
     return TlvIterator::Invalid();
 }
 
+TlvIterator BasePath::TLV_From_Offset_Lvl_Cam(const Guid& tlvId)
+{
+    return mBinaryPath->TlvById(tlvId);
+}
+
+Guid BasePath::TLVInfo_From_TLVPtr(relive::Path_TLV* pTlv)
+{
+    return pTlv->mId;
+}
+
 void BasePath::Free()
 {
     mBinaryPath = nullptr;

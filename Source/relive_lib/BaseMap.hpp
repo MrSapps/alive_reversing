@@ -162,7 +162,8 @@ public:
     TlvIterator VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind);
     TlvIterator TLV_First_Of_Type_In_Camera(ReliveTypes objectType, s16 camX);
     TlvIterator TLV_Get_At(TlvIterator pTlv, FP xpos, FP ypos, FP width, FP height);
-    virtual TlvIterator TLV_From_Offset_Lvl_Cam(const Guid& tlvId);
+    TlvIterator TLV_From_Offset_Lvl_Cam(const Guid& tlvId);
+    void Reset_TLVs(u16 pathId);
     TlvIterator Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx);
 
     void ReloadPathJsonRequest(const std::string& pathJsonFileName);

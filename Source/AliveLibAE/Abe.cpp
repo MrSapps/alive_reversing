@@ -2021,7 +2021,7 @@ void Abe::VOnTlvCollision(TlvIterator tlvIterator)
                 }
                 if (pResetSwitchRange->mClearObjects)
                 {
-                    static_cast<Map&>(mMap).Reset_TLVs(pResetSwitchRange->mPath);
+                    mMap.Reset_TLVs(pResetSwitchRange->mPath);
                 }
             }
         }

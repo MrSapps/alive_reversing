@@ -43,7 +43,7 @@ void Path::Init(const PathData* pPathData, EReliveLevelIds level, s16 path, s16 
     mMap.mCamsOnY = (mPathData->field_6_bBottom - mPathData->field_2_bRight) / mPathData->field_C_grid_height;
 }
 
-void Path::Loader_4DB800(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad, ResourceManagerWrapper& resMan, BaseMap& map)
+void Path::Loader(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad)
 {
     TlvIterator tlvIterator = mBinaryPath->TlvsForCamera(xpos, ypos);
     while(tlvIterator.GetTlv())
@@ -60,7 +60,7 @@ void Path::Loader_4DB800(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode,
                 }
 
                 // Call the factory to construct the item
-                mFactory.ConstructTLVObject(pPathTLV, pPathTLV->mId, loadMode, resMan, map);
+                mFactory.ConstructTLVObject(pPathTLV, pPathTLV->mId, loadMode, mMap.GetResourceManager(), mMap);
             }
         }
 
@@ -196,15 +196,7 @@ TlvIterator Path::TLV_Get_At(TlvIterator tlvIterator, FP xpos, FP ypos, FP width
     return tlvIterator;
 }
 
-TlvIterator Path::TLV_From_Offset_Lvl_Cam(const Guid& tlvId)
-{
-    return mBinaryPath->TlvById(tlvId);
-}
 
-Guid Path::TLVInfo_From_TLVPtr(relive::Path_TLV* pTlv)
-{
-    return pTlv->mId;
-}
 
 
 

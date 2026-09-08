@@ -8753,7 +8753,7 @@ void Abe::Motion_156_DoorEnter()
                     }
                     if (pTlv->mClearObjects)
                     {
-                        static_cast<Map&>(mMap).ResetPathObjects(pTlv->mPath);
+                        mMap.Reset_TLVs(pTlv->mPath);
                     }
                 }
             }

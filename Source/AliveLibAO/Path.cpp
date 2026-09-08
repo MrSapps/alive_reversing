@@ -3,6 +3,7 @@
 #include "Map.hpp"
 #include "../relive_lib/MapWrapper.hpp"
 #include "../relive_lib/BinaryPath.hpp"
+#include "../relive_lib/AmbientSound.hpp"
 
 namespace AO {
 
@@ -163,6 +164,87 @@ TlvIterator Path::TLV_Get_At(TlvIterator tlvIterator, FP xpos, FP ypos, FP width
         }
     }
     return tlvIterator;
+}
+
+void Path::Loader(s16 camX, s16 camY, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad)
+{
+    // Get TLVs for this cam
+    BinaryPath* pPathRes = mMap.GetPathResourceBlockPtr(mMap.mCurrentPath);
+    TlvIterator tlvIterator = pPathRes->TlvsForCamera(camX, camY);
+    while(tlvIterator.GetTlv())
+    {
+        auto pTlv = tlvIterator.GetTlv();
+        if (typeToLoad == ReliveTypes::eNone || typeToLoad == pTlv->mTlvType)
+        {
+            if (loadMode != relive::Factory::LoadMode::ConstructObject_0 || !(pTlv->mTlvFlags.Get(relive::TlvFlags::eBit1_Created) || pTlv->mTlvFlags.Get(relive::TlvFlags::eBit2_Destroyed)))
+            {
+                // Call the factory to construct the item
+                mFactory.ConstructTLVObject(pTlv, pTlv->mId, loadMode, mMap.GetResourceManager(), mMap);
+
+                if (loadMode == relive::Factory::LoadMode::ConstructObject_0)
+                {
+                    pTlv->mTlvFlags.Set(relive::TlvFlags::eBit1_Created);
+                    pTlv->mTlvFlags.Set(relive::TlvFlags::eBit2_Destroyed);
+                }
+            }
+        }
+
+        // End of TLV list for current camera
+        if (pTlv->mTlvFlags.Get(relive::TlvFlags::eBit3_End_TLV_List))
+        {
+            break;
+        }
+        tlvIterator = tlvIterator.Next_TLV();
+    }
+}
+
+void Path::Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx)
+{
+    BinaryPath* pPathData = mMap.GetPathResourceBlockPtr(mMap.mCurrentPath);
+
+    // TODO: Shouldn't really need to depend on these
+    const s32 cam_global_left = mPathData->field_C_grid_width * cam_x_idx;
+    const s32 cam_global_right = cam_global_left + mPathData->field_C_grid_width;
+
+    const s32 cam_y_grid_top = mPathData->field_E_grid_height * cam_y_idx;
+    const s32 cam_y_grid_bottom = cam_y_grid_top + mPathData->field_E_grid_height;
+
+    for (auto& cam : pPathData->GetCameras())
+    {
+        // Enumerate the TLVs
+        for (auto& pTlv : cam->mTlvs.mTlvs)
+        {
+            if (pTlv->mTopLeftX >= cam_global_left && pTlv->mTopLeftX <= cam_global_right)
+            {
+                if (pTlv->mTopLeftY >= cam_y_grid_top && pTlv->mTopLeftY <= cam_y_grid_bottom && (!pTlv->mTlvFlags.Get(relive::eBit1_Created) && !pTlv->mTlvFlags.Get(relive::eBit2_Destroyed)))
+                {
+                    Start_Sounds_for_TLV(direction, pTlv.get(), mMap.GetResourceManager(), mMap);
+                }
+            }
+
+            if (pTlv->mTlvFlags.Get(relive::eBit3_End_TLV_List))
+            {
+                break;
+            }
+        }
+    }
+}
+
+void Path::Reset_TLVs(u16 pathNum)
+{
+    BinaryPath* pPathRes = mMap.GetPathResourceBlockPtr(pathNum);
+    for (auto& cam : pPathRes->GetCameras())
+    {
+        for (auto& pTlv : cam->mTlvs.mTlvs)
+        {
+            pTlv->mTlvFlags.Clear(relive::TlvFlags::eBit1_Created);
+            pTlv->mTlvFlags.Clear(relive::TlvFlags::eBit2_Destroyed);
+            if (pTlv->mTlvFlags.Get(relive::TlvFlags::eBit3_End_TLV_List))
+            {
+                break;
+            }
+        }
+    }
 }
 
 } // namespace AO
