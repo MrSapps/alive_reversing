@@ -1710,7 +1710,7 @@ s16 Glukkon::Brain_3_PlayerControlled()
                 return mBrainSubState;
             }
             gPsxDisplay.PutCurrentDispEnv();
-            gScreenManager->DecompressCameraToVRam(mMap.field_2C_camera_array[0]->mCamRes);
+            gScreenManager->DecompressCameraToVRam(mMap.mCurrentCameras[0]->mCamRes);
             if (pFade)
             {
                 pFade->Init(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeOut, 1, 8);

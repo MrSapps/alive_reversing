@@ -7330,7 +7330,7 @@ void Abe::Motion_88_HandstoneBegin()
             if (Movie::gMovieRefCount == 0)
             {
                 gPsxDisplay.PutCurrentDispEnv();
-                gScreenManager->DecompressCameraToVRam(mMap.field_2C_camera_array[0]->mCamRes);
+                gScreenManager->DecompressCameraToVRam(mMap.mCurrentCameras[0]->mCamRes);
                 gScreenManager->EnableRendering();
                 auto pCircularFade = static_cast<CircularFade*>(sObjectIds.Find_Impl(mCircularFadeId));
                 pCircularFade->VFadeIn(0, 0);

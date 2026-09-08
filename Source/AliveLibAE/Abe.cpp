@@ -6031,7 +6031,7 @@ void Abe::Motion_86_HandstoneBegin()
             if (Movie::gMovieRefCount == 0)
             {
                 gPsxDisplay.PutCurrentDispEnv();
-                gScreenManager->DecompressCameraToVRam(mMap.field_2C_camera_array[0]->mCamRes);
+                gScreenManager->DecompressCameraToVRam(mMap.mCurrentCameras[0]->mCamRes);
                 gScreenManager->EnableRendering();
                 pCircularFade->VFadeIn(0, 0);
                 field_120_state.stone = StoneStates::eHandstoneEnd_3;

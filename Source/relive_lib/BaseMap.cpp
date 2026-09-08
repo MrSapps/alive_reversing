@@ -134,7 +134,7 @@ s16 BaseMap::SetActiveCameraDelayed(MapDirections direction, BaseAliveGameObject
 
 Camera* BaseMap::GetCamera(CameraPos pos)
 {
-    return field_2C_camera_array[static_cast<s32>(pos)];
+    return mCurrentCameras[static_cast<s32>(pos)];
 }
 
 s16 BaseMap::SetActiveCam(EReliveLevelIds level, s16 path, s16 cam, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange)
@@ -268,7 +268,7 @@ CameraPos BaseMap::GetDirection(EReliveLevelIds level, s32 path, FP xpos, FP ypo
 
 void BaseMap::Create_FG1s()
 {
-    Camera* pCamera = field_2C_camera_array[0];
+    Camera* pCamera = mCurrentCameras[0];
     pCamera->CreateFG1(mResourceManager, *this);
 }
 
@@ -331,9 +331,9 @@ TlvIterator BaseMap::Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y
 
 void BaseMap::Reset()
 {
-    for (s32 i = 0; i < ALIVE_COUNTOF(field_2C_camera_array); i++)
+    for (s32 i = 0; i < ALIVE_COUNTOF(mCurrentCameras); i++)
     {
-        field_2C_camera_array[i] = nullptr;
+        mCurrentCameras[i] = nullptr;
     }
 
     ClearPathResourceBlocks();
@@ -344,9 +344,9 @@ void BaseMap::Reset()
 
 void BaseMap::Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange)
 {
-    for (s32 i = 0; i < ALIVE_COUNTOF(field_2C_camera_array); i++)
+    for (s32 i = 0; i < ALIVE_COUNTOF(mCurrentCameras); i++)
     {
-        field_2C_camera_array[i] = nullptr;
+        mCurrentCameras[i] = nullptr;
     }
 
     mOverlayId = -1;
@@ -367,12 +367,12 @@ void BaseMap::Shutdown()
     FreePathResourceBlocks();
 
     // Free cameras
-    for (s32 i = 0; i < ALIVE_COUNTOF(field_2C_camera_array); i++)
+    for (s32 i = 0; i < ALIVE_COUNTOF(mCurrentCameras); i++)
     {
-        if (field_2C_camera_array[i])
+        if (mCurrentCameras[i])
         {
-            relive_delete field_2C_camera_array[i];
-            field_2C_camera_array[i] = nullptr;
+            relive_delete mCurrentCameras[i];
+            mCurrentCameras[i] = nullptr;
         }
     }
 

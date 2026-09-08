@@ -105,7 +105,7 @@ s16 Map::Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect)
         return 0;
     }
 
-    Camera* pCamera = field_2C_camera_array[static_cast<s32>(camIdx)];
+    Camera* pCamera = mCurrentCameras[static_cast<s32>(camIdx)];
     if (!pCamera)
     {
         return 0;
@@ -225,12 +225,12 @@ void Map::GoTo_Camera()
         mResourceManager.LoadingLoop(bShowLoadingIcon, this);
 
         // Free all cameras
-        for (s32 i = 0; i < ALIVE_COUNTOF(field_2C_camera_array); i++)
+        for (s32 i = 0; i < ALIVE_COUNTOF(mCurrentCameras); i++)
         {
-            if (field_2C_camera_array[i])
+            if (mCurrentCameras[i])
             {
-                relive_delete field_2C_camera_array[i];
-                field_2C_camera_array[i] = nullptr;
+                relive_delete mCurrentCameras[i];
+                mCurrentCameras[i] = nullptr;
             }
         }
 
@@ -324,50 +324,50 @@ void Map::GoTo_Camera()
     }
 
     // Copy camera array and blank out the source
-    for (s32 i = 0; i < ALIVE_COUNTOF(field_40_stru_5); i++)
+    for (s32 i = 0; i < ALIVE_COUNTOF(mPreviousCameras); i++)
     {
-        field_40_stru_5[i] = field_2C_camera_array[i];
-        field_2C_camera_array[i] = nullptr;
+        mPreviousCameras[i] = mCurrentCameras[i];
+        mCurrentCameras[i] = nullptr;
     }
 
-    field_2C_camera_array[0] = Create_Camera(mCamIdxOnX, mCamIdxOnY, 1);
-    field_2C_camera_array[3] = Create_Camera(mCamIdxOnX - 1, mCamIdxOnY, 0);
-    field_2C_camera_array[4] = Create_Camera(mCamIdxOnX + 1, mCamIdxOnY, 0);
-    field_2C_camera_array[1] = Create_Camera(mCamIdxOnX, mCamIdxOnY - 1, 0);
-    field_2C_camera_array[2] = Create_Camera(mCamIdxOnX, mCamIdxOnY + 1, 0);
+    mCurrentCameras[0] = Create_Camera(mCamIdxOnX, mCamIdxOnY, 1);
+    mCurrentCameras[3] = Create_Camera(mCamIdxOnX - 1, mCamIdxOnY, 0);
+    mCurrentCameras[4] = Create_Camera(mCamIdxOnX + 1, mCamIdxOnY, 0);
+    mCurrentCameras[1] = Create_Camera(mCamIdxOnX, mCamIdxOnY - 1, 0);
+    mCurrentCameras[2] = Create_Camera(mCamIdxOnX, mCamIdxOnY + 1, 0);
 
     // Free resources for each camera
-    for (s32 i = 0; i < ALIVE_COUNTOF(field_40_stru_5); i++)
+    for (s32 i = 0; i < ALIVE_COUNTOF(mPreviousCameras); i++)
     {
-        if (field_40_stru_5[i])
+        if (mPreviousCameras[i])
         {
-            //pResourceManager->Free_Resources_For_Camera_4656F0(field_40_stru_5[i]);
+            //pResourceManager->Free_Resources_For_Camera_4656F0(mPreviousCameras[i]);
         }
     }
 
     mResourceManager.LoadingLoop(bShowLoadingIcon, this);
 
     // Free each camera itself
-    for (s32 i = 0; i < ALIVE_COUNTOF(field_40_stru_5); i++)
+    for (s32 i = 0; i < ALIVE_COUNTOF(mPreviousCameras); i++)
     {
-        if (field_40_stru_5[i])
+        if (mPreviousCameras[i])
         {
-            relive_delete field_40_stru_5[i];
-            field_40_stru_5[i] = nullptr;
+            relive_delete mPreviousCameras[i];
+            mPreviousCameras[i] = nullptr;
         }
     }
 
-    Load_Path_Items(field_2C_camera_array[0], relive::Factory::LoadMode::ConstructObject_0);
+    Load_Path_Items(mCurrentCameras[0], relive::Factory::LoadMode::ConstructObject_0);
     mResourceManager.LoadingLoop(bShowLoadingIcon, this);
-    Load_Path_Items(field_2C_camera_array[3], relive::Factory::LoadMode::ConstructObject_0);
-    Load_Path_Items(field_2C_camera_array[4], relive::Factory::LoadMode::ConstructObject_0);
-    Load_Path_Items(field_2C_camera_array[1], relive::Factory::LoadMode::ConstructObject_0);
-    Load_Path_Items(field_2C_camera_array[2], relive::Factory::LoadMode::ConstructObject_0);
+    Load_Path_Items(mCurrentCameras[3], relive::Factory::LoadMode::ConstructObject_0);
+    Load_Path_Items(mCurrentCameras[4], relive::Factory::LoadMode::ConstructObject_0);
+    Load_Path_Items(mCurrentCameras[1], relive::Factory::LoadMode::ConstructObject_0);
+    Load_Path_Items(mCurrentCameras[2], relive::Factory::LoadMode::ConstructObject_0);
 
     // Create the screen manager if it hasn't already been done (probably should have always been done by this point though?)
     if (!gScreenManager)
     {
-        gScreenManager = relive_new ScreenManager(field_2C_camera_array[0]->mCamRes, &mCameraOffset, GetResourceManager(), *this);
+        gScreenManager = relive_new ScreenManager(mCurrentCameras[0]->mCamRes, &mCameraOffset, GetResourceManager(), *this);
     }
 
     mPath.Loader(mCamIdxOnX, mCamIdxOnY, relive::Factory::LoadMode::ConstructObject_0, ReliveTypes::eNone); // none = load all
@@ -387,12 +387,12 @@ void Map::GoTo_Camera()
 
     if (mCameraSwapEffect == CameraSwapEffects::ePlay1FMV_5)
     {
-        Map::FMV_Camera_Change(field_2C_camera_array[0]->mCamRes, this, mNextLevel);
+        Map::FMV_Camera_Change(mCurrentCameras[0]->mCamRes, this, mNextLevel);
     }
 
     if (mCameraSwapEffect == CameraSwapEffects::eUnknown_11)
     {
-        gScreenManager->DecompressCameraToVRam(field_2C_camera_array[0]->mCamRes);
+        gScreenManager->DecompressCameraToVRam(mCurrentCameras[0]->mCamRes);
         gScreenManager->EnableRendering();
     }
 
@@ -424,7 +424,7 @@ void Map::GoTo_Camera()
         {
             if (!mTeleporterTransition)
             {
-                relive_new CameraSwapper(field_2C_camera_array[0]->mCamRes, mResourceManager, *this, mCameraSwapEffect, 368 / 2, 240 / 2);
+                relive_new CameraSwapper(mCurrentCameras[0]->mCamRes, mResourceManager, *this, mCameraSwapEffect, 368 / 2, 240 / 2);
             }
             else
             {
@@ -715,16 +715,16 @@ Camera* Map::Create_Camera(s16 xpos, s16 ypos, s32 /*a4*/)
     }
 
     // Return existing camera if we already have one
-    for (s32 i = 0; i < ALIVE_COUNTOF(field_40_stru_5); i++)
+    for (s32 i = 0; i < ALIVE_COUNTOF(mPreviousCameras); i++)
     {
-        if (field_40_stru_5[i]
-            && field_40_stru_5[i]->mLevel == mCurrentLevel
-            && field_40_stru_5[i]->mPath == mCurrentPath
-            && field_40_stru_5[i]->mCamXOff == xpos
-            && field_40_stru_5[i]->mCamYOff == ypos)
+        if (mPreviousCameras[i]
+            && mPreviousCameras[i]->mLevel == mCurrentLevel
+            && mPreviousCameras[i]->mPath == mCurrentPath
+            && mPreviousCameras[i]->mCamXOff == xpos
+            && mPreviousCameras[i]->mCamYOff == ypos)
         {
-            Camera* pTemp = field_40_stru_5[i];
-            field_40_stru_5[i] = nullptr;
+            Camera* pTemp = mPreviousCameras[i];
+            mPreviousCameras[i] = nullptr;
             return pTemp;
         }
     }
@@ -789,7 +789,7 @@ void Map::CreateScreenTransistionForTLV(relive::Path_TLV* pTlv)
     const s16 doorYDiff = static_cast<s16>(pTlv->mTopLeftY - FP_GetExponent(gScreenManager->CamYPos()));
     const s16 midX = (pTlv->mTopLeftX + pTlv->mBottomRightX) / 2;
     const s16 rightPos = static_cast<s16>(midX - FP_GetExponent(gScreenManager->CamXPos()));
-    relive_new CameraSwapper(field_2C_camera_array[0]->mCamRes, mResourceManager, *this, mCameraSwapEffect, rightPos, doorYDiff);
+    relive_new CameraSwapper(mCurrentCameras[0]->mCamRes, mResourceManager, *this, mCameraSwapEffect, rightPos, doorYDiff);
 }
 
 

@@ -178,8 +178,8 @@ public:
 
     s16 mDoorTransitionPending = 0;
 
-    Camera* field_2C_camera_array[5] = {};
-    Camera* field_40_stru_5[5] = {};
+    Camera* mCurrentCameras[5] = {};
+    Camera* mPreviousCameras[5] = {};
 
     std::vector<std::unique_ptr<BinaryPath>> mLoadedPaths;
     FP_Point mCameraOffset = {};

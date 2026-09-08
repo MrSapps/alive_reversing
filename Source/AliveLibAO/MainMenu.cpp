@@ -678,7 +678,7 @@ void Menu::FMV_Select_Update()
                     }
 
                     gPsxDisplay.PutCurrentDispEnv();
-                    gScreenManager->DecompressCameraToVRam(mMap.field_2C_camera_array[0]->mCamRes);
+                    gScreenManager->DecompressCameraToVRam(mMap.mCurrentCameras[0]->mCamRes);
                     gScreenManager->EnableRendering();
                     SND_Restart(mMap);
                 }
