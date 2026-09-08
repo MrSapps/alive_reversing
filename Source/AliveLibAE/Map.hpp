@@ -55,9 +55,8 @@ public:
     void LoadResource(const char_type* pFileName, s32 type, s32 resourceId, relive::Factory::LoadMode loadMode, s16 bDontLoad = 0);
 
     s16 Is_Point_In_Current_Camera(EReliveLevelIds level, s32 path, FP xpos, FP ypos, s16 width) override;
-    CameraPos GetDirection(EReliveLevelIds level, s32 path, FP xpos, FP ypos) override;
 
-    s16 Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect);
+    s16 Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect) override;
 
     void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1) override;
     void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1) override;

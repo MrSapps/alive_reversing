@@ -118,6 +118,7 @@ public:
     virtual void Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed) = 0;
 
     virtual CameraPos Rect_Location_Relative_To_Active_Camera(const PSX_RECT* pRect, s16 width = 0) = 0;
+    virtual s16 Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect) = 0;
 
     s16 SetActiveCameraDelayed(MapDirections direction, BaseAliveGameObject* pObj, s16 swapEffect);
 
@@ -125,9 +126,9 @@ public:
 
     s16 SetActiveCam(EReliveLevelIds level, s16 path, s16 cam, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange);
 
-    
+
     virtual s16 Is_Point_In_Current_Camera(EReliveLevelIds level, s32 path, FP xpos, FP ypos, s16 width) = 0;
-    virtual CameraPos GetDirection(EReliveLevelIds level, s32 path, FP xpos, FP ypos) = 0;
+    CameraPos GetDirection(EReliveLevelIds level, s32 path, FP xpos, FP ypos);
     virtual void GetCurrentCamCoords(PSX_Point* pPoint) = 0;
     virtual void GoTo_Camera() = 0;
 
