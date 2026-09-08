@@ -16,7 +16,6 @@
 #include "../relive_lib/Sys.hpp"
 #include "../relive_lib/BaseGameAutoPlayer.hpp"
 #include "../relive_lib/Engine.hpp"
-#include "../relive_lib/AmbientSound.hpp"
 
 namespace AO {
 
@@ -75,7 +74,7 @@ CameraSwapper::~CameraSwapper()
 
     BackgroundMusic::Play();
     MusicController::EnableMusic(1);
-    Start_Sounds_For_Objects_In_Near_Cameras(mMap);
+    mMap.Start_Sounds_For_Objects_In_Near_Cameras();
 }
 
 void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)

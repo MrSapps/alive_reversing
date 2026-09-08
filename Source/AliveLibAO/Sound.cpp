@@ -3,7 +3,7 @@
 #include "MusicController.hpp"
 #include "Midi.hpp"
 #include "../relive_lib/GameObjects/BackgroundMusic.hpp"
-#include "../relive_lib/AmbientSound.hpp"
+#include "../relive_lib/BaseMap.hpp"
 
 #include "../relive_lib/Sound/Sound.hpp"
 
@@ -20,7 +20,7 @@ void SND_Restart(BaseMap& map)
     {
         SND_SEQ_PlaySeq(static_cast<SeqId>(gBackgroundMusicSeqId), 0, 0);
     }
-    Start_Sounds_For_Objects_In_Near_Cameras(map);
+    map.Start_Sounds_For_Objects_In_Near_Cameras();
 }
 
 } // namespace AO

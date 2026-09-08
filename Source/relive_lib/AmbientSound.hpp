@@ -10,8 +10,6 @@ namespace relive
     class Path_TLV;
 }
 
-void Start_Sounds_For_Objects_In_Near_Cameras(BaseMap& map);
-
 void SND_Init_Ambiance();
 void SND_Reset_Ambiance();
 

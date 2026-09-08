@@ -16,6 +16,7 @@
 #include "PsxDisplay.hpp"
 #include "Sfx.hpp"
 #include "Sys.hpp"
+#include "AmbientSound.hpp"
 
 bool gMap_bDoPurpleLightEffect = false;
 
@@ -176,6 +177,15 @@ void BaseMap::Reset_TLVs(u16 pathId)
 void BaseMap::Get_map_size(PSX_Point* pPoint)
 {
     *pPoint = GetPath().VGetMapSize();
+}
+
+void BaseMap::Start_Sounds_For_Objects_In_Near_Cameras()
+{
+    SND_Reset_Ambiance();
+    GetPath().Start_Sounds_For_Objects_In_Camera(CameraPos::eCamLeft_3, -1, 0);
+    GetPath().Start_Sounds_For_Objects_In_Camera(CameraPos::eCamRight_4, 1, 0);
+    GetPath().Start_Sounds_For_Objects_In_Camera(CameraPos::eCamTop_1, 0, -1);
+    GetPath().Start_Sounds_For_Objects_In_Camera(CameraPos::eCamBottom_2, 0, 1);
 }
 
 void BaseMap::ReloadPathJsonRequest(const std::string& pathJsonFileName)

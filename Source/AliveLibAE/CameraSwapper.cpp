@@ -5,7 +5,6 @@
 #include "Map.hpp"
 #include "../relive_lib/GameObjects/BackgroundMusic.hpp"
 #include "MusicController.hpp"
-#include "AmbientSound.hpp"
 #include "stdlib.hpp"
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
@@ -62,7 +61,7 @@ CameraSwapper::~CameraSwapper()
 
     BackgroundMusic::Play();
     MusicController::static_EnableMusic(1);
-    Start_Sounds_For_Objects_In_Near_Cameras(mMap);
+    mMap.Start_Sounds_For_Objects_In_Near_Cameras();
 }
 
 static const s32 kSliceWidth = 8;

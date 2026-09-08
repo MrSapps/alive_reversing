@@ -166,6 +166,7 @@ public:
     TlvIterator TLV_From_Offset_Lvl_Cam(const Guid& tlvId);
     void Reset_TLVs(u16 pathId);
     TlvIterator Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx);
+    void Start_Sounds_For_Objects_In_Near_Cameras();
 
     void ReloadPathJsonRequest(const std::string& pathJsonFileName);
 
