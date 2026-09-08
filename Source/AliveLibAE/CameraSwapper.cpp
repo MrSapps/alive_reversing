@@ -56,7 +56,7 @@ CameraSwapper::~CameraSwapper()
 
     if (gMap_bDoPurpleLightEffect)
     {
-        static_cast<Map&>(mMap).RemoveObjectsWithPurpleLight(0);
+        mMap.RemoveObjectsWithPurpleLight(0);
         gMap_bDoPurpleLightEffect = 0;
     }
 

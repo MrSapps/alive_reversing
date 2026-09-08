@@ -314,7 +314,7 @@ void Meat::VUpdate()
                     *gBaseGameObjects);
 
                 // TODO: OG bug - why only checking for out of the bottom of the map?? Nades check for death object - probably should check both
-                if (mYPos > FP_FromInteger(static_cast<Map&>(mMap).mPath.mPathData->field_6_bBottom))
+                if (mYPos > FP_FromInteger(mMap.GetPath().VGetMapSize().y))
                 {
                     SetDead(true);
                 }

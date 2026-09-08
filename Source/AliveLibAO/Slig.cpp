@@ -156,7 +156,7 @@ void Slig::Slig_SoundEffect(SligSfx sfxIdx)
     {
         volRight = sSligSfxSounds[sfxIdxInt].mDefaultVolume / 2;
     }
-    static_cast<Map&>(mMap).Get_Camera_World_Rect(dir, &worldRect);
+    mMap.Get_Camera_World_Rect(dir, &worldRect);
     switch (dir)
     {
         case CameraPos::eCamCurrent_0:
@@ -428,7 +428,7 @@ void Slig::Init()
     {
         for (s16 xCam = -2; xCam < 3; xCam++)
         {
-            auto pTlvIter = static_cast<Map&>(mMap).Get_First_TLV_For_Offsetted_Camera(xCam, yCam);
+            auto pTlvIter = mMap.Get_First_TLV_For_Offsetted_Camera(xCam, yCam);
             while (pTlvIter.GetTlv())
             {
                 bool addPoint = false;

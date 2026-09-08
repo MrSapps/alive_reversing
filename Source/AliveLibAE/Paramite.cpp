@@ -6117,7 +6117,7 @@ void Paramite::Sound(ParamiteSpeak soundId, s16 pitch_min)
     }
 
     PSX_RECT pRect = {};
-    static_cast<Map&>(mMap).Get_Camera_World_Rect(direction, &pRect);
+    mMap.Get_Camera_World_Rect(direction, &pRect);
 
     s16 volLeft = 0;
     switch (direction)

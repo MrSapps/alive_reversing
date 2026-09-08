@@ -538,7 +538,7 @@ s32 Scrab::Scrab_SFX(ScrabSounds soundId, s32 /*vol*/, s32 pitch, s16 applyDirec
         mXPos,
         mYPos);
     PSX_RECT worldRect;
-    static_cast<Map&>(mMap).Get_Camera_World_Rect(direction, &worldRect);
+    mMap.Get_Camera_World_Rect(direction, &worldRect);
     volumeLeft = volumeRight;
     if (applyDirection)
     {

@@ -2876,7 +2876,7 @@ void Slog::Sfx(SlogSound effectId)
         mXPos,
         mYPos);
     PSX_RECT pRect = {};
-    static_cast<Map&>(mMap).Get_Camera_World_Rect(direction, &pRect);
+    mMap.Get_Camera_World_Rect(direction, &pRect);
 
     const s16 defaultSndIdxVol = effectDef.mDefaultVolume;
     volumeRight = defaultSndIdxVol;

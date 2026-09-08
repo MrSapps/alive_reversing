@@ -611,7 +611,7 @@ void Slog::Sfx(s32 soundId)
         mXPos,
         mYPos);
     PSX_RECT worldRect;
-    static_cast<Map&>(mMap).Get_Camera_World_Rect(direction, &worldRect);
+    mMap.Get_Camera_World_Rect(direction, &worldRect);
     volumeLeft = volumeRight;
     switch (direction)
     {

@@ -707,7 +707,7 @@ void Paramite::Sound(ParamiteSpeak idx)
     s16 volLeft = 0;
 
     PSX_RECT rect = {};
-    static_cast<Map&>(mMap).Get_Camera_World_Rect(direction, &rect);
+    mMap.Get_Camera_World_Rect(direction, &rect);
 
     switch (direction)
     {

@@ -1896,7 +1896,7 @@ s32 Fleech::Sound(FleechSound soundId)
         mYPos);
 
     PSX_RECT pRect = {};
-    static_cast<Map&>(mMap).Get_Camera_World_Rect(direction, &pRect);
+    mMap.Get_Camera_World_Rect(direction, &pRect);
     switch (direction)
     {
         case CameraPos::eCamCurrent_0:

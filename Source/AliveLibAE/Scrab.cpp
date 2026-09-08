@@ -3849,7 +3849,7 @@ s32 Scrab::Scrab_SFX(ScrabSounds soundId, s32 vol, s32 pitch, s16 applyDirection
     if (applyDirection)
     {
         PSX_RECT pRect = {};
-        static_cast<Map&>(mMap).Get_Camera_World_Rect(direction, &pRect);
+        mMap.Get_Camera_World_Rect(direction, &pRect);
         switch (direction)
         {
             case CameraPos::eCamCurrent_0:

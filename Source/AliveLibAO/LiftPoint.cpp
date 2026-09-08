@@ -662,7 +662,7 @@ void LiftPoint::VScreenChanged()
 
 void LiftPoint::CreatePulleyIfExists(s16 camX, s16 camY)
 {
-    auto tlvIterator = static_cast<Map&>(mMap).Get_First_TLV_For_Offsetted_Camera(camX, camY);
+    auto tlvIterator = mMap.Get_First_TLV_For_Offsetted_Camera(camX, camY);
     if (tlvIterator.GetTlv())
     {
         while (1)
