@@ -929,7 +929,7 @@ bool BaseAliveGameObject::MapFollowMeAO(bool snapToGrid)
                 const s32 x_i = abs(FP_GetExponent(mXPos));
                 const s32 camXIndex = x_i % 1024;
 
-                static_cast<AO::Map&>(mMap).Get_map_size(&currentCamCoords);
+                mMap.Get_map_size(&currentCamCoords);
                 if (x_i < (currentCamCoords.x - 1024))
                 {
                     UsePathTransScale();
@@ -972,7 +972,7 @@ bool BaseAliveGameObject::MapFollowMeAO(bool snapToGrid)
         // In the right camera void and moving right?
         else if (camXIndex > 624 && mVelX > FP_FromInteger(0)) // Never hit as velx is < 0
         {
-            static_cast<AO::Map&>(mMap).Get_map_size(&currentCamCoords);
+            mMap.Get_map_size(&currentCamCoords);
             if (x_i < (currentCamCoords.x - 1024))
             {
                 UsePathTransScale();

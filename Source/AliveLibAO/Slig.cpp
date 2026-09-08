@@ -522,7 +522,7 @@ void Slig::VUpdate()
             mYPos += mVelY;
 
             PSX_Point mapSize = {};
-            static_cast<Map&>(mMap).Get_map_size(&mapSize);
+            mMap.Get_map_size(&mapSize);
 
             if (mXPos < FP_FromInteger(0))
             {

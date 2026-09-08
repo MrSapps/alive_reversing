@@ -6,6 +6,7 @@
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/BinaryPath.hpp"
 #include "../relive_lib/BasePath.hpp"
+#include "../relive_lib/Psx.hpp"
 
 class ResourceManagerWrapper;
 class Map;
@@ -231,6 +232,7 @@ public:
     void Loader(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad) override;
     void Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx) override;
     void Reset_TLVs(u16 pathId) override;
+    PSX_Point VGetMapSize() const override;
 
     const PathData* mPathData = nullptr;
 };

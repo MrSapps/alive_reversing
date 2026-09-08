@@ -875,12 +875,6 @@ s32 Map::VPurpleLightFrameCount(s16 bMakeInvisible)
     return bMakeInvisible != 0 ? 12 : 4;
 }
 
-void Map::Get_map_size(PSX_Point* pPoint)
-{
-    pPoint->x = mPath.mPathData->field_8_bTop;
-    pPoint->y = mPath.mPathData->field_A_bBottom;
-}
-
 CameraSwapper* Map::FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLevelIds levelId)
 {
     // This is required to make the movies work when abe completes scrabania and paramonia.

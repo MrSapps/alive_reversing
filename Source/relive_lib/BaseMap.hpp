@@ -138,6 +138,7 @@ public:
     virtual s16 Is_Point_In_Current_Camera(EReliveLevelIds level, s32 path, FP xpos, FP ypos, s16 width) = 0;
     CameraPos GetDirection(EReliveLevelIds level, s32 path, FP xpos, FP ypos);
     virtual void GetCurrentCamCoords(PSX_Point* pPoint) = 0;
+    void Get_map_size(PSX_Point* pPoint);
     virtual void GoTo_Camera() = 0;
 
     virtual void ScreenChange() = 0;

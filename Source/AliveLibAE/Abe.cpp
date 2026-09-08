@@ -759,7 +759,7 @@ void Abe::HandleDDCheat()
 
         // Keep within map max bounds
         PSX_Point mapSize = {};
-        static_cast<Map&>(mMap).Get_map_size(&mapSize);
+        mMap.Get_map_size(&mapSize);
 
         FP mapWidth = FP_FromInteger(mapSize.x);
         if (mXPos >= mapWidth)

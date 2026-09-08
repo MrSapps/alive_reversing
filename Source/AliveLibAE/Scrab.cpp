@@ -540,7 +540,7 @@ void Scrab::HandleDDCheat()
 
         // Keep in map bounds
         PSX_Point point = {};
-        static_cast<Map&>(mMap).Get_map_size(&point);
+        mMap.Get_map_size(&point);
         if (mXPos < FP_FromInteger(0))
         {
             mXPos = FP_FromInteger(0);

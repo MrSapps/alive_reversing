@@ -8,6 +8,7 @@ class BaseMap;
 class Guid;
 struct FixedPoint;
 using FP = FixedPoint;
+struct PSX_Point;
 enum class ReliveTypes : s16;
 
 namespace relive
@@ -41,6 +42,9 @@ public:
     virtual void Loader(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad) = 0;
     virtual void Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx) = 0;
     virtual void Reset_TLVs(u16 pathId) = 0;
+
+    // The top/bottom map bounds recorded in the engine specific path data.
+    virtual PSX_Point VGetMapSize() const = 0;
 
     TlvIterator Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx);
     TlvIterator TLV_First_Of_Type_In_Camera(ReliveTypes objectType, s16 camX);

@@ -220,3 +220,8 @@ void Path::Reset_TLVs(u16 pathId)
     }
 }
 
+PSX_Point Path::VGetMapSize() const
+{
+    return {mPathData->field_4_bTop, mPathData->field_6_bBottom};
+}
+

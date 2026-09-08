@@ -4567,7 +4567,7 @@ void Slig::HandleDDCheat()
 
         // Keep in the map bounds
         PSX_Point mapBounds = {};
-        static_cast<Map&>(mMap).Get_map_size(&mapBounds);
+        mMap.Get_map_size(&mapBounds);
 
         if (mXPos < FP_FromInteger(0))
         {

@@ -210,6 +210,7 @@ public:
     void Loader(s16 camX, s16 camY, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad) override;
     void Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx) override;
     void Reset_TLVs(u16 pathId) override;
+    PSX_Point VGetMapSize() const override;
 
     const PathData* mPathData = nullptr;
 };

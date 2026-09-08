@@ -1,6 +1,7 @@
 #include "BinaryPath.hpp"
 #include "stdafx.h"
 #include "BaseMap.hpp"
+#include "Psx.hpp"
 #include "../relive_lib/Engine.hpp"// DestroyObjects
 #include "../AliveLibAE/Map.hpp"
 #include "../AliveLibAO/Map.hpp"
@@ -170,6 +171,11 @@ TlvIterator BaseMap::TLV_From_Offset_Lvl_Cam(const Guid& tlvId)
 void BaseMap::Reset_TLVs(u16 pathId)
 {
     GetPath().Reset_TLVs(pathId);
+}
+
+void BaseMap::Get_map_size(PSX_Point* pPoint)
+{
+    *pPoint = GetPath().VGetMapSize();
 }
 
 void BaseMap::ReloadPathJsonRequest(const std::string& pathJsonFileName)

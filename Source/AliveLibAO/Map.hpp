@@ -80,7 +80,6 @@ public:
         mSaveData = nullptr;
     }
 
-    void Get_map_size(PSX_Point* pPoint);
     static CameraSwapper* FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLevelIds levelId);
     Camera* Create_Camera(s16 xpos, s16 ypos, s32 a4);
     void Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode);

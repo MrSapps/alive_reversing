@@ -57,7 +57,6 @@ public:
         mRestoreMapObjectStates = false;
     }
 
-    void Get_map_size(PSX_Point* pPoint);
     static BaseGameObject* FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLevelIds lvlId);
     Camera* Create_Camera(s16 xpos, s16 ypos, s32 a4);
     void Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode);

@@ -3202,7 +3202,7 @@ void Elum::VUpdate()
             mYPos += mVelY;
 
             PSX_Point map_size = {};
-            static_cast<Map&>(mMap).Get_map_size(&map_size);
+            mMap.Get_map_size(&map_size);
 
             if (mXPos < FP_FromInteger(0))
             {

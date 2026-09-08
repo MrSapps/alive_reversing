@@ -246,5 +246,9 @@ void Path::Reset_TLVs(u16 pathNum)
     }
 }
 
+PSX_Point Path::VGetMapSize() const
+{
+    return {mPathData->field_8_bTop, mPathData->field_A_bBottom};
+}
 
 } // namespace AO
