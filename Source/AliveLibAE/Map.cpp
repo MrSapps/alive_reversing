@@ -45,7 +45,6 @@ s32 MaxGridBlocks(FP scale)
     }
 }
 
-
 Map::Map(ResourceManagerWrapper& resMan, relive::Factory& factory)
     : BaseMap(resMan, factory)
     , mPath(*this, factory)
@@ -53,219 +52,101 @@ Map::Map(ResourceManagerWrapper& resMan, relive::Factory& factory)
     Reset();
 }
 
-
-
-void Map::ScreenChange()
-{
-    if (mCamState == CamChangeStates::eInactive_0)
-    {
-        return;
-    }
-
-    if (gMap_bDoPurpleLightEffect && mCurrentLevel != EReliveLevelIds::eBoardRoom)
-    {
-        RemoveObjectsWithPurpleLight(1);
-    }
-
-    for (s32 i = 0; i < 2; i++) // Not sure why this is done twice?
-    {
-        for (s32 j = 0; j < gBaseGameObjects->Size(); j++)
-        {
-            BaseGameObject* pItem = gBaseGameObjects->ItemAt(j);
-            if (!pItem)
-            {
-                break;
-            }
-
-            pItem->VScreenChanged();
-
-            // Did the screen change kill the object?
-            if (pItem->GetDead())
-            {
-                j = gBaseGameObjects->RemoveAt(j);
-                relive_delete pItem;
-            }
-        }
-    }
-
-    // TODO: Refactor this logic
-    if (!gMap_bDoPurpleLightEffect && mNextLevel == mCurrentLevel)
-    {
-        ScreenChange_Common();
-        return;
-    }
-
-    if (LevelChanged())
-    {
-        SsUtAllKeyOff(0);
-    }
-
-    if (mNextLevel != EReliveLevelIds::eNone)
-    {
-        if (mNextLevel == EReliveLevelIds::eCredits)
-        {
-            mSoundChannelsMask = 0;
-            ScreenChange_Common();
-            return;
-        }
-    }
-    else if (mCurrentLevel == EReliveLevelIds::eMenu)
-    {
-        mSoundChannelsMask = 0;
-        ScreenChange_Common();
-        return;
-    }
-    mSoundChannelsMask = SND_MIDI(0, 0, 36, 70, 0, 0);
-    ScreenChange_Common();
-}
-
-
-
-s32 Map::VPurpleLightFrameCount(s16 /*bMakeInvisible*/)
-{
-    return 12;
-}
-
-void Map::VCollectPurpleLightObjects(DynamicArrayT<BaseAnimatedWithPhysicsGameObject>& objects, DynamicArrayT<Particle>& lights)
-{
-    for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
-    {
-        BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
-        if (!pObj)
-        {
-            break;
-        }
-
-        if (pObj->GetIsBaseAnimatedWithPhysicsObj())
-        {
-            if (pObj->GetDrawable())
-            {
-                auto pBaseObj = static_cast<BaseAnimatedWithPhysicsGameObject*>(pObj);
-
-                const PSX_RECT objRect = pBaseObj->VGetBoundingRect();
-
-                if (pBaseObj->GetDoPurpleLightEffect())
-                {
-                    if (pBaseObj->GetAnimation().GetRender())
-                    {
-                        if (!pBaseObj->GetDead() && pBaseObj != sControlledCharacter && Rect_Location_Relative_To_Active_Camera(&objRect) == CameraPos::eCamCurrent_0)
-                        {
-                            AddPurpleLight(pBaseObj, objects, lights);
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-void Map::Handle_PathTransition()
-{
-    relive::Path_PathTransition* pTlv = nullptr;
-    if (mAliveObj)
-    {
-        pTlv = static_cast<relive::Path_PathTransition*>(mPath.VTLV_Get_At_Of_Type(
-            FP_GetExponent(mAliveObj->mXPos),
-            FP_GetExponent(mAliveObj->mYPos),
-            FP_GetExponent(mAliveObj->mXPos),
-            FP_GetExponent(mAliveObj->mYPos),
-            ReliveTypes::ePathTransition).GetTlv());
-    }
-
-    if (mAliveObj && pTlv)
-    {
-        mNextLevel = pTlv->mNextLevel;
-        mNextPath = pTlv->mNextPath;
-        mNextCamera = pTlv->mNextCamera;
-        mFmvBaseId = pTlv->mMovieId;
-
-        mCameraSwapEffect = kPathChangeEffectToInternalScreenChangeEffect[pTlv->mWipeEffect];
-
-        mAliveObj->mCurrentLevel = pTlv->mNextLevel;
-        mAliveObj->mCurrentPath = pTlv->mNextPath;
-
-        // Save value before pPathChangeTLV is deleted
-        const auto next_path_scale = pTlv->mNextPathScale;
-
-        GoTo_Camera();
-
-        switch (next_path_scale)
-        {
-            case relive::reliveScale::eFull:
-                gAbe->SetSpriteScale(FP_FromInteger(1));
-                gAbe->GetAnimation().SetRenderLayer(Layer::eLayer_AbeMenu_32);
-                break;
-
-            case relive::reliveScale::eHalf:
-                gAbe->SetSpriteScale(FP_FromDouble(0.5));
-                gAbe->GetAnimation().SetRenderLayer(Layer::eLayer_AbeMenu_Half_13);
-                break;
-
-            default:
-                LOG_ERROR("Invalid scale %d", static_cast<s16>(next_path_scale));
-                break;
-        }
-
-        CameraPos remapped = CameraPos::eCamInvalid_m1;
-        switch (mMapDirection)
-        {
-            case MapDirections::eMapLeft_0:
-                remapped = CameraPos::eCamLeft_3;
-                break;
-            case MapDirections::eMapRight_1:
-                remapped = CameraPos::eCamRight_4;
-                break;
-            case MapDirections::eMapTop_2:
-                remapped = CameraPos::eCamTop_1;
-                break;
-            case MapDirections::eMapBottom_3:
-                remapped = CameraPos::eCamBottom_2;
-                break;
-        }
-
-        mAliveObj->VOnPathTransition(
-            mPath.mPathData->field_A_grid_width * mCamIdxOnX,
-            mPath.mPathData->field_C_grid_height * mCamIdxOnY,
-            remapped);
-    }
-    else
-    {
-        switch (mMapDirection)
-        {
-            case MapDirections::eMapLeft_0:
-                mCamIdxOnX--;
-                mCameraSwapEffect = CameraSwapEffects::eRightToLeft_2;
-                break;
-            case MapDirections::eMapRight_1:
-                mCamIdxOnX++;
-                mCameraSwapEffect = CameraSwapEffects::eLeftToRight_1;
-                break;
-            case MapDirections::eMapTop_2:
-                mCamIdxOnY--;
-                mCameraSwapEffect = CameraSwapEffects::eBottomToTop_4;
-                break;
-            case MapDirections::eMapBottom_3:
-                mCamIdxOnY++;
-                mCameraSwapEffect = CameraSwapEffects::eTopToBottom_3;
-                break;
-            default:
-                break;
-        }
-
-        const BinaryPath* pPathRes = GetPathResourceBlockPtr(mCurrentPath);
-        const char* pCameraName = pPathRes->CameraName(mCamIdxOnX, mCamIdxOnY);
-
-        mNextCamera = static_cast<s16>(pPathRes->CameraNameAsInteger(pCameraName));
-
-        GoTo_Camera();
-    }
-}
-
 Map::~Map()
 {
     Shutdown();
 }
 
+s16 Map::GetOverlayId()
+{
+    // TODO: Probably need to redo field_C data as 1 bytes instead of a word
+    return Path_Get_Bly_Record(mNextLevel, mNextPath)->mOverlayId & 0xFF;
+}
+
+CameraPos Map::Rect_Location_Relative_To_Active_Camera(const PSX_RECT* pRect, s16 /*width*/)
+{
+    if (EventGet(Event::kEventDeathReset))
+    {
+        return CameraPos::eCamNone_5;
+    }
+
+    const s32 camX = FP_GetExponent(mCameraOffset.x);
+    const s32 camY = FP_GetExponent(mCameraOffset.y);
+
+    if (pRect->x > (camX + 368))
+    {
+        return CameraPos::eCamRight_4;
+    }
+
+    if (pRect->y > (camY + 240))
+    {
+        return CameraPos::eCamBottom_2;
+    }
+
+    if (pRect->w >= camX)
+    {
+        if (pRect->h < camY)
+        {
+            return CameraPos::eCamTop_1;
+        }
+        else
+        {
+            return CameraPos::eCamCurrent_0;
+        }
+    }
+
+    return CameraPos::eCamLeft_3;
+}
+
+s16 Map::Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect)
+{
+    if (camIdx < CameraPos::eCamCurrent_0 || camIdx > CameraPos::eCamRight_4)
+    {
+        return 0;
+    }
+
+    Camera* pCamera = field_2C_camera_array[static_cast<s32>(camIdx)];
+    if (!pCamera)
+    {
+        return 0;
+    }
+
+    if (!pRect)
+    {
+        return 1;
+    }
+
+    const s16 xpos = pCamera->mCamXOff * mPath.mPathData->field_A_grid_width;
+    const s16 ypos = pCamera->mCamYOff * mPath.mPathData->field_C_grid_height;
+
+    pRect->x = xpos;
+    pRect->y = ypos;
+    pRect->w = xpos + 368;
+    pRect->h = ypos + 240;
+    return 1;
+}
+
+s16 Map::Is_Point_In_Current_Camera(EReliveLevelIds level, s32 path, FP xpos, FP ypos, s16 width)
+{
+    const FP calculated_width = (width != 0) ? FP_FromInteger(6) : FP_FromInteger(0);
+    if (level != mCurrentLevel || path != mCurrentPath) // TODO: Remove when 100%
+    {
+        return false;
+    }
+
+    PSX_RECT rect = {};
+    rect.x = FP_GetExponent(xpos - calculated_width);
+    rect.w = FP_GetExponent(calculated_width + xpos);
+    rect.y = FP_GetExponent(ypos);
+    rect.h = FP_GetExponent(ypos);
+    return Rect_Location_Relative_To_Active_Camera(&rect) == CameraPos::eCamCurrent_0;
+}
+
+void Map::GetCurrentCamCoords(PSX_Point* pPoint)
+{
+    pPoint->x = mCamIdxOnX * mPath.mPathData->field_A_grid_width;
+    pPoint->y = mCamIdxOnY * mPath.mPathData->field_C_grid_height;
+}
 
 void Map::GoTo_Camera()
 {
@@ -577,18 +458,208 @@ void Map::GoTo_Camera()
     }
 }
 
-
-
-
-
-
-void Map::CreateScreenTransistionForTLV(relive::Path_TLV* pTlv)
+void Map::ScreenChange()
 {
-    // TODO: Refactor
-    const s16 doorYDiff = static_cast<s16>(pTlv->mTopLeftY - FP_GetExponent(gScreenManager->CamYPos()));
-    const s16 midX = (pTlv->mTopLeftX + pTlv->mBottomRightX) / 2;
-    const s16 rightPos = static_cast<s16>(midX - FP_GetExponent(gScreenManager->CamXPos()));
-    relive_new CameraSwapper(field_2C_camera_array[0]->mCamRes, mResourceManager, *this, mCameraSwapEffect, rightPos, doorYDiff);
+    if (mCamState == CamChangeStates::eInactive_0)
+    {
+        return;
+    }
+
+    if (gMap_bDoPurpleLightEffect && mCurrentLevel != EReliveLevelIds::eBoardRoom)
+    {
+        RemoveObjectsWithPurpleLight(1);
+    }
+
+    for (s32 i = 0; i < 2; i++) // Not sure why this is done twice?
+    {
+        for (s32 j = 0; j < gBaseGameObjects->Size(); j++)
+        {
+            BaseGameObject* pItem = gBaseGameObjects->ItemAt(j);
+            if (!pItem)
+            {
+                break;
+            }
+
+            pItem->VScreenChanged();
+
+            // Did the screen change kill the object?
+            if (pItem->GetDead())
+            {
+                j = gBaseGameObjects->RemoveAt(j);
+                relive_delete pItem;
+            }
+        }
+    }
+
+    // TODO: Refactor this logic
+    if (!gMap_bDoPurpleLightEffect && mNextLevel == mCurrentLevel)
+    {
+        ScreenChange_Common();
+        return;
+    }
+
+    if (LevelChanged())
+    {
+        SsUtAllKeyOff(0);
+    }
+
+    if (mNextLevel != EReliveLevelIds::eNone)
+    {
+        if (mNextLevel == EReliveLevelIds::eCredits)
+        {
+            mSoundChannelsMask = 0;
+            ScreenChange_Common();
+            return;
+        }
+    }
+    else if (mCurrentLevel == EReliveLevelIds::eMenu)
+    {
+        mSoundChannelsMask = 0;
+        ScreenChange_Common();
+        return;
+    }
+    mSoundChannelsMask = SND_MIDI(0, 0, 36, 70, 0, 0);
+    ScreenChange_Common();
+}
+
+void Map::Handle_PathTransition()
+{
+    relive::Path_PathTransition* pTlv = nullptr;
+    if (mAliveObj)
+    {
+        pTlv = static_cast<relive::Path_PathTransition*>(mPath.VTLV_Get_At_Of_Type(
+            FP_GetExponent(mAliveObj->mXPos),
+            FP_GetExponent(mAliveObj->mYPos),
+            FP_GetExponent(mAliveObj->mXPos),
+            FP_GetExponent(mAliveObj->mYPos),
+            ReliveTypes::ePathTransition).GetTlv());
+    }
+
+    if (mAliveObj && pTlv)
+    {
+        mNextLevel = pTlv->mNextLevel;
+        mNextPath = pTlv->mNextPath;
+        mNextCamera = pTlv->mNextCamera;
+        mFmvBaseId = pTlv->mMovieId;
+
+        mCameraSwapEffect = kPathChangeEffectToInternalScreenChangeEffect[pTlv->mWipeEffect];
+
+        mAliveObj->mCurrentLevel = pTlv->mNextLevel;
+        mAliveObj->mCurrentPath = pTlv->mNextPath;
+
+        // Save value before pPathChangeTLV is deleted
+        const auto next_path_scale = pTlv->mNextPathScale;
+
+        GoTo_Camera();
+
+        switch (next_path_scale)
+        {
+            case relive::reliveScale::eFull:
+                gAbe->SetSpriteScale(FP_FromInteger(1));
+                gAbe->GetAnimation().SetRenderLayer(Layer::eLayer_AbeMenu_32);
+                break;
+
+            case relive::reliveScale::eHalf:
+                gAbe->SetSpriteScale(FP_FromDouble(0.5));
+                gAbe->GetAnimation().SetRenderLayer(Layer::eLayer_AbeMenu_Half_13);
+                break;
+
+            default:
+                LOG_ERROR("Invalid scale %d", static_cast<s16>(next_path_scale));
+                break;
+        }
+
+        CameraPos remapped = CameraPos::eCamInvalid_m1;
+        switch (mMapDirection)
+        {
+            case MapDirections::eMapLeft_0:
+                remapped = CameraPos::eCamLeft_3;
+                break;
+            case MapDirections::eMapRight_1:
+                remapped = CameraPos::eCamRight_4;
+                break;
+            case MapDirections::eMapTop_2:
+                remapped = CameraPos::eCamTop_1;
+                break;
+            case MapDirections::eMapBottom_3:
+                remapped = CameraPos::eCamBottom_2;
+                break;
+        }
+
+        mAliveObj->VOnPathTransition(
+            mPath.mPathData->field_A_grid_width * mCamIdxOnX,
+            mPath.mPathData->field_C_grid_height * mCamIdxOnY,
+            remapped);
+    }
+    else
+    {
+        switch (mMapDirection)
+        {
+            case MapDirections::eMapLeft_0:
+                mCamIdxOnX--;
+                mCameraSwapEffect = CameraSwapEffects::eRightToLeft_2;
+                break;
+            case MapDirections::eMapRight_1:
+                mCamIdxOnX++;
+                mCameraSwapEffect = CameraSwapEffects::eLeftToRight_1;
+                break;
+            case MapDirections::eMapTop_2:
+                mCamIdxOnY--;
+                mCameraSwapEffect = CameraSwapEffects::eBottomToTop_4;
+                break;
+            case MapDirections::eMapBottom_3:
+                mCamIdxOnY++;
+                mCameraSwapEffect = CameraSwapEffects::eTopToBottom_3;
+                break;
+            default:
+                break;
+        }
+
+        const BinaryPath* pPathRes = GetPathResourceBlockPtr(mCurrentPath);
+        const char* pCameraName = pPathRes->CameraName(mCamIdxOnX, mCamIdxOnY);
+
+        mNextCamera = static_cast<s16>(pPathRes->CameraNameAsInteger(pCameraName));
+
+        GoTo_Camera();
+    }
+}
+
+void Map::VCollectPurpleLightObjects(DynamicArrayT<BaseAnimatedWithPhysicsGameObject>& objects, DynamicArrayT<Particle>& lights)
+{
+    for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
+    {
+        BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
+        if (!pObj)
+        {
+            break;
+        }
+
+        if (pObj->GetIsBaseAnimatedWithPhysicsObj())
+        {
+            if (pObj->GetDrawable())
+            {
+                auto pBaseObj = static_cast<BaseAnimatedWithPhysicsGameObject*>(pObj);
+
+                const PSX_RECT objRect = pBaseObj->VGetBoundingRect();
+
+                if (pBaseObj->GetDoPurpleLightEffect())
+                {
+                    if (pBaseObj->GetAnimation().GetRender())
+                    {
+                        if (!pBaseObj->GetDead() && pBaseObj != sControlledCharacter && Rect_Location_Relative_To_Active_Camera(&objRect) == CameraPos::eCamCurrent_0)
+                        {
+                            AddPurpleLight(pBaseObj, objects, lights);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+s32 Map::VPurpleLightFrameCount(s16 /*bMakeInvisible*/)
+{
+    return 12;
 }
 
 void Map::Get_map_size(PSX_Point* pPoint)
@@ -596,100 +667,6 @@ void Map::Get_map_size(PSX_Point* pPoint)
     pPoint->x = mPath.mPathData->field_4_bTop;
     pPoint->y = mPath.mPathData->field_6_bBottom;
 }
-
-void Map::GetCurrentCamCoords(PSX_Point* pPoint)
-{
-    pPoint->x = mCamIdxOnX * mPath.mPathData->field_A_grid_width;
-    pPoint->y = mCamIdxOnY * mPath.mPathData->field_C_grid_height;
-}
-
-s16 Map::GetOverlayId()
-{
-    // TODO: Probably need to redo field_C data as 1 bytes instead of a word
-    return Path_Get_Bly_Record(mNextLevel, mNextPath)->mOverlayId & 0xFF;
-}
-
-
-s16 Map::Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect)
-{
-    if (camIdx < CameraPos::eCamCurrent_0 || camIdx > CameraPos::eCamRight_4)
-    {
-        return 0;
-    }
-
-    Camera* pCamera = field_2C_camera_array[static_cast<s32>(camIdx)];
-    if (!pCamera)
-    {
-        return 0;
-    }
-
-    if (!pRect)
-    {
-        return 1;
-    }
-
-    const s16 xpos = pCamera->mCamXOff * mPath.mPathData->field_A_grid_width;
-    const s16 ypos = pCamera->mCamYOff * mPath.mPathData->field_C_grid_height;
-
-    pRect->x = xpos;
-    pRect->y = ypos;
-    pRect->w = xpos + 368;
-    pRect->h = ypos + 240;
-    return 1;
-}
-
-s16 Map::Is_Point_In_Current_Camera(EReliveLevelIds level, s32 path, FP xpos, FP ypos, s16 width)
-{
-    const FP calculated_width = (width != 0) ? FP_FromInteger(6) : FP_FromInteger(0);
-    if (level != mCurrentLevel || path != mCurrentPath) // TODO: Remove when 100%
-    {
-        return false;
-    }
-
-    PSX_RECT rect = {};
-    rect.x = FP_GetExponent(xpos - calculated_width);
-    rect.w = FP_GetExponent(calculated_width + xpos);
-    rect.y = FP_GetExponent(ypos);
-    rect.h = FP_GetExponent(ypos);
-    return Rect_Location_Relative_To_Active_Camera(&rect) == CameraPos::eCamCurrent_0;
-}
-
-
-CameraPos Map::Rect_Location_Relative_To_Active_Camera(const PSX_RECT* pRect, s16 /*width*/)
-{
-    if (EventGet(Event::kEventDeathReset))
-    {
-        return CameraPos::eCamNone_5;
-    }
-
-    const s32 camX = FP_GetExponent(mCameraOffset.x);
-    const s32 camY = FP_GetExponent(mCameraOffset.y);
-
-    if (pRect->x > (camX + 368))
-    {
-        return CameraPos::eCamRight_4;
-    }
-
-    if (pRect->y > (camY + 240))
-    {
-        return CameraPos::eCamBottom_2;
-    }
-
-    if (pRect->w >= camX)
-    {
-        if (pRect->h < camY)
-        {
-            return CameraPos::eCamTop_1;
-        }
-        else
-        {
-            return CameraPos::eCamCurrent_0;
-        }
-    }
-
-    return CameraPos::eCamLeft_3;
-}
-
 
 BaseGameObject* Map::FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLevelIds lvlId)
 {
@@ -811,6 +788,16 @@ void Map::Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode)
 
     }
 }
+
+void Map::CreateScreenTransistionForTLV(relive::Path_TLV* pTlv)
+{
+    // TODO: Refactor
+    const s16 doorYDiff = static_cast<s16>(pTlv->mTopLeftY - FP_GetExponent(gScreenManager->CamYPos()));
+    const s16 midX = (pTlv->mTopLeftX + pTlv->mBottomRightX) / 2;
+    const s16 rightPos = static_cast<s16>(midX - FP_GetExponent(gScreenManager->CamXPos()));
+    relive_new CameraSwapper(field_2C_camera_array[0]->mCamRes, mResourceManager, *this, mCameraSwapEffect, rightPos, doorYDiff);
+}
+
 
 
 

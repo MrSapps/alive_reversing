@@ -223,18 +223,13 @@ class Path : public BasePath
 {
 public:
     Path(Map& map, relive::Factory& factory);
-    ~Path();
+
     void Free() override;
     void Init(const PathData* pPathData, EReliveLevelIds level, s16 path, s16 cameraId, BinaryPath* ppPathRes);
-
-
-    void Loader(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad) override;
-
     TlvIterator VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes objectType) override;
     TlvIterator TLV_Get_At(TlvIterator pTlv, FP xpos, FP ypos, FP w, FP h) override;
-
+    void Loader(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad) override;
     void Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx) override;
-
     void Reset_TLVs(u16 pathId) override;
 
     const PathData* mPathData = nullptr;

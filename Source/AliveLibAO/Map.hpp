@@ -58,53 +58,42 @@ class Map final : public BaseMap
 public:
     Map(ResourceManagerWrapper& resMan, relive::Factory& factory);
 
-    void ScreenChange() override;
-
-    void GoTo_Camera() override;
-    void VCollectPurpleLightObjects(DynamicArrayT<BaseAnimatedWithPhysicsGameObject>& objects, DynamicArrayT<Particle>& lights) override;
-    s32 VPurpleLightFrameCount(s16 bMakeInvisible) override;
-
-    void Handle_PathTransition() override;
-
-    void Get_map_size(PSX_Point* pPoint);
-
-    void GetCurrentCamCoords(PSX_Point* pPoint) override;
     s16 GetOverlayId() override;
 
-    static CameraSwapper* FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLevelIds levelId);
-
-    Camera* Create_Camera(s16 xpos, s16 ypos, s32 a4);
-
-    void RestoreBlyData(const u8* pSaveData);
-
-    void Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode);
-
+    BasePath& GetPath() override
+    {
+        return mPath;
+    }
 
     CameraPos Rect_Location_Relative_To_Active_Camera(const PSX_RECT* pRect, s16 width = 0) override;
-
     s16 Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect) override;
-
     s16 Is_Point_In_Current_Camera(EReliveLevelIds level, s32 path, FP xpos, FP ypos, s16 width) override;
-
-    // NOTE: Global func in AE
-    void Start_Sounds_For_Objects_In_Near_Cameras();
-
-    void SaveBlyData(u8* pSaveBuffer);
-
-    s16 field_1E_door = 0;
-
-    s16 mMapChanged = 0;
-    u8* mSaveData = nullptr;
+    void GetCurrentCamCoords(PSX_Point* pPoint) override;
+    void GoTo_Camera() override;
+    void ScreenChange() override;
+    void Handle_PathTransition() override;
+    void VCollectPurpleLightObjects(DynamicArrayT<BaseAnimatedWithPhysicsGameObject>& objects, DynamicArrayT<Particle>& lights) override;
+    s32 VPurpleLightFrameCount(s16 bMakeInvisible) override;
 
     void VClearPendingSaveRestore() override
     {
         mSaveData = nullptr;
     }
 
-    BasePath& GetPath() override
-    {
-        return mPath;
-    }
+    void Get_map_size(PSX_Point* pPoint);
+    static CameraSwapper* FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLevelIds levelId);
+    Camera* Create_Camera(s16 xpos, s16 ypos, s32 a4);
+    void Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode);
+    void RestoreBlyData(const u8* pSaveData);
+    void SaveBlyData(u8* pSaveBuffer);
+
+    // NOTE: Global func in AE
+    void Start_Sounds_For_Objects_In_Near_Cameras();
+
+    s16 field_1E_door = 0;
+
+    s16 mMapChanged = 0;
+    u8* mSaveData = nullptr;
 
     Path mPath;
 };

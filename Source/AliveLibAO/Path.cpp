@@ -12,6 +12,12 @@ Path::Path(Map& map, relive::Factory& factory) : BasePath(map, factory)
 
 }
 
+void Path::Free()
+{
+    mPathData = nullptr;
+    BasePath::Free();
+}
+
 void Path::Init(const PathData* pPathData, EReliveLevelIds level, u16 pathId, s16 cameraId, BinaryPath* pBinaryPath)
 {
     mPathData = pPathData;
@@ -19,13 +25,6 @@ void Path::Init(const PathData* pPathData, EReliveLevelIds level, u16 pathId, s1
     mPathId = pathId;
     mCameraId = cameraId;
     mBinaryPath = pBinaryPath;
-}
-
-
-void Path::Free()
-{
-    mPathData = nullptr;
-    BasePath::Free();
 }
 
 TlvIterator Path::VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind)
@@ -246,5 +245,6 @@ void Path::Reset_TLVs(u16 pathNum)
         }
     }
 }
+
 
 } // namespace AO

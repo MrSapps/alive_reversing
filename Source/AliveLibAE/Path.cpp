@@ -19,11 +19,6 @@ Path::Path(Map& map, relive::Factory& factory) : BasePath(map, factory)
     mLevelId = EReliveLevelIds::eMenu;
 }
 
-Path::~Path()
-{
-
-}
-
 void Path::Free()
 {
     mPathData = nullptr;
@@ -41,36 +36,6 @@ void Path::Init(const PathData* pPathData, EReliveLevelIds level, s16 path, s16 
     mPathData = pPathData;
     mMap.mCamsOnX = (mPathData->field_4_bTop - mPathData->field_0_bLeft) / mPathData->field_A_grid_width;
     mMap.mCamsOnY = (mPathData->field_6_bBottom - mPathData->field_2_bRight) / mPathData->field_C_grid_height;
-}
-
-void Path::Loader(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad)
-{
-    TlvIterator tlvIterator = mBinaryPath->TlvsForCamera(xpos, ypos);
-    while(tlvIterator.GetTlv())
-    {
-        auto pPathTLV = tlvIterator.GetTlv();
-        if (typeToLoad == ReliveTypes::eNone || typeToLoad == pPathTLV->mTlvType)
-        {
-            if (loadMode != relive::Factory::LoadMode::ConstructObject_0 || !(pPathTLV->mTlvFlags.Get(relive::TlvFlags::eBit1_Created) || pPathTLV->mTlvFlags.Get(relive::TlvFlags::eBit2_Destroyed)))
-            {
-                if (loadMode == relive::Factory::LoadMode::ConstructObject_0)
-                {
-                    pPathTLV->mTlvFlags.Set(relive::TlvFlags::eBit1_Created);
-                    pPathTLV->mTlvFlags.Set(relive::TlvFlags::eBit2_Destroyed);
-                }
-
-                // Call the factory to construct the item
-                mFactory.ConstructTLVObject(pPathTLV, pPathTLV->mId, loadMode, mMap.GetResourceManager(), mMap);
-            }
-        }
-
-        // End of TLV list for current camera
-        if (pPathTLV->mTlvFlags.Get(relive::TlvFlags::eBit3_End_TLV_List))
-        {
-            break;
-        }
-        tlvIterator = tlvIterator.Next_TLV();
-    }
 }
 
 TlvIterator Path::VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes objectType)
@@ -196,11 +161,35 @@ TlvIterator Path::TLV_Get_At(TlvIterator tlvIterator, FP xpos, FP ypos, FP width
     return tlvIterator;
 }
 
+void Path::Loader(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad)
+{
+    TlvIterator tlvIterator = mBinaryPath->TlvsForCamera(xpos, ypos);
+    while(tlvIterator.GetTlv())
+    {
+        auto pPathTLV = tlvIterator.GetTlv();
+        if (typeToLoad == ReliveTypes::eNone || typeToLoad == pPathTLV->mTlvType)
+        {
+            if (loadMode != relive::Factory::LoadMode::ConstructObject_0 || !(pPathTLV->mTlvFlags.Get(relive::TlvFlags::eBit1_Created) || pPathTLV->mTlvFlags.Get(relive::TlvFlags::eBit2_Destroyed)))
+            {
+                if (loadMode == relive::Factory::LoadMode::ConstructObject_0)
+                {
+                    pPathTLV->mTlvFlags.Set(relive::TlvFlags::eBit1_Created);
+                    pPathTLV->mTlvFlags.Set(relive::TlvFlags::eBit2_Destroyed);
+                }
 
+                // Call the factory to construct the item
+                mFactory.ConstructTLVObject(pPathTLV, pPathTLV->mId, loadMode, mMap.GetResourceManager(), mMap);
+            }
+        }
 
-
-
-
+        // End of TLV list for current camera
+        if (pPathTLV->mTlvFlags.Get(relive::TlvFlags::eBit3_End_TLV_List))
+        {
+            break;
+        }
+        tlvIterator = tlvIterator.Next_TLV();
+    }
+}
 
 void Path::Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx)
 {
@@ -230,3 +219,4 @@ void Path::Reset_TLVs(u16 pathId)
         }
     }
 }
+
