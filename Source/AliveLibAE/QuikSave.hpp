@@ -6,7 +6,6 @@
 
 class SerializedObjectData;
 class BaseMap;
-class Map;
 
 enum class EReliveLevelIds : s16;
 
@@ -170,7 +169,7 @@ struct SaveFileRec final
 class QuikSave final
 {
 public:
-    static void LoadActive(Map& map);
+    static void LoadActive(BaseMap& map);
     static void DoQuicksave(BaseMap& map);
     static void RestoreWorldInfo(const Quicksave_WorldInfo& rInfo);
     static void SaveWorldInfo(Quicksave_WorldInfo* pInfo, BaseMap& map);

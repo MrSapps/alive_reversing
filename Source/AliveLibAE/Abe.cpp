@@ -5017,7 +5017,7 @@ void Abe::Motion_57_Dead_4589A0()
                 0,
                 true,
                 true, mResMan, mMap);
-            QuikSave::LoadActive(static_cast<Map&>(mMap));
+            QuikSave::LoadActive(mMap);
             return;
         default:
             return;

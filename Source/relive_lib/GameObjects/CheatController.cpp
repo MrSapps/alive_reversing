@@ -112,7 +112,7 @@ static void CheatController_Cheat_PathSkip(BaseMap& map)
     QuikSave::gActiveQuicksaveData = {};
     from_json(j, QuikSave::gActiveQuicksaveData);
 
-    QuikSave::LoadActive(static_cast<Map&>(map));
+    QuikSave::LoadActive(map);
 }
 
 struct CheatEntry final

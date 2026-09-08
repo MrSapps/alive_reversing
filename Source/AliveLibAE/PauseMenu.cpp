@@ -805,7 +805,7 @@ void PauseMenu::Page_Load_Update()
     // When F6 is pressed
     if (gQuicksave_LoadNextFrame)
     {
-        QuikSave::LoadActive(static_cast<Map&>(mMap));
+        QuikSave::LoadActive(mMap);
         gQuicksave_LoadNextFrame = false;
         mPauseRenderLoop = false;
     }
@@ -888,7 +888,7 @@ void PauseMenu::Page_Load_Update()
 
             gAbe->mXPos = FP_FromInteger(0);
             gAbe->mYPos = FP_FromInteger(0);
-            QuikSave::LoadActive(static_cast<Map&>(mMap));
+            QuikSave::LoadActive(mMap);
             mPauseRenderLoop = false;
             SfxPlayMono(relive::SoundEffects::IngameTransition, 90);
         }
@@ -994,7 +994,7 @@ void PauseMenu::VUpdate()
                 }
                 else if (gQuicksave_LoadNextFrame)
                 {
-                    QuikSave::LoadActive(static_cast<Map&>(mMap));
+                    QuikSave::LoadActive(mMap);
                     SND_SEQ_Stop(SeqId::MudokonChant1_10);
                     pHero = gAbe;
                     pControlledChar = sControlledCharacter;

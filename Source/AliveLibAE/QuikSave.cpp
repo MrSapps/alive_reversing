@@ -392,14 +392,14 @@ void QuikSave::RestoreBlyData(Quicksave& pSaveData, ResourceManagerWrapper& resM
     resMan.LoadingLoop(false);
 }
 
-void Quicksave_LoadFromMemory_4C95A0(Map& map)
+void Quicksave_LoadFromMemory_4C95A0(BaseMap& map)
 {
     DestroyObjects(map.GetResourceManager());
     EventsReset();
     gSkipGameObjectUpdates = true;
     QuikSave::RestoreWorldInfo(QuikSave::gActiveQuicksaveData.mWorldInfo);
     gSwitchStates = QuikSave::gActiveQuicksaveData.mSwitchStates;
-    map.mRestoreMapObjectStates = true;
+    static_cast<Map&>(map).mRestoreMapObjectStates = true;
     map.SetActiveCam(
         QuikSave::gActiveQuicksaveData.mWorldInfo.mLevel,
         QuikSave::gActiveQuicksaveData.mWorldInfo.mPath,
@@ -410,7 +410,7 @@ void Quicksave_LoadFromMemory_4C95A0(Map& map)
     map.mForceLoad = 1;
 }
 
-void QuikSave::LoadActive(Map& map)
+void QuikSave::LoadActive(BaseMap& map)
 {
     map.GetResourceManager().ShowLoadingIcon(map);
     Quicksave_LoadFromMemory_4C95A0(map);

@@ -1647,7 +1647,7 @@ MainMenuNextCam MainMenuController::LoadNewGame_Update_4D0920(u32 /*input*/)
             gAbe->mXPos = FP_FromInteger(0);
             gAbe->mYPos = FP_FromInteger(0);
 
-            QuikSave::LoadActive(static_cast<Map&>(mMap));
+            QuikSave::LoadActive(mMap);
 
             return MainMenuNextCam(MainMenuCams::eNoChange);
         }
@@ -1950,7 +1950,7 @@ MainMenuNextCam MainMenuController::LoadDemo_Update_4D1040(u32)
         nlohmann::json j = nlohmann::json::parse(jsonStr);
         QuikSave::gActiveQuicksaveData = {};
         from_json(j, QuikSave::gActiveQuicksaveData);
-        QuikSave::LoadActive(static_cast<Map&>(mMap));
+        QuikSave::LoadActive(mMap);
     }
     else
     {
