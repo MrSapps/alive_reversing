@@ -40,7 +40,6 @@ public:
     virtual TlvIterator VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind) = 0;
     virtual TlvIterator TLV_Get_At(TlvIterator tlvIterator, FP xpos, FP ypos, FP width, FP height) = 0;
     virtual void Loader(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad) = 0;
-    virtual void Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx) = 0;
     virtual void Reset_TLVs(u16 pathId) = 0;
 
     // The top/bottom map bounds recorded in the engine specific path data.
@@ -51,6 +50,7 @@ public:
 
     TlvIterator Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx);
     TlvIterator TLV_First_Of_Type_In_Camera(ReliveTypes objectType, s16 camX);
+    void Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx);
 
     static TlvIterator TLV_Next_Of_Type(TlvIterator tlvIterator, ReliveTypes type);
 

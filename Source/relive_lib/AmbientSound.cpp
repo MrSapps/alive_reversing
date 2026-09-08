@@ -231,7 +231,6 @@ void Stop_slig_sounds(CameraPos direction)
     }
 }
 
-// AE only
 void Start_Sounds_For_Objects_In_Near_Cameras(BaseMap& map)
 {
     SND_Reset_Ambiance();

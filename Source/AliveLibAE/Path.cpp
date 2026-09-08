@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "PathData.hpp"
 #include "Map.hpp"
-#include "AmbientSound.hpp"
 #include "../relive_lib/BinaryPath.hpp"
 #include <assert.h>
 #include "Path.hpp"
@@ -186,19 +185,6 @@ void Path::Loader(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode, Relive
         if (pPathTLV->mTlvFlags.Get(relive::TlvFlags::eBit3_End_TLV_List))
         {
             break;
-        }
-        tlvIterator = tlvIterator.Next_TLV();
-    }
-}
-
-void Path::Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx)
-{
-    TlvIterator tlvIterator = Get_First_TLV_For_Offsetted_Camera(cam_x_idx, cam_y_idx);
-    while(tlvIterator.GetTlv())
-    {
-        if (!(tlvIterator.GetTlv()->mTlvFlags.Get(relive::TlvFlags::eBit1_Created) || (tlvIterator.GetTlv()->mTlvFlags.Get(relive::TlvFlags::eBit2_Destroyed))))
-        {
-            Start_Sounds_for_TLV(direction, tlvIterator.GetTlv(), mMap.GetResourceManager(), mMap);
         }
         tlvIterator = tlvIterator.Next_TLV();
     }

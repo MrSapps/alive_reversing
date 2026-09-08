@@ -1113,32 +1113,6 @@ void Map::SaveBlyData(u8* pSaveBuffer)
     }
 }
 
-void Map::Start_Sounds_For_Objects_In_Near_Cameras()
-{
-    SND_Reset_Ambiance();
-
-    if (Get_Camera_World_Rect(CameraPos::eCamLeft_3, nullptr))
-    {
-        mPath.Start_Sounds_For_Objects_In_Camera(CameraPos::eCamLeft_3, mCamIdxOnX - 1, mCamIdxOnY);
-    }
-
-    if (Get_Camera_World_Rect(CameraPos::eCamRight_4, nullptr))
-    {
-        mPath.Start_Sounds_For_Objects_In_Camera(CameraPos::eCamRight_4, mCamIdxOnX + 1, mCamIdxOnY);
-    }
-
-    if (Get_Camera_World_Rect(CameraPos::eCamTop_1, nullptr))
-    {
-        mPath.Start_Sounds_For_Objects_In_Camera(CameraPos::eCamTop_1, mCamIdxOnX, mCamIdxOnY - 1);
-    }
-
-    if (Get_Camera_World_Rect(CameraPos::eCamBottom_2, nullptr))
-    {
-        mPath.Start_Sounds_For_Objects_In_Camera(CameraPos::eCamBottom_2, mCamIdxOnX, mCamIdxOnY + 1);
-    }
-}
-
-
 relive::Path_TLV* Path_TLV::Next_446460(relive::Path_TLV* pTlv)
 {
     return Next(pTlv);

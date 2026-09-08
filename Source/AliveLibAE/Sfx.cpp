@@ -2,7 +2,7 @@
 #include "Sfx.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/Sound/Midi.hpp"
-#include "Map.hpp"
+#include "../relive_lib/BaseMap.hpp"
 #include <assert.h>
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
 #include "../relive_lib/FixedPoint.hpp"
@@ -57,7 +57,7 @@ s16 Calc_Slig_Sound_Direction(BaseAnimatedWithPhysicsGameObject* pObj, s16 defau
         }
 
         PSX_RECT camRect = {};
-        static_cast<Map&>(map).Get_Camera_World_Rect(dir, &camRect);
+        map.Get_Camera_World_Rect(dir, &camRect);
 
         const s32 volScaler = defaultVol / 3;
         switch (dir)

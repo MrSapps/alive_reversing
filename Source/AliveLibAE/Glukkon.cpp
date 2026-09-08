@@ -2730,7 +2730,7 @@ void Glukkon::PlaySound(s32 sndIdx, Glukkon* pGlukkon)
         pGlukkon->mXPos,
         pGlukkon->mYPos);
     PSX_RECT worldRect;
-    static_cast<Map&>(pGlukkon->mMap).Get_Camera_World_Rect(direction, &worldRect);
+    pGlukkon->mMap.Get_Camera_World_Rect(direction, &worldRect);
     switch (direction)
     {
         case CameraPos::eCamCurrent_0:

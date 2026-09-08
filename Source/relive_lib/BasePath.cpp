@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "BasePath.hpp"
 #include "BaseMap.hpp"
+#include "AmbientSound.hpp"
 #include "data_conversion/relive_tlvs.hpp"
 
 TlvIterator BasePath::Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx)
@@ -29,6 +30,19 @@ TlvIterator BasePath::TLV_First_Of_Type_In_Camera(ReliveTypes objectType, s16 ca
         tlvIterator = tlvIterator.Next_TLV();
     }
     return TlvIterator::Invalid();
+}
+
+void BasePath::Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx)
+{
+    TlvIterator tlvIterator = Get_First_TLV_For_Offsetted_Camera(cam_x_idx, cam_y_idx);
+    while (tlvIterator.GetTlv())
+    {
+        if (!tlvIterator.GetTlv()->mTlvFlags.Get(relive::TlvFlags::eBit1_Created) && !tlvIterator.GetTlv()->mTlvFlags.Get(relive::TlvFlags::eBit2_Destroyed))
+        {
+            Start_Sounds_for_TLV(direction, tlvIterator.GetTlv(), mMap.GetResourceManager(), mMap);
+        }
+        tlvIterator = tlvIterator.Next_TLV();
+    }
 }
 
 TlvIterator BasePath::TLV_Next_Of_Type(TlvIterator tlvIterator, ReliveTypes type)

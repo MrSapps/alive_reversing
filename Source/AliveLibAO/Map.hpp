@@ -86,9 +86,6 @@ public:
     void RestoreBlyData(const u8* pSaveData);
     void SaveBlyData(u8* pSaveBuffer);
 
-    // NOTE: Global func in AE
-    void Start_Sounds_For_Objects_In_Near_Cameras();
-
     s16 mMapChanged = 0;
     u8* mSaveData = nullptr;
 

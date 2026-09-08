@@ -309,7 +309,7 @@ void Factory::LiftPointAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, 
             s16 pointNumber = 1;
             while (pointNumber < 8)
             {
-                tlvIterator = static_cast<AO::Map&>(map).Get_First_TLV_For_Offsetted_Camera(
+                tlvIterator = map.Get_First_TLV_For_Offsetted_Camera(
                     0,
                     pointNumber / 2 * (pointNumber % 2 != 0 ? -1 : 1));
                 while (tlvIterator.GetTlv())
@@ -1037,7 +1037,7 @@ void Factory::SligBoundLeftAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMo
 
         for (s16 camX_idx = -2; camX_idx < 3; camX_idx++)
         {
-            TlvIterator pTlvIter = static_cast<AO::Map&>(map).Get_First_TLV_For_Offsetted_Camera(camX_idx, 0);
+            TlvIterator pTlvIter = map.Get_First_TLV_For_Offsetted_Camera(camX_idx, 0);
             Path_TLV* pSligTlv = FindMatchingSligTLVAO(pTlvIter, pBound).GetTlv();
             if (pSligTlv)
             {

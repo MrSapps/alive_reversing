@@ -3,7 +3,6 @@
 #include "Map.hpp"
 #include "../relive_lib/MapWrapper.hpp"
 #include "../relive_lib/BinaryPath.hpp"
-#include "../relive_lib/AmbientSound.hpp"
 
 namespace AO {
 
@@ -194,38 +193,6 @@ void Path::Loader(s16 camX, s16 camY, relive::Factory::LoadMode loadMode, Relive
             break;
         }
         tlvIterator = tlvIterator.Next_TLV();
-    }
-}
-
-void Path::Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx)
-{
-    BinaryPath* pPathData = mMap.GetPathResourceBlockPtr(mMap.mCurrentPath);
-
-    // TODO: Shouldn't really need to depend on these
-    const s32 cam_global_left = mPathData->field_C_grid_width * cam_x_idx;
-    const s32 cam_global_right = cam_global_left + mPathData->field_C_grid_width;
-
-    const s32 cam_y_grid_top = mPathData->field_E_grid_height * cam_y_idx;
-    const s32 cam_y_grid_bottom = cam_y_grid_top + mPathData->field_E_grid_height;
-
-    for (auto& cam : pPathData->GetCameras())
-    {
-        // Enumerate the TLVs
-        for (auto& pTlv : cam->mTlvs.mTlvs)
-        {
-            if (pTlv->mTopLeftX >= cam_global_left && pTlv->mTopLeftX <= cam_global_right)
-            {
-                if (pTlv->mTopLeftY >= cam_y_grid_top && pTlv->mTopLeftY <= cam_y_grid_bottom && (!pTlv->mTlvFlags.Get(relive::eBit1_Created) && !pTlv->mTlvFlags.Get(relive::eBit2_Destroyed)))
-                {
-                    Start_Sounds_for_TLV(direction, pTlv.get(), mMap.GetResourceManager(), mMap);
-                }
-            }
-
-            if (pTlv->mTlvFlags.Get(relive::eBit3_End_TLV_List))
-            {
-                break;
-            }
-        }
     }
 }
 
