@@ -5,7 +5,6 @@
 #include "MapWrapper.hpp"
 #include "data_conversion/relive_tlvs.hpp"
 #include "../AliveLibAE/Path.hpp"
-#include "../AliveLibAE/Map.hpp"
 #include "GameType.hpp"
 #include "../AliveLibAO/MusicTrigger.hpp"
 #include "BaseMap.hpp"
@@ -236,9 +235,8 @@ void Stop_slig_sounds(CameraPos direction)
 void Start_Sounds_For_Objects_In_Near_Cameras(BaseMap& map)
 {
     SND_Reset_Ambiance();
-    Map& mapAe = static_cast<Map&>(map);
-    mapAe.mPath.Start_Sounds_For_Objects_In_Camera(CameraPos::eCamLeft_3, -1, 0);
-    mapAe.mPath.Start_Sounds_For_Objects_In_Camera(CameraPos::eCamRight_4, 1, 0);
-    mapAe.mPath.Start_Sounds_For_Objects_In_Camera(CameraPos::eCamTop_1, 0, -1);
-    mapAe.mPath.Start_Sounds_For_Objects_In_Camera(CameraPos::eCamBottom_2, 0, 1);
+    map.GetPath().Start_Sounds_For_Objects_In_Camera(CameraPos::eCamLeft_3, -1, 0);
+    map.GetPath().Start_Sounds_For_Objects_In_Camera(CameraPos::eCamRight_4, 1, 0);
+    map.GetPath().Start_Sounds_For_Objects_In_Camera(CameraPos::eCamTop_1, 0, -1);
+    map.GetPath().Start_Sounds_For_Objects_In_Camera(CameraPos::eCamBottom_2, 0, 1);
 }

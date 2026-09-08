@@ -722,12 +722,12 @@ void LiftPoint::CreatePulleyIfExists()
 {
     relive::Path_TLV* pFound = nullptr;
 
-    const PathData* pPathData = static_cast<Map&>(mMap).mPath.mPathData;
-    s16 yCamIdx = FP_GetExponent(mYPos) / pPathData->field_C_grid_height;
+    const PSX_Point gridSize = mMap.GetPath().VGetGridSize();
+    s16 yCamIdx = FP_GetExponent(mYPos) / gridSize.y;
     // If we are in the top row of cameras then there can't be a pulley in the screen above because there are no more screens above!
     while (yCamIdx >= 0)
     {
-        const s16 xCamIdx = (FP_GetExponent(mXPos) / pPathData->field_A_grid_width) - mMap.mCamIdxOnX;
+        const s16 xCamIdx = (FP_GetExponent(mXPos) / gridSize.x) - mMap.mCamIdxOnX;
         // Keep looking up 1 camera for any camera that has TLVs in it.
         TlvIterator tlvIter = mMap.Get_First_TLV_For_Offsetted_Camera(xCamIdx, yCamIdx - mMap.mCamIdxOnY);
         while (tlvIter.GetTlv())

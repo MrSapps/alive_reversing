@@ -75,7 +75,7 @@ void LiftMover::VUpdate()
                         {
                             for (s16 x = 0; x < mMap.mCamsOnX; x++)
                             {
-                                static_cast<Map&>(mMap).mPath.Loader(x, y, relive::Factory::LoadMode::ConstructObject_0, ReliveTypes::eLiftPoint);
+                                mMap.GetPath().Loader(x, y, relive::Factory::LoadMode::ConstructObject_0, ReliveTypes::eLiftPoint);
                             }
                         }
 

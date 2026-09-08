@@ -46,6 +46,9 @@ public:
     // The top/bottom map bounds recorded in the engine specific path data.
     virtual PSX_Point VGetMapSize() const = 0;
 
+    // The camera grid cell width/height recorded in the engine specific path data.
+    virtual PSX_Point VGetGridSize() const = 0;
+
     TlvIterator Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx);
     TlvIterator TLV_First_Of_Type_In_Camera(ReliveTypes objectType, s16 camX);
 

@@ -251,4 +251,9 @@ PSX_Point Path::VGetMapSize() const
     return {mPathData->field_8_bTop, mPathData->field_A_bBottom};
 }
 
+PSX_Point Path::VGetGridSize() const
+{
+    return {mPathData->field_C_grid_width, mPathData->field_E_grid_height};
+}
+
 } // namespace AO

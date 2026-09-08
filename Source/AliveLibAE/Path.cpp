@@ -225,3 +225,8 @@ PSX_Point Path::VGetMapSize() const
     return {mPathData->field_4_bTop, mPathData->field_6_bBottom};
 }
 
+PSX_Point Path::VGetGridSize() const
+{
+    return {mPathData->field_A_grid_width, mPathData->field_C_grid_height};
+}
+
