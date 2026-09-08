@@ -11,6 +11,15 @@ Path::Path(Map& map, relive::Factory& factory) : BasePath(map, factory)
 
 }
 
+void Path::Init(const PathData* pPathData, EReliveLevelIds level, u16 pathId, s16 cameraId, BinaryPath* pBinaryPath)
+{
+    mPathData = pPathData;
+    mLevelId = level;
+    mPathId = pathId;
+    mCameraId = cameraId;
+    mBinaryPath = pBinaryPath;
+}
+
 void Path::TLV_Reset(const Guid& tlvId, s16 hiFlags)
 {
     Set_TLVData(tlvId, hiFlags, 0, 0);

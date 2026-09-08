@@ -604,8 +604,8 @@ void Map::Handle_PathTransition()
         }
 
         mAliveObj->VOnPathTransition(
-            mPathData->field_C_grid_width * mCamIdxOnX,
-            mPathData->field_E_grid_height * mCamIdxOnY,
+            mPath.mPathData->field_C_grid_width * mCamIdxOnX,
+            mPath.mPathData->field_E_grid_height * mCamIdxOnY,
             remapped);
     }
     else
@@ -617,7 +617,7 @@ void Map::Handle_PathTransition()
                 if (mAliveObj)
                 {
                     mAliveObj->VSetXSpawn(
-                        mCamIdxOnX * mPathData->field_C_grid_width,
+                        mCamIdxOnX * mPath.mPathData->field_C_grid_width,
                         MaxGridBlocks(mAliveObj->GetSpriteScale()) - 1);
                 }
                 mCameraSwapEffect = CameraSwapEffects::eRightToLeft_2;
@@ -626,7 +626,7 @@ void Map::Handle_PathTransition()
                 mCamIdxOnX++;
                 if (mAliveObj)
                 {
-                    mAliveObj->VSetXSpawn(mCamIdxOnX * mPathData->field_C_grid_width,
+                    mAliveObj->VSetXSpawn(mCamIdxOnX * mPath.mPathData->field_C_grid_width,
                                                    1);
                 }
                 mCameraSwapEffect = CameraSwapEffects::eLeftToRight_1;
@@ -635,7 +635,7 @@ void Map::Handle_PathTransition()
                 mCamIdxOnY--;
                 if (mAliveObj)
                 {
-                    mAliveObj->VSetYSpawn(mCamIdxOnY * mPathData->field_E_grid_height,
+                    mAliveObj->VSetYSpawn(mCamIdxOnY * mPath.mPathData->field_E_grid_height,
                                                    1);
                 }
                 mCameraSwapEffect = CameraSwapEffects::eBottomToTop_4;
@@ -644,7 +644,7 @@ void Map::Handle_PathTransition()
                 mCamIdxOnY++;
                 if (mAliveObj)
                 {
-                    mAliveObj->VSetYSpawn(mCamIdxOnY * mPathData->field_E_grid_height,
+                    mAliveObj->VSetYSpawn(mCamIdxOnY * mPath.mPathData->field_E_grid_height,
                                                    2);
                 }
                 mCameraSwapEffect = CameraSwapEffects::eTopToBottom_3;
@@ -790,14 +790,14 @@ void Map::GoTo_Camera()
     mCurrentLevel = mNextLevel;
 
     const PathBlyRec* pPathRecord = AO::Path_Get_Bly_Record(mNextLevel, mNextPath);
-    mPathData = pPathRecord->field_4_pPathData;
-    mCamsOnX = (mPathData->field_8_bTop - mPathData->field_4_bLeft) / mPathData->field_C_grid_width;
-    mCamsOnY = (mPathData->field_A_bBottom - mPathData->field_6_bRight) / mPathData->field_E_grid_height;
+    BinaryPath* pNextPath = GetPathResourceBlockPtr(mNextPath);
+    mPath.Init(pPathRecord->field_4_pPathData, mNextLevel, mNextPath, mNextCamera, pNextPath);
+
+    mCamsOnX = (mPath.mPathData->field_8_bTop - mPath.mPathData->field_4_bLeft) / mPath.mPathData->field_C_grid_width;
+    mCamsOnY = (mPath.mPathData->field_A_bBottom - mPath.mPathData->field_6_bRight) / mPath.mPathData->field_E_grid_height;
 
     mCamIdxOnX = 0;
     mCamIdxOnY = 0;
-
-    BinaryPath* pNextPath = GetPathResourceBlockPtr(mNextPath);
     for (auto& cam : pNextPath->GetCameras())
     {
         if (pNextPath->CameraNameAsInteger(cam->mName.c_str()) == static_cast<u32>(mNextCamera))
@@ -809,8 +809,8 @@ void Map::GoTo_Camera()
     }
 
 
-    mCameraOffset.x = FP_FromInteger(mCamIdxOnX * mPathData->field_C_grid_width + 440);
-    mCameraOffset.y = FP_FromInteger(mCamIdxOnY * mPathData->field_E_grid_height + 240);
+    mCameraOffset.x = FP_FromInteger(mCamIdxOnX * mPath.mPathData->field_C_grid_width + 440);
+    mCameraOffset.y = FP_FromInteger(mCamIdxOnY * mPath.mPathData->field_E_grid_height + 240);
 
     if (old_current_path != mCurrentPath || old_current_level != mCurrentLevel)
     {
@@ -1071,11 +1071,11 @@ void Map::Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx,
     BinaryPath* pPathData = GetPathResourceBlockPtr(mCurrentPath);
 
     // TODO: Shouldn't really need to depend on these
-    const s32 cam_global_left = mPathData->field_C_grid_width * cam_x_idx;
-    const s32 cam_global_right = cam_global_left + mPathData->field_C_grid_width;
+    const s32 cam_global_left = mPath.mPathData->field_C_grid_width * cam_x_idx;
+    const s32 cam_global_right = cam_global_left + mPath.mPathData->field_C_grid_width;
 
-    const s32 cam_y_grid_top = mPathData->field_E_grid_height * cam_y_idx;
-    const s32 cam_y_grid_bottom = cam_y_grid_top + mPathData->field_E_grid_height;
+    const s32 cam_y_grid_top = mPath.mPathData->field_E_grid_height * cam_y_idx;
+    const s32 cam_y_grid_bottom = cam_y_grid_top + mPath.mPathData->field_E_grid_height;
 
     for (auto& cam : pPathData->GetCameras())
     {
@@ -1156,10 +1156,10 @@ s16 Map::Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect)
         return 1;
     }
 
-    s16 cam_x_pos = mPathData->field_C_grid_width * pCamera->mCamXOff;
+    s16 cam_x_pos = mPath.mPathData->field_C_grid_width * pCamera->mCamXOff;
     cam_x_pos += 120;
 
-    const s16 cam_y_pos = mPathData->field_E_grid_height * pCamera->mCamYOff;
+    const s16 cam_y_pos = mPath.mPathData->field_E_grid_height * pCamera->mCamYOff;
 
     pRect->x = cam_x_pos;
     pRect->y = cam_y_pos + 120;
@@ -1241,8 +1241,8 @@ TlvIterator Map::VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, 
         bottom = height;
     }
 
-    const s32 grid_cell_y = top / mPathData->field_E_grid_height;
-    const s32 grid_cell_x = (right / mPathData->field_C_grid_width);
+    const s32 grid_cell_y = top / mPath.mPathData->field_E_grid_height;
+    const s32 grid_cell_x = (right / mPath.mPathData->field_C_grid_width);
 
     // Check within map bounds
     if (grid_cell_x >= mCamsOnX)
@@ -1301,7 +1301,7 @@ TlvIterator Map::TLV_Get_At(TlvIterator tlvIterator, FP xpos, FP ypos, FP width,
 
     if (!tlvIterator.GetTlv())
     {
-        const PathData* pPathData = mPathData;
+        const PathData* pPathData = mPath.mPathData;
 
         const auto camX = xpos_converted / pPathData->field_C_grid_width;
         const auto camY = ypos_converted / pPathData->field_E_grid_height;
@@ -1571,14 +1571,14 @@ CameraSwapper* Map::FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLev
 
 void Map::GetCurrentCamCoords(PSX_Point* pPoint)
 {
-    pPoint->x = mPathData->field_C_grid_width * mCamIdxOnX;
-    pPoint->y = mPathData->field_E_grid_height * mCamIdxOnY;
+    pPoint->x = mPath.mPathData->field_C_grid_width * mCamIdxOnX;
+    pPoint->y = mPath.mPathData->field_E_grid_height * mCamIdxOnY;
 }
 
 void Map::Get_map_size(PSX_Point* pPoint)
 {
-    pPoint->x = mPathData->field_8_bTop;
-    pPoint->y = mPathData->field_A_bBottom;
+    pPoint->x = mPath.mPathData->field_8_bTop;
+    pPoint->y = mPath.mPathData->field_A_bBottom;
 }
 
 relive::Path_TLV* Path_TLV::Next_446460(relive::Path_TLV* pTlv)

@@ -121,7 +121,6 @@ public:
 
     s16 field_1E_door = 0;
 
-    const PathData* mPathData = nullptr;
     s16 mMapChanged = 0;
     u8* mSaveData = nullptr;
 

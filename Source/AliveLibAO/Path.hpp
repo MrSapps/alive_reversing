@@ -4,6 +4,9 @@
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
 #include "../relive_lib/Psx.hpp"
 #include "../relive_lib/BasePath.hpp"
+#include "PathData.hpp"
+
+class BinaryPath;
 
 namespace AO {
 
@@ -200,10 +203,18 @@ class Path final : public BasePath
 public:
     explicit Path(Map& map, relive::Factory& factory);
 
+    void Init(const PathData* pPathData, EReliveLevelIds level, u16 pathId, s16 cameraId, BinaryPath* pBinaryPath);
+
     void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1);
     void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1);
     void TLV_Delete(const Guid& tlvId, s16 hiFlags = -1);
     void Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed);
+
+    EReliveLevelIds mLevelId = EReliveLevelIds::eNone;
+    u16 mPathId = 0;
+    s16 mCameraId = 0;
+    const PathData* mPathData = nullptr;
+    BinaryPath* mBinaryPath = nullptr;
 };
 
 } // namespace AO
