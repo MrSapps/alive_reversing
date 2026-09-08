@@ -63,6 +63,7 @@
 #include "Path.hpp"
 #include "../relive_lib/data_conversion/PathTlvsAO.hpp"
 #include "GameEnderController.hpp"
+#include "UXB.hpp"
 
 namespace AO {
 
@@ -7836,10 +7837,10 @@ void Abe::Motion_127_SlapBomb()
 {
     if (gAbe->GetAnimation().GetCurrentFrame() >= 6)
     {
-        auto pThrowable = static_cast<::BaseThrowable*>(sObjectIds.Find_Impl(field_15C_pThrowable));
-        if (pThrowable)
+        auto pUxb = static_cast<UXB*>(sObjectIds.Find(field_15C_pThrowable, ReliveTypes::eUXB));
+        if (pUxb)
         {
-            pThrowable->VOnAbeInteraction();
+            pUxb->VOnAbeInteraction();
             field_15C_pThrowable = Guid{};
         }
     }

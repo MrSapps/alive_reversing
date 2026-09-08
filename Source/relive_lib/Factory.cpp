@@ -285,7 +285,7 @@ void Factory::LiftPointAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 
             if (!pObjIter->GetDead() && pObjIter->Type() == ReliveTypes::eLiftPoint)
             {
-                auto pLiftObj = static_cast<LiftPoint*>(pObjIter);
+                auto pLiftObj = static_cast<AO::LiftPoint*>(pObjIter);
 
                 const s16 xpos_i = FP_GetExponent(pLiftObj->mXPos);
                 if (pTlv->mTopLeftX <= xpos_i
@@ -881,7 +881,7 @@ void Factory::ParamiteAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        mResourceManager.PendAnims(Paramite::sParamiteMotionAnimIds);
+        mResourceManager.PendAnims(AO::Paramite::sParamiteMotionAnimIds);
         mResourceManager.PendAnimation(AnimId::ParamiteWeb);
         return;
     }
@@ -1203,7 +1203,7 @@ void Factory::ScrabAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
-        mResourceManager.PendAnims(Scrab::sScrabMotionAnimIds);
+        mResourceManager.PendAnims(AO::Scrab::sScrabMotionAnimIds);
         return;
     }
     relive_new AO::Scrab(static_cast<Path_Scrab*>(pTlv), tlvId, mResourceManager, mMap);
