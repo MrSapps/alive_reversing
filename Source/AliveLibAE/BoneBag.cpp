@@ -91,7 +91,7 @@ void BoneBag::VScreenChanged()
 
 BoneBag::~BoneBag()
 {
-    Path::TLV_Reset(mTlvInfo);
+    mMap.TLV_Reset(mTlvInfo);
 }
 
 void BoneBag::VUpdate()

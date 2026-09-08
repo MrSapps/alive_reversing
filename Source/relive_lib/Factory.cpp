@@ -203,7 +203,7 @@ void Factory::HoistAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
         }
         else
         {
-            Path::TLV_Reset(tlvId);
+            mMap.TLV_Reset(tlvId);
         }
     }
 }
@@ -216,7 +216,7 @@ void Factory::EdgeAO(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode loadMode)
     }
     else
     {
-        Path::TLV_Reset(tlvId);
+        mMap.TLV_Reset(tlvId);
     }
 }
 
@@ -293,7 +293,7 @@ void Factory::LiftPointAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
                     && pLiftObj->mCurrentLevel == mMap.mCurrentLevel
                     && pLiftObj->mCurrentPath == mMap.mCurrentPath)
                 {
-                    Path::TLV_Reset(tlvId);
+                    mMap.TLV_Reset(tlvId);
                     return;
                 }
             }
@@ -799,7 +799,7 @@ void Factory::ElumWallAO(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode loadMod
     }
     else
     {
-        Path::TLV_Reset(tlvId);
+        mMap.TLV_Reset(tlvId);
     }
 }
 
@@ -945,7 +945,7 @@ void Factory::BellSongStoneAO(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode lo
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
-        Path::TLV_Reset(tlvId);
+        mMap.TLV_Reset(tlvId);
     }
 }
 
@@ -1416,7 +1416,7 @@ void Factory::HandStoneAO(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode loadMo
     }
     else
     {
-        Path::TLV_Reset(tlvId);
+        mMap.TLV_Reset(tlvId);
     }
 }
 
@@ -1588,7 +1588,7 @@ void Factory::RingCancelAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
                 AO::gAbe->mRingPulseTimer = 0;
             }
         }
-        Path::TLV_Reset(tlvId);
+        mMap.TLV_Reset(tlvId);
     }
 }
 
@@ -1641,7 +1641,7 @@ void Factory::KillUnsavedMudsAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode load
         {
             AO::gKilledMudokons = static_cast<s16>(pTlvKillMuds->mMudsToKillCount - AO::gRescuedMudokons);
             pTlvKillMuds->mTlvSpecificMeaning = 1;
-            Path::TLV_Delete(tlvId);
+            mMap.TLV_Delete(tlvId);
         }
     }
 }
@@ -1694,7 +1694,7 @@ void Factory::HoistAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadmode)
     }
     else
     {
-        Path::TLV_Reset(tlvId);
+        mMap.TLV_Reset(tlvId);
     }
 }
 
@@ -1706,7 +1706,7 @@ void Factory::EdgeAE(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode loadmode)
     }
     else
     {
-        Path::TLV_Reset(tlvId);
+        mMap.TLV_Reset(tlvId);
     }
 }
 
@@ -1788,7 +1788,7 @@ void Factory::LiftPointAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
                 if (pTlv->mTopLeftX <= xpos && xpos <= pTlv->mBottomRightX && pLiftPoint->mLiftPointId == pLiftTlv->mLiftPointId && pLiftPoint->mCurrentLevel == mMap.mCurrentLevel && pLiftPoint->mCurrentPath == mMap.mCurrentPath)
                 {
                     // Yes so just reset its data
-                    Path::TLV_Reset(tlvId);
+                    mMap.TLV_Reset(tlvId);
                     return;
                 }
             }
@@ -1806,7 +1806,7 @@ void Factory::LiftPointAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
             s16 pointNumber = 1;
             while (pointNumber < 8)
             {
-                TlvIterator tlvIterator = gPathInfo->Get_First_TLV_For_Offsetted_Camera(
+                TlvIterator tlvIterator = mMap.Get_First_TLV_For_Offsetted_Camera(
                     0,
                     pointNumber / 2 * (pointNumber % 2 != 0 ? -1 : 1));
 
@@ -2119,7 +2119,7 @@ void Factory::MovieHandStoneAE(Path_TLV*, const Guid& tlvId, LoadMode loadmode)
     }
     else
     {
-        Path::TLV_Reset(tlvId);
+        mMap.TLV_Reset(tlvId);
     }
 }
 
@@ -2149,7 +2149,7 @@ void Factory::BirdPortalAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode)
     }
     else
     {
-        Path::TLV_Reset(tlvId);
+        mMap.TLV_Reset(tlvId);
     }
 }
 
@@ -2210,7 +2210,7 @@ void Factory::SligBoundLeftAE(Path_TLV* pTlv,  const Guid& /*tlvId*/, LoadMode l
 
         for (s16 camX_idx = -2; camX_idx < 3; camX_idx++)
         {
-            TlvIterator pTlvIter = FindMatchingSligTLVAE( gPathInfo->Get_First_TLV_For_Offsetted_Camera(camX_idx, 0), pBound);
+            TlvIterator pTlvIter = FindMatchingSligTLVAE( mMap.Get_First_TLV_For_Offsetted_Camera(camX_idx, 0), pBound);
             if (pTlvIter.GetTlv())
             {
                 pTlvIter.GetTlv()->mTlvFlags.Set(TlvFlags::eBit1_Created);
@@ -2457,7 +2457,7 @@ void Factory::HandStoneAE(Path_TLV*, const Guid& tlvId, LoadMode loadmode)
     }
     else
     {
-        Path::TLV_Reset(tlvId);
+        mMap.TLV_Reset(tlvId);
     }
 }
 
@@ -2876,7 +2876,7 @@ void Factory::ExplosionSetAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
             relive_new ExplosionSet(mResourceManager, mMap);
         }
         gExplosionSet->Init(static_cast<Path_ExplosionSet*>(pTlv));
-        Path::TLV_Reset(tlvId);
+        mMap.TLV_Reset(tlvId);
     }
 }
 

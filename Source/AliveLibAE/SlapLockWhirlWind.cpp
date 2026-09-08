@@ -26,11 +26,11 @@ SlapLockWhirlWind::SlapLockWhirlWind(s16 doorNumber, s16 switchId, FP xpos, FP y
     mSwitchId = switchId;
 
     bool bFoundTarget = false;
-    for (s16 y = 0; y < gPathInfo->mCamsOnY; y++)
+    for (s16 y = 0; y < mMap.mCamsOnY; y++)
     {
-        for (s16 x = 0; x < gPathInfo->mCamsOnX; x++)
+        for (s16 x = 0; x < mMap.mCamsOnX; x++)
         {
-            TlvIterator doorTlvIterator = gPathInfo->Get_First_TLV_For_Offsetted_Camera(
+            TlvIterator doorTlvIterator = mMap.Get_First_TLV_For_Offsetted_Camera(
                 x - mMap.mCamIdxOnX,
                 y - mMap.mCamIdxOnY);
             while (doorTlvIterator.GetTlv())

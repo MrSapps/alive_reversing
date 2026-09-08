@@ -28,7 +28,7 @@ Honey::Honey(FP xpos, FP ypos, ResourceManagerWrapper& resMan, BaseMap& map)
 void Honey::VScreenChanged()
 {
     SetDead(true);
-    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
+    mMap.TLV_Reset(mTlvInfo);
 }
 
 } // namespace AO

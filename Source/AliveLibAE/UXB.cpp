@@ -259,11 +259,11 @@ UXB::~UXB()
 {
     if (mCurrentState != UXBState::eExploding || sGnFrame < mNextStateTimer)
     {
-        Path::TLV_Reset(mTlvInfo);
+        mMap.TLV_Reset(mTlvInfo);
     }
     else
     {
-        Path::TLV_Delete(mTlvInfo);
+        mMap.TLV_Delete(mTlvInfo);
     }
 
     mFlashAnim.VCleanUp();
@@ -279,15 +279,15 @@ void UXB::VScreenChanged()
     {
         if (mStartingState == UXBState::eDeactivated && mCurrentState != UXBState::eDeactivated)
         {
-            Path::TLV_Persist(mTlvInfo, 1);
+            mMap.TLV_Persist(mTlvInfo, 1);
         }
         else if (mStartingState != UXBState::eDelay || mCurrentState != UXBState::eDeactivated)
         {
-            Path::TLV_Persist(mTlvInfo, 0);
+            mMap.TLV_Persist(mTlvInfo, 0);
         }
         else
         {
-            Path::TLV_Persist(mTlvInfo, 1);
+            mMap.TLV_Persist(mTlvInfo, 1);
         }
         SetDead(true);
     }
@@ -428,16 +428,16 @@ void UXB::VUpdate()
             {
                 if (mStartingState != UXBState::eDelay || mCurrentState != UXBState::eDeactivated)
                 {
-                    Path::TLV_Persist(mTlvInfo, 0);
+                    mMap.TLV_Persist(mTlvInfo, 0);
                 }
                 else
                 {
-                    Path::TLV_Persist(mTlvInfo, 1);
+                    mMap.TLV_Persist(mTlvInfo, 1);
                 }
             }
             else
             {
-                Path::TLV_Persist(mTlvInfo, 1);
+                mMap.TLV_Persist(mTlvInfo, 1);
             }
             SetDead(true);
         }
@@ -526,7 +526,7 @@ void UXB::CreateFromSaveState(SerializedObjectData& __pSaveState, ResourceManage
 {
     const auto pSaveState = __pSaveState.ReadTmpPtr<UXBSaveState>();
 
-    relive::Path_UXB* uxbPath = reinterpret_cast<relive::Path_UXB*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pSaveState->mTlvInfo).GetTlv());
+    relive::Path_UXB* uxbPath = reinterpret_cast<relive::Path_UXB*>(map.TLV_From_Offset_Lvl_Cam(pSaveState->mTlvInfo).GetTlv());
 
     UXB* pUXB = relive_new UXB(uxbPath, pSaveState->mTlvInfo, resMan, map);
 

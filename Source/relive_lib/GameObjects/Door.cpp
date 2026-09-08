@@ -175,7 +175,7 @@ void Door::Close()
         if (GetGameType() == GameType::eAe)
         {
             mStartState = relive::Path_Door::DoorStates::eClosed;
-            relive::Path_TLV* pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(mTlvId).GetTlv();
+            relive::Path_TLV* pTlv = mMap.TLV_From_Offset_Lvl_Cam(mTlvId).GetTlv();
             pTlv->mTlvSpecificMeaning = 1;
         }
     }
@@ -382,7 +382,7 @@ void Door::PlaySound()
 
 Door::~Door()
 {
-    Path::TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 void Door::VScreenChanged()
@@ -532,11 +532,11 @@ TrainDoor::~TrainDoor()
 {
     if (mCurrentState == relive::Path_Door::DoorStates::eOpen)
     {
-        Path::TLV_Reset(mTlvId);
+        mMap.TLV_Reset(mTlvId);
     }
     else
     {
-        Path::TLV_Reset(mTlvId, 1);
+        mMap.TLV_Reset(mTlvId, 1);
     }
 }
 

@@ -41,7 +41,7 @@ LightEffect::LightEffect(relive::Path_LightEffect* pTlv, const Guid& tlvId, Reso
 
 LightEffect::~LightEffect()
 {
-    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 void LightEffect::VRender(OrderingTable& /*ot*/)

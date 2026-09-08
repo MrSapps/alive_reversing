@@ -43,7 +43,7 @@ void BeeNest::VScreenChanged()
 {
     if (mMap.LevelChanged() || mMap.PathChanged() || !mBeeSwarm.IsValid())
     {
-        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
+        mMap.TLV_Reset(mTlvInfo);
         mBeeSwarm = Guid{};
         SetDead(true);
     }

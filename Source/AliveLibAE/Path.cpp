@@ -8,14 +8,12 @@
 #include "Factory.hpp"
 #include "MapWrapper.hpp"
 
-Path* gPathInfo = nullptr;
-
-Path::Path(Map& map) : mMap(map)
+Path::Path(Map& map) : BasePath(map)
 {
     mPathData = nullptr;
     mBinaryPath = nullptr;
-    mCamsOnY = 0;
-    mCamsOnX = 0;
+    mMap.mCamsOnY = 0;
+    mMap.mCamsOnX = 0;
     mCameraId = 0;
     mPathId = 0;
     mLevelId = EReliveLevelIds::eMenu;
@@ -30,8 +28,8 @@ void Path::Free()
 {
     mPathData = 0;
     mBinaryPath = nullptr;
-    mCamsOnY = 0;
-    mCamsOnX = 0;
+    mMap.mCamsOnY = 0;
+    mMap.mCamsOnX = 0;
     mCameraId = 0;
     mPathId = 0;
     mLevelId = EReliveLevelIds::eMenu;
@@ -46,8 +44,8 @@ void Path::Init(const PathData* pPathData, EReliveLevelIds level, s16 path, s16 
     mPathId = path;
 
     mPathData = pPathData;
-    mCamsOnX = (mPathData->field_4_bTop - mPathData->field_0_bLeft) / mPathData->field_A_grid_width;
-    mCamsOnY = (mPathData->field_6_bBottom - mPathData->field_2_bRight) / mPathData->field_C_grid_height;
+    mMap.mCamsOnX = (mPathData->field_4_bTop - mPathData->field_0_bLeft) / mPathData->field_A_grid_width;
+    mMap.mCamsOnY = (mPathData->field_6_bBottom - mPathData->field_2_bRight) / mPathData->field_C_grid_height;
 }
 
 void Path::Loader_4DB800(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad, ResourceManagerWrapper& resMan, BaseMap& map)
@@ -80,34 +78,6 @@ void Path::Loader_4DB800(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode,
         }
         tlvIterator = tlvIterator.Next_TLV();
     }
-}
-
-TlvIterator Path::Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx)
-{
-    const s32 camY = cam_y_idx + mMap.mCamIdxOnY;
-    const s32 camX = cam_x_idx + mMap.mCamIdxOnX;
-
-    if (camX >= mCamsOnX || camX < 0 || camY >= mCamsOnY || camY < 0)
-    {
-        return TlvIterator::Invalid();
-    }
-
-    BinaryPath* pPathData = mMap.GetPathResourceBlockPtr(mMap.mCurrentPath);
-    return pPathData->TlvsForCamera(camX, camY);
-}
-
-TlvIterator Path::TLV_First_Of_Type_In_Camera(ReliveTypes objectType, s16 camX)
-{
-    TlvIterator tlvIterator = Get_First_TLV_For_Offsetted_Camera(camX, 0);
-    while(tlvIterator.GetTlv())
-    {
-        if (tlvIterator.GetTlv()->mTlvType == objectType)
-        {
-            return tlvIterator;
-        }
-        tlvIterator = tlvIterator.Next_TLV();
-    }
-    return TlvIterator::Invalid();
 }
 
 TlvIterator Path::VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes objectType)
@@ -188,7 +158,7 @@ TlvIterator Path::TLV_Get_At(TlvIterator tlvIterator, FP xpos, FP ypos, FP width
         const s32 camX = (xpos_converted + width_converted) / (2 * pPathData->field_A_grid_width);
         const s32 camY = (ypos_converted + height_converted) / (2 * pPathData->field_C_grid_height);
 
-        if (camX >= mCamsOnX || camY >= mCamsOnY)
+        if (camX >= mMap.mCamsOnX || camY >= mMap.mCamsOnY)
         {
             return TlvIterator::Invalid();
         }
@@ -243,35 +213,19 @@ Guid Path::TLVInfo_From_TLVPtr(relive::Path_TLV* pTlv)
     return pTlv->mId;
 }
 
-TlvIterator Path::TLV_Next_Of_Type(TlvIterator tlvIterator, ReliveTypes type)
-{
-    // Skip current which is already of type
-    tlvIterator = tlvIterator.Next_TLV();
-    while (tlvIterator.GetTlv())
-    {
-        // Got the next of type
-        if (tlvIterator.GetTlv()->mTlvType == type)
-        {
-            return tlvIterator;
-        }
-        tlvIterator = tlvIterator.Next_TLV();
-    }
-    return TlvIterator::Invalid();
-}
-
 void Path::TLV_Reset(const Guid& tlvId, s16 hiFlags)
 {
-    gPathInfo->Set_TLVData(tlvId, hiFlags, 0, 0);
+    Set_TLVData(tlvId, hiFlags, 0, 0);
 }
 
 void Path::TLV_Persist(const Guid& tlvId, s16 hiFlags)
 {
-    gPathInfo->Set_TLVData(tlvId, hiFlags, 1, 0);
+    Set_TLVData(tlvId, hiFlags, 1, 0);
 }
 
 void Path::TLV_Delete(const Guid& tlvId, s16 hiFlags)
 {
-    gPathInfo->Set_TLVData(tlvId, hiFlags, 0, 1);
+    Set_TLVData(tlvId, hiFlags, 0, 1);
 }
 
 void Path::Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed)
@@ -300,7 +254,7 @@ void Path::Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDe
 
 void Path::Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx)
 {
-    TlvIterator tlvIterator = gPathInfo->Get_First_TLV_For_Offsetted_Camera(cam_x_idx, cam_y_idx);
+    TlvIterator tlvIterator = Get_First_TLV_For_Offsetted_Camera(cam_x_idx, cam_y_idx);
     while(tlvIterator.GetTlv())
     {
         if (!(tlvIterator.GetTlv()->mTlvFlags.Get(relive::TlvFlags::eBit1_Created) || (tlvIterator.GetTlv()->mTlvFlags.Get(relive::TlvFlags::eBit2_Destroyed))))

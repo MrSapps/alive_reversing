@@ -97,6 +97,9 @@ public:
     s16 mCamIdxOnX = 0;
     s16 mCamIdxOnY = 0;
 
+    u16 mCamsOnX = 0;
+    u16 mCamsOnY = 0;
+
     bool mFreeAllAnimAndPalts = false;
 
     s16 mOverlayId = 0;
@@ -130,6 +133,7 @@ public:
     virtual TlvIterator TLV_First_Of_Type_In_Camera(ReliveTypes objectType, s16 camX) = 0;
     virtual TlvIterator TLV_Get_At(TlvIterator pTlv, FP xpos, FP ypos, FP width, FP height) = 0;
     virtual TlvIterator TLV_From_Offset_Lvl_Cam(const Guid& tlvId);
+    virtual TlvIterator Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx) = 0;
 
     void ReloadPathJsonRequest(const std::string& pathJsonFileName);
 

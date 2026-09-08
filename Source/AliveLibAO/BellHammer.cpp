@@ -63,7 +63,7 @@ BellHammer::BellHammer(relive::Path_BellHammer* pTlv, const Guid& tlvId, Resourc
 
 BellHammer::~BellHammer()
 {
-    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
+    mMap.TLV_Reset(mTlvInfo);
 }
 
 void BellHammer::VScreenChanged()

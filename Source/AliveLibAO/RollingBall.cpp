@@ -31,11 +31,11 @@ RollingBall::~RollingBall()
 {
     if (mState != States::eInactive)
     {
-        Path::TLV_Delete(static_cast<Map&>(mMap), mTlvInfo);
+        mMap.TLV_Delete(mTlvInfo);
     }
     else
     {
-        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
+        mMap.TLV_Reset(mTlvInfo);
     }
 
     KillRollingBallShaker();

@@ -32,7 +32,7 @@ InvisibleSwitch::InvisibleSwitch(relive::Path_InvisibleSwitch* pTlv, const Guid&
 
 InvisibleSwitch::~InvisibleSwitch()
 {
-    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 bool InvisibleSwitch::IsAbeUsingDoor() const

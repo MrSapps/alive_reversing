@@ -6,6 +6,7 @@
 #include "stdlib.hpp"
 #include "../relive_lib/Grid.hpp"
 #include "Path.hpp"
+#include "../relive_lib/BaseMap.hpp"
 #include "../relive_lib/FixedPoint.hpp"
 
 void StatusLight::LoadAnimations()
@@ -138,7 +139,7 @@ void StatusLight::VUpdate()
 
 StatusLight::~StatusLight()
 {
-    Path::TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 void StatusLight::VScreenChanged()

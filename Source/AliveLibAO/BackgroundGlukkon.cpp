@@ -20,11 +20,11 @@ BackgroundGlukkon::~BackgroundGlukkon()
 {
     if (mHealth <= FP_FromInteger(0))
     {
-        Path::TLV_Delete(static_cast<Map&>(mMap), mTlvId);
+        mMap.TLV_Delete(mTlvId);
     }
     else
     {
-        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
+        mMap.TLV_Reset(mTlvId);
     }
 }
 

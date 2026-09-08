@@ -28,7 +28,7 @@ SecurityDoor::~SecurityDoor()
     {
         mState = SecurityDoorStates::eInactive_0;
     }
-    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId, mState + 1);
+    mMap.TLV_Reset(mTlvId, mState + 1);
 }
 
 SecurityDoor::SecurityDoor(relive::Path_SecurityDoor* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)

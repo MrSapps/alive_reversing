@@ -125,11 +125,11 @@ MotionDetector::~MotionDetector()
 {
     if (mDontComeBack)
     {
-        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
+        mMap.TLV_Reset(mTlvId);
     }
     else
     {
-        Path::TLV_Delete(static_cast<Map&>(mMap), mTlvId);
+        mMap.TLV_Delete(mTlvId);
     }
 
     BaseGameObject* pLaser = sObjectIds.Find_Impl(mLaserId);

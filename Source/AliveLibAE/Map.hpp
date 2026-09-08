@@ -4,6 +4,7 @@
 #include "../relive_lib/FixedPoint.hpp"
 #include "../relive_lib/BaseMap.hpp"
 #include "../relive_lib/Factory.hpp"
+#include "Path.hpp"
 
 class BaseGameObject;
 class Camera;
@@ -67,6 +68,9 @@ public:
     TlvIterator TLV_First_Of_Type_In_Camera(ReliveTypes type, s16 camX) override;
     TlvIterator TLV_Get_At(TlvIterator pTlv, FP xpos, FP ypos, FP width, FP height) override;
     TlvIterator TLV_From_Offset_Lvl_Cam(const Guid& tlvId) override;
+    TlvIterator Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx) override;
+
+    void Reset_TLVs(u16 pathId);
 
 private:
 
@@ -80,8 +84,9 @@ public:
 
     FP_Point mCameraOffset = {};
 
-    const PathData* mPathData = nullptr;
     bool mRestoreMapObjectStates = false;
+
+    Path mPath;
 };
 
 extern bool gMap_bDoPurpleLightEffect;

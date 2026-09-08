@@ -4,6 +4,7 @@
 #include "../relive_lib/FixedPoint.hpp"
 #include "../relive_lib/BaseMap.hpp"
 #include "../relive_lib/Factory.hpp"
+#include "Path.hpp"
 
 enum class ReliveTypes : s16;
 class CamResource;
@@ -120,13 +121,13 @@ public:
     void Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed) override;
 
     s16 field_1E_door = 0;
-    u16 mMaxCamsX = 0;
-    u16 mMaxCamsY = 0;
     FP_Point mCameraOffset = {};
 
     const PathData* mPathData = nullptr;
     s16 mMapChanged = 0;
     u8* mSaveData = nullptr;
+
+    Path mPath;
 };
 
 

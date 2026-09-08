@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "LiftMover.hpp"
+#include "../relive_lib/BaseMap.hpp"
 #include "../relive_lib/Function.hpp"
 #include "LiftPoint.hpp"
 #include "../relive_lib/Events.hpp"
@@ -34,7 +35,7 @@ LiftMover::LiftMover(relive::Path_LiftMover* pTlv, const Guid& tlvId, ResourceMa
 
 LiftMover::~LiftMover()
 {
-    Path::TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 void LiftMover::VUpdate()
@@ -220,7 +221,7 @@ void LiftMover::CreateFromSaveState(SerializedObjectData& pData, ResourceManager
 {
     const auto pState = pData.ReadTmpPtr<LiftMoverSaveState>();
 
-    relive::Path_LiftMover* pTlv = static_cast<relive::Path_LiftMover*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv());
+    relive::Path_LiftMover* pTlv = static_cast<relive::Path_LiftMover*>(map.TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv());
     auto pLiftMover = relive_new LiftMover(pTlv, pState->mTlvId, resMan, map);
     if (pLiftMover)
     {

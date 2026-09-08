@@ -74,7 +74,7 @@ RockSack::RockSack(relive::Path_RockSack* pTlv, const Guid& tlvId, ResourceManag
 
 RockSack::~RockSack()
 {
-    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 void RockSack::VScreenChanged()

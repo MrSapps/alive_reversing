@@ -624,6 +624,8 @@ SET(relive_lib_src
     MapWrapper.cpp
     BaseMap.hpp
     BaseMap.cpp
+    BasePath.hpp
+    BasePath.cpp
     PsxDisplay.cpp
     PsxDisplay.hpp
     Compression.hpp

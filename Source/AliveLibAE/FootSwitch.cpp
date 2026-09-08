@@ -112,7 +112,7 @@ FootSwitch::FootSwitch(relive::Path_FootSwitch* pTlv, const Guid& tlvId, Resourc
 
 FootSwitch::~FootSwitch()
 {
-    Path::TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 void FootSwitch::VUpdate()

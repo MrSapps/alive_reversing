@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "FlyingSligSpawner.hpp"
+#include "../relive_lib/BaseMap.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/Events.hpp"
 #include "stdlib.hpp"
@@ -36,7 +37,7 @@ void FlyingSligSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, Resou
 {
     const auto pState = pBuffer.ReadTmpPtr<FlyingSligSpawnerSaveState>();
 
-    auto pTlv = static_cast<relive::Path_FlyingSligSpawner*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pState->field_4_tlvInfo).GetTlv());
+    auto pTlv = static_cast<relive::Path_FlyingSligSpawner*>(map.TLV_From_Offset_Lvl_Cam(pState->field_4_tlvInfo).GetTlv());
 
     auto pFlyingSligSpawner = relive_new FlyingSligSpawner(pTlv, pState->field_4_tlvInfo, resMan, map);
     if (pFlyingSligSpawner)
@@ -49,7 +50,7 @@ void FlyingSligSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, Resou
 
 FlyingSligSpawner::~FlyingSligSpawner()
 {
-    Path::TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 void FlyingSligSpawner::VUpdate()
@@ -91,7 +92,7 @@ void FlyingSligSpawner::VUpdate()
         }
         else if (SwitchStates_Get(field_28_spawner_switch_id))
         {
-            auto pFlyingSligTlv = static_cast<relive::Path_FlyingSlig*>(gPathInfo->VTLV_Get_At_Of_Type(
+            auto pFlyingSligTlv = static_cast<relive::Path_FlyingSlig*>(mMap.VTLV_Get_At_Of_Type(
                 field_2C_tlv_header->mTopLeftX,
                 field_2C_tlv_header->mTopLeftY,
                 field_2C_tlv_header->mTopLeftX + 25,

@@ -348,7 +348,7 @@ DoorFlame::~DoorFlame()
 
     VStopAudio();
 
-    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
+    mMap.TLV_Reset(mTlvInfo);
 }
 
 void DoorFlame::VStopAudio()

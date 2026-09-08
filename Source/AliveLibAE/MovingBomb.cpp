@@ -114,11 +114,11 @@ MovingBomb::~MovingBomb()
 
     if (mState == States::eBlowingUp_6 || mState == States::eKillMovingBomb_7)
     {
-        Path::TLV_Delete(mTlvId);
+        mMap.TLV_Delete(mTlvId);
     }
     else
     {
-        Path::TLV_Reset(mTlvId);
+        mMap.TLV_Reset(mTlvId);
     }
 
     if (sMovingBomb == this)
@@ -341,7 +341,7 @@ void MovingBomb::VUpdate()
 
             FollowLine();
 
-            BaseAliveGameObjectPathTLV = gPathInfo->VTLV_Get_At_Of_Type(
+            BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                 FP_GetExponent(mXPos),
                 FP_GetExponent(mYPos),
                 FP_GetExponent(mXPos),
@@ -383,7 +383,7 @@ void MovingBomb::VUpdate()
 
             FollowLine();
 
-            BaseAliveGameObjectPathTLV = gPathInfo->VTLV_Get_At_Of_Type(
+            BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
                 FP_GetExponent(mXPos),
                 FP_GetExponent(mYPos),
                 FP_GetExponent(mXPos),

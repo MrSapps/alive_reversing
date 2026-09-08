@@ -96,7 +96,7 @@ PullRingRope::PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId, R
 
 PullRingRope::~PullRingRope()
 {
-    Path::TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
 
     BaseGameObject* pRope = sObjectIds.Find(mRopeId, ReliveTypes::eRope);
     if (pRope)

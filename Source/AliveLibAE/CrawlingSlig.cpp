@@ -173,7 +173,7 @@ void CrawlingSlig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMa
 {
     const auto pState = pBuffer.ReadTmpPtr<CrawlingSligSaveState>();
 
-    auto pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mCrawlingSligTlvId).GetTlv<relive::Path_CrawlingSlig>();
+    auto pTlv = map.TLV_From_Offset_Lvl_Cam(pState->mCrawlingSligTlvId).GetTlv<relive::Path_CrawlingSlig>();
 
     auto pCrawlingSlig = relive_new CrawlingSlig(pTlv, pState->mCrawlingSligTlvId, resMan, map);
     if (pCrawlingSlig)
@@ -407,7 +407,7 @@ void CrawlingSlig::VUpdate()
 
         if (oldX != mXPos || oldY != mYPos)
         {
-            auto pTlv = gPathInfo->TLV_Get_At(
+            auto pTlv = mMap.TLV_Get_At(
                 TlvIterator::Invalid(),
                 mXPos,
                 mYPos,
@@ -439,7 +439,7 @@ s16 CrawlingSlig::HandleEnemyStopper(FP /*velX*/)
     }
 
     const FP gridSize = ScaleToGridSize(GetSpriteScale());
-    auto tlvIterator = gPathInfo->VTLV_Get_At_Of_Type(
+    auto tlvIterator = mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos),
         FP_GetExponent(mYPos),
         FP_GetExponent(mXPos + gridSizeDirected),
@@ -453,7 +453,7 @@ s16 CrawlingSlig::HandleEnemyStopper(FP /*velX*/)
         return 1;
     }
 
-    tlvIterator = (gPathInfo->VTLV_Get_At_Of_Type(
+    tlvIterator = (mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos),
         FP_GetExponent(mYPos),
         FP_GetExponent(mXPos + gridSizeDirected),
@@ -467,14 +467,14 @@ s16 CrawlingSlig::HandleEnemyStopper(FP /*velX*/)
 
 relive::Path_TLV* CrawlingSlig::FindPantsOrWings()
 {
-    TlvIterator pTlvIter = gPathInfo->TLV_Get_At(TlvIterator::Invalid(), mXPos, mYPos, mXPos, mYPos);
+    TlvIterator pTlvIter = mMap.TLV_Get_At(TlvIterator::Invalid(), mXPos, mYPos, mXPos, mYPos);
     while (pTlvIter.GetTlv())
     {
         if (pTlvIter.GetTlv()->mTlvType == ReliveTypes::eSligGetPants || pTlvIter.GetTlv()->mTlvType == ReliveTypes::eSligGetWings)
         {
             return pTlvIter.GetTlv();
         }
-        pTlvIter = gPathInfo->TLV_Get_At(pTlvIter, mXPos, mYPos, mXPos, mYPos);
+        pTlvIter = mMap.TLV_Get_At(pTlvIter, mXPos, mYPos, mXPos, mYPos);
     }
     return nullptr;
 }
@@ -515,7 +515,7 @@ void CrawlingSlig::VOnTlvCollision(TlvIterator tlvIterator)
             }
         }
 
-        tlvIterator = gPathInfo->TLV_Get_At(
+        tlvIterator = mMap.TLV_Get_At(
             tlvIterator,
             mXPos,
             mYPos,
@@ -666,11 +666,11 @@ CrawlingSlig::~CrawlingSlig()
     }
     if (mHealth > FP_FromInteger(0) || mTlv.mRespawnOnDeath)
     {
-        Path::TLV_Reset(mGuid);
+        mMap.TLV_Reset(mGuid);
     }
     else
     {
-        Path::TLV_Delete(mGuid);
+        mMap.TLV_Delete(mGuid);
     }
 }
 
@@ -1279,7 +1279,7 @@ void CrawlingSlig::Motion_1_UsingButton()
 
                 SfxPlayMono(relive::SoundEffects::SligSpawn, 0);
 
-                auto pWalkingSlig = relive_new Slig(static_cast<relive::Path_Slig*>(mTlvHeader), gPathInfo->TLVInfo_From_TLVPtr(mTlvHeader), mResMan, mMap);
+                auto pWalkingSlig = relive_new Slig(static_cast<relive::Path_Slig*>(mTlvHeader), Path::TLVInfo_From_TLVPtr(mTlvHeader), mResMan, mMap);
                 if (pWalkingSlig)
                 {
                     mTransformedSligId = pWalkingSlig->mBaseGameObjectId;
@@ -1308,7 +1308,7 @@ void CrawlingSlig::Motion_1_UsingButton()
 
                 SfxPlayMono(relive::SoundEffects::FlyingSligSpawn, 0);
 
-                auto pFlyingSlig = relive_new FlyingSlig(static_cast<relive::Path_FlyingSlig*>(mTlvHeader), gPathInfo->TLVInfo_From_TLVPtr(mTlvHeader), mResMan, mMap);
+                auto pFlyingSlig = relive_new FlyingSlig(static_cast<relive::Path_FlyingSlig*>(mTlvHeader), Path::TLVInfo_From_TLVPtr(mTlvHeader), mResMan, mMap);
                 if (pFlyingSlig)
                 {
                     mTransformedSligId = pFlyingSlig->mBaseGameObjectId;

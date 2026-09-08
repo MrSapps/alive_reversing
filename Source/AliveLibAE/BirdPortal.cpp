@@ -127,12 +127,12 @@ BirdPortal::~BirdPortal()
     if (SwitchStates_Get(mDeletePortalSwitchId))
     {
         // Never come back
-        Path::TLV_Delete(mTlvInfo);
+        mMap.TLV_Delete(mTlvInfo);
     }
     else
     {
         // Always come back
-        Path::TLV_Reset(mTlvInfo);
+        mMap.TLV_Reset(mTlvInfo);
     }
 }
 
@@ -751,7 +751,7 @@ void BirdPortal::KillTerminators()
 void BirdPortal::VGetSaveState(SerializedObjectData& pBuffer)
 {
     BirdPortalSaveState data = {};
-    auto pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(mTlvInfo).GetTlv<relive::Path_BirdPortal>();
+    auto pTlv = mMap.TLV_From_Offset_Lvl_Cam(mTlvInfo).GetTlv<relive::Path_BirdPortal>();
 
     s16 numMudsForShrykull = 0;
     if (pTlv)
@@ -770,7 +770,7 @@ void BirdPortal::VGetSaveState(SerializedObjectData& pBuffer)
 void BirdPortal::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pSaveState = pBuffer.ReadTmpPtr<BirdPortalSaveState>();
-    auto pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(pSaveState->mTlvInfo).GetTlv<relive::Path_BirdPortal>();
+    auto pTlv = map.TLV_From_Offset_Lvl_Cam(pSaveState->mTlvInfo).GetTlv<relive::Path_BirdPortal>();
     if (!pTlv)
     {
         return;

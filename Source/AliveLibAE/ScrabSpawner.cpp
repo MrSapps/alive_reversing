@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "ScrabSpawner.hpp"
+#include "../relive_lib/BaseMap.hpp"
 #include "../relive_lib/Function.hpp"
 #include "stdlib.hpp"
 #include "../relive_lib/ObjectIds.hpp"
@@ -37,7 +38,7 @@ ScrabSpawner::ScrabSpawner(relive::Path_ScrabSpawner* pTlv, const Guid& tlvId, R
 void ScrabSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<ScrabSpawnerSaveState>();
-    auto pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(pState->field_4_tlvInfo).GetTlv<relive::Path_ScrabSpawner>();
+    auto pTlv = map.TLV_From_Offset_Lvl_Cam(pState->field_4_tlvInfo).GetTlv<relive::Path_ScrabSpawner>();
     auto pScrabSpawner = relive_new ScrabSpawner(pTlv, pState->field_4_tlvInfo, resMan, map);
     if (pScrabSpawner)
     {
@@ -49,7 +50,7 @@ void ScrabSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMa
 
 ScrabSpawner::~ScrabSpawner()
 {
-    Path::TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 void ScrabSpawner::VGetSaveState(SerializedObjectData& pSaveBuffer)
@@ -113,7 +114,7 @@ void ScrabSpawner::VUpdate()
         {
             if (SwitchStates_Get(field_24_spawner_switch_id))
             {
-                auto pTlv = gPathInfo->VTLV_Get_At_Of_Type(
+                auto pTlv = mMap.VTLV_Get_At_Of_Type(
                     field_28_tlv_data.mTopLeftX,
                     field_28_tlv_data.mTopLeftY,
                     field_28_tlv_data.mTopLeftX,

@@ -48,7 +48,7 @@ Teleporter::Teleporter(relive::Path_Teleporter* pTlv, const Guid& tlvId, Resourc
 
 Teleporter::~Teleporter()
 {
-    Path::TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 void Teleporter::VScreenChanged()
@@ -116,7 +116,7 @@ void Teleporter::VUpdate()
 
             mSwitchState = SwitchStates_Get(mTlvData.mSwitchId);
 
-            if (!gPathInfo->VTLV_Get_At_Of_Type(
+            if (!mMap.VTLV_Get_At_Of_Type(
                     FP_GetExponent(sControlledCharacter->mXPos),
                     FP_GetExponent(sControlledCharacter->mYPos),
                     FP_GetExponent(sControlledCharacter->mXPos),
@@ -231,7 +231,7 @@ void Teleporter::VUpdate()
 
             Relive_Path_Teleporter_Data tlvData = {};
             relive::Path_Teleporter* pTeleporterTlv = nullptr;
-            TlvIterator teleporterTlvIterator = gPathInfo->TLV_First_Of_Type_In_Camera(ReliveTypes::eTeleporter, 0);
+            TlvIterator teleporterTlvIterator = mMap.TLV_First_Of_Type_In_Camera(ReliveTypes::eTeleporter, 0);
             while (teleporterTlvIterator.GetTlv())
             {
                 pTeleporterTlv = static_cast<relive::Path_Teleporter*>(teleporterTlvIterator.GetTlv());
@@ -240,7 +240,7 @@ void Teleporter::VUpdate()
                     SetData(tlvData, *pTeleporterTlv);
                     break;
                 }
-                teleporterTlvIterator = gPathInfo->TLV_Next_Of_Type(teleporterTlvIterator, ReliveTypes::eTeleporter);
+                teleporterTlvIterator = Path::TLV_Next_Of_Type(teleporterTlvIterator, ReliveTypes::eTeleporter);
             }
 
             if (!pTeleporterTlv || tlvData.mTeleporterId != mTlvData.mOtherTeleporterId)

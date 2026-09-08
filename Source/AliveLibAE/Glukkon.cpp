@@ -155,7 +155,7 @@ enum Brain_5_WaitToSpawn
 void Glukkon::CreateFromSaveState(SerializedObjectData& pSaveBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pSaveState = pSaveBuffer.ReadTmpPtr<GlukkonSaveState>();
-    auto pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(pSaveState->mTlvId).GetTlv<relive::Path_Glukkon>();
+    auto pTlv = map.TLV_From_Offset_Lvl_Cam(pSaveState->mTlvId).GetTlv<relive::Path_Glukkon>();
 
     auto pGlukkon = relive_new Glukkon(pTlv, pSaveState->mTlvId, resMan, map);
     if (pGlukkon)
@@ -2052,11 +2052,11 @@ Glukkon::~Glukkon()
 {
     if (mHealth <= FP_FromInteger(0))
     {
-        Path::TLV_Delete(mTlvId);
+        mMap.TLV_Delete(mTlvId);
     }
     else
     {
-        Path::TLV_Reset(mTlvId);
+        mMap.TLV_Reset(mTlvId);
     }
 
     SetDrawable(true); // Seems wrong to do this here ??
@@ -2131,7 +2131,7 @@ void Glukkon::VUpdate()
 
         if (oldXPos != mXPos || oldYPos != mYPos)
         {
-            TlvIterator pTlv = gPathInfo->TLV_Get_At(
+            TlvIterator pTlv = mMap.TLV_Get_At(
                 TlvIterator::Invalid(),
                 mXPos,
                 mYPos,
@@ -2456,7 +2456,7 @@ s16 Glukkon::PathBlocked(FP /*a2*/, s16 checkBounds)
         return 1;
     }
 
-    BaseAliveGameObjectPathTLV = gPathInfo->VTLV_Get_At_Of_Type(
+    BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos),
         FP_GetExponent(mYPos), // TODO Abs() ??
         FP_GetExponent(mXPos + gridSize),
@@ -2470,7 +2470,7 @@ s16 Glukkon::PathBlocked(FP /*a2*/, s16 checkBounds)
         return 1;
     }
 
-    BaseAliveGameObjectPathTLV = gPathInfo->VTLV_Get_At_Of_Type(
+    BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos),
         FP_GetExponent(mYPos),
         FP_GetExponent(mXPos + gridSize),
@@ -2490,7 +2490,7 @@ s16 Glukkon::PathBlocked(FP /*a2*/, s16 checkBounds)
         return 0;
     }
 
-    if (gPathInfo->VTLV_Get_At_Of_Type(
+    if (mMap.VTLV_Get_At_Of_Type(
             FP_GetExponent(mXPos),
             FP_GetExponent(mYPos), // TODO: Abs() ??
             FP_GetExponent(mXPos + gridSize),
@@ -2843,7 +2843,7 @@ void Glukkon::VOnTlvCollision(TlvIterator tlvIterator)
             }
         }
 
-        tlvIterator = gPathInfo->TLV_Get_At(
+        tlvIterator = mMap.TLV_Get_At(
             tlvIterator,
             mXPos,
             mYPos,

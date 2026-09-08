@@ -95,11 +95,11 @@ HoneySack::~HoneySack()
 
     if (mState == State::eDripHoney_0)
     {
-        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
+        mMap.TLV_Reset(mTlvInfo);
     }
     else
     {
-        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo, FP_GetExponent(mYPos - mObjectYPos));
+        mMap.TLV_Reset(mTlvInfo, FP_GetExponent(mYPos - mObjectYPos));
     }
 
     mBeeSwarm = Guid{};

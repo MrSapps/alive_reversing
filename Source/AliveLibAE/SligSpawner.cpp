@@ -36,11 +36,11 @@ SligSpawner::~SligSpawner()
 {
     if (mDontDestroyTLV)
     {
-        Path::TLV_Reset(mTlvInfo);
+        mMap.TLV_Reset(mTlvInfo);
     }
     else
     {
-        Path::TLV_Delete(mTlvInfo);
+        mMap.TLV_Delete(mTlvInfo);
     }
 }
 
@@ -97,7 +97,7 @@ void SligSpawner::VUpdate()
     {
         if (SwitchStates_Get(mSligSpawnerSwitchId))
         {
-            TlvIterator sligSpawnerIterator = gPathInfo->VTLV_Get_At_Of_Type(mPathTlv.mTopLeftX, mPathTlv.mTopLeftY, mPathTlv.mTopLeftX, mPathTlv.mTopLeftY, ReliveTypes::eSligSpawner);
+            TlvIterator sligSpawnerIterator = mMap.VTLV_Get_At_Of_Type(mPathTlv.mTopLeftX, mPathTlv.mTopLeftY, mPathTlv.mTopLeftX, mPathTlv.mTopLeftY, ReliveTypes::eSligSpawner);
             if (sligSpawnerIterator.GetTlv())
             {
                 auto pSlig = relive_new Slig(sligSpawnerIterator.GetTlv<relive::Path_Slig>(), mTlvInfo, mResMan, mMap);
@@ -139,7 +139,7 @@ void SligSpawner::VGetSaveState(SerializedObjectData& pSaveBuffer)
 void SligSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<SligSpawnerSaveState>();
-    auto pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv<relive::Path_Slig>();
+    auto pTlv = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv<relive::Path_Slig>();
     auto pSpawner = relive_new SligSpawner(pTlv, pState->mTlvId, resMan, map);
     if (pSpawner)
     {

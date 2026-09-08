@@ -86,7 +86,7 @@ SecurityDoor::~SecurityDoor()
         mState = SecurityDoorStates::eInactive_0;
     }
 
-    Path::TLV_Reset(mTlvId, static_cast<s16>(mState) + 1);
+    mMap.TLV_Reset(mTlvId, static_cast<s16>(mState) + 1);
 }
 
 void SecurityDoor::VScreenChanged()

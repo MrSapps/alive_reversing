@@ -105,7 +105,7 @@ LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId, ResourceMa
 
     pTlv->mTlvSpecificMeaning = 3;
 
-    mTlvId = gPathInfo->TLVInfo_From_TLVPtr(pTlv);
+    mTlvId = Path::TLVInfo_From_TLVPtr(pTlv);
 
     if (pTlv->mScale == relive::reliveScale::eHalf)
     {
@@ -246,7 +246,7 @@ void LiftPoint::StayOnFloor(bool bFloor, relive::Path_LiftPoint* pLiftTlv)
 
     mMoving = false;
     pLiftTlv->mTlvSpecificMeaning = 3;
-    mTlvId = gPathInfo->TLVInfo_From_TLVPtr(pLiftTlv);
+    mTlvId = Path::TLVInfo_From_TLVPtr(pLiftTlv);
     pLiftTlv->mLiftPointId = mLiftPointId;
     mVelY = FP_FromInteger(0);
 
@@ -410,7 +410,7 @@ void LiftPoint::VUpdate()
 
                             pLiftTlv->mTlvSpecificMeaning = 3;
 
-                            mTlvId = gPathInfo->TLVInfo_From_TLVPtr(pLiftTlv);
+                            mTlvId = Path::TLVInfo_From_TLVPtr(pLiftTlv);
                             pLiftTlv->mLiftPointId = mLiftPointId;
                             mTopFloor = true;
                         }
@@ -439,7 +439,7 @@ void LiftPoint::VUpdate()
 
                             pLiftTlv->mTlvSpecificMeaning = 3;
 
-                            mTlvId = gPathInfo->TLVInfo_From_TLVPtr(pLiftTlv);
+                            mTlvId = Path::TLVInfo_From_TLVPtr(pLiftTlv);
                             pLiftTlv->mLiftPointId = mLiftPointId;
                             mBottomFloor = true;
                         }
@@ -473,7 +473,7 @@ void LiftPoint::VUpdate()
                         }
 
                         pLiftTlv->mTlvSpecificMeaning = 3;
-                        mTlvId = gPathInfo->TLVInfo_From_TLVPtr(pLiftTlv);
+                        mTlvId = Path::TLVInfo_From_TLVPtr(pLiftTlv);
                         pLiftTlv->mLiftPointId = mLiftPointId;
                         mMiddleFloor = true;
                     }
@@ -722,14 +722,14 @@ void LiftPoint::CreatePulleyIfExists()
 {
     relive::Path_TLV* pFound = nullptr;
 
-    const PathData* pPathData = gPathInfo->mPathData;
+    const PathData* pPathData = static_cast<Map&>(mMap).mPath.mPathData;
     s16 yCamIdx = FP_GetExponent(mYPos) / pPathData->field_C_grid_height;
     // If we are in the top row of cameras then there can't be a pulley in the screen above because there are no more screens above!
     while (yCamIdx >= 0)
     {
         const s16 xCamIdx = (FP_GetExponent(mXPos) / pPathData->field_A_grid_width) - mMap.mCamIdxOnX;
         // Keep looking up 1 camera for any camera that has TLVs in it.
-        TlvIterator tlvIter = gPathInfo->Get_First_TLV_For_Offsetted_Camera(xCamIdx, yCamIdx - mMap.mCamIdxOnY);
+        TlvIterator tlvIter = mMap.Get_First_TLV_For_Offsetted_Camera(xCamIdx, yCamIdx - mMap.mCamIdxOnY);
         while (tlvIter.GetTlv())
         {
             if (tlvIter.GetTlv()->mTlvType == ReliveTypes::ePulley)
@@ -810,7 +810,7 @@ LiftPoint::~LiftPoint()
         pRope1->SetDead(true);
     }
 
-    Path::TLV_Reset(mPlatformBaseTlvInfo);
+    mMap.TLV_Reset(mPlatformBaseTlvInfo);
 
     auto pLiftPointTlv = mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos),
@@ -860,7 +860,7 @@ void LiftPoint::CreateFromSaveState(SerializedObjectData& pData, ResourceManager
 {
     const auto pState = pData.ReadTmpPtr<LiftPointSaveState>();
 
-    relive::Path_LiftPoint* pTlv = static_cast<relive::Path_LiftPoint*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mPlatformId).GetTlv());
+    relive::Path_LiftPoint* pTlv = static_cast<relive::Path_LiftPoint*>(map.TLV_From_Offset_Lvl_Cam(pState->mPlatformId).GetTlv());
 
     auto pLiftPoint = relive_new LiftPoint(pTlv, pState->mPlatformId, resMan, map);
     if (pLiftPoint)
@@ -905,6 +905,6 @@ void LiftPoint::CreateFromSaveState(SerializedObjectData& pData, ResourceManager
         return;
     }
 
-    relive::Path_TLV* pTlv2 = gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv();
+    relive::Path_TLV* pTlv2 = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv();
     pTlv2->mTlvSpecificMeaning = 3;
 }

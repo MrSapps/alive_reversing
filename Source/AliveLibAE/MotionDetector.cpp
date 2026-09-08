@@ -153,11 +153,11 @@ MotionDetector::~MotionDetector()
     {
         if (mDontComeBack)
         {
-            Path::TLV_Reset(mTlvId);
+            mMap.TLV_Reset(mTlvId);
         }
         else
         {
-            Path::TLV_Delete(mTlvId);
+            mMap.TLV_Delete(mTlvId);
         }
     }
 

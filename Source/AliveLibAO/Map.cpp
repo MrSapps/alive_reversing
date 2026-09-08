@@ -241,6 +241,7 @@ void Map::ScreenChange_Common()
 
 Map::Map(ResourceManagerWrapper& resMan)
     : BaseMap(resMan)
+    , mPath(*this)
 {
     Reset();
 }
@@ -861,8 +862,8 @@ void Map::GoTo_Camera()
 
     const PathBlyRec* pPathRecord = AO::Path_Get_Bly_Record(mNextLevel, mNextPath);
     mPathData = pPathRecord->field_4_pPathData;
-    mMaxCamsX = (mPathData->field_8_bTop - mPathData->field_4_bLeft) / mPathData->field_C_grid_width;
-    mMaxCamsY = (mPathData->field_A_bBottom - mPathData->field_6_bRight) / mPathData->field_E_grid_height;
+    mCamsOnX = (mPathData->field_8_bTop - mPathData->field_4_bLeft) / mPathData->field_C_grid_width;
+    mCamsOnY = (mPathData->field_A_bBottom - mPathData->field_6_bRight) / mPathData->field_E_grid_height;
 
     mCamIdxOnX = 0;
     mCamIdxOnY = 0;
@@ -1030,16 +1031,7 @@ s16 Map::GetOverlayId()
 
 TlvIterator Map::Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx)
 {
-    const auto camX = cam_x_idx + mCamIdxOnX;
-    const auto camY = cam_y_idx + mCamIdxOnY;
-
-    if (camX >= mMaxCamsX || camX < 0 || camY >= mMaxCamsY || camY < 0)
-    {
-        return TlvIterator::Invalid();
-    }
-
-    BinaryPath* pPathData = GetPathResourceBlockPtr(mCurrentPath);
-    return pPathData->TlvsForCamera(camX, camY);
+    return mPath.Get_First_TLV_For_Offsetted_Camera(cam_x_idx, cam_y_idx);
 }
 
 void Map::Create_FG1s()
@@ -1089,22 +1081,22 @@ void Map::SaveBlyData(u8* pSaveBuffer)
 
 void Map::TLV_Reset(const Guid& tlvId, s16 hiFlags)
 {
-    Path::TLV_Reset(*this, tlvId, hiFlags);
+    mPath.TLV_Reset(tlvId, hiFlags);
 }
 
 void Map::TLV_Persist(const Guid& tlvId, s16 hiFlags)
 {
-    Path::TLV_Persist(*this, tlvId, hiFlags);
+    mPath.TLV_Persist(tlvId, hiFlags);
 }
 
 void Map::TLV_Delete(const Guid& tlvId, s16 hiFlags)
 {
-    Path::TLV_Delete(*this, tlvId, hiFlags);
+    mPath.TLV_Delete(tlvId, hiFlags);
 }
 
 void Map::Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed)
 {
-    Path::Set_TLVData(*this, tlvId, hiFlags, bSetCreated, bSetDestroyed);
+    mPath.Set_TLVData(tlvId, hiFlags, bSetCreated, bSetDestroyed);
 }
 
 void Map::RestoreBlyData(const u8* pSaveData)
@@ -1324,12 +1316,12 @@ TlvIterator Map::VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, 
     const s32 grid_cell_x = (right / mPathData->field_C_grid_width);
 
     // Check within map bounds
-    if (grid_cell_x >= mMaxCamsX)
+    if (grid_cell_x >= mCamsOnX)
     {
         return TlvIterator::Invalid();
     }
 
-    if (grid_cell_y >= mMaxCamsY)
+    if (grid_cell_y >= mCamsOnY)
     {
         return TlvIterator::Invalid();
     }
@@ -1385,7 +1377,7 @@ TlvIterator Map::TLV_Get_At(TlvIterator tlvIterator, FP xpos, FP ypos, FP width,
         const auto camX = xpos_converted / pPathData->field_C_grid_width;
         const auto camY = ypos_converted / pPathData->field_E_grid_height;
 
-        if (camX >= mMaxCamsX || camY >= mMaxCamsY)
+        if (camX >= mCamsOnX || camY >= mCamsOnY)
         {
             return TlvIterator::Invalid();
         }
@@ -1449,16 +1441,7 @@ void Map::ResetPathObjects(u16 pathNum)
 
 TlvIterator Map::TLV_First_Of_Type_In_Camera(ReliveTypes objectType, s16 camX)
 {
-    TlvIterator tlvIterator = Get_First_TLV_For_Offsetted_Camera(camX, 0);
-    while(tlvIterator.GetTlv())
-    {
-        if (tlvIterator.GetTlv()->mTlvType == objectType)
-        {
-            return tlvIterator;
-        }
-        tlvIterator = tlvIterator.Next_TLV();
-    }
-    return TlvIterator::Invalid();
+    return mPath.TLV_First_Of_Type_In_Camera(objectType, camX);
 }
 
 void Map::Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode)
@@ -1508,7 +1491,7 @@ Camera* Map::Create_Camera(s16 xpos, s16 ypos, s32 /*a4*/)
     }
 
     // Check max bounds
-    if (xpos >= mMaxCamsX || ypos >= mMaxCamsY)
+    if (xpos >= mCamsOnX || ypos >= mCamsOnY)
     {
         return nullptr;
     }
@@ -1674,22 +1657,6 @@ void Map::Get_map_size(PSX_Point* pPoint)
 relive::Path_TLV* Path_TLV::Next_446460(relive::Path_TLV* pTlv)
 {
     return Next(pTlv);
-}
-
-TlvIterator Path_TLV::TLV_Next_Of_Type_446500(TlvIterator tlvIterator, ReliveTypes type)
-{
-    // Skip current which is already of type
-    tlvIterator = tlvIterator.Next_TLV();
-    while (tlvIterator.GetTlv())
-    {
-        // Got the next of type
-        if (tlvIterator.GetTlv()->mTlvType == type)
-        {
-            return tlvIterator;
-        }
-        tlvIterator = tlvIterator.Next_TLV();
-    }
-    return TlvIterator::Invalid();
 }
 
 } // namespace AO

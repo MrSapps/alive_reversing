@@ -317,13 +317,13 @@ void Bullet::VUpdate()
     }
 }
 
-bool Bullet::InZBulletCover(FP xpos, FP ypos, const PSX_RECT& objRect)
+bool Bullet::InZBulletCover(BaseMap& map, FP xpos, FP ypos, const PSX_RECT& objRect)
 {
     TlvIterator pZCover = TlvIterator::Invalid();
     while (1)
     {
         // Go to the next entry (or first if first call).
-        pZCover = gPathInfo->TLV_Get_At(
+        pZCover = map.TLV_Get_At(
             pZCover,
             xpos,
             ypos,

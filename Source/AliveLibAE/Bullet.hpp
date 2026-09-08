@@ -25,7 +25,7 @@ public:
     Bullet(BaseAliveGameObject* pParent, BulletType type, FP xpos, FP ypos, FP xDist, FP scale, s32 numberOfBullets, ResourceManagerWrapper& resMan, BaseMap& map);
     
     virtual void VUpdate() override;
-    static bool InZBulletCover(FP xpos, FP ypos, const PSX_RECT& objRect);
+    static bool InZBulletCover(BaseMap& map, FP xpos, FP ypos, const PSX_RECT& objRect);
     const FP& xpos() const { return mXPos; }
     const FP& ypos() const { return mYPos; }
     const FP& XDistance() const { return mXDistance; }

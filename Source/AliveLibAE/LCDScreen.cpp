@@ -345,5 +345,5 @@ void LCDScreen::VScreenChanged()
 LCDScreen::~LCDScreen()
 {
     gObjListDrawables->Remove_Item(this);
-    Path::TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }

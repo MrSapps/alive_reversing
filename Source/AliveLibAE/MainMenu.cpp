@@ -561,7 +561,7 @@ MainMenuController::MainMenuController(relive::Path_TLV* /*pTlv*/, const Guid& t
 
 MainMenuController::~MainMenuController()
 {
-    Path::TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
     field_158_animation.VCleanUp();
 
     sMainMenuObjectCounter_BB4400--;

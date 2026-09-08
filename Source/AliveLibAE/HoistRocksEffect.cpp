@@ -81,7 +81,7 @@ HoistRocksEffect::~HoistRocksEffect()
         particle.mAnim.VCleanUp();
     }
 
-    Path::TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 void HoistRocksEffect::VUpdate()

@@ -58,11 +58,11 @@ SecurityOrb::~SecurityOrb()
 
     if (mHealth > FP_FromInteger(0))
     {
-        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
+        mMap.TLV_Reset(mTlvInfo);
     }
     else
     {
-        Path::TLV_Delete(static_cast<Map&>(mMap), mTlvInfo);
+        mMap.TLV_Delete(mTlvInfo);
     }
 }
 

@@ -83,7 +83,7 @@ Bat::~Bat()
     {
         pAttackTarget->mChaseCounter--;
     }
-    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
+    mMap.TLV_Reset(mTlvInfo);
 }
 
 void Bat::VScreenChanged()

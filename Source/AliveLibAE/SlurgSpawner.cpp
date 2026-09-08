@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "SlurgSpawner.hpp"
+#include "../relive_lib/BaseMap.hpp"
 #include "DDCheat.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/SwitchStates.hpp"
@@ -51,6 +52,6 @@ void SlurgSpawner::VUpdate()
 
 void SlurgSpawner::VScreenChanged()
 {
-    Path::TLV_Reset(mTlvInfo, mSpawnedCount);
+    mMap.TLV_Reset(mTlvInfo, mSpawnedCount);
     SetDead(true);
 }

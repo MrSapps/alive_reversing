@@ -301,7 +301,7 @@ void Slog::VGetSaveState(SerializedObjectData& pSaveBuffer)
 void Slog::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<SlogSaveState>();
-    auto pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mSlogTlvId).GetTlv<relive::Path_Slog>();
+    auto pTlv = map.TLV_From_Offset_Lvl_Cam(pState->mSlogTlvId).GetTlv<relive::Path_Slog>();
 
     Slog* pSlog = nullptr;
     if (pState->mSlogTlvId == Guid{})
@@ -2805,7 +2805,7 @@ void Slog::VUpdate()
 
         if (oldXPos != mXPos || oldYPos != mYPos)
         {
-            BaseAliveGameObjectPathTLV = gPathInfo->TLV_Get_At(
+            BaseAliveGameObjectPathTLV = mMap.TLV_Get_At(
                 TlvIterator::Invalid(),
                 mXPos,
                 mYPos,
@@ -2831,11 +2831,11 @@ Slog::~Slog()
     {
         if (mHealth <= FP_FromInteger(0))
         {
-            Path::TLV_Delete(mTlvId);
+            mMap.TLV_Delete(mTlvId);
         }
         else
         {
-            Path::TLV_Reset(mTlvId);
+            mMap.TLV_Reset(mTlvId);
         }
     }
 
@@ -3209,7 +3209,7 @@ void Slog::VOnTlvCollision(TlvIterator tlvIterator)
             SetDead(true);
             break;
         }
-        tlvIterator = gPathInfo->TLV_Get_At(tlvIterator, mXPos, mYPos, mXPos, mYPos);
+        tlvIterator = mMap.TLV_Get_At(tlvIterator, mXPos, mYPos, mXPos, mYPos);
     }
 }
 
@@ -3389,7 +3389,7 @@ s16 Slog::HandleEnemyStopper()
         xToUse = mXPos;
     }
 
-    auto stopperPath = gPathInfo->VTLV_Get_At_Of_Type(
+    auto stopperPath = mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(xToUse), FP_GetExponent(mYPos),
         FP_GetExponent(width), FP_GetExponent(mYPos), ReliveTypes::eEnemyStopper).GetTlv<relive::Path_EnemyStopper>();
 

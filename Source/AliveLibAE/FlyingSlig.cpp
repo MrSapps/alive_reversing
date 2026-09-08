@@ -232,7 +232,7 @@ void FlyingSlig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMana
 {
     const auto pSaveState = pBuffer.ReadTmpPtr<FlyingSligSaveState>();
 
-    auto pTlv = static_cast<relive::Path_FlyingSlig*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pSaveState->field_3C_tlvInfo).GetTlv());
+    auto pTlv = static_cast<relive::Path_FlyingSlig*>(map.TLV_From_Offset_Lvl_Cam(pSaveState->field_3C_tlvInfo).GetTlv());
 
     auto pFlyingSlig = relive_new FlyingSlig(pTlv, pSaveState->field_3C_tlvInfo, resMan, map);
     if (pFlyingSlig)
@@ -465,18 +465,18 @@ FlyingSlig::~FlyingSlig()
         }
     }
 
-    relive::Path_TLV* pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(field_148_tlvInfo).GetTlv();
+    relive::Path_TLV* pTlv = mMap.TLV_From_Offset_Lvl_Cam(field_148_tlvInfo).GetTlv();
     if (pTlv)
     {
         if (pTlv->mTlvType != ReliveTypes::eSligGetWings && pTlv->mTlvType != ReliveTypes::eFlyingSligSpawner)
         {
             if (mHealth <= FP_FromInteger(0))
             {
-                Path::TLV_Delete(field_148_tlvInfo);
+                mMap.TLV_Delete(field_148_tlvInfo);
             }
             else
             {
-                Path::TLV_Reset(field_148_tlvInfo);
+                mMap.TLV_Reset(field_148_tlvInfo);
             }
         }
     }
@@ -836,7 +836,7 @@ bool FlyingSlig::VTakeDamage(BaseGameObject* pFrom)
                 TlvIterator tlvIterator = TlvIterator::Invalid();
                 do
                 {
-                    tlvIterator = gPathInfo->TLV_Get_At(tlvIterator,
+                    tlvIterator = mMap.TLV_Get_At(tlvIterator,
                                                                  mXPos,
                                                                  FP_FromInteger(bRect.y),
                                                                  mXPos,
@@ -2492,11 +2492,11 @@ ReliveTypes FlyingSlig::FindLeftOrRightBound(FP xOrY, FP wOrH)
     // TODO: Check left is really Abs'd.
     ReliveTypes found_type = ReliveTypes::eNone;
 
-    if (gPathInfo->VTLV_Get_At_Of_Type(FP_GetExponent(FP_Abs(left)), FP_GetExponent(top), FP_GetExponent(right), FP_GetExponent(bottom), ReliveTypes::eSligBoundLeft).GetTlv())
+    if (mMap.VTLV_Get_At_Of_Type(FP_GetExponent(FP_Abs(left)), FP_GetExponent(top), FP_GetExponent(right), FP_GetExponent(bottom), ReliveTypes::eSligBoundLeft).GetTlv())
     {
         found_type = ReliveTypes::eSligBoundLeft;
     }
-    else if (gPathInfo->VTLV_Get_At_Of_Type(FP_GetExponent(left), FP_GetExponent(top), FP_GetExponent(right), FP_GetExponent(bottom), ReliveTypes::eSligBoundRight).GetTlv())
+    else if (mMap.VTLV_Get_At_Of_Type(FP_GetExponent(left), FP_GetExponent(top), FP_GetExponent(right), FP_GetExponent(bottom), ReliveTypes::eSligBoundRight).GetTlv())
     {
         found_type = ReliveTypes::eSligBoundRight;
     }

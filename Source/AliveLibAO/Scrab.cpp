@@ -130,11 +130,11 @@ Scrab::~Scrab()
 
     if (mHealth <= FP_FromInteger(0))
     {
-        Path::TLV_Delete(static_cast<Map&>(mMap), field_134_tlvInfo);
+        mMap.TLV_Delete(field_134_tlvInfo);
     }
     else
     {
-        Path::TLV_Reset(static_cast<Map&>(mMap), field_134_tlvInfo);
+        mMap.TLV_Reset(field_134_tlvInfo);
     }
 
     MusicController::static_PlayMusic(MusicController::MusicTypes::eType0, this, 0, 0);

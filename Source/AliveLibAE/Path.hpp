@@ -5,6 +5,7 @@
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/BinaryPath.hpp"
+#include "../relive_lib/BasePath.hpp"
 
 class ResourceManagerWrapper;
 class Map;
@@ -218,7 +219,7 @@ namespace relive
     enum class LoadMode : s16;
 }
 
-class Path
+class Path : public BasePath
 {
 public:
     Path(Map& map);
@@ -229,19 +230,15 @@ public:
 
     void Loader_4DB800(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad, ResourceManagerWrapper& resMan, BaseMap& map);
 
-    TlvIterator Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx);
-
-    TlvIterator TLV_First_Of_Type_In_Camera(ReliveTypes objectType, s16 camX);
     TlvIterator VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes objectType);
     TlvIterator TLV_Get_At(TlvIterator pTlv, FP xpos, FP ypos, FP w, FP h);
     TlvIterator TLV_From_Offset_Lvl_Cam(const Guid& tlvId);
 
-    Guid TLVInfo_From_TLVPtr(relive::Path_TLV* pTlv);
+    static Guid TLVInfo_From_TLVPtr(relive::Path_TLV* pTlv);
 
-    static TlvIterator TLV_Next_Of_Type(TlvIterator pTlv, ReliveTypes type);
-    static void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1);
-    static void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1);
-    static void TLV_Delete(const Guid& tlvId, s16 hiFlags = -1);
+    void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1);
+    void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1);
+    void TLV_Delete(const Guid& tlvId, s16 hiFlags = -1);
     void Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed);
     void Start_Sounds_For_Objects_In_Camera(CameraPos direction, s16 cam_x_idx, s16 cam_y_idx);
 
@@ -250,13 +247,8 @@ public:
     EReliveLevelIds mLevelId = EReliveLevelIds::eNone;
     u16 mPathId = 0;
     s16 mCameraId = 0;
-    u16 mCamsOnX = 0;
-    u16 mCamsOnY = 0;
     const PathData* mPathData = nullptr;
     BinaryPath* mBinaryPath = nullptr; // Non owning ptr
-    BaseMap& mMap;
 };
 
 enum class CameraPos : s16;
-
-extern Path* gPathInfo;

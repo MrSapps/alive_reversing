@@ -347,7 +347,7 @@ void LCDScreen::VScreenChanged()
 LCDScreen::~LCDScreen()
 {
     gObjListDrawables->Remove_Item(this);
-    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 } // namespace AO

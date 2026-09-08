@@ -125,7 +125,7 @@ BirdPortal::~BirdPortal()
         mSfxPlaying = 0;
     }
 
-    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
+    mMap.TLV_Reset(mTlvInfo);
 }
 
 void BirdPortal::VUpdate()

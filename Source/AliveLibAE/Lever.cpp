@@ -94,7 +94,7 @@ Lever::Lever(relive::Path_Lever* pTlv, const Guid& tlvId, ResourceManagerWrapper
 
 Lever::~Lever()
 {
-    Path::TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 void Lever::VScreenChanged()

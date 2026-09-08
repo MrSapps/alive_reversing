@@ -34,7 +34,7 @@ MultiSwitchController::MultiSwitchController(relive::Path_MultiSwitchController*
 
 MultiSwitchController::~MultiSwitchController()
 {
-    Path::TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 void MultiSwitchController::VScreenChanged()

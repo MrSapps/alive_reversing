@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "RockSack.hpp"
+#include "../relive_lib/BaseMap.hpp"
 #include "Rock.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/GameObjects/ThrowableArray.hpp"
@@ -65,7 +66,7 @@ RockSack::RockSack(relive::Path_RockSack* pTlv, const Guid& tlvId, ResourceManag
 
 RockSack::~RockSack()
 {
-    Path::TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 void RockSack::VScreenChanged()

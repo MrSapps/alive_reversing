@@ -105,11 +105,11 @@ MovingBomb::~MovingBomb()
 
     if (mState == States::eBlowingUp_6 || mState == States::eKillMovingBomb_7)
     {
-        Path::TLV_Delete(static_cast<Map&>(mMap), mTlvId);
+        mMap.TLV_Delete(mTlvId);
     }
     else
     {
-        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
+        mMap.TLV_Reset(mTlvId);
     }
 
     if (sMovingBomb == this)

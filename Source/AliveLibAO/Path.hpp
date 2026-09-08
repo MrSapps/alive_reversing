@@ -3,6 +3,7 @@
 #include "../relive_lib/BitField.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
 #include "../relive_lib/Psx.hpp"
+#include "../relive_lib/BasePath.hpp"
 
 namespace AO {
 
@@ -178,7 +179,10 @@ struct Path_TLV
         return reinterpret_cast<relive::Path_TLV*>(pNext);
     }
 
-    static TlvIterator TLV_Next_Of_Type_446500(TlvIterator tlvIterator, ReliveTypes type);
+    static TlvIterator TLV_Next_Of_Type_446500(TlvIterator tlvIterator, ReliveTypes type)
+    {
+        return BasePath::TLV_Next_Of_Type(tlvIterator, type);
+    }
 
     // Some strange self terminate check that is inlined everywhere
     void RangeCheck()
@@ -191,13 +195,15 @@ struct Path_TLV
 };
 ALIVE_ASSERT_SIZEOF_ALWAYS(Path_TLV, 0x18);
 
-class Path final
+class Path final : public BasePath
 {
 public:
-    static void TLV_Reset(Map& map, const Guid& tlvId, s16 hiFlags = -1);
-    static void TLV_Persist(Map& map, const Guid& tlvId, s16 hiFlags = -1);
-    static void TLV_Delete(Map& map, const Guid& tlvId, s16 hiFlags = -1);
+    explicit Path(Map& map);
 
-    static void Set_TLVData(Map& map, const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed);
+    void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1);
+    void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1);
+    void TLV_Delete(const Guid& tlvId, s16 hiFlags = -1);
+    void Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed);
 };
+
 } // namespace AO

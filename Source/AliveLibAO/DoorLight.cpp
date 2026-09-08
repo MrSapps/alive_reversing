@@ -127,7 +127,7 @@ DoorLight::DoorLight(relive::Path_LightEffect* pTlv, const Guid& tlvId, Resource
 
 DoorLight::~DoorLight()
 {
-    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 void DoorLight::VScreenChanged()

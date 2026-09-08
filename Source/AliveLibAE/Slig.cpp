@@ -644,7 +644,7 @@ void Slig::VGetSaveState(SerializedObjectData& pSaveBuffer)
 void Slig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<SligSaveState>();
-    auto pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(pState->field_5C_tlvInfo).GetTlv<relive::Path_Slig>();
+    auto pTlv = map.TLV_From_Offset_Lvl_Cam(pState->field_5C_tlvInfo).GetTlv<relive::Path_Slig>();
 
     auto pSlig = relive_new Slig(pTlv, pState->field_5C_tlvInfo, resMan, map);
     if (pSlig)
@@ -1778,7 +1778,7 @@ void Slig::Motion_34_Knockback()
             mCurrentMotion = eSligMotions::Motion_34_Knockback;
             field_12C_timer = MakeTimer(10);
             if (mYPos - BaseAliveGameObjectLastLineYPos > FP_FromInteger(180)
-                && !gPathInfo->VTLV_Get_At_Of_Type(
+                && !mMap.VTLV_Get_At_Of_Type(
                     FP_GetExponent(mXPos),
                     FP_GetExponent(mYPos),
                     FP_GetExponent(mXPos),
@@ -1985,7 +1985,7 @@ void Slig::Motion_38_OutToFall()
         SetDead(true);
     }
 
-    if (mCurrentMotion == eSligMotions::Motion_40_LandingSoft && fallDepth > FP_FromInteger(180) && !gPathInfo->VTLV_Get_At_Of_Type(FP_GetExponent(mXPos), FP_GetExponent(mYPos), FP_GetExponent(mXPos), FP_GetExponent(mYPos), ReliveTypes::eSoftLanding).GetTlv())
+    if (mCurrentMotion == eSligMotions::Motion_40_LandingSoft && fallDepth > FP_FromInteger(180) && !mMap.VTLV_Get_At_Of_Type(FP_GetExponent(mXPos), FP_GetExponent(mYPos), FP_GetExponent(mXPos), FP_GetExponent(mYPos), ReliveTypes::eSoftLanding).GetTlv())
     {
         mCurrentMotion = eSligMotions::Motion_41_LandingFatal;
         field_12C_timer = MakeTimer(30);
@@ -4423,7 +4423,7 @@ void Slig::Init()
     {
         for (s16 xCam = -3; xCam < 4; xCam++)
         {
-            TlvIterator pTlvIter = gPathInfo->Get_First_TLV_For_Offsetted_Camera(xCam, yCam);
+            TlvIterator pTlvIter = mMap.Get_First_TLV_For_Offsetted_Camera(xCam, yCam);
             while (pTlvIter.GetTlv())
             {
                 bool addPoint = false;
@@ -4487,7 +4487,7 @@ Slig::~Slig()
         }
     }
 
-    relive::Path_TLV* pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(field_118_tlvInfo).GetTlv();
+    relive::Path_TLV* pTlv = mMap.TLV_From_Offset_Lvl_Cam(field_118_tlvInfo).GetTlv();
     if (pTlv)
     {
         if (pTlv->mTlvType != ReliveTypes::eSligGetPants && pTlv->mTlvType != ReliveTypes::eSligSpawner)
@@ -4673,7 +4673,7 @@ void Slig::VUpdate()
 
         if (oldXPos != mXPos || oldYPos != mYPos)
         {
-            BaseAliveGameObjectPathTLV = gPathInfo->TLV_Get_At(
+            BaseAliveGameObjectPathTLV = mMap.TLV_Get_At(
                 TlvIterator::Invalid(),
                 mXPos,
                 mYPos,
@@ -4749,7 +4749,7 @@ void Slig::VOnTlvCollision(TlvIterator tlvIterator)
                 break;
             }
         }
-        tlvIterator = gPathInfo->TLV_Get_At(tlvIterator, mXPos, mYPos, mXPos, mYPos);
+        tlvIterator = mMap.TLV_Get_At(tlvIterator, mXPos, mYPos, mXPos, mYPos);
     }
 }
 
@@ -4785,7 +4785,7 @@ void Slig::WakeUp()
     SetBrain(&Slig::Brain_31_WakingUp);
 
     MusicController::static_PlayMusic(MusicController::MusicTypes::eTension_4, this, 0, 0);
-    relive::Path_TLV* pTlv = gPathInfo->VTLV_Get_At_Of_Type(
+    relive::Path_TLV* pTlv = mMap.VTLV_Get_At_Of_Type(
         mSligTlv.mTopLeftX,
         mSligTlv.mTopLeftY,
         mSligTlv.mTopLeftX,
@@ -5914,7 +5914,7 @@ s16 Slig::HandleEnemyStopper(s32 gridBlocks)
     }
 
     const FP width = ScaleToGridSize(GetSpriteScale()) * FP_FromInteger(directedGirdBlocks) + mXPos;
-    auto pTlv = gPathInfo->VTLV_Get_At_Of_Type(
+    auto pTlv = mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos),
         FP_GetExponent(mYPos),
         FP_GetExponent(width),
@@ -6210,7 +6210,7 @@ s16 Slig::IsAbeEnteringDoor(BaseAliveGameObject* pThis)
 s16 Slig::FindLever()
 {
     const s16 yPos = FP_GetExponent(mYPos - FP_FromInteger(5));
-    if (gPathInfo->VTLV_Get_At_Of_Type(FP_GetExponent(mXPos), yPos, FP_GetExponent(mXPos), yPos, ReliveTypes::eLever).GetTlv())
+    if (mMap.VTLV_Get_At_Of_Type(FP_GetExponent(mXPos), yPos, FP_GetExponent(mXPos), yPos, ReliveTypes::eLever).GetTlv())
     {
         return 0;
     }
@@ -6221,7 +6221,7 @@ s16 Slig::FindLever()
         xOff = -xOff;
     }
 
-    return gPathInfo->VTLV_Get_At_Of_Type(
+    return mMap.VTLV_Get_At_Of_Type(
                FP_GetExponent(FP_Abs(mXPos) + xOff),
                yPos,
                FP_GetExponent(FP_Abs(mXPos) + xOff),
@@ -6253,7 +6253,7 @@ static s16 IsInZCover(relive::Path_TLV* pTlv, const PSX_RECT* pRect)
 s16 Slig::IsInZCover(BaseAliveGameObject* pObj)
 {
     const PSX_RECT bRect = pObj->VGetBoundingRect();
-    return Bullet::InZBulletCover(pObj->mXPos, FP_FromInteger(bRect.y), bRect);
+    return Bullet::InZBulletCover(pObj->GetMap(), pObj->mXPos, FP_FromInteger(bRect.y), bRect);
 }
 
 bool Slig::InAnyWellRenderLayer(BaseAliveGameObject* pThis)
@@ -6366,7 +6366,7 @@ bool Slig::VTakeDamage(BaseGameObject* pFrom)
                     TlvIterator pTlvIter = TlvIterator::Invalid();
                     for (;;)
                     {
-                        pTlvIter = gPathInfo->TLV_Get_At(pTlvIter, mXPos, rectY, mXPos, rectY);
+                        pTlvIter = mMap.TLV_Get_At(pTlvIter, mXPos, rectY, mXPos, rectY);
                         if (!pTlvIter.GetTlv())
                         {
                             break;

@@ -122,7 +122,7 @@ Slurg::Slurg(relive::Path_Slurg* pTlv, const Guid& tlvId, ResourceManagerWrapper
 void Slurg::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pData.ReadTmpPtr<SlurgSaveState>();
-    auto pTlv = static_cast<relive::Path_Slurg*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv());
+    auto pTlv = static_cast<relive::Path_Slurg*>(map.TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv());
 
     auto pSlurg = relive_new Slurg(pTlv, pState->mTlvId, resMan, map);
 
@@ -156,11 +156,11 @@ Slurg::~Slurg()
         // NOTE: OG bug? OG passed in 0xFFFFFFFF but it probably should've been mTlvInfo?
         if (mSlurgState == SlurgStates::eBurst_2)
         {
-            Path::TLV_Delete({});
+            mMap.TLV_Delete({});
         }
         else
         {
-            Path::TLV_Reset({});
+            mMap.TLV_Reset({});
         }
     }
 }
@@ -264,7 +264,7 @@ void Slurg::VUpdate()
 
     if (oldXPos != mXPos)
     {
-        VOnTlvCollision(gPathInfo->TLV_Get_At(
+        VOnTlvCollision(mMap.TLV_Get_At(
             TlvIterator::Invalid(),
             mXPos,
             mYPos,
@@ -303,7 +303,7 @@ void Slurg::VOnTlvCollision(TlvIterator tlvIterator)
                 GoRight();
             }
         }
-        tlvIterator = gPathInfo->TLV_Get_At(tlvIterator, mXPos, mYPos, mXPos, mYPos);
+        tlvIterator = mMap.TLV_Get_At(tlvIterator, mXPos, mYPos, mXPos, mYPos);
     }
 
     if (mGoingRight)

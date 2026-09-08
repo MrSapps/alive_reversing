@@ -65,6 +65,7 @@ void Map::ScreenChange_Common()
 
 Map::Map(ResourceManagerWrapper& resMan)
     : BaseMap(resMan)
+    , mPath(*this)
 {
     Reset();
 }
@@ -84,8 +85,6 @@ void Map::Reset()
 
 void Map::Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange)
 {
-    gPathInfo = relive_new Path(*this);
-
     for (s32 i = 0; i < ALIVE_COUNTOF(field_2C_camera_array); i++)
     {
         field_2C_camera_array[i] = nullptr;
@@ -187,9 +186,8 @@ void Map::Shutdown()
 
     gScreenManager = nullptr;
 
-    // Free 
-    relive_delete gPathInfo;
-    gPathInfo = nullptr;
+    // Free
+    mPath.Free();
 
     Reset();
 }
@@ -341,7 +339,7 @@ void Map::Handle_PathTransition()
     relive::Path_PathTransition* pTlv = nullptr;
     if (mAliveObj)
     {
-        pTlv = static_cast<relive::Path_PathTransition*>(gPathInfo->VTLV_Get_At_Of_Type(
+        pTlv = static_cast<relive::Path_PathTransition*>(mPath.VTLV_Get_At_Of_Type(
             FP_GetExponent(mAliveObj->mXPos),
             FP_GetExponent(mAliveObj->mYPos),
             FP_GetExponent(mAliveObj->mXPos),
@@ -401,8 +399,8 @@ void Map::Handle_PathTransition()
         }
 
         mAliveObj->VOnPathTransition(
-            mPathData->field_A_grid_width * mCamIdxOnX,
-            mPathData->field_C_grid_height * mCamIdxOnY,
+            mPath.mPathData->field_A_grid_width * mCamIdxOnX,
+            mPath.mPathData->field_C_grid_height * mCamIdxOnY,
             remapped);
     }
     else
@@ -608,7 +606,7 @@ void Map::GoTo_Camera()
             {
                 SND_Reset();
                 FreePathResourceBlocks();
-                gPathInfo->Free();
+                mPath.Free();
             }
 
         }
@@ -656,10 +654,9 @@ void Map::GoTo_Camera()
     mCurrentCamera = mNextCamera;
 
     const PathBlyRec* pPathRec_1 = Path_Get_Bly_Record(mNextLevel, mNextPath);
-    mPathData = pPathRec_1->field_4_pPathData;
 
-    gPathInfo->Init(
-        mPathData,
+    mPath.Init(
+        pPathRec_1->field_4_pPathData,
         mNextLevel,
         mNextPath,
         mNextCamera,
@@ -676,8 +673,8 @@ void Map::GoTo_Camera()
         }
     }
 
-    mCameraOffset.x = FP_FromInteger(mCamIdxOnX * mPathData->field_A_grid_width);
-    mCameraOffset.y = FP_FromInteger(mCamIdxOnY * mPathData->field_C_grid_height);
+    mCameraOffset.x = FP_FromInteger(mCamIdxOnX * mPath.mPathData->field_A_grid_width);
+    mCameraOffset.y = FP_FromInteger(mCamIdxOnY * mPath.mPathData->field_C_grid_height);
 
     // If map has changed then load new collision info
     if (prevPathId != mCurrentPath || prevLevelId != mCurrentLevel)
@@ -739,7 +736,7 @@ void Map::GoTo_Camera()
         gScreenManager = relive_new ScreenManager(field_2C_camera_array[0]->mCamRes, &mCameraOffset, GetResourceManager(), *this);
     }
 
-    gPathInfo->Loader_4DB800(mCamIdxOnX, mCamIdxOnY, relive::Factory::LoadMode::ConstructObject_0, ReliveTypes::eNone, mResourceManager, *this); // none = load all
+    mPath.Loader_4DB800(mCamIdxOnX, mCamIdxOnY, relive::Factory::LoadMode::ConstructObject_0, ReliveTypes::eNone, mResourceManager, *this); // none = load all
 
     if (prevPathId != mCurrentPath || prevLevelId != mCurrentLevel)
     {
@@ -777,7 +774,7 @@ void Map::GoTo_Camera()
             // TODO: Add template helpers
 
             // Door transition
-            TlvIterator doorIterator = gPathInfo->TLV_First_Of_Type_In_Camera(ReliveTypes::eDoor, 0);
+            TlvIterator doorIterator = mPath.TLV_First_Of_Type_In_Camera(ReliveTypes::eDoor, 0);
             while (doorIterator.GetTlv())
             {
                 auto pDoorTlv = static_cast<relive::Path_Door*>(doorIterator.GetTlv());
@@ -800,7 +797,7 @@ void Map::GoTo_Camera()
                 // TODO: Add template helpers
 
                 // Teleporter transition
-                TlvIterator teleporterIterator = gPathInfo->TLV_First_Of_Type_In_Camera(ReliveTypes::eTeleporter, 0);
+                TlvIterator teleporterIterator = mPath.TLV_First_Of_Type_In_Camera(ReliveTypes::eTeleporter, 0);
                 while (teleporterIterator.GetTlv())
                 {
                     auto pTeleporterTlv = static_cast<relive::Path_Teleporter*>(teleporterIterator.GetTlv());
@@ -835,22 +832,22 @@ void Map::Create_FG1s()
 
 void Map::TLV_Reset(const Guid& tlvId, s16 hiFlags)
 {
-    Path::TLV_Reset(tlvId, hiFlags);
+    mPath.TLV_Reset(tlvId, hiFlags);
 }
 
 void Map::TLV_Persist(const Guid& tlvId, s16 hiFlags)
 {
-    Path::TLV_Persist(tlvId, hiFlags);
+    mPath.TLV_Persist(tlvId, hiFlags);
 }
 
 void Map::TLV_Delete(const Guid& tlvId, s16 hiFlags)
 {
-    Path::TLV_Delete(tlvId, hiFlags);
+    mPath.TLV_Delete(tlvId, hiFlags);
 }
 
 void Map::Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed)
 {
-    gPathInfo->Set_TLVData(tlvId, hiFlags, bSetCreated, bSetDestroyed);
+    mPath.Set_TLVData(tlvId, hiFlags, bSetCreated, bSetDestroyed);
 }
 
 void Map::CreateScreenTransistionForTLV(relive::Path_TLV* pTlv)
@@ -864,14 +861,14 @@ void Map::CreateScreenTransistionForTLV(relive::Path_TLV* pTlv)
 
 void Map::Get_map_size(PSX_Point* pPoint)
 {
-    pPoint->x = mPathData->field_4_bTop;
-    pPoint->y = mPathData->field_6_bBottom;
+    pPoint->x = mPath.mPathData->field_4_bTop;
+    pPoint->y = mPath.mPathData->field_6_bBottom;
 }
 
 void Map::GetCurrentCamCoords(PSX_Point* pPoint)
 {
-    pPoint->x = mCamIdxOnX * mPathData->field_A_grid_width;
-    pPoint->y = mCamIdxOnY * mPathData->field_C_grid_height;
+    pPoint->x = mCamIdxOnX * mPath.mPathData->field_A_grid_width;
+    pPoint->y = mCamIdxOnY * mPath.mPathData->field_C_grid_height;
 }
 
 s16 Map::GetOverlayId()
@@ -899,8 +896,8 @@ s16 Map::Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect)
         return 1;
     }
 
-    const s16 xpos = pCamera->mCamXOff * mPathData->field_A_grid_width;
-    const s16 ypos = pCamera->mCamYOff * mPathData->field_C_grid_height;
+    const s16 xpos = pCamera->mCamXOff * mPath.mPathData->field_A_grid_width;
+    const s16 ypos = pCamera->mCamYOff * mPath.mPathData->field_C_grid_height;
 
     pRect->x = xpos;
     pRect->y = ypos;
@@ -1009,7 +1006,7 @@ Camera* Map::Create_Camera(s16 xpos, s16 ypos, s32 /*a4*/)
     }
 
     // Check max bounds
-    if (xpos >= gPathInfo->mCamsOnX || ypos >= gPathInfo->mCamsOnY)
+    if (xpos >= mCamsOnX || ypos >= mCamsOnY)
     {
         return nullptr;
     }
@@ -1068,7 +1065,7 @@ void Map::Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode)
             // Async camera load
             pCamera->mCamRes = mResourceManager.LoadCam(pCamera->mLevel, pCamera->mPath, pCamera->mCameraNumber);
 
-            gPathInfo->Loader_4DB800(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResourceFromList_1, ReliveTypes::eNone, mResourceManager, *this); // none = load all
+            mPath.Loader_4DB800(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResourceFromList_1, ReliveTypes::eNone, mResourceManager, *this); // none = load all
         }
         else
         {
@@ -1077,7 +1074,7 @@ void Map::Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode)
             pCamera->mCamResLoaded = true;
             // pCamera->mCamRes = mResourceManager.LoadCam(pCamera->mLevel, pCamera->mPath, pCamera->mCamera);
 
-            gPathInfo->Loader_4DB800(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResource_2, ReliveTypes::eNone, mResourceManager, *this); // none = load all
+            mPath.Loader_4DB800(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResource_2, ReliveTypes::eNone, mResourceManager, *this); // none = load all
         }
 
     }
@@ -1096,20 +1093,30 @@ void Map::LoadResource(const char_type* /*pFileName*/, s32 /*type*/, s32 /*resou
 
 TlvIterator Map::VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind)
 {
-    return gPathInfo->VTLV_Get_At_Of_Type(xpos, ypos, width, height, typeToFind);
+    return mPath.VTLV_Get_At_Of_Type(xpos, ypos, width, height, typeToFind);
 }
 
 TlvIterator Map::TLV_First_Of_Type_In_Camera(ReliveTypes type, s16 camX)
 {
-    return gPathInfo->TLV_First_Of_Type_In_Camera(type, camX);
+    return mPath.TLV_First_Of_Type_In_Camera(type, camX);
 }
 
 TlvIterator Map::TLV_Get_At(TlvIterator pTlv, FP xpos, FP ypos, FP width, FP height)
 {
-    return gPathInfo->TLV_Get_At(pTlv, xpos, ypos, width, height);
+    return mPath.TLV_Get_At(pTlv, xpos, ypos, width, height);
 }
 
 TlvIterator Map::TLV_From_Offset_Lvl_Cam(const Guid& tlvId)
 {
-    return gPathInfo->mBinaryPath->TlvById(tlvId);
+    return mPath.TLV_From_Offset_Lvl_Cam(tlvId);
+}
+
+TlvIterator Map::Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx)
+{
+    return mPath.Get_First_TLV_For_Offsetted_Camera(cam_x_idx, cam_y_idx);
+}
+
+void Map::Reset_TLVs(u16 pathId)
+{
+    mPath.Reset_TLVs(pathId);
 }

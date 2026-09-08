@@ -228,7 +228,7 @@ Drill::Drill(relive::Path_Drill* pTlv, const Guid& tlvId, ResourceManagerWrapper
 void Drill::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pData.ReadTmpPtr<DrillSaveState>();
-    auto pTlv = static_cast<relive::Path_Drill*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mDrillTlvId).GetTlv());
+    auto pTlv = static_cast<relive::Path_Drill*>(map.TLV_From_Offset_Lvl_Cam(pState->mDrillTlvId).GetTlv());
     auto pDrill = relive_new Drill(pTlv, pState->mDrillTlvId, resMan, map);
 
     if (pState->mState != DrillStates::eRestartCycle_0)
@@ -408,11 +408,11 @@ Drill::~Drill()
 
     if (mUseId && !!SwitchStates_Get(mDrillSwitchId) != mStartOff)
     {
-        Path::TLV_Reset(mTlvInfo, 1);
+        mMap.TLV_Reset(mTlvInfo, 1);
     }
     else
     {
-        Path::TLV_Reset(mTlvInfo, 0);
+        mMap.TLV_Reset(mTlvInfo, 0);
     }
 }
 

@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "SligGetPantsAndWings.hpp"
+#include "../relive_lib/BaseMap.hpp"
 #include "../relive_lib/Events.hpp"
 #include "stdlib.hpp"
 #include "Engine.hpp"
@@ -52,7 +53,7 @@ SligGetPantsAndWings::SligGetPantsAndWings(relive::Path_TLV* pTlv, const Guid& t
 
 void SligGetPantsAndWings::VUpdate()
 {
-    relive::Path_TLV* pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(mTlvInfo).GetTlv();
+    relive::Path_TLV* pTlv = mMap.TLV_From_Offset_Lvl_Cam(mTlvInfo).GetTlv();
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);
@@ -95,5 +96,5 @@ void SligGetPantsAndWings::VScreenChanged()
 
 SligGetPantsAndWings::~SligGetPantsAndWings()
 {
-    Path::TLV_Reset(mTlvInfo, 0);
+    mMap.TLV_Reset(mTlvInfo, 0);
 }

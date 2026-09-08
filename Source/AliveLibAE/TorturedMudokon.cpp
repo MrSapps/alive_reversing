@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "TorturedMudokon.hpp"
+#include "../relive_lib/BaseMap.hpp"
 #include "Engine.hpp"
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
 #include "stdlib.hpp"
@@ -91,7 +92,7 @@ TorturedMudokon::~TorturedMudokon()
 {
     if (mState != TorturedMudokonState::eReleased_2)
     {
-        Path::TLV_Reset(mTlvInfo);
+        mMap.TLV_Reset(mTlvInfo);
     }
 
     mTearsAnim.VCleanUp();
@@ -210,7 +211,7 @@ void TorturedMudokon::VUpdate()
         GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::Tortured_Mudokon_Released));
         mTearsAnim.SetRender(false);
         mZapAnim.SetRender(false);
-        relive::Path_TLV* pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(mTlvInfo).GetTlv();
+        relive::Path_TLV* pTlv = mMap.TLV_From_Offset_Lvl_Cam(mTlvInfo).GetTlv();
         if (pTlv)
         {
             pTlv->mTlvSpecificMeaning = 1;

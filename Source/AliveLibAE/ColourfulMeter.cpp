@@ -65,7 +65,7 @@ ColourfulMeter::ColourfulMeter(relive::Path_ColourfulMeter* pTlv, const Guid& tl
 ColourfulMeter::~ColourfulMeter()
 {
     gObjListDrawables->Remove_Item(this);
-    Path::TLV_Reset(mTlvInfo);
+    mMap.TLV_Reset(mTlvInfo);
 }
 
 void ColourfulMeter::VScreenChanged()

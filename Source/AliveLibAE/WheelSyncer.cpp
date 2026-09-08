@@ -92,7 +92,7 @@ void WheelSyncer::VUpdate()
 
 WheelSyncer::~WheelSyncer()
 {
-    Path::TLV_Reset(mTlvInfo);
+    mMap.TLV_Reset(mTlvInfo);
 }
 
 void WheelSyncer::VScreenChanged()

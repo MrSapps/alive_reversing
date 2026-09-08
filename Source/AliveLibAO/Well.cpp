@@ -45,7 +45,7 @@ Well::~Well()
 {
     if (mTlvInfo.IsValid())
     {
-        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
+        mMap.TLV_Reset(mTlvInfo);
     }
 }
 
@@ -159,7 +159,7 @@ void Well::VUpdate()
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);
-        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
+        mMap.TLV_Reset(mTlvInfo);
     }
 
     if (mEmitLeaves)

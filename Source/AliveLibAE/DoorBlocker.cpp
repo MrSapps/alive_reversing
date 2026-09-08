@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "DoorBlocker.hpp"
+#include "../relive_lib/BaseMap.hpp"
 #include "../relive_lib/SwitchStates.hpp"
 #include "../relive_lib/Events.hpp"
 #include "Sfx.hpp"
@@ -43,7 +44,7 @@ DoorBlocker::DoorBlocker(relive::Path_DoorBlocker* pTlv, const Guid& tlvId, Reso
 
 DoorBlocker::~DoorBlocker()
 {
-    Path::TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 void DoorBlocker::LoadAnimations()

@@ -33,7 +33,7 @@ SlogSpawner::SlogSpawner(relive::Path_SlogSpawner* pTlv, const Guid& tlvId, Reso
 
 void SlogSpawner::VScreenChanged()
 {
-    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo, mSpawnedSlogsCount);
+    mMap.TLV_Reset(mTlvInfo, mSpawnedSlogsCount);
     SetDead(true);
 }
 
@@ -64,7 +64,7 @@ void SlogSpawner::VUpdate()
 
             if (mSpawnedSlogsCount >= mMaxSlogs)
             {
-                Path::TLV_Delete(static_cast<Map&>(mMap), mTlvInfo, mSpawnedSlogsCount);
+                mMap.TLV_Delete(mTlvInfo, mSpawnedSlogsCount);
                 SetDead(true);
             }
         }

@@ -362,11 +362,11 @@ Mudokon::~Mudokon()
 
     if (!mBit2_Unknown || mHealth <= FP_FromInteger(0) || GetElectrocuted())
     {
-        Path::TLV_Delete(static_cast<Map&>(mMap), mTlvId);
+        mMap.TLV_Delete(mTlvId);
     }
     else
     {
-        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
+        mMap.TLV_Reset(mTlvId);
     }
 
     /*

@@ -62,7 +62,7 @@ CameraSwapper::~CameraSwapper()
 
     BackgroundMusic::Play();
     MusicController::static_EnableMusic(1);
-    Start_Sounds_For_Objects_In_Near_Cameras();
+    Start_Sounds_For_Objects_In_Near_Cameras(mMap);
 }
 
 static const s32 kSliceWidth = 8;

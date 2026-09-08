@@ -214,7 +214,7 @@ void Scrab::VOnTlvCollision(TlvIterator tlvIterator)
                 }
             }
         }
-        tlvIterator = gPathInfo->TLV_Get_At(
+        tlvIterator = mMap.TLV_Get_At(
             tlvIterator,
             mXPos,
             mYPos,
@@ -227,7 +227,7 @@ void Scrab::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWr
 {
     const auto pState = pBuffer.ReadTmpPtr<ScrabSaveState>();
 
-    auto pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(pState->field_44_tlvInfo).GetTlv<relive::Path_Scrab>();
+    auto pTlv = map.TLV_From_Offset_Lvl_Cam(pState->field_44_tlvInfo).GetTlv<relive::Path_Scrab>();
 
     auto pScrab = relive_new Scrab(pTlv, pState->field_44_tlvInfo, relive::Path_ScrabSpawner::SpawnDirection::eNone, resMan, map);
     if (pScrab)
@@ -426,11 +426,11 @@ Scrab::~Scrab()
 
     if (mHealth <= FP_FromInteger(0))
     {
-        Path::TLV_Delete(field_144_tlvInfo);
+        mMap.TLV_Delete(field_144_tlvInfo);
     }
     else
     {
-        Path::TLV_Reset(field_144_tlvInfo);
+        mMap.TLV_Reset(field_144_tlvInfo);
     }
 
     MusicController::static_PlayMusic(MusicController::MusicTypes::eNone_0, this, 0, 0);
@@ -657,7 +657,7 @@ void Scrab::VUpdate()
 
             if (field_198_max_xpos != mXPos || field_19C_max_ypos != mYPos)
             {
-                BaseAliveGameObjectPathTLV = gPathInfo->TLV_Get_At(
+                BaseAliveGameObjectPathTLV = mMap.TLV_Get_At(
                     TlvIterator::Invalid(),
                     mXPos,
                     mYPos,
@@ -1464,7 +1464,7 @@ s16 Scrab::Brain_ChasingEnemy_State_2_Running(BaseAliveGameObject* pObj)
     if (xPosition < 6
         && Check_IsOnEndOfLine(mVelX < FP_FromInteger(0), 1)
         && ((pObj->mYPos - mYPos < FP_FromInteger(5))
-            || gPathInfo->VTLV_Get_At_Of_Type(
+            || mMap.VTLV_Get_At_Of_Type(
                 FP_GetExponent(mXPos + xOffset),
                 FP_GetExponent(mYPos + FP_FromInteger(10)),
                 FP_GetExponent(mXPos + xOffset),
@@ -4180,7 +4180,7 @@ s16 Scrab::Handle_SlamDoor_or_EnemyStopper(FP velX, s16 bCheckLeftRightBounds)
         return 1;
     }
 
-    BaseAliveGameObjectPathTLV = gPathInfo->VTLV_Get_At_Of_Type(
+    BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos),
         FP_GetExponent(FP_Abs(mYPos)),
         FP_GetExponent(mXPos + gridSize),
@@ -4193,7 +4193,7 @@ s16 Scrab::Handle_SlamDoor_or_EnemyStopper(FP velX, s16 bCheckLeftRightBounds)
         return 1;
     }
 
-    BaseAliveGameObjectPathTLV = gPathInfo->VTLV_Get_At_Of_Type(
+    BaseAliveGameObjectPathTLV = mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos),
         FP_GetExponent(mYPos),
         FP_GetExponent(mXPos + gridSize),
@@ -4208,7 +4208,7 @@ s16 Scrab::Handle_SlamDoor_or_EnemyStopper(FP velX, s16 bCheckLeftRightBounds)
 
     if (bCheckLeftRightBounds)
     {
-        if (gPathInfo->VTLV_Get_At_Of_Type(
+        if (mMap.VTLV_Get_At_Of_Type(
                 FP_GetExponent(mXPos),
                 FP_GetExponent(FP_Abs(mYPos)),
                 FP_GetExponent(mXPos + gridSize),

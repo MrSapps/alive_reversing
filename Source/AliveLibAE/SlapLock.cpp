@@ -101,14 +101,14 @@ SlapLock::SlapLock(relive::Path_SlapLock* pTlv, const Guid& tlvId, ResourceManag
 
 SlapLock::~SlapLock()
 {
-    Path::TLV_Reset(mTlvInfo);
+    mMap.TLV_Reset(mTlvInfo);
 }
 
 void SlapLock::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<SlapLockSaveState>();
 
-    auto pTlv = static_cast<relive::Path_SlapLock*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mTlvInfo).GetTlv());
+    auto pTlv = static_cast<relive::Path_SlapLock*>(map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo).GetTlv());
 
     auto pSlapLock = relive_new SlapLock(pTlv, pState->mTlvInfo, resMan, map);
     if (pSlapLock)
@@ -137,7 +137,7 @@ void SlapLock::VScreenChanged()
 
 void SlapLock::GiveInvisibility()
 {
-    mSlapLockTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(mTlvInfo);
+    mSlapLockTlv = mMap.TLV_From_Offset_Lvl_Cam(mTlvInfo);
     if (gAbe)
     {
         gAbe->mInvisibilityDuration = mSlapLockTlv.GetTlv<relive::Path_SlapLock>()->mInvisibilityDuration;
@@ -154,7 +154,7 @@ void SlapLock::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mType = ReliveTypes::eSlapLock;
     data.mAnimRender = GetAnimation().GetRender() & 1;
     data.mTlvInfo = mTlvInfo;
-    data.mTlvState = gPathInfo->TLV_From_Offset_Lvl_Cam(mTlvInfo).GetTlv()->mTlvSpecificMeaning;
+    data.mTlvState = mMap.TLV_From_Offset_Lvl_Cam(mTlvInfo).GetTlv()->mTlvSpecificMeaning;
     data.mState = mState;
     data.mTimer1 = mTimer1;
     data.mShinyParticleTimer = mShinyParticleTimer;
@@ -176,7 +176,7 @@ void SlapLock::VGetSaveState(SerializedObjectData& pSaveBuffer)
 
 void SlapLock::VUpdate()
 {
-    mSlapLockTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(mTlvInfo);
+    mSlapLockTlv = mMap.TLV_From_Offset_Lvl_Cam(mTlvInfo);
 
     if (EventGet(Event::kEventDeathReset))
     {
@@ -426,7 +426,7 @@ void SlapLock::SetInvisibilityTarget()
 
 bool SlapLock::VTakeDamage(BaseGameObject* pFrom)
 {
-    mSlapLockTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(mTlvInfo);
+    mSlapLockTlv = mMap.TLV_From_Offset_Lvl_Cam(mTlvInfo);
 
     if (pFrom->Type() != ReliveTypes::eAbe)
     {

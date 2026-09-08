@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "SlogSpawner.hpp"
+#include "../relive_lib/BaseMap.hpp"
 #include "../relive_lib/Function.hpp"
 #include "stdlib.hpp"
 #include "../relive_lib/Events.hpp"
@@ -32,7 +33,7 @@ SlogSpawner::SlogSpawner(relive::Path_SlogSpawner* pTlv, const Guid& tlvId, Reso
 
 void SlogSpawner::VScreenChanged()
 {
-    Path::TLV_Reset(mTlvInfo, mSpawnedSlogsCount);
+    mMap.TLV_Reset(mTlvInfo, mSpawnedSlogsCount);
     SetDead(true);
 }
 
@@ -60,7 +61,7 @@ void SlogSpawner::VUpdate()
 
             if (mSpawnedSlogsCount >= mMaxSlogs)
             {
-                Path::TLV_Delete(mTlvInfo, mSpawnedSlogsCount);
+                mMap.TLV_Delete(mTlvInfo, mSpawnedSlogsCount);
                 SetDead(true);
             }
         }

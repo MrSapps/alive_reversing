@@ -113,7 +113,7 @@ Greeter::Greeter(relive::Path_Greeter* pTlv, const Guid& tlvId, ResourceManagerW
 void Greeter::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<GreeterSaveState>();
-    auto pTlv = static_cast<relive::Path_Greeter*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv());
+    auto pTlv = static_cast<relive::Path_Greeter*>(map.TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv());
 
     auto pGreeter = relive_new Greeter(pTlv, pState->mTlvId, resMan, map);
     if (pGreeter)
@@ -233,11 +233,11 @@ Greeter::~Greeter()
 {
     if (field_12E_bDontSetDestroyed)
     {
-        Path::TLV_Reset(mTlvId);
+        mMap.TLV_Reset(mTlvId);
     }
     else
     {
-        Path::TLV_Delete(mTlvId);
+        mMap.TLV_Delete(mTlvId);
     }
 
     BaseGameObject* pMotionDetector = sObjectIds.Find_Impl(field_11C_motionDetectorId);
@@ -336,7 +336,7 @@ void Greeter::HandleRollingAlong()
                 break;
         }
 
-        tlvIterator = gPathInfo->TLV_Get_At(tlvIterator,
+        tlvIterator = mMap.TLV_Get_At(tlvIterator,
                                             mVelX + mXPos + mVelX,
                                             mVelY + mYPos + mVelY,
                                             mVelX + mXPos + mVelX,
@@ -775,7 +775,7 @@ void Greeter::VUpdate()
                           + mYPos
                           + mVelY;
 
-            field_138_pTlv = gPathInfo->TLV_Get_At(TlvIterator::Invalid(), xpos, ypos, xpos, ypos);
+            field_138_pTlv = mMap.TLV_Get_At(TlvIterator::Invalid(), xpos, ypos, xpos, ypos);
             HandleRollingAlong();
         }
     }
@@ -783,7 +783,7 @@ void Greeter::VUpdate()
     bool collisionCheck = true;
     if (mBrainState == GreeterBrainStates::eBrain_7_Fall)
     {
-        field_138_pTlv = gPathInfo->TLV_Get_At(
+        field_138_pTlv = mMap.TLV_Get_At(
             TlvIterator::Invalid(),
             mXPos,
             mYPos,

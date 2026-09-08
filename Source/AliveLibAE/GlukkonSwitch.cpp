@@ -79,7 +79,7 @@ GlukkonSwitch::GlukkonSwitch(relive::Path_GlukkonSwitch* pTlv, const Guid& tlvId
 
 GlukkonSwitch::~GlukkonSwitch()
 {
-    Path::TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 void GlukkonSwitch::VScreenChanged()

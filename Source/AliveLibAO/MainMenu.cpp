@@ -471,7 +471,7 @@ Menu::Menu(relive::Path_TLV* /*pTlv*/, const Guid& tlvId, ResourceManagerWrapper
 
 Menu::~Menu()
 {
-    Path::TLV_Reset(static_cast<Map&>(mMap), field_1D4_tlvInfo);
+    mMap.TLV_Reset(field_1D4_tlvInfo);
     mButtonAnim.VCleanUp();
 
     /*

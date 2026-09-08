@@ -175,7 +175,7 @@ void ZBall::VUpdate()
         SetDead(true);
         if (mTlvInfo.IsValid())
         {
-            Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
+            mMap.TLV_Reset(mTlvInfo);
         }
     }
 }

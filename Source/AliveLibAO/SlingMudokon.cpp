@@ -113,11 +113,11 @@ SlingMudokon::~SlingMudokon()
 {
     if (mDontSetDestroyed)
     {
-        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
+        mMap.TLV_Reset(mTlvId);
     }
     else
     {
-        Path::TLV_Delete(static_cast<Map&>(mMap), mTlvId);
+        mMap.TLV_Delete(mTlvId);
     }
 
     /*

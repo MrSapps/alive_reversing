@@ -165,11 +165,11 @@ Paramite::~Paramite()
 
     if (mHealth <= FP_FromInteger(0))
     {
-        Path::TLV_Delete(static_cast<Map&>(mMap), field_12C_tlvInfo);
+        mMap.TLV_Delete(field_12C_tlvInfo);
     }
     else
     {
-        Path::TLV_Reset(static_cast<Map&>(mMap), field_12C_tlvInfo);
+        mMap.TLV_Reset(field_12C_tlvInfo);
     }
 
     SND_SEQ_Stop(SeqId::eParamiteNearby_30);

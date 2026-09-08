@@ -8,6 +8,7 @@
 #include "../relive_lib/SwitchStates.hpp"
 #include "Abe.hpp"
 #include "Path.hpp"
+#include "../relive_lib/BaseMap.hpp"
 #include "../relive_lib/GameType.hpp"
 
 InvisibleSwitch::InvisibleSwitch(relive::Path_InvisibleSwitch* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
@@ -28,7 +29,7 @@ InvisibleSwitch::InvisibleSwitch(relive::Path_InvisibleSwitch* pTlv, const Guid&
 
 InvisibleSwitch::~InvisibleSwitch()
 {
-    Path::TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 bool InvisibleSwitch::IsAbeUsingDoor() const

@@ -114,7 +114,7 @@ const AnimId sMineCarAnimIdTable[7] = {
 void MineCar::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<MineCarSaveState>();
-    auto pTlv = static_cast<relive::Path_MineCar*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pState->field_4C_tlvInfo).GetTlv());
+    auto pTlv = static_cast<relive::Path_MineCar*>(map.TLV_From_Offset_Lvl_Cam(pState->field_4C_tlvInfo).GetTlv());
 
     auto pMineCar = relive_new MineCar(pTlv, pState->field_4C_tlvInfo, 0, 0, 0, resMan, map);
     if (pMineCar)
@@ -280,7 +280,7 @@ void MineCar::VScreenChanged()
 
 MineCar::~MineCar()
 {
-    Path::TLV_Delete(field_118_tlvInfo);
+    mMap.TLV_Delete(field_118_tlvInfo);
     if (field_1D0_sound_channels_mask)
     {
         SND_Stop_Channels_Mask(field_1D0_sound_channels_mask);

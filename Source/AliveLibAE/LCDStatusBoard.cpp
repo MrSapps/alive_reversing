@@ -44,7 +44,7 @@ LCDStatusBoard::LCDStatusBoard(relive::Path_LCDStatusBoard* pTlv, const Guid& tl
 LCDStatusBoard::~LCDStatusBoard()
 {
     gObjListDrawables->Remove_Item(this);
-    Path::TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 void LCDStatusBoard::VUpdate()

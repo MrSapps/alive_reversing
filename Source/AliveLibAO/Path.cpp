@@ -6,24 +6,29 @@
 
 namespace AO {
 
-void Path::TLV_Reset(Map& map, const Guid& tlvId, s16 hiFlags)
+Path::Path(Map& map) : BasePath(map)
 {
-    Path::Set_TLVData(map, tlvId, hiFlags, 0, 0);
+
 }
 
-void Path::TLV_Persist(Map& map, const Guid& tlvId, s16 hiFlags)
+void Path::TLV_Reset(const Guid& tlvId, s16 hiFlags)
 {
-    Path::Set_TLVData(map, tlvId, hiFlags, 1, 0);
+    Set_TLVData(tlvId, hiFlags, 0, 0);
 }
 
-void Path::TLV_Delete(Map& map, const Guid& tlvId, s16 hiFlags)
+void Path::TLV_Persist(const Guid& tlvId, s16 hiFlags)
 {
-    Path::Set_TLVData(map, tlvId, hiFlags, 0, 1);
+    Set_TLVData(tlvId, hiFlags, 1, 0);
 }
 
-void Path::Set_TLVData(Map& map, const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed)
+void Path::TLV_Delete(const Guid& tlvId, s16 hiFlags)
 {
-    auto& paths = map.GetLoadedPaths();
+    Set_TLVData(tlvId, hiFlags, 0, 1);
+}
+
+void Path::Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed)
+{
+    auto& paths = mMap.GetLoadedPaths();
     for (std::unique_ptr<BinaryPath>& pBinPath : paths)
     if (pBinPath)
     {

@@ -47,12 +47,12 @@ BrewMachine::BrewMachine(relive::Path_BrewMachine* pTlv, const Guid& tlvId, Reso
 
 BrewMachine::~BrewMachine()
 {
-    Path::TLV_Reset(mTlvInfo);
+    mMap.TLV_Reset(mTlvInfo);
 }
 
 void BrewMachine::VUpdate()
 {
-    relive::Path_BrewMachine* pTlv = static_cast<relive::Path_BrewMachine*>(gPathInfo->TLV_From_Offset_Lvl_Cam(mTlvInfo).GetTlv());
+    relive::Path_BrewMachine* pTlv = static_cast<relive::Path_BrewMachine*>(mMap.TLV_From_Offset_Lvl_Cam(mTlvInfo).GetTlv());
     if (mRemainingBrewCount > 0)
     {
         pTlv->mTlvSpecificMeaning = static_cast<u8>(mRemainingBrewCount);

@@ -219,7 +219,7 @@ Paramite::Paramite(relive::Path_Paramite* pTlv, const Guid& tlvId, ResourceManag
 void Paramite::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<ParamiteSaveState>();
-    auto pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(pState->field_3C_tlvInfo).GetTlv<relive::Path_Paramite>();
+    auto pTlv = map.TLV_From_Offset_Lvl_Cam(pState->field_3C_tlvInfo).GetTlv<relive::Path_Paramite>();
 
     auto pParamite = relive_new Paramite(pTlv, pState->field_3C_tlvInfo, resMan, map);
 
@@ -4947,11 +4947,11 @@ Paramite::~Paramite()
 
     if (mHealth > FP_FromInteger(0) || mSpawned)
     {
-        Path::TLV_Reset(field_140_tlvInfo);
+        mMap.TLV_Reset(field_140_tlvInfo);
     }
     else
     {
-        Path::TLV_Delete(field_140_tlvInfo);
+        mMap.TLV_Delete(field_140_tlvInfo);
     }
 
     SND_SEQ_Stop(SeqId::ParamiteNearby_25);
@@ -5082,7 +5082,7 @@ void Paramite::HandleBrainsAndMotions()
 
     if (oldXPos != mXPos || oldYPos != mYPos)
     {
-        BaseAliveGameObjectPathTLV = gPathInfo->TLV_Get_At(
+        BaseAliveGameObjectPathTLV = mMap.TLV_Get_At(
             TlvIterator::Invalid(),
             mXPos,
             mYPos,
@@ -5470,7 +5470,7 @@ void Paramite::VOnTlvCollision(TlvIterator tlvIterator)
                 break;
             }
         }
-        tlvIterator = gPathInfo->TLV_Get_At(tlvIterator, mXPos, mYPos, mXPos, mYPos);
+        tlvIterator = mMap.TLV_Get_At(tlvIterator, mXPos, mYPos, mXPos, mYPos);
     }
 }
 
@@ -5595,7 +5595,7 @@ s16 Paramite::CanIAcceptAGameSpeakCommand()
 
 s16 Paramite::HandleEnemyStopper(s16 numGridBlocks)
 {
-    auto pEnemyStopper = gPathInfo->VTLV_Get_At_Of_Type(
+    auto pEnemyStopper = mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos),
         FP_GetExponent(mYPos),
         FP_GetExponent(mXPos + (ScaleToGridSize(GetSpriteScale()) * FP_FromInteger(numGridBlocks))),

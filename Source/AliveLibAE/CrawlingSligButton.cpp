@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "CrawlingSligButton.hpp"
+#include "../relive_lib/BaseMap.hpp"
 #include "Sfx.hpp"
 #include "stdlib.hpp"
 #include "../relive_lib/SwitchStates.hpp"
@@ -71,7 +72,7 @@ void CrawlingSligButton::UseButton()
 
 CrawlingSligButton::~CrawlingSligButton()
 {
-    Path::TLV_Reset(mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 void CrawlingSligButton::VUpdate()

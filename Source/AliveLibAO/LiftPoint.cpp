@@ -733,7 +733,7 @@ LiftPoint::~LiftPoint()
         pRope1->SetDead(true);
     }
 
-    Path::TLV_Reset(static_cast<Map&>(mMap), mPlatformBaseTlvInfo);
+    mMap.TLV_Reset(mPlatformBaseTlvInfo);
 
     auto pLiftPointTlv = mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos),

@@ -8,7 +8,7 @@ namespace AO {
 
 OneShotSwitchIdSetter::~OneShotSwitchIdSetter()
 {
-    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 OneShotSwitchIdSetter::OneShotSwitchIdSetter(Path_OneShotSwitchIdSetter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)

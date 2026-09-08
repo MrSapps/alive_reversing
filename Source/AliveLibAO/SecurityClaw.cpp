@@ -124,11 +124,11 @@ SecurityClaw::~SecurityClaw()
 {
     if (mDetectorComeBack)
     {
-        Path::TLV_Reset(static_cast<Map&>(mMap), mTlvInfo);
+        mMap.TLV_Reset(mTlvInfo);
     }
     else
     {
-        Path::TLV_Delete(static_cast<Map&>(mMap), mTlvInfo);
+        mMap.TLV_Delete(mTlvInfo);
     }
 
     BaseGameObject* pClaw = sObjectIds.Find_Impl(mClawId);

@@ -131,7 +131,7 @@ FallingItem::~FallingItem()
     {
         sPrimaryFallingItem = nullptr;
     }
-    Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
+    mMap.TLV_Reset(mTlvId);
 }
 
 void FallingItem::VScreenChanged()

@@ -230,7 +230,7 @@ SlamDoor::~SlamDoor()
 {
     if (!mDelete || mClosed)
     {
-        Path::TLV_Reset(mTlvInfo);
+        mMap.TLV_Reset(mTlvInfo);
     }
 
     if (mCollisionLine1)
@@ -445,5 +445,5 @@ void SlamDoor::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerW
 {
     const auto pSaveState = pData.ReadTmpPtr<SlamDoorSaveState>();
 
-    relive_new SlamDoor(static_cast<relive::Path_SlamDoor*>(gPathInfo->TLV_From_Offset_Lvl_Cam(pSaveState->mTlvInfo).GetTlv()), pSaveState->mTlvInfo, resMan, map);
+    relive_new SlamDoor(static_cast<relive::Path_SlamDoor*>(map.TLV_From_Offset_Lvl_Cam(pSaveState->mTlvInfo).GetTlv()), pSaveState->mTlvInfo, resMan, map);
 }

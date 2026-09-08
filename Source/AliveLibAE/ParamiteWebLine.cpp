@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "ParamiteWebLine.hpp"
+#include "../relive_lib/BaseMap.hpp"
 #include "../relive_lib/Function.hpp"
 #include "stdlib.hpp"
 #include "../relive_lib/Collisions.hpp"
@@ -147,7 +148,7 @@ ParamiteWebLine::~ParamiteWebLine()
 {
     relive_delete[] field_FC_pRes;
     field_108_anim_flare.VCleanUp();
-    Path::TLV_Reset(field_100_tlv_info);
+    mMap.TLV_Reset(field_100_tlv_info);
 }
 
 void ParamiteWebLine::VUpdate()

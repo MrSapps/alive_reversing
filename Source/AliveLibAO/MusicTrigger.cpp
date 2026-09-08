@@ -133,7 +133,7 @@ void MusicTrigger::VUpdate()
         SetDead(true);
         if (mTlvId.IsValid())
         {
-            Path::TLV_Reset(static_cast<Map&>(mMap), mTlvId);
+            mMap.TLV_Reset(mTlvId);
         }
     }
 

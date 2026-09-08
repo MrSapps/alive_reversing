@@ -633,7 +633,7 @@ void Mudokon::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager
 {
     const auto pState = pBuffer.ReadTmpPtr<MudokonSaveState>();
 
-    auto pTlv = gPathInfo->TLV_From_Offset_Lvl_Cam(pState->field_40_tlvInfo).GetTlv<relive::Path_Mudokon>();
+    auto pTlv = map.TLV_From_Offset_Lvl_Cam(pState->field_40_tlvInfo).GetTlv<relive::Path_Mudokon>();
 
     const auto oldCount = sAlertedMudCount_5C3010;
     auto pMud = relive_new Mudokon(pTlv, pState->field_40_tlvInfo, resMan, map);
@@ -973,7 +973,7 @@ void Mudokon::VUpdate()
 
     if (oldXPos != mXPos || oldYPos != mYPos)
     {
-        BaseAliveGameObjectPathTLV = gPathInfo->TLV_Get_At(
+        BaseAliveGameObjectPathTLV = mMap.TLV_Get_At(
             TlvIterator::Invalid(),
             mXPos,
             mYPos,
@@ -1071,7 +1071,7 @@ void Mudokon::VOnTlvCollision(TlvIterator tlvIterator)
             }
         }
 
-        tlvIterator = gPathInfo->TLV_Get_At(
+        tlvIterator = mMap.TLV_Get_At(
             tlvIterator,
             mXPos,
             mYPos,
@@ -1136,11 +1136,11 @@ Mudokon::~Mudokon()
 
     if (!mNotRescued || mHealth <= FP_FromInteger(0) || GetElectrocuted())
     {
-        Path::TLV_Delete(field_118_tlvInfo);
+        mMap.TLV_Delete(field_118_tlvInfo);
     }
     else
     {
-        Path::TLV_Reset(field_118_tlvInfo);
+        mMap.TLV_Reset(field_118_tlvInfo);
     }
 
     if (!mBrainState && mBrainSubState > 4u)
@@ -1250,7 +1250,7 @@ bool Mudokon::VTakeDamage(BaseGameObject* pFrom)
                 const PSX_RECT v11 = VGetBoundingRect();
                 const FP tlvYPos = FP_FromInteger(v11.h);
 
-                if (Bullet::InZBulletCover(mXPos, tlvYPos, v11) || !mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, tlvYPos, 0))
+                if (Bullet::InZBulletCover(mMap, mXPos, tlvYPos, v11) || !mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, tlvYPos, 0))
                 {
                     // ZCover saved us, or somehow we've not in the current camera
                     mbGotShot = false;
@@ -1499,7 +1499,7 @@ s16 Mudokon::TurningWheelHelloOrAllYaResponse()
         return mBrainSubState;
     }
 
-    auto pWheelTlv = gPathInfo->VTLV_Get_At_Of_Type(
+    auto pWheelTlv = mMap.VTLV_Get_At_Of_Type(
         FP_GetExponent(mXPos),
         FP_GetExponent(mYPos),
         FP_GetExponent(mXPos),
@@ -2986,7 +2986,7 @@ s16 Mudokon::Brain_4_ListeningToAbe()
             {
                 mDoAngry = true;
 
-                if (gPathInfo->VTLV_Get_At_Of_Type(
+                if (mMap.VTLV_Get_At_Of_Type(
                         FP_GetExponent(mXPos),
                         FP_GetExponent(mYPos - FP_FromInteger(5)),
                         FP_GetExponent(mXPos),
@@ -4835,7 +4835,7 @@ s16 Mudokon::Brain_8_AngryWorker()
             // adds mudokon lag when quicksaving/quickloading in the same screen
             AddAlerted();
 
-            return gPathInfo->VTLV_Get_At_Of_Type(
+            return mMap.VTLV_Get_At_Of_Type(
                        FP_GetExponent(mXPos),
                        FP_GetExponent(mYPos),
                        FP_GetExponent(mXPos),
@@ -4928,7 +4928,7 @@ s16 Mudokon::Brain_8_AngryWorker()
                 mNextMotion = eMudMotions::M_Speak_6_472FA0;
                 MudEmotionSound(field_160_delayed_speak);
                 field_194_timer = MakeTimer(Math_RandomRange(30, 45));
-                return gPathInfo->VTLV_Get_At_Of_Type(
+                return mMap.VTLV_Get_At_Of_Type(
                            FP_GetExponent(mXPos),
                            FP_GetExponent(mYPos),
                            FP_GetExponent(mXPos),
@@ -6366,7 +6366,7 @@ void Mudokon::Motion_49_Fall()
 
                 MapFollowMe(true);
 
-                if ((gPathInfo->VTLV_Get_At_Of_Type(
+                if ((mMap.VTLV_Get_At_Of_Type(
                          FP_GetExponent(mXPos),
                          FP_GetExponent(mYPos),
                          FP_GetExponent(mXPos),
@@ -6783,7 +6783,7 @@ void Mudokon::ToStand()
 s16 Mudokon::FindWheel(FP xpos, FP ypos)
 {
     auto* pWheelTlv = static_cast<relive::Path_WorkWheel*>(
-        gPathInfo->VTLV_Get_At_Of_Type(
+        mMap.VTLV_Get_At_Of_Type(
             FP_GetExponent(xpos), FP_GetExponent(ypos), FP_GetExponent(xpos), FP_GetExponent(ypos), ReliveTypes::eWorkWheel).GetTlv());
 
     if (pWheelTlv)
@@ -6859,7 +6859,7 @@ s16 Mudokon::StopAtWheel()
             if (bRect.x <= ourRect.w && bRect.w >= ourRect.x && bRect.h >= ourRect.y && bRect.y <= ourRect.h)
             {
                 if (pOtherMud->mStoppedAtWheel || (
-                    gPathInfo->VTLV_Get_At_Of_Type(
+                    mMap.VTLV_Get_At_Of_Type(
                         FP_GetExponent(pObj->mXPos), 
                         FP_GetExponent(pObj->mYPos), 
                         FP_GetExponent(pObj->mXPos), 
