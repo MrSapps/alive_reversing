@@ -9,6 +9,7 @@
 #include "data_conversion/string_util.hpp"
 #include "Camera.hpp"
 #include "Sound/Midi.hpp"
+#include "GameObjects/ScreenManager.hpp"
 
 bool gMap_bDoPurpleLightEffect = false;
 
@@ -311,4 +312,59 @@ TlvIterator BaseMap::TLV_Get_At(TlvIterator pTlv, FP xpos, FP ypos, FP width, FP
 TlvIterator BaseMap::Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx)
 {
     return GetPath().Get_First_TLV_For_Offsetted_Camera(cam_x_idx, cam_y_idx);
+}
+
+void BaseMap::Reset()
+{
+    for (s32 i = 0; i < ALIVE_COUNTOF(field_2C_camera_array); i++)
+    {
+        field_2C_camera_array[i] = nullptr;
+    }
+
+    ClearPathResourceBlocks();
+
+    mFreeAllAnimAndPalts = false;
+    VClearPendingSaveRestore();
+}
+
+void BaseMap::Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange)
+{
+    for (s32 i = 0; i < ALIVE_COUNTOF(field_2C_camera_array); i++)
+    {
+        field_2C_camera_array[i] = nullptr;
+    }
+
+    mOverlayId = -1;
+
+    mCurrentCamera = -1;
+    mCurrentPath = -1;
+    mCurrentLevel = EReliveLevelIds::eNone;
+
+    SetActiveCam(level, path, camera, screenChangeEffect, fmvBaseId, forceChange);
+    GoTo_Camera();
+
+    mCamState = CamChangeStates::eInactive_0;
+}
+
+void BaseMap::Shutdown()
+{
+    // Free Path resources
+    FreePathResourceBlocks();
+
+    // Free cameras
+    for (s32 i = 0; i < ALIVE_COUNTOF(field_2C_camera_array); i++)
+    {
+        if (field_2C_camera_array[i])
+        {
+            relive_delete field_2C_camera_array[i];
+            field_2C_camera_array[i] = nullptr;
+        }
+    }
+
+    gScreenManager = nullptr;
+
+    // Free
+    GetPath().Free();
+
+    Reset();
 }

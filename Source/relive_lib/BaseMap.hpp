@@ -139,8 +139,13 @@ public:
 
     virtual void ScreenChange() = 0;
     virtual void Handle_PathTransition() = 0;
-    virtual void Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange) = 0;
-    virtual void Shutdown() = 0;
+    void Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange);
+    void Shutdown();
+    void Reset();
+
+    // A save restore is pending until the next GoTo_Camera consumes it. Each
+    // game tracks that request differently, so clearing it is engine specific.
+    virtual void VClearPendingSaveRestore() = 0;
     
     TlvIterator VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind);
     TlvIterator TLV_First_Of_Type_In_Camera(ReliveTypes objectType, s16 camX);

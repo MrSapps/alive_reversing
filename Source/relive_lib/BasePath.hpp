@@ -41,6 +41,9 @@ public:
 
     static TlvIterator TLV_Next_Of_Type(TlvIterator tlvIterator, ReliveTypes type);
 
+    // Derived adds clearing of its own engine specific mPathData.
+    virtual void Free();
+
     void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1);
     void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1);
     void TLV_Delete(const Guid& tlvId, s16 hiFlags = -1);
@@ -48,4 +51,9 @@ public:
 
     BaseMap& mMap;
     relive::Factory& mFactory;
+
+    EReliveLevelIds mLevelId = EReliveLevelIds::eNone;
+    u16 mPathId = 0;
+    s16 mCameraId = 0;
+    BinaryPath* mBinaryPath = nullptr; // Non owning ptr
 };

@@ -58,11 +58,6 @@ class Map final : public BaseMap
 public:
     Map(ResourceManagerWrapper& resMan, relive::Factory& factory);
 
-    void Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange) override;
-
-    void Shutdown() override;
-    void Reset();
-
     void ScreenChange() override;
 
     void GoTo_Camera() override;
@@ -107,6 +102,11 @@ public:
 
     s16 mMapChanged = 0;
     u8* mSaveData = nullptr;
+
+    void VClearPendingSaveRestore() override
+    {
+        mSaveData = nullptr;
+    }
 
     BasePath& GetPath() override
     {

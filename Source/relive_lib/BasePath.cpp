@@ -47,6 +47,16 @@ TlvIterator BasePath::TLV_Next_Of_Type(TlvIterator tlvIterator, ReliveTypes type
     return TlvIterator::Invalid();
 }
 
+void BasePath::Free()
+{
+    mBinaryPath = nullptr;
+    mMap.mCamsOnY = 0;
+    mMap.mCamsOnX = 0;
+    mCameraId = 0;
+    mPathId = 0;
+    mLevelId = EReliveLevelIds::eMenu;
+}
+
 void BasePath::TLV_Reset(const Guid& tlvId, s16 hiFlags)
 {
     Set_TLVData(tlvId, hiFlags, 0, 0);

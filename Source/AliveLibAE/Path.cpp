@@ -26,13 +26,8 @@ Path::~Path()
 
 void Path::Free()
 {
-    mPathData = 0;
-    mBinaryPath = nullptr;
-    mMap.mCamsOnY = 0;
-    mMap.mCamsOnX = 0;
-    mCameraId = 0;
-    mPathId = 0;
-    mLevelId = EReliveLevelIds::eMenu;
+    mPathData = nullptr;
+    BasePath::Free();
 }
 
 void Path::Init(const PathData* pPathData, EReliveLevelIds level, s16 path, s16 cameraId, BinaryPath* ppPathRes)

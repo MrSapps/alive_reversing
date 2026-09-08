@@ -205,15 +205,13 @@ public:
 
     void Init(const PathData* pPathData, EReliveLevelIds level, u16 pathId, s16 cameraId, BinaryPath* pBinaryPath);
 
+    void Free() override;
+
     TlvIterator VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind) override;
     TlvIterator TLV_Get_At(TlvIterator tlvIterator, FP xpos, FP ypos, FP width, FP height) override;
 
 
-    EReliveLevelIds mLevelId = EReliveLevelIds::eNone;
-    u16 mPathId = 0;
-    s16 mCameraId = 0;
     const PathData* mPathData = nullptr;
-    BinaryPath* mBinaryPath = nullptr;
 };
 
 } // namespace AO

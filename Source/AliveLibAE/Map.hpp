@@ -37,9 +37,6 @@ public:
     void GoTo_Camera() override;
     void RemoveObjectsWithPurpleLight(s16 a2);
     void Handle_PathTransition() override;
-    void Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange) override;
-    void Shutdown() override;
-    void Reset();
     Map(ResourceManagerWrapper& resMan, relive::Factory& factory);
     ~Map();
 
@@ -50,8 +47,6 @@ public:
     static BaseGameObject* FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLevelIds lvlId);
     Camera* Create_Camera(s16 xpos, s16 ypos, s32 a4);
     void Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode);
-
-    void LoadResource(const char_type* pFileName, s32 type, s32 resourceId, relive::Factory::LoadMode loadMode, s16 bDontLoad = 0);
 
     s16 Is_Point_In_Current_Camera(EReliveLevelIds level, s32 path, FP xpos, FP ypos, s16 width) override;
 
@@ -70,6 +65,11 @@ public:
     s16 mTeleporterTransition = 0;
 
     bool mRestoreMapObjectStates = false;
+
+    void VClearPendingSaveRestore() override
+    {
+        mRestoreMapObjectStates = false;
+    }
 
     BasePath& GetPath() override
     {

@@ -229,37 +229,7 @@ Map::Map(ResourceManagerWrapper& resMan, relive::Factory& factory)
     Reset();
 }
 
-void Map::Reset()
-{
-    for (s32 i = 0; i < ALIVE_COUNTOF(field_2C_camera_array); i++)
-    {
-        field_2C_camera_array[i] = nullptr;
-    }
 
-    ClearPathResourceBlocks();
-
-    mFreeAllAnimAndPalts = false;
-    mSaveData = 0;
-}
-
-void Map::Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange)
-{
-    for (s32 i = 0; i < ALIVE_COUNTOF(field_2C_camera_array); i++)
-    {
-        field_2C_camera_array[i] = nullptr;
-    }
-
-    mOverlayId = -1;
-
-    mCurrentCamera = -1;
-    mCurrentPath = -1;
-    mCurrentLevel = EReliveLevelIds::eNone;
-
-    SetActiveCam(level, path, camera, screenChangeEffect, fmvBaseId, forceChange);
-    GoTo_Camera();
-
-    mCamState = CamChangeStates::eInactive_0;
-}
 
 void Map::ScreenChange()
 {
@@ -334,25 +304,6 @@ void Map::ScreenChange()
 }
 
 
-void Map::Shutdown()
-{
-    // Free Path resources
-    FreePathResourceBlocks();
-
-    // Free cameras
-    for (s32 i = 0; i < ALIVE_COUNTOF(field_2C_camera_array); i++)
-    {
-        if (field_2C_camera_array[i])
-        {
-            relive_delete field_2C_camera_array[i];
-            field_2C_camera_array[i] = nullptr;
-        }
-    }
-
-    gScreenManager = nullptr;
-
-    Reset();
-}
 
 void Map::RemoveObjectsWithPurpleLight(s16 bMakeInvisible)
 {

@@ -224,7 +224,7 @@ class Path : public BasePath
 public:
     Path(Map& map, relive::Factory& factory);
     ~Path();
-    void Free();
+    void Free() override;
     void Init(const PathData* pPathData, EReliveLevelIds level, s16 path, s16 cameraId, BinaryPath* ppPathRes);
 
 
@@ -240,11 +240,7 @@ public:
 
     void Reset_TLVs(u16 pathId);
 
-    EReliveLevelIds mLevelId = EReliveLevelIds::eNone;
-    u16 mPathId = 0;
-    s16 mCameraId = 0;
     const PathData* mPathData = nullptr;
-    BinaryPath* mBinaryPath = nullptr; // Non owning ptr
 };
 
 enum class CameraPos : s16;

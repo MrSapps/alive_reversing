@@ -21,6 +21,12 @@ void Path::Init(const PathData* pPathData, EReliveLevelIds level, u16 pathId, s1
 }
 
 
+void Path::Free()
+{
+    mPathData = nullptr;
+    BasePath::Free();
+}
+
 TlvIterator Path::VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind)
 {
     s32 right = 0;
