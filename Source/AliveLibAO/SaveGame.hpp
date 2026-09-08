@@ -8,9 +8,9 @@
 #include "Abe.hpp"
 #include "Elum.hpp"
 
-namespace AO {
+class BaseMap;
 
-class Map;
+namespace AO {
 
 // Note this is the "relive" copy/format of the save data
 struct SaveData final
@@ -83,9 +83,9 @@ struct SaveData final
 class SaveGame final
 {
 public:
-    static void LoadFromMemory(SaveData* pData, s32 bKillObjects, Map& map);
-    static void SaveToMemory(SaveData* pSaveData, Map& map);
-    static s16 LoadFromFile(const char_type* name, Map& map);
+    static void LoadFromMemory(SaveData* pData, s32 bKillObjects, BaseMap& map);
+    static void SaveToMemory(SaveData* pSaveData, BaseMap& map);
+    static s16 LoadFromFile(const char_type* name, BaseMap& map);
     static bool SaveToFile(const char_type* name);
 
     static s16 GetPathId(s16 pathToFind, s16* outFoundPathRow = nullptr);

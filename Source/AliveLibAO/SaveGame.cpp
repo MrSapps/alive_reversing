@@ -24,7 +24,7 @@ static SaveData sSaveToLoadBuffer = {};
 
 SaveData gSaveBuffer = {};
 
-void Kill_Objects(Map& map)
+void Kill_Objects(BaseMap& map)
 {
     map.GetResourceManager().LoadingLoop(0);
 
@@ -52,7 +52,7 @@ void Kill_Objects(Map& map)
     }
 }
 
-void SaveGame::LoadFromMemory(SaveData* pData, s32 bKillObjects, Map& map)
+void SaveGame::LoadFromMemory(SaveData* pData, s32 bKillObjects, BaseMap& map)
 {
     TRACE_ENTRYEXIT;
 
@@ -101,7 +101,7 @@ void SaveGame::LoadFromMemory(SaveData* pData, s32 bKillObjects, Map& map)
 
     gAbe->GetAnimation().SetRender(false);
 
-    map.mSaveData = pData->field_2B0_pSaveBuffer;
+    static_cast<Map&>(map).mSaveData = pData->field_2B0_pSaveBuffer;
 
     if (gAbe->mRingPulseTimer)
     {
@@ -198,7 +198,7 @@ s16 SaveGame::GetPathId(s16 pathToFind, s16* outFoundPathRow)
     return path_id;
 }
 
-void SaveGame::SaveToMemory(SaveData* pSaveData, Map& map)
+void SaveGame::SaveToMemory(SaveData* pSaveData, BaseMap& map)
 {
     pSaveData->mCurrentLevel = map.mCurrentLevel;
     pSaveData->mAbe_ContinuePointClearFromId = gAbe->mContinuePointClearFromId;
@@ -292,11 +292,11 @@ void SaveGame::SaveToMemory(SaveData* pSaveData, Map& map)
         pSaveData->mDeathGasTimer = 0;
     }
     pSaveData->mCurrentControllerIdx = Input().CurrentController() == InputObject::PadIndex::First ? 0 : 1;
-    map.SaveBlyData(pSaveData->field_2B0_pSaveBuffer);
+    static_cast<Map&>(map).SaveBlyData(pSaveData->field_2B0_pSaveBuffer);
 }
 
 
-s16 SaveGame::LoadFromFile(const char_type* name, Map& map)
+s16 SaveGame::LoadFromFile(const char_type* name, BaseMap& map)
 {
     char_type buffer[40] = {};
 

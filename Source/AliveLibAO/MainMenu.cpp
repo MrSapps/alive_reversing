@@ -2949,7 +2949,7 @@ void Menu::LoadSave_Update()
         gAbe = relive_new Abe(mResMan, mMap);
     }
 
-    if (!SaveGame::LoadFromFile(sSaveNames_9F1DD8[mSelectedButtonIndex.raw].field_0_mName, static_cast<Map&>(mMap)))
+    if (!SaveGame::LoadFromFile(sSaveNames_9F1DD8[mSelectedButtonIndex.raw].field_0_mName, mMap))
     {
         mFnUpdate = &Menu::SaveLoadFailed_Update;
         mFnRender = &Menu::SaveLoadFailed_Render;

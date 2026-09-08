@@ -2345,7 +2345,7 @@ void Abe::VOnTlvCollision(TlvIterator tlvIterator)
                     GameEnderController::gRestartRuptureFarmsSavedMuds = gRescuedMudokons;
                 }
 
-                SaveGame::SaveToMemory(&gSaveBuffer, static_cast<Map&>(mMap));
+                SaveGame::SaveToMemory(&gSaveBuffer, mMap);
 
                 const FP camXPos = FP_NoFractional(gScreenManager->CamXPos());
 
@@ -6112,7 +6112,7 @@ void Abe::Motion_61_Respawn()
                     mContinuePointTopLeft.x = camPos.x + 512;
                     mContinuePointTopLeft.y = camPos.y + 240;
                 }
-                SaveGame::LoadFromMemory(&gSaveBuffer, 0, static_cast<Map&>(mMap));
+                SaveGame::LoadFromMemory(&gSaveBuffer, 0, mMap);
                 if (field_19C_throwable_count)
                 {
                     LoadRockTypes(gSaveBuffer.mCurrentLevel, gSaveBuffer.mCurrentPath);
