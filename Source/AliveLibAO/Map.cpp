@@ -593,7 +593,7 @@ void Map::GoTo_Camera()
 
     if (mCameraSwapEffect != CameraSwapEffects::ePlay1FMV_5 && mCameraSwapEffect != CameraSwapEffects::eUnknown_11)
     {
-        if (mDoorTransitionPending)
+        if (mPendingTransition == PendingTransition::eDoor_1)
         {
             TlvIterator doorIterator = TLV_First_Of_Type_In_Camera(ReliveTypes::eDoor, 0);
             while (doorIterator.GetTlv<relive::Path_Door>()->mDoorId != gAbe->field_196_door_id)

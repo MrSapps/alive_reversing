@@ -8768,7 +8768,7 @@ void Abe::Motion_156_DoorEnter()
                 FP_GetExponent(mYPos),
                 ReliveTypes::eDoor);
             BaseAliveGameObjectPathTLV = doorIterator;
-            mMap.mDoorTransitionPending = 1;
+            mMap.mPendingTransition = BaseMap::PendingTransition::eDoor_1;
             const auto changeEffect = kPathChangeEffectToInternalScreenChangeEffect[doorIterator.GetTlv<relive::Path_Door>()->mWipeEffect];
             s16 flag = 0;
             if (changeEffect == CameraSwapEffects::ePlay1FMV_5 || changeEffect == CameraSwapEffects::eUnknown_11)
@@ -8790,7 +8790,7 @@ void Abe::Motion_156_DoorEnter()
         {
             mCurrentLevel = mMap.mCurrentLevel;
             mCurrentPath = mMap.mCurrentPath;
-            mMap.mDoorTransitionPending = 0;
+            mMap.mPendingTransition = BaseMap::PendingTransition::eNone_0;
             auto doorIterator = mMap.TLV_First_Of_Type_In_Camera(ReliveTypes::eDoor, 0);
             BaseAliveGameObjectPathTLV = doorIterator;
 

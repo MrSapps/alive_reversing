@@ -75,6 +75,16 @@ public:
         eInstantChange_2 = 2
     };
 
+    // The world transition Abe is currently walking through, looked up by
+    // GoTo_Camera() to build the screen change effect. Teleporters don't
+    // exist in AO, so eTeleporter_2 is only ever set by the AE Teleporter object.
+    enum class PendingTransition : s16
+    {
+        eNone_0 = 0,
+        eDoor_1 = 1,
+        eTeleporter_2 = 2,
+    };
+
     virtual ~BaseMap()
     {
 
@@ -177,7 +187,7 @@ public:
     BaseAliveGameObject* mAliveObj = nullptr;
     CamChangeStates mCamState = CamChangeStates::eInactive_0;
 
-    s16 mDoorTransitionPending = 0;
+    PendingTransition mPendingTransition = PendingTransition::eNone_0;
 
     Camera* mCurrentCameras[5] = {};
     Camera* mPreviousCameras[5] = {};

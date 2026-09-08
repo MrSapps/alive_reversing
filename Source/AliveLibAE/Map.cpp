@@ -403,7 +403,7 @@ void Map::GoTo_Camera()
 
     if (mCameraSwapEffect != CameraSwapEffects::ePlay1FMV_5 && mCameraSwapEffect != CameraSwapEffects::eUnknown_11)
     {
-        if (mDoorTransitionPending)
+        if (mPendingTransition == PendingTransition::eDoor_1)
         {
             // TODO: Add template helpers
 
@@ -415,34 +415,31 @@ void Map::GoTo_Camera()
                 if (pDoorTlv->mDoorId == gAbe->field_1A0_door_id)
                 {
                     CreateScreenTransistionForTLV(doorIterator.GetTlv());
-                    break;                    
+                    break;
                 }
                 doorIterator = Path::TLV_Next_Of_Type(doorIterator, ReliveTypes::eDoor);
             }
         }
+        else if (mPendingTransition == PendingTransition::eTeleporter_2)
+        {
+            // TODO: Add template helpers
+
+            // Teleporter transition
+            TlvIterator teleporterIterator = mPath.TLV_First_Of_Type_In_Camera(ReliveTypes::eTeleporter, 0);
+            while (teleporterIterator.GetTlv())
+            {
+                auto pTeleporterTlv = static_cast<relive::Path_Teleporter*>(teleporterIterator.GetTlv());
+                if (pTeleporterTlv->mTeleporterId == gAbe->field_1A0_door_id)
+                {
+                    CreateScreenTransistionForTLV(pTeleporterTlv);
+                    break;
+                }
+                teleporterIterator = Path::TLV_Next_Of_Type(teleporterIterator, ReliveTypes::eTeleporter);
+            }
+        }
         else
         {
-            if (!mTeleporterTransition)
-            {
-                relive_new CameraSwapper(mCurrentCameras[0]->mCamRes, mResourceManager, *this, mCameraSwapEffect, 368 / 2, 240 / 2);
-            }
-            else
-            {
-                // TODO: Add template helpers
-
-                // Teleporter transition
-                TlvIterator teleporterIterator = mPath.TLV_First_Of_Type_In_Camera(ReliveTypes::eTeleporter, 0);
-                while (teleporterIterator.GetTlv())
-                {
-                    auto pTeleporterTlv = static_cast<relive::Path_Teleporter*>(teleporterIterator.GetTlv());
-                    if (pTeleporterTlv->mTeleporterId == gAbe->field_1A0_door_id)
-                    {
-                        CreateScreenTransistionForTLV(pTeleporterTlv);
-                        break;
-                    }
-                    teleporterIterator = Path::TLV_Next_Of_Type(teleporterIterator, ReliveTypes::eTeleporter);
-                }
-            }
+            relive_new CameraSwapper(mCurrentCameras[0]->mCamRes, mResourceManager, *this, mCameraSwapEffect, 368 / 2, 240 / 2);
         }
     }
 
