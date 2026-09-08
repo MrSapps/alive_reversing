@@ -198,7 +198,7 @@ ALIVE_ASSERT_SIZEOF_ALWAYS(Path_TLV, 0x18);
 class Path final : public BasePath
 {
 public:
-    explicit Path(Map& map);
+    explicit Path(Map& map, relive::Factory& factory);
 
     void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1);
     void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1);

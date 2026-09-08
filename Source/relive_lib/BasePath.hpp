@@ -5,6 +5,11 @@
 class BaseMap;
 enum class ReliveTypes : s16;
 
+namespace relive
+{
+    class Factory;
+}
+
 // Common base of AliveLibAE::Path and AliveLibAO::Path. Both engines walk TLV
 // lists identically here - they only differ in how the underlying path
 // resource data (mPathData/mBinaryPath) is loaded and laid out, which stays
@@ -12,8 +17,9 @@ enum class ReliveTypes : s16;
 class BasePath
 {
 public:
-    explicit BasePath(BaseMap& map)
+    explicit BasePath(BaseMap& map, relive::Factory& factory)
         : mMap(map)
+        , mFactory(factory)
     {
 
     }
@@ -24,4 +30,5 @@ public:
     static TlvIterator TLV_Next_Of_Type(TlvIterator tlvIterator, ReliveTypes type);
 
     BaseMap& mMap;
+    relive::Factory& mFactory;
 };

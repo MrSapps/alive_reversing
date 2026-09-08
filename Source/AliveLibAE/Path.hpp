@@ -222,7 +222,7 @@ namespace relive
 class Path : public BasePath
 {
 public:
-    Path(Map& map);
+    Path(Map& map, relive::Factory& factory);
     ~Path();
     void Free();
     void Init(const PathData* pPathData, EReliveLevelIds level, s16 path, s16 cameraId, BinaryPath* ppPathRes);

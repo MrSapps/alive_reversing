@@ -63,9 +63,9 @@ void Map::ScreenChange_Common()
     sSoundChannelsMask = 0;
 }
 
-Map::Map(ResourceManagerWrapper& resMan)
-    : BaseMap(resMan)
-    , mPath(*this)
+Map::Map(ResourceManagerWrapper& resMan, relive::Factory& factory)
+    : BaseMap(resMan, factory)
+    , mPath(*this, factory)
 {
     Reset();
 }

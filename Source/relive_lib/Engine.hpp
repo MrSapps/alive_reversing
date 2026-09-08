@@ -3,6 +3,7 @@
 #include "GameType.hpp"
 #include "Ipc/Ipc.hpp"
 #include "ResourceManagerWrapper.hpp"
+#include "Factory.hpp"
 
 class FileSystem;
 class CommandLineParser;
@@ -39,4 +40,5 @@ private:
     std::unique_ptr<relive::IIpcInterface> mIpcInterface;
     ResourceManagerWrapper mResMan;
     std::unique_ptr<BaseMap> mMap;
+    relive::Factory mFactory;
 };

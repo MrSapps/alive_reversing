@@ -34,11 +34,17 @@ enum class CameraSwapEffects : s16
     eUnknown_11 = 11        // Unknown, has special handing in the map object
 };
 
+namespace relive
+{
+    class Factory;
+}
+
 class BaseMap
 {
 public:
-    explicit BaseMap(ResourceManagerWrapper& resMan)
+    explicit BaseMap(ResourceManagerWrapper& resMan, relive::Factory& factory)
         : mResourceManager(resMan)
+        , mFactory(factory)
     {
 
     }
@@ -151,4 +157,5 @@ public:
 
 protected:
     ResourceManagerWrapper& mResourceManager;
+    relive::Factory& mFactory;
 };

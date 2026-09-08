@@ -56,7 +56,7 @@ namespace CameraIds::Menu
 class Map final : public BaseMap
 {
 public:
-    explicit Map(ResourceManagerWrapper& resMan);
+    explicit Map(ResourceManagerWrapper& resMan, relive::Factory& factory);
 
     void Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange) override;
 

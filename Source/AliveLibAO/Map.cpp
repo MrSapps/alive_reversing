@@ -239,9 +239,9 @@ void Map::ScreenChange_Common()
     sSoundChannelsMask = 0;
 }
 
-Map::Map(ResourceManagerWrapper& resMan)
-    : BaseMap(resMan)
-    , mPath(*this)
+Map::Map(ResourceManagerWrapper& resMan, relive::Factory& factory)
+    : BaseMap(resMan, factory)
+    , mPath(*this, factory)
 {
     Reset();
 }
@@ -1541,8 +1541,6 @@ Camera* Map::Create_Camera(s16 xpos, s16 ypos, s32 /*a4*/)
 
 void Map::Loader(s16 camX, s16 camY, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad)
 {
-    relive::Factory factory(mResourceManager, *this);
-
     // Get TLVs for this cam
     BinaryPath* pPathRes = GetPathResourceBlockPtr(mCurrentPath);
     TlvIterator tlvIterator = pPathRes->TlvsForCamera(camX, camY);
@@ -1554,7 +1552,7 @@ void Map::Loader(s16 camX, s16 camY, relive::Factory::LoadMode loadMode, ReliveT
             if (loadMode != relive::Factory::LoadMode::ConstructObject_0 || !(pTlv->mTlvFlags.Get(relive::TlvFlags::eBit1_Created) || pTlv->mTlvFlags.Get(relive::TlvFlags::eBit2_Destroyed)))
             {
                 // Call the factory to construct the item
-                factory.ConstructTLVObject(pTlv, pTlv->mId, loadMode);
+                mFactory.ConstructTLVObject(pTlv, pTlv->mId, loadMode, mResourceManager, *this);
 
                 if (loadMode == relive::Factory::LoadMode::ConstructObject_0)
                 {

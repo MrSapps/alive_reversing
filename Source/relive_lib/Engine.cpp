@@ -611,11 +611,11 @@ void Engine::Run()
 
     if (mGameType == GameType::eAe)
     {
-        mMap = std::make_unique<Map>(mResMan);
+        mMap = std::make_unique<Map>(mResMan, mFactory);
     }
     else
     {
-        mMap = std::make_unique<AO::Map>(mResMan);
+        mMap = std::make_unique<AO::Map>(mResMan, mFactory);
     }  
 
     GetGameAutoPlayer().ProcessCommandLine(mClp);

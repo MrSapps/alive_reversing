@@ -8,7 +8,7 @@
 #include "Factory.hpp"
 #include "MapWrapper.hpp"
 
-Path::Path(Map& map) : BasePath(map)
+Path::Path(Map& map, relive::Factory& factory) : BasePath(map, factory)
 {
     mPathData = nullptr;
     mBinaryPath = nullptr;
@@ -50,8 +50,6 @@ void Path::Init(const PathData* pPathData, EReliveLevelIds level, s16 path, s16 
 
 void Path::Loader_4DB800(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad, ResourceManagerWrapper& resMan, BaseMap& map)
 {
-    relive::Factory factory(resMan, map);
-
     TlvIterator tlvIterator = mBinaryPath->TlvsForCamera(xpos, ypos);
     while(tlvIterator.GetTlv())
     {
@@ -67,7 +65,7 @@ void Path::Loader_4DB800(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode,
                 }
 
                 // Call the factory to construct the item
-                factory.ConstructTLVObject(pPathTLV, pPathTLV->mId, loadMode);
+                mFactory.ConstructTLVObject(pPathTLV, pPathTLV->mId, loadMode, resMan, map);
             }
         }
 

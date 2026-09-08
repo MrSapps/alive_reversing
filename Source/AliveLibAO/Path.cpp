@@ -6,7 +6,7 @@
 
 namespace AO {
 
-Path::Path(Map& map) : BasePath(map)
+Path::Path(Map& map, relive::Factory& factory) : BasePath(map, factory)
 {
 
 }
