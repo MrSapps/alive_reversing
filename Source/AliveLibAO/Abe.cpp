@@ -6496,7 +6496,7 @@ void Abe::Motion_61_Respawn()
                     mContinuePointTopLeft.x = camPos.x + 512;
                     mContinuePointTopLeft.y = camPos.y + 240;
                 }
-                QuikSave::RestoreCheckpoint(mResMan, mMap, false);
+                QuikSave::RestoreCheckpoint(mResMan, mMap);
                 if (field_19C_throwable_count)
                 {
                     LoadRockTypes(mCurrentLevel, mCurrentPath);

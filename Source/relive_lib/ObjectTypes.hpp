@@ -202,7 +202,8 @@ enum class ReliveTypes : s16
     eWebLine,
     eWell,
     eThrowableArray,
-    eDoorLight
+    eDoorLight,
+    eHoistParticle
 };
 
 enum class AETypes : s16
