@@ -77,6 +77,7 @@ endif()
 
 set(PROJECT_SOURCES
         Source/ReliveApiWrapper.hpp
+        Source/ExecApiCall.hpp
         Source/SnapSettings.hpp
         Source/ClipBoard.cpp
         Source/ClipBoard.hpp
