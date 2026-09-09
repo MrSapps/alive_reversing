@@ -2,7 +2,8 @@
 
 #include <QGraphicsScene>
 #include <QKeyEvent>
-#include <map>
+#include "ItemPositionData.hpp"
+#include "TransparencySettings.hpp"
 
 class ResizeableArrowItem;
 class ResizeableRectItem;
@@ -10,127 +11,6 @@ class CameraGraphicsItem;
 class EditorTab;
 struct EditorCamera;
 class Model;
-
-class ItemPositionData final
-{
-public:
-    struct RectPos final
-    {
-        QRectF rect;
-        EditorCamera* containingCamera = nullptr;
-
-        bool operator == (const RectPos& rhs) const
-        {
-            return rect == rhs.rect && containingCamera == rhs.containingCamera;
-        }
-    };
-
-    struct LinePos final
-    {
-        qreal x = 0;
-        qreal y = 0;
-        QLineF line;
-
-        bool operator == (const LinePos& rhs) const
-        {
-            return x == rhs.x && y == rhs.y && line == rhs.line;
-        }
-    };
-
-    void Save(QList<QGraphicsItem*>& items, Model& model, bool recalculateParentCamera);
-    void Restore(Model& model);
-
-    bool operator == (const ItemPositionData& rhs) const
-    {
-        if (mRects != rhs.mRects)
-        {
-            return false;
-        }
-
-        if (mLines != rhs.mLines)
-        {
-            return false;
-        }
-
-        return true;
-    }
-
-    bool operator != (const ItemPositionData& rhs) const
-    {
-        return !(*this == rhs);
-    }
-
-    size_t Count() const
-    {
-        return mRects.size() + mLines.size();
-    }
-
-    const RectPos* FirstRectPos() const
-    {
-        if (mRects.empty())
-        {
-            return nullptr;
-        }
-        return &mRects.begin()->second;
-    }
-
-    const LinePos* FirstLinePos() const
-    {
-        if (mLines.empty())
-        {
-            return nullptr;
-        }
-        return &mLines.begin()->second;
-    }
-private:
-    void AddRect(ResizeableRectItem* pItem, Model& model, bool recalculateParentCamera);
-
-    void AddLine(ResizeableArrowItem* pItem);
-
-    std::map<ResizeableRectItem*, RectPos> mRects;
-    std::map<ResizeableArrowItem*, LinePos> mLines;
-};
-
-class TransparencySettings final
-{
-public:
-    int CameraTransparency() const
-    {
-        return mCameraTransparency;
-    }
-
-    int CollisionTransparency() const
-    {
-        return mCollisionTransparency;
-    }
-
-    int MapObjectTransparency() const
-    {
-        return mMapObjectTransparency;
-    }
-
-    void SetCameraTransparency(int value)
-    {
-        mCameraTransparency = value;
-    }
-
-    void SetCollisionTransparency(int value)
-    {
-        mCollisionTransparency = value;
-    }
-
-    void SetMapObjectTransparency(int value)
-    {
-        mMapObjectTransparency = value;
-    }
-
-private:
-    int mCameraTransparency = 70;
-    int mCollisionTransparency = 90;
-    int mMapObjectTransparency = 60;
-};
-
-EditorCamera* CalcContainingCamera(ResizeableRectItem* pItem, Model& model);
 
 class EditorGraphicsScene final : public QGraphicsScene
 {

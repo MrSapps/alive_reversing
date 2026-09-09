@@ -4,6 +4,7 @@
 #include "ResizeableArrowItem.hpp"
 #include "ResizeableRectItem.hpp"
 #include "Model.hpp"
+#include "ItemPositionData.hpp"
 
 PasteItemsCommand::PasteItemsCommand(EditorTab* pTab, ClipBoard& clipBoard)
     : mTab(pTab), mSelectionSaver(pTab)
