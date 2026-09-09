@@ -1,6 +1,7 @@
 #include "stdafx_ao.h"
 #include "../relive_lib/Function.hpp"
 #include "SligSpawner.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Slig.hpp"
 #include "../relive_lib/SwitchStates.hpp"
 #include "../relive_lib/Events.hpp"
@@ -63,6 +64,36 @@ SligSpawner::~SligSpawner()
     else
     {
         mMap.TLV_Delete(mTlvInfo);
+    }
+}
+
+void SligSpawner::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    SligSpawnerSaveState data = {};
+
+    data.mTlvId = mTlvInfo;
+    data.mSligSpawnerSwitchId = mSligSpawnerSwitchId;
+
+    pSaveBuffer.Write(data);
+}
+
+void SligSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<SligSpawnerSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
+    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eSligSpawner)
+    {
+        // The saved tlv-info didn't resolve back to a TLV of the expected
+        // type (can happen if two TLVs ended up sharing the same id) -
+        // nothing safe to do here, so drop this record.
+        return;
+    }
+    auto pTlv = tlvIterator.GetTlv<relive::Path_Slig>();
+
+    auto pSpawner = relive_new SligSpawner(pTlv, pTlv, pState->mTlvId, resMan, map);
+    if (pSpawner)
+    {
+        pSpawner->mSligSpawnerSwitchId = pState->mSligSpawnerSwitchId;
     }
 }
 
