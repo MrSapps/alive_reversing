@@ -15,6 +15,7 @@
 #include "MeatSaw.hpp"
 #include "HoistRocksEffect.hpp"
 #include "LiftPoint.hpp"
+#include "BirdPortal.hpp"
 #include "RollingBall.hpp"
 #include "MovingBomb.hpp"
 #include "FallingItem.hpp"
@@ -243,6 +244,10 @@ void QuikSave::RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManag
 
             case ReliveTypes::eLiftPoint:
                 LiftPoint::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eBirdPortal:
+                BirdPortal::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
                 break;
 
             case ReliveTypes::eGrenade:
