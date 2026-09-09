@@ -175,6 +175,10 @@ set(PROJECT_SOURCES
         Source/LinkedBoolProperty.hpp
         Source/EnumProperty.cpp
         Source/EnumProperty.hpp
+        Source/EnumPropertyBase.hpp
+        Source/EnumPropertyChangeData.hpp
+        Source/LinkedEnumProperty.hpp
+        Source/ChangeEnumPropertyCommand.hpp
         Source/ReflectedEnumProperties.hpp
         Source/ColourPickerProperty.cpp
         Source/ColourPickerProperty.hpp
