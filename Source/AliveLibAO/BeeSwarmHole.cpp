@@ -8,6 +8,7 @@
 #include "Abe.hpp"
 #include "../relive_lib/Collisions.hpp"
 #include "Path.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 
 namespace AO {
 
@@ -119,6 +120,29 @@ void BeeSwarmHole::VUpdate()
                 break;
             }
         }
+    }
+}
+
+void BeeSwarmHole::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    BeeSwarmHoleSaveState data = {};
+
+    data.mTlvId = mTlvId;
+    data.mStartIntervalTimer = mStartIntervalTimer;
+
+    pSaveBuffer.Write(data);
+}
+
+void BeeSwarmHole::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<BeeSwarmHoleSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
+    auto pTlv = tlvIterator.GetTlvChecked<relive::Path_BeeSwarmHole>(ReliveTypes::eBeeSwarmHole);
+
+    auto pHole = relive_new BeeSwarmHole(pTlv, pState->mTlvId, resMan, map);
+    if (pHole)
+    {
+        pHole->mStartIntervalTimer = pState->mStartIntervalTimer;
     }
 }
 

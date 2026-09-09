@@ -1290,6 +1290,7 @@ struct Path_BeeSwarmHole final : public Path_TLV
     Path_BeeSwarmHole()
     {
         mTlvType = ReliveTypes::eBeeSwarmHole;
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     enum class MovementType : s16
     {
