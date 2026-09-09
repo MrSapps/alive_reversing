@@ -854,6 +854,7 @@ struct Path_BellHammer final : public Path_TLV
     Path_BellHammer()
     {
         mTlvType = ReliveTypes::eBellHammer;
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     s16 mSwitchId = 0;
     reliveSwitchOp mAction = reliveSwitchOp::eSetTrue;

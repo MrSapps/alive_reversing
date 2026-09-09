@@ -16,6 +16,7 @@
 #include "Bat.hpp"
 #include "BeeNest.hpp"
 #include "BeeSwarmHole.hpp"
+#include "BellHammer.hpp"
 #include "HoistRocksEffect.hpp"
 #include "LiftPoint.hpp"
 #include "LiftMover.hpp"
@@ -264,6 +265,10 @@ void QuikSave::RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManag
 
             case ReliveTypes::eBeeSwarmHole:
                 BeeSwarmHole::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eBellHammer:
+                BellHammer::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
                 break;
 
             case ReliveTypes::eBirdPortal:
