@@ -3,6 +3,9 @@
 
 #include "../relive_lib/GameObjects/BaseGameObject.hpp"
 #include "../relive_lib/FixedPoint.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
+
+class SerializedObjectData;
 
 namespace relive
 {
@@ -23,13 +26,28 @@ enum class LiftMoverStates : s16
     eMovingDone_5 = 5,
 };
 
+// Only mTlvId + mState are persisted - mTargetLift is a runtime object id
+// that isn't meaningful across a save/load (matches AE's LiftMover, which
+// re-resolves its target LiftPoint by the TLV-derived mTargetLiftPointId
+// rather than trying to carry the id itself across a restore).
+struct LiftMoverSaveState final : public SaveStateBase
+{
+    LiftMoverSaveState()
+        : SaveStateBase(ReliveTypes::eLiftMover, sizeof(*this))
+    { }
+    Guid mTlvId;
+    LiftMoverStates mState = LiftMoverStates::eInactive_0;
+};
+
 class LiftMover final : public ::BaseGameObject
 {
 public:
     LiftMover(relive::Path_LiftMover* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
     ~LiftMover();
-    
+
     virtual void VUpdate() override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map);
 
     LiftPoint* FindLiftPointWithId(s16 id);
 
