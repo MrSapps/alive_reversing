@@ -1,5 +1,7 @@
 #pragma once
 
+#include "IPointSnapper.hpp"
+
 struct SnapSetting final
 {
     bool mSnapX = false;
@@ -32,13 +34,4 @@ public:
 private:
     SnapSetting mMapObjectSnappingSettings;
     SnapSetting mCollisionSnappingSettings;
-};
-
-class IPointSnapper
-{
-public:
-    virtual ~IPointSnapper() = default;
-    virtual int SnapX(bool enabled, int x) = 0;
-    virtual int SnapY(bool enabled, int y) = 0;
-
 };

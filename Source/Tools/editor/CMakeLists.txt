@@ -79,6 +79,7 @@ set(PROJECT_SOURCES
         Source/ReliveApiWrapper.hpp
         Source/ExecApiCall.hpp
         Source/SnapSettings.hpp
+        Source/IPointSnapper.hpp
         Source/ClipBoard.cpp
         Source/ClipBoard.hpp
         Source/PasteItemsCommand.cpp
