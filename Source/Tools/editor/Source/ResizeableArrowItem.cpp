@@ -5,7 +5,7 @@
 #include <QGraphicsSceneMouseEvent>
 #include <QGraphicsView>
 #include "Model.hpp"
-#include "PropertyTreeWidget.hpp"
+#include "ISyncPropertiesToTree.hpp"
 #include "SnapSettings.hpp"
 #include <QDebug>
 
