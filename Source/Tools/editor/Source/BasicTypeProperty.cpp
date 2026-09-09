@@ -1,4 +1,5 @@
 #include "BasicTypeProperty.hpp"
+#include "ChangeBasicTypePropertyCommand.hpp"
 #include "IGraphicsItem.hpp"
 #include <QDateTime>
 #include "BigSpinBox.hpp"

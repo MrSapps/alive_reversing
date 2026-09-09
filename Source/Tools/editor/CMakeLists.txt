@@ -164,6 +164,9 @@ set(PROJECT_SOURCES
         Source/BasicTypeProperty.cpp
         Source/ChangeBasicTypePropertyCommand.hpp
         Source/ChangeBasicTypePropertyCommand.cpp
+        Source/IntegerType.hpp
+        Source/BasicTypePropertyChangeData.hpp
+        Source/LinkedBasicTypeProperty.hpp
         Source/BoolProperty.hpp
         Source/BoolProperty.cpp
         Source/ChangeBoolPropertyCommand.hpp
