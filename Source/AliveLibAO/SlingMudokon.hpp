@@ -3,11 +3,14 @@
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
 #include "GameSpeak.hpp"
 #include "../relive_lib/FatalError.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 
 namespace relive
 {
     struct Path_SlingMudokon;
 }
+
+class SerializedObjectData;
 
 namespace AO {
 
@@ -129,6 +132,43 @@ private:
     EState mBrainState = EState::Unknown_0;
 };
 
+struct SlingMudokonSaveState final : public SaveStateBase
+{
+    SlingMudokonSaveState()
+        : SaveStateBase(ReliveTypes::SlingMud, sizeof(*this))
+    { }
+    FP mXPos = {};
+    FP mYPos = {};
+    s16 mCurrentPath = 0;
+    EReliveLevelIds mCurrentLevel = EReliveLevelIds::eNone;
+    FP mSpriteScale = {};
+    Scale mScale = Scale::Fg;
+    bool bFlipX = false;
+    eSlingMudMotions mCurrentMotion = eSlingMudMotions::Motion_0_Idle;
+    eSlingMudMotions mNextMotion = eSlingMudMotions::Motion_0_Idle;
+    s32 mCurrentFrame = 0;
+    u16 mFrameChangeCounter = 0;
+    bool mRender = false;
+    bool mAnimate = false;
+    Guid mTlvId;
+    s32 mCodeConverted = 0;
+    s16 mCodeLength = 0;
+    bool mDontSetDestroyed = false;
+    bool mAbeGettingCloser = false;
+    GameSpeakEvents mCodeBuffer[16] = {};
+    s16 mBufferStart = 0;
+    s16 mBufferIdx = 0;
+    s32 mTimer140 = 0;
+    s32 mTimer144 = 0;
+    GiveCodeBrain::EState mPreviousGiveCodeState = GiveCodeBrain::EState::Init;
+    s16 mCodePos = 0;
+    bool mCodeMatches = false;
+    ISlingMudokonBrain::EBrainTypes mActiveBrain = ISlingMudokonBrain::EBrainTypes::Spawn;
+    GiveCodeBrain::EState mGiveCodeState = GiveCodeBrain::EState::Init;
+    SpawnBrain::EState mSpawnState = SpawnBrain::EState::Init;
+    AskForPasswordBrain::EState mAskForPasswordState = AskForPasswordBrain::EState::Unknown_0;
+};
+
 class SlingMudokon final : public ::BaseAliveGameObject
 {
 public:
@@ -147,6 +187,8 @@ public:
 
     virtual void VScreenChanged() override;
     virtual void VUpdate() override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
     virtual void VCallBrain();
     virtual void VCallMotion();

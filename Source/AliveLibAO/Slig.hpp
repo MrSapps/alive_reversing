@@ -2,12 +2,16 @@
 
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
 #include "../relive_lib/FatalError.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 #include "GameSpeak.hpp"
 
 namespace relive
 {
     struct Path_Slig;
 }
+
+class SerializedObjectData;
+enum eLineTypes : s16;
 
 namespace AO {
 
@@ -118,6 +122,57 @@ enum class SligSfx : s8
     eBlurgh_17 = 17,
 };
 
+struct SligSaveState final : public SaveStateBase
+{
+    SligSaveState()
+        : SaveStateBase(ReliveTypes::eSlig, sizeof(*this))
+    { }
+    FP mXPos = {};
+    FP mYPos = {};
+    FP mVelX = {};
+    FP mVelY = {};
+    FP mFallingVelxScaleFactor = {};
+    s16 mCurrentPath = 0;
+    EReliveLevelIds mCurrentLevel = EReliveLevelIds::eNone;
+    FP mSpriteScale = {};
+    Scale mScale = Scale::Fg;
+    s16 mRed = 0;
+    s16 mGreen = 0;
+    s16 mBlue = 0;
+    bool bFlipX = false;
+    eSligMotions mCurrentMotion = eSligMotions::Motion_0_StandIdle;
+    s32 mCurrentFrame = 0;
+    u16 mFrameChangeCounter = 0;
+    bool mRender = true;
+    bool mDrawable = true;
+    FP mHealth = {};
+    eSligMotions mPreviousMotion = eSligMotions::Motion_0_StandIdle;
+    eSligMotions mNextMotion = eSligMotions::Motion_0_StandIdle;
+    u16 mLastLineYPos = 0;
+    eLineTypes mCollisionLineType = eLineTypes::eNone_m1;
+    bool bActiveChar = false;
+    s16 mBrainSubState = 0;
+    s16 mGameSpeakPitchMin = 0;
+    s32 mTimer114 = 0;
+    bool mReturnToPreviousMotion = false;
+    bool mCheckedIfOffScreen = false;
+    s32 mInput = 0;
+    s32 mTimer128 = 0;
+    Guid mTlvInfo;
+    s16 mResIdx = 0;
+    eSligMotions mShotMotion = eSligMotions::None_m1;
+    PSX_RECT mZoneRect = {};
+    EReliveLevelIds mAbeLevel = EReliveLevelIds::eNone;
+    s16 mAbePath = 0;
+    s16 mAbeCamera = 0;
+    s32 mDeathByBeingShotTimer = 0;
+    s32 mExplodeTimer = 0;
+    s32 mBrainStateIdx = 0;
+    s16 mShootCount = 0;
+    s16 mForceAliveState = 0;
+    s16 mSpottedPossessedSlig = 0;
+};
+
 class Slig final : public ::BaseAliveGameObject
 {
 public:
@@ -193,6 +248,8 @@ public:
     virtual void VOnTlvCollision(TlvIterator tlvIterator) override;
     virtual bool VIsFacingMe(BaseAnimatedWithPhysicsGameObject* pOther) override;
     virtual bool VOnSameYLevel(BaseAnimatedWithPhysicsGameObject* pOther) override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
     virtual s16 VGetMotion(eMotionType motionType) override
     {
         switch (motionType)

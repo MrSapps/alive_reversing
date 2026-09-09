@@ -1,6 +1,27 @@
 #include "stdafx_ao.h"
 #include "QuikSave.hpp"
 #include "Abe.hpp"
+#include "Slig.hpp"
+#include "Scrab.hpp"
+#include "Paramite.hpp"
+#include "Slog.hpp"
+#include "Mudokon.hpp"
+#include "SlingMudokon.hpp"
+#include "Elum.hpp"
+#include "UXB.hpp"
+#include "LCDScreen.hpp"
+#include "DoorLight.hpp"
+#include "RollingBall.hpp"
+#include "MovingBomb.hpp"
+#include "FallingItem.hpp"
+#include "MeatSack.hpp"
+#include "RockSack.hpp"
+#include "InvisibleSwitch.hpp"
+#include "SecurityClaw.hpp"
+#include "SecurityOrb.hpp"
+#include "ChimeLock.hpp"
+#include "BackgroundGlukkon.hpp"
+#include "Shrykull.hpp"
 #include "DDCheat.hpp"
 #include "../relive_lib/BaseMap.hpp"
 #include "../relive_lib/GameObjects/GasCountDown.hpp"
@@ -97,12 +118,13 @@ void QuikSave::LoadActive(BaseMap& map)
 // Per-object restore dispatch. Every live object's VGetSaveState() gets
 // called generically in DoQuicksave (base class default is a no-op), so
 // the only types that actually appear in the stream are the ones that
-// override it: Abe, plus the relive_lib GameObjects that already implement
-// CreateFromSaveState identically for both engines (Grenade, TrapDoor,
-// TimerTrigger, AbilityRing, ThrowableArray). Anything else - AO's own
-// enemy/NPC types - doesn't implement VGetSaveState yet, so it never
-// writes a record here and there's nothing to restore for it; it just
-// comes back however its own VUpdate() naturally spawns it from its TLV.
+// override it: Abe, Slig, Scrab, plus the relive_lib GameObjects that
+// already implement CreateFromSaveState identically for both engines
+// (Grenade, TrapDoor, TimerTrigger, AbilityRing, ThrowableArray). Anything
+// else - AO's other enemy/NPC types - doesn't implement VGetSaveState yet,
+// so it never writes a record here and there's nothing to restore for it;
+// it just comes back however its own VUpdate() naturally spawns it from
+// its TLV.
 void QuikSave::RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     pSaveData.mObjectsStateData.ReadRewind();
@@ -113,6 +135,90 @@ void QuikSave::RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManag
         {
             case ReliveTypes::eAbe:
                 Abe::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eSlig:
+                Slig::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eScrab:
+                Scrab::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eParamite:
+                Paramite::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eSlog:
+                Slog::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eMudokon:
+                Mudokon::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::SlingMud:
+                SlingMudokon::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eElum:
+                Elum::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eUXB:
+                UXB::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eRollingBall:
+                RollingBall::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eTimedMine:
+                MovingBomb::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eRockSpawner:
+                FallingItem::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eMeatSack:
+                MeatSack::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eRockSack:
+                RockSack::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eInvisibleSwitch:
+                InvisibleSwitch::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eSecurityClaw:
+                SecurityClaw::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eSecurityOrb:
+                SecurityOrb::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eChimeLock:
+                ChimeLock::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eBackgroundGlukkon:
+                BackgroundGlukkon::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eShrykull:
+                Shrykull::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eLCDScreen:
+                LCDScreen::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eDoorLight:
+                DoorLight::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
                 break;
 
             case ReliveTypes::eGrenade:

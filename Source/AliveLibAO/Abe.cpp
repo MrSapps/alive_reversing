@@ -636,6 +636,35 @@ const u32 sAbe_yVel_table_4BB138[8] = {0, 4294705152, 4294705152, 4294705152, 0,
 
 void Abe::VUpdate()
 {
+    if (GetRestoredFromQuickSave())
+    {
+        SetRestoredFromQuickSave(false);
+
+        if (BaseAliveGameObjectCollisionLineType != -1)
+        {
+            gCollisions->Raycast(
+                mXPos,
+                mYPos - FP_FromInteger(20),
+                mXPos,
+                mYPos + FP_FromInteger(20),
+                &BaseAliveGameObjectCollisionLine,
+                &mXPos,
+                &mYPos,
+                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+
+            BaseAliveGameObjectCollisionLineType = -1;
+        }
+
+        BaseAliveGameObject_PlatformId = BaseGameObject::RefreshId(BaseAliveGameObject_PlatformId);
+        mFadeId = BaseGameObject::RefreshId(mFadeId);
+        field_15C_pThrowable = BaseGameObject::RefreshId(field_15C_pThrowable);
+        mPullRingRope = BaseGameObject::RefreshId(mPullRingRope);
+        mCircularFadeId = BaseGameObject::RefreshId(mCircularFadeId);
+        mOrbWhirlWindId = BaseGameObject::RefreshId(mOrbWhirlWindId);
+        field_18C_pObjToPossess = BaseGameObject::RefreshId(field_18C_pObjToPossess);
+        mThrowable = BaseGameObject::RefreshId(mThrowable);
+    }
+
     if (gAbeInvulnerableCheat)
     {
         mHealth = FP_FromInteger(1);
@@ -741,7 +770,10 @@ void Abe::VUpdate()
             {
                 motion_idx = field_112_prev_motion;
                 ToKnockback(1, 0);
-                mCurrentMotion = motion_idx;
+                if (motion_idx != eAbeMotions::None_m1)
+                {
+                    mCurrentMotion = motion_idx;
+                }
                 mNextMotion = eAbeMotions::Motion_0_Idle;
                 field_112_prev_motion = eAbeMotions::Motion_0_Idle;
                 mbMotionChanged = true;
@@ -2555,6 +2587,12 @@ void Abe::GetSaveState(AbeSaveState& pSaveState)
     pSaveState.mHealth = mHealth;
     pSaveState.mLastLineYPos = static_cast<u16>(FP_GetExponent(BaseAliveGameObjectLastLineYPos));
 
+    pSaveState.mCollisionLineType = eLineTypes::eNone_m1;
+    if (BaseAliveGameObjectCollisionLine)
+    {
+        pSaveState.mCollisionLineType = BaseAliveGameObjectCollisionLine->mLineType;
+    }
+
     pSaveState.mPlatformId = BaseAliveGameObject_PlatformId;
     if (BaseAliveGameObject_PlatformId != Guid{})
     {
@@ -2757,6 +2795,7 @@ void Abe::CreateFromSaveState(const AbeSaveState& pData, ResourceManagerWrapper&
     gAbe->mNextMotion = pData.mNextMotion;
     gAbe->field_112_prev_motion = pData.mKnockdownMotion;
     gAbe->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pData.mLastLineYPos);
+    gAbe->BaseAliveGameObjectCollisionLineType = static_cast<s16>(pData.mCollisionLineType);
     gAbe->BaseAliveGameObject_PlatformId = pData.mPlatformId;
 
     gAbe->field_110_state.raw = pData.mInternalState;

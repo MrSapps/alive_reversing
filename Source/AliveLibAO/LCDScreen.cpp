@@ -7,6 +7,7 @@
 #include "Sfx.hpp"
 #include "../relive_lib/Function.hpp"
 #include "LCDScreen.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "StringFormatters.hpp"
 #include "../relive_lib/Primitives.hpp"
@@ -348,6 +349,55 @@ LCDScreen::~LCDScreen()
 {
     gObjListDrawables->Remove_Item(this);
     mMap.TLV_Reset(mTlvId);
+}
+
+void LCDScreen::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    LCDScreenSaveState data = {};
+
+    data.mTlvId = mTlvId;
+    for (s32 i = 0; i < 512; i++)
+    {
+        data.mMessageBuffer[i] = mMessageBuffer[i];
+    }
+    data.mMessageId1 = mMessageId1;
+    data.mOffsetX = mOffsetX;
+    data.mCharacterWidth = mCharacterWidth;
+    data.mShowRandomMessage = mShowRandomMessage;
+    data.mActiveMessageOffset = static_cast<s32>(mActiveMessage - mMessageBuffer);
+
+    pSaveBuffer.Write(data);
+}
+
+void LCDScreen::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<LCDScreenSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
+    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eLCDScreen)
+    {
+        // The saved tlv-info didn't resolve back to a TLV of the expected
+        // type (can happen if two TLVs ended up sharing the same id) -
+        // nothing safe to do here, so drop this record.
+        return;
+    }
+    auto pTlv = tlvIterator.GetTlv<relive::Path_LCDScreen>();
+
+    auto pScreen = relive_new LCDScreen(pTlv, pState->mTlvId, resMan, map);
+    if (pScreen)
+    {
+        for (s32 i = 0; i < 512; i++)
+        {
+            pScreen->mMessageBuffer[i] = pState->mMessageBuffer[i];
+        }
+        pScreen->mMessageId1 = pState->mMessageId1;
+        pScreen->mOffsetX = pState->mOffsetX;
+        pScreen->mCharacterWidth = pState->mCharacterWidth;
+        pScreen->mShowRandomMessage = pState->mShowRandomMessage;
+        pScreen->mActiveMessage = pScreen->mMessageBuffer + pState->mActiveMessageOffset;
+        pScreen->mMessageCutoffPtr = nullptr;
+
+        pScreen->mFont.mFontContext->mFntResource.mCurPal = pScreen->mShowRandomMessage ? pScreen->mPal2.mPal : pScreen->mPal1.mPal;
+    }
 }
 
 } // namespace AO

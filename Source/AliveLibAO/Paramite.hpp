@@ -3,8 +3,11 @@
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
 #include "../relive_lib/FatalError.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 
 class ParamiteWeb;
+class SerializedObjectData;
+enum eLineTypes : s16;
 
 namespace AO {
 
@@ -58,6 +61,53 @@ enum class eParamiteMotions
 
 class Meat;
 
+struct ParamiteSaveState final : public SaveStateBase
+{
+    ParamiteSaveState()
+        : SaveStateBase(ReliveTypes::eParamite, sizeof(*this))
+    { }
+    FP mXPos = {};
+    FP mYPos = {};
+    FP mVelX = {};
+    FP mVelY = {};
+    s16 mCurrentPath = 0;
+    EReliveLevelIds mCurrentLevel = EReliveLevelIds::eNone;
+    FP mSpriteScale = {};
+    Scale mScale = Scale::Fg;
+    s16 mRed = 0;
+    s16 mGreen = 0;
+    s16 mBlue = 0;
+    bool bFlipX = false;
+    eParamiteMotions mCurrentMotion = eParamiteMotions::Motion_0_Idle;
+    s32 mCurrentFrame = 0;
+    u16 mFrameChangeCounter = 0;
+    bool mRender = true;
+    bool mDrawable = true;
+    FP mHealth = {};
+    eParamiteMotions mPreviousMotion = eParamiteMotions::Motion_0_Idle;
+    eParamiteMotions mNextMotion = eParamiteMotions::Motion_0_Idle;
+    u16 mLastLineYPos = 0;
+    eLineTypes mCollisionLineType = eLineTypes::eNone_m1;
+    s16 mBrainSubState = 0;
+    s16 mSurpriseWebDelayTimer = 0;
+    s32 mTimer114 = 0;
+    s16 mMeatEatingTime = 0;
+    s16 mAloneChaseDelay = 0;
+    s32 mWaitTimer = 0;
+    FP mXSpeed = {};
+    Guid mTlvInfo;
+    s32 mGroupChaseDelay = 0;
+    s32 mAttackTimer = 0;
+    s16 mSurpriseWebSwitchId = 0;
+    bool mHissBeforeAttack = false;
+    s16 mUsePrevMotion = 0;
+    bool bSnapped = false;
+    bool mDeleteWhenOutOfSight = false;
+    Guid mMeatId;
+    Guid mParamiteWebId;
+    s32 mBrainStateIdx = 0;
+};
+
 class Paramite final : public ::BaseAliveGameObject
 {
 public:
@@ -99,6 +149,8 @@ public:
     virtual bool VOnSameYLevel(BaseAnimatedWithPhysicsGameObject* pOther) override;
     virtual void VOnTrapDoorOpen() override;
     virtual void VUpdate() override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
     virtual s16 VGetMotion(eMotionType motionType) override
     {
         switch (motionType)

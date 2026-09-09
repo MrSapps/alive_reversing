@@ -9,6 +9,7 @@
 #include "UXB.hpp"
 #include "../relive_lib/GameObjects/ThrowableArray.hpp"
 #include "LCDStatusBoard.hpp"
+#include "LCDScreen.hpp"
 #include "DDCheat.hpp"
 #include "../relive_lib/Events.hpp"
 #include "WorkWheel.hpp"
@@ -326,7 +327,10 @@ static void RestoreObjectState(ReliveTypes type, SerializedObjectData& pData, Re
 
         case ::ReliveTypes::eWorkWheel:
             return WorkWheel::CreateFromSaveState(pData, resMan, map);
-            
+
+        case ::ReliveTypes::eLCDScreen:
+            return LCDScreen::CreateFromSaveState(pData, resMan, map);
+
         default:
             ALIVE_FATAL("No create save state for type %d", static_cast<s32>(type));
     }

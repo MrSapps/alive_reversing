@@ -1,6 +1,9 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
+
+class SerializedObjectData;
 
 namespace relive
 {
@@ -10,6 +13,43 @@ namespace relive
 namespace AO {
 
 class Bells;
+
+struct ChimeLockSaveState final : public SaveStateBase
+{
+    ChimeLockSaveState()
+        : SaveStateBase(ReliveTypes::eChimeLock, sizeof(*this))
+    { }
+    FP mXPos = {};
+    FP mYPos = {};
+    FP mVelX = {};
+    FP mVelY = {};
+    bool bActiveChar = false;
+    Guid mTlvId;
+    s16 mChimeLockState = 0;
+    u16 mMaxIdx = 0;
+    s32 mCode1 = 0;
+    s16 mCodeIdx = 0;
+    s32 mTimer12C = 0;
+    bool mHasBellSong = false;
+    s16 mSolveSwitchId = 0;
+    s16 mPressed = 0;
+    s16 mUnpossessionCountdown = 0;
+    FP mTargetX = {};
+    FP mTargetY = {};
+    FP mBallStartX = {};
+    FP mBallStartY = {};
+    FP mXPosOffset = {};
+    FP mYPosOffset = {};
+    s16 mXSize = 0;
+    s16 mYSize = 0;
+    s16 mBallState = 0;
+    s16 mBallAngle = 0;
+    s16 mBallTimer = 0;
+    s16 mChimeLockNum0 = 0;
+    s16 mChimeLockNum1 = 0;
+    bool mCanUnpossess = false;
+    bool mHitAllBells = false;
+};
 
 class ChimeLock final : public ::BaseAliveGameObject
 {
@@ -21,6 +61,8 @@ public:
     virtual void VScreenChanged() override;
     virtual void VPossessed() override;
     virtual void VUnPosses() override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
 private:
     s16 DoNote(s16 note);

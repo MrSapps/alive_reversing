@@ -2,6 +2,9 @@
 
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
 #include "../relive_lib/DynamicArray.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
+
+class SerializedObjectData;
 
 namespace relive
 {
@@ -28,6 +31,28 @@ enum class SecurityClawStates : s16
     eAnimateClaw_DoFlashAndSound_3
 };
 
+struct SecurityClawSaveState final : public SaveStateBase
+{
+    SecurityClawSaveState()
+        : SaveStateBase(ReliveTypes::eSecurityClaw, sizeof(*this))
+    { }
+    Guid mTlvInfo;
+    SecurityClawStates mState = SecurityClawStates::eInit_0;
+    s32 mTimer = 0;
+    s16 mAlarmSwitchId = 0;
+    s16 mAlarmDuration = 0;
+    FP mClawX = {};
+    FP mClawY = {};
+    u8 mAngle = 0;
+    s32 mOrbSoundChannels = 0;
+    bool mDetectorComeBack = false;
+    PSX_Point mTlvTopLeft = {};
+    PSX_Point mTlvBottomRight = {};
+    bool mAnimLoaded = false;
+    u32 mMotionDetectorArrayCount = 0;
+    Guid mMotionDetectorArray[10] = {};
+};
+
 class SecurityClaw final : public ::BaseAliveGameObject
 {
 public:
@@ -40,6 +65,8 @@ public:
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
     virtual void VUpdate() override;
     virtual void VOnThrowableHit(BaseGameObject* pFrom) override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
     Guid mTlvInfo;
     SecurityClawStates mState = SecurityClawStates::eInit_0;

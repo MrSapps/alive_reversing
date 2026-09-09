@@ -3,6 +3,7 @@
 #include "AmbientSound.hpp"
 #include "../relive_lib/Function.hpp"
 #include "Slig.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Lever.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "../relive_lib/Shadow.hpp"
@@ -490,6 +491,26 @@ const u32 sSligVelYTable_4BCA50[] = {0, 4294705152, 4294705152, 4294705152, 0, 2
 
 void Slig::VUpdate()
 {
+    if (GetRestoredFromQuickSave())
+    {
+        if (BaseAliveGameObjectCollisionLineType != -1)
+        {
+            gCollisions->Raycast(
+                mXPos,
+                mYPos - FP_FromInteger(20),
+                mXPos,
+                mYPos + FP_FromInteger(20),
+                &BaseAliveGameObjectCollisionLine,
+                &mXPos,
+                &mYPos,
+                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+
+            BaseAliveGameObjectCollisionLineType = -1;
+        }
+
+        SetRestoredFromQuickSave(false);
+    }
+
     if (!Input_IsChanting())
     {
         mPreventDepossession &= ~4u;
@@ -5432,6 +5453,224 @@ void Slig::SetBrain(Slig::TBrainFn fn)
 bool Slig::BrainIs(Slig::TBrainFn fn)
 {
     return mBrainState == fn;
+}
+
+// Index-addressable table of every brain function a Slig can be set to - used
+// to save/restore mBrainState (a function pointer) as a small integer.
+static const Slig::TBrainFn sSligBrainTable[] = {
+    &Slig::Brain_SpottedEnemy,
+    &Slig::Brain_Paused,
+    &Slig::Brain_EnemyDead,
+    &Slig::Brain_KilledEnemy,
+    &Slig::Brain_Unknown,
+    &Slig::Brain_Sleeping,
+    &Slig::Brain_WakingUp,
+    &Slig::Brain_Inactive,
+    &Slig::Brain_Possessed,
+    &Slig::Brain_Death,
+    &Slig::Brain_DeathDropDeath,
+    &Slig::Brain_ReturnControlToAbeAndDie,
+    &Slig::Brain_PanicTurning,
+    &Slig::Brain_PanicRunning,
+    &Slig::Brain_PanicYelling,
+    &Slig::Brain_Chasing,
+    &Slig::Brain_StopChasing,
+    &Slig::Brain_StartChasing,
+    &Slig::Brain_Idle,
+    &Slig::Brain_Turning,
+    &Slig::Brain_Walking,
+    &Slig::Brain_GetAlertedTurn,
+    &Slig::Brain_GetAlerted,
+    &Slig::Brain_StoppingNextToMudokon,
+    &Slig::Brain_BeatingUp,
+    &Slig::Brain_Discussion,
+    &Slig::Brain_ChaseAndDisappear,
+    &Slig::Brain_Shooting,
+    &Slig::Brain_ZSpottedEnemy,
+    &Slig::Brain_ZShooting,
+};
+
+void Slig::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    if (GetElectrocuted())
+    {
+        return;
+    }
+
+    // Sligs created dynamically by SligSpawner aren't tied to their own TLV
+    // (field_134_tlvInfo is {}), so there's nothing stable to re-resolve on
+    // restore - skip them rather than risk matching an unrelated TLV whose
+    // id also defaulted to {}.
+    if (!field_134_tlvInfo.IsValid())
+    {
+        return;
+    }
+
+    SligSaveState data = {};
+
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mVelX = mVelX;
+    data.mVelY = mVelY;
+    data.mFallingVelxScaleFactor = mFallingVelxScaleFactor;
+
+    data.mCurrentPath = mCurrentPath;
+    data.mCurrentLevel = mCurrentLevel;
+    data.mSpriteScale = GetSpriteScale();
+    data.mScale = GetScale();
+
+    data.mRed = mRGB.r;
+    data.mGreen = mRGB.g;
+    data.mBlue = mRGB.b;
+
+    data.bFlipX = GetAnimation().GetFlipX();
+    data.mCurrentMotion = mCurrentMotion;
+    data.mCurrentFrame = static_cast<s32>(GetAnimation().GetCurrentFrame());
+    data.mFrameChangeCounter = static_cast<u16>(GetAnimation().GetFrameChangeCounter());
+    data.mRender = GetAnimation().GetRender();
+    data.mDrawable = GetDrawable();
+    data.mHealth = mHealth;
+    data.mPreviousMotion = mPreviousMotion;
+    data.mNextMotion = mNextMotion;
+    data.mLastLineYPos = static_cast<u16>(FP_GetExponent(BaseAliveGameObjectLastLineYPos));
+
+    data.mCollisionLineType = eLineTypes::eNone_m1;
+    if (BaseAliveGameObjectCollisionLine)
+    {
+        data.mCollisionLineType = BaseAliveGameObjectCollisionLine->mLineType;
+    }
+
+    data.bActiveChar = (this == sControlledCharacter);
+    data.mBrainSubState = mBrainSubState;
+    data.mGameSpeakPitchMin = mGameSpeakPitchMin;
+    data.mTimer114 = field_114_timer;
+    data.mReturnToPreviousMotion = mReturnToPreviousMotion;
+    data.mCheckedIfOffScreen = mCheckedIfOffScreen;
+    data.mInput = mInput;
+    data.mTimer128 = field_128_timer;
+    data.mTlvInfo = field_134_tlvInfo;
+    data.mShotMotion = field_13A_shot_motion;
+    data.mZoneRect = field_13C_zone_rect;
+    data.mAbeLevel = mAbeLevel;
+    data.mAbePath = mAbePath;
+    data.mAbeCamera = mAbeCamera;
+    data.mDeathByBeingShotTimer = field_154_death_by_being_shot_timer;
+    data.mExplodeTimer = mExplodeTimer;
+    data.mShootCount = mShootCount;
+    data.mForceAliveState = field_20C_force_alive_state;
+    data.mSpottedPossessedSlig = mSpottedPossessedSlig;
+
+    data.mBrainStateIdx = 0;
+    s32 idx = 0;
+    for (const auto& fn : sSligBrainTable)
+    {
+        if (BrainIs(fn))
+        {
+            data.mBrainStateIdx = idx;
+            break;
+        }
+        idx++;
+    }
+
+    pSaveBuffer.Write(data);
+}
+
+void Slig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<SligSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);
+    if (!tlvIterator.GetTlv() ||
+        (tlvIterator.GetTlv()->mTlvType != ReliveTypes::eSlig && tlvIterator.GetTlv()->mTlvType != ReliveTypes::eSligSpawner))
+    {
+        // The saved tlv-info didn't resolve back to a Slig (or SligSpawner -
+        // Path_SligSpawner derives from Path_Slig, since Sligs spawned by
+        // one are tagged with the spawner's own tlv-info) TLV. This can
+        // happen if two TLVs ended up sharing the same id - nothing safe to
+        // do here, so drop this record rather than construct from a TLV of
+        // the wrong type.
+        return;
+    }
+    auto pTlv = tlvIterator.GetTlv<relive::Path_Slig>();
+
+    auto pSlig = relive_new Slig(pTlv, pState->mTlvInfo, resMan, map);
+    if (pSlig)
+    {
+        if (pState->bActiveChar)
+        {
+            sControlledCharacter = pSlig;
+            pSlig->SetPossessed(true);
+        }
+
+        pSlig->BaseAliveGameObjectPathTLV = TlvIterator::Invalid();
+        pSlig->BaseAliveGameObjectCollisionLine = nullptr;
+        pSlig->mXPos = pState->mXPos;
+        pSlig->mYPos = pState->mYPos;
+        pSlig->mVelX = pState->mVelX;
+        pSlig->mVelY = pState->mVelY;
+        pSlig->mCurrentPath = pState->mCurrentPath;
+        pSlig->mCurrentLevel = pState->mCurrentLevel;
+        pSlig->SetSpriteScale(pState->mSpriteScale);
+
+        if (pSlig->GetSpriteScale() == FP_FromInteger(1))
+        {
+            pSlig->GetAnimation().SetRenderLayer(Layer::eLayer_SligGreeterFartsBats_33);
+        }
+        else
+        {
+            pSlig->GetAnimation().SetRenderLayer(Layer::eLayer_SligGreeterFartsBat_Half_14);
+        }
+
+        pSlig->SetScale(pState->mScale);
+
+        pSlig->mRGB.SetRGB(pState->mRed, pState->mGreen, pState->mBlue);
+
+        pSlig->mCurrentMotion = pState->mCurrentMotion;
+        pSlig->GetAnimation().Set_Animation_Data(pSlig->GetAnimRes(sSligMotionAnimIds[static_cast<s32>(pState->mCurrentMotion)]));
+
+        pSlig->GetAnimation().SetCurrentFrame(pState->mCurrentFrame);
+        pSlig->GetAnimation().SetFrameChangeCounter(pState->mFrameChangeCounter);
+
+        pSlig->SetDrawable(pState->mDrawable);
+
+        pSlig->GetAnimation().SetFlipX(pState->bFlipX);
+        pSlig->GetAnimation().SetRender(pState->mRender);
+
+        if (IsLastFrame(&pSlig->GetAnimation()))
+        {
+            pSlig->GetAnimation().SetIsLastFrame(true);
+        }
+
+        pSlig->mHealth = pState->mHealth;
+        pSlig->mPreviousMotion = pState->mPreviousMotion;
+        pSlig->mNextMotion = pState->mNextMotion;
+        pSlig->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pState->mLastLineYPos);
+        pSlig->BaseAliveGameObjectCollisionLineType = static_cast<s16>(pState->mCollisionLineType);
+
+        pSlig->mBrainSubState = pState->mBrainSubState;
+        pSlig->mGameSpeakPitchMin = pState->mGameSpeakPitchMin;
+        pSlig->field_114_timer = pState->mTimer114;
+        pSlig->mReturnToPreviousMotion = pState->mReturnToPreviousMotion;
+        pSlig->mCheckedIfOffScreen = pState->mCheckedIfOffScreen;
+        pSlig->mInput = pState->mInput;
+        pSlig->field_128_timer = pState->mTimer128;
+        pSlig->field_134_tlvInfo = pState->mTlvInfo;
+        pSlig->field_13A_shot_motion = pState->mShotMotion;
+        pSlig->field_13C_zone_rect = pState->mZoneRect;
+        pSlig->mAbeLevel = pState->mAbeLevel;
+        pSlig->mAbePath = pState->mAbePath;
+        pSlig->mAbeCamera = pState->mAbeCamera;
+        pSlig->field_154_death_by_being_shot_timer = pState->mDeathByBeingShotTimer;
+        pSlig->mExplodeTimer = pState->mExplodeTimer;
+        pSlig->mShootCount = pState->mShootCount;
+        pSlig->field_20C_force_alive_state = pState->mForceAliveState;
+        pSlig->mSpottedPossessedSlig = pState->mSpottedPossessedSlig;
+
+        pSlig->SetBrain(sSligBrainTable[pState->mBrainStateIdx]);
+
+        // Arms the VUpdate() block above that re-raycasts the collision
+        // line - see BaseAliveGameObjectCollisionLineType above.
+        pSlig->SetRestoredFromQuickSave(true);
+    }
 }
 
 } // namespace AO

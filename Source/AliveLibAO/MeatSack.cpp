@@ -1,5 +1,6 @@
 #include "stdafx_ao.h"
 #include "MeatSack.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
 #include "../relive_lib/Events.hpp"
 #include "Path.hpp"
@@ -182,6 +183,64 @@ Meat::Meat(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan, BaseMap&
     mState = 0;
 
     CreateShadow();
+}
+
+void MeatSack::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    if (GetElectrocuted())
+    {
+        return;
+    }
+
+    MeatSackSaveState data = {};
+
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mCurrentPath = mCurrentPath;
+    data.mCurrentLevel = mCurrentLevel;
+    data.mSpriteScale = GetSpriteScale();
+    data.mScale = GetScale();
+
+    data.mTlvId = mTlvId;
+    data.mHasBeenHit = mHasBeenHit;
+    data.mMeatAmount = mMeatAmount;
+    data.mPlayWobbleSound = mPlayWobbleSound;
+    data.mTlvVelX = mTlvVelX;
+    data.mTlvVelY = mTlvVelY;
+
+    pSaveBuffer.Write(data);
+}
+
+void MeatSack::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<MeatSackSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
+    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eMeatSack)
+    {
+        // The saved tlv-info didn't resolve back to a TLV of the expected
+        // type (can happen if two TLVs ended up sharing the same id) -
+        // nothing safe to do here, so drop this record.
+        return;
+    }
+    auto pTlv = tlvIterator.GetTlv<relive::Path_MeatSack>();
+
+    auto pSack = relive_new MeatSack(pTlv, pState->mTlvId, resMan, map);
+    if (pSack)
+    {
+        pSack->mXPos = pState->mXPos;
+        pSack->mYPos = pState->mYPos;
+        pSack->mCurrentPath = pState->mCurrentPath;
+        pSack->mCurrentLevel = pState->mCurrentLevel;
+        pSack->SetSpriteScale(pState->mSpriteScale);
+        pSack->SetScale(pState->mScale);
+
+        pSack->mTlvId = pState->mTlvId;
+        pSack->mHasBeenHit = pState->mHasBeenHit;
+        pSack->mMeatAmount = pState->mMeatAmount;
+        pSack->mPlayWobbleSound = pState->mPlayWobbleSound;
+        pSack->mTlvVelX = pState->mTlvVelX;
+        pSack->mTlvVelY = pState->mTlvVelY;
+    }
 }
 
 } // namespace AO

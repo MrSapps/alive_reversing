@@ -195,6 +195,7 @@ UXB::UXB(relive::Path_UXB* pTlv, const Guid& tlvId, ResourceManagerWrapper& resM
     }
 
     mTlvInfo = tlvId;
+    mBaseGameObjectTlvInfo = tlvId;
     mNextStateTimer = sGnFrame;
 
     const FP gridSnap = ScaleToGridSize(GetSpriteScale());

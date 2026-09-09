@@ -6,6 +6,7 @@
 #include "../relive_lib/SaveStateBase.hpp"
 
 class SerializedObjectData;
+enum eLineTypes : s16;
 
 namespace relive
 {
@@ -355,6 +356,7 @@ struct AbeSaveState final : public SaveStateBase
 
     FP mHealth;
     u16 mLastLineYPos;
+    eLineTypes mCollisionLineType;
     Guid mPlatformId;
     bool mIsAbeControlled;
 

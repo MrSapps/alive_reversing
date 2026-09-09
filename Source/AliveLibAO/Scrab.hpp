@@ -3,6 +3,10 @@
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
 #include "../relive_lib/FatalError.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
+
+class SerializedObjectData;
+enum eLineTypes : s16;
 
 namespace AO {
 
@@ -58,6 +62,54 @@ enum class ScrabSounds : u8
     eYell_8 = 8,
 };
 
+struct ScrabSaveState final : public SaveStateBase
+{
+    ScrabSaveState()
+        : SaveStateBase(ReliveTypes::eScrab, sizeof(*this))
+    { }
+    FP mXPos = {};
+    FP mYPos = {};
+    FP mVelX = {};
+    FP mVelY = {};
+    s16 mCurrentPath = 0;
+    EReliveLevelIds mCurrentLevel = EReliveLevelIds::eNone;
+    FP mSpriteScale = {};
+    Scale mScale = Scale::Fg;
+    s16 mRed = 0;
+    s16 mGreen = 0;
+    s16 mBlue = 0;
+    bool bFlipX = false;
+    eScrabMotions mCurrentMotion = eScrabMotions::Motion_0_Empty;
+    s32 mCurrentFrame = 0;
+    u16 mFrameChangeCounter = 0;
+    bool mRender = true;
+    bool mDrawable = true;
+    FP mHealth = {};
+    eScrabMotions mPreviousMotion = eScrabMotions::Motion_0_Empty;
+    eScrabMotions mNextMotion = eScrabMotions::Motion_0_Empty;
+    u16 mLastLineYPos = 0;
+    eLineTypes mCollisionLineType = eLineTypes::eNone_m1;
+    s16 mBrainSubState = 0;
+    s16 mAttackDelay = 0;
+    relive::Path_Scrab::ScrabPatrolType mPatrolType = relive::Path_Scrab::ScrabPatrolType::eWalk;
+    s32 mTimer118 = 0;
+    Guid mScrabTargetId;
+    Guid mAbeOrMudTargetId;
+    FP mKnockbackVelXScale = {};
+    FP mStuckCheckXPos = {};
+    Guid mTlvInfo;
+    s32 mSpottingAbeDelay = 0;
+    s32 mSpottingTimer = 0;
+    s32 mLastShriekTimer = 0;
+    s16 mPauseLeftMin = 0;
+    s16 mPauseLeftMax = 0;
+    s16 mPauseRightMin = 0;
+    s16 mPauseRightMax = 0;
+    s32 mSfxChannelMask = 0;
+    s16 mFlags = 0;
+    s32 mBrainStateIdx = 0;
+};
+
 class Scrab final : public ::BaseAliveGameObject
 {
 public:
@@ -103,6 +155,8 @@ public:
     virtual void VScreenChanged() override;
     virtual void VOnTrapDoorOpen() override;
     virtual bool VOnSameYLevel(BaseAnimatedWithPhysicsGameObject* pOther) override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
     virtual s16 VGetMotion(eMotionType motionType) override
     {
         switch (motionType)

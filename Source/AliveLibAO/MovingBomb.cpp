@@ -1,6 +1,7 @@
 #include "stdafx_ao.h"
 #include "../relive_lib/Function.hpp"
 #include "MovingBomb.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "Map.hpp"
 #include "Engine.hpp"
@@ -272,6 +273,26 @@ void MovingBomb::FollowLine()
 
 void MovingBomb::VUpdate()
 {
+    if (GetRestoredFromQuickSave())
+    {
+        if (BaseAliveGameObjectCollisionLineType != -1)
+        {
+            gCollisions->Raycast(
+                mXPos,
+                mYPos - FP_FromInteger(20),
+                mXPos,
+                mYPos + FP_FromInteger(20),
+                &BaseAliveGameObjectCollisionLine,
+                &mXPos,
+                &mYPos,
+                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+
+            BaseAliveGameObjectCollisionLineType = -1;
+        }
+
+        SetRestoredFromQuickSave(false);
+    }
+
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);
@@ -448,6 +469,93 @@ void MovingBomb::VUpdate()
 
         default:
             break;
+    }
+}
+
+void MovingBomb::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    if (GetElectrocuted())
+    {
+        return;
+    }
+
+    MovingBombSaveState data = {};
+
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mVelX = mVelX;
+    data.mVelY = mVelY;
+    data.mCurrentPath = mCurrentPath;
+    data.mCurrentLevel = mCurrentLevel;
+    data.mSpriteScale = GetSpriteScale();
+    data.mScale = GetScale();
+    data.bFlipX = GetAnimation().GetFlipX();
+    data.mRender = GetAnimation().GetRender();
+    data.mLastLineYPos = static_cast<u16>(FP_GetExponent(BaseAliveGameObjectLastLineYPos));
+
+    data.mCollisionLineType = eLineTypes::eNone_m1;
+    if (BaseAliveGameObjectCollisionLine)
+    {
+        data.mCollisionLineType = BaseAliveGameObjectCollisionLine->mLineType;
+    }
+
+    data.mState = static_cast<s16>(mState);
+    data.mTlvId = mTlvId;
+    data.mTimer = mTimer;
+    data.mSpeed = mSpeed;
+    data.mStartMovingSwitchId = mStartMovingSwitchId;
+    data.mMinStopTime = mMinStopTime;
+    data.mMaxStopTime = mMaxStopTime;
+    data.mChannelMask = mChannelMask;
+    data.mPersistOffscreen = mPersistOffscreen;
+
+    pSaveBuffer.Write(data);
+}
+
+void MovingBomb::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<MovingBombSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
+    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eMovingBomb)
+    {
+        // The saved tlv-info didn't resolve back to a TLV of the expected
+        // type (can happen if two TLVs ended up sharing the same id) -
+        // nothing safe to do here, so drop this record.
+        return;
+    }
+    auto pTlv = tlvIterator.GetTlv<relive::Path_MovingBomb>();
+
+    auto pBomb = relive_new MovingBomb(pTlv, pState->mTlvId, resMan, map);
+    if (pBomb)
+    {
+        pBomb->BaseAliveGameObjectPathTLV = TlvIterator::Invalid();
+        pBomb->BaseAliveGameObjectCollisionLine = nullptr;
+        pBomb->mXPos = pState->mXPos;
+        pBomb->mYPos = pState->mYPos;
+        pBomb->mVelX = pState->mVelX;
+        pBomb->mVelY = pState->mVelY;
+        pBomb->mCurrentPath = pState->mCurrentPath;
+        pBomb->mCurrentLevel = pState->mCurrentLevel;
+        pBomb->SetSpriteScale(pState->mSpriteScale);
+        pBomb->SetScale(pState->mScale);
+        pBomb->GetAnimation().SetFlipX(pState->bFlipX);
+        pBomb->GetAnimation().SetRender(pState->mRender);
+        pBomb->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pState->mLastLineYPos);
+        pBomb->BaseAliveGameObjectCollisionLineType = static_cast<s16>(pState->mCollisionLineType);
+
+        pBomb->mState = static_cast<States>(pState->mState);
+        pBomb->mTlvId = pState->mTlvId;
+        pBomb->mTimer = pState->mTimer;
+        pBomb->mSpeed = pState->mSpeed;
+        pBomb->mStartMovingSwitchId = pState->mStartMovingSwitchId;
+        pBomb->mMinStopTime = pState->mMinStopTime;
+        pBomb->mMaxStopTime = pState->mMaxStopTime;
+        pBomb->mChannelMask = pState->mChannelMask;
+        pBomb->mPersistOffscreen = pState->mPersistOffscreen;
+
+        // Arms the VUpdate() block above that re-raycasts the collision
+        // line - see BaseAliveGameObjectCollisionLineType above.
+        pBomb->SetRestoredFromQuickSave(true);
     }
 }
 

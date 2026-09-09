@@ -1,5 +1,6 @@
 #include "stdafx_ao.h"
 #include "UXB.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../relive_lib/Function.hpp"
 #include "Sfx.hpp"
 #include "../AliveLibAE/stdlib.hpp"
@@ -180,6 +181,7 @@ UXB::UXB(relive::Path_UXB* pTlv, const Guid& tlvId, ResourceManagerWrapper& resM
     }
 
     mTlvInfo = tlvId;
+    mBaseGameObjectTlvInfo = tlvId;
     mNextStateTimer = sGnFrame;
 
     const FP gridSnap = ScaleToGridSize(GetSpriteScale());
@@ -486,6 +488,53 @@ void UXB::VRender(OrderingTable& ot)
 
             BaseAnimatedWithPhysicsGameObject::VRender(ot);
         }
+    }
+}
+
+void UXB::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    UXBSaveState data = {};
+
+    data.mTlvInfo = mTlvInfo;
+    data.mNextStateTimer = mNextStateTimer;
+    data.mCurrentState = mCurrentState;
+    data.mStartingState = mStartingState;
+    data.mPatternIndex = mPatternIndex;
+    data.mRedBlinkCount = mRedBlinkCount;
+    data.mIsRed = mIsRed;
+
+    pSaveBuffer.Write(data);
+}
+
+void UXB::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<UXBSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);
+    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eUXB)
+    {
+        // The saved tlv-info didn't resolve back to a TLV of the expected
+        // type (can happen if two TLVs ended up sharing the same id) -
+        // nothing safe to do here, so drop this record.
+        return;
+    }
+    auto pTlv = tlvIterator.GetTlv<relive::Path_UXB>();
+
+    auto pUXB = relive_new UXB(pTlv, pState->mTlvInfo, resMan, map);
+    if (pUXB)
+    {
+        if (pState->mCurrentState == UXBState::eDeactivated)
+        {
+            pUXB->mFlashAnim.LoadPal(pUXB->GetPalRes(PalId::GreenFlash));
+            pUXB->mFlashAnim.Set_Animation_Data(pUXB->GetAnimRes(AnimId::Bomb_RedGreenTick));
+            pUXB->GetAnimation().Set_Animation_Data(pUXB->GetAnimRes(AnimId::UXB_Disabled));
+        }
+
+        pUXB->mNextStateTimer = pState->mNextStateTimer;
+        pUXB->mCurrentState = pState->mCurrentState;
+        pUXB->mStartingState = pState->mStartingState;
+        pUXB->mPatternIndex = pState->mPatternIndex;
+        pUXB->mRedBlinkCount = pState->mRedBlinkCount;
+        pUXB->mIsRed = pState->mIsRed ? 1 : 0;
     }
 }
 

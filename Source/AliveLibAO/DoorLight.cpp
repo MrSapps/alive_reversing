@@ -1,6 +1,7 @@
 #include "stdafx_ao.h"
 #include "../relive_lib/Function.hpp"
 #include "DoorLight.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../relive_lib/SwitchStates.hpp"
 #include "Math.hpp"
 #include "Engine.hpp"
@@ -207,6 +208,40 @@ void DoorLight::VRender(OrderingTable& ot)
             ot,
             mWidth,
             mHeight);
+    }
+}
+
+void DoorLight::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    DoorLightSaveState data = {};
+
+    data.mTlvId = mTlvId;
+    data.mSwitchState = mSwitchState;
+    data.mRed = mRGB.r;
+    data.mGreen = mRGB.g;
+    data.mBlue = mRGB.b;
+
+    pSaveBuffer.Write(data);
+}
+
+void DoorLight::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<DoorLightSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
+    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eLightEffect)
+    {
+        // The saved tlv-info didn't resolve back to a TLV of the expected
+        // type (can happen if two TLVs ended up sharing the same id) -
+        // nothing safe to do here, so drop this record.
+        return;
+    }
+    auto pTlv = tlvIterator.GetTlv<relive::Path_LightEffect>();
+
+    auto pLight = relive_new DoorLight(pTlv, pState->mTlvId, resMan, map);
+    if (pLight)
+    {
+        pLight->mSwitchState = pState->mSwitchState;
+        pLight->mRGB.SetRGB(pState->mRed, pState->mGreen, pState->mBlue);
     }
 }
 

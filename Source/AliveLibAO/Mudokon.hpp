@@ -2,12 +2,16 @@
 
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
 #include "../relive_lib/FatalError.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 #include "GameSpeak.hpp"
 
 namespace {
 class Path_TLV;
 
 }
+
+class SerializedObjectData;
+enum eLineTypes : s16;
 
 namespace AO {
 
@@ -93,6 +97,74 @@ struct Mudokon_Resources final
 
 enum class GameSpeakEvents : s16;
 
+struct MudokonSaveState final : public SaveStateBase
+{
+    MudokonSaveState()
+        : SaveStateBase(ReliveTypes::eMudokon, sizeof(*this))
+    { }
+    FP mXPos = {};
+    FP mYPos = {};
+    FP mVelX = {};
+    FP mVelY = {};
+    s16 mCurrentPath = 0;
+    EReliveLevelIds mCurrentLevel = EReliveLevelIds::eNone;
+    FP mSpriteScale = {};
+    Scale mScale = Scale::Fg;
+    s16 mRed = 0;
+    s16 mGreen = 0;
+    s16 mBlue = 0;
+    bool bFlipX = false;
+    eMudMotions mCurrentMotion = eMudMotions::Motion_0_Idle;
+    s32 mCurrentFrame = 0;
+    u16 mFrameChangeCounter = 0;
+    bool mRender = true;
+    bool mDrawable = true;
+    FP mHealth = {};
+    eMudMotions mPreviousMotion = eMudMotions::Motion_0_Idle;
+    eMudMotions mNextMotion = eMudMotions::Motion_0_Idle;
+    u16 mLastLineYPos = 0;
+    eLineTypes mCollisionLineType = eLineTypes::eNone_m1;
+    Guid mTlvId;
+    s16 mLiftSwitchId = 0;
+    s32 mTimer114 = 0;
+    s32 mTimer118 = 0;
+    FP mFp11C = {};
+    s16 mVoicePitch = 0;
+    s16 mInput = 0;
+    s16 mTimer13C = 0;
+    s16 mTimer13E = 0;
+    bool mBit2_Unknown = false;
+    bool mSnapToGrid = false;
+    bool mPersist = false;
+    bool mBit7_Unknown = false;
+    bool mBit8_Unknown = false;
+    bool mAlerted = false;
+    bool mGiveRingWithoutPassword = false;
+    bool mDeaf = false;
+    s16 mJob184 = 0;
+    bool mGivePassword = false;
+    s16 mAction188 = 0;
+    FP mHowFarToWalk = {};
+    FP mFp190 = {};
+    Guid mLiftPointId;
+    s16 mAbeMustFaceMud = 0;
+    s16 mCodeIdx = 0;
+    s16 mS16_1A0 = 0;
+    s32 mCodeConverted = 0;
+    s16 mCodeLength = 0;
+    u16 mRingTimeout = 0;
+    Guid mBirdPortalId;
+    s16 mS16_1B0 = 0;
+    s16 mRescueSwitchId = 0;
+    s16 mIdleTime = 0;
+    s16 mS16_1B6 = 0;
+    s16 mBrainState = 0;
+    s16 mBrainSubState = 0;
+    s16 mS16_1BC = 0;
+    s32 mTimer1C0 = 0;
+    bool mDoPathTrans = false;
+};
+
 class Mudokon final : public ::BaseAliveGameObject
 {
 public:
@@ -174,6 +246,8 @@ public:
     virtual void VOnTlvCollision(TlvIterator tlvIterator) override;
     virtual void VScreenChanged() override;
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
     virtual void VUpdateResBlock();
     virtual s16 VGetMotion(eMotionType motionType) override

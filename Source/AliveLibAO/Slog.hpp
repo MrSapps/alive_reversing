@@ -2,12 +2,16 @@
 
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
 #include "../relive_lib/FatalError.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 #include "GameSpeak.hpp"
 
 namespace relive {
 class Path_TLV;
 struct Path_Slog;
 }
+
+class SerializedObjectData;
+enum eLineTypes : s16;
 
 namespace AO {
 
@@ -44,6 +48,62 @@ enum class eSlogMotions
     None_m2 = -2,
     None_m1 = -1,
     SLOG_STATES_ENUM_AO(MAKE_ENUM)
+};
+
+struct SlogSaveState final : public SaveStateBase
+{
+    SlogSaveState()
+        : SaveStateBase(ReliveTypes::eSlog, sizeof(*this))
+    { }
+    Guid mBaseTlvId;
+    FP mXPos = {};
+    FP mYPos = {};
+    FP mVelX = {};
+    FP mVelY = {};
+    s16 mCurrentPath = 0;
+    EReliveLevelIds mCurrentLevel = EReliveLevelIds::eNone;
+    FP mSpriteScale = {};
+    s16 mRed = 0;
+    s16 mGreen = 0;
+    s16 mBlue = 0;
+    bool bFlipX = false;
+    eSlogMotions mCurrentMotion = eSlogMotions::Motion_0_Idle;
+    s32 mCurrentFrame = 0;
+    u16 mFrameChangeCounter = 0;
+    bool mRender = true;
+    bool mDrawable = true;
+    FP mHealth = {};
+    eSlogMotions mPreviousMotion = eSlogMotions::Motion_0_Idle;
+    eSlogMotions mNextMotion = eSlogMotions::Motion_0_Idle;
+    u16 mLastLineYPos = 0;
+    eLineTypes mCollisionLineType = eLineTypes::eNone_m1;
+    Guid mPlatformId;
+    Guid mSlogTlvId;
+    Guid mTargetId;
+    s16 mBrainState = 0;
+    s16 mBrainSubState = 0;
+    s32 mMultiUseTimer = 0;
+    Guid mListeningToSligId;
+    s16 mHasWoofed = 0;
+    s16 mWaitingCounter = 0;
+    s16 mResponseIdx = 0;
+    s16 mResponsePart = 0;
+    s16 mAngerLevel = 0;
+    s16 mWakeUpAnger = 0;
+    s16 mTotalAnger = 0;
+    s16 mChaseAnger = 0;
+    s16 mAngerSwitchId = 0;
+    s16 mChaseDelay = 0;
+    s16 mJumpCounter = 0;
+    s16 mStopRunning = 0;
+    s16 mListenToSligs = 0;
+    s16 mShot = 0;
+    s16 mHitByAbilityRing = 0;
+    s32 mScratchTimer = 0;
+    s32 mGrowlTimer = 0;
+    bool bAsleep = false;
+    s16 mMovedOffScreen = 0;
+    s16 mBitingTarget = 0;
 };
 
 class Slog final : public ::BaseAliveGameObject
@@ -86,6 +146,8 @@ public:
     virtual void VOnThrowableHit(BaseGameObject* pFrom) override;
     virtual void VOnTrapDoorOpen() override;
     virtual void VUpdate() override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
     virtual s16 VGetMotion(eMotionType motionType) override
     {
         switch (motionType)

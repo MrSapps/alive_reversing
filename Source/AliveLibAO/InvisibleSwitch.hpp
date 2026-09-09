@@ -3,10 +3,23 @@
 #include "../relive_lib/GameObjects/BaseGameObject.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
 #include "../relive_lib/Psx.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
+
+class SerializedObjectData;
 
 namespace AO {
 
 enum class SwitchOp : s16;
+
+struct InvisibleSwitchSaveState final : public SaveStateBase
+{
+    InvisibleSwitchSaveState()
+        : SaveStateBase(ReliveTypes::eInvisibleSwitch, sizeof(*this))
+    { }
+    Guid mTlvId;
+    u16 mState = 0;
+    s32 mDelayTimer = 0;
+};
 
 class InvisibleSwitch final : public BaseGameObject
 {
@@ -16,6 +29,8 @@ public:
 
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
 private:
     bool IsAbeUsingDoor() const;

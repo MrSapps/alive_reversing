@@ -1,6 +1,7 @@
 #include "stdafx_ao.h"
 #include "../relive_lib/Function.hpp"
 #include "SlingMudokon.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "GameSpeak.hpp"
 #include "../relive_lib/Collisions.hpp"
 #include "Sfx.hpp"
@@ -881,6 +882,119 @@ void AskForPasswordBrain::VUpdate()
 
         default:
             return;
+    }
+}
+
+void SlingMudokon::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    if (GetElectrocuted())
+    {
+        return;
+    }
+
+    SlingMudokonSaveState data = {};
+
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mCurrentPath = mCurrentPath;
+    data.mCurrentLevel = mCurrentLevel;
+    data.mSpriteScale = GetSpriteScale();
+    data.mScale = GetScale();
+    data.bFlipX = GetAnimation().GetFlipX();
+    data.mCurrentMotion = mCurrentMotion;
+    data.mNextMotion = mNextMotion;
+    data.mCurrentFrame = static_cast<s32>(GetAnimation().GetCurrentFrame());
+    data.mFrameChangeCounter = static_cast<u16>(GetAnimation().GetFrameChangeCounter());
+    data.mRender = GetAnimation().GetRender();
+    data.mAnimate = GetAnimation().GetAnimate();
+
+    data.mTlvId = mTlvId;
+    data.mCodeConverted = mCodeConverted;
+    data.mCodeLength = mCodeLength;
+    data.mDontSetDestroyed = mDontSetDestroyed;
+    data.mAbeGettingCloser = mAbeGettingCloser;
+
+    for (s32 i = 0; i < 16; i++)
+    {
+        data.mCodeBuffer[i] = mCodeBuffer[i];
+    }
+
+    data.mBufferStart = mBufferStart;
+    data.mBufferIdx = mBufferIdx;
+    data.mTimer140 = field_140_timer;
+    data.mTimer144 = field_144_timer2;
+    data.mPreviousGiveCodeState = field_154_previous_brain_state;
+    data.mCodePos = mCodePos;
+    data.mCodeMatches = mCodeMatches;
+
+    data.mActiveBrain = mCurrentBrain->VGetBrain();
+    data.mGiveCodeState = mGiveCodeBrain.State();
+    data.mSpawnState = mSpawnBrain.State();
+    data.mAskForPasswordState = mAskForPasswordBrain.State();
+
+    pSaveBuffer.Write(data);
+}
+
+void SlingMudokon::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<SlingMudokonSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
+    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::SlingMud)
+    {
+        // The saved tlv-info didn't resolve back to a TLV of the expected
+        // type (can happen if two TLVs ended up sharing the same id) -
+        // nothing safe to do here, so drop this record.
+        return;
+    }
+    auto pTlv = tlvIterator.GetTlv<relive::Path_SlingMudokon>();
+
+    auto pSlingMud = relive_new SlingMudokon(pTlv, pState->mTlvId, resMan, map);
+    if (pSlingMud)
+    {
+        pSlingMud->BaseAliveGameObjectPathTLV = TlvIterator::Invalid();
+        pSlingMud->mXPos = pState->mXPos;
+        pSlingMud->mYPos = pState->mYPos;
+        pSlingMud->mCurrentPath = pState->mCurrentPath;
+        pSlingMud->mCurrentLevel = pState->mCurrentLevel;
+        pSlingMud->SetSpriteScale(pState->mSpriteScale);
+        pSlingMud->SetScale(pState->mScale);
+        pSlingMud->GetAnimation().SetFlipX(pState->bFlipX);
+        pSlingMud->mCurrentMotion = pState->mCurrentMotion;
+        pSlingMud->mNextMotion = pState->mNextMotion;
+        pSlingMud->GetAnimation().Set_Animation_Data(pSlingMud->GetAnimRes(sSlingMudMotionAnimIds[static_cast<u32>(pState->mCurrentMotion)]));
+        pSlingMud->GetAnimation().SetCurrentFrame(pState->mCurrentFrame);
+        pSlingMud->GetAnimation().SetFrameChangeCounter(pState->mFrameChangeCounter);
+        pSlingMud->GetAnimation().SetRender(pState->mRender);
+        pSlingMud->GetAnimation().SetAnimate(pState->mAnimate);
+
+        if (IsLastFrame(&pSlingMud->GetAnimation()))
+        {
+            pSlingMud->GetAnimation().SetIsLastFrame(true);
+        }
+
+        pSlingMud->mTlvId = pState->mTlvId;
+        pSlingMud->mCodeConverted = pState->mCodeConverted;
+        pSlingMud->mCodeLength = pState->mCodeLength;
+        pSlingMud->mDontSetDestroyed = pState->mDontSetDestroyed;
+        pSlingMud->mAbeGettingCloser = pState->mAbeGettingCloser;
+
+        for (s32 i = 0; i < 16; i++)
+        {
+            pSlingMud->mCodeBuffer[i] = pState->mCodeBuffer[i];
+        }
+
+        pSlingMud->mBufferStart = pState->mBufferStart;
+        pSlingMud->mBufferIdx = pState->mBufferIdx;
+        pSlingMud->field_140_timer = pState->mTimer140;
+        pSlingMud->field_144_timer2 = pState->mTimer144;
+        pSlingMud->field_154_previous_brain_state = pState->mPreviousGiveCodeState;
+        pSlingMud->mCodePos = pState->mCodePos;
+        pSlingMud->mCodeMatches = pState->mCodeMatches;
+
+        pSlingMud->mGiveCodeBrain.SetState(pState->mGiveCodeState);
+        pSlingMud->mSpawnBrain.SetState(pState->mSpawnState);
+        pSlingMud->mAskForPasswordBrain.SetState(pState->mAskForPasswordState);
+        pSlingMud->SetBrain(pState->mActiveBrain);
     }
 }
 

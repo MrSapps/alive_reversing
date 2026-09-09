@@ -1,6 +1,7 @@
 #include "stdafx_ao.h"
 #include "../relive_lib/Function.hpp"
 #include "Elum.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "Map.hpp"
 #include "LiftPoint.hpp"
@@ -3159,6 +3160,26 @@ void Elum::Motion_50_Knockback()
 
 void Elum::VUpdate()
 {
+    if (GetRestoredFromQuickSave())
+    {
+        if (BaseAliveGameObjectCollisionLineType != -1)
+        {
+            gCollisions->Raycast(
+                mXPos,
+                mYPos - FP_FromInteger(20),
+                mXPos,
+                mYPos + FP_FromInteger(20),
+                &BaseAliveGameObjectCollisionLine,
+                &mXPos,
+                &mYPos,
+                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+
+            BaseAliveGameObjectCollisionLineType = -1;
+        }
+
+        SetRestoredFromQuickSave(false);
+    }
+
     if (gDDCheat_FlyingEnabled && sControlledCharacter == this)
     {
         VOnTrapDoorOpen();
@@ -3528,6 +3549,165 @@ Elum::Elum(const Guid& tlvInfo, ResourceManagerWrapper& resMan, BaseMap& map)
     relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eSecretAreaShort, relive::Path_MusicTrigger::TriggeredBy::eTouching, 0, 30, mResMan, mMap);
 
     CreateShadow();
+}
+
+void Elum::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    if (GetElectrocuted())
+    {
+        return;
+    }
+
+    ElumSaveState data = {};
+
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mVelX = mVelX;
+    data.mVelY = mVelY;
+
+    data.mCurrentPath = mCurrentPath;
+    data.mCurrentLevel = mCurrentLevel;
+    data.mSpriteScale = GetSpriteScale();
+    data.mScale = GetScale();
+
+    data.mRed = mRGB.r;
+    data.mGreen = mRGB.g;
+    data.mBlue = mRGB.b;
+
+    data.bFlipX = GetAnimation().GetFlipX();
+    data.mCurrentMotion = mCurrentMotion;
+    data.mCurrentFrame = static_cast<s32>(GetAnimation().GetCurrentFrame());
+    data.mFrameChangeCounter = static_cast<u16>(GetAnimation().GetFrameChangeCounter());
+    data.mRender = GetAnimation().GetRender();
+    data.mDrawable = GetDrawable();
+    data.mHealth = mHealth;
+    data.mPreviousMotion = mPreviousMotion;
+    data.mNextMotion = mNextMotion;
+    data.mLastLineYPos = static_cast<u16>(FP_GetExponent(BaseAliveGameObjectLastLineYPos));
+
+    data.mCollisionLineType = eLineTypes::eNone_m1;
+    if (BaseAliveGameObjectCollisionLine)
+    {
+        data.mCollisionLineType = BaseAliveGameObjectCollisionLine->mLineType;
+    }
+
+    data.bActiveChar = (this == sControlledCharacter);
+    data.mTlvId = mTlvId;
+    data.mAbeForcedDownFromElum = field_154_bAbeForcedDownFromElum;
+    data.mBrainIdx = mBrainIdx;
+    data.mStrugglingWithBees = mStrugglingWithBees;
+    data.mRespawnOnDead = mRespawnOnDead;
+    data.mContinuePointRect = mContinuePointRect;
+    data.mPreviousContinuePointZoneNumber = mPreviousContinuePointZoneNumber;
+    data.mAbeZoneNumber = mAbeZoneNumber;
+    data.mContinuePointLevel = mContinuePointLevel;
+    data.mContinuePointPath = mContinuePointPath;
+    data.mContinueCamera = mContinueCamera;
+    data.mHoneyXPos = mHoneyXPos;
+    data.mDontFollowAbe = mDontFollowAbe;
+    data.mStungByBees = mStungByBees;
+    data.mFoundHoney = mFoundHoney;
+    data.mUnknown120 = field_120_bUnknown;
+    data.mBrainSubState = mBrainSubState;
+    data.mContinuePointSpriteScale = mContinuePointSpriteScale;
+    data.mFalling = mFalling;
+    data.mHoneyCamera = mHoneyCamera;
+    data.mFootStep2 = field_10C_bFootStep2;
+    data.mPressed = field_10E_pressed;
+    data.mTimer110 = field_110_timer;
+    data.mRespondTimer = field_114_respond_timer;
+    data.mJumpVelX = field_118_jump_velx;
+    data.mShouldIdleToWalk1 = field_124_bShould_IdleToWalk1;
+    data.mHoneyYPos = mHoneyYPos;
+    data.mChangedPathNotMounted = mChangedPathNotMounted;
+    data.mCanSpeak = mCanSpeak;
+    data.mChangedPathMounted = mChangedPathMounted;
+
+    pSaveBuffer.Write(data);
+}
+
+void Elum::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<ElumSaveState>();
+
+    auto pElum = relive_new Elum(pState->mTlvId, resMan, map);
+    if (pElum)
+    {
+        if (pState->bActiveChar)
+        {
+            sControlledCharacter = pElum;
+        }
+
+        pElum->BaseAliveGameObjectPathTLV = TlvIterator::Invalid();
+        pElum->BaseAliveGameObjectCollisionLine = nullptr;
+        pElum->mXPos = pState->mXPos;
+        pElum->mYPos = pState->mYPos;
+        pElum->mVelX = pState->mVelX;
+        pElum->mVelY = pState->mVelY;
+        pElum->mCurrentPath = pState->mCurrentPath;
+        pElum->mCurrentLevel = pState->mCurrentLevel;
+        pElum->SetSpriteScale(pState->mSpriteScale);
+        pElum->SetScale(pState->mScale);
+
+        pElum->mRGB.SetRGB(pState->mRed, pState->mGreen, pState->mBlue);
+
+        pElum->mCurrentMotion = pState->mCurrentMotion;
+        pElum->GetAnimation().Set_Animation_Data(pElum->GetAnimRes(gElumMotionAnimIds[static_cast<s32>(pState->mCurrentMotion)]));
+
+        pElum->GetAnimation().SetCurrentFrame(pState->mCurrentFrame);
+        pElum->GetAnimation().SetFrameChangeCounter(pState->mFrameChangeCounter);
+
+        pElum->SetDrawable(pState->mDrawable);
+
+        pElum->GetAnimation().SetFlipX(pState->bFlipX);
+        pElum->GetAnimation().SetRender(pState->mRender);
+
+        if (IsLastFrame(&pElum->GetAnimation()))
+        {
+            pElum->GetAnimation().SetIsLastFrame(true);
+        }
+
+        pElum->mHealth = pState->mHealth;
+        pElum->mPreviousMotion = pState->mPreviousMotion;
+        pElum->mNextMotion = pState->mNextMotion;
+        pElum->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pState->mLastLineYPos);
+        pElum->BaseAliveGameObjectCollisionLineType = static_cast<s16>(pState->mCollisionLineType);
+
+        pElum->mTlvId = pState->mTlvId;
+        pElum->field_154_bAbeForcedDownFromElum = pState->mAbeForcedDownFromElum;
+        pElum->mBrainIdx = pState->mBrainIdx;
+        pElum->mStrugglingWithBees = pState->mStrugglingWithBees;
+        pElum->mRespawnOnDead = pState->mRespawnOnDead;
+        pElum->mContinuePointRect = pState->mContinuePointRect;
+        pElum->mPreviousContinuePointZoneNumber = pState->mPreviousContinuePointZoneNumber;
+        pElum->mAbeZoneNumber = pState->mAbeZoneNumber;
+        pElum->mContinuePointLevel = pState->mContinuePointLevel;
+        pElum->mContinuePointPath = pState->mContinuePointPath;
+        pElum->mContinueCamera = pState->mContinueCamera;
+        pElum->mHoneyXPos = pState->mHoneyXPos;
+        pElum->mDontFollowAbe = pState->mDontFollowAbe;
+        pElum->mStungByBees = pState->mStungByBees;
+        pElum->mFoundHoney = pState->mFoundHoney;
+        pElum->field_120_bUnknown = pState->mUnknown120;
+        pElum->mBrainSubState = pState->mBrainSubState;
+        pElum->mContinuePointSpriteScale = pState->mContinuePointSpriteScale;
+        pElum->mFalling = pState->mFalling;
+        pElum->mHoneyCamera = pState->mHoneyCamera;
+        pElum->field_10C_bFootStep2 = pState->mFootStep2;
+        pElum->field_10E_pressed = pState->mPressed;
+        pElum->field_110_timer = pState->mTimer110;
+        pElum->field_114_respond_timer = pState->mRespondTimer;
+        pElum->field_118_jump_velx = pState->mJumpVelX;
+        pElum->field_124_bShould_IdleToWalk1 = pState->mShouldIdleToWalk1;
+        pElum->mHoneyYPos = pState->mHoneyYPos;
+        pElum->mChangedPathNotMounted = pState->mChangedPathNotMounted;
+        pElum->mCanSpeak = pState->mCanSpeak;
+        pElum->mChangedPathMounted = pState->mChangedPathMounted;
+
+        // Arms the VUpdate() block above that re-raycasts the collision
+        // line - see BaseAliveGameObjectCollisionLineType above.
+        pElum->SetRestoredFromQuickSave(true);
+    }
 }
 
 } // namespace AO

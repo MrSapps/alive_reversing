@@ -1,6 +1,7 @@
 #include "stdafx_ao.h"
 #include "../relive_lib/Function.hpp"
 #include "SecurityClaw.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Math.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "Midi.hpp"
@@ -214,6 +215,15 @@ bool SecurityClaw::VTakeDamage(BaseGameObject* pFrom)
 
 void SecurityClaw::VUpdate()
 {
+    if (GetRestoredFromQuickSave())
+    {
+        for (u32 i = 0; i < mMotionDetectorArrayCount; i++)
+        {
+            mMotionDetectorArray[i] = BaseGameObject::RefreshId(mMotionDetectorArray[i]);
+        }
+        SetRestoredFromQuickSave(false);
+    }
+
     auto pClaw = static_cast<Claw*>(sObjectIds.Find_Impl(mClawId));
 
     if (EventGet(Event::kEventDeathReset))
@@ -416,6 +426,88 @@ void SecurityClaw::VUpdate()
 void SecurityClaw::VOnThrowableHit(BaseGameObject* /*pFrom*/)
 {
     // Empty
+}
+
+void SecurityClaw::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    if (GetElectrocuted())
+    {
+        return;
+    }
+
+    SecurityClawSaveState data = {};
+
+    data.mTlvInfo = mTlvInfo;
+    data.mState = mState;
+    data.mTimer = mTimer;
+    data.mAlarmSwitchId = mAlarmSwitchId;
+    data.mAlarmDuration = mAlarmDuration;
+    data.mClawX = mClawX;
+    data.mClawY = mClawY;
+    data.mAngle = mAngle;
+    data.mOrbSoundChannels = mOrbSoundChannels;
+    data.mDetectorComeBack = mDetectorComeBack;
+    data.mTlvTopLeft = mTlvTopLeft;
+    data.mTlvBottomRight = mTlvBottomRight;
+    data.mAnimLoaded = mAnimLoaded;
+
+    data.mMotionDetectorArrayCount = mMotionDetectorArrayCount;
+    for (u32 i = 0; i < mMotionDetectorArrayCount; i++)
+    {
+        data.mMotionDetectorArray[i] = Guid{};
+        if (mMotionDetectorArray[i] != Guid{})
+        {
+            BaseGameObject* pObj = sObjectIds.Find_Impl(mMotionDetectorArray[i]);
+            if (pObj)
+            {
+                data.mMotionDetectorArray[i] = pObj->mBaseGameObjectTlvInfo;
+            }
+        }
+    }
+
+    pSaveBuffer.Write(data);
+}
+
+void SecurityClaw::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<SecurityClawSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);
+    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eSecurityClaw)
+    {
+        // The saved tlv-info didn't resolve back to a TLV of the expected
+        // type (can happen if two TLVs ended up sharing the same id) -
+        // nothing safe to do here, so drop this record.
+        return;
+    }
+    auto pTlv = tlvIterator.GetTlv<relive::Path_SecurityClaw>();
+
+    auto pSecClaw = relive_new SecurityClaw(pTlv, pState->mTlvInfo, resMan, map);
+    if (pSecClaw)
+    {
+        pSecClaw->mState = pState->mState;
+        pSecClaw->mTimer = pState->mTimer;
+        pSecClaw->mAlarmSwitchId = pState->mAlarmSwitchId;
+        pSecClaw->mAlarmDuration = pState->mAlarmDuration;
+        pSecClaw->mClawX = pState->mClawX;
+        pSecClaw->mClawY = pState->mClawY;
+        pSecClaw->mAngle = pState->mAngle;
+        pSecClaw->mOrbSoundChannels = pState->mOrbSoundChannels;
+        pSecClaw->mDetectorComeBack = pState->mDetectorComeBack;
+        pSecClaw->mTlvTopLeft = pState->mTlvTopLeft;
+        pSecClaw->mTlvBottomRight = pState->mTlvBottomRight;
+        pSecClaw->mAnimLoaded = pState->mAnimLoaded;
+
+        pSecClaw->mMotionDetectorArrayCount = pState->mMotionDetectorArrayCount;
+        for (u32 i = 0; i < pState->mMotionDetectorArrayCount; i++)
+        {
+            pSecClaw->mMotionDetectorArray[i] = pState->mMotionDetectorArray[i];
+        }
+
+        // mMotionDetectorArray above still holds saved tlv-info Guids at
+        // this point, not live runtime ids - VUpdate() resolves them via
+        // BaseGameObject::RefreshId() once every object has been recreated.
+        pSecClaw->SetRestoredFromQuickSave(true);
+    }
 }
 
 } // namespace AO

@@ -46,7 +46,7 @@ void SligSpawner::VUpdate()
 
         if (pTlv)
         {
-            relive_new Slig(pTlv, {}, mResMan, mMap);
+            relive_new Slig(pTlv, mTlvInfo, mResMan, mMap);
         }
 
         SetDead(true);

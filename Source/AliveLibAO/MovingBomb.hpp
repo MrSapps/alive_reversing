@@ -1,12 +1,44 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
+
+class SerializedObjectData;
+enum eLineTypes : s16;
 
 namespace relive {
 struct Path_MovingBomb;
 }
 
 namespace AO {
+
+struct MovingBombSaveState final : public SaveStateBase
+{
+    MovingBombSaveState()
+        : SaveStateBase(ReliveTypes::eTimedMine, sizeof(*this))
+    { }
+    FP mXPos = {};
+    FP mYPos = {};
+    FP mVelX = {};
+    FP mVelY = {};
+    s16 mCurrentPath = 0;
+    EReliveLevelIds mCurrentLevel = EReliveLevelIds::eNone;
+    FP mSpriteScale = {};
+    Scale mScale = Scale::Fg;
+    bool bFlipX = false;
+    bool mRender = true;
+    u16 mLastLineYPos = 0;
+    eLineTypes mCollisionLineType = eLineTypes::eNone_m1;
+    s16 mState = 0;
+    Guid mTlvId;
+    s32 mTimer = 0;
+    FP mSpeed = {};
+    u16 mStartMovingSwitchId = 0;
+    s16 mMinStopTime = 0;
+    s16 mMaxStopTime = 0;
+    s32 mChannelMask = 0;
+    bool mPersistOffscreen = false;
+};
 
 class MovingBomb final : public ::BaseAliveGameObject
 {
@@ -19,6 +51,8 @@ public:
     virtual void VOnThrowableHit(BaseGameObject* pFrom) override;
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
     virtual void VScreenChanged() override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
     void FollowLine();
     s16 HitObject();

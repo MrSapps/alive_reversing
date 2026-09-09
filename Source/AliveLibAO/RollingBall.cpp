@@ -1,6 +1,7 @@
 #include "stdafx_ao.h"
 #include "../relive_lib/Function.hpp"
 #include "RollingBall.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "../relive_lib/Collisions.hpp"
 #include "../relive_lib/GameObjects/RollingBallShaker.hpp"
@@ -117,8 +118,123 @@ RollingBall::RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId, Reso
     }
 }
 
+void RollingBall::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    if (GetElectrocuted())
+    {
+        return;
+    }
+
+    RollingBallSaveState data = {};
+
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mVelX = mVelX;
+    data.mVelY = mVelY;
+    data.mCurrentPath = mCurrentPath;
+    data.mCurrentLevel = mCurrentLevel;
+    data.mSpriteScale = GetSpriteScale();
+    data.mScale = GetScale();
+    data.bFlipX = GetAnimation().GetFlipX();
+    data.mLastLineYPos = static_cast<u16>(FP_GetExponent(BaseAliveGameObjectLastLineYPos));
+
+    data.mCollisionLineType = eLineTypes::eNone_m1;
+    if (BaseAliveGameObjectCollisionLine)
+    {
+        data.mCollisionLineType = BaseAliveGameObjectCollisionLine->mLineType;
+    }
+
+    data.mTlvInfo = mTlvInfo;
+    data.mReleaseSwitchId = mReleaseSwitchId;
+    data.mState = static_cast<s16>(mState);
+    data.mMaxSpeed = mMaxSpeed;
+    data.mAcceleration = mAcceleration;
+
+    data.mRollingBallShakerId = Guid{};
+    if (mRollingBallShakerId != Guid{})
+    {
+        BaseGameObject* pObj = sObjectIds.Find_Impl(mRollingBallShakerId);
+        if (pObj)
+        {
+            data.mRollingBallShakerId = pObj->mBaseGameObjectTlvInfo;
+        }
+    }
+
+    pSaveBuffer.Write(data);
+}
+
+void RollingBall::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<RollingBallSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);
+    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eRollingBall)
+    {
+        // The saved tlv-info didn't resolve back to a TLV of the expected
+        // type (can happen if two TLVs ended up sharing the same id) -
+        // nothing safe to do here, so drop this record.
+        return;
+    }
+    auto pTlv = tlvIterator.GetTlv<relive::Path_RollingBall>();
+
+    auto pBall = relive_new RollingBall(pTlv, pState->mTlvInfo, resMan, map);
+    if (pBall)
+    {
+        pBall->BaseAliveGameObjectPathTLV = TlvIterator::Invalid();
+        pBall->BaseAliveGameObjectCollisionLine = nullptr;
+        pBall->mXPos = pState->mXPos;
+        pBall->mYPos = pState->mYPos;
+        pBall->mVelX = pState->mVelX;
+        pBall->mVelY = pState->mVelY;
+        pBall->mCurrentPath = pState->mCurrentPath;
+        pBall->mCurrentLevel = pState->mCurrentLevel;
+        pBall->SetSpriteScale(pState->mSpriteScale);
+        pBall->SetScale(pState->mScale);
+        pBall->GetAnimation().SetFlipX(pState->bFlipX);
+        pBall->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pState->mLastLineYPos);
+        pBall->BaseAliveGameObjectCollisionLineType = static_cast<s16>(pState->mCollisionLineType);
+
+        pBall->mTlvInfo = pState->mTlvInfo;
+        pBall->mReleaseSwitchId = pState->mReleaseSwitchId;
+        pBall->mState = static_cast<States>(pState->mState);
+        pBall->mMaxSpeed = pState->mMaxSpeed;
+        pBall->mAcceleration = pState->mAcceleration;
+        pBall->mRollingBallShakerId = pState->mRollingBallShakerId;
+
+        if (pBall->mState == States::eStartRolling || pBall->mState == States::eRolling)
+        {
+            pBall->GetAnimation().Set_Animation_Data(pBall->GetAnimRes(AnimId::Stone_Ball_Rolling));
+        }
+
+        // mRollingBallShakerId above is still the saved tlv-info Guid at
+        // this point, not a live runtime id - VUpdate() resolves it via
+        // BaseGameObject::RefreshId() once every object has been recreated.
+        pBall->SetRestoredFromQuickSave(true);
+    }
+}
+
 void RollingBall::VUpdate()
 {
+    if (GetRestoredFromQuickSave())
+    {
+        if (BaseAliveGameObjectCollisionLineType != -1)
+        {
+            gCollisions->Raycast(
+                mXPos,
+                mYPos - FP_FromInteger(20),
+                mXPos,
+                mYPos + FP_FromInteger(20),
+                &BaseAliveGameObjectCollisionLine,
+                &mXPos,
+                &mYPos,
+                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+
+            BaseAliveGameObjectCollisionLineType = -1;
+        }
+
+        mRollingBallShakerId = BaseGameObject::RefreshId(mRollingBallShakerId);
+        SetRestoredFromQuickSave(false);
+    }
+
     switch (mState)
     {
         case States::eInactive:

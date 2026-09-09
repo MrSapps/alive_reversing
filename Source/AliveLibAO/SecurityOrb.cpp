@@ -1,6 +1,7 @@
 #include "stdafx_ao.h"
 #include "../relive_lib/Function.hpp"
 #include "SecurityOrb.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Midi.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "../relive_lib/GameObjects/AirExplosion.hpp"
@@ -219,6 +220,45 @@ void SecurityOrb::VUpdate()
                 mState = States::eIdle_0;
             }
             break;
+    }
+}
+
+void SecurityOrb::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    if (GetElectrocuted())
+    {
+        return;
+    }
+
+    SecurityOrbSaveState data = {};
+
+    data.mTlvInfo = mTlvInfo;
+    data.mState = static_cast<s16>(mState);
+    data.mTimer = mTimer;
+    data.mSoundChannelsMask = mSoundChannelsMask;
+
+    pSaveBuffer.Write(data);
+}
+
+void SecurityOrb::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<SecurityOrbSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);
+    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eSecurityOrb)
+    {
+        // The saved tlv-info didn't resolve back to a TLV of the expected
+        // type (can happen if two TLVs ended up sharing the same id) -
+        // nothing safe to do here, so drop this record.
+        return;
+    }
+    auto pTlv = tlvIterator.GetTlv<relive::Path_SecurityOrb>();
+
+    auto pOrb = relive_new SecurityOrb(pTlv, pState->mTlvInfo, resMan, map);
+    if (pOrb)
+    {
+        pOrb->mState = static_cast<States>(pState->mState);
+        pOrb->mTimer = pState->mTimer;
+        pOrb->mSoundChannelsMask = pState->mSoundChannelsMask;
     }
 }
 

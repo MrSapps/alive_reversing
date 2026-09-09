@@ -143,7 +143,7 @@ public:
     Path_SecurityOrb()
     {
         mTlvType = ReliveTypes::eSecurityOrb;
-        mAttribute = QuiksaveAttribute::eClearTlvFlags_1;
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     reliveScale mScale = reliveScale::eFull;
     static constexpr char kClassName[] = "security_orb";
@@ -226,7 +226,7 @@ struct Path_RockSack final : public Path_TLV
     Path_RockSack()
     {
         mTlvType = ReliveTypes::eRockSack;
-        mAttribute = QuiksaveAttribute::eDoNothing_0;
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     reliveXDirection mRockFallDirection = reliveXDirection::eLeft;
     u16 mVelX = 0;
@@ -269,7 +269,7 @@ struct Path_FallingItem final : public Path_TLV
     Path_FallingItem()
     {
         mTlvType = ReliveTypes::eFallingItem;
-        mAttribute = QuiksaveAttribute::eClearTlvFlags_1;
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     s16 mSwitchId = 0;
     reliveScale mScale = reliveScale::eFull;
@@ -384,7 +384,7 @@ struct Path_LCDScreen final : public Path_TLV
     Path_LCDScreen()
     {
         mTlvType = ReliveTypes::eLCDScreen;
-        mAttribute = QuiksaveAttribute::eDoNothing_0;
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     s16 mMessageId1 = 0;
     s16 mMessageRandMinId = 0;
@@ -415,7 +415,7 @@ struct Path_InvisibleSwitch final : public Path_TLV
     Path_InvisibleSwitch()
     {
         mTlvType = ReliveTypes::eInvisibleSwitch;
-        mAttribute = QuiksaveAttribute::eDoNothing_0;
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     s16 mSwitchId = 0;
     reliveSwitchOp mAction = reliveSwitchOp::eSetTrue;
@@ -639,7 +639,7 @@ struct Path_LightEffect final : public Path_TLV
     Path_LightEffect()
     {
         mTlvType = ReliveTypes::eLightEffect;
-        mAttribute = QuiksaveAttribute::eDoNothing_0; // assuming this is TlvType light  
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2; // assuming this is TlvType light  
     }
     enum class Type : s16
     {
@@ -811,7 +811,7 @@ struct Path_RollingBall final : public Path_TLV
     Path_RollingBall()
     {
         mTlvType = ReliveTypes::eRollingBall;
-        mAttribute = QuiksaveAttribute::eClearTlvFlags_1;
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     reliveScale mScale = reliveScale::eFull;
     reliveXDirection mRollDirection = reliveXDirection::eRight;
@@ -1107,7 +1107,7 @@ struct Path_LCDStatusBoard final : public Path_TLV
     Path_LCDStatusBoard()
     {
         mTlvType = ReliveTypes::eLCDStatusBoard;
-        mAttribute = QuiksaveAttribute::eClearTlvFlags_1;
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     // AO has no fields
     s16 mNumberOfMuds = 0;
@@ -1154,7 +1154,7 @@ struct Path_MeatSack final : public Path_TLV
     Path_MeatSack()
     {
         mTlvType = ReliveTypes::eMeatSack;
-        mAttribute = QuiksaveAttribute::eDoNothing_0;
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     reliveXDirection mMeatFallDirection = reliveXDirection::eRight;
     u16 mVelX = 0;
@@ -1476,7 +1476,7 @@ struct Path_MovingBomb final : public Path_TLV
     Path_MovingBomb()
     {
         mTlvType = ReliveTypes::eMovingBomb;
-        mAttribute = QuiksaveAttribute::eClearTlvFlags_1;
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     u16 mSpeed = 0;
     s16 mStartMovingSwitchId = 0;
@@ -1519,7 +1519,7 @@ struct Path_SecurityClaw final : public Path_TLV
     Path_SecurityClaw()
     {
         mTlvType = ReliveTypes::eSecurityClaw;
-        mAttribute = QuiksaveAttribute::eClearTlvFlags_1;
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     reliveScale mScale = reliveScale::eFull;
     s16 mAlarmSwitchId = 0;
@@ -1547,7 +1547,7 @@ struct Path_FootSwitch final : public Path_TLV
     Path_FootSwitch()
     {
         mTlvType = ReliveTypes::eFootSwitch;
-        mAttribute = QuiksaveAttribute::eClearTlvFlags_1;
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     enum class FootSwitchTriggerBy : s16
     {
@@ -1622,7 +1622,7 @@ struct Path_GasEmitter final : public Path_TLV
     Path_GasEmitter()
     {
         mTlvType = ReliveTypes::eGasEmitter;
-        mAttribute = QuiksaveAttribute::eClearTlvFlags_1;
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     // NOTE: AO has no fields
     enum class GasColour : s16
@@ -1688,6 +1688,7 @@ struct Path_LiftMudokon final : public Path_TLV
     Path_LiftMudokon()
     {
         mTlvType = ReliveTypes::eLiftMudokon;
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     s16 mHowFarToWalk = 0;
     s16 mLiftSwitchId = 0;
@@ -1710,6 +1711,7 @@ struct Path_RingMudokon final : public Path_TLV
     Path_RingMudokon()
     {
         mTlvType = ReliveTypes::eRingMudokon;
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     reliveXDirection mFacing = reliveXDirection::eRight;
     enum class MustFaceMud : s16
