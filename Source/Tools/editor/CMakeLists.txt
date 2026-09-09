@@ -141,6 +141,9 @@ set(PROJECT_SOURCES
         Source/CameraGraphicsItem.hpp
         Source/EditorGraphicsScene.cpp
         Source/EditorGraphicsScene.hpp
+        Source/ItemPositionData.cpp
+        Source/ItemPositionData.hpp
+        Source/TransparencySettings.hpp
         Source/BigSpinBox.cpp
         Source/BigSpinBox.hpp
         Source/PropertyTreeItemBase.hpp
