@@ -17,6 +17,7 @@
 #include "qdebug.h"
 #include "qactiongroup.h"
 #include "ReliveApiWrapper.hpp"
+#include "ExecApiCall.hpp"
 #include "ShowContext.hpp"
 
 static void FatalError(const char* msg)
