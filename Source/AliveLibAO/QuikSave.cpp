@@ -14,6 +14,7 @@
 #include "DoorLight.hpp"
 #include "MeatSaw.hpp"
 #include "HoistRocksEffect.hpp"
+#include "LiftPoint.hpp"
 #include "RollingBall.hpp"
 #include "MovingBomb.hpp"
 #include "FallingItem.hpp"
@@ -238,6 +239,10 @@ void QuikSave::RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManag
 
             case ReliveTypes::eHoistParticle:
                 HoistParticle::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eLiftPoint:
+                LiftPoint::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
                 break;
 
             case ReliveTypes::eGrenade:
