@@ -2,6 +2,7 @@
 #include "QuikSave.hpp"
 #include "Abe.hpp"
 #include "Slig.hpp"
+#include "SligSpawner.hpp"
 #include "Scrab.hpp"
 #include "Paramite.hpp"
 #include "Slog.hpp"
@@ -139,6 +140,10 @@ void QuikSave::RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManag
 
             case ReliveTypes::eSlig:
                 Slig::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eSligSpawner:
+                SligSpawner::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
                 break;
 
             case ReliveTypes::eScrab:

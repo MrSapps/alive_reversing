@@ -6558,7 +6558,21 @@ void Abe::Motion_61_Respawn()
             SetElectrocuted(false);
 
             auto pFade = sObjectIds.Find<Fade>(mFadeId, ReliveTypes::eFade);
-            pFade->Init(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeOut, 1, 8);
+            if (pFade)
+            {
+                pFade->Init(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeOut, 1, 8);
+            }
+            else
+            {
+                // mFadeId doesn't point to a live Fade (e.g. it was
+                // restored from a checkpoint save taken while no fade was
+                // active) - create one instead of assuming it exists.
+                pFade = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeOut, 1, 8, relive::TBlendModes::eBlend_2, mResMan, mMap);
+                if (pFade)
+                {
+                    mFadeId = pFade->mBaseGameObjectId;
+                }
+            }
             mNextMotion = eAbeMotions::Motion_0_Idle;
             field_118_timer = MakeTimer(60);
             field_114_gnFrame = 2;
