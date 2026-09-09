@@ -23,6 +23,7 @@
 #include "../relive_lib/ObjectIds.hpp"
 #include "Map.hpp"
 #include "../relive_lib/GameObjects/BirdPortalTerminator.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 
 namespace AO {
 
@@ -755,6 +756,77 @@ void BirdPortal::KillTerminators()
         if (pObj->Type() == ReliveTypes::eBirdPortalTerminator)
         {
             pObj->SetDead(true);
+        }
+    }
+}
+
+void BirdPortal::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    BirdPortalSaveState data = {};
+
+    s16 numMudsForShrykull = 0;
+    auto pTlv = mMap.TLV_From_Offset_Lvl_Cam(mTlvInfo).GetTlv<relive::Path_BirdPortal>();
+    if (pTlv)
+    {
+        numMudsForShrykull = pTlv->mMudCountForShrykull;
+    }
+
+    data.mTlvInfo = mTlvInfo;
+    data.mState = mState;
+    data.mMudCountForShrykull = static_cast<u8>(numMudsForShrykull - mMudCountForShrykull);
+
+    pSaveBuffer.Write(data);
+}
+
+void BirdPortal::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pSaveState = pBuffer.ReadTmpPtr<BirdPortalSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pSaveState->mTlvInfo);
+    auto pTlv = tlvIterator.GetTlvChecked<relive::Path_BirdPortal>(ReliveTypes::eBirdPortal);
+
+    auto pPortal = relive_new BirdPortal(pTlv, pSaveState->mTlvInfo, resMan, map);
+    if (pPortal)
+    {
+        pPortal->SetUpdateDelay(1);
+        pPortal->mMudCountForShrykull -= pSaveState->mMudCountForShrykull;
+
+        switch (pSaveState->mState)
+        {
+            case PortalStates::JoinDovesInCenter_2:
+            case PortalStates::KillDoves_3:
+            case PortalStates::CreateTerminators_4:
+            case PortalStates::ExpandTerminators_5:
+            case PortalStates::ActivePortal_6:
+            {
+                pPortal->mState = PortalStates::ActivePortal_6;
+                pPortal->CreateTerminators();
+                auto pTerminator1 = static_cast<BirdPortalTerminator*>(sObjectIds.Find_Impl(pPortal->mTerminatorId1));
+                auto pTerminator2 = static_cast<BirdPortalTerminator*>(sObjectIds.Find_Impl(pPortal->mTerminatorId2));
+                pTerminator1->mYPos -= (FP_FromInteger(45) * pPortal->mSpriteScale);
+                pTerminator2->mYPos += (FP_FromInteger(45) * pPortal->mSpriteScale);
+                break;
+            }
+
+            case PortalStates::Unused_8:
+            {
+                ALIVE_FATAL("PortalStates::Unused_8 never expected to be used");
+                break;
+            }
+
+            case PortalStates::ShrykullGetDoves_7:
+            case PortalStates::GetShrykull_9:
+            {
+                pPortal->CreateTerminators();
+                auto pTerminator1 = static_cast<BirdPortalTerminator*>(sObjectIds.Find_Impl(pPortal->mTerminatorId1));
+                auto pTerminator2 = static_cast<BirdPortalTerminator*>(sObjectIds.Find_Impl(pPortal->mTerminatorId2));
+                pTerminator1->mYPos -= (FP_FromInteger(45) * pPortal->mSpriteScale);
+                pTerminator2->mYPos += (FP_FromInteger(45) * pPortal->mSpriteScale);
+                pPortal->mState = PortalStates::GetShrykull_9;
+                pPortal->mTimer = MakeTimer(20);
+                break;
+            }
+            default:
+                break;
         }
     }
 }
