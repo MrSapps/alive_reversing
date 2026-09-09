@@ -132,14 +132,7 @@ void InvisibleSwitch::CreateFromSaveState(SerializedObjectData& pBuffer, Resourc
 {
     const auto pState = pBuffer.ReadTmpPtr<InvisibleSwitchSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
-    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eInvisibleSwitch)
-    {
-        // The saved tlv-info didn't resolve back to a TLV of the expected
-        // type (can happen if two TLVs ended up sharing the same id) -
-        // nothing safe to do here, so drop this record.
-        return;
-    }
-    auto pTlv = tlvIterator.GetTlv<relive::Path_InvisibleSwitch>();
+    auto pTlv = tlvIterator.GetTlvChecked<relive::Path_InvisibleSwitch>(ReliveTypes::eInvisibleSwitch);
 
     auto pSwitch = relive_new InvisibleSwitch(pTlv, pState->mTlvId, resMan, map);
     if (pSwitch)

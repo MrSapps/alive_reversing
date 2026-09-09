@@ -244,14 +244,7 @@ void SecurityOrb::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMan
 {
     const auto pState = pBuffer.ReadTmpPtr<SecurityOrbSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);
-    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eSecurityOrb)
-    {
-        // The saved tlv-info didn't resolve back to a TLV of the expected
-        // type (can happen if two TLVs ended up sharing the same id) -
-        // nothing safe to do here, so drop this record.
-        return;
-    }
-    auto pTlv = tlvIterator.GetTlv<relive::Path_SecurityOrb>();
+    auto pTlv = tlvIterator.GetTlvChecked<relive::Path_SecurityOrb>(ReliveTypes::eSecurityOrb);
 
     auto pOrb = relive_new SecurityOrb(pTlv, pState->mTlvInfo, resMan, map);
     if (pOrb)

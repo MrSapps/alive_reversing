@@ -939,14 +939,7 @@ void SlingMudokon::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMa
 {
     const auto pState = pBuffer.ReadTmpPtr<SlingMudokonSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
-    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::SlingMud)
-    {
-        // The saved tlv-info didn't resolve back to a TLV of the expected
-        // type (can happen if two TLVs ended up sharing the same id) -
-        // nothing safe to do here, so drop this record.
-        return;
-    }
-    auto pTlv = tlvIterator.GetTlv<relive::Path_SlingMudokon>();
+    auto pTlv = tlvIterator.GetTlvChecked<relive::Path_SlingMudokon>(ReliveTypes::SlingMud);
 
     auto pSlingMud = relive_new SlingMudokon(pTlv, pState->mTlvId, resMan, map);
     if (pSlingMud)

@@ -1,6 +1,7 @@
 #include "stdafx_ao.h"
 #include "../relive_lib/Function.hpp"
 #include "MeatSaw.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../relive_lib/SwitchStates.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "../relive_lib/Shadow.hpp"
@@ -361,6 +362,53 @@ void MeatSaw::VRender(OrderingTable& ot)
             ot,
             0,
             0);
+    }
+}
+
+void MeatSaw::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    MeatSawSaveState data = {};
+
+    data.mTlvId = mTlvId;
+    data.mState = mState;
+    data.mRenderYOffset = mRenderYOffset;
+    data.mCurrentSpeed = mCurrentSpeed;
+    data.mAutomaticMeatSawIsDown = mAutomaticMeatSawIsDown;
+    data.field_F0_switch_value = field_F0_switch_value;
+    data.field_F2_switch_value = field_F2_switch_value;
+    data.mIdleTimer = mIdleTimer;
+    data.mSfxTimer = mSfxTimer;
+    data.mFrameCountForSfx = mFrameCountForSfx;
+
+    pSaveBuffer.Write(data);
+}
+
+void MeatSaw::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<MeatSawSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
+    auto pTlv = tlvIterator.GetTlvChecked<relive::Path_MeatSaw>(ReliveTypes::eMeatSaw);
+
+    auto pSaw = relive_new MeatSaw(pTlv, pState->mTlvId, resMan, map);
+    if (pSaw)
+    {
+        pSaw->mState = pState->mState;
+        pSaw->mRenderYOffset = pState->mRenderYOffset;
+        pSaw->mCurrentSpeed = pState->mCurrentSpeed;
+        pSaw->mAutomaticMeatSawIsDown = pState->mAutomaticMeatSawIsDown;
+        pSaw->field_F0_switch_value = pState->field_F0_switch_value;
+        pSaw->field_F2_switch_value = pState->field_F2_switch_value;
+        pSaw->mIdleTimer = pState->mIdleTimer;
+        pSaw->mSfxTimer = pState->mSfxTimer;
+        pSaw->mFrameCountForSfx = pState->mFrameCountForSfx;
+
+        // The constructor always sets the idle animation - re-apply the
+        // moving one if the saw was mid-travel when saved, matching what
+        // VUpdate()'s own state transitions do.
+        if (pSaw->mState != MeatSawStates::eIdle_0)
+        {
+            pSaw->GetAnimation().Set_Animation_Data(pSaw->GetAnimRes(AnimId::MeatSaw_Moving));
+        }
     }
 }
 

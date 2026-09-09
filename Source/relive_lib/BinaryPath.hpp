@@ -6,6 +6,7 @@
 #include "FatalError.hpp"
 
 class Guid;
+enum class ReliveTypes : s16;
 
 namespace relive
 {
@@ -68,9 +69,19 @@ public:
     }
 
     template<typename T>
-    T* GetTlv() 
+    T* GetTlv()
     {
         return static_cast<T*>(mTlv);
+    }
+
+    // Use when re-resolving a saved TLV id back to a TLV during save-state
+    // load - fatals instead of silently continuing if the id no longer
+    // resolves to a TLV of the expected type, since that means the save
+    // data is corrupt/stale rather than something safe to route around.
+    template<typename T>
+    T* GetTlvChecked(ReliveTypes expectedType)
+    {
+        return static_cast<T*>(GetTlvCheckedImpl(expectedType));
     }
 
     bool IsValid()
@@ -84,6 +95,8 @@ public:
     }
 
 private:
+    relive::Path_TLV* GetTlvCheckedImpl(ReliveTypes expectedType);
+
     relive::Path_TLV* mTlv = nullptr;
     const TlvList* mTlvList = nullptr;
     u32 mIndex = 0;

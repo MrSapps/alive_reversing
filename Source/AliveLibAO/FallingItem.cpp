@@ -410,14 +410,7 @@ void FallingItem::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMan
 {
     const auto pState = pBuffer.ReadTmpPtr<FallingItemSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
-    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eFallingItem)
-    {
-        // The saved tlv-info didn't resolve back to a TLV of the expected
-        // type (can happen if two TLVs ended up sharing the same id) -
-        // nothing safe to do here, so drop this record.
-        return;
-    }
-    auto pTlv = tlvIterator.GetTlv<relive::Path_FallingItem>();
+    auto pTlv = tlvIterator.GetTlvChecked<relive::Path_FallingItem>(ReliveTypes::eFallingItem);
 
     auto pItem = relive_new FallingItem(pTlv, pState->mTlvId, resMan, map);
     if (pItem)

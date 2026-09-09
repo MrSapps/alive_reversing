@@ -5548,7 +5548,11 @@ void Slig::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mCheckedIfOffScreen = mCheckedIfOffScreen;
     data.mInput = mInput;
     data.mTimer128 = field_128_timer;
-    data.mTlvInfo = field_134_tlvInfo;
+    // field_134_tlvInfo is wrong for Sligs recreated via SligBoundLeftAO/
+    // SligBoundRightAO (AO OG bug: gets set to the bound marker's tlv id,
+    // not the Slig's own) - field_174_tlv always points at the Slig's real
+    // TLV, so use its id instead.
+    data.mTlvInfo = field_174_tlv->mId;
     data.mShotMotion = field_13A_shot_motion;
     data.mZoneRect = field_13C_zone_rect;
     data.mAbeLevel = mAbeLevel;

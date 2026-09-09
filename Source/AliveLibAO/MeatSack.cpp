@@ -215,14 +215,7 @@ void MeatSack::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManage
 {
     const auto pState = pBuffer.ReadTmpPtr<MeatSackSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
-    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eMeatSack)
-    {
-        // The saved tlv-info didn't resolve back to a TLV of the expected
-        // type (can happen if two TLVs ended up sharing the same id) -
-        // nothing safe to do here, so drop this record.
-        return;
-    }
-    auto pTlv = tlvIterator.GetTlv<relive::Path_MeatSack>();
+    auto pTlv = tlvIterator.GetTlvChecked<relive::Path_MeatSack>(ReliveTypes::eMeatSack);
 
     auto pSack = relive_new MeatSack(pTlv, pState->mTlvId, resMan, map);
     if (pSack)

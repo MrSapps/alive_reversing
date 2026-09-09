@@ -472,14 +472,7 @@ void SecurityClaw::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMa
 {
     const auto pState = pBuffer.ReadTmpPtr<SecurityClawSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);
-    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eSecurityClaw)
-    {
-        // The saved tlv-info didn't resolve back to a TLV of the expected
-        // type (can happen if two TLVs ended up sharing the same id) -
-        // nothing safe to do here, so drop this record.
-        return;
-    }
-    auto pTlv = tlvIterator.GetTlv<relive::Path_SecurityClaw>();
+    auto pTlv = tlvIterator.GetTlvChecked<relive::Path_SecurityClaw>(ReliveTypes::eSecurityClaw);
 
     auto pSecClaw = relive_new SecurityClaw(pTlv, pState->mTlvInfo, resMan, map);
     if (pSecClaw)

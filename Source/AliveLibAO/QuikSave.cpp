@@ -12,6 +12,7 @@
 #include "UXB.hpp"
 #include "LCDScreen.hpp"
 #include "DoorLight.hpp"
+#include "MeatSaw.hpp"
 #include "RollingBall.hpp"
 #include "MovingBomb.hpp"
 #include "FallingItem.hpp"
@@ -224,6 +225,10 @@ void QuikSave::RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManag
 
             case ReliveTypes::eDoorLight:
                 DoorLight::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eMeatSaw:
+                MeatSaw::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
                 break;
 
             case ReliveTypes::eGrenade:

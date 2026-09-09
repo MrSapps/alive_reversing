@@ -247,14 +247,7 @@ void BackgroundGlukkon::CreateFromSaveState(SerializedObjectData& pBuffer, Resou
 {
     const auto pState = pBuffer.ReadTmpPtr<BackgroundGlukkonSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
-    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eBackgroundGlukkon)
-    {
-        // The saved tlv-info didn't resolve back to a TLV of the expected
-        // type (can happen if two TLVs ended up sharing the same id) -
-        // nothing safe to do here, so drop this record.
-        return;
-    }
-    auto pTlv = tlvIterator.GetTlv<relive::Path_BackgroundGlukkon>();
+    auto pTlv = tlvIterator.GetTlvChecked<relive::Path_BackgroundGlukkon>(ReliveTypes::eBackgroundGlukkon);
 
     auto pGlukkon = relive_new BackgroundGlukkon(pTlv, pState->mTlvId, resMan, map);
     if (pGlukkon)

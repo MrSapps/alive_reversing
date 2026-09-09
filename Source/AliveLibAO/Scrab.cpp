@@ -3761,14 +3761,7 @@ void Scrab::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWr
 {
     const auto pState = pBuffer.ReadTmpPtr<ScrabSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);
-    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eScrab)
-    {
-        // The saved tlv-info didn't resolve back to a TLV of the expected
-        // type (can happen if two TLVs ended up sharing the same id) -
-        // nothing safe to do here, so drop this record.
-        return;
-    }
-    auto pTlv = tlvIterator.GetTlv<relive::Path_Scrab>();
+    auto pTlv = tlvIterator.GetTlvChecked<relive::Path_Scrab>(ReliveTypes::eScrab);
 
     auto pScrab = relive_new Scrab(pTlv, pState->mTlvInfo, resMan, map);
     if (pScrab)

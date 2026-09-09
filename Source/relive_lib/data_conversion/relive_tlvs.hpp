@@ -495,6 +495,7 @@ struct Path_MeatSaw final : public Path_TLV
     Path_MeatSaw()
     {
         mTlvType = ReliveTypes::eMeatSaw;
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     reliveScale mScale = reliveScale::eFull;
     s16 mSwitchMinTimeOff = 0;
