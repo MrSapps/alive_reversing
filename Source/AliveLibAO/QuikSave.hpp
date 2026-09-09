@@ -32,13 +32,17 @@ struct Quicksave final : PendingObjectRestoreData
     QuicksaveWorldInfoBase mWorldInfo;
     SwitchStates mSwitchStates;
 
-    // The lighter "continue at last checkpoint" snapshot Abe takes when he
-    // passes a continue point TLV - just enough to bring Abe and the world
-    // counters back, not a full quickload. Mirrors AE's
-    // mRestartPathWorldInfo/mRestartPathAbeState/mRestartPathSwitchStates.
+    // The "continue at last checkpoint" snapshot Abe takes when he passes a
+    // continue point TLV. Abe's own state is restored synchronously via
+    // mRestartPathAbeState (RestoreCheckpoint needs gAbe's fields updated
+    // immediately, mid-respawn-motion, rather than deferred like everything
+    // else - see RestoreCheckpoint). Every other live object gets the same
+    // generic per-object snapshot/restore as the quicksave slot above, via
+    // mRestartPathObjectData.
     QuicksaveWorldInfoBase mRestartPathWorldInfo;
     AbeSaveState mRestartPathAbeState;
     SwitchStates mRestartPathSwitchStates;
+    PendingObjectRestoreData mRestartPathObjectData;
 };
 
 class QuikSave final
@@ -57,7 +61,7 @@ public:
 
     // Checkpoint snapshot/respawn - see mRestartPath* fields above.
     static void SaveCheckpoint(BaseMap& map);
-    static void RestoreCheckpoint(ResourceManagerWrapper& resMan, BaseMap& map, bool killObjects);
+    static void RestoreCheckpoint(ResourceManagerWrapper& resMan, BaseMap& map);
 
 public:
     static Quicksave gActiveQuicksaveData;

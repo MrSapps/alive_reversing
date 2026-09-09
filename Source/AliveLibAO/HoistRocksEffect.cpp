@@ -4,6 +4,7 @@
 #include "../AliveLibAE/stdlib.hpp"
 #include "Math.hpp"
 #include "../relive_lib/Collisions.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Path.hpp"
 #include "../relive_lib/FixedPoint.hpp"
 #include "Map.hpp"
@@ -11,7 +12,7 @@
 namespace AO {
 
 HoistParticle::HoistParticle(FP xpos, FP ypos, FP scale, AnimId animId, ResourceManagerWrapper& resMan, BaseMap& map)
-    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map), mAnimId(animId)
 {
     mXPos = xpos;
     mYPos = ypos;
@@ -84,6 +85,33 @@ void HoistParticle::VUpdate()
             mVelY = (mVelY * FP_FromDouble(-0.3));
             mHitGround = true;
         }
+    }
+}
+
+void HoistParticle::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    HoistParticleSaveState data = {};
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mVelY = mVelY;
+    data.mScale = GetSpriteScale();
+    data.mAnimId = mAnimId;
+    data.mHitGround = mHitGround;
+    data.mCurrentPath = mCurrentPath;
+    data.mCurrentLevel = mCurrentLevel;
+    pSaveBuffer.Write(data);
+}
+
+void HoistParticle::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<HoistParticleSaveState>();
+    auto pParticle = relive_new HoistParticle(pState->mXPos, pState->mYPos, pState->mScale, pState->mAnimId, resMan, map);
+    if (pParticle)
+    {
+        pParticle->mVelY = pState->mVelY;
+        pParticle->mHitGround = pState->mHitGround;
+        pParticle->mCurrentPath = pState->mCurrentPath;
+        pParticle->mCurrentLevel = pState->mCurrentLevel;
     }
 }
 
@@ -164,6 +192,22 @@ void HoistRocksEffect::VUpdate()
 
         SetUpdateDelay(Math_RandomRange(10, 20));
     }
+}
+
+void HoistRocksEffect::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    HoistRocksEffectSaveState data = {};
+    data.mTlvId = mTlvId;
+    pSaveBuffer.Write(data);
+}
+
+void HoistRocksEffect::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<HoistRocksEffectSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
+    auto pTlv = tlvIterator.GetTlvChecked<relive::Path_Hoist>(ReliveTypes::eHoist);
+
+    relive_new HoistRocksEffect(pTlv, pState->mTlvId, resMan, map);
 }
 
 } // namespace AO

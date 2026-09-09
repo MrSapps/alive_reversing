@@ -13,6 +13,7 @@
 #include "LCDScreen.hpp"
 #include "DoorLight.hpp"
 #include "MeatSaw.hpp"
+#include "HoistRocksEffect.hpp"
 #include "RollingBall.hpp"
 #include "MovingBomb.hpp"
 #include "FallingItem.hpp"
@@ -231,6 +232,14 @@ void QuikSave::RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManag
                 MeatSaw::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
                 break;
 
+            case ReliveTypes::eHoist:
+                HoistRocksEffect::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eHoistParticle:
+                HoistParticle::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
             case ReliveTypes::eGrenade:
                 Grenade::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
                 break;
@@ -267,19 +276,40 @@ void QuikSave::SaveCheckpoint(BaseMap& map)
     SaveWorldInfo(gActiveQuicksaveData.mRestartPathWorldInfo, map);
     gAbe->GetSaveState(gActiveQuicksaveData.mRestartPathAbeState);
     gActiveQuicksaveData.mRestartPathSwitchStates = gSwitchStates;
+
+    // Same generic per-object snapshot DoQuicksave uses, minus Abe (who is
+    // captured above via mRestartPathAbeState instead - see RestoreCheckpoint).
+    gActiveQuicksaveData.mRestartPathObjectData.mObjectsStateData.WriteRewind();
+    for (s32 idx = 0; idx < gBaseGameObjects->Size(); idx++)
+    {
+        BaseGameObject* pObj = gBaseGameObjects->ItemAt(idx);
+        if (!pObj)
+        {
+            break;
+        }
+
+        if (!pObj->GetDead() && pObj != gAbe)
+        {
+            pObj->VGetSaveState(gActiveQuicksaveData.mRestartPathObjectData.mObjectsStateData);
+        }
+    }
+
+    map.SaveQuicksaveBlyData(gActiveQuicksaveData.mRestartPathObjectData.mObjectBlyData);
 }
 
-void QuikSave::RestoreCheckpoint(ResourceManagerWrapper& resMan, BaseMap& map, bool killObjects)
+void QuikSave::RestoreCheckpoint(ResourceManagerWrapper& resMan, BaseMap& map)
 {
-    if (killObjects)
-    {
-        DestroyObjects(resMan);
-    }
+    // Destroy everything except objects that opt out (Abe included - see
+    // Abe's constructor) so the deferred restore below recreates the rest
+    // fresh from the checkpoint snapshot instead of leaving stale/dead
+    // instances (e.g. an already-exploded bomb) sitting around forever.
+    DestroyObjects(resMan);
 
     gSwitchStates = gActiveQuicksaveData.mRestartPathSwitchStates;
     Abe::CreateFromSaveState(gActiveQuicksaveData.mRestartPathAbeState, resMan, map);
     RestoreWorldInfo(gActiveQuicksaveData.mRestartPathWorldInfo);
 
+    map.mPendingSaveRestore = &gActiveQuicksaveData.mRestartPathObjectData;
     map.SetActiveCam(
         gActiveQuicksaveData.mRestartPathWorldInfo.mLevel,
         gActiveQuicksaveData.mRestartPathWorldInfo.mPath,
