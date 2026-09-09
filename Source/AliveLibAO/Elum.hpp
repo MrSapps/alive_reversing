@@ -2,7 +2,11 @@
 
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
 #include "../relive_lib/FatalError.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 #include "GameSpeak.hpp"
+
+class SerializedObjectData;
+enum eLineTypes : s16;
 
 namespace AO {
 
@@ -81,6 +85,66 @@ enum class ElumSounds : u8
     eLickingHoney_8 = 8
 };
 
+struct ElumSaveState final : public SaveStateBase
+{
+    ElumSaveState()
+        : SaveStateBase(ReliveTypes::eElum, sizeof(*this))
+    { }
+    FP mXPos = {};
+    FP mYPos = {};
+    FP mVelX = {};
+    FP mVelY = {};
+    s16 mCurrentPath = 0;
+    EReliveLevelIds mCurrentLevel = EReliveLevelIds::eNone;
+    FP mSpriteScale = {};
+    Scale mScale = Scale::Fg;
+    s16 mRed = 0;
+    s16 mGreen = 0;
+    s16 mBlue = 0;
+    bool bFlipX = false;
+    eElumMotions mCurrentMotion = eElumMotions::Motion_0_Respawn;
+    s32 mCurrentFrame = 0;
+    u16 mFrameChangeCounter = 0;
+    bool mRender = true;
+    bool mDrawable = true;
+    FP mHealth = {};
+    eElumMotions mPreviousMotion = eElumMotions::Motion_0_Respawn;
+    eElumMotions mNextMotion = eElumMotions::Motion_0_Respawn;
+    u16 mLastLineYPos = 0;
+    eLineTypes mCollisionLineType = eLineTypes::eNone_m1;
+    bool bActiveChar = false;
+    Guid mTlvId;
+    s16 mAbeForcedDownFromElum = 0;
+    s16 mBrainIdx = 0;
+    bool mStrugglingWithBees = false;
+    s16 mRespawnOnDead = 0;
+    PSX_RECT mContinuePointRect = {};
+    s16 mPreviousContinuePointZoneNumber = 0;
+    s16 mAbeZoneNumber = 0;
+    EReliveLevelIds mContinuePointLevel = EReliveLevelIds::eNone;
+    s16 mContinuePointPath = 0;
+    s16 mContinueCamera = 0;
+    s16 mHoneyXPos = 0;
+    s16 mDontFollowAbe = 0;
+    bool mStungByBees = false;
+    bool mFoundHoney = false;
+    s16 mUnknown120 = 0;
+    s16 mBrainSubState = 0;
+    FP mContinuePointSpriteScale = {};
+    bool mFalling = false;
+    s16 mHoneyCamera = 0;
+    s16 mFootStep2 = 0;
+    s16 mPressed = 0;
+    s32 mTimer110 = 0;
+    s32 mRespondTimer = 0;
+    FP mJumpVelX = {};
+    s16 mShouldIdleToWalk1 = 0;
+    s16 mHoneyYPos = 0;
+    bool mChangedPathNotMounted = false;
+    bool mCanSpeak = false;
+    bool mChangedPathMounted = false;
+};
+
 class Elum final : public ::BaseAliveGameObject
 {
 public:
@@ -143,6 +207,8 @@ public:
     virtual void VUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VScreenChanged() override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
     Elum(const Guid& tlvInfo, ResourceManagerWrapper& resMan, BaseMap& map);
     ~Elum();

@@ -1,6 +1,7 @@
 #include "stdafx_ao.h"
 #include "../relive_lib/Function.hpp"
 #include "Paramite.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Math.hpp"
 #include "Sfx.hpp"
 #include "../relive_lib/Shadow.hpp"
@@ -292,6 +293,28 @@ bool Paramite::VOnSameYLevel(BaseAnimatedWithPhysicsGameObject* pOther)
 
 void Paramite::VUpdate()
 {
+    if (GetRestoredFromQuickSave())
+    {
+        if (BaseAliveGameObjectCollisionLineType != -1)
+        {
+            gCollisions->Raycast(
+                mXPos,
+                mYPos - FP_FromInteger(20),
+                mXPos,
+                mYPos + FP_FromInteger(20),
+                &BaseAliveGameObjectCollisionLine,
+                &mXPos,
+                &mYPos,
+                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+
+            BaseAliveGameObjectCollisionLineType = -1;
+        }
+
+        mMeat = BaseGameObject::RefreshId(mMeat);
+        mParamiteWeb = BaseGameObject::RefreshId(mParamiteWeb);
+        SetRestoredFromQuickSave(false);
+    }
+
     if (mHealth > FP_FromInteger(0)
         && mMap.Is_Point_In_Current_Camera(
             mCurrentLevel,
@@ -2452,6 +2475,186 @@ void Paramite::SetBrain(Paramite::TParamiteBrain fn)
 bool Paramite::BrainIs(Paramite::TParamiteBrain fn)
 {
     return mBrainState == fn;
+}
+
+// Index-addressable table of every brain function a Paramite can be set to -
+// used to save/restore mBrainState (a function pointer) as a small integer.
+static const Paramite::TParamiteBrain sParamiteBrainTable[] = {
+    &Paramite::Brain_0_Patrol,
+    &Paramite::Brain_1_SurpriseWeb,
+    &Paramite::Brain_2_Struggling,
+    &Paramite::Brain_3_Death,
+    &Paramite::Brain_4_ChasingAbe,
+    &Paramite::Brain_5_SpottedMeat,
+};
+
+void Paramite::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    if (GetElectrocuted())
+    {
+        return;
+    }
+
+    ParamiteSaveState data = {};
+
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mVelX = mVelX;
+    data.mVelY = mVelY;
+
+    data.mCurrentPath = mCurrentPath;
+    data.mCurrentLevel = mCurrentLevel;
+    data.mSpriteScale = GetSpriteScale();
+    data.mScale = GetScale();
+
+    data.mRed = mRGB.r;
+    data.mGreen = mRGB.g;
+    data.mBlue = mRGB.b;
+
+    data.bFlipX = GetAnimation().GetFlipX();
+    data.mCurrentMotion = mCurrentMotion;
+    data.mCurrentFrame = static_cast<s32>(GetAnimation().GetCurrentFrame());
+    data.mFrameChangeCounter = static_cast<u16>(GetAnimation().GetFrameChangeCounter());
+    data.mRender = GetAnimation().GetRender();
+    data.mDrawable = GetDrawable();
+    data.mHealth = mHealth;
+    data.mPreviousMotion = mPreviousMotion;
+    data.mNextMotion = mNextMotion;
+    data.mLastLineYPos = static_cast<u16>(FP_GetExponent(BaseAliveGameObjectLastLineYPos));
+
+    data.mCollisionLineType = eLineTypes::eNone_m1;
+    if (BaseAliveGameObjectCollisionLine)
+    {
+        data.mCollisionLineType = BaseAliveGameObjectCollisionLine->mLineType;
+    }
+
+    data.mBrainSubState = mBrainSubState;
+    data.mSurpriseWebDelayTimer = mSurpriseWebDelayTimer;
+    data.mTimer114 = field_114_timer;
+    data.mMeatEatingTime = mMeatEatingTime;
+    data.mAloneChaseDelay = mAloneChaseDelay;
+    data.mWaitTimer = mWaitTimer;
+    data.mXSpeed = field_124_XSpeed;
+    data.mTlvInfo = field_12C_tlvInfo;
+    data.mGroupChaseDelay = mGroupChaseDelay;
+    data.mAttackTimer = mAttackTimer;
+    data.mSurpriseWebSwitchId = mSurpriseWebSwitchId;
+    data.mHissBeforeAttack = mHissBeforeAttack;
+    data.mUsePrevMotion = field_140_use_prev_motion;
+    data.bSnapped = field_142_bSnapped != 0;
+    data.mDeleteWhenOutOfSight = mDeleteWhenOutOfSight;
+
+    data.mMeatId = Guid{};
+    if (mMeat != Guid{})
+    {
+        BaseGameObject* pObj = sObjectIds.Find_Impl(mMeat);
+        if (pObj)
+        {
+            data.mMeatId = pObj->mBaseGameObjectTlvInfo;
+        }
+    }
+
+    data.mParamiteWebId = Guid{};
+    if (mParamiteWeb != Guid{})
+    {
+        BaseGameObject* pObj = sObjectIds.Find_Impl(mParamiteWeb);
+        if (pObj)
+        {
+            data.mParamiteWebId = pObj->mBaseGameObjectTlvInfo;
+        }
+    }
+
+    data.mBrainStateIdx = 0;
+    s32 idx = 0;
+    for (const auto& fn : sParamiteBrainTable)
+    {
+        if (BrainIs(fn))
+        {
+            data.mBrainStateIdx = idx;
+            break;
+        }
+        idx++;
+    }
+
+    pSaveBuffer.Write(data);
+}
+
+void Paramite::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<ParamiteSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);
+    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eParamite)
+    {
+        // The saved tlv-info didn't resolve back to a TLV of the expected
+        // type (can happen if two TLVs ended up sharing the same id) -
+        // nothing safe to do here, so drop this record.
+        return;
+    }
+    auto pTlv = tlvIterator.GetTlv<relive::Path_Paramite>();
+
+    auto pParamite = relive_new Paramite(pTlv, pState->mTlvInfo, resMan, map);
+    if (pParamite)
+    {
+        pParamite->BaseAliveGameObjectPathTLV = TlvIterator::Invalid();
+        pParamite->BaseAliveGameObjectCollisionLine = nullptr;
+        pParamite->mXPos = pState->mXPos;
+        pParamite->mYPos = pState->mYPos;
+        pParamite->mVelX = pState->mVelX;
+        pParamite->mVelY = pState->mVelY;
+        pParamite->mCurrentPath = pState->mCurrentPath;
+        pParamite->mCurrentLevel = pState->mCurrentLevel;
+        pParamite->SetSpriteScale(pState->mSpriteScale);
+        pParamite->SetScale(pState->mScale);
+
+        pParamite->mRGB.SetRGB(pState->mRed, pState->mGreen, pState->mBlue);
+
+        pParamite->mCurrentMotion = pState->mCurrentMotion;
+        pParamite->GetAnimation().Set_Animation_Data(pParamite->GetAnimRes(sParamiteMotionAnimIds[static_cast<s32>(pState->mCurrentMotion)]));
+
+        pParamite->GetAnimation().SetCurrentFrame(pState->mCurrentFrame);
+        pParamite->GetAnimation().SetFrameChangeCounter(pState->mFrameChangeCounter);
+
+        pParamite->SetDrawable(pState->mDrawable);
+
+        pParamite->GetAnimation().SetFlipX(pState->bFlipX);
+        pParamite->GetAnimation().SetRender(pState->mRender);
+
+        if (IsLastFrame(&pParamite->GetAnimation()))
+        {
+            pParamite->GetAnimation().SetIsLastFrame(true);
+        }
+
+        pParamite->mHealth = pState->mHealth;
+        pParamite->mPreviousMotion = pState->mPreviousMotion;
+        pParamite->mNextMotion = pState->mNextMotion;
+        pParamite->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pState->mLastLineYPos);
+        pParamite->BaseAliveGameObjectCollisionLineType = static_cast<s16>(pState->mCollisionLineType);
+
+        pParamite->mBrainSubState = pState->mBrainSubState;
+        pParamite->mSurpriseWebDelayTimer = pState->mSurpriseWebDelayTimer;
+        pParamite->field_114_timer = pState->mTimer114;
+        pParamite->mMeatEatingTime = pState->mMeatEatingTime;
+        pParamite->mAloneChaseDelay = pState->mAloneChaseDelay;
+        pParamite->mWaitTimer = pState->mWaitTimer;
+        pParamite->field_124_XSpeed = pState->mXSpeed;
+        pParamite->field_12C_tlvInfo = pState->mTlvInfo;
+        pParamite->mGroupChaseDelay = pState->mGroupChaseDelay;
+        pParamite->mAttackTimer = pState->mAttackTimer;
+        pParamite->mSurpriseWebSwitchId = pState->mSurpriseWebSwitchId;
+        pParamite->mHissBeforeAttack = pState->mHissBeforeAttack;
+        pParamite->field_140_use_prev_motion = pState->mUsePrevMotion;
+        pParamite->field_142_bSnapped = pState->bSnapped ? 1 : 0;
+        pParamite->mDeleteWhenOutOfSight = pState->mDeleteWhenOutOfSight;
+        pParamite->mMeat = pState->mMeatId;
+        pParamite->mParamiteWeb = pState->mParamiteWebId;
+
+        pParamite->SetBrain(sParamiteBrainTable[pState->mBrainStateIdx]);
+
+        // mMeat/mParamiteWeb above are still the saved tlv-info Guids at
+        // this point, not live runtime ids - VUpdate() resolves them via
+        // BaseGameObject::RefreshId() once every object has been recreated.
+        pParamite->SetRestoredFromQuickSave(true);
+    }
 }
 
 s16 Paramite::HandleEnemyStopper(s16 numGridBlocks, relive::Path_EnemyStopper::StopDirection dir)

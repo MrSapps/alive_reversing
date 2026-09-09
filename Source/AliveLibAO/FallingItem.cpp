@@ -1,6 +1,7 @@
 #include "stdafx_ao.h"
 #include "../relive_lib/Function.hpp"
 #include "FallingItem.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "../relive_lib/Shadow.hpp"
 #include "Engine.hpp"
@@ -369,5 +370,83 @@ void FallingItem::VOnThrowableHit(BaseGameObject* /*pFrom*/)
     // Empty
 }
 
+void FallingItem::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    if (GetElectrocuted())
+    {
+        return;
+    }
+
+    FallingItemSaveState data = {};
+
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mVelX = mVelX;
+    data.mVelY = mVelY;
+    data.mCurrentPath = mCurrentPath;
+    data.mCurrentLevel = mCurrentLevel;
+    data.mSpriteScale = GetSpriteScale();
+    data.mScale = GetScale();
+
+    data.mTlvId = mTlvId;
+    data.mState = static_cast<s16>(mState);
+    data.mSwitchId = mSwitchId;
+    data.mFallInterval = mFallInterval;
+    data.mMaxFallingItems = mMaxFallingItems;
+    data.mRemainingFallingItems = mRemainingFallingItems;
+    data.mResetSwitchIdAfterUse = mResetSwitchIdAfterUse;
+    data.mTlvXPos = mTlvXPos;
+    data.mTlvYPos = mTlvYPos;
+    data.mStartYPos = mStartYPos;
+    data.mFallIntervalTimer = mFallIntervalTimer;
+    data.mDoAirStreamSound = mDoAirStreamSound;
+    data.mAirStreamSndChannels = mAirStreamSndChannels;
+    data.mCreatedGnFrame = mCreatedGnFrame;
+
+    pSaveBuffer.Write(data);
+}
+
+void FallingItem::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<FallingItemSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
+    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eFallingItem)
+    {
+        // The saved tlv-info didn't resolve back to a TLV of the expected
+        // type (can happen if two TLVs ended up sharing the same id) -
+        // nothing safe to do here, so drop this record.
+        return;
+    }
+    auto pTlv = tlvIterator.GetTlv<relive::Path_FallingItem>();
+
+    auto pItem = relive_new FallingItem(pTlv, pState->mTlvId, resMan, map);
+    if (pItem)
+    {
+        pItem->BaseAliveGameObjectPathTLV = TlvIterator::Invalid();
+        pItem->mXPos = pState->mXPos;
+        pItem->mYPos = pState->mYPos;
+        pItem->mVelX = pState->mVelX;
+        pItem->mVelY = pState->mVelY;
+        pItem->mCurrentPath = pState->mCurrentPath;
+        pItem->mCurrentLevel = pState->mCurrentLevel;
+        pItem->SetSpriteScale(pState->mSpriteScale);
+        pItem->SetScale(pState->mScale);
+
+        pItem->mTlvId = pState->mTlvId;
+        pItem->mState = static_cast<State>(pState->mState);
+        pItem->mSwitchId = pState->mSwitchId;
+        pItem->mFallInterval = pState->mFallInterval;
+        pItem->mMaxFallingItems = pState->mMaxFallingItems;
+        pItem->mRemainingFallingItems = pState->mRemainingFallingItems;
+        pItem->mResetSwitchIdAfterUse = pState->mResetSwitchIdAfterUse;
+        pItem->mTlvXPos = pState->mTlvXPos;
+        pItem->mTlvYPos = pState->mTlvYPos;
+        pItem->mStartYPos = pState->mStartYPos;
+        pItem->mFallIntervalTimer = pState->mFallIntervalTimer;
+        pItem->mDoAirStreamSound = pState->mDoAirStreamSound;
+        pItem->mAirStreamSndChannels = pState->mAirStreamSndChannels;
+        pItem->mCreatedGnFrame = pState->mCreatedGnFrame;
+    }
+}
 
 } // namespace AO

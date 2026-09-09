@@ -1,5 +1,6 @@
 #include "stdafx_ao.h"
 #include "Scrab.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../relive_lib/Function.hpp"
 #include "Map.hpp"
 #include "../relive_lib/Events.hpp"
@@ -151,6 +152,28 @@ void Scrab::VRender(OrderingTable& ot)
 
 void Scrab::VUpdate()
 {
+    if (GetRestoredFromQuickSave())
+    {
+        if (BaseAliveGameObjectCollisionLineType != -1)
+        {
+            gCollisions->Raycast(
+                mXPos,
+                mYPos - FP_FromInteger(20),
+                mXPos,
+                mYPos + FP_FromInteger(20),
+                &BaseAliveGameObjectCollisionLine,
+                &mXPos,
+                &mYPos,
+                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+
+            BaseAliveGameObjectCollisionLineType = -1;
+        }
+
+        mScrabTargetId = BaseGameObject::RefreshId(mScrabTargetId);
+        mAbeOrMudTargetId = BaseGameObject::RefreshId(mAbeOrMudTargetId);
+        SetRestoredFromQuickSave(false);
+    }
+
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);
@@ -3628,6 +3651,190 @@ void Scrab::SetBrain(TBrainType fn)
 bool Scrab::BrainIs(TBrainType fn)
 {
     return mBrainState == fn;
+}
+
+// Index-addressable table of every brain function a Scrab can be set to -
+// used to save/restore mBrainState (a function pointer) as a small integer.
+static const Scrab::TBrainType sScrabBrainTable[] = {
+    &Scrab::Brain_Fighting,
+    &Scrab::Brain_BatDeath,
+    &Scrab::Brain_Death,
+    &Scrab::Brain_ChasingEnemy,
+    &Scrab::Brain_Patrol,
+    &Scrab::Brain_WalkAround,
+};
+
+void Scrab::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    if (GetElectrocuted())
+    {
+        return;
+    }
+
+    ScrabSaveState data = {};
+
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mVelX = mVelX;
+    data.mVelY = mVelY;
+
+    data.mCurrentPath = mCurrentPath;
+    data.mCurrentLevel = mCurrentLevel;
+    data.mSpriteScale = GetSpriteScale();
+    data.mScale = GetScale();
+
+    data.mRed = mRGB.r;
+    data.mGreen = mRGB.g;
+    data.mBlue = mRGB.b;
+
+    data.bFlipX = GetAnimation().GetFlipX();
+    data.mCurrentMotion = mCurrentMotion;
+    data.mCurrentFrame = static_cast<s32>(GetAnimation().GetCurrentFrame());
+    data.mFrameChangeCounter = static_cast<u16>(GetAnimation().GetFrameChangeCounter());
+    data.mRender = GetAnimation().GetRender();
+    data.mDrawable = GetDrawable();
+    data.mHealth = mHealth;
+    data.mPreviousMotion = mPreviousMotion;
+    data.mNextMotion = mNextMotion;
+    data.mLastLineYPos = static_cast<u16>(FP_GetExponent(BaseAliveGameObjectLastLineYPos));
+
+    data.mCollisionLineType = eLineTypes::eNone_m1;
+    if (BaseAliveGameObjectCollisionLine)
+    {
+        data.mCollisionLineType = BaseAliveGameObjectCollisionLine->mLineType;
+    }
+
+    data.mBrainSubState = mBrainSubState;
+    data.mAttackDelay = mAttackDelay;
+    data.mPatrolType = mPatrolType;
+    data.mTimer118 = field_118_timer;
+
+    data.mScrabTargetId = Guid{};
+    if (mScrabTargetId != Guid{})
+    {
+        BaseGameObject* pObj = sObjectIds.Find_Impl(mScrabTargetId);
+        if (pObj)
+        {
+            data.mScrabTargetId = pObj->mBaseGameObjectTlvInfo;
+        }
+    }
+
+    data.mAbeOrMudTargetId = Guid{};
+    if (mAbeOrMudTargetId != Guid{})
+    {
+        BaseGameObject* pObj = sObjectIds.Find_Impl(mAbeOrMudTargetId);
+        if (pObj)
+        {
+            data.mAbeOrMudTargetId = pObj->mBaseGameObjectTlvInfo;
+        }
+    }
+
+    data.mKnockbackVelXScale = field_128;
+    data.mStuckCheckXPos = field_12C;
+    data.mTlvInfo = field_134_tlvInfo;
+    data.mSpottingAbeDelay = field_138_spotting_abe_delay;
+    data.mSpottingTimer = field_13C_spotting_timer;
+    data.mLastShriekTimer = field_140_last_shriek_timer;
+    data.mPauseLeftMin = mPauseLeftMin;
+    data.mPauseLeftMax = mPauseLeftMax;
+    data.mPauseRightMin = mPauseRightMin;
+    data.mPauseRightMax = mPauseRightMax;
+    data.mSfxChannelMask = field_14C;
+    data.mFlags = field_188_flags;
+
+    data.mBrainStateIdx = 0;
+    s32 idx = 0;
+    for (const auto& fn : sScrabBrainTable)
+    {
+        if (BrainIs(fn))
+        {
+            data.mBrainStateIdx = idx;
+            break;
+        }
+        idx++;
+    }
+
+    pSaveBuffer.Write(data);
+}
+
+void Scrab::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<ScrabSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);
+    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eScrab)
+    {
+        // The saved tlv-info didn't resolve back to a TLV of the expected
+        // type (can happen if two TLVs ended up sharing the same id) -
+        // nothing safe to do here, so drop this record.
+        return;
+    }
+    auto pTlv = tlvIterator.GetTlv<relive::Path_Scrab>();
+
+    auto pScrab = relive_new Scrab(pTlv, pState->mTlvInfo, resMan, map);
+    if (pScrab)
+    {
+        pScrab->BaseAliveGameObjectPathTLV = TlvIterator::Invalid();
+        pScrab->BaseAliveGameObjectCollisionLine = nullptr;
+        pScrab->mXPos = pState->mXPos;
+        pScrab->mYPos = pState->mYPos;
+        pScrab->mVelX = pState->mVelX;
+        pScrab->mVelY = pState->mVelY;
+        pScrab->mCurrentPath = pState->mCurrentPath;
+        pScrab->mCurrentLevel = pState->mCurrentLevel;
+        pScrab->SetSpriteScale(pState->mSpriteScale);
+        pScrab->SetScale(pState->mScale);
+
+        pScrab->mRGB.SetRGB(pState->mRed, pState->mGreen, pState->mBlue);
+
+        pScrab->mCurrentMotion = pState->mCurrentMotion;
+        pScrab->GetAnimation().Set_Animation_Data(pScrab->GetAnimRes(sScrabMotionAnimIds[static_cast<s32>(pState->mCurrentMotion)]));
+
+        pScrab->GetAnimation().SetCurrentFrame(pState->mCurrentFrame);
+        pScrab->GetAnimation().SetFrameChangeCounter(pState->mFrameChangeCounter);
+
+        pScrab->SetDrawable(pState->mDrawable);
+
+        pScrab->GetAnimation().SetFlipX(pState->bFlipX);
+        pScrab->GetAnimation().SetRender(pState->mRender);
+
+        if (IsLastFrame(&pScrab->GetAnimation()))
+        {
+            pScrab->GetAnimation().SetIsLastFrame(true);
+        }
+
+        pScrab->mHealth = pState->mHealth;
+        pScrab->mPreviousMotion = pState->mPreviousMotion;
+        pScrab->mNextMotion = pState->mNextMotion;
+        pScrab->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pState->mLastLineYPos);
+        pScrab->BaseAliveGameObjectCollisionLineType = static_cast<s16>(pState->mCollisionLineType);
+
+        pScrab->mBrainSubState = pState->mBrainSubState;
+        pScrab->mAttackDelay = pState->mAttackDelay;
+        pScrab->mPatrolType = pState->mPatrolType;
+        pScrab->field_118_timer = pState->mTimer118;
+        pScrab->mScrabTargetId = pState->mScrabTargetId;
+        pScrab->mAbeOrMudTargetId = pState->mAbeOrMudTargetId;
+        pScrab->field_128 = pState->mKnockbackVelXScale;
+        pScrab->field_12C = pState->mStuckCheckXPos;
+        pScrab->field_134_tlvInfo = pState->mTlvInfo;
+        pScrab->field_138_spotting_abe_delay = pState->mSpottingAbeDelay;
+        pScrab->field_13C_spotting_timer = pState->mSpottingTimer;
+        pScrab->field_140_last_shriek_timer = pState->mLastShriekTimer;
+        pScrab->mPauseLeftMin = pState->mPauseLeftMin;
+        pScrab->mPauseLeftMax = pState->mPauseLeftMax;
+        pScrab->mPauseRightMin = pState->mPauseRightMin;
+        pScrab->mPauseRightMax = pState->mPauseRightMax;
+        pScrab->field_14C = pState->mSfxChannelMask;
+        pScrab->field_188_flags = pState->mFlags;
+
+        pScrab->SetBrain(sScrabBrainTable[pState->mBrainStateIdx]);
+
+        // mScrabTargetId/mAbeOrMudTargetId above are still the saved
+        // tlv-info Guids at this point, not live runtime ids - VUpdate()
+        // resolves them via BaseGameObject::RefreshId() once every object
+        // has been recreated (see GetRestoredFromQuickSave() below).
+        pScrab->SetRestoredFromQuickSave(true);
+    }
 }
 
 void Scrab::SetFightTarget(Scrab* pTarget)

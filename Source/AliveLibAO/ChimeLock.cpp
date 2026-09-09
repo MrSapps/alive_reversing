@@ -1,6 +1,7 @@
 #include "stdafx_ao.h"
 #include "../relive_lib/Function.hpp"
 #include "ChimeLock.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Bells.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "../relive_lib/SwitchStates.hpp"
@@ -654,6 +655,105 @@ void ChimeLock::VPossessed()
     mBallState = BallStates::eIdle_0;
     field_164_ChimeLock_num[0] = BellPositions::eNone_0;
     field_164_ChimeLock_num[1] = BellPositions::eNone_0;
+}
+
+void ChimeLock::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    if (GetElectrocuted())
+    {
+        return;
+    }
+
+    ChimeLockSaveState data = {};
+
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mVelX = mVelX;
+    data.mVelY = mVelY;
+    data.bActiveChar = (this == sControlledCharacter);
+
+    data.mTlvId = mTlvId;
+    data.mChimeLockState = static_cast<s16>(mChimeLockState);
+    data.mMaxIdx = field_120_max_idx;
+    data.mCode1 = field_124_code1;
+    data.mCodeIdx = field_128_idx;
+    data.mTimer12C = field_12C_timer;
+    data.mHasBellSong = mHasBellSong;
+    data.mSolveSwitchId = mSolveSwitchId;
+    data.mPressed = field_134_pressed;
+    data.mUnpossessionCountdown = mUnpossessionCountdown;
+    data.mTargetX = mTargetX;
+    data.mTargetY = mTargetY;
+    data.mBallStartX = mBallStartX;
+    data.mBallStartY = mBallStartY;
+    data.mXPosOffset = mXPosOffset;
+    data.mYPosOffset = mYPosOffset;
+    data.mXSize = mXSize;
+    data.mYSize = mYSize;
+    data.mBallState = static_cast<s16>(mBallState);
+    data.mBallAngle = field_15E_ball_angle;
+    data.mBallTimer = field_160_ball_timer;
+    data.mChimeLockNum0 = static_cast<s16>(field_164_ChimeLock_num[0]);
+    data.mChimeLockNum1 = static_cast<s16>(field_164_ChimeLock_num[1]);
+    data.mCanUnpossess = mCanUnpossess;
+    data.mHitAllBells = mHitAllBells;
+
+    pSaveBuffer.Write(data);
+}
+
+void ChimeLock::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<ChimeLockSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
+    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eChimeLock)
+    {
+        // The saved tlv-info didn't resolve back to a TLV of the expected
+        // type (can happen if two TLVs ended up sharing the same id) -
+        // nothing safe to do here, so drop this record.
+        return;
+    }
+    auto pTlv = tlvIterator.GetTlv<relive::Path_ChimeLock>();
+
+    auto pLock = relive_new ChimeLock(pTlv, pState->mTlvId, resMan, map);
+    if (pLock)
+    {
+
+        if (pState->bActiveChar)
+        {
+            sControlledCharacter = pLock;
+            pLock->SetPossessed(true);
+        }
+
+        pLock->mXPos = pState->mXPos;
+        pLock->mYPos = pState->mYPos;
+        pLock->mVelX = pState->mVelX;
+        pLock->mVelY = pState->mVelY;
+
+        pLock->mChimeLockState = static_cast<ChimeLockStates>(pState->mChimeLockState);
+        pLock->field_120_max_idx = pState->mMaxIdx;
+        pLock->field_124_code1 = pState->mCode1;
+        pLock->field_128_idx = pState->mCodeIdx;
+        pLock->field_12C_timer = pState->mTimer12C;
+        pLock->mHasBellSong = pState->mHasBellSong;
+        pLock->mSolveSwitchId = pState->mSolveSwitchId;
+        pLock->field_134_pressed = pState->mPressed;
+        pLock->mUnpossessionCountdown = pState->mUnpossessionCountdown;
+        pLock->mTargetX = pState->mTargetX;
+        pLock->mTargetY = pState->mTargetY;
+        pLock->mBallStartX = pState->mBallStartX;
+        pLock->mBallStartY = pState->mBallStartY;
+        pLock->mXPosOffset = pState->mXPosOffset;
+        pLock->mYPosOffset = pState->mYPosOffset;
+        pLock->mXSize = pState->mXSize;
+        pLock->mYSize = pState->mYSize;
+        pLock->mBallState = static_cast<BallStates>(pState->mBallState);
+        pLock->field_15E_ball_angle = pState->mBallAngle;
+        pLock->field_160_ball_timer = pState->mBallTimer;
+        pLock->field_164_ChimeLock_num[0] = static_cast<BellPositions>(pState->mChimeLockNum0);
+        pLock->field_164_ChimeLock_num[1] = static_cast<BellPositions>(pState->mChimeLockNum1);
+        pLock->mCanUnpossess = pState->mCanUnpossess;
+        pLock->mHitAllBells = pState->mHitAllBells;
+    }
 }
 
 } // namespace AO

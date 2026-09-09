@@ -1,6 +1,7 @@
 #include "stdafx_ao.h"
 #include "../relive_lib/Function.hpp"
 #include "Shrykull.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Map.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "Abe.hpp"
@@ -115,6 +116,13 @@ bool Shrykull::CanElectrocute(BaseGameObject* pObj) const
 
 void Shrykull::VUpdate()
 {
+    if (GetRestoredFromQuickSave())
+    {
+        mZapTargetId = BaseGameObject::RefreshId(mZapTargetId);
+        mZapLineId = BaseGameObject::RefreshId(mZapLineId);
+        SetRestoredFromQuickSave(false);
+    }
+
     auto pExistingBeingZappedObj = static_cast<BaseAliveGameObject*>(sObjectIds.Find_Impl(mZapTargetId));
     auto pExistingZapLine = static_cast<ZapLine*>(sObjectIds.Find_Impl(mZapLineId));
 
@@ -316,6 +324,88 @@ void Shrykull::VUpdate()
 
         default:
             return;
+    }
+}
+
+void Shrykull::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    if (GetElectrocuted())
+    {
+        return;
+    }
+
+    ShrykullSaveState data = {};
+
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mSpriteScale = GetSpriteScale();
+    data.mScale = GetScale();
+    data.bFlipX = GetAnimation().GetFlipX();
+    data.mCurrentFrame = static_cast<s32>(GetAnimation().GetCurrentFrame());
+    data.mFrameChangeCounter = static_cast<u16>(GetAnimation().GetFrameChangeCounter());
+
+    data.mState = static_cast<s16>(mState);
+    data.mZapIntervalTimer = mZapIntervalTimer;
+    data.mFlashTimer = mFlashTimer;
+    data.mCanElectrocute = mCanElectrocute;
+    data.mResetRingTimer = mResetRingTimer;
+
+    data.mZapLineId = Guid{};
+    if (mZapLineId != Guid{})
+    {
+        BaseGameObject* pObj = sObjectIds.Find_Impl(mZapLineId);
+        if (pObj)
+        {
+            data.mZapLineId = pObj->mBaseGameObjectTlvInfo;
+        }
+    }
+
+    data.mZapTargetId = Guid{};
+    if (mZapTargetId != Guid{})
+    {
+        BaseGameObject* pObj = sObjectIds.Find_Impl(mZapTargetId);
+        if (pObj)
+        {
+            data.mZapTargetId = pObj->mBaseGameObjectTlvInfo;
+        }
+    }
+
+    pSaveBuffer.Write(data);
+}
+
+void Shrykull::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<ShrykullSaveState>();
+
+    auto pShrykull = relive_new Shrykull(resMan, map);
+    if (pShrykull)
+    {
+        pShrykull->mXPos = pState->mXPos;
+        pShrykull->mYPos = pState->mYPos;
+        pShrykull->SetSpriteScale(pState->mSpriteScale);
+        pShrykull->SetScale(pState->mScale);
+        pShrykull->GetAnimation().SetFlipX(pState->bFlipX);
+        pShrykull->GetAnimation().SetCurrentFrame(pState->mCurrentFrame);
+        pShrykull->GetAnimation().SetFrameChangeCounter(pState->mFrameChangeCounter);
+
+        if (IsLastFrame(&pShrykull->GetAnimation()))
+        {
+            pShrykull->GetAnimation().SetIsLastFrame(true);
+        }
+
+        pShrykull->mState = static_cast<State>(pState->mState);
+        pShrykull->mZapIntervalTimer = pState->mZapIntervalTimer;
+        pShrykull->mFlashTimer = pState->mFlashTimer;
+        pShrykull->mCanElectrocute = pState->mCanElectrocute;
+        pShrykull->mResetRingTimer = pState->mResetRingTimer;
+        pShrykull->mZapLineId = pState->mZapLineId;
+        pShrykull->mZapTargetId = pState->mZapTargetId;
+
+        // mZapLineId/mZapTargetId above are still the saved tlv-info Guids
+        // at this point, not live runtime ids - VUpdate() resolves them
+        // via BaseGameObject::RefreshId() once every object has been
+        // recreated.
+        pShrykull->SetRestoredFromQuickSave(true);
     }
 }
 

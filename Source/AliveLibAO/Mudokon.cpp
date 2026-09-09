@@ -1,6 +1,7 @@
 #include "stdafx_ao.h"
 #include "../relive_lib/Function.hpp"
 #include "Mudokon.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "GameSpeak.hpp"
 #include "../relive_lib/Shadow.hpp"
 #include "../AliveLibAE/stdlib.hpp"
@@ -408,6 +409,28 @@ void Mudokon::KillLiftPoint_194()
 
 void Mudokon::VUpdate()
 {
+    if (GetRestoredFromQuickSave())
+    {
+        if (BaseAliveGameObjectCollisionLineType != -1)
+        {
+            gCollisions->Raycast(
+                mXPos,
+                mYPos - FP_FromInteger(20),
+                mXPos,
+                mYPos + FP_FromInteger(20),
+                &BaseAliveGameObjectCollisionLine,
+                &mXPos,
+                &mYPos,
+                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+
+            BaseAliveGameObjectCollisionLineType = -1;
+        }
+
+        mLiftPointId = BaseGameObject::RefreshId(mLiftPointId);
+        mBirdPortalId = BaseGameObject::RefreshId(mBirdPortalId);
+        SetRestoredFromQuickSave(false);
+    }
+
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);
@@ -4218,6 +4241,204 @@ s16 Mudokon::Brain_15_Choke()
         mNextMotion = eMudMotions::Motion_62_PoisonGasDeath;
     }
     return 0;
+}
+
+void Mudokon::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    if (GetElectrocuted())
+    {
+        return;
+    }
+
+    MudokonSaveState data = {};
+
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mVelX = mVelX;
+    data.mVelY = mVelY;
+
+    data.mCurrentPath = mCurrentPath;
+    data.mCurrentLevel = mCurrentLevel;
+    data.mSpriteScale = GetSpriteScale();
+    data.mScale = GetScale();
+
+    data.mRed = mRGB.r;
+    data.mGreen = mRGB.g;
+    data.mBlue = mRGB.b;
+
+    data.bFlipX = GetAnimation().GetFlipX();
+    data.mCurrentMotion = mCurrentMotion;
+    data.mCurrentFrame = static_cast<s32>(GetAnimation().GetCurrentFrame());
+    data.mFrameChangeCounter = static_cast<u16>(GetAnimation().GetFrameChangeCounter());
+    data.mRender = GetAnimation().GetRender();
+    data.mDrawable = GetDrawable();
+    data.mHealth = mHealth;
+    data.mPreviousMotion = mPreviousMotion;
+    data.mNextMotion = mNextMotion;
+    data.mLastLineYPos = static_cast<u16>(FP_GetExponent(BaseAliveGameObjectLastLineYPos));
+
+    data.mCollisionLineType = eLineTypes::eNone_m1;
+    if (BaseAliveGameObjectCollisionLine)
+    {
+        data.mCollisionLineType = BaseAliveGameObjectCollisionLine->mLineType;
+    }
+
+    data.mTlvId = mTlvId;
+    data.mLiftSwitchId = field_110_lift_switch_id;
+    data.mTimer114 = field_114;
+    data.mTimer118 = field_118;
+    data.mFp11C = field_11C;
+    data.mVoicePitch = field_124_voice_pitch;
+    data.mInput = field_126_input;
+    data.mTimer13C = field_13C;
+    data.mTimer13E = field_13E;
+    data.mBit2_Unknown = mBit2_Unknown;
+    data.mSnapToGrid = mSnapToGrid;
+    data.mPersist = mPersist;
+    data.mBit7_Unknown = mBit7_Unknown;
+    data.mBit8_Unknown = mBit8_Unknown;
+    data.mAlerted = mAlerted;
+    data.mGiveRingWithoutPassword = mGiveRingWithoutPassword;
+    data.mDeaf = mDeaf;
+    data.mJob184 = field_184;
+    data.mGivePassword = mGivePassword;
+    data.mAction188 = field_188;
+    data.mHowFarToWalk = field_18C_how_far_to_walk;
+    data.mFp190 = field_190;
+    data.mAbeMustFaceMud = field_198_abe_must_face_mud;
+    data.mCodeIdx = field_19E_code_idx;
+    data.mS16_1A0 = field_1A0;
+    data.mCodeConverted = field_1A4_code_converted;
+    data.mCodeLength = field_1A8_code_length;
+    data.mRingTimeout = field_1AA_ring_timeout;
+    data.mS16_1B0 = field_1B0;
+    data.mRescueSwitchId = field_1B2_rescue_switch_id;
+    data.mIdleTime = field_1B4_idle_time;
+    data.mS16_1B6 = field_1B6;
+    data.mBrainState = field_1B8_brain_state;
+    data.mBrainSubState = field_1BA_brain_sub_state;
+    data.mS16_1BC = field_1BC;
+    data.mTimer1C0 = field_1C0_timer;
+    data.mDoPathTrans = field_1C4_bDoPathTrans != 0;
+
+    data.mLiftPointId = Guid{};
+    if (mLiftPointId != Guid{})
+    {
+        BaseGameObject* pObj = sObjectIds.Find_Impl(mLiftPointId);
+        if (pObj)
+        {
+            data.mLiftPointId = pObj->mBaseGameObjectTlvInfo;
+        }
+    }
+
+    data.mBirdPortalId = Guid{};
+    if (mBirdPortalId != Guid{})
+    {
+        BaseGameObject* pObj = sObjectIds.Find_Impl(mBirdPortalId);
+        if (pObj)
+        {
+            data.mBirdPortalId = pObj->mBaseGameObjectTlvInfo;
+        }
+    }
+
+    pSaveBuffer.Write(data);
+}
+
+void Mudokon::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<MudokonSaveState>();
+    auto pTlv = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv();
+    if (!pTlv)
+    {
+        // The saved tlv-info didn't resolve back to a TLV at all (can
+        // happen if two TLVs ended up sharing the same id) - nothing safe
+        // to do here, so drop this record.
+        return;
+    }
+
+    auto pMud = relive_new Mudokon(pTlv, pState->mTlvId, resMan, map);
+    if (pMud)
+    {
+        pMud->BaseAliveGameObjectPathTLV = TlvIterator::Invalid();
+        pMud->BaseAliveGameObjectCollisionLine = nullptr;
+        pMud->mXPos = pState->mXPos;
+        pMud->mYPos = pState->mYPos;
+        pMud->mVelX = pState->mVelX;
+        pMud->mVelY = pState->mVelY;
+        pMud->mCurrentPath = pState->mCurrentPath;
+        pMud->mCurrentLevel = pState->mCurrentLevel;
+        pMud->SetSpriteScale(pState->mSpriteScale);
+        pMud->SetScale(pState->mScale);
+
+        pMud->mRGB.SetRGB(pState->mRed, pState->mGreen, pState->mBlue);
+
+        pMud->mCurrentMotion = pState->mCurrentMotion;
+        pMud->GetAnimation().Set_Animation_Data(pMud->GetAnimRes(sMudMotionAnimIds[static_cast<s32>(pState->mCurrentMotion)]));
+
+        pMud->GetAnimation().SetCurrentFrame(pState->mCurrentFrame);
+        pMud->GetAnimation().SetFrameChangeCounter(pState->mFrameChangeCounter);
+
+        pMud->SetDrawable(pState->mDrawable);
+
+        pMud->GetAnimation().SetFlipX(pState->bFlipX);
+        pMud->GetAnimation().SetRender(pState->mRender);
+
+        if (IsLastFrame(&pMud->GetAnimation()))
+        {
+            pMud->GetAnimation().SetIsLastFrame(true);
+        }
+
+        pMud->mHealth = pState->mHealth;
+        pMud->mPreviousMotion = pState->mPreviousMotion;
+        pMud->mNextMotion = pState->mNextMotion;
+        pMud->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pState->mLastLineYPos);
+        pMud->BaseAliveGameObjectCollisionLineType = static_cast<s16>(pState->mCollisionLineType);
+
+        pMud->field_110_lift_switch_id = pState->mLiftSwitchId;
+        pMud->field_114 = pState->mTimer114;
+        pMud->field_118 = pState->mTimer118;
+        pMud->field_11C = pState->mFp11C;
+        pMud->field_124_voice_pitch = pState->mVoicePitch;
+        pMud->field_126_input = pState->mInput;
+        pMud->field_13C = pState->mTimer13C;
+        pMud->field_13E = pState->mTimer13E;
+        pMud->mBit2_Unknown = pState->mBit2_Unknown;
+        pMud->mSnapToGrid = pState->mSnapToGrid;
+        pMud->mPersist = pState->mPersist;
+        pMud->mBit7_Unknown = pState->mBit7_Unknown;
+        pMud->mBit8_Unknown = pState->mBit8_Unknown;
+        pMud->mAlerted = pState->mAlerted;
+        pMud->mGiveRingWithoutPassword = pState->mGiveRingWithoutPassword;
+        pMud->mDeaf = pState->mDeaf;
+        pMud->field_184 = pState->mJob184;
+        pMud->mGivePassword = pState->mGivePassword;
+        pMud->field_188 = pState->mAction188;
+        pMud->field_18C_how_far_to_walk = pState->mHowFarToWalk;
+        pMud->field_190 = pState->mFp190;
+        pMud->field_198_abe_must_face_mud = pState->mAbeMustFaceMud;
+        pMud->field_19E_code_idx = pState->mCodeIdx;
+        pMud->field_1A0 = pState->mS16_1A0;
+        pMud->field_1A4_code_converted = pState->mCodeConverted;
+        pMud->field_1A8_code_length = pState->mCodeLength;
+        pMud->field_1AA_ring_timeout = pState->mRingTimeout;
+        pMud->field_1B0 = pState->mS16_1B0;
+        pMud->field_1B2_rescue_switch_id = pState->mRescueSwitchId;
+        pMud->field_1B4_idle_time = pState->mIdleTime;
+        pMud->field_1B6 = pState->mS16_1B6;
+        pMud->field_1B8_brain_state = pState->mBrainState;
+        pMud->field_1BA_brain_sub_state = pState->mBrainSubState;
+        pMud->field_1BC = pState->mS16_1BC;
+        pMud->field_1C0_timer = pState->mTimer1C0;
+        pMud->field_1C4_bDoPathTrans = pState->mDoPathTrans ? 1 : 0;
+        pMud->mLiftPointId = pState->mLiftPointId;
+        pMud->mBirdPortalId = pState->mBirdPortalId;
+
+        // mLiftPointId/mBirdPortalId above are still the saved tlv-info
+        // Guids at this point, not live runtime ids - VUpdate() resolves
+        // them via BaseGameObject::RefreshId() once every object has been
+        // recreated.
+        pMud->SetRestoredFromQuickSave(true);
+    }
 }
 
 } // namespace AO

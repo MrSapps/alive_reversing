@@ -1,6 +1,7 @@
 #include "stdafx_ao.h"
 #include "../relive_lib/Function.hpp"
 #include "InvisibleSwitch.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "Abe.hpp"
 #include "../relive_lib/SwitchStates.hpp"
@@ -116,5 +117,37 @@ void InvisibleSwitch::VScreenChanged()
     }
 }
 
+void InvisibleSwitch::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    InvisibleSwitchSaveState data = {};
+
+    data.mTlvId = mTlvId;
+    data.mState = static_cast<u16>(mState);
+    data.mDelayTimer = mDelayTimer;
+
+    pSaveBuffer.Write(data);
+}
+
+void InvisibleSwitch::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<InvisibleSwitchSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
+    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eInvisibleSwitch)
+    {
+        // The saved tlv-info didn't resolve back to a TLV of the expected
+        // type (can happen if two TLVs ended up sharing the same id) -
+        // nothing safe to do here, so drop this record.
+        return;
+    }
+    auto pTlv = tlvIterator.GetTlv<relive::Path_InvisibleSwitch>();
+
+    auto pSwitch = relive_new InvisibleSwitch(pTlv, pState->mTlvId, resMan, map);
+    if (pSwitch)
+    {
+        pSwitch->mTlvId = pState->mTlvId;
+        pSwitch->mState = static_cast<States>(pState->mState);
+        pSwitch->mDelayTimer = pState->mDelayTimer;
+    }
+}
 
 } // namespace AO

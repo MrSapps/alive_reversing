@@ -1,6 +1,9 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
+
+class SerializedObjectData;
 
 namespace relive
 {
@@ -8,6 +11,17 @@ namespace relive
 }
 
 namespace AO {
+
+struct SecurityOrbSaveState final : public SaveStateBase
+{
+    SecurityOrbSaveState()
+        : SaveStateBase(ReliveTypes::eSecurityOrb, sizeof(*this))
+    { }
+    Guid mTlvInfo;
+    s16 mState = 0;
+    s32 mTimer = 0;
+    s32 mSoundChannelsMask = 0;
+};
 
 class SecurityOrb final : public ::BaseAliveGameObject
 {
@@ -18,6 +32,8 @@ public:
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
 private:
     Guid mTlvInfo;

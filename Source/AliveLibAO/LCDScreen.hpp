@@ -4,8 +4,10 @@
 #include "PathData.hpp"
 #include "Font.hpp"
 #include "../relive_lib/Primitives.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 
 struct StringTable;
+class SerializedObjectData;
 
 namespace relive
 {
@@ -16,6 +18,20 @@ namespace AO {
 
 void SetLcdMessagesForLvl(const StringTable& msgs, LevelIds lvl, u32 pathId);
 
+struct LCDScreenSaveState final : public SaveStateBase
+{
+    LCDScreenSaveState()
+        : SaveStateBase(ReliveTypes::eLCDScreen, sizeof(*this))
+    { }
+    Guid mTlvId;
+    char_type mMessageBuffer[512] = {};
+    s32 mMessageId1 = 0;
+    s32 mOffsetX = 0;
+    s32 mCharacterWidth = 0;
+    s32 mShowRandomMessage = 0;
+    s32 mActiveMessageOffset = 0;
+};
+
 class LCDScreen final : public ::BaseGameObject
 {
 public:
@@ -25,6 +41,8 @@ public:
     virtual void VUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VScreenChanged() override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
 private:
     Prim_ScissorRect mPrimClippers[2] = {};

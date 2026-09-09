@@ -1,6 +1,7 @@
 #include "stdafx_ao.h"
 #include "../relive_lib/Function.hpp"
 #include "Slog.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Abe.hpp"
 #include "MusicController.hpp"
 #include "Midi.hpp"
@@ -302,6 +303,28 @@ void Slog::VOnTlvCollision(TlvIterator tlvIterator)
 
 void Slog::VUpdate()
 {
+    if (GetRestoredFromQuickSave())
+    {
+        if (BaseAliveGameObjectCollisionLineType != -1)
+        {
+            gCollisions->Raycast(
+                mXPos,
+                mYPos - FP_FromInteger(20),
+                mXPos,
+                mYPos + FP_FromInteger(20),
+                &BaseAliveGameObjectCollisionLine,
+                &mXPos,
+                &mYPos,
+                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+
+            BaseAliveGameObjectCollisionLineType = -1;
+        }
+
+        mTargetId = BaseGameObject::RefreshId(mTargetId);
+        mListeningToSligId = BaseGameObject::RefreshId(mListeningToSligId);
+        SetRestoredFromQuickSave(false);
+    }
+
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);
@@ -2590,6 +2613,196 @@ void Slog::DelayedResponse(s16 responseIdx)
     mResponseIdx = responseIdx;
     mResponsePart = 0;
     mMultiUseTimer = MakeTimer(10);
+}
+
+void Slog::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    if (GetElectrocuted())
+    {
+        return;
+    }
+
+    SlogSaveState data = {};
+
+    data.mBaseTlvId = mBaseGameObjectTlvInfo;
+
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mVelX = mVelX;
+    data.mVelY = mVelY;
+
+    data.mCurrentPath = mCurrentPath;
+    data.mCurrentLevel = mCurrentLevel;
+    data.mSpriteScale = GetSpriteScale();
+
+    data.mRed = mRGB.r;
+    data.mGreen = mRGB.g;
+    data.mBlue = mRGB.b;
+
+    data.bFlipX = GetAnimation().GetFlipX();
+    data.mCurrentMotion = mCurrentMotion;
+    data.mCurrentFrame = static_cast<s32>(GetAnimation().GetCurrentFrame());
+    data.mFrameChangeCounter = static_cast<u16>(GetAnimation().GetFrameChangeCounter());
+    data.mRender = GetAnimation().GetRender();
+    data.mDrawable = GetDrawable();
+    data.mHealth = mHealth;
+    data.mPreviousMotion = mCurrentMotion;
+    data.mNextMotion = mNextMotion;
+    data.mLastLineYPos = static_cast<u16>(FP_GetExponent(BaseAliveGameObjectLastLineYPos));
+
+    data.mCollisionLineType = eLineTypes::eNone_m1;
+    if (BaseAliveGameObjectCollisionLine)
+    {
+        data.mCollisionLineType = BaseAliveGameObjectCollisionLine->mLineType;
+    }
+
+    data.mPlatformId = BaseAliveGameObject_PlatformId;
+    data.mSlogTlvId = mTlvId;
+
+    data.mTargetId = Guid{};
+    if (mTargetId != Guid{})
+    {
+        BaseGameObject* pObj = sObjectIds.Find_Impl(mTargetId);
+        if (pObj)
+        {
+            data.mTargetId = pObj->mBaseGameObjectTlvInfo;
+        }
+    }
+
+    data.mBrainState = mBrainState;
+    data.mBrainSubState = mBrainSubState;
+    data.mMultiUseTimer = mMultiUseTimer;
+
+    data.mListeningToSligId = Guid{};
+    if (mListeningToSligId != Guid{})
+    {
+        BaseGameObject* pObj = sObjectIds.Find_Impl(mListeningToSligId);
+        if (pObj)
+        {
+            data.mListeningToSligId = pObj->mBaseGameObjectTlvInfo;
+        }
+    }
+
+    data.mHasWoofed = mHasWoofed;
+    data.mWaitingCounter = mWaitingCounter;
+    data.mResponseIdx = mResponseIdx;
+    data.mResponsePart = mResponsePart;
+    data.mAngerLevel = mAngerLevel;
+    data.mWakeUpAnger = mWakeUpAnger;
+    data.mTotalAnger = mTotalAnger;
+    data.mChaseAnger = mChaseAnger;
+    data.mAngerSwitchId = mAngerSwitchId;
+    data.mChaseDelay = mChaseDelay;
+    data.mJumpCounter = mJumpCounter;
+    data.mStopRunning = mStopRunning;
+    data.mListenToSligs = mListenToSligs;
+    data.mShot = mShot;
+    data.mHitByAbilityRing = mHitByAbilityRing;
+    data.mScratchTimer = mScratchTimer;
+    data.mGrowlTimer = mGrowlTimer;
+    data.bAsleep = mAsleep;
+    data.mMovedOffScreen = mMovedOffScreen;
+    data.mBitingTarget = mBitingTarget;
+
+    pSaveBuffer.Write(data);
+}
+
+void Slog::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<SlogSaveState>();
+
+    Slog* pSlog = nullptr;
+    if (pState->mSlogTlvId == Guid{})
+    {
+        pSlog = relive_new Slog(pState->mXPos, pState->mYPos, pState->mSpriteScale, resMan, map);
+        if (pSlog)
+        {
+            pSlog->mBaseGameObjectTlvInfo = pState->mBaseTlvId;
+        }
+    }
+    else
+    {
+        auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mSlogTlvId);
+        if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eSlog)
+        {
+            // The saved tlv-info didn't resolve back to a Slog TLV (can
+            // happen if two TLVs ended up sharing the same id) - nothing
+            // safe to do here, so drop this record.
+            return;
+        }
+        auto pTlv = tlvIterator.GetTlv<relive::Path_Slog>();
+        pSlog = relive_new Slog(pTlv, pState->mSlogTlvId, resMan, map);
+    }
+
+    if (pSlog)
+    {
+        pSlog->BaseAliveGameObjectPathTLV = TlvIterator::Invalid();
+        pSlog->BaseAliveGameObjectCollisionLine = nullptr;
+        pSlog->BaseAliveGameObject_PlatformId = pState->mPlatformId;
+        pSlog->mXPos = pState->mXPos;
+        pSlog->mYPos = pState->mYPos;
+        pSlog->mVelX = pState->mVelX;
+        pSlog->mVelY = pState->mVelY;
+        pSlog->mCurrentPath = pState->mCurrentPath;
+        pSlog->mCurrentLevel = pState->mCurrentLevel;
+        pSlog->SetSpriteScale(pState->mSpriteScale);
+        pSlog->mRGB.SetRGB(pState->mRed, pState->mGreen, pState->mBlue);
+
+        pSlog->mCurrentMotion = pState->mCurrentMotion;
+        pSlog->GetAnimation().Set_Animation_Data(pSlog->GetAnimRes(sSlogMotionAnimIds[static_cast<s32>(pSlog->mCurrentMotion)]));
+
+        pSlog->GetAnimation().SetCurrentFrame(pState->mCurrentFrame);
+        pSlog->GetAnimation().SetFrameChangeCounter(pState->mFrameChangeCounter);
+
+        pSlog->GetAnimation().SetFlipX(pState->bFlipX);
+        pSlog->GetAnimation().SetRender(pState->mRender);
+
+        pSlog->SetDrawable(pState->mDrawable);
+
+        if (IsLastFrame(&pSlog->GetAnimation()))
+        {
+            pSlog->GetAnimation().SetIsLastFrame(true);
+        }
+
+        pSlog->mHealth = pState->mHealth;
+        pSlog->mPreviousMotion = pState->mPreviousMotion;
+        pSlog->mNextMotion = pState->mNextMotion;
+        pSlog->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pState->mLastLineYPos);
+        pSlog->BaseAliveGameObjectCollisionLineType = static_cast<s16>(pState->mCollisionLineType);
+
+        pSlog->mTargetId = pState->mTargetId;
+        pSlog->mBrainState = pState->mBrainState;
+        pSlog->mBrainSubState = pState->mBrainSubState;
+        pSlog->mMultiUseTimer = pState->mMultiUseTimer;
+        pSlog->mTlvId = pState->mSlogTlvId;
+        pSlog->mListeningToSligId = pState->mListeningToSligId;
+        pSlog->mHasWoofed = pState->mHasWoofed;
+        pSlog->mWaitingCounter = pState->mWaitingCounter;
+        pSlog->mResponseIdx = pState->mResponseIdx;
+        pSlog->mResponsePart = pState->mResponsePart;
+        pSlog->mAngerLevel = pState->mAngerLevel;
+        pSlog->mWakeUpAnger = pState->mWakeUpAnger;
+        pSlog->mTotalAnger = pState->mTotalAnger;
+        pSlog->mChaseAnger = pState->mChaseAnger;
+        pSlog->mAngerSwitchId = pState->mAngerSwitchId;
+        pSlog->mChaseDelay = pState->mChaseDelay;
+        pSlog->mJumpCounter = pState->mJumpCounter;
+        pSlog->mStopRunning = pState->mStopRunning;
+        pSlog->mListenToSligs = pState->mListenToSligs;
+        pSlog->mShot = pState->mShot;
+        pSlog->mHitByAbilityRing = pState->mHitByAbilityRing;
+        pSlog->mScratchTimer = pState->mScratchTimer;
+        pSlog->mGrowlTimer = pState->mGrowlTimer;
+        pSlog->mAsleep = pState->bAsleep;
+        pSlog->mMovedOffScreen = pState->mMovedOffScreen;
+        pSlog->mBitingTarget = pState->mBitingTarget;
+
+        // mTargetId/mListeningToSligId above are still the saved tlv-info
+        // Guids at this point, not live runtime ids - VUpdate() resolves
+        // them via BaseGameObject::RefreshId() once every object has been
+        // recreated.
+        pSlog->SetRestoredFromQuickSave(true);
+    }
 }
 
 } // namespace AO

@@ -201,7 +201,8 @@ enum class ReliveTypes : s16
     eTorturedMud,
     eWebLine,
     eWell,
-    eThrowableArray
+    eThrowableArray,
+    eDoorLight
 };
 
 enum class AETypes : s16

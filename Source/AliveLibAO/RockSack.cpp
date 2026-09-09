@@ -4,6 +4,7 @@
 #include "Math.hpp"
 #include "Rock.hpp"
 #include "RockSack.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Sfx.hpp"
 #include "../relive_lib/GameObjects/ThrowableArray.hpp"
 #include "../relive_lib/AnimResources.hpp"
@@ -173,6 +174,66 @@ void RockSack::VUpdate()
 
             mHasBeenHit = true;
         }
+    }
+}
+
+void RockSack::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    if (GetElectrocuted())
+    {
+        return;
+    }
+
+    RockSackSaveState data = {};
+
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mCurrentPath = mCurrentPath;
+    data.mCurrentLevel = mCurrentLevel;
+    data.mSpriteScale = GetSpriteScale();
+    data.mScale = GetScale();
+
+    data.mTlvId = mTlvId;
+    data.mHasBeenHit = mHasBeenHit;
+    data.mRockAmount = mRockAmount;
+    data.mPlayWobbleSound = mPlayWobbleSound;
+    data.mForceWobbleSound = mForceWobbleSound;
+    data.mTlvVelX = mTlvVelX;
+    data.mTlvVelY = mTlvVelY;
+
+    pSaveBuffer.Write(data);
+}
+
+void RockSack::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<RockSackSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
+    if (!tlvIterator.GetTlv() || tlvIterator.GetTlv()->mTlvType != ReliveTypes::eRockSack)
+    {
+        // The saved tlv-info didn't resolve back to a TLV of the expected
+        // type (can happen if two TLVs ended up sharing the same id) -
+        // nothing safe to do here, so drop this record.
+        return;
+    }
+    auto pTlv = tlvIterator.GetTlv<relive::Path_RockSack>();
+
+    auto pSack = relive_new RockSack(pTlv, pState->mTlvId, resMan, map);
+    if (pSack)
+    {
+        pSack->mXPos = pState->mXPos;
+        pSack->mYPos = pState->mYPos;
+        pSack->mCurrentPath = pState->mCurrentPath;
+        pSack->mCurrentLevel = pState->mCurrentLevel;
+        pSack->SetSpriteScale(pState->mSpriteScale);
+        pSack->SetScale(pState->mScale);
+
+        pSack->mTlvId = pState->mTlvId;
+        pSack->mHasBeenHit = pState->mHasBeenHit;
+        pSack->mRockAmount = pState->mRockAmount;
+        pSack->mPlayWobbleSound = pState->mPlayWobbleSound;
+        pSack->mForceWobbleSound = pState->mForceWobbleSound;
+        pSack->mTlvVelX = pState->mTlvVelX;
+        pSack->mTlvVelY = pState->mTlvVelY;
     }
 }
 
