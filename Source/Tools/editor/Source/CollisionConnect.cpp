@@ -2,6 +2,7 @@
 
 #include <utility>
 #include "Model.hpp"
+#include "ResizeableArrowItem.hpp"
 
 CollisionConnectCommand::CollisionConnectCommand(std::vector<CollisionConnectData> collisionConnectData):
         mCollisionConnectData(std::move(collisionConnectData))

@@ -110,6 +110,7 @@ set(PROJECT_SOURCES
         Source/CameraManager.ui
         Source/CollisionConnect.cpp
         Source/CollisionConnect.hpp
+        Source/CollisionConnectData.hpp
         Source/ExportPathDialog.hpp
         Source/ExportPathDialog.cpp
         Source/ExportPathDialog.ui

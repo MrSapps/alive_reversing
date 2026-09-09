@@ -1,25 +1,10 @@
 #pragma once
 
 #include <QUndoCommand>
-#include "ResizeableArrowItem.hpp"
-#include "../../relive_lib/Types.hpp"
+#include <vector>
+#include "CollisionConnectData.hpp"
 
-class CollisionObject;
-
-struct CollisionConnectData
-{
-    CollisionConnectData(s16* mCurrentValue, int mOldValue, int mNewValue)
-        : mCurrentValue(mCurrentValue)
-        , mOldValue(mOldValue)
-        , mNewValue(mNewValue)
-    {
-
-    }
-
-    s16* mCurrentValue;
-    s16 mOldValue;
-    s16 mNewValue;
-};
+class ResizeableArrowItem;
 
 class CollisionConnectCommand final : public QUndoCommand
 {
@@ -36,4 +21,3 @@ private:
     std::vector<CollisionConnectData> mCollisionConnectData;
 
 };
-
