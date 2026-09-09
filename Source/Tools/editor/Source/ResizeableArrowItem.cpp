@@ -6,10 +6,10 @@
 #include <QGraphicsView>
 #include "Model.hpp"
 #include "ISyncPropertiesToTree.hpp"
-#include "SnapSettings.hpp"
+#include "GridSnapSettings.hpp"
 #include <QDebug>
 
-ResizeableArrowItem::ResizeableArrowItem(QGraphicsView* pView, CollisionObject* pLine, ISyncPropertiesToTree& propSyncer, int transparency, SnapSettings& snapSettings, IGridPointSnapper& snapper)
+ResizeableArrowItem::ResizeableArrowItem(QGraphicsView* pView, CollisionObject* pLine, ISyncPropertiesToTree& propSyncer, int transparency, GridSnapSettings& snapSettings, IGridPointSnapper& snapper)
     : QGraphicsLineItem(pLine->X2(), pLine->Y2(), pLine->X1(), pLine->Y1())
     , mView(pView)
     , mLine(pLine)

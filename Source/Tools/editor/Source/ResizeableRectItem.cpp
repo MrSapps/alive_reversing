@@ -11,14 +11,14 @@
 #include <QGraphicsView>
 #include <QPixmapCache>
 #include "ISyncPropertiesToTree.hpp"
-#include "SnapSettings.hpp"
+#include "GridSnapSettings.hpp"
 #include <nlohmann/json.hpp>
 #include "../../relive_lib/Types.hpp"
 #include "../../relive_api/TlvsRelive.hpp"
 
 const quint32 ResizeableRectItem::kMinRectSize = 10;
 
-ResizeableRectItem::ResizeableRectItem(QGraphicsView* pView, MapObjectBase* pMapObject, ISyncPropertiesToTree& propSyncer, int transparency, SnapSettings& snapSettings, IGridPointSnapper& snapper)
+ResizeableRectItem::ResizeableRectItem(QGraphicsView* pView, MapObjectBase* pMapObject, ISyncPropertiesToTree& propSyncer, int transparency, GridSnapSettings& snapSettings, IGridPointSnapper& snapper)
       : mView(pView), mMapObject(pMapObject), mPropSyncer(propSyncer), mSnapSettings(snapSettings), mPointSnapper(snapper)
 {
     SyncFromMapObject();

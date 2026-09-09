@@ -193,7 +193,7 @@ private:
 };
 
 
-EditorTab::EditorTab(QTabWidget* aParent, std::unique_ptr<Model> model, QString jsonFileName, bool isTempFile, QStatusBar* pStatusBar, SnapSettings& snapSettings)
+EditorTab::EditorTab(QTabWidget* aParent, std::unique_ptr<Model> model, QString jsonFileName, bool isTempFile, QStatusBar* pStatusBar, GridSnapSettings& snapSettings)
     : QMainWindow(aParent),
     ui(new Ui::EditorTab),
     mModel(std::move(model)),

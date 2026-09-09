@@ -2,7 +2,7 @@
 
 #include "IGridPointSnapper.hpp"
 
-class SnapSettings final
+class GridSnapSettings final
 {
 public:
     struct SnapSetting final
