@@ -352,8 +352,3 @@ void Model::CalculateMapSize()
     mYSize++;
 }
 
-CollisionObject::CollisionObject(int id, const CollisionObject& rhs)
-    : mId(id)
-{
-    mLine = rhs.mLine;
-}

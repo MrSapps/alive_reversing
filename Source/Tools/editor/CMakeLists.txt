@@ -127,6 +127,9 @@ set(PROJECT_SOURCES
         Source/AboutDialog.hpp
         Source/Model.cpp
         Source/Model.hpp
+        Source/EditorCamera.hpp
+        Source/CollisionObject.cpp
+        Source/CollisionObject.hpp
         Source/ResizeableArrowItem.cpp
         Source/ResizeableArrowItem.hpp
         Source/ResizeableRectItem.cpp
