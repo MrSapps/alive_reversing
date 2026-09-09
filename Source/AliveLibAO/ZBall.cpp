@@ -8,6 +8,7 @@
 #include "Path.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
 #include "Map.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 
 namespace AO {
 
@@ -177,6 +178,30 @@ void ZBall::VUpdate()
         {
             mMap.TLV_Reset(mTlvInfo);
         }
+    }
+}
+
+void ZBall::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    ZBallSaveState data = {};
+
+    data.mTlvInfo = mTlvInfo;
+    data.mFrame = GetAnimation().GetCurrentFrame();
+
+    pSaveBuffer.Write(data);
+}
+
+void ZBall::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<ZBallSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);
+    auto pTlv = tlvIterator.GetTlvChecked<relive::Path_ZBall>(ReliveTypes::eZBall);
+
+    auto pZBall = relive_new ZBall(pTlv, pState->mTlvInfo, resMan, map);
+    if (pZBall)
+    {
+        pZBall->GetAnimation().SetFrame(static_cast<u32>(pState->mFrame));
+        pZBall->GetAnimation().VDecode();
     }
 }
 
