@@ -7,12 +7,12 @@
 class MapObjectBase;
 class ISyncPropertiesToTree;
 class SnapSettings;
-class IPointSnapper;
+class IGridPointSnapper;
 
 class ResizeableRectItem final : public IGraphicsItem, public QGraphicsItem
 {
 public:
-    ResizeableRectItem(QGraphicsView* pView, MapObjectBase* pMapObject, ISyncPropertiesToTree& propSyncer, int transparency, SnapSettings& snapSettings, IPointSnapper& snapper);
+    ResizeableRectItem(QGraphicsView* pView, MapObjectBase* pMapObject, ISyncPropertiesToTree& propSyncer, int transparency, SnapSettings& snapSettings, IGridPointSnapper& snapper);
     enum { Type = UserType + 1 };
     int type() const override { return Type; }
     QRectF CurrentRect() const;
@@ -90,7 +90,7 @@ private:
     int mHeight = 0;
 
     SnapSettings& mSnapSettings;
-    IPointSnapper& mPointSnapper;
+    IGridPointSnapper& mPointSnapper;
 
     QString mNoIconObjectName = "";
     QString mIconPath;

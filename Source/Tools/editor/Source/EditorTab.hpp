@@ -28,7 +28,7 @@ class SnapSettings;
 struct EditorCamera;
 class Model;
 
-class EditorTab final : public QMainWindow, public IPointSnapper
+class EditorTab final : public QMainWindow, public IGridPointSnapper
 {
     Q_OBJECT
 public:

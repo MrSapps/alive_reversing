@@ -1,11 +1,16 @@
 #pragma once
 
-#include "IPointSnapper.hpp"
-#include "SnapSetting.hpp"
+#include "IGridPointSnapper.hpp"
 
 class SnapSettings final
 {
 public:
+    struct SnapSetting final
+    {
+        bool mSnapX = false;
+        bool mSnapY = false;
+    };
+
     const SnapSetting& MapObjectSnapping() const
     {
         return mMapObjectSnappingSettings;
