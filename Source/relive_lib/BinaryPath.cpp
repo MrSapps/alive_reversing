@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "BinaryPath.hpp"
+#include "FatalError.hpp"
 #include "data_conversion/relive_tlvs_serialization.hpp"
 #include "../AliveLibAO/Path.hpp"
 #include "nlohmann/json.hpp"
@@ -259,4 +260,13 @@ TlvIterator BinaryPath::TlvById(const Guid& id)
         }
     }
     return TlvIterator::Invalid();
+}
+
+relive::Path_TLV* TlvIterator::GetTlvCheckedImpl(ReliveTypes expectedType)
+{
+    if (!mTlv || mTlv->mTlvType != expectedType)
+    {
+        ALIVE_FATAL("Save state TLV id did not resolve back to a TLV of the expected type %d", static_cast<s32>(expectedType));
+    }
+    return mTlv;
 }

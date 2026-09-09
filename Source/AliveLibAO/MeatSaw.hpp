@@ -1,6 +1,9 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
+
+class SerializedObjectData;
 
 namespace relive
 {
@@ -16,6 +19,23 @@ enum class MeatSawStates : s16
     eGoingUp_2 = 2
 };
 
+struct MeatSawSaveState final : public SaveStateBase
+{
+    MeatSawSaveState()
+        : SaveStateBase(ReliveTypes::eMeatSaw, sizeof(*this))
+    { }
+    Guid mTlvId;
+    MeatSawStates mState = MeatSawStates::eIdle_0;
+    s16 mRenderYOffset = 0;
+    s16 mCurrentSpeed = 0;
+    bool mAutomaticMeatSawIsDown = false;
+    s32 field_F0_switch_value = 0;
+    s32 field_F2_switch_value = 0;
+    s32 mIdleTimer = 0;
+    s32 mSfxTimer = 0;
+    s32 mFrameCountForSfx = 0;
+};
+
 class MeatSaw final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
@@ -26,6 +46,8 @@ public:
     virtual void VScreenChanged() override;
     virtual void VUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
 
 private:
     void LoadAnimations();
