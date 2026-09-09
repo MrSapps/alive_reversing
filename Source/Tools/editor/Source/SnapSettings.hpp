@@ -1,12 +1,7 @@
 #pragma once
 
 #include "IPointSnapper.hpp"
-
-struct SnapSetting final
-{
-    bool mSnapX = false;
-    bool mSnapY = false;
-};
+#include "SnapSetting.hpp"
 
 class SnapSettings final
 {
