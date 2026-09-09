@@ -13,6 +13,7 @@
 #include "Path.hpp"
 #include "../relive_lib/FixedPoint.hpp"
 #include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Map.hpp"
 
 namespace AO {
@@ -311,6 +312,97 @@ void Bat::VUpdate()
 
         default:
             return;
+    }
+}
+
+void Bat::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    BatSaveState data = {};
+
+    data.mTlvInfo = mTlvInfo;
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mVelX = mVelX;
+    data.mVelY = mVelY;
+    data.mBatVelX = mBatVelX;
+    data.mCurrentPath = mCurrentPath;
+    data.mCurrentLevel = mCurrentLevel;
+    data.mSpriteScale = GetSpriteScale();
+    data.mScale = GetScale();
+    data.bFlipX = GetAnimation().GetFlipX();
+    data.mRender = GetAnimation().GetRender();
+    data.mBatState = mBatState;
+    data.mTimer = mTimer;
+    data.mAttackDurationTimer = mAttackDurationTimer;
+    data.mEnemyXPos = mEnemyXPos;
+    data.mEnemyYPos = mEnemyYPos;
+
+    pSaveBuffer.Write(data);
+}
+
+void Bat::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<BatSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);
+    auto pTlv = tlvIterator.GetTlvChecked<relive::Path_Bat>(ReliveTypes::eBat);
+
+    auto pBat = relive_new Bat(pTlv, pState->mTlvInfo, resMan, map);
+    if (pBat)
+    {
+        pBat->mXPos = pState->mXPos;
+        pBat->mYPos = pState->mYPos;
+        pBat->mVelX = pState->mVelX;
+        pBat->mVelY = pState->mVelY;
+        pBat->mBatVelX = pState->mBatVelX;
+        pBat->mCurrentPath = pState->mCurrentPath;
+        pBat->mCurrentLevel = pState->mCurrentLevel;
+        pBat->SetSpriteScale(pState->mSpriteScale);
+        pBat->SetScale(pState->mScale);
+        pBat->GetAnimation().SetFlipX(pState->bFlipX);
+        pBat->GetAnimation().SetRender(pState->mRender);
+        pBat->mTimer = pState->mTimer;
+        pBat->mAttackDurationTimer = pState->mAttackDurationTimer;
+        pBat->mEnemyXPos = pState->mEnemyXPos;
+        pBat->mEnemyYPos = pState->mEnemyYPos;
+
+        // The constructor's own raycast found the line at the TLV's spawn
+        // rect - re-raycast at the restored position instead, since the
+        // bat may have moved along connected track lines since then.
+        FP hitX = {};
+        FP hitY = {};
+        gCollisions->Raycast(
+            pState->mXPos,
+            pState->mYPos - FP_FromInteger(4),
+            pState->mXPos,
+            pState->mYPos + FP_FromInteger(4),
+            &pBat->mBatLine,
+            &hitX,
+            &hitY,
+            CollisionMask(eTrackLine_8));
+
+        pBat->mBatState = pState->mBatState;
+        if (pBat->mBatState == BatStates::eAttackTarget_4)
+        {
+            // mAttackTarget isn't restorable (see BatSaveState comment) -
+            // land safely in the "give up and fly off" state instead of
+            // eAttackTarget_4, which would dereference a null target.
+            pBat->mBatState = BatStates::eFlyAwayAndDie_5;
+        }
+
+        switch (pBat->mBatState)
+        {
+            case BatStates::eStartMoving_2:
+                pBat->GetAnimation().Set_Animation_Data(pBat->GetAnimRes(AnimId::Bat_Unknown));
+                break;
+
+            case BatStates::eFlying_3:
+            case BatStates::eFlyAwayAndDie_5:
+                pBat->GetAnimation().Set_Animation_Data(pBat->GetAnimRes(AnimId::Bat_Flying));
+                break;
+
+            default:
+                break;
+        }
     }
 }
 

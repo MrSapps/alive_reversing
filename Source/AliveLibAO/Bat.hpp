@@ -1,8 +1,10 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 
 class PathLine;
+class SerializedObjectData;
 
 namespace relive
 {
@@ -45,6 +47,40 @@ public:
     FP mEnemyXPos = {};
     FP mEnemyYPos = {};
     Guid mAttackTarget = {};
+
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+};
+
+// mAttackTarget is deliberately not persisted - it's a transient "who am I
+// currently attacking" reference to another live object, same treatment as
+// Abe's own transient effect ids (Fade/OrbWhirlWind) elsewhere in this
+// codebase. If the bat was mid-attack when saved, it restores into
+// eFlyAwayAndDie_5 instead of eAttackTarget_4, since eAttackTarget_4
+// dereferences mAttackTarget unconditionally in VUpdate() with no null
+// check, and there isn't a stable id to restore it from anyway.
+struct BatSaveState final : public SaveStateBase
+{
+    BatSaveState()
+        : SaveStateBase(ReliveTypes::eBat, sizeof(*this))
+    { }
+    Guid mTlvInfo;
+    FP mXPos = {};
+    FP mYPos = {};
+    FP mVelX = {};
+    FP mVelY = {};
+    FP mBatVelX = {};
+    s16 mCurrentPath = 0;
+    EReliveLevelIds mCurrentLevel = EReliveLevelIds::eNone;
+    FP mSpriteScale = {};
+    Scale mScale = Scale::Fg;
+    bool bFlipX = false;
+    bool mRender = true;
+    Bat::BatStates mBatState = Bat::BatStates::eSetTimer_0;
+    s32 mTimer = 0;
+    s32 mAttackDurationTimer = 0;
+    FP mEnemyXPos = {};
+    FP mEnemyYPos = {};
 };
 
 } // namespace AO

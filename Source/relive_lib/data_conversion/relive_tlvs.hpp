@@ -783,6 +783,7 @@ struct Path_Bat final : public Path_TLV
     Path_Bat()
     {
         mTlvType = ReliveTypes::eBat;
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     s16 mTimeBeforeMoving = 0;
     s16 mSpeed = 0;
@@ -1171,6 +1172,7 @@ struct Path_BeeNest final : public Path_TLV
     Path_BeeNest()
     {
         mTlvType = ReliveTypes::eBeeNest;
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     s16 mSwitchId = 0;
     s16 mSwarmSize = 0;
