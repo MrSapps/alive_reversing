@@ -8222,7 +8222,10 @@ void Abe::Motion_132_LiftUseDown()
 void Abe::Motion_133_LiftGrabBegin()
 {
     auto pLiftPoint = static_cast<LiftPoint*>(sObjectIds.Find_Impl(BaseAliveGameObject_PlatformId));
-    pLiftPoint->Move(FP_FromInteger(0), FP_FromInteger(0));
+    if (pLiftPoint)
+    {
+        pLiftPoint->Move(FP_FromInteger(0), FP_FromInteger(0));
+    }
 
     mVelY = FP_FromInteger(0);
     if (GetAnimation().GetIsLastFrame())
@@ -8262,7 +8265,10 @@ void Abe::Motion_135_LiftGrabIdle()
 
     FollowLift();
 
-    pLiftPoint->Move(FP_FromInteger(0), FP_FromInteger(0));
+    if (pLiftPoint)
+    {
+        pLiftPoint->Move(FP_FromInteger(0), FP_FromInteger(0));
+    }
 
     mVelY = FP_FromInteger(0);
 

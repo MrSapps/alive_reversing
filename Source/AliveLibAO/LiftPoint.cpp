@@ -11,6 +11,7 @@
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
 #include "../relive_lib/ObjectIds.hpp"
 #include "../relive_lib/FixedPoint.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Path.hpp"
 
 namespace AO {
@@ -112,6 +113,8 @@ LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId, ResourceMa
     LoadAnimations();
 
     pTlv->mTlvSpecificMeaning = 3;
+
+    mTlvId = Path::TLVInfo_From_TLVPtr(pTlv);
 
     if (pTlv->mScale == relive::reliveScale::eHalf)
     {
@@ -245,6 +248,7 @@ void LiftPoint::StayOnFloor(bool bFloor, relive::Path_LiftPoint* pLiftTlv)
 
     mMoving = false;
     pLiftTlv->mTlvSpecificMeaning = 3;
+    mTlvId = Path::TLVInfo_From_TLVPtr(pLiftTlv);
     pLiftTlv->mLiftPointId = mLiftPointId;
     mVelY = FP_FromInteger(0);
 
@@ -391,6 +395,7 @@ void LiftPoint::VUpdate()
                         {
                             pLiftTlv->mTlvSpecificMeaning = 1;
                             mTopFloor = false;
+                            mTlvId = Guid{};
                         }
                         else
                         {
@@ -400,6 +405,7 @@ void LiftPoint::VUpdate()
 
                             pLiftTlv->mTlvSpecificMeaning = 3;
 
+                            mTlvId = Path::TLVInfo_From_TLVPtr(pLiftTlv);
                             pLiftTlv->mLiftPointId = mLiftPointId;
                             mTopFloor = true;
                         }
@@ -418,6 +424,7 @@ void LiftPoint::VUpdate()
                         {
                             pLiftTlv->mTlvSpecificMeaning = 1;
                             mBottomFloor = false;
+                            mTlvId = Guid{};
                         }
                         else
                         {
@@ -427,6 +434,7 @@ void LiftPoint::VUpdate()
 
                             pLiftTlv->mTlvSpecificMeaning = 3;
 
+                            mTlvId = Path::TLVInfo_From_TLVPtr(pLiftTlv);
                             pLiftTlv->mLiftPointId = mLiftPointId;
                             mBottomFloor = true;
                         }
@@ -442,6 +450,7 @@ void LiftPoint::VUpdate()
                     if (distanceToFloor <= kMinus25Scaled || distanceToFloor >= k30Scaled)
                     {
                         pLiftTlv->mTlvSpecificMeaning = 1;
+                        mTlvId = Guid{};
                     }
                     else
                     {
@@ -459,6 +468,7 @@ void LiftPoint::VUpdate()
                         }
 
                         pLiftTlv->mTlvSpecificMeaning = 3;
+                        mTlvId = Path::TLVInfo_From_TLVPtr(pLiftTlv);
                         pLiftTlv->mLiftPointId = mLiftPointId;
                         mMiddleFloor = true;
                     }
@@ -468,6 +478,7 @@ void LiftPoint::VUpdate()
                     if (pLiftTlv)
                     {
                         pLiftTlv->mTlvSpecificMeaning = 1;
+                        mTlvId = Guid{};
                     }
 
                     mTopFloor = false;
@@ -754,6 +765,85 @@ LiftPoint::~LiftPoint()
     {
         mPulleyAnim.VCleanUp();
     }
+}
+
+void LiftPoint::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    LiftPointSaveState data = {};
+
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mPlatformId = mPlatformBaseTlvInfo;
+    data.mTlvId = mTlvId;
+    data.mFloorLevelY = mFloorLevelY;
+    data.mLiftPointStopType = mLiftPointStopType;
+
+    data.mMoving = mMoving;
+    data.mTopFloor = mTopFloor;
+    data.mMiddleFloor = mMiddleFloor;
+    data.mBottomFloor = mBottomFloor;
+    data.mMoveToFloorLevel = mMoveToFloorLevel;
+    data.mKeepOnMiddleFloor = mKeepOnMiddleFloor;
+
+    pSaveBuffer.Write(data);
+}
+
+void LiftPoint::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pData.ReadTmpPtr<LiftPointSaveState>();
+
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mPlatformId);
+    auto pTlv = tlvIterator.GetTlvChecked<relive::Path_LiftPoint>(ReliveTypes::eLiftPoint);
+
+    auto pLiftPoint = relive_new LiftPoint(pTlv, pState->mPlatformId, resMan, map);
+    if (pLiftPoint)
+    {
+        pLiftPoint->mXPos = pState->mXPos;
+        pLiftPoint->mYPos = pState->mYPos;
+        pLiftPoint->SyncCollisionLinePosition();
+
+        Rope* pRope2 = sObjectIds.Find<Rope>(pLiftPoint->mRopeId2, ReliveTypes::eRope);
+        Rope* pRope1 = sObjectIds.Find<Rope>(pLiftPoint->mRopeId1, ReliveTypes::eRope);
+
+        pRope2->mBottom = FP_GetExponent(FP_FromInteger(pLiftPoint->mPlatformBaseCollisionLine->mRect.y) + (FP_FromInteger(25) * pLiftPoint->GetSpriteScale()));
+        pRope1->mBottom = FP_GetExponent(FP_FromInteger(pLiftPoint->mPlatformBaseCollisionLine->mRect.y) + (FP_FromInteger(25) * pLiftPoint->GetSpriteScale()));
+
+        if (pLiftPoint->mHasPulley)
+        {
+            pRope2->mTop = FP_GetExponent(FP_FromInteger(pLiftPoint->mPulleyYPos) + FP_FromInteger(-19) * pLiftPoint->GetSpriteScale());
+            pRope1->mTop = FP_GetExponent(FP_FromInteger(pLiftPoint->mPulleyYPos) + FP_FromInteger(-19) * pLiftPoint->GetSpriteScale());
+        }
+
+        pLiftPoint->mTlvId = pState->mTlvId;
+        pLiftPoint->mFloorLevelY = pState->mFloorLevelY;
+        pLiftPoint->mLiftPointStopType = pState->mLiftPointStopType;
+
+        pLiftPoint->mMoving = pState->mMoving;
+        pLiftPoint->mTopFloor = pState->mTopFloor;
+        pLiftPoint->mMiddleFloor = pState->mMiddleFloor;
+        pLiftPoint->mBottomFloor = pState->mBottomFloor;
+        pLiftPoint->mMoveToFloorLevel = pState->mMoveToFloorLevel;
+        pLiftPoint->mKeepOnMiddleFloor = pState->mKeepOnMiddleFloor;
+    }
+
+    // mTlvId tracks whichever nearby floor-TLV the lift is currently
+    // resting on/heading to (distinct from mPlatformId, its own spawn TLV -
+    // see the assignments in VUpdate()/StayOnFloor()). Restore that TLV's
+    // mTlvSpecificMeaning marker to match, same as the constructor already
+    // did for the spawn TLV above.
+    if (pState->mTlvId == pState->mPlatformId)
+    {
+        return;
+    }
+
+    pTlv->mTlvSpecificMeaning = 1;
+    if (pState->mTlvId == Guid{})
+    {
+        return;
+    }
+
+    relive::Path_TLV* pTlv2 = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv();
+    pTlv2->mTlvSpecificMeaning = 3;
 }
 
 } // namespace AO
