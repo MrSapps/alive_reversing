@@ -7,6 +7,7 @@
 #include "Factory.hpp"
 #include "Path.hpp"
 #include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Map.hpp"
 
 namespace AO {
@@ -43,8 +44,22 @@ LiftMover::~LiftMover()
 
 void LiftMover::VUpdate()
 {
-    // NOTE: Isn't null checked, could easily crash later :)
     auto pTargetLift = static_cast<LiftPoint*>(sObjectIds.Find_Impl(mTargetLift));
+
+    if (!pTargetLift && mState != LiftMoverStates::eInactive_0)
+    {
+        // mTargetLift is a runtime object id restored (or left default)
+        // from a save/load, so it isn't meaningful across sessions - if
+        // we're mid-operation but don't have a live target, re-resolve it
+        // by the TLV-derived mTargetLiftPointId the same way eInactive_0
+        // below already does, instead of the active states further down
+        // dereferencing a null pTargetLift (previously unguarded here).
+        pTargetLift = FindLiftPointWithId(mTargetLiftPointId);
+        if (pTargetLift)
+        {
+            mTargetLift = pTargetLift->mBaseGameObjectId;
+        }
+    }
 
     if (pTargetLift && pTargetLift->GetDead())
     {
@@ -93,6 +108,11 @@ void LiftMover::VUpdate()
             break;
 
         case LiftMoverStates::eStartMovingDown_1:
+            if (!pTargetLift)
+            {
+                return;
+            }
+
             if (!pTargetLift->OnAnyFloor())
             {
                 pTargetLift->mKeepOnMiddleFloor = true;
@@ -110,6 +130,11 @@ void LiftMover::VUpdate()
             break;
 
         case LiftMoverStates::eMovingDown_2:
+            if (!pTargetLift)
+            {
+                return;
+            }
+
             if (!pTargetLift->OnAFloorLiftMoverCanUse())
             {
                 pTargetLift->Move(FP_FromInteger(0), mLiftSpeed);
@@ -122,6 +147,11 @@ void LiftMover::VUpdate()
             break;
 
         case LiftMoverStates::eStartMovingUp_3:
+            if (!pTargetLift)
+            {
+                return;
+            }
+
             if (pTargetLift->OnAFloorLiftMoverCanUse())
             {
                 pTargetLift->Move(FP_FromInteger(0), mLiftSpeed);
@@ -139,6 +169,11 @@ void LiftMover::VUpdate()
             break;
 
         case LiftMoverStates::eMovingUp_4:
+            if (!pTargetLift)
+            {
+                return;
+            }
+
             if (pTargetLift->OnAFloorLiftMoverCanUse())
             {
                 pTargetLift->Move(FP_FromInteger(0), FP_FromInteger(0));
@@ -189,6 +224,36 @@ LiftPoint* LiftMover::FindLiftPointWithId(s16 id)
         }
     }
     return nullptr;
+}
+
+void LiftMover::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    LiftMoverSaveState data = {};
+
+    data.mTlvId = mTlvId;
+    data.mState = mState;
+
+    pSaveBuffer.Write(data);
+}
+
+void LiftMover::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pData.ReadTmpPtr<LiftMoverSaveState>();
+
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
+    auto pTlv = tlvIterator.GetTlvChecked<relive::Path_LiftMover>(ReliveTypes::eLiftMover);
+
+    auto pLiftMover = relive_new LiftMover(pTlv, pState->mTlvId, resMan, map);
+    if (pLiftMover)
+    {
+        // mTargetLift is deliberately left at its freshly-constructed
+        // default (invalid) value - it's a runtime object id, not
+        // meaningful across a restore. VUpdate() already re-resolves it
+        // from mTargetLiftPointId on its next tick if mState says we
+        // should be mid-operation (see the guard added at the top of
+        // VUpdate above).
+        pLiftMover->mState = pState->mState;
+    }
 }
 
 } // namespace AO
