@@ -6,9 +6,7 @@
 class CollisionObject final
 {
 public:
-    explicit CollisionObject(int id)
-        : mId(id)
-    { }
+    explicit CollisionObject(int id);
 
     CollisionObject(const CollisionObject&) = delete;
 

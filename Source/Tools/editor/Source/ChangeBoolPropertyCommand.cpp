@@ -3,6 +3,12 @@
 #include "PropertyTreeItemBase.hpp"
 #include "IGraphicsItem.hpp"
 
+ChangeBoolPropertyCommand::ChangeBoolPropertyCommand(LinkedBoolProperty linkedProperty, BoolPropertyChangeData propertyData)
+    : mLinkedProperty(linkedProperty), mPropertyData(propertyData)
+{
+    UpdateText();
+}
+
 void ChangeBoolPropertyCommand::undo()
 {
     mLinkedProperty.mBoolValue = mPropertyData.mOldValue;

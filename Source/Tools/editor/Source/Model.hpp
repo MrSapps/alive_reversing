@@ -17,12 +17,9 @@ public:
     class ModelException
     {
     public:
-        virtual ~ModelException()
-        { }
+        virtual ~ModelException();
         ModelException() = default;
-        explicit ModelException(const std::string& what)
-            : mWhat(what)
-        { }
+        explicit ModelException(const std::string& what);
         const std::string& what() const
         {
             return mWhat;
@@ -54,12 +51,7 @@ public:
     class ObjectPropertyTypeNotFoundException final : public ModelException
     {
     public:
-        explicit ObjectPropertyTypeNotFoundException(const std::string& structureName, const std::string& typeName)
-            : ModelException(structureName + ":" + typeName)
-            , mStructName(structureName)
-            , mTypeName(typeName)
-        {
-        }
+        explicit ObjectPropertyTypeNotFoundException(const std::string& structureName, const std::string& typeName);
 
         const std::string& StructName() const
         {
@@ -79,11 +71,7 @@ public:
     class JsonKeyNotFoundException final : public ModelException
     {
     public:
-        explicit JsonKeyNotFoundException(const std::string& key)
-            : ModelException(key)
-            , mKey(key)
-        {
-        }
+        explicit JsonKeyNotFoundException(const std::string& key);
 
         const std::string& Key() const
         {
