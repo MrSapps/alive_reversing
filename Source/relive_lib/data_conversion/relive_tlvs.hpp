@@ -771,6 +771,14 @@ struct Path_HoneySack final : public Path_TLV
     Path_HoneySack()
     {
         mTlvType = ReliveTypes::eHoneySack;
+        // eClearTlvFlags_1, not eKeepTlvFlags_2: HoneySack has no explicit
+        // CreateFromSaveState (relies on the natural per-camera TLV spawn
+        // scan to recreate it), so the Created/Destroyed bits must come
+        // back cleared to let that scan actually (re)construct it. The
+        // "already fell to the ground" state is still recovered correctly
+        // because mTlvSpecificMeaning (the constructor reads it to decide
+        // whether to start already-landed) is captured/restored either way.
+        mAttribute = QuiksaveAttribute::eClearTlvFlags_1;
     }
     s16 mChaseTime = 0;
     reliveScale mScale = reliveScale::eFull;
