@@ -125,6 +125,8 @@ set(PROJECT_SOURCES
         Source/EditorMainWindow.hpp
         Source/EditorTab.cpp
         Source/EditorTab.hpp
+        Source/EditorGraphicsView.cpp
+        Source/EditorGraphicsView.hpp
         Source/FireWidget.cpp
         Source/FireWidget.hpp
         Source/AboutDialog.cpp
