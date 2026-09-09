@@ -2,44 +2,13 @@
 
 #include <QList>
 #include <QGraphicsItem>
-#include <QUndoCommand>
-#include "SelectionSaver.hpp"
-#include "EditorGraphicsScene.hpp"
+#include <memory>
+#include <vector>
 #include "../../../relive_lib/GameType.hpp"
 
-class EditorTab;
 class Model;
-class ClipBoard;
-class ResizeableRectItem;
-class ResizeableArrowItem;
-struct EditorCamera;
+class MapObjectBase;
 class CollisionObject;
-
-class PasteItemsCommand final : public QUndoCommand
-{
-public:
-    PasteItemsCommand(EditorTab* pTab, ClipBoard& clipBoard);
-    ~PasteItemsCommand();
-    void redo() override;
-    void undo() override;
-private:
-    EditorTab* mTab = nullptr;
-
-    struct PastedMapObject final
-    {
-        std::unique_ptr<MapObjectBase> mPastedMapObject;
-        EditorCamera* mContainingCamera;
-    };
-    std::vector<PastedMapObject> mMapObjects;
-    std::vector<ResizeableRectItem*> mMapGraphicsObjects;
-
-    std::vector<std::unique_ptr<CollisionObject>> mCollisions;
-    std::vector<ResizeableArrowItem*> mCollisionGraphicsObjects;
-
-    SelectionSaver mSelectionSaver;
-
-    bool mPasted = false;
-};
 
 class ClipBoard final
 {

@@ -36,6 +36,7 @@
 #include <QtConcurrent/QtConcurrent>
 #include "DeleteItemsCommand.hpp"
 #include "ClipBoard.hpp"
+#include "PasteItemsCommand.hpp"
 #include "../../../relive_lib/Grid.hpp"
 #include "CollisionConnect.hpp"
 #include "Model.hpp"

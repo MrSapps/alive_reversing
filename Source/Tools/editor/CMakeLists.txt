@@ -80,6 +80,8 @@ set(PROJECT_SOURCES
         Source/SnapSettings.hpp
         Source/ClipBoard.cpp
         Source/ClipBoard.hpp
+        Source/PasteItemsCommand.cpp
+        Source/PasteItemsCommand.hpp
         Source/DeleteItemsCommand.cpp
         Source/DeleteItemsCommand.hpp
         Source/ProgressDialog.hpp
