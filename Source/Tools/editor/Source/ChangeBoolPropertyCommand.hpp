@@ -1,36 +1,8 @@
 #pragma once
 
 #include <QUndoCommand>
-
-class PropertyTreeWidget;
-class IGraphicsItem;
-
-struct BoolPropertyChangeData
-{
-    BoolPropertyChangeData(bool& boolValue, bool oldValue)
-        : mBoolValue(boolValue), mOldValue(oldValue)
-    {
-
-    }
-
-    bool& mBoolValue;
-    bool mOldValue = false;
-};
-
-// TODO: probably merge with BasicTypePropertyChangeData ??
-struct LinkedBoolProperty
-{
-    LinkedBoolProperty(const char* propertyName, bool& boolValue, PropertyTreeWidget* pTreeWidget, IGraphicsItem* pGraphicsItem)
-        : mPropertyName(propertyName), mBoolValue(boolValue), mTreeWidget(pTreeWidget), mGraphicsItem(pGraphicsItem)
-    {
-
-    }
-
-    const char* mPropertyName = nullptr;
-    bool& mBoolValue;
-    PropertyTreeWidget* mTreeWidget = nullptr;
-    IGraphicsItem* mGraphicsItem = nullptr;
-};
+#include "BoolPropertyChangeData.hpp"
+#include "LinkedBoolProperty.hpp"
 
 class ChangeBoolPropertyCommand final : public QUndoCommand
 {
