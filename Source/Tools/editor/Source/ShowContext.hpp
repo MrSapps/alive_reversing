@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ReliveApiWrapper.hpp"
+#include "relive_api.hpp"
 #include <QMessageBox>
 
 inline void ShowContext(const ReliveAPI::Context& context)
