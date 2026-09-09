@@ -5013,7 +5013,7 @@ void Abe::Motion_57_Dead_4589A0()
             Make_Circular_Fade(
                 FP_FromInteger(QuikSave::gActiveQuicksaveData.mWorldInfo.mControlledCharX),
                 FP_FromInteger(QuikSave::gActiveQuicksaveData.mWorldInfo.mControlledCharY),
-                QuikSave::gActiveQuicksaveData.mWorldInfo.mControlledCharScale != 0 ? FP_FromDouble(1.0) : FP_FromDouble(0.5),
+                QuikSave::gActiveQuicksaveData.mWorldInfo.mControlledCharAtFullScale ? FP_FromDouble(1.0) : FP_FromDouble(0.5),
                 0,
                 true,
                 true, mResMan, mMap);

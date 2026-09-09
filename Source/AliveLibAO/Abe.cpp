@@ -45,6 +45,7 @@
 #include "../relive_lib/Collisions.hpp"
 #include "BirdPortal.hpp"
 #include "SaveGame.hpp"
+#include "QuikSave.hpp"
 #include "Map.hpp"
 #include "BeeSwarm.hpp"
 #include "Shrykull.hpp"
@@ -58,6 +59,8 @@
 #include "../relive_lib/Sound/Midi.hpp"
 #include "../relive_lib/FatalError.hpp"
 #include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
+#include "../relive_lib/GameObjects/Electrocute.hpp"
 #include "../relive_lib/SwitchStates.hpp"
 #include "../relive_lib/Psx.hpp"
 #include "Path.hpp"
@@ -2345,7 +2348,7 @@ void Abe::VOnTlvCollision(TlvIterator tlvIterator)
                     GameEnderController::gRestartRuptureFarmsSavedMuds = gRescuedMudokons;
                 }
 
-                SaveGame::SaveToMemory(&gSaveBuffer, mMap);
+                QuikSave::SaveCheckpoint(mMap);
 
                 const FP camXPos = FP_NoFractional(gScreenManager->CamXPos());
 
@@ -2485,6 +2488,348 @@ eAbeMotions Abe::HandleDoAction()
             mYPos);
     }
     return eAbeMotions::Motion_36_DunnoBegin;
+}
+
+void Abe::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    AbeSaveState data = {};
+    GetSaveState(data);
+    pSaveBuffer.Write(data);
+}
+
+void Abe::GetSaveState(AbeSaveState& pSaveState)
+{
+    pSaveState.mType = ReliveTypes::eAbe;
+    pSaveState.mXPos = mXPos;
+    pSaveState.mYPos = mYPos;
+    pSaveState.mVelX = mVelX;
+    pSaveState.mVelY = mVelY;
+    pSaveState.mCurrentPath = mCurrentPath;
+    pSaveState.mCurrentLevel = mCurrentLevel;
+    pSaveState.mSpriteScale = GetSpriteScale();
+    pSaveState.mScale = GetScale();
+    pSaveState.mRed = mRGB.r;
+    pSaveState.mGreen = mRGB.g;
+    pSaveState.mBlue = mRGB.b;
+
+    if (GetElectrocuting())
+    {
+        for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
+        {
+            auto pObj = gBaseGameObjects->ItemAt(i);
+            if (!pObj)
+            {
+                break;
+            }
+
+            if (pObj->Type() == ReliveTypes::eElectrocute)
+            {
+                auto pElectrocute = static_cast<const Electrocute*>(pObj);
+                if (pElectrocute->mTargetObjId == mBaseGameObjectId)
+                {
+                    pSaveState.mRed = static_cast<u16>(pElectrocute->mTargetRed);
+                    pSaveState.mGreen = static_cast<u16>(pElectrocute->mTargetGreen);
+                    pSaveState.mBlue = static_cast<u16>(pElectrocute->mTargetBlue);
+                    break;
+                }
+            }
+        }
+    }
+
+    pSaveState.bAnimFlipX = GetAnimation().GetFlipX();
+    pSaveState.mCurrentMotion = mCurrentMotion;
+    pSaveState.mPreviousMotion = mPreviousMotion;
+    pSaveState.mNextMotion = mNextMotion;
+    pSaveState.mKnockdownMotion = field_112_prev_motion;
+    pSaveState.mCurrentFrame = GetAnimation().GetCurrentFrame();
+    pSaveState.mFrameChangeCounter = static_cast<u16>(GetAnimation().GetFrameChangeCounter());
+
+    if (GetAnimation().GetFrameChangeCounter() == 0)
+    {
+        pSaveState.mFrameChangeCounter = 1;
+    }
+
+    pSaveState.mIsDrawable = GetDrawable();
+    pSaveState.mAnimRender = GetAnimation().GetRender();
+    pSaveState.mRenderLayer = static_cast<s8>(GetAnimation().GetRenderLayer());
+    pSaveState.mHealth = mHealth;
+    pSaveState.mLastLineYPos = static_cast<u16>(FP_GetExponent(BaseAliveGameObjectLastLineYPos));
+
+    pSaveState.mPlatformId = BaseAliveGameObject_PlatformId;
+    if (BaseAliveGameObject_PlatformId != Guid{})
+    {
+        auto pObj = sObjectIds.Find_Impl(BaseAliveGameObject_PlatformId);
+        if (pObj)
+        {
+            pSaveState.mPlatformId = pObj->mBaseGameObjectTlvInfo;
+        }
+    }
+
+    pSaveState.mIsAbeControlled = (this == sControlledCharacter);
+
+    pSaveState.mInternalState = field_110_state.raw;
+    pSaveState.mPrevInput = field_10C_prev_held;
+    pSaveState.mReleasedButtons = field_10E_released_buttons;
+    pSaveState.mGnFrame = field_114_gnFrame;
+    pSaveState.mTimer = field_118_timer;
+    pSaveState.mRegenHealthTimer = field_11C_regen_health_timer;
+    pSaveState.mRollingMotionTimer = field_12C_timer;
+    pSaveState.mSay = field_130_say;
+    pSaveState.mAutoSayTimer = field_134_auto_say_timer;
+
+    pSaveState.mContinuePointTopLeft = mContinuePointTopLeft;
+    pSaveState.mContinuePointBottomRight = mContinuePointBottomRight;
+    pSaveState.mContinuePointCamera = mContinuePointCamera;
+    pSaveState.mContinuePointPath = mContinuePointPath;
+    pSaveState.mContinuePointLevel = mContinuePointLevel;
+    pSaveState.mContinuePointZoneNumber = mContinuePointZoneNumber;
+    pSaveState.mContinuePointClearFromId = mContinuePointClearFromId;
+    pSaveState.mContinuePointClearToId = mContinuePointClearToId;
+    pSaveState.mContinuePointSpriteScale = mContinuePointSpriteScale;
+    pSaveState.mSavedRingTimer = field_150_saved_ring_timer;
+    pSaveState.mSavedHaveShrykull = field_154_bSavedHaveShrykull;
+
+    pSaveState.mFadeId = mFadeId;
+    if (mFadeId != Guid{})
+    {
+        auto pObj = sObjectIds.Find_Impl(mFadeId);
+        if (pObj)
+        {
+            pSaveState.mFadeId = pObj->mBaseGameObjectTlvInfo;
+        }
+    }
+
+    pSaveState.mSlappableOrPickupId = field_15C_pThrowable;
+    if (field_15C_pThrowable != Guid{})
+    {
+        auto pObj = sObjectIds.Find_Impl(field_15C_pThrowable);
+        if (pObj)
+        {
+            pSaveState.mSlappableOrPickupId = pObj->mBaseGameObjectTlvInfo;
+        }
+    }
+
+    pSaveState.mPullRingRopeId = mPullRingRope;
+    if (mPullRingRope != Guid{})
+    {
+        auto pObj = sObjectIds.Find_Impl(mPullRingRope);
+        if (pObj)
+        {
+            pSaveState.mPullRingRopeId = pObj->mBaseGameObjectTlvInfo;
+        }
+    }
+
+    pSaveState.mCircularFadeId = mCircularFadeId;
+    if (mCircularFadeId != Guid{})
+    {
+        auto pObj = sObjectIds.Find_Impl(mCircularFadeId);
+        if (pObj)
+        {
+            pSaveState.mCircularFadeId = pObj->mBaseGameObjectTlvInfo;
+        }
+    }
+
+    pSaveState.mOrbWhirlWindId = mOrbWhirlWindId;
+    if (mOrbWhirlWindId != Guid{})
+    {
+        auto pObj = sObjectIds.Find_Impl(mOrbWhirlWindId);
+        if (pObj)
+        {
+            pSaveState.mOrbWhirlWindId = pObj->mBaseGameObjectTlvInfo;
+        }
+    }
+
+    pSaveState.mPossessedObjectId = field_18C_pObjToPossess;
+    if (field_18C_pObjToPossess != Guid{})
+    {
+        auto pObj = sObjectIds.Find_Impl(field_18C_pObjToPossess);
+        if (pObj)
+        {
+            pSaveState.mPossessedObjectId = pObj->mBaseGameObjectTlvInfo;
+        }
+    }
+
+    pSaveState.mThrowableId = mThrowable;
+    if (mThrowable != Guid{})
+    {
+        auto pObj = sObjectIds.Find_Impl(mThrowable);
+        if (pObj)
+        {
+            pSaveState.mThrowableId = pObj->mBaseGameObjectTlvInfo;
+        }
+    }
+
+    pSaveState.mRingPulseTimer = mRingPulseTimer;
+    pSaveState.mHaveShrykull = mHaveShrykull;
+
+    pSaveState.mHandStoneCamIdx = field_16E_cameraIdx;
+    pSaveState.mHandStoneType = mHandStoneType;
+
+    pSaveState.mDstWellLevel = field_190_level;
+    pSaveState.mDstWellPath = field_192_path;
+    pSaveState.mDstWellCamera = field_194_camera;
+    pSaveState.mDoorId = field_196_door_id;
+
+    pSaveState.mThrowableCount = field_19C_throwable_count;
+    pSaveState.mThrowDirection = mThrowDirection;
+
+    pSaveState.mBirdPortalSubState = field_19E_portal_sub_state;
+
+    pSaveState.mReturnToPreviousMotion = mReturnToPreviousMotion;
+    pSaveState.mWalkToRun = mWalkToRun;
+    pSaveState.mSnapAbe = mSnapAbe;
+    pSaveState.mShrivel = mShrivel;
+    pSaveState.mBlockChanting = mBlockChanting;
+    pSaveState.mLandSoft = mLandSoft;
+    pSaveState.mLaughAtChantEnd = mLaughAtChantEnd;
+    pSaveState.mParamoniaDone = mParamoniaDone;
+    pSaveState.mScrabaniaDone = mScrabaniaDone;
+    pSaveState.mGotShrykullFromBigFace = mGotShrykullFromBigFace;
+    pSaveState.mGiveShrykullFromBigFace = mGiveShrykullFromBigFace;
+    pSaveState.mAbeRespawnFlipX = mAbeRespawnFlipX;
+    pSaveState.mRidingElum = mRidingElum;
+    pSaveState.mElumMountBegin = mElumMountBegin;
+    pSaveState.mElumMountEnd = mElumMountEnd;
+    pSaveState.mElumUnmountBegin = mElumUnmountBegin;
+
+    pSaveState.mIsElectrocuted = GetElectrocuted();
+    pSaveState.mIsInvisible = GetInvisible();
+    pSaveState.mTeleporting = GetTeleporting();
+
+    pSaveState.mShadowEnabled = GetShadow()->mEnabled;
+    pSaveState.mShadowAtBottom = GetShadow()->mShadowAtBottom;
+}
+
+void Abe::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const AbeSaveState* pSaveState = pData.ReadTmpPtr<AbeSaveState>();
+    Abe::CreateFromSaveState(*pSaveState, resMan, map);
+}
+
+void Abe::CreateFromSaveState(const AbeSaveState& pData, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    Abe* pAbe = gAbe;
+    if (!gAbe)
+    {
+        pAbe = relive_new Abe(resMan, map);
+        gAbe = pAbe;
+    }
+
+    if (pData.mIsAbeControlled)
+    {
+        sControlledCharacter = pAbe;
+    }
+
+    gAbe->BaseAliveGameObjectPathTLV = TlvIterator::Invalid();
+    gAbe->BaseAliveGameObjectCollisionLine = nullptr;
+    gAbe->mXPos = pData.mXPos;
+    gAbe->mYPos = pData.mYPos;
+    gAbe->mVelX = pData.mVelX;
+    gAbe->mVelY = pData.mVelY;
+    gAbe->mCurrentPath = pData.mCurrentPath;
+    gAbe->mCurrentLevel = pData.mCurrentLevel;
+    gAbe->SetSpriteScale(pData.mSpriteScale);
+    gAbe->SetScale(pData.mScale);
+
+    gAbe->mCurrentMotion = pData.mCurrentMotion;
+    gAbe->GetAnimation().Set_Animation_Data(gAbe->GetAnimRes(sAbeMotionAnimIds[static_cast<u32>(gAbe->mCurrentMotion)]));
+
+    gAbe->GetAnimation().SetCurrentFrame(pData.mCurrentFrame);
+    gAbe->GetAnimation().SetFrameChangeCounter(pData.mFrameChangeCounter);
+    gAbe->GetAnimation().SetFlipX(pData.bAnimFlipX);
+    gAbe->GetAnimation().SetRender(pData.mAnimRender);
+    gAbe->SetDrawable(pData.mIsDrawable);
+    gAbe->GetAnimation().SetRenderLayer(static_cast<Layer>(pData.mRenderLayer));
+
+    if (IsLastFrame(&gAbe->GetAnimation()))
+    {
+        gAbe->GetAnimation().SetIsLastFrame(true);
+    }
+
+    gAbe->GetAnimation().ReloadPal();
+    gAbe->SetTint(sAbeTintTable, map.mCurrentLevel);
+    gAbe->GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_0);
+    gAbe->GetAnimation().SetSemiTrans(true);
+    gAbe->GetAnimation().SetBlending(false);
+
+    gAbe->mHealth = pData.mHealth;
+    gAbe->mPreviousMotion = pData.mPreviousMotion;
+    gAbe->mNextMotion = pData.mNextMotion;
+    gAbe->field_112_prev_motion = pData.mKnockdownMotion;
+    gAbe->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pData.mLastLineYPos);
+    gAbe->BaseAliveGameObject_PlatformId = pData.mPlatformId;
+
+    gAbe->field_110_state.raw = pData.mInternalState;
+    gAbe->field_10C_prev_held = pData.mPrevInput;
+    gAbe->field_10E_released_buttons = pData.mReleasedButtons;
+    gAbe->field_114_gnFrame = pData.mGnFrame;
+    gAbe->field_118_timer = pData.mTimer;
+    gAbe->field_11C_regen_health_timer = pData.mRegenHealthTimer;
+    gAbe->field_12C_timer = pData.mRollingMotionTimer;
+    gAbe->field_130_say = pData.mSay;
+    gAbe->field_134_auto_say_timer = pData.mAutoSayTimer;
+
+    gAbe->mContinuePointTopLeft = pData.mContinuePointTopLeft;
+    gAbe->mContinuePointBottomRight = pData.mContinuePointBottomRight;
+    gAbe->mContinuePointCamera = pData.mContinuePointCamera;
+    gAbe->mContinuePointPath = pData.mContinuePointPath;
+    gAbe->mContinuePointLevel = pData.mContinuePointLevel;
+    gAbe->mContinuePointZoneNumber = pData.mContinuePointZoneNumber;
+    gAbe->mContinuePointClearFromId = pData.mContinuePointClearFromId;
+    gAbe->mContinuePointClearToId = pData.mContinuePointClearToId;
+    gAbe->mContinuePointSpriteScale = pData.mContinuePointSpriteScale;
+    gAbe->field_150_saved_ring_timer = pData.mSavedRingTimer;
+    gAbe->field_154_bSavedHaveShrykull = pData.mSavedHaveShrykull;
+
+    gAbe->mFadeId = pData.mFadeId;
+    gAbe->field_15C_pThrowable = pData.mSlappableOrPickupId;
+    gAbe->mPullRingRope = pData.mPullRingRopeId;
+    gAbe->mCircularFadeId = pData.mCircularFadeId;
+    gAbe->mOrbWhirlWindId = pData.mOrbWhirlWindId;
+    gAbe->field_18C_pObjToPossess = pData.mPossessedObjectId;
+    gAbe->mThrowable = pData.mThrowableId;
+
+    gAbe->mRingPulseTimer = pData.mRingPulseTimer;
+    gAbe->mHaveShrykull = pData.mHaveShrykull;
+
+    gAbe->field_16E_cameraIdx = pData.mHandStoneCamIdx;
+    gAbe->mHandStoneType = pData.mHandStoneType;
+
+    gAbe->field_190_level = pData.mDstWellLevel;
+    gAbe->field_192_path = pData.mDstWellPath;
+    gAbe->field_194_camera = pData.mDstWellCamera;
+    gAbe->field_196_door_id = pData.mDoorId;
+
+    gAbe->field_19C_throwable_count = pData.mThrowableCount;
+    gAbe->mThrowDirection = pData.mThrowDirection;
+
+    gAbe->field_19E_portal_sub_state = pData.mBirdPortalSubState;
+
+    gAbe->SetElectrocuted(pData.mIsElectrocuted);
+    gAbe->SetInvisible(pData.mIsInvisible);
+    gAbe->SetTeleporting(pData.mTeleporting);
+
+    gAbe->mReturnToPreviousMotion = pData.mReturnToPreviousMotion;
+    gAbe->mWalkToRun = pData.mWalkToRun;
+    gAbe->mSnapAbe = pData.mSnapAbe;
+    gAbe->mShrivel = pData.mShrivel;
+    gAbe->mBlockChanting = pData.mBlockChanting;
+    gAbe->mLandSoft = pData.mLandSoft;
+    gAbe->mLaughAtChantEnd = pData.mLaughAtChantEnd;
+    gAbe->mParamoniaDone = pData.mParamoniaDone;
+    gAbe->mScrabaniaDone = pData.mScrabaniaDone;
+    gAbe->mGotShrykullFromBigFace = pData.mGotShrykullFromBigFace;
+    gAbe->mGiveShrykullFromBigFace = pData.mGiveShrykullFromBigFace;
+    gAbe->mAbeRespawnFlipX = pData.mAbeRespawnFlipX;
+    gAbe->mRidingElum = pData.mRidingElum;
+    gAbe->mElumMountBegin = pData.mElumMountBegin;
+    gAbe->mElumMountEnd = pData.mElumMountEnd;
+    gAbe->mElumUnmountBegin = pData.mElumUnmountBegin;
+
+    gAbe->GetShadow()->mEnabled = pData.mShadowEnabled;
+    gAbe->GetShadow()->mShadowAtBottom = pData.mShadowAtBottom;
+
+    gAbe->SetRestoredFromQuickSave(true);
 }
 
 bool Abe::VTakeDamage(BaseGameObject* pFrom)
@@ -6112,10 +6457,10 @@ void Abe::Motion_61_Respawn()
                     mContinuePointTopLeft.x = camPos.x + 512;
                     mContinuePointTopLeft.y = camPos.y + 240;
                 }
-                SaveGame::LoadFromMemory(&gSaveBuffer, 0, mMap);
+                QuikSave::RestoreCheckpoint(mResMan, mMap, false);
                 if (field_19C_throwable_count)
                 {
-                    LoadRockTypes(gSaveBuffer.mCurrentLevel, gSaveBuffer.mCurrentPath);
+                    LoadRockTypes(mCurrentLevel, mCurrentPath);
                     if (!gThrowableArray)
                     {
                         gThrowableArray = relive_new ThrowableArray(mResMan, mMap);
@@ -6251,150 +6596,13 @@ void Abe::Motion_61_Respawn()
 
 void Abe::Motion_62_LoadedSaveSpawn()
 {
-    EventBroadcast(Event::kEventResetting, this);
-
-    if (field_114_gnFrame)
-    {
-        auto pSaveData = field_2AC_pSaveData;
-        mYPos = FP_FromInteger(pSaveData->mAbe_YPos);
-        mXPos = FP_FromInteger(pSaveData->mAbe_XPos);
-
-        PathLine* pLine2 = nullptr;
-        FP hitX2 = {};
-        FP hitY2 = {};
-        if (gCollisions->Raycast(
-                gAbe->mXPos,
-                gAbe->mYPos - FP_FromInteger(60),
-                gAbe->mXPos,
-                gAbe->mYPos + FP_FromInteger(60),
-                &pLine2,
-                &hitX2,
-                &hitY2,
-                CollisionMask(static_cast<eLineTypes>(pSaveData->mAbe_LineType))))
-        {
-            gAbe->BaseAliveGameObjectCollisionLine = pLine2;
-            gAbe->mYPos = hitY2;
-            gAbe->mCurrentMotion = eAbeMotions::Motion_0_Idle;
-        }
-        else
-        {
-            gAbe->mCurrentMotion = eAbeMotions::Motion_3_Fall;
-        }
-        gAbe->mLandSoft = false;
-        gAbe->BaseAliveGameObjectLastLineYPos = gAbe->mYPos;
-        gAbe->field_110_state.raw = static_cast<s16>(pSaveData->mAbe_StoneState);
-        gAbe->field_114_gnFrame = pSaveData->mAbe_GnFrame;
-        gAbe->mBaseAliveGameObjectLastAnimFrame = pSaveData->mAbe_CurrentFrame;
-        gAbe->GetAnimation().SetFlipX(pSaveData->mAbe_FlipX & 1);
-        gAbe->MapFollowMe(true);
-        gAbe->GetAnimation().SetRender(true);
-        if (gAbe->field_19C_throwable_count)
-        {
-            if (!gThrowableArray)
-            {
-                LoadRockTypes(gSaveBuffer.mCurrentLevel, gSaveBuffer.mCurrentPath);
-
-                gThrowableArray = relive_new ThrowableArray(mResMan, mMap);
-            }
-            gThrowableArray->Add(gAbe->field_19C_throwable_count);
-        }
-        if (pSaveData->mInfiniteGrenades == -1)
-        {
-            LoadRockTypes(EReliveLevelIds::eRuptureFarmsReturn, 19);
-            if (!gThrowableArray)
-            {
-                gThrowableArray = relive_new ThrowableArray(mResMan, mMap);
-            }
-            gThrowableArray->Add(1);
-            gInfiniteThrowables = true;
-        }
-        else
-        {
-            gInfiniteThrowables = false;
-        }
-        if (pSaveData->mElumExists)
-        {
-            if (!gElum)
-            {
-                Elum::Spawn(Guid{}, mResMan, mMap);
-            }
-
-            if (gElum)
-            {
-                gElum->SetUpdatable(false);
-                gElum->GetAnimation().SetRender(false);
-                gElum->mContinuePointRect = pSaveData->mElum_ContinuePointRect;
-                gElum->mPreviousContinuePointZoneNumber = pSaveData->mElum_PreviousContinueZonePointNumber;
-                gElum->mAbeZoneNumber = pSaveData->mElum_AbeZoneNumber;
-                gElum->mContinuePointPath = pSaveData->mElum_ContinuePointPath;
-                gElum->mContinuePointLevel = pSaveData->mElum_ContinuePointLevel;
-                gElum->mContinuePointSpriteScale = pSaveData->mElum_ContinuePointSpriteScale;
-                gElum->mRespawnOnDead = pSaveData->mElum_RespawnOnDead;
-                gElum->mCurrentLevel = pSaveData->mElum_CurrentLevel;
-                gElum->mCurrentPath = pSaveData->mElum_CurrentPath;
-                gElum->mXPos = FP_FromInteger(pSaveData->mElum_XPos);
-                gElum->mYPos = FP_FromInteger(pSaveData->mElum_YPos);
-                gElum->GetAnimation().SetFlipX(pSaveData->mElum_FlipX & 1);
-                gElum->mBaseAliveGameObjectLastAnimFrame = 0;
-                gElum->field_120_bUnknown = 1;
-                gElum->mDontFollowAbe = pSaveData->mElum_DontFollowAbe;
-                gElum->mBrainIdx = pSaveData->mElum_BrainIdx;
-                gElum->mBrainSubState = pSaveData->mElum_BrainSubState;
-                gElum->mHoneyXPos = static_cast<s16>(pSaveData->mElum_HoneyXPos);
-                gElum->mHoneyCamera = pSaveData->mElum_HoneyCamera;
-
-                gElum->mFoundHoney = pSaveData->mElum_FoundHoney & 1;
-                gElum->mFalling = pSaveData->mElum_Falling & 1;
-                gElum->mStungByBees = pSaveData->mElum_StungByBees & 1;
-                if (gElum->mCurrentPath == gAbe->mCurrentPath)
-                {
-                    if (pSaveData->mElum_LineType != -1)
-                    {
-                        PathLine* pLine = nullptr;
-                        FP hitX = {};
-                        FP hitY = {};
-                        if (gCollisions->Raycast(
-                            gElum->mXPos,
-                            gElum->mYPos - FP_FromInteger(60),
-                            gElum->mXPos,
-                            gElum->mYPos + FP_FromInteger(60),
-                            &pLine,
-                            &hitX,
-                            &hitY,
-                            CollisionMask(static_cast<eLineTypes>(pSaveData->mElum_LineType))))
-                        {
-                            gElum->BaseAliveGameObjectCollisionLine = pLine;
-                            gElum->mCurrentMotion = eElumMotions::Motion_1_Idle;
-                            gElum->mPreviousMotion = eElumMotions::Motion_1_Idle;
-                        }
-                        else
-                        {
-                            gElum->mCurrentMotion = eElumMotions::Motion_21_Land;
-                            gElum->mPreviousMotion = eElumMotions::Motion_21_Land;
-                        }
-                    }
-                }
-                else
-                {
-                    //TODO fix this madness
-                    gElum->BaseAliveGameObjectCollisionLine = reinterpret_cast<PathLine*>(-2);
-                }
-
-                if (gElum->mFoundHoney)
-                {
-                    gElum->mCurrentMotion = eElumMotions::Motion_25_LickingHoney;
-                    gElum->mPreviousMotion = eElumMotions::Motion_25_LickingHoney;
-                }
-                gElum->MapFollowMe(true);
-                gElum->SetUpdatable(true);
-                gElum->GetAnimation().SetRender(true);
-            }
-        }
-    }
-    else
-    {
-        field_114_gnFrame = 1;
-    }
+    // Dead code: nothing sets mCurrentMotion to this anymore now that
+    // checkpoint/quicksave restore goes through Abe::CreateFromSaveState
+    // (see QuikSave::RestoreCheckpoint/RestoreObjectState), which restores
+    // position/animation/motion directly instead of this two-stage
+    // SaveData-pointer-chasing landing fix-up. Kept only so the motion
+    // dispatch table (sMotionFuncs) doesn't need restructuring.
+    ToIdle();
 }
 
 void Abe::Motion_63_TurnToRun()

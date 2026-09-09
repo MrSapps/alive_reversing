@@ -17,6 +17,8 @@ SET(AliveLibSrcAO
    ../AliveLibAO/Sound.cpp
    ../AliveLibAO/SaveGame.hpp
    ../AliveLibAO/SaveGame.cpp
+   ../AliveLibAO/QuikSave.hpp
+   ../AliveLibAO/QuikSave.cpp
    ../AliveLibAO/CameraSwapper.hpp
    ../AliveLibAO/CameraSwapper.cpp
    ../AliveLibAO/Input.hpp
@@ -626,6 +628,9 @@ SET(relive_lib_src
     BaseMap.cpp
     BasePath.hpp
     BasePath.cpp
+    SerializedObjectData.hpp
+    QuikSaveTypes.hpp
+    QuikSaveTypes.cpp
     PsxDisplay.cpp
     PsxDisplay.hpp
     Compression.hpp

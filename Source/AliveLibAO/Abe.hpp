@@ -3,6 +3,9 @@
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
 #include "../relive_lib/GameObjects/BaseAbe.hpp"
 #include "../relive_lib/FatalError.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
+
+class SerializedObjectData;
 
 namespace relive
 {
@@ -307,6 +310,124 @@ enum class EnvironmentSfx : u8
 
 struct SaveData;
 
+// AO's quicksave snapshot of Abe. Mirrors AE::AbeSaveState's shape/pattern
+// (see Source/AliveLibAE/Abe.hpp) but with AO's own field names/mechanics -
+// AO has no mood system, invisibility potion, work wheel, evil fart or
+// healing power, so those are simply absent here rather than stubbed.
+//
+// Not saved: the live mHandStone/mMovieStone/mBellsongStone/field_1A0_portal
+// pointers (mid-handstone-cutscene or mid-bird-portal-transition state).
+// Those point at TLV data that would need Guid round-tripping like the
+// other object references below, and saving/loading mid-cutscene is a rare
+// enough edge case that it isn't worth the added risk without being able to
+// test it. The related state enums (mHandStoneType, field_19E_portal_sub_state)
+// are still saved for self-consistency; on restore the object pointer is
+// simply left null, same as it is for a freshly spawned Abe.
+struct AbeSaveState final : public SaveStateBase
+{
+    AbeSaveState()
+        : SaveStateBase(ReliveTypes::eAbe, sizeof(*this))
+    {
+    }
+
+    FP mXPos;
+    FP mYPos;
+    FP mVelX;
+    FP mVelY;
+    s16 mCurrentPath;
+    EReliveLevelIds mCurrentLevel;
+    FP mSpriteScale;
+    Scale mScale;
+    u16 mRed;
+    u16 mGreen;
+    u16 mBlue;
+
+    bool bAnimFlipX;
+    eAbeMotions mCurrentMotion;
+    eAbeMotions mPreviousMotion;
+    eAbeMotions mNextMotion;
+    eAbeMotions mKnockdownMotion; // field_112_prev_motion
+    s32 mCurrentFrame;
+    u16 mFrameChangeCounter;
+    s8 mRenderLayer;
+    bool mAnimRender;
+    bool mIsDrawable;
+
+    FP mHealth;
+    u16 mLastLineYPos;
+    Guid mPlatformId;
+    bool mIsAbeControlled;
+
+    s16 mInternalState; // field_110_state.raw
+    s16 mPrevInput;     // field_10C_prev_held
+    s16 mReleasedButtons; // field_10E_released_buttons
+    s32 mGnFrame;         // field_114_gnFrame
+    s32 mTimer;           // field_118_timer
+    s32 mRegenHealthTimer; // field_11C_regen_health_timer
+    s32 mRollingMotionTimer; // field_12C_timer
+    s16 mSay;                // field_130_say
+    s32 mAutoSayTimer;       // field_134_auto_say_timer
+
+    PSX_Point mContinuePointTopLeft;
+    PSX_Point mContinuePointBottomRight;
+    s16 mContinuePointCamera;
+    s16 mContinuePointPath;
+    EReliveLevelIds mContinuePointLevel;
+    s16 mContinuePointZoneNumber;
+    s16 mContinuePointClearFromId;
+    s16 mContinuePointClearToId;
+    FP mContinuePointSpriteScale;
+    s32 mSavedRingTimer;      // field_150_saved_ring_timer
+    s16 mSavedHaveShrykull;   // field_154_bSavedHaveShrykull
+
+    Guid mFadeId;
+    Guid mSlappableOrPickupId; // field_15C_pThrowable
+    Guid mPullRingRopeId;      // mPullRingRope
+    Guid mCircularFadeId;
+    Guid mOrbWhirlWindId;
+    Guid mPossessedObjectId; // field_18C_pObjToPossess
+    Guid mThrowableId;       // mThrowable
+
+    s32 mRingPulseTimer;
+    s16 mHaveShrykull;
+
+    s16 mHandStoneCamIdx; // field_16E_cameraIdx
+    ReliveTypes mHandStoneType;
+
+    EReliveLevelIds mDstWellLevel; // field_190_level
+    s16 mDstWellPath;              // field_192_path
+    s16 mDstWellCamera;            // field_194_camera
+    s16 mDoorId;                   // field_196_door_id
+
+    s8 mThrowableCount; // field_19C_throwable_count
+    s8 mThrowDirection;
+
+    PortalSubStates mBirdPortalSubState; // field_19E_portal_sub_state
+
+    bool mReturnToPreviousMotion;
+    bool mWalkToRun;
+    bool mSnapAbe;
+    bool mShrivel;
+    bool mBlockChanting;
+    bool mLandSoft;
+    bool mLaughAtChantEnd;
+    bool mParamoniaDone;
+    bool mScrabaniaDone;
+    bool mGotShrykullFromBigFace;
+    bool mGiveShrykullFromBigFace;
+    bool mAbeRespawnFlipX;
+    bool mRidingElum;
+    bool mElumMountBegin;
+    bool mElumMountEnd;
+    bool mElumUnmountBegin;
+
+    bool mIsElectrocuted;
+    bool mIsInvisible;
+    bool mTeleporting;
+
+    bool mShadowEnabled;
+    bool mShadowAtBottom;
+};
 
 class Abe final : public BaseAbe
 {
@@ -493,6 +614,11 @@ public:
     IBirdPortal* VIntoBirdPortal(s16 gridBlocks) override;
     virtual void VOnTrapDoorOpen() override;
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
+
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    void GetSaveState(AbeSaveState& pSaveState);
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(const AbeSaveState& pData, ResourceManagerWrapper& resMan, BaseMap& map);
     virtual s16 VGetMotion(eMotionType motionType) override
     {
         switch (motionType)

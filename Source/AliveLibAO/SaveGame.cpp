@@ -56,29 +56,64 @@ void SaveGame::LoadFromMemory(SaveData* pData, s32 bKillObjects, BaseMap& map)
 {
     TRACE_ENTRYEXIT;
 
-    // Never actually used
-    //const s32 hash = Hash(pData);
-
     if (bKillObjects)
     {
         Kill_Objects(map);
     }
 
-    sControlledCharacter = gAbe;
+    // Legacy SaveData is a flatter, older format than AbeSaveState (no TLV
+    // bly flags, no Guid object references, no handstone/portal/well
+    // state) - fields it doesn't have are left at AbeSaveState's defaults,
+    // same as a freshly spawned Abe. This is what lets LoadFromMemory reach
+    // Abe::CreateFromSaveState/QuikSave::RestoreWorldInfo generically
+    // instead of poking Map fields directly.
+    AbeSaveState abeState = {};
+    abeState.mIsAbeControlled = true;
+    abeState.mXPos = FP_FromInteger(pData->mAbe_XPos);
+    abeState.mYPos = FP_FromInteger(pData->mAbe_YPos);
+    abeState.mCurrentPath = pData->mCurrentPath;
+    abeState.mCurrentLevel = pData->mCurrentLevel;
+    abeState.mSpriteScale = pData->mAbe_SpriteScale;
+    abeState.mScale = pData->mAbe_SpriteScale >= FP_FromInteger(1) ? Scale::Fg : Scale::Bg;
+    abeState.mRed = 128;
+    abeState.mGreen = 128;
+    abeState.mBlue = 128;
+    abeState.bAnimFlipX = (pData->mAbe_FlipX & 1) != 0;
+    abeState.mCurrentMotion = eAbeMotions::Motion_0_Idle;
+    abeState.mPreviousMotion = eAbeMotions::Motion_0_Idle;
+    abeState.mNextMotion = eAbeMotions::Motion_0_Idle;
+    abeState.mKnockdownMotion = eAbeMotions::None_m1;
+    abeState.mCurrentFrame = pData->mAbe_CurrentFrame;
+    abeState.mFrameChangeCounter = 1;
+    abeState.mAnimRender = false;
+    abeState.mIsDrawable = true;
+    abeState.mHealth = FP_FromInteger(1);
+    abeState.mInternalState = static_cast<s16>(pData->mAbe_StoneState);
+    abeState.mGnFrame = 0;
+    abeState.mTimer = pData->mAbe_Timer;
+    abeState.mRegenHealthTimer = static_cast<s32>(sGnFrame);
 
-    gAbe->mContinuePointZoneNumber = pData->mAbe_ContinuePointZoneNumber;
-    gAbe->mContinuePointClearFromId = pData->mAbe_ContinuePointClearFromId;
-    gAbe->mContinuePointClearToId = pData->mAbe_ContinuePointClearToId;
-    gAbe->mContinuePointTopLeft = pData->mAbe_ContinuePointTopLeft;
-    gAbe->mContinuePointBottomRight = pData->mAbe_ContinuePointBottomRight;
-    gAbe->mContinuePointLevel = pData->mAbe_ContinuePointLevel;
-    gAbe->mContinuePointPath = pData->mAbe_ContinuePointPath;
-    gAbe->mContinuePointCamera = pData->mAbe_ContinuePoint_Camera;
-    gAbe->mContinuePointSpriteScale = pData->mAbe_ContinuePointSpriteScale;
-    gAbe->field_150_saved_ring_timer = pData->mAbe_SavedRingTimer;
-    gAbe->field_154_bSavedHaveShrykull = pData->mAbe_SavedHaveShrykull;
-    gAbe->mRingPulseTimer = pData->mAbe_RingPulseTimer;
-    gAbe->mHaveShrykull = pData->mAbe_HaveShrykull;
+    abeState.mContinuePointTopLeft = pData->mAbe_ContinuePointTopLeft;
+    abeState.mContinuePointBottomRight = pData->mAbe_ContinuePointBottomRight;
+    abeState.mContinuePointCamera = pData->mAbe_ContinuePoint_Camera;
+    abeState.mContinuePointPath = pData->mAbe_ContinuePointPath;
+    abeState.mContinuePointLevel = pData->mAbe_ContinuePointLevel;
+    abeState.mContinuePointZoneNumber = pData->mAbe_ContinuePointZoneNumber;
+    abeState.mContinuePointClearFromId = pData->mAbe_ContinuePointClearFromId;
+    abeState.mContinuePointClearToId = pData->mAbe_ContinuePointClearToId;
+    abeState.mContinuePointSpriteScale = pData->mAbe_ContinuePointSpriteScale;
+    abeState.mSavedRingTimer = pData->mAbe_SavedRingTimer;
+    abeState.mSavedHaveShrykull = pData->mAbe_SavedHaveShrykull;
+
+    abeState.mRingPulseTimer = pData->mAbe_RingPulseTimer;
+    abeState.mHaveShrykull = pData->mAbe_HaveShrykull;
+
+    abeState.mThrowableCount = static_cast<s8>(pData->mAbe_ThrowableCount);
+    abeState.mParamoniaDone = (pData->mAbe_ParamoniaDone & 1) != 0;
+    abeState.mScrabaniaDone = (pData->mAbe_ScrabaniaDone & 1) != 0;
+    abeState.mLandSoft = true;
+
+    Abe::CreateFromSaveState(abeState, map.GetResourceManager(), map);
 
     gRescuedMudokons = pData->mRescuedMudokons;
     gKilledMudokons = pData->mKilledMudokons;
@@ -86,55 +121,17 @@ void SaveGame::LoadFromMemory(SaveData* pData, s32 bKillObjects, BaseMap& map)
     GameEnderController::gRestartRuptureFarmsSavedMuds = pData->field_2A4_restartRuptureFarmsSavedMudokons;
     GameEnderController::gRestartRuptureFarmsKilledMuds = pData->mRestartRuptureFarmsKilledMuds;
 
-    gAbe->mHealth = FP_FromInteger(1);
-    gAbe->field_11C_regen_health_timer = sGnFrame;
-    gAbe->SetSpriteScale(pData->mAbe_SpriteScale);
-    gAbe->field_118_timer = pData->mAbe_Timer;
-    gAbe->field_19C_throwable_count = static_cast<s8>(pData->mAbe_ThrowableCount); // TODO: Type check when other save func done
     gAbe->mbGotShot = 0;
-
     gAbe->mShrivel = false;
-    gAbe->mParamoniaDone = pData->mAbe_ParamoniaDone & 1;
-    gAbe->mScrabaniaDone = pData->mAbe_ScrabaniaDone & 1;
-
-    gAbe->GetAnimation().SetFlipX(pData->mAbe_FlipX & 1);
-
-    gAbe->GetAnimation().SetRender(false);
-
-    static_cast<Map&>(map).mSaveData = pData->field_2B0_pSaveBuffer;
-
-    if (gAbe->mRingPulseTimer)
-    {
-        if (gAbe->mHaveShrykull)
-        {
-            //if (!ResourceManager::GetLoadedResource(ResourceManager::Resource_Animation, AOResourceID::kAbemorphAOResID, 0, 0))
-            //{
-            //    ResourceManager::LoadResourceFile_4551E0("SHRYPORT.BND", nullptr, nullptr, nullptr);
-            //    ResourceManager::LoadingLoop(0);
-            //}
-
-            //if (!ResourceManager::GetLoadedResource(ResourceManager::Resource_Animation, AOResourceID::kSplineAOResID, 0, 0))
-            //{
-            //    ResourceManager::LoadResourceFile_4551E0("SPLINE.BAN", nullptr, nullptr, nullptr);
-            //    ResourceManager::LoadingLoop(0);
-            //}
-
-            //Abe::Get_Shrykull_Resources_42F480();
-        }
-    }
 
     if (pData->mDeathGasTimer)
     {
-        gDeathGasTimer = sGnFrame - pData->mDeathGasTimer;
+        gDeathGasTimer = static_cast<s32>(sGnFrame) - pData->mDeathGasTimer;
     }
     else
     {
         gDeathGasTimer = 0;
     }
-
-    gAbe->field_2AC_pSaveData = pData;
-    gAbe->mCurrentMotion = eAbeMotions::Motion_62_LoadedSaveSpawn;
-    gAbe->field_114_gnFrame = 0;
 
     MusicController::static_PlayMusic(MusicController::MusicTypes::eType0, gAbe, 0, 0);
 
@@ -292,7 +289,9 @@ void SaveGame::SaveToMemory(SaveData* pSaveData, BaseMap& map)
         pSaveData->mDeathGasTimer = 0;
     }
     pSaveData->mCurrentControllerIdx = Input().CurrentController() == InputObject::PadIndex::First ? 0 : 1;
-    static_cast<Map&>(map).SaveBlyData(pSaveData->field_2B0_pSaveBuffer);
+
+    // TLV bly flags aren't part of this legacy format (see LoadFromMemory) -
+    // field_2B0_pSaveBuffer is left zeroed.
 }
 
 

@@ -3,6 +3,7 @@
 #include "ResizeableArrowItem.hpp"
 #include "ResizeableRectItem.hpp"
 #include "StringProperty.hpp"
+#include "ReadOnlyStringProperty.hpp"
 #include "BasicTypeProperty.hpp"
 #include "BoolProperty.hpp"
 #include "EnumProperty.hpp"

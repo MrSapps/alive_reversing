@@ -343,7 +343,7 @@ void ConvertObjectsStatesToJson(nlohmann::json& j, const SerializedObjectData& p
     }
 }
 
-void QuikSave::RestoreBlyData(Quicksave& pSaveData, ResourceManagerWrapper& resMan, BaseMap& map)
+void QuikSave::RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     pSaveData.mObjectsStateData.ReadRewind();
     while (pSaveData.mObjectsStateData.CanRead())
@@ -352,43 +352,7 @@ void QuikSave::RestoreBlyData(Quicksave& pSaveData, ResourceManagerWrapper& resM
         RestoreObjectState(pSaveStateBase->mType, pSaveData.mObjectsStateData, resMan, map);
     }
 
-    pSaveData.mObjectBlyData.ReadRewind();
-
-    const u32 flagsTotal = pSaveData.mObjectBlyData.ReadU32();
-    u32 readFlagsCount = 0;
-    for (auto& binaryPath : map.GetLoadedPaths())
-    {
-        for (auto& cam : binaryPath->GetCameras())
-        {
-            for (auto& pTlv : cam->mTlvs.mTlvs)
-            {
-                if (pTlv->mAttribute == relive::QuiksaveAttribute::eClearTlvFlags_1 || pTlv->mAttribute == relive::QuiksaveAttribute::eKeepTlvFlags_2) // Type 0 ignored - actually it should never be written here anyway
-                {
-                    const bool isLastTlv = pTlv->mTlvFlags.Get(relive::TlvFlags::eBit3_End_TLV_List);
-
-                    pTlv->mTlvFlags.Raw().all = pSaveData.mObjectBlyData.ReadU8();
-
-                    // OG bug: the bly data can overwrite the end tlv list flag so we restore it
-                    if (pTlv->mTlvFlags.Get(relive::TlvFlags::eBit3_End_TLV_List) != isLastTlv)
-                    {
-                        LOG_WARNING("Bly data load removed end list terminator flag, putting it back");
-                        pTlv->mTlvFlags.Set(relive::TlvFlags::eBit3_End_TLV_List);
-                    }
-
-
-                    pTlv->mTlvSpecificMeaning = pSaveData.mObjectBlyData.ReadU8();
-                    readFlagsCount++;
-
-                    // Note: We can't check for an exact match because some OG demo saves have flags
-                    // that are not being read
-                    if (readFlagsCount > flagsTotal)
-                    {
-                        ALIVE_FATAL("Save data contains %d sets of flags but read more than that", flagsTotal);
-                    }
-                }
-            }
-        }
-    }
+    map.RestoreQuicksaveBlyData(pSaveData.mObjectBlyData);
     resMan.LoadingLoop(false);
 }
 
@@ -399,7 +363,7 @@ void Quicksave_LoadFromMemory_4C95A0(BaseMap& map)
     gSkipGameObjectUpdates = true;
     QuikSave::RestoreWorldInfo(QuikSave::gActiveQuicksaveData.mWorldInfo);
     gSwitchStates = QuikSave::gActiveQuicksaveData.mSwitchStates;
-    static_cast<Map&>(map).mRestoreMapObjectStates = true;
+    map.mPendingSaveRestore = &QuikSave::gActiveQuicksaveData;
     map.SetActiveCam(
         QuikSave::gActiveQuicksaveData.mWorldInfo.mLevel,
         QuikSave::gActiveQuicksaveData.mWorldInfo.mPath,
@@ -414,66 +378,6 @@ void QuikSave::LoadActive(BaseMap& map)
 {
     map.GetResourceManager().ShowLoadingIcon(map);
     Quicksave_LoadFromMemory_4C95A0(map);
-}
-
-static void WriteFlags(SerializedObjectData& pSaveBuffer, const relive::Path_TLV* pTlv, const BitField8<relive::TlvFlags>& flags)
-{
-    pSaveBuffer.WriteU8(flags.Raw().all);
-    pSaveBuffer.WriteU8(pTlv->mTlvSpecificMeaning);
-}
-
-static u32 Quicksave_SaveBlyData_CountOrSave(SerializedObjectData* pSaveBuffer, BaseMap& map)
-{
-    u32 flagsTotal = 0;
-
-    for (auto& binaryPath : map.GetLoadedPaths())
-    {
-        for (auto& cam : binaryPath->GetCameras())
-        {
-            for (auto& pTlv : cam->mTlvs.mTlvs)
-            {
-                if (pTlv->mAttribute == relive::QuiksaveAttribute::eClearTlvFlags_1)
-                {
-                    if (pSaveBuffer)
-                    {
-                        BitField8<relive::TlvFlags> flags = pTlv->mTlvFlags;
-                        if (flags.Get(relive::TlvFlags::eBit1_Created))
-                        {
-                            flags.Clear(relive::TlvFlags::eBit1_Created);
-                            flags.Clear(relive::TlvFlags::eBit2_Destroyed);
-                        }
-
-                        WriteFlags(*pSaveBuffer, pTlv.get(), flags);
-                    }
-                    flagsTotal++;
-                }
-                else if (pTlv->mAttribute == relive::QuiksaveAttribute::eKeepTlvFlags_2)
-                {
-                    if (pSaveBuffer)
-                    {
-                        WriteFlags(*pSaveBuffer, pTlv.get(), pTlv->mTlvFlags);
-                    }
-                    flagsTotal++;
-                }
-                else
-                {
-                    // Type 0 ignored
-                }
-            }
-        }
-    }
-    return flagsTotal;
-}
-
-
-void Quicksave_SaveBlyData_4C9660(SerializedObjectData& pSaveBuffer, BaseMap& map)
-{
-    pSaveBuffer.WriteRewind();
-
-    const u32 flagsCount = Quicksave_SaveBlyData_CountOrSave(nullptr, map);
-    pSaveBuffer.WriteU32(flagsCount);
-
-    Quicksave_SaveBlyData_CountOrSave(&pSaveBuffer, map);
 }
 
 void QuikSave::SaveToMemory_4C91A0(Quicksave& pSave, BaseMap& map)
@@ -498,7 +402,7 @@ void QuikSave::SaveToMemory_4C91A0(Quicksave& pSave, BaseMap& map)
             }
         }
 
-        Quicksave_SaveBlyData_4C9660(pSave.mObjectBlyData, map);
+        map.SaveQuicksaveBlyData(pSave.mObjectBlyData);
     }
 }
 
@@ -563,7 +467,7 @@ void QuikSave::SaveWorldInfo(Quicksave_WorldInfo* pInfo, BaseMap& map)
     pInfo->mGasTimer = gDeathGasTimer;
     pInfo->mControlledCharX = FP_GetExponent(sControlledCharacter->mXPos);
     pInfo->mControlledCharY = rect.h;
-    pInfo->mControlledCharScale = sControlledCharacter->GetSpriteScale() == FP_FromDouble(1.0);
+    pInfo->mControlledCharAtFullScale = sControlledCharacter->GetSpriteScale() == FP_FromDouble(1.0);
 }
 
 static s32 Sort_comparitor_4D42C0(const void* pSaveRecLeft, const void* pSaveRecRight)

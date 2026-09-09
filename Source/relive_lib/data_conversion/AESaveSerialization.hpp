@@ -2998,7 +2998,7 @@ inline void to_json(nlohmann::json& j, const Quicksave_WorldInfo& p)
         {"save_file_id", p.mSaveFileId},
         {"controlled_x", p.mControlledCharX},
         {"controlled_y", p.mControlledCharY},
-        {"controlled_scale", p.mControlledCharScale},
+        {"controlled_scale", p.mControlledCharAtFullScale},
         {"saved_muds", p.mRescuedMudokons},
         {"killed_muds", p.mKilledMudokons},
         {"muds_in_area", p.field_16_muds_in_area},
@@ -3024,7 +3024,7 @@ inline void from_json(const nlohmann::json& j, Quicksave_WorldInfo& p)
     j.at("save_file_id").get_to(p.mSaveFileId);
     j.at("controlled_x").get_to(p.mControlledCharX);
     j.at("controlled_y").get_to(p.mControlledCharY);
-    j.at("controlled_scale").get_to(p.mControlledCharScale);
+    j.at("controlled_scale").get_to(p.mControlledCharAtFullScale);
     j.at("saved_muds").get_to(p.mRescuedMudokons);
     j.at("killed_muds").get_to(p.mKilledMudokons);
     j.at("muds_in_area").get_to(p.field_16_muds_in_area);

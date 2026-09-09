@@ -52,11 +52,6 @@ public:
     void VCollectPurpleLightObjects(DynamicArrayT<BaseAnimatedWithPhysicsGameObject>& objects, DynamicArrayT<Particle>& lights) override;
     s32 VPurpleLightFrameCount(s16 bMakeInvisible) override;
 
-    void VClearPendingSaveRestore() override
-    {
-        mRestoreMapObjectStates = false;
-    }
-
     static BaseGameObject* FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLevelIds lvlId);
     Camera* Create_Camera(s16 xpos, s16 ypos, s32 a4);
     void Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode);
@@ -65,8 +60,6 @@ private:
     void CreateScreenTransistionForTLV(relive::Path_TLV* pTlv);
 
 public:
-    bool mRestoreMapObjectStates = false;
-
     Path mPath;
 };
 

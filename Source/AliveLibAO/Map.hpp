@@ -75,23 +75,14 @@ public:
     void VCollectPurpleLightObjects(DynamicArrayT<BaseAnimatedWithPhysicsGameObject>& objects, DynamicArrayT<Particle>& lights) override;
     s32 VPurpleLightFrameCount(s16 bMakeInvisible) override;
 
-    void VClearPendingSaveRestore() override
-    {
-        mSaveData = nullptr;
-    }
-
     static CameraSwapper* FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLevelIds levelId);
     Camera* Create_Camera(s16 xpos, s16 ypos, s32 a4);
     void Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode);
-    void RestoreBlyData(const u8* pSaveData);
-    void SaveBlyData(u8* pSaveBuffer);
 
     s16 mMapChanged = 0;
-    u8* mSaveData = nullptr;
 
     Path mPath;
 };
-
 
 s32 MaxGridBlocks(FP scale);
 

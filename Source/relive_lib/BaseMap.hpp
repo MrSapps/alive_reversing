@@ -5,6 +5,7 @@
 #include "FixedPoint.hpp"
 #include "BasePath.hpp"
 #include "DynamicArray.hpp"
+#include "QuikSaveTypes.hpp"
 
 class Guid;
 struct PSX_RECT;
@@ -47,26 +48,7 @@ namespace relive
 class BaseMap
 {
 public:
-    explicit BaseMap(ResourceManagerWrapper& resMan, relive::Factory& factory)
-        : mResourceManager(resMan)
-        , mFactory(factory)
-    {
-
-    }
-
-    ResourceManagerWrapper& GetResourceManager()
-    {
-        return mResourceManager;
-    }
-
-    std::vector<std::unique_ptr<BinaryPath>>& GetLoadedPaths()
-    {
-        return mLoadedPaths;
-    }
-
-    BinaryPath* GetPathResourceBlockPtr(u32 pathId);
-    void FreePathResourceBlocks();
-    void ClearPathResourceBlocks();
+    // --- Nested types ---
 
     enum class CamChangeStates : s16
     {
@@ -85,9 +67,30 @@ public:
         eTeleporter_2 = 2,
     };
 
+    // --- Construction ---
+
+    explicit BaseMap(ResourceManagerWrapper& resMan, relive::Factory& factory)
+        : mResourceManager(resMan)
+        , mFactory(factory)
+    {
+
+    }
+
     virtual ~BaseMap()
     {
 
+    }
+
+    // --- Simple queries ---
+
+    ResourceManagerWrapper& GetResourceManager()
+    {
+        return mResourceManager;
+    }
+
+    std::vector<std::unique_ptr<BinaryPath>>& GetLoadedPaths()
+    {
+        return mLoadedPaths;
     }
 
     bool LevelChanged() const
@@ -104,6 +107,82 @@ public:
     {
         return mCurrentCamera != mNextCamera;
     }
+
+    // --- Engine specific virtual interface ---
+
+    virtual s16 GetOverlayId() = 0;
+
+    // The engine specific Path object this map walks.
+    virtual BasePath& GetPath() = 0;
+
+    virtual CameraPos Rect_Location_Relative_To_Active_Camera(const PSX_RECT* pRect, s16 width = 0) = 0;
+    virtual s16 Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect) = 0;
+    virtual s16 Is_Point_In_Current_Camera(EReliveLevelIds level, s32 path, FP xpos, FP ypos, s16 width) = 0;
+    virtual void GetCurrentCamCoords(PSX_Point* pPoint) = 0;
+    virtual void GoTo_Camera() = 0;
+    virtual void ScreenChange() = 0;
+    virtual void Handle_PathTransition() = 0;
+
+    // Which on screen objects get a purple light, and the light particles spawned
+    // for them. The two games scan different object lists and cull differently.
+    virtual void VCollectPurpleLightObjects(DynamicArrayT<BaseAnimatedWithPhysicsGameObject>& objects, DynamicArrayT<Particle>& lights) = 0;
+
+    // How many frames the purple light effect is rendered for.
+    virtual s32 VPurpleLightFrameCount(s16 bMakeInvisible) = 0;
+
+    // Some engines carry additional legacy pending-restore state of their own
+    // (AO's SaveGame buffer pointer) that needs clearing alongside
+    // mPendingSaveRestore below. Default is a no-op.
+    virtual void VClearPendingSaveRestore()
+    {
+    }
+
+    // --- Path/resource management ---
+
+    BinaryPath* GetPathResourceBlockPtr(u32 pathId);
+    void FreePathResourceBlocks();
+    void ClearPathResourceBlocks();
+    void ReloadPathJsonRequest(const std::string& pathJsonFileName);
+
+    // --- Camera/level transitions ---
+
+    s16 SetActiveCameraDelayed(MapDirections direction, BaseAliveGameObject* pObj, s16 swapEffect);
+    Camera* GetCamera(CameraPos pos);
+    s16 SetActiveCam(EReliveLevelIds level, s16 path, s16 cam, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange);
+    CameraPos GetDirection(EReliveLevelIds level, s32 path, FP xpos, FP ypos);
+    void Get_map_size(PSX_Point* pPoint);
+    void Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange);
+    void Shutdown();
+    void Reset();
+
+    // --- TLVs ---
+
+    void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1);
+    void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1);
+    void TLV_Delete(const Guid& tlvId, s16 hiFlags = -1);
+    void Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed);
+    TlvIterator VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind);
+    TlvIterator TLV_First_Of_Type_In_Camera(ReliveTypes objectType, s16 camX);
+    TlvIterator TLV_Get_At(TlvIterator pTlv, FP xpos, FP ypos, FP width, FP height);
+    TlvIterator TLV_From_Offset_Lvl_Cam(const Guid& tlvId);
+    void Reset_TLVs(u16 pathId);
+    TlvIterator Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx);
+
+    // --- Purple light / ambient sound ---
+
+    void RemoveObjectsWithPurpleLight(s16 bMakeInvisible);
+    void Start_Sounds_For_Objects_In_Near_Cameras();
+
+    // --- Quicksave ---
+
+    // Writes/reads the bly-flag bytes for every currently loaded TLV whose
+    // QuiksaveAttribute says it participates in a quicksave. Shared by AO
+    // and AE's QuikSave, since that attribute lives on the one shared TLV
+    // struct definitions both engines use.
+    void SaveQuicksaveBlyData(SerializedObjectData& pSaveBuffer);
+    void RestoreQuicksaveBlyData(SerializedObjectData& pSaveData);
+
+    // --- Data members ---
 
     EReliveLevelIds mCurrentLevel = EReliveLevelIds::eNone;
     s16 mCurrentPath = 0;
@@ -125,62 +204,6 @@ public:
 
     s16 mOverlayId = 0;
 
-    virtual s16 GetOverlayId() = 0;
-
-    // The engine specific Path object this map walks.
-    virtual BasePath& GetPath() = 0;
-
-    void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1);
-    void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1);
-    void TLV_Delete(const Guid& tlvId, s16 hiFlags = -1);
-    void Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed);
-
-    virtual CameraPos Rect_Location_Relative_To_Active_Camera(const PSX_RECT* pRect, s16 width = 0) = 0;
-    virtual s16 Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect) = 0;
-
-    s16 SetActiveCameraDelayed(MapDirections direction, BaseAliveGameObject* pObj, s16 swapEffect);
-
-    Camera* GetCamera(CameraPos pos);
-
-    s16 SetActiveCam(EReliveLevelIds level, s16 path, s16 cam, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange);
-
-
-    virtual s16 Is_Point_In_Current_Camera(EReliveLevelIds level, s32 path, FP xpos, FP ypos, s16 width) = 0;
-    CameraPos GetDirection(EReliveLevelIds level, s32 path, FP xpos, FP ypos);
-    virtual void GetCurrentCamCoords(PSX_Point* pPoint) = 0;
-    void Get_map_size(PSX_Point* pPoint);
-    virtual void GoTo_Camera() = 0;
-
-    virtual void ScreenChange() = 0;
-    virtual void Handle_PathTransition() = 0;
-    void Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange);
-    void Shutdown();
-    void Reset();
-
-    void RemoveObjectsWithPurpleLight(s16 bMakeInvisible);
-
-    // Which on screen objects get a purple light, and the light particles spawned
-    // for them. The two games scan different object lists and cull differently.
-    virtual void VCollectPurpleLightObjects(DynamicArrayT<BaseAnimatedWithPhysicsGameObject>& objects, DynamicArrayT<Particle>& lights) = 0;
-
-    // How many frames the purple light effect is rendered for.
-    virtual s32 VPurpleLightFrameCount(s16 bMakeInvisible) = 0;
-
-    // A save restore is pending until the next GoTo_Camera consumes it. Each
-    // game tracks that request differently, so clearing it is engine specific.
-    virtual void VClearPendingSaveRestore() = 0;
-    
-    TlvIterator VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes typeToFind);
-    TlvIterator TLV_First_Of_Type_In_Camera(ReliveTypes objectType, s16 camX);
-    TlvIterator TLV_Get_At(TlvIterator pTlv, FP xpos, FP ypos, FP width, FP height);
-    TlvIterator TLV_From_Offset_Lvl_Cam(const Guid& tlvId);
-    void Reset_TLVs(u16 pathId);
-    TlvIterator Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx);
-    void Start_Sounds_For_Objects_In_Near_Cameras();
-
-    void ReloadPathJsonRequest(const std::string& pathJsonFileName);
-
-public:
     CameraSwapEffects mCameraSwapEffect = CameraSwapEffects::eInstantChange_0;
     u16 mFmvBaseId = 0;
     MapDirections mMapDirection = MapDirections::eMapLeft_0;
@@ -188,6 +211,13 @@ public:
     CamChangeStates mCamState = CamChangeStates::eInactive_0;
 
     PendingTransition mPendingTransition = PendingTransition::eNone_0;
+
+    // A quicksave restore pending until the next GoTo_Camera consumes it via
+    // GetPath()'s TLV bly-flag data. Shared by both engines' QuikSave, since
+    // which TLVs participate is driven by relive::QuiksaveAttribute, common
+    // to both. Not to be confused with AO's separate legacy SaveGame restore
+    // (see VClearPendingSaveRestore).
+    PendingObjectRestoreData* mPendingSaveRestore = nullptr;
 
     Camera* mCurrentCameras[5] = {};
     Camera* mPreviousCameras[5] = {};

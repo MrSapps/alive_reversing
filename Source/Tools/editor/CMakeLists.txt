@@ -140,17 +140,27 @@ set(PROJECT_SOURCES
         Source/PropertyTreeItemBase.hpp
         Source/StringProperty.hpp
         Source/StringProperty.cpp
+        Source/ChangeStringPropertyCommand.hpp
+        Source/ChangeStringPropertyCommand.cpp
+        Source/ReadOnlyStringProperty.hpp
+        Source/ReadOnlyStringProperty.cpp
         Source/PropertyTreeWidget.cpp
         Source/PropertyTreeWidget.hpp
         Source/BasicTypeProperty.hpp
         Source/BasicTypeProperty.cpp
+        Source/ChangeBasicTypePropertyCommand.hpp
+        Source/ChangeBasicTypePropertyCommand.cpp
         Source/BoolProperty.hpp
         Source/BoolProperty.cpp
+        Source/ChangeBoolPropertyCommand.hpp
+        Source/ChangeBoolPropertyCommand.cpp
         Source/EnumProperty.cpp
         Source/EnumProperty.hpp
         Source/ReflectedEnumProperties.hpp
         Source/ColourPickerProperty.cpp
         Source/ColourPickerProperty.hpp
+        Source/ChangeColourPickerPropertyCommand.hpp
+        Source/ChangeColourPickerPropertyCommand.cpp
         Source/resources.qrc
         ${TS_FILES}
 )
