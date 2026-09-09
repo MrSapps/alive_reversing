@@ -5,6 +5,32 @@
 #include "../../relive_lib/data_conversion/EnumSerialization.hpp"
 #include <QDebug>
 
+Model::ModelException::~ModelException()
+{
+
+}
+
+Model::ModelException::ModelException(const std::string& what)
+    : mWhat(what)
+{
+
+}
+
+Model::ObjectPropertyTypeNotFoundException::ObjectPropertyTypeNotFoundException(const std::string& structureName, const std::string& typeName)
+    : ModelException(structureName + ":" + typeName)
+    , mStructName(structureName)
+    , mTypeName(typeName)
+{
+
+}
+
+Model::JsonKeyNotFoundException::JsonKeyNotFoundException(const std::string& key)
+    : ModelException(key)
+    , mKey(key)
+{
+
+}
+
 static std::optional<std::string> LoadFileToString(const std::string& fileName)
 {
     EditorFileIO fileIo;

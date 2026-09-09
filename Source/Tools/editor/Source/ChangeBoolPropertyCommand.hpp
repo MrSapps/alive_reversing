@@ -7,11 +7,7 @@
 class ChangeBoolPropertyCommand final : public QUndoCommand
 {
 public:
-    ChangeBoolPropertyCommand(LinkedBoolProperty linkedProperty, BoolPropertyChangeData propertyData)
-        : mLinkedProperty(linkedProperty), mPropertyData(propertyData)
-    {
-        UpdateText();
-    }
+    ChangeBoolPropertyCommand(LinkedBoolProperty linkedProperty, BoolPropertyChangeData propertyData);
 
     void undo() override;
 
