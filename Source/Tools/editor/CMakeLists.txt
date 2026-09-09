@@ -168,6 +168,8 @@ set(PROJECT_SOURCES
         Source/BoolProperty.cpp
         Source/ChangeBoolPropertyCommand.hpp
         Source/ChangeBoolPropertyCommand.cpp
+        Source/BoolPropertyChangeData.hpp
+        Source/LinkedBoolProperty.hpp
         Source/EnumProperty.cpp
         Source/EnumProperty.hpp
         Source/ReflectedEnumProperties.hpp
