@@ -5170,7 +5170,7 @@ struct Quicksave_WorldInfo final
         d.mSaveFileId = data.mSaveFileId;
         d.mControlledCharX = data.mControlledCharX;
         d.mControlledCharY = data.mControlledCharY;
-        d.mControlledCharScale = data.mControlledCharScale;
+        d.mControlledCharAtFullScale = data.mControlledCharScale;
         d.mRescuedMudokons = data.mRescuedMudokons;
         d.mKilledMudokons = data.mKilledMudokons;
         d.field_16_muds_in_area = data.field_16_muds_in_area;

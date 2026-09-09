@@ -1,0 +1,177 @@
+#include "stdafx_ao.h"
+#include "QuikSave.hpp"
+#include "Abe.hpp"
+#include "DDCheat.hpp"
+#include "../relive_lib/BaseMap.hpp"
+#include "../relive_lib/GameObjects/GasCountDown.hpp"
+#include "../relive_lib/Engine.hpp"
+#include "../relive_lib/Events.hpp"
+#include "../relive_lib/SwitchStates.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
+#include "../relive_lib/GameObjects/Grenade.hpp"
+#include "../relive_lib/GameObjects/TrapDoor.hpp"
+#include "../relive_lib/GameObjects/TimerTrigger.hpp"
+#include "../relive_lib/GameObjects/AbilityRing.hpp"
+#include "../relive_lib/GameObjects/ThrowableArray.hpp"
+
+namespace AO {
+
+Quicksave QuikSave::gActiveQuicksaveData;
+
+void QuikSave::SaveWorldInfo(QuicksaveWorldInfoBase& pInfo, BaseMap& map)
+{
+    const PSX_RECT rect = sControlledCharacter->VGetBoundingRect();
+
+    pInfo.mGnFrame = static_cast<s32>(sGnFrame);
+    pInfo.mLevel = map.mCurrentLevel;
+    pInfo.mPath = map.mCurrentPath;
+    pInfo.mCam = map.mCurrentCamera;
+    pInfo.mRescuedMudokons = gRescuedMudokons;
+    pInfo.mKilledMudokons = gKilledMudokons;
+    pInfo.mGasTimer = gDeathGasTimer;
+    pInfo.mAbeInvincible = gAbeInvulnerableCheat != 0;
+    pInfo.mControlledCharX = static_cast<s16>(FP_GetExponent(sControlledCharacter->mXPos));
+    pInfo.mControlledCharY = rect.h;
+    pInfo.mControlledCharAtFullScale = sControlledCharacter->GetSpriteScale() == FP_FromInteger(1);
+}
+
+void QuikSave::RestoreWorldInfo(const QuicksaveWorldInfoBase& pInfo)
+{
+    sGnFrame = static_cast<u32>(pInfo.mGnFrame);
+    gRescuedMudokons = pInfo.mRescuedMudokons;
+    gKilledMudokons = pInfo.mKilledMudokons;
+    gDeathGasTimer = pInfo.mGasTimer;
+    gAbeInvulnerableCheat = pInfo.mAbeInvincible ? 1 : 0;
+}
+
+void QuikSave::DoQuicksave(BaseMap& map)
+{
+    map.GetResourceManager().ShowLoadingIcon(map);
+
+    if (gAbe && gAbe->mHealth > FP_FromInteger(0))
+    {
+        SaveWorldInfo(gActiveQuicksaveData.mWorldInfo, map);
+        gActiveQuicksaveData.mSwitchStates = gSwitchStates;
+
+        gActiveQuicksaveData.mObjectsStateData.WriteRewind();
+        for (s32 idx = 0; idx < gBaseGameObjects->Size(); idx++)
+        {
+            BaseGameObject* pObj = gBaseGameObjects->ItemAt(idx);
+            if (!pObj)
+            {
+                break;
+            }
+
+            if (!pObj->GetDead())
+            {
+                pObj->VGetSaveState(gActiveQuicksaveData.mObjectsStateData);
+            }
+        }
+
+        map.SaveQuicksaveBlyData(gActiveQuicksaveData.mObjectBlyData);
+    }
+}
+
+void QuikSave::LoadActive(BaseMap& map)
+{
+    map.GetResourceManager().ShowLoadingIcon(map);
+
+    DestroyObjects(map.GetResourceManager());
+    EventsReset();
+    gSkipGameObjectUpdates = true;
+
+    RestoreWorldInfo(gActiveQuicksaveData.mWorldInfo);
+    gSwitchStates = gActiveQuicksaveData.mSwitchStates;
+
+    map.mPendingSaveRestore = &gActiveQuicksaveData;
+    map.SetActiveCam(
+        gActiveQuicksaveData.mWorldInfo.mLevel,
+        gActiveQuicksaveData.mWorldInfo.mPath,
+        gActiveQuicksaveData.mWorldInfo.mCam,
+        CameraSwapEffects::eInstantChange_0,
+        0,
+        1);
+    map.mForceLoad = 1;
+}
+
+// Per-object restore dispatch. Every live object's VGetSaveState() gets
+// called generically in DoQuicksave (base class default is a no-op), so
+// the only types that actually appear in the stream are the ones that
+// override it: Abe, plus the relive_lib GameObjects that already implement
+// CreateFromSaveState identically for both engines (Grenade, TrapDoor,
+// TimerTrigger, AbilityRing, ThrowableArray). Anything else - AO's own
+// enemy/NPC types - doesn't implement VGetSaveState yet, so it never
+// writes a record here and there's nothing to restore for it; it just
+// comes back however its own VUpdate() naturally spawns it from its TLV.
+void QuikSave::RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    pSaveData.mObjectsStateData.ReadRewind();
+    while (pSaveData.mObjectsStateData.CanRead())
+    {
+        const SaveStateBase* pSaveStateBase = pSaveData.mObjectsStateData.PeekTmpPtr<SaveStateBase>();
+        switch (pSaveStateBase->mType)
+        {
+            case ReliveTypes::eAbe:
+                Abe::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eGrenade:
+                Grenade::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eTrapDoor:
+                TrapDoor::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eTimerTrigger:
+                TimerTrigger::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eAbilityRing:
+                AbilityRing::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eThrowableArray:
+                ThrowableArray::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            default:
+                // Shouldn't happen given the comment above, but don't
+                // corrupt the rest of the stream if it ever does.
+                pSaveData.mObjectsStateData.SkipRead(pSaveStateBase->mSize);
+                break;
+        }
+    }
+
+    map.RestoreQuicksaveBlyData(pSaveData.mObjectBlyData);
+}
+
+void QuikSave::SaveCheckpoint(BaseMap& map)
+{
+    SaveWorldInfo(gActiveQuicksaveData.mRestartPathWorldInfo, map);
+    gAbe->GetSaveState(gActiveQuicksaveData.mRestartPathAbeState);
+    gActiveQuicksaveData.mRestartPathSwitchStates = gSwitchStates;
+}
+
+void QuikSave::RestoreCheckpoint(ResourceManagerWrapper& resMan, BaseMap& map, bool killObjects)
+{
+    if (killObjects)
+    {
+        DestroyObjects(resMan);
+    }
+
+    gSwitchStates = gActiveQuicksaveData.mRestartPathSwitchStates;
+    Abe::CreateFromSaveState(gActiveQuicksaveData.mRestartPathAbeState, resMan, map);
+    RestoreWorldInfo(gActiveQuicksaveData.mRestartPathWorldInfo);
+
+    map.SetActiveCam(
+        gActiveQuicksaveData.mRestartPathWorldInfo.mLevel,
+        gActiveQuicksaveData.mRestartPathWorldInfo.mPath,
+        gActiveQuicksaveData.mRestartPathWorldInfo.mCam,
+        CameraSwapEffects::eInstantChange_0,
+        0,
+        1);
+    map.mForceLoad = 1;
+}
+
+} // namespace AO

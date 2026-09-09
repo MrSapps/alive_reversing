@@ -8,6 +8,7 @@
 #include "Midi.hpp"
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
 #include "Abe.hpp"
+#include "QuikSave.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
 #include "AmbientSound.hpp"
 #include "../relive_lib/GameObjects/BackgroundMusic.hpp"
@@ -511,10 +512,10 @@ void Map::GoTo_Camera()
         gCollisions = relive_new Collisions(GetPathResourceBlockPtr(mCurrentPath)->GetCollisions());
     }
 
-    if (mSaveData)
+    if (mPendingSaveRestore)
     {
-        RestoreBlyData(mSaveData);
-        mSaveData = nullptr;
+        QuikSave::RestoreBlyData(*mPendingSaveRestore, mResourceManager, *this);
+        mPendingSaveRestore = nullptr;
     }
 
     // Copy camera array and blank out the source
@@ -1032,83 +1033,6 @@ void Map::Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode)
             pCamera->mCamResLoaded = true;
 
             mPath.Loader(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResource_2, ReliveTypes::eNone); // none = load all
-        }
-    }
-}
-
-void Map::RestoreBlyData(const u8* pSaveData)
-{
-    memcpy(gSwitchStates.mData, pSaveData, sizeof(gSwitchStates.mData));
-    const u8* pAfterSwitchStates = pSaveData + sizeof(gSwitchStates.mData);
-
-    for (s16 i = 1; i < AO::Path_Get_Num_Paths(mCurrentLevel); i++)
-    {
-        BinaryPath* ppPathRes = GetPathResourceBlockPtr(i);
-        if (ppPathRes)
-        {
-            const PathBlyRec* pPathRec = AO::Path_Get_Bly_Record(mCurrentLevel, i);
-            if (pPathRec->field_0_blyName)
-            {
-                for (auto& cam : ppPathRes->GetCameras())
-                {
-                    for (auto& pTlv : cam->mTlvs.mTlvs)
-                    {
-                        const bool isLastTlv = pTlv->mTlvFlags.Get(relive::eBit3_End_TLV_List);
-
-                        pTlv->mTlvFlags.Raw().all = *pAfterSwitchStates;
-                        pAfterSwitchStates++;
-
-                        // OG bug: the bly data can overwrite the end tlv list flag so we restore it
-                        if (pTlv->mTlvFlags.Get(relive::eBit3_End_TLV_List) != isLastTlv)
-                        {
-                            LOG_WARNING("Bly data load removed end list terminator flag, putting it back");
-                            pTlv->mTlvFlags.Set(relive::eBit3_End_TLV_List);
-                        }
-
-                        pTlv->mTlvSpecificMeaning = *pAfterSwitchStates;
-                        pAfterSwitchStates++;
-                    }
-                }
-            }
-        }
-    }
-}
-
-void Map::SaveBlyData(u8* pSaveBuffer)
-{
-    memcpy(pSaveBuffer, gSwitchStates.mData, sizeof(gSwitchStates.mData));
-
-    u8* pAfterSwitchStates = pSaveBuffer + sizeof(gSwitchStates.mData);
-    for (s16 i = 1; i < AO::Path_Get_Num_Paths(mCurrentLevel); i++)
-    {
-        const PathBlyRec* pPathRec = AO::Path_Get_Bly_Record(mCurrentLevel, i);
-        if (pPathRec->field_0_blyName)
-        {
-            BinaryPath* ppPathRes = GetPathResourceBlockPtr(i); // TODO: Is this actually the id ??
-
-            for (auto& cam : ppPathRes->GetCameras())
-            {
-                for (auto& pTlv : cam->mTlvs.mTlvs)
-                {
-                    BitField8<relive::TlvFlags> flags = pTlv->mTlvFlags;
-                    if (flags.Get(relive::eBit1_Created))
-                    {
-                        flags.Clear(relive::eBit1_Created);
-                        flags.Clear(relive::eBit2_Destroyed);
-                    }
-
-                    // Save the flags
-                    *pAfterSwitchStates = flags.Raw().all;
-                    pAfterSwitchStates++;
-                    *pAfterSwitchStates = pTlv->mTlvSpecificMeaning;
-                    pAfterSwitchStates++;
-
-                    if (pTlv->mTlvFlags.Get(relive::eBit3_End_TLV_List))
-                    {
-                        break;
-                    }
-                }
-            }
         }
     }
 }

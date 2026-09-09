@@ -317,10 +317,10 @@ void Map::GoTo_Camera()
         gCollisions = relive_new Collisions(GetPathResourceBlockPtr(mCurrentPath)->GetCollisions());
     }
 
-    if (mRestoreMapObjectStates)
+    if (mPendingSaveRestore)
     {
-        QuikSave::RestoreBlyData(QuikSave::gActiveQuicksaveData, mResourceManager, *this);
-        mRestoreMapObjectStates = false;
+        QuikSave::RestoreBlyData(*mPendingSaveRestore, mResourceManager, *this);
+        mPendingSaveRestore = nullptr;
     }
 
     // Copy camera array and blank out the source

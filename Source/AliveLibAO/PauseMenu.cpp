@@ -5,6 +5,7 @@
 #include "../relive_lib/Primitives.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
 #include "SaveGame.hpp"
+#include "QuikSave.hpp"
 #include "StringFormatters.hpp"
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
 #include "Sound.hpp"
@@ -13,6 +14,10 @@
 #include "../relive_lib/Sys.hpp"
 #include "Map.hpp"
 #include "GameAutoPlayer.hpp"
+
+// Set by Sys.cpp on F5/F6, shared with AE's quicksave (Source/AliveLibAE/PauseMenu.hpp).
+extern bool gQuicksave_SaveNextFrame;
+extern bool gQuicksave_LoadNextFrame;
 
 namespace AO {
 
@@ -87,6 +92,19 @@ enum PauseMenuPages
 
 void PauseMenu::VUpdate()
 {
+    // TODO: AO::QuikSave only saves/restores TLV bly flags so far, not
+    // per-object or world-position state - see AliveLibAO/QuikSave.cpp.
+    if (gQuicksave_SaveNextFrame)
+    {
+        gQuicksave_SaveNextFrame = false;
+        QuikSave::DoQuicksave(mMap);
+    }
+    else if (gQuicksave_LoadNextFrame)
+    {
+        gQuicksave_LoadNextFrame = false;
+        QuikSave::LoadActive(mMap);
+    }
+
     if (Input().IsAnyPressed(InputCommands::ePause))
     {
         SND_StopAll();

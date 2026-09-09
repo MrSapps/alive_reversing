@@ -349,6 +349,7 @@ void BaseMap::Reset()
     ClearPathResourceBlocks();
 
     mFreeAllAnimAndPalts = false;
+    mPendingSaveRestore = nullptr;
     VClearPendingSaveRestore();
 }
 
