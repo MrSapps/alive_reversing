@@ -1,7 +1,7 @@
 #pragma once
 
 #include "PropertyTreeItemBase.hpp"
-#include "ChangeBasicTypePropertyCommand.hpp"
+#include "IntegerType.hpp"
 
 class QUndoStack;
 class BigSpinBox;
