@@ -7,6 +7,7 @@
 #include "Abe.hpp"
 #include "Path.hpp"
 #include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Map.hpp"
 
 namespace AO {
@@ -87,6 +88,40 @@ void BeeNest::VUpdate()
 
         default:
             break;
+    }
+}
+
+void BeeNest::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    BeeNestSaveState data = {};
+
+    data.mTlvInfo = mTlvInfo;
+    data.mState = mState;
+
+    pSaveBuffer.Write(data);
+}
+
+void BeeNest::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<BeeNestSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);
+    auto pTlv = tlvIterator.GetTlvChecked<relive::Path_BeeNest>(ReliveTypes::eBeeNest);
+
+    auto pNest = relive_new BeeNest(pTlv, pState->mTlvInfo, resMan, map);
+    if (pNest)
+    {
+        if (pState->mState == BeeNestStates::eResetIfDead_1)
+        {
+            // The chase swarm that was active can't be restored (see
+            // BeeNestSaveState comment) - mirror the same cleanup
+            // eResetIfDead_1 itself does when a swarm finishes, so the
+            // trigger switch doesn't stay stuck "on" with nothing chasing.
+            SwitchStates_Set(pNest->mSwitchId, 0);
+        }
+        else
+        {
+            pNest->mState = pState->mState;
+        }
     }
 }
 

@@ -13,6 +13,8 @@
 #include "LCDScreen.hpp"
 #include "DoorLight.hpp"
 #include "MeatSaw.hpp"
+#include "Bat.hpp"
+#include "BeeNest.hpp"
 #include "HoistRocksEffect.hpp"
 #include "LiftPoint.hpp"
 #include "LiftMover.hpp"
@@ -249,6 +251,14 @@ void QuikSave::RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManag
 
             case ReliveTypes::eLiftMover:
                 LiftMover::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eBat:
+                Bat::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
+                break;
+
+            case ReliveTypes::eBeeNest:
+                BeeNest::CreateFromSaveState(pSaveData.mObjectsStateData, resMan, map);
                 break;
 
             case ReliveTypes::eBirdPortal:
