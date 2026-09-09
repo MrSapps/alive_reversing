@@ -9,6 +9,7 @@
 #include "../relive_lib/Grid.hpp"
 #include "Path.hpp"
 #include "Map.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 
 namespace AO {
 
@@ -126,6 +127,33 @@ void BellHammer::VUpdate()
         {
             gElum->mXPos = (FP_FromInteger(mapCoords.x + XGrid_Index_To_XPos_AO(GetSpriteScale(), 0))) - ScaleToGridSize(GetSpriteScale());
             gElum->mYPos = gElum->mYPos + FP_FromInteger(450);
+        }
+    }
+}
+
+void BellHammer::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    BellHammerSaveState data = {};
+
+    data.mTlvInfo = mTlvInfo;
+    data.mState = mState;
+
+    pSaveBuffer.Write(data);
+}
+
+void BellHammer::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+{
+    const auto pState = pBuffer.ReadTmpPtr<BellHammerSaveState>();
+    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);
+    auto pTlv = tlvIterator.GetTlvChecked<relive::Path_BellHammer>(ReliveTypes::eBellHammer);
+
+    auto pHammer = relive_new BellHammer(pTlv, pState->mTlvInfo, resMan, map);
+    if (pHammer)
+    {
+        pHammer->mState = pState->mState;
+        if (pHammer->mState == BellHammerStates::eSmashingBell_1)
+        {
+            pHammer->GetAnimation().Set_Animation_Data(pHammer->GetAnimRes(AnimId::BellHammer_Smashing));
         }
     }
 }
