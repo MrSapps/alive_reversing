@@ -76,7 +76,10 @@ if (MSVC)
 endif()
 
 set(PROJECT_SOURCES
-        Source/ReliveApiWrapper.hpp
+        Source/File.hpp
+        Source/File.cpp
+        Source/EditorFileIO.hpp
+        Source/EditorFileIO.cpp
         Source/ExecApiCall.hpp
         Source/SnapSettings.hpp
         Source/IPointSnapper.hpp
