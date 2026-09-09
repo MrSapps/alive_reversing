@@ -242,6 +242,7 @@ struct Path_ZBall final : public Path_TLV
     Path_ZBall()
     {
         mTlvType = ReliveTypes::eZBall;
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     enum class StartPos : s16
     {
