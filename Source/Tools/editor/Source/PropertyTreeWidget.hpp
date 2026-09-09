@@ -2,6 +2,7 @@
 
 #include <QTreeWidget>
 #include <QCoreApplication>
+#include "ISyncPropertiesToTree.hpp"
 
 class PropertyTreeItemBase;
 class IGraphicsItem;
@@ -12,14 +13,6 @@ class QUndoStack;
 class Model;
 
 inline const QString kIndent("    ");
-
-class ISyncPropertiesToTree
-{
-public:
-    virtual ~ISyncPropertiesToTree() { }
-    virtual void Sync(IGraphicsItem* pItem) = 0;
-};
-
 
 class PropertyTreeWidget : public ISyncPropertiesToTree, public QTreeWidget
 {

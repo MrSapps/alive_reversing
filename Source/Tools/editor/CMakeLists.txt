@@ -148,6 +148,7 @@ set(PROJECT_SOURCES
         Source/BigSpinBox.cpp
         Source/BigSpinBox.hpp
         Source/PropertyTreeItemBase.hpp
+        Source/ISyncPropertiesToTree.hpp
         Source/StringProperty.hpp
         Source/StringProperty.cpp
         Source/ChangeStringPropertyCommand.hpp

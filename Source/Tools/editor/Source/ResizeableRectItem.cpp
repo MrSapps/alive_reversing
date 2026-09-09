@@ -10,7 +10,7 @@
 #include <QGraphicsScene>
 #include <QGraphicsView>
 #include <QPixmapCache>
-#include "PropertyTreeWidget.hpp"
+#include "ISyncPropertiesToTree.hpp"
 #include "SnapSettings.hpp"
 #include <nlohmann/json.hpp>
 #include "../../relive_lib/Types.hpp"
