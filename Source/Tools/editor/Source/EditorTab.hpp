@@ -9,7 +9,7 @@
 #include <QTreeWidget>
 #include <QApplication>
 #include <memory>
-#include "SnapSettings.hpp"
+#include "GridSnapSettings.hpp"
 
 namespace Ui
 {
@@ -24,7 +24,7 @@ class MapObjectBase;
 class CollisionObject;
 class CameraManager;
 class ClipBoard;
-class SnapSettings;
+class GridSnapSettings;
 struct EditorCamera;
 class Model;
 
@@ -32,7 +32,7 @@ class EditorTab final : public QMainWindow, public IGridPointSnapper
 {
     Q_OBJECT
 public:
-    EditorTab(QTabWidget* aParent, std::unique_ptr<Model> model, QString jsonFileName, bool isTempFile, QStatusBar* pStatusBar, SnapSettings& snapSettings);
+    EditorTab(QTabWidget* aParent, std::unique_ptr<Model> model, QString jsonFileName, bool isTempFile, QStatusBar* pStatusBar, GridSnapSettings& snapSettings);
     ~EditorTab();
     void ZoomIn();
     void ZoomOut();
@@ -132,6 +132,6 @@ private:
 
     QStatusBar* mStatusBar = nullptr;
 
-    SnapSettings& mSnapSettings;
+    GridSnapSettings& mSnapSettings;
     QString mPathDirectory;
 };

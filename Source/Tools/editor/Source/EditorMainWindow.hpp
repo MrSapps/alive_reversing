@@ -4,7 +4,7 @@
 #include <QSettings>
 #include "EditorTab.hpp"
 #include "ClipBoard.hpp"
-#include "SnapSettings.hpp"
+#include "GridSnapSettings.hpp"
 
 namespace Ui
 {
@@ -101,6 +101,6 @@ private:
     QSettings m_Settings;
     ClipBoard mClipBoard;
     // Global to all tabs
-    SnapSettings mSnapSettings;
+    GridSnapSettings mSnapSettings;
     QString mUnthemedStyle;
 };

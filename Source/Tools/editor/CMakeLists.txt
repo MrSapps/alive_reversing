@@ -81,7 +81,7 @@ set(PROJECT_SOURCES
         Source/EditorFileIO.hpp
         Source/EditorFileIO.cpp
         Source/ExecApiCall.hpp
-        Source/SnapSettings.hpp
+        Source/GridSnapSettings.hpp
         Source/IGridPointSnapper.hpp
         Source/ClipBoard.cpp
         Source/ClipBoard.hpp
