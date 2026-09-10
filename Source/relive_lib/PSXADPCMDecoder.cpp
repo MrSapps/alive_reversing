@@ -69,15 +69,10 @@ static void DecodeBlock(
 }
 
 template <class T>
-static void Decode(const PSXADPCMDecoder::SoundFrame& sf, T& out)
+static void Decode(const PSXADPCMDecoder::SoundFrame& sf, T& out, f64& oldLeft, f64& olderLeft, f64& oldRight, f64& olderRight)
 {
     s16 dstLeft = 0;
-    static f64 oldLeft = 0;
-    static f64 olderLeft = 0;
-
     s16 dstRight = 1;
-    static f64 oldRight = 0;
-    static f64 olderRight = 0;
 
     for (s32 i = 0; i < 18; i++)
     {
@@ -93,11 +88,11 @@ static void Decode(const PSXADPCMDecoder::SoundFrame& sf, T& out)
 void PSXADPCMDecoder::DecodeFrameToPCM(std::vector<s16>& out, uint8_t* arg_adpcm_frame)
 {
     const PSXADPCMDecoder::SoundFrame* sf = reinterpret_cast<const PSXADPCMDecoder::SoundFrame*>(arg_adpcm_frame);
-    Decode(*sf, out);
+    Decode(*sf, out, mOldLeft, mOlderLeft, mOldRight, mOlderRight);
 }
 
 void PSXADPCMDecoder::DecodeFrameToPCM(std::array<s16, 4032>& out, uint8_t* arg_adpcm_frame)
 {
     const PSXADPCMDecoder::SoundFrame* sf = reinterpret_cast<const PSXADPCMDecoder::SoundFrame*>(arg_adpcm_frame);
-    Decode(*sf, out);
+    Decode(*sf, out, mOldLeft, mOlderLeft, mOldRight, mOlderRight);
 }
