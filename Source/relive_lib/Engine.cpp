@@ -6,7 +6,6 @@
 #include "BaseGameAutoPlayer.hpp"
 #include "Sys.hpp"
 
-#include "../AliveLibAE/Io.hpp"
 #include "CommandLineParser.hpp"
 #include "Renderer/IRenderer.hpp"
 #include "Function.hpp"
@@ -24,7 +23,6 @@
 #include "../AliveLibAE/PauseMenu.hpp"
 #include "../AliveLibAE/GameSpeak.hpp"
 #include "../AliveLibAE/DDCheat.hpp"
-#include "../AliveLibAE/Io.hpp"
 #include "../relive_lib/Sound/Midi.hpp"
 #include <fstream>
 #include "../relive_lib/Events.hpp"
@@ -52,7 +50,6 @@
 #include "../AliveLibAO/DDCheat.hpp"
 #include "../relive_lib/Psx.hpp"
 #include "../relive_lib/Sys.hpp"
-#include "../AliveLibAE/Io.hpp"
 #include "../relive_lib/DynamicArray.hpp"
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
@@ -95,6 +92,7 @@ Engine::Engine(GameType gameType, FileSystem& fs, CommandLineParser& clp)
     : mGameType(gameType)
     , mFs(fs)
     , mClp(clp)
+    , mResMan(mFs)
 {
 
     mIpcInterface = relive::MakeIpcInterface();
@@ -355,7 +353,6 @@ void Game_Shutdown()
 {
     Input_DisableInputForPauseMenuAndDebug_4EDDC0();
     GetSoundAPI().mSND_SsQuit();
-    IO_Stop_ASync_IO_Thread_4F26B0();
     VGA_Shutdown();
 }
 
@@ -618,9 +615,7 @@ void Engine::Run()
         mMap = std::make_unique<AO::Map>(mResMan, mFactory);
     }  
 
-    GetGameAutoPlayer().ProcessCommandLine(mClp);
-
-    IO_Init_494230();
+    GetGameAutoPlayer().ProcessCommandLine(mFs, mClp);
 
     sCommandLine_ShowFps = mClp.SwitchExists("-ddfps");
     gCommandLine_NoFrameSkip = mClp.SwitchExists("-ddnoskip");

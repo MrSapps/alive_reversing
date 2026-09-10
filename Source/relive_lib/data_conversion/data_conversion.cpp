@@ -12,7 +12,6 @@
 
 #include "nlohmann/json.hpp"
 #include "LvlReaderWriter.hpp"
-#include "../../Tools/relive_api/file_api.hpp"
 #include "../../Tools/relive_api/CamConverter.hpp"
 #include "../../Tools/relive_api/PathCamerasEnumerator.hpp"
 #include "../../Tools/relive_api/ApiFG1Reader.hpp"
@@ -484,7 +483,7 @@ static void SaveLevelInfoJson(const FileSystem::Path& dataDir, EReliveLevelIds /
 
 extern PalRecConversionInfo kPalConversionInfo[17];
 
-static void ConvertPal(const FileSystem::Path& dataDir, const char* pFileName, const u16* pData, u32 len);
+static void ConvertPal(FileSystem& fs, const FileSystem::Path& dataDir, const char* pFileName, const u16* pData, u32 len);
 
 static void LogNonConvertedPals(bool isAo)
 {
@@ -501,7 +500,7 @@ static void LogNonConvertedPals(bool isAo)
     }
 }
 
-static void ConvertPals(const FileSystem::Path& dataDir, std::vector<u8>& fileBuffer, ReliveAPI::LvlReader& lvlReader, bool isAo)
+static void ConvertPals(FileSystem& fs, const FileSystem::Path& dataDir, std::vector<u8>& fileBuffer, ReliveAPI::LvlReader& lvlReader, bool isAo)
 {
     for (auto& rec : kPalConversionInfo)
     {
@@ -526,7 +525,7 @@ static void ConvertPals(const FileSystem::Path& dataDir, std::vector<u8>& fileBu
                             u32 palLen = *reinterpret_cast<const u32*>(palData.data());
                             const u16* pPalData = reinterpret_cast<const u16*>(palData.data()) + 2;
 
-                            ConvertPal(dataDir, ToString(rec.mPalId), pPalData, palLen);
+                            ConvertPal(fs, dataDir, ToString(rec.mPalId), pPalData, palLen);
                             rec.mConverted = true;
                         }
                     }
@@ -628,7 +627,7 @@ void ConvertAnimations(const FileSystem::Path& dataDir, FileSystem& fs, std::vec
                             }
                         }
 
-                        AnimationConverter animationConverter(filePath, fixedDetails, res->Data(), isAo);
+                        AnimationConverter animationConverter(fs, filePath, fixedDetails, res->Data(), isAo);
 
                         // Track what is converted so we know what is missing at the end
                         rec.mConverted = true;
@@ -810,7 +809,7 @@ static void ConvertCamera(ThreadPool& tp, const FileSystem::Path& dataDir, const
     tp.AddJob(std::make_unique<ConvertCameraJob>(dirToSaveConvertedCamIn, jsonFileName, camNameWithoutExtension, camFileData, isAo));
 }
 
-static void ConvertFont(const FileSystem::Path& dataDir, const std::string& fileName, ReliveAPI::LvlReader& lvlReader, std::vector<u8>& fileBuffer, bool isPauseMenuFont)
+static void ConvertFont(FileSystem& fs, const FileSystem::Path& dataDir, const std::string& fileName, ReliveAPI::LvlReader& lvlReader, std::vector<u8>& fileBuffer, bool isPauseMenuFont)
 {
     ReadLvlFileInto(lvlReader, fileName.c_str(), fileBuffer);
 
@@ -871,11 +870,11 @@ static void ConvertFont(const FileSystem::Path& dataDir, const std::string& file
              }
          }
 
-         png.Save(path.GetPath().c_str(), pal, newDataTmp, 256, 256);
+         png.Save(fs, path.GetPath().c_str(), pal, newDataTmp, 256, 256);
      }
      else
      {
-         png.Save(path.GetPath().c_str(), pal, newData, fontFile->mWidth, fontFile->mHeight);
+         png.Save(fs, path.GetPath().c_str(), pal, newData, fontFile->mWidth, fontFile->mHeight);
      }
 
      // TODO: Dump out the atlas for each char
@@ -943,20 +942,20 @@ static void ConvertFilesInLvl(ThreadPool& tp, const FileSystem::Path& dataDir, F
             fileBuffer.erase(fileBuffer.begin(), fileBuffer.begin() + sizeof(ReliveAPI::ResourceHeader));
 
             // TODO: Actually convert at some later point
-            AESaveConverter saveConverter;
+            AESaveConverter saveConverter(fs);
             saveConverter.Convert(fileBuffer, (fileName + ".json").c_str(), pathsCache);
         }
         else
         {
             if (bConvertLcdFont)
             {
-                ConvertFont(dataDir, fileName, lvlReader, fileBuffer, false);
+                ConvertFont(fs, dataDir, fileName, lvlReader, fileBuffer, false);
             }
             else if (string_util::endsWith(fileName, ".CAM"))
             {
                 if (bConvertMenuFonts)
                 {
-                    ConvertFont(dataDir, fileName, lvlReader, fileBuffer, true);
+                    ConvertFont(fs, dataDir, fileName, lvlReader, fileBuffer, true);
                 }
 
                 if (bConvertCams)
@@ -977,14 +976,13 @@ static void ConvertFilesInLvl(ThreadPool& tp, const FileSystem::Path& dataDir, F
 }
 
 
-static void SavePal(const AnimationPal& pal, const FileSystem::Path& fileName)
+static void SavePal(FileSystem& fs, const AnimationPal& pal, const FileSystem::Path& fileName)
 {
-    AutoFILE f;
-    f.Open(fileName.GetPath().c_str(), "wb", false);
+    AutoFILE f = fs.OpenFile(fileName.GetPath().c_str(), "wb");
     f.Write(pal.mPal);
 }
 
-static void ConvertPal(const FileSystem::Path& dataDir, const char* pFileName, const u16* pData, u32 len)
+static void ConvertPal(FileSystem& fs, const FileSystem::Path& dataDir, const char* pFileName, const u16* pData, u32 len)
 {
     FileSystem::Path palFilePath = dataDir;
     palFilePath.Append(pFileName);
@@ -999,10 +997,10 @@ static void ConvertPal(const FileSystem::Path& dataDir, const char* pFileName, c
         pal.mPal[i].b = pixel.b;
         pal.mPal[i].a = pixel.a;
     }
-    SavePal(pal, palFilePath);
+    SavePal(fs, pal, palFilePath);
 }
 
-static void ConvertHardcodedPals(const FileSystem::Path& dataDir)
+static void ConvertHardcodedPals(FileSystem& fs, const FileSystem::Path& dataDir)
 {
     const static u8 mainMenuFontPal[] = {
         0x00, 0x00, 0x21, 0x84, 0x42, 0x88, 0x63, 0x8C, 0x84, 0x90,
@@ -1041,21 +1039,21 @@ static void ConvertHardcodedPals(const FileSystem::Path& dataDir)
         0x18, 0xD8};
 
 
-    ConvertPal(dataDir, ToString(PalId::MainMenuFont_MainMenu), reinterpret_cast<const u16*>(mainMenuFontPal), ALIVE_COUNTOF(mainMenuFontPal) / sizeof(u16));
+    ConvertPal(fs, dataDir, ToString(PalId::MainMenuFont_MainMenu), reinterpret_cast<const u16*>(mainMenuFontPal), ALIVE_COUNTOF(mainMenuFontPal) / sizeof(u16));
 
-    ConvertPal(dataDir, ToString(PalId::MainMenuFont_PauseMenu), reinterpret_cast<const u16*>(pauseMenuFontPal), ALIVE_COUNTOF(pauseMenuFontPal) / sizeof(u16));
+    ConvertPal(fs, dataDir, ToString(PalId::MainMenuFont_PauseMenu), reinterpret_cast<const u16*>(pauseMenuFontPal), ALIVE_COUNTOF(pauseMenuFontPal) / sizeof(u16));
 
-    ConvertPal(dataDir, ToString(PalId::LedFont_ColourfulMeter), reinterpret_cast<const u16*>(pal_ColourfulMeter), ALIVE_COUNTOF(pal_ColourfulMeter) / sizeof(u16));
+    ConvertPal(fs, dataDir, ToString(PalId::LedFont_ColourfulMeter), reinterpret_cast<const u16*>(pal_ColourfulMeter), ALIVE_COUNTOF(pal_ColourfulMeter) / sizeof(u16));
 
-    ConvertPal(dataDir, ToString(PalId::LedFont_1), reinterpret_cast<const u16*>(sLCDScreen_Palette), ALIVE_COUNTOF(sLCDScreen_Palette) / sizeof(u16));
+    ConvertPal(fs, dataDir, ToString(PalId::LedFont_1), reinterpret_cast<const u16*>(sLCDScreen_Palette), ALIVE_COUNTOF(sLCDScreen_Palette) / sizeof(u16));
 
-    ConvertPal(dataDir, ToString(PalId::LedFont_2), reinterpret_cast<const u16*>(sLCDScreen_Palette2), ALIVE_COUNTOF(sLCDScreen_Palette2) / sizeof(u16));
+    ConvertPal(fs, dataDir, ToString(PalId::LedFont_2), reinterpret_cast<const u16*>(sLCDScreen_Palette2), ALIVE_COUNTOF(sLCDScreen_Palette2) / sizeof(u16));
 
-    ConvertPal(dataDir, ToString(PalId::LedFont_Red), reinterpret_cast<const u16*>(pal_LCDStatusBoard), ALIVE_COUNTOF(pal_LCDStatusBoard) / sizeof(u16));
+    ConvertPal(fs, dataDir, ToString(PalId::LedFont_Red), reinterpret_cast<const u16*>(pal_LCDStatusBoard), ALIVE_COUNTOF(pal_LCDStatusBoard) / sizeof(u16));
 }
 
 template<typename FnOnLvl>
-static void IterateAELvls(FnOnLvl fnOnLvl)
+static void IterateAELvls(FileSystem& fs, FnOnLvl fnOnLvl)
 {
     for (s32 lvlIdx = 0; lvlIdx < Path_Get_Paths_Count(); lvlIdx++)
     {
@@ -1068,10 +1066,9 @@ static void IterateAELvls(FnOnLvl fnOnLvl)
 
         // Open the LVL file
         const EReliveLevelIds reliveLvl = MapWrapper::FromAE(lvlIdxAsLvl);
-        ReliveAPI::FileIO fileIo;
 
         auto lvName = std::string(::Path_Get_Lvl_Name(reliveLvl)) + ".LVL";
-        ReliveAPI::LvlReader lvlReader(fileIo, lvName.c_str());
+        ReliveAPI::LvlReader lvlReader(fs, lvName.c_str());
 
         if (!lvlReader.IsOpen())
         {
@@ -1083,7 +1080,7 @@ static void IterateAELvls(FnOnLvl fnOnLvl)
 }
 
 template<typename FnOnLvl>
-static void IterateAOLvls(FnOnLvl fnOnLvl)
+static void IterateAOLvls(FileSystem& fs, FnOnLvl fnOnLvl)
 {
     for (s32 lvlIdx = 0; lvlIdx < AO::Path_Get_Paths_Count(); lvlIdx++)
     {
@@ -1095,8 +1092,7 @@ static void IterateAOLvls(FnOnLvl fnOnLvl)
         }
 
         const EReliveLevelIds reliveLvl = MapWrapper::FromAO(lvlIdxAsLvl);
-        ReliveAPI::FileIO fileIo;
-        ReliveAPI::LvlReader lvlReader(fileIo, (std::string(AO::Path_Get_Lvl_Name(reliveLvl)) + ".LVL").c_str(), false);
+        ReliveAPI::LvlReader lvlReader(fs, (std::string(AO::Path_Get_Lvl_Name(reliveLvl)) + ".LVL").c_str(), false);
 
         if (!lvlReader.IsOpen())
         {
@@ -1160,17 +1156,17 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
 
     if (dv.ConvertFmvs())
     {
-        ConvertFMVs(dataDir, true);
+        ConvertFMVs(fs, dataDir, true);
     }
 
     // TODO: Prob diff data in AO, check me
     if (dv.ConvertPalettes())
     {
-        ConvertHardcodedPals(dataDir);
+        ConvertHardcodedPals(fs, dataDir);
     }
 
     std::vector<u8> fileBuffer;
-    IterateAOLvls([&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, AO::LevelIds lvlIdxAsLvl)
+    IterateAOLvls(fs, [&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, AO::LevelIds lvlIdxAsLvl)
     {
         if (dv.ConvertAnimations())
         {
@@ -1179,7 +1175,7 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
 
         if (dv.ConvertPalettes())
         {
-            ConvertPals(dataDir, fileBuffer, lvlReader, true);
+            ConvertPals(fs, dataDir, fileBuffer, lvlReader, true);
         }
 
         ConvertFilesInLvl<AO::LevelIds, AO::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, true, false);
@@ -1187,7 +1183,7 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
 
     if (dv.ConvertSaves())
     {
-        IterateAOLvls([&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, AO::LevelIds lvlIdxAsLvl)
+        IterateAOLvls(fs, [&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, AO::LevelIds lvlIdxAsLvl)
         {
             ConvertFilesInLvl<AO::LevelIds, AO::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, true, true);
         });
@@ -1210,16 +1206,16 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
 
     if (dv.ConvertFmvs())
     {
-        ConvertFMVs(dataDir, false);
+        ConvertFMVs(fs, dataDir, false);
     }
 
     if (dv.ConvertPalettes())
     {
-        ConvertHardcodedPals(dataDir);
+        ConvertHardcodedPals(fs, dataDir);
     }
 
     std::vector<u8> fileBuffer;
-    IterateAELvls([&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, LevelIds lvlIdxAsLvl) 
+    IterateAELvls(fs, [&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, LevelIds lvlIdxAsLvl) 
     {
         if (dv.ConvertAnimations())
         {
@@ -1228,7 +1224,7 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
 
         if (dv.ConvertPalettes())
         {
-            ConvertPals(dataDir, fileBuffer, lvlReader, false);
+            ConvertPals(fs, dataDir, fileBuffer, lvlReader, false);
         }
 
         ConvertFilesInLvl<::LevelIds, ::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, false, false);
@@ -1236,7 +1232,7 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
 
     if (dv.ConvertSaves())
     {
-        IterateAELvls([&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, LevelIds lvlIdxAsLvl) 
+        IterateAELvls(fs, [&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, LevelIds lvlIdxAsLvl) 
         { 
             ConvertFilesInLvl<::LevelIds, ::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, false, true);
         });

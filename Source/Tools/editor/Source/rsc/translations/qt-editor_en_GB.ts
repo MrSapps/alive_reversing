@@ -537,10 +537,6 @@ Do you want to overwrite it?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Export to lvl</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Edit HintFly messages</source>
         <translation type="unfinished"></translation>
     </message>
@@ -725,57 +721,6 @@ Do you want to overwrite it?</source>
     </message>
     <message>
         <source>Connected collisions</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>ExportPathDialog</name>
-    <message>
-        <source>Export path to lvl</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>LVL file</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Browse</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Path json file</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Location of extra LVLs to find resources in</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>R.E.L.I.V.E executable path</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Save path json</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Json Files (*.json);;All Files (*)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Open level</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Level Files (*.lvl);;All Files (*)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Select R.E.L.I.V.E executable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Select LVLs source dir</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

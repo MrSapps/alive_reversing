@@ -14,6 +14,6 @@ struct LoadedJsonRelive final
 class JsonReaderRelive final : public JsonReaderBase
 {
 public:
-    LoadedJsonRelive Load(IFileIO& fileIO, const std::string& fileName, Context& context);
+    LoadedJsonRelive Load(FileSystem& fs, const std::string& fileName, Context& context);
 };
 } // namespace ReliveAPI

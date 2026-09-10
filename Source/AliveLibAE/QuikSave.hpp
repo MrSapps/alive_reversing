@@ -6,6 +6,7 @@
 #include "Abe.hpp"
 
 class BaseMap;
+class FileSystem;
 
 enum class EReliveLevelIds : s16;
 
@@ -50,7 +51,7 @@ public:
     static void DoQuicksave(BaseMap& map);
     static void RestoreWorldInfo(const Quicksave_WorldInfo& rInfo);
     static void SaveWorldInfo(Quicksave_WorldInfo* pInfo, BaseMap& map);
-    static void FindSaves();
+    static void FindSaves(FileSystem& fs);
     static void RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManagerWrapper& resMan, BaseMap& map);
 
 public:

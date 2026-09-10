@@ -235,9 +235,8 @@ void PNGFile::Decode(const std::string& fileName, const std::vector<u8>& pngData
     }
 }
 
-void PNGFile::Load(const char_type* pFileName, std::vector<u8>& pixelData, u32& width, u32& height)
+void PNGFile::Load(FileSystem& fs, const char_type* pFileName, std::vector<u8>& pixelData, u32& width, u32& height)
 {
-    FileSystem fs;
     std::vector<u8> buffer;
 
     if (!fs.LoadToVec(pFileName, buffer))
@@ -248,10 +247,9 @@ void PNGFile::Load(const char_type* pFileName, std::vector<u8>& pixelData, u32& 
     Decode(pFileName, buffer, pixelData, width, height);
 }
 
-void PNGFile::Load(const char_type* pFileName, AnimationPal& pal256, std::vector<u8>& pixelData, u32& width, u32& height)
+void PNGFile::Load(FileSystem& fs, const char_type* pFileName, AnimationPal& pal256, std::vector<u8>& pixelData, u32& width, u32& height)
 {
-    AutoFILE f;
-    f.Open(pFileName, "rb", false);
+    AutoFILE f = fs.OpenFile(pFileName, "rb");
 
     PngApi api(PngContext::CtxType::Decode);
 
@@ -321,12 +319,11 @@ void PNGFile::Load(const char_type* pFileName, AnimationPal& pal256, std::vector
     }
 }
 
-void PNGFile::Save(const char_type* pFileName, const AnimationPal& pal256, const std::vector<u8>& pixelData, u32 width, u32 height)
+void PNGFile::Save(FileSystem& fs, const char_type* pFileName, const AnimationPal& pal256, const std::vector<u8>& pixelData, u32 width, u32 height)
 {
     // The PNG header uses a var length id string which means we can't just use
     // a struct to represent it since the alignment is not fixed until after this field.
-    AutoFILE f;
-    f.Open(pFileName, "wb", false);
+    AutoFILE f = fs.OpenFile(pFileName, "wb");
 
     PngApi api(PngContext::CtxType::Encode);
 

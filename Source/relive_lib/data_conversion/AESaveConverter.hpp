@@ -5232,6 +5232,11 @@ public:
         std::vector<std::unique_ptr<BinaryPath>> mPaths;
     };
 
+    explicit AESaveConverter(FileSystem& fs)
+        : mResMan(fs)
+    {
+    }
+
     bool Convert(const std::vector<u8>& savData, const char_type* pFileName, PathsCache& cache);
 
 private:

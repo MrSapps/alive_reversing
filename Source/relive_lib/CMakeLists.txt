@@ -201,8 +201,6 @@ SET(AliveLibAESrc
     ../AliveLibAE/AnimationCallBacks.hpp
     ../AliveLibAE/PathData.cpp
     ../AliveLibAE/PathData.hpp
-    ../AliveLibAE/Io.cpp
-    ../AliveLibAE/Io.hpp
     ../AliveLibAE/StringFormatters.hpp
     ../AliveLibAE/StringFormatters.cpp
     ../AliveLibAE/Abe.hpp
@@ -546,6 +544,8 @@ SET(data_conversion_src
     data_conversion/data_conversion.cpp
     data_conversion/file_system.hpp
     data_conversion/file_system.cpp
+    data_conversion/AutoFile.hpp
+    data_conversion/AutoFile.cpp
     data_conversion/AnimationConverter.hpp
     data_conversion/AnimationConverter.cpp
     data_conversion/relive_tlvs.hpp

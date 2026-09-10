@@ -33,7 +33,8 @@
 class FmvConv final
 {
 public:
-    explicit FmvConv()
+    explicit FmvConv(FileSystem& fs)
+        : mFs(fs)
     {
 
     }
@@ -43,7 +44,7 @@ public:
         TRACE_ENTRYEXIT;
 
 //        relive::DDVDumper dumper;
-        relive::DDVAe ddv(fName.c_str(), nullptr);
+        relive::DDVAe ddv(mFs, fName.c_str(), nullptr);
 
         if (!ddv.ReadInfo())
         {
@@ -450,6 +451,7 @@ private:
     }
 
 private:
+    FileSystem& mFs;
     const int kVideoTrackNumber = 1;
     const int kAudioTrackNumber = 2;
     int64_t mLast_pts_ns = 0;
@@ -460,7 +462,7 @@ private:
     uint32_t mAudioBitsPerSample = 0;
 };
 
-void ConvertFMVs(const FileSystem::Path& dataDir, bool isAo)
+void ConvertFMVs(FileSystem& fs, const FileSystem::Path& dataDir, bool isAo)
 {
     if (isAo)
     {
@@ -505,7 +507,7 @@ void ConvertFMVs(const FileSystem::Path& dataDir, bool isAo)
         */
 
         const std::string outPath = moviePath.GetPath() + ".webm";
-        FmvConv fmvConv;
+        FmvConv fmvConv(fs);
         fmvConv.Convert(movieName);
     }
 

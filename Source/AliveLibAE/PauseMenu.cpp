@@ -527,7 +527,7 @@ void PauseMenu::Page_Main_Update()
                 return;
 
             case MainPages::ePage_Load_5:
-                QuikSave::FindSaves();
+                QuikSave::FindSaves(GetResMan().mFs);
                 mActiveMenu = sLoadMenuPage;
                 SfxPlayMono(relive::SoundEffects::IngameTransition, 90);
                 mSaveState = SaveState::ReadingInput_0;
@@ -907,7 +907,7 @@ void PauseMenu::Page_Load_Update()
             strcpy(saveFileName, QuikSave::gSaveFileRecords[QuikSave::gSavedGameToLoadIdx].mFileName);
             strcat(saveFileName, ".json");
             relive_remove(saveFileName);
-            QuikSave::FindSaves();
+            QuikSave::FindSaves(GetResMan().mFs);
         }
     }
 }

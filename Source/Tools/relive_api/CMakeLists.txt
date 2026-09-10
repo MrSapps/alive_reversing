@@ -10,7 +10,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(relive_api_src
     ApiContext.hpp
     RoundUp.hpp
-    file_api.hpp
+    ../../relive_lib/data_conversion/file_system.hpp
+    ../../relive_lib/data_conversion/file_system.cpp
+    ../../relive_lib/data_conversion/AutoFile.hpp
+    ../../relive_lib/data_conversion/AutoFile.cpp
     ApiFG1Reader.hpp
     ApiFG1Reader.cpp
     Base64.hpp
@@ -83,4 +86,4 @@ target_include_directories(relive_api PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/3rdParty>"
     "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/3rdParty/json/include>"
     "$<INSTALL_INTERFACE:include>"
-    PRIVATE ${CMAKE_BINARY_DIR})
+    PRIVATE ${CMAKE_BINARY_DIR} ../../relive_lib)

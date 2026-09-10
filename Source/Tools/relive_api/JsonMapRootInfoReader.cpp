@@ -3,19 +3,19 @@
 #include "JsonMapRootInfoReader.hpp"
 #include <nlohmann/json.hpp>
 #include "JsonReadUtils.hpp"
-#include "file_api.hpp"
+#include "../../relive_lib/data_conversion/file_system.hpp"
 
 namespace ReliveAPI {
-void JsonMapRootInfoReader::Read(IFileIO& fileIO, const std::string& fileName)
+void JsonMapRootInfoReader::Read(FileSystem& fs, const std::string& fileName)
 {
-    auto inputFileStream = fileIO.Open(fileName, IFileIO::Mode::Read);
-    if (!inputFileStream->IsOpen())
+    AutoFILE inputFileStream = fs.OpenFile(fileName.c_str(), "r");
+    if (!inputFileStream.GetFile())
     {
         throw ReliveAPI::IOReadException(fileName.c_str());
     }
 
     std::string& jsonStr = getStaticStringBuffer();
-    readFileContentsIntoString(jsonStr, *inputFileStream);
+    inputFileStream.ReadInto(jsonStr);
 
     nlohmann::json rootObj = nlohmann::json::parse(jsonStr);
     if (rootObj.is_discarded())
@@ -44,11 +44,6 @@ void JsonMapRootInfoReader::Read(IFileIO& fileIO, const std::string& fileName)
 
 
     throw ReliveAPI::InvalidGameException(mMapRootInfo.mGame);
-}
-
-void readFileContentsIntoString(std::string& target, IFile& file)
-{
-    file.ReadInto(target);
 }
 
 std::string& getStaticStringBuffer()

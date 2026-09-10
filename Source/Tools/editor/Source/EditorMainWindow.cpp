@@ -10,13 +10,12 @@
 #include <QUuid>
 #include "Model.hpp"
 #include "PathSelectionDialog.hpp"
-#include "ExportPathDialog.hpp"
 #include "relive_api.hpp"
 #include "EditorGraphicsScene.hpp"
 #include "qstylefactory.h"
 #include "qdebug.h"
 #include "qactiongroup.h"
-#include "EditorFileIO.hpp"
+#include "../../relive_lib/data_conversion/file_system.hpp"
 #include "ExecApiCall.hpp"
 #include "ShowContext.hpp"
 
@@ -148,7 +147,6 @@ void EditorMainWindow::setMenuActionsEnabled(bool enable)
     m_ui->actionSave_all->setEnabled(enable);
     m_ui->actionExport_and_play->setEnabled(enable);
     m_ui->actionSave_As->setEnabled(enable);
-    m_ui->actionExport_to_lvl->setEnabled(enable);
 
     QList<QMenu*> menus = {
         m_ui->menuEdit,
@@ -173,7 +171,7 @@ bool EditorMainWindow::onOpenPath(QString fullFileName, bool createNewPath)
     bool isUpgraded = false;
     std::optional<int> selectedPath;
 
-    EditorFileIO fileIo;
+    FileSystem fs;
     ReliveAPI::Context context;
 
     auto fnOpenPath = [&]()
@@ -181,7 +179,7 @@ bool EditorMainWindow::onOpenPath(QString fullFileName, bool createNewPath)
         if (fullFileName.endsWith(".lvl", Qt::CaseInsensitive))
         {
             // Get the paths in the LVL
-            ReliveAPI::EnumeratePathsResult ret = ReliveAPI::EnumeratePaths(fileIo, fullFileName.toStdString());
+            ReliveAPI::EnumeratePathsResult ret = ReliveAPI::EnumeratePaths(fs, fullFileName.toStdString());
             if (!createNewPath)
             {
                 // Ask the user to pick one
@@ -226,7 +224,7 @@ bool EditorMainWindow::onOpenPath(QString fullFileName, bool createNewPath)
                 uuid.toString(QUuid::WithoutBraces) + ".json");
 
             // Convert the binary lvl path to json
-            ReliveAPI::ExportPathBinaryToJson(fileIo, tempFileFullPath.toStdString(), fullFileName.toStdString(), selectedPath.value(), context);
+            ReliveAPI::ExportPathBinaryToJson(fs, tempFileFullPath.toStdString(), fullFileName.toStdString(), selectedPath.value(), context);
 
             isTempfile = true;
 
@@ -537,22 +535,6 @@ void EditorMainWindow::on_actionSave_all_triggered()
         pTab->Save();
     }
 }
-
-void EditorMainWindow::on_actionExport_to_lvl_triggered()
-{
-    EditorTab* pTab = getActiveTab(m_ui->tabWidget);
-    if (pTab)
-    {
-        pTab->Export(false);
-    }
-    else
-    {
-        auto exportDialog = new ExportPathDialog(this, false);
-        exportDialog->exec();
-        delete exportDialog;
-    }
-}
-
 
 void EditorMainWindow::on_tabWidget_currentChanged(int /*index*/)
 {

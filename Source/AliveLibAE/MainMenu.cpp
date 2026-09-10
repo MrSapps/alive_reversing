@@ -18,7 +18,6 @@
 #include "../relive_lib/Sound/Sound.hpp"
 #include "Abe.hpp"
 #include "PauseMenu.hpp"
-#include "Io.hpp"
 #include "GameEnderController.hpp"
 #include "Glukkon.hpp"
 #include "../relive_lib/Sys.hpp"
@@ -2146,7 +2145,7 @@ void MainMenuController::tLoadGame_Load_4D42F0()
     field_23A_Inside_LoadGame_Screen = 6;
     field_230_target_entry_index = 0;
     field_1FC_button_index = NO_SELECTABLE_BUTTONS;
-    QuikSave::FindSaves();
+    QuikSave::FindSaves(GetResMan().mFs);
     sSelectedSavedGameIdx_BB43E8 = QuikSave::gSavedGameToLoadIdx;
     field_1F4_credits_next_frame = 0;
 }

@@ -1,5 +1,5 @@
 #include "Model.hpp"
-#include "EditorFileIO.hpp"
+#include "../../relive_lib/data_conversion/file_system.hpp"
 #include <optional>
 #include "../../relive_lib/data_conversion/relive_tlvs_serialization.hpp"
 #include "../../relive_lib/data_conversion/EnumSerialization.hpp"
@@ -33,14 +33,14 @@ Model::JsonKeyNotFoundException::JsonKeyNotFoundException(const std::string& key
 
 static std::optional<std::string> LoadFileToString(const std::string& fileName)
 {
-    EditorFileIO fileIo;
-    auto file = fileIo.Open(fileName, ReliveAPI::IFileIO::Mode::ReadBinary);
-    if (!file->IsOpen())
+    FileSystem fs;
+    AutoFILE file = fs.OpenFile(fileName.c_str(), "rb");
+    if (!file.GetFile())
     {
         return {};
     }
     std::string s;
-    file->ReadInto(s);
+    file.ReadInto(s);
     return { s };
 }
 

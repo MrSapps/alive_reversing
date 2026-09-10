@@ -101,7 +101,7 @@ public:
         u32 mMaxH = 0;
     };
 
-    AnimationConverter(const FileSystem::Path& outputFile, const AnimRecord& rec, const std::vector<u8>& fileData, bool isAoData);
+    AnimationConverter(FileSystem& fs, const FileSystem::Path& outputFile, const AnimRecord& rec, const std::vector<u8>& fileData, bool isAoData);
     static u16 ToPNGPixelFormat(u16 pixel);
 private:
     // Calc the max width and height because the ones in the header are often way too big for some reason

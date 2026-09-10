@@ -5,10 +5,11 @@
 
 constexpr u32 kVersion = 0x1997 + 2;
 
-void BaseRecorder::Init(const char* pFileName, bool autoFlushFile)
+void BaseRecorder::Init(FileSystem& fs, const char* pFileName, bool autoFlushFile)
 {
     LOG_INFO("Recording to %s auto flush= %s", pFileName, (autoFlushFile ? "yes" : "no"));
-    if (!mFile.Open(pFileName, "wb", autoFlushFile))
+    mFile = fs.OpenFile(pFileName, "wb", autoFlushFile);
+    if (!mFile.GetFile())
     {
         ALIVE_FATAL("Can't open recording file %s for writing", pFileName);
     }
@@ -59,10 +60,11 @@ void BaseRecorder::SaveBuffer(const std::vector<u8>& buffer)
     }
 }
 
-void BasePlayer::Init(const char* pFileName)
+void BasePlayer::Init(FileSystem& fs, const char* pFileName)
 {
     LOG_INFO("Playing from %s", pFileName);
-    if (!mFile.Open(pFileName, "rb", false))
+    mFile = fs.OpenFile(pFileName, "rb");
+    if (!mFile.GetFile())
     {
         ALIVE_FATAL("Can't open play back file %s for reading", pFileName);
     }
@@ -193,17 +195,17 @@ void BasePlayer::ValidateNextTypeIs(RecordTypes type)
     }
 }
 
-void BaseGameAutoPlayer::ProcessCommandLine(CommandLineParser& clp)
+void BaseGameAutoPlayer::ProcessCommandLine(FileSystem& fs, CommandLineParser& clp)
 {
     std::string buffer;
     if (clp.ExtractNamePairArgument(buffer, "-record="))
     {
-        mRecorder.Init(buffer.c_str(), clp.SwitchExists("-flush"));
+        mRecorder.Init(fs, buffer.c_str(), clp.SwitchExists("-flush"));
         mMode = Mode::Record;
     }
     else if (clp.ExtractNamePairArgument(buffer, "-play="))
     {
-        mPlayer.Init(buffer.c_str());
+        mPlayer.Init(fs, buffer.c_str());
         mMode = Mode::Play;
 
         mNoFpsLimit = clp.SwitchExists("-fastest");

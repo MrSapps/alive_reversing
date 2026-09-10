@@ -2,20 +2,7 @@
 
 #include "Function.hpp"
 #include "Types.hpp"
-
-struct Movie_IO final
-{
-    void(CC* mIO_Close)(void* pHandle);
-    bool(CC* mIO_Wait)
-    (void* pHandle);
-    bool(CC* mIO_Seek)
-    (void* pHandle, u32 offset, u32 origin);
-    void*(CC* mIO_Open)(const char_type* pFileName);
-    bool(CC* mIO_Read)
-    (void* pHandle, void* pBuffer, u32 size);
-};
-
-Movie_IO& GetMovieIO();
+#include "data_conversion/file_system.hpp"
 
 struct Masher_Header final
 {
@@ -88,7 +75,7 @@ public:
 
 
     // Same as 0x523FA0 in MGSI.exe
-    s32 Init(const char_type* movieFileName);
+    s32 Init(FileSystem& fs, const char_type* movieFileName);
 
     // Same as 0x524214 in MGSI.exe
     ~Masher();
@@ -131,7 +118,7 @@ private:
     static void ConvertYuvToRgbAndBlit(RGBA32* pixelBuffer, s32 xoff, s32 yoff, s32 width, s32 height, bool doubleWidth, bool doubleHeight);
 
 
-    void* field_0_file_handle;
+    AutoFILE field_0_file_handle;
 
 public:
     Masher_Header field_4_ddv_header;
