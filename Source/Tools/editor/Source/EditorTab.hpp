@@ -39,7 +39,6 @@ public:
     void ResetZoom();
     bool Save();
     bool SaveAs();
-    void Export(bool exportAndPlay);
     QString GetJsonFileName() const { return mJsonFileName; }
     Model& GetModel() const { return *mModel; }
     void ClearPropertyEditor();
@@ -122,9 +121,6 @@ private:
     std::unique_ptr<EditorGraphicsScene> mScene;
     QString mJsonFileName;
 
-    QString mExportedPathLvlName;
-    QString mReliveExePath;
-    QString mExtraLvlsPath;
     QTabWidget* mParent = nullptr;
     bool mIsTempFile = false;
 
