@@ -53,8 +53,8 @@ size_t IO_Read(IO_FileHandleType pHandle, void* ptr, size_t size, size_t maxnum)
 
 void IO_Stop_ASync_IO_Thread_4F26B0();
 bool IO_CreateThread();
-bool IO_DirectoryExists(const char_type* pDirName);
 
+// Forwards to FileSystem::EnumerateDirectory (see relive_lib/data_conversion/file_system.hpp).
 using TEnumCallBack = void(const char_type*, u32);
 void IO_EnumerateDirectory(const char_type* fileName, TEnumCallBack cb);
 

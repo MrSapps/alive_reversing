@@ -1,9 +1,19 @@
 #include "stdafx.h"
 #include "file_system.hpp"
 #include "../FatalError.hpp"
+#include <algorithm>
+#include <cctype>
 
 #if !_WIN32
     #include <sys/stat.h>
+    #include <dirent.h>
+    #include <libgen.h>
+    #include <string.h>
+    #include <regex>
+#endif
+
+#if _WIN32
+    #include <io.h>
 #endif
 
 #if _WIN32
@@ -55,7 +65,7 @@ bool FileSystem::Save(const FileSystem::Path& path, const std::vector<u8>& data)
 
 bool FileSystem::Save(const char_type* path, const std::vector<u8>& data)
 {
-    FILE* pFile = ::fopen(path, "wb");
+    FILE* pFile = FileSystem::OpenFile(path, "wb");
     if (pFile)
     {
         ::fwrite(data.data(), 1, data.size(), pFile);
@@ -72,7 +82,7 @@ std::string FileSystem::LoadToString(const FileSystem::Path& path)
 
 std::string FileSystem::LoadToString(const char* path)
 {
-    FILE* pFile = ::fopen(path, "rb");
+    FILE* pFile = FileSystem::OpenFile(path, "rb");
     if (pFile)
     {
         ::fseek(pFile, 0, SEEK_END);
@@ -110,7 +120,7 @@ bool FileSystem::LoadToVec(const char* path, std::vector<u8>& buffer)
 {
     buffer.clear();
 
-    FILE* pFile = ::fopen(path, "rb");
+    FILE* pFile = FileSystem::OpenFile(path, "rb");
     if (pFile)
     {
         ::fseek(pFile, 0, SEEK_END);
@@ -156,7 +166,7 @@ void FileSystem::CreateDirectory(const FileSystem::Path& path)
 
 bool FileSystem::FileExists(const char_type* fileName)
 {
-    FILE* f = fopen(fileName, "r");
+    FILE* f = FileSystem::OpenFile(fileName, "r");
     if (f)
     {
         fclose(f);
@@ -217,7 +227,7 @@ void AutoFILE::Seek(u32 pos, AutoFILE::SeekMode mode)
 bool AutoFILE::Open(const char* pFileName, const char* pMode, bool autoFlushFile)
 {
     Close();
-    mFile = ::fopen(pFileName, pMode);
+    mFile = FileSystem::OpenFile(pFileName, pMode);
     if (strchr(pMode, 'w'))
     {
         mIsWriter = true;
@@ -273,4 +283,180 @@ void AutoFILE::Flush()
             ALIVE_FATAL("fflush failed");
         }
     }
+}
+
+// ===========================================================
+
+FILE* FileSystem::OpenFile(const char_type* path, const char_type* mode)
+{
+    // Matches the OG-compat fixup IO_Open used to do: strip a leading "./" or ".\".
+    if (strlen(path) >= 3 && path[0] == '.' && (path[1] == '/' || path[1] == '\\'))
+    {
+        path += 2;
+    }
+
+    FILE* file = ::fopen(path, mode);
+
+#if !_WIN32
+    if (!file)
+    {
+        // Game data is Windows-authored (mixed case); an exact-case fopen can fail on a
+        // case-sensitive filesystem even though the file is there under different casing.
+        // Fall back to a case-insensitive scan of the containing directory.
+        char* dirNameBuf = ::strdup(path);
+        char* baseNameBuf = ::strdup(path);
+        const std::string dir = ::dirname(dirNameBuf);
+        const std::string base = ::basename(baseNameBuf);
+        ::free(dirNameBuf);
+        ::free(baseNameBuf);
+
+        std::string lowerBase = base;
+        std::transform(lowerBase.begin(), lowerBase.end(), lowerBase.begin(), [](unsigned char c) { return static_cast<char>(::tolower(c)); });
+
+        DIR* dirHandle = ::opendir(dir.c_str());
+        if (dirHandle)
+        {
+            struct dirent* entry = nullptr;
+            while ((entry = ::readdir(dirHandle)) != nullptr)
+            {
+                std::string lowerEntryName = entry->d_name;
+                std::transform(lowerEntryName.begin(), lowerEntryName.end(), lowerEntryName.begin(), [](unsigned char c) { return static_cast<char>(::tolower(c)); });
+
+                if (lowerEntryName == lowerBase)
+                {
+                    file = ::fopen((dir + "/" + entry->d_name).c_str(), mode);
+                    if (file)
+                    {
+                        break;
+                    }
+                }
+            }
+            ::closedir(dirHandle);
+        }
+    }
+#endif
+
+    return file;
+}
+
+bool FileSystem::DirectoryExists(const char_type* pDirName)
+{
+#if _WIN32
+    WIN32_FIND_DATA sFindData = {};
+    HANDLE hFind = FindFirstFile(pDirName, &sFindData);
+    if (hFind == INVALID_HANDLE_VALUE)
+    {
+        return false;
+    }
+    FindClose(hFind);
+    return true;
+#else
+    DIR* dir = opendir(pDirName);
+    if (dir)
+    {
+        closedir(dir);
+        return true;
+    }
+    return false;
+#endif
+}
+
+#if !_WIN32
+namespace
+{
+    void ReplaceAll(std::string& input, const std::string& find, const std::string& replace)
+    {
+        size_t pos = 0;
+        while ((pos = input.find(find, pos)) != std::string::npos)
+        {
+            input.replace(pos, find.length(), replace);
+            pos += replace.length();
+        }
+    }
+
+    void EscapeRegex(std::string& regex)
+    {
+        ReplaceAll(regex, "\\", "\\\\");
+        ReplaceAll(regex, "^", "\\^");
+        ReplaceAll(regex, ".", "\\.");
+        ReplaceAll(regex, "$", "\\$");
+        ReplaceAll(regex, "|", "\\|");
+        ReplaceAll(regex, "(", "\\(");
+        ReplaceAll(regex, ")", "\\)");
+        ReplaceAll(regex, "[", "\\[");
+        ReplaceAll(regex, "]", "\\]");
+        ReplaceAll(regex, "*", "\\*");
+        ReplaceAll(regex, "+", "\\+");
+        ReplaceAll(regex, "?", "\\?");
+        ReplaceAll(regex, "/", "\\/");
+    }
+
+    bool WildCardMatcher(const std::string& text, std::string wildcardPattern, bool caseSensitive)
+    {
+        // Escape all regex special chars
+        EscapeRegex(wildcardPattern);
+
+        // Convert chars '*?' back to their regex equivalents
+        ReplaceAll(wildcardPattern, "\\?", ".");
+        ReplaceAll(wildcardPattern, "\\*", ".*");
+
+        std::regex pattern(wildcardPattern,
+                            caseSensitive ? std::regex_constants::ECMAScript : std::regex_constants::ECMAScript | std::regex_constants::icase);
+
+        return std::regex_match(text, pattern);
+    }
+} // namespace
+#endif
+
+void FileSystem::EnumerateDirectory(const char_type* fileName, TEnumCallBack cb)
+{
+#if _WIN32
+    _finddata_t findRec = {};
+    intptr_t hFind = _findfirst(fileName, &findRec);
+    if (hFind != -1)
+    {
+        for (;;)
+        {
+            if (!(findRec.attrib & FILE_ATTRIBUTE_DIRECTORY))
+            {
+                cb(findRec.name, static_cast<u32>(findRec.time_write)); // TODO: Chopping off a lot of time stamp resolution here
+            }
+
+            if (_findnext(hFind, &findRec) == -1)
+            {
+                break;
+            }
+        }
+        _findclose(hFind);
+    }
+#else
+    DIR* dir(opendir("."));
+    if (dir)
+    {
+        dirent* ent = nullptr;
+        do
+        {
+            ent = readdir(dir);
+            if (ent)
+            {
+                const std::string itemName = ent->d_name;
+                const std::string strFilter(fileName);
+                if (WildCardMatcher(itemName, strFilter, true))
+                {
+                    struct stat statbuf;
+                    if (stat(("./" + itemName).c_str(), &statbuf) == 0)
+                    {
+                        const bool isFile = !S_ISDIR(statbuf.st_mode);
+                        if (isFile)
+                        {
+                            cb(itemName.c_str(), statbuf.st_mtime);
+                        }
+                    }
+                }
+            }
+        }
+        while (ent);
+        closedir(dir);
+    }
+#endif
 }

@@ -6,7 +6,7 @@
 class FileSystem final
 {
 public:
-
+    using TEnumCallBack = void(const char_type*, u32);
 
     class Path final
     {
@@ -37,6 +37,16 @@ public:
     void CreateDirectory(const Path& path);
 
     bool FileExists(const char_type* fileName);
+
+    // Opens a file the way the engine expects game data to be found: strips a leading "./" or
+    // ".\\" (matches how the original game's IO_Open normalized paths), and on non-Windows,
+    // if an exact-case open fails, falls back to a case-insensitive scan of the containing
+    // directory - game data is Windows-authored and its casing doesn't always match what the
+    // code requests, which only worked before by luck of running on a case-insensitive fs.
+    static FILE* OpenFile(const char_type* path, const char_type* mode);
+
+    static bool DirectoryExists(const char_type* pDirName);
+    static void EnumerateDirectory(const char_type* fileName, TEnumCallBack cb);
 };
 
 

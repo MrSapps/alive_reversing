@@ -5,12 +5,8 @@
 #include "stdlib.hpp"
 #include "../relive_lib/Masher.hpp"
 #include "../relive_lib/FatalError.hpp"
+#include "../relive_lib/data_conversion/file_system.hpp"
 #include <SDL3/SDL.h>
-
-#if !_WIN32
-    #include <dirent.h>
-    #include <sys/stat.h>
-#endif
 
 // TODO: Remove this
 #ifdef _WIN32
@@ -39,7 +35,7 @@ IO_FileHandleType IO_Open(const char_type* fileName, const char_type* mode)
 #if USE_SDL3_IO
     return SDL_IOFromFile(fileName, mode);
 #else
-    return ::fopen(fileName, mode);
+    return FileSystem::OpenFile(fileName, mode);
 #endif
 }
 
@@ -472,136 +468,8 @@ void IO_Stop_ASync_IO_Thread_4F26B0()
 }
 
 
-bool IO_DirectoryExists(const char_type* pDirName)
-{
-#if _WIN32
-    WIN32_FIND_DATA sFindData = {};
-    HANDLE hFind = FindFirstFile(pDirName, &sFindData);
-    if (hFind == INVALID_HANDLE_VALUE)
-    {
-        return false;
-    }
-    FindClose(hFind);
-    return true;
-#else
-    DIR* dir = opendir(pDirName);
-    if (dir)
-    {
-        closedir(dir);
-        return true;
-    }
-    return false;
-#endif
-}
-
-#if !_WIN32
-    #include <string>
-    #include <regex>
-
-[[maybe_unused]] static void replace_all(std::string& input, s8 find, const s8 replace)
-{
-    size_t pos = 0;
-    while ((pos = input.find(find, pos)) != std::string::npos)
-    {
-        input.replace(pos, 1, 1, replace);
-        pos += 1;
-    }
-}
-
-static void replace_all(std::string& input, const std::string& find, const std::string& replace)
-{
-    size_t pos = 0;
-    while ((pos = input.find(find, pos)) != std::string::npos)
-    {
-        input.replace(pos, find.length(), replace);
-        pos += replace.length();
-    }
-}
-
-static void EscapeRegex(std::string& regex)
-{
-    replace_all(regex, "\\", "\\\\");
-    replace_all(regex, "^", "\\^");
-    replace_all(regex, ".", "\\.");
-    replace_all(regex, "$", "\\$");
-    replace_all(regex, "|", "\\|");
-    replace_all(regex, "(", "\\(");
-    replace_all(regex, ")", "\\)");
-    replace_all(regex, "[", "\\[");
-    replace_all(regex, "]", "\\]");
-    replace_all(regex, "*", "\\*");
-    replace_all(regex, "+", "\\+");
-    replace_all(regex, "?", "\\?");
-    replace_all(regex, "/", "\\/");
-}
-
-static bool WildCardMatcher(const std::string& text, std::string wildcardPattern, bool caseSensitive)
-{
-    // Escape all regex special chars
-    EscapeRegex(wildcardPattern);
-
-    // Convert chars '*?' back to their regex equivalents
-    replace_all(wildcardPattern, "\\?", ".");
-    replace_all(wildcardPattern, "\\*", ".*");
-
-    std::regex pattern(wildcardPattern,
-                       caseSensitive ? std::regex_constants::ECMAScript : std::regex_constants::ECMAScript | std::regex_constants::icase);
-
-    return std::regex_match(text, pattern);
-}
-#endif
-
 void IO_EnumerateDirectory(const char_type* fileName, TEnumCallBack cb)
 {
     TRACE_ENTRYEXIT;
-
-#if _WIN32
-    _finddata_t findRec = {};
-    intptr_t hFind = _findfirst(fileName, &findRec);
-    if (hFind != -1)
-    {
-        for (;;)
-        {
-            if (!(findRec.attrib & FILE_ATTRIBUTE_DIRECTORY))
-            {
-                cb(findRec.name, static_cast<u32>(findRec.time_write)); // TODO: Chopping off a lot of time stamp resolution here
-            }
-
-            if (_findnext(hFind, &findRec) == -1)
-            {
-                break;
-            }
-        }
-        _findclose(hFind);
-    }
-#else
-    DIR* dir(opendir("."));
-    if (dir)
-    {
-        dirent* ent = nullptr;
-        do
-        {
-            ent = readdir(dir);
-            if (ent)
-            {
-                const std::string itemName = ent->d_name;
-                const std::string strFilter(fileName);
-                if (WildCardMatcher(itemName, strFilter, true))
-                {
-                    struct stat statbuf;
-                    if (stat((+"./" + itemName).c_str(), &statbuf) == 0)
-                    {
-                        const bool isFile = !S_ISDIR(statbuf.st_mode);
-                        if (isFile)
-                        {
-                            cb(itemName.c_str(), statbuf.st_mtime);
-                        }
-                    }
-                }
-            }
-        }
-        while (ent);
-        closedir(dir);
-    }
-#endif
+    FileSystem::EnumerateDirectory(fileName, cb);
 }
