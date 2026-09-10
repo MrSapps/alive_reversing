@@ -1,11 +1,13 @@
 #include "fmv_converter.hpp"
 #include "../../AliveLibAE/PathData.hpp"
+#include "../../AliveLibAO/PathData.hpp"
 #include "../FatalError.hpp"
 #include "PNGFile.hpp"
 
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <thread>
 
 #ifdef _MSC_VER
@@ -41,13 +43,15 @@ public:
 
     }
 
-    void Convert(relive::IFmvSource& source, std::string fName)
+    void Convert(relive::IFmvSource& source, std::string fName, const FileSystem::Path& outDir)
     {
         TRACE_ENTRYEXIT;
 
         if (!source.ReadInfo())
         {
-            ALIVE_FATAL("Failed to open FMV source '%s'", fName.c_str());
+            LOG_WARNING("Failed to open FMV source '%s'", fName.c_str());
+            // At least one retail FMV is missing for some reason
+            return;
         }
 
         const u32 width = source.FrameWidth() > 0 ? source.FrameWidth() : 640u;
@@ -56,7 +60,8 @@ public:
         LOG_INFO("FMV dimensions: %ux%u (header reported %ux%u)", width, height,
                  source.FrameWidth(), source.FrameHeight());
 
-        const u32 frameRate = source.FrameRate() > 0 ? source.FrameRate() : 15u;
+        // TODO: FIX ME - hack to 15
+        const u32 frameRate = 15; //source.FrameRate() > 0 ? source.FrameRate() : 15u;
         const u32 audioSampleRate = source.AudioSampleRate() > 0 ? source.AudioSampleRate() : 44100u;
         const u32 audioChannels = source.AudioChannels() > 0 ? source.AudioChannels() : 2u;
         const u32 audioBitsPerSample = source.AudioBitsPerSample() > 0 ? source.AudioBitsPerSample() : 16u;
@@ -100,7 +105,9 @@ public:
             ALIVE_FATAL("Failed to set cpu-used");
         }
 
-        const std::string outFileName = fName + ".webm";
+        FileSystem::Path outPathBuilder = outDir;
+        outPathBuilder.Append(fName + ".webm");
+        const std::string outFileName = outPathBuilder.GetPath();
         FILE* outFile = fopen(outFileName.c_str(), "wb");
         if (!outFile)
         {
@@ -464,70 +471,59 @@ private:
 class ConvertFmvJob final : public IJob
 {
 public:
-    ConvertFmvJob(FileSystem& fs, std::string movieName, bool isAo)
+    ConvertFmvJob(FileSystem& fs, std::string movieName, FileSystem::Path outDir, bool isAo)
         : mFs(fs)
         , mMovieName(std::move(movieName))
+        , mOutDir(std::move(outDir))
         , mIsAo(isAo)
     {
     }
 
     void Execute() override
     {
+        // Masher (AE's DDV decoder) and PSXADPCMDecoder (used by AO's PsxStrDemuxer)
+        // both carry process-wide static decode state left over from the original
+        // single-threaded engine code (e.g. Masher's IDCT scratch blocks and audio
+        // channel/bits-per-sample globals, PSXADPCMDecoder's ADPCM predictor history).
+        // Running more than one of these decodes at once corrupts whichever jobs
+        // overlap, so serialize the actual decode+encode work here - jobs still run
+        // off the calling thread via the pool, they just can't overlap each other.
+        static std::mutex sDecodeMutex;
+        std::unique_lock lock(sDecodeMutex);
+
         FmvConv fmvConv(mFs);
         if (mIsAo)
         {
             relive::PsxStrDemuxer source(mFs, mMovieName.c_str());
-            fmvConv.Convert(source, mMovieName);
+            fmvConv.Convert(source, mMovieName, mOutDir);
         }
         else
         {
             relive::DDVAe source(mFs, mMovieName.c_str(), nullptr);
-            fmvConv.Convert(source, mMovieName);
+            fmvConv.Convert(source, mMovieName, mOutDir);
         }
     }
 
 private:
     FileSystem& mFs;
     std::string mMovieName;
+    FileSystem::Path mOutDir;
     bool mIsAo = false;
 };
 
 void ConvertFMVs(ThreadPool& tp, FileSystem& fs, const FileSystem::Path& dataDir, bool isAo)
 {
-    (void)dataDir;
+    FileSystem::Path fmvOutDir = dataDir;
+    fmvOutDir.Append("fmvs");
+    fs.CreateDirectory(fmvOutDir);
 
-    if (isAo)
-    {
-        // TODO: These AO .STR FMV filenames need confirming against real retail game
-        // data - unlike AE's movieNames list below, there's no existing reference list
-        // in this repo to draw from (AO's FmvInfo table is populated at runtime from
-        // the original game's own binary data, not from anything available at compile
-        // time). Fill this in once the real filenames are known.
-        const std::vector<std::string> movieNamesAo =
-        {
-        };
-
-        for (const auto& movieName : movieNamesAo)
-        {
-            tp.AddJob(std::make_unique<ConvertFmvJob>(fs, movieName, true));
-        }
-        return;
-    }
-
-    const std::vector<std::string> movieNames =
-    {
-        "SV160703.ddv",
-        "PHLEGINF.DDV",
-        "TRAIN1.DDV",
-        "vision.ddv",
-        "INTRO.DDV",
-        "prophecy.ddv",
-        //"DDLOGO.DDV",
-        //"GTILOGO.DDV"
-    };
+    // Real, per-level FMV filenames straight from each game's own reversed FmvInfo
+    // tables (AliveLibAE/AliveLibAO PathData.cpp) rather than a separately hand
+    // maintained list here.
+    const std::vector<std::string> movieNames = isAo ? AO::Path_GetAllFmvNames() : ::Path_GetAllFmvNames();
 
     for (const auto& movieName : movieNames)
     {
-        tp.AddJob(std::make_unique<ConvertFmvJob>(fs, movieName, false));
+        tp.AddJob(std::make_unique<ConvertFmvJob>(fs, movieName, fmvOutDir, isAo));
     }
 }

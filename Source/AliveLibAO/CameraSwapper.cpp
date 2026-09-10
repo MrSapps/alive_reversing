@@ -2,7 +2,7 @@
 #include "CameraSwapper.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
-#include "Movie.hpp"
+#include "../relive_lib/Movie.hpp"
 #include "Map.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "../relive_lib/Psx.hpp"

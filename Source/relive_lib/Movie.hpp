@@ -1,6 +1,7 @@
 #pragma once
 
-#include "../relive_lib/GameObjects/BaseGameObject.hpp"
+#include "GameObjects/BaseGameObject.hpp"
+#include <string>
 
 struct CdlLOC;
 
@@ -20,6 +21,6 @@ private:
     void Init();
     void DeInit();
 
-    const char_type* mName = nullptr;
+    std::string mName;
 };
 

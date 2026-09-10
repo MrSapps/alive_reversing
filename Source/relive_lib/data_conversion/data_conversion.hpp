@@ -146,8 +146,7 @@ public:
 
         bool ConvertFmvs() const
         {
-            //return mFmvVersion != kFmvVersion;
-            return false;
+            return mFmvVersion != kFmvVersion;
         }
 
         bool ConvertPaths() const

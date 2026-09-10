@@ -18,7 +18,7 @@
 #include "Engine.hpp"
 #include "../relive_lib/Engine.hpp"
 #include "Midi.hpp"
-#include "Movie.hpp"
+#include "../relive_lib/Movie.hpp"
 #include "../relive_lib/GameObjects/CircularFade.hpp"
 #include "../relive_lib/GameObjects/Fade.hpp"
 #include "../relive_lib/GameObjects/BaseThrowable.hpp"
@@ -7530,7 +7530,7 @@ void Abe::Motion_88_HandstoneBegin()
                             mMap.mCurrentLevel,
                             mMovieStone->mMovieId);
 
-                        relive_new Movie(pFmvInfo->field_0_pName, mResMan, mMap);
+                        relive_new Movie(pFmvInfo->mName, mResMan, mMap);
 
                         field_110_state.stone = StoneStates::eHandstoneMovieDone_2;
                         break;

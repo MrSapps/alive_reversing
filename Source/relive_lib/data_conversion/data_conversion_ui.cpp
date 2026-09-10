@@ -114,7 +114,13 @@ void DataConversionUI::VUpdate()
     const size_t completed = mDataConversion->CompletedConversionJobs();
     const size_t total = mDataConversion->TotalConversionJobs();
     const size_t active = mDataConversion->ActiveConversionJobs();
-    mCurMessage = "Data conversion in progress" + mDots
+
+    // Pad to a fixed width so the "(x/y jobs, ...)" text doesn't shift left/right as
+    // the "..." ellipsis animates.
+    std::string dotsPadded = mDots;
+    dotsPadded.resize(3, ' ');
+
+    mCurMessage = "Data conversion in progress" + dotsPadded
         + " (" + std::to_string(completed) + "/" + std::to_string(total) + " jobs, "
         + std::to_string(active) + " active)";
     mTimer++;

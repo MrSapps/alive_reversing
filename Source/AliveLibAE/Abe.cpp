@@ -26,7 +26,7 @@
 #include "PullRingRope.hpp"
 #include "../relive_lib/GameObjects/CircularFade.hpp"
 #include "../relive_lib/GameObjects/Fade.hpp"
-#include "Movie.hpp"
+#include "../relive_lib/Movie.hpp"
 #include "../relive_lib/GameObjects/PossessionFlicker.hpp"
 #include "../relive_lib/GameObjects/Door.hpp"
 #include "QuikSave.hpp"
@@ -6005,7 +6005,7 @@ void Abe::Motion_86_HandstoneBegin()
 
                     FmvInfo* pFmvRec = Path_Get_FMV_Record(mMap.mCurrentLevel, mFmvId);
 
-                    relive_new Movie(pFmvRec->field_0_pName, mResMan, mMap);
+                    relive_new Movie(pFmvRec->mName, mResMan, mMap);
                     field_120_state.stone = StoneStates::eHandstoneMovieDone_2;
                 }
                 else if (mHandStoneType == ReliveTypes::eHandStone)

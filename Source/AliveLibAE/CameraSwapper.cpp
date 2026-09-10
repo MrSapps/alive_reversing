@@ -9,7 +9,7 @@
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
 #include "Sfx.hpp"
-#include "Movie.hpp"
+#include "../relive_lib/Movie.hpp"
 #include "../relive_lib/GameObjects/ScreenClipper.hpp"
 #include "../relive_lib/FatalError.hpp"
 

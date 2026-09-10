@@ -2,6 +2,9 @@
 
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/Types.hpp"
+#include "../relive_lib/FmvInfo.hpp"
+#include <vector>
+#include <string>
 
 enum class EReliveLevelIds : s16;
 
@@ -59,16 +62,7 @@ struct PathBlyRec final
     u16 field_E;
 };
 
-struct FmvInfo final
-{
-    const char_type* field_0_pName;
-    u16 field_4_id;
-    s16 field_6;
-    s16 field_8_stop_music;
-    s16 field_A;
-    s16 field_C_volume;
-    s16 field_E;
-};
+using FmvInfo = relive::FmvInfoEntry;
 
 struct SoundBlockInfo final
 {
@@ -107,6 +101,10 @@ struct PathRootContainer final
 const PathBlyRec* Path_Get_Bly_Record(EReliveLevelIds level, u16 path);
 
 FmvInfo* Path_Get_FMV_Record(EReliveLevelIds levelId, u16 fmvId);
+
+// All real, unique FMV (.DDV) filenames referenced by any level's FmvInfo table -
+// used to drive FMV data conversion without a separately-maintained hardcoded list.
+[[nodiscard]] std::vector<std::string> Path_GetAllFmvNames();
 
 s32 Path_Format_CameraName(char_type* pNameBuffer, EReliveLevelIds level, s16 path, s16 camera);
 

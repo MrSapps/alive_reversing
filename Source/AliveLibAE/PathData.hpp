@@ -2,6 +2,9 @@
 
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/MapWrapper.hpp"
+#include "../relive_lib/FmvInfo.hpp"
+#include <vector>
+#include <string>
 
 struct CollisionInfo;
 
@@ -27,15 +30,7 @@ enum class LevelIds : s16
     eCredits_16 = 16
 };
 
-struct FmvInfo final
-{
-    const char_type* field_0_pName;
-    u16 field_4_id;
-    s16 field_6_flags;
-    u16 field_8_flags;
-    s16 field_A_volume; // usually 127 ?
-};
-ALIVE_ASSERT_SIZEOF(FmvInfo, 0xC);
+using FmvInfo = relive::FmvInfoEntry;
 
 struct PathData final
 {
@@ -128,6 +123,10 @@ struct SeqHandleTable final
 
 // note: has to be writable
 FmvInfo* Path_Get_FMV_Record(EReliveLevelIds lvlId, u16 fmvId);
+
+// All real, unique FMV (.DDV) filenames referenced by any level's FmvInfo table -
+// used to drive FMV data conversion without a separately-maintained hardcoded list.
+[[nodiscard]] std::vector<std::string> Path_GetAllFmvNames();
 
 void Path_Format_CameraName(char_type* pStrBuffer, EReliveLevelIds levelId, s16 pathId, s16 cameraId);
 
