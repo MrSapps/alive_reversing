@@ -29,6 +29,8 @@
 #include "file_system.hpp"
 
 #include "DDVAe.hpp"
+#include "PsxStrDemuxer.hpp"
+#include "ThreadPool.hpp"
 
 class FmvConv final
 {
@@ -39,28 +41,25 @@ public:
 
     }
 
-    void Convert(std::string fName)
+    void Convert(relive::IFmvSource& source, std::string fName)
     {
         TRACE_ENTRYEXIT;
 
-//        relive::DDVDumper dumper;
-        relive::DDVAe ddv(mFs, fName.c_str(), nullptr);
-
-        if (!ddv.ReadInfo())
+        if (!source.ReadInfo())
         {
-            ALIVE_FATAL("Failed to open DDV '%s'", fName.c_str());
+            ALIVE_FATAL("Failed to open FMV source '%s'", fName.c_str());
         }
 
-        const u32 width = ddv.FrameWidth() > 0 ? ddv.FrameWidth() : 640u;
-        const u32 height = ddv.FrameHeight() > 0 ? ddv.FrameHeight() : 240u;
+        const u32 width = source.FrameWidth() > 0 ? source.FrameWidth() : 640u;
+        const u32 height = source.FrameHeight() > 0 ? source.FrameHeight() : 240u;
 
-        LOG_INFO("DDV dimensions: %ux%u (header reported %ux%u)", width, height,
-                 ddv.FrameWidth(), ddv.FrameHeight());
+        LOG_INFO("FMV dimensions: %ux%u (header reported %ux%u)", width, height,
+                 source.FrameWidth(), source.FrameHeight());
 
-        const u32 frameRate =15; //ddv.FrameRate();
-        const u32 audioSampleRate = ddv.AudioSampleRate() > 0 ? ddv.AudioSampleRate() : 44100u;
-        const u32 audioChannels = ddv.AudioChannels() > 0 ? ddv.AudioChannels() : 2u;
-        const u32 audioBitsPerSample = ddv.AudioBitsPerSample() > 0 ? ddv.AudioBitsPerSample() : 16u;
+        const u32 frameRate = source.FrameRate() > 0 ? source.FrameRate() : 15u;
+        const u32 audioSampleRate = source.AudioSampleRate() > 0 ? source.AudioSampleRate() : 44100u;
+        const u32 audioChannels = source.AudioChannels() > 0 ? source.AudioChannels() : 2u;
+        const u32 audioBitsPerSample = source.AudioBitsPerSample() > 0 ? source.AudioBitsPerSample() : 16u;
         std::vector<u8> frameBuffer(width * height * sizeof(u32));
 
         aom_codec_iface_t* encoder = &aom_codec_av1_cx_algo;
@@ -181,17 +180,17 @@ public:
                 }
             };
 
-            const u32 totalFrames = ddv.TotalVideoFrames();
+            const u32 totalFrames = source.TotalVideoFrames();
             u32 frame_index = 0;
-            while (frame_index < (totalFrames > 0 ? totalFrames : 64u))
+            while (totalFrames == 0 || frame_index < totalFrames)
             {
-                if (!ddv.StepFrame())
+                if (!source.StepFrame())
                 {
                     break;
                 }
-                frameBuffer = ddv.GetPixels();
+                frameBuffer = source.GetPixels();
 
-                const std::vector<u8> audioFrames = ddv.GetAudioFrames();
+                const std::vector<u8> audioFrames = source.GetAudioFrames();
                 if (!audioFrames.empty() && mAudioTrackNumber != 0)
                 {
                     const u32 bytesPerSampleFrame = (mAudioBitsPerSample / 8u) * mAudioChannels;
@@ -462,10 +461,56 @@ private:
     uint32_t mAudioBitsPerSample = 0;
 };
 
-void ConvertFMVs(FileSystem& fs, const FileSystem::Path& dataDir, bool isAo)
+class ConvertFmvJob final : public IJob
 {
+public:
+    ConvertFmvJob(FileSystem& fs, std::string movieName, bool isAo)
+        : mFs(fs)
+        , mMovieName(std::move(movieName))
+        , mIsAo(isAo)
+    {
+    }
+
+    void Execute() override
+    {
+        FmvConv fmvConv(mFs);
+        if (mIsAo)
+        {
+            relive::PsxStrDemuxer source(mFs, mMovieName.c_str());
+            fmvConv.Convert(source, mMovieName);
+        }
+        else
+        {
+            relive::DDVAe source(mFs, mMovieName.c_str(), nullptr);
+            fmvConv.Convert(source, mMovieName);
+        }
+    }
+
+private:
+    FileSystem& mFs;
+    std::string mMovieName;
+    bool mIsAo = false;
+};
+
+void ConvertFMVs(ThreadPool& tp, FileSystem& fs, const FileSystem::Path& dataDir, bool isAo)
+{
+    (void)dataDir;
+
     if (isAo)
     {
+        // TODO: These AO .STR FMV filenames need confirming against real retail game
+        // data - unlike AE's movieNames list below, there's no existing reference list
+        // in this repo to draw from (AO's FmvInfo table is populated at runtime from
+        // the original game's own binary data, not from anything available at compile
+        // time). Fill this in once the real filenames are known.
+        const std::vector<std::string> movieNamesAo =
+        {
+        };
+
+        for (const auto& movieName : movieNamesAo)
+        {
+            tp.AddJob(std::make_unique<ConvertFmvJob>(fs, movieName, true));
+        }
         return;
     }
 
@@ -483,32 +528,6 @@ void ConvertFMVs(FileSystem& fs, const FileSystem::Path& dataDir, bool isAo)
 
     for (const auto& movieName : movieNames)
     {
-        FileSystem::Path moviePath = dataDir;
-        moviePath.Append(movieName);
-
-
-        /*
-        relive::DDVDumper dumper(moviePath.GetPath());
-        relive::DDVAe ddv(movieName.c_str(), &dumper);
-        if (ddv.ReadInfo())
-        {
-            s32 hack = 0;
-            while (ddv.StepFrame())
-            {
-                ddv.GetAudioFrames();
-
-                hack++;
-                if (hack > 50)
-                {
-                    break;
-                }
-            }
-        }
-        */
-
-        const std::string outPath = moviePath.GetPath() + ".webm";
-        FmvConv fmvConv(fs);
-        fmvConv.Convert(movieName);
+        tp.AddJob(std::make_unique<ConvertFmvJob>(fs, movieName, false));
     }
-
 }

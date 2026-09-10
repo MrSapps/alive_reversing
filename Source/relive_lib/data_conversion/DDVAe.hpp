@@ -1,6 +1,7 @@
 #pragma once
 
 #include "PNGFile.hpp"
+#include "IFmvSource.hpp"
 #include <fstream>
 #include <deque>
 
@@ -64,22 +65,22 @@ private:
     u32 frameIndex = 0;
 };
 
-class DDVAe final
+class DDVAe final : public IFmvSource
 {
 public:
     DDVAe(FileSystem& fs, const char_type* pDDVName, IDDVReaderCallBacks* callBacks);
     ~DDVAe();
-    bool StepFrame();
-    bool ReadInfo();
-    u32 FrameWidth();
-    u32 FrameHeight();
-    u32 FrameRate();
-    u32 TotalVideoFrames();
-    u32 AudioSampleRate();
-    u32 AudioChannels();
-    u32 AudioBitsPerSample();
-    const std::vector<u8>& GetPixels() const { return mPixels; }
-    std::vector<u8> GetAudioFrames()
+    bool StepFrame() override;
+    bool ReadInfo() override;
+    u32 FrameWidth() override;
+    u32 FrameHeight() override;
+    u32 FrameRate() override;
+    u32 TotalVideoFrames() override;
+    u32 AudioSampleRate() override;
+    u32 AudioChannels() override;
+    u32 AudioBitsPerSample() override;
+    const std::vector<u8>& GetPixels() const override { return mPixels; }
+    std::vector<u8> GetAudioFrames() override
     { 
         if (!mInterleaveAudioFrames.empty())
         {

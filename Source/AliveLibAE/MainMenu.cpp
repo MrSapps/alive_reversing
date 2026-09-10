@@ -1376,9 +1376,9 @@ MainMenuNextCam MainMenuController::Page_FMV_Level_Update_4D4AB0(u32 input_held)
     if (field_25C_Inside_FMV_Screen)
     {
         MenuFMV* pMenuFMV = &pDemosOrFmvs_BB4414.mFmvRec[field_230_target_entry_index];
-        if (pMenuFMV->field_A_fmv_id >= 0)
+        if (pMenuFMV->mFmvId >= 0)
         {
-            FmvInfo* pFmvRecord = Path_Get_FMV_Record(pMenuFMV->field_4_level_id, pMenuFMV->field_A_fmv_id);
+            FmvInfo* pFmvRecord = Path_Get_FMV_Record(pMenuFMV->mLevel, pMenuFMV->mFmvId);
 
             auto pMovie = relive_new Movie(pFmvRecord->field_0_pName, mResMan, mMap);
 

@@ -1121,6 +1121,21 @@ bool DataConversion::AsyncTasksInProgress() const
     return mThreadPool->Busy();
 }
 
+size_t DataConversion::TotalConversionJobs() const
+{
+    return mThreadPool->TotalJobs();
+}
+
+size_t DataConversion::CompletedConversionJobs() const
+{
+    return mThreadPool->CompletedJobs();
+}
+
+size_t DataConversion::ActiveConversionJobs() const
+{
+    return mThreadPool->ActiveJobs();
+}
+
 std::optional<DataConversion::DataVersions> DataConversion::DataVersionAO()
 {
     FileSystem::Path dataDir;
@@ -1156,7 +1171,7 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
 
     if (dv.ConvertFmvs())
     {
-        ConvertFMVs(fs, dataDir, true);
+        ConvertFMVs(*mThreadPool, fs, dataDir, true);
     }
 
     // TODO: Prob diff data in AO, check me
@@ -1206,7 +1221,7 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
 
     if (dv.ConvertFmvs())
     {
-        ConvertFMVs(fs, dataDir, false);
+        ConvertFMVs(*mThreadPool, fs, dataDir, false);
     }
 
     if (dv.ConvertPalettes())

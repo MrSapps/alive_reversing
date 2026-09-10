@@ -98,6 +98,10 @@ public:
 
     bool AsyncTasksInProgress() const;
 
+    [[nodiscard]] size_t TotalConversionJobs() const;
+    [[nodiscard]] size_t CompletedConversionJobs() const;
+    [[nodiscard]] size_t ActiveConversionJobs() const;
+
     struct [[nodiscard]] DataVersions final
     {
     private:
