@@ -238,6 +238,7 @@ public:
 
     // == new res manager interface ==
 
+    std::string FmvPath(const std::string& fmvName);
 
     // TODO: needs to be async like og
     void PendAnimation(AnimId anim, const std::string& theme = "");
