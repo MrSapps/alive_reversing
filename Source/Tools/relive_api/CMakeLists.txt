@@ -22,14 +22,9 @@ set(relive_api_src
     CamConverter.cpp
     JsonReadUtils.hpp
     JsonModelTypes.hpp
-    JsonModelTypes.cpp
     JsonMapRootInfoReader.hpp
     JsonMapRootInfoReader.cpp
     ReliveLine.hpp
-    JsonWriterBase.hpp
-    JsonWriterBase.cpp
-    JsonWriterRelive.hpp
-    JsonWriterRelive.cpp
     JsonUpgraderRelive.cpp
     JsonUpgraderRelive.hpp
     TlvsRelive.hpp

@@ -638,10 +638,6 @@ Do you want to overwrite it?</source>
         <translation>Level öffnen</translation>
     </message>
     <message>
-        <source>Supported Files (*.json *.lvl);; Json Files (*.json);;Level Files (*.lvl);;All Files (*)</source>
-        <translation>Unterstützte Dateien (*.json *.lvl);; Json Dateien (*.json);;Level Dateien (*.lvl);;Alle Dateien (*)</translation>
-    </message>
-    <message>
         <source>Oddysee/Exoddus editor by Relive Team [https://aliveteam.github.io]</source>
         <translation>Oddysee/Exoddus editor vom Relive Team [https://aliveteam.github.io]</translation>
     </message>
@@ -654,16 +650,20 @@ Do you want to overwrite it?</source>
         <translation>Möchtest du deine Änderungen speichern?</translation>
     </message>
     <message>
-        <source>Open lvl (as template for new path)</source>
-        <translation>Lvl öffnen (als vorlage für einen neuen Pfad)</translation>
-    </message>
-    <message>
-        <source>Level Files (*.lvl);;All Files (*)</source>
-        <translation>Level Dateien (*.lvl);;Alle Dateien (*)</translation>
-    </message>
-    <message>
         <source>You can&apos;t cut/copy paste data between AO and AE</source>
         <translation>Du kannst keine Daten zwischen AO und AE ausschneiden/kopieren</translation>
+    </message>
+    <message>
+        <source>Json Files (*.json);;All Files (*)</source>
+        <translation type="unfinished">Json Dateien (*.json);;Alle Dateien (*)</translation>
+    </message>
+    <message>
+        <source>Select game</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Game</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -812,13 +812,6 @@ Do you want to overwrite it?</source>
     <message>
         <source>Good ending muds</source>
         <translation>Gutes Ende muds</translation>
-    </message>
-</context>
-<context>
-    <name>PathSelectionDialog</name>
-    <message>
-        <source>Select path to load</source>
-        <translation>Pfad zum Laden auswählen</translation>
     </message>
 </context>
 <context>

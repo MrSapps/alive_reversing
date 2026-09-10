@@ -7,17 +7,12 @@
 #include <QTabBar>
 #include <QFileDialog>
 #include <QInputDialog>
-#include <QUuid>
 #include "Model.hpp"
-#include "PathSelectionDialog.hpp"
 #include "relive_api.hpp"
 #include "EditorGraphicsScene.hpp"
 #include "qstylefactory.h"
 #include "qdebug.h"
 #include "qactiongroup.h"
-#include "../../relive_lib/data_conversion/file_system.hpp"
-#include "ExecApiCall.hpp"
-#include "ShowContext.hpp"
 
 static void FatalError(const char* msg)
 {
@@ -104,7 +99,7 @@ EditorMainWindow::EditorMainWindow(QWidget* aParent)
         QFile f(file);
         if (f.exists())
         {
-            onOpenPath(file, false);
+            onOpenPath(file);
         }
     }
 
@@ -164,90 +159,32 @@ void EditorMainWindow::setMenuActionsEnabled(bool enable)
     }
 }
 
-bool EditorMainWindow::onOpenPath(QString fullFileName, bool createNewPath)
+EditorTab* EditorMainWindow::AddModelTab(std::unique_ptr<Model> model, QString fileName, bool isTempFile)
 {
-    int newPathId = 0;
-    bool isTempfile = false;
+    EditorTab* view = new EditorTab(m_ui->tabWidget, std::move(model), fileName, isTempFile, statusBar(), mSnapSettings);
+
+    connect(
+        view, &EditorTab::CleanChanged,
+        this, &EditorMainWindow::UpdateWindowTitle
+    );
+
+    QFileInfo fileInfo(fileName);
+    const int tabIdx = m_ui->tabWidget->addTab(view, fileInfo.fileName());
+    m_ui->tabWidget->setTabToolTip(tabIdx, fileName);
+    m_ui->tabWidget->setTabIcon(tabIdx, QIcon(":/icons/rsc/icons/Well.png"));
+    m_ui->tabWidget->setCurrentIndex(tabIdx);
+
+    m_ui->stackedWidget->setCurrentIndex(1);
+
+    view->UpdateTabTitle(view->IsClean());
+    setMenuActionsEnabled(true);
+
+    return view;
+}
+
+bool EditorMainWindow::onOpenPath(QString fullFileName)
+{
     bool isUpgraded = false;
-    std::optional<int> selectedPath;
-
-    FileSystem fs;
-    ReliveAPI::Context context;
-
-    auto fnOpenPath = [&]()
-    {
-        if (fullFileName.endsWith(".lvl", Qt::CaseInsensitive))
-        {
-            // Get the paths in the LVL
-            ReliveAPI::EnumeratePathsResult ret = ReliveAPI::EnumeratePaths(fs, fullFileName.toStdString());
-            if (!createNewPath)
-            {
-                // Ask the user to pick one
-                auto pathSelection = new PathSelectionDialog(this, ret);
-                pathSelection->exec();
-
-                selectedPath = pathSelection->SelectedPath();
-                delete pathSelection;
-
-                if (!selectedPath)
-                {
-                    // They didn't pick one
-                    return false;
-                }
-            }
-            else
-            {
-                if (ret.paths.empty())
-                {
-                    // The selected LVL had no path for some reason
-                    QMessageBox::critical(this, "Error", "Selected LVL appears to contain no paths");
-                    return false;
-                }
-                // Pick the first path to use as a template for the new path
-                selectedPath = ret.paths[0];
-
-                // And ask the user for the new path id
-                bool ok = false;
-                newPathId = QInputDialog::getInt(this, tr("Enter new path Id"), tr("Path Id"), 0, 0, 99, 1, &ok);
-                if (!ok)
-                {
-                    // User bailed on picking a path id
-                    return false;
-                }
-            }
-
-            QUuid uuid = QUuid::createUuid();
-            QString tempFileFullPath = QDir::toNativeSeparators(
-                QDir::tempPath() + "/" +
-                qApp->applicationName().replace(" ", "") +
-                "_" +
-                uuid.toString(QUuid::WithoutBraces) + ".json");
-
-            // Convert the binary lvl path to json
-            ReliveAPI::ExportPathBinaryToJson(fs, tempFileFullPath.toStdString(), fullFileName.toStdString(), selectedPath.value(), context);
-
-            isTempfile = true;
-
-            // And continue to load the newly saved json file
-            fullFileName = tempFileFullPath;
-        }
-        return true;
-    };
-
-    auto fnOnError = [&](QString err)
-    {
-        QMessageBox::critical(this, "Error", err);
-    };
-
-    if (!ExecApiCall(fnOpenPath, fnOnError))
-    {
-        return false;
-    }
-
-    if (!context.Ok())
-    {
-        ShowContext(context);
-    }
 
     // First check if we already have this json file open
     for (int i = 0; i < m_ui->tabWidget->count(); i++)
@@ -295,43 +232,11 @@ bool EditorMainWindow::onOpenPath(QString fullFileName, bool createNewPath)
         }
         */
 
-        if (createNewPath)
-        {
-            model->CreateAsNewPath(newPathId);
-        }
-
-        // If exported to a temp file then delete it now we've loaded it to memory
-        if (isTempfile)
-        {
-            QFile::remove(fullFileName);
-
-            // Also change the file name to something more sane and force SaveAs if the user
-            // attempts to save this path.
-           // const auto generatedName = model->GetMapInfo().mGame + "_" + model->GetMapInfo().mPathBnd + "_" + QString::number(*selectedPath).toStdString();
-           // fullFileName = QString(generatedName.c_str());
-        }
-
-        EditorTab* view = new EditorTab(m_ui->tabWidget, std::move(model), fullFileName, isTempfile, statusBar(), mSnapSettings);
-
-        connect(
-            view, &EditorTab::CleanChanged,
-            this, &EditorMainWindow::UpdateWindowTitle
-        );
-
-        QFileInfo fileInfo(fullFileName);
-        const int tabIdx = m_ui->tabWidget->addTab(view, fileInfo.fileName());
-        m_ui->tabWidget->setTabToolTip(tabIdx, fullFileName);
-        m_ui->tabWidget->setTabIcon(tabIdx, QIcon(":/icons/rsc/icons/Well.png"));
-        m_ui->tabWidget->setCurrentIndex(tabIdx);
-
-        m_ui->stackedWidget->setCurrentIndex(1);
-
-        view->UpdateTabTitle(view->IsClean());
+        EditorTab* view = AddModelTab(std::move(model), fullFileName, false);
         if (isUpgraded)
         {
             view->Save();
         }
-        setMenuActionsEnabled(true);
 
         return true;
     }
@@ -443,10 +348,10 @@ void EditorMainWindow::on_action_about_triggered()
 void EditorMainWindow::on_action_open_path_triggered()
 {
     QString lastOpenDir = m_Settings.value("last_open_dir").toString();
-    QString fileName = QFileDialog::getOpenFileName(this, tr("Open level"), lastOpenDir, tr("Supported Files (*.json *.lvl);; Json Files (*.json);;Level Files (*.lvl);;All Files (*)"));
+    QString fileName = QFileDialog::getOpenFileName(this, tr("Open level"), lastOpenDir, tr("Json Files (*.json);;All Files (*)"));
     if (!fileName.isEmpty())
     {
-        if (onOpenPath(fileName, false))
+        if (onOpenPath(fileName))
         {
             QFileInfo info(fileName);
             m_Settings.setValue("last_open_dir", info.dir().path());
@@ -683,16 +588,24 @@ void EditorMainWindow::on_actionEdit_map_size_triggered()
 
 void EditorMainWindow::on_actionNew_path_triggered()
 {
-    QString lastOpenDir = m_Settings.value("last_open_dir").toString();
-    QString fileName = QFileDialog::getOpenFileName(this, tr("Open lvl (as template for new path)"), lastOpenDir, tr("Level Files (*.lvl);;All Files (*)"));
-    if (!fileName.isEmpty())
+    bool ok = false;
+    const int newPathId = QInputDialog::getInt(this, tr("Enter new path Id"), tr("Path Id"), 0, 0, 99, 1, &ok);
+    if (!ok)
     {
-        if (onOpenPath(fileName, true))
-        {
-            QFileInfo info(fileName);
-            m_Settings.setValue("last_open_dir", info.dir().path());
-        }
+        return;
     }
+
+    const QStringList gameNames = { "AO", "AE" };
+    const QString gameName = QInputDialog::getItem(this, tr("Select game"), tr("Game"), gameNames, 0, false, &ok);
+    if (!ok)
+    {
+        return;
+    }
+
+    auto model = std::make_unique<Model>();
+    model->CreateAsNewPath(newPathId, gameName == "AO" ? GameType::eAo : GameType::eAe);
+
+    AddModelTab(std::move(model), QString("New Path %1.json").arg(newPathId), true);
 }
 
 void EditorMainWindow::on_actionSave_As_triggered()

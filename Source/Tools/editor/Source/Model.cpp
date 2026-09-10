@@ -1,5 +1,6 @@
 #include "Model.hpp"
 #include "../../relive_lib/data_conversion/file_system.hpp"
+#include "../../relive_api/relive_api.hpp"
 #include <optional>
 #include "../../relive_lib/data_conversion/relive_tlvs_serialization.hpp"
 #include "../../relive_lib/data_conversion/EnumSerialization.hpp"
@@ -224,22 +225,21 @@ void Model::LoadJsonFromFile(const std::string& jsonFile)
     LoadJsonFromString(*jsonString);
 }
 
-void Model::CreateAsNewPath(int newPathId)
+void Model::CreateAsNewPath(s32 newPathId, GameType game)
 {
-    // Reset everything to a 1x1 empty map
-    /*
-    mMapInfo.mPathId = newPathId;
-    mMapInfo.mXSize = 1;
-    mMapInfo.mYSize = 1;
-    */
-
+    // Reset everything to a blank 1x1 map with a single empty camera
     mCameras.clear();
     mCollisions.clear();
 
-    auto cam = std::make_unique<EditorCamera>();
-    cam->mX = 0;
-    cam->mY = 0;
-    mCameras.emplace_back(std::move(cam));
+    mGame = game;
+    mPathId = newPathId;
+    mPathVersion = ReliveAPI::GetApiVersion();
+    mSoundInfo = nlohmann::json::object();
+
+    mXSize = 1;
+    mYSize = 1;
+
+    CreateEmptyCameras();
 }
 
 std::string Model::ToJson() const

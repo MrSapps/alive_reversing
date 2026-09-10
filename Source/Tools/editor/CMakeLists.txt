@@ -77,7 +77,6 @@ if (MSVC)
 endif()
 
 set(PROJECT_SOURCES
-        Source/ExecApiCall.hpp
         Source/GridSnapSettings.hpp
         Source/IGridPointSnapper.hpp
         Source/ClipBoard.cpp
@@ -111,9 +110,6 @@ set(PROJECT_SOURCES
         Source/CollisionConnect.cpp
         Source/CollisionConnect.hpp
         Source/CollisionConnectData.hpp
-        Source/PathSelectionDialog.hpp
-        Source/PathSelectionDialog.cpp
-        Source/PathSelectionDialog.ui
         Source/IGraphicsItem.hpp
         Source/main.cpp
         Source/AboutDialog.ui
