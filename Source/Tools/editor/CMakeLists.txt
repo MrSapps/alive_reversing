@@ -85,6 +85,12 @@ set(PROJECT_SOURCES
         Source/PasteItemsCommand.hpp
         Source/DeleteItemsCommand.cpp
         Source/DeleteItemsCommand.hpp
+        Source/SetSelectionCommand.cpp
+        Source/SetSelectionCommand.hpp
+        Source/MoveItemsCommand.cpp
+        Source/MoveItemsCommand.hpp
+        Source/AddCollisionCommand.cpp
+        Source/AddCollisionCommand.hpp
         Source/ProgressDialog.hpp
         Source/ProgressDialog.cpp
         Source/ProgressDialog.ui
