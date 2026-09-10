@@ -1,5 +1,6 @@
 #include "stdafx_ao.h"
 #include "../relive_lib/Function.hpp"
+#include "../relive_lib/MenuFmv.hpp"
 #include "MainMenu.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
@@ -231,20 +232,9 @@ static s32 sSelectedSaveIdx = 0;
 static s32 sSaveIdx = 0;
 
 
-struct MenuFMV;
+using MenuFMV = relive::MenuFmvEntry;
 
 static const MenuFMV* sActiveList = nullptr;
-
-struct MenuFMV final
-{
-    const char_type* mMenuEntryName;
-    EReliveLevelIds mLevel;
-    s16 mPath;
-    s16 mCamera;
-    s16 mFmvId;
-    s16 mAbeSpawnX;
-    s16 mAbeSpawnY;
-};
 
 static const MenuFMV sFmvList[13] = {
     {"Oddworld Intro", EReliveLevelIds::eMenu, -1, -1, 1, -1, -1},
@@ -810,7 +800,7 @@ void Menu::FMV_Or_Level_Select_Render(OrderingTable& ot)
         s32 itemIdx = mSelectedButtonIndex.raw + idxStart;
         if (itemIdx >= 0 && itemIdx <= sListCount - 1)
         {
-            field_1F4_text = sActiveList[itemIdx].mMenuEntryName;
+            field_1F4_text = sActiveList[itemIdx].mName;
             const s32 textWidth = mFont.MeasureScaledTextWidth(field_1F4_text, FP_FromInteger(1));
             s16 textXOff = 0;
             if (textWidth >= 336)

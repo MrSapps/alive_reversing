@@ -2,4 +2,6 @@
 
 #include "file_system.hpp"
 
-void ConvertFMVs(FileSystem& fs, const FileSystem::Path& dataDir, bool isAo);
+class ThreadPool;
+
+void ConvertFMVs(ThreadPool& tp, FileSystem& fs, const FileSystem::Path& dataDir, bool isAo);

@@ -571,6 +571,9 @@ SET(data_conversion_src
     data_conversion/fmv_converter.hpp
     data_conversion/DDVAe.cpp
     data_conversion/DDVAe.hpp
+    data_conversion/IFmvSource.hpp
+    data_conversion/PsxStrDemuxer.cpp
+    data_conversion/PsxStrDemuxer.hpp
     data_conversion/LvlReader.hpp
     data_conversion/CommonTypesSerialization.hpp
     data_conversion/CommonTypesSerialization.cpp
@@ -624,6 +627,7 @@ SET(relive_lib_src
     ResourceManagerWrapper.cpp
     MapWrapper.hpp
     MapWrapper.cpp
+    MenuFmv.hpp
     BaseMap.hpp
     BaseMap.cpp
     BasePath.hpp

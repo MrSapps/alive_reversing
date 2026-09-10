@@ -11,6 +11,7 @@
 DataConversionUI::DataConversionUI(GameType gameType, ResourceManagerWrapper& resMan, BaseMap& map)
     : BaseGameObject(FALSE, 0, resMan, map)
     , mGameType(gameType)
+    , mDataConversion(std::make_unique<DataConversion>())
 {
     mPoly.SetXYWH(0, 0, 640, 240);
     mPoly.SetRGB0(255, 0, 0);
@@ -63,9 +64,6 @@ void DataConversionUI::ThreadFunc()
 {
     TRACE_ENTRYEXIT;
 
-    // TODO: The thread saftey here is questionable and we also need
-    // to be able to incrementally call/poll the conversion for info/progress/errors
-    DataConversion dataConversion;
     DataConversion::DataVersions zeroVersions;
 
 #if 0
@@ -76,16 +74,16 @@ void DataConversionUI::ThreadFunc()
 
     if (mGameType == GameType::eAe)
     {
-        dataConversion.ConvertDataAE(dataConversion.DataVersionAE().value_or(zeroVersions));
+        mDataConversion->ConvertDataAE(mDataConversion->DataVersionAE().value_or(zeroVersions));
     }
     else
     {
-        dataConversion.ConvertDataAO(dataConversion.DataVersionAO().value_or(zeroVersions));
+        mDataConversion->ConvertDataAO(mDataConversion->DataVersionAO().value_or(zeroVersions));
     }
 
     // Don't exit till any async jobs are finished
     // TODO: Don't busy loop here
-    while (dataConversion.AsyncTasksInProgress())
+    while (mDataConversion->AsyncTasksInProgress())
     {
         // Hang on a sec..
     }
@@ -113,7 +111,12 @@ void DataConversionUI::VUpdate()
     //mLcdStatusBoard->VUpdate();
     //mLcd->VUpdate();
 
-    mCurMessage = "Data conversion in progress" + mDots;
+    const size_t completed = mDataConversion->CompletedConversionJobs();
+    const size_t total = mDataConversion->TotalConversionJobs();
+    const size_t active = mDataConversion->ActiveConversionJobs();
+    mCurMessage = "Data conversion in progress" + mDots
+        + " (" + std::to_string(completed) + "/" + std::to_string(total) + " jobs, "
+        + std::to_string(active) + " active)";
     mTimer++;
 
     if (mTimer > 5)

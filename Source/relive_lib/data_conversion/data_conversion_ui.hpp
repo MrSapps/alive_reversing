@@ -6,6 +6,7 @@
 #include "../../AliveLibAE/LCDScreen.hpp"
 #include "../../AliveLibAE/LCDStatusBoard.hpp"
 #include "GameType.hpp"
+#include "data_conversion.hpp"
 #include <thread>
 #include <atomic>
 
@@ -28,6 +29,7 @@ private:
     Poly_G4 mPoly;
     std::unique_ptr<std::thread> mThread;
     std::atomic<bool> mDone{false};
+    std::unique_ptr<DataConversion> mDataConversion;
 
     FontContext mFontContext;
     AliveFont mFont;

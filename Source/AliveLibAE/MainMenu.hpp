@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Font.hpp"
+#include "../relive_lib/MenuFmv.hpp"
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
 #include "Input.hpp"
 #include "PathData.hpp"
@@ -8,16 +9,7 @@
 
 enum class LevelIds : s16;
 
-struct MenuFMV final
-{
-    const char_type* field_0_name;
-    EReliveLevelIds field_4_level_id;
-    s16 field_6;
-    s16 field_8;
-    s16 field_A_fmv_id;
-    s16 field_C;
-    s16 field_E;
-};
+using MenuFMV = relive::MenuFmvEntry;
 
 enum MainMenuButtonType : s16
 {
