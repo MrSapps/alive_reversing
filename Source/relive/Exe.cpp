@@ -21,7 +21,6 @@
 #include "../relive_lib/Engine.hpp"
 #include "../relive_lib/SwitchStates.hpp"
 
-#include "../AliveLibAE/Io.hpp"
 #include "../relive_lib/Font.hpp"
 
 #include "../relive_lib/data_conversion/file_system.hpp"
@@ -191,10 +190,10 @@ static void SDL2_Init()
     }
 }
 
-static void GameDirListing()
+static void GameDirListing(FileSystem& fs)
 {
-    IO_EnumerateDirectory("*.*", [](const char_type* fileName, u32)
-                          { LOG_INFO(fileName); });
+    fs.EnumerateDirectory("*.*", [](const char_type* fileName, u32)
+                           { LOG_INFO(fileName); });
 }
 
 static bool CheckRequiredGameFilesExist(FileSystem& fs, GameType gameType, bool showError)
@@ -233,7 +232,7 @@ static bool CheckRequiredGameFilesExist(FileSystem& fs, GameType gameType, bool 
         }
 
         SDL_Init(SDL_INIT_EVENTS);
-        GameDirListing();
+        GameDirListing(fs);
         Alive_Show_ErrorMsg(errorMessage.c_str());
     }
     return false;

@@ -48,6 +48,7 @@ add_library(editor_glue_dynamic_crt
     ../../relive_lib/MapWrapper.cpp
     ../../relive_lib/data_conversion/PNGFile.cpp
     ../../relive_lib/data_conversion/file_system.cpp
+    ../../relive_lib/data_conversion/AutoFile.cpp
     ../../relive_lib/data_conversion/guid.cpp
     ../../relive_lib/data_conversion/relive_tlvs_serialization.cpp
     ../../relive_lib/data_conversion/CommonTypesSerialization.cpp
@@ -76,10 +77,6 @@ if (MSVC)
 endif()
 
 set(PROJECT_SOURCES
-        Source/File.hpp
-        Source/File.cpp
-        Source/EditorFileIO.hpp
-        Source/EditorFileIO.cpp
         Source/ExecApiCall.hpp
         Source/GridSnapSettings.hpp
         Source/IGridPointSnapper.hpp
@@ -114,9 +111,6 @@ set(PROJECT_SOURCES
         Source/CollisionConnect.cpp
         Source/CollisionConnect.hpp
         Source/CollisionConnectData.hpp
-        Source/ExportPathDialog.hpp
-        Source/ExportPathDialog.cpp
-        Source/ExportPathDialog.ui
         Source/PathSelectionDialog.hpp
         Source/PathSelectionDialog.cpp
         Source/PathSelectionDialog.ui

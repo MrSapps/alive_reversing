@@ -3,7 +3,6 @@
 #include "../relive_lib/PSXADPCMDecoder.h"
 #include "../relive_lib/PSXMDECDecoder.h"
 #include "../relive_lib/Masher.hpp"
-#include "../AliveLibAE/Io.hpp"
 #include "../relive_lib/Sys.hpp"
 #include "../relive_lib/Psx.hpp"
 #include "../AliveLibAE/VGA.hpp"
@@ -12,6 +11,7 @@
 #include "GameAutoPlayer.hpp"
 #include "Midi.hpp"
 #include <FatalError.hpp>
+#include "../relive_lib/data_conversion/file_system.hpp"
 
 #define NO_WAVE
 #include "../relive_lib/Sound/Sound.hpp"
@@ -43,12 +43,17 @@ public:
     std::vector<unsigned char> mDemuxBuffer;
     PSXMDECDecoder mMdec;
     PSXADPCMDecoder mAdpcm;
-    void* mFile = nullptr;
+    AutoFILE& mFile;
     std::vector<u8> pixelBuffer;
     int mFrameW = 0;
     int mFrameH = 0;
 
      std::vector<s16> outPtr;
+
+    explicit PsxStr(AutoFILE& file)
+        : mFile(file)
+    {
+    }
 
     bool DecodeAudioAndVideo()
     {
@@ -62,7 +67,7 @@ public:
         for (;;)
         {
             PsxStrHeader w;
-            if (!GetMovieIO().mIO_Read(mFile, &w, sizeof(w)))
+            if (!mFile.Read(reinterpret_cast<u8*>(&w), sizeof(w)))
             {
                 // EOF
                 return false;
@@ -206,8 +211,6 @@ Movie::Movie(const char_type* pFmvName, ResourceManagerWrapper& resMan, BaseMap&
 
     SetType(ReliveTypes::eMovie);
 
-    IO_Init_494230(); // Set up IO funcs
-
     Movie::gMovieRefCount++;
 }
 
@@ -301,17 +304,16 @@ void Movie::VUpdate()
     }
 
     // Open the file
-    void* hMovieFile = GetMovieIO().mIO_Open(mFmvName);
+    AutoFILE hMovieFile = GetResMan().mFs.OpenFile(mFmvName, "rb");
 
     // Bail if failed to open
-    if (!hMovieFile)
+    if (!hMovieFile.GetFile())
     {
         SetDead(true);
         return;
     }
 
-    PsxStr psxStr;
-    psxStr.mFile = hMovieFile;
+    PsxStr psxStr(hMovieFile);
 
     sNoAudioOrAudioError = false;
     sFmvAudioSampleOffset = 0;
@@ -404,8 +406,6 @@ void Movie::VUpdate()
     }
 
     //Bmp_Free_4F1950(&tmpBmp);
-
-    GetMovieIO().mIO_Close(hMovieFile);
 
     SetDead(true);
 }

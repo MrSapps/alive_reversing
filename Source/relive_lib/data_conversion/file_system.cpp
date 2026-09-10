@@ -65,11 +65,10 @@ bool FileSystem::Save(const FileSystem::Path& path, const std::vector<u8>& data)
 
 bool FileSystem::Save(const char_type* path, const std::vector<u8>& data)
 {
-    FILE* pFile = FileSystem::OpenFile(path, "wb");
-    if (pFile)
+    AutoFILE file = OpenFile(path, "wb");
+    if (file.GetFile())
     {
-        ::fwrite(data.data(), 1, data.size(), pFile);
-        ::fclose(pFile);
+        ::fwrite(data.data(), 1, data.size(), file.GetFile());
         return true;
     }
     return false;
@@ -82,16 +81,16 @@ std::string FileSystem::LoadToString(const FileSystem::Path& path)
 
 std::string FileSystem::LoadToString(const char* path)
 {
-    FILE* pFile = FileSystem::OpenFile(path, "rb");
-    if (pFile)
+    AutoFILE file = OpenFile(path, "rb");
+    if (file.GetFile())
     {
+        FILE* pFile = file.GetFile();
         ::fseek(pFile, 0, SEEK_END);
         const auto fsize = ftell(pFile);
         ::fseek(pFile, 0, SEEK_SET);
         std::string r;
         r.resize(fsize);
         ::fread(r.data(), 1, fsize, pFile);
-        ::fclose(pFile);
         return r;
     }
     return {};
@@ -120,15 +119,15 @@ bool FileSystem::LoadToVec(const char* path, std::vector<u8>& buffer)
 {
     buffer.clear();
 
-    FILE* pFile = FileSystem::OpenFile(path, "rb");
-    if (pFile)
+    AutoFILE file = OpenFile(path, "rb");
+    if (file.GetFile())
     {
+        FILE* pFile = file.GetFile();
         ::fseek(pFile, 0, SEEK_END);
         const auto fsize = ftell(pFile);
         ::fseek(pFile, 0, SEEK_SET);
         buffer.resize(fsize);
         ::fread(buffer.data(), 1, fsize, pFile);
-        ::fclose(pFile);
         return true;
     }
     return false;
@@ -166,130 +165,14 @@ void FileSystem::CreateDirectory(const FileSystem::Path& path)
 
 bool FileSystem::FileExists(const char_type* fileName)
 {
-    FILE* f = FileSystem::OpenFile(fileName, "r");
-    if (f)
-    {
-        fclose(f);
-        return true;
-    }
-    return false;
+    return OpenFile(fileName, "r").GetFile() != nullptr;
 }
 
 // ===========================================================
 
-u32 AutoFILE::PeekU32()
+AutoFILE FileSystem::OpenFile(const char_type* path, const char_type* mode, bool autoFlushFile)
 {
-    const auto oldPos = ::ftell(mFile);
-
-    const u32 data = ReadU32();
-
-    if (::fseek(mFile, oldPos, SEEK_SET) != 0)
-    {
-        ALIVE_FATAL("Seek back failed");
-    }
-
-    return data;
-}
-
-u32 AutoFILE::ReadU32() const
-{
-    u32 value = 0;
-    if (::fread(&value, sizeof(u32), 1, mFile) != 1)
-    {
-        ALIVE_FATAL("Read U32 failed");
-    }
-    return value;
-}
-
-u32 AutoFILE::Pos()
-{
-    return static_cast<u32>(::ftell(mFile));
-}
-
-void AutoFILE::Seek(u32 pos, AutoFILE::SeekMode mode)
-{
-    switch (mode)
-    {
-        case SeekMode::Current:
-            if (::fseek(mFile, pos, SEEK_CUR) != 0)
-            {
-                ALIVE_FATAL("Seek back failed");
-            }
-            break;
-
-        default:
-            ALIVE_FATAL("Unknown seek mode");
-            break;
-    }
-}
-
-
-bool AutoFILE::Open(const char* pFileName, const char* pMode, bool autoFlushFile)
-{
-    Close();
-    mFile = FileSystem::OpenFile(pFileName, pMode);
-    if (strchr(pMode, 'w'))
-    {
-        mIsWriter = true;
-    }
-    mAutoFlushFile = autoFlushFile;
-    return mFile != nullptr;
-}
-
-AutoFILE::~AutoFILE()
-{
-    Close();
-}
-
-FILE* AutoFILE::GetFile()
-{
-    return mFile;
-}
-
-bool AutoFILE::Write(const u8* pBytes, u32 numBytes)
-{
-    const bool ret = ::fwrite(pBytes, 1, numBytes, mFile) == 1;
-    Flush();
-    return ret;
-}
-
-long AutoFILE::FileSize()
-{
-    const long oldPos = ftell(mFile);
-    fseek(mFile, 0, SEEK_END);
-    const long fileSize = ftell(mFile);
-    fseek(mFile, oldPos, SEEK_SET);
-    return fileSize;
-}
-
-void AutoFILE::Close()
-{
-    if (mFile)
-    {
-        if (mIsWriter)
-        {
-            ::fflush(mFile);
-        }
-        ::fclose(mFile);
-    }
-}
-
-void AutoFILE::Flush()
-{
-    if (mAutoFlushFile)
-    {
-        if (::fflush(mFile) != 0)
-        {
-            ALIVE_FATAL("fflush failed");
-        }
-    }
-}
-
-// ===========================================================
-
-FILE* FileSystem::OpenFile(const char_type* path, const char_type* mode)
-{
-    // Matches the OG-compat fixup IO_Open used to do: strip a leading "./" or ".\".
+    // Strip a leading "./" or ".\".
     if (strlen(path) >= 3 && path[0] == '.' && (path[1] == '/' || path[1] == '\\'))
     {
         path += 2;
@@ -336,7 +219,8 @@ FILE* FileSystem::OpenFile(const char_type* path, const char_type* mode)
     }
 #endif
 
-    return file;
+    const bool isWriter = mode && ::strchr(mode, 'w') != nullptr;
+    return AutoFILE(file, isWriter, autoFlushFile);
 }
 
 bool FileSystem::DirectoryExists(const char_type* pDirName)
@@ -408,7 +292,7 @@ namespace
 } // namespace
 #endif
 
-void FileSystem::EnumerateDirectory(const char_type* fileName, TEnumCallBack cb)
+void FileSystem::EnumerateDirectory(const char_type* fileName, FileSystem::TEnumCallBack cb)
 {
 #if _WIN32
     _finddata_t findRec = {};

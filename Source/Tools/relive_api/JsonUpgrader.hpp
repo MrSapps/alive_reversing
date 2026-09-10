@@ -9,6 +9,8 @@
 #include <unordered_map>
 #include "nlohmann/json_fwd.hpp"
 
+class FileSystem;
+
 namespace ReliveAPI {
 class JsonUpgraderBase;
 
@@ -27,7 +29,6 @@ using RemapEnums = std::map<std::string, std::string>;
 using RemapNumberToEnum = std::map<int, std::string>;
 
 class TypesCollectionBase;
-class IFileIO;
 
 class JsonUpgraderBase
 {
@@ -36,7 +37,7 @@ public:
     { }
     virtual void AddUpgraders() = 0;
 
-    std::string Upgrade(TypesCollectionBase& baseTypesCollection, IFileIO& fileIO, const std::string& jsonFile, s32 currentJsonVersion, s32 targetApiVersion);
+    std::string Upgrade(TypesCollectionBase& baseTypesCollection, FileSystem& fs, const std::string& jsonFile, s32 currentJsonVersion, s32 targetApiVersion);
 
 private:
     void UpgradeTargetIsValid(s32 currentJsonVersion, s32 targetApiVersion);

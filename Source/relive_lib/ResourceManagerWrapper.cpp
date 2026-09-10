@@ -21,8 +21,9 @@
 
 u32 UniqueResId::mGlobalId = 1;
 
-ResourceManagerWrapper::ResourceManagerWrapper()
-    : mThreadPool(std::make_unique<ThreadPool>())
+ResourceManagerWrapper::ResourceManagerWrapper(FileSystem& fs)
+    : mFs(fs)
+    , mThreadPool(std::make_unique<ThreadPool>())
 {
     bHideLoadingIcon = 0;
     loading_ticks = 0;
@@ -82,8 +83,7 @@ public:
         // One huge blocking func for now - needs to work like OG res man
         std::string filePath = GetAnimPath(mAnimId, mThemeName, false);
 
-        // TODO: fs instance should probably be shared and thread safe
-        FileSystem fs;
+        FileSystem& fs = mResMan->mFs;
         std::string jsonStr = fs.LoadToString((filePath + ".json").c_str());
         if (jsonStr.empty())
         {
@@ -97,11 +97,10 @@ public:
             }
         }
 
-        // TODO: Use FS
         auto pPngData = std::make_shared<PngData>();
         PNGFile pngFile;
         pPngData->mPal = std::make_shared<AnimationPal>();
-        pngFile.Load((filePath + ".png").c_str(), *pPngData->mPal, pPngData->mPixels, pPngData->mWidth, pPngData->mHeight);
+        pngFile.Load(fs, (filePath + ".png").c_str(), *pPngData->mPal, pPngData->mPixels, pPngData->mWidth, pPngData->mHeight);
 
         auto pAnimationAttributesAndFrames = std::make_shared<AnimationAttributesAndFrames>(jsonStr);
 
@@ -227,8 +226,7 @@ PalResource ResourceManagerWrapper::LoadPal(PalId pal)
 
     filePath.Append(ToString(newRes.mId));
 
-    FileSystem fs;
-    auto palData = fs.LoadToVec(filePath.GetPath().c_str());
+    auto palData = mFs.LoadToVec(filePath.GetPath().c_str());
     if (palData.size() != 1024) // 256 RGBA entries
     {
         ALIVE_FATAL("Bad pal data size %d but expected 1024", palData.size());
@@ -261,14 +259,14 @@ static FileSystem::Path CamBaseName(EReliveLevelIds lvlId, u32 pathNumber, u32 c
     return filePath;
 }
 
-static RgbaData LoadPng(const std::string& filePath)
+static RgbaData LoadPng(FileSystem& fs, const std::string& filePath)
 {
     std::vector<u8> vec;
     unsigned int w = 0;
     unsigned int h = 0;
     PNGFile png;
 
-    png.Load(filePath.c_str(), vec, w, h);
+    png.Load(fs, filePath.c_str(), vec, w, h);
 
     RgbaData data;
     data.mWidth = w;
@@ -282,7 +280,7 @@ CamResource ResourceManagerWrapper::LoadCam(EReliveLevelIds lvlId, u32 pathNumbe
     FileSystem::Path filePath = CamBaseName(lvlId, pathNumber, camNumber);
 
     CamResource newRes;
-    newRes.mData = LoadPng(filePath.GetPath() + ".png");
+    newRes.mData = LoadPng(mFs, filePath.GetPath() + ".png");
     return newRes;
 }
 
@@ -293,8 +291,7 @@ Fg1Resource ResourceManagerWrapper::LoadFg1(EReliveLevelIds lvlId, u32 pathNumbe
     Fg1Resource newRes;
 
     // Load the json manifest
-    FileSystem fs;
-    const std::string jsonStr = fs.LoadToString((filePath.GetPath() + ".json").c_str());
+    const std::string jsonStr = mFs.LoadToString((filePath.GetPath() + ".json").c_str());
     if (!jsonStr.empty())
     {
         nlohmann::json j = nlohmann::json::parse(jsonStr);
@@ -306,19 +303,19 @@ Fg1Resource ResourceManagerWrapper::LoadFg1(EReliveLevelIds lvlId, u32 pathNumbe
             std::string s = fg1File;
             if (s.find("fg_well") != std::string::npos)
             {
-                newRes.mFgWell.mImage = LoadPng(filePath.GetPath() + "fg_well.png");
+                newRes.mFgWell.mImage = LoadPng(mFs, filePath.GetPath() + "fg_well.png");
             }
             else if (s.find("bg_well") != std::string::npos)
             {
-                newRes.mBgWell.mImage = LoadPng(filePath.GetPath() + "bg_well.png");
+                newRes.mBgWell.mImage = LoadPng(mFs, filePath.GetPath() + "bg_well.png");
             }
             else if (s.find("fg") != std::string::npos)
             {
-                newRes.mFg.mImage = LoadPng(filePath.GetPath() + "fg.png");
+                newRes.mFg.mImage = LoadPng(mFs, filePath.GetPath() + "fg.png");
             }
             else if (s.find("bg") != std::string::npos)
             {
-                newRes.mBg.mImage = LoadPng(filePath.GetPath() + "bg.png");
+                newRes.mBg.mImage = LoadPng(mFs, filePath.GetPath() + "bg.png");
             }
         }
     }
@@ -349,11 +346,10 @@ FontResource ResourceManagerWrapper::LoadFont(FontType fontId)
         }
     }
 
-    // TODO: Use FS
     auto pPngData = std::make_shared<PngData>();
     PNGFile pngFile;
     pPngData->mPal = std::make_shared<AnimationPal>();
-    pngFile.Load((filePath.GetPath() + ".png").c_str(), *pPngData->mPal, pPngData->mPixels, pPngData->mWidth, pPngData->mHeight);
+    pngFile.Load(mFs, (filePath.GetPath() + ".png").c_str(), *pPngData->mPal, pPngData->mPixels, pPngData->mWidth, pPngData->mHeight);
 
     FontResource newRes(fontId, pPngData);
 
@@ -378,8 +374,7 @@ std::vector<std::unique_ptr<BinaryPath>> ResourceManagerWrapper::LoadPaths(EReli
     FileSystem::Path levelInfo = pathDir;
     levelInfo.Append("level_info.json");
 
-    FileSystem fs;
-    const std::string jsonStr = fs.LoadToString(levelInfo);
+    const std::string jsonStr = mFs.LoadToString(levelInfo);
     nlohmann::json j = nlohmann::json::parse(jsonStr);
     const auto& paths = j["paths"];
     for (const auto& path : paths)
@@ -388,7 +383,7 @@ std::vector<std::unique_ptr<BinaryPath>> ResourceManagerWrapper::LoadPaths(EReli
 
         FileSystem::Path pathJsonFile = pathDir;
         pathJsonFile.Append(pathId).Append("path.json");
-        const std::string pathJsonStr = fs.LoadToString(pathJsonFile);
+        const std::string pathJsonStr = mFs.LoadToString(pathJsonFile);
 
         // TODO: set the res ptrs to the parsed json data
         // TODO: Handle exception on bad data
@@ -418,8 +413,7 @@ std::vector<u8> ResourceManagerWrapper::LoadFile(const char_type* pFileName, ERe
 
     pathDir.Append(pFileName);
 
-    FileSystem fs;
-    return fs.LoadToVec(pathDir.GetPath().c_str());
+    return mFs.LoadToVec(pathDir.GetPath().c_str());
 }
 
 

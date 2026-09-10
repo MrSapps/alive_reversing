@@ -53,7 +53,7 @@ class BaseRecorder
 public:
     BaseRecorder() = default;
     virtual ~BaseRecorder() = default;
-    void Init(const char* pFileName, bool autoFlushFile);
+    void Init(FileSystem& fs, const char* pFileName, bool autoFlushFile);
     void SaveInput(const Pads& data);
     void SaveRng(s32 rng);
 
@@ -74,7 +74,7 @@ class [[nodiscard]] BasePlayer
 public:
     BasePlayer() = default;
     virtual ~BasePlayer() = default;
-    void Init(const char* pFileName);
+    void Init(FileSystem& fs, const char* pFileName);
     Pads ReadInput();
     s32 ReadRng();
     u32 ReadTicks();
@@ -124,7 +124,7 @@ protected:
     virtual u32 ReadInput(u32 padIdx) = 0;
 
 public:
-    void ProcessCommandLine(CommandLineParser& clp);
+    void ProcessCommandLine(FileSystem& fs, CommandLineParser& clp);
 
     RecordTypes PeekNextType();
 

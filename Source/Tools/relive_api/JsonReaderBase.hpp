@@ -5,6 +5,8 @@
 #include "../../relive_lib/Collisions.hpp"
 #include "TlvObjectBaseMacros.hpp"
 
+class FileSystem;
+
 namespace ReliveAPI {
 class ReliveLine final : public PropertyCollection
 {
@@ -33,7 +35,6 @@ public:
     PathLine mLine = {};
 };
 
-class IFileIO;
 class Context;
 
 
@@ -50,7 +51,7 @@ public:
     MapInfo mRootInfo;
 
 protected:
-    LoadedJsonBase Load(TypesCollectionBase& types, IFileIO& fileIO, const std::string& fileName, Context& context);
+    LoadedJsonBase Load(TypesCollectionBase& types, FileSystem& fs, const std::string& fileName, Context& context);
 
     std::vector<::PathLine> ReadReliveLines(TypesCollectionBase& types, const nlohmann::json& collisionsArray, Context& context);
 };

@@ -194,12 +194,13 @@ public:
 
 
 class ThreadPool;
+class FileSystem;
 
 // Temp adapter interface
 class ResourceManagerWrapper final
 {
 public:
-    ResourceManagerWrapper();
+    explicit ResourceManagerWrapper(FileSystem& fs);
     ~ResourceManagerWrapper();
 
     // TODO: Remove/unify when both games resource managers are merged into one object
@@ -299,6 +300,9 @@ public:
 
     using AnimCacheKey = std::pair<std::string, AnimId>;
     std::map<AnimCacheKey, AnimCache> mLoadedAnimations;
+
+    // FileSystem has no state, so sharing this reference across ThreadPool worker threads is safe.
+    FileSystem& mFs;
 
 private:
     // unique_ptr to avoid bringing the header in

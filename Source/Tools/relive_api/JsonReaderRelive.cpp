@@ -3,10 +3,10 @@
 #include "JsonReadUtils.hpp"
 
 namespace ReliveAPI {
-LoadedJsonRelive JsonReaderRelive::Load(IFileIO& fileIO, const std::string& fileName, Context& context)
+LoadedJsonRelive JsonReaderRelive::Load(FileSystem& fs, const std::string& fileName, Context& context)
 {
     TypesCollectionRelive globalTypes;
-    LoadedJsonBase loadedJsonBase = JsonReaderBase::Load(globalTypes, fileIO, fileName, context);
+    LoadedJsonBase loadedJsonBase = JsonReaderBase::Load(globalTypes, fs, fileName, context);
 
     const nlohmann::json& collisionsObject = ReadObject(loadedJsonBase.mMapJson, "collisions");
     const nlohmann::json& collisionsArray = ReadArray(collisionsObject, "items");

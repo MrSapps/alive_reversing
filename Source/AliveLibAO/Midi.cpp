@@ -8,7 +8,6 @@
 #include "MusicController.hpp"
 #include "AmbientSound.hpp"
 #include "Sound.hpp"
-#include "../AliveLibAE/Io.hpp"
 
 #include "Sfx.hpp"
 #include "../AliveLibAE/Sfx.hpp"
@@ -204,7 +203,7 @@ public:
         return mMidi_WaitUntil;
     }
 
-    virtual IO_FileHandleType& sSoundDatFileHandle() override
+    virtual AutoFILE& sSoundDatFileHandle() override
     {
         // Should never be called
         throw std::logic_error("The method or operation is not implemented.");

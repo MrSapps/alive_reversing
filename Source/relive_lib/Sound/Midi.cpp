@@ -141,7 +141,7 @@ s16 SND_VAB_Load_4C9FE0(PathSoundInfo& pSoundBlockInfo, ResourceManagerWrapper& 
     pSoundBlockInfo.mVabId = SsVabOpenHead(reinterpret_cast<VabHeader*>(pSoundBlockInfo.mVhFileData.data()));
 
     // Load actual sample data (copied, hence vec goes out of scope after this)
-    SsVabTransBody_4FC840(reinterpret_cast<VabBodyRecord*>(vbFileData.data()), static_cast<s16>(pSoundBlockInfo.mVabId));
+    SsVabTransBody_4FC840(resMan.mFs, reinterpret_cast<VabBodyRecord*>(vbFileData.data()), static_cast<s16>(pSoundBlockInfo.mVabId));
 
     SsVabTransCompleted(SS_WAIT_COMPLETED);
 

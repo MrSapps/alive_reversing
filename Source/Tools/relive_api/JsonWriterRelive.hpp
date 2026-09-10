@@ -7,7 +7,6 @@
 #include <unordered_map>
 
 namespace ReliveAPI {
-class IFileIO;
 class TypesCollectionRelive;
 class JsonWriterRelive final : public JsonWriterBase
 {

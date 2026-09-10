@@ -2,7 +2,7 @@
 #include "JsonMapRootInfoReader.hpp"
 #include "JsonReadUtils.hpp"
 #include "TlvObjectBase.hpp"
-#include "file_api.hpp"
+#include "../../relive_lib/data_conversion/file_system.hpp"
 #include <set>
 
 namespace ReliveAPI {
@@ -21,16 +21,16 @@ std::vector<::PathLine> JsonReaderBase::ReadReliveLines(TypesCollectionBase& typ
     return lines;
 }
 
-LoadedJsonBase JsonReaderBase::Load(TypesCollectionBase& types, IFileIO& fileIO, const std::string& fileName, Context& context)
+LoadedJsonBase JsonReaderBase::Load(TypesCollectionBase& types, FileSystem& fs, const std::string& fileName, Context& context)
 {
-    auto inputFileStream = fileIO.Open(fileName, IFileIO::Mode::Read);
-    if (!inputFileStream->IsOpen())
+    AutoFILE inputFileStream = fs.OpenFile(fileName.c_str(), "r");
+    if (!inputFileStream.GetFile())
     {
         throw ReliveAPI::IOReadException(fileName);
     }
 
     std::string& jsonStr = getStaticStringBuffer();
-    readFileContentsIntoString(jsonStr, *inputFileStream);
+    inputFileStream.ReadInto(jsonStr);
 
     nlohmann::json rootObj = nlohmann::json::parse(jsonStr);
     if (rootObj.is_discarded())

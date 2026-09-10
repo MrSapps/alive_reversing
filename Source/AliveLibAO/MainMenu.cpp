@@ -22,7 +22,7 @@
 #include "Sound.hpp"
 #include "../relive_lib/GameObjects/Particle.hpp"
 #include "../relive_lib/Camera.hpp"
-#include "../AliveLibAE/Io.hpp"
+#include "../relive_lib/data_conversion/file_system.hpp"
 #include "Input.hpp"
 #include "Path.hpp"
 #include "../relive_lib/Psx.hpp"
@@ -1412,7 +1412,7 @@ void Menu::To_Load_Update()
         if (pMenuTrans->field_16_bDone)
         {
             sSaveIdx = 0;
-            IO_EnumerateDirectory("*.json", [](const char_type* fileName, u32 /*lastWriteTime*/)
+            GetResMan().mFs.EnumerateDirectory("*.json", [](const char_type* fileName, u32 /*lastWriteTime*/)
                                   {
                                       if (sSaveIdx < 128) // TODO: Array len
                                       {

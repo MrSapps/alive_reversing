@@ -1,4 +1,5 @@
 #include "AnimationConverter.hpp"
+#include "file_system.hpp"
 #include "nlohmann/json.hpp"
 #include "../Compression.hpp"
 #include "../../AliveLibAE/Compression.hpp" // TODO: combine with common compression files
@@ -82,7 +83,7 @@ static bool AttemptHalfSpaceBinPack(std::vector<mapbox::Bin>& myBins, std::vecto
     return false;
 }
 
-AnimationConverter::AnimationConverter(const FileSystem::Path& outputFile, const AnimRecord& rec, const std::vector<u8>& fileData, bool isAoData)
+AnimationConverter::AnimationConverter(FileSystem& fs, const FileSystem::Path& outputFile, const AnimRecord& rec, const std::vector<u8>& fileData, bool isAoData)
     : mFileData(fileData)
     , mIsAoData(isAoData)
 {
@@ -298,7 +299,7 @@ AnimationConverter::AnimationConverter(const FileSystem::Path& outputFile, const
     }
 
     PNGFile pngFile;
-    pngFile.Save((outputFile.GetPath() + ".png").c_str(), pal, spriteSheetBuffer, allocTextureSize, allocTextureSize);
+    pngFile.Save(fs, (outputFile.GetPath() + ".png").c_str(), pal, spriteSheetBuffer, allocTextureSize, allocTextureSize);
 
     // Write json file
     AnimAttributes attributes = {};
@@ -327,8 +328,7 @@ AnimationConverter::AnimationConverter(const FileSystem::Path& outputFile, const
     animJsonInfo["frames"] = perFrameInfos;
 
     const std::string animJsonInfoString = animJsonInfo.dump(4);
-    AutoFILE jsonFile;
-    jsonFile.Open((outputFile.GetPath() + ".json").c_str(), "wb", false);
+    AutoFILE jsonFile = fs.OpenFile((outputFile.GetPath() + ".json").c_str(), "wb");
     jsonFile.Write(reinterpret_cast<const u8*>(animJsonInfoString.c_str()), static_cast<u32>(animJsonInfoString.size()));
 }
 

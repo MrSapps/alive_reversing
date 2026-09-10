@@ -5,13 +5,7 @@
 #include <assert.h>
 #include "FatalError.hpp"
 #include "data_conversion/rgb_conversion.hpp"
-
-Movie_IO sMovie_IO_BBB314 = {};
-
-Movie_IO& GetMovieIO()
-{
-    return sMovie_IO_BBB314;
-}
+#include "data_conversion/file_system.hpp"
 
 AudioDecompressor::AudioDecompressor()
 {
@@ -736,7 +730,7 @@ static void Populate_Y_C_Tables(int quantScale)
     }
 }
 
-s32 Masher::Init(const char_type* movieFileName)
+s32 Masher::Init(FileSystem& fs, const char_type* movieFileName)
 {
     field_40_video_frame_to_decode = nullptr;
     field_44_decoded_frame_data_buffer = nullptr;
@@ -750,11 +744,11 @@ s32 Masher::Init(const char_type* movieFileName)
     field_88_audio_data_offset = 0;
 
     // Open the file
-    field_0_file_handle = sMovie_IO_BBB314.mIO_Open(movieFileName);
+    field_0_file_handle = fs.OpenFile(movieFileName, "rb");
 
     // Read file magic
     u32 fileMagic = 0;
-    if (!field_0_file_handle || !sMovie_IO_BBB314.mIO_Read(field_0_file_handle, (u8*) &fileMagic, sizeof(u32)) || !sMovie_IO_BBB314.mIO_Wait(field_0_file_handle))
+    if (!field_0_file_handle.GetFile() || !field_0_file_handle.Read(fileMagic))
     {
         return 1;
     }
@@ -767,7 +761,7 @@ s32 Masher::Init(const char_type* movieFileName)
     }
 
     // Read DDV header
-    if (!sMovie_IO_BBB314.mIO_Read(field_0_file_handle, (u8*) &field_4_ddv_header, sizeof(Masher_Header)) || !sMovie_IO_BBB314.mIO_Wait(field_0_file_handle))
+    if (!field_0_file_handle.Read(field_4_ddv_header))
     {
         return 1;
     }
@@ -783,7 +777,7 @@ s32 Masher::Init(const char_type* movieFileName)
     if (field_61_bHasVideo)
     {
         // Read the video header
-        if (!sMovie_IO_BBB314.mIO_Read(field_0_file_handle, (u8*) &field_14_video_header, sizeof(Masher_VideoHeader)) || !sMovie_IO_BBB314.mIO_Wait(field_0_file_handle))
+        if (!field_0_file_handle.Read(field_14_video_header))
         {
             return 1;
         }
@@ -821,7 +815,7 @@ s32 Masher::Init(const char_type* movieFileName)
     if (field_60_bHasAudio)
     {
         // Read audio header
-        if (!sMovie_IO_BBB314.mIO_Read(field_0_file_handle, (u8*) &field_2C_audio_header, sizeof(Masher_AudioHeader)) || !sMovie_IO_BBB314.mIO_Wait(field_0_file_handle))
+        if (!field_0_file_handle.Read(field_2C_audio_header))
         {
             return 1;
         }
@@ -867,7 +861,7 @@ s32 Masher::Init(const char_type* movieFileName)
     }
 
     // Populate frame sizes array from disk
-    if (!sMovie_IO_BBB314.mIO_Read(field_0_file_handle, (u8*) field_70_frame_sizes_array, frameSizeArrayInBytes) || !sMovie_IO_BBB314.mIO_Wait(field_0_file_handle))
+    if (!field_0_file_handle.Read(reinterpret_cast<u8*>(field_70_frame_sizes_array), frameSizeArrayInBytes))
     {
         return 1;
     }
@@ -882,11 +876,6 @@ s32 Masher::Init(const char_type* movieFileName)
 
 Masher::~Masher()
 {
-    if (field_0_file_handle)
-    {
-        sMovie_IO_BBB314.mIO_Close(field_0_file_handle);
-    }
-
     free(field_70_frame_sizes_array);
     free(field_80_raw_frame_data);
     free(field_44_decoded_frame_data_buffer);
@@ -909,7 +898,7 @@ s32 Masher::ReadNextFrame()
         }
 
         if (frameSizeToRead > 0
-            && (!sMovie_IO_BBB314.mIO_Wait(field_0_file_handle) || !sMovie_IO_BBB314.mIO_Read(field_0_file_handle, (u8*) field_80_raw_frame_data + field_88_audio_data_offset, frameSizeToRead)))
+            && !field_0_file_handle.Read((u8*) field_80_raw_frame_data + field_88_audio_data_offset, frameSizeToRead))
         {
             return 0;
         }
@@ -946,7 +935,7 @@ s32 Masher::ReadNextFrameToMemory_4EAC30(Masher* pMasher)
     s32* pFrameSize = pMasher->field_74_pCurrentFrameSize;
     s32 sizeToRead = *pFrameSize;
     pMasher->field_74_pCurrentFrameSize = pFrameSize + 1;
-    if (!sMovie_IO_BBB314.mIO_Read(pMasher->field_0_file_handle, reinterpret_cast<u8*>(pMasher->field_80_raw_frame_data), sizeToRead) || !sMovie_IO_BBB314.mIO_Wait(pMasher->field_0_file_handle))
+    if (!pMasher->field_0_file_handle.Read(reinterpret_cast<u8*>(pMasher->field_80_raw_frame_data), sizeToRead))
     {
         return 0;
     }

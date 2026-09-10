@@ -5,6 +5,7 @@
 #include <deque>
 
 class Masher;
+class FileSystem;
 
 namespace relive
 {
@@ -66,7 +67,7 @@ private:
 class DDVAe final
 {
 public:
-    DDVAe(const char_type* pDDVName, IDDVReaderCallBacks* callBacks);
+    DDVAe(FileSystem& fs, const char_type* pDDVName, IDDVReaderCallBacks* callBacks);
     ~DDVAe();
     bool StepFrame();
     bool ReadInfo();
@@ -89,6 +90,7 @@ public:
         return mAudioFrames; 
     }
 private:
+    FileSystem& mFs;
     std::string mDDvName;
     IDDVReaderCallBacks* mCallBacks = nullptr;
     std::vector<u8> mPixels;

@@ -534,10 +534,6 @@ Do you want to overwrite it?</source>
         <translation></translation>
     </message>
     <message>
-        <source>Export to lvl</source>
-        <translation>Nach lvl exportieren</translation>
-    </message>
-    <message>
         <source>Edit HintFly messages</source>
         <translation>HintFly Nachrichten bearbeiten</translation>
     </message>
@@ -723,57 +719,6 @@ Do you want to overwrite it?</source>
     <message>
         <source>Connected collisions</source>
         <translation>Verbundene Kollisionen</translation>
-    </message>
-</context>
-<context>
-    <name>ExportPathDialog</name>
-    <message>
-        <source>Export path to lvl</source>
-        <translation></translation>
-    </message>
-    <message>
-        <source>LVL file</source>
-        <translation>LVL Datei</translation>
-    </message>
-    <message>
-        <source>Browse</source>
-        <translation>Durchsuchen</translation>
-    </message>
-    <message>
-        <source>Path json file</source>
-        <translation>Pfad json Datei</translation>
-    </message>
-    <message>
-        <source>Location of extra LVLs to find resources in</source>
-        <translation>Standort zusätzlicher LVLs in denen Ressourcen gefunden werden können</translation>
-    </message>
-    <message>
-        <source>R.E.L.I.V.E executable path</source>
-        <translation>R.E.L.I.V.E Programm Pfad</translation>
-    </message>
-    <message>
-        <source>Save path json</source>
-        <translation>Pfad json speichern</translation>
-    </message>
-    <message>
-        <source>Json Files (*.json);;All Files (*)</source>
-        <translation>Json Dateien (*.json);;Alle Dateien (*)</translation>
-    </message>
-    <message>
-        <source>Open level</source>
-        <translation>Level öffnen</translation>
-    </message>
-    <message>
-        <source>Level Files (*.lvl);;All Files (*)</source>
-        <translation>Level Dateien (*.lvl);;Alle Dateien (*)</translation>
-    </message>
-    <message>
-        <source>Select R.E.L.I.V.E executable</source>
-        <translation>R.E.L.I.V.E. Programm auswählen</translation>
-    </message>
-    <message>
-        <source>Select LVLs source dir</source>
-        <translation>LVLs Quellverzeichnis auswählen</translation>
     </message>
 </context>
 <context>

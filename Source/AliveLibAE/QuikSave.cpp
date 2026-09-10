@@ -14,7 +14,7 @@
 #include "../relive_lib/Events.hpp"
 #include "WorkWheel.hpp"
 #include "Drill.hpp"
-#include "Io.hpp"
+#include "../relive_lib/data_conversion/file_system.hpp"
 #include "LiftPoint.hpp"
 #include "LiftMover.hpp"
 #include "../relive_lib/GameObjects/TrapDoor.hpp"
@@ -489,11 +489,11 @@ static s32 Sort_comparitor_4D42C0(const void* pSaveRecLeft, const void* pSaveRec
     }
 }
 
-void QuikSave::FindSaves()
+void QuikSave::FindSaves(FileSystem& fs)
 {
     gTotalSaveFilesCount = 0;
 
-    IO_EnumerateDirectory("*.json", [](const char_type* fileName, u32 lastWriteTime)
+    fs.EnumerateDirectory("*.json", [](const char_type* fileName, u32 lastWriteTime)
                           {
                               if (gTotalSaveFilesCount < 128)
                               {

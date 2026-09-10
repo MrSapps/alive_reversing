@@ -8,8 +8,8 @@
 
 namespace relive
 {
-DDVAe::DDVAe(const char_type* pDDVName, IDDVReaderCallBacks* callBacks)
- : mDDvName(pDDVName), mCallBacks(callBacks)
+DDVAe::DDVAe(FileSystem& fs, const char_type* pDDVName, IDDVReaderCallBacks* callBacks)
+ : mFs(fs), mDDvName(pDDVName), mCallBacks(callBacks)
 {
 
 }
@@ -107,7 +107,7 @@ bool DDVAe::ReadInfo()
     }
 
     sMasherInstance = relive_new Masher();
-    if (sMasherInstance->Init(mDDvName.c_str()))
+    if (sMasherInstance->Init(mFs, mDDvName.c_str()))
     {
         relive_delete sMasherInstance;
         sMasherInstance = nullptr;

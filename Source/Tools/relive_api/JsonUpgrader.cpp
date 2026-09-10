@@ -3,7 +3,7 @@
 #include "JsonMapRootInfoReader.hpp"
 #include "JsonReadUtils.hpp"
 #include "TypesCollectionBase.hpp"
-#include "file_api.hpp"
+#include "../../relive_lib/data_conversion/file_system.hpp"
 #include "nlohmann/json.hpp"
 
 namespace ReliveAPI {
@@ -90,16 +90,16 @@ void JsonUpgraderBase::RenameMapObjectProperty(nlohmann::json& rootObj, const st
     }
 }
 
-std::string JsonUpgraderBase::Upgrade(TypesCollectionBase& baseTypesCollection, IFileIO& fileIO, const std::string& jsonFile, s32 currentJsonVersion, s32 targetApiVersion)
+std::string JsonUpgraderBase::Upgrade(TypesCollectionBase& baseTypesCollection, FileSystem& fs, const std::string& jsonFile, s32 currentJsonVersion, s32 targetApiVersion)
 {
-    auto inputFileStream = fileIO.Open(jsonFile, IFileIO::Mode::Read);
-    if (!inputFileStream->IsOpen())
+    AutoFILE inputFileStream = fs.OpenFile(jsonFile.c_str(), "r");
+    if (!inputFileStream.GetFile())
     {
         throw ReliveAPI::IOReadException(jsonFile);
     }
 
     std::string& jsonStr = getStaticStringBuffer();
-    readFileContentsIntoString(jsonStr, *inputFileStream);
+    inputFileStream.ReadInto(jsonStr);
 
     UpgradeTargetIsValid(currentJsonVersion, targetApiVersion);
 

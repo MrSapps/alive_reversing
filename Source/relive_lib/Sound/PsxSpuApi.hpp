@@ -2,7 +2,9 @@
 
 #include "../../relive_lib/Function.hpp"
 #include "Sound.hpp"
-#include "../../AliveLibAE/Io.hpp"
+
+class AutoFILE;
+class FileSystem;
 
 struct ProgAtr final
 {
@@ -184,7 +186,7 @@ public:
     virtual s8& sbDisableSeqs() = 0;
     virtual u32& sLastTime() = 0;
     virtual u32& sMidi_WaitUntil() = 0;
-    virtual IO_FileHandleType& sSoundDatFileHandle() = 0;
+    virtual AutoFILE& sSoundDatFileHandle() = 0;
     virtual u8& sControllerValue() = 0;
     virtual void MIDI_ParseMidiMessage(s32 idx) = 0;
     virtual void SsUtKeyOffV(s32 idx) = 0;
@@ -193,7 +195,7 @@ public:
 void SetSpuApiVars(IPsxSpuApiVars* pVars);
 IPsxSpuApiVars* GetSpuApiVars();
 
-void SsVabTransBody_4FC840(VabBodyRecord* pVabBody, s16 vabId);
+void SsVabTransBody_4FC840(FileSystem& fs, VabBodyRecord* pVabBody, s16 vabId);
 
 #define SS_WAIT_COMPLETED 1
 void SsVabTransCompleted(s32 immediateFlag);

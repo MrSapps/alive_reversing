@@ -1,8 +1,8 @@
 #include "../stdafx.h"
 #include "PsxSpuApi.hpp"
 #include "../../relive_lib/Function.hpp"
-#include "../../AliveLibAE/Io.hpp"
 #include "../../AliveLibAE/stdlib.hpp"
+#include "../data_conversion/file_system.hpp"
 #include "../../relive_lib/ResourceManagerWrapper.hpp"
 #include "Sound.hpp"    // SoundEntry structure
 #include "../../relive_lib/Sys.hpp"      // SYS_GetTicks
@@ -76,7 +76,7 @@ bool sSoundDatIsNull_BD1CE8 = 1;
 s8 sbDisableSeqs_BD1CE4 = 0;
 u32 sLastTime_578E20 = 0xFFFFFFFF;
 u32 sMidi_WaitUntil_BD1CF0 = 0;
-IO_FileHandleType sSoundDatFileHandle_BD1CE0 = nullptr;
+AutoFILE sSoundDatFileHandle_BD1CE0;
 u8 sControllerValue_BD1CFC = 0;
 
 
@@ -167,7 +167,7 @@ public:
         return sMidi_WaitUntil_BD1CF0;
     }
 
-    virtual IO_FileHandleType& sSoundDatFileHandle() override
+    virtual AutoFILE& sSoundDatFileHandle() override
     {
         return sSoundDatFileHandle_BD1CE0;
     }
@@ -320,13 +320,13 @@ s32 SND_SoundsDat_Read_4FC4E0(VabHeader* pVabHeader, VabBodyRecord* pVabBody, s3
 {
     const s32 sampleOffset = *SND_SoundsDat_Get_Sample_Offset_4FC3D0(pVabHeader, pVabBody, idx); // = field_8_fileOffset
     const s32 sampleLen = SND_SoundsDat_Get_Sample_Len_4FC400(pVabHeader, pVabBody, idx);
-    if (sampleOffset == -1 || !gSpuVars->sSoundDatFileHandle())
+    if (sampleOffset == -1 || !gSpuVars->sSoundDatFileHandle().GetFile())
     {
         return 0;
     }
 
-    IO_Seek(gSpuVars->sSoundDatFileHandle(), sampleOffset, 0);
-    IO_Read(gSpuVars->sSoundDatFileHandle(), pBuffer, 2 * sampleLen, 1u);
+    gSpuVars->sSoundDatFileHandle().Seek(static_cast<u32>(sampleOffset), AutoFILE::SeekMode::Start);
+    gSpuVars->sSoundDatFileHandle().Read(static_cast<u8*>(pBuffer), static_cast<u32>(2 * sampleLen));
 
     return sampleLen;
 }
@@ -427,15 +427,15 @@ s16 SsVabOpenHead(VabHeader* pVabHeader)
 }
 
 // Loads sounds dat to memory
-void SsVabTransBody_4FC840(VabBodyRecord* pVabBody, s16 vabId)
+void SsVabTransBody_4FC840(FileSystem& fs, VabBodyRecord* pVabBody, s16 vabId)
 {
     if (vabId < 0)
     {
         return;
     }
 
-    gSpuVars->sSoundDatFileHandle() = IO_Open("sounds.dat", "rb");
-    gSpuVars->sSoundDatIsNull() = gSpuVars->sSoundDatFileHandle() == nullptr;
+    gSpuVars->sSoundDatFileHandle() = fs.OpenFile("sounds.dat", "rb");
+    gSpuVars->sSoundDatIsNull() = gSpuVars->sSoundDatFileHandle().GetFile() == nullptr;
 
     assert(vabId < 4);
     VabHeader* pVabHeader = gSpuVars->spVabHeaders()[vabId];
@@ -498,11 +498,7 @@ void SsVabTransBody_4FC840(VabBodyRecord* pVabBody, s16 vabId)
         }
     }
 
-    if (gSpuVars->sSoundDatFileHandle())
-    {
-        IO_Close(gSpuVars->sSoundDatFileHandle());
-        gSpuVars->sSoundDatFileHandle() = nullptr;
-    }
+    gSpuVars->sSoundDatFileHandle().Close();
 }
 
 s32 MIDI_Invert_4FCA40(s32 /*not_used*/, s32 value)
