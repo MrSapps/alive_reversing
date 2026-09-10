@@ -610,10 +610,6 @@ Do you want to overwrite it?</source>
         <translation>Alle speichern</translation>
     </message>
     <message>
-        <source>Export and play</source>
-        <translation>Exportieren und spielen</translation>
-    </message>
-    <message>
         <source>Ready</source>
         <translation>Bereit</translation>
     </message>
