@@ -16,6 +16,15 @@ public:
     void DecodeFrameToPCM(std::array<s16, 4032>& out, uint8_t* arg_adpcm_frame);
     void DecodeFrameToPCM(std::vector<s16>& out, uint8_t* arg_adpcm_frame);
 
+private:
+    // ADPCM predictor history - must persist across successive DecodeFrameToPCM calls
+    // for the same stream, but is scoped per-instance so two decoders (e.g. running on
+    // different threads for different movies) don't stomp on each other's state.
+    f64 mOldLeft = 0;
+    f64 mOlderLeft = 0;
+    f64 mOldRight = 0;
+    f64 mOlderRight = 0;
+
 public:
 #pragma pack(push)
 #pragma pack(1)

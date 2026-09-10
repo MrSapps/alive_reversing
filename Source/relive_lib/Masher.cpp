@@ -195,10 +195,8 @@ void AudioDecompressor::SetChannelCount(s32 numChannels)
 
 /*static*/ void AudioDecompressor::init_Snd_tbl()
 {
-    static bool done = false;
-    if (!done)
+    static const bool done = []
     {
-        done = true;
         s32 index = 0;
         do
         {
@@ -210,7 +208,9 @@ void AudioDecompressor::SetChannelCount(s32 numChannels)
             gSndTbl_byte_62EEB0[index++] = static_cast<u8>(tableValue);
         }
         while (index < 256);
-    }
+        return true;
+    }();
+    (void)done;
 }
 
 /*static*/ u8 AudioDecompressor::gSndTbl_byte_62EEB0[256];
@@ -510,16 +510,15 @@ const u32 g_block_related_3_dword_42B0D0[64] = {
     0x0000002D, 0x00000026, 0x0000001F, 0x00000027, 0x0000002E, 0x00000035, 0x0000003C, 0x0000003D,
     0x00000036, 0x0000002F, 0x00000037, 0x0000003E, 0x0000003F, 0x0000098E, 0x0000098E, 0x0000F384};
 
-u32 g_CTable[64] = {};
-u32 g_YTable[64] = {};
-
 // Return val becomes param 1
 
 // for Cr, Cb, Y1, Y2, Y3, Y4
-int16_t* RunLengthToBlock(int16_t* inPtr, int16_t* outputBlockPtr, bool isYBlock)
+// mCTable/mYTable were file-static globals (g_CTable/g_YTable) shared by every Masher
+// instance; now per-instance members so concurrent conversions can't race on them.
+int16_t* Masher::RunLengthToBlock(int16_t* inPtr, int16_t* outputBlockPtr, bool isYBlock)
 {
     const s32 v1 = isYBlock;
-    const u32* pTable = isYBlock ? &g_YTable[1] : &g_CTable[1];
+    const u32* pTable = isYBlock ? &mYTable[1] : &mCTable[1];
     u32 counter = 0;
     u16* pInput = reinterpret_cast<u16*>(inPtr);
     u32* pOutput = reinterpret_cast<u32*>(outputBlockPtr); // off 10 quantised coefficients
@@ -636,16 +635,6 @@ int16_t* RunLengthToBlock(int16_t* inPtr, int16_t* outputBlockPtr, bool isYBlock
     return reinterpret_cast<int16_t*>(pInput);
 }
 
-// TODO: Should probably just be 64? Making this bigger fixes a sound glitch which is probably caused
-// by an out of bounds write somewhere.
-typedef std::array<int32_t, 64 * 4> T64IntsArray;
-
-static T64IntsArray Cr_block = {};
-static T64IntsArray Cb_block = {};
-static T64IntsArray Y1_block = {};
-static T64IntsArray Y2_block = {};
-static T64IntsArray Y3_block = {};
-static T64IntsArray Y4_block = {};
 
 
 static void half_idct(T64IntsArray& pSource, T64IntsArray& pDestination, s32 nPitch, s32 nIncrement, s32 nShift)
@@ -699,12 +688,12 @@ static void idct(int16_t* input, T64IntsArray& pDestination) // dst is 64 dwords
 }
 
 
-static void Populate_Y_C_Tables(int quantScale)
+void Masher::Populate_Y_C_Tables(int quantScale)
 {
     if (quantScale > 0)
     {
-        g_YTable[0] = 16;
-        g_CTable[0] = 16;
+        mYTable[0] = 16;
+        mCTable[0] = 16;
         signed int result = 0;
         do
         {
@@ -713,8 +702,8 @@ static void Populate_Y_C_Tables(int quantScale)
 
             result++; // TODO: Bug ?  Surely Y and C should be done the same way
             // 1
-            g_YTable[result] = quantScale * val;
-            g_CTable[result] = quantScale * k_CTable_Matrix_42AFC4[result];
+            mYTable[result] = quantScale * val;
+            mCTable[result] = quantScale * k_CTable_Matrix_42AFC4[result];
 
 
         } while (result < 63);                   // 252/4=63
@@ -724,8 +713,8 @@ static void Populate_Y_C_Tables(int quantScale)
         // These are simply null buffers to start with
         for (s32 i = 0; i < 64; i++)
         {
-            g_CTable[i] = 16;
-            g_YTable[i] = 16;
+            mCTable[i] = 16;
+            mYTable[i] = 16;
         }
     }
 }
@@ -996,27 +985,27 @@ void Masher::VideoFrameDecode(RGBA32* pPixelBuffer)
             const s32 dataSizeBytes = field_90_64_or_0 * 2; // Convert to byte count 64*4=256
 
             int16_t* afterBlock1Ptr = RunLengthToBlock(bitstreamCurPos, block1Output, 0);
-            idct(block1Output, Cr_block);
+            idct(block1Output, mCr_block);
             int16_t* block2Output = dataSizeBytes + block1Output;
 
             int16_t* afterBlock2Ptr = RunLengthToBlock(afterBlock1Ptr, block2Output, 0);
-            idct(block2Output, Cb_block);
+            idct(block2Output, mCb_block);
             int16_t* block3Output = dataSizeBytes + block2Output;
 
             int16_t* afterBlock3Ptr = RunLengthToBlock(afterBlock2Ptr, block3Output, 1);
-            idct(block3Output, Y1_block);
+            idct(block3Output, mY1_block);
             int16_t* block4Output = dataSizeBytes + block3Output;
 
             int16_t* afterBlock4Ptr = RunLengthToBlock(afterBlock3Ptr, block4Output, 1);
-            idct(block4Output, Y2_block);
+            idct(block4Output, mY2_block);
             int16_t* block5Output = dataSizeBytes + block4Output;
 
             int16_t* afterBlock5Ptr = RunLengthToBlock(afterBlock4Ptr, block5Output, 1);
-            idct(block5Output, Y3_block);
+            idct(block5Output, mY3_block);
             int16_t* block6Output = dataSizeBytes + block5Output;
 
             bitstreamCurPos = RunLengthToBlock(afterBlock5Ptr, block6Output, 1);
-            idct(block6Output, Y4_block);
+            idct(block6Output, mY4_block);
             block1Output = dataSizeBytes + block6Output;
 
             if (pPixelBuffer)
@@ -1037,37 +1026,28 @@ void Masher::VideoFrameDecode(RGBA32* pPixelBuffer)
     }
 }
 
-static s32 gMasher_num_channels_BBB9B4 = 0;
-static s32 gMasher_bits_per_sample_BBB9A8 = 0;
-
-void Masher::DDV_Set_Channels_And_BitsPerSample_4ECFD0(s32 numChannels, s32 bitsPerSample)
-{
-    gMasher_num_channels_BBB9B4 = numChannels;
-    gMasher_bits_per_sample_BBB9A8 = bitsPerSample;
-}
-
-void Masher::DDV_DecompressAudioFrame_4ECFF0(s32* pMasherFrame, u8* pDecodedFrame, s32 frameSize)
+void Masher::DDV_DecompressAudioFrame_4ECFF0(s32* pMasherFrame, u8* pDecodedFrame, s32 frameSize, s32 numChannels, s32 bitsPerSample)
 {
     AudioDecompressor decompressor;
-    const s32 bytesPerSample = gMasher_bits_per_sample_BBB9A8 / 8;
+    const s32 bytesPerSample = bitsPerSample / 8;
     decompressor.SetChannelCount(bytesPerSample);
     decompressor.SetupAudioDecodePtrs(reinterpret_cast<u16*>(pMasherFrame));
-    memset(pDecodedFrame, 0, frameSize * bytesPerSample * gMasher_num_channels_BBB9B4);
+    memset(pDecodedFrame, 0, frameSize * bytesPerSample * numChannels);
 
-    if (gMasher_bits_per_sample_BBB9A8 == 8)
+    if (bitsPerSample == 8)
     {
         u8* pAsByte = pDecodedFrame;
         decompressor.decode_8bit_audio_frame(pAsByte, frameSize, false);
-        if (gMasher_num_channels_BBB9B4 == 2)
+        if (numChannels == 2)
         {
             decompressor.decode_8bit_audio_frame(pAsByte + 1, frameSize, true);
         }
     }
 
-    if (gMasher_bits_per_sample_BBB9A8 == 16)
+    if (bitsPerSample == 16)
     {
         decompressor.decode_16bit_audio_frame(reinterpret_cast<u16*>(pDecodedFrame), frameSize, false);
-        if (gMasher_num_channels_BBB9B4 == 2)
+        if (numChannels == 2)
         {
             decompressor.decode_16bit_audio_frame(reinterpret_cast<u16*>(pDecodedFrame) + 1, frameSize, true);
         }
@@ -1080,11 +1060,12 @@ void* Masher::GetDecompressedAudioFrame_4EAC60(Masher* pMasher)
     if (pMasher->field_60_bHasAudio
         && pMasher->field_64_audio_frame_idx < pMasher->field_4_ddv_header.field_C_number_of_frames)
     {
-        DDV_Set_Channels_And_BitsPerSample_4ECFD0(pMasher->field_50_num_channels, pMasher->field_54_bits_per_sample);
         DDV_DecompressAudioFrame_4ECFF0(
             pMasher->field_48_sound_frame_to_decode,
             static_cast<u8*>(pMasher->field_4C_decoded_audio_buffer),
-            pMasher->field_2C_audio_header.field_C_single_audio_frame_size);
+            pMasher->field_2C_audio_header.field_C_single_audio_frame_size,
+            pMasher->field_50_num_channels,
+            pMasher->field_54_bits_per_sample);
         result = pMasher->field_4C_decoded_audio_buffer;
         ++pMasher->field_64_audio_frame_idx;
     }
@@ -1158,20 +1139,20 @@ void Masher::ConvertYuvToRgbAndBlit(RGBA32* pixelBuffer, s32 xoff, s32 yoff, s32
     {
         for (s32 y = 0; y < 8; y++)
         {
-            Macroblock_YCbCr[x][y].Y = static_cast<f32>(Y1_block[To1d(x, y)]);
-            Macroblock_YCbCr[x + 8][y].Y = static_cast<f32>(Y2_block[To1d(x, y)]);
-            Macroblock_YCbCr[x][y + 8].Y = static_cast<f32>(Y3_block[To1d(x, y)]);
-            Macroblock_YCbCr[x + 8][y + 8].Y = static_cast<f32>(Y4_block[To1d(x, y)]);
+            Macroblock_YCbCr[x][y].Y = static_cast<f32>(mY1_block[To1d(x, y)]);
+            Macroblock_YCbCr[x + 8][y].Y = static_cast<f32>(mY2_block[To1d(x, y)]);
+            Macroblock_YCbCr[x][y + 8].Y = static_cast<f32>(mY3_block[To1d(x, y)]);
+            Macroblock_YCbCr[x + 8][y + 8].Y = static_cast<f32>(mY4_block[To1d(x, y)]);
 
-            Macroblock_YCbCr[x * 2][y * 2].Cb = static_cast<f32>(Cb_block[To1d(x, y)]);
-            Macroblock_YCbCr[x * 2 + 1][y * 2].Cb = static_cast<f32>(Cb_block[To1d(x, y)]);
-            Macroblock_YCbCr[x * 2][y * 2 + 1].Cb = static_cast<f32>(Cb_block[To1d(x, y)]);
-            Macroblock_YCbCr[x * 2 + 1][y * 2 + 1].Cb = static_cast<f32>(Cb_block[To1d(x, y)]);
+            Macroblock_YCbCr[x * 2][y * 2].Cb = static_cast<f32>(mCb_block[To1d(x, y)]);
+            Macroblock_YCbCr[x * 2 + 1][y * 2].Cb = static_cast<f32>(mCb_block[To1d(x, y)]);
+            Macroblock_YCbCr[x * 2][y * 2 + 1].Cb = static_cast<f32>(mCb_block[To1d(x, y)]);
+            Macroblock_YCbCr[x * 2 + 1][y * 2 + 1].Cb = static_cast<f32>(mCb_block[To1d(x, y)]);
 
-            Macroblock_YCbCr[x * 2][y * 2].Cr = static_cast<f32>(Cr_block[To1d(x, y)]);
-            Macroblock_YCbCr[x * 2 + 1][y * 2].Cr = static_cast<f32>(Cr_block[To1d(x, y)]);
-            Macroblock_YCbCr[x * 2][y * 2 + 1].Cr = static_cast<f32>(Cr_block[To1d(x, y)]);
-            Macroblock_YCbCr[x * 2 + 1][y * 2 + 1].Cr = static_cast<f32>(Cr_block[To1d(x, y)]);
+            Macroblock_YCbCr[x * 2][y * 2].Cr = static_cast<f32>(mCr_block[To1d(x, y)]);
+            Macroblock_YCbCr[x * 2 + 1][y * 2].Cr = static_cast<f32>(mCr_block[To1d(x, y)]);
+            Macroblock_YCbCr[x * 2][y * 2 + 1].Cr = static_cast<f32>(mCr_block[To1d(x, y)]);
+            Macroblock_YCbCr[x * 2 + 1][y * 2 + 1].Cr = static_cast<f32>(mCr_block[To1d(x, y)]);
         }
     }
 

@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
-#include <mutex>
 #include <thread>
 
 #ifdef _MSC_VER
@@ -481,16 +480,6 @@ public:
 
     void Execute() override
     {
-        // Masher (AE's DDV decoder) and PSXADPCMDecoder (used by AO's PsxStrDemuxer)
-        // both carry process-wide static decode state left over from the original
-        // single-threaded engine code (e.g. Masher's IDCT scratch blocks and audio
-        // channel/bits-per-sample globals, PSXADPCMDecoder's ADPCM predictor history).
-        // Running more than one of these decodes at once corrupts whichever jobs
-        // overlap, so serialize the actual decode+encode work here - jobs still run
-        // off the calling thread via the pool, they just can't overlap each other.
-        static std::mutex sDecodeMutex;
-        std::unique_lock lock(sDecodeMutex);
-
         FmvConv fmvConv(mFs);
         if (mIsAo)
         {

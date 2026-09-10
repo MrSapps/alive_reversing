@@ -3,6 +3,7 @@
 #include "Function.hpp"
 #include "Types.hpp"
 #include "data_conversion/file_system.hpp"
+#include <array>
 
 struct Masher_Header final
 {
@@ -35,6 +36,8 @@ struct Masher_AudioHeader final
 ALIVE_ASSERT_SIZEOF(Masher_AudioHeader, 20);
 
 struct RGBA32;
+
+typedef std::array<int32_t, 64 * 4> T64IntsArray;
 
 class AudioDecompressor final
 {
@@ -90,11 +93,8 @@ public:
     void Decode_4EA670();
     void VideoFrameDecode(RGBA32* pPixelBuffer);
 
-    // Same as 0x52B015 in MGSI.exe
-    static void DDV_Set_Channels_And_BitsPerSample_4ECFD0(s32 numChannels, s32 bitsPerSample);
-
     // Same as 0x52B028 in MGSI.exe
-    static void DDV_DecompressAudioFrame_4ECFF0(s32* pMasherFrame, u8* pDecodedFrame, s32 frameSize);
+    static void DDV_DecompressAudioFrame_4ECFF0(s32* pMasherFrame, u8* pDecodedFrame, s32 frameSize, s32 numChannels, s32 bitsPerSample);
 
     // Same as 0x52899C in MGSI.exe
     static void* GetDecompressedAudioFrame_4EAC60(Masher* pMasher);
@@ -115,8 +115,24 @@ private:
 
     static void SetElement(s32 x, s32 y, s32 width, s32 height, RGBA32* ptr, const RGBA32& value, bool doubleWidth, bool doubleHeight);
 
-    static void ConvertYuvToRgbAndBlit(RGBA32* pixelBuffer, s32 xoff, s32 yoff, s32 width, s32 height, bool doubleWidth, bool doubleHeight);
+    // Non-static (was static, reading/writing file-static globals) so these can use
+    // this instance's own decode state - see the m*_block/m*Table members below.
+    void ConvertYuvToRgbAndBlit(RGBA32* pixelBuffer, s32 xoff, s32 yoff, s32 width, s32 height, bool doubleWidth, bool doubleHeight);
+    void Populate_Y_C_Tables(int quantScale);
+    int16_t* RunLengthToBlock(int16_t* inPtr, int16_t* outputBlockPtr, bool isYBlock);
 
+    // Per-macroblock IDCT output and quantization tables, used only within a single
+    // VideoFrameDecode() call. Formerly file-static/global (shared across every Masher
+    // instance and every in-flight decode), which corrupted output when more than one
+    // FMV converted concurrently - now scoped per-instance.
+    T64IntsArray mCr_block = {};
+    T64IntsArray mCb_block = {};
+    T64IntsArray mY1_block = {};
+    T64IntsArray mY2_block = {};
+    T64IntsArray mY3_block = {};
+    T64IntsArray mY4_block = {};
+    u32 mCTable[64] = {};
+    u32 mYTable[64] = {};
 
     AutoFILE field_0_file_handle;
 
