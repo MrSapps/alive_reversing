@@ -14,6 +14,7 @@
 #include "Engine.hpp"
 #include "Renderer/IRenderer.hpp"
 #include "data_conversion/rgb_conversion.hpp"
+#include "data_conversion/file_system.hpp"
 
 #include <numeric>
 #include <deque>
@@ -1001,14 +1002,8 @@ void Movie::Init()
 
 Movie::Movie(const char_type* pName, ResourceManagerWrapper& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
-    // HACK: pName is the original pre-conversion movie name (e.g. "SV160703.ddv") - the
-    // converted file that FmvConv::Convert produces is named "<original name>.webm"
-    // (see fmv_converter.cpp), so just append that extension for now. This doesn't yet
-    // account for the "fmvs" output subdirectory added to the converter, so it assumes
-    // the converted file has also been placed/copied next to where the game looks for
-    // it at runtime - needs revisiting once that's wired up properly.
-    , mName(std::string(pName) + ".webm")
 {
+    mName = resMan.FmvPath(pName);
     Init();
 }
 

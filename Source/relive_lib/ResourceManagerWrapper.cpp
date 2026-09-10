@@ -188,6 +188,14 @@ void ResourceManagerWrapper::PendAnimation(AnimId animId, const std::string& the
     }
 }
 
+std::string ResourceManagerWrapper::FmvPath(const std::string& fmvName) 
+{
+    FileSystem::Path filePath = BasePath();
+    filePath.Append("fmvs");
+    filePath.Append(fmvName + ".webm");
+    return filePath.GetPath();
+}
+
 AnimResource ResourceManagerWrapper::LoadAnimation(AnimId anim, const std::string& themeName)
 {
     // TODO: Remove this when all of factory etc is updated (since it will always already be loaded here)
