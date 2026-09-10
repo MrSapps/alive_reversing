@@ -1,6 +1,5 @@
 #include "../../relive_lib/stdafx.h"
 #include "TypesCollectionBase.hpp"
-#include "TlvObjectBase.hpp"
 #include "../../AliveLibAO/PathData.hpp"
 #include "../../AliveLibAO/Map.hpp"
 #include "../../AliveLibAE/Path.hpp"

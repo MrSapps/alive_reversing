@@ -3,10 +3,7 @@
 #include "../../relive_lib/Types.hpp"
 #include <string>
 #include <vector>
-#include <set>
 #include <nlohmann/json_fwd.hpp>
-
-enum class AnimId;
 
 namespace AO {
 class PathLineAO;
@@ -72,21 +69,6 @@ public:
     {
         return !mForegroundLayer.empty() || !mBackgroundLayer.empty() || !mForegroundWellLayer.empty() || !mBackgroundWellLayer.empty();
     }
-};
-
-struct CameraNameAndTlvBlob final
-{
-    s32 mId = 0;
-    s32 x = 0;
-    s32 y = 0;
-    std::string mName;
-    std::vector<std::vector<u8>> mTlvBlobs;
-
-    CameraImageAndLayers mCameraAndLayers;
-
-    [[nodiscard]] std::size_t TotalTlvSize() const;
-
-    std::set<AnimId> mRequiredResources;
 };
 
 struct MapRootInfo final

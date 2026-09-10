@@ -25,10 +25,7 @@ set(relive_api_src
     JsonModelTypes.cpp
     JsonMapRootInfoReader.hpp
     JsonMapRootInfoReader.cpp
-    JsonReaderBase.hpp
-    JsonReaderBase.cpp
-    JsonReaderRelive.hpp
-    JsonReaderRelive.cpp
+    ReliveLine.hpp
     JsonWriterBase.hpp
     JsonWriterBase.cpp
     JsonWriterRelive.hpp
@@ -54,16 +51,9 @@ set(relive_api_src
     relive_api.cpp
     relive_api.hpp
     relive_api_exceptions.hpp
-    TlvFactory.cpp
-    TlvFactory.hpp
-    TlvObjectBase.cpp
-    TlvObjectBase.hpp
-    TlvObjectBaseRelive.cpp
-    TlvObjectBaseRelive.hpp
     TlvObjectBaseMacros.hpp
     TypedProperty.cpp
     TypedProperty.hpp
-    TypesCollectionRelive.cpp
     TypesCollectionRelive.hpp
     TypesCollectionBase.cpp
     TypesCollectionBase.hpp

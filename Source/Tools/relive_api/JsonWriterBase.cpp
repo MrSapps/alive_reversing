@@ -2,7 +2,7 @@
 #include "TypesCollectionBase.hpp"
 #include "relive_api.hpp"
 #include <nlohmann/json.hpp>
-#include "../../relive_lib/data_conversion/LvlReaderWriter.hpp"
+#include "../../relive_lib/data_conversion/LvlReader.hpp"
 #include "CamConverter.hpp"
 #include "../../relive_lib/data_conversion/PathTlvsAE.hpp"
 #include "../../relive_lib/data_conversion/PathTlvsAO.hpp"
@@ -157,9 +157,7 @@ void JsonWriterBase::Save(std::vector<u8>& fileDataBuffer, LvlReader& lvlReader,
     schemaObject["object_structure_property_basic_types"] = mBaseTypesCollection.BasicTypesToJson();
     schemaObject["object_structure_property_enums"] = mBaseTypesCollection.EnumsToJson();
 
-    nlohmann::json objectStructuresArray = nlohmann::json::array();
-    mBaseTypesCollection.AddTlvsToJsonArray(objectStructuresArray);
-    schemaObject["object_structures"] = objectStructuresArray;
+    schemaObject["object_structures"] = nlohmann::json::array();
 
     rootObject["map"] = rootMapObject;
     rootObject["schema"] = schemaObject;

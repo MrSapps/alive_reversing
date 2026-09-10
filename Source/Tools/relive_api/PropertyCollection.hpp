@@ -8,6 +8,7 @@
 #include <nlohmann/json.hpp>
 
 #include <string>
+#include <type_traits>
 #include <unordered_set>
 
 namespace ReliveAPI {
@@ -77,4 +78,35 @@ protected:
     std::vector<const void*> mPropertiesInsertionOrdering;
     std::unordered_set<std::string> mRegisteredPropertyNames;
 };
+
+// Defined here as it depends on a full definition of PropertyCollection
+template <class T>
+void TypedProperty<T>::Read(const PropertyCollection& propertyCollection, const TypesCollectionBase& types, const nlohmann::json& properties, Context& context)
+{
+    if constexpr (std::is_enum_v<T>)
+    {
+        propertyCollection.ReadEnumValue(types, *m_data, properties, context);
+    }
+    else
+    {
+        propertyCollection.ReadBasicType(*m_data, properties);
+        (void) types; // statically compiled out in this branch
+        (void) context; // ditto
+    }
+}
+
+template <class T>
+void TypedProperty<T>::Write(const PropertyCollection& propertyCollection, const TypesCollectionBase& types, nlohmann::json& properties, Context& context)
+{
+    if constexpr (std::is_enum_v<T>)
+    {
+        propertyCollection.WriteEnumValue(types, properties, *m_data, context);
+    }
+    else
+    {
+        propertyCollection.WriteBasicType(*m_data, properties);
+        (void) types; // statically compiled out in this branch
+        (void) context; // ditto
+    }
+}
 } // namespace ReliveAPI

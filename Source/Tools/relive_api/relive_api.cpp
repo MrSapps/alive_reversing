@@ -3,10 +3,9 @@
 #include "../../AliveLibAE/Path.hpp"
 #include "../../AliveLibAE/PathData.hpp"
 #include "../../relive_lib/Collisions.hpp"
-#include "../../relive_lib/data_conversion/LvlReaderWriter.hpp"
+#include "../../relive_lib/data_conversion/LvlReader.hpp"
 #include "JsonUpgraderRelive.hpp"
 #include "JsonModelTypes.hpp"
-#include "JsonReaderRelive.hpp"
 #include "JsonWriterRelive.hpp"
 #include "JsonMapRootInfoReader.hpp"
 #include "ApiContext.hpp"
@@ -251,73 +250,6 @@ std::string UpgradePathJson(FileSystem& fs, const std::string& jsonFile)
     TypesCollectionRelive reliveTypes;
     return upgrader.Upgrade(reliveTypes, fs, jsonFile, rootInfo.mMapRootInfo.mVersion, GetApiVersion());
 }
-
-template <typename ReturnType, typename ContainerType>
-static ReturnType* ItemAtXY(ContainerType& container, s32 x, s32 y)
-{
-    for (auto& iteratedItem : container)
-    {
-        if (iteratedItem.x == x && iteratedItem.y == y)
-        {
-            return &iteratedItem;
-        }
-    }
-    return nullptr;
-}
-
-template <typename ItemType, typename ContainerType, typename FnOnItem>
-static void ForEachItemAtXY(u32 xSize, u32 ySize, ContainerType& container, FnOnItem onItem)
-{
-    for (u32 y = 0; y < ySize; y++)
-    {
-        for (u32 x = 0; x < xSize; x++)
-        {
-            auto item = ItemAtXY<ItemType>(container, x, y);
-            if (item)
-            {
-                onItem(*item);
-            }
-        }
-    }
-}
-
-/*
-static void WriteCollisionLine(ByteStream& s, const ::PathLine& line)
-{
-    s.Write(line.mRect.x);
-    s.Write(line.mRect.y);
-    s.Write(line.mRect.w);
-    s.Write(line.mRect.h);
-
-    s.Write(static_cast<u8>(line.mLineType));
-
-    s.Write(line.mPrevious);
-    s.Write(line.mNext);
-
-    s.Write(line.mLineLength);
-}
-*/
-
-/*
-static void WriteStringTable(const std::vector<std::string>& strings, ByteStream& s)
-{
-    // String count
-    s.Write(static_cast<u64>(strings.size()));
-
-    // String lengths (size of a pointer)
-    for (const auto& str : strings)
-    {
-        s.Write(static_cast<u64>(str.length() + 1));
-    }
-
-    // String data
-    for (const auto& str : strings)
-    {
-        s.Write(str);
-        s.Write(u8(0));
-    }
-}
-*/
 
 [[nodiscard]] EnumeratePathsResult EnumeratePaths(FileSystem& fs, const std::string& inputLvlFile)
 {

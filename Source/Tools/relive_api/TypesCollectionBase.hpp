@@ -6,7 +6,6 @@
 #include <nlohmann/json_fwd.hpp>
 
 namespace ReliveAPI {
-class TlvObjectBase;
 
 enum class Game
 {
@@ -22,9 +21,6 @@ public:
 
     TypesCollectionBase(const TypesCollectionBase&) = delete;
     TypesCollectionBase(TypesCollectionBase&&) = delete;
-
-    virtual void AddTlvsToJsonArray(nlohmann::json& array) = 0;
-    virtual std::unique_ptr<TlvObjectBase> MakeTlvFromString(const std::string& tlvTypeName) = 0;
 
     [[nodiscard]] nlohmann::json EnumsToJson() const;
     [[nodiscard]] nlohmann::json BasicTypesToJson() const;

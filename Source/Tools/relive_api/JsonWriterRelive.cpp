@@ -2,8 +2,7 @@
 #include "../../AliveLibAE/Path.hpp"
 #include <nlohmann/json.hpp>
 #include "TypesCollectionRelive.hpp"
-#include "JsonReaderBase.hpp"
-#include "TlvObjectBase.hpp"
+#include "ReliveLine.hpp"
 
 namespace ReliveAPI {
 
@@ -58,7 +57,7 @@ inline relive::Path_TLV* Next_TLV_Impl(relive::Path_TLV* pTlv)
     return reinterpret_cast<relive::Path_TLV*>(pNext);
 }
 
-[[nodiscard]] nlohmann::json JsonWriterRelive::ReadTlvStream(u8* ptr, Context& context)
+[[nodiscard]] nlohmann::json JsonWriterRelive::ReadTlvStream(u8* ptr, Context& /*context*/)
 {
     nlohmann::json mapObjects = nlohmann::json::array();
 
@@ -66,21 +65,7 @@ inline relive::Path_TLV* Next_TLV_Impl(relive::Path_TLV* pTlv)
     while (pPathTLV)
     {
         mTypeCounterMap[pPathTLV->mTlvType]++;
-        auto obj = mTypesCollection->MakeTlvRelive(pPathTLV->mTlvType, pPathTLV, mTypeCounterMap[pPathTLV->mTlvType]);
-        if (obj)
-        {
-            if (pPathTLV->mLength != obj->TlvLen())
-            {
-                LOG_ERROR("path tlv size of type %d should be %d but got %d", static_cast<s32>(pPathTLV->mTlvType), pPathTLV->mLength, obj->TlvLen());
-                throw ReliveAPI::WrongTLVLengthException();
-            }
-
-            mapObjects.push_back(obj->InstanceToJson(*mTypesCollection, context));
-        }
-        else
-        {
-            LOG_WARNING("Ignoring type: %d", static_cast<u32>(pPathTLV->mTlvType));
-        }
+        LOG_WARNING("Ignoring type: %d", static_cast<u32>(pPathTLV->mTlvType));
 
         pPathTLV = Next_TLV_Impl(pPathTLV);
     }

@@ -132,9 +132,7 @@ std::string JsonUpgraderBase::Upgrade(TypesCollectionBase& baseTypesCollection, 
         schemaObject["object_structure_property_basic_types"] = baseTypesCollection.BasicTypesToJson();
         schemaObject["object_structure_property_enums"] = baseTypesCollection.EnumsToJson();
 
-        nlohmann::json objectStructuresArray = nlohmann::json::array();
-        baseTypesCollection.AddTlvsToJsonArray(objectStructuresArray);
-        schemaObject["object_structures"] = objectStructuresArray;
+        schemaObject["object_structures"] = nlohmann::json::array();
 
         nlohmann::json newSchema = nlohmann::json::parse(schemaObject.dump(4), nullptr, false);
         if (newSchema.is_discarded())

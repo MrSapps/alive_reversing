@@ -42,16 +42,4 @@ namespace ReliveAPI {
 
     return obj;
 }
-
-[[nodiscard]] std::size_t CameraNameAndTlvBlob::TotalTlvSize() const
-{
-    std::size_t allTlvsLen = 0;
-
-    for (const auto& tlv : mTlvBlobs)
-    {
-        allTlvsLen += tlv.size();
-    }
-
-    return allTlvsLen;
-}
 } // namespace ReliveAPI
