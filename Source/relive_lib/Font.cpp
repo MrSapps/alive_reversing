@@ -18,6 +18,52 @@ namespace
 {
     constexpr u32 kGlyphIdNamedFlag = 0x8000'0000u;
     constexpr u32 kGlyphIdSmallFlag = 0x4000'0000u;
+
+    // If text[i] starts a "{Name}" macro or a "{{" escape, describes how many raw bytes it spans;
+    // mRawByteLength is left at 0 for anything else (unknown/unterminated macro included), telling
+    // the caller to fall back to decoding text[i] as an ordinary character. Mirrors the exact rule
+    // FontString::Parse segments text with, kept in one place because both SliceText and
+    // AliveFont::MeasureLeadingGlyphWidth need to recognise it directly off raw text - callers that
+    // step through a string one rendered glyph at a time rather than through a pre-parsed FontString.
+    struct MacroSpan
+    {
+        size_t mRawByteLength = 0;
+        bool mIsEscape = false; // "{{" -> literal '{'; mNamedGlyph is unused in this case
+        NamedGlyph mNamedGlyph = NamedGlyph::Button_A;
+    };
+
+    MacroSpan TryDecodeMacroAt(const char_type* text, size_t i)
+    {
+        MacroSpan span;
+        if (text[i] != '{')
+        {
+            return span;
+        }
+
+        if (text[i + 1] == '{')
+        {
+            span.mRawByteLength = 2;
+            span.mIsEscape = true;
+            return span;
+        }
+
+        const char_type* closeBrace = strchr(text + i + 1, '}');
+        if (!closeBrace)
+        {
+            return span;
+        }
+
+        const std::string_view macroName(text + i + 1, static_cast<size_t>(closeBrace - (text + i + 1)));
+        NamedGlyph namedGlyph = NamedGlyph::Button_A;
+        if (!NamedGlyphFromMacroName(macroName, namedGlyph))
+        {
+            return span;
+        }
+
+        span.mRawByteLength = static_cast<size_t>(closeBrace + 1 - (text + i));
+        span.mNamedGlyph = namedGlyph;
+        return span;
+    }
 } // namespace
 
 GlyphId GlyphId::FromCodepoint(char32_t codepoint, GlyphSize size)
@@ -373,7 +419,54 @@ s32 AliveFont::MeasureCharacterWidth(char_type character)
     return result;
 }
 
-// Wasn't too sure what to call this. Returns the char offset of where the text is cut off. (left and right region)
+// Measures the width of the single glyph unit at the start of text, and reports via outByteLength
+// how many raw UTF-8 bytes it occupies - 1 for a plain/control byte (matching MeasureCharacterWidth
+// exactly), more for a multi-byte codepoint or a whole "{Name}" macro. For anything but the plain
+// single-byte case, this can't be answered by looking at text[0] alone, so callers that need to
+// step through text one rendered glyph at a time (LCDScreen's scrolling ticker) should use this
+// instead of assuming one raw byte is always one glyph.
+s32 AliveFont::MeasureLeadingGlyphWidth(const char_type* text, size_t& outByteLength)
+{
+    const MacroSpan macro = TryDecodeMacroAt(text, 0);
+    if (macro.mRawByteLength != 0 && !macro.mIsEscape)
+    {
+        outByteLength = macro.mRawByteLength;
+
+        const auto it = mFontContext->mAtlas->find(GlyphId::FromNamed(macro.mNamedGlyph));
+        const s32 width = (it != mFontContext->mAtlas->end()) ? it->second.mWidth : mFontContext->GetSpaceWidth();
+        return gFontDrawScreenSpace ? width : static_cast<s32>(width * 0.575);
+    }
+
+    if (macro.mIsEscape)
+    {
+        // "{{" -> a single literal '{' glyph, spanning 2 raw bytes.
+        outByteLength = macro.mRawByteLength;
+        return MeasureCharacterWidth('{');
+    }
+
+    if (static_cast<unsigned char>(text[0]) >= 0x80)
+    {
+        size_t i = 0;
+        const char32_t codepoint = DecodeUtf8Codepoint(text, i);
+        outByteLength = i;
+
+        const auto it = mFontContext->mAtlas->find(GlyphId::FromCodepoint(codepoint));
+        const s32 width = (it != mFontContext->mAtlas->end()) ? it->second.mWidth : mFontContext->GetSpaceWidth();
+        return gFontDrawScreenSpace ? width : static_cast<s32>(width * 0.575);
+    }
+
+    outByteLength = 1;
+    return MeasureCharacterWidth(text[0]);
+}
+
+// Returns a pointer into text at the character where rendering would be cut off by the given
+// left/right region - i.e. the first character that would NOT be shown. Callers (LCDScreen's
+// scrolling marquee) compare this pointer across frames to detect when a new glyph has scrolled
+// into view, and check whether it's a space to decide whether to play a tick sound.
+//
+// A {MacroName} named glyph counts as one glyph here (via TryDecodeMacroAt), not several
+// unsupported literal characters decoded byte-by-byte, matching how DrawString/MeasureTextWidth
+// already treat it through FontString.
 const char_type* AliveFont::SliceText(const char_type* text, s32 left, FP scale, s32 right)
 {
     s32 xOff = 0;
@@ -397,16 +490,40 @@ const char_type* AliveFont::SliceText(const char_type* text, s32 left, FP scale,
     }
 
     size_t i = 0;
-    const size_t len = strlen(text);
-    while (i < len)
+    while (text[i] != '\0')
     {
         if (xOff >= rightWorldSpace)
         {
             break;
         }
 
+        const MacroSpan macro = TryDecodeMacroAt(text, i);
+        if (macro.mRawByteLength != 0 && !macro.mIsEscape)
+        {
+            const auto it = mFontContext->mAtlas->find(GlyphId::FromNamed(macro.mNamedGlyph));
+            if (it == mFontContext->mAtlas->end())
+            {
+                LOG_INFO("unsupported named glyph: %d", static_cast<s32>(macro.mNamedGlyph));
+                return text + i;
+            }
+
+            xOff += static_cast<s32>(it->second.mWidth * FP_GetDouble(scale)) + mFontContext->GetGlyphSpacing();
+            i += macro.mRawByteLength;
+            continue;
+        }
+
         const size_t glyphStart = i;
-        const char32_t codepoint = DecodeUtf8Codepoint(text, i);
+        char32_t codepoint;
+        if (macro.mIsEscape)
+        {
+            codepoint = U'{';
+            i += macro.mRawByteLength;
+        }
+        else
+        {
+            codepoint = DecodeUtf8Codepoint(text, i);
+        }
+
         if (codepoint == U' ')
         {
             xOff += mFontContext->GetSpaceWidth();
@@ -421,11 +538,11 @@ const char_type* AliveFont::SliceText(const char_type* text, s32 left, FP scale,
         else
         {
             LOG_INFO("unsupported glyph: %.*s", static_cast<int>(i - glyphStart), text + glyphStart);
-            break;
+            return text + glyphStart;
         }
     }
 
-    return text;
+    return text + i;
 }
 
 void FontContext::LoadFontType(FontType resourceID, ResourceManagerWrapper& resMan)

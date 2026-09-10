@@ -114,6 +114,7 @@ public:
     s32 MeasureTextWidth(const char_type* text);
     s32 MeasureTextWidth(const FontString& text);
     s32 MeasureCharacterWidth(char_type character);
+    s32 MeasureLeadingGlyphWidth(const char_type* text, size_t& outByteLength);
     s32 MeasureScaledTextWidth(const char_type* text, FP scale);
 
     s32 DrawString(OrderingTable& ot, const char_type* text, s32 x, s16 y, relive::TBlendModes blendMode, s32 bSemiTrans, s32 disableBlending, Layer layer, u8 r, u8 g, u8 b, s32 polyOffset, FP scale, s32 maxRenderWidth, s16 colorRandomRange);

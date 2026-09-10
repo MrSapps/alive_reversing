@@ -36,6 +36,7 @@ private:
     s32 mMessageId1 = 0;
     s32 mOffsetX = 0;
     s32 mCharacterWidth = 0;
+    size_t mCharacterByteLength = 1; // how many raw bytes of mActiveMessage the leading glyph (whose width is mCharacterWidth) occupies
     s32 mShowRandomMessage = 0;
     u16 mMessageRandMinId = 0;
     u16 mMessageRandMaxId = 0;

@@ -192,7 +192,7 @@ LCDScreen::LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId, ResourceMa
     mMessageRandMaxId = pTlv->mMessageRandMaxId;
 
     gFontDrawScreenSpace = true;
-    mCharacterWidth = mFont.MeasureCharacterWidth(mMessageBuffer[0]);
+    mCharacterWidth = mFont.MeasureLeadingGlyphWidth(mMessageBuffer, mCharacterByteLength);
     gFontDrawScreenSpace = false;
 
     mShowRandomMessage = 0;
@@ -217,7 +217,7 @@ void LCDScreen::VUpdate()
     {
         mOffsetX -= mCharacterWidth;
         const s8 lastChar = *mActiveMessage;
-        mActiveMessage++;
+        mActiveMessage += mCharacterByteLength;
 
         if (lastChar == 0)
         {
@@ -267,7 +267,7 @@ void LCDScreen::VUpdate()
         }
 
         gFontDrawScreenSpace = true;
-        mCharacterWidth = mFont.MeasureCharacterWidth(mActiveMessage[0]);
+        mCharacterWidth = mFont.MeasureLeadingGlyphWidth(mActiveMessage, mCharacterByteLength);
         gFontDrawScreenSpace = false;
     }
 

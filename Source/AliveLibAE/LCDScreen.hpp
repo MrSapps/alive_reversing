@@ -37,6 +37,7 @@ private:
     bool mPlayLetterSound = false;
     s32 mOffsetX = 0;
     s32 mCharacterWidth = 0;
+    size_t mCharacterByteLength = 1; // how many raw bytes of mActiveMessage the leading glyph (whose width is mCharacterWidth) occupies
     bool mShowRandomMessage = false;
     u16 mMessageRandMinId = 0;
     u16 mMessageRandMaxId = 0;
