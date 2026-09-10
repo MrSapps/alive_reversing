@@ -28,7 +28,6 @@
 #include "MessageEditorDialog.hpp"
 #include "PathDataEditorDialog.hpp"
 #include "AddObjectDialog.hpp"
-#include "SelectionSaver.hpp"
 #include "TransparencyDialog.hpp"
 #include "ProgressDialog.hpp"
 #include <QFutureWatcher>
@@ -37,6 +36,9 @@
 #include "DeleteItemsCommand.hpp"
 #include "ClipBoard.hpp"
 #include "PasteItemsCommand.hpp"
+#include "SetSelectionCommand.hpp"
+#include "MoveItemsCommand.hpp"
+#include "AddCollisionCommand.hpp"
 #include "../../../relive_lib/Grid.hpp"
 #include "CollisionConnect.hpp"
 #include "Model.hpp"
@@ -49,148 +51,6 @@ const float KMaxZoomOutLevels = 6.0f;
 const float KMaxZoomInLevels = 14.0f;
 
 //INITIALIZE_EASYLOGGINGPP
-
-class SetSelectionCommand final : public QUndoCommand
-{
-    Q_DECLARE_TR_FUNCTIONS(SetSelectionCommand)
-
-public:
-    SetSelectionCommand(EditorTab* pTab, QGraphicsScene* pScene, QList<QGraphicsItem*>& oldSelection, QList<QGraphicsItem*>& newSelection) 
-      : mTab(pTab),
-        mScene(pScene),
-        mOldSelection(oldSelection),
-        mNewSelection(newSelection)
-    {
-        mFirst = true;
-        if (mNewSelection.count() > 0)
-        {
-            setText(tr("Select %1 item(s)").arg(mNewSelection.count()));
-        }
-        else
-        {
-            setText(tr("Clear selection"));
-        }
-    }
-
-    void redo() override
-    {
-        if (!mFirst)
-        {
-            mScene->clearSelection();
-            for (auto& item : mNewSelection)
-            {
-                item->setSelected(true);
-            }
-            mScene->update();
-        }
-        mFirst = false;
-        mTab->SyncPropertyEditor();
-    }
-
-    void undo() override
-    {
-        mScene->clearSelection();
-        for (auto& item : mOldSelection)
-        {
-            item->setSelected(true);
-        }
-        mScene->update();
-        mTab->SyncPropertyEditor();
-    }
-
-private:
-    EditorTab* mTab = nullptr;
-    QGraphicsScene* mScene = nullptr;
-    QList<QGraphicsItem*> mOldSelection;
-    QList<QGraphicsItem*> mNewSelection;
-    bool mFirst = false;
-};
-
-
-class MoveItemsCommand final : public QUndoCommand
-{
-    Q_DECLARE_TR_FUNCTIONS(MoveItemsCommand)
-
-public:
-    MoveItemsCommand(QGraphicsScene* pScene, ItemPositionData oldPositions, ItemPositionData newPositions, Model& model)
-        : mScene(pScene),
-        mOldPositions(oldPositions),
-        mNewPositions(newPositions),
-        mModel(model)
-    {
-        mFirst = true;
-
-        if (mNewPositions.Count() == 1)
-        {
-            auto pNewLine = mNewPositions.FirstLinePos();
-            auto pOldRect = mOldPositions.FirstRectPos();
-            if (pNewLine)
-            {
-                auto pOldLine = mOldPositions.FirstLinePos();
-                const bool posChange = pOldLine->x != pNewLine->x || pOldLine->y != pNewLine->y;
-                const bool lineChanged = pOldLine->line != pNewLine->line;
-                if (posChange && lineChanged)
-                {
-                    setText(tr("Move and resize collision"));
-                }
-                else if (posChange && !lineChanged)
-                {
-                    setText(tr("Move collision"));
-                }
-                else
-                {
-                    setText(tr("Move collision point"));
-                }
-            }
-            else
-            {
-                auto pNewRect = mNewPositions.FirstRectPos();
-                const bool xOryChanged = pOldRect->rect.x() != pNewRect->rect.x() || pOldRect->rect.y() != pNewRect->rect.y();
-                const bool wOrhChanged = pOldRect->rect.width() != pNewRect->rect.width() || pOldRect->rect.height() != pNewRect->rect.height();
-                if (xOryChanged && wOrhChanged)
-                {
-                    setText(tr("Move and resize map object"));
-                }
-                else if (xOryChanged && !wOrhChanged)
-                {
-                    setText(tr("Move map object"));
-                }
-                else // only wOrhChanged
-                {
-                    setText(tr("Resize map object"));
-                }
-            }
-        }
-        else
-        {
-            setText(tr("Move %1 item(s)").arg(mNewPositions.Count()));
-        }
-    }
-
-    void redo() override
-    {
-        if (!mFirst)
-        {
-            mNewPositions.Restore(mModel);
-            mScene->update();
-        }
-        mFirst = false;
-    }
-
-    void undo() override
-    {
-        mOldPositions.Restore(mModel);
-        mScene->update();
-    }
-
-private:
-    QGraphicsScene* mScene = nullptr;
-    ItemPositionData mOldPositions;
-    ItemPositionData mNewPositions;
-    Model& mModel;
-    bool mFirst = false;
-};
-
 
 EditorTab::EditorTab(QTabWidget* aParent, std::unique_ptr<Model> model, QString jsonFileName, bool isTempFile, QStatusBar* pStatusBar, GridSnapSettings& snapSettings)
     : QMainWindow(aParent),
@@ -663,79 +523,6 @@ void EditorTab::AddObject()
     pDlg->exec();
     delete pDlg;
 }
-
-class AddCollisionCommand final : public QUndoCommand
-{
-public:
-    explicit AddCollisionCommand(EditorTab* pTab)
-     : mSelectionSaver(pTab), mTab(pTab)
-    {
-        MakeNewCollision();
-
-        setText("Add collision line");
-    }
-
-    ~AddCollisionCommand()
-    {
-        if (!mAdded)
-        {
-            delete mArrowItem;
-        }
-    }
-
-    void undo() override
-    {
-        mTab->GetScene().removeItem(mArrowItem);
-
-        mNewObject = mTab->GetModel().RemoveCollisionItem(mArrowItem->GetCollisionItem());
-
-        mAdded = false;
-
-        mSelectionSaver.undo();
-    }
-
-    void redo() override
-    {
-        mTab->GetScene().addItem(mArrowItem);
-        mTab->GetModel().CollisionItems().push_back(std::move(mNewObject));
-
-        // Set the new item as the only thing selected
-        mTab->GetScene().clearSelection();
-        mArrowItem->setSelected(true);
-
-        mAdded = true;
-
-        mSelectionSaver.redo();
-    }
-
-private:
-    void MakeNewCollision()
-    {
-        mNewObject = std::make_unique<CollisionObject>(mTab->GetModel().NextCollisionId());
-
-        QGraphicsView* pView = mTab->GetScene().views().at(0);
-        QPoint scenePos = pView->mapToScene(pView->pos()).toPoint();
-
-        mNewObject->SetX1(scenePos.x() + 100);
-        mNewObject->SetX2(scenePos.x() + 200);
-
-        mNewObject->SetY1(scenePos.y() + 100);
-        mNewObject->SetY2(scenePos.y() + 100);
-
-        mNewObject->SetPrevious(-1);
-        mNewObject->SetNext(-1);
-
-        mNewObject->CalculateLength();
-
-        mArrowItem = mTab->MakeResizeableArrowItem(mNewObject.get());
-    }
-
-    SelectionSaver mSelectionSaver;
-    bool mAdded = false;
-    EditorTab* mTab = nullptr;
-    std::unique_ptr<CollisionObject> mNewObject;
-    ResizeableArrowItem* mArrowItem = nullptr;
-};
 
 void EditorTab::AddCollision()
 {
