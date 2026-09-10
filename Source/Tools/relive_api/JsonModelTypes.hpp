@@ -21,41 +21,6 @@ class TypesCollectionAO;
 class TypesCollectionAE;
 class CameraImageAndLayers;
 
-struct CameraObject final
-{
-    std::string mName;
-    s32 mId = 0;
-    s32 mX = 0;
-    s32 mY = 0;
-
-    [[nodiscard]] nlohmann::json ToJsonObject(nlohmann::json mapObjectsArray, const CameraImageAndLayers& cameraImageAndLayers) const;
-};
-
-struct PathInfo final
-{
-    s32 mGridWidth = 0;
-    s32 mWidth = 0;
-    s32 mGridHeight = 0;
-    s32 mHeight = 0;
-    u32 mObjectOffset = 0;
-    u32 mIndexTableOffset = 0;
-
-    s32 mNumCollisionItems = 0;
-    s32 mCollisionOffset = 0;
-
-    s32 mAbeStartXPos = 0;
-    s32 mAbeStartYPos = 0;
-
-    s32 mNumMudsInPath = 0;
-
-    s32 mTotalMuds = 0;
-    s32 mBadEndingMuds = 0;
-    s32 mGoodEndingMuds = 0;
-
-    std::vector<std::string> mLCDScreenMessages;
-    std::vector<std::string> mHintFlyMessages;
-};
-
 class CameraImageAndLayers final
 {
 public:
@@ -77,27 +42,4 @@ struct MapRootInfo final
     std::string mGame;
 };
 
-struct MapInfo final
-{
-    std::string mPathBnd;
-    s32 mPathId = 0;
-
-    s32 mXGridSize = 0;
-    s32 mXSize = 0;
-
-    s32 mYGridSize = 0;
-    s32 mYSize = 0;
-
-    s32 mAbeStartXPos = 0;
-    s32 mAbeStartYPos = 0;
-
-    s32 mNumMudsInPath = 0;
-
-    s32 mTotalMuds = 0;
-    s32 mBadEndingMuds = 0;
-    s32 mGoodEndingMuds = 0;
-
-    std::vector<std::string> mLCDScreenMessages;
-    std::vector<std::string> mHintFlyMessages;
-};
 } // namespace ReliveAPI

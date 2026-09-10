@@ -641,10 +641,6 @@ Do you want to overwrite it?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Supported Files (*.json *.lvl);; Json Files (*.json);;Level Files (*.lvl);;All Files (*)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Oddysee/Exoddus editor by Relive Team [https://aliveteam.github.io]</source>
         <translation type="unfinished"></translation>
     </message>
@@ -657,15 +653,19 @@ Do you want to overwrite it?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Open lvl (as template for new path)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Level Files (*.lvl);;All Files (*)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>You can&apos;t cut/copy paste data between AO and AE</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Json Files (*.json);;All Files (*)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Select game</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Game</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -814,13 +814,6 @@ Do you want to overwrite it?</source>
     </message>
     <message>
         <source>Good ending muds</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>PathSelectionDialog</name>
-    <message>
-        <source>Select path to load</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

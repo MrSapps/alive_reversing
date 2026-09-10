@@ -92,7 +92,7 @@ public:
 
     void LoadJsonFromString(const std::string& json);
     void LoadJsonFromFile(const std::string& jsonFile);
-    void CreateAsNewPath(int newPathId);
+    void CreateAsNewPath(s32 newPathId, GameType game);
     std::string ToJson() const;
 
     EditorCamera* GetContainingCamera(MapObjectBase* pMapObject);

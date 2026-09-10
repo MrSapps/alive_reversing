@@ -91,7 +91,8 @@ private slots:
 private:
     void readSettings();
     void setMenuActionsEnabled(bool enable);
-    bool onOpenPath(QString fileName, bool createNewPath);
+    bool onOpenPath(QString fileName);
+    EditorTab* AddModelTab(std::unique_ptr<Model> model, QString fileName, bool isTempFile);
     void UpdateWindowTitle();
     void DisconnectTabSignals();
     void closeEvent(QCloseEvent* pEvent) override;
