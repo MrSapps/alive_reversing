@@ -156,8 +156,6 @@ SET(AliveLibSrcAO
    ../AliveLibAO/PathData.cpp
    ../AliveLibAO/AnimationCallBacks.cpp
    ../AliveLibAO/AnimationCallBacks.hpp
-   ../AliveLibAO/Movie.hpp
-   ../AliveLibAO/Movie.cpp
    ../AliveLibAO/MusicController.hpp
    ../AliveLibAO/MusicController.cpp
    ../AliveLibAO/GameSpeak.hpp
@@ -219,8 +217,6 @@ SET(AliveLibAESrc
     ../AliveLibAE/LCDStatusBoard.cpp
     ../AliveLibAE/Compression.hpp
     ../AliveLibAE/Compression.cpp
-    ../AliveLibAE/Movie.hpp
-    ../AliveLibAE/Movie.cpp
     ../AliveLibAE/CameraSwapper.cpp
     ../AliveLibAE/CameraSwapper.hpp
     ../AliveLibAE/MainMenuTransition.hpp
@@ -628,6 +624,10 @@ SET(relive_lib_src
     MapWrapper.hpp
     MapWrapper.cpp
     MenuFmv.hpp
+    FmvInfo.hpp
+    FmvInfo.cpp
+    Movie.hpp
+    Movie.cpp
     BaseMap.hpp
     BaseMap.cpp
     BasePath.hpp

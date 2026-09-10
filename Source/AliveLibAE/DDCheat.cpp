@@ -3,7 +3,7 @@
 #include "stdlib.hpp"
 #include "../relive_lib/Function.hpp"
 #include "Map.hpp"
-#include "Movie.hpp"
+#include "../relive_lib/Movie.hpp"
 #include "PathData.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
 #include "Abe.hpp"
@@ -138,23 +138,23 @@ void DDCheat::Menu_Movies()
         sDDCheat_MovieSelectIdx++;
     }
 
-    if (Path_Get_FMV_Record(mMap.mCurrentLevel, sDDCheat_MovieSelectIdx)->field_4_id <= 0)
+    if (Path_Get_FMV_Record(mMap.mCurrentLevel, sDDCheat_MovieSelectIdx)->mId <= 0)
     {
         sDDCheat_MovieSelectIdx = 1;
     }
 
     if (mInputPressed & InputCommands::eDown)
     {
-        Path_Get_FMV_Record(mMap.mCurrentLevel, sDDCheat_MovieSelectIdx)->field_4_id--;
+        Path_Get_FMV_Record(mMap.mCurrentLevel, sDDCheat_MovieSelectIdx)->mId--;
     }
     if (mInputPressed & InputCommands::eUp)
     {
         FmvInfo* movieToPlayInfo = Path_Get_FMV_Record(mMap.mCurrentLevel, sDDCheat_MovieSelectIdx);
-        relive_new Movie(movieToPlayInfo->field_0_pName, mResMan, mMap);
+        relive_new Movie(movieToPlayInfo->mName, mResMan, mMap);
     }
 
     const FmvInfo* fmvInfo = Path_Get_FMV_Record(mMap.mCurrentLevel, sDDCheat_MovieSelectIdx);
-    DDCheat::DebugStr("\n<- Movie -> %d %d %s \n", sDDCheat_MovieSelectIdx, fmvInfo->field_4_id, fmvInfo->field_0_pName);
+    DDCheat::DebugStr("\n<- Movie -> %d %d %s \n", sDDCheat_MovieSelectIdx, fmvInfo->mId, fmvInfo->mName);
 }
 
 DDCheat::DDCheat(ResourceManagerWrapper& resMan, BaseMap& map)

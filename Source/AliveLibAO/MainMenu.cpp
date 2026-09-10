@@ -15,7 +15,7 @@
 #include "PauseMenu.hpp"
 #include "DemoPlayback.hpp"
 #include "../relive_lib/GameObjects/Grenade.hpp"
-#include "Movie.hpp"
+#include "../relive_lib/Movie.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
 #include "CreditsController.hpp"
 #include "SaveGame.hpp"
@@ -642,7 +642,7 @@ void Menu::FMV_Select_Update()
                     SND_StopAll();
 
                     const FmvInfo* pFmvRec = Path_Get_FMV_Record(sActiveList[mSelectedButtonIndex.raw].mLevel, sActiveList[mSelectedButtonIndex.raw].mFmvId);
-                    relive_new Movie(pFmvRec->field_0_pName, mResMan, mMap);
+                    relive_new Movie(pFmvRec->mName, mResMan, mMap);
 
                     while (Movie::gMovieRefCount)
                     {

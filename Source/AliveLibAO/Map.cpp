@@ -889,7 +889,7 @@ CameraSwapper* Map::FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLev
         FmvInfo* pFmvRec2 = AO::Path_Get_FMV_Record(levelId, fmvBaseId % 100);
         FmvInfo* pFmvRec3 = AO::Path_Get_FMV_Record(levelId, fmvBaseId / 100 % 100);
 
-        if (pFmvRec1->field_8_stop_music || pFmvRec2->field_8_stop_music || pFmvRec3->field_8_stop_music)
+        if (pFmvRec1->mFlags || pFmvRec2->mFlags || pFmvRec3->mFlags)
         {
             BackgroundMusic::Stop();
             MusicController::EnableMusic(0);
@@ -899,19 +899,19 @@ CameraSwapper* Map::FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLev
             ppBits,
             pMap->mResourceManager,
             *pMap,
-            pFmvRec1->field_A == 1,
-            pFmvRec1->field_0_pName,
-            pFmvRec2->field_A == 1,
-            pFmvRec2->field_0_pName,
-            pFmvRec3->field_A == 1,
-            pFmvRec3->field_0_pName);
+            pFmvRec1->mFlag2 == 1,
+            pFmvRec1->mName,
+            pFmvRec2->mFlag2 == 1,
+            pFmvRec2->mName,
+            pFmvRec3->mFlag2 == 1,
+            pFmvRec3->mName);
     }
     else if (fmvBaseId > 100u)
     {
         // Double FMV
         FmvInfo* pFmvRec1 = AO::Path_Get_FMV_Record(levelId, fmvBaseId / 100);
         FmvInfo* pFmvRec2 = AO::Path_Get_FMV_Record(levelId, fmvBaseId % 100);
-        if (pFmvRec1->field_8_stop_music || pFmvRec2->field_8_stop_music)
+        if (pFmvRec1->mFlags || pFmvRec2->mFlags)
         {
             BackgroundMusic::Stop();
             MusicController::EnableMusic(0);
@@ -921,16 +921,16 @@ CameraSwapper* Map::FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLev
             ppBits,
             pMap->mResourceManager,
             *pMap,
-            pFmvRec1->field_A == 1,
-            pFmvRec1->field_0_pName,
-            pFmvRec2->field_A == 1,
-            pFmvRec2->field_0_pName);
+            pFmvRec1->mFlag2 == 1,
+            pFmvRec1->mName,
+            pFmvRec2->mFlag2 == 1,
+            pFmvRec2->mName);
     }
     else // < 100
     {
         // Single FMV
         FmvInfo* pFmvRecord = AO::Path_Get_FMV_Record(levelId, fmvBaseId);
-        if (pFmvRecord->field_8_stop_music)
+        if (pFmvRecord->mFlags)
         {
             BackgroundMusic::Stop();
             MusicController::EnableMusic(0);
@@ -940,8 +940,8 @@ CameraSwapper* Map::FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLev
             ppBits,
             pMap->mResourceManager,
             *pMap,
-            pFmvRecord->field_A == 1,
-            pFmvRecord->field_0_pName);
+            pFmvRecord->mFlag2 == 1,
+            pFmvRecord->mName);
     }
 }
 

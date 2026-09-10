@@ -1,19 +1,19 @@
 #include "data_conversion/guid.hpp"
 #include "stdafx.h"
 #include "Movie.hpp"
-#include "../relive_lib/Function.hpp"
-#include "../relive_lib/Psx.hpp"
-#include "stdlib.hpp"
-#include "Text.hpp"
-#include "MainMenu.hpp"
-#include "../relive_lib/Sound/Midi.hpp"
-#include "../relive_lib/Sys.hpp"
-#include "../relive_lib/Sound/Sound.hpp"
-#include "VGA.hpp"
-#include "GameAutoPlayer.hpp"
+#include "Function.hpp"
+#include "Psx.hpp"
+#include "../AliveLibAE/stdlib.hpp"
+#include "../AliveLibAE/Text.hpp"
+#include "../AliveLibAE/MainMenu.hpp"
+#include "Sound/Midi.hpp"
+#include "Sys.hpp"
+#include "Sound/Sound.hpp"
+#include "../AliveLibAE/VGA.hpp"
+#include "../AliveLibAE/GameAutoPlayer.hpp"
 #include "Engine.hpp"
-#include "../relive_lib/Renderer/IRenderer.hpp"
-#include "../relive_lib/data_conversion/rgb_conversion.hpp"
+#include "Renderer/IRenderer.hpp"
+#include "data_conversion/rgb_conversion.hpp"
 
 #include <numeric>
 #include <deque>
@@ -1001,11 +1001,15 @@ void Movie::Init()
 
 Movie::Movie(const char_type* pName, ResourceManagerWrapper& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
-    , mName(pName)
+    // HACK: pName is the original pre-conversion movie name (e.g. "SV160703.ddv") - the
+    // converted file that FmvConv::Convert produces is named "<original name>.webm"
+    // (see fmv_converter.cpp), so just append that extension for now. This doesn't yet
+    // account for the "fmvs" output subdirectory added to the converter, so it assumes
+    // the converted file has also been placed/copied next to where the game looks for
+    // it at runtime - needs revisiting once that's wired up properly.
+    , mName(std::string(pName) + ".webm")
 {
-    mName = "vision.ddv.webm";
     Init();
-
 }
 
 extern bool gBreakGameLoop;
@@ -1025,7 +1029,7 @@ void Movie::VUpdate()
     {
         SND_StopAll();
 
-        while (!DDV_Play(mName))
+        while (!DDV_Play(mName.c_str()))
         {
             if (gAttract)
             {

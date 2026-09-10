@@ -12,7 +12,7 @@
 #include "Abe.hpp"
 #include "../relive_lib/GameObjects/Particle.hpp"
 #include "../relive_lib/GameObjects/CheatController.hpp"
-#include "Movie.hpp"
+#include "../relive_lib/Movie.hpp"
 #include "MainMenuTransition.hpp"
 #include "Text.hpp"
 #include "../relive_lib/Sound/Sound.hpp"
@@ -1380,7 +1380,7 @@ MainMenuNextCam MainMenuController::Page_FMV_Level_Update_4D4AB0(u32 input_held)
         {
             FmvInfo* pFmvRecord = Path_Get_FMV_Record(pMenuFMV->mLevel, pMenuFMV->mFmvId);
 
-            auto pMovie = relive_new Movie(pFmvRecord->field_0_pName, mResMan, mMap);
+            auto pMovie = relive_new Movie(pFmvRecord->mName, mResMan, mMap);
 
             while (Movie::gMovieRefCount)
             {
@@ -1761,7 +1761,7 @@ MainMenuNextCam MainMenuController::BackStory_Or_NewGame_Update_4D1C60(u32 input
                 }
             }
 
-            auto pMovie = relive_new Movie(pFmvRecord->field_0_pName, mResMan, mMap);
+            auto pMovie = relive_new Movie(pFmvRecord->mName, mResMan, mMap);
 
             while (Movie::gMovieRefCount)
             {

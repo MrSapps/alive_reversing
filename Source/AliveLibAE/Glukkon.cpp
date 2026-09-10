@@ -20,7 +20,7 @@
 #include "Slurg.hpp"
 #include "../relive_lib/GameObjects/Fade.hpp"
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
-#include "Movie.hpp"
+#include "../relive_lib/Movie.hpp"
 #include "DDCheat.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
 #include "../relive_lib/Sound/Sound.hpp"
@@ -1700,7 +1700,7 @@ s16 Glukkon::Brain_3_PlayerControlled()
             gScreenManager->DisableRendering();
 
             const FmvInfo* pFmvRec = Path_Get_FMV_Record(mMap.mCurrentLevel, mTlvData.mMovieId);
-            relive_new Movie(pFmvRec->field_0_pName, mResMan, mMap);
+            relive_new Movie(pFmvRec->mName, mResMan, mMap);
         }
         return Brain_3_PlayerControlled::eBrain3_WaitForMovieToFinish5;
 
