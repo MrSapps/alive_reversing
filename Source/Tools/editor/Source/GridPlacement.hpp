@@ -41,20 +41,21 @@ namespace GridPlacement
         return ClampInt(value, 0, static_cast<int>(totalSizePixels) - 1);
     }
 
-    // Clamps where a [start, start + length) range begins so the *whole* range fits within
-    // [0, totalSizePixels), keeping length fixed - unlike clamping each endpoint of the range
-    // independently (via ClampPixelToMapBounds on start and start+length separately), which
-    // can collapse the range to a single point: e.g. start=-180, length=100 clamps start to 0
-    // and the end (-80) *also* clamps to 0, losing the range entirely even though a
+    // Clamps where a [start, start + length] range begins so *both* start and start + length
+    // are valid coordinates (i.e. each individually satisfies the same [0, totalSizePixels - 1]
+    // bound as ClampPixelToMapBounds), keeping length fixed - unlike clamping each endpoint of
+    // the range independently (via ClampPixelToMapBounds on start and start+length separately),
+    // which can collapse the range to a single point: e.g. start=-180, length=100 clamps start
+    // to 0 and the end (-80) *also* clamps to 0, losing the range entirely even though a
     // same-length range beginning at 0 fits fine. Only shrinks length as a last resort, if
-    // totalSizePixels is smaller than length itself (nothing of that length can fit at all).
+    // totalSizePixels is smaller than length + 1 (nothing of that length can fit at all).
     inline int ClampRangeStartToMapBounds(int start, int length, unsigned int totalSizePixels)
     {
         if (totalSizePixels == 0)
         {
             return 0;
         }
-        const int maxStart = static_cast<int>(totalSizePixels) - length;
+        const int maxStart = static_cast<int>(totalSizePixels) - 1 - length;
         if (maxStart < 0)
         {
             return 0;

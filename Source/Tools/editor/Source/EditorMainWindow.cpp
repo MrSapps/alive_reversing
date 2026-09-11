@@ -14,6 +14,7 @@
 #include "qdebug.h"
 #include "qactiongroup.h"
 #include "AutomationServer.hpp"
+#include "AutomationSceneCommands.hpp"
 #include <QCoreApplication>
 
 static void FatalError(const char* msg)
@@ -136,6 +137,10 @@ EditorMainWindow::EditorMainWindow(QWidget* aParent)
         if (!socketName.isEmpty())
         {
             mAutomationServer = std::make_unique<AutomationServer>(this);
+            mAutomationServer->SetDomainCommandHandler([this](const std::string& cmd, const nlohmann::json& req)
+            {
+                return Automation::TryExecuteSceneCommand(this, cmd, req);
+            });
             if (!mAutomationServer->Listen(socketName))
             {
                 qWarning() << "Automation server failed to listen on" << socketName << ":" << mAutomationServer->ErrorString();
@@ -405,6 +410,11 @@ static EditorTab* getActiveTab(QTabWidget* pTabWidget)
         return static_cast<EditorTab*>(pTabWidget->widget(idx));
     }
     return nullptr;
+}
+
+EditorTab* EditorMainWindow::CurrentTab() const
+{
+    return getActiveTab(m_ui->tabWidget);
 }
 
 void EditorMainWindow::on_action_zoom_reset_triggered()

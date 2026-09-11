@@ -113,6 +113,10 @@ private:
 
     int SnapX(bool enabled, int x) override;
     int SnapY(bool enabled, int y) override;
+    int ClampX(int x) override;
+    int ClampY(int y) override;
+    int ClampRangeStartX(int start, int length) override;
+    int ClampRangeStartY(int start, int length) override;
 
     Ui::EditorTab* ui = nullptr;
     float iZoomLevel = 1.0f;

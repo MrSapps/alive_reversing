@@ -14,6 +14,7 @@
 #include <QDateTime>
 #include <QElapsedTimer>
 #include <QLocalSocket>
+#include <QPoint>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QThread>
@@ -118,6 +119,11 @@ namespace
         // process only; it stays on for everything else.
         QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
         env.insert("ASAN_OPTIONS", "detect_leaks=0");
+        // Qt's "offscreen" platform plugin renders to an in-memory backing store instead of a
+        // real window - QWidget::grab() (screenshot) and synthesized mouse/key events both
+        // still work exactly the same, but nothing appears on the real display or steals
+        // keyboard/mouse focus from whatever else is running there while these tests run.
+        env.insert("QT_QPA_PLATFORM", "offscreen");
         editor.setProcessEnvironment(env);
 
         editor.start(QString::fromUtf8(RELIVE_EDITOR_PATH), {QStringLiteral("--automation-socket=%1").arg(outSocketName)});
@@ -337,13 +343,16 @@ TEST(EditorAutomation, NewPathAddCollisionAddObject)
     }
 
     // Unlike the other tests, this tab now has real unsaved changes, so "close" hits
-    // closeEvent()'s other branch: an unsaved-changes QMessageBox (Save / Cancel / "Close
-    // without Saving") that blocks the close until answered. Its buttons have no objectName
-    // (and the QMessageBox itself has no parent, so it isn't reachable from root by descending
-    // the widget tree either) - resolved by visible text via "@active_modal_button:" instead.
+    // closeEvent()'s other branch: an unsaved-changes QMessageBox (Save/Cancel/Discard) that
+    // blocks the close until answered. Its buttons have no objectName (and the QMessageBox
+    // itself has no parent, so it isn't reachable from root by descending the widget tree
+    // either) - resolved by visible text via "@active_modal_button:" instead. The exact label
+    // is platform-theme-dependent (confirmed "Discard" under QT_QPA_PLATFORM=offscreen, which
+    // these tests run under; a GTK-integrated desktop session showed "Close without Saving"
+    // for the same button).
     const int closeClickId = client.SendCommand({{"cmd", "close"}});
     {
-        const int id = client.SendCommand({{"cmd", "click"}, {"target", "@active_modal_button:Close without Saving"}});
+        const int id = client.SendCommand({{"cmd", "click"}, {"target", "@active_modal_button:Discard"}});
         ASSERT_TRUE(client.WaitForResponse(id, 5000).value("ok", false)) << "no unsaved-changes prompt to dismiss";
     }
     EXPECT_TRUE(client.WaitForResponse(closeClickId, 5000).value("ok", false));
@@ -351,6 +360,185 @@ TEST(EditorAutomation, NewPathAddCollisionAddObject)
     ASSERT_TRUE(editor.waitForFinished(10000)) << "editor did not exit after close";
     EXPECT_EQ(editor.exitStatus(), QProcess::NormalExit);
     EXPECT_EQ(editor.exitCode(), 0);
+}
+
+// Exercises interactive dragging of a collision line: each endpoint moves independently,
+// dragging out of bounds clamps rather than escaping the map (or collapsing to a point -
+// see GridPlacement::ClampRangeStartToMapBounds), dragging the middle moves the whole line
+// as a rigid unit, and grid-snapping actually snaps when enabled. Coordinates are always
+// read back via get_scene_items / derived via scene_to_view rather than hardcoded, since the
+// "offscreen" Qt platform's virtual screen size (and so the view's initial scroll position)
+// isn't the same as a real display's.
+TEST(EditorAutomation, CollisionLineDragBoundsAndSnap)
+{
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    const int newPathClickId = client.SendCommand({{"cmd", "click"}, {"target", "actionNew_path"}});
+    {
+        const int id = client.SendCommand({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}});
+        ASSERT_TRUE(client.WaitForResponse(id, 5000).value("ok", false));
+    }
+    {
+        const int id = client.SendCommand({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}});
+        ASSERT_TRUE(client.WaitForResponse(id, 5000).value("ok", false));
+    }
+    EXPECT_TRUE(client.WaitForResponse(newPathClickId, 5000).value("ok", false));
+
+    {
+        const int id = client.SendCommand({{"cmd", "click"}, {"target", "actionAdd_collision"}});
+        EXPECT_TRUE(client.WaitForResponse(id, 5000).value("ok", false));
+    }
+
+    auto getCollisionLine = [&]() -> nlohmann::json
+    {
+        const int id = client.SendCommand({{"cmd", "get_scene_items"}});
+        const auto resp = client.WaitForResponse(id, 5000);
+        EXPECT_TRUE(resp.value("ok", false));
+        for (const auto& item : resp.at("result").value("items", nlohmann::json::array()))
+        {
+            if (item.value("kind", std::string()) == "collision_line")
+            {
+                return item;
+            }
+        }
+        ADD_FAILURE() << "no collision_line in get_scene_items result: " << resp.dump();
+        return nlohmann::json::object();
+    };
+
+    auto sceneToView = [&](double x, double y) -> QPoint
+    {
+        const int id = client.SendCommand({{"cmd", "scene_to_view"}, {"x", x}, {"y", y}});
+        const auto resp = client.WaitForResponse(id, 5000);
+        EXPECT_TRUE(resp.value("ok", false));
+        return QPoint(resp.at("result").value("x", 0), resp.at("result").value("y", 0));
+    };
+
+    auto dragView = [&](QPoint from, QPoint to)
+    {
+        const int id = client.SendCommand({
+            {"cmd", "drag"}, {"target", "graphicsView"},
+            {"from", {{"x", from.x()}, {"y", from.y()}}},
+            {"to", {{"x", to.x()}, {"y", to.y()}}},
+        });
+        EXPECT_TRUE(client.WaitForResponse(id, 5000).value("ok", false));
+    };
+
+    const nlohmann::json baseline = getCollisionLine();
+    ASSERT_TRUE(baseline.contains("x1"));
+    const int baseX1 = baseline.at("x1").get<int>();
+    const int baseY1 = baseline.at("y1").get<int>();
+    const int baseX2 = baseline.at("x2").get<int>();
+    const int baseY2 = baseline.at("y2").get<int>();
+    EXPECT_NE(baseX1, baseX2) << "freshly created collision line is zero-length";
+
+    // 1. Endpoint drag, in bounds: P2 should move to exactly the target; P1 stays put.
+    {
+        const QPoint from = sceneToView(baseX2, baseY2);
+        const int targetX = baseX2 + 50;
+        const int targetY = baseY2 + 30;
+        dragView(from, sceneToView(targetX, targetY));
+
+        const nlohmann::json line = getCollisionLine();
+        EXPECT_EQ(line.value("x1", -1), baseX1) << "P1 should not have moved";
+        EXPECT_EQ(line.value("y1", -1), baseY1);
+        EXPECT_EQ(line.value("x2", -1), targetX);
+        EXPECT_EQ(line.value("y2", -1), targetY);
+    }
+
+    // 2. Endpoint drag, out of bounds: dragging P2 far past the map edge must clamp it back
+    // in, not let it escape and not collapse the line to a single point.
+    {
+        const nlohmann::json before = getCollisionLine();
+        const QPoint from = sceneToView(before.at("x2").get<int>(), before.at("y2").get<int>());
+        dragView(from, sceneToView(1'000'000, 1'000'000));
+
+        const nlohmann::json line = getCollisionLine();
+        const int x1 = line.value("x1", -1);
+        const int x2 = line.value("x2", -1);
+        const int y2 = line.value("y2", -1);
+        EXPECT_NE(x2, x1) << "line collapsed to a zero-length point when dragged out of bounds";
+        EXPECT_LT(x2, 100000) << "endpoint escaped the map bounds";
+        EXPECT_LT(y2, 100000) << "endpoint escaped the map bounds";
+    }
+
+    // 3. Whole-line drag, in bounds: grabbing the middle (away from both endpoints, so
+    // CalcWhichEndOfLineClicked falls into the whole-line branch with no modifier needed)
+    // moves both endpoints by the same delta - a rigid translation.
+    int shapeWidth = 0;
+    int shapeHeight = 0;
+    {
+        const nlohmann::json before = getCollisionLine();
+        const int x1 = before.at("x1").get<int>();
+        const int y1 = before.at("y1").get<int>();
+        const int x2 = before.at("x2").get<int>();
+        const int y2 = before.at("y2").get<int>();
+        shapeWidth = x2 - x1;
+        shapeHeight = y2 - y1;
+
+        // Shift toward the map's origin (negative), not away from it: step 2 just dragged P2
+        // hard against the map's far edge, so the line's bounding box is already pinned there
+        // - shifting further in that direction would legitimately have nowhere to go and get
+        // clamped (that's step 4's job), which would make this "unclamped" case flaky.
+        const int midX = (x1 + x2) / 2;
+        const int midY = (y1 + y2) / 2;
+        const int targetMidX = midX - 20;
+        const int targetMidY = midY - 20;
+        dragView(sceneToView(midX, midY), sceneToView(targetMidX, targetMidY));
+
+        const nlohmann::json line = getCollisionLine();
+        EXPECT_EQ(line.value("x1", -1), x1 + (targetMidX - midX)) << "whole-line drag did not translate P1 correctly";
+        EXPECT_EQ(line.value("y1", -1), y1 + (targetMidY - midY));
+        EXPECT_EQ(line.value("x2", -1), x2 + (targetMidX - midX)) << "whole-line drag did not translate P2 correctly";
+        EXPECT_EQ(line.value("y2", -1), y2 + (targetMidY - midY));
+    }
+
+    // 4. Whole-line drag, out of bounds: dragging the middle far off the map must keep the
+    // line fully in bounds *and* preserve its exact shape (not clamp each endpoint
+    // independently, which could distort or collapse it).
+    {
+        const nlohmann::json before = getCollisionLine();
+        const int midX = (before.at("x1").get<int>() + before.at("x2").get<int>()) / 2;
+        const int midY = (before.at("y1").get<int>() + before.at("y2").get<int>()) / 2;
+        dragView(sceneToView(midX, midY), sceneToView(-1'000'000, -1'000'000));
+
+        const nlohmann::json line = getCollisionLine();
+        const int x1 = line.value("x1", -1);
+        const int y1 = line.value("y1", -1);
+        const int x2 = line.value("x2", -1);
+        const int y2 = line.value("y2", -1);
+        EXPECT_GE(x1, 0) << "line escaped the map bounds";
+        EXPECT_GE(y1, 0) << "line escaped the map bounds";
+        EXPECT_LT(x1, 100000) << "line escaped the map bounds";
+        EXPECT_LT(y1, 100000) << "line escaped the map bounds";
+        EXPECT_EQ(x2 - x1, shapeWidth) << "line shape was not preserved while clamping";
+        EXPECT_EQ(y2 - y1, shapeHeight) << "line shape was not preserved while clamping";
+    }
+
+    // 5. Snapping: enabling collision-line grid snap and dragging an endpoint to a
+    // deliberately non-grid-aligned target should still land on the grid. EditorTab::SnapY
+    // (Source/Tools/editor/Source/EditorTab.cpp) is a simple, documented (y / 20) * 20, which
+    // this checks directly without duplicating the AO/AE fixed-point X-grid formula.
+    {
+        const int id1 = client.SendCommand({{"cmd", "click"}, {"target", "action_snap_collision_items_on_x"}});
+        EXPECT_TRUE(client.WaitForResponse(id1, 5000).value("ok", false));
+        const int id2 = client.SendCommand({{"cmd", "click"}, {"target", "action_snap_collision_objects_on_y"}});
+        EXPECT_TRUE(client.WaitForResponse(id2, 5000).value("ok", false));
+
+        const nlohmann::json before = getCollisionLine();
+        const QPoint from = sceneToView(before.at("x2").get<int>(), before.at("y2").get<int>());
+        // Deliberately not a multiple of 20 (or of the AO grid).
+        dragView(from, sceneToView(before.at("x2").get<int>() + 47, before.at("y2").get<int>() + 47));
+
+        const nlohmann::json line = getCollisionLine();
+        const int y2 = line.value("y2", -1);
+        EXPECT_EQ(y2 % 20, 0) << "endpoint did not snap to the Y grid: y2=" << y2;
+    }
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
 int main(int argc, char** argv)

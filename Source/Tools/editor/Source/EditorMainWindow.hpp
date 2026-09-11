@@ -21,6 +21,10 @@ class EditorMainWindow final : public QMainWindow
 public:
     explicit EditorMainWindow( QWidget* aParent = 0 );
     ~EditorMainWindow();
+
+    // Currently active tab, or nullptr if none is open. Used by AutomationSceneCommands to
+    // reach the graphics scene without exposing m_ui itself.
+    EditorTab* CurrentTab() const;
 private slots:
     void on_actionDark_Fusion_theme_triggered();
 

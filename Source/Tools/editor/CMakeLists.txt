@@ -123,6 +123,8 @@ set(PROJECT_SOURCES
         Source/AutomationServer.cpp
         Source/AutomationCommands.hpp
         Source/AutomationCommands.cpp
+        Source/AutomationSceneCommands.hpp
+        Source/AutomationSceneCommands.cpp
         Source/AboutDialog.ui
         Source/EditorMainWindow.ui
         Source/EditorTab.ui

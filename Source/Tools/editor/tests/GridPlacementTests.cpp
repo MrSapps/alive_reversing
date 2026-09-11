@@ -94,9 +94,13 @@ TEST(ClampRangeStartToMapBounds, NegativeStartClampsToZeroKeepingLength)
 
 TEST(ClampRangeStartToMapBounds, StartPastMapEdgeKeepsLengthByShiftingBack)
 {
+    // Max valid coordinate for a 1024px-wide map is 1023 (matches ClampPixelToMapBounds), so
+    // a 100-long range's start must land at 923, not 924 - 924+100 = 1024 would be one pixel
+    // past the map, which is exactly the off-by-one this function used to have (caught by
+    // dragging a collision line's midpoint out of bounds and observing x2 come back as 1024).
     const int start = ClampRangeStartToMapBounds(1000, 100, 1024);
-    EXPECT_EQ(start, 924);
-    EXPECT_EQ(start + 100, 1024);
+    EXPECT_EQ(start, 923);
+    EXPECT_EQ(start + 100, 1023);
     EXPECT_NE(start, start + 100) << "line collapsed to a zero-length point";
 }
 

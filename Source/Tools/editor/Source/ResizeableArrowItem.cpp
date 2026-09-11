@@ -8,6 +8,8 @@
 #include "ISyncPropertiesToTree.hpp"
 #include "GridSnapSettings.hpp"
 #include <QDebug>
+#include <algorithm>
+#include <cmath>
 
 ResizeableArrowItem::ResizeableArrowItem(QGraphicsView* pView, CollisionObject* pLine, ISyncPropertiesToTree& propSyncer, int transparency, GridSnapSettings& snapSettings, IGridPointSnapper& snapper)
     : QGraphicsLineItem(pLine->X2(), pLine->Y2(), pLine->X1(), pLine->Y1())
@@ -69,6 +71,20 @@ void ResizeableArrowItem::mouseMoveEvent( QGraphicsSceneMouseEvent* aEvent )
 
         QLineF tmp = m_MouseDownLine;
         tmp.translate(tl);
+
+        // Keep the whole line within the map bounds by shifting it back in as a rigid unit,
+        // preserving its exact shape - clamping each endpoint independently here could
+        // collapse the line to a point if its bounding box straddles a boundary (the same bug
+        // fixed for line creation in AddCollisionCommand). pos() is zero at this point (just
+        // reset above), so tmp's coordinates are already scene-equivalent.
+        const qreal left = std::min(tmp.x1(), tmp.x2());
+        const qreal top = std::min(tmp.y1(), tmp.y2());
+        const qreal width = std::abs(tmp.x2() - tmp.x1());
+        const qreal height = std::abs(tmp.y2() - tmp.y1());
+        const int clampedLeft = mSnapper.ClampRangeStartX(static_cast<int>(left), static_cast<int>(width));
+        const int clampedTop = mSnapper.ClampRangeStartY(static_cast<int>(top), static_cast<int>(height));
+        tmp.translate(clampedLeft - left, clampedTop - top);
+
         setLine(tmp);
 
         PosOrLineChanged();
@@ -96,6 +112,9 @@ void ResizeableArrowItem::mouseMoveEvent( QGraphicsSceneMouseEvent* aEvent )
         QPoint tmp = newLine.p1().toPoint();
         tmp.setX(mSnapper.SnapX(mSnapSettings.CollisionSnapping().mSnapX, tmp.x()));
         tmp.setY(mSnapper.SnapY(mSnapSettings.CollisionSnapping().mSnapY, tmp.y()));
+        // Only this one endpoint moves (the other end is anchored), so clamping it alone can't
+        // collapse the line the way independently clamping both ends could.
+        tmp = ClampToMapBounds(tmp);
         newLine.setP1(tmp);
     }
     else
@@ -103,6 +122,7 @@ void ResizeableArrowItem::mouseMoveEvent( QGraphicsSceneMouseEvent* aEvent )
         QPoint tmp = newLine.p2().toPoint();
         tmp.setX(mSnapper.SnapX(mSnapSettings.CollisionSnapping().mSnapX, tmp.x()));
         tmp.setY(mSnapper.SnapY(mSnapSettings.CollisionSnapping().mSnapY, tmp.y()));
+        tmp = ClampToMapBounds(tmp);
         newLine.setP2(tmp);
     }
 
@@ -268,6 +288,14 @@ void ResizeableArrowItem::Init()
 
     // TODO: Use QPixmapCache instead
     setCacheMode( ItemCoordinateCache );
+}
+
+QPoint ResizeableArrowItem::ClampToMapBounds(QPoint pt) const
+{
+    const QPointF scenePos = QPointF(pt) + pos();
+    const int clampedX = mSnapper.ClampX(static_cast<int>(scenePos.x()));
+    const int clampedY = mSnapper.ClampY(static_cast<int>(scenePos.y()));
+    return QPoint(clampedX - static_cast<int>(pos().x()), clampedY - static_cast<int>(pos().y()));
 }
 
 void ResizeableArrowItem::CalcWhichEndOfLineClicked( QPointF aPos, Qt::KeyboardModifiers aMods )

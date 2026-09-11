@@ -28,6 +28,7 @@
 #include "MessageEditorDialog.hpp"
 #include "PathDataEditorDialog.hpp"
 #include "AddObjectDialog.hpp"
+#include "GridPlacement.hpp"
 #include "TransparencyDialog.hpp"
 #include "ProgressDialog.hpp"
 #include <QFutureWatcher>
@@ -68,6 +69,7 @@ EditorTab::EditorTab(QTabWidget* aParent, std::unique_ptr<Model> model, QString 
     // TODO: Set as a promoted type
     delete ui->graphicsView;
     ui->graphicsView = new EditorGraphicsView(this);
+    ui->graphicsView->setObjectName(QStringLiteral("graphicsView")); // preserve the name setupUi() gave the widget this replaces
     QGraphicsView* pView = ui->graphicsView;
     pView->setDragMode(QGraphicsView::RubberBandDrag);
 
@@ -105,6 +107,7 @@ EditorTab::EditorTab(QTabWidget* aParent, std::unique_ptr<Model> model, QString 
     // TODO: Temp hack
     delete ui->treeWidget;
     ui->treeWidget = new PropertyTreeWidget(ui->dockWidgetContents_2);
+    ui->treeWidget->setObjectName(QStringLiteral("treeWidget")); // preserve the name setupUi() gave the widget this replaces
     ui->verticalLayout_5->addWidget(ui->treeWidget);
 
     // Disable "already disabled" context menus on the QDockWidgets
@@ -511,4 +514,24 @@ int EditorTab::SnapY(bool enabled, int y)
         y = (y / yGridSize) * yGridSize;
     }
     return y;
+}
+
+int EditorTab::ClampX(int x)
+{
+    return GridPlacement::ClampPixelToMapBounds(x, mModel->XSize() * mModel->CameraGridWidth());
+}
+
+int EditorTab::ClampY(int y)
+{
+    return GridPlacement::ClampPixelToMapBounds(y, mModel->YSize() * mModel->CameraGridHeight());
+}
+
+int EditorTab::ClampRangeStartX(int start, int length)
+{
+    return GridPlacement::ClampRangeStartToMapBounds(start, length, mModel->XSize() * mModel->CameraGridWidth());
+}
+
+int EditorTab::ClampRangeStartY(int start, int length)
+{
+    return GridPlacement::ClampRangeStartToMapBounds(start, length, mModel->YSize() * mModel->CameraGridHeight());
 }

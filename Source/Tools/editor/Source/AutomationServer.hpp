@@ -3,6 +3,8 @@
 #include "AutomationProtocol.hpp"
 #include <QHash>
 #include <QObject>
+#include <functional>
+#include <optional>
 
 class QLocalServer;
 class QLocalSocket;
@@ -32,6 +34,15 @@ public:
     bool Listen(const QString& name);
     QString ErrorString() const;
 
+    using DomainCommandHandler = std::function<std::optional<nlohmann::json>(const std::string& cmd, const nlohmann::json& request)>;
+
+    // Optional extension point tried before the generic Automation::ExecuteCommand, so
+    // editor-domain-specific commands (e.g. inspecting the graphics scene) don't require
+    // AutomationCommands/AutomationServer themselves to know about editor types - see
+    // AutomationSceneCommands.hpp, wired in by EditorMainWindow. Returning std::nullopt falls
+    // through to the generic dispatch.
+    void SetDomainCommandHandler(DomainCommandHandler handler);
+
 private slots:
     void OnNewConnection();
     void OnReadyRead();
@@ -45,4 +56,5 @@ private:
     QWidget* mRoot = nullptr;
     QLocalServer* mServer = nullptr;
     QHash<QLocalSocket*, Automation::FrameReader> mReaders;
+    DomainCommandHandler mDomainCommandHandler;
 };
