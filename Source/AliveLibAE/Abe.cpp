@@ -6003,7 +6003,7 @@ void Abe::Motion_86_HandstoneBegin()
                 {
                     gScreenManager->EnableRendering();
 
-                    FmvInfo* pFmvRec = Path_Get_FMV_Record(mMap.mCurrentLevel, mFmvId);
+                    relive::FmvInfoEntry* pFmvRec = Path_Get_FMV_Record(mMap.mCurrentLevel, mFmvId);
 
                     relive_new Movie(pFmvRec->mName, mResMan, mMap);
                     field_120_state.stone = StoneStates::eHandstoneMovieDone_2;

@@ -1378,7 +1378,7 @@ MainMenuNextCam MainMenuController::Page_FMV_Level_Update_4D4AB0(u32 input_held)
         MenuFMV* pMenuFMV = &pDemosOrFmvs_BB4414.mFmvRec[field_230_target_entry_index];
         if (pMenuFMV->mFmvId >= 0)
         {
-            FmvInfo* pFmvRecord = Path_Get_FMV_Record(pMenuFMV->mLevel, pMenuFMV->mFmvId);
+            relive::FmvInfoEntry* pFmvRecord = Path_Get_FMV_Record(pMenuFMV->mLevel, pMenuFMV->mFmvId);
 
             auto pMovie = relive_new Movie(pFmvRecord->mName, mResMan, mMap);
 
@@ -1705,7 +1705,7 @@ MainMenuNextCam MainMenuController::LoadNewGame_Update_4D0920(u32 /*input*/)
         gAbe->SetUpdateDelay(1);
         mMap.SetActiveCam(field_244_lvl_id, field_246_path_id, field_248_camera, CameraSwapEffects::eInstantChange_0, 0, 0);
 
-        const PathBlyRec* pPathData = Path_Get_Bly_Record(field_244_lvl_id, field_246_path_id);
+        const relive::PathBlyRec* pPathData = Path_Get_Bly_Record(field_244_lvl_id, field_246_path_id);
         gAbe->mXPos = FP_FromInteger(field_24A_abeXOff - pPathData->mPathData->mAbeStartXPos);
         gAbe->mYPos = FP_FromInteger(field_24C_abeYOff - pPathData->mPathData->mAbeStartYPos);
 
@@ -1751,7 +1751,7 @@ MainMenuNextCam MainMenuController::BackStory_Or_NewGame_Update_4D1C60(u32 input
     {
         if (field_1FC_button_index == 0) // Show backstory
         {
-            FmvInfo* pFmvRecord = Path_Get_FMV_Record(EReliveLevelIds::eMenu, 4u);
+            relive::FmvInfoEntry* pFmvRecord = Path_Get_FMV_Record(EReliveLevelIds::eMenu, 4u);
 
             if (!GetGameAutoPlayer().IsRecording() && !GetGameAutoPlayer().IsPlaying())
             {

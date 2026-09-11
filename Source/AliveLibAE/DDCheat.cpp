@@ -149,11 +149,11 @@ void DDCheat::Menu_Movies()
     }
     if (mInputPressed & InputCommands::eUp)
     {
-        FmvInfo* movieToPlayInfo = Path_Get_FMV_Record(mMap.mCurrentLevel, sDDCheat_MovieSelectIdx);
+        relive::FmvInfoEntry* movieToPlayInfo = Path_Get_FMV_Record(mMap.mCurrentLevel, sDDCheat_MovieSelectIdx);
         relive_new Movie(movieToPlayInfo->mName, mResMan, mMap);
     }
 
-    const FmvInfo* fmvInfo = Path_Get_FMV_Record(mMap.mCurrentLevel, sDDCheat_MovieSelectIdx);
+    const relive::FmvInfoEntry* fmvInfo = Path_Get_FMV_Record(mMap.mCurrentLevel, sDDCheat_MovieSelectIdx);
     DDCheat::DebugStr("\n<- Movie -> %d %d %s \n", sDDCheat_MovieSelectIdx, fmvInfo->mId, fmvInfo->mName);
 }
 

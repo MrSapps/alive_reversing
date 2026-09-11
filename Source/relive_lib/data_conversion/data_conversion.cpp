@@ -340,7 +340,7 @@ static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const Reli
         }
         else
         {
-            const ::PathBlyRec* pBlyRec = ::Path_Get_Bly_Record(reliveLvl, static_cast<u16>(pathBndChunk.Id()));
+            const relive::PathBlyRec* pBlyRec = ::Path_Get_Bly_Record(reliveLvl, static_cast<u16>(pathBndChunk.Id()));
 
             // Save cameras and map objects
             width = (pBlyRec->mPathData->mTop - pBlyRec->mPathData->mLeft) / pBlyRec->mPathData->mGridWidth;
@@ -399,7 +399,7 @@ static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const Reli
     else
     {
         EReliveLevelIds soundLevel = GetLevelIdFromPathId(reliveLvl, pathBndChunk.Id());
-        const SoundBlockInfo* pSoundBlock = Path_Get_MusicInfo(soundLevel);
+        const relive::SoundBlockInfo* pSoundBlock = Path_Get_MusicInfo(soundLevel);
 
         // TODO: Convert to AO format instead of using sounds.dat for now (in the vh/vb/bsq copy)
         soundInfo.mVhFile = pSoundBlock->mVabHeaderName;

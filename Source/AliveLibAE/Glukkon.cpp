@@ -1699,7 +1699,7 @@ s16 Glukkon::Brain_3_PlayerControlled()
         {
             gScreenManager->DisableRendering();
 
-            const FmvInfo* pFmvRec = Path_Get_FMV_Record(mMap.mCurrentLevel, mTlvData.mMovieId);
+            const relive::FmvInfoEntry* pFmvRec = Path_Get_FMV_Record(mMap.mCurrentLevel, mTlvData.mMovieId);
             relive_new Movie(pFmvRec->mName, mResMan, mMap);
         }
         return Brain_3_PlayerControlled::eBrain3_WaitForMovieToFinish5;
