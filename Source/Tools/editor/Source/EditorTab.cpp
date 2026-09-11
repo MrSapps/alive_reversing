@@ -345,6 +345,11 @@ bool EditorTab::SaveAs()
         return false;
     }
 
+    return SaveAsPath(jsonSaveFileName);
+}
+
+bool EditorTab::SaveAsPath(QString jsonSaveFileName)
+{
     // Append .json file ext if not specified
     if (!jsonSaveFileName.endsWith(".json", Qt::CaseInsensitive))
     {

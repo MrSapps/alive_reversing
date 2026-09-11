@@ -25,6 +25,13 @@ public:
     // Currently active tab, or nullptr if none is open. Used by AutomationSceneCommands to
     // reach the graphics scene without exposing m_ui itself.
     EditorTab* CurrentTab() const;
+
+    // Public wrapper for onOpenPath() - used by AutomationSceneCommands so tests can open a
+    // known path directly instead of driving the real QFileDialog-based Open flow.
+    bool OpenPath(QString fullFileName)
+    {
+        return onOpenPath(fullFileName);
+    }
 private slots:
     void on_actionDark_Fusion_theme_triggered();
 

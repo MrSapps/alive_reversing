@@ -39,6 +39,10 @@ public:
     void ResetZoom();
     bool Save();
     bool SaveAs();
+    // Does what SaveAs() does after the user picks a path via QFileDialog, but with an
+    // explicit path instead - used by AutomationSceneCommands so tests can save to a known
+    // (e.g. temp) location without driving a real file dialog.
+    bool SaveAsPath(QString jsonSaveFileName);
     QString GetJsonFileName() const { return mJsonFileName; }
     Model& GetModel() const { return *mModel; }
     void ClearPropertyEditor();
