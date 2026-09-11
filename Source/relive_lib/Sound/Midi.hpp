@@ -5,7 +5,6 @@ class BaseMap;
 #include "../../relive_lib/Function.hpp"
 #include <memory>
 
-struct SoundBlockInfo;
 struct OpenSeqHandle;
 
 struct PathSoundInfo;

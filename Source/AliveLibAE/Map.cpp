@@ -116,8 +116,8 @@ s16 Map::Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect)
         return 1;
     }
 
-    const s16 xpos = pCamera->mCamXOff * mPath.mPathData->field_A_grid_width;
-    const s16 ypos = pCamera->mCamYOff * mPath.mPathData->field_C_grid_height;
+    const s16 xpos = pCamera->mCamXOff * mPath.mPathData->mGridWidth;
+    const s16 ypos = pCamera->mCamYOff * mPath.mPathData->mGridHeight;
 
     pRect->x = xpos;
     pRect->y = ypos;
@@ -144,8 +144,8 @@ s16 Map::Is_Point_In_Current_Camera(EReliveLevelIds level, s32 path, FP xpos, FP
 
 void Map::GetCurrentCamCoords(PSX_Point* pPoint)
 {
-    pPoint->x = mCamIdxOnX * mPath.mPathData->field_A_grid_width;
-    pPoint->y = mCamIdxOnY * mPath.mPathData->field_C_grid_height;
+    pPoint->x = mCamIdxOnX * mPath.mPathData->mGridWidth;
+    pPoint->y = mCamIdxOnY * mPath.mPathData->mGridHeight;
 }
 
 void Map::GoTo_Camera()
@@ -290,7 +290,7 @@ void Map::GoTo_Camera()
     const PathBlyRec* pPathRec_1 = Path_Get_Bly_Record(mNextLevel, mNextPath);
 
     mPath.Init(
-        pPathRec_1->field_4_pPathData,
+        pPathRec_1->mPathData,
         mNextLevel,
         mNextPath,
         mNextCamera,
@@ -307,8 +307,8 @@ void Map::GoTo_Camera()
         }
     }
 
-    mCameraOffset.x = FP_FromInteger(mCamIdxOnX * mPath.mPathData->field_A_grid_width);
-    mCameraOffset.y = FP_FromInteger(mCamIdxOnY * mPath.mPathData->field_C_grid_height);
+    mCameraOffset.x = FP_FromInteger(mCamIdxOnX * mPath.mPathData->mGridWidth);
+    mCameraOffset.y = FP_FromInteger(mCamIdxOnY * mPath.mPathData->mGridHeight);
 
     // If map has changed then load new collision info
     if (prevPathId != mCurrentPath || prevLevelId != mCurrentLevel)
@@ -584,8 +584,8 @@ void Map::Handle_PathTransition()
         }
 
         mAliveObj->VOnPathTransition(
-            mPath.mPathData->field_A_grid_width * mCamIdxOnX,
-            mPath.mPathData->field_C_grid_height * mCamIdxOnY,
+            mPath.mPathData->mGridWidth * mCamIdxOnX,
+            mPath.mPathData->mGridHeight * mCamIdxOnY,
             remapped);
     }
     else

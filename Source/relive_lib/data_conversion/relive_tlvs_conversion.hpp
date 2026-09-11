@@ -1663,8 +1663,8 @@ public:
         const PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
         if (tlv.mDeviceX != 0)
         {
-            r.mDeviceX = tlv.mDeviceX - pathData.field_1A_abe_start_xpos;
-            r.mDeviceY = tlv.mDeviceY - pathData.field_1C_abe_start_ypos;
+            r.mDeviceX = tlv.mDeviceX - pathData.mAbeStartXPos;
+            r.mDeviceY = tlv.mDeviceY - pathData.mAbeStartYPos;
         }
         else
         {
@@ -3137,12 +3137,12 @@ public:
         const PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
         if (tlv.mXPos > 0)
         {
-            r.mXPos -= pathData.field_1A_abe_start_xpos;
+            r.mXPos -= pathData.mAbeStartXPos;
         }
 
         if (tlv.mYPos > 0)
         {
-            r.mYPos -= pathData.field_1C_abe_start_ypos;
+            r.mYPos -= pathData.mAbeStartYPos;
         }
         return r;
     }
@@ -3229,12 +3229,12 @@ public:
         const PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
         if (tlv.mExitX > 0)
         {
-            r.mExitX -= pathData.field_1A_abe_start_xpos;
+            r.mExitX -= pathData.mAbeStartXPos;
         }
 
         if (tlv.mExitY > 0)
         {
-            r.mExitY -= pathData.field_1C_abe_start_ypos;
+            r.mExitY -= pathData.mAbeStartYPos;
         }
 
         r.mOffDestX = tlv.mOffLevelOrDestX.dx;
@@ -3243,12 +3243,12 @@ public:
 
         if (tlv.mOffLevelOrDestX.dx > 0)
         {
-            r.mOffDestX -= pathData.field_1A_abe_start_xpos;
+            r.mOffDestX -= pathData.mAbeStartXPos;
         }
 
         if (tlv.mOffPathOrDestY > 0)
         {
-            r.mOffDestY -= pathData.field_1C_abe_start_ypos;
+            r.mOffDestY -= pathData.mAbeStartYPos;
         }
 
         // Local well
@@ -3278,12 +3278,12 @@ public:
         const PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
         if (tlv.field_18_off_dx > 0)
         {
-            r.mOffDestX -= pathData.field_1A_abe_start_xpos;
+            r.mOffDestX -= pathData.mAbeStartXPos;
         }
 
         if (tlv.field_1A_off_dy > 0)
         {
-            r.mOffDestY -= pathData.field_1C_abe_start_ypos;
+            r.mOffDestY -= pathData.mAbeStartYPos;
         }
 
         // Local well
@@ -3292,12 +3292,12 @@ public:
 
         if (tlv.mOnDestX > 0)
         {
-            r.mOnDestX -= pathData.field_1A_abe_start_xpos;
+            r.mOnDestX -= pathData.mAbeStartXPos;
         }
 
         if (tlv.mOnDestY > 0)
         {
-            r.mOnDestY -= pathData.field_1C_abe_start_ypos;
+            r.mOnDestY -= pathData.mAbeStartYPos;
         }
 
         r.mEmitLeaves = relive::From(tlv.mEmitLeaves);
@@ -3306,12 +3306,12 @@ public:
 
         if (tlv.mLeafX > 0)
         {
-            r.mLeafX += pathData.field_1A_abe_start_xpos;
+            r.mLeafX += pathData.mAbeStartXPos;
         }
 
         if (tlv.mLeafY > 0)
         {
-            r.mLeafX += pathData.field_1A_abe_start_xpos;
+            r.mLeafX += pathData.mAbeStartXPos;
         }
         return r;
     }
@@ -3368,12 +3368,12 @@ public:
         const PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
         if (tlv.field_18_exit_x > 0)
         {
-            r.mExitX -= pathData.field_1A_abe_start_xpos;
+            r.mExitX -= pathData.mAbeStartXPos;
         }
 
         if (tlv.field_1A_exit_y > 0)
         {
-            r.mExitY -= pathData.field_1C_abe_start_ypos;
+            r.mExitY -= pathData.mAbeStartYPos;
         }
 
         r.mOffDestLevel = MapWrapper::FromAE(tlv.field_1C_disabled_well_level);
@@ -3392,12 +3392,12 @@ public:
 
         if (tlv.mLeafX > 0)
         {
-            r.mLeafX += pathData.field_1A_abe_start_xpos;
+            r.mLeafX += pathData.mAbeStartXPos;
         }
 
         if (tlv.mLeafY > 0)
         {
-            r.mLeafX += pathData.field_1A_abe_start_xpos;
+            r.mLeafX += pathData.mAbeStartXPos;
         }
 
         r.mMovieId = tlv.mMovieId;
@@ -3947,12 +3947,12 @@ public:
         const PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
         if (tlv.mXPos > 0)
         {
-            r.mXPos -= pathData.field_1A_abe_start_xpos;
+            r.mXPos -= pathData.mAbeStartXPos;
         }
 
         if (tlv.mYPos > 0)
         {
-            r.mYPos -= pathData.field_1C_abe_start_ypos;
+            r.mYPos -= pathData.mAbeStartYPos;
         }
         return r;
     }
@@ -4390,8 +4390,8 @@ public:
         r.mMovieId = tlv.mData.mMovieId;
 
         const PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
-        r.mElectricX = tlv.mData.mElectricX - pathData.field_1A_abe_start_xpos;
-        r.mElectricY = tlv.mData.mElectricY - pathData.field_1C_abe_start_ypos;
+        r.mElectricX = tlv.mData.mElectricX - pathData.mAbeStartXPos;
+        r.mElectricY = tlv.mData.mElectricY - pathData.mAbeStartYPos;
         return r;
     }
 };

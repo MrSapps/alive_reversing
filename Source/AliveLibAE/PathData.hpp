@@ -3,6 +3,7 @@
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/MapWrapper.hpp"
 #include "../relive_lib/FmvInfo.hpp"
+#include "../relive_lib/PathData.hpp"
 #include <vector>
 #include <string>
 
@@ -31,61 +32,10 @@ enum class LevelIds : s16
 };
 
 using FmvInfo = relive::FmvInfoEntry;
-
-struct PathData final
-{
-    s16 field_0_bLeft;
-    s16 field_2_bRight;
-    s16 field_4_bTop;
-    s16 field_6_bBottom;
-    s16 field_A_grid_width;
-    s16 field_C_grid_height;
-    s16 field_E_width;
-    s16 field_10_height;
-    u32 field_12_object_offset;
-    u32 field_16_object_indextable_offset;
-    s16 field_1A_abe_start_xpos;
-    s16 field_1C_abe_start_ypos;
-};
-ALIVE_ASSERT_SIZEOF(PathData, 0x41C);
-
-struct PathBlyRec final
-{
-    const char_type* field_0_blyName;
-    PathData* field_4_pPathData;
-    CollisionInfo* field_8_pCollisionData;
-    u16 mOverlayId;
-    u16 field_E_padding;
-};
-
-struct SoundBlockInfo final
-{
-    const char_type* field_0_vab_header_name;
-    const char_type* field_4_vab_body_name;
-    s32 field_8_vab_id;
-    u8* field_C_pVabHeader;
-};
-
-struct PathRoot final
-{
-    PathBlyRec* field_0_pBlyArrayPtr;
-    FmvInfo* field_4_pFmvArray;
-    SoundBlockInfo* field_8_pMusicInfo;
-    const char_type* field_C_bsq_file_name;
-    s16 field_10_reverb;
-    s16 field_12_bg_music_id;
-    const char_type* field_14_lvl_name;
-    s16 field_18_num_paths;
-    s16 field_1A_unused; // message to display to change cd ??
-    s32 field_1C_padding;
-    const char_type* field_20_lvl_name_cd;
-    s32 field_24_padding;
-    const char_type* field_28_ovl_name_cd;
-    s32 field_2C_padding;
-    const char_type* field_30_mov_name_cd;
-    const char_type* field_34_idx_name;
-    const char_type* field_38_bnd_name;
-};
+using PathData = relive::PathData;
+using PathBlyRec = relive::PathBlyRec;
+using SoundBlockInfo = relive::SoundBlockInfo;
+using PathRoot = relive::PathRoot;
 
 struct PathRootContainer final
 {

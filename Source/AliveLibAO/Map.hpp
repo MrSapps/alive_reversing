@@ -24,7 +24,6 @@ extern const CameraSwapEffects kPathChangeEffectToInternalScreenChangeEffect[10]
 
 namespace AO {
 
-struct PathData;
 class CameraSwapper;
 
 struct CameraName final

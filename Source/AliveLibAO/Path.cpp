@@ -54,8 +54,8 @@ TlvIterator Path::VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height,
         bottom = height;
     }
 
-    const s32 grid_cell_y = top / mPathData->field_E_grid_height;
-    const s32 grid_cell_x = (right / mPathData->field_C_grid_width);
+    const s32 grid_cell_y = top / mPathData->mGridHeight;
+    const s32 grid_cell_x = (right / mPathData->mGridWidth);
 
     // Check within map bounds
     if (grid_cell_x >= mMap.mCamsOnX)
@@ -116,8 +116,8 @@ TlvIterator Path::TLV_Get_At(TlvIterator tlvIterator, FP xpos, FP ypos, FP width
     {
         const PathData* pPathData = mPathData;
 
-        const auto camX = xpos_converted / pPathData->field_C_grid_width;
-        const auto camY = ypos_converted / pPathData->field_E_grid_height;
+        const auto camX = xpos_converted / pPathData->mGridWidth;
+        const auto camY = ypos_converted / pPathData->mGridHeight;
 
         if (camX >= mMap.mCamsOnX || camY >= mMap.mCamsOnY)
         {
@@ -215,12 +215,12 @@ void Path::Reset_TLVs(u16 pathNum)
 
 PSX_Point Path::VGetMapSize() const
 {
-    return {mPathData->field_8_bTop, mPathData->field_A_bBottom};
+    return {mPathData->mTop, mPathData->mBottom};
 }
 
 PSX_Point Path::VGetGridSize() const
 {
-    return {mPathData->field_C_grid_width, mPathData->field_E_grid_height};
+    return {mPathData->mGridWidth, mPathData->mGridHeight};
 }
 
 } // namespace AO

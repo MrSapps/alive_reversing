@@ -11,7 +11,11 @@
 class ResourceManagerWrapper;
 class Map;
 
+namespace relive
+{
 struct PathData;
+}
+
 struct FixedPoint;
 using FP = FixedPoint;
 
@@ -226,7 +230,7 @@ public:
     Path(Map& map, relive::Factory& factory);
 
     void Free() override;
-    void Init(const PathData* pPathData, EReliveLevelIds level, s16 path, s16 cameraId, BinaryPath* ppPathRes);
+    void Init(const relive::PathData* pPathData, EReliveLevelIds level, s16 path, s16 cameraId, BinaryPath* ppPathRes);
     TlvIterator VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes objectType) override;
     TlvIterator TLV_Get_At(TlvIterator pTlv, FP xpos, FP ypos, FP w, FP h) override;
     void Loader(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode, ReliveTypes typeToLoad) override;
@@ -234,7 +238,7 @@ public:
     PSX_Point VGetMapSize() const override;
     PSX_Point VGetGridSize() const override;
 
-    const PathData* mPathData = nullptr;
+    const relive::PathData* mPathData = nullptr;
 };
 
 enum class CameraPos : s16;

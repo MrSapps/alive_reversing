@@ -61,7 +61,7 @@ bool AESaveConverter::Convert(const std::vector<u8>& savData, const char_type* p
     while (*reinterpret_cast<const u32*>(pSavedObjStates) != 0)
     {
         // Maps to AETypes
-        pSavedObjStates += ConvertObjectSaveStateData(j, static_cast<AETypes>(*pSavedObjStates), pBlyRec->field_4_pPathData->field_12_object_offset, reinterpret_cast<const u8*>(pSavedObjStates)) / sizeof(u16);
+        pSavedObjStates += ConvertObjectSaveStateData(j, static_cast<AETypes>(*pSavedObjStates), pBlyRec->mPathData->mObjectOffset, reinterpret_cast<const u8*>(pSavedObjStates)) / sizeof(u16);
         // TODO: Add the read state as json
     }
 

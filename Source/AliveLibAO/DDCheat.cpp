@@ -320,7 +320,7 @@ void DDCheat::Teleport()
         if (sTeleport_Path <= 21u)
         {
             const auto pPathRec = Path_Get_Bly_Record(MapWrapper::FromAO(static_cast<LevelIds>(sTeleport_Level)), sTeleport_Path);
-            if (pPathRec && pPathRec->field_0_blyName && pPathRec->field_4_pPathData && pPathRec->field_8_pCollisionData)
+            if (pPathRec && pPathRec->mBlyName && pPathRec->mPathData && pPathRec->mCollisionData)
             {
                 if (sTeleport_Cam <= 21)
                 {

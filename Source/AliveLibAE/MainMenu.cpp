@@ -1706,8 +1706,8 @@ MainMenuNextCam MainMenuController::LoadNewGame_Update_4D0920(u32 /*input*/)
         mMap.SetActiveCam(field_244_lvl_id, field_246_path_id, field_248_camera, CameraSwapEffects::eInstantChange_0, 0, 0);
 
         const PathBlyRec* pPathData = Path_Get_Bly_Record(field_244_lvl_id, field_246_path_id);
-        gAbe->mXPos = FP_FromInteger(field_24A_abeXOff - pPathData->field_4_pPathData->field_1A_abe_start_xpos);
-        gAbe->mYPos = FP_FromInteger(field_24C_abeYOff - pPathData->field_4_pPathData->field_1C_abe_start_ypos);
+        gAbe->mXPos = FP_FromInteger(field_24A_abeXOff - pPathData->mPathData->mAbeStartXPos);
+        gAbe->mYPos = FP_FromInteger(field_24C_abeYOff - pPathData->mPathData->mAbeStartYPos);
 
         if (field_24E_start_scale == -1)
         {
