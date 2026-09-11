@@ -57,7 +57,7 @@ bool AESaveConverter::Convert(const std::vector<u8>& savData, const char_type* p
     nlohmann::json j;
     j = AEData::Quicksave::From(*reinterpret_cast<const AEData::Quicksave*>(pSavedWorldData));
 
-    const PathBlyRec* pBlyRec = Path_Get_Bly_Record(MapWrapper::FromAE(pSavedWorldData->field_204_world_info.mLevel), pSavedWorldData->field_204_world_info.mPath);
+    const relive::PathBlyRec* pBlyRec = Path_Get_Bly_Record(MapWrapper::FromAE(pSavedWorldData->field_204_world_info.mLevel), pSavedWorldData->field_204_world_info.mPath);
     while (*reinterpret_cast<const u32*>(pSavedObjStates) != 0)
     {
         // Maps to AETypes

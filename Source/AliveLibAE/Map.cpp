@@ -287,7 +287,7 @@ void Map::GoTo_Camera()
     mCurrentLevel = mNextLevel;
     mCurrentCamera = mNextCamera;
 
-    const PathBlyRec* pPathRec_1 = Path_Get_Bly_Record(mNextLevel, mNextPath);
+    const relive::PathBlyRec* pPathRec_1 = Path_Get_Bly_Record(mNextLevel, mNextPath);
 
     mPath.Init(
         pPathRec_1->mPathData,
@@ -664,9 +664,9 @@ BaseGameObject* Map::FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLe
     if (pMap->mFmvBaseId > 10000u)
     {
         // Trippe FMV
-        FmvInfo* pFmvRec1 = Path_Get_FMV_Record(lvlId, pMap->mFmvBaseId / 10000);
-        FmvInfo* pFmvRec2 = Path_Get_FMV_Record(lvlId, pMap->mFmvBaseId % 100);
-        FmvInfo* pFmvRec3 = Path_Get_FMV_Record(lvlId, pMap->mFmvBaseId / 100 % 100);
+        relive::FmvInfoEntry* pFmvRec1 = Path_Get_FMV_Record(lvlId, pMap->mFmvBaseId / 10000);
+        relive::FmvInfoEntry* pFmvRec2 = Path_Get_FMV_Record(lvlId, pMap->mFmvBaseId % 100);
+        relive::FmvInfoEntry* pFmvRec3 = Path_Get_FMV_Record(lvlId, pMap->mFmvBaseId / 100 % 100);
 
         return relive_new CameraSwapper(ppBits, pMap->mResourceManager, *pMap,
                                         pFmvRec1->mFlags == 1,
@@ -679,8 +679,8 @@ BaseGameObject* Map::FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLe
     else if (pMap->mFmvBaseId >= 100u)
     {
         // Double FMV
-        FmvInfo* pFmvRec1 = Path_Get_FMV_Record(lvlId, pMap->mFmvBaseId / 100);
-        FmvInfo* pFmvRec2 = Path_Get_FMV_Record(lvlId, pMap->mFmvBaseId % 100);
+        relive::FmvInfoEntry* pFmvRec1 = Path_Get_FMV_Record(lvlId, pMap->mFmvBaseId / 100);
+        relive::FmvInfoEntry* pFmvRec2 = Path_Get_FMV_Record(lvlId, pMap->mFmvBaseId % 100);
         return relive_new CameraSwapper(ppBits, pMap->mResourceManager, *pMap,
                                               pFmvRec1->mFlags == 1,
                                               pFmvRec1->mName,
@@ -690,7 +690,7 @@ BaseGameObject* Map::FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLe
     else // < 100
     {
         // Single FMV
-        FmvInfo* pFmvRec1 = Path_Get_FMV_Record(lvlId, pMap->mFmvBaseId);
+        relive::FmvInfoEntry* pFmvRec1 = Path_Get_FMV_Record(lvlId, pMap->mFmvBaseId);
         return relive_new CameraSwapper(ppBits, pMap->mResourceManager, *pMap,
                                               pFmvRec1->mFlags == 1,
                                               pFmvRec1->mName);

@@ -1660,7 +1660,7 @@ public:
         BaseConvert(r, tlv, tlvId);
         r.mScale = relive::From(tlv.mScale);
 
-        const PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
+        const relive::PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
         if (tlv.mDeviceX != 0)
         {
             r.mDeviceX = tlv.mDeviceX - pathData.mAbeStartXPos;
@@ -3134,7 +3134,7 @@ public:
         r.mXPos = tlv.mXPos;
         r.mYPos = tlv.mYPos;
 
-        const PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
+        const relive::PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
         if (tlv.mXPos > 0)
         {
             r.mXPos -= pathData.mAbeStartXPos;
@@ -3226,7 +3226,7 @@ public:
         r.mExitX = tlv.mExitX;
         r.mExitY = tlv.mExitY;
 
-        const PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
+        const relive::PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
         if (tlv.mExitX > 0)
         {
             r.mExitX -= pathData.mAbeStartXPos;
@@ -3275,7 +3275,7 @@ public:
         r.mOffDestX = tlv.field_18_off_dx;
         r.mOffDestY = tlv.field_1A_off_dy;
 
-        const PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
+        const relive::PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
         if (tlv.field_18_off_dx > 0)
         {
             r.mOffDestX -= pathData.mAbeStartXPos;
@@ -3365,7 +3365,7 @@ public:
         r.mExitX = tlv.field_18_exit_x;
         r.mExitY = tlv.field_1A_exit_y;
 
-        const PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
+        const relive::PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
         if (tlv.field_18_exit_x > 0)
         {
             r.mExitX -= pathData.mAbeStartXPos;
@@ -3944,7 +3944,7 @@ public:
         r.mXPos = tlv.mXPos;
         r.mYPos = tlv.mYPos;
 
-        const PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
+        const relive::PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
         if (tlv.mXPos > 0)
         {
             r.mXPos -= pathData.mAbeStartXPos;
@@ -4389,7 +4389,7 @@ public:
         r.mWipeEffect = relive::From(tlv.mData.mWipeEffect);
         r.mMovieId = tlv.mData.mMovieId;
 
-        const PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
+        const relive::PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
         r.mElectricX = tlv.mData.mElectricX - pathData.mAbeStartXPos;
         r.mElectricY = tlv.mData.mElectricY - pathData.mAbeStartYPos;
         return r;

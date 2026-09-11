@@ -5210,7 +5210,7 @@ struct Quicksave final
         // data.field_200_accumulated_obj_count is never used
         d.mWorldInfo = Quicksave_WorldInfo::From(data.field_204_world_info);
         d.mRestartPathWorldInfo = Quicksave_WorldInfo::From(data.field_244_restart_path_world_info);
-        const PathBlyRec* pBlyRec = Path_Get_Bly_Record(MapWrapper::FromAE(data.field_204_world_info.mLevel), data.field_204_world_info.mPath);
+        const relive::PathBlyRec* pBlyRec = Path_Get_Bly_Record(MapWrapper::FromAE(data.field_204_world_info.mLevel), data.field_204_world_info.mPath);
         d.mRestartPathAbeState = AbeSaveState::From(data.field_284_restart_path_abe_state, pBlyRec->mPathData->mObjectOffset);
         d.mRestartPathSwitchStates = SwitchStates::From(data.field_35C_restart_path_switch_states);
         d.mSwitchStates = SwitchStates::From(data.field_45C_switch_states);

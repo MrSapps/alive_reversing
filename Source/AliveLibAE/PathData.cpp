@@ -9,14 +9,14 @@
 
 const u32 kMaxPaths = 99;
 
-const PathData kNullPathEntry = {};
+const relive::PathData kNullPathEntry = {};
 
-static PathData ST_PathData[kMaxPaths] = {
+static relive::PathData ST_PathData[kMaxPaths] = {
     kNullPathEntry,
     {0, 0, 2625, 2340, 375, 260, 504, 660, 375, 260},
 };
 
-static PathData MI_PathData[kMaxPaths] = {
+static relive::PathData MI_PathData[kMaxPaths] = {
     kNullPathEntry,
     {0, 0, 5625, 2340, 375, 260, 2980, 11796, 1875, 0},
     {0, 0, 4125, 2600, 375, 260, 3860, 8772, 0, 0},
@@ -32,7 +32,7 @@ static PathData MI_PathData[kMaxPaths] = {
     {0, 0, 3750, 780, 375, 260, 1160, 4816, 375, 0},
 };
 
-static PathData NE_PathData[kMaxPaths] = {
+static relive::PathData NE_PathData[kMaxPaths] = {
     kNullPathEntry,
     {0, 0, 1875, 1300, 375, 260, 740, 2268, 0, 0},
     {0, 0, 2250, 2080, 375, 260, 2404, 5496, 1875, 520},
@@ -43,7 +43,7 @@ static PathData NE_PathData[kMaxPaths] = {
     {0, 0, 2625, 780, 375, 260, 588, 3356, 750, 520},
 };
 
-static PathData PV_PathData[kMaxPaths] = {
+static relive::PathData PV_PathData[kMaxPaths] = {
     kNullPathEntry,
     {0, 0, 5250, 1560, 375, 260, 3192, 6548, 0, 520},
     {0, 0, 1500, 260, 375, 260, 212, 772, 3375, 1820},
@@ -62,7 +62,7 @@ static PathData PV_PathData[kMaxPaths] = {
     {0, 0, 1500, 1040, 375, 260, 648, 2128, 1125, 520},
 };
 
-static PathData SV_PathData[kMaxPaths] = {
+static relive::PathData SV_PathData[kMaxPaths] = {
     kNullPathEntry,
     {0, 0, 3000, 520, 375, 260, 768, 3076, 375, 0},
     {0, 0, 1500, 1560, 375, 260, 1872, 5068, 375, 0},
@@ -80,7 +80,7 @@ static PathData SV_PathData[kMaxPaths] = {
     {0, 0, 2250, 780, 375, 260, 1204, 3024, 375, 520},
 };
 
-static PathData FD_PathData[kMaxPaths] = {
+static relive::PathData FD_PathData[kMaxPaths] = {
     kNullPathEntry,
     {0, 0, 3000, 1560, 375, 260, 1124, 3992, 3375, 520},
     {0, 0, 3000, 2080, 375, 260, 2372, 7184, 2625, 1560},
@@ -98,7 +98,7 @@ static PathData FD_PathData[kMaxPaths] = {
     {0, 0, 1500, 780, 375, 260, 396, 1256, 375, 1300},
 };
 
-static PathData BA_PathData[kMaxPaths] = {
+static relive::PathData BA_PathData[kMaxPaths] = {
     kNullPathEntry,
     {0, 0, 2250, 2080, 375, 260, 2444, 7612, 375, 0},
     {0, 0, 1125, 1040, 375, 260, 336, 1536, 0, 0},
@@ -118,7 +118,7 @@ static PathData BA_PathData[kMaxPaths] = {
     {0, 0, 750, 260, 375, 260, 156, 936, 375, 260},
 };
 
-static PathData BW_PathData[kMaxPaths] = {
+static relive::PathData BW_PathData[kMaxPaths] = {
     kNullPathEntry,
     {0, 0, 3750, 1820, 375, 260, 1820, 4412, 0, 0},
     {0, 0, 3750, 2080, 375, 260, 3160, 9076, 0, 0},
@@ -136,7 +136,7 @@ static PathData BW_PathData[kMaxPaths] = {
     {0, 0, 3000, 780, 375, 260, 832, 2180, 750, 520},
 };
 
-static PathData BR_PathData[kMaxPaths] = {
+static relive::PathData BR_PathData[kMaxPaths] = {
     kNullPathEntry,
     {0, 0, 3000, 1040, 375, 260, 1836, 6272, 0, 0},
     {0, 0, 4500, 1820, 375, 260, 2512, 5592, 375, 780},
@@ -169,18 +169,18 @@ static PathData BR_PathData[kMaxPaths] = {
     {0, 0, 3000, 780, 375, 260, 552, 3284, 0, 1040},
 };
 
-static PathData BM_PathData[kMaxPaths] = {
+static relive::PathData BM_PathData[kMaxPaths] = {
     kNullPathEntry,
     {0, 0, 2625, 2600, 375, 260, 2560, 8488, 375, 0},
 };
 
-static PathData TL_PathData[kMaxPaths] = {
+static relive::PathData TL_PathData[kMaxPaths] = {
     kNullPathEntry,
     {0, 0, 1125, 260, 375, 260, 424, 740, 375, 260},
     {0, 0, 1875, 1820, 375, 260, 860, 1672, 375, 0},
 };
 
-static PathData CR_PathData[kMaxPaths] = {
+static relive::PathData CR_PathData[kMaxPaths] = {
     kNullPathEntry,
     {0, 0, 3750, 1820, 375, 260, 560, 592, 375, 520},
     {0, 0, 3750, 1300, 375, 260, 400, 416, 375, 260},
@@ -355,13 +355,13 @@ static CollisionInfo CR_CollisionInfo[kMaxPaths] = {
 
 // ========================================================================
 
-const PathBlyRec kNullPathBlyRec = {};
+const relive::PathBlyRec kNullPathBlyRec = {};
 
-static PathBlyRec ST_PathBlyRecInfo[kMaxPaths] = {
+static relive::PathBlyRec ST_PathBlyRecInfo[kMaxPaths] = {
     kNullPathBlyRec,
     {"STP1.BLY", &ST_PathData[1], &ST_CollisionInfo[1], 256, 0}};
 
-static PathBlyRec MI_PathBlyRecInfo[kMaxPaths] = {
+static relive::PathBlyRec MI_PathBlyRecInfo[kMaxPaths] = {
     kNullPathBlyRec,
     {"MIP1.BLY", &MI_PathData[1], &MI_CollisionInfo[1], 1796, 2312},
     {"MIP2.BLY", &MI_PathData[2], &MI_CollisionInfo[2], 2565, 3083},
@@ -376,7 +376,7 @@ static PathBlyRec MI_PathBlyRecInfo[kMaxPaths] = {
     {"MIP11.BLY", &MI_PathData[11], &MI_CollisionInfo[11], 1796, 2312},
     {"MIP12.BLY", &MI_PathData[12], &MI_CollisionInfo[12], 4882, 5396}};
 
-static PathBlyRec NE_PathBlyRecInfo[kMaxPaths] = {
+static relive::PathBlyRec NE_PathBlyRecInfo[kMaxPaths] = {
     kNullPathBlyRec,
     {"NEP1.BLY", &NE_PathData[1], &NE_CollisionInfo[1], 7966, 8480},
     {"NEP2.BLY", &NE_PathData[2], &NE_CollisionInfo[2], 9508, 10022},
@@ -386,7 +386,7 @@ static PathBlyRec NE_PathBlyRecInfo[kMaxPaths] = {
     {"NEP6.BLY", &NE_PathData[6], &NE_CollisionInfo[6], 7966, 8480},
     {"NEP7.BLY", &NE_PathData[7], &NE_CollisionInfo[7], 7966, 8480}};
 
-static PathBlyRec PV_PathBlyRecInfo[kMaxPaths] = {
+static relive::PathBlyRec PV_PathBlyRecInfo[kMaxPaths] = {
     kNullPathBlyRec,
     {"PVP1.BLY", &PV_PathData[1], &PV_CollisionInfo[1], 10536, 11050},
     {"PVP2.BLY", &PV_PathData[2], &PV_CollisionInfo[2], 10536, 11050},
@@ -404,7 +404,7 @@ static PathBlyRec PV_PathBlyRecInfo[kMaxPaths] = {
     {"PVP14.BLY", &PV_PathData[14], &PV_CollisionInfo[14], 12078, 12592},
     {"PVP15.BLY", &PV_PathData[15], &PV_CollisionInfo[15], 13106, 13620}};
 
-static PathBlyRec SV_PathBlyRecInfo[kMaxPaths] = {
+static relive::PathBlyRec SV_PathBlyRecInfo[kMaxPaths] = {
     kNullPathBlyRec,
     {"SVP1.BLY", &SV_PathData[1], &SV_CollisionInfo[1], 14134, 14648},
     {"SVP2.BLY", &SV_PathData[2], &SV_CollisionInfo[2], 14134, 14648},
@@ -421,7 +421,7 @@ static PathBlyRec SV_PathBlyRecInfo[kMaxPaths] = {
     {"SVP13.BLY", &SV_PathData[13], &SV_CollisionInfo[13], 14134, 14648},
     {"SVP14.BLY", &SV_PathData[14], &SV_CollisionInfo[14], 14134, 14648}};
 
-static PathBlyRec BW_PathBlyRecInfo[kMaxPaths] = {
+static relive::PathBlyRec BW_PathBlyRecInfo[kMaxPaths] = {
     kNullPathBlyRec,
     {"BWP1.BLY", &BW_PathData[1], &BW_CollisionInfo[1], 30068, 30582},
     {"BWP2.BLY", &BW_PathData[2], &BW_CollisionInfo[2], 31610, 32124},
@@ -438,7 +438,7 @@ static PathBlyRec BW_PathBlyRecInfo[kMaxPaths] = {
     {"BWP13.BLY", &BW_PathData[13], &BW_CollisionInfo[13], 35722, 36236},
     {"BWP14.BLY", &BW_PathData[14], &BW_CollisionInfo[14], 30068, 30582}};
 
-static PathBlyRec BR_PathBlyRecInfo[kMaxPaths] = {
+static relive::PathBlyRec BR_PathBlyRecInfo[kMaxPaths] = {
     kNullPathBlyRec,
     {"BRP1.BLY", &BR_PathData[1], &BR_CollisionInfo[1], 36750, 37264},
     {"BRP2.BLY", &BR_PathData[2], &BR_CollisionInfo[2], 38292, 38806},
@@ -470,11 +470,11 @@ static PathBlyRec BR_PathBlyRecInfo[kMaxPaths] = {
     {"BRP28.BLY", &BR_PathData[28], &BR_CollisionInfo[28], 47544, 48058},
     {"BRP29.BLY", &BR_PathData[29], &BR_CollisionInfo[29], 49600, 50114}};
 
-static PathBlyRec BM_PathBlyRecInfo[kMaxPaths] = {
+static relive::PathBlyRec BM_PathBlyRecInfo[kMaxPaths] = {
     kNullPathBlyRec,
     {"BMP1.BLY", &BM_PathData[1], &BM_CollisionInfo[1], 52684, 53198}};
 
-static PathBlyRec FD_PathBlyRecInfo[kMaxPaths] = {
+static relive::PathBlyRec FD_PathBlyRecInfo[kMaxPaths] = {
     kNullPathBlyRec,
     {"FDP1.BLY", &FD_PathData[1], &FD_CollisionInfo[1], 17732, 18246},
     {"FDP2.BLY", &FD_PathData[2], &FD_CollisionInfo[2], 17732, 18246},
@@ -491,7 +491,7 @@ static PathBlyRec FD_PathBlyRecInfo[kMaxPaths] = {
     {"FDP13.BLY", &FD_PathData[13], &FD_CollisionInfo[13], 23386, 23900},
     {"FDP14.BLY", &FD_PathData[14], &FD_CollisionInfo[14], 17732, 18246}};
 
-static PathBlyRec BA_PathBlyRecInfo[kMaxPaths] = {
+static relive::PathBlyRec BA_PathBlyRecInfo[kMaxPaths] = {
     kNullPathBlyRec,
     {"BAP1.BLY", &BA_PathData[1], &BA_CollisionInfo[1], 24414, 24928},
     {"BAP2.BLY", &BA_PathData[2], &BA_CollisionInfo[2], 24414, 24928},
@@ -510,7 +510,7 @@ static PathBlyRec BA_PathBlyRecInfo[kMaxPaths] = {
     {"BAP15.BLY", &BA_PathData[15], &BA_CollisionInfo[15], 25956, 26470},
     {"BAP16.BLY", &BA_PathData[16], &BA_CollisionInfo[16], 25956, 26470}};
 
-static PathBlyRec TL_PathBlyRecInfo[kMaxPaths] = {
+static relive::PathBlyRec TL_PathBlyRecInfo[kMaxPaths] = {
     kNullPathBlyRec,
     {"TLP1.BLY", &TL_PathData[1], &TL_CollisionInfo[1], 209, 0},
     {
@@ -522,7 +522,7 @@ static PathBlyRec TL_PathBlyRecInfo[kMaxPaths] = {
     },
 };
 
-static PathBlyRec CR_PathBlyRecInfo[kMaxPaths] = {
+static relive::PathBlyRec CR_PathBlyRecInfo[kMaxPaths] = {
     kNullPathBlyRec,
     {"CRP1.BLY", &CR_PathData[1], &CR_CollisionInfo[1], 256, 0},
     {
@@ -536,9 +536,9 @@ static PathBlyRec CR_PathBlyRecInfo[kMaxPaths] = {
 
 // =======================================================================
 
-const FmvInfo kNullFmvInfo = {nullptr, 0, 0, 0};
+const relive::FmvInfoEntry kNullFmvInfo = {nullptr, 0, 0, 0};
 
-FmvInfo ST_FmvInfo[] = {
+relive::FmvInfoEntry ST_FmvInfo[] = {
     kNullFmvInfo,
     {"LOGO.DDV", 205, 1, 127},
     {"OPTION.DDV", 45, 2, 127},
@@ -547,7 +547,7 @@ FmvInfo ST_FmvInfo[] = {
     {"INTRO.DDV", 530, 1, 127},
     {"DDLOGO.DDV", 95, 1, 127}};
 
-FmvInfo MI_FmvInfo[] = {
+relive::FmvInfoEntry MI_FmvInfo[] = {
     kNullFmvInfo,
     {"PROPHECY.DDV", 440, 1, 127},
     {"V1A4S01.DDV", 449, 2, 127},
@@ -586,7 +586,7 @@ FmvInfo MI_FmvInfo[] = {
     {"MI431419.DDV", 45, 2, 127},
     {"NEBLK201.DDV", 45, 2, 127}};
 
-FmvInfo NE_FmvInfo[] = {
+relive::FmvInfoEntry NE_FmvInfo[] = {
     kNullFmvInfo,
     {"NEP1C7.DDV", 60, 2, 127},
     {"NEP1C11.DDV", 60, 2, 127},
@@ -614,7 +614,7 @@ FmvInfo NE_FmvInfo[] = {
     {"PV131452.DDV", 45, 2, 127},
     {"S1102N58.DDV", 45, 2, 127}};
 
-FmvInfo PV_FmvInfo[] = {
+relive::FmvInfoEntry PV_FmvInfo[] = {
     kNullFmvInfo,
     {"PVP1C5.DDV", 45, 2, 127},
     {"PVP7P10.DDV", 60, 2, 127},
@@ -653,14 +653,14 @@ FmvInfo PV_FmvInfo[] = {
     {"PV131452.DDV", 45, 2, 127},
     {"PV430402.DDV", 45, 2, 127}};
 
-FmvInfo FD_FmvInfo[] = {
+relive::FmvInfoEntry FD_FmvInfo[] = {
     kNullFmvInfo,
     {"ASLIKEXP.DDV", 321, 1, 127},
     {"ASLIKINF.DDV", 596, 1, 127},
     {"INFBOOTH.DDV", 567, 1, 127},
     {"FEECO.DDV", 1406, 32769, 127}};
 
-FmvInfo BA_FmvInfo[] = {
+relive::FmvInfoEntry BA_FmvInfo[] = {
     kNullFmvInfo,
     {"SBP01C01.DDV", 60, 2, 127},
     {"SBP01C1R.DDV", 60, 2, 127},
@@ -670,7 +670,7 @@ FmvInfo BA_FmvInfo[] = {
     {"BA1114.DDV", 60, 2, 127},
     {"BA1114R.DDV", 60, 2, 127}};
 
-FmvInfo SV_FmvInfo[] = {
+relive::FmvInfoEntry SV_FmvInfo[] = {
     kNullFmvInfo,
     {"SVP1C5.DDV", 60, 2, 127},
     {"SV22073L.DDV", 45, 2, 127},
@@ -711,7 +711,7 @@ FmvInfo SV_FmvInfo[] = {
     {"REWARD.DDV", 2140, 32769, 127}};
 
 
-FmvInfo BR_FmvInfo[] = {
+relive::FmvInfoEntry BR_FmvInfo[] = {
     kNullFmvInfo,
     {"BRP01C01.DDV", 60, 2, 127},
     {"BRP01C02.DDV", 60, 2, 127},
@@ -732,7 +732,7 @@ FmvInfo BR_FmvInfo[] = {
     {"GDENDING.DDV", 2380, 32769, 127},
     {"BDENDING.DDV", 965, 32769, 127}};
 
-FmvInfo BM_FmvInfo[] = {
+relive::FmvInfoEntry BM_FmvInfo[] = {
     kNullFmvInfo,
     {"BRP01C01.DDV", 60, 2, 127},
     {"BRP01C02.DDV", 60, 2, 127},
@@ -753,7 +753,7 @@ FmvInfo BM_FmvInfo[] = {
     {"GDENDING.DDV", 2380, 32769, 127},
     {"BDENDING.DDV", 965, 32769, 127}};
 
-FmvInfo BW_FmvInfo[] = {
+relive::FmvInfoEntry BW_FmvInfo[] = {
     kNullFmvInfo,
     {"BWP1C2.DDV", 60, 2, 127},
     {"BWP3P4.DDV", 60, 2, 127},
@@ -762,81 +762,81 @@ FmvInfo BW_FmvInfo[] = {
     {"PHLEGEXP.DDV", 425, 1, 127},
     {"TRAIN3.DDV", 499, 2, 127}};
 
-FmvInfo TL_FmvInfo[] = {
+relive::FmvInfoEntry TL_FmvInfo[] = {
     kNullFmvInfo};
 
-FmvInfo CR_FmvInfo[] = {
+relive::FmvInfoEntry CR_FmvInfo[] = {
     kNullFmvInfo,
     {"LOGO.DDV", 205, 1, 127}};
 
 // ===================================================================
-const SoundBlockInfo kNullSoundBlockInfo = {};
+const relive::SoundBlockInfo kNullSoundBlockInfo = {};
 
-SoundBlockInfo ST_SoundBlockInfo[] = {
+relive::SoundBlockInfo ST_SoundBlockInfo[] = {
     {"OPTION.VH", "OPTION.VB", -1, 0},
     kNullSoundBlockInfo};
 
-SoundBlockInfo MI_SoundBlockInfo[] = {
+relive::SoundBlockInfo MI_SoundBlockInfo[] = {
     {"MINES.VH", "MINES.VB", -1, 0},
     kNullSoundBlockInfo};
 
-SoundBlockInfo NE_SoundBlockInfo[] = {
+relive::SoundBlockInfo NE_SoundBlockInfo[] = {
     {"NECRUM.VH", "NECRUM.VB", -1, 0},
     kNullSoundBlockInfo};
 
-SoundBlockInfo PV_SoundBlockInfo[] = {
+relive::SoundBlockInfo PV_SoundBlockInfo[] = {
     {"PARVAULT.VH", "PARVAULT.VB", -1, 0},
     kNullSoundBlockInfo};
 
-SoundBlockInfo SV_SoundBlockInfo[] = {
+relive::SoundBlockInfo SV_SoundBlockInfo[] = {
     {"SCRVAULT.VH", "SCRVAULT.VB", -1, 0},
     kNullSoundBlockInfo};
 
-SoundBlockInfo FD_SoundBlockInfo[] = {
+relive::SoundBlockInfo FD_SoundBlockInfo[] = {
     {"FEECO.VH", "FEECO.VB", -1, 0},
     kNullSoundBlockInfo};
 
-SoundBlockInfo BA_SoundBlockInfo[] = {
+relive::SoundBlockInfo BA_SoundBlockInfo[] = {
     {"BARRACKS.VH", "BARRACKS.VB", -1, 0},
     kNullSoundBlockInfo};
 
-SoundBlockInfo SV_Ender_SoundBlockInfo[] = {
+relive::SoundBlockInfo SV_Ender_SoundBlockInfo[] = {
     {"SVENDER.VH", "SVENDER.VB", -1, 0},
     kNullSoundBlockInfo};
 
-SoundBlockInfo BW_SoundBlockInfo[] = {
+relive::SoundBlockInfo BW_SoundBlockInfo[] = {
     {"BONEWERK.VH", "BONEWERK.VB", -1, 0},
     kNullSoundBlockInfo};
 
-SoundBlockInfo BR_SoundBlockInfo[] = {
+relive::SoundBlockInfo BR_SoundBlockInfo[] = {
     {"BREWERY.VH", "BREWERY.VB", -1, 0},
     kNullSoundBlockInfo};
 
-SoundBlockInfo BM_SoundBlockInfo[] = {
+relive::SoundBlockInfo BM_SoundBlockInfo[] = {
     {"BRENDER.VH", "BRENDER.VB", -1, 0},
     kNullSoundBlockInfo};
 
-SoundBlockInfo PV_Ender_SoundBlockInfo[] = {
+relive::SoundBlockInfo PV_Ender_SoundBlockInfo[] = {
     {"PVENDER.VH", "PVENDER.VB", -1, 0},
     kNullSoundBlockInfo};
 
-SoundBlockInfo FD_Ender_SoundBlockInfo[] = {
+relive::SoundBlockInfo FD_Ender_SoundBlockInfo[] = {
     {"FEENDER.VH", "FEENDER.VB", -1, 0},
     kNullSoundBlockInfo};
 
-SoundBlockInfo BA_Ender_SoundBlockInfo[] = {
+relive::SoundBlockInfo BA_Ender_SoundBlockInfo[] = {
     {"BAENDER.VH", "BAENDER.VB", -1, 0},
     kNullSoundBlockInfo};
 
-SoundBlockInfo BW_Ender_SoundBlockInfo[] = {
+relive::SoundBlockInfo BW_Ender_SoundBlockInfo[] = {
     {"BWENDER.VH", "BWENDER.VB", -1, 0},
     kNullSoundBlockInfo};
 
-SoundBlockInfo TL_SoundBlockInfo[] = {
+relive::SoundBlockInfo TL_SoundBlockInfo[] = {
     {"MINES.VH", "MINES.VB", -1, 0},
     kNullSoundBlockInfo};
 
-SoundBlockInfo CR_SoundBlockInfo[] = {
+relive::SoundBlockInfo CR_SoundBlockInfo[] = {
     {"OPTION.VH", "OPTION.VB", -1, 0},
     kNullSoundBlockInfo};
 
@@ -1069,9 +1069,9 @@ const static PerLvlData gDemoData_off_5617F0[23] = {
 
 static PathRootContainer sPathData_559660 = pathData;
 
-[[nodiscard]] const PathBlyRec* Path_Get_Bly_Record(EReliveLevelIds lvlId, u16 pathId)
+[[nodiscard]] const relive::PathBlyRec* Path_Get_Bly_Record(EReliveLevelIds lvlId, u16 pathId)
 {
-    const PathBlyRec* rec = &sPathData_559660.paths[static_cast<s32>(MapWrapper::ToAE(lvlId))].mBlyArrayPtr[pathId];
+    const relive::PathBlyRec* rec = &sPathData_559660.paths[static_cast<s32>(MapWrapper::ToAE(lvlId))].mBlyArrayPtr[pathId];
     if (!rec)
     {
         ALIVE_FATAL("Path record not found for lvl %d with pathId %d", static_cast<s32>(MapWrapper::ToAE(lvlId)), pathId);
@@ -1079,7 +1079,7 @@ static PathRootContainer sPathData_559660 = pathData;
     return rec;
 }
 
-FmvInfo* Path_Get_FMV_Record(EReliveLevelIds lvlId, u16 fmvId)
+relive::FmvInfoEntry* Path_Get_FMV_Record(EReliveLevelIds lvlId, u16 fmvId)
 {
     return &sPathData_559660.paths[static_cast<s32>(MapWrapper::ToAE(lvlId))].mFmvArray[fmvId];
 }
@@ -1134,7 +1134,7 @@ const char_type* Path_Get_BndName(EReliveLevelIds lvlId)
     return sPathData_559660.paths[static_cast<s32>(MapWrapper::ToAE(lvlId))].mBndName;
 }
 
-SoundBlockInfo* Path_Get_MusicInfo(EReliveLevelIds lvlId)
+relive::SoundBlockInfo* Path_Get_MusicInfo(EReliveLevelIds lvlId)
 {
     return sPathData_559660.paths[static_cast<s32>(MapWrapper::ToAE(lvlId))].mMusicInfo;
 }
@@ -1159,7 +1159,7 @@ s32 Path_Get_Paths_Count()
     return ALIVE_COUNTOF(sPathData_559660.paths);
 }
 
-PathRoot* Path_Get_PathRoot(s32 lvlId)
+relive::PathRoot* Path_Get_PathRoot(s32 lvlId)
 {
     return &sPathData_559660.paths[lvlId];
 }
@@ -1189,7 +1189,7 @@ CollisionInfo* GetCollisions(s32 lvlId)
     return sCollisionRoots[lvlId];
 }
 
-static PathData* sPathDataRoots[ALIVE_COUNTOF(sPathData_559660.paths)] = {
+static relive::PathData* sPathDataRoots[ALIVE_COUNTOF(sPathData_559660.paths)] = {
     ST_PathData,
     MI_PathData,
     NE_PathData,
@@ -1208,7 +1208,7 @@ static PathData* sPathDataRoots[ALIVE_COUNTOF(sPathData_559660.paths)] = {
     TL_PathData,
     CR_PathData};
 
-PathData* GetPathData(s32 lvlId)
+relive::PathData* GetPathData(s32 lvlId)
 {
     return sPathDataRoots[lvlId];
 }

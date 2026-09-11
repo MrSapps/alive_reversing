@@ -24,7 +24,7 @@ void Path::Free()
     BasePath::Free();
 }
 
-void Path::Init(const PathData* pPathData, EReliveLevelIds level, s16 path, s16 cameraId, BinaryPath* ppPathRes)
+void Path::Init(const relive::PathData* pPathData, EReliveLevelIds level, s16 path, s16 cameraId, BinaryPath* ppPathRes)
 {
     mBinaryPath = ppPathRes;
 
@@ -111,7 +111,7 @@ TlvIterator Path::TLV_Get_At(TlvIterator tlvIterator, FP xpos, FP ypos, FP width
 
     if (!tlvIterator.IsValid())
     {
-        const PathData* pPathData = mPathData;
+        const relive::PathData* pPathData = mPathData;
         const s32 camX = (xpos_converted + width_converted) / (2 * pPathData->mGridWidth);
         const s32 camY = (ypos_converted + height_converted) / (2 * pPathData->mGridHeight);
 

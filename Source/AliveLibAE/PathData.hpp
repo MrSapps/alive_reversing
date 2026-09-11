@@ -31,15 +31,9 @@ enum class LevelIds : s16
     eCredits_16 = 16
 };
 
-using FmvInfo = relive::FmvInfoEntry;
-using PathData = relive::PathData;
-using PathBlyRec = relive::PathBlyRec;
-using SoundBlockInfo = relive::SoundBlockInfo;
-using PathRoot = relive::PathRoot;
-
 struct PathRootContainer final
 {
-    PathRoot paths[17];
+    relive::PathRoot paths[17];
 };
 
 struct PerLvlData final
@@ -69,10 +63,10 @@ struct SeqHandleTable final
     OpenSeqHandle mSeqs[145];
 };
 
-[[nodiscard]] const PathBlyRec* Path_Get_Bly_Record(EReliveLevelIds lvlId, u16 pathId);
+[[nodiscard]] const relive::PathBlyRec* Path_Get_Bly_Record(EReliveLevelIds lvlId, u16 pathId);
 
 // note: has to be writable
-FmvInfo* Path_Get_FMV_Record(EReliveLevelIds lvlId, u16 fmvId);
+relive::FmvInfoEntry* Path_Get_FMV_Record(EReliveLevelIds lvlId, u16 fmvId);
 
 // All real, unique FMV (.DDV) filenames referenced by any level's FmvInfo table -
 // used to drive FMV data conversion without a separately-maintained hardcoded list.
@@ -91,7 +85,7 @@ s16 Path_Get_Unknown(EReliveLevelIds lvlId);
 const char_type* Path_Get_BndName(EReliveLevelIds lvlId);
 
 // note: has to be writable
-SoundBlockInfo* Path_Get_MusicInfo(EReliveLevelIds lvlId);
+relive::SoundBlockInfo* Path_Get_MusicInfo(EReliveLevelIds lvlId);
 
 s16 Path_Get_Reverb(EReliveLevelIds lvlId);
 
@@ -101,11 +95,11 @@ s16 Path_Get_BackGroundMusicId(EReliveLevelIds lvlId);
 
 s32 Path_Get_Paths_Count();
 
-PathRoot* Path_Get_PathRoot(s32 lvlId);
+relive::PathRoot* Path_Get_PathRoot(s32 lvlId);
 
 CollisionInfo* GetCollisions(s32 lvlId);
 
-PathData* GetPathData(s32 lvlId);
+relive::PathData* GetPathData(s32 lvlId);
 
 void Path_SetMudsInLevel(EReliveLevelIds lvlId, u32 pathId, u32 count);
 
