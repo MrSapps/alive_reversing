@@ -331,11 +331,11 @@ static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const Reli
             const AO::PathBlyRec* pBlyRec = AO::Path_Get_Bly_Record(reliveLvl, static_cast<u16>(pathBndChunk.Id()));
 
             // Save cameras and map objects
-            width = (pBlyRec->field_4_pPathData->field_8_bTop - pBlyRec->field_4_pPathData->field_4_bLeft) / pBlyRec->field_4_pPathData->field_C_grid_width;
-            height = (pBlyRec->field_4_pPathData->field_A_bBottom - pBlyRec->field_4_pPathData->field_6_bRight) / pBlyRec->field_4_pPathData->field_E_grid_height;
-            collisionInfo = *pBlyRec->field_8_pCollisionData;
-            indexTableOffset = pBlyRec->field_4_pPathData->field_18_object_index_table_offset;
-            objectOffset = pBlyRec->field_4_pPathData->field_14_object_offset;
+            width = (pBlyRec->mPathData->mTop - pBlyRec->mPathData->mLeft) / pBlyRec->mPathData->mGridWidth;
+            height = (pBlyRec->mPathData->mBottom - pBlyRec->mPathData->mRight) / pBlyRec->mPathData->mGridHeight;
+            collisionInfo = *pBlyRec->mCollisionData;
+            indexTableOffset = pBlyRec->mPathData->mObjectIndexTableOffset;
+            objectOffset = pBlyRec->mPathData->mObjectOffset;
             overlayId = pBlyRec->mOverlayId & 0xFF;
         }
         else
@@ -343,11 +343,11 @@ static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const Reli
             const ::PathBlyRec* pBlyRec = ::Path_Get_Bly_Record(reliveLvl, static_cast<u16>(pathBndChunk.Id()));
 
             // Save cameras and map objects
-            width = (pBlyRec->field_4_pPathData->field_4_bTop - pBlyRec->field_4_pPathData->field_0_bLeft) / pBlyRec->field_4_pPathData->field_A_grid_width;
-            height = (pBlyRec->field_4_pPathData->field_6_bBottom - pBlyRec->field_4_pPathData->field_2_bRight) / pBlyRec->field_4_pPathData->field_C_grid_height;
-            collisionInfo = *pBlyRec->field_8_pCollisionData;
-            indexTableOffset = pBlyRec->field_4_pPathData->field_16_object_indextable_offset;
-            objectOffset = pBlyRec->field_4_pPathData->field_12_object_offset;
+            width = (pBlyRec->mPathData->mTop - pBlyRec->mPathData->mLeft) / pBlyRec->mPathData->mGridWidth;
+            height = (pBlyRec->mPathData->mBottom - pBlyRec->mPathData->mRight) / pBlyRec->mPathData->mGridHeight;
+            collisionInfo = *pBlyRec->mCollisionData;
+            indexTableOffset = pBlyRec->mPathData->mObjectIndexTableOffset;
+            objectOffset = pBlyRec->mPathData->mObjectOffset;
             overlayId = pBlyRec->mOverlayId & 0xFF;
         }
     }
@@ -392,8 +392,8 @@ static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const Reli
     if (isAo)
     {
         const AO::SoundBlockInfo* pSoundBlock = AO::Path_Get_MusicInfo(reliveLvl);
-        soundInfo.mVhFile = pSoundBlock->field_0_vab_header_name;
-        soundInfo.mVbFile = pSoundBlock->field_4_vab_body_name;
+        soundInfo.mVhFile = pSoundBlock->mVabHeaderName;
+        soundInfo.mVbFile = pSoundBlock->mVabBodyName;
         soundInfo.mSeqFiles = ConvertBSQ(seqsDir, AO::Path_Get_BsqFileName(reliveLvl), lvlReader, isAo);
     }
     else
@@ -402,8 +402,8 @@ static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const Reli
         const SoundBlockInfo* pSoundBlock = Path_Get_MusicInfo(soundLevel);
 
         // TODO: Convert to AO format instead of using sounds.dat for now (in the vh/vb/bsq copy)
-        soundInfo.mVhFile = pSoundBlock->field_0_vab_header_name;
-        soundInfo.mVbFile = pSoundBlock->field_4_vab_body_name;
+        soundInfo.mVhFile = pSoundBlock->mVabHeaderName;
+        soundInfo.mVbFile = pSoundBlock->mVabBodyName;
 
         soundInfo.mSeqFiles = ConvertBSQ(seqsDir, Path_Get_BsqFileName(soundLevel), lvlReader, isAo);
 

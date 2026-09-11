@@ -8,7 +8,6 @@
 
 class BaseGameObject;
 class Camera;
-struct PathData;
 class BinaryPath;
 enum class LevelIds : s16;
 struct PSX_Point;

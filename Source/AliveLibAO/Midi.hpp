@@ -11,8 +11,6 @@ class BaseMap;
 
 namespace AO {
 
-struct SoundBlockInfo;
-
 enum class SeqId : s16
 {
     None_M1 = -1,

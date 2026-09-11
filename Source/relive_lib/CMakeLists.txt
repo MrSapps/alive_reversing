@@ -626,6 +626,7 @@ SET(relive_lib_src
     MenuFmv.hpp
     FmvInfo.hpp
     FmvInfo.cpp
+    PathData.hpp
     Movie.hpp
     Movie.cpp
     BaseMap.hpp

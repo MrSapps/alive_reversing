@@ -33,8 +33,8 @@ void Path::Init(const PathData* pPathData, EReliveLevelIds level, s16 path, s16 
     mPathId = path;
 
     mPathData = pPathData;
-    mMap.mCamsOnX = (mPathData->field_4_bTop - mPathData->field_0_bLeft) / mPathData->field_A_grid_width;
-    mMap.mCamsOnY = (mPathData->field_6_bBottom - mPathData->field_2_bRight) / mPathData->field_C_grid_height;
+    mMap.mCamsOnX = (mPathData->mTop - mPathData->mLeft) / mPathData->mGridWidth;
+    mMap.mCamsOnY = (mPathData->mBottom - mPathData->mRight) / mPathData->mGridHeight;
 }
 
 TlvIterator Path::VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height, ReliveTypes objectType)
@@ -68,8 +68,8 @@ TlvIterator Path::VTLV_Get_At_Of_Type(s16 xpos, s16 ypos, s16 width, s16 height,
         bottom = height;
     }
 
-    const s32 grid_cell_y = (top + bottom) / (2 * mPathData->field_C_grid_height);
-    const s32 grid_cell_x = (right + left) / (2 * mPathData->field_A_grid_width);
+    const s32 grid_cell_y = (top + bottom) / (2 * mPathData->mGridHeight);
+    const s32 grid_cell_x = (right + left) / (2 * mPathData->mGridWidth);
 
     // Get the offset to where the TLV list starts for this camera cell
     BinaryPath* pBinPath = mMap.GetPathResourceBlockPtr(mMap.mCurrentPath);
@@ -112,8 +112,8 @@ TlvIterator Path::TLV_Get_At(TlvIterator tlvIterator, FP xpos, FP ypos, FP width
     if (!tlvIterator.IsValid())
     {
         const PathData* pPathData = mPathData;
-        const s32 camX = (xpos_converted + width_converted) / (2 * pPathData->field_A_grid_width);
-        const s32 camY = (ypos_converted + height_converted) / (2 * pPathData->field_C_grid_height);
+        const s32 camX = (xpos_converted + width_converted) / (2 * pPathData->mGridWidth);
+        const s32 camY = (ypos_converted + height_converted) / (2 * pPathData->mGridHeight);
 
         if (camX >= mMap.mCamsOnX || camY >= mMap.mCamsOnY)
         {
@@ -208,11 +208,11 @@ void Path::Reset_TLVs(u16 pathId)
 
 PSX_Point Path::VGetMapSize() const
 {
-    return {mPathData->field_4_bTop, mPathData->field_6_bBottom};
+    return {mPathData->mTop, mPathData->mBottom};
 }
 
 PSX_Point Path::VGetGridSize() const
 {
-    return {mPathData->field_A_grid_width, mPathData->field_C_grid_height};
+    return {mPathData->mGridWidth, mPathData->mGridHeight};
 }
 
