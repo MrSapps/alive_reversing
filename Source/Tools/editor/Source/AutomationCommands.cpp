@@ -1,7 +1,10 @@
 #include "AutomationCommands.hpp"
 
 #include <QAbstractButton>
+#include <QAbstractItemModel>
+#include <QAbstractItemView>
 #include <QAction>
+#include <QApplication>
 #include <QBuffer>
 #include <QCheckBox>
 #include <QComboBox>
@@ -13,6 +16,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QList>
+#include <QListWidget>
 #include <QMouseEvent>
 #include <QPixmap>
 #include <QSpinBox>
@@ -24,6 +28,58 @@ namespace Automation
     {
         QObject* ResolveTargetByName(QWidget* root, const std::string& name)
         {
+            // Special-cased rather than an objectName: dialogs opened via static convenience
+            // functions (QInputDialog::getInt/getItem, QMessageBox::*) are anonymous - Qt
+            // never gives them an objectName - so there is no string to findChildren() for.
+            // This resolves whatever such dialog is currently on screen instead.
+            if (name == "@active_modal")
+            {
+                QWidget* modal = QApplication::activeModalWidget();
+                if (!modal)
+                {
+                    throw CommandError("no active modal dialog");
+                }
+                return modal;
+            }
+
+            // Same idea as "@active_modal", one level deeper: QMessageBox's standard buttons
+            // (Save/Discard/Cancel, ...) get neither an objectName nor a parent under the main
+            // window (QMessageBox is often constructed with no parent at all), so they can't be
+            // reached by name or by descending from root either. Find by visible text instead.
+            static const std::string kActiveModalButtonPrefix = "@active_modal_button:";
+            if (name.rfind(kActiveModalButtonPrefix, 0) == 0)
+            {
+                QWidget* modal = QApplication::activeModalWidget();
+                if (!modal)
+                {
+                    throw CommandError("no active modal dialog");
+                }
+
+                const QString wantedText = QString::fromStdString(name.substr(kActiveModalButtonPrefix.size()));
+                QAbstractButton* found = nullptr;
+                int matchCount = 0;
+                for (QAbstractButton* button : modal->findChildren<QAbstractButton*>())
+                {
+                    QString text = button->text();
+                    text.remove(QLatin1Char('&')); // strip Qt's mnemonic marker, e.g. "&Discard"
+                    if (text.compare(wantedText, Qt::CaseInsensitive) == 0)
+                    {
+                        found = button;
+                        ++matchCount;
+                    }
+                }
+
+                if (matchCount == 0)
+                {
+                    throw CommandError("no button with text '" + wantedText.toStdString() + "' in active modal dialog");
+                }
+                if (matchCount > 1)
+                {
+                    throw CommandError("ambiguous button text '" + wantedText.toStdString() + "' (" + std::to_string(matchCount) + " matches)");
+                }
+                return found;
+            }
+
             const QString qname = QString::fromStdString(name);
             const QList<QObject*> matches = root->findChildren<QObject*>(qname);
             if (matches.isEmpty())
@@ -122,6 +178,23 @@ namespace Automation
             {
                 combo->setCurrentText(QString::fromStdString(value.get<std::string>()));
             }
+            else if (auto* listWidget = qobject_cast<QListWidget*>(widget))
+            {
+                if (value.is_number_integer())
+                {
+                    listWidget->setCurrentRow(value.get<int>());
+                }
+                else
+                {
+                    const QString text = QString::fromStdString(value.get<std::string>());
+                    const QList<QListWidgetItem*> matches = listWidget->findItems(text, Qt::MatchExactly);
+                    if (matches.isEmpty())
+                    {
+                        throw CommandError("no list item matching: " + text.toStdString());
+                    }
+                    listWidget->setCurrentItem(matches.first());
+                }
+            }
             else
             {
                 widget->setProperty("text", QString::fromStdString(value.is_string() ? value.get<std::string>() : value.dump()));
@@ -192,6 +265,23 @@ namespace Automation
                 else if (auto* box = qobject_cast<QGroupBox*>(widget))
                 {
                     j["text"] = box->title().toStdString();
+                }
+                else if (auto* itemView = qobject_cast<QAbstractItemView*>(widget))
+                {
+                    // Covers QListWidget, QListView, QTreeView, QTableView, QUndoView, etc.
+                    // - anything showing a QAbstractItemModel. Column 0 display text per row
+                    // is enough to both read list-style contents (e.g. an undo stack's command
+                    // history) and to know what set_value's row-index selection refers to.
+                    nlohmann::json items = nlohmann::json::array();
+                    if (QAbstractItemModel* model = itemView->model())
+                    {
+                        const int rowCount = model->rowCount();
+                        for (int row = 0; row < rowCount; ++row)
+                        {
+                            items.push_back(model->index(row, 0).data(Qt::DisplayRole).toString().toStdString());
+                        }
+                    }
+                    j["items"] = items;
                 }
             }
 

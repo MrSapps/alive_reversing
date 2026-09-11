@@ -18,6 +18,8 @@
 #include <QProcessEnvironment>
 #include <QThread>
 
+#include <algorithm>
+
 #include <map>
 
 namespace
@@ -133,6 +135,24 @@ namespace
 
         return true;
     }
+
+    // Recursively searches a get_state tree (see AutomationCommands.cpp's DescribeObject) for
+    // a node with the given className.
+    bool ContainsClassName(const nlohmann::json& node, const std::string& className)
+    {
+        if (node.value("className", std::string()) == className)
+        {
+            return true;
+        }
+        for (const auto& child : node.value("children", nlohmann::json::array()))
+        {
+            if (ContainsClassName(child, className))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 }
 
 TEST(EditorAutomation, OpenCloseAboutAndExit)
@@ -234,6 +254,101 @@ TEST(EditorAutomation, ExitActionClosesWindow)
     }
 
     ASSERT_TRUE(editor.waitForFinished(10000)) << "editor did not exit after clicking Exit";
+    EXPECT_EQ(editor.exitStatus(), QProcess::NormalExit);
+    EXPECT_EQ(editor.exitCode(), 0);
+}
+
+// Exercises the core level-editing workflow: create a new path, add a collision line, add a
+// map object. "New path" prompts via two sequential QInputDialog::getInt/getItem static
+// dialogs, which (unlike AboutDialog) have no objectName at all, so they're addressed via the
+// "@active_modal" target instead and accepted with their defaults. Success is verified through
+// the undo history (QUndoView "undoView"), since the added collision line and object live in
+// the tab's QGraphicsScene, which isn't part of the QWidget/QAction tree get_state can see.
+TEST(EditorAutomation, NewPathAddCollisionAddObject)
+{
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    const int newPathClickId = client.SendCommand({{"cmd", "click"}, {"target", "actionNew_path"}});
+
+    // Accept the "path id" dialog (default 0), then the "game" dialog (default AO) - both
+    // still nested inside the still-outstanding click above.
+    {
+        const int id = client.SendCommand({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}});
+        ASSERT_TRUE(client.WaitForResponse(id, 5000).value("ok", false)) << "no active modal for path id dialog";
+    }
+    {
+        const int id = client.SendCommand({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}});
+        ASSERT_TRUE(client.WaitForResponse(id, 5000).value("ok", false)) << "no active modal for game dialog";
+    }
+    EXPECT_TRUE(client.WaitForResponse(newPathClickId, 5000).value("ok", false));
+
+    {
+        const int id = client.SendCommand({{"cmd", "get_state"}, {"target", "tabWidget"}});
+        const auto resp = client.WaitForResponse(id, 5000);
+        ASSERT_TRUE(resp.value("ok", false));
+        EXPECT_TRUE(ContainsClassName(resp.at("result"), "EditorTab")) << "new path tab not found under tabWidget";
+    }
+
+    // Add collision: no dialog, pushes straight onto the undo stack.
+    {
+        const int id = client.SendCommand({{"cmd", "click"}, {"target", "actionAdd_collision"}});
+        EXPECT_TRUE(client.WaitForResponse(id, 5000).value("ok", false));
+    }
+    {
+        const int id = client.SendCommand({{"cmd", "get_state"}, {"target", "undoView"}});
+        const auto resp = client.WaitForResponse(id, 5000);
+        ASSERT_TRUE(resp.value("ok", false));
+        const auto items = resp.at("result").value("items", nlohmann::json::array());
+        EXPECT_NE(std::find(items.begin(), items.end(), "Add collision line"), items.end())
+            << "undo history does not show the added collision line: " << resp.at("result").dump();
+    }
+
+    // Add object: opens a modal dialog (AddObjectDialog) with a search box and a list of
+    // object types - only added to the model if an item is actually selected before accepting.
+    const int addObjectClickId = client.SendCommand({{"cmd", "click"}, {"target", "actionAdd_object"}});
+    {
+        const int id = client.SendCommand({{"cmd", "set_value"}, {"target", "lstObjects"}, {"value", 0}});
+        ASSERT_TRUE(client.WaitForResponse(id, 5000).value("ok", false)) << "failed to select an object type";
+    }
+    {
+        const int id = client.SendCommand({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}});
+        ASSERT_TRUE(client.WaitForResponse(id, 5000).value("ok", false)) << "no active modal for AddObjectDialog";
+    }
+    EXPECT_TRUE(client.WaitForResponse(addObjectClickId, 5000).value("ok", false));
+
+    {
+        const int id = client.SendCommand({{"cmd", "get_state"}, {"target", "undoView"}});
+        const auto resp = client.WaitForResponse(id, 5000);
+        ASSERT_TRUE(resp.value("ok", false));
+
+        bool foundAddObject = false;
+        for (const auto& item : resp.at("result").value("items", nlohmann::json::array()))
+        {
+            if (item.get<std::string>().rfind("Add new object ", 0) == 0)
+            {
+                foundAddObject = true;
+                break;
+            }
+        }
+        EXPECT_TRUE(foundAddObject) << "undo history does not show the added object: " << resp.at("result").dump();
+    }
+
+    // Unlike the other tests, this tab now has real unsaved changes, so "close" hits
+    // closeEvent()'s other branch: an unsaved-changes QMessageBox (Save / Cancel / "Close
+    // without Saving") that blocks the close until answered. Its buttons have no objectName
+    // (and the QMessageBox itself has no parent, so it isn't reachable from root by descending
+    // the widget tree either) - resolved by visible text via "@active_modal_button:" instead.
+    const int closeClickId = client.SendCommand({{"cmd", "close"}});
+    {
+        const int id = client.SendCommand({{"cmd", "click"}, {"target", "@active_modal_button:Close without Saving"}});
+        ASSERT_TRUE(client.WaitForResponse(id, 5000).value("ok", false)) << "no unsaved-changes prompt to dismiss";
+    }
+    EXPECT_TRUE(client.WaitForResponse(closeClickId, 5000).value("ok", false));
+
+    ASSERT_TRUE(editor.waitForFinished(10000)) << "editor did not exit after close";
     EXPECT_EQ(editor.exitStatus(), QProcess::NormalExit);
     EXPECT_EQ(editor.exitCode(), 0);
 }

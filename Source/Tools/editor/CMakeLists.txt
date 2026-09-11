@@ -233,3 +233,13 @@ if (MSVC)
     target_compile_options(EditorAutomationTests PRIVATE /MDd)
 endif()
 add_test(NAME EditorAutomationTests COMMAND EditorAutomationTests)
+
+# Plain unit tests for pure placement math (GridPlacement.hpp) - no Qt/GUI dependency at all,
+# unlike EditorAutomationTests above which drives the real editor process end-to-end.
+add_executable(GridPlacementTests tests/GridPlacementTests.cpp Source/GridPlacement.hpp)
+target_include_directories(GridPlacementTests PRIVATE Source)
+target_link_libraries(GridPlacementTests PUBLIC googletest)
+if (MSVC)
+    target_compile_options(GridPlacementTests PRIVATE /MDd)
+endif()
+add_test(NAME GridPlacementTests COMMAND GridPlacementTests)

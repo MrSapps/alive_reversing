@@ -10,6 +10,7 @@
 #include "EditorTab.hpp"
 #include "../../relive_api/TlvsRelive.hpp"
 #include "ReflectedEnumProperties.hpp"
+#include "GridPlacement.hpp"
 
 class ObjectListItem final : public QListWidgetItem
 {
@@ -98,25 +99,19 @@ private:
         QGraphicsView* pView = mTab->GetScene().views().at(0);
         QPoint viewPos = pView->mapToScene(pView->rect().center()).toPoint();
 
+        // camX/camY are camera *grid indices* (which column/row of cameras), found by
+        // dividing a pixel position by a single camera's pixel size - so they must be
+        // clamped against the map's actual camera grid dimensions (Model::XSize()/YSize()),
+        // not against CameraGridWidth()/Height(), which are a single camera's pixel size and
+        // bear no relation to how many cameras the map has. Comparing against the pixel size
+        // was effectively a no-op clamp for any normal-sized map (e.g. up to 1024 instead of
+        // up to the real column count), which could produce a camX/camY that names no actual
+        // camera and null-deref CameraAt()'s result in AddNewObjectCommand::redo().
         int camX = viewPos.x() / mTab->GetModel().CameraGridWidth();
-        if (camX < 0)
-        {
-            camX = 0;
-        }
-        if (camX > static_cast<int>(mTab->GetModel().CameraGridWidth()))
-        {
-            camX = mTab->GetModel().CameraGridWidth();
-        }
+        camX = GridPlacement::ClampCameraIndex(camX, mTab->GetModel().XSize());
 
         int camY = viewPos.y() / mTab->GetModel().CameraGridHeight();
-        if (camY < 0)
-        {
-            camY = 0;
-        }
-        if (camY > static_cast<int>(mTab->GetModel().CameraGridHeight()))
-        {
-            camY = mTab->GetModel().CameraGridHeight();
-        }
+        camY = GridPlacement::ClampCameraIndex(camY, mTab->GetModel().YSize());
 
         mCamera = mTab->GetModel().CameraAt(camX, camY);
 
