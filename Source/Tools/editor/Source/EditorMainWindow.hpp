@@ -2,6 +2,7 @@
 
 #include <QMainWindow>
 #include <QSettings>
+#include <memory>
 #include "EditorTab.hpp"
 #include "ClipBoard.hpp"
 #include "GridSnapSettings.hpp"
@@ -10,6 +11,8 @@ namespace Ui
 {
     class EditorMainWindow;
 }
+
+class AutomationServer;
 
 class EditorMainWindow final : public QMainWindow
 {
@@ -101,4 +104,5 @@ private:
     // Global to all tabs
     GridSnapSettings mSnapSettings;
     QString mUnthemedStyle;
+    std::unique_ptr<AutomationServer> mAutomationServer;
 };

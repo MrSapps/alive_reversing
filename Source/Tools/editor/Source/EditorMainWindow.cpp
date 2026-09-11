@@ -13,6 +13,8 @@
 #include "qstylefactory.h"
 #include "qdebug.h"
 #include "qactiongroup.h"
+#include "AutomationServer.hpp"
+#include <QCoreApplication>
 
 static void FatalError(const char* msg)
 {
@@ -84,6 +86,7 @@ EditorMainWindow::EditorMainWindow(QWidget* aParent)
     m_ui->toolBar->addAction(m_ui->action_snap_map_objects_y);
 
     connect(m_ui->tabWidget, &QTabWidget::tabCloseRequested, this, &EditorMainWindow::onCloseTab);
+    connect(m_ui->action_exit_application, &QAction::triggered, this, &QWidget::close);
 
     QPixmapCache::setCacheLimit(1024 * 50);
 
@@ -107,6 +110,43 @@ EditorMainWindow::EditorMainWindow(QWidget* aParent)
 
     // Disable context menu on the QToolBar
     m_ui->toolBar->setContextMenuPolicy(Qt::PreventContextMenu);
+
+    // Automation (opt-in): --automation-socket=<name> (or --automation-socket <name>) starts
+    // an AutomationServer listening for JSON commands on that QLocalServer name. This is an
+    // unauthenticated local command channel that can read/manipulate the running app, so it
+    // must only ever start when explicitly requested via this argument, never by default.
+    {
+        const QStringList args = QCoreApplication::arguments();
+        QString socketName;
+        for (int i = 0; i < args.size(); ++i)
+        {
+            const QString& arg = args[i];
+            if (arg.startsWith("--automation-socket="))
+            {
+                socketName = arg.mid(QStringLiteral("--automation-socket=").size());
+                break;
+            }
+            if (arg == "--automation-socket" && i + 1 < args.size())
+            {
+                socketName = args[i + 1];
+                break;
+            }
+        }
+
+        if (!socketName.isEmpty())
+        {
+            mAutomationServer = std::make_unique<AutomationServer>(this);
+            if (!mAutomationServer->Listen(socketName))
+            {
+                qWarning() << "Automation server failed to listen on" << socketName << ":" << mAutomationServer->ErrorString();
+                mAutomationServer.reset();
+            }
+            else
+            {
+                qDebug() << "Automation server listening on" << socketName;
+            }
+        }
+    }
 
     statusBar()->showMessage(tr("Ready"));
 }

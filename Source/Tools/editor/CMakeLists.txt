@@ -22,8 +22,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 #    endif()
 #endif()
 
-find_package(QT NAMES Qt5 COMPONENTS Widgets Multimedia LinguistTools REQUIRED)
-find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets Multimedia LinguistTools REQUIRED)
+find_package(QT NAMES Qt5 COMPONENTS Widgets Multimedia Network LinguistTools REQUIRED)
+find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets Multimedia Network LinguistTools REQUIRED)
 
 set(TS_FILES
   Source/rsc/translations/qt-editor_en_GB.ts
@@ -118,6 +118,11 @@ set(PROJECT_SOURCES
         Source/CollisionConnectData.hpp
         Source/IGraphicsItem.hpp
         Source/main.cpp
+        Source/AutomationProtocol.hpp
+        Source/AutomationServer.hpp
+        Source/AutomationServer.cpp
+        Source/AutomationCommands.hpp
+        Source/AutomationCommands.cpp
         Source/AboutDialog.ui
         Source/EditorMainWindow.ui
         Source/EditorTab.ui
@@ -211,4 +216,20 @@ if (MSVC)
     set_target_properties(relive-editor PROPERTIES VS_DEBUGGER_ENVIRONMENT "${MY_PATH}")
 endif()
 
-target_link_libraries(relive-editor PUBLIC relive_api Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Multimedia editor_glue_dynamic_crt relive_ipc_dynamic_crt)
+target_link_libraries(relive-editor PUBLIC relive_api Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Multimedia Qt${QT_VERSION_MAJOR}::Network editor_glue_dynamic_crt relive_ipc_dynamic_crt)
+
+add_executable(relive-editor-automation-cli tools/AutomationCli.cpp Source/AutomationProtocol.hpp)
+target_include_directories(relive-editor-automation-cli PRIVATE Source)
+target_link_libraries(relive-editor-automation-cli PUBLIC Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Network)
+if (MSVC)
+    target_compile_options(relive-editor-automation-cli PRIVATE /MDd)
+endif()
+
+add_executable(EditorAutomationTests tests/EditorAutomationTests.cpp Source/AutomationProtocol.hpp)
+target_include_directories(EditorAutomationTests PRIVATE Source)
+target_link_libraries(EditorAutomationTests PUBLIC googletest Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Network)
+target_compile_definitions(EditorAutomationTests PRIVATE RELIVE_EDITOR_PATH="$<TARGET_FILE:relive-editor>")
+if (MSVC)
+    target_compile_options(EditorAutomationTests PRIVATE /MDd)
+endif()
+add_test(NAME EditorAutomationTests COMMAND EditorAutomationTests)
