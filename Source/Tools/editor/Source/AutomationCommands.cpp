@@ -3,6 +3,7 @@
 #include <QAbstractButton>
 #include <QAbstractItemModel>
 #include <QAbstractItemView>
+#include <QAbstractScrollArea>
 #include <QAction>
 #include <QApplication>
 #include <QBuffer>
@@ -123,6 +124,19 @@ namespace Automation
             return widget;
         }
 
+        // QAbstractScrollArea-derived widgets (QGraphicsView among them) actually receive
+        // mouse events on an internal viewport() child widget, not the widget itself - sending
+        // synthesized events directly to the scroll area would silently never reach whatever
+        // it's showing (e.g. a QGraphicsScene's items). Redirect so click/drag both work there.
+        QWidget* ResolveMouseEventTarget(QWidget* widget)
+        {
+            if (auto* scrollArea = qobject_cast<QAbstractScrollArea*>(widget))
+            {
+                return scrollArea->viewport();
+            }
+            return widget;
+        }
+
         nlohmann::json HandleClick(QWidget* root, const nlohmann::json& request)
         {
             QObject* target = ResolveTargetRequired(root, request);
@@ -141,11 +155,45 @@ namespace Automation
                 return nlohmann::json::object();
             }
 
+            QWidget* eventTarget = ResolveMouseEventTarget(widget);
             const QPoint center = widget->rect().center();
             QMouseEvent press(QEvent::MouseButtonPress, center, widget->mapToGlobal(center), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
             QMouseEvent release(QEvent::MouseButtonRelease, center, widget->mapToGlobal(center), Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
-            QCoreApplication::sendEvent(widget, &press);
-            QCoreApplication::sendEvent(widget, &release);
+            QCoreApplication::sendEvent(eventTarget, &press);
+            QCoreApplication::sendEvent(eventTarget, &release);
+            return nlohmann::json::object();
+        }
+
+        nlohmann::json HandleDrag(QWidget* root, const nlohmann::json& request)
+        {
+            QWidget* widget = RequireWidget(ResolveTargetRequired(root, request));
+            if (!request.contains("from") || !request.contains("to"))
+            {
+                throw CommandError("'from' and 'to' are required");
+            }
+
+            auto readPoint = [](const nlohmann::json& j) -> QPoint
+            {
+                return QPoint(j.at("x").get<int>(), j.at("y").get<int>());
+            };
+            const QPoint from = readPoint(request.at("from"));
+            const QPoint to = readPoint(request.at("to"));
+
+            QWidget* eventTarget = ResolveMouseEventTarget(widget);
+
+            // A single move straight from press to release is enough: QGraphicsItem's default
+            // move handling computes displacement from the original button-down position (not
+            // the previous move event), and item-level drag handlers here only look at each
+            // move event's final position.
+            QMouseEvent press(QEvent::MouseButtonPress, from, eventTarget->mapToGlobal(from), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+            QCoreApplication::sendEvent(eventTarget, &press);
+
+            QMouseEvent move(QEvent::MouseMove, to, eventTarget->mapToGlobal(to), Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+            QCoreApplication::sendEvent(eventTarget, &move);
+
+            QMouseEvent release(QEvent::MouseButtonRelease, to, eventTarget->mapToGlobal(to), Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+            QCoreApplication::sendEvent(eventTarget, &release);
+
             return nlohmann::json::object();
         }
 
@@ -356,6 +404,10 @@ namespace Automation
         if (cmd == "click")
         {
             return HandleClick(root, request);
+        }
+        if (cmd == "drag")
+        {
+            return HandleDrag(root, request);
         }
         if (cmd == "set_value")
         {

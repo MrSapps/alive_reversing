@@ -46,6 +46,10 @@ private:
     void SyncFromCollisionItem();
     void SyncToCollisionItem();
     void PosOrLineChanged();
+    // pt is in this item's local coordinates; returned point is clamped to the map bounds,
+    // also in local coordinates (accounts for pos() so it's correct regardless of whether
+    // pos() is currently zero).
+    QPoint ClampToMapBounds(QPoint pt) const;
 private:
     // For knowing which end to anchor line if required.
     enum eLinePoints

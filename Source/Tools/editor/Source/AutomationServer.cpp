@@ -29,6 +29,11 @@ QString AutomationServer::ErrorString() const
     return mServer->errorString();
 }
 
+void AutomationServer::SetDomainCommandHandler(DomainCommandHandler handler)
+{
+    mDomainCommandHandler = std::move(handler);
+}
+
 void AutomationServer::OnNewConnection()
 {
     while (QLocalSocket* socket = mServer->nextPendingConnection())
@@ -120,8 +125,15 @@ void AutomationServer::HandleFrame(QLocalSocket* socket, const nlohmann::json& r
         {
             throw Automation::CommandError("missing 'cmd'");
         }
+        const std::string cmd = request.at("cmd").get<std::string>();
 
-        response["result"] = Automation::ExecuteCommand(mRoot, request.at("cmd").get<std::string>(), request);
+        std::optional<nlohmann::json> domainResult;
+        if (mDomainCommandHandler)
+        {
+            domainResult = mDomainCommandHandler(cmd, request);
+        }
+
+        response["result"] = domainResult ? *domainResult : Automation::ExecuteCommand(mRoot, cmd, request);
         response["ok"] = true;
     }
     catch (const std::exception& e)
