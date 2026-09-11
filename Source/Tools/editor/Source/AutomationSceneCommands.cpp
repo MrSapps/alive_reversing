@@ -51,12 +51,19 @@ namespace Automation
             }
             else if (auto* rect = dynamic_cast<ResizeableRectItem*>(item))
             {
+                // ResizeableRectItem reads/writes mBaseTlv->mBottomRightX/Y directly as a raw
+                // width/height (see SyncFromMapObject/SyncToMapObject) - MapObjectBase::Width()/
+                // Height() instead compute mBottomRightX - mTopLeftX, treating the same field as
+                // a coordinate. The two are inconsistent; CurrentRect() is the item's own
+                // authoritative, always-synced state (same principle as ResizeableArrowItem's
+                // X1()/Y1()/X2()/Y2() above), so use that rather than MapObjectBase's accessors.
+                const QRectF r = rect->CurrentRect();
                 MapObjectBase* obj = rect->GetMapObject();
                 j["kind"] = "map_object";
-                j["xpos"] = obj->XPos();
-                j["ypos"] = obj->YPos();
-                j["width"] = obj->Width();
-                j["height"] = obj->Height();
+                j["xpos"] = r.x();
+                j["ypos"] = r.y();
+                j["width"] = r.width();
+                j["height"] = r.height();
                 j["tlvType"] = static_cast<int>(obj->mBaseTlv->mTlvType);
             }
             else if (auto* camera = dynamic_cast<CameraGraphicsItem*>(item))
@@ -109,6 +116,38 @@ namespace Automation
             result["y"] = viewPos.y();
             return result;
         }
+
+        std::string RequirePath(const nlohmann::json& request)
+        {
+            if (!request.contains("path") || !request.at("path").is_string())
+            {
+                throw CommandError("'path' is required");
+            }
+            return request.at("path").get<std::string>();
+        }
+
+        // Bypasses the real QFileDialog-based Save As flow (EditorTab::SaveAs()) so tests can
+        // save to a known (e.g. temp) location without driving a file dialog.
+        nlohmann::json HandleSavePathAs(EditorMainWindow* mainWindow, const nlohmann::json& request)
+        {
+            EditorTab* tab = RequireCurrentTab(mainWindow);
+            const std::string path = RequirePath(request);
+
+            nlohmann::json result = nlohmann::json::object();
+            result["saved"] = tab->SaveAsPath(QString::fromStdString(path));
+            return result;
+        }
+
+        // Bypasses the real QFileDialog-based Open flow (EditorMainWindow::on_action_open_path_triggered())
+        // so tests can open a known path directly.
+        nlohmann::json HandleOpenPath(EditorMainWindow* mainWindow, const nlohmann::json& request)
+        {
+            const std::string path = RequirePath(request);
+
+            nlohmann::json result = nlohmann::json::object();
+            result["opened"] = mainWindow->OpenPath(QString::fromStdString(path));
+            return result;
+        }
     }
 
     std::optional<nlohmann::json> TryExecuteSceneCommand(EditorMainWindow* mainWindow, const std::string& cmd, const nlohmann::json& request)
@@ -120,6 +159,14 @@ namespace Automation
         if (cmd == "scene_to_view")
         {
             return HandleSceneToView(mainWindow, request);
+        }
+        if (cmd == "save_path_as")
+        {
+            return HandleSavePathAs(mainWindow, request);
+        }
+        if (cmd == "open_path")
+        {
+            return HandleOpenPath(mainWindow, request);
         }
         return std::nullopt;
     }

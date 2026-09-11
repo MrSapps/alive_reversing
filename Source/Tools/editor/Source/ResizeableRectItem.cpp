@@ -68,13 +68,22 @@ void ResizeableRectItem::mouseMoveEvent( QGraphicsSceneMouseEvent* aEvent )
     QGraphicsItem::mouseMoveEvent( aEvent );
 
     QRectF curRect = CurrentRect();
-    
+
     const auto w = curRect.width();
     const auto h = curRect.height();
     curRect.setX(mPointSnapper.SnapX(mSnapSettings.MapObjectSnapping().mSnapX, static_cast<int>(curRect.x())));
     curRect.setWidth(w);
 
     curRect.setY(mPointSnapper.SnapY(mSnapSettings.MapObjectSnapping().mSnapY, static_cast<int>(curRect.y())));
+    curRect.setHeight(h);
+
+    // Keep the whole box within the map bounds by shifting it back in as a rigid unit,
+    // preserving its exact size - clamping x/y independently after the fact could shrink or
+    // distort the box if it's dragged partway past an edge (same reasoning as the whole-line
+    // drag clamp in ResizeableArrowItem::mouseMoveEvent).
+    curRect.setX(mPointSnapper.ClampRangeStartX(static_cast<int>(curRect.x()), static_cast<int>(w)));
+    curRect.setWidth(w);
+    curRect.setY(mPointSnapper.ClampRangeStartY(static_cast<int>(curRect.y()), static_cast<int>(h)));
     curRect.setHeight(h);
 
     curRect = curRect.normalized();
@@ -315,6 +324,10 @@ void ResizeableRectItem::onResize( QPointF aPos )
     const bool isTop = ( m_ResizeMode == eResize_Top )       || ( m_ResizeMode == eResize_TopLeftCorner )    || ( m_ResizeMode == eResize_TopRightCorner );
     const bool isBottom = ( m_ResizeMode == eResize_Bottom ) || ( m_ResizeMode == eResize_BottomLeftCorner ) || ( m_ResizeMode == eResize_BottomRightCorner );
 
+    // Each branch below moves exactly one edge while the opposite edge stays anchored, so
+    // clamping that one moving edge to the map bounds (via ClampX/ClampY, same as
+    // ResizeableArrowItem's single-endpoint drag) can't collapse or distort the box the way
+    // clamping two independently-derived edges could.
     if ( isRight )
     {
         qreal newWidth = aPos.x() - curRect.x();
@@ -323,6 +336,7 @@ void ResizeableRectItem::onResize( QPointF aPos )
         {
             newWidth = kMinRectSize;
         }
+        newWidth = mPointSnapper.ClampX(static_cast<int>(curRect.x() + newWidth)) - curRect.x();
         curRect.setWidth(newWidth);
     }
     else if ( isLeft )
@@ -333,6 +347,7 @@ void ResizeableRectItem::onResize( QPointF aPos )
         {
             newx = (curRect.x()+curRect.width())-kMinRectSize;
         }
+        newx = mPointSnapper.ClampX(static_cast<int>(newx));
         curRect.setX(newx);
     }
 
@@ -344,6 +359,7 @@ void ResizeableRectItem::onResize( QPointF aPos )
         {
             newy = curRect.y()+curRect.height()-kMinRectSize;
         }
+        newy = mPointSnapper.ClampY(static_cast<int>(newy));
         curRect.setY(newy);
     }
     else if ( isBottom )
@@ -354,6 +370,7 @@ void ResizeableRectItem::onResize( QPointF aPos )
         {
             newHeight = kMinRectSize;
         }
+        newHeight = mPointSnapper.ClampY(static_cast<int>(curRect.y() + newHeight)) - curRect.y();
         curRect.setHeight(newHeight);
     }
 
