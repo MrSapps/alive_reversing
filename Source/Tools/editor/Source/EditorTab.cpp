@@ -478,28 +478,24 @@ void EditorTab::AddCollision()
 
 void EditorTab::ConnectCollisions()
 {
-    if (!mScene->selectedItems().isEmpty())
+    std::vector<ResizeableArrowItem*> collisions;
+    for (auto& selectedItem : mScene->selectedItems())
     {
-        std::vector<ResizeableArrowItem*> collisions;
-
-        for (auto& selectedItem : mScene->selectedItems())
+        auto asResizableArrowItem = qgraphicsitem_cast<ResizeableArrowItem*>(selectedItem);
+        if (asResizableArrowItem != nullptr)
         {
-            auto asResizableArrowItem = qgraphicsitem_cast<ResizeableArrowItem*>(selectedItem);
-            if (asResizableArrowItem != nullptr)
-            {
-                collisions.push_back(asResizableArrowItem);
-            }
-        }
-
-        std::vector<CollisionConnectData> collisionConnectData = CollisionConnectCommand::getConnectCollisionsChanges(collisions);
-
-        if (!collisionConnectData.empty())
-        {
-            mUndoStack.push(new CollisionConnectCommand(collisionConnectData));
-            mStatusBar->showMessage(tr("Connected collisions"));
+            collisions.push_back(asResizableArrowItem);
         }
     }
 
+    if (collisions.size() != 2)
+    {
+        QMessageBox::critical(this, tr("Error"), tr("Select exactly two collision lines to connect."));
+        return;
+    }
+
+    mUndoStack.push(new CollisionConnectCommand(collisions[0], collisions[1]));
+    mStatusBar->showMessage(tr("Connected collisions"));
 }
 
 int EditorTab::SnapX(bool enabled, int x)

@@ -240,6 +240,21 @@ namespace
         return nlohmann::json::object();
     }
 
+    // Finds a collision_line item by its model id (CollisionObject::mId) - for telling two
+    // same-kind items apart once there's more than one in the scene.
+    nlohmann::json FindCollisionById(const nlohmann::json& items, int id)
+    {
+        for (const auto& item : items)
+        {
+            if (item.value("kind", std::string()) == "collision_line" && item.value("id", -1) == id)
+            {
+                return item;
+            }
+        }
+        ADD_FAILURE() << "no collision_line with id " << id << " in scene: " << items.dump();
+        return nlohmann::json::object();
+    }
+
     // The undo stack's list of command description strings, in oldest-to-newest order, as
     // shown in the QUndoView ("undoView") - e.g. "Add collision line", "Move 3 item(s)". Works
     // because AutomationCommands.cpp special-cases any QAbstractItemView (QUndoView included)
@@ -1336,6 +1351,175 @@ TEST(EditorAutomation, PasteClampsBoundsAndPreservesSizeThroughEditAndReload)
     EXPECT_EQ(reopenedCount, 2) << "expected both the original and pasted object to still be there after reopening";
     EXPECT_TRUE(foundMatchingPasted) << "pasted object's position/size did not round-trip through save/reopen";
     EXPECT_TRUE(foundMatchingOriginal) << "original object's position/size did not round-trip through save/reopen";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Regression test for "Connect collisions": it used to only link two lines whose endpoints
+// already coincided exactly (practically never true for two independently-drawn lines, so this
+// almost never actually connected anything), never moved anything to make ends meet, and had no
+// guard against connecting more than two lines at once. Now it snaps whichever pair of endpoints
+// (out of the 4 possible pairings between two lines) is physically nearest together to a shared
+// midpoint, and links mNext/mPrevious accordingly - fully undoable/redoable.
+TEST(EditorAutomation, ConnectCollisionsSnapsNearestEndsAndLinksNextPrevious)
+{
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateNewPath(client));
+    ASSERT_TRUE(AddCollisionLine(client));
+    ASSERT_TRUE(AddCollisionLine(client));
+
+    // AddCollisionCommand always places a new line at the same fixed offset from the view, so
+    // both lines start out fully coincident - id order tells them apart (NextCollisionId()
+    // increments), not position, until line 2 is moved below.
+    int id1 = -1;
+    int id2 = -1;
+    {
+        const nlohmann::json items = GetSceneItems(client);
+        std::vector<int> ids;
+        for (const auto& item : items)
+        {
+            if (item.value("kind", std::string()) == "collision_line")
+            {
+                ids.push_back(item.value("id", -1));
+            }
+        }
+        ASSERT_EQ(ids.size(), 2u) << "expected exactly two collision lines";
+        id1 = std::min(ids[0], ids[1]);
+        id2 = std::max(ids[0], ids[1]);
+    }
+
+    const nlohmann::json line1Baseline = FindCollisionById(GetSceneItems(client), id1);
+    const nlohmann::json line2Baseline = FindCollisionById(GetSceneItems(client), id2);
+    ASSERT_EQ(line1Baseline.at("x1").get<int>(), line2Baseline.at("x1").get<int>()) << "test setup expected both freshly-added lines to start coincident";
+
+    // Move line 2 (the most recently added, so still the only thing selected) past line 1's far
+    // end, offset by just a little more than line 1's own length (both lines are the same fixed
+    // 100px length - see AddCollisionCommand::MakeNewCollision) plus a small extra nudge. A
+    // *smaller* shift would be ambiguous: sliding a line along its own direction by less than its
+    // length leaves both same-side ends (P1~P1 and P2~P2) nearly equidistant, a near-tie that
+    // doesn't actually exercise picking a specific pairing. Shifting past the far end instead
+    // makes line 1's P2 and line 2's P1 unambiguously the closest pair of all four.
+    {
+        const double midX = (line2Baseline.at("x1").get<double>() + line2Baseline.at("x2").get<double>()) / 2;
+        const double midY = line2Baseline.at("y1").get<double>();
+        const double lineLength = line2Baseline.at("x2").get<double>() - line2Baseline.at("x1").get<double>();
+        DragView(client, SceneToView(client, midX, midY), SceneToView(client, midX + lineLength + 10, midY + 5));
+    }
+
+    const nlohmann::json line1BeforeConnect = FindCollisionById(GetSceneItems(client), id1);
+    const nlohmann::json line2BeforeConnect = FindCollisionById(GetSceneItems(client), id2);
+    ASSERT_NE(line1BeforeConnect.at("x2").get<int>(), line2BeforeConnect.at("x1").get<int>()) << "test setup failed to separate the two lines' nearest ends";
+
+    // Select both lines via rubber-band, then connect them.
+    {
+        const double minX = std::min({line1BeforeConnect.at("x1").get<double>(), line1BeforeConnect.at("x2").get<double>(), line2BeforeConnect.at("x1").get<double>(), line2BeforeConnect.at("x2").get<double>()});
+        const double minY = std::min({line1BeforeConnect.at("y1").get<double>(), line1BeforeConnect.at("y2").get<double>(), line2BeforeConnect.at("y1").get<double>(), line2BeforeConnect.at("y2").get<double>()});
+        const double maxX = std::max({line1BeforeConnect.at("x1").get<double>(), line1BeforeConnect.at("x2").get<double>(), line2BeforeConnect.at("x1").get<double>(), line2BeforeConnect.at("x2").get<double>()});
+        const double maxY = std::max({line1BeforeConnect.at("y1").get<double>(), line1BeforeConnect.at("y2").get<double>(), line2BeforeConnect.at("y1").get<double>(), line2BeforeConnect.at("y2").get<double>()});
+        DragView(client, SceneToView(client, minX - 20, minY - 20), SceneToView(client, maxX + 20, maxY + 20));
+    }
+    {
+        const nlohmann::json selected = GetSceneItems(client);
+        ASSERT_TRUE(FindCollisionById(selected, id1).value("selected", false)) << "rubber-band drag did not select line 1";
+        ASSERT_TRUE(FindCollisionById(selected, id2).value("selected", false)) << "rubber-band drag did not select line 2";
+    }
+
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "actionConnect_collisions"}}).value("ok", false));
+    EXPECT_TRUE(UndoContains(GetUndoWidgetTextList(client), "Connected collisions"));
+
+    const nlohmann::json line1AfterConnect = FindCollisionById(GetSceneItems(client), id1);
+    const nlohmann::json line2AfterConnect = FindCollisionById(GetSceneItems(client), id2);
+
+    // The nearest ends (line 1's P2, line 2's P1) must now physically coincide exactly...
+    EXPECT_EQ(line1AfterConnect.at("x2").get<int>(), line2AfterConnect.at("x1").get<int>()) << "connected endpoints do not share the same x";
+    EXPECT_EQ(line1AfterConnect.at("y2").get<int>(), line2AfterConnect.at("y1").get<int>()) << "connected endpoints do not share the same y";
+    // ...the midpoint of where they used to be, specifically (not e.g. one end snapping to the
+    // other's original position).
+    EXPECT_EQ(line1AfterConnect.at("x2").get<int>(), (line1BeforeConnect.at("x2").get<int>() + line2BeforeConnect.at("x1").get<int>()) / 2);
+    EXPECT_EQ(line1AfterConnect.at("y2").get<int>(), (line1BeforeConnect.at("y2").get<int>() + line2BeforeConnect.at("y1").get<int>()) / 2);
+    // ...while each line's *far* end - the one that wasn't part of the nearest pair - stays put.
+    EXPECT_EQ(line1AfterConnect.at("x1").get<int>(), line1BeforeConnect.at("x1").get<int>()) << "the unconnected end of line 1 moved";
+    EXPECT_EQ(line2AfterConnect.at("x2").get<int>(), line2BeforeConnect.at("x2").get<int>()) << "the unconnected end of line 2 moved";
+
+    // Next/previous linkage: line 1's P2 connects, so line 1's Next is line 2; line 2's P1
+    // connects, so line 2's Previous is line 1.
+    EXPECT_EQ(line1AfterConnect.at("next").get<int>(), id2);
+    EXPECT_EQ(line2AfterConnect.at("previous").get<int>(), id1);
+    EXPECT_EQ(line1AfterConnect.at("previous").get<int>(), -1) << "line 1's unrelated Previous field should be untouched";
+    EXPECT_EQ(line2AfterConnect.at("next").get<int>(), -1) << "line 2's unrelated Next field should be untouched";
+
+    // Undo must restore both lines' exact pre-connect positions and next/previous fields.
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_undo"}}).value("ok", false));
+    {
+        const nlohmann::json line1AfterUndo = FindCollisionById(GetSceneItems(client), id1);
+        const nlohmann::json line2AfterUndo = FindCollisionById(GetSceneItems(client), id2);
+        EXPECT_EQ(line1AfterUndo.at("x2").get<int>(), line1BeforeConnect.at("x2").get<int>());
+        EXPECT_EQ(line1AfterUndo.at("y2").get<int>(), line1BeforeConnect.at("y2").get<int>());
+        EXPECT_EQ(line2AfterUndo.at("x1").get<int>(), line2BeforeConnect.at("x1").get<int>());
+        EXPECT_EQ(line2AfterUndo.at("y1").get<int>(), line2BeforeConnect.at("y1").get<int>());
+        EXPECT_EQ(line1AfterUndo.at("next").get<int>(), -1) << "undo did not restore line 1's original Next";
+        EXPECT_EQ(line2AfterUndo.at("previous").get<int>(), -1) << "undo did not restore line 2's original Previous";
+    }
+
+    // Redo must re-apply the exact same connection.
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_redo"}}).value("ok", false));
+    {
+        const nlohmann::json line1AfterRedo = FindCollisionById(GetSceneItems(client), id1);
+        const nlohmann::json line2AfterRedo = FindCollisionById(GetSceneItems(client), id2);
+        EXPECT_EQ(line1AfterRedo.at("x2").get<int>(), line1AfterConnect.at("x2").get<int>());
+        EXPECT_EQ(line1AfterRedo.at("y2").get<int>(), line1AfterConnect.at("y2").get<int>());
+        EXPECT_EQ(line2AfterRedo.at("x1").get<int>(), line2AfterConnect.at("x1").get<int>());
+        EXPECT_EQ(line2AfterRedo.at("y1").get<int>(), line2AfterConnect.at("y1").get<int>());
+        EXPECT_EQ(line1AfterRedo.at("next").get<int>(), id2);
+        EXPECT_EQ(line2AfterRedo.at("previous").get<int>(), id1);
+    }
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// "Connect collisions" only makes sense for exactly two lines - selecting more (or fewer) must
+// show a clear error instead of silently doing nothing or connecting an arbitrary subset.
+TEST(EditorAutomation, ConnectCollisionsRequiresExactlyTwoSelected)
+{
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateNewPath(client));
+    ASSERT_TRUE(AddCollisionLine(client));
+    ASSERT_TRUE(AddCollisionLine(client));
+    ASSERT_TRUE(AddCollisionLine(client));
+
+    // All three lines are coincident (see the comment in the test above) - a rubber-band drag
+    // around that single point selects all of them at once.
+    const nlohmann::json line = FindKind(GetSceneItems(client), "collision_line");
+    const QPoint at = SceneToView(client, line.at("x1").get<int>(), line.at("y1").get<int>());
+    DragView(client, QPoint(at.x() - 20, at.y() - 20), QPoint(at.x() + 20, at.y() + 20));
+    {
+        int selectedCount = 0;
+        for (const auto& item : GetSceneItems(client))
+        {
+            if (item.value("kind", std::string()) == "collision_line" && item.value("selected", false))
+            {
+                selectedCount++;
+            }
+        }
+        ASSERT_EQ(selectedCount, 3) << "rubber-band drag did not select all three lines";
+    }
+
+    const int clickId = client.SendCommand({{"cmd", "click"}, {"target", "actionConnect_collisions"}});
+    ASSERT_TRUE(client.Call({{"cmd", "get_state"}, {"target", "@active_modal"}}).value("ok", false)) << "no error dialog shown for more than two selected lines";
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "@active_modal_button:OK"}}).value("ok", false));
+    EXPECT_TRUE(client.WaitForResponse(clickId, 5000).value("ok", false));
+
+    EXPECT_FALSE(UndoContains(GetUndoWidgetTextList(client), "Connected collisions")) << "an invalid selection should not have pushed a connect command";
 
     editor.terminate();
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";

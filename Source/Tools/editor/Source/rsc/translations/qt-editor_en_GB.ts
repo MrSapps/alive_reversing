@@ -719,6 +719,14 @@ Do you want to overwrite it?</source>
         <source>Connected collisions</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Error</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Select exactly two collision lines to connect.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>MessageEditorDialog</name>
