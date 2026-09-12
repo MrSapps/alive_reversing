@@ -51,6 +51,8 @@ namespace Automation
                 j["x2"] = obj->X2();
                 j["y2"] = obj->Y2();
                 j["lineType"] = static_cast<int>(obj->mLine.mLineType);
+                j["next"] = obj->Next();
+                j["previous"] = obj->Previous();
             }
             else if (auto* rect = dynamic_cast<ResizeableRectItem*>(item))
             {

@@ -115,7 +115,6 @@ set(PROJECT_SOURCES
         Source/CameraManager.ui
         Source/CollisionConnect.cpp
         Source/CollisionConnect.hpp
-        Source/CollisionConnectData.hpp
         Source/IGraphicsItem.hpp
         Source/main.cpp
         Source/AutomationProtocol.hpp
