@@ -9,10 +9,13 @@
 #include "CameraGraphicsItem.hpp"
 #include "CollisionObject.hpp"
 #include "EditorCamera.hpp"
+#include "CameraManager.hpp"
 #include "../../relive_api/TlvsRelive.hpp"
 
 #include <QGraphicsItem>
 #include <QGraphicsView>
+#include <QPixmap>
+#include <map>
 
 namespace Automation
 {
@@ -71,6 +74,10 @@ namespace Automation
                 j["kind"] = "camera";
                 j["gridX"] = camera->GetCamera()->mX;
                 j["gridY"] = camera->GetCamera()->mY;
+                j["camName"] = camera->GetCamera()->mName;
+                j["hasMainImage"] = !camera->GetCamera()->mCameraImageandLayers.mCameraImage.isNull();
+                j["hasForegroundLayer"] = !camera->GetCamera()->mCameraImageandLayers.mForegroundLayer.isNull();
+                j["hasBackgroundLayer"] = !camera->GetCamera()->mCameraImageandLayers.mBackgroundLayer.isNull();
             }
             else
             {
@@ -148,6 +155,43 @@ namespace Automation
             result["opened"] = mainWindow->OpenPath(QString::fromStdString(path));
             return result;
         }
+
+        // Bypasses CameraManager's QFileDialog-based image picking (see
+        // CameraManager::SetCameraImageForAutomation) so tests can create/update a camera's
+        // image (main, or an FG1 layer) at a known grid cell without driving a native file
+        // picker.
+        nlohmann::json HandleSetCameraImage(EditorMainWindow* mainWindow, const nlohmann::json& request)
+        {
+            EditorTab* tab = RequireCurrentTab(mainWindow);
+            if (!request.contains("x") || !request.contains("y") || !request.contains("image_path"))
+            {
+                throw CommandError("'x', 'y' and 'image_path' are required");
+            }
+
+            const int x = request.at("x").get<int>();
+            const int y = request.at("y").get<int>();
+            const QString imagePath = QString::fromStdString(request.at("image_path").get<std::string>());
+
+            static const std::map<std::string, TabImageIdx> kLayers = {
+                {"main", TabImageIdx::Main},
+                {"foreground", TabImageIdx::Foreground},
+                {"background", TabImageIdx::Background},
+                {"foreground_well", TabImageIdx::ForegroundWell},
+                {"background_well", TabImageIdx::BackgroundWell},
+            };
+            const std::string layer = request.value("layer", std::string("main"));
+            const auto it = kLayers.find(layer);
+            if (it == kLayers.end())
+            {
+                throw CommandError("unknown 'layer': " + layer);
+            }
+
+            QPixmap img(imagePath);
+
+            nlohmann::json result = nlohmann::json::object();
+            result["ok"] = CameraManager::SetCameraImageForAutomation(tab, x, y, it->second, img);
+            return result;
+        }
     }
 
     std::optional<nlohmann::json> TryExecuteSceneCommand(EditorMainWindow* mainWindow, const std::string& cmd, const nlohmann::json& request)
@@ -167,6 +211,10 @@ namespace Automation
         if (cmd == "open_path")
         {
             return HandleOpenPath(mainWindow, request);
+        }
+        if (cmd == "set_camera_image")
+        {
+            return HandleSetCameraImage(mainWindow, request);
         }
         return std::nullopt;
     }

@@ -33,6 +33,13 @@ public:
     void OnCameraIdChanged(EditorCamera* pCam);
     void CreateCamera(bool dropEvent, QPixmap img);
 
+    // Test/automation-only bypass for this dialog's QFileDialog-driven image picking (see the
+    // "set_camera_image" automation command) - mirrors CreateCamera/ChangeCameraImageCommand
+    // exactly (image-size normalization, the eager on-disk save, the FG1 layers.json sidecar),
+    // just resolving the target camera by grid (x, y) instead of reading ui->lstCameras's
+    // current selection. Doesn't require a live CameraManager dialog to be open.
+    static bool SetCameraImageForAutomation(EditorTab* pTab, int camX, int camY, TabImageIdx index, QPixmap img);
+
 private slots:
     void on_btnSelectImage_clicked();
 
@@ -50,7 +57,7 @@ private:
     void UpdateTabImages(CameraGraphicsItem* pItem);
     
     int NextFreeCamId();
-    bool SaveCameraImage(const QPixmap& camImage, const QString& pathDirectory, const std::string& camName, TabImageIdx imgIdx);
+    static bool SaveCameraImage(const QPixmap& camImage, const QString& pathDirectory, const std::string& camName, TabImageIdx imgIdx);
 
     CameraGraphicsItem* CameraGraphicsItemByPos(const QPoint& pos);
     CameraGraphicsItem* CameraGraphicsItemByModelPtr(const EditorCamera* cam);

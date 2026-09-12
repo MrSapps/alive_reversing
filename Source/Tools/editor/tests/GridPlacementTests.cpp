@@ -114,6 +114,34 @@ TEST(ClampRangeStartToMapBounds, ZeroSizeClampsToZero)
     EXPECT_EQ(ClampRangeStartToMapBounds(50, 100, 0), 0);
 }
 
+TEST(ClampLengthToMapBounds, WithinBoundsUnchanged)
+{
+    EXPECT_EQ(ClampLengthToMapBounds(500, 1024), 500);
+}
+
+TEST(ClampLengthToMapBounds, EqualToMapUnchanged)
+{
+    EXPECT_EQ(ClampLengthToMapBounds(1024, 1024), 1024);
+}
+
+TEST(ClampLengthToMapBounds, LargerThanMapShrinksToMapSize)
+{
+    // The scenario from shrinking a map down to e.g. a single 1024-wide camera: an existing
+    // object spanning several cameras (say 3000px) must shrink to fit, not just get repositioned
+    // (which is all ClampRangeStartToMapBounds alone can do for a range that already fits).
+    EXPECT_EQ(ClampLengthToMapBounds(3000, 1024), 1024);
+}
+
+TEST(ClampLengthToMapBounds, NegativeClampsToZero)
+{
+    EXPECT_EQ(ClampLengthToMapBounds(-50, 1024), 0);
+}
+
+TEST(ClampLengthToMapBounds, ZeroSizeMapClampsToZero)
+{
+    EXPECT_EQ(ClampLengthToMapBounds(500, 0), 0);
+}
+
 int main(int argc, char** argv)
 {
     ::testing::InitGoogleTest(&argc, argv);

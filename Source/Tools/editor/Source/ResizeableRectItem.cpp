@@ -12,6 +12,7 @@
 #include <QPixmapCache>
 #include "ISyncPropertiesToTree.hpp"
 #include "GridSnapSettings.hpp"
+#include "ItemPositionData.hpp"
 #include <nlohmann/json.hpp>
 #include "../../relive_lib/Types.hpp"
 #include "../../relive_api/TlvsRelive.hpp"
@@ -77,17 +78,35 @@ void ResizeableRectItem::mouseMoveEvent( QGraphicsSceneMouseEvent* aEvent )
     curRect.setY(mPointSnapper.SnapY(mSnapSettings.MapObjectSnapping().mSnapY, static_cast<int>(curRect.y())));
     curRect.setHeight(h);
 
+    const bool multiSelect = scene()->selectedItems().count() > 1;
+
     // Keep the whole box within the map bounds by shifting it back in as a rigid unit,
     // preserving its exact size - clamping x/y independently after the fact could shrink or
     // distort the box if it's dragged partway past an edge (same reasoning as the whole-line
-    // drag clamp in ResizeableArrowItem::mouseMoveEvent).
-    curRect.setX(mPointSnapper.ClampRangeStartX(static_cast<int>(curRect.x()), static_cast<int>(w)));
-    curRect.setWidth(w);
-    curRect.setY(mPointSnapper.ClampRangeStartY(static_cast<int>(curRect.y()), static_cast<int>(h)));
-    curRect.setHeight(h);
+    // drag clamp in ResizeableArrowItem::mouseMoveEvent). Skipped here while multiple items are
+    // selected: this item's own base-class move above already translated every other selected
+    // item by the same raw delta, unclamped, so clamping only this one here (to its own bounds)
+    // would pin it near an edge while the rest of the selection keeps drifting arbitrarily far
+    // away, wrecking their relative layout.
+    if (!multiSelect)
+    {
+        curRect.setX(mPointSnapper.ClampRangeStartX(static_cast<int>(curRect.x()), static_cast<int>(w)));
+        curRect.setWidth(w);
+        curRect.setY(mPointSnapper.ClampRangeStartY(static_cast<int>(curRect.y()), static_cast<int>(h)));
+        curRect.setHeight(h);
+    }
 
     curRect = curRect.normalized();
     SetRect(curRect);
+
+    // Multi-selection case instead: clamp the whole selection's union bounding box as one rigid
+    // group, live on every move (not just once when the drag finishes) - same as a single
+    // selected item already gets above, just applied to the group as a unit so relative layout
+    // between items is preserved rather than each one clamping independently.
+    if (multiSelect)
+    {
+        ClampSelectedItemsToMapBounds(scene(), mPointSnapper);
+    }
 }
 
 void ResizeableRectItem::mouseReleaseEvent( QGraphicsSceneMouseEvent* aEvent )

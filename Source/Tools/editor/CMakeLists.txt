@@ -229,7 +229,7 @@ endif()
 
 add_executable(EditorAutomationTests tests/EditorAutomationTests.cpp Source/AutomationProtocol.hpp)
 target_include_directories(EditorAutomationTests PRIVATE Source)
-target_link_libraries(EditorAutomationTests PUBLIC googletest Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Network)
+target_link_libraries(EditorAutomationTests PUBLIC googletest Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::Gui)
 target_compile_definitions(EditorAutomationTests PRIVATE RELIVE_EDITOR_PATH="$<TARGET_FILE:relive-editor>")
 if (MSVC)
     target_compile_options(EditorAutomationTests PRIVATE /MDd)

@@ -164,6 +164,46 @@ namespace Automation
             return nlohmann::json::object();
         }
 
+        // Sends a single mouse press, move, or release event to a target - the building block
+        // "drag" is a convenience wrapper around (press+move+release in one call). Exists so a
+        // test can inspect state *between* press and release (e.g. get_scene_items mid-drag),
+        // which "drag" can't do since it runs all three synchronously with no way to observe
+        // anything in between.
+        nlohmann::json HandleMouseEvent(QWidget* root, const nlohmann::json& request)
+        {
+            QWidget* widget = RequireWidget(ResolveTargetRequired(root, request));
+            if (!request.contains("phase") || !request.contains("x") || !request.contains("y"))
+            {
+                throw CommandError("'phase', 'x' and 'y' are required");
+            }
+
+            const std::string phase = request.at("phase").get<std::string>();
+            const QPoint pos(request.at("x").get<int>(), request.at("y").get<int>());
+            QWidget* eventTarget = ResolveMouseEventTarget(widget);
+
+            if (phase == "down")
+            {
+                QMouseEvent press(QEvent::MouseButtonPress, pos, eventTarget->mapToGlobal(pos), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+                QCoreApplication::sendEvent(eventTarget, &press);
+            }
+            else if (phase == "move")
+            {
+                QMouseEvent move(QEvent::MouseMove, pos, eventTarget->mapToGlobal(pos), Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+                QCoreApplication::sendEvent(eventTarget, &move);
+            }
+            else if (phase == "up")
+            {
+                QMouseEvent release(QEvent::MouseButtonRelease, pos, eventTarget->mapToGlobal(pos), Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+                QCoreApplication::sendEvent(eventTarget, &release);
+            }
+            else
+            {
+                throw CommandError("unknown 'phase': " + phase);
+            }
+
+            return nlohmann::json::object();
+        }
+
         nlohmann::json HandleDrag(QWidget* root, const nlohmann::json& request)
         {
             QWidget* widget = RequireWidget(ResolveTargetRequired(root, request));
@@ -408,6 +448,10 @@ namespace Automation
         if (cmd == "drag")
         {
             return HandleDrag(root, request);
+        }
+        if (cmd == "mouse_event")
+        {
+            return HandleMouseEvent(root, request);
         }
         if (cmd == "set_value")
         {

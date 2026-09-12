@@ -5,9 +5,14 @@
 #include "EditorGraphicsScene.hpp"
 #include "SelectionSaver.hpp"
 #include "ResizeableRectItem.hpp"
+#include "ResizeableArrowItem.hpp"
 #include "CameraGraphicsItem.hpp"
+#include "ItemPositionData.hpp"
+#include "GridPlacement.hpp"
 #include <QDebug>
 #include "Model.hpp"
+#include <algorithm>
+#include <cmath>
 
 struct RemovedCamera final
 {
@@ -290,7 +295,51 @@ struct AddedCamera final
     }
 };
 
-// TODO: Handle collision items that are now outside of the map rect
+// Forces every surviving map object and collision line to fit within the map's current
+// (already-resized) pixel bounds: shrinks an object/line's own size first if it's now bigger
+// than the whole map (e.g. shrinking the grid down to a single camera), then repositions it -
+// same idea as a drag/resize/paste clamp, just applied to everything in the scene at once
+// rather than one item. Cameras themselves need no such handling: CalcMapChanges only ever
+// removes/adds whole grid cells at the edge, it never repositions a surviving one.
+static void ForceItemsInsideMapBounds(EditorTab* pTab)
+{
+    const Model& model = pTab->GetModel();
+    const unsigned int mapWidth = model.CameraGridWidth() * model.XSize();
+    const unsigned int mapHeight = model.CameraGridHeight() * model.YSize();
+
+    for (QGraphicsItem* item : pTab->GetScene().items())
+    {
+        if (auto* pRect = qgraphicsitem_cast<ResizeableRectItem*>(item))
+        {
+            const QRectF rect = pRect->CurrentRect();
+            const int width = GridPlacement::ClampLengthToMapBounds(static_cast<int>(rect.width()), mapWidth);
+            const int height = GridPlacement::ClampLengthToMapBounds(static_cast<int>(rect.height()), mapHeight);
+            const int x = GridPlacement::ClampRangeStartToMapBounds(static_cast<int>(rect.x()), width, mapWidth);
+            const int y = GridPlacement::ClampRangeStartToMapBounds(static_cast<int>(rect.y()), height, mapHeight);
+            if (x != rect.x() || y != rect.y() || width != rect.width() || height != rect.height())
+            {
+                pRect->SetRect(QRectF(x, y, width, height));
+            }
+        }
+        else if (auto* pArrow = qgraphicsitem_cast<ResizeableArrowItem*>(item))
+        {
+            const QLineF line = pArrow->SaveLine().translated(pArrow->x(), pArrow->y());
+            const qreal left = std::min(line.x1(), line.x2());
+            const qreal top = std::min(line.y1(), line.y2());
+            const qreal width = std::abs(line.x2() - line.x1());
+            const qreal height = std::abs(line.y2() - line.y1());
+            const int clampedLeft = GridPlacement::ClampRangeStartToMapBounds(static_cast<int>(left), static_cast<int>(width), mapWidth);
+            const int clampedTop = GridPlacement::ClampRangeStartToMapBounds(static_cast<int>(top), static_cast<int>(height), mapHeight);
+            const int dx = clampedLeft - static_cast<int>(left);
+            const int dy = clampedTop - static_cast<int>(top);
+            if (dx != 0 || dy != 0)
+            {
+                pArrow->Translate(dx, dy);
+            }
+        }
+    }
+}
+
 class ChangeMapSizeCommand final : public QUndoCommand
 {
 public:
@@ -303,7 +352,7 @@ public:
         mOldXSize = mTab->GetModel().XSize();
         mOldYSize = mTab->GetModel().YSize();
 
-        setText("Change map size from " + 
+        setText("Change map size from " +
             QString::number(mOldXSize) + "x" + QString::number(mOldYSize) + " to " +
             QString::number(mNewXSize) + "x" + QString::number(mNewYSize));
 
@@ -321,6 +370,14 @@ public:
                 mAddedCameras.emplace_back(std::make_unique<AddedCamera>(mTab, edit.x, edit.y));
             }
         }
+
+        // Snapshot every surviving item's pre-resize position/size, so undo can put anything
+        // ForceItemsInsideMapBounds touched in redo() back exactly where/how big it was -
+        // restoring the old map size alone isn't enough once an oversized object has been
+        // shrunk to fit. Capturing everything currently in the scene is simplest; restoring an
+        // item that redo() never actually touched is just a harmless no-op.
+        QList<QGraphicsItem*> allItems = mTab->GetScene().items();
+        mBeforeResizeSnapshot.Save(allItems, mTab->GetModel(), false);
     }
 
     void undo() override
@@ -342,6 +399,9 @@ public:
         {
             added->undo(mTab->GetModel(), &mTab->GetScene());
         }
+
+        // Put back exactly where/how big everything was before redo()'s bounds enforcement.
+        mBeforeResizeSnapshot.Restore(mTab->GetModel());
 
         mSelectionSaver.undo();
     }
@@ -367,6 +427,12 @@ public:
         {
             added->redo(mTab->GetModel(), &mTab->GetScene());
         }
+
+        // Shrink map got smaller than some object/line, or growing exposed an object that
+        // was previously extending past the map edge and only got away with it because
+        // there simply wasn't any code enforcing it - either way, force everything remaining
+        // back within the new bounds.
+        ForceItemsInsideMapBounds(mTab);
     }
 
 private:
@@ -382,6 +448,7 @@ private:
 
     std::vector<std::unique_ptr<RemovedCamera>> mRemovedCameras;
     std::vector<std::unique_ptr<AddedCamera>> mAddedCameras;
+    ItemPositionData mBeforeResizeSnapshot;
 };
 
 ChangeMapSizeDialog::ChangeMapSizeDialog(QWidget *parent, EditorTab* pTab) :
