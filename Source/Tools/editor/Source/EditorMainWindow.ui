@@ -848,6 +848,9 @@
    </property>
   </action>
   <action name="actionAdd_collision">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
    <property name="icon">
     <iconset resource="resources.qrc">
      <normaloff>:/icons/rsc/icons/New_Line.png</normaloff>:/icons/rsc/icons/New_Line.png</iconset>

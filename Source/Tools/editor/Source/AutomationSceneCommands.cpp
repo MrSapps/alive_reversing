@@ -14,6 +14,7 @@
 
 #include <QGraphicsItem>
 #include <QGraphicsView>
+#include <QGraphicsLineItem>
 #include <QPixmap>
 #include <map>
 
@@ -80,6 +81,19 @@ namespace Automation
                 j["hasMainImage"] = !camera->GetCamera()->mCameraImageandLayers.mCameraImage.isNull();
                 j["hasForegroundLayer"] = !camera->GetCamera()->mCameraImageandLayers.mForegroundLayer.isNull();
                 j["hasBackgroundLayer"] = !camera->GetCamera()->mCameraImageandLayers.mBackgroundLayer.isNull();
+            }
+            else if (auto* plainLine = dynamic_cast<QGraphicsLineItem*>(item))
+            {
+                // The click-to-place "add collision" tool's ghost preview line (a plain
+                // QGraphicsLineItem, not a ResizeableArrowItem - it's non-interactive and never
+                // becomes a real CollisionObject unless/until the second click commits it).
+                // Checked after ResizeableArrowItem above (which is itself a QGraphicsLineItem)
+                // so a real collision line is never misreported as a ghost.
+                j["kind"] = "collision_ghost_line";
+                j["x1"] = plainLine->line().x1();
+                j["y1"] = plainLine->line().y1();
+                j["x2"] = plainLine->line().x2();
+                j["y2"] = plainLine->line().y2();
             }
             else
             {

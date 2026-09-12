@@ -21,6 +21,7 @@ public:
 
     void keyReleaseEvent(QKeyEvent* pEvent) override;
     void focusOutEvent(QFocusEvent* pEvent) override;
+    void leaveEvent(QEvent* pEvent) override;
     void contextMenuEvent(QContextMenuEvent* pEvent) override;
     void dragEnterEvent(QDragEnterEvent* pEvent) override;
     void dragMoveEvent(QDragMoveEvent* pEvent) override;

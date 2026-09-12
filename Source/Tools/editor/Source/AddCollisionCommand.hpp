@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QUndoCommand>
+#include <QPoint>
 #include <memory>
 #include "SelectionSaver.hpp"
 
@@ -11,7 +12,10 @@ class ResizeableArrowItem;
 class AddCollisionCommand final : public QUndoCommand
 {
 public:
-    explicit AddCollisionCommand(EditorTab* pTab);
+    // p1/p2 are the two user-clicked endpoints, in scene coordinates (see
+    // EditorGraphicsScene::HandlePlaceCollisionLineClick) - clamped to the map bounds as a rigid
+    // unit (preserving the line's exact length/shape) the same way a drag or resize is.
+    AddCollisionCommand(EditorTab* pTab, QPoint p1, QPoint p2);
 
     ~AddCollisionCommand();
 
@@ -20,7 +24,7 @@ public:
     void redo() override;
 
 private:
-    void MakeNewCollision();
+    void MakeNewCollision(QPoint p1, QPoint p2);
 
     SelectionSaver mSelectionSaver;
     bool mAdded = false;

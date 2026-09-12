@@ -211,6 +211,16 @@ EditorTab* EditorMainWindow::AddModelTab(std::unique_ptr<Model> model, QString f
         this, &EditorMainWindow::UpdateWindowTitle
     );
 
+    // Keeps actionAdd_collision visibly "depressed" for exactly as long as this tab's
+    // click-to-place tool is active - covers every way placement can end (the second click,
+    // Escape, the view losing focus, the mouse leaving it), not just re-clicking the button,
+    // since all of them funnel through EditorGraphicsScene::CancelPlaceCollisionLine.
+    connect(
+        &view->GetScene(), &EditorGraphicsScene::PlacingCollisionLineChanged,
+        this, [this](bool placing)
+        { m_ui->actionAdd_collision->setChecked(placing); }
+    );
+
     QFileInfo fileInfo(fileName);
     const int tabIdx = m_ui->tabWidget->addTab(view, fileInfo.fileName());
     m_ui->tabWidget->setTabToolTip(tabIdx, fileName);
