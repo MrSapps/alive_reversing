@@ -1,5 +1,6 @@
 #include "EditorGraphicsView.hpp"
 #include "EditorTab.hpp"
+#include "EditorGraphicsScene.hpp"
 #include "CameraManager.hpp"
 #include "CameraGraphicsItem.hpp"
 #include <QDebug>
@@ -89,8 +90,22 @@ void EditorGraphicsView::focusOutEvent(QFocusEvent* pEvent)
         // prevents ScrollHandDrag getting "stuck" when losing focus while holding shift
         setDragMode(DragMode::RubberBandDrag);
         setInteractive(true);
+
+        // Cancel an in-progress "add collision" click-to-place (e.g. alt-tabbing away,
+        // switching tabs, minimizing) - nothing is committed to the model/undo stack until the
+        // second click, so there's nothing worth preserving through an interruption, unlike an
+        // actual in-progress drag.
+        mEditorTab->GetScene().CancelPlaceCollisionLine();
     }
     QGraphicsView::focusOutEvent(pEvent);
+}
+
+void EditorGraphicsView::leaveEvent(QEvent* pEvent)
+{
+    // Same reasoning as focusOutEvent: the mouse leaving the view entirely means there's no
+    // sensible "second point" to keep waiting for.
+    mEditorTab->GetScene().CancelPlaceCollisionLine();
+    QGraphicsView::leaveEvent(pEvent);
 }
 
 void EditorGraphicsView::contextMenuEvent(QContextMenuEvent* pEvent)

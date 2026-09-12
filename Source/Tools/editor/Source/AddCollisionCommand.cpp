@@ -4,12 +4,13 @@
 #include "CollisionObject.hpp"
 #include "Model.hpp"
 #include "GridPlacement.hpp"
-#include <QGraphicsView>
+#include <algorithm>
+#include <cmath>
 
-AddCollisionCommand::AddCollisionCommand(EditorTab* pTab)
+AddCollisionCommand::AddCollisionCommand(EditorTab* pTab, QPoint p1, QPoint p2)
  : mSelectionSaver(pTab), mTab(pTab)
 {
-    MakeNewCollision();
+    MakeNewCollision(p1, p2);
 
     setText("Add collision line");
 }
@@ -47,33 +48,32 @@ void AddCollisionCommand::redo()
     mSelectionSaver.redo();
 }
 
-void AddCollisionCommand::MakeNewCollision()
+void AddCollisionCommand::MakeNewCollision(QPoint p1, QPoint p2)
 {
     mNewObject = std::make_unique<CollisionObject>(mTab->GetModel().NextCollisionId());
-
-    QGraphicsView* pView = mTab->GetScene().views().at(0);
-    QPoint scenePos = pView->mapToScene(pView->pos()).toPoint();
 
     const Model& model = mTab->GetModel();
     const unsigned int mapWidthPixels = model.XSize() * model.CameraGridWidth();
     const unsigned int mapHeightPixels = model.YSize() * model.CameraGridHeight();
 
-    // Originally a fixed-size 100px-long horizontal line at (scenePos + 100, scenePos + 100)
-    // to (scenePos + 200, scenePos + 100). Clamping x1/x2 independently to the map bounds can
-    // collapse that to a zero-length point (e.g. scenePos.x() = -280: x1 = -180 and x2 = -80
-    // both clamp to 0), so the X span is clamped by its start instead, keeping the full
-    // length whenever the map is at least that wide (always true here - even a 1x1 AE map is
-    // 375px wide). Y1 == Y2 always (it's a horizontal line), so there's no length to preserve
-    // there - a plain pixel clamp is enough.
-    constexpr int kLineLength = 100;
-    const int x1 = GridPlacement::ClampRangeStartToMapBounds(scenePos.x() + 100, kLineLength, mapWidthPixels);
-    const int x2 = GridPlacement::ClampPixelToMapBounds(x1 + kLineLength, mapWidthPixels);
-    const int y = GridPlacement::ClampPixelToMapBounds(scenePos.y() + 100, mapHeightPixels);
+    // Keep the whole line within the map bounds by shifting it back in as a rigid unit,
+    // preserving its exact shape - clamping each endpoint independently could collapse the line
+    // to a single point if its bounding box straddles a boundary (e.g. p1.x() = -180, p2.x() =
+    // -80: both clamp to 0 independently, losing the line's length entirely). Same reasoning as
+    // ResizeableArrowItem's whole-line drag clamp.
+    const int left = std::min(p1.x(), p2.x());
+    const int top = std::min(p1.y(), p2.y());
+    const int width = std::abs(p2.x() - p1.x());
+    const int height = std::abs(p2.y() - p1.y());
+    const int clampedLeft = GridPlacement::ClampRangeStartToMapBounds(left, width, mapWidthPixels);
+    const int clampedTop = GridPlacement::ClampRangeStartToMapBounds(top, height, mapHeightPixels);
+    const int dx = clampedLeft - left;
+    const int dy = clampedTop - top;
 
-    mNewObject->SetX1(x1);
-    mNewObject->SetX2(x2);
-    mNewObject->SetY1(y);
-    mNewObject->SetY2(y);
+    mNewObject->SetX1(p1.x() + dx);
+    mNewObject->SetY1(p1.y() + dy);
+    mNewObject->SetX2(p2.x() + dx);
+    mNewObject->SetY2(p2.y() + dy);
 
     mNewObject->SetPrevious(-1);
     mNewObject->SetNext(-1);

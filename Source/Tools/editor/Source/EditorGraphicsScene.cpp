@@ -10,6 +10,11 @@
 #include "Model.hpp"
 #include <QUndoCommand>
 #include "DeleteItemsCommand.hpp"
+#include "AddCollisionCommand.hpp"
+#include <QGraphicsLineItem>
+#include <QGraphicsView>
+#include <QPen>
+#include <QKeyEvent>
 
 EditorGraphicsScene::EditorGraphicsScene(EditorTab* pTab)
     : mTab(pTab)
@@ -154,6 +159,25 @@ void EditorGraphicsScene::ToggleGrid()
 
 void EditorGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* pEvent)
 {
+    if (mPlacingCollisionLine)
+    {
+        if (pEvent->button() == Qt::LeftButton)
+        {
+            // Explicitly accept, not just "handled by returning": QGraphicsView starts its
+            // RubberBandDrag tracking whenever the forwarded press comes back unaccepted, which
+            // is this event's default state regardless of dragMode - and on the *completing*
+            // click specifically, HandlePlaceCollisionLineClick below restores dragMode back to
+            // RubberBandDrag as part of ending placement, before QGraphicsView's own check runs
+            // (it happens immediately after this handler returns) - so without an explicit
+            // accept() here, that one click's trailing drag (if the button is released even a
+            // moment later than the press) could still start a rubber band regardless of the
+            // NoDrag mode used for every other click during placement.
+            pEvent->accept();
+            HandlePlaceCollisionLineClick(pEvent->scenePos());
+        }
+        return;
+    }
+
     if (pEvent->button() != Qt::LeftButton)
     {
         qDebug() << "Ignore non left click";
@@ -194,11 +218,37 @@ void EditorGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* pEvent)
 
 void EditorGraphicsScene::mouseMoveEvent(QGraphicsSceneMouseEvent* pEvent)
 {
+    if (mPlacingCollisionLine)
+    {
+        if (mHaveCollisionLineFirstPoint && mCollisionLineGhost)
+        {
+            QLineF line = mCollisionLineGhost->line();
+            line.setP2(pEvent->scenePos());
+            mCollisionLineGhost->setLine(line);
+        }
+
+        // Re-assert the cross cursor on every move: Qt dispatches hover events to whatever
+        // item is under the cursor (ResizeableArrowItem/ResizeableRectItem's hover handlers set
+        // their own cursor, e.g. an open hand) as part of the same event that leads here, before
+        // this override runs - so without this, hovering an existing item while placing would
+        // silently steal the cursor back, which is what made it "sometimes" look wrong.
+        if (!views().isEmpty())
+        {
+            views().first()->setCursor(Qt::CrossCursor);
+        }
+        return;
+    }
+
     QGraphicsScene::mouseMoveEvent(pEvent);
 }
 
 void EditorGraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* pEvent)
 {
+    if (mPlacingCollisionLine)
+    {
+        return;
+    }
+
     // Handle the button up
     QGraphicsScene::mouseReleaseEvent(pEvent);
 
@@ -245,6 +295,12 @@ void EditorGraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* pEvent)
 
 void EditorGraphicsScene::keyPressEvent(QKeyEvent* keyEvent)
 {
+    if (mPlacingCollisionLine && keyEvent->key() == Qt::Key_Escape)
+    {
+        CancelPlaceCollisionLine();
+        return;
+    }
+
     if (keyEvent->key() == Qt::Key_Delete)
     {
         QList<QGraphicsItem*> selected = selectedItems();
@@ -256,6 +312,103 @@ void EditorGraphicsScene::keyPressEvent(QKeyEvent* keyEvent)
     else
     {
         QGraphicsScene::keyPressEvent(keyEvent);
+    }
+}
+
+void EditorGraphicsScene::BeginPlaceCollisionLine()
+{
+    CancelPlaceCollisionLine();
+    mPlacingCollisionLine = true;
+    mHaveCollisionLineFirstPoint = false;
+    clearSelection();
+
+    // The mouse *release* that follows the second (committing) click arrives after placement
+    // has already ended (HandlePlaceCollisionLineClick resets it synchronously as part of
+    // handling that press), so it falls through to mouseReleaseEvent's normal, non-placing
+    // path - which compares against mOldSelection/mOldPositions to decide whether to push a
+    // SetSelectionCommand/MoveItemsCommand. Left stale from whatever they were before placement
+    // started, that comparison would spuriously "detect" the selection change AddCollisionCommand
+    // just made (selecting the new line) and push an extra, wrong undo entry on top of it.
+    // Resetting them now, and again right when a line is actually committed below, keeps that
+    // comparison honest.
+    mOldSelection = selectedItems();
+    mOldPositions = ItemPositionData();
+
+    // QGraphicsView::RubberBandDrag draws its rubber-band overlay and starts item selection
+    // entirely inside the view's own mousePressEvent/mouseMoveEvent - overriding this scene's
+    // virtual mousePressEvent (returning without calling the base implementation, so nothing
+    // "accepts" the event) doesn't stop it, since the view decides whether to start a rubber
+    // band before the scene's *virtual* handler even runs. Switching off drag mode entirely is
+    // the only way to actually suppress it while placing.
+    if (!views().isEmpty())
+    {
+        QGraphicsView* view = views().first();
+        view->setDragMode(QGraphicsView::NoDrag);
+        view->setCursor(Qt::CrossCursor);
+    }
+
+    emit PlacingCollisionLineChanged(true);
+}
+
+void EditorGraphicsScene::CancelPlaceCollisionLine()
+{
+    const bool wasPlacing = mPlacingCollisionLine;
+
+    if (mCollisionLineGhost)
+    {
+        removeItem(mCollisionLineGhost);
+        delete mCollisionLineGhost;
+        mCollisionLineGhost = nullptr;
+    }
+    mPlacingCollisionLine = false;
+    mHaveCollisionLineFirstPoint = false;
+
+    if (wasPlacing)
+    {
+        if (!views().isEmpty())
+        {
+            QGraphicsView* view = views().first();
+            view->setDragMode(QGraphicsView::RubberBandDrag);
+            view->unsetCursor();
+        }
+
+        emit PlacingCollisionLineChanged(false);
+    }
+}
+
+void EditorGraphicsScene::HandlePlaceCollisionLineClick(QPointF scenePos)
+{
+    if (!mHaveCollisionLineFirstPoint)
+    {
+        mCollisionLineFirstPoint = scenePos;
+        mHaveCollisionLineFirstPoint = true;
+
+        QPen ghostPen(QColor(255, 255, 0, 180));
+        ghostPen.setStyle(Qt::DashLine);
+        ghostPen.setWidth(2);
+        ghostPen.setCosmetic(true);
+
+        mCollisionLineGhost = new QGraphicsLineItem(QLineF(scenePos, scenePos));
+        mCollisionLineGhost->setPen(ghostPen);
+        mCollisionLineGhost->setZValue(10.0);
+        addItem(mCollisionLineGhost);
+    }
+    else
+    {
+        const QPointF firstPoint = mCollisionLineFirstPoint;
+        const QPointF secondPoint = scenePos;
+
+        // Clears the ghost and resets placement state before pushing the command - the command's
+        // own construction (MakeResizeableArrowItem etc.) shouldn't run while still "placing".
+        CancelPlaceCollisionLine();
+
+        mTab->AddCommand(new AddCollisionCommand(mTab, firstPoint.toPoint(), secondPoint.toPoint()));
+
+        // AddCollisionCommand::redo() selects the new line - resync mOldSelection to match so
+        // the mouseReleaseEvent still to come for this same click (now running the normal,
+        // non-placing path - see BeginPlaceCollisionLine's comment) doesn't mistake that for a
+        // user-driven selection change and push a spurious SetSelectionCommand on top.
+        mOldSelection = selectedItems();
     }
 }
 

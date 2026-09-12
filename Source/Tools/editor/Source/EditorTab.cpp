@@ -39,7 +39,6 @@
 #include "PasteItemsCommand.hpp"
 #include "SetSelectionCommand.hpp"
 #include "MoveItemsCommand.hpp"
-#include "AddCollisionCommand.hpp"
 #include "../../../relive_lib/Grid.hpp"
 #include "CollisionConnect.hpp"
 #include "Model.hpp"
@@ -72,6 +71,9 @@ EditorTab::EditorTab(QTabWidget* aParent, std::unique_ptr<Model> model, QString 
     ui->graphicsView->setObjectName(QStringLiteral("graphicsView")); // preserve the name setupUi() gave the widget this replaces
     QGraphicsView* pView = ui->graphicsView;
     pView->setDragMode(QGraphicsView::RubberBandDrag);
+    // Needed so mouseMoveEvent fires with no button held, for the "add collision" click-to-place
+    // tool's ghost preview line to follow the cursor between the first and second click.
+    pView->setMouseTracking(true);
 
 
     pView->setRenderHint(QPainter::SmoothPixmapTransform);
@@ -473,7 +475,19 @@ void EditorTab::AddObject()
 
 void EditorTab::AddCollision()
 {
-    mUndoStack.push(new AddCollisionCommand(this));
+    // Starts the click-to-place tool rather than adding a line immediately: the actual
+    // AddCollisionCommand only gets pushed once the user has clicked both endpoints (see
+    // EditorGraphicsScene::HandlePlaceCollisionLineClick). Clicking the (now checkable, so it
+    // visibly stays "depressed" while active) action again cancels rather than restarting, the
+    // usual behavior for a toggled tool button.
+    if (mScene->IsPlacingCollisionLine())
+    {
+        mScene->CancelPlaceCollisionLine();
+    }
+    else
+    {
+        mScene->BeginPlaceCollisionLine();
+    }
 }
 
 void EditorTab::ConnectCollisions()

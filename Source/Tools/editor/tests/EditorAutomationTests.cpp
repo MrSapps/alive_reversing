@@ -193,12 +193,6 @@ namespace
         return client.WaitForResponse(newPathClickId, 5000).value("ok", false);
     }
 
-    // Adds a collision line: no dialog, pushes straight onto the undo stack.
-    bool AddCollisionLine(AutomationClient& client)
-    {
-        return client.Call({{"cmd", "click"}, {"target", "actionAdd_collision"}}).value("ok", false);
-    }
-
     // Adds a map object via AddObjectDialog: select the first entry in the (unfiltered) type
     // list and accept.
     bool AddMapObject(AutomationClient& client)
@@ -309,6 +303,28 @@ namespace
     bool SendMouseEvent(AutomationClient& client, const char* phase, QPoint pos)
     {
         return client.Call({{"cmd", "mouse_event"}, {"target", "graphicsView"}, {"phase", phase}, {"x", pos.x()}, {"y", pos.y()}}).value("ok", false);
+    }
+
+    // Adds a collision line via the click-to-place tool (actionAdd_collision starts placement;
+    // it no longer creates a line immediately - see AddCollisionClickToPlaceShowsGhostAndCreatesLine
+    // for that flow in detail). Always clicks the same fixed pair of scene points - a 100px
+    // horizontal line, matching the tool's own placement-independent shape - so tests that add
+    // more than one line still get predictable (and, called twice in a row, coincident)
+    // positions to work with, same as the old fixed-offset default did.
+    bool AddCollisionLine(AutomationClient& client)
+    {
+        if (!client.Call({{"cmd", "click"}, {"target", "actionAdd_collision"}}).value("ok", false))
+        {
+            return false;
+        }
+
+        const QPoint p1 = SceneToView(client, 100, 100);
+        const QPoint p2 = SceneToView(client, 200, 100);
+        if (!SendMouseEvent(client, "down", p1) || !SendMouseEvent(client, "up", p1))
+        {
+            return false;
+        }
+        return SendMouseEvent(client, "down", p2) && SendMouseEvent(client, "up", p2);
     }
 
     // Opens ChangeMapSizeDialog (actionEdit_map_size), sets both spinboxes and accepts via
@@ -1520,6 +1536,221 @@ TEST(EditorAutomation, ConnectCollisionsRequiresExactlyTwoSelected)
     EXPECT_TRUE(client.WaitForResponse(clickId, 5000).value("ok", false));
 
     EXPECT_FALSE(UndoContains(GetUndoWidgetTextList(client), "Connected collisions")) << "an invalid selection should not have pushed a connect command";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Feature test for the click-to-place "add collision" tool: actionAdd_collision no longer
+// creates a line immediately - the first click sets one endpoint (showing a ghost preview line
+// that follows the mouse without a button held, via mouse_event's "move" phase), and the second
+// click commits the real collision line at the two clicked points.
+TEST(EditorAutomation, AddCollisionClickToPlaceShowsGhostAndCreatesLine)
+{
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateNewPath(client));
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "actionAdd_collision"}}).value("ok", false));
+
+    // Nothing exists yet - not even a ghost - until the first click.
+    {
+        const nlohmann::json items = GetSceneItems(client);
+        EXPECT_EQ(CountKind(items, "collision_line"), 0);
+        EXPECT_EQ(CountKind(items, "collision_ghost_line"), 0);
+    }
+
+    const QPoint p1 = SceneToView(client, 100, 100);
+    const QPoint p2a = SceneToView(client, 250, 120); // an intermediate mouse position
+    const QPoint p2 = SceneToView(client, 300, 180);  // where the second click actually lands
+
+    // First click: places the first endpoint and shows the ghost, but creates no real line yet.
+    ASSERT_TRUE(SendMouseEvent(client, "down", p1));
+    ASSERT_TRUE(SendMouseEvent(client, "up", p1));
+    {
+        const nlohmann::json items = GetSceneItems(client);
+        EXPECT_EQ(CountKind(items, "collision_line"), 0) << "a real collision line was created after only one click";
+        const nlohmann::json ghost = FindKind(items, "collision_ghost_line");
+        EXPECT_DOUBLE_EQ(ghost.value("x1", -1.0), 100);
+        EXPECT_DOUBLE_EQ(ghost.value("y1", -1.0), 100);
+        EXPECT_DOUBLE_EQ(ghost.value("x2", -1.0), 100) << "ghost should start collapsed to the first click point";
+        EXPECT_DOUBLE_EQ(ghost.value("y2", -1.0), 100);
+    }
+
+    // Moving the mouse (no button held) before the second click updates the ghost's far end to
+    // follow the cursor, without touching the first endpoint.
+    ASSERT_TRUE(SendMouseEvent(client, "move", p2a));
+    {
+        const nlohmann::json ghost = FindKind(GetSceneItems(client), "collision_ghost_line");
+        EXPECT_DOUBLE_EQ(ghost.value("x1", -1.0), 100);
+        EXPECT_DOUBLE_EQ(ghost.value("y1", -1.0), 100);
+        EXPECT_DOUBLE_EQ(ghost.value("x2", -1.0), 250);
+        EXPECT_DOUBLE_EQ(ghost.value("y2", -1.0), 120);
+    }
+    ASSERT_TRUE(SendMouseEvent(client, "move", p2));
+    {
+        const nlohmann::json ghost = FindKind(GetSceneItems(client), "collision_ghost_line");
+        EXPECT_DOUBLE_EQ(ghost.value("x2", -1.0), 300);
+        EXPECT_DOUBLE_EQ(ghost.value("y2", -1.0), 180);
+    }
+
+    // Second click: commits the real line at the two clicked points and removes the ghost.
+    ASSERT_TRUE(SendMouseEvent(client, "down", p2));
+    ASSERT_TRUE(SendMouseEvent(client, "up", p2));
+
+    {
+        const nlohmann::json items = GetSceneItems(client);
+        EXPECT_EQ(CountKind(items, "collision_ghost_line"), 0) << "ghost line was not removed after the second click";
+        const nlohmann::json line = FindKind(items, "collision_line");
+        EXPECT_EQ(line.value("x1", -1), 100);
+        EXPECT_EQ(line.value("y1", -1), 100);
+        EXPECT_EQ(line.value("x2", -1), 300);
+        EXPECT_EQ(line.value("y2", -1), 180);
+    }
+    // "Add collision line" must be the *last* entry pushed - the mouse release that follows this
+    // same click arrives after placement has already ended (during the preceding press), so it
+    // falls through to the scene's normal, non-placing release handling; if that stale selection-
+    // change detection isn't reset when placement starts/commits, it spuriously "sees" the
+    // selection AddCollisionCommand::redo() just made and pushes an extra SetSelectionCommand
+    // ("Select 1 item(s)") on top, which would make the *next* undo below undo the wrong thing.
+    {
+        const auto undoItems = GetUndoWidgetTextList(client);
+        EXPECT_TRUE(UndoContains(undoItems, "Add collision line"));
+        ASSERT_FALSE(undoItems.empty());
+        EXPECT_EQ(undoItems.back(), "Add collision line") << "an extra command was pushed after committing the line";
+    }
+
+    // Undo/redo still work normally for the committed line.
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_undo"}}).value("ok", false));
+    EXPECT_EQ(CountKind(GetSceneItems(client), "collision_line"), 0) << "undo did not remove the added line";
+
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_redo"}}).value("ok", false));
+    {
+        const nlohmann::json line = FindKind(GetSceneItems(client), "collision_line");
+        EXPECT_EQ(line.value("x1", -1), 100);
+        EXPECT_EQ(line.value("y2", -1), 180);
+    }
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Escape must cancel an in-progress placement cleanly: remove the ghost, push no command, and
+// leave the tool usable again afterward (not "stuck" half-placed).
+TEST(EditorAutomation, AddCollisionClickToPlaceCancelledByEscape)
+{
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateNewPath(client));
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "actionAdd_collision"}}).value("ok", false));
+
+    const QPoint p1 = SceneToView(client, 100, 100);
+    ASSERT_TRUE(SendMouseEvent(client, "down", p1));
+    ASSERT_TRUE(SendMouseEvent(client, "up", p1));
+    ASSERT_EQ(CountKind(GetSceneItems(client), "collision_ghost_line"), 1) << "test setup: expected the ghost to appear after the first click";
+
+    ASSERT_TRUE(client.Call({{"cmd", "send_key"}, {"target", "graphicsView"}, {"key", "Escape"}}).value("ok", false));
+
+    {
+        const nlohmann::json items = GetSceneItems(client);
+        EXPECT_EQ(CountKind(items, "collision_ghost_line"), 0) << "Escape did not remove the ghost line";
+        EXPECT_EQ(CountKind(items, "collision_line"), 0) << "Escape should not have created a real collision line";
+    }
+    EXPECT_FALSE(UndoContains(GetUndoWidgetTextList(client), "Add collision line")) << "cancelling placement should not push an undo command";
+
+    // A fresh "add collision" afterward should work normally, proving cancellation didn't leave
+    // the tool stuck in a half-placed state.
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "actionAdd_collision"}}).value("ok", false));
+    const QPoint q1 = SceneToView(client, 50, 60);
+    const QPoint q2 = SceneToView(client, 150, 60);
+    ASSERT_TRUE(SendMouseEvent(client, "down", q1));
+    ASSERT_TRUE(SendMouseEvent(client, "up", q1));
+    ASSERT_TRUE(SendMouseEvent(client, "down", q2));
+    ASSERT_TRUE(SendMouseEvent(client, "up", q2));
+    EXPECT_EQ(CountKind(GetSceneItems(client), "collision_line"), 1) << "tool did not work correctly after a cancelled placement";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Regression test for two more click-to-place bugs: (1) only the scene's own click handling was
+// intercepted, which doesn't stop QGraphicsView's independent RubberBandDrag machinery - so a
+// click that turns into a drag before release (including the *completing* click specifically,
+// since ending placement restores normal drag mode as part of handling that very press, before
+// QGraphicsView's own rubber-band-start check runs) could still show/perform a selection
+// rectangle while placing; and (2) actionAdd_collision now stays visibly "depressed" (checked)
+// for as long as placement is active, like the grid-snap toggle actions.
+TEST(EditorAutomation, AddCollisionClickToPlaceSuppressesRubberBandAndTogglesButton)
+{
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateNewPath(client));
+    ASSERT_TRUE(AddMapObject(client));
+
+    auto findAddCollisionAction = [&]() -> nlohmann::json
+    {
+        const auto resp = client.Call({{"cmd", "list_actions"}});
+        EXPECT_TRUE(resp.value("ok", false));
+        for (const auto& action : resp.at("result"))
+        {
+            if (action.value("objectName", std::string()) == "actionAdd_collision")
+            {
+                return action;
+            }
+        }
+        ADD_FAILURE() << "actionAdd_collision not found in list_actions result";
+        return nlohmann::json::object();
+    };
+
+    {
+        const nlohmann::json action = findAddCollisionAction();
+        EXPECT_TRUE(action.value("checkable", false)) << "actionAdd_collision should be checkable so it can show a depressed state";
+        EXPECT_FALSE(action.value("checked", true)) << "should not start checked";
+    }
+
+    const nlohmann::json mapObject = FindKind(GetSceneItems(client), "map_object");
+
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "actionAdd_collision"}}).value("ok", false));
+    EXPECT_TRUE(findAddCollisionAction().value("checked", false)) << "button did not depress once placement started";
+
+    // First point: a clean click.
+    const QPoint p1 = SceneToView(client, 20, 20);
+    ASSERT_TRUE(SendMouseEvent(client, "down", p1));
+    ASSERT_TRUE(SendMouseEvent(client, "up", p1));
+
+    // Second point: a click that turns into a drag across the map object before releasing -
+    // exactly the gesture that used to leak through to rubber-band selection.
+    const double objX = mapObject.at("xpos").get<double>();
+    const double objY = mapObject.at("ypos").get<double>();
+    const double objW = mapObject.at("width").get<double>();
+    const double objH = mapObject.at("height").get<double>();
+    const QPoint dragFrom = SceneToView(client, objX - 20, objY - 20);
+    const QPoint dragTo = SceneToView(client, objX + objW + 20, objY + objH + 20);
+    ASSERT_TRUE(SendMouseEvent(client, "down", dragFrom));
+    ASSERT_TRUE(SendMouseEvent(client, "move", dragTo));
+    ASSERT_TRUE(SendMouseEvent(client, "up", dragTo));
+
+    {
+        const nlohmann::json items = GetSceneItems(client);
+        EXPECT_FALSE(FindKind(items, "map_object").value("selected", false)) << "rubber-band selection was not suppressed while placing a collision line";
+
+        const nlohmann::json line = FindKind(items, "collision_line");
+        EXPECT_DOUBLE_EQ(line.at("x1").get<double>(), 20);
+        EXPECT_DOUBLE_EQ(line.at("y1").get<double>(), 20);
+        // Placement acts on the *press*, not a completed drag gesture - the line's second point
+        // is wherever dragFrom landed, not dragTo.
+        EXPECT_DOUBLE_EQ(line.value("x2", -1.0), objX - 20);
+        EXPECT_DOUBLE_EQ(line.value("y2", -1.0), objY - 20);
+    }
+    EXPECT_FALSE(findAddCollisionAction().value("checked", true)) << "button should un-depress once placement finished";
 
     editor.terminate();
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
