@@ -17,6 +17,15 @@ public:
     int type() const override { return Type; }
     QLineF SaveLine() const;
     void RestoreLine(const QLineF& line);
+
+    // Rigidly shifts the whole line by (dx, dy) without changing its shape, syncing the
+    // underlying CollisionObject/property tree the same way a drag does.
+    void Translate(qreal dx, qreal dy)
+    {
+        setX(x() + dx);
+        setY(y() + dy);
+        PosOrLineChanged();
+    }
     CollisionObject* GetCollisionItem() const
     {
         return mLine;

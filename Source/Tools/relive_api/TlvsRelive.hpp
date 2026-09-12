@@ -240,7 +240,13 @@ struct MapObjectBaseInterface : public MapObjectBase
 
     std::unique_ptr<MapObjectBase> Clone() const final
     {
-        return std::make_unique<DerivedType>(static_cast<const DerivedType&>(*this));
+        // The compiler-generated copy constructor copies mBaseTlv verbatim, leaving it
+        // pointing at *this* object's mTlv rather than the clone's own - every getter/setter
+        // (and SerializeObject) goes through mBaseTlv, so without this fixup a clone silently
+        // aliases and mutates the original object's data instead of owning its own.
+        auto clone = std::make_unique<DerivedType>(static_cast<const DerivedType&>(*this));
+        clone->mBaseTlv = &clone->mTlv;
+        return clone;
     }
 
     static std::unique_ptr<MapObjectBase> EditorNewFunc()

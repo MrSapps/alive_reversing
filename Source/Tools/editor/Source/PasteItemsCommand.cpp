@@ -5,22 +5,51 @@
 #include "ResizeableRectItem.hpp"
 #include "Model.hpp"
 #include "ItemPositionData.hpp"
+#include "IGridPointSnapper.hpp"
+#include <algorithm>
+#include <cstdlib>
 
 PasteItemsCommand::PasteItemsCommand(EditorTab* pTab, ClipBoard& clipBoard)
     : mTab(pTab), mSelectionSaver(pTab)
 {
+    // Access the clamp helpers via the interface, not EditorTab directly - EditorTab re-declares
+    // them as private overrides (see ResizeableArrowItem/ResizeableRectItem for the same idiom).
+    IGridPointSnapper& snapper = *mTab;
+
     // Make another deep copy of the items and create graphics items for them
     mCollisions = clipBoard.CloneCollisions(nullptr);
     for (auto& obj : mCollisions)
     {
         // Fix collision line ids
         obj->mId = mTab->GetModel().NextCollisionId();
+
+        // Keep the whole line within the map bounds, preserving its exact shape - same rigid
+        // clamp as ResizeableArrowItem's whole-line drag, since a pasted line otherwise has no
+        // bounds clamping applied to it at all (unlike a manually dragged/created one).
+        const int left = std::min(obj->X1(), obj->X2());
+        const int top = std::min(obj->Y1(), obj->Y2());
+        const int width = std::abs(obj->X2() - obj->X1());
+        const int height = std::abs(obj->Y2() - obj->Y1());
+        const int clampedLeft = snapper.ClampRangeStartX(left, width);
+        const int clampedTop = snapper.ClampRangeStartY(top, height);
+        const int dx = clampedLeft - left;
+        const int dy = clampedTop - top;
+        obj->SetX1(obj->X1() + dx);
+        obj->SetY1(obj->Y1() + dy);
+        obj->SetX2(obj->X2() + dx);
+        obj->SetY2(obj->Y2() + dy);
+
         mCollisionGraphicsObjects.emplace_back(mTab->MakeResizeableArrowItem(obj.get()));
     }
 
     auto clonedMapObjects = clipBoard.CloneMapObjects(nullptr);
     for (auto& obj : clonedMapObjects)
     {
+        // Keep the pasted object within the map bounds as a rigid unit (same clamp a manual
+        // move/resize gets) - paste previously applied no bounds check at all.
+        obj->SetXPos(snapper.ClampRangeStartX(obj->XPos(), obj->Width()));
+        obj->SetYPos(snapper.ClampRangeStartY(obj->YPos(), obj->Height()));
+
         // Create the graphics item
         ResizeableRectItem* mapObjectGraphicsItem = mTab->MakeResizeableRectItem(obj.get());
 

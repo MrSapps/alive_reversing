@@ -222,6 +222,14 @@ void EditorGraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* pEvent)
             ItemPositionData newPositions;
             newPositions.Save(currentSelection, mTab->GetModel(), true);
 
+            // Keep the whole selection within the map bounds as a rigid group. Only the one
+            // item actually grabbed during a multi-item drag gets clamped to *its own* bounds
+            // live (ResizeableRectItem/ResizeableArrowItem::mouseMoveEvent) - Qt's default
+            // QGraphicsItem::mouseMoveEvent moves every other selected item by the raw delta
+            // with no clamping at all, so a multi-select drag could otherwise leave part of the
+            // selection outside the map. This re-clamps the union of everything that moved.
+            newPositions.ClampToMapBounds(*mTab);
+
             if (mOldPositions != newPositions)
             {
                 qDebug() << "left release positions changed";

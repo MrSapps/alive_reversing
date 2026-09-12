@@ -7,6 +7,8 @@
 #include <QMessageBox>
 #include <QBuffer>
 #include <QGraphicsItem>
+#include <QFile>
+#include <QTextStream>
 #include "CameraGraphicsItem.hpp"
 #include "SelectionSaver.hpp"
 #include "ResizeableRectItem.hpp"
@@ -49,6 +51,43 @@ static int CamIdFromCamName(const std::string camName)
     }
 
     return QString(camName.c_str()).toInt();
+}
+
+// Writes the "<camName>.json" sidecar that tells the engine which optional FG1 layers (fg,
+// fg_well, bg, bg_well - never the main image) exist for a camera, listing the exact filenames
+// SaveCameraImage wrote them under. CameraGraphicsItem::Load is the reader for this file; before
+// this function existed nothing ever wrote it, so a camera's FG1 layers loaded fine in the same
+// session but silently vanished on reopening the path.
+static void SaveCameraLayersJson(const QString& pathDirectory, const std::string& camName, const EditorCamera::CameraImageAndLayers& layers)
+{
+    nlohmann::json layerNames = nlohmann::json::array();
+    if (!layers.mForegroundLayer.isNull())
+    {
+        layerNames.push_back(camName + "fg.png");
+    }
+    if (!layers.mForegroundWellLayer.isNull())
+    {
+        layerNames.push_back(camName + "fg_well.png");
+    }
+    if (!layers.mBackgroundLayer.isNull())
+    {
+        layerNames.push_back(camName + "bg.png");
+    }
+    if (!layers.mBackgroundWellLayer.isNull())
+    {
+        layerNames.push_back(camName + "bg_well.png");
+    }
+
+    nlohmann::json j;
+    j["layers"] = layerNames;
+
+    const QString savePath = pathDirectory + QString("/%1.json").arg(QString::fromStdString(camName));
+    QFile f(savePath);
+    if (f.open(QFile::WriteOnly | QFile::Text))
+    {
+        QTextStream out(&f);
+        out << QString::fromStdString(j.dump(4));
+    }
 }
 
 class NewCameraCommand final : public QUndoCommand
@@ -184,6 +223,11 @@ private:
             mCameraGraphicsItem->GetCamera()->mCameraImageandLayers.mBackgroundWellLayer = img;
             break;
         };
+
+        if (mImgIdx != Main)
+        {
+            SaveCameraLayersJson(mEditorTab->GetPathDirectory(), mCameraGraphicsItem->GetCamera()->mName, mCameraGraphicsItem->GetCamera()->mCameraImageandLayers);
+        }
     }
 
     CameraGraphicsItem* mCameraGraphicsItem = nullptr;
@@ -476,7 +520,11 @@ void CameraManager::CreateCamera(bool dropEvent, QPixmap img)
 
         const std::string newCamName = CameraNameFromId(camId);
 
-        if (!SaveCameraImage(img, mTab->GetPathDirectory(), pItem->GetCamera()->mName, index))
+        // Must save under the new camera's name, not pItem->GetCamera()->mName - that's still
+        // empty at this point (only NewCameraCommand::redo(), pushed below, sets it), so saving
+        // against it wrote the image to "<dir>/.png" instead of "<dir>/<newCamName>.png",
+        // silently orphaning it from the camera that's about to be created.
+        if (!SaveCameraImage(img, mTab->GetPathDirectory(), newCamName, index))
         {
             return;
         }
@@ -747,4 +795,83 @@ bool CameraManager::SaveCameraImage(const QPixmap& camImage, const QString& path
         return camImage.save(savePath);
     }
     return false;
+}
+
+bool CameraManager::SetCameraImageForAutomation(EditorTab* pTab, int camX, int camY, TabImageIdx index, QPixmap img)
+{
+    if (img.isNull())
+    {
+        return false;
+    }
+
+    if (img.width() != 640 || img.height() != 240)
+    {
+        img = img.scaled(640, 240);
+        if (img.isNull())
+        {
+            return false;
+        }
+    }
+
+    EditorCamera* camModel = pTab->GetModel().CameraAt(camX, camY);
+    if (!camModel)
+    {
+        return false;
+    }
+    CameraGraphicsItem* pCameraGraphicsItem = pTab->GetScene().CameraAt(camX, camY);
+    if (!pCameraGraphicsItem)
+    {
+        return false;
+    }
+
+    if (!camModel->mName.empty())
+    {
+        // Existing camera: update one of its image layers - same path CreateCamera takes for a
+        // camera that already has a name.
+        if (!SaveCameraImage(img, pTab->GetPathDirectory(), camModel->mName, index))
+        {
+            return false;
+        }
+        pTab->AddCommand(new ChangeCameraImageCommand(pCameraGraphicsItem, img, index, pTab));
+        return true;
+    }
+
+    // No camera here yet: only a main image can create one (matches CreateCamera's "set the
+    // main image first" rule).
+    if (index != TabImageIdx::Main)
+    {
+        return false;
+    }
+
+    int camId = -1;
+    for (int i = 0; i < 99; i++)
+    {
+        bool used = false;
+        for (auto& cam : pTab->GetModel().GetCameras())
+        {
+            if (CamIdFromCamName(cam->mName) == i)
+            {
+                used = true;
+                break;
+            }
+        }
+        if (!used)
+        {
+            camId = i;
+            break;
+        }
+    }
+    if (camId == -1)
+    {
+        return false;
+    }
+
+    const std::string newCamName = CameraNameFromId(camId);
+    if (!SaveCameraImage(img, pTab->GetPathDirectory(), newCamName, TabImageIdx::Main))
+    {
+        return false;
+    }
+
+    pTab->AddCommand(new NewCameraCommand(pCameraGraphicsItem, img, pTab, newCamName, camId));
+    return true;
 }

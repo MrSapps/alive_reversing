@@ -288,7 +288,12 @@ std::string Model::ToJson() const
     for (auto& camera : mCameras)
     {
 
-        if (!camera->mMapObjects.empty() || camera->mId != 0)
+        // mId == 0 is not a reliable "no camera here" sentinel: it's also the valid id of a
+        // real, freshly-created first camera in a path whose path id is 0, so that condition
+        // silently dropped it (and any other still-empty-of-objects camera with id 0) from the
+        // saved JSON. mName is only ever set once a camera is actually created (NewCameraCommand)
+        // - CameraGraphicsItem::Load uses the same mName.empty() check to mean "no camera here".
+        if (!camera->mName.empty())
         {
             nlohmann::json mapObjects = nlohmann::json::array();
             for (auto& mapObject : camera->mMapObjects)

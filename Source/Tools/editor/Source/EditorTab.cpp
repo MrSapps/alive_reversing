@@ -364,6 +364,13 @@ bool EditorTab::SaveAsPath(QString jsonSaveFileName)
     // Saved OK, update the file name and tab title
     mJsonFileName = jsonSaveFileName;
 
+    // Camera images/layers save next to whatever mPathDirectory currently points at (see
+    // CameraManager::SaveCameraImage) - without updating it here it stays stuck at wherever
+    // this tab was first constructed from (e.g. "." for a brand new, not-yet-saved path), so
+    // "Save As" to a real location wouldn't actually redirect where camera images go, and a
+    // freshly added camera's files would end up somewhere other than next to the saved json.
+    mPathDirectory = QFileInfo(jsonSaveFileName).path();
+
     // No longer a temp file so don't force SaveAs next time
     if (mIsTempFile)
     {

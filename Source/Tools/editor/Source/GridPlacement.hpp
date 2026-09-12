@@ -62,4 +62,21 @@ namespace GridPlacement
         }
         return ClampInt(start, 0, maxStart);
     }
+
+    // Shrinks a length (a rect's width or height) so it can't be bigger than the map itself -
+    // e.g. when the map shrinks to fewer/smaller cameras than an existing object spans. Used
+    // ahead of ClampRangeStartToMapBounds, which alone can only reposition a range that already
+    // fits; it can't make an oversized one smaller. A negative length clamps to 0.
+    inline int ClampLengthToMapBounds(int length, unsigned int totalSizePixels)
+    {
+        if (length < 0)
+        {
+            return 0;
+        }
+        if (static_cast<unsigned int>(length) > totalSizePixels)
+        {
+            return static_cast<int>(totalSizePixels);
+        }
+        return length;
+    }
 }

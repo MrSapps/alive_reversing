@@ -7,6 +7,7 @@
 #include "Model.hpp"
 #include "ISyncPropertiesToTree.hpp"
 #include "GridSnapSettings.hpp"
+#include "ItemPositionData.hpp"
 #include <QDebug>
 #include <algorithm>
 #include <cmath>
@@ -72,22 +73,39 @@ void ResizeableArrowItem::mouseMoveEvent( QGraphicsSceneMouseEvent* aEvent )
         QLineF tmp = m_MouseDownLine;
         tmp.translate(tl);
 
+        const bool multiSelect = scene()->selectedItems().count() > 1;
+
         // Keep the whole line within the map bounds by shifting it back in as a rigid unit,
         // preserving its exact shape - clamping each endpoint independently here could
         // collapse the line to a point if its bounding box straddles a boundary (the same bug
         // fixed for line creation in AddCollisionCommand). pos() is zero at this point (just
-        // reset above), so tmp's coordinates are already scene-equivalent.
-        const qreal left = std::min(tmp.x1(), tmp.x2());
-        const qreal top = std::min(tmp.y1(), tmp.y2());
-        const qreal width = std::abs(tmp.x2() - tmp.x1());
-        const qreal height = std::abs(tmp.y2() - tmp.y1());
-        const int clampedLeft = mSnapper.ClampRangeStartX(static_cast<int>(left), static_cast<int>(width));
-        const int clampedTop = mSnapper.ClampRangeStartY(static_cast<int>(top), static_cast<int>(height));
-        tmp.translate(clampedLeft - left, clampedTop - top);
+        // reset above), so tmp's coordinates are already scene-equivalent. Skipped here while
+        // multiple items are selected - see the matching comment in
+        // ResizeableRectItem::mouseMoveEvent for why: this item's own base-class move above
+        // already translated every other selected item by the same raw delta, unclamped, so
+        // clamping only this one here (to its own bounds) would distort the group's relative
+        // layout instead of preserving it.
+        if (!multiSelect)
+        {
+            const qreal left = std::min(tmp.x1(), tmp.x2());
+            const qreal top = std::min(tmp.y1(), tmp.y2());
+            const qreal width = std::abs(tmp.x2() - tmp.x1());
+            const qreal height = std::abs(tmp.y2() - tmp.y1());
+            const int clampedLeft = mSnapper.ClampRangeStartX(static_cast<int>(left), static_cast<int>(width));
+            const int clampedTop = mSnapper.ClampRangeStartY(static_cast<int>(top), static_cast<int>(height));
+            tmp.translate(clampedLeft - left, clampedTop - top);
+        }
 
         setLine(tmp);
 
         PosOrLineChanged();
+
+        // Multi-selection case instead: clamp the whole selection's union bounding box as one
+        // rigid group, live on every move (not just once when the drag finishes).
+        if (multiSelect)
+        {
+            ClampSelectedItemsToMapBounds(scene(), mSnapper);
+        }
         return;
     }
 
