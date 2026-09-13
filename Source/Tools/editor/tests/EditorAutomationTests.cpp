@@ -371,6 +371,56 @@ namespace
         ADD_FAILURE() << "no selected '" << kind << "' item in scene: " << items.dump();
         return nlohmann::json::object();
     }
+
+    // Deletes the camera at a scene position by driving the real UI path - right-click (context
+    // menu) -> "Edit camera" -> CameraManager's "Delete camera" button -> close the dialog -
+    // rather than a domain-specific automation-only bypass. Both the context menu (QMenu::exec())
+    // and the CameraManager dialog (QDialog::exec()) block in their own nested event loop until
+    // dismissed, same as any other modal here, so each step is fired via SendCommand (not Call)
+    // and its response only collected once the step that unblocks it has happened - same idiom
+    // CreateNewPath uses for its two chained QInputDialogs, just one level deeper. Triggering
+    // "actionEditCamera" directly (rather than through the menu's own click handling) doesn't
+    // tell the menu itself to close, so that's dismissed explicitly with Escape at the end.
+    bool DeleteCameraViaContextMenu(AutomationClient& client, QPoint viewPos)
+    {
+        const int contextMenuId = client.SendCommand({{"cmd", "context_menu"}, {"target", "graphicsView"}, {"x", viewPos.x()}, {"y", viewPos.y()}});
+        const int editCameraClickId = client.SendCommand({{"cmd", "click"}, {"target", "actionEditCamera"}});
+
+        if (!client.Call({{"cmd", "get_state"}, {"target", "CameraManager"}}).value("ok", false))
+        {
+            ADD_FAILURE() << "CameraManager dialog did not open from the context menu";
+            return false;
+        }
+        if (!client.Call({{"cmd", "click"}, {"target", "btnDeleteCamera"}}).value("ok", false))
+        {
+            ADD_FAILURE() << "failed to click btnDeleteCamera";
+            return false;
+        }
+        if (!client.Call({{"cmd", "close"}, {"target", "CameraManager"}}).value("ok", false))
+        {
+            ADD_FAILURE() << "failed to close the CameraManager dialog";
+            return false;
+        }
+        if (!client.WaitForResponse(editCameraClickId, 5000).value("ok", false))
+        {
+            ADD_FAILURE() << "click on actionEditCamera did not report success";
+            return false;
+        }
+
+        // Showing CameraManager (an application-modal QDialog) already closes the still-open
+        // QMenu as a side effect of it grabbing focus - so by this point the menu is normally
+        // already gone. Dismiss it explicitly (Escape is the normal way to close a QMenu) only
+        // if it's somehow still around.
+        if (client.Call({{"cmd", "get_state"}, {"target", "graphicsViewContextMenu"}}).value("ok", false))
+        {
+            if (!client.Call({{"cmd", "send_key"}, {"target", "graphicsViewContextMenu"}, {"key", "Escape"}}).value("ok", false))
+            {
+                ADD_FAILURE() << "failed to dismiss the still-open context menu";
+                return false;
+            }
+        }
+        return client.WaitForResponse(contextMenuId, 5000).value("ok", false);
+    }
 }
 
 TEST(EditorAutomation, OpenCloseAboutAndExit)
@@ -1751,6 +1801,200 @@ TEST(EditorAutomation, AddCollisionClickToPlaceSuppressesRubberBandAndTogglesBut
         EXPECT_DOUBLE_EQ(line.value("y2", -1.0), objY - 20);
     }
     EXPECT_FALSE(findAddCollisionAction().value("checked", true)) << "button should un-depress once placement finished";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Regression coverage for object deletion: the Delete key removes the selected map object via
+// DeleteItemsCommand, undo restores it exactly, redo re-deletes it, and saving+reopening the
+// path leaves it gone rather than resurrected from a stale in-memory reference.
+TEST(EditorAutomation, DeleteObjectUndoRedoAndSaveRemovesIt)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString savePath = tempDir.filePath("relive_editor_test_level.json");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateNewPath(client));
+    ASSERT_TRUE(AddMapObject(client));
+
+    const nlohmann::json before = FindKind(GetSceneItems(client), "map_object");
+
+    // Rubber-band select it - same idiom as PasteClampsBoundsAndPreservesSizeThroughEditAndReload.
+    {
+        const double x = before.at("xpos").get<double>();
+        const double y = before.at("ypos").get<double>();
+        const double w = before.at("width").get<double>();
+        const double h = before.at("height").get<double>();
+        DragView(client, SceneToView(client, x - 20, y - 20), SceneToView(client, x + w + 20, y + h + 20));
+    }
+    ASSERT_TRUE(FindKind(GetSceneItems(client), "map_object").value("selected", false)) << "rubber-band select did not select the object";
+
+    ASSERT_TRUE(client.Call({{"cmd", "send_key"}, {"target", "graphicsView"}, {"key", "Delete"}}).value("ok", false));
+
+    EXPECT_EQ(CountKind(GetSceneItems(client), "map_object"), 0) << "Delete key did not remove the selected object";
+    EXPECT_TRUE(UndoContains(GetUndoWidgetTextList(client), "Delete 1 item(s)")) << "no undo entry recorded for the deletion";
+
+    // Undo restores it, at exactly its pre-delete position/size/type.
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_undo"}}).value("ok", false));
+    {
+        const nlohmann::json afterUndo = FindKind(GetSceneItems(client), "map_object");
+        EXPECT_DOUBLE_EQ(afterUndo.value("xpos", -1.0), before.at("xpos").get<double>());
+        EXPECT_DOUBLE_EQ(afterUndo.value("ypos", -1.0), before.at("ypos").get<double>());
+        EXPECT_DOUBLE_EQ(afterUndo.value("width", -1.0), before.at("width").get<double>());
+        EXPECT_DOUBLE_EQ(afterUndo.value("height", -1.0), before.at("height").get<double>());
+        EXPECT_EQ(afterUndo.value("tlvType", -1), before.at("tlvType").get<int>());
+    }
+
+    // Redo re-deletes it.
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_redo"}}).value("ok", false));
+    EXPECT_EQ(CountKind(GetSceneItems(client), "map_object"), 0) << "redo did not reapply the deletion";
+
+    // Save while the object is deleted, then reopen: it must not come back.
+    {
+        const auto resp = client.Call({{"cmd", "save_path_as"}, {"path", savePath.toStdString()}});
+        ASSERT_TRUE(resp.value("ok", false));
+        ASSERT_TRUE(resp.at("result").value("saved", false)) << "save_path_as reported failure";
+    }
+    {
+        const auto resp = client.Call({{"cmd", "open_path"}, {"path", savePath.toStdString()}});
+        ASSERT_TRUE(resp.value("ok", false));
+        ASSERT_TRUE(resp.at("result").value("opened", false)) << "open_path reported failure";
+    }
+
+    EXPECT_EQ(CountKind(GetSceneItems(client), "map_object"), 0) << "deleted object reappeared after saving and reopening the path";
+
+    // Check the on-disk json directly too, not just what the reopened in-memory scene shows -
+    // belt and suspenders against a bug that only affects one of the two.
+    {
+        QFile f(savePath);
+        ASSERT_TRUE(f.open(QFile::ReadOnly | QFile::Text));
+        const auto j = nlohmann::json::parse(f.readAll().toStdString());
+        for (const auto& camera : j.at("map").at("cameras"))
+        {
+            EXPECT_TRUE(camera.value("map_objects", nlohmann::json::array()).empty())
+                << "saved json still contains a map object in camera " << camera.dump();
+        }
+    }
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Regression coverage for camera deletion: DeleteCameraCommand must delete the camera's own map
+// objects along with it - not just visually hide the camera while quietly keeping its objects
+// around under an untracked "blank" camera - undo must restore the camera and its objects
+// together, redo must re-delete both, and saving+reopening the path must not resurrect either
+// the camera or its objects. Drives deletion via the real UI path (right-click the camera ->
+// "Edit camera" -> "Delete camera" - see DeleteCameraViaContextMenu) using the generic
+// "context_menu" automation command, rather than a domain-specific automation-only bypass.
+TEST(EditorAutomation, DeleteCameraUndoRedoAndSaveRemovesCameraAndItsObjects)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString savePath = tempDir.filePath("relive_editor_test_level.json");
+    const QString mainImagePath = tempDir.filePath("sample_main.png");
+    {
+        QImage main(64, 24, QImage::Format_RGB32);
+        main.fill(QColor(80, 80, 200));
+        ASSERT_TRUE(main.save(mainImagePath)) << "failed to write the sample main camera image";
+    }
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateNewPath(client));
+
+    // set_camera_image (and the FG1 sidecar/image saves DeleteCameraCommand doesn't touch, but
+    // EditorTab::mPathDirectory is what matters here) only work once the tab has a real on-disk
+    // path - same prerequisite as CameraAddSaveAndFg1LayerRoundTrip.
+    {
+        const auto resp = client.Call({{"cmd", "save_path_as"}, {"path", savePath.toStdString()}});
+        ASSERT_TRUE(resp.value("ok", false));
+        ASSERT_TRUE(resp.at("result").value("saved", false));
+    }
+
+    // Turn the only camera in this fresh 1x1 path into a real, named camera.
+    {
+        const auto resp = client.Call({{"cmd", "set_camera_image"}, {"x", 0}, {"y", 0}, {"layer", "main"}, {"image_path", mainImagePath.toStdString()}});
+        ASSERT_TRUE(resp.value("ok", false));
+        ASSERT_TRUE(resp.at("result").value("ok", false)) << "failed to create the camera";
+    }
+    ASSERT_EQ(FindKind(GetSceneItems(client), "camera").value("camName", std::string()), "0");
+
+    // Add a map object - on a 1x1 map it lands inside the only (now real) camera.
+    ASSERT_TRUE(AddMapObject(client));
+    const nlohmann::json objectBefore = FindKind(GetSceneItems(client), "map_object");
+
+    // Right-click inside the camera cell to delete it, exactly the way a user would.
+    ASSERT_TRUE(DeleteCameraViaContextMenu(client, SceneToView(client, 10, 10)));
+
+    {
+        const nlohmann::json items = GetSceneItems(client);
+        EXPECT_EQ(CountKind(items, "map_object"), 0) << "deleting the camera did not remove its map object";
+        EXPECT_TRUE(FindKind(items, "camera").value("camName", std::string("unset")).empty()) << "camera still present after deletion";
+    }
+    EXPECT_TRUE(UndoContainsPrefix(GetUndoWidgetTextList(client), "Delete camera at")) << "no undo entry recorded for the camera deletion";
+
+    // Undo restores both the camera and its map object, at the object's exact pre-delete
+    // position/size.
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_undo"}}).value("ok", false));
+    {
+        const nlohmann::json items = GetSceneItems(client);
+        EXPECT_EQ(FindKind(items, "camera").value("camName", std::string()), "0") << "undo did not restore the camera";
+
+        const nlohmann::json obj = FindKind(items, "map_object");
+        EXPECT_DOUBLE_EQ(obj.value("xpos", -1.0), objectBefore.at("xpos").get<double>()) << "undo did not restore the object inside the deleted camera";
+        EXPECT_DOUBLE_EQ(obj.value("ypos", -1.0), objectBefore.at("ypos").get<double>());
+        EXPECT_DOUBLE_EQ(obj.value("width", -1.0), objectBefore.at("width").get<double>());
+        EXPECT_DOUBLE_EQ(obj.value("height", -1.0), objectBefore.at("height").get<double>());
+    }
+
+    // Redo re-deletes both.
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_redo"}}).value("ok", false));
+    {
+        const nlohmann::json items = GetSceneItems(client);
+        EXPECT_EQ(CountKind(items, "map_object"), 0) << "redo did not reapply the object deletion";
+        EXPECT_TRUE(FindKind(items, "camera").value("camName", std::string("unset")).empty()) << "redo did not reapply the camera deletion";
+    }
+
+    // Save while both are deleted, then reopen: neither the camera nor its object should come
+    // back.
+    {
+        const auto resp = client.Call({{"cmd", "save_path_as"}, {"path", savePath.toStdString()}});
+        ASSERT_TRUE(resp.value("ok", false));
+        ASSERT_TRUE(resp.at("result").value("saved", false));
+    }
+    {
+        const auto resp = client.Call({{"cmd", "open_path"}, {"path", savePath.toStdString()}});
+        ASSERT_TRUE(resp.value("ok", false));
+        ASSERT_TRUE(resp.at("result").value("opened", false));
+    }
+    {
+        const nlohmann::json items = GetSceneItems(client);
+        EXPECT_EQ(CountKind(items, "map_object"), 0) << "deleted object reappeared after saving and reopening the path";
+        EXPECT_TRUE(FindKind(items, "camera").value("camName", std::string("unset")).empty()) << "deleted camera reappeared after saving and reopening the path";
+    }
+
+    // Check the on-disk json directly too.
+    {
+        QFile f(savePath);
+        ASSERT_TRUE(f.open(QFile::ReadOnly | QFile::Text));
+        const auto j = nlohmann::json::parse(f.readAll().toStdString());
+        for (const auto& camera : j.at("map").at("cameras"))
+        {
+            EXPECT_NE(camera.value("name", std::string()), "0") << "saved json still contains the deleted camera";
+            EXPECT_TRUE(camera.value("map_objects", nlohmann::json::array()).empty())
+                << "saved json still contains a map object in camera " << camera.dump();
+        }
+    }
 
     editor.terminate();
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";

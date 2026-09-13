@@ -472,6 +472,15 @@ void EditorMainWindow::on_action_redo_triggered()
     }
 }
 
+void EditorMainWindow::on_action_delete_selected_items_triggered()
+{
+    EditorTab* pTab = getActiveTab(m_ui->tabWidget);
+    if (pTab)
+    {
+        pTab->GetScene().DeleteSelectedItems();
+    }
+}
+
 void EditorMainWindow::on_action_save_path_triggered()
 {
     EditorTab* pTab = getActiveTab(m_ui->tabWidget);

@@ -111,6 +111,11 @@ void EditorGraphicsView::leaveEvent(QEvent* pEvent)
 void EditorGraphicsView::contextMenuEvent(QContextMenuEvent* pEvent)
 {
     QMenu menu(this);
+    // Named so automation can dismiss it (Escape) after driving one of its actions directly via
+    // the "click" command - that bypasses QMenu's own click handling (which would otherwise
+    // close the menu itself once an action is chosen), so the automation-driven test flow has to
+    // close it explicitly instead. See the "context_menu" automation command.
+    menu.setObjectName("graphicsViewContextMenu");
 
     const QPoint scenePos = mapToScene(pEvent->pos()).toPoint();
     QList<QGraphicsItem*> itemsAtMousePos = scene()->items(scenePos);
@@ -130,6 +135,7 @@ void EditorGraphicsView::contextMenuEvent(QContextMenuEvent* pEvent)
     if (cameraAtMenu)
     {
         auto pEditCameraAction = new QAction(tr("Edit camera"), &menu);
+        pEditCameraAction->setObjectName("actionEditCamera");
         connect(pEditCameraAction, &QAction::triggered, this, [&]()
                 {
                     CameraManager cameraManager(this, mEditorTab, &scenePos);

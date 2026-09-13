@@ -25,6 +25,11 @@ public:
 
     CameraGraphicsItem* CameraAt(int x, int y);
 
+    // Deletes the current selection via DeleteItemsCommand (undoable). Shared by the Delete
+    // key (keyPressEvent) and action_delete_selected_items so both go through the same path.
+    // No-op if nothing is selected.
+    void DeleteSelectedItems();
+
     TransparencySettings& GetTransparencySettings();
 
     void SyncTransparencySettings();

@@ -55,6 +55,8 @@ private slots:
 
     void on_action_redo_triggered();
 
+    void on_action_delete_selected_items_triggered();
+
     void on_action_save_path_triggered();
 
     void on_actionSave_all_triggered();
