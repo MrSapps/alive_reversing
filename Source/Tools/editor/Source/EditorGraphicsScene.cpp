@@ -303,15 +303,20 @@ void EditorGraphicsScene::keyPressEvent(QKeyEvent* keyEvent)
 
     if (keyEvent->key() == Qt::Key_Delete)
     {
-        QList<QGraphicsItem*> selected = selectedItems();
-        if (!selected.isEmpty())
-        {
-            mTab->AddCommand(new DeleteItemsCommand(mTab, false, selected));
-        }
+        DeleteSelectedItems();
     }
     else
     {
         QGraphicsScene::keyPressEvent(keyEvent);
+    }
+}
+
+void EditorGraphicsScene::DeleteSelectedItems()
+{
+    QList<QGraphicsItem*> selected = selectedItems();
+    if (!selected.isEmpty())
+    {
+        mTab->AddCommand(new DeleteItemsCommand(mTab, false, selected));
     }
 }
 

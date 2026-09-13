@@ -9,6 +9,7 @@
 #include <QBuffer>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QContextMenuEvent>
 #include <QCoreApplication>
 #include <QDoubleSpinBox>
 #include <QGroupBox>
@@ -237,6 +238,29 @@ namespace Automation
             return nlohmann::json::object();
         }
 
+        // Synthesizes a right-click (QContextMenuEvent) at a target - e.g. so a test can drive
+        // graphicsView's real "right-click a camera -> Edit camera" menu instead of a
+        // domain-specific automation-only bypass. Like "mouse_event"/"drag", this can open a
+        // QMenu::exec() that doesn't return until the menu is dismissed - the caller must send
+        // this via SendCommand (not Call) and only collect its response after the menu has been
+        // driven and closed (see AboutDialog-style "@active_modal" tests for the same pattern
+        // with QDialog::exec()).
+        nlohmann::json HandleContextMenu(QWidget* root, const nlohmann::json& request)
+        {
+            QWidget* widget = RequireWidget(ResolveTargetRequired(root, request));
+            if (!request.contains("x") || !request.contains("y"))
+            {
+                throw CommandError("'x' and 'y' are required");
+            }
+
+            const QPoint pos(request.at("x").get<int>(), request.at("y").get<int>());
+            QWidget* eventTarget = ResolveMouseEventTarget(widget);
+
+            QContextMenuEvent event(QContextMenuEvent::Mouse, pos, eventTarget->mapToGlobal(pos));
+            QCoreApplication::sendEvent(eventTarget, &event);
+            return nlohmann::json::object();
+        }
+
         nlohmann::json HandleSetValue(QWidget* root, const nlohmann::json& request)
         {
             QWidget* widget = RequireWidget(ResolveTargetRequired(root, request));
@@ -452,6 +476,10 @@ namespace Automation
         if (cmd == "mouse_event")
         {
             return HandleMouseEvent(root, request);
+        }
+        if (cmd == "context_menu")
+        {
+            return HandleContextMenu(root, request);
         }
         if (cmd == "set_value")
         {

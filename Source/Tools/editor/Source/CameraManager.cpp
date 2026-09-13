@@ -797,81 +797,49 @@ bool CameraManager::SaveCameraImage(const QPixmap& camImage, const QString& path
     return false;
 }
 
+static QPixmap CameraLayerPixmap(const EditorCamera* pCamera, TabImageIdx index)
+{
+    switch (index)
+    {
+        case TabImageIdx::Main:
+            return pCamera->mCameraImageandLayers.mCameraImage;
+        case TabImageIdx::Foreground:
+            return pCamera->mCameraImageandLayers.mForegroundLayer;
+        case TabImageIdx::Background:
+            return pCamera->mCameraImageandLayers.mBackgroundLayer;
+        case TabImageIdx::ForegroundWell:
+            return pCamera->mCameraImageandLayers.mForegroundWellLayer;
+        case TabImageIdx::BackgroundWell:
+            return pCamera->mCameraImageandLayers.mBackgroundWellLayer;
+    }
+    return QPixmap();
+}
+
 bool CameraManager::SetCameraImageForAutomation(EditorTab* pTab, int camX, int camY, TabImageIdx index, QPixmap img)
 {
-    if (img.isNull())
-    {
-        return false;
-    }
-
-    if (img.width() != 640 || img.height() != 240)
-    {
-        img = img.scaled(640, 240);
-        if (img.isNull())
-        {
-            return false;
-        }
-    }
-
     EditorCamera* camModel = pTab->GetModel().CameraAt(camX, camY);
     if (!camModel)
     {
         return false;
     }
-    CameraGraphicsItem* pCameraGraphicsItem = pTab->GetScene().CameraAt(camX, camY);
-    if (!pCameraGraphicsItem)
+
+    // Never shown/exec()'d - just here to borrow CreateCamera() (targeting (camX, camY) the same
+    // way a real "Edit camera" -> "Select image" click would) instead of re-implementing its
+    // image validation/scaling, on-disk save and command-dispatch logic a second time. Same
+    // never-shown-dialog idiom EditorGraphicsView::dropEvent already uses for drag-and-drop
+    // image drops.
+    const QPoint openedPos(camX * pTab->GetModel().CameraGridWidth(), camY * pTab->GetModel().CameraGridHeight());
+    CameraManager cameraManager(nullptr, pTab, &openedPos);
+    if (cameraManager.ui->lstCameras->selectedItems().isEmpty())
     {
         return false;
     }
+    cameraManager.ui->tabWidget->setCurrentIndex(static_cast<int>(index));
 
-    if (!camModel->mName.empty())
-    {
-        // Existing camera: update one of its image layers - same path CreateCamera takes for a
-        // camera that already has a name.
-        if (!SaveCameraImage(img, pTab->GetPathDirectory(), camModel->mName, index))
-        {
-            return false;
-        }
-        pTab->AddCommand(new ChangeCameraImageCommand(pCameraGraphicsItem, img, index, pTab));
-        return true;
-    }
-
-    // No camera here yet: only a main image can create one (matches CreateCamera's "set the
-    // main image first" rule).
-    if (index != TabImageIdx::Main)
-    {
-        return false;
-    }
-
-    int camId = -1;
-    for (int i = 0; i < 99; i++)
-    {
-        bool used = false;
-        for (auto& cam : pTab->GetModel().GetCameras())
-        {
-            if (CamIdFromCamName(cam->mName) == i)
-            {
-                used = true;
-                break;
-            }
-        }
-        if (!used)
-        {
-            camId = i;
-            break;
-        }
-    }
-    if (camId == -1)
-    {
-        return false;
-    }
-
-    const std::string newCamName = CameraNameFromId(camId);
-    if (!SaveCameraImage(img, pTab->GetPathDirectory(), newCamName, TabImageIdx::Main))
-    {
-        return false;
-    }
-
-    pTab->AddCommand(new NewCameraCommand(pCameraGraphicsItem, img, pTab, newCamName, camId));
-    return true;
+    // CreateCamera reports failure via QMessageBox rather than a return value - since nothing
+    // here drives one, a failure (bad image, no free camera ids, ...) surfaces as this returning
+    // false (the layer's cache key is unchanged) rather than a dialog appearing.
+    const qint64 beforeKey = CameraLayerPixmap(camModel, index).cacheKey();
+    cameraManager.CreateCamera(false, img);
+    return CameraLayerPixmap(camModel, index).cacheKey() != beforeKey;
 }

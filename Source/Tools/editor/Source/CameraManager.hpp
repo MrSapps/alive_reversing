@@ -34,10 +34,12 @@ public:
     void CreateCamera(bool dropEvent, QPixmap img);
 
     // Test/automation-only bypass for this dialog's QFileDialog-driven image picking (see the
-    // "set_camera_image" automation command) - mirrors CreateCamera/ChangeCameraImageCommand
-    // exactly (image-size normalization, the eager on-disk save, the FG1 layers.json sidecar),
-    // just resolving the target camera by grid (x, y) instead of reading ui->lstCameras's
-    // current selection. Doesn't require a live CameraManager dialog to be open.
+    // "set_camera_image" automation command) - a native file picker can't be driven by
+    // automation, so this constructs its own (never shown/exec()'d) CameraManager targeting
+    // (camX, camY) and delegates to the same CreateCamera() a real "Select image" click would
+    // call, rather than re-implementing its image-size normalization/on-disk save/command-
+    // dispatch logic here too. Mirrors how EditorGraphicsView::dropEvent already uses a
+    // never-shown CameraManager the same way for drag-and-drop image drops.
     static bool SetCameraImageForAutomation(EditorTab* pTab, int camX, int camY, TabImageIdx index, QPixmap img);
 
 private slots:
