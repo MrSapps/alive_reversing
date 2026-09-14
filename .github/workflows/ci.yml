@@ -68,7 +68,7 @@ jobs:
       if: matrix.name == 'Windows32'
       run: |
         cd build
-        ctest -C $env:CONFIGURATION --output-on-failure -R FileSystemTests
+        ctest -C $env:CONFIGURATION --output-on-failure -R relive_lib_tests
 
     # ======================================
     #      Windows64
@@ -94,7 +94,7 @@ jobs:
       if: matrix.name == 'Windows64'
       run: |
         cd build
-        ctest -C $env:CONFIGURATION --output-on-failure -R FileSystemTests
+        ctest -C $env:CONFIGURATION --output-on-failure -R relive_lib_tests
         
     # ======================================
     #      Linux
@@ -125,7 +125,7 @@ jobs:
       if: matrix.name == 'Linux'
       run: |
         cd build
-        ctest --output-on-failure -R FileSystemTests
+        ctest --output-on-failure -R relive_lib_tests
 
     - name: 'Linux: Build AppImage'
       if: matrix.name == 'Linux'

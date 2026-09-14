@@ -7,19 +7,19 @@
     <x>0</x>
     <y>0</y>
     <width>400</width>
-    <height>47</height>
+    <height>70</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
     <width>400</width>
-    <height>47</height>
+    <height>70</height>
    </size>
   </property>
   <property name="maximumSize">
    <size>
     <width>16777215</width>
-    <height>47</height>
+    <height>70</height>
    </size>
   </property>
   <property name="windowTitle">
@@ -29,6 +29,13 @@
    <bool>true</bool>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QLabel" name="label">
+     <property name="text">
+      <string/>
+     </property>
+    </widget>
+   </item>
    <item>
     <widget class="QProgressBar" name="progressBar">
      <property name="maximum">

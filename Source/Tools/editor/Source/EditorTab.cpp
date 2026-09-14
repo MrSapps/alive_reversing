@@ -398,24 +398,6 @@ bool EditorTab::SaveAsPath(QString jsonSaveFileName)
     return true;
 }
 
-template<class ResultType>
-static ResultType ExecASync(QString dialogTitle, std::function<ResultType()> fnDoWork)
-{
-    auto dlg = new ProgressDialog();
-    dlg->setWindowFlags(Qt::Window | Qt::WindowTitleHint | Qt::CustomizeWindowHint);
-    dlg->setWindowTitle(dialogTitle);
-
-    QFutureWatcher<ResultType>* watcher = new QFutureWatcher<ResultType>();
-    QObject::connect(watcher, &QFutureWatcher<ResultType>::finished, [&]() { dlg->close(); });
-    QFuture<ResultType> f = QtConcurrent::run(fnDoWork);
-
-    watcher->setFuture(f);
-
-    dlg->exec();
-
-    return f.result();
-}
-
 bool EditorTab::DoSave(QString fileName)
 {
     if (ExecASync<bool>("Saving... " + fileName, [&]()
