@@ -951,6 +951,14 @@ Do you want to overwrite it?</source>
         <source>The mod was created, but copying levels from the chosen project failed partway through.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>New mod</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>New mod (%1)</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>PathDataEditorDialog</name>

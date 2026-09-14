@@ -12,3 +12,8 @@ ProgressDialog::~ProgressDialog()
 {
     delete ui;
 }
+
+void ProgressDialog::SetLabel(const QString& text)
+{
+    ui->label->setText(text);
+}

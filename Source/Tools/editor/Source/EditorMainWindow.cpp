@@ -18,6 +18,7 @@
 #include "EditorMod.hpp"
 #include "ModTreeWidget.hpp"
 #include "NewModDialog.hpp"
+#include "ProgressDialog.hpp"
 #include <QCoreApplication>
 #include <QDir>
 
@@ -94,7 +95,7 @@ EditorMainWindow::EditorMainWindow(QWidget* aParent)
         const QString lastModDir = m_Settings.value("last_open_mod_dir").toString();
         if (!lastModDir.isEmpty())
         {
-            if (auto mod = EditorMod::LoadFromDirectory(lastModDir))
+            if (auto mod = ExecASync<std::unique_ptr<EditorMod>>("Loading mod...", [&]() { return EditorMod::LoadFromDirectory(lastModDir); }))
             {
                 SwitchToMod(std::move(mod));
             }
@@ -300,7 +301,7 @@ void EditorMainWindow::on_actionOpenMod_triggered()
         return;
     }
 
-    auto mod = EditorMod::LoadFromDirectory(dir);
+    auto mod = ExecASync<std::unique_ptr<EditorMod>>("Loading mod...", [&]() { return EditorMod::LoadFromDirectory(dir); });
     if (!mod)
     {
         QMessageBox::critical(this, tr("Error"), tr("That folder doesn't contain a modinfo.json."));

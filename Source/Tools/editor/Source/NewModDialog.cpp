@@ -3,11 +3,42 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QDir>
+#include "ProgressDialog.hpp"
 
 NewModDialog::NewModDialog(QWidget* pParent)
     : QDialog(pParent), ui(new Ui::NewModDialog)
 {
     ui->setupUi(this);
+
+    // Current OS user as a sensible default author, same idiom used cross-platform by other
+    // tools ("USER" on Linux/Mac, "USERNAME" on Windows) - the user can still freely change it.
+#ifdef _WIN32
+    ui->txtAuthor->setText(qEnvironmentVariable("USERNAME"));
+#else
+    ui->txtAuthor->setText(qEnvironmentVariable("USER"));
+#endif
+
+    // Default parent directory for the new mod, used both for the directory preview below and
+    // as the starting point if the user browses for a location - same default location logic
+    // as "last_open_dir" elsewhere in the editor, just without depending on that setting.
+    mParentDir = QDir::homePath();
+
+    // Pick a non-colliding default name: "New mod", then "New mod (1)", "New mod (2)", ... up to
+    // a small bound, checking against sibling directories in the default parent dir.
+    QString defaultName = tr("New mod");
+    for (int i = 0; QDir(mParentDir).exists(defaultName); ++i)
+    {
+        defaultName = tr("New mod (%1)").arg(i + 1);
+        if (i >= 100)
+        {
+            // Give up trying to find a free name and just let UpdateDirectoryPreview/CreateNew
+            // report the collision as normal, rather than looping indefinitely.
+            break;
+        }
+    }
+    ui->txtName->setText(defaultName);
+
+    UpdateDirectoryPreview();
 }
 
 NewModDialog::~NewModDialog()
@@ -99,22 +130,36 @@ void NewModDialog::on_buttonBox_accepted()
     }
 
     const GameType game = ui->cmbGame->currentText() == "AE" ? GameType::eAe : GameType::eAo;
-    mCreatedMod = EditorMod::CreateNew(ui->txtDirectory->text(), ui->txtName->text().trimmed(), ui->txtAuthor->text().trimmed(), game);
+    const bool baseOn = ui->chkBaseOn->isChecked();
+    const QString dir = ui->txtDirectory->text();
+    const QString name = ui->txtName->text().trimmed();
+    const QString author = ui->txtAuthor->text().trimmed();
+    const QString baseOnDir = ui->txtBaseOn->text();
+
+    bool copyFailed = false;
+    mCreatedMod = ExecASync<std::unique_ptr<EditorMod>>("Creating mod...", [&]()
+        {
+            auto mod = EditorMod::CreateNew(dir, name, author, game);
+            // The mod itself is already created at this point either way - a failed copy leaves a
+            // real, usable (if empty) mod behind rather than rolling anything back, same as
+            // CreateNew's own "no transactional rollback" behavior for a failed directory/modinfo.json
+            // write.
+            if (mod && baseOn)
+            {
+                copyFailed = !EditorMod::CopyLevelsFrom(baseOnDir, mod->mDirectory);
+            }
+            return mod;
+        });
+
     if (!mCreatedMod)
     {
         QMessageBox::warning(this, tr("New Mod"), tr("Failed to create the mod - the folder may already contain files, or couldn't be written to."));
         return;
     }
 
-    // The mod itself is already created at this point either way - a failed copy leaves a real,
-    // usable (if empty) mod behind rather than rolling anything back, same as CreateNew's own
-    // "no transactional rollback" behavior for a failed directory/modinfo.json write.
-    if (ui->chkBaseOn->isChecked())
+    if (copyFailed)
     {
-        if (!EditorMod::CopyLevelsFrom(ui->txtBaseOn->text(), mCreatedMod->mDirectory))
-        {
-            QMessageBox::warning(this, tr("New Mod"), tr("The mod was created, but copying levels from the chosen project failed partway through."));
-        }
+        QMessageBox::warning(this, tr("New Mod"), tr("The mod was created, but copying levels from the chosen project failed partway through."));
     }
 
     accept();
