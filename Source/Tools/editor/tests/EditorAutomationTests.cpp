@@ -1228,6 +1228,76 @@ TEST(EditorAutomation, SavePathThenReopenPreservesPositions)
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
+// Regression test: Model::ToJson() used to only serialize a camera (and, with it, that
+// camera's whole "map_objects" array) when EditorCamera::mName was non-empty. mName is only
+// ever set once a camera is actually given an image via CameraManager::CreateCamera /
+// NewCameraCommand - but AddObjectDialog lets a map object be added to a camera grid cell
+// before it has an image at all, pushing straight onto that still-nameless camera's
+// mMapObjects. So a map object added to such an "empty" camera (no image ever set) would
+// vanish silently on the very next save_path_as + open_path round-trip, with no error either
+// way - it was just gone.
+TEST(EditorAutomation, AddMapObjectToEmptyCameraPersistsThroughSaveAndReload)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString savePath = tempDir.filePath("relive_editor_test_level.json");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateNewPath(client));
+
+    // Deliberately never call set_camera_image - the only camera in this fresh 1x1 path stays
+    // "empty" (EditorCamera::mName unset) for the whole test.
+    {
+        const nlohmann::json cam = FindKind(GetSceneItems(client), "camera");
+        ASSERT_TRUE(cam.value("camName", std::string()).empty()) << "camera should have no name/image yet";
+        ASSERT_FALSE(cam.value("hasMainImage", false)) << "camera should have no image yet";
+    }
+
+    ASSERT_TRUE(AddMapObject(client));
+    ASSERT_EQ(CountKind(GetSceneItems(client), "map_object"), 1);
+
+    const nlohmann::json objBeforeSave = FindKind(GetSceneItems(client), "map_object");
+
+    {
+        const auto resp = client.Call({{"cmd", "save_path_as"}, {"path", savePath.toStdString()}});
+        ASSERT_TRUE(resp.value("ok", false));
+        ASSERT_TRUE(resp.at("result").value("saved", false)) << "save_path_as reported failure";
+    }
+    ASSERT_TRUE(QFile::exists(savePath)) << "save_path_as did not create a file at " << savePath.toStdString();
+
+    // The saved JSON itself should list the camera (still nameless) and its map object -
+    // catches the bug at the source, rather than only through the editor's own in-memory state.
+    {
+        QFile f(savePath);
+        ASSERT_TRUE(f.open(QFile::ReadOnly | QFile::Text));
+        const auto j = nlohmann::json::parse(f.readAll().toStdString());
+        const auto& cameras = j.at("map").at("cameras");
+        ASSERT_EQ(cameras.size(), 1u) << "the nameless camera itself was dropped from the saved JSON: " << j.dump();
+        EXPECT_EQ(cameras.at(0).at("map_objects").size(), 1u) << "the map object was dropped from the saved JSON: " << j.dump();
+    }
+
+    {
+        const auto resp = client.Call({{"cmd", "open_path"}, {"path", savePath.toStdString()}});
+        ASSERT_TRUE(resp.value("ok", false));
+        ASSERT_TRUE(resp.at("result").value("opened", false)) << "open_path reported failure";
+    }
+
+    // open_path makes the reopened file the active tab, so get_scene_items now reads it back.
+    const nlohmann::json itemsAfterReopen = GetSceneItems(client);
+    EXPECT_EQ(CountKind(itemsAfterReopen, "map_object"), 1) << "map object added to an empty camera did not survive a save+reload round-trip";
+
+    const nlohmann::json objAfterReopen = FindKind(itemsAfterReopen, "map_object");
+    EXPECT_DOUBLE_EQ(objAfterReopen.value("xpos", -1.0), objBeforeSave.value("xpos", -2.0)) << "map object xpos did not round-trip";
+    EXPECT_DOUBLE_EQ(objAfterReopen.value("ypos", -1.0), objBeforeSave.value("ypos", -2.0)) << "map object ypos did not round-trip";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
 // Regression test for dragging an already-multi-selected group (a collision line + a map
 // object, selected together via a rubber-band drag): only the one item actually grabbed used
 // to get clamped to the map bounds (to its own bounds) - Qt's default QGraphicsItem::

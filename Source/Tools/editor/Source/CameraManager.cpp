@@ -287,8 +287,14 @@ public:
         mTab->GetScene().removeItem(mEmptyCamera);
         mEmptyCameraModel = mTab->GetModel().RemoveCamera(mEmptyCamera->GetCamera());
 
-        // Move empty camera map objects to original camera
-        mCameraOriginalModel->mMapObjects = std::move(mEmptyCameraModel->mMapObjects);
+        // Move the objects parked in this command back onto the restored camera. They're kept
+        // here rather than on mEmptyCameraModel itself so that, while the camera is deleted, the
+        // still-nameless placeholder camera that occupies its grid cell is genuinely empty -
+        // Model::ToJson() keeps any camera that still has map objects (so a real map object
+        // added before a camera ever gets an image round-trips through save/load), and this
+        // placeholder having "orphaned" objects parked on it for undo's sake used to make a
+        // deleted camera's objects reappear in the saved JSON despite the camera itself being gone.
+        mCameraOriginalModel->mMapObjects = std::move(mRemovedMapObjects);
 
         // Add back the original camera
         mTab->GetModel().AddCamera(std::move(mCameraOriginalModel));
@@ -317,8 +323,9 @@ public:
         mCameraOriginalModel = mTab->GetModel().RemoveCamera(mCameraOriginal->GetCamera());
         mTab->GetScene().removeItem(mCameraOriginal);
 
-        // Move original map objects to blank camera
-        mEmptyCameraModel->mMapObjects = std::move(mCameraOriginalModel->mMapObjects);
+        // Park the original camera's map objects on the command itself (not on
+        // mEmptyCameraModel - see the comment in undo()), purely so undo can put them back.
+        mRemovedMapObjects = std::move(mCameraOriginalModel->mMapObjects);
 
         // Remove map object graphics items
         for (auto& item : mGraphicsItemMapObjects)
@@ -352,6 +359,8 @@ private:
 
     CameraGraphicsItem* mEmptyCamera = nullptr;
     std::unique_ptr<EditorCamera> mEmptyCameraModel;
+
+    std::vector<UP_MapObjectBase> mRemovedMapObjects;
 
     bool mAdded = false;
 };

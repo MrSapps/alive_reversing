@@ -293,7 +293,13 @@ std::string Model::ToJson() const
         // silently dropped it (and any other still-empty-of-objects camera with id 0) from the
         // saved JSON. mName is only ever set once a camera is actually created (NewCameraCommand)
         // - CameraGraphicsItem::Load uses the same mName.empty() check to mean "no camera here".
-        if (!camera->mName.empty())
+        //
+        // But mName.empty() alone isn't a reliable "nothing to save here" check either: a map
+        // object can be added to a camera grid cell before it's ever given an image (AddObjectDialog
+        // pushes straight onto EditorCamera::mMapObjects with no such requirement), so a camera
+        // with map objects but still no name used to get silently dropped too, along with every
+        // object placed in it. Keep it whenever it has a name *or* actual content to save.
+        if (!camera->mName.empty() || !camera->mMapObjects.empty())
         {
             nlohmann::json mapObjects = nlohmann::json::array();
             for (auto& mapObject : camera->mMapObjects)
