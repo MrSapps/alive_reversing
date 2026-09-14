@@ -102,11 +102,12 @@
     <addaction name="action_save_path"/>
     <addaction name="action_save_path_as"/>
     <addaction name="action_run_level"/>
-    <addaction name="action_exit_application"/>
     <addaction name="actionSave_As"/>
     <addaction name="actionSave_all"/>
     <addaction name="separator"/>
     <addaction name="action_close_path"/>
+    <addaction name="separator"/>
+    <addaction name="action_exit_application"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
