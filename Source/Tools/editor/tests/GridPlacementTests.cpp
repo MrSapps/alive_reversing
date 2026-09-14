@@ -266,6 +266,97 @@ TEST(FitLineToMapBounds, ShrinksOversizedLineToFitMap)
     EXPECT_EQ(result.y2, 0);
 }
 
+namespace
+{
+    // Order-independent comparison for CalcMapChanges' output - the exact set of edits matters,
+    // not what order the nested x/y loop happened to produce them in.
+    bool SameCameraEdits(const std::vector<CamToEdit>& actual, const std::vector<CamToEdit>& expected)
+    {
+        if (actual.size() != expected.size())
+        {
+            return false;
+        }
+        for (const auto& item : expected)
+        {
+            if (std::find(actual.begin(), actual.end(), item) == actual.end())
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+// CalcMapChanges diffs an old camera grid size against a new one. These 7 scenarios were
+// previously a hand-rolled set of Test_*() functions (DoMapSizeTests, ChangeMapSizeDialog.cpp)
+// that ran unconditionally at the very start of every real editor launch (main.cpp) and called
+// abort() on failure - not exactly a subtle way to fail a release build. Same scenarios, now
+// proper (and correctly spelled - "Coulmn" was never a word) tests.
+
+TEST(CalcMapChanges, RemoveColumn)
+{
+    const auto edits = CalcMapChanges(2, 1, 2, 2);
+    const std::vector<CamToEdit> expected = {CamToEdit{1, 0, false}, CamToEdit{1, 1, false}};
+    EXPECT_TRUE(SameCameraEdits(edits, expected));
+}
+
+TEST(CalcMapChanges, AddColumn)
+{
+    const auto edits = CalcMapChanges(2, 3, 2, 2);
+    const std::vector<CamToEdit> expected = {CamToEdit{2, 0, true}, CamToEdit{2, 1, true}};
+    EXPECT_TRUE(SameCameraEdits(edits, expected));
+}
+
+TEST(CalcMapChanges, RemoveRow)
+{
+    const auto edits = CalcMapChanges(2, 2, 2, 1);
+    const std::vector<CamToEdit> expected = {CamToEdit{0, 1, false}, CamToEdit{1, 1, false}};
+    EXPECT_TRUE(SameCameraEdits(edits, expected));
+}
+
+TEST(CalcMapChanges, AddRow)
+{
+    const auto edits = CalcMapChanges(2, 2, 2, 3);
+    const std::vector<CamToEdit> expected = {CamToEdit{0, 2, true}, CamToEdit{1, 2, true}};
+    EXPECT_TRUE(SameCameraEdits(edits, expected));
+}
+
+TEST(CalcMapChanges, RemoveColumnAddRow)
+{
+    const auto edits = CalcMapChanges(2, 1, 2, 3);
+    const std::vector<CamToEdit> expected = {
+        CamToEdit{1, 0, false}, CamToEdit{1, 1, false},
+        CamToEdit{0, 2, true}, CamToEdit{1, 2, true}};
+    EXPECT_TRUE(SameCameraEdits(edits, expected));
+}
+
+TEST(CalcMapChanges, AddColumnAddRow)
+{
+    const auto edits = CalcMapChanges(2, 3, 2, 3);
+    const std::vector<CamToEdit> expected = {
+        CamToEdit{2, 0, true}, CamToEdit{2, 1, true},
+        CamToEdit{0, 2, true}, CamToEdit{1, 2, true},
+        CamToEdit{2, 2, true}};
+    EXPECT_TRUE(SameCameraEdits(edits, expected));
+}
+
+TEST(CalcMapChanges, RemoveColumnRemoveRow)
+{
+    // The corner cell (1,1) is visited from both the shrinking-width and shrinking-height
+    // checks inside CalcMapChanges - AddCameraGridEdit must not list it twice.
+    const auto edits = CalcMapChanges(2, 1, 2, 1);
+    const std::vector<CamToEdit> expected = {
+        CamToEdit{1, 0, false}, CamToEdit{1, 1, false},
+        CamToEdit{0, 1, false}};
+    EXPECT_TRUE(SameCameraEdits(edits, expected));
+    EXPECT_EQ(edits.size(), 3u) << "corner cell double-counted";
+}
+
+TEST(CalcMapChanges, NoChangeProducesNoEdits)
+{
+    EXPECT_TRUE(CalcMapChanges(2, 2, 2, 2).empty());
+}
+
 int main(int argc, char** argv)
 {
     ::testing::InitGoogleTest(&argc, argv);

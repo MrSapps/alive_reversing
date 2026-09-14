@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <utility>
+#include <vector>
 
 // Small, pure placement-math helpers shared by AddCollisionCommand and AddObjectDialog's
 // AddNewObjectCommand. Deliberately dependency-free (no Qt, EditorTab, or Model types) so
@@ -155,5 +156,73 @@ namespace GridPlacement
             [totalHeightPixels](int length) { return ClampLengthToMapBounds(length, totalHeightPixels); },
             [totalWidthPixels](int start, int length) { return ClampRangeStartToMapBounds(start, length, totalWidthPixels); },
             [totalHeightPixels](int start, int length) { return ClampRangeStartToMapBounds(start, length, totalHeightPixels); });
+    }
+
+    // A single camera grid cell to add or remove, as computed by CalcMapChanges below.
+    struct CamToEdit final
+    {
+        int x = 0;
+        int y = 0;
+        bool mAdd = false;
+
+        bool operator == (const CamToEdit& rhs) const
+        {
+            return x == rhs.x && y == rhs.y && mAdd == rhs.mAdd;
+        }
+    };
+
+    // Records that the cell at (x, y) needs to be added/removed, overwriting any earlier verdict
+    // for that same cell (a cell can be visited from both the width and height loops in
+    // CalcMapChanges - see the "x >= oldW" and "y >= oldH" checks there - so without this a
+    // corner cell that both a shrinking width and a growing height touch could end up listed
+    // twice, once to add and once to remove).
+    inline void AddCameraGridEdit(std::vector<CamToEdit>& edits, int x, int y, bool add)
+    {
+        for (auto& edit : edits)
+        {
+            if (edit.x == x && edit.y == y)
+            {
+                edit.mAdd = add;
+                return;
+            }
+        }
+        edits.push_back(CamToEdit{x, y, add});
+    }
+
+    // Diffs an old (oldW x oldH) camera grid against a new (newW x newH) one and returns which
+    // cells need to be added or removed - e.g. shrinking from 2x2 to 1x2 removes the whole
+    // x==1 column; growing from 2x2 to 2x3 adds the whole y==2 row. Order isn't meaningful -
+    // callers (ChangeMapSizeCommand) apply every edit regardless of order.
+    inline std::vector<CamToEdit> CalcMapChanges(int oldW, int newW, int oldH, int newH)
+    {
+        const int maxX = std::max(oldW, newW);
+        const int maxY = std::max(oldH, newH);
+
+        std::vector<CamToEdit> edits;
+        for (int x = 0; x < maxX; x++)
+        {
+            for (int y = 0; y < maxY; y++)
+            {
+                if (x >= oldW)
+                {
+                    AddCameraGridEdit(edits, x, y, true);
+                }
+                else if (x >= newW)
+                {
+                    AddCameraGridEdit(edits, x, y, false);
+                }
+
+                if (y >= oldH)
+                {
+                    AddCameraGridEdit(edits, x, y, true);
+                }
+                else if (y >= newH)
+                {
+                    AddCameraGridEdit(edits, x, y, false);
+                }
+            }
+        }
+
+        return edits;
     }
 }

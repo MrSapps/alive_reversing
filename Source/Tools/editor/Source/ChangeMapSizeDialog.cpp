@@ -9,10 +9,7 @@
 #include "CameraGraphicsItem.hpp"
 #include "ItemPositionData.hpp"
 #include "GridPlacement.hpp"
-#include <QDebug>
 #include "Model.hpp"
-#include <algorithm>
-#include <cmath>
 
 struct RemovedCamera final
 {
@@ -70,192 +67,6 @@ struct RemovedCamera final
         }
     }
 };
-
-struct CamToEdit final
-{
-    int x = 0;
-    int y = 0;
-    bool mAdd = false;
-
-    bool operator == (const CamToEdit& rhs) const
-    {
-        return x == rhs.x && y == rhs.y && mAdd == rhs.mAdd;
-    }
-};
-
-static void Add(std::vector<CamToEdit>& edits, int x, int y, bool add)
-{
-    for (auto& edit : edits)
-    {
-        if (edit.x == x && edit.y == y)
-        {
-            edit.mAdd = add;
-            return;
-        }
-    }
-    edits.push_back(CamToEdit{ x, y, add });
-}
-
-static std::vector<CamToEdit> CalcMapChanges(int oldW, int newW, int oldH, int newH)
-{
-    // Calculate coords to remove or add cameras to
-    const int maxX = std::max(oldW, newW);
-    const int maxY = std::max(oldH, newH);
-
-    //const int minX = std::min(oldW, newW);
-    //const int minY = std::min(oldH, newH);
-
-    std::vector<CamToEdit> edits;
-    for (int x = 0; x < maxX; x++)
-    {
-        for (int y = 0; y < maxY; y++)
-        {
-            if (x >= oldW)
-            {
-                // add
-                Add(edits, x, y, true);
-            }
-            else if (x >= newW)
-            {
-                // remove
-                Add(edits, x, y, false);
-            }
-
-            if (y >= oldH)
-            {
-                // add
-                Add(edits, x, y, true);
-            }
-            else if (y >= newH)
-            {
-                // remove
-                Add(edits, x, y, false);
-            }
-        }
-    }
-
-    for (auto& edit : edits)
-    {
-        qDebug() << edit.x << ", " << edit.y << (edit.mAdd ? " remove" : " add");
-    }
-
-    return edits;
-}
-
-static bool Equal(const std::vector<CamToEdit>& lhs, const std::vector<CamToEdit>& rhs)
-{
-    if (lhs.size() != rhs.size())
-    {
-        return false;
-    }
-
-    for (const auto& lhsItem : lhs)
-    {
-        bool found = false;
-        for (const auto& rhsItem : rhs)
-        {
-            if (rhsItem == lhsItem)
-            {
-                found = true;
-                break;
-            }
-        }
-        if (!found)
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-void Test_RemoveCoulmn()
-{
-    auto edits = CalcMapChanges(2, 1, 2, 2);
-    std::vector<CamToEdit> expected = { CamToEdit{1, 0, false}, CamToEdit{1, 1, false} };
-    if (!Equal(edits, expected))
-    {
-        abort();
-    }
-}
-
-void Test_AddCoulmn()
-{
-    auto edits = CalcMapChanges(2, 3, 2, 2);
-    std::vector<CamToEdit> expected = { CamToEdit{2, 0, true}, CamToEdit{2, 1, true} };
-    if (!Equal(edits, expected))
-    {
-        abort();
-    }
-}
-
-void Test_RemoveRow()
-{
-    auto edits = CalcMapChanges(2, 2, 2, 1);
-    std::vector<CamToEdit> expected = { CamToEdit{0, 1, false}, CamToEdit{1, 1, false} };
-    if (!Equal(edits, expected))
-    {
-        abort();
-    }
-}
-
-void Test_AddRow()
-{
-    auto edits = CalcMapChanges(2, 2, 2, 3);
-    std::vector<CamToEdit> expected = { CamToEdit{0, 2, true}, CamToEdit{1, 2, true} };
-    if (!Equal(edits, expected))
-    {
-        abort();
-    }
-}
-
-void Test_RemoveCoulmn_AddRow()
-{
-    auto edits = CalcMapChanges(2, 1, 2, 3);
-    std::vector<CamToEdit> expected = { 
-        CamToEdit{1, 0, false}, CamToEdit{1, 1, false},
-        CamToEdit{0, 2, true}, CamToEdit{1, 2, true} };
-
-    if (!Equal(edits, expected))
-    {
-        abort();
-    }
-}
-
-void Test_AddCoulmn_AddRow()
-{
-    auto edits = CalcMapChanges(2, 3, 2, 3);
-    std::vector<CamToEdit> expected = { 
-        CamToEdit{2, 0, true}, CamToEdit{2, 1, true},
-        CamToEdit{0, 2, true}, CamToEdit{1, 2, true}, 
-        CamToEdit{2, 2, true} };
-    if (!Equal(edits, expected))
-    {
-        abort();
-    }
-}
-
-void Test_RemoveCoulmn_RemoveRow()
-{
-    auto edits = CalcMapChanges(2, 1, 2, 1);
-    std::vector<CamToEdit> expected = { 
-        CamToEdit{1, 0, false}, CamToEdit{1, 1, false},
-        CamToEdit{0, 1, false}, };
-    if (!Equal(edits, expected))
-    {
-        abort();
-    }
-}
-void DoMapSizeTests()
-{
-    Test_RemoveCoulmn();
-    Test_AddCoulmn();
-    Test_RemoveRow();
-    Test_AddRow();
-    Test_RemoveCoulmn_AddRow();
-    Test_AddCoulmn_AddRow();
-    Test_RemoveCoulmn_RemoveRow();
-}
 
 struct AddedCamera final
 {
@@ -362,7 +173,7 @@ public:
             QString::number(mOldXSize) + "x" + QString::number(mOldYSize) + " to " +
             QString::number(mNewXSize) + "x" + QString::number(mNewYSize));
 
-        auto edits = CalcMapChanges(mOldXSize, mNewXSize, mOldYSize, mNewYSize);
+        auto edits = GridPlacement::CalcMapChanges(mOldXSize, mNewXSize, mOldYSize, mNewYSize);
 
         for (auto& edit : edits)
         {

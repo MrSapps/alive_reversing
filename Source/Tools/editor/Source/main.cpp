@@ -6,12 +6,8 @@
 #include <QtCore/qcommandlineparser.h>
 #include <QLibraryInfo>
 
-void DoMapSizeTests();
-
 int main(int argc, char *argv[])
 {
-    DoMapSizeTests();
-
     static const char ENV_VAR_QT_DEVICE_PIXEL_RATIO[] = "QT_DEVICE_PIXEL_RATIO";
     if (!qEnvironmentVariableIsSet(ENV_VAR_QT_DEVICE_PIXEL_RATIO)
         && !qEnvironmentVariableIsSet("QT_AUTO_SCREEN_SCALE_FACTOR")
