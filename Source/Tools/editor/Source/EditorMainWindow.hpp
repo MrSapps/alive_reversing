@@ -41,7 +41,7 @@ public:
     // knows exactly where the file should live (inside the mod's level folder). AddModelTab
     // (private) is the only thing that constructs an EditorTab, so this is the same kind of
     // public wrapper OpenPath() already is for onOpenPath().
-    bool CreateAndOpenNewPath(QString jsonFileName, s32 pathId, GameType game);
+    bool CreateAndOpenNewPath(QString jsonFileName, s32 pathId, GameType game, u32 xSize = 4, u32 ySize = 4);
 
 private slots:
     void on_actionNewMod_triggered();

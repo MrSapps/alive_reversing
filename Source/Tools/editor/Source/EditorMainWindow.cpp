@@ -259,7 +259,7 @@ bool EditorMainWindow::SwitchToMod(std::unique_ptr<EditorMod> pMod)
     return true;
 }
 
-bool EditorMainWindow::CreateAndOpenNewPath(QString jsonFileName, s32 pathId, GameType game)
+bool EditorMainWindow::CreateAndOpenNewPath(QString jsonFileName, s32 pathId, GameType game, u32 xSize, u32 ySize)
 {
     // EditorTab::Save()/DoSave() just opens jsonFileName for writing - it doesn't create any
     // missing parent directories (matching QFile::open's own behavior), so the mod's
@@ -267,7 +267,7 @@ bool EditorMainWindow::CreateAndOpenNewPath(QString jsonFileName, s32 pathId, Ga
     QDir().mkpath(QFileInfo(jsonFileName).path());
 
     auto model = std::make_unique<Model>();
-    model->CreateAsNewPath(pathId, game);
+    model->CreateAsNewPath(pathId, game, xSize, ySize);
 
     EditorTab* view = AddModelTab(std::move(model), jsonFileName, false);
     return view->Save();
@@ -763,8 +763,20 @@ void EditorMainWindow::on_actionNew_path_triggered()
         return;
     }
 
+    const int xSize = QInputDialog::getInt(this, tr("New path size"), tr("Width (cameras)"), 4, 1, 99, 1, &ok);
+    if (!ok)
+    {
+        return;
+    }
+
+    const int ySize = QInputDialog::getInt(this, tr("New path size"), tr("Height (cameras)"), 4, 1, 99, 1, &ok);
+    if (!ok)
+    {
+        return;
+    }
+
     auto model = std::make_unique<Model>();
-    model->CreateAsNewPath(newPathId, gameName == "AO" ? GameType::eAo : GameType::eAe);
+    model->CreateAsNewPath(newPathId, gameName == "AO" ? GameType::eAo : GameType::eAe, static_cast<u32>(xSize), static_cast<u32>(ySize));
 
     AddModelTab(std::move(model), QString("New Path %1.json").arg(newPathId), true);
 }

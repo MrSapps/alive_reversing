@@ -210,7 +210,19 @@ void Model::LoadJsonFromString(const std::string& json)
         mCollisions.push_back(std::move(tmpCollision));
     }
 
-    CalculateMapSize();
+    // Prefer the explicitly saved grid size (see ToJson) - falling back to re-deriving it from
+    // the loaded cameras only for older save files written before "x_size"/"y_size" existed, so
+    // those still open at whatever size their surviving cameras implied rather than failing to
+    // load at all.
+    if (map.contains("x_size") && map.contains("y_size") && map.at("x_size").is_number() && map.at("y_size").is_number())
+    {
+        mXSize = ReadNumber(map, "x_size");
+        mYSize = ReadNumber(map, "y_size");
+    }
+    else
+    {
+        CalculateMapSize();
+    }
     CreateEmptyCameras();
 }
 
@@ -225,9 +237,11 @@ void Model::LoadJsonFromFile(const std::string& jsonFile)
     LoadJsonFromString(*jsonString);
 }
 
-void Model::CreateAsNewPath(s32 newPathId, GameType game)
+void Model::CreateAsNewPath(s32 newPathId, GameType game, u32 xSize, u32 ySize)
 {
-    // Reset everything to a blank 1x1 map with a single empty camera
+    // Reset everything to a blank xSize*ySize map of empty cameras (defaults to 4x4 - see the
+    // header default - rather than the 1x1 this used to hardcode, so a brand new path starts
+    // with room to actually lay a level out instead of immediately needing an "Edit map size").
     mCameras.clear();
     mCollisions.clear();
 
@@ -236,8 +250,8 @@ void Model::CreateAsNewPath(s32 newPathId, GameType game)
     mPathVersion = ReliveAPI::GetApiVersion();
     mSoundInfo = nlohmann::json::object();
 
-    mXSize = 1;
-    mYSize = 1;
+    mXSize = xSize;
+    mYSize = ySize;
 
     CreateEmptyCameras();
 }
@@ -252,6 +266,16 @@ std::string Model::ToJson() const
     nlohmann::json map = nlohmann::json::object();
     map["path_id"] = mPathId;
     map["sound_info"] = mSoundInfo;
+    // The grid's own dimensions weren't persisted at all until now - LoadJsonFromString instead
+    // re-derived them from the highest x/y among the cameras that actually got saved below
+    // (CalculateMapSize). That happened to round-trip a still-all-empty 1x1 path only by luck
+    // (0 cameras saved -> derived size 0,0 -> clamped up to 1x1, coincidentally right), but
+    // silently shrank any bigger grid with an untouched cell past the last saved camera (e.g. a
+    // freshly created path at the new 4x4 default, or any map whose far edge was never used) back
+    // down to whatever smaller area its saved cameras still spanned. Save the real size
+    // explicitly instead of trying to reconstruct it after the fact.
+    map["x_size"] = mXSize;
+    map["y_size"] = mYSize;
 
     /*
     map << "path_bnd" << mMapInfo.mPathBnd;

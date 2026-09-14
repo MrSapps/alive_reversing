@@ -187,10 +187,16 @@ namespace
         return count;
     }
 
-    // Creates a new path via actionNew_path, accepting both of its sequential "path id"/"game"
-    // QInputDialogs with their defaults (0, AO) via the "@active_modal" target - they have no
-    // objectName of their own, unlike AboutDialog.
-    bool CreateNewPath(AutomationClient& client)
+    // Creates a new path via actionNew_path, accepting the "path id"/"game" QInputDialogs with
+    // their defaults (0, AO) via the "@active_modal" target - they have no objectName of their
+    // own, unlike AboutDialog - then setting its "width"/"height" (in cameras) QInputDialogs to
+    // xSize/ySize via "@active_modal_input" (same idiom CreateNewMod's txtName/txtAuthor use,
+    // one level further in since these dialogs have no named widget to target directly).
+    // Defaults to 1x1 (Model::CreateAsNewPath's own default is 4x4 - see its header comment) so
+    // every existing caller of this helper, written back when 1x1 was the *only* size a new path
+    // could ever be, keeps testing exactly the single-camera map it already assumes without
+    // having to pass a size explicitly; a test that actually wants a bigger grid passes one.
+    bool CreateNewPath(AutomationClient& client, int xSize = 1, int ySize = 1)
     {
         const int newPathClickId = client.SendCommand({{"cmd", "click"}, {"target", "actionNew_path"}});
         if (!client.Call({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}}).value("ok", false))
@@ -201,6 +207,26 @@ namespace
         if (!client.Call({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}}).value("ok", false))
         {
             ADD_FAILURE() << "no active modal for game dialog";
+            return false;
+        }
+        if (!client.Call({{"cmd", "set_value"}, {"target", "@active_modal_input"}, {"value", xSize}}).value("ok", false))
+        {
+            ADD_FAILURE() << "failed to set new path width";
+            return false;
+        }
+        if (!client.Call({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}}).value("ok", false))
+        {
+            ADD_FAILURE() << "no active modal for width dialog";
+            return false;
+        }
+        if (!client.Call({{"cmd", "set_value"}, {"target", "@active_modal_input"}, {"value", ySize}}).value("ok", false))
+        {
+            ADD_FAILURE() << "failed to set new path height";
+            return false;
+        }
+        if (!client.Call({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}}).value("ok", false))
+        {
+            ADD_FAILURE() << "no active modal for height dialog";
             return false;
         }
         return client.WaitForResponse(newPathClickId, 5000).value("ok", false);
@@ -1293,6 +1319,80 @@ TEST(EditorAutomation, AddMapObjectToEmptyCameraPersistsThroughSaveAndReload)
     const nlohmann::json objAfterReopen = FindKind(itemsAfterReopen, "map_object");
     EXPECT_DOUBLE_EQ(objAfterReopen.value("xpos", -1.0), objBeforeSave.value("xpos", -2.0)) << "map object xpos did not round-trip";
     EXPECT_DOUBLE_EQ(objAfterReopen.value("ypos", -1.0), objBeforeSave.value("ypos", -2.0)) << "map object ypos did not round-trip";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// A brand new path now defaults to a 4x4 camera grid rather than 1x1, so there's actually room
+// to lay a level out without immediately needing "Edit map size" - see Model::CreateAsNewPath's
+// header default. Exercises actionNew_path's own "width"/"height" QInputDialogs by accepting
+// their defaults (Return, same idiom as the path id/game dialogs before them), rather than
+// setting them via CreateNewPath's xSize/ySize args as every other test here does, so this is
+// also the one place the production default itself - not just a test-chosen size - is checked.
+TEST(EditorAutomation, NewPathViaMenuDefaultsToFourByFourGrid)
+{
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    const int newPathClickId = client.SendCommand({{"cmd", "click"}, {"target", "actionNew_path"}});
+    ASSERT_TRUE(client.Call({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}}).value("ok", false)) << "no active modal for path id dialog";
+    ASSERT_TRUE(client.Call({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}}).value("ok", false)) << "no active modal for game dialog";
+    ASSERT_TRUE(client.Call({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}}).value("ok", false)) << "no active modal for width dialog";
+    ASSERT_TRUE(client.Call({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}}).value("ok", false)) << "no active modal for height dialog";
+    ASSERT_TRUE(client.WaitForResponse(newPathClickId, 5000).value("ok", false));
+
+    EXPECT_EQ(CountKind(GetSceneItems(client), "camera"), 16) << "New Path did not default to a 4x4 grid";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Regression test: Model::ToJson() never actually persisted the grid's own x_size/y_size -
+// Model::LoadJsonFromString instead re-derived them from the highest x/y among whichever
+// cameras got saved (CalculateMapSize). That happened to round-trip a wholly untouched 1x1 path
+// correctly only by coincidence (0 cameras saved -> derived size 0,0 -> clamped up to 1x1), but
+// silently shrank any bigger grid with an unused cell past its last saved camera - e.g. this
+// 4x4 path, whose corner camera (3,3) never gets touched - down to whatever smaller area its
+// saved cameras still spanned.
+TEST(EditorAutomation, GridSizePersistsThroughSaveAndReloadEvenWithUntouchedCells)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString savePath = tempDir.filePath("relive_editor_test_level.json");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateNewPath(client, 4, 4));
+    ASSERT_EQ(CountKind(GetSceneItems(client), "camera"), 16) << "test setup: expected a 4x4 grid";
+
+    {
+        const auto resp = client.Call({{"cmd", "save_path_as"}, {"path", savePath.toStdString()}});
+        ASSERT_TRUE(resp.value("ok", false));
+        ASSERT_TRUE(resp.at("result").value("saved", false)) << "save_path_as reported failure";
+    }
+
+    // The saved JSON itself should record the grid size explicitly, not leave it to be inferred.
+    {
+        QFile f(savePath);
+        ASSERT_TRUE(f.open(QFile::ReadOnly | QFile::Text));
+        const auto j = nlohmann::json::parse(f.readAll().toStdString());
+        EXPECT_EQ(j.at("map").value("x_size", -1), 4) << "grid width was not saved: " << j.dump();
+        EXPECT_EQ(j.at("map").value("y_size", -1), 4) << "grid height was not saved: " << j.dump();
+    }
+
+    {
+        const auto resp = client.Call({{"cmd", "open_path"}, {"path", savePath.toStdString()}});
+        ASSERT_TRUE(resp.value("ok", false));
+        ASSERT_TRUE(resp.at("result").value("opened", false)) << "open_path reported failure";
+    }
+
+    EXPECT_EQ(CountKind(GetSceneItems(client), "camera"), 16) << "grid shrank after a save+reload round-trip despite an untouched corner cell";
 
     editor.terminate();
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
@@ -3171,8 +3271,9 @@ TEST(EditorAutomation, NewLevelAndNewPathViaTreeContextMenuCreatesFilesAndOpensP
         EXPECT_EQ(levelInfo.at("paths")[0].value("path_id", std::string()), "0");
     }
 
-    // The new path should already be open as a tab (showing the default 1x1 camera grid).
-    ASSERT_EQ(CountKind(GetSceneItems(client), "camera"), 1) << "new path did not open as a tab";
+    // The new path should already be open as a tab (showing the default 4x4 camera grid - see
+    // Model::CreateAsNewPath's header default).
+    ASSERT_EQ(CountKind(GetSceneItems(client), "camera"), 16) << "new path did not open as a tab";
 
     const auto treeResp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
     ASSERT_TRUE(treeResp.value("ok", false));
@@ -3228,7 +3329,7 @@ TEST(EditorAutomation, ModTreeDoubleClickTogglesLevelAndOpensPathWithoutDuplicat
     }
 
     ASSERT_TRUE(client.Call({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", "Path 0"}, {"double_click", true}}).value("ok", false));
-    ASSERT_EQ(CountKind(GetSceneItems(client), "camera"), 1) << "double-clicking the path did not reopen it";
+    ASSERT_EQ(CountKind(GetSceneItems(client), "camera"), 16) << "double-clicking the path did not reopen it";
 
     const auto tabsResp = client.Call({{"cmd", "get_state"}, {"target", "tabWidget"}});
     ASSERT_TRUE(tabsResp.value("ok", false));
@@ -3280,6 +3381,70 @@ TEST(EditorAutomation, ModTreeStaysInSyncWithAddAndUndoInOpenPath)
 
     ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_undo"}}).value("ok", false));
     EXPECT_EQ(mapObjectNodeCount(), 0) << "tree did not remove the map object again after undo";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Regression test: RefreshPathSubtree used to skip listing a camera in the mod tree entirely
+// whenever it had neither a name (no image set yet) nor any map objects - so a still-imageless
+// camera on a freshly created path had no row in the tree at all, and so no way to right-click
+// it to open CameraManager and give it an image (unlike the scene view, where every grid cell -
+// imageless or not - can always be right-clicked for "Edit camera"). The tree now lists every
+// camera cell, labelling an unset one "x,y @ empty" (CameraManager's own list does the same),
+// and right-clicking it offers the same "Edit camera" action, wired to open the same
+// CameraManager dialog, as the scene view's own context menu.
+TEST(EditorAutomation, EmptyCameraListedInTreeAndEditCameraOpensCameraManager)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString modDir = tempDir.filePath("MyMod");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateModWithLevelAndOpenPath(client, modDir));
+
+    // The fresh path's default 4x4 = 16 cameras have never been given an image, so they're all
+    // still unnamed - yet every one of them should already have a row in the tree, not just the
+    // ones that happen to hold a map object.
+    {
+        const auto treeResp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+        ASSERT_TRUE(treeResp.value("ok", false));
+        const auto& camerasGroup = treeResp.at("result").at("items")[0].at("children")[0].at("children")[0].at("children")[0];
+        EXPECT_EQ(camerasGroup.value("text", std::string()), "Cameras");
+        ASSERT_EQ(camerasGroup.at("children").size(), 16u) << "not every still-imageless camera has a row in the tree";
+        bool foundEmptyCamAtOrigin = false;
+        for (const auto& camera : camerasGroup.at("children"))
+        {
+            if (camera.value("text", std::string()) == "0,0 @ empty")
+            {
+                foundEmptyCamAtOrigin = true;
+                break;
+            }
+        }
+        EXPECT_TRUE(foundEmptyCamAtOrigin) << "no row for the still-imageless camera at 0,0";
+    }
+
+    // Right-click that row and use its "Edit camera" action - same idiom as
+    // CreateModWithLevelAndOpenPath's own right-clicks, and as DeleteCameraViaContextMenu's for
+    // the scene view's equivalent menu: QMenu::exec() blocks in a nested event loop, so the
+    // right-click itself is fired via SendCommand and only collected once the action that
+    // dismisses the menu (opening CameraManager) has happened.
+    const int rightClickCameraId = client.SendCommand({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", "0,0 @ empty"}, {"right_click", true}});
+    const int editCameraClickId = client.SendCommand({{"cmd", "click"}, {"target", "actionEditCamera"}});
+
+    ASSERT_TRUE(client.Call({{"cmd", "get_state"}, {"target", "CameraManager"}}).value("ok", false))
+        << "CameraManager dialog did not open from the tree's context menu";
+    ASSERT_TRUE(client.Call({{"cmd", "close"}, {"target", "CameraManager"}}).value("ok", false))
+        << "failed to close the CameraManager dialog";
+    ASSERT_TRUE(client.WaitForResponse(editCameraClickId, 5000).value("ok", false))
+        << "click on actionEditCamera did not report success";
+
+    ASSERT_TRUE(DismissMenuIfStillOpen(client, "modTreeContextMenu"));
+    ASSERT_TRUE(client.WaitForResponse(rightClickCameraId, 5000).value("ok", false));
 
     editor.terminate();
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
