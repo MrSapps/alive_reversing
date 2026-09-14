@@ -113,6 +113,15 @@ set(PROJECT_SOURCES
         Source/CameraManager.cpp
         Source/CameraManager.hpp
         Source/CameraManager.ui
+        Source/EditorMod.hpp
+        Source/EditorMod.cpp
+        Source/ModTreeItem.hpp
+        Source/ModTreeItem.cpp
+        Source/ModTreeWidget.hpp
+        Source/ModTreeWidget.cpp
+        Source/NewModDialog.hpp
+        Source/NewModDialog.cpp
+        Source/NewModDialog.ui
         Source/CollisionConnect.cpp
         Source/CollisionConnect.hpp
         Source/IGraphicsItem.hpp

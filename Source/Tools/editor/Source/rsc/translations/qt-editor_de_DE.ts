@@ -661,6 +661,30 @@ Do you want to overwrite it?</source>
         <source>Game</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Mod</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>New Mod...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Open Mod...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Open mod</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Error</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>That folder doesn&apos;t contain a modinfo.json.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>EditorTab</name>
@@ -757,6 +781,53 @@ Do you want to overwrite it?</source>
     </message>
 </context>
 <context>
+    <name>ModTreeWidget</name>
+    <message>
+        <source>Cameras</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Collisions</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>New Level...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>New Path...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>New Level</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Level folder name (e.g. a 2-letter abbreviation)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>That level already exists.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>New Path</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Path Id</source>
+        <translation type="unfinished">Pfad Id</translation>
+    </message>
+    <message>
+        <source>That path id already exists in this level.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Failed to create the new path.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>MoveItemsCommand</name>
     <message>
         <source>Move and resize collision</source>
@@ -785,6 +856,57 @@ Do you want to overwrite it?</source>
     <message>
         <source>Move %1 item(s)</source>
         <translation>Bewege %1 item(s)</translation>
+    </message>
+</context>
+<context>
+    <name>NewModDialog</name>
+    <message>
+        <source>New Mod</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Author</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Target game</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>AO</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>AE</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Location</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Browse...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Choose a location for the new mod</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Please enter a mod name.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Please choose a location.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Failed to create the mod - the folder may already contain files, or couldn&apos;t be written to.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>

@@ -15,7 +15,11 @@
 #include "qactiongroup.h"
 #include "AutomationServer.hpp"
 #include "AutomationSceneCommands.hpp"
+#include "EditorMod.hpp"
+#include "ModTreeWidget.hpp"
+#include "NewModDialog.hpp"
 #include <QCoreApplication>
+#include <QDir>
 
 static void FatalError(const char* msg)
 {
@@ -36,6 +40,14 @@ EditorMainWindow::EditorMainWindow(QWidget* aParent)
 
     // Construct the UI from the XML
     m_ui->setupUi(this);
+
+    // TODO: Set as a promoted type
+    delete m_ui->modTreeWidget;
+    mModTree = new ModTreeWidget(m_ui->modTreeDockWidgetContents, this);
+    mModTree->setObjectName(QStringLiteral("modTreeWidget"));
+    m_ui->modTreeWidget = mModTree;
+    m_ui->modTreeDockWidgetContents->layout()->addWidget(mModTree);
+    addDockWidget(Qt::LeftDockWidgetArea, m_ui->modTreeDockWidget);
 
     UpdateWindowTitle();
     setMenuActionsEnabled(false);
@@ -68,6 +80,21 @@ EditorMainWindow::EditorMainWindow(QWidget* aParent)
     }
 
     readSettings();
+
+    // Remember + auto-reopen the last mod that was open, same idiom as "last_open_dir" -
+    // silently skip (no error box on boot) if the directory's gone or no longer looks like a
+    // mod, rather than nagging the user every launch about a folder they may have deleted/moved.
+    {
+        const QString lastModDir = m_Settings.value("last_open_mod_dir").toString();
+        if (!lastModDir.isEmpty())
+        {
+            if (auto mod = EditorMod::LoadFromDirectory(lastModDir))
+            {
+                SwitchToMod(std::move(mod));
+            }
+        }
+    }
+
     // Add short cuts to the tool bar.
     m_ui->toolBar->setIconSize(QSize(32, 32));
     m_ui->toolBar->addAction(m_ui->action_open_path);
@@ -202,6 +229,77 @@ void EditorMainWindow::setMenuActionsEnabled(bool enable)
     }
 }
 
+bool EditorMainWindow::CloseAllTabs()
+{
+    while (m_ui->tabWidget->count() > 0)
+    {
+        const int countBefore = m_ui->tabWidget->count();
+        onCloseTab(0);
+        if (m_ui->tabWidget->count() == countBefore)
+        {
+            // The user cancelled an unsaved-changes prompt - stop here and leave the rest open.
+            return false;
+        }
+    }
+    return true;
+}
+
+bool EditorMainWindow::SwitchToMod(std::unique_ptr<EditorMod> pMod)
+{
+    if (!CloseAllTabs())
+    {
+        return false;
+    }
+
+    mCurrentMod = std::move(pMod);
+    mModTree->SetMod(mCurrentMod.get());
+    UpdateWindowTitle();
+
+    m_Settings.setValue("last_open_mod_dir", mCurrentMod ? mCurrentMod->mDirectory : QString());
+    return true;
+}
+
+bool EditorMainWindow::CreateAndOpenNewPath(QString jsonFileName, s32 pathId, GameType game)
+{
+    // EditorTab::Save()/DoSave() just opens jsonFileName for writing - it doesn't create any
+    // missing parent directories (matching QFile::open's own behavior), so the mod's
+    // <level>/paths/<id>/ folder has to exist before the save below, or it silently fails.
+    QDir().mkpath(QFileInfo(jsonFileName).path());
+
+    auto model = std::make_unique<Model>();
+    model->CreateAsNewPath(pathId, game);
+
+    EditorTab* view = AddModelTab(std::move(model), jsonFileName, false);
+    return view->Save();
+}
+
+void EditorMainWindow::on_actionNewMod_triggered()
+{
+    NewModDialog dlg(this);
+    if (dlg.exec() == QDialog::Accepted)
+    {
+        SwitchToMod(dlg.TakeMod());
+    }
+}
+
+void EditorMainWindow::on_actionOpenMod_triggered()
+{
+    const QString dir = QFileDialog::getExistingDirectory(this, tr("Open mod"));
+    if (dir.isEmpty())
+    {
+        return;
+    }
+
+    auto mod = EditorMod::LoadFromDirectory(dir);
+    if (!mod)
+    {
+        QMessageBox::critical(this, tr("Error"), tr("That folder doesn't contain a modinfo.json."));
+        return;
+    }
+
+    SwitchToMod(std::move(mod));
+}
+
 EditorTab* EditorMainWindow::AddModelTab(std::unique_ptr<Model> model, QString fileName, bool isTempFile)
 {
     EditorTab* view = new EditorTab(m_ui->tabWidget, std::move(model), fileName, isTempFile, statusBar(), mSnapSettings);
@@ -231,6 +329,10 @@ EditorTab* EditorMainWindow::AddModelTab(std::unique_ptr<Model> model, QString f
 
     view->UpdateTabTitle(view->IsClean());
     setMenuActionsEnabled(true);
+
+    // A no-op if fileName doesn't belong to the currently open mod (classic File > Open/New
+    // Path, or no mod open at all) - see ModTreeWidget::NotifyTabOpened.
+    mModTree->NotifyTabOpened(view, fileName);
 
     return view;
 }
@@ -317,6 +419,7 @@ void EditorMainWindow::onCloseTab(int index)
 
     if (close)
     {
+        mModTree->NotifyTabClosed(tab);
         tab->deleteLater();
         m_ui->tabWidget->removeTab(index);
         const int count = m_ui->tabWidget->tabBar()->count();
