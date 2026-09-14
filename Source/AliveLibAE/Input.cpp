@@ -1074,7 +1074,7 @@ s32 Input_Convert_KeyboardGamePadInput_To_Internal_Format_492150()
 
         Input_GetJoyState_460280(&pX1, &pY1, &pX2, &pY2, &pButtons);
 
-        if ((sGamepadCapFlags_5C2EF8 & eDisableAutoRun) == 1 && sJoystickNumButtons_5C2EFC <= 4 && fabs(pX1) >= 0.75f) // Auto sprint
+        if ((sGamepadCapFlags_5C2EF8 & eDisableAutoRun) == 1 && sJoystickNumButtons_5C2EFC <= 4 && fabs(static_cast<double>(pX1)) >= 0.75) // Auto sprint
         {
             pressed_keyboard_keys |= InputCommands::eRun;
             keys_down = pressed_keyboard_keys;

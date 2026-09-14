@@ -13,6 +13,8 @@ public:
     class Path final
     {
     public:
+        Path() = default;
+        explicit Path(const std::string& path) : mPath(path) { }
         Path& Append(const std::string& directory);
 
         Path Parent() const;

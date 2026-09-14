@@ -915,7 +915,7 @@ void SsVabTransBody(VabBodyRecord* pVabBody, s16 vabId)
     }
 }
 
-s16 SND_VAB_Load_476CB0(PathSoundInfo& pSoundBlockInfo, ResourceManagerWrapper& resMan, BaseMap& map)
+s16 SND_VAB_Load_476CB0(PathSoundInfo& pSoundBlockInfo, ResourceManagerWrapper& resMan, BaseMap& /*map*/)
 {
     // Find the VH file record
     pSoundBlockInfo.mVhFileData = resMan.LoadSoundFile(pSoundBlockInfo.mVhFile.c_str(), pSoundBlockInfo.mSoundTheme);

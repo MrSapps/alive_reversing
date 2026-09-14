@@ -87,7 +87,7 @@ void Slig_SoundEffect(SligSfx effect, BaseAliveGameObject* pObj)
     }
 }
 
-void Animation_OnFrame_Slig(BaseGameObject* pObj, u32&, const IndexedPoint& point, ResourceManagerWrapper& resMan, BaseMap& map)
+void Animation_OnFrame_Slig(BaseGameObject* pObj, u32&, const IndexedPoint& point, ResourceManagerWrapper& resMan, BaseMap& /*map*/)
 {
     auto pSlig = reinterpret_cast<Slig*>(pObj);
 
