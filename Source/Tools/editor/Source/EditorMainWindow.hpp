@@ -29,6 +29,12 @@ public:
     // reach the graphics scene without exposing m_ui itself.
     EditorTab* CurrentTab() const;
 
+    // Switches focus to an already-open tab - e.g. double-clicking a camera row in ModTreeWidget
+    // should bring that camera's path to the front the same way double-clicking the path row
+    // itself does (OpenPath's dedup-by-filename already does this for that case; this is the
+    // same operation for a caller that already has the EditorTab*, not just its filename).
+    void MakeTabCurrent(EditorTab* pTab);
+
     // Public wrapper for onOpenPath() - used by AutomationSceneCommands so tests can open a
     // known path directly instead of driving the real QFileDialog-based Open flow.
     bool OpenPath(QString fullFileName)

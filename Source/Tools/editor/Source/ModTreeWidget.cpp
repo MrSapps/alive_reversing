@@ -16,6 +16,7 @@
 #include <QMessageBox>
 #include <QLineEdit>
 #include <QSet>
+#include <algorithm>
 
 namespace
 {
@@ -371,6 +372,38 @@ void ModTreeWidget::onItemSelectionChanged()
         return;
     }
 
+    // A selection only ever makes sense within one open path at a time - use whichever path the
+    // first selected row belongs to (there's only ever one scene to activate/update). Selecting
+    // any row under a path (a camera, a group header, the path row itself, ...) is reason enough
+    // to bring that path's tab to the front, not just the map-object/collision-line rows that go
+    // on to drive the scene's own selection below.
+    PathTreeItem* pPathItem = FindAncestorPathItem(selected.first());
+    EditorTab* pTab = pPathItem ? pPathItem->Tab() : nullptr;
+    if (!pTab)
+    {
+        return;
+    }
+    mMainWindow->MakeTabCurrent(pTab);
+
+    // A selection made up entirely of camera rows - CameraGraphicsItem isn't a selectable scene
+    // item at all, so there's no scene selection to drive here, just center the view on whichever
+    // camera(s) got selected (a mix of this and map-object/collision-line rows isn't handled -
+    // falls through to the loop below, which will bail out on the camera rows it doesn't
+    // recognise, same as any other genuinely unsupported mixed selection).
+    if (std::all_of(selected.begin(), selected.end(), [](QTreeWidgetItem* pItem) { return dynamic_cast<CameraTreeItem*>(pItem) != nullptr; }))
+    {
+        const Model& model = pTab->GetModel();
+        QRectF bounds;
+        for (QTreeWidgetItem* pItem : selected)
+        {
+            const EditorCamera* pCamera = static_cast<CameraTreeItem*>(pItem)->Camera();
+            const QRectF camRect(pCamera->mX * model.CameraGridWidth(), pCamera->mY * model.CameraGridHeight(), model.CameraGridWidth(), model.CameraGridHeight());
+            bounds = bounds.isNull() ? camRect : bounds.united(camRect);
+        }
+        pTab->CenterViewOn(bounds.center());
+        return;
+    }
+
     // Only ever drive the scene from a selection made up entirely of map-object/collision-line
     // rows (a "mixed" selection of the two is fine - that's exactly the case a rubber-band drag
     // in the scene already produces). Selecting a camera/group/path/level row alongside or
@@ -395,16 +428,6 @@ void ModTreeWidget::onItemSelectionChanged()
         }
     }
 
-    // A mixed selection only ever makes sense within one open path at a time - use whichever
-    // path the first selected row belongs to, same as the scene itself (there's only ever one
-    // scene selection to update).
-    PathTreeItem* pPathItem = FindAncestorPathItem(selected.first());
-    EditorTab* pTab = pPathItem ? pPathItem->Tab() : nullptr;
-    if (!pTab)
-    {
-        return;
-    }
-
     // Apply the new selection directly first, then record it on the undo stack exactly the way
     // EditorGraphicsScene's own mouse handlers do (see EditorTab's SelectionChanged connection -
     // that's also a "mutate first, push the command after" flow, not push-then-apply -
@@ -420,6 +443,7 @@ void ModTreeWidget::onItemSelectionChanged()
     QList<QGraphicsItem*> oldSelection = scene.selectedItems();
 
     scene.clearSelection();
+    QRectF bounds;
     for (QGraphicsItem* pItem : scene.items())
     {
         if (auto* pRect = qgraphicsitem_cast<ResizeableRectItem*>(pItem))
@@ -427,6 +451,7 @@ void ModTreeWidget::onItemSelectionChanged()
             if (wantedMapObjects.contains(pRect->GetMapObject()))
             {
                 pRect->setSelected(true);
+                bounds = bounds.isNull() ? pRect->sceneBoundingRect() : bounds.united(pRect->sceneBoundingRect());
             }
         }
         else if (auto* pArrow = qgraphicsitem_cast<ResizeableArrowItem*>(pItem))
@@ -434,6 +459,7 @@ void ModTreeWidget::onItemSelectionChanged()
             if (wantedLines.contains(pArrow->GetCollisionItem()))
             {
                 pArrow->setSelected(true);
+                bounds = bounds.isNull() ? pArrow->sceneBoundingRect() : bounds.united(pArrow->sceneBoundingRect());
             }
         }
     }
@@ -442,6 +468,14 @@ void ModTreeWidget::onItemSelectionChanged()
     if (newSelection != oldSelection)
     {
         pTab->AddCommand(new SetSelectionCommand(pTab, &scene, oldSelection, newSelection));
+    }
+
+    // Selecting via the tree might have picked something that's currently scrolled off screen -
+    // e.g. the object was there all along, just never brought into view (unlike a click in the
+    // scene, which can only ever select something already visible).
+    if (!bounds.isNull())
+    {
+        pTab->CenterViewOn(bounds.center());
     }
 }
 
@@ -471,6 +505,11 @@ void ModTreeWidget::onItemDoubleClicked(QTreeWidgetItem* pItem, int /*column*/)
         {
             if (EditorTab* pTab = pPathItem->Tab())
             {
+                // The camera might belong to a path open in a background tab - bring it to the
+                // front so the centering below is actually visible, same as double-clicking the
+                // path row itself already does via OpenPath's dedup-by-filename.
+                mMainWindow->MakeTabCurrent(pTab);
+
                 const Model& model = pTab->GetModel();
                 const EditorCamera* pCamera = pCameraItem->Camera();
                 const QPointF center(

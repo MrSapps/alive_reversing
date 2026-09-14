@@ -540,6 +540,11 @@ EditorTab* EditorMainWindow::CurrentTab() const
     return getActiveTab(m_ui->tabWidget);
 }
 
+void EditorMainWindow::MakeTabCurrent(EditorTab* pTab)
+{
+    m_ui->tabWidget->setCurrentWidget(pTab);
+}
+
 void EditorMainWindow::on_action_zoom_reset_triggered()
 {
     EditorTab* pTab = getActiveTab(m_ui->tabWidget);

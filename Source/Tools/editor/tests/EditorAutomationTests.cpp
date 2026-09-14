@@ -3906,6 +3906,205 @@ TEST(EditorAutomation, DoubleClickCameraRowCentersView)
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
+// Regression test: double-clicking a camera row only centered the view - if that camera
+// belonged to a path open in a background tab (not the currently active one), the centering
+// happened somewhere the user couldn't see, in a tab they weren't even looking at.
+TEST(EditorAutomation, DoubleClickCameraRowMakesItsTabCurrent)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString modDir = tempDir.filePath("MyMod");
+    const QString mainImagePath = tempDir.filePath("sample_main.png");
+    {
+        QImage main(64, 24, QImage::Format_RGB32);
+        main.fill(QColor(200, 40, 40));
+        ASSERT_TRUE(main.save(mainImagePath)) << "failed to write the sample main camera image";
+    }
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    // Path 0, opened by this helper, becomes the active tab.
+    ASSERT_TRUE(CreateModWithLevelAndOpenPath(client, modDir));
+
+    // Path 1: another path in the same level, via the tree's own "New Path..." - same flow
+    // CreateModWithLevelAndOpenPath already used once for Path 0. Creating/opening it makes it
+    // the new active tab.
+    {
+        const int rightClickLevelId = client.SendCommand({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", "MI"}, {"right_click", true}});
+        const int clickId = client.SendCommand({{"cmd", "click"}, {"target", "actionNewPath"}});
+        ASSERT_TRUE(client.Call({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}}).value("ok", false));
+        ASSERT_TRUE(client.WaitForResponse(clickId, 5000).value("ok", false));
+        ASSERT_TRUE(DismissMenuIfStillOpen(client, "modTreeContextMenu"));
+        ASSERT_TRUE(client.WaitForResponse(rightClickLevelId, 5000).value("ok", false));
+    }
+
+    // Give Path 1's camera at (0,0) a name/image, purely so its tree row ("0 @ 0,0") reads
+    // differently from Path 0's still-untouched camera at the same grid position ("0,0 @
+    // empty") - otherwise both paths would have an identically-labelled "0,0 @ empty" row and
+    // click_tree_item's row_text lookup (which isn't scoped to one path's subtree) couldn't
+    // tell them apart.
+    {
+        const auto resp = client.Call({{"cmd", "set_camera_image"}, {"x", 0}, {"y", 0}, {"layer", "main"}, {"image_path", mainImagePath.toStdString()}});
+        ASSERT_TRUE(resp.value("ok", false));
+        ASSERT_TRUE(resp.at("result").value("ok", false)) << "failed to create the camera";
+    }
+
+    auto findCameraAtOrigin = [&]() -> nlohmann::json
+    {
+        for (const auto& item : GetSceneItems(client))
+        {
+            if (item.value("kind", std::string()) == "camera" && item.value("gridX", -1) == 0 && item.value("gridY", -1) == 0)
+            {
+                return item;
+            }
+        }
+        ADD_FAILURE() << "no camera at grid (0,0) in the current tab's scene";
+        return nlohmann::json::object();
+    };
+
+    // Switch back to Path 0 so Path 1 is now the backgrounded tab this test is actually about.
+    ASSERT_TRUE(client.Call({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", "Path 0"}, {"double_click", true}}).value("ok", false));
+    ASSERT_FALSE(findCameraAtOrigin().value("hasMainImage", true)) << "test setup: switched back to the wrong path (Path 0's camera should still be imageless)";
+
+    ASSERT_TRUE(client.Call({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", "0 @ 0,0"}, {"double_click", true}}).value("ok", false));
+
+    EXPECT_TRUE(findCameraAtOrigin().value("hasMainImage", false)) << "double-clicking Path 1's camera row did not bring Path 1's tab to the front";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Generalizes DoubleClickCameraRowMakesItsTabCurrent: selecting *any* row under a path -
+// map-object/collision-line rows included, via a plain (single) click, not just double-clicking
+// a camera row - should bring that path's tab to the front if it's open in the background.
+TEST(EditorAutomation, SelectingMapObjectInTreeMakesItsTabCurrent)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString modDir = tempDir.filePath("MyMod");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    // Path 0, opened by this helper, becomes the active tab.
+    ASSERT_TRUE(CreateModWithLevelAndOpenPath(client, modDir));
+
+    // Path 1: becomes the active tab once opened, and gets the one map object in this test - see
+    // DoubleClickCameraRowMakesItsTabCurrent for why a second path is the only way to actually
+    // exercise "bring a *background* tab to the front".
+    {
+        const int rightClickLevelId = client.SendCommand({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", "MI"}, {"right_click", true}});
+        const int clickId = client.SendCommand({{"cmd", "click"}, {"target", "actionNewPath"}});
+        ASSERT_TRUE(client.Call({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}}).value("ok", false));
+        ASSERT_TRUE(client.WaitForResponse(clickId, 5000).value("ok", false));
+        ASSERT_TRUE(DismissMenuIfStillOpen(client, "modTreeContextMenu"));
+        ASSERT_TRUE(client.WaitForResponse(rightClickLevelId, 5000).value("ok", false));
+    }
+    ASSERT_TRUE(AddMapObject(client));
+
+    std::string objectRowText;
+    {
+        const auto treeResp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+        ASSERT_TRUE(treeResp.value("ok", false));
+        // Path 1 is the second child under the level (Path 0 was created first).
+        const auto& camerasGroup = treeResp.at("result").at("items")[0].at("children")[0].at("children")[1].at("children")[0];
+        for (const auto& camera : camerasGroup.at("children"))
+        {
+            if (!camera.at("children").empty())
+            {
+                objectRowText = camera.at("children")[0].value("text", std::string());
+                break;
+            }
+        }
+    }
+    ASSERT_FALSE(objectRowText.empty()) << "test setup: no map object row found under Path 1";
+
+    // Switch back to Path 0 so Path 1 is the backgrounded tab this test is actually about.
+    ASSERT_TRUE(client.Call({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", "Path 0"}, {"double_click", true}}).value("ok", false));
+    ASSERT_EQ(CountKind(GetSceneItems(client), "map_object"), 0) << "test setup: switched back to the wrong path (Path 0 should have no map objects)";
+
+    ASSERT_TRUE(client.Call({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", objectRowText}}).value("ok", false));
+
+    EXPECT_EQ(CountKind(GetSceneItems(client), "map_object"), 1) << "selecting Path 1's map object row in the tree did not bring Path 1's tab to the front";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Regression test: selecting a row in the tree updated the scene's own selection, but the view
+// itself never moved - a map object scrolled off screen (e.g. dragged to a far corner, then
+// deselected) stayed off screen after selecting its row in the tree, selected but invisible.
+TEST(EditorAutomation, SelectingMapObjectInTreeCentersView)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString modDir = tempDir.filePath("MyMod");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateModWithLevelAndOpenPath(client, modDir));
+    ASSERT_TRUE(AddMapObject(client));
+
+    // Drag the object away from the view's default center (AddObjectDialog places a new object
+    // dead center of the view) so centering on it afterward actually has to move something.
+    {
+        const nlohmann::json rect = FindKind(GetSceneItems(client), "map_object");
+        const double midX = rect.at("xpos").get<double>() + rect.at("width").get<double>() / 2;
+        const double midY = rect.at("ypos").get<double>() + rect.at("height").get<double>() / 2;
+        DragView(client, SceneToView(client, midX, midY), SceneToView(client, midX + 400, midY + 300));
+    }
+
+    // Deselect (click well away from the object's new position) so the tree click below is what
+    // actually does the selecting/centering, not just leaving the drag's own selection alone.
+    const QPoint emptySpot = SceneToView(client, 5, 5);
+    ASSERT_TRUE(SendMouseEvent(client, "down", emptySpot));
+    ASSERT_TRUE(SendMouseEvent(client, "up", emptySpot));
+    ASSERT_FALSE(FindKind(GetSceneItems(client), "map_object").value("selected", false)) << "test setup: click on empty space should deselect";
+
+    const nlohmann::json objAfterDrag = FindKind(GetSceneItems(client), "map_object");
+    const QPointF expectedCenter(objAfterDrag.at("xpos").get<double>() + objAfterDrag.at("width").get<double>() / 2,
+                                  objAfterDrag.at("ypos").get<double>() + objAfterDrag.at("height").get<double>() / 2);
+
+    std::string rowText;
+    {
+        const auto treeResp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+        ASSERT_TRUE(treeResp.value("ok", false));
+        const auto& camerasGroup = treeResp.at("result").at("items")[0].at("children")[0].at("children")[0].at("children")[0];
+        for (const auto& camera : camerasGroup.at("children"))
+        {
+            if (!camera.at("children").empty())
+            {
+                rowText = camera.at("children")[0].value("text", std::string());
+                break;
+            }
+        }
+    }
+    ASSERT_FALSE(rowText.empty()) << "test setup: no map object row found in the tree";
+
+    ASSERT_TRUE(client.Call({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", rowText}}).value("ok", false));
+
+    const QPoint viewPoint = SceneToView(client, expectedCenter.x(), expectedCenter.y());
+    const auto viewResp = client.Call({{"cmd", "get_state"}, {"target", "graphicsView"}});
+    ASSERT_TRUE(viewResp.value("ok", false));
+    const auto& geometry = viewResp.at("result").at("geometry");
+    const QPoint viewportCenter(geometry.value("w", 0) / 2, geometry.value("h", 0) / 2);
+
+    // Generous slack, same reasoning as DoubleClickCameraRowCentersView.
+    EXPECT_NEAR(viewPoint.x(), viewportCenter.x(), 20) << "selecting the object's row in the tree did not center the view horizontally";
+    EXPECT_NEAR(viewPoint.y(), viewportCenter.y(), 20) << "selecting the object's row in the tree did not center the view vertically";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
 // Regression test: EditorTab's own QUndoStack member is destroyed implicitly right after
 // ~EditorTab()'s body runs, and can still emit signals of its own accord while doing so
 // (clearing its commands changes its index) - well before QObject's own destructor gets a
