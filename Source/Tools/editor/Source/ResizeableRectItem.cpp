@@ -71,6 +71,13 @@ void ResizeableRectItem::mouseMoveEvent( QGraphicsSceneMouseEvent* aEvent )
 
     QRectF curRect = CurrentRect();
 
+    // This item's raw position right after Qt's own default move above - the same raw delta
+    // every other selected item was just moved by too (Qt applies one shared delta to the whole
+    // selection). Captured before any of the adjustments below so their combined effect on just
+    // this item can be measured and reapplied to the rest of the selection further down.
+    const qreal rawX = curRect.x();
+    const qreal rawY = curRect.y();
+
     const auto w = curRect.width();
     const auto h = curRect.height();
     curRect.setX(mPointSnapper.SnapX(mSnapSettings.MapObjectSnapping().mSnapX, static_cast<int>(curRect.x())));
@@ -100,12 +107,20 @@ void ResizeableRectItem::mouseMoveEvent( QGraphicsSceneMouseEvent* aEvent )
     curRect = curRect.normalized();
     SetRect(curRect);
 
-    // Multi-selection case instead: clamp the whole selection's union bounding box as one rigid
-    // group, live on every move (not just once when the drag finishes) - same as a single
-    // selected item already gets above, just applied to the group as a unit so relative layout
-    // between items is preserved rather than each one clamping independently.
     if (multiSelect)
     {
+        // Snap (or, even with snapping off, the plain int-truncation curRect.x()/y() above
+        // always applies to this item's position) can nudge this grabbed item beyond the raw
+        // delta every other selected item already got from Qt's own default move - apply that
+        // same nudge to the rest of the selection too, or a previously-aligned group silently
+        // drifts apart by it: dramatically under grid snap, or by a stray pixel or so even
+        // without it.
+        TranslateOtherSelectedItems(scene(), this, curRect.x() - rawX, curRect.y() - rawY);
+
+        // Then clamp the whole selection's union bounding box as one rigid group, live on every
+        // move (not just once when the drag finishes) - same as a single selected item already
+        // gets above, just applied to the group as a unit so relative layout between items is
+        // preserved rather than each one clamping independently.
         ClampSelectedItemsToMapBounds(scene(), mPointSnapper);
     }
 }

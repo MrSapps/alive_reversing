@@ -25,6 +25,17 @@ EditorCamera* CalcContainingCamera(ResizeableRectItem* pItem, Model& model);
 // correction was applied.
 bool ClampSelectedItemsToMapBounds(QGraphicsScene* scene, IGridPointSnapper& snapper);
 
+// Translates every selected item except pGrabbedItem by (dx, dy), keeping a multi-item
+// selection's relative layout intact when the grabbed item's own position is adjusted by
+// something beyond the raw per-frame mouse delta Qt's own default multi-select move already
+// applies identically to every selected item - grid snap, but also just the int-truncation a
+// grabbed rect's own mouseMoveEvent always applies to its position (regardless of whether
+// snapping is even enabled), which the other selected items never go through since they're never
+// touched by anything but that raw Qt move. Without this, previously-aligned items drift apart by
+// that remainder: dramatically under grid snap, or by a stray pixel or so even with snapping off.
+// A no-op when dx and dy are both 0.
+void TranslateOtherSelectedItems(QGraphicsScene* scene, QGraphicsItem* pGrabbedItem, qreal dx, qreal dy);
+
 class ItemPositionData final
 {
 public:

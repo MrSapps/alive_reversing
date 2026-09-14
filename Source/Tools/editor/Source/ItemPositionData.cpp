@@ -183,6 +183,31 @@ bool ClampSelectedItemsToMapBounds(QGraphicsScene* scene, IGridPointSnapper& sna
     return true;
 }
 
+void TranslateOtherSelectedItems(QGraphicsScene* scene, QGraphicsItem* pGrabbedItem, qreal dx, qreal dy)
+{
+    if (dx == 0 && dy == 0)
+    {
+        return;
+    }
+
+    for (QGraphicsItem* item : scene->selectedItems())
+    {
+        if (item == pGrabbedItem)
+        {
+            continue;
+        }
+
+        if (auto* pRect = qgraphicsitem_cast<ResizeableRectItem*>(item))
+        {
+            pRect->SetRect(pRect->CurrentRect().translated(dx, dy));
+        }
+        else if (auto* pLine = qgraphicsitem_cast<ResizeableArrowItem*>(item))
+        {
+            pLine->Translate(dx, dy);
+        }
+    }
+}
+
 void ItemPositionData::AddRect(ResizeableRectItem* pItem, Model& model, bool recalculateParentCamera)
 {
     EditorCamera* pContainingCamera = nullptr;
