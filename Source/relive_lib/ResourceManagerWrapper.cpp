@@ -248,6 +248,7 @@ PalResource ResourceManagerWrapper::LoadPal(PalId pal)
 static FileSystem::Path PerLvlBasePath(EReliveLevelIds lvlId)
 {
     FileSystem::Path filePath = BasePath();
+    filePath.Append("levels");
     if (GetGameType() == GameType::eAe)
     {
         filePath.Append(ToString(MapWrapper::ToAE(lvlId)));
@@ -261,8 +262,9 @@ static FileSystem::Path PerLvlBasePath(EReliveLevelIds lvlId)
 
 static FileSystem::Path CamBaseName(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
 {
+    // No separate "paths" subdir under the level - a level's content already *is* its paths.
     FileSystem::Path filePath = PerLvlBasePath(lvlId);
-    filePath.Append("paths").Append(std::to_string(pathNumber));
+    filePath.Append(std::to_string(pathNumber));
     filePath.Append(std::to_string(camNumber));
     return filePath;
 }
@@ -369,15 +371,7 @@ std::vector<std::unique_ptr<BinaryPath>> ResourceManagerWrapper::LoadPaths(EReli
     std::vector<std::unique_ptr<BinaryPath>> ret;
 
     // TODO: Load level_info.json so we know which path jsons to load for this level
-    FileSystem::Path pathDir = BasePath();
-    if (GetGameType() == GameType::eAe)
-    {
-        pathDir.Append(ToString(MapWrapper::ToAE(lvlId))).Append("paths");
-    }
-    else
-    {
-        pathDir.Append(ToString(MapWrapper::ToAO(lvlId))).Append("paths");
-    }
+    FileSystem::Path pathDir = PerLvlBasePath(lvlId);
 
     FileSystem::Path levelInfo = pathDir;
     levelInfo.Append("level_info.json");
@@ -407,21 +401,12 @@ std::vector<std::unique_ptr<BinaryPath>> ResourceManagerWrapper::LoadPaths(EReli
     return ret;
 }
 
-std::vector<u8> ResourceManagerWrapper::LoadFile(const char_type* pFileName, EReliveLevelIds lvlId)
+std::vector<u8> ResourceManagerWrapper::LoadSoundFile(const char_type* pFileName, const std::string& soundTheme)
 {
-    FileSystem::Path pathDir = BasePath();
-    if (GetGameType() == GameType::eAe)
-    {
-        pathDir.Append(ToString(MapWrapper::ToAE(lvlId)));
-    }
-    else
-    {
-        pathDir.Append(ToString(MapWrapper::ToAO(lvlId)));
-    }
 
-    pathDir.Append(pFileName);
-
-    return mFs.LoadToVec(pathDir.GetPath().c_str());
+    FileSystem::Path soundFilePath = BasePath();
+    soundFilePath.Append("sounds").Append(soundTheme).Append(pFileName);
+    return mFs.LoadToVec(soundFilePath.GetPath().c_str());
 }
 
 

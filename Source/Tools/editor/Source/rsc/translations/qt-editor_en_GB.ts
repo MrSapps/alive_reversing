@@ -927,6 +927,30 @@ Do you want to overwrite it?</source>
         <source>Failed to create the mod - the folder may already contain files, or couldn&apos;t be written to.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Base this mod on an existing project</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Project</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Choose a mod or base game folder to copy levels from</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>That folder has no &quot;levels&quot; subfolder - pick a mod&apos;s root folder or a relive_data/AO or relive_data/AE folder instead.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Please choose a project to base this mod on, or uncheck the option.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The mod was created, but copying levels from the chosen project failed partway through.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>PathDataEditorDialog</name>

@@ -31,7 +31,12 @@ s16 sSFXPitchVariationEnabled_560F58 = true;
 s16 sNeedToHashSeqNames_560F40 = 1;
 
 // I think this is the burrrrrrrrrrrrrrrrrrrr loading sound
-const PathSoundInfo soundBlock = {"MONK.VH", "MONK.VB", {}, {}, {}, {}};
+// TODO: mSoundTheme left blank - which sounds/<theme>/ dir MONK.VH/VB actually end up in after
+// conversion can't be determined from source, only from real converted output (grep regenerated
+// path.json files for "vh_file": "MONK.VH" once the data conversion tool has been run against
+// real game data). Fill this in once verified - loading this fallback sound will fail (empty
+// theme) until then.
+const PathSoundInfo soundBlock = {"MONK.VH", "MONK.VB", {}, "", {}, {}, {}};
 
 PathSoundInfo sMonkVh_Vb_560F48 = soundBlock;
 
@@ -131,11 +136,11 @@ void SND_Reset()
 s16 SND_VAB_Load_4C9FE0(PathSoundInfo& pSoundBlockInfo, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     // Load the VH file data
-    pSoundBlockInfo.mVhFileData = resMan.LoadFile(pSoundBlockInfo.mVhFile.c_str(), map.mNextLevel);
+    pSoundBlockInfo.mVhFileData = resMan.LoadSoundFile(pSoundBlockInfo.mVhFile.c_str(), pSoundBlockInfo.mSoundTheme);
     //GetMidiVars()->LoadingLoop(0);
 
     // Load the VB file data
-    std::vector<u8> vbFileData = resMan.LoadFile(pSoundBlockInfo.mVbFile.c_str(), map.mNextLevel);
+    std::vector<u8> vbFileData = resMan.LoadSoundFile(pSoundBlockInfo.mVbFile.c_str(), pSoundBlockInfo.mSoundTheme);
 
     // Convert the records in the header to internal representation
     pSoundBlockInfo.mVabId = SsVabOpenHead(reinterpret_cast<VabHeader*>(pSoundBlockInfo.mVhFileData.data()));
@@ -677,7 +682,7 @@ void SND_Load_Seqs_Impl(OpenSeqHandle* pSeqTable, PathSoundInfo& info, ResourceM
         // Get a pointer to each SEQ
         for (const auto& seqName : info.mSeqFiles)
         {
-            auto buffer = resMan.LoadFile(seqName.c_str(), map.mNextLevel);
+            auto buffer = resMan.LoadSoundFile(seqName.c_str(), info.mSoundTheme);
 
             // We have to insert into the table at the position that matches the file name
             GetMidiVars()->sSeqDataTable()[GetTableIdxForName(seqName.c_str())].field_C_ppSeq_Data = buffer;

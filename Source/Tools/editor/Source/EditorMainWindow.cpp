@@ -273,7 +273,7 @@ bool EditorMainWindow::CreateAndOpenNewPath(QString jsonFileName, s32 pathId, Ga
 {
     // EditorTab::Save()/DoSave() just opens jsonFileName for writing - it doesn't create any
     // missing parent directories (matching QFile::open's own behavior), so the mod's
-    // <level>/paths/<id>/ folder has to exist before the save below, or it silently fails.
+    // levels/<level>/<id>/ folder has to exist before the save below, or it silently fails.
     QDir().mkpath(QFileInfo(jsonFileName).path());
 
     auto model = std::make_unique<Model>();

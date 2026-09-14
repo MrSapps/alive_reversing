@@ -3,6 +3,7 @@
 #include "../FatalError.hpp"
 #include <algorithm>
 #include <cctype>
+#include <cstring>
 
 #if !_WIN32
     #include <sys/stat.h>
@@ -292,55 +293,91 @@ namespace
 } // namespace
 #endif
 
-void FileSystem::EnumerateDirectory(const char_type* fileName, FileSystem::TEnumCallBack cb)
+namespace
 {
 #if _WIN32
-    _finddata_t findRec = {};
-    intptr_t hFind = _findfirst(fileName, &findRec);
-    if (hFind != -1)
+    // Shared _findfirst/_findnext walk for both EnumerateDirectory (searchPattern is a wildcard
+    // file pattern, e.g. "*.json", resolved relative to the CWD) and EnumerateSubDirectories
+    // (searchPattern is "<dirPath>\*") - they differ only in that pattern and in what
+    // shouldReport considers a match.
+    void WalkFindFirst(const char_type* searchPattern, const std::function<void(const char_type*, u32)>& cb, const std::function<bool(const _finddata_t&)>& shouldReport)
     {
-        for (;;)
+        _finddata_t findRec = {};
+        intptr_t hFind = _findfirst(searchPattern, &findRec);
+        if (hFind != -1)
         {
-            if (!(findRec.attrib & FILE_ATTRIBUTE_DIRECTORY))
+            for (;;)
             {
-                cb(findRec.name, static_cast<u32>(findRec.time_write)); // TODO: Chopping off a lot of time stamp resolution here
-            }
+                if (shouldReport(findRec))
+                {
+                    cb(findRec.name, static_cast<u32>(findRec.time_write)); // TODO: Chopping off a lot of time stamp resolution here
+                }
 
-            if (_findnext(hFind, &findRec) == -1)
-            {
-                break;
+                if (_findnext(hFind, &findRec) == -1)
+                {
+                    break;
+                }
             }
+            _findclose(hFind);
         }
-        _findclose(hFind);
     }
 #else
-    DIR* dir(opendir("."));
-    if (dir)
+    // Shared opendir/readdir walk for both EnumerateDirectory (searchDir is always "." - fileName
+    // is only ever a wildcard filter, not a real path, on this platform - see its own comment)
+    // and EnumerateSubDirectories (searchDir is the real directory to list) - they differ only in
+    // which directory that is and in what shouldReport considers a match.
+    void WalkReadDir(const char_type* searchDir, const std::function<void(const char_type*, u32)>& cb, const std::function<bool(const std::string&, const struct stat&)>& shouldReport)
     {
-        dirent* ent = nullptr;
-        do
+        DIR* dir(opendir(searchDir));
+        if (dir)
         {
-            ent = readdir(dir);
-            if (ent)
+            dirent* ent = nullptr;
+            do
             {
-                const std::string itemName = ent->d_name;
-                const std::string strFilter(fileName);
-                if (WildCardMatcher(itemName, strFilter, true))
+                ent = readdir(dir);
+                if (ent)
                 {
-                    struct stat statbuf;
-                    if (stat(("./" + itemName).c_str(), &statbuf) == 0)
+                    const std::string itemName = ent->d_name;
+                    if (itemName != "." && itemName != "..")
                     {
-                        const bool isFile = !S_ISDIR(statbuf.st_mode);
-                        if (isFile)
+                        struct stat statbuf;
+                        const std::string fullPath = std::string(searchDir) + "/" + itemName;
+                        if (stat(fullPath.c_str(), &statbuf) == 0 && shouldReport(itemName, statbuf))
                         {
-                            cb(itemName.c_str(), statbuf.st_mtime);
+                            cb(itemName.c_str(), static_cast<u32>(statbuf.st_mtime));
                         }
                     }
                 }
             }
+            while (ent);
+            closedir(dir);
         }
-        while (ent);
-        closedir(dir);
     }
+#endif
+}
+
+void FileSystem::EnumerateDirectory(const char_type* fileName, FileSystem::TEnumCallBack cb)
+{
+#if _WIN32
+    WalkFindFirst(fileName, cb, [](const _finddata_t& rec)
+                  { return !(rec.attrib & FILE_ATTRIBUTE_DIRECTORY); });
+#else
+    // fileName is a wildcard filter (e.g. "*.json"), not a real path - always searches "."
+    // (WildCardMatcher is POSIX-only, see its own #if !_WIN32 guard above, since _findfirst
+    // already does wildcard matching natively on Windows).
+    WalkReadDir(".", cb, [&fileName](const std::string& itemName, const struct stat& statbuf)
+                { return !S_ISDIR(statbuf.st_mode) && WildCardMatcher(itemName, fileName, true); });
+#endif
+}
+
+void FileSystem::EnumerateSubDirectories(const char_type* dirPath, const std::function<void(const char_type*, u32)>& cb)
+{
+#if _WIN32
+    const std::string pattern = std::string(dirPath) + "\\*";
+    WalkFindFirst(pattern.c_str(), cb, [](const _finddata_t& rec)
+                  { return (rec.attrib & FILE_ATTRIBUTE_DIRECTORY) && std::strcmp(rec.name, ".") != 0 && std::strcmp(rec.name, "..") != 0; });
+#else
+    WalkReadDir(dirPath, cb, [](const std::string&, const struct stat& statbuf)
+                { return static_cast<bool>(S_ISDIR(statbuf.st_mode)); });
 #endif
 }

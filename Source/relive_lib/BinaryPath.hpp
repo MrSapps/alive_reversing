@@ -19,6 +19,12 @@ struct PathSoundInfo final
     std::string mVbFile;
     std::vector<std::string> mSeqFiles;
 
+    // Which sounds/<theme>/ directory mVhFile/mVbFile/mSeqFiles live in - not necessarily this
+    // path's own level (see data_conversion.cpp's GetLevelIdFromPathId use for AE's combined
+    // "ender" levels). ResourceManagerWrapper::LoadSoundFile resolves against this instead of
+    // the current level, so a mod can reference any theme, including the base game's.
+    std::string mSoundTheme;
+
     // TODO: Runtime only vars - move out when sound refactor done
     s32 mVabId = -1;
     std::vector<u8> mVhFileData;

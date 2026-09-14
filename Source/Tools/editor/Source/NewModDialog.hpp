@@ -28,6 +28,8 @@ public:
 
 private slots:
     void on_btnBrowse_clicked();
+    void on_btnBrowseBaseOn_clicked();
+    void on_chkBaseOn_toggled(bool checked);
     void on_txtName_textChanged(const QString& text);
     void on_buttonBox_accepted();
 

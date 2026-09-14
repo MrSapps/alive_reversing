@@ -169,6 +169,8 @@ target_precompile_headers(
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/relive_lib/pch_shared.h"
 )
 
+target_precompile_headers(FileSystemTests REUSE_FROM relive_lib)
+
 target_precompile_headers(
     relive-editor PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Tools/editor/Source/pch_editor.h"

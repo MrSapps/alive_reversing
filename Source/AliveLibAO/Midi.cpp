@@ -39,7 +39,8 @@ s16 sSFXPitchVariationEnabled_4D0018 = true;
 s16 sNeedToHashSeqNames_4D0000 = 1;
 
 // I think this is the burrrrrrrrrrrrrrrrrrrr loading sound
-const PathSoundInfo soundBlock = {"MONK.VH", "MONK.VB", {}, {}, {}, {}};
+// TODO: mSoundTheme left blank - see the matching TODO in relive_lib/Sound/Midi.cpp for why.
+const PathSoundInfo soundBlock = {"MONK.VH", "MONK.VB", {}, "", {}, {}, {}};
 PathSoundInfo sMonkVh_Vb_4D0008 = soundBlock;
 
 class AOMidiVars final : public IMidiVars
@@ -917,11 +918,11 @@ void SsVabTransBody(VabBodyRecord* pVabBody, s16 vabId)
 s16 SND_VAB_Load_476CB0(PathSoundInfo& pSoundBlockInfo, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     // Find the VH file record
-    pSoundBlockInfo.mVhFileData = resMan.LoadFile(pSoundBlockInfo.mVhFile.c_str(), map.mNextLevel);
+    pSoundBlockInfo.mVhFileData = resMan.LoadSoundFile(pSoundBlockInfo.mVhFile.c_str(), pSoundBlockInfo.mSoundTheme);
     pSoundBlockInfo.mVabId = AO::SsVabOpenHead(reinterpret_cast<VabHeader*>(pSoundBlockInfo.mVhFileData.data()));
 
     // Load the VB file data
-    std::vector<u8> vbFileData = resMan.LoadFile(pSoundBlockInfo.mVbFile.c_str(), map.mNextLevel);
+    std::vector<u8> vbFileData = resMan.LoadSoundFile(pSoundBlockInfo.mVbFile.c_str(), pSoundBlockInfo.mSoundTheme);
 
     SsVabTransBody(reinterpret_cast<VabBodyRecord*>(vbFileData.data()), static_cast<s16>(pSoundBlockInfo.mVabId));
     SsVabTransCompleted(SS_WAIT_COMPLETED);
