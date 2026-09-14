@@ -40,6 +40,10 @@ BasicTypeProperty::BasicTypeProperty(IntegerType intType, void* pInteger, const 
 QWidget* BasicTypeProperty::GetEditorWidget(PropertyTreeWidget* pParent)
 {
     mSpinBox = new BigSpinBox(pParent);
+    // Named so automation can reach it (see the "click_tree_item"/"set_value" automation
+    // commands) - this widget only exists transiently once the user clicks into this property's
+    // row, so it has no fixed identity otherwise.
+    mSpinBox->setObjectName(QString("propertyEditor_%1").arg(mPropertyName));
 
 
     switch(mIntType)
@@ -72,12 +76,20 @@ QWidget* BasicTypeProperty::GetEditorWidget(PropertyTreeWidget* pParent)
         {
             if (mOldValue != newValue)
             {
-                mUndoStack.push(new ChangeBasicTypePropertyCommand(
+                // PushIfEffective's redo() (run whether or not it ends up pushing) refreshes
+                // this property via Refresh(), which already resyncs mOldValue to whatever is
+                // actually stored - do not also set it to the raw requested newValue afterward:
+                // that would clobber the corrected value with the pre-correction one whenever
+                // they differ (e.g. clamped), leaving mOldValue stale. The *next* edit would
+                // then compare against that stale number instead of reality - wrongly treating
+                // an actual no-op as a real change (spuriously pushing a "from stale to
+                // corrected" undo entry) while also leaving BigSpinBox's own already-corrected
+                // display with nothing to re-sync it if a later comparison instead wrongly
+                // treats a real change as a no-op and skips the correction entirely.
+                ChangeBasicTypePropertyCommand::PushIfEffective(mUndoStack,
                     LinkedBasicTypeProperty(this->mPropertyName, this->mIntType, this->mIntegerPtr, pParent, this->mGraphicsItem),
-                    BasicTypePropertyChangeData(this->mIntType, this->mIntegerPtr, this->mOldValue, newValue)));
+                    BasicTypePropertyChangeData(this->mIntType, this->mIntegerPtr, this->mOldValue, newValue));
             }
-
-            mOldValue = newValue;
 
             if (closeEditor)
             {
@@ -95,10 +107,22 @@ QWidget* BasicTypeProperty::GetEditorWidget(PropertyTreeWidget* pParent)
 
 void BasicTypeProperty::Refresh()
 {
-    setText(1, QString::number(ReadInt(mIntType, mIntegerPtr)));
+    // Also resync mOldValue - not just the displayed text/spin box - to whatever the model
+    // actually holds now. Refresh() runs after ChangeBasicTypePropertyCommand::redo()/undo(),
+    // which may have corrected the raw value it just wrote (e.g. ResizeableRectItem::
+    // SyncFromMapObject clamping an out-of-bounds size/position); mOldValue is what the spin
+    // box's valueChanged lambda compares the *next* edit against to decide whether anything
+    // changed, so leaving it at the pre-correction value would make one subsequent step/edit
+    // that happens to land back on that stale number silently produce no command at all -
+    // letting the displayed value drift out of sync with the model a little further with every
+    // such step, same bug this whole reorder exists to fix.
+    const qint64 currentValue = ReadInt(mIntType, mIntegerPtr);
+    setText(1, QString::number(currentValue));
 
     if (mSpinBox)
     {
-        mSpinBox->setValue(ReadInt(mIntType, mIntegerPtr), false);
+        mSpinBox->setValue(currentValue, false);
     }
+
+    mOldValue = currentValue;
 }

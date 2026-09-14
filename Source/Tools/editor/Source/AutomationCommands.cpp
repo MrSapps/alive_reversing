@@ -1,9 +1,11 @@
 #include "AutomationCommands.hpp"
+#include "BigSpinBox.hpp"
 
 #include <QAbstractButton>
 #include <QAbstractItemModel>
 #include <QAbstractItemView>
 #include <QAbstractScrollArea>
+#include <QAbstractSpinBox>
 #include <QAction>
 #include <QApplication>
 #include <QBuffer>
@@ -22,6 +24,7 @@
 #include <QMouseEvent>
 #include <QPixmap>
 #include <QSpinBox>
+#include <QTreeWidget>
 #include <QWidget>
 
 namespace Automation
@@ -162,6 +165,87 @@ namespace Automation
             QMouseEvent release(QEvent::MouseButtonRelease, center, widget->mapToGlobal(center), Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
             QCoreApplication::sendEvent(eventTarget, &press);
             QCoreApplication::sendEvent(eventTarget, &release);
+            return nlohmann::json::object();
+        }
+
+        // Clicks a QTreeWidget cell identified by its row's column-0 text (e.g. a property
+        // panel row's field name) rather than a pixel position or row index, since a dynamic
+        // tree's rows/order aren't known ahead of time. Synthesizes a real mouse press+release
+        // at that cell so QTreeWidget's own click handling fires exactly as it would for a real
+        // click (e.g. PropertyTreeWidget's itemPressed handler, which is what spawns a row's
+        // transient editor widget - see BasicTypeProperty::GetEditorWidget/"set_value").
+        nlohmann::json HandleClickTreeItem(QWidget* root, const nlohmann::json& request)
+        {
+            auto* tree = qobject_cast<QTreeWidget*>(RequireWidget(ResolveTargetRequired(root, request)));
+            if (!tree)
+            {
+                throw CommandError("target is not a QTreeWidget");
+            }
+            if (!request.contains("row_text"))
+            {
+                throw CommandError("'row_text' is required");
+            }
+
+            const QString wanted = QString::fromStdString(request.at("row_text").get<std::string>());
+            const int column = request.value("column", 1);
+
+            QTreeWidgetItem* found = nullptr;
+            for (int i = 0; i < tree->topLevelItemCount(); ++i)
+            {
+                if (tree->topLevelItem(i)->text(0) == wanted)
+                {
+                    found = tree->topLevelItem(i);
+                    break;
+                }
+            }
+            if (!found)
+            {
+                throw CommandError("no tree row with column-0 text: " + wanted.toStdString());
+            }
+
+            const int row = tree->indexOfTopLevelItem(found);
+            const QModelIndex index = tree->model()->index(row, column);
+            const QPoint center = tree->visualRect(index).center();
+            QWidget* viewport = tree->viewport();
+            QMouseEvent press(QEvent::MouseButtonPress, center, viewport->mapToGlobal(center), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+            QMouseEvent release(QEvent::MouseButtonRelease, center, viewport->mapToGlobal(center), Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+            QCoreApplication::sendEvent(viewport, &press);
+            QCoreApplication::sendEvent(viewport, &release);
+            return nlohmann::json::object();
+        }
+
+        // Clicks a QAbstractSpinBox's up/down step buttons programmatically (stepUp()/stepDown()
+        // are the exact slots those buttons invoke) - e.g. to check a spin box's own step
+        // clamping independently of typing a value directly (see BigSpinBox::stepBy).
+        nlohmann::json HandleSpinStep(QWidget* root, const nlohmann::json& request)
+        {
+            auto* spin = qobject_cast<QAbstractSpinBox*>(RequireWidget(ResolveTargetRequired(root, request)));
+            if (!spin)
+            {
+                throw CommandError("target is not a QAbstractSpinBox");
+            }
+            if (!request.contains("direction"))
+            {
+                throw CommandError("'direction' is required");
+            }
+
+            const std::string direction = request.at("direction").get<std::string>();
+            const int count = request.value("count", 1);
+            for (int i = 0; i < count; ++i)
+            {
+                if (direction == "down")
+                {
+                    spin->stepDown();
+                }
+                else if (direction == "up")
+                {
+                    spin->stepUp();
+                }
+                else
+                {
+                    throw CommandError("unknown 'direction': " + direction);
+                }
+            }
             return nlohmann::json::object();
         }
 
@@ -306,6 +390,15 @@ namespace Automation
                     }
                     listWidget->setCurrentItem(matches.first());
                 }
+            }
+            else if (auto* bigSpin = qobject_cast<BigSpinBox*>(widget))
+            {
+                // The property panel's integer editor (BasicTypeProperty). setValue(v, true)
+                // emits valueChanged(v, false) - same signal BasicTypeProperty::GetEditorWidget
+                // connects to push a ChangeBasicTypePropertyCommand a real "type a value, press
+                // Enter" would via BigSpinBox::OnEditComplete (which only differs in emitting
+                // closeEditor=true, cosmetic - whether the transient editor widget is removed).
+                bigSpin->setValue(value.get<qint64>(), true);
             }
             else
             {
@@ -480,6 +573,14 @@ namespace Automation
         if (cmd == "context_menu")
         {
             return HandleContextMenu(root, request);
+        }
+        if (cmd == "click_tree_item")
+        {
+            return HandleClickTreeItem(root, request);
+        }
+        if (cmd == "spin_step")
+        {
+            return HandleSpinStep(root, request);
         }
         if (cmd == "set_value")
         {

@@ -1,4 +1,5 @@
 #include "ResizeableRectItem.hpp"
+#include <algorithm>
 #include <QGraphicsSceneMouseEvent>
 #include <QGraphicsSceneMoveEvent>
 #include <QPainter>
@@ -425,11 +426,31 @@ void ResizeableRectItem::Visit(IReflector& f)
 
 void ResizeableRectItem::SyncFromMapObject()
 {
-    setX(mMapObject->XPos());
-    setY(mMapObject->YPos());
-    setWidth(mMapObject->mBaseTlv->mBottomRightX);
-    setHeight(mMapObject->mBaseTlv->mBottomRightY);
+    // The model can be written to directly with no bounds checking at all - e.g. the properties
+    // panel's spin boxes (BasicTypeProperty/ChangeBasicTypePropertyCommand) write straight into
+    // mBaseTlv via a raw pointer, bypassing every mouse-driven resize/drag/paste path's
+    // mPointSnapper clamp entirely. Apply the same invariants here so a value typed there can't
+    // leave the object smaller than kMinRectSize or outside the map - same idea as
+    // ForceItemsInsideMapBounds enforces for the map-resize case: shrink an oversized length
+    // first, then reposition (which alone can only reposition a range that already fits).
+    int width = std::max<int>(mMapObject->mBaseTlv->mBottomRightX, static_cast<int>(kMinRectSize));
+    int height = std::max<int>(mMapObject->mBaseTlv->mBottomRightY, static_cast<int>(kMinRectSize));
+    width = mPointSnapper.ClampLengthX(width);
+    height = mPointSnapper.ClampLengthY(height);
+
+    const int xpos = mPointSnapper.ClampRangeStartX(mMapObject->XPos(), width);
+    const int ypos = mPointSnapper.ClampRangeStartY(mMapObject->YPos(), height);
+
+    setX(xpos);
+    setY(ypos);
+    setWidth(width);
+    setHeight(height);
     UpdateIcon();
+
+    // Write any correction back into the model - otherwise an out-of-bounds value written
+    // directly (rather than via a mouse drag, which never produces one in the first place) would
+    // only look fixed on screen and still round-trip to disk as-is.
+    SyncToMapObject();
 }
 
 void ResizeableRectItem::SyncToMapObject()

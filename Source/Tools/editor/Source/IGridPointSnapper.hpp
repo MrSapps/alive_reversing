@@ -16,4 +16,10 @@ public:
     // independently (which can collapse it to a point - see GridPlacement::ClampRangeStartToMapBounds).
     virtual int ClampRangeStartX(int start, int length) = 0;
     virtual int ClampRangeStartY(int start, int length) = 0;
+
+    // Shrinks a length (a rect's width or height) so it can't be bigger than the map itself -
+    // see GridPlacement::ClampLengthToMapBounds. Apply before ClampRangeStartX/Y, which alone
+    // can only reposition a range that already fits, not shrink an oversized one.
+    virtual int ClampLengthX(int length) = 0;
+    virtual int ClampLengthY(int length) = 0;
 };
