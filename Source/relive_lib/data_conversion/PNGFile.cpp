@@ -250,7 +250,11 @@ void PNGFile::Load(FileSystem& fs, const char_type* pFileName, std::vector<u8>& 
 void PNGFile::Load(FileSystem& fs, const char_type* pFileName, AnimationPal& pal256, std::vector<u8>& pixelData, u32& width, u32& height)
 {
     AutoFILE f = fs.OpenFile(pFileName, "rb");
-
+    if (!f.GetFile())
+    {
+        return;
+    }
+    
     PngApi api(PngContext::CtxType::Decode);
 
     api.DisableCRC();

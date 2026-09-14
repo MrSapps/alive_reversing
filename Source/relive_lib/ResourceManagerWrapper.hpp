@@ -200,7 +200,7 @@ class FileSystem;
 class ResourceManagerWrapper final
 {
 public:
-    explicit ResourceManagerWrapper(FileSystem& fs);
+    ResourceManagerWrapper(FileSystem& fs, const std::string& modPath);
     ~ResourceManagerWrapper();
 
     // TODO: Remove/unify when both games resource managers are merged into one object
@@ -282,7 +282,8 @@ public:
             }
         }
     }
-
+    
+    std::vector<std::string> mSearchPaths;
 private:
 
     struct AnimCache final
@@ -296,6 +297,8 @@ private:
     bool Exists(AnimId animId, const std::string& theme);
     AnimCache LookUp(AnimId animId, const std::string& theme);
 
+    void AddSearchPaths(const std::string& modPath);
+
 public:
     std::mutex mLoadedAnimationsMutex;
     // TODO: Remove dead entries at some point
@@ -305,6 +308,7 @@ public:
 
     // FileSystem has no state, so sharing this reference across ThreadPool worker threads is safe.
     FileSystem& mFs;
+
 
 private:
     // unique_ptr to avoid bringing the header in

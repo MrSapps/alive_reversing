@@ -81,24 +81,6 @@ static std::string ReadString(nlohmann::json& o, const std::string& key)
     return o.at(key);   
 }
 
-static std::string ReadStringOptional(nlohmann::json& o, const std::string& key)
-{
-    if (!o.contains(key) || !o.at(key).is_string())
-    {
-        return "";
-    }
-    return o.at(key);
-}
-
-static bool ReadBool(nlohmann::json& o, const std::string& key)
-{
-    if (!o.contains(key) || !o.at(key).is_boolean())
-    {
-        throw Model::JsonKeyNotFoundException(key);
-    }
-    return o.at(key);
-}
-
 EditorCamera* Model::GetContainingCamera(MapObjectBase* pMapObject)
 {
     EditorCamera* pContainingCamera = nullptr;

@@ -133,7 +133,7 @@ void SND_Reset()
 }
 
 
-s16 SND_VAB_Load_4C9FE0(PathSoundInfo& pSoundBlockInfo, ResourceManagerWrapper& resMan, BaseMap& map)
+s16 SND_VAB_Load_4C9FE0(PathSoundInfo& pSoundBlockInfo, ResourceManagerWrapper& resMan, BaseMap& /*map*/)
 {
     // Load the VH file data
     pSoundBlockInfo.mVhFileData = resMan.LoadSoundFile(pSoundBlockInfo.mVhFile.c_str(), pSoundBlockInfo.mSoundTheme);
@@ -659,7 +659,7 @@ static u32 GetTableIdxForName(const char_type* pName)
     ALIVE_FATAL("Couldn't find seq name in the table");
 }
 
-void SND_Load_Seqs_Impl(OpenSeqHandle* pSeqTable, PathSoundInfo& info, ResourceManagerWrapper& resMan, BaseMap& map)
+void SND_Load_Seqs_Impl(OpenSeqHandle* pSeqTable, PathSoundInfo& info, ResourceManagerWrapper& resMan, BaseMap& /*map*/)
 {
     if (pSeqTable)
     {

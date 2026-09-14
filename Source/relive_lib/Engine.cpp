@@ -92,7 +92,7 @@ Engine::Engine(GameType gameType, FileSystem& fs, CommandLineParser& clp)
     : mGameType(gameType)
     , mFs(fs)
     , mClp(clp)
-    , mResMan(mFs)
+    , mResMan(mFs, "")
 {
 
     mIpcInterface = relive::MakeIpcInterface();

@@ -18,31 +18,66 @@
 #include "Sys.hpp"
 #include "ThreadPool.hpp"
 #include <FatalError.hpp>
+#include <string>
 
 u32 UniqueResId::mGlobalId = 1;
 
-ResourceManagerWrapper::ResourceManagerWrapper(FileSystem& fs)
+ResourceManagerWrapper::ResourceManagerWrapper(FileSystem& fs, const std::string& modPath)
     : mFs(fs)
     , mThreadPool(std::make_unique<ThreadPool>())
 {
     bHideLoadingIcon = 0;
     loading_ticks = 0;
+
+    AddSearchPaths(modPath);
 }
+
+void ResourceManagerWrapper::AddSearchPaths(const std::string& modPath)
+{
+    // Root of all data
+    FileSystem::Path reliveDataPath;
+    reliveDataPath.Append("relive_data");
+
+    // Where the base dir of the game type we are running is
+    FileSystem::Path primaryBaseGamePath = reliveDataPath;
+
+    // Where the base dir of the opposite game might be - we check here if primary fails
+    FileSystem::Path backupBaseGamePath = reliveDataPath;
+    if (GetGameType() == GameType::eAe)
+    {
+        primaryBaseGamePath.Append("ae");
+        backupBaseGamePath.Append("ao");
+    }
+    else
+    {
+        primaryBaseGamePath.Append("ao");
+        backupBaseGamePath.Append("ae");
+    }
+
+    if (!modPath.empty())
+    {
+        mSearchPaths.push_back(modPath);
+    }
+
+    mSearchPaths.push_back(primaryBaseGamePath.GetPath());
+    mSearchPaths.push_back(backupBaseGamePath.GetPath());
+}
+
 
 // Out of line so unique_ptr<ThreadPool> can be destroyed with an incomplete ThreadPool type
 ResourceManagerWrapper::~ResourceManagerWrapper() = default;
 
-static FileSystem::Path BasePath(bool invertGame = false)
+static FileSystem::Path PerLvlBasePath(const std::string& basePath, EReliveLevelIds lvlId)
 {
-    FileSystem::Path filePath;
-    filePath.Append("relive_data");
-    if (GetGameType() == GameType::eAe && !invertGame)
+    FileSystem::Path filePath(basePath);
+    filePath.Append("levels");
+    if (GetGameType() == GameType::eAe)
     {
-        filePath.Append("ae");
+        filePath.Append(ToString(MapWrapper::ToAE(lvlId)));
     }
     else
     {
-        filePath.Append("ao");
+        filePath.Append(ToString(MapWrapper::ToAO(lvlId)));
     }
     return filePath;
 }
@@ -50,10 +85,10 @@ static FileSystem::Path BasePath(bool invertGame = false)
 class AnimationLoaderJob final : public IJob
 {
 private:
-    static std::string GetAnimPath(AnimId animId, const std::string& themeName, bool invertGameType)
+    static std::string GetAnimPath(const std::string& basePath, AnimId animId, const std::string& themeName)
     {
         // One huge blocking func for now - needs to work like OG res man
-        FileSystem::Path filePath = BasePath(invertGameType);
+        FileSystem::Path filePath(basePath);
 
         filePath.Append("animations");
 
@@ -81,19 +116,17 @@ public:
     void Execute() override
     {
         // One huge blocking func for now - needs to work like OG res man
-        std::string filePath = GetAnimPath(mAnimId, mThemeName, false);
 
         FileSystem& fs = mResMan->mFs;
-        std::string jsonStr = fs.LoadToString((filePath + ".json").c_str());
-        if (jsonStr.empty())
+        std::string jsonStr;
+        std::string filePath;
+        for (const auto& basePath : mResMan->mSearchPaths)
         {
-            // If Ae try to find in Ao and vice versa
-            filePath = GetAnimPath(mAnimId, mThemeName, true);
+            filePath = GetAnimPath(basePath, mAnimId, mThemeName);
             jsonStr = fs.LoadToString((filePath + ".json").c_str());
-
-            if (jsonStr.empty())
+            if (!jsonStr.empty())
             {
-                ALIVE_FATAL("Missing anim json for anim: %s", (filePath + ".json").c_str());
+                break;
             }
         }
 
@@ -190,10 +223,17 @@ void ResourceManagerWrapper::PendAnimation(AnimId animId, const std::string& the
 
 std::string ResourceManagerWrapper::FmvPath(const std::string& fmvName) 
 {
-    FileSystem::Path filePath = BasePath();
-    filePath.Append("fmvs");
-    filePath.Append(fmvName + ".webm");
-    return filePath.GetPath();
+    for (const auto& basePath : mSearchPaths)
+    {
+        FileSystem::Path filePath(basePath);
+        filePath.Append("fmvs");
+        filePath.Append(fmvName + ".webm");
+        if (mFs.FileExists(filePath.GetPath().c_str()))
+        {
+            return filePath.GetPath();
+        }
+    }
+    return fmvName;
 }
 
 AnimResource ResourceManagerWrapper::LoadAnimation(AnimId anim, const std::string& themeName)
@@ -230,9 +270,16 @@ PalResource ResourceManagerWrapper::LoadPal(PalId pal)
     newRes.mId = pal;
     newRes.mPal = std::make_shared<AnimationPal>();
 
-    FileSystem::Path filePath = BasePath();
-
-    filePath.Append(ToString(newRes.mId));
+    FileSystem::Path filePath;
+    for (auto& basePath : mSearchPaths)
+    {
+        filePath = FileSystem::Path(basePath);
+        filePath.Append(ToString(newRes.mId));
+        if (mFs.FileExists(filePath.GetPath().c_str()))
+        {
+            break;
+        }
+    }
 
     auto palData = mFs.LoadToVec(filePath.GetPath().c_str());
     if (palData.size() != 1024) // 256 RGBA entries
@@ -245,25 +292,11 @@ PalResource ResourceManagerWrapper::LoadPal(PalId pal)
     return newRes;
 }
 
-static FileSystem::Path PerLvlBasePath(EReliveLevelIds lvlId)
-{
-    FileSystem::Path filePath = BasePath();
-    filePath.Append("levels");
-    if (GetGameType() == GameType::eAe)
-    {
-        filePath.Append(ToString(MapWrapper::ToAE(lvlId)));
-    }
-    else
-    {
-        filePath.Append(ToString(MapWrapper::ToAO(lvlId)));
-    }
-    return filePath;
-}
 
-static FileSystem::Path CamBaseName(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
+static FileSystem::Path CamBaseName(const std::string& basePath, EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
 {
     // No separate "paths" subdir under the level - a level's content already *is* its paths.
-    FileSystem::Path filePath = PerLvlBasePath(lvlId);
+    FileSystem::Path filePath = PerLvlBasePath(basePath, lvlId);
     filePath.Append(std::to_string(pathNumber));
     filePath.Append(std::to_string(camNumber));
     return filePath;
@@ -287,82 +320,97 @@ static RgbaData LoadPng(FileSystem& fs, const std::string& filePath)
 
 CamResource ResourceManagerWrapper::LoadCam(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
 {
-    FileSystem::Path filePath = CamBaseName(lvlId, pathNumber, camNumber);
-
+    
     CamResource newRes;
-    newRes.mData = LoadPng(mFs, filePath.GetPath() + ".png");
+    for (const auto& basePath : mSearchPaths)
+    {
+        FileSystem::Path filePath = CamBaseName(basePath, lvlId, pathNumber, camNumber);
+        newRes.mData = LoadPng(mFs, filePath.GetPath() + ".png");
+        if (newRes.mData.mPixels)
+        {
+            break;
+        }
+    }
+
     return newRes;
 }
 
 Fg1Resource ResourceManagerWrapper::LoadFg1(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
 {
-    FileSystem::Path filePath = CamBaseName(lvlId, pathNumber, camNumber);
-
     Fg1Resource newRes;
-
+    
     // Load the json manifest
-    const std::string jsonStr = mFs.LoadToString((filePath.GetPath() + ".json").c_str());
-    if (!jsonStr.empty())
+    for (const auto& basePath : mSearchPaths)
     {
-        nlohmann::json j = nlohmann::json::parse(jsonStr);
-        newRes.mFg1ResBlockCount = j["fg1_block_count"];
-
-        // TODO: Make this more sane later
-        for (auto& fg1File : j["layers"])
+        FileSystem::Path filePath = CamBaseName(basePath, lvlId, pathNumber, camNumber);
+        const std::string jsonStr = mFs.LoadToString((filePath.GetPath() + ".json").c_str());
+        if (!jsonStr.empty())
         {
-            std::string s = fg1File;
-            if (s.find("fg_well") != std::string::npos)
+            nlohmann::json j = nlohmann::json::parse(jsonStr);
+            newRes.mFg1ResBlockCount = j["fg1_block_count"];
+
+            // TODO: Make this more sane later
+            for (auto& fg1File : j["layers"])
             {
-                newRes.mFgWell.mImage = LoadPng(mFs, filePath.GetPath() + "fg_well.png");
+                std::string s = fg1File;
+                if (s.find("fg_well") != std::string::npos)
+                {
+                    newRes.mFgWell.mImage = LoadPng(mFs, filePath.GetPath() + "fg_well.png");
+                }
+                else if (s.find("bg_well") != std::string::npos)
+                {
+                    newRes.mBgWell.mImage = LoadPng(mFs, filePath.GetPath() + "bg_well.png");
+                }
+                else if (s.find("fg") != std::string::npos)
+                {
+                    newRes.mFg.mImage = LoadPng(mFs, filePath.GetPath() + "fg.png");
+                }
+                else if (s.find("bg") != std::string::npos)
+                {
+                    newRes.mBg.mImage = LoadPng(mFs, filePath.GetPath() + "bg.png");
+                }
             }
-            else if (s.find("bg_well") != std::string::npos)
-            {
-                newRes.mBgWell.mImage = LoadPng(mFs, filePath.GetPath() + "bg_well.png");
-            }
-            else if (s.find("fg") != std::string::npos)
-            {
-                newRes.mFg.mImage = LoadPng(mFs, filePath.GetPath() + "fg.png");
-            }
-            else if (s.find("bg") != std::string::npos)
-            {
-                newRes.mBg.mImage = LoadPng(mFs, filePath.GetPath() + "bg.png");
-            }
+            break;
         }
     }
-
     return newRes;
 }
 
 FontResource ResourceManagerWrapper::LoadFont(FontType fontId)
 {
-    FileSystem::Path filePath = BasePath();
-
-    switch (fontId)
+    auto pPngData = std::make_shared<PngData>();
+    pPngData->mPal = std::make_shared<AnimationPal>();
+    for (const auto& basePath : mSearchPaths)
     {
-        case FontType::None:
-            ALIVE_FATAL("Can't load none");
-            break;
-
-        case FontType::LcdFont:
+        FileSystem::Path filePath(basePath);
+        switch (fontId)
         {
-            filePath.Append("lcd_font");
-            break;
+            case FontType::None:
+                ALIVE_FATAL("Can't load none");
+                break;
+
+            case FontType::LcdFont:
+            {
+                filePath.Append("lcd_font");
+                break;
+            }
+
+            case FontType::PauseMenu:
+            {
+                filePath.Append("pause_menu_font");
+                break;
+            }
         }
 
-        case FontType::PauseMenu:
+        PNGFile pngFile;
+        pngFile.Load(mFs, (filePath.GetPath() + ".png").c_str(), *pPngData->mPal, pPngData->mPixels, pPngData->mWidth, pPngData->mHeight);
+        if (!pPngData->mPixels.empty())
         {
-            filePath.Append("pause_menu_font");
             break;
         }
     }
 
-    auto pPngData = std::make_shared<PngData>();
-    PNGFile pngFile;
-    pPngData->mPal = std::make_shared<AnimationPal>();
-    pngFile.Load(mFs, (filePath.GetPath() + ".png").c_str(), *pPngData->mPal, pPngData->mPixels, pPngData->mWidth, pPngData->mHeight);
-
     FontResource newRes(fontId, pPngData);
-
     return newRes;
 }
 
@@ -370,32 +418,39 @@ std::vector<std::unique_ptr<BinaryPath>> ResourceManagerWrapper::LoadPaths(EReli
 {
     std::vector<std::unique_ptr<BinaryPath>> ret;
 
-    // TODO: Load level_info.json so we know which path jsons to load for this level
-    FileSystem::Path pathDir = PerLvlBasePath(lvlId);
-
-    FileSystem::Path levelInfo = pathDir;
-    levelInfo.Append("level_info.json");
-
-    const std::string jsonStr = mFs.LoadToString(levelInfo);
-    nlohmann::json j = nlohmann::json::parse(jsonStr);
-    const auto& paths = j["paths"];
-    for (const auto& path : paths)
+    for (const auto& basePath : mSearchPaths)
     {
-        const std::string pathId = path["path_id"];
+        // TODO: Load level_info.json so we know which path jsons to load for this level
+        FileSystem::Path pathDir = PerLvlBasePath(basePath, lvlId);
 
-        FileSystem::Path pathJsonFile = pathDir;
-        pathJsonFile.Append(pathId).Append("path.json");
-        const std::string pathJsonStr = mFs.LoadToString(pathJsonFile);
+        FileSystem::Path levelInfo = pathDir;
+        levelInfo.Append("level_info.json");
 
-        // TODO: set the res ptrs to the parsed json data
-        // TODO: Handle exception on bad data
+        const std::string jsonStr = mFs.LoadToString(levelInfo);
+        if (!jsonStr.empty())
+        {
+            nlohmann::json j = nlohmann::json::parse(jsonStr);
+            const auto& paths = j["paths"];
+            for (const auto& path : paths)
+            {
+                const std::string pathId = path["path_id"];
 
-        nlohmann::json pathJson = nlohmann::json::parse(pathJsonStr);
-        LOG_INFO("Cam count %d", pathJson["map"]["cameras"].size());
+                FileSystem::Path pathJsonFile = pathDir;
+                pathJsonFile.Append(pathId).Append("path.json");
+                const std::string pathJsonStr = mFs.LoadToString(pathJsonFile);
 
-        auto pathBuffer = std::make_unique<BinaryPath>(pathJsonFile.GetPath(), pathJson["map"]["path_id"]);
-        pathBuffer->CreateFromJson(pathJson);
-        ret.emplace_back(std::move(pathBuffer));
+                // TODO: set the res ptrs to the parsed json data
+                // TODO: Handle exception on bad data
+
+                nlohmann::json pathJson = nlohmann::json::parse(pathJsonStr);
+                LOG_INFO("Cam count %d", pathJson["map"]["cameras"].size());
+
+                auto pathBuffer = std::make_unique<BinaryPath>(pathJsonFile.GetPath(), pathJson["map"]["path_id"]);
+                pathBuffer->CreateFromJson(pathJson);
+                ret.emplace_back(std::move(pathBuffer));
+            }
+            break;
+        }
     }
 
     return ret;
@@ -403,10 +458,17 @@ std::vector<std::unique_ptr<BinaryPath>> ResourceManagerWrapper::LoadPaths(EReli
 
 std::vector<u8> ResourceManagerWrapper::LoadSoundFile(const char_type* pFileName, const std::string& soundTheme)
 {
-
-    FileSystem::Path soundFilePath = BasePath();
-    soundFilePath.Append("sounds").Append(soundTheme).Append(pFileName);
-    return mFs.LoadToVec(soundFilePath.GetPath().c_str());
+    for (const auto& basePath : mSearchPaths)
+    {
+        FileSystem::Path soundFilePath(basePath);
+        soundFilePath.Append("sounds").Append(soundTheme).Append(pFileName);
+        auto vec = mFs.LoadToVec(soundFilePath.GetPath().c_str());
+        if (!vec.empty())
+        {
+            return vec;
+        }
+    }
+    return {};
 }
 
 

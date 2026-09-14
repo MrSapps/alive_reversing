@@ -156,7 +156,7 @@ static const FP_Point sThrowVelocities[6] = {
     {FP_FromInteger(10), FP_FromInteger(-4)},
     {FP_FromInteger(4), FP_FromInteger(-3)}};
 
-void Abe_OnFrame(::BaseGameObject* pObj, u32&, const IndexedPoint& pData, ResourceManagerWrapper& resMan, BaseMap& map)
+void Abe_OnFrame(::BaseGameObject* pObj, u32&, const IndexedPoint& pData, ResourceManagerWrapper& /*resMan*/, BaseMap& /*map*/)
 {
     auto pAbe = static_cast<Abe*>(pObj);
 

@@ -5233,7 +5233,7 @@ public:
     };
 
     explicit AESaveConverter(FileSystem& fs)
-        : mResMan(fs)
+        : mResMan(fs, "")
     {
     }
 
