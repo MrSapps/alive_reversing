@@ -6,6 +6,7 @@
 #include "EditorTab.hpp"
 #include "ClipBoard.hpp"
 #include "GridSnapSettings.hpp"
+#include "../../relive_lib/GameType.hpp"
 
 namespace Ui
 {
@@ -13,6 +14,8 @@ namespace Ui
 }
 
 class AutomationServer;
+class EditorMod;
+class ModTreeWidget;
 
 class EditorMainWindow final : public QMainWindow
 {
@@ -32,7 +35,17 @@ public:
     {
         return onOpenPath(fullFileName);
     }
+
+    // Creates a new path at an explicit on-disk location and opens+saves it immediately (no
+    // Save-As dialog) - used by ModTreeWidget's "New Path" context menu action, which already
+    // knows exactly where the file should live (inside the mod's level folder). AddModelTab
+    // (private) is the only thing that constructs an EditorTab, so this is the same kind of
+    // public wrapper OpenPath() already is for onOpenPath().
+    bool CreateAndOpenNewPath(QString jsonFileName, s32 pathId, GameType game);
+
 private slots:
+    void on_actionNewMod_triggered();
+    void on_actionOpenMod_triggered();
     void on_actionDark_Fusion_theme_triggered();
 
     void on_actionDark_theme_triggered();
@@ -110,6 +123,19 @@ private:
     void UpdateWindowTitle();
     void DisconnectTabSignals();
     void closeEvent(QCloseEvent* pEvent) override;
+
+    // Closes every open tab (each honoring its own unsaved-changes prompt via onCloseTab).
+    // Returns false (leaving whatever's still open alone) if the user cancels any of those
+    // prompts, so a mod switch that triggers this can abort rather than leave the tree/tabs out
+    // of sync with each other.
+    bool CloseAllTabs();
+
+    // Common path for New Mod/Open Mod: closes every open tab (see CloseAllTabs), swaps
+    // mCurrentMod, repopulates the mod tree, updates the window title, and persists
+    // "last_open_mod_dir" (same QSettings/Editor.ini idiom "last_open_dir"/"theme"/
+    // "windowState" already use) so it can be auto-reopened on next launch. Returns false (mod
+    // left unchanged) if CloseAllTabs was cancelled.
+    bool SwitchToMod(std::unique_ptr<EditorMod> pMod);
 private:
     Ui::EditorMainWindow* m_ui;
     QSettings m_Settings;
@@ -118,4 +144,6 @@ private:
     GridSnapSettings mSnapSettings;
     QString mUnthemedStyle;
     std::unique_ptr<AutomationServer> mAutomationServer;
+    std::unique_ptr<EditorMod> mCurrentMod;
+    ModTreeWidget* mModTree = nullptr;
 };

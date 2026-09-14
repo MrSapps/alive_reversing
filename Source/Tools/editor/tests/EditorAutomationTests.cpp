@@ -174,6 +174,19 @@ namespace
         return false;
     }
 
+    // Same idea as ContainsClassName, but counts every match rather than stopping at the first -
+    // e.g. counting how many EditorTab widgets currently exist under tabWidget, to check a
+    // double-click didn't open a duplicate tab for an already-open path.
+    int CountClassName(const nlohmann::json& node, const std::string& className)
+    {
+        int count = node.value("className", std::string()) == className ? 1 : 0;
+        for (const auto& child : node.value("children", nlohmann::json::array()))
+        {
+            count += CountClassName(child, className);
+        }
+        return count;
+    }
+
     // Creates a new path via actionNew_path, accepting both of its sequential "path id"/"game"
     // QInputDialogs with their defaults (0, AO) via the "@active_modal" target - they have no
     // objectName of their own, unlike AboutDialog.
@@ -486,6 +499,109 @@ namespace
             DragView(client, SceneToView(client, curX + 10, curY + 10), SceneToView(client, targetX + 10, rowY + 10));
         }
         return SortedMapObjectsByX(client);
+    }
+
+    // Drives NewModDialog (File > Mod > New Mod...) end to end: fills name/author/directory
+    // (bypassing the "Browse..." native folder picker - txtDirectory is read-only in the UI, but
+    // "set_value" writes to it directly via QLineEdit::setText, same as it does for any other
+    // read-only field elsewhere in these tests) and accepts. Leaves gameIndex (0=AO, 1=AE)
+    // untouched if not overridden, matching cmbGame's own default.
+    bool CreateNewMod(AutomationClient& client, const QString& dir, const QString& name, const QString& author, int gameIndex = 0)
+    {
+        const int clickId = client.SendCommand({{"cmd", "click"}, {"target", "actionNewMod"}});
+        if (!client.Call({{"cmd", "set_value"}, {"target", "txtName"}, {"value", name.toStdString()}}).value("ok", false))
+        {
+            ADD_FAILURE() << "failed to set mod name";
+            return false;
+        }
+        if (!client.Call({{"cmd", "set_value"}, {"target", "txtAuthor"}, {"value", author.toStdString()}}).value("ok", false))
+        {
+            ADD_FAILURE() << "failed to set mod author";
+            return false;
+        }
+        if (gameIndex != 0 && !client.Call({{"cmd", "set_value"}, {"target", "cmbGame"}, {"value", gameIndex}}).value("ok", false))
+        {
+            ADD_FAILURE() << "failed to set mod target game";
+            return false;
+        }
+        if (!client.Call({{"cmd", "set_value"}, {"target", "txtDirectory"}, {"value", dir.toStdString()}}).value("ok", false))
+        {
+            ADD_FAILURE() << "failed to set mod directory";
+            return false;
+        }
+        if (!client.Call({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}}).value("ok", false))
+        {
+            ADD_FAILURE() << "no active modal for NewModDialog";
+            return false;
+        }
+        return client.WaitForResponse(clickId, 5000).value("ok", false);
+    }
+
+    // Creates a mod, a "MI" level, and path 0 inside it via the tree's own right-click New
+    // Level/New Path actions (not a shortcut around them) - shared setup for tests that need an
+    // already-open path inside a mod without re-verifying the creation flow itself (see
+    // NewLevelAndNewPathViaTreeContextMenuCreatesFilesAndOpensPath for that).
+    // Triggering a context menu's action programmatically (via "click" on its QAction, rather
+    // than a real mouse click landing inside the still-open QMenu) doesn't tell the menu itself
+    // to close - same gotcha DeleteCameraViaContextMenu's own comment documents for
+    // "graphicsViewContextMenu". Dismiss it explicitly with Escape (only if it's actually still
+    // around - the action may have already closed it some other way) so the menu's own exec()
+    // call unblocks and the original right-click command can finally return.
+    bool DismissMenuIfStillOpen(AutomationClient& client, const char* menuObjectName)
+    {
+        if (client.Call({{"cmd", "get_state"}, {"target", menuObjectName}}).value("ok", false))
+        {
+            return client.Call({{"cmd", "send_key"}, {"target", menuObjectName}, {"key", "Escape"}}).value("ok", false);
+        }
+        return true;
+    }
+
+    bool CreateModWithLevelAndOpenPath(AutomationClient& client, const QString& modDir)
+    {
+        if (!CreateNewMod(client, modDir, "My Mod", "Tester"))
+        {
+            return false;
+        }
+        // A right-click opens ModTreeWidget's context menu via QMenu::exec() - a nested,
+        // blocking event loop, same as EditorGraphicsView's own context menu (see
+        // DeleteCameraViaContextMenu's comment above) - so it has to be fired via SendCommand
+        // (not Call) and its response only collected via WaitForResponse once the action that
+        // dismisses the menu (clicking one of its entries) has actually happened.
+        const int rightClickModRootId = client.SendCommand({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", "My Mod"}, {"right_click", true}});
+        {
+            const int clickId = client.SendCommand({{"cmd", "click"}, {"target", "actionNewLevel"}});
+            if (!client.Call({{"cmd", "set_value"}, {"target", "@active_modal_input"}, {"value", "MI"}}).value("ok", false)
+                || !client.Call({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}}).value("ok", false)
+                || !client.WaitForResponse(clickId, 5000).value("ok", false))
+            {
+                ADD_FAILURE() << "New Level flow failed";
+                return false;
+            }
+        }
+        if (!DismissMenuIfStillOpen(client, "modTreeContextMenu")
+            || !client.WaitForResponse(rightClickModRootId, 5000).value("ok", false))
+        {
+            ADD_FAILURE() << "failed to right-click the mod root";
+            return false;
+        }
+
+        const int rightClickLevelId = client.SendCommand({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", "MI"}, {"right_click", true}});
+        {
+            const int clickId = client.SendCommand({{"cmd", "click"}, {"target", "actionNewPath"}});
+            if (!client.Call({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}}).value("ok", false)
+                || !client.WaitForResponse(clickId, 5000).value("ok", false))
+            {
+                ADD_FAILURE() << "New Path flow failed";
+                return false;
+            }
+        }
+        if (!DismissMenuIfStillOpen(client, "modTreeContextMenu")
+            || !client.WaitForResponse(rightClickLevelId, 5000).value("ok", false))
+        {
+            ADD_FAILURE() << "failed to right-click the new level";
+            return false;
+        }
+        return true;
     }
 }
 
@@ -2884,6 +3000,257 @@ TEST(EditorAutomation, PropertyPanelSpinBoxArrowsStayInSyncAtMinRectSize)
 
     editor.terminate();
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Regression/feature test for the Mod project system: File > Mod > New Mod... (NewModDialog)
+// should write modinfo.json with the fields entered, and ModTreeWidget (the new left-docked
+// tree) should show just the mod's root item - no levels yet, since nothing's been created
+// inside it.
+TEST(EditorAutomation, CreateModWritesModInfoAndShowsEmptyTree)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString modDir = tempDir.filePath("MyMod");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateNewMod(client, modDir, "My Mod", "Tester"));
+
+    ASSERT_TRUE(QFile::exists(modDir + "/modinfo.json")) << "New Mod did not write modinfo.json";
+    {
+        QFile f(modDir + "/modinfo.json");
+        ASSERT_TRUE(f.open(QIODevice::ReadOnly));
+        const nlohmann::json modInfo = nlohmann::json::parse(f.readAll().toStdString());
+        EXPECT_EQ(modInfo.value("name", std::string()), "My Mod");
+        EXPECT_EQ(modInfo.value("author", std::string()), "Tester");
+        EXPECT_EQ(modInfo.value("target_game", std::string()), "AO") << "cmbGame's default (index 0) should be AO";
+    }
+
+    const auto treeResp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+    ASSERT_TRUE(treeResp.value("ok", false));
+    const auto& items = treeResp.at("result").at("items");
+    ASSERT_EQ(items.size(), 1u) << "expected just the mod root item";
+    EXPECT_EQ(items[0].value("text", std::string()), "My Mod");
+    EXPECT_EQ(items[0].at("children").size(), 0u) << "a brand new mod should have no levels yet";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Right-click the mod root -> New Level..., right-click that level -> New Path... must create
+// the on-disk layout EditorMod expects (<level>/paths/level_info.json + <id>/path.json), open
+// the new path as a tab, and populate the tree down to that path's Cameras/Collisions groups
+// immediately (RefreshPathSubtree runs as soon as NotifyTabOpened links the freshly-opened tab
+// to its tree node - see ModTreeWidget::PromptNewPath).
+TEST(EditorAutomation, NewLevelAndNewPathViaTreeContextMenuCreatesFilesAndOpensPath)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString modDir = tempDir.filePath("MyMod");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateNewMod(client, modDir, "My Mod", "Tester"));
+
+    // A right-click opens the tree's context menu via QMenu::exec() - a nested, blocking event
+    // loop (same as EditorGraphicsView's own context menu - see DeleteCameraViaContextMenu's
+    // comment above), so it's fired via SendCommand and its response only collected via
+    // WaitForResponse once the action that dismisses the menu has actually happened.
+    const int rightClickModRootId = client.SendCommand({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", "My Mod"}, {"right_click", true}});
+    {
+        const int clickId = client.SendCommand({{"cmd", "click"}, {"target", "actionNewLevel"}});
+        ASSERT_TRUE(client.Call({{"cmd", "set_value"}, {"target", "@active_modal_input"}, {"value", "MI"}}).value("ok", false));
+        ASSERT_TRUE(client.Call({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}}).value("ok", false));
+        ASSERT_TRUE(client.WaitForResponse(clickId, 5000).value("ok", false));
+    }
+    ASSERT_TRUE(DismissMenuIfStillOpen(client, "modTreeContextMenu"));
+    ASSERT_TRUE(client.WaitForResponse(rightClickModRootId, 5000).value("ok", false));
+
+    ASSERT_TRUE(QDir(modDir + "/MI/paths").exists()) << "New Level did not create the level's paths/ folder";
+    {
+        const auto treeResp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+        ASSERT_TRUE(treeResp.value("ok", false));
+        const auto& items = treeResp.at("result").at("items");
+        ASSERT_EQ(items[0].at("children").size(), 1u) << "expected exactly one level after New Level";
+        EXPECT_EQ(items[0].at("children")[0].value("text", std::string()), "MI");
+    }
+
+    const int rightClickLevelId = client.SendCommand({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", "MI"}, {"right_click", true}});
+    {
+        const int clickId = client.SendCommand({{"cmd", "click"}, {"target", "actionNewPath"}});
+        // Path id defaults to the lowest unused one (0 for a brand new level) - accept as-is.
+        ASSERT_TRUE(client.Call({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}}).value("ok", false));
+        ASSERT_TRUE(client.WaitForResponse(clickId, 5000).value("ok", false));
+    }
+    ASSERT_TRUE(DismissMenuIfStillOpen(client, "modTreeContextMenu"));
+    ASSERT_TRUE(client.WaitForResponse(rightClickLevelId, 5000).value("ok", false));
+
+    ASSERT_TRUE(QFile::exists(modDir + "/MI/paths/0/path.json")) << "New Path did not write path.json";
+    ASSERT_TRUE(QFile::exists(modDir + "/MI/paths/level_info.json")) << "New Path did not update level_info.json";
+    {
+        QFile f(modDir + "/MI/paths/level_info.json");
+        ASSERT_TRUE(f.open(QIODevice::ReadOnly));
+        const nlohmann::json levelInfo = nlohmann::json::parse(f.readAll().toStdString());
+        ASSERT_EQ(levelInfo.at("paths").size(), 1u);
+        EXPECT_EQ(levelInfo.at("paths")[0].value("path_id", std::string()), "0");
+    }
+
+    // The new path should already be open as a tab (showing the default 1x1 camera grid).
+    ASSERT_EQ(CountKind(GetSceneItems(client), "camera"), 1) << "new path did not open as a tab";
+
+    const auto treeResp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+    ASSERT_TRUE(treeResp.value("ok", false));
+    const auto& level = treeResp.at("result").at("items")[0].at("children")[0];
+    ASSERT_EQ(level.at("children").size(), 1u);
+    const auto& pathItem = level.at("children")[0];
+    EXPECT_EQ(pathItem.value("text", std::string()), "Path 0");
+    ASSERT_EQ(pathItem.at("children").size(), 2u) << "expected Cameras and Collisions group headers";
+    EXPECT_EQ(pathItem.at("children")[0].value("text", std::string()), "Cameras");
+    EXPECT_EQ(pathItem.at("children")[1].value("text", std::string()), "Collisions");
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Double-clicking a LevelTreeItem toggles its expansion; double-clicking a PathTreeItem opens
+// it (or refocuses its tab if already open, via the same onOpenPath dedup-by-filename every
+// other way of opening a path already relies on) rather than ever duplicating the tab.
+TEST(EditorAutomation, ModTreeDoubleClickTogglesLevelAndOpensPathWithoutDuplicating)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString modDir = tempDir.filePath("MyMod");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateModWithLevelAndOpenPath(client, modDir));
+
+    auto levelExpanded = [&]() -> bool
+    {
+        const auto resp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+        return resp.at("result").at("items")[0].at("children")[0].value("expanded", false);
+    };
+    ASSERT_TRUE(levelExpanded()) << "test setup: a just-created level should start expanded";
+
+    ASSERT_TRUE(client.Call({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", "MI"}, {"double_click", true}}).value("ok", false));
+    EXPECT_FALSE(levelExpanded()) << "double-clicking an expanded level did not collapse it";
+
+    ASSERT_TRUE(client.Call({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", "MI"}, {"double_click", true}}).value("ok", false));
+    EXPECT_TRUE(levelExpanded()) << "double-clicking a collapsed level did not re-expand it";
+
+    // Close the path's tab, then double-click it in the tree to reopen it. GetSceneItems needs
+    // an active tab (get_scene_items errors with none open), so check the tab count via
+    // tabWidget's own children instead of the scene here.
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_close_path"}}).value("ok", false));
+    {
+        const auto tabsResp = client.Call({{"cmd", "get_state"}, {"target", "tabWidget"}});
+        ASSERT_TRUE(tabsResp.value("ok", false));
+        ASSERT_EQ(CountClassName(tabsResp.at("result"), "EditorTab"), 0) << "test setup: path should be closed";
+    }
+
+    ASSERT_TRUE(client.Call({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", "Path 0"}, {"double_click", true}}).value("ok", false));
+    ASSERT_EQ(CountKind(GetSceneItems(client), "camera"), 1) << "double-clicking the path did not reopen it";
+
+    const auto tabsResp = client.Call({{"cmd", "get_state"}, {"target", "tabWidget"}});
+    ASSERT_TRUE(tabsResp.value("ok", false));
+    ASSERT_EQ(CountClassName(tabsResp.at("result"), "EditorTab"), 1) << "test setup: exactly one tab should be open";
+
+    // Double-clicking the same path again must not open a second tab for the same file.
+    ASSERT_TRUE(client.Call({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", "Path 0"}, {"double_click", true}}).value("ok", false));
+    const auto tabsRespAfter = client.Call({{"cmd", "get_state"}, {"target", "tabWidget"}});
+    ASSERT_TRUE(tabsRespAfter.value("ok", false));
+    EXPECT_EQ(CountClassName(tabsRespAfter.at("result"), "EditorTab"), 1) << "double-clicking an already-open path duplicated its tab";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// The tree's Cameras/Collisions listing for an open path must track every add/undo/redo, not
+// just what it looked like when the path was first opened - ModTreeWidget connects to
+// EditorTab::GetUndoStack()'s indexChanged for exactly this, once when a path node is first
+// linked to its tab (see ModTreeWidget::NotifyTabOpened), rather than every individual command
+// (DeleteItemsCommand, AddCollisionCommand, ...) needing to know about the tree directly.
+TEST(EditorAutomation, ModTreeStaysInSyncWithAddAndUndoInOpenPath)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString modDir = tempDir.filePath("MyMod");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateModWithLevelAndOpenPath(client, modDir));
+
+    auto mapObjectNodeCount = [&]() -> int
+    {
+        const auto resp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+        const auto& camerasGroup = resp.at("result").at("items")[0].at("children")[0].at("children")[0].at("children")[0];
+        int total = 0;
+        for (const auto& camera : camerasGroup.at("children"))
+        {
+            total += static_cast<int>(camera.at("children").size());
+        }
+        return total;
+    };
+    ASSERT_EQ(mapObjectNodeCount(), 0) << "test setup: freshly created path should have no map objects";
+
+    ASSERT_TRUE(AddMapObject(client));
+    EXPECT_EQ(mapObjectNodeCount(), 1) << "tree did not pick up the newly added map object";
+
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_undo"}}).value("ok", false));
+    EXPECT_EQ(mapObjectNodeCount(), 0) << "tree did not remove the map object again after undo";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// The editor should remember the last mod that was open (QSettings "last_open_mod_dir", same
+// Editor.ini-backed idiom as "last_open_dir"/"theme"/"windowState") and auto-reopen it on the
+// next launch - simulated here via two separate LaunchEditorAndConnect processes sharing the
+// same working directory (and therefore the same Editor.ini, since QSettings resolves that
+// relative path from the process's cwd).
+TEST(EditorAutomation, RestartReopensLastMod)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString modDir = tempDir.filePath("MyMod");
+
+    {
+        QProcess editor;
+        AutomationClient client;
+        QString socketName;
+        ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+        ASSERT_TRUE(CreateNewMod(client, modDir, "My Mod", "Tester"));
+        editor.terminate();
+        ASSERT_TRUE(editor.waitForFinished(5000)) << "first editor instance did not exit after terminate()";
+    }
+
+    {
+        QProcess editor;
+        AutomationClient client;
+        QString socketName;
+        ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+        const auto treeResp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+        ASSERT_TRUE(treeResp.value("ok", false));
+        const auto& items = treeResp.at("result").at("items");
+        ASSERT_EQ(items.size(), 1u) << "the previously open mod was not automatically reopened";
+        EXPECT_EQ(items[0].value("text", std::string()), "My Mod");
+
+        editor.terminate();
+        ASSERT_TRUE(editor.waitForFinished(5000)) << "second editor instance did not exit after terminate()";
+    }
 }
 
 int main(int argc, char** argv)

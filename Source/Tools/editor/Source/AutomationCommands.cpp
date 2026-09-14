@@ -1,6 +1,7 @@
 #include "AutomationCommands.hpp"
 #include "BigSpinBox.hpp"
 
+#include <algorithm>
 #include <QAbstractButton>
 #include <QAbstractItemModel>
 #include <QAbstractItemView>
@@ -25,6 +26,7 @@
 #include <QPixmap>
 #include <QSpinBox>
 #include <QTreeWidget>
+#include <QTreeWidgetItemIterator>
 #include <QWidget>
 
 namespace Automation
@@ -83,6 +85,32 @@ namespace Automation
                     throw CommandError("ambiguous button text '" + wantedText.toStdString() + "' (" + std::to_string(matchCount) + " matches)");
                 }
                 return found;
+            }
+
+            // Same idea again: QInputDialog::getText's internal QLineEdit (getInt's QSpinBox,
+            // getItem's QComboBox) is anonymous too - resolves to whichever one is present in
+            // the active modal, so "set_value" can fill it in directly instead of only ever
+            // accepting whatever default value the dialog was opened with.
+            if (name == "@active_modal_input")
+            {
+                QWidget* modal = QApplication::activeModalWidget();
+                if (!modal)
+                {
+                    throw CommandError("no active modal dialog");
+                }
+                if (QWidget* w = modal->findChild<QLineEdit*>())
+                {
+                    return w;
+                }
+                if (QWidget* w = modal->findChild<QSpinBox*>())
+                {
+                    return w;
+                }
+                if (QWidget* w = modal->findChild<QComboBox*>())
+                {
+                    return w;
+                }
+                throw CommandError("no input widget found in active modal dialog");
             }
 
             const QString qname = QString::fromStdString(name);
@@ -169,11 +197,16 @@ namespace Automation
         }
 
         // Clicks a QTreeWidget cell identified by its row's column-0 text (e.g. a property
-        // panel row's field name) rather than a pixel position or row index, since a dynamic
-        // tree's rows/order aren't known ahead of time. Synthesizes a real mouse press+release
-        // at that cell so QTreeWidget's own click handling fires exactly as it would for a real
-        // click (e.g. PropertyTreeWidget's itemPressed handler, which is what spawns a row's
-        // transient editor widget - see BasicTypeProperty::GetEditorWidget/"set_value").
+        // panel row's field name, or a nested mod-tree row - searched at every depth via
+        // QTreeWidgetItemIterator, not just top-level rows, since a tree like ModTreeWidget's
+        // nests levels/paths/cameras/etc. several deep) rather than a pixel position or row
+        // index, since a dynamic tree's rows/order aren't known ahead of time. Synthesizes real
+        // mouse events at that cell so the widget's own handling fires exactly as it would for a
+        // real interaction (e.g. PropertyTreeWidget's itemPressed handler, which is what spawns
+        // a row's transient editor widget - see BasicTypeProperty::GetEditorWidget/"set_value").
+        // "double_click"/"right_click" (booleans, default false, mutually exclusive) select a
+        // double-click (ModTreeWidget's expand/open) or a context-menu event (its right-click
+        // "New Level.../New Path..." menu) at that same cell instead of a plain click.
         nlohmann::json HandleClickTreeItem(QWidget* root, const nlohmann::json& request)
         {
             auto* tree = qobject_cast<QTreeWidget*>(RequireWidget(ResolveTargetRequired(root, request)));
@@ -190,11 +223,11 @@ namespace Automation
             const int column = request.value("column", 1);
 
             QTreeWidgetItem* found = nullptr;
-            for (int i = 0; i < tree->topLevelItemCount(); ++i)
+            for (QTreeWidgetItemIterator it(tree); *it; ++it)
             {
-                if (tree->topLevelItem(i)->text(0) == wanted)
+                if ((*it)->text(0) == wanted)
                 {
-                    found = tree->topLevelItem(i);
+                    found = *it;
                     break;
                 }
             }
@@ -203,15 +236,85 @@ namespace Automation
                 throw CommandError("no tree row with column-0 text: " + wanted.toStdString());
             }
 
-            const int row = tree->indexOfTopLevelItem(found);
-            const QModelIndex index = tree->model()->index(row, column);
-            const QPoint center = tree->visualRect(index).center();
+            // QTreeWidget::indexFromItem is protected, so build the target cell's rect by hand
+            // from visualItemRect (column 0's row rect - public) combined with the requested
+            // column's own viewport position/width (also public), rather than going through a
+            // QModelIndex at all.
+            const QRect rowRect = tree->visualItemRect(found);
+            // Column 0 dead center can land on the expand/collapse branch arrow for a nested,
+            // indented item (its horizontal position depends on depth) - a real left-click there
+            // toggles expansion as an unrelated side effect of Qt's own item-view handling,
+            // before whatever this call actually asked for even happens. Bias toward the right
+            // edge of the cell instead, safely past any indentation, for column 0 only - other
+            // columns (e.g. the property panel's value column) have no such decoration and keep
+            // the existing dead-center targeting.
+            const int cellLeft = tree->columnViewportPosition(column);
+            const int cellWidth = tree->columnWidth(column);
+            const int x = column == 0 ? (cellLeft + cellWidth - std::min(10, cellWidth / 2)) : (cellLeft + cellWidth / 2);
+            const QPoint center(x, rowRect.center().y());
             QWidget* viewport = tree->viewport();
+
+            if (request.value("right_click", false))
+            {
+                QContextMenuEvent event(QContextMenuEvent::Mouse, center, viewport->mapToGlobal(center));
+                QCoreApplication::sendEvent(viewport, &event);
+                return nlohmann::json::object();
+            }
+
             QMouseEvent press(QEvent::MouseButtonPress, center, viewport->mapToGlobal(center), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
             QMouseEvent release(QEvent::MouseButtonRelease, center, viewport->mapToGlobal(center), Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
             QCoreApplication::sendEvent(viewport, &press);
             QCoreApplication::sendEvent(viewport, &release);
+
+            if (request.value("double_click", false))
+            {
+                // Real Qt event sequence for a double-click is press, release, DoubleClick,
+                // release (not two full press/release pairs) - QAbstractItemView's
+                // mouseDoubleClickEvent is what actually emits doubleClicked()/itemDoubleClicked.
+                QMouseEvent dblClick(QEvent::MouseButtonDblClick, center, viewport->mapToGlobal(center), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+                QMouseEvent release2(QEvent::MouseButtonRelease, center, viewport->mapToGlobal(center), Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+                QCoreApplication::sendEvent(viewport, &dblClick);
+                QCoreApplication::sendEvent(viewport, &release2);
+            }
             return nlohmann::json::object();
+        }
+
+        nlohmann::json DescribeTreeItem(QTreeWidgetItem* item)
+        {
+            nlohmann::json j = nlohmann::json::object();
+            j["text"] = item->text(0).toStdString();
+            j["expanded"] = item->isExpanded();
+            j["selected"] = item->isSelected();
+            nlohmann::json children = nlohmann::json::array();
+            for (int i = 0; i < item->childCount(); ++i)
+            {
+                children.push_back(DescribeTreeItem(item->child(i)));
+            }
+            j["children"] = children;
+            return j;
+        }
+
+        // Dumps a QTreeWidget's full row hierarchy (column-0 text/expanded/selected + children,
+        // recursively) as JSON - QTreeWidgetItem isn't a QObject, so "get_state"'s
+        // QObject::children()-based widget tree can't see into it at all; this is the only way
+        // a test can inspect what a tree (e.g. ModTreeWidget) actually shows.
+        nlohmann::json HandleGetTreeItems(QWidget* root, const nlohmann::json& request)
+        {
+            auto* tree = qobject_cast<QTreeWidget*>(RequireWidget(ResolveTargetRequired(root, request)));
+            if (!tree)
+            {
+                throw CommandError("target is not a QTreeWidget");
+            }
+
+            nlohmann::json items = nlohmann::json::array();
+            for (int i = 0; i < tree->topLevelItemCount(); ++i)
+            {
+                items.push_back(DescribeTreeItem(tree->topLevelItem(i)));
+            }
+
+            nlohmann::json result = nlohmann::json::object();
+            result["items"] = items;
+            return result;
         }
 
         // Clicks a QAbstractSpinBox's up/down step buttons programmatically (stepUp()/stepDown()
@@ -577,6 +680,10 @@ namespace Automation
         if (cmd == "click_tree_item")
         {
             return HandleClickTreeItem(root, request);
+        }
+        if (cmd == "get_tree_items")
+        {
+            return HandleGetTreeItems(root, request);
         }
         if (cmd == "spin_step")
         {

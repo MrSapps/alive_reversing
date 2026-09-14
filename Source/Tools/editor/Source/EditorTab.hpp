@@ -105,6 +105,14 @@ public:
         return mPathDirectory;
     }
 
+    // Lets an external observer (ModTreeWidget) react to every push/undo/redo via
+    // QUndoStack::indexChanged, rather than needing each individual command hand-wired to poke
+    // it directly.
+    QUndoStack& GetUndoStack()
+    {
+        return mUndoStack;
+    }
+
 signals:
     void CleanChanged();
 

@@ -83,6 +83,45 @@
     </item>
    </layout>
   </widget>
+  <widget class="QDockWidget" name="modTreeDockWidget">
+   <property name="floating">
+    <bool>false</bool>
+   </property>
+   <property name="features">
+    <set>QDockWidget::DockWidgetMovable</set>
+   </property>
+   <property name="allowedAreas">
+    <set>Qt::AllDockWidgetAreas</set>
+   </property>
+   <property name="windowTitle">
+    <string>Mod</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>1</number>
+   </attribute>
+   <widget class="QWidget" name="modTreeDockWidgetContents">
+    <layout class="QVBoxLayout" name="verticalLayout_mod">
+     <property name="spacing">
+      <number>0</number>
+     </property>
+     <property name="leftMargin">
+      <number>0</number>
+     </property>
+     <property name="topMargin">
+      <number>0</number>
+     </property>
+     <property name="rightMargin">
+      <number>0</number>
+     </property>
+     <property name="bottomMargin">
+      <number>0</number>
+     </property>
+     <item>
+      <widget class="QTreeWidget" name="modTreeWidget"/>
+     </item>
+    </layout>
+   </widget>
+  </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
@@ -126,6 +165,13 @@
     <addaction name="action_toggle_show_grid"/>
     <addaction name="action_toggle_bring_selection_to_front"/>
     <addaction name="actionItem_transparency"/>
+   </widget>
+   <widget class="QMenu" name="menuMod">
+    <property name="title">
+     <string>Mod</string>
+    </property>
+    <addaction name="actionNewMod"/>
+    <addaction name="actionOpenMod"/>
    </widget>
    <widget class="QMenu" name="menuEdit">
     <property name="title">
@@ -175,6 +221,7 @@
     <addaction name="actionDark_Fusion_theme"/>
    </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuMod"/>
    <addaction name="menuEdit"/>
    <addaction name="menuSnapping"/>
    <addaction name="menuOptions"/>
@@ -931,6 +978,16 @@
    </property>
    <property name="text">
     <string>Save all</string>
+   </property>
+  </action>
+  <action name="actionNewMod">
+   <property name="text">
+    <string>New Mod...</string>
+   </property>
+  </action>
+  <action name="actionOpenMod">
+   <property name="text">
+    <string>Open Mod...</string>
    </property>
   </action>
  </widget>
