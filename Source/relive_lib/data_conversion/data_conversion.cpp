@@ -100,6 +100,7 @@ static void to_json(nlohmann::json& j, const PathSoundInfo& p)
         {"vh_file", p.mVhFile},
         {"vb_file", p.mVbFile},
         {"seq_files", p.mSeqFiles},
+        {"sound_theme", p.mSoundTheme},
     };
 }
 
@@ -196,13 +197,34 @@ static std::vector<std::string> ConvertBSQ(const FileSystem::Path& dataDir, cons
     return seqs;
 }
 
+// Level dirs live under a "levels" layer (dataDir/levels/<levelName>/...) rather than as direct
+// children of dataDir, so the editor/engine can enumerate "what levels exist" without also
+// seeing animations/fmvs/palettes/sounds/etc - all of which stay as direct dataDir children.
+template <typename LevelIdType>
+static FileSystem::Path LevelDir(const FileSystem::Path& dataDir, LevelIdType lvlIdx)
+{
+    FileSystem::Path p = dataDir;
+    p.Append("levels").Append(ToString(lvlIdx));
+    return p;
+}
+
+// VH/VB/SEQ sound files live under a shared, level-identity-independent sounds/<theme>/ dir
+// (dataDir/sounds/<theme>/...) so a mod can point a path's sound_info at any theme - its own, or
+// one it doesn't have and falls back to the base game's (see ResourceManagerWrapper::
+// LoadSoundFile) - rather than being forced to duplicate a whole level just to reuse its sounds.
+static FileSystem::Path SoundsThemeDir(const FileSystem::Path& dataDir, const std::string& theme)
+{
+    FileSystem::Path p = dataDir;
+    p.Append("sounds").Append(theme);
+    return p;
+}
+
 template <typename LevelIdType>
 static void ConvertDemo(const std::string& fileName, const FileSystem::Path& dataDir, ReliveAPI::LvlReader& lvlReader, LevelIdType lvlIdxAsLvl, std::vector<u8>& fileBuffer, bool isAo)
 {
     ReadLvlFileInto(lvlReader, fileName.c_str(), fileBuffer);
 
-    FileSystem::Path filePath = dataDir;
-    filePath.Append(ToString(lvlIdxAsLvl));
+    FileSystem::Path filePath = LevelDir(dataDir, lvlIdxAsLvl);
 
     FileSystem fs;
     fs.CreateDirectory(filePath);
@@ -279,9 +301,8 @@ static void SaveFileFromLvlDirect(const char_type* pFileName, const FileSystem::
 {
     ReadLvlFileInto(lvlReader, pFileName, fileBuffer);
 
-    FileSystem::Path filePath = dataDir;
-    filePath.Append(ToString(lvlIdxAsLvl));
-    
+    FileSystem::Path filePath = LevelDir(dataDir, lvlIdxAsLvl);
+
     FileSystem fs;
     fs.CreateDirectory(filePath);
     filePath.Append(pFileName);
@@ -383,18 +404,23 @@ static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const Reli
     nlohmann::json collisionsArray = nlohmann::json::array();
     ConvertPathCollisions(collisionsArray, collisionInfo, pathBndChunk.Data(), isAo);
 
-    FileSystem::Path seqsDir = path;
-    seqsDir.Append(ToString(lvlIdx));
-    fs.CreateDirectory(seqsDir);
-
-    // Save sound info (per path rather than per LVL)
+    // Save sound info (per path rather than per LVL) - VH/VB/SEQ all live in a shared
+    // sounds/<theme>/ dir (not this path's own level dir - see SoundsThemeDir), so a mod can
+    // point a path at any theme, including one it doesn't have a copy of itself (falls back to
+    // the base game's, see ResourceManagerWrapper::LoadSoundFile). The theme is the level a
+    // path's sound actually comes from - for AE's combined "ender" paths that's not the same as
+    // the path's own level dir, so reuse the same GetLevelIdFromPathId selection sound loading
+    // already needs, so an ender path shares its theme with its non-ender counterpart instead of
+    // getting a separate copy of the same sounds.
     PathSoundInfo soundInfo;
+    std::string soundTheme;
     if (isAo)
     {
         const AO::SoundBlockInfo* pSoundBlock = AO::Path_Get_MusicInfo(reliveLvl);
         soundInfo.mVhFile = pSoundBlock->mVabHeaderName;
         soundInfo.mVbFile = pSoundBlock->mVabBodyName;
-        soundInfo.mSeqFiles = ConvertBSQ(seqsDir, AO::Path_Get_BsqFileName(reliveLvl), lvlReader, isAo);
+        soundTheme = ToString(MapWrapper::ToAO(reliveLvl));
+        soundInfo.mSeqFiles = ConvertBSQ(SoundsThemeDir(path, soundTheme), AO::Path_Get_BsqFileName(reliveLvl), lvlReader, isAo);
     }
     else
     {
@@ -404,8 +430,9 @@ static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const Reli
         // TODO: Convert to AO format instead of using sounds.dat for now (in the vh/vb/bsq copy)
         soundInfo.mVhFile = pSoundBlock->mVabHeaderName;
         soundInfo.mVbFile = pSoundBlock->mVabBodyName;
+        soundTheme = ToString(MapWrapper::ToAE(soundLevel));
 
-        soundInfo.mSeqFiles = ConvertBSQ(seqsDir, Path_Get_BsqFileName(soundLevel), lvlReader, isAo);
+        soundInfo.mSeqFiles = ConvertBSQ(SoundsThemeDir(path, soundTheme), Path_Get_BsqFileName(soundLevel), lvlReader, isAo);
 
         // TODO
         //Path_Get_BackGroundMusicId(reliveLvl);
@@ -414,9 +441,19 @@ static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const Reli
         // TODO: Makes more sense to calculate this on loading by summing up the mud count(s)?
         //Path_GetMudsInLevel(reliveLvl, pathBndChunk.Id());
     }
+    soundInfo.mSoundTheme = soundTheme;
 
-    SaveFileFromLvlDirect(soundInfo.mVhFile.c_str(), path, lvlReader, lvlIdx, fileBuffer);
-    SaveFileFromLvlDirect(soundInfo.mVbFile.c_str(), path, lvlReader, lvlIdx, fileBuffer);
+    {
+        const FileSystem::Path soundsDir = SoundsThemeDir(path, soundTheme);
+        fs.CreateDirectory(soundsDir);
+        for (const std::string& vabFile : {soundInfo.mVhFile, soundInfo.mVbFile})
+        {
+            ReadLvlFileInto(lvlReader, vabFile.c_str(), fileBuffer);
+            FileSystem::Path filePath = soundsDir;
+            filePath.Append(vabFile);
+            fs.Save(filePath, fileBuffer);
+        }
+    }
 
     nlohmann::json j = {
         {"path_version", DataConversion::DataVersions::LatestVersion().mPathVersion},
@@ -429,8 +466,8 @@ static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const Reli
         }}
     };
 
-    FileSystem::Path pathJsonFile = path;
-    pathJsonFile.Append(ToString(lvlIdx)).Append("paths").Append(std::to_string(pathBndChunk.Id()));
+    FileSystem::Path pathJsonFile = LevelDir(path, lvlIdx);
+    pathJsonFile.Append(std::to_string(pathBndChunk.Id()));
     fs.CreateDirectory(pathJsonFile);
     pathJsonFile.Append("path.json");
     SaveJson(j, fs, pathJsonFile);
@@ -440,8 +477,9 @@ static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const Reli
 template <typename LevelIdType>
 static void SaveLevelInfoJson(const FileSystem::Path& dataDir, EReliveLevelIds /*reliveLvl*/, LevelIdType lvlIdxAsLvl, FileSystem& fs, const ReliveAPI::ChunkedLvlFile& pathBndFile, bool /* isAo*/)
 {
-    FileSystem::Path pathDir = dataDir;
-    pathDir.Append(ToString(lvlIdxAsLvl)).Append("paths");
+    // No separate "paths" subdir under the level - a level's content already *is* its paths (see
+    // LevelDir), so that layer was purely redundant nesting.
+    FileSystem::Path pathDir = LevelDir(dataDir, lvlIdxAsLvl);
     fs.CreateDirectory(pathDir);
 
     FileSystem::Path pathJsonFile = pathDir;
@@ -795,14 +833,12 @@ static void ConvertCamera(ThreadPool& tp, const FileSystem::Path& dataDir, const
     // Convert 05 for example to 5
     camNameWithoutExtension = std::to_string(std::stoi(camNameWithoutExtension));
 
-    FileSystem::Path dirToSaveConvertedCamIn = dataDir;
-
-    dirToSaveConvertedCamIn.Append(ToString(lvlIdxAsLvl));
+    FileSystem::Path dirToSaveConvertedCamIn = LevelDir(dataDir, lvlIdxAsLvl);
 
     FileSystem::Path jsonFileName = dirToSaveConvertedCamIn;
-    jsonFileName.Append("paths").Append(pathId).Append(camNameWithoutExtension + ".json");
-    
-    dirToSaveConvertedCamIn.Append("paths").Append(pathId); 
+    jsonFileName.Append(pathId).Append(camNameWithoutExtension + ".json");
+
+    dirToSaveConvertedCamIn.Append(pathId);
     fs.CreateDirectory(dirToSaveConvertedCamIn);
     dirToSaveConvertedCamIn.Append(camNameWithoutExtension);
 
@@ -1160,6 +1196,20 @@ static void WriteDataVersion(const FileSystem::Path& path)
     dv.Save(path);
 }
 
+// relive_data/mods/ (siblings of ao/ae, shared across both games - a mod's own modinfo.json
+// says which game it targets) is where relive::Mods::EnumerateMods/EditorMod-created mods are
+// expected to live. Nothing else creates it - it's not tied to converting any particular game's
+// data - so ensure it exists as an (idempotent - see FileSystem::CreateDirectory) side effect of
+// running the converter at all, same as ao/ae get created below regardless of what actually
+// needed reconverting.
+static void EnsureModsDirExists(FileSystem& fs)
+{
+    FileSystem::Path modsDir;
+    modsDir.Append("relive_data");
+    modsDir.Append("mods");
+    fs.CreateDirectory(modsDir);
+}
+
 void DataConversion::ConvertDataAO(const DataVersions& dv)
 {
     FileSystem fs;
@@ -1168,6 +1218,7 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
     dataDir.Append("relive_data");
     dataDir.Append("ao");
     fs.CreateDirectory(dataDir);
+    EnsureModsDirExists(fs);
 
     if (dv.ConvertFmvs())
     {
@@ -1218,6 +1269,7 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
     dataDir.Append("relive_data");
     dataDir.Append("ae");
     fs.CreateDirectory(dataDir);
+    EnsureModsDirExists(fs);
 
     if (dv.ConvertFmvs())
     {

@@ -107,13 +107,16 @@ public:
     private:
         // Bump this if any data format breaks are made so that OG/mod data is re-converted/upgraded
         static constexpr u32 kFmvVersion = 1;
-        static constexpr u32 kPathVersion = 15;
+        // 17: dropped the redundant "paths" subdir under each level (levels/<name>/<pathId>/...
+        // instead of levels/<name>/paths/<pathId>/...) and lower-cased "Sounds" to "sounds".
+        static constexpr u32 kPathVersion = 17;
         static constexpr u32 kPaletteVersion = 1;
         static constexpr u32 kAnimationVersion = 4;
-        static constexpr u32 kCameraVersion = 7;
+        // 9: dropped the redundant "paths" subdir under each level, same as kPathVersion 17.
+        static constexpr u32 kCameraVersion = 9;
         static constexpr u32 kSaveFileVersion = 3;
         static constexpr u32 kFontFileVersion = 1;
-        static constexpr u32 kDemoFileVersion = 1;
+        static constexpr u32 kDemoFileVersion = 2;
 
         static constexpr char_type kDataVersionFileName[] = "data_version.json";
     public:

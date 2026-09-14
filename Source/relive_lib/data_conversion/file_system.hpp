@@ -2,6 +2,7 @@
 
 #include "../../AliveLibAE/stdafx.h"
 #include "AutoFile.hpp"
+#include <functional>
 
 // TODO: Lots of stuff missing, needs to do utf8 -> utf16 on windows
 class FileSystem final
@@ -47,4 +48,13 @@ public:
 
     bool DirectoryExists(const char_type* pDirName);
     void EnumerateDirectory(const char_type* fileName, TEnumCallBack cb);
+
+    // Lists the immediate subdirectories of dirPath (an actual directory path, not a wildcard
+    // filter like EnumerateDirectory's fileName - "." and ".." are skipped). EnumerateDirectory
+    // only ever reports files (see its implementation), so this is a separate function rather
+    // than an overload of it. Takes std::function rather than reusing TEnumCallBack's raw
+    // function-pointer type so callers can pass a capturing lambda (e.g. to accumulate results
+    // into a local container) - EnumerateDirectory's existing callers all use non-capturing
+    // lambdas today so that type was never a problem there, but this one's first caller needs to.
+    void EnumerateSubDirectories(const char_type* dirPath, const std::function<void(const char_type*, u32)>& cb);
 };

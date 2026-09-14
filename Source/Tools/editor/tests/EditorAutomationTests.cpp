@@ -3210,8 +3210,71 @@ TEST(EditorAutomation, CreateModWritesModInfoAndShowsEmptyTree)
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
+// "Base this mod on an existing project": creating a mod with chkBaseOn checked and txtBaseOn
+// pointing at another mod's root should copy that mod's whole levels/ tree (paths, cameras)
+// into the new mod, giving the user a starting point instead of an empty project.
+TEST(EditorAutomation, NewModBasedOnExistingModCopiesItsLevels)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString sourceModDir = tempDir.filePath("SourceMod");
+    const QString newModDir = tempDir.filePath("NewMod");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    // Build a source mod with one level/path/map object to copy from.
+    ASSERT_TRUE(CreateModWithLevelAndOpenPath(client, sourceModDir));
+    ASSERT_TRUE(AddMapObject(client));
+    {
+        const auto resp = client.Call({{"cmd", "save_path_as"}, {"path", (sourceModDir + "/levels/MI/0/path.json").toStdString()}});
+        ASSERT_TRUE(resp.value("ok", false));
+        ASSERT_TRUE(resp.at("result").value("saved", false)) << "failed to save the source mod's path";
+    }
+    ASSERT_TRUE(QFile::exists(sourceModDir + "/levels/MI/0/path.json")) << "test setup: source mod's path was not written";
+
+    // Create a new mod based on it.
+    const int clickId = client.SendCommand({{"cmd", "click"}, {"target", "actionNewMod"}});
+    ASSERT_TRUE(client.Call({{"cmd", "set_value"}, {"target", "txtName"}, {"value", "New Mod"}}).value("ok", false));
+    ASSERT_TRUE(client.Call({{"cmd", "set_value"}, {"target", "txtAuthor"}, {"value", "Tester"}}).value("ok", false));
+    ASSERT_TRUE(client.Call({{"cmd", "set_value"}, {"target", "txtDirectory"}, {"value", newModDir.toStdString()}}).value("ok", false));
+    ASSERT_TRUE(client.Call({{"cmd", "set_value"}, {"target", "chkBaseOn"}, {"value", true}}).value("ok", false))
+        << "failed to check chkBaseOn";
+    ASSERT_TRUE(client.Call({{"cmd", "set_value"}, {"target", "txtBaseOn"}, {"value", sourceModDir.toStdString()}}).value("ok", false))
+        << "failed to set txtBaseOn";
+    ASSERT_TRUE(client.Call({{"cmd", "send_key"}, {"target", "@active_modal"}, {"key", "Return"}}).value("ok", false))
+        << "no active modal for NewModDialog";
+    ASSERT_TRUE(client.WaitForResponse(clickId, 5000).value("ok", false));
+
+    // The new mod's levels/ tree should match the source mod's, byte for byte.
+    ASSERT_TRUE(QFile::exists(newModDir + "/levels/MI/level_info.json")) << "level_info.json was not copied";
+    ASSERT_TRUE(QFile::exists(newModDir + "/levels/MI/0/path.json")) << "path.json was not copied";
+    {
+        QFile sourceFile(sourceModDir + "/levels/MI/0/path.json");
+        QFile destFile(newModDir + "/levels/MI/0/path.json");
+        ASSERT_TRUE(sourceFile.open(QIODevice::ReadOnly));
+        ASSERT_TRUE(destFile.open(QIODevice::ReadOnly));
+        EXPECT_EQ(sourceFile.readAll(), destFile.readAll()) << "copied path.json does not match the source mod's";
+    }
+
+    // The copy should also be reflected in the tree once the new mod is opened (it already is,
+    // as the just-switched-to current mod).
+    const auto treeResp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+    ASSERT_TRUE(treeResp.value("ok", false));
+    const auto& items = treeResp.at("result").at("items");
+    ASSERT_EQ(items.size(), 1u);
+    EXPECT_EQ(items[0].value("text", std::string()), "New Mod");
+    ASSERT_EQ(items[0].at("children").size(), 1u) << "expected the copied MI level";
+    EXPECT_EQ(items[0].at("children")[0].value("text", std::string()), "MI");
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
 // Right-click the mod root -> New Level..., right-click that level -> New Path... must create
-// the on-disk layout EditorMod expects (<level>/paths/level_info.json + <id>/path.json), open
+// the on-disk layout EditorMod expects (levels/<level>/level_info.json + <id>/path.json), open
 // the new path as a tab, and populate the tree down to that path's Cameras/Collisions groups
 // immediately (RefreshPathSubtree runs as soon as NotifyTabOpened links the freshly-opened tab
 // to its tree node - see ModTreeWidget::PromptNewPath).
@@ -3242,7 +3305,7 @@ TEST(EditorAutomation, NewLevelAndNewPathViaTreeContextMenuCreatesFilesAndOpensP
     ASSERT_TRUE(DismissMenuIfStillOpen(client, "modTreeContextMenu"));
     ASSERT_TRUE(client.WaitForResponse(rightClickModRootId, 5000).value("ok", false));
 
-    ASSERT_TRUE(QDir(modDir + "/MI/paths").exists()) << "New Level did not create the level's paths/ folder";
+    ASSERT_TRUE(QDir(modDir + "/levels/MI").exists()) << "New Level did not create the level's folder";
     {
         const auto treeResp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
         ASSERT_TRUE(treeResp.value("ok", false));
@@ -3261,10 +3324,10 @@ TEST(EditorAutomation, NewLevelAndNewPathViaTreeContextMenuCreatesFilesAndOpensP
     ASSERT_TRUE(DismissMenuIfStillOpen(client, "modTreeContextMenu"));
     ASSERT_TRUE(client.WaitForResponse(rightClickLevelId, 5000).value("ok", false));
 
-    ASSERT_TRUE(QFile::exists(modDir + "/MI/paths/0/path.json")) << "New Path did not write path.json";
-    ASSERT_TRUE(QFile::exists(modDir + "/MI/paths/level_info.json")) << "New Path did not update level_info.json";
+    ASSERT_TRUE(QFile::exists(modDir + "/levels/MI/0/path.json")) << "New Path did not write path.json";
+    ASSERT_TRUE(QFile::exists(modDir + "/levels/MI/level_info.json")) << "New Path did not update level_info.json";
     {
-        QFile f(modDir + "/MI/paths/level_info.json");
+        QFile f(modDir + "/levels/MI/level_info.json");
         ASSERT_TRUE(f.open(QIODevice::ReadOnly));
         const nlohmann::json levelInfo = nlohmann::json::parse(f.readAll().toStdString());
         ASSERT_EQ(levelInfo.at("paths").size(), 1u);
@@ -3499,7 +3562,7 @@ TEST(EditorAutomation, SetCameraImageUpdatesTreeRowLabel)
     // Simulate the image going missing from disk (moved/deleted outside the editor) by removing
     // it before reopening the path - CameraGraphicsItem::Load then leaves mCameraImage null
     // while mName ("0", loaded straight from the JSON) stays set.
-    const QString pngPath = modDir + "/MI/paths/0/0.png";
+    const QString pngPath = modDir + "/levels/MI/0/0.png";
     ASSERT_TRUE(QFile::exists(pngPath)) << "test setup: camera image was not saved to disk";
     ASSERT_TRUE(QFile::remove(pngPath));
 
@@ -3507,7 +3570,7 @@ TEST(EditorAutomation, SetCameraImageUpdatesTreeRowLabel)
     // bytes to disk directly - the model's own path.json, which records the camera's name/id,
     // still needs this) - otherwise closing the tab below blocks on an unsaved-changes prompt.
     {
-        const auto resp = client.Call({{"cmd", "save_path_as"}, {"path", (modDir + "/MI/paths/0/path.json").toStdString()}});
+        const auto resp = client.Call({{"cmd", "save_path_as"}, {"path", (modDir + "/levels/MI/0/path.json").toStdString()}});
         ASSERT_TRUE(resp.value("ok", false));
         ASSERT_TRUE(resp.at("result").value("saved", false)) << "save_path_as reported failure";
     }
@@ -3517,7 +3580,7 @@ TEST(EditorAutomation, SetCameraImageUpdatesTreeRowLabel)
     // path from disk instead of leaving the in-memory camera (still holding the image) untouched.
     ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_close_path"}}).value("ok", false));
     {
-        const auto resp = client.Call({{"cmd", "open_path"}, {"path", (modDir + "/MI/paths/0/path.json").toStdString()}});
+        const auto resp = client.Call({{"cmd", "open_path"}, {"path", (modDir + "/levels/MI/0/path.json").toStdString()}});
         ASSERT_TRUE(resp.value("ok", false));
         ASSERT_TRUE(resp.at("result").value("opened", false)) << "open_path reported failure";
     }

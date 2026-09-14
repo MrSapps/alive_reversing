@@ -81,7 +81,7 @@ void CameraGraphicsItem::Load(QString basePath)
         return;
     }
 
-    QString baseCameraName = basePath + "/" + mCamera->mName.c_str(); // e.g barracks/paths/1/P01C04
+    QString baseCameraName = basePath + "/" + mCamera->mName.c_str(); // e.g barracks/1/P01C04
     qDebug() << baseCameraName;
 
     mCamera->mCameraImageandLayers.mCameraImage.loadFromData(ReadAll(baseCameraName + ".png"));

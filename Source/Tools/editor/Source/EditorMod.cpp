@@ -1,5 +1,6 @@
 #include "EditorMod.hpp"
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QTextStream>
@@ -85,19 +86,19 @@ QString EditorMod::ModInfoFile() const
     return mDirectory + "/modinfo.json";
 }
 
-QString EditorMod::LevelPathsDir(const QString& levelDir) const
+QString EditorMod::LevelDir(const QString& levelDir) const
 {
-    return mDirectory + "/" + levelDir + "/paths";
+    return mDirectory + "/levels/" + levelDir;
 }
 
 QString EditorMod::LevelInfoFile(const QString& levelDir) const
 {
-    return LevelPathsDir(levelDir) + "/level_info.json";
+    return LevelDir(levelDir) + "/level_info.json";
 }
 
 QString EditorMod::PathJsonFile(const QString& levelDir, int pathId) const
 {
-    return LevelPathsDir(levelDir) + "/" + QString::number(pathId) + "/path.json";
+    return LevelDir(levelDir) + "/" + QString::number(pathId) + "/path.json";
 }
 
 std::unique_ptr<EditorMod> EditorMod::CreateNew(const QString& dir, const QString& name, const QString& author, GameType targetGame)
@@ -156,14 +157,24 @@ bool EditorMod::SaveModInfo() const
 
 QVector<QString> EditorMod::DiscoverLevels() const
 {
+    // levels/ is a dedicated subdir now (sounds/mods etc. are siblings of it, not inside it -
+    // see this class's own doc comment), so every subdirectory of it is a level candidate with
+    // no further filtering needed - unlike before "levels/" existed, when this had to scan the
+    // mod root directly and tell a real level dir apart from anything else living there. A
+    // level shows up here as soon as CreateLevel makes its directory, even before it has any
+    // paths (level_info.json) yet - don't require that too, or a just-created empty level would
+    // vanish from the tree until its first path is added.
     QVector<QString> levels;
-    const QStringList entries = QDir(mDirectory).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+    const QString levelsDir = mDirectory + "/levels";
+    if (!QDir(levelsDir).exists())
+    {
+        // Brand new mod - nothing created under levels/ yet.
+        return levels;
+    }
+    const QStringList entries = QDir(levelsDir).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
     for (const QString& entry : entries)
     {
-        if (QDir(mDirectory + "/" + entry + "/paths").exists())
-        {
-            levels.push_back(entry);
-        }
+        levels.push_back(entry);
     }
     return levels;
 }
@@ -188,12 +199,12 @@ QVector<int> EditorMod::DiscoverPathIds(const QString& levelDir) const
 
     // Manifest missing/unreadable - fall back to scanning for <id>/path.json subdirectories
     // directly, so a hand-assembled or partially-converted level still shows its paths.
-    const QStringList entries = QDir(LevelPathsDir(levelDir)).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+    const QStringList entries = QDir(LevelDir(levelDir)).entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
     for (const QString& entry : entries)
     {
         bool ok = false;
         const int id = entry.toInt(&ok);
-        if (ok && QFile::exists(LevelPathsDir(levelDir) + "/" + entry + "/path.json"))
+        if (ok && QFile::exists(LevelDir(levelDir) + "/" + entry + "/path.json"))
         {
             ids.push_back(id);
         }
@@ -227,6 +238,54 @@ void EditorMod::RecordPathId(const QString& levelDir, int pathId) const
 
 bool EditorMod::CreateLevel(const QString& levelDir) const
 {
-    QDir().mkpath(LevelPathsDir(levelDir));
-    return QDir(LevelPathsDir(levelDir)).exists();
+    QDir().mkpath(LevelDir(levelDir));
+    return QDir(LevelDir(levelDir)).exists();
+}
+
+bool EditorMod::CopyLevelsFrom(const QString& sourceDir, const QString& destModDir)
+{
+    const QString sourceLevelsDir = sourceDir + "/levels";
+    if (!QDir(sourceLevelsDir).exists())
+    {
+        return false;
+    }
+
+    const QString destLevelsDir = destModDir + "/levels";
+    if (!QDir().mkpath(destLevelsDir))
+    {
+        return false;
+    }
+
+    // Subdirectories first (QDirIterator::Subdirectories walks depth-first, but doesn't
+    // guarantee a directory is yielded before its own contents) - two passes keeps this simple
+    // and correct rather than relying on iteration order: create every directory, then copy
+    // every file into an already-fully-created tree.
+    QDirIterator dirWalker(sourceLevelsDir, QDir::Dirs | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    while (dirWalker.hasNext())
+    {
+        const QString sourceSubDir = dirWalker.next();
+        const QString relative = QDir(sourceLevelsDir).relativeFilePath(sourceSubDir);
+        if (!QDir().mkpath(destLevelsDir + "/" + relative))
+        {
+            return false;
+        }
+    }
+
+    QDirIterator fileWalker(sourceLevelsDir, QDir::Files, QDirIterator::Subdirectories);
+    while (fileWalker.hasNext())
+    {
+        const QString sourceFile = fileWalker.next();
+        const QString relative = QDir(sourceLevelsDir).relativeFilePath(sourceFile);
+        const QString destFile = destLevelsDir + "/" + relative;
+        if (QFile::exists(destFile))
+        {
+            QFile::remove(destFile);
+        }
+        if (!QFile::copy(sourceFile, destFile))
+        {
+            return false;
+        }
+    }
+
+    return true;
 }

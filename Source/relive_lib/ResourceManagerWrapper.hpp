@@ -253,8 +253,9 @@ public:
 
     std::vector<std::unique_ptr<BinaryPath>> LoadPaths(EReliveLevelIds lvlId);
 
-    // TODO: Used only for vh/vb/bsq loading, will be changed when these file formats are updated
-    std::vector<u8> LoadFile(const char_type* pFileName, EReliveLevelIds lvlId);
+    // Loads a VH/VB/SEQ sound file from the given theme's shared sounds/<soundTheme>/ dir (see
+    // PathSoundInfo::mSoundTheme) - not the current level's own dir.
+    std::vector<u8> LoadSoundFile(const char_type* pFileName, const std::string& soundTheme);
 
     void LoadingLoop(bool bShowLoadingIcon, class BaseMap* pMap = nullptr);
 

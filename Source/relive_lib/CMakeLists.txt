@@ -785,3 +785,34 @@ target_link_libraries(relive_lib
     )
 
 export(TARGETS relive_lib FILE relive_lib.cmake)
+
+# Deliberately does NOT link the whole relive_lib target: that static library is only ever
+# actually link-complete once it's part of the "relive" executable (or relive-editor via
+# editor_glue_dynamic_crt's own copies of these same files) - much of it calls out to functions
+# (e.g. GetGameAutoPlayer(), relive::MakeIpcInterface()) that are only defined at the game/editor
+# binary level, not inside relive_lib itself. So this compiles just the specific translation
+# units FileSystem/Mods actually need, the same minimal slice already proven to link cleanly
+# standalone.
+add_executable(FileSystemTests
+    tests/FileSystemTests.cpp
+    tests/TestFatalErrorStub.cpp
+    data_conversion/file_system.cpp
+    data_conversion/AutoFile.cpp
+    Mods.cpp
+)
+target_include_directories(FileSystemTests PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_SOURCE_DIR}/3rdParty"
+    "${CMAKE_SOURCE_DIR}/3rdParty/json/single_include"
+    src
+    ${CMAKE_BINARY_DIR}
+)
+target_compile_definitions(FileSystemTests PRIVATE "_CRT_SECURE_NO_WARNINGS" "JSON_DISABLE_ENUM_SERIALIZATION=1" "GLEW_NO_GLU" "GLEW_STATIC" "SPNG_STATIC")
+target_link_libraries(FileSystemTests PUBLIC googletest SDL3::SDL3)
+add_dependencies(FileSystemTests UpdateConfigHeader)
+# FileSystemTests REUSE_FROM relive_lib's own PCH is set up in the top-level CMakeLists.txt,
+# alongside relive_lib's own target_precompile_headers call it needs to come after.
+if (MSVC)
+    target_compile_options(FileSystemTests PRIVATE /MDd)
+endif()
+add_test(NAME FileSystemTests COMMAND FileSystemTests)

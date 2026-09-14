@@ -64,6 +64,12 @@ jobs:
         cmake --build . --config $env:CONFIGURATION
         cpack -G ZIP -C $env:CONFIGURATION
 
+    - name: 'Windows32: Run tests'
+      if: matrix.name == 'Windows32'
+      run: |
+        cd build
+        ctest -C $env:CONFIGURATION --output-on-failure -R FileSystemTests
+
     # ======================================
     #      Windows64
     # ======================================
@@ -83,6 +89,12 @@ jobs:
         cmake .. -G"Visual Studio 17 2022" -DSDL3_DIR="$env:GITHUB_WORKSPACE\SDL3-3.4.14\cmake" -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" -A x64 -DCI_PROVIDER="GitHub" -DBUILD_NUMBER="$env:GITHUB_RUN_NUMBER"
         cmake --build . --config $env:CONFIGURATION
         cpack -G ZIP -C $env:CONFIGURATION
+
+    - name: 'Windows64: Run tests'
+      if: matrix.name == 'Windows64'
+      run: |
+        cd build
+        ctest -C $env:CONFIGURATION --output-on-failure -R FileSystemTests
         
     # ======================================
     #      Linux
@@ -108,6 +120,17 @@ jobs:
         cd build
         cmake .. -G"Unix Makefiles" -DCMAKE_BUILD_TYPE=$CONFIGURATION -DCI_PROVIDER="GitHub" -DBUILD_NUMBER=$GITHUB_RUN_NUMBER -DCMAKE_POLICY_VERSION_MINIMUM=3.5
         make -j$(nproc)
+
+    - name: 'Linux: Run tests'
+      if: matrix.name == 'Linux'
+      run: |
+        cd build
+        ctest --output-on-failure -R FileSystemTests
+
+    - name: 'Linux: Build AppImage'
+      if: matrix.name == 'Linux'
+      run: |
+        cd build
         cmake --build . --target appimage
 
     # ======================================

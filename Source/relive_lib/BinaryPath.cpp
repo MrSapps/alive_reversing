@@ -12,6 +12,7 @@ static void from_json(const nlohmann::json& j, PathSoundInfo& s)
     j.at("vh_file").get_to(s.mVhFile);
     j.at("vb_file").get_to(s.mVbFile);
     j.at("seq_files").get_to(s.mSeqFiles);
+    j.at("sound_theme").get_to(s.mSoundTheme);
 }
 class ITlvAllocator
 {
