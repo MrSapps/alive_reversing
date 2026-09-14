@@ -56,14 +56,19 @@ std::string BuildAndBitnesString()
     return buildAndBitness;
 }
 
-std::string WindowTitleAO()
+static std::string ModNameSuffix(const std::string& modName)
 {
-    return "R.E.L.I.V.E. Oddworld Abe's Oddysee" + BuildAndBitnesString();
+    return modName.empty() ? "" : (" [" + modName + "]");
 }
 
-std::string WindowTitleAE()
+std::string WindowTitleAO(const std::string& modName)
 {
-    return "R.E.L.I.V.E. Oddworld Abe's Exoddus" + BuildAndBitnesString();
+    return "R.E.L.I.V.E. Oddworld Abe's Oddysee" + ModNameSuffix(modName) + BuildAndBitnesString();
+}
+
+std::string WindowTitleAE(const std::string& modName)
+{
+    return "R.E.L.I.V.E. Oddworld Abe's Exoddus" + ModNameSuffix(modName) + BuildAndBitnesString();
 }
 
 TWindowHandleType Sys_GetHWnd()

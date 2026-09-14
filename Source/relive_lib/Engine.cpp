@@ -77,6 +77,8 @@
 #include "../relive_lib/GameObjects/PlatformBase.hpp"
 #include "../AliveLibAO/GameEnderController.hpp"
 #include "../relive_lib/Mods.hpp"
+#include "data_conversion/file_system.hpp"
+#include <FatalError.hpp>
 
 u32 sGnFrame = 0;
 bool gBreakGameLoop = false;
@@ -92,7 +94,6 @@ Engine::Engine(GameType gameType, FileSystem& fs, CommandLineParser& clp)
     : mGameType(gameType)
     , mFs(fs)
     , mClp(clp)
-    , mResMan(mFs, "")
 {
 
     mIpcInterface = relive::MakeIpcInterface();
@@ -178,7 +179,7 @@ static s32 Game_End_Frame(u32 flags)
 }
 
 
-void Engine::CmdLineRenderInit()
+void Engine::CmdLineRenderInit(const std::string& activeModName)
 {
 #if FORCE_DDCHEAT
     gDDCheatOn = true;
@@ -208,11 +209,11 @@ void Engine::CmdLineRenderInit()
 
     if (mGameType == GameType::eAe)
     {
-        VGA_CreateRenderer(rendererToCreate, WindowTitleAE());
+        VGA_CreateRenderer(rendererToCreate, WindowTitleAE(activeModName));
     }
     else
     {
-        VGA_CreateRenderer(rendererToCreate, WindowTitleAO());
+        VGA_CreateRenderer(rendererToCreate, WindowTitleAO(activeModName));
     }
 
     PSX_EMU_SetCallBack_4F9430(Game_End_Frame);
@@ -312,13 +313,13 @@ void Engine::Init_Sound_DynamicArrays_And_Others()
     {
         SND_Init();
         SND_Init_Ambiance();
-        MusicController::Create(mResMan, *mMap);
+        MusicController::Create(*mResMan, *mMap);
     }
     else
     {
         AO::SND_Init();
         SND_Init_Ambiance();
-        AO::MusicController::Create(mResMan, *mMap);
+        AO::MusicController::Create(*mResMan, *mMap);
     }
     Init_GameStates(); // Init other vars + switch states
 
@@ -540,15 +541,15 @@ void Engine::Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera
 
     if (mGameType == GameType::eAe)
     {
-        relive_new DDCheat(mResMan, *mMap);
-        gEventSystem = relive_new GameSpeak(mResMan, *mMap);
+        relive_new DDCheat(*mResMan, *mMap);
+        gEventSystem = relive_new GameSpeak(*mResMan, *mMap);
     }
     else
     {
-        relive_new AO::DDCheat(mResMan, *mMap);
-        AO::gEventSystem = relive_new AO::GameSpeak(mResMan, *mMap);
+        relive_new AO::DDCheat(*mResMan, *mMap);
+        AO::gEventSystem = relive_new AO::GameSpeak(*mResMan, *mMap);
     }
-    gCheatController = relive_new CheatController(mResMan, *mMap);
+    gCheatController = relive_new CheatController(*mResMan, *mMap);
 
     Game_Init_LoadingIcon();
 
@@ -604,47 +605,62 @@ void Engine::Game_Main(EReliveLevelIds startLevel, s32 startPath, s32 startCamer
 
 void Engine::Run()
 {
-    gPsxDisplay.Init(mResMan);
-
-    if (mGameType == GameType::eAe)
-    {
-        mMap = std::make_unique<Map>(mResMan, mFactory);
-    }
-    else
-    {
-        mMap = std::make_unique<AO::Map>(mResMan, mFactory);
-    }  
-
-    GetGameAutoPlayer().ProcessCommandLine(mFs, mClp);
-
-    sCommandLine_ShowFps = mClp.SwitchExists("-ddfps");
-    gCommandLine_NoFrameSkip = mClp.SwitchExists("-ddnoskip");
-
-    CmdLineRenderInit();
+    std::string activeModPath;
+    std::string activeModDisplayName;
 
     std::string modName;
     if (mClp.ExtractNamePairArgument(modName, "-mod="))
     {
         LOG_INFO("Set active mod to be %s", modName.c_str());
 
-        relive::Mods mods(mFs);
-//        mods.EnumerateMods();
+        FileSystem::Path modsDir;
+        modsDir.Append("relive_data").Append("mods");
 
-        const relive::Mod* pMod =  mods.FindByDirOrModName(modName);
-        if (pMod)
+        relive::Mods mods(mFs);
+        mods.EnumerateMods(modsDir.GetPath());
+
+        const relive::Mod* pMod = mods.FindByDirOrModName(modName);
+        if (!pMod)
         {
-            // TODO: Add resource path as primary path in resource manager
-            // TODO: Include mod name in window title
-            // TODO: Fail if mod isn't for the active game type
+            ALIVE_FATAL("Mod \"%s\" was set as the active mod on the command line but doesn't exist", modName.c_str());
         }
+
+        const char_type* const expectedTargetGame = (mGameType == GameType::eAe) ? "AE" : "AO";
+        if (strcmpi(pMod->mTargetGame.c_str(), expectedTargetGame) != 0)
+        {
+            ALIVE_FATAL("Mod \"%s\" targets \"%s\" but the active game is \"%s\"", modName.c_str(), pMod->mTargetGame.c_str(), expectedTargetGame);
+        }
+
+        activeModDisplayName = pMod->mName;
+        activeModPath = modsDir.Append(pMod->mDirectory).GetPath();
     }
+
+    mResMan = std::make_unique<ResourceManagerWrapper>(mFs, activeModPath);
+
+    gPsxDisplay.Init(*mResMan);
+
+    if (mGameType == GameType::eAe)
+    {
+        mMap = std::make_unique<Map>(*mResMan, mFactory);
+    }
+    else
+    {
+        mMap = std::make_unique<AO::Map>(*mResMan, mFactory);
+    }
+
+    GetGameAutoPlayer().ProcessCommandLine(mFs, mClp);
+
+    sCommandLine_ShowFps = mClp.SwitchExists("-ddfps");
+    gCommandLine_NoFrameSkip = mClp.SwitchExists("-ddnoskip");
+
+    CmdLineRenderInit(activeModDisplayName);
 
     // Another hack till refactor branch replaces master
     GetGameAutoPlayer().Pause(true);
     GetGameAutoPlayer().DisableRecorder();
 
     // TODO: HACK mini loop till Game.cpp is merged
-    DataConversionUI dcu(mGameType, mResMan, *mMap);
+    DataConversionUI dcu(mGameType, *mResMan, *mMap);
     if (dcu.ConversionRequired())
     {
         do
