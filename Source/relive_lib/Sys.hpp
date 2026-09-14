@@ -36,7 +36,7 @@ enum class MouseButtons
     eRight
 };
 bool Sys_IsMouseButtonDown(MouseButtons button);
-void SYS_EventsPump();
+void SYS_EventsPump(class BaseMap* pMap = nullptr);
 TWindowHandleType Sys_GetHWnd();
 void Sys_DestroyWindow();
 bool Sys_WindowClass_Register(const char_type* lpWindowName, s32 x, s32 y, s32 nWidth, s32 nHeight, s32 extraAttributes);

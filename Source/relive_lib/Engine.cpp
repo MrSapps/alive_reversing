@@ -155,7 +155,7 @@ static void DrawFps_4952F0(f32 fps)
 }
 
 
-static s32 Game_End_Frame(u32 flags)
+static s32 Game_End_Frame(u32 flags, BaseMap* pMap)
 {
     if (flags & 1)
     {
@@ -171,7 +171,7 @@ static s32 Game_End_Frame(u32 flags)
 
     ++sFrameCount_5CA300;
 
-    if (Sys_PumpMessages())
+    if (Sys_PumpMessages(pMap))
     {
         exit(0);
     }
@@ -216,7 +216,7 @@ void Engine::CmdLineRenderInit(const std::string& activeModName)
         VGA_CreateRenderer(rendererToCreate, WindowTitleAO(activeModName));
     }
 
-    PSX_EMU_SetCallBack_4F9430(Game_End_Frame);
+    PSX_EMU_SetCallBack_4F9430([this](u32 flags) { return Game_End_Frame(flags, mMap.get()); });
 }
 
 
@@ -244,9 +244,9 @@ void DestroyObjects(ResourceManagerWrapper& resMan)
     }
 }
 
-void SYS_EventsPump()
+void SYS_EventsPump(BaseMap* pMap)
 {
-    if (Sys_PumpMessages())
+    if (Sys_PumpMessages(pMap))
     {
         exit(0);
     }
@@ -435,7 +435,7 @@ void Game_Loop(BaseMap& map)
 
         gPsxDisplay.mDebugFont.DebugFont_Flush();
         gScreenManager->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
-        SYS_EventsPump(); // Exit checking?
+        SYS_EventsPump(&map); // Exit checking?
 
         GetGameAutoPlayer().SyncPoint(SyncPoints::RenderOT);
         gPsxDisplay.RenderOrderingTable();
@@ -516,7 +516,7 @@ void Game_Loop(BaseMap& map)
 void Engine::Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera)
 {
     // Begin start up
-    SYS_EventsPump();
+    SYS_EventsPump(mMap.get());
 
     gAttract = 0;
  
@@ -647,7 +647,6 @@ void Engine::Run()
     {
         mMap = std::make_unique<AO::Map>(*mResMan, mFactory);
     }
-
     GetGameAutoPlayer().ProcessCommandLine(mFs, mClp);
 
     sCommandLine_ShowFps = mClp.SwitchExists("-ddfps");
@@ -669,7 +668,7 @@ void Engine::Run()
 
             dcu.VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
 
-            SYS_EventsPump();
+            SYS_EventsPump(mMap.get());
             gPsxDisplay.RenderOrderingTable();
         }
         while (!dcu.GetDead());
