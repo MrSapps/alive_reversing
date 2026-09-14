@@ -3,6 +3,7 @@
 #include "PropertyTreeItemBase.hpp"
 #include "IGraphicsItem.hpp"
 #include <QDateTime>
+#include <memory>
 #include "../../relive_lib/Types.hpp"
 
 static void WriteInt(IntegerType intType, void* intPtr, qint64 value)
@@ -27,6 +28,25 @@ static void WriteInt(IntegerType intType, void* intPtr, qint64 value)
     }
 }
 
+static qint64 ReadInt(IntegerType intType, const void* intPtr)
+{
+    switch (intType)
+    {
+        case IntegerType::Int_S16:
+        return *reinterpret_cast<const s16*>(intPtr);
+
+        case IntegerType::Int_U16:
+        return *reinterpret_cast<const u16*>(intPtr);
+
+        case IntegerType::Int_S32:
+        return *reinterpret_cast<const s32*>(intPtr);
+
+        case IntegerType::Int_U32:
+        return *reinterpret_cast<const u32*>(intPtr);
+    }
+    return 0;
+}
+
 ChangeBasicTypePropertyCommand::ChangeBasicTypePropertyCommand(LinkedBasicTypeProperty linkedProperty, BasicTypePropertyChangeData propertyData)
     : mLinkedProperty(linkedProperty), mPropertyData(propertyData)
 {
@@ -37,16 +57,33 @@ ChangeBasicTypePropertyCommand::ChangeBasicTypePropertyCommand(LinkedBasicTypePr
 void ChangeBasicTypePropertyCommand::undo()
 {
     WriteInt(mLinkedProperty.mIntegerType, mLinkedProperty.mIntPtr, mPropertyData.mOldValue);
-    mLinkedProperty.mTreeWidget->FindObjectPropertyByKey(mLinkedProperty.mIntPtr)->Refresh();
+    // SyncInternalObject (e.g. ResizeableRectItem::SyncFromMapObject) can silently correct the
+    // raw value just written - clamping it to the map bounds/minimum size - so Refresh() must
+    // run after it, not before, or the property row (and a still-open spin box's own internal
+    // value/displayed text) is left showing the pre-correction number rather than what's
+    // actually stored. That divergence compounds with every further step of a spin box's
+    // up/down arrows, since each one computes its next value from its own (increasingly stale)
+    // displayed number rather than the model's real, corrected one.
     mLinkedProperty.mGraphicsItem->SyncInternalObject();
+
+    // Record what's actually stored now, not the raw value that was requested - the same
+    // correction above means they can differ (e.g. undoing back to a value that's since become
+    // invalid because the map shrank). Without this, mOldValue drifts from reality exactly like
+    // mSpinBox's own displayed value used to, and the undo entry's "from X to Y" text (and any
+    // later mergeWith bookkeeping built on it) keeps describing an edit that never actually
+    // happened.
+    mPropertyData.mOldValue = ReadInt(mLinkedProperty.mIntegerType, mLinkedProperty.mIntPtr);
+    mLinkedProperty.mTreeWidget->FindObjectPropertyByKey(mLinkedProperty.mIntPtr)->Refresh();
+    UpdateText();
 }
 
 void ChangeBasicTypePropertyCommand::redo()
 {
     WriteInt(mLinkedProperty.mIntegerType, mLinkedProperty.mIntPtr, mPropertyData.mNewValue);
-    mLinkedProperty.mTreeWidget->FindObjectPropertyByKey(mLinkedProperty.mIntPtr)->Refresh();
     mLinkedProperty.mGraphicsItem->SyncInternalObject();
-
+    mPropertyData.mNewValue = ReadInt(mLinkedProperty.mIntegerType, mLinkedProperty.mIntPtr);
+    mLinkedProperty.mTreeWidget->FindObjectPropertyByKey(mLinkedProperty.mIntPtr)->Refresh();
+    UpdateText();
 }
 
 bool ChangeBasicTypePropertyCommand::mergeWith(const QUndoCommand* command)
@@ -67,6 +104,27 @@ bool ChangeBasicTypePropertyCommand::mergeWith(const QUndoCommand* command)
         }
     }
     return false;
+}
+
+void ChangeBasicTypePropertyCommand::PushIfEffective(QUndoStack& stack, LinkedBasicTypeProperty linkedProperty, BasicTypePropertyChangeData propertyData)
+{
+    auto cmd = std::make_unique<ChangeBasicTypePropertyCommand>(linkedProperty, propertyData);
+
+    // Run the edit now (exactly what QUndoStack::push() would do immediately anyway) so
+    // mPropertyData.mNewValue reflects the actual, possibly-corrected result - only then do we
+    // know whether this is worth an undo-stack entry at all.
+    cmd->redo();
+
+    if (cmd->mPropertyData.mNewValue == cmd->mPropertyData.mOldValue)
+    {
+        // Fully absorbed by a correction - the redo() above already reapplied it and refreshed
+        // the display, so the property is exactly where it started and there's nothing to undo.
+        return;
+    }
+
+    // push() calls redo() again - harmless, since it just re-applies the same already-current
+    // value a second time - but is what actually registers the command with the stack/QUndoView.
+    stack.push(cmd.release());
 }
 
 void ChangeBasicTypePropertyCommand::UpdateText()

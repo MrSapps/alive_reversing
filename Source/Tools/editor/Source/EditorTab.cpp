@@ -557,3 +557,13 @@ int EditorTab::ClampRangeStartY(int start, int length)
 {
     return GridPlacement::ClampRangeStartToMapBounds(start, length, mModel->YSize() * mModel->CameraGridHeight());
 }
+
+int EditorTab::ClampLengthX(int length)
+{
+    return GridPlacement::ClampLengthToMapBounds(length, mModel->XSize() * mModel->CameraGridWidth());
+}
+
+int EditorTab::ClampLengthY(int length)
+{
+    return GridPlacement::ClampLengthToMapBounds(length, mModel->YSize() * mModel->CameraGridHeight());
+}

@@ -421,6 +421,25 @@ namespace
         }
         return client.WaitForResponse(contextMenuId, 5000).value("ok", false);
     }
+
+    // Reads the text currently displayed by a BigSpinBox (a property panel row's editor
+    // widget) via its internal QLineEdit child ("qt_spinbox_lineedit") - the only place that
+    // text is exposed through get_state, since DescribeObject only reports a "text" field for
+    // QLineEdit/QLabel/QAbstractButton, not QAbstractSpinBox itself.
+    std::string SpinBoxDisplayedText(AutomationClient& client, const std::string& objectName)
+    {
+        const auto resp = client.Call({{"cmd", "get_state"}, {"target", objectName}});
+        EXPECT_TRUE(resp.value("ok", false));
+        for (const auto& child : resp.at("result").value("children", nlohmann::json::array()))
+        {
+            if (child.value("className", std::string()) == "QLineEdit")
+            {
+                return child.value("text", std::string());
+            }
+        }
+        ADD_FAILURE() << "no QLineEdit child found under " << objectName;
+        return {};
+    }
 }
 
 TEST(EditorAutomation, OpenCloseAboutAndExit)
@@ -1994,6 +2013,209 @@ TEST(EditorAutomation, DeleteCameraUndoRedoAndSaveRemovesCameraAndItsObjects)
             EXPECT_TRUE(camera.value("map_objects", nlohmann::json::array()).empty())
                 << "saved json still contains a map object in camera " << camera.dump();
         }
+    }
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Regression test: the properties panel let a map object's width/height/xpos be set to an
+// arbitrary value with no bounds checking at all - BasicTypeProperty's spin box only limits the
+// value to the field's own integer range (e.g. s32), and ChangeBasicTypePropertyCommand writes
+// it straight into the model via a raw pointer. Every mouse-driven path (resize handles, drag,
+// paste, map-resize) goes through IGridPointSnapper's clamp instead; ResizeableRectItem::
+// SyncFromMapObject - the one place that turns a model change back into on-screen geometry -
+// now applies the same clamp regardless of how the model got mutated. Drives the panel via the
+// "click_tree_item" automation command (which spawns a property row's transient editor widget
+// exactly like a real click does) and "set_value" on the resulting BigSpinBox.
+TEST(EditorAutomation, PropertyPanelEditIsClampedToMapBoundsWithUndoAndSaveReload)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString savePath = tempDir.filePath("relive_editor_test_level.json");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateNewPath(client));
+    ASSERT_TRUE(AddMapObject(client));
+
+    const nlohmann::json original = FindKind(GetSceneItems(client), "map_object");
+
+    // Select it (rubber-band select) so the properties panel populates for it.
+    {
+        const double x = original.at("xpos").get<double>();
+        const double y = original.at("ypos").get<double>();
+        const double w = original.at("width").get<double>();
+        const double h = original.at("height").get<double>();
+        DragView(client, SceneToView(client, x - 20, y - 20), SceneToView(client, x + w + 20, y + h + 20));
+    }
+    ASSERT_TRUE(FindKind(GetSceneItems(client), "map_object").value("selected", false)) << "rubber-band select did not select the object";
+
+    // Clicks into a property row (spawning its editor widget if not already open) and types a
+    // new value into it - mirrors "click column 1 of this row, then type a value and commit".
+    auto setProperty = [&](const std::string& fieldName, qint64 value) -> bool
+    {
+        if (!client.Call({{"cmd", "click_tree_item"}, {"target", "treeWidget"}, {"row_text", fieldName}}).value("ok", false))
+        {
+            ADD_FAILURE() << "failed to click the '" << fieldName << "' property row";
+            return false;
+        }
+        return client.Call({{"cmd", "set_value"}, {"target", "propertyEditor_" + fieldName}, {"value", value}}).value("ok", false);
+    };
+
+    // A wildly oversized width must clamp to the map's own bounds (AO's 1x1 default map is
+    // 1024x480 - Model::CameraGridWidth/Height), the same invariant MapObjectDragResizeBoundsAndSnap
+    // already checks for the drag-resize path - not just accept it raw.
+    ASSERT_TRUE(setProperty("width", 999999));
+    {
+        const nlohmann::json afterWidth = FindKind(GetSceneItems(client), "map_object");
+        EXPECT_LE(afterWidth.at("xpos").get<double>() + afterWidth.at("width").get<double>(), 1024)
+            << "properties panel let width push the object past the map's right edge";
+    }
+
+    // Undo restores the exact pre-edit width...
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_undo"}}).value("ok", false));
+    {
+        const nlohmann::json afterUndo = FindKind(GetSceneItems(client), "map_object");
+        EXPECT_DOUBLE_EQ(afterUndo.value("width", -1.0), original.at("width").get<double>()) << "undo did not restore the pre-edit width";
+    }
+    // ...and redo re-applies the clamp, not the raw typed value.
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_redo"}}).value("ok", false));
+    {
+        const nlohmann::json afterRedo = FindKind(GetSceneItems(client), "map_object");
+        EXPECT_LE(afterRedo.at("xpos").get<double>() + afterRedo.at("width").get<double>(), 1024) << "redo did not reapply the clamp";
+    }
+
+    // Same oversized check on the other axis.
+    ASSERT_TRUE(setProperty("height", 999999));
+    {
+        const nlohmann::json afterHeight = FindKind(GetSceneItems(client), "map_object");
+        EXPECT_LE(afterHeight.at("ypos").get<double>() + afterHeight.at("height").get<double>(), 480)
+            << "properties panel let height push the object past the map's bottom edge";
+    }
+
+    // A negative/undersized value must still respect the minimum rect size the resize handles
+    // enforce (ResizeableRectItem::kMinRectSize == 10), not just "not below zero".
+    ASSERT_TRUE(setProperty("height", -500));
+    EXPECT_GE(FindKind(GetSceneItems(client), "map_object").at("height").get<double>(), 10)
+        << "a negative height was not clamped to the minimum rect size";
+
+    // xpos (a position, not a size) must reposition the object back into bounds the same way.
+    ASSERT_TRUE(setProperty("xpos", 999999));
+    {
+        const nlohmann::json afterXpos = FindKind(GetSceneItems(client), "map_object");
+        EXPECT_LE(afterXpos.at("xpos").get<double>() + afterXpos.at("width").get<double>(), 1024)
+            << "properties panel let xpos push the object past the map's right edge";
+    }
+
+    // Save while every field above is still (correctly) clamped, then reopen: the corrected
+    // values - not the raw out-of-bounds ones that were typed - must be what's on disk, proving
+    // the fix writes the correction back into the model rather than only patching the on-screen
+    // rect.
+    {
+        const auto resp = client.Call({{"cmd", "save_path_as"}, {"path", savePath.toStdString()}});
+        ASSERT_TRUE(resp.value("ok", false));
+        ASSERT_TRUE(resp.at("result").value("saved", false));
+    }
+    {
+        const auto resp = client.Call({{"cmd", "open_path"}, {"path", savePath.toStdString()}});
+        ASSERT_TRUE(resp.value("ok", false));
+        ASSERT_TRUE(resp.at("result").value("opened", false));
+    }
+    {
+        const nlohmann::json reopened = FindKind(GetSceneItems(client), "map_object");
+        EXPECT_LE(reopened.at("xpos").get<double>() + reopened.at("width").get<double>(), 1024) << "oversized width/xpos survived a save/reopen round-trip";
+        EXPECT_LE(reopened.at("ypos").get<double>() + reopened.at("height").get<double>(), 480) << "oversized height survived a save/reopen round-trip";
+        EXPECT_GE(reopened.at("width").get<double>(), 10);
+        EXPECT_GE(reopened.at("height").get<double>(), 10);
+    }
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Regression test for a follow-up to the properties-panel clamp bug above: the spin box's own
+// up/down arrows (QAbstractSpinBox::stepDown(), which the actual on-screen arrow buttons call)
+// can't be typed past kMinRectSize like a raw value can, but repeatedly clicking down past it
+// used to leave the *displayed* number drifting further and further from reality (e.g. "-176")
+// while the real, correctly-clamped width sat at 10 underneath - because
+// ChangeBasicTypePropertyCommand refreshed the property row's text/spin box *before*
+// SyncInternalObject had a chance to correct the value it had just written. Confirmed by
+// reverting just the display-refresh-ordering fix and re-running this: the object's own width
+// still floored at 10 (proving the earlier clamp fix holds), but the spin box's line edit showed
+// a wrong, ever-decreasing negative number instead.
+TEST(EditorAutomation, PropertyPanelSpinBoxArrowsStayInSyncAtMinRectSize)
+{
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateNewPath(client));
+    ASSERT_TRUE(AddMapObject(client));
+
+    const nlohmann::json before = FindKind(GetSceneItems(client), "map_object");
+    {
+        const double x = before.at("xpos").get<double>();
+        const double y = before.at("ypos").get<double>();
+        const double w = before.at("width").get<double>();
+        const double h = before.at("height").get<double>();
+        DragView(client, SceneToView(client, x - 20, y - 20), SceneToView(client, x + w + 20, y + h + 20));
+    }
+    ASSERT_TRUE(FindKind(GetSceneItems(client), "map_object").value("selected", false)) << "rubber-band select did not select the object";
+
+    const size_t undoCountBeforeEdits = GetUndoWidgetTextList(client).size();
+
+    ASSERT_TRUE(client.Call({{"cmd", "click_tree_item"}, {"target", "treeWidget"}, {"row_text", "width"}}).value("ok", false));
+
+    // Click the down arrow far more times than needed to cross the minimum - if the display
+    // were drifting unboundedly (the bug), this is what would produce a wildly negative number.
+    ASSERT_TRUE(client.Call({{"cmd", "spin_step"}, {"target", "propertyEditor_width"}, {"direction", "down"}, {"count", 200}}).value("ok", false));
+
+    {
+        const nlohmann::json afterDown = FindKind(GetSceneItems(client), "map_object");
+        EXPECT_DOUBLE_EQ(afterDown.at("width").get<double>(), 10) << "width was not floored at the minimum rect size";
+        EXPECT_EQ(SpinBoxDisplayedText(client, "propertyEditor_width"), "10")
+            << "spin box display drifted away from the actual (correctly clamped) width";
+    }
+    // The undo entry must describe what actually happened (ending at the floor, 10) rather than
+    // the raw, never-actually-applied value the spin box last requested (a wildly negative
+    // number after 200 down-clicks) - ChangeBasicTypePropertyCommand::redo() now re-reads the
+    // post-clamp value before building its "Change property X from A to B" text.
+    const std::vector<std::string> undoAfterInitialEdit = GetUndoWidgetTextList(client);
+    EXPECT_TRUE(UndoContains(undoAfterInitialEdit, "Change property width from 24 to 10"))
+        << "undo entry describes the raw requested value instead of the actual clamped result";
+    // All 200 clicks - the genuine 24->10 transition plus 186 further no-ops once already at the
+    // floor - must collapse into exactly that one entry: the merge across edits to the same
+    // field within a second already coalesced the *effective* ones, and PushIfEffective now
+    // skips pushing anything at all for a click that the clamp fully absorbs (old value ==
+    // corrected new value), so no run of no-op clicks should ever grow the stack.
+    EXPECT_EQ(undoAfterInitialEdit.size(), undoCountBeforeEdits + 1)
+        << "no-op down-clicks at the floor added their own undo entries instead of being discarded";
+
+    // Clicking down further while already pinned at the floor - each one individually a no-op -
+    // must not add any more undo entries at all (this is what "10 to 10" showing up in the undo
+    // list, or the stack growing on every held-down click, would look like).
+    ASSERT_TRUE(client.Call({{"cmd", "spin_step"}, {"target", "propertyEditor_width"}, {"direction", "down"}, {"count", 50}}).value("ok", false));
+    {
+        const nlohmann::json afterMoreDown = FindKind(GetSceneItems(client), "map_object");
+        EXPECT_DOUBLE_EQ(afterMoreDown.at("width").get<double>(), 10) << "width moved away from the floor on a further no-op down-click";
+        EXPECT_EQ(SpinBoxDisplayedText(client, "propertyEditor_width"), "10");
+    }
+    EXPECT_EQ(GetUndoWidgetTextList(client), undoAfterInitialEdit)
+        << "further no-op down-clicks at the floor changed the undo stack";
+
+    // Recovery check: since the display is back in sync at the floor, clicking up must
+    // immediately start growing the object again - not silently do nothing while the display
+    // slowly climbs back out of whatever negative range it had drifted into.
+    ASSERT_TRUE(client.Call({{"cmd", "spin_step"}, {"target", "propertyEditor_width"}, {"direction", "up"}, {"count", 5}}).value("ok", false));
+    {
+        const nlohmann::json afterUp = FindKind(GetSceneItems(client), "map_object");
+        EXPECT_DOUBLE_EQ(afterUp.at("width").get<double>(), 15) << "up arrow did not immediately resume growing the object from the floor";
+        EXPECT_EQ(SpinBoxDisplayedText(client, "propertyEditor_width"), "15");
     }
 
     editor.terminate();

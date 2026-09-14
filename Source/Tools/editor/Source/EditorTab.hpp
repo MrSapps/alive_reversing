@@ -121,6 +121,8 @@ private:
     int ClampY(int y) override;
     int ClampRangeStartX(int start, int length) override;
     int ClampRangeStartY(int start, int length) override;
+    int ClampLengthX(int length) override;
+    int ClampLengthY(int length) override;
 
     Ui::EditorTab* ui = nullptr;
     float iZoomLevel = 1.0f;
