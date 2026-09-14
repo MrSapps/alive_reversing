@@ -1,14 +1,14 @@
 #pragma once
 
 #include "Types.hpp"
-#include "AddPointer.hpp"
 #include "Function.hpp"
 #include "FixedPoint.hpp"
+#include <functional>
 
 struct PSX_DISPENV;
 struct PSX_RECT;
 
-using TPsxEmuCallBack = AddPointer_t<s32(u32)>;
+using TPsxEmuCallBack = std::function<s32(u32)>;
 
 enum class VSyncMode
 {
