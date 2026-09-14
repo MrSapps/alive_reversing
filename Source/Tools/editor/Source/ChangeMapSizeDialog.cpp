@@ -323,18 +323,24 @@ static void ForceItemsInsideMapBounds(EditorTab* pTab)
         }
         else if (auto* pArrow = qgraphicsitem_cast<ResizeableArrowItem*>(item))
         {
+            // Same shrink-then-reposition as the rect branch above, via the same GridPlacement
+            // primitives (FitLineToMapBounds composes them for a line - see its own comment in
+            // GridPlacement.hpp) - a line just has no independent width/height to write the
+            // shrunk extent back to, only two endpoints. ItemPositionData::Save/Restore (used by
+            // mBeforeResizeSnapshot below) captures a line's full local line() shape, not just
+            // its position, so undo restores an oversized line's exact pre-shrink shape even
+            // though this shrinks it here.
             const QLineF line = pArrow->SaveLine().translated(pArrow->x(), pArrow->y());
-            const qreal left = std::min(line.x1(), line.x2());
-            const qreal top = std::min(line.y1(), line.y2());
-            const qreal width = std::abs(line.x2() - line.x1());
-            const qreal height = std::abs(line.y2() - line.y1());
-            const int clampedLeft = GridPlacement::ClampRangeStartToMapBounds(static_cast<int>(left), static_cast<int>(width), mapWidth);
-            const int clampedTop = GridPlacement::ClampRangeStartToMapBounds(static_cast<int>(top), static_cast<int>(height), mapHeight);
-            const int dx = clampedLeft - static_cast<int>(left);
-            const int dy = clampedTop - static_cast<int>(top);
-            if (dx != 0 || dy != 0)
+            const int x1 = static_cast<int>(line.x1());
+            const int y1 = static_cast<int>(line.y1());
+            const int x2 = static_cast<int>(line.x2());
+            const int y2 = static_cast<int>(line.y2());
+
+            const GridPlacement::ClampedLine fitted = GridPlacement::FitLineToMapBounds(x1, y1, x2, y2, mapWidth, mapHeight);
+            if (fitted.x1 != x1 || fitted.y1 != y1 || fitted.x2 != x2 || fitted.y2 != y2)
             {
-                pArrow->Translate(dx, dy);
+                pArrow->setPos(QPointF());
+                pArrow->RestoreLine(QLineF(fitted.x1, fitted.y1, fitted.x2, fitted.y2));
             }
         }
     }

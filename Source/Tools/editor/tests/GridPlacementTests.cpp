@@ -142,6 +142,130 @@ TEST(ClampLengthToMapBounds, ZeroSizeMapClampsToZero)
     EXPECT_EQ(ClampLengthToMapBounds(500, 0), 0);
 }
 
+// RemapLineToBoundingBox takes an already-computed new box (typically from ClampLengthToMapBounds
+// + ClampRangeStartToMapBounds, one call per axis - the same two functions a rect's width/height/
+// position clamp uses directly above) and remaps a line's two endpoints into it. It doesn't know
+// about map bounds itself, so these pass the new box in directly rather than going through a
+// map size, unlike the map-bounds tests above.
+TEST(RemapLineToBoundingBox, UnchangedWhenBoxIsIdentical)
+{
+    const auto result = RemapLineToBoundingBox(100, 50, 300, 50, 100, 50, 200, 0);
+    EXPECT_EQ(result.x1, 100);
+    EXPECT_EQ(result.y1, 50);
+    EXPECT_EQ(result.x2, 300);
+    EXPECT_EQ(result.y2, 50);
+}
+
+TEST(RemapLineToBoundingBox, TranslatesWithoutDistortingWhenOnlyPositionChanges)
+{
+    // New box is the same size (100x50) as the line's own bounding box - a pure reposition, the
+    // same case ChangeMapSizeDialog's ForceItemsInsideMapBounds and PasteItemsCommand hit for a
+    // line that already fits but is offset out of bounds.
+    const auto result = RemapLineToBoundingBox(2000, 3000, 2100, 3050, 923, 429, 100, 50);
+    EXPECT_EQ(result.x1, 923);
+    EXPECT_EQ(result.y1, 429);
+    EXPECT_EQ(result.x2, 1023);
+    EXPECT_EQ(result.y2, 479);
+}
+
+TEST(RemapLineToBoundingBox, ShrinksProportionallyAboutTopLeftCorner)
+{
+    // A line spanning a 2000x1000 box shrunk to fit a 1000x1000 one - each axis scales
+    // independently (width halves, height unchanged), same as a rect's width/height clamp.
+    const auto result = RemapLineToBoundingBox(0, 0, 2000, 1000, 0, 0, 1000, 1000);
+    EXPECT_EQ(result.x1, 0);
+    EXPECT_EQ(result.y1, 0);
+    EXPECT_EQ(result.x2, 1000);
+    EXPECT_EQ(result.y2, 1000);
+}
+
+TEST(RemapLineToBoundingBox, PreservesEndpointDirectionWhenShrinking)
+{
+    // x1 is the "high" end (1000) and x2 the "low" end (0) before the shrink - it must still be
+    // the high end afterwards, not swapped, since callers (ResizeableArrowItem) rely on which
+    // endpoint is which for the model's X1/X2 and (via mNext/mPrevious) chained collision lines.
+    const auto result = RemapLineToBoundingBox(1000, 0, 0, 0, 0, 0, 500, 0);
+    EXPECT_EQ(result.x1, 500);
+    EXPECT_EQ(result.x2, 0);
+    EXPECT_GT(result.x1, result.x2);
+}
+
+TEST(RemapLineToBoundingBox, ZeroWidthVerticalLineDoesNotDivideByZero)
+{
+    // A perfectly vertical line (x1 == x2) has zero width - the x-axis scale factor must fall
+    // back to a safe default instead of computing 0/0, while the y-axis (height 2000, shrunk to
+    // 480) still scales normally.
+    const auto result = RemapLineToBoundingBox(500, 0, 500, 2000, 10, 20, 0, 480);
+    EXPECT_EQ(result.x1, 10);
+    EXPECT_EQ(result.x2, 10);
+    EXPECT_EQ(result.y1, 20);
+    EXPECT_EQ(result.y2, 500);
+}
+
+TEST(RemapLineToBoundingBox, ZeroHeightHorizontalLineDoesNotDivideByZero)
+{
+    const auto result = RemapLineToBoundingBox(0, 300, 2000, 300, 5, 7, 1024, 0);
+    EXPECT_EQ(result.y1, 7);
+    EXPECT_EQ(result.y2, 7);
+    EXPECT_EQ(result.x1, 5);
+    EXPECT_EQ(result.x2, 1029);
+}
+
+// FitLineToBounds is generic over how each axis gets clamped (4 callables), so both
+// FitLineToMapBounds below and ResizeableArrowItem::SyncFromCollisionItem (which clamps via
+// mSnapper instead of a raw map size) share this one composition. Use deliberately distinct,
+// order-sensitive clamp callables per axis here - not real map-bounds clamps - so a wiring bug
+// (e.g. the Y callables receiving X's length, or a (start, length) pair passed swapped) shows up
+// as a wrong number rather than silently passing because X and Y happened to behave the same.
+TEST(FitLineToBounds, ThreadsPerAxisCallablesInCorrectOrder)
+{
+    const auto result = FitLineToBounds(
+        0, 0, 300, 100,
+        [](int length) { return std::min(length, 200); },      // X length capped at 200
+        [](int length) { return std::min(length, 50); },       // Y length capped at 50
+        [](int start, int length) { return start + length; },  // distinct, order-sensitive X start
+        [](int start, int length) { return start - length; }); // distinct, order-sensitive Y start
+    EXPECT_EQ(result.x1, 200);
+    EXPECT_EQ(result.y1, -50);
+    EXPECT_EQ(result.x2, 400);
+    EXPECT_EQ(result.y2, 0);
+}
+
+// FitLineToMapBounds is the one-shot version for a caller with the raw map size on hand
+// (ChangeMapSizeDialog's ForceItemsInsideMapBounds) - it composes ClampLengthToMapBounds +
+// ClampRangeStartToMapBounds + RemapLineToBoundingBox, so these mostly just confirm the
+// composition wires those three together correctly; the boundary behavior of each piece is
+// already covered by their own tests above.
+TEST(FitLineToMapBounds, WithinBoundsUnchanged)
+{
+    const auto result = FitLineToMapBounds(10, 10, 110, 60, 1024, 480);
+    EXPECT_EQ(result.x1, 10);
+    EXPECT_EQ(result.y1, 10);
+    EXPECT_EQ(result.x2, 110);
+    EXPECT_EQ(result.y2, 60);
+}
+
+TEST(FitLineToMapBounds, RepositionsWithoutShrinkingWhenAlreadyFits)
+{
+    // 100x50 already fits a 1024x480 map - only needs to move back onto it, not shrink.
+    const auto result = FitLineToMapBounds(2000, 3000, 2100, 3050, 1024, 480);
+    EXPECT_EQ(result.x1, 923);
+    EXPECT_EQ(result.y1, 429);
+    EXPECT_EQ(result.x2, 1023);
+    EXPECT_EQ(result.y2, 479);
+}
+
+TEST(FitLineToMapBounds, ShrinksOversizedLineToFitMap)
+{
+    // The regression case: a line 3000px wide pasted/left over from a bigger map, fit onto a
+    // single 1024x480 camera - must shrink, not just slide sideways and still hang off the edge.
+    const auto result = FitLineToMapBounds(0, 0, 3000, 0, 1024, 480);
+    EXPECT_EQ(result.x1, 0);
+    EXPECT_EQ(result.y1, 0);
+    EXPECT_EQ(result.x2, 1024);
+    EXPECT_EQ(result.y2, 0);
+}
+
 int main(int argc, char** argv)
 {
     ::testing::InitGoogleTest(&argc, argv);

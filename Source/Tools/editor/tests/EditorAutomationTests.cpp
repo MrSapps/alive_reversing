@@ -1180,6 +1180,80 @@ TEST(EditorAutomation, ChangeMapSizeForcesObjectsInsideBoundsWithUndoRedo)
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
+// Same regression as ChangeMapSizeForcesObjectsInsideBoundsWithUndoRedo above, but for a
+// collision line: ForceItemsInsideMapBounds used to only reposition a line, never shrink one
+// that's bigger than the whole map (unlike the rect branch right above it, which always shrank
+// via ClampLengthToMapBounds) - so shrinking the map down could leave a line hanging out past
+// the far edge. Fixed via GridPlacement::RemapLineToBoundingBox, the same helper
+// ResizeableArrowItem::SyncFromCollisionItem() uses for paste/load. Also confirms
+// ItemPositionData::Save/Restore captures a line's full shape (not just position), so undo
+// restores the exact pre-shrink oversized line rather than merely un-repositioning a still-
+// shrunk one.
+TEST(EditorAutomation, ChangeMapSizeForcesCollisionLineInsideBoundsWithUndoRedo)
+{
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateNewPath(client));
+    ASSERT_TRUE(AddCollisionLine(client));
+
+    // Grow to a 3-wide map (AO's camera grid cell is 1024x480 - see Model::CameraGridWidth) so
+    // there's room to stretch the line bigger than a single camera cell.
+    ASSERT_TRUE(SetMapSize(client, 3, 1));
+    ASSERT_EQ(CountKind(GetSceneItems(client), "camera"), 3) << "map did not grow to 3 cameras wide";
+
+    {
+        const nlohmann::json before = FindKind(GetSceneItems(client), "collision_line");
+        DragView(client, SceneToView(client, before.at("x2").get<int>(), before.at("y2").get<int>()),
+                  SceneToView(client, 3000, before.at("y2").get<int>()));
+    }
+
+    const nlohmann::json oversized = FindKind(GetSceneItems(client), "collision_line");
+    const int oversizedWidth = std::abs(oversized.at("x2").get<int>() - oversized.at("x1").get<int>());
+    ASSERT_GT(oversizedWidth, 1024) << "test setup failed to make the line wider than a single camera";
+
+    // Shrink back down to a single 1x1 camera: the line must shrink to fit AND reposition, not
+    // just get left hanging outside the map.
+    ASSERT_TRUE(SetMapSize(client, 1, 1));
+    ASSERT_EQ(CountKind(GetSceneItems(client), "camera"), 1) << "map did not shrink to a single camera";
+
+    const nlohmann::json shrunk = FindKind(GetSceneItems(client), "collision_line");
+    const int shrunkWidth = std::abs(shrunk.at("x2").get<int>() - shrunk.at("x1").get<int>());
+    const int shrunkMinX = std::min(shrunk.at("x1").get<int>(), shrunk.at("x2").get<int>());
+    const int shrunkMaxX = std::max(shrunk.at("x1").get<int>(), shrunk.at("x2").get<int>());
+    EXPECT_LE(shrunkWidth, 1024) << "oversized line was not shrunk to fit the map";
+    EXPECT_GE(shrunkMinX, 0);
+    EXPECT_LE(shrunkMaxX, 1024) << "line still extends past the map's right edge";
+
+    // Undo must restore both the map size and the line's exact pre-shrink oversized shape - not
+    // just whichever position it happened to have after the clamp.
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_undo"}}).value("ok", false));
+    ASSERT_EQ(CountKind(GetSceneItems(client), "camera"), 3) << "undo did not restore the 3-wide map";
+    {
+        const nlohmann::json afterUndo = FindKind(GetSceneItems(client), "collision_line");
+        EXPECT_EQ(afterUndo.value("x1", -1), oversized.at("x1").get<int>()) << "undo did not restore the line's pre-shrink position/shape";
+        EXPECT_EQ(afterUndo.value("y1", -1), oversized.at("y1").get<int>());
+        EXPECT_EQ(afterUndo.value("x2", -1), oversized.at("x2").get<int>());
+        EXPECT_EQ(afterUndo.value("y2", -1), oversized.at("y2").get<int>());
+    }
+
+    // Redo must re-apply the exact same shrink+reposition.
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_redo"}}).value("ok", false));
+    ASSERT_EQ(CountKind(GetSceneItems(client), "camera"), 1) << "redo did not reapply the 1-wide map";
+    {
+        const nlohmann::json afterRedo = FindKind(GetSceneItems(client), "collision_line");
+        EXPECT_EQ(afterRedo.value("x1", -1), shrunk.at("x1").get<int>()) << "redo did not reapply the same clamp";
+        EXPECT_EQ(afterRedo.value("y1", -1), shrunk.at("y1").get<int>());
+        EXPECT_EQ(afterRedo.value("x2", -1), shrunk.at("x2").get<int>());
+        EXPECT_EQ(afterRedo.value("y2", -1), shrunk.at("y2").get<int>());
+    }
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
 // Regression test for two camera bugs: CameraManager::CreateCamera used to save a brand new
 // camera's image under the wrong (still-empty) name, orphaning it from the camera being
 // created; and Model::ToJson() used mId != 0 as a "does this camera exist" check, which
@@ -1436,6 +1510,159 @@ TEST(EditorAutomation, PasteClampsBoundsAndPreservesSizeThroughEditAndReload)
     EXPECT_EQ(reopenedCount, 2) << "expected both the original and pasted object to still be there after reopening";
     EXPECT_TRUE(foundMatchingPasted) << "pasted object's position/size did not round-trip through save/reopen";
     EXPECT_TRUE(foundMatchingOriginal) << "original object's position/size did not round-trip through save/reopen";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Regression test for pasting a collision line across paths where the destination path's map is
+// smaller than the one the line was copied from: PasteItemsCommand only ever repositioned a
+// pasted line (ClampRangeStartX/Y), never shrank one that's wider/taller than the destination
+// map itself, so it could still stick out past the far edge even after "clamping". Fixed by
+// having ResizeableArrowItem self-correct (shrink-then-reposition, same idea as
+// ResizeableRectItem::SyncFromMapObject) in its constructor - which MakeResizeableArrowItem
+// calls for every pasted line, same as it always has for every loaded one.
+TEST(EditorAutomation, PasteOfOversizedCollisionLineIntoSmallerPathShrinksToFit)
+{
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    // Path A: grow to 3 cameras wide (AO's camera grid cell is 1024x480 - see
+    // Model::CameraGridWidth) and stretch a collision line across most of that width, well past
+    // the size of a single (default, 1x1) map.
+    ASSERT_TRUE(CreateNewPath(client));
+    ASSERT_TRUE(SetMapSize(client, 3, 1));
+    ASSERT_TRUE(AddCollisionLine(client));
+    {
+        const nlohmann::json before = FindKind(GetSceneItems(client), "collision_line");
+        DragView(client, SceneToView(client, before.at("x2").get<int>(), before.at("y2").get<int>()),
+                  SceneToView(client, 3000, before.at("y2").get<int>()));
+    }
+    const nlohmann::json oversized = FindKind(GetSceneItems(client), "collision_line");
+    const int oversizedWidth = std::abs(oversized.at("x2").get<int>() - oversized.at("x1").get<int>());
+    ASSERT_GT(oversizedWidth, 1024) << "test setup failed to make the line wider than a single camera";
+
+    // Select it (rubber-band, same idiom as PasteClampsBoundsAndPreservesSizeThroughEditAndReload
+    // - a freshly click-placed line isn't necessarily left selected) then copy it.
+    {
+        const int minX = std::min(oversized.at("x1").get<int>(), oversized.at("x2").get<int>()) - 20;
+        const int minY = std::min(oversized.at("y1").get<int>(), oversized.at("y2").get<int>()) - 20;
+        const int maxX = std::max(oversized.at("x1").get<int>(), oversized.at("x2").get<int>()) + 20;
+        const int maxY = std::max(oversized.at("y1").get<int>(), oversized.at("y2").get<int>()) + 20;
+        DragView(client, SceneToView(client, minX, minY), SceneToView(client, maxX, maxY));
+    }
+    ASSERT_TRUE(FindKind(GetSceneItems(client), "collision_line").value("selected", false)) << "rubber-band select did not select the line";
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "actionCopy"}}).value("ok", false));
+
+    // Path B: a brand new, still-default (1 camera, 1024x480) path - smaller than the map the
+    // line was copied from. CreateNewPath opens it as a new tab and makes it the active one.
+    ASSERT_TRUE(CreateNewPath(client));
+    ASSERT_EQ(CountKind(GetSceneItems(client), "collision_line"), 0) << "new path already has a collision line";
+
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "actionPaste"}}).value("ok", false));
+
+    const nlohmann::json pasted = FindKind(GetSceneItems(client), "collision_line");
+    ASSERT_FALSE(pasted.empty()) << "paste did not add a collision line to the smaller path";
+
+    const int pastedWidth = std::abs(pasted.at("x2").get<int>() - pasted.at("x1").get<int>());
+    const int pastedMinX = std::min(pasted.at("x1").get<int>(), pasted.at("x2").get<int>());
+    const int pastedMinY = std::min(pasted.at("y1").get<int>(), pasted.at("y2").get<int>());
+    const int pastedMaxX = std::max(pasted.at("x1").get<int>(), pasted.at("x2").get<int>());
+    const int pastedMaxY = std::max(pasted.at("y1").get<int>(), pasted.at("y2").get<int>());
+
+    EXPECT_LE(pastedWidth, 1024) << "pasted line was not shrunk to fit the smaller destination map";
+    EXPECT_GE(pastedMinX, 0) << "pasted line escaped the destination map's left edge";
+    EXPECT_GE(pastedMinY, 0) << "pasted line escaped the destination map's top edge";
+    EXPECT_LE(pastedMaxX, 1024) << "pasted line escaped the destination map's right edge";
+    EXPECT_LE(pastedMaxY, 480) << "pasted line escaped the destination map's bottom edge";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Regression test for opening a path whose saved JSON already contains an out-of-bounds
+// collision line (e.g. hand-edited, or from before paste/map-resize bounds clamping existed):
+// the line must be moved back within the map's bounds as soon as the path is opened, and that
+// correction must not be undoable - undoing it back to the out-of-bounds error condition would
+// defeat the point of fixing it on load. EditorTab's constructor builds every collision line via
+// MakeResizeableArrowItem, whose ResizeableArrowItem ctor now self-clamps before any QUndoCommand
+// exists, so there's nothing on the undo stack that could ever put it back.
+TEST(EditorAutomation, OpeningPathWithOutOfBoundsCollisionLineClampsOnLoadNonUndoably)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString savePath = tempDir.filePath("relive_editor_test_oob_level.json");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateNewPath(client));
+    ASSERT_TRUE(AddCollisionLine(client));
+
+    {
+        const auto resp = client.Call({{"cmd", "save_path_as"}, {"path", savePath.toStdString()}});
+        ASSERT_TRUE(resp.value("ok", false));
+        ASSERT_TRUE(resp.at("result").value("saved", false)) << "save_path_as reported failure";
+    }
+
+    // Hand-edit the saved JSON so its one collision line's raw x/w (CollisionObject::X1/X2) is
+    // far outside the still-1x1 (1024x480) map's bounds - PathLine's on-disk field names are
+    // x/y/w/h (see relive_tlvs_serialization.cpp's to_json/from_json for PathLine), which map to
+    // X1/Y1/X2/Y2 respectively (see CollisionObject.hpp).
+    {
+        QFile file(savePath);
+        ASSERT_TRUE(file.open(QIODevice::ReadOnly)) << "failed to reopen saved file for editing";
+        const QByteArray contents = file.readAll();
+        file.close();
+
+        nlohmann::json root = nlohmann::json::parse(contents.toStdString());
+        nlohmann::json& collisions = root.at("map").at("collisions");
+        ASSERT_EQ(collisions.size(), 1u) << "expected exactly one collision line in the saved file";
+        collisions[0]["x"] = 900;
+        collisions[0]["y"] = 100;
+        collisions[0]["w"] = 5000;
+        collisions[0]["h"] = 100;
+
+        ASSERT_TRUE(file.open(QIODevice::WriteOnly | QIODevice::Truncate)) << "failed to rewrite saved file";
+        const std::string rewritten = root.dump();
+        ASSERT_EQ(file.write(rewritten.data(), static_cast<qint64>(rewritten.size())), static_cast<qint64>(rewritten.size()));
+        file.close();
+    }
+
+    // Close the tab that's still open on savePath first - onOpenPath() treats a file already
+    // open in a tab as "just switch to it", skipping the disk read entirely, which would leave
+    // this test looking at the pre-edit, still-in-bounds in-memory state rather than actually
+    // exercising the load path.
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_close_path"}}).value("ok", false));
+
+    {
+        const auto resp = client.Call({{"cmd", "open_path"}, {"path", savePath.toStdString()}});
+        ASSERT_TRUE(resp.value("ok", false));
+        ASSERT_TRUE(resp.at("result").value("opened", false)) << "open_path reported failure";
+    }
+
+    const nlohmann::json afterOpen = FindKind(GetSceneItems(client), "collision_line");
+    ASSERT_FALSE(afterOpen.empty()) << "collision line missing after opening the path";
+
+    const int afterOpenMaxX = std::max(afterOpen.at("x1").get<int>(), afterOpen.at("x2").get<int>());
+    EXPECT_LE(afterOpenMaxX, 1024) << "out-of-bounds line was not clamped to the map's bounds on load";
+    EXPECT_GE(std::min(afterOpen.at("x1").get<int>(), afterOpen.at("x2").get<int>()), 0);
+
+    // Nothing should be on the undo stack for a freshly opened path - clicking undo must be a
+    // no-op, not a way back to the on-disk out-of-bounds values.
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_undo"}}).value("ok", false));
+
+    const nlohmann::json afterUndo = FindKind(GetSceneItems(client), "collision_line");
+    EXPECT_EQ(afterUndo.value("x1", -1), afterOpen.value("x1", -2)) << "undo changed the clamped-on-load line - the load-time fix must not be undoable";
+    EXPECT_EQ(afterUndo.value("y1", -1), afterOpen.value("y1", -2));
+    EXPECT_EQ(afterUndo.value("x2", -1), afterOpen.value("x2", -2));
+    EXPECT_EQ(afterUndo.value("y2", -1), afterOpen.value("y2", -2));
+    const int afterUndoMaxX = std::max(afterUndo.at("x1").get<int>(), afterUndo.at("x2").get<int>());
+    EXPECT_LE(afterUndoMaxX, 1024) << "undo put the line back outside the map's bounds";
 
     editor.terminate();
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";

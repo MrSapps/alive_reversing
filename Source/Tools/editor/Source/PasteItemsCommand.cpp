@@ -6,8 +6,6 @@
 #include "Model.hpp"
 #include "ItemPositionData.hpp"
 #include "IGridPointSnapper.hpp"
-#include <algorithm>
-#include <cstdlib>
 
 PasteItemsCommand::PasteItemsCommand(EditorTab* pTab, ClipBoard& clipBoard)
     : mTab(pTab), mSelectionSaver(pTab)
@@ -23,22 +21,10 @@ PasteItemsCommand::PasteItemsCommand(EditorTab* pTab, ClipBoard& clipBoard)
         // Fix collision line ids
         obj->mId = mTab->GetModel().NextCollisionId();
 
-        // Keep the whole line within the map bounds, preserving its exact shape - same rigid
-        // clamp as ResizeableArrowItem's whole-line drag, since a pasted line otherwise has no
-        // bounds clamping applied to it at all (unlike a manually dragged/created one).
-        const int left = std::min(obj->X1(), obj->X2());
-        const int top = std::min(obj->Y1(), obj->Y2());
-        const int width = std::abs(obj->X2() - obj->X1());
-        const int height = std::abs(obj->Y2() - obj->Y1());
-        const int clampedLeft = snapper.ClampRangeStartX(left, width);
-        const int clampedTop = snapper.ClampRangeStartY(top, height);
-        const int dx = clampedLeft - left;
-        const int dy = clampedTop - top;
-        obj->SetX1(obj->X1() + dx);
-        obj->SetY1(obj->Y1() + dy);
-        obj->SetX2(obj->X2() + dx);
-        obj->SetY2(obj->Y2() + dy);
-
+        // MakeResizeableArrowItem's ResizeableArrowItem ctor calls SyncFromCollisionItem(),
+        // which shrinks the line if it's bigger than the destination map and repositions it to
+        // stay within bounds, writing the correction back into obj - handles a paste across
+        // paths where the destination map is smaller than the one the line was copied from.
         mCollisionGraphicsObjects.emplace_back(mTab->MakeResizeableArrowItem(obj.get()));
     }
 
