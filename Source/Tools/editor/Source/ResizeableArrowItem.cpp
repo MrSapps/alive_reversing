@@ -8,18 +8,20 @@
 #include "ISyncPropertiesToTree.hpp"
 #include "GridSnapSettings.hpp"
 #include "ItemPositionData.hpp"
+#include "GridPlacement.hpp"
 #include <QDebug>
 #include <algorithm>
 #include <cmath>
 
 ResizeableArrowItem::ResizeableArrowItem(QGraphicsView* pView, CollisionObject* pLine, ISyncPropertiesToTree& propSyncer, int transparency, GridSnapSettings& snapSettings, IGridPointSnapper& snapper)
-    : QGraphicsLineItem(pLine->X2(), pLine->Y2(), pLine->X1(), pLine->Y1())
-    , mView(pView)
+    : mView(pView)
     , mLine(pLine)
     , mPropSyncer(propSyncer)
     , mSnapSettings(snapSettings)
     , mSnapper(snapper)
 {
+    SyncFromCollisionItem();
+
     Init();
     setZValue(2.0);
     SetTransparency(this, transparency);
@@ -379,7 +381,32 @@ void ResizeableArrowItem::Visit(IReflector& f)
 
 void ResizeableArrowItem::SyncFromCollisionItem()
 {
-    setLine(mLine->X2(), mLine->Y2(), mLine->X1(), mLine->Y1());
+    // The model can be written to directly with no bounds checking at all - e.g. the properties
+    // panel's spin boxes write straight into mLine, bypassing every mouse-driven resize/drag/paste
+    // path's mSnapper clamp entirely, and a freshly-loaded path can already contain an
+    // out-of-bounds line (e.g. hand-edited JSON, or one that was out of bounds on the map before
+    // it shrank). Apply the same invariants here so any such value can't leave the line outside
+    // the map - same "shrink an oversized extent first, then reposition" idea as
+    // ResizeableRectItem::SyncFromMapObject, via GridPlacement::FitLineToBounds, clamping each
+    // axis through mSnapper (this item doesn't know its tab's raw pixel size, only how to clamp
+    // against it) rather than GridPlacement::FitLineToMapBounds's raw-map-size overload (used by
+    // ChangeMapSizeDialog, which does have that on hand).
+    const int x1 = mLine->X1();
+    const int y1 = mLine->Y1();
+    const int x2 = mLine->X2();
+    const int y2 = mLine->Y2();
+
+    const GridPlacement::ClampedLine fitted = GridPlacement::FitLineToBounds(
+        x1, y1, x2, y2,
+        [this](int length) { return mSnapper.ClampLengthX(length); },
+        [this](int length) { return mSnapper.ClampLengthY(length); },
+        [this](int start, int length) { return mSnapper.ClampRangeStartX(start, length); },
+        [this](int start, int length) { return mSnapper.ClampRangeStartY(start, length); });
+    setLine(fitted.x2, fitted.y2, fitted.x1, fitted.y1);
+
+    // Write any correction back into the model - otherwise an out-of-bounds value would only
+    // look fixed on screen and still round-trip to disk as-is.
+    SyncToCollisionItem();
 
     // Full repaint because the line type may have changed which changes the line colour
     update();

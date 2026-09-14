@@ -3,34 +3,19 @@
 #include "ResizeableRectItem.hpp"
 #include "Model.hpp"
 #include "IGridPointSnapper.hpp"
+#include "GridPlacement.hpp"
 #include <QGraphicsScene>
 #include <algorithm>
 
 EditorCamera* CalcContainingCamera(ResizeableRectItem* pItem, Model& model)
 {
-    QPoint midPoint = pItem->CurrentRect().center().toPoint();
+    const QPoint midPoint = pItem->CurrentRect().center().toPoint();
 
-    int camX = midPoint.x() / model.CameraGridWidth();
-    if (camX < 0)
-    {
-        camX = 0;
-    }
-
-    if (camX >= static_cast<int>(model.XSize()))
-    {
-        camX = model.XSize() - 1;
-    }
-
-    int camY = midPoint.y() / model.CameraGridHeight();
-    if (camY < 0)
-    {
-        camY = 0;
-    }
-
-    if (camY >= static_cast<int>(model.YSize()))
-    {
-        camY = model.YSize() - 1;
-    }
+    // Same [0, gridCount - 1] clamp GridPlacement::ClampCameraIndex already has its own tests
+    // for (including the gridCount == 0 case, which dividing/subtracting inline here used to get
+    // wrong via unsigned underflow) - reuse it instead of duplicating that logic by hand.
+    const int camX = GridPlacement::ClampCameraIndex(midPoint.x() / model.CameraGridWidth(), model.XSize());
+    const int camY = GridPlacement::ClampCameraIndex(midPoint.y() / model.CameraGridHeight(), model.YSize());
 
     return model.CameraAt(camX, camY);
 }

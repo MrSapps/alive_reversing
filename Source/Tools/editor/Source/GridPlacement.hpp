@@ -1,5 +1,10 @@
 #pragma once
 
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+#include <utility>
+
 // Small, pure placement-math helpers shared by AddCollisionCommand and AddObjectDialog's
 // AddNewObjectCommand. Deliberately dependency-free (no Qt, EditorTab, or Model types) so
 // they're directly unit-testable without any GUI/event-loop machinery.
@@ -78,5 +83,77 @@ namespace GridPlacement
             return static_cast<int>(totalSizePixels);
         }
         return length;
+    }
+
+    struct ClampedLine final
+    {
+        int x1, y1, x2, y2;
+    };
+
+    // Remaps a line's two endpoints into a new bounding box (newLeft, newTop, newWidth,
+    // newHeight), scaling each axis independently and keeping each endpoint at the same
+    // relative position within the box it had before - e.g. an endpoint that sat at the box's
+    // top-left stays at the new box's top-left, one halfway across stays halfway across. Used
+    // to shrink-then-reposition a line the same way a rect's width/height get clamped directly
+    // (ClampLengthToMapBounds then ClampRangeStartToMapBounds), except a line has no
+    // independent width/height to write back to - only two endpoints - so the equivalent
+    // "shrink" has to be expressed as remapping those endpoints into the already-clamped box.
+    // Pure geometry: doesn't know about map bounds at all, so the caller works out newWidth/
+    // newHeight/newLeft/newTop itself (typically via ClampLengthToMapBounds and
+    // ClampRangeStartToMapBounds, one call per axis).
+    inline ClampedLine RemapLineToBoundingBox(int x1, int y1, int x2, int y2, int newLeft, int newTop, int newWidth, int newHeight)
+    {
+        const int left = std::min(x1, x2);
+        const int top = std::min(y1, y2);
+        const int width = std::abs(x2 - x1);
+        const int height = std::abs(y2 - y1);
+
+        // A zero-length axis (a perfectly horizontal/vertical line) has nothing to scale -
+        // leave its own axis alone and just let the translation below carry it into the new box.
+        const double sx = width > 0 ? static_cast<double>(newWidth) / width : 1.0;
+        const double sy = height > 0 ? static_cast<double>(newHeight) / height : 1.0;
+
+        const auto remap = [&](int x, int y) -> std::pair<int, int>
+        {
+            return {newLeft + static_cast<int>(std::lround((x - left) * sx)),
+                    newTop + static_cast<int>(std::lround((y - top) * sy))};
+        };
+        const auto [rx1, ry1] = remap(x1, y1);
+        const auto [rx2, ry2] = remap(x2, y2);
+        return {rx1, ry1, rx2, ry2};
+    }
+
+    // Full shrink-then-reposition fit for a line: clamps each axis's length then its range
+    // start (one call per axis, same primitives + order a rect's width/height/position clamp
+    // uses directly) and feeds the results into RemapLineToBoundingBox. Generic over how each
+    // axis is actually clamped, via 4 callables - (length) -> length for the two length clamps,
+    // (start, length) -> start for the two range-start clamps - so both a caller with the raw
+    // map size on hand (FitLineToMapBounds below, which just plugs ClampLengthToMapBounds/
+    // ClampRangeStartToMapBounds straight in) and one that only has an IGridPointSnapper-style
+    // interface to clamp against (ResizeableArrowItem::SyncFromCollisionItem, which clamps
+    // against whichever tab it belongs to without ever needing to know that tab's raw pixel
+    // size) share this one composition instead of each repeating it by hand.
+    template <typename ClampLengthX, typename ClampLengthY, typename ClampRangeStartX, typename ClampRangeStartY>
+    inline ClampedLine FitLineToBounds(int x1, int y1, int x2, int y2,
+                                        ClampLengthX clampLengthX, ClampLengthY clampLengthY,
+                                        ClampRangeStartX clampRangeStartX, ClampRangeStartY clampRangeStartY)
+    {
+        const int width = clampLengthX(std::abs(x2 - x1));
+        const int height = clampLengthY(std::abs(y2 - y1));
+        const int left = clampRangeStartX(std::min(x1, x2), width);
+        const int top = clampRangeStartY(std::min(y1, y2), height);
+        return RemapLineToBoundingBox(x1, y1, x2, y2, left, top, width, height);
+    }
+
+    // FitLineToBounds against a map of totalWidthPixels x totalHeightPixels directly, for a
+    // caller with the raw map size on hand (e.g. ChangeMapSizeDialog's ForceItemsInsideMapBounds).
+    inline ClampedLine FitLineToMapBounds(int x1, int y1, int x2, int y2, unsigned int totalWidthPixels, unsigned int totalHeightPixels)
+    {
+        return FitLineToBounds(
+            x1, y1, x2, y2,
+            [totalWidthPixels](int length) { return ClampLengthToMapBounds(length, totalWidthPixels); },
+            [totalHeightPixels](int length) { return ClampLengthToMapBounds(length, totalHeightPixels); },
+            [totalWidthPixels](int start, int length) { return ClampRangeStartToMapBounds(start, length, totalWidthPixels); },
+            [totalHeightPixels](int start, int length) { return ClampRangeStartToMapBounds(start, length, totalHeightPixels); });
     }
 }
