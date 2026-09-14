@@ -298,8 +298,22 @@ void EditorTab::ResetZoom()
 
 EditorTab::~EditorTab()
 {
-    disconnect(&mUndoStack, &QUndoStack::cleanChanged, this, &EditorTab::UpdateTabTitle);
+    // mUndoStack is destroyed implicitly after this body runs (it's a plain member), and its own
+    // destructor can itself still emit signals (e.g. clearing its commands changes its index) -
+    // still well before QObject's own destructor gets a chance to sever mUndoStack's connections
+    // on its way out. ModTreeWidget listens for indexChanged for as long as this tab is tracked
+    // as open (see NotifyTabOpened) and reacts by touching this tab's model/scene - both already
+    // gone by then if that fires after delete ui below, or after this object is otherwise
+    // partway through being torn down (crash at shutdown in RefreshPathSubtree). Disconnect
+    // everything from mUndoStack up front so nothing downstream can observe this tab mid-
+    // destruction, no matter what later parts of the process happen to do internally.
+    mUndoStack.disconnect();
     delete ui;
+}
+
+void EditorTab::CenterViewOn(const QPointF& scenePos)
+{
+    ui->graphicsView->centerOn(scenePos);
 }
 
 void EditorTab::ClearPropertyEditor()

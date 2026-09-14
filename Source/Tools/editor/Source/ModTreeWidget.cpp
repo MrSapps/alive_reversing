@@ -5,12 +5,47 @@
 #include "EditorTab.hpp"
 #include "Model.hpp"
 #include "CameraManager.hpp"
+#include "EditorGraphicsScene.hpp"
+#include "ResizeableRectItem.hpp"
+#include "ResizeableArrowItem.hpp"
+#include "SetSelectionCommand.hpp"
 #include <QTreeWidgetItemIterator>
 #include <QMenu>
 #include <QAction>
 #include <QInputDialog>
 #include <QMessageBox>
 #include <QLineEdit>
+#include <QSet>
+
+namespace
+{
+    // Walks up from pItem to its containing PathTreeItem - e.g. a MapObjectTreeItem's parent
+    // chain is Path -> "Cameras" group -> Camera -> MapObject - shared by every handler that
+    // needs "which open path/tab does this row belong to" (the context menu's "Edit camera", and
+    // tree<->scene selection sync below).
+    PathTreeItem* FindAncestorPathItem(QTreeWidgetItem* pItem)
+    {
+        for (QTreeWidgetItem* ancestor = pItem; ancestor; ancestor = ancestor->parent())
+        {
+            if (auto* pPathItem = dynamic_cast<PathTreeItem*>(ancestor))
+            {
+                return pPathItem;
+            }
+        }
+        return nullptr;
+    }
+
+    // Expands every ancestor of pItem up to (but not including) its PathTreeItem, so a row that
+    // just became selected is actually visible rather than sitting collapsed under a "Cameras"/
+    // camera/"Collisions" row nobody had a reason to open yet.
+    void ExpandAncestors(QTreeWidgetItem* pItem)
+    {
+        for (QTreeWidgetItem* ancestor = pItem->parent(); ancestor && !dynamic_cast<PathTreeItem*>(ancestor); ancestor = ancestor->parent())
+        {
+            ancestor->setExpanded(true);
+        }
+    }
+}
 
 ModTreeWidget::ModTreeWidget(QWidget* pParent, EditorMainWindow* pMainWindow)
     : QTreeWidget(pParent), mMainWindow(pMainWindow)
@@ -23,10 +58,14 @@ ModTreeWidget::ModTreeWidget(QWidget* pParent, EditorMainWindow* pMainWindow)
     // event, so a double-click ends up net-toggling twice (i.e. doing nothing) instead of once.
     // This widget owns double-click semantics itself (expand a level, or open a path) instead.
     setExpandsOnDoubleClick(false);
+    // A mixed selection (a collision line *and* a map object together) needs multi-select -
+    // ctrl/shift-click across rows, same as the scene view already supports via rubber-band drag.
+    setSelectionMode(QAbstractItemView::ExtendedSelection);
 
     connect(this, &QTreeWidget::itemDoubleClicked, this, &ModTreeWidget::onItemDoubleClicked);
     connect(this, &QTreeWidget::itemExpanded, this, &ModTreeWidget::onItemExpanded);
     connect(this, &QTreeWidget::customContextMenuRequested, this, &ModTreeWidget::onCustomContextMenuRequested);
+    connect(this, &QTreeWidget::itemSelectionChanged, this, &ModTreeWidget::onItemSelectionChanged);
 }
 
 void ModTreeWidget::SetMod(EditorMod* pMod)
@@ -124,9 +163,33 @@ void ModTreeWidget::NotifyTabOpened(EditorTab* pTab, const QString& jsonFileName
     RefreshPathSubtree(pPathItem);
     pPathItem->setExpanded(true);
 
-    mUndoStackConnections[pTab] = connect(&pTab->GetUndoStack(), &QUndoStack::indexChanged, this, [this, pTab](int)
+    mUndoStackConnections[pTab] = connect(&pTab->GetUndoStack(), &QUndoStack::indexChanged, this, [this, pTab](int newIndex)
     {
-        if (PathTreeItem* pStillOpen = FindPathItemByTab(pTab))
+        PathTreeItem* pStillOpen = FindPathItemByTab(pTab);
+        if (!pStillOpen)
+        {
+            return;
+        }
+
+        // EditorTab pushes a SetSelectionCommand for every plain scene selection change (see
+        // its SelectionChanged connection), same as any other undoable edit - so a full
+        // RefreshPathSubtree used to run on every single click in the scene, tearing down and
+        // rebuilding the whole subtree (losing manually-expanded nodes, scroll position, ...)
+        // just to reflect a selection that changed, nothing structural. Recognise that case (the
+        // command that was just applied going forward - command(newIndex-1) - or, if this
+        // transition was an undo, the one about to be redone - command(newIndex) - is a
+        // SetSelectionCommand either way) and only re-sync the tree's own highlighted rows
+        // instead of rebuilding.
+        QUndoStack& stack = pTab->GetUndoStack();
+        const bool selectionOnly = pStillOpen->SubtreePopulated() &&
+            ((newIndex > 0 && dynamic_cast<const SetSelectionCommand*>(stack.command(newIndex - 1))) ||
+             (newIndex < stack.count() && dynamic_cast<const SetSelectionCommand*>(stack.command(newIndex))));
+
+        if (selectionOnly)
+        {
+            SyncTreeSelectionFromScene(pStillOpen);
+        }
+        else
         {
             RefreshPathSubtree(pStillOpen);
         }
@@ -161,6 +224,43 @@ void ModTreeWidget::RefreshPathSubtree(PathTreeItem* pPathItem)
         return;
     }
 
+    // Every row is about to be torn down and recreated from scratch (a brand new QTreeWidgetItem
+    // always starts collapsed) - remember which ones the user had actually opened so they can be
+    // put back, or something as unremarkable as adding one map object collapses the whole tree
+    // shut around whatever the user was just looking at. Keyed by the underlying model pointer
+    // (stable across this rebuild - only the QTreeWidgetItems representing it are being replaced)
+    // rather than position, so this still lines up correctly even if cameras/objects were
+    // reordered by whatever change triggered this refresh.
+    bool wasCamerasExpanded = false;
+    bool wasCollisionsExpanded = false;
+    QSet<EditorCamera*> expandedCameras;
+    for (int i = 0; i < pPathItem->childCount(); ++i)
+    {
+        auto* pGroupItem = dynamic_cast<GroupTreeItem*>(pPathItem->child(i));
+        if (!pGroupItem)
+        {
+            continue;
+        }
+        if (pGroupItem->Type() == ModTreeItem::eType::eCamerasGroup)
+        {
+            wasCamerasExpanded = pGroupItem->isExpanded();
+            for (int j = 0; j < pGroupItem->childCount(); ++j)
+            {
+                if (auto* pCameraItem = dynamic_cast<CameraTreeItem*>(pGroupItem->child(j)))
+                {
+                    if (pCameraItem->isExpanded())
+                    {
+                        expandedCameras.insert(pCameraItem->Camera());
+                    }
+                }
+            }
+        }
+        else if (pGroupItem->Type() == ModTreeItem::eType::eCollisionsGroup)
+        {
+            wasCollisionsExpanded = pGroupItem->isExpanded();
+        }
+    }
+
     while (pPathItem->childCount() > 0)
     {
         delete pPathItem->takeChild(0);
@@ -168,6 +268,7 @@ void ModTreeWidget::RefreshPathSubtree(PathTreeItem* pPathItem)
 
     auto* pCamerasGroup = new GroupTreeItem(ModTreeItem::eType::eCamerasGroup, tr("Cameras"));
     pPathItem->addChild(pCamerasGroup);
+    pCamerasGroup->setExpanded(wasCamerasExpanded);
     for (auto& pCamera : pTab->GetModel().GetCameras())
     {
         // Model::CreateEmptyCameras fills every cell in the grid whether or not it's ever been
@@ -177,6 +278,7 @@ void ModTreeWidget::RefreshPathSubtree(PathTreeItem* pPathItem)
         // and give it one, the same way a real camera in the scene view can.
         auto* pCameraItem = new CameraTreeItem(pCamera.get());
         pCamerasGroup->addChild(pCameraItem);
+        pCameraItem->setExpanded(expandedCameras.contains(pCamera.get()));
         for (auto& pMapObject : pCamera->mMapObjects)
         {
             pCameraItem->addChild(new MapObjectTreeItem(pMapObject.get()));
@@ -185,12 +287,162 @@ void ModTreeWidget::RefreshPathSubtree(PathTreeItem* pPathItem)
 
     auto* pCollisionsGroup = new GroupTreeItem(ModTreeItem::eType::eCollisionsGroup, tr("Collisions"));
     pPathItem->addChild(pCollisionsGroup);
+    pCollisionsGroup->setExpanded(wasCollisionsExpanded);
     for (auto& pLine : pTab->GetModel().CollisionItems())
     {
         pCollisionsGroup->addChild(new CollisionLineTreeItem(pLine.get()));
     }
 
     pPathItem->SetSubtreePopulated(true);
+
+    // Every row just got torn down and recreated from scratch, so any selection highlighting the
+    // tree had is gone - restore it from the scene's own (still-intact) selection rather than
+    // leaving the tree looking like nothing is selected.
+    SyncTreeSelectionFromScene(pPathItem);
+}
+
+void ModTreeWidget::SyncTreeSelectionFromScene(PathTreeItem* pPathItem)
+{
+    EditorTab* pTab = pPathItem->Tab();
+    if (!pTab)
+    {
+        return;
+    }
+
+    QSet<MapObjectBase*> selectedMapObjects;
+    QSet<CollisionObject*> selectedLines;
+    for (QGraphicsItem* pItem : pTab->GetScene().selectedItems())
+    {
+        if (auto* pRect = qgraphicsitem_cast<ResizeableRectItem*>(pItem))
+        {
+            selectedMapObjects.insert(pRect->GetMapObject());
+        }
+        else if (auto* pArrow = qgraphicsitem_cast<ResizeableArrowItem*>(pItem))
+        {
+            selectedLines.insert(pArrow->GetCollisionItem());
+        }
+    }
+
+    // blockSignals rather than a reentrancy flag: setSelected() below would otherwise fire
+    // itemSelectionChanged for every row touched, re-entering onItemSelectionChanged and pushing
+    // the (already up to date) selection right back onto the scene for no reason.
+    const bool wasBlocked = blockSignals(true);
+    for (QTreeWidgetItemIterator it(pPathItem); *it; ++it)
+    {
+        // QTreeWidgetItemIterator walks the whole tree from pPathItem onward, including
+        // everything after this path's own subtree - stop once we leave it.
+        if (*it != pPathItem && FindAncestorPathItem(*it) != pPathItem)
+        {
+            break;
+        }
+        if (auto* pMapObjectItem = dynamic_cast<MapObjectTreeItem*>(*it))
+        {
+            const bool isSelected = selectedMapObjects.contains(pMapObjectItem->MapObject());
+            pMapObjectItem->setSelected(isSelected);
+            if (isSelected)
+            {
+                // A row being selected is exactly the case worth surfacing - e.g. the object
+                // AddNewObjectCommand just created and selected inside a camera that had nothing
+                // in it before, which otherwise stayed collapsed (a still-empty camera/group row
+                // has no reason to auto-expand on its own - RefreshPathSubtree only preserves
+                // expansion that was already there, see its own comment - so a brand new object's
+                // very first appearance needs this extra push or there'd be nothing to preserve).
+                ExpandAncestors(pMapObjectItem);
+            }
+        }
+        else if (auto* pLineItem = dynamic_cast<CollisionLineTreeItem*>(*it))
+        {
+            const bool isSelected = selectedLines.contains(pLineItem->Line());
+            pLineItem->setSelected(isSelected);
+            if (isSelected)
+            {
+                ExpandAncestors(pLineItem);
+            }
+        }
+    }
+    blockSignals(wasBlocked);
+}
+
+void ModTreeWidget::onItemSelectionChanged()
+{
+    const QList<QTreeWidgetItem*> selected = selectedItems();
+    if (selected.isEmpty())
+    {
+        return;
+    }
+
+    // Only ever drive the scene from a selection made up entirely of map-object/collision-line
+    // rows (a "mixed" selection of the two is fine - that's exactly the case a rubber-band drag
+    // in the scene already produces). Selecting a camera/group/path/level row alongside or
+    // instead doesn't correspond to anything selectable in the scene (CameraGraphicsItem isn't
+    // selectable at all) - leave the scene's current selection alone rather than silently
+    // clearing it just because the user clicked some unrelated row.
+    QSet<MapObjectBase*> wantedMapObjects;
+    QSet<CollisionObject*> wantedLines;
+    for (QTreeWidgetItem* pItem : selected)
+    {
+        if (auto* pMapObjectItem = dynamic_cast<MapObjectTreeItem*>(pItem))
+        {
+            wantedMapObjects.insert(pMapObjectItem->MapObject());
+        }
+        else if (auto* pLineItem = dynamic_cast<CollisionLineTreeItem*>(pItem))
+        {
+            wantedLines.insert(pLineItem->Line());
+        }
+        else
+        {
+            return;
+        }
+    }
+
+    // A mixed selection only ever makes sense within one open path at a time - use whichever
+    // path the first selected row belongs to, same as the scene itself (there's only ever one
+    // scene selection to update).
+    PathTreeItem* pPathItem = FindAncestorPathItem(selected.first());
+    EditorTab* pTab = pPathItem ? pPathItem->Tab() : nullptr;
+    if (!pTab)
+    {
+        return;
+    }
+
+    // Apply the new selection directly first, then record it on the undo stack exactly the way
+    // EditorGraphicsScene's own mouse handlers do (see EditorTab's SelectionChanged connection -
+    // that's also a "mutate first, push the command after" flow, not push-then-apply -
+    // SetSelectionCommand's own first redo() is a no-op by design, assuming the caller already
+    // applied it). Earlier this bypassed the undo stack entirely, which "worked" for the tree's
+    // own display but left the undo stack's idea of the current selection stale - undoing some
+    // unrelated later command could then restore a selection from *before* a tree click that, as
+    // far as the undo stack was concerned, never happened. Going through SetSelectionCommand like
+    // every other selection change keeps that one source of truth. It also does not reintroduce a
+    // full tree rebuild: NotifyTabOpened's indexChanged handler already special-cases any
+    // SetSelectionCommand (regardless of what triggered it) to just re-sync highlighting instead.
+    EditorGraphicsScene& scene = pTab->GetScene();
+    QList<QGraphicsItem*> oldSelection = scene.selectedItems();
+
+    scene.clearSelection();
+    for (QGraphicsItem* pItem : scene.items())
+    {
+        if (auto* pRect = qgraphicsitem_cast<ResizeableRectItem*>(pItem))
+        {
+            if (wantedMapObjects.contains(pRect->GetMapObject()))
+            {
+                pRect->setSelected(true);
+            }
+        }
+        else if (auto* pArrow = qgraphicsitem_cast<ResizeableArrowItem*>(pItem))
+        {
+            if (wantedLines.contains(pArrow->GetCollisionItem()))
+            {
+                pArrow->setSelected(true);
+            }
+        }
+    }
+
+    QList<QGraphicsItem*> newSelection = scene.selectedItems();
+    if (newSelection != oldSelection)
+    {
+        pTab->AddCommand(new SetSelectionCommand(pTab, &scene, oldSelection, newSelection));
+    }
 }
 
 void ModTreeWidget::onItemDoubleClicked(QTreeWidgetItem* pItem, int /*column*/)
@@ -209,6 +461,23 @@ void ModTreeWidget::onItemDoubleClicked(QTreeWidgetItem* pItem, int /*column*/)
             // by filename, so this is safe to call unconditionally whether or not the path is
             // already open.
             mMainWindow->OpenPath(mMod->PathJsonFile(pPathItem->LevelDir(), pPathItem->PathId()));
+        }
+        return;
+    }
+
+    if (auto* pCameraItem = dynamic_cast<CameraTreeItem*>(pItem))
+    {
+        if (PathTreeItem* pPathItem = FindAncestorPathItem(pCameraItem))
+        {
+            if (EditorTab* pTab = pPathItem->Tab())
+            {
+                const Model& model = pTab->GetModel();
+                const EditorCamera* pCamera = pCameraItem->Camera();
+                const QPointF center(
+                    pCamera->mX * model.CameraGridWidth() + model.CameraGridWidth() / 2.0,
+                    pCamera->mY * model.CameraGridHeight() + model.CameraGridHeight() / 2.0);
+                pTab->CenterViewOn(center);
+            }
         }
     }
 }
@@ -258,9 +527,9 @@ void ModTreeWidget::onCustomContextMenuRequested(const QPoint& pos)
     else if (auto* pCameraItem = dynamic_cast<CameraTreeItem*>(pItem))
     {
         // A CameraTreeItem only ever exists under an already-populated (so already-open) path's
-        // subtree - see RefreshPathSubtree - so its great-grandparent PathTreeItem is guaranteed
-        // to have a live Tab().
-        if (auto* pPathItem = dynamic_cast<PathTreeItem*>(pCameraItem->parent() ? pCameraItem->parent()->parent() : nullptr))
+        // subtree - see RefreshPathSubtree - so its containing PathTreeItem is guaranteed to have
+        // a live Tab().
+        if (PathTreeItem* pPathItem = FindAncestorPathItem(pCameraItem))
         {
             if (EditorTab* pTab = pPathItem->Tab())
             {

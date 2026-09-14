@@ -50,10 +50,14 @@ public:
     void Undo();
     void Redo();
     void wheelEvent(QWheelEvent* pEvent) override;
-    EditorGraphicsScene& GetScene() 
+    EditorGraphicsScene& GetScene()
     {
         return *mScene;
     }
+
+    // Scrolls the graphics view so scenePos is in the middle of the viewport - e.g. double-
+    // clicking a camera's row in ModTreeWidget.
+    void CenterViewOn(const QPointF& scenePos);
 
     void EditHintFlyMessages();
     void EditLCDScreenMessages();

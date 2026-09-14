@@ -78,6 +78,14 @@ namespace Automation
                 j["gridX"] = camera->GetCamera()->mX;
                 j["gridY"] = camera->GetCamera()->mY;
                 j["camName"] = camera->GetCamera()->mName;
+                // CameraGraphicsItem's rect() is constructed directly in scene coordinates (its
+                // own pos() stays at the origin - see CameraGraphicsItem::CameraGraphicsItem),
+                // so this is this camera's actual on-screen scene rect, same idea as
+                // ResizeableRectItem's width/height above.
+                j["sceneX"] = camera->rect().x();
+                j["sceneY"] = camera->rect().y();
+                j["width"] = camera->rect().width();
+                j["height"] = camera->rect().height();
                 j["hasMainImage"] = !camera->GetCamera()->mCameraImageandLayers.mCameraImage.isNull();
                 j["hasForegroundLayer"] = !camera->GetCamera()->mCameraImageandLayers.mForegroundLayer.isNull();
                 j["hasBackgroundLayer"] = !camera->GetCamera()->mCameraImageandLayers.mBackgroundLayer.isNull();

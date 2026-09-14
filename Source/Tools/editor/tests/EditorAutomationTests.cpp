@@ -3450,6 +3450,529 @@ TEST(EditorAutomation, EmptyCameraListedInTreeAndEditCameraOpensCameraManager)
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
+// Regression test: RefreshPathSubtree rebuilds a CameraTreeItem from scratch after any
+// undoable command touches the model, including setting a camera's main image
+// (NewCameraCommand) - so the row genuinely was being recreated, but its label formula
+// (CameraLabel) only ever depended on the camera's name/position, never whether it actually has
+// an image, so the "refresh" was invisible for anything image-related. That matters beyond
+// cosmetics: CameraGraphicsItem::Load silently leaves mCameraImage null if "<name>.png" is
+// missing from disk when a path is (re)opened (e.g. the file got deleted/moved outside the
+// editor) - a named camera with no image is a real, reachable state, and the tree previously had
+// no way to show it. CameraLabel now appends "(no image)" whenever a named camera has none.
+TEST(EditorAutomation, SetCameraImageUpdatesTreeRowLabel)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString modDir = tempDir.filePath("MyMod");
+    const QString mainImagePath = tempDir.filePath("sample_main.png");
+    {
+        QImage main(64, 24, QImage::Format_RGB32);
+        main.fill(QColor(200, 40, 40));
+        ASSERT_TRUE(main.save(mainImagePath)) << "failed to write the sample main camera image";
+    }
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateModWithLevelAndOpenPath(client, modDir));
+
+    // Model::CreateEmptyCameras always fills the grid in x-major, y-minor order starting at
+    // (0,0), so the camera at (0,0) is always the Cameras group's first child regardless of its
+    // current name/label.
+    auto cameraRowText = [&]() -> std::string
+    {
+        const auto treeResp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+        const auto& camerasGroup = treeResp.at("result").at("items")[0].at("children")[0].at("children")[0].at("children")[0];
+        return camerasGroup.at("children")[0].value("text", std::string());
+    };
+    ASSERT_EQ(cameraRowText(), "0,0 @ empty") << "test setup: camera at 0,0 should start with no name/image";
+
+    {
+        const auto resp = client.Call({{"cmd", "set_camera_image"}, {"x", 0}, {"y", 0}, {"layer", "main"}, {"image_path", mainImagePath.toStdString()}});
+        ASSERT_TRUE(resp.value("ok", false));
+        ASSERT_TRUE(resp.at("result").value("ok", false)) << "failed to create the camera";
+    }
+    EXPECT_EQ(cameraRowText(), "0 @ 0,0") << "tree row did not update after the camera was named/given an image";
+
+    // Simulate the image going missing from disk (moved/deleted outside the editor) by removing
+    // it before reopening the path - CameraGraphicsItem::Load then leaves mCameraImage null
+    // while mName ("0", loaded straight from the JSON) stays set.
+    const QString pngPath = modDir + "/MI/paths/0/0.png";
+    ASSERT_TRUE(QFile::exists(pngPath)) << "test setup: camera image was not saved to disk";
+    ASSERT_TRUE(QFile::remove(pngPath));
+
+    // Save first so the tab has no unsaved changes left (set_camera_image only wrote the image
+    // bytes to disk directly - the model's own path.json, which records the camera's name/id,
+    // still needs this) - otherwise closing the tab below blocks on an unsaved-changes prompt.
+    {
+        const auto resp = client.Call({{"cmd", "save_path_as"}, {"path", (modDir + "/MI/paths/0/path.json").toStdString()}});
+        ASSERT_TRUE(resp.value("ok", false));
+        ASSERT_TRUE(resp.at("result").value("saved", false)) << "save_path_as reported failure";
+    }
+
+    // open_path dedups against an already-open tab by filename and just focuses it rather than
+    // reloading - close the tab first so reopening it actually re-reads the (now image-less)
+    // path from disk instead of leaving the in-memory camera (still holding the image) untouched.
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_close_path"}}).value("ok", false));
+    {
+        const auto resp = client.Call({{"cmd", "open_path"}, {"path", (modDir + "/MI/paths/0/path.json").toStdString()}});
+        ASSERT_TRUE(resp.value("ok", false));
+        ASSERT_TRUE(resp.at("result").value("opened", false)) << "open_path reported failure";
+    }
+    EXPECT_EQ(cameraRowText(), "0 @ 0,0 (no image)") << "tree row does not reflect the camera's missing image";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Regression test: the tree used to have no idea what was selected in the scene at all (no
+// itemSelectionChanged handling either direction), and RefreshPathSubtree's full rebuild (which
+// used to run on every single selection change too, not just structural edits) would have wiped
+// any tree selection state anyway even if something had set it. Adding a map object selects it
+// (AddNewObjectCommand::redo()) without going through SetSelectionCommand/the custom
+// EditorGraphicsScene::SelectionChanged signal - it's picked up purely because
+// RefreshPathSubtree now ends with SyncTreeSelectionFromScene, which reads the scene's actual
+// selectedItems() rather than relying on that signal.
+TEST(EditorAutomation, SceneSelectionSyncsToTreeSelection)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString modDir = tempDir.filePath("MyMod");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateModWithLevelAndOpenPath(client, modDir));
+    ASSERT_TRUE(AddMapObject(client));
+    ASSERT_TRUE(AddMapObject(client));
+
+    // The second AddMapObject leaves only the newly added object selected in the scene - the
+    // tree should show exactly one selected row, and it should be a map object, not the first.
+    const auto treeResp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+    ASSERT_TRUE(treeResp.value("ok", false));
+    const auto& camerasGroup = treeResp.at("result").at("items")[0].at("children")[0].at("children")[0].at("children")[0];
+
+    int selectedMapObjectRows = 0;
+    for (const auto& camera : camerasGroup.at("children"))
+    {
+        for (const auto& mapObject : camera.at("children"))
+        {
+            if (mapObject.value("selected", false))
+            {
+                selectedMapObjectRows++;
+            }
+        }
+    }
+    EXPECT_EQ(selectedMapObjectRows, 1) << "tree selection does not match the scene's actual selection";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// The reverse direction: selecting a map object's row in the tree should select the matching
+// item in the scene (ModTreeWidget::onItemSelectionChanged), the same way clicking it in the
+// scene directly would.
+TEST(EditorAutomation, TreeSelectionSyncsToSceneSelection)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString modDir = tempDir.filePath("MyMod");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateModWithLevelAndOpenPath(client, modDir));
+    ASSERT_TRUE(AddMapObject(client));
+
+    const nlohmann::json objBefore = FindKind(GetSceneItems(client), "map_object");
+    ASSERT_TRUE(objBefore.value("selected", false)) << "test setup: adding an object should leave it selected";
+
+    // Deselect everything (click empty scene space, well away from the new object - which
+    // AddObjectDialog places dead center of the view - so the upcoming tree click is what
+    // actually does the selecting, not just leaving AddMapObject's own selection untouched).
+    const QPoint emptySpot = SceneToView(client, 5, 5);
+    ASSERT_TRUE(SendMouseEvent(client, "down", emptySpot));
+    ASSERT_TRUE(SendMouseEvent(client, "up", emptySpot));
+    ASSERT_FALSE(FindKind(GetSceneItems(client), "map_object").value("selected", false)) << "test setup: click on empty space should deselect";
+
+    // Read the row's actual label straight from the tree rather than trying to reconstruct
+    // MapObjectTreeItem's "TypeName (x, y)" format independently here.
+    std::string rowText;
+    {
+        const auto treeResp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+        ASSERT_TRUE(treeResp.value("ok", false));
+        const auto& camerasGroup = treeResp.at("result").at("items")[0].at("children")[0].at("children")[0].at("children")[0];
+        for (const auto& camera : camerasGroup.at("children"))
+        {
+            if (!camera.at("children").empty())
+            {
+                rowText = camera.at("children")[0].value("text", std::string());
+                break;
+            }
+        }
+    }
+    ASSERT_FALSE(rowText.empty()) << "test setup: no map object row found in the tree";
+
+    ASSERT_TRUE(client.Call({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", rowText}}).value("ok", false));
+
+    const nlohmann::json objAfter = FindKind(GetSceneItems(client), "map_object");
+    EXPECT_TRUE(objAfter.value("selected", false)) << "selecting the object's row in the tree did not select it in the scene";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Regression test: selecting a row in the tree used to mutate the scene's selection directly,
+// entirely bypassing the undo stack (unlike a real click in the scene, which always goes through
+// SetSelectionCommand). That left the undo stack's own record of "what's selected" stale the
+// moment a tree click changed it - so undoing some later, unrelated command could restore a
+// selection from *before* the tree click, silently reintroducing an object the user had since
+// deselected via the tree, or the other way around. onItemSelectionChanged now pushes a
+// SetSelectionCommand of its own, the same way the scene's own mouse handlers do.
+TEST(EditorAutomation, TreeSelectionIsUndoable)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString modDir = tempDir.filePath("MyMod");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateModWithLevelAndOpenPath(client, modDir));
+    ASSERT_TRUE(AddMapObject(client));
+
+    // Deselect (see TreeSelectionSyncsToSceneSelection for why an empty click has to land well
+    // away from the object AddObjectDialog placed dead center of the view).
+    const QPoint emptySpot = SceneToView(client, 5, 5);
+    ASSERT_TRUE(SendMouseEvent(client, "down", emptySpot));
+    ASSERT_TRUE(SendMouseEvent(client, "up", emptySpot));
+    ASSERT_FALSE(FindKind(GetSceneItems(client), "map_object").value("selected", false)) << "test setup: click on empty space should deselect";
+
+    std::string rowText;
+    {
+        const auto treeResp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+        ASSERT_TRUE(treeResp.value("ok", false));
+        const auto& camerasGroup = treeResp.at("result").at("items")[0].at("children")[0].at("children")[0].at("children")[0];
+        for (const auto& camera : camerasGroup.at("children"))
+        {
+            if (!camera.at("children").empty())
+            {
+                rowText = camera.at("children")[0].value("text", std::string());
+                break;
+            }
+        }
+    }
+    ASSERT_FALSE(rowText.empty()) << "test setup: no map object row found in the tree";
+
+    ASSERT_TRUE(client.Call({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", rowText}}).value("ok", false));
+    ASSERT_TRUE(FindKind(GetSceneItems(client), "map_object").value("selected", false)) << "test setup: tree click should have selected the object";
+
+    EXPECT_TRUE(UndoContainsPrefix(GetUndoWidgetTextList(client), "Select ")) << "the tree-driven selection was not recorded on the undo stack";
+
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_undo"}}).value("ok", false));
+    EXPECT_FALSE(FindKind(GetSceneItems(client), "map_object").value("selected", false)) << "undo did not revert the selection the tree click made";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Regression test: RefreshPathSubtree tears down and recreates every row from scratch on any
+// structural change (e.g. adding a map object) - a brand new QTreeWidgetItem always starts
+// collapsed, so without explicitly restoring expansion state, something as unremarkable as
+// adding one more object to a camera the user had already expanded to look at collapsed the
+// whole "Cameras" group (and that camera's own row) shut around them.
+TEST(EditorAutomation, TreeExpansionSurvivesAddingMapObject)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString modDir = tempDir.filePath("MyMod");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateModWithLevelAndOpenPath(client, modDir));
+    ASSERT_TRUE(AddMapObject(client));
+
+    auto findCamerasGroupAndCamera = [&](const nlohmann::json& treeResp) -> std::pair<nlohmann::json, nlohmann::json>
+    {
+        const auto& camerasGroup = treeResp.at("result").at("items")[0].at("children")[0].at("children")[0].at("children")[0];
+        for (const auto& camera : camerasGroup.at("children"))
+        {
+            if (!camera.at("children").empty())
+            {
+                return {camerasGroup, camera};
+            }
+        }
+        return {camerasGroup, nlohmann::json::object()};
+    };
+
+    // Expand the "Cameras" group and the camera row holding the object added above by clicking
+    // the object's own (nested) row - click_tree_item auto-expands every ancestor of whatever
+    // row it targets so the click can actually land on it (see its own comment), which as a side
+    // effect is also the only way available here to expand a GroupTreeItem/CameraTreeItem row at
+    // all: ModTreeWidget deliberately disables Qt's built-in double-click-to-expand
+    // (setExpandsOnDoubleClick(false)) and only handles a double-click itself for Level/Path rows.
+    std::string objectRowText;
+    {
+        const auto treeResp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+        ASSERT_TRUE(treeResp.value("ok", false));
+        const auto [camerasGroup, camera] = findCamerasGroupAndCamera(treeResp);
+        ASSERT_FALSE(camera.at("children").empty()) << "test setup: no camera with a map object found";
+        objectRowText = camera.at("children")[0].value("text", std::string());
+    }
+    ASSERT_TRUE(client.Call({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", objectRowText}}).value("ok", false));
+    {
+        const auto treeResp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+        ASSERT_TRUE(treeResp.value("ok", false));
+        const auto [camerasGroup, camera] = findCamerasGroupAndCamera(treeResp);
+        ASSERT_TRUE(camerasGroup.value("expanded", false)) << "test setup: clicking the object row should expand its ancestors, including Cameras";
+        ASSERT_TRUE(camera.value("expanded", false)) << "test setup: clicking the object row should expand its ancestors, including the camera";
+    }
+
+    // Adding a second object is a genuine structural change - RefreshPathSubtree really does
+    // tear the whole subtree down and rebuild it - so this is exercising expansion-state
+    // preservation across that rebuild, not just proving nothing happened at all.
+    ASSERT_TRUE(AddMapObject(client));
+
+    const auto treeResp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+    ASSERT_TRUE(treeResp.value("ok", false));
+    const auto [camerasGroup, camera] = findCamerasGroupAndCamera(treeResp);
+    EXPECT_TRUE(camerasGroup.value("expanded", false)) << "adding a map object collapsed the Cameras group";
+    EXPECT_TRUE(camera.value("expanded", false)) << "adding a map object collapsed the camera row the new object landed in";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Regression test: adding the very first object to a camera that had nothing in it before (so
+// its row - and the "Cameras" group above it - had never been expanded, nothing to preserve)
+// used to leave the new object sitting selected but invisible, collapsed away under rows nobody
+// had a reason to open yet. AddNewObjectCommand selects the object it just created, and
+// SyncTreeSelectionFromScene now expands a selected row's ancestors as part of syncing the
+// tree's highlighting to match (see ExpandAncestors) - not just preserving expansion state that
+// already existed, which is all TreeExpansionSurvivesAddingMapObject covers.
+TEST(EditorAutomation, AddingFirstMapObjectAutoExpandsTreeToRevealIt)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString modDir = tempDir.filePath("MyMod");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateModWithLevelAndOpenPath(client, modDir));
+
+    const auto treeRespBefore = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+    ASSERT_TRUE(treeRespBefore.value("ok", false));
+    ASSERT_FALSE(treeRespBefore.at("result").at("items")[0].at("children")[0].at("children")[0].at("children")[0].value("expanded", false))
+        << "test setup: Cameras group should start collapsed";
+
+    ASSERT_TRUE(AddMapObject(client));
+
+    const auto treeResp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+    ASSERT_TRUE(treeResp.value("ok", false));
+    const auto& camerasGroup = treeResp.at("result").at("items")[0].at("children")[0].at("children")[0].at("children")[0];
+    ASSERT_TRUE(camerasGroup.value("expanded", false)) << "adding the first map object did not expand the Cameras group";
+
+    bool foundExpandedCameraWithObject = false;
+    for (const auto& camera : camerasGroup.at("children"))
+    {
+        if (!camera.at("children").empty())
+        {
+            foundExpandedCameraWithObject = camera.value("expanded", false);
+            break;
+        }
+    }
+    EXPECT_TRUE(foundExpandedCameraWithObject) << "adding the first map object did not expand the camera row it landed in";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Same regression as AddingFirstMapObjectAutoExpandsTreeToRevealIt, for collision lines -
+// AddCollisionCommand selects the line it just created the same way AddNewObjectCommand does for
+// map objects.
+TEST(EditorAutomation, AddingFirstCollisionLineAutoExpandsTreeToRevealIt)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString modDir = tempDir.filePath("MyMod");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateModWithLevelAndOpenPath(client, modDir));
+
+    const auto treeRespBefore = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+    ASSERT_TRUE(treeRespBefore.value("ok", false));
+    ASSERT_FALSE(treeRespBefore.at("result").at("items")[0].at("children")[0].at("children")[0].at("children")[1].value("expanded", false))
+        << "test setup: Collisions group should start collapsed";
+
+    ASSERT_TRUE(AddCollisionLine(client));
+
+    const auto treeResp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+    ASSERT_TRUE(treeResp.value("ok", false));
+    const auto& collisionsGroup = treeResp.at("result").at("items")[0].at("children")[0].at("children")[0].at("children")[1];
+    EXPECT_TRUE(collisionsGroup.value("expanded", false)) << "adding the first collision line did not expand the Collisions group";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Double-clicking a camera's row should center the scene view on it, the same way double-
+// clicking a path row opens it - verified by converting the camera's known center (grid index *
+// cell size + half a cell) back to view coordinates via scene_to_view and checking it lands at
+// the viewport's own center pixel, which is exactly what QGraphicsView::centerOn guarantees.
+TEST(EditorAutomation, DoubleClickCameraRowCentersView)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString modDir = tempDir.filePath("MyMod");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateModWithLevelAndOpenPath(client, modDir));
+
+    // Pick a camera that isn't already at the view's default center (0,0 almost certainly is,
+    // given a freshly opened path) so this only passes if the double-click actually moved
+    // something - x=3,y=3 is the far corner of the default 4x4 grid.
+    const int camX = 3;
+    const int camY = 3;
+    std::string cameraRowText;
+    {
+        const auto treeResp = client.Call({{"cmd", "get_tree_items"}, {"target", "modTreeWidget"}});
+        ASSERT_TRUE(treeResp.value("ok", false));
+        const auto& camerasGroup = treeResp.at("result").at("items")[0].at("children")[0].at("children")[0].at("children")[0];
+        cameraRowText = QString("%1,%2 @ empty").arg(camX).arg(camY).toStdString();
+        bool found = false;
+        for (const auto& camera : camerasGroup.at("children"))
+        {
+            if (camera.value("text", std::string()) == cameraRowText)
+            {
+                found = true;
+                break;
+            }
+        }
+        ASSERT_TRUE(found) << "test setup: no row found for the camera at " << camX << "," << camY;
+    }
+
+    ASSERT_TRUE(client.Call({{"cmd", "click_tree_item"}, {"target", "modTreeWidget"}, {"column", 0}, {"row_text", cameraRowText}, {"double_click", true}}).value("ok", false));
+
+    const auto camResp = client.Call({{"cmd", "get_scene_items"}});
+    ASSERT_TRUE(camResp.value("ok", false));
+    QPointF expectedCenter(-1.0, -1.0);
+    for (const auto& item : camResp.at("result").at("items"))
+    {
+        if (item.value("kind", std::string()) == "camera" && item.value("gridX", -1) == camX && item.value("gridY", -1) == camY)
+        {
+            expectedCenter = QPointF(item.value("sceneX", 0.0) + item.value("width", 0.0) / 2.0,
+                                      item.value("sceneY", 0.0) + item.value("height", 0.0) / 2.0);
+            break;
+        }
+    }
+    ASSERT_GE(expectedCenter.x(), 0.0) << "test setup: could not find the camera's own scene rect";
+    const QPoint viewPoint = SceneToView(client, expectedCenter.x(), expectedCenter.y());
+
+    const auto viewResp = client.Call({{"cmd", "get_state"}, {"target", "graphicsView"}});
+    ASSERT_TRUE(viewResp.value("ok", false));
+    const auto& geometry = viewResp.at("result").at("geometry");
+    const QPoint viewportCenter(geometry.value("w", 0) / 2, geometry.value("h", 0) / 2);
+
+    // Generous slack for QGraphicsView::centerOn's own scrollbar-step rounding (it snaps to
+    // whatever discrete scrollbar positions are available, not an exact pixel) - this only needs
+    // to catch centering not happening at all (which would be off by hundreds of pixels, not a
+    // handful), not assert pixel-perfect placement.
+    EXPECT_NEAR(viewPoint.x(), viewportCenter.x(), 20) << "double-clicking the camera row did not center the view horizontally";
+    EXPECT_NEAR(viewPoint.y(), viewportCenter.y(), 20) << "double-clicking the camera row did not center the view vertically";
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Regression test: EditorTab's own QUndoStack member is destroyed implicitly right after
+// ~EditorTab()'s body runs, and can still emit signals of its own accord while doing so
+// (clearing its commands changes its index) - well before QObject's own destructor gets a
+// chance to sever connections on its way out. ModTreeWidget listens to a still-open tab's
+// indexChanged for as long as the tab is tracked as open, and reacts to it by touching that
+// tab's model/scene - both already gone by the time this fires if the tab is mid-teardown,
+// crashing (this is what the app's own shutdown path exercises: exiting with an unsaved mod/path
+// still open, rather than closing each tab first through the usual "unsaved changes" prompt).
+TEST(EditorAutomation, ExitWhileModPathOpenWithUndoHistoryDoesNotCrash)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString modDir = tempDir.filePath("MyMod");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateModWithLevelAndOpenPath(client, modDir));
+    ASSERT_TRUE(AddMapObject(client));
+    ASSERT_TRUE(AddCollisionLine(client));
+
+    // Real, unsaved changes are pending (unlike ExitActionClosesWindow's blank-state exit), so
+    // this hits the same unsaved-changes prompt NewPathAddCollisionAddObject's own close does -
+    // fired via SendCommand and only collected once the prompt's been dismissed.
+    const int exitClickId = client.SendCommand({{"cmd", "click"}, {"target", "action_exit_application"}});
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "@active_modal_button:Discard"}}).value("ok", false))
+        << "no unsaved-changes prompt to dismiss";
+    EXPECT_TRUE(client.WaitForResponse(exitClickId, 5000).value("ok", false));
+
+    ASSERT_TRUE(editor.waitForFinished(10000)) << "editor did not exit after clicking Exit";
+    EXPECT_EQ(editor.exitStatus(), QProcess::NormalExit);
+    EXPECT_EQ(editor.exitCode(), 0);
+}
+
+// The mod tree dock has nothing useful to show (and no mod-scoped actions to offer) until a mod
+// is actually open - it should start hidden and only appear once one is.
+TEST(EditorAutomation, ModTreeDockHiddenUntilModOpen)
+{
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid()) << "failed to create a temp directory";
+    const QString modDir = tempDir.filePath("MyMod");
+
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    {
+        const auto resp = client.Call({{"cmd", "get_state"}, {"target", "modTreeDockWidget"}});
+        ASSERT_TRUE(resp.value("ok", false));
+        EXPECT_FALSE(resp.at("result").value("visible", true)) << "mod tree dock should start hidden with no mod open";
+    }
+
+    ASSERT_TRUE(CreateNewMod(client, modDir, "My Mod", "Tester"));
+
+    {
+        const auto resp = client.Call({{"cmd", "get_state"}, {"target", "modTreeDockWidget"}});
+        ASSERT_TRUE(resp.value("ok", false));
+        EXPECT_TRUE(resp.at("result").value("visible", false)) << "mod tree dock should become visible once a mod is open";
+    }
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
 // The editor should remember the last mod that was open (QSettings "last_open_mod_dir", same
 // Editor.ini-backed idiom as "last_open_dir"/"theme"/"windowState") and auto-reopen it on the
 // next launch - simulated here via two separate LaunchEditorAndConnect processes sharing the
