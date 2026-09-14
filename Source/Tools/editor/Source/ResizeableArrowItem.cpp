@@ -75,7 +75,29 @@ void ResizeableArrowItem::mouseMoveEvent( QGraphicsSceneMouseEvent* aEvent )
         QLineF tmp = m_MouseDownLine;
         tmp.translate(tl);
 
+        // The line's raw position right after Qt's own default move above - the same raw delta
+        // every other selected item was just moved by too (Qt applies one shared delta to the
+        // whole selection). Captured before snap/bounds-clamp below so their combined effect on
+        // just this item can be measured and reapplied to the rest of a multi-selection further
+        // down.
+        const qreal rawLeft = std::min(tmp.x1(), tmp.x2());
+        const qreal rawTop = std::min(tmp.y1(), tmp.y2());
+
         const bool multiSelect = scene()->selectedItems().count() > 1;
+
+        // Snap the whole line's bounding box to the grid as a rigid unit, the same way a single
+        // rect's body drag snaps (ResizeableRectItem::mouseMoveEvent) - snapping each endpoint
+        // independently could distort the line's angle if the grid moved each end by a
+        // different sub-grid amount. Previously this only happened for the single-endpoint
+        // resize branch below; a whole-line body drag silently ignored CollisionSnapping
+        // entirely.
+        {
+            const qreal left = std::min(tmp.x1(), tmp.x2());
+            const qreal top = std::min(tmp.y1(), tmp.y2());
+            const int snappedLeft = mSnapper.SnapX(mSnapSettings.CollisionSnapping().mSnapX, static_cast<int>(left));
+            const int snappedTop = mSnapper.SnapY(mSnapSettings.CollisionSnapping().mSnapY, static_cast<int>(top));
+            tmp.translate(snappedLeft - left, snappedTop - top);
+        }
 
         // Keep the whole line within the map bounds by shifting it back in as a rigid unit,
         // preserving its exact shape - clamping each endpoint independently here could
@@ -102,10 +124,18 @@ void ResizeableArrowItem::mouseMoveEvent( QGraphicsSceneMouseEvent* aEvent )
 
         PosOrLineChanged();
 
-        // Multi-selection case instead: clamp the whole selection's union bounding box as one
-        // rigid group, live on every move (not just once when the drag finishes).
         if (multiSelect)
         {
+            // Snap (above) can nudge this grabbed line beyond the raw delta every other
+            // selected item already got from Qt's own default move - apply that same nudge to
+            // the rest of the selection too, same fix as ResizeableRectItem::mouseMoveEvent, or
+            // a previously-aligned group silently drifts apart by it.
+            const qreal finalLeft = std::min(tmp.x1(), tmp.x2());
+            const qreal finalTop = std::min(tmp.y1(), tmp.y2());
+            TranslateOtherSelectedItems(scene(), this, finalLeft - rawLeft, finalTop - rawTop);
+
+            // Then clamp the whole selection's union bounding box as one rigid group, live on
+            // every move (not just once when the drag finishes).
             ClampSelectedItemsToMapBounds(scene(), mSnapper);
         }
         return;
