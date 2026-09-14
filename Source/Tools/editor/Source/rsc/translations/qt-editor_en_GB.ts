@@ -688,6 +688,18 @@ Do you want to overwrite it?</source>
         <source>That folder doesn&apos;t contain a modinfo.json.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>New path size</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Width (cameras)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Height (cameras)</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>EditorTab</name>
@@ -827,6 +839,10 @@ Do you want to overwrite it?</source>
     </message>
     <message>
         <source>Failed to create the new path.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edit camera</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

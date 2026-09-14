@@ -4,6 +4,7 @@
 #include "EditorMainWindow.hpp"
 #include "EditorTab.hpp"
 #include "Model.hpp"
+#include "CameraManager.hpp"
 #include <QTreeWidgetItemIterator>
 #include <QMenu>
 #include <QAction>
@@ -169,16 +170,11 @@ void ModTreeWidget::RefreshPathSubtree(PathTreeItem* pPathItem)
     pPathItem->addChild(pCamerasGroup);
     for (auto& pCamera : pTab->GetModel().GetCameras())
     {
-        if (pCamera->mName.empty() && pCamera->mMapObjects.empty())
-        {
-            // Model::CreateEmptyCameras fills every cell in the grid whether or not it's ever
-            // been assigned an image/name or had anything placed in it - skip a cell that's
-            // truly untouched (no name *and* no objects) to avoid cluttering the tree with rows
-            // for empty space, but never hide one that actually holds a map object just because
-            // it hasn't been named yet (CameraManager's own listing shows every cell either way,
-            // labelling an unnamed one "x,y @ empty" - see CameraTreeItem/CameraLabel).
-            continue;
-        }
+        // Model::CreateEmptyCameras fills every cell in the grid whether or not it's ever been
+        // assigned an image/name yet - list every one of them here too (labelling an unnamed one
+        // "x,y @ empty", same as CameraManager's own list - see CameraTreeItem/CameraLabel), so
+        // an as-yet-imageless camera can still be found and right-clicked to open CameraManager
+        // and give it one, the same way a real camera in the scene view can.
         auto* pCameraItem = new CameraTreeItem(pCamera.get());
         pCamerasGroup->addChild(pCameraItem);
         for (auto& pMapObject : pCamera->mMapObjects)
@@ -258,6 +254,34 @@ void ModTreeWidget::onCustomContextMenuRequested(const QPoint& pos)
         pNewPathAction->setObjectName("actionNewPath");
         connect(pNewPathAction, &QAction::triggered, this, [this, pLevelItem]() { PromptNewPath(pLevelItem); });
         menu.addAction(pNewPathAction);
+    }
+    else if (auto* pCameraItem = dynamic_cast<CameraTreeItem*>(pItem))
+    {
+        // A CameraTreeItem only ever exists under an already-populated (so already-open) path's
+        // subtree - see RefreshPathSubtree - so its great-grandparent PathTreeItem is guaranteed
+        // to have a live Tab().
+        if (auto* pPathItem = dynamic_cast<PathTreeItem*>(pCameraItem->parent() ? pCameraItem->parent()->parent() : nullptr))
+        {
+            if (EditorTab* pTab = pPathItem->Tab())
+            {
+                // Same action (name included) as EditorGraphicsView::contextMenuEvent's own
+                // "Edit camera" - right-clicking a camera here should behave identically to
+                // right-clicking it in the scene view, including for a camera that has no image
+                // yet (now listed in the tree too, see RefreshPathSubtree above).
+                EditorCamera* pCamera = pCameraItem->Camera();
+                auto* pEditCameraAction = new QAction(tr("Edit camera"), &menu);
+                pEditCameraAction->setObjectName("actionEditCamera");
+                connect(pEditCameraAction, &QAction::triggered, this, [this, pTab, pCamera]()
+                {
+                    const QPoint scenePos(pCamera->mX * pTab->GetModel().CameraGridWidth(), pCamera->mY * pTab->GetModel().CameraGridHeight());
+                    CameraManager cameraManager(this, pTab, &scenePos);
+                    pTab->SetCameraManagerDialog(&cameraManager);
+                    cameraManager.exec();
+                    pTab->SetCameraManagerDialog(nullptr);
+                });
+                menu.addAction(pEditCameraAction);
+            }
+        }
     }
 
     if (menu.actions().count() > 0)

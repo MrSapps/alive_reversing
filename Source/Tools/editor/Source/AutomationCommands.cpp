@@ -236,6 +236,21 @@ namespace Automation
                 throw CommandError("no tree row with column-0 text: " + wanted.toStdString());
             }
 
+            // A row several levels deep (e.g. ModTreeWidget's Path -> Cameras -> a camera) isn't
+            // actually on screen unless every ancestor above it is expanded - QTreeWidgetItem
+            // defaults to collapsed, and nothing walks the tree auto-expanding it just because a
+            // row exists in the model. Without this, visualItemRect below would return a rect for
+            // wherever that row *would* be if visible - not where the click actually needs to
+            // land - so the synthesized event would silently hit whatever's really at that pixel
+            // (or nothing) instead of the intended row. Expand every ancestor so "click this row"
+            // always works regardless of the tree's current expand state, the same way a real
+            // user could always get there by expanding each level in turn first.
+            for (QTreeWidgetItem* ancestor = found->parent(); ancestor; ancestor = ancestor->parent())
+            {
+                ancestor->setExpanded(true);
+            }
+            tree->scrollToItem(found);
+
             // QTreeWidget::indexFromItem is protected, so build the target cell's rect by hand
             // from visualItemRect (column 0's row rect - public) combined with the requested
             // column's own viewport position/width (also public), rather than going through a
