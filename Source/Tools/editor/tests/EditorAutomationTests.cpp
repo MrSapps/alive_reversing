@@ -757,6 +757,126 @@ TEST(EditorAutomation, CollisionLineDragBoundsAndSnap)
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
+// Regression test: ResizeableArrowItem's whole-line body drag used to silently ignore
+// CollisionSnapping entirely - only the single-endpoint resize branch actually called
+// SnapX/SnapY (see CollisionLineDragBoundsAndSnap's step 5, which only drags an endpoint).
+// Enables snap, grabs the line's middle (away from both endpoints, so this is a rigid whole-line
+// translation, not a resize), and checks the whole line lands on the grid - not just repositioned
+// but with its exact shape preserved, the same rigid-box-snap idea as a map object's body drag.
+TEST(EditorAutomation, CollisionLineWholeLineDragSnapsToGrid)
+{
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateNewPath(client));
+    ASSERT_TRUE(AddCollisionLine(client));
+
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_snap_collision_items_on_x"}}).value("ok", false));
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_snap_collision_objects_on_y"}}).value("ok", false));
+
+    const nlohmann::json before = FindKind(GetSceneItems(client), "collision_line");
+    const int x1 = before.at("x1").get<int>();
+    const int y1 = before.at("y1").get<int>();
+    const int x2 = before.at("x2").get<int>();
+    const int y2 = before.at("y2").get<int>();
+    const int shapeWidth = x2 - x1;
+    const int shapeHeight = y2 - y1;
+
+    const int midX = (x1 + x2) / 2;
+    const int midY = (y1 + y2) / 2;
+    // Deliberately not a multiple of 20 (or of the AO X grid).
+    DragView(client, SceneToView(client, midX, midY), SceneToView(client, midX + 47, midY + 47));
+
+    const nlohmann::json line = FindKind(GetSceneItems(client), "collision_line");
+    const int newX1 = line.at("x1").get<int>();
+    const int newY1 = line.at("y1").get<int>();
+    const int newX2 = line.at("x2").get<int>();
+    const int newY2 = line.at("y2").get<int>();
+
+    EXPECT_EQ(newY1 % 20, 0) << "whole-line drag did not snap P1 to the Y grid: y1=" << newY1;
+    EXPECT_EQ(newY2 % 20, 0) << "whole-line drag did not snap P2 to the Y grid: y2=" << newY2;
+    // The drag must still be a rigid translation - the box snaps, not each endpoint
+    // independently, which could distort the line's shape.
+    EXPECT_EQ(newX2 - newX1, shapeWidth) << "whole-line drag snap distorted the line's shape";
+    EXPECT_EQ(newY2 - newY1, shapeHeight);
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
+// Multi-select desync bug (see MultiSelectDragWithSnapKeepsRowAligned), but the grabbed item is
+// the *line* this time - exercises the TranslateOtherSelectedItems call in
+// ResizeableArrowItem::mouseMoveEvent's own whole-line body-drag branch (added alongside that
+// branch's new snap support above), not just the rect arm the earlier multi-select tests cover.
+TEST(EditorAutomation, MultiSelectDragWithSnapKeepsLineGrabbedSelectionAligned)
+{
+    QProcess editor;
+    AutomationClient client;
+    QString socketName;
+    ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
+
+    ASSERT_TRUE(CreateNewPath(client));
+
+    // Map object -> (600, 100), clear of the line's default (100,100)-(200,100) placement.
+    ASSERT_TRUE(AddMapObject(client));
+    {
+        const nlohmann::json obj = FindSelectedKind(GetSceneItems(client), "map_object");
+        ASSERT_FALSE(obj.empty());
+        const double curX = obj.at("xpos").get<double>();
+        const double curY = obj.at("ypos").get<double>();
+        DragView(client, SceneToView(client, curX + 10, curY + 10), SceneToView(client, 610, 110));
+    }
+
+    ASSERT_TRUE(AddCollisionLine(client));
+
+    const nlohmann::json objBefore = FindKind(GetSceneItems(client), "map_object");
+    const nlohmann::json lineBefore = FindKind(GetSceneItems(client), "collision_line");
+
+    // Rubber-band select both.
+    DragView(client, SceneToView(client, 50, 50), SceneToView(client, 750, 250));
+    ASSERT_EQ(CountKind(GetSceneItems(client), "map_object"), 1);
+    ASSERT_EQ(CountKind(GetSceneItems(client), "collision_line"), 1);
+    for (const auto& item : GetSceneItems(client))
+    {
+        const std::string kind = item.value("kind", std::string());
+        if (kind != "map_object" && kind != "collision_line")
+        {
+            continue;
+        }
+        EXPECT_TRUE(item.value("selected", false)) << "rubber-band select did not select both items: " << item.dump();
+    }
+
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_snap_collision_items_on_x"}}).value("ok", false));
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_snap_collision_objects_on_y"}}).value("ok", false));
+
+    // Drag the line's middle by a deliberately non-grid-aligned amount.
+    {
+        const int midX = (lineBefore.at("x1").get<int>() + lineBefore.at("x2").get<int>()) / 2;
+        const int midY = (lineBefore.at("y1").get<int>() + lineBefore.at("y2").get<int>()) / 2;
+        DragView(client, SceneToView(client, midX, midY), SceneToView(client, midX + 47, midY + 47));
+    }
+
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_snap_collision_items_on_x"}}).value("ok", false));
+    ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_snap_collision_objects_on_y"}}).value("ok", false));
+
+    const nlohmann::json lineAfter = FindKind(GetSceneItems(client), "collision_line");
+    const nlohmann::json objAfter = FindKind(GetSceneItems(client), "map_object");
+
+    // The dx/dy the grabbed line actually moved by (raw drag delta + snap correction).
+    const double dx = lineAfter.at("x1").get<int>() - lineBefore.at("x1").get<int>();
+    const double dy = lineAfter.at("y1").get<int>() - lineBefore.at("y1").get<int>();
+    ASSERT_NE(dy, 47) << "test setup: snap did not actually change the raw 47px Y drag - nothing to desync";
+
+    EXPECT_DOUBLE_EQ(objAfter.at("xpos").get<double>() - objBefore.at("xpos").get<double>(), dx)
+        << "map object desynced from the grabbed line after a snapped multi-select drag";
+    EXPECT_DOUBLE_EQ(objAfter.at("ypos").get<double>() - objBefore.at("ypos").get<double>(), dy);
+
+    editor.terminate();
+    ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
+}
+
 // Exercises interactive dragging of a map object's box (ResizeableRectItem): moving the whole
 // box, resizing via a corner handle, and bounds-clamping for both - added alongside the same
 // clamping for AddNewObjectCommand's initial placement and ResizeableArrowItem's collision-line
