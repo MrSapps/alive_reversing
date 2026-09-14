@@ -24,8 +24,8 @@ MessageBoxButton Sys_MessageBox(TWindowHandleType windowHandle, const char_type*
 
 std::string BuildString();
 std::string BuildAndBitnesString();
-std::string WindowTitleAO();
-std::string WindowTitleAE();
+std::string WindowTitleAO(const std::string& modName = "");
+std::string WindowTitleAE(const std::string& modName = "");
 void Alive_Show_ErrorMsg(const char_type* fmt, ...);
 u32 SYS_GetTicks();
 

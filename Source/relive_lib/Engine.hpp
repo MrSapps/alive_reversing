@@ -27,7 +27,7 @@ public:
     void Run();
     static void Init_GameStates();
 private:
-    void CmdLineRenderInit();
+    void CmdLineRenderInit(const std::string& activeModName);
 
     void Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera);
     void Game_Main(EReliveLevelIds startLevel, s32 startPath, s32 startCamera);
@@ -38,7 +38,7 @@ private:
     FileSystem& mFs;
     CommandLineParser& mClp;
     std::unique_ptr<relive::IIpcInterface> mIpcInterface;
-    ResourceManagerWrapper mResMan;
+    std::unique_ptr<ResourceManagerWrapper> mResMan;
     std::unique_ptr<BaseMap> mMap;
     relive::Factory mFactory;
 };
