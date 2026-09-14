@@ -80,6 +80,12 @@ EditorMainWindow::EditorMainWindow(QWidget* aParent)
     }
 
     readSettings();
+    // readSettings() can restore this dock's visibility from a previous session's saved window
+    // state (e.g. via restoreState()), independently of whether a mod is actually open this time
+    // - no mod is open yet at this point, so force it hidden regardless of what got restored.
+    // SwitchToMod (below, if the last mod auto-reopens, or later via actionOpenMod/actionNewMod)
+    // is what reveals it once one actually is.
+    m_ui->modTreeDockWidget->setVisible(false);
 
     // Remember + auto-reopen the last mod that was open, same idiom as "last_open_dir" -
     // silently skip (no error box on boot) if the directory's gone or no longer looks like a
@@ -253,6 +259,10 @@ bool EditorMainWindow::SwitchToMod(std::unique_ptr<EditorMod> pMod)
 
     mCurrentMod = std::move(pMod);
     mModTree->SetMod(mCurrentMod.get());
+    // The tree has nothing useful to show (and nothing to right-click - New Level/New Path both
+    // require a mod) until a mod is actually open - keep the dock hidden rather than showing an
+    // empty, unusable tree.
+    m_ui->modTreeDockWidget->setVisible(mCurrentMod != nullptr);
     UpdateWindowTitle();
 
     m_Settings.setValue("last_open_mod_dir", mCurrentMod ? mCurrentMod->mDirectory : QString());
