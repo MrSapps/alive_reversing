@@ -22,6 +22,15 @@ public:
 
     bool ConversionRequired();
 
+    // Lets Engine::Run() (the only thing that owns a DataConversionUI, and so the only thing
+    // that can reach one to begin with - deliberately not exposed any more broadly than that,
+    // e.g. via a global) request cancellation of any FMV conversion job still running in the
+    // background if the user quits while dcu.GetDead() hasn't fired yet, and wait for that to
+    // actually happen before exiting for real. See ThreadPool::RequestCancel and
+    // FmvConv::Convert's periodic IsCancelRequested() check.
+    void RequestCancel();
+    [[nodiscard]] bool AsyncTasksInProgress() const;
+
 private:
     void ThreadFunc();
 

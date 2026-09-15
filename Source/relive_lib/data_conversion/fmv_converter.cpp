@@ -32,6 +32,12 @@
 #include "DDVAe.hpp"
 #include "PsxStrDemuxer.hpp"
 #include "ThreadPool.hpp"
+#include "data_conversion.hpp"
+#include "nlohmann/json.hpp"
+
+#include <mutex>
+#include <set>
+#include <cstdio>
 
 // Some FMV sources (e.g. AO's raw PSX STR streams, which have no header - each frame's
 // width/height comes from its own MOIR sector) don't know their true frame size or frame
@@ -63,6 +69,79 @@ static FmvScanResult ScanFmvSource(relive::IFmvSource& source)
     return result;
 }
 
+// Tracks, per movie, whether its FMV conversion fully completed (encoded + finalized + moved
+// into place - see FmvConv::Convert's temp-file handling) under the fmvVersion this manifest was
+// constructed with. Backs ConvertFMVs' resume-on-relaunch behavior: FMV conversion is the one
+// data category slow enough that a user is likely to actually quit mid-conversion (killed, or
+// cancelled via ThreadPool::RequestCancel/Engine::Run()'s quit handling), so an interrupted run
+// shouldn't have to redo movies that already finished. A version bump invalidates the whole
+// manifest rather than trying to reconcile old entries against new encoding settings - simpler,
+// and correct, since a version bump means everything needs redoing anyway.
+class FmvConversionManifest final
+{
+public:
+    FmvConversionManifest(FileSystem& fs, FileSystem::Path manifestPath, u32 fmvVersion)
+        : mFs(fs)
+        , mManifestPath(std::move(manifestPath))
+        , mFmvVersion(fmvVersion)
+    {
+        const std::string jsonStr = mFs.LoadToString(mManifestPath);
+        if (jsonStr.empty())
+        {
+            return;
+        }
+
+        try
+        {
+            const nlohmann::json j = nlohmann::json::parse(jsonStr);
+            if (j.value("fmv_version", 0u) != mFmvVersion)
+            {
+                // A different code version's encoding settings - everything needs redoing, so
+                // don't trust any of this list.
+                return;
+            }
+            for (const auto& name : j.at("completed"))
+            {
+                mCompleted.insert(name.get<std::string>());
+            }
+        }
+        catch (const nlohmann::json::exception&)
+        {
+            // Corrupt/unreadable manifest - treat as empty, everything gets (re)converted.
+        }
+    }
+
+    [[nodiscard]] bool IsCompleted(const std::string& movieName) const
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        return mCompleted.count(movieName) != 0;
+    }
+
+    // Called once a movie's conversion is fully done (see ConvertFmvJob::Execute) - multiple
+    // worker threads can call this around the same time, so it's mutex-guarded and re-saves the
+    // whole manifest under the lock rather than trying to do a lock-free incremental update.
+    void MarkCompleted(const std::string& movieName)
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        mCompleted.insert(movieName);
+
+        std::vector<std::string> names(mCompleted.begin(), mCompleted.end());
+        std::sort(names.begin(), names.end());
+        const nlohmann::json j = {
+            {"fmv_version", mFmvVersion},
+            {"completed", names},
+        };
+        SaveJson(j, mFs, mManifestPath);
+    }
+
+private:
+    FileSystem& mFs;
+    FileSystem::Path mManifestPath;
+    u32 mFmvVersion = 0;
+    mutable std::mutex mMutex;
+    std::set<std::string> mCompleted;
+};
+
 class FmvConv final
 {
 public:
@@ -73,8 +152,12 @@ public:
     }
 
     // pScan, when given, overrides the source's own (possibly unknown/0) frame size and
-    // frame count - see ScanFmvSource() above.
-    void Convert(relive::IFmvSource& source, std::string fName, const FileSystem::Path& outDir, const FmvScanResult* pScan = nullptr)
+    // frame count - see ScanFmvSource() above. Returns true once the movie is fully encoded and
+    // its temp output file has been moved into place; false if the source couldn't be opened, or
+    // tp.IsCancelRequested() was set partway through (see ThreadPool::RequestCancel/Engine::Run()'s
+    // quit handling) - the caller (ConvertFmvJob) only marks a movie complete in the manifest when
+    // this returns true.
+    bool Convert(relive::IFmvSource& source, std::string fName, const FileSystem::Path& outDir, ThreadPool& tp, const FmvScanResult* pScan = nullptr)
     {
         TRACE_ENTRYEXIT;
 
@@ -84,7 +167,7 @@ public:
         {
             LOG_WARNING("Failed to open FMV source '%s'", fName.c_str());
             // At least one retail FMV is missing for some reason
-            return;
+            return false;
         }
 
         const u32 width = (pScan && pScan->mMaxWidth > 0) ? pScan->mMaxWidth : (source.FrameWidth() > 0 ? source.FrameWidth() : 640u);
@@ -157,11 +240,20 @@ public:
         FileSystem::Path outPathBuilder = outDir;
         outPathBuilder.Append(fName + ".webm");
         const std::string outFileName = outPathBuilder.GetPath();
-        FILE* outFile = fopen(outFileName.c_str(), "wb");
+        // Written under a temp name and only renamed to outFileName once fully finalized (see
+        // below), so a conversion that gets killed or cancelled mid-write (see
+        // ThreadPool::IsCancelRequested() below) never leaves a corrupt/truncated file sitting at
+        // the final path - and so ConvertFMVs' "is this one already done" resume check (backed by
+        // FmvConversionManifest, which only records a movie complete once this rename happens)
+        // can't mistake a partial file for a finished one.
+        const std::string tempFileName = outFileName + ".tmp";
+        FILE* outFile = fopen(tempFileName.c_str(), "wb");
         if (!outFile)
         {
-            ALIVE_FATAL("Failed to open output file '%s'", outFileName.c_str());
+            ALIVE_FATAL("Failed to open output file '%s'", tempFileName.c_str());
         }
+
+        bool cancelled = false;
 
         {
             mkvmuxer::MkvWriter writer(outFile);
@@ -240,6 +332,17 @@ public:
             u32 frame_index = 0;
             while (totalFrames == 0 || frame_index < totalFrames)
             {
+                // Checked once per frame rather than more granularly - encoding a single frame
+                // is fast enough (well under the ~1s ALIVE_FATAL warns about in encode_frame)
+                // that this is still a prompt response to a quit request, without adding
+                // per-frame overhead anywhere else.
+                if (tp.IsCancelRequested())
+                {
+                    LOG_INFO("FMV conversion of '%s' cancelled at frame %u/%u", fName.c_str(), frame_index, totalFrames);
+                    cancelled = true;
+                    break;
+                }
+
                 if (!source.StepFrame())
                 {
                     break;
@@ -327,21 +430,42 @@ public:
                 ++frame_index;
             }
 
-            while (encode_frame(&segment, &cfg, &codec, nullptr, -1, 0))
+            bool finalizedOk = false;
+            if (!cancelled)
             {
-                continue;
-            }
+                while (encode_frame(&segment, &cfg, &codec, nullptr, -1, 0))
+                {
+                    continue;
+                }
 
-            const bool ok = segment.Finalize();
-            if (!ok)
-            {
-                fprintf(stderr, "webmenc> Segment::Finalize failed.\n");
+                finalizedOk = segment.Finalize();
+                if (!finalizedOk)
+                {
+                    fprintf(stderr, "webmenc> Segment::Finalize failed.\n");
+                }
             }
 
             fclose(outFile);
+
+            if (cancelled || !finalizedOk)
+            {
+                std::remove(tempFileName.c_str());
+                aom_img_free(&rawImageFrameData);
+                return false;
+            }
         }
 
         aom_img_free(&rawImageFrameData);
+
+        if (std::rename(tempFileName.c_str(), outFileName.c_str()) != 0)
+        {
+            LOG_ERROR("Failed to move converted FMV '%s' into place (from '%s' to '%s')",
+                fName.c_str(), tempFileName.c_str(), outFileName.c_str());
+            std::remove(tempFileName.c_str());
+            return false;
+        }
+
+        return true;
     }
 
 private:
@@ -564,19 +688,29 @@ private:
 class ConvertFmvJob final : public IJob
 {
 public:
-    ConvertFmvJob(FileSystem& fs, std::string movieName, FileSystem::Path outDir, bool isAo)
+    ConvertFmvJob(FileSystem& fs, std::string movieName, FileSystem::Path outDir, bool isAo,
+                  ThreadPool& tp, std::shared_ptr<FmvConversionManifest> manifest)
         : mFs(fs)
         , mMovieName(std::move(movieName))
         , mOutDir(std::move(outDir))
         , mIsAo(isAo)
+        , mThreadPool(tp)
+        , mManifest(std::move(manifest))
     {
     }
 
     void Execute() override
     {
+        if (mThreadPool.IsCancelRequested())
+        {
+            // Don't even start a fresh conversion once shutdown's underway.
+            return;
+        }
+
         LOG_INFO("ConvertFmvJob: starting '%s' (isAo=%d)", mMovieName.c_str(), mIsAo ? 1 : 0);
 
         FmvConv fmvConv(mFs);
+        bool completed = false;
         if (mIsAo)
         {
             // AO's raw STR frames have no stream header - the true max frame size and
@@ -588,14 +722,19 @@ public:
                      scan.mMaxWidth, scan.mMaxHeight, scan.mFrameCount);
 
             relive::PsxStrDemuxer source(mFs, mMovieName.c_str());
-            fmvConv.Convert(source, mMovieName, mOutDir, &scan);
+            completed = fmvConv.Convert(source, mMovieName, mOutDir, mThreadPool, &scan);
         }
         else
         {
             // AE's DDV header already declares a fixed frame size and frame count up
             // front, so no pre-pass is needed here.
             relive::DDVAe source(mFs, mMovieName.c_str(), nullptr);
-            fmvConv.Convert(source, mMovieName, mOutDir);
+            completed = fmvConv.Convert(source, mMovieName, mOutDir, mThreadPool);
+        }
+
+        if (completed)
+        {
+            mManifest->MarkCompleted(mMovieName);
         }
     }
 
@@ -604,13 +743,19 @@ private:
     std::string mMovieName;
     FileSystem::Path mOutDir;
     bool mIsAo = false;
+    ThreadPool& mThreadPool;
+    std::shared_ptr<FmvConversionManifest> mManifest;
 };
 
-void ConvertFMVs(ThreadPool& tp, FileSystem& fs, const FileSystem::Path& dataDir, bool isAo)
+void ConvertFMVs(ThreadPool& tp, FileSystem& fs, const FileSystem::Path& dataDir, bool isAo, u32 fmvVersion)
 {
     FileSystem::Path fmvOutDir = dataDir;
     fmvOutDir.Append("fmvs");
     fs.CreateDirectory(fmvOutDir);
+
+    FileSystem::Path manifestPath = fmvOutDir;
+    manifestPath.Append("_conversion_progress.json");
+    auto manifest = std::make_shared<FmvConversionManifest>(fs, manifestPath, fmvVersion);
 
     // Real, per-level FMV filenames straight from each game's own reversed FmvInfo
     // tables (AliveLibAE/AliveLibAO PathData.cpp) rather than a separately hand
@@ -619,6 +764,20 @@ void ConvertFMVs(ThreadPool& tp, FileSystem& fs, const FileSystem::Path& dataDir
 
     for (const auto& movieName : movieNames)
     {
-        tp.AddJob(std::make_unique<ConvertFmvJob>(fs, movieName, fmvOutDir, isAo));
+        // Resuming an interrupted conversion (killed, or cancelled because the user quit - see
+        // ThreadPool::RequestCancel/Engine::Run()'s quit handling): skip movies the manifest already
+        // has recorded as done under this exact fmvVersion, so relaunching doesn't have to
+        // needlessly re-encode everything that already finished. The manifest only ever records
+        // a movie complete once FmvConv::Convert has moved its finished temp file into place, so
+        // this can't mistake a half-written file for a done one.
+        FileSystem::Path outFile = fmvOutDir;
+        outFile.Append(movieName + ".webm");
+        if (manifest->IsCompleted(movieName) && fs.FileExists(outFile.GetPath().c_str()))
+        {
+            LOG_INFO("ConvertFMVs: '%s' already converted, skipping", movieName.c_str());
+            continue;
+        }
+
+        tp.AddJob(std::make_unique<ConvertFmvJob>(fs, movieName, fmvOutDir, isAo, tp, manifest));
     }
 }

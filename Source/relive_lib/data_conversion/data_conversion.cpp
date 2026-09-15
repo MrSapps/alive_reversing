@@ -1168,6 +1168,16 @@ bool DataConversion::AsyncTasksInProgress() const
     return mThreadPool->Busy();
 }
 
+void DataConversion::RequestCancel()
+{
+    mThreadPool->RequestCancel();
+}
+
+bool DataConversion::IsCancelRequested() const
+{
+    return mThreadPool->IsCancelRequested();
+}
+
 size_t DataConversion::TotalConversionJobs() const
 {
     return mThreadPool->TotalJobs();
@@ -1201,12 +1211,6 @@ std::optional<DataConversion::DataVersions> DataConversion::DataVersionAE()
     return dv.Load(dataDir) ? std::make_optional(dv) : std::nullopt;
 }
 
-static void WriteDataVersion(const FileSystem::Path& path)
-{
-    const DataConversion::DataVersions dv = DataConversion::DataVersions::LatestVersion();
-    dv.Save(path);
-}
-
 // relive_data/mods/ (siblings of ao/ae, shared across both games - a mod's own modinfo.json
 // says which game it targets) is where relive::Mods::EnumerateMods/EditorMod-created mods are
 // expected to live. Nothing else creates it - it's not tied to converting any particular game's
@@ -1233,7 +1237,7 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
 
     if (dv.ConvertFmvs())
     {
-        ConvertFMVs(*mThreadPool, fs, dataDir, true);
+        ConvertFMVs(*mThreadPool, fs, dataDir, true, DataVersions::LatestVersion().mFmvVersion);
     }
 
     // TODO: Prob diff data in AO, check me
@@ -1266,7 +1270,7 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
         });
     }
 
-    WriteDataVersion(dataDir);
+    // NOT WriteDataVersion(dataDir) here - see ConvertDataAE's own comment on this, same reason.
 
     LogNonConvertedAnims(true);
     LogNonConvertedPals(true);
@@ -1284,7 +1288,7 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
 
     if (dv.ConvertFmvs())
     {
-        ConvertFMVs(*mThreadPool, fs, dataDir, false);
+        ConvertFMVs(*mThreadPool, fs, dataDir, false, DataVersions::LatestVersion().mFmvVersion);
     }
 
     if (dv.ConvertPalettes())
@@ -1310,12 +1314,19 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
 
     if (dv.ConvertSaves())
     {
-        IterateAELvls(fs, [&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, LevelIds lvlIdxAsLvl) 
-        { 
+        IterateAELvls(fs, [&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, LevelIds lvlIdxAsLvl)
+        {
             ConvertFilesInLvl<::LevelIds, ::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, false, true);
         });
     }
-    WriteDataVersion(dataDir);
+
+    // NOT WriteDataVersion(dataDir) here - everything above this point only *dispatches* work
+    // onto mThreadPool (FMVs, and ConvertFilesInLvl's own paths/etc jobs), it doesn't wait for
+    // any of it to actually finish, so data_version.json would end up claiming full completion
+    // (letting a later launch's dv.ConvertFmvs()/dv.ConvertPaths() skip reconversion entirely)
+    // the moment this function returns - almost immediately, nowhere near done. The caller
+    // (DataConversionUI::ThreadFunc) already has its own wait for mThreadPool to actually drain;
+    // it writes the version file itself once that's done, and only if nothing got cancelled.
 
     LogNonConvertedAnims(false);
 }

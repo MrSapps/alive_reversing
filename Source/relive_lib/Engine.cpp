@@ -155,6 +155,8 @@ static void DrawFps_4952F0(f32 fps)
 }
 
 
+// Called wherever Sys_PumpMessages() signals the user confirmed they want to quit. A hard
+// exit(0) here previously left FMV conversion jobs still writing to their final output file
 static s32 Game_End_Frame(u32 flags, BaseMap* pMap)
 {
     if (flags & 1)
@@ -171,6 +173,10 @@ static s32 Game_End_Frame(u32 flags, BaseMap* pMap)
 
     ++sFrameCount_5CA300;
 
+    // A background FMV conversion (DataConversionUI) never overlaps with this callback actually
+    // firing - it only runs during Game_Loop, well after DataConversionUI's own loop (which pumps
+    // messages itself - see Engine::Run()) has already finished - so there's nothing here that
+    // ever needs to know about cancelling one.
     if (Sys_PumpMessages(pMap))
     {
         exit(0);
@@ -668,7 +674,26 @@ void Engine::Run()
 
             dcu.VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
 
-            SYS_EventsPump(mMap.get());
+            // Not the general SYS_EventsPump(mMap.get()) (which would just exit(0) immediately)
+            // - dcu (and so any FMV conversion jobs it dispatched onto its own ThreadPool - see
+            // fmv_converter.cpp) is only ever reachable from right here, so quitting while it's
+            // still running is handled locally: ask it to cancel and give it a bounded window to
+            // actually stop (FmvConv::Convert checks ThreadPool::IsCancelRequested() roughly once
+            // per encoded frame and cleans up its own temp file) before exiting for real either
+            // way, rather than a hard exit(0) leaving conversion jobs mid-write.
+            if (Sys_PumpMessages(mMap.get()))
+            {
+                dcu.RequestCancel();
+
+                constexpr u32 kMaxCancelWaitMs = 2000;
+                const u32 waitStartTicks = SYS_GetTicks();
+                while (dcu.AsyncTasksInProgress() && (SYS_GetTicks() - waitStartTicks) < kMaxCancelWaitMs)
+                {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                }
+
+                exit(0);
+            }
             gPsxDisplay.RenderOrderingTable();
         }
         while (!dcu.GetDead());

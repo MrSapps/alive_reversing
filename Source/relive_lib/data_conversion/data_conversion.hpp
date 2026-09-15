@@ -103,6 +103,13 @@ public:
 
     bool AsyncTasksInProgress() const;
 
+    // Cooperative cancellation for jobs still running in the background - see
+    // ThreadPool::RequestCancel(). Used to stop long-running conversion (FMVs specifically, so
+    // far) from leaving a corrupt/incomplete file behind if the user quits mid-conversion - see
+    // Engine.cpp's quit handling, which calls this (via ActiveDataConversion()) before exiting.
+    void RequestCancel();
+    [[nodiscard]] bool IsCancelRequested() const;
+
     [[nodiscard]] size_t TotalConversionJobs() const;
     [[nodiscard]] size_t CompletedConversionJobs() const;
     [[nodiscard]] size_t ActiveConversionJobs() const;
