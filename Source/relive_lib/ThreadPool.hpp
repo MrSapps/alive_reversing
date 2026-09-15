@@ -75,26 +75,7 @@ public:
             std::unique_lock lock(mJobsQueueMutex);
             mJobs.emplace(std::move(job));
         }
-        ++mTotalJobs;
         mWaitForWork.notify_one();
-    }
-
-    // Total number of jobs ever added via AddJob().
-    [[nodiscard]] size_t TotalJobs() const
-    {
-        return mTotalJobs;
-    }
-
-    // Number of jobs that have finished Execute().
-    [[nodiscard]] size_t CompletedJobs() const
-    {
-        return mCompletedJobs;
-    }
-
-    // Number of jobs currently being executed by a worker thread.
-    [[nodiscard]] size_t ActiveJobs() const
-    {
-        return static_cast<size_t>(mBusyJobs.load());
     }
 
     // Cooperative cancellation: doesn't interrupt a running Execute() (the pool has no way to do
@@ -136,13 +117,10 @@ private:
             }
             job->Execute();
             --mBusyJobs;
-            ++mCompletedJobs;
         }
     }
 
     std::atomic<int> mBusyJobs{0};
-    std::atomic<size_t> mTotalJobs{0};
-    std::atomic<size_t> mCompletedJobs{0};
     std::atomic<bool> mStopThreads{false};
     std::atomic<bool> mCancelRequested{false};
     mutable std::mutex mJobsQueueMutex;

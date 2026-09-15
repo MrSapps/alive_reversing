@@ -32,11 +32,14 @@
 #include "DDVAe.hpp"
 #include "PsxStrDemuxer.hpp"
 #include "ThreadPool.hpp"
+#include "ConversionProgress.hpp"
 #include "data_conversion.hpp"
 #include "nlohmann/json.hpp"
 
 #include <mutex>
+#include <optional>
 #include <set>
+#include <unordered_map>
 #include <cstdio>
 
 // Some FMV sources (e.g. AO's raw PSX STR streams, which have no header - each frame's
@@ -157,7 +160,7 @@ public:
     // tp.IsCancelRequested() was set partway through (see ThreadPool::RequestCancel/Engine::Run()'s
     // quit handling) - the caller (ConvertFmvJob) only marks a movie complete in the manifest when
     // this returns true.
-    bool Convert(relive::IFmvSource& source, std::string fName, const FileSystem::Path& outDir, ThreadPool& tp, const FmvScanResult* pScan = nullptr)
+    bool Convert(relive::IFmvSource& source, std::string fName, const FileSystem::Path& outDir, ThreadPool& tp, ConversionProgress& progress, const FmvScanResult* pScan = nullptr)
     {
         TRACE_ENTRYEXIT;
 
@@ -427,6 +430,8 @@ public:
                     LOG_INFO("Video frame %u (total unknown)", frame_index + 1u);
                 }
 
+                progress.AddCompleted(ConversionCategory::Fmvs, 1);
+
                 ++frame_index;
             }
 
@@ -688,14 +693,20 @@ private:
 class ConvertFmvJob final : public IJob
 {
 public:
+    // scan, when set, is the AO frame-count/size dry-run result already computed upfront by
+    // ConvertFMVs' scan wave (see below) - reused here instead of redecoding the whole movie a
+    // second time. Always empty for AE (its DDV header already declares this, no scan needed).
     ConvertFmvJob(FileSystem& fs, std::string movieName, FileSystem::Path outDir, bool isAo,
-                  ThreadPool& tp, std::shared_ptr<FmvConversionManifest> manifest)
+                  ThreadPool& tp, std::shared_ptr<FmvConversionManifest> manifest,
+                  ConversionProgress& progress, std::optional<FmvScanResult> scan)
         : mFs(fs)
         , mMovieName(std::move(movieName))
         , mOutDir(std::move(outDir))
         , mIsAo(isAo)
         , mThreadPool(tp)
         , mManifest(std::move(manifest))
+        , mProgress(progress)
+        , mScan(std::move(scan))
     {
     }
 
@@ -709,33 +720,31 @@ public:
 
         LOG_INFO("ConvertFmvJob: starting '%s' (isAo=%d)", mMovieName.c_str(), mIsAo ? 1 : 0);
 
+        mProgress.ReportItemStarted(mMovieName);
+
         FmvConv fmvConv(mFs);
         bool completed = false;
         if (mIsAo)
         {
-            // AO's raw STR frames have no stream header - the true max frame size and
-            // frame count are only known after decoding every frame once, so do that as
-            // a throwaway pre-pass before the real (encoding) pass.
-            relive::PsxStrDemuxer scanSource(mFs, mMovieName.c_str());
-            const FmvScanResult scan = ScanFmvSource(scanSource);
-            LOG_INFO("ConvertFmvJob: '%s' scanned max %ux%u over %u frames", mMovieName.c_str(),
-                     scan.mMaxWidth, scan.mMaxHeight, scan.mFrameCount);
-
             relive::PsxStrDemuxer source(mFs, mMovieName.c_str());
-            completed = fmvConv.Convert(source, mMovieName, mOutDir, mThreadPool, &scan);
+            completed = fmvConv.Convert(source, mMovieName, mOutDir, mThreadPool, mProgress, mScan ? &*mScan : nullptr);
         }
         else
         {
             // AE's DDV header already declares a fixed frame size and frame count up
             // front, so no pre-pass is needed here.
             relive::DDVAe source(mFs, mMovieName.c_str(), nullptr);
-            completed = fmvConv.Convert(source, mMovieName, mOutDir, mThreadPool);
+            completed = fmvConv.Convert(source, mMovieName, mOutDir, mThreadPool, mProgress);
         }
 
         if (completed)
         {
             mManifest->MarkCompleted(mMovieName);
         }
+
+        // Cleared regardless of outcome (success/failure/cancel) so a cancelled/failed movie
+        // doesn't linger in the "in progress" list forever.
+        mProgress.ReportItemFinished(mMovieName);
     }
 
 private:
@@ -745,9 +754,53 @@ private:
     bool mIsAo = false;
     ThreadPool& mThreadPool;
     std::shared_ptr<FmvConversionManifest> mManifest;
+    ConversionProgress& mProgress;
+    std::optional<FmvScanResult> mScan;
 };
 
-void ConvertFMVs(ThreadPool& tp, FileSystem& fs, const FileSystem::Path& dataDir, bool isAo, u32 fmvVersion)
+namespace
+{
+    // Only used for AO's upfront frame-count dry run (see ConvertFMVs) - AE doesn't need this,
+    // its DDV header already declares frame count directly (ReadInfo() alone, no decode needed).
+    class ScanAoFmvJob final : public IJob
+    {
+    public:
+        ScanAoFmvJob(FileSystem& fs, std::string movieName, ThreadPool& tp,
+                     std::mutex& resultsMutex, std::unordered_map<std::string, FmvScanResult>& results)
+            : mFs(fs)
+            , mMovieName(std::move(movieName))
+            , mThreadPool(tp)
+            , mResultsMutex(resultsMutex)
+            , mResults(results)
+        {
+        }
+
+        void Execute() override
+        {
+            if (mThreadPool.IsCancelRequested())
+            {
+                return;
+            }
+
+            relive::PsxStrDemuxer source(mFs, mMovieName.c_str());
+            const FmvScanResult scan = ScanFmvSource(source);
+            LOG_INFO("ScanAoFmvJob: '%s' scanned max %ux%u over %u frames", mMovieName.c_str(),
+                     scan.mMaxWidth, scan.mMaxHeight, scan.mFrameCount);
+
+            std::lock_guard<std::mutex> lock(mResultsMutex);
+            mResults.emplace(mMovieName, scan);
+        }
+
+    private:
+        FileSystem& mFs;
+        std::string mMovieName;
+        ThreadPool& mThreadPool;
+        std::mutex& mResultsMutex;
+        std::unordered_map<std::string, FmvScanResult>& mResults;
+    };
+} // namespace
+
+void ConvertFMVs(ThreadPool& tp, FileSystem& fs, const FileSystem::Path& dataDir, bool isAo, u32 fmvVersion, ConversionProgress& progress)
 {
     FileSystem::Path fmvOutDir = dataDir;
     fmvOutDir.Append("fmvs");
@@ -762,8 +815,55 @@ void ConvertFMVs(ThreadPool& tp, FileSystem& fs, const FileSystem::Path& dataDir
     // maintained list here.
     const std::vector<std::string> movieNames = isAo ? AO::Path_GetAllFmvNames() : ::Path_GetAllFmvNames();
 
+    // Upfront per-movie frame-count dry run, so the Fmvs category total (weighted highest of all
+    // categories, since fmvs take by far the longest to convert) is known before any real
+    // encoding starts. Every movie gets scanned here regardless of whether the manifest already
+    // has it marked complete - frame counts aren't persisted into the manifest (would need a
+    // schema migration for a resume-only cost: this only re-scans already-done AO movies on a
+    // launch that resumes an interrupted conversion, not on every ordinary launch, since once
+    // data_version.json is stamped ConvertFmvs() is false and none of this runs again).
+    std::unordered_map<std::string, FmvScanResult> aoScanResults;
+    if (isAo)
+    {
+        std::mutex resultsMutex;
+        for (const auto& movieName : movieNames)
+        {
+            tp.AddJob(std::make_unique<ScanAoFmvJob>(fs, movieName, tp, resultsMutex, aoScanResults));
+        }
+
+        // Wait for the whole scan wave to drain before dispatching any real conversion below -
+        // real ConvertFmvJobs need aoScanResults fully populated so they can reuse it instead of
+        // rescanning, and the category total needs to reflect every movie before any
+        // AddCompleted() call could otherwise run ahead of it.
+        while (tp.Busy())
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+    }
+
     for (const auto& movieName : movieNames)
     {
+        u32 frameCount = 0;
+        std::optional<FmvScanResult> scan;
+        if (isAo)
+        {
+            const auto it = aoScanResults.find(movieName);
+            if (it != aoScanResults.end())
+            {
+                scan = it->second;
+                frameCount = it->second.mFrameCount;
+            }
+        }
+        else
+        {
+            relive::DDVAe source(fs, movieName.c_str(), nullptr);
+            if (source.ReadInfo())
+            {
+                frameCount = source.TotalVideoFrames();
+            }
+        }
+        progress.AddToTotal(ConversionCategory::Fmvs, frameCount);
+
         // Resuming an interrupted conversion (killed, or cancelled because the user quit - see
         // ThreadPool::RequestCancel/Engine::Run()'s quit handling): skip movies the manifest already
         // has recorded as done under this exact fmvVersion, so relaunching doesn't have to
@@ -775,9 +875,12 @@ void ConvertFMVs(ThreadPool& tp, FileSystem& fs, const FileSystem::Path& dataDir
         if (manifest->IsCompleted(movieName) && fs.FileExists(outFile.GetPath().c_str()))
         {
             LOG_INFO("ConvertFMVs: '%s' already converted, skipping", movieName.c_str());
+            // No job will run for this movie, so credit its (just-scanned) frame count as done
+            // immediately rather than leaving the category total ahead of its completed count.
+            progress.AddCompleted(ConversionCategory::Fmvs, frameCount);
             continue;
         }
 
-        tp.AddJob(std::make_unique<ConvertFmvJob>(fs, movieName, fmvOutDir, isAo, tp, manifest));
+        tp.AddJob(std::make_unique<ConvertFmvJob>(fs, movieName, fmvOutDir, isAo, tp, manifest, progress, scan));
     }
 }

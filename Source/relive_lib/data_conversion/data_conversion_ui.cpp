@@ -3,6 +3,7 @@
 #include "data_conversion.hpp"
 #include <functional>
 #include <chrono>
+#include <algorithm>
 #include "../../AliveLibAE/Resources.hpp"
 #include "../../AliveLibAE/Map.hpp"
 #include "../../AliveLibAE/PsxRender.hpp"
@@ -20,12 +21,36 @@ DataConversionUI::DataConversionUI(GameType gameType, ResourceManagerWrapper& re
     mPoly.SetRGB2(0, 0, 255);
     mPoly.SetRGB3(255, 0, 255);
 
+    // Progress bar border (fixed, a couple px larger than the track on every side so it reads as
+    // an outline behind it) + track (fixed) + fill (width recomputed every VUpdate() from the
+    // weighted overall percentage - see ConversionProgress::OverallPercent).
+    mProgressBarBorder.SetXYWH(18, 203, 604, 12);
+    mProgressBarBorder.SetRGB0(200, 200, 200);
+    mProgressBarBorder.SetRGB1(200, 200, 200);
+    mProgressBarBorder.SetRGB2(200, 200, 200);
+    mProgressBarBorder.SetRGB3(200, 200, 200);
+
+    mProgressBarTrack.SetXYWH(20, 205, 600, 8);
+    mProgressBarTrack.SetRGB0(40, 40, 40);
+    mProgressBarTrack.SetRGB1(40, 40, 40);
+    mProgressBarTrack.SetRGB2(40, 40, 40);
+    mProgressBarTrack.SetRGB3(40, 40, 40);
+
+    mProgressBarFill.SetXYWH(20, 205, 0, 8);
+    mProgressBarFill.SetRGB0(80, 200, 120);
+    mProgressBarFill.SetRGB1(80, 200, 120);
+    mProgressBarFill.SetRGB2(80, 200, 120);
+    mProgressBarFill.SetRGB3(80, 200, 120);
 
     mFontContext.LoadFontType(FontType::Debug, mResMan);
 
     PalResource palRes;
     palRes.mPal = mFontContext.mFntResource.mCurPal;
-    mFont.Load(512,  palRes, &mFontContext);
+    // 2048 (was 512): VRender now draws the status message plus up to 12 activity-list lines
+    // every frame (mFntPolyArray is a single shared, fixed-size array all of that frame's
+    // DrawString calls write into via an accumulating offset - see VRender) - 512 was already
+    // tight for just the status line at longer path/animation names, let alone 12 more lines.
+    mFont.Load(2048,  palRes, &mFontContext);
     
 
     /*
@@ -140,19 +165,28 @@ void DataConversionUI::VUpdate()
     //mLcdStatusBoard->VUpdate();
     //mLcd->VUpdate();
 
-    const size_t completed = mDataConversion->CompletedConversionJobs();
-    const size_t total = mDataConversion->TotalConversionJobs();
-    const size_t active = mDataConversion->ActiveConversionJobs();
+    mLastSnapshot = mDataConversion->ProgressSnapshot();
+    const s32 overallPercent = static_cast<s32>(mLastSnapshot.mOverallPercent * 100.0f + 0.5f);
 
-    // Pad to a fixed width so the "(x/y jobs, ...)" text doesn't shift left/right as
-    // the "..." ellipsis animates.
+    const s16 trackWidth = 600;
+    const s16 fillWidth = static_cast<s16>(trackWidth * std::clamp(mLastSnapshot.mOverallPercent, 0.0f, 1.0f));
+    mProgressBarFill.SetXYWH(20, 205, fillWidth, 8);
+
+    // Pad to a fixed width so the "X%" text doesn't shift left/right as the "..." ellipsis
+    // animates.
     std::string dotsPadded = mDots;
     dotsPadded.resize(3, ' ');
 
-    mCurMessage = "Data conversion in progress" + dotsPadded
-        + " (" + std::to_string(completed) + "/" + std::to_string(total) + " jobs, "
-        + std::to_string(active) + " active)";
+    mCurMessage = "Data conversion in progress" + dotsPadded + " " + std::to_string(overallPercent) + "%";
     mTimer++;
+
+    // Cheap sanity-check log for headless/log-based debugging - only fires when the weighted
+    // percentage actually changes, not every frame.
+    if (overallPercent != mLastLoggedPercent)
+    {
+        LOG_INFO("DataConversion progress: %d%%", overallPercent);
+        mLastLoggedPercent = overallPercent;
+    }
 
     if (mTimer > 5)
     {
@@ -173,8 +207,77 @@ void DataConversionUI::VRender(OrderingTable& ot)
     //mLcd->VRender(ot);
 
     gFontDrawScreenSpace = true;
-    mFont.DrawString(ot, mCurMessage.c_str(), 20, (240) - 15, relive::TBlendModes::eBlend_0, 0, 0, Layer::eLayer_0, 127, 127, 127, 0, FP_FromInteger(1), 640, 0);
+
+    // polyOffset must track the NEW absolute offset AliveFont::DrawString returns (polyOffset +
+    // however many characters it actually rendered) - NOT be added on top of via +=, since the
+    // return value already includes the incoming polyOffset. Using += here double-counted it
+    // every call (new = old + (old + rendered) = 2*old + rendered), so polyOffset shot up
+    // exponentially across just a handful of calls (confirmed live: 43 -> 104 -> 228 -> 478 ->
+    // 976 -> 1983 -> 3984 in one frame) instead of the ~13-line status+list actually needing well
+    // under a hundred. That's also what was silently corrupting mFntPolyArray past its end before
+    // the bounds check below existed - every character in a frame's later DrawString calls was
+    // written far outside the array. DebugFont::PSX_DrawDebugTextBuffers (PsxDisplay.cpp) has the
+    // same += pattern - harmless there so far only because it's never given a large starting
+    // polyOffset, but it's the same latent bug.
+    s32 polyOffset = 0;
+    polyOffset = mFont.DrawString(ot, mCurMessage.c_str(), 20, (240) - 15, relive::TBlendModes::eBlend_0, 0, 0, Layer::eLayer_0, 127, 127, 127, polyOffset, FP_FromInteger(1), 640, 0);
+
+    // Activity list: in-progress items first (warmer color - these are the long-running ones,
+    // cameras/fmvs, that can otherwise sit unchanged for a while), then most-recently-finished
+    // items (paths/animations/etc fly past quickly early on, settling into "converting: X.webm"
+    // entries once only fmvs are left) - drawn oldest-of-the-shown-window at the top, newest at
+    // the bottom, so new completions append below rather than pushing everything down from the
+    // top. Sized to fill the space between the status line and the progress bar (y=20..~195,
+    // border top at 203) rather than an arbitrary small count.
+    s16 listY = 20;
+    constexpr s16 kLineHeight = 10;
+    constexpr s16 kMaxListLines = 17;
+    constexpr size_t kMaxLineChars = 70;
+    s32 linesDrawn = 0;
+
+    // Keeps each line's contribution to this frame's shared mFntPolyArray budget bounded and
+    // predictable, on top of DrawString's own out-of-bounds guard - belt and suspenders.
+    const auto truncate = [](const std::string& s) -> std::string
+    {
+        return s.size() > kMaxLineChars ? (s.substr(0, kMaxLineChars - 3) + "...") : s;
+    };
+
+    for (const std::string& inProgress : mLastSnapshot.mInProgressItems)
+    {
+        if (linesDrawn >= kMaxListLines)
+        {
+            break;
+        }
+        const std::string line = "> " + truncate(inProgress);
+        polyOffset = mFont.DrawString(ot, line.c_str(), 20, listY, relive::TBlendModes::eBlend_0, 0, 0, Layer::eLayer_0, 255, 200, 100, polyOffset, FP_FromInteger(1), 640, 0);
+        listY += kLineHeight;
+        linesDrawn++;
+    }
+
+    // mRecentItems is most-recent-first (see ConversionProgress::ReportItemFinished) - walk
+    // backwards through the slice we're about to show so the oldest of that slice draws first
+    // (top) and the newest draws last (bottom).
+    const size_t recentBudget = (linesDrawn < kMaxListLines) ? static_cast<size_t>(kMaxListLines - linesDrawn) : 0;
+    const size_t recentToShow = std::min(recentBudget, mLastSnapshot.mRecentItems.size());
+    for (size_t i = 0; i < recentToShow; i++)
+    {
+        const std::string recent = truncate(mLastSnapshot.mRecentItems[recentToShow - 1 - i]);
+        polyOffset = mFont.DrawString(ot, recent.c_str(), 20, listY, relive::TBlendModes::eBlend_0, 0, 0, Layer::eLayer_0, 150, 150, 150, polyOffset, FP_FromInteger(1), 640, 0);
+        listY += kLineHeight;
+        linesDrawn++;
+    }
+
+    // OrderingTable::Add prepends (mOrderingTable[layer] = pPrim; pPrim->mNext = <previous head>),
+    // and DrawOTag() draws head-first - so whatever gets Add()'ed FIRST ends up drawn LAST (i.e.
+    // painted on top), and whatever gets Add()'ed LAST is drawn FIRST (underneath). Add order here
+    // (fill, track, border, mPoly) matches the desired front-to-back visual stack: fill on top of
+    // track, track on top of the border "ring" around it, mPoly (opaque full-screen background)
+    // underneath everything.
+    ot.Add(Layer::eLayer_0, &mProgressBarFill);
+    ot.Add(Layer::eLayer_0, &mProgressBarTrack);
+    ot.Add(Layer::eLayer_0, &mProgressBarBorder);
     ot.Add(Layer::eLayer_0, &mPoly);
+
     gFontDrawScreenSpace = false;
 }
 

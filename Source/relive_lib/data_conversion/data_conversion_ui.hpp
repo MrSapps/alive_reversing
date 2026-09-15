@@ -36,6 +36,9 @@ private:
 
     GameType mGameType = GameType::eAe;
     Poly_G4 mPoly;
+    Poly_G4 mProgressBarBorder;
+    Poly_G4 mProgressBarTrack;
+    Poly_G4 mProgressBarFill;
     std::unique_ptr<std::thread> mThread;
     std::atomic<bool> mDone{false};
     std::unique_ptr<DataConversion> mDataConversion;
@@ -46,6 +49,8 @@ private:
     u32 mTimer = 0;
     std::string mCurMessage;
     std::string mDots;
+    ConversionProgress::Snapshot mLastSnapshot;
+    s32 mLastLoggedPercent = -1;
     /*
     relive::Path_LCDScreen mLcdScreenParams = {};
     std::unique_ptr<LCDScreen> mLcd;

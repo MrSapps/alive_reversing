@@ -6,6 +6,7 @@
 #include "../MapWrapper.hpp"
 #include "nlohmann/json_fwd.hpp"
 
+#include "ConversionProgress.hpp"
 #include "file_system.hpp"
 #include <optional>
 
@@ -110,9 +111,12 @@ public:
     void RequestCancel();
     [[nodiscard]] bool IsCancelRequested() const;
 
-    [[nodiscard]] size_t TotalConversionJobs() const;
-    [[nodiscard]] size_t CompletedConversionJobs() const;
-    [[nodiscard]] size_t ActiveConversionJobs() const;
+    // Weighted overall progress (paths/animations/cameras/misc/fmvs) - see
+    // ConversionProgress.hpp. Reflects every conversion category, including the ones
+    // (paths/animations/palettes/saves/fonts/demos) that convert synchronously and never go
+    // through ThreadPool::AddJob - unlike ThreadPool's own job counters, which only ever
+    // reflected cameras+fmvs and were removed from here as redundant once this existed.
+    [[nodiscard]] ConversionProgress::Snapshot ProgressSnapshot() const;
 
     struct [[nodiscard]] DataVersions final
     {
@@ -223,4 +227,5 @@ public:
 
 private:
     std::unique_ptr<ThreadPool> mThreadPool;
+    ConversionProgress mProgress;
 };

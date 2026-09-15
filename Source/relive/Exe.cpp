@@ -185,8 +185,7 @@ static void SDL2_Init()
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_HAPTIC | SDL_INIT_JOYSTICK | SDL_INIT_GAMEPAD))
     {
-        LOG_ERROR(SDL_GetError());
-        ALIVE_FATAL(SDL_GetError());
+        ALIVE_FATAL("SDL2_Init: SDL_Init failed: %s", SDL_GetError());
     }
 }
 
