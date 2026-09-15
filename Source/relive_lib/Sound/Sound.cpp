@@ -409,6 +409,15 @@ u64 SND_Get_Generated_Audio_Samples()
 #endif
 }
 
+u32 SND_Get_Device_Sample_Rate()
+{
+#if USE_SDL3_SOUND
+    return sDSound_BBC344 ? sDSound_BBC344->GetDeviceSampleRate() : 44100u;
+#else
+    return 44100u;
+#endif
+}
+
 // Never seems to get called?
 // TODO: Clean up!
 u32* SND_4F00B0(u32* /*a1*/, u32 /*a2*/, s32 /*a3*/)

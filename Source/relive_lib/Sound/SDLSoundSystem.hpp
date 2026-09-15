@@ -22,6 +22,7 @@ public:
     void Pause();
     void Resume();
     u64 GetGeneratedAudioSamples() const;
+    u32 GetDeviceSampleRate() const { return static_cast<u32>(mAudioDeviceSpec.freq); }
 
     HRESULT DuplicateSoundBuffer(TSoundBufferType* pDSBufferOriginal, TSoundBufferType** ppDSBufferDuplicate);
 

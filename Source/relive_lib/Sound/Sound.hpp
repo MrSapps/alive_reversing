@@ -111,6 +111,11 @@ u32 SND_Get_Sound_Entry_Pos_4EF620(SoundEntry* pSoundEntry);
 void SND_Pause_Audio();
 void SND_Resume_Audio();
 u64 SND_Get_Generated_Audio_Samples();
+// The actual output rate SND_Get_Generated_Audio_Samples() counts at - each voice is
+// resampled to this rate regardless of its own source rate (see SDLSoundBuffer::SetFrequency),
+// so callers converting that sample count to elapsed time must divide by this, not by any
+// individual sound's own sample rate.
+u32 SND_Get_Device_Sample_Rate();
 s32 SND_Clear_4EF350(SoundEntry* pSoundEntry, u32 sampleOffset, u32 size);
 void SND_SsQuit_4EFD50();
 s32 SND_CreateDS_4EEAA0(u32 sampleRate, s32 bitsPerSample, s32 isStereo);
