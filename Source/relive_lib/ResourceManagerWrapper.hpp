@@ -257,6 +257,17 @@ public:
     // PathSoundInfo::mSoundTheme) - not the current level's own dir.
     std::vector<u8> LoadSoundFile(const char_type* pFileName, const std::string& soundTheme);
 
+    // The vh_file/vb_file/seq_files a sounds/<soundTheme>/sound_info.json declares - every path
+    // sharing a theme shares one of these too, so it's cached per theme name rather than
+    // re-read/re-parsed for every path loaded (see LoadPaths).
+    struct SoundThemeInfo final
+    {
+        std::string mVhFile;
+        std::string mVbFile;
+        std::vector<std::string> mSeqFiles;
+    };
+    const SoundThemeInfo& LoadSoundThemeInfo(const std::string& soundTheme);
+
     void LoadingLoop(bool bShowLoadingIcon, class BaseMap* pMap = nullptr);
 
     // TODO: Call LoadingLoop after master/engine merge, LoadingLoop will
@@ -313,5 +324,7 @@ public:
 private:
     // unique_ptr to avoid bringing the header in
     std::unique_ptr<ThreadPool> mThreadPool;
+
+    std::map<std::string, SoundThemeInfo> mSoundThemeInfoCache;
 };
 

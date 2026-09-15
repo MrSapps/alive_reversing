@@ -94,12 +94,11 @@ static void to_json(nlohmann::json& j, const CameraEntry& p)
     };
 }
 
+// vh_file/vb_file/seq_files live once per theme in sounds/<theme>/sound_info.json (written by
+// ConvertPath below) rather than being duplicated into every path.json that shares the theme.
 static void to_json(nlohmann::json& j, const PathSoundInfo& p)
 {
     j = nlohmann::json{
-        {"vh_file", p.mVhFile},
-        {"vb_file", p.mVbFile},
-        {"seq_files", p.mSeqFiles},
         {"sound_theme", p.mSoundTheme},
     };
 }
@@ -453,6 +452,18 @@ static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const Reli
             filePath.Append(vabFile);
             fs.Save(filePath, fileBuffer);
         }
+
+        // Every path sharing this theme writes the same sound_info.json (see the "OK: every
+        // (theme, vb_file, vh_file) triple has exactly one seq_files set" invariant this
+        // relies on) - so it's fine for a later path to just overwrite an earlier one's copy.
+        const nlohmann::json soundInfoJson = {
+            {"vh_file", soundInfo.mVhFile},
+            {"vb_file", soundInfo.mVbFile},
+            {"seq_files", soundInfo.mSeqFiles},
+        };
+        FileSystem::Path soundInfoJsonPath = soundsDir;
+        soundInfoJsonPath.Append("sound_info.json");
+        SaveJson(soundInfoJson, fs, soundInfoJsonPath);
     }
 
     nlohmann::json j = {
