@@ -793,12 +793,14 @@ static void ConvertPathBND(const FileSystem::Path& dataDir, const std::string& f
 class ConvertCameraJob final : public IJob
 {
 public:
-    ConvertCameraJob(FileSystem::Path dirToSaveConvertedCamIn,
+    ConvertCameraJob(ThreadPool& tp,
+                     FileSystem::Path dirToSaveConvertedCamIn,
                      FileSystem::Path jsonFileName,
                      std::string camNameWithoutExtension,
                      ReliveAPI::ChunkedLvlFile camFileData,
                      bool isAo)
-        : mDirToSaveConvertedCamIn(dirToSaveConvertedCamIn)
+        : mThreadPool(tp)
+        , mDirToSaveConvertedCamIn(dirToSaveConvertedCamIn)
         , mJsonFileName(jsonFileName)
         , mCamNameWithoutExtension(camNameWithoutExtension)
         , mCamFileData(camFileData)
@@ -809,6 +811,16 @@ public:
 
     void Execute() override
     {
+        // Cameras/paths/etc don't get FMVs' fine-grained per-item resume tracking (see
+        // FmvConversionManifest in fmv_converter.cpp) - a cancelled conversion just redoes all of
+        // this from scratch next launch (data_version.json only gets stamped once nothing was
+        // cancelled - see DataConversionUI::ThreadFunc), so once cancellation's been requested
+        // there's no point doing (or finishing) any more of it.
+        if (mThreadPool.IsCancelRequested())
+        {
+            return;
+        }
+
         // Convert camera images and FG layers
         ReliveAPI::CamConverter cc;
         auto fg1ReaderAndBlockCount = cc.Convert(mCamFileData, mDirToSaveConvertedCamIn.GetPath(), mIsAo);
@@ -819,6 +831,7 @@ public:
     }
 
 private:
+    ThreadPool& mThreadPool;
     FileSystem::Path mDirToSaveConvertedCamIn;
     FileSystem::Path mJsonFileName;
     std::string mCamNameWithoutExtension;
@@ -853,7 +866,7 @@ static void ConvertCamera(ThreadPool& tp, const FileSystem::Path& dataDir, const
     fs.CreateDirectory(dirToSaveConvertedCamIn);
     dirToSaveConvertedCamIn.Append(camNameWithoutExtension);
 
-    tp.AddJob(std::make_unique<ConvertCameraJob>(dirToSaveConvertedCamIn, jsonFileName, camNameWithoutExtension, camFileData, isAo));
+    tp.AddJob(std::make_unique<ConvertCameraJob>(tp, dirToSaveConvertedCamIn, jsonFileName, camNameWithoutExtension, camFileData, isAo));
 }
 
 static void ConvertFont(FileSystem& fs, const FileSystem::Path& dataDir, const std::string& fileName, ReliveAPI::LvlReader& lvlReader, std::vector<u8>& fileBuffer, bool isPauseMenuFont)
@@ -1249,6 +1262,15 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
     std::vector<u8> fileBuffer;
     IterateAOLvls(fs, [&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, AO::LevelIds lvlIdxAsLvl)
     {
+        // Cameras/paths/etc don't get FMVs' fine-grained per-item resume tracking - a cancelled
+        // conversion just redoes all of this from scratch next launch (data_version.json only
+        // gets stamped once nothing was cancelled - see DataConversionUI::ThreadFunc), so once
+        // cancellation's been requested there's no point starting any more levels' worth of it.
+        if (mThreadPool->IsCancelRequested())
+        {
+            return;
+        }
+
         if (dv.ConvertAnimations())
         {
             ConvertAnimations(dataDir, fs, fileBuffer, lvlReader, reliveLvl, true);
@@ -1266,6 +1288,11 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
     {
         IterateAOLvls(fs, [&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, AO::LevelIds lvlIdxAsLvl)
         {
+            if (mThreadPool->IsCancelRequested())
+            {
+                return;
+            }
+
             ConvertFilesInLvl<AO::LevelIds, AO::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, true, true);
         });
     }
@@ -1297,8 +1324,17 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
     }
 
     std::vector<u8> fileBuffer;
-    IterateAELvls(fs, [&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, LevelIds lvlIdxAsLvl) 
+    IterateAELvls(fs, [&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, LevelIds lvlIdxAsLvl)
     {
+        // Cameras/paths/etc don't get FMVs' fine-grained per-item resume tracking - a cancelled
+        // conversion just redoes all of this from scratch next launch (data_version.json only
+        // gets stamped once nothing was cancelled - see DataConversionUI::ThreadFunc), so once
+        // cancellation's been requested there's no point starting any more levels' worth of it.
+        if (mThreadPool->IsCancelRequested())
+        {
+            return;
+        }
+
         if (dv.ConvertAnimations())
         {
             ConvertAnimations(dataDir, fs, fileBuffer, lvlReader, reliveLvl, false);
@@ -1316,6 +1352,11 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
     {
         IterateAELvls(fs, [&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, LevelIds lvlIdxAsLvl)
         {
+            if (mThreadPool->IsCancelRequested())
+            {
+                return;
+            }
+
             ConvertFilesInLvl<::LevelIds, ::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, false, true);
         });
     }
