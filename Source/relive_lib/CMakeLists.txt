@@ -565,6 +565,8 @@ SET(data_conversion_src
     data_conversion/data_conversion_ui.cpp
     data_conversion/fmv_converter.cpp
     data_conversion/fmv_converter.hpp
+    data_conversion/ConversionProgress.hpp
+    data_conversion/ConversionProgress.cpp
     data_conversion/DDVAe.cpp
     data_conversion/DDVAe.hpp
     data_conversion/IFmvSource.hpp
@@ -797,6 +799,7 @@ export(TARGETS relive_lib FILE relive_lib.cmake)
 add_executable(relive_lib_tests
     tests/FileSystemTests.cpp
     tests/MovieFrameSyncTests.cpp
+    tests/ConversionProgressTests.cpp
     tests/TestStubs.cpp
 )
 target_include_directories(relive_lib_tests PRIVATE

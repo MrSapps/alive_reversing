@@ -66,6 +66,17 @@ s32 AliveFont::DrawString(OrderingTable& ot, const char_type* text, s32 x, s16 y
             break;
         }
 
+        // mFntPolyArray is a single fixed-size array (see Load()) shared across every
+        // DrawString() call in a frame via the caller-accumulated polyOffset - writing past its
+        // end here means writing past the end of the heap allocation entirely, silently
+        // corrupting whatever object happens to sit right after it, which can then misrender (or
+        // worse, get misread as a wholly different primitive type) far away from this call site.
+        if (polyOffset + characterRenderCount >= mPolyCount)
+        {
+            LOG_WARNING("AliveFont::DrawString ran out of poly capacity (%d) partway through '%s' - truncating", mPolyCount, text);
+            break;
+        }
+
         const u8 c = text[i];
         if (c <= 32 || c > 175)
         {

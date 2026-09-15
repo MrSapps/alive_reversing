@@ -322,7 +322,7 @@ static void SetCollisionInfoFromPathExt(CollisionInfo& pColInfo, PerPathExtensio
 }
 
 template <typename TlvType, typename LevelIdType>
-static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const ReliveAPI::LvlFileChunk& pathBndChunk, EReliveLevelIds reliveLvl, LevelIdType lvlIdx, ReliveAPI::LvlReader& lvlReader, std::vector<u8>& fileBuffer, bool isAo, PerPathExtension* pPathExt)
+static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const ReliveAPI::LvlFileChunk& pathBndChunk, EReliveLevelIds reliveLvl, LevelIdType lvlIdx, ReliveAPI::LvlReader& lvlReader, std::vector<u8>& fileBuffer, bool isAo, PerPathExtension* pPathExt, ConversionProgress& progress)
 {
     auto level = (isAo ? ToString(MapWrapper::ToAO(reliveLvl)) : ToString(MapWrapper::ToAE(reliveLvl)));
     LOG_INFO("Converting: %s; path %d", level, pathBndChunk.Id());
@@ -482,6 +482,9 @@ static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const Reli
     fs.CreateDirectory(pathJsonFile);
     pathJsonFile.Append("path.json");
     SaveJson(j, fs, pathJsonFile);
+
+    progress.AddCompleted(ConversionCategory::Paths, 1);
+    progress.ReportItemFinished(std::string(level) + "/" + std::to_string(pathBndChunk.Id()));
 }
 
 
@@ -549,7 +552,7 @@ static void LogNonConvertedPals(bool isAo)
     }
 }
 
-static void ConvertPals(FileSystem& fs, const FileSystem::Path& dataDir, std::vector<u8>& fileBuffer, ReliveAPI::LvlReader& lvlReader, bool isAo)
+static void ConvertPals(FileSystem& fs, const FileSystem::Path& dataDir, std::vector<u8>& fileBuffer, ReliveAPI::LvlReader& lvlReader, bool isAo, ConversionProgress& progress)
 {
     for (auto& rec : kPalConversionInfo)
     {
@@ -576,6 +579,9 @@ static void ConvertPals(FileSystem& fs, const FileSystem::Path& dataDir, std::ve
 
                             ConvertPal(fs, dataDir, ToString(rec.mPalId), pPalData, palLen);
                             rec.mConverted = true;
+
+                            progress.AddCompleted(ConversionCategory::Misc, 1);
+                            progress.ReportItemFinished(ToString(rec.mPalId));
                         }
                     }
                 }
@@ -601,7 +607,7 @@ static u32 GetHighestFrameTableOffset(const std::string& bndName, bool isAo)
     return highestFrameTableOffset;
 }
 
-void ConvertAnimations(const FileSystem::Path& dataDir, FileSystem& fs, std::vector<u8>& fileBuffer, ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, bool isAo)
+void ConvertAnimations(const FileSystem::Path& dataDir, FileSystem& fs, std::vector<u8>& fileBuffer, ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, bool isAo, ConversionProgress& progress)
 {
     // Convert animations that exist in this LVL
     for (auto& rec : kAnimRecConversionInfo)
@@ -680,6 +686,9 @@ void ConvertAnimations(const FileSystem::Path& dataDir, FileSystem& fs, std::vec
 
                         // Track what is converted so we know what is missing at the end
                         rec.mConverted = true;
+
+                        progress.AddCompleted(ConversionCategory::Animations, 1);
+                        progress.ReportItemFinished(animName);
                     }
                 }
             }
@@ -704,7 +713,7 @@ static void LogNonConvertedAnims(bool isAo)
 }
 
 template <typename LevelIdType, typename TlvType>
-static void ConvertPathBND(const FileSystem::Path& dataDir, const std::string& fileName, FileSystem& fs, std::vector<u8>& fileBuffer, ReliveAPI::LvlReader& lvlReader, LevelIdType lvlIdxAsLvl, EReliveLevelIds reliveLvl, bool isAo)
+static void ConvertPathBND(const FileSystem::Path& dataDir, const std::string& fileName, FileSystem& fs, std::vector<u8>& fileBuffer, ReliveAPI::LvlReader& lvlReader, LevelIdType lvlIdxAsLvl, EReliveLevelIds reliveLvl, bool isAo, ConversionProgress& progress)
 {
     ReadLvlFileInto(lvlReader, fileName.c_str(), fileBuffer);
     ReliveAPI::ChunkedLvlFile pathBndFile(fileBuffer);
@@ -760,7 +769,7 @@ static void ConvertPathBND(const FileSystem::Path& dataDir, const std::string& f
             }
         }
 
-        ConvertPath<TlvType, LevelIdType>(fs, dataDir, pathBndChunk, reliveLvl, lvlIdxAsLvl, lvlReader, fileBuffer, isAo, pPathExt);
+        ConvertPath<TlvType, LevelIdType>(fs, dataDir, pathBndChunk, reliveLvl, lvlIdxAsLvl, lvlReader, fileBuffer, isAo, pPathExt, progress);
     }
 
     SaveLevelInfoJson(dataDir, reliveLvl, lvlIdxAsLvl, fs, pathBndFile, isAo);
@@ -798,13 +807,15 @@ public:
                      FileSystem::Path jsonFileName,
                      std::string camNameWithoutExtension,
                      ReliveAPI::ChunkedLvlFile camFileData,
-                     bool isAo)
+                     bool isAo,
+                     ConversionProgress& progress)
         : mThreadPool(tp)
         , mDirToSaveConvertedCamIn(dirToSaveConvertedCamIn)
         , mJsonFileName(jsonFileName)
         , mCamNameWithoutExtension(camNameWithoutExtension)
         , mCamFileData(camFileData)
         , mIsAo(isAo)
+        , mProgress(progress)
     {
 
     }
@@ -821,6 +832,8 @@ public:
             return;
         }
 
+        mProgress.ReportItemStarted(mCamNameWithoutExtension);
+
         // Convert camera images and FG layers
         ReliveAPI::CamConverter cc;
         auto fg1ReaderAndBlockCount = cc.Convert(mCamFileData, mDirToSaveConvertedCamIn.GetPath(), mIsAo);
@@ -828,6 +841,9 @@ public:
         {
             SaveCameraJsonManifest(mCamNameWithoutExtension, *fg1ReaderAndBlockCount.first, mJsonFileName, fg1ReaderAndBlockCount.second);
         }
+
+        mProgress.AddCompleted(ConversionCategory::Cameras, 1);
+        mProgress.ReportItemFinished(mCamNameWithoutExtension);
     }
 
 private:
@@ -837,10 +853,11 @@ private:
     std::string mCamNameWithoutExtension;
     ReliveAPI::ChunkedLvlFile mCamFileData;
     bool mIsAo = false;
+    ConversionProgress& mProgress;
 };
 
 template <typename LevelIdType>
-static void ConvertCamera(ThreadPool& tp, const FileSystem::Path& dataDir, const std::string& fileName, FileSystem& fs, std::vector<u8>& fileBuffer, ReliveAPI::LvlReader& lvlReader, LevelIdType lvlIdxAsLvl, bool isAo)
+static void ConvertCamera(ThreadPool& tp, const FileSystem::Path& dataDir, const std::string& fileName, FileSystem& fs, std::vector<u8>& fileBuffer, ReliveAPI::LvlReader& lvlReader, LevelIdType lvlIdxAsLvl, bool isAo, ConversionProgress& progress)
 {
     LOG_INFO("%s", fileName.c_str());
     ReadLvlFileInto(lvlReader, fileName.c_str(), fileBuffer);
@@ -866,7 +883,7 @@ static void ConvertCamera(ThreadPool& tp, const FileSystem::Path& dataDir, const
     fs.CreateDirectory(dirToSaveConvertedCamIn);
     dirToSaveConvertedCamIn.Append(camNameWithoutExtension);
 
-    tp.AddJob(std::make_unique<ConvertCameraJob>(tp, dirToSaveConvertedCamIn, jsonFileName, camNameWithoutExtension, camFileData, isAo));
+    tp.AddJob(std::make_unique<ConvertCameraJob>(tp, dirToSaveConvertedCamIn, jsonFileName, camNameWithoutExtension, camFileData, isAo, progress));
 }
 
 static void ConvertFont(FileSystem& fs, const FileSystem::Path& dataDir, const std::string& fileName, ReliveAPI::LvlReader& lvlReader, std::vector<u8>& fileBuffer, bool isPauseMenuFont)
@@ -967,7 +984,7 @@ static bool IsUnusedSaveFile(const std::string& saveName)
 }
 
 template<typename LevelIdType, typename TlvType>
-static void ConvertFilesInLvl(ThreadPool& tp, const FileSystem::Path& dataDir, FileSystem& fs, ReliveAPI::LvlReader& lvlReader, std::vector<u8>& fileBuffer, LevelIdType lvlIdxAsLvl, EReliveLevelIds reliveLvl, const DataConversion::DataVersions& dv, bool isAo, bool onlySaves)
+static void ConvertFilesInLvl(ThreadPool& tp, const FileSystem::Path& dataDir, FileSystem& fs, ReliveAPI::LvlReader& lvlReader, std::vector<u8>& fileBuffer, LevelIdType lvlIdxAsLvl, EReliveLevelIds reliveLvl, const DataConversion::DataVersions& dv, bool isAo, bool onlySaves, ConversionProgress& progress)
 {
     // Iterate and convert specific file types in the LVL
     AESaveConverter::PathsCache pathsCache;
@@ -1004,32 +1021,44 @@ static void ConvertFilesInLvl(ThreadPool& tp, const FileSystem::Path& dataDir, F
             // TODO: Actually convert at some later point
             AESaveConverter saveConverter(fs);
             saveConverter.Convert(fileBuffer, (fileName + ".json").c_str(), pathsCache);
+
+            progress.AddCompleted(ConversionCategory::Misc, 1);
+            progress.ReportItemFinished(fileName);
         }
         else
         {
             if (bConvertLcdFont)
             {
                 ConvertFont(fs, dataDir, fileName, lvlReader, fileBuffer, false);
+
+                progress.AddCompleted(ConversionCategory::Misc, 1);
+                progress.ReportItemFinished(fileName);
             }
             else if (string_util::endsWith(fileName, ".CAM"))
             {
                 if (bConvertMenuFonts)
                 {
                     ConvertFont(fs, dataDir, fileName, lvlReader, fileBuffer, true);
+
+                    progress.AddCompleted(ConversionCategory::Misc, 1);
+                    progress.ReportItemFinished(fileName);
                 }
 
                 if (bConvertCams)
                 {
-                    ConvertCamera(tp, dataDir, fileName, fs, fileBuffer, lvlReader, lvlIdxAsLvl, isAo);
+                    ConvertCamera(tp, dataDir, fileName, fs, fileBuffer, lvlReader, lvlIdxAsLvl, isAo, progress);
                 }
             }
             else if (bConvertDemos)
             {
                 ConvertDemo(fileName, dataDir, lvlReader, lvlIdxAsLvl, fileBuffer, isAo);
+
+                progress.AddCompleted(ConversionCategory::Misc, 1);
+                progress.ReportItemFinished(fileName);
             }
             else if (bConvertPaths)
             {
-                ConvertPathBND<LevelIdType, TlvType>(dataDir, fileName, fs, fileBuffer, lvlReader, lvlIdxAsLvl, reliveLvl, isAo);
+                ConvertPathBND<LevelIdType, TlvType>(dataDir, fileName, fs, fileBuffer, lvlReader, lvlIdxAsLvl, reliveLvl, isAo, progress);
             }
         }
     }
@@ -1060,7 +1089,7 @@ static void ConvertPal(FileSystem& fs, const FileSystem::Path& dataDir, const ch
     SavePal(fs, pal, palFilePath);
 }
 
-static void ConvertHardcodedPals(FileSystem& fs, const FileSystem::Path& dataDir)
+static void ConvertHardcodedPals(FileSystem& fs, const FileSystem::Path& dataDir, ConversionProgress& progress)
 {
     const static u8 mainMenuFontPal[] = {
         0x00, 0x00, 0x21, 0x84, 0x42, 0x88, 0x63, 0x8C, 0x84, 0x90,
@@ -1110,6 +1139,87 @@ static void ConvertHardcodedPals(FileSystem& fs, const FileSystem::Path& dataDir
     ConvertPal(fs, dataDir, ToString(PalId::LedFont_2), reinterpret_cast<const u16*>(sLCDScreen_Palette2), ALIVE_COUNTOF(sLCDScreen_Palette2) / sizeof(u16));
 
     ConvertPal(fs, dataDir, ToString(PalId::LedFont_Red), reinterpret_cast<const u16*>(pal_LCDStatusBoard), ALIVE_COUNTOF(pal_LCDStatusBoard) / sizeof(u16));
+
+    progress.AddCompleted(ConversionCategory::Misc, 6);
+    progress.ReportItemFinished("hardcoded_palettes");
+}
+
+// Fast "how much work exists" pre-pass so DataConversionUI can show an accurate percentage from
+// the very first frame, instead of the total only growing as real conversion happens to discover
+// more of it. Deliberately cheap: table lookups + filename-suffix filtering against the already-
+// open lvl TOC, plus one extra (small) PATH.BND read/parse for the path count specifically (the
+// same read ConvertPathBND does for real at conversion time - reading it twice is negligible next
+// to the per-path TLV decode cost). Mirrors each real dispatch condition in ConvertFilesInLvl/
+// ConvertAnimations exactly, so totals line up 1:1 with the AddCompleted calls those make.
+static void ScanLevelForProgressTotals(ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, const DataConversion::DataVersions& dv, bool isAo, std::vector<u8>& fileBuffer, ConversionProgress& progress)
+{
+    if (dv.ConvertAnimations())
+    {
+        u32 animCount = 0;
+        for (auto& rec : kAnimRecConversionInfo)
+        {
+            if ((isAo && rec.mAoLvl == reliveLvl) || (!isAo && rec.mAeLvl == reliveLvl))
+            {
+                animCount++;
+            }
+        }
+        progress.AddToTotal(ConversionCategory::Animations, animCount);
+    }
+
+    u32 camCount = 0;
+    u32 miscCount = 0;
+    for (s32 i = 0; i < lvlReader.FileCount(); i++)
+    {
+        const auto fileName = lvlReader.FileNameAt(i);
+        if (fileName.empty())
+        {
+            continue;
+        }
+
+        if (dv.ConvertFonts() && fileName == "LCDFONT.FNT")
+        {
+            miscCount++;
+        }
+        else if (string_util::endsWith(fileName, ".CAM"))
+        {
+            if (dv.ConvertFonts() && (fileName == "S1P01C01.CAM" || fileName == "STP01C06.CAM"))
+            {
+                miscCount++;
+            }
+
+            if (dv.ConvertCameras())
+            {
+                camCount++;
+            }
+        }
+        else if (dv.ConvertDemos() && string_util::endsWith(fileName, ".JOY"))
+        {
+            miscCount++;
+        }
+        else if (dv.ConvertPaths() && string_util::endsWith(fileName, "PATH.BND"))
+        {
+            if (ReadLvlFileInto(lvlReader, fileName.c_str(), fileBuffer))
+            {
+                const ReliveAPI::ChunkedLvlFile pathBndFile(fileBuffer);
+                u32 pathCount = 0;
+                for (u32 j = 0; j < pathBndFile.ChunkCount(); j++)
+                {
+                    if (pathBndFile.ChunkAt(j).Header().mResourceType == ResourceManagerWrapper::Resource_Path)
+                    {
+                        pathCount++;
+                    }
+                }
+                progress.AddToTotal(ConversionCategory::Paths, pathCount);
+            }
+        }
+        else if (dv.ConvertSaves() && !isAo && string_util::endsWith(fileName, ".SAV") && !IsUnusedSaveFile(fileName))
+        {
+            miscCount++;
+        }
+    }
+
+    progress.AddToTotal(ConversionCategory::Cameras, camCount);
+    progress.AddToTotal(ConversionCategory::Misc, miscCount);
 }
 
 template<typename FnOnLvl>
@@ -1191,19 +1301,11 @@ bool DataConversion::IsCancelRequested() const
     return mThreadPool->IsCancelRequested();
 }
 
-size_t DataConversion::TotalConversionJobs() const
+ConversionProgress::Snapshot DataConversion::ProgressSnapshot() const
 {
-    return mThreadPool->TotalJobs();
-}
-
-size_t DataConversion::CompletedConversionJobs() const
-{
-    return mThreadPool->CompletedJobs();
-}
-
-size_t DataConversion::ActiveConversionJobs() const
-{
-    return mThreadPool->ActiveJobs();
+    // 17 matches DataConversionUI::VRender's kMaxListLines - no point returning more than it'll
+    // ever display.
+    return mProgress.GetSnapshot(17);
 }
 
 std::optional<DataConversion::DataVersions> DataConversion::DataVersionAO()
@@ -1238,6 +1340,24 @@ static void EnsureModsDirExists(FileSystem& fs)
     fs.CreateDirectory(modsDir);
 }
 
+// Palettes aren't scoped to a single level (ConvertPals tries every level's lvlReader until it
+// finds whichever one happens to contain a given pal's mBanName), so their total is counted once
+// up front here rather than inside ScanLevelForProgressTotals - mirrors LogNonConvertedPals'
+// mBanName check, plus the 6 always-present hardcoded pals ConvertHardcodedPals writes.
+static void ScanPaletteProgressTotal(bool isAo, ConversionProgress& progress)
+{
+    u32 count = 6;
+    for (auto& rec : kPalConversionInfo)
+    {
+        const auto palDetails = isAo ? AO::PalRec(rec.mPalId) : PalRec(rec.mPalId);
+        if (palDetails.mBanName)
+        {
+            count++;
+        }
+    }
+    progress.AddToTotal(ConversionCategory::Misc, count);
+}
+
 void DataConversion::ConvertDataAO(const DataVersions& dv)
 {
     FileSystem fs;
@@ -1248,15 +1368,30 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
     fs.CreateDirectory(dataDir);
     EnsureModsDirExists(fs);
 
+    // Upfront dry-run pass: cheaply learn how much work each category actually has before
+    // dispatching any of it for real, so DataConversionUI's weighted percentage is accurate from
+    // the first frame instead of the total only growing as work happens to be discovered.
+    if (dv.ConvertPalettes())
+    {
+        ScanPaletteProgressTotal(true, mProgress);
+    }
+    {
+        std::vector<u8> scanFileBuffer;
+        IterateAOLvls(fs, [&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, AO::LevelIds /*lvlIdxAsLvl*/)
+        {
+            ScanLevelForProgressTotals(lvlReader, reliveLvl, dv, true, scanFileBuffer, mProgress);
+        });
+    }
+
     if (dv.ConvertFmvs())
     {
-        ConvertFMVs(*mThreadPool, fs, dataDir, true, DataVersions::LatestVersion().mFmvVersion);
+        ConvertFMVs(*mThreadPool, fs, dataDir, true, DataVersions::LatestVersion().mFmvVersion, mProgress);
     }
 
     // TODO: Prob diff data in AO, check me
     if (dv.ConvertPalettes())
     {
-        ConvertHardcodedPals(fs, dataDir);
+        ConvertHardcodedPals(fs, dataDir, mProgress);
     }
 
     std::vector<u8> fileBuffer;
@@ -1273,15 +1408,15 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
 
         if (dv.ConvertAnimations())
         {
-            ConvertAnimations(dataDir, fs, fileBuffer, lvlReader, reliveLvl, true);
+            ConvertAnimations(dataDir, fs, fileBuffer, lvlReader, reliveLvl, true, mProgress);
         }
 
         if (dv.ConvertPalettes())
         {
-            ConvertPals(fs, dataDir, fileBuffer, lvlReader, true);
+            ConvertPals(fs, dataDir, fileBuffer, lvlReader, true, mProgress);
         }
 
-        ConvertFilesInLvl<AO::LevelIds, AO::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, true, false);
+        ConvertFilesInLvl<AO::LevelIds, AO::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, true, false, mProgress);
     });
 
     if (dv.ConvertSaves())
@@ -1293,7 +1428,7 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
                 return;
             }
 
-            ConvertFilesInLvl<AO::LevelIds, AO::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, true, true);
+            ConvertFilesInLvl<AO::LevelIds, AO::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, true, true, mProgress);
         });
     }
 
@@ -1313,14 +1448,27 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
     fs.CreateDirectory(dataDir);
     EnsureModsDirExists(fs);
 
+    // Upfront dry-run pass - see ConvertDataAO's own comment on this, same reason.
+    if (dv.ConvertPalettes())
+    {
+        ScanPaletteProgressTotal(false, mProgress);
+    }
+    {
+        std::vector<u8> scanFileBuffer;
+        IterateAELvls(fs, [&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, LevelIds /*lvlIdxAsLvl*/)
+        {
+            ScanLevelForProgressTotals(lvlReader, reliveLvl, dv, false, scanFileBuffer, mProgress);
+        });
+    }
+
     if (dv.ConvertFmvs())
     {
-        ConvertFMVs(*mThreadPool, fs, dataDir, false, DataVersions::LatestVersion().mFmvVersion);
+        ConvertFMVs(*mThreadPool, fs, dataDir, false, DataVersions::LatestVersion().mFmvVersion, mProgress);
     }
 
     if (dv.ConvertPalettes())
     {
-        ConvertHardcodedPals(fs, dataDir);
+        ConvertHardcodedPals(fs, dataDir, mProgress);
     }
 
     std::vector<u8> fileBuffer;
@@ -1337,15 +1485,15 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
 
         if (dv.ConvertAnimations())
         {
-            ConvertAnimations(dataDir, fs, fileBuffer, lvlReader, reliveLvl, false);
+            ConvertAnimations(dataDir, fs, fileBuffer, lvlReader, reliveLvl, false, mProgress);
         }
 
         if (dv.ConvertPalettes())
         {
-            ConvertPals(fs, dataDir, fileBuffer, lvlReader, false);
+            ConvertPals(fs, dataDir, fileBuffer, lvlReader, false, mProgress);
         }
 
-        ConvertFilesInLvl<::LevelIds, ::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, false, false);
+        ConvertFilesInLvl<::LevelIds, ::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, false, false, mProgress);
     });
 
     if (dv.ConvertSaves())
@@ -1357,7 +1505,7 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
                 return;
             }
 
-            ConvertFilesInLvl<::LevelIds, ::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, false, true);
+            ConvertFilesInLvl<::LevelIds, ::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, false, true, mProgress);
         });
     }
 

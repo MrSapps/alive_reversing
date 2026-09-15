@@ -18,7 +18,7 @@ Sdl3Texture::Sdl3Texture(Sdl3Context& context, u32 width, u32 height, SDL_PixelF
         mTexture = SDL_CreateTexture(mContext.GetRenderer(), mFormat, mTextureAccess, mWidth, mHeight);
         if (!mTexture)
         {
-            ALIVE_FATAL("%s", SDL_GetError());
+            ALIVE_FATAL("SDL_CreateTexture failed: %s", SDL_GetError());
         }
 
         SDL_SetTextureBlendMode(mTexture, SDL_BLENDMODE_NONE);
@@ -274,7 +274,7 @@ void Sdl3Texture::Resize(u32 width, u32 height)
 
     if (!mTexture)
     {
-        ALIVE_FATAL("%s", SDL_GetError());
+        ALIVE_FATAL("Sdl3Texture::Resize: SDL_CreateTexture failed: %s", SDL_GetError());
     }
 }
 
@@ -312,7 +312,8 @@ void Sdl3Texture::Update(const SDL_Rect* rect, const void* pixels)
 
         if (!SDL_UpdateTexture(mTexture, rect, pixels, pitch))
         {
-            ALIVE_FATAL(SDL_GetError());
+            ALIVE_FATAL("Sdl3Texture::Update: SDL_UpdateTexture failed (format=%d, %ux%u, pixels=%p): %s",
+                        mFormat, mWidth, mHeight, pixels, SDL_GetError());
         }
     }
 }

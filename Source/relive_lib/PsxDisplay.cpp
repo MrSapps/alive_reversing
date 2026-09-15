@@ -165,7 +165,14 @@ void DebugFont::PSX_DrawDebugTextBuffers(OrderingTable& ot)
         for (char_type* j = strtok(pRecord->mText.mDstTxt, "\n\r"); j; j = strtok(0, "\n\r"))
         {
             gFontDrawScreenSpace = true;
-            polyOffset += mDebugFont.DrawString(ot, j, xpos, ypos, relive::TBlendModes::eBlend_0, 0, 0, Layer::eLayer_Text_42, 127, 127, 127, polyOffset, FP_FromInteger(1), 640, 0);
+            // AliveFont::DrawString returns the new absolute offset (polyOffset + characters
+            // rendered), not a delta to add - += here double-counted the incoming polyOffset on
+            // every call after the first (new = old + (old + rendered) = 2*old + rendered),
+            // exploding exponentially once more than a couple of lines/records accumulate in one
+            // call. Never visibly triggered here (typically few, short debug lines), but it's the
+            // exact bug that did trigger - loudly - once DataConversionUI::VRender copied this
+            // same (broken) accumulation pattern for a longer, multi-line draw.
+            polyOffset = mDebugFont.DrawString(ot, j, xpos, ypos, relive::TBlendModes::eBlend_0, 0, 0, Layer::eLayer_Text_42, 127, 127, 127, polyOffset, FP_FromInteger(1), 640, 0);
             gFontDrawScreenSpace = false;
             ypos += 9;
         }
