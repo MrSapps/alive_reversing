@@ -104,8 +104,14 @@ s32 CamDecompressor::next_bits()
 
         m_left7_array = o >> 7;
 
-        // Get 25 bits
-        m_right25_array = (o << 25) >> 25;
+        // Sign-extend the low 7 bits of o into a 32-bit value: shift them up to the top of the
+        // word then arithmetic-shift back down. o is u16, and left-shifting a *signed* value far
+        // enough to push bits out past the sign bit is undefined behavior (pre-C++20) even though
+        // discarding them is exactly the intended effect here - doing the left shift on the
+        // unsigned widened value instead keeps the same bit pattern without hitting that UB
+        // (confirmed live via UBSan: "left shift of 2689 by 25 places cannot be represented in
+        // type 'int'", hit converting AE's menu camera during a full data reconversion).
+        m_right25_array = static_cast<s32>(static_cast<u32>(o) << 25) >> 25;
 
         // To next word
         ++m_pointer_to_vlc_buffer;

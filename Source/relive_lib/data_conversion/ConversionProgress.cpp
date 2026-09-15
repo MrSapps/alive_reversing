@@ -31,17 +31,31 @@ void ConversionProgress::AddCompleted(ConversionCategory cat, u32 amount)
     mCategories[static_cast<size_t>(cat)].mCompleted += amount;
 }
 
-void ConversionProgress::ReportItemStarted(std::string itemName)
+void ConversionProgress::ReportItemStarted(std::string itemName, u32 total)
 {
     std::unique_lock lock(mLogMutex);
-    mInProgressItems.emplace_back(std::move(itemName));
+    mInProgressItems.push_back(InProgressItem{std::move(itemName), 0, total});
+}
+
+void ConversionProgress::UpdateItemProgress(const std::string& itemName, u32 current)
+{
+    std::unique_lock lock(mLogMutex);
+    for (InProgressItem& item : mInProgressItems)
+    {
+        if (item.mName == itemName)
+        {
+            item.mCurrent = current;
+            return;
+        }
+    }
 }
 
 void ConversionProgress::ReportItemFinished(const std::string& itemName)
 {
     std::unique_lock lock(mLogMutex);
 
-    const auto it = std::find(mInProgressItems.begin(), mInProgressItems.end(), itemName);
+    const auto it = std::find_if(mInProgressItems.begin(), mInProgressItems.end(),
+                                  [&itemName](const InProgressItem& item) { return item.mName == itemName; });
     if (it != mInProgressItems.end())
     {
         mInProgressItems.erase(it);
@@ -93,6 +107,12 @@ ConversionProgress::Snapshot ConversionProgress::GetSnapshot(size_t maxRecentIte
 {
     Snapshot snapshot;
     snapshot.mOverallPercent = OverallPercent();
+
+    for (size_t i = 0; i < static_cast<size_t>(ConversionCategory::Count); i++)
+    {
+        snapshot.mTotalItems += mCategories[i].mTotal;
+        snapshot.mTotalCompleted += mCategories[i].mCompleted;
+    }
 
     std::unique_lock lock(mLogMutex);
     snapshot.mInProgressItems.assign(mInProgressItems.begin(), mInProgressItems.end());

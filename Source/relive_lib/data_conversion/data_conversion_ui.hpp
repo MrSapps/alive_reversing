@@ -7,6 +7,8 @@
 #include "../../AliveLibAE/LCDStatusBoard.hpp"
 #include "GameType.hpp"
 #include "data_conversion.hpp"
+#include "ProgressBar.hpp"
+#include "EtaEstimator.hpp"
 #include <thread>
 #include <atomic>
 
@@ -36,9 +38,11 @@ private:
 
     GameType mGameType = GameType::eAe;
     Poly_G4 mPoly;
-    Poly_G4 mProgressBarBorder;
-    Poly_G4 mProgressBarTrack;
-    Poly_G4 mProgressBarFill;
+    // y=208 leaves the bar's border enough clearance from the activity list text drawn just
+    // above it. height=12 (taller than the 8px-tall percentage text drawn inside it) gives that
+    // text its own margin above/below within the track, so the border ring can stay a thin,
+    // uniform 2px without sitting right against the text.
+    ProgressBar mProgressBar{20, 208, 600, 12};
     std::unique_ptr<std::thread> mThread;
     std::atomic<bool> mDone{false};
     std::unique_ptr<DataConversion> mDataConversion;
@@ -51,6 +55,8 @@ private:
     std::string mDots;
     ConversionProgress::Snapshot mLastSnapshot;
     s32 mLastLoggedPercent = -1;
+
+    EtaEstimator mEtaEstimator;
     /*
     relive::Path_LCDScreen mLcdScreenParams = {};
     std::unique_ptr<LCDScreen> mLcd;

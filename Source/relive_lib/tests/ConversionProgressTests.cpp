@@ -92,10 +92,62 @@ TEST(ConversionProgress, StartedItemAppearsInProgressUntilFinished)
     {
         const ConversionProgress::Snapshot snapshot = progress.GetSnapshot();
         ASSERT_EQ(snapshot.mInProgressItems.size(), 1u);
-        EXPECT_EQ(snapshot.mInProgressItems[0], "movie_b.webm");
+        EXPECT_EQ(snapshot.mInProgressItems[0].mName, "movie_b.webm");
         ASSERT_EQ(snapshot.mRecentItems.size(), 1u);
         EXPECT_EQ(snapshot.mRecentItems[0], "movie_a.webm");
     }
+}
+
+TEST(ConversionProgress, UpdateItemProgressTracksCurrentAgainstStartedTotal)
+{
+    ConversionProgress progress;
+
+    progress.ReportItemStarted("movie_a.webm", 500);
+    progress.UpdateItemProgress("movie_a.webm", 123);
+
+    const ConversionProgress::Snapshot snapshot = progress.GetSnapshot();
+    ASSERT_EQ(snapshot.mInProgressItems.size(), 1u);
+    EXPECT_EQ(snapshot.mInProgressItems[0].mName, "movie_a.webm");
+    EXPECT_EQ(snapshot.mInProgressItems[0].mCurrent, 123u);
+    EXPECT_EQ(snapshot.mInProgressItems[0].mTotal, 500u);
+}
+
+TEST(ConversionProgress, UpdateItemProgressIsNoOpForUnknownItem)
+{
+    ConversionProgress progress;
+
+    // No matching in-progress item (never started, or already finished) - shouldn't crash or
+    // fabricate an entry.
+    progress.UpdateItemProgress("nonexistent.webm", 42);
+
+    EXPECT_TRUE(progress.GetSnapshot().mInProgressItems.empty());
+}
+
+TEST(ConversionProgress, ItemStartedWithoutTotalDefaultsToZero)
+{
+    ConversionProgress progress;
+
+    // Cameras/paths/etc don't track sub-progress - total should default to 0, not garbage.
+    progress.ReportItemStarted("some_camera");
+
+    const ConversionProgress::Snapshot snapshot = progress.GetSnapshot();
+    ASSERT_EQ(snapshot.mInProgressItems.size(), 1u);
+    EXPECT_EQ(snapshot.mInProgressItems[0].mTotal, 0u);
+}
+
+TEST(ConversionProgress, SnapshotSumsTotalsAndCompletedAcrossCategories)
+{
+    ConversionProgress progress;
+
+    progress.AddToTotal(ConversionCategory::Paths, 10);
+    progress.AddCompleted(ConversionCategory::Paths, 4);
+
+    progress.AddToTotal(ConversionCategory::Fmvs, 5000);
+    progress.AddCompleted(ConversionCategory::Fmvs, 123);
+
+    const ConversionProgress::Snapshot snapshot = progress.GetSnapshot();
+    EXPECT_EQ(snapshot.mTotalItems, 5010u);
+    EXPECT_EQ(snapshot.mTotalCompleted, 127u);
 }
 
 TEST(ConversionProgress, RecentItemsAreMostRecentFirstAndBoundedBySnapshotLimit)
