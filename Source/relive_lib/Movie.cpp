@@ -1,6 +1,7 @@
 #include "data_conversion/guid.hpp"
 #include "stdafx.h"
 #include "Movie.hpp"
+#include "MovieFrameSync.hpp"
 #include "Function.hpp"
 #include "Psx.hpp"
 #include "../AliveLibAE/stdlib.hpp"
@@ -393,6 +394,10 @@ namespace
                 return false;
             }
 
+            // Tried multi-threaded decode here (matching the encoder side's thread budget) to
+            // address the decode thread falling behind on costlier frames - see the frame-drop
+            // burst investigation below - but it produced visible tile-decode corruption
+            // (vertical banding), so left as the single decode thread default for now.
             if (aom_codec_dec_init(&mCodec, aom_codec_av1_dx(), nullptr, 0) != AOM_CODEC_OK)
             {
                 return false;
@@ -683,6 +688,43 @@ namespace
         std::thread mVideoThread;
         std::thread mAudioThread;
     };
+
+    // Real IMovieSyncClock backing DDV_Play_Impl's own playback state - see MovieFrameSync.hpp
+    // for the fake used by MovieFrameSyncTests.cpp instead of this.
+    class RealMovieSyncClock final : public IMovieSyncClock
+    {
+    public:
+        RealMovieSyncClock(bool& audioStarted, u64& audioStartSample)
+            : mAudioStarted(audioStarted)
+            , mAudioStartSample(audioStartSample)
+        {
+        }
+
+        bool AudioStarted() const override
+        {
+            return mAudioStarted;
+        }
+
+        u64 AudioClockMs() const override
+        {
+            return (SND_Get_Generated_Audio_Samples() - mAudioStartSample) * 1000 / SND_Get_Device_Sample_Rate();
+        }
+
+        bool SkipRequested() const override
+        {
+            return AreMovieSkippingInputsHeld();
+        }
+
+        void PumpIdle() override
+        {
+            SYS_EventsPump();
+            PSX_VSync(VSyncMode::UncappedFps);
+        }
+
+    private:
+        bool& mAudioStarted;
+        u64& mAudioStartSample;
+    };
 }
 
 static void Render_DDV_Frame(Poly_FT4* poly)
@@ -898,28 +940,16 @@ s8 DDV_Play_Impl(const char_type* pMovieName)
         }
 
         const u64 frameMs = frame.mPtsNs / 1000000ULL;
-        const u64 audioClockMs = audioStarted
-            ? (SND_Get_Generated_Audio_Samples() - audioStartSample) * 1000 / SND_Get_Device_Sample_Rate()
-            : 0;
-        if (audioStarted && frameMs + 100 < audioClockMs)
+        RealMovieSyncClock syncClock(audioStarted, audioStartSample);
+        const MovieFrameOutcome syncOutcome = ProcessMovieFrameSync(frameMs, syncClock);
+        if (syncOutcome == MovieFrameOutcome::Dropped)
         {
             ++droppedFrameCount;
             continue;
         }
-
-        while (audioStarted
-               && frameMs > (SND_Get_Generated_Audio_Samples() - audioStartSample) * 1000 / SND_Get_Device_Sample_Rate())
+        if (syncOutcome == MovieFrameOutcome::SkippedByUserInput)
         {
-            if (AreMovieSkippingInputsHeld())
-            {
-                moviePipeline.reset();
-                break;
-            }
-            SYS_EventsPump();
-            PSX_VSync(VSyncMode::UncappedFps);
-        }
-        if (!moviePipeline)
-        {
+            moviePipeline.reset();
             break;
         }
 

@@ -629,6 +629,8 @@ SET(relive_lib_src
     PathData.hpp
     Movie.hpp
     Movie.cpp
+    MovieFrameSync.hpp
+    MovieFrameSync.cpp
     BaseMap.hpp
     BaseMap.cpp
     BasePath.hpp
@@ -794,6 +796,7 @@ export(TARGETS relive_lib FILE relive_lib.cmake)
 # these tests exercise those code paths at runtime.
 add_executable(relive_lib_tests
     tests/FileSystemTests.cpp
+    tests/MovieFrameSyncTests.cpp
     tests/TestStubs.cpp
 )
 target_include_directories(relive_lib_tests PRIVATE
