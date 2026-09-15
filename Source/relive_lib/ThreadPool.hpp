@@ -97,6 +97,20 @@ public:
         return static_cast<size_t>(mBusyJobs.load());
     }
 
+    // Cooperative cancellation: doesn't interrupt a running Execute() (the pool has no way to do
+    // that safely), just asks for it - long-running jobs (e.g. FMV conversion) should poll
+    // IsCancelRequested() periodically and wind themselves down early when it's set. Once
+    // requested it can't be un-requested - this pool is done taking new work after that point.
+    void RequestCancel()
+    {
+        mCancelRequested = true;
+    }
+
+    [[nodiscard]] bool IsCancelRequested() const
+    {
+        return mCancelRequested;
+    }
+
 private:
     void ThreadProc()
     {
@@ -130,6 +144,7 @@ private:
     std::atomic<size_t> mTotalJobs{0};
     std::atomic<size_t> mCompletedJobs{0};
     std::atomic<bool> mStopThreads{false};
+    std::atomic<bool> mCancelRequested{false};
     mutable std::mutex mJobsQueueMutex;
     std::condition_variable mWaitForWork;
     std::vector<std::thread> mThreads;
