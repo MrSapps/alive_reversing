@@ -111,7 +111,9 @@ public:
     {
     private:
         // Bump this if any data format breaks are made so that OG/mod data is re-converted/upgraded
-        static constexpr u32 kFmvVersion = 1;
+        // 2: encode periodic keyframes (at least every ~2s) instead of only ever forcing one at
+        // frame 0 - fixes external players being unable to seek partway into an FMV.
+        static constexpr u32 kFmvVersion = 2;
         // 17: dropped the redundant "paths" subdir under each level (levels/<name>/<pathId>/...
         // instead of levels/<name>/paths/<pathId>/...) and lower-cased "Sounds" to "sounds".
         // 18: moved vh_file/vb_file/seq_files out of every path.json's own sound_info (where

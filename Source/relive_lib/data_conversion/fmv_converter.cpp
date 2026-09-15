@@ -126,6 +126,17 @@ public:
         cfg.g_lag_in_frames = 0;
         cfg.g_threads = std::max(1u, std::thread::hardware_concurrency() / 2u);
 
+        // AOM_USAGE_REALTIME's default kf_mode is AOM_KF_DISABLED - we were only ever getting
+        // the single forced keyframe at frame 0 below, and nothing else for the rest of the
+        // movie (confirmed via ffprobe: exactly one K frame in a 530-frame file). Besides making
+        // every seek in an external player replay the whole movie from the start to get there,
+        // that's also more fragile than it needs to be - losing/corrupting any single P-frame
+        // breaks every frame after it for the rest of the movie, instead of just until the next
+        // keyframe.
+        cfg.kf_mode = AOM_KF_AUTO;
+        cfg.kf_min_dist = 0;
+        cfg.kf_max_dist = (frameRate > 0 ? frameRate : 15) * 2; // at least one keyframe every ~2s
+
         aom_codec_ctx_t codec = {};
         if (aom_codec_enc_init(&codec, encoder, &cfg, 0))
         {

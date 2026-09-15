@@ -114,7 +114,7 @@ TEST(MovieFrameSync, ReturnsSkippedWithoutPumpingWhenSkipAlreadyHeld)
     clock.mAudioClockMs = 0;
     clock.mSkipRequested = true;
     // Never advances - if the implementation checked pump before skip, this would spin forever.
-    clock.mOnPumpIdle = [&clock]()
+    clock.mOnPumpIdle = []()
     {
         FAIL() << "PumpIdle should not run once a skip is already held";
     };
@@ -143,12 +143,13 @@ TEST(MovieFrameSync, ReturnsSkippedPartwayThroughAWait)
 
 // Reproduces the real "video freezes then hitches" bug report this suite was written to guard:
 // once the audio clock is well ahead of a whole backlog of already-decoded/queued frames (e.g.
-// because the decoder genuinely fell behind for a few real seconds - see Movie.cpp's decoder
-// init comment), every one of those backlogged frames should be Dropped in one burst rather than
-// rendered (which would show the stale frame for the entire backlog) or waited on (which would
-// never resolve, since the clock isn't going to run backwards to meet them). A fake "demuxer" is
-// just a sequence of plain frame numbers/timestamps here - no real pixels/audio needed to verify
-// this.
+// because decode genuinely fell behind for a few real seconds - see Movie.cpp's decoder init
+// comment; turned out to be a debug-build-only slowdown, not a real throughput problem, but the
+// backlog-handling behavior being tested here matters regardless of why a backlog built up),
+// every one of those backlogged frames should be Dropped in one burst rather than rendered
+// (which would show the stale frame for the entire backlog) or waited on (which would never
+// resolve, since the clock isn't going to run backwards to meet them). A fake "demuxer" is just
+// a sequence of plain frame numbers/timestamps here - no real pixels/audio needed to verify this.
 TEST(MovieFrameSync, DropsAnEntireStaleBacklogBurstThenResumesRenderingLiveFrames)
 {
     FakeMovieSyncClock clock;
