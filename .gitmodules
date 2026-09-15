@@ -43,3 +43,9 @@
 [submodule "3rdParty/minivorbis"]
 	path = 3rdParty/minivorbis
 	url = https://github.com/edubart/minivorbis.git
+[submodule "3rdParty/ogg"]
+	path = 3rdParty/ogg
+	url = https://github.com/xiph/ogg.git
+[submodule "3rdParty/vorbis"]
+	path = 3rdParty/vorbis
+	url = https://github.com/xiph/vorbis.git
