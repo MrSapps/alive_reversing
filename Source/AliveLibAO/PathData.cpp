@@ -3,6 +3,7 @@
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/Collisions.hpp"
 #include "../relive_lib/MapWrapper.hpp"
+#include "../relive_lib/FatalError.hpp"
 
 namespace AO {
 
@@ -792,22 +793,22 @@ static FmvInfo g_F2_Fmvs_4C8A70[53] = {
 
 
 static PathRootContainer gMapData_4CAB58 = {
-    {{g_S1_Paths_4C8720, g_S1_Fmvs_4C8740, g_S1_SoundBlock_4C8790, "S1SEQ.BSQ", 16, 9, "S1", 1, 0, 1, "S1.LVL;1", 0, "S1.OVL;1", 2, "S1.MOV;1", "S1.IDX", "S1PATH.BND"},
-     {g_R1_Paths_4C9910, g_R1_Fmvs_4C9A60, g_R1_SoundBlock_4C9B00, "R1SEQ.BSQ", 16, 8, "R1", 20, 0, 4, "R1.LVL;1", 3, "R1.OVL;1", 5, "R1.MOV;1", "R1.IDX", "R1PATH.BND"},
-     {g_L1_Paths_4C96C0, g_L1_Fmvs_4C9730, g_L1_SoundBlock_4C98F0, "L1SEQ.BSQ", 23, 7, "L1", 6, 0, 12, "L1.LVL;1", 11, "L1.OVL;1", 14, "L1.MOV;1", "L1.IDX", "L1PATH.BND"},
-     {g_F1_Paths_4C8840, g_F1_Fmvs_4C88E0, g_F1_SoundBlock_4C89C0, "F1SEQ.BSQ", 16, 5, "F1", 9, 0, 16, "F1.LVL;1", 15, "F1.OVL;1", 17, "F1.MOV;1", "F1.IDX", "F1PATH.BND"},
-     {g_F2_Paths_4C89E0, g_F2_Fmvs_4C8A70, g_F2_SoundBlock_4C8DC0, "F2SEQ.BSQ", 23, 6, "F2", 8, 0, 19, "F2.LVL;1", 18, "F2.OVL;1", 21, "F2.MOV;1", "F2.IDX", "F2PATH.BND"},
-     {g_E1_Paths_4C8EA0, g_E1_Fmvs_4C8F10, g_E1_SoundBlock_4C8F70, "E1SEQ.BSQ", 16, 2, "E1", 6, 0, 7, "E1.LVL;1", 6, "E1.OVL;1", 10, "E1.MOV;1", "E1.IDX", "E1PATH.BND"},
-     {g_E2_Paths_4C8F90, g_E2_Fmvs_4C8FE0, g_E2_SoundBlock_4C9020, "E2SEQ.BSQ", 23, 3, "E2", 4, 0, 37, "E2.LVL;1", 36, "E2.OVL;1", 38, "E2.MOV;1", "E2.IDX", "E2PATH.BND"},
-     {nullptr, nullptr, nullptr, nullptr, 16, 5, nullptr, 0, 0, 0, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr},
-     {g_D1_Paths_4C9040, g_D1_Fmvs_4C90E0, g_D1_SoundBlock_4C91A0, "D1SEQ.BSQ", 16, 0, "D1", 9, 0, 25, "D1.LVL;1", 24, "D1.OVL;1", 29, "D1.MOV;1", "D1.IDX", "D1PATH.BND"},
-     {g_D2_Paths_4C91C0, g_D2_Fmvs_4C9270, g_D2_SoundBlock_4C95C0, "D2SEQ.BSQ", 23, 1, "D2", 10, 0, 31, "D2.LVL;1", 30, "D2.OVL;1", 33, "D2.MOV;1", "D2.IDX", "D2PATH.BND"},
-     {g_C1_Paths_4C87B0, g_C1_Fmvs_4C87D0, g_C1_SoundBlock_4C8820, "C1SEQ.BSQ", 16, 9, "C1", 1, 0, 52, "\\C1.LVL;1", 0, "\\S1.OVL;1", 53, "\\C1.MOV;1", "C1.IDX", "C1PATH.BND"},
-     {nullptr, nullptr, nullptr, nullptr, 16, 5, nullptr, 0, 0, 0, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr},
-     {g_R6_Paths_4C9DE0, g_R6_R2_Fmvs_4C9C70, g_R6_SoundBlock_4C9E50, "R6SEQ.BSQ", 16, 8, "R6", 6, 0, 50, "\\R6.LVL;1", 49, "\\R6.OVL;1", 48, "\\R2.MOV;1", "R2.IDX", "R6PATH.BND"},
-     {g_R2_Paths_4C9B20, g_R6_R2_Fmvs_4C9C70, g_R2_SoundBlock_4C9DC0, "R2SEQ.BSQ", 16, 8, "R2", 20, 0, 40, "R2.LVL;1", 39, "R2.OVL;1", 48, "R2.MOV;1", "R2.IDX", "R2PATH.BND"},
-     {g_F2_Paths_4C8DE0, g_F2_Fmvs_4C8A70, g_F2_SoundBlock_4C8E80, "F2SEQ.BSQ", 23, 6, "F4", 9, 0, 23, "\\F4.LVL;1", 22, "\\F4.OVL;1", 21, "\\F2.MOV;1", "F2.IDX", "F4PATH.BND"},
-     {g_D2_Paths_4C95E0, g_D2_Fmvs_4C9270, g_D2_SoundBlock_4C96A0, "D2SEQ.BSQ", 23, 1, "D7", 11, 0, 35, "\\D7.LVL;1", 34, "\\D7.OVL;1", 33, "\\D2.MOV;1", "D2.IDX", "D7PATH.BND"}}};
+    {{g_S1_Paths_4C8720, {g_S1_Fmvs_4C8740, ALIVE_COUNTOF(g_S1_Fmvs_4C8740)}, g_S1_SoundBlock_4C8790, "S1SEQ.BSQ", 16, 9, "S1", 1, 0, 1, "S1.LVL;1", 0, "S1.OVL;1", 2, "S1.MOV;1", "S1.IDX", "S1PATH.BND"},
+     {g_R1_Paths_4C9910, {g_R1_Fmvs_4C9A60, ALIVE_COUNTOF(g_R1_Fmvs_4C9A60)}, g_R1_SoundBlock_4C9B00, "R1SEQ.BSQ", 16, 8, "R1", 20, 0, 4, "R1.LVL;1", 3, "R1.OVL;1", 5, "R1.MOV;1", "R1.IDX", "R1PATH.BND"},
+     {g_L1_Paths_4C96C0, {g_L1_Fmvs_4C9730, ALIVE_COUNTOF(g_L1_Fmvs_4C9730)}, g_L1_SoundBlock_4C98F0, "L1SEQ.BSQ", 23, 7, "L1", 6, 0, 12, "L1.LVL;1", 11, "L1.OVL;1", 14, "L1.MOV;1", "L1.IDX", "L1PATH.BND"},
+     {g_F1_Paths_4C8840, {g_F1_Fmvs_4C88E0, ALIVE_COUNTOF(g_F1_Fmvs_4C88E0)}, g_F1_SoundBlock_4C89C0, "F1SEQ.BSQ", 16, 5, "F1", 9, 0, 16, "F1.LVL;1", 15, "F1.OVL;1", 17, "F1.MOV;1", "F1.IDX", "F1PATH.BND"},
+     {g_F2_Paths_4C89E0, {g_F2_Fmvs_4C8A70, ALIVE_COUNTOF(g_F2_Fmvs_4C8A70)}, g_F2_SoundBlock_4C8DC0, "F2SEQ.BSQ", 23, 6, "F2", 8, 0, 19, "F2.LVL;1", 18, "F2.OVL;1", 21, "F2.MOV;1", "F2.IDX", "F2PATH.BND"},
+     {g_E1_Paths_4C8EA0, {g_E1_Fmvs_4C8F10, ALIVE_COUNTOF(g_E1_Fmvs_4C8F10)}, g_E1_SoundBlock_4C8F70, "E1SEQ.BSQ", 16, 2, "E1", 6, 0, 7, "E1.LVL;1", 6, "E1.OVL;1", 10, "E1.MOV;1", "E1.IDX", "E1PATH.BND"},
+     {g_E2_Paths_4C8F90, {g_E2_Fmvs_4C8FE0, ALIVE_COUNTOF(g_E2_Fmvs_4C8FE0)}, g_E2_SoundBlock_4C9020, "E2SEQ.BSQ", 23, 3, "E2", 4, 0, 37, "E2.LVL;1", 36, "E2.OVL;1", 38, "E2.MOV;1", "E2.IDX", "E2PATH.BND"},
+     {nullptr, {nullptr, 0}, nullptr, nullptr, 16, 5, nullptr, 0, 0, 0, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr},
+     {g_D1_Paths_4C9040, {g_D1_Fmvs_4C90E0, ALIVE_COUNTOF(g_D1_Fmvs_4C90E0)}, g_D1_SoundBlock_4C91A0, "D1SEQ.BSQ", 16, 0, "D1", 9, 0, 25, "D1.LVL;1", 24, "D1.OVL;1", 29, "D1.MOV;1", "D1.IDX", "D1PATH.BND"},
+     {g_D2_Paths_4C91C0, {g_D2_Fmvs_4C9270, ALIVE_COUNTOF(g_D2_Fmvs_4C9270)}, g_D2_SoundBlock_4C95C0, "D2SEQ.BSQ", 23, 1, "D2", 10, 0, 31, "D2.LVL;1", 30, "D2.OVL;1", 33, "D2.MOV;1", "D2.IDX", "D2PATH.BND"},
+     {g_C1_Paths_4C87B0, {g_C1_Fmvs_4C87D0, ALIVE_COUNTOF(g_C1_Fmvs_4C87D0)}, g_C1_SoundBlock_4C8820, "C1SEQ.BSQ", 16, 9, "C1", 1, 0, 52, "\\C1.LVL;1", 0, "\\S1.OVL;1", 53, "\\C1.MOV;1", "C1.IDX", "C1PATH.BND"},
+     {nullptr, {nullptr, 0}, nullptr, nullptr, 16, 5, nullptr, 0, 0, 0, nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr},
+     {g_R6_Paths_4C9DE0, {g_R6_R2_Fmvs_4C9C70, ALIVE_COUNTOF(g_R6_R2_Fmvs_4C9C70)}, g_R6_SoundBlock_4C9E50, "R6SEQ.BSQ", 16, 8, "R6", 6, 0, 50, "\\R6.LVL;1", 49, "\\R6.OVL;1", 48, "\\R2.MOV;1", "R2.IDX", "R6PATH.BND"},
+     {g_R2_Paths_4C9B20, {g_R6_R2_Fmvs_4C9C70, ALIVE_COUNTOF(g_R6_R2_Fmvs_4C9C70)}, g_R2_SoundBlock_4C9DC0, "R2SEQ.BSQ", 16, 8, "R2", 20, 0, 40, "R2.LVL;1", 39, "R2.OVL;1", 48, "R2.MOV;1", "R2.IDX", "R2PATH.BND"},
+     {g_F2_Paths_4C8DE0, {g_F2_Fmvs_4C8A70, ALIVE_COUNTOF(g_F2_Fmvs_4C8A70)}, g_F2_SoundBlock_4C8E80, "F2SEQ.BSQ", 23, 6, "F4", 9, 0, 23, "\\F4.LVL;1", 22, "\\F4.OVL;1", 21, "\\F2.MOV;1", "F2.IDX", "F4PATH.BND"},
+     {g_D2_Paths_4C95E0, {g_D2_Fmvs_4C9270, ALIVE_COUNTOF(g_D2_Fmvs_4C9270)}, g_D2_SoundBlock_4C96A0, "D2SEQ.BSQ", 23, 1, "D7", 11, 0, 35, "\\D7.LVL;1", 34, "\\D7.OVL;1", 33, "\\D2.MOV;1", "D2.IDX", "D7PATH.BND"}}};
 
 const PathBlyRec* Path_Get_Bly_Record(EReliveLevelIds level, u16 path)
 {
@@ -816,7 +817,26 @@ const PathBlyRec* Path_Get_Bly_Record(EReliveLevelIds level, u16 path)
 
 FmvInfo* Path_Get_FMV_Record(EReliveLevelIds levelId, u16 fmvId)
 {
-    return &gMapData_4CAB58.paths[static_cast<s32>(MapWrapper::ToAO(levelId))].mFmvArray[fmvId];
+    return const_cast<FmvInfo*>(&gMapData_4CAB58.paths[static_cast<s32>(MapWrapper::ToAO(levelId))].mFmvArray.mArray[fmvId]);
+}
+
+FmvInfo* Path_Get_FMV_Record(EReliveLevelIds levelId, const std::string& fmvName)
+{
+    if (fmvName.empty())
+    {
+        return nullptr;
+    }
+
+    const relive::FmvInfoArray& fmvArray = gMapData_4CAB58.paths[static_cast<s32>(MapWrapper::ToAO(levelId))].mFmvArray;
+    for (size_t i = 0; i < fmvArray.mCount; i++)
+    {
+        if (fmvArray.mArray[i].mName && fmvName == fmvArray.mArray[i].mName)
+        {
+            return const_cast<FmvInfo*>(&fmvArray.mArray[i]);
+        }
+    }
+
+    ALIVE_FATAL("FMV record '%s' not found for lvl %d", fmvName.c_str(), static_cast<s32>(MapWrapper::ToAO(levelId)));
 }
 
 std::vector<std::string> Path_GetAllFmvNames()

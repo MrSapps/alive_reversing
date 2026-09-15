@@ -8,6 +8,8 @@
 #include "AnimConversionInfo.hpp"
 #include "../AliveLibAO/Path.hpp"
 #include "../AliveLibAE/Path.hpp"
+#include "../AliveLibAO/PathData.hpp"
+#include "../AliveLibAE/PathData.hpp"
 
 // Convert an AO or AE TLV to a relive TLV
 
@@ -32,6 +34,47 @@ inline void BaseConvert(relive::Path_TLV& r, const AO::Path_TLV& base, const Gui
         r.mBottomRightY = base.mBottomRight.y;
         r.mTlvSpecificMeaning = base.mTlvSpecificMeaning;
         r.mTlvFlags.Raw().all = base.mTlvFlags.Raw().all;
+    }
+
+    // Resolves a raw on-disk FMV index (as read from an original TLV) to the FMV's real
+    // name, once, here at conversion time - so the engine never has to touch a numeric FMV
+    // id/index again. Index 0 always resolves to "no movie" (both games use a name-less
+    // sentinel record at index 0), matching the original games' "0 means none" convention.
+    inline std::string ResolveFmvName_AO(EReliveLevelIds lvlId, s16 fmvId)
+    {
+        const AO::FmvInfo* pRec = AO::Path_Get_FMV_Record(lvlId, static_cast<u16>(fmvId));
+        return (pRec && pRec->mName) ? pRec->mName : std::string();
+    }
+
+    inline std::string ResolveFmvName_AE(EReliveLevelIds lvlId, s16 fmvId)
+    {
+        const relive::FmvInfoEntry* pRec = ::Path_Get_FMV_Record(lvlId, static_cast<u16>(fmvId));
+        return (pRec && pRec->mName) ? pRec->mName : std::string();
+    }
+
+    // Decodes a legacy packed FMV id (single/double/triple, see ResolveFmvName_AO/AE's
+    // callers for the packing scheme) into up to 3 resolved names. Some callers (BirdPortal's
+    // negative-sentinel remap - see its converter below) compute the packed value in a way
+    // that overflows s16 by design, relying on wraparound (the original engine code did the
+    // same via "u16 fmvBaseId = pMap->mFmvBaseId"), so reinterpret as u16 before thresholding.
+    inline void DecodeFmvChain_AO(EReliveLevelIds lvlId, s16 packedIdRaw, std::string& out1, std::string& out2, std::string& out3)
+    {
+        const u16 packedId = static_cast<u16>(packedIdRaw);
+        if (packedId > 10000)
+        {
+            out1 = ResolveFmvName_AO(lvlId, packedId / 10000);
+            out2 = ResolveFmvName_AO(lvlId, packedId % 100);
+            out3 = ResolveFmvName_AO(lvlId, packedId / 100 % 100);
+        }
+        else if (packedId > 100)
+        {
+            out1 = ResolveFmvName_AO(lvlId, packedId / 100);
+            out2 = ResolveFmvName_AO(lvlId, packedId % 100);
+        }
+        else
+        {
+            out1 = ResolveFmvName_AO(lvlId, packedId);
+        }
     }
 
     // also used for AO
@@ -1218,7 +1261,20 @@ public:
         r.mExitPath = tlv.mExitPath;
         r.mExitCamera = tlv.mExitCamera;
         r.mScale = relive::From(tlv.mScale);
-        r.mMovieId = tlv.mMovieId;
+        // See BirdPortal::VGetMapChange (engine): resolved against the destination level
+        // (mExitLevel), not this TLV's own level. Positive ids are a single movie; 0 means
+        // none; -3/-4 are sentinels remapped, only once Abe has finished both Paramonia and
+        // Scrabania, into a packed alternate movie set - decode both outcomes now so the
+        // engine never has to touch the raw id again.
+        if (tlv.mMovieId > 0)
+        {
+            r.mMovie1 = ResolveFmvName_AO(r.mExitLevel, tlv.mMovieId);
+        }
+        else if (tlv.mMovieId < 0)
+        {
+            DecodeFmvChain_AO(r.mExitLevel, static_cast<s16>(17 - (100 * tlv.mMovieId)), r.mMovie1, r.mMovie2, r.mMovie3);
+            DecodeFmvChain_AO(r.mExitLevel, static_cast<s16>(1617 - (10000 * tlv.mMovieId)), r.mMovieAllDone1, r.mMovieAllDone2, r.mMovieAllDone3);
+        }
         r.mPortalType = From(tlv.mPortalType);
         r.mMudCountForShrykull = tlv.mMudCountForShrykull;
         return r;
@@ -1233,7 +1289,12 @@ public:
         r.mExitPath = tlv.mExitPath;
         r.mExitCamera = tlv.mExitCamera;
         r.mScale = relive::From(tlv.mScale);
-        r.mMovieId = tlv.mMovieId;
+        // AE has no negative-sentinel case (see BirdPortal::VGetMapChange): a positive id is
+        // a single movie resolved against the destination level, <= 0 means none.
+        if (tlv.mMovieId > 0)
+        {
+            r.mMovie1 = ResolveFmvName_AE(r.mExitLevel, tlv.mMovieId);
+        }
         r.mPortalType = From(tlv.mPortalType);
         r.mMudCountForShrykull = tlv.mMudCountForShrykull;
         r.mCreatePortalSwitchId = tlv.mCreatePortalSwitchId;
@@ -2180,20 +2241,20 @@ private:
 class Path_MovieStone_Converter final
 {
 public:
-    static Path_MovieStone From(const AO::Path_MovieStone& tlv, const Guid& tlvId)
+    static Path_MovieStone From(const AO::Path_MovieStone& tlv, const Guid& tlvId, AO::LevelIds lvlId)
     {
         Path_MovieStone r;
         BaseConvert(r, tlv, tlvId);
-        r.mMovieId = tlv.mData.mMovieId;
+        r.mMovieName = ResolveFmvName_AO(MapWrapper::FromAO(lvlId), tlv.mData.mMovieId);
         r.mScale = relive::From(tlv.mData.mScale);
         return r;
     }
 
-    static Path_MovieStone From(const ::Path_MovieStone& tlv, const Guid& tlvId)
+    static Path_MovieStone From(const ::Path_MovieStone& tlv, const Guid& tlvId, ::LevelIds lvlId)
     {
         Path_MovieStone r;
         BaseConvert(r, tlv, tlvId);
-        r.mMovieId = tlv.mMovieId;
+        r.mMovieName = ResolveFmvName_AE(MapWrapper::FromAE(lvlId), tlv.mMovieId);
         r.mScale = relive::From(tlv.mScale);
         r.mTriggerSwitchId = tlv.mTriggerSwitchId;
         return r;
@@ -2237,29 +2298,68 @@ public:
 class Path_PathTransition_Converter final
 {
 public:
-    static Path_PathTransition From(const AO::Path_PathTransition& tlv, const Guid& tlvId)
+    // The level a packed movie id is resolved against depends on which screen-change effect
+    // mWipeEffect maps to (see kPathChangeEffectToInternalScreenChangeEffect): effect index 0
+    // (ePlay1FMV_5) is resolved by GoTo_Camera *after* the level swap, against the destination
+    // level; index 8 (eUnknown_11) is resolved *before* the swap, against the source level (the
+    // level this TLV itself lives in). Every other wipe effect never plays a movie at all.
+    static Path_PathTransition From(const AO::Path_PathTransition& tlv, const Guid& tlvId, AO::LevelIds lvlId)
     {
         Path_PathTransition r;
         BaseConvert(r, tlv, tlvId);
         r.mNextLevel = MapWrapper::FromAO(tlv.mNextLevel);
         r.mNextPath = tlv.mNextPath;
         r.mNextCamera = tlv.mNextCamera;
-        r.mMovieId = tlv.mMovieId;
         r.mWipeEffect = tlv.mWipeEffect;
         r.mNextPathScale = relive::From(tlv.mNextPathScale);
+
+        const EReliveLevelIds fmvLookupLevel = (tlv.mWipeEffect == 0) ? r.mNextLevel : MapWrapper::FromAO(lvlId);
+        const s16 movieId = tlv.mMovieId;
+        if (movieId > 10000)
+        {
+            r.mMovie1 = ResolveFmvName_AO(fmvLookupLevel, movieId / 10000);
+            r.mMovie2 = ResolveFmvName_AO(fmvLookupLevel, movieId % 100);
+            r.mMovie3 = ResolveFmvName_AO(fmvLookupLevel, movieId / 100 % 100);
+        }
+        else if (movieId > 100)
+        {
+            r.mMovie1 = ResolveFmvName_AO(fmvLookupLevel, movieId / 100);
+            r.mMovie2 = ResolveFmvName_AO(fmvLookupLevel, movieId % 100);
+        }
+        else
+        {
+            r.mMovie1 = ResolveFmvName_AO(fmvLookupLevel, movieId);
+        }
         return r;
     }
 
-    static Path_PathTransition From(const ::Path_PathTransition& tlv, const Guid& tlvId)
+    static Path_PathTransition From(const ::Path_PathTransition& tlv, const Guid& tlvId, ::LevelIds lvlId)
     {
         Path_PathTransition r;
         BaseConvert(r, tlv, tlvId);
         r.mNextLevel = MapWrapper::FromAE(tlv.mNextLevel);
         r.mNextPath = tlv.mNextPath;
         r.mNextCamera = tlv.mNextCamera;
-        r.mMovieId = tlv.mMovieId;
         r.mWipeEffect = tlv.mWipeEffect;
         r.mNextPathScale = relive::From(tlv.mNextPathScale);
+
+        const EReliveLevelIds fmvLookupLevel = (tlv.mWipeEffect == 0) ? r.mNextLevel : MapWrapper::FromAE(lvlId);
+        const s16 movieId = tlv.mMovieId;
+        if (movieId > 10000)
+        {
+            r.mMovie1 = ResolveFmvName_AE(fmvLookupLevel, movieId / 10000);
+            r.mMovie2 = ResolveFmvName_AE(fmvLookupLevel, movieId % 100);
+            r.mMovie3 = ResolveFmvName_AE(fmvLookupLevel, movieId / 100 % 100);
+        }
+        else if (movieId >= 100)
+        {
+            r.mMovie1 = ResolveFmvName_AE(fmvLookupLevel, movieId / 100);
+            r.mMovie2 = ResolveFmvName_AE(fmvLookupLevel, movieId % 100);
+        }
+        else
+        {
+            r.mMovie1 = ResolveFmvName_AE(fmvLookupLevel, movieId);
+        }
         return r;
     }
 };
@@ -2405,7 +2505,11 @@ public:
         r.mHub8 = tlv.mHub8;
         // for the time being until we have an enum for wipe_effect
         r.mWipeEffect = static_cast<reliveScreenChangeEffects>(tlv.mWipeEffect);
-        r.mMovieId = tlv.mMovieId;
+        // Effect index 0 (ePlay1FMV_5) resolves against the destination level (GoTo_Camera
+        // calls FMV_Camera_Change(mNextLevel) for it, after the level swap); every other
+        // effect that can play a movie (notably index 8, eUnknown_11) resolves against the
+        // source level - this door's own level - since that call happens before the swap.
+        r.mMovieName = ResolveFmvName_AO(tlv.mWipeEffect == 0 ? r.mNextLevel : MapWrapper::FromAO(lvlId), tlv.mMovieId);
         r.mDoorOffsetX = tlv.mDoorOffsetX;
         r.mDoorOffsetY = tlv.mDoorOffsetY;
         r.mExitDirection = relive::From(tlv.mExitDirection);
@@ -2475,7 +2579,8 @@ public:
         r.mHub7 = tlv.mHub7;
         r.mHub8 = tlv.mHub8;
         r.mWipeEffect = relive::From(tlv.mWipeEffect);
-        r.mMovieId = tlv.mMovieId;
+        // See the AO overload above for why the lookup level depends on the wipe effect.
+        r.mMovieName = ResolveFmvName_AE(tlv.mWipeEffect == 0 ? r.mNextLevel : MapWrapper::FromAE(lvlId), tlv.mMovieId);
         r.mDoorOffsetX = tlv.mDoorOffsetX;
         r.mDoorOffsetY = tlv.mDoorOffsetY;
         r.mExitDirection = relive::From(tlv.mExitDirection);
@@ -3348,7 +3453,11 @@ public:
         r.mEmitLeaves = relive::From(tlv.mEmitLeaves);
         r.mLeafX = tlv.mLeafX;
         r.mLeafY = tlv.mLeafY;
-        r.mMovieId = tlv.mMovieId;
+        // Abe.cpp resolves this against whichever of mOnDestLevel/mOffDestLevel a runtime
+        // switch state picks, which conversion can't know - resolve against mOffDestLevel
+        // (the default/"off" path), which in practice is always the same level as mOnDestLevel
+        // for a given express well.
+        r.mMovieName = ResolveFmvName_AO(r.mOffDestLevel, tlv.mMovieId);
         return r;
     }
 
@@ -3400,7 +3509,8 @@ public:
             r.mLeafX += pathData.mAbeStartXPos;
         }
 
-        r.mMovieId = tlv.mMovieId;
+        // See the AO overload above for why mOffDestLevel is used here.
+        r.mMovieName = ResolveFmvName_AE(r.mOffDestLevel, tlv.mMovieId);
         return r;
     }
 };
@@ -4163,7 +4273,9 @@ public:
         r.mDestLevel = MapWrapper::FromAE(tlv.mDestLevel);
         r.mDestPath = tlv.mDestPath;
         r.mDestCamera = tlv.mDestCamera;
-        r.mMovieId = tlv.mMovieId;
+        // Always played with CameraSwapEffects::ePlay1FMV_5, which GoTo_Camera always
+        // resolves against the destination level.
+        r.mMovieName = ResolveFmvName_AE(r.mDestLevel, tlv.mMovieId);
         return r;
     }
 };
@@ -4375,7 +4487,7 @@ private:
 class Path_Teleporter_Converter final
 {
 public:
-    static Path_Teleporter From(const ::Path_Teleporter& tlv, const Guid& tlvId)
+    static Path_Teleporter From(const ::Path_Teleporter& tlv, const Guid& tlvId, ::LevelIds lvlId)
     {
         Path_Teleporter r;
         BaseConvert(r, tlv, tlvId);
@@ -4387,7 +4499,8 @@ public:
         r.mSwitchId = tlv.mData.mSwitchId;
         r.mScale = relive::From(tlv.mData.mScale);
         r.mWipeEffect = relive::From(tlv.mData.mWipeEffect);
-        r.mMovieId = tlv.mData.mMovieId;
+        // See Path_Door_Converter above for why the lookup level depends on the wipe effect.
+        r.mMovieName = ResolveFmvName_AE(tlv.mData.mWipeEffect == 0 ? r.mDestLevel : MapWrapper::FromAE(lvlId), tlv.mData.mMovieId);
 
         const relive::PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
         r.mElectricX = tlv.mData.mElectricX - pathData.mAbeStartXPos;
@@ -4399,7 +4512,7 @@ public:
 class Path_Glukkon_Converter final
 {
 public:
-    static Path_Glukkon From(const ::Path_Glukkon& tlv, const Guid& tlvId)
+    static Path_Glukkon From(const ::Path_Glukkon& tlv, const Guid& tlvId, ::LevelIds lvlId)
     {
         Path_Glukkon r;
         BaseConvert(r, tlv, tlvId);
@@ -4415,7 +4528,9 @@ public:
         r.mGlukkonType = From(tlv.mGlukkonType);
         r.mDeathSwitchId = tlv.mDeathSwitchId;
         r.mPlayMovieSwitchId = tlv.mPlayMovieSwitchId;
-        r.mMovieId = tlv.mMovieId;
+        // Glukkon plays its movie directly (not via SetActiveCam/FMV_Camera_Change), looked
+        // up against whatever level the Glukkon currently is in - i.e. this TLV's own level.
+        r.mMovieName = ResolveFmvName_AE(MapWrapper::FromAE(lvlId), tlv.mMovieId);
         return r;
     }
 private:

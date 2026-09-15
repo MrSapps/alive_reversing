@@ -243,15 +243,16 @@ s32 MaxGridBlocks(FP scale)
     }
 }
 
-s16 BaseMap::SetActiveCam(EReliveLevelIds level, s16 path, s16 cam, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange)
+bool BaseMap::SetActiveCam(EReliveLevelIds level, s16 path, s16 cam, CameraSwapEffects screenChangeEffect, FmvIds fmvIds, bool forceChange)
 {
     if (!forceChange && cam == mCurrentCamera && level == mCurrentLevel && path == mCurrentPath)
     {
-        return 0;
+        return false;
     }
 
     mNextCamera = cam;
-    mFmvBaseId = fmvBaseId;
+    mFmvIds = std::move(fmvIds);
+    mFmvPending = mFmvIds.IsNone() ? 0 : 1;
     mNextPath = path;
     mNextLevel = level;
     mCameraSwapEffect = screenChangeEffect;
@@ -266,7 +267,7 @@ s16 BaseMap::SetActiveCam(EReliveLevelIds level, s16 path, s16 cam, CameraSwapEf
         gMap_bDoPurpleLightEffect = false;
     }
 
-    return 1;
+    return true;
 }
 
 TlvIterator BaseMap::TLV_From_Offset_Lvl_Cam(const Guid& tlvId)
@@ -458,7 +459,7 @@ void BaseMap::Reset()
     VClearPendingSaveRestore();
 }
 
-void BaseMap::Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange)
+void BaseMap::Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, FmvIds fmvIds, bool forceChange)
 {
     for (s32 i = 0; i < ALIVE_COUNTOF(mCurrentCameras); i++)
     {
@@ -471,7 +472,7 @@ void BaseMap::Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffect
     mCurrentPath = -1;
     mCurrentLevel = EReliveLevelIds::eNone;
 
-    SetActiveCam(level, path, camera, screenChangeEffect, fmvBaseId, forceChange);
+    SetActiveCam(level, path, camera, screenChangeEffect, std::move(fmvIds), forceChange);
     GoTo_Camera();
 
     mCamState = CamChangeStates::eInactive_0;

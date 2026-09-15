@@ -1699,7 +1699,7 @@ s16 Glukkon::Brain_3_PlayerControlled()
         {
             gScreenManager->DisableRendering();
 
-            const relive::FmvInfoEntry* pFmvRec = Path_Get_FMV_Record(mMap.mCurrentLevel, mTlvData.mMovieId);
+            const relive::FmvInfoEntry* pFmvRec = Path_Get_FMV_Record(mMap.mCurrentLevel, mTlvData.mMovieName);
             relive_new Movie(pFmvRec->mName, mResMan, mMap);
         }
         return Brain_3_PlayerControlled::eBrain3_WaitForMovieToFinish5;
@@ -2788,8 +2788,7 @@ void Glukkon::ToDead()
                 mAbeLevel,
                 mAbePath,
                 mAbeCamera,
-                CameraSwapEffects::eInstantChange_0,
-                0,
+                CameraSwapEffects::eInstantChange_0,{},
                 0);
         }
     }

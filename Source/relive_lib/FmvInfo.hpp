@@ -29,4 +29,10 @@ struct FmvInfoArray final
 // Walks a game's set of per-level FmvInfo tables and returns every real, unique FMV
 // filename referenced by any of them - used to drive FMV data conversion.
 [[nodiscard]] std::vector<std::string> CollectUniqueFmvNames(std::initializer_list<FmvInfoArray> arrays);
+
+// Converts an original on-disk FMV name (e.g. "HELLO.DDV") to the converted file's base
+// name (e.g. "HELLO") by dropping its original extension, if any, rather than appending
+// ".webm" onto the full "HELLO.DDV" name. Used by both the data conversion output path
+// and the runtime resource lookup so the two can never drift apart again.
+[[nodiscard]] std::string FmvNameWithoutExtension(const std::string& fmvName);
 } // namespace relive

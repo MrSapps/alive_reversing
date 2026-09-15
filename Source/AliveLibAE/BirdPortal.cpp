@@ -35,7 +35,9 @@ BirdPortal::BirdPortal(relive::Path_BirdPortal* pTlv, const Guid& tlvId, Resourc
     mExitLevel = pTlv->mExitLevel;
     mExitPath = pTlv->mExitPath;
     mExitCamera = pTlv->mExitCamera;
-    mMovieId = pTlv->mMovieId;
+    mMovie1 = pTlv->mMovie1;
+    mMovie2 = pTlv->mMovie2;
+    mMovie3 = pTlv->mMovie3;
     mMudCountForShrykull = pTlv->mMudCountForShrykull;
     mDeletePortalSwitchId = pTlv->mDeletePortalSwitchId;
     mTlvInfo = tlvId;
@@ -683,19 +685,19 @@ void BirdPortal::VExitPortal()
     }
 }
 
-void BirdPortal::VGetMapChange(EReliveLevelIds* level, u16* path, u16* camera, CameraSwapEffects* screenChangeEffect, u16* movieId)
+void BirdPortal::VGetMapChange(EReliveLevelIds* level, u16* path, u16* camera, CameraSwapEffects* screenChangeEffect, FmvIds* fmvIds)
 {
     *level = mExitLevel;
     *path = mExitPath;
     *camera = mExitCamera;
 
-    if (mMovieId <= 0)
+    if (mMovie1.empty())
     {
         *screenChangeEffect = CameraSwapEffects::eInstantChange_0;
     }
     else
     {
-        *movieId = mMovieId;
+        *fmvIds = FmvIds{mMovie1, mMovie2, mMovie3};
         *screenChangeEffect = CameraSwapEffects::ePlay1FMV_5;
     }
 }

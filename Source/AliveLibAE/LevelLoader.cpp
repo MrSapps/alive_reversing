@@ -16,7 +16,7 @@ LevelLoader::LevelLoader(relive::Path_LevelLoader* pTlv, const Guid& tlvId, Reso
     mDestLevel = pTlv->mDestLevel;
     mDestPath = pTlv->mDestPath;
     mDestCamera = pTlv->mDestCamera;
-    mMovieId = pTlv->mMovieId;
+    mMovieName = pTlv->mMovieName;
     mTlvId = tlvId;
     mState = States::eIdle_0;
 }
@@ -46,14 +46,14 @@ void LevelLoader::VUpdate()
             Fade* pFade = static_cast<Fade*>(sObjectIds.Find_Impl(mFadeId));
             if (!pFade || pFade->mDone)
             {
-                if (mMovieId)
+                if (!mMovieName.empty())
                 {
                     mMap.SetActiveCam(
                         mDestLevel,
                         mDestPath,
                         mDestCamera,
                         CameraSwapEffects::ePlay1FMV_5,
-                        mMovieId,
+                        FmvIds{mMovieName},
                         0);
                 }
                 else
@@ -62,8 +62,7 @@ void LevelLoader::VUpdate()
                         mDestLevel,
                         mDestPath,
                         mDestCamera,
-                        CameraSwapEffects::eInstantChange_0,
-                        0,
+                        CameraSwapEffects::eInstantChange_0,{},
                         0);
                 }
                 mState = States::eDone_2;

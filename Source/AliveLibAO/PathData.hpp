@@ -50,6 +50,7 @@ struct PathRootContainer final
 const PathBlyRec* Path_Get_Bly_Record(EReliveLevelIds level, u16 path);
 
 FmvInfo* Path_Get_FMV_Record(EReliveLevelIds levelId, u16 fmvId);
+FmvInfo* Path_Get_FMV_Record(EReliveLevelIds levelId, const std::string& fmvName);
 
 // All real, unique FMV (.DDV) filenames referenced by any level's FmvInfo table -
 // used to drive FMV data conversion without a separately-maintained hardcoded list.

@@ -26,7 +26,7 @@ static void SetData(Relive_Path_Teleporter_Data& tlvData, const relive::Path_Tel
     tlvData.mSwitchId = tlv.mSwitchId;
     tlvData.mScale = tlv.mScale;
     tlvData.mWipeEffect = tlv.mWipeEffect;
-    tlvData.mMovieId = tlv.mMovieId;
+    tlvData.mMovieName = tlv.mMovieName;
     tlvData.mElectricX = tlv.mElectricX;
     tlvData.mElectricY = tlv.mElectricY;
 }
@@ -216,7 +216,7 @@ void Teleporter::VUpdate()
                 mTlvData.mDestPath,
                 mTlvData.mDestCamera,
                 effect,
-                mTlvData.mMovieId,
+                FmvIds{mTlvData.mMovieName},
                 bForceChange);
 
             sControlledCharacter->SetUpdateDelay(3);

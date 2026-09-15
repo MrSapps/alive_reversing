@@ -22,7 +22,7 @@ static void ConvertTLV(nlohmann::json& j, const ::Path_TLV& tlv, const Guid& tlv
             convert_tlv<relive::Path_ContinuePoint_Converter, ::Path_ContinuePoint>(j, tlv, tlvId);
             break;
         case ::TlvTypes::PathTransition_1:
-            convert_tlv<relive::Path_PathTransition_Converter, ::Path_PathTransition>(j, tlv, tlvId);
+            j.push_back(relive::Path_PathTransition_Converter::From(static_cast<const ::Path_PathTransition&>(tlv), tlvId, lvlId));
             break;
         case ::TlvTypes::Hoist_2:
             convert_tlv<relive::Path_Hoist_Converter, ::Path_Hoist>(j, tlv, tlvId);
@@ -86,7 +86,7 @@ static void ConvertTLV(nlohmann::json& j, const ::Path_TLV& tlv, const Guid& tlv
             convert_tlv<relive::Path_AbeStart_Converter, ::Path_AbeStart>(j, tlv, tlvId);
             break;
         case ::TlvTypes::WellExpress_23:
-            convert_tlv<relive::Path_WellExpress_Converter, ::Path_WellExpress>(j, tlv, tlvId);
+            j.push_back(relive::Path_WellExpress_Converter::From(static_cast<const ::Path_WellExpress&>(tlv), tlvId));
             break;
         case ::TlvTypes::Mine_24:
             convert_tlv<relive::Path_Mine_Converter, ::Path_Mine>(j, tlv, tlvId);
@@ -98,10 +98,10 @@ static void ConvertTLV(nlohmann::json& j, const ::Path_TLV& tlv, const Guid& tlv
             convert_tlv<relive::Path_Paramite_Converter, ::Path_Paramite>(j, tlv, tlvId);
             break;
         case ::TlvTypes::MovieHandStone_27:
-            convert_tlv<relive::Path_MovieStone_Converter, ::Path_MovieStone>(j, tlv, tlvId);
+            j.push_back(relive::Path_MovieStone_Converter::From(static_cast<const ::Path_MovieStone&>(tlv), tlvId, lvlId));
             break;
         case ::TlvTypes::BirdPortal_28:
-            convert_tlv<relive::Path_BirdPortal_Converter, ::Path_BirdPortal>(j, tlv, tlvId);
+            j.push_back(relive::Path_BirdPortal_Converter::From(static_cast<const ::Path_BirdPortal&>(tlv), tlvId));
             break;
         case ::TlvTypes::BirdPortalExit_29:
             convert_tlv<relive::Path_BirdPortalExit_Converter, ::Path_BirdPortalExit>(j, tlv, tlvId);
@@ -231,7 +231,7 @@ static void ConvertTLV(nlohmann::json& j, const ::Path_TLV& tlv, const Guid& tlv
             convert_tlv<relive::Path_ZzzSpawner_Converter, ::Path_ZzzSpawner>(j, tlv, tlvId);
             break;
         case ::TlvTypes::Glukkon_73:
-            convert_tlv<relive::Path_Glukkon_Converter, ::Path_Glukkon>(j, tlv, tlvId);
+            j.push_back(relive::Path_Glukkon_Converter::From(static_cast<const ::Path_Glukkon&>(tlv), tlvId, lvlId));
             break;
         case ::TlvTypes::KillUnsavedMudokons_74: // AO only
             return;
@@ -267,13 +267,13 @@ static void ConvertTLV(nlohmann::json& j, const ::Path_TLV& tlv, const Guid& tlv
             convert_tlv<relive::Path_SlamDoor_Converter, ::Path_SlamDoor>(j, tlv, tlvId);
             break;
         case ::TlvTypes::LevelLoader_86:
-            convert_tlv<relive::Path_LevelLoader_Converter, ::Path_LevelLoader>(j, tlv, tlvId);
+            j.push_back(relive::Path_LevelLoader_Converter::From(static_cast<const ::Path_LevelLoader&>(tlv), tlvId));
             break;
         case ::TlvTypes::DemoSpawnPoint_87:
             convert_tlv<relive::Path_DemoSpawnPoint_Converter, ::Path_DemoSpawnPoint>(j, tlv, tlvId);
             break;
         case ::TlvTypes::Teleporter_88:
-            convert_tlv<relive::Path_Teleporter_Converter, ::Path_Teleporter>(j, tlv, tlvId);
+            j.push_back(relive::Path_Teleporter_Converter::From(static_cast<const ::Path_Teleporter&>(tlv), tlvId, lvlId));
             break;
         case ::TlvTypes::SlurgSpawner_89:
             convert_tlv<relive::Path_SlurgSpawner_Converter, ::Path_SlurgSpawner>(j, tlv, tlvId);
@@ -358,7 +358,7 @@ static void ConvertTLV(nlohmann::json& j, const AO::Path_TLV& tlv, const Guid& t
             convert_tlv<relive::Path_ContinuePoint_Converter, AO::Path_ContinuePoint>(j, tlv, tlvId);
             break;
         case AO::TlvTypes::PathTransition_1:
-            convert_tlv<relive::Path_PathTransition_Converter, AO::Path_PathTransition>(j, tlv, tlvId);
+            j.push_back(relive::Path_PathTransition_Converter::From(static_cast<const AO::Path_PathTransition&>(tlv), tlvId, lvlId));
             break;
         case AO::TlvTypes::ContinueZone_2: // dead tlv
             return;
@@ -456,7 +456,7 @@ static void ConvertTLV(nlohmann::json& j, const AO::Path_TLV& tlv, const Guid& t
             convert_tlv<relive::Path_BeeNest_Converter, AO::Path_BeeNest>(j, tlv, tlvId);
             break;
         case AO::TlvTypes::WellExpress_45:
-            convert_tlv<relive::Path_WellExpress_Converter, AO::Path_WellExpress>(j, tlv, tlvId);
+            j.push_back(relive::Path_WellExpress_Converter::From(static_cast<const AO::Path_WellExpress&>(tlv), tlvId));
             break;
         case AO::TlvTypes::Mine_46:
             convert_tlv<relive::Path_Mine_Converter, AO::Path_Mine>(j, tlv, tlvId);
@@ -474,10 +474,10 @@ static void ConvertTLV(nlohmann::json& j, const AO::Path_TLV& tlv, const Guid& t
             convert_tlv<relive::Path_RingMudokon_Converter, AO::Path_RingMudokon>(j, tlv, tlvId);
             break;
         case AO::TlvTypes::MovieStone_51:
-            convert_tlv<relive::Path_MovieStone_Converter, AO::Path_MovieStone>(j, tlv, tlvId);
+            j.push_back(relive::Path_MovieStone_Converter::From(static_cast<const AO::Path_MovieStone&>(tlv), tlvId, lvlId));
             break;
         case AO::TlvTypes::BirdPortal_52:
-            convert_tlv<relive::Path_BirdPortal_Converter, AO::Path_BirdPortal>(j, tlv, tlvId);
+            j.push_back(relive::Path_BirdPortal_Converter::From(static_cast<const AO::Path_BirdPortal&>(tlv), tlvId));
             break;
         case AO::TlvTypes::BirdPortalExit_53:
             convert_tlv<relive::Path_BirdPortalExit_Converter, AO::Path_BirdPortalExit>(j, tlv, tlvId);

@@ -788,6 +788,9 @@ target_link_libraries(relive_lib
     libglew_static
     imgui
     glm
+    ogg
+    vorbis
+    vorbisenc
     ${WIN32_LIBS}
     SDL3::SDL3
     )

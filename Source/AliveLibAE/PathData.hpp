@@ -67,6 +67,7 @@ struct SeqHandleTable final
 
 // note: has to be writable
 relive::FmvInfoEntry* Path_Get_FMV_Record(EReliveLevelIds lvlId, u16 fmvId);
+relive::FmvInfoEntry* Path_Get_FMV_Record(EReliveLevelIds lvlId, const std::string& fmvName);
 
 // All real, unique FMV (.DDV) filenames referenced by any level's FmvInfo table -
 // used to drive FMV data conversion without a separately-maintained hardcoded list.

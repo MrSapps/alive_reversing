@@ -312,8 +312,7 @@ Slig::~Slig()
                 mAbeLevel,
                 mAbePath,
                 mAbeCamera,
-                CameraSwapEffects::eInstantChange_0,
-                0,
+                CameraSwapEffects::eInstantChange_0,{},
                 0);
     }
 
@@ -4311,8 +4310,7 @@ s16 Slig::Brain_Death()
                 mAbeLevel,
                 mAbePath,
                 mAbeCamera,
-                CameraSwapEffects::eInstantChange_0,
-                0,
+                CameraSwapEffects::eInstantChange_0,{},
                 0);
         }
     }
@@ -4381,7 +4379,7 @@ s16 Slig::Brain_DeathDropDeath()
                 {
                     MusicController::static_PlayMusic(MusicController::MusicTypes::eType0, this, 0, 0);
                     sControlledCharacter = gAbe;
-                    mMap.SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+                    mMap.SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, {}, 0);
                 }
                 SetDead(true);
             }
@@ -4402,8 +4400,7 @@ s16 Slig::Brain_ReturnControlToAbeAndDie()
             mAbeLevel,
             mAbePath,
             mAbeCamera,
-            CameraSwapEffects::eInstantChange_0,
-            0,
+            CameraSwapEffects::eInstantChange_0,{},
             0);
     }
     SetDead(true);

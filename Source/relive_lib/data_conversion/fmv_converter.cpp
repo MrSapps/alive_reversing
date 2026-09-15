@@ -2,6 +2,7 @@
 #include "../../AliveLibAE/PathData.hpp"
 #include "../../AliveLibAO/PathData.hpp"
 #include "../FatalError.hpp"
+#include "../FmvInfo.hpp"
 #include "PNGFile.hpp"
 
 #include <algorithm>
@@ -241,7 +242,7 @@ public:
         }
 
         FileSystem::Path outPathBuilder = outDir;
-        outPathBuilder.Append(fName + ".webm");
+        outPathBuilder.Append(relive::FmvNameWithoutExtension(fName) + ".webm");
         const std::string outFileName = outPathBuilder.GetPath();
         // Written under a temp name and only renamed to outFileName once fully finalized (see
         // below), so a conversion that gets killed or cancelled mid-write (see
@@ -898,7 +899,7 @@ void ConvertFMVs(ThreadPool& tp, FileSystem& fs, const FileSystem::Path& dataDir
         // a movie complete once FmvConv::Convert has moved its finished temp file into place, so
         // this can't mistake a half-written file for a done one.
         FileSystem::Path outFile = fmvOutDir;
-        outFile.Append(info.mName + ".webm");
+        outFile.Append(relive::FmvNameWithoutExtension(info.mName) + ".webm");
         if (manifest->IsCompleted(info.mName) && fs.FileExists(outFile.GetPath().c_str()))
         {
             LOG_INFO("ConvertFMVs: '%s' already converted, skipping", info.mName.c_str());

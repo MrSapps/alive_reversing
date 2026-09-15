@@ -135,13 +135,13 @@ void GameEnderController::VUpdate()
                         if (gRescuedMudokons >= Path_GetTotalMuds(mMap.mCurrentLevel, mMap.mCurrentPath))
                         {
                             // Perfect ending
-                            mMap.SetActiveCam(EReliveLevelIds::eBrewery_Ender, 1, 17, CameraSwapEffects::eUnknown_11, 17, 0);
+                            mMap.SetActiveCam(EReliveLevelIds::eBrewery_Ender, 1, 17, CameraSwapEffects::eUnknown_11, FmvIds{"GDENDING.DDV"}, 0);
                             mState = GameEnderControllerStates::eAngelicEnding_5;
                         }
                         else
                         {
                             // Good enough ending
-                            mMap.SetActiveCam(EReliveLevelIds::eBrewery_Ender, 1, 18, CameraSwapEffects::eUnknown_11, 17, 0);
+                            mMap.SetActiveCam(EReliveLevelIds::eBrewery_Ender, 1, 18, CameraSwapEffects::eUnknown_11, FmvIds{"GDENDING.DDV"}, 0);
                             mState = GameEnderControllerStates::eGoodEnding_4;
                         }
                     }
@@ -151,14 +151,14 @@ void GameEnderController::VUpdate()
                         {
                             // Very bad ending
                             gAbeInvincible = true;
-                            mMap.SetActiveCam(EReliveLevelIds::eBrewery_Ender, 1, 15, CameraSwapEffects::eUnknown_11, 18, 0);
+                            mMap.SetActiveCam(EReliveLevelIds::eBrewery_Ender, 1, 15, CameraSwapEffects::eUnknown_11, FmvIds{"BDENDING.DDV"}, 0);
                             mState = GameEnderControllerStates::eBadEnding_3;
                         }
                         else
                         {
                             // Bad ending
                             gAbeInvincible = false;
-                            mMap.SetActiveCam(EReliveLevelIds::eBrewery_Ender, 1, 16, CameraSwapEffects::eUnknown_11, 18, 0);
+                            mMap.SetActiveCam(EReliveLevelIds::eBrewery_Ender, 1, 16, CameraSwapEffects::eUnknown_11, FmvIds{"BDENDING.DDV"}, 0);
                             mState = GameEnderControllerStates::eBadEnding_3;
                             gRescuedMudokons = gFeecoRestart_SavedMudCount;
                             gKilledMudokons = gFeeco_Restart_KilledMudCount;
@@ -175,7 +175,7 @@ void GameEnderController::VUpdate()
         case GameEnderControllerStates::eBadEnding_3:
             if (Input().IsAnyPressed(InputCommands::eUnPause_OrConfirm) || Input().IsAnyPressed(InputCommands::eBack))
             {
-                mMap.SetActiveCam(EReliveLevelIds::eFeeCoDepot, 1, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eFeeCoDepot, 1, 1, CameraSwapEffects::eInstantChange_0, {}, 0);
                 mState = GameEnderControllerStates::eFinish_2;
             }
             break;
@@ -183,7 +183,7 @@ void GameEnderController::VUpdate()
         case GameEnderControllerStates::eGoodEnding_4:
             if (Input().IsAnyPressed(InputCommands::eUnPause_OrConfirm) || Input().IsAnyPressed(InputCommands::eBack))
             {
-                mMap.SetActiveCam(EReliveLevelIds::eCredits, 1, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eCredits, 1, 1, CameraSwapEffects::eInstantChange_0, {}, 0);
                 mState = GameEnderControllerStates::eFinish_2;
             }
             break;
@@ -191,7 +191,7 @@ void GameEnderController::VUpdate()
         case GameEnderControllerStates::eAngelicEnding_5:
             if (Input().IsAnyPressed(InputCommands::eUnPause_OrConfirm) || Input().IsAnyPressed(InputCommands::eBack))
             {
-                mMap.SetActiveCam(EReliveLevelIds::eBrewery_Ender, 1, 20, CameraSwapEffects::eInstantChange_0, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eBrewery_Ender, 1, 20, CameraSwapEffects::eInstantChange_0, {}, 0);
                 mState = GameEnderControllerStates::eAngelicEndingCredits_6;
             }
             break;
@@ -199,7 +199,7 @@ void GameEnderController::VUpdate()
         case GameEnderControllerStates::eAngelicEndingCredits_6:
             if (Input().IsAnyPressed(InputCommands::eUnPause_OrConfirm) || Input().IsAnyPressed(InputCommands::eBack))
             {
-                mMap.SetActiveCam(EReliveLevelIds::eCredits, 2, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eCredits, 2, 1, CameraSwapEffects::eInstantChange_0, {}, 0);
                 mMap.mFreeAllAnimAndPalts = true;
                 mState = GameEnderControllerStates::eFinish_2;
             }

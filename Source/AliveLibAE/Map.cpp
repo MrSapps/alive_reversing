@@ -515,7 +515,7 @@ void Map::Handle_PathTransition()
         mNextLevel = pTlv->mNextLevel;
         mNextPath = pTlv->mNextPath;
         mNextCamera = pTlv->mNextCamera;
-        mFmvBaseId = pTlv->mMovieId;
+        mFmvIds = FmvIds{pTlv->mMovie1, pTlv->mMovie2, pTlv->mMovie3};
 
         mCameraSwapEffect = kPathChangeEffectToInternalScreenChangeEffect[pTlv->mWipeEffect];
 
@@ -639,40 +639,14 @@ s32 Map::VPurpleLightFrameCount(s16 /*bMakeInvisible*/)
 
 BaseGameObject* Map::FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLevelIds lvlId)
 {
-    if (pMap->mFmvBaseId > 10000u)
-    {
-        // Trippe FMV
-        relive::FmvInfoEntry* pFmvRec1 = Path_Get_FMV_Record(lvlId, pMap->mFmvBaseId / 10000);
-        relive::FmvInfoEntry* pFmvRec2 = Path_Get_FMV_Record(lvlId, pMap->mFmvBaseId % 100);
-        relive::FmvInfoEntry* pFmvRec3 = Path_Get_FMV_Record(lvlId, pMap->mFmvBaseId / 100 % 100);
+    relive::FmvInfoEntry* pFmvRec1 = Path_Get_FMV_Record(lvlId, pMap->mFmvIds.mFmv1);
+    relive::FmvInfoEntry* pFmvRec2 = Path_Get_FMV_Record(lvlId, pMap->mFmvIds.mFmv2);
+    relive::FmvInfoEntry* pFmvRec3 = Path_Get_FMV_Record(lvlId, pMap->mFmvIds.mFmv3);
 
-        return relive_new CameraSwapper(ppBits, pMap->mResourceManager, *pMap,
-                                        pFmvRec1->mFlags == 1,
-                                        pFmvRec1->mName,
-                                        pFmvRec2->mFlags == 1, // TODO: Master branch gobbed
-                                        pFmvRec2->mName,
-                                        pFmvRec3->mFlags == 1,
-                                        pFmvRec3->mName);
-    }
-    else if (pMap->mFmvBaseId >= 100u)
-    {
-        // Double FMV
-        relive::FmvInfoEntry* pFmvRec1 = Path_Get_FMV_Record(lvlId, pMap->mFmvBaseId / 100);
-        relive::FmvInfoEntry* pFmvRec2 = Path_Get_FMV_Record(lvlId, pMap->mFmvBaseId % 100);
-        return relive_new CameraSwapper(ppBits, pMap->mResourceManager, *pMap,
-                                              pFmvRec1->mFlags == 1,
-                                              pFmvRec1->mName,
-                                              pFmvRec2->mFlags == 1,
-                                              pFmvRec2->mName);
-    }
-    else // < 100
-    {
-        // Single FMV
-        relive::FmvInfoEntry* pFmvRec1 = Path_Get_FMV_Record(lvlId, pMap->mFmvBaseId);
-        return relive_new CameraSwapper(ppBits, pMap->mResourceManager, *pMap,
-                                              pFmvRec1->mFlags == 1,
-                                              pFmvRec1->mName);
-    }
+    return relive_new CameraSwapper(ppBits, pMap->mResourceManager, *pMap,
+                                     pFmvRec1 && pFmvRec1->mFlags == 1, pFmvRec1 ? pFmvRec1->mName : nullptr,
+                                     pFmvRec2 && pFmvRec2->mFlags == 1, pFmvRec2 ? pFmvRec2->mName : nullptr,
+                                     pFmvRec3 && pFmvRec3->mFlags == 1, pFmvRec3 ? pFmvRec3->mName : nullptr);
 }
 
 

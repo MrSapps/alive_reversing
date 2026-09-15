@@ -719,6 +719,7 @@ private:
     s8 mHandStoneCamIdx = 0;
     ReliveTypes mHandStoneType = {};
     s16 mFmvId = 0;
+    std::string mFmvName; // Set (only) for eMovieHandStone - mFmvId is reused for an unrelated, never-read value in the eHandStone case.
     s16 mHandStoneCams[3] = {};
     bool mHasEvilFart = false;
     EReliveLevelIds mDstWellLevel = EReliveLevelIds::eNone;

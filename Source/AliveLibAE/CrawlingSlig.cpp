@@ -659,8 +659,7 @@ CrawlingSlig::~CrawlingSlig()
                 mAbeLevel,
                 mAbePath,
                 mAbeCamera,
-                CameraSwapEffects::eInstantChange_0,
-                0,
+                CameraSwapEffects::eInstantChange_0,{},
                 0);
         }
     }
@@ -1052,7 +1051,7 @@ void PossessedBrain::VUpdate()
 
                 sControlledCharacter = gAbe;
                 mCrawlingSlig.SetPossessed(false);
-                mCrawlingSlig.mMap.SetActiveCam(mCrawlingSlig.mAbeLevel, mCrawlingSlig.mAbePath, mCrawlingSlig.mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+                mCrawlingSlig.mMap.SetActiveCam(mCrawlingSlig.mAbeLevel, mCrawlingSlig.mAbePath, mCrawlingSlig.mAbeCamera, CameraSwapEffects::eInstantChange_0, {}, 0);
                 mCrawlingSlig.SetBrain(ICrawlingSligBrain::EBrainTypes::GetKilled);
                 mCrawlingSlig.mGetKilledBrain.SetState(GetKilledBrain::eGibsDeath);
                 MusicController::static_PlayMusic(MusicController::MusicTypes::eNone_0, &mCrawlingSlig, 0, 0);

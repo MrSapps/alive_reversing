@@ -4990,9 +4990,9 @@ void Abe::IntoPortalStates()
                 u16 path = 0;
                 u16 camera = 0;
                 CameraSwapEffects screenChangeEffect = {};
-                u16 movieId = 0;
-                field_1A0_portal->VGetMapChange(&level, &path, &camera, &screenChangeEffect, &movieId);
-                mMap.SetActiveCam(level, path, camera, screenChangeEffect, movieId, false);
+                FmvIds fmvIds;
+                field_1A0_portal->VGetMapChange(&level, &path, &camera, &screenChangeEffect, &fmvIds);
+                mMap.SetActiveCam(level, path, camera, screenChangeEffect, fmvIds, false);
                 field_19E_portal_sub_state = PortalSubStates::eSetNewAbePosition_4;
             }
             break;
@@ -7302,13 +7302,13 @@ void Abe::Motion_81_InsideWellExpress()
         || field_194_camera != mMap.mCurrentCamera)
     {
         field_114_gnFrame = 1;
-        if (pExpressWell->mMovieId)
+        if (!pExpressWell->mMovieName.empty())
         {
-            mMap.SetActiveCam(field_190_level, field_192_path, field_194_camera, CameraSwapEffects::ePlay1FMV_5, pExpressWell->mMovieId, 0);
+            mMap.SetActiveCam(field_190_level, field_192_path, field_194_camera, CameraSwapEffects::ePlay1FMV_5, FmvIds{pExpressWell->mMovieName}, 0);
         }
         else
         {
-            mMap.SetActiveCam(field_190_level, field_192_path, field_194_camera, CameraSwapEffects::eInstantChange_0, 0, 0);
+            mMap.SetActiveCam(field_190_level, field_192_path, field_194_camera, CameraSwapEffects::eInstantChange_0, {}, 0);
         }
         mCurrentMotion = eAbeMotions::Motion_82_WellExpressShotOut;
     }
@@ -7528,7 +7528,7 @@ void Abe::Motion_88_HandstoneBegin()
                     {
                         auto pFmvInfo = Path_Get_FMV_Record(
                             mMap.mCurrentLevel,
-                            mMovieStone->mMovieId);
+                            mMovieStone->mMovieName);
 
                         relive_new Movie(pFmvInfo->mName, mResMan, mMap);
 
@@ -7577,7 +7577,7 @@ void Abe::Motion_88_HandstoneBegin()
                             mHandStone->mLevel1,
                             mHandStone->mPath1,
                             mHandStone->mCameraId1,
-                            CameraSwapEffects::eInstantChange_0, 0, 0);
+                            CameraSwapEffects::eInstantChange_0, {}, 0);
                         break;
                     }
                     default:
@@ -7696,7 +7696,7 @@ void Abe::Motion_88_HandstoneBegin()
                     field_16E_cameraIdx++;
                     pFade = relive_new Fade(Layer::eLayer_FadeFlash_40, FadeOptions::eFadeOut, 0, 8, relive::TBlendModes::eBlend_2, mResMan, mMap);
                     mFadeId = pFade->mBaseGameObjectId;
-                    mMap.SetActiveCam(MapWrapper::FromAO(camera.level), camera.path, camera.camera, CameraSwapEffects::eInstantChange_0, 0, 0);
+                    mMap.SetActiveCam(MapWrapper::FromAO(camera.level), camera.path, camera.camera, CameraSwapEffects::eInstantChange_0, {}, 0);
                 }
             }
             break;
@@ -7708,7 +7708,7 @@ void Abe::Motion_88_HandstoneBegin()
             {
                 GetAnimation().SetRender(true);
                 field_110_state.stone = StoneStates::eCircularFadeExit_13;
-                mMap.SetActiveCam(field_190_level, field_192_path, field_194_camera, CameraSwapEffects::eInstantChange_0, 0, 0);
+                mMap.SetActiveCam(field_190_level, field_192_path, field_194_camera, CameraSwapEffects::eInstantChange_0, {}, 0);
             }
             break;
         }
@@ -9047,7 +9047,7 @@ void Abe::Motion_156_DoorEnter()
                 doorIterator.GetTlv<relive::Path_Door>()->mNextPath,
                 doorIterator.GetTlv<relive::Path_Door>()->mNextCamera,
                 changeEffect,
-                doorIterator.GetTlv<relive::Path_Door>()->mMovieId,
+                FmvIds{doorIterator.GetTlv<relive::Path_Door>()->mMovieName},
                 flag);
             field_110_state.door = AbeDoorStates::eSetNewAbePosition_5;
             field_196_door_id = doorIterator.GetTlv<relive::Path_Door>()->mTargetDoorId;

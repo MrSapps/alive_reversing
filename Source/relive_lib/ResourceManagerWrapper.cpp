@@ -13,6 +13,7 @@
 
 #include "BinaryPath.hpp"
 #include "BaseGameAutoPlayer.hpp"
+#include "FmvInfo.hpp"
 #include "GameObjects/Particle.hpp"
 #include "nlohmann/json.hpp"
 #include "Sys.hpp"
@@ -221,13 +222,14 @@ void ResourceManagerWrapper::PendAnimation(AnimId animId, const std::string& the
     }
 }
 
-std::string ResourceManagerWrapper::FmvPath(const std::string& fmvName) 
+std::string ResourceManagerWrapper::FmvPath(const std::string& fmvName)
 {
+    const std::string webmName = relive::FmvNameWithoutExtension(fmvName) + ".webm";
     for (const auto& basePath : mSearchPaths)
     {
         FileSystem::Path filePath(basePath);
         filePath.Append("fmvs");
-        filePath.Append(fmvName + ".webm");
+        filePath.Append(webmName);
         if (mFs.FileExists(filePath.GetPath().c_str()))
         {
             return filePath.GetPath();

@@ -5783,13 +5783,13 @@ void Abe::Motion_82_InsideWellExpress_45CC80()
     {
         field_124_timer = 1;
 
-        if (pExpressWell->mMovieId)
+        if (!pExpressWell->mMovieName.empty())
         {
-            mMap.SetActiveCam(mDstWellLevel, mDstWellPath, mDstWellCamera, CameraSwapEffects::ePlay1FMV_5, pExpressWell->mMovieId, 0);
+            mMap.SetActiveCam(mDstWellLevel, mDstWellPath, mDstWellCamera, CameraSwapEffects::ePlay1FMV_5, FmvIds{pExpressWell->mMovieName}, 0);
         }
         else
         {
-            mMap.SetActiveCam(mDstWellLevel, mDstWellPath, mDstWellCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+            mMap.SetActiveCam(mDstWellLevel, mDstWellPath, mDstWellCamera, CameraSwapEffects::eInstantChange_0, {}, 0);
         }
 
         // FeeCo hack!
@@ -5975,7 +5975,7 @@ void Abe::Motion_86_HandstoneBegin()
                 {
                     switch_id = pMovieStoneTlv->mTriggerSwitchId;
 
-                    mFmvId = pMovieStoneTlv->mMovieId;
+                    mFmvName = pMovieStoneTlv->mMovieName;
                     mHandStoneCams[0] = static_cast<s16>(pMovieStoneTlv->mScale); // TODO: Never used?
                     mHandStoneCams[1] = static_cast<s16>(pMovieStoneTlv->mTriggerSwitchId);    // TODO: Never used?
                 }
@@ -6003,7 +6003,7 @@ void Abe::Motion_86_HandstoneBegin()
                 {
                     gScreenManager->EnableRendering();
 
-                    relive::FmvInfoEntry* pFmvRec = Path_Get_FMV_Record(mMap.mCurrentLevel, mFmvId);
+                    relive::FmvInfoEntry* pFmvRec = Path_Get_FMV_Record(mMap.mCurrentLevel, mFmvName);
 
                     relive_new Movie(pFmvRec->mName, mResMan, mMap);
                     field_120_state.stone = StoneStates::eHandstoneMovieDone_2;
@@ -6022,7 +6022,7 @@ void Abe::Motion_86_HandstoneBegin()
                     }
 
                     mDstWellCamera = mMap.mCurrentCamera;
-                    mMap.SetActiveCam(mCurrentLevel, mCurrentPath, mHandStoneCams[0], CameraSwapEffects::eInstantChange_0, 0, 0);
+                    mMap.SetActiveCam(mCurrentLevel, mCurrentPath, mHandStoneCams[0], CameraSwapEffects::eInstantChange_0, {}, 0);
                 }
             }
             break;
@@ -6085,8 +6085,7 @@ void Abe::Motion_86_HandstoneBegin()
                         mCurrentLevel,
                         mCurrentPath,
                         mHandStoneCams[mHandStoneCamIdx++],
-                        CameraSwapEffects::eInstantChange_0,
-                        0,
+                        CameraSwapEffects::eInstantChange_0,{},
                         0);
                 }
                 else
@@ -6105,8 +6104,7 @@ void Abe::Motion_86_HandstoneBegin()
                     mCurrentLevel,
                     mCurrentPath,
                     mDstWellCamera,
-                    CameraSwapEffects::eInstantChange_0,
-                    0,
+                    CameraSwapEffects::eInstantChange_0,{},
                     0);
             }
             break;
@@ -6989,7 +6987,7 @@ void Abe::Motion_114_DoorEnter()
             {
                 // Plays FMV where the weirdos give Abe the drunk mud healing power and then dumps Abe at the portal that leads
                 // back to Necrum mines.
-                mMap.SetActiveCam(EReliveLevelIds::eNecrum, 3, 10, CameraSwapEffects::ePlay1FMV_5, 22, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eNecrum, 3, 10, CameraSwapEffects::ePlay1FMV_5, FmvIds{"REWARD.DDV"}, 0);
                 mVelY = FP_FromInteger(0);
                 mVelX = FP_FromInteger(0);
                 mXPos = FP_FromInteger(2287);
@@ -7016,7 +7014,7 @@ void Abe::Motion_114_DoorEnter()
                 pDoorTlv->mNextPath,
                 pDoorTlv->mNextCamera,
                 effect,
-                pDoorTlv->mMovieId,
+                FmvIds{pDoorTlv->mMovieName},
                 bForceChange);
 
             field_120_state.door = AbeDoorStates::eSetNewAbePosition_5;
@@ -8662,10 +8660,10 @@ void Abe::IntoPortalStates_451990()
                     u16 path = 0;
                     u16 camera = 0;
                     CameraSwapEffects screenChangeEffect = {};
-                    u16 movieId = 0;
+                    FmvIds fmvIds;
 
-                    pBirdPortal->VGetMapChange(&level, &path, &camera, &screenChangeEffect, &movieId);
-                    mMap.SetActiveCam(level, path, camera, screenChangeEffect, movieId, false);
+                    pBirdPortal->VGetMapChange(&level, &path, &camera, &screenChangeEffect, &fmvIds);
+                    mMap.SetActiveCam(level, path, camera, screenChangeEffect, fmvIds, false);
                     mBirdPortalSubState = PortalSubStates::eSetNewAbePosition_4;
                 }
                 break;

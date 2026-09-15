@@ -15,7 +15,7 @@ struct Relive_Path_Teleporter_Data
     s16 mSwitchId;
     relive::reliveScale mScale;
     relive::reliveScreenChangeEffects mWipeEffect;
-    s16 mMovieId;
+    std::string mMovieName;
     s16 mElectricX;
     s16 mElectricY;
 };

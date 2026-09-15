@@ -17,6 +17,31 @@ class BaseAnimatedWithPhysicsGameObject;
 
 enum class ReliveTypes : s16;
 
+// Up to 3 FMVs to play back to back during a camera swap. Replaces the old scheme of
+// packing up to 3 small FMV indices into a single decimal number (e.g. 12402 meant
+// play FMV 1, then FMV 24, then FMV 2 - decoded via /10000, %100 and /100%100) that
+// FMV_Camera_Change used to unpack. An empty name means "no FMV in that slot".
+struct FmvIds final
+{
+    FmvIds() = default;
+    explicit FmvIds(std::string fmv1, std::string fmv2 = {}, std::string fmv3 = {})
+        : mFmv1(std::move(fmv1))
+        , mFmv2(std::move(fmv2))
+        , mFmv3(std::move(fmv3))
+    {
+
+    }
+
+    std::string mFmv1;
+    std::string mFmv2;
+    std::string mFmv3;
+
+    bool IsNone() const
+    {
+        return mFmv1.empty() && mFmv2.empty() && mFmv3.empty();
+    }
+};
+
 // Largest valid grid-block index for a sprite of the given scale (0.5 or 1.0).
 // Same for both engines. An invalid scale logs a warning and returns 0 rather
 // than asserting - AO can reach this path in practice (e.g. dying with DDCheat on).
@@ -156,10 +181,10 @@ public:
     Camera* Create_Camera(s16 xpos, s16 ypos, s32 a4);
     void Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode);
     void GetCurrentCamCoords(PSX_Point* pPoint);
-    s16 SetActiveCam(EReliveLevelIds level, s16 path, s16 cam, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange);
+    bool SetActiveCam(EReliveLevelIds level, s16 path, s16 cam, CameraSwapEffects screenChangeEffect, FmvIds fmvIds = {}, bool forceChange = false);
     CameraPos GetDirection(EReliveLevelIds level, s32 path, FP xpos, FP ypos);
     void Get_map_size(PSX_Point* pPoint);
-    void Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange);
+    void Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, FmvIds fmvIds = {}, bool forceChange = false);
     void Shutdown();
     void Reset();
 
@@ -213,7 +238,13 @@ public:
     s16 mOverlayId = 0;
 
     CameraSwapEffects mCameraSwapEffect = CameraSwapEffects::eInstantChange_0;
-    u16 mFmvBaseId = 0;
+    FmvIds mFmvIds;
+
+    // Kept in sync with mFmvIds by SetActiveCam - 1 whenever an FMV is queued to play, 0
+    // otherwise. Exists only for Source/relive/Exe.cpp's AutoSplitterData ABI, which external
+    // tools (speedrun auto-splitters) read via a fixed memory layout and can't be given a
+    // string-based field without breaking that ABI.
+    u16 mFmvPending = 0;
     MapDirections mMapDirection = MapDirections::eMapLeft_0;
     BaseAliveGameObject* mAliveObj = nullptr;
     CamChangeStates mCamState = CamChangeStates::eInactive_0;

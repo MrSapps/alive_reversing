@@ -577,14 +577,14 @@ void Menu::CopyRight_Update()
         if (static_cast<s32>(sGnFrame) > field_1D8_timer)
         {
             field_1D8_timer = MakeTimer(150);
-            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eCopyright_10, CameraSwapEffects::eInstantChange_0, 0, 0);
+            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eCopyright_10, CameraSwapEffects::eInstantChange_0, {}, 0);
         }
     }
     else
     {
         if (static_cast<s32>(sGnFrame) > field_1D8_timer || mMap.mCurrentCamera != 10)
         {
-            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::ePlay1FMV_5, 30102, 0);
+            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::ePlay1FMV_5, FmvIds{"GTDDLOGO.DDV", "XAOSOPEN.DDV", "LOGOINT.DDV"}, 0);
             mFnUpdate = &Menu::WaitForDoorToOpen;
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuDoor));
         }
@@ -679,7 +679,7 @@ void Menu::FMV_Select_Update()
 
                     // The credits are re-done in this class rather than using CreditsController... go to the Sherry credit screen
                     mCurrentCreditsCamera = 1;
-                    mMap.SetActiveCam(EReliveLevelIds::eCredits, 1, static_cast<s16>(mCurrentCreditsCamera), CameraSwapEffects::eInstantChange_0, 0, 0);
+                    mMap.SetActiveCam(EReliveLevelIds::eCredits, 1, static_cast<s16>(mCurrentCreditsCamera), CameraSwapEffects::eInstantChange_0, {}, 0);
                     mFnUpdate = &Menu::To_Credits_Update;
                     mFnRender = &Menu::Empty_Render;
                 }
@@ -1157,14 +1157,14 @@ void Menu::GoToSelectedMenuPage()
     {
         if (mToFmvSelect)
         {
-            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eFmvSelect_30, CameraSwapEffects::eInstantChange_0, 0, 0);
+            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eFmvSelect_30, CameraSwapEffects::eInstantChange_0, {}, 0);
             mFnUpdate = &Menu::ToNextMenuPage;
             return;
         }
 
         if (mToLevelSelect)
         {
-            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eLvlSelect_31, CameraSwapEffects::eInstantChange_0, 0, 0);
+            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eLvlSelect_31, CameraSwapEffects::eInstantChange_0, {}, 0);
             mFnUpdate = &Menu::ToNextMenuPage;
             return;
         }
@@ -1178,11 +1178,11 @@ void Menu::GoToSelectedMenuPage()
                 // Diff cam depending on input method ?
                 if (Input().IsJoyStickEnabled())
                 {
-                    mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eGamespeakGamepad_3, CameraSwapEffects::eInstantChange_0, 0, 0);
+                    mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eGamespeakGamepad_3, CameraSwapEffects::eInstantChange_0, {}, 0);
                 }
                 else
                 {
-                    mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eGamespeakKeyboard_33, CameraSwapEffects::eInstantChange_0, 0, 0);
+                    mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eGamespeakKeyboard_33, CameraSwapEffects::eInstantChange_0, {}, 0);
                 }
 
                 mFnUpdate = &Menu::ToNextMenuPage;
@@ -1203,13 +1203,13 @@ void Menu::GoToSelectedMenuPage()
 
             // Load
             case MainMenuOptions::eLoad_3:
-                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eLoad_6, CameraSwapEffects::eInstantChange_0, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eLoad_6, CameraSwapEffects::eInstantChange_0, {}, 0);
                 mFnUpdate = &Menu::ToNextMenuPage;
                 break;
 
             // Options
             case MainMenuOptions::eOptions_4:
-                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eOptions_2, CameraSwapEffects::eInstantChange_0, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eOptions_2, CameraSwapEffects::eInstantChange_0, {}, 0);
                 mFnUpdate = &Menu::ToNextMenuPage;
                 break;
 
@@ -1313,7 +1313,7 @@ void Menu::ToLoading()
         if (pMenuTrans->field_16_bDone)
         {
             pMenuTrans->StartTrans_436560(Layer::eLayer_FadeFlash_40, 0, 0, 16);
-            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eLoading_21, CameraSwapEffects::eInstantChange_0, 0, 0);
+            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eLoading_21, CameraSwapEffects::eInstantChange_0, {}, 0);
             field_204_flags &= ~2u;
             mFnUpdate = &Menu::Loading_Update;
             mFnRender = &Menu::Empty_Render;
@@ -1341,11 +1341,11 @@ void Menu::GameSpeak_Render(OrderingTable& ot)
 #if AUTO_SWITCH_CONTROLLER // OG Change - Automatically switch between Gamepad/Keyboard GameSpeak Menu if joystick is added/removed
     if (Input().IsJoyStickEnabled() && mMap.mNextCamera == CameraIds::Menu::eGamespeakKeyboard_33)
     {
-        mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eGamespeakGamepad_3, CameraSwapEffects::eInstantChange_0, 0, 0);
+        mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eGamespeakGamepad_3, CameraSwapEffects::eInstantChange_0, {}, 0);
     }
     else if (!Input().IsJoyStickEnabled() && mMap.mNextCamera == CameraIds::Menu::eGamespeakGamepad_3)
     {
-        mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eGamespeakKeyboard_33, CameraSwapEffects::eInstantChange_0, 0, 0);
+        mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eGamespeakKeyboard_33, CameraSwapEffects::eInstantChange_0, {}, 0);
     }
 #endif
 
@@ -1700,7 +1700,7 @@ void Menu::NewGameStart()
         if (mUsingLvlSelectCheat)
         {
             mUsingLvlSelectCheat = false;
-            mMap.SetActiveCam(mLvlSelectCheatLevel, mLvlSelectCheatPath, mLvlSelectCheatCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+            mMap.SetActiveCam(mLvlSelectCheatLevel, mLvlSelectCheatPath, mLvlSelectCheatCamera, CameraSwapEffects::eInstantChange_0, {}, 0);
             gAbe->mXPos = FP_FromInteger(mLvlSelectCheatAbeSpawnX);
             gAbe->mYPos = FP_FromInteger(mLvlSelectCheatAbeSpawnY);
         }
@@ -1708,7 +1708,7 @@ void Menu::NewGameStart()
         {
             // Start the game in the biggest meat processing plant
             gInfiniteThrowables = false;
-            mMap.SetActiveCam(EReliveLevelIds::eRuptureFarms, 15, 1, CameraSwapEffects::ePlay1FMV_5, 102, 0);
+            mMap.SetActiveCam(EReliveLevelIds::eRuptureFarms, 15, 1, CameraSwapEffects::ePlay1FMV_5, FmvIds{"BEGIN.DDV", "GAMEBGN.DDV"}, 0);
 
             // What if someone made a level editor and wanted to change where abe spawns on the first map? Well... hard luck pal
             gAbe->mXPos = FP_FromInteger(1378);
@@ -1821,17 +1821,17 @@ void Menu::Option_GoTo_Selected_Update()
             {
                 // Controller
                 case OptionsMenuOptions::eController_0:
-                    mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eController_40, CameraSwapEffects::eInstantChange_0, 0, 0);
+                    mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eController_40, CameraSwapEffects::eInstantChange_0, {}, 0);
                     break;
 
                 // Sound
                 case OptionsMenuOptions::eSound_1:
-                    mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eSound_5, CameraSwapEffects::eInstantChange_0, 0, 0);
+                    mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eSound_5, CameraSwapEffects::eInstantChange_0, {}, 0);
                     break;
 
                 // Back to main menu screen
                 case OptionsMenuOptions::eMainMenu_2:
-                    mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, 0, 0);
+                    mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, {}, 0);
                     break;
 
                 default:
@@ -2175,7 +2175,7 @@ void Menu::Options_WaitForScreenTrans_Update()
     {
         if (pMenuTrans->field_16_bDone)
         {
-            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eOptions_2, CameraSwapEffects::eInstantChange_0, 0, 0);
+            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eOptions_2, CameraSwapEffects::eInstantChange_0, {}, 0);
             mFnUpdate = &Menu::To_MainOptions_Screen_After_Camera_Change_Update;
         }
     }
@@ -2483,7 +2483,7 @@ void Menu::FMV_Or_Level_Select_To_Back_Update()
     auto pMenuTrans = static_cast<MainMenuTransition*>(sObjectIds.Find_Impl(mMenuTransId));
     if (pMenuTrans->field_16_bDone)
     {
-        mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, 0, 0);
+        mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, {}, 0);
         mFnUpdate = &Menu::FMV_Or_Level_Select_Back_Update;
     }
 }
@@ -2551,12 +2551,12 @@ void Menu::GoTo_ControllerConfigure_Or_Back_AfterScreenTrans_Update()
             {
                 // Goto controller configuration
                 case 0:
-                    mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eControllerConfig_41, CameraSwapEffects::eInstantChange_0, 0, 0);
+                    mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eControllerConfig_41, CameraSwapEffects::eInstantChange_0, {}, 0);
                     break;
 
                 // Back to main options (sound/controller)
                 case 1:
-                    mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eOptions_2, CameraSwapEffects::eInstantChange_0, 0, 0);
+                    mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eOptions_2, CameraSwapEffects::eInstantChange_0, {}, 0);
                     break;
             }
 
@@ -3008,7 +3008,7 @@ void Menu::To_ShowAbeMotions_ChangeCamera_Update()
         {
             if (field_230_bGoBack == 9)
             {
-                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMotions_4, CameraSwapEffects::eInstantChange_0, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMotions_4, CameraSwapEffects::eInstantChange_0, {}, 0);
                 mFnUpdate = &Menu::To_ShowAbeMotions_SaveSettings_Update;
             }
         }
@@ -3052,14 +3052,14 @@ void Menu::Credits_Update()
         if (mCurrentCreditsCamera > 24)
         {
             // Credits done
-            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eFmvSelect_30, CameraSwapEffects::eInstantChange_0, 0, 0);
+            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eFmvSelect_30, CameraSwapEffects::eInstantChange_0, {}, 0);
             mFnUpdate = &Menu::CreditsEnd_BackTo_FMV_Or_Level_List_Update;
             gCreditsControllerExists = 0;
         }
         else
         {
             // Next credits screen
-            mMap.SetActiveCam(EReliveLevelIds::eCredits, 1, static_cast<s16>(mCurrentCreditsCamera), CameraSwapEffects::eTopToBottom_3, 0, 0);
+            mMap.SetActiveCam(EReliveLevelIds::eCredits, 1, static_cast<s16>(mCurrentCreditsCamera), CameraSwapEffects::eTopToBottom_3, {}, 0);
             field_1D8_timer = MakeTimer(60);
         }
     }
@@ -3226,7 +3226,7 @@ void Menu::ToggleMotions_Update()
             }
             else
             {
-                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMotionsGamespeakKeyboard_37, CameraSwapEffects::eTopToBottom_3, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMotionsGamespeakKeyboard_37, CameraSwapEffects::eTopToBottom_3, {}, 0);
             }
 
             // Go to game speak toggle
@@ -3269,7 +3269,7 @@ void Menu::Toggle_Motions_Screens_Update()
             }
             else
             {
-                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMotions_4, CameraSwapEffects::eBottomToTop_4, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMotions_4, CameraSwapEffects::eBottomToTop_4, {}, 0);
             }
 
             mFnUpdate = &Menu::ToggleMotions_Update;
@@ -3296,7 +3296,7 @@ void Menu::MotionsScreen_Back_Update()
     {
         if (pMenuTrans->field_16_bDone)
         {
-            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eOptions_2, CameraSwapEffects::eInstantChange_0, 0, 0);
+            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eOptions_2, CameraSwapEffects::eInstantChange_0, {}, 0);
             mFnUpdate = &Menu::Motions_ToOptions_Update;
         }
     }
@@ -3347,11 +3347,11 @@ void Menu::Load_BackToMainScreen_Update()
         {
             if (!mLoadSave)
             {
-                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, {}, 0);
             }
             else
             {
-                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eLoading_21, CameraSwapEffects::eInstantChange_0, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eLoading_21, CameraSwapEffects::eInstantChange_0, {}, 0);
             }
             mFnUpdate = &Menu::To_MainScreenOrLoad_Update;
         }
@@ -3377,7 +3377,7 @@ void Menu::GamespeakBack_WaitForScreenTrans_Update()
         if (pMenuTrans->field_16_bDone)
         {
             field_204_flags &= ~1u;
-            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, 0, 0);
+            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, {}, 0);
             mFnUpdate = &Menu::GameSpeak_To_MainScreen_Update;
         }
     }

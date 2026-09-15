@@ -27,7 +27,7 @@ private:
     EReliveLevelIds mDestLevel = EReliveLevelIds::eNone;
     s16 mDestPath = 0;
     s16 mDestCamera = 0;
-    s16 mMovieId = 0;
+    std::string mMovieName;
     Guid mTlvId;
     Guid mFadeId;
 };

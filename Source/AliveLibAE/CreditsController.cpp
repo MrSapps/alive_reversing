@@ -34,11 +34,11 @@ void CreditsController::VUpdate()
             if (mCurrentCamera > 22)
             {
                 mCurrentCamera = 1;
-                mMap.SetActiveCam(EReliveLevelIds::eCredits, 1, 1, CameraSwapEffects::eTopToBottom_3, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eCredits, 1, 1, CameraSwapEffects::eTopToBottom_3, {}, 0);
             }
             else
             {
-                mMap.SetActiveCam(EReliveLevelIds::eCredits, 2, mCurrentCamera, CameraSwapEffects::eTopToBottom_3, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eCredits, 2, mCurrentCamera, CameraSwapEffects::eTopToBottom_3, {}, 0);
             }
             mMap.mFreeAllAnimAndPalts = true;
         }
@@ -46,11 +46,11 @@ void CreditsController::VUpdate()
         {
             if (mCurrentCamera > 36)
             {
-                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 1, CameraSwapEffects::eInstantChange_0, {}, 0);
             }
             else
             {
-                mMap.SetActiveCam(EReliveLevelIds::eCredits, 1, mCurrentCamera, CameraSwapEffects::eTopToBottom_3, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eCredits, 1, mCurrentCamera, CameraSwapEffects::eTopToBottom_3, {}, 0);
             }
             mMap.mFreeAllAnimAndPalts = true;
         }

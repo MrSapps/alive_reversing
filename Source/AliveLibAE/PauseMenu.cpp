@@ -419,7 +419,7 @@ void PauseMenu::RestartPath()
         QuikSave::gActiveQuicksaveData.mRestartPathWorldInfo.mPath,
         QuikSave::gActiveQuicksaveData.mRestartPathWorldInfo.mCam,
         CameraSwapEffects::eInstantChange_0,
-        1,
+        {},
         1);
 
     mMap.mForceLoad = true;
@@ -598,7 +598,7 @@ void PauseMenu::Page_QuitConfirmation_Update()
         }
 
         gPauseMenu = nullptr;
-        mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
+        mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 1, CameraSwapEffects::eInstantChange_0, {}, 0);
         mMap.mFreeAllAnimAndPalts = true;
         sCurrentControllerIndex = 0;
     }

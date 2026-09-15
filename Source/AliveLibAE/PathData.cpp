@@ -843,23 +843,23 @@ relive::SoundBlockInfo CR_SoundBlockInfo[] = {
 // =========================================================
 
 PathRootContainer pathData = {
-    {{ST_PathBlyRecInfo, ST_FmvInfo, ST_SoundBlockInfo, "STSEQ.BSQ", 16, 0, "ST", 1, 0, 2, "\\ST.LVL;1", 0, "\\ST.OVL;1", 3, "\\ST.MOV;1", "ST.IDX", "STPATH.BND"},
-     {MI_PathBlyRecInfo, MI_FmvInfo, MI_SoundBlockInfo, "MISEQ.BSQ", 32, 1, "MI", 12, 1, 16, "\\MI.LVL;1", 4, "\\MI.OVL;1", 17, "\\MI.MOV;1", "MI.IDX", "MIPATH.BND"},
-     {NE_PathBlyRecInfo, NE_FmvInfo, NE_SoundBlockInfo, "NESEQ.BSQ", 24, 8, "NE", 7, 1, 34, "\\NE.LVL;1", 30, "\\NE.OVL;1", 35, "\\NE.MOV;1", "NE.IDX", "NEPATH.BND"},
-     {PV_PathBlyRecInfo, PV_FmvInfo, PV_SoundBlockInfo, "PVSEQ.BSQ", 32, 2, "PV", 15, 1, 44, "\\PV.LVL;1", 40, "\\PV.OVL;1", 45, "\\PV.MOV;1", "PV.IDX", "PVPATH.BND"},
-     {SV_PathBlyRecInfo, SV_FmvInfo, SV_SoundBlockInfo, "SVSEQ.BSQ", 32, 3, "SV", 14, 1, 58, "\\SV.LVL;1", 54, "\\SV.OVL;1", 59, "\\SV.MOV;1", "SV.IDX", "SVPATH.BND"},
-     {FD_PathBlyRecInfo, FD_FmvInfo, FD_SoundBlockInfo, "FDSEQ.BSQ", 32, 4, "FD", 14, 2, 72, "\\FD.LVL;1", 68, "\\FD.OVL;1", 73, "\\FD.MOV;1", "FD.IDX", "FDPATH.BND"},
-     {BA_PathBlyRecInfo, BA_FmvInfo, BA_SoundBlockInfo, "BASEQ.BSQ", 24, 7, "BA", 16, 2, 98, "\\BA.LVL;1", 94, "\\BA.OVL;1", 99, "\\BA.MOV;1", "BA.IDX", "BAPATH.BND"},
-     {SV_PathBlyRecInfo, SV_FmvInfo, SV_Ender_SoundBlockInfo, "SESEQ.BSQ", 32, 3, "SV", 14, 1, 58, "\\SV.LVL;1", 54, "\\SV.OVL;1", 59, "\\SV.MOV;1", "SV.IDX", "SVPATH.BND"},
-     {BW_PathBlyRecInfo, BW_FmvInfo, BW_SoundBlockInfo, "BWSEQ.BSQ", 32, 6, "BW", 14, 2, 120, "\\BW.LVL;1", 116, "\\BW.OVL;1", 121, "\\BW.MOV;1", "BW.IDX", "BWPATH.BND"},
-     {BR_PathBlyRecInfo, BR_FmvInfo, BR_SoundBlockInfo, "BRSEQ.BSQ", 32, 5, "BR", 29, 2, 146, "\\BR.LVL;1", 142, "\\BR.OVL;1", 147, "\\BR.MOV;1", "BR.IDX", "BRPATH.BND"},
-     {BM_PathBlyRecInfo, BM_FmvInfo, BM_SoundBlockInfo, "BMSEQ.BSQ", 16, 5, "BM", 1, 2, 208, "\\BM.LVL;1", 204, "\\BM.OVL;1", 147, "\\BR.MOV;1", "BR.IDX", "BMPATH.BND"},
-     {PV_PathBlyRecInfo, PV_FmvInfo, PV_Ender_SoundBlockInfo, "PESEQ.BSQ", 32, 2, "PV", 15, 1, 44, "\\PV.LVL;1", 40, "\\PV.OVL;1", 45, "\\PV.MOV;1", "PV.IDX", "PVPATH.BND"},
-     {FD_PathBlyRecInfo, FD_FmvInfo, FD_Ender_SoundBlockInfo, "FESEQ.BSQ", 32, 4, "FD", 14, 2, 72, "\\FD.LVL;1", 68, "\\FD.OVL;1", 73, "\\FD.MOV;1", "FD.IDX", "FDPATH.BND"},
-     {BA_PathBlyRecInfo, BA_FmvInfo, BA_Ender_SoundBlockInfo, "B2SEQ.BSQ", 24, 7, "BA", 16, 2, 98, "\\BA.LVL;1", 94, "\\BA.OVL;1", 99, "\\BA.MOV;1", "BA.IDX", "BAPATH.BND"},
-     {BW_PathBlyRecInfo, BW_FmvInfo, BW_Ender_SoundBlockInfo, "B3SEQ.BSQ", 32, 6, "BW", 14, 2, 120, "\\BW.LVL;1", 116, "\\BW.OVL;1", 121, "\\BW.MOV;1", "BW.IDX", "BWPATH.BND"},
-     {TL_PathBlyRecInfo, TL_FmvInfo, TL_SoundBlockInfo, "TLSEQ.BSQ", 16, 1, "TL", 2, 1, 213, "\\TL.LVL;1", 209, "\\TL.OVL;1", 214, "\\TL.MOV;1", "TL.IDX", "TLPATH.BND"},
-     {CR_PathBlyRecInfo, CR_FmvInfo, CR_SoundBlockInfo, "STSEQ.BSQ", 16, 0, "CR", 2, 0, 215, "\\CR.LVL;1", 0, "\\ST.OVL;1", 216, "\\CR.MOV;1", "CR.IDX", "CRPATH.BND"}}};
+    {{ST_PathBlyRecInfo, {ST_FmvInfo, ALIVE_COUNTOF(ST_FmvInfo)}, ST_SoundBlockInfo, "STSEQ.BSQ", 16, 0, "ST", 1, 0, 2, "\\ST.LVL;1", 0, "\\ST.OVL;1", 3, "\\ST.MOV;1", "ST.IDX", "STPATH.BND"},
+     {MI_PathBlyRecInfo, {MI_FmvInfo, ALIVE_COUNTOF(MI_FmvInfo)}, MI_SoundBlockInfo, "MISEQ.BSQ", 32, 1, "MI", 12, 1, 16, "\\MI.LVL;1", 4, "\\MI.OVL;1", 17, "\\MI.MOV;1", "MI.IDX", "MIPATH.BND"},
+     {NE_PathBlyRecInfo, {NE_FmvInfo, ALIVE_COUNTOF(NE_FmvInfo)}, NE_SoundBlockInfo, "NESEQ.BSQ", 24, 8, "NE", 7, 1, 34, "\\NE.LVL;1", 30, "\\NE.OVL;1", 35, "\\NE.MOV;1", "NE.IDX", "NEPATH.BND"},
+     {PV_PathBlyRecInfo, {PV_FmvInfo, ALIVE_COUNTOF(PV_FmvInfo)}, PV_SoundBlockInfo, "PVSEQ.BSQ", 32, 2, "PV", 15, 1, 44, "\\PV.LVL;1", 40, "\\PV.OVL;1", 45, "\\PV.MOV;1", "PV.IDX", "PVPATH.BND"},
+     {SV_PathBlyRecInfo, {SV_FmvInfo, ALIVE_COUNTOF(SV_FmvInfo)}, SV_SoundBlockInfo, "SVSEQ.BSQ", 32, 3, "SV", 14, 1, 58, "\\SV.LVL;1", 54, "\\SV.OVL;1", 59, "\\SV.MOV;1", "SV.IDX", "SVPATH.BND"},
+     {FD_PathBlyRecInfo, {FD_FmvInfo, ALIVE_COUNTOF(FD_FmvInfo)}, FD_SoundBlockInfo, "FDSEQ.BSQ", 32, 4, "FD", 14, 2, 72, "\\FD.LVL;1", 68, "\\FD.OVL;1", 73, "\\FD.MOV;1", "FD.IDX", "FDPATH.BND"},
+     {BA_PathBlyRecInfo, {BA_FmvInfo, ALIVE_COUNTOF(BA_FmvInfo)}, BA_SoundBlockInfo, "BASEQ.BSQ", 24, 7, "BA", 16, 2, 98, "\\BA.LVL;1", 94, "\\BA.OVL;1", 99, "\\BA.MOV;1", "BA.IDX", "BAPATH.BND"},
+     {SV_PathBlyRecInfo, {SV_FmvInfo, ALIVE_COUNTOF(SV_FmvInfo)}, SV_Ender_SoundBlockInfo, "SESEQ.BSQ", 32, 3, "SV", 14, 1, 58, "\\SV.LVL;1", 54, "\\SV.OVL;1", 59, "\\SV.MOV;1", "SV.IDX", "SVPATH.BND"},
+     {BW_PathBlyRecInfo, {BW_FmvInfo, ALIVE_COUNTOF(BW_FmvInfo)}, BW_SoundBlockInfo, "BWSEQ.BSQ", 32, 6, "BW", 14, 2, 120, "\\BW.LVL;1", 116, "\\BW.OVL;1", 121, "\\BW.MOV;1", "BW.IDX", "BWPATH.BND"},
+     {BR_PathBlyRecInfo, {BR_FmvInfo, ALIVE_COUNTOF(BR_FmvInfo)}, BR_SoundBlockInfo, "BRSEQ.BSQ", 32, 5, "BR", 29, 2, 146, "\\BR.LVL;1", 142, "\\BR.OVL;1", 147, "\\BR.MOV;1", "BR.IDX", "BRPATH.BND"},
+     {BM_PathBlyRecInfo, {BM_FmvInfo, ALIVE_COUNTOF(BM_FmvInfo)}, BM_SoundBlockInfo, "BMSEQ.BSQ", 16, 5, "BM", 1, 2, 208, "\\BM.LVL;1", 204, "\\BM.OVL;1", 147, "\\BR.MOV;1", "BR.IDX", "BMPATH.BND"},
+     {PV_PathBlyRecInfo, {PV_FmvInfo, ALIVE_COUNTOF(PV_FmvInfo)}, PV_Ender_SoundBlockInfo, "PESEQ.BSQ", 32, 2, "PV", 15, 1, 44, "\\PV.LVL;1", 40, "\\PV.OVL;1", 45, "\\PV.MOV;1", "PV.IDX", "PVPATH.BND"},
+     {FD_PathBlyRecInfo, {FD_FmvInfo, ALIVE_COUNTOF(FD_FmvInfo)}, FD_Ender_SoundBlockInfo, "FESEQ.BSQ", 32, 4, "FD", 14, 2, 72, "\\FD.LVL;1", 68, "\\FD.OVL;1", 73, "\\FD.MOV;1", "FD.IDX", "FDPATH.BND"},
+     {BA_PathBlyRecInfo, {BA_FmvInfo, ALIVE_COUNTOF(BA_FmvInfo)}, BA_Ender_SoundBlockInfo, "B2SEQ.BSQ", 24, 7, "BA", 16, 2, 98, "\\BA.LVL;1", 94, "\\BA.OVL;1", 99, "\\BA.MOV;1", "BA.IDX", "BAPATH.BND"},
+     {BW_PathBlyRecInfo, {BW_FmvInfo, ALIVE_COUNTOF(BW_FmvInfo)}, BW_Ender_SoundBlockInfo, "B3SEQ.BSQ", 32, 6, "BW", 14, 2, 120, "\\BW.LVL;1", 116, "\\BW.OVL;1", 121, "\\BW.MOV;1", "BW.IDX", "BWPATH.BND"},
+     {TL_PathBlyRecInfo, {TL_FmvInfo, ALIVE_COUNTOF(TL_FmvInfo)}, TL_SoundBlockInfo, "TLSEQ.BSQ", 16, 1, "TL", 2, 1, 213, "\\TL.LVL;1", 209, "\\TL.OVL;1", 214, "\\TL.MOV;1", "TL.IDX", "TLPATH.BND"},
+     {CR_PathBlyRecInfo, {CR_FmvInfo, ALIVE_COUNTOF(CR_FmvInfo)}, CR_SoundBlockInfo, "STSEQ.BSQ", 16, 0, "CR", 2, 0, 215, "\\CR.LVL;1", 0, "\\ST.OVL;1", 216, "\\CR.MOV;1", "CR.IDX", "CRPATH.BND"}}};
 
 SeqHandleTable sSeqData = {
     {{"OPTAMB.SEQ", 0, 0u, 60u, -1, {}},
@@ -1081,7 +1081,26 @@ static PathRootContainer sPathData_559660 = pathData;
 
 relive::FmvInfoEntry* Path_Get_FMV_Record(EReliveLevelIds lvlId, u16 fmvId)
 {
-    return &sPathData_559660.paths[static_cast<s32>(MapWrapper::ToAE(lvlId))].mFmvArray[fmvId];
+    return const_cast<relive::FmvInfoEntry*>(&sPathData_559660.paths[static_cast<s32>(MapWrapper::ToAE(lvlId))].mFmvArray.mArray[fmvId]);
+}
+
+relive::FmvInfoEntry* Path_Get_FMV_Record(EReliveLevelIds lvlId, const std::string& fmvName)
+{
+    if (fmvName.empty())
+    {
+        return nullptr;
+    }
+
+    const relive::FmvInfoArray& fmvArray = sPathData_559660.paths[static_cast<s32>(MapWrapper::ToAE(lvlId))].mFmvArray;
+    for (size_t i = 0; i < fmvArray.mCount; i++)
+    {
+        if (fmvArray.mArray[i].mName && fmvName == fmvArray.mArray[i].mName)
+        {
+            return const_cast<relive::FmvInfoEntry*>(&fmvArray.mArray[i]);
+        }
+    }
+
+    ALIVE_FATAL("FMV record '%s' not found for lvl %d", fmvName.c_str(), static_cast<s32>(MapWrapper::ToAE(lvlId)));
 }
 
 std::vector<std::string> Path_GetAllFmvNames()

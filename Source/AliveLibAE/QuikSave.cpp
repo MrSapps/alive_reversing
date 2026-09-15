@@ -372,8 +372,7 @@ void Quicksave_LoadFromMemory_4C95A0(BaseMap& map)
         QuikSave::gActiveQuicksaveData.mWorldInfo.mLevel,
         QuikSave::gActiveQuicksaveData.mWorldInfo.mPath,
         QuikSave::gActiveQuicksaveData.mWorldInfo.mCam,
-        CameraSwapEffects::eInstantChange_0,
-        0,
+        CameraSwapEffects::eInstantChange_0,{},
         1);
     map.mForceLoad = 1;
 }

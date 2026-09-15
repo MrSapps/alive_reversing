@@ -45,7 +45,7 @@ struct SoundBlockInfo final
 struct PathRoot final
 {
     PathBlyRec* mBlyArrayPtr;
-    FmvInfoEntry* mFmvArray;
+    FmvInfoArray mFmvArray;
     SoundBlockInfo* mMusicInfo;
     const char_type* mBsqFileName;
     s16 mReverb;

@@ -62,7 +62,7 @@ public:
 
     virtual void VGiveShrykull(s16 bPlaySound) = 0;
     virtual void VExitPortal() = 0;
-    virtual void VGetMapChange(EReliveLevelIds* level, u16* path, u16* camera, CameraSwapEffects* screenChangeEffect, u16* movieId) = 0;
+    virtual void VGetMapChange(EReliveLevelIds* level, u16* path, u16* camera, CameraSwapEffects* screenChangeEffect, FmvIds* fmvIds) = 0;
 
 public:
     relive::Path_BirdPortal::PortalType mPortalType = relive::Path_BirdPortal::PortalType::eAbe;
@@ -80,7 +80,13 @@ protected:
     Guid mDoveIds[6] = {};
     s32 mTimer = 0;
     FP mSpriteScale = {};
-    s16 mMovieId = 0;
+    // See relive::Path_BirdPortal for what these mean (AE only ever populates mMovie1-3).
+    std::string mMovie1;
+    std::string mMovie2;
+    std::string mMovie3;
+    std::string mMovieAllDone1;
+    std::string mMovieAllDone2;
+    std::string mMovieAllDone3;
 
     Guid mTerminatorId1 = Guid{};
     Guid mTerminatorId2 = Guid{};

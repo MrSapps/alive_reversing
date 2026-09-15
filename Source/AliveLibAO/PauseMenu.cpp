@@ -449,7 +449,7 @@ void PauseMenu::VUpdate()
                             SetDead(true);
                         }
                         gPauseMenu = nullptr;
-                        mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, 0, 0);
+                        mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, {}, 0);
                         mMap.mFreeAllAnimAndPalts = true;
                         Input().SetCurrentController(InputObject::PadIndex::First);
                     }

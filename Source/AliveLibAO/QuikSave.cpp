@@ -120,8 +120,7 @@ void QuikSave::LoadActive(BaseMap& map)
         gActiveQuicksaveData.mWorldInfo.mLevel,
         gActiveQuicksaveData.mWorldInfo.mPath,
         gActiveQuicksaveData.mWorldInfo.mCam,
-        CameraSwapEffects::eInstantChange_0,
-        0,
+        CameraSwapEffects::eInstantChange_0,{},
         1);
     map.mForceLoad = 1;
 }
@@ -354,8 +353,7 @@ void QuikSave::RestoreCheckpoint(ResourceManagerWrapper& resMan, BaseMap& map)
         gActiveQuicksaveData.mRestartPathWorldInfo.mLevel,
         gActiveQuicksaveData.mRestartPathWorldInfo.mPath,
         gActiveQuicksaveData.mRestartPathWorldInfo.mCam,
-        CameraSwapEffects::eInstantChange_0,
-        0,
+        CameraSwapEffects::eInstantChange_0,{},
         1);
     map.mForceLoad = 1;
 }

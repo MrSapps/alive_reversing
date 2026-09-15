@@ -23,4 +23,10 @@ std::vector<std::string> CollectUniqueFmvNames(std::initializer_list<FmvInfoArra
 
     return names;
 }
+
+std::string FmvNameWithoutExtension(const std::string& fmvName)
+{
+    const std::string::size_type dotPos = fmvName.find_last_of('.');
+    return dotPos == std::string::npos ? fmvName : fmvName.substr(0, dotPos);
+}
 } // namespace relive

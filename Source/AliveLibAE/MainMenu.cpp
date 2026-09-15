@@ -1402,7 +1402,7 @@ MainMenuNextCam MainMenuController::Page_FMV_Level_Update_4D4AB0(u32 input_held)
             gCreditsControllerExists = 1;
             field_240_credits_current_cam = 1;
             field_1F4_credits_next_frame = MakeTimer(160);
-            mMap.SetActiveCam(EReliveLevelIds::eCredits, 1, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
+            mMap.SetActiveCam(EReliveLevelIds::eCredits, 1, 1, CameraSwapEffects::eInstantChange_0, {}, 0);
         }
         return MainMenuNextCam(MainMenuCams::eNoChange);
     }
@@ -1703,7 +1703,7 @@ MainMenuNextCam MainMenuController::LoadNewGame_Update_4D0920(u32 /*input*/)
         mCheatLevelSelectLoading = false;
 
         gAbe->SetUpdateDelay(1);
-        mMap.SetActiveCam(field_244_lvl_id, field_246_path_id, field_248_camera, CameraSwapEffects::eInstantChange_0, 0, 0);
+        mMap.SetActiveCam(field_244_lvl_id, field_246_path_id, field_248_camera, CameraSwapEffects::eInstantChange_0, {}, 0);
 
         const relive::PathBlyRec* pPathData = Path_Get_Bly_Record(field_244_lvl_id, field_246_path_id);
         gAbe->mXPos = FP_FromInteger(field_24A_abeXOff - pPathData->mPathData->mAbeStartXPos);
@@ -1724,7 +1724,7 @@ MainMenuNextCam MainMenuController::LoadNewGame_Update_4D0920(u32 /*input*/)
     }
     else
     {
-        mMap.SetActiveCam(EReliveLevelIds::eMines, 1, 4, CameraSwapEffects::ePlay1FMV_5, 12402, 0);
+        mMap.SetActiveCam(EReliveLevelIds::eMines, 1, 4, CameraSwapEffects::ePlay1FMV_5, FmvIds{"PROPHECY.DDV", "V1A4S01.DDV", "VISION.DDV"}, 0);
         gAbe->mXPos = FP_FromInteger(837);
         gAbe->mYPos = FP_FromInteger(1300);
         gAbe->BaseAliveGameObjectLastLineYPos = FP_FromInteger(1400);
@@ -2655,7 +2655,7 @@ void MainMenuController::HandleCreditsControllerUpdate()
     if (Input().IsAnyPressed(InputCommands::eBack))
     {
         gCreditsControllerExists = 0;
-        mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 6, CameraSwapEffects::eInstantChange_0, 0, 0);
+        mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 6, CameraSwapEffects::eInstantChange_0, {}, 0);
         return;
     }
 
@@ -2669,11 +2669,11 @@ void MainMenuController::HandleCreditsControllerUpdate()
             if (currentCam > 22)
             {
                 field_240_credits_current_cam = 1;
-                mMap.SetActiveCam(EReliveLevelIds::eCredits, 1, static_cast<s16>(field_240_credits_current_cam), CameraSwapEffects::eTopToBottom_3, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eCredits, 1, static_cast<s16>(field_240_credits_current_cam), CameraSwapEffects::eTopToBottom_3, {}, 0);
             }
             else
             {
-                mMap.SetActiveCam(EReliveLevelIds::eCredits, 2, static_cast<s16>(currentCam), CameraSwapEffects::eTopToBottom_3, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eCredits, 2, static_cast<s16>(currentCam), CameraSwapEffects::eTopToBottom_3, {}, 0);
             }
         }
         else
@@ -2681,10 +2681,10 @@ void MainMenuController::HandleCreditsControllerUpdate()
             if (currentCam > 36)
             {
                 gCreditsControllerExists = 0;
-                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 6, CameraSwapEffects::eInstantChange_0, 0, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 6, CameraSwapEffects::eInstantChange_0, {}, 0);
                 return;
             }
-            mMap.SetActiveCam(EReliveLevelIds::eCredits, 1, static_cast<s16>(field_240_credits_current_cam), CameraSwapEffects::eTopToBottom_3, 0, 0);
+            mMap.SetActiveCam(EReliveLevelIds::eCredits, 1, static_cast<s16>(field_240_credits_current_cam), CameraSwapEffects::eTopToBottom_3, {}, 0);
         }
     }
 }
@@ -3001,7 +3001,7 @@ s32 MainMenuController::ChangeScreenAndIntroLogic_4CF640()
 
                 gPsxDisplay.PutCurrentDispEnv();
 
-                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 1, CameraSwapEffects::ePlay1FMV_5, 10502, 0);
+                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 1, CameraSwapEffects::ePlay1FMV_5, FmvIds{"LOGO.DDV", "OPTION.DDV", "INTRO.DDV"}, 0);
                 GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuDoor));
                 Load_Anim_Pal_4D06A0(&GetAnimation());
 
@@ -3046,8 +3046,7 @@ s32 MainMenuController::ChangeScreenAndIntroLogic_4CF640()
                 EReliveLevelIds::eMenu,
                 1,
                 sMainMenuPages_561960[field_218_target_page_index].field_0_cam_id,
-                screenChangeEffect,
-                0,
+                screenChangeEffect,{},
                 0);
 
             GetAnimation().SetRender(false);
