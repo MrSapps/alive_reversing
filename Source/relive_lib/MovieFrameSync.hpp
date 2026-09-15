@@ -44,3 +44,15 @@ constexpr u64 kMovieFrameDropThresholdMs = 100;
 // threads - see MovieFrameSyncTests.cpp. frameTimestampMs is the frame's own presentation
 // timestamp (mkv PTS in ms).
 MovieFrameOutcome ProcessMovieFrameSync(u64 frameTimestampMs, IMovieSyncClock& clock);
+
+// While catching up on a backlog of Dropped frames (e.g. because decode fell behind for a few
+// real seconds - see Movie.cpp's decoder init comment), nothing gets displayed at all until a
+// frame is finally back in sync and actually Rendered - so playback looks completely frozen for
+// however long the backlog takes to clear, then jumps straight to current. Rather than skip every
+// Dropped frame in total silence, the caller should occasionally paint one of them anyway (still
+// counted as dropped for droppedFrameCount/sync purposes - this is display-only), so it reads as
+// fast-forwarding through stale content instead of a freeze. Throttled by wall-clock time so it
+// doesn't slow down actually catching up. nowMs/lastDisplayMs are any shared, monotonically
+// increasing time source (real playback uses SYS_GetTicks()).
+constexpr u64 kStaleFrameDisplayIntervalMs = 200;
+bool ShouldDisplayStaleFrame(u64 nowMs, u64 lastDisplayMs, u64 minIntervalMs = kStaleFrameDisplayIntervalMs);
