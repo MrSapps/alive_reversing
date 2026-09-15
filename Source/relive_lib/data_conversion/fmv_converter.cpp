@@ -33,6 +33,36 @@
 #include "PsxStrDemuxer.hpp"
 #include "ThreadPool.hpp"
 
+// Some FMV sources (e.g. AO's raw PSX STR streams, which have no header - each frame's
+// width/height comes from its own MOIR sector) don't know their true frame size or frame
+// count until every frame has been decoded once. For those, the caller does a throwaway
+// pass with ScanFmvSource() first to find the largest frame size and the frame count -
+// also handy groundwork for real conversion progress reporting later.
+struct FmvScanResult final
+{
+    u32 mMaxWidth = 0;
+    u32 mMaxHeight = 0;
+    u32 mFrameCount = 0;
+};
+
+static FmvScanResult ScanFmvSource(relive::IFmvSource& source)
+{
+    FmvScanResult result;
+    if (!source.ReadInfo())
+    {
+        return result;
+    }
+
+    while (source.StepFrame())
+    {
+        result.mMaxWidth = std::max(result.mMaxWidth, source.FrameWidth());
+        result.mMaxHeight = std::max(result.mMaxHeight, source.FrameHeight());
+        ++result.mFrameCount;
+    }
+
+    return result;
+}
+
 class FmvConv final
 {
 public:
@@ -42,9 +72,13 @@ public:
 
     }
 
-    void Convert(relive::IFmvSource& source, std::string fName, const FileSystem::Path& outDir)
+    // pScan, when given, overrides the source's own (possibly unknown/0) frame size and
+    // frame count - see ScanFmvSource() above.
+    void Convert(relive::IFmvSource& source, std::string fName, const FileSystem::Path& outDir, const FmvScanResult* pScan = nullptr)
     {
         TRACE_ENTRYEXIT;
+
+        mCurrentMovieName = fName;
 
         if (!source.ReadInfo())
         {
@@ -53,10 +87,10 @@ public:
             return;
         }
 
-        const u32 width = source.FrameWidth() > 0 ? source.FrameWidth() : 640u;
-        const u32 height = source.FrameHeight() > 0 ? source.FrameHeight() : 240u;
+        const u32 width = (pScan && pScan->mMaxWidth > 0) ? pScan->mMaxWidth : (source.FrameWidth() > 0 ? source.FrameWidth() : 640u);
+        const u32 height = (pScan && pScan->mMaxHeight > 0) ? pScan->mMaxHeight : (source.FrameHeight() > 0 ? source.FrameHeight() : 240u);
 
-        LOG_INFO("FMV dimensions: %ux%u (header reported %ux%u)", width, height,
+        LOG_INFO("FMV '%s' dimensions: %ux%u (header reported %ux%u)", fName.c_str(), width, height,
                  source.FrameWidth(), source.FrameHeight());
 
         // TODO: FIX ME - hack to 15
@@ -186,7 +220,7 @@ public:
                 }
             };
 
-            const u32 totalFrames = source.TotalVideoFrames();
+            const u32 totalFrames = (pScan && pScan->mFrameCount > 0) ? pScan->mFrameCount : source.TotalVideoFrames();
             u32 frame_index = 0;
             while (totalFrames == 0 || frame_index < totalFrames)
             {
@@ -194,7 +228,32 @@ public:
                 {
                     break;
                 }
-                frameBuffer = source.GetPixels();
+
+                const std::vector<u8>& srcPixels = source.GetPixels();
+                const u32 frameW = source.FrameWidth();
+                const u32 frameH = source.FrameHeight();
+
+                if (frameW == width && frameH == height)
+                {
+                    frameBuffer = srcPixels;
+                }
+                else
+                {
+                    // The source changed frame size mid-stream (seen in some AO PSX STR
+                    // streams). Composite into the top-left of the canvas sized to the
+                    // largest frame seen (see ScanFmvSource()), clearing first so a
+                    // shrinking frame doesn't leave stale pixels behind; a frame somehow
+                    // bigger than the canvas gets truncated to fit it.
+                    std::fill(frameBuffer.begin(), frameBuffer.end(), 0);
+                    const u32 copyW = std::min(frameW, width);
+                    const u32 copyH = std::min(frameH, height);
+                    for (u32 y = 0; y < copyH; ++y)
+                    {
+                        std::memcpy(frameBuffer.data() + (static_cast<size_t>(y) * width * sizeof(u32)),
+                                    srcPixels.data() + (static_cast<size_t>(y) * frameW * sizeof(u32)),
+                                    static_cast<size_t>(copyW) * sizeof(u32));
+                    }
+                }
 
                 const std::vector<u8> audioFrames = source.GetAudioFrames();
                 if (!audioFrames.empty() && mAudioTrackNumber != 0)
@@ -203,13 +262,17 @@ public:
                     if (bytesPerSampleFrame > 0 && (audioFrames.size() % bytesPerSampleFrame) == 0)
                     {
                         const u64 sampleFrameCount = static_cast<u64>(audioFrames.size() / bytesPerSampleFrame);
-                        const u64 audioPtsNs = (static_cast<u64>(mAudioFrameIndex) * sampleFrameCount * 1000000000ULL) / static_cast<u64>(mAudioSampleRate);
+                        // PTS from a running total of samples actually written so far, not
+                        // callCount * thisChunkSize - AO's audio chunks aren't fixed size (a
+                        // variable number of VALE sectors can land between two video frames),
+                        // so that would make the PTS jump around non-monotonically.
+                        const u64 audioPtsNs = (mAudioSamplesWritten * 1000000000ULL) / static_cast<u64>(mAudioSampleRate);
                         const bool ok = segment.AddFrame(audioFrames.data(), static_cast<uint64_t>(audioFrames.size()), mAudioTrackNumber, audioPtsNs, false);
                         if (!ok)
                         {
                             fprintf(stderr, "webmenc> AddAudioFrame failed.\n");
                         }
-                        ++mAudioFrameIndex;
+                        mAudioSamplesWritten += sampleFrameCount;
                     }
                 }
 
@@ -224,7 +287,16 @@ public:
 
                 convert_rgba_to_i420();
                 const int flags = (frame_index == 0) ? AOM_EFLAG_FORCE_KF : 0;
-                encode_frame(&segment, &cfg, &codec, &rawImageFrameData, static_cast<int>(frame_index), flags);
+
+                // Tie video timestamps to the same real (sample-counted) audio clock rather
+                // than an assumed-constant frame rate - AO's true playback rate isn't a clean
+                // 15fps (see the frameRate hack above), so the two would otherwise drift apart
+                // over a long enough movie until a video frame's assumed-rate timestamp landed
+                // behind audio's real-rate timestamp, which the muxer rejects as non-monotonic.
+                const int64_t videoPtsNs = (mAudioTrackNumber != 0)
+                    ? static_cast<int64_t>((mAudioSamplesWritten * 1000000000ULL) / static_cast<u64>(mAudioSampleRate))
+                    : -1;
+                encode_frame(&segment, &cfg, &codec, &rawImageFrameData, static_cast<int>(frame_index), flags, videoPtsNs);
 
                 if (totalFrames > 0)
                 {
@@ -258,9 +330,12 @@ public:
 
 private:
 
-    int mkv_write_block(mkvmuxer::Segment* segment, const aom_codec_enc_cfg_t* cfg, const aom_codec_cx_pkt_t* pkt)
+    // videoPtsNs, when >= 0, overrides the timestamp derived from the encoder's own pts.
+    // The caller uses this to tie video timestamps to the same real (sample-counted)
+    // audio clock as mkv audio frames - see the call site for why.
+    int mkv_write_block(mkvmuxer::Segment* segment, const aom_codec_enc_cfg_t* cfg, const aom_codec_cx_pkt_t* pkt, int64_t videoPtsNs)
     {
-        int64_t pts_ns = pkt->data.frame.pts * 1000000000ll * cfg->g_timebase.num / cfg->g_timebase.den;
+        int64_t pts_ns = videoPtsNs >= 0 ? videoPtsNs : (pkt->data.frame.pts * 1000000000ll * cfg->g_timebase.num / cfg->g_timebase.den);
         if (pts_ns <= mLast_pts_ns)
         {
             pts_ns = mLast_pts_ns + 1000000;
@@ -417,7 +492,7 @@ private:
         return 0;
     }
 
-    bool encode_frame(mkvmuxer::Segment* segment, const aom_codec_enc_cfg_t* cfg, aom_codec_ctx_t* codec, aom_image_t* img, int frame_index, int flags)
+    bool encode_frame(mkvmuxer::Segment* segment, const aom_codec_enc_cfg_t* cfg, aom_codec_ctx_t* codec, aom_image_t* img, int frame_index, int flags, int64_t videoPtsNs = -1)
     {
         bool got_pkts = false;
         aom_codec_iter_t iter = nullptr;
@@ -428,7 +503,9 @@ private:
 
         if (res != AOM_CODEC_OK)
         {
-            ALIVE_FATAL("Failed to encode frame");
+            const char* const detail = aom_codec_error_detail(codec);
+            ALIVE_FATAL("Failed to encode frame %d of FMV '%s': %s (%s)", frame_index, mCurrentMovieName.c_str(),
+                        aom_codec_err_to_string(res), detail ? detail : aom_codec_error(codec));
         }
 
         if (elapsedMs > 1000)
@@ -444,9 +521,9 @@ private:
             {
                 const int keyframe = (pkt->data.frame.flags & AOM_FRAME_IS_KEY) != 0;
 
-                if (mkv_write_block(segment, cfg, pkt) != 0)
+                if (mkv_write_block(segment, cfg, pkt, videoPtsNs) != 0)
                 {
-                    ALIVE_FATAL("Failed to write compressed frame");
+                    ALIVE_FATAL("Failed to write compressed frame %d of FMV '%s'", frame_index, mCurrentMovieName.c_str());
                 }
                 LOG_INFO(keyframe ? "K" : ".");
             }
@@ -457,11 +534,12 @@ private:
 
 private:
     FileSystem& mFs;
+    std::string mCurrentMovieName;
     const int kVideoTrackNumber = 1;
     const int kAudioTrackNumber = 2;
     int64_t mLast_pts_ns = 0;
     uint64_t mAudioTrackNumber = 0;
-    uint64_t mAudioFrameIndex = 0;
+    uint64_t mAudioSamplesWritten = 0;
     uint32_t mAudioSampleRate = 0;
     uint32_t mAudioChannels = 0;
     uint32_t mAudioBitsPerSample = 0;
@@ -480,14 +558,26 @@ public:
 
     void Execute() override
     {
+        LOG_INFO("ConvertFmvJob: starting '%s' (isAo=%d)", mMovieName.c_str(), mIsAo ? 1 : 0);
+
         FmvConv fmvConv(mFs);
         if (mIsAo)
         {
+            // AO's raw STR frames have no stream header - the true max frame size and
+            // frame count are only known after decoding every frame once, so do that as
+            // a throwaway pre-pass before the real (encoding) pass.
+            relive::PsxStrDemuxer scanSource(mFs, mMovieName.c_str());
+            const FmvScanResult scan = ScanFmvSource(scanSource);
+            LOG_INFO("ConvertFmvJob: '%s' scanned max %ux%u over %u frames", mMovieName.c_str(),
+                     scan.mMaxWidth, scan.mMaxHeight, scan.mFrameCount);
+
             relive::PsxStrDemuxer source(mFs, mMovieName.c_str());
-            fmvConv.Convert(source, mMovieName, mOutDir);
+            fmvConv.Convert(source, mMovieName, mOutDir, &scan);
         }
         else
         {
+            // AE's DDV header already declares a fixed frame size and frame count up
+            // front, so no pre-pass is needed here.
             relive::DDVAe source(mFs, mMovieName.c_str(), nullptr);
             fmvConv.Convert(source, mMovieName, mOutDir);
         }
