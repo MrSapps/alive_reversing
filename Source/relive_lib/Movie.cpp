@@ -880,10 +880,16 @@ s8 DDV_Play_Impl(const char_type* pMovieName)
             continue;
         }
 
+        // SND_Get_Generated_Audio_Samples() counts samples at the mixer's fixed output rate
+        // (every voice, including this movie's, gets resampled to it - see
+        // SDLSoundBuffer::SetFrequency) - so it must be divided by that device rate here, not
+        // by the movie's own AudioSampleRate(). AE's DDV audio happens to already be 44100Hz,
+        // matching the (also 44100Hz) device rate, which is why this was previously masked;
+        // AO's true 18900Hz stream exposed it as frames dropping and audio going out of sync.
         LOG_INFO("FMV playback %u: dequeued offset=%lld pts=%llu clock=%llu", playbackId, frame.mFileOffset,
             static_cast<unsigned long long>(frame.mPtsNs),
             static_cast<unsigned long long>(audioStarted
-                ? (SND_Get_Generated_Audio_Samples() - audioStartSample) * 1000 / movie.AudioSampleRate()
+                ? (SND_Get_Generated_Audio_Samples() - audioStartSample) * 1000 / SND_Get_Device_Sample_Rate()
                 : 0));
 
         if (AreMovieSkippingInputsHeld())
@@ -893,7 +899,7 @@ s8 DDV_Play_Impl(const char_type* pMovieName)
 
         const u64 frameMs = frame.mPtsNs / 1000000ULL;
         const u64 audioClockMs = audioStarted
-            ? (SND_Get_Generated_Audio_Samples() - audioStartSample) * 1000 / movie.AudioSampleRate()
+            ? (SND_Get_Generated_Audio_Samples() - audioStartSample) * 1000 / SND_Get_Device_Sample_Rate()
             : 0;
         if (audioStarted && frameMs + 100 < audioClockMs)
         {
@@ -902,7 +908,7 @@ s8 DDV_Play_Impl(const char_type* pMovieName)
         }
 
         while (audioStarted
-               && frameMs > (SND_Get_Generated_Audio_Samples() - audioStartSample) * 1000 / movie.AudioSampleRate())
+               && frameMs > (SND_Get_Generated_Audio_Samples() - audioStartSample) * 1000 / SND_Get_Device_Sample_Rate())
         {
             if (AreMovieSkippingInputsHeld())
             {
@@ -952,7 +958,7 @@ s8 DDV_Play_Impl(const char_type* pMovieName)
         LOG_INFO("FMV playback %u: screen frame=%u offset=%lld pts=%llu clock=%llu hash=%llu queued=%zu", playbackId, renderedFrameCount,
             frame.mFileOffset, static_cast<unsigned long long>(frame.mPtsNs),
             static_cast<unsigned long long>(audioStarted
-                ? (SND_Get_Generated_Audio_Samples() - audioStartSample) * 1000 / movie.AudioSampleRate()
+                ? (SND_Get_Generated_Audio_Samples() - audioStartSample) * 1000 / SND_Get_Device_Sample_Rate()
                 : 0),
             static_cast<unsigned long long>(pixelHash), videoQueue.Size());
 
