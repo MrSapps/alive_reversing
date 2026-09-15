@@ -394,10 +394,14 @@ namespace
                 return false;
             }
 
-            // Tried multi-threaded decode here (matching the encoder side's thread budget) to
-            // address the decode thread falling behind on costlier frames - see the frame-drop
-            // burst investigation below - but it produced visible tile-decode corruption
-            // (vertical banding), so left as the single decode thread default for now.
+            // A "video freezes then drops a big backlog at once" report traced back to this
+            // decode call taking 20-70ms per (320x240!) frame - only ever reproduces in an
+            // unoptimized debug build (a Release build keeps every frame comfortably under the
+            // ~67ms/frame budget at 15fps, dropped=0), so it's not a real decode throughput
+            // problem. Tried multi-threaded decode here as a workaround, confirmed it does clear
+            // up the debug-build stutter, but it also produced visible tile-decode corruption
+            // (vertical banding) - not worth it to paper over a debug-only slowdown, so left on
+            // the single decode thread default.
             if (aom_codec_dec_init(&mCodec, aom_codec_av1_dx(), nullptr, 0) != AOM_CODEC_OK)
             {
                 return false;
