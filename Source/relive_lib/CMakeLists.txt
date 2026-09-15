@@ -567,6 +567,10 @@ SET(data_conversion_src
     data_conversion/fmv_converter.hpp
     data_conversion/ConversionProgress.hpp
     data_conversion/ConversionProgress.cpp
+    data_conversion/ProgressBar.hpp
+    data_conversion/ProgressBar.cpp
+    data_conversion/EtaEstimator.hpp
+    data_conversion/EtaEstimator.cpp
     data_conversion/DDVAe.cpp
     data_conversion/DDVAe.hpp
     data_conversion/IFmvSource.hpp
@@ -800,6 +804,7 @@ add_executable(relive_lib_tests
     tests/FileSystemTests.cpp
     tests/MovieFrameSyncTests.cpp
     tests/ConversionProgressTests.cpp
+    tests/EtaEstimatorTests.cpp
     tests/TestStubs.cpp
 )
 target_include_directories(relive_lib_tests PRIVATE

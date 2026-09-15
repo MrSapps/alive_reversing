@@ -4,6 +4,8 @@
 #include <functional>
 #include <chrono>
 #include <algorithm>
+#include <cstdio>
+#include "Sys.hpp"
 #include "../../AliveLibAE/Resources.hpp"
 #include "../../AliveLibAE/Map.hpp"
 #include "../../AliveLibAE/PsxRender.hpp"
@@ -21,26 +23,8 @@ DataConversionUI::DataConversionUI(GameType gameType, ResourceManagerWrapper& re
     mPoly.SetRGB2(0, 0, 255);
     mPoly.SetRGB3(255, 0, 255);
 
-    // Progress bar border (fixed, a couple px larger than the track on every side so it reads as
-    // an outline behind it) + track (fixed) + fill (width recomputed every VUpdate() from the
-    // weighted overall percentage - see ConversionProgress::OverallPercent).
-    mProgressBarBorder.SetXYWH(18, 203, 604, 12);
-    mProgressBarBorder.SetRGB0(200, 200, 200);
-    mProgressBarBorder.SetRGB1(200, 200, 200);
-    mProgressBarBorder.SetRGB2(200, 200, 200);
-    mProgressBarBorder.SetRGB3(200, 200, 200);
-
-    mProgressBarTrack.SetXYWH(20, 205, 600, 8);
-    mProgressBarTrack.SetRGB0(40, 40, 40);
-    mProgressBarTrack.SetRGB1(40, 40, 40);
-    mProgressBarTrack.SetRGB2(40, 40, 40);
-    mProgressBarTrack.SetRGB3(40, 40, 40);
-
-    mProgressBarFill.SetXYWH(20, 205, 0, 8);
-    mProgressBarFill.SetRGB0(80, 200, 120);
-    mProgressBarFill.SetRGB1(80, 200, 120);
-    mProgressBarFill.SetRGB2(80, 200, 120);
-    mProgressBarFill.SetRGB3(80, 200, 120);
+    // mProgressBar itself is constructed via its default member initializer (see the header) -
+    // nothing to set up here.
 
     mFontContext.LoadFontType(FontType::Debug, mResMan);
 
@@ -166,26 +150,29 @@ void DataConversionUI::VUpdate()
     //mLcd->VUpdate();
 
     mLastSnapshot = mDataConversion->ProgressSnapshot();
-    const s32 overallPercent = static_cast<s32>(mLastSnapshot.mOverallPercent * 100.0f + 0.5f);
+    const s32 roundedPercent = static_cast<s32>(mLastSnapshot.mOverallPercent * 100.0f + 0.5f);
 
-    const s16 trackWidth = 600;
-    const s16 fillWidth = static_cast<s16>(trackWidth * std::clamp(mLastSnapshot.mOverallPercent, 0.0f, 1.0f));
-    mProgressBarFill.SetXYWH(20, 205, fillWidth, 8);
+    mProgressBar.SetPercent(mLastSnapshot.mOverallPercent);
 
-    // Pad to a fixed width so the "X%" text doesn't shift left/right as the "..." ellipsis
+    // Pad to a fixed width so trailing text doesn't shift left/right as the "..." ellipsis
     // animates.
     std::string dotsPadded = mDots;
     dotsPadded.resize(3, ' ');
 
-    mCurMessage = "Data conversion in progress" + dotsPadded + " " + std::to_string(overallPercent) + "%";
+    const u32 nowTicks = SYS_GetTicks();
+    mEtaEstimator.Update(nowTicks, mLastSnapshot.mTotalCompleted, mLastSnapshot.mTotalItems);
+
+    mCurMessage = "Data conversion in progress" + dotsPadded + " "
+        + std::to_string(mLastSnapshot.mTotalCompleted) + "/" + std::to_string(mLastSnapshot.mTotalItems)
+        + " ETA " + mEtaEstimator.EtaString();
     mTimer++;
 
-    // Cheap sanity-check log for headless/log-based debugging - only fires when the weighted
-    // percentage actually changes, not every frame.
-    if (overallPercent != mLastLoggedPercent)
+    // Cheap sanity-check log for headless/log-based debugging - only fires when the (whole
+    // number, to avoid log spam) percentage actually changes, not every frame.
+    if (roundedPercent != mLastLoggedPercent)
     {
-        LOG_INFO("DataConversion progress: %d%%", overallPercent);
-        mLastLoggedPercent = overallPercent;
+        LOG_INFO("DataConversion progress: %d%% (%s)", roundedPercent, mCurMessage.c_str());
+        mLastLoggedPercent = roundedPercent;
     }
 
     if (mTimer > 5)
@@ -228,7 +215,7 @@ void DataConversionUI::VRender(OrderingTable& ot)
     // entries once only fmvs are left) - drawn oldest-of-the-shown-window at the top, newest at
     // the bottom, so new completions append below rather than pushing everything down from the
     // top. Sized to fill the space between the status line and the progress bar (y=20..~195,
-    // border top at 203) rather than an arbitrary small count.
+    // border top at 206) rather than an arbitrary small count.
     s16 listY = 20;
     constexpr s16 kLineHeight = 10;
     constexpr s16 kMaxListLines = 17;
@@ -242,13 +229,25 @@ void DataConversionUI::VRender(OrderingTable& ot)
         return s.size() > kMaxLineChars ? (s.substr(0, kMaxLineChars - 3) + "...") : s;
     };
 
-    for (const std::string& inProgress : mLastSnapshot.mInProgressItems)
+    for (const InProgressItem& inProgress : mLastSnapshot.mInProgressItems)
     {
         if (linesDrawn >= kMaxListLines)
         {
             break;
         }
-        const std::string line = "> " + truncate(inProgress);
+
+        std::string label = inProgress.mName;
+        if (inProgress.mTotal > 0)
+        {
+            // Sub-progress within this one item (currently just fmvs, by frame) - a single fmv
+            // can itself take long enough that its name just sitting there looks stalled.
+            const float itemPercent = (100.0f * static_cast<float>(inProgress.mCurrent)) / static_cast<float>(inProgress.mTotal);
+            char itemProgressBuf[48];
+            snprintf(itemProgressBuf, sizeof(itemProgressBuf), " (%u/%u %.1f%%)", inProgress.mCurrent, inProgress.mTotal, itemPercent);
+            label += itemProgressBuf;
+        }
+
+        const std::string line = "> " + truncate(label);
         polyOffset = mFont.DrawString(ot, line.c_str(), 20, listY, relive::TBlendModes::eBlend_0, 0, 0, Layer::eLayer_0, 255, 200, 100, polyOffset, FP_FromInteger(1), 640, 0);
         listY += kLineHeight;
         linesDrawn++;
@@ -267,15 +266,12 @@ void DataConversionUI::VRender(OrderingTable& ot)
         linesDrawn++;
     }
 
-    // OrderingTable::Add prepends (mOrderingTable[layer] = pPrim; pPrim->mNext = <previous head>),
-    // and DrawOTag() draws head-first - so whatever gets Add()'ed FIRST ends up drawn LAST (i.e.
-    // painted on top), and whatever gets Add()'ed LAST is drawn FIRST (underneath). Add order here
-    // (fill, track, border, mPoly) matches the desired front-to-back visual stack: fill on top of
-    // track, track on top of the border "ring" around it, mPoly (opaque full-screen background)
-    // underneath everything.
-    ot.Add(Layer::eLayer_0, &mProgressBarFill);
-    ot.Add(Layer::eLayer_0, &mProgressBarTrack);
-    ot.Add(Layer::eLayer_0, &mProgressBarBorder);
+    // ProgressBar::Draw adds its own polys (fill/track/border) via ot.Add() too - since
+    // OrderingTable::Add prepends and DrawOTag() draws head-first, whatever's Add()'ed first ends
+    // up drawn last (on top). Calling this before ot.Add(&mPoly) below is what keeps the bar
+    // visible on top of the background instead of getting painted over by it.
+    polyOffset = mProgressBar.Draw(ot, mFont, polyOffset);
+
     ot.Add(Layer::eLayer_0, &mPoly);
 
     gFontDrawScreenSpace = false;

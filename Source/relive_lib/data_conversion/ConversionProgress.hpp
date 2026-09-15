@@ -28,6 +28,17 @@ enum class ConversionCategory : u8
     Count
 };
 
+// An item currently being converted. mTotal is 0 for items with no meaningful sub-progress of
+// their own (paths/animations/misc/cameras - each is just "in progress" or "done", nothing in
+// between worth showing) - only fmvs currently set it, to the movie's own frame count, since a
+// single fmv can take long enough on its own that "in progress" alone looks stalled.
+struct InProgressItem final
+{
+    std::string mName;
+    u32 mCurrent = 0;
+    u32 mTotal = 0;
+};
+
 class ConversionProgress final
 {
 public:
@@ -44,8 +55,15 @@ public:
 
     // Adds itemName to the "in progress" list. Only worth calling for genuinely
     // long-running items (cameras, fmvs) - fast synchronous items (paths/anims/misc)
-    // can skip straight to ReportItemFinished.
-    void ReportItemStarted(std::string itemName);
+    // can skip straight to ReportItemFinished. total, when given, is the item's own
+    // sub-progress ceiling (currently just an fmv's frame count).
+    void ReportItemStarted(std::string itemName, u32 total = 0);
+
+    // Updates itemName's current sub-progress (e.g. the frame just encoded) - a no-op if it was
+    // never started with a nonzero total, or has already finished. Safe to call at high frequency
+    // (once per encoded fmv frame), same as AddCompleted, though it does briefly lock mLogMutex
+    // (unlike AddCompleted) since it has to find and update the matching in-progress entry.
+    void UpdateItemProgress(const std::string& itemName, u32 current);
 
     // Removes itemName from "in progress" (harmless no-op if it was never started)
     // and pushes it onto the bounded, most-recent-first "recent items" log.
@@ -63,8 +81,13 @@ public:
     struct Snapshot final
     {
         float mOverallPercent = 0.0f;
+        // Sum of every category's total/completed (paths+animations+cameras+misc+fmvs, the last
+        // counted in frames) - a raw, mixed-unit "how much work overall" count. Mainly useful
+        // for fmv-dominated runs where the weighted percentage alone barely seems to move.
+        u64 mTotalCompleted = 0;
+        u64 mTotalItems = 0;
         std::vector<std::string> mRecentItems;
-        std::vector<std::string> mInProgressItems;
+        std::vector<InProgressItem> mInProgressItems;
     };
     [[nodiscard]] Snapshot GetSnapshot(size_t maxRecentItems = 8) const;
 
@@ -79,6 +102,6 @@ private:
     // Guards mInProgressItems/mRecentItems only - the hot path (AddCompleted) never
     // touches this mutex.
     mutable std::mutex mLogMutex;
-    std::vector<std::string> mInProgressItems;
+    std::vector<InProgressItem> mInProgressItems;
     std::deque<std::string> mRecentItems;
 };

@@ -431,6 +431,7 @@ public:
                 }
 
                 progress.AddCompleted(ConversionCategory::Fmvs, 1);
+                progress.UpdateItemProgress(fName, frame_index + 1);
 
                 ++frame_index;
             }
@@ -696,9 +697,13 @@ public:
     // scan, when set, is the AO frame-count/size dry-run result already computed upfront by
     // ConvertFMVs' scan wave (see below) - reused here instead of redecoding the whole movie a
     // second time. Always empty for AE (its DDV header already declares this, no scan needed).
+    // totalFrames is this movie's own frame count (already known either way by the time
+    // ConvertFMVs dispatches this job) - shown as this item's own sub-progress ("frame X/Y") in
+    // the UI's in-progress list, since a single fmv can itself take long enough that just seeing
+    // its name sit there looks stalled.
     ConvertFmvJob(FileSystem& fs, std::string movieName, FileSystem::Path outDir, bool isAo,
                   ThreadPool& tp, std::shared_ptr<FmvConversionManifest> manifest,
-                  ConversionProgress& progress, std::optional<FmvScanResult> scan)
+                  ConversionProgress& progress, std::optional<FmvScanResult> scan, u32 totalFrames)
         : mFs(fs)
         , mMovieName(std::move(movieName))
         , mOutDir(std::move(outDir))
@@ -707,6 +712,7 @@ public:
         , mManifest(std::move(manifest))
         , mProgress(progress)
         , mScan(std::move(scan))
+        , mTotalFrames(totalFrames)
     {
     }
 
@@ -720,7 +726,7 @@ public:
 
         LOG_INFO("ConvertFmvJob: starting '%s' (isAo=%d)", mMovieName.c_str(), mIsAo ? 1 : 0);
 
-        mProgress.ReportItemStarted(mMovieName);
+        mProgress.ReportItemStarted(mMovieName, mTotalFrames);
 
         FmvConv fmvConv(mFs);
         bool completed = false;
@@ -756,6 +762,7 @@ private:
     std::shared_ptr<FmvConversionManifest> mManifest;
     ConversionProgress& mProgress;
     std::optional<FmvScanResult> mScan;
+    u32 mTotalFrames = 0;
 };
 
 namespace
@@ -841,17 +848,33 @@ void ConvertFMVs(ThreadPool& tp, FileSystem& fs, const FileSystem::Path& dataDir
         }
     }
 
+    // Per-movie frame count/scan, computed for every movie before any AddToTotal() call below -
+    // deliberately a separate pass from the skip-or-dispatch one further down. Combining the two
+    // into one loop (as an earlier version of this did) let a job dispatched for an early movie
+    // start completing frames on a worker thread while the loop was still only partway through
+    // adding later movies' totals - the category total kept growing out from under jobs already
+    // in flight, making the reported percentage swing wildly (confirmed live: 0% -> 57% -> 61% ->
+    // 33% -> ...) instead of climbing monotonically.
+    struct MovieInfo final
+    {
+        std::string mName;
+        u32 mFrameCount = 0;
+        std::optional<FmvScanResult> mScan;
+    };
+    std::vector<MovieInfo> movieInfos;
+    movieInfos.reserve(movieNames.size());
+
     for (const auto& movieName : movieNames)
     {
-        u32 frameCount = 0;
-        std::optional<FmvScanResult> scan;
+        MovieInfo info;
+        info.mName = movieName;
         if (isAo)
         {
             const auto it = aoScanResults.find(movieName);
             if (it != aoScanResults.end())
             {
-                scan = it->second;
-                frameCount = it->second.mFrameCount;
+                info.mScan = it->second;
+                info.mFrameCount = it->second.mFrameCount;
             }
         }
         else
@@ -859,11 +882,15 @@ void ConvertFMVs(ThreadPool& tp, FileSystem& fs, const FileSystem::Path& dataDir
             relive::DDVAe source(fs, movieName.c_str(), nullptr);
             if (source.ReadInfo())
             {
-                frameCount = source.TotalVideoFrames();
+                info.mFrameCount = source.TotalVideoFrames();
             }
         }
-        progress.AddToTotal(ConversionCategory::Fmvs, frameCount);
+        progress.AddToTotal(ConversionCategory::Fmvs, info.mFrameCount);
+        movieInfos.push_back(std::move(info));
+    }
 
+    for (const MovieInfo& info : movieInfos)
+    {
         // Resuming an interrupted conversion (killed, or cancelled because the user quit - see
         // ThreadPool::RequestCancel/Engine::Run()'s quit handling): skip movies the manifest already
         // has recorded as done under this exact fmvVersion, so relaunching doesn't have to
@@ -871,16 +898,16 @@ void ConvertFMVs(ThreadPool& tp, FileSystem& fs, const FileSystem::Path& dataDir
         // a movie complete once FmvConv::Convert has moved its finished temp file into place, so
         // this can't mistake a half-written file for a done one.
         FileSystem::Path outFile = fmvOutDir;
-        outFile.Append(movieName + ".webm");
-        if (manifest->IsCompleted(movieName) && fs.FileExists(outFile.GetPath().c_str()))
+        outFile.Append(info.mName + ".webm");
+        if (manifest->IsCompleted(info.mName) && fs.FileExists(outFile.GetPath().c_str()))
         {
-            LOG_INFO("ConvertFMVs: '%s' already converted, skipping", movieName.c_str());
+            LOG_INFO("ConvertFMVs: '%s' already converted, skipping", info.mName.c_str());
             // No job will run for this movie, so credit its (just-scanned) frame count as done
             // immediately rather than leaving the category total ahead of its completed count.
-            progress.AddCompleted(ConversionCategory::Fmvs, frameCount);
+            progress.AddCompleted(ConversionCategory::Fmvs, info.mFrameCount);
             continue;
         }
 
-        tp.AddJob(std::make_unique<ConvertFmvJob>(fs, movieName, fmvOutDir, isAo, tp, manifest, progress, scan));
+        tp.AddJob(std::make_unique<ConvertFmvJob>(fs, info.mName, fmvOutDir, isAo, tp, manifest, progress, info.mScan, info.mFrameCount));
     }
 }
