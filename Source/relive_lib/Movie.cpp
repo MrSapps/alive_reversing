@@ -759,11 +759,11 @@ s8 DDV_Play_Impl(const char_type* pMovieName)
     const u32 playbackId = ++sFmvPlaybackId;
     u32 renderedFrameCount = 0;
     u32 droppedFrameCount = 0;
+    u32 staleFrameDisplayCount = 0;
     u32 invalidDisplayedFrameCount = 0;
     bool haveLastDisplayedOffset = false;
     long long lastDisplayedOffset = 0;
-    u64 lastDisplayedPixelHash = 0;
-    u32 repeatedDisplayedPixelCount = 0;
+    u64 lastDisplayUpdateMs = SYS_GetTicks();
     LOG_INFO("FMV playback %u: started", playbackId);
 
     const bool hasAudio = movie.HasAudio();
@@ -802,6 +802,35 @@ s8 DDV_Play_Impl(const char_type* pMovieName)
     Poly_FT4 polyFT4 = {};
     polyFT4.SetXYWH(0, 0, 640, 240);
     polyFT4.mCam = &fmvFrame;
+
+    // Shared by both the normal (in-sync) render path and the stale-frame-while-catching-up
+    // path below (see ShouldDisplayStaleFrame) - both paint real decoded pixels to the screen,
+    // so both should feed the same non-increasing-screen-content diagnostic below.
+    auto DisplayFrame = [&](const MkvVideoFrame& f)
+    {
+        std::memcpy(fmvFrame.mData.mPixels->data(), f.mPixels.data(), f.mPixels.size());
+
+        Input_IsVKPressed_4EDD40(VK_ESCAPE);
+        Input_IsVKPressed_4EDD40(VK_RETURN);
+
+        polyFT4.mCam->mUniqueId = UniqueResId{};
+        Render_DDV_Frame(&polyFT4);
+
+        // mFileOffset already comes from the demuxer strictly increasing (each video packet
+        // occupies a later position in the file than the last) - the same "same or earlier
+        // offset shown twice" pipeline bug a full pixel-content hash would have been trying to
+        // catch here shows up for free as this offset failing to have advanced, no need to hash
+        // ~300KB of every displayed frame to get that.
+        if (haveLastDisplayedOffset && f.mFileOffset <= lastDisplayedOffset)
+        {
+            ++invalidDisplayedFrameCount;
+            LOG_ERROR("FMV playback %u: non-increasing screen offset=%lld previous=%lld pts=%llu",
+                playbackId, f.mFileOffset, lastDisplayedOffset, static_cast<unsigned long long>(f.mPtsNs));
+        }
+        haveLastDisplayedOffset = true;
+        lastDisplayedOffset = f.mFileOffset;
+        lastDisplayUpdateMs = SYS_GetTicks();
+    };
 
     MkvVideoQueue videoQueue;
     MkvAudioQueue audioQueue;
@@ -949,6 +978,21 @@ s8 DDV_Play_Impl(const char_type* pMovieName)
         if (syncOutcome == MovieFrameOutcome::Dropped)
         {
             ++droppedFrameCount;
+
+            // Otherwise, with a big enough backlog of stale/behind frames to drop, the screen
+            // sits on whatever was last actually rendered for however long the backlog takes to
+            // clear, then jumps straight to current - looks frozen, then hitches. Occasionally
+            // painting one of the stale frames anyway (throttled by wall-clock time so it
+            // doesn't slow down actually catching up) makes it read as fast-forwarding instead.
+            const u64 nowMs = SYS_GetTicks();
+            if (ShouldDisplayStaleFrame(nowMs, lastDisplayUpdateMs))
+            {
+                ++staleFrameDisplayCount;
+                DisplayFrame(frame);
+                LOG_INFO("FMV playback %u: stale frame while catching up offset=%lld pts=%llu dropped=%u queued=%zu",
+                    playbackId, frame.mFileOffset, static_cast<unsigned long long>(frame.mPtsNs),
+                    droppedFrameCount, videoQueue.Size());
+            }
             continue;
         }
         if (syncOutcome == MovieFrameOutcome::SkippedByUserInput)
@@ -958,43 +1002,14 @@ s8 DDV_Play_Impl(const char_type* pMovieName)
         }
 
         LOG_INFO("FMV playback: render frame pts=%llu queued=%zu", static_cast<unsigned long long>(frame.mPtsNs), videoQueue.Size());
-        std::memcpy(fmvFrame.mData.mPixels->data(), frame.mPixels.data(), frame.mPixels.size());
-
-        Input_IsVKPressed_4EDD40(VK_ESCAPE);
-        Input_IsVKPressed_4EDD40(VK_RETURN);
-
-        polyFT4.mCam->mUniqueId = UniqueResId{};
-        Render_DDV_Frame(&polyFT4);
         ++renderedFrameCount;
-        u64 pixelHash = 1469598103934665603ULL;
-        for (const u8 pixel : frame.mPixels)
-        {
-            pixelHash ^= pixel;
-            pixelHash *= 1099511628211ULL;
-        }
-        if (renderedFrameCount > 1 && pixelHash == lastDisplayedPixelHash)
-        {
-            ++repeatedDisplayedPixelCount;
-            LOG_ERROR("FMV playback %u: repeated screen pixels frame=%u offset=%lld hash=%llu",
-                playbackId, renderedFrameCount, frame.mFileOffset,
-                static_cast<unsigned long long>(pixelHash));
-        }
-        lastDisplayedPixelHash = pixelHash;
-        if (haveLastDisplayedOffset && frame.mFileOffset <= lastDisplayedOffset)
-        {
-            ++invalidDisplayedFrameCount;
-            LOG_ERROR("FMV playback %u: non-increasing screen frame=%u offset=%lld previous=%lld pts=%llu",
-                playbackId, renderedFrameCount, frame.mFileOffset, lastDisplayedOffset,
-                static_cast<unsigned long long>(frame.mPtsNs));
-        }
-        haveLastDisplayedOffset = true;
-        lastDisplayedOffset = frame.mFileOffset;
-        LOG_INFO("FMV playback %u: screen frame=%u offset=%lld pts=%llu clock=%llu hash=%llu queued=%zu", playbackId, renderedFrameCount,
+        DisplayFrame(frame);
+        LOG_INFO("FMV playback %u: screen frame=%u offset=%lld pts=%llu clock=%llu queued=%zu", playbackId, renderedFrameCount,
             frame.mFileOffset, static_cast<unsigned long long>(frame.mPtsNs),
             static_cast<unsigned long long>(audioStarted
                 ? (SND_Get_Generated_Audio_Samples() - audioStartSample) * 1000 / SND_Get_Device_Sample_Rate()
                 : 0),
-            static_cast<unsigned long long>(pixelHash), videoQueue.Size());
+            videoQueue.Size());
 
         SYS_EventsPump();
         PSX_VSync(VSyncMode::UncappedFps);
@@ -1002,8 +1017,8 @@ s8 DDV_Play_Impl(const char_type* pMovieName)
 
     moviePipeline.reset();
 
-    LOG_INFO("FMV playback %u: finished rendered=%u dropped=%u invalidDisplayed=%u repeatedPixels=%u", playbackId,
-        renderedFrameCount, droppedFrameCount, invalidDisplayedFrameCount, repeatedDisplayedPixelCount);
+    LOG_INFO("FMV playback %u: finished rendered=%u dropped=%u staleDisplayed=%u invalidDisplayed=%u", playbackId,
+        renderedFrameCount, droppedFrameCount, staleFrameDisplayCount, invalidDisplayedFrameCount);
 
     if (sFmvSoundEntry.field_4_pDSoundBuffer)
     {

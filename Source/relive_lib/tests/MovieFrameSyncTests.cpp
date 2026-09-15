@@ -192,3 +192,51 @@ TEST(MovieFrameSync, DropsAnEntireStaleBacklogBurstThenResumesRenderingLiveFrame
     // Once caught up to a live (in-sync) frame, playback resumes rendering normally.
     EXPECT_EQ(ProcessMovieFrameSync(11000, clock), MovieFrameOutcome::Rendered);
 }
+
+TEST(MovieFrameSync, DoesNotDisplayStaleFrameBeforeIntervalElapses)
+{
+    EXPECT_FALSE(ShouldDisplayStaleFrame(/*nowMs=*/1000, /*lastDisplayMs=*/900, /*minIntervalMs=*/200));
+}
+
+TEST(MovieFrameSync, DisplaysStaleFrameOnceIntervalElapses)
+{
+    EXPECT_TRUE(ShouldDisplayStaleFrame(/*nowMs=*/1100, /*lastDisplayMs=*/900, /*minIntervalMs=*/200));
+}
+
+TEST(MovieFrameSync, DisplaysStaleFrameExactlyAtInterval)
+{
+    EXPECT_TRUE(ShouldDisplayStaleFrame(/*nowMs=*/1100, /*lastDisplayMs=*/900, /*minIntervalMs=*/200));
+    EXPECT_FALSE(ShouldDisplayStaleFrame(/*nowMs=*/1099, /*lastDisplayMs=*/900, /*minIntervalMs=*/200));
+}
+
+// A whole backlog of Dropped frames still only trickles a handful of stale frames to the screen
+// at the configured throttle rate, rather than painting every single one of them (which would
+// defeat catching up quickly) - simulates "wall clock time" advancing a fixed amount per
+// backlogged frame, same idea DropsAnEntireStaleBacklogBurstThenResumesRenderingLiveFrames above
+// uses for the audio clock.
+TEST(MovieFrameSync, ThrottlesStaleFrameDisplayAcrossABacklog)
+{
+    u64 nowMs = 0;
+    u64 lastDisplayMs = 0;
+    u32 displayedCount = 0;
+
+    // 100 backlogged frames, 10ms of "wall clock" apart - a real decode stall spans a much wider
+    // range of frame timestamps than wall-clock time (see the DropsAnEntireStaleBacklogBurst
+    // test's own frame timestamps vs. this test's time source), but what's under test here is
+    // purely the throttle, so a plain fixed step is enough.
+    for (int i = 0; i < 100; ++i)
+    {
+        nowMs += 10;
+        if (ShouldDisplayStaleFrame(nowMs, lastDisplayMs))
+        {
+            ++displayedCount;
+            lastDisplayMs = nowMs;
+        }
+    }
+
+    // 1000ms of backlog at a 200ms throttle should display roughly 1000/200 = 5 times, not all
+    // 100 (silent/frozen) or 0 (still frozen, just differently).
+    EXPECT_GT(displayedCount, 0u);
+    EXPECT_LT(displayedCount, 100u);
+    EXPECT_EQ(displayedCount, 5u);
+}

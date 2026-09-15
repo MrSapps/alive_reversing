@@ -24,3 +24,8 @@ MovieFrameOutcome ProcessMovieFrameSync(u64 frameTimestampMs, IMovieSyncClock& c
 
     return MovieFrameOutcome::Rendered;
 }
+
+bool ShouldDisplayStaleFrame(u64 nowMs, u64 lastDisplayMs, u64 minIntervalMs)
+{
+    return (nowMs - lastDisplayMs) >= minIntervalMs;
+}
