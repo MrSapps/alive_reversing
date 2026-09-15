@@ -6,6 +6,7 @@
 #include "BasePath.hpp"
 #include "DynamicArray.hpp"
 #include "QuikSaveTypes.hpp"
+#include "Factory.hpp"
 
 class Guid;
 struct PSX_RECT;
@@ -15,6 +16,11 @@ class Particle;
 class BaseAnimatedWithPhysicsGameObject;
 
 enum class ReliveTypes : s16;
+
+// Largest valid grid-block index for a sprite of the given scale (0.5 or 1.0).
+// Same for both engines. An invalid scale logs a warning and returns 0 rather
+// than asserting - AO can reach this path in practice (e.g. dying with DDCheat on).
+s32 MaxGridBlocks(FP scale);
 
 enum class MapDirections : s16
 {
@@ -118,7 +124,6 @@ public:
     virtual CameraPos Rect_Location_Relative_To_Active_Camera(const PSX_RECT* pRect, s16 width = 0) = 0;
     virtual s16 Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect) = 0;
     virtual s16 Is_Point_In_Current_Camera(EReliveLevelIds level, s32 path, FP xpos, FP ypos, s16 width) = 0;
-    virtual void GetCurrentCamCoords(PSX_Point* pPoint) = 0;
     virtual void GoTo_Camera() = 0;
     virtual void ScreenChange() = 0;
     virtual void Handle_PathTransition() = 0;
@@ -148,6 +153,9 @@ public:
 
     s16 SetActiveCameraDelayed(MapDirections direction, BaseAliveGameObject* pObj, s16 swapEffect);
     Camera* GetCamera(CameraPos pos);
+    Camera* Create_Camera(s16 xpos, s16 ypos, s32 a4);
+    void Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode);
+    void GetCurrentCamCoords(PSX_Point* pPoint);
     s16 SetActiveCam(EReliveLevelIds level, s16 path, s16 cam, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange);
     CameraPos GetDirection(EReliveLevelIds level, s32 path, FP xpos, FP ypos);
     void Get_map_size(PSX_Point* pPoint);

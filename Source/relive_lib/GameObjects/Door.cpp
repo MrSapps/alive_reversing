@@ -262,14 +262,19 @@ void Door::SetDoorPosition(relive::Path_Door* pTlv)
     FP* yOff = &mYPos;
 
     FP tlvXMid = FP_FromInteger(pTlv->MidPointX());
-    
+
     PSX_Point cam;
     mMap.GetCurrentCamCoords(&cam);
-    
-    // Bottom of *this* camera in world space
-    s32 screenHeight = 260 + 240; // cam starts at off y=240 in AO 
-    FP rayEndY = FP_FromInteger(cam.y + screenHeight);
-    
+
+    // Bottom of *this* camera in world space. AO's cameras live in a bigger grid
+    // than AE's (640x360 + a 120px margin vs AE's plain 368x240), so the real
+    // per-engine bottom edge has to come from Get_Camera_World_Rect (which already
+    // knows both the camera's grid origin and its true on-screen size) rather than
+    // a single hardcoded constant shared between engines.
+    PSX_RECT camRect = {};
+    mMap.Get_Camera_World_Rect(CameraPos::eCamCurrent_0, &camRect);
+    FP rayEndY = FP_FromInteger(camRect.h);
+
     PathLine* pathLine = nullptr;
     if (gCollisions->Raycast(
             tlvXMid,

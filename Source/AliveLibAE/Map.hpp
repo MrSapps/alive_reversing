@@ -44,7 +44,6 @@ public:
     CameraPos Rect_Location_Relative_To_Active_Camera(const PSX_RECT* pRect, s16 width = 0) override;
     s16 Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect) override;
     s16 Is_Point_In_Current_Camera(EReliveLevelIds level, s32 path, FP xpos, FP ypos, s16 width) override;
-    void GetCurrentCamCoords(PSX_Point* pPoint) override;
     void GoTo_Camera() override;
     void ScreenChange() override;
     void Handle_PathTransition() override;
@@ -52,8 +51,6 @@ public:
     s32 VPurpleLightFrameCount(s16 bMakeInvisible) override;
 
     static BaseGameObject* FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLevelIds lvlId);
-    Camera* Create_Camera(s16 xpos, s16 ypos, s32 a4);
-    void Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode);
 
 private:
     void CreateScreenTransistionForTLV(relive::Path_TLV* pTlv);
@@ -64,5 +61,3 @@ public:
 
 extern bool gMap_bDoPurpleLightEffect;
 extern const CameraSwapEffects kPathChangeEffectToInternalScreenChangeEffect[10];
-
-s32 MaxGridBlocks(FP scale);

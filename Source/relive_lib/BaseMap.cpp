@@ -17,6 +17,7 @@
 #include "Sfx.hpp"
 #include "Sys.hpp"
 #include "AmbientSound.hpp"
+#include "logger.hpp"
 
 bool gMap_bDoPurpleLightEffect = false;
 
@@ -136,6 +137,110 @@ s16 BaseMap::SetActiveCameraDelayed(MapDirections direction, BaseAliveGameObject
 Camera* BaseMap::GetCamera(CameraPos pos)
 {
     return mCurrentCameras[static_cast<s32>(pos)];
+}
+
+Camera* BaseMap::Create_Camera(s16 xpos, s16 ypos, s32 /*a4*/)
+{
+    // Check min bound
+    if (xpos < 0 || ypos < 0)
+    {
+        return nullptr;
+    }
+
+    // Check max bounds
+    if (xpos >= mCamsOnX || ypos >= mCamsOnY)
+    {
+        return nullptr;
+    }
+
+    // Return existing camera if we already have one
+    for (s32 i = 0; i < ALIVE_COUNTOF(mPreviousCameras); i++)
+    {
+        if (mPreviousCameras[i]
+            && mPreviousCameras[i]->mLevel == mCurrentLevel
+            && mPreviousCameras[i]->mPath == mCurrentPath
+            && mPreviousCameras[i]->mCamXOff == xpos
+            && mPreviousCameras[i]->mCamYOff == ypos)
+        {
+            Camera* pTemp = mPreviousCameras[i];
+            mPreviousCameras[i] = nullptr;
+            return pTemp;
+        }
+    }
+
+    // Get a pointer to the camera name from the Path resource
+    const BinaryPath* pPathData = GetPathResourceBlockPtr(mCurrentPath);
+    const char* pCamName = pPathData->CameraName(xpos, ypos);
+
+    // Empty/blank camera in the map array
+    if (!pCamName || !pCamName[0])
+    {
+        return nullptr;
+    }
+
+    Camera* newCamera = relive_new Camera();
+
+    newCamera->mCamXOff = xpos;
+    newCamera->mCamYOff = ypos;
+
+    newCamera->mCamResLoaded = false;
+
+    newCamera->mLevel = mCurrentLevel;
+    newCamera->mPath = mCurrentPath;
+    newCamera->mCameraNumber = pPathData->CameraNameAsInteger(pCamName);
+
+    return newCamera;
+}
+
+void BaseMap::Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode)
+{
+    if (!pCamera)
+    {
+        return;
+    }
+
+    // Is camera resource loaded check
+    if (!pCamera->mCamResLoaded)
+    {
+        if (loadMode == relive::Factory::LoadMode::ConstructObject_0)
+        {
+            // Async camera load
+            pCamera->mCamRes = mResourceManager.LoadCam(pCamera->mLevel, pCamera->mPath, pCamera->mCameraNumber);
+
+            GetPath().Loader(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResourceFromList_1, ReliveTypes::eNone); // none = load all
+        }
+        else
+        {
+            // Blocking camera load
+            pCamera->mCamResLoaded = true;
+
+            GetPath().Loader(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResource_2, ReliveTypes::eNone); // none = load all
+        }
+    }
+}
+
+void BaseMap::GetCurrentCamCoords(PSX_Point* pPoint)
+{
+    const PSX_Point gridSize = GetPath().VGetGridSize();
+    pPoint->x = mCamIdxOnX * gridSize.x;
+    pPoint->y = mCamIdxOnY * gridSize.y;
+}
+
+s32 MaxGridBlocks(FP scale)
+{
+    if (scale == FP_FromDouble(0.5))
+    {
+        return 30; // (29+1) * 13 (grid block size) for 377/390
+    }
+    else if (scale == FP_FromInteger(1))
+    {
+        return 16; // (15+1) * 25 (grid block size) for 375/400
+    }
+    else
+    {
+        LOG_WARNING("Scale should be 0.5 or 1 but got %f. This usually occurs when you die with DDCheat on.", FP_GetDouble(scale));
+        return 0;
+    }
 }
 
 s16 BaseMap::SetActiveCam(EReliveLevelIds level, s16 path, s16 cam, CameraSwapEffects screenChangeEffect, s16 fmvBaseId, s16 forceChange)

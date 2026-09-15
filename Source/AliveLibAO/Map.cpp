@@ -205,23 +205,6 @@ OpenSeqHandle g_SeqTable_4C9E70[165] = {
     {"ALL_8_1.SEQ", 0, 0, 90, -1, {}},
     {nullptr, 0, 0, 0, 0, {}}};
 
-s32 MaxGridBlocks(FP scale)
-{
-    if (scale == FP_FromDouble(0.5))
-    {
-        return 30; // (29+1) * 13 (grid block size) for 377/390
-    }
-    else if (scale == FP_FromInteger(1))
-    {
-        return 16; // (15+1) * 25 (grid block size) for 375/400
-    }
-    else
-    {
-        LOG_WARNING("Scale should be 0.5 or 1 but got %f. This usually occurs when you die with DDCheat on.", FP_GetDouble(scale));
-        return 0;
-    }
-}
-
 Map::Map(ResourceManagerWrapper& resMan, relive::Factory& factory)
     : BaseMap(resMan, factory)
     , mPath(*this, factory)
@@ -322,12 +305,6 @@ s16 Map::Is_Point_In_Current_Camera(EReliveLevelIds level, s32 path, FP xpos, FP
     rect.y = FP_GetExponent(ypos);
     rect.h = FP_GetExponent(ypos);
     return Rect_Location_Relative_To_Active_Camera(&rect, width) == CameraPos::eCamCurrent_0;
-}
-
-void Map::GetCurrentCamCoords(PSX_Point* pPoint)
-{
-    pPoint->x = mPath.mPathData->mGridWidth * mCamIdxOnX;
-    pPoint->y = mPath.mPathData->mGridHeight * mCamIdxOnY;
 }
 
 void Map::GoTo_Camera()
@@ -942,98 +919,6 @@ CameraSwapper* Map::FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLev
             *pMap,
             pFmvRecord->mFlag2 == 1,
             pFmvRecord->mName);
-    }
-}
-
-Camera* Map::Create_Camera(s16 xpos, s16 ypos, s32 /*a4*/)
-{
-    // Check min bound
-    if (xpos < 0 || ypos < 0)
-    {
-        return nullptr;
-    }
-
-    // Check max bounds
-    if (xpos >= mCamsOnX || ypos >= mCamsOnY)
-    {
-        return nullptr;
-    }
-
-    // Return existing camera if we already have one
-    for (s32 i = 0; i < ALIVE_COUNTOF(mPreviousCameras); i++)
-    {
-        if (mPreviousCameras[i]
-            && mPreviousCameras[i]->mLevel == mCurrentLevel
-            && mPreviousCameras[i]->mPath == mCurrentPath
-            && mPreviousCameras[i]->mCamXOff == xpos
-            && mPreviousCameras[i]->mCamYOff == ypos)
-        {
-            auto pTemp = mPreviousCameras[i];
-            mPreviousCameras[i] = nullptr;
-            return pTemp;
-        }
-    }
-
-    // Get a pointer to the camera name from the Path resource
-    BinaryPath* pPathData = GetPathResourceBlockPtr(mCurrentPath);
-    auto pCamName = pPathData->CameraName(xpos, ypos);
-
-    // Empty/blank camera in the map array
-    if (!pCamName || !pCamName[0])
-    {
-        return nullptr;
-    }
-
-    auto newCamera = relive_new Camera();
-
-    newCamera->mCamXOff = xpos;
-    newCamera->mCamYOff = ypos;
-
-    newCamera->mCamResLoaded = false;
-
-    newCamera->mLevel = mCurrentLevel;
-    newCamera->mPath = mCurrentPath;
-
-    newCamera->mCameraNumber = pPathData->CameraNameAsInteger(pCamName);
-
-    return newCamera;
-}
-
-void Map::Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode)
-{
-    if (!pCamera)
-    {
-        return;
-    }
-
-    // Is camera resource loaded check
-    if (!pCamera->mCamResLoaded)
-    {
-        if (loadMode == relive::Factory::LoadMode::ConstructObject_0)
-        {
-            // Async camera load
-            /*
-            ResourceManager::LoadResourceFile(
-                pCamera->field_1E_fileName,
-                Camera::On_Loaded,
-                pCamera,
-                pCamera);*/
-
-            pCamera->mCamRes = mResourceManager.LoadCam(pCamera->mLevel, pCamera->mPath, pCamera->mCameraNumber);
-            mPath.Loader(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResourceFromList_1, ReliveTypes::eNone); // none = load all
-        }
-        else
-        {
-            // Blocking camera load
-            /*
-            ResourceManager::LoadResourceFile_455270(pCamera->field_1E_fileName, pCamera);
-            pCamera->field_C_ppBits = ResourceManager::GetLoadedResource(ResourceManager::Resource_Bits, pCamera->field_10_resId, 1, 0);
-            */
-
-            pCamera->mCamResLoaded = true;
-
-            mPath.Loader(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResource_2, ReliveTypes::eNone); // none = load all
-        }
     }
 }
 

@@ -40,3 +40,6 @@
 [submodule "3rdParty/libmodplug"]
 	path = 3rdParty/libmodplug
 	url = https://github.com/AliveTeam/libmodplug.git
+[submodule "3rdParty/minivorbis"]
+	path = 3rdParty/minivorbis
+	url = https://github.com/edubart/minivorbis.git
