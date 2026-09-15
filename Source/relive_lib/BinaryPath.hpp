@@ -15,6 +15,10 @@ namespace relive
 
 struct PathSoundInfo final
 {
+    // Populated at load time (ResourceManagerWrapper::LoadPaths) from sounds/<mSoundTheme>/
+    // sound_info.json, not parsed directly out of this path's own path.json - every path
+    // sharing a theme used to carry its own copy of these, so changing sound_theme without
+    // also hand-updating them left them pointing at the previous theme's files.
     std::string mVhFile;
     std::string mVbFile;
     std::vector<std::string> mSeqFiles;

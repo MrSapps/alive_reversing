@@ -447,6 +447,13 @@ std::vector<std::unique_ptr<BinaryPath>> ResourceManagerWrapper::LoadPaths(EReli
 
                 auto pathBuffer = std::make_unique<BinaryPath>(pathJsonFile.GetPath(), pathJson["map"]["path_id"]);
                 pathBuffer->CreateFromJson(pathJson);
+
+                PathSoundInfo& soundInfo = *pathBuffer->GetSoundInfo();
+                const SoundThemeInfo& themeInfo = LoadSoundThemeInfo(soundInfo.mSoundTheme);
+                soundInfo.mVhFile = themeInfo.mVhFile;
+                soundInfo.mVbFile = themeInfo.mVbFile;
+                soundInfo.mSeqFiles = themeInfo.mSeqFiles;
+
                 ret.emplace_back(std::move(pathBuffer));
             }
             break;
@@ -469,6 +476,31 @@ std::vector<u8> ResourceManagerWrapper::LoadSoundFile(const char_type* pFileName
         }
     }
     return {};
+}
+
+const ResourceManagerWrapper::SoundThemeInfo& ResourceManagerWrapper::LoadSoundThemeInfo(const std::string& soundTheme)
+{
+    const auto existing = mSoundThemeInfoCache.find(soundTheme);
+    if (existing != mSoundThemeInfoCache.end())
+    {
+        return existing->second;
+    }
+
+    SoundThemeInfo info;
+    const std::vector<u8> bytes = LoadSoundFile("sound_info.json", soundTheme);
+    if (!bytes.empty())
+    {
+        const nlohmann::json j = nlohmann::json::parse(bytes.begin(), bytes.end());
+        j.at("vh_file").get_to(info.mVhFile);
+        j.at("vb_file").get_to(info.mVbFile);
+        j.at("seq_files").get_to(info.mSeqFiles);
+    }
+    else
+    {
+        LOG_ERROR("Missing sound_info.json for sound theme '%s'", soundTheme.c_str());
+    }
+
+    return mSoundThemeInfoCache.emplace(soundTheme, std::move(info)).first->second;
 }
 
 

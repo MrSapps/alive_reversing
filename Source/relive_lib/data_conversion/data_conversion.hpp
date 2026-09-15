@@ -63,20 +63,25 @@ inline const char* ToString(::LevelIds lvlId)
         case ::LevelIds::eNecrum_2:
             return "necrum";
         case ::LevelIds::eMudomoVault_3:
-        case ::LevelIds::eMudomoVault_Ender_11:
             return "mudomo_vault";
+        case ::LevelIds::eMudomoVault_Ender_11:
+            return "mudomo_vault_ender";
         case ::LevelIds::eMudancheeVault_4:
-        case ::LevelIds::eMudancheeVault_Ender_7:
             return "mudanchee_vault";
+        case ::LevelIds::eMudancheeVault_Ender_7:
+            return "mudanchee_vault_ender";
         case ::LevelIds::eFeeCoDepot_5:
-        case ::LevelIds::eFeeCoDepot_Ender_12:
             return "feeco_depot";
+        case ::LevelIds::eFeeCoDepot_Ender_12:
+            return "feeco_depot_ender";
         case ::LevelIds::eBarracks_6:
-        case ::LevelIds::eBarracks_Ender_13:
             return "barracks";
+        case ::LevelIds::eBarracks_Ender_13:
+            return "barracks_ender";
         case ::LevelIds::eBonewerkz_8:
-        case ::LevelIds::eBonewerkz_Ender_14:
             return "bonewerkz";
+        case ::LevelIds::eBonewerkz_Ender_14:
+            return "bonewerkz_ender";
         case ::LevelIds::eBrewery_9:
             return "brewery";
         case ::LevelIds::eBrewery_Ender_10:
@@ -109,7 +114,13 @@ public:
         static constexpr u32 kFmvVersion = 1;
         // 17: dropped the redundant "paths" subdir under each level (levels/<name>/<pathId>/...
         // instead of levels/<name>/paths/<pathId>/...) and lower-cased "Sounds" to "sounds".
-        static constexpr u32 kPathVersion = 17;
+        // 18: moved vh_file/vb_file/seq_files out of every path.json's own sound_info (where
+        // changing sound_theme without also hand-updating them left them pointing at the
+        // previous theme's files) into one sounds/<theme>/sound_info.json per theme; also
+        // split the AE ender themes (barracks/bonewerkz/feeco_depot/mudanchee_vault/
+        // mudomo_vault) that used to share their base theme's dir under two different vb/vh
+        // pairs into their own "<theme>_ender" theme dirs, matching brewery/brewery_ender.
+        static constexpr u32 kPathVersion = 18;
         static constexpr u32 kPaletteVersion = 1;
         static constexpr u32 kAnimationVersion = 4;
         // 9: dropped the redundant "paths" subdir under each level, same as kPathVersion 17.
