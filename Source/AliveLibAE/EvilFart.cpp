@@ -307,7 +307,7 @@ void EvilFart::VUpdate()
     {
         sControlledCharacter = gAbe;
         SetDead(true);
-        mMap.SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+        mMap.SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, {}, 0);
     }
 
     // Show the count to the boom

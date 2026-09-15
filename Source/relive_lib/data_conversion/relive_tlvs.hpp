@@ -612,7 +612,17 @@ struct Path_BirdPortal final : public Path_TLV
     s16 mExitPath = 0;
     s16 mExitCamera = 0;
     reliveScale mScale = reliveScale::eFull;
-    s16 mMovieId = 0;
+    // The movie(s) to play on exiting the portal, resolved against mExitLevel. Empty means
+    // no movie in that slot. AO overloads its raw movie id with 2 negative sentinel values
+    // (-3/-4) that pick a *different* movie set once Abe has finished both Paramonia and
+    // Scrabania (see BirdPortal::VGetMapChange) - mMovieAllDone1-3 hold that alternate set,
+    // and are always empty for AE (which has no such sentinel).
+    std::string mMovie1;
+    std::string mMovie2;
+    std::string mMovie3;
+    std::string mMovieAllDone1;
+    std::string mMovieAllDone2;
+    std::string mMovieAllDone3;
     PortalType mPortalType = PortalType::eWorker;
     s16 mMudCountForShrykull = 0;
 
@@ -1220,7 +1230,7 @@ struct Path_MovieStone final : public Path_TLV
         mTlvType = ReliveTypes::eMovieHandStone;
         mAttribute = QuiksaveAttribute::eDoNothing_0;
     }
-    s16 mMovieId = 0;
+    std::string mMovieName; // Empty means no movie
     reliveScale mScale = reliveScale::eFull;
 
     // AE only
@@ -1265,7 +1275,12 @@ struct Path_PathTransition final : public Path_TLV
     EReliveLevelIds mNextLevel = EReliveLevelIds::eNone;
     s16 mNextPath = 0;
     s16 mNextCamera = 0;
-    s16 mMovieId = 0;
+    // Up to 3 FMVs to play in sequence during this transition. Empty means no movie in
+    // that slot. Replaces the old single mMovieId field, whose value packed up to 3 FMV
+    // indices into one decimal number (e.g. 12402 meant play FMV 1, then 24, then 2).
+    std::string mMovie1;
+    std::string mMovie2;
+    std::string mMovie3;
     s16 mWipeEffect = 0; // TODO: enum
     reliveScale mNextPathScale = reliveScale::eFull;
     static constexpr char kClassName[] = "path_transition";
@@ -1361,7 +1376,7 @@ struct Path_Door final : public Path_TLV
     s16 mHub7 = 0;
     s16 mHub8 = 0;
     reliveScreenChangeEffects mWipeEffect = reliveScreenChangeEffects::eBoxOut;
-    s16 mMovieId = 0;
+    std::string mMovieName; // Empty means no movie
     s16 mDoorOffsetX = 0;
     s16 mDoorOffsetY = 0;
     reliveXDirection mExitDirection = reliveXDirection::eRight;
@@ -1797,7 +1812,7 @@ struct Path_WellExpress final : public relive::Path_WellBase
     bool mEmitLeaves = false;
     s16 mLeafX = 0;
     s16 mLeafY = 0;
-    s16 mMovieId = 0;
+    std::string mMovieName; // Empty means no movie
     static constexpr char kClassName[] = "well_express";
     static constexpr ReliveTypes kReliveType = ReliveTypes::eWellExpress;
 };
@@ -2235,7 +2250,7 @@ struct Path_LevelLoader final : public Path_TLV
     EReliveLevelIds mDestLevel = EReliveLevelIds::eNone;
     s16 mDestPath = 0;
     s16 mDestCamera = 0;
-    s16 mMovieId = 0;
+    std::string mMovieName; // Empty means no movie
     static constexpr char kClassName[] = "level_loader";
     static constexpr ReliveTypes kReliveType = ReliveTypes::eLevelLoader;
 };
@@ -2429,7 +2444,7 @@ struct Path_Teleporter final : public Path_TLV
     s16 mSwitchId = 0;
     reliveScale mScale = reliveScale::eFull;
     reliveScreenChangeEffects mWipeEffect = reliveScreenChangeEffects::eBoxOut;
-    s16 mMovieId = 0;
+    std::string mMovieName; // Empty means no movie
     s16 mElectricX = 0;
     s16 mElectricY = 0;
     static constexpr char kClassName[] = "teleporter";
@@ -2479,7 +2494,7 @@ struct Path_Glukkon final : public Path_TLV
     GlukkonTypes mGlukkonType = GlukkonTypes::eNormal;
     s16 mDeathSwitchId = 0;
     s16 mPlayMovieSwitchId = 0;
-    s16 mMovieId = 0;
+    std::string mMovieName; // Empty means no movie
     static constexpr char kClassName[] = "glukkon";
     static constexpr ReliveTypes kReliveType = ReliveTypes::eGlukkon;
 };

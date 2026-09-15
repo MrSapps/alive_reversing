@@ -140,7 +140,7 @@ void SaveGame::LoadFromMemory(SaveData* pData, s32 bKillObjects, BaseMap& map)
         pData->mCurrentPath,
         pData->mCurrentCamera,
         CameraSwapEffects::eInstantChange_0,
-        0,
+        {},
         1);
 }
 

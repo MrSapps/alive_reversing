@@ -329,8 +329,7 @@ void DDCheat::Teleport()
                         MapWrapper::FromAO(static_cast<LevelIds>(sTeleport_Level)),
                         sTeleport_Path,
                         sTeleport_Cam,
-                        CameraSwapEffects::eInstantChange_0,
-                        0,
+                        CameraSwapEffects::eInstantChange_0,{},
                         0);
                     mTeleporting = true;
                 }

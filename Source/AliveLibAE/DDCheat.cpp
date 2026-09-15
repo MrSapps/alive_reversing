@@ -122,7 +122,7 @@ void DDCheat::Teleport()
     {
         gDDCheat_FlyingEnabled = true;
 
-        mMap.SetActiveCam(MapWrapper::FromAE(static_cast<LevelIds>(sTeleport_Level)), sTeleport_Path, sTeleport_Cam, CameraSwapEffects::eInstantChange_0, 0, 0);
+        mMap.SetActiveCam(MapWrapper::FromAE(static_cast<LevelIds>(sTeleport_Level)), sTeleport_Path, sTeleport_Cam, CameraSwapEffects::eInstantChange_0, {}, 0);
         mTeleporting = true;
     }
 }

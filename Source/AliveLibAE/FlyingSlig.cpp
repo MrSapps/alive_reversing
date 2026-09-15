@@ -459,8 +459,7 @@ FlyingSlig::~FlyingSlig()
                 mAbeLevel,
                 mAbePath,
                 mAbeCamera,
-                CameraSwapEffects::eInstantChange_0,
-                0,
+                CameraSwapEffects::eInstantChange_0,{},
                 0);
         }
     }

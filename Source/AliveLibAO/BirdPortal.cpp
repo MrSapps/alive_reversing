@@ -35,7 +35,12 @@ BirdPortal::BirdPortal(relive::Path_BirdPortal* pTlv, const Guid& tlvId, Resourc
     mExitLevel = pTlv->mExitLevel;
     mExitPath = pTlv->mExitPath;
     mExitCamera = pTlv->mExitCamera;
-    mMovieId = pTlv->mMovieId;
+    mMovie1 = pTlv->mMovie1;
+    mMovie2 = pTlv->mMovie2;
+    mMovie3 = pTlv->mMovie3;
+    mMovieAllDone1 = pTlv->mMovieAllDone1;
+    mMovieAllDone2 = pTlv->mMovieAllDone2;
+    mMovieAllDone3 = pTlv->mMovieAllDone3;
     mMudCountForShrykull = pTlv->mMudCountForShrykull;
     mTlvInfo = tlvId;
 
@@ -677,38 +682,31 @@ void BirdPortal::VExitPortal()
     }
 }
 
-void BirdPortal::VGetMapChange(EReliveLevelIds* level, u16* path, u16* camera, CameraSwapEffects* screenChangeEffect, u16* movieId)
+void BirdPortal::VGetMapChange(EReliveLevelIds* level, u16* path, u16* camera, CameraSwapEffects* screenChangeEffect, FmvIds* fmvIds)
 {
     *level = mExitLevel;
     *path = mExitPath;
     *camera = mExitCamera;
 
-    // Positive
-    if (mMovieId > 0)
+    // mMovieAllDone1-3 are only ever populated for the negative-sentinel case (see
+    // relive::Path_BirdPortal), i.e. "return from paramonia"/"return from scrabania" portals.
+    if (!mMovieAllDone1.empty() && gAbe->mParamoniaDone && gAbe->mScrabaniaDone)
     {
-        *movieId = mMovieId;
+        *fmvIds = FmvIds{mMovieAllDone1, mMovieAllDone2, mMovieAllDone3};
         *screenChangeEffect = CameraSwapEffects::ePlay1FMV_5;
         return;
     }
 
-    // Zero
-    if (mMovieId == 0)
+    // Covers both the ordinary positive-id single-movie case and the negative-sentinel case
+    // before Abe has finished both Paramonia and Scrabania.
+    if (!mMovie1.empty())
     {
-        *screenChangeEffect = CameraSwapEffects::eInstantChange_0;
-        return;
-    }
-
-    // Negative cases
-    // mMovieId -3 is for when you return from paramonia and -4 is for scrabania
-    if (gAbe->mParamoniaDone && gAbe->mScrabaniaDone)
-    {
-        *movieId = 1617 - (10000 * mMovieId);
+        *fmvIds = FmvIds{mMovie1, mMovie2, mMovie3};
         *screenChangeEffect = CameraSwapEffects::ePlay1FMV_5;
         return;
     }
 
-    *movieId = 17 - (100 * mMovieId);
-    *screenChangeEffect = CameraSwapEffects::ePlay1FMV_5;
+    *screenChangeEffect = CameraSwapEffects::eInstantChange_0;
 }
 
 Event BirdPortal::GetEvent()

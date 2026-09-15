@@ -59,7 +59,7 @@ struct AEGameInfo
     EReliveLevelIds* levelId;  // 1
     s16* pathId;        // 2
     s16* camId;         // 3
-    u16* fmvId;         // 4
+    u16* fmvId;         // 4 - now 0/1 "is an FMV queued to play", not a real id (FMVs are identified by name internally now)
     u32* gnFrame;       // 5
     Abe** pAbe;         // 6
     s32 abeYOffSet;     // 7
@@ -89,7 +89,7 @@ extern "C"
         &gMap.mCurrentLevel,
         &gMap.mCurrentPath,
         &gMap.mCurrentCamera,
-        &gMap.mFmvBaseId,
+        &gMap.mFmvPending,
         &sGnFrame,
         &gAbe,
         offsetof(Abe, mYPos),

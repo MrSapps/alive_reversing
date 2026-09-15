@@ -559,7 +559,7 @@ void Engine::Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera
 
     Game_Init_LoadingIcon();
 
-    mMap->Init(startLevel, static_cast<s16>(startPath), static_cast<s16>(startCamera), CameraSwapEffects::eInstantChange_0, 0, 0);
+    mMap->Init(startLevel, static_cast<s16>(startPath), static_cast<s16>(startCamera), CameraSwapEffects::eInstantChange_0, {}, 0);
 
     // Main loop start
     Game_Loop(*mMap);

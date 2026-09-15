@@ -54,12 +54,12 @@ void DemoPlayback::VUpdate()
         if (gIsDemoStartedManually)
         {
             // go back to the demo selection menu
-            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 30, CameraSwapEffects::eInstantChange_0, 0, 0);
+            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 30, CameraSwapEffects::eInstantChange_0, {}, 0);
         }
         else
         {
             // go back to the main screen
-            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 1, CameraSwapEffects::eInstantChange_0, 0, 0);
+            mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 1, CameraSwapEffects::eInstantChange_0, {}, 0);
         }
 
         mMap.mFreeAllAnimAndPalts = true;

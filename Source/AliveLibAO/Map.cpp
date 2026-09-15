@@ -689,7 +689,7 @@ void Map::Handle_PathTransition()
         mNextLevel = pTlv->mNextLevel;
         mNextPath = pTlv->mNextPath;
         mNextCamera = pTlv->mNextCamera;
-        mFmvBaseId = pTlv->mMovieId;
+        mFmvIds = FmvIds{pTlv->mMovie1, pTlv->mMovie2, pTlv->mMovie3};
 
         mCameraSwapEffect = kPathChangeEffectToInternalScreenChangeEffect[pTlv->mWipeEffect];
 
@@ -855,71 +855,23 @@ s32 Map::VPurpleLightFrameCount(s16 bMakeInvisible)
 
 CameraSwapper* Map::FMV_Camera_Change(CamResource& ppBits, Map* pMap, EReliveLevelIds levelId)
 {
-    // This is required to make the movies work when abe completes scrabania and paramonia.
-    // u16 41617 -> s16 -23919 -> u16 41617
-    // TODO: should probably use the s32 type for every function parameter with a fmv base id
-    u16 fmvBaseId = pMap->mFmvBaseId;
+    FmvInfo* pFmvRec1 = AO::Path_Get_FMV_Record(levelId, pMap->mFmvIds.mFmv1);
+    FmvInfo* pFmvRec2 = AO::Path_Get_FMV_Record(levelId, pMap->mFmvIds.mFmv2);
+    FmvInfo* pFmvRec3 = AO::Path_Get_FMV_Record(levelId, pMap->mFmvIds.mFmv3);
 
-    if (fmvBaseId > 10000u)
+    if ((pFmvRec1 && pFmvRec1->mFlags) || (pFmvRec2 && pFmvRec2->mFlags) || (pFmvRec3 && pFmvRec3->mFlags))
     {
-        FmvInfo* pFmvRec1 = AO::Path_Get_FMV_Record(levelId, fmvBaseId / 10000);
-        FmvInfo* pFmvRec2 = AO::Path_Get_FMV_Record(levelId, fmvBaseId % 100);
-        FmvInfo* pFmvRec3 = AO::Path_Get_FMV_Record(levelId, fmvBaseId / 100 % 100);
-
-        if (pFmvRec1->mFlags || pFmvRec2->mFlags || pFmvRec3->mFlags)
-        {
-            BackgroundMusic::Stop();
-            MusicController::EnableMusic(0);
-        }
-
-        return relive_new CameraSwapper(
-            ppBits,
-            pMap->mResourceManager,
-            *pMap,
-            pFmvRec1->mFlag2 == 1,
-            pFmvRec1->mName,
-            pFmvRec2->mFlag2 == 1,
-            pFmvRec2->mName,
-            pFmvRec3->mFlag2 == 1,
-            pFmvRec3->mName);
+        BackgroundMusic::Stop();
+        MusicController::EnableMusic(0);
     }
-    else if (fmvBaseId > 100u)
-    {
-        // Double FMV
-        FmvInfo* pFmvRec1 = AO::Path_Get_FMV_Record(levelId, fmvBaseId / 100);
-        FmvInfo* pFmvRec2 = AO::Path_Get_FMV_Record(levelId, fmvBaseId % 100);
-        if (pFmvRec1->mFlags || pFmvRec2->mFlags)
-        {
-            BackgroundMusic::Stop();
-            MusicController::EnableMusic(0);
-        }
 
-        return relive_new CameraSwapper(
-            ppBits,
-            pMap->mResourceManager,
-            *pMap,
-            pFmvRec1->mFlag2 == 1,
-            pFmvRec1->mName,
-            pFmvRec2->mFlag2 == 1,
-            pFmvRec2->mName);
-    }
-    else // < 100
-    {
-        // Single FMV
-        FmvInfo* pFmvRecord = AO::Path_Get_FMV_Record(levelId, fmvBaseId);
-        if (pFmvRecord->mFlags)
-        {
-            BackgroundMusic::Stop();
-            MusicController::EnableMusic(0);
-        }
-
-        return relive_new CameraSwapper(
-            ppBits,
-            pMap->mResourceManager,
-            *pMap,
-            pFmvRecord->mFlag2 == 1,
-            pFmvRecord->mName);
-    }
+    return relive_new CameraSwapper(
+        ppBits,
+        pMap->mResourceManager,
+        *pMap,
+        pFmvRec1 && pFmvRec1->mFlag2 == 1, pFmvRec1 ? pFmvRec1->mName : nullptr,
+        pFmvRec2 && pFmvRec2->mFlag2 == 1, pFmvRec2 ? pFmvRec2->mName : nullptr,
+        pFmvRec3 && pFmvRec3->mFlag2 == 1, pFmvRec3 ? pFmvRec3->mName : nullptr);
 }
 
 relive::Path_TLV* Path_TLV::Next_446460(relive::Path_TLV* pTlv)

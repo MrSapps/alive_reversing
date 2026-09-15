@@ -386,7 +386,12 @@ public:
          r.Visit("BirdPortalExit Path", mTlv.mExitPath);
         r.Visit("BirdPortalExit Camera", mTlv.mExitCamera);
         r.Visit("Scale", mTlv.mScale);
-        r.Visit("Movie ID", mTlv.mMovieId);
+        r.Visit("Movie 1", mTlv.mMovie1);
+        r.Visit("Movie 2", mTlv.mMovie2);
+        r.Visit("Movie 3", mTlv.mMovie3);
+        r.Visit("Movie 1 (Paramonia+Scrabania done)", mTlv.mMovieAllDone1);
+        r.Visit("Movie 2 (Paramonia+Scrabania done)", mTlv.mMovieAllDone2);
+        r.Visit("Movie 3 (Paramonia+Scrabania done)", mTlv.mMovieAllDone3);
         r.Visit("Portal Type", mTlv.mPortalType);
         r.Visit("Mudokon Amount For Shrykull", mTlv.mMudCountForShrykull);
         r.Visit("(AE) Create Portal Switch ID", mTlv.mCreatePortalSwitchId);
@@ -463,7 +468,7 @@ public:
         r.Visit("Hub 7 ID", mTlv.mHub7);
         r.Visit("Hub 8 ID", mTlv.mHub8);
         r.Visit("Wipe Effect", mTlv.mWipeEffect);
-        r.Visit("Movie ID", mTlv.mMovieId);
+        r.Visit("Movie Name", mTlv.mMovieName);
         r.Visit("X Offset", mTlv.mDoorOffsetX);
         r.Visit("Y Offset", mTlv.mDoorOffsetY);
         r.Visit("Abe Direction On Exit", mTlv.mExitDirection);
@@ -688,7 +693,7 @@ public:
         r.Visit("Switch ID", mTlv.mSwitchId);
         r.Visit("Scale", mTlv.mScale);
         r.Visit("Screen Change Effect", mTlv.mWipeEffect);
-        r.Visit("Movie ID", mTlv.mMovieId);
+        r.Visit("Movie Name", mTlv.mMovieName);
         r.Visit("Electric X", mTlv.mElectricX);
         r.Visit("Electric Y", mTlv.mElectricY);
     }
@@ -967,7 +972,7 @@ public:
         r.Visit("Emit Leaves", mTlv.mEmitLeaves);
         r.Visit("Leaf X", mTlv.mLeafX);
         r.Visit("Leaf Y", mTlv.mLeafY);
-        r.Visit("Movie ID", mTlv.mMovieId);
+        r.Visit("Movie Name", mTlv.mMovieName);
     }
 
     std::string GetIconPath() const override
@@ -1358,7 +1363,7 @@ public:
         r.Visit("Destination Level", mTlv.mDestLevel);
         r.Visit("Destination Path", mTlv.mDestPath);
         r.Visit("Destination Camera", mTlv.mDestCamera);
-        r.Visit("Movie ID", mTlv.mMovieId);
+        r.Visit("Movie Name", mTlv.mMovieName);
     }
 
     std::string GetIconPath() const override
@@ -1839,7 +1844,9 @@ public:
         r.Visit("Next Level", mTlv.mNextLevel);
         r.Visit("Next Path", mTlv.mNextPath);
         r.Visit("Next Camera", mTlv.mNextCamera);
-        r.Visit("Movie ID", mTlv.mMovieId);
+        r.Visit("Movie 1", mTlv.mMovie1);
+        r.Visit("Movie 2", mTlv.mMovie2);
+        r.Visit("Movie 3", mTlv.mMovie3);
         r.Visit("Wipe Effect", mTlv.mWipeEffect);
         r.Visit("Next Path Scale", mTlv.mNextPathScale);
     }
@@ -2338,7 +2345,7 @@ public:
     {
         MapObjectBase::Visit(r);
 
-        r.Visit("Movie ID", mTlv.mMovieId);
+        r.Visit("Movie Name", mTlv.mMovieName);
         r.Visit("Scale", mTlv.mScale);
         r.Visit("(AE) Trigger Switch ID", mTlv.mTriggerSwitchId);
     }
@@ -2594,7 +2601,7 @@ public:
         r.Visit("Glukkon Type", mTlv.mGlukkonType);
         r.Visit("Death Switch ID", mTlv.mDeathSwitchId);
         r.Visit("Play Movie Switch ID", mTlv.mPlayMovieSwitchId);
-        r.Visit("Movie To Play (FMV ID)", mTlv.mMovieId);
+        r.Visit("Movie To Play (Name)", mTlv.mMovieName);
     }
 
     std::string GetIconPath() const override

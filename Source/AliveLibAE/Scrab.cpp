@@ -444,8 +444,7 @@ Scrab::~Scrab()
                 mAbeLevel,
                 mAbePath,
                 mAbeCamera,
-                CameraSwapEffects::eInstantChange_0,
-                0,
+                CameraSwapEffects::eInstantChange_0,{},
                 0);
         }
     }
@@ -1890,7 +1889,7 @@ s16 Scrab::Brain_5_Possessed()
         MusicController::static_PlayMusic(MusicController::MusicTypes::eNone_0, this, 0, 0);
         ToPatrol();
         mBrainSubState = Scrab_Brain_0_Patrol::eBrain0_ToMoving_0;
-        mMap.SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+        mMap.SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, {}, 0);
         return mBrainSubState;
     }
 
@@ -3015,7 +3014,7 @@ void Scrab::Motion_28_GetDepossessedBegin()
             mCurrentMotion = eScrabMotions::Motion_29_GetDepossessedEnd;
             ToPatrol();
             mBrainSubState = Scrab_Brain_0_Patrol::eBrain0_ToMoving_0;
-            mMap.SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+            mMap.SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, {}, 0);
         }
     }
 }

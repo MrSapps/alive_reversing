@@ -1265,7 +1265,7 @@ s16 Paramite::Brain_1_Death()
         if (field_130_timer < static_cast<s32>(sGnFrame))
         {
             sControlledCharacter = gAbe;
-            mMap.SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+            mMap.SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, {}, 0);
         }
     }
 
@@ -2427,7 +2427,7 @@ s16 Paramite::Brain_7_DeathDrop()
         if (sControlledCharacter == this)
         {
             sControlledCharacter = gAbe;
-            mMap.SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+            mMap.SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, {}, 0);
         }
 
         SetDead(true);
@@ -4339,7 +4339,7 @@ void Paramite::Motion_29_GetDepossessedBegin()
             mCurrentMotion = eParamiteMotions::Motion_30_GetDepossessedEnd;
             SetBrain(&Paramite::Brain_0_Patrol);
             mBrainSubState = 0;
-            mMap.SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, 0, 0);
+            mMap.SetActiveCam(mAbeLevel, mAbePath, mAbeCamera, CameraSwapEffects::eInstantChange_0, {}, 0);
             if (mAbeCamera != mMap.mCurrentCamera)
             {
                 if (mSpawned)
@@ -4966,8 +4966,7 @@ Paramite::~Paramite()
                 mAbeLevel,
                 mAbePath,
                 mAbeCamera,
-                CameraSwapEffects::eInstantChange_0,
-                0,
+                CameraSwapEffects::eInstantChange_0,{},
                 0);
         }
     }
