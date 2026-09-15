@@ -13,6 +13,7 @@
 #include "../AliveLibAE/VGA.hpp"
 #include "../AliveLibAE/GameAutoPlayer.hpp"
 #include "Engine.hpp"
+#include "GameObjects/ScreenManager.hpp"
 #include "Renderer/IRenderer.hpp"
 #include "data_conversion/rgb_conversion.hpp"
 #include "data_conversion/file_system.hpp"
@@ -815,6 +816,23 @@ s8 DDV_Play_Impl(const char_type* pMovieName)
 
         polyFT4.mCam->mUniqueId = UniqueResId{};
         Render_DDV_Frame(&polyFT4);
+
+        // Keep the "camera" ScreenManager draws into the ordering table every tick (behind
+        // whatever Movie's own direct Render_DDV_Frame presents while a movie is actively
+        // playing) in sync with the last FMV frame actually shown. CameraSwapper deliberately
+        // doesn't apply its own (real, pre-chain) camera to ScreenManager until an entire
+        // multi-FMV chain finishes, so without this, ScreenManager's per-tick draw is stuck
+        // showing whatever camera was active before the chain even started - invisible while a
+        // movie's own rendering is running, but visible as a one-tick flash of that stale camera
+        // in the gap between one chained FMV finishing and the next one starting (a whole
+        // movie's blocking playback runs within a single object-update pass, so that pass's own
+        // ScreenManager render already happened by the time CameraSwapper gets a chance to react
+        // and start the next movie in the chain - see CameraSwapper's ePlay2FMVs_9/
+        // ePlay3FMVs_10).
+        if (gScreenManager)
+        {
+            gScreenManager->DecompressCameraToVRam(fmvFrame);
+        }
 
         // mFileOffset already comes from the demuxer strictly increasing (each video packet
         // occupies a later position in the file than the last) - the same "same or earlier
