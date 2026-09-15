@@ -28,8 +28,13 @@ public:
     // Unknown up-front for a raw STR stream (no frame-count header field like DDV has) -
     // FmvConv::Convert loops on StepFrame() returning false to detect EOF instead.
     [[nodiscard]] u32 TotalVideoFrames() override { return 0; }
-    [[nodiscard]] u32 AudioSampleRate() override { return 37800; }
-    [[nodiscard]] u32 AudioChannels() override { return 1; }
+    // PSXADPCMDecoder::Decode() always de-interleaves left/right (see its dstLeft/dstRight,
+    // stride-2 writes) - this stream is genuine interleaved stereo, at half the per-channel
+    // rate of XA-ADPCM mono so the sector's total sample budget (and so its real duration)
+    // is unchanged. Declaring it as mono @ 37800 played both channels back to back as one
+    // fast mono stream - double speed, audible as audio pitched up an octave.
+    [[nodiscard]] u32 AudioSampleRate() override { return 18900; }
+    [[nodiscard]] u32 AudioChannels() override { return 2; }
     [[nodiscard]] u32 AudioBitsPerSample() override { return 16; }
 
     [[nodiscard]] const std::vector<u8>& GetPixels() const override { return mPixels; }
