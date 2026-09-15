@@ -135,7 +135,12 @@ public:
         // keyframe.
         cfg.kf_mode = AOM_KF_AUTO;
         cfg.kf_min_dist = 0;
-        cfg.kf_max_dist = (frameRate > 0 ? frameRate : 15) * 2; // at least one keyframe every ~2s
+        // 1s, matching normal seek-to-the-second expectations from typical video files. The
+        // usual reason to space keyframes out further (they're much bigger than a P-frame, so
+        // more of them costs real bitrate) barely applies at this tiny 320x240/~15fps size - a
+        // keyframe here only runs about 3.8KB more than an average P-frame (measured via
+        // ffprobe), so a 1s cadence instead of 2s only adds a few % to typical FMV file sizes.
+        cfg.kf_max_dist = (frameRate > 0 ? frameRate : 15) * 1;
 
         aom_codec_ctx_t codec = {};
         if (aom_codec_enc_init(&codec, encoder, &cfg, 0))
