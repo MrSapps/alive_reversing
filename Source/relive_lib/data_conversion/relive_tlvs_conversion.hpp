@@ -40,16 +40,35 @@ inline void BaseConvert(relive::Path_TLV& r, const AO::Path_TLV& base, const Gui
     // name, once, here at conversion time - so the engine never has to touch a numeric FMV
     // id/index again. Index 0 always resolves to "no movie" (both games use a name-less
     // sentinel record at index 0), matching the original games' "0 means none" convention.
+    // Bounds-checked against the level's real FMV table (unlike Path_Get_FMV_Record's plain
+    // numeric-index overload, which - matching the original game - does not bounds check at
+    // all). Conversion-time data can't be trusted the way the original game's own compiled-in
+    // ids could, so an out-of-range id here logs a warning and resolves to "no movie" instead
+    // of reading past the end of the table.
     inline std::string ResolveFmvName_AO(EReliveLevelIds lvlId, s16 fmvId)
     {
-        const AO::FmvInfo* pRec = AO::Path_Get_FMV_Record(lvlId, static_cast<u16>(fmvId));
-        return (pRec && pRec->mName) ? pRec->mName : std::string();
+        const AO::PathRoot* pRoot = AO::Path_Get_PathRoot(static_cast<s32>(MapWrapper::ToAO(lvlId)));
+        const u16 index = static_cast<u16>(fmvId);
+        if (!pRoot || index >= pRoot->mFmvArray.mCount)
+        {
+            LOG_WARNING("FMV index %u out of range for level %d during conversion - treating as no movie", index, static_cast<s32>(lvlId));
+            return {};
+        }
+        const relive::FmvInfoEntry& rec = pRoot->mFmvArray.mArray[index];
+        return rec.mName ? rec.mName : std::string();
     }
 
     inline std::string ResolveFmvName_AE(EReliveLevelIds lvlId, s16 fmvId)
     {
-        const relive::FmvInfoEntry* pRec = ::Path_Get_FMV_Record(lvlId, static_cast<u16>(fmvId));
-        return (pRec && pRec->mName) ? pRec->mName : std::string();
+        const relive::PathRoot* pRoot = ::Path_Get_PathRoot(static_cast<s32>(MapWrapper::ToAE(lvlId)));
+        const u16 index = static_cast<u16>(fmvId);
+        if (!pRoot || index >= pRoot->mFmvArray.mCount)
+        {
+            LOG_WARNING("FMV index %u out of range for level %d during conversion - treating as no movie", index, static_cast<s32>(lvlId));
+            return {};
+        }
+        const relive::FmvInfoEntry& rec = pRoot->mFmvArray.mArray[index];
+        return rec.mName ? rec.mName : std::string();
     }
 
     // Decodes a legacy packed FMV id (single/double/triple, see ResolveFmvName_AO/AE's

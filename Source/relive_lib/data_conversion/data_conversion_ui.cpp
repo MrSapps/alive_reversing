@@ -243,7 +243,7 @@ void DataConversionUI::VRender(OrderingTable& ot)
             // can itself take long enough that its name just sitting there looks stalled.
             const float itemPercent = (100.0f * static_cast<float>(inProgress.mCurrent)) / static_cast<float>(inProgress.mTotal);
             char itemProgressBuf[48];
-            snprintf(itemProgressBuf, sizeof(itemProgressBuf), " (%u/%u %.1f%%)", inProgress.mCurrent, inProgress.mTotal, itemPercent);
+            snprintf(itemProgressBuf, sizeof(itemProgressBuf), " (%u/%u %.1f%%)", inProgress.mCurrent, inProgress.mTotal, static_cast<double>(itemPercent));
             label += itemProgressBuf;
         }
 

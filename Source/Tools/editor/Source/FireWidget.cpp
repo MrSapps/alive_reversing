@@ -152,7 +152,7 @@ void FireWidget::init_fire_tab()
     {
         if ( (result & 0xFFFFFC00) >= 0x3FC00 )
         {
-            v12 |= 0xFF;
+            v12 = 0xFF;
             //LOBYTE(v12) = -1;
         }
         else
@@ -171,7 +171,7 @@ void FireWidget::init_fire_tab()
 
         if ( (iFireB & 0xFFFFFC00u) >= 0x3FC00 )
         {
-            v13 |= 0xFF;
+            v13 = 0xFF;
             //LOBYTE(v13) = -1;
         }
         else

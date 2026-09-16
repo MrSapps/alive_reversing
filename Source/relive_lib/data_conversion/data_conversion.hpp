@@ -126,7 +126,9 @@ public:
         // external players being unable to seek partway into an FMV.
         // 3: tightened the keyframe cadence from ~2s to ~1s, matching normal seek-to-the-second
         // expectations - negligible size cost at this resolution/framerate.
-        static constexpr u32 kFmvVersion = 3;
+        // 4: audio track switched from raw A_PCM to A_VORBIS (much smaller files, and fixes the
+        // ".DDV.webm" naming bug where the audio codec ID didn't matter yet).
+        static constexpr u32 kFmvVersion = 4;
         // 17: dropped the redundant "paths" subdir under each level (levels/<name>/<pathId>/...
         // instead of levels/<name>/paths/<pathId>/...) and lower-cased "Sounds" to "sounds".
         // 18: moved vh_file/vb_file/seq_files out of every path.json's own sound_info (where
@@ -135,7 +137,10 @@ public:
         // split the AE ender themes (barracks/bonewerkz/feeco_depot/mudanchee_vault/
         // mudomo_vault) that used to share their base theme's dir under two different vb/vh
         // pairs into their own "<theme>_ender" theme dirs, matching brewery/brewery_ender.
-        static constexpr u32 kPathVersion = 18;
+        // 19: FMV ids on TLVs (door/teleporter/path_transition/bird_portal/movie_stone/
+        // well_express/level_loader/glukkon) are now resolved movie name strings instead of
+        // raw numeric indices into a level's FMV table - see relive::Path_Door::mMovieName etc.
+        static constexpr u32 kPathVersion = 19;
         static constexpr u32 kPaletteVersion = 1;
         static constexpr u32 kAnimationVersion = 4;
         // 9: dropped the redundant "paths" subdir under each level, same as kPathVersion 17.

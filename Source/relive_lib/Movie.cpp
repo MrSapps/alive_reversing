@@ -19,6 +19,7 @@
 #include "data_conversion/file_system.hpp"
 
 #include <numeric>
+#include <cstring>
 #include <deque>
 #include <array>
 #include <atomic>
@@ -35,6 +36,8 @@
 #include "aom/third_party/libwebm/mkvparser/mkvparser.h"
 #include "aom/third_party/libwebm/mkvparser/mkvreader.h"
 #pragma warning(pop)
+
+#include <vorbis/codec.h>
 
 // Inputs on the controller that can be used for aborting skippable movies
 const u32 MOVIE_SKIPPER_GAMEPAD_INPUTS = (InputCommands::eUnPause_OrConfirm | InputCommands::eBack | InputCommands::ePause);
@@ -67,6 +70,167 @@ namespace
         long long mFileOffset = 0;
         int mTrackNumber = 0;
         std::vector<u8> mPayload;
+    };
+
+    // Decodes Ogg Vorbis packets (demuxed from an A_VORBIS WebM audio track) back to
+    // interleaved s16 PCM - the decode-side counterpart of VorbisAudioEncoder in
+    // fmv_converter.cpp, which produced those packets in the first place.
+    class VorbisAudioDecoder final
+    {
+    public:
+        ~VorbisAudioDecoder()
+        {
+            Cleanup();
+        }
+
+        bool IsReady() const
+        {
+            return mReady;
+        }
+
+        void Reset()
+        {
+            Cleanup();
+        }
+
+        // CodecPrivate for A_VORBIS is the 3 Vorbis header packets (identification, comment,
+        // setup) concatenated using Matroska's "Xiph lacing" format - see the encoder side
+        // (VorbisAudioEncoder::BuildCodecPrivate in fmv_converter.cpp) for the exact layout
+        // this reverses.
+        bool Init(const unsigned char* pCodecPrivate, size_t codecPrivateSize)
+        {
+            Cleanup();
+
+            if (!pCodecPrivate || codecPrivateSize < 1)
+            {
+                return false;
+            }
+
+            size_t offset = 0;
+            const u8 numLengths = pCodecPrivate[offset++];
+            std::vector<size_t> lengths;
+            for (u8 i = 0; i < numLengths; ++i)
+            {
+                size_t len = 0;
+                while (offset < codecPrivateSize && pCodecPrivate[offset] == 255)
+                {
+                    len += 255;
+                    ++offset;
+                }
+                if (offset >= codecPrivateSize)
+                {
+                    return false;
+                }
+                len += pCodecPrivate[offset++];
+                lengths.push_back(len);
+            }
+
+            size_t totalHeaderBytes = 0;
+            for (const size_t len : lengths)
+            {
+                totalHeaderBytes += len;
+            }
+            if (offset + totalHeaderBytes > codecPrivateSize)
+            {
+                return false;
+            }
+
+            vorbis_info_init(&mInfo);
+            vorbis_comment_init(&mComment);
+
+            size_t packetOffset = offset;
+            for (size_t i = 0; i <= lengths.size(); ++i)
+            {
+                const size_t packetLen = (i < lengths.size()) ? lengths[i] : (codecPrivateSize - packetOffset);
+                ogg_packet op = {};
+                op.packet = const_cast<unsigned char*>(pCodecPrivate + packetOffset);
+                op.bytes = static_cast<long>(packetLen);
+                op.b_o_s = (i == 0) ? 1 : 0;
+                op.packetno = static_cast<long>(i);
+                if (vorbis_synthesis_headerin(&mInfo, &mComment, &op) < 0)
+                {
+                    vorbis_comment_clear(&mComment);
+                    vorbis_info_clear(&mInfo);
+                    return false;
+                }
+                packetOffset += packetLen;
+            }
+
+            if (vorbis_synthesis_init(&mDspState, &mInfo) != 0)
+            {
+                vorbis_comment_clear(&mComment);
+                vorbis_info_clear(&mInfo);
+                return false;
+            }
+
+            vorbis_block_init(&mDspState, &mBlock);
+            mReady = true;
+            return true;
+        }
+
+        // Appends the decoded PCM for one packet to pcmOut (does not clear it first, so the
+        // caller can accumulate several packets' worth before consuming).
+        bool Decode(const std::vector<u8>& payload, u32 channels, std::vector<u8>& pcmOut)
+        {
+            if (!mReady || payload.empty())
+            {
+                return false;
+            }
+
+            ogg_packet op = {};
+            op.packet = const_cast<unsigned char*>(payload.data());
+            op.bytes = static_cast<long>(payload.size());
+
+            if (vorbis_synthesis(&mBlock, &op) != 0)
+            {
+                return false;
+            }
+
+            if (vorbis_synthesis_blockin(&mDspState, &mBlock) != 0)
+            {
+                return false;
+            }
+
+            float** pPcm = nullptr;
+            int samples = 0;
+            while ((samples = vorbis_synthesis_pcmout(&mDspState, &pPcm)) > 0)
+            {
+                const size_t writeOffset = pcmOut.size();
+                pcmOut.resize(writeOffset + (static_cast<size_t>(samples) * channels * sizeof(s16)));
+                s16* pOut = reinterpret_cast<s16*>(pcmOut.data() + writeOffset);
+                for (int i = 0; i < samples; ++i)
+                {
+                    for (u32 ch = 0; ch < channels; ++ch)
+                    {
+                        float sampleValue = pPcm[ch][i];
+                        sampleValue = std::max(-1.0f, std::min(1.0f, sampleValue));
+                        pOut[(i * channels) + ch] = static_cast<s16>(sampleValue * 32767.0f);
+                    }
+                }
+                vorbis_synthesis_read(&mDspState, samples);
+            }
+
+            return true;
+        }
+
+    private:
+        void Cleanup()
+        {
+            if (mReady)
+            {
+                vorbis_block_clear(&mBlock);
+                vorbis_dsp_clear(&mDspState);
+                vorbis_comment_clear(&mComment);
+                vorbis_info_clear(&mInfo);
+                mReady = false;
+            }
+        }
+
+        vorbis_info mInfo = {};
+        vorbis_comment mComment = {};
+        vorbis_dsp_state mDspState = {};
+        vorbis_block mBlock = {};
+        bool mReady = false;
     };
 
     static constexpr size_t kMaxBufferedVideoFrames = 30;
@@ -386,6 +550,14 @@ namespace
                         mAudioSampleRate = static_cast<u32>(mAudioTrack->GetSamplingRate());
                         mAudioChannels = static_cast<u32>(mAudioTrack->GetChannels());
                         mAudioBitsPerSample = static_cast<u32>(mAudioTrack->GetBitDepth());
+
+                        const char* pCodecId = mAudioTrack->GetCodecId();
+                        if (pCodecId && std::strcmp(pCodecId, "A_VORBIS") == 0)
+                        {
+                            size_t codecPrivateSize = 0;
+                            const unsigned char* pCodecPrivate = mAudioTrack->GetCodecPrivate(codecPrivateSize);
+                            mIsVorbisAudio = mVorbisDecoder.Init(pCodecPrivate, codecPrivateSize);
+                        }
                     }
                 }
             }
@@ -441,6 +613,27 @@ namespace
             frame.mPtsNs = packet.mPtsNs;
             frame.mFileOffset = packet.mFileOffset;
             return DecodeAv1Frame(packet.mPayload, frame.mPixels);
+        }
+
+        // Vorbis packets decode to a variable number of PCM sample frames each, so pcmOut's
+        // size isn't knowable up front the way a fixed-format PCM passthrough's is. Non-Vorbis
+        // (legacy raw A_PCM) files are passed straight through unchanged for backwards
+        // compatibility with any webm converted before Vorbis audio was added.
+        bool DecodeAudio(const MkvEncodedPacket& packet, std::vector<u8>& pcmOut)
+        {
+            pcmOut.clear();
+            if (packet.mPayload.empty())
+            {
+                return false;
+            }
+
+            if (!mIsVorbisAudio)
+            {
+                pcmOut = packet.mPayload;
+                return true;
+            }
+
+            return mVorbisDecoder.Decode(packet.mPayload, mAudioChannels, pcmOut);
         }
 
     private:
@@ -515,6 +708,9 @@ namespace
                 mCodecReady = false;
             }
 
+            mVorbisDecoder.Reset();
+            mIsVorbisAudio = false;
+
             if (mSegment)
             {
                 delete mSegment;
@@ -568,6 +764,8 @@ namespace
         u32 mAudioSampleRate = 44100;
         u32 mAudioChannels = 2;
         u32 mAudioBitsPerSample = 16;
+        VorbisAudioDecoder mVorbisDecoder;
+        bool mIsVorbisAudio = false;
     };
 
     using MkvPacketQueue = AVQueue<MkvEncodedPacket, 128u>;
@@ -670,7 +868,11 @@ namespace
                 MkvAudioChunk chunk;
                 chunk.mPtsNs = packet.mPtsNs;
                 chunk.mFileOffset = packet.mFileOffset;
-                chunk.mBuffer = std::move(packet.mPayload);
+                if (!mMovie.DecodeAudio(packet, chunk.mBuffer))
+                {
+                    packet = {};
+                    continue;
+                }
                 while (!mStop && !mAudioQueue.TryPush(chunk))
                 {
                     std::this_thread::sleep_for(std::chrono::milliseconds(1));

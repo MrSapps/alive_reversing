@@ -26,6 +26,9 @@
 
 #include "aom/common/av1_config.h"
 
+#include <vorbis/codec.h>
+#include <vorbis/vorbisenc.h>
+
 #include "../Masher.hpp"
 #include "rgb_conversion.hpp"
 #include "file_system.hpp"
@@ -144,6 +147,121 @@ private:
     u32 mFmvVersion = 0;
     mutable std::mutex mMutex;
     std::set<std::string> mCompleted;
+};
+
+// Encodes interleaved s16 PCM into Ogg Vorbis packets for muxing into the FMV's WebM
+// container as an A_VORBIS audio track (replacing raw, much larger, A_PCM audio).
+class VorbisAudioEncoder final
+{
+public:
+    ~VorbisAudioEncoder()
+    {
+        if (mInitialized)
+        {
+            vorbis_block_clear(&mBlock);
+            vorbis_dsp_clear(&mDspState);
+            vorbis_comment_clear(&mComment);
+            vorbis_info_clear(&mInfo);
+        }
+    }
+
+    bool Init(u32 sampleRate, u32 channels, float baseQuality = 0.4f)
+    {
+        vorbis_info_init(&mInfo);
+        if (vorbis_encode_init_vbr(&mInfo, static_cast<long>(channels), static_cast<long>(sampleRate), baseQuality) != 0)
+        {
+            vorbis_info_clear(&mInfo);
+            return false;
+        }
+
+        vorbis_comment_init(&mComment);
+        vorbis_analysis_init(&mDspState, &mInfo);
+        vorbis_block_init(&mDspState, &mBlock);
+        mChannels = channels;
+        mInitialized = true;
+        return true;
+    }
+
+    // The 3 Vorbis header packets (identification/comment/setup), concatenated using
+    // Matroska's "Xiph lacing" CodecPrivate format - see the Matroska A_VORBIS spec. Must be
+    // called once, right after Init() and before any EncodePcm()/Finish() calls.
+    std::vector<u8> BuildCodecPrivate()
+    {
+        ogg_packet idHeader = {};
+        ogg_packet commentHeader = {};
+        ogg_packet setupHeader = {};
+        vorbis_analysis_headerout(&mDspState, &mComment, &idHeader, &commentHeader, &setupHeader);
+
+        std::vector<u8> out;
+        out.push_back(2); // 2 lengths follow (the setup header's length is implied as the remainder)
+        AppendXiphLacedLength(out, idHeader.bytes);
+        AppendXiphLacedLength(out, commentHeader.bytes);
+        out.insert(out.end(), idHeader.packet, idHeader.packet + idHeader.bytes);
+        out.insert(out.end(), commentHeader.packet, commentHeader.packet + commentHeader.bytes);
+        out.insert(out.end(), setupHeader.packet, setupHeader.packet + setupHeader.bytes);
+        return out;
+    }
+
+    // samples is interleaved s16 PCM, sampleFrameCount frames (i.e. samples.size() == sampleFrameCount * channels).
+    template <typename OnPacketFn>
+    void EncodePcm(const s16* samples, size_t sampleFrameCount, const OnPacketFn& onPacket)
+    {
+        if (sampleFrameCount > 0)
+        {
+            float** buffer = vorbis_analysis_buffer(&mDspState, static_cast<int>(sampleFrameCount));
+            for (size_t i = 0; i < sampleFrameCount; ++i)
+            {
+                for (u32 ch = 0; ch < mChannels; ++ch)
+                {
+                    buffer[ch][i] = static_cast<float>(samples[i * mChannels + ch]) / 32768.0f;
+                }
+            }
+            vorbis_analysis_wrote(&mDspState, static_cast<int>(sampleFrameCount));
+        }
+        DrainPackets(onPacket);
+    }
+
+    // Signals end-of-stream and flushes any packets libvorbis was still holding onto.
+    template <typename OnPacketFn>
+    void Finish(const OnPacketFn& onPacket)
+    {
+        vorbis_analysis_wrote(&mDspState, 0);
+        DrainPackets(onPacket);
+    }
+
+private:
+    template <typename OnPacketFn>
+    void DrainPackets(const OnPacketFn& onPacket)
+    {
+        while (vorbis_analysis_blockout(&mDspState, &mBlock) == 1)
+        {
+            vorbis_analysis(&mBlock, nullptr);
+            vorbis_bitrate_addblock(&mBlock);
+
+            ogg_packet packet;
+            while (vorbis_bitrate_flushpacket(&mDspState, &packet))
+            {
+                onPacket(packet);
+            }
+        }
+    }
+
+    static void AppendXiphLacedLength(std::vector<u8>& out, long length)
+    {
+        while (length >= 255)
+        {
+            out.push_back(255);
+            length -= 255;
+        }
+        out.push_back(static_cast<u8>(length));
+    }
+
+    vorbis_info mInfo = {};
+    vorbis_comment mComment = {};
+    vorbis_dsp_state mDspState = {};
+    vorbis_block mBlock = {};
+    u32 mChannels = 0;
+    bool mInitialized = false;
 };
 
 class FmvConv final
@@ -382,20 +500,28 @@ public:
                 if (!audioFrames.empty() && mAudioTrackNumber != 0)
                 {
                     const u32 bytesPerSampleFrame = (mAudioBitsPerSample / 8u) * mAudioChannels;
-                    if (bytesPerSampleFrame > 0 && (audioFrames.size() % bytesPerSampleFrame) == 0)
+                    if (bytesPerSampleFrame > 0 && mAudioBitsPerSample == 16 && (audioFrames.size() % bytesPerSampleFrame) == 0)
                     {
-                        const u64 sampleFrameCount = static_cast<u64>(audioFrames.size() / bytesPerSampleFrame);
-                        // PTS from a running total of samples actually written so far, not
-                        // callCount * thisChunkSize - AO's audio chunks aren't fixed size (a
-                        // variable number of VALE sectors can land between two video frames),
-                        // so that would make the PTS jump around non-monotonically.
-                        const u64 audioPtsNs = (mAudioSamplesWritten * 1000000000ULL) / static_cast<u64>(mAudioSampleRate);
-                        const bool ok = segment.AddFrame(audioFrames.data(), static_cast<uint64_t>(audioFrames.size()), mAudioTrackNumber, audioPtsNs, false);
-                        if (!ok)
-                        {
-                            fprintf(stderr, "webmenc> AddAudioFrame failed.\n");
-                        }
-                        mAudioSamplesWritten += sampleFrameCount;
+                        const size_t sampleFrameCount = audioFrames.size() / bytesPerSampleFrame;
+                        mVorbisEncoder.EncodePcm(reinterpret_cast<const s16*>(audioFrames.data()), sampleFrameCount,
+                            [&](const ogg_packet& packet)
+                            {
+                                // granulepos is the total PCM sample count (per channel) the
+                                // encoder has actually finalized up to and including this
+                                // packet. This lags behind the raw count of samples fed into
+                                // EncodePcm() so far by the codec's own look-ahead/windowing
+                                // delay, so it - not a running count of input samples - has to
+                                // be the single clock both audio and video timestamps are
+                                // derived from below; otherwise video's timestamp (fed samples)
+                                // can run ahead of audio's (encoder-confirmed samples) and the
+                                // muxer rejects the next audio frame as non-monotonic.
+                                mLastAudioGranulePos = static_cast<u64>(packet.granulepos);
+                                const u64 audioPtsNs = (mLastAudioGranulePos * 1000000000ULL) / static_cast<u64>(mAudioSampleRate);
+                                if (!segment.AddFrame(packet.packet, static_cast<uint64_t>(packet.bytes), mAudioTrackNumber, audioPtsNs, true))
+                                {
+                                    fprintf(stderr, "webmenc> AddAudioFrame failed.\n");
+                                }
+                            });
                     }
                 }
 
@@ -417,7 +543,7 @@ public:
                 // over a long enough movie until a video frame's assumed-rate timestamp landed
                 // behind audio's real-rate timestamp, which the muxer rejects as non-monotonic.
                 const int64_t videoPtsNs = (mAudioTrackNumber != 0)
-                    ? static_cast<int64_t>((mAudioSamplesWritten * 1000000000ULL) / static_cast<u64>(mAudioSampleRate))
+                    ? static_cast<int64_t>((mLastAudioGranulePos * 1000000000ULL) / static_cast<u64>(mAudioSampleRate))
                     : -1;
                 encode_frame(&segment, &cfg, &codec, &rawImageFrameData, static_cast<int>(frame_index), flags, videoPtsNs);
 
@@ -443,6 +569,19 @@ public:
                 while (encode_frame(&segment, &cfg, &codec, nullptr, -1, 0))
                 {
                     continue;
+                }
+
+                if (mAudioTrackNumber != 0)
+                {
+                    mVorbisEncoder.Finish(
+                        [&](const ogg_packet& packet)
+                        {
+                            const u64 audioPtsNs = (static_cast<u64>(packet.granulepos) * 1000000000ULL) / static_cast<u64>(mAudioSampleRate);
+                            if (!segment.AddFrame(packet.packet, static_cast<uint64_t>(packet.bytes), mAudioTrackNumber, audioPtsNs, true))
+                            {
+                                fprintf(stderr, "webmenc> AddAudioFrame failed.\n");
+                            }
+                        });
                 }
 
                 finalizedOk = segment.Finalize();
@@ -516,6 +655,12 @@ private:
 
         if (mAudioSampleRate > 0 && mAudioChannels > 0 && mAudioBitsPerSample > 0)
         {
+            if (!mVorbisEncoder.Init(mAudioSampleRate, mAudioChannels))
+            {
+                fprintf(stderr, "webmenc> Vorbis encoder init failed.\n");
+                return -1;
+            }
+
             const uint64_t audio_track_id = segment->AddAudioTrack(static_cast<int32_t>(mAudioSampleRate), static_cast<int32_t>(mAudioChannels), kAudioTrackNumber);
             mkvmuxer::AudioTrack* const audio_track = static_cast<mkvmuxer::AudioTrack*>(segment->GetTrackByNumber(audio_track_id));
             if (!audio_track)
@@ -523,9 +668,15 @@ private:
                 fprintf(stderr, "webmenc> Audio track creation failed.\n");
                 return -1;
             }
-            // Matroska PCM uses the standard codec ID for little-endian integer PCM.
-            // "A_PCM" by itself is not a recognized codec string for most players.
-            audio_track->set_codec_id("A_PCM/INT/LIT");
+
+            const std::vector<u8> codecPrivate = mVorbisEncoder.BuildCodecPrivate();
+            if (!audio_track->SetCodecPrivate(codecPrivate.data(), codecPrivate.size()))
+            {
+                fprintf(stderr, "webmenc> Unable to set Vorbis codec private data.\n");
+                return -1;
+            }
+
+            audio_track->set_codec_id("A_VORBIS");
             audio_track->set_bit_depth(mAudioBitsPerSample);
             mAudioTrackNumber = audio_track_id;
         }
@@ -686,10 +837,11 @@ private:
     const int kAudioTrackNumber = 2;
     int64_t mLast_pts_ns = 0;
     uint64_t mAudioTrackNumber = 0;
-    uint64_t mAudioSamplesWritten = 0;
+    uint64_t mLastAudioGranulePos = 0;
     uint32_t mAudioSampleRate = 0;
     uint32_t mAudioChannels = 0;
     uint32_t mAudioBitsPerSample = 0;
+    VorbisAudioEncoder mVorbisEncoder;
 };
 
 class ConvertFmvJob final : public IJob

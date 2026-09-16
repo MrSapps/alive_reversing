@@ -44,7 +44,7 @@ void ProgressBar::SetPercent(float percent01)
 s32 ProgressBar::Draw(OrderingTable& ot, AliveFont& font, s32 polyOffset)
 {
     char barText[16];
-    snprintf(barText, sizeof(barText), "%05.2f%%", mPercent * 100.0f);
+    snprintf(barText, sizeof(barText), "%05.2f%%", static_cast<double>(mPercent * 100.0f));
     const s32 textWidth = font.MeasureTextWidth(barText);
     const s32 textX = mX + (mWidth - textWidth) / 2;
     // Vertically centered within the track rather than flush with its top - the debug font's
