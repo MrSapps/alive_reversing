@@ -468,7 +468,9 @@ public:
         r.Visit("Hub 7 ID", mTlv.mHub7);
         r.Visit("Hub 8 ID", mTlv.mHub8);
         r.Visit("Wipe Effect", mTlv.mWipeEffect);
-        r.Visit("Movie Name", mTlv.mMovieName);
+        r.Visit("Movie 1", mTlv.mMovie1);
+        r.Visit("Movie 2", mTlv.mMovie2);
+        r.Visit("Movie 3", mTlv.mMovie3);
         r.Visit("X Offset", mTlv.mDoorOffsetX);
         r.Visit("Y Offset", mTlv.mDoorOffsetY);
         r.Visit("Abe Direction On Exit", mTlv.mExitDirection);
@@ -693,7 +695,9 @@ public:
         r.Visit("Switch ID", mTlv.mSwitchId);
         r.Visit("Scale", mTlv.mScale);
         r.Visit("Screen Change Effect", mTlv.mWipeEffect);
-        r.Visit("Movie Name", mTlv.mMovieName);
+        r.Visit("Movie 1", mTlv.mMovie1);
+        r.Visit("Movie 2", mTlv.mMovie2);
+        r.Visit("Movie 3", mTlv.mMovie3);
         r.Visit("Electric X", mTlv.mElectricX);
         r.Visit("Electric Y", mTlv.mElectricY);
     }
@@ -972,7 +976,9 @@ public:
         r.Visit("Emit Leaves", mTlv.mEmitLeaves);
         r.Visit("Leaf X", mTlv.mLeafX);
         r.Visit("Leaf Y", mTlv.mLeafY);
-        r.Visit("Movie Name", mTlv.mMovieName);
+        r.Visit("Movie 1", mTlv.mMovie1);
+        r.Visit("Movie 2", mTlv.mMovie2);
+        r.Visit("Movie 3", mTlv.mMovie3);
     }
 
     std::string GetIconPath() const override
@@ -1363,7 +1369,9 @@ public:
         r.Visit("Destination Level", mTlv.mDestLevel);
         r.Visit("Destination Path", mTlv.mDestPath);
         r.Visit("Destination Camera", mTlv.mDestCamera);
-        r.Visit("Movie Name", mTlv.mMovieName);
+        r.Visit("Movie 1", mTlv.mMovie1);
+        r.Visit("Movie 2", mTlv.mMovie2);
+        r.Visit("Movie 3", mTlv.mMovie3);
     }
 
     std::string GetIconPath() const override

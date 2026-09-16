@@ -1376,7 +1376,11 @@ struct Path_Door final : public Path_TLV
     s16 mHub7 = 0;
     s16 mHub8 = 0;
     reliveScreenChangeEffects mWipeEffect = reliveScreenChangeEffects::eBoxOut;
-    std::string mMovieName; // Empty means no movie
+    // Empty mMovie1 means no movie. mMovie2/3 are only ever populated when the original
+    // packed id was a double/triple FMV chain - see DecodeFmvChain_AE/AO.
+    std::string mMovie1;
+    std::string mMovie2;
+    std::string mMovie3;
     s16 mDoorOffsetX = 0;
     s16 mDoorOffsetY = 0;
     reliveXDirection mExitDirection = reliveXDirection::eRight;
@@ -1812,7 +1816,11 @@ struct Path_WellExpress final : public relive::Path_WellBase
     bool mEmitLeaves = false;
     s16 mLeafX = 0;
     s16 mLeafY = 0;
-    std::string mMovieName; // Empty means no movie
+    // Empty mMovie1 means no movie. mMovie2/3 are only ever populated when the original
+    // packed id was a double/triple FMV chain - see DecodeFmvChain_AE/AO.
+    std::string mMovie1;
+    std::string mMovie2;
+    std::string mMovie3;
     static constexpr char kClassName[] = "well_express";
     static constexpr ReliveTypes kReliveType = ReliveTypes::eWellExpress;
 };
@@ -2250,7 +2258,11 @@ struct Path_LevelLoader final : public Path_TLV
     EReliveLevelIds mDestLevel = EReliveLevelIds::eNone;
     s16 mDestPath = 0;
     s16 mDestCamera = 0;
-    std::string mMovieName; // Empty means no movie
+    // Empty mMovie1 means no movie. mMovie2/3 are only ever populated when the original
+    // packed id was a double/triple FMV chain - see DecodeFmvChain_AE/AO.
+    std::string mMovie1;
+    std::string mMovie2;
+    std::string mMovie3;
     static constexpr char kClassName[] = "level_loader";
     static constexpr ReliveTypes kReliveType = ReliveTypes::eLevelLoader;
 };
@@ -2444,7 +2456,11 @@ struct Path_Teleporter final : public Path_TLV
     s16 mSwitchId = 0;
     reliveScale mScale = reliveScale::eFull;
     reliveScreenChangeEffects mWipeEffect = reliveScreenChangeEffects::eBoxOut;
-    std::string mMovieName; // Empty means no movie
+    // Empty mMovie1 means no movie. mMovie2/3 are only ever populated when the original
+    // packed id was a double/triple FMV chain - see DecodeFmvChain_AE/AO.
+    std::string mMovie1;
+    std::string mMovie2;
+    std::string mMovie3;
     s16 mElectricX = 0;
     s16 mElectricY = 0;
     static constexpr char kClassName[] = "teleporter";

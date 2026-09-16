@@ -96,6 +96,27 @@ inline void BaseConvert(relive::Path_TLV& r, const AO::Path_TLV& base, const Gui
         }
     }
 
+    // AE counterpart of DecodeFmvChain_AO - see its comment.
+    inline void DecodeFmvChain_AE(EReliveLevelIds lvlId, s16 packedIdRaw, std::string& out1, std::string& out2, std::string& out3)
+    {
+        const u16 packedId = static_cast<u16>(packedIdRaw);
+        if (packedId > 10000)
+        {
+            out1 = ResolveFmvName_AE(lvlId, packedId / 10000);
+            out2 = ResolveFmvName_AE(lvlId, packedId % 100);
+            out3 = ResolveFmvName_AE(lvlId, packedId / 100 % 100);
+        }
+        else if (packedId > 100)
+        {
+            out1 = ResolveFmvName_AE(lvlId, packedId / 100);
+            out2 = ResolveFmvName_AE(lvlId, packedId % 100);
+        }
+        else
+        {
+            out1 = ResolveFmvName_AE(lvlId, packedId);
+        }
+    }
+
     // also used for AO
     static relive::TBlendModes ToReliveBlendMode(u32 blendMode)
     {
@@ -2528,7 +2549,7 @@ public:
         // calls FMV_Camera_Change(mNextLevel) for it, after the level swap); every other
         // effect that can play a movie (notably index 8, eUnknown_11) resolves against the
         // source level - this door's own level - since that call happens before the swap.
-        r.mMovieName = ResolveFmvName_AO(tlv.mWipeEffect == 0 ? r.mNextLevel : MapWrapper::FromAO(lvlId), tlv.mMovieId);
+        DecodeFmvChain_AO(tlv.mWipeEffect == 0 ? r.mNextLevel : MapWrapper::FromAO(lvlId), tlv.mMovieId, r.mMovie1, r.mMovie2, r.mMovie3);
         r.mDoorOffsetX = tlv.mDoorOffsetX;
         r.mDoorOffsetY = tlv.mDoorOffsetY;
         r.mExitDirection = relive::From(tlv.mExitDirection);
@@ -2599,7 +2620,7 @@ public:
         r.mHub8 = tlv.mHub8;
         r.mWipeEffect = relive::From(tlv.mWipeEffect);
         // See the AO overload above for why the lookup level depends on the wipe effect.
-        r.mMovieName = ResolveFmvName_AE(tlv.mWipeEffect == 0 ? r.mNextLevel : MapWrapper::FromAE(lvlId), tlv.mMovieId);
+        DecodeFmvChain_AE(tlv.mWipeEffect == 0 ? r.mNextLevel : MapWrapper::FromAE(lvlId), tlv.mMovieId, r.mMovie1, r.mMovie2, r.mMovie3);
         r.mDoorOffsetX = tlv.mDoorOffsetX;
         r.mDoorOffsetY = tlv.mDoorOffsetY;
         r.mExitDirection = relive::From(tlv.mExitDirection);
@@ -3476,7 +3497,7 @@ public:
         // switch state picks, which conversion can't know - resolve against mOffDestLevel
         // (the default/"off" path), which in practice is always the same level as mOnDestLevel
         // for a given express well.
-        r.mMovieName = ResolveFmvName_AO(r.mOffDestLevel, tlv.mMovieId);
+        DecodeFmvChain_AO(r.mOffDestLevel, tlv.mMovieId, r.mMovie1, r.mMovie2, r.mMovie3);
         return r;
     }
 
@@ -3529,7 +3550,7 @@ public:
         }
 
         // See the AO overload above for why mOffDestLevel is used here.
-        r.mMovieName = ResolveFmvName_AE(r.mOffDestLevel, tlv.mMovieId);
+        DecodeFmvChain_AE(r.mOffDestLevel, tlv.mMovieId, r.mMovie1, r.mMovie2, r.mMovie3);
         return r;
     }
 };
@@ -4293,8 +4314,10 @@ public:
         r.mDestPath = tlv.mDestPath;
         r.mDestCamera = tlv.mDestCamera;
         // Always played with CameraSwapEffects::ePlay1FMV_5, which GoTo_Camera always
-        // resolves against the destination level.
-        r.mMovieName = ResolveFmvName_AE(r.mDestLevel, tlv.mMovieId);
+        // resolves against the destination level. Like Door/Teleporter/WellExpress, mMovieId
+        // can be a packed double/triple FMV chain, not just a single index - see
+        // DecodeFmvChain_AE.
+        DecodeFmvChain_AE(r.mDestLevel, tlv.mMovieId, r.mMovie1, r.mMovie2, r.mMovie3);
         return r;
     }
 };
@@ -4519,7 +4542,7 @@ public:
         r.mScale = relive::From(tlv.mData.mScale);
         r.mWipeEffect = relive::From(tlv.mData.mWipeEffect);
         // See Path_Door_Converter above for why the lookup level depends on the wipe effect.
-        r.mMovieName = ResolveFmvName_AE(tlv.mData.mWipeEffect == 0 ? r.mDestLevel : MapWrapper::FromAE(lvlId), tlv.mData.mMovieId);
+        DecodeFmvChain_AE(tlv.mData.mWipeEffect == 0 ? r.mDestLevel : MapWrapper::FromAE(lvlId), tlv.mData.mMovieId, r.mMovie1, r.mMovie2, r.mMovie3);
 
         const relive::PathData& pathData = GetPathData(static_cast<s32>(tlvId.GetTlvInfo().levelId))[tlvId.GetTlvInfo().pathId];
         r.mElectricX = tlv.mData.mElectricX - pathData.mAbeStartXPos;

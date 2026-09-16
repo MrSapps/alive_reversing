@@ -1452,7 +1452,9 @@ void to_json(nlohmann::json& j, const Path_Door& p)
         {"hub_7", p.mHub7},
         {"hub_8", p.mHub8},
         {"wipe_effect", p.mWipeEffect},
-        {"movie_name", p.mMovieName},
+        {"movie_1", p.mMovie1},
+        {"movie_2", p.mMovie2},
+        {"movie_3", p.mMovie3},
         {"door_offset_x", p.mDoorOffsetX},
         {"door_offset_y", p.mDoorOffsetY},
         {"exit_direction", p.mExitDirection},
@@ -1483,7 +1485,9 @@ void from_json(const nlohmann::json& j, Path_Door& p)
     j.at("hub_7").get_to(p.mHub7);
     j.at("hub_8").get_to(p.mHub8);
     j.at("wipe_effect").get_to(p.mWipeEffect);
-    j.at("movie_name").get_to(p.mMovieName);
+    j.at("movie_1").get_to(p.mMovie1);
+    j.at("movie_2").get_to(p.mMovie2);
+    j.at("movie_3").get_to(p.mMovie3);
     j.at("door_offset_x").get_to(p.mDoorOffsetX);
     j.at("door_offset_y").get_to(p.mDoorOffsetY);
     j.at("exit_direction").get_to(p.mExitDirection);
@@ -2017,7 +2021,9 @@ void to_json(nlohmann::json& j, const Path_WellExpress& p)
         {"emit_leaves", p.mEmitLeaves},
         {"leaf_x", p.mLeafX},
         {"leaf_y", p.mLeafY},
-        {"movie_name", p.mMovieName},
+        {"movie_1", p.mMovie1},
+        {"movie_2", p.mMovie2},
+        {"movie_3", p.mMovie3},
     };
 }
 
@@ -2046,7 +2052,9 @@ void from_json(const nlohmann::json& j, Path_WellExpress& p)
     j.at("emit_leaves").get_to(p.mEmitLeaves);
     j.at("leaf_x").get_to(p.mLeafX);
     j.at("leaf_y").get_to(p.mLeafY);
-    j.at("movie_name").get_to(p.mMovieName);
+    j.at("movie_1").get_to(p.mMovie1);
+    j.at("movie_2").get_to(p.mMovie2);
+    j.at("movie_3").get_to(p.mMovie3);
 }
 
 // Path_Slog
@@ -2620,7 +2628,9 @@ void to_json(nlohmann::json& j, const Path_LevelLoader& p)
         {"dest_level", p.mDestLevel},
         {"dest_path", p.mDestPath},
         {"dest_camera", p.mDestCamera},
-        {"movie_name", p.mMovieName},
+        {"movie_1", p.mMovie1},
+        {"movie_2", p.mMovie2},
+        {"movie_3", p.mMovie3},
     };
 }
 
@@ -2631,7 +2641,9 @@ void from_json(const nlohmann::json& j, Path_LevelLoader& p)
     j.at("dest_level").get_to(p.mDestLevel);
     j.at("dest_path").get_to(p.mDestPath);
     j.at("dest_camera").get_to(p.mDestCamera);
-    j.at("movie_name").get_to(p.mMovieName);
+    j.at("movie_1").get_to(p.mMovie1);
+    j.at("movie_2").get_to(p.mMovie2);
+    j.at("movie_3").get_to(p.mMovie3);
 }
 
 // Path_SlamDoor
@@ -2891,7 +2903,9 @@ void to_json(nlohmann::json& j, const Path_Teleporter& p)
         {"switch_id", p.mSwitchId},
         {"scale", p.mScale},
         {"wipe_effect", p.mWipeEffect},
-        {"movie_name", p.mMovieName},
+        {"movie_1", p.mMovie1},
+        {"movie_2", p.mMovie2},
+        {"movie_3", p.mMovie3},
         {"electric_x", p.mElectricX},
         {"electric_y", p.mElectricY},
     };
@@ -2908,7 +2922,9 @@ void from_json(const nlohmann::json& j, Path_Teleporter& p)
     j.at("switch_id").get_to(p.mSwitchId);
     j.at("scale").get_to(p.mScale);
     j.at("wipe_effect").get_to(p.mWipeEffect);
-    j.at("movie_name").get_to(p.mMovieName);
+    j.at("movie_1").get_to(p.mMovie1);
+    j.at("movie_2").get_to(p.mMovie2);
+    j.at("movie_3").get_to(p.mMovie3);
     j.at("electric_x").get_to(p.mElectricX);
     j.at("electric_y").get_to(p.mElectricY);
 }
