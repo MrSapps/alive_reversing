@@ -445,24 +445,6 @@ std::vector<std::unique_ptr<BinaryPath>> ResourceManagerWrapper::LoadPaths(EReli
                 // TODO: Handle exception on bad data
 
                 nlohmann::json pathJson = nlohmann::json::parse(pathJsonStr);
-
-                // A mod's path.json isn't touched by the base game's kPathVersion-triggered
-                // reconversion (mods are the user's own authored content, not regenerated from
-                // the original game files), so a mod saved under an older schema can still be
-                // sitting in a search path here. Catch that with a clear, actionable error
-                // instead of letting a stale/missing field crash deep inside CreateFromJson with
-                // an opaque nlohmann::json exception.
-                const u32 filePathVersion = pathJson.value("path_version", 0u);
-                const u32 currentPathVersion = DataConversion::DataVersions::LatestVersion().mPathVersion;
-                if (filePathVersion != currentPathVersion)
-                {
-                    ALIVE_FATAL(
-                        "'%s' was converted with path data version %u, but this build expects version %u. "
-                        "If this is a mod, re-save/re-export it from the editor; if this is the base game, "
-                        "delete its relive_data folder and let it reconvert.",
-                        pathJsonFile.GetPath().c_str(), filePathVersion, currentPathVersion);
-                }
-
                 LOG_INFO("Cam count %d", pathJson["map"]["cameras"].size());
 
                 auto pathBuffer = std::make_unique<BinaryPath>(pathJsonFile.GetPath(), pathJson["map"]["path_id"]);

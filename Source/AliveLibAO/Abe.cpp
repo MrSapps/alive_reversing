@@ -7302,9 +7302,9 @@ void Abe::Motion_81_InsideWellExpress()
         || field_194_camera != mMap.mCurrentCamera)
     {
         field_114_gnFrame = 1;
-        if (!pExpressWell->mMovieName.empty())
+        if (!pExpressWell->mMovie1.empty())
         {
-            mMap.SetActiveCam(field_190_level, field_192_path, field_194_camera, CameraSwapEffects::ePlay1FMV_5, FmvIds{pExpressWell->mMovieName}, 0);
+            mMap.SetActiveCam(field_190_level, field_192_path, field_194_camera, CameraSwapEffects::ePlay1FMV_5, FmvIds{pExpressWell->mMovie1, pExpressWell->mMovie2, pExpressWell->mMovie3}, 0);
         }
         else
         {
@@ -9047,7 +9047,7 @@ void Abe::Motion_156_DoorEnter()
                 doorIterator.GetTlv<relive::Path_Door>()->mNextPath,
                 doorIterator.GetTlv<relive::Path_Door>()->mNextCamera,
                 changeEffect,
-                FmvIds{doorIterator.GetTlv<relive::Path_Door>()->mMovieName},
+                FmvIds{doorIterator.GetTlv<relive::Path_Door>()->mMovie1, doorIterator.GetTlv<relive::Path_Door>()->mMovie2, doorIterator.GetTlv<relive::Path_Door>()->mMovie3},
                 flag);
             field_110_state.door = AbeDoorStates::eSetNewAbePosition_5;
             field_196_door_id = doorIterator.GetTlv<relive::Path_Door>()->mTargetDoorId;

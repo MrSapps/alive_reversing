@@ -5783,9 +5783,9 @@ void Abe::Motion_82_InsideWellExpress_45CC80()
     {
         field_124_timer = 1;
 
-        if (!pExpressWell->mMovieName.empty())
+        if (!pExpressWell->mMovie1.empty())
         {
-            mMap.SetActiveCam(mDstWellLevel, mDstWellPath, mDstWellCamera, CameraSwapEffects::ePlay1FMV_5, FmvIds{pExpressWell->mMovieName}, 0);
+            mMap.SetActiveCam(mDstWellLevel, mDstWellPath, mDstWellCamera, CameraSwapEffects::ePlay1FMV_5, FmvIds{pExpressWell->mMovie1, pExpressWell->mMovie2, pExpressWell->mMovie3}, 0);
         }
         else
         {
@@ -7014,7 +7014,7 @@ void Abe::Motion_114_DoorEnter()
                 pDoorTlv->mNextPath,
                 pDoorTlv->mNextCamera,
                 effect,
-                FmvIds{pDoorTlv->mMovieName},
+                FmvIds{pDoorTlv->mMovie1, pDoorTlv->mMovie2, pDoorTlv->mMovie3},
                 bForceChange);
 
             field_120_state.door = AbeDoorStates::eSetNewAbePosition_5;

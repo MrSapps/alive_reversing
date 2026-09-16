@@ -140,7 +140,13 @@ public:
         // 19: FMV ids on TLVs (door/teleporter/path_transition/bird_portal/movie_stone/
         // well_express/level_loader/glukkon) are now resolved movie name strings instead of
         // raw numeric indices into a level's FMV table - see relive::Path_Door::mMovieName etc.
-        static constexpr u32 kPathVersion = 19;
+        // 20: door/teleporter/well_express/level_loader's raw mMovieId can be a packed
+        // double/triple FMV chain (same convention as bird_portal/path_transition, decoded via
+        // the original FMV_Camera_Change's >100/>10000 thresholds) - not just a single index as
+        // 19 assumed, which left multi-movie ids resolving out of range (blank movie name).
+        // These 4 TLVs now have mMovie1/2/3 like bird_portal/path_transition instead of a single
+        // mMovieName - see DecodeFmvChain_AE/AO.
+        static constexpr u32 kPathVersion = 20;
         static constexpr u32 kPaletteVersion = 1;
         static constexpr u32 kAnimationVersion = 4;
         // 9: dropped the redundant "paths" subdir under each level, same as kPathVersion 17.
