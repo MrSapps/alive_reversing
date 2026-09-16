@@ -96,16 +96,16 @@ void BigSpinBox::stepBy( int aSteps )
     }
 }
 
-void BigSpinBox::fixup( QString& aInput ) const
+void BigSpinBox::fixup( QString& /*aInput*/ ) const
 {
 
 }
 
-QValidator::State BigSpinBox::validate( QString& aInput, int& aPos ) const
+QValidator::State BigSpinBox::validate( QString& aInput, int& /*aPos*/ ) const
 {
     bool ok = false;
     qint64 value = aInput.toLongLong( &ok );
-    if (!ok && aInput.isEmpty() || (aInput == "-" && mMinRange < 0))
+    if ((!ok && aInput.isEmpty()) || (aInput == "-" && mMinRange < 0))
     {
         // Special case to allow deleting all of the spinbox input, when deleted we use a value of the min range
         // or when entering just "-" and our range allows negative numbers

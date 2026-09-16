@@ -721,15 +721,9 @@ Event BirdPortal::GetEvent()
 
         if (pObj->Type() == ReliveTypes::eBirdPortal)
         {
-            if (pObj == this)
-            {
-                return Event::kEventPortalOpen;
-            }
-            else
-            {
-     			return Event::kEventPortalOpen;
-                // return Event::kEventOtherPortalOpen; // TODO: Use after Mudokon::FindBirdPortal is common
-            }
+            // TODO: Use kEventOtherPortalOpen for the pObj != this case after
+            // Mudokon::FindBirdPortal is common - both branches return the same event for now.
+            return Event::kEventPortalOpen;
         }
     }
     return Event::kEventPortalOpen;

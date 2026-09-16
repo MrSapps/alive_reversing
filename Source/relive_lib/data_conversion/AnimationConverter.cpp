@@ -419,10 +419,16 @@ void AnimationConverter::DecompressAnimFrame(std::vector<u8>& decompressionBuffe
         case CompressionType::eType_3_RLE_Blocks:
             if (mIsAoData)
             {
+                // field_8_width2 is only a u16 - this intentionally also reads the field
+                // right after it as part of the same u32, matching the original packed
+                // layout. memcpy (rather than a reinterpret_cast dereference) avoids
+                // violating strict aliasing.
+                u32 widthAndNext = 0;
+                memcpy(&widthAndNext, &pFrameHeader->field_8_width2, sizeof(widthAndNext));
                 AO::Decompress_Type_3(
                     (u8*) &pFrameHeader[1],
                     decompressionBuffer.data(),
-                    *(u32*) &pFrameHeader->field_8_width2,
+                    widthAndNext,
                     2 * pFrameHeader->field_5_height * CalcWidthAdjustedForBPP(pFrameHeader));
             }
             else

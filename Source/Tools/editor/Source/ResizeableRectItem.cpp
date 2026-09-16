@@ -340,7 +340,7 @@ ResizeableRectItem::eResize ResizeableRectItem::getResizeLocation( QPointF aPos,
 bool ResizeableRectItem::IsNear( qreal xP1, qreal xP2 )
 {
     qreal tolerance = 8; // aka epsilon
-    if ( mWidth <= kMinRectSize || mHeight <= kMinRectSize )
+    if ( mWidth <= static_cast<int>(kMinRectSize) || mHeight <= static_cast<int>(kMinRectSize) )
     {
         tolerance = 1;
     }
