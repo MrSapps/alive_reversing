@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "Sys.hpp"
+#include "AppIcon.hpp"
 #include "../AliveLibAE/Input.hpp"
 #include "../relive/resource.h"
 #include "Renderer/IRenderer.hpp"
@@ -910,6 +911,22 @@ void Sys_DestroyWindow()
     }
 }
 
+static void Sys_SetWindowIcon(TWindowHandleType window)
+{
+    SDL_Surface* iconSurface = SDL_CreateSurfaceFrom(kAppIconWidth, kAppIconHeight, SDL_PIXELFORMAT_RGBA32, const_cast<u8*>(kAppIconRGBA32), kAppIconWidth * 4);
+    if (iconSurface)
+    {
+        // Window managers (X11/Wayland/Windows taskbar) only pick this up from the running
+        // process - the exe resource icon (see resource.rc) doesn't cover it.
+        SDL_SetWindowIcon(window, iconSurface);
+        SDL_DestroySurface(iconSurface);
+    }
+    else
+    {
+        LOG_ERROR("Failed to create window icon surface %s", SDL_GetError());
+    }
+}
+
 bool Sys_WindowClass_Register(const char_type* lpWindowName, s32 /*x*/, s32 /*y*/, s32 nWidth, s32 nHeight, s32 extraAttributes)
 {
     TRACE_ENTRYEXIT;
@@ -918,6 +935,8 @@ bool Sys_WindowClass_Register(const char_type* lpWindowName, s32 /*x*/, s32 /*y*
     if (sHwnd)
     {
         LOG_INFO("Window created");
+
+        Sys_SetWindowIcon(sHwnd);
 
         if (!SDL_SetWindowPosition(sHwnd, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED))
         {

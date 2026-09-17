@@ -698,6 +698,7 @@ SET(relive_lib_src
     Function.hpp
     Sys.hpp
     Sys.cpp
+    AppIcon.hpp
     Psx.hpp
     Psx.cpp
     FixedPoint.hpp
