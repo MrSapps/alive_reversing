@@ -24,6 +24,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <memory>
 #include <thread>
 #include <utility>
 #include <algorithm>
@@ -350,6 +351,47 @@ namespace
         }
     }
 
+    // RAII guard for an aom_codec_ctx_t. aom_codec_destroy() is only valid to call on a context
+    // that aom_codec_dec_init() actually succeeded on, so Init()/Reset() track that instead of
+    // relying on a caller-managed "ready" flag next to a bare aom_codec_ctx_t.
+    class AutoAomCodecCtx final
+    {
+    public:
+        ~AutoAomCodecCtx()
+        {
+            Reset();
+        }
+
+        bool Init(aom_codec_iface_t* pIface)
+        {
+            Reset();
+            if (aom_codec_dec_init(&mCtx, pIface, nullptr, 0) != AOM_CODEC_OK)
+            {
+                return false;
+            }
+            mInitialized = true;
+            return true;
+        }
+
+        void Reset()
+        {
+            if (mInitialized)
+            {
+                aom_codec_destroy(&mCtx);
+                mInitialized = false;
+            }
+        }
+
+        aom_codec_ctx_t* Get()
+        {
+            return &mCtx;
+        }
+
+    private:
+        aom_codec_ctx_t mCtx = {};
+        bool mInitialized = false;
+    };
+
     class WebmMoviePlayer final
     {
     public:
@@ -458,7 +500,7 @@ namespace
 
                     const mkvparser::Block::Frame& frame = pBlock->GetFrame(mCurrentFrameIndex++);
                     std::vector<u8> payload(static_cast<size_t>(frame.len));
-                    if (frame.Read(mReader, payload.data()) != 0)
+                    if (frame.Read(mReader.get(), payload.data()) != 0)
                     {
                         mParsingComplete = true;
                         return false;
@@ -575,11 +617,10 @@ namespace
             // up the debug-build stutter, but it also produced visible tile-decode corruption
             // (vertical banding) - not worth it to paper over a debug-only slowdown, so left on
             // the single decode thread default.
-            if (aom_codec_dec_init(&mCodec, aom_codec_av1_dx(), nullptr, 0) != AOM_CODEC_OK)
+            if (!mCodec.Init(aom_codec_av1_dx()))
             {
                 return false;
             }
-            mCodecReady = true;
 
             mCurrentCluster = mSegment->GetFirst();
             mCurrentBlockEntry = nullptr;
@@ -639,33 +680,30 @@ namespace
     private:
         bool TryOpenFile(const std::string& path)
         {
-            mMovieFile = fopen(path.c_str(), "rb");
-            if (!mMovieFile)
+            FileSystem fs;
+            mMovieFile = fs.OpenFile(path.c_str(), "rb");
+            if (!mMovieFile.GetFile())
             {
                 return false;
             }
 
-            mReader = new mkvparser::MkvReader(mMovieFile);
-            if (!mReader)
-            {
-                fclose(mMovieFile);
-                mMovieFile = nullptr;
-                return false;
-            }
+            mReader = std::make_unique<mkvparser::MkvReader>(mMovieFile.GetFile());
 
             mkvparser::EBMLHeader header;
             long long pos = 0;
-            if (header.Parse(mReader, pos) < 0)
+            if (header.Parse(mReader.get(), pos) < 0)
             {
                 Cleanup();
                 return false;
             }
 
-            if (mkvparser::Segment::CreateInstance(mReader, pos, mSegment) != 0)
+            mkvparser::Segment* pSegment = nullptr;
+            if (mkvparser::Segment::CreateInstance(mReader.get(), pos, pSegment) != 0)
             {
                 Cleanup();
                 return false;
             }
+            mSegment.reset(pSegment);
 
             if (mSegment->Load() < 0)
             {
@@ -683,7 +721,7 @@ namespace
                 return false;
             }
 
-            aom_codec_err_t status = aom_codec_decode(&mCodec, compressedFrame.data(), static_cast<unsigned int>(compressedFrame.size()), nullptr);
+            aom_codec_err_t status = aom_codec_decode(mCodec.Get(), compressedFrame.data(), static_cast<unsigned int>(compressedFrame.size()), nullptr);
             if (status != AOM_CODEC_OK)
             {
                 return false;
@@ -691,7 +729,7 @@ namespace
 
             aom_codec_iter_t iter = nullptr;
             aom_image_t* pImage = nullptr;
-            while ((pImage = aom_codec_get_frame(&mCodec, &iter)) != nullptr)
+            while ((pImage = aom_codec_get_frame(mCodec.Get(), &iter)) != nullptr)
             {
                 ConvertI420ToRGBA(pImage, rgbaPixels);
                 return true;
@@ -702,32 +740,17 @@ namespace
 
         void Cleanup()
         {
-            if (mCodecReady)
-            {
-                aom_codec_destroy(&mCodec);
-                mCodecReady = false;
-            }
+            mCodec.Reset();
 
             mVorbisDecoder.Reset();
             mIsVorbisAudio = false;
 
-            if (mSegment)
-            {
-                delete mSegment;
-                mSegment = nullptr;
-            }
-
-            if (mReader)
-            {
-                delete mReader;
-                mReader = nullptr;
-            }
-
-            if (mMovieFile)
-            {
-                fclose(mMovieFile);
-                mMovieFile = nullptr;
-            }
+            // Reset in this order (segment, then reader, then file) to mirror the ownership
+            // chain: the segment references the reader, and the reader (constructed from an
+            // already-open FILE*, see MkvReader(FILE*)) never closes the file itself.
+            mSegment.reset();
+            mReader.reset();
+            mMovieFile.Close();
 
             mVideoTrack = nullptr;
             mAudioTrack = nullptr;
@@ -744,9 +767,9 @@ namespace
             mHeight = 240;
         }
 
-        FILE* mMovieFile = nullptr;
-        mkvparser::MkvReader* mReader = nullptr;
-        mkvparser::Segment* mSegment = nullptr;
+        AutoFILE mMovieFile;
+        std::unique_ptr<mkvparser::MkvReader> mReader;
+        std::unique_ptr<mkvparser::Segment> mSegment;
         const mkvparser::VideoTrack* mVideoTrack = nullptr;
         const mkvparser::AudioTrack* mAudioTrack = nullptr;
         std::deque<MkvVideoFrame> mVideoFrames;
@@ -755,8 +778,7 @@ namespace
         const mkvparser::BlockEntry* mCurrentBlockEntry = nullptr;
         int mCurrentFrameIndex = 0;
         std::atomic_bool mParsingComplete = false;
-        aom_codec_ctx_t mCodec = {};
-        bool mCodecReady = false;
+        AutoAomCodecCtx mCodec;
         int mVideoTrackNumber = 0;
         int mAudioTrackNumber = 0;
         u32 mWidth = 640;
