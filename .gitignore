@@ -19,3 +19,7 @@ Source/relive_lib/relive_config.h
 Scripts/Hex2Bits.py
 
 /Source/relive/resource.aps
+.flatpak-builder
+flatpak-repo
+*.flatpak
+

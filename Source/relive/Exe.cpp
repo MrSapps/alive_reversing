@@ -154,8 +154,7 @@ static std::string GetCwd()
     {
         const char* pBasePath = SDL_GetBasePath();
         LOG_INFO("Mac/Linux cwd is %s SDL_GetBasePath is %s SDL_GetPrefPath is %s", answer, pBasePath, GetPrefPath().c_str());
-        std::string tmp(pBasePath);
-        return tmp;
+        return answer;
     }
     else
     {
