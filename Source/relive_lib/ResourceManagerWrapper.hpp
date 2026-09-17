@@ -274,6 +274,21 @@ public:
     // cause a de-sync due to calling sound funcs
     void LoadingLoop2();
 
+    // Thread-safe: records a resource that should always exist (an animation, etc) but
+    // couldn't be found at any of the given locations, instead of raising a message box
+    // immediately. PendAnimation's jobs run in parallel on ThreadPool worker threads, so
+    // several failing around the same time would otherwise pop up one modal message box per
+    // job, all at once - callers report here and a later FlushMissingResourceReports() call
+    // (from the main thread) shows everything collected so far as a single dialog.
+    void ReportMissingResource(std::string description, std::vector<std::string> searchedPaths);
+
+    // Must be called from the main thread. Collates every ReportMissingResource() call made
+    // since the last flush into one message box - each resource listed with every location
+    // searched for it, in the order they were tried - then fatally aborts if anything was
+    // recorded. LoadingLoop/LoadingLoop2 already call this once their batch of async loading
+    // finishes; call it from elsewhere too (e.g. a VUpdate) if reports need to surface sooner.
+    void FlushMissingResourceReports();
+
     // Stateless helper, no instance state is used
     static s32 SEQ_HashName(const char_type* seqFileName);
 
@@ -309,6 +324,15 @@ private:
     AnimCache LookUp(AnimId animId, const std::string& theme);
 
     void AddSearchPaths(const std::string& modPath);
+
+    struct MissingResourceReport final
+    {
+        std::string mDescription;
+        std::vector<std::string> mSearchedPaths;
+    };
+
+    std::mutex mMissingResourcesMutex;
+    std::vector<MissingResourceReport> mMissingResources;
 
 public:
     std::mutex mLoadedAnimationsMutex;

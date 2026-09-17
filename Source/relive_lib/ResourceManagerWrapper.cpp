@@ -107,6 +107,16 @@ private:
         return filePath.GetPath();
     }
 
+    std::string Describe() const
+    {
+        std::string desc = std::string("Animation \"") + AnimRecName(mAnimId) + "\"";
+        if (!mThemeName.empty())
+        {
+            desc += " (theme \"" + mThemeName + "\")";
+        }
+        return desc;
+    }
+
 public:
     explicit AnimationLoaderJob(ResourceManagerWrapper* pResMan, AnimId anim, const std::string& themeName)
         : mResMan(pResMan), mAnimId(anim), mThemeName(themeName)
@@ -121,20 +131,41 @@ public:
         FileSystem& fs = mResMan->mFs;
         std::string jsonStr;
         std::string filePath;
+        std::vector<std::string> searchedJsonPaths;
         for (const auto& basePath : mResMan->mSearchPaths)
         {
             filePath = GetAnimPath(basePath, mAnimId, mThemeName);
-            jsonStr = fs.LoadToString((filePath + ".json").c_str());
+            const std::string jsonPath = filePath + ".json";
+            searchedJsonPaths.push_back(jsonPath);
+            jsonStr = fs.LoadToString(jsonPath.c_str());
             if (!jsonStr.empty())
             {
                 break;
             }
         }
 
+        // Not found under any search path - report it (rather than letting PNGFile::Load below
+        // hard-abort the process, possibly from one of several ThreadPool worker threads at
+        // once) and bail out without touching the (non-existent) png or parsing an empty json
+        // string. Exists()/LookUp() will keep reporting this animation as not loaded, same as
+        // if this job had never run.
+        if (jsonStr.empty())
+        {
+            mResMan->ReportMissingResource(Describe(), searchedJsonPaths);
+            return;
+        }
+
+        const std::string pngPath = filePath + ".png";
+        if (!fs.FileExists(pngPath.c_str()))
+        {
+            mResMan->ReportMissingResource(Describe(), {pngPath});
+            return;
+        }
+
         auto pPngData = std::make_shared<PngData>();
         PNGFile pngFile;
         pPngData->mPal = std::make_shared<AnimationPal>();
-        pngFile.Load(fs, (filePath + ".png").c_str(), *pPngData->mPal, pPngData->mPixels, pPngData->mWidth, pPngData->mHeight);
+        pngFile.Load(fs, pngPath.c_str(), *pPngData->mPal, pPngData->mPixels, pPngData->mWidth, pPngData->mHeight);
 
         auto pAnimationAttributesAndFrames = std::make_shared<AnimationAttributesAndFrames>(jsonStr);
 
@@ -250,6 +281,12 @@ AnimResource ResourceManagerWrapper::LoadAnimation(AnimId anim, const std::strin
 
         AnimationLoaderJob hack(this, anim, themeName);
         hack.Execute();
+
+        // hack.Execute() only records a report and returns if the resource is missing (see
+        // AnimationLoaderJob::Execute) - unlike PendAnimation's async jobs, this can't wait for
+        // the next LoadingLoop to surface it, since the caller needs the animation right now, so
+        // flush (and fatally abort, listing every location searched) immediately if it did.
+        FlushMissingResourceReports();
     }
 
     AnimCache cache = LookUp(anim, themeName);
@@ -528,6 +565,11 @@ void ResourceManagerWrapper::LoadingLoop(bool bShowLoadingIcon, BaseMap* pMap)
     }
 
     GetGameAutoPlayer().EnableRecorder();
+
+    // This batch of async loading has fully finished (successfully or not) - the main thread is
+    // blocked right here waiting for it either way, so this is the natural place to surface
+    // anything PendAnimation's worker-thread jobs couldn't find.
+    FlushMissingResourceReports();
 }
 
 void ResourceManagerWrapper::LoadingLoop2()
@@ -536,6 +578,43 @@ void ResourceManagerWrapper::LoadingLoop2()
     {
         // Just block, hang everything
     }
+
+    FlushMissingResourceReports();
+}
+
+void ResourceManagerWrapper::ReportMissingResource(std::string description, std::vector<std::string> searchedPaths)
+{
+    std::unique_lock<std::mutex> lock(mMissingResourcesMutex);
+    mMissingResources.push_back({std::move(description), std::move(searchedPaths)});
+}
+
+void ResourceManagerWrapper::FlushMissingResourceReports()
+{
+    std::vector<MissingResourceReport> reports;
+    {
+        std::unique_lock<std::mutex> lock(mMissingResourcesMutex);
+        if (mMissingResources.empty())
+        {
+            return;
+        }
+        reports = std::move(mMissingResources);
+        mMissingResources.clear();
+    }
+
+    std::string message = "The following resources should exist but could not be found:\n";
+    for (const auto& report : reports)
+    {
+        message += "\n" + report.mDescription + "\nSearched (in order):\n";
+        for (const auto& path : report.mSearchedPaths)
+        {
+            message += "  " + path + "\n";
+        }
+    }
+
+    // A batch listing every location searched for several missing resources can easily be
+    // longer than ALIVE_FATAL's stack buffer - it falls back to a heap one sized to fit rather
+    // than truncating, so passing the whole message through here is safe.
+    ALIVE_FATAL("%s", message.c_str());
 }
 
 
