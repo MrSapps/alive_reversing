@@ -233,6 +233,7 @@ void Map::GoTo_Camera()
         {
             // Don't let the force flag make us reload paths for no reason
             mLoadedPaths = mResourceManager.LoadPaths(mNextLevel);
+            mResourceManager.FlushMissingResourceReports();
 
             BinaryPath* pNextPath = GetPathResourceBlockPtr(mNextPath);
             SND_Load_VABS(pNextPath->GetSoundInfo(), Path_Get_Reverb(mNextLevel), mResourceManager, *this); // TODO: Remove hard coded data
