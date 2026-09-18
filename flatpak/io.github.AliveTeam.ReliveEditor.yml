@@ -1,0 +1,68 @@
+# Flatpak manifest for the R.E.L.I.V.E level/mod editor (relive-editor).
+#
+# Local test build:
+#   flatpak-builder --force-clean --user --install build-dir-relive-editor \
+#       flatpak/io.github.AliveTeam.ReliveEditor.yml
+#   flatpak run io.github.AliveTeam.ReliveEditor
+id: io.github.AliveTeam.ReliveEditor
+
+# Same Qt 5.15 branch the CI matrix installs (jurplel/install-qt-action, version 5.15.2).
+runtime: org.kde.Platform
+runtime-version: '5.15-24.08'
+sdk: org.kde.Sdk
+
+command: relive-editor
+
+finish-args:
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio
+  - --share=ipc
+  - --device=dri
+  - --filesystem=host
+  # See io.github.AliveTeam.Relive.yml - the root CMakeLists.txt builds every Unix target with
+  # ASan+LSan unconditionally, and LSan's ptrace-based leak scan fails under bwrap's sandbox.
+  - --env=ASAN_OPTIONS=detect_leaks=0
+
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - /lib/cmake
+  - /share/man
+
+modules:
+  - name: sdl3
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DSDL_SHARED=ON
+      - -DSDL_STATIC=OFF
+    sources:
+      - type: archive
+        url: https://github.com/libsdl-org/SDL/releases/download/release-3.4.14/SDL3-3.4.14.tar.gz
+        sha256: 30d4aa2b3037718142b32dffd4e72f917ebb6cc5227150e7bb9c45efb2153aeb
+
+  - name: relive-editor
+    buildsystem: simple
+    build-commands:
+      # Mirrors the CI Linux build (see .github/workflows/ci.yml) - Unix Makefiles, same
+      # CMAKE_POLICY_VERSION_MINIMUM workaround the vendored 3rdParty projects need - but only
+      # builds the relive-editor target itself, not relive/relive_api/tests.
+      - cmake -S . -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCI_PROVIDER=Flatpak
+      - make -C build -j${FLATPAK_BUILDER_N_JOBS:-$(nproc)} relive-editor
+      - install -Dm755 build/Source/Tools/editor/relive-editor /app/bin/relive-editor
+      - install -Dm644 assets/relive-editor-256.png /app/share/icons/hicolor/256x256/apps/io.github.AliveTeam.ReliveEditor.png
+      - 'printf "%s\n" "[Desktop Entry]" "Name=R.E.L.I.V.E Editor" "Comment=Level and mod editor for the R.E.L.I.V.E engine" "Exec=relive-editor" "Icon=io.github.AliveTeam.ReliveEditor" "Type=Application" "Categories=Development;" > relive-editor.desktop'
+      - install -Dm644 relive-editor.desktop /app/share/applications/io.github.AliveTeam.ReliveEditor.desktop
+    sources:
+      - type: dir
+        path: ..
+        # Copying the whole repo verbatim would drag in every native (host) build directory -
+        # multiple gigabytes, and potentially stale CMakeCache.txt/absolute paths from those.
+        skip:
+          - build
+          - build-*
+          - .flatpak-builder
+          - flatpak-repo
+          - build-dir-*
+          - .git

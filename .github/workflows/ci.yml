@@ -133,6 +133,29 @@ jobs:
         cd build
         cmake --build . --target appimage
 
+    - name: 'Linux: Install flatpak & flatpak-builder'
+      if: matrix.name == 'Linux'
+      run: |
+        sudo apt-get install -y flatpak flatpak-builder
+        sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+        sudo flatpak install -y --noninteractive flathub org.kde.Platform//5.15-24.08 org.kde.Sdk//5.15-24.08
+
+    # flatpak-builder does its own from-scratch source build inside the sandboxed
+    # runtime/SDK above (it can't reuse ./build from the "Linux: Build" step - different
+    # sysroot, different SDL3), so this doubles Linux CI time. Both manifests share one repo
+    # (see flatpak/*.yml) so each just produces its own ref/bundle from it.
+    - name: 'Linux: Build relive flatpak'
+      if: matrix.name == 'Linux'
+      run: |
+        flatpak-builder --force-clean --repo=flatpak-repo build-dir-relive flatpak/io.github.AliveTeam.Relive.yml
+        flatpak build-bundle flatpak-repo relive.flatpak io.github.AliveTeam.Relive
+
+    - name: 'Linux: Build relive-editor flatpak'
+      if: matrix.name == 'Linux'
+      run: |
+        flatpak-builder --force-clean --repo=flatpak-repo build-dir-relive-editor flatpak/io.github.AliveTeam.ReliveEditor.yml
+        flatpak build-bundle flatpak-repo relive-editor.flatpak io.github.AliveTeam.ReliveEditor
+
     # ======================================
     #      macOS
     # ======================================
@@ -188,6 +211,20 @@ jobs:
       with:
         name: ${{ matrix.name }}-${{ env.CONFIGURATION }}
         path: build/*.AppImage
+
+    - name: 'Linux: Upload relive flatpak'
+      if: matrix.name == 'Linux'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.name }}-${{ env.CONFIGURATION }}-relive-flatpak
+        path: relive.flatpak
+
+    - name: 'Linux: Upload relive-editor flatpak'
+      if: matrix.name == 'Linux'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.name }}-${{ env.CONFIGURATION }}-relive-editor-flatpak
+        path: relive-editor.flatpak
 
    # - name: 'macOS: Upload relive dmg'
    #   if: matrix.name == 'macOS'

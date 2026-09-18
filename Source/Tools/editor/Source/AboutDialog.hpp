@@ -1,6 +1,12 @@
 #pragma once
 
 #include <QDialog>
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <vector>
+
+struct SDL_AudioStream;
 
 namespace Ui
 {
@@ -21,5 +27,10 @@ private slots:
 private:
     Ui::AboutDialog *ui;
     std::string mScrollText;
-    class QMediaPlayer* mPlayer = nullptr;
+    static void FeedAudio(void* userdata, SDL_AudioStream* stream, int additionalAmount, int totalAmount);
+
+    std::vector<int16_t> mPcm;
+    size_t mPcmPos = 0;
+    SDL_AudioStream* mAudioStream = nullptr;
+    bool mSdlAudioInited = false;
 };

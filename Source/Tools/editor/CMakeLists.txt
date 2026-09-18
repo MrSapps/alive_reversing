@@ -22,8 +22,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 #    endif()
 #endif()
 
-find_package(QT NAMES Qt5 COMPONENTS Widgets Multimedia Network LinguistTools REQUIRED)
-find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets Multimedia Network LinguistTools REQUIRED)
+find_package(QT NAMES Qt5 COMPONENTS Widgets Network LinguistTools REQUIRED)
+find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets Network LinguistTools REQUIRED)
 
 set(TS_FILES
   Source/rsc/translations/qt-editor_en_GB.ts
@@ -226,7 +226,7 @@ if (MSVC)
     set_target_properties(relive-editor PROPERTIES VS_DEBUGGER_ENVIRONMENT "${MY_PATH}")
 endif()
 
-target_link_libraries(relive-editor PUBLIC relive_api Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Multimedia Qt${QT_VERSION_MAJOR}::Network editor_glue_dynamic_crt relive_ipc_dynamic_crt)
+target_link_libraries(relive-editor PUBLIC relive_api SDL3::SDL3 vorbisfile Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Network editor_glue_dynamic_crt relive_ipc_dynamic_crt)
 
 add_executable(relive-editor-automation-cli tools/AutomationCli.cpp Source/AutomationProtocol.hpp)
 target_include_directories(relive-editor-automation-cli PRIVATE Source)
