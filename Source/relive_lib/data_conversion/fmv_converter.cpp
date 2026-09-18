@@ -2,6 +2,7 @@
 #include "../../AliveLibAE/PathData.hpp"
 #include "../../AliveLibAO/PathData.hpp"
 #include "../FatalError.hpp"
+#include "../logger.hpp"
 #include "../FmvInfo.hpp"
 #include "PNGFile.hpp"
 
@@ -519,7 +520,7 @@ public:
                                 const u64 audioPtsNs = (mLastAudioGranulePos * 1000000000ULL) / static_cast<u64>(mAudioSampleRate);
                                 if (!segment.AddFrame(packet.packet, static_cast<uint64_t>(packet.bytes), mAudioTrackNumber, audioPtsNs, true))
                                 {
-                                    fprintf(stderr, "webmenc> AddAudioFrame failed.\n");
+                                    LOG_ERROR("AddAudioFrame failed.");
                                 }
                             });
                     }
@@ -579,7 +580,7 @@ public:
                             const u64 audioPtsNs = (static_cast<u64>(packet.granulepos) * 1000000000ULL) / static_cast<u64>(mAudioSampleRate);
                             if (!segment.AddFrame(packet.packet, static_cast<uint64_t>(packet.bytes), mAudioTrackNumber, audioPtsNs, true))
                             {
-                                fprintf(stderr, "webmenc> AddAudioFrame failed.\n");
+                                LOG_ERROR("AddAudioFrame failed.");
                             }
                         });
                 }
@@ -587,7 +588,7 @@ public:
                 finalizedOk = segment.Finalize();
                 if (!finalizedOk)
                 {
-                    fprintf(stderr, "webmenc> Segment::Finalize failed.\n");
+                    LOG_ERROR("Segment::Finalize failed.");
                 }
             }
 
@@ -633,7 +634,7 @@ private:
                                pkt->data.frame.sz, kVideoTrackNumber, pts_ns,
                                pkt->data.frame.flags & AOM_FRAME_IS_KEY))
         {
-            fprintf(stderr, "webmenc> AddFrame failed.\n");
+            LOG_ERROR("AddFrame failed.");
             return -1;
         }
         return 0;
@@ -646,7 +647,7 @@ private:
         bool ok = segment->Init(writer);
         if (!ok)
         {
-            fprintf(stderr, "webmenc> mkvmuxer Init failed.\n");
+            LOG_ERROR("mkvmuxer Init failed.");
             return -1;
         }
 
@@ -657,7 +658,7 @@ private:
         {
             if (!mVorbisEncoder.Init(mAudioSampleRate, mAudioChannels))
             {
-                fprintf(stderr, "webmenc> Vorbis encoder init failed.\n");
+                LOG_ERROR("Vorbis encoder init failed.");
                 return -1;
             }
 
@@ -665,14 +666,14 @@ private:
             mkvmuxer::AudioTrack* const audio_track = static_cast<mkvmuxer::AudioTrack*>(segment->GetTrackByNumber(audio_track_id));
             if (!audio_track)
             {
-                fprintf(stderr, "webmenc> Audio track creation failed.\n");
+                LOG_ERROR("Audio track creation failed.");
                 return -1;
             }
 
             const std::vector<u8> codecPrivate = mVorbisEncoder.BuildCodecPrivate();
             if (!audio_track->SetCodecPrivate(codecPrivate.data(), codecPrivate.size()))
             {
-                fprintf(stderr, "webmenc> Unable to set Vorbis codec private data.\n");
+                LOG_ERROR("Unable to set Vorbis codec private data.");
                 return -1;
             }
 
@@ -684,7 +685,7 @@ private:
         mkvmuxer::SegmentInfo* const info = segment->GetSegmentInfo();
         if (!info)
         {
-            fprintf(stderr, "webmenc> Cannot retrieve Segment Info.\n");
+            LOG_ERROR("Cannot retrieve Segment Info.");
             return -1;
         }
 
@@ -707,7 +708,7 @@ private:
 
         if (!video_track)
         {
-            fprintf(stderr, "webmenc> Video track creation failed.\n");
+            LOG_ERROR("Video track creation failed.");
             return -1;
         }
 
@@ -736,14 +737,14 @@ private:
         }
         if (!ok)
         {
-            fprintf(stderr, "webmenc> Unable to set AV1 config.\n");
+            LOG_ERROR("Unable to set AV1 config.");
             return -1;
         }
 
         ok = video_track->SetStereoMode(1); // STEREO_FORMAT_LEFT_RIGHT
         if (!ok)
         {
-            fprintf(stderr, "webmenc> Unable to set stereo mode.\n");
+            LOG_ERROR("Unable to set stereo mode.");
             return -1;
         }
 
@@ -768,13 +769,13 @@ private:
             mkvmuxer::Tag* tag = segment->AddTag();
             if (tag == nullptr)
             {
-                fprintf(stderr, "webmenc> Unable to allocate memory for encoder settings tag.\n");
+                LOG_ERROR("Unable to allocate memory for encoder settings tag.");
                 return -1;
             }
             ok = tag->add_simple_tag("ENCODER_SETTINGS", encoder_settings);
             if (!ok)
             {
-                fprintf(stderr, "webmenc> Unable to allocate memory for encoder settings tag.\n");
+                LOG_ERROR("Unable to allocate memory for encoder settings tag.");
                 return -1;
             }
         }*/
