@@ -401,6 +401,7 @@ void Map::GoTo_Camera()
         if (LevelChanged())
         {
             mLoadedPaths = mResourceManager.LoadPaths(mNextLevel);
+            mResourceManager.FlushMissingResourceReports();
         }
 
         SND_Load_VABS(mLoadedPaths[0]->GetSoundInfo(), AO::Path_Get_Reverb(mNextLevel), mResourceManager, *this); // TODO: Remove hard coded data

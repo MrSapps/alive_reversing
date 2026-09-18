@@ -68,18 +68,20 @@ void ResourceManagerWrapper::AddSearchPaths(const std::string& modPath)
 // Out of line so unique_ptr<ThreadPool> can be destroyed with an incomplete ThreadPool type
 ResourceManagerWrapper::~ResourceManagerWrapper() = default;
 
+static std::string LvlDirName(EReliveLevelIds lvlId)
+{
+    if (GetGameType() == GameType::eAe)
+    {
+        return ToString(MapWrapper::ToAE(lvlId));
+    }
+    return ToString(MapWrapper::ToAO(lvlId));
+}
+
 static FileSystem::Path PerLvlBasePath(const std::string& basePath, EReliveLevelIds lvlId)
 {
     FileSystem::Path filePath(basePath);
     filePath.Append("levels");
-    if (GetGameType() == GameType::eAe)
-    {
-        filePath.Append(ToString(MapWrapper::ToAE(lvlId)));
-    }
-    else
-    {
-        filePath.Append(ToString(MapWrapper::ToAO(lvlId)));
-    }
+    filePath.Append(LvlDirName(lvlId));
     return filePath;
 }
 
@@ -310,14 +312,26 @@ PalResource ResourceManagerWrapper::LoadPal(PalId pal)
     newRes.mPal = std::make_shared<AnimationPal>();
 
     FileSystem::Path filePath;
+    std::vector<std::string> searchedPaths;
+    bool found = false;
     for (auto& basePath : mSearchPaths)
     {
         filePath = FileSystem::Path(basePath);
         filePath.Append(ToString(newRes.mId));
+        searchedPaths.push_back(filePath.GetPath());
         if (mFs.FileExists(filePath.GetPath().c_str()))
         {
+            found = true;
             break;
         }
+    }
+
+    if (!found)
+    {
+        // The caller needs the palette right now, so (like LoadAnimation) flush and fatally abort
+        // immediately instead of waiting for the next LoadingLoop.
+        ReportMissingResource(std::string("Palette \"") + ToString(newRes.mId) + "\"", std::move(searchedPaths));
+        FlushMissingResourceReports();
     }
 
     auto palData = mFs.LoadToVec(filePath.GetPath().c_str());
@@ -359,18 +373,23 @@ static RgbaData LoadPng(FileSystem& fs, const std::string& filePath)
 
 CamResource ResourceManagerWrapper::LoadCam(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
 {
-    
     CamResource newRes;
+    std::vector<std::string> searchedPaths;
     for (const auto& basePath : mSearchPaths)
     {
-        FileSystem::Path filePath = CamBaseName(basePath, lvlId, pathNumber, camNumber);
-        newRes.mData = LoadPng(mFs, filePath.GetPath() + ".png");
-        if (newRes.mData.mPixels)
+        const std::string pngPath = CamBaseName(basePath, lvlId, pathNumber, camNumber).GetPath() + ".png";
+        searchedPaths.push_back(pngPath);
+        if (mFs.FileExists(pngPath.c_str()))
         {
-            break;
+            newRes.mData = LoadPng(mFs, pngPath);
+            return newRes;
         }
     }
 
+    // The caller needs the camera right now, so (like LoadAnimation) flush and fatally abort
+    // immediately instead of waiting for the next LoadingLoop.
+    ReportMissingResource("Camera " + std::to_string(camNumber) + " of path " + std::to_string(pathNumber) + " of level \"" + LvlDirName(lvlId) + "\"", std::move(searchedPaths));
+    FlushMissingResourceReports();
     return newRes;
 }
 
@@ -417,36 +436,53 @@ Fg1Resource ResourceManagerWrapper::LoadFg1(EReliveLevelIds lvlId, u32 pathNumbe
 
 FontResource ResourceManagerWrapper::LoadFont(FontType fontId)
 {
+    std::string fontName;
+    switch (fontId)
+    {
+        case FontType::None:
+            ALIVE_FATAL("Can't load none");
+            break;
+
+        case FontType::LcdFont:
+            fontName = "lcd_font";
+            break;
+
+        case FontType::PauseMenu:
+            fontName = "pause_menu_font";
+            break;
+    }
+
     auto pPngData = std::make_shared<PngData>();
     pPngData->mPal = std::make_shared<AnimationPal>();
+    std::vector<std::string> searchedPaths;
+    bool found = false;
     for (const auto& basePath : mSearchPaths)
     {
         FileSystem::Path filePath(basePath);
-        switch (fontId)
+        filePath.Append(fontName);
+
+        const std::string pngPath = filePath.GetPath() + ".png";
+        searchedPaths.push_back(pngPath);
+        if (!mFs.FileExists(pngPath.c_str()))
         {
-            case FontType::None:
-                ALIVE_FATAL("Can't load none");
-                break;
-
-            case FontType::LcdFont:
-            {
-                filePath.Append("lcd_font");
-                break;
-            }
-
-            case FontType::PauseMenu:
-            {
-                filePath.Append("pause_menu_font");
-                break;
-            }
+            continue;
         }
 
         PNGFile pngFile;
-        pngFile.Load(mFs, (filePath.GetPath() + ".png").c_str(), *pPngData->mPal, pPngData->mPixels, pPngData->mWidth, pPngData->mHeight);
+        pngFile.Load(mFs, pngPath.c_str(), *pPngData->mPal, pPngData->mPixels, pPngData->mWidth, pPngData->mHeight);
         if (!pPngData->mPixels.empty())
         {
+            found = true;
             break;
         }
+    }
+
+    if (!found)
+    {
+        // The caller needs the font right now, so (like LoadAnimation) flush and fatally abort
+        // immediately instead of waiting for the next LoadingLoop.
+        ReportMissingResource("Font \"" + fontName + "\"", std::move(searchedPaths));
+        FlushMissingResourceReports();
     }
 
     FontResource newRes(fontId, pPngData);
@@ -456,6 +492,8 @@ FontResource ResourceManagerWrapper::LoadFont(FontType fontId)
 std::vector<std::unique_ptr<BinaryPath>> ResourceManagerWrapper::LoadPaths(EReliveLevelIds lvlId)
 {
     std::vector<std::unique_ptr<BinaryPath>> ret;
+    std::vector<std::string> searchedLevelInfoPaths;
+    bool foundLevelInfo = false;
 
     for (const auto& basePath : mSearchPaths)
     {
@@ -464,6 +502,7 @@ std::vector<std::unique_ptr<BinaryPath>> ResourceManagerWrapper::LoadPaths(EReli
 
         FileSystem::Path levelInfo = pathDir;
         levelInfo.Append("level_info.json");
+        searchedLevelInfoPaths.push_back(levelInfo.GetPath());
 
         const std::string jsonStr = mFs.LoadToString(levelInfo);
         if (!jsonStr.empty())
@@ -477,6 +516,14 @@ std::vector<std::unique_ptr<BinaryPath>> ResourceManagerWrapper::LoadPaths(EReli
                 FileSystem::Path pathJsonFile = pathDir;
                 pathJsonFile.Append(pathId).Append("path.json");
                 const std::string pathJsonStr = mFs.LoadToString(pathJsonFile);
+
+                // level_info.json listed this path so it should exist, and it can only live next
+                // to that level_info.json - there is no other search path to fall back to.
+                if (pathJsonStr.empty())
+                {
+                    ReportMissingResource("Path " + pathId + " of level \"" + LvlDirName(lvlId) + "\"", {pathJsonFile.GetPath()});
+                    continue;
+                }
 
                 // TODO: set the res ptrs to the parsed json data
                 // TODO: Handle exception on bad data
@@ -495,26 +542,50 @@ std::vector<std::unique_ptr<BinaryPath>> ResourceManagerWrapper::LoadPaths(EReli
 
                 ret.emplace_back(std::move(pathBuffer));
             }
+            foundLevelInfo = true;
             break;
         }
+    }
+
+    if (!foundLevelInfo)
+    {
+        ReportMissingResource("Level info of level \"" + LvlDirName(lvlId) + "\"", std::move(searchedLevelInfoPaths));
     }
 
     return ret;
 }
 
-std::vector<u8> ResourceManagerWrapper::LoadSoundFile(const char_type* pFileName, const std::string& soundTheme)
+// Doesn't report anything itself - callers decide whether an empty result is fatal right now
+// (LoadSoundFile) or just gets recorded for later (LoadSoundThemeInfo, see there).
+static std::vector<u8> FindSoundFile(FileSystem& fs, const std::vector<std::string>& searchPaths, const char_type* pFileName, const std::string& soundTheme, std::vector<std::string>& searchedPaths)
 {
-    for (const auto& basePath : mSearchPaths)
+    for (const auto& basePath : searchPaths)
     {
         FileSystem::Path soundFilePath(basePath);
         soundFilePath.Append("sounds").Append(soundTheme).Append(pFileName);
-        auto vec = mFs.LoadToVec(soundFilePath.GetPath().c_str());
+        searchedPaths.push_back(soundFilePath.GetPath());
+        auto vec = fs.LoadToVec(soundFilePath.GetPath().c_str());
         if (!vec.empty())
         {
             return vec;
         }
     }
     return {};
+}
+
+std::vector<u8> ResourceManagerWrapper::LoadSoundFile(const char_type* pFileName, const std::string& soundTheme)
+{
+    std::vector<std::string> searchedPaths;
+    std::vector<u8> vec = FindSoundFile(mFs, mSearchPaths, pFileName, soundTheme, searchedPaths);
+    if (vec.empty())
+    {
+        // The callers (VH/VB/SEQ loading) dereference the data straight away, so like
+        // LoadAnimation flush and fatally abort immediately instead of waiting for the next
+        // LoadingLoop.
+        ReportMissingResource("Sound file \"" + std::string(pFileName) + "\" of sound theme \"" + soundTheme + "\"", std::move(searchedPaths));
+        FlushMissingResourceReports();
+    }
+    return vec;
 }
 
 const ResourceManagerWrapper::SoundThemeInfo& ResourceManagerWrapper::LoadSoundThemeInfo(const std::string& soundTheme)
@@ -526,7 +597,8 @@ const ResourceManagerWrapper::SoundThemeInfo& ResourceManagerWrapper::LoadSoundT
     }
 
     SoundThemeInfo info;
-    const std::vector<u8> bytes = LoadSoundFile("sound_info.json", soundTheme);
+    std::vector<std::string> searchedPaths;
+    const std::vector<u8> bytes = FindSoundFile(mFs, mSearchPaths, "sound_info.json", soundTheme, searchedPaths);
     if (!bytes.empty())
     {
         const nlohmann::json j = nlohmann::json::parse(bytes.begin(), bytes.end());
@@ -537,6 +609,11 @@ const ResourceManagerWrapper::SoundThemeInfo& ResourceManagerWrapper::LoadSoundT
     else
     {
         LOG_ERROR("Missing sound_info.json for sound theme '%s'", soundTheme.c_str());
+
+        // Report only, no flush: LoadPaths (our caller) also runs on the data conversion worker
+        // thread via AESaveConverter, where a modal + abort isn't safe - the game's callers
+        // flush right after LoadPaths on the main thread.
+        ReportMissingResource("Sound info of sound theme \"" + soundTheme + "\"", std::move(searchedPaths));
     }
 
     return mSoundThemeInfoCache.emplace(soundTheme, std::move(info)).first->second;
