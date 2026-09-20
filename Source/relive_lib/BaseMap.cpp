@@ -296,7 +296,7 @@ void BaseMap::Start_Sounds_For_Objects_In_Near_Cameras()
 
 void BaseMap::ReloadPathJsonRequest(const std::string& pathJsonFileName)
 {
-    for (auto& binaryPath : c)
+    for (auto& binaryPath : mLoadedPaths)
     {
         if (string_util::endsWith(pathJsonFileName, binaryPath->JsonFileName()))
         {
