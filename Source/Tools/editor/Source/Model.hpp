@@ -6,7 +6,7 @@
 #include "../../relive_lib/Collisions.hpp"
 #include "../../relive_lib/GameType.hpp"
 
-#include "../../Tools/relive_api/TlvsRelive.hpp"
+#include "../../relive_lib/data_conversion/EditorMapObjects.hpp"
 
 #include "EditorCamera.hpp"
 #include "CollisionObject.hpp"

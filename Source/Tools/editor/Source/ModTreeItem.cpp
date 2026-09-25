@@ -2,7 +2,7 @@
 #include "EditorCamera.hpp"
 #include "CollisionObject.hpp"
 #include "ReflectedEnumProperties.hpp"
-#include "../../relive_api/TlvsRelive.hpp"
+#include "../../relive_lib/data_conversion/EditorMapObjects.hpp"
 
 namespace
 {

@@ -1,24 +1,23 @@
-#include "ApiFG1Reader.hpp"
-#include "JsonModelTypes.hpp"
+#include "FG1PngReader.hpp"
+#include "CameraImageAndLayers.hpp"
 #include "Base64.hpp"
 #include "CamConverter.hpp"
-#include "../../relive_lib/data_conversion/file_system.hpp"
+#include "file_system.hpp"
 
-namespace ReliveAPI {
 
-ApiFG1Reader::ApiFG1Reader(FG1Format format)
+FG1PngReader::FG1PngReader(FG1Format format)
     : BaseFG1Reader(format)
 {
     // Dynamically allocated due to the huge stack space it would consume
     mFg1Buffers = std::make_unique<FG1Buffers>();
 }
 
-ApiFG1Reader::~ApiFG1Reader()
+FG1PngReader::~FG1PngReader()
 {
 
 }
 
-u16 ApiFG1Reader::ConvertPixel(u16 pixel)
+u16 FG1PngReader::ConvertPixel(u16 pixel)
 {
     return ((pixel >> 15) << 5)
          | ((pixel & 31) << 11)
@@ -26,7 +25,7 @@ u16 ApiFG1Reader::ConvertPixel(u16 pixel)
          | (((pixel >> 10) & 31) << 0);
 }
 
-void ApiFG1Reader::BltRectMerged(u32 xpos, u32 ypos, u32 width, u32 height, u32 layer, const u16* pSrcPixels, const u32* pBitMask)
+void FG1PngReader::BltRectMerged(u32 xpos, u32 ypos, u32 width, u32 height, u32 layer, const u16* pSrcPixels, const u32* pBitMask)
 {
     mUsedLayers[layer] = true;
 
@@ -65,7 +64,7 @@ void ApiFG1Reader::BltRectMerged(u32 xpos, u32 ypos, u32 width, u32 height, u32 
     }
 }
 
-void ApiFG1Reader::OnPartialChunk(const Fg1Chunk& rChunk)
+void FG1PngReader::OnPartialChunk(const Fg1Chunk& rChunk)
 {
     const u16* pPixels = nullptr;
     const u32* pBitMap = nullptr;
@@ -86,7 +85,7 @@ void ApiFG1Reader::OnPartialChunk(const Fg1Chunk& rChunk)
                   pBitMap);
 }
 
-void ApiFG1Reader::OnFullChunk(const Fg1Chunk& rChunk)
+void FG1PngReader::OnFullChunk(const Fg1Chunk& rChunk)
 {
     BltRectMerged(rChunk.field_4_xpos_or_compressed_size,
                   rChunk.field_6_ypos,
@@ -97,20 +96,20 @@ void ApiFG1Reader::OnFullChunk(const Fg1Chunk& rChunk)
                   nullptr);
 }
 
-u8** ApiFG1Reader::Allocate(u32 len)
+u8** FG1PngReader::Allocate(u32 len)
 {
     u8** pHolder = new u8*;
     *pHolder = new u8[len];
     return pHolder;
 }
 
-void ApiFG1Reader::Deallocate(u8** ptr)
+void FG1PngReader::Deallocate(u8** ptr)
 {
     delete[] * ptr;
     delete ptr;
 }
 
-void ApiFG1Reader::LayersToPng(CameraImageAndLayers& outData)
+void FG1PngReader::LayersToPng(CameraImageAndLayers& outData)
 {
     for (u32 i = 0; i < 4; i++)
     {
@@ -123,7 +122,7 @@ void ApiFG1Reader::LayersToPng(CameraImageAndLayers& outData)
 }
 
 
-void ApiFG1Reader::DebugSave(const std::string& prefix, const CameraImageAndLayers& outData)
+void FG1PngReader::DebugSave(const std::string& prefix, const CameraImageAndLayers& outData)
 {
     FileSystem fs;
     if (!outData.mCameraImage.empty())
@@ -152,7 +151,7 @@ void ApiFG1Reader::DebugSave(const std::string& prefix, const CameraImageAndLaye
     }
 }
 
-void ApiFG1Reader::SaveAsPng(const std::string& baseName)
+void FG1PngReader::SaveAsPng(const std::string& baseName)
 {
     for (u32 i = 0; i < 4; i++)
     {
@@ -176,7 +175,7 @@ static void FileToBase64(std::string& outData, const std::string& pngFileName)
     }
 }
 
-void ApiFG1Reader::DebugRead(const std::string& prefix, CameraImageAndLayers& outData)
+void FG1PngReader::DebugRead(const std::string& prefix, CameraImageAndLayers& outData)
 {
     FileToBase64(outData.mCameraImage, prefix + "_cam.png");
     FileToBase64(outData.mBackgroundLayer, prefix + "_bg.png");
@@ -185,7 +184,7 @@ void ApiFG1Reader::DebugRead(const std::string& prefix, CameraImageAndLayers& ou
     FileToBase64(outData.mForegroundWellLayer, prefix + "_fg_well.png");
 }
 
-std::string& ApiFG1Reader::BufferForLayer(CameraImageAndLayers& outData, u32 layer)
+std::string& FG1PngReader::BufferForLayer(CameraImageAndLayers& outData, u32 layer)
 {
     if (mFormat == FG1Format::AO)
     {
@@ -221,7 +220,7 @@ std::string& ApiFG1Reader::BufferForLayer(CameraImageAndLayers& outData, u32 lay
 }
 
 
-std::string ApiFG1Reader::NameForLayer(u32 layer)
+std::string FG1PngReader::NameForLayer(u32 layer)
 {
     if (mFormat == FG1Format::AO)
     {
@@ -255,4 +254,3 @@ std::string ApiFG1Reader::NameForLayer(u32 layer)
     ALIVE_FATAL("Bad layer");
 }
 
-} // namespace ReliveAPI

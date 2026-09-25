@@ -4,7 +4,7 @@
 #include <QList>
 #include <QGraphicsItem>
 #include <QCoreApplication>
-#include "../../relive_api/TlvsRelive.hpp"
+#include "../../relive_lib/data_conversion/EditorMapObjects.hpp"
 
 class EditorTab;
 struct EditorCamera;

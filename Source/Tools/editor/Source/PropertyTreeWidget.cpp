@@ -9,7 +9,7 @@
 #include "EnumProperty.hpp"
 #include <QHeaderView>
 #include <QDebug>
-#include "../../Tools/relive_api/TlvsRelive.hpp"
+#include "../../relive_lib/data_conversion/EditorMapObjects.hpp"
 #include "ColourPickerProperty.hpp"
 #include "StringProperty.hpp"
 

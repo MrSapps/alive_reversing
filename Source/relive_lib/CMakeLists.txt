@@ -560,6 +560,8 @@ SET(data_conversion_src
     data_conversion/AESaveConverter.hpp
     data_conversion/AESaveConverter.cpp
     data_conversion/AESaveSerialization.hpp
+    data_conversion/AESaveSerialization.cpp
+    data_conversion/AEQuicksaveJson.hpp
     data_conversion/AOSaveSerialization.hpp
     data_conversion/data_conversion_ui.hpp
     data_conversion/data_conversion_ui.cpp
@@ -580,6 +582,18 @@ SET(data_conversion_src
     data_conversion/CommonTypesSerialization.hpp
     data_conversion/CommonTypesSerialization.cpp
     data_conversion/TLVConverter.hpp
+    data_conversion/Base64.hpp
+    data_conversion/Base64.cpp
+    data_conversion/CamConverter.hpp
+    data_conversion/CamConverter.cpp
+    data_conversion/FG1PngReader.hpp
+    data_conversion/FG1PngReader.cpp
+    data_conversion/CameraImageAndLayers.hpp
+    data_conversion/PathCamerasEnumerator.hpp
+    data_conversion/ByteStream.hpp
+    data_conversion/RoundUp.hpp
+    data_conversion/EditorMapObjects.hpp
+    data_conversion/PathJsonVersion.hpp
 )
 
 source_group("Source Files/AE"               FILES ${AliveLibAESrc})
@@ -600,12 +614,6 @@ SET(relive_lib_src
     ${sound_src}
     ${game_objects_src}
     ${data_conversion_src}
-    # temp hack to use these bits of the api for the data conversion
-    ../Tools/relive_api/Base64.cpp
-    ../Tools/relive_api/CamConverter.cpp
-    ../Tools/relive_api/CamConverter.hpp
-    ../Tools/relive_api/ApiFG1Reader.cpp
-    ../Tools/relive_api/ApiFG1Reader.hpp
     CommandLineParser.hpp
     BinaryPath.hpp
     BinaryPath.cpp
@@ -823,7 +831,4 @@ target_link_libraries(relive_lib_tests PRIVATE relive_lib googletest SDL3::SDL3)
 add_dependencies(relive_lib_tests UpdateConfigHeader)
 # relive_lib_tests REUSE_FROM relive_lib's own PCH is set up in the top-level CMakeLists.txt,
 # alongside relive_lib's own target_precompile_headers call it needs to come after.
-if (MSVC)
-    target_compile_options(relive_lib_tests PRIVATE /MDd)
-endif()
 add_test(NAME relive_lib_tests COMMAND relive_lib_tests)

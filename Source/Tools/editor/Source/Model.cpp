@@ -1,6 +1,6 @@
 #include "Model.hpp"
 #include "../../relive_lib/data_conversion/file_system.hpp"
-#include "../../relive_api/relive_api.hpp"
+#include "../../relive_lib/data_conversion/PathJsonVersion.hpp"
 #include <optional>
 #include "../../relive_lib/data_conversion/relive_tlvs_serialization.hpp"
 #include "../../relive_lib/data_conversion/EnumSerialization.hpp"
@@ -229,7 +229,7 @@ void Model::CreateAsNewPath(s32 newPathId, GameType game, u32 xSize, u32 ySize)
 
     mGame = game;
     mPathId = newPathId;
-    mPathVersion = ReliveAPI::GetApiVersion();
+    mPathVersion = kPathJsonVersion;
     mSoundInfo = nlohmann::json::object();
 
     mXSize = xSize;

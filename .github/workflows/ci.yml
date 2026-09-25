@@ -25,10 +25,19 @@ jobs:
         include:
           - os: windows-2022
             name: Windows32
+            cmake_arch: Win32
+            qt_arch: win32_msvc2019
           - os: windows-2022
             name: Windows64
+            cmake_arch: x64
+            qt_arch: win64_msvc2019_64
+          # The AppImage and the flatpaks are separate jobs: flatpak-builder does its own
+          # from-scratch build inside the flatpak SDK (different sysroot and SDL3), so it can't
+          # reuse the native build. Running them in one job built the project serially 3 times.
           - os: ubuntu-26.04
-            name: Linux
+            name: Linux-AppImage
+          - os: ubuntu-26.04
+            name: Linux-Flatpak
           # - os: macos-latest-large
           #   name: macOS
 
@@ -45,113 +54,89 @@ jobs:
         7z x SDL3.zip
 
     # ======================================
-    #      Windows32
+    #      Windows
     # ======================================
 
-    - name: 'Windows32: Install Qt 5.15.2'
+    - name: 'Windows: Install Qt 5.15.2'
       if: runner.os == 'Windows'
       uses: jurplel/install-qt-action@v4
       with:
         version: '5.15.2'
-        arch: 'win32_msvc2019'
+        arch: ${{ matrix.qt_arch }}
 
-    - name: 'Windows32: Build'
-      if: matrix.name == 'Windows32'
+    - name: 'Windows: Build'
+      if: runner.os == 'Windows'
       run: |
         mkdir build
         cd build
-        cmake .. -G"Visual Studio 17 2022" -DSDL3_DIR="$env:GITHUB_WORKSPACE\SDL3-3.4.14\cmake" -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" -A Win32 -DCI_PROVIDER="GitHub" -DBUILD_NUMBER="$env:GITHUB_RUN_NUMBER"
+        cmake .. -G"Visual Studio 17 2022" -DSDL3_DIR="$env:GITHUB_WORKSPACE\SDL3-3.4.14\cmake" -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" -A ${{ matrix.cmake_arch }} -DCI_PROVIDER="GitHub" -DBUILD_NUMBER="$env:GITHUB_RUN_NUMBER"
         cmake --build . --config $env:CONFIGURATION
         cpack -G ZIP -C $env:CONFIGURATION
 
-    - name: 'Windows32: Run tests'
-      if: matrix.name == 'Windows32'
+    - name: 'Windows: Run tests'
+      if: runner.os == 'Windows'
       run: |
         cd build
         ctest -C $env:CONFIGURATION --output-on-failure -R relive_lib_tests
 
     # ======================================
-    #      Windows64
+    #      Linux AppImage
     # ======================================
 
-    - name: 'Windows64: Install Qt 5.15.2'
-      if: runner.os == 'Windows'
-      uses: jurplel/install-qt-action@v4
-      with:
-        version: '5.15.2'
-        arch: 'win64_msvc2019_64'
-
-    - name: 'Windows64: Build'
-      if: matrix.name == 'Windows64'
-      run: |
-        mkdir build
-        cd build
-        cmake .. -G"Visual Studio 17 2022" -DSDL3_DIR="$env:GITHUB_WORKSPACE\SDL3-3.4.14\cmake" -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" -A x64 -DCI_PROVIDER="GitHub" -DBUILD_NUMBER="$env:GITHUB_RUN_NUMBER"
-        cmake --build . --config $env:CONFIGURATION
-        cpack -G ZIP -C $env:CONFIGURATION
-
-    - name: 'Windows64: Run tests'
-      if: matrix.name == 'Windows64'
-      run: |
-        cd build
-        ctest -C $env:CONFIGURATION --output-on-failure -R relive_lib_tests
-        
-    # ======================================
-    #      Linux
-    # ======================================
-
-    - name: 'Linux: Install SDL3'
-      if: matrix.name == 'Linux'
+    - name: 'Linux-AppImage: Install SDL3'
+      if: matrix.name == 'Linux-AppImage'
       run: |
         sudo apt-get update
         sudo apt-get install -y libsdl3-dev
 
-    - name: 'Linux: Install Qt 5.15.2'
-      if: matrix.name == 'Linux'
+    - name: 'Linux-AppImage: Install Qt 5.15.2'
+      if: matrix.name == 'Linux-AppImage'
       uses: jurplel/install-qt-action@v4
       with:
         version: '5.15.2'
         arch: 'gcc_64'
 
-    - name: 'Linux: Build'
-      if: matrix.name == 'Linux'
+    - name: 'Linux-AppImage: Build'
+      if: matrix.name == 'Linux-AppImage'
       run: |
         mkdir build
         cd build
         cmake .. -G"Unix Makefiles" -DCMAKE_BUILD_TYPE=$CONFIGURATION -DCI_PROVIDER="GitHub" -DBUILD_NUMBER=$GITHUB_RUN_NUMBER -DCMAKE_POLICY_VERSION_MINIMUM=3.5
         make -j$(nproc)
 
-    - name: 'Linux: Run tests'
-      if: matrix.name == 'Linux'
+    - name: 'Linux-AppImage: Run tests'
+      if: matrix.name == 'Linux-AppImage'
       run: |
         cd build
         ctest --output-on-failure -R relive_lib_tests
 
-    - name: 'Linux: Build AppImage'
-      if: matrix.name == 'Linux'
+    - name: 'Linux-AppImage: Build AppImage'
+      if: matrix.name == 'Linux-AppImage'
       run: |
         cd build
         cmake --build . --target appimage
 
-    - name: 'Linux: Install flatpak & flatpak-builder'
-      if: matrix.name == 'Linux'
+    # ======================================
+    #      Linux Flatpak
+    # ======================================
+
+    - name: 'Linux-Flatpak: Install flatpak & flatpak-builder'
+      if: matrix.name == 'Linux-Flatpak'
       run: |
         sudo apt-get install -y flatpak flatpak-builder
         sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
         sudo flatpak install -y --noninteractive flathub org.kde.Platform//5.15-24.08 org.kde.Sdk//5.15-24.08
 
-    # flatpak-builder does its own from-scratch source build inside the sandboxed
-    # runtime/SDK above (it can't reuse ./build from the "Linux: Build" step - different
-    # sysroot, different SDL3), so this doubles Linux CI time. Both manifests share one repo
-    # (see flatpak/*.yml) so each just produces its own ref/bundle from it.
-    - name: 'Linux: Build relive flatpak'
-      if: matrix.name == 'Linux'
+    # Both manifests share one repo (see flatpak/*.yml) so each just produces its own
+    # ref/bundle from it. Each manifest only builds its own target.
+    - name: 'Linux-Flatpak: Build relive flatpak'
+      if: matrix.name == 'Linux-Flatpak'
       run: |
         flatpak-builder --force-clean --repo=flatpak-repo build-dir-relive flatpak/io.github.AliveTeam.Relive.yml
         flatpak build-bundle flatpak-repo relive.flatpak io.github.AliveTeam.Relive
 
-    - name: 'Linux: Build relive-editor flatpak'
-      if: matrix.name == 'Linux'
+    - name: 'Linux-Flatpak: Build relive-editor flatpak'
+      if: matrix.name == 'Linux-Flatpak'
       run: |
         flatpak-builder --force-clean --repo=flatpak-repo build-dir-relive-editor flatpak/io.github.AliveTeam.ReliveEditor.yml
         flatpak build-bundle flatpak-repo relive-editor.flatpak io.github.AliveTeam.ReliveEditor
@@ -200,30 +185,32 @@ jobs:
           build\Source\relive\${{ env.CONFIGURATION }}\SDL3.dll
 
     - name: 'Windows: Upload relive symbols'
+      if: runner.os == 'Windows'
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.name }}-${{ env.CONFIGURATION }}-relive-symbols
         path: build\Source\relive\${{ env.CONFIGURATION }}\relive.pdb
 
-    - name: 'Linux: Upload relive AppImage'
-      if: matrix.name == 'Linux'
+    - name: 'Linux-AppImage: Upload relive and relive-editor AppImages'
+      if: matrix.name == 'Linux-AppImage'
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.name }}-${{ env.CONFIGURATION }}
+        name: Linux-${{ env.CONFIGURATION }}-relive-appimages
         path: build/*.AppImage
 
-    - name: 'Linux: Upload relive flatpak'
-      if: matrix.name == 'Linux'
+    # The flatpak manifests always build Release, whatever CONFIGURATION is.
+    - name: 'Linux-Flatpak: Upload relive flatpak'
+      if: matrix.name == 'Linux-Flatpak'
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.name }}-${{ env.CONFIGURATION }}-relive-flatpak
+        name: Linux-Release-relive-flatpak
         path: relive.flatpak
 
-    - name: 'Linux: Upload relive-editor flatpak'
-      if: matrix.name == 'Linux'
+    - name: 'Linux-Flatpak: Upload relive-editor flatpak'
+      if: matrix.name == 'Linux-Flatpak'
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.name }}-${{ env.CONFIGURATION }}-relive-editor-flatpak
+        name: Linux-Release-relive-editor-flatpak
         path: relive-editor.flatpak
 
    # - name: 'macOS: Upload relive dmg'

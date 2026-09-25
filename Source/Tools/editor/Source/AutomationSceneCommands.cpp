@@ -10,7 +10,7 @@
 #include "CollisionObject.hpp"
 #include "EditorCamera.hpp"
 #include "CameraManager.hpp"
-#include "../../relive_api/TlvsRelive.hpp"
+#include "../../relive_lib/data_conversion/EditorMapObjects.hpp"
 
 #include <QGraphicsItem>
 #include <QGraphicsView>

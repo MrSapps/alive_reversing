@@ -1,4 +1,16 @@
-cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.15 FATAL_ERROR)
+
+# MSVC C runtime (CRT). The engine (relive, relive_lib and the 3rdParty libs it links) uses the
+# static CRT so it runs without the VC++ redistributable. Qt is built against the dynamic CRT, so
+# the editor and everything linked into it must use the dynamic CRT too - Source/Tools/editor
+# switches its whole directory to RELIVE_DYNAMIC_CRT. MSVC can't mix CRTs in one binary, so code
+# both sides need is compiled twice: the dynamic CRT copies have a "_dynamic_crt" suffix.
+# CMAKE_POLICY_DEFAULT_CMP0091 makes vendored subprojects that ask for an older CMake honour
+# CMAKE_MSVC_RUNTIME_LIBRARY too.
+set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+set(RELIVE_DYNAMIC_CRT "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+
 project(relive VERSION 0.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -68,9 +80,6 @@ set(CompilerFlags
         CMAKE_C_FLAGS_RELEASE
         )
 foreach(CompilerFlag ${CompilerFlags})
-  # Set MSVC runtime to MultiThreaded (/MT)
-  string(REPLACE "/MD" "/MT" ${CompilerFlag} "${${CompilerFlag}}")
-  
   # Remove warning level 3 as we set level 4 later
   string(REPLACE "/W3" "" ${CompilerFlag} "${${CompilerFlag}}")
 endforeach()
@@ -95,9 +104,6 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/Source/relive)
 #if (${BUILD_EDITOR})
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/Source/Tools/editor)
 #endif()
-add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/Source/Tools/relive_api)
-#add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/Source/Tools/relive_api_integration_test)
-#add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/Source/Tools/relive_api_unit_test)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/assets)
 
 # -----------------------------------------------------------------------------
@@ -110,10 +116,6 @@ set_target_properties(imgui         PROPERTIES UNITY_BUILD ON)
 #set_target_properties(AliveLibAE     PROPERTIES UNITY_BUILD OFF)
 #set_target_properties(AliveLibAO     PROPERTIES UNITY_BUILD OFF)
 set_target_properties(relive         PROPERTIES UNITY_BUILD OFF)
-
-set_target_properties(relive_api      PROPERTIES UNITY_BUILD OFF) # too big
-#set_target_properties(relive_api_integration_test PROPERTIES UNITY_BUILD OFF) # too big
-#set_target_properties(relive_api_unit_test PROPERTIES UNITY_BUILD OFF) # too big
 
 # -----------------------------------------------------------------------------
 
@@ -139,28 +141,9 @@ target_precompile_headers(
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/relive_lib/pch_shared.h"
 )
 
-#target_precompile_headers(relive_api_integration_test REUSE_FROM AliveLibAO)
-#target_precompile_headers(
-#    relive_api_integration_test PRIVATE
-#    "${CMAKE_CURRENT_SOURCE_DIR}/Source/relive_lib/pch_shared.h"
-#)
-
-#target_precompile_headers(relive_api_unit_test REUSE_FROM AliveLibAO)
-#target_precompile_headers(
-#    relive_api_unit_test PRIVATE
-#    "${CMAKE_CURRENT_SOURCE_DIR}/Source/relive_lib/pch_shared.h"
-#)
-
 #target_precompile_headers(relive       REUSE_FROM AliveLibAO)
 target_precompile_headers(
     relive PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/Source/relive_lib/pch_shared.h"
-)
-
-# 'relive_api' needs its own PCH because of different `_CRT_SECURE_NO_WARNINGS`
-# and defines with the rest
-target_precompile_headers(
-    relive_api PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/relive_lib/pch_shared.h"
 )
 

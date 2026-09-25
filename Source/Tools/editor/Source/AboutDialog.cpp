@@ -9,7 +9,7 @@
 #include <vorbis/vorbisfile.h>
 #include <algorithm>
 #include <cstring>
-#include "relive_api.hpp"
+#include "../../relive_lib/data_conversion/PathJsonVersion.hpp"
 
 namespace
 {
@@ -109,8 +109,8 @@ AboutDialog::AboutDialog(QWidget *parent) :
     this->setMaximumSize( this->size() );
     this->setMinimumSize( this->size() );
 
-    QString usingReliveApiV = tr("Using Relive API v");
-    setWindowTitle(windowTitle() + " (" + usingReliveApiV + QString::number(ReliveAPI::GetApiVersion()) + ")");
+    QString usingPathFormatV = tr("Using path format v");
+    setWindowTitle(windowTitle() + " (" + usingPathFormatV + QString::number(kPathJsonVersion) + ")");
 
     QTimer* timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(DoText()));

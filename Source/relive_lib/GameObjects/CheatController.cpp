@@ -5,7 +5,9 @@
 #include "../AliveLibAE/QuikSave.hpp"
 #include "../AliveLibAE/Map.hpp"
 #include "data_conversion/file_system.hpp"
-#include "data_conversion/AESaveSerialization.hpp"
+#include "data_conversion/AEQuicksaveJson.hpp"
+#include "../AliveLibAE/Input.hpp"
+#include <nlohmann/json.hpp>
 #include "GameType.hpp"
 #include "Engine.hpp"
 

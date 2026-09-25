@@ -29,7 +29,7 @@
 #include "QuikSave.hpp"
 #include "DDCheat.hpp"
 #include "nlohmann/json.hpp"
-#include "../relive_lib/data_conversion/AESaveSerialization.hpp"
+#include "../relive_lib/data_conversion/AEQuicksaveJson.hpp"
 #include "stdlib.hpp"
 #include "DemoPlayback.hpp"
 

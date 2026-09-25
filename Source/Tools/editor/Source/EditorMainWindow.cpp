@@ -8,7 +8,8 @@
 #include <QFileDialog>
 #include <QInputDialog>
 #include "Model.hpp"
-#include "relive_api.hpp"
+#include "../../relive_lib/data_conversion/PathJsonVersion.hpp"
+#include "../../relive_lib/FatalError.hpp"
 #include "EditorGraphicsScene.hpp"
 #include "qstylefactory.h"
 #include "qdebug.h"
@@ -21,9 +22,18 @@
 #include "ProgressDialog.hpp"
 #include <QCoreApplication>
 #include <QDir>
+#include <cstdarg>
+#include <cstdio>
 
-static void FatalError(const char* msg)
+// The editor's own ALIVE_FATAL for the relive_lib code it compiles in - the engine's version
+// in relive_lib/FatalError.cpp pulls in its windowing code.
+[[noreturn]] void ALIVE_FATAL(const char_type* fmt, ...)
 {
+    va_list args;
+    va_start(args, fmt);
+    const QString msg = QString::vasprintf(fmt, args);
+    va_end(args);
+
     QMessageBox::critical(nullptr, QMessageBox::tr("Unrecoverable error"), msg);
     exit(EXIT_FAILURE);
 }
@@ -34,8 +44,6 @@ EditorMainWindow::EditorMainWindow(QWidget* aParent)
     m_Settings("Editor.ini", QSettings::IniFormat),
     mUnthemedStyle(QApplication::style()->objectName())
 {
-    ReliveAPI::SetAliveFatalCallBack(FatalError);
-
     //auto p = new AudioOutputPrimer();
     //p->start();
 
@@ -350,7 +358,6 @@ EditorTab* EditorMainWindow::AddModelTab(std::unique_ptr<Model> model, QString f
 
 bool EditorMainWindow::onOpenPath(QString fullFileName)
 {
-    bool isUpgraded = false;
 
     // First check if we already have this json file open
     for (int i = 0; i < m_ui->tabWidget->count(); i++)
@@ -371,38 +378,8 @@ bool EditorMainWindow::onOpenPath(QString fullFileName)
         // Load the json file into the editors object model
         auto model = std::make_unique<Model>();
         model->LoadJsonFromFile(fullFileName.toStdString());
-        /*
-        if (model->GetMapInfo().mPathVersion > ReliveAPI::GetApiVersion())
-        {
-            // The json API level is higher than what we support
-            QMessageBox::critical(this, "Error", "Editor is too old to load this json. Editor API version is " + QString::number(ReliveAPI::GetApiVersion()) + " but json API version is " + QString::number(model->GetMapInfo().mPathVersion));
-            return false;
-        }
-        else if (model->GetMapInfo().mPathVersion < ReliveAPI::GetApiVersion())
-        {
-            // The json API level is lower than what we support - but we can upgrade it
-            std::string upgradedJson = ReliveAPI::UpgradePathJson(fileIo, fullFileName.toStdString());
-            {
-                
-                QString filename = "upgrade_test.json";
-                QFile file(filename);
-                if (file.open(QIODevice::ReadWrite)) 
-                {
-                    QTextStream stream(&file);
-                    stream << upgradedJson.c_str() << endl;
-                }
-            }
-            model = std::make_unique<Model>();
-            model->LoadJsonFromString(upgradedJson);
-            isUpgraded = true;
-        }
-        */
 
-        EditorTab* view = AddModelTab(std::move(model), fullFileName, false);
-        if (isUpgraded)
-        {
-            view->Save();
-        }
+        AddModelTab(std::move(model), fullFileName, false);
 
         return true;
     }

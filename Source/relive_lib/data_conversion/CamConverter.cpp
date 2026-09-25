@@ -1,17 +1,16 @@
 #include "CamConverter.hpp"
-#include "../../relive_lib/data_conversion/LvlReader.hpp"
-#include "../../relive_lib/GameObjects/ScreenManager.hpp"
-#include "../../relive_lib/CamDecompressor.hpp"
-#include "../../relive_lib/FG1Reader.hpp"
-#include "../../relive_lib/logger.hpp"
+#include "LvlReader.hpp"
+#include "../GameObjects/ScreenManager.hpp"
+#include "../CamDecompressor.hpp"
+#include "../FG1Reader.hpp"
+#include "../logger.hpp"
 #include "Base64.hpp"
-#include "JsonModelTypes.hpp"
-#include "ApiFG1Reader.hpp"
-#include "../../relive_lib/data_conversion/rgb_conversion.hpp"
-#include "../../relive_lib/data_conversion/PNGFile.hpp"
-#include "../../relive_lib/data_conversion/file_system.hpp"
+#include "CameraImageAndLayers.hpp"
+#include "FG1PngReader.hpp"
+#include "rgb_conversion.hpp"
+#include "PNGFile.hpp"
+#include "file_system.hpp"
 
-namespace ReliveAPI {
 
 struct TmpBuffer final
 {
@@ -50,29 +49,29 @@ static void AppendCamSegment(s32 x, s32 y, s32 width, s32 height, u16* pDst, con
     }
 }
 
-static std::unique_ptr<ApiFG1Reader> MergeFG1Blocks(const ChunkedLvlFile& camFile, BaseFG1Reader::FG1Format fg1Format)
+static std::unique_ptr<FG1PngReader> MergeFG1Blocks(const ChunkedLvlFile& camFile, BaseFG1Reader::FG1Format fg1Format)
 {
 
     // For some crazy reason there can be multiple FG1 blocks, here we squash them down into a single
     // image for each "layer".
-    std::optional<ApiFG1Reader> ret;
+    std::optional<FG1PngReader> ret;
     std::optional<LvlFileChunk> anyFG1 = camFile.ChunkByType(ResourceManagerWrapper::Resource_FG1);
     if (anyFG1)
     {
         const u8* pFg1Data = anyFG1->Data().data();
-        const bool isReliveFormat = ApiFG1Reader::IsReliveFG1(reinterpret_cast<const FG1ResourceBlockHeader*>(pFg1Data));
+        const bool isReliveFormat = FG1PngReader::IsReliveFG1(reinterpret_cast<const FG1ResourceBlockHeader*>(pFg1Data));
         if (isReliveFormat)
         {
             // For relive format its very slightly tweaked AE format, move past the extra u32 we added and process the FG1
             // we also know there is only 1 chunk in relive format.
             pFg1Data += sizeof(u32);
-            auto reader = std::make_unique<ApiFG1Reader>(BaseFG1Reader::FG1Format::AE);
+            auto reader = std::make_unique<FG1PngReader>(BaseFG1Reader::FG1Format::AE);
             reader->Iterate(reinterpret_cast<const FG1ResourceBlockHeader*>(pFg1Data));
             return reader;
         }
         else
         {
-            auto reader = std::make_unique<ApiFG1Reader>(fg1Format);
+            auto reader = std::make_unique<FG1PngReader>(fg1Format);
             for (u32 i = 0; i < camFile.ChunkCount(); i++)
             {
                 if (camFile.ChunkAt(i).Header().mResourceType == ResourceManagerWrapper::Resource_FG1)
@@ -145,7 +144,7 @@ static std::vector<u16> StitchAOCamera(const LvlFileChunk& bitsRes)
     return camBuffer;
 }
 
-std::pair<std::unique_ptr<ApiFG1Reader>, u32> CamConverter::Convert(const ChunkedLvlFile& camFile, const std::string& baseName, bool isAo)
+std::pair<std::unique_ptr<FG1PngReader>, u32> CamConverter::Convert(const ChunkedLvlFile& camFile, const std::string& baseName, bool isAo)
 {
     std::optional<LvlFileChunk> bitsRes = camFile.ChunkByType(ResourceManagerWrapper::Resource_Bits);
     if (bitsRes)
@@ -210,4 +209,3 @@ u32 CamConverter::CamBitsIdFromName(const std::string& pCamName)
     return 1 * (pCamName[7] - '0') + 10 * (pCamName[6] - '0') + 100 * (pCamName[4] - '0') + 1000 * (pCamName[3] - '0');
 }
 
-} // namespace ReliveAPI
