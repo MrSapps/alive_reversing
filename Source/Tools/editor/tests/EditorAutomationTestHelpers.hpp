@@ -54,6 +54,12 @@ namespace AutomationTest {
             const int id = mNextId++;
             cmd["id"] = id;
             Automation::WriteFrame(&mSocket, cmd);
+            // This client has no event loop. On Windows QLocalSocket is a named pipe whose writes
+            // only progress from the event loop or waitForBytesWritten, so without this a request
+            // can sit in the write buffer forever while we wait for its response.
+            while (mSocket.bytesToWrite() > 0 && mSocket.waitForBytesWritten(5000))
+            {
+            }
             return id;
         }
 

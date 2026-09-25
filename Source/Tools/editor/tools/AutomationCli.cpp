@@ -92,6 +92,10 @@ int main(int argc, char* argv[])
     }
 
     Automation::WriteFrame(&socket, command);
+    // No event loop here: on Windows the named pipe only sends from waitForBytesWritten.
+    while (socket.bytesToWrite() > 0 && socket.waitForBytesWritten(connectTimeoutMs))
+    {
+    }
 
     Automation::FrameReader reader;
     while (true)
