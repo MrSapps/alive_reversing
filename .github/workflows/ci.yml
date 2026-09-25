@@ -33,10 +33,12 @@ jobs:
             name: Windows32
             cmake_arch: Win32
             qt_arch: win32_msvc2019
+            sdl_arch: x86
           - os: windows-2022
             name: Windows64
             cmake_arch: x64
             qt_arch: win64_msvc2019_64
+            sdl_arch: x64
           # The AppImage and the flatpaks are separate jobs: flatpak-builder does its own
           # from-scratch build inside the flatpak SDK (different sysroot and SDL3), so it can't
           # reuse the native build. Running them in one job built the project serially 3 times.
@@ -91,11 +93,16 @@ jobs:
         cmake --build . --config $env:CONFIGURATION
         cpack -G ZIP -C $env:CONFIGURATION
 
+    # All the tests, including the editor ones. EditorAutomationTests launches the real editor,
+    # headless, which needs SDL3.dll on PATH (install-qt-action already put Qt there).
     - name: 'Windows: Run tests'
       if: runner.os == 'Windows'
+      env:
+        QT_QPA_PLATFORM: offscreen
       run: |
+        $env:PATH = "$env:GITHUB_WORKSPACE\SDL3-3.4.14\lib\${{ matrix.sdl_arch }};$env:PATH"
         cd build
-        ctest -C $env:CONFIGURATION --verbose -R relive_lib_tests
+        ctest -C $env:CONFIGURATION --verbose
 
     # ======================================
     #      Linux AppImage
@@ -124,9 +131,13 @@ jobs:
 
     - name: 'Linux-AppImage: Run tests'
       if: matrix.name == 'Linux-AppImage'
+      env:
+        QT_QPA_PLATFORM: offscreen
+        # The Debug build has ASan on; leak reports at exit are expected (see CLAUDE.md).
+        ASAN_OPTIONS: detect_leaks=0
       run: |
         cd build
-        ctest --verbose -R relive_lib_tests
+        ctest --verbose
 
     - name: 'Linux-AppImage: Build AppImage'
       if: matrix.name == 'Linux-AppImage'
