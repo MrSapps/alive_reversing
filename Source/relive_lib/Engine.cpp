@@ -366,6 +366,20 @@ static void Game_Free_LoadingIcon()
 }
 
 
+// Quitting leaves objects behind: the main loop stops with the level still running, and
+// DestroyObjects keeps the ones that survive death resets (the screen manager, music
+// controller, DDCheat...). Deletes all of them.
+static void DestroyAllObjects()
+{
+    while (!gBaseGameObjects->IsEmpty())
+    {
+        // Taken out first, since deleting an object can make or kill others
+        BaseGameObject* pObj = gBaseGameObjects->ItemAt(gBaseGameObjects->Size() - 1);
+        gBaseGameObjects->RemoveAt(gBaseGameObjects->Size() - 1);
+        delete pObj;
+    }
+}
+
 void Game_Shutdown()
 {
     Input_DisableInputForPauseMenuAndDebug_4EDDC0();
@@ -767,6 +781,19 @@ void Engine::Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera
     // Shut down start
     Game_Free_LoadingIcon();
 
+    // Before the objects go, it only marks the music controller as dead
+    if (mGameType == GameType::eAe)
+    {
+        MusicController::Shutdown();
+    }
+    else
+    {
+        AO::MusicController::Shutdown();
+    }
+
+    // While the map the objects use still exists
+    DestroyAllObjects();
+
     mMap->Shutdown();
     mMap.reset();
 
@@ -786,15 +813,6 @@ void Engine::Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera
     ShadowZone::FreeArray();
     relive_delete gBaseAliveGameObjects;
     relive_delete gCollisions;
-
-    if (mGameType == GameType::eAe)
-    {
-        MusicController::Shutdown();
-    }
-    else
-    {
-        AO::MusicController::Shutdown();
-    }
 
     SND_Reset_Ambiance();
     SND_Shutdown();

@@ -25,11 +25,10 @@ cmake --build build -j5 --target relive_lib_tests # unit tests
 ```
 
 - Build with `-j5`. Higher parallelism runs out of memory.
-- On Linux, Debug builds have ASan and UBSan on (see top-level `CMakeLists.txt`). An ASan
-  leak report when the game quits is expected and does not mean the change is broken.
-  UBSan's `vptr`, `alignment`, `null` and `pointer-overflow` checks are off because they
-  made Debug builds several times slower. Configure with `-DRELIVE_FULL_UBSAN=ON` to turn
-  them back on.
+- On Linux, Debug builds have ASan and UBSan on (see top-level `CMakeLists.txt`). Quitting
+  the game should give no ASan leak report, so a new one means something leaks. UBSan's
+  `vptr`, `alignment`, `null` and `pointer-overflow` checks are off because they made Debug
+  builds several times slower. Configure with `-DRELIVE_FULL_UBSAN=ON` to turn them back on.
 - Editor translations: the build only compiles the `.ts` files, it never changes them.
   After adding or removing `tr()` strings, run
   `cmake --build build --target update_translations` and commit the updated `.ts` files.
