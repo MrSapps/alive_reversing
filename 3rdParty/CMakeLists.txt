@@ -45,10 +45,12 @@ target_include_directories(Cinder SYSTEM INTERFACE Cinder/)
 export(TARGETS Cinder FILE Cinder.cmake)
 
 # googletest lib
-add_library(googletest
+set(googletest_src
     googletest/googletest/src/gtest-all.cc
     googletest/googlemock/src/gmock-all.cc
     )
+
+add_library(googletest ${googletest_src})
 
 target_include_directories(googletest SYSTEM PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/googletest/googletest>"
@@ -65,6 +67,26 @@ target_include_directories(googletest SYSTEM PUBLIC
 
 export(TARGETS googletest FILE googletest.cmake)
 set_property(TARGET googletest PROPERTY FOLDER "3rdParty")
+
+# googletest lib dynamic crt
+add_library(googletest_dynamic_crt ${googletest_src})
+
+target_include_directories(googletest_dynamic_crt SYSTEM PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/googletest/googletest>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/googletest/googletest/include>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/googletest/googletest/include/gtest>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/googletest/googletest/include/gtest/internal>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/googletest/googlemock>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/googletest/googlemock/include>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/googletest/googlemock/include/gmock>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/googletest/googlemock/include/gmock/internal>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/googletest/googlemock/include/gmock/internal/custom>"
+    "$<INSTALL_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/googletest/googlemock/include/gmock>"
+    )
+
+set_property(TARGET googletest_dynamic_crt PROPERTY MSVC_RUNTIME_LIBRARY ${RELIVE_DYNAMIC_CRT})
+export(TARGETS googletest_dynamic_crt FILE googletest_dynamic_crt.cmake)
+set_property(TARGET googletest_dynamic_crt PROPERTY FOLDER "3rdParty")
 
 # dear imgui lib
 add_library(imgui
@@ -103,10 +125,12 @@ target_include_directories(glm SYSTEM INTERFACE
 export(TARGETS glm FILE glm.cmake)
 
 # miniz lib
-add_library(miniz
+set(miniz_src
     miniz/miniz.c
     miniz/miniz.h
     )
+
+add_library(miniz ${miniz_src})
 
 target_include_directories(miniz SYSTEM PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/miniz>"
@@ -117,27 +141,24 @@ export(TARGETS miniz FILE miniz.cmake)
 set_property(TARGET miniz PROPERTY FOLDER "3rdParty")
 
 # miniz lib dynamic crt
-add_library(miniz_dynamic_crt
-    miniz/miniz.c
-    miniz/miniz.h
-    )
+add_library(miniz_dynamic_crt ${miniz_src})
 
 target_include_directories(miniz_dynamic_crt SYSTEM PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/miniz>"
     "$<INSTALL_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/miniz>"
     )
-if (MSVC)
-    target_compile_options(miniz_dynamic_crt PRIVATE /MDd)
-endif()
+set_property(TARGET miniz_dynamic_crt PROPERTY MSVC_RUNTIME_LIBRARY ${RELIVE_DYNAMIC_CRT})
 export(TARGETS miniz_dynamic_crt FILE miniz_dynamic_crt.cmake)
 set_property(TARGET miniz_dynamic_crt PROPERTY FOLDER "3rdParty")
 
 
 # spng lib
-add_library(spng
+set(spng_src
     libspng/spng/spng.c
     libspng/spng/spng.h
     )
+
+add_library(spng ${spng_src})
 
 target_compile_definitions(spng PRIVATE SPNG_USE_MINIZ)
 target_compile_definitions(spng PRIVATE SPNG_STATIC)
@@ -153,10 +174,7 @@ export(TARGETS spng FILE spng.cmake)
 set_property(TARGET spng PROPERTY FOLDER "3rdParty")
 
 # spng lib dynamic crt
-add_library(spng_dynamic_crt
-    libspng/spng/spng.c
-    libspng/spng/spng.h
-    )
+add_library(spng_dynamic_crt ${spng_src})
 
 target_compile_definitions(spng_dynamic_crt PRIVATE SPNG_USE_MINIZ)
 target_compile_definitions(spng_dynamic_crt PRIVATE SPNG_STATIC)
@@ -167,9 +185,7 @@ target_include_directories(spng_dynamic_crt SYSTEM PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/miniz>"
     "$<INSTALL_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libspng>"
     )
-if (MSVC)
-    target_compile_options(spng_dynamic_crt PRIVATE /MDd)
-endif()
+set_property(TARGET spng_dynamic_crt PROPERTY MSVC_RUNTIME_LIBRARY ${RELIVE_DYNAMIC_CRT})
 export(TARGETS spng_dynamic_crt FILE spng_dynamic_crt.cmake)
 set_property(TARGET spng_dynamic_crt PROPERTY FOLDER "3rdParty")
 
@@ -189,3 +205,45 @@ set_property(TARGET ogg PROPERTY FOLDER "3rdParty")
 set_property(TARGET vorbis PROPERTY FOLDER "3rdParty")
 set_property(TARGET vorbisenc PROPERTY FOLDER "3rdParty")
 set_property(TARGET vorbisfile PROPERTY FOLDER "3rdParty")
+
+# vorbisfile + the vorbis decoder + ogg in one lib, dynamic crt - for the editor's About dialog
+# music. The sources mirror vorbis/lib/CMakeLists.txt and ogg/CMakeLists.txt (encoder excluded).
+add_library(vorbisfile_dynamic_crt
+    ogg/src/bitwise.c
+    ogg/src/framing.c
+    vorbis/lib/mdct.c
+    vorbis/lib/smallft.c
+    vorbis/lib/block.c
+    vorbis/lib/envelope.c
+    vorbis/lib/window.c
+    vorbis/lib/lsp.c
+    vorbis/lib/lpc.c
+    vorbis/lib/analysis.c
+    vorbis/lib/synthesis.c
+    vorbis/lib/psy.c
+    vorbis/lib/info.c
+    vorbis/lib/floor1.c
+    vorbis/lib/floor0.c
+    vorbis/lib/res0.c
+    vorbis/lib/mapping0.c
+    vorbis/lib/registry.c
+    vorbis/lib/codebook.c
+    vorbis/lib/sharedbook.c
+    vorbis/lib/lookup.c
+    vorbis/lib/bitrate.c
+    vorbis/lib/vorbisfile.c
+    )
+target_include_directories(vorbisfile_dynamic_crt SYSTEM PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ogg/include>"
+    # ogg's generated config_types.h
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/ogg/include>"
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vorbis/include>"
+    )
+target_include_directories(vorbisfile_dynamic_crt PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/vorbis/lib")
+if (MSVC)
+    target_compile_definitions(vorbisfile_dynamic_crt PRIVATE _CRT_SECURE_NO_WARNINGS _CRT_SECURE_NO_DEPRECATE _CRT_NONSTDC_NO_DEPRECATE)
+elseif (UNIX)
+    target_link_libraries(vorbisfile_dynamic_crt PUBLIC m)
+endif()
+set_property(TARGET vorbisfile_dynamic_crt PROPERTY MSVC_RUNTIME_LIBRARY ${RELIVE_DYNAMIC_CRT})
+set_property(TARGET vorbisfile_dynamic_crt PROPERTY FOLDER "3rdParty")

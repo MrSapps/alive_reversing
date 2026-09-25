@@ -47,7 +47,7 @@ modules:
     build-commands:
       # Mirrors the CI Linux build (see .github/workflows/ci.yml) - Unix Makefiles, same
       # CMAKE_POLICY_VERSION_MINIMUM workaround the vendored 3rdParty projects need - but only
-      # builds the relive-editor target itself, not relive/relive_api/tests.
+      # builds the relive-editor target itself, not relive/tests.
       - cmake -S . -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCI_PROVIDER=Flatpak
       - make -C build -j${FLATPAK_BUILDER_N_JOBS:-$(nproc)} relive-editor
       - install -Dm755 build/Source/Tools/editor/relive-editor /app/bin/relive-editor

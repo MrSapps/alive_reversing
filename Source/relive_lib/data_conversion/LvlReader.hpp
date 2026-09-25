@@ -1,14 +1,13 @@
 #pragma once
 
-#include "../../Tools/relive_api/ByteStream.hpp"
+#include "ByteStream.hpp"
 
 
 #include "../../relive_lib/Function.hpp"
 #include "../../relive_lib/ResourceManagerWrapper.hpp"
 
-#include "../../Tools/relive_api/relive_api_exceptions.hpp"
 #include "file_system.hpp"
-#include "../../Tools/relive_api/RoundUp.hpp"
+#include "RoundUp.hpp"
 
 #include <cstddef>
 #include <cstring>
@@ -17,7 +16,6 @@
 #include <utility>
 #include <vector>
 
-namespace ReliveAPI {
 
 // Represents the LVL structure on disk
 struct LvlFileRecord final
@@ -286,15 +284,12 @@ private:
 class LvlReader final
 {
 public:
-    explicit LvlReader(FileSystem& fs, const char_type* lvlFile, bool bThrowOnFail = true)
+    // Check IsOpen() afterwards - it's false if the file is missing or its TOC can't be read.
+    explicit LvlReader(FileSystem& fs, const char_type* lvlFile)
     {
         mFileHandle = fs.OpenFile(lvlFile, "rb");
         if (!mFileHandle.GetFile())
         {
-            if (bThrowOnFail)
-            {
-                throw ReliveAPI::IOReadException(lvlFile);
-            }
             return;
         }
 
@@ -405,4 +400,3 @@ protected:
     std::vector<LvlFileRecord> mFileRecords;
 };
 
-} // namespace ReliveAPI

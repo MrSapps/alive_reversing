@@ -1,20 +1,19 @@
 #pragma once
 
-#include "../../relive_lib/Types.hpp"
+#include "../Types.hpp"
 #include <string>
 #include <vector>
 #include <memory>
-#include "ApiFG1Reader.hpp"
+#include "FG1PngReader.hpp"
 
-namespace ReliveAPI {
 class ChunkedLvlFile;
 class CameraImageAndLayers;
-class ApiFG1Reader;
+class FG1PngReader;
 
 class CamConverter final
 {
 public:
-    std::pair<std::unique_ptr<ApiFG1Reader>, u32> Convert(const ChunkedLvlFile& camFile, const std::string& baseName, bool isAo);
+    std::pair<std::unique_ptr<FG1PngReader>, u32> Convert(const ChunkedLvlFile& camFile, const std::string& baseName, bool isAo);
 
     CamConverter() = default;
     CamConverter(const ChunkedLvlFile& camFile, CameraImageAndLayers& outData);
@@ -25,4 +24,3 @@ public:
 std::string RGB565ToBase64PngString(const u16* pRgb565Buffer);
 void RGB565ToPngBuffer(const u16* camBuffer, std::vector<u8>& outPngData);
 
-} // namespace ReliveAPI

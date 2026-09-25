@@ -12,9 +12,9 @@
 
 #include "nlohmann/json.hpp"
 #include "LvlReader.hpp"
-#include "../../Tools/relive_api/CamConverter.hpp"
-#include "../../Tools/relive_api/PathCamerasEnumerator.hpp"
-#include "../../Tools/relive_api/ApiFG1Reader.hpp"
+#include "CamConverter.hpp"
+#include "PathCamerasEnumerator.hpp"
+#include "FG1PngReader.hpp"
 #include "../Collisions.hpp"
 #include "AnimationConverter.hpp"
 #include "relive_tlvs_conversion.hpp"
@@ -74,7 +74,7 @@ static EReliveLevelIds GetLevelIdFromPathId(EReliveLevelIds levelId, u32 pathId)
     return levelId;
 }
 
-static bool ReadLvlFileInto(ReliveAPI::LvlReader& archive, const char_type* fileName, std::vector<u8>& fileBuffer)
+static bool ReadLvlFileInto(LvlReader& archive, const char_type* fileName, std::vector<u8>& fileBuffer)
 {
     if (!archive.ReadFileInto(fileBuffer, fileName))
     {
@@ -146,7 +146,7 @@ static const char_type* FileNameFromSEQId(OpenSeqHandle* pTable, s32 size, s32 i
     ALIVE_FATAL("Unknown SEQ id");
 }
 
-static std::vector<std::string> ConvertBSQ(const FileSystem::Path& dataDir, const char_type* pBSQName, ReliveAPI::LvlReader& lvlReader, bool isAo)
+static std::vector<std::string> ConvertBSQ(const FileSystem::Path& dataDir, const char_type* pBSQName, LvlReader& lvlReader, bool isAo)
 {
     auto bsqData = lvlReader.ReadFile(pBSQName);
     if (!bsqData)
@@ -169,10 +169,10 @@ static std::vector<std::string> ConvertBSQ(const FileSystem::Path& dataDir, cons
     }
 
     std::vector<std::string> seqs;
-    ReliveAPI::ChunkedLvlFile bsq(*bsqData);
+    ChunkedLvlFile bsq(*bsqData);
     for (u32 i = 0u; i < bsq.ChunkCount(); i++)
     {
-        const ReliveAPI::LvlFileChunk& chunk = bsq.ChunkAt(i);
+        const LvlFileChunk& chunk = bsq.ChunkAt(i);
         if (chunk.Header().mResourceType == ResourceManagerWrapper::Resource_Seq)
         {
             const char_type* pSeqName = nullptr;
@@ -219,7 +219,7 @@ static FileSystem::Path SoundsThemeDir(const FileSystem::Path& dataDir, const st
 }
 
 template <typename LevelIdType>
-static void ConvertDemo(const std::string& fileName, const FileSystem::Path& dataDir, ReliveAPI::LvlReader& lvlReader, LevelIdType lvlIdxAsLvl, std::vector<u8>& fileBuffer, bool isAo)
+static void ConvertDemo(const std::string& fileName, const FileSystem::Path& dataDir, LvlReader& lvlReader, LevelIdType lvlIdxAsLvl, std::vector<u8>& fileBuffer, bool isAo)
 {
     ReadLvlFileInto(lvlReader, fileName.c_str(), fileBuffer);
 
@@ -231,12 +231,12 @@ static void ConvertDemo(const std::string& fileName, const FileSystem::Path& dat
 
     nlohmann::json commandsArray = nlohmann::json::array();
 
-    const u32* pData = reinterpret_cast<const u32*>(fileBuffer.data() + sizeof(ReliveAPI::ResourceHeader));
+    const u32* pData = reinterpret_cast<const u32*>(fileBuffer.data() + sizeof(ResourceHeader));
 
     u32 idx;
     if (isAo)
     {
-        auto pSaveData = reinterpret_cast<const AO::AOData::SaveData*>(fileBuffer.data() + sizeof(ReliveAPI::ResourceHeader));
+        auto pSaveData = reinterpret_cast<const AO::AOData::SaveData*>(fileBuffer.data() + sizeof(ResourceHeader));
         AOSaveConverter saveConverter;
         auto convSave = saveConverter.Convert(*pSaveData);
 
@@ -296,7 +296,7 @@ static void ConvertDemo(const std::string& fileName, const FileSystem::Path& dat
 }
 
 template <typename LevelIdType>
-static void SaveFileFromLvlDirect(const char_type* pFileName, const FileSystem::Path& dataDir, ReliveAPI::LvlReader& lvlReader, LevelIdType lvlIdxAsLvl, std::vector<u8>& fileBuffer)
+static void SaveFileFromLvlDirect(const char_type* pFileName, const FileSystem::Path& dataDir, LvlReader& lvlReader, LevelIdType lvlIdxAsLvl, std::vector<u8>& fileBuffer)
 {
     ReadLvlFileInto(lvlReader, pFileName, fileBuffer);
 
@@ -322,7 +322,7 @@ static void SetCollisionInfoFromPathExt(CollisionInfo& pColInfo, PerPathExtensio
 }
 
 template <typename TlvType, typename LevelIdType>
-static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const ReliveAPI::LvlFileChunk& pathBndChunk, EReliveLevelIds reliveLvl, LevelIdType lvlIdx, ReliveAPI::LvlReader& lvlReader, std::vector<u8>& fileBuffer, bool isAo, PerPathExtension* pPathExt, ConversionProgress& progress)
+static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const LvlFileChunk& pathBndChunk, EReliveLevelIds reliveLvl, LevelIdType lvlIdx, LvlReader& lvlReader, std::vector<u8>& fileBuffer, bool isAo, PerPathExtension* pPathExt, ConversionProgress& progress)
 {
     auto level = (isAo ? ToString(MapWrapper::ToAO(reliveLvl)) : ToString(MapWrapper::ToAE(reliveLvl)));
     LOG_INFO("Converting: %s; path %d", level, pathBndChunk.Id());
@@ -489,7 +489,7 @@ static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const Reli
 
 
 template <typename LevelIdType>
-static void SaveLevelInfoJson(const FileSystem::Path& dataDir, EReliveLevelIds /*reliveLvl*/, LevelIdType lvlIdxAsLvl, FileSystem& fs, const ReliveAPI::ChunkedLvlFile& pathBndFile, bool /* isAo*/)
+static void SaveLevelInfoJson(const FileSystem::Path& dataDir, EReliveLevelIds /*reliveLvl*/, LevelIdType lvlIdxAsLvl, FileSystem& fs, const ChunkedLvlFile& pathBndFile, bool /* isAo*/)
 {
     // No separate "paths" subdir under the level - a level's content already *is* its paths (see
     // LevelDir), so that layer was purely redundant nesting.
@@ -504,7 +504,7 @@ static void SaveLevelInfoJson(const FileSystem::Path& dataDir, EReliveLevelIds /
     // Convert hard coded path data json
     for (u32 j = 0; j < pathBndFile.ChunkCount(); j++)
     {
-        const ReliveAPI::LvlFileChunk& pathBndChunk = pathBndFile.ChunkAt(j);
+        const LvlFileChunk& pathBndChunk = pathBndFile.ChunkAt(j);
         if (pathBndChunk.Header().mResourceType == ResourceManagerWrapper::Resource_Path)
         {
             nlohmann::json pathInfoObj = nlohmann::json::object();
@@ -552,7 +552,7 @@ static void LogNonConvertedPals(bool isAo)
     }
 }
 
-static void ConvertPals(FileSystem& fs, const FileSystem::Path& dataDir, std::vector<u8>& fileBuffer, ReliveAPI::LvlReader& lvlReader, bool isAo, ConversionProgress& progress)
+static void ConvertPals(FileSystem& fs, const FileSystem::Path& dataDir, std::vector<u8>& fileBuffer, LvlReader& lvlReader, bool isAo, ConversionProgress& progress)
 {
     for (auto& rec : kPalConversionInfo)
     {
@@ -565,7 +565,7 @@ static void ConvertPals(FileSystem& fs, const FileSystem::Path& dataDir, std::ve
                 if (ReadLvlFileInto(lvlReader, palDetails.mBanName, fileBuffer))
                 {
                     // A BAN/BND can have multiple chunks, make sure we pick the right one
-                    ReliveAPI::ChunkedLvlFile palFile(fileBuffer);
+                    ChunkedLvlFile palFile(fileBuffer);
                     for (u32 i = 0; i < palFile.ChunkCount(); i++)
                     {
                         const auto& res = palFile.ChunkAt(i);
@@ -607,7 +607,7 @@ static u32 GetHighestFrameTableOffset(const std::string& bndName, bool isAo)
     return highestFrameTableOffset;
 }
 
-void ConvertAnimations(const FileSystem::Path& dataDir, FileSystem& fs, std::vector<u8>& fileBuffer, ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, bool isAo, ConversionProgress& progress)
+void ConvertAnimations(const FileSystem::Path& dataDir, FileSystem& fs, std::vector<u8>& fileBuffer, LvlReader& lvlReader, EReliveLevelIds reliveLvl, bool isAo, ConversionProgress& progress)
 {
     // Convert animations that exist in this LVL
     for (auto& rec : kAnimRecConversionInfo)
@@ -629,7 +629,7 @@ void ConvertAnimations(const FileSystem::Path& dataDir, FileSystem& fs, std::vec
                 if (ReadLvlFileInto(lvlReader, animDetails.mBanName, fileBuffer))
                 {
                     // A BAN/BND can have multiple chunks, make sure we pick the right one
-                    ReliveAPI::ChunkedLvlFile animFile(fileBuffer);
+                    ChunkedLvlFile animFile(fileBuffer);
 
                     auto res = animFile.ChunkById(animDetails.mResourceId);
                     if (res)
@@ -713,15 +713,15 @@ static void LogNonConvertedAnims(bool isAo)
 }
 
 template <typename LevelIdType, typename TlvType>
-static void ConvertPathBND(const FileSystem::Path& dataDir, const std::string& fileName, FileSystem& fs, std::vector<u8>& fileBuffer, ReliveAPI::LvlReader& lvlReader, LevelIdType lvlIdxAsLvl, EReliveLevelIds reliveLvl, bool isAo, ConversionProgress& progress)
+static void ConvertPathBND(const FileSystem::Path& dataDir, const std::string& fileName, FileSystem& fs, std::vector<u8>& fileBuffer, LvlReader& lvlReader, LevelIdType lvlIdxAsLvl, EReliveLevelIds reliveLvl, bool isAo, ConversionProgress& progress)
 {
     ReadLvlFileInto(lvlReader, fileName.c_str(), fileBuffer);
-    ReliveAPI::ChunkedLvlFile pathBndFile(fileBuffer);
+    ChunkedLvlFile pathBndFile(fileBuffer);
 
     std::vector<PerPathExtension> pathsWithExt;
     for (u32 i = 0; i < pathBndFile.ChunkCount(); i++)
     {
-        const ReliveAPI::LvlFileChunk& pathBndChunk = pathBndFile.ChunkAt(i);
+        const LvlFileChunk& pathBndChunk = pathBndFile.ChunkAt(i);
         
         if (pathBndChunk.Header().mResourceType != ResourceManagerWrapper::ResourceType::Resource_Pxtd)
         {
@@ -752,7 +752,7 @@ static void ConvertPathBND(const FileSystem::Path& dataDir, const std::string& f
 
     for (u32 j = 0; j < pathBndFile.ChunkCount(); j++)
     {
-        const ReliveAPI::LvlFileChunk& pathBndChunk = pathBndFile.ChunkAt(j);
+        const LvlFileChunk& pathBndChunk = pathBndFile.ChunkAt(j);
         PerPathExtension* pPathExt = nullptr;
 
         if (pathBndChunk.Header().mResourceType != ResourceManagerWrapper::Resource_Path)
@@ -775,7 +775,7 @@ static void ConvertPathBND(const FileSystem::Path& dataDir, const std::string& f
     SaveLevelInfoJson(dataDir, reliveLvl, lvlIdxAsLvl, fs, pathBndFile, isAo);
 }
 
-/*static*/ void SaveCameraJsonManifest(const std::string& baseName, ReliveAPI::ApiFG1Reader& reader, const FileSystem::Path& dataDir, u32 fg1ResBlockCount)
+/*static*/ void SaveCameraJsonManifest(const std::string& baseName, FG1PngReader& reader, const FileSystem::Path& dataDir, u32 fg1ResBlockCount)
 {
     nlohmann::json camManifest;
     nlohmann::json layersArray;
@@ -806,7 +806,7 @@ public:
                      FileSystem::Path dirToSaveConvertedCamIn,
                      FileSystem::Path jsonFileName,
                      std::string camNameWithoutExtension,
-                     ReliveAPI::ChunkedLvlFile camFileData,
+                     ChunkedLvlFile camFileData,
                      bool isAo,
                      ConversionProgress& progress)
         : mThreadPool(tp)
@@ -835,7 +835,7 @@ public:
         mProgress.ReportItemStarted(mCamNameWithoutExtension);
 
         // Convert camera images and FG layers
-        ReliveAPI::CamConverter cc;
+        CamConverter cc;
         auto fg1ReaderAndBlockCount = cc.Convert(mCamFileData, mDirToSaveConvertedCamIn.GetPath(), mIsAo);
         if (fg1ReaderAndBlockCount.first)
         {
@@ -851,18 +851,18 @@ private:
     FileSystem::Path mDirToSaveConvertedCamIn;
     FileSystem::Path mJsonFileName;
     std::string mCamNameWithoutExtension;
-    ReliveAPI::ChunkedLvlFile mCamFileData;
+    ChunkedLvlFile mCamFileData;
     bool mIsAo = false;
     ConversionProgress& mProgress;
 };
 
 template <typename LevelIdType>
-static void ConvertCamera(ThreadPool& tp, const FileSystem::Path& dataDir, const std::string& fileName, FileSystem& fs, std::vector<u8>& fileBuffer, ReliveAPI::LvlReader& lvlReader, LevelIdType lvlIdxAsLvl, bool isAo, ConversionProgress& progress)
+static void ConvertCamera(ThreadPool& tp, const FileSystem::Path& dataDir, const std::string& fileName, FileSystem& fs, std::vector<u8>& fileBuffer, LvlReader& lvlReader, LevelIdType lvlIdxAsLvl, bool isAo, ConversionProgress& progress)
 {
     LOG_INFO("%s", fileName.c_str());
     ReadLvlFileInto(lvlReader, fileName.c_str(), fileBuffer);
 
-    ReliveAPI::ChunkedLvlFile camFileData(fileBuffer);
+    ChunkedLvlFile camFileData(fileBuffer);
 
     std::string camNameWithoutExtension = fileName.substr(0, fileName.length() - 4); // chop off .CAM
 
@@ -886,13 +886,13 @@ static void ConvertCamera(ThreadPool& tp, const FileSystem::Path& dataDir, const
     tp.AddJob(std::make_unique<ConvertCameraJob>(tp, dirToSaveConvertedCamIn, jsonFileName, camNameWithoutExtension, camFileData, isAo, progress));
 }
 
-static void ConvertFont(FileSystem& fs, const FileSystem::Path& dataDir, const std::string& fileName, ReliveAPI::LvlReader& lvlReader, std::vector<u8>& fileBuffer, bool isPauseMenuFont)
+static void ConvertFont(FileSystem& fs, const FileSystem::Path& dataDir, const std::string& fileName, LvlReader& lvlReader, std::vector<u8>& fileBuffer, bool isPauseMenuFont)
 {
     ReadLvlFileInto(lvlReader, fileName.c_str(), fileBuffer);
 
-    ReliveAPI::ChunkedLvlFile camFile(fileBuffer);
+    ChunkedLvlFile camFile(fileBuffer);
 
-     std::optional<ReliveAPI::LvlFileChunk> font = camFile.ChunkByType(ResourceManagerWrapper::Resource_Font);
+     std::optional<LvlFileChunk> font = camFile.ChunkByType(ResourceManagerWrapper::Resource_Font);
      if (!font)
      {
          ALIVE_FATAL("Font missing");
@@ -984,7 +984,7 @@ static bool IsUnusedSaveFile(const std::string& saveName)
 }
 
 template<typename LevelIdType, typename TlvType>
-static void ConvertFilesInLvl(ThreadPool& tp, const FileSystem::Path& dataDir, FileSystem& fs, ReliveAPI::LvlReader& lvlReader, std::vector<u8>& fileBuffer, LevelIdType lvlIdxAsLvl, EReliveLevelIds reliveLvl, const DataConversion::DataVersions& dv, bool isAo, bool onlySaves, ConversionProgress& progress)
+static void ConvertFilesInLvl(ThreadPool& tp, const FileSystem::Path& dataDir, FileSystem& fs, LvlReader& lvlReader, std::vector<u8>& fileBuffer, LevelIdType lvlIdxAsLvl, EReliveLevelIds reliveLvl, const DataConversion::DataVersions& dv, bool isAo, bool onlySaves, ConversionProgress& progress)
 {
     // Iterate and convert specific file types in the LVL
     AESaveConverter::PathsCache pathsCache;
@@ -1016,7 +1016,7 @@ static void ConvertFilesInLvl(ThreadPool& tp, const FileSystem::Path& dataDir, F
             }
 
             // Remove the resource header
-            fileBuffer.erase(fileBuffer.begin(), fileBuffer.begin() + sizeof(ReliveAPI::ResourceHeader));
+            fileBuffer.erase(fileBuffer.begin(), fileBuffer.begin() + sizeof(ResourceHeader));
 
             // TODO: Actually convert at some later point
             AESaveConverter saveConverter(fs);
@@ -1151,7 +1151,7 @@ static void ConvertHardcodedPals(FileSystem& fs, const FileSystem::Path& dataDir
 // same read ConvertPathBND does for real at conversion time - reading it twice is negligible next
 // to the per-path TLV decode cost). Mirrors each real dispatch condition in ConvertFilesInLvl/
 // ConvertAnimations exactly, so totals line up 1:1 with the AddCompleted calls those make.
-static void ScanLevelForProgressTotals(ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, const DataConversion::DataVersions& dv, bool isAo, std::vector<u8>& fileBuffer, ConversionProgress& progress)
+static void ScanLevelForProgressTotals(LvlReader& lvlReader, EReliveLevelIds reliveLvl, const DataConversion::DataVersions& dv, bool isAo, std::vector<u8>& fileBuffer, ConversionProgress& progress)
 {
     if (dv.ConvertAnimations())
     {
@@ -1200,7 +1200,7 @@ static void ScanLevelForProgressTotals(ReliveAPI::LvlReader& lvlReader, EReliveL
         {
             if (ReadLvlFileInto(lvlReader, fileName.c_str(), fileBuffer))
             {
-                const ReliveAPI::ChunkedLvlFile pathBndFile(fileBuffer);
+                const ChunkedLvlFile pathBndFile(fileBuffer);
                 u32 pathCount = 0;
                 for (u32 j = 0; j < pathBndFile.ChunkCount(); j++)
                 {
@@ -1238,12 +1238,12 @@ static void IterateAELvls(FileSystem& fs, FnOnLvl fnOnLvl)
         const EReliveLevelIds reliveLvl = MapWrapper::FromAE(lvlIdxAsLvl);
 
         auto lvName = std::string(::Path_Get_Lvl_Name(reliveLvl)) + ".LVL";
-        ReliveAPI::LvlReader lvlReader(fs, lvName.c_str());
+        LvlReader lvlReader(fs, lvName.c_str());
 
         if (!lvlReader.IsOpen())
         {
             // Fatal, missing LVL file
-            ALIVE_FATAL("Couldn't open lvl file");
+            ALIVE_FATAL("Couldn't open lvl file %s", lvName.c_str());
         }
         fnOnLvl(lvlReader, reliveLvl, lvlIdxAsLvl);
     }
@@ -1262,14 +1262,14 @@ static void IterateAOLvls(FileSystem& fs, FnOnLvl fnOnLvl)
         }
 
         const EReliveLevelIds reliveLvl = MapWrapper::FromAO(lvlIdxAsLvl);
-        ReliveAPI::LvlReader lvlReader(fs, (std::string(AO::Path_Get_Lvl_Name(reliveLvl)) + ".LVL").c_str(), false);
+        const std::string lvName = std::string(AO::Path_Get_Lvl_Name(reliveLvl)) + ".LVL";
+        LvlReader lvlReader(fs, lvName.c_str());
 
         if (!lvlReader.IsOpen())
         {
-            // Fatal, missing LVL file
-            //ALIVE_FATAL("Couldn't open lvl file");
-
-            LOG_WARNING("Couldn't open lvl file");
+            // Not fatal (unlike AE) - skip the level
+            LOG_WARNING("Couldn't open lvl file %s, skipping it", lvName.c_str());
+            continue;
         }
 
         fnOnLvl(lvlReader, reliveLvl, lvlIdxAsLvl);
@@ -1377,7 +1377,7 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
     }
     {
         std::vector<u8> scanFileBuffer;
-        IterateAOLvls(fs, [&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, AO::LevelIds /*lvlIdxAsLvl*/)
+        IterateAOLvls(fs, [&](LvlReader& lvlReader, EReliveLevelIds reliveLvl, AO::LevelIds /*lvlIdxAsLvl*/)
         {
             ScanLevelForProgressTotals(lvlReader, reliveLvl, dv, true, scanFileBuffer, mProgress);
         });
@@ -1395,7 +1395,7 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
     }
 
     std::vector<u8> fileBuffer;
-    IterateAOLvls(fs, [&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, AO::LevelIds lvlIdxAsLvl)
+    IterateAOLvls(fs, [&](LvlReader& lvlReader, EReliveLevelIds reliveLvl, AO::LevelIds lvlIdxAsLvl)
     {
         // Cameras/paths/etc don't get FMVs' fine-grained per-item resume tracking - a cancelled
         // conversion just redoes all of this from scratch next launch (data_version.json only
@@ -1421,7 +1421,7 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
 
     if (dv.ConvertSaves())
     {
-        IterateAOLvls(fs, [&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, AO::LevelIds lvlIdxAsLvl)
+        IterateAOLvls(fs, [&](LvlReader& lvlReader, EReliveLevelIds reliveLvl, AO::LevelIds lvlIdxAsLvl)
         {
             if (mThreadPool->IsCancelRequested())
             {
@@ -1455,7 +1455,7 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
     }
     {
         std::vector<u8> scanFileBuffer;
-        IterateAELvls(fs, [&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, LevelIds /*lvlIdxAsLvl*/)
+        IterateAELvls(fs, [&](LvlReader& lvlReader, EReliveLevelIds reliveLvl, LevelIds /*lvlIdxAsLvl*/)
         {
             ScanLevelForProgressTotals(lvlReader, reliveLvl, dv, false, scanFileBuffer, mProgress);
         });
@@ -1472,7 +1472,7 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
     }
 
     std::vector<u8> fileBuffer;
-    IterateAELvls(fs, [&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, LevelIds lvlIdxAsLvl)
+    IterateAELvls(fs, [&](LvlReader& lvlReader, EReliveLevelIds reliveLvl, LevelIds lvlIdxAsLvl)
     {
         // Cameras/paths/etc don't get FMVs' fine-grained per-item resume tracking - a cancelled
         // conversion just redoes all of this from scratch next launch (data_version.json only
@@ -1498,7 +1498,7 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
 
     if (dv.ConvertSaves())
     {
-        IterateAELvls(fs, [&](ReliveAPI::LvlReader& lvlReader, EReliveLevelIds reliveLvl, LevelIds lvlIdxAsLvl)
+        IterateAELvls(fs, [&](LvlReader& lvlReader, EReliveLevelIds reliveLvl, LevelIds lvlIdxAsLvl)
         {
             if (mThreadPool->IsCancelRequested())
             {

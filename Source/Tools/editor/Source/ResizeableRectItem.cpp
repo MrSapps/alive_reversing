@@ -16,7 +16,7 @@
 #include "ItemPositionData.hpp"
 #include <nlohmann/json.hpp>
 #include "../../relive_lib/Types.hpp"
-#include "../../relive_api/TlvsRelive.hpp"
+#include "../../relive_lib/data_conversion/EditorMapObjects.hpp"
 
 const quint32 ResizeableRectItem::kMinRectSize = 10;
 

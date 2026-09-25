@@ -1,6 +1,5 @@
 #include "Base64.hpp"
 
-namespace ReliveAPI {
 static const unsigned char base64_table[65] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 static std::string base64_encode(const u8* src, size_t len)
@@ -97,4 +96,3 @@ std::vector<u8> FromBase64(const std::string& vec)
 {
     return b64decode(reinterpret_cast<const u8*>(vec.data()), vec.length());
 }
-} // namespace ReliveAPI

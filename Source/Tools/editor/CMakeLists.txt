@@ -9,6 +9,10 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Qt uses the dynamic CRT, so every target in this directory does too and must only link
+# *_dynamic_crt libs - see the MSVC CRT comment in the top-level CMakeLists.txt.
+set(CMAKE_MSVC_RUNTIME_LIBRARY ${RELIVE_DYNAMIC_CRT})
+
 # QtCreator supports the following variables for Android, which are identical to qmake Android variables.
 # Check https://doc.qt.io/qt/deployment-android.html for more information.
 # They need to be set before the find_package( ...) calls below.
@@ -36,11 +40,10 @@ include_directories(../../../3rdParty/json/single_include)
 include_directories(Source)
 
 add_library(editor_glue_dynamic_crt
-    # Hack to include bits the editor uses, can't link the libs directly
-    # due to diff CRT settings (static vs dynamic)
+    # The relive_lib bits the editor uses, compiled against the dynamic CRT - relive_lib
+    # itself uses the static CRT so it can't be linked directly.
     ../../relive_lib/Grid.cpp
     ../../AliveLibAE/PathData.cpp
-    ../../relive_lib/Grid.cpp
     ../../AliveLibAO/PathData.cpp
     ../../relive_lib/CompressionType_4Or5.cpp
     ../../relive_lib/CamDecompressor.cpp
@@ -52,16 +55,12 @@ add_library(editor_glue_dynamic_crt
     ../../relive_lib/data_conversion/guid.cpp
     ../../relive_lib/data_conversion/relive_tlvs_serialization.cpp
     ../../relive_lib/data_conversion/CommonTypesSerialization.cpp
+    ../../relive_lib/data_conversion/EditorMapObjects.cpp
 )
 target_include_directories(editor_glue_dynamic_crt PRIVATE
     ../../relive_lib
 )
 target_link_libraries(editor_glue_dynamic_crt PUBLIC spng_dynamic_crt miniz_dynamic_crt SDL3::SDL3)
-
-if (MSVC)
-    target_compile_options(editor_glue_dynamic_crt PRIVATE /MDd)
-endif()
-
 
 add_library(relive_ipc_dynamic_crt
     ../../relive_lib/Ipc/Ipc.cpp
@@ -71,10 +70,6 @@ add_library(relive_ipc_dynamic_crt
 target_include_directories(relive_ipc_dynamic_crt PRIVATE
     ../../relive_lib
 )
-
-if (MSVC)
-    target_compile_options(relive_ipc_dynamic_crt PRIVATE /MDd)
-endif()
 
 set(PROJECT_SOURCES
         Source/GridSnapSettings.hpp
@@ -221,35 +216,25 @@ if (UNIX)
 endif()
 
 if (MSVC)
-    target_compile_options(relive-editor PRIVATE /MDd)
     set(MY_PATH "PATH=%PATH%;${Qt5_DIR}/../../../bin")
     set_target_properties(relive-editor PROPERTIES VS_DEBUGGER_ENVIRONMENT "${MY_PATH}")
 endif()
 
-target_link_libraries(relive-editor PUBLIC relive_api SDL3::SDL3 vorbisfile Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Network editor_glue_dynamic_crt relive_ipc_dynamic_crt)
+target_link_libraries(relive-editor PUBLIC SDL3::SDL3 vorbisfile_dynamic_crt Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Network editor_glue_dynamic_crt relive_ipc_dynamic_crt)
 
 add_executable(relive-editor-automation-cli tools/AutomationCli.cpp Source/AutomationProtocol.hpp)
 target_include_directories(relive-editor-automation-cli PRIVATE Source)
 target_link_libraries(relive-editor-automation-cli PUBLIC Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Network)
-if (MSVC)
-    target_compile_options(relive-editor-automation-cli PRIVATE /MDd)
-endif()
 
 add_executable(EditorAutomationTests tests/EditorAutomationTests.cpp Source/AutomationProtocol.hpp)
 target_include_directories(EditorAutomationTests PRIVATE Source)
-target_link_libraries(EditorAutomationTests PUBLIC googletest Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::Gui)
+target_link_libraries(EditorAutomationTests PUBLIC googletest_dynamic_crt Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::Gui)
 target_compile_definitions(EditorAutomationTests PRIVATE RELIVE_EDITOR_PATH="$<TARGET_FILE:relive-editor>")
-if (MSVC)
-    target_compile_options(EditorAutomationTests PRIVATE /MDd)
-endif()
 add_test(NAME EditorAutomationTests COMMAND EditorAutomationTests)
 
 # Plain unit tests for pure placement math (GridPlacement.hpp) - no Qt/GUI dependency at all,
 # unlike EditorAutomationTests above which drives the real editor process end-to-end.
 add_executable(GridPlacementTests tests/GridPlacementTests.cpp Source/GridPlacement.hpp)
 target_include_directories(GridPlacementTests PRIVATE Source)
-target_link_libraries(GridPlacementTests PUBLIC googletest)
-if (MSVC)
-    target_compile_options(GridPlacementTests PRIVATE /MDd)
-endif()
+target_link_libraries(GridPlacementTests PUBLIC googletest_dynamic_crt)
 add_test(NAME GridPlacementTests COMMAND GridPlacementTests)

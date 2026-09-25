@@ -6,9 +6,8 @@
 #include <type_traits>
 #include <vector>
 #include <array>
-#include "relive_api_exceptions.hpp"
+#include "../FatalError.hpp"
 
-namespace ReliveAPI {
 class ByteStream final
 {
 public:
@@ -145,7 +144,7 @@ private:
 
         if (mReadPos + len > mData.size())
         {
-            throw ReliveAPI::IOReadPastEOFException();
+            ALIVE_FATAL("ByteStream read past the end of its data");
         }
 
         std::memcpy(buffer, &mData[mReadPos], len);
@@ -157,4 +156,3 @@ private:
     std::size_t mWritePos = 0;
     std::vector<u8> mData;
 };
-} // namespace ReliveAPI

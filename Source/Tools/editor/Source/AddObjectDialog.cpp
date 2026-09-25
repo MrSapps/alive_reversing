@@ -8,7 +8,7 @@
 #include "SelectionSaver.hpp"
 #include "Model.hpp"
 #include "EditorTab.hpp"
-#include "../../relive_api/TlvsRelive.hpp"
+#include "../../relive_lib/data_conversion/EditorMapObjects.hpp"
 #include "ReflectedEnumProperties.hpp"
 #include "GridPlacement.hpp"
 

@@ -23,8 +23,8 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <translation></translation>
     </message>
     <message>
-        <source>Using Relive API v</source>
-        <translation>Verwendet Relive API v</translation>
+        <source>Using path format v</source>
+        <translation>Verwendet Pfadformat v</translation>
     </message>
 </context>
 <context>
