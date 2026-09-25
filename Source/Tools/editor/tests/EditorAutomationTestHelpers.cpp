@@ -29,7 +29,15 @@ namespace AutomationTest {
         // real window - QWidget::grab() (screenshot) and synthesized mouse/key events both
         // still work exactly the same, but nothing appears on the real display or steals
         // keyboard/mouse focus from whatever else is running there while these tests run.
+#ifdef _WIN32
+        // Except on Windows: Qt 5.15's offscreen plugin has no native interface, and on Windows
+        // QMessageBox::showEvent dereferences it (qt_getWindowsSystemMenu) and crashes the editor
+        // with an access violation. Use the native platform there instead, clearing any offscreen
+        // setting inherited from the environment.
+        env.remove("QT_QPA_PLATFORM");
+#else
         env.insert("QT_QPA_PLATFORM", "offscreen");
+#endif
         // Qt on Windows sends a GUI app's log output to the debugger, not stderr, unless told to.
         env.insert("QT_FORCE_STDERR_LOGGING", "1");
         editor.setProcessEnvironment(env);
