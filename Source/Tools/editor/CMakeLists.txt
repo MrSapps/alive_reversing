@@ -193,7 +193,6 @@ set(PROJECT_SOURCES
         Source/ColourPickerProperty.hpp
         Source/ChangeColourPickerPropertyCommand.hpp
         Source/ChangeColourPickerPropertyCommand.cpp
-        Source/resources.qrc
         ${TS_FILES}
 )
 
@@ -201,12 +200,23 @@ set(PROJECT_SOURCES
 #    qt_create_translation(QM_FILES "${CMAKE_CURRENT_SOURCE_DIR}/Source" ${TS_FILES} OPTIONS -no-obsolete -no-ui-lines -locations none)
 #    qt_add_executable(relive-editor ${PROJECT_SOURCES} ${QM_FILES})
 #else()
-    qt5_create_translation(QM_FILES "${CMAKE_CURRENT_SOURCE_DIR}/Source" ${TS_FILES} OPTIONS -no-obsolete -no-ui-lines -locations none)
+    # Only compile the .ts files to .qm in the build. qt5_create_translation also ran lupdate over
+    # the whole source dir whenever a source changed, which slowed builds down and rewrote the
+    # checked-in .ts files (dropping existing translations). Refresh them explicitly with:
+    #   cmake --build build --target update_translations
+    qt5_add_translation(QM_FILES ${TS_FILES})
+    add_custom_target(update_translations
+        COMMAND Qt5::lupdate "${CMAKE_CURRENT_SOURCE_DIR}/Source" -no-obsolete -no-ui-lines -locations none -ts ${TS_FILES}
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        VERBATIM)
+    # The editor's ~6 MB of resources: qt5_add_big_resources embeds them into an object file
+    # directly instead of generating (and compiling) a ~27 MB C++ array, which took ~20 s.
+    qt5_add_big_resources(EDITOR_RESOURCES Source/resources.qrc)
     if(WIN32)
         set(APP_ICON_RESOURCE_WINDOWS "${CMAKE_CURRENT_SOURCE_DIR}/Source/rsc/icons/relive-editor.rc")
-        add_executable(relive-editor ${PROJECT_SOURCES} ${QM_FILES} ${APP_ICON_RESOURCE_WINDOWS})
+        add_executable(relive-editor ${PROJECT_SOURCES} ${QM_FILES} ${EDITOR_RESOURCES} ${APP_ICON_RESOURCE_WINDOWS})
     else()
-        add_executable(relive-editor ${PROJECT_SOURCES} ${QM_FILES})
+        add_executable(relive-editor ${PROJECT_SOURCES} ${QM_FILES} ${EDITOR_RESOURCES})
     endif()
 #endif()
 
@@ -226,10 +236,28 @@ add_executable(relive-editor-automation-cli tools/AutomationCli.cpp Source/Autom
 target_include_directories(relive-editor-automation-cli PRIVATE Source)
 target_link_libraries(relive-editor-automation-cli PUBLIC Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Network)
 
-add_executable(EditorAutomationTests tests/EditorAutomationTests.cpp Source/AutomationProtocol.hpp)
+add_executable(EditorAutomationTests
+    tests/EditorAutomationTestHelpers.hpp
+    tests/EditorAutomationTestHelpers.cpp
+    tests/EditorAutomationBasicTests.cpp
+    tests/EditorAutomationMultiSelectTests.cpp
+    tests/EditorAutomationEditTests.cpp
+    tests/EditorAutomationPropertyAndModTests.cpp
+    tests/EditorAutomationTreeTests.cpp
+    Source/AutomationProtocol.hpp)
 target_include_directories(EditorAutomationTests PRIVATE Source)
 target_link_libraries(EditorAutomationTests PUBLIC googletest_dynamic_crt Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::Gui)
 target_compile_definitions(EditorAutomationTests PRIVATE RELIVE_EDITOR_PATH="$<TARGET_FILE:relive-editor>")
+# The test files are split up so they build in parallel; the PCH stops each one re-parsing
+# gtest, Qt and json.
+target_precompile_headers(EditorAutomationTests PRIVATE
+    <gtest/gtest.h>
+    <nlohmann/json.hpp>
+    <QCoreApplication>
+    <QImage>
+    <QLocalSocket>
+    <QProcess>
+    <QString>)
 add_test(NAME EditorAutomationTests COMMAND EditorAutomationTests)
 
 # Plain unit tests for pure placement math (GridPlacement.hpp) - no Qt/GUI dependency at all,

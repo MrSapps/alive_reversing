@@ -104,3 +104,21 @@ make -j$(nproc)
 5. You can optionally install the package using `make install` or create a Debian-compatible package using `cpack -G DEB`.
 
 </details>
+
+## Editor translations
+
+The editor's translations live in `Source/Tools/editor/Source/rsc/translations/*.ts`. The build
+only compiles them into `.qm` files; it never changes the `.ts` files.
+
+After adding, changing or removing any `tr()` string (in code or `.ui` files):
+
+1. Update the `.ts` files from the sources:
+   ```
+   cmake --build build --target update_translations
+   ```
+2. Fill in the new entries (e.g. with Qt Linguist). New strings show up as `type="unfinished"`.
+3. Commit the updated `.ts` files along with your change.
+
+Don't edit the `.ts` files by hand to add or remove strings, and don't reintroduce
+`qt5_create_translation`: it re-runs `lupdate` on every build and has wiped existing
+translations before.

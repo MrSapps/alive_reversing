@@ -27,6 +27,12 @@ cmake --build build -j5 --target relive_lib_tests # unit tests
 - Build with `-j5`. Higher parallelism runs out of memory.
 - On Linux, Debug builds have ASan and UBSan on (see top-level `CMakeLists.txt`). An ASan
   leak report when the game quits is expected and does not mean the change is broken.
+  UBSan's `vptr`, `alignment`, `null` and `pointer-overflow` checks are off because they
+  made Debug builds several times slower. Configure with `-DRELIVE_FULL_UBSAN=ON` to turn
+  them back on.
+- Editor translations: the build only compiles the `.ts` files, it never changes them.
+  After adding or removing `tr()` strings, run
+  `cmake --build build --target update_translations` and commit the updated `.ts` files.
 - Flatpak builds: `flatpak-builder` ignores the job-count env var. Pass `--jobs=5`
   and run it under a `systemd-run` memory cap to avoid OOM.
 
@@ -37,6 +43,16 @@ nlohmann json (de)serializers and the per-TLV editor types: every file that incl
 instantiated them again. Put that code in one `.cpp`, and give callers a small header that
 only declares what they call (e.g. `data_conversion/AEQuicksaveJson.hpp`). Don't reach for
 pimpl.
+
+UBSan was the biggest single cost: on `Abe.cpp`, full UBSan + ASan took 7.7 s to compile
+against 2.0 s for ASan alone, and made `relive` ~475 MB (mostly check data and its
+relocations). Measure before re-enabling expensive sanitizer checks.
+
+The build is throughput-bound at `-j5`: wall time is roughly total compile time / 5, so only
+cutting total CPU helps a clean build. Splitting a big file only helps incremental builds of
+that file. PCH findings (measured per file, with and without): `relive_lib`'s PCH saves ~40%,
+the editor's and the editor tests' are small net wins, and a target with one or two files
+shouldn't have one.
 
 To find hot spots: build in a separate dir with
 `CC=clang-14 CXX=clang++-14 ... -DCMAKE_CXX_FLAGS=-ftime-trace`. Clang writes a `<obj>.json`
