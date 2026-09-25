@@ -99,7 +99,7 @@ namespace AutomationTest {
 
             ADD_FAILURE() << "timed out waiting for response id=" << id << " (socket state " << mSocket.state()
                           << ", error '" << mSocket.errorString().toStdString() << "', " << mSocket.bytesToWrite()
-                          << " bytes still unsent)";
+                          << " bytes still unsent" << DescribeEditor() << ")";
             return nlohmann::json::object();
         }
 
@@ -110,7 +110,28 @@ namespace AutomationTest {
             return WaitForResponse(SendCommand(std::move(cmd)), timeoutMs);
         }
 
+        // The editor this client talks to, so a timeout can say whether it has exited or crashed.
+        void SetEditorProcess(QProcess* editor)
+        {
+            mEditor = editor;
+        }
+
     private:
+        std::string DescribeEditor() const
+        {
+            if (!mEditor)
+            {
+                return {};
+            }
+            if (mEditor->state() == QProcess::NotRunning || mEditor->waitForFinished(0))
+            {
+                return ", editor exited: exit code 0x" + QString::number(static_cast<quint32>(mEditor->exitCode()), 16).toStdString() +
+                       (mEditor->exitStatus() == QProcess::CrashExit ? " (crashed)" : "");
+            }
+            return ", editor still running";
+        }
+
+        QProcess* mEditor = nullptr;
         QLocalSocket mSocket;
         Automation::FrameReader mReader;
         std::map<int, nlohmann::json> mPending;

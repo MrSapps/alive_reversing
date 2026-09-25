@@ -43,6 +43,7 @@ namespace AutomationTest {
             return false;
         }
 
+        client.SetEditorProcess(&editor);
         if (!client.ConnectWithRetry(outSocketName, 10000))
         {
             ADD_FAILURE() << "failed to connect to automation socket";
