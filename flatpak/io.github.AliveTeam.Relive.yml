@@ -30,11 +30,6 @@ finish-args:
   - --share=ipc
   - --device=dri
   - --filesystem=host
-  # The root CMakeLists.txt builds every Unix target with ASan+LSan unconditionally (not gated
-  # behind a Debug/opt-in flag - see the `elseif (UNIX)` branch there). LeakSanitizer's
-  # stop-the-world leak scan needs ptrace, which bwrap's sandbox blocks, so it aborts on
-  # startup with "LeakSanitizer has encountered a fatal error" unless leak detection is off.
-  - --env=ASAN_OPTIONS=detect_leaks=0
 
 cleanup:
   - /include

@@ -39,7 +39,9 @@ if (MSVC)
 elseif (UNIX)
     #add_compile_options(-ftime-trace)
 
-    set(SANITIZER_FLAGS "-fsanitize=undefined,address")
+    # Debug only: in Release (-O3) they make compiles several times slower, and packaged
+    # builds (AppImage/flatpak) shouldn't ship with them.
+    set(SANITIZER_FLAGS "$<$<CONFIG:Debug>:-fsanitize=undefined,address>")
     add_compile_options(${SANITIZER_FLAGS})
     add_link_options(${SANITIZER_FLAGS})
 endif()

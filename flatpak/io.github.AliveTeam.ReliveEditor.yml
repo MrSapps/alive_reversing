@@ -20,9 +20,6 @@ finish-args:
   - --share=ipc
   - --device=dri
   - --filesystem=host
-  # See io.github.AliveTeam.Relive.yml - the root CMakeLists.txt builds every Unix target with
-  # ASan+LSan unconditionally, and LSan's ptrace-based leak scan fails under bwrap's sandbox.
-  - --env=ASAN_OPTIONS=detect_leaks=0
 
 cleanup:
   - /include
