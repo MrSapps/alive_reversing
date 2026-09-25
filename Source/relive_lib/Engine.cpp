@@ -609,10 +609,9 @@ void Engine::Game_Main(EReliveLevelIds startLevel, s32 startPath, s32 startCamer
     Game_Shutdown();
 }
 
-void Engine::Run()
+void Engine::Init()
 {
     std::string activeModPath;
-    std::string activeModDisplayName;
 
     std::string modName;
     if (mClp.ExtractNamePairArgument(modName, "-mod="))
@@ -637,7 +636,7 @@ void Engine::Run()
             ALIVE_FATAL("Mod \"%s\" targets \"%s\" but the active game is \"%s\"", modName.c_str(), pMod->mTargetGame.c_str(), expectedTargetGame);
         }
 
-        activeModDisplayName = pMod->mName;
+        mActiveModDisplayName = pMod->mName;
         activeModPath = modsDir.Append(pMod->mDirectory).GetPath();
     }
 
@@ -653,17 +652,16 @@ void Engine::Run()
     {
         mMap = std::make_unique<AO::Map>(*mResMan, mFactory);
     }
+}
 
-    if (mMapCreatedFn)
-    {
-        mMapCreatedFn(*mMap);
-    }
+void Engine::Run()
+{
     GetGameAutoPlayer().ProcessCommandLine(mFs, mClp);
 
     sCommandLine_ShowFps = mClp.SwitchExists("-ddfps");
     gCommandLine_NoFrameSkip = mClp.SwitchExists("-ddnoskip");
 
-    CmdLineRenderInit(activeModDisplayName);
+    CmdLineRenderInit(mActiveModDisplayName);
 
     // Another hack till refactor branch replaces master
     GetGameAutoPlayer().Pause(true);
