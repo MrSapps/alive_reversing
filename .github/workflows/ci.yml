@@ -102,7 +102,7 @@ jobs:
       run: |
         $env:PATH = "$env:GITHUB_WORKSPACE\SDL3-3.4.14\lib\${{ matrix.sdl_arch }};$env:PATH"
         cd build
-        ctest -C $env:CONFIGURATION --verbose
+        ctest -C $env:CONFIGURATION --verbose --timeout 300
 
     # ======================================
     #      Linux AppImage
@@ -137,7 +137,7 @@ jobs:
         ASAN_OPTIONS: detect_leaks=0
       run: |
         cd build
-        ctest --verbose
+        ctest --verbose --timeout 300
 
     - name: 'Linux-AppImage: Build AppImage'
       if: matrix.name == 'Linux-AppImage'

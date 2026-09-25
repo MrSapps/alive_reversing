@@ -20,9 +20,10 @@ namespace Automation
         const std::string payload = msg.dump();
         const uint32_t length = static_cast<uint32_t>(payload.size());
 
-        QByteArray header(reinterpret_cast<const char*>(&length), sizeof(length));
-        device->write(header);
-        device->write(payload.data(), static_cast<qint64>(payload.size()));
+        // One write per frame, so a frame never ends up split across two pending writes.
+        QByteArray frame(reinterpret_cast<const char*>(&length), sizeof(length));
+        frame.append(payload.data(), static_cast<int>(payload.size()));
+        device->write(frame);
     }
 
     // Accumulates bytes across possibly-partial reads and yields complete JSON frames
