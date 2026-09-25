@@ -19,10 +19,10 @@ FG1PngReader::~FG1PngReader()
 
 u16 FG1PngReader::ConvertPixel(u16 pixel)
 {
-    return ((pixel >> 15) << 5)
+    return static_cast<u16>(((pixel >> 15) << 5)
          | ((pixel & 31) << 11)
          | (((pixel >> 5) & 31) << 6)
-         | (((pixel >> 10) & 31) << 0);
+         | (((pixel >> 10) & 31) << 0));
 }
 
 void FG1PngReader::BltRectMerged(u32 xpos, u32 ypos, u32 width, u32 height, u32 layer, const u16* pSrcPixels, const u32* pBitMask)
