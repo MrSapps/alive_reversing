@@ -11,8 +11,7 @@ struct Line_G4;
 struct Poly_G3;
 struct Poly_FT4;
 struct Poly_G4;
-struct SDL_Window;
-using TWindowHandleType = SDL_Window*;
+class Window;
 
 namespace relive {
 enum class TBlendModes : u32;
@@ -91,13 +90,14 @@ public:
     };
 
     static IRenderer* GetRenderer();
-    static bool CreateRenderer(Renderers type, const std::string& windowTitle);
+    // Creates a renderer of type for window, see Window::CreateWithRenderer
+    static bool CreateRenderer(Renderers type, Window& window);
     static void FreeRenderer();
 
 public:
-    explicit IRenderer(SDL_Window* window)
+    explicit IRenderer(Window& window)
         : mWindow(window)
-    { 
+    {
 
     }
 
@@ -124,20 +124,7 @@ public:
     virtual void Clear(u8 r, u8 g, u8 b) = 0;
 
     // Derived objects should always call this
-    virtual void StartFrame()
-    {
-        if (mIsFirstStartFrame)
-        {
-            // Make the window visible only on the first frame otherwise you can see
-            // some unclear framebuffer crap for a half second or so
-            SDL_ShowWindow(mWindow);
-
-            // Bring to front and give input focus
-            SDL_RaiseWindow(mWindow);
-
-            mIsFirstStartFrame = false;
-        }
-    }
+    virtual void StartFrame();
 
     virtual void EndFrame() = 0;
 
@@ -187,7 +174,7 @@ protected:
 protected:
     bool mIsFirstStartFrame = true;
 
-    SDL_Window* mWindow = nullptr;
+    Window& mWindow;
 
     s32 mOffsetX = 0;
     s32 mOffsetY = 0;

@@ -2,10 +2,12 @@
 
 #include <SDL3/SDL.h>
 
+class Window;
+
 class Sdl3Context final
 {
 public:
-    Sdl3Context(SDL_Window* window);
+    explicit Sdl3Context(Window& window);
     ~Sdl3Context();
 
     SDL_Renderer* GetRenderer();
@@ -20,5 +22,4 @@ private:
     SDL_Renderer* mRenderer;
     SDL_Rect mLastClipRect;
     SDL_Texture* mLastFramebuffer;
-    SDL_Window* mWindow;
 };

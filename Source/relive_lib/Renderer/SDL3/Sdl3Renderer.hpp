@@ -8,7 +8,7 @@
 class Sdl3Renderer final : public IRenderer
 {
 public:
-    explicit Sdl3Renderer(TWindowHandleType window);
+    explicit Sdl3Renderer(Window& window);
     ~Sdl3Renderer() override;
 
     void Clear(u8 r, u8 g, u8 b) override;

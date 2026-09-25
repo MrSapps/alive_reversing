@@ -45,6 +45,17 @@ CommandLineOptions CommandLineOptions::Parse(const CommandLineParser& clp)
     options.mDdCheat = clp.HasSwitch("-ddcheat") || clp.HasSwitch("-it_is_me_your_father");
     options.mShowFps = clp.HasSwitch("-ddfps");
     options.mNoFrameSkip = clp.HasSwitch("-ddnoskip");
+    if (const auto slowLoad = clp.GetValue("-ddslowload"))
+    {
+        try
+        {
+            options.mSlowLoadMs = static_cast<u32>(std::stoul(*slowLoad));
+        }
+        catch (const std::exception&)
+        {
+            LOG_WARNING("Ignoring -ddslowload=%s, it should be a number of milliseconds", slowLoad->c_str());
+        }
+    }
 
     options.mRecordFile = clp.GetValue("-record");
     options.mFlushRecording = clp.HasSwitch("-flush");
@@ -85,6 +96,7 @@ const char* CommandLineOptions::Usage()
            "  -ddcheat                    Enable the debug cheat menu\n"
            "  -ddfps                      Show the frame rate\n"
            "  -ddnoskip                   Render every frame instead of skipping to keep up\n"
+           "  -ddslowload=<ms>            Make each resource take at least this long to load\n"
            "  -help, --help, -h, /?       Show this and exit\n"
            "\n"
            "The display options also take =true or =false, and are saved to relive.ini.\n"

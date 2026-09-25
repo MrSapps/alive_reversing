@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "Sys.hpp"
-#include "AppIcon.hpp"
+#include "Window.hpp"
 #include "../AliveLibAE/Input.hpp"
 #include "../relive/resource.h"
 #include "Renderer/IRenderer.hpp"
@@ -15,91 +15,6 @@
 #include "DisplaySettings.hpp"
 #include "IniFile.hpp"
 #include "ResourceManagerWrapper.hpp"
-
-static bool sAppIsActivated = false;
-static TWindowHandleType sHwnd = nullptr;
-
-#if AUTO_SWITCH_CONTROLLER // OG Change - Used for Auto-switching active controller (gamepad/keyboard)
-static int totalConnectedJoysticks = 0;
-#endif
-
-#if ORIGINAL_PS1_BEHAVIOR // OG Change - Allow for exiting save menu using controller
-static bool saveMenuOpen = false;
-
-void setSaveMenuOpen(bool val)
-{
-    saveMenuOpen = val;
-}
-#endif
-
-std::string BuildString()
-{
-#ifdef BUILD_NUMBER
-    // Automated CI build title
-    return std::string("(") + CI_PROVIDER + " Build: " + std::to_string(BUILD_NUMBER) + ")";
-#else
-    return "";
-#endif
-}
-
-std::string BuildAndBitnesString()
-{
-    std::string buildAndBitness;
-    std::string buildStr = BuildString();
-
-    LOG_INFO("Build String is: %s", buildStr.c_str());
-
-    if (!buildStr.empty())
-    {
-        buildAndBitness += " ";
-        buildAndBitness += buildStr;
-    }
-
-    std::string kBitness = sizeof(void*) == 4 ? " (32 bit)" : " (64 bit)";
-    buildAndBitness += kBitness;
-    return buildAndBitness;
-}
-
-static std::string ModNameSuffix(const std::string& modName)
-{
-    return modName.empty() ? "" : (" [" + modName + "]");
-}
-
-std::string WindowTitleAO(const std::string& modName)
-{
-    return "R.E.L.I.V.E. Oddworld Abe's Oddysee" + ModNameSuffix(modName) + BuildAndBitnesString();
-}
-
-std::string WindowTitleAE(const std::string& modName)
-{
-    return "R.E.L.I.V.E. Oddworld Abe's Exoddus" + ModNameSuffix(modName) + BuildAndBitnesString();
-}
-
-TWindowHandleType Sys_GetHWnd()
-{
-    return sHwnd;
-}
-
-bool Sys_IsAnyKeyDown()
-{
-    return sIsAKeyDown;
-}
-
-void Sys_SetWindowText(TWindowHandleType windowHandle, const char_type* title)
-{
-    SDL_SetWindowTitle(windowHandle, title);
-}
-
-bool Sys_IsMouseButtonDown(MouseButtons button)
-{
-    if (button == MouseButtons::eRight)
-    {
-        return !!(SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON_MASK(SDL_BUTTON_RIGHT));
-    }
-    return !!(SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON_MASK(SDL_BUTTON_LEFT));
-}
-
-SoundEntry* gMovieSoundEntry = nullptr;
 
 static s32 sdl_key_to_win32_vkey(SDL_Scancode key)
 {
@@ -528,44 +443,34 @@ static s32 sdl_key_to_win32_vkey(SDL_Scancode key)
     }
 }
 
-// This is a combination of the window proc and the window proc "filter"
 
-static bool bNeedToQuit = false;
-
-bool Sys_IsAppActive()
+Sys::Sys(Window& window, ResourceManagerWrapper& resMan, u32 pathReloadEventType)
+    : mWindow(window)
+    , mResMan(resMan)
+    , mPathReloadEventType(pathReloadEventType)
 {
-    return sAppIsActivated;
+    Input_InitKeyStateArray_4EDD60();
 }
 
-// The display settings the F9-F12 hotkeys change, and the Engine's resource manager, which
-// saves them and reloads the input settings when a joystick is plugged in. See
-// Sys_SetDisplaySettings.
-static DisplaySettings sDisplaySettings;
-static ResourceManagerWrapper* spResMan = nullptr;
-
-void Sys_SetDisplaySettings(const DisplaySettings& settings, ResourceManagerWrapper& resMan)
+void Sys::SetDisplaySettings(const DisplaySettings& settings)
 {
-    sDisplaySettings = settings;
-    spResMan = &resMan;
-    sDisplaySettings.ApplyTo(*IRenderer::GetRenderer(), Sys_GetWindowHandle());
+    mDisplaySettings = settings;
+    mDisplaySettings.ApplyTo(*IRenderer::GetRenderer(), mWindow);
 }
 
 // Applies a hotkey's change and saves it so it persists between runs.
-static void DisplaySettingsChanged()
+void Sys::DisplaySettingsChanged()
 {
-    sDisplaySettings.ApplyTo(*IRenderer::GetRenderer(), Sys_GetWindowHandle());
-    if (spResMan)
-    {
-        IniFile ini = spResMan->LoadSettingsIni();
-        sDisplaySettings.WriteTo(ini);
-        spResMan->SaveSettingsIni(ini);
-    }
+    mDisplaySettings.ApplyTo(*IRenderer::GetRenderer(), mWindow);
+    IniFile ini = mResMan.LoadSettingsIni();
+    mDisplaySettings.WriteTo(ini);
+    mResMan.SaveSettingsIni(ini);
 }
 
-static void KeyDownEvent(SDL_Scancode scanCode)
+void Sys::KeyDownEvent(SDL_Scancode scanCode)
 {
-#if ORIGINAL_PS1_BEHAVIOR                  // OG Change - Allow for exiting save menu using controller
-    const bool allowTyping = saveMenuOpen; // Allow typing if save menu is open
+#if ORIGINAL_PS1_BEHAVIOR                          // OG Change - Allow for exiting save menu using controller
+    const bool allowTyping = Input().IsSaveMenuOpen(); // Allow typing if save menu is open
 #else
     const bool allowTyping = !Input_GetInputEnabled_4EDDE0(); // Old method: Allow typing only if all other inputs disabled
 #endif
@@ -638,28 +543,28 @@ static void KeyDownEvent(SDL_Scancode scanCode)
         }
         else if (vk == VK_F9)
         {
-            sDisplaySettings.mUseOriginalResolution = !sDisplaySettings.mUseOriginalResolution;
+            mDisplaySettings.mUseOriginalResolution = !mDisplaySettings.mUseOriginalResolution;
             DisplaySettingsChanged();
         }
         else if (vk == VK_F10)
         {
-            sDisplaySettings.mFilterScreen = !sDisplaySettings.mFilterScreen;
+            mDisplaySettings.mFilterScreen = !mDisplaySettings.mFilterScreen;
             DisplaySettingsChanged();
         }
         else if (vk == VK_F11)
         {
-            sDisplaySettings.mKeepAspectRatio = !sDisplaySettings.mKeepAspectRatio;
+            mDisplaySettings.mKeepAspectRatio = !mDisplaySettings.mKeepAspectRatio;
             DisplaySettingsChanged();
         }
         else if (vk == VK_F12)
         {
-            sDisplaySettings.mFullscreen = !sDisplaySettings.mFullscreen;
+            mDisplaySettings.mFullscreen = !mDisplaySettings.mFullscreen;
             DisplaySettingsChanged();
         }
     }
 }
 
-static void KeyUpEvent(SDL_Scancode scanCode)
+void Sys::KeyUpEvent(SDL_Scancode scanCode)
 {
     const s32 vk = sdl_key_to_win32_vkey(scanCode);
     // LOG_INFO("Key up " << vk);
@@ -668,34 +573,21 @@ static void KeyUpEvent(SDL_Scancode scanCode)
     sLastPressedKey = 0;
 }
 
-static void QuitEvent(bool isRecordedEvent, bool isRecording, BaseMap* pMap)
+void Sys::QuitEvent(bool isRecordedEvent, bool isRecording, BaseMap* pMap)
 {
-#if USE_SDL3_SOUND
     SND_Pause_Audio();
-#endif
 
-    if (gMovieSoundEntry)
-    {
-#if !USE_SDL3_SOUND
-        LPDIRECTSOUNDBUFFER pDSoundBuffer = gMovieSoundEntry->field_4_pDSoundBuffer;
-        if (pDSoundBuffer)
-        {
-            pDSoundBuffer->Stop();
-        }
-#endif
-    }
     if (SND_Seq_Table_Valid())
     {
         SND_StopAll();
     }
 
     // Full screen message boxes act really strange.. so force window mode before we show it
-    const SDL_WindowFlags flags = SDL_GetWindowFlags(Sys_GetWindowHandle());
     bool forcedWindowMode = false;
-    if (flags & SDL_WINDOW_FULLSCREEN)
+    if (mWindow.IsFullscreen())
     {
         forcedWindowMode = true;
-        SDL_SetWindowFullscreen(Sys_GetWindowHandle(), 0);
+        mWindow.SetFullscreen(false);
     }
 
     bool actuallyQuit = false;
@@ -707,7 +599,7 @@ static void QuitEvent(bool isRecordedEvent, bool isRecording, BaseMap* pMap)
     }
 
     const MessageBoxButton recordedButtonResult = actuallyQuit ? MessageBoxButton::eYes : MessageBoxButton::eNo;
-    const MessageBoxButton button = isRecordedEvent ? recordedButtonResult : Sys_MessageBox(Sys_GetWindowHandle(), "Do you really want to quit?", "R.E.L.I.V.E.", MessageBoxType::eQuestion);
+    const MessageBoxButton button = isRecordedEvent ? recordedButtonResult : ShowMessageBox(&mWindow, "Do you really want to quit?", "R.E.L.I.V.E.", MessageBoxType::eQuestion);
 
     if (isRecording)
     {
@@ -722,31 +614,21 @@ static void QuitEvent(bool isRecordedEvent, bool isRecording, BaseMap* pMap)
         GetSoundAPI().mSND_Restart(*pMap);
     }
 
-#if !USE_SDL3_SOUND
-    if (gMovieSoundEntry && gMovieSoundEntry->field_4_pDSoundBuffer)
-    {
-        gMovieSoundEntry->field_4_pDSoundBuffer->Play(0, 0, 1);
-    }
-#endif
-
     if (button == MessageBoxButton::eYes)
     {
-        // So Sys_PumpMessages thinks we got an quit
-        bNeedToQuit = true;
+        mQuitConfirmed = true;
     }
     else
     {
         if (forcedWindowMode)
         {
-            SDL_SetWindowFullscreen(Sys_GetWindowHandle(), true);
+            mWindow.SetFullscreen(true);
         }
-#if USE_SDL3_SOUND
         SND_Resume_Audio();
-#endif
     }
 }
 
-s8 Sys_PumpMessages(BaseMap* pMap)
+Sys::PumpResult Sys::PumpEvents(BaseMap* pMap)
 {
     GetGameAutoPlayer().SyncPoint(SyncPoints::PumpEventsStart);
 
@@ -754,8 +636,9 @@ s8 Sys_PumpMessages(BaseMap* pMap)
     const bool isRecording = GetGameAutoPlayer().IsRecording();
     const bool isPlaying = GetGameAutoPlayer().IsPlaying();
 
-    // Replay any recorded events
-    if (isPlaying)
+    // Replay any recorded events. None were recorded while the recorder was disabled (e.g.
+    // while loading), and reading them then would take them from the wrong place.
+    if (isPlaying && !GetGameAutoPlayer().IsRecorderDisabled())
     {
         while (GetGameAutoPlayer().PeekNextType() == RecordTypes::EventPoint)
         {
@@ -793,21 +676,21 @@ s8 Sys_PumpMessages(BaseMap* pMap)
         const bool allowAutoSwitch = !isRecording && !isPlaying;
         if (allowAutoSwitch)
         {
-            if (event.type == SDL_EVENT_JOYSTICK_ADDED && !isRecording)
+            if (event.type == SDL_EVENT_JOYSTICK_ADDED)
             {
-                totalConnectedJoysticks++;
+                mConnectedJoysticks++;
                 LOG_INFO("User just inserted joystick!");
-                Input_Init(*spResMan);
+                Input_Init(mResMan);
                 Input().SetJoyStickEnabled(true);
             }
-            else if (event.type == SDL_EVENT_JOYSTICK_REMOVED && !isRecording)
+            else if (event.type == SDL_EVENT_JOYSTICK_REMOVED)
             {
-                totalConnectedJoysticks--;
+                mConnectedJoysticks--;
                 LOG_INFO("User just removed joystick!");
 
-                if (totalConnectedJoysticks > 0)
+                if (mConnectedJoysticks > 0)
                 {
-                    Input_Init(*spResMan); // Ensures next joystick is usable
+                    Input_Init(mResMan); // Ensures next joystick is usable
                 }
                 else
                 {
@@ -847,18 +730,6 @@ s8 Sys_PumpMessages(BaseMap* pMap)
                 GetGameAutoPlayer().RecordEvent(recEvent);
             }
         }
-        else if (event.window.type == SDL_EVENT_WINDOW_FOCUS_GAINED)
-        {
-            sAppIsActivated = true;
-        }
-        else if (event.window.type == SDL_EVENT_WINDOW_FOCUS_LOST)
-        {
-            sAppIsActivated = false;
-        }
-        else if (event.window.type == SDL_EVENT_WINDOW_EXPOSED)
-        {
-            // Add_Dirty_Area_4ED970(0, 0, 640, 240);
-        }
         else if (event.type == SDL_EVENT_QUIT)
         {
             if (!isPlaying)
@@ -879,109 +750,26 @@ s8 Sys_PumpMessages(BaseMap* pMap)
             else
             {
                 // Force quit if attempting to close the game during playback
-                bNeedToQuit = true;
+                mQuitConfirmed = true;
             }
         }
-        else if (event.type == Sys_BaseUserEventNumber())
+        else if (event.type == mPathReloadEventType)
         {
             std::string t(reinterpret_cast<const char*>(event.user.data1), reinterpret_cast<uintptr_t>(event.user.data2));
             delete[] reinterpret_cast<const char*>(event.user.data1);
 
             LOG_INFO("Reload path event %s", t.c_str());
 
-            if (pMap)
-            {
-                pMap->ReloadPathJsonRequest(t);
-            }
+            mPathReloadRequests.push_back(std::move(t));
         }
     }
 
     GetGameAutoPlayer().SyncPoint(SyncPoints::PumpEventsEnd);
 
-    if (bNeedToQuit)
-    {
-        return 1;
-    }
-
-    return 0;
+    return mQuitConfirmed ? PumpResult::eQuit : PumpResult::eContinue;
 }
 
-u32 Sys_BaseUserEventNumber()
-{
-    const static u32 eventBase = SDL_RegisterEvents(1);
-    static bool loggedEventBase = false;
-    if (!loggedEventBase)
-    {
-        LOG_INFO("Event base %d", eventBase);
-        loggedEventBase = true;
-    }
-    return eventBase;
-}
-
-
-TWindowHandleType Sys_GetWindowHandle()
-{
-    return sHwnd;
-}
-
-void Sys_DestroyWindow()
-{
-    if (sHwnd)
-    {
-        SDL_DestroyWindow(sHwnd);
-        sHwnd = nullptr;
-    }
-}
-
-static void Sys_SetWindowIcon(TWindowHandleType window)
-{
-    SDL_Surface* iconSurface = SDL_CreateSurfaceFrom(kAppIconWidth, kAppIconHeight, SDL_PIXELFORMAT_RGBA32, const_cast<u8*>(kAppIconRGBA32), kAppIconWidth * 4);
-    if (iconSurface)
-    {
-        // Window managers (X11/Wayland/Windows taskbar) only pick this up from the running
-        // process - the exe resource icon (see resource.rc) doesn't cover it.
-        SDL_SetWindowIcon(window, iconSurface);
-        SDL_DestroySurface(iconSurface);
-    }
-    else
-    {
-        LOG_ERROR("Failed to create window icon surface %s", SDL_GetError());
-    }
-}
-
-bool Sys_WindowClass_Register(const char_type* lpWindowName, s32 /*x*/, s32 /*y*/, s32 nWidth, s32 nHeight, s32 extraAttributes)
-{
-    TRACE_ENTRYEXIT;
-
-    sHwnd = SDL_CreateWindow(lpWindowName, nWidth, nHeight, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | extraAttributes);
-    if (sHwnd)
-    {
-        LOG_INFO("Window created");
-
-        Sys_SetWindowIcon(sHwnd);
-
-        if (!SDL_SetWindowPosition(sHwnd, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED))
-        {
-            // wayland doesn't allow setting the window pos
-            LOG_INFO("%s", SDL_GetError());
-        }
-
-        Input_InitKeyStateArray_4EDD60();
-
-        SDL_HideCursor();
-
-        // SDL will not send a window focused message on start up, so default to activated
-        sAppIsActivated = true;
-    }
-    else
-    {
-        LOG_ERROR("Window create with flags %d failed with %s", extraAttributes, SDL_GetError());
-    }
-    return sHwnd != nullptr;
-}
-
-
-MessageBoxButton Sys_MessageBox(TWindowHandleType windowHandle, const char_type* message, const char_type* title, MessageBoxType type)
+MessageBoxButton Sys::ShowMessageBox(const Window* pParent, const char_type* message, const char_type* title, MessageBoxType type)
 {
     SDL_MessageBoxData data = {};
     data.title = title;
@@ -1007,7 +795,7 @@ MessageBoxButton Sys_MessageBox(TWindowHandleType windowHandle, const char_type*
         data.buttons = buttons;
     }
 
-    data.window = windowHandle;
+    data.window = pParent ? pParent->Get() : nullptr;
 
     switch (type)
     {
@@ -1039,4 +827,11 @@ MessageBoxButton Sys_MessageBox(TWindowHandleType windowHandle, const char_type*
     }
 
     return MessageBoxButton::eOK;
+}
+
+std::vector<std::string> Sys::TakePathReloadRequests()
+{
+    std::vector<std::string> requests = std::move(mPathReloadRequests);
+    mPathReloadRequests.clear();
+    return requests;
 }

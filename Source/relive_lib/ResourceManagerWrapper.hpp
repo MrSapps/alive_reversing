@@ -2,6 +2,8 @@
 
 #include "AnimResources.hpp"
 #include <mutex>
+#include <condition_variable>
+#include <set>
 
 enum class AnimId;
 enum class EReliveLevelIds : s16;
@@ -198,6 +200,14 @@ class FileSystem;
 class IniFile;
 
 // Temp adapter interface
+// When the main loop shows the loading icon while waiting, see
+// ResourceManagerWrapper::RequestLoadingWait
+enum class LoadingIcon
+{
+    eIfSlow, // once the wait has taken a while
+    eNow,    // straight away, even if nothing is loading
+};
+
 class ResourceManagerWrapper final
 {
 public:
@@ -253,8 +263,11 @@ public:
 
     std::string FmvPath(const std::string& fmvName);
 
-    // TODO: needs to be async like og
+    // Starts loading anim on a worker thread. Whatever needs it asks the main loop to wait for
+    // it with RequestLoadingWait, and uses it with LoadAnimation once that's done.
     void PendAnimation(AnimId anim, const std::string& theme = "");
+    // Waits for anim if it's still being loaded by PendAnimation, or loads it right now if
+    // nothing pended it
     AnimResource LoadAnimation(AnimId anim, const std::string& themeName = "");
 
     PalResource LoadPal(PalId pal);
@@ -281,11 +294,29 @@ public:
     };
     const SoundThemeInfo& LoadSoundThemeInfo(const std::string& soundTheme);
 
-    void LoadingLoop(bool bShowLoadingIcon, class BaseMap* pMap = nullptr);
+    // Asks the main loop to wait for everything pended so far before it carries on (see
+    // Engine::Game_Loop). Whatever needs those resources carries on from its next update, or
+    // returns ScreenChangeResult::eWaiting for a screen change.
+    void RequestLoadingWait(LoadingIcon icon = LoadingIcon::eIfSlow);
+    bool LoadingWaitRequested() const
+    {
+        return mLoadingWaitRequested;
+    }
+    bool ShowLoadingIconNow() const
+    {
+        return mShowLoadingIconNow;
+    }
+    // Called by the main loop once nothing is loading any more
+    void EndLoadingWait();
 
-    // TODO: Call LoadingLoop after master/engine merge, LoadingLoop will
-    // cause a de-sync due to calling sound funcs
-    void LoadingLoop2();
+    // True while any pended resource is still loading
+    bool IsLoading();
+
+    // For testing slow storage: each resource loaded on a worker thread takes at least this long
+    void SetDebugLoadDelay(u32 delayMs)
+    {
+        mDebugLoadDelayMs = delayMs;
+    }
 
     // Thread-safe: records a resource that should always exist (an animation, etc) but
     // couldn't be found at any of the given locations, instead of raising a message box
@@ -298,17 +329,13 @@ public:
     // Must be called from the main thread. Collates every ReportMissingResource() call made
     // since the last flush into one message box - each resource listed with every location
     // searched for it, in the order they were tried - then fatally aborts if anything was
-    // recorded. LoadingLoop/LoadingLoop2 already call this once their batch of async loading
-    // finishes; call it from elsewhere too (e.g. a VUpdate) if reports need to surface sooner.
+    // recorded. EndLoadingWait already calls this once a batch of async loading has finished;
+    // call it from elsewhere too (e.g. a VUpdate) if reports need to surface sooner.
     void FlushMissingResourceReports();
 
     // Stateless helper, no instance state is used
     static s32 SEQ_HashName(const char_type* seqFileName);
 
-    s16 bHideLoadingIcon = 0;
-    s32 loading_ticks = 0;
-
-    void ShowLoadingIcon(class BaseMap& map);
 
     template <typename T, int size>
     void PendAnims(const T (&anims)[size])
@@ -356,6 +383,12 @@ public:
     using AnimCacheKey = std::pair<std::string, AnimId>;
     std::map<AnimCacheKey, AnimCache> mLoadedAnimations;
 
+    // Pended animations still loading, guarded by mLoadedAnimationsMutex. mAnimationLoaded is
+    // signalled each time one finishes (whether it was found or not).
+    std::set<AnimCacheKey> mPendingAnimations;
+    std::condition_variable mAnimationLoaded;
+    u32 mDebugLoadDelayMs = 0;
+
     // FileSystem has no state, so sharing this reference across ThreadPool worker threads is safe.
     FileSystem& mFs;
 
@@ -363,6 +396,9 @@ public:
 private:
     // unique_ptr to avoid bringing the header in
     std::unique_ptr<ThreadPool> mThreadPool;
+
+    bool mLoadingWaitRequested = false;
+    bool mShowLoadingIconNow = false;
 
     std::map<std::string, SoundThemeInfo> mSoundThemeInfoCache;
 };

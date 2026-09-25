@@ -31,6 +31,7 @@
 #include "../relive_lib/ObjectIds.hpp"
 #include "../relive_lib/Engine.hpp"
 #include "GameEnderController.hpp"
+#include "../relive_lib/GameObjects/QuitGame.hpp"
 
 namespace AO {
 
@@ -514,8 +515,32 @@ void Menu::VScreenChanged()
     // Empty
 }
 
+Menu::AfterMovieResult Menu::UpdateAfterMovie()
+{
+    if (!mRestoreAfterMovie)
+    {
+        return AfterMovieResult::eNothingToDo;
+    }
+
+    if (Movie::gMovieRefCount == 0)
+    {
+        mRestoreAfterMovie = false;
+
+        gPsxDisplay.PutCurrentDispEnv();
+        gScreenManager->DecompressCameraToVRam(mMap.mCurrentCameras[0]->mCamRes);
+        gScreenManager->EnableRendering();
+        SND_Restart(mMap);
+    }
+    return AfterMovieResult::eBusy;
+}
+
 void Menu::VUpdate()
 {
+    if (UpdateAfterMovie() == AfterMovieResult::eBusy)
+    {
+        return;
+    }
+
     mButtonRgb += mButtonRgbModifier;
 
     if (mButtonRgb < 40 || mButtonRgb > 80)
@@ -642,35 +667,14 @@ void Menu::FMV_Select_Update()
                     SND_StopAll();
 
                     const FmvInfo* pFmvRec = Path_Get_FMV_Record(sActiveList[mSelectedButtonIndex.raw].mLevel, sActiveList[mSelectedButtonIndex.raw].mFmvId);
-                    relive_new Movie(pFmvRec->mName, mResMan, mMap);
+                    auto pMovie = relive_new Movie(pFmvRec->mName, mResMan, mMap);
+                    mRestoreAfterMovie = true;
 
-                    while (Movie::gMovieRefCount)
-                    {
-                        for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
-                        {
-                            BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
-                            if (!pObj)
-                            {
-                                break;
-                            }
-
-                            if (pObj->Type() == ReliveTypes::eMovie)
-                            {
-                                if (pObj->GetUpdatable())
-                                {
-                                    if (!pObj->GetDead() && (!gNumCamSwappers || pObj->GetUpdateDuringCamSwap()))
-                                    {
-                                        pObj->VUpdate();
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    gPsxDisplay.PutCurrentDispEnv();
-                    gScreenManager->DecompressCameraToVRam(mMap.mCurrentCameras[0]->mCamRes);
-                    gScreenManager->EnableRendering();
-                    SND_Restart(mMap);
+                    // Start it now rather than when the object loop gets to it, like the
+                    // original did. When recording or playing back it finishes straight away,
+                    // so restore the menu straight away too.
+                    pMovie->VUpdate();
+                    UpdateAfterMovie();
                 }
                 else
                 {
@@ -1197,8 +1201,7 @@ void Menu::GoToSelectedMenuPage()
 
             // Quit
             case MainMenuOptions::eQuit_2:
-                gBreakGameLoop = true;
-                exit(0);
+                relive_new QuitGame(mResMan, mMap);
                 break;
 
             // Load
@@ -1659,24 +1662,31 @@ void Menu::NewGameStart()
 {
     if (!gAbe)
     {
-        mResMan.PendAnims(Abe::sAbeMotionAnimIds);
-        // TODO: Hack - should be part of abes anim array
-        // These animations were originally loaded in the abe ctor in OG
-        mResMan.PendAnimation(AnimId::ChantOrb_Particle);
-        mResMan.PendAnimation(AnimId::ChantOrb_Particle_Small);
-        mResMan.PendAnimation(AnimId::SquibSmoke_Particle);
-        mResMan.PendAnimation(AnimId::BloodDrop);
-        mResMan.PendAnimation(AnimId::ObjectShadow);
-        mResMan.PendAnimation(AnimId::DeathFlare_1);
-        mResMan.PendAnimation(AnimId::DeathFlare_2);
-        mResMan.PendAnimation(AnimId::Dove_Idle);
-        mResMan.PendAnimation(AnimId::Dove_Flying);
+        if (!mAbeAnimsPended)
+        {
+            mResMan.PendAnims(Abe::sAbeMotionAnimIds);
+            // TODO: Hack - should be part of abes anim array
+            // These animations were originally loaded in the abe ctor in OG
+            mResMan.PendAnimation(AnimId::ChantOrb_Particle);
+            mResMan.PendAnimation(AnimId::ChantOrb_Particle_Small);
+            mResMan.PendAnimation(AnimId::SquibSmoke_Particle);
+            mResMan.PendAnimation(AnimId::BloodDrop);
+            mResMan.PendAnimation(AnimId::ObjectShadow);
+            mResMan.PendAnimation(AnimId::DeathFlare_1);
+            mResMan.PendAnimation(AnimId::DeathFlare_2);
+            mResMan.PendAnimation(AnimId::Dove_Idle);
+            mResMan.PendAnimation(AnimId::Dove_Flying);
 
-        // Required after abe gets back from both temples and gets the ring from big face
-        mResMan.PendAnimation(AnimId::ShrykullStart);
-        mResMan.PendAnimation(AnimId::ShrykullTransform);
-        mResMan.PendAnimation(AnimId::ShrykullDetransform);
-        mResMan.LoadingLoop2();
+            // Required after abe gets back from both temples and gets the ring from big face
+            mResMan.PendAnimation(AnimId::ShrykullStart);
+            mResMan.PendAnimation(AnimId::ShrykullTransform);
+            mResMan.PendAnimation(AnimId::ShrykullDetransform);
+
+            // Abe is made on the next update, once the main loop has waited for these
+            mResMan.RequestLoadingWait();
+            mAbeAnimsPended = true;
+            return;
+        }
         gAbe = relive_new Abe(mResMan, mMap);
     }
 

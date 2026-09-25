@@ -3,7 +3,6 @@
 #include "SDLSoundBuffer.hpp"
 #include "SDLSoundSystem.hpp"
 
-#if USE_SDL3_SOUND
 
 bool gReverbEnabled = false;
 bool gAudioStereo = true;
@@ -45,4 +44,3 @@ const char_type* SND_HR_Err_To_String_SDL(long)
     return "unknown error";
 }
 
-#endif

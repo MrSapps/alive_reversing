@@ -272,7 +272,36 @@ public:
 
     void Set_Anim_4D05E0(s16 a2, s16 a3 = 0);
     void Load_Anim_Pal_4D06A0(Animation* pAnim);
-    s32 ChangeScreenAndIntroLogic_4CF640();
+    enum class ChangeScreen
+    {
+        eNone,
+        eChanging,
+        // The rest of the update runs after the logo movies, see UpdateAfterMovie
+        ePlayingIntroLogos,
+    };
+    ChangeScreen ChangeScreenAndIntroLogic_4CF640();
+
+    // What the menu does once the movie it's waiting on has finished
+    enum class AfterMovie : s16
+    {
+        eNone,
+        eRestoreMenu,
+        eRestoreMenuSelectStartGame,
+        ePlayDDLogo,
+        eFinishIntroLogos,
+    };
+
+    // Plays a movie (which freezes everything else until it has finished), then does afterMovie
+    void PlayMovie(const char_type* pName, AfterMovie afterMovie);
+    enum class AfterMovieResult
+    {
+        eNothingToDo,
+        // Did something or is still waiting on the movie: skip the rest of this update
+        eBusy,
+    };
+
+    // Carries on once the movie the menu is waiting on has finished
+    AfterMovieResult UpdateAfterMovie();
     void AnimationAndSoundLogic_4CFE80();
     void UpdateHighliteGlow_4D0630();
     static void DrawMenuText_4D20D0(const MainMenuText* array, OrderingTable& ot, AliveFont* font, s32* polyIndex, s8 a5);
@@ -407,6 +436,11 @@ public:
     s16 field_23A_Inside_LoadGame_Screen = 0;
     bool mDisableChangingSelection = false;
     bool mLoading = false;
+    // The message shown when a demo file is missing, see LoadDemo_Update_4D1040
+    Guid mDemoMessageId;
+    AfterMovie mAfterMovie = AfterMovie::eNone;
+    // Abe's animations have been pended for a new game, see LoadNewGame_Update_4D0920
+    bool mAbeAnimsPended = false;
     bool mLoadingSave = false;
     bool mGameSpeakPlaying = false;
     bool mChantSeqPlaying = false;

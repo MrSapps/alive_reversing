@@ -1,15 +1,18 @@
 #pragma once
 
-#include "../../../relive_lib/Sys.hpp"
+#include <SDL3/SDL.h>
 
-//typedef void* SDL_GLContext;
+class Window;
 
 class GLContext final
 {
 public:
-    GLContext(TWindowHandleType window);
+    explicit GLContext(Window& window);
     ~GLContext();
 
+    void SwapBuffers();
+
 private:
+    Window& mWindow;
     SDL_GLContext mContext = nullptr;
 };

@@ -24,10 +24,8 @@ static SaveData sSaveToLoadBuffer = {};
 
 SaveData gSaveBuffer = {};
 
-void Kill_Objects(BaseMap& map)
+void Kill_Objects()
 {
-    map.GetResourceManager().LoadingLoop(0);
-
     for (s32 i = 0; i < 2; i++)
     {
         for (s32 j = 0; j < gBaseGameObjects->Size(); j++)
@@ -58,7 +56,7 @@ void SaveGame::LoadFromMemory(SaveData* pData, s32 bKillObjects, BaseMap& map)
 
     if (bKillObjects)
     {
-        Kill_Objects(map);
+        Kill_Objects();
     }
 
     // Legacy SaveData is a flatter, older format than AbeSaveState (no TLV

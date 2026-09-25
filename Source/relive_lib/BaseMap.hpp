@@ -14,8 +14,25 @@ class Camera;
 class ResourceManagerWrapper;
 class Particle;
 class BaseAnimatedWithPhysicsGameObject;
+class BaseGameObject;
 
 enum class ReliveTypes : s16;
+
+// What the screen change steps return, see BaseMap::ScreenChange
+enum class ScreenChangeResult
+{
+    eDone,
+    // A modal (purple lights, the endings' FMVs) or loading has to finish first: call it again
+    // after
+    eWaiting,
+};
+
+// What BaseMap::RemoveObjectsWithPurpleLight returns
+enum class PurpleLightResult
+{
+    eNoLights,
+    eShowing,
+};
 
 // Up to 3 FMVs to play back to back during a camera swap. Replaces the old scheme of
 // packing up to 3 small FMV indices into a single decimal number (e.g. 12402 meant
@@ -149,9 +166,19 @@ public:
     virtual CameraPos Rect_Location_Relative_To_Active_Camera(const PSX_RECT* pRect, s16 width = 0) = 0;
     virtual s16 Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect) = 0;
     virtual s16 Is_Point_In_Current_Camera(EReliveLevelIds level, s32 path, FP xpos, FP ypos, s16 width) = 0;
-    virtual void GoTo_Camera() = 0;
-    virtual void ScreenChange() = 0;
-    virtual void Handle_PathTransition() = 0;
+    // Changes to the next camera. It waits for what the new camera's objects need to load
+    // before making them, and the game endings' FMV change (eUnknown_11) plays its FMVs first:
+    // calling it again once that's done carries on (see mScreenChangeResume).
+    virtual ScreenChangeResult GoTo_Camera() = 0;
+    // Runs a pending camera change at the end of a frame. While it's waiting on a modal
+    // (purple lights, the endings' FMVs) or on loading, Engine::RunFrame calls it again once
+    // that's finished and it carries on from where it stopped.
+    virtual ScreenChangeResult ScreenChange() = 0;
+    virtual ScreenChangeResult Handle_PathTransition() = 0;
+
+    // Restarts the music and ambient sounds once a camera swap has finished, after any purple
+    // lights it ends with.
+    virtual void VCameraSwapFinished() = 0;
 
     // Which on screen objects get a purple light, and the light particles spawned
     // for them. The two games scan different object lists and cull differently.
@@ -172,6 +199,8 @@ public:
     BinaryPath* GetPathResourceBlockPtr(u32 pathId);
     void FreePathResourceBlocks();
     void ClearPathResourceBlocks();
+    // The editor changed a path's JSON: reloads it if it's loaded. The Engine calls this
+    // between frames, and the camera change it needs runs at the start of the next one.
     void ReloadPathJsonRequest(const std::string& pathJsonFileName);
 
     // --- Camera/level transitions ---
@@ -184,7 +213,17 @@ public:
     bool SetActiveCam(EReliveLevelIds level, s16 path, s16 cam, CameraSwapEffects screenChangeEffect, FmvIds fmvIds = {}, bool forceChange = false);
     CameraPos GetDirection(EReliveLevelIds level, s32 path, FP xpos, FP ypos);
     void Get_map_size(PSX_Point* pPoint);
+    // The first camera is changed to at the start of the first frame, see
+    // ContinueDirectCameraChange
     void Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffects screenChangeEffect, FmvIds fmvIds = {}, bool forceChange = false);
+
+    // Init and path reloads change camera outside of a screen change: the Engine calls this at
+    // the start of each frame while one is pending, until it's done.
+    bool DirectCameraChangePending() const
+    {
+        return mDirectCameraChangePending;
+    }
+    ScreenChangeResult ContinueDirectCameraChange();
     void Shutdown();
     void Reset();
 
@@ -203,8 +242,26 @@ public:
 
     // --- Purple light / ambient sound ---
 
-    void RemoveObjectsWithPurpleLight(s16 bMakeInvisible);
+    // Plays the purple light effect for VPurpleLightFrameCount() frames as a modal (see
+    // GetActiveModal). When bMakeInvisible is 0 (the end of a camera swap),
+    // VCameraSwapFinished() runs once it's done.
+    PurpleLightResult RemoveObjectsWithPurpleLight(s16 bMakeInvisible);
     void Start_Sounds_For_Objects_In_Near_Cameras();
+
+    // --- Modal objects ---
+
+    // A modal object takes over the main loop the way the original game's nested loops did
+    // (pause menu, movies, purple lights...): while one is active, Engine::Game_Loop runs only
+    // the newest one's VModalUpdate() each iteration and the rest of the game is frozen behind
+    // it. See BaseGameObject::StartModal.
+    BaseGameObject* GetActiveModal() const
+    {
+        return mModals.empty() ? nullptr : mModals.back();
+    }
+    void AddModal(BaseGameObject& obj);
+    void RemoveModal(BaseGameObject& obj);
+    // For quitting: ends every modal without finishing what it was doing
+    void EndAllModals();
 
     // --- Quicksave ---
 
@@ -269,9 +326,29 @@ protected:
     void AddPurpleLight(BaseAnimatedWithPhysicsGameObject* pObj, DynamicArrayT<BaseAnimatedWithPhysicsGameObject>& objects, DynamicArrayT<Particle>& lights);
 
     void Create_FG1s();
-    void ScreenChange_Common();
+    ScreenChangeResult ScreenChange_Common();
+
+    // The game endings' FMV camera change (eUnknown_11) runs one update pass over every object
+    // before the new camera loads, the FMVs playing as the pass reaches them. Runs that pass as
+    // a modal, which finishes once the pass has, or once pFmvSwapper has been deleted.
+    // bKeepCantKill: AE keeps dead objects that can't be killed yet, AO deletes them.
+    void RunFmvCameraChangePass(BaseGameObject* pFmvSwapper, bool bKeepCantKill);
+
+    // Where a screen change that's waiting on a modal carries on from when it's called again
+    enum class ScreenChangeResume : s16
+    {
+        eNone,
+        eAfterPurpleLight,
+        eAfterFmvPass,
+        eAfterCameraLoad,
+    };
+    ScreenChangeResume mScreenChangeResume = ScreenChangeResume::eNone;
 
     ResourceManagerWrapper& mResourceManager;
     relive::Factory& mFactory;
     u32 mSoundChannelsMask = 0;
+
+private:
+    std::vector<BaseGameObject*> mModals;
+    bool mDirectCameraChangePending = false;
 };

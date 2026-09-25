@@ -3,7 +3,8 @@
 #include "CommandLineOptions.hpp"
 #include <FatalError.hpp>
 
-constexpr u32 kVersion = 0x1997 + 2;
+// Bump whenever what gets recorded, or the order it's recorded in, changes
+constexpr u32 kVersion = 0x1997 + 3;
 
 void BaseRecorder::Init(FileSystem& fs, const char* pFileName, bool autoFlushFile)
 {

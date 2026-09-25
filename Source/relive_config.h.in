@@ -14,7 +14,6 @@
 #cmakedefine01 XINPUT_SUPPORT
 #cmakedefine01 RENDER_TEST
 #cmakedefine01 USE_SDL3
-#cmakedefine01 USE_SDL3_SOUND
 #cmakedefine01 USE_SDL3_IO
 #cmakedefine01 RENDERER_OPENGL
 #cmakedefine BUILD_NUMBER @BUILD_NUMBER@

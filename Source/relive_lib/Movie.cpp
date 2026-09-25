@@ -11,7 +11,6 @@
 #include "Sys.hpp"
 #include "Sound/Sound.hpp"
 #include "../AliveLibAE/GameAutoPlayer.hpp"
-#include "Engine.hpp"
 #include "GameObjects/ScreenManager.hpp"
 #include "Renderer/IRenderer.hpp"
 #include "data_conversion/rgb_conversion.hpp"
@@ -27,6 +26,7 @@
 #include <thread>
 #include <utility>
 #include <algorithm>
+#include <optional>
 
 #pragma warning(push)
 #pragma warning(disable: 4505)
@@ -42,14 +42,6 @@
 // Inputs on the controller that can be used for aborting skippable movies
 const u32 MOVIE_SKIPPER_GAMEPAD_INPUTS = (InputCommands::eUnPause_OrConfirm | InputCommands::eBack | InputCommands::ePause);
 
-// Tells whether reverb was enabled before starting the FMV
-static bool wasReverbEnabled = false;
-static SoundEntry sFmvSoundEntry = {};
-static bool sNoAudioOrAudioError = false;
-static std::atomic<u32> sFmvPlaybackId = 0;
-
-namespace
-{
     struct MkvVideoFrame final
     {
         uint64_t mPtsNs = 0;
@@ -296,7 +288,7 @@ namespace
         std::atomic<size_t> mWriteIndex = 0;
     };
 
-    inline void ClampToRGB(s32& value)
+    static inline void ClampToRGB(s32& value)
     {
         if (value < 0)
         {
@@ -308,7 +300,7 @@ namespace
         }
     }
 
-    void ConvertI420ToRGBA(const aom_image_t* pImage, std::vector<u8>& rgbaPixels)
+    static void ConvertI420ToRGBA(const aom_image_t* pImage, std::vector<u8>& rgbaPixels)
     {
         const u32 width = pImage->d_w;
         const u32 height = pImage->d_h;
@@ -917,12 +909,12 @@ namespace
         std::thread mAudioThread;
     };
 
-    // Real IMovieSyncClock backing DDV_Play_Impl's own playback state - see MovieFrameSync.hpp
-    // for the fake used by MovieFrameSyncTests.cpp instead of this.
+    // Real IMovieSyncClock backing MoviePlayback's sync - see MovieFrameSync.hpp for the fake
+    // used by MovieFrameSyncTests.cpp instead of this.
     class RealMovieSyncClock final : public IMovieSyncClock
     {
     public:
-        RealMovieSyncClock(bool& audioStarted, u64& audioStartSample)
+        RealMovieSyncClock(bool audioStarted, u64 audioStartSample)
             : mAudioStarted(audioStarted)
             , mAudioStartSample(audioStartSample)
         {
@@ -943,17 +935,10 @@ namespace
             return AreMovieSkippingInputsHeld();
         }
 
-        void PumpIdle() override
-        {
-            SYS_EventsPump();
-            PSX_VSync(VSyncMode::UncappedFps);
-        }
-
     private:
-        bool& mAudioStarted;
-        u64& mAudioStartSample;
+        const bool mAudioStarted;
+        const u64 mAudioStartSample;
     };
-}
 
 static void Render_DDV_Frame(Poly_FT4* poly)
 {
@@ -963,83 +948,326 @@ static void Render_DDV_Frame(Poly_FT4* poly)
     IRenderer::GetRenderer()->StartFrame();
 }
 
-s8 DDV_Play_Impl(const char_type* pMovieName)
+// A movie being played a bit at a time: Movie calls Update() once per main loop iteration.
+class MoviePlayback final
 {
-    if (!pMovieName || !*pMovieName)
+public:
+    explicit MoviePlayback(const std::string& name)
+        : mName(name)
     {
-        return 1;
     }
 
-    while (AreMovieSkippingInputsHeld())
+    ~MoviePlayback()
     {
-        SYS_EventsPump();
-    }
-
-    WebmMoviePlayer movie;
-    if (!movie.Open(pMovieName) || !movie.Parse())
-    {
-        return 0;
-    }
-
-    const u32 playbackId = ++sFmvPlaybackId;
-    u32 renderedFrameCount = 0;
-    u32 droppedFrameCount = 0;
-    u32 staleFrameDisplayCount = 0;
-    u32 invalidDisplayedFrameCount = 0;
-    bool haveLastDisplayedOffset = false;
-    long long lastDisplayedOffset = 0;
-    u64 lastDisplayUpdateMs = SYS_GetTicks();
-    LOG_INFO("FMV playback %u: started", playbackId);
-
-    const bool hasAudio = movie.HasAudio();
-
-    sNoAudioOrAudioError = false;
-    if (hasAudio)
-    {
-        #if USE_SDL3_SOUND
-        wasReverbEnabled = gReverbEnabled;
-        gReverbEnabled = false;
-        #endif
-
-        const u32 sampleRate = movie.AudioSampleRate();
-        const u32 bitDepth = movie.AudioBitsPerSample();
-        const u32 channels = movie.AudioChannels();
-        const s32 soundFlags = channels > 1 ? 7 : (bitDepth == 16 ? 2 : 0);
-        const u32 audioBufferSamples = std::max<u32>(sampleRate * 4u, 4096u);
-
-        if (GetSoundAPI().mSND_New(&sFmvSoundEntry, static_cast<s32>(audioBufferSamples), sampleRate, bitDepth, soundFlags) < 0)
+        if (!mOpened)
         {
-            sFmvSoundEntry.field_4_pDSoundBuffer = nullptr;
-            sNoAudioOrAudioError = true;
+            return;
+        }
+
+        mPipeline.reset();
+
+        LOG_INFO("FMV playback %s: finished rendered=%u dropped=%u staleDisplayed=%u invalidDisplayed=%u", mName.c_str(),
+            mRenderedFrameCount, mDroppedFrameCount, mStaleFrameDisplayCount, mInvalidDisplayedFrameCount);
+
+        if (mSoundEntry.field_4_pDSoundBuffer)
+        {
+            SND_StopAll();
+            GetSoundAPI().mSND_Free(&mSoundEntry);
+            mSoundEntry.field_4_pDSoundBuffer = nullptr;
+        }
+
+        if (mReverbDisabled)
+        {
+            gReverbEnabled = mWasReverbEnabled;
         }
     }
-    else
+
+    MoviePlayback(const MoviePlayback&) = delete;
+    MoviePlayback& operator=(const MoviePlayback&) = delete;
+
+    // Returns false if the movie can't be played.
+    bool Open()
     {
-        sNoAudioOrAudioError = true;
+        if (!mMovie.Open(mName.c_str()) || !mMovie.Parse())
+        {
+            return false;
+        }
+        mOpened = true;
+
+        LOG_INFO("FMV playback %s: started", mName.c_str());
+        mLastDisplayUpdateMs = SYS_GetTicks();
+
+        mHasAudio = mMovie.HasAudio();
+        if (mHasAudio)
+        {
+            mWasReverbEnabled = gReverbEnabled;
+            mReverbDisabled = true;
+            gReverbEnabled = false;
+
+            const u32 sampleRate = mMovie.AudioSampleRate();
+            const u32 bitDepth = mMovie.AudioBitsPerSample();
+            const u32 channels = mMovie.AudioChannels();
+            const s32 soundFlags = channels > 1 ? 7 : (bitDepth == 16 ? 2 : 0);
+            const u32 audioBufferSamples = std::max<u32>(sampleRate * 4u, 4096u);
+
+            if (GetSoundAPI().mSND_New(&mSoundEntry, static_cast<s32>(audioBufferSamples), sampleRate, bitDepth, soundFlags) < 0)
+            {
+                mSoundEntry.field_4_pDSoundBuffer = nullptr;
+                mNoAudioOrAudioError = true;
+            }
+        }
+        else
+        {
+            mNoAudioOrAudioError = true;
+        }
+
+        mFmvFrame.mData.mWidth = mMovie.Width();
+        mFmvFrame.mData.mHeight = mMovie.Height();
+        mFmvFrame.mData.mPixels = std::make_shared<std::vector<u8>>();
+        mFmvFrame.mData.mPixels->resize(mFmvFrame.mData.mWidth * mFmvFrame.mData.mHeight * sizeof(RGBA32));
+
+        mPoly.SetXYWH(0, 0, 640, 240);
+        mPoly.mCam = &mFmvFrame;
+
+        mBlockAlign = (mMovie.AudioBitsPerSample() / 8u) * mMovie.AudioChannels();
+        mAudioBufferSamples = std::max<u32>(mMovie.AudioSampleRate() * 4u, 4096u);
+        mAudioFinished = !mHasAudio || mNoAudioOrAudioError;
+
+        mPipeline = std::make_unique<MkvMoviePipeline>(mMovie, mVideoQueue, mAudioQueue);
+        return true;
     }
 
-    CamResource fmvFrame;
-    fmvFrame.mData.mWidth = movie.Width();
-    fmvFrame.mData.mHeight = movie.Height();
-    fmvFrame.mData.mPixels = std::make_shared<std::vector<u8>>();
-    fmvFrame.mData.mPixels->resize(fmvFrame.mData.mWidth * fmvFrame.mData.mHeight * sizeof(RGBA32));
+    // Plays until a frame has been shown or it has to wait for the decoder or the audio.
+    // Finishes once the movie has played or been skipped.
+    ModalState Update()
+    {
+        for (;;)
+        {
+            switch (Step())
+            {
+                case StepResult::eContinue:
+                    break;
 
-    Poly_FT4 polyFT4 = {};
-    polyFT4.SetXYWH(0, 0, 640, 240);
-    polyFT4.mCam = &fmvFrame;
+                case StepResult::eYield:
+                    PSX_VSync(VSyncMode::UncappedFps);
+                    return ModalState::eRunning;
+
+                case StepResult::eFinished:
+                    return ModalState::eFinished;
+            }
+        }
+    }
+
+private:
+    enum class StepResult
+    {
+        eContinue,
+        eYield,
+        eFinished,
+    };
+
+    StepResult Step()
+    {
+        if (!mPendingFrame && mVideoQueue.Empty() && mPipeline->VideoComplete())
+        {
+            return StepResult::eFinished;
+        }
+
+        FeedAudio();
+
+        if (mHasAudio && !mAudioStarted && !mAudioFinished && !mNoAudioOrAudioError)
+        {
+            if ((SYS_GetTicks() & 255) < 2)
+            {
+                LOG_INFO("FMV playback %s: waiting for audio preroll samples=%u pending=%zu", mName.c_str(),
+                    mAudioSamplesSubmitted, mPendingAudioChunks.size());
+            }
+            return StepResult::eYield;
+        }
+
+        if (!mPendingFrame)
+        {
+            MkvVideoFrame frame;
+            if (!mVideoQueue.TryPop(frame))
+            {
+                if (mPipeline->VideoComplete())
+                {
+                    return StepResult::eFinished;
+                }
+                return StepResult::eYield;
+            }
+
+            // SND_Get_Generated_Audio_Samples() counts samples at the mixer's fixed output rate
+            // (every voice, including this movie's, gets resampled to it - see
+            // SDLSoundBuffer::SetFrequency) - so it must be divided by that device rate here, not
+            // by the movie's own AudioSampleRate(). AE's DDV audio happens to already be 44100Hz,
+            // matching the (also 44100Hz) device rate, which is why this was previously masked;
+            // AO's true 18900Hz stream exposed it as frames dropping and audio going out of sync.
+            LOG_INFO("FMV playback %s: dequeued offset=%lld pts=%llu clock=%llu", mName.c_str(), frame.mFileOffset,
+                static_cast<unsigned long long>(frame.mPtsNs),
+                static_cast<unsigned long long>(AudioClockMs()));
+
+            mPendingFrame = std::move(frame);
+        }
+
+        if (AreMovieSkippingInputsHeld())
+        {
+            return StepResult::eFinished;
+        }
+
+        const u64 frameMs = mPendingFrame->mPtsNs / 1000000ULL;
+        RealMovieSyncClock syncClock(mAudioStarted, mAudioStartSample);
+        const MovieFrameOutcome syncOutcome = ProcessMovieFrameSync(frameMs, syncClock);
+        if (syncOutcome == MovieFrameOutcome::Wait)
+        {
+            // Ahead of the audio, show it on a later tick
+            return StepResult::eYield;
+        }
+
+        MkvVideoFrame frame = std::move(*mPendingFrame);
+        mPendingFrame.reset();
+
+        if (syncOutcome == MovieFrameOutcome::Dropped)
+        {
+            ++mDroppedFrameCount;
+
+            // Otherwise, with a big enough backlog of stale/behind frames to drop, the screen
+            // sits on whatever was last actually rendered for however long the backlog takes to
+            // clear, then jumps straight to current - looks frozen, then hitches. Occasionally
+            // painting one of the stale frames anyway (throttled by wall-clock time so it
+            // doesn't slow down actually catching up) makes it read as fast-forwarding instead.
+            const u64 nowMs = SYS_GetTicks();
+            if (ShouldDisplayStaleFrame(nowMs, mLastDisplayUpdateMs))
+            {
+                ++mStaleFrameDisplayCount;
+                DisplayFrame(frame);
+                LOG_INFO("FMV playback %s: stale frame while catching up offset=%lld pts=%llu dropped=%u queued=%zu",
+                    mName.c_str(), frame.mFileOffset, static_cast<unsigned long long>(frame.mPtsNs),
+                    mDroppedFrameCount, mVideoQueue.Size());
+            }
+            return StepResult::eContinue;
+        }
+
+        if (syncOutcome == MovieFrameOutcome::SkippedByUserInput)
+        {
+            return StepResult::eFinished;
+        }
+
+        LOG_INFO("FMV playback: render frame pts=%llu queued=%zu", static_cast<unsigned long long>(frame.mPtsNs), mVideoQueue.Size());
+        ++mRenderedFrameCount;
+        DisplayFrame(frame);
+        LOG_INFO("FMV playback %s: screen frame=%u offset=%lld pts=%llu clock=%llu queued=%zu", mName.c_str(), mRenderedFrameCount,
+            frame.mFileOffset, static_cast<unsigned long long>(frame.mPtsNs),
+            static_cast<unsigned long long>(AudioClockMs()),
+            mVideoQueue.Size());
+
+        return StepResult::eYield;
+    }
+
+    u64 AudioClockMs() const
+    {
+        return mAudioStarted
+            ? (SND_Get_Generated_Audio_Samples() - mAudioStartSample) * 1000 / SND_Get_Device_Sample_Rate()
+            : 0;
+    }
+
+    // Moves decoded audio into the movie's sound buffer as it has room, starting it once enough
+    // has been buffered.
+    void FeedAudio()
+    {
+        MkvAudioChunk audioChunk;
+        while (mAudioQueue.TryPop(audioChunk))
+        {
+            mPendingAudioChunks.push_back(std::move(audioChunk));
+        }
+
+        const u32 maxBufferedSamples = mAudioBufferSamples - std::min<u32>(mAudioBufferSamples / 4u, 1024u);
+        while (!mNoAudioOrAudioError && mHasAudio && !mPendingAudioChunks.empty())
+        {
+            const u32 readOffset = mAudioStarted
+                ? GetSoundAPI().mSND_Get_Sound_Entry_Pos(&mSoundEntry)
+                : 0;
+            const u32 bufferedSamples = mAudioStarted
+                ? (mAudioWriteOffset >= readOffset ? mAudioWriteOffset - readOffset : mAudioBufferSamples - readOffset + mAudioWriteOffset)
+                : mAudioSamplesSubmitted;
+            if (bufferedSamples >= maxBufferedSamples)
+            {
+                break;
+            }
+
+            MkvAudioChunk& pendingChunk = mPendingAudioChunks.front();
+            const u32 pendingSamples = static_cast<u32>(pendingChunk.mBuffer.size() / std::max<u32>(1u, mBlockAlign));
+            if (pendingSamples == 0)
+            {
+                mPendingAudioChunks.pop_front();
+                continue;
+            }
+
+            const u32 bufferSpaceSamples = maxBufferedSamples - bufferedSamples;
+            const u32 samplesUntilBufferEnd = mAudioBufferSamples - mAudioWriteOffset;
+            const u32 samplesToWrite = std::min({pendingSamples, bufferSpaceSamples, samplesUntilBufferEnd});
+            if (samplesToWrite == 0)
+            {
+                mAudioWriteOffset = 0;
+                continue;
+            }
+
+            u64 audioHash = 1469598103934665603ULL;
+            const size_t bytesToWrite = static_cast<size_t>(samplesToWrite) * mBlockAlign;
+            for (size_t byteIndex = 0; byteIndex < bytesToWrite; ++byteIndex)
+            {
+                audioHash ^= pendingChunk.mBuffer[byteIndex];
+                audioHash *= 1099511628211ULL;
+            }
+
+            if (GetSoundAPI().mSND_LoadSamples(&mSoundEntry, mAudioWriteOffset, pendingChunk.mBuffer.data(), samplesToWrite) < 0)
+            {
+                mNoAudioOrAudioError = true;
+                break;
+            }
+            ++mAudioWriteCount;
+            LOG_INFO("FMV playback %s: audio write=%u sourceOffset=%lld pts=%llu writeOffset=%u readOffset=%u samples=%u hash=%llu",
+                mName.c_str(), mAudioWriteCount, pendingChunk.mFileOffset,
+                static_cast<unsigned long long>(pendingChunk.mPtsNs), mAudioWriteOffset, readOffset, samplesToWrite,
+                static_cast<unsigned long long>(audioHash));
+            mAudioWriteOffset = (mAudioWriteOffset + samplesToWrite) % mAudioBufferSamples;
+            mAudioSamplesSubmitted += samplesToWrite;
+            pendingChunk.mBuffer.erase(pendingChunk.mBuffer.begin(), pendingChunk.mBuffer.begin() + samplesToWrite * mBlockAlign);
+            if (pendingChunk.mBuffer.empty())
+            {
+                mPendingAudioChunks.pop_front();
+            }
+
+            if (!mAudioStarted && (mAudioSamplesSubmitted >= mMovie.AudioSampleRate() / 5u || mPipeline->AudioComplete()))
+            {
+                if (FAILED(SND_PlayEx(&mSoundEntry, 116, 116, 1.0, 0, 1, 100)))
+                {
+                    mNoAudioOrAudioError = true;
+                }
+                mAudioStartSample = SND_Get_Generated_Audio_Samples();
+                mAudioStarted = !mNoAudioOrAudioError;
+            }
+        }
+
+        if (mAudioStarted && !mAudioFinished && mPipeline->AudioComplete() && mPendingAudioChunks.empty()
+            && SND_Get_Generated_Audio_Samples() - mAudioStartSample >= mAudioSamplesSubmitted)
+        {
+            SND_StopAll();
+            mAudioStarted = false;
+            mAudioFinished = true;
+            LOG_INFO("FMV playback %s: audio finished samples=%u", mName.c_str(), mAudioSamplesSubmitted);
+        }
+    }
 
     // Shared by both the normal (in-sync) render path and the stale-frame-while-catching-up
-    // path below (see ShouldDisplayStaleFrame) - both paint real decoded pixels to the screen,
-    // so both should feed the same non-increasing-screen-content diagnostic below.
-    auto DisplayFrame = [&](const MkvVideoFrame& f)
+    // path (see ShouldDisplayStaleFrame) - both paint real decoded pixels to the screen, so both
+    // should feed the same non-increasing-screen-content diagnostic below.
+    void DisplayFrame(const MkvVideoFrame& f)
     {
-        std::memcpy(fmvFrame.mData.mPixels->data(), f.mPixels.data(), f.mPixels.size());
+        std::memcpy(mFmvFrame.mData.mPixels->data(), f.mPixels.data(), f.mPixels.size());
 
-        Input_IsVKPressed_4EDD40(VK_ESCAPE);
-        Input_IsVKPressed_4EDD40(VK_RETURN);
-
-        polyFT4.mCam->mUniqueId = UniqueResId{};
-        Render_DDV_Frame(&polyFT4);
+        mPoly.mCam->mUniqueId = UniqueResId{};
+        Render_DDV_Frame(&mPoly);
 
         // Keep the "camera" ScreenManager draws into the ordering table every tick (behind
         // whatever Movie's own direct Render_DDV_Frame presents while a movie is actively
@@ -1048,14 +1276,11 @@ s8 DDV_Play_Impl(const char_type* pMovieName)
         // multi-FMV chain finishes, so without this, ScreenManager's per-tick draw is stuck
         // showing whatever camera was active before the chain even started - invisible while a
         // movie's own rendering is running, but visible as a one-tick flash of that stale camera
-        // in the gap between one chained FMV finishing and the next one starting (a whole
-        // movie's blocking playback runs within a single object-update pass, so that pass's own
-        // ScreenManager render already happened by the time CameraSwapper gets a chance to react
-        // and start the next movie in the chain - see CameraSwapper's ePlay2FMVs_9/
-        // ePlay3FMVs_10).
+        // in the gap between one chained FMV finishing and the next one starting (see
+        // CameraSwapper's ePlay2FMVs_9/ePlay3FMVs_10).
         if (gScreenManager)
         {
-            gScreenManager->DecompressCameraToVRam(fmvFrame);
+            gScreenManager->DecompressCameraToVRam(mFmvFrame);
         }
 
         // mFileOffset already comes from the demuxer strictly increasing (each video packet
@@ -1063,222 +1288,55 @@ s8 DDV_Play_Impl(const char_type* pMovieName)
         // offset shown twice" pipeline bug a full pixel-content hash would have been trying to
         // catch here shows up for free as this offset failing to have advanced, no need to hash
         // ~300KB of every displayed frame to get that.
-        if (haveLastDisplayedOffset && f.mFileOffset <= lastDisplayedOffset)
+        if (mHaveLastDisplayedOffset && f.mFileOffset <= mLastDisplayedOffset)
         {
-            ++invalidDisplayedFrameCount;
-            LOG_ERROR("FMV playback %u: non-increasing screen offset=%lld previous=%lld pts=%llu",
-                playbackId, f.mFileOffset, lastDisplayedOffset, static_cast<unsigned long long>(f.mPtsNs));
+            ++mInvalidDisplayedFrameCount;
+            LOG_ERROR("FMV playback %s: non-increasing screen offset=%lld previous=%lld pts=%llu",
+                mName.c_str(), f.mFileOffset, mLastDisplayedOffset, static_cast<unsigned long long>(f.mPtsNs));
         }
-        haveLastDisplayedOffset = true;
-        lastDisplayedOffset = f.mFileOffset;
-        lastDisplayUpdateMs = SYS_GetTicks();
-    };
-
-    MkvVideoQueue videoQueue;
-    MkvAudioQueue audioQueue;
-    auto moviePipeline = std::make_unique<MkvMoviePipeline>(movie, videoQueue, audioQueue);
-
-    u64 audioStartSample = 0;
-    std::deque<MkvAudioChunk> pendingAudioChunks;
-    const u32 blockAlign = (movie.AudioBitsPerSample() / 8u) * movie.AudioChannels();
-    const u32 audioBufferSamples = std::max<u32>(movie.AudioSampleRate() * 4u, 4096u);
-    u32 audioWriteOffset = 0;
-    u32 audioSamplesSubmitted = 0;
-    u32 audioWriteCount = 0;
-    bool audioStarted = false;
-    bool audioFinished = !hasAudio || sNoAudioOrAudioError;
-
-    while (!videoQueue.Empty() || !moviePipeline->VideoComplete())
-    {
-        MkvAudioChunk audioChunk;
-        while (audioQueue.TryPop(audioChunk))
-        {
-            pendingAudioChunks.push_back(std::move(audioChunk));
-        }
-
-        const u32 maxBufferedSamples = audioBufferSamples - std::min<u32>(audioBufferSamples / 4u, 1024u);
-        while (!sNoAudioOrAudioError && hasAudio && !pendingAudioChunks.empty())
-        {
-            const u32 readOffset = audioStarted
-                ? GetSoundAPI().mSND_Get_Sound_Entry_Pos(&sFmvSoundEntry)
-                : 0;
-            const u32 bufferedSamples = audioStarted
-                ? (audioWriteOffset >= readOffset ? audioWriteOffset - readOffset : audioBufferSamples - readOffset + audioWriteOffset)
-                : audioSamplesSubmitted;
-            if (bufferedSamples >= maxBufferedSamples)
-            {
-                break;
-            }
-
-            MkvAudioChunk& pendingChunk = pendingAudioChunks.front();
-            const u32 pendingSamples = static_cast<u32>(pendingChunk.mBuffer.size() / std::max<u32>(1u, blockAlign));
-            if (pendingSamples == 0)
-            {
-                pendingAudioChunks.pop_front();
-                continue;
-            }
-
-            const u32 bufferSpaceSamples = maxBufferedSamples - bufferedSamples;
-            const u32 samplesUntilBufferEnd = audioBufferSamples - audioWriteOffset;
-            const u32 samplesToWrite = std::min({pendingSamples, bufferSpaceSamples, samplesUntilBufferEnd});
-            if (samplesToWrite == 0)
-            {
-                audioWriteOffset = 0;
-                continue;
-            }
-
-            u64 audioHash = 1469598103934665603ULL;
-            const size_t bytesToWrite = static_cast<size_t>(samplesToWrite) * blockAlign;
-            for (size_t byteIndex = 0; byteIndex < bytesToWrite; ++byteIndex)
-            {
-                audioHash ^= pendingChunk.mBuffer[byteIndex];
-                audioHash *= 1099511628211ULL;
-            }
-
-            if (GetSoundAPI().mSND_LoadSamples(&sFmvSoundEntry, audioWriteOffset, pendingChunk.mBuffer.data(), samplesToWrite) < 0)
-            {
-                sNoAudioOrAudioError = true;
-                break;
-            }
-            ++audioWriteCount;
-            LOG_INFO("FMV playback %u: audio write=%u sourceOffset=%lld pts=%llu writeOffset=%u readOffset=%u samples=%u hash=%llu",
-                playbackId, audioWriteCount, pendingChunk.mFileOffset,
-                static_cast<unsigned long long>(pendingChunk.mPtsNs), audioWriteOffset, readOffset, samplesToWrite,
-                static_cast<unsigned long long>(audioHash));
-            audioWriteOffset = (audioWriteOffset + samplesToWrite) % audioBufferSamples;
-            audioSamplesSubmitted += samplesToWrite;
-            pendingChunk.mBuffer.erase(pendingChunk.mBuffer.begin(), pendingChunk.mBuffer.begin() + samplesToWrite * blockAlign);
-            if (pendingChunk.mBuffer.empty())
-            {
-                pendingAudioChunks.pop_front();
-            }
-
-            if (!audioStarted && (audioSamplesSubmitted >= movie.AudioSampleRate() / 5u || moviePipeline->AudioComplete()))
-            {
-                if (FAILED(SND_PlayEx(&sFmvSoundEntry, 116, 116, 1.0, 0, 1, 100)))
-                {
-                    sNoAudioOrAudioError = true;
-                }
-                audioStartSample = SND_Get_Generated_Audio_Samples();
-                audioStarted = !sNoAudioOrAudioError;
-            }
-        }
-
-        if (audioStarted && !audioFinished && moviePipeline->AudioComplete() && pendingAudioChunks.empty()
-            && SND_Get_Generated_Audio_Samples() - audioStartSample >= audioSamplesSubmitted)
-        {
-            SND_StopAll();
-            audioStarted = false;
-            audioFinished = true;
-            LOG_INFO("FMV playback %u: audio finished samples=%u", playbackId, audioSamplesSubmitted);
-        }
-
-        if (hasAudio && !audioStarted && !audioFinished && !sNoAudioOrAudioError)
-        {
-            if ((SYS_GetTicks() & 255) < 2)
-            {
-                LOG_INFO("FMV playback %u: waiting for audio preroll samples=%u pending=%zu", playbackId,
-                    audioSamplesSubmitted, pendingAudioChunks.size());
-            }
-            SYS_EventsPump();
-            PSX_VSync(VSyncMode::UncappedFps);
-            continue;
-        }
-
-        MkvVideoFrame frame;
-        if (!videoQueue.TryPop(frame))
-        {
-            if (moviePipeline->VideoComplete())
-            {
-                break;
-            }
-            SYS_EventsPump();
-            PSX_VSync(VSyncMode::UncappedFps);
-            continue;
-        }
-
-        // SND_Get_Generated_Audio_Samples() counts samples at the mixer's fixed output rate
-        // (every voice, including this movie's, gets resampled to it - see
-        // SDLSoundBuffer::SetFrequency) - so it must be divided by that device rate here, not
-        // by the movie's own AudioSampleRate(). AE's DDV audio happens to already be 44100Hz,
-        // matching the (also 44100Hz) device rate, which is why this was previously masked;
-        // AO's true 18900Hz stream exposed it as frames dropping and audio going out of sync.
-        LOG_INFO("FMV playback %u: dequeued offset=%lld pts=%llu clock=%llu", playbackId, frame.mFileOffset,
-            static_cast<unsigned long long>(frame.mPtsNs),
-            static_cast<unsigned long long>(audioStarted
-                ? (SND_Get_Generated_Audio_Samples() - audioStartSample) * 1000 / SND_Get_Device_Sample_Rate()
-                : 0));
-
-        if (AreMovieSkippingInputsHeld())
-        {
-            break;
-        }
-
-        const u64 frameMs = frame.mPtsNs / 1000000ULL;
-        RealMovieSyncClock syncClock(audioStarted, audioStartSample);
-        const MovieFrameOutcome syncOutcome = ProcessMovieFrameSync(frameMs, syncClock);
-        if (syncOutcome == MovieFrameOutcome::Dropped)
-        {
-            ++droppedFrameCount;
-
-            // Otherwise, with a big enough backlog of stale/behind frames to drop, the screen
-            // sits on whatever was last actually rendered for however long the backlog takes to
-            // clear, then jumps straight to current - looks frozen, then hitches. Occasionally
-            // painting one of the stale frames anyway (throttled by wall-clock time so it
-            // doesn't slow down actually catching up) makes it read as fast-forwarding instead.
-            const u64 nowMs = SYS_GetTicks();
-            if (ShouldDisplayStaleFrame(nowMs, lastDisplayUpdateMs))
-            {
-                ++staleFrameDisplayCount;
-                DisplayFrame(frame);
-                LOG_INFO("FMV playback %u: stale frame while catching up offset=%lld pts=%llu dropped=%u queued=%zu",
-                    playbackId, frame.mFileOffset, static_cast<unsigned long long>(frame.mPtsNs),
-                    droppedFrameCount, videoQueue.Size());
-            }
-            continue;
-        }
-        if (syncOutcome == MovieFrameOutcome::SkippedByUserInput)
-        {
-            moviePipeline.reset();
-            break;
-        }
-
-        LOG_INFO("FMV playback: render frame pts=%llu queued=%zu", static_cast<unsigned long long>(frame.mPtsNs), videoQueue.Size());
-        ++renderedFrameCount;
-        DisplayFrame(frame);
-        LOG_INFO("FMV playback %u: screen frame=%u offset=%lld pts=%llu clock=%llu queued=%zu", playbackId, renderedFrameCount,
-            frame.mFileOffset, static_cast<unsigned long long>(frame.mPtsNs),
-            static_cast<unsigned long long>(audioStarted
-                ? (SND_Get_Generated_Audio_Samples() - audioStartSample) * 1000 / SND_Get_Device_Sample_Rate()
-                : 0),
-            videoQueue.Size());
-
-        SYS_EventsPump();
-        PSX_VSync(VSyncMode::UncappedFps);
+        mHaveLastDisplayedOffset = true;
+        mLastDisplayedOffset = f.mFileOffset;
+        mLastDisplayUpdateMs = SYS_GetTicks();
     }
 
-    moviePipeline.reset();
+    const std::string mName;
+    bool mOpened = false;
 
-    LOG_INFO("FMV playback %u: finished rendered=%u dropped=%u staleDisplayed=%u invalidDisplayed=%u", playbackId,
-        renderedFrameCount, droppedFrameCount, staleFrameDisplayCount, invalidDisplayedFrameCount);
+    WebmMoviePlayer mMovie;
+    MkvVideoQueue mVideoQueue;
+    MkvAudioQueue mAudioQueue;
+    // Decodes into the queues above on its own threads, so it's declared after them
+    std::unique_ptr<MkvMoviePipeline> mPipeline;
 
-    if (sFmvSoundEntry.field_4_pDSoundBuffer)
-    {
-        SND_StopAll();
-        GetSoundAPI().mSND_Free(&sFmvSoundEntry);
-        sFmvSoundEntry.field_4_pDSoundBuffer = nullptr;
-    }
+    // A dequeued frame that's ahead of the audio clock, waiting to be shown
+    std::optional<MkvVideoFrame> mPendingFrame;
 
-    return 1;
-}
+    CamResource mFmvFrame;
+    Poly_FT4 mPoly = {};
 
-s8 DDV_Play(const char_type* pDDVName)
-{
-    gMovieSoundEntry = &sFmvSoundEntry;
-    const s8 ret = DDV_Play_Impl(pDDVName);
-    gMovieSoundEntry = nullptr;
-    return ret;
-}
+    bool mHasAudio = false;
+    SoundEntry mSoundEntry = {};
+    bool mNoAudioOrAudioError = false;
+    bool mReverbDisabled = false;
+    bool mWasReverbEnabled = false;
+    std::deque<MkvAudioChunk> mPendingAudioChunks;
+    u64 mAudioStartSample = 0;
+    u32 mBlockAlign = 0;
+    u32 mAudioBufferSamples = 0;
+    u32 mAudioWriteOffset = 0;
+    u32 mAudioSamplesSubmitted = 0;
+    u32 mAudioWriteCount = 0;
+    bool mAudioStarted = false;
+    bool mAudioFinished = false;
+
+    u32 mRenderedFrameCount = 0;
+    u32 mDroppedFrameCount = 0;
+    u32 mStaleFrameDisplayCount = 0;
+    u32 mInvalidDisplayedFrameCount = 0;
+    bool mHaveLastDisplayedOffset = false;
+    long long mLastDisplayedOffset = 0;
+    u64 mLastDisplayUpdateMs = 0;
+};
 
 s32 Movie::gMovieRefCount = 0;
 
@@ -1304,50 +1362,55 @@ Movie::Movie(const char_type* pName, ResourceManagerWrapper& resMan, BaseMap& ma
     Init();
 }
 
-extern bool gBreakGameLoop;
+Movie::~Movie() = default;
 
 void Movie::VUpdate()
 {
-    LOG_INFO("Movie VUpdate begin break=%d", gBreakGameLoop ? 1 : 0);
-    if (gBreakGameLoop)
+    if (GetGameAutoPlayer().IsPlaying() || GetGameAutoPlayer().IsRecording() || mName.empty())
     {
-        SetDead(true);
+        Finish();
+        return;
     }
-    else if (GetGameAutoPlayer().IsPlaying() || GetGameAutoPlayer().IsRecording())
-    {
-        SetDead(true);
-    }
-    else
-    {
-        SND_StopAll();
 
-        while (!DDV_Play(mName.c_str()))
-        {
-            if (gAttract)
-            {
-                break;
-            }
+    SND_StopAll();
 
-            if (!Display_Full_Screen_Message_Blocking(MessageType::eSkipMovie_1, mResMan, mMap))
-            {
-                break;
-            }
-        }
-    }
-    DeInit();
-    //gBreakGameLoop = true;
-    //LOG_INFO("Movie VUpdate complete break=%d", gBreakGameLoop ? 1 : 0);
+    // The game is frozen while the movie plays, see VModalUpdate
+    StartModal();
 }
 
-void Movie::DeInit()
+ModalState Movie::VModalUpdate()
 {
+    if (!mPlayback)
+    {
+        // Don't let the key that started the movie skip it
+        if (AreMovieSkippingInputsHeld() || Input_IsVKPressed_4EDD40(VK_RETURN))
+        {
+            return ModalState::eRunning;
+        }
+
+        mPlayback = std::make_unique<MoviePlayback>(mName);
+        if (!mPlayback->Open())
+        {
+            Finish();
+            return ModalState::eFinished;
+        }
+    }
+
+    if (mPlayback->Update() == ModalState::eFinished)
+    {
+        Finish();
+        return ModalState::eFinished;
+    }
+    return ModalState::eRunning;
+}
+
+void Movie::Finish()
+{
+    mPlayback.reset();
+
     PSX_VSync(VSyncMode::LimitTo30Fps);
 
     --Movie::gMovieRefCount;
-
-    #if USE_SDL3_SOUND
-    gReverbEnabled = wasReverbEnabled;
-    #endif
 
     SetDead(true);
 }

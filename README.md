@@ -52,6 +52,7 @@ If the chosen game's files aren't in the directory, the other game is run. If bo
 | `-ddcheat` | Enable the debug cheat menu. Builds with `FORCE_DDCHEAT` (the default) always have it. |
 | `-ddfps` | Show the frame rate. |
 | `-ddnoskip` | Render every frame instead of skipping frames to keep up. |
+| `-ddslowload=<ms>` | Make each resource loaded in the background take at least this many milliseconds, to test loading on slow storage. |
 | `-help` | Show the command line options and exit (`--help`, `-h` and `/?` also work). |
 
 The display options (`-renderer`, `-fullscreen`, `-keep_aspect_ratio`, `-filter_screen`,

@@ -895,7 +895,8 @@ s32 Input_Convert_KeyboardGamePadInput_To_Internal_Format_492150()
     f32 pY2 = 0.0f;
     f32 pX2 = 0.0f;
 
-    if (Sys_IsAppActive())
+    // Ignore the keyboard while the window is unfocused, a key released elsewhere would stay down
+    if (SDL_GetKeyboardFocus())
     {
         for (s32 i = 0; i < 256; i++)
         {
@@ -1373,7 +1374,7 @@ void Input_Init(ResourceManagerWrapper& resMan)
 
 u32 Input_GetLastPressedKey_492610()
 {
-    if (!Sys_IsAnyKeyDown())
+    if (!sIsAKeyDown)
     {
         return 0;
     }

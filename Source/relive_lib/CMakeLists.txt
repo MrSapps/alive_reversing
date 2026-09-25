@@ -402,8 +402,6 @@ SET(sound_src
     Sound/Sound.hpp
     Sound/Reverb.hpp
     Sound/Reverb.cpp
-    Sound/SoundDSound.cpp
-    Sound/SoundDSound.hpp
     Sound/SoundSDL.hpp
     Sound/SoundSDL.cpp
     Sound/SDLSoundBuffer.hpp
@@ -415,6 +413,7 @@ SET(sound_src
 SET(game_objects_src
     GameObjects/BaseGameObject.hpp
     GameObjects/BaseGameObject.cpp
+    GameObjects/QuitGame.hpp
     GameObjects/BaseAnimatedWithPhysicsGameObject.hpp
     GameObjects/BaseAnimatedWithPhysicsGameObject.cpp
     GameObjects/EffectBase.hpp
@@ -707,6 +706,8 @@ SET(relive_lib_src
     Function.hpp
     Sys.hpp
     Sys.cpp
+    Window.hpp
+    Window.cpp
     AppIcon.hpp
     Psx.hpp
     Psx.cpp

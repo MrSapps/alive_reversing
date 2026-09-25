@@ -2,7 +2,6 @@
 #include "ResourceManagerWrapper.hpp"
 #include "GameType.hpp"
 #include "Psx.hpp"
-#include "../AliveLibAE/PsxRender.hpp"
 
 #include "data_conversion/file_system.hpp"
 
@@ -14,12 +13,13 @@
 #include "BinaryPath.hpp"
 #include "BaseGameAutoPlayer.hpp"
 #include "FmvInfo.hpp"
-#include "GameObjects/Particle.hpp"
 #include "nlohmann/json.hpp"
 #include "Sys.hpp"
 #include "ThreadPool.hpp"
 #include <FatalError.hpp>
 #include <string>
+#include <chrono>
+#include <thread>
 #include "IniFile.hpp"
 
 u32 UniqueResId::mGlobalId = 1;
@@ -28,9 +28,6 @@ ResourceManagerWrapper::ResourceManagerWrapper(FileSystem& fs, const std::string
     : mFs(fs)
     , mThreadPool(std::make_unique<ThreadPool>())
 {
-    bHideLoadingIcon = 0;
-    loading_ticks = 0;
-
     AddSearchPaths(modPath);
 }
 
@@ -148,6 +145,22 @@ public:
     }
 
     void Execute() override
+    {
+        if (mResMan->mDebugLoadDelayMs)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mResMan->mDebugLoadDelayMs));
+        }
+
+        Load();
+
+        {
+            std::unique_lock<std::mutex> lock(mResMan->mLoadedAnimationsMutex);
+            mResMan->mPendingAnimations.erase(std::make_pair(mThemeName, mAnimId));
+        }
+        mResMan->mAnimationLoaded.notify_all();
+    }
+
+    void Load()
     {
         // One huge blocking func for now - needs to work like OG res man
 
@@ -269,11 +282,42 @@ AnimationAttributesAndFrames::AnimationAttributesAndFrames(const std::string& js
 
 void ResourceManagerWrapper::PendAnimation(AnimId animId, const std::string& theme)
 {
-    if (!Exists(animId, theme))
     {
-        auto job = std::make_unique<AnimationLoaderJob>(this, animId, theme);
-        mThreadPool->AddJob(std::move(job));
+        std::unique_lock<std::mutex> lock(mLoadedAnimationsMutex);
+        const AnimCacheKey key = std::make_pair(theme, animId);
+        if (mLoadedAnimations.count(key) || !mPendingAnimations.insert(key).second)
+        {
+            // Already loaded or loading
+            return;
+        }
     }
+
+    mThreadPool->AddJob(std::make_unique<AnimationLoaderJob>(this, animId, theme));
+}
+
+void ResourceManagerWrapper::RequestLoadingWait(LoadingIcon icon)
+{
+    mLoadingWaitRequested = true;
+    if (icon == LoadingIcon::eNow)
+    {
+        mShowLoadingIconNow = true;
+    }
+}
+
+void ResourceManagerWrapper::EndLoadingWait()
+{
+    mLoadingWaitRequested = false;
+    mShowLoadingIconNow = false;
+
+    // This batch of async loading has fully finished (successfully or not), so this is the
+    // natural place to surface anything PendAnimation's worker-thread jobs couldn't find.
+    FlushMissingResourceReports();
+}
+
+bool ResourceManagerWrapper::IsLoading()
+{
+    std::unique_lock<std::mutex> lock(mLoadedAnimationsMutex);
+    return !mPendingAnimations.empty();
 }
 
 std::string ResourceManagerWrapper::FmvPath(const std::string& fmvName)
@@ -294,12 +338,19 @@ std::string ResourceManagerWrapper::FmvPath(const std::string& fmvName)
 
 AnimResource ResourceManagerWrapper::LoadAnimation(AnimId anim, const std::string& themeName)
 {
+    {
+        // Still loading on a worker thread, wait for it rather than loading it again
+        std::unique_lock<std::mutex> lock(mLoadedAnimationsMutex);
+        const AnimCacheKey key = std::make_pair(themeName, anim);
+        mAnimationLoaded.wait(lock, [&]() { return mPendingAnimations.count(key) == 0; });
+    }
+
     // TODO: Remove this when all of factory etc is updated (since it will always already be loaded here)
     if (!Exists(anim, themeName))
     {
         if (static_cast<s32>(anim) <= 908) // ignore background animations for now
         {
-            LOG_ERROR("Animation %d wasn't loaded async before calling LoadAnimation, or didn't wait for async loading to finish", static_cast<s32>(anim));
+            LOG_ERROR("Animation %d wasn't pended before calling LoadAnimation", static_cast<s32>(anim));
         }
 
         AnimationLoaderJob hack(this, anim, themeName);
@@ -307,7 +358,7 @@ AnimResource ResourceManagerWrapper::LoadAnimation(AnimId anim, const std::strin
 
         // hack.Execute() only records a report and returns if the resource is missing (see
         // AnimationLoaderJob::Execute) - unlike PendAnimation's async jobs, this can't wait for
-        // the next LoadingLoop to surface it, since the caller needs the animation right now, so
+        // the next loading wait to surface it, since the caller needs the animation right now, so
         // flush (and fatally abort, listing every location searched) immediately if it did.
         FlushMissingResourceReports();
     }
@@ -350,7 +401,7 @@ PalResource ResourceManagerWrapper::LoadPal(PalId pal)
     if (!found)
     {
         // The caller needs the palette right now, so (like LoadAnimation) flush and fatally abort
-        // immediately instead of waiting for the next LoadingLoop.
+        // immediately instead of waiting for the next loading wait.
         ReportMissingResource(std::string("Palette \"") + ToString(newRes.mId) + "\"", std::move(searchedPaths));
         FlushMissingResourceReports();
     }
@@ -408,7 +459,7 @@ CamResource ResourceManagerWrapper::LoadCam(EReliveLevelIds lvlId, u32 pathNumbe
     }
 
     // The caller needs the camera right now, so (like LoadAnimation) flush and fatally abort
-    // immediately instead of waiting for the next LoadingLoop.
+    // immediately instead of waiting for the next loading wait.
     ReportMissingResource("Camera " + std::to_string(camNumber) + " of path " + std::to_string(pathNumber) + " of level \"" + LvlDirName(lvlId) + "\"", std::move(searchedPaths));
     FlushMissingResourceReports();
     return newRes;
@@ -501,7 +552,7 @@ FontResource ResourceManagerWrapper::LoadFont(FontType fontId)
     if (!found)
     {
         // The caller needs the font right now, so (like LoadAnimation) flush and fatally abort
-        // immediately instead of waiting for the next LoadingLoop.
+        // immediately instead of waiting for the next loading wait.
         ReportMissingResource("Font \"" + fontName + "\"", std::move(searchedPaths));
         FlushMissingResourceReports();
     }
@@ -602,7 +653,7 @@ std::vector<u8> ResourceManagerWrapper::LoadSoundFile(const char_type* pFileName
     {
         // The callers (VH/VB/SEQ loading) dereference the data straight away, so like
         // LoadAnimation flush and fatally abort immediately instead of waiting for the next
-        // LoadingLoop.
+        // loading wait.
         ReportMissingResource("Sound file \"" + std::string(pFileName) + "\" of sound theme \"" + soundTheme + "\"", std::move(searchedPaths));
         FlushMissingResourceReports();
     }
@@ -640,45 +691,6 @@ const ResourceManagerWrapper::SoundThemeInfo& ResourceManagerWrapper::LoadSoundT
     return mSoundThemeInfoCache.emplace(soundTheme, std::move(info)).first->second;
 }
 
-
-void ResourceManagerWrapper::LoadingLoop(bool bShowLoadingIcon, BaseMap* pMap)
-{
-    GetGameAutoPlayer().DisableRecorder();
-
-    const u32 startTime = SYS_GetTicks();
-    while (mThreadPool->Busy())
-    {
-        SYS_EventsPump();
-
-        // If not uncapped fps playback then actually wait for 1 frame on each iteration of the loop
-        const bool unCappedFps = GetGameAutoPlayer().IsPlaying() && GetGameAutoPlayer().NoFpsLimitPlayBack();
-
-        PSX_VSync(unCappedFps ? VSyncMode::UncappedFps : VSyncMode::LimitTo30Fps);
-        const u32 k1Second = 1000; // Show loading icon after 1 second of loading
-        if (bShowLoadingIcon && !bHideLoadingIcon && SYS_GetTicks() > startTime + k1Second)
-        {
-            // Render everything in the ordering table including the loading icon
-            ShowLoadingIcon(*pMap);
-        }
-    }
-
-    GetGameAutoPlayer().EnableRecorder();
-
-    // This batch of async loading has fully finished (successfully or not) - the main thread is
-    // blocked right here waiting for it either way, so this is the natural place to surface
-    // anything PendAnimation's worker-thread jobs couldn't find.
-    FlushMissingResourceReports();
-}
-
-void ResourceManagerWrapper::LoadingLoop2()
-{
-    while (mThreadPool->Busy())
-    {
-        // Just block, hang everything
-    }
-
-    FlushMissingResourceReports();
-}
 
 void ResourceManagerWrapper::ReportMissingResource(std::string description, std::vector<std::string> searchedPaths)
 {
@@ -753,28 +765,6 @@ s32 ResourceManagerWrapper::SEQ_HashName(const char_type* seqFileName)
         }
     }
     return hashId;
-}
-
-void ResourceManagerWrapper::ShowLoadingIcon(BaseMap& map)
-{
-    AnimResource res = LoadAnimation(AnimId::Loading_Icon2);
-    auto pParticle = relive_new Particle(FP_FromInteger(0), FP_FromInteger(0), res, *this, map);
-    if (pParticle)
-    {
-        pParticle->GetAnimation().SetSemiTrans(false);
-        pParticle->GetAnimation().SetBlending(true);
-
-        pParticle->GetAnimation().SetRenderLayer(Layer::eLayer_0);
-
-        OrderingTable local_ot;
-
-        pParticle->GetAnimation().VRender(320, 220, local_ot, 0, 0);
-        PSX_DrawOTag(local_ot);
-
-        PSX_PutDispEnv_4F5890();
-        pParticle->SetDead(true);
-        bHideLoadingIcon = true;
-    }
 }
 
 bool ResourceManagerWrapper::Exists(AnimId animId, const std::string& theme)

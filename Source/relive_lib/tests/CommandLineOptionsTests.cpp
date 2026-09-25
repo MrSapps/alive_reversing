@@ -56,14 +56,21 @@ TEST(CommandLineOptions, GameIgnoresValuesContainingAGameName)
 
 TEST(CommandLineOptions, ModAndDebugOptions)
 {
-    const CommandLineOptions options = Parse({"-mod=My Mod", "-ddcheat", "-ddfps", "-ddnoskip"});
+    const CommandLineOptions options = Parse({"-mod=My Mod", "-ddcheat", "-ddfps", "-ddnoskip", "-ddslowload=250"});
 
     EXPECT_EQ(options.mModName, "My Mod");
     EXPECT_TRUE(options.mDdCheat);
     EXPECT_TRUE(options.mShowFps);
     EXPECT_TRUE(options.mNoFrameSkip);
+    EXPECT_EQ(options.mSlowLoadMs, 250u);
 
     EXPECT_TRUE(Parse({"-it_is_me_your_father"}).mDdCheat);
+}
+
+TEST(CommandLineOptions, InvalidSlowLoadIsIgnored)
+{
+    EXPECT_EQ(Parse({}).mSlowLoadMs, 0u);
+    EXPECT_EQ(Parse({"-ddslowload=soon"}).mSlowLoadMs, 0u);
 }
 
 TEST(CommandLineOptions, RecordingOptions)
@@ -110,7 +117,7 @@ TEST(CommandLineOptions, UsageListsEveryOption)
 {
     const std::string usage = CommandLineOptions::Usage();
     for (const char* option : {"AE", "AO", "-mod=", "-renderer=", "-fullscreen", "-keep_aspect_ratio", "-filter_screen",
-                               "-use_original_resolution", "-ddcheat", "-ddfps", "-ddnoskip", "-help",
+                               "-use_original_resolution", "-ddcheat", "-ddfps", "-ddnoskip", "-ddslowload=", "-help",
                                "-record=", "-flush", "-play=", "-fastest", "-ignore_desyncs"})
     {
         EXPECT_NE(usage.find(option), std::string::npos) << option;

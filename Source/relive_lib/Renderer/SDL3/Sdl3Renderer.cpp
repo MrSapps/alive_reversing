@@ -3,9 +3,10 @@
 #include "Clamp.hpp"
 #include "FatalError.hpp"
 #include "Sdl3Renderer.hpp"
+#include "../../Window.hpp"
 #include <cmath>
 
-Sdl3Renderer::Sdl3Renderer(TWindowHandleType window)
+Sdl3Renderer::Sdl3Renderer(Window& window)
     : IRenderer(window),
     mContext(window),
     mPsxFbTexture{

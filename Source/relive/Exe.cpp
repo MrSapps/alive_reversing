@@ -6,6 +6,7 @@
 
 #include "W32CrashHandler.hpp"
 #include "../relive_lib/Sys.hpp"
+#include "../relive_lib/Window.hpp"
 #include "../relive_lib/SwitchStates.hpp"
 
 #include "../AliveLibAE/Map.hpp"
@@ -290,7 +291,7 @@ s32 main(s32 argc, char_type** argv)
         printf("%s", CommandLineOptions::Usage());
 #if _WIN32
         // A Windows GUI app's console closes as soon as it exits
-        Sys_MessageBox(nullptr, CommandLineOptions::Usage(), "R.E.L.I.V.E. command line options");
+        Sys::ShowMessageBox(nullptr, CommandLineOptions::Usage(), "R.E.L.I.V.E. command line options");
 #endif
         return 0;
     }
@@ -304,7 +305,7 @@ s32 main(s32 argc, char_type** argv)
     RedirectIoStream(true);
 
 #endif
-    LOG_INFO("Relive: %s", BuildAndBitnesString().c_str());
+    LOG_INFO("Relive: %s", Window::BuildAndBitnessString().c_str());
 
     SDL2_Init();
 

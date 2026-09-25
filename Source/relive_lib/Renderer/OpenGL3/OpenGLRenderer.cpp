@@ -1,3 +1,4 @@
+#include "../../Window.hpp"
 #include <algorithm>
 
 #include "../../../relive_lib/data_conversion/rgb_conversion.hpp"
@@ -31,7 +32,7 @@ static bool gRenderEnable_G4 = true;
 static bool gRenderEnable_G3 = true;
 static bool gRenderEnable_G2 = true;
 
-OpenGLRenderer::OpenGLRenderer(TWindowHandleType window)
+OpenGLRenderer::OpenGLRenderer(Window& window)
     : IRenderer(window),
     mContext(window),
     mFilterFramebuffer(kTargetFramebufferWidth, kTargetFramebufferHeight),
@@ -42,8 +43,6 @@ OpenGLRenderer::OpenGLRenderer(TWindowHandleType window)
     mBatcher(UvMode::UnNormalized),
     mPaletteCache(kAvailablePalettes)
 {
-    mWindow = window;
-
     // Create and bind the VAO, and never touch it again! Wahey.
     GL_VERIFY(glGenVertexArrays(1, &mVAO));
     GL_VERIFY(glBindVertexArray(mVAO));
@@ -91,7 +90,7 @@ OpenGLRenderer::~OpenGLRenderer()
 
 void OpenGLRenderer::Clear(u8 r, u8 g, u8 b)
 {
-    if (!mFrameStarted || SDL_GetWindowFlags(mWindow) & SDL_WINDOW_MINIMIZED)
+    if (!mFrameStarted || mWindow.IsMinimized())
     {
         return;
     }
@@ -129,7 +128,7 @@ void OpenGLRenderer::StartFrame()
     mStats.Reset();
     mBatcher.StartFrame();
 
-    if (SDL_GetWindowFlags(mWindow) & SDL_WINDOW_MINIMIZED)
+    if (mWindow.IsMinimized())
     {
         return;
     }
@@ -171,7 +170,7 @@ void OpenGLRenderer::EndFrame()
     // because:
     //     Sometimes EndFrame is called before StartFrame
     //     When minimised, rendering to the screen blows up Intel HD 2000
-    if (!mFrameStarted || SDL_GetWindowFlags(mWindow) & SDL_WINDOW_MINIMIZED)
+    if (!mFrameStarted || mWindow.IsMinimized())
     {
         return;
     }
@@ -205,7 +204,7 @@ void OpenGLRenderer::EndFrame()
     glGetError();
 
     // Render end
-    SDL_GL_SwapWindow(mWindow);
+    mContext.SwapBuffers();
 
     mFrameStarted = false;
 

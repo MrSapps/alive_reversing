@@ -6,10 +6,6 @@
 class BaseMap;
 
 
-#if !USE_SDL3_SOUND
-//#include <mmeapi.h>
-//#include <dsound.h>
-#else
 /*
  *  extended waveform format structure used for all non-PCM formats. this
  *  structure is common to all non-PCM formats.
@@ -62,23 +58,14 @@ typedef s32 HRESULT;
     #endif
     #endif
 
-#endif
 
 
-#if USE_SDL3_SOUND
 using TSoundBufferType = class SDLSoundBuffer;
 extern bool gReverbEnabled;
 extern bool gAudioStereo;
-#else
-using TSoundBufferType = struct IDirectSoundBuffer;
-#endif
 
-#if USE_SDL3_SOUND
 class SDLSoundSystem;
 extern SDLSoundSystem* sDSound_BBC344;
-#else
-extern LPDIRECTSOUND sDSound_BBC344;
-#endif
 
 struct SoundEntry final
 {
@@ -154,13 +141,7 @@ struct SoundApi final
     decltype(&SND_HR_Err_To_String_4EEC70) mSND_HR_Err_To_String;
     decltype(&SND_Free_4EFA30) mSND_Free;
     decltype(&SND_Restart_4CB0E0) mSND_Restart;
-#if !USE_SDL3_SOUND
-    decltype(&SND_SetPrimarySoundBufferFormat_4EE990) SND_SetPrimarySoundBufferFormat;
-#endif
     decltype(&SND_InitVolumeTable_4EEF60) SND_InitVolumeTable;
-#if !USE_SDL3_SOUND
-    decltype(&SND_CreatePrimarySoundBuffer_4EEEC0) SND_CreatePrimarySoundBuffer;
-#endif
     decltype(&SND_Renew_4EEDD0) mSND_Renew;
     decltype(&SND_Get_Buffer_Status) mSND_Get_Buffer_Status;
     decltype(&SND_Stop_Sample_At_Idx) mSND_Stop_Sample_At_Idx;

@@ -15,12 +15,12 @@
 #include "../relive_lib/Movie.hpp"
 #include "MainMenuTransition.hpp"
 #include "Text.hpp"
+#include "../relive_lib/ObjectIds.hpp"
 #include "../relive_lib/Sound/Sound.hpp"
 #include "Abe.hpp"
 #include "PauseMenu.hpp"
 #include "GameEnderController.hpp"
 #include "Glukkon.hpp"
-#include "../relive_lib/Sys.hpp"
 #include "../relive_lib/BaseGameAutoPlayer.hpp"
 #include "../relive_lib/Camera.hpp"
 #include "Path.hpp"
@@ -32,6 +32,7 @@
 #include "../relive_lib/data_conversion/AEQuicksaveJson.hpp"
 #include "stdlib.hpp"
 #include "DemoPlayback.hpp"
+#include "../relive_lib/GameObjects/QuitGame.hpp"
 
 constexpr s32 kShortDemoTimer = 300;
 constexpr s32 kLongDemoTimer = 1500;
@@ -545,7 +546,6 @@ MainMenuController::MainMenuController(relive::Path_TLV* /*pTlv*/, const Guid& t
 
     if (mMap.mCurrentCamera == MainMenuCams::eDemoSelectionCam)
     {
-        mResMan.LoadingLoop(false);
         field_1FC_button_index = 0;
         field_250_selected_entry_index = sDemoIdChosenFromDemoMenu_5C1B9E;
         field_254 = FP_FromInteger(0);
@@ -811,13 +811,13 @@ MainMenuNextCam MainMenuController::SligSpeak_Update_4D3280(u32 input_held)
 void MainMenuController::SligSpeak_Unload_4D3170()
 {
     Unload_Resource(AnimId::MenuSligSpeak_Idle);
-    mResMan.ShowLoadingIcon(mMap);
+    mResMan.RequestLoadingWait(LoadingIcon::eNow);
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eAbe_Idle);
 }
 
 void MainMenuController::SligSpeak_Load_4D3090()
 {
-    mResMan.ShowLoadingIcon(mMap);
+    mResMan.RequestLoadingWait(LoadingIcon::eNow);
     GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuSligSpeak_Idle));
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eSlig_Idle);
 }
@@ -866,13 +866,13 @@ MainMenuNextCam MainMenuController::GlukkonSpeak_Update_4D3670(u32 input_held)
 
 void MainMenuController::GlukkonSpeak_Unload_4D3560()
 {
-    mResMan.ShowLoadingIcon(mMap);
+    mResMan.RequestLoadingWait(LoadingIcon::eNow);
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eAbe_Idle);
 }
 
 void MainMenuController::GlukkonSpeak_Load_4D3480()
 {
-    mResMan.ShowLoadingIcon(mMap);
+    mResMan.RequestLoadingWait(LoadingIcon::eNow);
     GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuGlukkonSpeak_Idle));
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eGlukkon_Idle);
 }
@@ -915,13 +915,13 @@ MainMenuNextCam MainMenuController::ScrabSpeak_Update_4D3A60(u32 input_held)
 
 void MainMenuController::ScrabSpeak_Unload_4D3950()
 {
-    mResMan.ShowLoadingIcon(mMap);
+    mResMan.RequestLoadingWait(LoadingIcon::eNow);
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eAbe_Idle);
 }
 
 void MainMenuController::ScrabSpeak_Load_4D3870()
 {
-    mResMan.ShowLoadingIcon(mMap);
+    mResMan.RequestLoadingWait(LoadingIcon::eNow);
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eScrab_Idle);
 }
 
@@ -972,13 +972,13 @@ MainMenuNextCam MainMenuController::ParamiteSpeak_Update_4D3D60(u32 input_held)
 
 void MainMenuController::ParamiteSpeak_Unload_4D3C50()
 {
-    mResMan.ShowLoadingIcon(mMap);
+    mResMan.RequestLoadingWait(LoadingIcon::eNow);
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eAbe_Idle);
 }
 
 void MainMenuController::ParamiteSpeak_Load_4D3B70()
 {
-    mResMan.ShowLoadingIcon(mMap);
+    mResMan.RequestLoadingWait(LoadingIcon::eNow);
     GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuParamiteSpeak_Idle));
     Set_Anim_4D05E0(MainMenuGamespeakAnimIds::eParamite_Idle);
 }
@@ -1380,22 +1380,7 @@ MainMenuNextCam MainMenuController::Page_FMV_Level_Update_4D4AB0(u32 input_held)
         {
             relive::FmvInfoEntry* pFmvRecord = Path_Get_FMV_Record(pMenuFMV->mLevel, pMenuFMV->mFmvId);
 
-            auto pMovie = relive_new Movie(pFmvRecord->mName, mResMan, mMap);
-
-            while (Movie::gMovieRefCount)
-            {
-                if (pMovie->GetUpdatable())
-                {
-                    if (!pMovie->GetDead() && (!gNumCamSwappers || pMovie->GetUpdateDuringCamSwap()))
-                    {
-                        pMovie->VUpdate();
-                    }
-                }
-            }
-            gPsxDisplay.PutCurrentDispEnv();
-            gScreenManager->DecompressCameraToVRam(mMap.mCurrentCameras[0]->mCamRes);
-            gScreenManager->EnableRendering();
-            GetSoundAPI().mSND_Restart(mMap);
+            PlayMovie(pFmvRecord->mName, AfterMovie::eRestoreMenu);
         }
         else
         {
@@ -1673,14 +1658,7 @@ MainMenuNextCam MainMenuController::LoadNewGame_Update_4D0920(u32 /*input*/)
     field_F4_resources.field_0_resources[MenuResIds::eAbeSpeak] = nullptr;
     ResourceManager::Reclaim_Memory_49C470(0);
     */
-    GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Idle));
-
-    if (!gPauseMenu)
-    {
-        gPauseMenu = relive_new PauseMenu(mResMan, mMap);
-    }
-
-    if (!gAbe)
+    if (!gAbe && !mAbeAnimsPended)
     {
         mResMan.PendAnims(Abe::sAbeAnimIdTable);
         mResMan.PendAnimation(AnimId::ChantOrb_Particle);
@@ -1694,7 +1672,22 @@ MainMenuNextCam MainMenuController::LoadNewGame_Update_4D0920(u32 /*input*/)
         mResMan.PendAnimation(AnimId::Dove_Idle);
         mResMan.PendAnimation(AnimId::Dove_Flying);
         mResMan.PendAnimation(AnimId::SpotLight);
-        mResMan.LoadingLoop2();
+
+        // Abe is made on the next update, once the main loop has waited for these
+        mResMan.RequestLoadingWait();
+        mAbeAnimsPended = true;
+        return MainMenuNextCam(MainMenuCams::eNoChange);
+    }
+
+    GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuAbeSpeak_Idle));
+
+    if (!gPauseMenu)
+    {
+        gPauseMenu = relive_new PauseMenu(mResMan, mMap);
+    }
+
+    if (!gAbe)
+    {
         gAbe = relive_new Abe(mResMan, mMap);
     }
 
@@ -1753,32 +1746,8 @@ MainMenuNextCam MainMenuController::BackStory_Or_NewGame_Update_4D1C60(u32 input
         {
             relive::FmvInfoEntry* pFmvRecord = Path_Get_FMV_Record(EReliveLevelIds::eMenu, 4u);
 
-            if (!GetGameAutoPlayer().IsRecording() && !GetGameAutoPlayer().IsPlaying())
-            {
-                while (Input_IsVKPressed_4EDD40(VK_RETURN))
-                {
-                    SYS_EventsPump();
-                }
-            }
-
-            auto pMovie = relive_new Movie(pFmvRecord->mName, mResMan, mMap);
-
-            while (Movie::gMovieRefCount)
-            {
-                if (pMovie->GetUpdatable())
-                {
-                    if (!(pMovie->GetDead() && (!gNumCamSwappers || (pMovie->GetUpdateDuringCamSwap()))))
-                    {
-                        pMovie->VUpdate();
-                    }
-                }
-            }
-
-            gPsxDisplay.PutCurrentDispEnv();
-            gScreenManager->DecompressCameraToVRam(mMap.mCurrentCameras[0]->mCamRes);
-            gScreenManager->EnableRendering();
-            GetSoundAPI().mSND_Restart(mMap);
-            field_1FC_button_index = 1; // Select start game
+            // The movie waits for Enter to be released so it doesn't skip itself
+            PlayMovie(pFmvRecord->mName, AfterMovie::eRestoreMenuSelectStartGame);
             return MainMenuNextCam(MainMenuCams::eNoChange);
         }
         else if (field_1FC_button_index == 1) // Start game
@@ -1804,7 +1773,7 @@ void MainMenuController::BackStory_Or_NewGame_Load_4D1BA0()
 
 void MainMenuController::BackStory_Or_NewGame_Unload_4D1BE0()
 {
-    mResMan.LoadingLoop(false);
+    // Empty: it only waited for loading, which the main loop does now
 }
 
 void MainMenuController::remove_ISO9660_Suffix_4D1660(char_type* out, const char_type* in)
@@ -1868,9 +1837,14 @@ MainMenuNextCam MainMenuController::LoadDemo_Update_4D1040(u32)
         strcpy(&lvFilename[7], CdLvlName((sDemos_5617F0[demoId].level)));
         auto lvFilenameNoPrefix = &lvFilename[7];
 
-        while (!MainMenuController::checkIfDemoFileExists_4D1430(lvFilenameNoPrefix) && !MainMenuController::checkIfDemoFileExists_4D1430(lvFilename))
+        // The message about the demo file being missing was closed since this last ran
+        if (auto pMessage = static_cast<FullScreenMessage*>(sObjectIds.Find_Impl(mDemoMessageId)))
         {
-            if (!Display_Full_Screen_Message_Blocking(MessageType::eSkipDemo_2, mResMan, mMap))
+            const bool escaped = pMessage->GetResult() == FullScreenMessage::Result::eEscape;
+            pMessage->SetDead(true);
+            mDemoMessageId = {};
+
+            if (escaped)
             {
                 field_1F8_page_timeout = 0;
                 if (gIsDemoStartedManually)
@@ -1882,6 +1856,15 @@ MainMenuNextCam MainMenuController::LoadDemo_Update_4D1040(u32)
                     return MainMenuNextCam(MainMenuCams::eMainMenuCam);
                 }
             }
+        }
+
+        if (!MainMenuController::checkIfDemoFileExists_4D1430(lvFilenameNoPrefix) && !MainMenuController::checkIfDemoFileExists_4D1430(lvFilename))
+        {
+            // Shown until Enter, Escape or a timeout, then this runs again: Escape gives up on
+            // the demo, otherwise the file is looked for again
+            auto pMessage = relive_new FullScreenMessage(MessageType::eSkipDemo_2, mResMan, mMap);
+            mDemoMessageId = pMessage->mBaseGameObjectId;
+            return MainMenuNextCam(MainMenuCams::eNoChange);
         }
 
         /*
@@ -2568,7 +2551,7 @@ void MainMenuController::tLoadGame_Unload_4D4360()
 
 void MainMenuController::Game_Force_Quit_Load_4D1A90()
 {
-    gBreakGameLoop = true;
+    relive_new QuitGame(mResMan, mMap);
 }
 
 MainMenuNextCam MainMenuController::HandleGameSpeakInput(u32 input_held, std::function<MainMenuNextCam(InputCommands cmd)> fnOnGameSpeak)
@@ -2706,7 +2689,19 @@ void MainMenuController::HandleMainMenuUpdate()
 
     UpdateHighliteGlow_4D0630();
 
-    if (ChangeScreenAndIntroLogic_4CF640())
+    if (UpdateAfterMovie() == AfterMovieResult::eBusy)
+    {
+        return;
+    }
+
+    const ChangeScreen changingScreen = ChangeScreenAndIntroLogic_4CF640();
+    if (changingScreen == ChangeScreen::ePlayingIntroLogos)
+    {
+        // UpdateAfterMovie carries on once they've played
+        return;
+    }
+
+    if (changingScreen == ChangeScreen::eChanging)
     {
         AnimationAndSoundLogic_4CFE80();
         return;
@@ -2856,6 +2851,74 @@ void MainMenuController::Unload_Resource(AnimId /*res*/)
     GetAnimation().SetAnimate(false);
 }
 
+void MainMenuController::PlayMovie(const char_type* pName, AfterMovie afterMovie)
+{
+    auto pMovie = relive_new Movie(pName, mResMan, mMap);
+    mAfterMovie = afterMovie;
+
+    // Start it now rather than when the object loop gets to it, like the original did. When
+    // recording or playing back it finishes straight away, so carry on straight away too.
+    pMovie->VUpdate();
+    UpdateAfterMovie();
+}
+
+MainMenuController::AfterMovieResult MainMenuController::UpdateAfterMovie()
+{
+    if (mAfterMovie == AfterMovie::eNone)
+    {
+        return AfterMovieResult::eNothingToDo;
+    }
+
+    while (mAfterMovie != AfterMovie::eNone && Movie::gMovieRefCount == 0)
+    {
+        const AfterMovie afterMovie = mAfterMovie;
+        mAfterMovie = AfterMovie::eNone;
+
+        switch (afterMovie)
+        {
+            case AfterMovie::eNone:
+                break;
+
+            case AfterMovie::eRestoreMenu:
+            case AfterMovie::eRestoreMenuSelectStartGame:
+                gPsxDisplay.PutCurrentDispEnv();
+                gScreenManager->DecompressCameraToVRam(mMap.mCurrentCameras[0]->mCamRes);
+                gScreenManager->EnableRendering();
+                GetSoundAPI().mSND_Restart(mMap);
+                if (afterMovie == AfterMovie::eRestoreMenuSelectStartGame)
+                {
+                    field_1FC_button_index = 1; // Select start game
+                }
+                break;
+
+            case AfterMovie::ePlayDDLogo:
+            {
+                auto pMovie = relive_new Movie("DDLOGO.DDV", mResMan, mMap);
+                mAfterMovie = AfterMovie::eFinishIntroLogos;
+                pMovie->VUpdate();
+                break;
+            }
+
+            case AfterMovie::eFinishIntroLogos:
+                gPsxDisplay.PutCurrentDispEnv();
+
+                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 1, CameraSwapEffects::ePlay1FMV_5, FmvIds{"LOGO.DDV", "OPTION.DDV", "INTRO.DDV"}, 0);
+                GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuDoor));
+                Load_Anim_Pal_4D06A0(&GetAnimation());
+
+                mDisableChangingSelection = true;
+                field_220_frame_table_idx = 9;
+                field_228_res_idx = 0;
+                field_21E_changeScreenState = 3;
+
+                // What HandleMainMenuUpdate does when ChangeScreenAndIntroLogic_4CF640 returns eChanging
+                AnimationAndSoundLogic_4CFE80();
+                break;
+        }
+    }
+    return AfterMovieResult::eBusy;
+}
+
 void MainMenuController::VUpdate()
 {
     if (gCreditsControllerExists)
@@ -2895,11 +2958,11 @@ void MainMenuController::Load_Anim_Pal_4D06A0(Animation* pAnim)
     pAnim->ReloadPal();
 }
 
-s32 MainMenuController::ChangeScreenAndIntroLogic_4CF640()
+MainMenuController::ChangeScreen MainMenuController::ChangeScreenAndIntroLogic_4CF640()
 {
     if (field_21E_changeScreenState == 0 || mGameSpeakPlaying || field_228_res_idx != 0)
     {
-        return 0;
+        return ChangeScreen::eNone;
     }
 
     CameraSwapEffects screenChangeEffect = CameraSwapEffects::eInstantChange_0;
@@ -2912,21 +2975,21 @@ s32 MainMenuController::ChangeScreenAndIntroLogic_4CF640()
                 if (field_21C_camSwapEffectState != camTransEffectState::eDone_2)
                 {
                     field_21E_changeScreenState = 2;
-                    return 1;
+                    return ChangeScreen::eChanging;
                 }
 
                 if (field_208_transition_obj)
                 {
                     field_208_transition_obj->StartTrans(Layer::eLayer_FadeFlash_40, 1, 0, 16);
                     field_21E_changeScreenState = 2;
-                    return 1;
+                    return ChangeScreen::eChanging;
                 }
 
                 field_208_transition_obj = relive_new MainMenuTransition(Layer::eLayer_FadeFlash_40, 1, 0, 16, relive::TBlendModes::eBlend_2, mResMan, mMap);
                 if (field_208_transition_obj)
                 {
                     field_21E_changeScreenState = 2;
-                    return 1;
+                    return ChangeScreen::eChanging;
                 }
             }
             else
@@ -2935,80 +2998,27 @@ s32 MainMenuController::ChangeScreenAndIntroLogic_4CF640()
                 {
                     field_208_transition_obj->StartTrans(Layer::eLayer_FadeFlash_40, 1, 0, 16);
                     field_21E_changeScreenState = 2;
-                    return 1;
+                    return ChangeScreen::eChanging;
                 }
 
                 field_208_transition_obj = relive_new MainMenuTransition(Layer::eLayer_FadeFlash_40, 1, 0, 16, relive::TBlendModes::eBlend_1, mResMan, mMap);
                 if (field_208_transition_obj)
                 {
                     field_21E_changeScreenState = 2;
-                    return 1;
+                    return ChangeScreen::eChanging;
                 }
             }
             // ae_new failure case
             field_21E_changeScreenState = 2;
-            return 1;
+            return ChangeScreen::eChanging;
 
         case 2:
             if (sMainMenuPages_561960[field_214_page_index].field_A_transition_effect == camTransEffectState::eUnknown_7)
             {
-                // Find the record for GTILOGO.DDV
-                if (!GetGameAutoPlayer().IsRecording() && !GetGameAutoPlayer().IsPlaying())
-                {
-                    while (Input_IsVKPressed_4EDD40(VK_RETURN))
-                    {
-                        SYS_EventsPump();
-                    }
-                }
-
-                auto pMovie = relive_new Movie("GTILOGO.DDV", mResMan, mMap);
-
-                // Run the movie till its done
-                while (Movie::gMovieRefCount > 0)
-                {
-                    if (pMovie->GetUpdatable())
-                    {
-                        if (!pMovie->GetDead() && (!gNumCamSwappers || pMovie->GetUpdateDuringCamSwap()))
-                        {
-                            pMovie->VUpdate();
-                        }
-                    }
-                }
-
-                if (!GetGameAutoPlayer().IsRecording() && !GetGameAutoPlayer().IsPlaying())
-                {
-                    while (Input_IsVKPressed_4EDD40(VK_RETURN))
-                    {
-                        SYS_EventsPump();
-                    }
-                }
-
-                // Create movie object for the DD logo
-                pMovie = relive_new Movie("DDLOGO.DDV", mResMan, mMap);
-
-                // Run the movie till its done
-                while (Movie::gMovieRefCount > 0)
-                {
-                    if (pMovie->GetUpdatable())
-                    {
-                        if (!pMovie->GetDead() && (!gNumCamSwappers || pMovie->GetUpdateDuringCamSwap()))
-                        {
-                            pMovie->VUpdate();
-                        }
-                    }
-                }
-
-                gPsxDisplay.PutCurrentDispEnv();
-
-                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, 1, CameraSwapEffects::ePlay1FMV_5, FmvIds{"LOGO.DDV", "OPTION.DDV", "INTRO.DDV"}, 0);
-                GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::MenuDoor));
-                Load_Anim_Pal_4D06A0(&GetAnimation());
-
-                mDisableChangingSelection = true;
-                field_220_frame_table_idx = 9;
-                field_228_res_idx = 0;
-                field_21E_changeScreenState = 3;
-                return 1;
+                // The logos play one after the other (each waits for Enter to be released so
+                // it doesn't skip itself), then UpdateAfterMovie finishes this off
+                PlayMovie("GTILOGO.DDV", AfterMovie::ePlayDDLogo);
+                return ChangeScreen::ePlayingIntroLogos;
             }
 
             switch (field_21C_camSwapEffectState)
@@ -3019,7 +3029,7 @@ s32 MainMenuController::ChangeScreenAndIntroLogic_4CF640()
                 {
                     break;
                 }
-                return 1;
+                return ChangeScreen::eChanging;
 
             case camTransEffectState::eTopToBottom_3:
                 screenChangeEffect = CameraSwapEffects::eTopToBottom_3;
@@ -3051,7 +3061,7 @@ s32 MainMenuController::ChangeScreenAndIntroLogic_4CF640()
             GetAnimation().SetRender(false);
             GetAnimation().SetAnimate(false);
             field_21E_changeScreenState = 3;
-            return 1;
+            return ChangeScreen::eChanging;
 
         case 3:
             if (sMainMenuPages_561960[field_214_page_index].field_20_fn_on_free)
@@ -3060,13 +3070,13 @@ s32 MainMenuController::ChangeScreenAndIntroLogic_4CF640()
                 (this->*fn)();
             }
             field_21E_changeScreenState = 4;
-            return 1;
+            return ChangeScreen::eChanging;
 
         case 4:
         {
             if (gNumCamSwappers > 0)
             {
-                return 1;
+                return ChangeScreen::eChanging;
             }
 
             if (field_21C_camSwapEffectState == camTransEffectState::eDone_0 || field_21C_camSwapEffectState == camTransEffectState::eDone_2)
@@ -3133,7 +3143,7 @@ s32 MainMenuController::ChangeScreenAndIntroLogic_4CF640()
                 (this->*targetPage.field_1C_fn_on_load)();
             }
 
-            return 1;
+            return ChangeScreen::eChanging;
         }
 
         case 5:
@@ -3146,13 +3156,13 @@ s32 MainMenuController::ChangeScreenAndIntroLogic_4CF640()
             if ((field_21C_camSwapEffectState == camTransEffectState::eDone_0 || field_21C_camSwapEffectState == camTransEffectState::eDone_2) 
                 && !field_208_transition_obj->mDone)
             {
-                return 1;
+                return ChangeScreen::eChanging;
             }
 
             field_21E_changeScreenState = 0;
-            return 0;
+            return ChangeScreen::eNone;
         default:
-            return 0;
+            return ChangeScreen::eNone;
     }
 }
 

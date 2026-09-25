@@ -4,6 +4,9 @@
 #include "PsxDisplay.hpp"
 #include "BaseGameAutoPlayer.hpp"
 #include "Sys.hpp"
+#include "Window.hpp"
+#include "GameObjects/Particle.hpp"
+#include "../AliveLibAE/PsxRender.hpp"
 
 #include "CommandLineOptions.hpp"
 #include "Renderer/IRenderer.hpp"
@@ -79,7 +82,6 @@
 #include <FatalError.hpp>
 
 u32 sGnFrame = 0;
-bool gBreakGameLoop = false;
 s16 gNumCamSwappers = 0;
 bool gSkipGameObjectUpdates = false;
 bool gDDCheatOn = false;
@@ -93,19 +95,21 @@ Engine::Engine(GameType gameType, FileSystem& fs, const CommandLineOptions& opti
     , mFs(fs)
     , mOptions(options)
 {
+    mPathReloadEventType = SDL_RegisterEvents(1);
+    LOG_INFO("Event base %d", mPathReloadEventType);
 
     mIpcInterface = relive::MakeIpcInterface();
-    mIpcInterface->Listen([&](relive::PacketTypes packetType, const std::vector<unsigned char>& buffer)
+    mIpcInterface->Listen([this](relive::PacketTypes packetType, const std::vector<unsigned char>& buffer)
     {
         // Process IPC packets (usually comes from level editor) on this worker thread, send to main
-        // thread via an SDL message which will end up in Sys_PumpMessages
+        // thread via an SDL message which will end up in Sys::PumpEvents
         LOG_INFO("On ipc packet type %d len %d", static_cast<u8>(packetType), buffer.size());
         if (packetType == relive::PacketTypes::LevelPathJsonChanged)
         {
 
             SDL_Event e;
             SDL_zero(e);
-            e.type = Sys_BaseUserEventNumber();
+            e.type = mPathReloadEventType;
             u8* tmp = new u8[buffer.size()];
             memcpy(tmp, buffer.data(), buffer.size());
             e.user.data1 = tmp;
@@ -119,6 +123,8 @@ Engine::~Engine()
 {
     TRACE_ENTRYEXIT;
     mIpcInterface.reset();
+    mSys.reset();
+    mWindow.reset();
 }
 
 
@@ -153,9 +159,8 @@ static void DrawFps_4952F0(f32 fps)
 }
 
 
-// Called wherever Sys_PumpMessages() signals the user confirmed they want to quit. A hard
-// exit(0) here previously left FMV conversion jobs still writing to their final output file
-static s32 Game_End_Frame(u32 flags, BaseMap* pMap)
+// Called each time a frame is presented
+static s32 Game_End_Frame(u32 flags)
 {
     if (flags & 1)
     {
@@ -170,18 +175,31 @@ static s32 Game_End_Frame(u32 flags, BaseMap* pMap)
     }
 
     ++sFrameCount_5CA300;
-
-    // A background FMV conversion (DataConversionUI) never overlaps with this callback actually
-    // firing - it only runs during Game_Loop, well after DataConversionUI's own loop (which pumps
-    // messages itself - see Engine::Run()) has already finished - so there's nothing here that
-    // ever needs to know about cancelling one.
-    if (Sys_PumpMessages(pMap))
-    {
-        exit(0);
-    }
     return 0;
 }
 
+
+// So the window never shows whatever was in it before the first frame, and the loading icon
+// has something to go on top of if loading comes first
+static void PresentBlackFrame()
+{
+    Poly_G4 black;
+    black.SetSemiTransparent(false);
+    black.SetShadeTex(false);
+    black.SetRGB0(0, 0, 0);
+    black.SetRGB1(0, 0, 0);
+    black.SetRGB2(0, 0, 0);
+    black.SetRGB3(0, 0, 0);
+    black.SetXY0(0, 0);
+    black.SetXY1(640, 0);
+    black.SetXY2(0, 240);
+    black.SetXY3(640, 240);
+
+    OrderingTable ot;
+    ot.Add(Layer::eLayer_0, &black);
+    PSX_DrawOTag(ot);
+    PSX_PutDispEnv_4F5890();
+}
 
 void Engine::CmdLineRenderInit(const std::string& activeModName)
 {
@@ -204,7 +222,7 @@ void Engine::CmdLineRenderInit(const std::string& activeModName)
     }
     LOG_INFO("Renderer is %s", DisplaySettings::RendererToString(displaySettings.mRenderer));
 
-    std::string windowTitle = mGameType == GameType::eAe ? WindowTitleAE(activeModName) : WindowTitleAO(activeModName);
+    std::string windowTitle = mGameType == GameType::eAe ? Window::TitleAE(activeModName) : Window::TitleAO(activeModName);
     if (GetGameAutoPlayer().IsRecording())
     {
         windowTitle += " [Recording]";
@@ -214,18 +232,22 @@ void Engine::CmdLineRenderInit(const std::string& activeModName)
         windowTitle += " [AutoPlay]";
     }
 
-    IRenderer::CreateRenderer(displaySettings.mRenderer, windowTitle);
-    IRenderer::GetRenderer()->Clear(0, 0, 0);
-    Sys_SetDisplaySettings(displaySettings, *mResMan);
+    mWindow = std::make_unique<Window>();
+    if (!mWindow->CreateWithRenderer(displaySettings.mRenderer, windowTitle))
+    {
+        ALIVE_FATAL("Failed to create a window and renderer, see the log for details");
+    }
+    mSys = std::make_unique<Sys>(*mWindow, *mResMan, mPathReloadEventType);
+    PresentBlackFrame();
+    mSys->SetDisplaySettings(displaySettings);
 
-    PSX_EMU_SetCallBack_4F9430([this](u32 flags) { return Game_End_Frame(flags, mMap.get()); });
+    PSX_EMU_SetCallBack_4F9430(Game_End_Frame);
 }
 
 
 // QuickSave load/Restart path calls this
-void DestroyObjects(ResourceManagerWrapper& resMan)
+void DestroyObjects()
 {
-    resMan.LoadingLoop(false);
     for (s32 iterations = 0; iterations < 2; iterations++)
     {
         for (s32 idx = 0;idx < gBaseGameObjects->Size(); idx++)
@@ -246,14 +268,6 @@ void DestroyObjects(ResourceManagerWrapper& resMan)
     }
 }
 
-void SYS_EventsPump(BaseMap* pMap)
-{
-    if (Sys_PumpMessages(pMap))
-    {
-        exit(0);
-    }
-}
-
 u32 SYS_GetTicks()
 {
     // Using this instead of SDL_GetTicks resolves a weird x64 issue on windows where
@@ -269,7 +283,7 @@ void Alive_Show_ErrorMsg(const char_type* fmt, ...)
     vsnprintf(buf, sizeof(buf) - 1, fmt, args);
     va_end(args);
 
-    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, ("R.E.L.I.V.E. " + BuildString()).c_str(), buf, nullptr);
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, ("R.E.L.I.V.E. " + Window::BuildString()).c_str(), buf, nullptr);
 }
 
 void Engine::Init_GameStates()
@@ -359,11 +373,154 @@ void Game_Shutdown()
     IRenderer::FreeRenderer();
 }
 
-void Game_Loop(BaseMap& map)
+// Draws the loading icon over whatever was shown last and presents it
+static void ShowLoadingIcon(ResourceManagerWrapper& resMan, BaseMap& map)
 {
-    gBreakGameLoop = false;
-    bool bPauseMenuObjectFound = false;
+    AnimResource res = resMan.LoadAnimation(AnimId::Loading_Icon2);
+    auto pParticle = relive_new Particle(FP_FromInteger(0), FP_FromInteger(0), res, resMan, map);
+    pParticle->GetAnimation().SetSemiTrans(false);
+    pParticle->GetAnimation().SetBlending(true);
+    pParticle->GetAnimation().SetRenderLayer(Layer::eLayer_0);
+
+    OrderingTable ot;
+    pParticle->GetAnimation().VRender(320, 220, ot, 0, 0);
+    PSX_DrawOTag(ot);
+    PSX_PutDispEnv_4F5890();
+
+    pParticle->SetDead(true);
+}
+
+// One main loop iteration spent waiting for loading to finish
+static Sys::PumpResult LoadingTick(Sys& sys, ResourceManagerWrapper& resMan, BaseMap& map, bool showLoadingIcon)
+{
+    // How many of these there are depends on how long loading takes, so none of it is recorded
+    GetGameAutoPlayer().DisableRecorder();
+
+    const Sys::PumpResult result = sys.PumpEvents(nullptr);
+
+    // If not uncapped fps playback then actually wait for 1 frame on each tick
+    const bool unCappedFps = GetGameAutoPlayer().IsPlaying() && GetGameAutoPlayer().NoFpsLimitPlayBack();
+    PSX_VSync(unCappedFps ? VSyncMode::UncappedFps : VSyncMode::LimitTo30Fps);
+
+    if (showLoadingIcon)
+    {
+        ShowLoadingIcon(resMan, map);
+    }
+
+    GetGameAutoPlayer().EnableRecorder();
+    return result;
+}
+
+void Engine::Game_Loop(BaseMap& map)
+{
+    mFrameStage = FrameStage::eBegin;
+    mPauseMenuObjectFound = false;
     while (!gBaseGameObjects->IsEmpty())
+    {
+        // Anything the resource manager loads can load in the background, and this is the only
+        // place that waits for it: whatever needs it asks for a wait (RequestLoadingWait) and
+        // carries on once it's done, e.g. a screen change returns ScreenChangeResult::eWaiting.
+        if (mResMan->LoadingWaitRequested())
+        {
+            if (!mLoadingWaitStarted)
+            {
+                mLoadingWaitStarted = true;
+                mLoadingWaitStartTicks = SYS_GetTicks();
+                mLoadingIconShown = false;
+            }
+
+            constexpr u32 kShowLoadingIconAfterMs = 1000;
+            const bool showLoadingIcon = !mLoadingIconShown
+                && (mResMan->ShowLoadingIconNow() || SYS_GetTicks() > mLoadingWaitStartTicks + kShowLoadingIconAfterMs);
+
+            if (mResMan->IsLoading() || showLoadingIcon)
+            {
+                if (LoadingTick(*mSys, *mResMan, map, showLoadingIcon) == Sys::PumpResult::eQuit)
+                {
+                    map.EndAllModals();
+                    break;
+                }
+                mLoadingIconShown = mLoadingIconShown || showLoadingIcon;
+                continue;
+            }
+
+            mResMan->EndLoadingWait();
+            mLoadingWaitStarted = false;
+        }
+
+        // The only other place events are pumped while the game runs. Modal objects (pause
+        // menu, movies...) run from here too, rather than in nested loops of their own. The
+        // nested loops never gave the pump the map, so restarting the music after the quit
+        // question still waits until no modal is active.
+        if (mSys->PumpEvents(map.GetActiveModal() ? nullptr : &map) == Sys::PumpResult::eQuit)
+        {
+            // Quit confirmed: abandon whatever was running and shut down normally
+            map.EndAllModals();
+            break;
+        }
+
+        if (BaseGameObject* pModal = map.GetActiveModal())
+        {
+            const ModalState state = pModal->VModalUpdate();
+            if (state == ModalState::eQuitGame)
+            {
+                GetGameAutoPlayer().SyncPoint(SyncPoints::MainLoopExit);
+                map.EndAllModals();
+                break;
+            }
+
+            if (state == ModalState::eFinished)
+            {
+                pModal->EndModal();
+            }
+            continue;
+        }
+
+        // Only between frames, so a reload can't pull objects out from under one
+        if (mFrameStage == FrameStage::eBegin && !map.DirectCameraChangePending())
+        {
+            for (const std::string& pathJsonFileName : mSys->TakePathReloadRequests())
+            {
+                map.ReloadPathJsonRequest(pathJsonFileName);
+            }
+        }
+
+        RunFrame(map);
+    } // Main loop end
+
+    PSX_VSync(VSyncMode::UncappedFps);
+
+    // Destroy all game objects
+    for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
+    {
+        BaseGameObject* pObjToKill = gBaseGameObjects->ItemAt(i);
+        if (!pObjToKill)
+        {
+            break;
+        }
+
+        if (pObjToKill->GetDead())
+        {
+            i = gBaseGameObjects->RemoveAt(i);
+            relive_delete pObjToKill;
+        }
+    }
+}
+
+void Engine::RunFrame(BaseMap& map)
+{
+    // Every stage that can start a modal object returns once one has, having already moved
+    // mFrameStage/mFrameObjIdx on to where the frame carries on from.
+    if (mFrameStage == FrameStage::eBegin && map.DirectCameraChangePending())
+    {
+        // The first camera, or a path reload's, see BaseMap::ContinueDirectCameraChange
+        if (map.ContinueDirectCameraChange() == ScreenChangeResult::eWaiting)
+        {
+            return;
+        }
+    }
+
+    if (mFrameStage == FrameStage::eBegin)
     {
         GetGameAutoPlayer().SyncPoint(SyncPoints::MainLoopStart);
 
@@ -373,9 +530,15 @@ void Game_Loop(BaseMap& map)
 
         // Update objects
         GetGameAutoPlayer().SyncPoint(SyncPoints::ObjectsUpdateStart);
-        for (s32 baseObjIdx = 0; baseObjIdx < gBaseGameObjects->Size(); baseObjIdx++)
+        mFrameObjIdx = 0;
+        mFrameStage = FrameStage::eUpdateObjects;
+    }
+
+    if (mFrameStage == FrameStage::eUpdateObjects)
+    {
+        for (; mFrameObjIdx < gBaseGameObjects->Size(); mFrameObjIdx++)
         {
-            BaseGameObject* pBaseGameObject = gBaseGameObjects->ItemAt(baseObjIdx);
+            BaseGameObject* pBaseGameObject = gBaseGameObjects->ItemAt(mFrameObjIdx);
 
             if (!pBaseGameObject || gSkipGameObjectUpdates)
             {
@@ -383,7 +546,7 @@ void Game_Loop(BaseMap& map)
             }
 
             if (pBaseGameObject->GetUpdatable()
-			    && !pBaseGameObject->GetDead() 
+                && !pBaseGameObject->GetDead()
                 && (gNumCamSwappers == 0 || pBaseGameObject->GetUpdateDuringCamSwap()))
             {
                 const s32 updateDelay = pBaseGameObject->UpdateDelay();
@@ -391,11 +554,16 @@ void Game_Loop(BaseMap& map)
                 {
                     if (pBaseGameObject == gPauseMenu)
                     {
-                        bPauseMenuObjectFound = true;
+                        mPauseMenuObjectFound = true;
                     }
                     else
                     {
                         pBaseGameObject->VUpdate();
+                        if (map.GetActiveModal())
+                        {
+                            mFrameObjIdx++;
+                            return;
+                        }
                     }
                 }
                 else
@@ -405,7 +573,11 @@ void Game_Loop(BaseMap& map)
             }
         }
         GetGameAutoPlayer().SyncPoint(SyncPoints::ObjectsUpdateEnd);
+        mFrameStage = FrameStage::eRender;
+    }
 
+    if (mFrameStage == FrameStage::eRender)
+    {
         // Animate everything
         if (gNumCamSwappers <= 0)
         {
@@ -437,17 +609,21 @@ void Game_Loop(BaseMap& map)
 
         gPsxDisplay.mDebugFont.DebugFont_Flush();
         gScreenManager->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
-        SYS_EventsPump(&map); // Exit checking?
 
         GetGameAutoPlayer().SyncPoint(SyncPoints::RenderOT);
         gPsxDisplay.RenderOrderingTable();
-        
-        GetGameAutoPlayer().SyncPoint(SyncPoints::RenderStart);
 
+        GetGameAutoPlayer().SyncPoint(SyncPoints::RenderStart);
+        mFrameObjIdx = 0;
+        mFrameStage = FrameStage::eDestroyObjects;
+    }
+
+    if (mFrameStage == FrameStage::eDestroyObjects)
+    {
         // Destroy objects with certain flags
-        for (s32 idx = 0; idx < gBaseGameObjects->Size(); idx++)
+        for (; mFrameObjIdx < gBaseGameObjects->Size(); mFrameObjIdx++)
         {
-            BaseGameObject* pObj = gBaseGameObjects->ItemAt(idx);
+            BaseGameObject* pObj = gBaseGameObjects->ItemAt(mFrameObjIdx);
             if (!pObj)
             {
                 break;
@@ -455,70 +631,84 @@ void Game_Loop(BaseMap& map)
 
             if (pObj->GetDead() && !pObj->GetCantKill() && pObj->mChaseCounter == 0)
             {
-                idx = gBaseGameObjects->RemoveAt(idx);
+                mFrameObjIdx = gBaseGameObjects->RemoveAt(mFrameObjIdx);
                 relive_delete pObj;
+
+                // e.g. a camera swapper finishing with the purple light effect
+                if (map.GetActiveModal())
+                {
+                    mFrameObjIdx++;
+                    return;
+                }
             }
         }
 
         GetGameAutoPlayer().SyncPoint(SyncPoints::RenderEnd);
+        mFrameStage = FrameStage::ePauseMenu;
+    }
 
+    if (mFrameStage == FrameStage::ePauseMenu)
+    {
+        mFrameStage = FrameStage::eScreenChange;
+
+        const bool bPauseMenuObjectFound = mPauseMenuObjectFound;
+        mPauseMenuObjectFound = false;
         if (bPauseMenuObjectFound && gPauseMenu)
         {
             gPauseMenu->VUpdate();
-        }
-
-        bPauseMenuObjectFound = false;
-
-        map.ScreenChange();
-
-        if (GetGameType() == GameType::eAe)
-        {
-            Input().Update(GetGameAutoPlayer());
-        }
-        else
-        {
-            AO::Input().Update(GetGameAutoPlayer());
-        }
-
-        if (gNumCamSwappers == 0)
-        {
-            GetGameAutoPlayer().SyncPoint(SyncPoints::IncrementFrame);
-            sGnFrame++;
-        }
-
-        if (gBreakGameLoop)
-        {
-            GetGameAutoPlayer().SyncPoint(SyncPoints::MainLoopExit);
-            break;
-        }
-
-        GetGameAutoPlayer().ValidateObjectStates();
-
-    } // Main loop end
-
-    PSX_VSync(VSyncMode::UncappedFps);
-
-    // Destroy all game objects
-    for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
-    {
-        BaseGameObject* pObjToKill = gBaseGameObjects->ItemAt(i);
-        if (!pObjToKill)
-        {
-            break;
-        }
-
-        if (pObjToKill->GetDead())
-        {
-            i = gBaseGameObjects->RemoveAt(i);
-            relive_delete pObjToKill;
+            if (map.GetActiveModal())
+            {
+                return;
+            }
         }
     }
+
+    if (mFrameStage == FrameStage::eScreenChange)
+    {
+        if (map.ScreenChange() == ScreenChangeResult::eWaiting)
+        {
+            // Waiting on a modal or loading part way through, called again to carry on once
+            // that's done
+            return;
+        }
+
+        mFrameStage = FrameStage::eEnd;
+        if (map.GetActiveModal())
+        {
+            return;
+        }
+    }
+
+    mFrameStage = FrameStage::eBegin;
+
+    if (GetGameType() == GameType::eAe)
+    {
+        Input().Update(GetGameAutoPlayer());
+    }
+    else
+    {
+        AO::Input().Update(GetGameAutoPlayer());
+    }
+
+    if (gNumCamSwappers == 0)
+    {
+        GetGameAutoPlayer().SyncPoint(SyncPoints::IncrementFrame);
+        sGnFrame++;
+    }
+
+    GetGameAutoPlayer().ValidateObjectStates();
 }
 
 void Engine::Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera)
 {
     // Begin start up
-    SYS_EventsPump(mMap.get());
+    if (mSys->PumpEvents(mMap.get()) == Sys::PumpResult::eQuit)
+    {
+        return;
+    }
+
+    // Needed while waiting for everything else to load, starting with the first camera
+    mResMan->PendAnimation(AnimId::Loading_Icon2);
 
     gAttract = 0;
  
@@ -637,6 +827,7 @@ void Engine::Init()
     }
 
     mResMan = std::make_unique<ResourceManagerWrapper>(mFs, activeModPath);
+    mResMan->SetDebugLoadDelay(mOptions.mSlowLoadMs);
 
     gPsxDisplay.Init(*mResMan);
 
@@ -673,14 +864,13 @@ void Engine::Run()
 
             dcu.VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
 
-            // Not the general SYS_EventsPump(mMap.get()) (which would just exit(0) immediately)
-            // - dcu (and so any FMV conversion jobs it dispatched onto its own ThreadPool - see
+            // dcu (and so any FMV conversion jobs it dispatched onto its own ThreadPool - see
             // fmv_converter.cpp) is only ever reachable from right here, so quitting while it's
             // still running is handled locally: ask it to cancel and give it a bounded window to
             // actually stop (FmvConv::Convert checks ThreadPool::IsCancelRequested() roughly once
             // per encoded frame and cleans up its own temp file) before exiting for real either
-            // way, rather than a hard exit(0) leaving conversion jobs mid-write.
-            if (Sys_PumpMessages(mMap.get()))
+            // way, rather than leaving conversion jobs mid-write.
+            if (mSys->PumpEvents(mMap.get()) == Sys::PumpResult::eQuit)
             {
                 dcu.RequestCancel();
 
@@ -691,7 +881,7 @@ void Engine::Run()
                     std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 }
 
-                exit(0);
+                return;
             }
             gPsxDisplay.RenderOrderingTable();
         }

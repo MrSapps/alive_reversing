@@ -51,6 +51,8 @@ BaseGameObject::BaseGameObject(s16 bAddToObjectList, s16 resourceArraySize, Reso
 
 BaseGameObject::~BaseGameObject()
 {
+    EndModal();
+
     EventCancelForObj(this);
 
     sObjectIds.Remove(mBaseGameObjectId);
@@ -59,6 +61,29 @@ BaseGameObject::~BaseGameObject()
 void BaseGameObject::VUpdate()
 {
 
+}
+
+ModalState BaseGameObject::VModalUpdate()
+{
+    return ModalState::eFinished;
+}
+
+void BaseGameObject::StartModal()
+{
+    if (!mModal)
+    {
+        mModal = true;
+        mMap.AddModal(*this);
+    }
+}
+
+void BaseGameObject::EndModal()
+{
+    if (mModal)
+    {
+        mModal = false;
+        mMap.RemoveModal(*this);
+    }
 }
 
 void BaseGameObject::VRender(OrderingTable& /*ot*/)

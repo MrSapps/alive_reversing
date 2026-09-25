@@ -144,6 +144,15 @@ public:
     void AbePopThroughDoor();
     void CopyRight_Update();
     void FMV_Select_Update();
+    enum class AfterMovieResult
+    {
+        eNothingToDo,
+        // Did something or is still waiting on the movie: skip the rest of this update
+        eBusy,
+    };
+
+    // Restores the menu once the movie picked in FMV_Select_Update has finished
+    AfterMovieResult UpdateAfterMovie();
     void SayHelloWaitForLoading();
     void WaitForAbeSayHello();
     void MainScreen_Update();
@@ -257,6 +266,9 @@ public:
     s16 field_204_flags = 0;
     s32 mCurrentCreditsCamera = 0;
     bool mUsingLvlSelectCheat = false;
+    bool mRestoreAfterMovie = false;
+    // Abe's animations have been pended for a new game, see NewGameStart
+    bool mAbeAnimsPended = false;
     EReliveLevelIds mLvlSelectCheatLevel = EReliveLevelIds::eNone;
     s16 mLvlSelectCheatPath = 0;
     s16 mLvlSelectCheatCamera = 0;

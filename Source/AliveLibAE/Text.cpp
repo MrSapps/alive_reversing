@@ -6,7 +6,6 @@
 #include "Input.hpp"
 #include "../relive_lib/Sound/Midi.hpp"
 #include "../relive_lib/Sound/Sound.hpp"
-#include "../relive_lib/Sys.hpp"
 #include "GameAutoPlayer.hpp"
 #include "../relive_lib/ResourceManagerWrapper.hpp"
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
@@ -133,45 +132,31 @@ void Text::VRender(OrderingTable& ot)
 // Movie::vUpdate_4E0030 will call with type 1 which does nothing (trying to display movie skip message when it can't be found?).
 // MainMenuController::LoadDemo_Update_4D1040 will call with type 2 (trying to display demo skip message when it can't be found?).
 // MainMenuController::ChangeScreenAndIntroLogic_4CF640 will call with type 3 (Shown on boot, says Abe's Exoddus).
-
-// TODO: When above functions are reversed clean up this function to remove strange dead cases..
-s8 Display_Full_Screen_Message_Blocking(MessageType messageType, ResourceManagerWrapper& resMan, BaseMap& map)
+// Only type 2 is used now.
+FullScreenMessage::FullScreenMessage(MessageType messageType, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
 {
-    // TODO: Why doesn't this go into the switch ??
-    if (messageType == MessageType::eSkipMovie_1)
-    {
-        return 0;
-    }
+    SetSurviveDeathReset(true);
+    SetUpdateDuringCamSwap(true);
 
-    auto pTextObj = relive_new Text("       Oddworld Abe's Exoddus        ", 1, 0, resMan, map);
+    mText = relive_new Text("       Oddworld Abe's Exoddus        ", 1, 0, resMan, map);
 
-    Text* pTextObj2 = nullptr;
     switch (messageType)
     {
-        // Dead due to early return ??
-        case MessageType::eSkipMovie_1:
-            pTextObj2 = relive_new Text("or esc to skip the movie", 1, 0, resMan, map);
-            if (pTextObj2)
-            {
-                pTextObj2->SetYPos(0, 30);
-            }
-            break;
-
         case MessageType::eSkipDemo_2:
-            pTextObj2 = relive_new Text("or esc to skip the demo", 1, 0, resMan, map);
-            if (pTextObj2)
+            mText2 = relive_new Text("or esc to skip the demo", 1, 0, resMan, map);
+            if (mText2)
             {
-                pTextObj2->SetYPos(0, 30);
+                mText2->SetYPos(0, 30);
             }
             break;
     }
 
-    SYS_EventsPump();
-    pTextObj->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
+    mText->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
 
-    if (pTextObj2)
+    if (mText2)
     {
-        pTextObj2->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
+        mText2->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
     }
 
     gDisplayRenderFrame = false;
@@ -182,76 +167,99 @@ s8 Display_Full_Screen_Message_Blocking(MessageType messageType, ResourceManager
         SND_StopAll();
     }
 
-    u32 displayForMsecs = GetGameAutoPlayer().SysGetTicks() + 1000;
+    mDisplayUntil = GetGameAutoPlayer().SysGetTicks() + 1000;
 
     if (GetGameAutoPlayer().IsRecording() || GetGameAutoPlayer().IsPlaying())
     {
-        displayForMsecs = 200; // Get rid of these quickly for recordings
+        mDisplayUntil = 200; // Get rid of these quickly for recordings
     }
 
-    s8 bQuitViaEnterOrTimeOut = 1;
-    if (GetGameAutoPlayer().SysGetTicks() < displayForMsecs)
+    if (GetGameAutoPlayer().SysGetTicks() >= mDisplayUntil)
     {
-        bool waitReturn = true;
-        while (!Input_IsVKPressed_4EDD40(VK_RETURN))
-        {
-            // User quit
-            if (Input_IsVKPressed_4EDD40(VK_ESCAPE))
-            {
-                bQuitViaEnterOrTimeOut = 0; // Nope, quitting via escape key
-
-                // Wait for escape to come back up
-                while (Input_IsVKPressed_4EDD40(VK_ESCAPE))
-                {
-                    SYS_EventsPump();
-                }
-                waitReturn = false;
-                break;
-            }
-
-            SYS_EventsPump();
-
-            if (GetGameAutoPlayer().SysGetTicks() >= displayForMsecs)
-            {
-                waitReturn = false;
-                break;
-            }
-        }
-
-        if (waitReturn)
-        {
-            // Wait for return to come back up, as we can only be here if it was pressed, didn't time out or escape wasn't pressed
-            if (!GetGameAutoPlayer().IsRecording() && !GetGameAutoPlayer().IsPlaying())
-            {
-                while (Input_IsVKPressed_4EDD40(VK_RETURN))
-                {
-                    SYS_EventsPump();
-                }
-            }
-        }
+        Close();
+        return;
     }
 
+    StartModal();
+}
+
+FullScreenMessage::~FullScreenMessage()
+{
+    for (Text* pText : {mText, mText2})
+    {
+        if (pText)
+        {
+            gBaseGameObjects->Remove_Item(pText);
+            relive_delete pText;
+        }
+    }
+}
+
+ModalState FullScreenMessage::VModalUpdate()
+{
+    switch (mState)
+    {
+        case State::eWaitForKey:
+            if (Input_IsVKPressed_4EDD40(VK_RETURN))
+            {
+                // Wait for return to come back up, so it doesn't also press whatever comes next
+                if (!GetGameAutoPlayer().IsRecording() && !GetGameAutoPlayer().IsPlaying())
+                {
+                    mState = State::eWaitForReturnRelease;
+                }
+                else
+                {
+                    Close();
+                }
+            }
+            else if (Input_IsVKPressed_4EDD40(VK_ESCAPE))
+            {
+                // User quit
+                mClosedResult = Result::eEscape;
+                mState = State::eWaitForEscapeRelease;
+            }
+            else if (GetGameAutoPlayer().SysGetTicks() >= mDisplayUntil)
+            {
+                Close();
+            }
+            break;
+
+        case State::eWaitForEscapeRelease:
+            if (!Input_IsVKPressed_4EDD40(VK_ESCAPE))
+            {
+                Close();
+            }
+            break;
+
+        case State::eWaitForReturnRelease:
+            if (!Input_IsVKPressed_4EDD40(VK_RETURN))
+            {
+                Close();
+            }
+            break;
+    }
+    return mResult == Result::eOpen ? ModalState::eRunning : ModalState::eFinished;
+}
+
+void FullScreenMessage::Close()
+{
     if (SND_Seq_Table_Valid())
     {
-        GetSoundAPI().mSND_Restart(map);
+        GetSoundAPI().mSND_Restart(mMap);
     }
-
-    SYS_EventsPump();
 
     gDisplayRenderFrame = false;
     gPsxDisplay.RenderOrderingTable();
 
-    if (pTextObj)
+    for (Text** ppText : {&mText, &mText2})
     {
-        gBaseGameObjects->Remove_Item(pTextObj);
-        relive_delete pTextObj;
+        if (*ppText)
+        {
+            gBaseGameObjects->Remove_Item(*ppText);
+            relive_delete *ppText;
+            *ppText = nullptr;
+        }
     }
 
-    if (pTextObj2)
-    {
-        gBaseGameObjects->Remove_Item(pTextObj2);
-        relive_delete pTextObj2;
-    }
-
-    return bQuitViaEnterOrTimeOut;
+    mResult = mClosedResult;
 }

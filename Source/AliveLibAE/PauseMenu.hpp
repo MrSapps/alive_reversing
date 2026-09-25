@@ -37,6 +37,7 @@ public:
     void LoadAnimations();
 
     virtual void VUpdate() override;
+    virtual ModalState VModalUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VScreenChanged() override;
 
@@ -108,6 +109,7 @@ public:
     PauseMenu::PauseMenuPage mActiveMenu = {};
     Animation mMudIconAnim = {};
     Poly_G4 mPolyG4 = {};
+    // While set the pause menu is open, see VModalUpdate
     bool mPauseRenderLoop = false;
 };
 

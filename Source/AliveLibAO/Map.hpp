@@ -67,9 +67,31 @@ public:
     CameraPos Rect_Location_Relative_To_Active_Camera(const PSX_RECT* pRect, s16 width = 0) override;
     s16 Get_Camera_World_Rect(CameraPos camIdx, PSX_RECT* pRect) override;
     s16 Is_Point_In_Current_Camera(EReliveLevelIds level, s32 path, FP xpos, FP ypos, s16 width) override;
-    void GoTo_Camera() override;
-    void ScreenChange() override;
-    void Handle_PathTransition() override;
+    ScreenChangeResult GoTo_Camera() override;
+    ScreenChangeResult ScreenChange() override;
+    void VCameraSwapFinished() override;
+    ScreenChangeResult Handle_PathTransition() override;
+
+private:
+    // Tells the objects about the screen change, the part of ScreenChange after the purple lights
+    void NotifyObjectsOfScreenChange();
+    // GoTo_Camera once any FMVs it plays first have finished, up to pending what the new
+    // camera's objects need
+    void StartLoadCamera();
+    // The rest of GoTo_Camera, once the main loop has waited for that loading
+    void FinishLoadCamera();
+    // After the path transition's camera change, see Handle_PathTransition
+    void FinishPathTransition();
+
+    // StartLoadCamera's state kept for FinishLoadCamera
+    s16 mLoadCameraPrevPath = 0;
+    EReliveLevelIds mLoadCameraPrevLevel = EReliveLevelIds::eNone;
+
+    // Handle_PathTransition's state kept while its camera change waits
+    bool mPathTransitionFromTlv = false;
+    relive::reliveScale mPathTransitionScale = {};
+
+public:
     void VCollectPurpleLightObjects(DynamicArrayT<BaseAnimatedWithPhysicsGameObject>& objects, DynamicArrayT<Particle>& lights) override;
     s32 VPurpleLightFrameCount(s16 bMakeInvisible) override;
 

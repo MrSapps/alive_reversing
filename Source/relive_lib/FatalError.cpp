@@ -29,6 +29,6 @@
 
     LOG_ERROR("%s", pMessage);
 
-    Sys_MessageBox(nullptr, pMessage, "R.E.L.I.V.E fatal error.");
+    Sys::ShowMessageBox(nullptr, pMessage, "R.E.L.I.V.E fatal error.");
     abort();
 }
