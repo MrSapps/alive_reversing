@@ -36,6 +36,16 @@ cmake --build build -j5 --target relive_lib_tests # unit tests
 - Flatpak builds: `flatpak-builder` ignores the job-count env var. Pass `--jobs=5`
   and run it under a `systemd-run` memory cap to avoid OOM.
 
+## Code style (new code)
+
+- No new globals. Keep state in the object that owns it (e.g. the display settings live in
+  `IRenderer`), or in a file-scope `static` when it really is file-local.
+- No anonymous namespaces: use file-scope `static` for file-local functions and data.
+- Don't create new `FileSystem` objects: use the one that's passed around (e.g. `Engine::mFs`),
+  passing it down to whatever needs it.
+- Avoid global free functions where a class fits: prefer member or static member functions
+  (e.g. `IniFile::Parse`, `DisplaySettings::Load`). File-scope `static` helpers are fine.
+
 ## Build time
 
 Keep template-heavy code out of widely included headers. The worst offenders were the

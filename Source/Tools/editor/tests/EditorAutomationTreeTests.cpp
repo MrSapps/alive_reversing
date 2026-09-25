@@ -646,9 +646,9 @@ TEST(EditorAutomation, ModTreeDockHiddenUntilModOpen)
 }
 
 // The editor should remember the last mod that was open (QSettings "last_open_mod_dir", same
-// Editor.ini-backed idiom as "last_open_dir"/"theme"/"windowState") and auto-reopen it on the
+// relive-editor.ini-backed idiom as "last_open_dir"/"theme"/"windowState") and auto-reopen it on the
 // next launch - simulated here via two separate LaunchEditorAndConnect processes sharing the
-// same working directory (and therefore the same Editor.ini, since QSettings resolves that
+// same working directory (and therefore the same relive-editor.ini, since QSettings resolves that
 // relative path from the process's cwd).
 TEST(EditorAutomation, RestartReopensLastMod)
 {

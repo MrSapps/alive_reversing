@@ -20,10 +20,8 @@ DemoPlayback::DemoPlayback(ResourceManagerWrapper& resMan, BaseMap& map)
         gActiveDemoPlayback = this;
         SetSurviveDeathReset(true);
 
-        // TODO: FIX ME - should pass this resource in
-        
         SetUpdateDelay(1);
-        Input().InitDemo(gActiveDemoName);
+        Input().InitDemo(resMan.LoadDemoFile(gActiveDemoName));
         SetType(ReliveTypes::eDemoPlayback);
     }
 }

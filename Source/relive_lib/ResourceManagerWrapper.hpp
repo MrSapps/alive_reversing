@@ -195,12 +195,25 @@ public:
 
 class ThreadPool;
 class FileSystem;
+class IniFile;
 
 // Temp adapter interface
 class ResourceManagerWrapper final
 {
 public:
     ResourceManagerWrapper(FileSystem& fs, const std::string& modPath);
+
+    // The user's settings - input bindings and display settings - in relive.ini in the game
+    // directory (not looked up through the search paths).
+    // The raw text is for GameAutoPlayer::RestoreFileBuffer, so recordings replay the settings
+    // they were recorded with.
+    std::string LoadSettingsIniText();
+    IniFile LoadSettingsIni();
+    bool SaveSettingsIni(const IniFile& ini);
+
+    // A demo's recorded input (PLAYBK*.JOY.json) or starting save (ATTR*.SAV.json), in the game
+    // directory. Empty if it's missing.
+    std::string LoadDemoFile(const std::string& fileName);
     ~ResourceManagerWrapper();
 
     // TODO: Remove/unify when both games resource managers are merged into one object
@@ -324,6 +337,8 @@ private:
     AnimCache LookUp(AnimId animId, const std::string& theme);
 
     void AddSearchPaths(const std::string& modPath);
+
+    static constexpr const char* kSettingsIniPath = "relive.ini";
 
     struct MissingResourceReport final
     {

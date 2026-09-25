@@ -56,3 +56,10 @@ add_custom_command(TARGET relive POST_BUILD
     INSTALL(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../../build/Frameworks/libSDL2.dylib" DESTINATION "relive.app/Contents/Frameworks")
     INSTALL(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../../build/Frameworks/libMoltenVK.dylib" DESTINATION "relive.app/Contents/Frameworks")
 endif()
+
+# -help prints the usage and exits without starting the game (not on Windows, where it also
+# shows a message box that would block the test)
+if (NOT WIN32)
+    add_test(NAME relive_help COMMAND relive -help)
+    set_tests_properties(relive_help PROPERTIES PASS_REGULAR_EXPRESSION "Usage: relive.*-record=<file>")
+endif()

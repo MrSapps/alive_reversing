@@ -1,6 +1,6 @@
 #include "BaseGameAutoPlayer.hpp"
 #include "Sys.hpp"
-#include "CommandLineParser.hpp"
+#include "CommandLineOptions.hpp"
 #include <FatalError.hpp>
 
 constexpr u32 kVersion = 0x1997 + 2;
@@ -195,21 +195,20 @@ void BasePlayer::ValidateNextTypeIs(RecordTypes type)
     }
 }
 
-void BaseGameAutoPlayer::ProcessCommandLine(FileSystem& fs, CommandLineParser& clp)
+void BaseGameAutoPlayer::ProcessCommandLine(FileSystem& fs, const CommandLineOptions& options)
 {
-    std::string buffer;
-    if (clp.ExtractNamePairArgument(buffer, "-record="))
+    if (options.mRecordFile)
     {
-        mRecorder.Init(fs, buffer.c_str(), clp.SwitchExists("-flush"));
+        mRecorder.Init(fs, options.mRecordFile->c_str(), options.mFlushRecording);
         mMode = Mode::Record;
     }
-    else if (clp.ExtractNamePairArgument(buffer, "-play="))
+    else if (options.mPlayFile)
     {
-        mPlayer.Init(fs, buffer.c_str());
+        mPlayer.Init(fs, options.mPlayFile->c_str());
         mMode = Mode::Play;
 
-        mNoFpsLimit = clp.SwitchExists("-fastest");
-        mIgnoreDesyncs = clp.SwitchExists("-ignore_desyncs");
+        mNoFpsLimit = options.mPlayFastest;
+        mIgnoreDesyncs = options.mIgnoreDesyncs;
     }
 }
 

@@ -2,16 +2,16 @@
 #include "GameType.hpp"
 #include "data_conversion/data_conversion_ui.hpp"
 #include "PsxDisplay.hpp"
-#include "../AliveLibAE/VGA.hpp"
 #include "BaseGameAutoPlayer.hpp"
 #include "Sys.hpp"
 
-#include "CommandLineParser.hpp"
+#include "CommandLineOptions.hpp"
 #include "Renderer/IRenderer.hpp"
+#include "DisplaySettings.hpp"
+#include "IniFile.hpp"
 #include "Function.hpp"
 
 #include "../relive_lib/Sys.hpp"
-#include "../AliveLibAE/VGA.hpp"
 #include "../AliveLibAE/Input.hpp"
 #include "../relive_lib/Psx.hpp"
 #include "../relive_lib/DynamicArray.hpp"
@@ -58,7 +58,6 @@
 #include "../relive_lib/GameObjects/CheatController.hpp"
 #include "../AliveLibAO/DDCheat.hpp"
 #include "../AliveLibAO/MusicController.hpp"
-#include "../AliveLibAE/VGA.hpp"
 #include "../AliveLibAO/Input.hpp"
 #include "../AliveLibAO/Midi.hpp"
 #include "../AliveLibAO/PauseMenu.hpp"
@@ -72,7 +71,6 @@
 #include "../relive_lib/Engine.hpp"
 #include "../AliveLibAO/PathDataExtensions.hpp"
 #include "../AliveLibAO/GameAutoPlayer.hpp"
-#include "../AliveLibAE/VGA.hpp"
 #include "../relive_lib/GameObjects/GasCountDown.hpp"
 #include "../relive_lib/GameObjects/PlatformBase.hpp"
 #include "../AliveLibAO/GameEnderController.hpp"
@@ -90,10 +88,10 @@ u16 gAttract = 0;
 
 static bool sCommandLine_ShowFps;
 
-Engine::Engine(GameType gameType, FileSystem& fs, CommandLineParser& clp)
+Engine::Engine(GameType gameType, FileSystem& fs, const CommandLineOptions& options)
     : mGameType(gameType)
     , mFs(fs)
-    , mClp(clp)
+    , mOptions(options)
 {
 
     mIpcInterface = relive::MakeIpcInterface();
@@ -190,37 +188,35 @@ void Engine::CmdLineRenderInit(const std::string& activeModName)
 #if FORCE_DDCHEAT
     gDDCheatOn = true;
 #else
-    gDDCheatOn = mClp.SwitchExists("-ddcheat") || mClp.SwitchExists("-it_is_me_your_father");
+    gDDCheatOn = mOptions.mDdCheat;
 #endif
 
-    IRenderer::Renderers rendererToCreate = IRenderer::Renderers::Sdl3;
-    LOG_INFO("Default renderer is Sdl3");
+    // Read directly from disk rather than through GameAutoPlayer::RestoreFileBuffer: display
+    // settings don't affect gameplay, and an extra buffer would desync recordings.
+    DisplaySettings displaySettings = DisplaySettings::FromIni(mResMan->LoadSettingsIni());
 
-    std::string renderer;
-    if (mClp.ExtractNamePairArgument(renderer, "-renderer="))
+    if (displaySettings.ApplyCommandLine(mOptions))
     {
-        if (strcmpi(renderer.c_str(), "gl") == 0 || strcmpi(renderer.c_str(), "gl3") == 0 || strcmpi(renderer.c_str(), "opengl") == 0 || strcmpi(renderer.c_str(), "opengl3") == 0)
-        {
-            LOG_INFO("Command line set renderer to opengl3");
-            rendererToCreate = IRenderer::Renderers::OpenGL;
-        }
+        // Command line settings are remembered, like the hotkeys'
+        IniFile ini = mResMan->LoadSettingsIni();
+        displaySettings.WriteTo(ini);
+        mResMan->SaveSettingsIni(ini);
+    }
+    LOG_INFO("Renderer is %s", DisplaySettings::RendererToString(displaySettings.mRenderer));
 
-        if (strcmpi(renderer.c_str(), "sdl") == 0)
-        {
-            LOG_INFO("Command line set renderer to sdl");
-            rendererToCreate = IRenderer::Renderers::Sdl3;
-        }
+    std::string windowTitle = mGameType == GameType::eAe ? WindowTitleAE(activeModName) : WindowTitleAO(activeModName);
+    if (GetGameAutoPlayer().IsRecording())
+    {
+        windowTitle += " [Recording]";
+    }
+    else if (GetGameAutoPlayer().IsPlaying())
+    {
+        windowTitle += " [AutoPlay]";
     }
 
-
-    if (mGameType == GameType::eAe)
-    {
-        VGA_CreateRenderer(rendererToCreate, WindowTitleAE(activeModName));
-    }
-    else
-    {
-        VGA_CreateRenderer(rendererToCreate, WindowTitleAO(activeModName));
-    }
+    IRenderer::CreateRenderer(displaySettings.mRenderer, windowTitle);
+    IRenderer::GetRenderer()->Clear(0, 0, 0);
+    Sys_SetDisplaySettings(displaySettings, *mResMan);
 
     PSX_EMU_SetCallBack_4F9430([this](u32 flags) { return Game_End_Frame(flags, mMap.get()); });
 }
@@ -360,7 +356,7 @@ void Game_Shutdown()
 {
     Input_DisableInputForPauseMenuAndDebug_4EDDC0();
     GetSoundAPI().mSND_SsQuit();
-    VGA_Shutdown();
+    IRenderer::FreeRenderer();
 }
 
 void Game_Loop(BaseMap& map)
@@ -536,11 +532,11 @@ void Engine::Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera
 
     if (mGameType == GameType::eAe)
     {
-        Input_Init();
+        Input_Init(*mResMan);
     }
     else
     {
-        AO::Input_Init();
+        AO::Input_Init(*mResMan);
     }
 
     Init_Sound_DynamicArrays_And_Others();
@@ -613,8 +609,8 @@ void Engine::Init()
 {
     std::string activeModPath;
 
-    std::string modName;
-    if (mClp.ExtractNamePairArgument(modName, "-mod="))
+    const std::string& modName = mOptions.mModName;
+    if (!modName.empty())
     {
         LOG_INFO("Set active mod to be %s", modName.c_str());
 
@@ -656,10 +652,10 @@ void Engine::Init()
 
 void Engine::Run()
 {
-    GetGameAutoPlayer().ProcessCommandLine(mFs, mClp);
+    GetGameAutoPlayer().ProcessCommandLine(mFs, mOptions);
 
-    sCommandLine_ShowFps = mClp.SwitchExists("-ddfps");
-    gCommandLine_NoFrameSkip = mClp.SwitchExists("-ddnoskip");
+    sCommandLine_ShowFps = mOptions.mShowFps;
+    gCommandLine_NoFrameSkip = mOptions.mNoFrameSkip;
 
     CmdLineRenderInit(mActiveModDisplayName);
 

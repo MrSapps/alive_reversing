@@ -44,6 +44,10 @@ TWindowHandleType Sys_GetWindowHandle();
 bool Sys_IsAnyKeyDown();
 bool Sys_IsAppActive();
 s8 Sys_PumpMessages(class BaseMap* pMap = nullptr);
+
+// Called once the renderer exists: applies the loaded display settings, which the F9-F12
+// hotkeys then change and save through resMan.
+void Sys_SetDisplaySettings(const struct DisplaySettings& settings, class ResourceManagerWrapper& resMan);
 u32 Sys_BaseUserEventNumber();
 
 #if ORIGINAL_PS1_BEHAVIOR // OG Change - Allow for exiting save menu using controller

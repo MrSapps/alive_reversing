@@ -1943,8 +1943,7 @@ MainMenuNextCam MainMenuController::LoadDemo_Update_4D1040(u32)
         sprintf(file, "ATTR%04d.SAV.json", sDemos_5617F0[demoId].demoId);
         sprintf(gActiveDemoName, "PLAYBK%02d.JOY.json", sDemos_5617F0[demoId].demoId);
 
-        FileSystem fs;
-        std::string jsonStr = fs.LoadToString(file);
+        std::string jsonStr = mResMan.LoadDemoFile(file);
 
         nlohmann::json j = nlohmann::json::parse(jsonStr);
         QuikSave::gActiveQuicksaveData = {};
@@ -2422,7 +2421,7 @@ MainMenuNextCam MainMenuController::ControllerMenu_Update_4D16D0(u32 input)
     {
         Input().SetJoyStickEnabled(sControllerEntryToSelect_BB43D8);
         Input_Init_Names_491870();
-        Input_SaveSettingsIni_492840();
+        Input_SaveSettingsIni_492840(mResMan);
         return MainMenuNextCam(MainMenuCams::eOptionsCam);
     }
 
@@ -2534,7 +2533,7 @@ MainMenuNextCam MainMenuController::RemapInput_Update_4D1820(u32 input)
 
         if (input & InputCommands::eBack)
         {
-            Input_SaveSettingsIni_492840();
+            Input_SaveSettingsIni_492840(mResMan);
             field_1FC_button_index = NO_SELECTABLE_BUTTONS;
             return MainMenuNextCam(MainMenuCams::eAbesMotionKeysCam);
         }

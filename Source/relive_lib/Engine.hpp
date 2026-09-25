@@ -6,7 +6,7 @@
 #include "Factory.hpp"
 
 class FileSystem;
-class CommandLineParser;
+struct CommandLineOptions;
 class BaseMap;
 enum class EReliveLevelIds : s16;
 
@@ -22,7 +22,7 @@ void DestroyObjects(ResourceManagerWrapper& resMan);
 class Engine final
 {
 public:
-    Engine(GameType gameType, FileSystem& fs, CommandLineParser& clp);
+    Engine(GameType gameType, FileSystem& fs, const CommandLineOptions& options);
     ~Engine();
     // Loads the active mod and creates the resource manager and map. Call before Run().
     void Init();
@@ -43,7 +43,7 @@ private:
 
     GameType mGameType = GameType::eAe;
     FileSystem& mFs;
-    CommandLineParser& mClp;
+    const CommandLineOptions& mOptions;
     std::unique_ptr<relive::IIpcInterface> mIpcInterface;
     std::unique_ptr<ResourceManagerWrapper> mResMan;
     std::unique_ptr<BaseMap> mMap;

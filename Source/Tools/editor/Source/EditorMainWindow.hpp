@@ -138,7 +138,7 @@ private:
 
     // Common path for New Mod/Open Mod: closes every open tab (see CloseAllTabs), swaps
     // mCurrentMod, repopulates the mod tree, updates the window title, and persists
-    // "last_open_mod_dir" (same QSettings/Editor.ini idiom "last_open_dir"/"theme"/
+    // "last_open_mod_dir" (same QSettings/relive-editor.ini idiom "last_open_dir"/"theme"/
     // "windowState" already use) so it can be auto-reopened on next launch. Returns false (mod
     // left unchanged) if CloseAllTabs was cancelled.
     bool SwitchToMod(std::unique_ptr<EditorMod> pMod);

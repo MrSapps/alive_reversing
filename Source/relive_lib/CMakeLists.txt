@@ -175,8 +175,6 @@ SET(AliveLibAESrc
     ../AliveLibAE/PathDataExtensions.hpp
     ../AliveLibAE/Input.cpp
     ../AliveLibAE/Input.hpp
-    ../AliveLibAE/VGA.cpp
-    ../AliveLibAE/VGA.hpp
     ../AliveLibAE/PsxRender.cpp
     ../AliveLibAE/PsxRender.hpp
     ../AliveLibAE/Math.cpp
@@ -615,6 +613,9 @@ SET(relive_lib_src
     ${game_objects_src}
     ${data_conversion_src}
     CommandLineParser.hpp
+    CommandLineParser.cpp
+    CommandLineOptions.hpp
+    CommandLineOptions.cpp
     BinaryPath.hpp
     BinaryPath.cpp
     SwitchStates.hpp
@@ -723,6 +724,10 @@ SET(relive_lib_src
     Factory.cpp
     Mods.hpp
     Mods.cpp
+    IniFile.hpp
+    IniFile.cpp
+    DisplaySettings.hpp
+    DisplaySettings.cpp
     FontResources.hpp
     FontResources.cpp
     Font.hpp
@@ -814,6 +819,10 @@ export(TARGETS relive_lib FILE relive_lib.cmake)
 # these tests exercise those code paths at runtime.
 add_executable(relive_lib_tests
     tests/FileSystemTests.cpp
+    tests/IniFileTests.cpp
+    tests/DisplaySettingsTests.cpp
+    tests/CommandLineParserTests.cpp
+    tests/CommandLineOptionsTests.cpp
     tests/MovieFrameSyncTests.cpp
     tests/ConversionProgressTests.cpp
     tests/EtaEstimatorTests.cpp
@@ -827,7 +836,7 @@ target_include_directories(relive_lib_tests PRIVATE
     ${CMAKE_BINARY_DIR}
 )
 target_compile_definitions(relive_lib_tests PRIVATE "_CRT_SECURE_NO_WARNINGS" "JSON_DISABLE_ENUM_SERIALIZATION=1" "GLEW_NO_GLU" "GLEW_STATIC" "SPNG_STATIC")
-target_link_libraries(relive_lib_tests PRIVATE relive_lib googletest SDL3::SDL3)
+target_link_libraries(relive_lib_tests PRIVATE relive_lib relive_ipc googletest SDL3::SDL3)
 add_dependencies(relive_lib_tests UpdateConfigHeader)
 if (MSVC)
     # Must match relive_lib's options because the tests reuse its precompiled header (C4652).

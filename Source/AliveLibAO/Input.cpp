@@ -320,14 +320,11 @@ void InputObject::Shutdown()
 {
 }
 
-void InputObject::InitDemo(const char_type* pDemoFileName)
+void InputObject::InitDemo(const std::string& demoJson)
 {
     mDemoCommandIndex = 0;
 
-    FileSystem fs;
-    auto file = fs.LoadToString(pDemoFileName);
-
-    sDemoData = nlohmann::json::parse(file);
+    sDemoData = nlohmann::json::parse(demoJson);
 
     mbDemoPlaying |= 1u;
     mCommandDuration = 0;
@@ -463,9 +460,9 @@ s8 Input_IsVKPressed(s32 key)
 // from the MainMenu class
 extern s32 gJoystickAvailable;
 
-void Input_Init()
+void Input_Init(ResourceManagerWrapper& resMan)
 {
-    ::Input_Init();
+    ::Input_Init(resMan);
 
     if (Input().IsJoyStickAvailable())
     {
@@ -551,10 +548,10 @@ bool InputObject::IsJoyStickAvailable()
 
 u32 dword_508A64 = 0;
 
-s32 Input_SaveSettingsIni()
+s32 Input_SaveSettingsIni(ResourceManagerWrapper& resMan)
 {
     // Call AE func both in standalone and DLL
-    Input_SaveSettingsIni_Common();
+    Input_SaveSettingsIni_Common(resMan);
     return 1;
 
     // AO approach

@@ -2,7 +2,7 @@
 #include "Psx.hpp"
 #include "Sound/PsxSpuApi.hpp"
 #include "PsxDisplay.hpp"
-#include "../AliveLibAE/VGA.hpp"
+#include "Renderer/IRenderer.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "../AliveLibAE/GameAutoPlayer.hpp"
 #include "Sys.hpp"
@@ -26,7 +26,8 @@ static void PSX_PutDispEnv_Impl_4F5640()
 
     if (!gTurnOffRendering)
     {
-        VGA_EndFrame();
+        IRenderer::GetRenderer()->Clear(0, 0, 0);
+        IRenderer::GetRenderer()->EndFrame();
     }
 
     SsSeqCalledTbyT();

@@ -12,6 +12,9 @@
 #include "relive_config.h"
 #include <FatalError.hpp>
 #include "BaseMap.hpp"
+#include "DisplaySettings.hpp"
+#include "IniFile.hpp"
+#include "ResourceManagerWrapper.hpp"
 
 static bool sAppIsActivated = false;
 static TWindowHandleType sHwnd = nullptr;
@@ -534,6 +537,31 @@ bool Sys_IsAppActive()
     return sAppIsActivated;
 }
 
+// The display settings the F9-F12 hotkeys change, and the Engine's resource manager, which
+// saves them and reloads the input settings when a joystick is plugged in. See
+// Sys_SetDisplaySettings.
+static DisplaySettings sDisplaySettings;
+static ResourceManagerWrapper* spResMan = nullptr;
+
+void Sys_SetDisplaySettings(const DisplaySettings& settings, ResourceManagerWrapper& resMan)
+{
+    sDisplaySettings = settings;
+    spResMan = &resMan;
+    sDisplaySettings.ApplyTo(*IRenderer::GetRenderer(), Sys_GetWindowHandle());
+}
+
+// Applies a hotkey's change and saves it so it persists between runs.
+static void DisplaySettingsChanged()
+{
+    sDisplaySettings.ApplyTo(*IRenderer::GetRenderer(), Sys_GetWindowHandle());
+    if (spResMan)
+    {
+        IniFile ini = spResMan->LoadSettingsIni();
+        sDisplaySettings.WriteTo(ini);
+        spResMan->SaveSettingsIni(ini);
+    }
+}
+
 static void KeyDownEvent(SDL_Scancode scanCode)
 {
 #if ORIGINAL_PS1_BEHAVIOR                  // OG Change - Allow for exiting save menu using controller
@@ -610,27 +638,23 @@ static void KeyDownEvent(SDL_Scancode scanCode)
         }
         else if (vk == VK_F9)
         {
-            IRenderer::GetRenderer()->ToggleUseOriginalResolution();
+            sDisplaySettings.mUseOriginalResolution = !sDisplaySettings.mUseOriginalResolution;
+            DisplaySettingsChanged();
         }
         else if (vk == VK_F10)
         {
-            IRenderer::GetRenderer()->ToggleFilterScreen();
+            sDisplaySettings.mFilterScreen = !sDisplaySettings.mFilterScreen;
+            DisplaySettingsChanged();
         }
         else if (vk == VK_F11)
         {
-            IRenderer::GetRenderer()->ToggleKeepAspectRatio();
+            sDisplaySettings.mKeepAspectRatio = !sDisplaySettings.mKeepAspectRatio;
+            DisplaySettingsChanged();
         }
         else if (vk == VK_F12)
         {
-            const SDL_WindowFlags flags = SDL_GetWindowFlags(Sys_GetWindowHandle());
-            if (flags & SDL_WINDOW_FULLSCREEN)
-            {
-                SDL_SetWindowFullscreen(Sys_GetWindowHandle(), false);
-            }
-            else
-            {
-                SDL_SetWindowFullscreen(Sys_GetWindowHandle(), true);
-            }
+            sDisplaySettings.mFullscreen = !sDisplaySettings.mFullscreen;
+            DisplaySettingsChanged();
         }
     }
 }
@@ -672,8 +696,6 @@ static void QuitEvent(bool isRecordedEvent, bool isRecording, BaseMap* pMap)
     {
         forcedWindowMode = true;
         SDL_SetWindowFullscreen(Sys_GetWindowHandle(), 0);
-        // RECT rect = {0, 0, 640, 240};
-        // VGA_EndFrame(&rect);
     }
 
     bool actuallyQuit = false;
@@ -775,7 +797,7 @@ s8 Sys_PumpMessages(BaseMap* pMap)
             {
                 totalConnectedJoysticks++;
                 LOG_INFO("User just inserted joystick!");
-                Input_Init();
+                Input_Init(*spResMan);
                 Input().SetJoyStickEnabled(true);
             }
             else if (event.type == SDL_EVENT_JOYSTICK_REMOVED && !isRecording)
@@ -785,7 +807,7 @@ s8 Sys_PumpMessages(BaseMap* pMap)
 
                 if (totalConnectedJoysticks > 0)
                 {
-                    Input_Init(); // Ensures next joystick is usable
+                    Input_Init(*spResMan); // Ensures next joystick is usable
                 }
                 else
                 {

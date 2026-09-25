@@ -20,6 +20,7 @@
 #include "ThreadPool.hpp"
 #include <FatalError.hpp>
 #include <string>
+#include "IniFile.hpp"
 
 u32 UniqueResId::mGlobalId = 1;
 
@@ -31,6 +32,26 @@ ResourceManagerWrapper::ResourceManagerWrapper(FileSystem& fs, const std::string
     loading_ticks = 0;
 
     AddSearchPaths(modPath);
+}
+
+std::string ResourceManagerWrapper::LoadSettingsIniText()
+{
+    return mFs.LoadToString(kSettingsIniPath);
+}
+
+IniFile ResourceManagerWrapper::LoadSettingsIni()
+{
+    return IniFile::Parse(LoadSettingsIniText());
+}
+
+bool ResourceManagerWrapper::SaveSettingsIni(const IniFile& ini)
+{
+    return ini.Save(mFs, kSettingsIniPath);
+}
+
+std::string ResourceManagerWrapper::LoadDemoFile(const std::string& fileName)
+{
+    return mFs.LoadToString(fileName.c_str());
 }
 
 void ResourceManagerWrapper::AddSearchPaths(const std::string& modPath)
