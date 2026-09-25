@@ -97,7 +97,9 @@ namespace AutomationTest {
                 }
             }
 
-            ADD_FAILURE() << "timed out waiting for response id=" << id;
+            ADD_FAILURE() << "timed out waiting for response id=" << id << " (socket state " << mSocket.state()
+                          << ", error '" << mSocket.errorString().toStdString() << "', " << mSocket.bytesToWrite()
+                          << " bytes still unsent)";
             return nlohmann::json::object();
         }
 

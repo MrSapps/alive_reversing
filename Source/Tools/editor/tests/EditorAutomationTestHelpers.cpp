@@ -30,7 +30,11 @@ namespace AutomationTest {
         // still work exactly the same, but nothing appears on the real display or steals
         // keyboard/mouse focus from whatever else is running there while these tests run.
         env.insert("QT_QPA_PLATFORM", "offscreen");
+        // Qt on Windows sends a GUI app's log output to the debugger, not stderr, unless told to.
+        env.insert("QT_FORCE_STDERR_LOGGING", "1");
         editor.setProcessEnvironment(env);
+        // Show the editor's own output (including its relive.automation trace) in the test log.
+        editor.setProcessChannelMode(QProcess::ForwardedChannels);
 
         editor.start(QString::fromUtf8(RELIVE_EDITOR_PATH), {QStringLiteral("--automation-socket=%1").arg(outSocketName)});
         if (!editor.waitForStarted(5000))
