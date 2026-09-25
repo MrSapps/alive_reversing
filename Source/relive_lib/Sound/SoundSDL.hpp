@@ -2,7 +2,6 @@
 
 #include "Sound.hpp"
 
-#if USE_SDL3_SOUND
     #include "../../AliveLibAE/stdlib.hpp"
 
     #define DSBSTATUS_PLAYING 0x00000001
@@ -42,4 +41,3 @@ s32 SND_CreateDS_SDL(u32 sampleRate, s32 bitsPerSample, s32 isStereo);
 s32 SND_Clear_SDL(SoundEntry* pSoundEntry, u32 sampleOffset, u32 size);
 const char_type* SND_HR_Err_To_String_SDL(long hr);
 
-#endif

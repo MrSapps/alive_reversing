@@ -78,7 +78,7 @@ void QuikSave::RestoreWorldInfo(const QuicksaveWorldInfoBase& pInfo)
 
 void QuikSave::DoQuicksave(BaseMap& map)
 {
-    map.GetResourceManager().ShowLoadingIcon(map);
+    map.GetResourceManager().RequestLoadingWait(LoadingIcon::eNow);
 
     if (gAbe && gAbe->mHealth > FP_FromInteger(0))
     {
@@ -106,9 +106,9 @@ void QuikSave::DoQuicksave(BaseMap& map)
 
 void QuikSave::LoadActive(BaseMap& map)
 {
-    map.GetResourceManager().ShowLoadingIcon(map);
+    map.GetResourceManager().RequestLoadingWait(LoadingIcon::eNow);
 
-    DestroyObjects(map.GetResourceManager());
+    DestroyObjects();
     EventsReset();
     gSkipGameObjectUpdates = true;
 
@@ -342,7 +342,7 @@ void QuikSave::RestoreCheckpoint(ResourceManagerWrapper& resMan, BaseMap& map)
     // Abe's constructor) so the deferred restore below recreates the rest
     // fresh from the checkpoint snapshot instead of leaving stale/dead
     // instances (e.g. an already-exploded bomb) sitting around forever.
-    DestroyObjects(resMan);
+    DestroyObjects();
 
     gSwitchStates = gActiveQuicksaveData.mRestartPathSwitchStates;
     Abe::CreateFromSaveState(gActiveQuicksaveData.mRestartPathAbeState, resMan, map);

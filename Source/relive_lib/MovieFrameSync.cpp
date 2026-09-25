@@ -13,13 +13,13 @@ MovieFrameOutcome ProcessMovieFrameSync(u64 frameTimestampMs, IMovieSyncClock& c
         return MovieFrameOutcome::Dropped;
     }
 
-    while (frameTimestampMs > clock.AudioClockMs())
+    if (frameTimestampMs > clock.AudioClockMs())
     {
         if (clock.SkipRequested())
         {
             return MovieFrameOutcome::SkippedByUserInput;
         }
-        clock.PumpIdle();
+        return MovieFrameOutcome::Wait;
     }
 
     return MovieFrameOutcome::Rendered;

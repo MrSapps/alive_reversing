@@ -28,7 +28,7 @@ enum class AnimId;
 class OpenGLRenderer final : public IRenderer
 {
 public:
-    explicit OpenGLRenderer(TWindowHandleType window);
+    explicit OpenGLRenderer(Window& window);
     ~OpenGLRenderer() override;
 
     void Clear(u8 r, u8 g, u8 b) override;

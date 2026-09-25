@@ -11,7 +11,7 @@
 #include "Sound.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "Sfx.hpp"
-#include "../relive_lib/Sys.hpp"
+#include "../AliveLibAE/Input.hpp"
 #include "Map.hpp"
 #include "GameAutoPlayer.hpp"
 
@@ -116,361 +116,362 @@ void PauseMenu::VUpdate()
         field_11E_selected_glow = 52;
         field_120_selected_glow_counter = 8;
 
-        // This is bad, let's nuke it later :)
-        while (1)
+        // The pause menu runs in VModalUpdate until it's closed
+        StartModal();
+    }
+}
+
+ModalState PauseMenu::VModalUpdate()
+{
+    gDisableFontFlicker = true;
+
+    for (s32 idx = 0; idx < gObjListDrawables->Size(); idx++)
+    {
+        auto pObjIter = gObjListDrawables->ItemAt(idx);
+        if (!pObjIter)
         {
-            gDisableFontFlicker = true;
-            SYS_EventsPump();
-
-            for (s32 idx = 0; idx < gObjListDrawables->Size(); idx++)
+            break;
+        }
+        if (!pObjIter->GetDead())
+        {
+            if (pObjIter->GetDrawable())
             {
-                auto pObjIter = gObjListDrawables->ItemAt(idx);
-                if (!pObjIter)
-                {
-                    break;
-                }
-                if (!pObjIter->GetDead())
-                {
-                    if (pObjIter->GetDrawable())
-                    {
-                        pObjIter->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
-                    }
-                }
+                pObjIter->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
             }
-            gScreenManager->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
-            gPsxDisplay.RenderOrderingTable();
-            Input().Update(GetGameAutoPlayer());
+        }
+    }
+    gScreenManager->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
+    gPsxDisplay.RenderOrderingTable();
+    Input().Update(GetGameAutoPlayer());
 
-            if (field_120_selected_glow_counter > 0)
-            {
-                field_11E_selected_glow += 8;
-            }
+    if (field_120_selected_glow_counter > 0)
+    {
+        field_11E_selected_glow += 8;
+    }
 
-            if (field_11E_selected_glow <= 100 || field_120_selected_glow_counter <= 0)
-            {
-                if (field_120_selected_glow_counter <= 0)
-                {
-                    field_11E_selected_glow -= 8;
-                    if (field_11E_selected_glow < 52)
-                    {
-                        field_120_selected_glow_counter = -field_120_selected_glow_counter;
-                        field_11E_selected_glow += field_120_selected_glow_counter;
-                    }
-                }
-            }
-            else
+    if (field_11E_selected_glow <= 100 || field_120_selected_glow_counter <= 0)
+    {
+        if (field_120_selected_glow_counter <= 0)
+        {
+            field_11E_selected_glow -= 8;
+            if (field_11E_selected_glow < 52)
             {
                 field_120_selected_glow_counter = -field_120_selected_glow_counter;
                 field_11E_selected_glow += field_120_selected_glow_counter;
             }
+        }
+    }
+    else
+    {
+        field_120_selected_glow_counter = -field_120_selected_glow_counter;
+        field_11E_selected_glow += field_120_selected_glow_counter;
+    }
 
-            enum Page1Selectables
-            {
-                eContinue_0 = 0,
-                eSave_1 = 1,
-                eControls_2 = 2,
-                eQuit_3 = 3
-            };
+    enum Page1Selectables
+    {
+        eContinue_0 = 0,
+        eSave_1 = 1,
+        eControls_2 = 2,
+        eQuit_3 = 3
+    };
 
-            switch (field_126_page)
+    switch (field_126_page)
+    {
+        case PauseMenuPages::ePause_0:
+        {
+            if (Input().IsAnyPressed(InputCommands::eCheatMode | InputCommands::eDown))
             {
-                case PauseMenuPages::ePause_0:
+                field_124++;
+                if (field_124 > 3)
                 {
-                    if (Input().IsAnyPressed(InputCommands::eCheatMode | InputCommands::eDown))
-                    {
-                        field_124++;
-                        if (field_124 > 3)
-                        {
-                            field_124 = 0;
-                        }
-                        SFX_Play_Pitch(relive::SoundEffects::MenuNavigation, 45, 400);
-                    }
+                    field_124 = 0;
+                }
+                SFX_Play_Pitch(relive::SoundEffects::MenuNavigation, 45, 400);
+            }
 
-                    if (Input().IsAnyPressed(InputCommands::eUp))
-                    {
-                        field_124--;
-                        if (field_124 < 0)
-                        {
-                            field_124 = 3;
-                        }
-                        SFX_Play_Pitch(relive::SoundEffects::MenuNavigation, 45, 400);
-                    }
+            if (Input().IsAnyPressed(InputCommands::eUp))
+            {
+                field_124--;
+                if (field_124 < 0)
+                {
+                    field_124 = 3;
+                }
+                SFX_Play_Pitch(relive::SoundEffects::MenuNavigation, 45, 400);
+            }
 
 #if ORIGINAL_PS1_BEHAVIOR // OG Change - Pause Menu controls like PS1
-                    if (Input().IsAnyPressed(InputCommands::ePause))
+            if (Input().IsAnyPressed(InputCommands::ePause))
+            {
+                field_11C = 0;
+                SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
+                SND_Restart(mMap);
+                break;
+            }
+
+            const bool optionClicked = Input().IsAnyPressed(InputCommands::eUnPause_OrConfirm);
+#else
+            const bool optionClicked = Input().IsAnyHeld(
+                InputCommands::eHop | InputCommands::eThrowItem | InputCommands::eUnPause_OrConfirm | InputCommands::eDoAction | InputCommands::eBack);
+#endif
+            if (optionClicked)
+            {
+                switch (field_124)
+                {
+                    case Page1Selectables::eContinue_0:
                     {
                         field_11C = 0;
                         SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
                         SND_Restart(mMap);
                         break;
                     }
-
-                    const bool optionClicked = Input().IsAnyPressed(InputCommands::eUnPause_OrConfirm);
-#else
-                    const bool optionClicked = Input().IsAnyHeld(
-                        InputCommands::eHop | InputCommands::eThrowItem | InputCommands::eUnPause_OrConfirm | InputCommands::eDoAction | InputCommands::eBack);
-#endif
-                    if (optionClicked)
+                    case Page1Selectables::eSave_1:
                     {
-                        switch (field_124)
+                        field_126_page = PauseMenuPages::eSave_1;
+                        field_12C = 0;
+                        field_134 = 1;
+                        SfxPlayMono(relive::SoundEffects::IngameTransition, 90);
+                        s32 tmp = static_cast<s32>(MapWrapper::ToAO(mMap.mCurrentLevel));
+                        if (mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
                         {
-                            case Page1Selectables::eContinue_0:
+                            s16 row = 0;
+                            auto pathId = SaveGame::GetPathId(mMap.mCurrentPath, &row);
+
+                            if (pathId != -1)
                             {
-                                field_11C = 0;
-                                SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
-                                SND_Restart(mMap);
-                                break;
+                                tmp += row + 3;
                             }
-                            case Page1Selectables::eSave_1:
+                        }
+
+                        auto curPathId = mMap.mCurrentPath;
+                        char_type curPathIdNumBuf[12] = {};
+
+                        strncpy(&saveNameBuffer_5080C6.characters[2], gLevelNames_4CE1D4[tmp], 19);
+                        if (tmp != 12 && tmp != 14 && tmp != 15)
+                        {
+                            strcat(&saveNameBuffer_5080C6.characters[2], " ");
+                            if (strlen(&saveNameBuffer_5080C6.characters[2]) < 18)
                             {
-                                field_126_page = PauseMenuPages::eSave_1;
-                                field_12C = 0;
-                                field_134 = 1;
-                                SfxPlayMono(relive::SoundEffects::IngameTransition, 90);
-                                s32 tmp = static_cast<s32>(MapWrapper::ToAO(mMap.mCurrentLevel));
-                                if (mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn)
-                                {
-                                    s16 row = 0;
-                                    auto pathId = SaveGame::GetPathId(mMap.mCurrentPath, &row);
+                                strcat(&saveNameBuffer_5080C6.characters[2], "p");
+                            }
+                            sprintf(curPathIdNumBuf, "%d", curPathId);
+                            strncat(&saveNameBuffer_5080C6.characters[2], curPathIdNumBuf, 19u);
+                        }
 
-                                    if (pathId != -1)
-                                    {
-                                        tmp += row + 3;
-                                    }
-                                }
-
-                                auto curPathId = mMap.mCurrentPath;
-                                char_type curPathIdNumBuf[12] = {};
-
-                                strncpy(&saveNameBuffer_5080C6.characters[2], gLevelNames_4CE1D4[tmp], 19);
-                                if (tmp != 12 && tmp != 14 && tmp != 15)
-                                {
-                                    strcat(&saveNameBuffer_5080C6.characters[2], " ");
-                                    if (strlen(&saveNameBuffer_5080C6.characters[2]) < 18)
-                                    {
-                                        strcat(&saveNameBuffer_5080C6.characters[2], "p");
-                                    }
-                                    sprintf(curPathIdNumBuf, "%d", curPathId);
-                                    strncat(&saveNameBuffer_5080C6.characters[2], curPathIdNumBuf, 19u);
-                                }
-
-                                const char_type aux[2] = {18, 0};
-                                strncat(&saveNameBuffer_5080C6.characters[2], aux, 19u);
+                        const char_type aux[2] = {18, 0};
+                        strncat(&saveNameBuffer_5080C6.characters[2], aux, 19u);
 #if ORIGINAL_PS1_BEHAVIOR // OG Change - Allow for exiting save menu using controller
-                                setSaveMenuOpen(true); // Sets saveMenuOpen bool to true, instead of disabling input
+                        ::Input().SetSaveMenuOpen(true); // Sets saveMenuOpen bool to true, instead of disabling input
 #else
-                                Input_DisableInput();
+                        Input_DisableInput();
 #endif
-                                break;
-                            }
-                            case Page1Selectables::eControls_2:
-                            {
-                                field_126_page = PauseMenuPages::eControls_2;
-                                field_128_controller_id = 0;
-                                SfxPlayMono(relive::SoundEffects::IngameTransition, 90);
-                                break;
-                            }
-                            case Page1Selectables::eQuit_3:
-                            {
-                                field_126_page = PauseMenuPages::eQuit_3;
-                                field_124 = 0;
-                                SfxPlayMono(relive::SoundEffects::IngameTransition, 90);
-                                break;
-                            }
-                            default:
-                            {
-                                break;
-                            }
-                        }
                         break;
                     }
-                    break;
-                }
-                case PauseMenuPages::eSave_1:
-                {
-                    if (field_12C)
+                    case Page1Selectables::eControls_2:
                     {
-                        if (field_12C == 4)
-                        {
-                            if (field_134)
-                            {
-                                field_134 = 0;
-                            }
-                            else
-                            {
-                                SaveGame::SaveToFile(&saveNameBuffer_5080C6.characters[2]);
-                                field_12C = 5;
-                            }
-                        }
-                        else if (field_12C == 5)
-                        {
-                            field_11C = 0;
-                            SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
-                            SND_Restart(mMap);
-                        }
+                        field_126_page = PauseMenuPages::eControls_2;
+                        field_128_controller_id = 0;
+                        SfxPlayMono(relive::SoundEffects::IngameTransition, 90);
                         break;
                     }
+                    case Page1Selectables::eQuit_3:
+                    {
+                        field_126_page = PauseMenuPages::eQuit_3;
+                        field_124 = 0;
+                        SfxPlayMono(relive::SoundEffects::IngameTransition, 90);
+                        break;
+                    }
+                    default:
+                    {
+                        break;
+                    }
+                }
+                break;
+            }
+            break;
+        }
+        case PauseMenuPages::eSave_1:
+        {
+            if (field_12C)
+            {
+                if (field_12C == 4)
+                {
+                    if (field_134)
+                    {
+                        field_134 = 0;
+                    }
+                    else
+                    {
+                        SaveGame::SaveToFile(&saveNameBuffer_5080C6.characters[2]);
+                        field_12C = 5;
+                    }
+                }
+                else if (field_12C == 5)
+                {
+                    field_11C = 0;
+                    SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
+                    SND_Restart(mMap);
+                }
+                break;
+            }
 
-                    auto last_pressed = static_cast<char_type>(Input_GetLastPressedKey());
-                    char_type lastPressedKeyNT[2] = {last_pressed, 0};
+            auto last_pressed = static_cast<char_type>(Input_GetLastPressedKey());
+            char_type lastPressedKeyNT[2] = {last_pressed, 0};
 
 #if ORIGINAL_PS1_BEHAVIOR // OG Change - Exit save menu using controller
-                    if (last_pressed == VK_ESCAPE || last_pressed == VK_RETURN) // Keyboard ESC or ENTER
-                    {
-                        setSaveMenuOpen(false);
-                    }
-                    else if (Input().IsAnyPressed(InputCommands::eBack)) // Triangle
-                    {
-                        last_pressed = VK_ESCAPE;
-                        setSaveMenuOpen(false);
-                    }
-                    else if (Input().IsAnyPressed(InputCommands::eUnPause_OrConfirm)) // Cross or Start
-                    {
-                        last_pressed = VK_RETURN;
-                        setSaveMenuOpen(false);
-                    }
+            if (last_pressed == VK_ESCAPE || last_pressed == VK_RETURN) // Keyboard ESC or ENTER
+            {
+                ::Input().SetSaveMenuOpen(false);
+            }
+            else if (Input().IsAnyPressed(InputCommands::eBack)) // Triangle
+            {
+                last_pressed = VK_ESCAPE;
+                ::Input().SetSaveMenuOpen(false);
+            }
+            else if (Input().IsAnyPressed(InputCommands::eUnPause_OrConfirm)) // Cross or Start
+            {
+                last_pressed = VK_RETURN;
+                ::Input().SetSaveMenuOpen(false);
+            }
 #endif
 
-                    if (!last_pressed)
+            if (!last_pressed)
+            {
+                break;
+            }
+            auto string_len_no_nullterminator = strlen(&saveNameBuffer_5080C6.characters[2]);
+            switch (last_pressed)
+            {
+                case VK_ESCAPE:
+                {
+                    SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
+                    field_126_page = 0;
+                    Input_Reset();
+                    break;
+                }
+                case VK_RETURN:
+                {
+                    if (string_len_no_nullterminator <= 1)
                     {
+                        SfxPlayMono(relive::SoundEffects::ElectricZap, 0);
                         break;
                     }
-                    auto string_len_no_nullterminator = strlen(&saveNameBuffer_5080C6.characters[2]);
-                    switch (last_pressed)
-                    {
-                        case VK_ESCAPE:
-                        {
-                            SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
-                            field_126_page = 0;
-                            Input_Reset();
-                            break;
-                        }
-                        case VK_RETURN:
-                        {
-                            if (string_len_no_nullterminator <= 1)
-                            {
-                                SfxPlayMono(relive::SoundEffects::ElectricZap, 0);
-                                break;
-                            }
-                            SfxPlayMono(relive::SoundEffects::IngameTransition, 90);
-                            saveNameBuffer_5080C6.characters[string_len_no_nullterminator + 1] = 0;
-                            field_12C = 4;
-                            field_134 = 1;
-                            Input_Reset();
-                            break;
-                        }
-                        case VK_BACK:
-                        {
-                            if (string_len_no_nullterminator <= 1)
-                            {
-                                SfxPlayMono(relive::SoundEffects::ElectricZap, 0);
-                                break;
-                            }
-                            saveNameBuffer_5080C6.characters[string_len_no_nullterminator] = 18;
-                            saveNameBuffer_5080C6.characters[string_len_no_nullterminator + 1] = 0;
-                            SfxPlayMono(relive::SoundEffects::PickupItem, 0);
-                            break;
-                        }
-                        default:
-                        {
-                            if (strspn(lastPressedKeyNT, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 !-"))
-                            {
-                                if (lastPressedKeyNT[0] != 32 || (string_len_no_nullterminator != 1 && saveNameBuffer_5080C6.characters[string_len_no_nullterminator] != lastPressedKeyNT[0]))
-                                {
-                                    if (string_len_no_nullterminator > 19)
-                                    {
-                                        SfxPlayMono(relive::SoundEffects::SackWobble, 0);
-                                    }
-                                    else
-                                    {
-                                        saveNameBuffer_5080C6.characters[string_len_no_nullterminator + 1] = lastPressedKeyNT[0];
-                                        saveNameBuffer_5080C6.characters[string_len_no_nullterminator + 2] = 18;
-                                        saveNameBuffer_5080C6.characters[string_len_no_nullterminator + 3] = 0;
-                                        SfxPlayMono(relive::SoundEffects::RockBounce, 0);
-                                    }
-                                }
-                                else
-                                {
-                                    SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 30, 2600);
-                                }
-                            }
-                            else
-                            {
-                                SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 70, 2200);
-                            }
-                            break;
-                        }
-                    }
+                    SfxPlayMono(relive::SoundEffects::IngameTransition, 90);
+                    saveNameBuffer_5080C6.characters[string_len_no_nullterminator + 1] = 0;
+                    field_12C = 4;
+                    field_134 = 1;
+                    Input_Reset();
                     break;
                 }
-                case PauseMenuPages::eControls_2:
+                case VK_BACK:
                 {
-                    if (Input().IsAnyPressed(InputCommands::eBack | InputCommands::eHop))
+                    if (string_len_no_nullterminator <= 1)
                     {
-                        field_126_page = 0;
-                        SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
+                        SfxPlayMono(relive::SoundEffects::ElectricZap, 0);
+                        break;
                     }
-
-                    if (Input().IsAnyPressed(
-                            InputCommands::eThrowItem | InputCommands::eUnPause_OrConfirm | InputCommands::eDoAction | InputCommands::eCheatMode | InputCommands::eUp | InputCommands::eRight | InputCommands::eDown | InputCommands::eLeft))
-                    {
-                        field_128_controller_id++;
-                        if (field_128_controller_id < 2)
-                        {
-                            SfxPlayMono(relive::SoundEffects::IngameTransition, 90);
-                        }
-                        else
-                        {
-                            field_128_controller_id = 0;
-                            field_126_page = PauseMenuPages::ePause_0;
-                            SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
-                        }
-                    }
-                    break;
-                }
-                case PauseMenuPages::eQuit_3:
-                {
-                    if (Input().IsAnyPressed(InputCommands::eBack | InputCommands::eHop))
-                    {
-                        field_126_page = 0;
-                        SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
-                    }
-
-                    if (Input().IsAnyPressed(InputCommands::eThrowItem | InputCommands::eUnPause_OrConfirm | InputCommands::eDoAction))
-                    {
-                        field_11C = 0;
-                        SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
-                        if (gPauseMenu && gPauseMenu == this)
-                        {
-                            gPauseMenu->SetDead(true);
-                        }
-                        else
-                        {
-                            SetDead(true);
-                        }
-                        gPauseMenu = nullptr;
-                        mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, {}, 0);
-                        mMap.mFreeAllAnimAndPalts = true;
-                        Input().SetCurrentController(InputObject::PadIndex::First);
-                    }
+                    saveNameBuffer_5080C6.characters[string_len_no_nullterminator] = 18;
+                    saveNameBuffer_5080C6.characters[string_len_no_nullterminator + 1] = 0;
+                    SfxPlayMono(relive::SoundEffects::PickupItem, 0);
                     break;
                 }
                 default:
                 {
+                    if (strspn(lastPressedKeyNT, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 !-"))
+                    {
+                        if (lastPressedKeyNT[0] != 32 || (string_len_no_nullterminator != 1 && saveNameBuffer_5080C6.characters[string_len_no_nullterminator] != lastPressedKeyNT[0]))
+                        {
+                            if (string_len_no_nullterminator > 19)
+                            {
+                                SfxPlayMono(relive::SoundEffects::SackWobble, 0);
+                            }
+                            else
+                            {
+                                saveNameBuffer_5080C6.characters[string_len_no_nullterminator + 1] = lastPressedKeyNT[0];
+                                saveNameBuffer_5080C6.characters[string_len_no_nullterminator + 2] = 18;
+                                saveNameBuffer_5080C6.characters[string_len_no_nullterminator + 3] = 0;
+                                SfxPlayMono(relive::SoundEffects::RockBounce, 0);
+                            }
+                        }
+                        else
+                        {
+                            SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 30, 2600);
+                        }
+                    }
+                    else
+                    {
+                        SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 70, 2200);
+                    }
                     break;
                 }
             }
-
-            if (!field_11C)
-            {
-                Input().Update(GetGameAutoPlayer());
-                SetDrawable(false);
-                break;
-            }
+            break;
         }
+        case PauseMenuPages::eControls_2:
+        {
+            if (Input().IsAnyPressed(InputCommands::eBack | InputCommands::eHop))
+            {
+                field_126_page = 0;
+                SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
+            }
 
-        gDisableFontFlicker = false;
+            if (Input().IsAnyPressed(
+                    InputCommands::eThrowItem | InputCommands::eUnPause_OrConfirm | InputCommands::eDoAction | InputCommands::eCheatMode | InputCommands::eUp | InputCommands::eRight | InputCommands::eDown | InputCommands::eLeft))
+            {
+                field_128_controller_id++;
+                if (field_128_controller_id < 2)
+                {
+                    SfxPlayMono(relive::SoundEffects::IngameTransition, 90);
+                }
+                else
+                {
+                    field_128_controller_id = 0;
+                    field_126_page = PauseMenuPages::ePause_0;
+                    SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
+                }
+            }
+            break;
+        }
+        case PauseMenuPages::eQuit_3:
+        {
+            if (Input().IsAnyPressed(InputCommands::eBack | InputCommands::eHop))
+            {
+                field_126_page = 0;
+                SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
+            }
+
+            if (Input().IsAnyPressed(InputCommands::eThrowItem | InputCommands::eUnPause_OrConfirm | InputCommands::eDoAction))
+            {
+                field_11C = 0;
+                SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
+                if (gPauseMenu && gPauseMenu == this)
+                {
+                    gPauseMenu->SetDead(true);
+                }
+                else
+                {
+                    SetDead(true);
+                }
+                gPauseMenu = nullptr;
+                mMap.SetActiveCam(EReliveLevelIds::eMenu, 1, CameraIds::Menu::eMainMenu_1, CameraSwapEffects::eInstantChange_0, {}, 0);
+                mMap.mFreeAllAnimAndPalts = true;
+                Input().SetCurrentController(InputObject::PadIndex::First);
+            }
+            break;
+        }
+        default:
+        {
+            break;
+        }
     }
+
+    if (!field_11C)
+    {
+        Input().Update(GetGameAutoPlayer());
+        SetDrawable(false);
+        gDisableFontFlicker = false;
+        return ModalState::eFinished;
+    }
+    return ModalState::eRunning;
 }
 
 PauseMenu::PauseEntry pauseEntries_4CDE50[6] = {

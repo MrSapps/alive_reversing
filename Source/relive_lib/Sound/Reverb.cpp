@@ -1,7 +1,6 @@
 #include "../stdafx.h"
 #include "Reverb.hpp"
 
-#if USE_SDL3_SOUND
 
     #include <math.h>
     #include <iostream>
@@ -104,4 +103,3 @@ void Reverb_Mix(StereoSample_S16* dst, SDL_AudioFormat format, Uint32 len, f32 v
     // memcpy(dst, sReverbBuffer, len); // Uncomment to hear only reverb
 }
 
-#endif

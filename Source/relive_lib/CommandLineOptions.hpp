@@ -22,6 +22,9 @@ struct CommandLineOptions final
     bool mDdCheat = false;
     bool mShowFps = false;
     bool mNoFrameSkip = false;
+    // -ddslowload=<ms>: makes each resource loaded in the background take at least this long,
+    // to test loading on slow storage. 0 if not given.
+    u32 mSlowLoadMs = 0;
 
     // Recording and playback
     std::optional<std::string> mRecordFile;

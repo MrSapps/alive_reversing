@@ -357,12 +357,11 @@ void QuikSave::RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManag
     }
 
     map.RestoreQuicksaveBlyData(pSaveData.mObjectBlyData);
-    resMan.LoadingLoop(false);
 }
 
 void Quicksave_LoadFromMemory_4C95A0(BaseMap& map)
 {
-    DestroyObjects(map.GetResourceManager());
+    DestroyObjects();
     EventsReset();
     gSkipGameObjectUpdates = true;
     QuikSave::RestoreWorldInfo(QuikSave::gActiveQuicksaveData.mWorldInfo);
@@ -379,7 +378,7 @@ void Quicksave_LoadFromMemory_4C95A0(BaseMap& map)
 
 void QuikSave::LoadActive(BaseMap& map)
 {
-    map.GetResourceManager().ShowLoadingIcon(map);
+    map.GetResourceManager().RequestLoadingWait(LoadingIcon::eNow);
     Quicksave_LoadFromMemory_4C95A0(map);
 }
 
@@ -411,7 +410,7 @@ void QuikSave::SaveToMemory_4C91A0(Quicksave& pSave, BaseMap& map)
 
 void QuikSave::DoQuicksave(BaseMap& map)
 {
-    map.GetResourceManager().ShowLoadingIcon(map);
+    map.GetResourceManager().RequestLoadingWait(LoadingIcon::eNow);
     QuikSave::SaveToMemory_4C91A0(gActiveQuicksaveData, map);
 }
 

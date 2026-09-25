@@ -10,7 +10,7 @@
 #include <cstdarg>
 #include <cstdlib>
 
-// The real ALIVE_FATAL (FatalError.cpp) calls Sys_MessageBox, which pulls in the whole
+// The real ALIVE_FATAL (FatalError.cpp) calls Sys::ShowMessageBox, which pulls in the whole
 // windowing/SDL subsystem this lightweight test target doesn't need. None of these tests are
 // expected to hit a fatal error; if one somehow does, abort loudly with the message instead of
 // silently misbehaving or failing to link.

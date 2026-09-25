@@ -45,6 +45,12 @@ cmake --build build -j5 --target relive_lib_tests # unit tests
   passing it down to whatever needs it.
 - Avoid global free functions where a class fits: prefer member or static member functions
   (e.g. `IniFile::Parse`, `DisplaySettings::Load`). File-scope `static` helpers are fine.
+- Don't call `exit()` (or `quick_exit`/`_exit`) to quit. Unwind instead: break out of the loop
+  and return, so shutdown code runs and `main` returns. Only the fatal error and crash handlers
+  may end the process directly.
+- Events are only pumped by the main loop (`Engine::Game_Loop`). Don't write nested loops that
+  wait for input or play something out: make the object modal (`BaseGameObject::StartModal`)
+  and do one step per `VModalUpdate()`.
 
 ## Build time
 

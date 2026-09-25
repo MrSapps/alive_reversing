@@ -7,6 +7,7 @@
 
 struct CommandLineOptions;
 class IniFile;
+class Window;
 
 // The display settings, saved in the [Display] section of relive.ini (see
 // ResourceManagerWrapper::LoadSettingsIni) so they persist between runs. The F9-F12 hotkeys
@@ -33,7 +34,7 @@ struct DisplaySettings final
     bool ApplyCommandLine(const CommandLineOptions& options);
 
     // Applies everything but mRenderer, which is only used when the renderer is created.
-    void ApplyTo(IRenderer& renderer, SDL_Window* pWindow) const;
+    void ApplyTo(IRenderer& renderer, Window& window) const;
 
     // Names as used by -renderer= and the ini: "sdl"/"sdl3", "gl"/"gl3"/"opengl"/"opengl3".
     static std::optional<IRenderer::Renderers> RendererFromString(const std::string& name);

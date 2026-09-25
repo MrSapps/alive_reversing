@@ -5,7 +5,6 @@
 
 enum class MessageType : s32
 {
-    eSkipMovie_1 = 1,
     eSkipDemo_2 = 2,
 };
 
@@ -34,4 +33,44 @@ private:
     char_type field_68_txt_buffer[60] = {};
 };
 
-s8 Display_Full_Screen_Message_Blocking(MessageType messageType, ResourceManagerWrapper& resMan, BaseMap& map);
+// Shows a full screen message until Enter, Escape or a timeout, the game frozen behind it (see
+// BaseGameObject::StartModal). While recording or playing back it closes straight away, in
+// the constructor. Once closed it waits for whoever made it to read Result() and kill it.
+class FullScreenMessage final : public BaseGameObject
+{
+public:
+    FullScreenMessage(MessageType messageType, ResourceManagerWrapper& resMan, BaseMap& map);
+    ~FullScreenMessage();
+
+    virtual ModalState VModalUpdate() override;
+
+    enum class Result
+    {
+        eOpen,
+        eEnterOrTimeout,
+        eEscape,
+    };
+
+    Result GetResult() const
+    {
+        return mResult;
+    }
+
+private:
+    void Close();
+
+    enum class State
+    {
+        eWaitForKey,
+        eWaitForEscapeRelease,
+        eWaitForReturnRelease,
+    };
+
+    State mState = State::eWaitForKey;
+    Text* mText = nullptr;
+    Text* mText2 = nullptr;
+    u32 mDisplayUntil = 0;
+    Result mResult = Result::eOpen;
+    // What mResult becomes when it closes
+    Result mClosedResult = Result::eEnterOrTimeout;
+};

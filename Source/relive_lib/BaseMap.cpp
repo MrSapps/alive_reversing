@@ -310,8 +310,8 @@ void BaseMap::ReloadPathJsonRequest(const std::string& pathJsonFileName)
             mNextLevel = oldCurrentLevel;
             mCurrentLevel = EReliveLevelIds::eNone;
             mCameraSwapEffect = CameraSwapEffects::eInstantChange_0; // prevent fmv playback
-            DestroyObjects(mResourceManager);
-            GoTo_Camera();
+            DestroyObjects();
+            mDirectCameraChangePending = true;
             return;
         }
     }
@@ -392,21 +392,28 @@ void BaseMap::Create_FG1s()
     pCamera->CreateFG1(mResourceManager, *this);
 }
 
-void BaseMap::ScreenChange_Common()
+ScreenChangeResult BaseMap::ScreenChange_Common()
 {
     if (mCamState == CamChangeStates::eSliceCam_1)
     {
-        Handle_PathTransition();
+        if (Handle_PathTransition() == ScreenChangeResult::eWaiting)
+        {
+            return ScreenChangeResult::eWaiting;
+        }
     }
     else if (mCamState == CamChangeStates::eInstantChange_2)
     {
-        GoTo_Camera();
+        if (GoTo_Camera() == ScreenChangeResult::eWaiting)
+        {
+            return ScreenChangeResult::eWaiting;
+        }
     }
 
     mCamState = CamChangeStates::eInactive_0;
 
     SND_Stop_Channels_Mask(mSoundChannelsMask);
     mSoundChannelsMask = 0;
+    return ScreenChangeResult::eDone;
 }
 
 void BaseMap::TLV_Reset(const Guid& tlvId, s16 hiFlags)
@@ -477,9 +484,19 @@ void BaseMap::Init(EReliveLevelIds level, s16 path, s16 camera, CameraSwapEffect
     mCurrentLevel = EReliveLevelIds::eNone;
 
     SetActiveCam(level, path, camera, screenChangeEffect, std::move(fmvIds), forceChange);
-    GoTo_Camera();
-
     mCamState = CamChangeStates::eInactive_0;
+    mDirectCameraChangePending = true;
+}
+
+ScreenChangeResult BaseMap::ContinueDirectCameraChange()
+{
+    if (GoTo_Camera() == ScreenChangeResult::eWaiting)
+    {
+        return ScreenChangeResult::eWaiting;
+    }
+
+    mDirectCameraChangePending = false;
+    return ScreenChangeResult::eDone;
 }
 
 void BaseMap::Shutdown()
@@ -523,93 +540,111 @@ void BaseMap::AddPurpleLight(BaseAnimatedWithPhysicsGameObject* pObj, DynamicArr
     }
 }
 
-void BaseMap::RemoveObjectsWithPurpleLight(s16 bMakeInvisible)
+// Shows purple lights on the objects that have them for a few frames, the game frozen
+// behind it. With bMakeInvisible the objects vanish while it plays (e.g. before a
+// teleport), otherwise they reappear.
+class PurpleLightEffect final : public BaseGameObject
 {
-    auto pObjectsWithLightsArray = relive_new DynamicArrayT<BaseAnimatedWithPhysicsGameObject>(16);
-
-    auto pPurpleLightArray = relive_new DynamicArrayT<Particle>(16);
-
-    VCollectPurpleLightObjects(*pObjectsWithLightsArray, *pPurpleLightArray);
-
-    if (!pPurpleLightArray->IsEmpty())
+public:
+    PurpleLightEffect(DynamicArrayT<BaseAnimatedWithPhysicsGameObject>* pObjectsWithLights, DynamicArrayT<Particle>* pPurpleLights, s16 bMakeInvisible, s32 totalFrames, ResourceManagerWrapper& resMan, BaseMap& map)
+        : BaseGameObject(true, 0, resMan, map)
+        , mObjectsWithLights(pObjectsWithLights)
+        , mPurpleLights(pPurpleLights)
+        , mMakeInvisible(bMakeInvisible)
+        , mTotalFrames(totalFrames)
     {
-        SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
+        SetSurviveDeathReset(true);
+        SetUpdateDuringCamSwap(true);
+        StartModal();
+    }
 
-        const s32 kTotal = VPurpleLightFrameCount(bMakeInvisible);
-        for (s32 counter = 0; counter < kTotal; counter++)
+    ~PurpleLightEffect()
+    {
+        DeleteArrays();
+    }
+
+    void VScreenChanged() override
+    {
+        // Can be part of a screen change, so must outlive it
+    }
+
+    ModalState VModalUpdate() override
+    {
+        if (mMakeInvisible && mCounter == 4)
         {
-            if (bMakeInvisible && counter == 4)
+            // Make all the objects that have lights invisible now that the lights have been rendered for a few frames
+            for (s32 i = 0; i < mObjectsWithLights->Size(); i++)
             {
-                // Make all the objects that have lights invisible now that the lights have been rendered for a few frames
-                for (s32 i = 0; i < pObjectsWithLightsArray->Size(); i++)
-                {
-                    BaseAnimatedWithPhysicsGameObject* pObj = pObjectsWithLightsArray->ItemAt(i);
-                    if (!pObj)
-                    {
-                        break;
-                    }
-                    pObj->GetAnimation().SetRender(false);
-                }
-            }
-
-            for (s32 i = 0; i < pPurpleLightArray->Size(); i++)
-            {
-                Particle* pLight = pPurpleLightArray->ItemAt(i);
-                if (!pLight)
+                BaseAnimatedWithPhysicsGameObject* pObj = mObjectsWithLights->ItemAt(i);
+                if (!pObj)
                 {
                     break;
                 }
-
-                if (!pLight->GetDead())
-                {
-                    pLight->VUpdate();
-                }
+                pObj->GetAnimation().SetRender(false);
             }
-
-            // TODO/HACK what is the point of the f64 loop? Why not do both in 1 iteration ??
-            for (s32 i = 0; i < pPurpleLightArray->Size(); i++)
-            {
-                Particle* pLight = pPurpleLightArray->ItemAt(i);
-                if (!pLight)
-                {
-                    break;
-                }
-
-                if (!pLight->GetDead())
-                {
-                    pLight->GetAnimation().VDecode();
-                }
-            }
-
-            for (s32 i = 0; i < gObjListDrawables->Size(); i++)
-            {
-                BaseGameObject* pDrawable = gObjListDrawables->ItemAt(i);
-                if (!pDrawable)
-                {
-                    break;
-                }
-
-                if (!pDrawable->GetDead())
-                {
-                    // TODO: Seems strange to check this flag, how did it get in the drawable list if its not a drawable ??
-                    if (pDrawable->GetDrawable())
-                    {
-                        pDrawable->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
-                    }
-                }
-            }
-
-            gScreenManager->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
-            SYS_EventsPump();
-            gPsxDisplay.RenderOrderingTable();
         }
 
-        if (bMakeInvisible)
+        for (s32 i = 0; i < mPurpleLights->Size(); i++)
+        {
+            Particle* pLight = mPurpleLights->ItemAt(i);
+            if (!pLight)
+            {
+                break;
+            }
+
+            if (!pLight->GetDead())
+            {
+                pLight->VUpdate();
+            }
+        }
+
+        // TODO/HACK what is the point of the f64 loop? Why not do both in 1 iteration ??
+        for (s32 i = 0; i < mPurpleLights->Size(); i++)
+        {
+            Particle* pLight = mPurpleLights->ItemAt(i);
+            if (!pLight)
+            {
+                break;
+            }
+
+            if (!pLight->GetDead())
+            {
+                pLight->GetAnimation().VDecode();
+            }
+        }
+
+        for (s32 i = 0; i < gObjListDrawables->Size(); i++)
+        {
+            BaseGameObject* pDrawable = gObjListDrawables->ItemAt(i);
+            if (!pDrawable)
+            {
+                break;
+            }
+
+            if (!pDrawable->GetDead())
+            {
+                // TODO: Seems strange to check this flag, how did it get in the drawable list if its not a drawable ??
+                if (pDrawable->GetDrawable())
+                {
+                    pDrawable->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
+                }
+            }
+        }
+
+        gScreenManager->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
+        gPsxDisplay.RenderOrderingTable();
+
+        if (++mCounter < mTotalFrames)
+        {
+            return ModalState::eRunning;
+        }
+
+        if (mMakeInvisible)
         {
             // Make all the objects that had lights visible again
-            for (s32 i = 0; i < pObjectsWithLightsArray->Size(); i++)
+            for (s32 i = 0; i < mObjectsWithLights->Size(); i++)
             {
-                BaseAnimatedWithPhysicsGameObject* pObj = pObjectsWithLightsArray->ItemAt(i);
+                BaseAnimatedWithPhysicsGameObject* pObj = mObjectsWithLights->ItemAt(i);
                 if (!pObj)
                 {
                     break;
@@ -617,11 +652,163 @@ void BaseMap::RemoveObjectsWithPurpleLight(s16 bMakeInvisible)
                 pObj->GetAnimation().SetRender(true);
             }
         }
+
+        DeleteArrays();
+        SetDead(true);
+
+        if (!mMakeInvisible)
+        {
+            // Shown at the end of a camera swap
+            mMap.VCameraSwapFinished();
+        }
+        return ModalState::eFinished;
     }
 
-    pObjectsWithLightsArray->mUsedSize = 0;
-    pPurpleLightArray->mUsedSize = 0;
+private:
+    void DeleteArrays()
+    {
+        if (mObjectsWithLights)
+        {
+            mObjectsWithLights->mUsedSize = 0;
+            mPurpleLights->mUsedSize = 0;
 
-    relive_delete pObjectsWithLightsArray;
-    relive_delete pPurpleLightArray;
+            relive_delete mObjectsWithLights;
+            relive_delete mPurpleLights;
+            mObjectsWithLights = nullptr;
+            mPurpleLights = nullptr;
+        }
+    }
+
+    DynamicArrayT<BaseAnimatedWithPhysicsGameObject>* mObjectsWithLights = nullptr;
+    DynamicArrayT<Particle>* mPurpleLights = nullptr;
+    const s16 mMakeInvisible = 0;
+    const s32 mTotalFrames = 0;
+    s32 mCounter = 0;
+};
+
+PurpleLightResult BaseMap::RemoveObjectsWithPurpleLight(s16 bMakeInvisible)
+{
+    auto pObjectsWithLightsArray = relive_new DynamicArrayT<BaseAnimatedWithPhysicsGameObject>(16);
+
+    auto pPurpleLightArray = relive_new DynamicArrayT<Particle>(16);
+
+    VCollectPurpleLightObjects(*pObjectsWithLightsArray, *pPurpleLightArray);
+
+    const s32 kTotal = VPurpleLightFrameCount(bMakeInvisible);
+    if (pPurpleLightArray->IsEmpty() || kTotal <= 0)
+    {
+        pObjectsWithLightsArray->mUsedSize = 0;
+        pPurpleLightArray->mUsedSize = 0;
+
+        relive_delete pObjectsWithLightsArray;
+        relive_delete pPurpleLightArray;
+        return PurpleLightResult::eNoLights;
+    }
+
+    SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
+
+    relive_new PurpleLightEffect(pObjectsWithLightsArray, pPurpleLightArray, bMakeInvisible, kTotal, mResourceManager, *this);
+    return PurpleLightResult::eShowing;
+}
+
+// See BaseMap::RunFmvCameraChangePass
+class FmvCameraChangePass final : public BaseGameObject
+{
+public:
+    FmvCameraChangePass(BaseGameObject* pFmvSwapper, bool bKeepCantKill, ResourceManagerWrapper& resMan, BaseMap& map)
+        : BaseGameObject(true, 0, resMan, map)
+        , mFmvSwapper(pFmvSwapper)
+        , mKeepCantKill(bKeepCantKill)
+    {
+        SetSurviveDeathReset(true);
+        SetUpdateDuringCamSwap(true);
+        StartModal();
+    }
+
+    void VScreenChanged() override
+    {
+        // Must outlive the screen change it's part of
+    }
+
+    ModalState VModalUpdate() override
+    {
+        for (; mIdx < gBaseGameObjects->Size(); mIdx++)
+        {
+            BaseGameObject* pBaseGameObj = gBaseGameObjects->ItemAt(mIdx);
+            if (!pBaseGameObj)
+            {
+                break;
+            }
+
+            if (pBaseGameObj == this)
+            {
+                continue;
+            }
+
+            if (pBaseGameObj->GetDead() && !(mKeepCantKill && pBaseGameObj->GetCantKill()))
+            {
+                mIdx = gBaseGameObjects->RemoveAt(mIdx);
+                relive_delete pBaseGameObj;
+                if (pBaseGameObj == mFmvSwapper)
+                {
+                    // FMV trans done
+                    break;
+                }
+            }
+            else if (pBaseGameObj->GetUpdatable())
+            {
+                if (!pBaseGameObj->GetDead() && (!gNumCamSwappers || pBaseGameObj->GetUpdateDuringCamSwap()))
+                {
+                    const s32 updateDelay = pBaseGameObj->UpdateDelay();
+                    if (updateDelay > 0)
+                    {
+                        pBaseGameObj->SetUpdateDelay(updateDelay - 1);
+                    }
+                    else
+                    {
+                        pBaseGameObj->VUpdate();
+                    }
+                }
+
+                if (mMap.GetActiveModal() != this)
+                {
+                    // A movie took over, carry on with the next object once it's done
+                    mIdx++;
+                    return ModalState::eRunning;
+                }
+            }
+        }
+
+        // The screen change that started this carries on now, see GoTo_Camera
+        SetDead(true);
+        return ModalState::eFinished;
+    }
+
+private:
+    BaseGameObject* mFmvSwapper = nullptr;
+    const bool mKeepCantKill = false;
+    s32 mIdx = 0;
+};
+
+void BaseMap::RunFmvCameraChangePass(BaseGameObject* pFmvSwapper, bool bKeepCantKill)
+{
+    relive_new FmvCameraChangePass(pFmvSwapper, bKeepCantKill, mResourceManager, *this);
+}
+
+void BaseMap::AddModal(BaseGameObject& obj)
+{
+    mModals.push_back(&obj);
+}
+
+void BaseMap::EndAllModals()
+{
+    while (!mModals.empty())
+    {
+        mModals.back()->EndModal();
+    }
+}
+
+void BaseMap::RemoveModal(BaseGameObject& obj)
+{
+    mModals.erase(std::remove(mModals.begin(), mModals.end(), &obj), mModals.end());
 }

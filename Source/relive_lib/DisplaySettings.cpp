@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "DisplaySettings.hpp"
+#include "Window.hpp"
 #include "IniFile.hpp"
 #include "CommandLineOptions.hpp"
 #include <cctype>
@@ -62,12 +63,12 @@ bool DisplaySettings::ApplyCommandLine(const CommandLineOptions& options)
     return changed;
 }
 
-void DisplaySettings::ApplyTo(IRenderer& renderer, SDL_Window* pWindow) const
+void DisplaySettings::ApplyTo(IRenderer& renderer, Window& window) const
 {
     renderer.SetUseOriginalResolution(mUseOriginalResolution);
     renderer.SetFilterScreen(mFilterScreen);
     renderer.SetKeepAspectRatio(mKeepAspectRatio);
-    SDL_SetWindowFullscreen(pWindow, mFullscreen);
+    window.SetFullscreen(mFullscreen);
 }
 
 std::optional<IRenderer::Renderers> DisplaySettings::RendererFromString(const std::string& name)

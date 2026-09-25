@@ -53,15 +53,12 @@ CameraSwapper::~CameraSwapper()
         mScreenClipper->SetDead(true);
     }
 
-    if (gMap_bDoPurpleLightEffect)
+    if (gMap_bDoPurpleLightEffect && mMap.RemoveObjectsWithPurpleLight(0) == PurpleLightResult::eShowing)
     {
-        mMap.RemoveObjectsWithPurpleLight(0);
-        gMap_bDoPurpleLightEffect = 0;
+        // The lights call VCameraSwapFinished once they're done
+        return;
     }
-
-    BackgroundMusic::Play();
-    MusicController::static_EnableMusic(1);
-    mMap.Start_Sounds_For_Objects_In_Near_Cameras();
+    mMap.VCameraSwapFinished();
 }
 
 static const s32 kSliceWidth = 8;

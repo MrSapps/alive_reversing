@@ -150,6 +150,12 @@ public:
         return mNoFpsLimit;
     }
 
+    // See DisableRecorder
+    bool IsRecorderDisabled() const
+    {
+        return mDisabled;
+    }
+
     s32 Rng(s32 rng);
 
     u32 SysGetTicks();

@@ -4,7 +4,7 @@
 
 #include "../../../relive_lib/Types.hpp"
 
-struct SDL_Window;
+class Window;
 
 class GLFramebuffer final
 {
@@ -18,7 +18,7 @@ public:
     s32 GetWidth();
     void Resize(s32 newWidth, s32 newHeight);
 
-    static void BindScreenAsTarget(SDL_Window* wnd, s32* outWidth = nullptr, s32* outHeight = nullptr);
+    static void BindScreenAsTarget(const Window& window, s32* outWidth = nullptr, s32* outHeight = nullptr);
 
 private:
     void CreateGLObjects();

@@ -1,3 +1,4 @@
+#include "../../Window.hpp"
 #include <GL/glew.h>
 
 #include "../../../relive_lib/Types.hpp"
@@ -89,11 +90,11 @@ void GLFramebuffer::DestroyGLObjects()
 }
 
 
-void GLFramebuffer::BindScreenAsTarget(SDL_Window* wnd, s32* outWidth, s32* outHeight)
+void GLFramebuffer::BindScreenAsTarget(const Window& window, s32* outWidth, s32* outHeight)
 {
     s32 viewportW, viewportH;
 
-    SDL_GetWindowSizeInPixels(wnd, &viewportW, &viewportH);
+    window.GetSizeInPixels(viewportW, viewportH);
 
     GL_VERIFY(glBindFramebuffer(GL_FRAMEBUFFER, 0));
     GL_VERIFY(glViewport(0, 0, viewportW, viewportH));

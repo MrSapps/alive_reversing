@@ -176,7 +176,19 @@ public:
     bool IsJoyStickEnabled() const;
     void SetJoyStickEnabled(bool enabled);
 
+    // OG Change (ORIGINAL_PS1_BEHAVIOR) - Allow for exiting save menu using controller: while
+    // the save menu is open, key presses type the save name
+    bool IsSaveMenuOpen() const
+    {
+        return mSaveMenuOpen;
+    }
+    void SetSaveMenuOpen(bool open)
+    {
+        mSaveMenuOpen = open;
+    }
+
 private:
+    bool mSaveMenuOpen = false;
 
 };
 

@@ -1,9 +1,9 @@
 #include "Sdl3Context.hpp"
+#include "../../Window.hpp"
 
-Sdl3Context::Sdl3Context(SDL_Window* window)
-    : mWindow(window)
+Sdl3Context::Sdl3Context(Window& window)
 {
-    mRenderer = SDL_CreateRenderer(window, NULL);
+    mRenderer = SDL_CreateRenderer(window.Get(), NULL);
     if (!mRenderer)
     {
         ALIVE_FATAL("Couldnt create SDL3 renderer: %s", SDL_GetError());

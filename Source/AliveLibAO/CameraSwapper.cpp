@@ -66,15 +66,12 @@ CameraSwapper::~CameraSwapper()
         mScreenClipper->SetDead(true);
     }
 
-    if (gMap_bDoPurpleLightEffect)
+    if (gMap_bDoPurpleLightEffect && mMap.RemoveObjectsWithPurpleLight(0) == PurpleLightResult::eShowing)
     {
-        mMap.RemoveObjectsWithPurpleLight(0);
-        gMap_bDoPurpleLightEffect = false;
+        // The lights call VCameraSwapFinished once they're done
+        return;
     }
-
-    BackgroundMusic::Play();
-    MusicController::EnableMusic(1);
-    mMap.Start_Sounds_For_Objects_In_Near_Cameras();
+    mMap.VCameraSwapFinished();
 }
 
 void CameraSwapper::Init(CamResource& camRes, CameraSwapEffects changeEffect)

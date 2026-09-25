@@ -14,6 +14,14 @@ class SerializedObjectData;
 class OrderingTable;
 class BaseMap;
 
+// What BaseGameObject::VModalUpdate() returns
+enum class ModalState
+{
+    eRunning,
+    eFinished, // ends the modal
+    eQuitGame, // stops the main loop, see QuitGame
+};
+
 class [[nodiscard]] BaseGameObject
 {
 public:
@@ -31,6 +39,10 @@ public:
     virtual void VStopAudio();
 
     virtual void VGetSaveState(SerializedObjectData& /*pSaveBuffer*/);
+
+    // Runs one main loop iteration while this object is the active modal, in place of the
+    // whole game frame. See StartModal.
+    virtual ModalState VModalUpdate();
 
     static ReliveTypes FromAO(AOTypes aoType);
     static AOTypes ToAO(ReliveTypes reliveType);
@@ -79,6 +91,17 @@ public:
     void SetUpdateDuringCamSwap(bool val) { mUpdateDuringCamSwap = val; }
     bool GetCantKill() const { return mCantKill; }
     void SetCantKill(bool val) { mCantKill = val; }
+    bool GetModal() const { return mModal; }
+
+    // Takes over the main loop, in place of the original game's nested loops: from the next
+    // iteration Engine::Game_Loop runs only this object's VModalUpdate(). The frame that was
+    // running is suspended and carries on where it stopped once VModalUpdate() returns
+    // eFinished (or the object is deleted). A modal started while another is active runs on top of it
+    // until it ends. Whatever started the modal checks on it from its own state when it
+    // next runs, e.g. Movie::gMovieRefCount going back to 0.
+    void StartModal();
+    // Called by the main loop when VModalUpdate() returns eFinished
+    void EndModal();
 
     // Helper to check if a timer has expired
     template <class T>
@@ -114,6 +137,7 @@ private:
     bool mSurviveDeathReset = false;
     bool mUpdateDuringCamSwap = false;
     bool mCantKill = false;
+    bool mModal = false;
 
 protected:
     ResourceManagerWrapper& mResMan;

@@ -8,9 +8,11 @@
 #include "../../../relive_lib/logger.hpp"
 #include "../../../relive_lib/Types.hpp"
 #include "GLContext.hpp"
+#include "../../Window.hpp"
 #include "SDL3/SDL.h"
 
-GLContext::GLContext(TWindowHandleType window)
+GLContext::GLContext(Window& window)
+    : mWindow(window)
 {
     // Find the opengl driver
     const s32 numDrivers = SDL_GetNumRenderDrivers();
@@ -51,7 +53,7 @@ GLContext::GLContext(TWindowHandleType window)
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
     // Create context
-    mContext = SDL_GL_CreateContext(window);
+    mContext = SDL_GL_CreateContext(mWindow.Get());
 
     if (mContext == NULL)
     {
@@ -66,7 +68,7 @@ GLContext::GLContext(TWindowHandleType window)
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
         // Create context
-        mContext = SDL_GL_CreateContext(window);
+        mContext = SDL_GL_CreateContext(mWindow.Get());
         if (mContext == NULL)
         {
             // FIXME: Throw exception?
@@ -101,7 +103,7 @@ GLContext::GLContext(TWindowHandleType window)
     ImGui::CreateContext();
 
     // Setup IMGUI for texture debugging
-    ImGui_ImplSDL3_InitForOpenGL(window, mContext);
+    ImGui_ImplSDL3_InitForOpenGL(mWindow.Get(), mContext);
     ImGui_ImplOpenGL3_Init(glslVer150Supported ? glslVer150 : glslVer140);
 }
 
@@ -114,4 +116,9 @@ GLContext::~GLContext()
         SDL_GL_DestroyContext(mContext);
         mContext = nullptr;
     }
+}
+
+void GLContext::SwapBuffers()
+{
+    SDL_GL_SwapWindow(mWindow.Get());
 }

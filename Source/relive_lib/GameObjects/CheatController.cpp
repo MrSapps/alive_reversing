@@ -98,7 +98,7 @@ static void CheatController_Cheat_PathSkip(BaseMap& map)
 {
     char_type nameBuffer[20];
 
-    DestroyObjects(gCheatController->GetResMan());
+    DestroyObjects();
     sprintf(nameBuffer, "NXTP%04d.SAV.json", QuikSave::gActiveQuicksaveData.mWorldInfo.mSaveFileId);
 
     FileSystem fs;

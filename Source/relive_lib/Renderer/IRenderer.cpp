@@ -4,7 +4,7 @@
 #include "SDL3/Sdl3Renderer.hpp"
 
 #include "../../relive_lib/FatalError.hpp"
-#include "../../relive_lib/Sys.hpp"
+#include "../../relive_lib/Window.hpp"
 
 #include <cmath>
 
@@ -16,75 +16,55 @@ IRenderer* IRenderer::GetRenderer()
 }
 
 template<typename T>
-static void MakeRenderer(const std::string& windowTitle, u32 windowAttributes)
+static void MakeRenderer(Window& window)
 {
     TRACE_ENTRYEXIT;
     try
     {
-        if (Sys_WindowClass_Register(windowTitle.c_str(), 32, 64, 640, 480, windowAttributes))
-        {
-            gRenderer = new T(Sys_GetHWnd());
-        }
-        else
-        {
-            LOG_INFO("No window, skip creating instance");
-        }
+        gRenderer = new T(window);
     }
     catch (const std::exception& e)
     {
         LOG_ERROR("Failed to create renderer [%s]", e.what());
-        Sys_DestroyWindow();
     }
 }
 
-static void AddRenderer(std::vector<IRenderer::Renderers>& renderers, IRenderer::Renderers toAdd)
-{
-    for (auto r : renderers)
-    {
-        if (r == toAdd)
-        {
-            return;
-        }
-    }
-    renderers.emplace_back(toAdd);
-}
-
-bool IRenderer::CreateRenderer(Renderers type, const std::string& windowTitle)
+bool IRenderer::CreateRenderer(Renderers type, Window& window)
 {
     if (gRenderer)
     {
         ALIVE_FATAL("Renderer already created");
     }
 
-    std::vector<Renderers> creationOrder{type};
-    AddRenderer(creationOrder, Renderers::Sdl3);
-    AddRenderer(creationOrder, Renderers::OpenGL);
-
-    for (Renderers typeToCreate : creationOrder)
+    switch (type)
     {
-        switch (typeToCreate)
-        {
-            case Renderers::Sdl3:
-                LOG_INFO("Create SDL3 renderer");
-                MakeRenderer<Sdl3Renderer>(windowTitle + " [SDL3]", 0);
-                break;
-
-            case Renderers::OpenGL:
-                LOG_INFO("Create OpenGL renderer");
-                MakeRenderer<OpenGLRenderer>(windowTitle + " [OpenGL3]", SDL_WINDOW_OPENGL);
-                break;
-
-            default:
-                ALIVE_FATAL("Unknown or unsupported renderer type");
-                break;
-        }
-
-        if (gRenderer)
-        {
+        case Renderers::Sdl3:
+            LOG_INFO("Create SDL3 renderer");
+            MakeRenderer<Sdl3Renderer>(window);
             break;
-        }
+
+        case Renderers::OpenGL:
+            LOG_INFO("Create OpenGL renderer");
+            MakeRenderer<OpenGLRenderer>(window);
+            break;
+
+        default:
+            ALIVE_FATAL("Unknown or unsupported renderer type");
+            break;
     }
     return gRenderer != nullptr;
+}
+
+void IRenderer::StartFrame()
+{
+    if (mIsFirstStartFrame)
+    {
+        // Make the window visible only on the first frame otherwise you can see
+        // some unclear framebuffer crap for a half second or so
+        mWindow.Show();
+
+        mIsFirstStartFrame = false;
+    }
 }
 
 void IRenderer::FreeRenderer()
@@ -120,7 +100,7 @@ SDL_Rect IRenderer::GetFramebufferRect()
         }
         else
         {
-            SDL_GetWindowSizeInPixels(mWindow, &desiredW, &desiredH);
+            mWindow.GetSizeInPixels(desiredW, desiredH);
         }
     }
 
@@ -137,7 +117,7 @@ SDL_Rect IRenderer::GetTargetDrawRect()
     s32 wndWidth = 0;
     s32 wndHeight = 0;
 
-    SDL_GetWindowSize(mWindow, &wndWidth, &wndHeight);
+    mWindow.GetSize(wndWidth, wndHeight);
 
     // Calculate the draw size, aspect ratio dealt with here
     rect.w = wndWidth;

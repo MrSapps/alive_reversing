@@ -27,55 +27,31 @@ SoundApi& GetSoundAPI()
     return sSoundApi;
 }
 
-#if USE_SDL3_SOUND
 SDLSoundSystem* sDSound_BBC344 = nullptr;
-#else
-LPDIRECTSOUND sDSound_BBC344 = nullptr;
-#endif
 
 s32 SND_CreateDS_4EEAA0(u32 sampleRate, s32 bitsPerSample, s32 isStereo)
 {
-#if USE_SDL3_SOUND
     return SND_CreateDS_SDL(sampleRate, bitsPerSample, isStereo);
-#else
-    return SND_CreateDS_DSound(sampleRate, bitsPerSample, isStereo);
-#endif
 }
 
 s32 SND_Clear_4EF350(SoundEntry* pSoundEntry, u32 sampleOffset, u32 size)
 {
-#if USE_SDL3_SOUND
     return SND_Clear_SDL(pSoundEntry, sampleOffset, size);
-#else
-    return SND_Clear_DSound(pSoundEntry, sampleOffset, size);
-#endif
 }
 
 s32 SND_LoadSamples_4EF1C0(const SoundEntry* pSnd, u32 sampleOffset, u8* pSoundBuffer, u32 sampleCount)
 {
-#if USE_SDL3_SOUND
     return SND_LoadSamples_SDL(pSnd, sampleOffset, pSoundBuffer, sampleCount);
-#else
-    return SND_LoadSamples_DSound(pSnd, sampleOffset, pSoundBuffer, sampleCount);
-#endif
 }
 
 const char_type* SND_HR_Err_To_String_4EEC70(HRESULT hr)
 {
-#if USE_SDL3_SOUND
     return SND_HR_Err_To_String_SDL(hr);
-#else
-    return SND_HR_Err_To_String_DSound(hr);
-#endif
 }
 
 void SND_InitVolumeTable_4EEF60()
 {
-#if USE_SDL3_SOUND
     return SND_InitVolumeTable_SDL();
-#else
-    return SND_InitVolumeTable_DSound();
-#endif
 }
 
 void SND_SsQuit_4EFD50()
@@ -382,40 +358,28 @@ u32 SND_Get_Sound_Entry_Pos_4EF620(SoundEntry* pSoundEntry)
 
 void SND_Pause_Audio()
 {
-#if USE_SDL3_SOUND
     if (sDSound_BBC344)
     {
         sDSound_BBC344->Pause();
     }
-#endif
 }
 
 void SND_Resume_Audio()
 {
-#if USE_SDL3_SOUND
     if (sDSound_BBC344)
     {
         sDSound_BBC344->Resume();
     }
-#endif
 }
 
 u64 SND_Get_Generated_Audio_Samples()
 {
-#if USE_SDL3_SOUND
     return sDSound_BBC344 ? sDSound_BBC344->GetGeneratedAudioSamples() : 0;
-#else
-    return 0;
-#endif
 }
 
 u32 SND_Get_Device_Sample_Rate()
 {
-#if USE_SDL3_SOUND
     return sDSound_BBC344 ? sDSound_BBC344->GetDeviceSampleRate() : 44100u;
-#else
-    return 44100u;
-#endif
 }
 
 // Never seems to get called?
@@ -674,13 +638,7 @@ SoundApi::SoundApi()
     mSND_HR_Err_To_String = SND_HR_Err_To_String_4EEC70;
     mSND_Free = SND_Free_4EFA30;
     mSND_Restart = SND_Restart_4CB0E0;
-#if !USE_SDL3_SOUND
-    SND_SetPrimarySoundBufferFormat = SND_SetPrimarySoundBufferFormat_4EE990;
-#endif
     SND_InitVolumeTable = SND_InitVolumeTable_4EEF60;
-#if !USE_SDL3_SOUND
-    SND_CreatePrimarySoundBuffer = SND_CreatePrimarySoundBuffer_4EEEC0;
-#endif
     mSND_Renew = SND_Renew_4EEDD0;
     mSND_Get_Buffer_Status = ::SND_Get_Buffer_Status;
     mSND_Stop_Sample_At_Idx = ::SND_Stop_Sample_At_Idx;

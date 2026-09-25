@@ -407,7 +407,7 @@ void PauseMenu::Page_Base_Render(OrderingTable& ot, PauseMenu::PauseMenuPage* pP
 
 void PauseMenu::RestartPath()
 {
-    DestroyObjects(mResMan);
+    DestroyObjects();
 
     gSwitchStates = QuikSave::gActiveQuicksaveData.mRestartPathSwitchStates;
 
@@ -520,7 +520,7 @@ void PauseMenu::Page_Main_Update()
                 strcat(sSaveString, sArrowStr_55E398);
 
 #if ORIGINAL_PS1_BEHAVIOR // OG Change - Allow for exiting save menu using controller
-                setSaveMenuOpen(true); // Sets saveMenuOpen bool to true, instead of disabling input
+                ::Input().SetSaveMenuOpen(true); // Sets saveMenuOpen bool to true, instead of disabling input
 #else
                 Input_DisableInputForPauseMenuAndDebug_4EDDC0();
 #endif
@@ -649,7 +649,7 @@ void PauseMenu::Page_Save_Update()
             mSaveState = SaveState::ReadingInput_0;
             strcat(sSaveString, sArrowStr_55E398);
 #if ORIGINAL_PS1_BEHAVIOR // OG Change - Allow for exiting save menu using controller
-            setSaveMenuOpen(true); // Sets saveMenuOpen bool to true, instead of disabling input
+            ::Input().SetSaveMenuOpen(true); // Sets saveMenuOpen bool to true, instead of disabling input
 #else
             Input_DisableInputForPauseMenuAndDebug_4EDDC0();
 #endif
@@ -663,17 +663,17 @@ void PauseMenu::Page_Save_Update()
 
         if (lastPressed == VK_ESCAPE || lastPressed == VK_RETURN) // Keyboard ESC or ENTER
         {
-            setSaveMenuOpen(false);
+            ::Input().SetSaveMenuOpen(false);
         }
         else if (Input().IsAnyPressed(InputCommands::eBack)) // Triangle
         {
             lastPressed = VK_ESCAPE;
-            setSaveMenuOpen(false);
+            ::Input().SetSaveMenuOpen(false);
         }
         else if (Input().IsAnyPressed(InputCommands::eUnPause_OrConfirm)) // Cross or START
         {
             lastPressed = VK_RETURN;
-            setSaveMenuOpen(false);
+            ::Input().SetSaveMenuOpen(false);
         }
 #else
         const u32 lastPressed = Input_GetLastPressedKey_492610();
@@ -1086,67 +1086,74 @@ void PauseMenu::VUpdate()
                 gDisableFontFlicker = true;
                 mActiveMenu = sMainMenuPage;
 
-                // Start pause menu update/render loop
-                while (mPauseRenderLoop)
-                {
-                    SYS_EventsPump();
-
-                    for (s32 i = 0; i < gObjListDrawables->Size(); i++)
-                    {
-                        BaseGameObject* pObj = gObjListDrawables->ItemAt(i);
-                        if (!pObj)
-                        {
-                            break;
-                        }
-
-                        if (!(pObj->GetDead()))
-                        {
-                            if (pObj->GetDrawable())
-                            {
-                                pObj->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
-                            }
-                        }
-                    }
-
-                    gScreenManager->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
-
-                    gPsxDisplay.RenderOrderingTable();
-                    Input().Update(GetGameAutoPlayer());
-
-                    if (mSelectedGlowCounter > 0)
-                    {
-                        mSelectedGlow += 8;
-                    }
-
-                    if (mSelectedGlow <= 120 || mSelectedGlowCounter <= 0)
-                    {
-                        if (mSelectedGlowCounter <= 0)
-                        {
-                            mSelectedGlow -= 8;
-                            if (mSelectedGlow < 40)
-                            {
-                                mSelectedGlowCounter = -mSelectedGlowCounter;
-                                mSelectedGlow += mSelectedGlowCounter;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        mSelectedGlowCounter = -mSelectedGlowCounter;
-                        mSelectedGlow += mSelectedGlowCounter;
-                    }
-
-                    (this->*mActiveMenu.mFnUpdate)();
-                }
-
-                // This call seems redundant as the calle will also update input right after this too
-                Input().Update(GetGameAutoPlayer());
-
-                SetDrawable(false);
+                // The pause menu runs in VModalUpdate until it's closed
+                StartModal();
+                return;
             }
         }
     }
     gDisableFontFlicker = false;
+}
+
+ModalState PauseMenu::VModalUpdate()
+{
+    for (s32 i = 0; i < gObjListDrawables->Size(); i++)
+    {
+        BaseGameObject* pObj = gObjListDrawables->ItemAt(i);
+        if (!pObj)
+        {
+            break;
+        }
+
+        if (!(pObj->GetDead()))
+        {
+            if (pObj->GetDrawable())
+            {
+                pObj->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
+            }
+        }
+    }
+
+    gScreenManager->VRender(gPsxDisplay.mDrawEnv.mOrderingTable);
+
+    gPsxDisplay.RenderOrderingTable();
+    Input().Update(GetGameAutoPlayer());
+
+    if (mSelectedGlowCounter > 0)
+    {
+        mSelectedGlow += 8;
+    }
+
+    if (mSelectedGlow <= 120 || mSelectedGlowCounter <= 0)
+    {
+        if (mSelectedGlowCounter <= 0)
+        {
+            mSelectedGlow -= 8;
+            if (mSelectedGlow < 40)
+            {
+                mSelectedGlowCounter = -mSelectedGlowCounter;
+                mSelectedGlow += mSelectedGlowCounter;
+            }
+        }
+    }
+    else
+    {
+        mSelectedGlowCounter = -mSelectedGlowCounter;
+        mSelectedGlow += mSelectedGlowCounter;
+    }
+
+    (this->*mActiveMenu.mFnUpdate)();
+
+    if (!mPauseRenderLoop)
+    {
+        // This call seems redundant as the calle will also update input right after this too
+        Input().Update(GetGameAutoPlayer());
+
+        SetDrawable(false);
+        gDisableFontFlicker = false;
+        return ModalState::eFinished;
+    }
+    return ModalState::eRunning;
 }
 
 PauseMenu* gPauseMenu = nullptr;
