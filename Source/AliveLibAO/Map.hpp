@@ -75,9 +75,14 @@ public:
 private:
     // Tells the objects about the screen change, the part of ScreenChange after the purple lights
     void NotifyObjectsOfScreenChange();
-    // GoTo_Camera once any FMVs it plays first have finished, up to pending what the new
-    // camera's objects need
-    void StartLoadCamera();
+    // GoTo_Camera once any FMVs it plays first have finished, up to pending a new level's
+    // paths. Returns eWaiting if it pended them.
+    ScreenChangeResult StartLoadCamera();
+    // Once the paths are loaded: takes them and pends the new level's sound files
+    void LoadPathsAndPendSounds();
+    // Carries on once the sound files are loaded (or straight after StartLoadCamera when the
+    // level doesn't change), up to pending what the new camera's objects need
+    void ContinueLoadCamera();
     // The rest of GoTo_Camera, once the main loop has waited for that loading
     void FinishLoadCamera();
     // After the path transition's camera change, see Handle_PathTransition

@@ -70,6 +70,7 @@ bool AESaveConverter::Convert(const std::vector<u8>& savData, const char_type* p
     {
         // Reload cache
         cache.mLvlId = reliveLvlId;
+        mResMan.PendPaths(reliveLvlId);
         cache.mPaths = mResMan.LoadPaths(reliveLvlId);
     }
 

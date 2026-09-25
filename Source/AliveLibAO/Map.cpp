@@ -6,6 +6,7 @@
 #include "PathData.hpp"
 #include "Engine.hpp"
 #include "Midi.hpp"
+#include "../relive_lib/Sound/Midi.hpp"
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
 #include "Abe.hpp"
 #include "QuikSave.hpp"
@@ -316,6 +317,20 @@ ScreenChangeResult Map::GoTo_Camera()
         return ScreenChangeResult::eDone;
     }
 
+    if (mScreenChangeResume == ScreenChangeResume::eAfterPathsLoad)
+    {
+        LoadPathsAndPendSounds();
+        mScreenChangeResume = ScreenChangeResume::eAfterSoundsLoad;
+        return ScreenChangeResult::eWaiting;
+    }
+
+    if (mScreenChangeResume == ScreenChangeResume::eAfterSoundsLoad)
+    {
+        ContinueLoadCamera();
+        mScreenChangeResume = ScreenChangeResume::eAfterCameraLoad;
+        return ScreenChangeResult::eWaiting;
+    }
+
     if (mCameraSwapEffect == CameraSwapEffects::eUnknown_11)
     {
         if (mScreenChangeResume != ScreenChangeResume::eAfterFmvPass)
@@ -329,12 +344,18 @@ ScreenChangeResult Map::GoTo_Camera()
         mScreenChangeResume = ScreenChangeResume::eNone;
     }
 
-    StartLoadCamera();
+    if (StartLoadCamera() == ScreenChangeResult::eWaiting)
+    {
+        mScreenChangeResume = ScreenChangeResume::eAfterPathsLoad;
+        return ScreenChangeResult::eWaiting;
+    }
+
+    ContinueLoadCamera();
     mScreenChangeResume = ScreenChangeResume::eAfterCameraLoad;
     return ScreenChangeResult::eWaiting;
 }
 
-void Map::StartLoadCamera()
+ScreenChangeResult Map::StartLoadCamera()
 {
     // NOTE: None check changed to match AE
     if (mCurrentLevel != EReliveLevelIds::eMenu && mCurrentLevel != EReliveLevelIds::eNone)
@@ -357,6 +378,7 @@ void Map::StartLoadCamera()
         {
             if (mCurrentCameras[i])
             {
+                Free_Resources_For_Camera(mCurrentCameras[i]);
                 relive_delete mCurrentCameras[i];
                 mCurrentCameras[i] = nullptr;
             }
@@ -372,13 +394,29 @@ void Map::StartLoadCamera()
 
         }
 
-        if (LevelChanged())
-        {
-            mLoadedPaths = mResourceManager.LoadPaths(mNextLevel);
-            mResourceManager.FlushMissingResourceReports();
-        }
+        mResourceManager.PendPaths(mNextLevel);
+        mResourceManager.RequestLoadingWait();
+        return ScreenChangeResult::eWaiting;
+    }
+    return ScreenChangeResult::eDone;
+}
 
-        SND_Load_VABS(mLoadedPaths[0]->GetSoundInfo(), AO::Path_Get_Reverb(mNextLevel), mResourceManager, *this); // TODO: Remove hard coded data
+void Map::LoadPathsAndPendSounds()
+{
+    // Pended by StartLoadCamera
+    mLoadedPaths = mResourceManager.LoadPaths(mNextLevel);
+    mResourceManager.FlushMissingResourceReports();
+
+    SND_Pend_Sound_Files(*mLoadedPaths[0]->GetSoundInfo(), mResourceManager);
+    mResourceManager.RequestLoadingWait();
+}
+
+void Map::ContinueLoadCamera()
+{
+    if (LevelChanged())
+    {
+        // Sound files pended by LoadPathsAndPendSounds
+        AO::SND_Load_VABS(mLoadedPaths[0]->GetSoundInfo(), AO::Path_Get_Reverb(mNextLevel), mResourceManager, *this); // TODO: Remove hard coded data
         SND_Load_Seqs_477AB0(g_SeqTable_4C9E70, mLoadedPaths[0]->GetSoundInfo(), mResourceManager, *this);
 
         relive_new BackgroundMusic(AO::Path_Get_BackGroundMusicId(mNextLevel), mResourceManager, *this); // TODO: Remove hard coded data
@@ -488,7 +526,7 @@ void Map::StartLoadCamera()
     {
         if (mPreviousCameras[i])
         {
-            //ResourceManager::Free_Resources_For_Camera_447170(mPreviousCameras[i]);
+            Free_Resources_For_Camera(mPreviousCameras[i]);
         }
     }
 
@@ -515,6 +553,8 @@ void Map::FinishLoadCamera()
 {
     const s16 old_current_path = mLoadCameraPrevPath;
     const EReliveLevelIds old_current_level = mLoadCameraPrevLevel;
+
+    Finish_Load_Cam(mCurrentCameras[0]);
 
     Load_Path_Items(mCurrentCameras[3], relive::Factory::LoadMode::ConstructObject_0);
     Load_Path_Items(mCurrentCameras[4], relive::Factory::LoadMode::ConstructObject_0);

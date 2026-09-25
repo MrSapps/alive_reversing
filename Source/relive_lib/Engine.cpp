@@ -710,6 +710,10 @@ void Engine::Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera
     // Needed while waiting for everything else to load, starting with the first camera
     mResMan->PendAnimation(AnimId::Loading_Icon2);
 
+    // Loaded by objects made at any time (menus, LCD screens), and there are only two
+    mResMan->PendFont(FontType::PauseMenu);
+    mResMan->PendFont(FontType::LcdFont);
+
     gAttract = 0;
  
     AO::Input().InitPad(1);
