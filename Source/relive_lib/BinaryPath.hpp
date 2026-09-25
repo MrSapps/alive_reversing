@@ -109,7 +109,7 @@ private:
 
     relive::Path_TLV* mTlv = nullptr;
     const TlvList* mTlvList = nullptr;
-    u32 mIndex = 0;
+    std::size_t mIndex = 0;
 };
 
 inline TlvIterator TlvList::FirstIterator() const
@@ -162,6 +162,12 @@ public:
 
     u32 CameraNameAsInteger(const char* pCamName) const
     {
+        if (!pCamName)
+        {
+            // CameraName() found no camera at that grid position
+            ALIVE_FATAL("Can't get the number of a camera that doesn't exist");
+        }
+
         if (pCamName[1] != 0)
         {
             // Handle 10-99

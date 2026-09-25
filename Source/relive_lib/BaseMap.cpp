@@ -170,6 +170,10 @@ Camera* BaseMap::Create_Camera(s16 xpos, s16 ypos, s32 /*a4*/)
 
     // Get a pointer to the camera name from the Path resource
     const BinaryPath* pPathData = GetPathResourceBlockPtr(mCurrentPath);
+    if (!pPathData)
+    {
+        ALIVE_FATAL("Path %d isn't loaded", mCurrentPath);
+    }
     const char* pCamName = pPathData->CameraName(xpos, ypos);
 
     // Empty/blank camera in the map array

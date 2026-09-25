@@ -226,7 +226,14 @@ void DataConversionUI::VRender(OrderingTable& ot)
     // predictable, on top of DrawString's own out-of-bounds guard - belt and suspenders.
     const auto truncate = [](const std::string& s) -> std::string
     {
-        return s.size() > kMaxLineChars ? (s.substr(0, kMaxLineChars - 3) + "...") : s;
+        if (s.size() <= kMaxLineChars)
+        {
+            return s;
+        }
+        std::string truncated;
+        truncated.reserve(kMaxLineChars);
+        truncated.append(s, 0, kMaxLineChars - 3).append("...");
+        return truncated;
     };
 
     for (const InProgressItem& inProgress : mLastSnapshot.mInProgressItems)

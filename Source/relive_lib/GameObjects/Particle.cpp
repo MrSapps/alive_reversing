@@ -5,7 +5,7 @@
 #include "FixedPoint.hpp"
 
 // TODO: Make this the only ctor
-Particle::Particle(FP xpos, FP ypos, AnimResource& res, ResourceManagerWrapper& resMan, BaseMap& map, bool explosionSizeHack)
+Particle::Particle(FP xpos, FP ypos, AnimResource& res, ResourceManagerWrapper& resMan, BaseMap& map, [[maybe_unused]] bool explosionSizeHack)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eParticle);
@@ -14,21 +14,11 @@ Particle::Particle(FP xpos, FP ypos, AnimResource& res, ResourceManagerWrapper& 
 
     mRGB.SetRGB(128, 128, 128);
 
-    if (!explosionSizeHack)
-    {
-        Animation_Init(res);
-    }
-    else
-    {
-        // TODO: Reimplement whatever this hack did in a sane way
-
-        // AnimId::Explosion_Small and AnimId::AirExplosion have different width/height but for some reason
-        // OG inits both with the AnimId::AirExplosion width and height in AirExplosion.cpp
-        // TODO
-        //Animation_Init(res, 202, 91);
-
-         Animation_Init(res); // Temp fix - don't crush
-    }
+    // TODO: explosionSizeHack is currently ignored - reimplement whatever it did in a sane way.
+    // AnimId::Explosion_Small and AnimId::AirExplosion have different width/height but for some reason
+    // OG inits both with the AnimId::AirExplosion width and height in AirExplosion.cpp, i.e.
+    // Animation_Init(res, 202, 91). Doing that crushes the small explosion, so init normally.
+    Animation_Init(res);
 
     mXPos = xpos;
     mYPos = ypos;
