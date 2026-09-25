@@ -1663,11 +1663,6 @@ void Factory::MainMenuControllerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode l
             }
             resMan.PendAnims(MainMenuController::kMenuAnims);
 
-            // Originally loaded in the PauseMenu::Init()
-            resMan.PendAnimation(AnimId::NormalMudIcon);
-            resMan.PendAnimation(AnimId::AngryMudIcon);
-            resMan.PendAnimation(AnimId::HappyMudIcon);
-
             // Originally loaded in Game_Init_LoadingIcon()
             resMan.PendAnimation(AnimId::Loading_Icon2);
         }

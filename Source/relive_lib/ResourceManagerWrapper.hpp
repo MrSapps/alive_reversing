@@ -268,6 +268,8 @@ public:
 
     // Starts loading anim on a worker thread. Whatever needs it asks the main loop to wait for
     // it with RequestLoadingWait, and uses it with LoadAnimation once that's done.
+    // Pins the animation so it stays loaded until it's used: into the pin list set by
+    // BeginAnimPins if there is one, or for the rest of the game if not.
     void PendAnimation(AnimId anim, const std::string& theme = "");
     // Waits for anim if it's still being loaded by PendAnimation, or loads it right now if
     // nothing pended it
@@ -363,6 +365,18 @@ public:
     static s32 SEQ_HashName(const char_type* seqFileName);
 
 
+    // Animations are only cached while something uses or pins them. PendAnimation adds what it
+    // pends to pins while they're set (e.g. a camera's objects' anims, see
+    // BaseMap::Load_Path_Items), and UnpinAnims releases them once they're not needed.
+    // TODO: Only what the current and adjacent cameras pin stays loaded, so walking back and forth
+    // between two cameras can reload anims that neither needs but the ones next to them do. Keep
+    // the cross section of the anims the adjacent cameras need instead.
+    using AnimCacheKey = std::pair<std::string, AnimId>;
+    using AnimPins = std::vector<AnimCacheKey>;
+    void BeginAnimPins(AnimPins& pins);
+    void EndAnimPins();
+    void UnpinAnims(AnimPins& pins);
+
     template <typename T, int size>
     void PendAnims(const T (&anims)[size])
     {
@@ -378,16 +392,11 @@ public:
     std::vector<std::string> mSearchPaths;
 private:
 
-    struct AnimCache final
-    {
-        // TODO: Need to be weak_ptrs
-        std::shared_ptr<AnimationAttributesAndFrames> mAnimAttributes;
-        std::shared_ptr<PngData> mAnimPng;
-        UniqueResId mAnimUniqueId;
-    };
-
-    bool Exists(AnimId animId, const std::string& theme);
-    AnimCache LookUp(AnimId animId, const std::string& theme);
+    // Returns false if the anim isn't loaded (never was, or was freed). Call with mLoadingMutex
+    // held.
+    bool LookUp(const AnimCacheKey& key, AnimResource& res);
+    // Call with mLoadingMutex held
+    void PinAnim(const AnimCacheKey& key);
 
     void AddSearchPaths(const std::string& modPath);
 
@@ -407,8 +416,24 @@ public:
     std::mutex mLoadingMutex;
     // TODO: Remove dead entries at some point
 
-    using AnimCacheKey = std::pair<std::string, AnimId>;
+    struct AnimCache final
+    {
+        // Weak, so an anim is freed once nothing uses or pins it
+        std::weak_ptr<AnimationAttributesAndFrames> mAnimAttributes;
+        std::weak_ptr<PngData> mAnimPng;
+        UniqueResId mAnimUniqueId;
+    };
     std::map<AnimCacheKey, AnimCache> mLoadedAnimations;
+
+    // What keeps pinned anims loaded, and how many pins each has. The pointers are set once
+    // the anim has loaded.
+    struct AnimPin final
+    {
+        std::shared_ptr<AnimationAttributesAndFrames> mAnimAttributes;
+        std::shared_ptr<PngData> mAnimPng;
+        u32 mCount = 0;
+    };
+    std::map<AnimCacheKey, AnimPin> mPinnedAnimations;
 
     // Pended animations still loading, guarded by mLoadingMutex. mResourceLoaded is signalled
     // each time a pended animation or camera finishes (whether it was found or not).
@@ -437,6 +462,9 @@ public:
 private:
     // unique_ptr to avoid bringing the header in
     std::unique_ptr<ThreadPool> mThreadPool;
+
+    // Set by BeginAnimPins
+    AnimPins* mActiveAnimPins = nullptr;
 
     bool mLoadingWaitRequested = false;
     bool mShowLoadingIconNow = false;

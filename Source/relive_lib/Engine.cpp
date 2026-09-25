@@ -714,6 +714,16 @@ void Engine::Game_Run(EReliveLevelIds startLevel, s32 startPath, s32 startCamera
     mResMan->PendFont(FontType::PauseMenu);
     mResMan->PendFont(FontType::LcdFont);
 
+    if (mGameType == GameType::eAe)
+    {
+        // The pause menu's, originally loaded in PauseMenu::Init(). Pended here so they stay
+        // loaded all game: the pause menu is made from several places, long after the main
+        // menu's camera (which used to pend them) may have been freed.
+        mResMan->PendAnimation(AnimId::NormalMudIcon);
+        mResMan->PendAnimation(AnimId::AngryMudIcon);
+        mResMan->PendAnimation(AnimId::HappyMudIcon);
+    }
+
     gAttract = 0;
  
     AO::Input().InitPad(1);

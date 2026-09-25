@@ -23,4 +23,7 @@ public:
     u32 mCameraNumber = 0;
     // mCamRes is loaded (see BaseMap::Finish_Load_Cam)
     bool mCamResLoaded = false;
+    // The anims this camera's objects need, kept loaded until the camera is freed (see
+    // BaseMap::Load_Path_Items)
+    ResourceManagerWrapper::AnimPins mAnimPins;
 };
