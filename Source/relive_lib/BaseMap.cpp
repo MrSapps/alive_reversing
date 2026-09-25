@@ -214,7 +214,9 @@ void BaseMap::Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMod
             mResourceManager.PendCam(pCamera->mLevel, pCamera->mPath, pCamera->mCameraNumber);
             mResourceManager.PendFg1(pCamera->mLevel, pCamera->mPath, pCamera->mCameraNumber);
 
+            mResourceManager.BeginAnimPins(pCamera->mAnimPins);
             GetPath().Loader(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResourceFromList_1, ReliveTypes::eNone); // none = load all
+            mResourceManager.EndAnimPins();
         }
         else
         {
@@ -242,6 +244,7 @@ void BaseMap::Free_Resources_For_Camera(Camera* pCamera)
 {
     mResourceManager.FreeCam(pCamera->mLevel, pCamera->mPath, pCamera->mCameraNumber);
     mResourceManager.FreeFg1(pCamera->mLevel, pCamera->mPath, pCamera->mCameraNumber);
+    mResourceManager.UnpinAnims(pCamera->mAnimPins);
 }
 
 void BaseMap::GetCurrentCamCoords(PSX_Point* pPoint)

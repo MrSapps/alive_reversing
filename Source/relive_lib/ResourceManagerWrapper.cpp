@@ -183,7 +183,7 @@ public:
         // Not found under any search path - report it (rather than letting PNGFile::Load below
         // hard-abort the process, possibly from one of several ThreadPool worker threads at
         // once) and bail out without touching the (non-existent) png or parsing an empty json
-        // string. Exists()/LookUp() will keep reporting this animation as not loaded, same as
+        // string. LookUp() will keep reporting this animation as not loaded, same as
         // if this job had never run.
         if (jsonStr.empty())
         {
@@ -213,7 +213,16 @@ public:
 
         std::unique_lock<std::mutex> lock(mResMan->mLoadingMutex);
 
-        mResMan->mLoadedAnimations[std::make_pair(mThemeName, mAnimId)] = {pAnimationAttributesAndFrames, pPngData, {}};
+        const auto key = std::make_pair(mThemeName, mAnimId);
+        mResMan->mLoadedAnimations[key] = {pAnimationAttributesAndFrames, pPngData, {}};
+
+        // Pinned while it loaded, keep it loaded
+        auto pin = mResMan->mPinnedAnimations.find(key);
+        if (pin != mResMan->mPinnedAnimations.end())
+        {
+            pin->second.mAnimAttributes = pAnimationAttributesAndFrames;
+            pin->second.mAnimPng = pPngData;
+        }
     }
 
 private:
@@ -285,7 +294,14 @@ void ResourceManagerWrapper::PendAnimation(AnimId animId, const std::string& the
     {
         std::unique_lock<std::mutex> lock(mLoadingMutex);
         const AnimCacheKey key = std::make_pair(theme, animId);
-        if (mLoadedAnimations.count(key) || !mPendingAnimations.insert(key).second)
+        PinAnim(key);
+        if (mActiveAnimPins)
+        {
+            mActiveAnimPins->push_back(key);
+        }
+
+        AnimResource res;
+        if (LookUp(key, res) || !mPendingAnimations.insert(key).second)
         {
             // Already loaded or loading
             return;
@@ -293,6 +309,47 @@ void ResourceManagerWrapper::PendAnimation(AnimId animId, const std::string& the
     }
 
     mThreadPool->AddJob(std::make_unique<AnimationLoaderJob>(this, animId, theme));
+}
+
+void ResourceManagerWrapper::PinAnim(const AnimCacheKey& key)
+{
+    AnimPin& pin = mPinnedAnimations[key];
+    pin.mCount++;
+    if (!pin.mAnimPng)
+    {
+        // Already loaded? Otherwise AnimationLoaderJob sets these once it is.
+        AnimResource res;
+        if (LookUp(key, res))
+        {
+            pin.mAnimAttributes = res.mJsonPtr;
+            pin.mAnimPng = res.mPngPtr;
+        }
+    }
+}
+
+void ResourceManagerWrapper::BeginAnimPins(AnimPins& pins)
+{
+    mActiveAnimPins = &pins;
+}
+
+void ResourceManagerWrapper::EndAnimPins()
+{
+    mActiveAnimPins = nullptr;
+}
+
+void ResourceManagerWrapper::UnpinAnims(AnimPins& pins)
+{
+    std::unique_lock<std::mutex> lock(mLoadingMutex);
+    for (const auto& key : pins)
+    {
+        auto pin = mPinnedAnimations.find(key);
+        if (pin != mPinnedAnimations.end() && --pin->second.mCount == 0)
+        {
+            // Freed now unless something still uses it
+            mPinnedAnimations.erase(pin);
+        }
+    }
+    pins.clear();
 }
 
 void ResourceManagerWrapper::RequestLoadingWait(LoadingIcon icon)
@@ -338,38 +395,41 @@ std::string ResourceManagerWrapper::FmvPath(const std::string& fmvName)
 
 AnimResource ResourceManagerWrapper::LoadAnimation(AnimId anim, const std::string& themeName)
 {
+    const AnimCacheKey key = std::make_pair(themeName, anim);
+    AnimResource res;
     {
         // Still loading on a worker thread, wait for it rather than loading it again
         std::unique_lock<std::mutex> lock(mLoadingMutex);
-        const AnimCacheKey key = std::make_pair(themeName, anim);
         mResourceLoaded.wait(lock, [&]() { return mPendingAnimations.count(key) == 0; });
-    }
-
-    // TODO: Remove this when all of factory etc is updated (since it will always already be loaded here)
-    if (!Exists(anim, themeName))
-    {
-        if (static_cast<s32>(anim) <= 908) // ignore background animations for now
+        if (LookUp(key, res))
         {
-            LOG_ERROR("Animation %d wasn't pended before calling LoadAnimation", static_cast<s32>(anim));
+            return res;
         }
 
-        AnimationLoaderJob hack(this, anim, themeName);
-        hack.Execute();
+        // TODO: Remove this when all of factory etc is updated (since it will always already be loaded here)
+        if (static_cast<s32>(anim) <= 908) // ignore background animations for now
+        {
+            LOG_ERROR("Animation %d wasn't pended (or was freed) before calling LoadAnimation", static_cast<s32>(anim));
+        }
 
-        // hack.Execute() only records a report and returns if the resource is missing (see
-        // AnimationLoaderJob::Execute) - unlike PendAnimation's async jobs, this can't wait for
-        // the next loading wait to surface it, since the caller needs the animation right now, so
-        // flush (and fatally abort, listing every location searched) immediately if it did.
-        FlushMissingResourceReports();
+        // Nothing pended it, so like PendAnimation with no pin list it stays loaded for the rest
+        // of the game
+        PinAnim(key);
+        mPendingAnimations.insert(key);
     }
 
-    AnimCache cache = LookUp(anim, themeName);
-    auto jsonPtr = cache.mAnimAttributes;
-    auto pngPtr = cache.mAnimPng;
-    if (jsonPtr && pngPtr)
+    AnimationLoaderJob hack(this, anim, themeName);
+    hack.Execute();
+
+    // hack.Execute() only records a report and returns if the resource is missing (see
+    // AnimationLoaderJob::Execute) - unlike PendAnimation's async jobs, this can't wait for
+    // the next loading wait to surface it, since the caller needs the animation right now, so
+    // flush (and fatally abort, listing every location searched) immediately if it did.
+    FlushMissingResourceReports();
+
+    std::unique_lock<std::mutex> lock(mLoadingMutex);
+    if (LookUp(key, res))
     {
-        AnimResource res(anim, jsonPtr, pngPtr);
-        res.mUniqueId = cache.mAnimUniqueId;
         return res;
     }
 
@@ -1196,26 +1256,24 @@ s32 ResourceManagerWrapper::SEQ_HashName(const char_type* seqFileName)
     return hashId;
 }
 
-bool ResourceManagerWrapper::Exists(AnimId animId, const std::string& theme)
+bool ResourceManagerWrapper::LookUp(const AnimCacheKey& key, AnimResource& res)
 {
-    std::unique_lock<std::mutex> lock(mLoadingMutex);
-
-    auto it = mLoadedAnimations.find(std::make_pair(theme, animId));
+    auto it = mLoadedAnimations.find(key);
     if (it == std::end(mLoadedAnimations))
     {
         return false;
     }
-    return true;
-}
 
-ResourceManagerWrapper::AnimCache ResourceManagerWrapper::LookUp(AnimId animId, const std::string& theme)
-{
-    std::unique_lock<std::mutex> lock(mLoadingMutex);
-
-    auto it = mLoadedAnimations.find(std::make_pair(theme, animId));
-    if (it == std::end(mLoadedAnimations))
+    auto jsonPtr = it->second.mAnimAttributes.lock();
+    auto pngPtr = it->second.mAnimPng.lock();
+    if (!jsonPtr || !pngPtr)
     {
-        return {};
+        // Freed
+        mLoadedAnimations.erase(it);
+        return false;
     }
-    return it->second;
+
+    res = AnimResource(key.second, jsonPtr, pngPtr);
+    res.mUniqueId = it->second.mAnimUniqueId;
+    return true;
 }
