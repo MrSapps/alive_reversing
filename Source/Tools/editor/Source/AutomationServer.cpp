@@ -5,7 +5,12 @@
 #include <QLocalSocket>
 #include <QWidget>
 #include <QDebug>
+#include <QLoggingCategory>
 #include <QTimer>
+
+// Traces each request through the server, so a test that times out shows how far it got.
+// Silence with QT_LOGGING_RULES="relive.automation=false".
+Q_LOGGING_CATEGORY(lcAutomation, "relive.automation")
 
 AutomationServer::AutomationServer(QWidget* root, QObject* parent)
     : QObject(parent)
@@ -58,7 +63,9 @@ void AutomationServer::OnReadyRead()
         return;
     }
 
-    it->Append(socket->readAll());
+    const QByteArray data = socket->readAll();
+    qCInfo(lcAutomation) << "read" << data.size() << "bytes";
+    it->Append(data);
     ScheduleProcessNextFrame(socket);
 }
 
@@ -118,6 +125,8 @@ void AutomationServer::HandleFrame(QLocalSocket* socket, const nlohmann::json& r
 {
     nlohmann::json response;
     response["id"] = request.value("id", nlohmann::json());
+    qCInfo(lcAutomation) << "handling id" << response["id"].dump().c_str() << request.value("cmd", std::string()).c_str()
+                         << request.value("target", std::string()).c_str();
 
     try
     {
@@ -142,5 +151,6 @@ void AutomationServer::HandleFrame(QLocalSocket* socket, const nlohmann::json& r
         response["error"] = e.what();
     }
 
+    qCInfo(lcAutomation) << "responding to id" << response["id"].dump().c_str() << "ok" << response.value("ok", false);
     Automation::WriteFrame(socket, response);
 }
