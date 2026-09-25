@@ -13,7 +13,31 @@ set(CONFIG_WEBM_IO ON)
 set(ENABLE_TOOLS ON) # required to get webm project
 add_definitions(-DNOMINMAX)
 set(AOM_TARGET_CPU generic)
+
+# aom's configure step rewrites its generated rtcd headers and dummy sources on every CMake
+# run, even when their content is unchanged. The new mtime makes ~260 aom files recompile.
+# Stash the previous copies, then put back any that are unchanged: file(COPY) keeps the
+# original timestamp.
+set(aom_bin_dir "${CMAKE_CURRENT_BINARY_DIR}/aom")
+set(aom_stash_dir "${CMAKE_CURRENT_BINARY_DIR}/aom_generated_stash")
+file(GLOB aom_generated_files RELATIVE "${aom_bin_dir}"
+     "${aom_bin_dir}/config/*_rtcd.h" "${aom_bin_dir}/gen_src/*")
+file(REMOVE_RECURSE "${aom_stash_dir}")
+foreach(f ${aom_generated_files})
+    get_filename_component(f_dir "${f}" DIRECTORY)
+    file(COPY "${aom_bin_dir}/${f}" DESTINATION "${aom_stash_dir}/${f_dir}")
+endforeach()
+
 add_subdirectory(aom EXCLUDE_FROM_ALL)
+
+foreach(f ${aom_generated_files})
+    execute_process(COMMAND ${CMAKE_COMMAND} -E compare_files "${aom_stash_dir}/${f}" "${aom_bin_dir}/${f}"
+                    RESULT_VARIABLE aom_file_differs)
+    if(aom_file_differs EQUAL 0)
+        get_filename_component(f_dir "${f}" DIRECTORY)
+        file(COPY "${aom_stash_dir}/${f}" DESTINATION "${aom_bin_dir}/${f_dir}")
+    endif()
+endforeach()
 set_property(TARGET aom PROPERTY FOLDER "3rdParty")
 set_property(TARGET aom_av1_common PROPERTY FOLDER "3rdParty")
 set_property(TARGET aom_av1_decoder PROPERTY FOLDER "3rdParty")
