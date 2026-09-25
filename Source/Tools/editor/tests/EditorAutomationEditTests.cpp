@@ -102,7 +102,7 @@ TEST(EditorAutomation, CameraAddSaveAndFg1LayerRoundTrip)
         EXPECT_TRUE(cam.value("hasForegroundLayer", false)) << "camera FG1 foreground layer did not round-trip after reopening";
     }
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -254,7 +254,7 @@ TEST(EditorAutomation, PasteClampsBoundsAndPreservesSizeThroughEditAndReload)
     EXPECT_TRUE(foundMatchingPasted) << "pasted object's position/size did not round-trip through save/reopen";
     EXPECT_TRUE(foundMatchingOriginal) << "original object's position/size did not round-trip through save/reopen";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -321,7 +321,7 @@ TEST(EditorAutomation, PasteOfOversizedCollisionLineIntoSmallerPathShrinksToFit)
     EXPECT_LE(pastedMaxX, 1024) << "pasted line escaped the destination map's right edge";
     EXPECT_LE(pastedMaxY, 480) << "pasted line escaped the destination map's bottom edge";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -407,7 +407,7 @@ TEST(EditorAutomation, OpeningPathWithOutOfBoundsCollisionLineClampsOnLoadNonUnd
     const int afterUndoMaxX = std::max(afterUndo.at("x1").get<int>(), afterUndo.at("x2").get<int>());
     EXPECT_LE(afterUndoMaxX, 1024) << "undo put the line back outside the map's bounds";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -534,7 +534,7 @@ TEST(EditorAutomation, ConnectCollisionsSnapsNearestEndsAndLinksNextPrevious)
         EXPECT_EQ(line2AfterRedo.at("previous").get<int>(), id1);
     }
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -576,7 +576,7 @@ TEST(EditorAutomation, ConnectCollisionsRequiresExactlyTwoSelected)
 
     EXPECT_FALSE(UndoContains(GetUndoWidgetTextList(client), "Connected collisions")) << "an invalid selection should not have pushed a connect command";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -672,7 +672,7 @@ TEST(EditorAutomation, AddCollisionClickToPlaceShowsGhostAndCreatesLine)
         EXPECT_EQ(line.value("y2", -1), 180);
     }
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -713,7 +713,7 @@ TEST(EditorAutomation, AddCollisionClickToPlaceCancelledByEscape)
     ASSERT_TRUE(SendMouseEvent(client, "up", q2));
     EXPECT_EQ(CountKind(GetSceneItems(client), "collision_line"), 1) << "tool did not work correctly after a cancelled placement";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -791,7 +791,7 @@ TEST(EditorAutomation, AddCollisionClickToPlaceSuppressesRubberBandAndTogglesBut
     }
     EXPECT_FALSE(findAddCollisionAction().value("checked", true)) << "button should un-depress once placement finished";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -871,7 +871,7 @@ TEST(EditorAutomation, DeleteObjectUndoRedoAndSaveRemovesIt)
         }
     }
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -985,7 +985,7 @@ TEST(EditorAutomation, DeleteCameraUndoRedoAndSaveRemovesCameraAndItsObjects)
         }
     }
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 

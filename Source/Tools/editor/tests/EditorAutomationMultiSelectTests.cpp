@@ -72,7 +72,7 @@ TEST(EditorAutomation, MultiSelectDragKeepsWholeSelectionInBounds)
     EXPECT_DOUBLE_EQ(rectAfter.value("xpos", -1.0) - lineAfter.value("x1", -2), relDX) << "group members' relative layout was not preserved while clamping";
     EXPECT_DOUBLE_EQ(rectAfter.value("ypos", -1.0) - lineAfter.value("y1", -2), relDY);
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -135,7 +135,7 @@ TEST(EditorAutomation, MultiSelectDragClampsLiveNotJustOnRelease)
 
     ASSERT_TRUE(SendMouseEvent(client, "up", farOut));
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -216,7 +216,7 @@ TEST(EditorAutomation, MultiSelectDragWithSnapKeepsRowAligned)
         << "row misaligned vertically after a snapped multi-select drag";
     EXPECT_DOUBLE_EQ(after[1].at("ypos").get<double>(), after[2].at("ypos").get<double>());
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -299,7 +299,7 @@ TEST(EditorAutomation, MultiSelectDragWithoutSnapKeepsRowAligned)
         << "row misaligned vertically after an unsnapped multi-select drag";
     EXPECT_DOUBLE_EQ(after[1].at("ypos").get<double>(), after[2].at("ypos").get<double>());
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -405,7 +405,7 @@ TEST(EditorAutomation, MultiSelectDragWithSnapKeepsMixedRectAndLineSelectionAlig
     EXPECT_DOUBLE_EQ(lineAfter.at("x2").get<int>() - lineBefore.at("x2").get<int>(), dx);
     EXPECT_DOUBLE_EQ(lineAfter.at("y2").get<int>() - lineBefore.at("y2").get<int>(), dy);
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -499,7 +499,7 @@ TEST(EditorAutomation, ChangeMapSizeForcesObjectsInsideBoundsWithUndoRedo)
         EXPECT_DOUBLE_EQ(afterRedo.value("height", -1.0), shrunk.value("height", -1.0));
     }
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -573,7 +573,7 @@ TEST(EditorAutomation, ChangeMapSizeForcesCollisionLineInsideBoundsWithUndoRedo)
         EXPECT_EQ(afterRedo.value("y2", -1), shrunk.at("y2").get<int>());
     }
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
