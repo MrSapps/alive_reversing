@@ -117,6 +117,19 @@ namespace AutomationTest {
         int mNextId = 1;
     };
 
+    // Stops an editor a test is finished with, without going through its unsaved-changes
+    // prompt. terminate() is SIGTERM on Unix, but on Windows it posts WM_CLOSE to the process's
+    // windows, and under QT_QPA_PLATFORM=offscreen the editor has no native windows to receive
+    // it, so it would never exit. Kill it there instead.
+    inline void StopEditor(QProcess& editor)
+    {
+#ifdef _WIN32
+        editor.kill();
+#else
+        editor.terminate();
+#endif
+    }
+
     // Launches relive-editor with a fresh, PID-qualified automation socket name and connects
     // to it. ASSERTs (via the returned bool) that both steps succeed.
     bool LaunchEditorAndConnect(QProcess& editor, AutomationClient& client, QString& outSocketName);

@@ -39,7 +39,7 @@ TEST(EditorAutomation, SceneSelectionSyncsToTreeSelection)
     }
     EXPECT_EQ(selectedMapObjectRows, 1) << "tree selection does not match the scene's actual selection";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -94,7 +94,7 @@ TEST(EditorAutomation, TreeSelectionSyncsToSceneSelection)
     const nlohmann::json objAfter = FindKind(GetSceneItems(client), "map_object");
     EXPECT_TRUE(objAfter.value("selected", false)) << "selecting the object's row in the tree did not select it in the scene";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -150,7 +150,7 @@ TEST(EditorAutomation, TreeSelectionIsUndoable)
     ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_undo"}}).value("ok", false));
     EXPECT_FALSE(FindKind(GetSceneItems(client), "map_object").value("selected", false)) << "undo did not revert the selection the tree click made";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -220,7 +220,7 @@ TEST(EditorAutomation, TreeExpansionSurvivesAddingMapObject)
     EXPECT_TRUE(camerasGroup.value("expanded", false)) << "adding a map object collapsed the Cameras group";
     EXPECT_TRUE(camera.value("expanded", false)) << "adding a map object collapsed the camera row the new object landed in";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -267,7 +267,7 @@ TEST(EditorAutomation, AddingFirstMapObjectAutoExpandsTreeToRevealIt)
     }
     EXPECT_TRUE(foundExpandedCameraWithObject) << "adding the first map object did not expand the camera row it landed in";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -299,7 +299,7 @@ TEST(EditorAutomation, AddingFirstCollisionLineAutoExpandsTreeToRevealIt)
     const auto& collisionsGroup = treeResp.at("result").at("items")[0].at("children")[0].at("children")[0].at("children")[1];
     EXPECT_TRUE(collisionsGroup.value("expanded", false)) << "adding the first collision line did not expand the Collisions group";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -372,7 +372,7 @@ TEST(EditorAutomation, DoubleClickCameraRowCentersView)
     EXPECT_NEAR(viewPoint.x(), viewportCenter.x(), 20) << "double-clicking the camera row did not center the view horizontally";
     EXPECT_NEAR(viewPoint.y(), viewportCenter.y(), 20) << "double-clicking the camera row did not center the view vertically";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -443,7 +443,7 @@ TEST(EditorAutomation, DoubleClickCameraRowMakesItsTabCurrent)
 
     EXPECT_TRUE(findCameraAtOrigin().value("hasMainImage", false)) << "double-clicking Path 1's camera row did not bring Path 1's tab to the front";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -502,7 +502,7 @@ TEST(EditorAutomation, SelectingMapObjectInTreeMakesItsTabCurrent)
 
     EXPECT_EQ(CountKind(GetSceneItems(client), "map_object"), 1) << "selecting Path 1's map object row in the tree did not bring Path 1's tab to the front";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -571,7 +571,7 @@ TEST(EditorAutomation, SelectingMapObjectInTreeCentersView)
     EXPECT_NEAR(viewPoint.x(), viewportCenter.x(), 20) << "selecting the object's row in the tree did not center the view horizontally";
     EXPECT_NEAR(viewPoint.y(), viewportCenter.y(), 20) << "selecting the object's row in the tree did not center the view vertically";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -638,7 +638,7 @@ TEST(EditorAutomation, ModTreeDockHiddenUntilModOpen)
         EXPECT_TRUE(resp.at("result").value("visible", false)) << "mod tree dock should become visible once a mod is open";
     }
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -659,7 +659,7 @@ TEST(EditorAutomation, RestartReopensLastMod)
         QString socketName;
         ASSERT_TRUE(LaunchEditorAndConnect(editor, client, socketName));
         ASSERT_TRUE(CreateNewMod(client, modDir, "My Mod", "Tester"));
-        editor.terminate();
+        StopEditor(editor);
         ASSERT_TRUE(editor.waitForFinished(5000)) << "first editor instance did not exit after terminate()";
     }
 
@@ -675,7 +675,7 @@ TEST(EditorAutomation, RestartReopensLastMod)
         ASSERT_EQ(items.size(), 1u) << "the previously open mod was not automatically reopened";
         EXPECT_EQ(items[0].value("text", std::string()), "My Mod");
 
-        editor.terminate();
+        StopEditor(editor);
         ASSERT_TRUE(editor.waitForFinished(5000)) << "second editor instance did not exit after terminate()";
     }
 }

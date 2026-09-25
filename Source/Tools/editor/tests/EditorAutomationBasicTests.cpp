@@ -269,7 +269,7 @@ TEST(EditorAutomation, CollisionLineDragBoundsAndSnap)
         EXPECT_EQ(y2 % 20, 0) << "endpoint did not snap to the Y grid: y2=" << y2;
     }
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -318,7 +318,7 @@ TEST(EditorAutomation, CollisionLineWholeLineDragSnapsToGrid)
     EXPECT_EQ(newX2 - newX1, shapeWidth) << "whole-line drag snap distorted the line's shape";
     EXPECT_EQ(newY2 - newY1, shapeHeight);
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -389,7 +389,7 @@ TEST(EditorAutomation, MultiSelectDragWithSnapKeepsLineGrabbedSelectionAligned)
         << "map object desynced from the grabbed line after a snapped multi-select drag";
     EXPECT_DOUBLE_EQ(objAfter.at("ypos").get<double>() - objBefore.at("ypos").get<double>(), dy);
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -550,7 +550,7 @@ TEST(EditorAutomation, MapObjectDragResizeBoundsAndSnap)
         EXPECT_DOUBLE_EQ(rect.value("height", -1.0), h);
     }
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -624,7 +624,7 @@ TEST(EditorAutomation, SavePathThenReopenPreservesPositions)
     EXPECT_DOUBLE_EQ(rectAfterReopen.value("width", -1.0), rectBeforeSave.value("width", -2.0)) << "map object width did not round-trip";
     EXPECT_DOUBLE_EQ(rectAfterReopen.value("height", -1.0), rectBeforeSave.value("height", -2.0)) << "map object height did not round-trip";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -694,7 +694,7 @@ TEST(EditorAutomation, AddMapObjectToEmptyCameraPersistsThroughSaveAndReload)
     EXPECT_DOUBLE_EQ(objAfterReopen.value("xpos", -1.0), objBeforeSave.value("xpos", -2.0)) << "map object xpos did not round-trip";
     EXPECT_DOUBLE_EQ(objAfterReopen.value("ypos", -1.0), objBeforeSave.value("ypos", -2.0)) << "map object ypos did not round-trip";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -720,7 +720,7 @@ TEST(EditorAutomation, NewPathViaMenuDefaultsToFourByFourGrid)
 
     EXPECT_EQ(CountKind(GetSceneItems(client), "camera"), 16) << "New Path did not default to a 4x4 grid";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -768,7 +768,7 @@ TEST(EditorAutomation, GridSizePersistsThroughSaveAndReloadEvenWithUntouchedCell
 
     EXPECT_EQ(CountKind(GetSceneItems(client), "camera"), 16) << "grid shrank after a save+reload round-trip despite an untouched corner cell";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 

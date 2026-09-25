@@ -110,7 +110,7 @@ TEST(EditorAutomation, PropertyPanelEditIsClampedToMapBoundsWithUndoAndSaveReloa
         EXPECT_GE(reopened.at("height").get<double>(), 10);
     }
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -195,7 +195,7 @@ TEST(EditorAutomation, PropertyPanelSpinBoxArrowsStayInSyncAtMinRectSize)
         EXPECT_EQ(SpinBoxDisplayedText(client, "propertyEditor_width"), "15");
     }
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -233,7 +233,7 @@ TEST(EditorAutomation, CreateModWritesModInfoAndShowsEmptyTree)
     EXPECT_EQ(items[0].value("text", std::string()), "My Mod");
     EXPECT_EQ(items[0].at("children").size(), 0u) << "a brand new mod should have no levels yet";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -296,7 +296,7 @@ TEST(EditorAutomation, NewModBasedOnExistingModCopiesItsLevels)
     ASSERT_EQ(items[0].at("children").size(), 1u) << "expected the copied MI level";
     EXPECT_EQ(items[0].at("children")[0].value("text", std::string()), "MI");
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -375,7 +375,7 @@ TEST(EditorAutomation, NewLevelAndNewPathViaTreeContextMenuCreatesFilesAndOpensP
     EXPECT_EQ(pathItem.at("children")[0].value("text", std::string()), "Cameras");
     EXPECT_EQ(pathItem.at("children")[1].value("text", std::string()), "Collisions");
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -431,7 +431,7 @@ TEST(EditorAutomation, ModTreeDoubleClickTogglesLevelAndOpensPathWithoutDuplicat
     ASSERT_TRUE(tabsRespAfter.value("ok", false));
     EXPECT_EQ(CountClassName(tabsRespAfter.at("result"), "EditorTab"), 1) << "double-clicking an already-open path duplicated its tab";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -472,7 +472,7 @@ TEST(EditorAutomation, ModTreeStaysInSyncWithAddAndUndoInOpenPath)
     ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_undo"}}).value("ok", false));
     EXPECT_EQ(mapObjectNodeCount(), 0) << "tree did not remove the map object again after undo";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -536,7 +536,7 @@ TEST(EditorAutomation, EmptyCameraListedInTreeAndEditCameraOpensCameraManager)
     ASSERT_TRUE(DismissMenuIfStillOpen(client, "modTreeContextMenu"));
     ASSERT_TRUE(client.WaitForResponse(rightClickCameraId, 5000).value("ok", false));
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
@@ -613,7 +613,7 @@ TEST(EditorAutomation, SetCameraImageUpdatesTreeRowLabel)
     }
     EXPECT_EQ(cameraRowText(), "0 @ 0,0 (no image)") << "tree row does not reflect the camera's missing image";
 
-    editor.terminate();
+    StopEditor(editor);
     ASSERT_TRUE(editor.waitForFinished(5000)) << "editor did not exit after terminate()";
 }
 
