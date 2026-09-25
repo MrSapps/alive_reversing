@@ -12,11 +12,6 @@ Camera::~Camera()
 
 }
 
-void Camera::On_Loaded(Camera* /*pCamera*/)
-{
-
-}
-
 void Camera::CreateFG1(ResourceManagerWrapper& resMan, BaseMap& map)
 {
     Fg1Resource fg1Res = resMan.LoadFg1(mLevel, mPath, mCameraNumber);

@@ -209,6 +209,10 @@ public:
     Camera* GetCamera(CameraPos pos);
     Camera* Create_Camera(s16 xpos, s16 ypos, s32 a4);
     void Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMode);
+    // Takes the camera image Load_Path_Items pended, waiting for it if it's still loading
+    void Finish_Load_Cam(Camera* pCamera);
+    // Frees what Load_Path_Items loaded for the camera
+    void Free_Resources_For_Camera(Camera* pCamera);
     void GetCurrentCamCoords(PSX_Point* pPoint);
     bool SetActiveCam(EReliveLevelIds level, s16 path, s16 cam, CameraSwapEffects screenChangeEffect, FmvIds fmvIds = {}, bool forceChange = false);
     CameraPos GetDirection(EReliveLevelIds level, s32 path, FP xpos, FP ypos);
@@ -340,6 +344,8 @@ protected:
         eNone,
         eAfterPurpleLight,
         eAfterFmvPass,
+        eAfterPathsLoad,
+        eAfterSoundsLoad,
         eAfterCameraLoad,
     };
     ScreenChangeResume mScreenChangeResume = ScreenChangeResume::eNone;

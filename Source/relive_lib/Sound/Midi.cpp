@@ -697,6 +697,24 @@ void SND_Load_Seqs_Impl(OpenSeqHandle* pSeqTable, PathSoundInfo& info, ResourceM
     }
 }
 
+void SND_Pend_Sound_Files(const PathSoundInfo& info, ResourceManagerWrapper& resMan)
+{
+    // Loaded once, by the first SND_Load_VABS
+    const PathSoundInfo& monkInfo = GetMidiVars()->sMonkVh_Vb();
+    if (monkInfo.mVabId < 0)
+    {
+        resMan.PendSoundFile(monkInfo.mVhFile, monkInfo.mSoundTheme);
+        resMan.PendSoundFile(monkInfo.mVbFile, monkInfo.mSoundTheme);
+    }
+
+    resMan.PendSoundFile(info.mVhFile, info.mSoundTheme);
+    resMan.PendSoundFile(info.mVbFile, info.mSoundTheme);
+    for (const auto& seqName : info.mSeqFiles)
+    {
+        resMan.PendSoundFile(seqName, info.mSoundTheme);
+    }
+}
+
 void SND_Load_Seqs(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& bsqFileName, ResourceManagerWrapper& resMan, BaseMap& map)
 {
     SND_Load_Seqs_Impl(pSeqTable, *bsqFileName, resMan, map);

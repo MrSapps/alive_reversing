@@ -4,6 +4,9 @@
 #include <mutex>
 #include <condition_variable>
 #include <set>
+#include <atomic>
+#include <tuple>
+#include <map>
 
 enum class AnimId;
 enum class EReliveLevelIds : s16;
@@ -27,12 +30,12 @@ public:
 private:
     static u32 NextGlobalId()
     {
-        mGlobalId++;
-        return mGlobalId;
+        return ++mGlobalId;
     }
 
     u32 mId = 0;
-    static u32 mGlobalId;
+    // Atomic because resources are made on ThreadPool worker threads too
+    static std::atomic<u32> mGlobalId;
 };
 
 struct PngData final
@@ -272,16 +275,39 @@ public:
 
     PalResource LoadPal(PalId pal);
 
+    // Starts loading a camera image on a worker thread. Whatever needs it asks the main loop to
+    // wait for it with RequestLoadingWait, and uses it with LoadCam once that's done.
+    void PendCam(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber);
+    // Waits for the camera if it's still being loaded by PendCam, or loads it right now if
+    // nothing pended it
     CamResource LoadCam(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber);
-    Fg1Resource LoadFg1(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber);
+    // Drops the camera from the cache (unlike animations, camera images are too big to keep)
+    void FreeCam(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber);
 
+    // Same as PendCam/LoadCam/FreeCam for a camera's FG1 layers. A camera with no FG1 loads
+    // an empty Fg1Resource.
+    void PendFg1(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber);
+    Fg1Resource LoadFg1(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber);
+    void FreeFg1(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber);
+
+    // Like PendAnimation/LoadAnimation. Each LoadFont returns a new copy of the font image.
+    void PendFont(FontType fontId);
     FontResource LoadFont(FontType fontId);
 
+    // Starts loading a level's paths on a worker thread, like PendAnimation
+    void PendPaths(EReliveLevelIds lvlId);
+    // Waits for the level's paths if PendPaths is still loading them, or loads them right now if
+    // nothing pended them. The caller owns them from then on, so they're only cached until this.
+    // Doesn't flush missing resource reports, callers on the main thread do that.
     std::vector<std::unique_ptr<BinaryPath>> LoadPaths(EReliveLevelIds lvlId);
 
-    // Loads a VH/VB/SEQ sound file from the given theme's shared sounds/<soundTheme>/ dir (see
-    // PathSoundInfo::mSoundTheme) - not the current level's own dir.
-    std::vector<u8> LoadSoundFile(const char_type* pFileName, const std::string& soundTheme);
+    // Starts loading a VH/VB/SEQ sound file from the given theme's shared sounds/<soundTheme>/
+    // dir (see PathSoundInfo::mSoundTheme) - not the current level's own dir - like
+    // PendAnimation.
+    void PendSoundFile(const std::string& fileName, const std::string& soundTheme);
+    // Waits for the sound file if PendSoundFile is still loading it, or loads it right now if
+    // nothing pended it. The caller owns it from then on, so it's only cached until this.
+    std::vector<u8> LoadSoundFile(const std::string& fileName, const std::string& soundTheme);
 
     // The vh_file/vb_file/seq_files a sounds/<soundTheme>/sound_info.json declares - every path
     // sharing a theme shares one of these too, so it's cached per theme name rather than
@@ -320,7 +346,7 @@ public:
 
     // Thread-safe: records a resource that should always exist (an animation, etc) but
     // couldn't be found at any of the given locations, instead of raising a message box
-    // immediately. PendAnimation's jobs run in parallel on ThreadPool worker threads, so
+    // immediately. PendAnimation's (and PendCam's) jobs run in parallel on ThreadPool worker threads, so
     // several failing around the same time would otherwise pop up one modal message box per
     // job, all at once - callers report here and a later FlushMissingResourceReports() call
     // (from the main thread) shows everything collected so far as a single dialog.
@@ -377,16 +403,31 @@ private:
     std::vector<MissingResourceReport> mMissingResources;
 
 public:
-    std::mutex mLoadedAnimationsMutex;
+    // Guards the loaded and pending resources below
+    std::mutex mLoadingMutex;
     // TODO: Remove dead entries at some point
 
     using AnimCacheKey = std::pair<std::string, AnimId>;
     std::map<AnimCacheKey, AnimCache> mLoadedAnimations;
 
-    // Pended animations still loading, guarded by mLoadedAnimationsMutex. mAnimationLoaded is
-    // signalled each time one finishes (whether it was found or not).
+    // Pended animations still loading, guarded by mLoadingMutex. mResourceLoaded is signalled
+    // each time a pended animation or camera finishes (whether it was found or not).
     std::set<AnimCacheKey> mPendingAnimations;
-    std::condition_variable mAnimationLoaded;
+    // Loaded and pended cameras, guarded by mLoadingMutex like the animations
+    using CamCacheKey = std::tuple<EReliveLevelIds, u32, u32>;
+    std::map<CamCacheKey, CamResource> mLoadedCams;
+    std::set<CamCacheKey> mPendingCams;
+    std::map<CamCacheKey, Fg1Resource> mLoadedFg1s;
+    std::set<CamCacheKey> mPendingFg1s;
+    std::map<EReliveLevelIds, std::vector<std::unique_ptr<BinaryPath>>> mLoadedLevelPaths;
+    std::set<EReliveLevelIds> mPendingLevelPaths;
+    // Keyed by sound theme and file name
+    using SoundFileKey = std::pair<std::string, std::string>;
+    std::map<SoundFileKey, std::vector<u8>> mLoadedSoundFiles;
+    std::set<SoundFileKey> mPendingSoundFiles;
+    std::map<FontType, std::shared_ptr<PngData>> mLoadedFonts;
+    std::set<FontType> mPendingFonts;
+    std::condition_variable mResourceLoaded;
     u32 mDebugLoadDelayMs = 0;
 
     // FileSystem has no state, so sharing this reference across ThreadPool worker threads is safe.
@@ -400,6 +441,8 @@ private:
     bool mLoadingWaitRequested = false;
     bool mShowLoadingIconNow = false;
 
+    // LoadSoundThemeInfo is called by PendPaths' jobs on worker threads
+    std::mutex mSoundThemeInfoMutex;
     std::map<std::string, SoundThemeInfo> mSoundThemeInfoCache;
 };
 

@@ -208,8 +208,11 @@ void BaseMap::Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMod
     {
         if (loadMode == relive::Factory::LoadMode::ConstructObject_0)
         {
-            // Async camera load
-            pCamera->mCamRes = mResourceManager.LoadCam(pCamera->mLevel, pCamera->mPath, pCamera->mCameraNumber);
+            // Async camera and FG1 load, Finish_Load_Cam and Create_FG1s use them once the main
+            // loop has waited for them. A neighbouring camera's loads aren't waited for, they're
+            // used if the camera becomes the current one.
+            mResourceManager.PendCam(pCamera->mLevel, pCamera->mPath, pCamera->mCameraNumber);
+            mResourceManager.PendFg1(pCamera->mLevel, pCamera->mPath, pCamera->mCameraNumber);
 
             GetPath().Loader(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResourceFromList_1, ReliveTypes::eNone); // none = load all
         }
@@ -221,6 +224,24 @@ void BaseMap::Load_Path_Items(Camera* pCamera, relive::Factory::LoadMode loadMod
             GetPath().Loader(pCamera->mCamXOff, pCamera->mCamYOff, relive::Factory::LoadMode::LoadResource_2, ReliveTypes::eNone); // none = load all
         }
     }
+}
+
+void BaseMap::Finish_Load_Cam(Camera* pCamera)
+{
+    if (!pCamera || pCamera->mCamResLoaded)
+    {
+        return;
+    }
+
+    // Was Camera::On_Loaded
+    pCamera->mCamRes = mResourceManager.LoadCam(pCamera->mLevel, pCamera->mPath, pCamera->mCameraNumber);
+    pCamera->mCamResLoaded = true;
+}
+
+void BaseMap::Free_Resources_For_Camera(Camera* pCamera)
+{
+    mResourceManager.FreeCam(pCamera->mLevel, pCamera->mPath, pCamera->mCameraNumber);
+    mResourceManager.FreeFg1(pCamera->mLevel, pCamera->mPath, pCamera->mCameraNumber);
 }
 
 void BaseMap::GetCurrentCamCoords(PSX_Point* pPoint)

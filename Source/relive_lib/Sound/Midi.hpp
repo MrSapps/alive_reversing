@@ -53,6 +53,8 @@ void SND_Restart_SetCallBack(TSNDRestart cb);
 
 
 void SND_Load_Seqs_Impl(OpenSeqHandle* pSeqTable, PathSoundInfo& info, ResourceManagerWrapper& resMan, BaseMap& map);
+// Pends the sound files a new level's SND_Load_VABS and SND_Load_Seqs will load (both games)
+void SND_Pend_Sound_Files(const PathSoundInfo& info, ResourceManagerWrapper& resMan);
 
 void SND_Stop_All_Seqs();
 

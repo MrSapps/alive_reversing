@@ -135,6 +135,20 @@ ScreenChangeResult Map::GoTo_Camera()
         return ScreenChangeResult::eDone;
     }
 
+    if (mScreenChangeResume == ScreenChangeResume::eAfterPathsLoad)
+    {
+        LoadPathsAndPendSounds();
+        mScreenChangeResume = ScreenChangeResume::eAfterSoundsLoad;
+        return ScreenChangeResult::eWaiting;
+    }
+
+    if (mScreenChangeResume == ScreenChangeResume::eAfterSoundsLoad)
+    {
+        ContinueLoadCamera();
+        mScreenChangeResume = ScreenChangeResume::eAfterCameraLoad;
+        return ScreenChangeResult::eWaiting;
+    }
+
     if (mCameraSwapEffect == CameraSwapEffects::eUnknown_11)
     {
         if (mScreenChangeResume != ScreenChangeResume::eAfterFmvPass)
@@ -154,12 +168,18 @@ ScreenChangeResult Map::GoTo_Camera()
         mSoundChannelsMask = SND_MIDI(0, 0, 36, 70, 0, 0);
     }
 
-    StartLoadCamera();
+    if (StartLoadCamera() == ScreenChangeResult::eWaiting)
+    {
+        mScreenChangeResume = ScreenChangeResume::eAfterPathsLoad;
+        return ScreenChangeResult::eWaiting;
+    }
+
+    ContinueLoadCamera();
     mScreenChangeResume = ScreenChangeResume::eAfterCameraLoad;
     return ScreenChangeResult::eWaiting;
 }
 
-void Map::StartLoadCamera()
+ScreenChangeResult Map::StartLoadCamera()
 {
     if (mCurrentLevel != EReliveLevelIds::eMenu && mCurrentLevel != EReliveLevelIds::eNone)
     {
@@ -184,6 +204,7 @@ void Map::StartLoadCamera()
         {
             if (mCurrentCameras[i])
             {
+                Free_Resources_For_Camera(mCurrentCameras[i]);
                 relive_delete mCurrentCameras[i];
                 mCurrentCameras[i] = nullptr;
             }
@@ -207,9 +228,31 @@ void Map::StartLoadCamera()
         else
         {
             // Don't let the force flag make us reload paths for no reason
-            mLoadedPaths = mResourceManager.LoadPaths(mNextLevel);
-            mResourceManager.FlushMissingResourceReports();
+            mResourceManager.PendPaths(mNextLevel);
+            mResourceManager.RequestLoadingWait();
+            return ScreenChangeResult::eWaiting;
+        }
+    }
+    return ScreenChangeResult::eDone;
+}
 
+void Map::LoadPathsAndPendSounds()
+{
+    // Pended by StartLoadCamera
+    mLoadedPaths = mResourceManager.LoadPaths(mNextLevel);
+    mResourceManager.FlushMissingResourceReports();
+
+    SND_Pend_Sound_Files(*GetPathResourceBlockPtr(mNextPath)->GetSoundInfo(), mResourceManager);
+    mResourceManager.RequestLoadingWait();
+}
+
+void Map::ContinueLoadCamera()
+{
+    if (LevelChanged() || mForceLoad)
+    {
+        if (mNextLevel != mCurrentLevel)
+        {
+            // Sound files pended by LoadPathsAndPendSounds
             BinaryPath* pNextPath = GetPathResourceBlockPtr(mNextPath);
             SND_Load_VABS(pNextPath->GetSoundInfo(), Path_Get_Reverb(mNextLevel), mResourceManager, *this); // TODO: Remove hard coded data
             SND_Load_Seqs(gSeqData.mSeqs, pNextPath->GetSoundInfo(), mResourceManager, *this);
@@ -295,7 +338,7 @@ void Map::StartLoadCamera()
     {
         if (mPreviousCameras[i])
         {
-            //pResourceManager->Free_Resources_For_Camera_4656F0(mPreviousCameras[i]);
+            Free_Resources_For_Camera(mPreviousCameras[i]);
         }
     }
 
@@ -322,6 +365,8 @@ void Map::FinishLoadCamera()
 {
     const s16 prevPathId = mLoadCameraPrevPath;
     const EReliveLevelIds prevLevelId = mLoadCameraPrevLevel;
+
+    Finish_Load_Cam(mCurrentCameras[0]);
 
     Load_Path_Items(mCurrentCameras[3], relive::Factory::LoadMode::ConstructObject_0);
     Load_Path_Items(mCurrentCameras[4], relive::Factory::LoadMode::ConstructObject_0);

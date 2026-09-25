@@ -15,13 +15,12 @@ public:
     void CreateFG1(ResourceManagerWrapper& resMan, BaseMap& map);
 
 public:
-    static void On_Loaded(Camera* pCamera);
-
     CamResource mCamRes;
     s16 mCamXOff = 0;
     s16 mCamYOff = 0;
     s16 mPath = 0;
     EReliveLevelIds mLevel;
     u32 mCameraNumber = 0;
+    // mCamRes is loaded (see BaseMap::Finish_Load_Cam)
     bool mCamResLoaded = false;
 };
