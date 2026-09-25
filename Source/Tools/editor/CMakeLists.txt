@@ -13,6 +13,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # *_dynamic_crt libs - see the MSVC CRT comment in the top-level CMakeLists.txt.
 set(CMAKE_MSVC_RUNTIME_LIBRARY ${RELIVE_DYNAMIC_CRT})
 
+# Qt 5.15's QList uses stdext::checked_array_iterator, which current MSVC STLs deprecate (STL4043).
+if (MSVC)
+    add_compile_definitions(_SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING)
+endif()
+
 # QtCreator supports the following variables for Android, which are identical to qmake Android variables.
 # Check https://doc.qt.io/qt/deployment-android.html for more information.
 # They need to be set before the find_package( ...) calls below.

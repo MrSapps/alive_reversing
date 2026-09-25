@@ -829,6 +829,10 @@ target_include_directories(relive_lib_tests PRIVATE
 target_compile_definitions(relive_lib_tests PRIVATE "_CRT_SECURE_NO_WARNINGS" "JSON_DISABLE_ENUM_SERIALIZATION=1" "GLEW_NO_GLU" "GLEW_STATIC" "SPNG_STATIC")
 target_link_libraries(relive_lib_tests PRIVATE relive_lib googletest SDL3::SDL3)
 add_dependencies(relive_lib_tests UpdateConfigHeader)
+if (MSVC)
+    # Must match relive_lib's options because the tests reuse its precompiled header (C4652).
+    target_compile_options(relive_lib_tests PRIVATE /W4 /wd4996 /MP)
+endif()
 # relive_lib_tests REUSE_FROM relive_lib's own PCH is set up in the top-level CMakeLists.txt,
 # alongside relive_lib's own target_precompile_headers call it needs to come after.
 add_test(NAME relive_lib_tests COMMAND relive_lib_tests)
