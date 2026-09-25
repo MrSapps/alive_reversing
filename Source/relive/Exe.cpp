@@ -83,7 +83,7 @@ extern "C"
 
 #ifdef _WIN32
     // The map is created at runtime by the Engine, so its field pointers are filled in by
-    // SetMap() once it exists.
+    // PopulateAutoSplitterVars() once it exists.
     static AEGameInfo kAeInfo = {
         "{DBC2AE1C-A5DE-465F-A89A-C385BE1DEFCC}",
         // 2 byte padding (32bit)
@@ -121,27 +121,24 @@ extern "C"
     }
 #endif
 }
+} // namespace AutoSplitterData
 
-static void SetMap(BaseMap& map)
+static void PopulateAutoSplitterVars(GameType gameType, BaseMap& map)
 {
-#ifdef _WIN32
-    kAeInfo.levelId = &map.mCurrentLevel;
-    kAeInfo.pathId = &map.mCurrentPath;
-    kAeInfo.camId = &map.mCurrentCamera;
-    kAeInfo.fmvId = &map.mFmvPending;
+    AutoSplitterData::gameType = gameType;
 
-    kAoInfo.levelId = &map.mCurrentLevel;
-    kAoInfo.pathId = &map.mCurrentPath;
-    kAoInfo.camId = &map.mCurrentCamera;
+#ifdef _WIN32
+    AutoSplitterData::kAeInfo.levelId = &map.mCurrentLevel;
+    AutoSplitterData::kAeInfo.pathId = &map.mCurrentPath;
+    AutoSplitterData::kAeInfo.camId = &map.mCurrentCamera;
+    AutoSplitterData::kAeInfo.fmvId = &map.mFmvPending;
+
+    AutoSplitterData::kAoInfo.levelId = &map.mCurrentLevel;
+    AutoSplitterData::kAoInfo.pathId = &map.mCurrentPath;
+    AutoSplitterData::kAoInfo.camId = &map.mCurrentCamera;
 #else
     (void) map;
 #endif
-}
-} // namespace AutoSplitterData
-
-void PopulateAutoSplitterVars(GameType gameType)
-{
-    AutoSplitterData::gameType = gameType;
 }
 
 #ifndef _WIN32
@@ -345,10 +342,9 @@ s32 main(s32 argc, char_type** argv)
 
     pAutoPlayer = gameToRun == GameType::eAo ? &GetGameAutoPlayerAO() : &GetGameAutoPlayerAE();
 
-    PopulateAutoSplitterVars(gameToRun);
-
     Engine e(gameToRun, fs, clp);
-    e.SetMapCreatedCallback(AutoSplitterData::SetMap);
+    e.Init();
+    PopulateAutoSplitterVars(gameToRun, e.GetMap());
     e.Run();
 
     return 0;

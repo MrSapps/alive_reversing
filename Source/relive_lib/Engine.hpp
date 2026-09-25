@@ -24,14 +24,14 @@ class Engine final
 public:
     Engine(GameType gameType, FileSystem& fs, CommandLineParser& clp);
     ~Engine();
+    // Loads the active mod and creates the resource manager and map. Call before Run().
+    void Init();
     void Run();
     static void Init_GameStates();
 
-    // Called once Run() has created the map, e.g. so the auto splitter can point at its fields.
-    using TMapCreatedFn = void (*)(BaseMap& map);
-    void SetMapCreatedCallback(TMapCreatedFn fn)
+    BaseMap& GetMap()
     {
-        mMapCreatedFn = fn;
+        return *mMap;
     }
 private:
     void CmdLineRenderInit(const std::string& activeModName);
@@ -48,5 +48,5 @@ private:
     std::unique_ptr<ResourceManagerWrapper> mResMan;
     std::unique_ptr<BaseMap> mMap;
     relive::Factory mFactory;
-    TMapCreatedFn mMapCreatedFn = nullptr;
+    std::string mActiveModDisplayName;
 };
