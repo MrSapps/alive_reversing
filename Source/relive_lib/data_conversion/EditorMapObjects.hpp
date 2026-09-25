@@ -127,22 +127,22 @@ public:
 
     void SetXPos(s32 xpos)
     {
-        mBaseTlv->mTopLeftX = xpos;
+        mBaseTlv->mTopLeftX = static_cast<s16>(xpos);
     }
 
     void SetYPos(s32 ypos)
     {
-        mBaseTlv->mTopLeftY = ypos;
+        mBaseTlv->mTopLeftY = static_cast<s16>(ypos);
     }
 
     void SetWidth(s32 width)
     {
-        mBaseTlv->mBottomRightX = width;
+        mBaseTlv->mBottomRightX = static_cast<s16>(width);
     }
 
     void SetHeight(s32 height)
     {
-        mBaseTlv->mBottomRightY = height;
+        mBaseTlv->mBottomRightY = static_cast<s16>(height);
     }
 
     s32 XPos() const
