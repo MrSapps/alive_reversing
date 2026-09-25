@@ -123,6 +123,7 @@ jobs:
     - name: 'Linux-Flatpak: Install flatpak & flatpak-builder'
       if: matrix.name == 'Linux-Flatpak'
       run: |
+        sudo apt-get update
         sudo apt-get install -y flatpak flatpak-builder
         sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
         sudo flatpak install -y --noninteractive flathub org.kde.Platform//5.15-24.08 org.kde.Sdk//5.15-24.08
