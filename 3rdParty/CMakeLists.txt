@@ -1,5 +1,10 @@
 project(Deps VERSION 0.1 LANGUAGES C CXX)
 
+# Third-party code isn't ours to fix, so don't show its warnings. Applies to every target defined
+# in this directory and the ones added below it. MSVC doesn't report any for these libraries.
+if (NOT MSVC)
+    add_compile_options(-w)
+endif()
 
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 set(ENABLE_DOCS OFF)
