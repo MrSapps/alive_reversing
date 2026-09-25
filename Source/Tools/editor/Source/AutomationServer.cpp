@@ -8,6 +8,16 @@
 #include <QLoggingCategory>
 #include <QTimer>
 
+#ifdef _WIN32
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+    #include <windows.h>
+#endif
+
 // Traces each request through the server, so a test that times out shows how far it got.
 // Silence with QT_LOGGING_RULES="relive.automation=false".
 Q_LOGGING_CATEGORY(lcAutomation, "relive.automation")
@@ -20,7 +30,59 @@ AutomationServer::AutomationServer(QWidget* root, QObject* parent)
     connect(mServer, &QLocalServer::newConnection, this, &AutomationServer::OnNewConnection);
 }
 
-AutomationServer::~AutomationServer() = default;
+namespace {
+    // How long exit waits, per connected client, for it to read the responses still in flight.
+    constexpr int kFlushTimeoutMs = 2000;
+
+#ifdef _WIN32
+    DWORD WINAPI FlushPipeThread(LPVOID param)
+    {
+        const HANDLE pipe = static_cast<HANDLE>(param);
+        FlushFileBuffers(pipe);
+        CloseHandle(pipe);
+        return 0;
+    }
+#endif
+
+    // Makes sure the client can still read a response written just before the editor exits
+    // (e.g. the one to the click on Exit itself).
+    void FlushToClient(QLocalSocket* socket)
+    {
+        // Get whatever Qt still holds into the socket/pipe.
+        while (socket->bytesToWrite() > 0 && socket->waitForBytesWritten(kFlushTimeoutMs))
+        {
+        }
+
+#ifdef _WIN32
+        // Once written, that's enough on Unix: the kernel keeps the data after we close. But Qt
+        // destroys a Windows QLocalSocket with DisconnectNamedPipe, which throws away anything
+        // the client hasn't read yet. FlushFileBuffers blocks until it has. It runs on its own
+        // thread, on its own handle, so a client that never reads can only delay exit, not hang it.
+        HANDLE pipe = nullptr;
+        if (!DuplicateHandle(GetCurrentProcess(), reinterpret_cast<HANDLE>(socket->socketDescriptor()), GetCurrentProcess(), &pipe, 0, FALSE, DUPLICATE_SAME_ACCESS))
+        {
+            return;
+        }
+        const HANDLE thread = CreateThread(nullptr, 0, FlushPipeThread, pipe, 0, nullptr);
+        if (!thread)
+        {
+            CloseHandle(pipe);
+            return;
+        }
+        WaitForSingleObject(thread, kFlushTimeoutMs);
+        CloseHandle(thread);
+#endif
+    }
+}
+
+AutomationServer::~AutomationServer()
+{
+    // The sockets are (grand)children of this, so they're all still alive here.
+    for (auto it = mReaders.keyBegin(); it != mReaders.keyEnd(); ++it)
+    {
+        FlushToClient(*it);
+    }
+}
 
 bool AutomationServer::Listen(const QString& name)
 {
