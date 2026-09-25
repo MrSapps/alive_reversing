@@ -26,6 +26,13 @@ public:
     ~Engine();
     void Run();
     static void Init_GameStates();
+
+    // Called once Run() has created the map, e.g. so the auto splitter can point at its fields.
+    using TMapCreatedFn = void (*)(BaseMap& map);
+    void SetMapCreatedCallback(TMapCreatedFn fn)
+    {
+        mMapCreatedFn = fn;
+    }
 private:
     void CmdLineRenderInit(const std::string& activeModName);
 
@@ -41,4 +48,5 @@ private:
     std::unique_ptr<ResourceManagerWrapper> mResMan;
     std::unique_ptr<BaseMap> mMap;
     relive::Factory mFactory;
+    TMapCreatedFn mMapCreatedFn = nullptr;
 };
