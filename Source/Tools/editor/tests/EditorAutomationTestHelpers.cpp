@@ -52,9 +52,13 @@ namespace AutomationTest {
         }
 
         client.SetEditorProcess(&editor);
-        if (!client.ConnectWithRetry(outSocketName, 10000))
+        // Generous: the first launch on a fresh Windows CI runner has taken over 10 s to get
+        // as far as listening, while later launches take well under a second.
+        if (!client.ConnectWithRetry(outSocketName, 30000))
         {
-            ADD_FAILURE() << "failed to connect to automation socket";
+            ADD_FAILURE() << "failed to connect to automation socket ("
+                          << (editor.state() == QProcess::NotRunning ? "editor exited, exit code 0x" + QString::number(static_cast<quint32>(editor.exitCode()), 16).toStdString() : std::string("editor still running"))
+                          << ")";
             return false;
         }
 
