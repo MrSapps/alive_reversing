@@ -272,42 +272,31 @@ void SsSetMVol_4FC360(s16 left, s16 right)
     gSpuVars->sGlobalVolumeLevel_right() = right;
 }
 
-u32* SND_SoundsDat_Get_Sample_Offset_4FC3D0(VabHeader* pVabHeader, VabBodyRecord* pBodyRecords, s32 idx)
+static const VabBodyRecord* SND_SoundsDat_Get_Record_4FC3D0(VabHeader* pVabHeader, VabBodyRecord* pBodyRecords, s32 idx)
 {
     if (!pVabHeader || idx < 0)
     {
         return nullptr;
     }
-
-    VabBodyRecord* ret = pBodyRecords;
-    if (idx - 1 >= 0)
-    {
-        ret = &pBodyRecords[idx];
-    }
-
-    return &ret->field_8_fileOffset;
+    return &pBodyRecords[idx];
 }
 
-// TODO: Reverse/refactor properly
 s32 SND_SoundsDat_Get_Sample_Len_4FC400(VabHeader* pVabHeader, VabBodyRecord* pVabBody, s32 idx)
 {
-    s32 result; // eax
-
-    if (pVabHeader && idx >= 0)
+    const VabBodyRecord* pRecord = SND_SoundsDat_Get_Record_4FC3D0(pVabHeader, pVabBody, idx);
+    if (!pRecord)
     {
-        result = (s32)(8 * *(SND_SoundsDat_Get_Sample_Offset_4FC3D0(pVabHeader, pVabBody, idx) - 2)) / 16; // -2 = field_0_length_or_duration
+        return -1;
     }
-    else
-    {
-        result = -1;
-    }
-    return result;
+    // OG reads the field as a u32, so do the multiply unsigned too.
+    return static_cast<s32>(8 * static_cast<u32>(pRecord->field_0_length_or_duration)) / 16;
 }
 
 // TODO: Reverse/refactor properly
 s32 sub_4FC440(VabHeader* pVabHeader, VabBodyRecord* pVabBody, s32 idx)
 {
-    return *(SND_SoundsDat_Get_Sample_Offset_4FC3D0(pVabHeader, pVabBody, idx) - 1); // -1 = field_4_unused
+    const VabBodyRecord* pRecord = SND_SoundsDat_Get_Record_4FC3D0(pVabHeader, pVabBody, idx);
+    return pRecord ? pRecord->field_4_unused : 0;
 }
 
 // TODO: Reverse/refactor properly
@@ -318,7 +307,13 @@ bool sub_4FC470(VabHeader* pVabHeader, VabBodyRecord* pVabBody, s32 idx)
 
 s32 SND_SoundsDat_Read_4FC4E0(VabHeader* pVabHeader, VabBodyRecord* pVabBody, s32 idx, void* pBuffer)
 {
-    const s32 sampleOffset = *SND_SoundsDat_Get_Sample_Offset_4FC3D0(pVabHeader, pVabBody, idx); // = field_8_fileOffset
+    const VabBodyRecord* pRecord = SND_SoundsDat_Get_Record_4FC3D0(pVabHeader, pVabBody, idx);
+    if (!pRecord)
+    {
+        return 0;
+    }
+
+    const s32 sampleOffset = static_cast<s32>(pRecord->field_8_fileOffset);
     const s32 sampleLen = SND_SoundsDat_Get_Sample_Len_4FC400(pVabHeader, pVabBody, idx);
     if (sampleOffset == -1 || !gSpuVars->sSoundDatFileHandle().GetFile())
     {

@@ -89,9 +89,13 @@ std::string FileSystem::LoadToString(const char* path)
         ::fseek(pFile, 0, SEEK_END);
         const auto fsize = ftell(pFile);
         ::fseek(pFile, 0, SEEK_SET);
+        if (fsize < 0)
+        {
+            return {};
+        }
         std::string r;
         r.resize(fsize);
-        ::fread(r.data(), 1, fsize, pFile);
+        r.resize(::fread(r.data(), 1, fsize, pFile));
         return r;
     }
     return {};
@@ -127,8 +131,16 @@ bool FileSystem::LoadToVec(const char* path, std::vector<u8>& buffer)
         ::fseek(pFile, 0, SEEK_END);
         const auto fsize = ftell(pFile);
         ::fseek(pFile, 0, SEEK_SET);
+        if (fsize < 0)
+        {
+            return false;
+        }
         buffer.resize(fsize);
-        ::fread(buffer.data(), 1, fsize, pFile);
+        if (::fread(buffer.data(), 1, fsize, pFile) != static_cast<size_t>(fsize))
+        {
+            buffer.clear();
+            return false;
+        }
         return true;
     }
     return false;

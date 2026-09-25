@@ -105,6 +105,17 @@ void SetMidiApiVars(IMidiVars* pVars)
     spMidiVars = pVars;
 }
 
+// Sounds are only played after a path's sound block has been loaded.
+static s32 LastLoadedVabId()
+{
+    const auto pInfo = GetMidiVars()->sLastLoadedSoundBlockInfo().lock();
+    if (!pInfo)
+    {
+        ALIVE_FATAL("Tried to play a sound before any sound block was loaded");
+    }
+    return pInfo->mVabId;
+}
+
 void SND_Free_All_VABS_4C9EB0()
 {
     auto pIter = GetMidiVars()->sLastLoadedSoundBlockInfo().lock();
@@ -266,9 +277,8 @@ s32 SFX_SfxDefinition_Play_Mono(const relive::SfxDefinition& sfxDef, s32 volume,
     }
 
     // Note: Inlined in psx
-    auto ptr = GetMidiVars()->sLastLoadedSoundBlockInfo().lock();
     auto midiHandle = MIDI_Play_Single_Note_4CA1B0(
-        sfxDef.mProgram | (ptr->mVabId << 8),
+        sfxDef.mProgram | (LastLoadedVabId() << 8),
         sfxDef.mNote << 8,
         volume,
         volume);
@@ -398,7 +408,7 @@ s32 SFX_SfxDefinition_Play_Stereo(const relive::SfxDefinition& sfxDef, s16 volLe
 
     // Note: Inlined in psx
     auto midiHandle = MIDI_Play_Single_Note_4CA1B0(
-        sfxDef.mProgram | (GetMidiVars()->sLastLoadedSoundBlockInfo().lock()->mVabId << 8),
+        sfxDef.mProgram | (LastLoadedVabId() << 8),
         sfxDef.mNote << 8,
         volLeft,
         volRight);
@@ -486,8 +496,7 @@ s16 SND_SEQ_PlaySeq(u16 idx, s16 repeatCount, s16 bDontStop)
             }
         }
 
-        const s32 vabId = GetMidiVars()->sLastLoadedSoundBlockInfo().lock()->mVabId;
-        rec.field_A_id_seqOpenId = SsSeqOpen_4FD6D0(rec.field_C_ppSeq_Data.data(), static_cast<s16>(vabId));
+        rec.field_A_id_seqOpenId = SsSeqOpen_4FD6D0(rec.field_C_ppSeq_Data.data(), static_cast<s16>(LastLoadedVabId()));
 
         GetMidiVars()->sSeq_Ids_word().ids[rec.field_A_id_seqOpenId] = idx;
         GetMidiVars()->sSeqsPlaying_count_word()++;
@@ -554,9 +563,7 @@ s16 SND_SEQ_Play(u16 idx, s16 repeatCount, s16 volLeft, s16 volRight)
         }
 
         // Open the SEQ
-        auto ptr = GetMidiVars()->sLastLoadedSoundBlockInfo().lock();
-        const s16 vabId = static_cast<s16>(ptr->mVabId);
-        rec.field_A_id_seqOpenId = SsSeqOpen_4FD6D0(rec.field_C_ppSeq_Data.data(), vabId);
+        rec.field_A_id_seqOpenId = SsSeqOpen_4FD6D0(rec.field_C_ppSeq_Data.data(), static_cast<s16>(LastLoadedVabId()));
 
         // Index into the IDS via the seq ID and map it to the index
         GetMidiVars()->sSeq_Ids_word().ids[rec.field_A_id_seqOpenId] = idx;
