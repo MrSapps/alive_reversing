@@ -17,7 +17,8 @@ env:
   CONFIGURATION: Debug
   # Some 3rdParty submodules still declare cmake_minimum_required < 3.10, which CMake 4 rejects
   # (< 3.5) or warns about. As an env var it also reaches the `cmake -P` scripts aom runs itself,
-  # at configure and build time.
+  # at configure and build time. The Windows image's CMake 3.31 predates it, so the Windows
+  # configure uses -Wno-deprecated instead.
   CMAKE_POLICY_VERSION_MINIMUM: '3.10'
 
 jobs:
@@ -86,7 +87,7 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake .. -G"Visual Studio 17 2022" -DSDL3_DIR="$env:GITHUB_WORKSPACE\SDL3-3.4.14\cmake" -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" -A ${{ matrix.cmake_arch }} -DCI_PROVIDER="GitHub" -DBUILD_NUMBER="$env:GITHUB_RUN_NUMBER"
+        cmake .. -G"Visual Studio 17 2022" -DSDL3_DIR="$env:GITHUB_WORKSPACE\SDL3-3.4.14\cmake" -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" -A ${{ matrix.cmake_arch }} -DCI_PROVIDER="GitHub" -DBUILD_NUMBER="$env:GITHUB_RUN_NUMBER" -Wno-deprecated
         cmake --build . --config $env:CONFIGURATION
         cpack -G ZIP -C $env:CONFIGURATION
 
