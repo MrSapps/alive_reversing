@@ -25,7 +25,7 @@ cmake --build build -j5 --target relive_lib_tests # unit tests
 ```
 
 - Build with `-j5`. Higher parallelism runs out of memory.
-- On Linux, ASan and UBSan are always on (see top-level `CMakeLists.txt`). An ASan
+- On Linux, Debug builds have ASan and UBSan on (see top-level `CMakeLists.txt`). An ASan
   leak report when the game quits is expected and does not mean the change is broken.
 - Flatpak builds: `flatpak-builder` ignores the job-count env var. Pass `--jobs=5`
   and run it under a `systemd-run` memory cap to avoid OOM.
