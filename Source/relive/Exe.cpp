@@ -27,6 +27,7 @@
 #include "../relive_lib/GameType.hpp"
 
 #include "../relive_lib/CommandLineParser.hpp"
+#include "../relive_lib/CommandLineOptions.hpp"
 
 #include <SDL3/SDL_main.h>
 
@@ -283,10 +284,15 @@ static void __attribute__((constructor)) FixCWD()
 
 s32 main(s32 argc, char_type** argv)
 {
-    std::string args;
-    for (s32 i = 0; i < argc; i++)
+    const CommandLineOptions options = CommandLineOptions::Parse(CommandLineParser(argc, argv));
+    if (options.mShowHelp)
     {
-        args += argv[i] + std::string(" ");
+        printf("%s", CommandLineOptions::Usage());
+#if _WIN32
+        // A Windows GUI app's console closes as soon as it exits
+        Sys_MessageBox(nullptr, CommandLineOptions::Usage(), "R.E.L.I.V.E. command line options");
+#endif
+        return 0;
     }
 
   Install_Crash_Handler();
@@ -302,12 +308,9 @@ s32 main(s32 argc, char_type** argv)
 
     SDL2_Init();
 
-    CommandLineParser clp(args.c_str());
-
     FileSystem fs;
 
-    // Default to AE but allow switching to AO with a command line, if AO is anywhere in the command line then assume we want to run AO
-    GameType gameToRun = clp.SwitchExists("AO") ? GameType::eAo : GameType::eAe;
+    GameType gameToRun = options.mGame.value_or(GameType::eAe);
 
 #ifdef __APPLE__
     FixCWD();
@@ -342,7 +345,7 @@ s32 main(s32 argc, char_type** argv)
 
     pAutoPlayer = gameToRun == GameType::eAo ? &GetGameAutoPlayerAO() : &GetGameAutoPlayerAE();
 
-    Engine e(gameToRun, fs, clp);
+    Engine e(gameToRun, fs, options);
     e.Init();
     PopulateAutoSplitterVars(gameToRun, e.GetMap());
     e.Run();

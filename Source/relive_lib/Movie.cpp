@@ -10,7 +10,6 @@
 #include "Sound/Midi.hpp"
 #include "Sys.hpp"
 #include "Sound/Sound.hpp"
-#include "../AliveLibAE/VGA.hpp"
 #include "../AliveLibAE/GameAutoPlayer.hpp"
 #include "Engine.hpp"
 #include "GameObjects/ScreenManager.hpp"
@@ -959,7 +958,8 @@ namespace
 static void Render_DDV_Frame(Poly_FT4* poly)
 {
     IRenderer::GetRenderer()->Draw(*poly);
-    VGA_EndFrame();
+    IRenderer::GetRenderer()->Clear(0, 0, 0);
+    IRenderer::GetRenderer()->EndFrame();
     IRenderer::GetRenderer()->StartFrame();
 }
 

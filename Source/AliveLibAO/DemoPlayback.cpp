@@ -38,10 +38,9 @@ DemoPlayback::DemoPlayback(ResourceManagerWrapper& resMan, BaseMap& map)
 
     //auto pd = reinterpret_cast<PlaybackData*>(*ppPlaybackData);
 
-    FileSystem fs;
     char_type fileName[32];
     sprintf(fileName, "ATTR%04d.SAV.json", gJoyResId);
-    auto jsonStr = fs.LoadToString(fileName);
+    auto jsonStr = GetResMan().LoadDemoFile(fileName);
 
     nlohmann::json j = nlohmann::json::parse(jsonStr);
     from_json(j, *mSaveData);
@@ -79,7 +78,7 @@ void DemoPlayback::VUpdate()
 
             char_type fileName[32];
             sprintf(fileName, "PLAYBK%02d.JOY", gJoyResId);
-            Input().InitDemo(fileName);
+            Input().InitDemo(GetResMan().LoadDemoFile(fileName));
 
             SetDrawable(true);
             mState = States::ePlaying_1;

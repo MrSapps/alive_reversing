@@ -8,50 +8,14 @@
 #include "data_conversion/file_system.hpp"
 #include "Mods.hpp"
 
+#include "ScratchDir.hpp"
+
 #include <gtest/gtest.h>
 #include <filesystem>
 #include <fstream>
 #include <algorithm>
 
-namespace
-{
-    namespace fs = std::filesystem;
-
-    // A fresh, uniquely-named scratch directory per test, cleaned up on destruction - avoids
-    // tests stepping on each other's files if run in parallel, and avoids leaving junk behind
-    // in the system temp dir across runs.
-    class ScratchDir final
-    {
-    public:
-        ScratchDir()
-            : mPath(fs::temp_directory_path() / fs::path("relive_filesystem_tests_" + std::to_string(reinterpret_cast<uintptr_t>(this))))
-        {
-            fs::remove_all(mPath);
-            fs::create_directories(mPath);
-        }
-
-        ~ScratchDir()
-        {
-            fs::remove_all(mPath);
-        }
-
-        ScratchDir(const ScratchDir&) = delete;
-        ScratchDir& operator=(const ScratchDir&) = delete;
-
-        std::string Path() const
-        {
-            return mPath.string();
-        }
-
-        std::string SubPath(const std::string& relative) const
-        {
-            return (mPath / relative).string();
-        }
-
-    private:
-        fs::path mPath;
-    };
-}
+namespace fs = std::filesystem;
 
 TEST(FileSystem, SaveThenLoadToStringRoundTrips)
 {

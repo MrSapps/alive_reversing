@@ -8,7 +8,8 @@
 #include "../relive_lib/Events.hpp"
 #include "PsxRender.hpp"
 #include "GameAutoPlayer.hpp"
-#include "../relive_lib/data_conversion/string_util.hpp"
+#include "../relive_lib/IniFile.hpp"
+#include "../relive_lib/ResourceManagerWrapper.hpp"
 #include <sstream>
 #include <algorithm>
 #include <SDL3/SDL_gamepad.h>
@@ -629,29 +630,6 @@ void Input_SetGamePadBinding_4931D0(const char_type* pButtonName, s32 inputComma
     }
 }
 
-std::vector<std::string> Ini_SplitParams(std::string line)
-{
-    auto paramSplit = string_util::SplitString(line, '=');
-    for (u32 i = 0; i < paramSplit.size(); i++)
-    {
-        if (paramSplit[i].size() == 0)
-        {
-            continue;
-        }
-
-        while (paramSplit[i].size() && paramSplit[i][0] == ' ')
-        {
-            paramSplit[i] = paramSplit[i].substr(1, paramSplit[i].size() - 1);
-        }
-        while (paramSplit[i].size() && (paramSplit[i][paramSplit[i].size() - 1] == ' ' || paramSplit[i][paramSplit[i].size() - 1] == '\r'))
-        {
-            paramSplit[i] = paramSplit[i].substr(0, paramSplit[i].size() - 1);
-        }
-    }
-
-    return paramSplit;
-}
-
 union intOrBoolPointer
 {
     intOrBoolPointer(bool* pBool)
@@ -672,29 +650,15 @@ struct IniCustomSaveEntry final
     bool isBool;
 };
 
-bool canOverwriteIni = true;
 bool gLatencyHack = true;
 
 const std::vector<IniCustomSaveEntry> gCustomSaveEntries = {
-//    {"keep_aspect", {&s_VGA_KeepAspectRatio}, true},
-//    {"filter_screen", {&s_VGA_FilterScreen}, true},
 #if USE_SDL2_SOUND
     {"reverb", {&gReverbEnabled}, true},
     {"audio_stereo", {&gAudioStereo}, true},
 #endif
-    {"overwrite_ini_by_game", {&canOverwriteIni}, true},
     {"latency_hack", {&gLatencyHack}, true},
 };
-
-enum class IniCategory
-{
-    eNone = -1,
-    eControl,
-    eKeyboard,
-    eGamepad,
-    eAlive
-};
-
 
 const char_type* iniCategories[4] = {
     "Control",
@@ -704,122 +668,90 @@ const char_type* iniCategories[4] = {
 
 
 
-void NewParseSettingsIni()
+// Resets the bindings a [Keyboard] (gamepad = 0) or [Gamepad] (gamepad = 1) section can rebind,
+// so commands it leaves out don't keep a default binding on top of the ini's.
+static void ResetIniBindings(s32 gamepad)
 {
-    FileSystem fs;
-    auto abeBuffer = fs.LoadToVec("abe2.ini");
+    Input_ResetBinding_4925A0(InputCommands::eRun, gamepad);
+    Input_ResetBinding_4925A0(InputCommands::eSneak, gamepad);
+    Input_ResetBinding_4925A0(InputCommands::eHop, gamepad);
+    Input_ResetBinding_4925A0(InputCommands::eDoAction, gamepad);
+    Input_ResetBinding_4925A0(InputCommands::eThrowItem, gamepad);
+    Input_ResetBinding_4925A0(InputCommands::eFartOrRoll, gamepad);
+    if (gamepad)
+    {
+        Input_ResetBinding_4925A0(InputCommands::eLeftGameSpeak, gamepad);
+        Input_ResetBinding_4925A0(InputCommands::eRightGameSpeak, gamepad);
+    }
+}
+
+static void NewParseSettingsIni(ResourceManagerWrapper& resMan)
+{
+    const std::string iniText = resMan.LoadSettingsIniText();
+    std::vector<u8> iniBuffer(iniText.begin(), iniText.end());
 
     // Save the ini data to the recording or overwrite the data we read from
     // disk with the previously saved ini file data buffer that is in the recording
     // that we are playing back.
     // This prevents rebound keys/game pad input buttons etc from de-syncing the game
     // by changing the LED text size thus changing the number of rng calls and other annoyances.
-    abeBuffer = GetGameAutoPlayer().RestoreFileBuffer(abeBuffer);
+    // Older recordings hold abe2.ini's text, which is in the same format.
+    iniBuffer = GetGameAutoPlayer().RestoreFileBuffer(iniBuffer);
 
-    const std::string abeConfig(reinterpret_cast<const char_type*>(abeBuffer.data()), abeBuffer.size());
-    std::vector<std::string> configSplit = string_util::SplitString(abeConfig, '\n');
+    const IniFile ini = IniFile::Parse(std::string(iniBuffer.begin(), iniBuffer.end()));
 
-    IniCategory currentCategory = IniCategory::eNone;
-
-    for (std::string& o : configSplit)
+    // Sections are applied in file order, like the original parser. Others, e.g. [Display], are
+    // someone else's.
+    for (const IniFile::Section& section : ini.Sections())
     {
-        if (o.size() == 0) // Skip empty strings
+        LOG_INFO("Ini category: %s", section.mName.c_str());
+        if (section.mName == iniCategories[0]) // Control
         {
-            continue;
-        }
-
-        if (o[0] == '[') // Category start
-        {
-            if (o[o.size() - 1] == '\r')
+            for (const IniFile::Entry& entry : section.mEntries)
             {
-                o = o.substr(0, o.size() - 1);
-            }
-
-            std::string category = o.substr(1, o.size() - 2);
-
-            LOG_INFO("Ini category: %s", category.c_str());
-            if (category == iniCategories[1])
-            {
-                currentCategory = IniCategory::eKeyboard;
-                Input_ResetBinding_4925A0(InputCommands::eRun, 0);
-                Input_ResetBinding_4925A0(InputCommands::eSneak, 0);
-                Input_ResetBinding_4925A0(InputCommands::eHop, 0);
-                Input_ResetBinding_4925A0(InputCommands::eDoAction, 0);
-                Input_ResetBinding_4925A0(InputCommands::eThrowItem, 0);
-                Input_ResetBinding_4925A0(InputCommands::eFartOrRoll, 0);
-            }
-            else if (category == iniCategories[2])
-            {
-                currentCategory = IniCategory::eGamepad;
-                Input_ResetBinding_4925A0(InputCommands::eRun, 1);
-                Input_ResetBinding_4925A0(InputCommands::eSneak, 1);
-                Input_ResetBinding_4925A0(InputCommands::eHop, 1);
-                Input_ResetBinding_4925A0(InputCommands::eDoAction, 1);
-                Input_ResetBinding_4925A0(InputCommands::eThrowItem, 1);
-                Input_ResetBinding_4925A0(InputCommands::eFartOrRoll, 1);
-                Input_ResetBinding_4925A0(InputCommands::eLeftGameSpeak, 1);
-                Input_ResetBinding_4925A0(InputCommands::eRightGameSpeak, 1);
-            }
-            else if (category == iniCategories[3])
-            {
-                currentCategory = IniCategory::eAlive;
-            }
-            else if (category == iniCategories[0])
-            {
-                currentCategory = IniCategory::eControl;
-            }
-            else
-            {
-                LOG_ERROR("Wrong INI category name! %s", category.c_str());
-                currentCategory = IniCategory::eNone;
+                if (entry.mKey == "controller" && entry.mValue == "Gamepad")
+                {
+                    sJoystickEnabled = true;
+                }
+                else if (entry.mKey == "controller" && entry.mValue == "Keyboard")
+                {
+                    sJoystickEnabled = false;
+                }
             }
         }
-        else
+        else if (section.mName == iniCategories[1]) // Keyboard
         {
-            std::vector<std::string> param = Ini_SplitParams(o);
-
-            if (param.size() == 2)
+            ResetIniBindings(0);
+            for (const IniFile::Entry& entry : section.mEntries)
             {
-                LOG_INFO("Value: %s = %s", param[0].c_str(), param[1].c_str());
-
-                if (currentCategory == IniCategory::eControl)
+                Input_SetKeyboardBinding_493180(entry.mValue.c_str(), Input_LoadSettingsIni_GetInputCommand_492B80(entry.mKey.c_str()));
+            }
+        }
+        else if (section.mName == iniCategories[2]) // Gamepad
+        {
+            ResetIniBindings(1);
+            for (const IniFile::Entry& entry : section.mEntries)
+            {
+                Input_SetGamePadBinding_4931D0(entry.mValue.c_str(), Input_LoadSettingsIni_GetInputCommand_492B80(entry.mKey.c_str()));
+            }
+        }
+        else if (section.mName == iniCategories[3]) // Alive
+        {
+            for (const IniFile::Entry& entry : section.mEntries)
+            {
+                for (const IniCustomSaveEntry& s : gCustomSaveEntries)
                 {
-                    if (param[0] == "controller" && param[1] == "Gamepad")
+                    if (entry.mKey == s.name)
                     {
-                        sJoystickEnabled = true;
-                    }
-                    else if (param[0] == "controller" && param[1] == "Keyboard")
-                    {
-                        sJoystickEnabled = false;
-                    }
-                }
-                else if (currentCategory == IniCategory::eKeyboard)
-                {
-                    InputCommands kbInputCommand = Input_LoadSettingsIni_GetInputCommand_492B80(param[0].c_str());
-                    Input_SetKeyboardBinding_493180(param[1].c_str(), kbInputCommand);
-                }
-                else if (currentCategory == IniCategory::eGamepad)
-                {
-                    InputCommands gamepadInputCommand = Input_LoadSettingsIni_GetInputCommand_492B80(param[0].c_str());
-                    Input_SetGamePadBinding_4931D0(param[1].c_str(), gamepadInputCommand);
-                }
-                else if (currentCategory == IniCategory::eAlive)
-                {
-                    for (const IniCustomSaveEntry& s : gCustomSaveEntries)
-                    {
-                        if (param[0] == s.name)
+                        if (s.isBool)
                         {
-                            if (s.isBool)
-                            {
-                                *s.data.boolVal = param[1] == "true";
-                            }
-                            else // s32
-                            {
-                                *s.data.intVal = atoi(param[1].c_str());
-                            }
-
-                            break;
+                            *s.data.boolVal = entry.mValue == "true";
                         }
+                        else // s32
+                        {
+                            *s.data.intVal = atoi(entry.mValue.c_str());
+                        }
+                        break;
                     }
                 }
             }
@@ -827,169 +759,79 @@ void NewParseSettingsIni()
     }
 }
 
-void Input_SaveSettingsIni_Common()
+// Adds "name = <binding>" for the command's keyboard (gamepad = 0) or gamepad (1) binding.
+static void AddBinding(IniFile::Section& section, const char_type* name, const char_type* command, s32 gamepad)
 {
-    if (!canOverwriteIni)
+    if (const char_type* btnString = Input_GetButtonString_492530(command, gamepad))
     {
-        return;
+        section.mEntries.push_back({name, btnString});
     }
+}
 
+void Input_SaveSettingsIni_Common(ResourceManagerWrapper& resMan)
+{
     s32 prevJoyState = sJoystickEnabled;
 
-    std::stringstream output;
+    // Only the input sections are replaced; the rest of the file (e.g. [Display]) is kept.
+    IniFile ini = resMan.LoadSettingsIni();
 
     // Control remap
-    output << "[" << iniCategories[0] << "]"
-           << "\n";
-
-    if (sJoystickEnabled)
-    {
-        output << "controller = Gamepad\n";
-    }
-    else
-    {
-        output << "controller = Keyboard\n";
-    }
-
-    output << "\n";
+    IniFile::Section control{iniCategories[0], {}};
+    control.mEntries.push_back({"controller", sJoystickEnabled ? "Gamepad" : "Keyboard"});
+    ini.ReplaceSection(std::move(control));
 
     sJoystickEnabled = false;
 
     // Keyboard remap
-    output << "[" << iniCategories[1] << "]"
-           << "\n";
-
-    const char_type* btnString = nullptr;
-
-    btnString = Input_GetButtonString_492530(kRun, 0);
-    if (btnString)
-    {
-        output << "run = " << btnString << "\n";
-    }
-    btnString = Input_GetButtonString_492530(kSneak, 0);
-    if (btnString)
-    {
-        output << "sneak = " << btnString << "\n";
-    }
-    btnString = Input_GetButtonString_492530(kJump, 0);
-    if (btnString)
-    {
-        output << "jump = " << btnString << "\n";
-    }
-    btnString = Input_GetButtonString_492530(kAction, 0);
-    if (btnString)
-    {
-        output << "action = " << btnString << "\n";
-    }
-    btnString = Input_GetButtonString_492530(kThrow, 0);
-    if (btnString)
-    {
-        output << "throw = " << btnString << "\n";
-    }
-    btnString = Input_GetButtonString_492530(kFart, 0);
-    if (btnString)
-    {
-        output << "fart = " << btnString << "\n";
-    }
+    IniFile::Section keyboard{iniCategories[1], {}};
+    AddBinding(keyboard, "run", kRun, 0);
+    AddBinding(keyboard, "sneak", kSneak, 0);
+    AddBinding(keyboard, "jump", kJump, 0);
+    AddBinding(keyboard, "action", kAction, 0);
+    AddBinding(keyboard, "throw", kThrow, 0);
+    AddBinding(keyboard, "fart", kFart, 0);
+    ini.ReplaceSection(std::move(keyboard));
 
     sJoystickEnabled = true;
 
-    output << "\n";
-
     // Gamepad remap
-    output << "[" << iniCategories[2] << "]"
-           << "\n";
-    output << "buttons = " << sJoystickNumButtons_5C2EFC << "\n";
-
-    btnString = Input_GetButtonString_492530(kRun, 1);
-    if (btnString)
-    {
-        output << "run = " << btnString << "\n";
-    }
-
-    btnString = Input_GetButtonString_492530(kSneak, 1);
-    if (btnString)
-    {
-        output << "sneak = " << btnString << "\n";
-    }
-
-    btnString = Input_GetButtonString_492530(kJump, 1);
-    if (btnString)
-    {
-        output << "jump = " << btnString << "\n";
-    }
-
-    btnString = Input_GetButtonString_492530(kAction, 1);
-    if (btnString)
-    {
-        output << "action = " << btnString << "\n";
-    }
-
-    btnString = Input_GetButtonString_492530(kThrow, 1);
-    if (btnString)
-    {
-        output << "throw = " << btnString << "\n";
-    }
-
-    btnString = Input_GetButtonString_492530(kFart, 1);
-    if (btnString)
-    {
-        output << "fart = " << btnString << "\n";
-    }
-
-    btnString = Input_GetButtonString_492530(kSpeak1, 1);
-    if (btnString)
-    {
-        output << "speak1 = " << btnString << "\n";
-    }
-
-    btnString = Input_GetButtonString_492530(kSpeak2, 1);
-    if (btnString)
-    {
-        output << "speak2 = " << btnString << "\n";
-    }
+    IniFile::Section gamepad{iniCategories[2], {}};
+    gamepad.mEntries.push_back({"buttons", std::to_string(sJoystickNumButtons_5C2EFC)});
+    AddBinding(gamepad, "run", kRun, 1);
+    AddBinding(gamepad, "sneak", kSneak, 1);
+    AddBinding(gamepad, "jump", kJump, 1);
+    AddBinding(gamepad, "action", kAction, 1);
+    AddBinding(gamepad, "throw", kThrow, 1);
+    AddBinding(gamepad, "fart", kFart, 1);
+    AddBinding(gamepad, "speak1", kSpeak1, 1);
+    AddBinding(gamepad, "speak2", kSpeak2, 1);
+    ini.ReplaceSection(std::move(gamepad));
 
     sJoystickEnabled = prevJoyState;
 
-    output << "\n";
-
-    // New Renderer Options
-    output << "[" << iniCategories[3] << "]"
-           << "\n";
-
+    IniFile::Section alive{iniCategories[3], {}};
     for (const auto& s : gCustomSaveEntries)
     {
-        if (s.isBool)
-        {
-            output << s.name << " = " << (*s.data.boolVal ? "true" : "false") << "\n";
-        }
-        else
-        {
-            output << s.name << " = " << *s.data.intVal << "\n";
-        }
+        alive.mEntries.push_back({s.name, s.isBool ? (*s.data.boolVal ? "true" : "false") : std::to_string(*s.data.intVal)});
     }
+    ini.ReplaceSection(std::move(alive));
 
-    FileSystem fs;
-    FileSystem::Path iniPath;
-    iniPath.Append("abe2.ini");
-    const auto iniDataStr = output.str();
-    std::vector<u8> buf(iniDataStr.begin(), iniDataStr.end());
-    if (!fs.Save(iniPath, buf))
+    if (!resMan.SaveSettingsIni(ini))
     {
-        ALIVE_FATAL("Saving abe2.ini failed");
+        ALIVE_FATAL("Saving relive.ini failed");
     }
 
     Input_Init_Names_491870();
 }
 
-void Input_SaveSettingsIni_492840()
+void Input_SaveSettingsIni_492840(ResourceManagerWrapper& resMan)
 {
-    Input_SaveSettingsIni_Common();
+    Input_SaveSettingsIni_Common(resMan);
 }
 
-void Input_LoadSettingsIni_492D40()
+static void Input_LoadSettingsIni_492D40(ResourceManagerWrapper& resMan)
 {
-    NewParseSettingsIni();
+    NewParseSettingsIni(resMan);
 }
 
 u32 dword_55EBF8 = 0;
@@ -1383,7 +1225,7 @@ void Input_InitJoyStick_460080()
     SDL_free(joysticks);
 }
 
-void Input_Init()
+void Input_Init(ResourceManagerWrapper& resMan)
 {
     // This seems so stupid
     strncpy(sGamePadStr_555708, sGamePadStr_55E85C, 32u);
@@ -1524,7 +1366,7 @@ void Input_Init()
     }
 
     memcpy(sGamePadBindings_5C98E0, sDefaultGamepadBindings_55EA2C, ALIVE_ARY_SIZEOF(sDefaultGamepadBindings_55EA2C));
-    Input_LoadSettingsIni_492D40();
+    Input_LoadSettingsIni_492D40(resMan);
     Input_Init_Names_491870();
     Input_SetCallback_4FA910(Input_Convert_KeyboardGamePadInput_To_Internal_Format_492150);
 }
@@ -1634,14 +1476,11 @@ void InputObject::UnsetDemoPlaying()
     mbDemoPlaying = false;
 }
 
-void InputObject::InitDemo(const char_type* pDemoFileName)
+void InputObject::InitDemo(const std::string& demoJson)
 {
     mDemoCommandIndex = 0;
-    
-    FileSystem fs;
-    auto file = fs.LoadToString(pDemoFileName);
 
-    sDemoData = nlohmann::json::parse(file);
+    sDemoData = nlohmann::json::parse(demoJson);
     
     mbDemoPlaying = true;
     mCommandDuration = 0;

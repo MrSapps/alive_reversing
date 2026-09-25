@@ -2,6 +2,8 @@
 
 #include "../relive_lib/Function.hpp"
 
+class ResourceManagerWrapper;
+
 class BaseGameAutoPlayer;
 
 namespace AO {
@@ -103,7 +105,7 @@ void Input_GetCurrentKeyStates();
 
 s8 Input_IsVKPressed(s32 key);
 
-void Input_Init();
+void Input_Init(ResourceManagerWrapper& resMan);
 
 void Input_DisableInput();
 
@@ -112,7 +114,7 @@ const char_type* Input_GetButtonString_44F1C0(InputCommands inputCommand);
 
 s32 Input_Remap(InputCommands inputCmd);
 
-s32 Input_SaveSettingsIni();
+s32 Input_SaveSettingsIni(ResourceManagerWrapper& resMan);
 
 s8 Input_GetLastPressedKey();
 
@@ -132,7 +134,8 @@ public:
 
     static void Shutdown();
 
-    void InitDemo(const char_type* pDemoFileName);
+    // demoJson is the demo input file (PLAYBK*.JOY.json), see ResourceManagerWrapper::LoadDemoFile
+    void InitDemo(const std::string& demoJson);
 
     s32 IsDemoPlaying();
 

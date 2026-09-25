@@ -41,7 +41,7 @@
 EditorMainWindow::EditorMainWindow(QWidget* aParent)
     : QMainWindow(aParent),
     m_ui(new Ui::EditorMainWindow),
-    m_Settings("Editor.ini", QSettings::IniFormat),
+    m_Settings("relive-editor.ini", QSettings::IniFormat),
     mUnthemedStyle(QApplication::style()->objectName())
 {
     //auto p = new AudioOutputPrimer();

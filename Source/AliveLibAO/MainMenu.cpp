@@ -2583,7 +2583,7 @@ void Menu::Goto_ConfigureController_OrSave_SettingIni_Update()
             // Back to main options (sound/controller)
             case 1:
             {
-                Input_SaveSettingsIni();
+                Input_SaveSettingsIni(mResMan);
                 mFnUpdate = &Menu::To_Options_Update;
                 mFnRender = &Menu::Options_Render;
                 mSelectedButtonIndex.options_menu = OptionsMenuOptions::eController_0;
@@ -3020,7 +3020,7 @@ void Menu::To_ShowAbeMotions_SaveSettings_Update()
     if (gNumCamSwappers <= 0)
     {
         mButtonAnim.Set_Animation_Data(GetAnimRes(AnimId::MenuHighlight_Circle));
-        Input_SaveSettingsIni();
+        Input_SaveSettingsIni(mResMan);
         field_204_flags &= ~2u;
         mFnUpdate = &Menu::To_ToggleMotions_Update;
         mFnRender = &Menu::ToggleMotions_Render;

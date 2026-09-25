@@ -106,19 +106,19 @@ public:
 
     }
 
-    void ToggleFilterScreen()
+    void SetFilterScreen(bool filterScreen)
     {
-        mFramebufferFilter = !mFramebufferFilter;
+        mFramebufferFilter = filterScreen;
     }
 
-    void ToggleKeepAspectRatio()
+    void SetKeepAspectRatio(bool keepAspectRatio)
     {
-        mKeepAspectRatio = !mKeepAspectRatio;
+        mKeepAspectRatio = keepAspectRatio;
     }
 
-    void ToggleUseOriginalResolution()
+    void SetUseOriginalResolution(bool useOriginalResolution)
     {
-        mUseOriginalResolution = !mUseOriginalResolution;
+        mUseOriginalResolution = useOriginalResolution;
     }
 
     virtual void Clear(u8 r, u8 g, u8 b) = 0;

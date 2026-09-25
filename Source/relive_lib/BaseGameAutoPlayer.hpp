@@ -4,7 +4,7 @@
 #include "Types.hpp"
 #include "data_conversion/file_system.hpp"
 
-class CommandLineParser;
+struct CommandLineOptions;
 
 enum RecordTypes : u32
 {
@@ -124,7 +124,7 @@ protected:
     virtual u32 ReadInput(u32 padIdx) = 0;
 
 public:
-    void ProcessCommandLine(FileSystem& fs, CommandLineParser& clp);
+    void ProcessCommandLine(FileSystem& fs, const CommandLineOptions& options);
 
     RecordTypes PeekNextType();
 

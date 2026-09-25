@@ -10,9 +10,67 @@ For more details, please check the project's website: https://aliveteam.github.i
 | :-: | :--: |
 | F5 | Quiksave |
 | F6 | Quikload |
+| F9 | Original Resolution |
 | F10 | Screen Filter |
 | F11 | Keep Aspect Ratio |
 | F12 | Fullscreen |
+
+## Settings (relive.ini)
+
+Settings are saved in `relive.ini` in the game data directory:
+
+- `[Control]`, `[Keyboard]`, `[Gamepad]`, `[Alive]`: controller choice and key/button bindings.
+  These used to live in `abe2.ini`, which is no longer read.
+- `[Display]`: remembered between runs.
+  - `renderer`: `sdl3` or `opengl`. Set with `-renderer=` on the command line or by editing
+    the file; used from the next start, since the renderer can't change while running.
+  - `fullscreen`, `keep_aspect_ratio` (4:3 when `true`, stretched to the window when
+    `false`), `filter_screen`, `use_original_resolution`: toggled in game with the function
+    keys above, or set on the command line.
+
+## Command Line Options
+
+Run `relive` from the game data directory. Each option is a separate argument; values use
+`-name=value` (quote the whole argument if the value has spaces, e.g. `"-mod=My Mod"`).
+
+| Option | Description |
+| :-- | :-- |
+| `AE` or `-AE` | Run Abe's Exoddus (the default). |
+| `AO` or `-AO` | Run Abe's Oddysee. |
+
+If the chosen game's files aren't in the directory, the other game is run. If both `AE` and
+`AO` are given, a warning is logged and the default is used.
+
+| Option | Description |
+| :-- | :-- |
+| `-mod=<name>` | Run a mod from `relive_data/mods`, by its directory or its name. |
+| `-renderer=<name>` | `sdl3` (default) or `opengl` (`sdl`, `gl`, `gl3` and `opengl3` also work). |
+| `-fullscreen` | Start fullscreen. |
+| `-keep_aspect_ratio` | Letterbox to 4:3. `-keep_aspect_ratio=false` stretches to the window instead (e.g. 16:9). |
+| `-filter_screen` | Filter (smooth) the scaled image. |
+| `-use_original_resolution` | Render at the original 640x240 and scale up. |
+| `-ddcheat` | Enable the debug cheat menu. Builds with `FORCE_DDCHEAT` (the default) always have it. |
+| `-ddfps` | Show the frame rate. |
+| `-ddnoskip` | Render every frame instead of skipping frames to keep up. |
+| `-help` | Show the command line options and exit (`--help`, `-h` and `/?` also work). |
+
+The display options (`-renderer`, `-fullscreen`, `-keep_aspect_ratio`, `-filter_screen`,
+`-use_original_resolution`) also take `=true` or `=false`, and are saved to `relive.ini`, so
+they stay set on later runs.
+
+### Recording and playback
+
+Recordings capture the input and events of a play session so it can be replayed exactly,
+e.g. to reproduce bugs or check that changes don't alter gameplay. A recording has to be
+played back with the same game, data and settings (key bindings are saved in the recording).
+
+| Option | Description |
+| :-- | :-- |
+| `-record=<file>` | Record this session to `<file>`. |
+| `-flush` | With `-record`, write every change to disk straight away, so a recording survives a crash. |
+| `-play=<file>` | Play back a recording. Playback stops with an error if the game stops matching the recording (a desync). |
+| `-fastest` | With `-play`, run as fast as possible instead of at normal speed. |
+| `-ignore_desyncs` | With `-play`, keep going after a desync instead of stopping (it logs one warning). |
 
 ## Contributing
 
