@@ -19,6 +19,7 @@
 #include <QThread>
 #include <algorithm>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -65,6 +66,41 @@ namespace AutomationTest {
 
         nlohmann::json WaitForResponse(int id, int timeoutMs)
         {
+            if (auto response = TryWaitForResponse(id, timeoutMs))
+            {
+                return *response;
+            }
+
+            ADD_FAILURE() << "timed out waiting for response id=" << id << " (socket state " << mSocket.state()
+                          << ", error '" << mSocket.errorString().toStdString() << "', " << mSocket.bytesToWrite()
+                          << " bytes still unsent" << DescribeEditor() << ")";
+            return nlohmann::json::object();
+        }
+
+        // For a command that quits the editor: its response may never arrive, since the editor
+        // can exit right after writing it and on Windows the pipe is torn down with the reply
+        // still unread. Returns the response if it arrives, nullopt once the connection drops.
+        std::optional<nlohmann::json> WaitForResponseUnlessDisconnected(int id, int timeoutMs)
+        {
+            return TryWaitForResponse(id, timeoutMs, true);
+        }
+
+        // Sends a command and waits for its response in one call - most call sites don't need
+        // the id split out, they just want "did this succeed" or the result payload.
+        nlohmann::json Call(nlohmann::json cmd, int timeoutMs = 5000)
+        {
+            return WaitForResponse(SendCommand(std::move(cmd)), timeoutMs);
+        }
+
+        // The editor this client talks to, so a timeout can say whether it has exited or crashed.
+        void SetEditorProcess(QProcess* editor)
+        {
+            mEditor = editor;
+        }
+
+    private:
+        std::optional<nlohmann::json> TryWaitForResponse(int id, int timeoutMs, bool stopOnDisconnect = false)
+        {
             if (const auto it = mPending.find(id); it != mPending.end())
             {
                 nlohmann::json result = it->second;
@@ -95,28 +131,14 @@ namespace AutomationTest {
                 {
                     mReader.Append(mSocket.readAll());
                 }
+                else if (stopOnDisconnect && mSocket.state() == QLocalSocket::UnconnectedState)
+                {
+                    return std::nullopt;
+                }
             }
-
-            ADD_FAILURE() << "timed out waiting for response id=" << id << " (socket state " << mSocket.state()
-                          << ", error '" << mSocket.errorString().toStdString() << "', " << mSocket.bytesToWrite()
-                          << " bytes still unsent" << DescribeEditor() << ")";
-            return nlohmann::json::object();
+            return std::nullopt;
         }
 
-        // Sends a command and waits for its response in one call - most call sites don't need
-        // the id split out, they just want "did this succeed" or the result payload.
-        nlohmann::json Call(nlohmann::json cmd, int timeoutMs = 5000)
-        {
-            return WaitForResponse(SendCommand(std::move(cmd)), timeoutMs);
-        }
-
-        // The editor this client talks to, so a timeout can say whether it has exited or crashed.
-        void SetEditorProcess(QProcess* editor)
-        {
-            mEditor = editor;
-        }
-
-    private:
         std::string DescribeEditor() const
         {
             if (!mEditor)
@@ -142,6 +164,13 @@ namespace AutomationTest {
     // prompt. terminate() is SIGTERM on Unix, but on Windows it posts WM_CLOSE to the process's
     // windows, and under QT_QPA_PLATFORM=offscreen the editor has no native windows to receive
     // it, so it would never exit. Kill it there instead.
+    // Waits for an editor that was told to quit. QProcess::waitForFinished() returns false if
+    // the process had already exited, which it can have by the time the caller gets here.
+    inline bool WaitForEditorExit(QProcess& editor, int timeoutMs)
+    {
+        return editor.state() == QProcess::NotRunning || editor.waitForFinished(timeoutMs);
+    }
+
     inline void StopEditor(QProcess& editor)
     {
 #ifdef _WIN32

@@ -53,7 +53,7 @@ TEST(EditorAutomation, OpenCloseAboutAndExit)
 
     EXPECT_TRUE(client.Call({{"cmd", "close"}}).value("ok", false));
 
-    ASSERT_TRUE(editor.waitForFinished(10000)) << "editor did not exit after close";
+    ASSERT_TRUE(WaitForEditorExit(editor, 10000)) << "editor did not exit after close";
     EXPECT_EQ(editor.exitStatus(), QProcess::NormalExit);
     EXPECT_EQ(editor.exitCode(), 0);
 }
@@ -86,7 +86,7 @@ TEST(EditorAutomation, ExitActionClosesWindow)
 
     EXPECT_TRUE(client.Call({{"cmd", "click"}, {"target", "action_exit_application"}}).value("ok", false));
 
-    ASSERT_TRUE(editor.waitForFinished(10000)) << "editor did not exit after clicking Exit";
+    ASSERT_TRUE(WaitForEditorExit(editor, 10000)) << "editor did not exit after clicking Exit";
     EXPECT_EQ(editor.exitStatus(), QProcess::NormalExit);
     EXPECT_EQ(editor.exitCode(), 0);
 }
@@ -133,9 +133,12 @@ TEST(EditorAutomation, NewPathAddCollisionAddObject)
     const int closeClickId = client.SendCommand({{"cmd", "close"}});
     ASSERT_TRUE(client.Call({{"cmd", "click"}, {"target", "@active_modal_button:Discard"}}).value("ok", false))
         << "no unsaved-changes prompt to dismiss";
-    EXPECT_TRUE(client.WaitForResponse(closeClickId, 5000).value("ok", false));
+    if (const auto closeResp = client.WaitForResponseUnlessDisconnected(closeClickId, 5000))
+    {
+        EXPECT_TRUE(closeResp->value("ok", false));
+    }
 
-    ASSERT_TRUE(editor.waitForFinished(10000)) << "editor did not exit after close";
+    ASSERT_TRUE(WaitForEditorExit(editor, 10000)) << "editor did not exit after close";
     EXPECT_EQ(editor.exitStatus(), QProcess::NormalExit);
     EXPECT_EQ(editor.exitCode(), 0);
 }
