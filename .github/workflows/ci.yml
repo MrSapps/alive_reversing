@@ -36,8 +36,20 @@ jobs:
           # reuse the native build. Running them in one job built the project serially 3 times.
           - os: ubuntu-26.04
             name: Linux-AppImage
+          # One job per flatpak so they build in parallel. They share little code (SDL3 and a
+          # few small libs), so building them in one job mostly just serialised them.
           - os: ubuntu-26.04
-            name: Linux-Flatpak
+            name: Linux-Flatpak-Relive
+            flatpak: true
+            flatpak_id: io.github.AliveTeam.Relive
+            flatpak_bundle: relive.flatpak
+            flatpak_artifact: Linux-Release-relive-flatpak
+          - os: ubuntu-26.04
+            name: Linux-Flatpak-ReliveEditor
+            flatpak: true
+            flatpak_id: io.github.AliveTeam.ReliveEditor
+            flatpak_bundle: relive-editor.flatpak
+            flatpak_artifact: Linux-Release-relive-editor-flatpak
           # - os: macos-latest-large
           #   name: macOS
 
@@ -121,26 +133,33 @@ jobs:
     # ======================================
 
     - name: 'Linux-Flatpak: Install flatpak & flatpak-builder'
-      if: matrix.name == 'Linux-Flatpak'
+      if: matrix.flatpak
       run: |
         sudo apt-get update
-        sudo apt-get install -y flatpak flatpak-builder
+        sudo apt-get install -y flatpak flatpak-builder ccache
         sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
         sudo flatpak install -y --noninteractive flathub org.kde.Platform//5.15-24.08 org.kde.Sdk//5.15-24.08
 
-    # Both manifests share one repo (see flatpak/*.yml) so each just produces its own
-    # ref/bundle from it. Each manifest only builds its own target.
-    - name: 'Linux-Flatpak: Build relive flatpak'
-      if: matrix.name == 'Linux-Flatpak'
-      run: |
-        flatpak-builder --force-clean --repo=flatpak-repo build-dir-relive flatpak/io.github.AliveTeam.Relive.yml
-        flatpak build-bundle flatpak-repo relive.flatpak io.github.AliveTeam.Relive
+    # flatpak-builder --ccache keeps its cache in .flatpak-builder/ccache. Carry it between
+    # runs so a push only recompiles what changed. Each run saves under a new key (caches
+    # are immutable) and restores the newest one for this flatpak.
+    - name: 'Linux-Flatpak: Restore ccache'
+      if: matrix.flatpak
+      uses: actions/cache@v4
+      with:
+        path: .flatpak-builder/ccache
+        key: flatpak-ccache-${{ matrix.flatpak_id }}-${{ github.sha }}
+        restore-keys: flatpak-ccache-${{ matrix.flatpak_id }}-
 
-    - name: 'Linux-Flatpak: Build relive-editor flatpak'
-      if: matrix.name == 'Linux-Flatpak'
+    - name: 'Linux-Flatpak: Build flatpak'
+      if: matrix.flatpak
       run: |
-        flatpak-builder --force-clean --repo=flatpak-repo build-dir-relive-editor flatpak/io.github.AliveTeam.ReliveEditor.yml
-        flatpak build-bundle flatpak-repo relive-editor.flatpak io.github.AliveTeam.ReliveEditor
+        mkdir -p .flatpak-builder/ccache
+        echo "max_size = 2G" > .flatpak-builder/ccache/ccache.conf
+        CCACHE_DIR=.flatpak-builder/ccache ccache --zero-stats
+        flatpak-builder --ccache --force-clean --repo=flatpak-repo "$RUNNER_TEMP/flatpak-build-dir" flatpak/${{ matrix.flatpak_id }}.yml
+        flatpak build-bundle flatpak-repo ${{ matrix.flatpak_bundle }} ${{ matrix.flatpak_id }}
+        CCACHE_DIR=.flatpak-builder/ccache ccache --show-stats
 
     # ======================================
     #      macOS
@@ -200,19 +219,12 @@ jobs:
         path: build/*.AppImage
 
     # The flatpak manifests always build Release, whatever CONFIGURATION is.
-    - name: 'Linux-Flatpak: Upload relive flatpak'
-      if: matrix.name == 'Linux-Flatpak'
+    - name: 'Linux-Flatpak: Upload flatpak'
+      if: matrix.flatpak
       uses: actions/upload-artifact@v4
       with:
-        name: Linux-Release-relive-flatpak
-        path: relive.flatpak
-
-    - name: 'Linux-Flatpak: Upload relive-editor flatpak'
-      if: matrix.name == 'Linux-Flatpak'
-      uses: actions/upload-artifact@v4
-      with:
-        name: Linux-Release-relive-editor-flatpak
-        path: relive-editor.flatpak
+        name: ${{ matrix.flatpak_artifact }}
+        path: ${{ matrix.flatpak_bundle }}
 
    # - name: 'macOS: Upload relive dmg'
    #   if: matrix.name == 'macOS'
