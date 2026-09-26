@@ -125,6 +125,15 @@ extern "C"
 }
 } // namespace AutoSplitterData
 
+#if defined(__SANITIZE_ADDRESS__) && !defined(_WIN32)
+// Read by LeakSanitizer at start up: leaks it shouldn't report
+extern "C" const char* __lsan_default_suppressions()
+{
+    // SDL's X11 message box (the quit dialog) never frees what SDL_GetPreferredLocales returns
+    return "leak:X11Toolkit_ShouldFlipUI\n";
+}
+#endif
+
 static void PopulateAutoSplitterVars(GameType gameType, BaseMap& map)
 {
     AutoSplitterData::gameType = gameType;
