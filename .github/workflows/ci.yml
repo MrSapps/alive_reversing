@@ -8,7 +8,7 @@ name: CI
 
 on:
   push:
-    branches: [beta]
+    branches: [beta, claude/port-upstream-warning-fixes-ctiy1s]
   pull_request:
     branches: [beta]
 
