@@ -130,7 +130,8 @@ public:
     std::vector<RenderBatch> mBatches;
 
     std::vector<IRenderer::PsxVertexData> mVertices;
-    u16 mIndexBufferIndex = 0;
+    // u32 like the indices: a frame can have more than 65536 vertices
+    u32 mIndexBufferIndex = 0;
     std::vector<u32> mIndices;
 
 private:

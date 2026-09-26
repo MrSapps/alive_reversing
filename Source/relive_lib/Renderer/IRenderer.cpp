@@ -55,6 +55,53 @@ bool IRenderer::CreateRenderer(Renderers type, Window& window)
     return gRenderer != nullptr;
 }
 
+const char* IRenderer::TypeToString(Renderers type)
+{
+    switch (type)
+    {
+        case Renderers::Sdl3:
+            return "SDL3";
+        case Renderers::OpenGL:
+            return "OpenGL";
+    }
+    return "Unknown";
+}
+
+bool IRenderer::TakeCapture(std::vector<u8>& rgbaPixels, s32& width, s32& height)
+{
+    if (!mCaptureReady)
+    {
+        return false;
+    }
+
+    rgbaPixels = std::move(mCapturePixels);
+    width = mCaptureWidth;
+    height = mCaptureHeight;
+
+    mCapturePixels.clear();
+    mCaptureReady = false;
+    return true;
+}
+
+void IRenderer::CaptureIfRequested()
+{
+    if (!mCaptureRequested)
+    {
+        return;
+    }
+
+    ReadPsxFramebuffer(mCapturePixels, mCaptureWidth, mCaptureHeight);
+
+    // Only the colour matters, the alpha channel holds whatever blending left there
+    for (std::size_t i = 3; i < mCapturePixels.size(); i += 4)
+    {
+        mCapturePixels[i] = 255;
+    }
+
+    mCaptureRequested = false;
+    mCaptureReady = true;
+}
+
 void IRenderer::StartFrame()
 {
     if (mIsFirstStartFrame)

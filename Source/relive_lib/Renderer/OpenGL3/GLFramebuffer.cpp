@@ -55,6 +55,22 @@ void GLFramebuffer::Resize(s32 newWidth, s32 newHeight)
     CreateGLObjects();
 }
 
+void GLFramebuffer::ReadPixels(std::vector<u8>& rgbaPixels)
+{
+    const std::size_t rowBytes = static_cast<std::size_t>(mWidth) * 4;
+    std::vector<u8> bottomUp(rowBytes * mHeight);
+
+    BindAsTarget();
+    GL_VERIFY(glPixelStorei(GL_PACK_ALIGNMENT, 1));
+    GL_VERIFY(glReadPixels(0, 0, mWidth, mHeight, GL_RGBA, GL_UNSIGNED_BYTE, bottomUp.data()));
+
+    // GL's rows start at the bottom
+    rgbaPixels.resize(bottomUp.size());
+    for (s32 y = 0; y < mHeight; y++)
+    {
+        memcpy(&rgbaPixels[y * rowBytes], &bottomUp[(mHeight - 1 - y) * rowBytes], rowBytes);
+    }
+}
 
 void GLFramebuffer::CreateGLObjects()
 {

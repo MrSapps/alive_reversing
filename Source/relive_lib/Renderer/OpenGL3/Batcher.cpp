@@ -114,7 +114,7 @@ template <typename TextureType, typename RenderBatchType, std::size_t kTextureBa
 void Batcher<TextureType, RenderBatchType, kTextureBatchSize>::InsertVertexData(const IRenderer::PsxVertexData* pVertData, s32 count)
 {
     // Push indicies for this data
-    const u16 nextIndex = mIndexBufferIndex;
+    const u32 nextIndex = mIndexBufferIndex;
     const s32 numTriangles = count - 2;
 
     if (numTriangles == 1)

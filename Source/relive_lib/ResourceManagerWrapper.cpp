@@ -393,6 +393,22 @@ std::string ResourceManagerWrapper::FmvPath(const std::string& fmvName)
     return fmvName;
 }
 
+void ResourceManagerWrapper::AddAnimation(AnimId anim, std::shared_ptr<AnimationAttributesAndFrames> attributesAndFrames, std::shared_ptr<PngData> png)
+{
+    std::unique_lock<std::mutex> lock(mLoadingMutex);
+    const AnimCacheKey key = std::make_pair(std::string(), anim);
+
+    AnimCache& cached = mLoadedAnimations[key];
+    cached.mAnimAttributes = attributesAndFrames;
+    cached.mAnimPng = png;
+
+    // Pinned, as nothing could load it again once it's freed
+    AnimPin& pin = mPinnedAnimations[key];
+    pin.mCount++;
+    pin.mAnimAttributes = std::move(attributesAndFrames);
+    pin.mAnimPng = std::move(png);
+}
+
 AnimResource ResourceManagerWrapper::LoadAnimation(AnimId anim, const std::string& themeName)
 {
     const AnimCacheKey key = std::make_pair(themeName, anim);

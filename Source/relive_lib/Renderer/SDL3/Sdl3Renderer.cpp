@@ -1,6 +1,5 @@
 #include "../../../relive_lib/Primitives.hpp"
 #include "../../../relive_lib/Font.hpp"
-#include "Clamp.hpp"
 #include "FatalError.hpp"
 #include "Sdl3Renderer.hpp"
 #include "../../Window.hpp"
@@ -24,6 +23,12 @@ Sdl3Renderer::Sdl3Renderer(Window& window)
     if (!mContext.IsRenderTargetSupported())
     {
         ALIVE_FATAL("%s", "SDL3 renderer requires render target support.");
+    }
+
+    // Thrown rather than fatal, so Window::CreateWithRenderer can fall back to another renderer
+    if (!mContext.SupportsCustomBlendModes())
+    {
+        throw RendererException("The SDL3 renderer needs custom blend modes, which this SDL renderer doesn't support");
     }
 }
 
@@ -298,6 +303,7 @@ void Sdl3Renderer::Draw(const Poly_FT4& poly)
         if (!mCopiedFbThisFrame)
         {
             SDL_RenderTexture(mContext.GetRenderer(), fbSrcTex, nullptr, nullptr);
+            mContext.CountDrawCall();
             mCopiedFbThisFrame = true;
         }
 
@@ -325,8 +331,14 @@ void Sdl3Renderer::Draw(const Poly_G4& poly)
 
 void Sdl3Renderer::EndFrame()
 {
+    CaptureIfRequested();
+
     mCopiedFbThisFrame = false;
     mTextureCache.DecreaseResourceLifetimes();
+
+    mLastFrameStats.mDrawCalls = mContext.TakeDrawCallCount();
+    mLastFrameStats.mTextureUploads = mContext.TakeTextureUploadCount();
+    mLastFrameStats.mCachedTextures = mTextureCache.Size();
 
     mContext.UseScreenFramebuffer();
 
@@ -339,6 +351,39 @@ void Sdl3Renderer::EndFrame()
     SDL_RenderTexture(mContext.GetRenderer(), GetActiveFbTexture().GetTexture(), nullptr, &fdrawRect);
 
     mContext.Present();
+}
+
+void Sdl3Renderer::ReadPsxFramebuffer(std::vector<u8>& rgbaPixels, s32& width, s32& height)
+{
+    width = 0;
+    height = 0;
+    rgbaPixels.clear();
+
+    mContext.UseTextureFramebuffer(GetActiveFbTexture().GetTexture());
+    SDL_Surface* pSurface = SDL_RenderReadPixels(mContext.GetRenderer(), nullptr);
+    if (!pSurface)
+    {
+        LOG_ERROR("SDL_RenderReadPixels failed: %s", SDL_GetError());
+        return;
+    }
+
+    SDL_Surface* pRgba = SDL_ConvertSurface(pSurface, SDL_PIXELFORMAT_RGBA32);
+    SDL_DestroySurface(pSurface);
+    if (!pRgba)
+    {
+        LOG_ERROR("SDL_ConvertSurface failed: %s", SDL_GetError());
+        return;
+    }
+
+    width = pRgba->w;
+    height = pRgba->h;
+    const std::size_t rowBytes = static_cast<std::size_t>(width) * 4;
+    rgbaPixels.resize(rowBytes * height);
+    for (s32 y = 0; y < height; y++)
+    {
+        memcpy(&rgbaPixels[y * rowBytes], static_cast<const u8*>(pRgba->pixels) + y * pRgba->pitch, rowBytes);
+    }
+    SDL_DestroySurface(pRgba);
 }
 
 void Sdl3Renderer::SetClip(const Prim_ScissorRect& clipper)
@@ -398,6 +443,9 @@ void Sdl3Renderer::StartFrame()
 
     // Default back to render target
     mContext.UseTextureFramebuffer(mPsxFbTexture[0].GetTexture());
+
+    // A clip rectangle only lasts until the end of the frame that set it, as with OpenGL
+    SDL_SetRenderClipRect(mContext.GetRenderer(), nullptr);
 }
 
 void Sdl3Renderer::DrawLines(const IRenderer::Point2D points[], s32 numPoints, RGBA32 color, relive::TBlendModes blendMode)
@@ -453,52 +501,23 @@ void Sdl3Renderer::DrawVertices(SDL_Vertex vertices[], s32 numVertices, const s3
                     vertices[i].color.a = 0.5f;
                 }
 
-                SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_MOD);
+                mContext.SetDrawBlendMode(SDL_BLENDMODE_MOD);
                 SDL_RenderGeometry(mContext.GetRenderer(), nullptr, dstVertices.data(), numVertices, indices, numIndices);
+                mContext.CountDrawCall();
 
-                SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_ADD);
+                mContext.SetDrawBlendMode(SDL_BLENDMODE_ADD);
                 break;
             }
 
             // 100% DST + 100% SRC
             case relive::TBlendModes::eBlend_1:
-                SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_ADD);
+                mContext.SetDrawBlendMode(SDL_BLENDMODE_ADD);
                 break;
 
             // 100% DST - 100% SRC
             case relive::TBlendModes::eBlend_2:
-            {
-                SDL_BlendMode customBlendMode =
-                    SDL_ComposeCustomBlendMode(
-                        SDL_BLENDFACTOR_ONE,
-                        SDL_BLENDFACTOR_ONE,
-                        SDL_BLENDOPERATION_REV_SUBTRACT,
-                        SDL_BLENDFACTOR_ZERO,
-                        SDL_BLENDFACTOR_ONE,
-                        SDL_BLENDOPERATION_ADD
-                    );
-
-                if (SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), customBlendMode))
-                {
-                    // Not ideal... fallback to MOD, it's kind of close-ish, since the game
-                    // mainly uses this blend mode to darken stuff uniformly, so MOD roughly ends
-                    // up with a similar result
-                    SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_MOD);
-
-                    // We must invert the colours of the vertices, because otherwise when the
-                    // game tries to draw black (RGB all 255), it will end up doing (dst * 1.0)
-                    // instead of the intended (dst - 1.0)
-                    //
-                    // Inverting (1 - src) should solve the problem, so black is still black
-                    for (s32 i = 0; i < numVertices; i++)
-                    {
-                        vertices[i].color.r = ClampedSub(0.5f, vertices[i].color.r);
-                        vertices[i].color.g = ClampedSub(0.5f, vertices[i].color.g);
-                        vertices[i].color.b = ClampedSub(0.5f, vertices[i].color.b);
-                    }
-                }
+                mContext.SetDrawBlendMode(Sdl3Context::SubtractBlendMode());
                 break;
-            }
 
             // 100% DST + 25% SRC
             case relive::TBlendModes::eBlend_3:
@@ -507,7 +526,7 @@ void Sdl3Renderer::DrawVertices(SDL_Vertex vertices[], s32 numVertices, const s3
                     vertices[i].color.a = 0.25f;
                 }
 
-                SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_ADD);
+                mContext.SetDrawBlendMode(SDL_BLENDMODE_ADD);
                 break;
 
             default:
@@ -517,7 +536,8 @@ void Sdl3Renderer::DrawVertices(SDL_Vertex vertices[], s32 numVertices, const s3
     }
 
     SDL_RenderGeometry(mContext.GetRenderer(), texture, vertices, numVertices, indices, numIndices);
-    SDL_SetRenderDrawBlendMode(mContext.GetRenderer(), SDL_BLENDMODE_NONE);
+    mContext.CountDrawCall();
+    mContext.SetDrawBlendMode(SDL_BLENDMODE_NONE);
 }
 
 Sdl3Texture& Sdl3Renderer::GetActiveFbTexture()
@@ -527,9 +547,6 @@ Sdl3Texture& Sdl3Renderer::GetActiveFbTexture()
 
 std::shared_ptr<Sdl3Texture> Sdl3Renderer::PrepareTextureFromPoly(const Poly_FT4& poly)
 {
-    static u32 fg1CamId = 0;
-    static u32 lastTouchedCamId = 0;
-
     std::shared_ptr<Sdl3Texture> texture;
 
     if (poly.mFg1)
@@ -538,9 +555,9 @@ std::shared_ptr<Sdl3Texture> Sdl3Renderer::PrepareTextureFromPoly(const Poly_FT4
         // FIXME: kCamLifetime should be in IRenderer ?
         texture = mTextureCache.GetCachedTexture(poly.mFg1->mUniqueId.Id(), 1);
 
-        if (!texture || fg1CamId != lastTouchedCamId)
+        if (!texture || mFg1CamId != mLastTouchedCamId)
         {
-            std::shared_ptr<Sdl3Texture> camRefTex = mTextureCache.GetCachedTexture(lastTouchedCamId, 1);
+            std::shared_ptr<Sdl3Texture> camRefTex = mTextureCache.GetCachedTexture(mLastTouchedCamId, 1);
 
             if (camRefTex)
             {
@@ -551,7 +568,7 @@ std::shared_ptr<Sdl3Texture> Sdl3Renderer::PrepareTextureFromPoly(const Poly_FT4
                     1,
                     fg1Tex);
 
-                fg1CamId = lastTouchedCamId;
+                mFg1CamId = mLastTouchedCamId;
 
                 LOG("SDL3 FG1 cache miss %u", poly.mFg1->mUniqueId.Id());
             }
@@ -563,7 +580,7 @@ std::shared_ptr<Sdl3Texture> Sdl3Renderer::PrepareTextureFromPoly(const Poly_FT4
     }
     else if (poly.mCam)
     {
-        lastTouchedCamId = poly.mCam->mUniqueId.Id();
+        mLastTouchedCamId = poly.mCam->mUniqueId.Id();
 
         // FIXME: kCamLifetime should be in IRenderer ?
         texture = mTextureCache.GetCachedTexture(poly.mCam->mUniqueId.Id(), 1);

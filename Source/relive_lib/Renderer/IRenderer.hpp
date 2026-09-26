@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SDL3/SDL.h>
+#include <vector>
 
 struct BasePrimitive;
 struct Prim_ScissorRect;
@@ -106,6 +107,36 @@ public:
 
     }
 
+    // Which renderer this is. Window::CreateWithRenderer falls back to another one if the
+    // requested one can't be created.
+    virtual Renderers GetType() const = 0;
+    static const char* TypeToString(Renderers type);
+
+    // What the renderer did in the last frame
+    struct FrameStats final
+    {
+        // Batches (OpenGL) or geometry submissions (SDL3)
+        u32 mDrawCalls = 0;
+        // Textures created or re-uploaded
+        u32 mTextureUploads = 0;
+        // Textures the renderer is keeping alive in its cache
+        u32 mCachedTextures = 0;
+    };
+
+    const FrameStats& GetLastFrameStats() const
+    {
+        return mLastFrameStats;
+    }
+
+    // Asks for a copy of the next frame's 640x240 PSX framebuffer, as it is before it's scaled
+    // to the window (so screen shake isn't in it). TakeCapture hands it over once that frame
+    // has ended: RGBA32 rows, top row first.
+    void RequestCapture()
+    {
+        mCaptureRequested = true;
+    }
+    bool TakeCapture(std::vector<u8>& rgbaPixels, s32& width, s32& height);
+
     void SetFilterScreen(bool filterScreen)
     {
         mFramebufferFilter = filterScreen;
@@ -171,6 +202,14 @@ protected:
     SDL_Rect GetFramebufferRect();
     SDL_Rect GetTargetDrawRect();
 
+    // Copies the PSX framebuffer out as RGBA32 rows, top row first
+    virtual void ReadPsxFramebuffer(std::vector<u8>& rgbaPixels, s32& width, s32& height) = 0;
+
+    // Derived objects call this in EndFrame once everything has been drawn to the PSX framebuffer
+    void CaptureIfRequested();
+
+    FrameStats mLastFrameStats;
+
 protected:
     bool mIsFirstStartFrame = true;
 
@@ -182,4 +221,11 @@ protected:
     bool mFramebufferFilter = true;
     bool mKeepAspectRatio = true;
     bool mUseOriginalResolution = true;
+
+private:
+    bool mCaptureRequested = false;
+    bool mCaptureReady = false;
+    std::vector<u8> mCapturePixels;
+    s32 mCaptureWidth = 0;
+    s32 mCaptureHeight = 0;
 };

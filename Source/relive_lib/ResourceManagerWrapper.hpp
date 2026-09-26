@@ -88,8 +88,10 @@ struct AnimAttributes final
 class AnimationAttributesAndFrames final
 {
 public:
+    // For animations made in code (see ResourceManagerWrapper::AddAnimation)
+    AnimationAttributesAndFrames() = default;
     explicit AnimationAttributesAndFrames(const std::string& jsonData);
-    AnimAttributes mAttributes;
+    AnimAttributes mAttributes = {};
     std::vector<PerFrameInfo> mFrames;
 };
 
@@ -376,6 +378,11 @@ public:
     void BeginAnimPins(AnimPins& pins);
     void EndAnimPins();
     void UnpinAnims(AnimPins& pins);
+
+    // Adds an animation made in code rather than loaded from disk, e.g. by the render test,
+    // which runs without game data. It stays loaded for the rest of the game, and
+    // PendAnimation/LoadAnimation return it like any other.
+    void AddAnimation(AnimId anim, std::shared_ptr<AnimationAttributesAndFrames> attributesAndFrames, std::shared_ptr<PngData> png);
 
     template <typename T, int size>
     void PendAnims(const T (&anims)[size])

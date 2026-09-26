@@ -109,7 +109,10 @@ GLContext::GLContext(Window& window)
 
 GLContext::~GLContext()
 {
+    // Needs the GL context, so before it goes
+    ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
+    ImGui::DestroyContext();
 
     if (mContext)
     {

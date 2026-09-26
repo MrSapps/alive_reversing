@@ -41,7 +41,15 @@ public:
     void EndFrame() override;
     void SetClip(const Prim_ScissorRect& clipper) override;
     void StartFrame() override;
-    
+
+    Renderers GetType() const override
+    {
+        return Renderers::OpenGL;
+    }
+
+protected:
+    void ReadPsxFramebuffer(std::vector<u8>& rgbaPixels, s32& width, s32& height) override;
+
 private:
     static constexpr u32 kAvailablePalettes = 256;
     static constexpr u32 kPaletteDepth = 256;
@@ -101,6 +109,10 @@ private:
 private:
     GLContext mContext;
     GLuint mVAO = 0;
+
+    // The quad UpdateFilterFramebuffer draws, made on first use
+    GLuint mFilterDrawVbo = 0;
+    GLuint mFilterUvVbo = 0;
 
     GLShaderProgram mPassthruShader;
     GLShaderProgram mPassthruFilterShader;
