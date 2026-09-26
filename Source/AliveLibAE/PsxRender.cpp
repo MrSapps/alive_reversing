@@ -34,6 +34,10 @@ void OrderingTable::HandlePrimRendering(IRenderer& renderer, const BasePrimitive
             renderer.Draw(static_cast<const Poly_G4&>(any));
             break;
 
+        case PrimitivesTypes::eScreenWave:
+            renderer.Draw(static_cast<const Prim_ScreenWave&>(any));
+            break;
+
         default:
             ALIVE_FATAL("Unknown prim type %d", static_cast<s32>(any.mType));
             break;

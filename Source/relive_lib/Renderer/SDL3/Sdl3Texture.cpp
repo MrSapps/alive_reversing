@@ -257,9 +257,6 @@ SdlTexturePtr Sdl3Texture::MakePaletteVariant(u32 paletteHash, const AnimationPa
     }
     mContext.CountTextureUpload();
 
-    // Unfiltered when scaled, like the OpenGL renderer's texelFetch
-    SDL_SetTextureScaleMode(texture.get(), SDL_SCALEMODE_NEAREST);
-
     Sdl3Context::SetTextureBlendMode(texture.get(),
         blendMode == relive::TBlendModes::eBlend_2
             ? Sdl3Context::PsxTextureSubtractBlendMode()

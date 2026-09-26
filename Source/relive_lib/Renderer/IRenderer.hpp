@@ -45,7 +45,8 @@ public: // TODO: Make protected later
         DefaultFT4 = 1,
         Camera = 2,
         FG1 = 3,
-        Gas = 4
+        Gas = 4,
+        ScreenWave = 5
     };
 
     struct PsxVertexData final
@@ -174,8 +175,13 @@ public:
     // MainMenuTransistion
     virtual void Draw(const Poly_G3& poly) = 0;
 
-    // FG1, Animation, Font, ScreenWave, Water
+    // FG1, Animation, Font, Water
     virtual void Draw(const Poly_FT4& poly) = 0;
+
+    // The screen wave (AO's bell song): moves pieces of the frame drawn so far. The pieces in a run
+    // of these all draw from the frame as it was before the first of them. Black, and anything
+    // from outside the screen, stays where it is: it isn't drawn over what's already there.
+    virtual void Draw(const Prim_ScreenWave& wave) = 0;
 
     // Fleech (tounge), DeathGas, ColourfulMeter
     virtual void Draw(const Poly_G4& poly) = 0;
@@ -185,10 +191,10 @@ public:
     //   - For regular Poly_FT4s, the peak tends to be about 300 when the game
     //     is rendering a Spline (chant orb zap made out of ~260 individual
     //     sprites)
-    //   - For ScreenWave framebuffer effect there are 256 quads
+    //   - For the screen wave there are 128 quads
     //
     static constexpr s32 kReserveFT4QuadCount = 300;
-    static constexpr s32 kReserveScreenWaveQuadCount = 256;
+    static constexpr s32 kReserveScreenWaveQuadCount = 128;
 
 protected:
 

@@ -336,21 +336,22 @@ void OpenGLRenderer::Draw(const Poly_FT4& poly)
 
         mBatcher.PushFont(poly, palIndex, texture);
     }
-    else
+}
+
+void OpenGLRenderer::Draw(const Prim_ScreenWave& wave)
+{
+    // The source corners go in as the texture coordinates, in screen pixels
+    PsxVertexData verts[4] = {};
+    for (s32 i = 0; i < 4; i++)
     {
-        // ScreenWave (Bell Song framebuffer effect)
-        const f32 baseUf = poly.uBase;
-        const f32 baseVf = poly.vBase;
-
-        PsxVertexData verts[4] = {
-            {static_cast<f32>(poly.X0()), static_cast<f32>(poly.Y0()), 127.0f, 127.0f, 127.0f, baseUf + static_cast<f32>(poly.U0()), kPsxFramebufferHeight - (baseVf + static_cast<f32>(poly.V0())), PsxDrawMode::DefaultFT4, 0, 0, relive::TBlendModes::eBlend_0, 0, 0},
-            {static_cast<f32>(poly.X1()), static_cast<f32>(poly.Y1()), 127.0f, 127.0f, 127.0f, baseUf + static_cast<f32>(poly.U1()), kPsxFramebufferHeight - (baseVf + static_cast<f32>(poly.V1())), PsxDrawMode::DefaultFT4, 0, 0, relive::TBlendModes::eBlend_0, 0, 0},
-            {static_cast<f32>(poly.X2()), static_cast<f32>(poly.Y2()), 127.0f, 127.0f, 127.0f, baseUf + static_cast<f32>(poly.U2()), kPsxFramebufferHeight - (baseVf + static_cast<f32>(poly.V2())), PsxDrawMode::DefaultFT4, 0, 0, relive::TBlendModes::eBlend_0, 0, 0},
-            {static_cast<f32>(poly.X3()), static_cast<f32>(poly.Y3()), 127.0f, 127.0f, 127.0f, baseUf + static_cast<f32>(poly.U3()), kPsxFramebufferHeight - (baseVf + static_cast<f32>(poly.V3())), PsxDrawMode::DefaultFT4, 0, 0, relive::TBlendModes::eBlend_0, 0, 0}
-        };
-
-        mBatcher.PushFramebufferVertexData(verts, ALIVE_COUNTOF(verts));
+        verts[i] = {
+            static_cast<f32>(wave.mVerts[i].x), static_cast<f32>(wave.mVerts[i].y),
+            127.0f, 127.0f, 127.0f,
+            static_cast<f32>(wave.mSource[i].x), static_cast<f32>(wave.mSource[i].y),
+            PsxDrawMode::ScreenWave, 0, 0, relive::TBlendModes::eBlend_0, 0, 0};
     }
+
+    mBatcher.PushFramebufferVertexData(verts, ALIVE_COUNTOF(verts));
 }
 
 void OpenGLRenderer::Draw(const Poly_G4& poly)

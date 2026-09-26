@@ -62,6 +62,9 @@ Checks (FAIL):
   scene's pixels may differ by more than 8 levels. What's left between them is which pixel
   wins where a triangle edge or texel boundary falls exactly on a pixel centre, which differs
   between GPUs and SDL's backends. The differences are saved in `diff_<a>_<b>/`.
+- **The screen wave draws exactly as it should.** Pieces of it that move part of the frame
+  without bending it must land pixel for pixel, at the original size and scaled up. Black, and
+  anything from outside the screen, must stay where it is.
 - **With `-baseline=<dir>`, captures are unchanged.** `<dir>` is an earlier `-auto` run's
   output. Anything different fails, and the difference is saved as `baseline_diff_*.png`.
   Look at those, and if the change was intended, use the new run as the baseline. GPUs and

@@ -65,6 +65,7 @@ const int DRAW_DEFAULT_FT4 = 1;
 const int DRAW_CAM         = 2;
 const int DRAW_FG1         = 3;
 const int DRAW_GAS         = 4;
+const int DRAW_SCREEN_WAVE = 5;
 
 const vec2 frameSize = vec2(640.0, 240.0);
 
@@ -242,8 +243,35 @@ void draw_gas()
     }
 }
 
+// The screen wave moves pieces of the frame. Black (anything that would be black in 16 bit colour)
+// and anything from outside the screen stays where it is.
+void draw_screen_wave()
+{
+    vec2 source = fsUV;
+    if (any(lessThan(source, vec2(0.0))) || any(greaterThanEqual(source, frameSize)))
+    {
+        discard;
+    }
+
+    // The framebuffer's rows count from the bottom
+    vec4 texel = texture(texFramebuffer, vec2(source.x, frameSize.y - source.y) / frameSize);
+    if (all(lessThan(floor(texel.rgb * 255.0 + 0.5), vec3(8.0, 4.0, 8.0))))
+    {
+        discard;
+    }
+
+    outColor = vec4(texel.rgb, 0.0);
+}
+
 void draw_framebuffer()
 {
+    if (int(fsFlags.x) == DRAW_SCREEN_WAVE)
+    {
+        draw_screen_wave();
+        return;
+    }
+
+    // The copy of the whole frame the framebuffer effects start with
     vec2 scaledUV = fsUV / frameSize;
 
     outColor = texture(texFramebuffer, scaledUV);

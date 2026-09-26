@@ -404,6 +404,171 @@ std::string RenderTest::RendererDir(IRenderer::Renderers type) const
 }
 
 // ----------------------------------------------------------------------------
+// Screen wave
+// ----------------------------------------------------------------------------
+
+// Frames drawn bigger than the screen, sampled down to its size
+static Capture ToScreenSize(const Capture& capture)
+{
+    if (capture.mWidth == IRenderer::kPsxFramebufferWidth && capture.mHeight == IRenderer::kPsxFramebufferHeight)
+    {
+        return capture;
+    }
+
+    Capture out;
+    out.mWidth = IRenderer::kPsxFramebufferWidth;
+    out.mHeight = IRenderer::kPsxFramebufferHeight;
+    out.mPixels.resize(static_cast<std::size_t>(out.mWidth) * out.mHeight * 4);
+    for (s32 y = 0; y < out.mHeight; y++)
+    {
+        const s32 srcY = (2 * y + 1) * capture.mHeight / (2 * out.mHeight);
+        for (s32 x = 0; x < out.mWidth; x++)
+        {
+            const s32 srcX = (2 * x + 1) * capture.mWidth / (2 * out.mWidth);
+            memcpy(&out.mPixels[(y * out.mWidth + x) * 4], &capture.mPixels[(srcY * capture.mWidth + srcX) * 4], 4);
+        }
+    }
+    return out;
+}
+
+// Draws the frame bigger than the screen, as the game does unless it's set to the original
+// resolution
+void RenderTest::SetScaledFramebuffer(bool scaled)
+{
+    IRenderer& renderer = *IRenderer::GetRenderer();
+    renderer.SetUseOriginalResolution(!scaled);
+    SDL_SetWindowSize(mWindow->Get(), scaled ? 1280 : 640, scaled ? 960 : 480);
+}
+
+// Screen wave pieces that move part of the frame without bending it, so that every renderer draws
+// them exactly: each pixel must be where it's expected. Black, and anything from outside the
+// screen, stays where it is.
+void RenderTest::CheckScreenWave(bool scaled)
+{
+    IRenderer& renderer = *IRenderer::GetRenderer();
+    const char* rendererName = IRenderer::TypeToString(renderer.GetType());
+    const char* sizeName = scaled ? "scaled" : "original size";
+
+    struct Move final
+    {
+        const char* mName;
+        s32 mDestX, mDestY, mWidth, mHeight;
+        s32 mSourceX, mSourceY;
+    };
+    static constexpr Move kMoves[] = {
+        // The camera's 1 pixel black and white checkerboard: the black stays
+        {"black", 400, 150, 64, 32, 64, 104},
+        // With the green corner square
+        {"right of the screen", 200, 40, 64, 32, 608, 0},
+        // With the blue corner square
+        {"below the screen", 300, 60, 32, 32, 0, 220},
+        // With the red corner square
+        {"left of the screen", 480, 40, 64, 32, -24, 0},
+        {"above the screen", 560, 100, 32, 32, 100, -20},
+    };
+
+    std::vector<Prim_ScreenWave> pieces(ALIVE_COUNTOF(kMoves));
+    for (std::size_t i = 0; i < pieces.size(); i++)
+    {
+        const Move& m = kMoves[i];
+        Prim_ScreenWave& piece = pieces[i];
+        const s16 x[4] = {0, static_cast<s16>(m.mWidth), 0, static_cast<s16>(m.mWidth)};
+        const s16 y[4] = {0, 0, static_cast<s16>(m.mHeight), static_cast<s16>(m.mHeight)};
+        piece.SetXY0(static_cast<s16>(m.mDestX + x[0]), static_cast<s16>(m.mDestY + y[0]));
+        piece.SetXY1(static_cast<s16>(m.mDestX + x[1]), static_cast<s16>(m.mDestY + y[1]));
+        piece.SetXY2(static_cast<s16>(m.mDestX + x[2]), static_cast<s16>(m.mDestY + y[2]));
+        piece.SetXY3(static_cast<s16>(m.mDestX + x[3]), static_cast<s16>(m.mDestY + y[3]));
+        for (u32 corner = 0; corner < 4; corner++)
+        {
+            piece.SetSource(corner, static_cast<s16>(m.mSourceX + x[corner]), static_cast<s16>(m.mSourceY + y[corner]));
+        }
+    }
+
+    // The frame without them, then with them
+    SetScaledFramebuffer(scaled);
+    mContext->DrawCamera(mOt, mRes->mGridCam);
+    const Capture before = ToScreenSize(RunFrameAndCaptureOt());
+    mContext->DrawCamera(mOt, mRes->mGridCam);
+    for (Prim_ScreenWave& piece : pieces)
+    {
+        mOt.Add(Layer::eLayer_FG1_37, &piece);
+    }
+    const Capture after = ToScreenSize(RunFrameAndCaptureOt());
+    SetScaledFramebuffer(false);
+
+    if (before.IsEmpty() || after.IsEmpty())
+    {
+        Fail(Format("%s: couldn't capture the screen wave check (%s)", rendererName, sizeName));
+        return;
+    }
+
+    auto pixel = [](const Capture& c, s32 x, s32 y)
+    {
+        return &c.mPixels[(y * c.mWidth + x) * 4];
+    };
+
+    Capture expected = before;
+    for (const Move& m : kMoves)
+    {
+        for (s32 y = 0; y < m.mHeight; y++)
+        {
+            for (s32 x = 0; x < m.mWidth; x++)
+            {
+                const s32 sourceX = m.mSourceX + x;
+                const s32 sourceY = m.mSourceY + y;
+                if (sourceX < 0 || sourceY < 0 || sourceX >= before.mWidth || sourceY >= before.mHeight)
+                {
+                    continue;
+                }
+
+                // What would be black in 16 bit colour
+                const u8* pSource = pixel(before, sourceX, sourceY);
+                if (pSource[0] < 8 && pSource[1] < 4 && pSource[2] < 8)
+                {
+                    continue;
+                }
+                memcpy(&expected.mPixels[((m.mDestY + y) * expected.mWidth + m.mDestX + x) * 4], pSource, 4);
+            }
+        }
+    }
+
+    const std::string diffFile = Format("screenwave_%s.png", scaled ? "scaled" : "original");
+    for (const Move& m : kMoves)
+    {
+        u32 wrong = 0;
+        for (s32 y = m.mDestY; y < m.mDestY + m.mHeight; y++)
+        {
+            for (s32 x = m.mDestX; x < m.mDestX + m.mWidth; x++)
+            {
+                wrong += memcmp(pixel(after, x, y), pixel(expected, x, y), 3) == 0 ? 0 : 1;
+            }
+        }
+        if (wrong)
+        {
+            Fail(Format("%s: the screen wave draws wrongly (%s): %s (%u pixels, see %s)", rendererName, sizeName, m.mName, wrong, diffFile.c_str()));
+        }
+    }
+
+    if (!CaptureDiff::Compare(after, expected).Identical())
+    {
+        CaptureDiff::MakeImage(after, expected).SavePng(mFs, RendererDir(renderer.GetType()) + "/" + diffFile);
+    }
+}
+
+// Draws what's in the OT, and returns what the renderer drew
+Capture RenderTest::RunFrameAndCaptureOt()
+{
+    IRenderer& renderer = *IRenderer::GetRenderer();
+    renderer.RequestCapture();
+    PSX_DrawOTag(mOt);
+    PSX_PutDispEnv_4F5890();
+
+    Capture capture;
+    renderer.TakeCapture(capture.mPixels, capture.mWidth, capture.mHeight);
+    return capture;
+}
+
+// ----------------------------------------------------------------------------
 // Interactive
 // ----------------------------------------------------------------------------
 
@@ -630,6 +795,13 @@ void RenderTest::RunAutoOnRenderer(IRenderer::Renderers type, RendererResult& re
                         baseAnimations, AnimationBase::gAnimations->Size()));
         }
     }
+
+    // What the screen wave draws, exactly
+    mSceneOrderIdx = 0;
+    StartScene(0);
+    CheckScreenWave(false);
+    CheckScreenWave(true);
+    EndScene();
 
     // Textures from the scenes must all expire once nothing draws them
     mSceneOrderIdx = 0;

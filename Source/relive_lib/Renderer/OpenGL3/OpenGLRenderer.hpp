@@ -37,6 +37,7 @@ public:
     void Draw(const Line_G4& line) override;
     void Draw(const Poly_G3& poly) override;
     void Draw(const Poly_FT4& poly) override;
+    void Draw(const Prim_ScreenWave& wave) override;
     void Draw(const Poly_G4& poly) override;
     void EndFrame() override;
     void SetClip(const Prim_ScissorRect& clipper) override;
