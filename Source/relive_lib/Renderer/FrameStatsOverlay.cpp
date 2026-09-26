@@ -68,49 +68,17 @@ void FrameStatsOverlay::Draw(IRenderer& renderer)
 
     const IRenderer::FrameStats& stats = renderer.GetLastFrameStats();
 
-    // In columns as wide as the widest each number should get, and right aligned in them, so
-    // nothing moves when a number gets a digit longer or shorter
-    struct Column final
-    {
-        char mText[32];
-        const char* mWidest;
-    };
-    Column columns[] = {
-        {{}, IRenderer::TypeToString(renderer.GetType())},
-        {{}, "999.9 fps"},
-        {{}, "999.99 ms"},
-        {{}, "99999 calls"},
-        {{}, "9999 tex"},
-    };
-    snprintf(columns[0].mText, sizeof(columns[0].mText), "%s", columns[0].mWidest);
-    snprintf(columns[1].mText, sizeof(columns[1].mText), "%.1f fps", mFps);
-    snprintf(columns[2].mText, sizeof(columns[2].mText), "%.2f ms", mFrameMs);
-    snprintf(columns[3].mText, sizeof(columns[3].mText), "%u calls", stats.mDrawCalls);
-    snprintf(columns[4].mText, sizeof(columns[4].mText), "%u tex", stats.mCachedTextures);
+    char text[128] = {};
+    snprintf(text, sizeof(text), "%s %.1f fps %.2f ms %u calls %u tex",
+             IRenderer::TypeToString(renderer.GetType()), mFps, mFrameMs, stats.mDrawCalls, stats.mCachedTextures);
 
+    // A black shadow, then the text, right aligned. Drawn straight to the renderer so they go over
+    // everything the frame drew, whatever clip rectangle or screen shake it left set.
     const bool screenSpace = gFontDrawScreenSpace;
     gFontDrawScreenSpace = true;
-
-    const s32 gap = Width("0");
-    s32 textX[ALIVE_COUNTOF(columns)] = {};
-    s32 right = IRenderer::kPsxFramebufferWidth - 4;
-    for (s32 i = ALIVE_COUNTOF(columns) - 1; i >= 0; i--)
-    {
-        textX[i] = right - Width(columns[i].mText);
-        right -= Width(columns[i].mWidest) + gap;
-    }
-
-    // A black shadow, then the text, drawn straight to the renderer so they go over everything the
-    // frame drew, whatever clip rectangle or screen shake it left set
-    s32 polyCount = 0;
-    for (s32 i = 0; i < ALIVE_COUNTOF(columns); i++)
-    {
-        polyCount = LayOut(columns[i].mText, textX[i] + 1, 3, 0, 0, 0, polyCount);
-    }
-    for (s32 i = 0; i < ALIVE_COUNTOF(columns); i++)
-    {
-        polyCount = LayOut(columns[i].mText, textX[i], 2, 0, 127, 127, polyCount);
-    }
+    const s32 x = IRenderer::kPsxFramebufferWidth - 4 - Width(text);
+    s32 polyCount = LayOut(text, x + 1, 3, 0, 0, 0, 0);
+    polyCount = LayOut(text, x, 2, 0, 127, 127, polyCount);
     gFontDrawScreenSpace = screenSpace;
 
     Prim_ScissorRect noClip;
