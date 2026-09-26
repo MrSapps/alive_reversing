@@ -1387,7 +1387,8 @@ void MIDI_ADSR_Update_4FDCE0()
                 timeDiff2 = 0;
             }
 
-            u32 timeDiffSquared = timeDiff1 * timeDiff1;
+            // Wraps past 46340, as the game's 32 bit multiply did: done unsigned so the overflow is defined
+            u32 timeDiffSquared = static_cast<u32>(timeDiff1) * static_cast<u32>(timeDiff1);
             switch (pChannel->field_1C_adsr.field_3_state + 1) // ADSR state ?
             {
                 case 0:
