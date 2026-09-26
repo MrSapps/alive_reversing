@@ -49,7 +49,6 @@ uniform sampler2D texGas;
 uniform sampler2D texCamera;
 
 uniform sampler2D texSpriteSheets[12];
-uniform vec2 fsSpriteSheetSize[12];
 
 uniform sampler2D texFramebuffer;
 

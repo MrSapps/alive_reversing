@@ -4,9 +4,9 @@
 #include "../../../relive_lib/Types.hpp"
 #include "GLDebug.hpp"
 
-bool gGlDebug = true;
+bool GLDebug::sChecks = false;
 
-void CheckGLError()
+void GLDebug::CheckError()
 {
     const GLenum lastGLError = glGetError();
     if (lastGLError != GL_NO_ERROR)

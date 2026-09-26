@@ -16,7 +16,7 @@ public:
 
     // Creates the window and its renderer, falling back to the other renderers if type can't
     // be created. Each renderer gets a window of its own, as they need different window flags.
-    bool CreateWithRenderer(IRenderer::Renderers type, const std::string& title);
+    bool CreateWithRenderer(IRenderer::Renderers type, const std::string& title, bool rendererChecks);
 
     // Only for SDL calls that need the window itself, like creating a renderer on it
     SDL_Window* Get() const

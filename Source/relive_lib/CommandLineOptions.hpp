@@ -29,6 +29,9 @@ struct CommandLineOptions final
     // -max_fps=<n> or -maxfps=<n>: the most frames a second, 0 for no limit. nullopt if not given
     // (invalid values are logged and treated as not given): 30, like the original.
     std::optional<u32> mMaxFps;
+    // -renderer_checks: the renderer checks for errors as it goes, which is slower. OpenGL checks
+    // every call, SDL3 turns on its GPU, Vulkan and Direct3D 11 backends' validation.
+    bool mRendererChecks = false;
 
     // Recording and playback
     std::optional<std::string> mRecordFile;

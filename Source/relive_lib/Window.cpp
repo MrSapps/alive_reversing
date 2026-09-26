@@ -22,7 +22,7 @@ static void AddRenderer(std::vector<IRenderer::Renderers>& renderers, IRenderer:
     renderers.emplace_back(toAdd);
 }
 
-bool Window::CreateWithRenderer(IRenderer::Renderers type, const std::string& title)
+bool Window::CreateWithRenderer(IRenderer::Renderers type, const std::string& title, bool rendererChecks)
 {
     std::vector<IRenderer::Renderers> creationOrder{type};
     AddRenderer(creationOrder, IRenderer::Renderers::Sdl3);
@@ -37,7 +37,7 @@ bool Window::CreateWithRenderer(IRenderer::Renderers type, const std::string& ti
             continue;
         }
 
-        if (IRenderer::CreateRenderer(typeToCreate, *this))
+        if (IRenderer::CreateRenderer(typeToCreate, *this, rendererChecks))
         {
             return true;
         }

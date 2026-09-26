@@ -32,20 +32,43 @@ static bool gRenderEnable_G4 = true;
 static bool gRenderEnable_G3 = true;
 static bool gRenderEnable_G2 = true;
 
-OpenGLRenderer::OpenGLRenderer(Window& window)
+OpenGLRenderer::OpenGLRenderer(Window& window, bool checks)
     : IRenderer(window),
-    mContext(window),
+    mContext(window, checks),
     mFilterFramebuffer(kTargetFramebufferWidth, kTargetFramebufferHeight),
     mPsxFramebuffer{
         GLFramebuffer(kPsxFramebufferWidth, kPsxFramebufferHeight),
         GLFramebuffer(kPsxFramebufferWidth, kPsxFramebufferHeight)
     },
-    mBatcher(UvMode::UnNormalized),
     mPaletteCache(kAvailablePalettes)
 {
-    // Create and bind the VAO, and never touch it again! Wahey.
-    GL_VERIFY(glGenVertexArrays(1, &mVAO));
-    GL_VERIFY(glBindVertexArray(mVAO));
+    // The batches' vertex layout. The element buffer binding is part of the VAO too.
+    GL_VERIFY(glGenVertexArrays(1, &mPsxVao));
+    GL_VERIFY(glGenBuffers(1, &mPsxVbo));
+    GL_VERIFY(glGenBuffers(1, &mPsxEbo));
+    GL_VERIFY(glBindVertexArray(mPsxVao));
+    GL_VERIFY(glBindBuffer(GL_ARRAY_BUFFER, mPsxVbo));
+    GL_VERIFY(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mPsxEbo));
+    GL_VERIFY(glEnableVertexAttribArray(0));
+    GL_VERIFY(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(PsxVertexData), (void*) offsetof(PsxVertexData, x)));
+    GL_VERIFY(glEnableVertexAttribArray(1));
+    GL_VERIFY(glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(PsxVertexData), (void*) offsetof(PsxVertexData, r)));
+    GL_VERIFY(glEnableVertexAttribArray(2));
+    GL_VERIFY(glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(PsxVertexData), (void*) offsetof(PsxVertexData, u)));
+    GL_VERIFY(glEnableVertexAttribArray(3));
+    GL_VERIFY(glVertexAttribIPointer(3, 4, GL_UNSIGNED_INT, sizeof(PsxVertexData), (void*) offsetof(PsxVertexData, drawMode)));
+    GL_VERIFY(glEnableVertexAttribArray(4));
+    GL_VERIFY(glVertexAttribIPointer(4, 2, GL_UNSIGNED_INT, sizeof(PsxVertexData), (void*) offsetof(PsxVertexData, paletteIndex)));
+
+    // The framebuffer quads' vertex layout
+    GL_VERIFY(glGenVertexArrays(1, &mQuadVao));
+    GL_VERIFY(glGenBuffers(1, &mQuadVbo));
+    GL_VERIFY(glBindVertexArray(mQuadVao));
+    GL_VERIFY(glBindBuffer(GL_ARRAY_BUFFER, mQuadVbo));
+    GL_VERIFY(glEnableVertexAttribArray(0));
+    GL_VERIFY(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(PassthruVertexData), (void*) offsetof(PassthruVertexData, x)));
+    GL_VERIFY(glEnableVertexAttribArray(1));
+    GL_VERIFY(glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(PassthruVertexData), (void*) offsetof(PassthruVertexData, u)));
 
     // Enable blending
     GL_VERIFY(glEnable(GL_BLEND));
@@ -71,12 +94,29 @@ OpenGLRenderer::OpenGLRenderer(Window& window)
     mPassthruFilterShader.LinkShaders(passthruVS, passthruFilterFS);
     mPsxShader.LinkShaders(psxVS, psxFS);
 
-    // Init array we pass to texture uniform to specify the units we're using
-    // which is the number of units starting at GL_TEXTURE7
+    // Uniforms that never change. The sprite sheets use the units from GL_TEXTURE7 on.
+    GLint spriteTextureUnits[kSpriteTextureUnitCount];
     for (u32 i = 0; i < kSpriteTextureUnitCount; i++)
     {
-        mTextureUnits[i] = i + 7;
+        spriteTextureUnits[i] = i + 7;
     }
+
+    mPsxShader.Use();
+    mPsxShader.UniformVec2("vsViewportSize", kPsxFramebufferWidth, kPsxFramebufferHeight);
+    mPsxShader.Uniform1i("texPalette", 0);
+    mPsxShader.Uniform1i("texGas", 1);
+    mPsxShader.Uniform1i("texCamera", 2);
+    mPsxShader.Uniform1i("texFramebuffer", 7);
+    mPsxShader.Uniform1iv("texSpriteSheets", kSpriteTextureUnitCount, spriteTextureUnits);
+
+    mPassthruShader.Use();
+    mPassthruShader.Uniform1i("texTextureData", 0);
+    mPassthruShader.Uniform1i("fsFlipUV", false);
+
+    mPassthruFilterShader.Use();
+    mPassthruFilterShader.Uniform1i("texTextureData", 0);
+    mPassthruFilterShader.UniformVec2("vsViewportSize", kTargetFramebufferWidth, kTargetFramebufferHeight);
+    mPassthruFilterShader.UniformVec2("fsTexSize", kPsxFramebufferWidth, kPsxFramebufferHeight);
 }
 
 OpenGLRenderer::~OpenGLRenderer()
@@ -85,13 +125,12 @@ OpenGLRenderer::~OpenGLRenderer()
 
     GL_VERIFY(glUseProgram(0));
 
-    if (mFilterDrawVbo)
-    {
-        GL_VERIFY(glDeleteBuffers(1, &mFilterDrawVbo));
-        GL_VERIFY(glDeleteBuffers(1, &mFilterUvVbo));
-    }
     GL_VERIFY(glBindVertexArray(0));
-    GL_VERIFY(glDeleteVertexArrays(1, &mVAO));
+    GL_VERIFY(glDeleteVertexArrays(1, &mPsxVao));
+    GL_VERIFY(glDeleteVertexArrays(1, &mQuadVao));
+    GL_VERIFY(glDeleteBuffers(1, &mPsxVbo));
+    GL_VERIFY(glDeleteBuffers(1, &mPsxEbo));
+    GL_VERIFY(glDeleteBuffers(1, &mQuadVbo));
 
     GLFramebuffer::BindScreenAsTarget(mWindow);
 }
@@ -103,17 +142,12 @@ void OpenGLRenderer::Clear(u8 r, u8 g, u8 b)
         return;
     }
 
-    GLboolean scissoring;
-
-    GL_VERIFY(glGetBooleanv(GL_SCISSOR_TEST, &scissoring));
+    const bool scissoring = mScissorEnabled;
 
     // We clear the screen framebuffer here
     GLFramebuffer::BindScreenAsTarget(mWindow);
 
-    if (scissoring)
-    {
-        GL_VERIFY(glDisable(GL_SCISSOR_TEST));
-    }
+    SetScissorTest(false);
 
     GL_VERIFY(glClearColor(static_cast<f32>(r), static_cast<f32>(g), static_cast<f32>(b), 1.0f));
     GL_VERIFY(glClear(GL_COLOR_BUFFER_BIT));
@@ -121,10 +155,7 @@ void OpenGLRenderer::Clear(u8 r, u8 g, u8 b)
     // Set back to the dest PSX framebuffer
     GetDestinationPsxFramebuffer().BindAsTarget();
 
-    if (scissoring)
-    {
-        GL_VERIFY(glEnable(GL_SCISSOR_TEST));
-    }
+    SetScissorTest(scissoring);
 }
 
 void OpenGLRenderer::StartFrame()
@@ -197,30 +228,30 @@ void OpenGLRenderer::EndFrame()
     // Draw the final composed framebuffer to the screen
     SDL_Rect drawRect = GetTargetDrawRect();
 
-    GL_VERIFY(glDisable(GL_SCISSOR_TEST));
+    SetScissorTest(false);
     DrawFramebufferToScreen(
         drawRect.x,
         drawRect.y,
         drawRect.w,
         drawRect.h);
 
-    // Do ImGui
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplSDL3_NewFrame();
-    ImGui::NewFrame();
-
+    // Do ImGui, only when there's something to show
     if (gDDCheat_FlyingEnabled || AO::gDDCheat_FlyingEnabled || GetGameAutoPlayer().IsPlaying())
     {
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
+        ImGui::NewFrame();
+
         DebugWindow();
+
+        ImGui::Render();
+        ImGui::EndFrame();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        // Throw away any errors caused by ImGui - this is necessary for AMD GPUs
+        // (AMD Radeon HD 7310 with driver 8.982.10.5000)
+        glGetError();
     }
-
-    ImGui::Render();
-    ImGui::EndFrame();
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-    // Throw away any errors caused by ImGui - this is necessary for AMD GPUs
-    // (AMD Radeon HD 7310 with driver 8.982.10.5000)
-    glGetError();
 
     // Render end
     mContext.SwapBuffers();
@@ -241,16 +272,10 @@ void OpenGLRenderer::ReadPsxFramebuffer(std::vector<u8>& rgbaPixels, s32& width,
 
 void OpenGLRenderer::SetClip(const Prim_ScissorRect& clipper)
 {
-    SDL_Rect rect;
-    rect.x = clipper.mRect.x;
-    rect.y = clipper.mRect.y;
-    rect.w = clipper.mRect.w;
-    rect.h = clipper.mRect.h;
-
-    if (rect.x == 0 && rect.y == 0 && rect.w == 1 && rect.h == 1)
+    SDL_Rect rect = {};
+    if (!IRenderer::IsScissorDisabled(clipper))
     {
-        // No scissor
-        rect = {};
+        rect = {clipper.mRect.x, clipper.mRect.y, clipper.mRect.w, clipper.mRect.h};
     }
 
     mBatcher.SetScissor(rect);
@@ -380,83 +405,43 @@ u32 OpenGLRenderer::PreparePalette(AnimationPal& pCache)
     return addRet.mIndex;
 }
 
-std::shared_ptr<GLTexture2D> OpenGLRenderer::PrepareTextureFromAnim(Animation& anim)
-{
-    const AnimResource& r = anim.mAnimRes;
-
-    std::shared_ptr<GLTexture2D> texture = mTextureCache.GetCachedTexture(r.mUniqueId.Id(), kSpriteTextureLifetime);
-
-    if (!texture || !texture->IsValid())
-    {
-        auto animTex = std::make_shared<GLTexture2D>(r.mPngPtr->mWidth, r.mPngPtr->mHeight, GL_RED);
-
-        animTex->LoadImage(r.mPngPtr->mPixels.data());
-
-        texture = mTextureCache.Add(r.mUniqueId.Id(), kSpriteTextureLifetime, std::move(animTex));
-
-        mStats.mAnimUploadCount++;
-    }
-
-    return texture;
-}
-
 std::shared_ptr<GLTexture2D> OpenGLRenderer::PrepareTextureFromPoly(const Poly_FT4& poly)
 {
-    std::shared_ptr<GLTexture2D> texture;
+    // Makes a texture of the given format holding pixels, counted in uploadCount
+    auto upload = [](u32 width, u32 height, GLenum format, const void* pixels, u32& uploadCount)
+    {
+        auto texture = std::make_shared<GLTexture2D>(width, height, format);
+        texture->LoadImage(pixels);
+        uploadCount++;
+        return texture;
+    };
 
     if (poly.mFg1)
     {
-        texture = mTextureCache.GetCachedTexture(poly.mFg1->mUniqueId.Id(), kCamTextureLifetime);
-
-        if (!texture || !texture->IsValid())
-        {
-            auto fg1Tex = std::make_shared<GLTexture2D>(poly.mFg1->mImage.mWidth, poly.mFg1->mImage.mHeight, GL_RGBA);
-
-            fg1Tex->LoadImage(poly.mFg1->mImage.mPixels->data());
-
-            texture = mTextureCache.Add(poly.mFg1->mUniqueId.Id(), kCamTextureLifetime, fg1Tex);
-
-            mStats.mFg1UploadCount++;
-        }
+        const auto& image = poly.mFg1->mImage;
+        return mTextureCache.GetOrAdd(poly.mFg1->mUniqueId.Id(), kCamTextureLifetime, [&]()
+            { return upload(image.mWidth, image.mHeight, GL_RGBA, image.mPixels->data(), mStats.mFg1UploadCount); });
     }
     else if (poly.mCam)
     {
-        texture = mTextureCache.GetCachedTexture(poly.mCam->mUniqueId.Id(), kCamTextureLifetime);
-
-        if (!texture || !texture->IsValid())
-        {
-            auto camTex = std::make_shared<GLTexture2D>(poly.mCam->mData.mWidth, poly.mCam->mData.mHeight, GL_RGBA);
-
-            camTex->LoadImage(poly.mCam->mData.mPixels->data());
-
-            texture = mTextureCache.Add(poly.mCam->mUniqueId.Id(), kCamTextureLifetime, camTex);
-
-            mStats.mCamUploadCount++;
-        }
+        const auto& data = poly.mCam->mData;
+        return mTextureCache.GetOrAdd(poly.mCam->mUniqueId.Id(), kCamTextureLifetime, [&]()
+            { return upload(data.mWidth, data.mHeight, GL_RGBA, data.mPixels->data(), mStats.mCamUploadCount); });
     }
     else if (poly.mAnim)
     {
-        return PrepareTextureFromAnim(*poly.mAnim);
+        const AnimResource& res = poly.mAnim->mAnimRes;
+        return mTextureCache.GetOrAdd(res.mUniqueId.Id(), kSpriteTextureLifetime, [&]()
+            { return upload(res.mPngPtr->mWidth, res.mPngPtr->mHeight, GL_RED, res.mPngPtr->mPixels.data(), mStats.mAnimUploadCount); });
     }
     else if (poly.mFont)
     {
-        texture = mTextureCache.GetCachedTexture(poly.mFont->mFntResource.mUniqueId.Id(), kSpriteTextureLifetime);
-
-        if (!texture || !texture->IsValid())
-        {
-            std::shared_ptr<PngData> pPng = poly.mFont->mFntResource.mPngPtr;
-
-            auto fontTex = std::make_shared<GLTexture2D>(pPng->mWidth, pPng->mHeight, GL_RED);
-
-            fontTex->LoadImage(pPng->mPixels.data());
-
-            texture = mTextureCache.Add(poly.mFont->mFntResource.mUniqueId.Id(), kSpriteTextureLifetime, fontTex);
-
-            mStats.mFontUploadCount++;
-        }
+        const FontResource& res = poly.mFont->mFntResource;
+        return mTextureCache.GetOrAdd(res.mUniqueId.Id(), kSpriteTextureLifetime, [&]()
+            { return upload(res.mPngPtr->mWidth, res.mPngPtr->mHeight, GL_RED, res.mPngPtr->mPixels.data(), mStats.mFontUploadCount); });
     }
 
-    return texture;
+    return nullptr;
 }
 
 void OpenGLRenderer::DrawFramebufferToScreen(s32 x, s32 y, s32 width, s32 height)
@@ -487,77 +472,48 @@ void OpenGLRenderer::DrawFramebufferToScreen(s32 x, s32 y, s32 width, s32 height
         texHeight = static_cast<f32>(GetDestinationPsxFramebuffer().GetHeight());
     }
 
-    // Set up VBOs
-    GLuint drawVboId = 0;
-    GLuint uvVboId = 0;
-
-    const f32 fX = static_cast<f32>(x);
-    const f32 fY = static_cast<f32>(y);
-    const f32 fWidth = static_cast<f32>(width);
-    const f32 fHeight = static_cast<f32>(height);
-
-    const GLfloat drawVertices[] = {
-        fX, fY,
-        fX, fY + fHeight,
-        fX + fWidth, fY,
-
-        fX + fWidth, fY,
-        fX, fY + fHeight,
-        fX + fWidth, fY + fHeight};
-    const GLfloat uvVertices[] = {
-        0.0f, texHeight,
-        0.0f, 0.0f,
-        texWidth, texHeight,
-
-        texWidth, texHeight,
-        0.0f, 0.0f,
-        texWidth, 0.0f};
-
-    GL_VERIFY(glGenBuffers(1, &drawVboId));
-    GL_VERIFY(glBindBuffer(GL_ARRAY_BUFFER, drawVboId));
-    GL_VERIFY(
-        glBufferData(
-            GL_ARRAY_BUFFER,
-            sizeof(drawVertices),
-            drawVertices,
-            GL_STREAM_DRAW));
-
-    GL_VERIFY(glGenBuffers(1, &uvVboId));
-    GL_VERIFY(glBindBuffer(GL_ARRAY_BUFFER, uvVboId));
-    GL_VERIFY(
-        glBufferData(
-            GL_ARRAY_BUFFER,
-            sizeof(uvVertices),
-            uvVertices,
-            GL_STREAM_DRAW));
-
-    // Bind framebuffers and draw
     s32 viewportW, viewportH;
 
     GLFramebuffer::BindScreenAsTarget(mWindow, &viewportW, &viewportH);
 
     mPassthruShader.Use();
-
-    mPassthruShader.Uniform1i("texTextureData", 0);
     mPassthruShader.UniformVec2("vsViewportSize", static_cast<f32>(viewportW), static_cast<f32>(viewportH));
-    mPassthruShader.Uniform1i("fsFlipUV", false);
     mPassthruShader.UniformVec2("fsTexSize", texWidth, texHeight);
 
-    GL_VERIFY(glEnableVertexAttribArray(0));
-    GL_VERIFY(glBindBuffer(GL_ARRAY_BUFFER, drawVboId));
-    GL_VERIFY(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0));
+    DrawQuad(static_cast<f32>(x), static_cast<f32>(y), static_cast<f32>(width), static_cast<f32>(height), texWidth, texHeight);
+}
 
-    GL_VERIFY(glEnableVertexAttribArray(1));
-    GL_VERIFY(glBindBuffer(GL_ARRAY_BUFFER, uvVboId));
-    GL_VERIFY(glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0));
+void OpenGLRenderer::DrawQuad(f32 x, f32 y, f32 width, f32 height, f32 texWidth, f32 texHeight)
+{
+    const PassthruVertexData vertices[] = {
+        {x, y, 0.0f, texHeight},
+        {x, y + height, 0.0f, 0.0f},
+        {x + width, y, texWidth, texHeight},
 
+        {x + width, y, texWidth, texHeight},
+        {x, y + height, 0.0f, 0.0f},
+        {x + width, y + height, texWidth, 0.0f}};
+
+    GL_VERIFY(glBindVertexArray(mQuadVao));
+    GL_VERIFY(glBindBuffer(GL_ARRAY_BUFFER, mQuadVbo));
+    GL_VERIFY(glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STREAM_DRAW));
     GL_VERIFY(glDrawArrays(GL_TRIANGLES, 0, 6));
+}
 
-    GL_VERIFY(glDeleteBuffers(1, &drawVboId));
-    GL_VERIFY(glDeleteBuffers(1, &uvVboId));
-
-    GL_VERIFY(glDisableVertexAttribArray(0));
-    GL_VERIFY(glDisableVertexAttribArray(1));
+void OpenGLRenderer::SetScissorTest(bool enabled)
+{
+    if (enabled != mScissorEnabled)
+    {
+        if (enabled)
+        {
+            GL_VERIFY(glEnable(GL_SCISSOR_TEST));
+        }
+        else
+        {
+            GL_VERIFY(glDisable(GL_SCISSOR_TEST));
+        }
+        mScissorEnabled = enabled;
+    }
 }
 
 void OpenGLRenderer::SetupBlendMode(relive::TBlendModes blendMode)
@@ -576,71 +532,12 @@ void OpenGLRenderer::SetupBlendMode(relive::TBlendModes blendMode)
 
 void OpenGLRenderer::UpdateFilterFramebuffer()
 {
-    // Set up VBOs
-    GLuint& drawVboId = mFilterDrawVbo;
-    GLuint& uvVboId = mFilterUvVbo;
-
-    if (drawVboId == 0)
-    {
-        constexpr GLfloat drawVertices[] = {
-            0.0f, 0.0f,
-            0.0f, kTargetFramebufferHeight,
-            kTargetFramebufferWidth, 0.0,
-
-            kTargetFramebufferWidth, 0.0f,
-            0.0f, kTargetFramebufferHeight,
-            kTargetFramebufferWidth, kTargetFramebufferHeight};
-
-        constexpr GLfloat uvVertices[] = {
-            0.0f, kPsxFramebufferHeight,
-            0.0f, 0.0f,
-            kPsxFramebufferWidth, kPsxFramebufferHeight,
-
-            kPsxFramebufferWidth, kPsxFramebufferHeight,
-            0.0f, 0.0f,
-            kPsxFramebufferWidth, 0.0f};
-
-        GL_VERIFY(glGenBuffers(1, &drawVboId));
-        GL_VERIFY(glBindBuffer(GL_ARRAY_BUFFER, drawVboId));
-        GL_VERIFY(
-            glBufferData(
-                GL_ARRAY_BUFFER,
-                sizeof(drawVertices),
-                drawVertices,
-                GL_STATIC_DRAW));
-
-        GL_VERIFY(glGenBuffers(1, &uvVboId));
-        GL_VERIFY(glBindBuffer(GL_ARRAY_BUFFER, uvVboId));
-        GL_VERIFY(
-            glBufferData(
-                GL_ARRAY_BUFFER,
-                sizeof(uvVertices),
-                uvVertices,
-                GL_STATIC_DRAW));
-    }
-
-    // Bind framebuffers and draw
     mPassthruFilterShader.Use();
-
-    mPassthruFilterShader.Uniform1i("texTextureData", 0);
-    mPassthruFilterShader.UniformVec2("vsViewportSize", kTargetFramebufferWidth, kTargetFramebufferHeight);
-    mPassthruFilterShader.UniformVec2("fsTexSize", kPsxFramebufferWidth, kPsxFramebufferHeight);
 
     mFilterFramebuffer.BindAsTarget();
     GetDestinationPsxFramebuffer().BindAsSourceTextureTo(GL_TEXTURE0);
 
-    GL_VERIFY(glEnableVertexAttribArray(0));
-    GL_VERIFY(glBindBuffer(GL_ARRAY_BUFFER, drawVboId));
-    GL_VERIFY(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0));
-
-    GL_VERIFY(glEnableVertexAttribArray(1));
-    GL_VERIFY(glBindBuffer(GL_ARRAY_BUFFER, uvVboId));
-    GL_VERIFY(glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0));
-
-    GL_VERIFY(glDrawArrays(GL_TRIANGLES, 0, 6));
-
-    GL_VERIFY(glDisableVertexAttribArray(0));
-    GL_VERIFY(glDisableVertexAttribArray(1));
+    DrawQuad(0.0f, 0.0f, kTargetFramebufferWidth, kTargetFramebufferHeight, kPsxFramebufferWidth, kPsxFramebufferHeight);
 }
 
 GLFramebuffer& OpenGLRenderer::GetSourcePsxFramebuffer()
@@ -687,9 +584,7 @@ void OpenGLRenderer::DebugWindow()
                 ImGui::MenuItem("G3", nullptr, &gRenderEnable_G3);
                 ImGui::MenuItem("G2", nullptr, &gRenderEnable_G2);
 
-                #if GL_DEBUG > 0
-                ImGui::MenuItem("gl_debug", nullptr, &gGlDebug);
-                #endif
+                ImGui::MenuItem("gl_debug", nullptr, &GLDebug::Checks());
 
                 ImGui::MenuItem("filter", nullptr, &mFramebufferFilter);
 
@@ -721,63 +616,40 @@ void OpenGLRenderer::DrawBatches()
 
     mPsxShader.Use();
 
-    GLuint eboId, vboId;
-
-    // Upload vertices
-    GL_VERIFY(glGenBuffers(1, &vboId));
-    GL_VERIFY(glBindBuffer(GL_ARRAY_BUFFER, vboId));
+    // Re-filling the buffers with glBufferData lets the driver give them new storage, so this
+    // doesn't wait for last frame's draws
+    GL_VERIFY(glBindVertexArray(mPsxVao));
+    GL_VERIFY(glBindBuffer(GL_ARRAY_BUFFER, mPsxVbo));
     GL_VERIFY(glBufferData(GL_ARRAY_BUFFER, sizeof(PsxVertexData) * mBatcher.mVertices.size(), mBatcher.mVertices.data(), GL_STREAM_DRAW));
-
-    // Upload indices
-    GL_VERIFY(glGenBuffers(1, &eboId));
-    GL_VERIFY(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, eboId));
     GL_VERIFY(glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(u32) * mBatcher.mIndices.size(), mBatcher.mIndices.data(), GL_STREAM_DRAW));
-
-    // Set up vertex attributes
-    GL_VERIFY(glEnableVertexAttribArray(0));
-    GL_VERIFY(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(PsxVertexData), 0));
-    GL_VERIFY(glEnableVertexAttribArray(1));
-    GL_VERIFY(glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(PsxVertexData), (void*) offsetof(PsxVertexData, r)));
-    GL_VERIFY(glEnableVertexAttribArray(2));
-    GL_VERIFY(glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(PsxVertexData), (void*) offsetof(PsxVertexData, u)));
-    GL_VERIFY(glEnableVertexAttribArray(3));
-    GL_VERIFY(glVertexAttribIPointer(3, 4, GL_UNSIGNED_INT, sizeof(PsxVertexData), (void*) offsetof(PsxVertexData, drawMode)));
-    GL_VERIFY(glEnableVertexAttribArray(4));
-    GL_VERIFY(glVertexAttribIPointer(4, 2, GL_UNSIGNED_INT, sizeof(PsxVertexData), (void*) offsetof(PsxVertexData, paletteIndex)));
-
-    // Inform our internal resolution
-    mPsxShader.UniformVec2("vsViewportSize", kPsxFramebufferWidth, kPsxFramebufferHeight);
 
     // Bind palette texture
     mPaletteTexture->BindTo(GL_TEXTURE0);
-    mPsxShader.Uniform1i("texPalette", 0);
 
     // Bind camera (if needed)
     if (mBatcher.mCamTexture && mBatcher.mCamTexture->IsValid())
     {
         mBatcher.mCamTexture->BindTo(GL_TEXTURE2);
-        mPsxShader.Uniform1i("texCamera", 2);
     }
 
     // Bind gas
     if (mCurGasTexture && mCurGasTexture->IsValid())
     {
         mCurGasTexture->BindTo(GL_TEXTURE1);
-        mPsxShader.Uniform1i("texGas", 1);
     }
 
     u32 idxOffset = 0;
     u32 baseTextureIdx = 0;
-    for (Batcher<GLTexture2D, BatchData, kSpriteTextureUnitCount>::RenderBatch& batch : mBatcher.mBatches)
+    s32 drawingFramebuffer = -1;
+    for (const GLBatcher::RenderBatch& batch : mBatcher.mBatches)
     {
         if (batch.mScissor.x == 0 && batch.mScissor.y == 0 && batch.mScissor.w == 0 && batch.mScissor.h == 0)
         {
-            // Disable scissor
-            GL_VERIFY(glDisable(GL_SCISSOR_TEST));
+            SetScissorTest(false);
         }
         else
         {
-            GL_VERIFY(glEnable(GL_SCISSOR_TEST));
+            SetScissorTest(true);
             ScaledScissor(batch.mScissor.x, batch.mScissor.y, batch.mScissor.w, batch.mScissor.h);
         }
 
@@ -790,28 +662,15 @@ void OpenGLRenderer::DrawBatches()
             GetSourcePsxFramebuffer().BindAsSourceTextureTo(GL_TEXTURE7);
             GetDestinationPsxFramebuffer().BindAsTarget();
 
-            mPsxShader.Uniform1i("texFramebuffer", 7);
-
             SetupBlendMode(relive::TBlendModes::eBlend_0); // Ensure we're using additive blend mode
         }
         else
         {
             // Bind sprite sheets
-            f32 texSizes[kSpriteTextureUnitCount * 2] = {};
-
             for (u32 i = 0; i < batch.mTexturesInBatch; i++)
             {
-                const u32 textureId = batch.mTextureIds[i];
-                const u32 batchTextureIdx = batch.TextureIdxForId(textureId);
-                auto pTex = mBatcher.mBatchTextures[baseTextureIdx + batchTextureIdx];
-                pTex->BindTo(GL_TEXTURE7 + batchTextureIdx);
-
-                texSizes[i * 2] = static_cast<f32>(pTex->GetWidth());
-                texSizes[(i * 2) + 1] = static_cast<f32>(pTex->GetHeight());
+                mBatcher.mBatchTextures[baseTextureIdx + i]->BindTo(GL_TEXTURE7 + i);
             }
-
-            mPsxShader.Uniform1iv("texSpriteSheets", kSpriteTextureUnitCount, mTextureUnits);
-            mPsxShader.Uniform2fv("fsSpriteSheetSize", kSpriteTextureUnitCount, texSizes);
 
             // Assign blend mode
             if (batch.mBlendMode != relive::TBlendModes::None)
@@ -820,7 +679,11 @@ void OpenGLRenderer::DrawBatches()
             }
         }
 
-        mPsxShader.Uniform1i("bDrawingFramebuffer", static_cast<GLint>(batch.mSourceIsFramebuffer));
+        if (drawingFramebuffer != static_cast<s32>(batch.mSourceIsFramebuffer))
+        {
+            drawingFramebuffer = static_cast<s32>(batch.mSourceIsFramebuffer);
+            mPsxShader.Uniform1i("bDrawingFramebuffer", drawingFramebuffer);
+        }
 
         // Set index data and render
         GL_VERIFY(glDrawElements(GL_TRIANGLES, (batch.mNumTrisToDraw) * 3, GL_UNSIGNED_INT, (void*) (idxOffset * sizeof(GLuint))));
@@ -830,16 +693,6 @@ void OpenGLRenderer::DrawBatches()
 
         mStats.mInvalidationsCount++;
     }
-
-    // Tear down
-    GL_VERIFY(glDeleteBuffers(1, &vboId));
-    GL_VERIFY(glDeleteBuffers(1, &eboId));
-
-    GL_VERIFY(glDisableVertexAttribArray(0));
-    GL_VERIFY(glDisableVertexAttribArray(1));
-    GL_VERIFY(glDisableVertexAttribArray(2));
-    GL_VERIFY(glDisableVertexAttribArray(3));
-    GL_VERIFY(glDisableVertexAttribArray(4));
 
     // Do not clear gas here - it's released later
 }

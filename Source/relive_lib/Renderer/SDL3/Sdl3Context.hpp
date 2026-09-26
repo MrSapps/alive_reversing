@@ -43,7 +43,9 @@ struct SdlRendererDeleter final
 class Sdl3Context final
 {
 public:
-    explicit Sdl3Context(Window& window);
+    // checks turns on the validation of SDL's GPU, Vulkan and Direct3D 11 backends, where they
+    // have it (SDL's OpenGL backends have none)
+    Sdl3Context(Window& window, bool checks);
 
     SDL_Renderer* GetRenderer();
     bool IsRenderTargetSupported();

@@ -22,6 +22,7 @@ TEST(CommandLineOptions, NothingGivenMeansDefaults)
     EXPECT_FALSE(options.mDdCheat);
     EXPECT_FALSE(options.mShowFps);
     EXPECT_FALSE(options.mNoFrameSkip);
+    EXPECT_FALSE(options.mRendererChecks);
     EXPECT_EQ(options.mRecordFile, std::nullopt);
     EXPECT_EQ(options.mPlayFile, std::nullopt);
     EXPECT_EQ(options.mRenderer, std::nullopt);
@@ -65,6 +66,12 @@ TEST(CommandLineOptions, ModAndDebugOptions)
     EXPECT_EQ(options.mSlowLoadMs, 250u);
 
     EXPECT_TRUE(Parse({"-it_is_me_your_father"}).mDdCheat);
+}
+
+TEST(CommandLineOptions, RendererChecks)
+{
+    EXPECT_TRUE(Parse({"-renderer_checks"}).mRendererChecks);
+    EXPECT_FALSE(Parse({"-renderer=opengl"}).mRendererChecks);
 }
 
 TEST(CommandLineOptions, InvalidSlowLoadIsIgnored)

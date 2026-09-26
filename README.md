@@ -54,6 +54,7 @@ If the chosen game's files aren't in the directory, the other game is run. If bo
 | `-max_fps=<n>` | Run at up to `n` frames a second instead of the original 30, or `0` for no limit (`-maxfps` also works). The game runs faster the more frames it shows, so this also speeds up playback of a recording. |
 | `-ddnoskip` | Render every frame instead of skipping frames to keep up. |
 | `-ddslowload=<ms>` | Make each resource loaded in the background take at least this many milliseconds, to test loading on slow storage. |
+| `-renderer_checks` | Check for renderer errors as it goes, which is slower. The OpenGL renderer checks every OpenGL call and stops on an error. The SDL3 renderer turns on the validation of SDL's GPU, Vulkan and Direct3D 11 backends, where they are used. |
 | `-help` | Show the command line options and exit (`--help`, `-h` and `/?` also work). |
 
 The display options (`-renderer`, `-fullscreen`, `-keep_aspect_ratio`, `-filter_screen`,

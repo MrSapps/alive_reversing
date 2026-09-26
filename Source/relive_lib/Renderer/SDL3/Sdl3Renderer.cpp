@@ -6,9 +6,9 @@
 #include <cmath>
 #include <algorithm>
 
-Sdl3Renderer::Sdl3Renderer(Window& window)
+Sdl3Renderer::Sdl3Renderer(Window& window, bool checks)
     : IRenderer(window),
-    mContext(window),
+    mContext(window, checks),
     mPsxFbTexture(mContext, kPsxFramebufferWidth, kPsxFramebufferHeight, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET),
     mGasTexture(mContext, kPsxFramebufferWidth, kPsxFramebufferHeight, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING),
     mGasTarget(mContext, kPsxFramebufferWidth, kPsxFramebufferHeight, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET)
@@ -215,7 +215,7 @@ void Sdl3Renderer::Draw(const Poly_FT4& poly)
     {
         tex = PrepareTextureFromPoly(poly)->GetTexture();
     }
-    else if (poly.mAnim)
+    else if (poly.mAnim || poly.mFont)
     {
         RGBA32 shading = {
             poly.R0(),
@@ -224,19 +224,20 @@ void Sdl3Renderer::Draw(const Poly_FT4& poly)
             255
         };
 
-        if (!poly.mIsShaded)
+        // Text is always shaded
+        if (poly.mAnim && !poly.mIsShaded)
         {
             shading.a = 0;
         }
 
-        AnimResource& animRes = poly.mAnim->mAnimRes;
-        const PerFrameInfo* pHeader = poly.mAnim->Get_FrameHeader(-1);
-        std::shared_ptr<PngData> pPng = animRes.mPngPtr;
+        const std::shared_ptr<AnimationPal>& pPal = poly.mAnim ? poly.mAnim->mAnimRes.mCurPal : poly.mFont->mFntResource.mCurPal;
+        const PngData& png = poly.mAnim ? *poly.mAnim->mAnimRes.mPngPtr : *poly.mFont->mFntResource.mPngPtr;
+        const IRenderer::QuadUVs uvs = poly.mAnim ? IRenderer::GetAnimUVs(poly) : IRenderer::GetFontUVs(poly);
 
         SDL_FColor vertexColour = {};
         tex =
             PrepareTextureFromPoly(poly)->GetTextureUsePalette(
-                poly.mAnim->mAnimRes.mCurPal,
+                pPal,
                 shading,
                 poly.mSemiTransparent,
                 poly.mBlendMode,
@@ -247,76 +248,14 @@ void Sdl3Renderer::Draw(const Poly_FT4& poly)
             vertex.color = vertexColour;
         }
 
-        // Fiddle with UVs...
-        f32 u0 = static_cast<f32>(pHeader->mSpriteSheetX) / pPng->mWidth;
-        f32 v0 = static_cast<f32>(pHeader->mSpriteSheetY) / pPng->mHeight;
-        f32 u1 = u0 + (static_cast<f32>(pHeader->mSpriteWidth - 1) / pPng->mWidth);
-        f32 v1 = v0 + (static_cast<f32>(pHeader->mSpriteHeight - 1) / pPng->mHeight);
-
-        if (poly.mFlipX)
-        {
-            std::swap(u0, u1);
-        }
-
-        if (poly.mFlipY)
-        {
-            std::swap(v0, v1);
-        }
-
-        vertices[0].tex_coord.x = u0;
-        vertices[0].tex_coord.y = v0;
-
-        vertices[1].tex_coord.x = u1;
-        vertices[1].tex_coord.y = v0;
-
-        vertices[2].tex_coord.x = u0;
-        vertices[2].tex_coord.y = v1;
-
-        vertices[3].tex_coord.x = u1;
-        vertices[3].tex_coord.y = v1;
-    }
-    else if (poly.mFont)
-    {
-        RGBA32 shading = {
-            poly.R0(),
-            poly.G0(),
-            poly.B0(),
-            255
-        };
-
-        std::shared_ptr<PngData> pPng = poly.mFont->mFntResource.mPngPtr;
-
-        f32 u0 = poly.U0() / static_cast<f32>(pPng->mWidth);
-        f32 v0 = poly.V0() / static_cast<f32>(pPng->mHeight);
-
-        f32 u1 = poly.U3() / static_cast<f32>(pPng->mWidth);
-        f32 v1 = poly.V3() / static_cast<f32>(pPng->mHeight);
-
-        SDL_FColor vertexColour = {};
-        tex =
-            PrepareTextureFromPoly(poly)->GetTextureUsePalette(
-                poly.mFont->mFntResource.mCurPal,
-                shading,
-                poly.mSemiTransparent,
-                poly.mBlendMode,
-                vertexColour
-            );
-        for (SDL_Vertex& vertex : vertices)
-        {
-            vertex.color = vertexColour;
-        }
-
-        vertices[0].tex_coord.x = u0;
-        vertices[0].tex_coord.y = v0;
-
-        vertices[1].tex_coord.x = u1;
-        vertices[1].tex_coord.y = v0;
-
-        vertices[2].tex_coord.x = u0;
-        vertices[2].tex_coord.y = v1;
-
-        vertices[3].tex_coord.x = u1;
-        vertices[3].tex_coord.y = v1;
+        const f32 u0 = uvs.u0 / png.mWidth;
+        const f32 v0 = uvs.v0 / png.mHeight;
+        const f32 u1 = uvs.u1 / png.mWidth;
+        const f32 v1 = uvs.v1 / png.mHeight;
+        vertices[0].tex_coord = {u0, v0};
+        vertices[1].tex_coord = {u1, v0};
+        vertices[2].tex_coord = {u0, v1};
+        vertices[3].tex_coord = {u1, v1};
     }
     else
     {
@@ -489,8 +428,7 @@ void Sdl3Renderer::SetClip(const Prim_ScissorRect& clipper)
     rect.w = static_cast<s32>(clipper.mRect.w * factorW);
     rect.h = static_cast<s32>(clipper.mRect.h * factorH);
 
-    // (0, 0, 1, 1) means no clipping
-    mClipEnabled = !(clipper.mRect.x == 0 && clipper.mRect.y == 0 && clipper.mRect.w == 1 && clipper.mRect.h == 1);
+    mClipEnabled = !IRenderer::IsScissorDisabled(clipper);
     mClipRect = rect;
     ApplyClip();
 
@@ -637,22 +575,17 @@ std::shared_ptr<Sdl3Texture> Sdl3Renderer::PrepareTextureFromPoly(const Poly_FT4
 
     if (poly.mFg1)
     {
-        // TODO: Implement this
-        // FIXME: kCamLifetime should be in IRenderer ?
-        texture = mTextureCache.GetCachedTexture(poly.mFg1->mUniqueId.Id(), 1);
+        texture = mTextureCache.GetCachedTexture(poly.mFg1->mUniqueId.Id(), kCamTextureLifetime);
 
         if (!texture || mFg1CamId != mLastTouchedCamId)
         {
-            std::shared_ptr<Sdl3Texture> camRefTex = mTextureCache.GetCachedTexture(mLastTouchedCamId, 1);
+            std::shared_ptr<Sdl3Texture> camRefTex = mTextureCache.GetCachedTexture(mLastTouchedCamId, kCamTextureLifetime);
 
             if (camRefTex)
             {
                 std::shared_ptr<Sdl3Texture> fg1Tex = Sdl3Texture::FromMask(mContext, camRefTex, poly.mFg1->mImage.mPixels->data());
 
-                texture = mTextureCache.Add(
-                    poly.mFg1->mUniqueId.Id(),
-                    1,
-                    fg1Tex);
+                texture = mTextureCache.Add(poly.mFg1->mUniqueId.Id(), kCamTextureLifetime, fg1Tex);
 
                 mFg1CamId = mLastTouchedCamId;
 
@@ -668,85 +601,26 @@ std::shared_ptr<Sdl3Texture> Sdl3Renderer::PrepareTextureFromPoly(const Poly_FT4
     {
         mLastTouchedCamId = poly.mCam->mUniqueId.Id();
 
-        // FIXME: kCamLifetime should be in IRenderer ?
-        texture = mTextureCache.GetCachedTexture(poly.mCam->mUniqueId.Id(), 1);
-
-        if (!texture)
+        texture = mTextureCache.GetOrAdd(poly.mCam->mUniqueId.Id(), kCamTextureLifetime, [&]()
         {
-            auto camTex =
-                std::make_shared<Sdl3Texture>(
-                    mContext,
-                    poly.mCam->mData.mWidth,
-                    poly.mCam->mData.mHeight,
-                    SDL_PIXELFORMAT_RGBA32,
-                    SDL_TEXTUREACCESS_STATIC
-                );
-
-            camTex->Update(nullptr, poly.mCam->mData.mPixels->data());
-
-            texture =
-                mTextureCache.Add(
-                    poly.mCam->mUniqueId.Id(),
-                    1,
-                    camTex
-                );
-
             LOG("SDL3 CAM cache miss %u", poly.mCam->mUniqueId.Id());
-        }
+            const auto& data = poly.mCam->mData;
+            auto camTex = std::make_shared<Sdl3Texture>(mContext, data.mWidth, data.mHeight, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC);
+            camTex->Update(nullptr, data.mPixels->data());
+            return camTex;
+        });
     }
-    else if (poly.mAnim)
+    else if (poly.mAnim || poly.mFont)
     {
-        // FIXME: Temp bump amount
-        texture = mTextureCache.GetCachedTexture(poly.mAnim->mAnimRes.mUniqueId.Id(), 255);
-
-        if (!texture)
+        // Sprite sheets are kept as 8 bit and drawn through their palette, see Sdl3Texture
+        const u32 id = poly.mAnim ? poly.mAnim->mAnimRes.mUniqueId.Id() : poly.mFont->mFntResource.mUniqueId.Id();
+        const PngData& png = poly.mAnim ? *poly.mAnim->mAnimRes.mPngPtr : *poly.mFont->mFntResource.mPngPtr;
+        texture = mTextureCache.GetOrAdd(id, kSpriteTextureLifetime, [&]()
         {
-            auto animTex =
-                std::make_shared<Sdl3Texture>(
-                    mContext,
-                    poly.mAnim->mAnimRes.mPngPtr->mWidth,
-                    poly.mAnim->mAnimRes.mPngPtr->mHeight,
-                    SDL_PIXELFORMAT_INDEX8,
-                    SDL_TEXTUREACCESS_STREAMING
-                );
-
-            animTex->Update(nullptr, poly.mAnim->mAnimRes.mPngPtr->mPixels.data());
-
-            texture =
-                mTextureCache.Add(
-                    poly.mAnim->mAnimRes.mUniqueId.Id(),
-                    255,
-                    animTex
-                );
-        }
-    }
-    else if (poly.mFont)
-    {
-        // FIXME: Temp bump amount
-        texture = mTextureCache.GetCachedTexture(poly.mFont->mFntResource.mUniqueId.Id(), 255);
-
-        if (!texture)
-        {
-            std::shared_ptr<PngData> pPng = poly.mFont->mFntResource.mPngPtr;
-
-            auto fontTex =
-                std::make_shared<Sdl3Texture>(
-                    mContext,
-                    pPng->mWidth,
-                    pPng->mHeight,
-                    SDL_PIXELFORMAT_INDEX8,
-                    SDL_TEXTUREACCESS_STREAMING
-                );
-
-            fontTex->Update(nullptr, pPng->mPixels.data());
-
-            texture =
-                mTextureCache.Add(
-                    poly.mFont->mFntResource.mUniqueId.Id(),
-                    255,
-                    fontTex
-                );
-        }
+            auto spriteTex = std::make_shared<Sdl3Texture>(mContext, png.mWidth, png.mHeight, SDL_PIXELFORMAT_INDEX8, SDL_TEXTUREACCESS_STREAMING);
+            spriteTex->Update(nullptr, png.mPixels.data());
+            return spriteTex;
+        });
     }
 
     return texture;

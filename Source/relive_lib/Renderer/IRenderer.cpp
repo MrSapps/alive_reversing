@@ -7,7 +7,11 @@
 #include "../../relive_lib/FatalError.hpp"
 #include "../../relive_lib/Window.hpp"
 
+#include "../Animation.hpp"
+#include "../Primitives.hpp"
+
 #include <cmath>
+#include <utility>
 
 static IRenderer* gRenderer = nullptr;
 
@@ -17,12 +21,12 @@ IRenderer* IRenderer::GetRenderer()
 }
 
 template<typename T>
-static void MakeRenderer(Window& window)
+static void MakeRenderer(Window& window, bool checks)
 {
     TRACE_ENTRYEXIT;
     try
     {
-        gRenderer = new T(window);
+        gRenderer = new T(window, checks);
     }
     catch (const std::exception& e)
     {
@@ -30,7 +34,7 @@ static void MakeRenderer(Window& window)
     }
 }
 
-bool IRenderer::CreateRenderer(Renderers type, Window& window)
+bool IRenderer::CreateRenderer(Renderers type, Window& window, bool checks)
 {
     if (gRenderer)
     {
@@ -41,12 +45,12 @@ bool IRenderer::CreateRenderer(Renderers type, Window& window)
     {
         case Renderers::Sdl3:
             LOG_INFO("Create SDL3 renderer");
-            MakeRenderer<Sdl3Renderer>(window);
+            MakeRenderer<Sdl3Renderer>(window, checks);
             break;
 
         case Renderers::OpenGL:
             LOG_INFO("Create OpenGL renderer");
-            MakeRenderer<OpenGLRenderer>(window);
+            MakeRenderer<OpenGLRenderer>(window, checks);
             break;
 
         default:
@@ -219,6 +223,39 @@ SDL_Rect IRenderer::GetTargetDrawRect()
     rect.y = shakeY + ((wndHeight - rect.h) / 2);
 
     return rect;
+}
+
+IRenderer::QuadUVs IRenderer::GetAnimUVs(const Poly_FT4& poly)
+{
+    const PerFrameInfo* pHeader = poly.mAnim->Get_FrameHeader(-1);
+
+    QuadUVs uvs;
+    uvs.u0 = static_cast<f32>(pHeader->mSpriteSheetX);
+    uvs.v0 = static_cast<f32>(pHeader->mSpriteSheetY);
+    uvs.u1 = uvs.u0 + pHeader->mSpriteWidth - 1;
+    uvs.v1 = uvs.v0 + pHeader->mSpriteHeight - 1;
+
+    if (poly.mFlipX)
+    {
+        std::swap(uvs.u0, uvs.u1);
+    }
+
+    if (poly.mFlipY)
+    {
+        std::swap(uvs.v0, uvs.v1);
+    }
+
+    return uvs;
+}
+
+IRenderer::QuadUVs IRenderer::GetFontUVs(const Poly_FT4& poly)
+{
+    return {static_cast<f32>(poly.U0()), static_cast<f32>(poly.V0()), static_cast<f32>(poly.U3()), static_cast<f32>(poly.V3())};
+}
+
+bool IRenderer::IsScissorDisabled(const Prim_ScissorRect& clipper)
+{
+    return clipper.mRect.x == 0 && clipper.mRect.y == 0 && clipper.mRect.w == 1 && clipper.mRect.h == 1;
 }
 
 IRenderer::Quad2D IRenderer::LineToQuad(const Point2D& p1, const Point2D& p2)

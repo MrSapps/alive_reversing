@@ -25,6 +25,7 @@ void GLShaderProgram::LinkShaders(GLShader &vertexShader, GLShader &fragmentShad
     fragmentShader.AttachTo(mGLId);
 
     GL_VERIFY(glLinkProgram(mGLId));
+    mUniformLocations.clear();
 
     // Check successful compile
     GLint infoLogLength;
@@ -77,9 +78,17 @@ void GLShaderProgram::Use()
 }
 
 
-GLuint GLShaderProgram::GetUniformLocation(const char_type* uniform)
+GLint GLShaderProgram::GetUniformLocation(const char_type* uniform)
 {
-    GLuint ret = GL_VERIFY(glGetUniformLocation(mGLId, uniform));
+    for (const UniformLocation& cached : mUniformLocations)
+    {
+        if (cached.mName == uniform)
+        {
+            return cached.mLocation;
+        }
+    }
 
-    return ret;
+    const GLint location = GL_VERIFY(glGetUniformLocation(mGLId, uniform));
+    mUniformLocations.push_back({uniform, location});
+    return location;
 }

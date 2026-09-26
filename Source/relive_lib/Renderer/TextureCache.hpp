@@ -2,12 +2,11 @@
 
 #include "../../relive_lib/Types.hpp"
 #include <map>
+#include <utility>
 
-#pragma once
-
-#include "../../relive_lib/Types.hpp"
-#include <map>
-
+// Keeps the renderer's textures alive for a while after they were last used, keyed by the
+// resource's unique id. A texture's lifetime is the number of DecreaseResourceLifetimes calls
+// (one a frame) it survives without being used again.
 template <typename TextureType>
 class TextureCache final
 {
@@ -29,16 +28,13 @@ public:
 
     TextureType Add(u32 uniqueId, u32 lifetime, TextureType texture)
     {
-        CachedTexture newTex;
-
-        newTex.mTexture = std::move(texture);
-        newTex.mLifetime = lifetime;
-
-        mTextureCache[uniqueId] = std::move(newTex);
-
-        return mTextureCache[uniqueId].mTexture;
+        CachedTexture& cached = mTextureCache[uniqueId];
+        cached.mTexture = std::move(texture);
+        cached.mLifetime = lifetime;
+        return cached.mTexture;
     }
 
+    // The cached texture, or nullptr. A bump above 0 resets its lifetime to bump.
     TextureType GetCachedTexture(u32 uniqueId, s32 bump)
     {
         auto it = mTextureCache.find(uniqueId);
@@ -55,6 +51,18 @@ public:
         }
 
         return it->second.mTexture;
+    }
+
+    // The cached texture with its lifetime reset, or else the one create() makes, which is added
+    template <typename CreateFn>
+    TextureType GetOrAdd(u32 uniqueId, s32 lifetime, CreateFn&& create)
+    {
+        TextureType texture = GetCachedTexture(uniqueId, lifetime);
+        if (!texture)
+        {
+            texture = Add(uniqueId, lifetime, create());
+        }
+        return texture;
     }
 
     void DecreaseResourceLifetimes()
@@ -79,26 +87,6 @@ private:
     {
         TextureType mTexture = {};
         s32 mLifetime = 0;
-
-
-        CachedTexture()
-        {
-        }
-
-        CachedTexture(CachedTexture&& src)
-            : mTexture(std::move(src.mTexture))
-            , mLifetime(src.mLifetime)
-        {
-        }
-
-
-        CachedTexture& operator=(CachedTexture&& src) noexcept
-        {
-            mTexture = std::move(src.mTexture);
-            mLifetime = src.mLifetime;
-
-            return *this;
-        }
     };
     std::map<u32, CachedTexture> mTextureCache;
 };
