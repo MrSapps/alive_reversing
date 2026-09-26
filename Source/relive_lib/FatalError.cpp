@@ -3,6 +3,26 @@
 #include <stdarg.h>
 #include <vector>
 
+#if defined(__SANITIZE_ADDRESS__) && !defined(_WIN32)
+    #include <sanitizer/common_interface_defs.h>
+#elif defined(__linux__)
+    #include <execinfo.h>
+    #include <unistd.h>
+#endif
+
+// Where the fatal error came from, on stderr
+static void PrintCallStack()
+{
+#if defined(__SANITIZE_ADDRESS__) && !defined(_WIN32)
+    // Symbolized, with file and line
+    __sanitizer_print_stack_trace();
+#elif defined(__linux__)
+    void* frames[64];
+    const int count = backtrace(frames, 64);
+    backtrace_symbols_fd(frames, count, STDERR_FILENO);
+#endif
+}
+
 [[noreturn]] void ALIVE_FATAL(const char_type* fmt, ...)
 {
     char_type stackBuf[2048] = {};
@@ -28,6 +48,7 @@
     va_end(argsCopy);
 
     LOG_ERROR("%s", pMessage);
+    PrintCallStack();
 
     Sys::ShowMessageBox(nullptr, pMessage, "R.E.L.I.V.E fatal error.");
     abort();
