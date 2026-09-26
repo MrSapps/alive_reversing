@@ -90,6 +90,7 @@ public:
     static SDL_BlendMode PsxTextureBlendMode();
     static SDL_BlendMode PsxTextureSubtractBlendMode();
     static SDL_BlendMode Fg1MaskBlendMode();
+    static SDL_BlendMode GasMaskBlendMode();
     bool SupportsCustomBlendModes();
 
     // Whether the SDL renderer can draw 8 bit textures through a palette (SDL 3.4's OpenGL

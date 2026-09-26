@@ -12,6 +12,7 @@
 #include "../../relive_lib/GameObjects/ScreenManager.hpp"
 #include "../../AliveLibAE/Map.hpp"
 #include "../../AliveLibAO/Map.hpp"
+#include "../../AliveLibAE/LaughingGas.hpp"
 #include <algorithm>
 #include <cstdio>
 #include <numeric>
@@ -27,6 +28,10 @@ static constexpr u32 kWarmUpFrames = 10;
 
 // Pixel differences between renderers smaller than this are rounding, not bugs
 static constexpr u8 kRendererDiffTolerance = 8;
+
+// The renderers draw the same apart from which pixel wins where a triangle edge or a texel
+// boundary falls exactly on a pixel centre. More pixels than this differing is a bug.
+static constexpr f64 kMaxRendererDiffPercent = 0.1;
 
 static f64 NowMs()
 {
@@ -180,6 +185,7 @@ void RenderTest::StartScene(u32 sceneIdx)
 
     // Every run of a scene starts from the same state, so its frames come out the same
     sRandomSeed = 0;
+    LaughingGas::ResetRandomSeed();
     sGnFrame = 0;
     mSceneFrame = 0;
 
@@ -769,7 +775,6 @@ void RenderTest::CompareWithBaseline(const RendererResult& result)
 
 void RenderTest::CompareRenderers(const std::vector<RendererResult>& results)
 {
-    // Only reported: the renderers are known to differ, the numbers show where and by how much
     for (std::size_t a = 0; a < results.size(); a++)
     {
         for (std::size_t b = a + 1; b < results.size(); b++)
@@ -785,9 +790,17 @@ void RenderTest::CompareRenderers(const std::vector<RendererResult>& results)
             {
                 const SceneResult& sceneA = results[a].mScenes[i];
                 const SceneResult& sceneB = results[b].mScenes[i];
-                if (!CaptureDiff::Compare(sceneA.mCapture, sceneB.mCapture, kRendererDiffTolerance).Identical())
+                const CaptureDiff diff = CaptureDiff::Compare(sceneA.mCapture, sceneB.mCapture, kRendererDiffTolerance);
+                if (!diff.Identical())
                 {
                     CaptureDiff::MakeImage(sceneA.mCapture, sceneB.mCapture, kRendererDiffTolerance).SavePng(mFs, dir + "/" + sceneA.mFileName);
+                }
+
+                if (diff.DifferingPercent() > kMaxRendererDiffPercent)
+                {
+                    Fail(Format("\"%s\" is drawn differently by %s and %s (%.2f%% of pixels, see %s)",
+                                sceneA.mTitle.c_str(), IRenderer::TypeToString(results[a].mType), IRenderer::TypeToString(results[b].mType),
+                                diff.DifferingPercent(), (dir.substr(mOptions.mOutDir.size() + 1) + "/" + sceneA.mFileName).c_str()));
                 }
             }
         }

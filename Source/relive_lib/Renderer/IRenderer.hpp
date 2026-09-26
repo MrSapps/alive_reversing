@@ -81,6 +81,7 @@ public: // TODO: Make protected later
         Point2D verts[4];
     };
 
+    // A 1 pixel wide quad along the line. verts[0] and [1] are at p1, [2] and [3] at p2.
     static Quad2D LineToQuad(const Point2D& p1, const Point2D& p2);
 
 public:

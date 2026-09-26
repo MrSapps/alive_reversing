@@ -249,6 +249,21 @@ IRenderer::Quad2D IRenderer::LineToQuad(const Point2D& p1, const Point2D& p2)
     //  | \__________/ |
     //  | /          \ |
     // xy1 ---------- xy3
+    //
+    // The first two corners are at p1's end and the last two at p2's, so that colours given
+    // per end go the right way however the line was drawn
+    if (p1.x > p2.x)
+    {
+        return {
+            {
+                { finalX2, finalY2 },
+                { finalX3, finalY3 },
+                { finalX0, finalY0 },
+                { finalX1, finalY1 }
+            }
+        };
+    }
+
     return {
         {
             { finalX0, finalY0 },

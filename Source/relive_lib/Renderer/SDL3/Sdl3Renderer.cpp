@@ -4,6 +4,7 @@
 #include "Sdl3Renderer.hpp"
 #include "../../Window.hpp"
 #include <cmath>
+#include <algorithm>
 
 Sdl3Renderer::Sdl3Renderer(Window& window)
     : IRenderer(window),
@@ -12,11 +13,13 @@ Sdl3Renderer::Sdl3Renderer(Window& window)
         Sdl3Texture(mContext, kPsxFramebufferWidth, kPsxFramebufferHeight, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET),
         Sdl3Texture(mContext, kPsxFramebufferWidth, kPsxFramebufferHeight, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET)
     },
-    mGasTexture(mContext, kPsxFramebufferWidth, kPsxFramebufferHeight, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING)
+    mGasTexture(mContext, kPsxFramebufferWidth, kPsxFramebufferHeight, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING),
+    mGasTarget(mContext, kPsxFramebufferWidth, kPsxFramebufferHeight, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET)
 {
     // Set up the gas blend mode
     //
-    mGasTexture.SetTextureBlendMode(SDL_BLENDMODE_ADD);
+    SDL_SetTextureScaleMode(mGasTexture.GetTexture(), SDL_SCALEMODE_NEAREST);
+    SDL_SetTextureScaleMode(mGasTarget.GetTexture(), SDL_SCALEMODE_NEAREST);
 
     // Render target support is required for things like FG1 mask and
     // framebuffer textures
@@ -30,6 +33,26 @@ Sdl3Renderer::Sdl3Renderer(Window& window)
     {
         throw RendererException("The SDL3 renderer needs custom blend modes, which this SDL renderer doesn't support");
     }
+
+    // The laughing gas checkerboard, in the OpenGL renderer's pattern (its framebuffer rows count
+    // from the bottom): white with half alpha where the gas is blended in, and black with full
+    // alpha ("leave alone" once drawn) elsewhere
+    std::vector<RGBA32> mask(kPsxFramebufferWidth * kPsxFramebufferHeight);
+    for (s32 y = 0; y < kPsxFramebufferHeight; y++)
+    {
+        for (s32 x = 0; x < kPsxFramebufferWidth; x++)
+        {
+            const bool blended = ((x + (kPsxFramebufferHeight - 1 - y)) & 1) == 0;
+            mask[y * kPsxFramebufferWidth + x] = blended ? RGBA32{255, 255, 255, 128} : RGBA32{0, 0, 0, 255};
+        }
+    }
+    mGasMask = mContext.CreateTexture(SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, kPsxFramebufferWidth, kPsxFramebufferHeight);
+    if (!SDL_UpdateTexture(mGasMask.get(), nullptr, mask.data(), kPsxFramebufferWidth * 4))
+    {
+        ALIVE_FATAL("SDL_UpdateTexture failed: %s", SDL_GetError());
+    }
+    Sdl3Context::SetTextureBlendMode(mGasMask.get(), Sdl3Context::GasMaskBlendMode());
+    SDL_SetTextureScaleMode(mGasMask.get(), SDL_SCALEMODE_NEAREST);
 }
 
 Sdl3Renderer::~Sdl3Renderer()
@@ -62,32 +85,65 @@ void Sdl3Renderer::Draw(const Prim_GasEffect& gasEffect)
 {
     mFramebufferSnapshotValid = false;
 
-    const f32 x = static_cast<f32>(gasEffect.x);
-    const f32 y = static_cast<f32>(gasEffect.y);
-    const f32 w = static_cast<f32>(gasEffect.w);
-    const f32 h = static_cast<f32>(gasEffect.h);
+    // The gas is a low resolution image (a quarter of the width and half the height of the
+    // area) stretched over the area. The OpenGL renderer blends it in half and half on every
+    // other pixel, in a checkerboard, and leaves the rest alone. Here that's done by stretching
+    // it into a render target at half strength, cutting the checkerboard out of that with a mask,
+    // and drawing the result over the frame.
+    const s32 gasWidth = (gasEffect.w - gasEffect.x) / 4;
+    const s32 gasHeight = (gasEffect.h - gasEffect.y) / 2;
+    if (!gasEffect.pGasPixels || gasWidth <= 0 || gasHeight <= 0)
+    {
+        return;
+    }
 
-    const f32 gasWidth = std::floor(static_cast<f32>(gasEffect.w - gasEffect.x) / 4);
-    const f32 gasHeight = std::floor(static_cast<f32>(gasEffect.h - gasEffect.y) / 2);
-
-    const SDL_Rect gasRect = { 0, 0, static_cast<s32>(gasWidth), static_cast<s32>(gasHeight) };
-
+    const SDL_Rect gasRect = {0, 0, gasWidth, gasHeight};
     mGasTexture.Update(&gasRect, gasEffect.pGasPixels);
 
-    SDL_FColor c = { 0.5f, 0.5f, 0.5f, 1.0f };
-
-    f32 u1 = gasWidth / kPsxFramebufferWidth;
-    f32 v1 = gasHeight / kPsxFramebufferHeight;
-
+    const f32 x0 = static_cast<f32>(gasEffect.x);
+    const f32 y0 = static_cast<f32>(gasEffect.y);
+    const f32 x1 = static_cast<f32>(gasEffect.w);
+    const f32 y1 = static_cast<f32>(gasEffect.h);
+    SDL_Renderer* pRenderer = mContext.GetRenderer();
     constexpr s32 indexList[6] = { 0, 1, 2, 1, 2 , 3 };
-    SDL_Vertex gasVerts[] = {
-        { {x, y}, c, { 0.0f,   0.0f } },
-        { {w, y}, c, { u1,  0.0f } },
-        { {x, h}, c, { 0.0f,  v1 } },
-        { {w, h}, c, { u1, v1 } },
-    };
 
-    DrawVertices(gasVerts, 4, indexList, 6, mGasTexture.GetTexture(), false, relive::TBlendModes::eBlend_0);
+    // 1: the gas at half strength, stretched over the area of the render target
+    mContext.UseTextureFramebuffer(mGasTarget.GetTexture());
+    const SDL_FColor half = {0.5f, 0.5f, 0.5f, 0.5f};
+    const f32 gasU = static_cast<f32>(gasWidth) / kPsxFramebufferWidth;
+    const f32 gasV = static_cast<f32>(gasHeight) / kPsxFramebufferHeight;
+    const SDL_Vertex gasVerts[] = {
+        { {x0, y0}, half, { 0.0f, 0.0f } },
+        { {x1, y0}, half, { gasU, 0.0f } },
+        { {x0, y1}, half, { 0.0f, gasV } },
+        { {x1, y1}, half, { gasU, gasV } },
+    };
+    SDL_RenderGeometry(pRenderer, mGasTexture.GetTexture(), gasVerts, 4, indexList, 6);
+    mContext.CountDrawCall();
+
+    // 2: the checkerboard cut out of it, the same area of the mask
+    const SDL_FColor white = {1.0f, 1.0f, 1.0f, 1.0f};
+    const f32 u0 = x0 / kPsxFramebufferWidth;
+    const f32 v0 = y0 / kPsxFramebufferHeight;
+    const f32 u1 = x1 / kPsxFramebufferWidth;
+    const f32 v1 = y1 / kPsxFramebufferHeight;
+    const SDL_Vertex areaVerts[] = {
+        { {x0, y0}, white, { u0, v0 } },
+        { {x1, y0}, white, { u1, v0 } },
+        { {x0, y1}, white, { u0, v1 } },
+        { {x1, y1}, white, { u1, v1 } },
+    };
+    SDL_RenderGeometry(pRenderer, mGasMask.get(), areaVerts, 4, indexList, 6);
+    mContext.CountDrawCall();
+
+    // 3: over the frame, as src + dst * src alpha, like the OpenGL renderer
+    mContext.UseTextureFramebuffer(GetActiveFbTexture().GetTexture());
+    ApplyClip();
+    SDL_Vertex frameVerts[4];
+    std::copy(std::begin(areaVerts), std::end(areaVerts), frameVerts);
+    mGasTarget.SetTextureBlendMode(Sdl3Context::PsxTextureBlendMode());
+    DrawVertices(frameVerts, 4, indexList, 6, mGasTarget.GetTexture(), false, relive::TBlendModes::eBlend_0);
+    mGasTarget.SetTextureBlendMode(SDL_BLENDMODE_NONE);
 }
 
 void Sdl3Renderer::Draw(const Line_G2& line)
@@ -99,14 +155,13 @@ void Sdl3Renderer::Draw(const Line_G2& line)
         IRenderer::Point2D(line.X1(), line.Y1())
     };
 
-    RGBA32 color;
+    // Gouraud shaded from one end to the other
+    const SDL_FColor colours[] = {
+        ToSDLColor(line.R0(), line.G0(), line.B0(), 255),
+        ToSDLColor(line.R1(), line.G1(), line.B1(), 255)
+    };
 
-    color.r = line.R0();
-    color.g = line.G0();
-    color.b = line.B0();
-    color.a = 255;
-
-    DrawLines(points, 2, color, line.mSemiTransparent ? line.mBlendMode : relive::TBlendModes::None);
+    DrawLines(points, colours, 2, line.mSemiTransparent ? line.mBlendMode : relive::TBlendModes::None);
 }
 
 void Sdl3Renderer::Draw(const Line_G4& line)
@@ -120,14 +175,14 @@ void Sdl3Renderer::Draw(const Line_G4& line)
         IRenderer::Point2D(line.X3(), line.Y3())
     };
 
-    RGBA32 color;
+    const SDL_FColor colours[] = {
+        ToSDLColor(line.R0(), line.G0(), line.B0(), 255),
+        ToSDLColor(line.R1(), line.G1(), line.B1(), 255),
+        ToSDLColor(line.R2(), line.G2(), line.B2(), 255),
+        ToSDLColor(line.R3(), line.G3(), line.B3(), 255)
+    };
 
-    color.r = line.R0();
-    color.g = line.G0();
-    color.b = line.B0();
-    color.a = 255;
-
-    DrawLines(points, 4, color, line.mSemiTransparent ? line.mBlendMode : relive::TBlendModes::None);
+    DrawLines(points, colours, 4, line.mSemiTransparent ? line.mBlendMode : relive::TBlendModes::None);
 }
 
 void Sdl3Renderer::Draw(const Poly_G3& poly)
@@ -455,23 +510,22 @@ void Sdl3Renderer::StartFrame()
     mFramebufferSnapshotValid = false;
 }
 
-void Sdl3Renderer::DrawLines(const IRenderer::Point2D points[], s32 numPoints, RGBA32 color, relive::TBlendModes blendMode)
+void Sdl3Renderer::DrawLines(const IRenderer::Point2D points[], const SDL_FColor colours[], s32 numPoints, relive::TBlendModes blendMode)
 {
     constexpr s32 indexList[6] = { 0, 1, 2, 1, 2 , 3 };
 
     for (s32 i = 1; i < numPoints; i++)
     {
-        const IRenderer::Point2D pointA = points[i - 1];
-        const IRenderer::Point2D pointB = points[i];
+        // The first two corners are at point A's end, the last two at B's
+        const IRenderer::Quad2D quad = IRenderer::LineToQuad(points[i - 1], points[i]);
+        const SDL_FColor colourA = colours[i - 1];
+        const SDL_FColor colourB = colours[i];
 
-        const IRenderer::Quad2D quad = IRenderer::LineToQuad(pointA, pointB);
-
-        // TODO: sdl3 fix
         SDL_Vertex vertices[4] = {
-            { { quad.verts[0].x, quad.verts[0].y }, {ToSDLColor(color.r, color.g, color.b, 255) }, { 0.0f, 0.0f } },
-            { { quad.verts[1].x, quad.verts[1].y }, {ToSDLColor(color.r, color.g, color.b, 255) }, { 0.0f, 0.0f } },
-            { { quad.verts[2].x, quad.verts[2].y }, {ToSDLColor(color.r, color.g, color.b, 255) }, { 0.0f, 0.0f } },
-            { { quad.verts[3].x, quad.verts[3].y }, {ToSDLColor(color.r, color.g, color.b, 255) }, { 0.0f, 0.0f } },
+            { { quad.verts[0].x, quad.verts[0].y }, colourA, { 0.0f, 0.0f } },
+            { { quad.verts[1].x, quad.verts[1].y }, colourA, { 0.0f, 0.0f } },
+            { { quad.verts[2].x, quad.verts[2].y }, colourB, { 0.0f, 0.0f } },
+            { { quad.verts[3].x, quad.verts[3].y }, colourB, { 0.0f, 0.0f } },
         };
 
         DrawVertices(vertices, 4, indexList, 6, nullptr, blendMode != relive::TBlendModes::None, blendMode);

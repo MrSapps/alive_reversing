@@ -21,7 +21,6 @@ public:
     void Update(const SDL_Rect* rect, const void* pixels);
 
 private:
-    static u8 HandleShading(const u8 src, const u8 shade);
     static RGBA32 ConvertPaletteColour(RGBA32 colour, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode);
     SdlTexturePtr MakePaletteVariant(u32 paletteHash, const AnimationPal& palette, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode);
 
