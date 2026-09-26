@@ -23,7 +23,7 @@ public:
 private:
     static u8 HandleShading(const u8 src, const u8 shade);
     static RGBA32 ConvertPaletteColour(RGBA32 colour, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode);
-    SdlTexturePtr MakePaletteVariant(const AnimationPal& palette, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode);
+    SdlTexturePtr MakePaletteVariant(u32 paletteHash, const AnimationPal& palette, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode);
 
 private:
     Sdl3Context& mContext;
@@ -52,4 +52,9 @@ private:
     std::size_t MaxPaletteVariants() const;
     std::vector<PaletteVariant> mPaletteVariants;
     u32 mUseCounter = 0;
+
+    // The last palette hashed, see GetTextureUsePalette
+    const AnimationPal* mHashedPalette = nullptr;
+    u32 mHashedFrame = 0;
+    u32 mHashedPaletteHash = 0;
 };

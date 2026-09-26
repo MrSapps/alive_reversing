@@ -11,6 +11,17 @@ Sdl3Context::Sdl3Context(Window& window)
     }
 
     LOG_INFO("SDL3 renderer name: %s", SDL_GetRendererName(mRenderer.get()));
+
+    const SDL_PixelFormat* pFormats = static_cast<const SDL_PixelFormat*>(
+        SDL_GetPointerProperty(SDL_GetRendererProperties(mRenderer.get()), SDL_PROP_RENDERER_TEXTURE_FORMATS_POINTER, nullptr));
+    for (; pFormats && *pFormats != SDL_PIXELFORMAT_UNKNOWN; pFormats++)
+    {
+        if (*pFormats == SDL_PIXELFORMAT_INDEX8)
+        {
+            mSupportsPaletteTextures = true;
+        }
+    }
+    LOG_INFO("SDL3 renderer palette textures: %s", mSupportsPaletteTextures ? "yes" : "no");
 }
 
 SDL_Renderer* Sdl3Context::GetRenderer()
@@ -148,4 +159,37 @@ void Sdl3Context::SetTextureBlendMode(SDL_Texture* texture, SDL_BlendMode blendM
     {
         ALIVE_FATAL("SDL_SetTextureBlendMode(0x%x) failed: %s", blendMode, SDL_GetError());
     }
+}
+
+SDL_Palette* Sdl3Context::SharedPalette(const PaletteKey& key, const SDL_Color (&colours)[256])
+{
+    // Textures hold their own reference to their palette, so dropping one from here is safe
+    constexpr std::size_t kMaxSharedPalettes = 512;
+
+    auto it = mSharedPalettes.find(key);
+    if (it == mSharedPalettes.end())
+    {
+        if (mSharedPalettes.size() >= kMaxSharedPalettes)
+        {
+            auto leastRecent = mSharedPalettes.begin();
+            for (auto i = mSharedPalettes.begin(); i != mSharedPalettes.end(); ++i)
+            {
+                if (i->second.mLastUsed < leastRecent->second.mLastUsed)
+                {
+                    leastRecent = i;
+                }
+            }
+            mSharedPalettes.erase(leastRecent);
+        }
+
+        SdlPalettePtr palette(SDL_CreatePalette(256));
+        if (!palette || !SDL_SetPaletteColors(palette.get(), colours, 0, 256))
+        {
+            ALIVE_FATAL("Creating an SDL palette failed: %s", SDL_GetError());
+        }
+        it = mSharedPalettes.emplace(key, SharedPaletteEntry{std::move(palette), 0}).first;
+    }
+
+    it->second.mLastUsed = ++mSharedPaletteUseCounter;
+    return it->second.mPalette.get();
 }

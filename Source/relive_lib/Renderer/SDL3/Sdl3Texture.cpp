@@ -99,8 +99,17 @@ SDL_Texture* Sdl3Texture::GetTextureUsePalette(const std::shared_ptr<AnimationPa
         ALIVE_FATAL("%s", "SDL3 attempt to use palette on non-indexed tex");
     }
 
+    // Hashing the palette is most of the cost of drawing a sprite, so it's done once a frame per
+    // palette. Palettes are only changed between frames, by the game objects' updates.
+    if (palette.get() != mHashedPalette || mHashedFrame != mContext.FrameNumber())
+    {
+        mHashedPalette = palette.get();
+        mHashedFrame = mContext.FrameNumber();
+        mHashedPaletteHash = PaletteCache::HashPalette(palette.get());
+    }
+
     PaletteVariant key;
-    key.mPaletteHash = PaletteCache::HashPalette(palette.get());
+    key.mPaletteHash = mHashedPaletteHash;
     // The tint only matters when shading is on
     key.mShading = shading.a == 255 ? shading : RGBA32{0, 0, 0, 0};
     key.mSemiTrans = isSemiTrans;
@@ -128,7 +137,7 @@ SDL_Texture* Sdl3Texture::GetTextureUsePalette(const std::shared_ptr<AnimationPa
         mPaletteVariants.erase(leastRecent);
     }
 
-    key.mTexture = MakePaletteVariant(*palette, key.mShading, isSemiTrans, blendMode);
+    key.mTexture = MakePaletteVariant(key.mPaletteHash, *palette, key.mShading, isSemiTrans, blendMode);
     SDL_Texture* pTexture = key.mTexture.get();
     mPaletteVariants.push_back(std::move(key));
     return pTexture;
@@ -136,7 +145,8 @@ SDL_Texture* Sdl3Texture::GetTextureUsePalette(const std::shared_ptr<AnimationPa
 
 std::size_t Sdl3Texture::MaxPaletteVariants() const
 {
-    const std::size_t variantBytes = static_cast<std::size_t>(mWidth) * mHeight * 4;
+    const std::size_t bytesPerPixel = mContext.SupportsPaletteTextures() ? 1 : 4;
+    const std::size_t variantBytes = static_cast<std::size_t>(mWidth) * mHeight * bytesPerPixel;
     return std::max(kMinPaletteVariants, kPaletteVariantBudgetBytes / std::max<std::size_t>(variantBytes, 1));
 }
 
@@ -180,31 +190,58 @@ RGBA32 Sdl3Texture::ConvertPaletteColour(RGBA32 colour, const RGBA32& shading, b
     return {colour.r, colour.g, colour.b, 0};
 }
 
-SdlTexturePtr Sdl3Texture::MakePaletteVariant(const AnimationPal& palette, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode)
+SdlTexturePtr Sdl3Texture::MakePaletteVariant(u32 paletteHash, const AnimationPal& palette, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode)
 {
-    SdlTexturePtr texture = mContext.CreateTexture(SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, mWidth, mHeight);
-    mContext.CountTextureUpload();
-
-    // Each palette entry is converted once, then the pixels are just looked up
+    // Each palette entry is converted once
     RGBA32 converted[256];
     for (s32 i = 0; i < 256; i++)
     {
         converted[i] = ConvertPaletteColour(palette.mPal[i], shading, isSemiTrans, blendMode);
     }
 
-    u8* pixelsTarget = nullptr;
-    s32 pitchTarget = 0;
-    SDL_LockTexture(texture.get(), nullptr, reinterpret_cast<void**>(&pixelsTarget), &pitchTarget);
-    for (u32 y = 0; y < mHeight; y++)
+    // Static and uploaded in one go: a streaming texture would get a staging buffer of its own
+    SdlTexturePtr texture;
+    if (mContext.SupportsPaletteTextures())
     {
-        RGBA32* pRow = reinterpret_cast<RGBA32*>(pixelsTarget + y * pitchTarget);
-        const u8* pIndices = mIndexedPixels.data() + y * mWidth;
-        for (u32 x = 0; x < mWidth; x++)
+        // The pixels go up as they are, and the converted colours become the texture's palette
+        texture = mContext.CreateTexture(SDL_PIXELFORMAT_INDEX8, SDL_TEXTUREACCESS_STATIC, mWidth, mHeight);
+        if (!SDL_UpdateTexture(texture.get(), nullptr, mIndexedPixels.data(), static_cast<s32>(mWidth)))
         {
-            pRow[x] = converted[pIndices[x]];
+            ALIVE_FATAL("SDL_UpdateTexture failed: %s", SDL_GetError());
+        }
+
+        SDL_Color colours[256];
+        for (s32 i = 0; i < 256; i++)
+        {
+            colours[i] = {converted[i].r, converted[i].g, converted[i].b, converted[i].a};
+        }
+
+        if (!SDL_SetTexturePalette(texture.get(), mContext.SharedPalette({paletteHash, shading.ToU32(), (static_cast<u32>(isSemiTrans) << 8) | static_cast<u32>(blendMode)}, colours)))
+        {
+            ALIVE_FATAL("SDL_SetTexturePalette failed: %s", SDL_GetError());
         }
     }
-    SDL_UnlockTexture(texture.get());
+    else
+    {
+        // Each pixel looked up in the converted palette
+        texture = mContext.CreateTexture(SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, mWidth, mHeight);
+
+        const std::size_t pixelCount = mIndexedPixels.size();
+        RGBA32* pPixels = reinterpret_cast<RGBA32*>(mContext.ScratchPixels(pixelCount).data());
+        for (std::size_t i = 0; i < pixelCount; i++)
+        {
+            pPixels[i] = converted[mIndexedPixels[i]];
+        }
+
+        if (!SDL_UpdateTexture(texture.get(), nullptr, pPixels, static_cast<s32>(mWidth * 4)))
+        {
+            ALIVE_FATAL("SDL_UpdateTexture failed: %s", SDL_GetError());
+        }
+    }
+    mContext.CountTextureUpload();
+
+    // Unfiltered when scaled, like the OpenGL renderer's texelFetch
+    SDL_SetTextureScaleMode(texture.get(), SDL_SCALEMODE_NEAREST);
 
     Sdl3Context::SetTextureBlendMode(texture.get(),
         blendMode == relive::TBlendModes::eBlend_2
