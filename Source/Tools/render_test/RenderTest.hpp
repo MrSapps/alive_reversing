@@ -98,6 +98,10 @@ private:
     s32 RunInteractive();
     void HandleKey(SDL_Keycode key, bool& quit);
 
+    void SetScaledFramebuffer(bool scaled);
+    void CheckScreenWave(bool scaled);
+    Capture RunFrameAndCaptureOt();
+
     s32 RunAuto();
     void RunAutoOnRenderer(IRenderer::Renderers type, RendererResult& result);
     void RunAutoScene(u32 sceneIdx, const Capture& reference, RendererResult& result);

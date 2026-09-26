@@ -32,6 +32,7 @@ enum class PrimitivesTypes : u8
 
     ePolyFT4,
     eScissorRect,
+    eScreenWave,
 };
 
 struct Prim_RGB final
@@ -394,9 +395,25 @@ struct Poly_FT4 final : public BasePrimitive
     class CamResource* mCam = nullptr;
     class FontContext* mFont = nullptr;
     class Fg1Layer* mFg1 = nullptr;
+};
 
-    f32 uBase = 0.0f;
-    f32 vBase = 0.0f;
+// One piece of the screen wave's ripple: the part of the frame drawn so far that's under the
+// source corners is drawn again over the quad. See IRenderer::Draw(const Prim_ScreenWave&).
+struct Prim_ScreenWave final : public BasePrimitive
+{
+    Prim_ScreenWave()
+        : BasePrimitive(PrimitivesTypes::eScreenWave)
+    {
+    }
+
+    // Corners in the same order as the quad's, in screen pixels
+    void SetSource(u32 idx, s16 x, s16 y)
+    {
+        mSource[idx].x = x;
+        mSource[idx].y = y;
+    }
+
+    Vert mSource[4];
 };
 
 struct Prim_ScissorRect final : public BasePrimitive

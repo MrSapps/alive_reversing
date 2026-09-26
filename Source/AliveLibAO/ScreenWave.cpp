@@ -1,13 +1,10 @@
 #include "stdafx_ao.h"
-#include "../relive_lib/Function.hpp"
 #include "ScreenWave.hpp"
-#include "../AliveLibAE/stdlib.hpp"
 #include "Map.hpp"
+#include "Math.hpp"
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
-#include "../relive_lib/Primitives.hpp"
-#include "Math.hpp"
-#include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
+#include "../AliveLibAE/PsxRender.hpp"
 
 #undef min
 #undef max
@@ -16,102 +13,70 @@
 
 namespace AO {
 
-static constexpr s32 kMaxUVCount = 32;
-static constexpr s32 kMaxPolygons = 4;
-
-struct ScreenWave_Data final
-{
-    FP_Point field_0_uv1[kMaxUVCount][kMaxPolygons + 1];
-    FP_Point field_500_uv2[kMaxUVCount][kMaxPolygons + 1];
-    FP_Point field_A00_xy[kMaxUVCount];
-    Poly_FT4 field_B00_poly[kMaxUVCount][kMaxPolygons];
-};
-ALIVE_ASSERT_SIZEOF(ScreenWave_Data, 0x3700);
-
 ScreenWave::ScreenWave(FP xpos, FP ypos, Layer layer, FP width, FP speed, s32 radius, ResourceManagerWrapper& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
+    , mLayer(layer)
+    , mXPos(xpos)
+    , mYPos(ypos)
+    , mLevel(map.mCurrentLevel)
+    , mPath(map.mCurrentPath)
+    , mSpeed(speed)
 {
     SetType(ReliveTypes::eScreenWave);
+    SetDrawable(true);
     gObjListDrawables->Push_Back(this);
 
-    // TODO: Using frame counter as an ID seems extremely dangerous due to id collision risk!
-    field_14_ppRes = relive_new ScreenWave_Data();
-    if (!field_14_ppRes)
-    {
-        SetDead(true);
-        return;
-    }
+    mScreenX = static_cast<s16>(FP_GetExponent(xpos) - FP_GetExponent(gScreenManager->CamXPos()));
+    mScreenY = static_cast<s16>(FP_GetExponent(ypos) - FP_GetExponent(gScreenManager->CamYPos()));
 
-    field_10_layer = layer;
-    field_1C_ypos = ypos;
-    field_30_speed = speed;
-
-    field_3C_path = mMap.mCurrentPath;
-    field_3A_level = mMap.mCurrentLevel;
-
-    SetDrawable(true);
-    field_18_xpos = xpos;
-
-    field_2C = FP_FromInteger(0);
-
-    field_36_screen_xpos = FP_GetExponent(xpos) - FP_GetExponent(gScreenManager->CamXPos());
-    field_38_screen_ypos = FP_GetExponent(ypos) - FP_GetExponent(gScreenManager->CamYPos());
-
-    // TODO: This needs to be checked, my brain melted halfway
-    const s16 v1 = static_cast<s16>(std::abs(field_36_screen_xpos) + std::abs(field_38_screen_ypos));
-    const s16 v2 = static_cast<s16>(std::abs(field_36_screen_xpos - gPsxDisplay.mWidth) + std::abs(field_38_screen_ypos));
-
-    const s16 v3 = static_cast<s16>(std::abs(field_36_screen_xpos) + std::abs(field_38_screen_ypos - gPsxDisplay.mHeight));
-    const s16 v4 = static_cast<s16>(std::abs(field_36_screen_xpos - gPsxDisplay.mWidth) + std::abs(field_38_screen_ypos - gPsxDisplay.mHeight));
-
-    field_34_max_radius = static_cast<s16>(std::max(std::max(v1, v2), std::max(v3, v4)));
-
+    // It's gone once it has grown past the screen's furthest corner (measured along x plus along y)
+    const s16 right = gPsxDisplay.mWidth;
+    const s16 bottom = gPsxDisplay.mHeight;
+    const s16 cornerDistances[4] = {
+        static_cast<s16>(std::abs(mScreenX) + std::abs(mScreenY)),
+        static_cast<s16>(std::abs(mScreenX - right) + std::abs(mScreenY)),
+        static_cast<s16>(std::abs(mScreenX) + std::abs(mScreenY - bottom)),
+        static_cast<s16>(std::abs(mScreenX - right) + std::abs(mScreenY - bottom))};
+    mMaxRadius = *std::max_element(std::begin(cornerDistances), std::end(cornerDistances));
     if (radius > 0)
     {
-        field_34_max_radius = std::min(field_34_max_radius, static_cast<s16>(radius));
+        mMaxRadius = std::min(mMaxRadius, static_cast<s16>(radius));
     }
 
-    field_20_fp1 = FP_FromInteger(1);
-    field_24_fp1 = FP_FromInteger(1);
+    // Along each spoke, the source points are evenly spread across the ring, and the destination
+    // points bulge out in the middle of it: that's what bends the picture.
+    const FP sourceStep = width / FP_FromInteger(4);
+    const FP halfWidth = width / FP_FromInteger(2);
 
-    const FP uv1_off = (width / FP_FromInteger(4));
-    const FP uv2_off = (width / FP_FromInteger(2));
-
-    ScreenWave_Data* pData = field_14_ppRes;
-
-    u8 ang2 = 0;
-    for (s32 i = 0; i < 32; i++)
+    u8 spokeAngle = 0;
+    for (s32 spoke = 0; spoke < kSpokes; spoke++)
     {
-        u8 ang = 128;
-        for (s32 j = 0; j < 5; j++)
+        const FP dirX = Math_Sine(spokeAngle);
+        const FP dirY = Math_Cosine(spokeAngle);
+
+        u8 bulgeAngle = 128;
+        for (s32 point = 0; point < kPointsPerSpoke; point++)
         {
-            pData->field_0_uv1[i][j].x = ((FP_FromInteger(j) * uv1_off) * Math_Sine(ang2));
-            pData->field_0_uv1[i][j].y = ((FP_FromInteger(j) * uv1_off) * Math_Cosine(ang2));
+            const FP sourceDistance = FP_FromInteger(point) * sourceStep;
+            mSource[spoke][point].x = sourceDistance * dirX;
+            mSource[spoke][point].y = sourceDistance * dirY;
 
-            pData->field_500_uv2[i][j].x = (((Math_Sine(ang) * uv2_off) + uv2_off) * Math_Sine(ang2));
-            pData->field_500_uv2[i][j].y = (((Math_Sine(ang) * uv2_off) + uv2_off) * Math_Cosine(ang2));
+            const FP destDistance = (Math_Sine(bulgeAngle) * halfWidth) + halfWidth;
+            mDest[spoke][point].x = destDistance * dirX;
+            mDest[spoke][point].y = destDistance * dirY;
 
-            ang -= 32;
+            bulgeAngle -= 32;
         }
 
-        pData->field_A00_xy[i].x = (Math_Sine(ang2) * speed);
-        pData->field_A00_xy[i].y = (Math_Cosine(ang2) * speed);
-        ang2 += 8;
-    }
-
-    for (s32 j = 0; j < 32; j++)
-    {
-        for (s32 k = 0; k < 4; k++)
-        {
-            pData->field_B00_poly[j][k].SetSemiTransparent(false);
-        }
+        mVelocity[spoke].x = dirX * speed;
+        mVelocity[spoke].y = dirY * speed;
+        spokeAngle += 256 / kSpokes;
     }
 }
 
 ScreenWave::~ScreenWave()
 {
     gObjListDrawables->Remove_Item(this);
-    relive_delete field_14_ppRes;
 }
 
 void ScreenWave::VScreenChanged()
@@ -124,144 +89,77 @@ void ScreenWave::VScreenChanged()
 
 void ScreenWave::VUpdate()
 {
-    if (FP_GetExponent(field_2C) <= field_34_max_radius)
-    {
-        field_2C += field_30_speed;
-
-        auto pData = field_14_ppRes;
-
-        for (s32 i = 0; i < 32; i++)
-        {
-            for (s32 j = 0; j < 5; j++)
-            {
-                pData->field_0_uv1[i][j].x += pData->field_A00_xy[i].x;
-                pData->field_0_uv1[i][j].y += pData->field_A00_xy[i].y;
-
-                pData->field_500_uv2[i][j].x += pData->field_A00_xy[i].x;
-                pData->field_500_uv2[i][j].y += pData->field_A00_xy[i].y;
-            }
-        }
-    }
-    else
+    if (FP_GetExponent(mRadius) > mMaxRadius)
     {
         SetDead(true);
+        return;
+    }
+
+    mRadius += mSpeed;
+    for (s32 spoke = 0; spoke < kSpokes; spoke++)
+    {
+        for (s32 point = 0; point < kPointsPerSpoke; point++)
+        {
+            mSource[spoke][point].x += mVelocity[spoke].x;
+            mSource[spoke][point].y += mVelocity[spoke].y;
+            mDest[spoke][point].x += mVelocity[spoke].x;
+            mDest[spoke][point].y += mVelocity[spoke].y;
+        }
     }
 }
 
 void ScreenWave::VRender(OrderingTable& ot)
 {
-    if (!mMap.Is_Point_In_Current_Camera(
-            field_3A_level,
-            field_3C_path,
-            field_18_xpos,
-            field_1C_ypos,
-            0))
+    if (!mMap.Is_Point_In_Current_Camera(mLevel, mPath, mXPos, mYPos, 0))
     {
         return;
     }
 
-    ScreenWave_Data* pScreenWaveData = field_14_ppRes;
-
-    const PSX_Point displaySize = {
-        static_cast<s16>(gPsxDisplay.mWidth),
-        static_cast<s16>(gPsxDisplay.mHeight)};
-
-    for (s32 i = 0; i < kMaxUVCount; i++)
+    // Points are in PSX screen coordinates, the quads in PC ones
+    auto toScreenX = [this](const FP_Point& p)
     {
-        const s32 i_inc = i + 1;
-        for (s32 j = 0; j < kMaxPolygons; j++)
+        return static_cast<s16>(PsxToPCX(static_cast<s16>(mScreenX + FP_GetExponent(p.x)), 11));
+    };
+    auto toScreenY = [this](const FP_Point& p)
+    {
+        return static_cast<s16>(mScreenY + FP_GetExponent(p.y));
+    };
+
+    for (s32 spoke = 0; spoke < kSpokes; spoke++)
+    {
+        const s32 nextSpoke = (spoke + 1) % kSpokes;
+        for (s32 quad = 0; quad < kQuadsPerSpoke; quad++)
         {
-            const s16 x0 = field_36_screen_xpos + FP_GetExponent(pScreenWaveData->field_500_uv2[i][j].x);
-            const s16 y0 = field_38_screen_ypos + FP_GetExponent(pScreenWaveData->field_500_uv2[i][j].y);
-            const s16 x1 = field_36_screen_xpos + FP_GetExponent(pScreenWaveData->field_500_uv2[i][j + 1].x);
-            const s16 y1 = field_38_screen_ypos + FP_GetExponent(pScreenWaveData->field_500_uv2[i][j + 1].y);
+            const FP_Point* dest[4] = {&mDest[spoke][quad], &mDest[spoke][quad + 1], &mDest[nextSpoke][quad], &mDest[nextSpoke][quad + 1]};
+            const FP_Point* source[4] = {&mSource[spoke][quad], &mSource[spoke][quad + 1], &mSource[nextSpoke][quad], &mSource[nextSpoke][quad + 1]};
 
-            const s32 next_i = i_inc == kMaxUVCount ? 0 : i_inc;
-
-            const s16 x2 = field_36_screen_xpos + FP_GetExponent(pScreenWaveData->field_500_uv2[next_i][j].x);
-            const s16 y2 = field_38_screen_ypos + FP_GetExponent(pScreenWaveData->field_500_uv2[next_i][j].y);
-            const s16 x3 = field_36_screen_xpos + FP_GetExponent(pScreenWaveData->field_500_uv2[next_i][j + 1].x);
-            const s16 y3 = field_38_screen_ypos + FP_GetExponent(pScreenWaveData->field_500_uv2[next_i][j + 1].y);
-
-            const s16 minX = static_cast<s16>(std::min(
-                std::min(x0, x1),
-                std::min(x2, x3)));
-
-            const s16 minY = static_cast<s16>(std::min(
-                std::min(y0, y1),
-                std::min(y2, y3)));
-
-            const s16 maxX = static_cast<s16>(std::max(
-                std::max(x0, x1),
-                std::max(x2, x3)));
-
-            const s16 maxY = static_cast<s16>(std::max(
-                std::max(y0, y1),
-                std::max(y2, y3)));
-
-            if (
-                maxX >= 0 && maxY >= 0 && minX < displaySize.x && minY < displaySize.y)
+            s16 x[4] = {};
+            s16 y[4] = {};
+            for (s32 i = 0; i < 4; i++)
             {
-                Poly_FT4* pPoly = &pScreenWaveData->field_B00_poly[i][j];
-
-                pPoly->SetXY0(
-                       static_cast<s16>(PsxToPCX(x0, 11)),
-                       static_cast<s16>(y0));
-                pPoly->SetXY1(
-                       static_cast<s16>(PsxToPCX(x1, 11)),
-                       static_cast<s16>(y1));
-                pPoly->SetXY2(
-                       static_cast<s16>(PsxToPCX(x2, 11)),
-                       static_cast<s16>(y2));
-                pPoly->SetXY3(
-                       static_cast<s16>(PsxToPCX(x3, 11)),
-                       static_cast<s16>(y3));
-
-                s16 u0 = static_cast<s16>(PsxToPCX(field_36_screen_xpos + FP_GetExponent(pScreenWaveData->field_0_uv1[i][j].x), 11));
-                const s16 v0 = field_38_screen_ypos + FP_GetExponent(pScreenWaveData->field_0_uv1[i][j].y);
-
-                s16 u1 = static_cast<s16>(PsxToPCX(field_36_screen_xpos + FP_GetExponent(pScreenWaveData->field_0_uv1[i][j + 1].x), 11));
-                const s16 v1 = field_38_screen_ypos + FP_GetExponent(pScreenWaveData->field_0_uv1[i][j + 1].y);
-
-                s16 u2 = static_cast<s16>(PsxToPCX(field_36_screen_xpos + FP_GetExponent(pScreenWaveData->field_0_uv1[next_i][j].x), 11));
-                const s16 v2 = field_38_screen_ypos + FP_GetExponent(pScreenWaveData->field_0_uv1[next_i][j].y);
-
-                s16 u3 = static_cast<s16>(PsxToPCX(field_36_screen_xpos + FP_GetExponent(pScreenWaveData->field_0_uv1[next_i][j + 1].x), 11));
-                const s16 v3 = field_38_screen_ypos + FP_GetExponent(pScreenWaveData->field_0_uv1[next_i][j + 1].y);
-
-                const s16 minU = std::min(
-                    std::min(u1, u0),
-                    std::min(u2, u3));
-                const s16 minU_capped = minU & 0xffC0;
-
-                u0 -= minU_capped;
-                u1 -= minU_capped;
-                u2 -= minU_capped;
-                u3 -= minU_capped;
-
-                pPoly->SetBlendMode(relive::TBlendModes::eBlend_0);
-
-                pPoly->uBase = static_cast<s16>(minU_capped);
-                pPoly->vBase = 0.0f;
-
-                pPoly->SetUV0(
-                       static_cast<u8>(u0),
-                       static_cast<u8>(v0));
-                pPoly->SetUV1(
-                       static_cast<u8>(u1),
-                       static_cast<u8>(v1));
-                pPoly->SetUV2(
-                       static_cast<u8>(u2),
-                       static_cast<u8>(v2));
-                pPoly->SetUV3(
-                       static_cast<u8>(u3),
-                       static_cast<u8>(v3));
-
-                pPoly->SetSemiTransparent(false);
-                pPoly->SetShadeTex(true);
-
-                ot.Add(field_10_layer, pPoly);
+                x[i] = toScreenX(*dest[i]);
+                y[i] = toScreenY(*dest[i]);
             }
+
+            const bool onScreen = *std::max_element(x, x + 4) >= 0 && *std::max_element(y, y + 4) >= 0 && *std::min_element(x, x + 4) < gPsxDisplay.mWidth && *std::min_element(y, y + 4) < gPsxDisplay.mHeight;
+            if (!onScreen)
+            {
+                continue;
+            }
+
+            Prim_ScreenWave& prim = mQuads[spoke][quad];
+            prim.SetXY0(x[0], y[0]);
+            prim.SetXY1(x[1], y[1]);
+            prim.SetXY2(x[2], y[2]);
+            prim.SetXY3(x[3], y[3]);
+            for (u32 i = 0; i < 4; i++)
+            {
+                // Source rows are kept to 0-255, so a piece reaching past the top or bottom of the
+                // screen draws from right across it: that smears a band of the picture along the
+                // edge, which is part of how the ripple looks
+                prim.SetSource(i, toScreenX(*source[i]), static_cast<u8>(toScreenY(*source[i])));
+            }
+            ot.Add(mLayer, &prim);
         }
     }
 }

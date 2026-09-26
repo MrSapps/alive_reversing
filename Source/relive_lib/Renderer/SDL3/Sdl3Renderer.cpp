@@ -9,18 +9,10 @@
 Sdl3Renderer::Sdl3Renderer(Window& window)
     : IRenderer(window),
     mContext(window),
-    mPsxFbTexture{
-        Sdl3Texture(mContext, kPsxFramebufferWidth, kPsxFramebufferHeight, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET),
-        Sdl3Texture(mContext, kPsxFramebufferWidth, kPsxFramebufferHeight, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET)
-    },
+    mPsxFbTexture(mContext, kPsxFramebufferWidth, kPsxFramebufferHeight, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET),
     mGasTexture(mContext, kPsxFramebufferWidth, kPsxFramebufferHeight, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING),
     mGasTarget(mContext, kPsxFramebufferWidth, kPsxFramebufferHeight, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET)
 {
-    // Set up the gas blend mode
-    //
-    SDL_SetTextureScaleMode(mGasTexture.GetTexture(), SDL_SCALEMODE_NEAREST);
-    SDL_SetTextureScaleMode(mGasTarget.GetTexture(), SDL_SCALEMODE_NEAREST);
-
     // Render target support is required for things like FG1 mask and
     // framebuffer textures
     if (!mContext.IsRenderTargetSupported())
@@ -52,7 +44,6 @@ Sdl3Renderer::Sdl3Renderer(Window& window)
         ALIVE_FATAL("SDL_UpdateTexture failed: %s", SDL_GetError());
     }
     Sdl3Context::SetTextureBlendMode(mGasMask.get(), Sdl3Context::GasMaskBlendMode());
-    SDL_SetTextureScaleMode(mGasMask.get(), SDL_SCALEMODE_NEAREST);
 }
 
 Sdl3Renderer::~Sdl3Renderer()
@@ -83,7 +74,7 @@ static SDL_FColor ToSDLColor(u8 r, u8 g, u8 b, u8 a)
 
 void Sdl3Renderer::Draw(const Prim_GasEffect& gasEffect)
 {
-    mFramebufferSnapshotValid = false;
+    mScreenWaveSourceValid = false;
 
     // The gas is a low resolution image (a quarter of the width and half the height of the
     // area) stretched over the area. The OpenGL renderer blends it in half and half on every
@@ -148,7 +139,7 @@ void Sdl3Renderer::Draw(const Prim_GasEffect& gasEffect)
 
 void Sdl3Renderer::Draw(const Line_G2& line)
 {
-    mFramebufferSnapshotValid = false;
+    mScreenWaveSourceValid = false;
 
     const IRenderer::Point2D points[] = {
         IRenderer::Point2D(line.X0(), line.Y0()),
@@ -166,7 +157,7 @@ void Sdl3Renderer::Draw(const Line_G2& line)
 
 void Sdl3Renderer::Draw(const Line_G4& line)
 {
-    mFramebufferSnapshotValid = false;
+    mScreenWaveSourceValid = false;
 
     const IRenderer::Point2D points[] = {
         IRenderer::Point2D(line.X0(), line.Y0()),
@@ -187,7 +178,7 @@ void Sdl3Renderer::Draw(const Line_G4& line)
 
 void Sdl3Renderer::Draw(const Poly_G3& poly)
 {
-    mFramebufferSnapshotValid = false;
+    mScreenWaveSourceValid = false;
 
     SDL_Vertex vertices[] = {
         { { static_cast<f32>(poly.X0()), static_cast<f32>(poly.Y0()) }, { ToSDLColor(poly.R0(), poly.G0(), poly.B0(), 255) }, { 0.0f, 0.0f } },
@@ -201,12 +192,7 @@ void Sdl3Renderer::Draw(const Poly_G3& poly)
 void Sdl3Renderer::Draw(const Poly_FT4& poly)
 {
     SDL_Texture* tex = nullptr;
-
-    const bool isFramebufferEffect = !poly.mFg1 && !poly.mCam && !poly.mAnim && !poly.mFont;
-    if (!isFramebufferEffect)
-    {
-        mFramebufferSnapshotValid = false;
-    }
+    mScreenWaveSourceValid = false;
 
     constexpr s32 indexList[6] = { 0, 1, 2, 1, 2 , 3 };
     SDL_Vertex vertices[] = {
@@ -320,57 +306,91 @@ void Sdl3Renderer::Draw(const Poly_FT4& poly)
         vertices[3].tex_coord.x = u1;
         vertices[3].tex_coord.y = v1;
     }
-    else // Assume ScreenWave!
+    else
     {
-        f32 u0 = (poly.uBase + poly.U0()) / kPsxFramebufferWidth;
-        f32 v0 = (poly.vBase + poly.V0()) / kPsxFramebufferHeight;
-
-        f32 u1 = (poly.uBase + poly.U1()) / kPsxFramebufferWidth;
-        f32 v1 = (poly.vBase + poly.V1()) / kPsxFramebufferHeight;
-
-        f32 u2 = (poly.uBase + poly.U2()) / kPsxFramebufferWidth;
-        f32 v2 = (poly.vBase + poly.V2()) / kPsxFramebufferHeight;
-
-        f32 u3 = (poly.uBase + poly.U3()) / kPsxFramebufferWidth;
-        f32 v3 = (poly.vBase + poly.V3()) / kPsxFramebufferHeight;
-
-        vertices[0].tex_coord.x = u0;
-        vertices[0].tex_coord.y = v0;
-
-        vertices[1].tex_coord.x = u1;
-        vertices[1].tex_coord.y = v1;
-
-        vertices[2].tex_coord.x = u2;
-        vertices[2].tex_coord.y = v2;
-
-        vertices[3].tex_coord.x = u3;
-        vertices[3].tex_coord.y = v3;
-
-        // As the OpenGL renderer does: the first of a run of these copies the frame to the other
-        // framebuffer, which becomes the one drawn to, and they all draw from the copy. So each
-        // only moves what was drawn before the run started.
-        if (!mFramebufferSnapshotValid)
-        {
-            SDL_Texture* pFrame = GetActiveFbTexture().GetTexture();
-            SwitchActiveFbTexture();
-
-            SDL_SetRenderClipRect(mContext.GetRenderer(), nullptr);
-            SDL_RenderTexture(mContext.GetRenderer(), pFrame, nullptr, nullptr);
-            mContext.CountDrawCall();
-            ApplyClip();
-
-            mFramebufferSnapshotValid = true;
-        }
-
-        tex = mPsxFbTexture[mActiveFbTexture == 0 ? 1 : 0].GetTexture();
+        return;
     }
 
     DrawVertices(vertices, 4, indexList, 6, tex, poly.mSemiTransparent, poly.mBlendMode);
 }
 
+void Sdl3Renderer::Draw(const Prim_ScreenWave& wave)
+{
+    // The pieces in a run all draw from the frame as it was before the first
+    if (!mScreenWaveSourceValid)
+    {
+        UpdateScreenWaveSource();
+        mScreenWaveSourceValid = true;
+    }
+
+    // mScreenWaveSource is the frame with a 1 pixel border round it
+    const f32 frameW = static_cast<f32>(GetActiveFbTexture().GetWidth());
+    const f32 frameH = static_cast<f32>(GetActiveFbTexture().GetHeight());
+    constexpr s32 indexList[6] = {0, 1, 2, 1, 2, 3};
+    SDL_Vertex vertices[4] = {};
+    for (s32 i = 0; i < 4; i++)
+    {
+        vertices[i].position = {static_cast<f32>(wave.mVerts[i].x), static_cast<f32>(wave.mVerts[i].y)};
+        vertices[i].color = {1.0f, 1.0f, 1.0f, 1.0f};
+        vertices[i].tex_coord.x = (wave.mSource[i].x * frameW / kPsxFramebufferWidth + 1.0f) / (frameW + 2.0f);
+        vertices[i].tex_coord.y = (wave.mSource[i].y * frameH / kPsxFramebufferHeight + 1.0f) / (frameH + 2.0f);
+    }
+
+    // Clamped, so anything from outside the screen reads the border. SDL's default wraps.
+    SDL_SetRenderTextureAddressMode(mContext.GetRenderer(), SDL_TEXTURE_ADDRESS_CLAMP, SDL_TEXTURE_ADDRESS_CLAMP);
+    DrawVertices(vertices, 4, indexList, 6, mScreenWaveSource.get(), false, relive::TBlendModes::eBlend_0);
+    SDL_SetRenderTextureAddressMode(mContext.GetRenderer(), SDL_TEXTURE_ADDRESS_AUTO, SDL_TEXTURE_ADDRESS_AUTO);
+}
+
+// A copy of the frame for the screen wave to draw from, with a 1 pixel border round it so that
+// anything from outside the screen reads the border. The border and black (anything that would be
+// black in 16 bit colour) are left out: colour 0 and alpha 1, for PsxTextureBlendMode's
+// src + dst * src alpha. Everything else has alpha 0.
+void Sdl3Renderer::UpdateScreenWaveSource()
+{
+    SDL_Surface* pSurface = SDL_RenderReadPixels(mContext.GetRenderer(), nullptr);
+    SDL_Surface* pFrame = pSurface ? SDL_ConvertSurface(pSurface, SDL_PIXELFORMAT_RGBA32) : nullptr;
+    SDL_DestroySurface(pSurface);
+    if (!pFrame)
+    {
+        LOG_ERROR("Reading the frame for the screen wave failed: %s", SDL_GetError());
+        return;
+    }
+
+    const s32 texW = pFrame->w + 2;
+    const s32 texH = pFrame->h + 2;
+    constexpr RGBA32 kLeftOut = {0, 0, 0, 255};
+    if (!mScreenWaveSource || mScreenWaveSource->w != texW || mScreenWaveSource->h != texH)
+    {
+        mScreenWaveSource = mContext.CreateTexture(SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, texW, texH);
+        Sdl3Context::SetTextureBlendMode(mScreenWaveSource.get(), Sdl3Context::PsxTextureBlendMode());
+
+        const std::vector<RGBA32> border(static_cast<std::size_t>(texW) * texH, kLeftOut);
+        SDL_UpdateTexture(mScreenWaveSource.get(), nullptr, border.data(), texW * 4);
+        mContext.CountTextureUpload();
+    }
+
+    std::vector<u32>& pixels = mContext.ScratchPixels(static_cast<std::size_t>(pFrame->w) * pFrame->h);
+    RGBA32* pOut = reinterpret_cast<RGBA32*>(pixels.data());
+    for (s32 y = 0; y < pFrame->h; y++)
+    {
+        const u8* pIn = static_cast<const u8*>(pFrame->pixels) + y * pFrame->pitch;
+        for (s32 x = 0; x < pFrame->w; x++, pIn += 4)
+        {
+            const bool black = pIn[0] < 8 && pIn[1] < 4 && pIn[2] < 8;
+            *pOut++ = black ? kLeftOut : RGBA32{pIn[0], pIn[1], pIn[2], 0};
+        }
+    }
+
+    const SDL_Rect frameRect = {1, 1, pFrame->w, pFrame->h};
+    SDL_UpdateTexture(mScreenWaveSource.get(), &frameRect, pixels.data(), pFrame->w * 4);
+    mContext.CountTextureUpload();
+    SDL_DestroySurface(pFrame);
+}
+
 void Sdl3Renderer::Draw(const Poly_G4& poly)
 {
-    mFramebufferSnapshotValid = false;
+    mScreenWaveSourceValid = false;
 
     constexpr s32 indexList[6] = { 0, 1, 2, 1, 2 , 3 };
     SDL_Vertex vertices[4] = {
@@ -401,7 +421,12 @@ void Sdl3Renderer::EndFrame()
 
     SDL_RectToFRect(&drawRect, &fdrawRect);
 
-    SDL_RenderTexture(mContext.GetRenderer(), GetActiveFbTexture().GetTexture(), nullptr, &fdrawRect);
+    // Filtering only applies to scaling the frame to the window. The framebuffer stays unfiltered
+    // while the frame is drawn, like every other texture.
+    SDL_Texture* pFrame = GetActiveFbTexture().GetTexture();
+    SDL_SetTextureScaleMode(pFrame, mFramebufferFilter ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
+    SDL_RenderTexture(mContext.GetRenderer(), pFrame, nullptr, &fdrawRect);
+    SDL_SetTextureScaleMode(pFrame, SDL_SCALEMODE_NEAREST);
 
     mContext.Present();
 }
@@ -456,8 +481,8 @@ void Sdl3Renderer::SetClip(const Prim_ScissorRect& clipper)
     mClipRect = rect;
     ApplyClip();
 
-    // Like the OpenGL renderer's batches, a new clip rectangle ends a run of framebuffer effects
-    mFramebufferSnapshotValid = false;
+    // Like the OpenGL renderer's batches, a new clip rectangle ends a run of screen wave pieces
+    mScreenWaveSourceValid = false;
 }
 
 void Sdl3Renderer::ApplyClip()
@@ -475,39 +500,26 @@ void Sdl3Renderer::StartFrame()
     mOffsetX = 0;
     mOffsetY = 0;
 
-    // Resize framebuffers if needed
+    // Resize the framebuffer if needed
     SDL_Rect desiredFbSize = GetFramebufferRect();
 
     u32 desiredW = static_cast<u32>(desiredFbSize.w);
     u32 desiredH = static_cast<u32>(desiredFbSize.h);
 
     if (
-        mPsxFbTexture[0].GetWidth() != desiredW ||
-        mPsxFbTexture[0].GetHeight() != desiredH
+        mPsxFbTexture.GetWidth() != desiredW ||
+        mPsxFbTexture.GetHeight() != desiredH
     )
     {
-        mPsxFbTexture[0].Resize(desiredW, desiredH);
-        mPsxFbTexture[1].Resize(desiredW, desiredH);
+        mPsxFbTexture.Resize(desiredW, desiredH);
     }
 
-    if (mFramebufferFilter)
-    {
-        SDL_SetTextureScaleMode(mPsxFbTexture[0].GetTexture(), SDL_SCALEMODE_LINEAR);
-        SDL_SetTextureScaleMode(mPsxFbTexture[1].GetTexture(), SDL_SCALEMODE_LINEAR);
-    }
-    else
-    {
-        SDL_SetTextureScaleMode(mPsxFbTexture[0].GetTexture(), SDL_SCALEMODE_NEAREST);
-        SDL_SetTextureScaleMode(mPsxFbTexture[1].GetTexture(), SDL_SCALEMODE_NEAREST);
-    }
-
-    // Whichever framebuffer the last frame ended on
     mContext.UseTextureFramebuffer(GetActiveFbTexture().GetTexture());
 
     // A clip rectangle only lasts until the end of the frame that set it, as with OpenGL
     mClipEnabled = false;
     ApplyClip();
-    mFramebufferSnapshotValid = false;
+    mScreenWaveSourceValid = false;
 }
 
 void Sdl3Renderer::DrawLines(const IRenderer::Point2D points[], const SDL_FColor colours[], s32 numPoints, relive::TBlendModes blendMode)
@@ -603,7 +615,7 @@ void Sdl3Renderer::DrawVertices(SDL_Vertex vertices[], s32 numVertices, const s3
 
 Sdl3Texture& Sdl3Renderer::GetActiveFbTexture()
 {
-    return mPsxFbTexture[mActiveFbTexture];
+    return mPsxFbTexture;
 }
 
 std::shared_ptr<Sdl3Texture> Sdl3Renderer::PrepareTextureFromPoly(const Poly_FT4& poly)
@@ -753,9 +765,3 @@ void Sdl3Renderer::ScaleVertices(SDL_Vertex vertices[], s32 numVertices)
     }
 }
 
-void Sdl3Renderer::SwitchActiveFbTexture()
-{
-    mActiveFbTexture = mActiveFbTexture == 0 ? 1 : 0;
-
-    SDL_SetRenderTarget(mContext.GetRenderer(), GetActiveFbTexture().GetTexture());
-}

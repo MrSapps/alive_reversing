@@ -122,6 +122,21 @@ Renderer changes: `build/Source/Tools/render_test/relive_render_test` draws test
 both renderers and needs no game data. `-auto` checks for leaks, times each scene and saves
 captures. See `Source/Tools/render_test/README.md`.
 
+For any rendering change, save a baseline **before** touching the code, then compare against it
+after, for both visuals and speed:
+
+```sh
+# On the unchanged code (build it first)
+build/Source/Tools/render_test/relive_render_test -auto -out=rt_baseline
+# After the change
+build/Source/Tools/render_test/relive_render_test -auto -out=rt_after -baseline=rt_baseline
+```
+
+`-baseline` fails on any capture that changed and saves `baseline_diff_*.png`: check each one is
+intended. Compare `rt_after/perf.csv` with `rt_baseline/perf.csv` (average and p95 frame time,
+draw calls, uploads per scene) and report any scene that got slower. Use the same machine and
+build type for both runs, and keep the output dirs out of the source tree (`build-*/` is ignored).
+
 AE needs `st.lvl` and `mi.lvl` in that directory. AO needs `s1.lvl` and `r1.lvl`.
 If they are missing, the game shows an error and logs a listing of the directory.
 

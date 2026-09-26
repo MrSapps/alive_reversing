@@ -42,6 +42,9 @@ SdlTexturePtr Sdl3Context::CreateTexture(SDL_PixelFormat format, SDL_TextureAcce
     {
         ALIVE_FATAL("SDL_CreateTexture(%ux%u) failed: %s", width, height, SDL_GetError());
     }
+
+    // Unfiltered when scaled, as the OpenGL renderer samples every texture. SDL's default is linear.
+    SDL_SetTextureScaleMode(texture.get(), SDL_SCALEMODE_NEAREST);
     return texture;
 }
 
