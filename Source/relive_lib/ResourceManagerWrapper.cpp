@@ -485,7 +485,7 @@ PalResource ResourceManagerWrapper::LoadPal(PalId pal)
     auto palData = mFs.LoadToVec(filePath.GetPath().c_str());
     if (palData.size() != 1024) // 256 RGBA entries
     {
-        ALIVE_FATAL("Bad pal data size %d but expected 1024", palData.size());
+        ALIVE_FATAL("Bad pal data size %zu but expected 1024", palData.size());
     }
 
     memcpy(newRes.mPal->mPal, palData.data(), palData.size());
@@ -973,7 +973,7 @@ private:
                     // TODO: Handle exception on bad data
 
                     nlohmann::json pathJson = nlohmann::json::parse(pathJsonStr);
-                    LOG_INFO("Cam count %d", pathJson["map"]["cameras"].size());
+                    LOG_INFO("Cam count %zu", pathJson["map"]["cameras"].size());
 
                     auto pathBuffer = std::make_unique<BinaryPath>(pathJsonFile.GetPath(), pathJson["map"]["path_id"]);
                     pathBuffer->CreateFromJson(pathJson);
