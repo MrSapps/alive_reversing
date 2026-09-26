@@ -18,6 +18,7 @@
 #include "Sys.hpp"
 #include "AmbientSound.hpp"
 #include "logger.hpp"
+#include <algorithm>
 
 bool gMap_bDoPurpleLightEffect = false;
 
