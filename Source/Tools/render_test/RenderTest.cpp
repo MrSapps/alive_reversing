@@ -27,6 +27,9 @@ static constexpr u32 kTextureExpiryFrames = 330;
 // Frames run before timing starts, so textures are uploaded and caches are warm
 static constexpr u32 kWarmUpFrames = 10;
 
+// Enough for a screen shake that starts on a scene's first frame to show
+static constexpr u32 kScreenShakeCheckFrames = 30;
+
 // Pixel differences between renderers smaller than this are rounding, not bugs
 static constexpr u8 kRendererDiffTolerance = 8;
 
@@ -383,6 +386,32 @@ Capture RenderTest::RunFrameAndCapture(bool advance)
     Capture capture;
     renderer.TakeCapture(capture.mPixels, capture.mWidth, capture.mHeight);
     return capture;
+}
+
+static bool SameScreenPosition(const SDL_Rect& a, const SDL_Rect& b)
+{
+    return a.x == b.x && a.y == b.y && a.w == b.w && a.h == b.h;
+}
+
+bool RenderTest::RunFramesAndCheckScreenMoved(u32 frames)
+{
+    const IRenderer& renderer = *IRenderer::GetRenderer();
+    SDL_Rect first = {};
+    bool moved = false;
+    for (u32 frame = 0; frame < frames; frame++)
+    {
+        RunFrame(true);
+        const SDL_Rect& screenRect = renderer.GetLastFrameStats().mScreenRect;
+        if (frame == 0)
+        {
+            first = screenRect;
+        }
+        else if (!SameScreenPosition(first, screenRect))
+        {
+            moved = true;
+        }
+    }
+    return moved;
 }
 
 void RenderTest::Fail(const std::string& message)
@@ -843,6 +872,10 @@ void RenderTest::RunAutoScene(u32 sceneIdx, const Capture& reference, RendererRe
     const u32 timedFrames = mOptions.mTimedFrames * (mScene->IsStress() ? 4 : 1);
     const u32 totalFrames = std::max(captureFrame + 2, kWarmUpFrames + timedFrames);
 
+    const bool shakesScreen = mScene->ShakesScreen();
+    SDL_Rect firstScreenRect = {};
+    bool screenMoved = false;
+
     Capture nextFrame;
     for (u32 frame = 0; frame < totalFrames; frame++)
     {
@@ -864,6 +897,15 @@ void RenderTest::RunAutoScene(u32 sceneIdx, const Capture& reference, RendererRe
             sceneResult.mTextureUploads += stats.mTextureUploads;
         }
         sceneResult.mPeakCachedTextures = std::max(sceneResult.mPeakCachedTextures, stats.mCachedTextures);
+
+        if (frame == 0)
+        {
+            firstScreenRect = stats.mScreenRect;
+        }
+        else if (!SameScreenPosition(firstScreenRect, stats.mScreenRect))
+        {
+            screenMoved = true;
+        }
 
         if (capture)
         {
@@ -888,6 +930,33 @@ void RenderTest::RunAutoScene(u32 sceneIdx, const Capture& reference, RendererRe
         {
             Fail(Format("%s: \"%s\" doesn't draw the same twice in a row (%u pixels differ)", rendererName, sceneResult.mTitle.c_str(), diff.mDifferingPixels));
             CaptureDiff::MakeImage(sceneResult.mCapture, nextFrame).SavePng(mFs, RendererDir(renderer.GetType()) + "/unstable_" + sceneResult.mFileName);
+        }
+    }
+
+    // Captures are taken before the frame is drawn to the window, so they can't show screen shake.
+    // Where the renderer drew the frame in the window is checked instead.
+    if (shakesScreen && !screenMoved)
+    {
+        Fail(Format("%s: \"%s\" didn't shake the screen", rendererName, sceneResult.mTitle.c_str()));
+    }
+    else if (!shakesScreen && screenMoved)
+    {
+        Fail(Format("%s: \"%s\" moved the frame in the window, but has no screen shake", rendererName, sceneResult.mTitle.c_str()));
+    }
+
+    if (shakesScreen)
+    {
+        // Again with the frame stats drawn over the frame, as the game and the interactive
+        // test can show them. They're left out of the run above because they'd be in its captures.
+        StartScene(sceneIdx);
+        renderer.ShowFrameStats(std::make_unique<FrameStatsOverlay>(*mResMan));
+        const bool movedWithStats = RunFramesAndCheckScreenMoved(kScreenShakeCheckFrames);
+        renderer.ShowFrameStats(nullptr);
+        EndScene();
+
+        if (!movedWithStats)
+        {
+            Fail(Format("%s: \"%s\" didn't shake the screen with the frame stats shown", rendererName, sceneResult.mTitle.c_str()));
         }
     }
 

@@ -73,7 +73,9 @@ void FrameStatsOverlay::Draw(IRenderer& renderer)
              IRenderer::TypeToString(renderer.GetType()), mFps, mFrameMs, stats.mDrawCalls, stats.mCachedTextures);
 
     // A black shadow, then the text, right aligned. Drawn straight to the renderer so they go over
-    // everything the frame drew, whatever clip rectangle or screen shake it left set.
+    // everything the frame drew, whatever clip rectangle it left set. The screen offset is left
+    // alone: it moves the whole frame when it's drawn to the window, so resetting it here would
+    // stop screen shake.
     const bool screenSpace = gFontDrawScreenSpace;
     gFontDrawScreenSpace = true;
     const s32 x = IRenderer::kPsxFramebufferWidth - 4 - Width(text);
@@ -84,8 +86,6 @@ void FrameStatsOverlay::Draw(IRenderer& renderer)
     Prim_ScissorRect noClip;
     noClip.SetRect({0, 0, 1, 1});
     renderer.SetClip(noClip);
-    Prim_ScreenOffset noOffset;
-    renderer.SetScreenOffset(noOffset);
 
     for (s32 i = 0; i < polyCount; i++)
     {

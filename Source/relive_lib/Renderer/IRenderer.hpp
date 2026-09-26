@@ -140,6 +140,8 @@ public:
         u32 mTextureUploads = 0;
         // Textures the renderer is keeping alive in its cache
         u32 mCachedTextures = 0;
+        // Where the frame was drawn in the window, which screen shake moves
+        SDL_Rect mScreenRect = {};
     };
 
     const FrameStats& GetLastFrameStats() const

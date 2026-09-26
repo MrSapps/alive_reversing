@@ -215,9 +215,9 @@ SDL_Rect IRenderer::GetTargetDrawRect()
         }
     }
 
-    // Calculate any screen shake
-    const s32 shakeX = static_cast<s32>(mOffsetX * (rect.w / 640.0f));
-    const s32 shakeY = static_cast<s32>(mOffsetY * (rect.h / 480.0f));
+    // Calculate any screen shake. The offsets are in PSX framebuffer pixels (640x240).
+    const s32 shakeX = static_cast<s32>(mOffsetX * (rect.w / static_cast<f32>(kPsxFramebufferWidth)));
+    const s32 shakeY = static_cast<s32>(mOffsetY * (rect.h / static_cast<f32>(kPsxFramebufferHeight)));
 
     rect.x = shakeX + ((wndWidth - rect.w) / 2);
     rect.y = shakeY + ((wndHeight - rect.h) / 2);

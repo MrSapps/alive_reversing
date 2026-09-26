@@ -107,6 +107,12 @@ public:
         return false;
     }
 
+    // Moves the whole frame in the window. Every other scene must leave it where it is.
+    virtual bool ShakesScreen() const
+    {
+        return false;
+    }
+
     // Measures performance with a lot of drawing, so it's timed for longer
     virtual bool IsStress() const
     {
