@@ -23,7 +23,7 @@ enum class MessageBoxButton
     eYes,
 };
 
-void Alive_Show_ErrorMsg(const char_type* fmt, ...);
+void Alive_Show_ErrorMsg(const char_type* fmt, ...) RELIVE_PRINTF_FMT(1, 2);
 u32 SYS_GetTicks();
 
 // Turns SDL's events into game input and actions. The Engine owns the only instance and pumps
