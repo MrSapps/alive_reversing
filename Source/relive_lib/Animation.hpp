@@ -40,7 +40,9 @@ public:
     u32 GetFrameDelay() const { return mFrameDelay; }
     void SetFrameDelay(u32 val) { mFrameDelay = val; }
     s32 GetCurrentFrame() const { return mCurrentFrame; }
-    void SetCurrentFrame(s32 val) { mCurrentFrame = val; }
+    // Kept to the animation's frames (or -1, before the first): a save state can pair a motion
+    // with a frame from the animation that was playing before it, see Abe::VOnTlvCollision
+    void SetCurrentFrame(s32 val);
     TFrameCallBackType* GetFnPtrArray() const { return mFnPtrArray; }
     void SetFnPtrArray(TFrameCallBackType* val) { mFnPtrArray = val; }
     FP GetSpriteScale() const { return mSpriteScale; }
