@@ -556,6 +556,56 @@ public:
     }
 };
 
+// The LCD screens' scrolling messages: every character a slightly different colour, changing every
+// frame, added to what's under it, inside a clip rectangle
+class FlickeringTextScene final : public Scene
+{
+public:
+    const char* Title() const override
+    {
+        return "Flickering text (LCD screens)";
+    }
+
+    const char* Expected() const override
+    {
+        return "Lines of grey text scrolling left, each letter flickering a little brighter or darker\n"
+               "every frame. The text is added to the bands, and cut off at the box's edges";
+    }
+
+    void Render(SceneContext& ctx, OrderingTable& ot) override
+    {
+        ctx.DrawCamera(ot, ctx.mRes.mBandsCam);
+
+        static constexpr s32 kBoxX = 40;
+        static constexpr s32 kBoxWidth = 560;
+        static constexpr s32 kLines = 8;
+        // As LCDScreen adds them: a layer's last item is drawn first, so the box is set, then the
+        // text drawn, then the whole screen set again
+        mClip[0].SetRect({0, 0, 640, 240});
+        ot.Add(Layer::eLayer_RopeWebDrillMeatSaw_24, &mClip[0]);
+
+        TextDrawer::Style style;
+        style.semiTrans = true;
+        style.blendMode = relive::TBlendModes::eBlend_1;
+        style.layer = Layer::eLayer_RopeWebDrillMeatSaw_24;
+        style.colourRandomRange = 40;
+
+        const s32 scroll = static_cast<s32>(mFrame++ * 2) % 400;
+        for (s32 line = 0; line < kLines; line++)
+        {
+            ctx.mText.Draw(ot, kBoxX + 20 - scroll + line * 7, kContentTop + 6 + line * 22,
+                           "WELCOME TO RUPTUREFARMS. REMEMBER: SAFETY IS EVERYONE'S JOB. 0123456789", style);
+        }
+
+        mClip[1].SetRect({kBoxX, kContentTop, kBoxWidth, kLines * 22});
+        ot.Add(Layer::eLayer_RopeWebDrillMeatSaw_24, &mClip[1]);
+    }
+
+private:
+    Prim_ScissorRect mClip[2];
+    u32 mFrame = 0;
+};
+
 // ----------------------------------------------------------------------------
 // Textures
 // ----------------------------------------------------------------------------
@@ -1646,6 +1696,7 @@ std::vector<SceneFactory> AllScenes()
         &MakeScene<BlendFlatScene>,
         &MakeScene<BlendSpritesScene>,
         &MakeScene<BlendTextScene>,
+        &MakeScene<FlickeringTextScene>,
         &MakeScene<CameraScene>,
         &MakeScene<SpriteShadingScene>,
         &MakeScene<SpriteTransformScene>,

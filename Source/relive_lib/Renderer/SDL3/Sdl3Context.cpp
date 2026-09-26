@@ -22,6 +22,51 @@ Sdl3Context::Sdl3Context(Window& window)
         }
     }
     LOG_INFO("SDL3 renderer palette textures: %s", mSupportsPaletteTextures ? "yes" : "no");
+
+    mSupportsBrightVertexColours = ProbeBrightVertexColours();
+    LOG_INFO("SDL3 renderer vertex colours above 1: %s", mSupportsBrightVertexColours ? "yes" : "no");
+}
+
+// Draws a dark grey texel with vertex colour 2 and checks it comes out twice as bright. SDL passes
+// vertex colours to the GPU as floats, but a renderer could clamp them to 1.
+bool Sdl3Context::ProbeBrightVertexColours()
+{
+    SDL_Renderer* pRenderer = mRenderer.get();
+    const SdlTexturePtr target(SDL_CreateTexture(pRenderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, 1, 1));
+    const SdlTexturePtr source(SDL_CreateTexture(pRenderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, 1, 1));
+    if (!target || !source)
+    {
+        return false;
+    }
+
+    const u8 grey[4] = {64, 64, 64, 255};
+    SDL_UpdateTexture(source.get(), nullptr, grey, 4);
+    SDL_SetTextureBlendMode(source.get(), SDL_BLENDMODE_NONE);
+
+    SDL_Texture* pOldTarget = SDL_GetRenderTarget(pRenderer);
+    SDL_SetRenderTarget(pRenderer, target.get());
+
+    // One triangle over the whole target
+    const SDL_FColor bright = {2.0f, 2.0f, 2.0f, 1.0f};
+    const SDL_Vertex vertices[3] = {
+        {{-1.0f, -1.0f}, bright, {0.5f, 0.5f}},
+        {{3.0f, -1.0f}, bright, {0.5f, 0.5f}},
+        {{-1.0f, 3.0f}, bright, {0.5f, 0.5f}}};
+    SDL_RenderGeometry(pRenderer, source.get(), vertices, 3, nullptr, 0);
+
+    bool supported = false;
+    if (SDL_Surface* pSurface = SDL_RenderReadPixels(pRenderer, nullptr))
+    {
+        u8 r = 0;
+        u8 g = 0;
+        u8 b = 0;
+        SDL_ReadSurfacePixel(pSurface, 0, 0, &r, &g, &b, nullptr);
+        supported = r > 96;
+        SDL_DestroySurface(pSurface);
+    }
+
+    SDL_SetRenderTarget(pRenderer, pOldTarget);
+    return supported;
 }
 
 SDL_Renderer* Sdl3Context::GetRenderer()

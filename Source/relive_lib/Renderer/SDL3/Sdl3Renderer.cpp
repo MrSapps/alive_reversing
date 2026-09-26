@@ -233,13 +233,19 @@ void Sdl3Renderer::Draw(const Poly_FT4& poly)
         const PerFrameInfo* pHeader = poly.mAnim->Get_FrameHeader(-1);
         std::shared_ptr<PngData> pPng = animRes.mPngPtr;
 
+        SDL_FColor vertexColour = {};
         tex =
             PrepareTextureFromPoly(poly)->GetTextureUsePalette(
                 poly.mAnim->mAnimRes.mCurPal,
                 shading,
                 poly.mSemiTransparent,
-                poly.mBlendMode
+                poly.mBlendMode,
+                vertexColour
             );
+        for (SDL_Vertex& vertex : vertices)
+        {
+            vertex.color = vertexColour;
+        }
 
         // Fiddle with UVs...
         f32 u0 = static_cast<f32>(pHeader->mSpriteSheetX) / pPng->mWidth;
@@ -286,13 +292,19 @@ void Sdl3Renderer::Draw(const Poly_FT4& poly)
         f32 u1 = poly.U3() / static_cast<f32>(pPng->mWidth);
         f32 v1 = poly.V3() / static_cast<f32>(pPng->mHeight);
 
+        SDL_FColor vertexColour = {};
         tex =
             PrepareTextureFromPoly(poly)->GetTextureUsePalette(
                 poly.mFont->mFntResource.mCurPal,
                 shading,
                 poly.mSemiTransparent,
-                poly.mBlendMode
+                poly.mBlendMode,
+                vertexColour
             );
+        for (SDL_Vertex& vertex : vertices)
+        {
+            vertex.color = vertexColour;
+        }
 
         vertices[0].tex_coord.x = u0;
         vertices[0].tex_coord.y = v0;

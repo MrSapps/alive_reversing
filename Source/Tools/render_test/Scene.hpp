@@ -33,6 +33,8 @@ public:
         bool semiTrans = false;
         relive::TBlendModes blendMode = relive::TBlendModes::eBlend_0;
         FP scale = FP_FromInteger(1);
+        // Each character's colour is off by up to this much, at random, as the LCD screens flicker
+        s16 colourRandomRange = 0;
     };
 
     // x and y in screen pixels

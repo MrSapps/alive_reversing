@@ -15,7 +15,9 @@ public:
     u32 GetHeight();
     u32 GetWidth();
     SDL_Texture* GetTexture();
-    SDL_Texture* GetTextureUsePalette(const std::shared_ptr<AnimationPal>& palette, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode);
+    // The sheet through the palette, and the colour to give the vertices: the tint (shading) is
+    // done with vertex colours where that comes out the same, so every tint shares one texture
+    SDL_Texture* GetTextureUsePalette(const std::shared_ptr<AnimationPal>& palette, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode, SDL_FColor& vertexColour);
     void Resize(u32 width, u32 height);
     void SetTextureBlendMode(SDL_BlendMode blendMode);
     void Update(const SDL_Rect* rect, const void* pixels);
