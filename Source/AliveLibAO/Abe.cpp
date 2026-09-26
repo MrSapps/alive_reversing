@@ -7123,7 +7123,7 @@ void Abe::Motion_77_WellBegin()
             }
             default:
             {
-                ALIVE_FATAL("Unrecognized state in Abe::Motion_77_WellBegin_430F10 called! %d", mCurrentMotion);
+                ALIVE_FATAL("Unrecognized state in Abe::Motion_77_WellBegin_430F10 called! %d", static_cast<s32>(mCurrentMotion));
                 break;
             }
         }
