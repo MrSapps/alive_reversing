@@ -1,4 +1,5 @@
 #include "Sdl3Texture.hpp"
+#include <algorithm>
 #include "FatalError.hpp"
 #include "Renderer/PaletteCache.hpp"
 #include "data_conversion/AnimationConverter.hpp"
@@ -11,29 +12,15 @@ Sdl3Texture::Sdl3Texture(Sdl3Context& context, u32 width, u32 height, SDL_PixelF
     // TODO: SDL now supports palette textures since version 3.4
     if (mFormat == SDL_PIXELFORMAT_INDEX8)
     {
-        mIndexedPixels = static_cast<u8*>(malloc(mWidth * mHeight));
+        mIndexedPixels.resize(mWidth * mHeight);
     }
     else
     {
-        mTexture = SDL_CreateTexture(mContext.GetRenderer(), mFormat, mTextureAccess, mWidth, mHeight);
-        if (!mTexture)
-        {
-            ALIVE_FATAL("SDL_CreateTexture failed: %s", SDL_GetError());
-        }
+        mTexture = mContext.CreateTexture(mFormat, mTextureAccess, mWidth, mHeight);
         mContext.CountTextureUpload();
 
-        Sdl3Context::SetTextureBlendMode(mTexture, SDL_BLENDMODE_NONE);
+        Sdl3Context::SetTextureBlendMode(mTexture.get(), SDL_BLENDMODE_NONE);
     }
-}
-
-Sdl3Texture::~Sdl3Texture()
-{
-    if (mTexture)
-    {
-        SDL_DestroyTexture(mTexture);
-    }
-
-    free(mIndexedPixels);
 }
 
 std::shared_ptr<Sdl3Texture> Sdl3Texture::FromMask(Sdl3Context& context, std::shared_ptr<Sdl3Texture> srcTex, const u8* maskPixels)
@@ -43,9 +30,9 @@ std::shared_ptr<Sdl3Texture> Sdl3Texture::FromMask(Sdl3Context& context, std::sh
     // Create mask texture
     u8* texPixels;
     s32 pitch;
-    SDL_Texture* maskTex = SDL_CreateTexture(context.GetRenderer(), SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, srcTex->mWidth, srcTex->mHeight);
+    const SdlTexturePtr maskTex = context.CreateTexture(SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, srcTex->mWidth, srcTex->mHeight);
 
-    SDL_LockTexture(maskTex, NULL, (void**) &texPixels, &pitch);
+    SDL_LockTexture(maskTex.get(), NULL, (void**) &texPixels, &pitch);
 
     for (s32 i = 0; i < pitch * static_cast<s32>(srcTex->mHeight); i += 4)
     {
@@ -65,7 +52,7 @@ std::shared_ptr<Sdl3Texture> Sdl3Texture::FromMask(Sdl3Context& context, std::sh
         }
     }
 
-    SDL_UnlockTexture(maskTex);
+    SDL_UnlockTexture(maskTex.get());
 
     // Paint result texture
     const SDL_BlendMode blendMode = Sdl3Context::Fg1MaskBlendMode();
@@ -75,14 +62,12 @@ std::shared_ptr<Sdl3Texture> Sdl3Texture::FromMask(Sdl3Context& context, std::sh
 
     SDL_RenderTexture(context.GetRenderer(), srcTex->GetTexture(), NULL, NULL);
 
-    Sdl3Context::SetTextureBlendMode(maskTex, blendMode);
-    SDL_RenderTexture(context.GetRenderer(), maskTex, NULL, NULL);
+    Sdl3Context::SetTextureBlendMode(maskTex.get(), blendMode);
+    SDL_RenderTexture(context.GetRenderer(), maskTex.get(), NULL, NULL);
 
     Sdl3Context::SetTextureBlendMode(resultTex->GetTexture(), SDL_BLENDMODE_BLEND);
 
-    // Cleanup
     context.RestoreFramebuffer();
-    SDL_DestroyTexture(maskTex);
 
     return resultTex;
 }
@@ -104,7 +89,7 @@ SDL_Texture* Sdl3Texture::GetTexture()
         ALIVE_FATAL("%s", "SDL3 use GetTextureUsePalette with INDEX8 tex");
     }
 
-    return mTexture;
+    return mTexture.get();
 }
 
 SDL_Texture* Sdl3Texture::GetTextureUsePalette(const std::shared_ptr<AnimationPal>& palette, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode)
@@ -114,151 +99,145 @@ SDL_Texture* Sdl3Texture::GetTextureUsePalette(const std::shared_ptr<AnimationPa
         ALIVE_FATAL("%s", "SDL3 attempt to use palette on non-indexed tex");
     }
 
-    // (Re)create texture if necessary (palette/shading/blend changes)
-    if (mTexture)
-    {
-        if (
-            PaletteCache::HashPalette(palette.get()) == mLastPaletteHash &&
-            mLastBlendMode == blendMode &&
-            mLastSemiTransparent == isSemiTrans &&
-            mLastShadeColor.ToU32() == shading.ToU32()
-        )
-        {
-            //LOG("%s", "SDL3 palette tex cache hit");
-            return mTexture;
-        }
+    PaletteVariant key;
+    key.mPaletteHash = PaletteCache::HashPalette(palette.get());
+    // The tint only matters when shading is on
+    key.mShading = shading.a == 255 ? shading : RGBA32{0, 0, 0, 0};
+    key.mSemiTrans = isSemiTrans;
+    key.mBlendMode = blendMode;
+    key.mLastUsed = ++mUseCounter;
 
-        SDL_DestroyTexture(mTexture);
+    // A sprite sheet is often drawn several ways in one frame (palettes, tints, blend modes),
+    // so a few converted copies are kept rather than converting it again each time
+    for (PaletteVariant& variant : mPaletteVariants)
+    {
+        if (variant.mPaletteHash == key.mPaletteHash &&
+            variant.mShading.ToU32() == key.mShading.ToU32() &&
+            variant.mSemiTrans == key.mSemiTrans &&
+            variant.mBlendMode == key.mBlendMode)
+        {
+            variant.mLastUsed = key.mLastUsed;
+            return variant.mTexture.get();
+        }
     }
 
-    //LOG("%s", "SDL3 palette tex cache miss");
-    mTexture = SDL_CreateTexture(mContext.GetRenderer(), SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, mWidth, mHeight);
+    if (mPaletteVariants.size() >= MaxPaletteVariants())
+    {
+        auto leastRecent = std::min_element(mPaletteVariants.begin(), mPaletteVariants.end(),
+            [](const PaletteVariant& a, const PaletteVariant& b) { return a.mLastUsed < b.mLastUsed; });
+        mPaletteVariants.erase(leastRecent);
+    }
+
+    key.mTexture = MakePaletteVariant(*palette, key.mShading, isSemiTrans, blendMode);
+    SDL_Texture* pTexture = key.mTexture.get();
+    mPaletteVariants.push_back(std::move(key));
+    return pTexture;
+}
+
+std::size_t Sdl3Texture::MaxPaletteVariants() const
+{
+    const std::size_t variantBytes = static_cast<std::size_t>(mWidth) * mHeight * 4;
+    return std::max(kMinPaletteVariants, kPaletteVariantBudgetBytes / std::max<std::size_t>(variantBytes, 1));
+}
+
+RGBA32 Sdl3Texture::ConvertPaletteColour(RGBA32 colour, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode)
+{
+    // This logic is basically a mirror of the GLSL shader, but in
+    // software - see ShaderPsx.cpp, and the blend mode stuff in
+    // OpenGLRenderer.cpp::DrawBatches
+
+    if (colour.ToU32() == 0)
+    {
+        return {0, 0, 0, 255};
+    }
+
+    if (shading.a == 255) // Shading required
+    {
+        colour.r = HandleShading(colour.r, shading.r);
+        colour.g = HandleShading(colour.g, shading.g);
+        colour.b = HandleShading(colour.b, shading.b);
+    }
+
+    if (isSemiTrans && colour.a == 255)
+    {
+        switch (blendMode)
+        {
+            case relive::TBlendModes::eBlend_0: // HALF_DST_ADD_HALF_SRC
+                return {static_cast<u8>(colour.r / 2), static_cast<u8>(colour.g / 2), static_cast<u8>(colour.b / 2), 128};
+
+            case relive::TBlendModes::eBlend_1: // ONE_DST_ADD_ONE_SRC
+            case relive::TBlendModes::eBlend_2: // ONE_DST_SUB_ONE_SRC
+                return {colour.r, colour.g, colour.b, 255};
+
+            case relive::TBlendModes::eBlend_3: // ONE_DST_ADD_QRT_SRC
+                return {static_cast<u8>(colour.r / 4), static_cast<u8>(colour.g / 4), static_cast<u8>(colour.b / 4), 255};
+
+            default:
+                ALIVE_FATAL("SDL3 Invalid blend mode %u", blendMode);
+        }
+    }
+
+    return {colour.r, colour.g, colour.b, 0};
+}
+
+SdlTexturePtr Sdl3Texture::MakePaletteVariant(const AnimationPal& palette, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode)
+{
+    SdlTexturePtr texture = mContext.CreateTexture(SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, mWidth, mHeight);
     mContext.CountTextureUpload();
 
-    // Lock target texture, all the per-pixel ops are handled here - sampling
-    // from palette + shading/blending
-    u8* pixelsTarget = NULL;
-    s32 pitchTarget = 0;
-
-    SDL_LockTexture(mTexture, NULL, (void**) &pixelsTarget, &pitchTarget);
-
-    for (s32 i = 0; i < static_cast<s32>(mWidth * mHeight); i++)
+    // Each palette entry is converted once, then the pixels are just looked up
+    RGBA32 converted[256];
+    for (s32 i = 0; i < 256; i++)
     {
-        s32 r = (i * 4);
-        s32 g = (i * 4) + 1;
-        s32 b = (i * 4) + 2;
-        s32 a = (i * 4) + 3;
-
-        RGBA32 colour = palette->mPal[mIndexedPixels[i]];
-
-        // This logic is basically a mirror of the GLSL shader, but in
-        // software - see ShaderPsx.cpp, and the blend mode stuff in
-        // OpenGLRenderer.cpp::DrawBatches
-
-        if (colour.ToU32() == 0)
-        {
-            pixelsTarget[r] = 0;
-            pixelsTarget[g] = 0;
-            pixelsTarget[b] = 0;
-            pixelsTarget[a] = 255;
-
-            continue;
-        }
-
-        if (shading.a == 255) // Shading required
-        {
-            colour.r = HandleShading(colour.r, shading.r);
-            colour.g = HandleShading(colour.g, shading.g);
-            colour.b = HandleShading(colour.b, shading.b);
-        }
-
-        if (isSemiTrans && colour.a == 255)
-        {
-            switch (blendMode)
-            {
-                case relive::TBlendModes::eBlend_0: // HALF_DST_ADD_HALF_SRC
-                    pixelsTarget[r] = colour.r / 2;
-                    pixelsTarget[g] = colour.g / 2;
-                    pixelsTarget[b] = colour.b / 2;
-                    pixelsTarget[a] = 128;
-                    break;
-
-                case relive::TBlendModes::eBlend_1: // ONE_DST_ADD_ONE_SRC
-                case relive::TBlendModes::eBlend_2: // ONE_DST_SUB_ONE_SRC
-                    pixelsTarget[r] = colour.r;
-                    pixelsTarget[g] = colour.g;
-                    pixelsTarget[b] = colour.b;
-                    pixelsTarget[a] = 255;
-                    break;
-
-                case relive::TBlendModes::eBlend_3: // ONE_DST_ADD_QRT_SRC
-                    pixelsTarget[r] = colour.r / 4;
-                    pixelsTarget[g] = colour.g / 4;
-                    pixelsTarget[b] = colour.b / 4;
-                    pixelsTarget[a] = 255;
-                    break;
-
-                default:
-                    ALIVE_FATAL("SDL3 Invalid blend mode %u", blendMode);
-                    break;
-            }
-        }
-        else
-        {
-            pixelsTarget[r] = colour.r;
-            pixelsTarget[g] = colour.g;
-            pixelsTarget[b] = colour.b;
-            pixelsTarget[a] = 0;
-        }
+        converted[i] = ConvertPaletteColour(palette.mPal[i], shading, isSemiTrans, blendMode);
     }
 
-    SDL_UnlockTexture(mTexture);
+    u8* pixelsTarget = nullptr;
+    s32 pitchTarget = 0;
+    SDL_LockTexture(texture.get(), nullptr, reinterpret_cast<void**>(&pixelsTarget), &pitchTarget);
+    for (u32 y = 0; y < mHeight; y++)
+    {
+        RGBA32* pRow = reinterpret_cast<RGBA32*>(pixelsTarget + y * pitchTarget);
+        const u8* pIndices = mIndexedPixels.data() + y * mWidth;
+        for (u32 x = 0; x < mWidth; x++)
+        {
+            pRow[x] = converted[pIndices[x]];
+        }
+    }
+    SDL_UnlockTexture(texture.get());
 
-    // Set up texture blend mode usage
-    const SDL_BlendMode texBlendMode =
+    Sdl3Context::SetTextureBlendMode(texture.get(),
         blendMode == relive::TBlendModes::eBlend_2
             ? Sdl3Context::PsxTextureSubtractBlendMode()
-            : Sdl3Context::PsxTextureBlendMode();
+            : Sdl3Context::PsxTextureBlendMode());
 
-    Sdl3Context::SetTextureBlendMode(mTexture, texBlendMode);
-
-    // Update cache state
-    mLastBlendMode = blendMode;
-    mLastPaletteHash = PaletteCache::HashPalette(palette.get());
-    mLastSemiTransparent = isSemiTrans;
-    mLastShadeColor = shading;
-
-    return mTexture;
+    return texture;
 }
 
 void Sdl3Texture::Resize(u32 width, u32 height)
 {
-    if (mTexture)
-    {
-        SDL_DestroyTexture(mTexture);
-    }
+    mTexture.reset();
 
     mWidth = width;
     mHeight = height;
 
-    mTexture = SDL_CreateTexture(mContext.GetRenderer(), mFormat, mTextureAccess, mWidth, mHeight);
-    if (!mTexture)
-    {
-        ALIVE_FATAL("Sdl3Texture::Resize: SDL_CreateTexture failed: %s", SDL_GetError());
-    }
-    Sdl3Context::SetTextureBlendMode(mTexture, SDL_BLENDMODE_NONE);
+    mTexture = mContext.CreateTexture(mFormat, mTextureAccess, mWidth, mHeight);
+    Sdl3Context::SetTextureBlendMode(mTexture.get(), SDL_BLENDMODE_NONE);
 }
 
 void Sdl3Texture::SetTextureBlendMode(SDL_BlendMode blendMode)
 {
-    Sdl3Context::SetTextureBlendMode(mTexture, blendMode);
+    Sdl3Context::SetTextureBlendMode(mTexture.get(), blendMode);
 }
 
 void Sdl3Texture::Update(const SDL_Rect* rect, const void* pixels)
 {
     if (mFormat == SDL_PIXELFORMAT_INDEX8)
     {
-        memcpy(mIndexedPixels, pixels, mWidth * mHeight);
+        memcpy(mIndexedPixels.data(), pixels, mIndexedPixels.size());
+
+        // Made from the old pixels
+        mPaletteVariants.clear();
     }
     else
     {
@@ -281,7 +260,7 @@ void Sdl3Texture::Update(const SDL_Rect* rect, const void* pixels)
                 break;
         }
 
-        if (!SDL_UpdateTexture(mTexture, rect, pixels, pitch))
+        if (!SDL_UpdateTexture(mTexture.get(), rect, pixels, pitch))
         {
             ALIVE_FATAL("Sdl3Texture::Update: SDL_UpdateTexture failed (format=%d, %ux%u, pixels=%p): %s",
                         mFormat, mWidth, mHeight, pixels, SDL_GetError());

@@ -4,69 +4,67 @@
 
 Sdl3Context::Sdl3Context(Window& window)
 {
-    mRenderer = SDL_CreateRenderer(window.Get(), NULL);
+    mRenderer.reset(SDL_CreateRenderer(window.Get(), NULL));
     if (!mRenderer)
     {
         ALIVE_FATAL("Couldnt create SDL3 renderer: %s", SDL_GetError());
     }
 
-    LOG_INFO("SDL3 renderer name: %s", SDL_GetRendererName(mRenderer));
-}
-
-Sdl3Context::~Sdl3Context()
-{
-    SDL_DestroyRenderer(mRenderer);
+    LOG_INFO("SDL3 renderer name: %s", SDL_GetRendererName(mRenderer.get()));
 }
 
 SDL_Renderer* Sdl3Context::GetRenderer()
 {
-    return mRenderer;
+    return mRenderer.get();
 }
 
 bool Sdl3Context::IsRenderTargetSupported()
 {
-    SDL_Texture* texture = SDL_CreateTexture(mRenderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, 1, 1);
-    const bool isTargetSupported = texture != NULL;
+    const SdlTexturePtr texture(SDL_CreateTexture(mRenderer.get(), SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, 1, 1));
+    return texture != nullptr;
+}
 
-    if (texture)
+SdlTexturePtr Sdl3Context::CreateTexture(SDL_PixelFormat format, SDL_TextureAccess access, u32 width, u32 height)
+{
+    SdlTexturePtr texture(SDL_CreateTexture(mRenderer.get(), format, access, width, height));
+    if (!texture)
     {
-        SDL_DestroyTexture(texture);
+        ALIVE_FATAL("SDL_CreateTexture(%ux%u) failed: %s", width, height, SDL_GetError());
     }
-
-    return isTargetSupported;
+    return texture;
 }
 
 void Sdl3Context::Present()
 {
-    SDL_RenderPresent(mRenderer);
+    SDL_RenderPresent(mRenderer.get());
 }
 
 void Sdl3Context::RestoreFramebuffer()
 {
-    SDL_SetRenderTarget(mRenderer, mLastFramebuffer);
+    SDL_SetRenderTarget(mRenderer.get(), mLastFramebuffer);
     mLastFramebuffer = nullptr;
 
     if (mLastClipRect.x != 0 || mLastClipRect.y != 0 || mLastClipRect.w != 0 || mLastClipRect.h != 0)
     {
-        SDL_SetRenderClipRect(mRenderer, &mLastClipRect);
+        SDL_SetRenderClipRect(mRenderer.get(), &mLastClipRect);
     }
 }
 
 void Sdl3Context::SaveFramebuffer()
 {
-    SDL_GetRenderClipRect(mRenderer, &mLastClipRect);
-    mLastFramebuffer = SDL_GetRenderTarget(mRenderer);
-    SDL_SetRenderTarget(mRenderer, nullptr);
+    SDL_GetRenderClipRect(mRenderer.get(), &mLastClipRect);
+    mLastFramebuffer = SDL_GetRenderTarget(mRenderer.get());
+    SDL_SetRenderTarget(mRenderer.get(), nullptr);
 }
 
 void Sdl3Context::UseScreenFramebuffer()
 {
-    SDL_SetRenderTarget(mRenderer, nullptr);
+    SDL_SetRenderTarget(mRenderer.get(), nullptr);
 }
 
 void Sdl3Context::UseTextureFramebuffer(SDL_Texture* texture)
 {
-    SDL_SetRenderTarget(mRenderer, texture);
+    SDL_SetRenderTarget(mRenderer.get(), texture);
 }
 
 SDL_BlendMode Sdl3Context::SubtractBlendMode()
@@ -120,26 +118,25 @@ SDL_BlendMode Sdl3Context::Fg1MaskBlendMode()
 
 bool Sdl3Context::SupportsCustomBlendModes()
 {
-    SDL_Texture* texture = SDL_CreateTexture(mRenderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, 1, 1);
+    const SdlTexturePtr texture(SDL_CreateTexture(mRenderer.get(), SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, 1, 1));
     if (!texture)
     {
         return false;
     }
 
     const bool supported =
-        SDL_SetTextureBlendMode(texture, PsxTextureBlendMode()) &&
-        SDL_SetTextureBlendMode(texture, PsxTextureSubtractBlendMode()) &&
-        SDL_SetTextureBlendMode(texture, Fg1MaskBlendMode()) &&
-        SDL_SetRenderDrawBlendMode(mRenderer, SubtractBlendMode());
+        SDL_SetTextureBlendMode(texture.get(), PsxTextureBlendMode()) &&
+        SDL_SetTextureBlendMode(texture.get(), PsxTextureSubtractBlendMode()) &&
+        SDL_SetTextureBlendMode(texture.get(), Fg1MaskBlendMode()) &&
+        SDL_SetRenderDrawBlendMode(mRenderer.get(), SubtractBlendMode());
 
-    SDL_DestroyTexture(texture);
-    SDL_SetRenderDrawBlendMode(mRenderer, SDL_BLENDMODE_NONE);
+    SDL_SetRenderDrawBlendMode(mRenderer.get(), SDL_BLENDMODE_NONE);
     return supported;
 }
 
 void Sdl3Context::SetDrawBlendMode(SDL_BlendMode blendMode)
 {
-    if (!SDL_SetRenderDrawBlendMode(mRenderer, blendMode))
+    if (!SDL_SetRenderDrawBlendMode(mRenderer.get(), blendMode))
     {
         ALIVE_FATAL("SDL_SetRenderDrawBlendMode(0x%x) failed: %s", blendMode, SDL_GetError());
     }

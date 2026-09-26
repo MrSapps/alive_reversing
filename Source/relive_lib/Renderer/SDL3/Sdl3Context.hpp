@@ -3,16 +3,39 @@
 #include <SDL3/SDL.h>
 #include "../../Types.hpp"
 
+#include <memory>
+
 class Window;
+
+struct SdlTextureDeleter final
+{
+    void operator()(SDL_Texture* pTexture) const
+    {
+        SDL_DestroyTexture(pTexture);
+    }
+};
+
+// Owns an SDL_Texture
+using SdlTexturePtr = std::unique_ptr<SDL_Texture, SdlTextureDeleter>;
+
+struct SdlRendererDeleter final
+{
+    void operator()(SDL_Renderer* pRenderer) const
+    {
+        SDL_DestroyRenderer(pRenderer);
+    }
+};
 
 class Sdl3Context final
 {
 public:
     explicit Sdl3Context(Window& window);
-    ~Sdl3Context();
 
     SDL_Renderer* GetRenderer();
     bool IsRenderTargetSupported();
+
+    // Fatal if it fails
+    SdlTexturePtr CreateTexture(SDL_PixelFormat format, SDL_TextureAccess access, u32 width, u32 height);
     void Present();
     void RestoreFramebuffer();
     void SaveFramebuffer();
@@ -54,7 +77,7 @@ public:
     }
 
 private:
-    SDL_Renderer* mRenderer;
+    std::unique_ptr<SDL_Renderer, SdlRendererDeleter> mRenderer;
     SDL_Rect mLastClipRect;
     SDL_Texture* mLastFramebuffer;
     u32 mTextureUploads = 0;
