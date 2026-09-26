@@ -1,4 +1,5 @@
 #include "Engine.hpp"
+#include "Renderer/FrameStatsOverlay.hpp"
 #include "GameType.hpp"
 #include "data_conversion/data_conversion_ui.hpp"
 #include "PsxDisplay.hpp"
@@ -88,8 +89,6 @@ bool gDDCheatOn = false;
 u16 gAttract = 0;
 
 
-static bool sCommandLine_ShowFps;
-
 Engine::Engine(GameType gameType, FileSystem& fs, const CommandLineOptions& options)
     : mGameType(gameType)
     , mFs(fs)
@@ -128,37 +127,6 @@ Engine::~Engine()
 }
 
 
-static f64 sFps_55EFDC = 0.0;
-static s32 sFrameDiff_5CA4DC = 0;
-static s32 sFrameCount_5CA300 = 0;
-
-static f64 Calculate_FPS_495250(s32 frameCount)
-{
-    static u32 sLastTime_5CA338 = SYS_GetTicks() - 500;
-    const u32 curTime = SYS_GetTicks();
-    const s32 timeDiff = curTime - sLastTime_5CA338;
-
-    if (static_cast<s32>((curTime - sLastTime_5CA338)) < 500)
-    {
-        return sFps_55EFDC;
-    }
-
-    const s32 diffFrames = frameCount - sFrameDiff_5CA4DC;
-    sFps_55EFDC = static_cast<f64>(diffFrames) * 1000.0 / static_cast<f64>(timeDiff);
-
-    sLastTime_5CA338 = curTime;
-    sFrameDiff_5CA4DC = frameCount;
-    return sFps_55EFDC;
-}
-
-static void DrawFps_4952F0(f32 fps)
-{
-    char_type strBuffer[125] = {};
-    snprintf(strBuffer, sizeof(strBuffer), "%02.1f fps ", static_cast<f64>(fps));
-    gPsxDisplay.mDebugFont.DebugFont_Printf(0, strBuffer);
-}
-
-
 // Called each time a frame is presented
 static s32 Game_End_Frame(u32 flags)
 {
@@ -168,13 +136,6 @@ static s32 Game_End_Frame(u32 flags)
         return 0;
     }
 
-    const f64 fps = Calculate_FPS_495250(sFrameCount_5CA300);
-    if (sCommandLine_ShowFps)
-    {
-        DrawFps_4952F0(static_cast<f32>(fps));
-    }
-
-    ++sFrameCount_5CA300;
     return 0;
 }
 
@@ -236,6 +197,10 @@ void Engine::CmdLineRenderInit(const std::string& activeModName)
     if (!mWindow->CreateWithRenderer(displaySettings.mRenderer, windowTitle))
     {
         ALIVE_FATAL("Failed to create a window and renderer, see the log for details");
+    }
+    if (mOptions.mShowFps)
+    {
+        IRenderer::GetRenderer()->ShowFrameStats(std::make_unique<FrameStatsOverlay>(*mResMan));
     }
     mSys = std::make_unique<Sys>(*mWindow, *mResMan, mPathReloadEventType);
     PresentBlackFrame();
@@ -412,9 +377,8 @@ static Sys::PumpResult LoadingTick(Sys& sys, ResourceManagerWrapper& resMan, Bas
 
     const Sys::PumpResult result = sys.PumpEvents(nullptr);
 
-    // If not uncapped fps playback then actually wait for 1 frame on each tick
-    const bool unCappedFps = GetGameAutoPlayer().IsPlaying() && GetGameAutoPlayer().NoFpsLimitPlayBack();
-    PSX_VSync(unCappedFps ? VSyncMode::UncappedFps : VSyncMode::LimitTo30Fps);
+    // One frame's turn per tick
+    PSX_VSync(VSyncMode::LimitFps);
 
     if (showLoadingIcon)
     {
@@ -877,8 +841,11 @@ void Engine::Run()
 {
     GetGameAutoPlayer().ProcessCommandLine(mFs, mOptions);
 
-    sCommandLine_ShowFps = mOptions.mShowFps;
     gCommandLine_NoFrameSkip = mOptions.mNoFrameSkip;
+    if (mOptions.mMaxFps)
+    {
+        PSX_SetMaxFps(*mOptions.mMaxFps);
+    }
 
     CmdLineRenderInit(mActiveModDisplayName);
 

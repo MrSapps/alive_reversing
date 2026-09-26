@@ -1041,6 +1041,13 @@ public:
     // Finishes once the movie has played or been skipped.
     ModalState Update()
     {
+        // Between a yield and now it was only waiting for the next frame's turn
+        if (mYieldedAtNs != 0)
+        {
+            IRenderer::GetRenderer()->AddIdleTime(SDL_GetTicksNS() - mYieldedAtNs);
+            mYieldedAtNs = 0;
+        }
+
         for (;;)
         {
             switch (Step())
@@ -1050,6 +1057,7 @@ public:
 
                 case StepResult::eYield:
                     PSX_VSync(VSyncMode::UncappedFps);
+                    mYieldedAtNs = SDL_GetTicksNS();
                     return ModalState::eRunning;
 
                 case StepResult::eFinished:
@@ -1308,6 +1316,9 @@ private:
     // Decodes into the queues above on its own threads, so it's declared after them
     std::unique_ptr<MkvMoviePipeline> mPipeline;
 
+    // When Update last gave the main loop its turn, for the frame stats' idle time
+    u64 mYieldedAtNs = 0;
+
     // A dequeued frame that's ahead of the audio clock, waiting to be shown
     std::optional<MkvVideoFrame> mPendingFrame;
 
@@ -1408,7 +1419,7 @@ void Movie::Finish()
 {
     mPlayback.reset();
 
-    PSX_VSync(VSyncMode::LimitTo30Fps);
+    PSX_VSync(VSyncMode::LimitFps);
 
     --Movie::gMovieRefCount;
 

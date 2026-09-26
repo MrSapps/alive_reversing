@@ -83,10 +83,33 @@ TEST(CommandLineOptions, RecordingOptions)
 
 TEST(CommandLineOptions, PlaybackOptions)
 {
-    const CommandLineOptions options = Parse({"-play=run.dat", "-fastest", "-ignore_desyncs"});
+    const CommandLineOptions options = Parse({"-play=run.dat", "-ignore_desyncs"});
     EXPECT_EQ(options.mPlayFile, "run.dat");
-    EXPECT_TRUE(options.mPlayFastest);
     EXPECT_TRUE(options.mIgnoreDesyncs);
+}
+
+TEST(CommandLineOptions, MaxFps)
+{
+    EXPECT_EQ(Parse({}).mMaxFps, std::nullopt);
+    EXPECT_EQ(Parse({"-max_fps=100"}).mMaxFps, 100u);
+    EXPECT_EQ(Parse({"-maxfps=144"}).mMaxFps, 144u);
+    EXPECT_EQ(Parse({"-max_fps=0"}).mMaxFps, 0u);
+}
+
+TEST(CommandLineOptions, InvalidMaxFpsIsIgnored)
+{
+    EXPECT_EQ(Parse({"-max_fps=-5"}).mMaxFps, std::nullopt);
+    EXPECT_EQ(Parse({"-max_fps=fast"}).mMaxFps, std::nullopt);
+    EXPECT_EQ(Parse({"-max_fps="}).mMaxFps, std::nullopt);
+    EXPECT_EQ(Parse({"-maxfps=60fps"}).mMaxFps, std::nullopt);
+}
+
+TEST(CommandLineOptions, ShowFpsAliases)
+{
+    EXPECT_TRUE(Parse({"-ddfps"}).mShowFps);
+    EXPECT_TRUE(Parse({"-show_fps"}).mShowFps);
+    EXPECT_TRUE(Parse({"-showfps"}).mShowFps);
+    EXPECT_FALSE(Parse({}).mShowFps);
 }
 
 TEST(CommandLineOptions, DisplayOptions)
@@ -118,7 +141,8 @@ TEST(CommandLineOptions, UsageListsEveryOption)
     const std::string usage = CommandLineOptions::Usage();
     for (const char* option : {"AE", "AO", "-mod=", "-renderer=", "-fullscreen", "-keep_aspect_ratio", "-filter_screen",
                                "-use_original_resolution", "-ddcheat", "-ddfps", "-ddnoskip", "-ddslowload=", "-help",
-                               "-record=", "-flush", "-play=", "-fastest", "-ignore_desyncs"})
+                               "-record=", "-flush", "-play=", "-ignore_desyncs", "-show_fps", "-showfps",
+                               "-max_fps=", "-maxfps="})
     {
         EXPECT_NE(usage.find(option), std::string::npos) << option;
     }

@@ -13,10 +13,14 @@ using TPsxEmuCallBack = std::function<s32(u32)>;
 enum class VSyncMode
 {
     UncappedFps,
-    LimitTo30Fps,
+    // Waits for the next frame's turn, see PSX_SetMaxFps
+    LimitFps,
 };
 
 void PSX_VSync(VSyncMode mode);
+
+// How many frames a second PSX_VSync lets through: 30 like the original, 0 for no limit
+void PSX_SetMaxFps(u32 maxFps);
 void PSX_PutDispEnv_4F5890();
 void PSX_EMU_SetCallBack_4F9430(TPsxEmuCallBack fnPtr);
 

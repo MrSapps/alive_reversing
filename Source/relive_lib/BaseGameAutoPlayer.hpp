@@ -145,11 +145,6 @@ public:
         return mMode == Mode::Play;
     }
 
-    bool NoFpsLimitPlayBack() const
-    {
-        return mNoFpsLimit;
-    }
-
     // See DisableRecorder
     bool IsRecorderDisabled() const
     {
@@ -195,7 +190,6 @@ private:
 
     BaseRecorder& mRecorder;
     BasePlayer& mPlayer;
-    bool mNoFpsLimit = false;
     bool mIgnoreDesyncs = false;
 };
 

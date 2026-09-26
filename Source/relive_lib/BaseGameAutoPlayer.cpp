@@ -208,7 +208,6 @@ void BaseGameAutoPlayer::ProcessCommandLine(FileSystem& fs, const CommandLineOpt
         mPlayer.Init(fs, options.mPlayFile->c_str());
         mMode = Mode::Play;
 
-        mNoFpsLimit = options.mPlayFastest;
         mIgnoreDesyncs = options.mIgnoreDesyncs;
     }
 }

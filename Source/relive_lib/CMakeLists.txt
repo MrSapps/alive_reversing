@@ -365,6 +365,8 @@ SET(AliveLibAESrc
 SET(renderer_src
     Renderer/IRenderer.hpp
     Renderer/IRenderer.cpp
+    Renderer/FrameStatsOverlay.hpp
+    Renderer/FrameStatsOverlay.cpp
     Renderer/PaletteCache.hpp
     Renderer/TextureCache.hpp
     Renderer/OpenGL3/Batcher.hpp

@@ -417,6 +417,7 @@ void Sdl3Renderer::Draw(const Poly_G4& poly)
 
 void Sdl3Renderer::EndFrame()
 {
+    DrawFrameStats();
     CaptureIfRequested();
 
     mTextureCache.DecreaseResourceLifetimes();

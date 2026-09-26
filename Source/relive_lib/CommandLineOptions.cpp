@@ -43,7 +43,7 @@ CommandLineOptions CommandLineOptions::Parse(const CommandLineParser& clp)
     options.mModName = clp.GetValue("-mod").value_or("");
 
     options.mDdCheat = clp.HasSwitch("-ddcheat") || clp.HasSwitch("-it_is_me_your_father");
-    options.mShowFps = clp.HasSwitch("-ddfps");
+    options.mShowFps = clp.HasSwitch("-ddfps") || clp.HasSwitch("-show_fps") || clp.HasSwitch("-showfps");
     options.mNoFrameSkip = clp.HasSwitch("-ddnoskip");
     if (const auto slowLoad = clp.GetValue("-ddslowload"))
     {
@@ -57,10 +57,22 @@ CommandLineOptions CommandLineOptions::Parse(const CommandLineParser& clp)
         }
     }
 
+    const char* maxFpsName = clp.Has("-max_fps") ? "-max_fps" : "-maxfps";
+    if (const auto maxFps = clp.GetValue(maxFpsName))
+    {
+        if (!maxFps->empty() && maxFps->size() <= 6 && maxFps->find_first_not_of("0123456789") == std::string::npos)
+        {
+            options.mMaxFps = static_cast<u32>(std::stoul(*maxFps));
+        }
+        else
+        {
+            LOG_WARNING("Ignoring %s=%s, it should be a number of frames a second (0 for no limit)", maxFpsName, maxFps->c_str());
+        }
+    }
+
     options.mRecordFile = clp.GetValue("-record");
     options.mFlushRecording = clp.HasSwitch("-flush");
     options.mPlayFile = clp.GetValue("-play");
-    options.mPlayFastest = clp.HasSwitch("-fastest");
     options.mIgnoreDesyncs = clp.HasSwitch("-ignore_desyncs");
 
     if (const auto name = clp.GetValue("-renderer"))
@@ -94,7 +106,9 @@ const char* CommandLineOptions::Usage()
            "  -filter_screen              Filter (smooth) the scaled image\n"
            "  -use_original_resolution    Render at 640x240 and scale up\n"
            "  -ddcheat                    Enable the debug cheat menu\n"
-           "  -ddfps                      Show the frame rate\n"
+           "  -ddfps, -show_fps, -showfps Show the frame rate and frame time\n"
+           "  -max_fps=<n>, -maxfps=<n>   Run at up to n frames a second (default 30), 0 for no limit.\n"
+           "                              The game runs faster the more frames it shows\n"
            "  -ddnoskip                   Render every frame instead of skipping to keep up\n"
            "  -ddslowload=<ms>            Make each resource take at least this long to load\n"
            "  -help, --help, -h, /?       Show this and exit\n"
@@ -105,6 +119,5 @@ const char* CommandLineOptions::Usage()
            "  -record=<file>              Record this session\n"
            "  -flush                      With -record, write to disk straight away\n"
            "  -play=<file>                Play back a recording, stopping if it desyncs\n"
-           "  -fastest                    With -play, run as fast as possible\n"
            "  -ignore_desyncs             With -play, keep going after a desync\n";
 }

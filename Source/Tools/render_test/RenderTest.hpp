@@ -139,7 +139,6 @@ private:
     bool mPaused = false;
     bool mUncapped = false;
     bool mFilter = false;
-    std::vector<f64> mRecentFrameMs;
 
     std::vector<Check> mChecks;
 };
