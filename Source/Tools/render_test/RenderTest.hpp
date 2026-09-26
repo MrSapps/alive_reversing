@@ -36,6 +36,9 @@ struct RenderTestOptions final
 
     // Only run scenes whose name contains this (interactively: start on the first one)
     std::string mSceneFilter;
+
+    // The renderers check for errors as they go (-renderer_checks)
+    bool mRendererChecks = false;
 };
 
 // Runs the render test scenes with the real renderers, the real ordering table and as

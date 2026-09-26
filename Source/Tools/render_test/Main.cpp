@@ -20,6 +20,7 @@ static const char* kUsage =
     "  -frames=<n>                  Frames timed per scene with -auto (default 120)\n"
     "  -out=<dir>                   Where -auto writes to (default render_test_out)\n"
     "  -baseline=<dir>              Fail if captures differ from an earlier -auto run's\n"
+    "  -renderer_checks             Check for renderer errors as it goes (slower)\n"
     "  -list                        List the scenes and exit\n"
     "\n"
     "Keys: left/right change scene, H hide text, P pause, F filtering, U uncapped fps,\n"
@@ -78,6 +79,7 @@ s32 main(s32 argc, char_type** argv)
     options.mSceneFilter = args.GetValue("-scene").value_or("");
     options.mOutDir = args.GetValue("-out").value_or(options.mOutDir);
     options.mBaselineDir = args.GetValue("-baseline").value_or("");
+    options.mRendererChecks = args.HasSwitch("-renderer_checks");
     if (const auto frames = args.GetValue("-frames"))
     {
         options.mTimedFrames = static_cast<u32>(std::max(1, std::atoi(frames->c_str())));

@@ -829,6 +829,9 @@ add_executable(relive_lib_tests
     tests/MovieFrameSyncTests.cpp
     tests/ConversionProgressTests.cpp
     tests/EtaEstimatorTests.cpp
+    tests/PaletteCacheTests.cpp
+    tests/TextureCacheTests.cpp
+    tests/BatcherTests.cpp
     tests/TestStubs.cpp
 )
 target_include_directories(relive_lib_tests PRIVATE

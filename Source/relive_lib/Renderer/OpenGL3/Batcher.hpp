@@ -6,12 +6,6 @@
 #include <vector>
 #include <memory>
 
-enum class UvMode
-{
-    UnNormalized,
-    Normalized,
-};
-
 template <typename TextureType, typename RenderBatchType, std::size_t kTextureBatchSize>
 class Batcher final
 {
@@ -25,10 +19,8 @@ public:
         mBatchingEnabled = batching;
     }
 
-    UvMode mUvMode = UvMode::UnNormalized;
-
-    Batcher(UvMode uvMode = UvMode::Normalized)
-        : mUvMode(uvMode)
+    // Texture coordinates are in texels
+    Batcher()
     {
         mVertices.reserve(IRenderer::kReserveFT4QuadCount * 4);
         mIndices.reserve(IRenderer::kReserveFT4QuadCount * 6);
@@ -93,6 +85,12 @@ public:
     void PushCAM(const Poly_FT4& poly, std::shared_ptr<TextureType>& texture);
 
     void PushAnim(const Poly_FT4& poly, u32 palIndex, std::shared_ptr<TextureType>& texture);
+
+    // An animation frame or a font glyph, drawn through palette palIndex
+    void PushSprite(const Poly_FT4& poly, const IRenderer::QuadUVs& uvs, u32 palIndex, std::shared_ptr<TextureType>& texture, u32 textureResId);
+
+    // A camera or FG1 image, covering the whole frame
+    void PushScreenImage(const Poly_FT4& poly, IRenderer::PsxDrawMode drawMode, std::shared_ptr<TextureType>& texture, u32 textureResId);
 
     void PushVertexData(IRenderer::PsxVertexData* pVertData, s32 count, std::shared_ptr<TextureType>& texture, u32 textureResId);
 

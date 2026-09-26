@@ -194,7 +194,7 @@ void Engine::CmdLineRenderInit(const std::string& activeModName)
     }
 
     mWindow = std::make_unique<Window>();
-    if (!mWindow->CreateWithRenderer(displaySettings.mRenderer, windowTitle))
+    if (!mWindow->CreateWithRenderer(displaySettings.mRenderer, windowTitle, mOptions.mRendererChecks))
     {
         ALIVE_FATAL("Failed to create a window and renderer, see the log for details");
     }

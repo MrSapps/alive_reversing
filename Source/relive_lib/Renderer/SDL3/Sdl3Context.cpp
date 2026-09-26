@@ -2,8 +2,15 @@
 #include "../../Window.hpp"
 #include "../../FatalError.hpp"
 
-Sdl3Context::Sdl3Context(Window& window)
+Sdl3Context::Sdl3Context(Window& window, bool checks)
 {
+    if (checks)
+    {
+        SDL_SetHint(SDL_HINT_RENDER_GPU_DEBUG, "1");
+        SDL_SetHint(SDL_HINT_RENDER_VULKAN_DEBUG, "1");
+        SDL_SetHint(SDL_HINT_RENDER_DIRECT3D11_DEBUG, "1");
+    }
+
     mRenderer.reset(SDL_CreateRenderer(window.Get(), NULL));
     if (!mRenderer)
     {

@@ -8,7 +8,7 @@
 class Sdl3Renderer final : public IRenderer
 {
 public:
-    explicit Sdl3Renderer(Window& window);
+    Sdl3Renderer(Window& window, bool checks);
     ~Sdl3Renderer() override;
 
     void Clear(u8 r, u8 g, u8 b) override;
@@ -42,6 +42,11 @@ private:
     void ApplyClip();
 
 private:
+    // How many frames a texture is kept for after it was last drawn (see TextureCache). Cameras
+    // and FG1s are only kept while they're on screen, as they're big.
+    static constexpr s32 kCamTextureLifetime = 1;
+    static constexpr s32 kSpriteTextureLifetime = 255;
+
     Sdl3Context mContext;
 
     bool mClipEnabled = false;

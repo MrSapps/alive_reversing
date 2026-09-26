@@ -87,6 +87,22 @@ public: // TODO: Make protected later
     // A 1 pixel wide quad along the line. verts[0] and [1] are at p1, [2] and [3] at p2.
     static Quad2D LineToQuad(const Point2D& p1, const Point2D& p2);
 
+    // A textured quad's texture coordinates in texels: (u0, v0) at its first corner, (u1, v1)
+    // at its last
+    struct QuadUVs final
+    {
+        f32 u0, v0, u1, v1;
+    };
+
+    // The area of its sprite sheet an animated poly's frame is in, flipped as the poly says
+    static QuadUVs GetAnimUVs(const Poly_FT4& poly);
+
+    // A font poly's glyph
+    static QuadUVs GetFontUVs(const Poly_FT4& poly);
+
+    // Prim_ScissorRect's (0, 0, 1, 1) means no clipping
+    static bool IsScissorDisabled(const Prim_ScissorRect& clipper);
+
 public:
     enum class Renderers
     {
@@ -95,8 +111,9 @@ public:
     };
 
     static IRenderer* GetRenderer();
-    // Creates a renderer of type for window, see Window::CreateWithRenderer
-    static bool CreateRenderer(Renderers type, Window& window);
+    // Creates a renderer of type for window, see Window::CreateWithRenderer. checks turns on
+    // the renderer's slow error checking (-renderer_checks).
+    static bool CreateRenderer(Renderers type, Window& window, bool checks);
     static void FreeRenderer();
 
 public:

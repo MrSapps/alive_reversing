@@ -70,6 +70,8 @@ CommandLineOptions CommandLineOptions::Parse(const CommandLineParser& clp)
         }
     }
 
+    options.mRendererChecks = clp.HasSwitch("-renderer_checks");
+
     options.mRecordFile = clp.GetValue("-record");
     options.mFlushRecording = clp.HasSwitch("-flush");
     options.mPlayFile = clp.GetValue("-play");
@@ -111,6 +113,7 @@ const char* CommandLineOptions::Usage()
            "                              The game runs faster the more frames it shows\n"
            "  -ddnoskip                   Render every frame instead of skipping to keep up\n"
            "  -ddslowload=<ms>            Make each resource take at least this long to load\n"
+           "  -renderer_checks            Check for renderer errors as it goes (slower)\n"
            "  -help, --help, -h, /?       Show this and exit\n"
            "\n"
            "The display options also take =true or =false, and are saved to relive.ini.\n"

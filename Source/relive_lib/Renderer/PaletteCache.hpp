@@ -4,6 +4,7 @@
 #include "../../relive_lib/data_conversion/AnimationConverter.hpp"
 #include "../../relive_lib/FatalError.hpp"
 #include <map>
+#include <unordered_map>
 
 class PaletteCache final
 {
@@ -24,6 +25,16 @@ public:
     {
         AddResult ret;
 
+        // Hashing the palette is most of the cost of drawing a sprite, so each palette is only
+        // looked up once a frame. Palettes are only changed between frames, by the game objects'
+        // updates, and a palette used this frame can't lose its slot until ResetUseFlags.
+        auto seenResult = mSeenThisFrame.find(&pCache);
+        if (seenResult != std::end(mSeenThisFrame))
+        {
+            ret.mIndex = seenResult->second;
+            return ret;
+        }
+
         // Check we don't already have this palette
         const u32 paletteHash = HashPalette(&pCache);
         auto searchResult = mPaletteCache.find(paletteHash);
@@ -32,6 +43,7 @@ public:
         {
             searchResult->second.mInUse = true;
             ret.mIndex = searchResult->second.mIndex; // Palette index
+            mSeenThisFrame[&pCache] = ret.mIndex;
             return ret;
         }
 
@@ -68,6 +80,7 @@ public:
         }
 
         mPaletteCache[paletteHash] = PalCacheEntry{nextIndex, true};
+        mSeenThisFrame[&pCache] = nextIndex;
 
         ret.mAllocated = true;
         ret.mIndex = nextIndex;
@@ -77,6 +90,8 @@ public:
 
     void ResetUseFlags()
     {
+        mSeenThisFrame.clear();
+
         for (auto iter = mPaletteCache.begin(); iter != mPaletteCache.end(); iter++)
         {
             // Default all palettes to unused for next draw
@@ -87,6 +102,7 @@ public:
     void Clear()
     {
         mPaletteCache.clear();
+        mSeenThisFrame.clear();
     }
 
 public:
@@ -113,5 +129,6 @@ private:
         bool mInUse = false;
     };
     std::map<u32, PalCacheEntry> mPaletteCache;
+    std::unordered_map<const AnimationPal*, u32> mSeenThisFrame;
     u32 mMaxCacheSize = 0;
 };

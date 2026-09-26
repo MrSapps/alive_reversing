@@ -7,7 +7,8 @@ class Window;
 class GLContext final
 {
 public:
-    explicit GLContext(Window& window);
+    // checks makes every GL call check for errors, see GLDebug
+    GLContext(Window& window, bool checks);
     ~GLContext();
 
     void SwapBuffers();

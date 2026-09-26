@@ -8,12 +8,15 @@
 #include "../../../relive_lib/logger.hpp"
 #include "../../../relive_lib/Types.hpp"
 #include "GLContext.hpp"
+#include "GLDebug.hpp"
 #include "../../Window.hpp"
 #include "SDL3/SDL.h"
 
-GLContext::GLContext(Window& window)
+GLContext::GLContext(Window& window, bool checks)
     : mWindow(window)
 {
+    GLDebug::SetChecks(checks);
+
     // Find the opengl driver
     const s32 numDrivers = SDL_GetNumRenderDrivers();
     if (numDrivers < 0)

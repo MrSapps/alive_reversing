@@ -5,6 +5,9 @@
 #include "../../../relive_lib/Types.hpp"
 #include "GLShader.hpp"
 
+#include <string>
+#include <vector>
+
 class GLShaderProgram final
 {
 public:
@@ -23,5 +26,13 @@ public:
 private:
     GLuint mGLId;
 
-    GLuint GetUniformLocation(const char_type* uniform);
+    // Looking a uniform up by name is slow, so each one is only looked up once
+    struct UniformLocation final
+    {
+        std::string mName;
+        GLint mLocation = -1;
+    };
+    std::vector<UniformLocation> mUniformLocations;
+
+    GLint GetUniformLocation(const char_type* uniform);
 };

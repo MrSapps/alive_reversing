@@ -28,7 +28,7 @@ enum class AnimId;
 class OpenGLRenderer final : public IRenderer
 {
 public:
-    explicit OpenGLRenderer(Window& window);
+    OpenGLRenderer(Window& window, bool checks);
     ~OpenGLRenderer() override;
 
     void Clear(u8 r, u8 g, u8 b) override;
@@ -48,6 +48,17 @@ public:
         return Renderers::OpenGL;
     }
 
+private:
+    static constexpr u32 kSpriteTextureUnitCount = 12;
+
+    struct BatchData
+    {
+
+    };
+
+public:
+    using GLBatcher = Batcher<GLTexture2D, BatchData, kSpriteTextureUnitCount>;
+
 protected:
     void ReadPsxFramebuffer(std::vector<u8>& rgbaPixels, s32& width, s32& height) override;
 
@@ -57,8 +68,6 @@ private:
 
     static constexpr u32 kCamTextureLifetime = 300;
     static constexpr u32 kSpriteTextureLifetime = 300;
-
-    static constexpr u32 kSpriteTextureUnitCount = 12;
 
 private:
     struct PassthruVertexData final
@@ -89,10 +98,13 @@ private:
 
 private:
     u32 PreparePalette(AnimationPal& pCache);
-    std::shared_ptr<GLTexture2D> PrepareTextureFromAnim(Animation& anim);
     std::shared_ptr<GLTexture2D> PrepareTextureFromPoly(const Poly_FT4& poly);
 
     void DrawFramebufferToScreen(s32 x, s32 y, s32 width, s32 height);
+    // Draws a rectangle with the bound shader: from (x, y) to (x + width, y + height), with
+    // texture coordinates from (0, texHeight) to (texWidth, 0)
+    void DrawQuad(f32 x, f32 y, f32 width, f32 height, f32 texWidth, f32 texHeight);
+    void SetScissorTest(bool enabled);
     void SetupBlendMode(relive::TBlendModes blendMode);
     void UpdateFilterFramebuffer();
 
@@ -109,11 +121,18 @@ private:
 
 private:
     GLContext mContext;
-    GLuint mVAO = 0;
 
-    // The quad UpdateFilterFramebuffer draws, made on first use
-    GLuint mFilterDrawVbo = 0;
-    GLuint mFilterUvVbo = 0;
+    // The batches' vertices and indices, re-filled each frame
+    GLuint mPsxVao = 0;
+    GLuint mPsxVbo = 0;
+    GLuint mPsxEbo = 0;
+
+    // The rectangles the framebuffers are drawn with
+    GLuint mQuadVao = 0;
+    GLuint mQuadVbo = 0;
+
+    // Tracked so it never has to be read back from GL
+    bool mScissorEnabled = false;
 
     GLShaderProgram mPassthruShader;
     GLShaderProgram mPassthruFilterShader;
@@ -127,17 +146,11 @@ private:
 
     bool mFrameStarted = false;
 
-    struct BatchData
-    {
-
-    };
-    Batcher<GLTexture2D, BatchData, kSpriteTextureUnitCount> mBatcher;
+    GLBatcher mBatcher;
 
     PaletteCache mPaletteCache;
     TextureCache<std::shared_ptr<GLTexture2D>> mTextureCache;
 
     std::shared_ptr<GLTexture2D> mPaletteTexture;
     std::shared_ptr<GLTexture2D> mCurGasTexture;
-
-    GLint mTextureUnits[kSpriteTextureUnitCount];
 };

@@ -150,7 +150,7 @@ bool RenderTest::CreateWindowAndRenderer(IRenderer::Renderers type)
 {
     const std::string title = std::string("R.E.L.I.V.E. render test (") + (mGameType == GameType::eAe ? "AE" : "AO") + ")";
     mWindow = std::make_unique<Window>();
-    if (!mWindow->CreateWithRenderer(type, title))
+    if (!mWindow->CreateWithRenderer(type, title, mOptions.mRendererChecks))
     {
         mWindow.reset();
         return false;
