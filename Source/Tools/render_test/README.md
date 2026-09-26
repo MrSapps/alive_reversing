@@ -58,6 +58,10 @@ Checks (FAIL):
   number there was before each scene.
 - **No textures are left behind.** Once the scenes are over, and after longer than any
   renderer keeps an unused texture, the texture cache is back to its starting size.
+- **The renderers draw the same.** With more than one renderer, no more than 0.1% of a
+  scene's pixels may differ by more than 8 levels. What's left between them is which pixel
+  wins where a triangle edge or texel boundary falls exactly on a pixel centre, which differs
+  between GPUs and SDL's backends. The differences are saved in `diff_<a>_<b>/`.
 - **With `-baseline=<dir>`, captures are unchanged.** `<dir>` is an earlier `-auto` run's
   output. Anything different fails, and the difference is saved as `baseline_diff_*.png`.
   Look at those, and if the change was intended, use the new run as the baseline. GPUs and
@@ -70,9 +74,7 @@ Reported, not failed:
   time only where the driver waits for the GPU. There are also draw calls and texture
   uploads per frame. The stress scenes are timed for 4 times as long (`-frames` sets the
   count).
-- How much each scene differs between the renderers, with images of where in
-  `diff_<a>_<b>/`. The renderers are known to differ, so this shows where and by how much
-  rather than failing.
+- How much each scene differs between the renderers.
 - WARN if a frame that draws nothing still shows the last frame. The renderers don't clear
   the framebuffer. The game doesn't need them to, as it draws a full screen camera every
   frame. Every scene does the same.

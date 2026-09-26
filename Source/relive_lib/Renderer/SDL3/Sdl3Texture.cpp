@@ -154,40 +154,57 @@ RGBA32 Sdl3Texture::ConvertPaletteColour(RGBA32 colour, const RGBA32& shading, b
 {
     // This logic is basically a mirror of the GLSL shader, but in
     // software - see ShaderPsx.cpp, and the blend mode stuff in
-    // OpenGLRenderer.cpp::DrawBatches
+    // OpenGLRenderer.cpp::DrawBatches. Like the shader it's worked out in floating point and
+    // rounded once at the end: rounding at each step makes semi-transparent sprites a little
+    // darker, which adds up where many overlap (zap lines).
 
     if (colour.ToU32() == 0)
     {
         return {0, 0, 0, 255};
     }
 
+    f32 rgb[3] = {static_cast<f32>(colour.r), static_cast<f32>(colour.g), static_cast<f32>(colour.b)};
+    const u8 shade[3] = {shading.r, shading.g, shading.b};
+
     if (shading.a == 255) // Shading required
     {
-        colour.r = HandleShading(colour.r, shading.r);
-        colour.g = HandleShading(colour.g, shading.g);
-        colour.b = HandleShading(colour.b, shading.b);
+        for (s32 i = 0; i < 3; i++)
+        {
+            rgb[i] = std::min(255.0f, (rgb[i] * (shade[i] / 255.0f)) / 0.5f);
+        }
     }
 
+    f32 scale = 1.0f;
+    u8 alpha = 0;
     if (isSemiTrans && colour.a == 255)
     {
         switch (blendMode)
         {
             case relive::TBlendModes::eBlend_0: // HALF_DST_ADD_HALF_SRC
-                return {static_cast<u8>(colour.r / 2), static_cast<u8>(colour.g / 2), static_cast<u8>(colour.b / 2), 128};
+                scale = 0.5f;
+                alpha = 128;
+                break;
 
             case relive::TBlendModes::eBlend_1: // ONE_DST_ADD_ONE_SRC
             case relive::TBlendModes::eBlend_2: // ONE_DST_SUB_ONE_SRC
-                return {colour.r, colour.g, colour.b, 255};
+                alpha = 255;
+                break;
 
             case relive::TBlendModes::eBlend_3: // ONE_DST_ADD_QRT_SRC
-                return {static_cast<u8>(colour.r / 4), static_cast<u8>(colour.g / 4), static_cast<u8>(colour.b / 4), 255};
+                scale = 0.25f;
+                alpha = 255;
+                break;
 
             default:
                 ALIVE_FATAL("SDL3 Invalid blend mode %u", blendMode);
         }
     }
 
-    return {colour.r, colour.g, colour.b, 0};
+    return {
+        static_cast<u8>(rgb[0] * scale + 0.5f),
+        static_cast<u8>(rgb[1] * scale + 0.5f),
+        static_cast<u8>(rgb[2] * scale + 0.5f),
+        alpha};
 }
 
 SdlTexturePtr Sdl3Texture::MakePaletteVariant(u32 paletteHash, const AnimationPal& palette, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode)
@@ -305,14 +322,3 @@ void Sdl3Texture::Update(const SDL_Rect* rect, const void* pixels)
     }
 }
 
-u8 Sdl3Texture::HandleShading(const u8 src, const u8 shade)
-{
-    f32 result = (src * (shade / 255.0f)) / 0.5f;
-
-    if (result > 255.0f)
-    {
-        return 255;
-    }
-
-    return static_cast<u8>(result);
-}

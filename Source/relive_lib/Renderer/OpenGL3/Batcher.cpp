@@ -127,13 +127,14 @@ void Batcher<TextureType, RenderBatchType, kTextureBatchSize>::InsertVertexData(
     }
     else if (numTriangles == 2)
     {
+        // Split along 1-2 like the PSX does, which matters for gouraud shading
+        mIndices.emplace_back(nextIndex);
         mIndices.emplace_back(nextIndex + 1);
-        mIndices.emplace_back(nextIndex);
-        mIndices.emplace_back(nextIndex + 3);
-
-        mIndices.emplace_back(nextIndex + 3);
-        mIndices.emplace_back(nextIndex);
         mIndices.emplace_back(nextIndex + 2);
+
+        mIndices.emplace_back(nextIndex + 1);
+        mIndices.emplace_back(nextIndex + 2);
+        mIndices.emplace_back(nextIndex + 3);
 
         mIndexBufferIndex += 4;
     }

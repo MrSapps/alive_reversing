@@ -31,7 +31,7 @@ protected:
     void ReadPsxFramebuffer(std::vector<u8>& rgbaPixels, s32& width, s32& height) override;
 
 private:
-    void DrawLines(const IRenderer::Point2D points[], s32 numPoints, RGBA32 color, relive::TBlendModes blendMode);
+    void DrawLines(const IRenderer::Point2D points[], const SDL_FColor colours[], s32 numPoints, relive::TBlendModes blendMode);
     void DrawVertices(SDL_Vertex vertices[], s32 numVertices, const s32 indices[], s32 numIndices, SDL_Texture* texture, bool isSemiTrans, relive::TBlendModes blendMode);
     Sdl3Texture& GetActiveFbTexture();
     std::shared_ptr<Sdl3Texture> PrepareTextureFromPoly(const Poly_FT4& poly);
@@ -51,7 +51,11 @@ private:
     SDL_Rect mClipRect = {};
     Sdl3Texture mPsxFbTexture[2];
 
+    // Laughing gas: the low resolution gas image, a screen sized render target it's stretched
+    // into, and the checkerboard it's blended in with (see Draw(const Prim_GasEffect&))
     Sdl3Texture mGasTexture;
+    Sdl3Texture mGasTarget;
+    SdlTexturePtr mGasMask;
 
     // The camera the FG1 textures were masked from, and the last one drawn
     u32 mFg1CamId = 0;

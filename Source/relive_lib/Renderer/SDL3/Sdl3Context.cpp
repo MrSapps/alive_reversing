@@ -127,6 +127,18 @@ SDL_BlendMode Sdl3Context::Fg1MaskBlendMode()
         SDL_BLENDOPERATION_ADD);
 }
 
+SDL_BlendMode Sdl3Context::GasMaskBlendMode()
+{
+    // Colour: dst * src (the mask keeps or blacks out the gas). Alpha: src (the mask's)
+    return SDL_ComposeCustomBlendMode(
+        SDL_BLENDFACTOR_ZERO,
+        SDL_BLENDFACTOR_SRC_COLOR,
+        SDL_BLENDOPERATION_ADD,
+        SDL_BLENDFACTOR_ONE,
+        SDL_BLENDFACTOR_ZERO,
+        SDL_BLENDOPERATION_ADD);
+}
+
 bool Sdl3Context::SupportsCustomBlendModes()
 {
     const SdlTexturePtr texture(SDL_CreateTexture(mRenderer.get(), SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, 1, 1));
@@ -139,6 +151,7 @@ bool Sdl3Context::SupportsCustomBlendModes()
         SDL_SetTextureBlendMode(texture.get(), PsxTextureBlendMode()) &&
         SDL_SetTextureBlendMode(texture.get(), PsxTextureSubtractBlendMode()) &&
         SDL_SetTextureBlendMode(texture.get(), Fg1MaskBlendMode()) &&
+        SDL_SetTextureBlendMode(texture.get(), GasMaskBlendMode()) &&
         SDL_SetRenderDrawBlendMode(mRenderer.get(), SubtractBlendMode());
 
     SDL_SetRenderDrawBlendMode(mRenderer.get(), SDL_BLENDMODE_NONE);

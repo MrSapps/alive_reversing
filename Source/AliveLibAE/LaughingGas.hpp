@@ -15,6 +15,9 @@ public:
     virtual void VUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
 
+    // Starts the gas's random numbers again, so it plays out the same way (for the render test)
+    static void ResetRandomSeed();
+
 private:
     void Init();
     void DoRender();
