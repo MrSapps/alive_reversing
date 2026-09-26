@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SDL3/SDL.h>
+#include <memory>
 #include <vector>
 
 struct BasePrimitive;
@@ -13,6 +14,7 @@ struct Poly_G3;
 struct Poly_FT4;
 struct Poly_G4;
 class Window;
+class FrameStatsOverlay;
 
 namespace relive {
 enum class TBlendModes : u32;
@@ -98,16 +100,14 @@ public:
     static void FreeRenderer();
 
 public:
-    explicit IRenderer(Window& window)
-        : mWindow(window)
-    {
+    explicit IRenderer(Window& window);
+    virtual ~IRenderer();
 
-    }
+    // Draws this over every frame from now on: the frame rate, frame time and what the renderer did
+    void ShowFrameStats(std::unique_ptr<FrameStatsOverlay> frameStats);
 
-    virtual ~IRenderer()
-    {
-
-    }
+    // Time spent waiting for the next frame's turn, which the frame time leaves out
+    void AddIdleTime(u64 ns);
 
     // Which renderer this is. Window::CreateWithRenderer falls back to another one if the
     // requested one can't be created.
@@ -215,6 +215,9 @@ protected:
     // Derived objects call this in EndFrame once everything has been drawn to the PSX framebuffer
     void CaptureIfRequested();
 
+    // Derived objects call this at the start of EndFrame, before drawing what's been queued
+    void DrawFrameStats();
+
     FrameStats mLastFrameStats;
 
 protected:
@@ -230,6 +233,8 @@ protected:
     bool mUseOriginalResolution = true;
 
 private:
+    std::unique_ptr<FrameStatsOverlay> mFrameStats;
+
     bool mCaptureRequested = false;
     bool mCaptureReady = false;
     std::vector<u8> mCapturePixels;

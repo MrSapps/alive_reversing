@@ -9,8 +9,9 @@
 
 extern bool gLatencyHack;
 
-static s32 sVSyncLastMillisecond = 0;
-static s32 sLastFrameTimestampMilliseconds_BD0F24 = 0;
+// When the last frame's turn came, and how far apart turns are (0: no limit)
+static u64 sVSyncLastNs = 0;
+static u64 sFrameIntervalNs = 1000000000ull / 30;
 static TPsxEmuCallBack sPsxEmu_put_disp_env_callback_C1D184 = nullptr;
 
 bool gTurnOffRendering = false;
@@ -66,50 +67,48 @@ void PSX_Prevent_Rendering()
 }
 
 
-// If mode is 1, game doesn't frame cap at all. If it is greater than 1, then it caps to (60 / mode) fps.
+void PSX_SetMaxFps(u32 maxFps)
+{
+    sFrameIntervalNs = maxFps == 0 ? 0 : 1000000000ull / maxFps;
+}
+
 void PSX_VSync(VSyncMode mode)
 {
     SsSeqCalledTbyT();
 
-    const s32 currentTime = SYS_GetTicks();
-
-    if (!sVSyncLastMillisecond)
+    const u64 nowNs = SDL_GetTicksNS();
+    if (!sVSyncLastNs)
     {
-        sVSyncLastMillisecond = currentTime;
+        sVSyncLastNs = nowNs;
     }
 
-    if (GetGameAutoPlayer().IsPlaying() && GetGameAutoPlayer().NoFpsLimitPlayBack())
+    if (mode != VSyncMode::LimitFps || sFrameIntervalNs == 0 || nowNs - sVSyncLastNs >= sFrameIntervalNs)
     {
-        // Uncapped playback
+        // Late, or not limited: the next frame's turn is counted from now
+        sVSyncLastNs = nowNs;
         return;
     }
 
-    s32 frameTimeInMilliseconds = currentTime - sVSyncLastMillisecond;
-    if (mode == VSyncMode::LimitTo30Fps && frameTimeInMilliseconds < (1000 * 2) / 60)
+    const u64 turnNs = sVSyncLastNs + sFrameIntervalNs;
+    while (SDL_GetTicksNS() < turnNs)
     {
-        s32 timeSinceLastFrame = 0;
-        do
+        // During recording or playback do not call SsSeqCalledTbyT an undeterminate
+        // amount of times as this can leak to de-syncs.
+        if (!GetGameAutoPlayer().IsRecording() && !GetGameAutoPlayer().IsPlaying())
         {
-            timeSinceLastFrame = SYS_GetTicks() - sVSyncLastMillisecond;
+            SsSeqCalledTbyT();
 
-            // During recording or playback do not call SsSeqCalledTbyT an undeterminate
-            // amount of times as this can leak to de-syncs.
-            if (!GetGameAutoPlayer().IsRecording() && !GetGameAutoPlayer().IsPlaying())
+            // Prevent max CPU usage, will probably cause stuttering on weaker machines
+            if (gLatencyHack)
             {
-                SsSeqCalledTbyT();
-
-                // Prevent max CPU usage, will probably cause stuttering on weaker machines
-                if (gLatencyHack)
-                {
-                    SDL_Delay(1);
-                }
+                SDL_Delay(1);
             }
         }
-        while (timeSinceLastFrame < (1000 * 2) / 60);
-
-        frameTimeInMilliseconds = (1000 * 2) / 60;
     }
 
-    sVSyncLastMillisecond += frameTimeInMilliseconds;
-    sLastFrameTimestampMilliseconds_BD0F24 = currentTime + frameTimeInMilliseconds;
+    if (IRenderer* pRenderer = IRenderer::GetRenderer())
+    {
+        pRenderer->AddIdleTime(SDL_GetTicksNS() - nowNs);
+    }
+    sVSyncLastNs = turnNs;
 }

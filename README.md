@@ -50,7 +50,8 @@ If the chosen game's files aren't in the directory, the other game is run. If bo
 | `-filter_screen` | Filter (smooth) the scaled image. |
 | `-use_original_resolution` | Render at the original 640x240 and scale up. |
 | `-ddcheat` | Enable the debug cheat menu. Builds with `FORCE_DDCHEAT` (the default) always have it. |
-| `-ddfps` | Show the frame rate. |
+| `-ddfps` | Show the renderer, frame rate, frame time, draw calls and cached textures in the top right (`-show_fps` and `-showfps` also work). The frame time leaves out time spent waiting for the next frame's turn. |
+| `-max_fps=<n>` | Run at up to `n` frames a second instead of the original 30, or `0` for no limit (`-maxfps` also works). The game runs faster the more frames it shows, so this also speeds up playback of a recording. |
 | `-ddnoskip` | Render every frame instead of skipping frames to keep up. |
 | `-ddslowload=<ms>` | Make each resource loaded in the background take at least this many milliseconds, to test loading on slow storage. |
 | `-help` | Show the command line options and exit (`--help`, `-h` and `/?` also work). |
@@ -70,7 +71,6 @@ played back with the same game, data and settings (key bindings are saved in the
 | `-record=<file>` | Record this session to `<file>`. |
 | `-flush` | With `-record`, write every change to disk straight away, so a recording survives a crash. |
 | `-play=<file>` | Play back a recording. Playback stops with an error if the game stops matching the recording (a desync). |
-| `-fastest` | With `-play`, run as fast as possible instead of at normal speed. |
 | `-ignore_desyncs` | With `-play`, keep going after a desync instead of stopping (it logs one warning). |
 
 ## Contributing

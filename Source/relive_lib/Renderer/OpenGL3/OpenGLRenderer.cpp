@@ -166,6 +166,7 @@ void OpenGLRenderer::StartFrame()
 
 void OpenGLRenderer::EndFrame()
 {
+    DrawFrameStats();
     mBatcher.EndFrame();
 
     DrawBatches();

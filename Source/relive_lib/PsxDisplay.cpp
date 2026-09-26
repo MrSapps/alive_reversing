@@ -223,7 +223,7 @@ void PsxDisplay::RenderOrderingTable()
         {
             gTurnOffRendering = true;
         }
-        PSX_VSync(VSyncMode::LimitTo30Fps);
+        PSX_VSync(VSyncMode::LimitFps);
     }
     
     PSX_PutDispEnv_4F5890();

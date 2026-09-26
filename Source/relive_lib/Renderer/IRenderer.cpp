@@ -1,5 +1,6 @@
 #include "../stdafx.h"
 #include "IRenderer.hpp"
+#include "FrameStatsOverlay.hpp"
 #include "OpenGL3/OpenGLRenderer.hpp"
 #include "SDL3/Sdl3Renderer.hpp"
 
@@ -81,6 +82,34 @@ bool IRenderer::TakeCapture(std::vector<u8>& rgbaPixels, s32& width, s32& height
     mCapturePixels.clear();
     mCaptureReady = false;
     return true;
+}
+
+IRenderer::IRenderer(Window& window)
+    : mWindow(window)
+{
+}
+
+IRenderer::~IRenderer() = default;
+
+void IRenderer::ShowFrameStats(std::unique_ptr<FrameStatsOverlay> frameStats)
+{
+    mFrameStats = std::move(frameStats);
+}
+
+void IRenderer::AddIdleTime(u64 ns)
+{
+    if (mFrameStats)
+    {
+        mFrameStats->AddIdleTime(ns);
+    }
+}
+
+void IRenderer::DrawFrameStats()
+{
+    if (mFrameStats)
+    {
+        mFrameStats->Draw(*this);
+    }
 }
 
 void IRenderer::CaptureIfRequested()

@@ -38,7 +38,11 @@ void TextDrawer::Draw(OrderingTable& ot, s32 x, s32 y, const char* text, const S
 
 s32 TextDrawer::Width(const char* text)
 {
-    return mFont.MeasureTextWidth(text);
+    // In screen pixels, as Draw takes
+    gFontDrawScreenSpace = true;
+    const s32 width = mFont.MeasureTextWidth(text);
+    gFontDrawScreenSpace = false;
+    return width;
 }
 
 void SceneContext::DrawCamera(OrderingTable& ot, const CamResource& cam)

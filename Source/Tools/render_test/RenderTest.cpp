@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../../relive_lib/Renderer/FrameStatsOverlay.hpp"
 #include "RenderTest.hpp"
 #include "TestResources.hpp"
 #include "../../relive_lib/Window.hpp"
@@ -161,6 +162,13 @@ bool RenderTest::CreateWindowAndRenderer(IRenderer::Renderers type)
         // CreateWithRenderer fell back to another one
         DestroyWindowAndRenderer();
         return false;
+    }
+
+    // The renderer, frame rate, frame time, draw calls and cached textures, in the top right. Left
+    // out of --auto's captures, as they change every frame.
+    if (!mOptions.mAuto)
+    {
+        renderer.ShowFrameStats(std::make_unique<FrameStatsOverlay>(*mResMan));
     }
 
     // The PSX framebuffer at 640x240, shown without filtering so single pixels can be seen
@@ -343,15 +351,6 @@ void RenderTest::DrawHud(OrderingTable& ot)
     const u32 sceneNumber = mSceneOrder[mSceneOrderIdx] + 1;
     const std::string title = Format("[%u/%u] %s%s", sceneNumber, static_cast<u32>(mSceneFactories.size()), mScene->Title(), mPaused ? "  (paused)" : "");
     drawShadowed(4, 2, title.c_str(), 127, 127, 0);
-
-    if (!mOptions.mAuto)
-    {
-        // Numbers that change every frame are left out of --auto's captures
-        const IRenderer::FrameStats& stats = IRenderer::GetRenderer()->GetLastFrameStats();
-        const f64 avgMs = Average(mRecentFrameMs);
-        const std::string info = Format("%s %.2f ms %u calls %u tex", IRenderer::TypeToString(IRenderer::GetRenderer()->GetType()), avgMs, stats.mDrawCalls, stats.mCachedTextures);
-        drawShadowed(636 - mText->Width(info.c_str()), 2, info.c_str(), 0, 127, 127);
-    }
 
     std::vector<std::string> lines;
     std::string expected = mScene->Expected();
@@ -611,13 +610,7 @@ s32 RenderTest::RunInteractive()
             break;
         }
 
-        const f64 start = NowMs();
         RunFrame(!mPaused);
-        mRecentFrameMs.push_back(NowMs() - start);
-        if (mRecentFrameMs.size() > 30)
-        {
-            mRecentFrameMs.erase(mRecentFrameMs.begin());
-        }
 
         if (!mUncapped)
         {
@@ -627,6 +620,7 @@ s32 RenderTest::RunInteractive()
             if (nextFrameNs > now)
             {
                 SDL_DelayPrecise(nextFrameNs - now);
+                IRenderer::GetRenderer()->AddIdleTime(SDL_GetTicksNS() - now);
             }
             else
             {

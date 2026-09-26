@@ -20,17 +20,20 @@ struct CommandLineOptions final
     std::string mModName;
 
     bool mDdCheat = false;
+    // -ddfps, -show_fps or -showfps
     bool mShowFps = false;
     bool mNoFrameSkip = false;
     // -ddslowload=<ms>: makes each resource loaded in the background take at least this long,
     // to test loading on slow storage. 0 if not given.
     u32 mSlowLoadMs = 0;
+    // -max_fps=<n> or -maxfps=<n>: the most frames a second, 0 for no limit. nullopt if not given
+    // (invalid values are logged and treated as not given): 30, like the original.
+    std::optional<u32> mMaxFps;
 
     // Recording and playback
     std::optional<std::string> mRecordFile;
     bool mFlushRecording = false;
     std::optional<std::string> mPlayFile;
-    bool mPlayFastest = false;
     bool mIgnoreDesyncs = false;
 
     // Display settings, named after their relive.ini keys. nullopt if not given (invalid
