@@ -32,7 +32,7 @@ void TextDrawer::Draw(OrderingTable& ot, s32 x, s32 y, const char* text, const S
         mPolyOffset,
         style.scale,
         640,
-        0);
+        style.colourRandomRange);
     gFontDrawScreenSpace = false;
 }
 

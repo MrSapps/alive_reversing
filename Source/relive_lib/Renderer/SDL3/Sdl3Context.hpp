@@ -100,6 +100,13 @@ public:
         return mSupportsPaletteTextures;
     }
 
+    // Whether vertex colours above 1 brighten what's drawn, so a sprite can be tinted by its
+    // vertex colours instead of converting its colours for each tint
+    bool SupportsBrightVertexColours() const
+    {
+        return mSupportsBrightVertexColours;
+    }
+
     // A blend mode that doesn't get set draws the wrong picture, so these are fatal if it fails
     void SetDrawBlendMode(SDL_BlendMode blendMode);
     static void SetTextureBlendMode(SDL_Texture* texture, SDL_BlendMode blendMode);
@@ -137,6 +144,8 @@ public:
     }
 
 private:
+    bool ProbeBrightVertexColours();
+
     std::unique_ptr<SDL_Renderer, SdlRendererDeleter> mRenderer;
     SDL_Rect mLastClipRect;
     SDL_Texture* mLastFramebuffer;
@@ -150,6 +159,7 @@ private:
     std::map<PaletteKey, SharedPaletteEntry> mSharedPalettes;
     u64 mSharedPaletteUseCounter = 0;
     bool mSupportsPaletteTextures = false;
+    bool mSupportsBrightVertexColours = false;
     u32 mFrameNumber = 0;
     u32 mTextureUploads = 0;
     u32 mDrawCalls = 0;

@@ -92,8 +92,23 @@ SDL_Texture* Sdl3Texture::GetTexture()
     return mTexture.get();
 }
 
-SDL_Texture* Sdl3Texture::GetTextureUsePalette(const std::shared_ptr<AnimationPal>& palette, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode)
+SDL_Texture* Sdl3Texture::GetTextureUsePalette(const std::shared_ptr<AnimationPal>& palette, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode, SDL_FColor& vertexColour)
 {
+    // A tint makes each colour min(255, colour * tint / 127.5), which is what the texture's colour
+    // times a vertex colour of tint / 127.5 comes out as. Half and quarter semi-transparency then
+    // scale the colour, and rounding it both before and after the tint makes overlapping sprites
+    // (zap lines) visibly darker, so those tints are still converted into the colours.
+    const bool shaded = shading.a == 255;
+    const bool scaledDown = isSemiTrans && (blendMode == relive::TBlendModes::eBlend_0 || blendMode == relive::TBlendModes::eBlend_3);
+    const bool tintByVertexColour = shaded && !scaledDown && mContext.SupportsBrightVertexColours();
+    vertexColour = {1.0f, 1.0f, 1.0f, 1.0f};
+    RGBA32 convertedShading = shading;
+    if (tintByVertexColour)
+    {
+        vertexColour = {shading.r / 127.5f, shading.g / 127.5f, shading.b / 127.5f, 1.0f};
+        convertedShading.a = 0;
+    }
+
     if (mFormat != SDL_PIXELFORMAT_INDEX8)
     {
         ALIVE_FATAL("%s", "SDL3 attempt to use palette on non-indexed tex");
@@ -110,8 +125,8 @@ SDL_Texture* Sdl3Texture::GetTextureUsePalette(const std::shared_ptr<AnimationPa
 
     PaletteVariant key;
     key.mPaletteHash = mHashedPaletteHash;
-    // The tint only matters when shading is on
-    key.mShading = shading.a == 255 ? shading : RGBA32{0, 0, 0, 0};
+    // The tint only matters when it's converted into the colours
+    key.mShading = convertedShading.a == 255 ? convertedShading : RGBA32{0, 0, 0, 0};
     key.mSemiTrans = isSemiTrans;
     key.mBlendMode = blendMode;
     key.mLastUsed = ++mUseCounter;
