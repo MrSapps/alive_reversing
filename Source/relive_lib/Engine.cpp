@@ -103,7 +103,7 @@ Engine::Engine(GameType gameType, FileSystem& fs, const CommandLineOptions& opti
     {
         // Process IPC packets (usually comes from level editor) on this worker thread, send to main
         // thread via an SDL message which will end up in Sys::PumpEvents
-        LOG_INFO("On ipc packet type %d len %d", static_cast<u8>(packetType), buffer.size());
+        LOG_INFO("On ipc packet type %d len %zu", static_cast<u8>(packetType), buffer.size());
         if (packetType == relive::PacketTypes::LevelPathJsonChanged)
         {
 

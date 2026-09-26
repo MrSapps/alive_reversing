@@ -973,7 +973,7 @@ private:
                     // TODO: Handle exception on bad data
 
                     nlohmann::json pathJson = nlohmann::json::parse(pathJsonStr);
-                    LOG_INFO("Cam count %d", pathJson["map"]["cameras"].size());
+                    LOG_INFO("Cam count %zu", pathJson["map"]["cameras"].size());
 
                     auto pathBuffer = std::make_unique<BinaryPath>(pathJsonFile.GetPath(), pathJson["map"]["path_id"]);
                     pathBuffer->CreateFromJson(pathJson);

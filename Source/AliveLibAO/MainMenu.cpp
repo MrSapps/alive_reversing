@@ -1637,7 +1637,7 @@ void Menu::Loading_Update()
                 char_type buffer[92] = {};
                 sprintf(buffer, "loading Joy # %d\n", gJoyResId);
                 // Never used ??
-                LOG_INFO(buffer);
+                LOG_INFO("%s", buffer);
             }
 
             pMenuTrans->SetDead(true);

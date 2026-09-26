@@ -447,7 +447,7 @@ const u32 MOVIE_SKIPPER_GAMEPAD_INPUTS = (InputCommands::eUnPause_OrConfirm | In
                     return false;
                 }
 
-                LOG_INFO("FMV parser: cluster advance to %p", pNextCluster);
+                LOG_INFO("FMV parser: cluster advance to %p", static_cast<const void*>(pNextCluster));
                 mCurrentCluster = pNextCluster;
                 mCurrentBlockEntry = nullptr;
                 mCurrentFrameIndex = 0;
