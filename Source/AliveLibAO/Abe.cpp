@@ -6497,7 +6497,28 @@ void Abe::Motion_61_Respawn()
                     mContinuePointTopLeft.x = camPos.x + 512;
                     mContinuePointTopLeft.y = camPos.y + 240;
                 }
+                // The death fade keeps the screen black through the restore, which destroys
+                // everything that doesn't survive a death reset and restores the fade id Abe
+                // was saved with
+                const Guid fadeId = mFadeId;
+                BaseGameObject* pDeathFade = sObjectIds.Find(mFadeId, ReliveTypes::eFade);
+                if (pDeathFade)
+                {
+                    pDeathFade->SetSurviveDeathReset(true);
+                }
+
                 QuikSave::RestoreCheckpoint(mResMan, mMap);
+
+                if (pDeathFade)
+                {
+                    pDeathFade->SetSurviveDeathReset(false);
+                    mFadeId = fadeId;
+                }
+
+                // Hidden until the doves bring him back, as the original's restore does: the
+                // checkpoint was saved with him visible, so he'd show for a frame where he stood
+                GetAnimation().SetRender(false);
+
                 if (field_19C_throwable_count)
                 {
                     LoadRockTypes(mCurrentLevel, mCurrentPath);

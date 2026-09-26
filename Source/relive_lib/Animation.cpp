@@ -397,6 +397,12 @@ void Animation::Init(const AnimResource& ppAnimData, BaseGameObject* pGameObj)
     SetCurrentFrame(-1);
 }
 
+void Animation::SetCurrentFrame(s32 val)
+{
+    const s32 lastFrame = static_cast<s32>(mAnimRes.mJsonPtr->mFrames.size()) - 1;
+    mCurrentFrame = std::clamp(val, -1, lastFrame);
+}
+
 void Animation::SetFrame(s32 newFrame)
 {
     if (newFrame == -1)
