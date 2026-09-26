@@ -38,11 +38,6 @@ Sdl3Renderer::~Sdl3Renderer()
 
 void Sdl3Renderer::Clear(u8 r, u8 g, u8 b)
 {
-    // Check and store the renderer's clipping state
-    SDL_Rect clipRect;
-
-    SDL_GetRenderClipRect(mContext.GetRenderer(), &clipRect);
-
     // Perform the clear now
     mContext.UseScreenFramebuffer();
 
@@ -50,12 +45,7 @@ void Sdl3Renderer::Clear(u8 r, u8 g, u8 b)
     SDL_RenderClear(mContext.GetRenderer());
 
     mContext.UseTextureFramebuffer(GetActiveFbTexture().GetTexture());
-
-    // Restore clip rect if needed
-    if (clipRect.x != 0 || clipRect.y != 0 || clipRect.w != 0 || clipRect.h != 0)
-    {
-        SDL_SetRenderClipRect(mContext.GetRenderer(), &clipRect);
-    }
+    ApplyClip();
 }
 
 static SDL_FColor ToSDLColor(u8 r, u8 g, u8 b, u8 a)
@@ -70,6 +60,8 @@ static SDL_FColor ToSDLColor(u8 r, u8 g, u8 b, u8 a)
 
 void Sdl3Renderer::Draw(const Prim_GasEffect& gasEffect)
 {
+    mFramebufferSnapshotValid = false;
+
     const f32 x = static_cast<f32>(gasEffect.x);
     const f32 y = static_cast<f32>(gasEffect.y);
     const f32 w = static_cast<f32>(gasEffect.w);
@@ -100,6 +92,8 @@ void Sdl3Renderer::Draw(const Prim_GasEffect& gasEffect)
 
 void Sdl3Renderer::Draw(const Line_G2& line)
 {
+    mFramebufferSnapshotValid = false;
+
     const IRenderer::Point2D points[] = {
         IRenderer::Point2D(line.X0(), line.Y0()),
         IRenderer::Point2D(line.X1(), line.Y1())
@@ -117,6 +111,8 @@ void Sdl3Renderer::Draw(const Line_G2& line)
 
 void Sdl3Renderer::Draw(const Line_G4& line)
 {
+    mFramebufferSnapshotValid = false;
+
     const IRenderer::Point2D points[] = {
         IRenderer::Point2D(line.X0(), line.Y0()),
         IRenderer::Point2D(line.X1(), line.Y1()),
@@ -136,6 +132,8 @@ void Sdl3Renderer::Draw(const Line_G4& line)
 
 void Sdl3Renderer::Draw(const Poly_G3& poly)
 {
+    mFramebufferSnapshotValid = false;
+
     SDL_Vertex vertices[] = {
         { { static_cast<f32>(poly.X0()), static_cast<f32>(poly.Y0()) }, { ToSDLColor(poly.R0(), poly.G0(), poly.B0(), 255) }, { 0.0f, 0.0f } },
         { { static_cast<f32>(poly.X1()), static_cast<f32>(poly.Y1()) }, { ToSDLColor(poly.R1(), poly.G1(), poly.B1(), 255) }, { 0.0f, 0.0f } },
@@ -148,6 +146,12 @@ void Sdl3Renderer::Draw(const Poly_G3& poly)
 void Sdl3Renderer::Draw(const Poly_FT4& poly)
 {
     SDL_Texture* tex = nullptr;
+
+    const bool isFramebufferEffect = !poly.mFg1 && !poly.mCam && !poly.mAnim && !poly.mFont;
+    if (!isFramebufferEffect)
+    {
+        mFramebufferSnapshotValid = false;
+    }
 
     constexpr s32 indexList[6] = { 0, 1, 2, 1, 2 , 3 };
     SDL_Vertex vertices[] = {
@@ -287,30 +291,23 @@ void Sdl3Renderer::Draw(const Poly_FT4& poly)
         vertices[3].tex_coord.x = u3;
         vertices[3].tex_coord.y = v3;
 
-        // First, draw to the secondary framebuffer, and then draw again from
-        // that back to the primary framebuffer
-        SDL_Texture* fbSrcTex = GetActiveFbTexture().GetTexture();
-
-        SwitchActiveFbTexture();
-
-        // Extra thingy, have we copied the framebuffer over this frame? If not,
-        // do so now - reason being because the edges of the textured polys can
-        // carry some bleed-through (so on first draw, there might be some black
-        // edges on the triangles)
-        //
-        // 'Resolve' this problem by copying the contents over entirely, so the
-        // issue isn't noticable
-        if (!mCopiedFbThisFrame)
+        // As the OpenGL renderer does: the first of a run of these copies the frame to the other
+        // framebuffer, which becomes the one drawn to, and they all draw from the copy. So each
+        // only moves what was drawn before the run started.
+        if (!mFramebufferSnapshotValid)
         {
-            SDL_RenderTexture(mContext.GetRenderer(), fbSrcTex, nullptr, nullptr);
+            SDL_Texture* pFrame = GetActiveFbTexture().GetTexture();
+            SwitchActiveFbTexture();
+
+            SDL_SetRenderClipRect(mContext.GetRenderer(), nullptr);
+            SDL_RenderTexture(mContext.GetRenderer(), pFrame, nullptr, nullptr);
             mContext.CountDrawCall();
-            mCopiedFbThisFrame = true;
+            ApplyClip();
+
+            mFramebufferSnapshotValid = true;
         }
 
-        DrawVertices(vertices, 4, indexList, 6, fbSrcTex, poly.mSemiTransparent, poly.mBlendMode);
-        tex = GetActiveFbTexture().GetTexture();
-
-        SwitchActiveFbTexture();
+        tex = mPsxFbTexture[mActiveFbTexture == 0 ? 1 : 0].GetTexture();
     }
 
     DrawVertices(vertices, 4, indexList, 6, tex, poly.mSemiTransparent, poly.mBlendMode);
@@ -318,6 +315,8 @@ void Sdl3Renderer::Draw(const Poly_FT4& poly)
 
 void Sdl3Renderer::Draw(const Poly_G4& poly)
 {
+    mFramebufferSnapshotValid = false;
+
     constexpr s32 indexList[6] = { 0, 1, 2, 1, 2 , 3 };
     SDL_Vertex vertices[4] = {
         { { static_cast<f32>(poly.X0()), static_cast<f32>(poly.Y0()) }, { ToSDLColor(poly.R0(), poly.G0(), poly.B0(), 255) }, { 0.0f, 0.0f } },
@@ -333,7 +332,6 @@ void Sdl3Renderer::EndFrame()
 {
     CaptureIfRequested();
 
-    mCopiedFbThisFrame = false;
     mTextureCache.DecreaseResourceLifetimes();
 
     mLastFrameStats.mDrawCalls = mContext.TakeDrawCallCount();
@@ -398,19 +396,26 @@ void Sdl3Renderer::SetClip(const Prim_ScissorRect& clipper)
     rect.w = static_cast<s32>(clipper.mRect.w * factorW);
     rect.h = static_cast<s32>(clipper.mRect.h * factorH);
 
-    if (clipper.mRect.x == 0 && clipper.mRect.y == 0 && clipper.mRect.w == 1 && clipper.mRect.h == 1)
-    {
-        SDL_SetRenderClipRect(mContext.GetRenderer(), nullptr);
-    }
-    else
-    {
-        SDL_SetRenderClipRect(mContext.GetRenderer(), &rect);
-    }
+    // (0, 0, 1, 1) means no clipping
+    mClipEnabled = !(clipper.mRect.x == 0 && clipper.mRect.y == 0 && clipper.mRect.w == 1 && clipper.mRect.h == 1);
+    mClipRect = rect;
+    ApplyClip();
+
+    // Like the OpenGL renderer's batches, a new clip rectangle ends a run of framebuffer effects
+    mFramebufferSnapshotValid = false;
+}
+
+void Sdl3Renderer::ApplyClip()
+{
+    // Each SDL render target has its own clip rectangle, so this is set again after switching
+    SDL_SetRenderClipRect(mContext.GetRenderer(), mClipEnabled ? &mClipRect : nullptr);
 }
 
 void Sdl3Renderer::StartFrame()
 {
     IRenderer::StartFrame();
+
+    mContext.NextFrame();
 
     mOffsetX = 0;
     mOffsetY = 0;
@@ -441,11 +446,13 @@ void Sdl3Renderer::StartFrame()
         SDL_SetTextureScaleMode(mPsxFbTexture[1].GetTexture(), SDL_SCALEMODE_NEAREST);
     }
 
-    // Default back to render target
-    mContext.UseTextureFramebuffer(mPsxFbTexture[0].GetTexture());
+    // Whichever framebuffer the last frame ended on
+    mContext.UseTextureFramebuffer(GetActiveFbTexture().GetTexture());
 
     // A clip rectangle only lasts until the end of the frame that set it, as with OpenGL
-    SDL_SetRenderClipRect(mContext.GetRenderer(), nullptr);
+    mClipEnabled = false;
+    ApplyClip();
+    mFramebufferSnapshotValid = false;
 }
 
 void Sdl3Renderer::DrawLines(const IRenderer::Point2D points[], s32 numPoints, RGBA32 color, relive::TBlendModes blendMode)

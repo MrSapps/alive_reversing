@@ -38,12 +38,17 @@ private:
     SDL_FPoint PointToViewport(const SDL_FPoint& point);
     void ScaleVertices(SDL_Vertex vertices[], s32 numVertices);
     void SwitchActiveFbTexture();
+    void ApplyClip();
 
 private:
     Sdl3Context mContext;
 
     u8 mActiveFbTexture = 0;
-    bool mCopiedFbThisFrame = false;
+    // Set while drawing a run of framebuffer effect quads (screen wave): they draw from a copy
+    // of the frame made when the run started
+    bool mFramebufferSnapshotValid = false;
+    bool mClipEnabled = false;
+    SDL_Rect mClipRect = {};
     Sdl3Texture mPsxFbTexture[2];
 
     Sdl3Texture mGasTexture;
