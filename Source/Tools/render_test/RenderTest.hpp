@@ -98,6 +98,10 @@ private:
     // Runs a frame and returns what the renderer drew
     Capture RunFrameAndCapture(bool advance);
 
+    // Runs frames of the current scene and says whether any was drawn to a different place in
+    // the window than the first, as screen shake does
+    bool RunFramesAndCheckScreenMoved(u32 frames);
+
     s32 RunInteractive();
     void HandleKey(SDL_Keycode key, bool& quit);
 

@@ -227,6 +227,7 @@ void OpenGLRenderer::EndFrame()
 
     // Draw the final composed framebuffer to the screen
     SDL_Rect drawRect = GetTargetDrawRect();
+    mLastFrameStats.mScreenRect = drawRect;
 
     SetScissorTest(false);
     DrawFramebufferToScreen(

@@ -1104,6 +1104,11 @@ public:
                "(Captures don't show it: the shake is applied when the frame is drawn to the window)";
     }
 
+    bool ShakesScreen() const override
+    {
+        return true;
+    }
+
     void Update(SceneContext& ctx, u32 frame) override
     {
         if (frame % 60 == 0)

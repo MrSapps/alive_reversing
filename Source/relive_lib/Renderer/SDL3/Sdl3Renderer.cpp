@@ -369,6 +369,7 @@ void Sdl3Renderer::EndFrame()
 
     // Copy framebuffer to screen
     SDL_Rect drawRect = GetTargetDrawRect();
+    mLastFrameStats.mScreenRect = drawRect;
     SDL_FRect fdrawRect;
 
     SDL_RectToFRect(&drawRect, &fdrawRect);
