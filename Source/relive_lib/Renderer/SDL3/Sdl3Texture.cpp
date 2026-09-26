@@ -20,8 +20,9 @@ Sdl3Texture::Sdl3Texture(Sdl3Context& context, u32 width, u32 height, SDL_PixelF
         {
             ALIVE_FATAL("SDL_CreateTexture failed: %s", SDL_GetError());
         }
+        mContext.CountTextureUpload();
 
-        SDL_SetTextureBlendMode(mTexture, SDL_BLENDMODE_NONE);
+        Sdl3Context::SetTextureBlendMode(mTexture, SDL_BLENDMODE_NONE);
     }
 }
 
@@ -67,25 +68,17 @@ std::shared_ptr<Sdl3Texture> Sdl3Texture::FromMask(Sdl3Context& context, std::sh
     SDL_UnlockTexture(maskTex);
 
     // Paint result texture
-    SDL_BlendMode blendMode =
-        SDL_ComposeCustomBlendMode(
-            SDL_BLENDFACTOR_ZERO,
-            SDL_BLENDFACTOR_ONE,
-            SDL_BLENDOPERATION_ADD,
-            SDL_BLENDFACTOR_SRC_ALPHA,
-            SDL_BLENDFACTOR_ZERO,
-            SDL_BLENDOPERATION_ADD
-        );
+    const SDL_BlendMode blendMode = Sdl3Context::Fg1MaskBlendMode();
 
     context.SaveFramebuffer();
     context.UseTextureFramebuffer(resultTex->GetTexture());
 
     SDL_RenderTexture(context.GetRenderer(), srcTex->GetTexture(), NULL, NULL);
 
-    SDL_SetTextureBlendMode(maskTex, blendMode);
+    Sdl3Context::SetTextureBlendMode(maskTex, blendMode);
     SDL_RenderTexture(context.GetRenderer(), maskTex, NULL, NULL);
 
-    SDL_SetTextureBlendMode(resultTex->GetTexture(), SDL_BLENDMODE_BLEND);
+    Sdl3Context::SetTextureBlendMode(resultTex->GetTexture(), SDL_BLENDMODE_BLEND);
 
     // Cleanup
     context.RestoreFramebuffer();
@@ -140,6 +133,7 @@ SDL_Texture* Sdl3Texture::GetTextureUsePalette(const std::shared_ptr<AnimationPa
 
     //LOG("%s", "SDL3 palette tex cache miss");
     mTexture = SDL_CreateTexture(mContext.GetRenderer(), SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, mWidth, mHeight);
+    mContext.CountTextureUpload();
 
     // Lock target texture, all the per-pixel ops are handled here - sampling
     // from palette + shading/blending
@@ -221,34 +215,12 @@ SDL_Texture* Sdl3Texture::GetTextureUsePalette(const std::shared_ptr<AnimationPa
     SDL_UnlockTexture(mTexture);
 
     // Set up texture blend mode usage
-    SDL_BlendMode texBlendMode;
+    const SDL_BlendMode texBlendMode =
+        blendMode == relive::TBlendModes::eBlend_2
+            ? Sdl3Context::PsxTextureSubtractBlendMode()
+            : Sdl3Context::PsxTextureBlendMode();
 
-    if (blendMode == relive::TBlendModes::eBlend_2)
-    {
-        texBlendMode =
-            SDL_ComposeCustomBlendMode(
-                SDL_BLENDFACTOR_SRC_ALPHA,
-                SDL_BLENDFACTOR_ONE,
-                SDL_BLENDOPERATION_REV_SUBTRACT,
-                SDL_BLENDFACTOR_SRC_ALPHA,
-                SDL_BLENDFACTOR_ONE,
-                SDL_BLENDOPERATION_REV_SUBTRACT
-            );
-    }
-    else
-    {
-        texBlendMode =
-            SDL_ComposeCustomBlendMode(
-                SDL_BLENDFACTOR_ONE,
-                SDL_BLENDFACTOR_SRC_ALPHA,
-                SDL_BLENDOPERATION_ADD,
-                SDL_BLENDFACTOR_ONE,
-                SDL_BLENDFACTOR_SRC_ALPHA,
-                SDL_BLENDOPERATION_ADD
-            );
-    }
-
-    SDL_SetTextureBlendMode(mTexture, texBlendMode);
+    Sdl3Context::SetTextureBlendMode(mTexture, texBlendMode);
 
     // Update cache state
     mLastBlendMode = blendMode;
@@ -270,17 +242,16 @@ void Sdl3Texture::Resize(u32 width, u32 height)
     mHeight = height;
 
     mTexture = SDL_CreateTexture(mContext.GetRenderer(), mFormat, mTextureAccess, mWidth, mHeight);
-    SDL_SetTextureBlendMode(mTexture, SDL_BLENDMODE_NONE);
-
     if (!mTexture)
     {
         ALIVE_FATAL("Sdl3Texture::Resize: SDL_CreateTexture failed: %s", SDL_GetError());
     }
+    Sdl3Context::SetTextureBlendMode(mTexture, SDL_BLENDMODE_NONE);
 }
 
 void Sdl3Texture::SetTextureBlendMode(SDL_BlendMode blendMode)
 {
-    SDL_SetTextureBlendMode(mTexture, blendMode);
+    Sdl3Context::SetTextureBlendMode(mTexture, blendMode);
 }
 
 void Sdl3Texture::Update(const SDL_Rect* rect, const void* pixels)

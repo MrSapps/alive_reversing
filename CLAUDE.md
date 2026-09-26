@@ -118,6 +118,10 @@ cd /path/to/AE/game/data && /home/snake/dev/alive_reversing/build/Source/relive/
 cd /path/to/AO/game/data && /home/snake/dev/alive_reversing/build/Source/relive/relive -AO   # Abe's Oddysee
 ```
 
+Renderer changes: `build/Source/Tools/render_test/relive_render_test` draws test scenes with
+both renderers and needs no game data. `-auto` checks for leaks, times each scene and saves
+captures. See `Source/Tools/render_test/README.md`.
+
 AE needs `st.lvl` and `mi.lvl` in that directory. AO needs `s1.lvl` and `r1.lvl`.
 If they are missing, the game shows an error and logs a listing of the directory.
 

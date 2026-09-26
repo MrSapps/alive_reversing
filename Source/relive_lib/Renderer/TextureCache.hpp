@@ -22,6 +22,11 @@ public:
         mTextureCache.clear();
     }
 
+    u32 Size() const
+    {
+        return static_cast<u32>(mTextureCache.size());
+    }
+
     TextureType Add(u32 uniqueId, u32 lifetime, TextureType texture)
     {
         CachedTexture newTex;

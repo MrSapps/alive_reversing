@@ -22,6 +22,14 @@ public:
     void SetClip(const Prim_ScissorRect& clipper) override;
     void StartFrame() override;
 
+    Renderers GetType() const override
+    {
+        return Renderers::Sdl3;
+    }
+
+protected:
+    void ReadPsxFramebuffer(std::vector<u8>& rgbaPixels, s32& width, s32& height) override;
+
 private:
     void DrawLines(const IRenderer::Point2D points[], s32 numPoints, RGBA32 color, relive::TBlendModes blendMode);
     void DrawVertices(SDL_Vertex vertices[], s32 numVertices, const s32 indices[], s32 numIndices, SDL_Texture* texture, bool isSemiTrans, relive::TBlendModes blendMode);
@@ -35,9 +43,14 @@ private:
     Sdl3Context mContext;
 
     u8 mActiveFbTexture = 0;
-    bool mCopiedFbThisFrame;
+    bool mCopiedFbThisFrame = false;
     Sdl3Texture mPsxFbTexture[2];
 
     Sdl3Texture mGasTexture;
+
+    // The camera the FG1 textures were masked from, and the last one drawn
+    u32 mFg1CamId = 0;
+    u32 mLastTouchedCamId = 0;
+
     TextureCache<std::shared_ptr<Sdl3Texture>> mTextureCache;
 };

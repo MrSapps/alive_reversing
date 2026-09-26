@@ -85,6 +85,14 @@ OpenGLRenderer::~OpenGLRenderer()
 
     GL_VERIFY(glUseProgram(0));
 
+    if (mFilterDrawVbo)
+    {
+        GL_VERIFY(glDeleteBuffers(1, &mFilterDrawVbo));
+        GL_VERIFY(glDeleteBuffers(1, &mFilterUvVbo));
+    }
+    GL_VERIFY(glBindVertexArray(0));
+    GL_VERIFY(glDeleteVertexArrays(1, &mVAO));
+
     GLFramebuffer::BindScreenAsTarget(mWindow);
 }
 
@@ -162,9 +170,19 @@ void OpenGLRenderer::EndFrame()
 
     DrawBatches();
 
+    if (mFrameStarted && !mWindow.IsMinimized())
+    {
+        CaptureIfRequested();
+    }
+
+    mLastFrameStats.mDrawCalls = mStats.mInvalidationsCount;
+    mLastFrameStats.mTextureUploads = mStats.mCamUploadCount + mStats.mFg1UploadCount + mStats.mAnimUploadCount + mStats.mFontUploadCount;
+
     // Always decrease resource lifetimes regardless of drawing to prevent
     // memory leaks
     DecreaseResourceLifetimes();
+
+    mLastFrameStats.mCachedTextures = mTextureCache.Size();
 
     // The rest of this method writes to the screen, we early return now
     // because:
@@ -210,6 +228,14 @@ void OpenGLRenderer::EndFrame()
 
     // Set the framebuffer target back to the destination PSX framebuffer
     GetDestinationPsxFramebuffer().BindAsTarget();
+}
+
+void OpenGLRenderer::ReadPsxFramebuffer(std::vector<u8>& rgbaPixels, s32& width, s32& height)
+{
+    GLFramebuffer& framebuffer = GetDestinationPsxFramebuffer();
+    framebuffer.ReadPixels(rgbaPixels);
+    width = framebuffer.GetWidth();
+    height = framebuffer.GetHeight();
 }
 
 void OpenGLRenderer::SetClip(const Prim_ScissorRect& clipper)
@@ -549,8 +575,8 @@ void OpenGLRenderer::SetupBlendMode(relive::TBlendModes blendMode)
 void OpenGLRenderer::UpdateFilterFramebuffer()
 {
     // Set up VBOs
-    static GLuint drawVboId = 0;
-    static GLuint uvVboId = 0;
+    GLuint& drawVboId = mFilterDrawVbo;
+    GLuint& uvVboId = mFilterUvVbo;
 
     if (drawVboId == 0)
     {
