@@ -3013,7 +3013,7 @@ MainMenuController::ChangeScreen MainMenuController::ChangeScreenAndIntroLogic_4
             return ChangeScreen::eChanging;
 
         case 2:
-            if (sMainMenuPages_561960[field_214_page_index].field_A_transition_effect == camTransEffectState::eUnknown_7)
+            if (sMainMenuPages_561960[field_214_page_index].field_A_transition_effect == static_cast<s16>(camTransEffectState::eUnknown_7))
             {
                 // The logos play one after the other (each waits for Enter to be released so
                 // it doesn't skip itself), then UpdateAfterMovie finishes this off
