@@ -42,6 +42,7 @@ public:
 };
 
 IMidiVars* GetMidiVars();
+// nullptr sets the default (AE) vars back
 void SetMidiApiVars(IMidiVars* pVars);
 
 using TReclaimMemoryFn = void(CC*)(u32);
@@ -57,7 +58,7 @@ void SND_StopAll_SetCallBack(TSNDStopAll cb);
 void SND_Restart_SetCallBack(TSNDRestart cb);
 
 
-void SND_Load_Seqs_Impl(OpenSeqHandle* pSeqTable, PathSoundInfo& info, ResourceManagerWrapper& resMan, BaseMap& map);
+void SND_Load_Seqs_Impl(OpenSeqHandle* pSeqTable, PathSoundInfo& info, ResourceManagerWrapper& resMan);
 // Pends the sound files a new level's SND_Load_VABS and SND_Load_Seqs will load (both games)
 void SND_Pend_Sound_Files(const PathSoundInfo& info, ResourceManagerWrapper& resMan);
 
@@ -68,8 +69,8 @@ void SND_Init();
 void SND_Shutdown();
 void SND_Stop_Channels_Mask(u32 bitMask);
 void SND_Reset();
-void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& info, s32 reverb, ResourceManagerWrapper& resMan, BaseMap& map);
-void SND_Load_Seqs(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& bsqFileName, ResourceManagerWrapper& resMan, BaseMap& map);
+void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& info, s32 reverb, ResourceManagerWrapper& resMan);
+void SND_Load_Seqs(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& bsqFileName, ResourceManagerWrapper& resMan);
 void SND_SEQ_Stop(u16 idx);
 s8 SND_Seq_Table_Valid();
 s16 SND_SEQ_PlaySeq(u16 idx, s16 repeatCount, s16 bDontStop);

@@ -39,6 +39,13 @@ s32 SND_CreateDS_SDL(u32 sampleRate, s32 bitsPerSample, s32 isStereo)
     return 0;
 }
 
+s32 SND_CreateDS_Offline(u32 /*sampleRate*/, s32 /*bitsPerSample*/, s32 /*isStereo*/)
+{
+    sDSound_BBC344 = new SDLSoundSystem();
+    sDSound_BBC344->InitOffline();
+    return 0;
+}
+
 const char_type* SND_HR_Err_To_String_SDL(long)
 {
     return "unknown error";

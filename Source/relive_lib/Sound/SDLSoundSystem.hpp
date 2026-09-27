@@ -19,6 +19,19 @@ class SDLSoundSystem final
 {
 public:
     void Init(u32 sampleRate, s32 bitsPerSample, s32 isStereo);
+
+    // No audio device or render thread: audio is only made by RenderOffline, and the sound clock
+    // (SND_GetTicks) is the length of the audio rendered so far. Makes the sound code
+    // deterministic, for the sound gold tests and tools.
+    void InitOffline();
+    bool IsOffline() const { return mOffline; }
+    u32 OfflineTicks() const;
+    // Mixes sampleCount more stereo samples onto the end of OfflineOutput()
+    void RenderOffline(u32 sampleCount);
+    // Renders until OfflineTicks() reaches ticks
+    void RenderOfflineUntil(u32 ticks);
+    std::vector<StereoSample_S16>& OfflineOutput() { return mOfflineOutput; }
+
     void Pause();
     void Resume();
     u64 GetGeneratedAudioSamples() const;
@@ -37,6 +50,9 @@ private:
     ~SDLSoundSystem();
 
     void AudioCallBack(SDL_AudioStream* stream, s32 additionalAmount);
+
+    // The part of Init that doesn't need an audio device
+    void InitMixer();
 
     void RenderAudioThread();
 
@@ -66,4 +82,6 @@ private:
 
 
     bool mCreated = false;
+    bool mOffline = false;
+    std::vector<StereoSample_S16> mOfflineOutput;
 };

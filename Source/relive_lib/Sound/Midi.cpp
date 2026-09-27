@@ -108,7 +108,7 @@ IMidiVars* GetMidiVars()
 
 void SetMidiApiVars(IMidiVars* pVars)
 {
-    spMidiVars = pVars;
+    spMidiVars = pVars ? pVars : &sAEMidiVars;
 }
 
 // Sounds are only played after a path's sound block has been loaded.
@@ -156,7 +156,7 @@ void SND_Reset()
 }
 
 
-s16 SND_VAB_Load_4C9FE0(PathSoundInfo& pSoundBlockInfo, ResourceManagerWrapper& resMan, BaseMap& /*map*/)
+s16 SND_VAB_Load_4C9FE0(PathSoundInfo& pSoundBlockInfo, ResourceManagerWrapper& resMan)
 {
     // Load the VH file data
     pSoundBlockInfo.mVhFileData = resMan.LoadSoundFile(pSoundBlockInfo.mVhFile.c_str(), pSoundBlockInfo.mSoundTheme);
@@ -227,7 +227,7 @@ void SND_Shutdown()
 }
 
 
-void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& info, s32 reverb, ResourceManagerWrapper& resMan, BaseMap& map)
+void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& info, s32 reverb, ResourceManagerWrapper& resMan)
 {
     GetMidiVars()->sSnd_ReloadAbeResources() = false;
     auto oldPtr = GetMidiVars()->sLastLoadedSoundBlockInfo().lock();
@@ -240,12 +240,12 @@ void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& info, s32 reverb, ResourceMan
         if (GetMidiVars()->sMonkVh_Vb().mVabId < 0)
         {
             // TODO: Fix me
-            SND_VAB_Load_4C9FE0(GetMidiVars()->sMonkVh_Vb(), resMan, map);
+            SND_VAB_Load_4C9FE0(GetMidiVars()->sMonkVh_Vb(), resMan);
         }
 
         GetMidiVars()->sLastLoadedSoundBlockInfo() = info;
 
-        SND_VAB_Load_4C9FE0(*info, resMan, map);
+        SND_VAB_Load_4C9FE0(*info, resMan);
 
         // Put abes resources back if we had to unload them to fit the VB in memory
         /*
@@ -652,7 +652,7 @@ static u32 GetTableIdxForName(const char_type* pName)
     ALIVE_FATAL("Couldn't find seq name in the table");
 }
 
-void SND_Load_Seqs_Impl(OpenSeqHandle* pSeqTable, PathSoundInfo& info, ResourceManagerWrapper& resMan, BaseMap& /*map*/)
+void SND_Load_Seqs_Impl(OpenSeqHandle* pSeqTable, PathSoundInfo& info, ResourceManagerWrapper& resMan)
 {
     if (pSeqTable)
     {
@@ -701,9 +701,9 @@ void SND_Pend_Sound_Files(const PathSoundInfo& info, ResourceManagerWrapper& res
     }
 }
 
-void SND_Load_Seqs(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& bsqFileName, ResourceManagerWrapper& resMan, BaseMap& map)
+void SND_Load_Seqs(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& bsqFileName, ResourceManagerWrapper& resMan)
 {
-    SND_Load_Seqs_Impl(pSeqTable, *bsqFileName, resMan, map);
+    SND_Load_Seqs_Impl(pSeqTable, *bsqFileName, resMan);
 }
 
 s8 SND_Seq_Table_Valid()

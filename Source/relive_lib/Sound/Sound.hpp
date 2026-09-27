@@ -94,6 +94,12 @@ struct SoundBuffer final
 };
 ALIVE_ASSERT_SIZEOF(SoundBuffer, 0x14);
 
+// The sound code's clock in ms: SYS_GetTicks, or the length of the audio rendered so far when
+// the sound system is offline (see SDLSoundSystem::InitOffline).
+u32 SND_GetTicks();
+// Busy waits for SND_GetTicks to reach ticks. Offline, it renders audio until then instead.
+void SND_WaitUntilTicks(u32 ticks);
+
 u32 SND_Get_Sound_Entry_Pos_4EF620(SoundEntry* pSoundEntry);
 void SND_Pause_Audio();
 void SND_Resume_Audio();

@@ -192,6 +192,7 @@ public:
     virtual void SsUtKeyOffV(s32 idx) = 0;
 };
 
+// nullptr sets the default (AE) vars back
 void SetSpuApiVars(IPsxSpuApiVars* pVars);
 IPsxSpuApiVars* GetSpuApiVars();
 
