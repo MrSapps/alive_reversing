@@ -15,7 +15,10 @@
 #include "../../AliveLibAE/GameAutoPlayer.hpp"
 #include "../../AliveLibAE/PathData.hpp"
 #include "../../AliveLibAO/GameAutoPlayer.hpp"
+#include "../../relive_lib/data_conversion/data_conversion.hpp"
 #include <SDL3/SDL_main.h>
+#include <chrono>
+#include <thread>
 #include <algorithm>
 #include <cstdio>
 #include <filesystem>
@@ -33,7 +36,9 @@ static const char* kUsage =
     "  -out=<dir>        Where to write (default sound_gold_out)\n"
     "  -baseline=<dir>   Compare with an earlier run's -out, exit code 1 if anything differs\n"
     "  -theme=<name>     Only this sound theme\n"
-    "  -seq_ms=<ms>      Longest time a SEQ is played for (default 60000)\n";
+    "  -seq_ms=<ms>      Longest time a SEQ is played for (default 60000)\n"
+    "  -convert          First convert the game's paths, which converts its sounds, as the\n"
+    "                    engine does (headless). Writes relive_data/ in the -data dir.\n";
 
 // relive_lib calls out to this for recording and playback, which this tool doesn't use
 BaseGameAutoPlayer& GetGameAutoPlayer()
@@ -76,6 +81,29 @@ struct Options final
     std::string mTheme;
     u32 mSeqMs = 60000;
 };
+
+// Converts the game's paths as the engine does on its first run. The sounds are converted with
+// the paths, so the rest (FMVs, animations, cameras...) is skipped.
+static void ConvertPaths(GameType game)
+{
+    DataConversion dataConversion;
+    DataConversion::DataVersions versions = DataConversion::DataVersions::LatestVersion();
+    versions.mPathVersion = 0;
+    if (game == GameType::eAo)
+    {
+        dataConversion.ConvertDataAO(versions);
+    }
+    else
+    {
+        dataConversion.ConvertDataAE(versions);
+    }
+
+    // The conversion runs on a thread pool
+    while (dataConversion.AsyncTasksInProgress())
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+}
 
 // The SEQ table entry a SEQ file is loaded into: OPTAMB.SEQ for OPTAMB.mid
 static std::string SeqTableName(GameType game, const std::string& seqFile)
@@ -224,10 +252,16 @@ s32 main(s32 argc, char_type** argv)
     fs::current_path(*data);
     SetGameType(options.mGame);
 
+    if (args.HasSwitch("-convert"))
+    {
+        printf("Converting the paths and sounds...\n");
+        ConvertPaths(options.mGame);
+    }
+
     const fs::path soundsDir = fs::path("relive_data") / (options.mGame == GameType::eAo ? "ao" : "ae") / "sounds";
     if (!fs::is_directory(soundsDir))
     {
-        printf("No %s in %s - convert the game data first (run relive there once)\n", soundsDir.string().c_str(), data->c_str());
+        printf("No %s in %s - convert the game data first (-convert, or run relive there once)\n", soundsDir.string().c_str(), data->c_str());
         return 1;
     }
 

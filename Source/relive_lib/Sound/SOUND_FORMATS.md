@@ -158,29 +158,26 @@ Found, not fixed yet:
 ## Checking against real game data
 
 The repo has no game data, so the real data check is staged for someone who has it (for
-example Claude Code running locally). `relive_sound_gold` plays every program's tones and every
-SEQ of every sound theme in a converted data dir through the sound code, offline, and saves a
-trace and a WAV of each. Run it before and after the format switch and compare:
+example Claude Code running locally). One script does all of it:
 
 ```sh
-# 1. The commit before the switch ("Add deterministic sound gold tests ..."): build, convert
-#    the data, render the gold set
-git checkout <commit before "Switch the sound data to SF2 and MIDI files">
-cmake --build build -j5 --target relive relive_sound_gold
-cd /path/to/AE && /path/to/build/Source/relive/relive      # converts on first run, then quit
-/path/to/build/Source/Tools/sound_gold/relive_sound_gold -data=/path/to/AE -out=/tmp/sound_gold_before
-
-# 2. The switch: build, convert again (the path data version went up), compare
-git checkout <the switch commit or later>
-cmake --build build -j5 --target relive relive_sound_gold
-cd /path/to/AE && /path/to/build/Source/relive/relive      # reconverts, then quit
-/path/to/build/Source/Tools/sound_gold/relive_sound_gold -data=/path/to/AE -out=/tmp/sound_gold_after -baseline=/tmp/sound_gold_before
+Source/Tools/sound_gold/compare_sound_formats.sh --ae /path/to/AE --ao /path/to/AO
 ```
 
-Do the same for AO (`relive -AO`, `relive_sound_gold -AO`). `-baseline` lists every trace or
-WAV that differs, and exits with 1 if any do. Nothing should differ. If something does, the
-trace shows where (tone table, sample checksum, or the first channel/voice change that isn't
-the same).
+It builds `relive_sound_gold` in two git worktrees (under `build-sound-compare/`): at the commit
+before "Switch the sound data to SF2 and MIDI files" (plus `before_switch_convert.patch`, which
+gives that commit's tool `-convert`) and at `HEAD`. Each converts the game with
+the engine's own data conversion (`relive_sound_gold -convert`, headless, paths and sounds only)
+into a scratch copy of the game dir, so the game dirs themselves aren't changed. Then it plays
+every program's tones and every SEQ of every sound theme through the sound code, offline, and
+saves a trace and a WAV of each. The "after" results are compared with the "before" ones:
+the script lists every trace or WAV that differs and exits with 1 if any do. Nothing should
+differ. If something does, the trace shows where (tone table, sample checksum, or the first
+channel/voice change that isn't the same), and the WAVs can be listened to.
+
+`--help` lists the options (`--after <ref>` checks another commit, `--sdl3` if the SDL3 build
+isn't the one in `build/CMakeCache.txt`). The two builds are full Debug builds, so the first run
+takes a while.
 
 Things worth checking in the real data while at it, which decide open questions above:
 
