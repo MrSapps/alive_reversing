@@ -254,8 +254,8 @@ void Map::ContinueLoadCamera()
         {
             // Sound files pended by LoadPathsAndPendSounds
             BinaryPath* pNextPath = GetPathResourceBlockPtr(mNextPath);
-            SND_Load_VABS(pNextPath->GetSoundInfo(), Path_Get_Reverb(mNextLevel), mResourceManager, *this); // TODO: Remove hard coded data
-            SND_Load_Seqs(gSeqData.mSeqs, pNextPath->GetSoundInfo(), mResourceManager, *this);
+            SND_Load_VABS(pNextPath->GetSoundInfo(), Path_Get_Reverb(mNextLevel), mResourceManager); // TODO: Remove hard coded data
+            SND_Load_Seqs(gSeqData.mSeqs, pNextPath->GetSoundInfo(), mResourceManager);
 
             // TODO: Remove hard coded data
             relive_new BackgroundMusic(Path_Get_BackGroundMusicId(mNextLevel), mResourceManager, *this);

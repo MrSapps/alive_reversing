@@ -417,8 +417,8 @@ void Map::ContinueLoadCamera()
     if (LevelChanged())
     {
         // Sound files pended by LoadPathsAndPendSounds
-        SND_Load_VABS(mLoadedPaths[0]->GetSoundInfo(), AO::Path_Get_Reverb(mNextLevel), mResourceManager, *this); // TODO: Remove hard coded data
-        SND_Load_Seqs(g_SeqTable_4C9E70, mLoadedPaths[0]->GetSoundInfo(), mResourceManager, *this);
+        SND_Load_VABS(mLoadedPaths[0]->GetSoundInfo(), AO::Path_Get_Reverb(mNextLevel), mResourceManager); // TODO: Remove hard coded data
+        SND_Load_Seqs(g_SeqTable_4C9E70, mLoadedPaths[0]->GetSoundInfo(), mResourceManager);
 
         relive_new BackgroundMusic(AO::Path_Get_BackGroundMusicId(mNextLevel), mResourceManager, *this); // TODO: Remove hard coded data
 
