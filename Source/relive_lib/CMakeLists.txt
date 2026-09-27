@@ -412,6 +412,12 @@ SET(sound_src
     Sound/SDLSoundSystem.cpp
     Sound/SoundGold.hpp
     Sound/SoundGold.cpp
+    Sound/SoundFont.hpp
+    Sound/SoundFont.cpp
+    Sound/VabSoundFont.hpp
+    Sound/VabSoundFont.cpp
+    Sound/SeqMidi.hpp
+    Sound/SeqMidi.cpp
 )
 
 SET(game_objects_src
@@ -837,6 +843,7 @@ add_executable(relive_lib_tests
     tests/SoundTestData.cpp
     tests/SoundTestData.hpp
     tests/SoundGoldTests.cpp
+    tests/SoundFormatTests.cpp
     tests/TestStubs.cpp
 )
 target_include_directories(relive_lib_tests PRIVATE

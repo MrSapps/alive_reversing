@@ -39,6 +39,33 @@ struct VabHeader final
 };
 ALIVE_ASSERT_SIZEOF(VabHeader, 0x820);
 
+// The VH has 16 of these per program after the VabHeader
+struct VagAtr final
+{
+    s8 field_0_priority;
+    s8 field_1_mode;
+    s8 field_2_vol;
+    s8 field_3_pan;
+    u8 field_4_centre;
+    u8 field_5_shift;
+    s8 field_6_min;
+    s8 field_7_max;
+    s8 field_8_vibW;
+    s8 field_9_vibT;
+    s8 field_A_porW;
+    s8 field_B_porT;
+    s8 field_C_pitch_bend_min;
+    s8 field_D_pitch_bend_max;
+    s8 field_E_reserved1;
+    s8 field_F_reserved2;
+    s16 field_10_adsr1;
+    s16 field_12_adsr2;
+    s16 field_14_prog;
+    s16 field_16_vag;
+    s16 field_18_reserved[4];
+};
+ALIVE_ASSERT_SIZEOF(VagAtr, 0x20);
+
 s16 SsVabOpenHead(VabHeader* pVabHeader);
 
 struct VabBodyRecord final

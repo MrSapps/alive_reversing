@@ -51,6 +51,11 @@ std::vector<u8> BuildVbAe(const Vab& vab, std::vector<u8>& soundsDat);
 // AO: the samples are in the VB
 std::vector<u8> BuildVbAo(const Vab& vab);
 
+// The VAB the sound gold tests use: several programs, key splits, layers, loops and envelopes
+Vab LevelVab();
+// A small VAB with id 0, standing in for MONK.VH/VB
+Vab MonkVab();
+
 std::vector<s16> Sine(s32 length, f64 period, s16 amplitude);
 std::vector<s16> Saw(s32 length, s32 period, s16 amplitude);
 std::vector<s16> Noise(s32 length, u32 seed, s16 amplitude);

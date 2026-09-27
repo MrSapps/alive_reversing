@@ -153,6 +153,83 @@ std::vector<s16> Noise(s32 length, u32 seed, s16 amplitude)
     return ret;
 }
 
+Vab LevelVab()
+{
+    Vab vab;
+    vab.mId = 1;
+    vab.mSamples = {
+        {Sine(6000, 100.0, 12000), false},
+        {Saw(3000, 80, 10000), false}, // Shorter than 4000, which AE pads
+        {Sine(2205, 49.0, 9000), true},
+        {Noise(1500, 1234, 8000), false},
+    };
+
+    Tone plain;
+    plain.mVag = 1;
+
+    Tone low;
+    low.mVag = 2;
+    low.mMax = 59;
+    low.mCentre = 48;
+    low.mShift = 64;
+    low.mAdsr1 = 0x3A8F;
+    low.mAdsr2 = 0x5FC5;
+
+    Tone high;
+    high.mVag = 3;
+    high.mMin = 60;
+    high.mCentre = 72;
+    high.mAdsr1 = 0x7F00;
+    high.mAdsr2 = 0x1FDF;
+    high.mVol = 90;
+    high.mPriority = 5;
+
+    Tone looped;
+    looped.mVag = 3;
+    looped.mAdsr1 = 0x2A4F;
+    looped.mAdsr2 = 0x0006;
+    looped.mMode = 4;
+    looped.mPan = 30;
+
+    Tone quiet = plain;
+    quiet.mVol = 80;
+
+    Tone noise;
+    noise.mVag = 4;
+    noise.mPriority = 10;
+    noise.mAdsr1 = 0x00FF;
+    noise.mAdsr2 = 0x1FC0;
+
+    Tone layer1 = plain;
+    layer1.mVol = 60;
+    Tone layer2;
+    layer2.mVag = 2;
+    layer2.mCentre = 67;
+    layer2.mVol = 50;
+    layer2.mAdsr1 = 0x4A3F;
+    layer2.mAdsr2 = 0x3FD3;
+
+    vab.mPrograms = {
+        {0, {plain}},
+        {1, {low, high}},
+        {2, {looped}},
+        {4, {quiet}}, // AE waits 10 ms after programs 4, 5, 8, 23, 24 and 25
+        {5, {noise}},
+        {8, {layer1, layer2}},
+    };
+    return vab;
+}
+
+Vab MonkVab()
+{
+    Vab vab;
+    vab.mId = 0;
+    vab.mSamples = {{Sine(3000, 70.0, 8000), false}};
+    Tone tone;
+    vab.mPrograms = {{0, {tone}}};
+    return vab;
+}
+
 SeqBuilder::SeqBuilder(u16 resolution, u32 tempoUsPerQuarter)
 {
     Put(mData, "pQES", 4);
