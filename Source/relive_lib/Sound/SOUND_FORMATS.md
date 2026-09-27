@@ -1,8 +1,8 @@
-# Sound data formats: VAB/SEQ -> SF2/SMF
+# Sound data formats
 
 Goal: one set of sound data formats and one sound code path for both games, with audio that
-can reach PS1 quality. This file records what the current code uses, whether SoundFont 2 (SF2)
-and Standard MIDI Files (SMF) can hold it, and the staged plan.
+can reach PS1 quality. This file records what the current code uses, why SoundFont 2 (SF2) was
+tried and rejected, and the staged plan.
 
 ## What the games ship (PC versions)
 
@@ -82,30 +82,25 @@ fine: the PS1 reverb is a fixed SPU algorithm with presets (room, studio S/M/L, 
 echo, echo, delay, pipe). The engine would implement it and pick the preset/depth from the
 path, as `Path_Get_Reverb` already provides.
 
-## Decision
+## Decision: not SF2
 
-SF2 and SMF are good containers. Neither loses sample data, key maps, loops or sequences. SF2's
-own generators can't hold everything exactly, so each converted file stores two things:
+SF2 was implemented and then dropped. Because its own generators can't hold the PS1 values
+exactly (see above), each tone had to store them twice: the nearest standard SF2 generators, so
+other SF2 players could use the file, plus the raw PS1 values in private generator numbers,
+which the engine read instead. That gives two copies of every value that can disagree. Editing a
+tone in an SF2 tool (Polyphone etc.) changed the standard generator, which the engine ignored, so
+the edit silently did nothing. A tool that drops unknown generators silently changed the sound
+instead. The engine also only used the SF2 as a container: it rebuilt a VH from the private
+values. No other sampler format (SFZ, DLS, XI/ITI, ...) can hold the PS1 ADSR, voice priority or
+1/128 semitone tuning either, so all of them would have the same problem.
 
-1. **Standard SF2 generators**, the best SF2 equivalent of every value, so the file plays
-   correctly in any SF2 player (Polyphone, FluidSynth) and can be edited there.
-2. **The raw PS1 values in private generators**, one per `VagAtr`/`ProgAtr`/`VabHeader` field
-   (`raw adsr1`, `raw adsr2`, `priority`, `vol`, `centre`, `shift`, `mode`, etc).
-   SF2 2.04 8.1.3 says a reader must ignore generator numbers it doesn't know, so other tools
-   still load the file.
+The bank format still has to be chosen. It must hold the PS1 values exactly, with one copy of each
+(for example the `VabHeader`/`ProgAtr`/`VagAtr` fields as JSON with the samples as WAVs, or VAB
+itself with AE's `sounds.dat` samples moved into the VB). An SF2/SFZ export for listening in other
+tools could come later, one way only.
 
-The engine reads the raw values when they are there, so conversion is lossless and a later
-PS1-accurate envelope has the real registers to work from. When a zone has no raw values (an
-SF2 made in another tool, or edited by one that drops unknown generators), the engine derives
-them from the standard generators.
-
-SEQ -> SMF type 0 is lossless: `MThd` (division = SEQ resolution), then one `MTrk` that starts
-with the header's tempo (FF 51) and time signature (FF 58) at delta 0, then the SEQ event
-bytes unchanged. The loader skips those leading meta events so the loop/rewind point is the
-same byte the SEQ player uses today.
-
-AE's `sounds.dat` goes away: conversion copies each sample into the SF2, so both games load
-the same format and AO/AE's separate `SsVabTransBody` versions disappear.
+SEQ -> SMF type 0 would be lossless and needs nothing private: the PSX SEQ is SMF track data with
+a different header, and the libsnd loop markers are ordinary controller events.
 
 ## Plan
 
@@ -115,10 +110,10 @@ the same format and AO/AE's separate `SsVabTransBody` versions disappear.
    generated in code for both games. Each scenario writes a trace (the loaded tone table, a
    checksum of every sample, then every change to the 24 MIDI channels and 32 voices over time)
    and a WAV, and compares the trace with the committed gold file.
-2. **SF2/SMF readers and writers** + VAB -> SF2 and SEQ -> SMF converters, with round trip
-   unit tests.
-3. **Switch data conversion and the engine** to `.sf2`/`.mid`, drop `sounds.dat`/VB loading and
-   AO's own `SsVabTransBody`. The gold traces must not change.
+2. **Pick the bank format** (see the decision above), and write its reader/writer with round
+   trip unit tests.
+3. **Switch data conversion and the engine** to it, drop `sounds.dat`/VB loading and AO's own
+   `SsVabTransBody`. The gold traces must not change.
 4. **Real data check** (needs the game files, see below).
 5. Later, each a separate, deliberate behaviour change with new gold files:
    - PS1 ADSR from the raw registers, stepped per sample instead of every 30 ms
@@ -160,11 +155,11 @@ of every sound theme in a converted data dir to traces and WAVs:
 
 ```sh
 # 1. On the commit before the format switch: convert the data and render the gold set
-cd /path/to/AE && /path/to/build/Source/relive/relive   # converts on first run, then quit
+cd /path/to/AE && /path/to/build/Source/relive/relive -convert
 build/Source/Tools/sound_gold/relive_sound_gold -data=/path/to/AE -out=sound_gold_before
 
 # 2. On the commit after it: convert again (the data version changed), then compare
-cd /path/to/AE && /path/to/build/Source/relive/relive   # reconverts, then quit
+cd /path/to/AE && /path/to/build/Source/relive/relive -convert   # reconverts
 build/Source/Tools/sound_gold/relive_sound_gold -data=/path/to/AE -out=sound_gold_after -baseline=sound_gold_before
 ```
 
