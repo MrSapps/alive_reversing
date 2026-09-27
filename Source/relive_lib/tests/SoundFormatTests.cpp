@@ -7,6 +7,8 @@
 #include "Sound/SeqMidi.hpp"
 #include "Sound/PsxSpuApi.hpp"
 #include <cstring>
+#include <map>
+#include <memory>
 
 using namespace SoundTestData;
 

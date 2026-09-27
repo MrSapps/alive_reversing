@@ -171,7 +171,7 @@ static void AddEnvelope(SoundFont::Zone& zone, s16 adsr1, s16 adsr2)
 
     zone.Add(SoundFont::eAttackVolEnv, static_cast<u16>(MsToTimecents(attackMs)));
     zone.Add(SoundFont::eDecayVolEnv, static_cast<u16>(MsToTimecents(decayMs)));
-    zone.Add(SoundFont::eSustainVolEnv, sustainLevel >= 16 ? 0 : VolToCentibels(std::max(sustainLevel, 0) * 127 / 16));
+    zone.Add(SoundFont::eSustainVolEnv, sustainLevel >= 16 ? static_cast<u16>(0) : VolToCentibels(std::max(sustainLevel, 0) * 127 / 16));
     zone.Add(SoundFont::eReleaseVolEnv, static_cast<u16>(MsToTimecents(releaseMs)));
 }
 
@@ -269,12 +269,12 @@ SoundFont VabSoundFont::ToSoundFont(const Vab& vab, const std::string& name)
             zone.Add(SoundFont::eFineTune, Raw(-static_cast<s32>(std::lround(atr.field_5_shift * 100.0 / 128.0))));
             zone.Add(SoundFont::eInitialAttenuation, VolToCentibels(atr.field_2_vol));
             zone.Add(SoundFont::ePan, Raw(PanToSf2(atr.field_3_pan)));
-            zone.Add(SoundFont::eReverbEffectsSend, (atr.field_1_mode & 4) ? 1000 : 0);
+            zone.Add(SoundFont::eReverbEffectsSend, static_cast<u16>((atr.field_1_mode & 4) ? 1000 : 0));
             AddEnvelope(zone, atr.field_10_adsr1, atr.field_12_adsr2);
 
             const s32 sampleIdx = static_cast<u8>(atr.field_16_vag) - 1;
             const bool haveSample = sampleIdx >= 0 && sampleIdx < static_cast<s32>(vab.mSamples.size());
-            zone.Add(SoundFont::eSampleModes, haveSample && vab.mSamples[sampleIdx].mLoop ? 1 : 0);
+            zone.Add(SoundFont::eSampleModes, static_cast<u16>(haveSample && vab.mSamples[sampleIdx].mLoop ? 1 : 0));
 
             zone.Add(ePsxTone, static_cast<u16>(toneEntry.first));
             zone.Add(ePsxPriority, Raw(atr.field_0_priority));

@@ -370,11 +370,6 @@ static std::string ChunkString(const ChunkRef& chunk)
     return std::string(p, len);
 }
 
-struct BagRecord final
-{
-    u16 mGenIdx;
-};
-
 // Reads the bag + gen chunks of pdta into zones: zoneStart..zoneEnd bag indices
 static bool ReadZones(const ChunkRef& bags, const ChunkRef& gens, u16 bagStart, u16 bagEnd, std::vector<SoundFont::Zone>& zones, std::string& error)
 {
