@@ -8,7 +8,7 @@ name: CI
 
 on:
   push:
-    branches: [beta, claude/ao-ae-sound-dedup-lcjqbg]
+    branches: [beta, claude/ao-ae-sound-dedup-lcjqbg, claude/ao-ae-sound-dedup-lcjqbg-8laod9]
   pull_request:
     branches: [beta]
 
