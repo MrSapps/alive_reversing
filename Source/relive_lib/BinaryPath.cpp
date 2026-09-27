@@ -7,7 +7,7 @@
 
 #include <typeindex>
 
-// mVhFile/mVbFile/mSeqFiles are filled in by the caller (ResourceManagerWrapper::LoadPaths)
+// mSoundBankFile/mSeqFiles are filled in by the caller (ResourceManagerWrapper::LoadPaths)
 // from the theme's own sound_info.json once mSoundTheme is known - see PathSoundInfo.
 static void from_json(const nlohmann::json& j, PathSoundInfo& s)
 {

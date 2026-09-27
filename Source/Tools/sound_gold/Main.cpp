@@ -28,7 +28,7 @@ static const char* kUsage =
     "Plays every sound theme of converted game data through the sound code, offline, and saves\n"
     "a trace and a WAV of each program's tones and of each SEQ.\n"
     "\n"
-    "  -data=<dir>       The game dir (holds relive_data/, and sounds.dat for AE)\n"
+    "  -data=<dir>       The game dir (holds relive_data/)\n"
     "  -AO               Abe's Oddysee data (default: Abe's Exoddus)\n"
     "  -out=<dir>        Where to write (default sound_gold_out)\n"
     "  -baseline=<dir>   Compare with an earlier run's -out, exit code 1 if anything differs\n"
@@ -45,6 +45,10 @@ BaseGameAutoPlayer& GetGameAutoPlayer()
         return autoPlayerAO;
     }
     return autoPlayerAE;
+}
+
+namespace AO {
+extern OpenSeqHandle g_SeqTable_4C9E70[165];
 }
 
 namespace fs = std::filesystem;
@@ -73,14 +77,30 @@ struct Options final
     u32 mSeqMs = 60000;
 };
 
+// The SEQ table entry a SEQ file is loaded into: OPTAMB.SEQ for OPTAMB.mid
+static std::string SeqTableName(GameType game, const std::string& seqFile)
+{
+    const std::string stem = seqFile.substr(0, seqFile.find('.'));
+    const OpenSeqHandle* pTable = game == GameType::eAo ? AO::g_SeqTable_4C9E70 : gSeqData.mSeqs;
+    const s32 size = game == GameType::eAo ? 164 : 144;
+    for (s32 i = 0; i < size; i++)
+    {
+        const char_type* pName = pTable[i].field_0_mBsqName;
+        if (pName && std::string(pName).substr(0, std::string(pName).find('.')) == stem)
+        {
+            return pName;
+        }
+    }
+    return seqFile;
+}
+
 // Plays one item in a new session so each result stands alone
 static void RenderItem(const Options& options, ResourceManagerWrapper& resMan, const std::string& theme, const std::string& monkTheme, const std::string& name,
     const std::function<void(SoundGoldSession&)>& play)
 {
     const ResourceManagerWrapper::SoundThemeInfo& themeInfo = resMan.LoadSoundThemeInfo(theme);
     auto info = std::make_shared<PathSoundInfo>();
-    info->mVhFile = themeInfo.mVhFile;
-    info->mVbFile = themeInfo.mVbFile;
+    info->mSoundBankFile = themeInfo.mSoundBankFile;
     info->mSeqFiles = themeInfo.mSeqFiles;
     info->mSoundTheme = theme;
 
@@ -118,10 +138,12 @@ static void RenderTheme(const Options& options, ResourceManagerWrapper& resMan, 
         }
     });
 
-    // Each SEQ once, until it ends or -seq_ms
-    const std::vector<std::string> seqNames = resMan.LoadSoundThemeInfo(theme).mSeqFiles;
-    for (const std::string& seqName : seqNames)
+    // Each SEQ once, until it ends or -seq_ms. Named by its SEQ table entry (OPTAMB.SEQ), not
+    // its file, so the results compare with the ones from before the SEQs were MIDI files.
+    const std::vector<std::string> seqFiles = resMan.LoadSoundThemeInfo(theme).mSeqFiles;
+    for (const std::string& seqFile : seqFiles)
     {
+        const std::string seqName = SeqTableName(options.mGame, seqFile);
         RenderItem(options, resMan, theme, monkTheme, "seq_" + seqName, [&](SoundGoldSession& session)
         {
             for (const u16 idx : session.LoadedSeqs())
@@ -220,16 +242,18 @@ s32 main(s32 argc, char_type** argv)
     }
     std::sort(themes.begin(), themes.end());
 
-    // The game has no theme for MONK.VH/VB yet (see sMonkVh_Vb), use the first theme that has it
+    // The game has no theme for the MONK sound bank yet (see sMonkVh_Vb), use the first theme that
+    // has it
+    const std::string monkFile = GetMidiVars()->sMonkVh_Vb().mSoundBankFile;
     for (const std::string& theme : themes)
     {
-        if (fs::exists(soundsDir / theme / "MONK.VH"))
+        if (fs::exists(soundsDir / theme / monkFile))
         {
             monkTheme = theme;
             break;
         }
     }
-    printf("MONK.VH/VB theme: %s\n", monkTheme.empty() ? "<none>" : monkTheme.c_str());
+    printf("%s theme: %s\n", monkFile.c_str(), monkTheme.empty() ? "<none>" : monkTheme.c_str());
 
     FileSystem fs;
     ResourceManagerWrapper resMan(fs, "");

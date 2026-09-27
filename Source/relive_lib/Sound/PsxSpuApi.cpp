@@ -2,7 +2,6 @@
 #include "PsxSpuApi.hpp"
 #include "../../relive_lib/Function.hpp"
 #include "../../AliveLibAE/stdlib.hpp"
-#include "../data_conversion/file_system.hpp"
 #include "../../relive_lib/ResourceManagerWrapper.hpp"
 #include "Sound.hpp"    // SoundEntry structure
 #include <assert.h>
@@ -48,7 +47,6 @@ bool sSoundDatIsNull_BD1CE8 = 1;
 s8 sbDisableSeqs_BD1CE4 = 0;
 u32 sLastTime_578E20 = 0xFFFFFFFF;
 u32 sMidi_WaitUntil_BD1CF0 = 0;
-AutoFILE sSoundDatFileHandle_BD1CE0;
 u8 sControllerValue_BD1CFC = 0;
 
 
@@ -137,11 +135,6 @@ public:
     virtual u32& sMidi_WaitUntil() override
     {
         return sMidi_WaitUntil_BD1CF0;
-    }
-
-    virtual AutoFILE& sSoundDatFileHandle() override
-    {
-        return sSoundDatFileHandle_BD1CE0;
     }
 
     virtual u8& sControllerValue() override
@@ -242,60 +235,6 @@ void SsSetMVol_4FC360(s16 left, s16 right)
 {
     gSpuVars->sGlobalVolumeLevel_left() = left;
     gSpuVars->sGlobalVolumeLevel_right() = right;
-}
-
-static const VabBodyRecord* SND_SoundsDat_Get_Record_4FC3D0(VabHeader* pVabHeader, VabBodyRecord* pBodyRecords, s32 idx)
-{
-    if (!pVabHeader || idx < 0)
-    {
-        return nullptr;
-    }
-    return &pBodyRecords[idx];
-}
-
-s32 SND_SoundsDat_Get_Sample_Len_4FC400(VabHeader* pVabHeader, VabBodyRecord* pVabBody, s32 idx)
-{
-    const VabBodyRecord* pRecord = SND_SoundsDat_Get_Record_4FC3D0(pVabHeader, pVabBody, idx);
-    if (!pRecord)
-    {
-        return -1;
-    }
-    // OG reads the field as a u32, so do the multiply unsigned too.
-    return static_cast<s32>(8 * static_cast<u32>(pRecord->field_0_length_or_duration)) / 16;
-}
-
-// TODO: Reverse/refactor properly
-s32 sub_4FC440(VabHeader* pVabHeader, VabBodyRecord* pVabBody, s32 idx)
-{
-    const VabBodyRecord* pRecord = SND_SoundsDat_Get_Record_4FC3D0(pVabHeader, pVabBody, idx);
-    return pRecord ? pRecord->field_4_unused : 0;
-}
-
-// TODO: Reverse/refactor properly
-bool sub_4FC470(VabHeader* pVabHeader, VabBodyRecord* pVabBody, s32 idx)
-{
-    return sub_4FC440(pVabHeader, pVabBody, idx) < 0;
-}
-
-s32 SND_SoundsDat_Read_4FC4E0(VabHeader* pVabHeader, VabBodyRecord* pVabBody, s32 idx, void* pBuffer)
-{
-    const VabBodyRecord* pRecord = SND_SoundsDat_Get_Record_4FC3D0(pVabHeader, pVabBody, idx);
-    if (!pRecord)
-    {
-        return 0;
-    }
-
-    const s32 sampleOffset = static_cast<s32>(pRecord->field_8_fileOffset);
-    const s32 sampleLen = SND_SoundsDat_Get_Sample_Len_4FC400(pVabHeader, pVabBody, idx);
-    if (sampleOffset == -1 || !gSpuVars->sSoundDatFileHandle().GetFile())
-    {
-        return 0;
-    }
-
-    gSpuVars->sSoundDatFileHandle().Seek(static_cast<u32>(sampleOffset), AutoFILE::SeekMode::Start);
-    gSpuVars->sSoundDatFileHandle().Read(static_cast<u8*>(pBuffer), static_cast<u32>(2 * sampleLen));
-
-    return sampleLen;
 }
 
 void SsVabClose_4FC5B0(s32 vabId)
@@ -413,19 +352,19 @@ void SsExt_SetVagFlags(s16 vabId, s32 vagIdx, u8 flags)
     }
 }
 
-// Loads sounds dat to memory
-void SsVabTransBody_4FC840(FileSystem& fs, VabBodyRecord* pVabBody, s16 vabId)
+// Loads a VAB's samples, after SsVabOpenHead has loaded its header. Was AE's
+// SsVabTransBody_4FC840 (which read them from sounds.dat) and AO's SsVabTransBody (from the VB).
+void SsVabTransBody(s16 vabId, const std::vector<VabSoundFont::Sample>& samples, bool padShortOneShots)
 {
     if (vabId < 0)
     {
         return;
     }
 
-    gSpuVars->sSoundDatFileHandle() = fs.OpenFile("sounds.dat", "rb");
-    gSpuVars->sSoundDatIsNull() = gSpuVars->sSoundDatFileHandle().GetFile() == nullptr;
+    // AE played nothing until it had opened sounds.dat, now the samples are always there
+    gSpuVars->sSoundDatIsNull() = false;
 
     assert(vabId < 4);
-    VabHeader* pVabHeader = gSpuVars->spVabHeaders()[vabId];
     const s32 vagCount = gSpuVars->sVagCounts()[vabId];
     for (s32 i = 0; i < vagCount; i++)
     {
@@ -437,38 +376,30 @@ void SsVabTransBody_4FC840(FileSystem& fs, VabBodyRecord* pVabBody, s16 vabId)
             SsSeqCalledTbyT();
         }
 
+        const bool haveSample = i < static_cast<s32>(samples.size());
+        const std::vector<s16>* pPcm = haveSample ? &samples[i].mPcm : nullptr;
+        const bool loop = haveSample && samples[i].mLoop;
 
-        s32 sampleLen = SND_SoundsDat_Get_Sample_Len_4FC400(pVabHeader, pVabBody, i);
-        if (sampleLen < 4000 && !sub_4FC470(pVabHeader, pVabBody, i))
+        s32 sampleLen = pPcm ? static_cast<s32>(pPcm->size()) : 0;
+        // TODO: AE plays short one shot samples padded to twice their length with silence (so
+        // they hold a voice for longer), AO doesn't. Find out which the PS1 does.
+        if (padShortOneShots && sampleLen < 4000 && !loop)
         {
             sampleLen *= 2;
         }
 
         if (sampleLen > 0)
         {
-            SsExt_SetVagFlags(vabId, i, sub_4FC470(pVabHeader, pVabBody, i) ? 4 : 0);
+            SsExt_SetVagFlags(vabId, i, loop ? 4 : 0);
 
-            // Allocate pEntry
             if (GetSoundAPI().mSND_New(pEntry, sampleLen, 44100, 16, 0) == 0)
             {
-                // Allocate a temp buffer to read sounds.dat bytes into
-                u8* pTempBuffer = relive_new u8[sampleLen * pEntry->field_1D_blockAlign]();
-                if (pTempBuffer)
-                {
-                    // Read the sample data
-                    memset(pTempBuffer, 0, sampleLen * pEntry->field_1D_blockAlign);
-                    if (SND_SoundsDat_Read_4FC4E0(pVabHeader, pVabBody, i, pTempBuffer))
-                    {
-                        // Load it into the sound buffer
-                        GetSoundAPI().mSND_Load(pEntry, pTempBuffer, sampleLen);
-                    }
-                    relive_delete[] pTempBuffer;
-                }
+                std::vector<u8> buffer(static_cast<size_t>(sampleLen) * pEntry->field_1D_blockAlign);
+                memcpy(buffer.data(), pPcm->data(), pPcm->size() * sizeof(s16));
+                GetSoundAPI().mSND_Load(pEntry, buffer.data(), sampleLen);
             }
         }
     }
-
-    gSpuVars->sSoundDatFileHandle().Close();
 }
 
 s32 MIDI_Invert_4FCA40(s32 /*not_used*/, s32 value)

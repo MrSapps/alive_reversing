@@ -32,7 +32,7 @@ public:
     SoundGoldSession& operator=(const SoundGoldSession&) = delete;
 
     // Loads a sound block the way the game's map does (SND_Load_VABS + SND_Load_Seqs), then
-    // records the tone tables and samples that got loaded. It also loads MONK.VH/VB from
+    // records the tone tables and samples that got loaded. It also loads the MONK sound bank from
     // monkTheme (the game hasn't got a theme for it yet, see sMonkVh_Vb), empty to skip it.
     void LoadSoundBlock(ResourceManagerWrapper& resMan, const std::shared_ptr<PathSoundInfo>& info, s32 reverb, const std::string& monkTheme);
 

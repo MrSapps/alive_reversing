@@ -8,7 +8,6 @@ class BaseMap;
 struct OpenSeqHandle;
 
 struct PathSoundInfo;
-struct VabBodyRecord;
 class ResourceManagerWrapper;
 
 namespace relive {
@@ -37,8 +36,8 @@ public:
     virtual PathSoundInfo& sMonkVh_Vb() = 0;
     virtual s32 MidiTableSize() = 0;
 
-    // AE streams sample data from sounds.dat, AO has it in the VB file
-    virtual void SsVabTransBody(ResourceManagerWrapper& resMan, VabBodyRecord* pVabBody, s16 vabId) = 0;
+    // AE pads short one shot samples with silence, AO doesn't (see SsVabTransBody)
+    virtual bool PadShortOneShotSamples() = 0;
 };
 
 IMidiVars* GetMidiVars();

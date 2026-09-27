@@ -34,6 +34,7 @@
 #include "../../AliveLibAO/DemoPlayback.hpp"
 #include "AOSaveSerialization.hpp"
 #include "string_util.hpp"
+#include "SoundConverter.hpp"
 
 // levels that have a different level id but are part of the same .lvl file
 static bool IsCombinedEnderLevel(::LevelIds levelId)
@@ -94,7 +95,7 @@ static void to_json(nlohmann::json& j, const CameraEntry& p)
     };
 }
 
-// vh_file/vb_file/seq_files live once per theme in sounds/<theme>/sound_info.json (written by
+// sound_bank/seq_files live once per theme in sounds/<theme>/sound_info.json (written by
 // ConvertPath below) rather than being duplicated into every path.json that shares the theme.
 static void to_json(nlohmann::json& j, const PathSoundInfo& p)
 {
@@ -146,7 +147,8 @@ static const char_type* FileNameFromSEQId(OpenSeqHandle* pTable, s32 size, s32 i
     ALIVE_FATAL("Unknown SEQ id");
 }
 
-static std::vector<std::string> ConvertBSQ(const FileSystem::Path& dataDir, const char_type* pBSQName, LvlReader& lvlReader, bool isAo)
+// Converts the SEQs of a BSQ to MIDI files, returns their names
+static std::vector<std::string> ConvertBSQ(SoundConverter& soundConverter, const FileSystem::Path& dataDir, const char_type* pBSQName, LvlReader& lvlReader, bool isAo)
 {
     auto bsqData = lvlReader.ReadFile(pBSQName);
     if (!bsqData)
@@ -184,13 +186,11 @@ static std::vector<std::string> ConvertBSQ(const FileSystem::Path& dataDir, cons
             {
                 pSeqName = FileNameFromSEQId(sSeqData.mSeqs, ALIVE_COUNTOF(sSeqData.mSeqs), chunk.Header().field_C_id);
             }
-            seqs.push_back(pSeqName);
-
-            FileSystem::Path filePath = dataDir;
-            filePath.Append(pSeqName);
-
-            FileSystem fs;
-            fs.Save(filePath, chunk.Data());
+            const std::string midiName = soundConverter.ConvertSeq(dataDir, pSeqName, chunk.Data());
+            if (!midiName.empty())
+            {
+                seqs.push_back(midiName);
+            }
         }
     }
     return seqs;
@@ -207,7 +207,7 @@ static FileSystem::Path LevelDir(const FileSystem::Path& dataDir, LevelIdType lv
     return p;
 }
 
-// VH/VB/SEQ sound files live under a shared, level-identity-independent sounds/<theme>/ dir
+// Sound bank and SEQ (MIDI) files live under a shared, level-identity-independent sounds/<theme>/ dir
 // (dataDir/sounds/<theme>/...) so a mod can point a path's sound_info at any theme - its own, or
 // one it doesn't have and falls back to the base game's (see ResourceManagerWrapper::
 // LoadSoundFile) - rather than being forced to duplicate a whole level just to reuse its sounds.
@@ -322,7 +322,7 @@ static void SetCollisionInfoFromPathExt(CollisionInfo& pColInfo, PerPathExtensio
 }
 
 template <typename TlvType, typename LevelIdType>
-static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const LvlFileChunk& pathBndChunk, EReliveLevelIds reliveLvl, LevelIdType lvlIdx, LvlReader& lvlReader, std::vector<u8>& fileBuffer, bool isAo, PerPathExtension* pPathExt, ConversionProgress& progress)
+static void ConvertPath(FileSystem& fs, SoundConverter& soundConverter, const FileSystem::Path& path, const LvlFileChunk& pathBndChunk, EReliveLevelIds reliveLvl, LevelIdType lvlIdx, LvlReader& lvlReader, bool isAo, PerPathExtension* pPathExt, ConversionProgress& progress)
 {
     auto level = (isAo ? ToString(MapWrapper::ToAO(reliveLvl)) : ToString(MapWrapper::ToAE(reliveLvl)));
     LOG_INFO("Converting: %s; path %d", level, pathBndChunk.Id());
@@ -403,7 +403,7 @@ static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const LvlF
     nlohmann::json collisionsArray = nlohmann::json::array();
     ConvertPathCollisions(collisionsArray, collisionInfo, pathBndChunk.Data(), isAo);
 
-    // Save sound info (per path rather than per LVL) - VH/VB/SEQ all live in a shared
+    // Save sound info (per path rather than per LVL) - the sound bank and SEQs all live in a shared
     // sounds/<theme>/ dir (not this path's own level dir - see SoundsThemeDir), so a mod can
     // point a path at any theme, including one it doesn't have a copy of itself (falls back to
     // the base game's, see ResourceManagerWrapper::LoadSoundFile). The theme is the level a
@@ -413,25 +413,26 @@ static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const LvlF
     // getting a separate copy of the same sounds.
     PathSoundInfo soundInfo;
     std::string soundTheme;
+    std::string vhName;
+    std::string vbName;
     if (isAo)
     {
         const AO::SoundBlockInfo* pSoundBlock = AO::Path_Get_MusicInfo(reliveLvl);
-        soundInfo.mVhFile = pSoundBlock->mVabHeaderName;
-        soundInfo.mVbFile = pSoundBlock->mVabBodyName;
+        vhName = pSoundBlock->mVabHeaderName;
+        vbName = pSoundBlock->mVabBodyName;
         soundTheme = ToString(MapWrapper::ToAO(reliveLvl));
-        soundInfo.mSeqFiles = ConvertBSQ(SoundsThemeDir(path, soundTheme), AO::Path_Get_BsqFileName(reliveLvl), lvlReader, isAo);
+        soundInfo.mSeqFiles = ConvertBSQ(soundConverter, SoundsThemeDir(path, soundTheme), AO::Path_Get_BsqFileName(reliveLvl), lvlReader, isAo);
     }
     else
     {
         EReliveLevelIds soundLevel = GetLevelIdFromPathId(reliveLvl, pathBndChunk.Id());
         const relive::SoundBlockInfo* pSoundBlock = Path_Get_MusicInfo(soundLevel);
 
-        // TODO: Convert to AO format instead of using sounds.dat for now (in the vh/vb/bsq copy)
-        soundInfo.mVhFile = pSoundBlock->mVabHeaderName;
-        soundInfo.mVbFile = pSoundBlock->mVabBodyName;
+        vhName = pSoundBlock->mVabHeaderName;
+        vbName = pSoundBlock->mVabBodyName;
         soundTheme = ToString(MapWrapper::ToAE(soundLevel));
 
-        soundInfo.mSeqFiles = ConvertBSQ(SoundsThemeDir(path, soundTheme), Path_Get_BsqFileName(soundLevel), lvlReader, isAo);
+        soundInfo.mSeqFiles = ConvertBSQ(soundConverter, SoundsThemeDir(path, soundTheme), Path_Get_BsqFileName(soundLevel), lvlReader, isAo);
 
         // TODO
         //Path_Get_BackGroundMusicId(reliveLvl);
@@ -445,20 +446,13 @@ static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const LvlF
     {
         const FileSystem::Path soundsDir = SoundsThemeDir(path, soundTheme);
         fs.CreateDirectory(soundsDir);
-        for (const std::string& vabFile : {soundInfo.mVhFile, soundInfo.mVbFile})
-        {
-            ReadLvlFileInto(lvlReader, vabFile.c_str(), fileBuffer);
-            FileSystem::Path filePath = soundsDir;
-            filePath.Append(vabFile);
-            fs.Save(filePath, fileBuffer);
-        }
+        soundInfo.mSoundBankFile = soundConverter.ConvertSoundBank(lvlReader, soundsDir, vhName, vbName);
 
         // Every path sharing this theme writes the same sound_info.json (see the "OK: every
         // (theme, vb_file, vh_file) triple has exactly one seq_files set" invariant this
         // relies on) - so it's fine for a later path to just overwrite an earlier one's copy.
         const nlohmann::json soundInfoJson = {
-            {"vh_file", soundInfo.mVhFile},
-            {"vb_file", soundInfo.mVbFile},
+            {"sound_bank", soundInfo.mSoundBankFile},
             {"seq_files", soundInfo.mSeqFiles},
         };
         FileSystem::Path soundInfoJsonPath = soundsDir;
@@ -713,7 +707,7 @@ static void LogNonConvertedAnims(bool isAo)
 }
 
 template <typename LevelIdType, typename TlvType>
-static void ConvertPathBND(const FileSystem::Path& dataDir, const std::string& fileName, FileSystem& fs, std::vector<u8>& fileBuffer, LvlReader& lvlReader, LevelIdType lvlIdxAsLvl, EReliveLevelIds reliveLvl, bool isAo, ConversionProgress& progress)
+static void ConvertPathBND(const FileSystem::Path& dataDir, const std::string& fileName, FileSystem& fs, SoundConverter& soundConverter, std::vector<u8>& fileBuffer, LvlReader& lvlReader, LevelIdType lvlIdxAsLvl, EReliveLevelIds reliveLvl, bool isAo, ConversionProgress& progress)
 {
     ReadLvlFileInto(lvlReader, fileName.c_str(), fileBuffer);
     ChunkedLvlFile pathBndFile(fileBuffer);
@@ -769,7 +763,7 @@ static void ConvertPathBND(const FileSystem::Path& dataDir, const std::string& f
             }
         }
 
-        ConvertPath<TlvType, LevelIdType>(fs, dataDir, pathBndChunk, reliveLvl, lvlIdxAsLvl, lvlReader, fileBuffer, isAo, pPathExt, progress);
+        ConvertPath<TlvType, LevelIdType>(fs, soundConverter, dataDir, pathBndChunk, reliveLvl, lvlIdxAsLvl, lvlReader, isAo, pPathExt, progress);
     }
 
     SaveLevelInfoJson(dataDir, reliveLvl, lvlIdxAsLvl, fs, pathBndFile, isAo);
@@ -984,7 +978,7 @@ static bool IsUnusedSaveFile(const std::string& saveName)
 }
 
 template<typename LevelIdType, typename TlvType>
-static void ConvertFilesInLvl(ThreadPool& tp, const FileSystem::Path& dataDir, FileSystem& fs, LvlReader& lvlReader, std::vector<u8>& fileBuffer, LevelIdType lvlIdxAsLvl, EReliveLevelIds reliveLvl, const DataConversion::DataVersions& dv, bool isAo, bool onlySaves, ConversionProgress& progress)
+static void ConvertFilesInLvl(ThreadPool& tp, const FileSystem::Path& dataDir, FileSystem& fs, SoundConverter& soundConverter, LvlReader& lvlReader, std::vector<u8>& fileBuffer, LevelIdType lvlIdxAsLvl, EReliveLevelIds reliveLvl, const DataConversion::DataVersions& dv, bool isAo, bool onlySaves, ConversionProgress& progress)
 {
     // Iterate and convert specific file types in the LVL
     AESaveConverter::PathsCache pathsCache;
@@ -1058,7 +1052,7 @@ static void ConvertFilesInLvl(ThreadPool& tp, const FileSystem::Path& dataDir, F
             }
             else if (bConvertPaths)
             {
-                ConvertPathBND<LevelIdType, TlvType>(dataDir, fileName, fs, fileBuffer, lvlReader, lvlIdxAsLvl, reliveLvl, isAo, progress);
+                ConvertPathBND<LevelIdType, TlvType>(dataDir, fileName, fs, soundConverter, fileBuffer, lvlReader, lvlIdxAsLvl, reliveLvl, isAo, progress);
             }
         }
     }
@@ -1367,6 +1361,7 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
     dataDir.Append("ao");
     fs.CreateDirectory(dataDir);
     EnsureModsDirExists(fs);
+    SoundConverter soundConverter(fs, true);
 
     // Upfront dry-run pass: cheaply learn how much work each category actually has before
     // dispatching any of it for real, so DataConversionUI's weighted percentage is accurate from
@@ -1416,7 +1411,7 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
             ConvertPals(fs, dataDir, fileBuffer, lvlReader, true, mProgress);
         }
 
-        ConvertFilesInLvl<AO::LevelIds, AO::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, true, false, mProgress);
+        ConvertFilesInLvl<AO::LevelIds, AO::Path_TLV>(*mThreadPool, dataDir, fs, soundConverter, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, true, false, mProgress);
     });
 
     if (dv.ConvertSaves())
@@ -1428,7 +1423,7 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
                 return;
             }
 
-            ConvertFilesInLvl<AO::LevelIds, AO::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, true, true, mProgress);
+            ConvertFilesInLvl<AO::LevelIds, AO::Path_TLV>(*mThreadPool, dataDir, fs, soundConverter, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, true, true, mProgress);
         });
     }
 
@@ -1447,6 +1442,7 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
     dataDir.Append("ae");
     fs.CreateDirectory(dataDir);
     EnsureModsDirExists(fs);
+    SoundConverter soundConverter(fs, false);
 
     // Upfront dry-run pass - see ConvertDataAO's own comment on this, same reason.
     if (dv.ConvertPalettes())
@@ -1493,7 +1489,7 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
             ConvertPals(fs, dataDir, fileBuffer, lvlReader, false, mProgress);
         }
 
-        ConvertFilesInLvl<::LevelIds, ::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, false, false, mProgress);
+        ConvertFilesInLvl<::LevelIds, ::Path_TLV>(*mThreadPool, dataDir, fs, soundConverter, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, false, false, mProgress);
     });
 
     if (dv.ConvertSaves())
@@ -1505,7 +1501,7 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
                 return;
             }
 
-            ConvertFilesInLvl<::LevelIds, ::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, false, true, mProgress);
+            ConvertFilesInLvl<::LevelIds, ::Path_TLV>(*mThreadPool, dataDir, fs, soundConverter, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, false, true, mProgress);
         });
     }
 

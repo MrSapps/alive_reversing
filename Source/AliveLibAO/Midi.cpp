@@ -39,11 +39,9 @@ s16 sSFXPitchVariationEnabled_4D0018 = true;
 s16 sNeedToHashSeqNames_4D0000 = 1;
 
 // I think this is the burrrrrrrrrrrrrrrrrrrr loading sound
-// TODO: mSoundTheme left blank - see the matching TODO in relive_lib/Sound/Midi.cpp for why.
-const PathSoundInfo soundBlock = {"MONK.VH", "MONK.VB", {}, "", {}, {}, {}};
+// TODO: mSoundTheme left blank and mVabId 0 - see the matching TODOs in relive_lib/Sound/Midi.cpp.
+const PathSoundInfo soundBlock = {"MONK.sf2", {}, "", {}, {}, {}};
 PathSoundInfo sMonkVh_Vb_4D0008 = soundBlock;
-
-void SsVabTransBody(VabBodyRecord* pVabBody, s16 vabId);
 
 class AOMidiVars final : public IMidiVars
 {
@@ -93,9 +91,9 @@ public:
         return kSeqTableSizeAO;
     }
 
-    virtual void SsVabTransBody(ResourceManagerWrapper& /*resMan*/, VabBodyRecord* pVabBody, s16 vabId) override
+    virtual bool PadShortOneShotSamples() override
     {
-        AO::SsVabTransBody(pVabBody, vabId);
+        return false;
     }
 
 private:
@@ -209,12 +207,6 @@ public:
     {
         // Always 0 in AO cause it dont exist
         return mMidi_WaitUntil;
-    }
-
-    virtual AutoFILE& sSoundDatFileHandle() override
-    {
-        // Should never be called
-        throw std::logic_error("The method or operation is not implemented.");
     }
 
     virtual u8& sControllerValue() override
@@ -718,108 +710,6 @@ s32 MIDI_ParseMidiMessage(s32 idx)
 void SND_SEQ_SetVol(SeqId idx, s16 volLeft, s16 volRight)
 {
     ::SND_SEQ_SetVol(static_cast<u16>(idx), volLeft, volRight);
-}
-
-static u8* GetVBAtIndex(VabBodyRecord* pRec, s32 index)
-{
-    u8* pIter = reinterpret_cast<u8*>(pRec);
-    for (s32 i = 0; i < index; i++)
-    {
-        u32 v = 0;
-        memcpy(&v, pIter, sizeof(u32));
-        pIter += v + 8;
-    }
-    return pIter;
-}
-
-static s32 IterateVBRecords_GetLengthOrDuration(VabBodyRecord* pRec, s32 index)
-{
-    s32 v = 0;
-    memcpy(&v, reinterpret_cast<u8*>(GetVBAtIndex(pRec, index)), sizeof(s32));
-    return v;
-}
-
-static s32 IterateVBRecords_GetUnused(VabBodyRecord* pRec, s32 index)
-{
-    s32 v = 0;
-    memcpy(&v, reinterpret_cast<u8*>(GetVBAtIndex(pRec, index)) + sizeof(s32), sizeof(s32));
-    return v;
-}
-
-static u8* IterateVBRecords_Offset(VabBodyRecord* pRec, s32 index)
-{
-    return reinterpret_cast<u8*>(GetVBAtIndex(pRec, index) + sizeof(s32) + sizeof(s32));
-}
-
-
-// Loads vab body sample data to memory
-void SsVabTransBody(VabBodyRecord* pVabBody, s16 vabId)
-{
-    if (vabId < 0)
-    {
-        return;
-    }
-
-    VabHeader* pVabHeader = GetSpuApiVars()->spVabHeaders()[vabId];
-    const s32 vagCount = GetSpuApiVars()->sVagCounts()[vabId];
-
-    for (s32 i = 0; i < vagCount; i++)
-    {
-        SoundEntry* pEntry = &GetSpuApiVars()->sSoundEntryTable16().table[vabId][i];
-
-        if (!(i & 7))
-        {
-            SsSeqCalledTbyT();
-        }
-
-        memset(pEntry, 0, sizeof(SoundEntry));
-
-        s32 sampleLen = -1;
-        if (pVabHeader && i >= 0)
-        {
-            sampleLen = (8 * IterateVBRecords_GetLengthOrDuration(pVabBody, i)) / 16;
-        }
-
-        if (sampleLen > 0)
-        {
-            s32 v10 = 0;
-            if (pVabHeader && i >= 0)
-            {
-                v10 = IterateVBRecords_GetUnused(pVabBody, i);
-            }
-
-            SsExt_SetVagFlags(vabId, i, v10 >= 0 ? 0 : 4);
-
-            if (!SND_New(pEntry, sampleLen, 44100, 16u, 0))
-            {
-                auto pTempBuffer = (u32*) malloc(sampleLen * pEntry->field_1D_blockAlign);
-                if (pTempBuffer)
-                {
-                    u8* pSrcVB = nullptr;
-                    if (pVabHeader && i >= 0)
-                    {
-                        pSrcVB = IterateVBRecords_Offset(pVabBody, i);
-                    }
-
-                    s32 sampleLen2 = -1;
-                    if (pVabHeader && i >= 0)
-                    {
-                        sampleLen2 = (8 * IterateVBRecords_GetLengthOrDuration(pVabBody, i)) / 16;
-                    }
-
-                    const s32 len = (16 * sampleLen2) / 8;
-                    memcpy(pTempBuffer, pSrcVB, len);
-
-                    if (sampleLen2)
-                    {
-                        SND_Load(pEntry, pTempBuffer, sampleLen2);
-                    }
-
-                    free(pTempBuffer);
-                }
-            }
-        }
-    }
 }
 
 s16 SND_SEQ_Play(SeqId idx, s32 repeatCount, s16 volLeft, s16 volRight)

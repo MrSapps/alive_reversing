@@ -545,6 +545,8 @@ SET(data_conversion_src
     data_conversion/guid.hpp
     data_conversion/data_conversion.hpp
     data_conversion/data_conversion.cpp
+    data_conversion/SoundConverter.cpp
+    data_conversion/SoundConverter.hpp
     data_conversion/file_system.hpp
     data_conversion/file_system.cpp
     data_conversion/AutoFile.hpp
@@ -844,6 +846,7 @@ add_executable(relive_lib_tests
     tests/SoundTestData.hpp
     tests/SoundGoldTests.cpp
     tests/SoundFormatTests.cpp
+    tests/SoundConverterTests.cpp
     tests/TestStubs.cpp
 )
 target_include_directories(relive_lib_tests PRIVATE

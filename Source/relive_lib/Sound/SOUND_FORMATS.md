@@ -109,16 +109,20 @@ the same format and AO/AE's separate `SsVabTransBody` versions disappear.
 
 ## Plan
 
-1. **Gold traces of the current code** (`relive_lib_tests`, `SoundGold*`). A deterministic,
-   offline run of the real sound code: the mixer renders into memory, and the sound clock is
-   driven by the number of samples rendered, not wall time. Synthetic VH/VB/SEQ data is
-   generated in code for both games. Each scenario writes a trace (the loaded tone table, a
-   checksum of every sample, then every change to the 24 MIDI channels and 32 voices over time)
-   and a WAV, and compares the trace with the committed gold file.
-2. **SF2/SMF readers and writers** + VAB -> SF2 and SEQ -> SMF converters, with round trip
-   unit tests.
-3. **Switch data conversion and the engine** to `.sf2`/`.mid`, drop `sounds.dat`/VB loading and
-   AO's own `SsVabTransBody`. The gold traces must not change.
+1. Done: **gold traces of the current code** (`relive_lib_tests`, `SoundGold*`). A
+   deterministic, offline run of the real sound code: the mixer renders into memory, and the
+   sound clock is driven by the number of samples rendered, not wall time. Synthetic VH/VB/SEQ
+   data is generated in code for both games. Each scenario records a trace (the loaded tone
+   table, a checksum of every sample, then every change to the 24 MIDI channels and 32 voices
+   over time) and compares it with the committed gold file in `tests/sound_gold`.
+2. Done: **SF2/SMF readers and writers** (`SoundFont`, `VabSoundFont`, `SeqMidi`) with round
+   trip unit tests.
+3. Done: **the data conversion and the engine use `.sf2`/`.mid`**. `sound_info.json` has
+   `sound_bank` (the SF2) instead of `vh_file`/`vb_file`, and `seq_files` are MIDI files
+   (`OPTAMB.mid` is the `OPTAMB.SEQ` table entry). The engine loads the SF2, makes the VAB
+   header its sound code works on from it, and loads the samples with one `SsVabTransBody` for
+   both games (AO's and AE's `sounds.dat` one are gone). The MIDI files become SEQs for the
+   SEQ player the same way. The gold traces made before this didn't change.
 4. **Real data check** (needs the game files, see below).
 5. Later, each a separate, deliberate behaviour change with new gold files:
    - PS1 ADSR from the raw registers, stepped per sample instead of every 30 ms
@@ -133,7 +137,6 @@ the same format and AO/AE's separate `SsVabTransBody` versions disappear.
      - AO only runs the ADSR for looping samples; AE runs it for all samples
      - the two games use different key off release times (AE: at least 300 ms, AO: 125 ms
        when there is no release)
-
      - AE's controller handler reads the controller number from the status byte
        (`(cmd >> 8) & 0x7F`, always 0), so AE never sees the loop markers or NRPNs; AO does
 
@@ -148,25 +151,40 @@ Already fixed, because the gold traces can't pin them:
 
 Found, not fixed yet:
 
-- MONK.VH/VB (the loading sound) is never loaded until the sound system has been shut down
+- MONK.VH/VB (the loading sound, now MONK.sf2) is never loaded until the sound system has been shut down
   once: `sMonkVh_Vb`'s initialiser leaves `mVabId` at 0 and it is only loaded when it's -1. It
   also has no sound theme yet (see the TODO in `Midi.cpp`).
 
 ## Checking against real game data
 
-The repo has no game data, so the real-data check is staged for someone who has it (for
-example Claude Code running locally). `relive_sound_gold` renders every VAB tone and every SEQ
-of every sound theme in a converted data dir to traces and WAVs:
+The repo has no game data, so the real data check is staged for someone who has it (for
+example Claude Code running locally). `relive_sound_gold` plays every program's tones and every
+SEQ of every sound theme in a converted data dir through the sound code, offline, and saves a
+trace and a WAV of each. Run it before and after the format switch and compare:
 
 ```sh
-# 1. On the commit before the format switch: convert the data and render the gold set
-cd /path/to/AE && /path/to/build/Source/relive/relive   # converts on first run, then quit
-build/Source/Tools/sound_gold/relive_sound_gold -data=/path/to/AE -out=sound_gold_before
+# 1. The commit before the switch ("Add deterministic sound gold tests ..."): build, convert
+#    the data, render the gold set
+git checkout <commit before "Switch the sound data to SF2 and MIDI files">
+cmake --build build -j5 --target relive relive_sound_gold
+cd /path/to/AE && /path/to/build/Source/relive/relive      # converts on first run, then quit
+/path/to/build/Source/Tools/sound_gold/relive_sound_gold -data=/path/to/AE -out=/tmp/sound_gold_before
 
-# 2. On the commit after it: convert again (the data version changed), then compare
-cd /path/to/AE && /path/to/build/Source/relive/relive   # reconverts, then quit
-build/Source/Tools/sound_gold/relive_sound_gold -data=/path/to/AE -out=sound_gold_after -baseline=sound_gold_before
+# 2. The switch: build, convert again (the path data version went up), compare
+git checkout <the switch commit or later>
+cmake --build build -j5 --target relive relive_sound_gold
+cd /path/to/AE && /path/to/build/Source/relive/relive      # reconverts, then quit
+/path/to/build/Source/Tools/sound_gold/relive_sound_gold -data=/path/to/AE -out=/tmp/sound_gold_after -baseline=/tmp/sound_gold_before
 ```
 
-Do the same for AO with `-AO`. `-baseline` lists every trace or WAV that differs. With the
-format switch alone nothing should differ.
+Do the same for AO (`relive -AO`, `relive_sound_gold -AO`). `-baseline` lists every trace or
+WAV that differs, and exits with 1 if any do. Nothing should differ. If something does, the
+trace shows where (tone table, sample checksum, or the first channel/voice change that isn't
+the same).
+
+Things worth checking in the real data while at it, which decide open questions above:
+
+- whether any SEQ uses the loop markers (NRPN 99 = 20/30): AE ignores them, AO now loops
+- whether any tone's `mode` has bit 2 (reverb) set, and whether that matches the looping
+  samples (the PC port uses bit 2 of `Converted_Vag::field_C` for "loop")
+- which theme has MONK.VH/VB (see the TODO in `Midi.cpp`)

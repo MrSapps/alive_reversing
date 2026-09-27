@@ -96,7 +96,7 @@ void SoundGoldSession::LoadSoundBlock(ResourceManagerWrapper& resMan, const std:
 {
     mInfo = info;
 
-    // The game only loads MONK.VH/VB when mVabId is -1, but it starts as 0 (sMonkVh_Vb's
+    // The game only loads the MONK sound bank when mVabId is -1, but it starts as 0 (sMonkVh_Vb's
     // initialiser) until SND_Shutdown sets it, so the game never loads it before then. Without a
     // monk theme do the same, as the load would fail.
     GetMidiVars()->sMonkVh_Vb().mSoundTheme = monkTheme;

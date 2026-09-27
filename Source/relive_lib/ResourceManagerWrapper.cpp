@@ -980,8 +980,7 @@ private:
 
                     PathSoundInfo& soundInfo = *pathBuffer->GetSoundInfo();
                     const ResourceManagerWrapper::SoundThemeInfo& themeInfo = mResMan->LoadSoundThemeInfo(soundInfo.mSoundTheme);
-                    soundInfo.mVhFile = themeInfo.mVhFile;
-                    soundInfo.mVbFile = themeInfo.mVbFile;
+                    soundInfo.mSoundBankFile = themeInfo.mSoundBankFile;
                     soundInfo.mSeqFiles = themeInfo.mSeqFiles;
 
                     ret.emplace_back(std::move(pathBuffer));
@@ -1156,7 +1155,7 @@ std::vector<u8> ResourceManagerWrapper::LoadSoundFile(const std::string& fileNam
         }
     }
 
-    // Missing. The callers (VH/VB/SEQ loading) dereference the data straight away, so like
+    // Missing. The callers (sound bank/SEQ loading) dereference the data straight away, so like
     // LoadAnimation flush and fatally abort immediately instead of waiting for the next
     // loading wait.
     FlushMissingResourceReports();
@@ -1179,8 +1178,7 @@ const ResourceManagerWrapper::SoundThemeInfo& ResourceManagerWrapper::LoadSoundT
     if (!bytes.empty())
     {
         const nlohmann::json j = nlohmann::json::parse(bytes.begin(), bytes.end());
-        j.at("vh_file").get_to(info.mVhFile);
-        j.at("vb_file").get_to(info.mVbFile);
+        j.at("sound_bank").get_to(info.mSoundBankFile);
         j.at("seq_files").get_to(info.mSeqFiles);
     }
     else

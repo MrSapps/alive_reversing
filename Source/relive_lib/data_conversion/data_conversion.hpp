@@ -146,7 +146,9 @@ public:
         // 19 assumed, which left multi-movie ids resolving out of range (blank movie name).
         // These 4 TLVs now have mMovie1/2/3 like bird_portal/path_transition instead of a single
         // mMovieName - see DecodeFmvChain_AE/AO.
-        static constexpr u32 kPathVersion = 20;
+        // 21: sounds: each theme's VAB (VH + VB, and AE's sounds.dat) is an SF2 (sound_bank in
+        // sound_info.json) and its SEQs are MIDI files, see Sound/SOUND_FORMATS.md.
+        static constexpr u32 kPathVersion = 21;
         static constexpr u32 kPaletteVersion = 1;
         static constexpr u32 kAnimationVersion = 4;
         // 9: dropped the redundant "paths" subdir under each level, same as kPathVersion 17.

@@ -10,6 +10,9 @@
 #include "../AliveLibAE/PathData.hpp"
 
 #include "PsxSpuApi.hpp"
+#include "SoundFont.hpp"
+#include "VabSoundFont.hpp"
+#include "SeqMidi.hpp"
 #include "../../relive_lib/BinaryPath.hpp"
 #include "../AmbientSound.hpp"
 #include "../../relive_lib/FatalError.hpp"
@@ -32,12 +35,13 @@ s16 sSFXPitchVariationEnabled_560F58 = true;
 s16 sNeedToHashSeqNames_560F40 = 1;
 
 // I think this is the burrrrrrrrrrrrrrrrrrrr loading sound
-// TODO: mSoundTheme left blank - which sounds/<theme>/ dir MONK.VH/VB actually end up in after
-// conversion can't be determined from source, only from real converted output (grep regenerated
-// path.json files for "vh_file": "MONK.VH" once the data conversion tool has been run against
+// TODO: mSoundTheme left blank - which sounds/<theme>/ dir MONK.sf2 actually ends up in after
+// conversion can't be determined from source, only from real converted output (look for the
+// sound_info.json with "sound_bank": "MONK.sf2" once the data conversion tool has been run against
 // real game data). Fill this in once verified - loading this fallback sound will fail (empty
 // theme) until then.
-const PathSoundInfo soundBlock = {"MONK.VH", "MONK.VB", {}, "", {}, {}, {}};
+// TODO: mVabId is 0 here, but SND_Load_VABS only loads this when it's -1 (SND_Shutdown sets that)
+const PathSoundInfo soundBlock = {"MONK.sf2", {}, "", {}, {}, {}};
 
 PathSoundInfo sMonkVh_Vb_560F48 = soundBlock;
 
@@ -89,9 +93,9 @@ public:
         return kSeqTableSizeAE;
     }
 
-    virtual void SsVabTransBody(ResourceManagerWrapper& resMan, VabBodyRecord* pVabBody, s16 vabId) override
+    virtual bool PadShortOneShotSamples() override
     {
-        SsVabTransBody_4FC840(resMan.mFs, pVabBody, vabId);
+        return true;
     }
 
 private:
@@ -152,18 +156,26 @@ void SND_Reset()
 
 s16 SND_VAB_Load_4C9FE0(PathSoundInfo& pSoundBlockInfo, ResourceManagerWrapper& resMan)
 {
-    // Load the VH file data
-    pSoundBlockInfo.mVhFileData = resMan.LoadSoundFile(pSoundBlockInfo.mVhFile.c_str(), pSoundBlockInfo.mSoundTheme);
-    //GetMidiVars()->LoadingLoop(0);
-
-    // Load the VB file data
-    std::vector<u8> vbFileData = resMan.LoadSoundFile(pSoundBlockInfo.mVbFile.c_str(), pSoundBlockInfo.mSoundTheme);
+    // The VAB is an SF2 (see SOUND_FORMATS.md). The sound code still works on the VAB header,
+    // so it gets one made from the SF2.
+    VabSoundFont::Vab vab;
+    const std::vector<u8> soundBank = resMan.LoadSoundFile(pSoundBlockInfo.mSoundBankFile, pSoundBlockInfo.mSoundTheme);
+    if (!soundBank.empty())
+    {
+        SoundFont sf2;
+        std::string error;
+        if (!SoundFont::Read(soundBank, sf2, error) || !VabSoundFont::FromSoundFont(sf2, vab, error))
+        {
+            ALIVE_FATAL("Sound bank %s of sound theme %s is broken: %s", pSoundBlockInfo.mSoundBankFile.c_str(), pSoundBlockInfo.mSoundTheme.c_str(), error.c_str());
+        }
+    }
+    pSoundBlockInfo.mVhFileData = std::move(vab.mVh);
 
     // Convert the records in the header to internal representation
     pSoundBlockInfo.mVabId = SsVabOpenHead(reinterpret_cast<VabHeader*>(pSoundBlockInfo.mVhFileData.data()));
 
-    // Load actual sample data (copied, hence vec goes out of scope after this)
-    GetMidiVars()->SsVabTransBody(resMan, reinterpret_cast<VabBodyRecord*>(vbFileData.data()), static_cast<s16>(pSoundBlockInfo.mVabId));
+    // Load the samples (copied, so they can go after this)
+    SsVabTransBody(static_cast<s16>(pSoundBlockInfo.mVabId), vab.mSamples, GetMidiVars()->PadShortOneShotSamples());
 
     SsVabTransCompleted(SS_WAIT_COMPLETED);
 
@@ -633,17 +645,25 @@ void SND_SEQ_Stop(u16 idx)
     }
 }
 
-static u32 GetTableIdxForName(const char_type* pName)
+// The name without its extension
+static std::string SeqStem(const std::string& name)
 {
+    return name.substr(0, name.find('.'));
+}
+
+// The table entry of a SEQ's MIDI file: OPTAMB.mid is OPTAMB.SEQ's
+static u32 GetTableIdxForName(const std::string& fileName)
+{
+    const std::string stem = SeqStem(fileName);
     for (s32 i = 0; i < GetMidiVars()->MidiTableSize(); i++)
     {
         auto curName = GetMidiVars()->sSeqDataTable()[i].field_0_mBsqName;
-        if (strcmp(curName, pName) == 0)
+        if (curName && SeqStem(curName) == stem)
         {
             return i;
         }
     }
-    ALIVE_FATAL("Couldn't find seq name in the table");
+    ALIVE_FATAL("Couldn't find seq %s in the table", fileName.c_str());
 }
 
 void SND_Load_Seqs_Impl(OpenSeqHandle* pSeqTable, PathSoundInfo& info, ResourceManagerWrapper& resMan)
@@ -666,13 +686,19 @@ void SND_Load_Seqs_Impl(OpenSeqHandle* pSeqTable, PathSoundInfo& info, ResourceM
 
         //GetMidiVars()->Reclaim_Memory(0);
 
-        // Get a pointer to each SEQ
+        // Load each SEQ. They are MIDI files, which the SEQ player gets as SEQs.
         for (const auto& seqName : info.mSeqFiles)
         {
-            auto buffer = resMan.LoadSoundFile(seqName.c_str(), info.mSoundTheme);
+            const std::vector<u8> midi = resMan.LoadSoundFile(seqName, info.mSoundTheme);
+            std::vector<u8> seq;
+            std::string error;
+            if (!midi.empty() && !SeqMidi::SmfToSeq(midi, seq, error))
+            {
+                ALIVE_FATAL("%s of sound theme %s is broken: %s", seqName.c_str(), info.mSoundTheme.c_str(), error.c_str());
+            }
 
             // We have to insert into the table at the position that matches the file name
-            GetMidiVars()->sSeqDataTable()[GetTableIdxForName(seqName.c_str())].field_C_ppSeq_Data = buffer;
+            GetMidiVars()->sSeqDataTable()[GetTableIdxForName(seqName)].field_C_ppSeq_Data = std::move(seq);
         }
     }
 }
@@ -683,12 +709,10 @@ void SND_Pend_Sound_Files(const PathSoundInfo& info, ResourceManagerWrapper& res
     const PathSoundInfo& monkInfo = GetMidiVars()->sMonkVh_Vb();
     if (monkInfo.mVabId < 0)
     {
-        resMan.PendSoundFile(monkInfo.mVhFile, monkInfo.mSoundTheme);
-        resMan.PendSoundFile(monkInfo.mVbFile, monkInfo.mSoundTheme);
+        resMan.PendSoundFile(monkInfo.mSoundBankFile, monkInfo.mSoundTheme);
     }
 
-    resMan.PendSoundFile(info.mVhFile, info.mSoundTheme);
-    resMan.PendSoundFile(info.mVbFile, info.mSoundTheme);
+    resMan.PendSoundFile(info.mSoundBankFile, info.mSoundTheme);
     for (const auto& seqName : info.mSeqFiles)
     {
         resMan.PendSoundFile(seqName, info.mSoundTheme);

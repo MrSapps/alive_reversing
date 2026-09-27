@@ -13,6 +13,8 @@
 #include "Sound/SoundGold.hpp"
 #include "Sound/Midi.hpp"
 #include "Sound/PsxSpuApi.hpp"
+#include "Sound/VabSoundFont.hpp"
+#include "Sound/SeqMidi.hpp"
 #include "BinaryPath.hpp"
 #include "ResourceManagerWrapper.hpp"
 #include "Sfx.hpp"
@@ -87,7 +89,32 @@ static std::vector<u8> DrumSeq()
     return seq.End();
 }
 
-// Writes the synthetic data where ResourceManagerWrapper looks for it
+// The name without its extension
+static std::string Stem(const std::string& name)
+{
+    return name.substr(0, name.find('.'));
+}
+
+// The synthetic VAB as the SF2 the data conversion makes of it (see SoundConverter)
+static std::vector<u8> ConvertedSoundBank(const SoundTestData::Vab& testVab, GameType game, const std::string& name)
+{
+    VabSoundFont::Vab vab;
+    vab.mVh = SoundTestData::BuildVh(testVab);
+    if (game == GameType::eAo)
+    {
+        EXPECT_TRUE(VabSoundFont::ReadVbAo(vab.mVh, SoundTestData::BuildVbAo(testVab), vab.mSamples));
+    }
+    else
+    {
+        std::vector<u8> soundsDat;
+        const std::vector<u8> vb = SoundTestData::BuildVbAe(testVab, soundsDat);
+        EXPECT_TRUE(VabSoundFont::ReadVbAe(vab.mVh, vb, soundsDat, vab.mSamples));
+    }
+    return VabSoundFont::ToSoundFont(vab, name).Write();
+}
+
+// Writes the synthetic data, converted as the data conversion does it, where
+// ResourceManagerWrapper looks for it
 static std::shared_ptr<PathSoundInfo> WriteTestData(const ScratchDir& dir, GameType game)
 {
     namespace fs = std::filesystem;
@@ -100,35 +127,23 @@ static std::shared_ptr<PathSoundInfo> WriteTestData(const ScratchDir& dir, GameT
         f.write(reinterpret_cast<const char*>(data.data()), static_cast<std::streamsize>(data.size()));
     };
 
-    std::vector<u8> soundsDat;
-    const SoundTestData::Vab level = SoundTestData::LevelVab();
-    const SoundTestData::Vab monk = SoundTestData::MonkVab();
-    save(themeDir / "TEST.VH", SoundTestData::BuildVh(level));
-    save(themeDir / "MONK.VH", SoundTestData::BuildVh(monk));
-    if (game == GameType::eAo)
-    {
-        save(themeDir / "TEST.VB", SoundTestData::BuildVbAo(level));
-        save(themeDir / "MONK.VB", SoundTestData::BuildVbAo(monk));
-    }
-    else
-    {
-        save(themeDir / "TEST.VB", SoundTestData::BuildVbAe(level, soundsDat));
-        save(themeDir / "MONK.VB", SoundTestData::BuildVbAe(monk, soundsDat));
-        save(fs::path(dir.Path()) / "sounds.dat", soundsDat);
-    }
+    save(themeDir / "TEST.sf2", ConvertedSoundBank(SoundTestData::LevelVab(), game, "TEST"));
+    save(themeDir / "MONK.sf2", ConvertedSoundBank(SoundTestData::MonkVab(), game, "MONK"));
 
     auto info = std::make_shared<PathSoundInfo>();
-    info->mVhFile = "TEST.VH";
-    info->mVbFile = "TEST.VB";
+    info->mSoundBankFile = "TEST.sf2";
     info->mSoundTheme = kTheme;
 
     const std::vector<u16> seqs = TestSeqIndices(game);
     const std::vector<u8> seqData[] = {MelodySeq(), DrumSeq()};
     for (size_t i = 0; i < seqs.size(); i++)
     {
-        const char_type* pName = SeqTable(game)[seqs[i]].field_0_mBsqName;
-        save(themeDir / pName, seqData[i]);
-        info->mSeqFiles.push_back(pName);
+        const std::string midiName = Stem(SeqTable(game)[seqs[i]].field_0_mBsqName) + ".mid";
+        std::vector<u8> midi;
+        std::string error;
+        EXPECT_TRUE(SeqMidi::SeqToSmf(seqData[i], midi, error)) << error;
+        save(themeDir / midiName, midi);
+        info->mSeqFiles.push_back(midiName);
     }
     return info;
 }

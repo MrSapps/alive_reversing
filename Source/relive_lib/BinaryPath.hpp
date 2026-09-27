@@ -19,11 +19,11 @@ struct PathSoundInfo final
     // sound_info.json, not parsed directly out of this path's own path.json - every path
     // sharing a theme used to carry its own copy of these, so changing sound_theme without
     // also hand-updating them left them pointing at the previous theme's files.
-    std::string mVhFile;
-    std::string mVbFile;
+    // The VAB as an SF2 and the SEQs as MIDI files (see Sound/SOUND_FORMATS.md)
+    std::string mSoundBankFile;
     std::vector<std::string> mSeqFiles;
 
-    // Which sounds/<theme>/ directory mVhFile/mVbFile/mSeqFiles live in - not necessarily this
+    // Which sounds/<theme>/ directory mSoundBankFile/mSeqFiles live in - not necessarily this
     // path's own level (see data_conversion.cpp's GetLevelIdFromPathId use for AE's combined
     // "ender" levels). ResourceManagerWrapper::LoadSoundFile resolves against this instead of
     // the current level, so a mod can reference any theme, including the base game's.
@@ -31,6 +31,7 @@ struct PathSoundInfo final
 
     // TODO: Runtime only vars - move out when sound refactor done
     s32 mVabId = -1;
+    // The VAB header the engine made from the sound bank (SsVabOpenHead keeps a pointer to it)
     std::vector<u8> mVhFileData;
     std::vector<u8> mBsqFileData;
 };

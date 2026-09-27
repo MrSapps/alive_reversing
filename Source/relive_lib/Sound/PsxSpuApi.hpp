@@ -2,9 +2,7 @@
 
 #include "../../relive_lib/Function.hpp"
 #include "Sound.hpp"
-
-class AutoFILE;
-class FileSystem;
+#include "VabSoundFont.hpp"
 
 struct ProgAtr final
 {
@@ -68,6 +66,7 @@ ALIVE_ASSERT_SIZEOF(VagAtr, 0x20);
 
 s16 SsVabOpenHead(VabHeader* pVabHeader);
 
+// An AE VB record: where a sample is in sounds.dat (see VabSoundFont::ReadVbAe)
 struct VabBodyRecord final
 {
     s32 field_0_length_or_duration;
@@ -213,7 +212,6 @@ public:
     virtual s8& sbDisableSeqs() = 0;
     virtual u32& sLastTime() = 0;
     virtual u32& sMidi_WaitUntil() = 0;
-    virtual AutoFILE& sSoundDatFileHandle() = 0;
     virtual u8& sControllerValue() = 0;
     virtual void MIDI_ParseMidiMessage(s32 idx) = 0;
     virtual void SsUtKeyOffV(s32 idx) = 0;
@@ -223,7 +221,9 @@ public:
 void SetSpuApiVars(IPsxSpuApiVars* pVars);
 IPsxSpuApiVars* GetSpuApiVars();
 
-void SsVabTransBody_4FC840(FileSystem& fs, VabBodyRecord* pVabBody, s16 vabId);
+// Loads the samples of a VAB SsVabOpenHead loaded. padShortOneShots: AE's short one shot sample
+// padding (see there).
+void SsVabTransBody(s16 vabId, const std::vector<VabSoundFont::Sample>& samples, bool padShortOneShots);
 
 #define SS_WAIT_COMPLETED 1
 void SsVabTransCompleted(s32 immediateFlag);

@@ -305,21 +305,20 @@ public:
     // Doesn't flush missing resource reports, callers on the main thread do that.
     std::vector<std::unique_ptr<BinaryPath>> LoadPaths(EReliveLevelIds lvlId);
 
-    // Starts loading a VH/VB/SEQ sound file from the given theme's shared sounds/<soundTheme>/
-    // dir (see PathSoundInfo::mSoundTheme) - not the current level's own dir - like
-    // PendAnimation.
+    // Starts loading a sound bank or SEQ (MIDI) file from the given theme's shared
+    // sounds/<soundTheme>/ dir (see PathSoundInfo::mSoundTheme) - not the current level's own
+    // dir - like PendAnimation.
     void PendSoundFile(const std::string& fileName, const std::string& soundTheme);
     // Waits for the sound file if PendSoundFile is still loading it, or loads it right now if
     // nothing pended it. The caller owns it from then on, so it's only cached until this.
     std::vector<u8> LoadSoundFile(const std::string& fileName, const std::string& soundTheme);
 
-    // The vh_file/vb_file/seq_files a sounds/<soundTheme>/sound_info.json declares - every path
+    // The sound_bank/seq_files a sounds/<soundTheme>/sound_info.json declares - every path
     // sharing a theme shares one of these too, so it's cached per theme name rather than
     // re-read/re-parsed for every path loaded (see LoadPaths).
     struct SoundThemeInfo final
     {
-        std::string mVhFile;
-        std::string mVbFile;
+        std::string mSoundBankFile;
         std::vector<std::string> mSeqFiles;
     };
     const SoundThemeInfo& LoadSoundThemeInfo(const std::string& soundTheme);
