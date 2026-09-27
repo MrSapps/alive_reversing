@@ -311,7 +311,8 @@ s32 MIDI_PlayerPlayMidiNote(s32 vabId, s32 program, s32 note, s32 leftVolume, s3
     }
 
     auto k16Counter = 16;
-    auto pVagOff = &GetSpuApiVars()->sConvertedVagTable().table[0][program + (vabId_ << 7)][0];
+    // OG: table[0][program + (vabId << 7)], which is the same for programs 0-127
+    auto pVagOff = &GetSpuApiVars()->sConvertedVagTable().table[vabId_][program][0];
     while (1)
     {
         if (!pVagOff->field_D_vol || pVagOff->field_8_min > noteKeyNumber || pVagOff->field_9_max < noteKeyNumber)
@@ -581,8 +582,10 @@ s32 MIDI_ParseMidiMessage(s32 idx)
                             case 0x26u:
                                 switch (GetSpuApiVars()->sControllerValue())
                                 {
-                                    case 20:                                         // set loop
-                                        pCtx->field_24_loop_start = (u8*) ppSeqData; // ???
+                                    case 20: // set loop
+                                        // Was (u8*) ppSeqData, the address of the read pointer, so the
+                                        // loop end jumped into this struct and played its bytes as MIDI
+                                        pCtx->field_24_loop_start = *ppSeqData;
                                         pCtx->field_2C_loop_count = data.param2;
                                         break;
 
