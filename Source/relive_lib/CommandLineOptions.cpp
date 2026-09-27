@@ -42,6 +42,7 @@ CommandLineOptions CommandLineOptions::Parse(const CommandLineParser& clp)
     options.mGame = ParseGame(clp);
     options.mModName = clp.GetValue("-mod").value_or("");
 
+    options.mConvertOnly = clp.HasSwitch("-convert");
     options.mDdCheat = clp.HasSwitch("-ddcheat") || clp.HasSwitch("-it_is_me_your_father");
     options.mShowFps = clp.HasSwitch("-ddfps") || clp.HasSwitch("-show_fps") || clp.HasSwitch("-showfps");
     options.mNoFrameSkip = clp.HasSwitch("-ddnoskip");
@@ -114,6 +115,8 @@ const char* CommandLineOptions::Usage()
            "  -ddnoskip                   Render every frame instead of skipping to keep up\n"
            "  -ddslowload=<ms>            Make each resource take at least this long to load\n"
            "  -renderer_checks            Check for renderer errors as it goes (slower)\n"
+           "  -convert                    Convert the game data if it's out of date, then exit\n"
+           "                              (no window)\n"
            "  -help, --help, -h, /?       Show this and exit\n"
            "\n"
            "The display options also take =true or =false, and are saved to relive.ini.\n"

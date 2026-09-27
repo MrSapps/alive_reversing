@@ -8,6 +8,7 @@
 
 #include "ConversionProgress.hpp"
 #include "file_system.hpp"
+#include "../GameType.hpp"
 #include <optional>
 
 class ThreadPool;
@@ -237,6 +238,11 @@ public:
 
     void ConvertDataAO(const DataVersions& dv);
     void ConvertDataAE(const DataVersions& dv);
+
+    // Converts what data_version.json says is out of date (everything without one), waits for
+    // the jobs on the thread pool to finish, then updates data_version.json unless it was
+    // cancelled. The first run conversion (DataConversionUI) and relive -convert use this.
+    void ConvertAll(GameType game);
 
 private:
     std::unique_ptr<ThreadPool> mThreadPool;

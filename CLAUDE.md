@@ -142,6 +142,12 @@ its timings only compare with another offscreen run. Compare `rt_after/perf.csv`
 draw calls, uploads per scene) and report any scene that got slower. Use the same machine and
 build type for both runs, and keep the output dirs out of the source tree (`build-*/` is ignored).
 
+`-convert` converts the game data (as the first run does) without opening a window, then exits:
+use it to convert headless or from a script.
+
+To check a sound change against the real game data, see `Source/relive_lib/Sound/SOUND_FORMATS.md`
+(`Source/Tools/sound_gold/compare_sound_formats.sh --ae <dir> --ao <dir>`).
+
 AE needs `st.lvl` and `mi.lvl` in that directory. AO needs `s1.lvl` and `r1.lvl`.
 If they are missing, the game shows an error and logs a listing of the directory.
 

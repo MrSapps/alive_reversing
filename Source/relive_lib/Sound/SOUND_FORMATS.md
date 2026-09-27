@@ -84,6 +84,12 @@ path, as `Path_Get_Reverb` already provides.
 
 ## Decision
 
+SF2 and SMF are only the file formats. The engine keeps playing them with its own code, the
+emulation of the PS1 sound library and SPU in `PsxSpuApi`/`Midi`, not with a general SF2 player
+such as FluidSynth: PS1 quality needs PS1 behaviour (its ADSR, its reverb, libsnd's SEQ quirks),
+which only our own code can match. Each game also still has its own SEQ parser, note on and key
+off (they differ, see the plan).
+
 SF2 and SMF are good containers. Neither loses sample data, key maps, loops or sequences. SF2's
 own generators can't hold everything exactly, so each converted file stores two things:
 

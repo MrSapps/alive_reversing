@@ -13,6 +13,8 @@ class CommandLineParser;
 struct CommandLineOptions final
 {
     bool mShowHelp = false;
+    // -convert: convert the game data if it's out of date, without a window, then exit
+    bool mConvertOnly = false;
 
     // AE/-AE or AO/-AO. nullopt if neither is given, or if both are (which is logged).
     std::optional<GameType> mGame;

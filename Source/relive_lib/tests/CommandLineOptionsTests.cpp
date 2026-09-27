@@ -17,6 +17,7 @@ TEST(CommandLineOptions, NothingGivenMeansDefaults)
     const CommandLineOptions options = Parse({});
 
     EXPECT_FALSE(options.mShowHelp);
+    EXPECT_FALSE(options.mConvertOnly);
     EXPECT_EQ(options.mGame, std::nullopt);
     EXPECT_EQ(options.mModName, "");
     EXPECT_FALSE(options.mDdCheat);
@@ -35,6 +36,12 @@ TEST(CommandLineOptions, EveryHelpSpelling)
     {
         EXPECT_TRUE(Parse({help}).mShowHelp) << help;
     }
+}
+
+TEST(CommandLineOptions, Convert)
+{
+    EXPECT_TRUE(Parse({"-convert"}).mConvertOnly);
+    EXPECT_TRUE(Parse({"-AO", "-convert"}).mConvertOnly);
 }
 
 TEST(CommandLineOptions, GameAcceptsEitherSpelling)
