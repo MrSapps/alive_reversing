@@ -29,6 +29,28 @@ SoundApi& GetSoundAPI()
 
 SDLSoundSystem* sDSound_BBC344 = nullptr;
 
+u32 SND_GetTicks()
+{
+    if (sDSound_BBC344 && sDSound_BBC344->IsOffline())
+    {
+        return sDSound_BBC344->OfflineTicks();
+    }
+    return SYS_GetTicks();
+}
+
+void SND_WaitUntilTicks(u32 ticks)
+{
+    if (sDSound_BBC344 && sDSound_BBC344->IsOffline())
+    {
+        sDSound_BBC344->RenderOfflineUntil(ticks);
+        return;
+    }
+
+    while (SYS_GetTicks() < ticks)
+    {
+    }
+}
+
 s32 SND_CreateDS_4EEAA0(u32 sampleRate, s32 bitsPerSample, s32 isStereo)
 {
     return SND_CreateDS_SDL(sampleRate, bitsPerSample, isStereo);
@@ -127,7 +149,7 @@ s32 SND_PlayEx(const SoundEntry* pSnd, s32 panLeft, s32 panRight, f32 freq, MIDI
         return -1;
     }
 
-    sLastNotePlayTime_BBC33C = SYS_GetTicks();
+    sLastNotePlayTime_BBC33C = SND_GetTicks();
 
     s32 panLeft2 = panLeft;
     s32 panRight2 = panRight;

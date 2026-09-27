@@ -2,7 +2,6 @@
 #include "SDLSoundSystem.hpp"
 #include "SDLSoundBuffer.hpp"
 #include "Reverb.hpp"
-#include "../../relive_lib/Sys.hpp"
 #include <functional>
 #include <cmath>
 
@@ -44,6 +43,24 @@ void SDLSoundSystem::Init(u32 /*sampleRate*/, s32 /*bitsPerSample*/, s32 /*isSte
     LOG_INFO("Driver: %s", SDL_GetCurrentAudioDriver());
     LOG_INFO("-----------------------------");
 
+    InitMixer();
+    sLastNotePlayTime_BBC33C = SND_GetTicks();
+    mCreated = true;
+
+    // Correctly size the lock free buffer on the main thread before any other threads start
+    mAudioRingBuffer.resize(2048 * 2);
+
+    // TODO: Test just running this on the main thread
+    if (!gLatencyHack)
+    {
+        mRenderAudioThread.reset(new std::thread(std::bind(&SDLSoundSystem::RenderAudioThread, this)));
+    }
+
+    SDL_ResumeAudioDevice(mAudioDevice);
+}
+
+void SDLSoundSystem::InitMixer()
+{
     Reverb_Init(mAudioDeviceSpec.freq);
 
     GetSoundAPI().SND_InitVolumeTable();
@@ -61,20 +78,43 @@ void SDLSoundSystem::Init(u32 /*sampleRate*/, s32 /*bitsPerSample*/, s32 /*isSte
             }
         }
     }
+}
 
-    sLastNotePlayTime_BBC33C = SYS_GetTicks();
+void SDLSoundSystem::InitOffline()
+{
+    mOffline = true;
+    mAudioDeviceSpec.format = SDL_AUDIO_S16;
+    mAudioDeviceSpec.channels = 2;
+    mAudioDeviceSpec.freq = 44100;
+
+    InitMixer();
+
+    sLastNotePlayTime_BBC33C = SND_GetTicks();
     mCreated = true;
+}
 
-    // Correctly size the lock free buffer on the main thread before any other threads start
-    mAudioRingBuffer.resize(2048 * 2);
+u32 SDLSoundSystem::OfflineTicks() const
+{
+    return static_cast<u32>(GetGeneratedAudioSamples() * 1000 / static_cast<u64>(mAudioDeviceSpec.freq));
+}
 
-    // TODO: Test just running this on the main thread
-    if (!gLatencyHack)
+void SDLSoundSystem::RenderOffline(u32 sampleCount)
+{
+    const size_t start = mOfflineOutput.size();
+    mOfflineOutput.resize(start + sampleCount);
+    RenderAudio(mOfflineOutput.data() + start, static_cast<s32>(sampleCount));
+    mGeneratedAudioSamples.fetch_add(sampleCount, std::memory_order_release);
+}
+
+void SDLSoundSystem::RenderOfflineUntil(u32 ticks)
+{
+    // The first sample count whose tick is >= ticks
+    const u64 targetSamples = (static_cast<u64>(ticks) * static_cast<u64>(mAudioDeviceSpec.freq) + 999) / 1000;
+    const u64 generated = GetGeneratedAudioSamples();
+    if (targetSamples > generated)
     {
-        mRenderAudioThread.reset(new std::thread(std::bind(&SDLSoundSystem::RenderAudioThread, this)));
+        RenderOffline(static_cast<u32>(targetSamples - generated));
     }
-
-    SDL_ResumeAudioDevice(mAudioDevice);
 }
 
 void SDLSoundSystem::Pause()
@@ -115,6 +155,22 @@ HRESULT SDLSoundSystem::CreateSoundBuffer(LPCDSBUFFERDESC pcDSBufferDesc, TSound
 HRESULT SDLSoundSystem::Release()
 {
     TRACE_ENTRYEXIT;
+
+    if (mOffline)
+    {
+        // There is no render thread to destroy the released voices, and SND_SsQuit has released
+        // all of them by now
+        for (s32 i = 0; i < MAX_VOICE_COUNT; i++)
+        {
+            SDLSoundBuffer* pVoice = sAE_ActiveVoices[i];
+            if (pVoice)
+            {
+                pVoice->Destroy();
+            }
+        }
+        delete this;
+        return S_OK;
+    }
 
     if (mCreated)
     {

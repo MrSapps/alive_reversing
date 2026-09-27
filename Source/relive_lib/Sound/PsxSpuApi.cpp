@@ -5,7 +5,6 @@
 #include "../data_conversion/file_system.hpp"
 #include "../../relive_lib/ResourceManagerWrapper.hpp"
 #include "Sound.hpp"    // SoundEntry structure
-#include "../../relive_lib/Sys.hpp"      // SYS_GetTicks
 #include <assert.h>
 #include "../../relive_lib/FatalError.hpp"
 #include <algorithm>
@@ -194,7 +193,7 @@ static IPsxSpuApiVars* gSpuVars = &gAeSpuVars; // Default to AE vars
 
 void SetSpuApiVars(IPsxSpuApiVars* pVars)
 {
-    gSpuVars = pVars;
+    gSpuVars = pVars ? pVars : &gAeSpuVars;
 }
 
 IPsxSpuApiVars* GetSpuApiVars()
@@ -258,7 +257,7 @@ void SSInit_4FC230()
 void SpuInitHot_4FC320()
 {
     gSpuVars->sMidi_Inited_dword() = 1;
-    gSpuVars->sMidiTime() = SYS_GetTicks();
+    gSpuVars->sMidiTime() = SND_GetTicks();
 }
 
 void SsEnd_4FC350()
@@ -698,7 +697,7 @@ s32 MIDI_PlayMidiNote_4FCB30(s32 vabId, s32 program, s32 note, s32 leftVolume, s
 
                     if (program == 4 || program == 5 || program == 8 || program == 23 || program == 24 || program == 25)
                     {
-                        gSpuVars->sMidi_WaitUntil() = SYS_GetTicks() + 10;
+                        gSpuVars->sMidi_WaitUntil() = SND_GetTicks() + 10;
                     }
 
                     usedChannelBits |= (1 << midiChannel);
@@ -712,9 +711,7 @@ s32 MIDI_PlayMidiNote_4FCB30(s32 vabId, s32 program, s32 note, s32 leftVolume, s
 
 void MIDI_Wait_4FCE50()
 {
-    while (SYS_GetTicks() < gSpuVars->sMidi_WaitUntil())
-    {
-    }
+    SND_WaitUntilTicks(gSpuVars->sMidi_WaitUntil());
     gSpuVars->sMidi_WaitUntil() = 0;
 }
 
@@ -1353,7 +1350,7 @@ void SsSeqCalledTbyT()
 {
     if (!gSpuVars->sbDisableSeqs())
     {
-        const u32 currentTime = SYS_GetTicks();
+        const u32 currentTime = SND_GetTicks();
         gSpuVars->sMidiTime() = currentTime;
         // First time or 30 passed?
         if (gSpuVars->sLastTime() == 0xFFFFFFFF || (s32)(currentTime - gSpuVars->sLastTime()) >= 30)

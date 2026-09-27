@@ -410,6 +410,8 @@ SET(sound_src
     Sound/SDLSoundBuffer.cpp
     Sound/SDLSoundSystem.hpp
     Sound/SDLSoundSystem.cpp
+    Sound/SoundGold.hpp
+    Sound/SoundGold.cpp
 )
 
 SET(game_objects_src
@@ -835,6 +837,9 @@ add_executable(relive_lib_tests
     tests/PaletteCacheTests.cpp
     tests/TextureCacheTests.cpp
     tests/BatcherTests.cpp
+    tests/SoundTestData.cpp
+    tests/SoundTestData.hpp
+    tests/SoundGoldTests.cpp
     tests/TestStubs.cpp
 )
 target_include_directories(relive_lib_tests PRIVATE
@@ -844,7 +849,7 @@ target_include_directories(relive_lib_tests PRIVATE
     src
     ${CMAKE_BINARY_DIR}
 )
-target_compile_definitions(relive_lib_tests PRIVATE "_CRT_SECURE_NO_WARNINGS" "JSON_DISABLE_ENUM_SERIALIZATION=1" "GLEW_NO_GLU" "GLEW_STATIC" "SPNG_STATIC")
+target_compile_definitions(relive_lib_tests PRIVATE "RELIVE_SOUND_GOLD_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/sound_gold\"" "_CRT_SECURE_NO_WARNINGS" "JSON_DISABLE_ENUM_SERIALIZATION=1" "GLEW_NO_GLU" "GLEW_STATIC" "SPNG_STATIC")
 target_link_libraries(relive_lib_tests PRIVATE relive_lib relive_ipc googletest SDL3::SDL3)
 add_dependencies(relive_lib_tests UpdateConfigHeader)
 if (MSVC)
