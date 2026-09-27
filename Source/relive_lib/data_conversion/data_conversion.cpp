@@ -34,6 +34,8 @@
 #include "../../AliveLibAO/DemoPlayback.hpp"
 #include "AOSaveSerialization.hpp"
 #include "string_util.hpp"
+#include <chrono>
+#include <thread>
 
 // levels that have a different level id but are part of the same .lvl file
 static bool IsCombinedEnderLevel(::LevelIds levelId)
@@ -1356,6 +1358,51 @@ static void ScanPaletteProgressTotal(bool isAo, ConversionProgress& progress)
         }
     }
     progress.AddToTotal(ConversionCategory::Misc, count);
+}
+
+void DataConversion::ConvertAll(GameType game)
+{
+    DataVersions zeroVersions;
+
+#if 0
+    // Dev hack to control which data files to convert (can force reconvert/force skip)
+    zeroVersions = DataVersions::LatestVersion();
+    zeroVersions.mFmvVersion = 0;
+#endif
+
+    if (game == GameType::eAe)
+    {
+        ConvertDataAE(DataVersionAE().value_or(zeroVersions));
+    }
+    else
+    {
+        ConvertDataAO(DataVersionAO().value_or(zeroVersions));
+    }
+
+    // ConvertDataAE/AO only *dispatch* work onto the thread pool (FMVs, paths, ...), they don't
+    // wait for any of it - don't exit (or, below, declare data_version.json up to date) till it's
+    // actually finished.
+    while (AsyncTasksInProgress())
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+
+    // Only stamp data_version.json with the versions we were actually converting towards once
+    // nothing got cancelled partway through (see ThreadPool::RequestCancel/Engine::Run()'s quit
+    // handling) - otherwise this would claim the whole conversion completed when some of it
+    // didn't, and a later launch's DataVersions::ConvertFmvs()/ConvertPaths()/etc checks would
+    // wrongly skip reconverting the parts that never actually finished. FMV conversion tracks its
+    // own finer-grained per-movie progress regardless (see FmvConversionManifest in
+    // fmv_converter.cpp), so it alone can still resume efficiently next launch even though this
+    // stays unwritten - other categories don't have that yet, so they just fully redo their work
+    // next launch, same as a version bump would make them do anyway.
+    if (!IsCancelRequested())
+    {
+        FileSystem::Path dataDir;
+        dataDir.Append("relive_data");
+        dataDir.Append(game == GameType::eAe ? "ae" : "ao");
+        DataVersions::LatestVersion().Save(dataDir);
+    }
 }
 
 void DataConversion::ConvertDataAO(const DataVersions& dv)

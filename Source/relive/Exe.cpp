@@ -25,6 +25,7 @@
 #include "../relive_lib/Font.hpp"
 
 #include "../relive_lib/data_conversion/file_system.hpp"
+#include "../relive_lib/data_conversion/data_conversion.hpp"
 #include "../relive_lib/GameType.hpp"
 
 #include "../relive_lib/CommandLineParser.hpp"
@@ -316,7 +317,11 @@ s32 main(s32 argc, char_type** argv)
 #endif
     LOG_INFO("Relive: %s", Window::BuildAndBitnessString().c_str());
 
-    SDL2_Init();
+    // Converting needs no window or input, so it works without a display
+    if (!options.mConvertOnly)
+    {
+        SDL2_Init();
+    }
 
     FileSystem fs;
 
@@ -354,6 +359,14 @@ s32 main(s32 argc, char_type** argv)
     SetGameType(gameToRun);
 
     pAutoPlayer = gameToRun == GameType::eAo ? &GetGameAutoPlayerAO() : &GetGameAutoPlayerAE();
+
+    if (options.mConvertOnly)
+    {
+        DataConversion dataConversion;
+        dataConversion.ConvertAll(gameToRun);
+        LOG_INFO("Converted the %s data", gameToRun == GameType::eAo ? "AO" : "AE");
+        return 0;
+    }
 
     Engine e(gameToRun, fs, options);
     e.Init();
