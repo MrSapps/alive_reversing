@@ -7,9 +7,9 @@ a renderer, port one to a new platform, or compare the renderers' speed.
 Everything it draws goes through the engine's own code: the ordering table,
 `PSX_DrawOTag`, `IRenderer`, `Animation`, `AliveFont`, `ScreenManager`, `FG1`, and the real
 game objects for the effects (`LaughingGas`, `AO::ScreenWave`, `ZapLine`, `ScreenClipper`,
-`ScreenShake`, `Fade`, `Flash`, `DeathGas`, `MainMenuTransition`). Cameras, FG1 layers and
-sprite sheets are generated in code (`TestResources.cpp`). The animations the game objects
-load are added to the resource manager with `ResourceManagerWrapper::AddAnimation`.
+`ThrowableTotalIndicator`, `ScreenShake`, `Fade`, `Flash`, `DeathGas`, `MainMenuTransition`).
+Cameras, FG1 layers and sprite sheets are generated in code (`TestResources.cpp`). The
+animations the game objects load are added to the resource manager with `ResourceManagerWrapper::AddAnimation`.
 
 ## Looking at it
 

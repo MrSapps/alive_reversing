@@ -11,7 +11,8 @@ public:
     Shadow(ResourceManagerWrapper& resMan, BaseMap& map);
     ~Shadow();
 
-    void Calculate_Position(FP xpos, FP ypos, PSX_RECT* frameRect, FP spriteScale, Scale scale);
+    // ownerLayer is the layer the owner was drawn on, just before its shadow
+    void Calculate_Position(FP xpos, FP ypos, PSX_RECT* frameRect, FP spriteScale, Scale scale, Layer ownerLayer);
     void Render(OrderingTable& ot);
 
 private:

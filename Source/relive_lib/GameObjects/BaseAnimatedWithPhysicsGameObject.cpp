@@ -138,7 +138,8 @@ void BaseAnimatedWithPhysicsGameObject::VRender(OrderingTable& ot)
                     mYPos,
                     &frameRect,
                     GetSpriteScale(),
-                    GetScale());
+                    GetScale(),
+                    GetAnimation().GetRenderLayer());
                 GetShadow()->Render(ot);
             }
         }

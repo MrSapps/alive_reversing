@@ -137,6 +137,25 @@ static const Glyph sGlyphs[] = {
 };
 
 
+// Callers pass the layer of whoever made the indicator. Abe is on the "in bird portal" layer
+// while he comes out of a portal, between the portal's clip rectangles (IBirdPortal::ClipPortal),
+// so an indicator he made then (a checkpoint he lands on) was cut off at the portal for as long
+// as it was up (issue #1087). Use the layer he goes back to once he's out.
+static Layer OutOfPortalLayer(Layer layer)
+{
+    switch (layer)
+    {
+        case Layer::eLayer_InBirdPortal_30:
+            return Layer::eLayer_AbeMenu_32;
+
+        case Layer::eLayer_InBirdPortal_Half_11:
+            return Layer::eLayer_AbeMenu_Half_13;
+
+        default:
+            return layer;
+    }
+}
+
 ThrowableTotalIndicator::ThrowableTotalIndicator(FP xpos, FP ypos, Layer layer, FP /*scale*/, s32 count, bool bFade, ResourceManagerWrapper& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
@@ -165,7 +184,7 @@ ThrowableTotalIndicator::ThrowableTotalIndicator(FP xpos, FP ypos, Layer layer, 
     }
 
     mSpriteScale = FP_FromInteger(1); // OG bug - should be using scale ??
-    mOtLayer = layer;
+    mOtLayer = OutOfPortalLayer(layer);
 
     mRGB.SetRGB(0, 0, 0);
 
