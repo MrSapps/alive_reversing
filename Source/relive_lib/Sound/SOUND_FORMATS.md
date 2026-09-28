@@ -9,14 +9,53 @@ tried and rejected, and the staged plan.
 | File | AO | AE |
 |---|---|---|
 | `*.VH` (VAB header) | `VabHeader` + 128 `ProgAtr` + 16 `VagAtr` per program | same |
-| `*.VB` (VAB body) | per sample: `u32 length`, `s32 flags`, then the PCM inline | per sample: `u32 length`, `s32 flags`, `u32 offset` into `sounds.dat` |
+| `*.VB` (VAB body) | per sample: `u32 length`, `s32 rate`, then the PCM inline | per sample: `u32 length`, `s32 rate`, `u32 offset` into `sounds.dat` |
 | `sounds.dat` | - | 16 bit mono PCM for every VB |
 | `*.SEQ` (in `*.BSQ`) | Sony SEQ (`pQES`) | same |
 
-The PC ports decoded the PS1 ADPCM (VAG) samples to 16 bit PCM. The samples are played as
-44100 Hz, and each tone's `centre`/`shift` sets the pitch. A negative `flags` value means "loop
-the whole sample" (`Converted_Vag::field_C` bit 2 -> `DSBPLAY_LOOPING`). The PS1 ADPCM loop
-start points are not in the PC data, so a looping sample always loops from its first sample.
+The PC samples are NOT decoded PS1 ADPCM: only 1.8% of AE's and 0.3% of AO's 28 sample blocks
+fit the ADPCM model, while a real decode fits 100%. They are the source audio from before the
+PS1 encoding (see "PC vs PS1 data" below).
+
+A VB record's `length` is in bytes. Its second field (`VabBodyRecord::field_4_unused`) is not
+flags but the sample's source rate (`s32 rate`: 5512, 8000, 11025, 22050, 44100, ...). A
+negative rate means "loop the whole sample" (`Converted_Vag::field_C` bit 2 ->
+`DSBPLAY_LOOPING`). The engine plays every sample as 44100 Hz and sets the pitch from the tone's
+`centre`/`shift`, like the PS1, where the rate is only authoring data. The PS1 ADPCM loop start
+points are not in the PC data, so a looping sample always loops from its first sample, which is
+what the PS1 data does too (see below).
+
+## PC vs PS1 data
+
+Compared (locally, with the game files): the EU PS1 discs against the GOG PC data.
+
+- Samples: about 98% (AO) and 99.8% (AE) of the PS1 VAGs are the PC sample, ADPCM encoded. The
+  correlation is above 0.99 and the difference is 17-41 dB below the signal (median about
+  21-23 dB). Quantising the PC PCM with each PS1 block's own filter/shift reproduces about 99% of
+  the PS1 nibbles, so the PC PCM is exactly what the PS1 encoder was given: the PC samples are
+  the cleaner copy. Each PS1 VAG starts with one 28 sample zero block.
+- AO: the PS1 stored some samples at a lower rate (for example 8000 vs 22050 Hz) with a higher
+  centre note. The PC kept the full rate and lowered the centre by the same amount, so the pitch
+  matches.
+- AE vag 8 is used by the sound effects SecurityOrb (program 0 note 63) and PortalOpening
+  (program 10 note 36). It has 2x the samples on PC with the same centre note, so the PC
+  probably plays it an octave lower than the PS1. Not yet confirmed by ear.
+- Unclear or different content: about 24 AO samples (mostly RFENDER), and AE PARVAULT vags
+  106-110.
+- Loops: every PS1 loop starts at block 1 (just after the zero block) and ends at the sample
+  end. That equals the PC's "loop the whole sample", so no loop data is missing.
+- VH: the tone parameters (centre, shift, vol, ADSR, keys, ...) are identical wherever a tone
+  exists in both versions. The PC AE VHs add 3 programs and 5 tones. The PS1 VH ends with a 512
+  byte VAG size table (256 x u16, size = value * 8), which the PC VH drops. AO's `ProgAtr`
+  differs only in unused bytes.
+- BSQ/SEQ: nearly all identical. AE's PC version replaced 3-6 short jingles per level with
+  single notes on the PC only programs. Each AO PS1 BSQ has one extra SEQ.
+
+Conclusion: the poor PC sound comes from the playback code, not the data. The ADSR is updated
+every 30 ms from only some of the register bits, there's no SPU reverb, pan and pitch bend range
+are ignored, SDL resamples instead of the SPU's interpolation, and AE doubles the read length of
+short one shot samples. The fix is a PS1 accurate playback engine that plays the PC PCM as it
+is: an emulated SPU (below), then a libsnd style layer on top of it.
 
 ## What the engine uses today
 
@@ -116,8 +155,9 @@ a different header, and the libsnd loop markers are ordinary controller events.
    `SsVabTransBody`. The gold traces must not change.
 4. **Real data check** (needs the game files, see below).
 5. Later, each a separate, deliberate behaviour change with new gold files:
-   - PS1 ADSR from the raw registers, stepped per sample instead of every 30 ms
-   - PS1 SPU reverb, per tone `mode` + path reverb depth
+   - PS1 ADSR from the raw registers, stepped per sample instead of every 30 ms (in the
+     emulated SPU, not wired in yet: see below)
+   - PS1 SPU reverb (in the emulated SPU), per tone `mode` + path reverb depth
    - tone pan, pitch bend range, vibrato
    - merge AO's and AE's MIDI parser / note on / key off. They differ in ways that look like
      reversing or OG bugs, for example:
@@ -146,6 +186,60 @@ Found, not fixed yet:
 - MONK.VH/VB (the loading sound) is never loaded until the sound system has been shut down
   once: `sMonkVh_Vb`'s initialiser leaves `mVabId` at 0 and it is only loaded when it's -1. It
   also has no sound theme yet (see the TODO in `Midi.cpp`).
+
+## The emulated SPU (`Sound/Spu`)
+
+`PsxSpu` is a PS1 SPU implemented from psx-spx ("Sound Processing Unit (SPU)"), in its own
+small library (`psx_spu`, no dependencies, `cmake --build build --target psx_spu`). It isn't
+used by the game yet: nothing calls it outside its unit tests (`tests/PsxSpuTests.cpp`), so the
+sound gold traces are unchanged.
+
+- 24 voices, 44100 Hz stereo, deterministic integer arithmetic. `Render(out, frames)` mixes
+  into an interleaved `s16` buffer; it never allocates or locks, so it can run in the audio
+  callback. The SPU isn't thread safe: register writes and `Render` must be on the same thread
+  or serialised by the owner. Output rendered in any block size is identical.
+- Voices play 16 bit PCM (`PsxSpuSample`: pointer, length, loop flag, loop start/end in
+  samples) instead of decoding ADPCM. The sample is picked up at key on, like `SSA`. A one shot
+  sample's end mutes the voice ("End+Mute"), a loop end jumps to the loop start
+  ("End+Repeat"); both set the voice's `ENDX` bit, which key on clears.
+- Pitch: the `PITCH` register (0x1000 = 44100 Hz, values above 0x3FFF play at 0x4000) drives a
+  pitch counter; bits 4-11 index the 512 entry "gaussian" table for the 4 point interpolation.
+  `PitchFromNote(note, fine, centre, shift)` and `PitchFromSampleRate(rate)` are the helpers
+  for the libsnd layer.
+- ADSR (`PsxSpuEnvelope`) stepped every sample from the raw ADSR1/ADSR2 registers, with the
+  psx-spx step/shift/counter rules: linear or exponential attack (the exponential one slows down
+  above 0x6000), exponential decay to (N + 1) * 0x800, sustain with its own mode, direction and
+  rate until key off, linear or exponential release. A rate with all bits set never steps
+  (psx-spx says this also holds for a release shift of 0x1F: check that against hardware if a
+  voice ever hangs).
+- Voice and master volume registers in fixed or sweep mode (the sweep uses the envelope step).
+- Reverb (`PsxSpuReverb`): the psx-spx formula at 22050 Hz on a 16 bit work area, with the SPU's
+  39 tap resampling filter on the way in and out. It includes the standard presets in libsnd order
+  (off, room, studio small/medium/large, hall, space echo, echo, delay, pipe), a per voice
+  reverb enable (`EON`), the reverb master enable (`ATTR` bit 7: stops the writes, the reads
+  continue) and the output volume (`EVOL`, libsnd's depth; `DepthToVolume` maps 0-127).
+  Intermediate values saturate to 16 bits, as psx-spx measured. Left and right are processed on
+  the same 22050 Hz tick (hardware alternates them, a 1-2 LSB difference). The `vIIR = -0x8000`
+  negation bug isn't emulated (no preset uses it).
+- Mixing: voices are summed with the reverb output, clamped to 16 bits, then scaled by the
+  master volume.
+
+Not emulated: ADPCM, noise, pitch modulation, CD/external input, IRQs and capture buffers.
+
+`Reverb.cpp` (the generic comb reverb the current mixer uses) is untouched. It stays until the
+current mixer is replaced, because changing it would change the current sound.
+
+### Still to do
+
+- The libsnd layer: SEQ player on top of the SPU, VAB tone mapping (key ranges, centre/shift,
+  vol/pan, program and VAB master volume/pan), note -> pitch with the pitch bend range,
+  vibrato, voice allocation by priority (with `IsVoiceActive`/`Endx`), reverb type/depth from
+  `SsUtSetReverbType`/`SsUtSetReverbDepth` and the path, and the tone `mode` reverb bit.
+- Driving the SPU from the audio callback (a command queue from the game thread), behind an
+  option, with new gold traces for the PS1 sound. The current gold traces stay for the current
+  path.
+- Check against real hardware or a PS1 recording: the envelope edge cases, the release shift
+  0x1F case, the order of the reverb and master volume in the mix, and AE vag 8's pitch.
 
 ## Checking against real game data
 

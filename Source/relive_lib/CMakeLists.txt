@@ -740,6 +740,23 @@ SET(relive_lib_src
     Font.hpp
     Font.cpp
 )
+# The emulated PS1 SPU. Its own small library with no dependencies (only Types.hpp), so it can be
+# built and worked on without the rest of the engine: cmake --build build --target psx_spu
+SET(psx_spu_src
+    Sound/Spu/PsxSpu.hpp
+    Sound/Spu/PsxSpu.cpp
+    Sound/Spu/PsxSpuReverb.hpp
+    Sound/Spu/PsxSpuReverb.cpp
+)
+source_group("Source Files/Sound/Spu" FILES ${psx_spu_src})
+add_library(psx_spu STATIC ${psx_spu_src})
+target_include_directories(psx_spu PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>")
+target_link_libraries(psx_spu PRIVATE project_warnings)
+export(TARGETS psx_spu FILE psx_spu.cmake)
+if (MSVC)
+    target_compile_options(psx_spu PRIVATE /W4 /WX /MP)
+endif()
+
 add_library(relive_lib ${relive_lib_src})
 
 SET(relive_ipc_src
@@ -798,6 +815,7 @@ else()
 endif()
 
 target_link_libraries(relive_lib
+    psx_spu
     shelf-pack-cpp
     project_warnings
     spng
@@ -840,6 +858,7 @@ add_executable(relive_lib_tests
     tests/SoundTestData.cpp
     tests/SoundTestData.hpp
     tests/SoundGoldTests.cpp
+    tests/PsxSpuTests.cpp
     tests/TestStubs.cpp
 )
 target_include_directories(relive_lib_tests PRIVATE
