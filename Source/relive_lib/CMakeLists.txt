@@ -617,6 +617,8 @@ SET(relive_lib_src
     CommandLineParser.cpp
     CommandLineOptions.hpp
     CommandLineOptions.cpp
+    Automation.hpp
+    Automation.cpp
     BinaryPath.hpp
     BinaryPath.cpp
     SwitchStates.hpp
@@ -826,6 +828,7 @@ add_executable(relive_lib_tests
     tests/DisplaySettingsTests.cpp
     tests/CommandLineParserTests.cpp
     tests/CommandLineOptionsTests.cpp
+    tests/AutomationTests.cpp
     tests/MovieFrameSyncTests.cpp
     tests/ConversionProgressTests.cpp
     tests/EtaEstimatorTests.cpp

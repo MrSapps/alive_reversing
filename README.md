@@ -74,6 +74,14 @@ played back with the same game, data and settings (key bindings are saved in the
 | `-play=<file>` | Play back a recording. Playback stops with an error if the game stops matching the recording (a desync). |
 | `-ignore_desyncs` | With `-play`, keep going after a desync instead of stopping (it logs one warning). |
 
+### Automation
+
+`-automation=<file>` runs a script of commands, so a tool (or a test) can drive the game
+without anyone watching: start a new game at any camera, wait, take screenshots and dump the
+game's state and objects as JSON. See `Source/relive_lib/Automation.hpp` for the commands. With
+`SDL_VIDEO_DRIVER=offscreen` it needs no display. Display options given with it aren't saved to
+`relive.ini`.
+
 ## Contributing
 
 Anyone who wishes to contribute is encouraged to join the project's [Discord](

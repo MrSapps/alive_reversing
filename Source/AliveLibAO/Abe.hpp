@@ -434,6 +434,9 @@ struct AbeSaveState final : public SaveStateBase
 class Abe final : public BaseAbe
 {
 public:
+    // Pends everything a new Abe needs, which the menus wait for before making him
+    static void PendResources(ResourceManagerWrapper& resMan);
+
     static constexpr AnimId sAbeMotionAnimIds[166] = {
         AnimId::Mudokon_Idle,
         AnimId::Mudokon_Walk,

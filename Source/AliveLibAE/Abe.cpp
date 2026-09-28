@@ -424,6 +424,22 @@ void Abe::LoadAnimations()
     }
 }
 
+void Abe::PendResources(ResourceManagerWrapper& resMan)
+{
+    resMan.PendAnims(sAbeAnimIdTable);
+    resMan.PendAnimation(AnimId::ChantOrb_Particle);
+    resMan.PendAnimation(AnimId::ChantOrb_Particle_Small);
+    resMan.PendAnimation(AnimId::SquibSmoke_Particle);
+    resMan.PendAnimation(AnimId::Dust_Particle);
+    resMan.PendAnimation(AnimId::BloodDrop);
+    resMan.PendAnimation(AnimId::ObjectShadow);
+    resMan.PendAnimation(AnimId::DeathFlare_1);
+    resMan.PendAnimation(AnimId::DeathFlare_2);
+    resMan.PendAnimation(AnimId::Dove_Idle);
+    resMan.PendAnimation(AnimId::Dove_Flying);
+    resMan.PendAnimation(AnimId::SpotLight);
+}
+
 Abe::Abe(ResourceManagerWrapper& resMan, BaseMap& map) :
     BaseAbe(kResourceArraySize, resMan, map)
 {

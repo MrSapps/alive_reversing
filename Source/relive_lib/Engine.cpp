@@ -1,4 +1,5 @@
 #include "Engine.hpp"
+#include "Automation.hpp"
 #include "Renderer/FrameStatsOverlay.hpp"
 #include "GameType.hpp"
 #include "data_conversion/data_conversion_ui.hpp"
@@ -121,6 +122,7 @@ Engine::Engine(GameType gameType, FileSystem& fs, const CommandLineOptions& opti
 Engine::~Engine()
 {
     TRACE_ENTRYEXIT;
+    mAutomation.reset();
     mIpcInterface.reset();
     mSys.reset();
     mWindow.reset();
@@ -174,7 +176,8 @@ void Engine::CmdLineRenderInit(const std::string& activeModName)
     // settings don't affect gameplay, and an extra buffer would desync recordings.
     DisplaySettings displaySettings = DisplaySettings::FromIni(mResMan->LoadSettingsIni());
 
-    if (displaySettings.ApplyCommandLine(mOptions))
+    // Not when automated: a script's run shouldn't change the player's settings
+    if (displaySettings.ApplyCommandLine(mOptions) && !mOptions.mAutomationScript)
     {
         // Command line settings are remembered, like the hotkeys'
         IniFile ini = mResMan->LoadSettingsIni();
@@ -435,6 +438,17 @@ void Engine::Game_Loop(BaseMap& map)
             // Quit confirmed: abandon whatever was running and shut down normally
             map.EndAllModals();
             break;
+        }
+
+        if (mAutomation)
+        {
+            const bool betweenFrames = !map.GetActiveModal() && mFrameStage == FrameStage::eBegin && !map.DirectCameraChangePending();
+            if (mAutomation->Update(map, betweenFrames) == Automation::Result::eQuit)
+            {
+                mAutomationFailed = mAutomation->Failed();
+                map.EndAllModals();
+                break;
+            }
         }
 
         if (BaseGameObject* pModal = map.GetActiveModal())
@@ -840,6 +854,27 @@ void Engine::Init()
 void Engine::Run()
 {
     GetGameAutoPlayer().ProcessCommandLine(mFs, mOptions);
+
+    if (mOptions.mAutomationScript)
+    {
+        const std::string& scriptPath = *mOptions.mAutomationScript;
+        if (!mFs.FileExists(scriptPath.c_str()))
+        {
+            LOG_ERROR("[automation] can't find %s", scriptPath.c_str());
+            mAutomationFailed = true;
+            return;
+        }
+
+        std::vector<Automation::Command> commands;
+        std::string error;
+        if (!Automation::Parse(mFs.LoadToString(scriptPath.c_str()), commands, error))
+        {
+            LOG_ERROR("[automation] %s: %s", scriptPath.c_str(), error.c_str());
+            mAutomationFailed = true;
+            return;
+        }
+        mAutomation = std::make_unique<Automation>(mFs, *mResMan, std::move(commands));
+    }
 
     gCommandLine_NoFrameSkip = mOptions.mNoFrameSkip;
     if (mOptions.mMaxFps)

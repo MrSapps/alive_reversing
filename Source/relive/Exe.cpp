@@ -360,5 +360,5 @@ s32 main(s32 argc, char_type** argv)
     PopulateAutoSplitterVars(gameToRun, e.GetMap());
     e.Run();
 
-    return 0;
+    return e.AutomationFailed() ? 1 : 0;
 }

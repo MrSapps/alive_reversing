@@ -1664,23 +1664,7 @@ void Menu::NewGameStart()
     {
         if (!mAbeAnimsPended)
         {
-            mResMan.PendAnims(Abe::sAbeMotionAnimIds);
-            // TODO: Hack - should be part of abes anim array
-            // These animations were originally loaded in the abe ctor in OG
-            mResMan.PendAnimation(AnimId::ChantOrb_Particle);
-            mResMan.PendAnimation(AnimId::ChantOrb_Particle_Small);
-            mResMan.PendAnimation(AnimId::SquibSmoke_Particle);
-            mResMan.PendAnimation(AnimId::BloodDrop);
-            mResMan.PendAnimation(AnimId::ObjectShadow);
-            mResMan.PendAnimation(AnimId::DeathFlare_1);
-            mResMan.PendAnimation(AnimId::DeathFlare_2);
-            mResMan.PendAnimation(AnimId::Dove_Idle);
-            mResMan.PendAnimation(AnimId::Dove_Flying);
-
-            // Required after abe gets back from both temples and gets the ring from big face
-            mResMan.PendAnimation(AnimId::ShrykullStart);
-            mResMan.PendAnimation(AnimId::ShrykullTransform);
-            mResMan.PendAnimation(AnimId::ShrykullDetransform);
+            Abe::PendResources(mResMan);
 
             // Abe is made on the next update, once the main loop has waited for these
             mResMan.RequestLoadingWait();
