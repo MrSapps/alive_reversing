@@ -10,6 +10,7 @@ struct CommandLineOptions;
 class BaseMap;
 class Sys;
 class Window;
+class Automation;
 enum class EReliveLevelIds : s16;
 
 extern u32 sGnFrame;
@@ -33,6 +34,12 @@ public:
     BaseMap& GetMap()
     {
         return *mMap;
+    }
+
+    // Whether the -automation script couldn't be loaded or one of its commands failed
+    bool AutomationFailed() const
+    {
+        return mAutomationFailed;
     }
 private:
     void CmdLineRenderInit(const std::string& activeModName);
@@ -79,4 +86,6 @@ private:
     std::unique_ptr<BaseMap> mMap;
     relive::Factory mFactory;
     std::string mActiveModDisplayName;
+    std::unique_ptr<Automation> mAutomation;
+    bool mAutomationFailed = false;
 };

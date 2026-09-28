@@ -77,6 +77,8 @@ CommandLineOptions CommandLineOptions::Parse(const CommandLineParser& clp)
     options.mPlayFile = clp.GetValue("-play");
     options.mIgnoreDesyncs = clp.HasSwitch("-ignore_desyncs");
 
+    options.mAutomationScript = clp.GetValue("-automation");
+
     if (const auto name = clp.GetValue("-renderer"))
     {
         options.mRenderer = DisplaySettings::RendererFromString(*name);
@@ -122,5 +124,8 @@ const char* CommandLineOptions::Usage()
            "  -record=<file>              Record this session\n"
            "  -flush                      With -record, write to disk straight away\n"
            "  -play=<file>                Play back a recording, stopping if it desyncs\n"
-           "  -ignore_desyncs             With -play, keep going after a desync\n";
+           "  -ignore_desyncs             With -play, keep going after a desync\n"
+           "\n"
+           "Automation:\n"
+           "  -automation=<file>          Run the commands in a script, see Source/relive_lib/Automation.hpp\n";
 }

@@ -1660,18 +1660,7 @@ MainMenuNextCam MainMenuController::LoadNewGame_Update_4D0920(u32 /*input*/)
     */
     if (!gAbe && !mAbeAnimsPended)
     {
-        mResMan.PendAnims(Abe::sAbeAnimIdTable);
-        mResMan.PendAnimation(AnimId::ChantOrb_Particle);
-        mResMan.PendAnimation(AnimId::ChantOrb_Particle_Small);
-        mResMan.PendAnimation(AnimId::SquibSmoke_Particle);
-        mResMan.PendAnimation(AnimId::Dust_Particle);
-        mResMan.PendAnimation(AnimId::BloodDrop);
-        mResMan.PendAnimation(AnimId::ObjectShadow);
-        mResMan.PendAnimation(AnimId::DeathFlare_1);
-        mResMan.PendAnimation(AnimId::DeathFlare_2);
-        mResMan.PendAnimation(AnimId::Dove_Idle);
-        mResMan.PendAnimation(AnimId::Dove_Flying);
-        mResMan.PendAnimation(AnimId::SpotLight);
+        Abe::PendResources(mResMan);
 
         // Abe is made on the next update, once the main loop has waited for these
         mResMan.RequestLoadingWait();

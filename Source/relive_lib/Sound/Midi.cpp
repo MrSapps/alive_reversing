@@ -129,6 +129,12 @@ void SND_Free_All_VABS_4C9EB0()
 
 void SND_Free_All_Seqs_4C9F40()
 {
+    // Not set until the first level's sounds load, which quitting straight away comes before
+    if (!GetMidiVars()->sSeqDataTable())
+    {
+        return;
+    }
+
     for (s32 i = 0; i < GetMidiVars()->MidiTableSize(); i++)
     {
         GetMidiVars()->sSeqDataTable()[i].field_C_ppSeq_Data.clear();

@@ -39,6 +39,9 @@ struct CommandLineOptions final
     std::optional<std::string> mPlayFile;
     bool mIgnoreDesyncs = false;
 
+    // -automation=<file>: run the commands in this script, see Automation.hpp
+    std::optional<std::string> mAutomationScript;
+
     // Display settings, named after their relive.ini keys. nullopt if not given (invalid
     // values are logged and treated as not given). See DisplaySettings::ApplyCommandLine.
     std::optional<IRenderer::Renderers> mRenderer;

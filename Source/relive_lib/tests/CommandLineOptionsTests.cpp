@@ -74,6 +74,12 @@ TEST(CommandLineOptions, RendererChecks)
     EXPECT_FALSE(Parse({"-renderer=opengl"}).mRendererChecks);
 }
 
+TEST(CommandLineOptions, AutomationScript)
+{
+    EXPECT_EQ(Parse({}).mAutomationScript, std::nullopt);
+    EXPECT_EQ(Parse({"-automation=script.txt"}).mAutomationScript, "script.txt");
+}
+
 TEST(CommandLineOptions, InvalidSlowLoadIsIgnored)
 {
     EXPECT_EQ(Parse({}).mSlowLoadMs, 0u);
@@ -149,7 +155,7 @@ TEST(CommandLineOptions, UsageListsEveryOption)
     for (const char* option : {"AE", "AO", "-mod=", "-renderer=", "-fullscreen", "-keep_aspect_ratio", "-filter_screen",
                                "-use_original_resolution", "-ddcheat", "-ddfps", "-ddnoskip", "-ddslowload=", "-help",
                                "-record=", "-flush", "-play=", "-ignore_desyncs", "-show_fps", "-showfps",
-                               "-max_fps=", "-maxfps="})
+                               "-max_fps=", "-maxfps=", "-automation="})
     {
         EXPECT_NE(usage.find(option), std::string::npos) << option;
     }

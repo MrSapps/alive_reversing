@@ -527,6 +527,27 @@ void Abe::LoadAnimations()
     }
 }
 
+void Abe::PendResources(ResourceManagerWrapper& resMan)
+{
+    resMan.PendAnims(sAbeMotionAnimIds);
+    // TODO: Hack - should be part of abes anim array
+    // These animations were originally loaded in the abe ctor in OG
+    resMan.PendAnimation(AnimId::ChantOrb_Particle);
+    resMan.PendAnimation(AnimId::ChantOrb_Particle_Small);
+    resMan.PendAnimation(AnimId::SquibSmoke_Particle);
+    resMan.PendAnimation(AnimId::BloodDrop);
+    resMan.PendAnimation(AnimId::ObjectShadow);
+    resMan.PendAnimation(AnimId::DeathFlare_1);
+    resMan.PendAnimation(AnimId::DeathFlare_2);
+    resMan.PendAnimation(AnimId::Dove_Idle);
+    resMan.PendAnimation(AnimId::Dove_Flying);
+
+    // Required after abe gets back from both temples and gets the ring from big face
+    resMan.PendAnimation(AnimId::ShrykullStart);
+    resMan.PendAnimation(AnimId::ShrykullTransform);
+    resMan.PendAnimation(AnimId::ShrykullDetransform);
+}
+
 Abe::Abe(ResourceManagerWrapper& resMan, BaseMap& map)
  : BaseAbe(0, resMan, map)
 {
