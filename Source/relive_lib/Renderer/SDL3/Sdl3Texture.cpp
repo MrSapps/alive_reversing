@@ -211,7 +211,7 @@ RGBA32 Sdl3Texture::ConvertPaletteColour(RGBA32 colour, const RGBA32& shading, b
                 break;
 
             default:
-                ALIVE_FATAL("SDL3 Invalid blend mode %u", blendMode);
+                ALIVE_FATAL("SDL3 Invalid blend mode %u", static_cast<u32>(blendMode));
         }
     }
 

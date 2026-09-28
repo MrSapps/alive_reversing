@@ -28,12 +28,6 @@ static void WriteFile(const std::string& path, const std::string& text)
     file << text;
 }
 
-static std::string ReadFile(const std::string& path)
-{
-    FileSystem fs;
-    return fs.LoadToString(path.c_str());
-}
-
 static DisplaySettings NonDefaultSettings()
 {
     DisplaySettings settings;

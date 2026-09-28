@@ -485,7 +485,7 @@ PalResource ResourceManagerWrapper::LoadPal(PalId pal)
     auto palData = mFs.LoadToVec(filePath.GetPath().c_str());
     if (palData.size() != 1024) // 256 RGBA entries
     {
-        ALIVE_FATAL("Bad pal data size %d but expected 1024", palData.size());
+        ALIVE_FATAL("Bad pal data size %zu but expected 1024", palData.size());
     }
 
     memcpy(newRes.mPal->mPal, palData.data(), palData.size());
