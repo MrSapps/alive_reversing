@@ -501,7 +501,7 @@ void renderWithGlowingEyes(OrderingTable& ot, BaseAliveGameObject* actor, std::s
 
             if (actor->GetShadow())
             {
-                actor->GetShadow()->Calculate_Position(actor->mXPos, actor->mYPos, &rectToInvalidate, actor->GetSpriteScale(), actor->GetScale());
+                actor->GetShadow()->Calculate_Position(actor->mXPos, actor->mYPos, &rectToInvalidate, actor->GetSpriteScale(), actor->GetScale(), actor->GetAnimation().GetRenderLayer());
                 actor->GetShadow()->Render(ot);
             }
         }

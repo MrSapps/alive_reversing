@@ -12,6 +12,7 @@
 #include "../../relive_lib/GameObjects/ScreenClipper.hpp"
 #include "../../relive_lib/GameObjects/ScreenManager.hpp"
 #include "../../relive_lib/GameObjects/ScreenShake.hpp"
+#include "../../relive_lib/GameObjects/ThrowableTotalIndicator.hpp"
 #include "../../relive_lib/GameObjects/ZapLine.hpp"
 #include "../../relive_lib/FG1.hpp"
 #include "../../AliveLibAE/LaughingGas.hpp"
@@ -1086,6 +1087,60 @@ private:
     Prim_ScissorRect mClip;
 };
 
+// Issue #1087: Abe comes out of a bird portal on the "in bird portal" layer, between the
+// portal's two clip rectangles. A checkpoint he lands on there made its sign on his layer,
+// so the portal cut it in half.
+class PortalClipIndicatorScene final : public Scene
+{
+public:
+    const char* Title() const override
+    {
+        return "Bird portal clip and throwable/checkpoint indicators";
+    }
+
+    const char* Expected() const override
+    {
+        return "The card is cut off at the red line, as Abe is when going into a portal. Circling on\n"
+               "both sides of the line: the checkpoint diamond (AO) or infinity sign (AE), and a 3 below";
+    }
+
+    void Enter(SceneContext& ctx) override
+    {
+        // The clippers a portal entered from the left makes (IBirdPortal::ClipPortal): only
+        // the left of the portal is drawn from its layer until the whole screen is let back in
+        relive_new ScreenClipper({0, 0}, {kPortalX, 240}, Layer::eLayer_BirdPortal_29, ctx.mResMan, ctx.mMap);
+        relive_new ScreenClipper({0, 0}, {640, 240}, Layer::eLayer_FallingItemDoorFlameRollingBallPortalClip_Half_31, ctx.mResMan, ctx.mMap);
+
+        // Made on Abe's layer, as Abe makes them, on both sides of the portal. They don't fade,
+        // so that they stay up.
+        for (s32 x : {kPortalX - 120, kPortalX + 120})
+        {
+            relive_new ThrowableTotalIndicator(WorldX(x), WorldY(70), Layer::eLayer_InBirdPortal_30, FP_FromInteger(1), 11, false, ctx.mResMan, ctx.mMap);
+            relive_new ThrowableTotalIndicator(WorldX(x), WorldY(170), Layer::eLayer_InBirdPortal_30, FP_FromInteger(1), 3, false, ctx.mResMan, ctx.mMap);
+        }
+
+        // A stand in for Abe, which the portal does cut off
+        mCard = MakeCard(ctx.mRes.mTestCard, kPortalX, 120);
+        mCard->mAnim.SetRenderLayer(Layer::eLayer_InBirdPortal_30);
+
+        SetLine(mPortalLine, kPortalX, kContentTop, kPortalX, 215);
+        SetColour(mPortalLine, 255, 0, 0);
+    }
+
+    void Render(SceneContext& ctx, OrderingTable& ot) override
+    {
+        ctx.DrawCamera(ot, ctx.mRes.mGridCam);
+        mCard->Render(ot);
+        ot.Add(Layer::eLayer_Menu_41, &mPortalLine);
+    }
+
+private:
+    static constexpr s16 kPortalX = 320;
+
+    Line_G2 mPortalLine;
+    std::unique_ptr<SceneSprite> mCard;
+};
+
 // ----------------------------------------------------------------------------
 // Effects, all made by the real game objects
 // ----------------------------------------------------------------------------
@@ -1710,6 +1765,7 @@ std::vector<SceneFactory> AllScenes()
         &MakeScene<Fg1Scene>,
         &MakeScene<ScissorScene>,
         &MakeScene<ClipCarryOverScene>,
+        &MakeScene<PortalClipIndicatorScene>,
         &MakeScene<ScreenShakeScene>,
         &MakeScene<LaughingGasScene>,
         &MakeScene<ScreenWaveScene>,

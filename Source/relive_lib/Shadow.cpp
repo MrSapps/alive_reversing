@@ -34,7 +34,7 @@ Shadow::~Shadow()
     mAnim.VCleanUp();
 }
 
-void Shadow::Calculate_Position(FP xpos, FP ypos, PSX_RECT* frameRect, FP spriteScale, Scale scale)
+void Shadow::Calculate_Position(FP xpos, FP ypos, PSX_RECT* frameRect, FP spriteScale, Scale scale, Layer ownerLayer)
 {
     if (mEnabled)
     {
@@ -146,7 +146,14 @@ void Shadow::Calculate_Position(FP xpos, FP ypos, PSX_RECT* frameRect, FP sprite
             mAnim.SetRender(false);
         }
 
-        if (scale == Scale::Fg)
+        if (ownerLayer == Layer::eLayer_InBirdPortal_30 || ownerLayer == Layer::eLayer_InBirdPortal_Half_11)
+        {
+            // The owner is going into or coming out of a bird portal, which clips its layer
+            // (IBirdPortal::ClipPortal). The shadow's own layer is drawn before the clip, so it
+            // showed where the owner didn't. Being added after the owner, it's still drawn under it.
+            mAnim.SetRenderLayer(ownerLayer);
+        }
+        else if (scale == Scale::Fg)
         {
             mAnim.SetRenderLayer(Layer::eLayer_Shadow_26);
         }
