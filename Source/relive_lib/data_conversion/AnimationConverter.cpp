@@ -8,6 +8,7 @@
 #include "PNGFile.hpp"
 #include <mapbox/shelf-pack.hpp>
 #include <FatalError.hpp>
+#include <utility>
 
 inline void to_json(nlohmann::json&  j, const Point32& p)
 {
@@ -81,6 +82,36 @@ static bool AttemptHalfSpaceBinPack(std::vector<mapbox::Bin>& myBins, std::vecto
         return AttemptHalfSpaceBinPack(myBins, packedHalf, allocTextureSize);
     }
     return false;
+}
+
+// AO's green glow (the DoorLight green lights) is a solid 4x5 block of texels in a 5x6 frame, and
+// DoorLight stretches it to 8x8, so it drew as a grey-green square. AO PC hid most of that: its
+// renderer showed the empty last row and column, and its 16 bit colour dropped the faint edge.
+// Round it off instead: clear the corners and fade the rest of the edge to the faintest colour.
+static void RoundAoGreenGlow(std::vector<u8>& spriteSheet, u32 sheetWidth, u32 baseX, u32 baseY, const FrameHeader* pFrameHeader)
+{
+    if (pFrameHeader->field_4_width != 5 || pFrameHeader->field_5_height != 6)
+    {
+        LOG_WARNING("AO GreenGlow isn't the size it should be, leaving it as it is");
+        return;
+    }
+
+    constexpr u8 kClear = 0;
+    constexpr u8 kFaintest = 1; // (24, 40, 24), semi transparent like the rest
+    const auto set = [&](u32 x, u32 y, u8 index)
+    {
+        spriteSheet[(baseY + y) * sheetWidth + baseX + x] = index;
+    };
+
+    for (const auto& [x, y] : {std::pair{0u, 0u}, {3u, 0u}, {0u, 4u}, {3u, 4u}})
+    {
+        set(x, y, kClear);
+    }
+
+    for (const auto& [x, y] : {std::pair{1u, 0u}, {2u, 0u}, {0u, 1u}, {3u, 1u}, {0u, 3u}, {3u, 3u}, {1u, 4u}, {2u, 4u}})
+    {
+        set(x, y, kFaintest);
+    }
 }
 
 AnimationConverter::AnimationConverter(FileSystem& fs, const FileSystem::Path& outputFile, const AnimRecord& rec, const std::vector<u8>& fileData, bool isAoData)
@@ -222,6 +253,11 @@ AnimationConverter::AnimationConverter(FileSystem& fs, const FileSystem::Path& o
             }
         }
 
+
+        if (isAoData && rec.mId == AnimId::GreenGlow)
+        {
+            RoundAoGreenGlow(spriteSheetBuffer, allocTextureSize, baseX, baseY, pFrameHeader);
+        }
 
         perFrameInfos[i].mWidth = pFrameHeader->field_4_width;
         perFrameInfos[i].mHeight = pFrameHeader->field_5_height;

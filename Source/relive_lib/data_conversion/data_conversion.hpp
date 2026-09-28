@@ -148,7 +148,8 @@ public:
         // mMovieName - see DecodeFmvChain_AE/AO.
         static constexpr u32 kPathVersion = 20;
         static constexpr u32 kPaletteVersion = 1;
-        static constexpr u32 kAnimationVersion = 4;
+        // 5: AO's green glow (DoorLight) has rounded corners, see RoundAoGreenGlow.
+        static constexpr u32 kAnimationVersion = 5;
         // 9: dropped the redundant "paths" subdir under each level, same as kPathVersion 17.
         static constexpr u32 kCameraVersion = 9;
         static constexpr u32 kSaveFileVersion = 3;
