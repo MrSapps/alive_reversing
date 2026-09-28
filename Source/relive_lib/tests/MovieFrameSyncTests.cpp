@@ -1,5 +1,5 @@
 // Unit tests for ProcessMovieFrameSync (MovieFrameSync.hpp) - the drop/wait/render decision
-// movie playback (Movie.cpp) makes for each decoded video frame against the movie's audio clock.
+// movie playback (Movie.cpp) makes for each decoded video frame against the movie clock, and for MovieClock.
 // Exercised here against a fake IMovieSyncClock instead of real audio/video/threads - frames are
 // just plain integers/timestamps from a fake sequence, not real decoded pixels, per the same
 // idea FileSystemTests.cpp already uses for pure-logic coverage elsewhere in this repo.
@@ -11,23 +11,17 @@
 
 namespace
 {
-    // A scriptable IMovieSyncClock: tests set the fields directly, advancing the audio clock
+    // A scriptable IMovieSyncClock: tests set the fields directly, advancing the movie clock
     // between calls the way real playback's main loop ticks let more audio play out.
     class FakeMovieSyncClock final : public IMovieSyncClock
     {
     public:
-        bool mAudioStarted = true;
-        u64 mAudioClockMs = 0;
+        u64 mClockMs = 0;
         bool mSkipRequested = false;
 
-        bool AudioStarted() const override
+        u64 ClockMs() const override
         {
-            return mAudioStarted;
-        }
-
-        u64 AudioClockMs() const override
-        {
-            return mAudioClockMs;
+            return mClockMs;
         }
 
         bool SkipRequested() const override
@@ -37,21 +31,10 @@ namespace
     };
 } // namespace
 
-TEST(MovieFrameSync, RendersImmediatelyWhenAudioHasNotStartedYet)
-{
-    FakeMovieSyncClock clock;
-    clock.mAudioStarted = false;
-    // Wildly "behind" by every other rule, but with no audio clock to sync against yet, video
-    // free-runs - matches a movie with no audio track at all.
-    clock.mAudioClockMs = 999999;
-
-    EXPECT_EQ(ProcessMovieFrameSync(0, clock), MovieFrameOutcome::Rendered);
-}
-
 TEST(MovieFrameSync, RendersWhenExactlyInSync)
 {
     FakeMovieSyncClock clock;
-    clock.mAudioClockMs = 1000;
+    clock.mClockMs = 1000;
 
     EXPECT_EQ(ProcessMovieFrameSync(1000, clock), MovieFrameOutcome::Rendered);
 }
@@ -61,7 +44,7 @@ TEST(MovieFrameSync, RendersWhenBehindButWithinDropThreshold)
     FakeMovieSyncClock clock;
     // Exactly at the threshold: frameMs + kMovieFrameDropThresholdMs == audioClockMs is NOT
     // "less than", so this must not be dropped.
-    clock.mAudioClockMs = 1000 + kMovieFrameDropThresholdMs;
+    clock.mClockMs = 1000 + kMovieFrameDropThresholdMs;
 
     EXPECT_EQ(ProcessMovieFrameSync(1000, clock), MovieFrameOutcome::Rendered);
 }
@@ -69,7 +52,7 @@ TEST(MovieFrameSync, RendersWhenBehindButWithinDropThreshold)
 TEST(MovieFrameSync, DropsWhenPastDropThreshold)
 {
     FakeMovieSyncClock clock;
-    clock.mAudioClockMs = 1000 + kMovieFrameDropThresholdMs + 1;
+    clock.mClockMs = 1000 + kMovieFrameDropThresholdMs + 1;
 
     EXPECT_EQ(ProcessMovieFrameSync(1000, clock), MovieFrameOutcome::Dropped);
     // Dropping doesn't wait on anything - it's a pure "skip this frame" decision.
@@ -78,7 +61,7 @@ TEST(MovieFrameSync, DropsWhenPastDropThreshold)
 TEST(MovieFrameSync, WaitsThenRendersOnceClockCatchesUp)
 {
     FakeMovieSyncClock clock;
-    clock.mAudioClockMs = 0;
+    clock.mClockMs = 0;
 
     // Each tick lets 40ms more of "audio" play out, same idea as real playback where a main
     // loop tick corresponds to some real elapsed time.
@@ -87,7 +70,7 @@ TEST(MovieFrameSync, WaitsThenRendersOnceClockCatchesUp)
     while ((outcome = ProcessMovieFrameSync(120, clock)) == MovieFrameOutcome::Wait)
     {
         ++waitCount;
-        clock.mAudioClockMs += 40;
+        clock.mClockMs += 40;
     }
 
     EXPECT_EQ(outcome, MovieFrameOutcome::Rendered);
@@ -98,7 +81,7 @@ TEST(MovieFrameSync, WaitsThenRendersOnceClockCatchesUp)
 TEST(MovieFrameSync, ReturnsSkippedInsteadOfWaitingWhenSkipHeld)
 {
     FakeMovieSyncClock clock;
-    clock.mAudioClockMs = 0;
+    clock.mClockMs = 0;
     clock.mSkipRequested = true;
 
     EXPECT_EQ(ProcessMovieFrameSync(1000, clock), MovieFrameOutcome::SkippedByUserInput);
@@ -107,13 +90,13 @@ TEST(MovieFrameSync, ReturnsSkippedInsteadOfWaitingWhenSkipHeld)
 TEST(MovieFrameSync, ReturnsSkippedPartwayThroughAWait)
 {
     FakeMovieSyncClock clock;
-    clock.mAudioClockMs = 0;
+    clock.mClockMs = 0;
 
     u32 waitCount = 0;
     MovieFrameOutcome outcome = MovieFrameOutcome::Wait;
     while ((outcome = ProcessMovieFrameSync(1000, clock)) == MovieFrameOutcome::Wait)
     {
-        clock.mAudioClockMs += 10;
+        clock.mClockMs += 10;
         if (++waitCount == 2)
         {
             clock.mSkipRequested = true;
@@ -137,7 +120,7 @@ TEST(MovieFrameSync, DropsAnEntireStaleBacklogBurstThenResumesRenderingLiveFrame
 {
     FakeMovieSyncClock clock;
     // The decoder fell behind for 11 real seconds - the audio clock kept advancing throughout.
-    clock.mAudioClockMs = 11000;
+    clock.mClockMs = 11000;
 
     // ~50 backlogged frames at 15fps (66.67ms apart), timestamps starting well before the clock.
     std::vector<u64> backlogFrameTimestampsMs;
@@ -226,4 +209,69 @@ TEST(MovieFrameSync, ThrottlesStaleFrameDisplayAcrossABacklog)
     EXPECT_GT(displayedCount, 0u);
     EXPECT_LT(displayedCount, 100u);
     EXPECT_EQ(displayedCount, 5u);
+}
+
+TEST(MovieClock, FollowsTheAudioWhileItPlays)
+{
+    MovieClock clock;
+    EXPECT_EQ(clock.Update(0, 1000), 0u);
+    // The audio, not the wall clock, decides: here it's running a bit slower
+    EXPECT_EQ(clock.Update(90, 1100), 90u);
+    EXPECT_EQ(clock.Update(180, 1200), 180u);
+}
+
+TEST(MovieClock, RunsOnWallClockTimeAfterTheAudioEnds)
+{
+    MovieClock clock;
+    EXPECT_EQ(clock.Update(5000, 10000), 5000u);
+    EXPECT_EQ(clock.Update(std::nullopt, 10016), 5016u);
+    EXPECT_EQ(clock.Update(std::nullopt, 11016), 6016u);
+}
+
+TEST(MovieClock, RunsOnWallClockTimeWithNoAudio)
+{
+    MovieClock clock;
+    // Starts at 0 whatever the wall clock reads
+    EXPECT_EQ(clock.Update(std::nullopt, 12345), 0u);
+    EXPECT_EQ(clock.Update(std::nullopt, 12345 + 67), 67u);
+}
+
+// Plays a 15fps movie on a 60Hz main loop and returns the wall-clock time it took. The audio
+// stops at audioEndMs (nullopt: no audio). Every frame must be rendered, none dropped. It
+// should take about as long as the video, give or take a frame.
+static u64 PlayMovie(u64 videoEndMs, std::optional<u64> audioEndMs)
+{
+    MovieClock movieClock;
+    FakeMovieSyncClock clock;
+    u64 wallMs = 0;
+    u64 frameMs = 0;
+    while (frameMs <= videoEndMs)
+    {
+        const bool audioPlaying = audioEndMs && wallMs < *audioEndMs;
+        clock.mClockMs = movieClock.Update(audioPlaying ? std::optional<u64>(wallMs) : std::nullopt, wallMs);
+        const MovieFrameOutcome outcome = ProcessMovieFrameSync(frameMs, clock);
+        EXPECT_NE(outcome, MovieFrameOutcome::Dropped) << "frame " << frameMs;
+        if (outcome != MovieFrameOutcome::Wait)
+        {
+            frameMs += 67;
+        }
+        wallMs += 16;
+    }
+    return wallMs;
+}
+
+// The video can run a few seconds past the end of its audio. Those last seconds used to play
+// as fast as the main loop could show frames, because with the audio gone there was no clock.
+TEST(MovieFrameSync, VideoThatOutlastsItsAudioKeepsItsPace)
+{
+    const u64 wallMs = PlayMovie(8000, 5000);
+    EXPECT_GE(wallMs, 8000u - 67u);
+    EXPECT_LE(wallMs, 8000u + 67u + 16u);
+}
+
+TEST(MovieFrameSync, VideoWithNoAudioKeepsItsPace)
+{
+    const u64 wallMs = PlayMovie(3000, std::nullopt);
+    EXPECT_GE(wallMs, 3000u - 67u);
+    EXPECT_LE(wallMs, 3000u + 67u + 16u);
 }

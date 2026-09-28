@@ -914,20 +914,14 @@ const u32 MOVIE_SKIPPER_GAMEPAD_INPUTS = (InputCommands::eUnPause_OrConfirm | In
     class RealMovieSyncClock final : public IMovieSyncClock
     {
     public:
-        RealMovieSyncClock(bool audioStarted, u64 audioStartSample)
-            : mAudioStarted(audioStarted)
-            , mAudioStartSample(audioStartSample)
+        explicit RealMovieSyncClock(u64 clockMs)
+            : mClockMs(clockMs)
         {
         }
 
-        bool AudioStarted() const override
+        u64 ClockMs() const override
         {
-            return mAudioStarted;
-        }
-
-        u64 AudioClockMs() const override
-        {
-            return (SND_Get_Generated_Audio_Samples() - mAudioStartSample) * 1000 / SND_Get_Device_Sample_Rate();
+            return mClockMs;
         }
 
         bool SkipRequested() const override
@@ -936,8 +930,7 @@ const u32 MOVIE_SKIPPER_GAMEPAD_INPUTS = (InputCommands::eUnPause_OrConfirm | In
         }
 
     private:
-        const bool mAudioStarted;
-        const u64 mAudioStartSample;
+        const u64 mClockMs;
     };
 
 static void Render_DDV_Frame(Poly_FT4* poly)
@@ -1124,11 +1117,11 @@ private:
         }
 
         const u64 frameMs = mPendingFrame->mPtsNs / 1000000ULL;
-        RealMovieSyncClock syncClock(mAudioStarted, mAudioStartSample);
+        RealMovieSyncClock syncClock(UpdateMovieClock());
         const MovieFrameOutcome syncOutcome = ProcessMovieFrameSync(frameMs, syncClock);
         if (syncOutcome == MovieFrameOutcome::Wait)
         {
-            // Ahead of the audio, show it on a later tick
+            // Ahead of the movie clock, show it on a later tick
             return StepResult::eYield;
         }
 
@@ -1177,6 +1170,13 @@ private:
         return mAudioStarted
             ? (SND_Get_Generated_Audio_Samples() - mAudioStartSample) * 1000 / SND_Get_Device_Sample_Rate()
             : 0;
+    }
+
+    // Follows the audio while it plays. The video can outlast the audio by a few seconds, and
+    // some movies have none, so otherwise it keeps going on wall-clock time.
+    u64 UpdateMovieClock()
+    {
+        return mMovieClock.Update(mAudioStarted ? std::optional<u64>(AudioClockMs()) : std::nullopt, SYS_GetTicks());
     }
 
     // Moves decoded audio into the movie's sound buffer as it has room, starting it once enough
@@ -1339,6 +1339,7 @@ private:
     u32 mAudioWriteCount = 0;
     bool mAudioStarted = false;
     bool mAudioFinished = false;
+    MovieClock mMovieClock;
 
     u32 mRenderedFrameCount = 0;
     u32 mDroppedFrameCount = 0;
