@@ -72,6 +72,18 @@ CommandLineOptions CommandLineOptions::Parse(const CommandLineParser& clp)
     }
 
     options.mRendererChecks = clp.HasSwitch("-renderer_checks");
+    options.mPs1Sound = clp.HasSwitch("-ps1_sound");
+    if (const auto filter = clp.GetValue("-spu_filter"))
+    {
+        if (*filter == "gaussian")
+        {
+            options.mSpuFilterGaussian = true;
+        }
+        else if (*filter != "hq")
+        {
+            LOG_WARNING("Ignoring -spu_filter=%s, it should be hq or gaussian", filter->c_str());
+        }
+    }
 
     options.mRecordFile = clp.GetValue("-record");
     options.mFlushRecording = clp.HasSwitch("-flush");
@@ -117,6 +129,9 @@ const char* CommandLineOptions::Usage()
            "  -ddnoskip                   Render every frame instead of skipping to keep up\n"
            "  -ddslowload=<ms>            Make each resource take at least this long to load\n"
            "  -renderer_checks            Check for renderer errors as it goes (slower)\n"
+           "  -ps1_sound                  Play the sound on an emulated PS1 SPU (work in progress)\n"
+           "  -spu_filter=<name>          With -ps1_sound: hq (default, no aliasing at high notes)\n"
+           "                              or gaussian (the PS1's own, buzzes on some high notes)\n"
            "  -convert                    Convert the game data if it's out of date, then exit\n"
            "                              (no window)\n"
            "  -help, --help, -h, /?       Show this and exit\n"

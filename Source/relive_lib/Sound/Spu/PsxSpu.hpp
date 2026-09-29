@@ -146,6 +146,18 @@ private:
 class PsxSpu final
 {
 public:
+    // How a voice's sample is resampled to 44100 Hz
+    enum class Interpolation : u8
+    {
+        // The SPU's 4 point gaussian interpolation at every pitch. Exact, but a voice played above
+        // 44100 Hz (PITCH > 1000h) aliases: its sample's high frequencies fold back into the audible
+        // range, which is heard as a buzz on bright samples at high notes.
+        Gaussian,
+        // Not the hardware: gaussian at and below 44100 Hz, and a band-limited (windowed sinc)
+        // resampler above it, which filters out what would alias. Same timing as the gaussian.
+        BandLimited,
+    };
+
     static constexpr s32 kNumVoices = 24;
     static constexpr u32 kSampleRate = 44100;
     static constexpr u16 kPitch44100 = 0x1000;
@@ -176,6 +188,9 @@ public:
     // KON/KOFF with a bit per voice, like the registers
     void KeyOnMask(u32 voices);
     void KeyOffMask(u32 voices);
+    // Silences a voice at once (level 0, no release), like a one shot sample's end. Not a hardware
+    // register: for stealing a voice, or before freeing the sample it plays.
+    void StopVoice(s32 voice);
 
     // ENDX: a bit per voice, set when the voice reaches its sample's (loop) end, cleared by key on.
     // Every voice starts with its bit set.
@@ -214,6 +229,16 @@ public:
         return mReverb;
     }
 
+    void SetInterpolation(Interpolation interpolation)
+    {
+        mInterpolation = interpolation;
+    }
+
+    Interpolation CurrentInterpolation() const
+    {
+        return mInterpolation;
+    }
+
     // Mixes frames 44100 Hz stereo samples into out (left, right, left, ...), overwriting it
     void Render(s16* out, u32 frames);
 
@@ -222,9 +247,11 @@ public:
     // PITCH register for a sample authored at sampleRate Hz, played at its natural speed
     static u16 PitchFromSampleRate(u32 sampleRate);
 
-    // PITCH register to play note (+ fine in 1/128 semitones) on a tone with root note centre
-    // (+ shift in 1/128 semitones), as the VAB tone's centre/shift give it. The tone's sample
-    // plays at 44100 Hz (0x1000) at its root note. Clamped to 0-0x3FFF.
+    // PITCH register to play note + fine (0-127, 1/128 semitones) on a VAB tone with root note
+    // centre and fine tune shift (1/128 semitones), exactly as libsnd's SsPitchFromNote does it.
+    // The shift RAISES the pitch: it's added to the note's fine tune, not to the root note. The
+    // tone's sample plays at 44100 Hz (0x1000) at its root note. The result is rounded down to 1/16
+    // semitones, and isn't clamped: values above 0x3FFF play at 0x4000 (see SetVoicePitch).
     static u16 PitchFromNote(s32 note, s32 fine, s32 centre, s32 shift);
 
     // The 512 entry 4 point interpolation table ("gaussian"), from psx-spx
@@ -248,6 +275,7 @@ private:
         u32 mCounter = 0;  // Pitch counter, bits 0-11: fraction, bits 4-11: interpolation index
         u32 mPosition = 0; // Next sample to read
         s16 mHistory[4] = {}; // oldest, older, old, new
+        u32 mSamplesRead = 0; // Since key on, loops unrolled: mHistory[3] is sample mSamplesRead - 1
     };
 
     bool ValidVoice(s32 voice) const
@@ -256,9 +284,14 @@ private:
     }
 
     s16 ReadNextSample(s32 voiceIdx, Voice& voice);
+    // The sample at index (since key on, loops unrolled) without moving the voice on: 0 before the
+    // key on and after a one shot sample's end
+    static s32 SampleAt(const Voice& voice, s64 index);
+    static s32 BandLimitedSample(const Voice& voice);
     void TickVoice(s32 voiceIdx, Voice& voice, s32& left, s32& right, s32& reverbLeft, s32& reverbRight);
 
     std::array<Voice, kNumVoices> mVoices;
+    Interpolation mInterpolation = Interpolation::Gaussian;
     u32 mEndx = 0;
     PsxSpuVolume mMasterLeft;
     PsxSpuVolume mMasterRight;

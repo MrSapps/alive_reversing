@@ -21,6 +21,7 @@
 #include "../relive_lib/Psx.hpp"
 #include "../relive_lib/DynamicArray.hpp"
 #include "../relive_lib/Sound/Sound.hpp" // for shut down func
+#include "../relive_lib/Sound/SDLSoundSystem.hpp"
 #include "AmbientSound.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
 #include "../AliveLibAE/Map.hpp"
@@ -293,6 +294,9 @@ void Engine::Init_Sound_DynamicArrays_And_Others()
 
     gBaseAliveGameObjects = relive_new DynamicArrayT<BaseAliveGameObject>(20);
 
+    // SND_Init creates the sound system
+    SDLSoundSystem::SetPs1SoundOnCreate(mOptions.mPs1Sound,
+        mOptions.mSpuFilterGaussian ? PsxSpu::Interpolation::Gaussian : PsxSpu::Interpolation::BandLimited);
     if (mGameType == GameType::eAe)
     {
         SND_Init();

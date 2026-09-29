@@ -1,6 +1,7 @@
 #include "PsxSpu.hpp"
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 // Implemented from psx-spx, "Sound Processing Unit (SPU)": "SPU ADPCM Pitch" (pitch counter,
 // 4 point interpolation), "SPU Volume and ADSR Generator" and "SPU Voice Flags".
@@ -390,6 +391,7 @@ void PsxSpu::KeyOn(s32 voice)
     v.mPlaying = true;
     v.mCounter = 0;
     v.mPosition = 0;
+    v.mSamplesRead = 0;
     mEndx &= ~(1u << voice);
 
     // The interpolation starts with the first sample as the newest one and silence before it
@@ -404,6 +406,16 @@ void PsxSpu::KeyOff(s32 voice)
     if (ValidVoice(voice))
     {
         mVoices[voice].mEnvelope.KeyOff();
+    }
+}
+
+void PsxSpu::StopVoice(s32 voice)
+{
+    if (ValidVoice(voice))
+    {
+        mVoices[voice].mEnvelope.Mute();
+        mVoices[voice].mPlaying = false;
+        mVoices[voice].mSample = {};
     }
 }
 
@@ -477,12 +489,49 @@ u16 PsxSpu::PitchFromSampleRate(u32 sampleRate)
     return static_cast<u16>(std::min<u64>(pitch, 0x3FFF));
 }
 
+// libsnd's pitch table: 4096 * 2^(i / 192) rounded down, a semitone (12 x 16 steps of 1/16 semitone)
+// for each of the 12 notes of the octave above the root note. The same values as the one in the AE
+// PS1 executable (SLES_014.80, 0x8009F090).
+static const std::array<u16, 192> kNotePitchTable = {{
+    4096, 4110, 4125, 4140, 4155, 4170, 4185, 4200, 4216, 4231, 4246, 4261, 4277, 4292, 4308, 4323,
+    4339, 4355, 4371, 4386, 4402, 4418, 4434, 4450, 4466, 4482, 4499, 4515, 4531, 4548, 4564, 4581,
+    4597, 4614, 4630, 4647, 4664, 4681, 4698, 4715, 4732, 4749, 4766, 4783, 4801, 4818, 4835, 4853,
+    4870, 4888, 4906, 4924, 4941, 4959, 4977, 4995, 5013, 5031, 5050, 5068, 5086, 5105, 5123, 5142,
+    5160, 5179, 5198, 5216, 5235, 5254, 5273, 5292, 5311, 5331, 5350, 5369, 5389, 5408, 5428, 5447,
+    5467, 5487, 5507, 5527, 5547, 5567, 5587, 5607, 5627, 5648, 5668, 5688, 5709, 5730, 5750, 5771,
+    5792, 5813, 5834, 5855, 5876, 5898, 5919, 5940, 5962, 5983, 6005, 6027, 6049, 6070, 6092, 6114,
+    6137, 6159, 6181, 6203, 6226, 6248, 6271, 6294, 6316, 6339, 6362, 6385, 6408, 6431, 6455, 6478,
+    6501, 6525, 6549, 6572, 6596, 6620, 6644, 6668, 6692, 6716, 6741, 6765, 6789, 6814, 6839, 6863,
+    6888, 6913, 6938, 6963, 6988, 7014, 7039, 7064, 7090, 7116, 7141, 7167, 7193, 7219, 7245, 7271,
+    7298, 7324, 7351, 7377, 7404, 7431, 7458, 7485, 7512, 7539, 7566, 7593, 7621, 7648, 7676, 7704,
+    7732, 7760, 7788, 7816, 7844, 7873, 7901, 7930, 7958, 7987, 8016, 8045, 8074, 8103, 8133, 8162,
+}};
+
 u16 PsxSpu::PitchFromNote(s32 note, s32 fine, s32 centre, s32 shift)
 {
-    // In 1/128 semitones
-    const s32 offset = (note * 128 + fine) - (centre * 128 + shift);
-    const f64 pitch = std::round(kPitch44100 * std::exp2(offset / (12.0 * 128.0)));
-    return static_cast<u16>(std::clamp(pitch, 0.0, static_cast<f64>(0x3FFF)));
+    // libsnd's SsPitchFromNote, from the AE PS1 executable (0x80076620; the SEQ note on at
+    // 0x80076518 does the same with the tone's centre/shift). The shift is added to the fine tune,
+    // then both are rounded down to 1/16 semitones, carrying one semitone at most. Negative values
+    // round towards zero, as the MIPS code does.
+    const s32 fineShift = (fine + (shift & 0xFF)) / 8;
+    const s32 carry = fineShift >= 16 ? 1 : 0;
+    const s32 step = fineShift - carry * 16;
+    const s32 semitones = note - (centre - 60) + carry;
+
+    // The table is the octave above the root (semitones 60-71). A note more than 60 semitones below
+    // the root makes libsnd read before its table (its division rounds towards zero), so round down
+    // instead there, which gives the right pitch. A negative fine tune does the same, but callers
+    // pass 0-127.
+    const s32 octaveOfNote = semitones >= 0 ? semitones / 12 : -((-semitones + 11) / 12);
+    const s32 idx = (semitones - octaveOfNote * 12) * 16 + step;
+    const u32 pitch = kNotePitchTable[static_cast<size_t>(std::clamp(idx, 0, 191))];
+
+    const s32 octave = octaveOfNote - 5;
+    if (octave > 0)
+    {
+        return static_cast<u16>(pitch << octave);
+    }
+    return static_cast<u16>(pitch >> std::min(-octave, 31));
 }
 
 s16 PsxSpu::ReadNextSample(s32 voiceIdx, Voice& voice)
@@ -510,13 +559,98 @@ s16 PsxSpu::ReadNextSample(s32 voiceIdx, Voice& voice)
         }
         voice.mPosition = sample.mLoopStart;
     }
+    voice.mSamplesRead++;
     return sample.mPcm[voice.mPosition++];
+}
+
+s32 PsxSpu::SampleAt(const Voice& voice, s64 index)
+{
+    const PsxSpuSample& sample = voice.mSample;
+    if (index < 0 || !sample.mPcm)
+    {
+        return 0;
+    }
+
+    const u32 length = sample.mLength;
+    u32 end = length;
+    bool loop = false;
+    if (sample.mLoop)
+    {
+        end = sample.mLoopEnd == 0 ? length : std::min(sample.mLoopEnd, length);
+        loop = sample.mLoopStart < end;
+    }
+
+    if (index < end)
+    {
+        return sample.mPcm[index];
+    }
+    if (!loop)
+    {
+        return 0;
+    }
+    const u32 loopLength = end - sample.mLoopStart;
+    return sample.mPcm[sample.mLoopStart + static_cast<u32>((index - end) % loopLength)];
+}
+
+// The band-limited kernel: a sinc with its cutoff at kCutoff of the output Nyquist, windowed
+// (Blackman) to kKernelHalfWidth output samples each side, in kKernelSteps steps per output sample.
+// It's stretched by the pitch ratio, so the cutoff follows the output rate.
+static constexpr s32 kKernelHalfWidth = 16;
+static constexpr s32 kKernelSteps = 256;
+static constexpr f64 kCutoff = 0.9;
+
+static std::vector<s32> MakeBandLimitedKernel()
+{
+    const f64 pi = 3.14159265358979323846;
+    std::vector<s32> kernel(kKernelHalfWidth * kKernelSteps + 1);
+    for (s32 i = 0; i < static_cast<s32>(kernel.size()); i++)
+    {
+        const f64 u = static_cast<f64>(i) / kKernelSteps;
+        const f64 x = pi * kCutoff * u;
+        const f64 sinc = i == 0 ? 1.0 : std::sin(x) / x;
+        const f64 w = u / kKernelHalfWidth;
+        const f64 window = 0.42 + 0.5 * std::cos(pi * w) + 0.08 * std::cos(2.0 * pi * w);
+        kernel[i] = static_cast<s32>(std::lround(kCutoff * sinc * window * 32768.0));
+    }
+    return kernel;
+}
+
+s32 PsxSpu::BandLimitedSample(const Voice& voice)
+{
+    static const std::vector<s32> kKernel = MakeBandLimitedKernel();
+
+    // The same position the gaussian interpolates at: mHistory[1] plus the counter's fraction, in
+    // 1/4096 samples
+    const s64 position = (static_cast<s64>(voice.mSamplesRead) - 3) * 0x1000 + (voice.mCounter & 0xFFF);
+    const s64 pitch = std::min(voice.mPitch, kMaxPitch);
+
+    // Kernel steps per 1/4096 of a source sample, in 16.16: kKernelSteps / pitch
+    const s64 stepScale = (static_cast<s64>(kKernelSteps) << 16) / pitch;
+    const s64 halfWidth = (kKernelHalfWidth * pitch + 0xFFF) / 0x1000; // In source samples
+    const s64 centre = position >> 12;
+
+    s64 sum = 0;
+    for (s64 j = centre - halfWidth; j <= centre + halfWidth + 1; j++)
+    {
+        const s64 distance = position - j * 0x1000;
+        const s64 k = ((distance < 0 ? -distance : distance) * stepScale) >> 16;
+        if (k >= static_cast<s64>(kKernel.size()))
+        {
+            continue;
+        }
+        sum += SampleAt(voice, j) * kKernel[static_cast<size_t>(k)];
+    }
+
+    // The kernel's gain is the pitch ratio (it's pitch / 1000h source samples per output sample)
+    const s64 out = ((sum >> 15) * 0x1000) / pitch;
+    return static_cast<s32>(std::clamp<s64>(out, -0x8000, 0x7FFF));
 }
 
 void PsxSpu::TickVoice(s32 voiceIdx, Voice& voice, s32& left, s32& right, s32& reverbLeft, s32& reverbRight)
 {
     // Output: interpolate, then apply the envelope and the voice volume
-    const s32 sample = Interpolate(voice.mHistory, (voice.mCounter >> 4) & 0xFF);
+    const bool bandLimited = mInterpolation == Interpolation::BandLimited && voice.mPitch > kPitch44100;
+    const s32 sample = bandLimited ? BandLimitedSample(voice) : Interpolate(voice.mHistory, (voice.mCounter >> 4) & 0xFF);
     const s32 enveloped = (sample * voice.mEnvelope.Level()) >> 15;
     const s32 outLeft = (enveloped * voice.mVolumeLeft.Current()) >> 15;
     const s32 outRight = (enveloped * voice.mVolumeRight.Current()) >> 15;

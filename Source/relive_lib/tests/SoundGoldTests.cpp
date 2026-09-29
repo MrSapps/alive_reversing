@@ -3,6 +3,8 @@
 // in tests/sound_gold. They pin the current behaviour so the sound code and its data formats can
 // be refactored without changing what the games sound like.
 //
+// The ps1_ gold files are the same scenarios played on the emulated PS1 SPU (-ps1_sound).
+//
 // A deliberate behaviour change updates the gold files: run the tests with
 // RELIVE_UPDATE_SOUND_GOLD=1 and review the diff. A failing test saves its trace and a WAV of its
 // audio to <temp>/relive_sound_gold/ to compare with.
@@ -281,7 +283,7 @@ static void CompareWithGold(const std::string& name, const std::string& trace, c
     }
 }
 
-static void RunGold(GameType game, const std::string& scenario, const std::function<void(SoundGoldSession&)>& play)
+static void RunGold(GameType game, bool ps1Sound, const std::string& scenario, const std::function<void(SoundGoldSession&)>& play)
 {
     SetGameType(game);
     ScratchDir dir;
@@ -294,14 +296,23 @@ static void RunGold(GameType game, const std::string& scenario, const std::funct
         FileSystem fs;
         ResourceManagerWrapper resMan(fs, "");
 
-        SoundGoldSession session(game);
-        session.LoadSoundBlock(resMan, info, 0, kTheme);
+        SoundGoldSession session(game, ps1Sound);
+        // Only the SPU has a reverb
+        session.LoadSoundBlock(resMan, info, ps1Sound ? 40 : 0, kTheme);
         play(session);
         trace = session.Trace();
         audio = session.Audio();
     }
 
-    CompareWithGold(std::string(game == GameType::eAo ? "ao_" : "ae_") + scenario, trace, audio);
+    if (ps1Sound)
+    {
+        EXPECT_TRUE(std::any_of(audio.begin(), audio.end(), [](const StereoSample_S16& s)
+        {
+            return s.left != 0 || s.right != 0;
+        })) << "The SPU played nothing";
+    }
+
+    CompareWithGold(std::string(ps1Sound ? "ps1_" : "") + (game == GameType::eAo ? "ao_" : "ae_") + scenario, trace, audio);
 }
 
 static relive::SfxDefinition Sfx(s32 program, s32 note, s16 volume, s16 pitchMin, s16 pitchMax)
@@ -315,9 +326,9 @@ static s32 KeyOn(SoundGoldSession& session, s32 program, s32 note, u16 vol)
     return SsVoKeyOn_4FCF10((session.VabId() << 8) | program, note << 8, vol, vol);
 }
 
-static void Sfx(GameType game)
+static void Sfx(GameType game, bool ps1Sound)
 {
-    RunGold(game, "sfx", [](SoundGoldSession& session)
+    RunGold(game, ps1Sound, "sfx", [](SoundGoldSession& session)
     {
         session.Note("sfx stereo prog 0");
         SFX_SfxDefinition_Play_Stereo(Sfx(0, 60, 100, 0, 0), 100, 60, 0, 0);
@@ -343,9 +354,9 @@ static void Sfx(GameType game)
     });
 }
 
-static void Adsr(GameType game)
+static void Adsr(GameType game, bool ps1Sound)
 {
-    RunGold(game, "adsr", [](SoundGoldSession& session)
+    RunGold(game, ps1Sound, "adsr", [](SoundGoldSession& session)
     {
         const s32 attack = KeyOn(session, 1, 64, 100);
         const s32 looped = KeyOn(session, 2, 60, 110);
@@ -371,9 +382,9 @@ static void Adsr(GameType game)
     });
 }
 
-static void Seq(GameType game)
+static void Seq(GameType game, bool ps1Sound)
 {
-    RunGold(game, "seq", [](SoundGoldSession& session)
+    RunGold(game, ps1Sound, "seq", [](SoundGoldSession& session)
     {
         const std::vector<u16> seqs = session.LoadedSeqs();
         ASSERT_EQ(seqs.size(), 2u);
@@ -401,9 +412,9 @@ static void Seq(GameType game)
     });
 }
 
-static void Steal(GameType game)
+static void Steal(GameType game, bool ps1Sound)
 {
-    RunGold(game, "steal", [](SoundGoldSession& session)
+    RunGold(game, ps1Sound, "steal", [](SoundGoldSession& session)
     {
         // More notes than the 24 channels, with different priorities
         const s32 programs[] = {0, 1, 2, 5, 8};
@@ -419,14 +430,22 @@ static void Steal(GameType game)
     });
 }
 
-TEST(SoundGold, AE_Sfx) { Sfx(GameType::eAe); }
-TEST(SoundGold, AO_Sfx) { Sfx(GameType::eAo); }
-TEST(SoundGold, AE_Adsr) { Adsr(GameType::eAe); }
-TEST(SoundGold, AO_Adsr) { Adsr(GameType::eAo); }
-TEST(SoundGold, AE_Seq) { Seq(GameType::eAe); }
-TEST(SoundGold, AO_Seq) { Seq(GameType::eAo); }
-TEST(SoundGold, AE_Steal) { Steal(GameType::eAe); }
-TEST(SoundGold, AO_Steal) { Steal(GameType::eAo); }
+TEST(SoundGold, AE_Sfx) { Sfx(GameType::eAe, false); }
+TEST(SoundGold, AO_Sfx) { Sfx(GameType::eAo, false); }
+TEST(SoundGold, AE_Adsr) { Adsr(GameType::eAe, false); }
+TEST(SoundGold, AO_Adsr) { Adsr(GameType::eAo, false); }
+TEST(SoundGold, AE_Seq) { Seq(GameType::eAe, false); }
+TEST(SoundGold, AO_Seq) { Seq(GameType::eAo, false); }
+TEST(SoundGold, AE_Steal) { Steal(GameType::eAe, false); }
+TEST(SoundGold, AO_Steal) { Steal(GameType::eAo, false); }
+TEST(SoundGold, PS1_AE_Sfx) { Sfx(GameType::eAe, true); }
+TEST(SoundGold, PS1_AO_Sfx) { Sfx(GameType::eAo, true); }
+TEST(SoundGold, PS1_AE_Adsr) { Adsr(GameType::eAe, true); }
+TEST(SoundGold, PS1_AO_Adsr) { Adsr(GameType::eAo, true); }
+TEST(SoundGold, PS1_AE_Seq) { Seq(GameType::eAe, true); }
+TEST(SoundGold, PS1_AO_Seq) { Seq(GameType::eAo, true); }
+TEST(SoundGold, PS1_AE_Steal) { Steal(GameType::eAe, true); }
+TEST(SoundGold, PS1_AO_Steal) { Steal(GameType::eAo, true); }
 
 // The same calls must give the same trace and audio every time
 TEST(SoundGold, Deterministic)

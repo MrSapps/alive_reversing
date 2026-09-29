@@ -397,6 +397,8 @@ SET(renderer_src
 
 SET(sound_src
     Sound/PsxSpuApi.cpp
+    Sound/PsxSoundEngine.hpp
+    Sound/PsxSoundEngine.cpp
     Sound/PsxSpuApi.hpp
     Sound/Midi.cpp
     Sound/Midi.hpp
@@ -859,6 +861,7 @@ add_executable(relive_lib_tests
     tests/SoundTestData.hpp
     tests/SoundGoldTests.cpp
     tests/PsxSpuTests.cpp
+    tests/PsxSoundEngineTests.cpp
     tests/TestStubs.cpp
 )
 target_include_directories(relive_lib_tests PRIVATE

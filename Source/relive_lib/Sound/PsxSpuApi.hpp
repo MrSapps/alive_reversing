@@ -39,6 +39,33 @@ struct VabHeader final
 };
 ALIVE_ASSERT_SIZEOF(VabHeader, 0x820);
 
+// A VAB tone, 16 per program after the VabHeader
+struct VagAtr final
+{
+    s8 field_0_priority;
+    s8 field_1_mode;
+    s8 field_2_vol;
+    s8 field_3_pan;
+    u8 field_4_centre;
+    u8 field_5_shift;
+    s8 field_6_min;
+    s8 field_7_max;
+    s8 field_8_vibW;
+    s8 field_9_vibT;
+    s8 field_A_porW;
+    s8 field_B_porT;
+    s8 field_C_pitch_bend_min;
+    s8 field_D_pitch_bend_max;
+    s8 field_E_reserved1;
+    s8 field_F_reserved2;
+    s16 field_10_adsr1;
+    s16 field_12_adsr2;
+    s16 field_14_prog;
+    s16 field_16_vag;
+    s16 field_18_reserved[4];
+};
+ALIVE_ASSERT_SIZEOF(VagAtr, 0x20);
+
 s16 SsVabOpenHead(VabHeader* pVabHeader);
 
 struct VabBodyRecord final
@@ -153,8 +180,8 @@ struct MIDI_SeqSong final
     s8 field_30_timeSignatureBars;
     s8 field_31_timeSignatureBars2; // bug: maybe they should have assigned beats instead? but never read anyway
     MIDI_ProgramVolume field_32_progVols[16];
-    s8 field_62_pad;
-    s8 field_63_pad;
+    // Microseconds of field_4_time that are left over from the whole milliseconds (was padding)
+    u16 mTimeRemainderUs;
 };
 ALIVE_ASSERT_SIZEOF(MIDI_SeqSong, 100);
 
@@ -231,10 +258,15 @@ void SsSeqPlay_4FD900(u16 idx, s8 playMode, s16 repeatCount);
 
 s32 MIDI_ParseMidiMessage_4FD100(s32 idx);
 s32 MIDI_Read_Var_Len_4FD0D0(MIDI_SeqSong* pMidiStru);
+// Moves the song's next event time (field_4_time, ms) on by ticks at its tempo (field_14_tempo, us
+// per tick), keeping the sub millisecond remainder. The PC code rounded every delta down to a whole
+// ms, which made the SEQs play up to 2% fast.
+void MIDI_AddDeltaTime(MIDI_SeqSong& song, u32 ticks);
 u8 MIDI_ReadByte_4FD6B0(MIDI_SeqSong* pData);
 void MIDI_SkipBytes_4FD6C0(MIDI_SeqSong* pData, s32 length);
 void MIDI_SetTempo(s16 idx, s16 kZero, s16 tempo);
-s32 MIDI_PlayerPlayMidiNote_4FCE80(s32 vabId, s32 program, s32 note, s32 leftVol, s32 rightVol, s32 volume);
+// seqIdx: the SEQ playing the note (for the PS1 sound)
+s32 MIDI_PlayerPlayMidiNote_4FCE80(s32 vabId, s32 program, s32 note, s32 leftVol, s32 rightVol, s32 volume, s32 seqIdx);
 s32 MIDI_Allocate_Channel(s32 not_used, s32 priority);
 
 using TVSyncCallBackFn = void(CC*)();

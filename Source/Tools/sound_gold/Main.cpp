@@ -33,7 +33,11 @@ static const char* kUsage =
     "  -out=<dir>        Where to write (default sound_gold_out)\n"
     "  -baseline=<dir>   Compare with an earlier run's -out, exit code 1 if anything differs\n"
     "  -theme=<name>     Only this sound theme\n"
-    "  -seq_ms=<ms>      Longest time a SEQ is played for (default 60000)\n";
+    "  -seq_ms=<ms>      Longest time a SEQ is played for (default 60000)\n"
+    "  -ps1_sound        Play on the emulated PS1 SPU, as relive -ps1_sound does\n"
+    "  -reverb=<depth>   The path reverb depth, 0-127 (default 0). Only the SPU has a reverb\n"
+    "  -seq_vol=<vol>    The volume the SEQs are played at, 0-127 (default 100)\n"
+    "  -spu_filter=<f>   With -ps1_sound: hq (default) or gaussian, as relive -spu_filter\n";
 
 // relive_lib calls out to this for recording and playback, which this tool doesn't use
 BaseGameAutoPlayer& GetGameAutoPlayer()
@@ -71,6 +75,10 @@ struct Options final
     fs::path mOut = "sound_gold_out";
     std::string mTheme;
     u32 mSeqMs = 60000;
+    s32 mReverb = 0;
+    bool mPs1Sound = false;
+    s16 mSeqVol = 100;
+    PsxSpu::Interpolation mInterpolation = PsxSpu::Interpolation::BandLimited;
 };
 
 // Plays one item in a new session so each result stands alone
@@ -84,8 +92,8 @@ static void RenderItem(const Options& options, ResourceManagerWrapper& resMan, c
     info->mSeqFiles = themeInfo.mSeqFiles;
     info->mSoundTheme = theme;
 
-    SoundGoldSession session(options.mGame);
-    session.LoadSoundBlock(resMan, info, 0, monkTheme);
+    SoundGoldSession session(options.mGame, options.mPs1Sound, options.mInterpolation);
+    session.LoadSoundBlock(resMan, info, options.mReverb, monkTheme);
     play(session);
 
     const fs::path base = options.mOut / theme / name;
@@ -132,7 +140,7 @@ static void RenderTheme(const Options& options, ResourceManagerWrapper& resMan, 
                 }
 
                 session.Note("play " + seqName);
-                SND_SEQ_Play(idx, 1, 100, 100);
+                SND_SEQ_Play(idx, 1, options.mSeqVol, options.mSeqVol);
                 u32 played = 0;
                 while (played < options.mSeqMs && SND_SsIsEos_DeInlined(idx))
                 {
@@ -194,6 +202,19 @@ s32 main(s32 argc, char_type** argv)
     if (const std::optional<std::string> seqMs = args.GetValue("-seq_ms"))
     {
         options.mSeqMs = static_cast<u32>(std::stoul(*seqMs));
+    }
+    if (const std::optional<std::string> reverb = args.GetValue("-reverb"))
+    {
+        options.mReverb = std::stoi(*reverb);
+    }
+    options.mPs1Sound = args.HasSwitch("-ps1_sound");
+    if (args.GetValue("-spu_filter").value_or("hq") == "gaussian")
+    {
+        options.mInterpolation = PsxSpu::Interpolation::Gaussian;
+    }
+    if (const std::optional<std::string> seqVol = args.GetValue("-seq_vol"))
+    {
+        options.mSeqVol = static_cast<s16>(std::stoi(*seqVol));
     }
     const std::optional<std::string> baseline = args.GetValue("-baseline");
     const fs::path baselineDir = baseline ? fs::absolute(*baseline) : fs::path();

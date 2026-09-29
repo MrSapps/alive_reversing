@@ -7,6 +7,15 @@
 
 extern bool gLatencyHack;
 
+static bool sPs1SoundOnCreate = false;
+static PsxSpu::Interpolation sPs1SoundInterpolation = PsxSpu::Interpolation::BandLimited;
+
+void SDLSoundSystem::SetPs1SoundOnCreate(bool enable, PsxSpu::Interpolation interpolation)
+{
+    sPs1SoundOnCreate = enable;
+    sPs1SoundInterpolation = interpolation;
+}
+
 void SDLSoundSystem::Init(u32 /*sampleRate*/, s32 /*bitsPerSample*/, s32 /*isStereo*/)
 {
     mCreated = false;
@@ -61,6 +70,13 @@ void SDLSoundSystem::Init(u32 /*sampleRate*/, s32 /*bitsPerSample*/, s32 /*isSte
 
 void SDLSoundSystem::InitMixer()
 {
+    if (sPs1SoundOnCreate)
+    {
+        LOG_INFO("PS1 sound: the VAB tones play on the emulated SPU");
+        mPs1Sound = std::make_unique<PsxSoundEngine>();
+        mPs1Sound->SetInterpolation(sPs1SoundInterpolation);
+    }
+
     Reverb_Init(mAudioDeviceSpec.freq);
 
     GetSoundAPI().SND_InitVolumeTable();
@@ -299,6 +315,12 @@ void SDLSoundSystem::RenderAudio(StereoSample_S16* pSampleBuffer, s32 sampleBuff
 
         // Mix our no reverb buffer
         SDL_MixAudio(reinterpret_cast<Uint8*>(pSampleBuffer), reinterpret_cast<Uint8*>(mNoReverbBuffer.data()), SDL_AUDIO_S16, sampleBufferCount * sizeof(StereoSample_S16), kMixVolume);
+    }
+
+    // After the generic reverb: the SPU has its own
+    if (mPs1Sound)
+    {
+        mPs1Sound->Mix(pSampleBuffer, static_cast<u32>(sampleBufferCount));
     }
 }
 

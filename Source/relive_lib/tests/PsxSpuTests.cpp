@@ -241,14 +241,24 @@ TEST(PsxSpu, PitchHelpers)
     EXPECT_EQ(PsxSpu::PitchFromNote(72, 0, 60, 0), 0x2000);
     EXPECT_EQ(PsxSpu::PitchFromNote(48, 0, 60, 0), 0x0800);
     EXPECT_EQ(PsxSpu::PitchFromNote(36, 0, 60, 0), 0x0400);
-    // Fine tune and shift are 1/128 semitones: a shift of 64 lowers the pitch by half a semitone
-    EXPECT_EQ(PsxSpu::PitchFromNote(60, 0, 60, 64), 3979);  // 4096 / 2^(1/24) = 3979.0
-    EXPECT_EQ(PsxSpu::PitchFromNote(60, 64, 60, 64), 0x1000);
-    EXPECT_EQ(PsxSpu::PitchFromNote(61, 0, 60, 0), 4340);   // 4096 * 2^(1/12) = 4339.5
-    // Two octaves up is 4000h, clamped to the largest register value
-    EXPECT_EQ(PsxSpu::PitchFromNote(84, 0, 60, 0), 0x3FFF);
-    // 4096 * 2^(-(127 * 128 + 127) / 1536) = 2.52
-    EXPECT_EQ(PsxSpu::PitchFromNote(0, 0, 127, 127), 3);
+    EXPECT_EQ(PsxSpu::PitchFromNote(61, 0, 60, 0), 4339); // floor(4096 * 2^(1/12))
+    EXPECT_EQ(PsxSpu::PitchFromNote(59, 0, 60, 0), 3866); // floor(4096 * 2^(11/12)) >> 1
+
+    // libsnd ADDS the shift to the fine tune: a shift of 64 RAISES the pitch by half a semitone.
+    // POSITIV9.SEQ's tone (AE MINES.VH program 27: centre 90, shift 70) played at its root.
+    EXPECT_EQ(PsxSpu::PitchFromNote(60, 0, 60, 64), 4216); // floor(4096 * 2^(8/192))
+    EXPECT_EQ(PsxSpu::PitchFromNote(90, 0, 90, 70), 4216); // 70 / 8 = 8.75, rounded down to 8
+    // Fine tune and shift are rounded down to 1/16 semitones together
+    EXPECT_EQ(PsxSpu::PitchFromNote(60, 7, 60, 0), 0x1000);
+    EXPECT_EQ(PsxSpu::PitchFromNote(60, 4, 60, 4), 4110);
+    // Past a semitone they carry into the note: 100 + 100 = 200 = 1 semitone + 72
+    EXPECT_EQ(PsxSpu::PitchFromNote(60, 100, 60, 100), PsxSpu::PitchFromNote(61, 72, 60, 0));
+
+    // Not clamped: two octaves up is 4000h, which the SPU plays at its highest rate
+    EXPECT_EQ(PsxSpu::PitchFromNote(84, 0, 60, 0), 0x4000);
+    // More than 60 semitones below the root (libsnd would read before its table):
+    // floor(4096 * 2^(5/12)) >> 6 = 85, 4096 * 2^(-67/12) = 85.3
+    EXPECT_EQ(PsxSpu::PitchFromNote(0, 0, 67, 0), 85);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -771,7 +781,7 @@ TEST(PsxSpu, RenderChecksum)
 {
     const std::vector<s16> out = RenderScene(441);
     const u32 crc = SoundGoldSession::Crc32(reinterpret_cast<const u8*>(out.data()), out.size() * sizeof(s16));
-    EXPECT_EQ(crc, 0xA71381FFu) << std::hex << "crc 0x" << crc;
+    EXPECT_EQ(crc, 0xB66CA325u) << std::hex << "crc 0x" << crc;
 
     // Not silent, and the reverb keeps sounding after the key offs
     EXPECT_GT(PeakAfter(out, 0), 1000);
@@ -807,4 +817,89 @@ TEST(PsxSpu, MixClamps)
     // The mix clamps to 7FFFh / -8000h before the master volume (7FFEh) is applied
     EXPECT_EQ(out[2 * 400], (0x7FFF * 0x7FFE) >> 15);
     EXPECT_EQ(out[2 * 400 + 1], (-0x8000 * 0x7FFE) >> 15);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Band-limited interpolation
+
+// A looped sine of the given period (in source samples), played at pitch for frames, left channel
+static std::vector<s32> RenderSine(PsxSpu::Interpolation interpolation, u16 pitch, s32 period, u32 frames)
+{
+    static std::vector<s16> pcm;
+    pcm.resize(static_cast<size_t>(period) * 200);
+    for (size_t i = 0; i < pcm.size(); i++)
+    {
+        pcm[i] = static_cast<s16>(std::lround(12000.0 * std::sin(2.0 * 3.14159265358979323846 * static_cast<f64>(i) / period)));
+    }
+
+    static PsxSpu spu;
+    spu.Reset();
+    spu.SetInterpolation(interpolation);
+    spu.SetMasterVolume(0x7FFE, 0x7FFE);
+    PsxSpuSample sample;
+    sample.mPcm = pcm.data();
+    sample.mLength = static_cast<u32>(pcm.size());
+    sample.mLoop = true;
+    spu.SetVoiceSample(0, sample);
+    spu.SetVoicePitch(0, pitch);
+    spu.SetVoiceVolume(0, 0x7FFE, 0x7FFE);
+    spu.SetVoiceAdsr(0, 0x000F, 0x1FC0); // Fastest attack, then hold
+    spu.KeyOn(0);
+
+    std::vector<s16> out(frames * 2);
+    spu.Render(out.data(), frames);
+    std::vector<s32> left(frames);
+    for (u32 i = 0; i < frames; i++)
+    {
+        left[i] = out[i * 2];
+    }
+    return left;
+}
+
+static f64 Rms(const std::vector<s32>& x, size_t from)
+{
+    f64 sum = 0;
+    for (size_t i = from; i < x.size(); i++)
+    {
+        sum += static_cast<f64>(x[i]) * x[i];
+    }
+    return std::sqrt(sum / static_cast<f64>(x.size() - from));
+}
+
+TEST(PsxSpu, BandLimitedIsGaussianUpTo44100)
+{
+    for (const u16 pitch : {0x0800, 0x0C00, 0x1000})
+    {
+        EXPECT_EQ(RenderSine(PsxSpu::Interpolation::BandLimited, pitch, 37, 4000), RenderSine(PsxSpu::Interpolation::Gaussian, pitch, 37, 4000)) << pitch;
+    }
+}
+
+TEST(PsxSpu, BandLimitedRemovesAliasing)
+{
+    // A period of 6 samples at 3E2Ch (3.89x) is a 28.6 kHz tone, above the output's Nyquist: the
+    // gaussian folds it back to 15.5 kHz, the band-limited resampler filters it out
+    const f64 gaussian = Rms(RenderSine(PsxSpu::Interpolation::Gaussian, 0x3E2C, 6, 8000), 2000);
+    const f64 bandLimited = Rms(RenderSine(PsxSpu::Interpolation::BandLimited, 0x3E2C, 6, 8000), 2000);
+    EXPECT_GT(gaussian, 1000.0);
+    EXPECT_LT(bandLimited, gaussian / 100.0); // At least 40 dB down
+}
+
+TEST(PsxSpu, BandLimitedKeepsInBandTonesAndTiming)
+{
+    // A period of 64 samples at 3E2Ch is 2677 Hz: both should play it the same, at the same time,
+    // so a voice bent across 1000h doesn't jump
+    const std::vector<s32> gaussian = RenderSine(PsxSpu::Interpolation::Gaussian, 0x3E2C, 64, 8000);
+    const std::vector<s32> bandLimited = RenderSine(PsxSpu::Interpolation::BandLimited, 0x3E2C, 64, 8000);
+    const f64 g = Rms(gaussian, 2000);
+    const f64 b = Rms(bandLimited, 2000);
+    EXPECT_NEAR(b / g, 1.0, 0.05);
+
+    f64 diff = 0;
+    for (size_t i = 2000; i < gaussian.size(); i++)
+    {
+        const f64 d = static_cast<f64>(gaussian[i]) - bandLimited[i];
+        diff += d * d;
+    }
+    diff = std::sqrt(diff / static_cast<f64>(gaussian.size() - 2000));
+    EXPECT_LT(diff, g * 0.1); // In phase: a one sample shift would be a 60% difference
 }
