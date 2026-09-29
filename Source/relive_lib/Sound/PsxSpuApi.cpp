@@ -5,6 +5,7 @@
 #include "../data_conversion/file_system.hpp"
 #include "../../relive_lib/ResourceManagerWrapper.hpp"
 #include "Sound.hpp"    // SoundEntry structure
+#include "PsxSoundEngine.hpp"
 #include <assert.h>
 #include "../../relive_lib/FatalError.hpp"
 #include <algorithm>
@@ -14,31 +15,6 @@
 #define BYTEn(x, n) (*((u8*) &(x) + n))
 #define BYTE1(x) BYTEn(x, 1)
 #define BYTE2(x) BYTEn(x, 2)
-
-struct VagAtr final
-{
-    s8 field_0_priority;
-    s8 field_1_mode;
-    s8 field_2_vol;
-    s8 field_3_pan;
-    u8 field_4_centre;
-    u8 field_5_shift;
-    s8 field_6_min;
-    s8 field_7_max;
-    s8 field_8_vibW;
-    s8 field_9_vibT;
-    s8 field_A_porW;
-    s8 field_B_porT;
-    s8 field_C_pitch_bend_min;
-    s8 field_D_pitch_bend_max;
-    s8 field_E_reserved1;
-    s8 field_F_reserved2;
-    s16 field_10_adsr1;
-    s16 field_12_adsr2;
-    s16 field_14_prog;
-    s16 field_16_vag;
-    s16 field_18_reserved[4];
-};
 
 
 
@@ -241,7 +217,14 @@ void SsExt_StopPlayingSamples()
     {
         if (gSpuVars->sMidi_Channels().channels[i].field_1C_adsr.field_3_state)
         {
-            GetSoundAPI().mSND_Stop_Sample_At_Idx(gSpuVars->sMidi_Channels().channels[i].field_0_sound_buffer_field_4);
+            if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+            {
+                pPs1Sound->Stop(i);
+            }
+            else
+            {
+                GetSoundAPI().mSND_Stop_Sample_At_Idx(gSpuVars->sMidi_Channels().channels[i].field_0_sound_buffer_field_4);
+            }
         }
     }
 }
@@ -269,6 +252,11 @@ void SsSetMVol_4FC360(s16 left, s16 right)
 {
     gSpuVars->sGlobalVolumeLevel_left() = left;
     gSpuVars->sGlobalVolumeLevel_right() = right;
+
+    if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+    {
+        pPs1Sound->SetMasterVolume(left, right);
+    }
 }
 
 static const VabBodyRecord* SND_SoundsDat_Get_Record_4FC3D0(VabHeader* pVabHeader, VabBodyRecord* pBodyRecords, s32 idx)
@@ -340,6 +328,11 @@ void SsVabClose_4FC5B0(s32 vabId)
 
     gSpuVars->sVagCounts()[vabId] = 0;
     gSpuVars->sProgCounts()[vabId] = 0;
+
+    if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+    {
+        pPs1Sound->CloseVab(vabId);
+    }
 }
 
 
@@ -390,7 +383,11 @@ s16 SsVabOpenHead(VabHeader* pVabHeader)
                 pData->field_9_max = pVagAttr->field_7_max;
 
                 const s16 centre = pVagAttr->field_4_centre;
-                pData->field_A_shift_cen = 2 * (pVagAttr->field_5_shift + (centre << 7));
+                // The pitch is 2^((note - field_A_shift_cen) / 256 / 12), both in 1/256 semitones. The PC
+                // version added the shift here (2 * (shift + (centre << 7))), which lowers the pitch,
+                // but libsnd adds it to the played note, which raises it (see SOUND_FORMATS.md, "Tone
+                // pitch"): so 44% of AE's and 36% of AO's tones played up to 1.9 semitones flat.
+                pData->field_A_shift_cen = static_cast<s16>((centre << 8) - 2 * pVagAttr->field_5_shift);
 
                 f32 sustain_level = static_cast<f32>((2 * (~(u8) pVagAttr->field_10_adsr1 & 0xF)));
 
@@ -416,6 +413,11 @@ s16 SsVabOpenHead(VabHeader* pVabHeader)
             }
             ++pVagAttr;
         }
+    }
+
+    if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+    {
+        pPs1Sound->OpenVab(vab_id, *pVabHeader);
     }
     return static_cast<s16>(vab_id);
 }
@@ -484,10 +486,16 @@ void SsVabTransBody_4FC840(FileSystem& fs, VabBodyRecord* pVabBody, s16 vabId)
                 {
                     // Read the sample data
                     memset(pTempBuffer, 0, sampleLen * pEntry->field_1D_blockAlign);
-                    if (SND_SoundsDat_Read_4FC4E0(pVabHeader, pVabBody, i, pTempBuffer))
+                    if (const s32 readLen = SND_SoundsDat_Read_4FC4E0(pVabHeader, pVabBody, i, pTempBuffer))
                     {
                         // Load it into the sound buffer
                         GetSoundAPI().mSND_Load(pEntry, pTempBuffer, sampleLen);
+
+                        // The sample's real length: the SDL voice's doubled one plays silence after it
+                        if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+                        {
+                            pPs1Sound->SetSample(vabId, i, reinterpret_cast<const s16*>(pTempBuffer), static_cast<u32>(readLen), sub_4FC470(pVabHeader, pVabBody, i));
+                        }
                     }
                     relive_delete[] pTempBuffer;
                 }
@@ -526,9 +534,11 @@ s32 MIDI_Allocate_Channel(s32 /*not_used*/, s32 priority)
     }
 
     // Try to find a channel that isn't playing anything
+    PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get();
     for (s32 i = 0; i < 24; i++)
     {
-        if (GetSoundAPI().mSND_Get_Buffer_Status(gSpuVars->sMidi_Channels().channels[i].field_0_sound_buffer_field_4) == 0)
+        const bool playing = pPs1Sound ? pPs1Sound->IsVoiceActive(i) : GetSoundAPI().mSND_Get_Buffer_Status(gSpuVars->sMidi_Channels().channels[i].field_0_sound_buffer_field_4) != 0;
+        if (!playing)
         {
             gSpuVars->sMidi_Channels().channels[i].field_1C_adsr.field_3_state = 0;
             return i;
@@ -541,12 +551,21 @@ s32 MIDI_Allocate_Channel(s32 /*not_used*/, s32 priority)
     {
         return -1;
     }
-    GetSoundAPI().mSND_Stop_Sample_At_Idx(gSpuVars->sMidi_Channels().channels[idx].field_0_sound_buffer_field_4);
+    if (pPs1Sound)
+    {
+        pPs1Sound->Stop(idx);
+    }
+    else
+    {
+        GetSoundAPI().mSND_Stop_Sample_At_Idx(gSpuVars->sMidi_Channels().channels[idx].field_0_sound_buffer_field_4);
+    }
     return idx;
 }
 
 
-s32 MIDI_PlayMidiNote_4FCB30(s32 vabId, s32 program, s32 note, s32 leftVolume, s32 rightVolume, s32 volume)
+// seqIdx: the SEQ playing the note, -1 for SsVoKeyOn. Only the PS1 sound uses it (libsnd sets their
+// volumes differently).
+static s32 MIDI_PlayMidiNote_4FCB30(s32 vabId, s32 program, s32 note, s32 leftVolume, s32 rightVolume, s32 volume, s32 seqIdx)
 {
     const s32 noteKeyNumber = (note >> 8) & 127;
     s32 leftVol2 = leftVolume;
@@ -681,6 +700,23 @@ s32 MIDI_PlayMidiNote_4FCB30(s32 vabId, s32 program, s32 note, s32 leftVolume, s
                     pChannel->field_10_freq = static_cast<f32>(pow(1.059463094359, (f64)(note - pVagIter->field_A_shift_cen) * 0.00390625));
 #endif
 
+                    if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+                    {
+                        // The SPU keys voices on straight away, so there's no need for the waits
+                        // below, which kept DirectSound from starting some programs together
+                        if (seqIdx >= 0)
+                        {
+                            pPs1Sound->NoteOnSeq(midiChannel, vabId, program, i, note, volume, seqIdx);
+                        }
+                        else
+                        {
+                            // libsnd doesn't have the PC's fixed velocity of 96
+                            pPs1Sound->NoteOnSfx(midiChannel, vabId, program, i, note, leftVolume, rightVolume);
+                        }
+                        usedChannelBits |= (1 << midiChannel);
+                        continue;
+                    }
+
                     if (gSpuVars->sMidi_WaitUntil())
                     {
                         MIDI_Wait_4FCE50();
@@ -716,7 +752,7 @@ void MIDI_Wait_4FCE50()
 }
 
 
-s32 MIDI_PlayerPlayMidiNote_4FCE80(s32 vabId, s32 program, s32 note, s32 leftVol, s32 rightVol, s32 volume)
+s32 MIDI_PlayerPlayMidiNote_4FCE80(s32 vabId, s32 program, s32 note, s32 leftVol, s32 rightVol, s32 volume, s32 seqIdx)
 {
     if (gSpuVars->sSoundDatIsNull())
     {
@@ -725,11 +761,11 @@ s32 MIDI_PlayerPlayMidiNote_4FCE80(s32 vabId, s32 program, s32 note, s32 leftVol
 
     if (rightVol >= 64)
     {
-        return MIDI_PlayMidiNote_4FCB30(vabId, program, note, leftVol * (127 - rightVol) / 64, leftVol, volume);
+        return MIDI_PlayMidiNote_4FCB30(vabId, program, note, leftVol * (127 - rightVol) / 64, leftVol, volume, seqIdx);
     }
     else
     {
-        return MIDI_PlayMidiNote_4FCB30(vabId, program, note, leftVol, rightVol * leftVol / 64, volume);
+        return MIDI_PlayMidiNote_4FCB30(vabId, program, note, leftVol, rightVol * leftVol / 64, volume, seqIdx);
     }
 }
 
@@ -743,7 +779,7 @@ s32 SsVoKeyOn_4FCF10(s32 vabIdAndProgram, s32 pitch, u16 leftVol, u16 rightVol)
         return 0;
     }
 
-    const s32 channelBits = MIDI_PlayMidiNote_4FCB30((vabIdAndProgram >> 8) & 31, vabIdAndProgram & 127, pitch, leftVol, rightVol, 96);
+    const s32 channelBits = MIDI_PlayMidiNote_4FCB30((vabIdAndProgram >> 8) & 31, vabIdAndProgram & 127, pitch, leftVol, rightVol, 96, -1);
 
     for (s32 idx = 0; idx < kNumChannels; idx++)
     {
@@ -1001,7 +1037,8 @@ s32 MIDI_ParseMidiMessage_4FD100(s32 idx)
                         v16 & 0xFF00,
                         leftVol,
                         v18->field_2_right_vol,
-                        v16 >> 16);
+                        v16 >> 16,
+                        idx);
                     channelIdx_1 = 0;
 
                     for (s32 i = 0; i < 24; i++)
@@ -1095,6 +1132,14 @@ s32 MIDI_ParseMidiMessage_4FD100(s32 idx)
 
             case 0xE0u: // Pitch bend
             {
+                if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+                {
+                    // libsnd only uses the high 7 bits of the bend, param2
+                    pPs1Sound->PitchBend(
+                        gSpuVars->sMidiSeqSongs(idx2).field_32_progVols[v16 & 0xF].field_0_program,
+                        static_cast<s32>((v16 >> 16) & 0x7F));
+                    break;
+                }
                 MIDI_PitchBend_4FDEC0(
                     gSpuVars->sMidiSeqSongs(idx2).field_32_progVols[v16 & 0xF].field_0_program,
                     static_cast<s16>(((v16 >> 8) - 0x4000) >> 4));
@@ -1112,8 +1157,8 @@ s32 MIDI_ParseMidiMessage_4FD100(s32 idx)
         if (v38)
         {
             v39 = gSpuVars->sMidiTime();
-            v40 = v38 * gSpuVars->sMidiSeqSongs(idx2).field_14_tempo / 1000u + gSpuVars->sMidiSeqSongs(idx2).field_4_time;
-            gSpuVars->sMidiSeqSongs(idx2).field_4_time = v40;
+            MIDI_AddDeltaTime(gSpuVars->sMidiSeqSongs(idx2), static_cast<u32>(v38));
+            v40 = gSpuVars->sMidiSeqSongs(idx2).field_4_time;
             if (v40 > v39)
             {
                 return 1;
@@ -1127,6 +1172,13 @@ s32 MIDI_ParseMidiMessage_4FD100(s32 idx)
         goto handle_next_event;
     }
     return 0;
+}
+
+void MIDI_AddDeltaTime(MIDI_SeqSong& song, u32 ticks)
+{
+    const u64 us = static_cast<u64>(ticks) * static_cast<u32>(song.field_14_tempo) + song.mTimeRemainderUs;
+    song.field_4_time += static_cast<u32>(us / 1000);
+    song.mTimeRemainderUs = static_cast<u16>(us % 1000);
 }
 
 u8 MIDI_ReadByte_4FD6B0(MIDI_SeqSong* pData)
@@ -1211,6 +1263,12 @@ s16 SsSeqOpen_4FD6D0(u8* pSeqData, s16 seqIdx)
     gSpuVars->sMidiSeqSongs(freeIdx).field_C_volume = 112;
     gSpuVars->sMidiSeqSongs(freeIdx).field_seq_idx = seqIdx;
 
+    // libsnd starts a SEQ at volume 127
+    if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+    {
+        pPs1Sound->SetSeqVolume(freeIdx, 127, 127);
+    }
+
     return static_cast<s16>(freeIdx);
 }
 
@@ -1238,6 +1296,7 @@ void SsSeqPlay_4FD900(u16 idx, s8 repeatMode, s16 repeatCount)
         if (rec.field_1C_pSeqData)
         {
             rec.field_4_time = gSpuVars->sMidiTime();
+            rec.mTimeRemainderUs = 0;
             rec.field_8_playTimeStamp = gSpuVars->sMidiTime();
             rec.field_18_repeatCount = repeatCount;
 
@@ -1245,12 +1304,7 @@ void SsSeqPlay_4FD900(u16 idx, s8 repeatMode, s16 repeatCount)
             {
                 rec.field_0_seq_data = rec.field_1C_pSeqData;
                 rec.field_2A_running_status = 0;
-                u32 midiTime = MIDI_Read_Var_Len_4FD0D0(&rec);
-                if (midiTime)
-                {
-                    midiTime = (midiTime * rec.field_14_tempo) / 1000;
-                }
-                rec.field_4_time += midiTime;
+                MIDI_AddDeltaTime(rec, static_cast<u32>(MIDI_Read_Var_Len_4FD0D0(&rec)));
             }
 
             if (repeatMode)
@@ -1316,6 +1370,11 @@ void SsSeqSetVol(s16 idx, s16 volLeft, s16 volRight)
     {
         // TODO: Refactor
         gSpuVars->sMidiSeqSongs(idx).field_C_volume = 112 * ((volRight + volLeft) >> 1) >> 7;
+
+        if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+        {
+            pPs1Sound->SetSeqVolume(idx, volLeft, volRight);
+        }
     }
 }
 
@@ -1373,6 +1432,20 @@ void SsSeqCalledTbyT()
 
 void MIDI_ADSR_Update_4FDCE0()
 {
+    if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+    {
+        // The SPU runs the envelopes: a channel is free once its voice has stopped
+        for (s32 i = 0; i < kNumChannels; i++)
+        {
+            MIDI_ADSR_State& adsr = gSpuVars->sMidi_Channels().channels[i].field_1C_adsr;
+            if (adsr.field_3_state && !pPs1Sound->IsVoiceActive(i))
+            {
+                adsr.field_3_state = 0;
+            }
+        }
+        return;
+    }
+
     for (s32 i = 0; i < kNumChannels; i++)
     {
         MIDI_Channel* pChannel = &gSpuVars->sMidi_Channels().channels[i];
@@ -1495,6 +1568,12 @@ s16 MIDI_PitchBend_4FDEC0(s16 program, s16 pitch)
 
 s16 SsUtChangePitch_4FDF70(s16 voice, s32 /*vabId*/, s32 /*prog*/, s16 old_note, s16 old_fine, s16 new_note, s16 new_fine)
 {
+    if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+    {
+        pPs1Sound->SetPitchOffset(voice, new_fine + (new_note - old_note) * 128 - old_fine);
+        return 0;
+    }
+
     const f32 freq = std::pow(1.059463094359f, (f32)(new_fine + ((new_note - (s32) old_note) * 128) - old_fine) * 0.0078125f);
     GetSoundAPI().mSND_Buffer_Set_Frequency1(gSpuVars->sMidi_Channels().channels[voice].field_0_sound_buffer_field_4, freq);
     return 0;
@@ -1518,6 +1597,11 @@ s16 SsUtKeyOffV_4FE010(s16 idx)
     MIDI_Channel* pChannel = &gSpuVars->sMidi_Channels().channels[idx];
     if (pChannel->field_1C_adsr.field_3_state)
     {
+        if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+        {
+            // The SPU releases it with the tone's own release rate
+            pPs1Sound->KeyOff(idx);
+        }
         pChannel->field_1C_adsr.field_3_state = 4;
         pChannel->field_C_vol = pChannel->field_8_left_vol;
         if (pChannel->field_1C_adsr.field_A_release < 300)
@@ -1551,28 +1635,46 @@ void SsSetTableSize_4FE0B0(void*, s32, s32)
 
 // TODO: Removed 4FE330
 
+// The reverb functions only do something with the PS1 sound (-ps1_sound)
+
 void SsUtReverbOn_4FE340()
 {
-    // Stub
+    if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+    {
+        pPs1Sound->SetReverbEnabled(true);
+    }
 }
 
 void SsUtReverbOff_4FE350()
 {
-    // Stub
-}
-void SsUtSetReverbType_4FE360(s32)
-{
-    // Stub
+    if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+    {
+        pPs1Sound->SetReverbEnabled(false);
+    }
 }
 
-void SsUtSetReverbDepth_4FE380(s32, s32)
+void SsUtSetReverbType_4FE360(s32 type)
 {
-    // Stub
+    if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+    {
+        pPs1Sound->SetReverbType(type);
+    }
+}
+
+void SsUtSetReverbDepth_4FE380(s32 leftDepth, s32 rightDepth)
+{
+    if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+    {
+        pPs1Sound->SetReverbDepth(leftDepth, rightDepth);
+    }
 }
 
 void SpuClearReverbWorkArea_4FA690(s32)
 {
-    // Stub
+    if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+    {
+        pPs1Sound->ClearReverb();
+    }
 }
 
 

@@ -2,6 +2,8 @@
 
 #include "Sound.hpp"
 #include "SoundSDL.hpp"
+#include "PsxSoundEngine.hpp"
+#include <memory>
 #include <thread>
 #include "SDL3/SDL.h"
 
@@ -31,6 +33,13 @@ public:
     // Renders until OfflineTicks() reaches ticks
     void RenderOfflineUntil(u32 ticks);
     std::vector<StereoSample_S16>& OfflineOutput() { return mOfflineOutput; }
+
+    // -ps1_sound: sound systems created after this play the VAB tones on the emulated PS1 SPU
+    // (PsxSoundEngine) instead of the SDL voices
+    // interpolation: how the SPU resamples voices (-spu_filter)
+    static void SetPs1SoundOnCreate(bool enable, PsxSpu::Interpolation interpolation = PsxSpu::Interpolation::BandLimited);
+    // nullptr when the PS1 sound is off
+    PsxSoundEngine* Ps1Sound() { return mPs1Sound.get(); }
 
     void Pause();
     void Resume();
@@ -80,6 +89,8 @@ private:
     std::atomic<u64> mGeneratedAudioSamples{0};
     std::unique_ptr<std::thread> mRenderAudioThread;
 
+
+    std::unique_ptr<PsxSoundEngine> mPs1Sound;
 
     bool mCreated = false;
     bool mOffline = false;

@@ -13,6 +13,7 @@
 #include "../AliveLibAE/Sfx.hpp"
 
 #include "../relive_lib/Sound/PsxSpuApi.hpp"
+#include "../relive_lib/Sound/PsxSoundEngine.hpp"
 #include "../relive_lib/Sound/Midi.hpp"
 #include "../relive_lib/Sound/Sound.hpp"
 #include "../AliveLibAE/PathData.hpp"
@@ -254,7 +255,8 @@ s16 SND_SsIsEos_DeInlined(SeqId idx)
 }
 
 // NOTE: Impl is not the same as AE
-s32 MIDI_PlayerPlayMidiNote(s32 vabId, s32 program, s32 note, s32 leftVolume, s32 rightVolume, s32 volume)
+// seqIdx: the SEQ playing the note, for the PS1 sound
+s32 MIDI_PlayerPlayMidiNote(s32 vabId, s32 program, s32 note, s32 leftVolume, s32 rightVolume, s32 volume, s32 seqIdx)
 {
     auto vabId_ = vabId;
     auto leftVolume_ = leftVolume;
@@ -405,14 +407,21 @@ s32 MIDI_PlayerPlayMidiNote(s32 vabId, s32 program, s32 note, s32 leftVolume, s3
                         pChannel->field_1C_adsr.field_2_note_byte1 = BYTE1(note) & 0x7F;
                         auto freq = pow(1.059463094359, (f64)(note - v29) * 0.00390625);
                         pChannel->field_10_freq = (f32) freq;
-                        SND_PlayEx(
-                            &GetSpuApiVars()->sSoundEntryTable16().table[vabId][vag_num],
-                            panLeft,
-                            panRight,
-                            (f32) freq,
-                            pChannel,
-                            playFlags,
-                            priority_);
+                        if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+                        {
+                            pPs1Sound->NoteOnSeq(midiChannel_, vabId, program, 16 - k16Counter, note, volume, seqIdx);
+                        }
+                        else
+                        {
+                            SND_PlayEx(
+                                &GetSpuApiVars()->sSoundEntryTable16().table[vabId][vag_num],
+                                panLeft,
+                                panRight,
+                                (f32) freq,
+                                pChannel,
+                                playFlags,
+                                priority_);
+                        }
                         volume_ = volume;
                         usedChannelBits |= 1 << midiChannel_;
                     }
@@ -429,15 +438,15 @@ s32 MIDI_PlayerPlayMidiNote(s32 vabId, s32 program, s32 note, s32 leftVolume, s3
     return 0;
 }
 
-s32 MIDI_PlayerPlayMidiNote_49DAD0(s32 vabId, s32 program, s32 note, s32 leftVol, s32 rightVol, s32 volume)
+s32 MIDI_PlayerPlayMidiNote_49DAD0(s32 vabId, s32 program, s32 note, s32 leftVol, s32 rightVol, s32 volume, s32 seqIdx)
 {
     if (rightVol >= 64)
     {
-        return MIDI_PlayerPlayMidiNote(vabId, program, note, leftVol * (127 - rightVol) / 64, leftVol, volume);
+        return MIDI_PlayerPlayMidiNote(vabId, program, note, leftVol * (127 - rightVol) / 64, leftVol, volume, seqIdx);
     }
     else
     {
-        return MIDI_PlayerPlayMidiNote(vabId, program, note, leftVol, leftVol * rightVol / 64, volume);
+        return MIDI_PlayerPlayMidiNote(vabId, program, note, leftVol, leftVol * rightVol / 64, volume, seqIdx);
     }
 }
 
@@ -449,7 +458,17 @@ void SsUtKeyOffV(s16 idx)
     auto pChannel = &GetSpuApiVars()->sMidi_Channels().channels[idx];
     if ((adsr_state <= 0 || adsr_state >= 4) && adsr_state != -1)
     {
-        if (adsr_state == 4)
+        if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+        {
+            // The SDL voices let a one shot sample (-2) play to its end and cut a released one (4)
+            // off. The SPU releases a one shot sample like any other, and lets a release finish.
+            if (adsr_state == -2)
+            {
+                pPs1Sound->KeyOff(idx);
+                pChannel->field_1C_adsr.field_3_state = 4;
+            }
+        }
+        else if (adsr_state == 4)
         {
             pChannel->field_1C_adsr.field_3_state = 0;
             SND_Stop_Sample_At_Idx(pChannel->field_0_sound_buffer_field_4);
@@ -457,6 +476,11 @@ void SsUtKeyOffV(s16 idx)
     }
     else
     {
+        if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+        {
+            // The SPU releases it with the tone's own release rate
+            pPs1Sound->KeyOff(idx);
+        }
         pChannel->field_1C_adsr.field_3_state = 4;
         pChannel->field_C_vol = pChannel->field_8_left_vol;
         if (!pChannel->field_1C_adsr.field_A_release)
@@ -571,7 +595,7 @@ s32 MIDI_ParseMidiMessage(s32 idx)
                         auto l_vol = (s16)((u32)(pProgVol->field_1_left_vol * pCtx->field_C_volume) >> 7);
 
                         auto freq = data.param2;
-                        MIDI_PlayerPlayMidiNote_49DAD0(pCtx->field_seq_idx, program, note, l_vol, r_vol, freq); // Note: inlined
+                        MIDI_PlayerPlayMidiNote_49DAD0(pCtx->field_seq_idx, program, note, l_vol, r_vol, freq, idx); // Note: inlined
                         break;
                     }
 
@@ -637,6 +661,13 @@ s32 MIDI_ParseMidiMessage(s32 idx)
                     case MidiEvent::PitchBend_E0:
                     {
                         const s32 prog_num = pCtx->field_32_progVols[data.Channel()].field_0_program;
+
+                        if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+                        {
+                            // libsnd only uses the high 7 bits of the bend, param2
+                            pPs1Sound->PitchBend(prog_num, data.param2 & 0x7F);
+                            break;
+                        }
 
                         // Inlined MIDI_PitchBend
                         const f32 freq_conv = (f32) pow(1.059463094359, (f64)(s16)(((data.param1) - 0x4000) >> 4) * 0.0078125);
@@ -704,7 +735,7 @@ s32 MIDI_ParseMidiMessage(s32 idx)
             const s32 timeStamp = MIDI_Read_Var_Len_4FD0D0(pCtx);
             if (timeStamp)
             {
-                pCtx->field_4_time = timeStamp * pCtx->field_14_tempo / 1000 + pCtx->field_4_time;
+                MIDI_AddDeltaTime(*pCtx, static_cast<u32>(timeStamp));
                 if (pCtx->field_4_time > GetSpuApiVars()->sMidiTime())
                 {
                     return 1;
@@ -813,6 +844,11 @@ void SsVabTransBody(VabBodyRecord* pVabBody, s16 vabId)
                     if (sampleLen2)
                     {
                         SND_Load(pEntry, pTempBuffer, sampleLen2);
+
+                        if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+                        {
+                            pPs1Sound->SetSample(vabId, i, reinterpret_cast<const s16*>(pTempBuffer), static_cast<u32>(sampleLen2), v10 < 0);
+                        }
                     }
 
                     free(pTempBuffer);

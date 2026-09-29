@@ -5,6 +5,7 @@
 #include "Sound.hpp"
 #include "SDLSoundBuffer.hpp"
 #include "SDLSoundSystem.hpp"
+#include "PsxSoundEngine.hpp"
 #include "../BinaryPath.hpp"
 #include "../FatalError.hpp"
 #include "../../AliveLibAE/PathData.hpp"
@@ -35,7 +36,7 @@ static std::string Format(const char_type* fmt, ...)
     return buf;
 }
 
-SoundGoldSession::SoundGoldSession(GameType game)
+SoundGoldSession::SoundGoldSession(GameType game, bool ps1Sound, PsxSpu::Interpolation interpolation)
     : mGame(game)
 {
     if (sDSound_BBC344)
@@ -52,6 +53,7 @@ SoundGoldSession::SoundGoldSession(GameType game)
 
     mOldCreateDS = GetSoundAPI().mSND_CreateDS;
     GetSoundAPI().mSND_CreateDS = SND_CreateDS_Offline;
+    SDLSoundSystem::SetPs1SoundOnCreate(ps1Sound, interpolation);
 
     if (game == GameType::eAo)
     {
@@ -77,7 +79,14 @@ SoundGoldSession::SoundGoldSession(GameType game)
 
     // Only record channels/voices once they change from this
     mLastChannelState.resize(kNumChannels, "off");
-    mLastVoiceState.resize(ALIVE_COUNTOF(sSoundBuffers_BBBAB8), "stopped");
+    if (ps1Sound)
+    {
+        mLastVoiceState.resize(PsxSpu::kNumVoices, "off");
+    }
+    else
+    {
+        mLastVoiceState.resize(ALIVE_COUNTOF(sSoundBuffers_BBBAB8), "stopped");
+    }
 }
 
 SoundGoldSession::~SoundGoldSession()
@@ -86,6 +95,7 @@ SoundGoldSession::~SoundGoldSession()
     GetMidiVars()->sMonkVh_Vb().mSoundTheme.clear();
 
     GetSoundAPI().mSND_CreateDS = mOldCreateDS;
+    SDLSoundSystem::SetPs1SoundOnCreate(false);
     SND_Restart_SetCallBack(nullptr);
     SND_StopAll_SetCallBack(nullptr);
     SetSpuApiVars(nullptr);
@@ -189,7 +199,8 @@ s32 SoundGoldSession::RootKey(s32 program) const
         const Converted_Vag& vag = GetSpuApiVars()->sConvertedVagTable().table[VabId()][program][tone];
         if (vag.field_D_vol > 0)
         {
-            return vag.field_A_shift_cen >> 8;
+            // centre * 256 - 2 * shift, with shift 0-127
+            return (vag.field_A_shift_cen + 255) >> 8;
         }
     }
     return 60;
@@ -262,6 +273,26 @@ void SoundGoldSession::RecordChanges()
             Note(Format("ch%d ", i) + state);
             mLastChannelState[i] = state;
         }
+    }
+
+    if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+    {
+        for (s32 i = 0; i < PsxSpu::kNumVoices; i++)
+        {
+            const PsxSoundEngine::VoiceState v = pPs1Sound->GetVoiceState(i);
+            std::string state = "off";
+            if (v.mPhase != PsxSpuEnvelope::Phase::Off)
+            {
+                state = Format("phase=%d pitch=%04x vol=%d,%d adsr=%04x,%04x reverb=%d", static_cast<s32>(v.mPhase), v.mPitch, v.mVolLeft, v.mVolRight, v.mAdsr1, v.mAdsr2, v.mReverb ? 1 : 0);
+            }
+
+            if (state != mLastVoiceState[i])
+            {
+                Note(Format("spu%d ", i) + state);
+                mLastVoiceState[i] = state;
+            }
+        }
+        return;
     }
 
     for (s32 i = 0; i < static_cast<s32>(ALIVE_COUNTOF(sSoundBuffers_BBBAB8)); i++)

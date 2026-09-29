@@ -55,6 +55,8 @@ If the chosen game's files aren't in the directory, the other game is run. If bo
 | `-ddnoskip` | Render every frame instead of skipping frames to keep up. |
 | `-ddslowload=<ms>` | Make each resource loaded in the background take at least this many milliseconds, to test loading on slow storage. |
 | `-renderer_checks` | Check for renderer errors as it goes, which is slower. The OpenGL renderer checks every OpenGL call and stops on an error. The SDL3 renderer turns on the validation of SDL's GPU, Vulkan and Direct3D 11 backends, where they are used. |
+| `-ps1_sound` | Play the sound effects and music on an emulated PS1 sound chip (SPU), like the PS1 version: its envelopes, reverb, pan and interpolation. Work in progress. |
+| `-spu_filter=<name>` | With `-ps1_sound`: how voices played above 44100 Hz are resampled. `hq` (default) filters out what would alias. `gaussian` is the PS1's own interpolation, exactly, which buzzes on some bright samples at high notes (for example the end of the secret area jingle). |
 | `-convert` | Convert the game data (into `relive_data`) if it is out of date, as the first run does, then exit without opening a window. For scripts and headless machines. Exit code 1 if the game files are missing. |
 | `-help` | Show the command line options and exit (`--help`, `-h` and `/?` also work). |
 
