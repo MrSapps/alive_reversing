@@ -31,18 +31,51 @@ TEST(PsxSoundEngine, LibsndVoiceVolume)
     };
     for (const Case& c : cases)
     {
-        const PsxSoundEngine::VoiceVolume v = PsxSoundEngine::LibsndVoiceVolume(c.mSeqNote, c.mVelocity, c.mVabVol, c.mProgVol, c.mToneVol, c.mTonePan, c.mProgPan,
+        const PsxSoundEngine::VoiceVolume v = PsxSoundEngine::LibsndVoiceVolume(c.mSeqNote, c.mSeqNote, c.mVelocity, c.mVabVol, c.mProgVol, c.mToneVol, c.mTonePan, c.mProgPan,
             c.mChannelPan, c.mSeqVolLeft, c.mSeqVolRight);
         EXPECT_EQ(v.mLeft, c.mLeft);
         EXPECT_EQ(v.mRight, c.mRight);
     }
 
     // Everything at full volume and centred is the largest register value, either way
-    EXPECT_EQ(PsxSoundEngine::LibsndVoiceVolume(true, 127, 127, 127, 127, 64, 64, 64, 127, 127).mLeft, 0x3FFF);
-    EXPECT_EQ(PsxSoundEngine::LibsndVoiceVolume(false, 127, 127, 127, 127, 64, 64, 64, 127, 127).mLeft, 0x3FFF);
+    EXPECT_EQ(PsxSoundEngine::LibsndVoiceVolume(true, true, 127, 127, 127, 127, 64, 64, 64, 127, 127).mLeft, 0x3FFF);
+    EXPECT_EQ(PsxSoundEngine::LibsndVoiceVolume(false, false, 127, 127, 127, 127, 64, 64, 64, 127, 127).mLeft, 0x3FFF);
     // A SEQ's note is squared: velocity 66 gives 4424, a sound effect's 8514
-    EXPECT_EQ(PsxSoundEngine::LibsndVoiceVolume(true, 66, 127, 127, 127, 64, 64, 64, 127, 127).mLeft, 4424);
-    EXPECT_EQ(PsxSoundEngine::LibsndVoiceVolume(false, 66, 127, 127, 127, 64, 64, 64, 127, 127).mLeft, 8514);
+    EXPECT_EQ(PsxSoundEngine::LibsndVoiceVolume(true, true, 66, 127, 127, 127, 64, 64, 64, 127, 127).mLeft, 4424);
+    EXPECT_EQ(PsxSoundEngine::LibsndVoiceVolume(false, false, 66, 127, 127, 127, 64, 64, 64, 127, 127).mLeft, 8514);
+}
+
+// AO's libsnd squares a sound effect too: its voice setup (0x8007c73c in the AO PS1 executable,
+// SLES_006.64) has no check for one. The expected values come from running it in a MIPS
+// interpreter, which agreed with LibsndVoiceVolume for all of 3000 random SEQ notes and sound
+// effects.
+TEST(PsxSoundEngine, LibsndVoiceVolumeAoSfx)
+{
+    struct Case final
+    {
+        s32 mVelocity, mVabVol, mProgVol, mToneVol, mTonePan, mProgPan, mChannelPan, mSeqVolLeft, mSeqVolRight;
+        s32 mLeft, mRight;
+    };
+    const Case cases[] = {
+        {44, 71, 115, 93, 18, 24, 93, 14, 54, 78, 3},
+        {46, 88, 65, 111, 15, 31, 57, 15, 101, 206, 2},
+        {87, 72, 68, 112, 30, 78, 46, 26, 48, 333, 66},
+        {71, 83, 91, 50, 80, 119, 116, 92, 76, 0, 173},
+        {83, 79, 122, 93, 73, 18, 30, 107, 42, 983, 24},
+        {74, 120, 68, 47, 89, 127, 116, 17, 23, 0, 194},
+        {118, 74, 123, 47, 88, 5, 118, 90, 43, 4, 3},
+        {97, 111, 95, 57, 101, 100, 127, 20, 42, 0, 822},
+    };
+    for (const Case& c : cases)
+    {
+        // A sound effect ignores the SEQ volume
+        const PsxSoundEngine::VoiceVolume v = PsxSoundEngine::LibsndVoiceVolume(false, true, c.mVelocity, c.mVabVol, c.mProgVol, c.mToneVol, c.mTonePan, c.mProgPan,
+            c.mChannelPan, c.mSeqVolLeft, c.mSeqVolRight);
+        EXPECT_EQ(v.mLeft, c.mLeft);
+        EXPECT_EQ(v.mRight, c.mRight);
+    }
+
+    EXPECT_EQ(PsxSoundEngine::LibsndVoiceVolume(false, true, 66, 127, 127, 127, 64, 64, 64, 127, 127).mLeft, 4424);
 }
 
 TEST(PsxSoundEngine, SfxVelocityAndPan)

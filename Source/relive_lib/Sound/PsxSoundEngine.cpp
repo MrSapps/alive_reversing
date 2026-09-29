@@ -20,7 +20,7 @@ static void ApplyPan(s32 pan, s32& left, s32& right)
     }
 }
 
-PsxSoundEngine::VoiceVolume PsxSoundEngine::LibsndVoiceVolume(bool seqNote, s32 velocity, s32 vabVol, s32 progVol, s32 toneVol, s32 tonePan, s32 progPan, s32 channelPan,
+PsxSoundEngine::VoiceVolume PsxSoundEngine::LibsndVoiceVolume(bool seqNote, bool squared, s32 velocity, s32 vabVol, s32 progVol, s32 toneVol, s32 tonePan, s32 progPan, s32 channelPan,
     s32 seqVolLeft, s32 seqVolRight)
 {
     // Checked against the real code run in a MIPS interpreter: the same result for all of 3000
@@ -35,7 +35,7 @@ PsxSoundEngine::VoiceVolume PsxSoundEngine::LibsndVoiceVolume(bool seqNote, s32 
     ApplyPan(progPan, v.mLeft, v.mRight);
     ApplyPan(channelPan, v.mLeft, v.mRight);
 
-    if (seqNote)
+    if (squared)
     {
         v.mLeft = v.mLeft * v.mLeft / 0x3FFF;
         v.mRight = v.mRight * v.mRight / 0x3FFF;
@@ -194,15 +194,15 @@ void PsxSoundEngine::NoteOnSeq(s32 voice, s32 vabId, s32 program, s32 tone, s32 
     // pan (CC 10), default 64. The games' SEQs never change the pan, and no parser handles CC 7 yet.
     constexpr s32 kChannelVolume = 127;
     constexpr s32 kChannelPan = 64;
-    NoteOn(voice, vabId, program, tone, note, seq, velocity * kChannelVolume / 127, kChannelPan);
+    NoteOn(voice, vabId, program, tone, note, seq, true, velocity * kChannelVolume / 127, kChannelPan);
 }
 
-void PsxSoundEngine::NoteOnSfx(s32 voice, s32 vabId, s32 program, s32 tone, s32 note, s32 volLeft, s32 volRight)
+void PsxSoundEngine::NoteOnSfx(s32 voice, s32 vabId, s32 program, s32 tone, s32 note, s32 volLeft, s32 volRight, bool squared)
 {
     s32 velocity = 0;
     s32 pan = 64;
     SfxVelocityAndPan(std::clamp(volLeft, 0, 127), std::clamp(volRight, 0, 127), velocity, pan);
-    NoteOn(voice, vabId, program, tone, note, -1, velocity, pan);
+    NoteOn(voice, vabId, program, tone, note, -1, squared, velocity, pan);
 }
 
 PsxSoundEngine::VoiceVolume PsxSoundEngine::CurrentVolume(const VoiceInfo& info) const
@@ -210,7 +210,7 @@ PsxSoundEngine::VoiceVolume PsxSoundEngine::CurrentVolume(const VoiceInfo& info)
     const bool seqNote = info.mSeq >= 0;
     const s32 seqLeft = seqNote ? mSeqVolumes[info.mSeq][0] : 127;
     const s32 seqRight = seqNote ? mSeqVolumes[info.mSeq][1] : 127;
-    return LibsndVoiceVolume(seqNote, info.mVelocity, info.mVabVol, info.mProgVol, info.mToneVol, info.mTonePan, info.mProgPan, info.mChannelPan, seqLeft, seqRight);
+    return LibsndVoiceVolume(seqNote, info.mSquared, info.mVelocity, info.mVabVol, info.mProgVol, info.mToneVol, info.mTonePan, info.mProgPan, info.mChannelPan, seqLeft, seqRight);
 }
 
 void PsxSoundEngine::SetSeqVolume(s32 seq, s32 left, s32 right)
@@ -235,7 +235,7 @@ void PsxSoundEngine::SetSeqVolume(s32 seq, s32 left, s32 right)
     }
 }
 
-void PsxSoundEngine::NoteOn(s32 voice, s32 vabId, s32 program, s32 tone, s32 note, s32 seq, s32 velocity, s32 channelPan)
+void PsxSoundEngine::NoteOn(s32 voice, s32 vabId, s32 program, s32 tone, s32 note, s32 seq, bool squared, s32 velocity, s32 channelPan)
 {
     if (!ValidVoice(voice) || !ValidVab(vabId) || program < 0 || program >= kMaxPrograms || tone < 0 || tone >= kTonesPerProgram)
     {
@@ -274,6 +274,7 @@ void PsxSoundEngine::NoteOn(s32 voice, s32 vabId, s32 program, s32 tone, s32 not
     info.mBendMax = t.mBendMax;
 
     info.mSeq = seq;
+    info.mSquared = squared;
     info.mVelocity = std::clamp(velocity, 0, 127);
     info.mChannelPan = channelPan;
     info.mVabVol = vab.mMasterVol;

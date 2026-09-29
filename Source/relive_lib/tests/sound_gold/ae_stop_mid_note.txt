@@ -1,0 +1,124 @@
+t=0 load seqs=3 reverb=0
+t=0 vab 0 progs=1 vags=1
+t=0 tone vab=0 prog=0 tone=0 vag=0 keys=0-127 shift_cen=15360 vol=100 prio=7 flags=0 adsr=0,1200,0,0 pan=64
+t=0 sample vab=0 idx=0 rate=44100 bits=16 stereo=0 bytes=12000 crc=a50670f8
+t=0 vab 1 progs=6 vags=4
+t=0 tone vab=1 prog=0 tone=0 vag=0 keys=0-127 shift_cen=15360 vol=100 prio=7 flags=0 adsr=0,1200,0,0 pan=64
+t=0 tone vab=1 prog=1 tone=0 vag=1 keys=0-59 shift_cen=12160 vol=100 prio=7 flags=0 adsr=2085,0,8,1 pan=64
+t=0 tone vab=1 prog=1 tone=1 vag=2 keys=60-127 shift_cen=18432 vol=90 prio=5 flags=4 adsr=32767,1200,0,32767 pan=64
+t=0 tone vab=1 prog=2 tone=0 vag=2 keys=0-127 shift_cen=15360 vol=100 prio=7 flags=4 adsr=130,0,4,2 pan=30
+t=0 tone vab=1 prog=4 tone=0 vag=0 keys=0-127 shift_cen=15360 vol=80 prio=7 flags=0 adsr=0,1200,0,0 pan=64
+t=0 tone vab=1 prog=5 tone=0 vag=3 keys=0-127 shift_cen=15360 vol=100 prio=10 flags=0 adsr=0,0,16,0 pan=64
+t=0 tone vab=1 prog=8 tone=0 vag=0 keys=0-127 shift_cen=15360 vol=60 prio=7 flags=0 adsr=0,1200,0,0 pan=64
+t=0 tone vab=1 prog=8 tone=1 vag=1 keys=0-127 shift_cen=17152 vol=50 prio=7 flags=0 adsr=32767,0,3,23592 pan=64
+t=0 sample vab=1 idx=0 rate=44100 bits=16 stereo=0 bytes=12000 crc=0a947473
+t=0 sample vab=1 idx=1 rate=44100 bits=16 stereo=0 bytes=12000 crc=b032e010
+t=0 sample vab=1 idx=2 rate=44100 bits=16 stereo=0 bytes=4410 crc=89daea41
+t=0 sample vab=1 idx=3 rate=44100 bits=16 stereo=0 bytes=6000 crc=601f31a3
+t=0 seq 0 OPTAMB.SEQ
+t=0 seq 1 MINESAMB.SEQ
+t=0 seq 2 PARAMB.SEQ
+t=0 play the melody, then the held note
+t=30 ch0 state=1 vol=0 cvol=36 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,1 seqch=0 ref=1 loop=0
+t=30 ch1 state=1 vol=0 cvol=36 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,2 seqch=16 ref=1 loop=1
+t=30 voice30 sample=3 vol=0 freq=44100 pan=0 loop=1
+t=30 voice31 sample=2 vol=0 freq=68012 pan=0 loop=0
+t=60 ch0 state=1 vol=2 cvol=36 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,1 seqch=0 ref=1 loop=0
+t=60 ch1 state=1 vol=28 cvol=36 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,2 seqch=16 ref=1 loop=1
+t=60 voice30 sample=3 vol=25 freq=44100 pan=0 loop=1
+t=90 ch0 state=1 vol=4 cvol=36 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,1 seqch=0 ref=1 loop=0
+t=90 ch1 state=3 vol=9 cvol=36 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,2 seqch=16 ref=1 loop=1
+t=90 voice30 sample=3 vol=7 freq=44100 pan=0 loop=1
+t=90 voice31 sample=2 vol=2 freq=68012 pan=0 loop=0
+t=120 ch0 state=1 vol=6 cvol=36 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,1 seqch=0 ref=1 loop=0
+t=120 voice31 stopped
+t=150 ch0 state=1 vol=9 cvol=36 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,1 seqch=0 ref=1 loop=0
+t=180 ch0 state=1 vol=11 cvol=36 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,1 seqch=0 ref=1 loop=0
+t=210 ch0 state=1 vol=13 cvol=36 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,1 seqch=0 ref=1 loop=0
+t=240 ch0 state=1 vol=15 cvol=36 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,1 seqch=0 ref=1 loop=0
+t=270 ch0 state=4 vol=15 cvol=15 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,300 seqch=0 ref=0 loop=0
+t=270 ch2 state=1 vol=0 cvol=35 prio=5 vab=1 prog=1 note=64 freq=0.6300 adsr=8703,1200,0,32767 seqch=0 ref=1 loop=1
+t=270 voice29 sample=3 vol=0 freq=27781 pan=0 loop=1
+t=360 ch0 state=4 vol=14 cvol=15 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,300 seqch=0 ref=0 loop=0
+t=390 ch0 state=4 vol=13 cvol=15 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,300 seqch=0 ref=0 loop=0
+t=420 ch0 state=4 vol=12 cvol=15 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,300 seqch=0 ref=0 loop=0
+t=420 ch2 state=1 vol=1 cvol=35 prio=5 vab=1 prog=1 note=64 freq=0.6300 adsr=8703,1200,0,32767 seqch=0 ref=1 loop=1
+t=450 ch0 state=4 vol=10 cvol=15 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,300 seqch=0 ref=0 loop=0
+t=480 ch0 state=4 vol=8 cvol=15 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,300 seqch=0 ref=0 loop=0
+t=500 stop the SEQ
+t=500 ch1 state=4 vol=9 cvol=9 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,300 seqch=0 ref=1 loop=1
+t=510 ch0 state=4 vol=6 cvol=15 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,300 seqch=0 ref=0 loop=0
+t=550 ch0 state=4 vol=6 cvol=6 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,300 seqch=0 ref=0 loop=0
+t=550 ch2 state=1 vol=2 cvol=35 prio=5 vab=1 prog=1 note=64 freq=0.6300 adsr=8703,1200,0,32767 seqch=0 ref=0 loop=1
+t=550 ch3 state=2 vol=19 cvol=19 prio=7 vab=1 prog=8 note=60 freq=1.0000 adsr=0,1200,0,0 seqch=1 ref=1 loop=0
+t=550 ch4 state=1 vol=0 cvol=16 prio=7 vab=1 prog=8 note=60 freq=0.6674 adsr=18943,0,3,23592 seqch=1 ref=1 loop=0
+t=550 voice27 sample=2 vol=0 freq=29433 pan=0 loop=0
+t=550 voice28 sample=1 vol=17 freq=44100 pan=0 loop=0
+t=600 ch1 state=4 vol=8 cvol=9 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,300 seqch=0 ref=1 loop=1
+t=600 voice30 sample=3 vol=6 freq=44100 pan=0 loop=1
+t=660 ch1 state=4 vol=7 cvol=9 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,300 seqch=0 ref=1 loop=1
+t=660 ch2 state=1 vol=3 cvol=35 prio=5 vab=1 prog=1 note=64 freq=0.6300 adsr=8703,1200,0,32767 seqch=0 ref=0 loop=1
+t=660 voice29 sample=3 vol=1 freq=27781 pan=0 loop=1
+t=660 voice30 sample=3 vol=5 freq=44100 pan=0 loop=1
+t=680 voice28 stopped
+t=690 ch0 state=4 vol=5 cvol=6 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,300 seqch=0 ref=0 loop=0
+t=690 ch1 state=4 vol=5 cvol=9 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,300 seqch=0 ref=1 loop=1
+t=690 voice30 sample=3 vol=3 freq=44100 pan=0 loop=1
+t=720 ch0 state=4 vol=4 cvol=6 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,300 seqch=0 ref=0 loop=0
+t=720 ch1 state=4 vol=4 cvol=9 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,300 seqch=0 ref=1 loop=1
+t=720 voice30 sample=3 vol=2 freq=44100 pan=0 loop=1
+t=750 ch1 state=4 vol=3 cvol=9 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,300 seqch=0 ref=1 loop=1
+t=750 voice30 sample=3 vol=1 freq=44100 pan=0 loop=1
+t=760 voice27 stopped
+t=780 ch0 state=4 vol=4 cvol=4 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,300 seqch=0 ref=0 loop=0
+t=780 ch1 state=4 vol=1 cvol=9 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,300 seqch=0 ref=1 loop=1
+t=780 ch3 state=2 vol=19 cvol=19 prio=7 vab=1 prog=8 note=60 freq=1.0000 adsr=0,1200,0,0 seqch=0 ref=0 loop=0
+t=780 ch4 state=1 vol=0 cvol=16 prio=7 vab=1 prog=8 note=60 freq=0.6674 adsr=18943,0,3,23592 seqch=0 ref=0 loop=0
+t=780 ch5 state=2 vol=41 cvol=41 prio=5 vab=1 prog=1 note=70 freq=0.8909 adsr=0,1200,0,32767 seqch=0 ref=1 loop=1
+t=780 voice26 sample=3 vol=38 freq=39289 pan=78 loop=1
+t=780 voice30 sample=3 vol=0 freq=44100 pan=0 loop=1
+t=810 ch1 off
+t=810 ch2 state=1 vol=4 cvol=35 prio=5 vab=1 prog=1 note=64 freq=0.6300 adsr=8703,1200,0,32767 seqch=0 ref=0 loop=1
+t=810 voice29 sample=3 vol=2 freq=27781 pan=0 loop=1
+t=810 voice30 stopped
+t=840 ch3 state=2 vol=18 cvol=19 prio=7 vab=1 prog=8 note=60 freq=1.0000 adsr=0,1200,0,0 seqch=0 ref=0 loop=0
+t=930 ch0 state=4 vol=3 cvol=4 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,300 seqch=0 ref=0 loop=0
+t=930 ch2 state=1 vol=5 cvol=35 prio=5 vab=1 prog=1 note=64 freq=0.6300 adsr=8703,1200,0,32767 seqch=0 ref=0 loop=1
+t=930 ch3 state=2 vol=17 cvol=19 prio=7 vab=1 prog=8 note=60 freq=1.0000 adsr=0,1200,0,0 seqch=0 ref=0 loop=0
+t=930 voice29 sample=3 vol=3 freq=27781 pan=0 loop=1
+t=990 ch5 state=2 vol=40 cvol=41 prio=5 vab=1 prog=1 note=70 freq=0.8909 adsr=0,1200,0,32767 seqch=0 ref=1 loop=1
+t=990 voice26 sample=3 vol=36 freq=39289 pan=78 loop=1
+t=1020 ch0 state=4 vol=2 cvol=4 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,300 seqch=0 ref=0 loop=0
+t=1020 ch3 state=2 vol=16 cvol=19 prio=7 vab=1 prog=8 note=60 freq=1.0000 adsr=0,1200,0,0 seqch=0 ref=0 loop=0
+t=1050 ch0 state=4 vol=1 cvol=4 prio=7 vab=1 prog=1 note=55 freq=1.5422 adsr=879,0,8,300 seqch=0 ref=0 loop=0
+t=1050 ch5 state=2 vol=39 cvol=41 prio=5 vab=1 prog=1 note=70 freq=0.8909 adsr=0,1200,0,32767 seqch=0 ref=1 loop=1
+t=1050 voice26 sample=3 vol=35 freq=39289 pan=78 loop=1
+t=1080 ch0 off
+t=1080 ch2 state=1 vol=6 cvol=35 prio=5 vab=1 prog=1 note=64 freq=0.6300 adsr=8703,1200,0,32767 seqch=0 ref=0 loop=1
+t=1080 voice29 sample=3 vol=4 freq=27781 pan=0 loop=1
+t=1110 ch3 state=2 vol=15 cvol=19 prio=7 vab=1 prog=8 note=60 freq=1.0000 adsr=0,1200,0,0 seqch=0 ref=0 loop=0
+t=1110 ch5 state=2 vol=38 cvol=41 prio=5 vab=1 prog=1 note=70 freq=0.8909 adsr=0,1200,0,32767 seqch=0 ref=1 loop=1
+t=1110 voice26 sample=3 vol=34 freq=39289 pan=78 loop=1
+t=1170 ch3 state=2 vol=14 cvol=19 prio=7 vab=1 prog=8 note=60 freq=1.0000 adsr=0,1200,0,0 seqch=0 ref=0 loop=0
+t=1170 ch4 state=1 vol=1 cvol=16 prio=7 vab=1 prog=8 note=60 freq=0.6674 adsr=18943,0,3,23592 seqch=0 ref=0 loop=0
+t=1170 ch5 state=2 vol=37 cvol=41 prio=5 vab=1 prog=1 note=70 freq=0.8909 adsr=0,1200,0,32767 seqch=0 ref=1 loop=1
+t=1170 voice26 sample=3 vol=33 freq=39289 pan=78 loop=1
+t=1200 ch2 state=1 vol=7 cvol=35 prio=5 vab=1 prog=1 note=64 freq=0.6300 adsr=8703,1200,0,32767 seqch=0 ref=0 loop=1
+t=1200 ch5 state=2 vol=36 cvol=41 prio=5 vab=1 prog=1 note=70 freq=0.8909 adsr=0,1200,0,32767 seqch=0 ref=1 loop=1
+t=1200 voice26 sample=3 vol=32 freq=39289 pan=78 loop=1
+t=1200 voice29 sample=3 vol=5 freq=27781 pan=0 loop=1
+t=1230 ch3 state=2 vol=13 cvol=19 prio=7 vab=1 prog=8 note=60 freq=1.0000 adsr=0,1200,0,0 seqch=0 ref=0 loop=0
+t=1260 ch5 state=2 vol=35 cvol=41 prio=5 vab=1 prog=1 note=70 freq=0.8909 adsr=0,1200,0,32767 seqch=0 ref=1 loop=1
+t=1260 voice26 sample=3 vol=31 freq=39289 pan=78 loop=1
+t=1290 ch2 state=4 vol=7 cvol=7 prio=5 vab=1 prog=1 note=64 freq=0.6300 adsr=8703,1200,0,32767 seqch=0 ref=0 loop=1
+t=1290 ch3 state=4 vol=13 cvol=13 prio=7 vab=1 prog=8 note=60 freq=1.0000 adsr=0,1200,0,300 seqch=0 ref=0 loop=0
+t=1290 ch4 state=4 vol=1 cvol=1 prio=7 vab=1 prog=8 note=60 freq=0.6674 adsr=18943,0,3,23592 seqch=0 ref=0 loop=0
+t=1290 ch5 state=4 vol=35 cvol=35 prio=5 vab=1 prog=1 note=70 freq=0.8909 adsr=0,1200,0,32767 seqch=0 ref=0 loop=1
+t=1380 ch3 state=4 vol=12 cvol=13 prio=7 vab=1 prog=8 note=60 freq=1.0000 adsr=0,1200,0,300 seqch=0 ref=0 loop=0
+t=1410 ch3 state=4 vol=11 cvol=13 prio=7 vab=1 prog=8 note=60 freq=1.0000 adsr=0,1200,0,300 seqch=0 ref=0 loop=0
+t=1440 ch3 state=4 vol=10 cvol=13 prio=7 vab=1 prog=8 note=60 freq=1.0000 adsr=0,1200,0,300 seqch=0 ref=0 loop=0
+t=1470 ch3 state=4 vol=9 cvol=13 prio=7 vab=1 prog=8 note=60 freq=1.0000 adsr=0,1200,0,300 seqch=0 ref=0 loop=0
+t=1500 ch3 state=4 vol=7 cvol=13 prio=7 vab=1 prog=8 note=60 freq=1.0000 adsr=0,1200,0,300 seqch=0 ref=0 loop=0
+t=1530 ch3 state=4 vol=5 cvol=13 prio=7 vab=1 prog=8 note=60 freq=1.0000 adsr=0,1200,0,300 seqch=0 ref=0 loop=0
+t=1560 ch3 state=4 vol=3 cvol=13 prio=7 vab=1 prog=8 note=60 freq=1.0000 adsr=0,1200,0,300 seqch=0 ref=0 loop=0
+t=1590 ch3 off

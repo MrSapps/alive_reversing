@@ -217,6 +217,12 @@ public:
     virtual u8& sControllerValue() = 0;
     virtual void MIDI_ParseMidiMessage(s32 idx) = 0;
     virtual void SsUtKeyOffV(s32 idx) = 0;
+
+    // Where the game's PS1 executable used libsnd differently, for -ps1_sound:
+    // Whether its libsnd squares a sound effect's volume, as it does a SEQ note's
+    virtual bool Ps1SquaresSfxVolume() = 0;
+    // The master volume (SsSetMVol) the game sets on init and on each sound reset
+    virtual s16 DefaultMasterVolume() = 0;
 };
 
 // nullptr sets the default (AE) vars back
@@ -262,6 +268,10 @@ s32 MIDI_Read_Var_Len_4FD0D0(MIDI_SeqSong* pMidiStru);
 // per tick), keeping the sub millisecond remainder. The PC code rounded every delta down to a whole
 // ms, which made the SEQs play up to 2% fast.
 void MIDI_AddDeltaTime(MIDI_SeqSong& song, u32 ticks);
+// A SEQ note off with the PS1 sound, as libsnd does it (0x80075f18 in the AE PS1 executable): keys
+// off every channel that SEQ seqIdx keyed on with this VAB, program and note. No reference counts,
+// other SEQs' and sound effects' notes aren't touched.
+void MIDI_Ps1SeqNoteOff(s32 seqIdx, s32 vabId, s32 program, s32 note);
 u8 MIDI_ReadByte_4FD6B0(MIDI_SeqSong* pData);
 void MIDI_SkipBytes_4FD6C0(MIDI_SeqSong* pData, s32 length);
 void MIDI_SetTempo(s16 idx, s16 kZero, s16 tempo);

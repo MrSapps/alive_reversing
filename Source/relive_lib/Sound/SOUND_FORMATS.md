@@ -136,6 +136,31 @@ The other libsnd pitch paths agree:
 Checking the sign from the AO tones the PS1 re-tuned (lower sample rate, higher centre) was
 inconclusive: the PS1 sample lengths only give the rate ratio to about half a semitone.
 
+## SEQ note on and off
+
+libsnd (AE PS1 executable):
+
+- Note on: always a new voice (the voice allocator at 0x800761b4 only looks at voice age and
+  priority), so a note struck again keeps sounding.
+- Note off (0x80075f18, also a note on with velocity 0): keys off EVERY voice that the same SEQ
+  keyed on with the same VAB, program and note. No reference counts; the SEQ's MIDI channel isn't
+  compared, only the SEQ; other SEQs' and sound effects' voices aren't touched.
+- SEQ stop: keys off the SEQ's voices.
+
+The PC code differs, and `-ps1_sound` follows libsnd instead (`MIDI_Ps1SeqNoteOff`); the default
+path keeps the PC behaviour:
+
+- AE: reference counts per MIDI channel, so overlapping identical notes sustain until the last note
+  off. Its handler for event 0x80 keys off channel `v31` (always 0) instead of the matching one;
+  most SEQs use velocity 0 note ons, which don't go through it.
+- AO: a note on first keys off the same note (any SEQ's), the note off only releases the first
+  match of any SEQ, and the 0x80 handler compares against a mangled VAB id, so it never matches.
+  AO also never recorded which SEQ owned a channel, so SsSeqStop didn't release a stopped SEQ's
+  notes (only a stop of SEQ 0 matched, by accident): a looping note hung when the game stopped the
+  music, e.g. the secret area jingle when Abe dies. Fixed for both paths.
+
+The `stop_mid_note` and `note_off_rules` sound gold scenarios pin this.
+
 ## Voice volume
 
 libsnd's voice setup (0x80076d94 in `SLES_014.80`), checked by running it in a MIPS interpreter
@@ -160,6 +185,27 @@ if (seqNote) { L = L * L / 0x3FFF; R = R * R / 0x3FFF; }   // SEQ notes are SQUA
   `127 - volL * 64 / volR`. No square.
 - The PC code used linear volumes for both, a fixed SFX velocity of 96, and a SEQ volume of
   `112 * vol >> 7` with channel volumes of 112. `-ps1_sound` uses libsnd's.
+
+AO's libsnd is an older version, and differs (AO PS1 executable `SLES_006.64`):
+
+- Its voice setup (0x8007c73c, called by both the SEQ note on and `SsUtKeyOnV`) squares EVERY
+  voice's volume, sound effects too: AE's skips the square for a sound effect (voice marked
+  `0x21`). Checked in the MIPS interpreter: the formula above with the square always on gave the
+  same result for all of 3000 random SEQ notes and sound effects. Sound effects played up to 6 dB
+  too loud against the music with AE's rule (velocity 66: 8514 instead of 4424).
+- Its `SND_Init` and `SND_Reset` set the master volume to 127 (`SsSetMVol`, 0x800784d4), AE's to
+  100, as the PC code does for both. With 100 everything was 2.1 dB quiet. The SDL voices keep
+  100, because the PC code also scales their volume by it.
+- The rest is the same: the SEQ and channel volume maths, `SsSeqSetVol` (0x8007cf10, which also
+  squares), and the game's clamping of SEQ volumes to 10-127.
+
+`IPsxSpuApiVars::Ps1SquaresSfxVolume` and `DefaultMasterVolume` hold these per game.
+
+`SsUtAllKeyOff` (AE 0x80074244, AO 0x80079160) doesn't only key the voices off: it first sets each
+voice's volume to 0, pitch to 1000h and ADSR to 80FFh/4000h, so they go silent at once. With a plain
+key off, the tones with a release shift of 29 or 30 (20% of AO's tones, 48% of AE's) take
+minutes to fade, so looping ones kept playing over the FMVs (`SND_StopAll` is the only caller).
+`-ps1_sound` stops the voices.
 
 Found while chasing a buzz in POSITIV9's last notes, which play a noisy looped sample at 3.89x
 (pitch `3e2c`) at velocity 66: squared, they sit 10 dB below the rest of the jingle instead of 6 dB.

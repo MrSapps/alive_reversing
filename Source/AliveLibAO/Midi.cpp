@@ -233,6 +233,21 @@ public:
         AO::SsUtKeyOffV(static_cast<s16>(idx));
     }
 
+    virtual bool Ps1SquaresSfxVolume() override
+    {
+        // AO's libsnd squares every voice's volume (0x8007c73c in the PS1 executable), AE's only
+        // a SEQ note's
+        return true;
+    }
+
+    virtual s16 DefaultMasterVolume() override
+    {
+        // The PS1 executable sets 127 (SsSetMVol at 0x800784d4, called from its SND_Init and
+        // SND_Reset), where the PC code sets AE's 100. The SDL voices keep 100: it also scales
+        // their volumes (sGlobalVolumeLevel).
+        return PsxSoundEngine::Get() ? 127 : 100;
+    }
+
 private:
     bool mSoundDatIsNull = false; // Pretend we have sounds dat opened so AE funcs work
     u32 mMidi_WaitUntil = 0;
@@ -266,7 +281,9 @@ s32 MIDI_PlayerPlayMidiNote(s32 vabId, s32 program, s32 note, s32 leftVolume, s3
     auto v32 = rightVolume;
     auto usedChannelBits = 0;
 
-    if (GetSpuApiVars()->sVagCounts()[v7])
+    // The PC code keys off the same note before playing it again (any SEQ's, on the first channel
+    // found). libsnd plays it on a new voice, and a note off then releases them all.
+    if (GetSpuApiVars()->sVagCounts()[v7] && !PsxSoundEngine::Get())
     {
         for (s32 i = 0; i < 24; i++)
         {
@@ -560,6 +577,12 @@ s32 MIDI_ParseMidiMessage(s32 idx)
                 {
                     case MidiEvent::NoteOff_80:
                     {
+                        if (PsxSoundEngine::Get())
+                        {
+                            MIDI_Ps1SeqNoteOff(idx, pCtx->field_seq_idx, pCtx->field_32_progVols[data.Channel()].field_0_program, data.param1 & 0x7F);
+                            break;
+                        }
+
                         // Cant see how the ADSR compare would ever be true, the logic makes no sense
                         const u8 program = pCtx->field_32_progVols[data.Channel()].field_0_program;
                         const s32 programShifted = ((s32) program >> 8);
@@ -589,13 +612,30 @@ s32 MIDI_ParseMidiMessage(s32 idx)
                     case MidiEvent::NoteOn_90:
                     {
                         MIDI_ProgramVolume* pProgVol = &pCtx->field_32_progVols[data.Channel()];
+                        if (PsxSoundEngine::Get() && data.param2 == 0)
+                        {
+                            // Velocity 0: a note off
+                            MIDI_Ps1SeqNoteOff(idx, pCtx->field_seq_idx, pProgVol->field_0_program, data.param1 & 0x7F);
+                            break;
+                        }
                         auto r_vol = pProgVol->field_2_right_vol;
                         auto note = data.param1 << 8;
                         auto program = pProgVol->field_0_program;
                         auto l_vol = (s16)((u32)(pProgVol->field_1_left_vol * pCtx->field_C_volume) >> 7);
 
                         auto freq = data.param2;
-                        MIDI_PlayerPlayMidiNote_49DAD0(pCtx->field_seq_idx, program, note, l_vol, r_vol, freq, idx); // Note: inlined
+                        const s32 usedChannels = MIDI_PlayerPlayMidiNote_49DAD0(pCtx->field_seq_idx, program, note, l_vol, r_vol, freq, idx); // Note: inlined
+
+                        // Record which SEQ and channel own the MIDI channels, as AE does, so SsSeqStop
+                        // keys them off. Without it a SEQ stopped mid note (e.g. the music when Abe
+                        // dies) left a looping note playing: only a stop of SEQ 0 matched the unset owner.
+                        for (s32 i = 0; i < kNumChannels; i++)
+                        {
+                            if (usedChannels & (1 << i))
+                            {
+                                GetSpuApiVars()->sMidi_Channels().channels[i].field_1C_adsr.field_C = static_cast<u16>(16 * idx + data.Channel());
+                            }
+                        }
                         break;
                     }
 

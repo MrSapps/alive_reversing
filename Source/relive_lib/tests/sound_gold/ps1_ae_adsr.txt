@@ -61,6 +61,5 @@ t=2610 ch0 off
 t=2610 spu0 off
 t=2900 all key off
 t=2900 ch1 state=4 vol=2 cvol=2 prio=5 vab=1 prog=1 note=70 freq=0.8909 adsr=15871,1200,0,32767 seqch=65535 ref=255 loop=1
-t=2900 spu1 phase=4 pitch=0e41 vol=9141,9141 adsr=7f00,1fdf reverb=0
+t=2900 spu1 off
 t=2910 ch1 off
-t=2910 spu1 off
