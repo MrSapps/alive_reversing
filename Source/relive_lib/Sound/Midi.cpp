@@ -152,7 +152,8 @@ void SND_Reset()
     SND_Stop_All_Seqs();
     SND_Free_All_Seqs_4C9F40();
     SND_Free_All_VABS_4C9EB0();
-    SsSetMVol_4FC360(100, 100);
+    const s16 masterVolume = GetSpuApiVars()->DefaultMasterVolume();
+    SsSetMVol_4FC360(masterVolume, masterVolume);
 }
 
 
@@ -194,7 +195,8 @@ void SND_Init()
     SsSetTickMode_4FDC20(4096);
     VSyncCallback_4F8C40(SND_CallBack_4020A4);
     SpuInitHot_4FC320();
-    SsSetMVol_4FC360(100, 100);
+    const s16 masterVolume = GetSpuApiVars()->DefaultMasterVolume();
+    SsSetMVol_4FC360(masterVolume, masterVolume);
     memset(&GetMidiVars()->sSeq_Ids_word(), -1, sizeof(SeqIds));
     GetMidiVars()->sSeqsPlaying_count_word() = 0;
 }

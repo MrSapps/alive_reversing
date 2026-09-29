@@ -39,18 +39,20 @@ public:
     // 1/256 semitones, as libsnd's note parameter. All volumes are 0-127.
     // A note of SEQ seq (0-31, as SsSeqOpen numbers them), at the SEQ's volume (SetSeqVolume)
     void NoteOnSeq(s32 voice, s32 vabId, s32 program, s32 tone, s32 note, s32 velocity, s32 seq);
-    // A sound effect (SsVoKeyOn): its left and right volume
-    void NoteOnSfx(s32 voice, s32 vabId, s32 program, s32 tone, s32 note, s32 volLeft, s32 volRight);
+    // A sound effect (SsVoKeyOn): its left and right volume. squared: the game's libsnd squares a
+    // sound effect's volume too (see LibsndVoiceVolume).
+    void NoteOnSfx(s32 voice, s32 vabId, s32 program, s32 tone, s32 note, s32 volLeft, s32 volRight, bool squared);
 
     // libsnd's voice volume (the voice setup at 0x80076d94 in the AE PS1 executable), as the left
     // and right VOLL/VOLR registers (0-0x3FFF). All inputs are 0-127, the pans 64 = centre. A SEQ's
-    // note is scaled by the SEQ volume and then SQUARED; a sound effect's isn't.
+    // note is scaled by the SEQ volume. squared: the volume is then SQUARED, which AE's libsnd does
+    // for SEQ notes only and AO's (0x8007c73c in its PS1 executable) for every voice.
     struct VoiceVolume final
     {
         s32 mLeft = 0;
         s32 mRight = 0;
     };
-    static VoiceVolume LibsndVoiceVolume(bool seqNote, s32 velocity, s32 vabVol, s32 progVol, s32 toneVol, s32 tonePan, s32 progPan, s32 channelPan, s32 seqVolLeft,
+    static VoiceVolume LibsndVoiceVolume(bool seqNote, bool squared, s32 velocity, s32 vabVol, s32 progVol, s32 toneVol, s32 tonePan, s32 progPan, s32 channelPan, s32 seqVolLeft,
         s32 seqVolRight);
     // How libsnd's SsVoKeyOn (0x80076080) turns a sound effect's left and right volume into a
     // velocity and a channel pan
@@ -156,6 +158,7 @@ private:
 
         // What its volume came from, so SetSeqVolume can work it out again
         s32 mSeq = -1; // -1: a sound effect
+        bool mSquared = false;
         s32 mVelocity = 0;
         s32 mChannelPan = 64;
         u8 mVabVol = 0;
@@ -176,7 +179,7 @@ private:
     }
 
     // seq -1 is a sound effect
-    void NoteOn(s32 voice, s32 vabId, s32 program, s32 tone, s32 note, s32 seq, s32 velocity, s32 channelPan);
+    void NoteOn(s32 voice, s32 vabId, s32 program, s32 tone, s32 note, s32 seq, bool squared, s32 velocity, s32 channelPan);
     VoiceVolume CurrentVolume(const VoiceInfo& info) const;
     void StopVabVoices(s32 vabId);
     void SetVoicePitch(s32 voice, s32 note128);

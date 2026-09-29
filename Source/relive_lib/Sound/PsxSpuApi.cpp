@@ -161,6 +161,18 @@ public:
     {
         SsUtKeyOffV_4FE010(static_cast<s16>(idx));
     }
+
+    virtual bool Ps1SquaresSfxVolume() override
+    {
+        // The voice setup (0x80076d94) skips the square for a sound effect
+        return false;
+    }
+
+    virtual s16 DefaultMasterVolume() override
+    {
+        // The PS1 executable's too
+        return 100;
+    }
 };
 
 static AEPsxSpuApiVars gAeSpuVars;
@@ -711,7 +723,7 @@ static s32 MIDI_PlayMidiNote_4FCB30(s32 vabId, s32 program, s32 note, s32 leftVo
                         else
                         {
                             // libsnd doesn't have the PC's fixed velocity of 96
-                            pPs1Sound->NoteOnSfx(midiChannel, vabId, program, i, note, leftVolume, rightVolume);
+                            pPs1Sound->NoteOnSfx(midiChannel, vabId, program, i, note, leftVolume, rightVolume, gSpuVars->Ps1SquaresSfxVolume());
                         }
                         usedChannelBits |= (1 << midiChannel);
                         continue;
@@ -981,6 +993,12 @@ s32 MIDI_ParseMidiMessage_4FD100(s32 idx)
 
                 v29 = v16 & 15;
                 v32 = &gSpuVars->sMidiSeqSongs(idx2).field_32_progVols[v29];
+                if (PsxSoundEngine::Get())
+                {
+                    MIDI_Ps1SeqNoteOff(idx, gSpuVars->sMidiSeqSongs(idx).field_seq_idx, v32->field_0_program, BYTE1(v16));
+                    idx2 = idx;
+                    break;
+                }
                 for (s32 i = 0; i < 24; i++)
                 {
                     pAdsr = &gSpuVars->sMidi_Channels().channels[i].field_1C_adsr;
@@ -1050,6 +1068,11 @@ s32 MIDI_ParseMidiMessage_4FD100(s32 idx)
                         }
                         ++channelIdx_1;
                     }
+                }
+                else if (PsxSoundEngine::Get())
+                {
+                    // Velocity 0: a note off
+                    MIDI_Ps1SeqNoteOff(idx, gSpuVars->sMidiSeqSongs(idx2).field_seq_idx, v18->field_0_program, BYTE1(v16));
                 }
                 else
                 {
@@ -1172,6 +1195,19 @@ s32 MIDI_ParseMidiMessage_4FD100(s32 idx)
         goto handle_next_event;
     }
     return 0;
+}
+
+void MIDI_Ps1SeqNoteOff(s32 seqIdx, s32 vabId, s32 program, s32 note)
+{
+    for (s32 i = 0; i < kNumChannels; i++)
+    {
+        MIDI_ADSR_State& adsr = gSpuVars->sMidi_Channels().channels[i].field_1C_adsr;
+        // field_C is 16 * SEQ + MIDI channel for a SEQ's note (0xFFFF for SsVoKeyOn's)
+        if (adsr.field_3_state && (adsr.field_C >> 4) == seqIdx && adsr.field_0_seq_idx == vabId && adsr.field_1_program == program && adsr.field_2_note_byte1 == note)
+        {
+            gSpuVars->SsUtKeyOffV(i);
+        }
+    }
 }
 
 void MIDI_AddDeltaTime(MIDI_SeqSong& song, u32 ticks)
@@ -1589,6 +1625,18 @@ void SsUtAllKeyOff(s32)
         gSpuVars->SsUtKeyOffV(idx--);
     }
     while (idx >= 0);
+
+    // libsnd's SsUtAllKeyOff (AE PS1 executable 0x80074244, AO 0x80079160) sets every voice's
+    // volume to 0 before keying it off, so it goes silent at once. A key off alone lets the tone's
+    // release play, and 20% of AO's tones and 48% of AE's have a release shift of 29 or 30, which
+    // takes minutes: their looping samples kept playing over the FMVs.
+    if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+    {
+        for (s32 i = 0; i < kNumChannels; i++)
+        {
+            pPs1Sound->Stop(i);
+        }
+    }
 }
 
 
