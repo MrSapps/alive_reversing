@@ -321,11 +321,13 @@ void PsxSpu::Reset()
         voice = Voice();
     }
     mEndx = kAllVoices;
+    mPendingKeyOn = 0;
+    mPendingKeyOff = 0;
     mMasterLeft.SetRegister(0);
     mMasterRight.SetRegister(0);
     mReverb.SetEnabled(false);
     mReverb.SetOutputVolume(0, 0);
-    mReverb.SetPreset(PsxSpuReverb::Preset::Off);
+    mReverb.Reset();
 }
 
 void PsxSpu::SetVoiceSample(s32 voice, const PsxSpuSample& sample)
@@ -336,7 +338,7 @@ void PsxSpu::SetVoiceSample(s32 voice, const PsxSpuSample& sample)
     }
 }
 
-void PsxSpu::SetVoicePitch(s32 voice, u16 pitch)
+void PsxSpu::SetVoicePitch(s32 voice, u32 pitch)
 {
     if (ValidVoice(voice))
     {
@@ -413,6 +415,11 @@ void PsxSpu::StopVoice(s32 voice)
 {
     if (ValidVoice(voice))
     {
+        // Nor does a key on that hasn't happened yet: its sample may be about to go
+        mPendingKeyOn &= ~(1u << voice);
+    }
+    if (ValidVoice(voice))
+    {
         mVoices[voice].mEnvelope.Mute();
         mVoices[voice].mPlaying = false;
         mVoices[voice].mSample = {};
@@ -421,24 +428,30 @@ void PsxSpu::StopVoice(s32 voice)
 
 void PsxSpu::KeyOnMask(u32 voices)
 {
-    for (s32 i = 0; i < kNumVoices; i++)
-    {
-        if (voices & (1u << i))
-        {
-            KeyOn(i);
-        }
-    }
+    mPendingKeyOn |= voices & kAllVoices;
 }
 
 void PsxSpu::KeyOffMask(u32 voices)
 {
+    mPendingKeyOff |= voices & kAllVoices;
+}
+
+void PsxSpu::ApplyPendingKeys()
+{
+    // Each voice's key off, then its key on, as the SPU does them
     for (s32 i = 0; i < kNumVoices; i++)
     {
-        if (voices & (1u << i))
+        if (mPendingKeyOff & (1u << i))
         {
             KeyOff(i);
         }
+        if (mPendingKeyOn & (1u << i))
+        {
+            KeyOn(i);
+        }
     }
+    mPendingKeyOn = 0;
+    mPendingKeyOff = 0;
 }
 
 s16 PsxSpu::VoiceEnvelope(s32 voice) const
@@ -507,7 +520,7 @@ static const std::array<u16, 192> kNotePitchTable = {{
     7732, 7760, 7788, 7816, 7844, 7873, 7901, 7930, 7958, 7987, 8016, 8045, 8074, 8103, 8133, 8162,
 }};
 
-u16 PsxSpu::PitchFromNote(s32 note, s32 fine, s32 centre, s32 shift)
+u32 PsxSpu::PitchFromNote(s32 note, s32 fine, s32 centre, s32 shift)
 {
     // libsnd's SsPitchFromNote, from the AE PS1 executable (0x80076620; the SEQ note on at
     // 0x80076518 does the same with the tone's centre/shift). The shift is added to the fine tune,
@@ -529,9 +542,9 @@ u16 PsxSpu::PitchFromNote(s32 note, s32 fine, s32 centre, s32 shift)
     const s32 octave = octaveOfNote - 5;
     if (octave > 0)
     {
-        return static_cast<u16>(pitch << octave);
+        return pitch << octave;
     }
-    return static_cast<u16>(pitch >> std::min(-octave, 31));
+    return pitch >> std::min(-octave, 31);
 }
 
 s16 PsxSpu::ReadNextSample(s32 voiceIdx, Voice& voice)
@@ -565,8 +578,13 @@ s16 PsxSpu::ReadNextSample(s32 voiceIdx, Voice& voice)
 
 s32 PsxSpu::SampleAt(const Voice& voice, s64 index)
 {
-    const PsxSpuSample& sample = voice.mSample;
-    if (index < 0 || !sample.mPcm)
+    return SampleAt(voice.mSample, index, 0);
+}
+
+s32 PsxSpu::SampleAt(const PsxSpuSample& sample, s64 index, s32 level)
+{
+    const s16* pPcm = level > 0 ? sample.mFiltered[level - 1] : sample.mPcm;
+    if (index < 0 || !pPcm)
     {
         return 0;
     }
@@ -582,14 +600,14 @@ s32 PsxSpu::SampleAt(const Voice& voice, s64 index)
 
     if (index < end)
     {
-        return sample.mPcm[index];
+        return pPcm[index];
     }
     if (!loop)
     {
         return 0;
     }
     const u32 loopLength = end - sample.mLoopStart;
-    return sample.mPcm[sample.mLoopStart + static_cast<u32>((index - end) % loopLength)];
+    return pPcm[sample.mLoopStart + static_cast<u32>((index - end) % loopLength)];
 }
 
 // The band-limited kernel: a sinc with its cutoff at kCutoff of the output Nyquist, windowed
@@ -624,13 +642,23 @@ s32 PsxSpu::BandLimitedSample(const Voice& voice)
     const s64 position = (static_cast<s64>(voice.mSamplesRead) - 3) * 0x1000 + (voice.mCounter & 0xFFF);
     const s64 pitch = std::min(voice.mPitch, kMaxPitch);
 
+    // Above 2x, a low-passed copy has nothing to alias, so it can be read at a stride: 2^level
+    // source samples. That keeps it at most 2 * 2 * kKernelHalfWidth taps.
+    s32 level = 0;
+    while (level < kPsxSpuFilterLevels && voice.mSample.mFiltered[level] && pitch >= (static_cast<s64>(kPitch44100) * 2) << level)
+    {
+        level++;
+    }
+    const s64 stride = s64{1} << level;
+
     // Kernel steps per 1/4096 of a source sample, in 16.16: kKernelSteps / pitch
     const s64 stepScale = (static_cast<s64>(kKernelSteps) << 16) / pitch;
     const s64 halfWidth = (kKernelHalfWidth * pitch + 0xFFF) / 0x1000; // In source samples
     const s64 centre = position >> 12;
 
     s64 sum = 0;
-    for (s64 j = centre - halfWidth; j <= centre + halfWidth + 1; j++)
+    const s64 first = (centre - halfWidth) & ~(stride - 1);
+    for (s64 j = first; j <= centre + halfWidth + 1; j += stride)
     {
         const s64 distance = position - j * 0x1000;
         const s64 k = ((distance < 0 ? -distance : distance) * stepScale) >> 16;
@@ -638,12 +666,90 @@ s32 PsxSpu::BandLimitedSample(const Voice& voice)
         {
             continue;
         }
-        sum += SampleAt(voice, j) * kKernel[static_cast<size_t>(k)];
+        sum += SampleAt(voice.mSample, j, level) * kKernel[static_cast<size_t>(k)];
     }
 
-    // The kernel's gain is the pitch ratio (it's pitch / 1000h source samples per output sample)
-    const s64 out = ((sum >> 15) * 0x1000) / pitch;
+    // The kernel's gain is the pitch ratio (it's pitch / 1000h source samples per output sample),
+    // over the stride
+    const s64 out = ((sum >> 15) * 0x1000 * stride) / pitch;
     return static_cast<s32>(std::clamp<s64>(out, -0x8000, 0x7FFF));
+}
+
+s32 PsxSpu::FilterLevelsFor(u32 maxPitch)
+{
+    s32 levels = 0;
+    while (levels < kPsxSpuFilterLevels && maxPitch >= (kPitch44100 * 2u) << levels)
+    {
+        levels++;
+    }
+    return levels;
+}
+
+std::vector<s16> PsxSpu::FilterSample(const PsxSpuSample& sample, s32 level)
+{
+    // A windowed (Blackman) sinc low pass at kCutoff of the 2^level times lower Nyquist,
+    // kKernelHalfWidth of its periods each side
+    const f64 pi = 3.14159265358979323846;
+    const s32 factor = 1 << level;
+    const f64 cutoff = kCutoff * 0.5 / factor; // In cycles a source sample
+    const s32 halfWidth = kKernelHalfWidth * factor;
+    std::vector<f64> taps(halfWidth * 2 + 1);
+    f64 total = 0.0;
+    for (s32 m = -halfWidth; m <= halfWidth; m++)
+    {
+        const f64 x = 2.0 * pi * cutoff * m;
+        const f64 sinc = m == 0 ? 1.0 : std::sin(x) / x;
+        const f64 w = static_cast<f64>(m) / (halfWidth + 1);
+        const f64 window = 0.42 + 0.5 * std::cos(pi * w) + 0.08 * std::cos(2.0 * pi * w);
+        taps[m + halfWidth] = sinc * window;
+        total += taps[m + halfWidth];
+    }
+    for (f64& t : taps)
+    {
+        t /= total;
+    }
+
+    const u32 length = sample.mPcm ? sample.mLength : 0;
+    u32 end = length;
+    bool loop = false;
+    if (sample.mLoop)
+    {
+        end = sample.mLoopEnd == 0 ? length : std::min(sample.mLoopEnd, length);
+        loop = sample.mLoopStart < end;
+    }
+    const u32 loopStart = sample.mLoopStart;
+    const u32 loopLength = loop ? end - loopStart : 0;
+
+    std::vector<s16> out(length);
+    for (u32 n = 0; n < length; n++)
+    {
+        // A loop's samples are filtered as the loop repeats: what's before its start is its end
+        const bool inLoop = loop && n >= loopStart && n < end;
+        f64 acc = 0.0;
+        for (s32 m = -halfWidth; m <= halfWidth; m++)
+        {
+            s64 i = static_cast<s64>(n) - m;
+            if (inLoop)
+            {
+                i = loopStart + (((i - loopStart) % loopLength) + loopLength) % loopLength;
+            }
+            else if (i < 0)
+            {
+                continue;
+            }
+            else if (i >= end)
+            {
+                if (!loop)
+                {
+                    continue;
+                }
+                i = loopStart + (i - end) % loopLength;
+            }
+            acc += sample.mPcm[i] * taps[m + halfWidth];
+        }
+        out[n] = static_cast<s16>(std::clamp<s64>(std::llround(acc), -0x8000, 0x7FFF));
+    }
+    return out;
 }
 
 void PsxSpu::TickVoice(s32 voiceIdx, Voice& voice, s32& left, s32& right, s32& reverbLeft, s32& reverbRight)
@@ -707,5 +813,11 @@ void PsxSpu::Render(s16* out, u32 frames)
 
         mMasterLeft.Tick();
         mMasterRight.Tick();
+
+        // KON/KOFF take effect a sample after they're written
+        if (frame == 0 && (mPendingKeyOn | mPendingKeyOff))
+        {
+            ApplyPendingKeys();
+        }
     }
 }

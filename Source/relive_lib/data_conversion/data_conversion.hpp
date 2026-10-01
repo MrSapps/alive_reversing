@@ -129,7 +129,9 @@ public:
         // expectations - negligible size cost at this resolution/framerate.
         // 4: audio track switched from raw A_PCM to A_VORBIS (much smaller files, and fixes the
         // ".DDV.webm" naming bug where the audio codec ID didn't matter yet).
-        static constexpr u32 kFmvVersion = 4;
+        // 5: AV1 realtime encode speed 8 -> 6: speeds 7/8 drop the chroma residual on some blocks
+        //    (flat desaturated squares mid-movie, e.g. GAMEBGN frame 5).
+        static constexpr u32 kFmvVersion = 5;
         // 17: dropped the redundant "paths" subdir under each level (levels/<name>/<pathId>/...
         // instead of levels/<name>/paths/<pathId>/...) and lower-cased "Sounds" to "sounds".
         // 18: moved vh_file/vb_file/seq_files out of every path.json's own sound_info (where

@@ -71,6 +71,8 @@ public:
 
     // Zero fills the work area and the resampler state
     void Clear();
+    // SPU reset: preset off, and the resampling and 22050 Hz phase start again
+    void Reset();
 
     // One 44100 Hz sample: in is the mix of the voices that have reverb on, out is the reverb's
     // output (already multiplied by the output volume)
@@ -84,6 +86,8 @@ private:
     static constexpr u32 kInputHistory = 64;  // Power of 2 >= kFirTaps
     static constexpr u32 kOutputHistory = 32; // Power of 2 >= 20 wet samples
 
+    // One channel's reverb at 22050 Hz
+    void TickChannel(s32 in, s16 vIn, u16 mSame, u16 dSame, u16 mDiff, u16 dDiff, u16 mComb1, u16 mComb2, u16 mComb3, u16 mComb4, u16 mApf1, u16 mApf2, s32& wet);
     void Tick22050(s32 inLeft, s32 inRight, s32& wetLeft, s32& wetRight);
 
     // Work area access, offset in 16 bit words from the current buffer address

@@ -348,7 +348,11 @@ public:
             ALIVE_FATAL("Failed to initialize encoder");
         }
 
-        const int speed = 8;
+        // Realtime speeds 7 and 8 leave blocks with their chroma residual dropped on some frames
+        // (flat grey/desaturated 8x8 squares, e.g. GAMEBGN frame 5's poster) - seen with both the
+        // in-tree libaom and ffmpeg's. Speed 6 is clean (checked every frame of GAMEBGN against the
+        // MDEC decode) at about 3x the encode time of 8, still far cheaper than the "good" usage.
+        const int speed = 6;
         if (aom_codec_control(&codec, AOME_SET_CPUUSED, speed))
         {
             ALIVE_FATAL("Failed to set cpu-used");

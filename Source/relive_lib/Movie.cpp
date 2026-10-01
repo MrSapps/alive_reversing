@@ -715,6 +715,10 @@ const u32 MOVIE_SKIPPER_GAMEPAD_INPUTS = (InputCommands::eUnPause_OrConfirm | In
             aom_codec_err_t status = aom_codec_decode(mCodec.Get(), compressedFrame.data(), static_cast<unsigned int>(compressedFrame.size()), nullptr);
             if (status != AOM_CODEC_OK)
             {
+                // A lost frame leaves every frame that references it with garbage blocks until
+                // the next key frame
+                LOG_WARNING("FMV: AV1 decode failed (%s: %s) on a %zu byte frame", aom_codec_err_to_string(status),
+                    aom_codec_error_detail(mCodec.Get()) ? aom_codec_error_detail(mCodec.Get()) : "", compressedFrame.size());
                 return false;
             }
 
@@ -726,6 +730,7 @@ const u32 MOVIE_SKIPPER_GAMEPAD_INPUTS = (InputCommands::eUnPause_OrConfirm | In
                 return true;
             }
 
+            LOG_WARNING("FMV: AV1 decode gave no frame for a %zu byte frame", compressedFrame.size());
             return false;
         }
 
@@ -1165,11 +1170,18 @@ private:
         return StepResult::eYield;
     }
 
+    // Samples of the movie's audio the device has played. The start sample is where the device
+    // gets to the sound, which is after the samples queued ahead of it when it was started, so
+    // this is 0 until then.
+    u64 AudioSamplesPlayed() const
+    {
+        const u64 generated = SND_Get_Generated_Audio_Samples();
+        return generated > mAudioStartSample ? generated - mAudioStartSample : 0;
+    }
+
     u64 AudioClockMs() const
     {
-        return mAudioStarted
-            ? (SND_Get_Generated_Audio_Samples() - mAudioStartSample) * 1000 / SND_Get_Device_Sample_Rate()
-            : 0;
+        return mAudioStarted ? AudioSamplesPlayed() * 1000 / SND_Get_Device_Sample_Rate() : 0;
     }
 
     // Follows the audio while it plays. The video can outlast the audio by a few seconds, and
@@ -1187,6 +1199,18 @@ private:
         while (mAudioQueue.TryPop(audioChunk))
         {
             mPendingAudioChunks.push_back(std::move(audioChunk));
+        }
+
+        // After the last chunk, queue silence to follow it: the buffer loops and the mixer runs
+        // ahead of the device, so otherwise it plays what's left in the buffer (older audio of
+        // this movie) until the sound is stopped. Written in turn like any chunk, so it can't
+        // overwrite audio that hasn't played yet.
+        if (mAudioStarted && !mAudioPadded && mHasAudio && mPipeline->AudioComplete() && mPendingAudioChunks.empty())
+        {
+            mAudioPadded = true;
+            MkvAudioChunk silence;
+            silence.mBuffer.assign(static_cast<size_t>(mMovie.AudioSampleRate() / 2u) * mBlockAlign, 0);
+            mPendingAudioChunks.push_back(std::move(silence));
         }
 
         const u32 maxBufferedSamples = mAudioBufferSamples - std::min<u32>(mAudioBufferSamples / 4u, 1024u);
@@ -1234,10 +1258,10 @@ private:
                 break;
             }
             ++mAudioWriteCount;
-            LOG_INFO("FMV playback %s: audio write=%u sourceOffset=%lld pts=%llu writeOffset=%u readOffset=%u samples=%u hash=%llu",
+            LOG_INFO("FMV playback %s: audio write=%u sourceOffset=%lld pts=%llu writeOffset=%u readOffset=%u samples=%u hash=%llu gen=%llu queued=%u",
                 mName.c_str(), mAudioWriteCount, pendingChunk.mFileOffset,
                 static_cast<unsigned long long>(pendingChunk.mPtsNs), mAudioWriteOffset, readOffset, samplesToWrite,
-                static_cast<unsigned long long>(audioHash));
+                static_cast<unsigned long long>(audioHash), static_cast<unsigned long long>(SND_Get_Generated_Audio_Samples()), SND_Get_Queued_Audio_Samples());
             mAudioWriteOffset = (mAudioWriteOffset + samplesToWrite) % mAudioBufferSamples;
             mAudioSamplesSubmitted += samplesToWrite;
             pendingChunk.mBuffer.erase(pendingChunk.mBuffer.begin(), pendingChunk.mBuffer.begin() + samplesToWrite * mBlockAlign);
@@ -1252,13 +1276,18 @@ private:
                 {
                     mNoAudioOrAudioError = true;
                 }
-                mAudioStartSample = SND_Get_Generated_Audio_Samples();
+                // The sound starts at the mixer's position, which is ahead of the device by what's
+                // queued: count from when the device gets to it, or the audio clock runs early and
+                // the end check below stops the sound before the device has played it all
+                mAudioStartSample = SND_Get_Generated_Audio_Samples() + SND_Get_Queued_Audio_Samples();
                 mAudioStarted = !mNoAudioOrAudioError;
             }
         }
 
+        // AudioSamplesPlayed counts at the device's rate, the submitted samples at the movie's
+        const u64 playedMovieSamples = AudioSamplesPlayed() * mMovie.AudioSampleRate() / SND_Get_Device_Sample_Rate();
         if (mAudioStarted && !mAudioFinished && mPipeline->AudioComplete() && mPendingAudioChunks.empty()
-            && SND_Get_Generated_Audio_Samples() - mAudioStartSample >= mAudioSamplesSubmitted)
+            && playedMovieSamples >= mAudioSamplesSubmitted)
         {
             SND_StopAll();
             mAudioStarted = false;
@@ -1339,6 +1368,9 @@ private:
     u32 mAudioWriteCount = 0;
     bool mAudioStarted = false;
     bool mAudioFinished = false;
+    // Silence was written after the last audio, so the looping buffer doesn't replay old audio
+    // before it's stopped
+    bool mAudioPadded = false;
     MovieClock mMovieClock;
 
     u32 mRenderedFrameCount = 0;

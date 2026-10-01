@@ -7,8 +7,6 @@
 #include "../AliveLibAE/GameAutoPlayer.hpp"
 #include "Sys.hpp"
 
-extern bool gLatencyHack;
-
 // When the last frame's turn came, and how far apart turns are (0: no limit)
 static u64 sVSyncLastNs = 0;
 static u64 sFrameIntervalNs = 1000000000ull / 30;
@@ -74,6 +72,10 @@ void PSX_SetMaxFps(u32 maxFps)
 
 void PSX_VSync(VSyncMode mode)
 {
+    if (mode == VSyncMode::LimitFps)
+    {
+        SND_DumpFrame();
+    }
     SsSeqCalledTbyT();
 
     const u64 nowNs = SDL_GetTicksNS();
@@ -98,11 +100,8 @@ void PSX_VSync(VSyncMode mode)
         {
             SsSeqCalledTbyT();
 
-            // Prevent max CPU usage, will probably cause stuttering on weaker machines
-            if (gLatencyHack)
-            {
-                SDL_Delay(1);
-            }
+            // Not a busy wait: the sequencer only needs ticking every few ms
+            SDL_Delay(1);
         }
     }
 

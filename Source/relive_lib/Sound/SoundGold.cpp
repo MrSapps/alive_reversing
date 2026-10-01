@@ -283,7 +283,8 @@ void SoundGoldSession::RecordChanges()
             std::string state = "off";
             if (v.mPhase != PsxSpuEnvelope::Phase::Off)
             {
-                state = Format("phase=%d pitch=%04x vol=%d,%d adsr=%04x,%04x reverb=%d", static_cast<s32>(v.mPhase), v.mPitch, v.mVolLeft, v.mVolRight, v.mAdsr1, v.mAdsr2, v.mReverb ? 1 : 0);
+                state = Format("phase=%d pitch=%04x vol=%d,%d adsr=%04x,%04x reverb=%d seq=%d prog=%d note=%d", static_cast<s32>(v.mPhase), v.mPitch, v.mVolLeft, v.mVolRight, v.mAdsr1,
+                    v.mAdsr2, v.mReverb ? 1 : 0, v.mLibsnd.mSeq, v.mLibsnd.mProgram, v.mLibsnd.mNote);
             }
 
             if (state != mLastVoiceState[i])

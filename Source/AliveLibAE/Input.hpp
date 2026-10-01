@@ -163,6 +163,9 @@ public:
     u16 field_3A_pad_idx = 0;
     u32 mCommand = 0;
     u32 mCommandDuration = 0;
+    // InputCommands the automation script holds down (Automation's hold command), OR'd into
+    // pad 0's input every update
+    u32 mAutomationInput = 0;
 
     bool IsAnyHeld(u32 command);
     bool IsAnyPressed(u32 command);

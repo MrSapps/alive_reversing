@@ -18,11 +18,16 @@ class ResourceManagerWrapper;
 //       world position (x, y), or near the middle of the camera. Levels are named as in the path
 //       JSON files, e.g. rupture_farms (see data_conversion/EnumSerialization.hpp).
 //   wait_frames <n>
-//       Let n frames run.
+//       Let n frames run. A modal's frames (the pause menu, a movie) count too.
 //   wait_until in_game
 //       Until there's a controlled character on a loaded camera outside the menus.
 //   wait_until camera <level> <path> <camera>
 //       Until that camera is loaded.
+//   hold <buttons> <frames>
+//       Hold these buttons down on pad 1 for that many frames, then release them. Buttons are
+//       joined with +, e.g. hold left+run 20. Names: up, down, left, right, run, action, sneak,
+//       throw, hop, roll (AO) or fart (AE), speak1-speak8 (AE's 1-8 or AO's 4), chant,
+//       pause, back, cheat.
 //   screenshot <file.png>
 //       The next frame's 640x240 framebuffer, before it's scaled to the window.
 //   dump_state <file.json>
@@ -73,6 +78,11 @@ private:
     bool Start(const Command& command, BaseMap& map, bool betweenFrames);
     bool Screenshot(const std::string& path);
     bool WaitUntil(const Command& command, BaseMap& map, bool betweenFrames) const;
+    // The InputCommands bits of a +-joined button list, false with error for an unknown name
+public:
+    static bool ParseButtons(const std::string& buttons, u32& bits, std::string& error);
+
+private:
     bool SaveText(const std::string& path, const std::string& text);
     std::string StateJson(BaseMap& map) const;
     std::string ObjectsJson() const;

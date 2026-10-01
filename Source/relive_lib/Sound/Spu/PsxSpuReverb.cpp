@@ -149,6 +149,21 @@ PsxSpuReverb::PsxSpuReverb()
 {
     // The one allocation: big enough for every preset, so changing preset never allocates
     mWorkArea.resize(MaxWorkAreaBytes() / sizeof(s16));
+    Reset();
+}
+
+void PsxSpuReverb::Reset()
+{
+    mInputLeft.fill(0);
+    mInputRight.fill(0);
+    mInputPos = 0;
+    mWetLeft.fill(0);
+    mWetRight.fill(0);
+    mWetPos = 0;
+    // The reverb runs on the second sample after a reset, then every other one. Checked against
+    // DuckStation's SPU playing the same register writes: with the other phase the output differed
+    // by 34 dB under the signal, with this by 60 dB (rounding).
+    mOddSample = false;
     SetPreset(Preset::Off);
 }
 
@@ -157,20 +172,16 @@ void PsxSpuReverb::SetPreset(Preset preset)
     mPreset = preset;
     mRegs = PresetRegisters(preset);
     mWorkAreaWords = PresetWorkAreaBytes(preset) / sizeof(s16);
+    // Writing mBASE starts the buffer at the work area's start. The 22050 Hz phase and the
+    // resampling filters carry on.
+    mBufferAddress = 0;
     Clear();
 }
 
 void PsxSpuReverb::Clear()
 {
+    // SpuClearReverbWorkArea only zeroes the work area in SPU RAM
     std::fill(mWorkArea.begin(), mWorkArea.end(), static_cast<s16>(0));
-    mBufferAddress = 0;
-    mInputLeft.fill(0);
-    mInputRight.fill(0);
-    mInputPos = 0;
-    mWetLeft.fill(0);
-    mWetRight.fill(0);
-    mWetPos = 0;
-    mOddSample = false;
 }
 
 s16 PsxSpuReverb::DepthToVolume(s32 depth)
@@ -204,70 +215,63 @@ void PsxSpuReverb::Write(s32 wordOffset, s32 value)
     mWorkArea[addr] = static_cast<s16>(Saturate16(value));
 }
 
-void PsxSpuReverb::Tick22050(s32 inLeft, s32 inRight, s32& wetLeft, s32& wetRight)
+// x * (0x8000 - alpha), how the IIR weighs the old value: as the hardware does it, including
+// alpha = -8000h (Mednafen's measurements)
+static s32 IirOld(s32 x, s16 alpha)
+{
+    if (alpha == -0x8000)
+    {
+        return x == -0x8000 ? 0 : x * -0x10000;
+    }
+    return x * (0x8000 - alpha);
+}
+
+// -x, with -8000h giving 7FFFh
+static s32 Negate(s32 x)
+{
+    return x == -0x8000 ? 0x7FFF : -x;
+}
+
+void PsxSpuReverb::TickChannel(s32 in, s16 vIn, u16 mSame, u16 dSame, u16 mDiff, u16 dDiff, u16 mComb1, u16 mComb2, u16 mComb3, u16 mComb4, u16 mApf1, u16 mApf2, s32& wet)
 {
     const Registers& r = mRegs;
 
-    // Input from the mixer
-    const s32 lIn = Mul(r.vLIN, inLeft);
-    const s32 rIn = Mul(r.vRIN, inRight);
-
-    // The reflections only write to the work area, so with writes off (ATTR bit 7 clear) they do
-    // nothing: psx-spx "Reverb Disable"
+    // The psx-spx formula, with each step's rounding and saturation where the hardware has them
+    // (as Mednafen and DuckStation measured it). The reflections only write to the work area, so
+    // with writes off (ATTR bit 7 clear) they do nothing.
     if (mEnabled)
     {
-        // Same side reflection (L to L, R to R)
-        {
-            const s32 lPrev = Read(Words(r.mLSAME) - 1);
-            const s32 rPrev = Read(Words(r.mRSAME) - 1);
-            const s32 l = Saturate16(lIn + Mul(Read(Words(r.dLSAME)), r.vWALL) - lPrev);
-            const s32 rr = Saturate16(rIn + Mul(Read(Words(r.dRSAME)), r.vWALL) - rPrev);
-            Write(Words(r.mLSAME), Mul(l, r.vIIR) + lPrev);
-            Write(Words(r.mRSAME), Mul(rr, r.vIIR) + rPrev);
-        }
-
-        // Different side reflection (R to L, L to R)
-        {
-            const s32 lPrev = Read(Words(r.mLDIFF) - 1);
-            const s32 rPrev = Read(Words(r.mRDIFF) - 1);
-            const s32 l = Saturate16(lIn + Mul(Read(Words(r.dRDIFF)), r.vWALL) - lPrev);
-            const s32 rr = Saturate16(rIn + Mul(Read(Words(r.dLDIFF)), r.vWALL) - rPrev);
-            Write(Words(r.mLDIFF), Mul(l, r.vIIR) + lPrev);
-            Write(Words(r.mRDIFF), Mul(rr, r.vIIR) + rPrev);
-        }
+        // Same side reflection
+        const s32 sameIn = Saturate16((((Read(Words(dSame)) * r.vWALL) >> 14) + ((in * vIn) >> 14)) >> 1);
+        const s32 same = Saturate16((((sameIn * r.vIIR) >> 14) + (IirOld(Read(Words(mSame) - 1), r.vIIR) >> 14)) >> 1);
+        // Different side reflection
+        const s32 diffIn = Saturate16((((Read(Words(dDiff)) * r.vWALL) >> 14) + ((in * vIn) >> 14)) >> 1);
+        const s32 diff = Saturate16((((diffIn * r.vIIR) >> 14) + (IirOld(Read(Words(mDiff) - 1), r.vIIR) >> 14)) >> 1);
+        Write(Words(mSame), same);
+        Write(Words(mDiff), diff);
     }
 
-    // Early echo (combs)
-    s32 lOut = Saturate16(Mul(r.vCOMB1, Read(Words(r.mLCOMB1))) + Mul(r.vCOMB2, Read(Words(r.mLCOMB2))) + Mul(r.vCOMB3, Read(Words(r.mLCOMB3))) + Mul(r.vCOMB4, Read(Words(r.mLCOMB4))));
-    s32 rOut = Saturate16(Mul(r.vCOMB1, Read(Words(r.mRCOMB1))) + Mul(r.vCOMB2, Read(Words(r.mRCOMB2))) + Mul(r.vCOMB3, Read(Words(r.mRCOMB3))) + Mul(r.vCOMB4, Read(Words(r.mRCOMB4))));
+    // Early echo (combs), not saturated
+    const s32 comb = ((Read(Words(mComb1)) * r.vCOMB1) >> 14) + ((Read(Words(mComb2)) * r.vCOMB2) >> 14) + ((Read(Words(mComb3)) * r.vCOMB3) >> 14)
+                   + ((Read(Words(mComb4)) * r.vCOMB4) >> 14);
 
-    // Late reverb, all pass filter 1
-    {
-        const s32 lDelayed = Read(Words(r.mLAPF1) - Words(r.dAPF1));
-        const s32 rDelayed = Read(Words(r.mRAPF1) - Words(r.dAPF1));
-        lOut = Saturate16(lOut - Mul(r.vAPF1, lDelayed));
-        rOut = Saturate16(rOut - Mul(r.vAPF1, rDelayed));
-        Write(Words(r.mLAPF1), lOut);
-        Write(Words(r.mRAPF1), rOut);
-        lOut = Saturate16(Mul(lOut, r.vAPF1) + lDelayed);
-        rOut = Saturate16(Mul(rOut, r.vAPF1) + rDelayed);
-    }
+    // Late reverb: the two all pass filters
+    const s32 apf1Delayed = Read(Words(mApf1) - Words(r.dAPF1));
+    const s32 apf2Delayed = Read(Words(mApf2) - Words(r.dAPF2));
+    const s32 apf1 = Saturate16((comb + ((apf1Delayed * Negate(r.vAPF1)) >> 14)) >> 1);
+    const s32 apf2 = Saturate16(apf1Delayed + ((((apf1 * r.vAPF1) >> 14) + ((apf2Delayed * Negate(r.vAPF2)) >> 14)) >> 1));
+    wet = Saturate16(apf2Delayed + ((apf2 * r.vAPF2) >> 15));
+    Write(Words(mApf1), apf1);
+    Write(Words(mApf2), apf2);
+}
 
-    // Late reverb, all pass filter 2
-    {
-        const s32 lDelayed = Read(Words(r.mLAPF2) - Words(r.dAPF2));
-        const s32 rDelayed = Read(Words(r.mRAPF2) - Words(r.dAPF2));
-        lOut = Saturate16(lOut - Mul(r.vAPF2, lDelayed));
-        rOut = Saturate16(rOut - Mul(r.vAPF2, rDelayed));
-        Write(Words(r.mLAPF2), lOut);
-        Write(Words(r.mRAPF2), rOut);
-        lOut = Saturate16(Mul(lOut, r.vAPF2) + lDelayed);
-        rOut = Saturate16(Mul(rOut, r.vAPF2) + rDelayed);
-    }
-
-    // Output to the mixer
-    wetLeft = Mul(lOut, mOutputVolumeLeft);
-    wetRight = Mul(rOut, mOutputVolumeRight);
+void PsxSpuReverb::Tick22050(s32 inLeft, s32 inRight, s32& wetLeft, s32& wetRight)
+{
+    const Registers& r = mRegs;
+    // The left channel is done before the right, as the hardware does: a right one could read a
+    // word the left one wrote
+    TickChannel(inLeft, r.vLIN, r.mLSAME, r.dLSAME, r.mLDIFF, r.dRDIFF, r.mLCOMB1, r.mLCOMB2, r.mLCOMB3, r.mLCOMB4, r.mLAPF1, r.mLAPF2, wetLeft);
+    TickChannel(inRight, r.vRIN, r.mRSAME, r.dRSAME, r.mRDIFF, r.dLDIFF, r.mRCOMB1, r.mRCOMB2, r.mRCOMB3, r.mRCOMB4, r.mRAPF1, r.mRAPF2, wetRight);
 
     // BufferAddress = MAX(ESA, (BufferAddress + 2) AND 7FFFEh): the next word, wrapping in the
     // work area
@@ -320,6 +324,10 @@ void PsxSpuReverb::Process(s32 inLeft, s32 inRight, s32& outLeft, s32& outRight)
         outLeft = mWetLeft[idx];
         outRight = mWetRight[idx];
     }
+    // The output volume (the reverb depth) is applied to the 44100 Hz output, so a change takes
+    // effect at once
+    outLeft = Mul(outLeft, mOutputVolumeLeft);
+    outRight = Mul(outRight, mOutputVolumeRight);
 
     mInputPos = (mInputPos + 1) & (kInputHistory - 1);
     mOddSample = !mOddSample;

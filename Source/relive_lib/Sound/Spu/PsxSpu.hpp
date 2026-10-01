@@ -22,11 +22,21 @@
 // must come from the same thread (e.g. the audio callback, fed by a command queue) or be
 // serialised by the owner.
 
+// How many low-passed copies of a sample there can be, see PsxSpuSample::mFiltered
+static constexpr s32 kPsxSpuFilterLevels = 3;
+
 // A voice's sample. The SPU doesn't own the PCM: it must stay alive while a voice plays it.
 struct PsxSpuSample final
 {
     const s16* mPcm = nullptr;
     u32 mLength = 0; // In samples
+
+    // For the band-limited interpolation (not the hardware): mFiltered[k - 1] is mPcm low-passed to
+    // below 1/2^k of its Nyquist (PsxSpu::FilterSample), the same length so the loop points are
+    // too. A voice played at more than 2^k times the rate reads it at a stride of 2^k, which keeps
+    // its cost the same at any pitch. Optional: without one the voice reads mPcm, at a cost that
+    // grows with the pitch.
+    std::array<const s16*, kPsxSpuFilterLevels> mFiltered = {};
 
     // A looping sample jumps back to mLoopStart when it reaches mLoopEnd, forever (the ADPCM
     // "End+Repeat" code). A one shot sample stops when it reaches its end, and the voice is
@@ -161,8 +171,13 @@ public:
     static constexpr s32 kNumVoices = 24;
     static constexpr u32 kSampleRate = 44100;
     static constexpr u16 kPitch44100 = 0x1000;
-    // Larger PITCH values play at this rate ("IF Step>3FFFh then Step=4000h")
-    static constexpr u16 kMaxPitch = 0x4000;
+    // Larger pitches play at this rate. NOT the hardware, which plays PITCH above 3FFFh at 4000h
+    // ("IF Step>3FFFh then Step=4000h"). The voices play the PC samples, and the PC data has some
+    // at a higher rate than the PS1's (with the tone's centre note lowered to match), so a note the
+    // PS1 played below 4000h can need more here: AO's secret area jingle (vag 43) is 2.75x the PS1
+    // rate, and its high notes need up to AAD8h. With the hardware limit they played up to 1.4
+    // octaves low. 16x covers samples at up to 4x the PS1 rate.
+    static constexpr u32 kMaxPitch = 0x10000;
 
     PsxSpu();
 
@@ -173,7 +188,8 @@ public:
     // Like SSA, the sample is only picked up by the next key on: a playing voice keeps playing
     // the sample it was keyed on with.
     void SetVoiceSample(s32 voice, const PsxSpuSample& sample);
-    void SetVoicePitch(s32 voice, u16 pitch);
+    // 0x1000 = 44100 Hz. Up to kMaxPitch, higher values play at kMaxPitch.
+    void SetVoicePitch(s32 voice, u32 pitch);
     // Raw VOLL/VOLR registers (see PsxSpuVolume::SetRegister)
     void SetVoiceVolumeRegisters(s32 voice, u16 left, u16 right);
     // Fixed volume, -0x8000 to 0x7FFE (0x3FFF register = 0x7FFE)
@@ -185,7 +201,9 @@ public:
     // KON/KOFF for one voice
     void KeyOn(s32 voice);
     void KeyOff(s32 voice);
-    // KON/KOFF with a bit per voice, like the registers
+    // KON/KOFF with a bit per voice, like the registers: they take effect after the next sample
+    // Render makes (as DuckStation does it, from hardware tests), a voice's key off before its key
+    // on. KeyOn/KeyOff take effect at once.
     void KeyOnMask(u32 voices);
     void KeyOffMask(u32 voices);
     // Silences a voice at once (level 0, no release), like a one shot sample's end. Not a hardware
@@ -251,8 +269,15 @@ public:
     // centre and fine tune shift (1/128 semitones), exactly as libsnd's SsPitchFromNote does it.
     // The shift RAISES the pitch: it's added to the note's fine tune, not to the root note. The
     // tone's sample plays at 44100 Hz (0x1000) at its root note. The result is rounded down to 1/16
-    // semitones, and isn't clamped: values above 0x3FFF play at 0x4000 (see SetVoicePitch).
-    static u16 PitchFromNote(s32 note, s32 fine, s32 centre, s32 shift);
+    // semitones, and isn't clamped: values above kMaxPitch play at kMaxPitch.
+    static u32 PitchFromNote(s32 note, s32 fine, s32 centre, s32 shift);
+
+    // sample's mPcm low-passed for PsxSpuSample::mFiltered[level - 1]. A looping sample is filtered
+    // as the loop repeats.
+    static std::vector<s16> FilterSample(const PsxSpuSample& sample, s32 level);
+    // How many low-passed copies a sample needs (0-kPsxSpuFilterLevels) for the band-limited
+    // interpolation to play it at up to maxPitch at its normal cost
+    static s32 FilterLevelsFor(u32 maxPitch);
 
     // The 512 entry 4 point interpolation table ("gaussian"), from psx-spx
     static const std::array<s16, 512>& GaussTable();
@@ -265,7 +290,7 @@ private:
     {
         PsxSpuSample mNextSample; // Set by SetVoiceSample, used from the next key on
         PsxSpuSample mSample;
-        u16 mPitch = 0;
+        u32 mPitch = 0;
         PsxSpuVolume mVolumeLeft;
         PsxSpuVolume mVolumeRight;
         PsxSpuEnvelope mEnvelope;
@@ -287,10 +312,16 @@ private:
     // The sample at index (since key on, loops unrolled) without moving the voice on: 0 before the
     // key on and after a one shot sample's end
     static s32 SampleAt(const Voice& voice, s64 index);
+    // The same from a sample's PCM or one of its low-passed copies (level 1-3)
+    static s32 SampleAt(const PsxSpuSample& sample, s64 index, s32 level);
     static s32 BandLimitedSample(const Voice& voice);
     void TickVoice(s32 voiceIdx, Voice& voice, s32& left, s32& right, s32& reverbLeft, s32& reverbRight);
 
+    void ApplyPendingKeys();
+
     std::array<Voice, kNumVoices> mVoices;
+    u32 mPendingKeyOn = 0;
+    u32 mPendingKeyOff = 0;
     Interpolation mInterpolation = Interpolation::Gaussian;
     u32 mEndx = 0;
     PsxSpuVolume mMasterLeft;

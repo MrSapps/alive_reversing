@@ -12,6 +12,7 @@
 #include "data_conversion/PNGFile.hpp"
 #include "data_conversion/file_system.hpp"
 #include "../AliveLibAE/Abe.hpp"
+#include "../AliveLibAE/Input.hpp"
 #include "../AliveLibAE/MainMenu.hpp"
 #include "../AliveLibAE/PauseMenu.hpp"
 #include "../AliveLibAO/Abe.hpp"
@@ -335,6 +336,12 @@ static bool CheckCommand(const Automation::Command& command, std::string& error)
         return false;
     }
 
+    if (name == "hold")
+    {
+        u32 bits = 0;
+        return expectArgs(2, "hold <buttons> <frames>") && Automation::ParseButtons(command.mArgs[0], bits, error) && expectNumber(command.mArgs[1], 1);
+    }
+
     if (name == "screenshot")
     {
         return expectArgs(1, "screenshot <file.png>");
@@ -416,7 +423,9 @@ Automation::Automation(FileSystem& fs, ResourceManagerWrapper& resMan, std::vect
 
 Automation::Result Automation::Update(BaseMap& map, bool betweenFrames)
 {
-    if (betweenFrames)
+    // A modal (the pause menu, a movie) runs a frame of its own each loop iteration
+    const bool frameTick = betweenFrames || map.GetActiveModal() != nullptr;
+    if (frameTick)
     {
         mFrames++;
     }
@@ -454,6 +463,69 @@ Automation::Result Automation::Update(BaseMap& map, bool betweenFrames)
     return Result::eQuit;
 }
 
+bool Automation::ParseButtons(const std::string& buttons, u32& bits, std::string& error)
+{
+    struct Button final
+    {
+        const char* mName;
+        u32 mBits;
+    };
+    // The shared (AE) InputCommands, which AO's input converts from
+    static const Button kButtons[] = {
+        {"up", InputCommands::eUp},
+        {"down", InputCommands::eDown},
+        {"left", InputCommands::eLeft},
+        {"right", InputCommands::eRight},
+        {"run", InputCommands::eRun},
+        {"action", InputCommands::eDoAction},
+        {"sneak", InputCommands::eSneak},
+        {"throw", InputCommands::eThrowItem},
+        {"hop", InputCommands::eHop},
+        {"roll", InputCommands::eFartOrRoll},
+        {"fart", InputCommands::eFartOrRoll},
+        {"speak1", InputCommands::eGameSpeak1},
+        {"speak2", InputCommands::eGameSpeak2},
+        {"speak3", InputCommands::eGameSpeak3},
+        {"speak4", InputCommands::eGameSpeak4},
+        {"speak5", InputCommands::eGameSpeak5},
+        {"speak6", InputCommands::eGameSpeak6},
+        {"speak7", InputCommands::eGameSpeak7},
+        {"speak8", InputCommands::eGameSpeak8},
+        {"chant", InputCommands::eChant},
+        {"pause", InputCommands::ePause},
+        {"back", InputCommands::eBack},
+        {"cheat", InputCommands::eCheatMode},
+    };
+
+    bits = 0;
+    std::stringstream ss(buttons);
+    std::string name;
+    while (std::getline(ss, name, '+'))
+    {
+        bool found = false;
+        for (const Button& button : kButtons)
+        {
+            if (name == button.mName)
+            {
+                bits |= button.mBits;
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+        {
+            error = "unknown button " + name + " (up, down, left, right, run, action, sneak, throw, hop, roll, fart, speak1-8, chant, pause, back, cheat)";
+            return false;
+        }
+    }
+    if (bits == 0)
+    {
+        error = "no buttons";
+        return false;
+    }
+    return true;
+}
+
 bool Automation::RunCommand(const Command& command, BaseMap& map, bool betweenFrames)
 {
     const std::string& name = command.mName;
@@ -471,12 +543,36 @@ bool Automation::RunCommand(const Command& command, BaseMap& map, bool betweenFr
             mWaitUntilFrame = mFrames + static_cast<u32>(std::stoi(args[0]));
             mStep = 1;
         }
-        return betweenFrames && mFrames >= mWaitUntilFrame;
+        return (betweenFrames || map.GetActiveModal()) && mFrames >= mWaitUntilFrame;
     }
 
     if (name == "wait_until")
     {
         return WaitUntil(command, map, betweenFrames);
+    }
+
+    if (name == "hold")
+    {
+        const bool frameTick = betweenFrames || map.GetActiveModal() != nullptr;
+        if (mStep == 0)
+        {
+            if (!frameTick)
+            {
+                return false;
+            }
+            u32 bits = 0;
+            std::string error;
+            ParseButtons(args[0], bits, error);
+            Input().mAutomationInput = bits;
+            mWaitUntilFrame = mFrames + static_cast<u32>(std::stoi(args[1]));
+            mStep = 1;
+        }
+        if (frameTick && mFrames >= mWaitUntilFrame)
+        {
+            Input().mAutomationInput = 0;
+            return true;
+        }
+        return false;
     }
 
     if (name == "screenshot")
