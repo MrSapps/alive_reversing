@@ -526,6 +526,13 @@ s32 MIDI_Invert_4FCA40(s32 /*not_used*/, s32 value)
 
 s32 MIDI_Allocate_Channel(s32 /*not_used*/, s32 priority)
 {
+    // The PC's allocation steals the quietest channel whatever its priority, so a note could take
+    // another of a higher priority SEQ while lower priority sound effects kept theirs
+    if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+    {
+        return pPs1Sound->AllocateVoice(priority);
+    }
+
     s32 lowestEndTime = -999999;
     u32 timeMod24 = gSpuVars->sMidiTime() % 24;
     for (s32 i = 0; i < 24; i++)
@@ -546,11 +553,9 @@ s32 MIDI_Allocate_Channel(s32 /*not_used*/, s32 priority)
     }
 
     // Try to find a channel that isn't playing anything
-    PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get();
     for (s32 i = 0; i < 24; i++)
     {
-        const bool playing = pPs1Sound ? pPs1Sound->IsVoiceActive(i) : GetSoundAPI().mSND_Get_Buffer_Status(gSpuVars->sMidi_Channels().channels[i].field_0_sound_buffer_field_4) != 0;
-        if (!playing)
+        if (GetSoundAPI().mSND_Get_Buffer_Status(gSpuVars->sMidi_Channels().channels[i].field_0_sound_buffer_field_4) == 0)
         {
             gSpuVars->sMidi_Channels().channels[i].field_1C_adsr.field_3_state = 0;
             return i;
@@ -563,14 +568,7 @@ s32 MIDI_Allocate_Channel(s32 /*not_used*/, s32 priority)
     {
         return -1;
     }
-    if (pPs1Sound)
-    {
-        pPs1Sound->Stop(idx);
-    }
-    else
-    {
-        GetSoundAPI().mSND_Stop_Sample_At_Idx(gSpuVars->sMidi_Channels().channels[idx].field_0_sound_buffer_field_4);
-    }
+    GetSoundAPI().mSND_Stop_Sample_At_Idx(gSpuVars->sMidi_Channels().channels[idx].field_0_sound_buffer_field_4);
     return idx;
 }
 
@@ -1469,6 +1467,14 @@ void SsSeqCalledTbyT()
         if (gSpuVars->sLastTime() == 0xFFFFFFFF || (s32)(currentTime - gSpuVars->sLastTime()) >= 30)
         {
             gSpuVars->sLastTime() = currentTime;
+
+            // libsnd reads the voices' envelopes before it plays the SEQs (0x800743a4 in the AO PS1
+            // executable), so the notes they key on look full until the next tick
+            if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+            {
+                pPs1Sound->Tick();
+            }
+
             for (s32 i = 0; i < kNumChannels; i++)
             {
                 if (gSpuVars->sMidiSeqSongs(i).field_0_seq_data)

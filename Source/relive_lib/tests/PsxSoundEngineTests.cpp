@@ -146,3 +146,69 @@ TEST(PsxSoundEngine, RestorePs1Tones)
     vh.resize(sizeof(VabHeader) + 8);
     PsxSoundEngine::RestorePs1Tones(GameType::eAo, "RFSNDFX.VH", vh);
 }
+
+// libsnd's voice allocation (0x8007bd30 in the AO PS1 executable)
+TEST(PsxSoundEngine, AllocateVoice)
+{
+    // One looping tone that holds its envelope at full, and releases slowly
+    std::vector<u8> vh(sizeof(VabHeader) + 16 * sizeof(VagAtr));
+    VabHeader header = {};
+    header.field_12_num_progs = 1;
+    header.field_18_master_vol = 127;
+    header.field_20_progs[0].field_1_vol = 127;
+    memcpy(vh.data(), &header, sizeof(header));
+    VagAtr tone = {};
+    tone.field_2_vol = 127;
+    tone.field_3_pan = 64;
+    tone.field_4_centre = 60;
+    tone.field_7_max = 127;
+    tone.field_10_adsr1 = 0x000F;
+    tone.field_12_adsr2 = 0x001F; // The slowest release
+    tone.field_16_vag = 1;
+    memcpy(vh.data() + sizeof(VabHeader), &tone, sizeof(tone));
+
+    PsxSoundEngine engine;
+    engine.OpenVab(0, *reinterpret_cast<const VabHeader*>(vh.data()));
+    const std::vector<s16> pcm(1000, 1000);
+    engine.SetSample(0, 0, pcm.data(), static_cast<u32>(pcm.size()), true);
+
+    std::vector<StereoSample_S16> out(441);
+    const auto play = [&](s32 voice)
+    {
+        engine.NoteOnSfx(voice, 0, 0, 0, 60 << 8, 127, 127, false);
+    };
+
+    // Free voices go in order. Voices 5 and 9 have a lower priority.
+    for (s32 i = 0; i < PsxSpu::kNumVoices; i++)
+    {
+        const s32 voice = engine.AllocateVoice(i == 5 || i == 9 ? 20 : 50);
+        ASSERT_EQ(voice, i);
+        play(voice);
+    }
+    engine.Mix(out.data(), static_cast<u32>(out.size()));
+    engine.Tick();
+
+    // Every voice has a higher priority: the note is dropped
+    EXPECT_EQ(engine.AllocateVoice(10), -1);
+
+    // The lowest priority, of the two the same envelope the oldest
+    EXPECT_EQ(engine.AllocateVoice(60), 5);
+    play(5);
+    EXPECT_EQ(engine.AllocateVoice(60), 9);
+    play(9);
+
+    // Now all 50, and voices 5 and 9 are at full envelope until the next tick reads them, so the
+    // oldest of the others goes
+    EXPECT_EQ(engine.AllocateVoice(50), 0);
+    play(0);
+
+    // A stopped voice is free whatever its priority
+    engine.Stop(12);
+    EXPECT_EQ(engine.AllocateVoice(1), 12);
+
+    // A released voice isn't free until its envelope is 0
+    engine.KeyOff(3);
+    engine.Mix(out.data(), static_cast<u32>(out.size()));
+    engine.Tick();
+    EXPECT_EQ(engine.AllocateVoice(1), 12);
+}

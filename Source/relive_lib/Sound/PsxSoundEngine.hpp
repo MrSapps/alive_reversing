@@ -65,6 +65,16 @@ public:
     // How libsnd's SsVoKeyOn (0x80076080) turns a sound effect's left and right volume into a
     // velocity and a channel pan
     static void SfxVelocityAndPan(s32 volLeft, s32 volRight, s32& velocity, s32& pan);
+    // libsnd's voice allocation (0x8007bd30 in the AO PS1 executable) for a tone of priority
+    // (VagAtr prior): a free voice (its key released and its envelope 0) if there is one. Else it
+    // steals, of the voices whose priority is at most this one's, the lowest priority, then the
+    // lowest envelope, then the oldest. -1 when there's none: the note isn't played.
+    s32 AllocateVoice(s32 priority);
+    // libsnd's voice tick (0x8007abe4): reads each voice's envelope for AllocateVoice, and takes a
+    // voice's key as released once its envelope has been 0 for 15 ticks (a one shot sample that
+    // ended without a key off)
+    void Tick();
+
     // Starts the voice's release
     void KeyOff(s32 voice);
     // Silences the voice at once
@@ -208,6 +218,21 @@ private:
     PsxSpu mSpu;
     std::array<Vab, kMaxVabs> mVabs;
     std::array<VoiceInfo, PsxSpu::kNumVoices> mVoices;
+
+    // What libsnd's voice allocation goes by
+    struct VoiceAlloc final
+    {
+        bool mKeyOn = false;
+        u16 mEnvelope = 0; // As of the last tick, 0x7FFF from key on until then
+        // Keyed on since the last Mix. On the PS1 the SPU starts the attack at once, here only when
+        // the audio thread next renders, so until then the envelope would read 0.
+        bool mUnrendered = false;
+        u8 mSilentTicks = 0; // Ticks the envelope has been 0
+        s32 mPriority = 0;
+        u16 mAge = 0; // Allocations since this voice's
+    };
+    std::array<VoiceAlloc, PsxSpu::kNumVoices> mAllocs = {};
+
     // SsSeqSetVol's left/right volume of each SEQ
     std::array<std::array<u8, 2>, kMaxSeqs> mSeqVolumes = {};
     static constexpr s32 kMidiChannels = 16;
