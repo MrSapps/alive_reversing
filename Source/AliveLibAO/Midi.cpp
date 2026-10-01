@@ -225,19 +225,12 @@ public:
 
     virtual void MIDI_ParseMidiMessage(s32 idx) override
     {
-        // The PS1 sound plays libsnd's SEQ player, which is the same in both games
-        if (PsxSoundEngine::Get())
-        {
-            ::MIDI_ParseMidiMessage_4FD100(idx);
-        }
-        else
-        {
-            AO::MIDI_ParseMidiMessage(idx);
-        }
+        AO::MIDI_ParseMidiMessage(idx);
     }
 
     virtual void SsUtKeyOffV(s32 idx) override
     {
+        // The PS1 sound's libsnd is the same for both games
         if (PsxSoundEngine::Get())
         {
             ::SsUtKeyOffV_4FE010(static_cast<s16>(idx));
@@ -246,13 +239,6 @@ public:
         {
             AO::SsUtKeyOffV(static_cast<s16>(idx));
         }
-    }
-
-    virtual bool Ps1SquaresSfxVolume() override
-    {
-        // AO's libsnd squares every voice's volume (0x8007c73c in the PS1 executable), AE's only
-        // a SEQ note's
-        return true;
     }
 
     virtual s16 DefaultMasterVolume() override
@@ -285,8 +271,7 @@ s16 SND_SsIsEos_DeInlined(SeqId idx)
 }
 
 // NOTE: Impl is not the same as AE
-// seqIdx: the SEQ playing the note and seqChannel its MIDI channel, for the PS1 sound
-s32 MIDI_PlayerPlayMidiNote(s32 vabId, s32 program, s32 note, s32 leftVolume, s32 rightVolume, s32 volume, s32 seqIdx, s32 seqChannel)
+s32 MIDI_PlayerPlayMidiNote(s32 vabId, s32 program, s32 note, s32 leftVolume, s32 rightVolume, s32 volume)
 {
     auto vabId_ = vabId;
     auto leftVolume_ = leftVolume;
@@ -296,9 +281,7 @@ s32 MIDI_PlayerPlayMidiNote(s32 vabId, s32 program, s32 note, s32 leftVolume, s3
     auto v32 = rightVolume;
     auto usedChannelBits = 0;
 
-    // The PC code keys off the same note before playing it again (any SEQ's, on the first channel
-    // found). libsnd plays it on a new voice, and a note off then releases them all.
-    if (GetSpuApiVars()->sVagCounts()[v7] && !PsxSoundEngine::Get())
+    if (GetSpuApiVars()->sVagCounts()[v7])
     {
         for (s32 i = 0; i < 24; i++)
         {
@@ -439,21 +422,14 @@ s32 MIDI_PlayerPlayMidiNote(s32 vabId, s32 program, s32 note, s32 leftVolume, s3
                         pChannel->field_1C_adsr.field_2_note_byte1 = BYTE1(note) & 0x7F;
                         auto freq = pow(1.059463094359, (f64)(note - v29) * 0.00390625);
                         pChannel->field_10_freq = (f32) freq;
-                        if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
-                        {
-                            pPs1Sound->NoteOnSeq(midiChannel_, vabId, program, 16 - k16Counter, note, volume, seqIdx, seqChannel);
-                        }
-                        else
-                        {
-                            SND_PlayEx(
-                                &GetSpuApiVars()->sSoundEntryTable16().table[vabId][vag_num],
-                                panLeft,
-                                panRight,
-                                (f32) freq,
-                                pChannel,
-                                playFlags,
-                                priority_);
-                        }
+                        SND_PlayEx(
+                            &GetSpuApiVars()->sSoundEntryTable16().table[vabId][vag_num],
+                            panLeft,
+                            panRight,
+                            (f32) freq,
+                            pChannel,
+                            playFlags,
+                            priority_);
                         volume_ = volume;
                         usedChannelBits |= 1 << midiChannel_;
                     }
@@ -470,15 +446,15 @@ s32 MIDI_PlayerPlayMidiNote(s32 vabId, s32 program, s32 note, s32 leftVolume, s3
     return 0;
 }
 
-s32 MIDI_PlayerPlayMidiNote_49DAD0(s32 vabId, s32 program, s32 note, s32 leftVol, s32 rightVol, s32 volume, s32 seqIdx, s32 seqChannel)
+s32 MIDI_PlayerPlayMidiNote_49DAD0(s32 vabId, s32 program, s32 note, s32 leftVol, s32 rightVol, s32 volume)
 {
     if (rightVol >= 64)
     {
-        return MIDI_PlayerPlayMidiNote(vabId, program, note, leftVol * (127 - rightVol) / 64, leftVol, volume, seqIdx, seqChannel);
+        return MIDI_PlayerPlayMidiNote(vabId, program, note, leftVol * (127 - rightVol) / 64, leftVol, volume);
     }
     else
     {
-        return MIDI_PlayerPlayMidiNote(vabId, program, note, leftVol, leftVol * rightVol / 64, volume, seqIdx, seqChannel);
+        return MIDI_PlayerPlayMidiNote(vabId, program, note, leftVol, leftVol * rightVol / 64, volume);
     }
 }
 
@@ -490,17 +466,7 @@ void SsUtKeyOffV(s16 idx)
     auto pChannel = &GetSpuApiVars()->sMidi_Channels().channels[idx];
     if ((adsr_state <= 0 || adsr_state >= 4) && adsr_state != -1)
     {
-        if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
-        {
-            // The SDL voices let a one shot sample (-2) play to its end and cut a released one (4)
-            // off. The SPU releases a one shot sample like any other, and lets a release finish.
-            if (adsr_state == -2)
-            {
-                pPs1Sound->KeyOff(idx);
-                pChannel->field_1C_adsr.field_3_state = 4;
-            }
-        }
-        else if (adsr_state == 4)
+        if (adsr_state == 4)
         {
             pChannel->field_1C_adsr.field_3_state = 0;
             SND_Stop_Sample_At_Idx(pChannel->field_0_sound_buffer_field_4);
@@ -508,11 +474,6 @@ void SsUtKeyOffV(s16 idx)
     }
     else
     {
-        if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
-        {
-            // The SPU releases it with the tone's own release rate
-            pPs1Sound->KeyOff(idx);
-        }
         pChannel->field_1C_adsr.field_3_state = 4;
         pChannel->field_C_vol = pChannel->field_8_left_vol;
         if (!pChannel->field_1C_adsr.field_A_release)
@@ -592,12 +553,6 @@ s32 MIDI_ParseMidiMessage(s32 idx)
                 {
                     case MidiEvent::NoteOff_80:
                     {
-                        if (PsxSoundEngine::Get())
-                        {
-                            MIDI_Ps1SeqNoteOff(idx, pCtx->field_seq_idx, pCtx->field_32_progVols[data.Channel()].field_0_program, data.param1 & 0x7F);
-                            break;
-                        }
-
                         // Cant see how the ADSR compare would ever be true, the logic makes no sense
                         const u8 program = pCtx->field_32_progVols[data.Channel()].field_0_program;
                         const s32 programShifted = ((s32) program >> 8);
@@ -627,19 +582,13 @@ s32 MIDI_ParseMidiMessage(s32 idx)
                     case MidiEvent::NoteOn_90:
                     {
                         MIDI_ProgramVolume* pProgVol = &pCtx->field_32_progVols[data.Channel()];
-                        if (PsxSoundEngine::Get() && data.param2 == 0)
-                        {
-                            // Velocity 0: a note off
-                            MIDI_Ps1SeqNoteOff(idx, pCtx->field_seq_idx, pProgVol->field_0_program, data.param1 & 0x7F);
-                            break;
-                        }
                         auto r_vol = pProgVol->field_2_right_vol;
                         auto note = data.param1 << 8;
                         auto program = pProgVol->field_0_program;
                         auto l_vol = (s16)((u32)(pProgVol->field_1_left_vol * pCtx->field_C_volume) >> 7);
 
                         auto freq = data.param2;
-                        const s32 usedChannels = MIDI_PlayerPlayMidiNote_49DAD0(pCtx->field_seq_idx, program, note, l_vol, r_vol, freq, idx, data.Channel()); // Note: inlined
+                        const s32 usedChannels = MIDI_PlayerPlayMidiNote_49DAD0(pCtx->field_seq_idx, program, note, l_vol, r_vol, freq); // Note: inlined
 
                         // Record which SEQ and channel own the MIDI channels, as AE does, so SsSeqStop
                         // keys them off. Without it a SEQ stopped mid note (e.g. the music when Abe
@@ -716,13 +665,6 @@ s32 MIDI_ParseMidiMessage(s32 idx)
                     case MidiEvent::PitchBend_E0:
                     {
                         const s32 prog_num = pCtx->field_32_progVols[data.Channel()].field_0_program;
-
-                        if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
-                        {
-                            // libsnd only uses the high 7 bits of the bend, param2
-                            pPs1Sound->PitchBend(prog_num, data.param2 & 0x7F);
-                            break;
-                        }
 
                         // Inlined MIDI_PitchBend
                         const f32 freq_conv = (f32) pow(1.059463094359, (f64)(s16)(((data.param1) - 0x4000) >> 4) * 0.0078125);

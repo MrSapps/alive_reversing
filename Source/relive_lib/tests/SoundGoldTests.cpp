@@ -514,14 +514,14 @@ static void NoteOffRules(GameType game, bool ps1Sound)
         SND_SEQ_Play(seqs[3], 1, 100, 100);
         const s16 heldSlot = GetMidiVars()->sSeqDataTable()[seqs[2]].field_A_id_seqOpenId;
         const s16 repeatSlot = GetMidiVars()->sSeqDataTable()[seqs[3]].field_A_id_seqOpenId;
-        // Sounding (keyed on, not released) channels of a SEQ slot
+        // Sounding (keyed on, not released) voices of a SEQ slot
         auto sounding = [](s16 slot)
         {
             s32 count = 0;
-            for (s32 i = 0; i < kNumChannels; i++)
+            for (s32 i = 0; i < PsxSpu::kNumVoices; i++)
             {
-                const MIDI_ADSR_State& adsr = GetSpuApiVars()->sMidi_Channels().channels[i].field_1C_adsr;
-                if ((adsr.field_C >> 4) == slot && adsr.field_3_state != 0 && adsr.field_3_state != 4)
+                const Libsnd::VoiceInfo info = PsxSoundEngine::Get()->GetVoiceState(i).mLibsnd;
+                if (info.mSeq == slot && info.mKeyed)
                 {
                     count++;
                 }
@@ -561,12 +561,12 @@ static void ChannelVolume(GameType game)
         // The left volume register of the sounding note of program 2, or -1
         auto heldVolume = []()
         {
-            for (s32 i = 0; i < kNumChannels; i++)
+            for (s32 i = 0; i < PsxSpu::kNumVoices; i++)
             {
-                const MIDI_ADSR_State& adsr = GetSpuApiVars()->sMidi_Channels().channels[i].field_1C_adsr;
-                if (adsr.field_1_program == 2 && adsr.field_3_state != 0 && adsr.field_3_state != 4)
+                const PsxSoundEngine::VoiceState state = PsxSoundEngine::Get()->GetVoiceState(i);
+                if (state.mLibsnd.mProgram == 2 && state.mLibsnd.mKeyed && state.mLibsnd.mSeq >= 0 && state.mLibsnd.mSeq < Libsnd::kMaxSeqs)
                 {
-                    return static_cast<s32>(PsxSoundEngine::Get()->GetVoiceState(i).mVolLeft);
+                    return static_cast<s32>(state.mVolLeft);
                 }
             }
             return -1;

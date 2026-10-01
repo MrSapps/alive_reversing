@@ -399,6 +399,8 @@ SET(sound_src
     Sound/PsxSpuApi.cpp
     Sound/PsxSoundEngine.hpp
     Sound/PsxSoundEngine.cpp
+    Sound/Libsnd.hpp
+    Sound/Libsnd.cpp
     Sound/PsxSpuApi.hpp
     Sound/Midi.cpp
     Sound/Midi.hpp
@@ -757,6 +759,10 @@ target_link_libraries(psx_spu PRIVATE project_warnings)
 export(TARGETS psx_spu FILE psx_spu.cmake)
 if (MSVC)
     target_compile_options(psx_spu PRIVATE /W4 /WX /MP)
+else()
+    # Hot DSP code: optimised even in Debug builds (the sanitizers stay on). At -O0 a 33 ms audio
+    # frame took up to 88 ms to mix, so the audio device underran whenever many voices played.
+    target_compile_options(psx_spu PRIVATE $<$<CONFIG:Debug>:-O2>)
 endif()
 
 add_library(relive_lib ${relive_lib_src})
@@ -860,6 +866,7 @@ add_executable(relive_lib_tests
     tests/SoundTestData.cpp
     tests/SoundTestData.hpp
     tests/SoundGoldTests.cpp
+    tests/SoundStreamingTests.cpp
     tests/PsxSpuTests.cpp
     tests/PsxSoundEngineTests.cpp
     tests/TestStubs.cpp

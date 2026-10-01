@@ -85,6 +85,9 @@ CommandLineOptions CommandLineOptions::Parse(const CommandLineParser& clp)
         }
     }
 
+    options.mDumpAudio = clp.GetValue("-dump_audio");
+    options.mDumpLiveAudio = clp.GetValue("-dump_live_audio");
+
     options.mRecordFile = clp.GetValue("-record");
     options.mFlushRecording = clp.HasSwitch("-flush");
     options.mPlayFile = clp.GetValue("-play");
@@ -132,6 +135,9 @@ const char* CommandLineOptions::Usage()
            "  -ps1_sound                  Play the sound on an emulated PS1 SPU (work in progress)\n"
            "  -spu_filter=<name>          With -ps1_sound: hq (default, no aliasing at high notes)\n"
            "                              or gaussian (the PS1's own, buzzes on some high notes)\n"
+           "  -dump_audio=<file.wav>      Save all the audio the game plays to this file, rendered\n"
+           "                              offline a frame at a time (no audio device)\n"
+           "  -dump_live_audio=<file.wav> Save the audio as it's rendered for the audio device\n"
            "  -convert                    Convert the game data if it's out of date, then exit\n"
            "                              (no window)\n"
            "  -help, --help, -h, /?       Show this and exit\n"

@@ -38,12 +38,22 @@ public:
     // (PsxSoundEngine) instead of the SDL voices
     // interpolation: how the SPU resamples voices (-spu_filter)
     static void SetPs1SoundOnCreate(bool enable, PsxSpu::Interpolation interpolation = PsxSpu::Interpolation::BandLimited);
+    // -dump_audio: sound systems created after this append everything they render to this WAV
+    // file (empty: no dump)
+    // liveWavPath: the same, but keeping the audio device (-dump_live_audio); wavPath wins
+    static void SetAudioDumpOnCreate(const std::string& wavPath, const std::string& liveWavPath = "");
+    // With -dump_audio: renders the next 1/30 s into the dump (nothing otherwise). The dump is
+    // made offline, one frame of audio a game frame, so it's locked to the game's time whatever
+    // the audio driver does.
+    void RenderDumpFrame();
     // nullptr when the PS1 sound is off
     PsxSoundEngine* Ps1Sound() { return mPs1Sound.get(); }
 
     void Pause();
     void Resume();
     u64 GetGeneratedAudioSamples() const;
+    // Mixed but not yet taken by the device (0 offline)
+    u32 GetQueuedAudioSamples() const;
     u32 GetDeviceSampleRate() const { return static_cast<u32>(mAudioDeviceSpec.freq); }
 
     HRESULT DuplicateSoundBuffer(TSoundBufferType* pDSBufferOriginal, TSoundBufferType** ppDSBufferDuplicate);
@@ -68,6 +78,10 @@ private:
 
     void RenderAudio(StereoSample_S16* pSampleBuffer, s32 sampleBufferCount);
 
+    void OpenAudioDump();
+    void CloseAudioDump();
+    void WriteAudioDump(const StereoSample_S16* pSamples, s32 count);
+
     void RenderSoundBuffer(SDLSoundBuffer& entry, StereoSample_S16* pSampleBuffer, s32 sampleBufferCount);
 
     void RenderMonoSample(Sint16* pVoiceBufferPtr, SDLSoundBuffer* pVoice, s32 i);
@@ -88,6 +102,14 @@ private:
     std::atomic_bool mRenderAudioThreadQuit{false};
     std::atomic<u64> mGeneratedAudioSamples{0};
     std::unique_ptr<std::thread> mRenderAudioThread;
+    // -dump_audio: the WAV being written, its header is finished by CloseAudioDump
+    FILE* mAudioDump = nullptr;
+    // With -dump_live_audio: <wav>.log, a line per render and per device callback with the
+    // time, sizes and how much the ring buffer held, to see where the live path stalls
+    FILE* mLiveLog = nullptr;
+    std::vector<StereoSample_S16> mCallbackBuffer;
+    std::vector<StereoSample_S16> mDumpFrameBuffer;
+    u64 mAudioDumpFrames = 0;
 
 
     std::unique_ptr<PsxSoundEngine> mPs1Sound;

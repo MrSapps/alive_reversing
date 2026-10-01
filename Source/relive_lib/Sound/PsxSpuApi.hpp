@@ -219,8 +219,6 @@ public:
     virtual void SsUtKeyOffV(s32 idx) = 0;
 
     // Where the game's PS1 executable used libsnd differently, for -ps1_sound:
-    // Whether its libsnd squares a sound effect's volume, as it does a SEQ note's
-    virtual bool Ps1SquaresSfxVolume() = 0;
     // The master volume (SsSetMVol) the game sets on init and on each sound reset
     virtual s16 DefaultMasterVolume() = 0;
 };
@@ -253,9 +251,9 @@ void SsSetTickMode_4FDC20(s32 tickMode);
 s32 SsVoKeyOn_4FCF10(s32 vabIdAndProgram, s32 pitch, u16 leftVol, u16 rightVol);
 void SsUtAllKeyOff(s32 mode);
 s16 SsUtKeyOffV_4FE010(s16 idx);
-s16 SsUtChangePitch_4FDF70(s16 voice, s32 /*vabId*/, s32 /*prog*/, s16 old_note, s16 old_fine, s16 new_note, s16 new_fine);
+s16 SsUtChangePitch_4FDF70(s16 voice, s32 vabId, s32 prog, s16 old_note, s16 old_fine, s16 new_note, s16 new_fine);
 
-s16 SsSeqOpen_4FD6D0(u8* pSeqData, s16 seqIdx);
+s16 SsSeqOpen_4FD6D0(u8* pSeqData, u32 seqSize, s16 seqIdx);
 void SsSeqClose_4FD8D0(s16 idx);
 void SsSeqStop(s16 idx);
 u16 SsIsEos_4FDA80(s16 idx, s16 seqNum);
@@ -268,15 +266,10 @@ s32 MIDI_Read_Var_Len_4FD0D0(MIDI_SeqSong* pMidiStru);
 // per tick), keeping the sub millisecond remainder. The PC code rounded every delta down to a whole
 // ms, which made the SEQs play up to 2% fast.
 void MIDI_AddDeltaTime(MIDI_SeqSong& song, u32 ticks);
-// A SEQ note off with the PS1 sound, as libsnd does it (0x80075f18 in the AE PS1 executable): keys
-// off every channel that SEQ seqIdx keyed on with this VAB, program and note. No reference counts,
-// other SEQs' and sound effects' notes aren't touched.
-void MIDI_Ps1SeqNoteOff(s32 seqIdx, s32 vabId, s32 program, s32 note);
 u8 MIDI_ReadByte_4FD6B0(MIDI_SeqSong* pData);
 void MIDI_SkipBytes_4FD6C0(MIDI_SeqSong* pData, s32 length);
 void MIDI_SetTempo(s16 idx, s16 kZero, s16 tempo);
-// seqIdx: the SEQ playing the note and seqChannel its MIDI channel (for the PS1 sound)
-s32 MIDI_PlayerPlayMidiNote_4FCE80(s32 vabId, s32 program, s32 note, s32 leftVol, s32 rightVol, s32 volume, s32 seqIdx, s32 seqChannel);
+s32 MIDI_PlayerPlayMidiNote_4FCE80(s32 vabId, s32 program, s32 note, s32 leftVol, s32 rightVol, s32 volume);
 s32 MIDI_Allocate_Channel(s32 not_used, s32 priority);
 
 using TVSyncCallBackFn = void(CC*)();

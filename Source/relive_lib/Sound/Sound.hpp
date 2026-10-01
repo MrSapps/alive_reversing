@@ -97,6 +97,9 @@ ALIVE_ASSERT_SIZEOF(SoundBuffer, 0x14);
 // The sound code's clock in ms: SYS_GetTicks, or the length of the audio rendered so far when
 // the sound system is offline (see SDLSoundSystem::InitOffline).
 u32 SND_GetTicks();
+// -dump_audio: renders one frame (1/30 s) of audio into the dump. The dumping sound system has no
+// audio device, so this is what moves its clock on: called once a frame by PSX_VSync.
+void SND_DumpFrame();
 // Busy waits for SND_GetTicks to reach ticks. Offline, it renders audio until then instead.
 void SND_WaitUntilTicks(u32 ticks);
 
@@ -104,6 +107,9 @@ u32 SND_Get_Sound_Entry_Pos_4EF620(SoundEntry* pSoundEntry);
 void SND_Pause_Audio();
 void SND_Resume_Audio();
 u64 SND_Get_Generated_Audio_Samples();
+// Samples mixed but not yet taken by the audio device (the render thread works ahead of it): a
+// sound started now reaches the device after this many samples
+u32 SND_Get_Queued_Audio_Samples();
 // The actual output rate SND_Get_Generated_Audio_Samples() counts at - each voice is
 // resampled to this rate regardless of its own source rate (see SDLSoundBuffer::SetFrequency),
 // so callers converting that sample count to elapsed time must divide by this, not by any

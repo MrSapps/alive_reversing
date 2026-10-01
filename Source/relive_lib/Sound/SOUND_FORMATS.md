@@ -147,10 +147,11 @@ libsnd (AE PS1 executable):
 
 - Note on: always a new voice (the voice allocator at 0x800761b4 only looks at voice age and
   priority), so a note struck again keeps sounding.
-- Voice allocation (AO PS1 executable 0x8007bd30, `PsxSoundEngine::AllocateVoice`): a voice is
+- Voice allocation (AO PS1 executable 0x8007bd30, `Libsnd::Alloc`): a voice is
   free when its key is released and its envelope is 0. The envelope is read back from the SPU
-  every tick (0x8007abe4, before the tick plays the SEQs), and key on sets it to 0x7FFF until then. A voice whose envelope stayed
-  0 for 15 ticks counts as released (a one shot that ended without a key off). With no free
+  every tick (0x8007abe4, before the tick plays the SEQs), and key on sets it to 0x7FFF until then. A
+  voice whose envelope has been 0 in history slots 0-14 (of a 16 slot ring, so 15 or 16 ticks)
+  counts as released (a one shot that ended without a key off). With no free
   voice, it steals among the voices whose priority is at most the new tone's: the lowest priority,
   then the lowest envelope, then the oldest (counted in allocations). If none qualifies, the note
   is dropped. The PC's `MIDI_Allocate_Channel` instead takes the quietest channel whatever its
@@ -160,7 +161,7 @@ libsnd (AE PS1 executable):
   compared, only the SEQ; other SEQs' and sound effects' voices aren't touched.
 - SEQ stop: keys off the SEQ's voices.
 
-The PC code differs, and `-ps1_sound` follows libsnd instead (`MIDI_Ps1SeqNoteOff`); the default
+The PC code differs, and `-ps1_sound` follows libsnd instead (`Libsnd::VmKeyOff`); the default
 path keeps the PC behaviour:
 
 - AE: reference counts per MIDI channel, so overlapping identical notes sustain until the last note
@@ -176,9 +177,8 @@ The `stop_mid_note` and `note_off_rules` sound gold scenarios pin this.
 
 ## Voice volume
 
-libsnd's voice setup (0x80076d94 in `SLES_014.80`), checked by running it in a MIPS interpreter
-(the same result as `PsxSoundEngine::LibsndVoiceVolume` for 3000 random inputs), in VOLL/VOLR
-register units (0-0x3FFF), all divisions rounding down:
+libsnd's voice setup (0x80076d94 in `SLES_014.80`, `Libsnd::KeyOnNow`), checked by running it in
+a MIPS interpreter, in VOLL/VOLR register units (0-0x3FFF), all divisions rounding down:
 
 ```c
 v = velocity * vabVol * 0x3FFF / (127 * 127);
@@ -191,8 +191,11 @@ if (seqNote) { L = L * L / 0x3FFF; R = R * R / 0x3FFF; }   // SEQ notes are SQUA
 ```
 
 - A SEQ note's velocity is first scaled by its channel volume (CC 7, default 127), and its channel
-  pan is CC 10 (default 64). `SsSeqSetVol` stores the game's values as they are (default 127) and
-  changes the SEQ's playing notes too (0x800776c4).
+  pan is CC 10 (default 64). AE's `SsSeqSetVol` (0x80073ef4) works out the SEQ's playing notes'
+  volumes again only while the SEQ plays (its flags are exactly "playing"), with each note's own
+  channel volume; otherwise it stores the volume, unclamped, for the notes to come. Its
+  `SpuVmSetSeqVol` (0x800776c4) always changes the playing notes, so `SsSeqPlay` and
+  `SsSeqClose` do too.
 - A sound effect (`SsVoKeyOn`, 0x80076080): velocity = the larger of its left/right volume, and
   channel pan = 64 if they're equal, else `volR * 64 / volL` (right quieter) or
   `127 - volL * 64 / volR`. No square.
@@ -209,16 +212,20 @@ AO's libsnd is an older version, and differs (AO PS1 executable `SLES_006.64`):
 - Its `SND_Init` and `SND_Reset` set the master volume to 127 (`SsSetMVol`, 0x800784d4), AE's to
   100, as the PC code does for both. With 100 everything was 2.1 dB quiet. The SDL voices keep
   100, because the PC code also scales their volume by it.
-- The rest is the same: the SEQ and channel volume maths, `SsSeqSetVol` (0x8007cf10, which also
-  squares), and the game's clamping of SEQ volumes to 10-127.
+- `SsSeqSetVol` (0x80078ee4) always works out the playing notes' volumes again (`SpuVmSetSeqVol`
+  0x8007cf10), with the volume of the channel the SEQ last read an event on, whichever channel
+  played the note, and takes a volume of 0 as 1. Its `_SsNoteOn` skips notes at SEQ volume 0, AE's
+  doesn't.
+- The game clamps SEQ volumes to 10-127 in both.
 
-`IPsxSpuApiVars::Ps1SquaresSfxVolume` and `DefaultMasterVolume` hold these per game.
+`Libsnd::Config` (set in `PsxSoundEngine.cpp`) holds these per game, and
+`IPsxSpuApiVars::DefaultMasterVolume` the master volume.
 
 `SsUtAllKeyOff` (AE 0x80074244, AO 0x80079160) doesn't only key the voices off: it first sets each
 voice's volume to 0, pitch to 1000h and ADSR to 80FFh/4000h, so they go silent at once. With a plain
 key off, the tones with a release shift of 29 or 30 (20% of AO's tones, 48% of AE's) take
 minutes to fade, so looping ones kept playing over the FMVs (`SND_StopAll` is the only caller).
-`-ps1_sound` stops the voices.
+`Libsnd::UtAllKeyOff` does the same.
 
 Found while chasing a buzz in POSITIV9's last notes, which play a noisy looped sample at 3.89x
 (pitch `3e2c`) at velocity 66: squared, they sit 10 dB below the rest of the jingle instead of 6 dB.
@@ -350,8 +357,12 @@ sound gold traces are unchanged.
   samples) instead of decoding ADPCM. The sample is picked up at key on, like `SSA`. A one shot
   sample's end mutes the voice ("End+Mute"), a loop end jumps to the loop start
   ("End+Repeat"); both set the voice's `ENDX` bit, which key on clears.
-- Pitch: the `PITCH` register (0x1000 = 44100 Hz, values above 0x3FFF play at 0x4000) drives a
-  pitch counter; bits 4-11 index the 512 entry "gaussian" table for the 4 point interpolation.
+- Pitch: the `PITCH` register (0x1000 = 44100 Hz) drives a pitch counter; bits 4-11 index the 512
+  entry "gaussian" table for the 4 point interpolation. Not the hardware: pitches go up to
+  `kMaxPitch` = 0x10000 (16x), where the hardware plays anything above 0x3FFF at 0x4000. The PC
+  data has some samples at a higher rate than the PS1's (with the tone's centre lowered to match),
+  so their notes need more: AO's secret area jingle (RFSNDFX vag 43) is 2.75x the PS1 rate, and
+  with the hardware limit its high notes played up to 1.4 octaves low.
   `PitchFromNote(note, fine, centre, shift)` and `PitchFromSampleRate(rate)` are the helpers
   for the libsnd layer.
 - ADSR (`PsxSpuEnvelope`) stepped every sample from the raw ADSR1/ADSR2 registers, with the
@@ -361,14 +372,19 @@ sound gold traces are unchanged.
   (psx-spx says this also holds for a release shift of 0x1F: check that against hardware if a
   voice ever hangs).
 - Voice and master volume registers in fixed or sweep mode (the sweep uses the envelope step).
+- `KON`/`KOFF` (`KeyOnMask`/`KeyOffMask`) take effect after the next sample, a voice's key off
+  before its key on, as DuckStation does it from hardware tests.
 - Reverb (`PsxSpuReverb`): the psx-spx formula at 22050 Hz on a 16 bit work area, with the SPU's
   39 tap resampling filter on the way in and out. It includes the standard presets in libsnd order
   (off, room, studio small/medium/large, hall, space echo, echo, delay, pipe), a per voice
   reverb enable (`EON`), the reverb master enable (`ATTR` bit 7: stops the writes, the reads
-  continue) and the output volume (`EVOL`, libsnd's depth; `DepthToVolume` maps 0-127).
-  Intermediate values saturate to 16 bits, as psx-spx measured. Left and right are processed on
-  the same 22050 Hz tick (hardware alternates them, a 1-2 LSB difference). The `vIIR = -0x8000`
-  negation bug isn't emulated (no preset uses it).
+  continue) and the output volume (`EVOL`, libsnd's depth; `DepthToVolume` maps 0-127), applied
+  at 44100 Hz so a change is immediate. Each step rounds and saturates where the hardware does
+  (as Mednafen and DuckStation measured it: the comb sum isn't saturated, the two all pass
+  filters share one saturation), which matters for loud input. It runs on every second sample
+  after an SPU reset; `Clear` (`SpuClearReverbWorkArea`) only zeroes the work area. libsnd's echo
+  and delay types (7, 8) work their registers out from a delay and feedback the games never set;
+  only type 4 (studio large) is used.
 - Mixing: voices are summed with the reverb output, clamped to 16 bits, then scaled by the
   master volume.
 
@@ -388,71 +404,78 @@ and below 1000h, and above it uses a windowed sinc (Blackman, 16 output samples 
 at 90% of the output Nyquist) stretched by the pitch ratio, which filters out what would alias. It
 is evaluated at the same position as the gaussian (mHistory[1] plus the counter fraction), reading
 ahead without moving the voice on, so ENDX, one shot ends and loops are unchanged and a voice bent
-across 1000h doesn't jump. `-spu_filter=gaussian` gives the exact hardware behaviour. The cost was
-about 1% of a whole theme's render time.
+across 1000h doesn't jump. `-spu_filter=gaussian` gives the exact hardware behaviour.
+
+Its cost grows with the pitch ratio (16 x ratio taps each side), and the jingle's notes at up to
+10.7x made the audio callback miss its deadline. So samples played above 2x get low-passed copies
+for 2x, 4x and 8x (`PsxSpu::FilterSample`, `PsxSpuSample::mFiltered`), kept at full length so the
+loops stay exact, and a voice reads the matching copy at a stride of 2^k: at most ~64 taps at any
+pitch. `PsxSoundEngine` makes them on the game thread, outside the audio lock, for the notes a SEQ
+plays when it's opened, and for a sound effect the first time it's played fast.
 
 `Reverb.cpp` (the generic comb reverb the current mixer uses) is untouched. It stays until the
 current mixer is replaced, because changing it would change the current sound.
 
 ### Wired in: `-ps1_sound`
 
-`PsxSoundEngine` puts the VAB tones on the SPU. `SDLSoundSystem` owns it (only with
-`relive -ps1_sound`) and adds its output to the SDL3 stream after the old mixer, so FMV audio still
-goes through the SDL voices. A mutex serialises the game thread's calls and the audio thread's
-`Mix`.
+Both games' PS1 sound is one implementation: `Libsnd`, a port of the PS1 sound library (libsnd's
+SEQ player and voice manager), drives the SPU, and `PsxSoundEngine` holds the two with the
+samples. `SDLSoundSystem` owns it (only with `relive -ps1_sound`) and adds its output to the SDL3
+stream after the old mixer, so FMV audio still goes through the SDL voices.
 
-The existing libsnd code still allocates the 24 MIDI channels and runs the SEQs; SPU voice n is
-MIDI channel n. Where it would start, stop or re-pitch an SDL voice, it calls the engine instead:
-
-- note on (AE `MIDI_PlayMidiNote_4FCB30`, AO `MIDI_PlayerPlayMidiNote`): the tone's raw
-  ADSR1/ADSR2, pitch from `centre`/`shift`, reverb from tone `mode` bit 2, and volume = velocity x
-  tone x program x VAB volume x the channel's volume, then the tone, program and VAB pan. AE's 10 ms
-  waits after some programs are skipped.
-- key off starts the SPU release. AO's one shot samples (state -2) are released too, and a
-  second key off lets the release finish instead of cutting it off.
-- a MIDI channel is free once its SPU voice is (`MIDI_ADSR_Update_4FDCE0` only polls); stealing
-  stops the voice at once (`PsxSpu::StopVoice`, not a hardware register).
-- `SsUtChangePitch` (SFX pitch variation), and pitch bend as a real 14 bit bend scaled by the
-  tone's `pbmin`/`pbmax`, for both games (their SDL paths decode the bend wrongly).
-- `SsSetMVol` -> MVOL, `SsUtSetReverbType/Depth/On/Off`, `SpuClearReverbWorkArea` -> the SPU reverb.
-- samples: AE gets the sample's real length, not the doubled length of short one shots.
+- The game's libsnd calls (`SsVoKeyOn_4FCF10`, `SsSeqOpen_4FD6D0`, `SsSeqPlay_4FD900`,
+  `SsUtKeyOffV_4FE010`, ...) go straight to it; the PC's MIDI channel code doesn't run.
+- `Libsnd` was ported from the MIT licensed libsnd decompilation in sotn-decomp
+  (`src/main/psxsdk/libsnd`), then corrected where the games' own libsnd differs (see `Voice volume`
+  and `Libsnd::Config`): AO's and AE's versions differ in squaring sound effects, `SsSeqSetVol`,
+  and `SpuVmSetVol`'s pan lookups (the decompilation's reads the wrong table entries; AE's is
+  right, AO's SEQs have no controllers).
+- Like the PS1, where the vsync interrupt ran libsnd's tick, it ticks 50 times a second of audio
+  (PAL) on the audio thread, between the SPU's samples (`PsxSoundEngine::Mix`). A tick writes the
+  registers the calls changed since the last one (so a sound effect starts at the next tick, up
+  to 20 ms later, as on the PS1), reads every voice's envelope for the voice allocation, and plays
+  the SEQs. A mutex serialises it with the game thread's calls.
+- Samples are named by VAB and VAG number instead of SPU addresses, and libsnd's pitch isn't cut
+  to 16 bits (see the SPU's pitch). Not used by the games, so not ported: SEP blocks, noise
+  voices, vibrato/portamento, crescendo/tempo changes, and the controllers other than bank,
+  volume, pan, the loop NRPNs and RPNs.
+- One deliberate difference: `SsVoKeyOn` returns 0, not -1, when there's no voice, because the
+  games take the result as a voice mask and would stop or re-pitch every voice with -1.
 
 The `ps1_*` gold traces (`SoundGold.PS1_*`) pin it, with each SPU voice's phase, pitch, volume,
-ADSR and reverb bit. `relive_sound_gold -ps1_sound -reverb=<depth>` renders real data through it.
+ADSR, reverb bit and what libsnd plays on it; `PsxSoundEngineTests.cpp` tests `Libsnd` on its own.
+
+### Checked against the real PS1 code
+
+`build-ps1re/ref` (local only: it uses DuckStation's SPU, which is CC-BY-NC-ND, and needs the PS1
+executables) runs each game's real libsnd out of its PS1 executable in a MIPS interpreter, on
+DuckStation's SPU. `RELIVE_SOUND_RECORD=<file> relive -ps1_sound` records the game's libsnd
+calls with the sound clock; `ps1snd [-ae] cmp <file>` replays them on the real libsnd and on
+`Libsnd` (on the same SPU, with the PS1 VH/VB/SEQ data) and diffs every SPU register write, and
+with `CMP_AUDIO=<prefix>` also renders `Libsnd` on relive's `PsxSpu` (the PS1 samples, ADPCM
+decoded) and compares the audio with DuckStation's. `relive_sound_gold -replay=<file>` plays a
+recording on the engine itself.
+
+Results (October 2026): every register write identical, and every sound effect got the same
+voices, for an AO recording (Rupture Farms' secret area: 567 sound effects, the jingle, voice
+stealing) and three AE ones (Mines, Barracks, Bonewerkz), plus synthetic ones for the SEQ volume
+and channel volume paths (AE's Scrab Vault SEQs, the only ones that use CC 7). The audio of
+relive's SPU differs from DuckStation's by 48-62 dB under the signal (at most 122 of 32767): the
+envelopes, interpolation, reverb and key on timing match.
+
+A real PS1 recording of the secret area (DuckStation, `build-ps1re/rec`) confirms the jingle's
+pitch and tempo.
 
 ### Still to do
 
 - Loudness: with the real AE data a few loud SEQs (e.g. MI_6_1, NEGATIV3) hit the SPU's 16 bit
-  clamp before the master volume, up to 0.1% of samples. Check libsnd's exact voice volume curve
-  (and master volume) against a PS1 recording before scaling anything.
-- SEQ timing: the SEQs still advance in 30 ms steps on the game thread (`SsSeqCalledTbyT`), so
-  notes start up to a frame late. libsnd ticks them from the VSync/root counter interrupt.
-- `SsSetMVol`'s master volume curve isn't checked against libsnd yet (the engine maps 0-127
-  linearly).
-- SEQ channel volume (CC 7). The only controller the SEQs use: 1357 times in AE's 377 SEQs,
-  none in AO's 522. Neither parser applies it (AE reads the controller number from the wrong
-  byte, AO only handles CC 6/38/99), so AE music plays each channel at its default volume. This is
-  the most useful thing left for the music.
-- The merged AO/AE MIDI parser (see the plan above).
-
-### Probably not needed
-
-Found by scanning every PC VH and SEQ (AE and AO; the PS1 VHs agree):
-
-- Vibrato: one tone of 5677 has `vibW`/`vibT` set (AE MINES.VH program 14, vibW 100 vibT 10).
-  How libsnd turns it on for a tone isn't confirmed. Only worth doing if that sound is heard to
-  wobble on the PS1.
-- Portamento: no tone sets `porW`/`porT`, and no SEQ sends portamento controllers. Not needed.
-- The libsnd loop and callback markers (NRPN 99 = 20/30/40): no SEQ uses them, so their code
-  paths never run with the real data.
-- libsnd's voice allocation: the PC's rules (a free channel first, then priority and volume) only
-  differ from libsnd's when all 24 voices are busy, which is rare. Worth checking only if notes
-  are heard cutting out in busy scenes.
-- Pitch bends are only in ambience SEQs: 1312 in AE's BARRAMB, NECRAMB, PARAMB and SCRAMB.SEQ, 375
-  in AO's D1AMB and D2AMB.SEQ. libsnd only bends the voices of the SEQ that sent the bend; the
-  engine bends every voice of the program, like the PC code.
-- Check against real hardware or a PS1 recording: the envelope edge cases, the release shift
-  0x1F case, the order of the reverb and master volume in the mix, and AE vag 8's pitch.
+  clamp before the master volume, up to 0.1% of samples. Check against a PS1 recording before
+  scaling anything.
+- The PC samples are brighter than the PS1's (no ADPCM, and AO's PS1 data had some at lower rates),
+  so the same notes sound clearer and a little louder (1-2 dB on the jingle): the PS1's gaussian
+  interpolation dulls a low rate sample.
+- Game logic: the PS1 games run at 25/50 Hz on PAL, relive at 30 fps, so how often the game
+  starts sound effects differs.
 
 ## Checking against real game data
 

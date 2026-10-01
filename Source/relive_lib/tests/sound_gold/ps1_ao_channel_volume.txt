@@ -21,21 +21,13 @@ t=0 seq 2 E1AMB.SEQ
 t=0 seq 3 E2AMB.SEQ
 t=0 seq 4 E2AMB2.SEQ
 t=0 play the fade
-t=30 ch0 state=1 vol=2 cvol=46 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,2 seqch=0 ref=1 loop=1
-t=30 spu0 phase=1 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
-t=110 spu0 phase=3 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
-t=540 spu0 phase=3 pitch=1000 vol=975,221 adsr=2a4f,0006 reverb=1
-t=1050 spu0 phase=3 pitch=1000 vol=0,0 adsr=2a4f,0006 reverb=1
+t=30 spu0 phase=1 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1 seq=0 prog=2 note=60
+t=100 spu0 phase=3 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1 seq=0 prog=2 note=60
+t=510 spu0 phase=3 pitch=1000 vol=975,221 adsr=2a4f,0006 reverb=1 seq=0 prog=2 note=60
+t=1010 spu0 phase=3 pitch=1000 vol=0,0 adsr=2a4f,0006 reverb=1 seq=0 prog=2 note=60
 t=1250 stop and play again
-t=1250 ch0 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,300 seqch=0 ref=1 loop=1
-t=1250 spu0 phase=4 pitch=1000 vol=0,0 adsr=2a4f,0006 reverb=1
-t=1260 ch0 off
-t=1260 spu0 off
-t=1350 ch0 state=1 vol=2 cvol=46 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,2 seqch=0 ref=1 loop=1
-t=1350 spu0 phase=1 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
-t=1430 spu0 phase=3 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
+t=1270 spu0 off
+t=1390 spu0 phase=1 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1 seq=0 prog=2 note=60
+t=1460 spu0 phase=3 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1 seq=0 prog=2 note=60
 t=1600 stop
-t=1600 ch0 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,300 seqch=0 ref=1 loop=1
-t=1600 spu0 phase=4 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
 t=1610 spu0 off
-t=1620 ch0 off

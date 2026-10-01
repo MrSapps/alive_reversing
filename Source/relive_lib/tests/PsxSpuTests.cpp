@@ -157,7 +157,7 @@ TEST(PsxSpu, InterpolationOfAConstantIsJustBelowUnity)
 
 // Plays a one shot sample of length samples and returns how many 44100 Hz samples the voice
 // stays active for. Also checks that the ENDX bit is set exactly when the voice stops.
-static u32 FramesUntilEnd(u16 pitch, u32 length)
+static u32 FramesUntilEnd(u32 pitch, u32 length)
 {
     std::vector<s16> pcm(length, 0x4000);
     PsxSpu spu;
@@ -207,8 +207,104 @@ TEST(PsxSpu, PitchSetsTheNumberOfOutputSamples)
     EXPECT_EQ(FramesUntilEnd(0x2000, length), length / 2);
     EXPECT_EQ(FramesUntilEnd(0x3000, length), CeilDiv(length * 0x1000, 0x3000));
     EXPECT_EQ(FramesUntilEnd(0x0123, length), CeilDiv(length * 0x1000, 0x0123));
-    // Anything above 3FFFh plays at 4000h
-    EXPECT_EQ(FramesUntilEnd(0xFFFF, length), CeilDiv(length * 0x1000, 0x4000));
+    // Unlike the hardware (4000h at most), the PC samples can need more: up to kMaxPitch
+    EXPECT_EQ(FramesUntilEnd(0xAAD8, length), CeilDiv(length * 0x1000, 0xAAD8));
+    EXPECT_EQ(FramesUntilEnd(PsxSpu::kMaxPitch, length), CeilDiv(length * 0x1000, PsxSpu::kMaxPitch));
+    EXPECT_EQ(FramesUntilEnd(PsxSpu::kMaxPitch * 4, length), CeilDiv(length * 0x1000, PsxSpu::kMaxPitch));
+}
+
+// RMS of a sine of period samples after FilterSample
+static f64 FilteredSineRms(f64 period, s32 level, bool loop)
+{
+    const u32 length = 4096;
+    std::vector<s16> pcm(length);
+    for (u32 i = 0; i < length; i++)
+    {
+        pcm[i] = static_cast<s16>(10000.0 * std::sin(2.0 * 3.14159265358979323846 * i / period));
+    }
+    PsxSpuSample sample;
+    sample.mPcm = pcm.data();
+    sample.mLength = length;
+    sample.mLoop = loop;
+    const std::vector<s16> filtered = PsxSpu::FilterSample(sample, level);
+    EXPECT_EQ(filtered.size(), pcm.size());
+    f64 sum = 0.0;
+    for (u32 i = 512; i < length - 512; i++)
+    {
+        sum += static_cast<f64>(filtered[i]) * filtered[i];
+    }
+    return std::sqrt(sum / (length - 1024));
+}
+
+TEST(PsxSpu, FilterSample)
+{
+    // A sine well below the level's cutoff passes, one above it is gone
+    const f64 full = 10000.0 / std::sqrt(2.0);
+    for (s32 level = 1; level <= kPsxSpuFilterLevels; level++)
+    {
+        const f64 cutoffPeriod = 2.0 * (1 << level) / 0.9;
+        EXPECT_NEAR(FilteredSineRms(cutoffPeriod * 4, level, false), full, full * 0.02) << "level " << level;
+        EXPECT_LT(FilteredSineRms(cutoffPeriod / 1.5, level, false), full * 0.01) << "level " << level;
+    }
+    // A loop is filtered as it repeats: a sine of a whole number of periods keeps its level
+    // right up to the loop's ends
+    EXPECT_NEAR(FilteredSineRms(64.0, 1, true), full, full * 0.02);
+
+    EXPECT_EQ(PsxSpu::FilterLevelsFor(0x1000), 0);
+    EXPECT_EQ(PsxSpu::FilterLevelsFor(0x1FFF), 0);
+    EXPECT_EQ(PsxSpu::FilterLevelsFor(0x2000), 1);
+    EXPECT_EQ(PsxSpu::FilterLevelsFor(0x4000), 2);
+    EXPECT_EQ(PsxSpu::FilterLevelsFor(0xAAD8), 3);
+    EXPECT_EQ(PsxSpu::FilterLevelsFor(0x10000), 3);
+}
+
+// A voice played fast reads the filtered copies: it sounds the same as without them for what's
+// below the output Nyquist
+TEST(PsxSpu, BandLimitedWithFilteredCopies)
+{
+    const u32 length = 20000;
+    std::vector<s16> pcm(length);
+    for (u32 i = 0; i < length; i++)
+    {
+        // Slow enough to be below the output Nyquist at 5x
+        pcm[i] = static_cast<s16>(8000.0 * std::sin(2.0 * 3.14159265358979323846 * i / 200.0));
+    }
+    PsxSpuSample sample;
+    sample.mPcm = pcm.data();
+    sample.mLength = length;
+    std::array<std::vector<s16>, kPsxSpuFilterLevels> copies;
+    for (s32 i = 0; i < kPsxSpuFilterLevels; i++)
+    {
+        copies[i] = PsxSpu::FilterSample(sample, i + 1);
+    }
+    PsxSpuSample filtered = sample;
+    for (s32 i = 0; i < kPsxSpuFilterLevels; i++)
+    {
+        filtered.mFiltered[i] = copies[i].data();
+    }
+
+    auto render = [](const PsxSpuSample& s)
+    {
+        PsxSpu spu;
+        spu.SetInterpolation(PsxSpu::Interpolation::BandLimited);
+        spu.SetMasterVolume(0x7FFE, 0x7FFE);
+        spu.SetVoiceSample(0, s);
+        spu.SetVoicePitch(0, 0x5000);
+        spu.SetVoiceVolume(0, 0x7FFE, 0x7FFE);
+        spu.SetVoiceAdsr(0, 0x000F, 0x0000); // Fastest attack, sustain at full
+        spu.KeyOn(0);
+        std::vector<s16> out(2000 * 2);
+        spu.Render(out.data(), 2000);
+        return out;
+    };
+    const std::vector<s16> a = render(sample);
+    const std::vector<s16> b = render(filtered);
+    s32 maxDiff = 0;
+    for (size_t i = 200; i < a.size(); i++)
+    {
+        maxDiff = std::max(maxDiff, std::abs(a[i] - b[i]));
+    }
+    EXPECT_LT(maxDiff, 200);
 }
 
 TEST(PsxSpu, PitchZeroNeverAdvances)
@@ -254,8 +350,9 @@ TEST(PsxSpu, PitchHelpers)
     // Past a semitone they carry into the note: 100 + 100 = 200 = 1 semitone + 72
     EXPECT_EQ(PsxSpu::PitchFromNote(60, 100, 60, 100), PsxSpu::PitchFromNote(61, 72, 60, 0));
 
-    // Not clamped: two octaves up is 4000h, which the SPU plays at its highest rate
-    EXPECT_EQ(PsxSpu::PitchFromNote(84, 0, 60, 0), 0x4000);
+    // Not clamped: two octaves up is 4000h, and four 10000h (it used to wrap to 0 in 16 bits)
+    EXPECT_EQ(PsxSpu::PitchFromNote(84, 0, 60, 0), 0x4000u);
+    EXPECT_EQ(PsxSpu::PitchFromNote(108, 0, 60, 0), 0x10000u);
     // More than 60 semitones below the root (libsnd would read before its table):
     // floor(4096 * 2^(5/12)) >> 6 = 85, 4096 * 2^(-67/12) = 85.3
     EXPECT_EQ(PsxSpu::PitchFromNote(0, 0, 67, 0), 85);
@@ -781,7 +878,9 @@ TEST(PsxSpu, RenderChecksum)
 {
     const std::vector<s16> out = RenderScene(441);
     const u32 crc = SoundGoldSession::Crc32(reinterpret_cast<const u8*>(out.data()), out.size() * sizeof(s16));
-    EXPECT_EQ(crc, 0xB66CA325u) << std::hex << "crc 0x" << crc;
+    // Changed by the key on/off latency (a sample, as the hardware), the reverb's saturation points
+    // and phase, and the filtered copies: each checked against DuckStation's SPU (build-ps1re)
+    EXPECT_EQ(crc, 0x0C36AF26u) << std::hex << "crc 0x" << crc;
 
     // Not silent, and the reverb keeps sounding after the key offs
     EXPECT_GT(PeakAfter(out, 0), 1000);

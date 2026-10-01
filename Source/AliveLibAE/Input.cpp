@@ -651,14 +651,11 @@ struct IniCustomSaveEntry final
     bool isBool;
 };
 
-bool gLatencyHack = true;
-
 const std::vector<IniCustomSaveEntry> gCustomSaveEntries = {
 #if USE_SDL2_SOUND
     {"reverb", {&gReverbEnabled}, true},
     {"audio_stereo", {&gAudioStereo}, true},
 #endif
-    {"latency_hack", {&gLatencyHack}, true},
 };
 
 const char_type* iniCategories[4] = {
@@ -1515,7 +1512,7 @@ void InputObject::Update(BaseGameAutoPlayer& autoPlayer)
         0};
 
     mPads[0].mPreviousInput = mPads[0].mRawInput;
-    mPads[0].mRawInput = autoPlayer.GetInput(0);
+    mPads[0].mRawInput = autoPlayer.GetInput(0) | mAutomationInput;
 
     if (IsDemoPlaying())
     {

@@ -297,6 +297,7 @@ void Engine::Init_Sound_DynamicArrays_And_Others()
     // SND_Init creates the sound system
     SDLSoundSystem::SetPs1SoundOnCreate(mOptions.mPs1Sound,
         mOptions.mSpuFilterGaussian ? PsxSpu::Interpolation::Gaussian : PsxSpu::Interpolation::BandLimited);
+    SDLSoundSystem::SetAudioDumpOnCreate(mOptions.mDumpAudio.value_or(""), mOptions.mDumpLiveAudio.value_or(""));
     if (mGameType == GameType::eAe)
     {
         SND_Init();

@@ -20,25 +20,13 @@ t=0 seq 1 D2AMB.SEQ
 t=0 seq 2 E1AMB.SEQ
 t=0 seq 3 E2AMB.SEQ
 t=0 play the held note, then the repeated one
-t=30 ch0 state=1 vol=2 cvol=46 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,2 seqch=0 ref=1 loop=1
-t=30 ch1 state=1 vol=2 cvol=46 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,2 seqch=16 ref=1 loop=1
-t=30 spu0 phase=1 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
-t=30 spu1 phase=1 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
-t=110 spu0 phase=3 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
-t=110 spu1 phase=3 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
-t=270 ch2 state=1 vol=2 cvol=46 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,2 seqch=16 ref=2 loop=1
-t=270 spu2 phase=1 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
-t=350 spu2 phase=3 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
-t=540 ch1 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,300 seqch=16 ref=1 loop=1
-t=540 ch2 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,300 seqch=16 ref=2 loop=1
-t=540 spu1 phase=4 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
-t=540 spu2 phase=4 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
-t=550 spu1 off
-t=550 spu2 off
-t=570 ch1 off
-t=570 ch2 off
+t=30 spu0 phase=1 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1 seq=0 prog=2 note=60
+t=30 spu1 phase=1 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1 seq=1 prog=2 note=60
+t=100 spu0 phase=3 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1 seq=0 prog=2 note=60
+t=100 spu1 phase=3 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1 seq=1 prog=2 note=60
+t=270 spu2 phase=1 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1 seq=1 prog=2 note=60
+t=340 spu2 phase=3 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1 seq=1 prog=2 note=60
+t=530 spu1 off
+t=530 spu2 off
 t=650 stop
-t=650 ch0 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,300 seqch=0 ref=1 loop=1
-t=650 spu0 phase=4 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
-t=660 ch0 off
-t=660 spu0 off
+t=670 spu0 off

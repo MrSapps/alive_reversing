@@ -5,8 +5,6 @@
 #include <functional>
 #include <cmath>
 
-extern bool gLatencyHack;
-
 static bool sPs1SoundOnCreate = false;
 static PsxSpu::Interpolation sPs1SoundInterpolation = PsxSpu::Interpolation::BandLimited;
 
@@ -16,9 +14,101 @@ void SDLSoundSystem::SetPs1SoundOnCreate(bool enable, PsxSpu::Interpolation inte
     sPs1SoundInterpolation = interpolation;
 }
 
+static std::string sAudioDumpOnCreate;
+static bool sAudioDumpOffline = true;
+
+void SDLSoundSystem::SetAudioDumpOnCreate(const std::string& wavPath, const std::string& liveWavPath)
+{
+    sAudioDumpOnCreate = wavPath.empty() ? liveWavPath : wavPath;
+    sAudioDumpOffline = !wavPath.empty();
+}
+
+static void WriteU32(FILE* f, u32 v)
+{
+    fwrite(&v, sizeof(v), 1, f);
+}
+
+static void WriteU16(FILE* f, u16 v)
+{
+    fwrite(&v, sizeof(v), 1, f);
+}
+
+void SDLSoundSystem::OpenAudioDump()
+{
+    if (sAudioDumpOnCreate.empty())
+    {
+        return;
+    }
+    mAudioDump = fopen(sAudioDumpOnCreate.c_str(), "wb");
+    if (!mAudioDump)
+    {
+        LOG_ERROR("Can't write the audio dump %s", sAudioDumpOnCreate.c_str());
+        return;
+    }
+    LOG_INFO("Dumping the audio to %s", sAudioDumpOnCreate.c_str());
+    mAudioDumpFrames = 0;
+    mLiveLog = fopen((sAudioDumpOnCreate + ".log").c_str(), "w");
+    if (mLiveLog)
+    {
+        fprintf(mLiveLog, "# ms event samples ringAvail ok|durationUs\n");
+    }
+    // A 16-bit stereo PCM header, the sizes are filled in by CloseAudioDump
+    fwrite("RIFF", 1, 4, mAudioDump);
+    WriteU32(mAudioDump, 0);
+    fwrite("WAVEfmt ", 1, 8, mAudioDump);
+    WriteU32(mAudioDump, 16);
+    WriteU16(mAudioDump, 1);
+    WriteU16(mAudioDump, 2);
+    const u32 rate = static_cast<u32>(mAudioDeviceSpec.freq);
+    WriteU32(mAudioDump, rate);
+    WriteU32(mAudioDump, rate * sizeof(StereoSample_S16));
+    WriteU16(mAudioDump, sizeof(StereoSample_S16));
+    WriteU16(mAudioDump, 16);
+    fwrite("data", 1, 4, mAudioDump);
+    WriteU32(mAudioDump, 0);
+}
+
+void SDLSoundSystem::WriteAudioDump(const StereoSample_S16* pSamples, s32 count)
+{
+    if (mAudioDump && count > 0)
+    {
+        fwrite(pSamples, sizeof(StereoSample_S16), static_cast<size_t>(count), mAudioDump);
+        mAudioDumpFrames += static_cast<u64>(count);
+    }
+}
+
+void SDLSoundSystem::CloseAudioDump()
+{
+    if (!mAudioDump)
+    {
+        return;
+    }
+    const u32 dataBytes = static_cast<u32>(mAudioDumpFrames * sizeof(StereoSample_S16));
+    fseek(mAudioDump, 4, SEEK_SET);
+    WriteU32(mAudioDump, 36 + dataBytes);
+    fseek(mAudioDump, 40, SEEK_SET);
+    WriteU32(mAudioDump, dataBytes);
+    fclose(mAudioDump);
+    mAudioDump = nullptr;
+    if (mLiveLog)
+    {
+        fclose(mLiveLog);
+        mLiveLog = nullptr;
+    }
+    LOG_INFO("Audio dump finished: %llu frames", static_cast<unsigned long long>(mAudioDumpFrames));
+}
+
 void SDLSoundSystem::Init(u32 /*sampleRate*/, s32 /*bitsPerSample*/, s32 /*isStereo*/)
 {
     mCreated = false;
+
+    if (!sAudioDumpOnCreate.empty() && sAudioDumpOffline)
+    {
+        // No audio device: the audio is rendered a frame at a time by RenderDumpFrame
+        LOG_INFO("-dump_audio: rendering the audio offline, a frame at a time");
+        InitOffline();
+        return;
+    }
 
     if (!SDL_InitSubSystem(SDL_INIT_AUDIO))
     {
@@ -57,13 +147,14 @@ void SDLSoundSystem::Init(u32 /*sampleRate*/, s32 /*bitsPerSample*/, s32 /*isSte
     mCreated = true;
 
     // Correctly size the lock free buffer on the main thread before any other threads start
-    mAudioRingBuffer.resize(2048 * 2);
+    // What the mixer may run ahead of the device: this much latency on every sound, against the
+    // slack to absorb a slow chunk of mixing (a frame of 24 voices takes up to ~0.9x real time
+    // in a Debug build)
+    mAudioRingBuffer.resize(2048);
 
-    // TODO: Test just running this on the main thread
-    if (!gLatencyHack)
-    {
-        mRenderAudioThread.reset(new std::thread(std::bind(&SDLSoundSystem::RenderAudioThread, this)));
-    }
+    // The mix is made on its own thread, ahead of the device's callback, so a slow frame of mixing
+    // is absorbed by the ring buffer instead of underrunning the device
+    mRenderAudioThread.reset(new std::thread(std::bind(&SDLSoundSystem::RenderAudioThread, this)));
 
     SDL_ResumeAudioDevice(mAudioDevice);
 }
@@ -78,6 +169,7 @@ void SDLSoundSystem::InitMixer()
     }
 
     Reverb_Init(mAudioDeviceSpec.freq);
+    OpenAudioDump();
 
     GetSoundAPI().SND_InitVolumeTable();
 
@@ -122,6 +214,25 @@ void SDLSoundSystem::RenderOffline(u32 sampleCount)
     mGeneratedAudioSamples.fetch_add(sampleCount, std::memory_order_release);
 }
 
+void SDLSoundSystem::RenderDumpFrame()
+{
+    if (!mOffline || !mAudioDump)
+    {
+        return;
+    }
+    static constexpr u32 kGameFps = 30;
+    const u32 sampleCount = static_cast<u32>(mAudioDeviceSpec.freq) / kGameFps;
+    mDumpFrameBuffer.assign(sampleCount, StereoSample_S16{});
+    const u64 startNs = SDL_GetTicksNS();
+    // RenderAudio writes the dump
+    RenderAudio(mDumpFrameBuffer.data(), static_cast<s32>(sampleCount));
+    mGeneratedAudioSamples.fetch_add(sampleCount, std::memory_order_release);
+    if (mLiveLog)
+    {
+        fprintf(mLiveLog, "%.3f frame %u 0 %llu\n", static_cast<f64>(startNs) / 1e6, sampleCount, static_cast<unsigned long long>((SDL_GetTicksNS() - startNs) / 1000));
+    }
+}
+
 void SDLSoundSystem::RenderOfflineUntil(u32 ticks)
 {
     // The first sample count whose tick is >= ticks
@@ -152,6 +263,11 @@ void SDLSoundSystem::Resume()
 u64 SDLSoundSystem::GetGeneratedAudioSamples() const
 {
     return mGeneratedAudioSamples.load(std::memory_order_acquire);
+}
+
+u32 SDLSoundSystem::GetQueuedAudioSamples() const
+{
+    return mOffline ? 0 : static_cast<u32>(mAudioRingBuffer.getAvailableRead());
 }
 
 
@@ -220,6 +336,7 @@ SDLSoundSystem::~SDLSoundSystem()
 {
     TRACE_ENTRYEXIT;
 
+    CloseAudioDump();
     Reverb_DeInit();
 
     // TODO: Clean up outstanding samples in sAE_ActiveVoices
@@ -233,29 +350,23 @@ void SDLSoundSystem::AudioCallBack(SDL_AudioStream* stream, s32 additionalAmount
     }
 
     const s32 bufferLenSamples = additionalAmount / sizeof(StereoSample_S16);
-    std::vector<StereoSample_S16> buffer(bufferLenSamples);
-    
-    if (gLatencyHack)
-    {
-        // Calculate the audio in the callback instead of another thread with a busy loop to reduce CPU usage
-        // this will probably cause audio glitching in a lot of cases
-        RenderAudio(buffer.data(), bufferLenSamples);
-    }
-    else
-    {
-        const s32 readAvilSamples = static_cast<s32>(mAudioRingBuffer.getAvailableRead());
-        if (readAvilSamples > 0 && readAvilSamples < bufferLenSamples)
-        {
-            LOG_WARNING("Audio buffer underflow!");
-        }
+    // No allocation on the device thread: reuse the buffer
+    mCallbackBuffer.assign(static_cast<size_t>(bufferLenSamples), StereoSample_S16{});
+    StereoSample_S16* const buffer = mCallbackBuffer.data();
 
-        if (!mAudioRingBuffer.read(buffer.data(), bufferLenSamples))
-        {
-            LOG_ERROR("Ring buffer read failure!");
-        }
+    const s32 readAvilSamples = static_cast<s32>(mAudioRingBuffer.getAvailableRead());
+    const bool ok = mAudioRingBuffer.read(buffer, bufferLenSamples);
+    if (!ok)
+    {
+        // The render thread is behind: this period is silence
+        LOG_WARNING("Audio buffer underflow: %d of %d samples", readAvilSamples, bufferLenSamples);
+    }
+    if (mLiveLog)
+    {
+        fprintf(mLiveLog, "%.3f callback %d %d %d\n", static_cast<f64>(SDL_GetTicksNS()) / 1e6, bufferLenSamples, readAvilSamples, ok ? 1 : 0);
     }
 
-    SDL_PutAudioStreamData(stream, buffer.data(), additionalAmount);
+    SDL_PutAudioStreamData(stream, buffer, additionalAmount);
     mGeneratedAudioSamples.fetch_add(static_cast<u64>(bufferLenSamples), std::memory_order_release);
 }
 
@@ -268,6 +379,7 @@ void SDLSoundSystem::RenderAudioThread()
         const size_t bufferSize = mAudioRingBuffer.getAvailableWrite();
         if (bufferSize > 0)
         {
+            const u64 startNs = SDL_GetTicksNS();
             tmpBuffer.resize(bufferSize);
             memset(tmpBuffer.data(), 0, tmpBuffer.size() * sizeof(StereoSample_S16));
             RenderAudio(tmpBuffer.data(), static_cast<s32>(tmpBuffer.size()));
@@ -276,6 +388,15 @@ void SDLSoundSystem::RenderAudioThread()
                 // Couldn't write all the data, should never happen ??
                 LOG_ERROR("Ring buffer write failed");
             }
+            if (mLiveLog)
+            {
+                fprintf(mLiveLog, "%.3f render %u %u %llu\n", static_cast<f64>(startNs) / 1e6, static_cast<u32>(bufferSize), static_cast<u32>(mAudioRingBuffer.getAvailableRead()), static_cast<unsigned long long>((SDL_GetTicksNS() - startNs) / 1000));
+            }
+        }
+        else
+        {
+            // The buffer is full: wait for the device to take some rather than spinning on a core
+            SDL_DelayNS(500 * 1000);
         }
     }
 
@@ -322,6 +443,8 @@ void SDLSoundSystem::RenderAudio(StereoSample_S16* pSampleBuffer, s32 sampleBuff
     {
         mPs1Sound->Mix(pSampleBuffer, static_cast<u32>(sampleBufferCount));
     }
+
+    WriteAudioDump(pSampleBuffer, sampleBufferCount);
 }
 
 
