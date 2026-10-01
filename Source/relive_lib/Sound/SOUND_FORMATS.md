@@ -147,6 +147,14 @@ libsnd (AE PS1 executable):
 
 - Note on: always a new voice (the voice allocator at 0x800761b4 only looks at voice age and
   priority), so a note struck again keeps sounding.
+- Voice allocation (AO PS1 executable 0x8007bd30, `PsxSoundEngine::AllocateVoice`): a voice is
+  free when its key is released and its envelope is 0. The envelope is read back from the SPU
+  every tick (0x8007abe4, before the tick plays the SEQs), and key on sets it to 0x7FFF until then. A voice whose envelope stayed
+  0 for 15 ticks counts as released (a one shot that ended without a key off). With no free
+  voice, it steals among the voices whose priority is at most the new tone's: the lowest priority,
+  then the lowest envelope, then the oldest (counted in allocations). If none qualifies, the note
+  is dropped. The PC's `MIDI_Allocate_Channel` instead takes the quietest channel whatever its
+  priority, and gives up if that one's priority is higher.
 - Note off (0x80075f18, also a note on with velocity 0): keys off EVERY voice that the same SEQ
   keyed on with the same VAB, program and note. No reference counts; the SEQ's MIDI channel isn't
   compared, only the SEQ; other SEQs' and sound effects' voices aren't touched.

@@ -301,6 +301,9 @@ void PsxSoundEngine::StopVabVoices(s32 vabId)
             mSpu.StopVoice(i);
             mSpu.SetVoiceSample(i, {});
             mVoices[i] = {};
+            mAllocs[i].mKeyOn = false;
+            mAllocs[i].mEnvelope = 0;
+            mAllocs[i].mUnrendered = false;
         }
     }
 }
@@ -467,6 +470,94 @@ void PsxSoundEngine::NoteOn(s32 voice, s32 vabId, s32 program, s32 tone, s32 not
     mSpu.SetVoiceAdsr(voice, t.mAdsr1, t.mAdsr2);
     mSpu.SetVoiceReverb(voice, info.mState.mReverb);
     mSpu.KeyOn(voice);
+
+    // libsnd's key on (0x8007a9ac) takes the envelope as full until the next tick reads it
+    VoiceAlloc& alloc = mAllocs[voice];
+    alloc.mKeyOn = true;
+    alloc.mEnvelope = 0x7FFF;
+    alloc.mSilentTicks = 0;
+    alloc.mUnrendered = true;
+}
+
+s32 PsxSoundEngine::AllocateVoice(s32 priority)
+{
+    std::lock_guard<std::mutex> lock(mMutex);
+    s32 voice = -1;
+    s32 victim = -1;
+    s32 lowestPriority = priority;
+    u16 lowestEnvelope = 0xFFFF;
+    u16 oldest = 0;
+    for (s32 i = 0; i < PsxSpu::kNumVoices; i++)
+    {
+        const VoiceAlloc& alloc = mAllocs[i];
+        if (!alloc.mKeyOn && alloc.mEnvelope == 0)
+        {
+            voice = i;
+            break;
+        }
+
+        if (alloc.mPriority < lowestPriority)
+        {
+            victim = i;
+            lowestPriority = alloc.mPriority;
+            lowestEnvelope = alloc.mEnvelope;
+            oldest = alloc.mAge;
+        }
+        else if (alloc.mPriority == lowestPriority)
+        {
+            if (alloc.mEnvelope < lowestEnvelope)
+            {
+                victim = i;
+                lowestEnvelope = alloc.mEnvelope;
+                oldest = alloc.mAge;
+            }
+            else if (alloc.mEnvelope == lowestEnvelope && alloc.mAge > oldest)
+            {
+                victim = i;
+                oldest = alloc.mAge;
+            }
+        }
+    }
+
+    if (voice < 0)
+    {
+        voice = victim;
+    }
+    if (voice < 0)
+    {
+        return -1;
+    }
+
+    for (VoiceAlloc& alloc : mAllocs)
+    {
+        alloc.mAge++;
+    }
+    mAllocs[voice].mAge = 0;
+    mAllocs[voice].mPriority = priority;
+    return voice;
+}
+
+void PsxSoundEngine::Tick()
+{
+    std::lock_guard<std::mutex> lock(mMutex);
+    for (s32 i = 0; i < PsxSpu::kNumVoices; i++)
+    {
+        VoiceAlloc& alloc = mAllocs[i];
+        if (alloc.mUnrendered)
+        {
+            continue;
+        }
+
+        alloc.mEnvelope = static_cast<u16>(std::max<s16>(mSpu.VoiceEnvelope(i), 0));
+        if (alloc.mEnvelope != 0)
+        {
+            alloc.mSilentTicks = 0;
+        }
+        else if (alloc.mSilentTicks < 15 && ++alloc.mSilentTicks == 15)
+        {
+            alloc.mKeyOn = false;
+        }
+    }
 }
 
 void PsxSoundEngine::SetVoicePitch(s32 voice, s32 note128)
@@ -481,14 +572,28 @@ void PsxSoundEngine::SetVoicePitch(s32 voice, s32 note128)
 
 void PsxSoundEngine::KeyOff(s32 voice)
 {
+    if (!ValidVoice(voice))
+    {
+        return;
+    }
+
     std::lock_guard<std::mutex> lock(mMutex);
     mSpu.KeyOff(voice);
+    mAllocs[voice].mKeyOn = false;
 }
 
 void PsxSoundEngine::Stop(s32 voice)
 {
+    if (!ValidVoice(voice))
+    {
+        return;
+    }
+
     std::lock_guard<std::mutex> lock(mMutex);
     mSpu.StopVoice(voice);
+    mAllocs[voice].mKeyOn = false;
+    mAllocs[voice].mEnvelope = 0;
+    mAllocs[voice].mUnrendered = false;
 }
 
 bool PsxSoundEngine::IsVoiceActive(s32 voice)
@@ -608,6 +713,10 @@ void PsxSoundEngine::Mix(StereoSample_S16* pOut, u32 frames)
     {
         const u32 chunk = std::min(frames, kMixChunkFrames);
         mSpu.Render(mRenderBuffer.data(), chunk);
+        for (VoiceAlloc& alloc : mAllocs)
+        {
+            alloc.mUnrendered = false;
+        }
         for (u32 i = 0; i < chunk; i++)
         {
             pOut[i].left = static_cast<s16>(std::clamp(pOut[i].left + mRenderBuffer[i * 2], -0x8000, 0x7FFF));

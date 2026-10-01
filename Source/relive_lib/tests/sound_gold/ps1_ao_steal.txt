@@ -72,155 +72,136 @@ t=120 ch14 state=1 vol=2 cvol=41 prio=7 vab=1 prog=2 note=52 freq=0.6300 adsr=62
 t=120 spu14 phase=1 pitch=0a14 vol=3264,740 adsr=2a4f,0006 reverb=1
 t=130 spu3 off
 t=130 key on prog=5 note=53
-t=130 ch1 state=-2 vol=42 cvol=42 prio=10 vab=1 prog=5 note=53 freq=0.6674 adsr=1009,0,8,1 seqch=65535 ref=255 loop=0
-t=130 spu1 phase=1 pitch=0aad vol=3355,3355 adsr=00ff,1fc0 reverb=0
-t=140 spu1 phase=3 pitch=0aad vol=3355,3355 adsr=00ff,1fc0 reverb=0
+t=130 ch15 state=-2 vol=42 cvol=42 prio=10 vab=1 prog=5 note=53 freq=0.6674 adsr=0,0,0,0 seqch=65535 ref=255 loop=0
+t=130 spu15 phase=1 pitch=0aad vol=3355,3355 adsr=00ff,1fc0 reverb=0
 t=140 spu7 off
+t=140 spu15 phase=3 pitch=0aad vol=3355,3355 adsr=00ff,1fc0 reverb=0
 t=140 key on prog=8 note=54
-t=140 ch15 state=1 vol=25 cvol=25 prio=7 vab=1 prog=8 note=54 freq=0.7071 adsr=0,1200,0,0 seqch=65535 ref=255 loop=0
-t=140 ch16 state=1 vol=2 cvol=21 prio=7 vab=1 prog=8 note=54 freq=0.4719 adsr=15871,0,3,23592 seqch=65535 ref=255 loop=0
-t=140 spu15 phase=1 pitch=0b50 vol=1240,1240 adsr=0000,0000 reverb=0
-t=140 spu16 phase=1 pitch=078d vol=862,862 adsr=4a3f,3fd3 reverb=0
+t=140 ch16 state=1 vol=25 cvol=25 prio=7 vab=1 prog=8 note=54 freq=0.7071 adsr=0,1200,0,0 seqch=65535 ref=255 loop=0
+t=140 ch17 state=1 vol=2 cvol=21 prio=7 vab=1 prog=8 note=54 freq=0.4719 adsr=15871,0,3,23592 seqch=65535 ref=255 loop=0
+t=140 spu16 phase=1 pitch=0b50 vol=1240,1240 adsr=0000,0000 reverb=0
+t=140 spu17 phase=1 pitch=078d vol=862,862 adsr=4a3f,3fd3 reverb=0
 t=150 spu8 phase=3 pitch=078d vol=2826,640 adsr=2a4f,0006 reverb=1
 t=150 spu9 off
-t=150 spu15 phase=3 pitch=0b50 vol=1240,1240 adsr=0000,0000 reverb=0
+t=150 spu16 phase=3 pitch=0b50 vol=1240,1240 adsr=0000,0000 reverb=0
 t=150 key on prog=0 note=55
 t=150 ch3 off
 t=150 ch7 off
 t=150 ch9 off
-t=150 ch17 state=1 vol=43 cvol=43 prio=7 vab=1 prog=0 note=55 freq=0.7492 adsr=0,1200,0,0 seqch=65535 ref=255 loop=0
-t=150 spu17 phase=1 pitch=0bfc vol=3542,3542 adsr=0000,0000 reverb=0
-t=160 spu17 phase=3 pitch=0bfc vol=3542,3542 adsr=0000,0000 reverb=0
+t=150 ch18 state=1 vol=43 cvol=43 prio=7 vab=1 prog=0 note=55 freq=0.7492 adsr=0,1200,0,0 seqch=65535 ref=255 loop=0
+t=150 spu18 phase=1 pitch=0bfc vol=3542,3542 adsr=0000,0000 reverb=0
+t=160 spu18 phase=3 pitch=0bfc vol=3542,3542 adsr=0000,0000 reverb=0
 t=160 key on prog=1 note=56
-t=160 ch3 state=1 vol=2 cvol=44 prio=7 vab=1 prog=1 note=56 freq=1.6339 adsr=1009,0,8,1 seqch=65535 ref=255 loop=0
-t=160 spu3 phase=1 pitch=1a24 vol=3636,3636 adsr=3a8f,5fc5 reverb=0
+t=160 ch19 state=1 vol=2 cvol=44 prio=7 vab=1 prog=1 note=56 freq=1.6339 adsr=1009,0,8,1 seqch=65535 ref=255 loop=0
+t=160 spu19 phase=1 pitch=1a24 vol=3636,3636 adsr=3a8f,5fc5 reverb=0
 t=170 spu13 off
 t=170 key on prog=2 note=57
-t=170 ch7 state=1 vol=2 cvol=44 prio=7 vab=1 prog=2 note=57 freq=0.8409 adsr=62,0,4,2 seqch=65535 ref=255 loop=1
-t=170 spu7 phase=1 pitch=0d74 vol=3733,846 adsr=2a4f,0006 reverb=1
+t=170 ch20 state=1 vol=2 cvol=44 prio=7 vab=1 prog=2 note=57 freq=0.8409 adsr=62,0,4,2 seqch=65535 ref=255 loop=1
+t=170 spu20 phase=1 pitch=0d74 vol=3733,846 adsr=2a4f,0006 reverb=1
 t=180 key on prog=5 note=58
-t=180 ch9 state=-2 vol=45 cvol=45 prio=10 vab=1 prog=5 note=58 freq=0.8909 adsr=0,0,0,0 seqch=65535 ref=255 loop=0
 t=180 ch13 off
-t=180 spu9 phase=1 pitch=0e41 vol=3830,3830 adsr=00ff,1fc0 reverb=0
-t=190 spu1 off
-t=190 spu9 phase=3 pitch=0e41 vol=3830,3830 adsr=00ff,1fc0 reverb=0
+t=180 ch21 state=-2 vol=45 cvol=45 prio=10 vab=1 prog=5 note=58 freq=0.8909 adsr=0,0,0,0 seqch=65535 ref=255 loop=0
+t=180 spu21 phase=1 pitch=0e41 vol=3830,3830 adsr=00ff,1fc0 reverb=0
+t=190 spu15 off
+t=190 spu21 phase=3 pitch=0e41 vol=3830,3830 adsr=00ff,1fc0 reverb=0
 t=190 key on prog=8 note=59
-t=190 ch13 state=1 vol=27 cvol=27 prio=7 vab=1 prog=8 note=59 freq=0.9439 adsr=0,1200,0,0 seqch=65535 ref=255 loop=0
-t=190 ch18 state=1 vol=2 cvol=22 prio=7 vab=1 prog=8 note=59 freq=0.6300 adsr=15871,0,3,23592 seqch=65535 ref=255 loop=0
-t=190 spu13 phase=1 pitch=0f1a vol=1414,1414 adsr=0000,0000 reverb=0
-t=190 spu18 phase=1 pitch=0a14 vol=982,982 adsr=4a3f,3fd3 reverb=0
-t=200 spu13 phase=3 pitch=0f1a vol=1414,1414 adsr=0000,0000 reverb=0
+t=190 ch22 state=1 vol=27 cvol=27 prio=7 vab=1 prog=8 note=59 freq=0.9439 adsr=0,1200,0,0 seqch=65535 ref=255 loop=0
+t=190 ch23 state=1 vol=2 cvol=22 prio=7 vab=1 prog=8 note=59 freq=0.6300 adsr=15871,0,3,23592 seqch=65535 ref=255 loop=0
+t=190 spu22 phase=1 pitch=0f1a vol=1414,1414 adsr=0000,0000 reverb=0
+t=190 spu23 phase=1 pitch=0a14 vol=982,982 adsr=4a3f,3fd3 reverb=0
 t=200 spu14 phase=3 pitch=0a14 vol=3264,740 adsr=2a4f,0006 reverb=1
+t=200 spu22 phase=3 pitch=0f1a vol=1414,1414 adsr=0000,0000 reverb=0
 t=200 key on prog=0 note=60
-t=200 ch19 state=1 vol=46 cvol=46 prio=7 vab=1 prog=0 note=60 freq=1.0000 adsr=0,1200,0,0 seqch=65535 ref=255 loop=0
-t=200 spu19 phase=1 pitch=1000 vol=4029,4029 adsr=0000,0000 reverb=0
-t=210 spu3 off
-t=210 spu19 phase=3 pitch=1000 vol=4029,4029 adsr=0000,0000 reverb=0
+t=200 ch1 state=1 vol=46 cvol=46 prio=7 vab=1 prog=0 note=60 freq=1.0000 adsr=0,1200,0,0 seqch=65535 ref=255 loop=0
+t=200 spu1 phase=1 pitch=1000 vol=4029,4029 adsr=0000,0000 reverb=0
+t=210 spu1 phase=3 pitch=1000 vol=4029,4029 adsr=0000,0000 reverb=0
+t=210 spu19 off
 t=210 key on prog=1 note=61
-t=210 ch1 off
-t=210 ch3 off
-t=210 ch20 state=1 vol=2 cvol=42 prio=5 vab=1 prog=1 note=61 freq=0.5297 adsr=15871,1200,0,32767 seqch=65535 ref=255 loop=1
-t=210 spu20 phase=1 pitch=0879 vol=3346,3346 adsr=7f00,1fdf reverb=0
-t=220 spu9 off
+t=210 ch15 off
+t=210 ch19 off
+t=220 spu21 off
 t=220 key on prog=2 note=62
-t=220 ch1 state=1 vol=2 cvol=47 prio=7 vab=1 prog=2 note=62 freq=1.1225 adsr=62,0,4,2 seqch=65535 ref=255 loop=1
-t=220 spu1 phase=1 pitch=11f5 vol=4234,960 adsr=2a4f,0006 reverb=1
+t=220 ch7 state=1 vol=2 cvol=47 prio=7 vab=1 prog=2 note=62 freq=1.1225 adsr=62,0,4,2 seqch=65535 ref=255 loop=1
+t=220 spu7 phase=1 pitch=11f5 vol=4234,960 adsr=2a4f,0006 reverb=1
 t=230 key on prog=5 note=63
-t=230 ch3 state=-2 vol=48 cvol=48 prio=10 vab=1 prog=5 note=63 freq=1.1892 adsr=1009,0,8,1 seqch=65535 ref=255 loop=0
-t=230 spu3 phase=1 pitch=1306 vol=4337,4337 adsr=00ff,1fc0 reverb=0
-t=240 spu3 phase=3 pitch=1306 vol=4337,4337 adsr=00ff,1fc0 reverb=0
+t=230 ch13 state=-2 vol=48 cvol=48 prio=10 vab=1 prog=5 note=63 freq=1.1892 adsr=1009,0,8,1 seqch=65535 ref=255 loop=0
+t=230 spu13 phase=1 pitch=1306 vol=4337,4337 adsr=00ff,1fc0 reverb=0
+t=240 spu13 phase=3 pitch=1306 vol=4337,4337 adsr=00ff,1fc0 reverb=0
 t=240 key on prog=8 note=64
-t=240 ch9 off
-t=240 ch21 state=1 vol=29 cvol=29 prio=7 vab=1 prog=8 note=64 freq=1.2599 adsr=0,1200,0,0 seqch=65535 ref=255 loop=0
-t=240 ch22 state=1 vol=2 cvol=24 prio=7 vab=1 prog=8 note=64 freq=0.8409 adsr=15871,0,3,23592 seqch=65535 ref=255 loop=0
-t=240 spu21 phase=1 pitch=1428 vol=1599,1599 adsr=0000,0000 reverb=0
-t=240 spu22 phase=1 pitch=0d74 vol=1110,1110 adsr=4a3f,3fd3 reverb=0
-t=250 spu7 phase=3 pitch=0d74 vol=3733,846 adsr=2a4f,0006 reverb=1
-t=250 spu21 phase=3 pitch=1428 vol=1599,1599 adsr=0000,0000 reverb=0
+t=240 ch19 state=1 vol=29 cvol=29 prio=7 vab=1 prog=8 note=64 freq=1.2599 adsr=0,1200,0,0 seqch=65535 ref=255 loop=0
+t=240 ch21 off
+t=240 ch23 state=1 vol=2 cvol=24 prio=7 vab=1 prog=8 note=64 freq=0.8409 adsr=15871,0,3,23592 seqch=65535 ref=255 loop=0
+t=240 spu19 phase=1 pitch=1428 vol=1599,1599 adsr=0000,0000 reverb=0
+t=240 spu23 phase=1 pitch=0d74 vol=1110,1110 adsr=4a3f,3fd3 reverb=0
+t=250 spu19 phase=3 pitch=1428 vol=1599,1599 adsr=0000,0000 reverb=0
+t=250 spu20 phase=3 pitch=0d74 vol=3733,846 adsr=2a4f,0006 reverb=1
 t=250 key on prog=0 note=65
-t=250 ch9 state=1 vol=49 cvol=49 prio=7 vab=1 prog=0 note=65 freq=1.3348 adsr=0,1200,0,0 seqch=65535 ref=255 loop=0
-t=250 spu9 phase=1 pitch=155b vol=4549,4549 adsr=0000,0000 reverb=0
-t=260 spu3 off
-t=260 spu9 phase=3 pitch=155b vol=4549,4549 adsr=0000,0000 reverb=0
+t=250 ch17 state=1 vol=49 cvol=49 prio=7 vab=1 prog=0 note=65 freq=1.3348 adsr=0,1200,0,0 seqch=65535 ref=255 loop=0
+t=250 spu17 phase=1 pitch=155b vol=4549,4549 adsr=0000,0000 reverb=0
+t=260 spu13 off
+t=260 spu17 phase=3 pitch=155b vol=4549,4549 adsr=0000,0000 reverb=0
 t=260 key on prog=1 note=66
-t=260 ch23 state=1 vol=2 cvol=44 prio=5 vab=1 prog=1 note=66 freq=0.7071 adsr=15871,1200,0,32767 seqch=65535 ref=255 loop=1
-t=260 spu23 phase=1 pitch=0b50 vol=3771,3771 adsr=7f00,1fdf reverb=0
 t=270 key on prog=2 note=67
-t=270 ch3 state=1 vol=2 cvol=50 prio=7 vab=1 prog=2 note=67 freq=1.4983 adsr=62,0,4,2 seqch=65535 ref=255 loop=1
-t=270 spu3 phase=1 pitch=17f9 vol=4766,1080 adsr=2a4f,0006 reverb=1
+t=270 ch11 state=1 vol=2 cvol=50 prio=7 vab=1 prog=2 note=67 freq=1.4983 adsr=62,0,4,2 seqch=65535 ref=255 loop=1
+t=270 ch13 off
+t=270 spu11 phase=1 pitch=17f9 vol=4766,1080 adsr=2a4f,0006 reverb=1
 t=280 key on prog=5 note=68
-t=280 ch1 state=-2 vol=51 cvol=51 prio=10 vab=1 prog=5 note=68 freq=1.5874 adsr=62,0,4,2 seqch=65535 ref=255 loop=0
-t=280 spu1 phase=1 pitch=1965 vol=4876,4876 adsr=00ff,1fc0 reverb=0
-t=290 spu1 phase=3 pitch=1965 vol=4876,4876 adsr=00ff,1fc0 reverb=0
-t=290 spu11 off
-t=290 spu16 off
+t=280 ch23 state=-2 vol=51 cvol=51 prio=10 vab=1 prog=5 note=68 freq=1.5874 adsr=15871,0,3,23592 seqch=65535 ref=255 loop=0
+t=280 spu23 phase=1 pitch=1965 vol=4876,4876 adsr=00ff,1fc0 reverb=0
+t=290 spu23 phase=3 pitch=1965 vol=4876,4876 adsr=00ff,1fc0 reverb=0
 t=290 key on prog=8 note=69
-t=290 ch11 state=1 vol=31 cvol=31 prio=7 vab=1 prog=8 note=69 freq=1.6818 adsr=0,1200,0,0 seqch=65535 ref=255 loop=0
-t=290 ch16 state=1 vol=2 cvol=25 prio=7 vab=1 prog=8 note=69 freq=1.1225 adsr=15871,0,3,23592 seqch=65535 ref=255 loop=0
-t=290 spu11 phase=1 pitch=1ae8 vol=1795,1795 adsr=0000,0000 reverb=0
-t=290 spu16 phase=1 pitch=11f5 vol=1247,1247 adsr=4a3f,3fd3 reverb=0
-t=300 spu5 off
-t=300 spu11 phase=3 pitch=1ae8 vol=1795,1795 adsr=0000,0000 reverb=0
-t=300 spu18 off
-t=300 ch5 off
-t=300 ch18 off
-t=310 spu1 off
-t=330 ch1 off
-t=330 ch22 off
-t=330 spu22 off
-t=340 spu13 off
-t=340 spu15 off
-t=340 spu17 off
-t=340 spu19 off
-t=350 spu3 phase=3 pitch=17f9 vol=4766,1080 adsr=2a4f,0006 reverb=1
+t=290 ch5 state=1 vol=31 cvol=31 prio=7 vab=1 prog=8 note=69 freq=1.6818 adsr=0,1200,0,0 seqch=65535 ref=255 loop=0
+t=290 ch7 state=1 vol=2 cvol=25 prio=7 vab=1 prog=8 note=69 freq=1.1225 adsr=15871,0,3,23592 seqch=65535 ref=255 loop=0
+t=290 spu5 phase=1 pitch=1ae8 vol=1795,1795 adsr=0000,0000 reverb=0
+t=290 spu7 phase=1 pitch=11f5 vol=1247,1247 adsr=4a3f,3fd3 reverb=0
+t=300 spu5 phase=3 pitch=1ae8 vol=1795,1795 adsr=0000,0000 reverb=0
+t=310 spu23 off
+t=330 ch23 off
+t=340 spu1 off
+t=340 spu16 off
+t=340 spu18 off
+t=340 spu22 off
 t=350 spu10 off
+t=350 spu11 phase=3 pitch=17f9 vol=4766,1080 adsr=2a4f,0006 reverb=1
 t=350 spu12 off
-t=350 spu21 off
-t=360 ch9 off
+t=350 spu19 off
+t=360 ch1 off
+t=360 ch7 off
 t=360 ch10 off
 t=360 ch12 off
-t=360 ch13 off
-t=360 ch15 off
 t=360 ch16 off
 t=360 ch17 off
+t=360 ch18 off
 t=360 ch19 off
-t=360 ch21 off
-t=360 spu9 off
-t=360 spu16 off
+t=360 ch22 off
+t=360 spu7 off
+t=360 spu17 off
+t=380 spu5 off
 t=380 spu6 off
-t=380 spu11 off
 t=390 ch4 off
+t=390 ch5 off
 t=390 ch6 off
-t=390 ch11 off
 t=390 spu4 off
 t=440 spu0 off
 t=450 ch0 off
 t=1800 key off every channel
 t=1800 ch2 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=42 freq=0.3536 adsr=62,0,4,300 seqch=65535 ref=255 loop=1
-t=1800 ch3 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=67 freq=1.4983 adsr=62,0,4,300 seqch=65535 ref=255 loop=1
-t=1800 ch7 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=57 freq=0.8409 adsr=62,0,4,300 seqch=65535 ref=255 loop=1
 t=1800 ch8 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=47 freq=0.4719 adsr=62,0,4,300 seqch=65535 ref=255 loop=1
+t=1800 ch11 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=67 freq=1.4983 adsr=62,0,4,300 seqch=65535 ref=255 loop=1
 t=1800 ch14 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=52 freq=0.6300 adsr=62,0,4,300 seqch=65535 ref=255 loop=1
-t=1800 ch20 state=4 vol=2 cvol=2 prio=5 vab=1 prog=1 note=61 freq=0.5297 adsr=15871,1200,0,32767 seqch=65535 ref=255 loop=1
-t=1800 ch23 state=4 vol=2 cvol=2 prio=5 vab=1 prog=1 note=66 freq=0.7071 adsr=15871,1200,0,32767 seqch=65535 ref=255 loop=1
+t=1800 ch20 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=57 freq=0.8409 adsr=62,0,4,300 seqch=65535 ref=255 loop=1
 t=1800 spu2 phase=4 pitch=05a8 vol=2420,548 adsr=2a4f,0006 reverb=1
-t=1800 spu3 phase=4 pitch=17f9 vol=4766,1080 adsr=2a4f,0006 reverb=1
-t=1800 spu7 phase=4 pitch=0d74 vol=3733,846 adsr=2a4f,0006 reverb=1
 t=1800 spu8 phase=4 pitch=078d vol=2826,640 adsr=2a4f,0006 reverb=1
+t=1800 spu11 phase=4 pitch=17f9 vol=4766,1080 adsr=2a4f,0006 reverb=1
 t=1800 spu14 phase=4 pitch=0a14 vol=3264,740 adsr=2a4f,0006 reverb=1
-t=1800 spu20 phase=4 pitch=0879 vol=3346,3346 adsr=7f00,1fdf reverb=0
-t=1800 spu23 phase=4 pitch=0b50 vol=3771,3771 adsr=7f00,1fdf reverb=0
+t=1800 spu20 phase=4 pitch=0d74 vol=3733,846 adsr=2a4f,0006 reverb=1
 t=1810 spu2 off
-t=1810 spu3 off
-t=1810 spu7 off
 t=1810 spu8 off
+t=1810 spu11 off
 t=1810 spu14 off
 t=1810 spu20 off
-t=1810 spu23 off
 t=1830 ch2 off
-t=1830 ch3 off
-t=1830 ch7 off
 t=1830 ch8 off
+t=1830 ch11 off
 t=1830 ch14 off
 t=1830 ch20 off
-t=1830 ch23 off
