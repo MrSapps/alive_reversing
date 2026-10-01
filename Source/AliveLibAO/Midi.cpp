@@ -225,12 +225,27 @@ public:
 
     virtual void MIDI_ParseMidiMessage(s32 idx) override
     {
-        AO::MIDI_ParseMidiMessage(idx);
+        // The PS1 sound plays libsnd's SEQ player, which is the same in both games
+        if (PsxSoundEngine::Get())
+        {
+            ::MIDI_ParseMidiMessage_4FD100(idx);
+        }
+        else
+        {
+            AO::MIDI_ParseMidiMessage(idx);
+        }
     }
 
     virtual void SsUtKeyOffV(s32 idx) override
     {
-        AO::SsUtKeyOffV(static_cast<s16>(idx));
+        if (PsxSoundEngine::Get())
+        {
+            ::SsUtKeyOffV_4FE010(static_cast<s16>(idx));
+        }
+        else
+        {
+            AO::SsUtKeyOffV(static_cast<s16>(idx));
+        }
     }
 
     virtual bool Ps1SquaresSfxVolume() override
@@ -270,8 +285,8 @@ s16 SND_SsIsEos_DeInlined(SeqId idx)
 }
 
 // NOTE: Impl is not the same as AE
-// seqIdx: the SEQ playing the note, for the PS1 sound
-s32 MIDI_PlayerPlayMidiNote(s32 vabId, s32 program, s32 note, s32 leftVolume, s32 rightVolume, s32 volume, s32 seqIdx)
+// seqIdx: the SEQ playing the note and seqChannel its MIDI channel, for the PS1 sound
+s32 MIDI_PlayerPlayMidiNote(s32 vabId, s32 program, s32 note, s32 leftVolume, s32 rightVolume, s32 volume, s32 seqIdx, s32 seqChannel)
 {
     auto vabId_ = vabId;
     auto leftVolume_ = leftVolume;
@@ -426,7 +441,7 @@ s32 MIDI_PlayerPlayMidiNote(s32 vabId, s32 program, s32 note, s32 leftVolume, s3
                         pChannel->field_10_freq = (f32) freq;
                         if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
                         {
-                            pPs1Sound->NoteOnSeq(midiChannel_, vabId, program, 16 - k16Counter, note, volume, seqIdx);
+                            pPs1Sound->NoteOnSeq(midiChannel_, vabId, program, 16 - k16Counter, note, volume, seqIdx, seqChannel);
                         }
                         else
                         {
@@ -455,15 +470,15 @@ s32 MIDI_PlayerPlayMidiNote(s32 vabId, s32 program, s32 note, s32 leftVolume, s3
     return 0;
 }
 
-s32 MIDI_PlayerPlayMidiNote_49DAD0(s32 vabId, s32 program, s32 note, s32 leftVol, s32 rightVol, s32 volume, s32 seqIdx)
+s32 MIDI_PlayerPlayMidiNote_49DAD0(s32 vabId, s32 program, s32 note, s32 leftVol, s32 rightVol, s32 volume, s32 seqIdx, s32 seqChannel)
 {
     if (rightVol >= 64)
     {
-        return MIDI_PlayerPlayMidiNote(vabId, program, note, leftVol * (127 - rightVol) / 64, leftVol, volume, seqIdx);
+        return MIDI_PlayerPlayMidiNote(vabId, program, note, leftVol * (127 - rightVol) / 64, leftVol, volume, seqIdx, seqChannel);
     }
     else
     {
-        return MIDI_PlayerPlayMidiNote(vabId, program, note, leftVol, leftVol * rightVol / 64, volume, seqIdx);
+        return MIDI_PlayerPlayMidiNote(vabId, program, note, leftVol, leftVol * rightVol / 64, volume, seqIdx, seqChannel);
     }
 }
 
@@ -624,7 +639,7 @@ s32 MIDI_ParseMidiMessage(s32 idx)
                         auto l_vol = (s16)((u32)(pProgVol->field_1_left_vol * pCtx->field_C_volume) >> 7);
 
                         auto freq = data.param2;
-                        const s32 usedChannels = MIDI_PlayerPlayMidiNote_49DAD0(pCtx->field_seq_idx, program, note, l_vol, r_vol, freq, idx); // Note: inlined
+                        const s32 usedChannels = MIDI_PlayerPlayMidiNote_49DAD0(pCtx->field_seq_idx, program, note, l_vol, r_vol, freq, idx, data.Channel()); // Note: inlined
 
                         // Record which SEQ and channel own the MIDI channels, as AE does, so SsSeqStop
                         // keys them off. Without it a SEQ stopped mid note (e.g. the music when Abe

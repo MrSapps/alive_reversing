@@ -15,6 +15,7 @@
 #include "Sound/SoundGold.hpp"
 #include "Sound/Midi.hpp"
 #include "Sound/PsxSpuApi.hpp"
+#include "Sound/PsxSoundEngine.hpp"
 #include "BinaryPath.hpp"
 #include "ResourceManagerWrapper.hpp"
 #include "Sfx.hpp"
@@ -184,8 +185,27 @@ static std::vector<u8> RepeatSeq()
     return seq.End();
 }
 
+// The held note faded by the channel volume (CC 7) while it plays: to half, then to 0. Then a note
+// at channel volume 0.
+static std::vector<u8> FadeSeq()
+{
+    SoundTestData::SeqBuilder seq(480, 500000);
+    seq.ProgramChange(0, 2)
+        .NoteOn(0, 60, 100)
+        .Wait(480)
+        .Controller(0, 7, 64)
+        .Wait(480)
+        .Controller(0, 7, 0)
+        .Wait(480)
+        .NoteOff(0, 60)
+        .NoteOn(0, 62, 100)
+        .Wait(480)
+        .NoteOff(0, 62);
+    return seq.End();
+}
+
 // Writes the synthetic data where ResourceManagerWrapper looks for it. extraSeqs: also load HeldSeq
-// (1) and RepeatSeq (2). Only some scenarios load them, so the others' traces don't change.
+// (1), RepeatSeq (2) and FadeSeq (3). Only some scenarios load them, so the others' traces don't change.
 static std::shared_ptr<PathSoundInfo> WriteTestData(const ScratchDir& dir, GameType game, s32 extraSeqs = 0)
 {
     namespace fs = std::filesystem;
@@ -221,7 +241,7 @@ static std::shared_ptr<PathSoundInfo> WriteTestData(const ScratchDir& dir, GameT
     info->mSoundTheme = kTheme;
 
     const std::vector<u16> seqs = TestSeqIndices(game, 2 + static_cast<size_t>(extraSeqs));
-    const std::vector<u8> seqData[] = {MelodySeq(), DrumSeq(), HeldSeq(), RepeatSeq()};
+    const std::vector<u8> seqData[] = {MelodySeq(), DrumSeq(), HeldSeq(), RepeatSeq(), FadeSeq()};
     for (size_t i = 0; i < seqs.size(); i++)
     {
         const char_type* pName = SeqTable(game)[seqs[i]].field_0_mBsqName;
@@ -529,6 +549,56 @@ static void NoteOffRules(GameType game, bool ps1Sound)
     }, 2);
 }
 
+// With the PS1 sound, a SEQ's channel volume (CC 7) changes its playing notes too, as libsnd's
+// _SsContMainVol does, and SsSeqStop sets it back to 127
+static void ChannelVolume(GameType game)
+{
+    RunGold(game, true, "channel_volume", [](SoundGoldSession& session)
+    {
+        const std::vector<u16> seqs = session.LoadedSeqs();
+        ASSERT_EQ(seqs.size(), 5u);
+
+        // The left volume register of the sounding note of program 2, or -1
+        auto heldVolume = []()
+        {
+            for (s32 i = 0; i < kNumChannels; i++)
+            {
+                const MIDI_ADSR_State& adsr = GetSpuApiVars()->sMidi_Channels().channels[i].field_1C_adsr;
+                if (adsr.field_1_program == 2 && adsr.field_3_state != 0 && adsr.field_3_state != 4)
+                {
+                    return static_cast<s32>(PsxSoundEngine::Get()->GetVoiceState(i).mVolLeft);
+                }
+            }
+            return -1;
+        };
+
+        session.Note("play the fade");
+        SND_SEQ_Play(seqs[4], 1, 100, 100);
+        session.Advance(250);
+        const s32 full = heldVolume();
+        EXPECT_GT(full, 0);
+
+        session.Advance(500); // Past the channel volume 64 at 500 ms
+        const s32 half = heldVolume();
+        EXPECT_GT(half, 0);
+        EXPECT_LT(half, full / 3) << "The channel volume should turn the playing note down (squared)";
+
+        session.Advance(500); // Past the channel volume 0 at 1000 ms
+        EXPECT_EQ(heldVolume(), 0);
+
+        session.Note("stop and play again");
+        SND_SEQ_Stop(seqs[4]);
+        session.Advance(100);
+        SND_SEQ_Play(seqs[4], 1, 100, 100);
+        session.Advance(250);
+        EXPECT_EQ(heldVolume(), full) << "SsSeqStop should set the channel volume back to 127";
+
+        session.Note("stop");
+        SND_Stop_All_Seqs();
+        session.Advance(500);
+    }, 3);
+}
+
 TEST(SoundGold, AE_Sfx) { Sfx(GameType::eAe, false); }
 TEST(SoundGold, AO_Sfx) { Sfx(GameType::eAo, false); }
 TEST(SoundGold, AE_Adsr) { Adsr(GameType::eAe, false); }
@@ -553,6 +623,8 @@ TEST(SoundGold, AE_NoteOffRules) { NoteOffRules(GameType::eAe, false); }
 TEST(SoundGold, AO_NoteOffRules) { NoteOffRules(GameType::eAo, false); }
 TEST(SoundGold, PS1_AE_NoteOffRules) { NoteOffRules(GameType::eAe, true); }
 TEST(SoundGold, PS1_AO_NoteOffRules) { NoteOffRules(GameType::eAo, true); }
+TEST(SoundGold, PS1_AE_ChannelVolume) { ChannelVolume(GameType::eAe); }
+TEST(SoundGold, PS1_AO_ChannelVolume) { ChannelVolume(GameType::eAo); }
 
 // The same calls must give the same trace and audio every time
 TEST(SoundGold, Deterministic)

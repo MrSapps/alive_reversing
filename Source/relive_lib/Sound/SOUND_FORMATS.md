@@ -44,8 +44,13 @@ Compared (locally, with the game files): the EU PS1 discs against the GOG PC dat
   106-110.
 - Loops: every PS1 loop starts at block 1 (just after the zero block) and ends at the sample
   end. That equals the PC's "loop the whole sample", so no loop data is missing.
-- VH: the tone parameters (centre, shift, vol, ADSR, keys, ...) are identical wherever a tone
-  exists in both versions. The PC AE VHs add 3 programs and 5 tones. The PS1 VH ends with a 512
+- VH: AE's tone parameters (centre, shift, vol, ADSR, keys, ...) are identical wherever a tone
+  exists in both versions. AO's are not: about 100 tones differ. Some have a lower priority and
+  volume on the PC (the secret area jingle, R1 program 81: 127/127 on the PS1, 70/70 on the PC,
+  so with the PC values an electric wall's buzz takes its voices). `-ps1_sound` puts the PS1
+  priority and volume back (`PsxSoundEngine::RestorePs1Tones`). Others have a different centre
+  and shift, which are kept: the samples played are the PC's. The PC AE VHs add 3 programs and
+  5 tones. The PS1 VH ends with a 512
   byte VAG size table (256 x u16, size = value * 8), which the PC VH drops. AO's `ProgAtr`
   differs only in unused bytes.
 - BSQ/SEQ: nearly all identical. AE's PC version replaced 3-6 short jingles per level with

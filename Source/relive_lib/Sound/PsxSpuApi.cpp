@@ -577,7 +577,7 @@ s32 MIDI_Allocate_Channel(s32 /*not_used*/, s32 priority)
 
 // seqIdx: the SEQ playing the note, -1 for SsVoKeyOn. Only the PS1 sound uses it (libsnd sets their
 // volumes differently).
-static s32 MIDI_PlayMidiNote_4FCB30(s32 vabId, s32 program, s32 note, s32 leftVolume, s32 rightVolume, s32 volume, s32 seqIdx)
+static s32 MIDI_PlayMidiNote_4FCB30(s32 vabId, s32 program, s32 note, s32 leftVolume, s32 rightVolume, s32 volume, s32 seqIdx, s32 seqChannel)
 {
     const s32 noteKeyNumber = (note >> 8) & 127;
     s32 leftVol2 = leftVolume;
@@ -718,7 +718,7 @@ static s32 MIDI_PlayMidiNote_4FCB30(s32 vabId, s32 program, s32 note, s32 leftVo
                         // below, which kept DirectSound from starting some programs together
                         if (seqIdx >= 0)
                         {
-                            pPs1Sound->NoteOnSeq(midiChannel, vabId, program, i, note, volume, seqIdx);
+                            pPs1Sound->NoteOnSeq(midiChannel, vabId, program, i, note, volume, seqIdx, seqChannel);
                         }
                         else
                         {
@@ -764,7 +764,7 @@ void MIDI_Wait_4FCE50()
 }
 
 
-s32 MIDI_PlayerPlayMidiNote_4FCE80(s32 vabId, s32 program, s32 note, s32 leftVol, s32 rightVol, s32 volume, s32 seqIdx)
+s32 MIDI_PlayerPlayMidiNote_4FCE80(s32 vabId, s32 program, s32 note, s32 leftVol, s32 rightVol, s32 volume, s32 seqIdx, s32 seqChannel)
 {
     if (gSpuVars->sSoundDatIsNull())
     {
@@ -773,11 +773,11 @@ s32 MIDI_PlayerPlayMidiNote_4FCE80(s32 vabId, s32 program, s32 note, s32 leftVol
 
     if (rightVol >= 64)
     {
-        return MIDI_PlayMidiNote_4FCB30(vabId, program, note, leftVol * (127 - rightVol) / 64, leftVol, volume, seqIdx);
+        return MIDI_PlayMidiNote_4FCB30(vabId, program, note, leftVol * (127 - rightVol) / 64, leftVol, volume, seqIdx, seqChannel);
     }
     else
     {
-        return MIDI_PlayMidiNote_4FCB30(vabId, program, note, leftVol, rightVol * leftVol / 64, volume, seqIdx);
+        return MIDI_PlayMidiNote_4FCB30(vabId, program, note, leftVol, rightVol * leftVol / 64, volume, seqIdx, seqChannel);
     }
 }
 
@@ -791,7 +791,7 @@ s32 SsVoKeyOn_4FCF10(s32 vabIdAndProgram, s32 pitch, u16 leftVol, u16 rightVol)
         return 0;
     }
 
-    const s32 channelBits = MIDI_PlayMidiNote_4FCB30((vabIdAndProgram >> 8) & 31, vabIdAndProgram & 127, pitch, leftVol, rightVol, 96, -1);
+    const s32 channelBits = MIDI_PlayMidiNote_4FCB30((vabIdAndProgram >> 8) & 31, vabIdAndProgram & 127, pitch, leftVol, rightVol, 96, -1, 0);
 
     for (s32 idx = 0; idx < kNumChannels; idx++)
     {
@@ -1056,7 +1056,8 @@ s32 MIDI_ParseMidiMessage_4FD100(s32 idx)
                         leftVol,
                         v18->field_2_right_vol,
                         v16 >> 16,
-                        idx);
+                        idx,
+                        v45);
                     channelIdx_1 = 0;
 
                     for (s32 i = 0; i < 24; i++)
@@ -1101,21 +1102,33 @@ s32 MIDI_ParseMidiMessage_4FD100(s32 idx)
                 }
                 break;
             case 0xB0u: // Controller change
-                v34 = (cmd >> 8) & 0x7F;
+                // The controller and its value are in v16, not cmd (the status nibble): reading
+                // cmd made v34 always 0, so the NRPN loops (as AO handles them) were ignored
+                v34 = (v16 >> 8) & 0x7F;
                 if (v34 != 6 && v34 != 0x26)
                 {
-                    if (v34 == 0x63)
+                    if (v34 == 0x63) // NRPN MSB
                     {
-                        gSpuVars->sControllerValue() = BYTE2(cmd);
+                        gSpuVars->sControllerValue() = BYTE2(v16);
+                    }
+                    else if (v34 == 7) // Channel volume: the PC ignores it, AE's SEQs fade with it
+                    {
+                        if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+                        {
+                            const s32 channel = v16 & 15;
+                            pPs1Sound->SetChannelVolume(idx2, channel, gSpuVars->sMidiSeqSongs(idx2).field_seq_idx,
+                                gSpuVars->sMidiSeqSongs(idx2).field_32_progVols[channel].field_0_program, BYTE2(v16));
+                        }
                     }
                     break;
                 }
 
+                // Data entry
                 switch (gSpuVars->sControllerValue())
                 {
                     case 20: // Set loop
                         gSpuVars->sMidiSeqSongs(idx2).field_24_loop_start = pCtx->field_0_seq_data;
-                        gSpuVars->sMidiSeqSongs(idx2).field_2C_loop_count = BYTE2(cmd);
+                        gSpuVars->sMidiSeqSongs(idx2).field_2C_loop_count = BYTE2(v16);
                         break;
                     case 30: // Loop
                         v36 = gSpuVars->sMidiSeqSongs(idx2).field_24_loop_start;
@@ -1138,7 +1151,7 @@ s32 MIDI_ParseMidiMessage_4FD100(s32 idx)
                         pFn = (void(CC*)(s32, u32, u32)) gSpuVars->sMidiSeqSongs(idx2).field_20_fn_ptr;
                         if (pFn)
                         {
-                            pFn(idx, 0, BYTE2(cmd));
+                            pFn(idx, 0, BYTE2(v16));
                             gSpuVars->sControllerValue() = 0;
                             goto next_time_stamp;
                         }
@@ -1299,10 +1312,10 @@ s16 SsSeqOpen_4FD6D0(u8* pSeqData, s16 seqIdx)
     gSpuVars->sMidiSeqSongs(freeIdx).field_C_volume = 112;
     gSpuVars->sMidiSeqSongs(freeIdx).field_seq_idx = seqIdx;
 
-    // libsnd starts a SEQ at volume 127
+    // libsnd starts a SEQ and its channels at volume 127
     if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
     {
-        pPs1Sound->SetSeqVolume(freeIdx, 127, 127);
+        pPs1Sound->OpenSeq(freeIdx);
     }
 
     return static_cast<s16>(freeIdx);
@@ -1377,6 +1390,11 @@ void SsSeqStop(s16 idx)
             gSpuVars->SsUtKeyOffV(static_cast<s16>(i));
             gSpuVars->sMidi_Channels().channels[i].field_1C_adsr.field_C = 0;
         }
+    }
+
+    if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+    {
+        pPs1Sound->ResetChannelVolumes(idx);
     }
 }
 

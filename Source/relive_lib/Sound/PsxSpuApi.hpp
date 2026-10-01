@@ -275,8 +275,8 @@ void MIDI_Ps1SeqNoteOff(s32 seqIdx, s32 vabId, s32 program, s32 note);
 u8 MIDI_ReadByte_4FD6B0(MIDI_SeqSong* pData);
 void MIDI_SkipBytes_4FD6C0(MIDI_SeqSong* pData, s32 length);
 void MIDI_SetTempo(s16 idx, s16 kZero, s16 tempo);
-// seqIdx: the SEQ playing the note (for the PS1 sound)
-s32 MIDI_PlayerPlayMidiNote_4FCE80(s32 vabId, s32 program, s32 note, s32 leftVol, s32 rightVol, s32 volume, s32 seqIdx);
+// seqIdx: the SEQ playing the note and seqChannel its MIDI channel (for the PS1 sound)
+s32 MIDI_PlayerPlayMidiNote_4FCE80(s32 vabId, s32 program, s32 note, s32 leftVol, s32 rightVol, s32 volume, s32 seqIdx, s32 seqChannel);
 s32 MIDI_Allocate_Channel(s32 not_used, s32 priority);
 
 using TVSyncCallBackFn = void(CC*)();
