@@ -39,6 +39,33 @@ struct VabHeader final
 };
 ALIVE_ASSERT_SIZEOF(VabHeader, 0x820);
 
+// A VAB tone, 16 per program after the VabHeader
+struct VagAtr final
+{
+    s8 field_0_priority;
+    s8 field_1_mode;
+    s8 field_2_vol;
+    s8 field_3_pan;
+    u8 field_4_centre;
+    u8 field_5_shift;
+    s8 field_6_min;
+    s8 field_7_max;
+    s8 field_8_vibW;
+    s8 field_9_vibT;
+    s8 field_A_porW;
+    s8 field_B_porT;
+    s8 field_C_pitch_bend_min;
+    s8 field_D_pitch_bend_max;
+    s8 field_E_reserved1;
+    s8 field_F_reserved2;
+    s16 field_10_adsr1;
+    s16 field_12_adsr2;
+    s16 field_14_prog;
+    s16 field_16_vag;
+    s16 field_18_reserved[4];
+};
+ALIVE_ASSERT_SIZEOF(VagAtr, 0x20);
+
 s16 SsVabOpenHead(VabHeader* pVabHeader);
 
 struct VabBodyRecord final
@@ -153,8 +180,8 @@ struct MIDI_SeqSong final
     s8 field_30_timeSignatureBars;
     s8 field_31_timeSignatureBars2; // bug: maybe they should have assigned beats instead? but never read anyway
     MIDI_ProgramVolume field_32_progVols[16];
-    s8 field_62_pad;
-    s8 field_63_pad;
+    // Microseconds of field_4_time that are left over from the whole milliseconds (was padding)
+    u16 mTimeRemainderUs;
 };
 ALIVE_ASSERT_SIZEOF(MIDI_SeqSong, 100);
 
@@ -190,6 +217,10 @@ public:
     virtual u8& sControllerValue() = 0;
     virtual void MIDI_ParseMidiMessage(s32 idx) = 0;
     virtual void SsUtKeyOffV(s32 idx) = 0;
+
+    // Where the game's PS1 executable used libsnd differently, for -ps1_sound:
+    // The master volume (SsSetMVol) the game sets on init and on each sound reset
+    virtual s16 DefaultMasterVolume() = 0;
 };
 
 // nullptr sets the default (AE) vars back
@@ -220,9 +251,9 @@ void SsSetTickMode_4FDC20(s32 tickMode);
 s32 SsVoKeyOn_4FCF10(s32 vabIdAndProgram, s32 pitch, u16 leftVol, u16 rightVol);
 void SsUtAllKeyOff(s32 mode);
 s16 SsUtKeyOffV_4FE010(s16 idx);
-s16 SsUtChangePitch_4FDF70(s16 voice, s32 /*vabId*/, s32 /*prog*/, s16 old_note, s16 old_fine, s16 new_note, s16 new_fine);
+s16 SsUtChangePitch_4FDF70(s16 voice, s32 vabId, s32 prog, s16 old_note, s16 old_fine, s16 new_note, s16 new_fine);
 
-s16 SsSeqOpen_4FD6D0(u8* pSeqData, s16 seqIdx);
+s16 SsSeqOpen_4FD6D0(u8* pSeqData, u32 seqSize, s16 seqIdx);
 void SsSeqClose_4FD8D0(s16 idx);
 void SsSeqStop(s16 idx);
 u16 SsIsEos_4FDA80(s16 idx, s16 seqNum);
@@ -231,6 +262,10 @@ void SsSeqPlay_4FD900(u16 idx, s8 playMode, s16 repeatCount);
 
 s32 MIDI_ParseMidiMessage_4FD100(s32 idx);
 s32 MIDI_Read_Var_Len_4FD0D0(MIDI_SeqSong* pMidiStru);
+// Moves the song's next event time (field_4_time, ms) on by ticks at its tempo (field_14_tempo, us
+// per tick), keeping the sub millisecond remainder. The PC code rounded every delta down to a whole
+// ms, which made the SEQs play up to 2% fast.
+void MIDI_AddDeltaTime(MIDI_SeqSong& song, u32 ticks);
 u8 MIDI_ReadByte_4FD6B0(MIDI_SeqSong* pData);
 void MIDI_SkipBytes_4FD6C0(MIDI_SeqSong* pData, s32 length);
 void MIDI_SetTempo(s16 idx, s16 kZero, s16 tempo);

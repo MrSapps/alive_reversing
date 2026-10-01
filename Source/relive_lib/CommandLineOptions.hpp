@@ -34,6 +34,16 @@ struct CommandLineOptions final
     // -renderer_checks: the renderer checks for errors as it goes, which is slower. OpenGL checks
     // every call, SDL3 turns on its GPU, Vulkan and Direct3D 11 backends' validation.
     bool mRendererChecks = false;
+    // -ps1_sound: play the sound effects and music on the emulated PS1 SPU (PsxSoundEngine)
+    bool mPs1Sound = false;
+    // -spu_filter=hq (default) or gaussian: with -ps1_sound, how voices above 44100 Hz are
+    // resampled. gaussian is the PS1's own, which aliases (buzzes) on bright samples at high notes.
+    bool mSpuFilterGaussian = false;
+    // -dump_audio=<file.wav>: save everything the sound system renders to this WAV file
+    std::optional<std::string> mDumpAudio;
+    // -dump_live_audio=<file.wav>: save what the sound system renders for the audio device, as
+    // it plays (not frame-locked: for checking the live path against -dump_audio)
+    std::optional<std::string> mDumpLiveAudio;
 
     // Recording and playback
     std::optional<std::string> mRecordFile;

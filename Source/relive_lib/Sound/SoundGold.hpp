@@ -3,6 +3,7 @@
 #include "../../relive_lib/Types.hpp"
 #include "../GameType.hpp"
 #include "SoundSDL.hpp"
+#include "Spu/PsxSpu.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -20,12 +21,15 @@ struct SoundApi;
 // loaded tone table and a checksum of every sample, then every change to the 24 MIDI channels
 // and the 32 voices, with the time it happened at.
 //
+// With ps1Sound the VAB tones play on the emulated SPU (PsxSoundEngine, as relive -ps1_sound
+// does), and the trace records every change to the 24 SPU voices instead of the SDL voices.
+//
 // Used by the SoundGold unit tests (synthetic data) and relive_sound_gold (real game data).
 class SoundGoldSession final
 {
 public:
     // Starts the sound system for game. Only one session may exist at a time.
-    explicit SoundGoldSession(GameType game);
+    explicit SoundGoldSession(GameType game, bool ps1Sound = false, PsxSpu::Interpolation interpolation = PsxSpu::Interpolation::BandLimited);
     ~SoundGoldSession();
 
     SoundGoldSession(const SoundGoldSession&) = delete;

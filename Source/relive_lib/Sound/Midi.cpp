@@ -10,13 +10,14 @@
 #include "../AliveLibAE/PathData.hpp"
 
 #include "PsxSpuApi.hpp"
+#include "PsxSoundEngine.hpp"
 #include "../../relive_lib/BinaryPath.hpp"
 #include "../AmbientSound.hpp"
 #include "../../relive_lib/FatalError.hpp"
 #include "../Math.hpp"
 #include "BaseMap.hpp"
 
-static void SND_SetChannelsPitch(s32 channelsBits, s32 note, s16 pitch);
+static void SND_SetChannelsPitch(s32 channelsBits, s32 vabId, s32 program, s32 note, s16 pitch);
 static s32 SFX_ApplyPitchVariation(const relive::SfxDefinition& sfxDef, s32 midiHandle, s16 pitch_min, s16 pitch_max);
 
 const s32 kSeqTableSizeAE = 144;
@@ -152,7 +153,8 @@ void SND_Reset()
     SND_Stop_All_Seqs();
     SND_Free_All_Seqs_4C9F40();
     SND_Free_All_VABS_4C9EB0();
-    SsSetMVol_4FC360(100, 100);
+    const s16 masterVolume = GetSpuApiVars()->DefaultMasterVolume();
+    SsSetMVol_4FC360(masterVolume, masterVolume);
 }
 
 
@@ -160,6 +162,10 @@ s16 SND_VAB_Load_4C9FE0(PathSoundInfo& pSoundBlockInfo, ResourceManagerWrapper& 
 {
     // Load the VH file data
     pSoundBlockInfo.mVhFileData = resMan.LoadSoundFile(pSoundBlockInfo.mVhFile.c_str(), pSoundBlockInfo.mSoundTheme);
+    if (PsxSoundEngine::Get())
+    {
+        PsxSoundEngine::RestorePs1Tones(GetGameType(), pSoundBlockInfo.mVhFile, pSoundBlockInfo.mVhFileData);
+    }
     //GetMidiVars()->LoadingLoop(0);
 
     // Load the VB file data
@@ -167,6 +173,10 @@ s16 SND_VAB_Load_4C9FE0(PathSoundInfo& pSoundBlockInfo, ResourceManagerWrapper& 
 
     // Convert the records in the header to internal representation
     pSoundBlockInfo.mVabId = SsVabOpenHead(reinterpret_cast<VabHeader*>(pSoundBlockInfo.mVhFileData.data()));
+    if (PsxSoundEngine* pRec = PsxSoundEngine::Get())
+    {
+        pRec->Record("VAB %d %s %s %s", pSoundBlockInfo.mVabId, pSoundBlockInfo.mSoundTheme.c_str(), pSoundBlockInfo.mVhFile.c_str(), pSoundBlockInfo.mVbFile.c_str());
+    }
 
     // Load actual sample data (copied, hence vec goes out of scope after this)
     GetMidiVars()->SsVabTransBody(resMan, reinterpret_cast<VabBodyRecord*>(vbFileData.data()), static_cast<s16>(pSoundBlockInfo.mVabId));
@@ -194,7 +204,8 @@ void SND_Init()
     SsSetTickMode_4FDC20(4096);
     VSyncCallback_4F8C40(SND_CallBack_4020A4);
     SpuInitHot_4FC320();
-    SsSetMVol_4FC360(100, 100);
+    const s16 masterVolume = GetSpuApiVars()->DefaultMasterVolume();
+    SsSetMVol_4FC360(masterVolume, masterVolume);
     memset(&GetMidiVars()->sSeq_Ids_word(), -1, sizeof(SeqIds));
     GetMidiVars()->sSeqsPlaying_count_word() = 0;
 }
@@ -300,7 +311,9 @@ s32 SFX_SfxDefinition_Play_Mono(const relive::SfxDefinition& sfxDef, s32 volume,
 
 
 // Note: Inlined in psx (SFX_SetPitch_4CA510 + the pitch code of SND_MIDI)
-static void SND_SetChannelsPitch(s32 channelsBits, s32 note, s16 pitch)
+// pitch: the offset in 1/128 semitones. The PC's SsUtChangePitch ignored the VAB and program, but
+// libsnd's (-ps1_sound) only changes a voice that is playing that VAB, program and note.
+static void SND_SetChannelsPitch(s32 channelsBits, s32 vabId, s32 program, s32 note, s16 pitch)
 {
     s32 v3 = 0;
     s16 v4 = 0;
@@ -320,9 +333,7 @@ static void SND_SetChannelsPitch(s32 channelsBits, s32 note, s16 pitch)
     {
         if ((1 << i) & channelsBits)
         {
-            const s16 vabId = 0;   // Not used by target func
-            const s16 program = 0; // Not used by target func
-            SsUtChangePitch_4FDF70(i, program, vabId, static_cast<s16>(note), 0, static_cast<s16>(note + v3), v4);
+            SsUtChangePitch_4FDF70(i, vabId, program, static_cast<s16>(note), 0, static_cast<s16>(note + v3), v4);
         }
     }
 }
@@ -336,7 +347,7 @@ static s32 SFX_ApplyPitchVariation(const relive::SfxDefinition& sfxDef, s32 midi
 
     if (pitch_min || pitch_max)
     {
-        SND_SetChannelsPitch(midiHandle, sfxDef.mNote, Math_RandomRange(pitch_min, pitch_max));
+        SND_SetChannelsPitch(midiHandle, LastLoadedVabId(), sfxDef.mProgram, sfxDef.mNote, Math_RandomRange(pitch_min, pitch_max));
     }
 
     return midiHandle;
@@ -358,7 +369,8 @@ s32 SND_MIDI(s32 program, s32 vabId, s32 note, s16 vol, s16 min, s16 max)
         }
     }
 
-    // Note: Inlined in psx
+    // Note: Inlined in psx. The parameters are named the wrong way round: program is the VAB
+    // (the high byte) and vabId the program.
     const s32 channelBits = MIDI_Play_Single_Note_4CA1B0(vabId | ((s16) program << 8), note << 8, volClamped, volClamped);
     if (!GetMidiVars()->sSFXPitchVariationEnabled())
     {
@@ -367,7 +379,7 @@ s32 SND_MIDI(s32 program, s32 vabId, s32 note, s16 vol, s16 min, s16 max)
 
     if (min || max)
     {
-        SND_SetChannelsPitch(channelBits, note, Math_RandomRange(min, max));
+        SND_SetChannelsPitch(channelBits, program, vabId, note, Math_RandomRange(min, max));
     }
     return channelBits;
 }
@@ -420,6 +432,10 @@ void SND_Stop_Channels_Mask(u32 bitMask)
         if ((1 << i) & bitMask)
         {
             // Turn it off
+            if (PsxSoundEngine* pRec = PsxSoundEngine::Get())
+            {
+                pRec->Record("KEYOFFV %d", i);
+            }
             GetSpuApiVars()->SsUtKeyOffV(static_cast<s16>(i));
         }
     }
@@ -435,6 +451,10 @@ void SND_Stop_All_Seqs()
         {
             if (SsIsEos_4FDA80(i, 0))
             {
+                if (PsxSoundEngine* pRec = PsxSoundEngine::Get())
+                {
+                    pRec->Record("SEQSTOP %d", i);
+                }
                 SsSeqStop(i);
             }
             SsSeqClose_4FD8D0(i);
@@ -482,7 +502,11 @@ s16 SND_SEQ_PlaySeq(u16 idx, s16 repeatCount, s16 bDontStop)
             }
         }
 
-        rec.field_A_id_seqOpenId = SsSeqOpen_4FD6D0(rec.field_C_ppSeq_Data.data(), static_cast<s16>(LastLoadedVabId()));
+        rec.field_A_id_seqOpenId = SsSeqOpen_4FD6D0(rec.field_C_ppSeq_Data.data(), static_cast<u32>(rec.field_C_ppSeq_Data.size()), static_cast<s16>(LastLoadedVabId()));
+        if (PsxSoundEngine* pRec = PsxSoundEngine::Get())
+        {
+            pRec->Record("SEQOPEN %d %d %d %s", rec.field_A_id_seqOpenId, rec.field_4_generated_res_id, LastLoadedVabId(), rec.field_0_mBsqName);
+        }
 
         GetMidiVars()->sSeq_Ids_word().ids[rec.field_A_id_seqOpenId] = idx;
         GetMidiVars()->sSeqsPlaying_count_word()++;
@@ -492,6 +516,10 @@ s16 SND_SEQ_PlaySeq(u16 idx, s16 repeatCount, s16 bDontStop)
         if (!bDontStop)
         {
             return 0;
+        }
+        if (PsxSoundEngine* pRec = PsxSoundEngine::Get())
+        {
+            pRec->Record("SEQSTOP %d", rec.field_A_id_seqOpenId);
         }
         SsSeqStop(rec.field_A_id_seqOpenId);
     }
@@ -549,7 +577,11 @@ s16 SND_SEQ_Play(u16 idx, s16 repeatCount, s16 volLeft, s16 volRight)
         }
 
         // Open the SEQ
-        rec.field_A_id_seqOpenId = SsSeqOpen_4FD6D0(rec.field_C_ppSeq_Data.data(), static_cast<s16>(LastLoadedVabId()));
+        rec.field_A_id_seqOpenId = SsSeqOpen_4FD6D0(rec.field_C_ppSeq_Data.data(), static_cast<u32>(rec.field_C_ppSeq_Data.size()), static_cast<s16>(LastLoadedVabId()));
+        if (PsxSoundEngine* pRec = PsxSoundEngine::Get())
+        {
+            pRec->Record("SEQOPEN %d %d %d %s", rec.field_A_id_seqOpenId, rec.field_4_generated_res_id, LastLoadedVabId(), rec.field_0_mBsqName);
+        }
 
         // Index into the IDS via the seq ID and map it to the index
         GetMidiVars()->sSeq_Ids_word().ids[rec.field_A_id_seqOpenId] = idx;
@@ -557,6 +589,10 @@ s16 SND_SEQ_Play(u16 idx, s16 repeatCount, s16 volLeft, s16 volRight)
     }
     else if (SsIsEos_4FDA80(rec.field_A_id_seqOpenId, 0))
     {
+        if (PsxSoundEngine* pRec = PsxSoundEngine::Get())
+        {
+            pRec->Record("SEQSTOP %d", rec.field_A_id_seqOpenId);
+        }
         SsSeqStop(rec.field_A_id_seqOpenId);
     }
 
@@ -634,6 +670,10 @@ void SND_SEQ_Stop(u16 idx)
     {
         if (SsIsEos_4FDA80(GetMidiVars()->sSeqDataTable()[idx].field_A_id_seqOpenId, 0))
         {
+            if (PsxSoundEngine* pRec = PsxSoundEngine::Get())
+            {
+                pRec->Record("SEQSTOP %d", GetMidiVars()->sSeqDataTable()[idx].field_A_id_seqOpenId);
+            }
             SsSeqStop(GetMidiVars()->sSeqDataTable()[idx].field_A_id_seqOpenId);
         }
     }

@@ -29,6 +29,14 @@ SoundApi& GetSoundAPI()
 
 SDLSoundSystem* sDSound_BBC344 = nullptr;
 
+void SND_DumpFrame()
+{
+    if (sDSound_BBC344)
+    {
+        sDSound_BBC344->RenderDumpFrame();
+    }
+}
+
 u32 SND_GetTicks()
 {
     if (sDSound_BBC344 && sDSound_BBC344->IsOffline())
@@ -397,6 +405,11 @@ void SND_Resume_Audio()
 u64 SND_Get_Generated_Audio_Samples()
 {
     return sDSound_BBC344 ? sDSound_BBC344->GetGeneratedAudioSamples() : 0;
+}
+
+u32 SND_Get_Queued_Audio_Samples()
+{
+    return sDSound_BBC344 ? sDSound_BBC344->GetQueuedAudioSamples() : 0;
 }
 
 u32 SND_Get_Device_Sample_Rate()

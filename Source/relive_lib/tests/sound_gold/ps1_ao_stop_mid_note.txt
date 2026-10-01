@@ -1,0 +1,37 @@
+t=0 load seqs=3 reverb=40
+t=0 vab 0 progs=1 vags=1
+t=0 tone vab=0 prog=0 tone=0 vag=0 keys=0-127 shift_cen=15360 vol=100 prio=7 flags=0 adsr=0,1200,0,0 pan=64
+t=0 sample vab=0 idx=0 rate=44100 bits=16 stereo=0 bytes=6000 crc=b6d8b98d
+t=0 vab 1 progs=6 vags=4
+t=0 tone vab=1 prog=0 tone=0 vag=0 keys=0-127 shift_cen=15360 vol=100 prio=7 flags=0 adsr=0,1200,0,0 pan=64
+t=0 tone vab=1 prog=1 tone=0 vag=1 keys=0-59 shift_cen=12160 vol=100 prio=7 flags=0 adsr=2085,0,8,1 pan=64
+t=0 tone vab=1 prog=1 tone=1 vag=2 keys=60-127 shift_cen=18432 vol=90 prio=5 flags=4 adsr=32767,1200,0,32767 pan=64
+t=0 tone vab=1 prog=2 tone=0 vag=2 keys=0-127 shift_cen=15360 vol=100 prio=7 flags=4 adsr=130,0,4,2 pan=30
+t=0 tone vab=1 prog=4 tone=0 vag=0 keys=0-127 shift_cen=15360 vol=80 prio=7 flags=0 adsr=0,1200,0,0 pan=64
+t=0 tone vab=1 prog=5 tone=0 vag=3 keys=0-127 shift_cen=15360 vol=100 prio=10 flags=0 adsr=0,0,16,0 pan=64
+t=0 tone vab=1 prog=8 tone=0 vag=0 keys=0-127 shift_cen=15360 vol=60 prio=7 flags=0 adsr=0,1200,0,0 pan=64
+t=0 tone vab=1 prog=8 tone=1 vag=1 keys=0-127 shift_cen=17152 vol=50 prio=7 flags=0 adsr=32767,0,3,23592 pan=64
+t=0 sample vab=1 idx=0 rate=44100 bits=16 stereo=0 bytes=12000 crc=0a947473
+t=0 sample vab=1 idx=1 rate=44100 bits=16 stereo=0 bytes=6000 crc=57fcd917
+t=0 sample vab=1 idx=2 rate=44100 bits=16 stereo=0 bytes=4410 crc=89daea41
+t=0 sample vab=1 idx=3 rate=44100 bits=16 stereo=0 bytes=3000 crc=3740e660
+t=0 seq 0 D1AMB.SEQ
+t=0 seq 1 D2AMB.SEQ
+t=0 seq 2 E1AMB.SEQ
+t=0 play the melody, then the held note
+t=30 spu0 phase=1 pitch=18ac vol=3903,3903 adsr=3a8f,5fc5 reverb=0 seq=0 prog=1 note=55
+t=30 spu1 phase=1 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1 seq=1 prog=2 note=60
+t=70 spu0 off
+t=100 spu1 phase=3 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1 seq=1 prog=2 note=60
+t=270 spu0 phase=1 pitch=0a14 vol=3825,3825 adsr=7f00,1fdf reverb=0 seq=0 prog=1 note=64
+t=390 spu0 phase=1 pitch=0a5f vol=3825,3825 adsr=7f00,1fdf reverb=0 seq=0 prog=1 note=64
+t=500 stop the SEQ
+t=510 spu0 phase=1 pitch=08f2 vol=3825,3825 adsr=7f00,1fdf reverb=0 seq=0 prog=1 note=64
+t=510 spu1 off
+t=510 spu2 phase=3 pitch=1000 vol=1138,1138 adsr=0000,0000 reverb=0 seq=0 prog=8 note=60
+t=510 spu3 phase=1 pitch=0aad vol=790,790 adsr=4a3f,3fd3 reverb=0 seq=0 prog=8 note=60
+t=610 spu3 off
+t=640 spu2 off
+t=770 spu0 phase=1 pitch=08f2 vol=3825,3825 adsr=7f00,1fdf reverb=0 seq=0 prog=1 note=70
+t=790 spu0 phase=1 pitch=0e41 vol=2023,2023 adsr=7f00,1fdf reverb=0 seq=0 prog=1 note=70
+t=1290 spu0 off

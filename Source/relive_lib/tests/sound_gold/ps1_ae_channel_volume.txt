@@ -1,0 +1,33 @@
+t=0 load seqs=5 reverb=40
+t=0 vab 0 progs=1 vags=1
+t=0 tone vab=0 prog=0 tone=0 vag=0 keys=0-127 shift_cen=15360 vol=100 prio=7 flags=0 adsr=0,1200,0,0 pan=64
+t=0 sample vab=0 idx=0 rate=44100 bits=16 stereo=0 bytes=12000 crc=a50670f8
+t=0 vab 1 progs=6 vags=4
+t=0 tone vab=1 prog=0 tone=0 vag=0 keys=0-127 shift_cen=15360 vol=100 prio=7 flags=0 adsr=0,1200,0,0 pan=64
+t=0 tone vab=1 prog=1 tone=0 vag=1 keys=0-59 shift_cen=12160 vol=100 prio=7 flags=0 adsr=2085,0,8,1 pan=64
+t=0 tone vab=1 prog=1 tone=1 vag=2 keys=60-127 shift_cen=18432 vol=90 prio=5 flags=4 adsr=32767,1200,0,32767 pan=64
+t=0 tone vab=1 prog=2 tone=0 vag=2 keys=0-127 shift_cen=15360 vol=100 prio=7 flags=4 adsr=130,0,4,2 pan=30
+t=0 tone vab=1 prog=4 tone=0 vag=0 keys=0-127 shift_cen=15360 vol=80 prio=7 flags=0 adsr=0,1200,0,0 pan=64
+t=0 tone vab=1 prog=5 tone=0 vag=3 keys=0-127 shift_cen=15360 vol=100 prio=10 flags=0 adsr=0,0,16,0 pan=64
+t=0 tone vab=1 prog=8 tone=0 vag=0 keys=0-127 shift_cen=15360 vol=60 prio=7 flags=0 adsr=0,1200,0,0 pan=64
+t=0 tone vab=1 prog=8 tone=1 vag=1 keys=0-127 shift_cen=17152 vol=50 prio=7 flags=0 adsr=32767,0,3,23592 pan=64
+t=0 sample vab=1 idx=0 rate=44100 bits=16 stereo=0 bytes=12000 crc=0a947473
+t=0 sample vab=1 idx=1 rate=44100 bits=16 stereo=0 bytes=12000 crc=b032e010
+t=0 sample vab=1 idx=2 rate=44100 bits=16 stereo=0 bytes=4410 crc=89daea41
+t=0 sample vab=1 idx=3 rate=44100 bits=16 stereo=0 bytes=6000 crc=601f31a3
+t=0 seq 0 OPTAMB.SEQ
+t=0 seq 1 MINESAMB.SEQ
+t=0 seq 2 PARAMB.SEQ
+t=0 seq 3 SCRAMB.SEQ
+t=0 seq 4 FEECOAMB.SEQ
+t=0 play the fade
+t=30 spu0 phase=1 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1 seq=0 prog=2 note=60
+t=100 spu0 phase=3 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1 seq=0 prog=2 note=60
+t=510 spu0 phase=3 pitch=1000 vol=975,221 adsr=2a4f,0006 reverb=1 seq=0 prog=2 note=60
+t=1010 spu0 phase=3 pitch=1000 vol=0,0 adsr=2a4f,0006 reverb=1 seq=0 prog=2 note=60
+t=1250 stop and play again
+t=1270 spu0 off
+t=1390 spu0 phase=1 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1 seq=0 prog=2 note=60
+t=1460 spu0 phase=3 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1 seq=0 prog=2 note=60
+t=1600 stop
+t=1610 spu0 off

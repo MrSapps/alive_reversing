@@ -1,0 +1,122 @@
+t=0 load seqs=2 reverb=40
+t=0 vab 0 progs=1 vags=1
+t=0 tone vab=0 prog=0 tone=0 vag=0 keys=0-127 shift_cen=15360 vol=100 prio=7 flags=0 adsr=0,1200,0,0 pan=64
+t=0 sample vab=0 idx=0 rate=44100 bits=16 stereo=0 bytes=12000 crc=a50670f8
+t=0 vab 1 progs=6 vags=4
+t=0 tone vab=1 prog=0 tone=0 vag=0 keys=0-127 shift_cen=15360 vol=100 prio=7 flags=0 adsr=0,1200,0,0 pan=64
+t=0 tone vab=1 prog=1 tone=0 vag=1 keys=0-59 shift_cen=12160 vol=100 prio=7 flags=0 adsr=2085,0,8,1 pan=64
+t=0 tone vab=1 prog=1 tone=1 vag=2 keys=60-127 shift_cen=18432 vol=90 prio=5 flags=4 adsr=32767,1200,0,32767 pan=64
+t=0 tone vab=1 prog=2 tone=0 vag=2 keys=0-127 shift_cen=15360 vol=100 prio=7 flags=4 adsr=130,0,4,2 pan=30
+t=0 tone vab=1 prog=4 tone=0 vag=0 keys=0-127 shift_cen=15360 vol=80 prio=7 flags=0 adsr=0,1200,0,0 pan=64
+t=0 tone vab=1 prog=5 tone=0 vag=3 keys=0-127 shift_cen=15360 vol=100 prio=10 flags=0 adsr=0,0,16,0 pan=64
+t=0 tone vab=1 prog=8 tone=0 vag=0 keys=0-127 shift_cen=15360 vol=60 prio=7 flags=0 adsr=0,1200,0,0 pan=64
+t=0 tone vab=1 prog=8 tone=1 vag=1 keys=0-127 shift_cen=17152 vol=50 prio=7 flags=0 adsr=32767,0,3,23592 pan=64
+t=0 sample vab=1 idx=0 rate=44100 bits=16 stereo=0 bytes=12000 crc=0a947473
+t=0 sample vab=1 idx=1 rate=44100 bits=16 stereo=0 bytes=12000 crc=b032e010
+t=0 sample vab=1 idx=2 rate=44100 bits=16 stereo=0 bytes=4410 crc=89daea41
+t=0 sample vab=1 idx=3 rate=44100 bits=16 stereo=0 bytes=6000 crc=601f31a3
+t=0 seq 0 OPTAMB.SEQ
+t=0 seq 1 MINESAMB.SEQ
+t=0 key on prog=0 note=40
+t=10 spu0 phase=3 pitch=050a vol=6094,6094 adsr=0000,0000 reverb=0 seq=33 prog=0 note=40
+t=10 key on prog=1 note=41
+t=20 key on prog=2 note=42
+t=30 spu1 phase=1 pitch=0afd vol=6196,6196 adsr=3a8f,5fc5 reverb=0 seq=33 prog=1 note=41
+t=30 spu2 phase=1 pitch=05a8 vol=6297,2998 adsr=2a4f,0006 reverb=1 seq=33 prog=2 note=42
+t=30 key on prog=5 note=43
+t=40 key on prog=8 note=44
+t=50 spu3 phase=3 pitch=05fe vol=6399,6399 adsr=00ff,1fc0 reverb=0 seq=33 prog=5 note=43
+t=50 spu4 phase=3 pitch=0659 vol=3900,3900 adsr=0000,0000 reverb=0 seq=33 prog=8 note=44
+t=50 spu5 phase=1 pitch=043c vol=3250,3250 adsr=4a3f,3fd3 reverb=0 seq=33 prog=8 note=44
+t=50 key on prog=0 note=45
+t=60 key on prog=1 note=46
+t=70 spu6 phase=3 pitch=06ba vol=6602,6602 adsr=0000,0000 reverb=0 seq=33 prog=0 note=45
+t=70 spu7 phase=1 pitch=0eac vol=6703,6703 adsr=3a8f,5fc5 reverb=0 seq=33 prog=1 note=46
+t=70 key on prog=2 note=47
+t=80 key on prog=5 note=48
+t=90 spu8 phase=1 pitch=078d vol=6805,3240 adsr=2a4f,0006 reverb=1 seq=33 prog=2 note=47
+t=90 spu9 phase=3 pitch=0800 vol=6907,6907 adsr=00ff,1fc0 reverb=0 seq=33 prog=5 note=48
+t=90 key on prog=8 note=49
+t=100 spu2 phase=3 pitch=05a8 vol=6297,2998 adsr=2a4f,0006 reverb=1 seq=33 prog=2 note=42
+t=100 key on prog=0 note=50
+t=110 spu10 phase=3 pitch=0879 vol=4205,4205 adsr=0000,0000 reverb=0 seq=33 prog=8 note=49
+t=110 spu11 phase=1 pitch=05a8 vol=3504,3504 adsr=4a3f,3fd3 reverb=0 seq=33 prog=8 note=49
+t=110 spu12 phase=3 pitch=08fa vol=7110,7110 adsr=0000,0000 reverb=0 seq=33 prog=0 note=50
+t=110 key on prog=1 note=51
+t=120 spu1 off
+t=120 key on prog=2 note=52
+t=130 spu13 phase=1 pitch=1395 vol=7211,7211 adsr=3a8f,5fc5 reverb=0 seq=33 prog=1 note=51
+t=130 spu14 phase=1 pitch=0a14 vol=7313,3482 adsr=2a4f,0006 reverb=1 seq=33 prog=2 note=52
+t=130 key on prog=5 note=53
+t=140 spu3 off
+t=140 spu7 off
+t=140 key on prog=8 note=54
+t=150 spu9 off
+t=150 spu15 phase=3 pitch=0aad vol=7414,7414 adsr=00ff,1fc0 reverb=0 seq=33 prog=5 note=53
+t=150 spu16 phase=3 pitch=0b50 vol=4509,4509 adsr=0000,0000 reverb=0 seq=33 prog=8 note=54
+t=150 spu17 phase=1 pitch=078d vol=3758,3758 adsr=4a3f,3fd3 reverb=0 seq=33 prog=8 note=54
+t=150 key on prog=0 note=55
+t=160 spu8 phase=3 pitch=078d vol=6805,3240 adsr=2a4f,0006 reverb=1 seq=33 prog=2 note=47
+t=160 key on prog=1 note=56
+t=170 spu18 phase=3 pitch=0bfc vol=7618,7618 adsr=0000,0000 reverb=0 seq=33 prog=0 note=55
+t=170 spu19 phase=1 pitch=1a24 vol=7719,7719 adsr=3a8f,5fc5 reverb=0 seq=33 prog=1 note=56
+t=170 key on prog=2 note=57
+t=180 spu13 off
+t=180 key on prog=5 note=58
+t=190 spu20 phase=1 pitch=0d74 vol=7821,3724 adsr=2a4f,0006 reverb=1 seq=33 prog=2 note=57
+t=190 spu21 phase=3 pitch=0e41 vol=7922,7922 adsr=00ff,1fc0 reverb=0 seq=33 prog=5 note=58
+t=190 key on prog=8 note=59
+t=200 spu14 phase=3 pitch=0a14 vol=7313,3482 adsr=2a4f,0006 reverb=1 seq=33 prog=2 note=52
+t=200 spu15 off
+t=200 key on prog=0 note=60
+t=210 spu1 phase=3 pitch=1000 vol=8125,8125 adsr=0000,0000 reverb=0 seq=33 prog=0 note=60
+t=210 spu19 off
+t=210 spu22 phase=3 pitch=0f1a vol=4814,4814 adsr=0000,0000 reverb=0 seq=33 prog=8 note=59
+t=210 spu23 phase=1 pitch=0a14 vol=4012,4012 adsr=4a3f,3fd3 reverb=0 seq=33 prog=8 note=59
+t=210 key on prog=1 note=61
+t=220 spu21 off
+t=220 key on prog=2 note=62
+t=230 spu7 phase=1 pitch=11f5 vol=8329,3966 adsr=2a4f,0006 reverb=1 seq=33 prog=2 note=62
+t=230 key on prog=5 note=63
+t=240 key on prog=8 note=64
+t=240 spu7 phase=1 pitch=11f5 vol=8329,3966 adsr=2a4f,0006 reverb=1 seq=33 prog=8 note=64
+t=250 spu7 phase=1 pitch=0d74 vol=4266,4266 adsr=4a3f,3fd3 reverb=0 seq=33 prog=8 note=64
+t=250 spu13 phase=3 pitch=1306 vol=8430,8430 adsr=00ff,1fc0 reverb=0 seq=33 prog=5 note=63
+t=250 spu19 phase=3 pitch=1428 vol=5119,5119 adsr=0000,0000 reverb=0 seq=33 prog=8 note=64
+t=250 key on prog=0 note=65
+t=250 spu19 phase=3 pitch=1428 vol=5119,5119 adsr=0000,0000 reverb=0 seq=33 prog=0 note=65
+t=260 spu20 phase=3 pitch=0d74 vol=7821,3724 adsr=2a4f,0006 reverb=1 seq=33 prog=2 note=57
+t=260 key on prog=1 note=66
+t=270 spu13 off
+t=270 spu19 phase=3 pitch=155b vol=8633,8633 adsr=0000,0000 reverb=0 seq=33 prog=0 note=65
+t=270 key on prog=2 note=67
+t=270 spu7 phase=1 pitch=0d74 vol=4266,4266 adsr=4a3f,3fd3 reverb=0 seq=33 prog=2 note=67
+t=280 key on prog=5 note=68
+t=280 spu23 phase=1 pitch=0a14 vol=4012,4012 adsr=4a3f,3fd3 reverb=0 seq=33 prog=5 note=68
+t=290 spu7 phase=1 pitch=17f9 vol=8837,4208 adsr=2a4f,0006 reverb=1 seq=33 prog=2 note=67
+t=290 spu17 off
+t=290 spu23 phase=3 pitch=1965 vol=8938,8938 adsr=00ff,1fc0 reverb=0 seq=33 prog=5 note=68
+t=290 key on prog=8 note=69
+t=290 spu7 phase=1 pitch=17f9 vol=8837,4208 adsr=2a4f,0006 reverb=1 seq=33 prog=8 note=69
+t=300 spu5 off
+t=300 spu11 off
+t=310 spu7 phase=3 pitch=1ae8 vol=5424,5424 adsr=0000,0000 reverb=0 seq=33 prog=8 note=69
+t=310 spu17 phase=1 pitch=11f5 vol=4520,4520 adsr=4a3f,3fd3 reverb=0 seq=33 prog=8 note=69
+t=310 spu23 off
+t=340 spu1 off
+t=340 spu16 off
+t=350 spu12 off
+t=350 spu18 off
+t=350 spu22 off
+t=360 spu10 off
+t=370 spu17 off
+t=370 spu19 off
+t=390 spu4 off
+t=390 spu6 off
+t=390 spu7 off
+t=440 spu0 off
+t=1800 key off every channel
+t=1810 spu2 off
+t=1810 spu8 off
+t=1810 spu14 off
+t=1810 spu20 off

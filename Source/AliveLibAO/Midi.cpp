@@ -13,6 +13,7 @@
 #include "../AliveLibAE/Sfx.hpp"
 
 #include "../relive_lib/Sound/PsxSpuApi.hpp"
+#include "../relive_lib/Sound/PsxSoundEngine.hpp"
 #include "../relive_lib/Sound/Midi.hpp"
 #include "../relive_lib/Sound/Sound.hpp"
 #include "../AliveLibAE/PathData.hpp"
@@ -229,7 +230,23 @@ public:
 
     virtual void SsUtKeyOffV(s32 idx) override
     {
-        AO::SsUtKeyOffV(static_cast<s16>(idx));
+        // The PS1 sound's libsnd is the same for both games
+        if (PsxSoundEngine::Get())
+        {
+            ::SsUtKeyOffV_4FE010(static_cast<s16>(idx));
+        }
+        else
+        {
+            AO::SsUtKeyOffV(static_cast<s16>(idx));
+        }
+    }
+
+    virtual s16 DefaultMasterVolume() override
+    {
+        // The PS1 executable sets 127 (SsSetMVol at 0x800784d4, called from its SND_Init and
+        // SND_Reset), where the PC code sets AE's 100. The SDL voices keep 100: it also scales
+        // their volumes (sGlobalVolumeLevel).
+        return PsxSoundEngine::Get() ? 127 : 100;
     }
 
 private:
@@ -571,7 +588,18 @@ s32 MIDI_ParseMidiMessage(s32 idx)
                         auto l_vol = (s16)((u32)(pProgVol->field_1_left_vol * pCtx->field_C_volume) >> 7);
 
                         auto freq = data.param2;
-                        MIDI_PlayerPlayMidiNote_49DAD0(pCtx->field_seq_idx, program, note, l_vol, r_vol, freq); // Note: inlined
+                        const s32 usedChannels = MIDI_PlayerPlayMidiNote_49DAD0(pCtx->field_seq_idx, program, note, l_vol, r_vol, freq); // Note: inlined
+
+                        // Record which SEQ and channel own the MIDI channels, as AE does, so SsSeqStop
+                        // keys them off. Without it a SEQ stopped mid note (e.g. the music when Abe
+                        // dies) left a looping note playing: only a stop of SEQ 0 matched the unset owner.
+                        for (s32 i = 0; i < kNumChannels; i++)
+                        {
+                            if (usedChannels & (1 << i))
+                            {
+                                GetSpuApiVars()->sMidi_Channels().channels[i].field_1C_adsr.field_C = static_cast<u16>(16 * idx + data.Channel());
+                            }
+                        }
                         break;
                     }
 
@@ -704,7 +732,7 @@ s32 MIDI_ParseMidiMessage(s32 idx)
             const s32 timeStamp = MIDI_Read_Var_Len_4FD0D0(pCtx);
             if (timeStamp)
             {
-                pCtx->field_4_time = timeStamp * pCtx->field_14_tempo / 1000 + pCtx->field_4_time;
+                MIDI_AddDeltaTime(*pCtx, static_cast<u32>(timeStamp));
                 if (pCtx->field_4_time > GetSpuApiVars()->sMidiTime())
                 {
                     return 1;
@@ -813,6 +841,11 @@ void SsVabTransBody(VabBodyRecord* pVabBody, s16 vabId)
                     if (sampleLen2)
                     {
                         SND_Load(pEntry, pTempBuffer, sampleLen2);
+
+                        if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+                        {
+                            pPs1Sound->SetSample(vabId, i, reinterpret_cast<const s16*>(pTempBuffer), static_cast<u32>(sampleLen2), v10 < 0);
+                        }
                     }
 
                     free(pTempBuffer);

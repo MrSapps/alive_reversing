@@ -22,6 +22,7 @@
 #include <fstream>
 #include <functional>
 #include <sstream>
+#include <map>
 
 static const char* kUsage =
     "Usage: relive_sound_gold -data=<dir> [options]\n"
@@ -33,7 +34,18 @@ static const char* kUsage =
     "  -out=<dir>        Where to write (default sound_gold_out)\n"
     "  -baseline=<dir>   Compare with an earlier run's -out, exit code 1 if anything differs\n"
     "  -theme=<name>     Only this sound theme\n"
-    "  -seq_ms=<ms>      Longest time a SEQ is played for (default 60000)\n";
+    "  -seq_ms=<ms>      Longest time a SEQ is played for (default 60000)\n"
+    "  -ps1_sound        Play on the emulated PS1 SPU, as relive -ps1_sound does\n"
+    "  -reverb=<depth>   The path reverb depth, 0-127 (default 0). Only the SPU has a reverb\n"
+    "  -seq_vol=<vol>    The volume the SEQs are played at, 0-127 (default 100)\n"
+    "  -spu_filter=<f>   With -ps1_sound: hq (default) or gaussian, as relive -spu_filter\n"
+    "  -replay=<file>    Play a RELIVE_SOUND_RECORD recording (relive -ps1_sound) to <out>/replay.wav,\n"
+    "                    as the PS1 sound (see SOUND_FORMATS.md)\n";
+
+s16 SND_VAB_Load_4C9FE0(PathSoundInfo& pSoundBlockInfo, ResourceManagerWrapper& resMan);
+namespace AO {
+extern OpenSeqHandle g_SeqTable_4C9E70[165];
+}
 
 // relive_lib calls out to this for recording and playback, which this tool doesn't use
 BaseGameAutoPlayer& GetGameAutoPlayer()
@@ -71,6 +83,10 @@ struct Options final
     fs::path mOut = "sound_gold_out";
     std::string mTheme;
     u32 mSeqMs = 60000;
+    s32 mReverb = 0;
+    bool mPs1Sound = false;
+    s16 mSeqVol = 100;
+    PsxSpu::Interpolation mInterpolation = PsxSpu::Interpolation::BandLimited;
 };
 
 // Plays one item in a new session so each result stands alone
@@ -84,8 +100,8 @@ static void RenderItem(const Options& options, ResourceManagerWrapper& resMan, c
     info->mSeqFiles = themeInfo.mSeqFiles;
     info->mSoundTheme = theme;
 
-    SoundGoldSession session(options.mGame);
-    session.LoadSoundBlock(resMan, info, 0, monkTheme);
+    SoundGoldSession session(options.mGame, options.mPs1Sound, options.mInterpolation);
+    session.LoadSoundBlock(resMan, info, options.mReverb, monkTheme);
     play(session);
 
     const fs::path base = options.mOut / theme / name;
@@ -132,7 +148,7 @@ static void RenderTheme(const Options& options, ResourceManagerWrapper& resMan, 
                 }
 
                 session.Note("play " + seqName);
-                SND_SEQ_Play(idx, 1, 100, 100);
+                SND_SEQ_Play(idx, 1, options.mSeqVol, options.mSeqVol);
                 u32 played = 0;
                 while (played < options.mSeqMs && SND_SsIsEos_DeInlined(idx))
                 {
@@ -146,6 +162,226 @@ static void RenderTheme(const Options& options, ResourceManagerWrapper& resMan, 
             }
         });
     }
+}
+
+
+// Plays a RELIVE_SOUND_RECORD recording on the PS1 sound code (the recorded VAB, SEQ and voice ids are
+// mapped to the ones this run gets)
+static s32 Replay(const Options& options, ResourceManagerWrapper& resMan, const std::string& recPath)
+{
+    std::ifstream in(recPath);
+    if (!in)
+    {
+        printf("Can't open %s\n", recPath.c_str());
+        return 1;
+    }
+    SoundGoldSession session(options.mGame, true, options.mInterpolation);
+    std::map<s32, s32> seqMap;
+    std::map<s32, s32> voiceMap; // recorded voice -> this replay's
+    std::string line;
+    bool started = false;
+    u64 t0 = 0;
+    u32 mismatches = 0;
+    while (std::getline(in, line))
+    {
+        std::istringstream ss(line);
+        u64 t = 0;
+        std::string cmd;
+        if (!(ss >> t >> cmd))
+        {
+            continue;
+        }
+        if (!started)
+        {
+            t0 = t;
+            started = true;
+        }
+        const u32 rel = static_cast<u32>(t - t0);
+        if (rel > SND_GetTicks())
+        {
+            session.Advance(rel - SND_GetTicks());
+        }
+        if (cmd == "TICK")
+        {
+            continue;
+        }
+        else if (cmd == "MVOL")
+        {
+            s32 l = 0;
+            s32 r = 0;
+            ss >> l >> r;
+            SsSetMVol_4FC360(static_cast<s16>(l), static_cast<s16>(r));
+        }
+        else if (cmd == "RVTYPE")
+        {
+            s32 type = 0;
+            ss >> type;
+            SsUtSetReverbType_4FE360(type);
+        }
+        else if (cmd == "RVDEPTH")
+        {
+            s32 l = 0;
+            s32 r = 0;
+            ss >> l >> r;
+            SsUtSetReverbDepth_4FE380(l, r);
+        }
+        else if (cmd == "RVON")
+        {
+            SsUtReverbOn_4FE340();
+        }
+        else if (cmd == "RVOFF")
+        {
+            SsUtReverbOff_4FE350();
+        }
+        else if (cmd == "RVCLEAR")
+        {
+            SpuClearReverbWorkArea_4FA690(4);
+        }
+        else if (cmd == "VAB")
+        {
+            s32 id = 0;
+            std::string theme;
+            std::string vh;
+            std::string vb;
+            ss >> id >> theme >> vh >> vb;
+            auto info = std::make_shared<PathSoundInfo>();
+            const ResourceManagerWrapper::SoundThemeInfo& themeInfo = resMan.LoadSoundThemeInfo(theme);
+            info->mVhFile = vh;
+            info->mVbFile = vb;
+            info->mSeqFiles = themeInfo.mSeqFiles;
+            info->mSoundTheme = theme;
+            SND_Pend_Sound_Files(*info, resMan);
+            SND_VAB_Load_4C9FE0(*info, resMan);
+            SND_Load_Seqs(options.mGame == GameType::eAo ? AO::g_SeqTable_4C9E70 : gSeqData.mSeqs, info, resMan);
+            if (info->mVabId != id)
+            {
+                printf("VAB id %d, recorded %d\n", info->mVabId, id);
+            }
+        }
+        else if (cmd == "VABCLOSE")
+        {
+            s32 id = 0;
+            ss >> id;
+            SsVabClose_4FC5B0(id);
+        }
+        else if (cmd == "SEQOPEN")
+        {
+            s32 id = 0;
+            s32 resId = 0;
+            s32 vab = 0;
+            std::string name;
+            ss >> id >> resId >> vab >> name;
+            for (s32 i = 0; i < GetMidiVars()->MidiTableSize(); i++)
+            {
+                OpenSeqHandle& rec = GetMidiVars()->sSeqDataTable()[i];
+                if (name == rec.field_0_mBsqName && !rec.field_C_ppSeq_Data.empty())
+                {
+                    seqMap[id] = SsSeqOpen_4FD6D0(rec.field_C_ppSeq_Data.data(), static_cast<u32>(rec.field_C_ppSeq_Data.size()), static_cast<s16>(vab));
+                }
+            }
+        }
+        else if (cmd == "SEQPLAY" || cmd == "SEQSTOP" || cmd == "SEQCLOSE" || cmd == "SEQVOL")
+        {
+            s32 id = 0;
+            s32 a = 0;
+            s32 b = 0;
+            ss >> id >> a >> b;
+            auto it = seqMap.find(id);
+            if (it == seqMap.end())
+            {
+                continue;
+            }
+            const s16 seq = static_cast<s16>(it->second);
+            if (cmd == "SEQPLAY")
+            {
+                SsSeqPlay_4FD900(static_cast<u16>(seq), static_cast<s8>(a), static_cast<s16>(b));
+            }
+            else if (cmd == "SEQSTOP")
+            {
+                SsSeqStop(seq);
+            }
+            else if (cmd == "SEQCLOSE")
+            {
+                SsSeqClose_4FD8D0(seq);
+                seqMap.erase(it);
+            }
+            else
+            {
+                SsSeqSetVol(seq, static_cast<s16>(a), static_cast<s16>(b));
+            }
+        }
+        else if (cmd == "KEYON")
+        {
+            s32 mask = 0;
+            s32 vabProg = 0;
+            s32 pitch = 0;
+            s32 l = 0;
+            s32 r = 0;
+            ss >> mask >> vabProg >> pitch >> l >> r;
+            const s32 got = SsVoKeyOn_4FCF10(vabProg, pitch, static_cast<u16>(l), static_cast<u16>(r));
+            if (got != mask)
+            {
+                mismatches++;
+            }
+            // The recording's voices are the game's run's: map them to this run's, in order
+            std::vector<s32> ours;
+            std::vector<s32> recorded;
+            for (s32 i = 0; i < 24; i++)
+            {
+                if (got & (1 << i))
+                {
+                    ours.push_back(i);
+                }
+                if (mask & (1 << i))
+                {
+                    recorded.push_back(i);
+                }
+            }
+            for (size_t i = 0; i < recorded.size(); i++)
+            {
+                voiceMap[recorded[i]] = i < ours.size() ? ours[i] : -1;
+            }
+        }
+        else if (cmd == "KEYOFFV" || cmd == "PITCH")
+        {
+            s32 voice = 0;
+            ss >> voice;
+            auto it = voiceMap.find(voice);
+            if (it == voiceMap.end() || it->second < 0)
+            {
+                continue;
+            }
+            if (cmd == "KEYOFFV")
+            {
+                GetSpuApiVars()->SsUtKeyOffV(it->second);
+            }
+            else
+            {
+                s32 vabId = 0;
+                s32 prog = 0;
+                s32 oldNote = 0;
+                s32 oldFine = 0;
+                s32 newNote = 0;
+                s32 newFine = 0;
+                ss >> vabId >> prog >> oldNote >> oldFine >> newNote >> newFine;
+                SsUtChangePitch_4FDF70(static_cast<s16>(it->second), vabId, prog, static_cast<s16>(oldNote), static_cast<s16>(oldFine), static_cast<s16>(newNote),
+                    static_cast<s16>(newFine));
+            }
+        }
+        else if (cmd == "ALLKEYOFF")
+        {
+            SsUtAllKeyOff(0);
+        }
+        else
+        {
+            printf("unknown command %s\n", cmd.c_str());
+        }
+    }
+    session.Advance(500);
+    const std::vector<u8> wav = SoundGoldSession::ToWav(session.Audio());
+    WriteBytes(options.mOut / "replay.wav", wav.data(), wav.size());
+    printf("%.1f s, %u key ons gave other voices than recorded\n", static_cast<f64>(session.Audio().size()) / 44100.0, mismatches);
+    return 0;
 }
 
 // Every file in baseline must be the same in out
@@ -195,6 +431,19 @@ s32 main(s32 argc, char_type** argv)
     {
         options.mSeqMs = static_cast<u32>(std::stoul(*seqMs));
     }
+    if (const std::optional<std::string> reverb = args.GetValue("-reverb"))
+    {
+        options.mReverb = std::stoi(*reverb);
+    }
+    options.mPs1Sound = args.HasSwitch("-ps1_sound");
+    if (args.GetValue("-spu_filter").value_or("hq") == "gaussian")
+    {
+        options.mInterpolation = PsxSpu::Interpolation::Gaussian;
+    }
+    if (const std::optional<std::string> seqVol = args.GetValue("-seq_vol"))
+    {
+        options.mSeqVol = static_cast<s16>(std::stoi(*seqVol));
+    }
     const std::optional<std::string> baseline = args.GetValue("-baseline");
     const fs::path baselineDir = baseline ? fs::absolute(*baseline) : fs::path();
 
@@ -233,6 +482,10 @@ s32 main(s32 argc, char_type** argv)
 
     FileSystem fs;
     ResourceManagerWrapper resMan(fs, "");
+    if (const std::optional<std::string> replay = args.GetValue("-replay"))
+    {
+        return Replay(options, resMan, *replay);
+    }
     for (const std::string& theme : themes)
     {
         if (options.mTheme.empty() || options.mTheme == theme)
