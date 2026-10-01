@@ -1,4 +1,4 @@
-t=0 load seqs=4 reverb=40
+t=0 load seqs=5 reverb=40
 t=0 vab 0 progs=1 vags=1
 t=0 tone vab=0 prog=0 tone=0 vag=0 keys=0-127 shift_cen=15360 vol=100 prio=7 flags=0 adsr=0,1200,0,0 pan=64
 t=0 sample vab=0 idx=0 rate=44100 bits=16 stereo=0 bytes=6000 crc=b6d8b98d
@@ -19,26 +19,23 @@ t=0 seq 0 D1AMB.SEQ
 t=0 seq 1 D2AMB.SEQ
 t=0 seq 2 E1AMB.SEQ
 t=0 seq 3 E2AMB.SEQ
-t=0 play the held note, then the repeated one
+t=0 seq 4 E2AMB2.SEQ
+t=0 play the fade
 t=30 ch0 state=1 vol=2 cvol=46 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,2 seqch=0 ref=1 loop=1
-t=30 ch1 state=1 vol=2 cvol=46 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,2 seqch=16 ref=1 loop=1
 t=30 spu0 phase=1 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
-t=30 spu1 phase=1 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
 t=110 spu0 phase=3 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
-t=110 spu1 phase=3 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
-t=270 ch2 state=1 vol=2 cvol=46 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,2 seqch=16 ref=2 loop=1
-t=270 spu2 phase=1 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
-t=350 spu2 phase=3 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
-t=540 ch1 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,300 seqch=16 ref=1 loop=1
-t=540 ch2 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,300 seqch=16 ref=2 loop=1
-t=540 spu1 phase=4 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
-t=540 spu2 phase=4 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
-t=550 spu1 off
-t=550 spu2 off
-t=570 ch1 off
-t=570 ch2 off
-t=650 stop
-t=650 ch0 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,300 seqch=0 ref=1 loop=1
-t=650 spu0 phase=4 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
-t=660 ch0 off
-t=660 spu0 off
+t=540 spu0 phase=3 pitch=1000 vol=975,221 adsr=2a4f,0006 reverb=1
+t=1050 spu0 phase=3 pitch=1000 vol=0,0 adsr=2a4f,0006 reverb=1
+t=1250 stop and play again
+t=1250 ch0 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,300 seqch=0 ref=1 loop=1
+t=1250 spu0 phase=4 pitch=1000 vol=0,0 adsr=2a4f,0006 reverb=1
+t=1260 ch0 off
+t=1260 spu0 off
+t=1350 ch0 state=1 vol=2 cvol=46 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,2 seqch=0 ref=1 loop=1
+t=1350 spu0 phase=1 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
+t=1430 spu0 phase=3 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
+t=1600 stop
+t=1600 ch0 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=60 freq=1.0000 adsr=54,0,4,300 seqch=0 ref=1 loop=1
+t=1600 spu0 phase=4 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1
+t=1610 spu0 off
+t=1620 ch0 off

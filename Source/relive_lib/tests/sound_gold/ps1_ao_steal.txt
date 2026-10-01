@@ -196,11 +196,11 @@ t=390 spu4 off
 t=440 spu0 off
 t=450 ch0 off
 t=1800 key off every channel
-t=1800 ch2 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=42 freq=0.3536 adsr=62,0,4,2 seqch=65535 ref=255 loop=1
-t=1800 ch3 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=67 freq=1.4983 adsr=62,0,4,2 seqch=65535 ref=255 loop=1
-t=1800 ch7 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=57 freq=0.8409 adsr=62,0,4,2 seqch=65535 ref=255 loop=1
-t=1800 ch8 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=47 freq=0.4719 adsr=62,0,4,2 seqch=65535 ref=255 loop=1
-t=1800 ch14 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=52 freq=0.6300 adsr=62,0,4,2 seqch=65535 ref=255 loop=1
+t=1800 ch2 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=42 freq=0.3536 adsr=62,0,4,300 seqch=65535 ref=255 loop=1
+t=1800 ch3 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=67 freq=1.4983 adsr=62,0,4,300 seqch=65535 ref=255 loop=1
+t=1800 ch7 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=57 freq=0.8409 adsr=62,0,4,300 seqch=65535 ref=255 loop=1
+t=1800 ch8 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=47 freq=0.4719 adsr=62,0,4,300 seqch=65535 ref=255 loop=1
+t=1800 ch14 state=4 vol=2 cvol=2 prio=7 vab=1 prog=2 note=52 freq=0.6300 adsr=62,0,4,300 seqch=65535 ref=255 loop=1
 t=1800 ch20 state=4 vol=2 cvol=2 prio=5 vab=1 prog=1 note=61 freq=0.5297 adsr=15871,1200,0,32767 seqch=65535 ref=255 loop=1
 t=1800 ch23 state=4 vol=2 cvol=2 prio=5 vab=1 prog=1 note=66 freq=0.7071 adsr=15871,1200,0,32767 seqch=65535 ref=255 loop=1
 t=1800 spu2 phase=4 pitch=05a8 vol=2420,548 adsr=2a4f,0006 reverb=1

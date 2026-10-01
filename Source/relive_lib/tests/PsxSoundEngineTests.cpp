@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 #include "Sound/PsxSoundEngine.hpp"
+#include "Sound/PsxSpuApi.hpp"
+#include <cstring>
 
 // libsnd's voice volume, from the voice setup at 0x80076d94 in the AE PS1 executable
 // (SLES_014.80). The expected values come from running that code in a MIPS interpreter.
@@ -91,4 +93,56 @@ TEST(PsxSoundEngine, SfxVelocityAndPan)
     PsxSoundEngine::SfxVelocityAndPan(50, 100, velocity, pan);
     EXPECT_EQ(velocity, 100);
     EXPECT_EQ(pan, 95);
+}
+
+// A VH whose first program has one tone: the secret area jingle's (RFSNDFX.VH program 81), as the PC
+// data has it
+static std::vector<u8> JingleVh(s8 priority, s8 vol)
+{
+    std::vector<u8> vh(sizeof(VabHeader) + 16 * sizeof(VagAtr));
+    VabHeader header = {};
+    header.field_12_num_progs = 1;
+    memcpy(vh.data(), &header, sizeof(header));
+
+    VagAtr tone = {};
+    tone.field_0_priority = priority;
+    tone.field_2_vol = vol;
+    tone.field_6_min = 0;
+    tone.field_7_max = 127;
+    tone.field_14_prog = 81;
+    tone.field_16_vag = 44;
+    memcpy(vh.data() + sizeof(VabHeader), &tone, sizeof(tone));
+    return vh;
+}
+
+static VagAtr FirstTone(const std::vector<u8>& vh)
+{
+    VagAtr tone = {};
+    memcpy(&tone, vh.data() + sizeof(VabHeader), sizeof(tone));
+    return tone;
+}
+
+TEST(PsxSoundEngine, RestorePs1Tones)
+{
+    // The PC data's 70/70 becomes the PS1's 127/127
+    std::vector<u8> vh = JingleVh(70, 70);
+    PsxSoundEngine::RestorePs1Tones(GameType::eAo, "rfsndfx.vh", vh);
+    EXPECT_EQ(FirstTone(vh).field_0_priority, 127);
+    EXPECT_EQ(FirstTone(vh).field_2_vol, 127);
+
+    // Only that VH of that game, and only a tone as the PC data has it
+    vh = JingleVh(70, 70);
+    PsxSoundEngine::RestorePs1Tones(GameType::eAe, "RFSNDFX.VH", vh);
+    EXPECT_EQ(FirstTone(vh).field_0_priority, 70);
+    PsxSoundEngine::RestorePs1Tones(GameType::eAo, "E1SNDFX.VH", vh);
+    EXPECT_EQ(FirstTone(vh).field_0_priority, 70);
+    vh = JingleVh(70, 60);
+    PsxSoundEngine::RestorePs1Tones(GameType::eAo, "RFSNDFX.VH", vh);
+    EXPECT_EQ(FirstTone(vh).field_0_priority, 70);
+    EXPECT_EQ(FirstTone(vh).field_2_vol, 60);
+
+    // Too short to hold its tones: left alone
+    vh = JingleVh(70, 70);
+    vh.resize(sizeof(VabHeader) + 8);
+    PsxSoundEngine::RestorePs1Tones(GameType::eAo, "RFSNDFX.VH", vh);
 }

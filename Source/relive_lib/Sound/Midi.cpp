@@ -10,6 +10,7 @@
 #include "../AliveLibAE/PathData.hpp"
 
 #include "PsxSpuApi.hpp"
+#include "PsxSoundEngine.hpp"
 #include "../../relive_lib/BinaryPath.hpp"
 #include "../AmbientSound.hpp"
 #include "../../relive_lib/FatalError.hpp"
@@ -161,6 +162,10 @@ s16 SND_VAB_Load_4C9FE0(PathSoundInfo& pSoundBlockInfo, ResourceManagerWrapper& 
 {
     // Load the VH file data
     pSoundBlockInfo.mVhFileData = resMan.LoadSoundFile(pSoundBlockInfo.mVhFile.c_str(), pSoundBlockInfo.mSoundTheme);
+    if (PsxSoundEngine::Get())
+    {
+        PsxSoundEngine::RestorePs1Tones(GetGameType(), pSoundBlockInfo.mVhFile, pSoundBlockInfo.mVhFileData);
+    }
     //GetMidiVars()->LoadingLoop(0);
 
     // Load the VB file data

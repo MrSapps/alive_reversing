@@ -3,6 +3,8 @@
 #include "PsxSpuApi.hpp"
 #include "SDLSoundSystem.hpp"
 #include <algorithm>
+#include <cctype>
+#include <cstring>
 
 // Frames rendered per SPU Render call in Mix
 static constexpr u32 kMixChunkFrames = 512;
@@ -68,11 +70,130 @@ static s16 VolumeRegister(s32 vol)
     return static_cast<s16>(std::clamp(vol, 0, 127) * 0x7FFE / 127);
 }
 
+// A tone whose priority and volume the PC data changed: the PC values (and the tone's keys and
+// sample, to be sure it's the same tone), then the PS1 ones. Made by comparing every VH of the PS1
+// and PC versions; AE's are all the same.
+struct Ps1ToneValues final
+{
+    GameType mGame;
+    const char_type* mVhFile;
+    u8 mProgram;
+    u8 mTone; // Slot 0-15 in the program
+    u8 mMinKey;
+    u8 mMaxKey;
+    u8 mVag;
+    u8 mPcPriority;
+    u8 mPcVol;
+    u8 mPs1Priority;
+    u8 mPs1Vol;
+};
+
+static const Ps1ToneValues kPs1ToneValues[] = {
+    {GameType::eAo, "D1SNDFX.VH", 81, 0, 0, 127, 41, 70, 70, 127, 127},
+    {GameType::eAo, "D1SNDFX.VH", 82, 0, 0, 126, 69, 95, 95, 127, 127},
+    {GameType::eAo, "D1SNDFX.VH", 82, 1, 0, 126, 69, 95, 95, 91, 127},
+    {GameType::eAo, "D1SNDFX.VH", 85, 0, 0, 127, 69, 95, 95, 101, 127},
+    {GameType::eAo, "D2ENDER.VH", 81, 0, 0, 127, 18, 70, 70, 127, 127},
+    {GameType::eAo, "D2ENDER.VH", 82, 0, 0, 127, 42, 95, 95, 101, 127},
+    {GameType::eAo, "D2ENDER.VH", 85, 0, 0, 127, 42, 95, 95, 101, 127},
+    {GameType::eAo, "D2SNDFX.VH", 81, 0, 0, 127, 51, 70, 70, 127, 127},
+    {GameType::eAo, "D2SNDFX.VH", 82, 0, 0, 127, 85, 95, 95, 101, 127},
+    {GameType::eAo, "D2SNDFX.VH", 85, 0, 0, 127, 85, 95, 95, 101, 127},
+    {GameType::eAo, "E1SNDFX.VH", 74, 0, 0, 127, 51, 100, 100, 0, 127},
+    {GameType::eAo, "E1SNDFX.VH", 76, 0, 0, 127, 51, 100, 100, 79, 127},
+    {GameType::eAo, "E1SNDFX.VH", 81, 0, 0, 127, 51, 70, 70, 127, 127},
+    {GameType::eAo, "E2SNDFX.VH", 76, 0, 0, 127, 52, 100, 100, 79, 127},
+    {GameType::eAo, "E2SNDFX.VH", 81, 0, 0, 127, 52, 70, 70, 127, 127},
+    {GameType::eAo, "F1SNDFX.VH", 81, 0, 0, 127, 92, 70, 70, 127, 127},
+    {GameType::eAo, "F2ENDER.VH", 81, 0, 0, 127, 27, 70, 70, 127, 127},
+    {GameType::eAo, "F2SNDFX.VH", 7, 3, 36, 43, 6, 40, 40, 2, 127},
+    {GameType::eAo, "F2SNDFX.VH", 7, 4, 44, 45, 10, 40, 40, 2, 127},
+    {GameType::eAo, "F2SNDFX.VH", 7, 5, 46, 46, 11, 40, 40, 2, 127},
+    {GameType::eAo, "F2SNDFX.VH", 7, 6, 47, 47, 26, 60, 60, 2, 127},
+    {GameType::eAo, "F2SNDFX.VH", 7, 7, 48, 48, 27, 60, 60, 2, 127},
+    {GameType::eAo, "F2SNDFX.VH", 7, 8, 49, 55, 40, 60, 60, 2, 127},
+    {GameType::eAo, "F2SNDFX.VH", 7, 9, 56, 57, 49, 40, 40, 2, 127},
+    {GameType::eAo, "F2SNDFX.VH", 7, 10, 65, 67, 53, 40, 40, 2, 127},
+    {GameType::eAo, "F2SNDFX.VH", 7, 12, 69, 75, 59, 40, 40, 2, 127},
+    {GameType::eAo, "F2SNDFX.VH", 81, 0, 0, 127, 46, 70, 70, 127, 127},
+    {GameType::eAo, "MLSNDFX.VH", 81, 0, 0, 127, 130, 70, 70, 127, 127},
+    {GameType::eAo, "OPTSNDFX.VH", 2, 0, 0, 127, 9, 70, 70, 79, 127},
+    {GameType::eAo, "RFENDER.VH", 49, 1, 61, 61, 67, 127, 127, 64, 127},
+    {GameType::eAo, "RFENDER.VH", 67, 0, 60, 60, 103, 127, 127, 127, 100},
+    {GameType::eAo, "RFENDER.VH", 67, 1, 61, 61, 104, 127, 127, 127, 100},
+    {GameType::eAo, "RFENDER.VH", 67, 2, 62, 62, 105, 127, 127, 127, 100},
+    {GameType::eAo, "RFENDER.VH", 67, 3, 63, 63, 106, 127, 127, 127, 100},
+    {GameType::eAo, "RFENDER.VH", 81, 0, 0, 127, 36, 70, 70, 127, 127},
+    {GameType::eAo, "RFSNDFX.VH", 7, 1, 36, 48, 95, 60, 60, 2, 127},
+    {GameType::eAo, "RFSNDFX.VH", 7, 2, 35, 35, 1, 40, 40, 2, 127},
+    {GameType::eAo, "RFSNDFX.VH", 7, 3, 34, 34, 2, 40, 40, 2, 127},
+    {GameType::eAo, "RFSNDFX.VH", 7, 4, 33, 33, 3, 40, 40, 2, 127},
+    {GameType::eAo, "RFSNDFX.VH", 7, 5, 32, 32, 7, 40, 40, 2, 127},
+    {GameType::eAo, "RFSNDFX.VH", 7, 6, 31, 31, 9, 40, 40, 2, 127},
+    {GameType::eAo, "RFSNDFX.VH", 7, 7, 30, 30, 12, 60, 60, 2, 127},
+    {GameType::eAo, "RFSNDFX.VH", 7, 8, 49, 51, 16, 40, 40, 2, 127},
+    {GameType::eAo, "RFSNDFX.VH", 7, 9, 52, 63, 17, 40, 40, 2, 127},
+    {GameType::eAo, "RFSNDFX.VH", 49, 1, 61, 61, 97, 127, 127, 64, 127},
+    {GameType::eAo, "RFSNDFX.VH", 81, 0, 0, 127, 44, 70, 70, 127, 127},
+};
+
+static bool CaseInsensitiveEquals(const std::string& a, const char_type* pB)
+{
+    const std::string b = pB;
+    return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), [](char x, char y)
+    {
+        return std::tolower(static_cast<unsigned char>(x)) == std::tolower(static_cast<unsigned char>(y));
+    });
+}
+
+void PsxSoundEngine::RestorePs1Tones(GameType game, const std::string& vhFile, std::vector<u8>& vhData)
+{
+    if (vhData.size() < sizeof(VabHeader))
+    {
+        return;
+    }
+
+    VabHeader header = {};
+    memcpy(&header, vhData.data(), sizeof(VabHeader));
+    const size_t numTones = static_cast<size_t>(std::clamp<s32>(header.field_12_num_progs, 0, kMaxPrograms)) * kTonesPerProgram;
+    if (vhData.size() < sizeof(VabHeader) + numTones * sizeof(VagAtr))
+    {
+        return;
+    }
+
+    for (const Ps1ToneValues& entry : kPs1ToneValues)
+    {
+        if (entry.mGame != game || !CaseInsensitiveEquals(vhFile, entry.mVhFile))
+        {
+            continue;
+        }
+
+        for (size_t i = 0; i < numTones; i++)
+        {
+            VagAtr tone = {};
+            u8* pTone = vhData.data() + sizeof(VabHeader) + i * sizeof(VagAtr);
+            memcpy(&tone, pTone, sizeof(VagAtr));
+            if (tone.field_14_prog == entry.mProgram && i % kTonesPerProgram == entry.mTone && static_cast<u8>(tone.field_6_min) == entry.mMinKey
+                && static_cast<u8>(tone.field_7_max) == entry.mMaxKey && (tone.field_16_vag & 0xFF) == entry.mVag
+                && static_cast<u8>(tone.field_0_priority) == entry.mPcPriority && static_cast<u8>(tone.field_2_vol) == entry.mPcVol)
+            {
+                tone.field_0_priority = static_cast<s8>(entry.mPs1Priority);
+                tone.field_2_vol = static_cast<s8>(entry.mPs1Vol);
+                memcpy(pTone, &tone, sizeof(VagAtr));
+            }
+        }
+    }
+}
+
 PsxSoundEngine::PsxSoundEngine()
 {
     for (std::array<u8, 2>& v : mSeqVolumes)
     {
         v = {127, 127};
+    }
+    for (std::array<u8, kMidiChannels>& v : mChannelVolumes)
+    {
+        v.fill(127);
     }
 
     // Sized here so Mix never allocates on the audio thread
@@ -184,17 +305,16 @@ void PsxSoundEngine::StopVabVoices(s32 vabId)
     }
 }
 
-void PsxSoundEngine::NoteOnSeq(s32 voice, s32 vabId, s32 program, s32 tone, s32 note, s32 velocity, s32 seq)
+void PsxSoundEngine::NoteOnSeq(s32 voice, s32 vabId, s32 program, s32 tone, s32 note, s32 velocity, s32 seq, s32 channel)
 {
-    if (seq < 0 || seq >= kMaxSeqs)
+    if (seq < 0 || seq >= kMaxSeqs || channel < 0 || channel >= kMidiChannels)
     {
         return;
     }
-    // libsnd scales the velocity by the channel volume (CC 7), default 127, and pans by the channel
-    // pan (CC 10), default 64. The games' SEQs never change the pan, and no parser handles CC 7 yet.
-    constexpr s32 kChannelVolume = 127;
+    // libsnd scales the velocity by the channel volume (CC 7), and pans by the channel pan (CC 10),
+    // default 64. The games' SEQs never change the pan.
     constexpr s32 kChannelPan = 64;
-    NoteOn(voice, vabId, program, tone, note, seq, true, velocity * kChannelVolume / 127, kChannelPan);
+    NoteOn(voice, vabId, program, tone, note, seq, true, velocity, mChannelVolumes[seq][channel], kChannelPan);
 }
 
 void PsxSoundEngine::NoteOnSfx(s32 voice, s32 vabId, s32 program, s32 tone, s32 note, s32 volLeft, s32 volRight, bool squared)
@@ -202,7 +322,7 @@ void PsxSoundEngine::NoteOnSfx(s32 voice, s32 vabId, s32 program, s32 tone, s32 
     s32 velocity = 0;
     s32 pan = 64;
     SfxVelocityAndPan(std::clamp(volLeft, 0, 127), std::clamp(volRight, 0, 127), velocity, pan);
-    NoteOn(voice, vabId, program, tone, note, -1, squared, velocity, pan);
+    NoteOn(voice, vabId, program, tone, note, -1, squared, velocity, 127, pan);
 }
 
 PsxSoundEngine::VoiceVolume PsxSoundEngine::CurrentVolume(const VoiceInfo& info) const
@@ -210,7 +330,58 @@ PsxSoundEngine::VoiceVolume PsxSoundEngine::CurrentVolume(const VoiceInfo& info)
     const bool seqNote = info.mSeq >= 0;
     const s32 seqLeft = seqNote ? mSeqVolumes[info.mSeq][0] : 127;
     const s32 seqRight = seqNote ? mSeqVolumes[info.mSeq][1] : 127;
-    return LibsndVoiceVolume(seqNote, info.mSquared, info.mVelocity, info.mVabVol, info.mProgVol, info.mToneVol, info.mTonePan, info.mProgPan, info.mChannelPan, seqLeft, seqRight);
+    // libsnd scales the velocity by the channel volume first (_SsVmKeyOn, 0x8007b56c in the AO PS1
+    // executable)
+    const s32 velocity = seqNote ? info.mVelocity * info.mChannelVolume / 127 : info.mVelocity;
+    return LibsndVoiceVolume(seqNote, info.mSquared, velocity, info.mVabVol, info.mProgVol, info.mToneVol, info.mTonePan, info.mProgPan, info.mChannelPan, seqLeft, seqRight);
+}
+
+void PsxSoundEngine::OpenSeq(s32 seq)
+{
+    ResetChannelVolumes(seq);
+    SetSeqVolume(seq, 127, 127);
+}
+
+void PsxSoundEngine::ResetChannelVolumes(s32 seq)
+{
+    if (seq < 0 || seq >= kMaxSeqs)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(mMutex);
+    mChannelVolumes[seq].fill(127);
+}
+
+void PsxSoundEngine::SetChannelVolume(s32 seq, s32 channel, s32 vabId, s32 program, s32 volume)
+{
+    if (seq < 0 || seq >= kMaxSeqs || channel < 0 || channel >= kMidiChannels)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(mMutex);
+    volume = std::clamp(volume, 0, 127);
+    mChannelVolumes[seq][channel] = static_cast<u8>(volume);
+    for (s32 i = 0; i < PsxSpu::kNumVoices; i++)
+    {
+        VoiceInfo& info = mVoices[i];
+        if (info.mSeq == seq && info.mVabId == vabId && info.mProgram == program && mSpu.IsVoiceActive(i))
+        {
+            // _SsVmSetVol (0x8007d6ac) turns 0 into 1 for the playing notes only
+            info.mChannelVolume = std::max(volume, 1);
+            UpdateVoiceVolume(i);
+        }
+    }
+}
+
+void PsxSoundEngine::UpdateVoiceVolume(s32 voice)
+{
+    VoiceInfo& info = mVoices[voice];
+    const VoiceVolume v = CurrentVolume(info);
+    info.mState.mVolLeft = static_cast<s16>(v.mLeft);
+    info.mState.mVolRight = static_cast<s16>(v.mRight);
+    mSpu.SetVoiceVolumeRegisters(voice, static_cast<u16>(v.mLeft), static_cast<u16>(v.mRight));
 }
 
 void PsxSoundEngine::SetSeqVolume(s32 seq, s32 left, s32 right)
@@ -227,15 +398,12 @@ void PsxSoundEngine::SetSeqVolume(s32 seq, s32 left, s32 right)
         VoiceInfo& info = mVoices[i];
         if (info.mSeq == seq && info.mVabId >= 0 && mSpu.IsVoiceActive(i))
         {
-            const VoiceVolume v = CurrentVolume(info);
-            info.mState.mVolLeft = static_cast<s16>(v.mLeft);
-            info.mState.mVolRight = static_cast<s16>(v.mRight);
-            mSpu.SetVoiceVolumeRegisters(i, static_cast<u16>(v.mLeft), static_cast<u16>(v.mRight));
+            UpdateVoiceVolume(i);
         }
     }
 }
 
-void PsxSoundEngine::NoteOn(s32 voice, s32 vabId, s32 program, s32 tone, s32 note, s32 seq, bool squared, s32 velocity, s32 channelPan)
+void PsxSoundEngine::NoteOn(s32 voice, s32 vabId, s32 program, s32 tone, s32 note, s32 seq, bool squared, s32 velocity, s32 channelVolume, s32 channelPan)
 {
     if (!ValidVoice(voice) || !ValidVab(vabId) || program < 0 || program >= kMaxPrograms || tone < 0 || tone >= kTonesPerProgram)
     {
@@ -276,6 +444,7 @@ void PsxSoundEngine::NoteOn(s32 voice, s32 vabId, s32 program, s32 tone, s32 not
     info.mSeq = seq;
     info.mSquared = squared;
     info.mVelocity = std::clamp(velocity, 0, 127);
+    info.mChannelVolume = std::clamp(channelVolume, 0, 127);
     info.mChannelPan = channelPan;
     info.mVabVol = vab.mMasterVol;
     info.mProgVol = prog.mVol;
