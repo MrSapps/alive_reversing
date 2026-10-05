@@ -1002,3 +1002,263 @@ TEST(PsxSpu, BandLimitedKeepsInBandTonesAndTiming)
     diff = std::sqrt(diff / static_cast<f64>(gaussian.size() - 2000));
     EXPECT_LT(diff, g * 0.1); // In phase: a one sample shift would be a 60% difference
 }
+
+// A voice stopped while it is loud (a VAB closed under it, or a voice taken) is a step in the
+// output on the hardware. With declick on it fades out over kDeclickSamples instead.
+static std::vector<s16> RenderStoppedVoice(bool declick)
+{
+    std::vector<s16> pcm(4000, 0x6000); // Held at a loud level
+    PsxSpu spu;
+    spu.SetDeclick(declick);
+    PsxSpuSample sample;
+    sample.mPcm = pcm.data();
+    sample.mLength = static_cast<u32>(pcm.size());
+    sample.mLoop = true;
+    spu.SetMasterVolume(0x7FFE, 0x7FFE);
+    spu.SetVoiceSample(0, sample);
+    spu.SetVoicePitch(0, 0x1000);
+    spu.SetVoiceVolume(0, 0x3FFF, 0x3FFF);
+    spu.SetVoiceAdsr(0, 0x000F, HoldingAdsr2(0));
+    spu.KeyOn(0);
+
+    std::vector<s16> out(2 * 1200);
+    spu.Render(out.data(), 600);
+    spu.StopVoice(0);
+    spu.Render(out.data() + 2 * 600, 600);
+    return out;
+}
+
+TEST(PsxSpu, StoppedVoiceStepsWithoutDeclick)
+{
+    const std::vector<s16> out = RenderStoppedVoice(false);
+    EXPECT_GT(std::abs(out[2 * 599]), 1000);
+    EXPECT_EQ(out[2 * 600], 0);
+}
+
+TEST(PsxSpu, StoppedVoiceFadesOutWithDeclick)
+{
+    const std::vector<s16> out = RenderStoppedVoice(true);
+    const s32 before = out[2 * 599];
+    ASSERT_GT(std::abs(before), 1000);
+
+    // No step bigger than a small part of the level, the tail runs down monotonically and ends at 0
+    s32 previous = before;
+    s32 maxStep = 0;
+    for (u32 i = 600; i < 600 + PsxSpu::kDeclickSamples; i++)
+    {
+        const s32 v = out[2 * i];
+        maxStep = std::max(maxStep, std::abs(previous - v));
+        EXPECT_LE(std::abs(v), std::abs(previous) + 1) << i;
+        previous = v;
+    }
+    EXPECT_LT(maxStep, std::abs(before) / 20);
+    EXPECT_EQ(out[2 * (600 + PsxSpu::kDeclickSamples + 2)], 0);
+}
+
+TEST(PsxSpu, QuietVoiceLeavesNoTail)
+{
+    std::vector<s16> pcm(4000, 20);
+    PsxSpu spu;
+    spu.SetDeclick(true);
+    PsxSpuSample sample;
+    sample.mPcm = pcm.data();
+    sample.mLength = static_cast<u32>(pcm.size());
+    sample.mLoop = true;
+    spu.SetMasterVolume(0x7FFE, 0x7FFE);
+    spu.SetVoiceSample(0, sample);
+    spu.SetVoicePitch(0, 0x1000);
+    spu.SetVoiceVolume(0, 0x3FFF, 0x3FFF);
+    spu.SetVoiceAdsr(0, 0x000F, HoldingAdsr2(0));
+    spu.KeyOn(0);
+    std::vector<s16> out(2 * 400);
+    spu.Render(out.data(), 200);
+    spu.StopVoice(0);
+    spu.Render(out.data() + 2 * 200, 200);
+    for (u32 i = 200; i < 400; i++)
+    {
+        EXPECT_EQ(out[2 * i], 0) << i;
+    }
+}
+
+TEST(PsxSpu, DeclickEasesMasterVolumeChanges)
+{
+    std::vector<s16> pcm(4000, 0x6000);
+    PsxSpu spu;
+    spu.SetDeclick(true);
+    PsxSpuSample sample;
+    sample.mPcm = pcm.data();
+    sample.mLength = static_cast<u32>(pcm.size());
+    sample.mLoop = true;
+    spu.SetMasterVolume(0x3FFF, 0x3FFF);
+    spu.SetVoiceSample(0, sample);
+    spu.SetVoicePitch(0, 0x1000);
+    spu.SetVoiceVolume(0, 0x3FFF, 0x3FFF);
+    spu.SetVoiceAdsr(0, 0x000F, HoldingAdsr2(0));
+    spu.KeyOn(0);
+    std::vector<s16> out(2 * 2000);
+    spu.Render(out.data(), 500);
+    spu.SetMasterVolume(0, 0); // The game's SsSetMVol(0, 0)
+    spu.Render(out.data() + 2 * 500, 1500);
+
+    const s32 before = out[2 * 499];
+    ASSERT_GT(std::abs(before), 1000);
+    s32 maxStep = 0;
+    for (u32 i = 501; i < 2000; i++)
+    {
+        maxStep = std::max<s32>(maxStep, std::abs(out[2 * i] - out[2 * (i - 1)]));
+    }
+    EXPECT_LT(maxStep, std::abs(before) / 20);
+    EXPECT_EQ(out[2 * 1999], 0);
+}
+
+// A key off with the fastest release drops the hardware's output to nothing in a few samples
+static std::vector<s16> RenderFastRelease(bool declick)
+{
+    std::vector<s16> pcm(4000, 0x6000);
+    PsxSpu spu;
+    spu.SetDeclick(declick);
+    PsxSpuSample sample;
+    sample.mPcm = pcm.data();
+    sample.mLength = static_cast<u32>(pcm.size());
+    sample.mLoop = true;
+    spu.SetMasterVolume(0x7FFE, 0x7FFE);
+    spu.SetVoiceSample(0, sample);
+    spu.SetVoicePitch(0, 0x1000);
+    spu.SetVoiceVolume(0, 0x3FFF, 0x3FFF);
+    spu.SetVoiceAdsr(0, 0x000F, HoldingAdsr2(0)); // Release shift 0: as fast as it gets
+    spu.KeyOn(0);
+    std::vector<s16> out(2 * 1000);
+    spu.Render(out.data(), 500);
+    spu.KeyOff(0);
+    spu.Render(out.data() + 2 * 500, 500);
+    return out;
+}
+
+TEST(PsxSpu, FastReleaseStepsWithoutDeclick)
+{
+    const std::vector<s16> out = RenderFastRelease(false);
+    ASSERT_GT(std::abs(out[2 * 499]), 1000);
+    EXPECT_LT(std::abs(out[2 * 520]), std::abs(out[2 * 499]) / 20) << "the hardware's release should be over in a few samples";
+}
+
+TEST(PsxSpu, FastReleaseTakesMinimumTimeWithDeclick)
+{
+    const std::vector<s16> out = RenderFastRelease(true);
+    const s32 before = out[2 * 499];
+    ASSERT_GT(std::abs(before), 1000);
+    s32 maxStep = 0;
+    for (u32 i = 501; i < 500 + PsxSpuEnvelope::kMinReleaseTicks + 4; i++)
+    {
+        maxStep = std::max<s32>(maxStep, std::abs(out[2 * i] - out[2 * (i - 1)]));
+    }
+    EXPECT_LT(maxStep, std::abs(before) / 20);
+    EXPECT_GT(std::abs(out[2 * 560]), std::abs(before) / 4) << "still sounding half way through";
+    EXPECT_EQ(out[2 * 800], 0);
+}
+
+TEST(PsxSpu, LongerMinimumReleaseTimeSlowsTheFall)
+{
+    std::vector<s16> pcm(4000, 0x6000);
+    PsxSpu spu;
+    spu.SetDeclick(true);
+    PsxSpuSample sample;
+    sample.mPcm = pcm.data();
+    sample.mLength = static_cast<u32>(pcm.size());
+    sample.mLoop = true;
+    spu.SetMasterVolume(0x7FFE, 0x7FFE);
+    spu.SetVoiceSample(0, sample);
+    spu.SetVoicePitch(0, 0x1000);
+    spu.SetVoiceVolume(0, 0x3FFF, 0x3FFF);
+    spu.SetVoiceAdsr(0, 0x000F, HoldingAdsr2(0));
+    spu.KeyOn(0);
+    std::vector<s16> out(2 * 6000);
+    spu.Render(out.data(), 500);
+    spu.SetMinimumReleaseTime(4410); // 100 ms
+    spu.SetVoiceAdsr(0, 0x80FF, 0x4000); // SsUtAllKeyOff's: the sustain falls as fast as it can
+    spu.SetVoiceVolume(0, 0, 0);
+    spu.KeyOff(0);
+    spu.Render(out.data() + 2 * 500, 5500);
+
+    const s32 before = out[2 * 499];
+    ASSERT_GT(std::abs(before), 1000);
+    EXPECT_GT(std::abs(out[2 * (500 + 1000)]), std::abs(before) / 8) << "still sounding 23 ms in";
+    EXPECT_EQ(out[2 * 5500], 0);
+    s32 maxStep = 0;
+    for (u32 i = 501; i < 5500; i++)
+    {
+        maxStep = std::max<s32>(maxStep, std::abs(out[2 * i] - out[2 * (i - 1)]));
+    }
+    EXPECT_LT(maxStep, std::abs(before) / 50);
+}
+
+// libsnd's SsUtAllKeyOff, to the SPU: the voice's volume to 0, its ADSR to the fastest release and
+// a key off, all at once
+TEST(PsxSpu, DeclickSmoothsLibsndsAllKeyOff)
+{
+    for (const bool declick : {false, true})
+    {
+        std::vector<s16> pcm(4000, 0x6000);
+        PsxSpu spu;
+        spu.SetDeclick(declick);
+        PsxSpuSample sample;
+        sample.mPcm = pcm.data();
+        sample.mLength = static_cast<u32>(pcm.size());
+        sample.mLoop = true;
+        spu.SetMasterVolume(0x7FFE, 0x7FFE);
+        spu.SetVoiceSample(0, sample);
+        spu.SetVoicePitch(0, 0x1000);
+        spu.SetVoiceVolume(0, 0x3FFF, 0x3FFF);
+        spu.SetVoiceAdsr(0, 0x000F, HoldingAdsr2(0));
+        spu.KeyOn(0);
+        std::vector<s16> out(2 * 1500);
+        spu.Render(out.data(), 500);
+        spu.SetVoicePitch(0, 0x1000);
+        spu.SetVoiceAdsr(0, 0x80FF, 0x4000);
+        spu.SetVoiceVolume(0, 0, 0);
+        spu.KeyOff(0);
+        spu.Render(out.data() + 2 * 500, 1000);
+
+        const s32 before = out[2 * 499];
+        ASSERT_GT(std::abs(before), 1000);
+        s32 maxStep = 0;
+        for (u32 i = 500; i < 1500; i++)
+        {
+            maxStep = std::max<s32>(maxStep, std::abs(out[2 * i] - out[2 * (i - 1)]));
+        }
+        if (declick)
+        {
+            EXPECT_LT(maxStep, std::abs(before) / 20) << "declick on";
+        }
+        else
+        {
+            EXPECT_GT(maxStep, std::abs(before) / 2) << "the hardware steps";
+        }
+    }
+}
+
+TEST(PsxSpu, ResetKeepsTheDeclickSettings)
+{
+    std::vector<s16> pcm(4000, 0x6000);
+    PsxSpu spu;
+    spu.SetDeclick(true);
+    spu.Reset(); // The engine's SSInit resets the SPU after it has been made
+    PsxSpuSample sample;
+    sample.mPcm = pcm.data();
+    sample.mLength = static_cast<u32>(pcm.size());
+    sample.mLoop = true;
+    spu.SetMasterVolume(0x7FFE, 0x7FFE);
+    spu.SetVoiceSample(0, sample);
+    spu.SetVoicePitch(0, 0x1000);
+    spu.SetVoiceVolume(0, 0x3FFF, 0x3FFF);
+    spu.SetVoiceAdsr(0, 0x000F, HoldingAdsr2(0));
+    spu.KeyOn(0);
+    std::vector<s16> out(2 * 1000);
+    spu.Render(out.data(), 500);
+    spu.SetVoiceAdsr(0, 0x80FF, 0x4000);
+    spu.SetVoiceVolume(0, 0, 0);
+    spu.KeyOff(0);
+    spu.Render(out.data() + 2 * 500, 500);
+    const s32 before = out[2 * 499];
+    ASSERT_GT(std::abs(before), 1000);
+    EXPECT_GT(std::abs(out[2 * 540]), std::abs(before) / 8) << "still sounding 40 samples in (the volume and the release fade together)";
+}

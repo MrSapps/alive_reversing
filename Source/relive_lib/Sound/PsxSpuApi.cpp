@@ -6,6 +6,7 @@
 #include "../../relive_lib/ResourceManagerWrapper.hpp"
 #include "Sound.hpp"    // SoundEntry structure
 #include "PsxSoundEngine.hpp"
+#include "../SoundDebug.hpp"
 #include <assert.h>
 #include "../../relive_lib/FatalError.hpp"
 #include <algorithm>
@@ -765,6 +766,7 @@ s32 SsVoKeyOn_4FCF10(s32 vabIdAndProgram, s32 pitch, u16 leftVol, u16 rightVol)
     {
         const s32 voices = pPs1Sound->VoKeyOn(vabIdAndProgram, pitch, leftVol, rightVol);
         pPs1Sound->Record("KEYON %d %d %d %d %d", voices, vabIdAndProgram, pitch, leftVol, rightVol);
+        SoundDebug::LogSeqOutput("KEYON %d %d %d %d %d", voices, vabIdAndProgram, pitch, leftVol, rightVol);
         return voices;
     }
 
@@ -1572,6 +1574,7 @@ s16 SsUtChangePitch_4FDF70(s16 voice, s32 vabId, s32 prog, s16 old_note, s16 old
     if (PsxSoundEngine* pRec = PsxSoundEngine::Get())
     {
         pRec->Record("PITCH %d %d %d %d %d %d %d", voice, vabId, prog, old_note, old_fine, new_note, new_fine);
+        SoundDebug::LogSeqOutput("PITCH %d %d %d %d %d %d %d", voice, vabId, prog, old_note, old_fine, new_note, new_fine);
         pRec->UtChangePitch(voice, static_cast<s16>(vabId), static_cast<s16>(prog), old_note, old_fine, new_note, new_fine);
         return 0;
     }

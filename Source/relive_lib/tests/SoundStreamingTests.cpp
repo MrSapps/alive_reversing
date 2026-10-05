@@ -2,6 +2,7 @@
 #include "../Sound/SoundGold.hpp"
 #include "../Sound/Sound.hpp"
 #include "../Sound/SDLSoundSystem.hpp"
+#include "../Sound/SDLSoundBuffer.hpp"
 #include "../GameType.hpp"
 #include <algorithm>
 #include <vector>
@@ -120,4 +121,71 @@ TEST(SoundStreaming, LoopingBufferStreamsContinuouslyInBigChunks)
 TEST(SoundStreaming, LoopingBufferStreamsContinuouslyInMixedChunks)
 {
     StreamTest(0);
+}
+
+// A playing buffer that is stopped or freed (a skipped movie) fades out instead of being cut off
+static std::vector<s32> RenderThenEnd(bool free)
+{
+    SoundGoldSession session(GameType::eAe);
+
+    const u32 rate = 44100;
+    const u32 frames = rate;
+    SoundEntry entry = {};
+    EXPECT_EQ(SND_New(&entry, static_cast<s32>(frames), static_cast<s32>(rate), 16, 7), 0);
+
+    // A loud constant signal
+    std::vector<s16> signal(frames * 2, 8000);
+    EXPECT_GE(GetSoundAPI().mSND_LoadSamples(&entry, 0, reinterpret_cast<u8*>(signal.data()), frames), 0);
+    EXPECT_EQ(SND_PlayEx(&entry, 116, 116, 1.0f, nullptr, 1, 100), 0);
+
+    sDSound_BBC344->RenderOffline(2000);
+    if (free)
+    {
+        GetSoundAPI().mSND_Free(&entry);
+    }
+    else
+    {
+        entry.field_4_pDSoundBuffer->Stop();
+    }
+    sDSound_BBC344->RenderOffline(1000);
+    if (!free)
+    {
+        GetSoundAPI().mSND_Free(&entry);
+        sDSound_BBC344->RenderOffline(1);
+    }
+
+    const std::vector<StereoSample_S16>& out = sDSound_BBC344->OfflineOutput();
+    std::vector<s32> left;
+    for (const StereoSample_S16& s : out)
+    {
+        left.push_back(s.left);
+    }
+    return left;
+}
+
+static void ExpectFadedOut(const std::vector<s32>& left)
+{
+    ASSERT_GE(left.size(), 3000u);
+    const s32 level = left[1900];
+    ASSERT_GT(std::abs(level), 500);
+
+    // Steps down gently from the level it was at to nothing, and stays there
+    s32 maxStep = 0;
+    for (size_t i = 2000; i < 2400; i++)
+    {
+        maxStep = std::max(maxStep, std::abs(left[i] - left[i - 1]));
+    }
+    EXPECT_LT(maxStep, std::abs(level) / 10);
+    EXPECT_EQ(left[2400], 0);
+    EXPECT_EQ(left[2900], 0);
+}
+
+TEST(SoundStreaming, StoppedBufferFadesOut)
+{
+    ExpectFadedOut(RenderThenEnd(false));
+}
+
+TEST(SoundStreaming, FreedBufferFadesOut)
+{
+    ExpectFadedOut(RenderThenEnd(true));
 }

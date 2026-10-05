@@ -2,6 +2,7 @@
 #include "BaseMap.hpp"
 #include "Engine.hpp"
 #include "GameType.hpp"
+#include "SoundDebug.hpp"
 #include "Movie.hpp"
 #include "ResourceManagerWrapper.hpp"
 #include "logger.hpp"
@@ -15,9 +16,11 @@
 #include "../AliveLibAE/Input.hpp"
 #include "../AliveLibAE/MainMenu.hpp"
 #include "../AliveLibAE/PauseMenu.hpp"
+#include "../AliveLibAE/QuikSave.hpp"
 #include "../AliveLibAO/Abe.hpp"
 #include "../AliveLibAO/MainMenu.hpp"
 #include "../AliveLibAO/PauseMenu.hpp"
+#include "../AliveLibAO/QuikSave.hpp"
 #include <SDL3/SDL_timer.h>
 #include <sstream>
 
@@ -317,6 +320,16 @@ static bool CheckCommand(const Automation::Command& command, std::string& error)
         return argCount == 3 || (expectNumber(command.mArgs[3], 0) && expectNumber(command.mArgs[4], 0));
     }
 
+    if (SoundDebug::IsSoundCommand(name))
+    {
+        return SoundDebug::Check(name, command.mArgs, error);
+    }
+
+    if (name == "fmv")
+    {
+        return expectArgs(1, "fmv <name>");
+    }
+
     if (name == "wait_frames")
     {
         return expectArgs(1, "wait_frames <n>") && expectNumber(command.mArgs[0], 1);
@@ -413,6 +426,11 @@ bool Automation::Parse(const std::string& script, std::vector<Command>& commands
     return true;
 }
 
+Automation::~Automation()
+{
+    SoundDebug::SetScriptFrame(false, 0);
+}
+
 Automation::Automation(FileSystem& fs, ResourceManagerWrapper& resMan, std::vector<Command> commands)
     : mFs(fs)
     , mResMan(resMan)
@@ -429,6 +447,7 @@ Automation::Result Automation::Update(BaseMap& map, bool betweenFrames)
     {
         mFrames++;
     }
+    SoundDebug::SetScriptFrame(true, mFrames);
 
     // Commands that finish straight away all run now, e.g. a dump then a screenshot
     while (mNextCommand < mCommands.size())
@@ -536,6 +555,34 @@ bool Automation::RunCommand(const Command& command, BaseMap& map, bool betweenFr
         return Start(command, map, betweenFrames);
     }
 
+    if (SoundDebug::IsSoundCommand(name))
+    {
+        // Between frames, so it's in the same place in the run each time
+        if (!betweenFrames)
+        {
+            return false;
+        }
+        std::string error;
+        if (!SoundDebug::Run(name, args, error, map, mResMan))
+        {
+            Fail(command, error);
+            return false;
+        }
+        return true;
+    }
+
+    if (name == "fmv")
+    {
+        // Starts the movie as the game's camera and menu code do: an object that takes over the main
+        // loop once it updates. Between frames, so it's always in the same place in the run
+        if (!betweenFrames)
+        {
+            return false;
+        }
+        relive_new Movie(args[0].c_str(), mResMan, map);
+        return true;
+    }
+
     if (name == "wait_frames")
     {
         if (mStep == 0)
@@ -611,6 +658,7 @@ bool Automation::Start(const Command& command, BaseMap& map, bool betweenFrames)
         return false;
     }
 
+    SoundDebug::ForgetOwners();
     const EReliveLevelIds level = LevelFromName(command.mArgs[0]);
     const s16 path = static_cast<s16>(std::stoi(command.mArgs[1]));
     const s16 camera = static_cast<s16>(std::stoi(command.mArgs[2]));
@@ -701,6 +749,17 @@ bool Automation::Start(const Command& command, BaseMap& map, bool betweenFrames)
         map.GetCurrentCamCoords(&camPos);
         sControlledCharacter->mXPos = FP_FromInteger(camPos.x + (isAe ? 184 : 448));
         sControlledCharacter->mYPos = FP_FromInteger(camPos.y + (isAe ? 60 : 180));
+    }
+
+    // The menus' new game makes a checkpoint, so dying has somewhere to respawn. Without one the
+    // respawn goes to level none and crashes
+    if (isAe)
+    {
+        QuikSave::DoQuicksave(map);
+    }
+    else
+    {
+        AO::QuikSave::SaveCheckpoint(map);
     }
     return true;
 }

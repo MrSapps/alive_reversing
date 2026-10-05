@@ -79,3 +79,21 @@ TEST(Automation, RejectsBadArguments)
     EXPECT_NE(ParseError("quit now").find("expected"), std::string::npos);
     EXPECT_NE(ParseError("timeout -5").find("'-5'"), std::string::npos);
 }
+
+TEST(Automation, SoundCommands)
+{
+    std::vector<Automation::Command> commands;
+    std::string error;
+    ASSERT_TRUE(Parse("music tension\nmusic 13\nsfx 5\nsfx 5 90\nseq_play 12\nseq_play 12 80 0\nseq_stop 12\nmusic tension other 0 1\nmusic 0 none\nkill_other\nsfx 5 20 90\n", commands, error)) << error;
+    EXPECT_EQ(commands.size(), 11u);
+    EXPECT_NE(ParseError("music 4 nobody").find("line 1"), std::string::npos);
+    EXPECT_NE(ParseError("music 4 abe 2").find("line 1"), std::string::npos);
+    EXPECT_NE(ParseError("kill_other now").find("expected"), std::string::npos);
+
+    EXPECT_NE(ParseError("music bogus").find("line 1"), std::string::npos);
+    EXPECT_NE(ParseError("music").find("expected"), std::string::npos);
+    EXPECT_NE(ParseError("sfx 99999").find("line 1"), std::string::npos);
+    EXPECT_NE(ParseError("sfx 5 200").find("line 1"), std::string::npos);
+    EXPECT_NE(ParseError("seq_play").find("expected"), std::string::npos);
+    EXPECT_NE(ParseError("seq_stop 1 2").find("expected"), std::string::npos);
+}

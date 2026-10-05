@@ -239,6 +239,14 @@ void PsxSpuEnvelope::Tick()
 
     s32 level = mLevel;
     Step(CurrentRate(), level, mCounter);
+    if (mMinimumRelease)
+    {
+        // The level doesn't fall faster than from full to nothing in mMinReleaseTicks, in any phase:
+        // libsnd's SsUtAllKeyOff writes the fastest decay into voices that are still sustaining, so
+        // they drop to nothing in a few samples before any key off (the hardware clicks)
+        const s32 maxDrop = std::max<s32>(1, 0x8000 / static_cast<s32>(mMinReleaseTicks));
+        level = std::max(level, static_cast<s32>(mLevel) - maxDrop);
+    }
     mLevel = static_cast<s16>(level);
 
     switch (mPhase)
@@ -320,6 +328,10 @@ void PsxSpu::Reset()
     {
         voice = Voice();
     }
+    // The voices are new: they need the declick settings again
+    SetDeclick(mDeclick);
+    SetMinimumReleaseTime(mVolumeRampSamples == kDeclickSamples ? 0 : mVolumeRampSamples);
+    mSmoothMasterValid = false;
     mEndx = kAllVoices;
     mPendingKeyOn = 0;
     mPendingKeyOff = 0;
@@ -390,6 +402,9 @@ void PsxSpu::KeyOn(s32 voice)
     Voice& v = mVoices[voice];
     v.mSample = v.mNextSample;
     v.mEnvelope.KeyOn();
+    // A new note starts at its volume
+    v.mSmoothVolLeft = v.mVolumeLeft.Current();
+    v.mSmoothVolRight = v.mVolumeRight.Current();
     v.mPlaying = true;
     v.mCounter = 0;
     v.mPosition = 0;
@@ -758,8 +773,27 @@ void PsxSpu::TickVoice(s32 voiceIdx, Voice& voice, s32& left, s32& right, s32& r
     const bool bandLimited = mInterpolation == Interpolation::BandLimited && voice.mPitch > kPitch44100;
     const s32 sample = bandLimited ? BandLimitedSample(voice) : Interpolate(voice.mHistory, (voice.mCounter >> 4) & 0xFF);
     const s32 enveloped = (sample * voice.mEnvelope.Level()) >> 15;
-    const s32 outLeft = (enveloped * voice.mVolumeLeft.Current()) >> 15;
-    const s32 outRight = (enveloped * voice.mVolumeRight.Current()) >> 15;
+    s32 volumeLeft = voice.mVolumeLeft.Current();
+    s32 volumeRight = voice.mVolumeRight.Current();
+    if (mDeclick)
+    {
+        // libsnd zeroes a voice's volume in one step before it keys it off (SsUtAllKeyOff, SeqClose)
+        // It closes in on the new volume exponentially, so the fade takes as long whatever the voice's
+        // volume is (a fixed step would empty a quiet voice much sooner)
+        const s32 rate = static_cast<s32>(std::min<u32>(0x10000, 4 * 0x10000 / mVolumeRampSamples));
+        const auto follow = [rate](s32& smooth, s32 target)
+        {
+            const s32 diff = target - smooth;
+            const s32 step = static_cast<s32>((static_cast<s64>(diff) * rate) >> 16);
+            smooth += step != 0 ? step : (diff > 0) - (diff < 0);
+        };
+        follow(voice.mSmoothVolLeft, volumeLeft);
+        follow(voice.mSmoothVolRight, volumeRight);
+        volumeLeft = voice.mSmoothVolLeft;
+        volumeRight = voice.mSmoothVolRight;
+    }
+    const s32 outLeft = (enveloped * volumeLeft) >> 15;
+    const s32 outRight = (enveloped * volumeRight) >> 15;
     left += outLeft;
     right += outRight;
     if (voice.mReverb)
@@ -767,6 +801,10 @@ void PsxSpu::TickVoice(s32 voiceIdx, Voice& voice, s32& left, s32& right, s32& r
         reverbLeft += outLeft;
         reverbRight += outRight;
     }
+    voice.mLastLeft = outLeft;
+    voice.mLastRight = outRight;
+    voice.mLastReverbLeft = voice.mReverb ? outLeft : 0;
+    voice.mLastReverbRight = voice.mReverb ? outRight : 0;
 
     voice.mEnvelope.Tick();
     voice.mVolumeLeft.Tick();
@@ -796,9 +834,32 @@ void PsxSpu::Render(s16* out, u32 frames)
         for (s32 i = 0; i < kNumVoices; i++)
         {
             Voice& voice = mVoices[i];
-            if (voice.mEnvelope.CurrentPhase() != PsxSpuEnvelope::Phase::Off)
+            const bool active = voice.mEnvelope.CurrentPhase() != PsxSpuEnvelope::Phase::Off;
+            if (active)
             {
                 TickVoice(i, voice, left, right, reverbLeft, reverbRight);
+            }
+            if (mDeclick)
+            {
+                if (voice.mWasActive && !active && (std::abs(voice.mLastLeft) + std::abs(voice.mLastRight)) > 32)
+                {
+                    // It stopped while it was loud: carry on from where it was and fade out
+                    voice.mTail = kDeclickSamples;
+                    voice.mTailLeft = voice.mLastLeft;
+                    voice.mTailRight = voice.mLastRight;
+                    voice.mTailReverbLeft = voice.mLastReverbLeft;
+                    voice.mTailReverbRight = voice.mLastReverbRight;
+                }
+                voice.mWasActive = active;
+                if (voice.mTail > 0)
+                {
+                    const s32 gain = static_cast<s32>(voice.mTail * 32768 / kDeclickSamples);
+                    left += (voice.mTailLeft * gain) >> 15;
+                    right += (voice.mTailRight * gain) >> 15;
+                    reverbLeft += (voice.mTailReverbLeft * gain) >> 15;
+                    reverbRight += (voice.mTailReverbRight * gain) >> 15;
+                    voice.mTail--;
+                }
             }
         }
 
@@ -808,8 +869,24 @@ void PsxSpu::Render(s16* out, u32 frames)
 
         const s32 mixLeft = Clamp16(left + wetLeft);
         const s32 mixRight = Clamp16(right + wetRight);
-        out[frame * 2] = Clamp16((mixLeft * mMasterLeft.Current()) >> 15);
-        out[frame * 2 + 1] = Clamp16((mixRight * mMasterRight.Current()) >> 15);
+        s32 masterLeft = mMasterLeft.Current();
+        s32 masterRight = mMasterRight.Current();
+        if (mDeclick)
+        {
+            if (!mSmoothMasterValid)
+            {
+                mSmoothMasterLeft = masterLeft;
+                mSmoothMasterRight = masterRight;
+                mSmoothMasterValid = true;
+            }
+            constexpr s32 kStep = 64;
+            mSmoothMasterLeft += std::clamp(masterLeft - mSmoothMasterLeft, -kStep, kStep);
+            mSmoothMasterRight += std::clamp(masterRight - mSmoothMasterRight, -kStep, kStep);
+            masterLeft = mSmoothMasterLeft;
+            masterRight = mSmoothMasterRight;
+        }
+        out[frame * 2] = Clamp16((mixLeft * masterLeft) >> 15);
+        out[frame * 2 + 1] = Clamp16((mixRight * masterRight) >> 15);
 
         mMasterLeft.Tick();
         mMasterRight.Tick();

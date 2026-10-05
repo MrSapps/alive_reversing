@@ -48,7 +48,17 @@ CameraSwapper::~CameraSwapper()
 {
     gNumCamSwappers--;
 
-    if (mScreenClipper)
+    // On quit every object is deleted in turn, so the clipper may be gone already
+    bool clipperAlive = false;
+    for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
+    {
+        if (gBaseGameObjects->ItemAt(i) == mScreenClipper)
+        {
+            clipperAlive = true;
+            break;
+        }
+    }
+    if (mScreenClipper && clipperAlive)
     {
         mScreenClipper->SetDead(true);
     }

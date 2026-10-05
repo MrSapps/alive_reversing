@@ -41,6 +41,7 @@
 #include "Engine.hpp"
 #include "QuikSave.hpp"
 #include "Glukkon.hpp"
+#include "../relive_lib/Sound/PsxSoundEngine.hpp"
 
 static const relive::SfxDefinition kSfxInfoTable[17] = {
     {0u, 1u, 58u, 40u, -256, -256},
@@ -63,7 +64,9 @@ static const relive::SfxDefinition kSfxInfoTable[17] = {
 
 void Slig_SoundEffect(SligSfx effect, BaseAliveGameObject* pObj)
 {
-    const relive::SfxDefinition& pEffect = kSfxInfoTable[static_cast<s32>(effect)];
+    // The PC moved the grenade throw to program 39, the PS1 uses program 2 (the same as the slig shot)
+    static const relive::SfxDefinition sPs1ThrowGrenade = {0u, 2u, 60u, 110u, -1000, -950};
+    const relive::SfxDefinition& pEffect = (effect == SligSfx::eThrowGrenade_8 && PsxSoundEngine::Get()) ? sPs1ThrowGrenade : kSfxInfoTable[static_cast<s32>(effect)];
     s16 vLeft = 0;
     s16 vRight = 0;
     if (Calc_Slig_Sound_Direction(pObj, 0, pEffect, &vLeft, &vRight, pObj->GetMap()))

@@ -80,6 +80,18 @@ public:
     void KeyOn();
     // Starts the release from the current level
     void KeyOff();
+    // With this on the level takes at least kMinReleaseTicks to fall from full to nothing: the
+    // hardware's can drop in a few samples, which clicks. See PsxSpu::SetDeclick
+    static constexpr u32 kMinReleaseTicks = 128;
+    void SetMinimumRelease(bool enable)
+    {
+        mMinimumRelease = enable;
+    }
+    // How long the next releases take at least (default kMinReleaseTicks)
+    void SetMinimumReleaseTicks(u32 ticks)
+    {
+        mMinReleaseTicks = ticks;
+    }
     // Level 0 and Off, what a one shot sample's end does
     void Mute();
 
@@ -116,6 +128,8 @@ public:
     static void Step(const Rate& rate, s32& level, u32& counter);
 
 private:
+    bool mMinimumRelease = false;
+    u32 mMinReleaseTicks = kMinReleaseTicks;
     Rate CurrentRate() const;
     void EnterPhase(Phase phase);
 
@@ -210,6 +224,30 @@ public:
     // register: for stealing a voice, or before freeing the sample it plays.
     void StopVoice(s32 voice);
 
+    // The real SPU cuts a voice off in a step (a hard stop, a release with no time, a voice taken
+    // for another note), which clicks. With this on, a voice that stops while it is loud leaves a
+    // tail of its last output that fades out over kDeclickSamples, so nothing steps. Off by default,
+    // for comparing with the hardware.
+    static constexpr u32 kDeclickSamples = 128;
+    // The time the key offs that come next take at least, in samples: the music fading out when a
+    // movie starts is longer than the declick's. 0 = back to the default
+    void SetMinimumReleaseTime(u32 samples)
+    {
+        mVolumeRampSamples = samples ? samples : kDeclickSamples;
+        for (Voice& voice : mVoices)
+        {
+            voice.mEnvelope.SetMinimumReleaseTicks(samples ? samples : PsxSpuEnvelope::kMinReleaseTicks);
+        }
+    }
+    void SetDeclick(bool enable)
+    {
+        mDeclick = enable;
+        for (Voice& voice : mVoices)
+        {
+            voice.mEnvelope.SetMinimumRelease(enable);
+        }
+    }
+
     // ENDX: a bit per voice, set when the voice reaches its sample's (loop) end, cleared by key on.
     // Every voice starts with its bit set.
     u32 Endx() const
@@ -301,6 +339,22 @@ private:
         u32 mPosition = 0; // Next sample to read
         s16 mHistory[4] = {}; // oldest, older, old, new
         u32 mSamplesRead = 0; // Since key on, loops unrolled: mHistory[3] is sample mSamplesRead - 1
+
+        // Declick (see SetDeclick): what the voice last output, whether it was audible, and the
+        // fading tail left when it stopped
+        bool mWasActive = false;
+        s32 mLastLeft = 0;
+        s32 mLastRight = 0;
+        s32 mLastReverbLeft = 0;
+        s32 mLastReverbRight = 0;
+        s32 mTailLeft = 0;
+        s32 mTailRight = 0;
+        s32 mTailReverbLeft = 0;
+        s32 mTailReverbRight = 0;
+        u32 mTail = 0; // Samples of tail left
+        // With declick the voice volume follows its setting over mVolumeRampSamples, not in a step
+        s32 mSmoothVolLeft = 0;
+        s32 mSmoothVolRight = 0;
     };
 
     bool ValidVoice(s32 voice) const
@@ -323,6 +377,12 @@ private:
     u32 mPendingKeyOn = 0;
     u32 mPendingKeyOff = 0;
     Interpolation mInterpolation = Interpolation::Gaussian;
+    bool mDeclick = false;
+    u32 mVolumeRampSamples = kDeclickSamples;
+    // With declick, the master volume moves to a new setting over about 12 ms instead of in a step
+    s32 mSmoothMasterLeft = 0;
+    s32 mSmoothMasterRight = 0;
+    bool mSmoothMasterValid = false;
     u32 mEndx = 0;
     PsxSpuVolume mMasterLeft;
     PsxSpuVolume mMasterRight;

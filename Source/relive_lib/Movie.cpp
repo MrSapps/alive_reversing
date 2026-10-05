@@ -8,6 +8,7 @@
 #include "../AliveLibAE/Text.hpp"
 #include "../AliveLibAE/MainMenu.hpp"
 #include "Sound/Midi.hpp"
+#include "Sound/PsxSoundEngine.hpp"
 #include "Sys.hpp"
 #include "Sound/Sound.hpp"
 #include "../AliveLibAE/GameAutoPlayer.hpp"
@@ -1416,6 +1417,13 @@ void Movie::VUpdate()
         return;
     }
 
+    // The music and sounds fade out over the movie's first moments instead of being cut off (a
+    // thump). libsnd applies the key offs at its next tick, so the longer release is for the next
+    // moments
+    if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
+    {
+        pPs1Sound->FadeOutNextKeyOffs(250, 250);
+    }
     SND_StopAll();
 
     // The game is frozen while the movie plays, see VModalUpdate

@@ -3,6 +3,7 @@
 #include "../AliveLibAE/Math.hpp"
 #include "../relive_lib/Sound/Midi.hpp"
 #include "FatalError.hpp"
+#include "Sound/PsxSoundEngine.hpp"
 
 namespace AO {
 
@@ -1231,7 +1232,15 @@ const relive::SfxDefinition& relive::GetSfx(relive::SoundEffects sfx)
     }
     else
     {
-        return sSfxEntries[static_cast<u32>(ToAe(sfx))];
+        const SoundEffect ae = ToAe(sfx);
+        if (ae == SoundEffect::SligShoot_5 && PsxSoundEngine::Get())
+        {
+            // The PC AE moved the slig shot to program 39, the PS1 uses program 2 (checked against
+            // the SFX table in the PS1 executable)
+            static const relive::SfxDefinition sPs1SligShoot = {0, 2, 60, 127, -1, 1};
+            return sPs1SligShoot;
+        }
+        return sSfxEntries[static_cast<u32>(ae)];
     }
 }
 

@@ -13,36 +13,48 @@ static_assert(std::is_pod<FixedPoint>::value, "FixedPoint must be a POD type, ot
 
 using FP = FixedPoint;
 
+// The games' 32 bit arithmetic wraps (an Abe falling forever ends up wrapped around, not trapped), so
+// add, subtract and negate wrap explicitly: signed overflow would be undefined behaviour
+inline s32 FP_WrapAdd(s32 lhs, s32 rhs)
+{
+    return static_cast<s32>(static_cast<u32>(lhs) + static_cast<u32>(rhs));
+}
+
+inline s32 FP_WrapSub(s32 lhs, s32 rhs)
+{
+    return static_cast<s32>(static_cast<u32>(lhs) - static_cast<u32>(rhs));
+}
+
 inline FixedPoint& operator+=(FixedPoint& lhs, const FixedPoint& rhs)
 {
-    lhs.fpValue += rhs.fpValue;
+    lhs.fpValue = FP_WrapAdd(lhs.fpValue, rhs.fpValue);
     return lhs;
 }
 
 inline FixedPoint& operator-=(FixedPoint& lhs, const FixedPoint& rhs)
 {
-    lhs.fpValue -= rhs.fpValue;
+    lhs.fpValue = FP_WrapSub(lhs.fpValue, rhs.fpValue);
     return lhs;
 }
 
 inline FixedPoint operator+(const FixedPoint& lhs, const FixedPoint& rhs)
 {
     FixedPoint f = {};
-    f.fpValue = lhs.fpValue + rhs.fpValue;
+    f.fpValue = FP_WrapAdd(lhs.fpValue, rhs.fpValue);
     return f;
 }
 
 inline FixedPoint operator-(const FixedPoint& lhs, const FixedPoint& rhs)
 {
     FixedPoint f = {};
-    f.fpValue = lhs.fpValue - rhs.fpValue;
+    f.fpValue = FP_WrapSub(lhs.fpValue, rhs.fpValue);
     return f;
 }
 
 inline FixedPoint operator-(const FixedPoint& value)
 {
     FixedPoint f = {};
-    f.fpValue = -value.fpValue;
+    f.fpValue = FP_WrapSub(0, value.fpValue);
     return f;
 }
 
@@ -119,7 +131,7 @@ inline FP FP_Abs(const FP& v)
 {
     if (v < FP_FromInteger(0))
     {
-        return FP_FromRaw(-v.fpValue);
+        return FP_FromRaw(FP_WrapSub(0, v.fpValue));
     }
     else
     {

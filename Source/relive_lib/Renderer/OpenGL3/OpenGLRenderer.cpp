@@ -1,4 +1,5 @@
 #include "../../Window.hpp"
+#include "../../SoundDebug.hpp"
 #include <algorithm>
 
 #include "../../../relive_lib/data_conversion/rgb_conversion.hpp"
@@ -237,7 +238,7 @@ void OpenGLRenderer::EndFrame()
         drawRect.h);
 
     // Do ImGui, only when there's something to show
-    if (gDDCheat_FlyingEnabled || AO::gDDCheat_FlyingEnabled || GetGameAutoPlayer().IsPlaying())
+    if (gDDCheat_FlyingEnabled || AO::gDDCheat_FlyingEnabled || GetGameAutoPlayer().IsPlaying() || SoundDebug::AlwaysShown())
     {
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
@@ -595,6 +596,8 @@ void OpenGLRenderer::DebugWindow()
         }
         ImGui::EndMainMenuBar();
     }
+
+    SoundDebug::DrawWindow();
 
     if (ImGui::Begin("Render stats"))
     {

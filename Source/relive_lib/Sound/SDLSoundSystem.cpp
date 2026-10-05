@@ -448,6 +448,12 @@ void SDLSoundSystem::RenderAudio(StereoSample_S16* pSampleBuffer, s32 sampleBuff
 }
 
 
+// The volume with a stop or release's fade out applied
+static s32 EffectiveVolume(const SDLSoundBuffer& voice)
+{
+    return (voice.mState.iVolume * voice.mState.iFade) / 127;
+}
+
 void SDLSoundSystem::RenderSoundBuffer(SDLSoundBuffer& entry, StereoSample_S16* pSampleBuffer, s32 sampleBufferCount)
 {
     bool reverbPass = false;
@@ -461,8 +467,18 @@ void SDLSoundSystem::RenderSoundBuffer(SDLSoundBuffer& entry, StereoSample_S16* 
 
     if (pVoice->mState.bIsReleased)
     {
-        pVoice->Destroy(); // TODO: Still correct ??
-        return;
+        if (pVoice->mState.eStatus == SDLSoundBufferStatus::Playing && pVoice->mState.iVolume > 0)
+        {
+            // Fade out before it goes: cutting a playing buffer off clicks (a skipped movie)
+            pVoice->mState.bFadingOut = true;
+            pVoice->mState.bFadingIn = false;
+            pVoice->mState.eStatus = SDLSoundBufferStatus::Stopped;
+        }
+        else if (!pVoice->mState.bFadingOut)
+        {
+            pVoice->Destroy(); // TODO: Still correct ??
+            return;
+        }
     }
 
     // Clear Temp Sample Buffer
@@ -472,7 +488,7 @@ void SDLSoundSystem::RenderSoundBuffer(SDLSoundBuffer& entry, StereoSample_S16* 
 
     for (s32 i = 0; i < sampleBufferCount; i++)
     {
-        if (pVoice->mBuffer->empty() || pVoice->mState.eStatus != SDLSoundBufferStatus::Playing || pVoice->mState.iSampleCount == 0)
+        if (pVoice->mBuffer->empty() || (pVoice->mState.eStatus != SDLSoundBufferStatus::Playing && !pVoice->mState.bFadingOut) || pVoice->mState.iSampleCount == 0)
         {
             break;
         }
@@ -500,6 +516,20 @@ void SDLSoundSystem::RenderSoundBuffer(SDLSoundBuffer& entry, StereoSample_S16* 
             reverbPass = true;
 
             RenderMonoSample(pVoiceBufferPtr, pVoice, i);
+        }
+
+        if (pVoice->mState.bFadingIn && ++pVoice->mState.iFade >= 127)
+        {
+            pVoice->mState.bFadingIn = false;
+            pVoice->mState.iFade = 127;
+        }
+
+        if (pVoice->mState.bFadingOut && --pVoice->mState.iFade <= 0)
+        {
+            pVoice->mState.bFadingOut = false;
+            pVoice->mState.iFade = 127;
+            pVoice->mState.eStatus = SDLSoundBufferStatus::Stopped;
+            break;
         }
 
         if (pVoice->mState.fPlaybackPosition >= pVoice->mState.iSampleCount / pVoice->mState.iChannels)
@@ -561,8 +591,8 @@ void SDLSoundSystem::RenderMonoSample(Sint16* pVoiceBufferPtr, SDLSoundBuffer* p
         rightPan = r;
     }
 
-    mTempSoundBuffer[i].left = static_cast<s16>((((s * leftPan) / 10000) * pVoice->mState.iVolume) / 127);
-    mTempSoundBuffer[i].right = static_cast<s16>((((s * rightPan) / 10000) * pVoice->mState.iVolume) / 127);
+    mTempSoundBuffer[i].left = static_cast<s16>((((s * leftPan) / 10000) * EffectiveVolume(*pVoice)) / 127);
+    mTempSoundBuffer[i].right = static_cast<s16>((((s * rightPan) / 10000) * EffectiveVolume(*pVoice)) / 127);
 
     pVoice->mState.fPlaybackPosition += pVoice->mState.fFrequency;
 }
@@ -570,8 +600,8 @@ void SDLSoundSystem::RenderMonoSample(Sint16* pVoiceBufferPtr, SDLSoundBuffer* p
 void SDLSoundSystem::RenderStereoSample(Sint16* pVoiceBufferPtr, SDLSoundBuffer* pVoice, s32 i)
 {
     StereoSample_S16 pSample = reinterpret_cast<StereoSample_S16*>(pVoiceBufferPtr)[static_cast<s32>(pVoice->mState.fPlaybackPosition)];
-    mTempSoundBuffer[i].left = static_cast<s16>((pSample.left * pVoice->mState.iVolume) / 127);
-    mTempSoundBuffer[i].right = static_cast<s16>((pSample.right * pVoice->mState.iVolume) / 127);
+    mTempSoundBuffer[i].left = static_cast<s16>((pSample.left * EffectiveVolume(*pVoice)) / 127);
+    mTempSoundBuffer[i].right = static_cast<s16>((pSample.right * EffectiveVolume(*pVoice)) / 127);
 
     pVoice->mState.fPlaybackPosition += pVoice->mState.fFrequency;
 }

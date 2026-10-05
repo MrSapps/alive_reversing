@@ -24,7 +24,7 @@ TEST(CommandLineOptions, NothingGivenMeansDefaults)
     EXPECT_FALSE(options.mShowFps);
     EXPECT_FALSE(options.mNoFrameSkip);
     EXPECT_FALSE(options.mRendererChecks);
-    EXPECT_FALSE(options.mPs1Sound);
+    EXPECT_TRUE(options.mPs1Sound);
     EXPECT_EQ(options.mRecordFile, std::nullopt);
     EXPECT_EQ(options.mPlayFile, std::nullopt);
     EXPECT_EQ(options.mRenderer, std::nullopt);
@@ -81,10 +81,16 @@ TEST(CommandLineOptions, RendererChecks)
     EXPECT_TRUE(Parse({"-renderer_checks"}).mRendererChecks);
     EXPECT_FALSE(Parse({"-renderer=opengl"}).mRendererChecks);
     EXPECT_TRUE(Parse({"-ps1_sound"}).mPs1Sound);
+    EXPECT_FALSE(Parse({"-pc_sound"}).mPs1Sound);
+    EXPECT_TRUE(Parse({"-pc_sound", "-ps1_sound"}).mPs1Sound);
+    EXPECT_EQ(Parse({"-ps1_data=/discs"}).mPs1DataDir, "/discs");
+    EXPECT_EQ(Parse({}).mPs1DataDir, "");
     EXPECT_FALSE(Parse({"-ps1_sound"}).mSpuFilterGaussian);
     EXPECT_TRUE(Parse({"-spu_filter=gaussian"}).mSpuFilterGaussian);
     EXPECT_FALSE(Parse({"-spu_filter=hq"}).mSpuFilterGaussian);
     EXPECT_FALSE(Parse({"-spu_filter=bogus"}).mSpuFilterGaussian);
+    EXPECT_TRUE(Parse({"-sound_debug"}).mSoundDebug);
+    EXPECT_FALSE(Parse({}).mSoundDebug);
 }
 
 TEST(CommandLineOptions, AutomationScript)

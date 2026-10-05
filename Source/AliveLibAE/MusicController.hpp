@@ -50,6 +50,8 @@ public:
     void PlayMusic(MusicTypes typeToSet, const BaseGameObject* pObj, s16 bFlag4, s8 bFlag0x20);
 
     void UpdateMusic();
+    // -ps1_sound: the PS1's version, which changes music on a beat grid (see the .cpp)
+    void UpdateMusicPs1();
     void UpdateAmbiance();
 
     static void static_PlayMusic(MusicTypes typeToSet, const BaseGameObject* pObj, s16 bFlag4, s8 bFlag0x20);
@@ -72,6 +74,10 @@ private:
     u16 field_50_current_vol = 0;
     u16 field_52_target_volume = 0;
     u32 field_54_music_volume_change_time = 0;
+    // The PS1's beat grid (its fields +56 and +60), unused by the PC: music changes when
+    // (time - origin) is a multiple of the period
+    s32 mBeatOrigin = 0;
+    s32 mBeatPeriod = 1;
     bool mMusicEnabled = false;
     bool mScreenChanged = false;
     bool mMusicDead = false;

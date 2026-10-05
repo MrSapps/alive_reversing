@@ -399,6 +399,8 @@ SET(sound_src
     Sound/PsxSpuApi.cpp
     Sound/PsxSoundEngine.hpp
     Sound/PsxSoundEngine.cpp
+    Sound/Ps1SoundData.hpp
+    Sound/Ps1SoundData.cpp
     Sound/Libsnd.hpp
     Sound/Libsnd.cpp
     Sound/PsxSpuApi.hpp
@@ -625,6 +627,8 @@ SET(relive_lib_src
     CommandLineOptions.cpp
     Automation.hpp
     Automation.cpp
+    SoundDebug.hpp
+    SoundDebug.cpp
     BinaryPath.hpp
     BinaryPath.cpp
     SwitchStates.hpp

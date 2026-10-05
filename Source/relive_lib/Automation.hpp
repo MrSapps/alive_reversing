@@ -34,6 +34,22 @@ class ResourceManagerWrapper;
 //       The game, level/path/camera, frame numbers, whether a movie or other modal is running.
 //   dump_objects <file.json>
 //       Every game object, with its position and animation (blend mode, tint, layer...).
+//   fmv <name>
+//       Play a movie (e.g. BA1114), the way the game's camera changes do. It takes over the main loop
+//       until it ends or is skipped: wait_frames counts its frames, and quit quits through it.
+//   music <type> [<owner> [<flag4> [<flag20>]]]
+//       Ask the game's MusicController for a music type (name or number, see SoundDebug.hpp) as
+//       abe (default), other (a second dummy object) or none, with the controller's two flags.
+//   kill_other
+//       Destroy the dummy owner, so the controller's owner is dead.
+//   sfx <index> [<volume> [<right volume>]]
+//       Play a relive::SoundEffects entry (its index in Sfx.hpp), at its default volume if none;
+//       with a right volume, in stereo.
+//   sfx_pitch <index> <volume> <pitch>
+//       Play a sound effect with a pitch offset in 1/128 semitones (SFX_Play_Pitch).
+//   seq_play <index> [<volume> [<repeat>]]
+//       Play a SEQ by its index in the game's SEQ table (volume default 100, repeat 0 = forever,
+//       default 1). seq_stop <index> stops it.
 //   timeout <seconds>
 //       Fail if the script is still running after this long, counted from the start (default 120).
 //   quit
@@ -56,6 +72,7 @@ public:
     static bool Parse(const std::string& script, std::vector<Command>& commands, std::string& error);
 
     Automation(FileSystem& fs, ResourceManagerWrapper& resMan, std::vector<Command> commands);
+    ~Automation();
 
     enum class Result
     {

@@ -466,6 +466,91 @@ envelopes, interpolation, reverb and key on timing match.
 A real PS1 recording of the secret area (DuckStation, `build-ps1re/rec`) confirms the jingle's
 pitch and tempo.
 
+### The music controller and the game's sound tables
+
+Above libsnd, `-ps1_sound` follows the PS1's own game code where the PC's differs. Checked
+against the PS1 executables (October 2026):
+
+- The SFX table (AO 113, AE 122 entries), the music tables (per level) and the SEQ name and volume
+  tables are byte for byte the PS1's, except AE's slig shot (PC program 39, PS1 program 2, which
+  `-ps1_sound` uses). `build-ps1re/tablecmp/*.py` redoes the check.
+- The music clock is the PS1's vblank counter read shifted right by one (`PsxSoundEngine::kVblankHz`
+  / 2 units a second: 25 on PAL, 30 on NTSC, which is the PC's rate).
+- AO: mono sound effects have a minimum volume of 10 (AE 1); `SND_SEQ_Play` sets the SEQ's volume
+  before playing it (the PC plays, then sets); `SetMusicVolumeDelayed` stores the target volume
+  itself.
+- AE: `UpdateMusic` changes music on a beat grid: only when the time since the last change is a
+  multiple of the music type's beat period (`MusicController::UpdateMusicPs1`), where the PC
+  waits for the old SEQ to end.
+- The PS1 has no `ClearObject`: the controller keeps a dangling owner pointer. relive's pointer =
+  1 does the same.
+
+The sound effect functions (`SFX_SfxDefinition_Play_Mono` and `_Stereo`, `SND_MIDI`) are checked the
+same way: `RELIVE_MUSIC_LOG` logs their arguments (SFXM, SFXS, SNDMIDI) and the resulting
+`SsVoKeyOn` and `SsUtChangePitch` calls, and `ps1music` calls the PS1's own functions with the same
+arguments. Every sound effect of both games at the default, a low, a high and a stereo volume,
+and seeded random sequences of competing music requests (owners, flags, owner death, level changes),
+give identical calls (AO 1099 SFX and 2101 music calls, AE 1010 and 2086).
+
+Known differences from the PS1 that are on purpose: for notes more than 5 octaves below a tone's
+centre the real libsnd reads before its pitch table and gets pitch 0 (a silent voice that stays
+at full envelope, so it is never freed); `Libsnd` rounds down instead (`PitchFromTable`). `ps1snd
+cmp` shows it as a few register writes that differ (AE's Feeco Depot SEQs). Pitches above 0x3FFF
+aren't clamped (the AO secret area jingle).
+
+To check the controller itself, `RELIVE_MUSIC_LOG=<file> relive [-AO] -ps1_sound -automation=<script>`
+logs the controller's inputs (CREATE, ENABLE, MUSIC, CLEAR, VUPDATE, FIND, RAND) and its
+`SND_SEQ_*` calls with the music clock's ms (frames of the script, so it's repeatable), and
+`build-ps1re/ref/ps1music [-ae] <file>` runs the real PS1 `MusicController` on the same inputs with
+only the `SND_SEQ_*` wrappers hooked. `ps1music cmp <relive log> <ps1 calls>` diffs the calls.
+`mcmp.sh` / `mcmp_ae.sh` do both for a script. The scripts drive the game with Automation's
+`music`, `sfx`, `seq_play` and `seq_stop` commands; `-sound_debug` shows the same as a window.
+
+### The PS1's own data: `-ps1_data`
+
+`relive -ps1_data=<dir>` plays the PS1's VH, VB and SEQ files instead of the PC's, so relive and the
+real PS1 code can be compared on the same data. `Ps1SoundData` indexes every `*.LVL` below `<dir>`
+(a PS1 disc's files; the container is the PC's), `ResourceManagerWrapper::LoadSoundFile` gives its
+files where it has them (a SEQ comes from the BSQ of the LVL that holds the theme's VH: a few SEQ
+ids are in several BSQs with different SEQs), and `SND_VAB_Load` decodes the VB's SPU ADPCM
+(`Ps1SoundData::DecodeVab`: the loop from the block with the loop start flag, a second pass of the
+loop decoded with the history the first left, as the SPU does) into the PCM the emulated SPU plays.
+The PS1's VH has the PS1's tone priorities, volumes and centres, so `RestorePs1Tones` isn't used.
+
+End to end (`build-ps1re/ref/e2e.sh`): the engine with `-ps1_data -spu_filter=gaussian` records its
+libsnd calls and audio, the real libsnd on DuckStation's SPU replays the calls, and `snr.py` compares
+the audio. AO (menu music, then Rupture Farms): the difference is 51.6 dB below the signal, the SPU
+emulations' difference; loudness, spectrum and note onsets match. AE (Mines, music and effects):
+44-55 dB below the signal in each second, with bursts at a few note onsets, which the recording's
+millisecond timestamps can place a few samples off.
+
+`-ps1_sound` is the default now (`-pc_sound` for the PC's way); `-ps1_sound` is still accepted.
+
+### Clicks: declick
+
+The hardware clicks wherever a voice is cut in a step: a voice stopped while it is loud (a VAB
+closed under it, a voice taken for another note, a release with no time), the master volume going
+to 0 in one step, and a sound buffer freed while it plays (a skipped movie). The recordings of the
+real PS1 code show the same steps, so this is on purpose better than the PS1:
+- `PsxSpu::SetDeclick` (on in the engine, `RELIVE_NO_DECLICK=1` for the hardware's output, which the
+  comparisons with the real libsnd use; the sound gold tests turn it off): a voice that stops while
+  loud keeps adding its last output, fading to 0 over 128 samples (3 ms), which needs no sample data
+  so a freed VAB is fine; the master volume moves to a new setting over about 12 ms.
+  The envelope level doesn't fall faster than full to nothing in 128 samples in any phase
+  (`PsxSpuEnvelope::SetMinimumRelease`), and a voice's volume follows its setting over the same time:
+  libsnd's `SsUtAllKeyOff` writes the fastest decay into voices that are still sustaining, sets their
+  volume to 0 and only then keys them off, and `SeqClose` zeroes the SEQ's volume first, so on the
+  hardware the music drops to nothing in a few samples (the thump when the music stops for a movie).
+  `PsxSoundEngine::FadeOutNextKeyOffs` lengthens both for a while: a movie starting fades the
+  music and sounds out over 150 ms.
+- `SDLSoundBuffer`: `Stop` and a release of a playing buffer fade it out over 127 samples (the
+  buffer reads as stopped at once), and `Play` fades in over the same; a skipped movie's audio is
+  freed that way.
+
+Quitting while a movie plays used to crash: the music controllers were destroyed before the movie,
+whose destructor stops all sound, which reached the destroyed controller. They clear their global as
+they go now.
+
 ### Still to do
 
 - Loudness: with the real AE data a few loud SEQs (e.g. MI_6_1, NEGATIV3) hit the SPU's 16 bit

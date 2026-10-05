@@ -11,6 +11,8 @@
 
 #include "PsxSpuApi.hpp"
 #include "PsxSoundEngine.hpp"
+#include "Ps1SoundData.hpp"
+#include "../SoundDebug.hpp"
 #include "../../relive_lib/BinaryPath.hpp"
 #include "../AmbientSound.hpp"
 #include "../../relive_lib/FatalError.hpp"
@@ -160,9 +162,13 @@ void SND_Reset()
 
 s16 SND_VAB_Load_4C9FE0(PathSoundInfo& pSoundBlockInfo, ResourceManagerWrapper& resMan)
 {
+    // The PS1's own data (-ps1_data), if it has this VAB. It has the PS1's tones and ADPCM samples
+    const Ps1SoundData* pPs1Data = PsxSoundEngine::Get() ? resMan.GetPs1SoundData() : nullptr;
+    const bool ps1Vab = pPs1Data && pPs1Data->Has(pSoundBlockInfo.mVhFile) && pPs1Data->Has(pSoundBlockInfo.mVbFile);
+
     // Load the VH file data
     pSoundBlockInfo.mVhFileData = resMan.LoadSoundFile(pSoundBlockInfo.mVhFile.c_str(), pSoundBlockInfo.mSoundTheme);
-    if (PsxSoundEngine::Get())
+    if (PsxSoundEngine::Get() && !ps1Vab)
     {
         PsxSoundEngine::RestorePs1Tones(GetGameType(), pSoundBlockInfo.mVhFile, pSoundBlockInfo.mVhFileData);
     }
@@ -176,6 +182,23 @@ s16 SND_VAB_Load_4C9FE0(PathSoundInfo& pSoundBlockInfo, ResourceManagerWrapper& 
     if (PsxSoundEngine* pRec = PsxSoundEngine::Get())
     {
         pRec->Record("VAB %d %s %s %s", pSoundBlockInfo.mVabId, pSoundBlockInfo.mSoundTheme.c_str(), pSoundBlockInfo.mVhFile.c_str(), pSoundBlockInfo.mVbFile.c_str());
+    }
+
+    if (ps1Vab)
+    {
+        // The samples are ADPCM VAGs: decode them for the emulated SPU
+        PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get();
+        const std::vector<Ps1SoundData::Sample> samples = Ps1SoundData::DecodeVab(pSoundBlockInfo.mVhFileData, vbFileData);
+        for (std::size_t i = 0; i < samples.size(); i++)
+        {
+            const Ps1SoundData::Sample& sample = samples[i];
+            if (!sample.mPcm.empty())
+            {
+                SsExt_SetVagFlags(static_cast<s16>(pSoundBlockInfo.mVabId), static_cast<s32>(i), sample.mLoop ? 4 : 0);
+                pPs1Sound->SetSample(pSoundBlockInfo.mVabId, static_cast<s32>(i), sample.mPcm.data(), static_cast<u32>(sample.mPcm.size()), sample.mLoop, sample.mLoopStart);
+            }
+        }
+        return 1;
     }
 
     // Load actual sample data (copied, hence vec goes out of scope after this)
@@ -273,8 +296,19 @@ void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& info, s32 reverb, ResourceMan
 }
 
 
+// Logs the result, for replaying a run on the PS1's sound effect code with the same choices
+static s32 SfxRandom(s32 min, s32 max)
+{
+    const s32 value = Math_RandomRange(min, max);
+    SoundDebug::LogSeqOutput("RAND %d %d %d", min, max, value);
+    return value;
+}
+
 s32 SFX_SfxDefinition_Play_Mono(const relive::SfxDefinition& sfxDef, s32 volume, s32 pitch_min, s32 pitch_max)
 {
+    SoundDebug::MusicScope scope;
+    SoundDebug::LogSeqCall("SFXM %d %d %d %d %d %d %d %d %d %d %d", sfxDef.mBlockIdx, sfxDef.mProgram, sfxDef.mNote, sfxDef.mDefaultVolume, sfxDef.mPitchMin, sfxDef.mPitchMax,
+        volume, pitch_min, pitch_max, LastLoadedVabId(), GetMidiVars()->sSFXPitchVariationEnabled());
     if (!volume)
     {
         volume = sfxDef.mDefaultVolume;
@@ -290,9 +324,11 @@ s32 SFX_SfxDefinition_Play_Mono(const relive::SfxDefinition& sfxDef, s32 volume,
         pitch_max = sfxDef.mPitchMax;
     }
 
-    if (volume < 1)
+    // PS1 AO clamps to 10 (AE to 1), the PC to 1 (checked against the PS1 executables)
+    const s32 minVolume = (PsxSoundEngine::Get() && GetGameType() == GameType::eAo) ? 10 : 1;
+    if (volume < minVolume)
     {
-        volume = 1;
+        volume = minVolume;
     }
     else if (volume >= 127)
     {
@@ -347,7 +383,7 @@ static s32 SFX_ApplyPitchVariation(const relive::SfxDefinition& sfxDef, s32 midi
 
     if (pitch_min || pitch_max)
     {
-        SND_SetChannelsPitch(midiHandle, LastLoadedVabId(), sfxDef.mProgram, sfxDef.mNote, Math_RandomRange(pitch_min, pitch_max));
+        SND_SetChannelsPitch(midiHandle, LastLoadedVabId(), sfxDef.mProgram, sfxDef.mNote, SfxRandom(pitch_min, pitch_max));
     }
 
     return midiHandle;
@@ -355,6 +391,8 @@ static s32 SFX_ApplyPitchVariation(const relive::SfxDefinition& sfxDef, s32 midi
 
 s32 SND_MIDI(s32 program, s32 vabId, s32 note, s16 vol, s16 min, s16 max)
 {
+    SoundDebug::MusicScope scope;
+    SoundDebug::LogSeqCall("SNDMIDI %d %d %d %d %d %d %d", program, vabId, note, vol, min, max, GetMidiVars()->sSFXPitchVariationEnabled());
     s32 volClamped = 0;
     if (vol < 10)
     {
@@ -379,13 +417,16 @@ s32 SND_MIDI(s32 program, s32 vabId, s32 note, s16 vol, s16 min, s16 max)
 
     if (min || max)
     {
-        SND_SetChannelsPitch(channelBits, program, vabId, note, Math_RandomRange(min, max));
+        SND_SetChannelsPitch(channelBits, program, vabId, note, SfxRandom(min, max));
     }
     return channelBits;
 }
 
 s32 SFX_SfxDefinition_Play_Stereo(const relive::SfxDefinition& sfxDef, s16 volLeft, s16 volRight, s16 pitch_min, s16 pitch_max)
 {
+    SoundDebug::MusicScope scope;
+    SoundDebug::LogSeqCall("SFXS %d %d %d %d %d %d %d %d %d %d %d %d", sfxDef.mBlockIdx, sfxDef.mProgram, sfxDef.mNote, sfxDef.mDefaultVolume, sfxDef.mPitchMin, sfxDef.mPitchMax,
+        volLeft, volRight, pitch_min, pitch_max, LastLoadedVabId(), GetMidiVars()->sSFXPitchVariationEnabled());
     if (pitch_min == 0x7FFF)
     {
         pitch_min = sfxDef.mPitchMin;
@@ -484,6 +525,7 @@ void SND_Seq_Stop_4CA8E0()
 
 s16 SND_SEQ_PlaySeq(u16 idx, s16 repeatCount, s16 bDontStop)
 {
+    SoundDebug::LogSeqOutput("PLAYSEQ %d %d %d", idx, repeatCount, bDontStop);
     OpenSeqHandle& rec = GetMidiVars()->sSeqDataTable()[idx];
     if (rec.field_C_ppSeq_Data.empty())
     {
@@ -554,6 +596,7 @@ s16 SND_SEQ_PlaySeq(u16 idx, s16 repeatCount, s16 bDontStop)
 
 s16 SND_SEQ_Play(u16 idx, s16 repeatCount, s16 volLeft, s16 volRight)
 {
+    SoundDebug::LogSeqOutput("PLAY %d %d %d %d", idx, repeatCount, volLeft, volRight);
     OpenSeqHandle& rec = GetMidiVars()->sSeqDataTable()[idx];
     if (rec.field_C_ppSeq_Data.empty())
     {
@@ -654,6 +697,7 @@ s32 SND_SsIsEos_DeInlined(u16 idx)
 
 void SND_SEQ_SetVol(s32 idx, s16 volLeft, s16 volRight)
 {
+    SoundDebug::LogSeqOutput("SETVOL %d %d %d", idx & 0xFFFF, volLeft, volRight);
     u16 limitedIdx = idx & 0xFFFF;
     if (GetMidiVars()->sSeqDataTable()[limitedIdx].field_A_id_seqOpenId != -1
         && !GetMidiVars()->sSeqDataTable()[limitedIdx].field_C_ppSeq_Data.empty()
@@ -666,6 +710,7 @@ void SND_SEQ_SetVol(s32 idx, s16 volLeft, s16 volRight)
 
 void SND_SEQ_Stop(u16 idx)
 {
+    SoundDebug::LogSeqOutput("STOP %d", idx);
     if (GetMidiVars()->sSeqDataTable()[idx].field_A_id_seqOpenId != -1 && !GetMidiVars()->sSeqDataTable()[idx].field_C_ppSeq_Data.empty())
     {
         if (SsIsEos_4FDA80(GetMidiVars()->sSeqDataTable()[idx].field_A_id_seqOpenId, 0))

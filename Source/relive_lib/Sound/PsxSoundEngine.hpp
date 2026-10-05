@@ -29,6 +29,11 @@ public:
     // The engine of the running sound system, or nullptr when -ps1_sound is off
     static PsxSoundEngine* Get();
 
+    // The PS1's music clock is a vblank counter (MusicController's RCntCNT3 callback adds 1 per
+    // vblank) that both games read shifted right by one, so 30 music units a second on NTSC (the
+    // PC's rate) and 25 on PAL. 50 is PAL, 60 NTSC, which is probably the better one to use.
+    static constexpr u32 kVblankHz = 50;
+
     // The PC data lowered some of AO's tone priorities and volumes: the secret area jingle's from 127
     // to 70, so sound effects (an electric wall's buzz) took its voices. Puts the PS1 values back in
     // VH data, before SsVabOpenHead reads it. vhFile: the VH's name, e.g. RFSNDFX.VH. A tone only
@@ -40,7 +45,8 @@ public:
     void OpenVab(s32 vabId, const u8* pVh, u32 size);
     // Copies one of the VAB's samples, 16 bit mono PCM. vagIdx is the VAG number - 1. loop: loop
     // the whole sample.
-    void SetSample(s32 vabId, s32 vagIdx, const s16* pPcm, u32 sampleCount, bool loop);
+    // loopStart: where a looping sample jumps back to, in samples
+    void SetSample(s32 vabId, s32 vagIdx, const s16* pPcm, u32 sampleCount, bool loop, u32 loopStart = 0);
     // SsVabClose: stops the voices playing the VAB and frees its samples
     void CloseVab(s32 vabId);
 
@@ -63,6 +69,13 @@ public:
 
     // How the SPU resamples the voices
     void SetInterpolation(PsxSpu::Interpolation interpolation);
+    // Fade a voice that stops while it is loud instead of cutting it off (see PsxSpu::SetDeclick). On
+    // by default, off to get the hardware's output
+    void SetDeclick(bool enable);
+    // The key offs of the next windowMs of audio take at least releaseMs to fade out (the music, when a
+    // movie starts), then it's the default of 3 ms again. libsnd applies a key off at its next tick, so
+    // a window rather than a setting
+    void FadeOutNextKeyOffs(u32 releaseMs, u32 windowMs);
 
     // SsSetMVol, 0-127
     void SetMasterVolume(s32 left, s32 right);
@@ -103,12 +116,14 @@ public:
 
 private:
     static constexpr s32 kMaxVabs = 4;
+    u32 mLongReleaseSamplesLeft = 0;
     static constexpr s32 kMaxSamples = 256;
 
     struct Vab final
     {
         std::array<std::vector<s16>, kMaxSamples> mSamples;
         std::array<bool, kMaxSamples> mLoops = {};
+        std::array<u32, kMaxSamples> mLoopStarts = {};
         // Low-passed copies of the samples the tones play fast, see PsxSpuSample::mFiltered
         std::array<std::array<std::vector<s16>, kPsxSpuFilterLevels>, kMaxSamples> mFiltered;
     };

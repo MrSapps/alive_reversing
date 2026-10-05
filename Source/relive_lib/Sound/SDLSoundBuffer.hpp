@@ -57,6 +57,12 @@ public:
         SDLSoundBufferStatus eStatus;
         bool bLoop;
         bool bIsReleased;
+        // A buffer that is stopped or released while it plays fades out over 127 samples instead of
+        // cutting off, which clicks. iFade is the gain (0-127) the fade brings down
+        bool bFadingOut = false;
+        // And a buffer that starts fades in the same way, so a sound that starts mid-wave doesn't click
+        bool bFadingIn = false;
+        s32 iFade = 127;
         f32 fPlaybackPosition;
 
         s32 iSampleCount;

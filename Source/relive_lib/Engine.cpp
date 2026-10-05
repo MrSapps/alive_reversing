@@ -1,5 +1,7 @@
 #include "Engine.hpp"
 #include "Automation.hpp"
+#include "SoundDebug.hpp"
+#include "Sound/Ps1SoundData.hpp"
 #include "Renderer/FrameStatsOverlay.hpp"
 #include "GameType.hpp"
 #include "data_conversion/data_conversion_ui.hpp"
@@ -295,6 +297,7 @@ void Engine::Init_Sound_DynamicArrays_And_Others()
     gBaseAliveGameObjects = relive_new DynamicArrayT<BaseAliveGameObject>(20);
 
     // SND_Init creates the sound system
+    SoundDebug::SetAlwaysShown(mOptions.mSoundDebug);
     SDLSoundSystem::SetPs1SoundOnCreate(mOptions.mPs1Sound,
         mOptions.mSpuFilterGaussian ? PsxSpu::Interpolation::Gaussian : PsxSpu::Interpolation::BandLimited);
     SDLSoundSystem::SetAudioDumpOnCreate(mOptions.mDumpAudio.value_or(""), mOptions.mDumpLiveAudio.value_or(""));
@@ -843,6 +846,14 @@ void Engine::Init()
 
     mResMan = std::make_unique<ResourceManagerWrapper>(mFs, activeModPath);
     mResMan->SetDebugLoadDelay(mOptions.mSlowLoadMs);
+    if (!mOptions.mPs1DataDir.empty())
+    {
+        auto ps1Data = std::make_unique<Ps1SoundData>(mFs);
+        if (ps1Data->Open(mOptions.mPs1DataDir))
+        {
+            mResMan->SetPs1SoundData(std::move(ps1Data));
+        }
+    }
 
     gPsxDisplay.Init(*mResMan);
 

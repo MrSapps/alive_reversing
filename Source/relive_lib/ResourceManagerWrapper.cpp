@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "ResourceManagerWrapper.hpp"
+#include "Sound/Ps1SoundData.hpp"
 #include "GameType.hpp"
 #include "Psx.hpp"
 
@@ -82,6 +83,11 @@ void ResourceManagerWrapper::AddSearchPaths(const std::string& modPath)
     mSearchPaths.push_back(backupBaseGamePath.GetPath());
 }
 
+
+void ResourceManagerWrapper::SetPs1SoundData(std::unique_ptr<Ps1SoundData> pData)
+{
+    mPs1SoundData = std::move(pData);
+}
 
 // Out of line so unique_ptr<ThreadPool> can be destroyed with an incomplete ThreadPool type
 ResourceManagerWrapper::~ResourceManagerWrapper() = default;
@@ -1082,7 +1088,23 @@ public:
         }
 
         std::vector<std::string> searchedPaths;
-        std::vector<u8> data = FindSoundFile(mResMan->mFs, mResMan->mSearchPaths, mFileName.c_str(), mSoundTheme, searchedPaths);
+        std::vector<u8> data;
+        if (const Ps1SoundData* pPs1 = mResMan->GetPs1SoundData())
+        {
+            // The PS1's file where it has one (a SEQ comes from the BSQ of the theme's LVL)
+            if (mFileName.size() > 4 && mFileName.compare(mFileName.size() - 4, 4, ".SEQ") == 0)
+            {
+                data = pPs1->ReadSeq(mFileName, mResMan->LoadSoundThemeInfo(mSoundTheme).mVhFile);
+            }
+            else
+            {
+                data = pPs1->ReadFile(mFileName);
+            }
+        }
+        if (data.empty())
+        {
+            data = FindSoundFile(mResMan->mFs, mResMan->mSearchPaths, mFileName.c_str(), mSoundTheme, searchedPaths);
+        }
         if (data.empty())
         {
             mResMan->ReportMissingResource(DescribeSoundFile(mFileName, mSoundTheme), std::move(searchedPaths));

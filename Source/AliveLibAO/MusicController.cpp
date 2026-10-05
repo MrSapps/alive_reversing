@@ -9,6 +9,8 @@
 #include "Math.hpp"
 #include "GameAutoPlayer.hpp"
 #include "Map.hpp"
+#include "../relive_lib/Sound/PsxSoundEngine.hpp"
+#include "../relive_lib/SoundDebug.hpp"
 
 namespace AO {
 
@@ -290,6 +292,8 @@ s16 MusicController::Create(ResourceManagerWrapper& resMan, BaseMap& map)
     if (pMusicController_507B98)
     {
         MusicController::SetBaseTimeStamp();
+        SoundDebug::LogSeqCall("CREATE");
+        SoundDebug::MusicScope scope;
 
         psx_root_event_507BA0 = Psx_Root_Counter_49C280(RCntCNT3, 2, 4096, MusicController::OnRootCounter);
 
@@ -313,14 +317,31 @@ s16 MusicController::Create(ResourceManagerWrapper& resMan, BaseMap& map)
 
 static u32 sMusicControllerBaseTimeStamp = 0;
 
+// Logs the result, for replaying a run on the PS1's MusicController with the same choices
+static s32 MusicRandom(s32 min, s32 max)
+{
+    const s32 value = Math_RandomRange(min, max);
+    SoundDebug::LogSeqCall("RAND %d %d %d", min, max, value);
+    return value;
+}
+
 void MusicController::SetBaseTimeStamp()
 {
-    sMusicControllerBaseTimeStamp = GetGameAutoPlayer().SysGetTicks();
+    sMusicControllerBaseTimeStamp = SoundDebug::MusicTicks(GetGameAutoPlayer().SysGetTicks());
 }
 
 void MusicController::UpdateMusicTime()
 {
-    sMusicTime_507B9C = (3 * GetGameAutoPlayer().SysGetTicks() - 3 * sMusicControllerBaseTimeStamp) / 100;
+    const u32 elapsedMs = SoundDebug::MusicTicks(GetGameAutoPlayer().SysGetTicks()) - sMusicControllerBaseTimeStamp;
+    if (PsxSoundEngine::Get())
+    {
+        // Half a unit per vblank (the PS1 reads its vblank counter shifted right by one)
+        sMusicTime_507B9C = (PsxSoundEngine::kVblankHz * elapsedMs) / 2000;
+    }
+    else
+    {
+        sMusicTime_507B9C = (3 * elapsedMs) / 100;
+    }
 }
 
 s32 MusicController::GetMusicTime()
@@ -360,6 +381,11 @@ MusicController::MusicController(ResourceManagerWrapper& resMan, BaseMap& map)
 
 MusicController::~MusicController()
 {
+    // Whatever is destroyed after this one (a movie stopping all sound as it goes) finds no controller
+    if (pMusicController_507B98 == this)
+    {
+        pMusicController_507B98 = nullptr;
+    }
     if (field_38_music_seq != SeqId::None_M1)
     {
         SND_SEQ_Stop(field_38_music_seq);
@@ -374,6 +400,8 @@ void MusicController::VScreenChanged()
 void MusicController::VUpdate()
 {
     MusicController::UpdateMusicTime();
+    SoundDebug::MusicScope scope;
+    SoundDebug::LogSeqCall("VUPDATE %d %d %d", static_cast<s32>(MapWrapper::ToAO(mMap.mCurrentLevel)), field_16_bScreenChanged ? 1 : 0, EventGet(Event::kEventDeathReset) ? 1 : 0);
 
     if (EventGet(Event::kEventDeathReset))
     {
@@ -433,6 +461,8 @@ void MusicController::VUpdate()
 
 void MusicController::static_PlayMusic(MusicTypes musicType, BaseGameObject* pObj, s16 a3, s16 a4)
 {
+    SoundDebug::MusicScope scope;
+    SoundDebug::LogSeqCall("MUSIC %d %d %d %d", static_cast<s32>(musicType), SoundDebug::ObjectOrdinal(pObj), a3, a4);
     if (pMusicController_507B98)
     {
         pMusicController_507B98->PlayMusic(musicType, pObj, a3, a4);
@@ -441,6 +471,8 @@ void MusicController::static_PlayMusic(MusicTypes musicType, BaseGameObject* pOb
 
 void MusicController::ClearObject(BaseGameObject* pObj)
 {
+    SoundDebug::MusicScope scope;
+    SoundDebug::LogSeqCall("CLEAR %d", SoundDebug::ObjectOrdinal(pObj));
     if (pMusicController_507B98)
     {
         pMusicController_507B98->DoClearObject(pObj);
@@ -531,6 +563,8 @@ void MusicController::UpdateVolumeState()
 
 void MusicController::Shutdown()
 {
+    SoundDebug::MusicScope scope;
+    SoundDebug::LogSeqCall("SHUTDOWN");
     if (pMusicController_507B98)
     {
         pMusicController_507B98->SetDead(true);
@@ -543,6 +577,12 @@ void MusicController::Shutdown()
 
 void MusicController::EnableMusic(s16 bEnable)
 {
+    SoundDebug::MusicScope scope;
+    SoundDebug::LogSeqCall("ENABLE %d", bEnable);
+    if (!pMusicController_507B98)
+    {
+        return;
+    }
     MusicController::UpdateMusicTime();
 
     if (pMusicController_507B98->field_10_bEnableMusic != bEnable)
@@ -667,6 +707,13 @@ s16 MusicController::SetMusicVolumeDelayed(s16 vol, s16 delay)
         field_4A_starting_volume = field_4C_current_vol;
         ret = (vol <= 0) ? 0 : vol;
 
+        if (PsxSoundEngine::Get())
+        {
+            // The PS1 stores the target itself, so the calls that don't use the result (a new level
+            // and EnableMusic) get their volume too
+            field_4E_vol = ret;
+        }
+
         field_2C_music_start_time = counterVal;
         field_50_music_volume_change_time = counterVal + delay;
 
@@ -732,7 +779,7 @@ void MusicController::UpdateMusic()
                 break;
 
             case MusicTypes::eDrumAmbience_3:
-                idx = field_44_bTypeChanged ? Math_RandomRange(0, 1) : -1;
+                idx = field_44_bTypeChanged ? MusicRandom(0, 1) : -1;
                 field_34_sync_after_beats = 1;
                 field_24_bAmbientMusicEnabled = 0;
                 field_4E_vol = SetMusicVolumeDelayed(field_14, 0);
@@ -790,7 +837,7 @@ void MusicController::UpdateMusic()
                     }
                     else
                     {
-                        idx = Math_RandomRange(118, 120);
+                        idx = MusicRandom(118, 120);
                     }
                     field_34_sync_after_beats = 22;
                 }
@@ -968,7 +1015,7 @@ void MusicController::UpdateAmbiance()
                     const auto diff = GetMusicTime() - field_2C_music_start_time;
                     if (rec.field_0_count < 0 || diff < rec.field_0_count)
                     {
-                        random = Math_RandomRange(rec.field_4_min, rec.field_6_max);
+                        random = MusicRandom(rec.field_4_min, rec.field_6_max);
                         break;
                     }
                 }
@@ -976,7 +1023,7 @@ void MusicController::UpdateAmbiance()
             else
             {
                 const MusicController_Record3* pRec = &rec3s_4CD798[static_cast<s32>(MapWrapper::ToAO(field_18_level))];
-                random = Math_RandomRange(pRec->field_0[0].field_4_min, pRec->field_0[0].field_6_max);
+                random = MusicRandom(pRec->field_0[0].field_4_min, pRec->field_0[0].field_6_max);
             }
 
             if (random < 0)

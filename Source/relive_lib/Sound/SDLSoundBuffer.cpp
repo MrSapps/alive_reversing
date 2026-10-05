@@ -114,6 +114,9 @@ HRESULT SDLSoundBuffer::Play(s32, s32, s32 flags)
 
     mState.fPlaybackPosition = 0;
     mState.eStatus = SDLSoundBufferStatus::Playing;
+    mState.bFadingOut = false;
+    mState.bFadingIn = true;
+    mState.iFade = 0;
 
     if (flags & DSBPLAY_LOOPING)
     {
@@ -127,6 +130,13 @@ HRESULT SDLSoundBuffer::Stop()
 {
     std::lock_guard<std::mutex> lock(mLock);
 
+    if (mState.eStatus == SDLSoundBufferStatus::Playing && mState.iVolume > 0)
+    {
+        // It reads as stopped at once, and the mixer plays a fade out tail (see
+        // AE_SDL_Voice_State::bFadingOut)
+        mState.bFadingOut = true;
+        mState.bFadingIn = false;
+    }
     mState.eStatus = SDLSoundBufferStatus::Stopped;
     return S_OK;
 }

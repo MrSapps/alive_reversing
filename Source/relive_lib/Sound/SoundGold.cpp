@@ -81,6 +81,11 @@ SoundGoldSession::SoundGoldSession(GameType game, bool ps1Sound, PsxSpu::Interpo
     mLastChannelState.resize(kNumChannels, "off");
     if (ps1Sound)
     {
+        // The gold files are the hardware's output
+        if (PsxSoundEngine* pPs1 = PsxSoundEngine::Get())
+        {
+            pPs1->SetDeclick(false);
+        }
         mLastVoiceState.resize(PsxSpu::kNumVoices, "off");
     }
     else

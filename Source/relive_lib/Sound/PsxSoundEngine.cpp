@@ -156,10 +156,27 @@ PsxSoundEngine::PsxSoundEngine()
     // Sized here so Mix never allocates on the audio thread
     mRenderBuffer.resize(kMixChunkFrames * 2);
 
+    // Voices that stop while they are loud fade out over 3 ms instead of clicking. The hardware
+    // clicks; RELIVE_NO_DECLICK=1 gives its output for comparing (see build-ps1re/ref)
+    SetDeclick(getenv("RELIVE_NO_DECLICK") == nullptr);
+
     if (const char* pRecord = getenv("RELIVE_SOUND_RECORD"))
     {
         mRecordFile = fopen(pRecord, "w");
     }
+}
+
+void PsxSoundEngine::FadeOutNextKeyOffs(u32 releaseMs, u32 windowMs)
+{
+    std::lock_guard<std::mutex> lock(mMutex);
+    mSpu.SetMinimumReleaseTime(releaseMs * PsxSpu::kSampleRate / 1000);
+    mLongReleaseSamplesLeft = windowMs * PsxSpu::kSampleRate / 1000;
+}
+
+void PsxSoundEngine::SetDeclick(bool enable)
+{
+    std::lock_guard<std::mutex> lock(mMutex);
+    mSpu.SetDeclick(enable);
 }
 
 PsxSoundEngine::~PsxSoundEngine()
@@ -210,7 +227,7 @@ void PsxSoundEngine::OpenVab(s32 vabId, const u8* pVh, u32 size)
     }
 }
 
-void PsxSoundEngine::SetSample(s32 vabId, s32 vagIdx, const s16* pPcm, u32 sampleCount, bool loop)
+void PsxSoundEngine::SetSample(s32 vabId, s32 vagIdx, const s16* pPcm, u32 sampleCount, bool loop, u32 loopStart)
 {
     if (!ValidVab(vabId) || vagIdx < 0 || vagIdx >= kMaxSamples)
     {
@@ -227,6 +244,7 @@ void PsxSoundEngine::SetSample(s32 vabId, s32 vagIdx, const s16* pPcm, u32 sampl
         StopVagVoices(vabId, vagIdx + 1);
         std::swap(mVabs[vabId].mSamples[vagIdx], pcm);
         mVabs[vabId].mLoops[vagIdx] = loop;
+        mVabs[vabId].mLoopStarts[vagIdx] = loopStart;
         std::swap(mVabs[vabId].mFiltered[vagIdx], oldFiltered);
     }
 }
@@ -320,6 +338,7 @@ void PsxSoundEngine::FilterSamples(s32 vabId, const std::array<u32, 256>& maxPit
         // A copy of the sample, filtered without the lock, then put in if it's still the same
         std::vector<s16> pcm;
         bool loop = false;
+        u32 loopStart = 0;
         s32 have = 0;
         {
             std::lock_guard<std::mutex> lock(mMutex);
@@ -334,12 +353,14 @@ void PsxSoundEngine::FilterSamples(s32 vabId, const std::array<u32, 256>& maxPit
             }
             pcm = vab.mSamples[vag - 1];
             loop = vab.mLoops[vag - 1];
+            loopStart = vab.mLoopStarts[vag - 1];
         }
 
         PsxSpuSample sample;
         sample.mPcm = pcm.data();
         sample.mLength = static_cast<u32>(pcm.size());
         sample.mLoop = loop;
+        sample.mLoopStart = loopStart;
         std::array<std::vector<s16>, kPsxSpuFilterLevels> filtered;
         for (s32 i = have; i < levels; i++)
         {
@@ -475,6 +496,7 @@ void PsxSoundEngine::SetVoiceSample(s32 voice, s32 vabId, s32 vag)
             sample.mPcm = pcm.data();
             sample.mLength = static_cast<u32>(pcm.size());
             sample.mLoop = vab.mLoops[vag - 1];
+            sample.mLoopStart = vab.mLoopStarts[vag - 1];
             for (s32 i = 0; i < kPsxSpuFilterLevels; i++)
             {
                 const std::vector<s16>& f = vab.mFiltered[vag - 1][i];
@@ -599,6 +621,14 @@ void PsxSoundEngine::Mix(StereoSample_S16* pOut, u32 frames)
             mSamplesToTick = kSamplesPerTick;
         }
         const u32 chunk = std::min({frames, kMixChunkFrames, mSamplesToTick});
+        if (mLongReleaseSamplesLeft > 0)
+        {
+            mLongReleaseSamplesLeft -= std::min(mLongReleaseSamplesLeft, chunk);
+            if (mLongReleaseSamplesLeft == 0)
+            {
+                mSpu.SetMinimumReleaseTime(0);
+            }
+        }
         mSpu.Render(mRenderBuffer.data(), chunk);
         for (u32 i = 0; i < chunk; i++)
         {

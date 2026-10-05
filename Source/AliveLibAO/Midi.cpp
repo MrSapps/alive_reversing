@@ -857,6 +857,12 @@ void SsVabTransBody(VabBodyRecord* pVabBody, s16 vabId)
 
 s16 SND_SEQ_Play(SeqId idx, s32 repeatCount, s16 volLeft, s16 volRight)
 {
+    if (PsxSoundEngine::Get())
+    {
+        // The PS1 sets the volume before it plays (the PC plays at the table's volume, then sets it)
+        return ::SND_SEQ_Play(static_cast<u16>(idx), static_cast<s16>(repeatCount), volLeft, volRight);
+    }
+
     const auto ret = SND_SEQ_PlaySeq(idx, repeatCount, 1); // TODO ??
 
     OpenSeqHandle* pOpenSeq = &GetMidiVars()->sSeqDataTable()[static_cast<u16>(idx)];

@@ -2,6 +2,7 @@
 
 #include "AnimResources.hpp"
 #include <mutex>
+#include <memory>
 #include <condition_variable>
 #include <set>
 #include <atomic>
@@ -201,6 +202,7 @@ public:
 
 
 class ThreadPool;
+class Ps1SoundData;
 class FileSystem;
 class IniFile;
 
@@ -342,6 +344,14 @@ public:
     // True while any pended resource is still loading
     bool IsLoading();
 
+    // The PS1's own sound data (-ps1_data): when set, LoadSoundFile gives its VH, VB and SEQ files in
+    // place of the PC's where it has them. Set once at start up, before any sound file is pended.
+    void SetPs1SoundData(std::unique_ptr<Ps1SoundData> pData);
+    const Ps1SoundData* GetPs1SoundData() const
+    {
+        return mPs1SoundData.get();
+    }
+
     // For testing slow storage: each resource loaded on a worker thread takes at least this long
     void SetDebugLoadDelay(u32 delayMs)
     {
@@ -475,6 +485,8 @@ private:
 
     bool mLoadingWaitRequested = false;
     bool mShowLoadingIconNow = false;
+
+    std::unique_ptr<Ps1SoundData> mPs1SoundData;
 
     // LoadSoundThemeInfo is called by PendPaths' jobs on worker threads
     std::mutex mSoundThemeInfoMutex;
