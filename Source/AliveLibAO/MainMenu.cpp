@@ -1,4 +1,5 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/relive_config.h"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/MenuFmv.hpp"
 #include "MainMenu.hpp"

@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/relive_config.h"
 #include "MainMenu.hpp"
 #include "../relive_lib/Function.hpp"
 #include "Map.hpp"

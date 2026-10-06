@@ -1,4 +1,5 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/relive_config.h"
 #include "Input.hpp"
 #include "Midi.hpp"
 #include "PauseMenu.hpp"

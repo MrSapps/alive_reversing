@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/relive_config.h"
 #include "Input.hpp"
 #include "../relive_lib/logger.hpp"
 #include "../relive_lib/Function.hpp"

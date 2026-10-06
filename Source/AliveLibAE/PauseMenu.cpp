@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/relive_config.h"
 #include "PauseMenu.hpp"
 #include "stdlib.hpp"
 #include "../relive_lib/Function.hpp"

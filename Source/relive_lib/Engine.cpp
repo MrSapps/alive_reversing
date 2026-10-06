@@ -1,4 +1,5 @@
 #include "Engine.hpp"
+#include "relive_config.h"
 #include "Automation.hpp"
 #include "SoundDebug.hpp"
 #include "Sound/Ps1SoundData.hpp"
