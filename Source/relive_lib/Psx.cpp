@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "Psx.hpp"
-#include "Sound/PsxSpuApi.hpp"
+#include "Sound/SDLSoundSystem.hpp"
 #include "PsxDisplay.hpp"
 #include "Renderer/IRenderer.hpp"
 #include "../AliveLibAE/stdlib.hpp"
@@ -21,15 +21,11 @@ void PSX_EMU_SetCallBack_4F9430(TPsxEmuCallBack fnPtr)
 
 static void PSX_PutDispEnv_Impl_4F5640()
 {
-    SsSeqCalledTbyT();
-
     if (!gTurnOffRendering)
     {
         IRenderer::GetRenderer()->Clear(0, 0, 0);
         IRenderer::GetRenderer()->EndFrame();
     }
-
-    SsSeqCalledTbyT();
 }
 
 void PSX_PutDispEnv_4F5890()
@@ -74,9 +70,8 @@ void PSX_VSync(VSyncMode mode)
 {
     if (mode == VSyncMode::LimitFps)
     {
-        SND_DumpFrame();
+        SDLSoundSystem::DumpFrame();
     }
-    SsSeqCalledTbyT();
 
     const u64 nowNs = SDL_GetTicksNS();
     if (!sVSyncLastNs)
@@ -94,13 +89,10 @@ void PSX_VSync(VSyncMode mode)
     const u64 turnNs = sVSyncLastNs + sFrameIntervalNs;
     while (SDL_GetTicksNS() < turnNs)
     {
-        // During recording or playback do not call SsSeqCalledTbyT an undeterminate
-        // amount of times as this can leak to de-syncs.
+        // Not a busy wait, except during recording or playback: an undeterminate number of
+        // delays could leak to de-syncs.
         if (!GetGameAutoPlayer().IsRecording() && !GetGameAutoPlayer().IsPlaying())
         {
-            SsSeqCalledTbyT();
-
-            // Not a busy wait: the sequencer only needs ticking every few ms
             SDL_Delay(1);
         }
     }

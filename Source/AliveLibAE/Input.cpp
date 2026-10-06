@@ -4,7 +4,6 @@
 #include "../relive_lib/Function.hpp"
 #include "Engine.hpp"
 #include "../relive_lib/Sys.hpp"
-#include "../relive_lib/Sound/Sound.hpp"
 #include "../relive_lib/Events.hpp"
 #include "PsxRender.hpp"
 #include "GameAutoPlayer.hpp"
@@ -631,38 +630,10 @@ void Input_SetGamePadBinding_4931D0(const char_type* pButtonName, s32 inputComma
     }
 }
 
-union intOrBoolPointer
-{
-    intOrBoolPointer(bool* pBool)
-        : boolVal(pBool)
-    { }
-    intOrBoolPointer(s32* pInt)
-        : intVal(pInt)
-    { }
-
-    s32* intVal;
-    bool* boolVal;
-};
-
-struct IniCustomSaveEntry final
-{
-    const char_type* name;
-    intOrBoolPointer data;
-    bool isBool;
-};
-
-const std::vector<IniCustomSaveEntry> gCustomSaveEntries = {
-#if USE_SDL2_SOUND
-    {"reverb", {&gReverbEnabled}, true},
-    {"audio_stereo", {&gAudioStereo}, true},
-#endif
-};
-
-const char_type* iniCategories[4] = {
+const char_type* iniCategories[3] = {
     "Control",
     "Keyboard",
-    "Gamepad",
-    "Alive"};
+    "Gamepad"};
 
 
 
@@ -733,27 +704,6 @@ static void NewParseSettingsIni(ResourceManagerWrapper& resMan)
                 Input_SetGamePadBinding_4931D0(entry.mValue.c_str(), Input_LoadSettingsIni_GetInputCommand_492B80(entry.mKey.c_str()));
             }
         }
-        else if (section.mName == iniCategories[3]) // Alive
-        {
-            for (const IniFile::Entry& entry : section.mEntries)
-            {
-                for (const IniCustomSaveEntry& s : gCustomSaveEntries)
-                {
-                    if (entry.mKey == s.name)
-                    {
-                        if (s.isBool)
-                        {
-                            *s.data.boolVal = entry.mValue == "true";
-                        }
-                        else // s32
-                        {
-                            *s.data.intVal = atoi(entry.mValue.c_str());
-                        }
-                        break;
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -806,13 +756,6 @@ void Input_SaveSettingsIni_Common(ResourceManagerWrapper& resMan)
     ini.ReplaceSection(std::move(gamepad));
 
     sJoystickEnabled = prevJoyState;
-
-    IniFile::Section alive{iniCategories[3], {}};
-    for (const auto& s : gCustomSaveEntries)
-    {
-        alive.mEntries.push_back({s.name, s.isBool ? (*s.data.boolVal ? "true" : "false") : std::to_string(*s.data.intVal)});
-    }
-    ini.ReplaceSection(std::move(alive));
 
     if (!resMan.SaveSettingsIni(ini))
     {

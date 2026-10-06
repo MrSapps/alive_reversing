@@ -20,7 +20,6 @@
 #include "CreditsController.hpp"
 #include "SaveGame.hpp"
 #include "Midi.hpp"
-#include "Sound.hpp"
 #include "../relive_lib/GameObjects/Particle.hpp"
 #include "../relive_lib/Camera.hpp"
 #include "../relive_lib/data_conversion/file_system.hpp"

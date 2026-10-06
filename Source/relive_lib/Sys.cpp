@@ -5,8 +5,9 @@
 #include "../relive/resource.h"
 #include "Renderer/IRenderer.hpp"
 
-#include "Sound/Sound.hpp"
 #include "Sound/Midi.hpp"
+#include "Sound/SDLSoundSystem.hpp"
+#include "Sound/SDLSoundSystem.hpp"
 #include "../AliveLibAE/PauseMenu.hpp"
 #include "../AliveLibAE/GameAutoPlayer.hpp"
 #include "relive_config.h"
@@ -575,7 +576,10 @@ void Sys::KeyUpEvent(SDL_Scancode scanCode)
 
 void Sys::QuitEvent(bool isRecordedEvent, bool isRecording, BaseMap* pMap)
 {
-    SND_Pause_Audio();
+    if (SDLSoundSystem* pSound = SDLSoundSystem::Get())
+    {
+        pSound->Pause();
+    }
 
     if (SND_Seq_Table_Valid())
     {
@@ -611,7 +615,7 @@ void Sys::QuitEvent(bool isRecordedEvent, bool isRecording, BaseMap* pMap)
 
     if (SND_Seq_Table_Valid() && pMap)
     {
-        GetSoundAPI().mSND_Restart(*pMap);
+        SND_Restart(*pMap);
     }
 
     if (button == MessageBoxButton::eYes)
@@ -624,7 +628,10 @@ void Sys::QuitEvent(bool isRecordedEvent, bool isRecording, BaseMap* pMap)
         {
             mWindow.SetFullscreen(true);
         }
-        SND_Resume_Audio();
+        if (SDLSoundSystem* pSound = SDLSoundSystem::Get())
+        {
+            pSound->Resume();
+        }
     }
 }
 

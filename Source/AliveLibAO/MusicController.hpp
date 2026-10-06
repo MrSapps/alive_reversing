@@ -54,7 +54,6 @@ public:
 
     static void Shutdown();
     static void EnableMusic(s16 bEnable);
-    static s32 OnRootCounter();
 
     void PlayMusic(MusicTypes a2, BaseGameObject* a3, s16 a4, s16 a5);
     void DoClearObject(BaseGameObject* pObj);

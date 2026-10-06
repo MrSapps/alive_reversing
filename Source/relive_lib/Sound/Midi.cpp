@@ -1,123 +1,81 @@
 #include "../stdafx.h"
 #include "Midi.hpp"
-#include "Sound.hpp"
-#include "../AliveLibAE/PathData.hpp"
-#include "../AliveLibAE/stdlib.hpp"
-#include "../AliveLibAE/MusicController.hpp"
-#include "../GameObjects/BackgroundMusic.hpp"
-
-#include "../Sfx.hpp"
-#include "../AliveLibAE/PathData.hpp"
-
-#include "PsxSpuApi.hpp"
-#include "PsxSoundEngine.hpp"
+#include "GameSound.hpp"
 #include "Ps1SoundData.hpp"
-#include "../SoundDebug.hpp"
+#include "VabFile.hpp"
+#include "OpenSeqHandle.hpp"
 #include "../../relive_lib/BinaryPath.hpp"
-#include "../AmbientSound.hpp"
 #include "../../relive_lib/FatalError.hpp"
 #include "../Math.hpp"
-#include "BaseMap.hpp"
+#include "../ResourceManagerWrapper.hpp"
+#include "../AmbientSound.hpp"
+#include "../BaseMap.hpp"
+#include "../GameObjects/BackgroundMusic.hpp"
+#include "../GameObjects/BaseGameObject.hpp"
+#include "../Sfx.hpp"
+#include "../SoundDebug.hpp"
+#include "../data_conversion/file_system.hpp"
+#include <algorithm>
+#include <cstring>
 
-static void SND_SetChannelsPitch(s32 channelsBits, s32 vabId, s32 program, s32 note, s16 pitch);
-static s32 SFX_ApplyPitchVariation(const relive::SfxDefinition& sfxDef, s32 midiHandle, s16 pitch_min, s16 pitch_max);
+static constexpr s32 kSeqTableSizeAE = 144;
+static constexpr s32 kSeqTableSizeAO = 164;
 
-const s32 kSeqTableSizeAE = 144;
+// The PS1 executables' SsSetMVol on init and on each reset (AE's at 0x800... and AO's at 0x800784d4)
+static constexpr s32 kMasterVolumeAE = 100;
+static constexpr s32 kMasterVolumeAO = 127;
 
-static TSNDStopAll sSNDStopAllCallBack = nullptr;
-static TSNDRestart sSNDRestartCallBack = nullptr;
+// The reverb type the games set on init (libsnd's SPU_REV_MODE_STUDIO_C)
+static constexpr s32 kReverbType = 4;
 
-SeqIds sSeq_Ids_word_BB2354 = {};
-u16 sSnd_ReloadAbeResources_BB2E3E = 0;
-OpenSeqHandle* sSeqDataTable_BB2E38 = nullptr;
-s16 sSeqsPlaying_count_word_BB2E3C = 0;
-s16 sSFXPitchVariationEnabled_560F58 = true;
-s16 sNeedToHashSeqNames_560F40 = 1;
+static std::unique_ptr<GameSound> sGameSound;
 
-// I think this is the burrrrrrrrrrrrrrrrrrrr loading sound
-// TODO: mSoundTheme left blank - which sounds/<theme>/ dir MONK.VH/VB actually end up in after
-// conversion can't be determined from source, only from real converted output (grep regenerated
-// path.json files for "vh_file": "MONK.VH" once the data conversion tool has been run against
-// real game data). Fill this in once verified - loading this fallback sound will fail (empty
-// theme) until then.
-const PathSoundInfo soundBlock = {"MONK.VH", "MONK.VB", {}, "", {}, {}, {}};
-
-PathSoundInfo sMonkVh_Vb_560F48 = soundBlock;
-
-class AEMidiVars final : public IMidiVars
+GameSound* GameSound::Get()
 {
-public:
-    virtual SeqIds& sSeq_Ids_word() override
-    {
-        return sSeq_Ids_word_BB2354;
-    }
-
-    virtual u16& sSnd_ReloadAbeResources() override
-    {
-        return sSnd_ReloadAbeResources_BB2E3E;
-    }
-
-    virtual OpenSeqHandle*& sSeqDataTable() override
-    {
-        return sSeqDataTable_BB2E38;
-    }
-
-    virtual s16& sSeqsPlaying_count_word() override
-    {
-        return sSeqsPlaying_count_word_BB2E3C;
-    }
-
-    virtual std::weak_ptr<PathSoundInfo>& sLastLoadedSoundBlockInfo() override
-    {
-        return mLastLoadedSoundBlockInfo;
-    }
-
-    virtual s16& sSFXPitchVariationEnabled() override
-    {
-        return sSFXPitchVariationEnabled_560F58;
-    }
-
-    virtual s16& sNeedToHashSeqNames() override
-    {
-        return sNeedToHashSeqNames_560F40;
-    }
-
-    virtual PathSoundInfo& sMonkVh_Vb() override
-    {
-        return sMonkVh_Vb_560F48;
-    }
-
-    virtual s32 MidiTableSize() override
-    {
-        return kSeqTableSizeAE;
-    }
-
-    virtual void SsVabTransBody(ResourceManagerWrapper& resMan, VabBodyRecord* pVabBody, s16 vabId) override
-    {
-        SsVabTransBody_4FC840(resMan.mFs, pVabBody, vabId);
-    }
-
-private:
-    std::weak_ptr<PathSoundInfo> mLastLoadedSoundBlockInfo;
-};
-
-static AEMidiVars sAEMidiVars;
-static IMidiVars* spMidiVars = &sAEMidiVars; // Default to AE vars
-
-IMidiVars* GetMidiVars()
-{
-    return spMidiVars;
+    return sGameSound.get();
 }
 
-void SetMidiApiVars(IMidiVars* pVars)
+static SDLSoundSystem::Options AudioOptions(const GameSoundConfig& config)
 {
-    spMidiVars = pVars ? pVars : &sAEMidiVars;
+    SDLSoundSystem::Options options;
+    options.mInterpolation = config.mGaussianInterpolation ? PsxSpu::Interpolation::Gaussian : PsxSpu::Interpolation::BandLimited;
+    options.mOffline = config.mOffline;
+    options.mDumpPath = config.mDumpPath;
+    options.mLiveDumpPath = config.mLiveDumpPath;
+    return options;
 }
 
-// Sounds are only played after a path's sound block has been loaded.
-static s32 LastLoadedVabId()
+GameSound::GameSound(const GameSoundConfig& config)
+    : mConfig(config)
+    , mSystem(std::make_unique<SDLSoundSystem>(AudioOptions(config)))
 {
-    const auto pInfo = GetMidiVars()->sLastLoadedSoundBlockInfo().lock();
+    for (s16& seq : mOpenSeqs)
+    {
+        seq = -1;
+    }
+
+    PsxSoundEngine& engine = Engine();
+    engine.SetReverbDepth(0, 0);
+    engine.SetReverbType(kReverbType);
+    engine.SetReverbEnabled(true);
+    SetMasterVolume(config.mGame == GameType::eAo ? kMasterVolumeAO : kMasterVolumeAE);
+}
+
+GameSound::~GameSound() = default;
+
+void GameSound::SetMasterVolume(s32 volume)
+{
+    Engine().SetMasterVolume(volume, volume);
+}
+
+s32 GameSound::SeqTableSize() const
+{
+    return mConfig.mGame == GameType::eAo ? kSeqTableSizeAO : kSeqTableSizeAE;
+}
+
+s32 GameSound::LastLoadedVabId() const
+{
+    const auto pInfo = mLastLoadedSoundBlockInfo.lock();
     if (!pInfo)
     {
         ALIVE_FATAL("Tried to play a sound before any sound block was loaded");
@@ -125,176 +83,270 @@ static s32 LastLoadedVabId()
     return pInfo->mVabId;
 }
 
-void SND_Free_All_VABS_4C9EB0()
+// ---- Sound blocks ----
+
+void GameSound::CloseVab(s32 vabId)
 {
-    auto pIter = GetMidiVars()->sLastLoadedSoundBlockInfo().lock();
-    if (pIter)
+    if (vabId < 0 || vabId >= kMaxVabs)
     {
-        SsVabClose_4FC5B0(pIter->mVabId);
-        pIter->mVabId = -1;
+        return;
     }
-    GetMidiVars()->sLastLoadedSoundBlockInfo().reset();
+    PsxSoundEngine& engine = Engine();
+    engine.Record("VABCLOSE %d", vabId);
+    engine.UtAllKeyOff();
+    engine.CloseVab(vabId);
+    mOpenVabs &= ~(1u << vabId);
 }
 
-void SND_Free_All_Seqs_4C9F40()
+void GameSound::FreeAllVabs()
+{
+    auto pIter = mLastLoadedSoundBlockInfo.lock();
+    if (pIter)
+    {
+        CloseVab(pIter->mVabId);
+        pIter->mVabId = -1;
+    }
+    mLastLoadedSoundBlockInfo.reset();
+}
+
+void GameSound::FreeAllSeqs()
 {
     // Not set until the first level's sounds load, which quitting straight away comes before
-    if (!GetMidiVars()->sSeqDataTable())
+    if (!mSeqTable)
     {
         return;
     }
 
-    for (s32 i = 0; i < GetMidiVars()->MidiTableSize(); i++)
+    for (s32 i = 0; i < SeqTableSize(); i++)
     {
-        GetMidiVars()->sSeqDataTable()[i].field_C_ppSeq_Data.clear();
+        mSeqTable[i].field_C_ppSeq_Data.clear();
     }
 }
 
-void SND_Reset()
+void GameSound::Reset()
 {
-    SND_Stop_All_Seqs();
-    SND_Free_All_Seqs_4C9F40();
-    SND_Free_All_VABS_4C9EB0();
-    const s16 masterVolume = GetSpuApiVars()->DefaultMasterVolume();
-    SsSetMVol_4FC360(masterVolume, masterVolume);
+    StopAllSeqs();
+    FreeAllSeqs();
+    FreeAllVabs();
+    SetMasterVolume(mConfig.mGame == GameType::eAo ? kMasterVolumeAO : kMasterVolumeAE);
 }
 
+void GameSound::Shutdown()
+{
+    Reset();
 
-s16 SND_VAB_Load_4C9FE0(PathSoundInfo& pSoundBlockInfo, ResourceManagerWrapper& resMan)
+    PsxSoundEngine& engine = Engine();
+    SetMasterVolume(0);
+    engine.SetReverbEnabled(false);
+    engine.SetReverbDepth(0, 0);
+    engine.StopAll();
+    for (s32 i = 0; i < kMaxVabs; i++)
+    {
+        if (mOpenVabs & (1u << i))
+        {
+            CloseVab(i);
+        }
+    }
+}
+
+// AE: the VB file is a table of records, the samples are in sounds.dat
+static void LoadVabBodyAE(FileSystem& fs, PsxSoundEngine& engine, s32 vabId, const std::vector<u8>& vbData, s32 vagCount)
+{
+    AutoFILE soundsDat = fs.OpenFile("sounds.dat", "rb");
+    if (!soundsDat.GetFile())
+    {
+        return;
+    }
+
+    std::vector<s16> pcm;
+    for (s32 i = 0; i < vagCount; i++)
+    {
+        if (static_cast<size_t>(i + 1) * sizeof(VabBodyRecord) > vbData.size())
+        {
+            break;
+        }
+
+        VabBodyRecord record = {};
+        memcpy(&record, vbData.data() + static_cast<size_t>(i) * sizeof(VabBodyRecord), sizeof(VabBodyRecord));
+
+        // The length is in 16 bit samples. A negative second field is a looping sample.
+        const s32 sampleCount = static_cast<s32>(8 * static_cast<u32>(record.field_0_length_or_duration)) / 16;
+        const s32 fileOffset = static_cast<s32>(record.field_8_fileOffset);
+        if (sampleCount <= 0 || fileOffset == -1)
+        {
+            continue;
+        }
+
+        pcm.assign(static_cast<size_t>(sampleCount), 0);
+        soundsDat.Seek(static_cast<u32>(fileOffset), AutoFILE::SeekMode::Start);
+        soundsDat.Read(reinterpret_cast<u8*>(pcm.data()), static_cast<u32>(2 * sampleCount));
+        engine.SetSample(vabId, i, pcm.data(), static_cast<u32>(sampleCount), record.field_4_unused < 0);
+    }
+}
+
+// AO: the VB file has the samples after a header of two s32s each, one after the other
+static void LoadVabBodyAO(PsxSoundEngine& engine, s32 vabId, const std::vector<u8>& vbData, s32 vagCount)
+{
+    size_t pos = 0;
+    std::vector<s16> pcm;
+    for (s32 i = 0; i < vagCount; i++)
+    {
+        if (pos + 2 * sizeof(s32) > vbData.size())
+        {
+            break;
+        }
+
+        s32 lengthOrDuration = 0;
+        s32 unused = 0;
+        memcpy(&lengthOrDuration, vbData.data() + pos, sizeof(s32));
+        memcpy(&unused, vbData.data() + pos + sizeof(s32), sizeof(s32));
+        const size_t dataPos = pos + 2 * sizeof(s32);
+        // The next sample starts after this one's length in bytes
+        pos += static_cast<size_t>(static_cast<u32>(lengthOrDuration)) + 8;
+
+        const s32 sampleCount = (8 * lengthOrDuration) / 16;
+        if (sampleCount <= 0 || dataPos + static_cast<size_t>(2 * sampleCount) > vbData.size())
+        {
+            continue;
+        }
+
+        pcm.resize(static_cast<size_t>(sampleCount));
+        memcpy(pcm.data(), vbData.data() + dataPos, static_cast<size_t>(2 * sampleCount));
+        engine.SetSample(vabId, i, pcm.data(), static_cast<u32>(sampleCount), unused < 0);
+    }
+}
+
+void GameSound::LoadVab(PathSoundInfo& info, ResourceManagerWrapper& resMan)
 {
     // The PS1's own data (-ps1_data), if it has this VAB. It has the PS1's tones and ADPCM samples
-    const Ps1SoundData* pPs1Data = PsxSoundEngine::Get() ? resMan.GetPs1SoundData() : nullptr;
-    const bool ps1Vab = pPs1Data && pPs1Data->Has(pSoundBlockInfo.mVhFile) && pPs1Data->Has(pSoundBlockInfo.mVbFile);
+    const Ps1SoundData* pPs1Data = resMan.GetPs1SoundData();
+    const bool ps1Vab = pPs1Data && pPs1Data->Has(info.mVhFile) && pPs1Data->Has(info.mVbFile);
 
-    // Load the VH file data
-    pSoundBlockInfo.mVhFileData = resMan.LoadSoundFile(pSoundBlockInfo.mVhFile.c_str(), pSoundBlockInfo.mSoundTheme);
-    if (PsxSoundEngine::Get() && !ps1Vab)
+    info.mVhFileData = resMan.LoadSoundFile(info.mVhFile.c_str(), info.mSoundTheme);
+    if (!ps1Vab)
     {
-        PsxSoundEngine::RestorePs1Tones(GetGameType(), pSoundBlockInfo.mVhFile, pSoundBlockInfo.mVhFileData);
+        VabFile::RestorePs1Tones(mConfig.mGame, info.mVhFile, info.mVhFileData);
     }
-    //GetMidiVars()->LoadingLoop(0);
+    const std::vector<u8> vbData = resMan.LoadSoundFile(info.mVbFile.c_str(), info.mSoundTheme);
 
-    // Load the VB file data
-    std::vector<u8> vbFileData = resMan.LoadSoundFile(pSoundBlockInfo.mVbFile.c_str(), pSoundBlockInfo.mSoundTheme);
-
-    // Convert the records in the header to internal representation
-    pSoundBlockInfo.mVabId = SsVabOpenHead(reinterpret_cast<VabHeader*>(pSoundBlockInfo.mVhFileData.data()));
-    if (PsxSoundEngine* pRec = PsxSoundEngine::Get())
+    // SsVabOpenHead
+    VabHeader header = {};
+    if (info.mVhFileData.size() < sizeof(VabHeader))
     {
-        pRec->Record("VAB %d %s %s %s", pSoundBlockInfo.mVabId, pSoundBlockInfo.mSoundTheme.c_str(), pSoundBlockInfo.mVhFile.c_str(), pSoundBlockInfo.mVbFile.c_str());
+        info.mVabId = -1;
+        return;
+    }
+    memcpy(&header, info.mVhFileData.data(), sizeof(VabHeader));
+    const s32 vabId = header.field_8_id;
+    const size_t headerSize = sizeof(VabHeader) + static_cast<size_t>(std::clamp<s32>(header.field_12_num_progs, 0, 128)) * 16 * sizeof(VagAtr);
+    if (vabId < 0 || vabId >= kMaxVabs || info.mVhFileData.size() < headerSize)
+    {
+        info.mVabId = -1;
+        return;
     }
 
+    CloseVab(vabId);
+    PsxSoundEngine& engine = Engine();
+    engine.OpenVab(vabId, info.mVhFileData.data(), static_cast<u32>(headerSize));
+    mOpenVabs |= 1u << vabId;
+    info.mVabId = vabId;
+    engine.Record("VAB %d %s %s %s", info.mVabId, info.mSoundTheme.c_str(), info.mVhFile.c_str(), info.mVbFile.c_str());
+
+    const s32 vagCount = std::min<s32>(header.field_16_num_vags, 255);
     if (ps1Vab)
     {
         // The samples are ADPCM VAGs: decode them for the emulated SPU
-        PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get();
-        const std::vector<Ps1SoundData::Sample> samples = Ps1SoundData::DecodeVab(pSoundBlockInfo.mVhFileData, vbFileData);
+        const std::vector<Ps1SoundData::Sample> samples = Ps1SoundData::DecodeVab(info.mVhFileData, vbData);
         for (std::size_t i = 0; i < samples.size(); i++)
         {
             const Ps1SoundData::Sample& sample = samples[i];
             if (!sample.mPcm.empty())
             {
-                SsExt_SetVagFlags(static_cast<s16>(pSoundBlockInfo.mVabId), static_cast<s32>(i), sample.mLoop ? 4 : 0);
-                pPs1Sound->SetSample(pSoundBlockInfo.mVabId, static_cast<s32>(i), sample.mPcm.data(), static_cast<u32>(sample.mPcm.size()), sample.mLoop, sample.mLoopStart);
+                engine.SetSample(vabId, static_cast<s32>(i), sample.mPcm.data(), static_cast<u32>(sample.mPcm.size()), sample.mLoop, sample.mLoopStart);
             }
         }
-        return 1;
+    }
+    else if (mConfig.mGame == GameType::eAe)
+    {
+        LoadVabBodyAE(resMan.mFs, engine, vabId, vbData, vagCount);
+    }
+    else
+    {
+        LoadVabBodyAO(engine, vabId, vbData, vagCount);
+    }
+}
+
+void GameSound::LoadVabs(std::shared_ptr<PathSoundInfo>& info, s32 reverb, ResourceManagerWrapper& resMan)
+{
+    auto oldPtr = mLastLoadedSoundBlockInfo.lock();
+    if (oldPtr.get() == info.get())
+    {
+        return;
     }
 
-    // Load actual sample data (copied, hence vec goes out of scope after this)
-    GetMidiVars()->SsVabTransBody(resMan, reinterpret_cast<VabBodyRecord*>(vbFileData.data()), static_cast<s16>(pSoundBlockInfo.mVabId));
+    PsxSoundEngine& engine = Engine();
+    engine.SetReverbEnabled(false);
+    engine.SetReverbDepth(0, 0);
+    engine.ClearReverb();
 
-    SsVabTransCompleted(SS_WAIT_COMPLETED);
+    mLastLoadedSoundBlockInfo = info;
+    LoadVab(*info, resMan);
 
-    return 1;
+    engine.SetReverbDepth(reverb, reverb);
+    engine.SetReverbEnabled(true);
 }
 
-// TODO: PSX has VSyncCallback here 0x800592dc
-
-s32 MIDI_Play_Single_Note_4CA1B0(s32 vabIdAndProgram, s32 note, s32 leftVol, s32 rightVol)
+void GameSound::PendSoundFiles(const PathSoundInfo& info, ResourceManagerWrapper& resMan)
 {
-    // NOTE: word_BB2E40 is used as a guard here, but it is never read anywhere else
-    return SsVoKeyOn_4FCF10(vabIdAndProgram, note, static_cast<u16>(leftVol), static_cast<u16>(rightVol));
-}
-
-void SND_Init()
-{
-    SSInit_4FC230();
-    SsSetTableSize_4FE0B0(nullptr, 16, 1);
-    SsUtSetReverbDepth_4FE380(0, 0);
-    SsUtSetReverbType_4FE360(4);
-    SsUtReverbOn_4FE340();
-    SsSetTickMode_4FDC20(4096);
-    VSyncCallback_4F8C40(SND_CallBack_4020A4);
-    SpuInitHot_4FC320();
-    const s16 masterVolume = GetSpuApiVars()->DefaultMasterVolume();
-    SsSetMVol_4FC360(masterVolume, masterVolume);
-    memset(&GetMidiVars()->sSeq_Ids_word(), -1, sizeof(SeqIds));
-    GetMidiVars()->sSeqsPlaying_count_word() = 0;
-}
-
-// SND_SetMono_NoRefs_4CA310
-
-// SND_SetStereo_NoRefs_4CA330
-
-void SND_Shutdown()
-{
-    SND_Reset();
-
-    if (GetMidiVars()->sMonkVh_Vb().mVabId >= 0)
+    resMan.PendSoundFile(info.mVhFile, info.mSoundTheme);
+    resMan.PendSoundFile(info.mVbFile, info.mSoundTheme);
+    for (const auto& seqName : info.mSeqFiles)
     {
-        SsVabClose_4FC5B0(GetMidiVars()->sMonkVh_Vb().mVabId);
-        GetMidiVars()->sMonkVh_Vb().mVabId = -1;
+        resMan.PendSoundFile(seqName, info.mSoundTheme);
     }
-
-    SsSetMVol_4FC360(0, 0);
-    SsUtReverbOff_4FE350();
-    SsUtSetReverbDepth_4FE380(0, 0);
-    SsEnd_4FC350();
-
-    // TODO: PSX calls a func that just does SpuQuit() here and nothing else
-    SsExt_StopPlayingSamples();
-
-    SsExt_CloseAllVabs();
-
-    GetSoundAPI().mSND_SsQuit();
 }
 
-
-void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& info, s32 reverb, ResourceManagerWrapper& resMan)
+void GameSound::LoadSeqs(OpenSeqHandle* pSeqTable, const PathSoundInfo& info, ResourceManagerWrapper& resMan)
 {
-    GetMidiVars()->sSnd_ReloadAbeResources() = false;
-    auto oldPtr = GetMidiVars()->sLastLoadedSoundBlockInfo().lock();
-    if (oldPtr.get() != info.get())
+    if (!pSeqTable)
     {
-        SsUtReverbOff_4FE350();
-        SsUtSetReverbDepth_4FE380(0, 0);
-        SpuClearReverbWorkArea_4FA690(4);
+        return;
+    }
+    mSeqTable = pSeqTable;
 
-        if (GetMidiVars()->sMonkVh_Vb().mVabId < 0)
+    // Generate resource ids from hashing the name if we haven't already
+    if (mNeedToHashSeqNames)
+    {
+        for (s32 i = 0; i < SeqTableSize(); i++)
         {
-            // TODO: Fix me
-            SND_VAB_Load_4C9FE0(GetMidiVars()->sMonkVh_Vb(), resMan);
+            mSeqTable[i].field_C_ppSeq_Data.clear();
+            mSeqTable[i].field_A_id_seqOpenId = -1;
+            mSeqTable[i].field_4_generated_res_id = ResourceManagerWrapper::SEQ_HashName(mSeqTable[i].field_0_mBsqName);
         }
+        mNeedToHashSeqNames = false;
+    }
 
-        GetMidiVars()->sLastLoadedSoundBlockInfo() = info;
-
-        SND_VAB_Load_4C9FE0(*info, resMan);
-
-        // Put abes resources back if we had to unload them to fit the VB in memory
-        /*
-        // TODO: Remove the abe unloading stuff
-        if (GetMidiVars()->sSnd_ReloadAbeResources())
+    // We have to insert into the table at the position that matches the file name
+    for (const auto& seqName : info.mSeqFiles)
+    {
+        s32 idx = -1;
+        for (s32 i = 0; i < SeqTableSize(); i++)
         {
-            GetMidiVars()->Reclaim_Memory(0);
-            gAbe->Load_Basic_Resources_44D460();
-        }*/
-
-        SsUtSetReverbDepth_4FE380(reverb, reverb);
-        SsUtReverbOn_4FE340();
+            if (strcmp(mSeqTable[i].field_0_mBsqName, seqName.c_str()) == 0)
+            {
+                idx = i;
+                break;
+            }
+        }
+        if (idx < 0)
+        {
+            ALIVE_FATAL("Couldn't find seq name in the table");
+        }
+        mSeqTable[idx].field_C_ppSeq_Data = resMan.LoadSoundFile(seqName.c_str(), info.mSoundTheme);
     }
 }
 
+// ---- Sound effects ----
 
 // Logs the result, for replaying a run on the PS1's sound effect code with the same choices
 static s32 SfxRandom(s32 min, s32 max)
@@ -304,52 +356,22 @@ static s32 SfxRandom(s32 min, s32 max)
     return value;
 }
 
-s32 SFX_SfxDefinition_Play_Mono(const relive::SfxDefinition& sfxDef, s32 volume, s32 pitch_min, s32 pitch_max)
+// The old PC code had a switch for the pitch variation, which was always on. It's still in the log
+// the reference harness reads.
+static constexpr s32 kPitchVariationLogged = 1;
+
+// SsVoKeyOn
+s32 GameSound::PlayNote(s32 vabIdAndProgram, s32 pitch, s32 leftVol, s32 rightVol)
 {
-    SoundDebug::MusicScope scope;
-    SoundDebug::LogSeqCall("SFXM %d %d %d %d %d %d %d %d %d %d %d", sfxDef.mBlockIdx, sfxDef.mProgram, sfxDef.mNote, sfxDef.mDefaultVolume, sfxDef.mPitchMin, sfxDef.mPitchMax,
-        volume, pitch_min, pitch_max, LastLoadedVabId(), GetMidiVars()->sSFXPitchVariationEnabled());
-    if (!volume)
-    {
-        volume = sfxDef.mDefaultVolume;
-    }
-
-    if (pitch_min == 0x7FFF)
-    {
-        pitch_min = sfxDef.mPitchMin;
-    }
-
-    if (pitch_max == 0x7FFF)
-    {
-        pitch_max = sfxDef.mPitchMax;
-    }
-
-    // PS1 AO clamps to 10 (AE to 1), the PC to 1 (checked against the PS1 executables)
-    const s32 minVolume = (PsxSoundEngine::Get() && GetGameType() == GameType::eAo) ? 10 : 1;
-    if (volume < minVolume)
-    {
-        volume = minVolume;
-    }
-    else if (volume >= 127)
-    {
-        volume = 127;
-    }
-
-    // Note: Inlined in psx
-    auto midiHandle = MIDI_Play_Single_Note_4CA1B0(
-        sfxDef.mProgram | (LastLoadedVabId() << 8),
-        sfxDef.mNote << 8,
-        volume,
-        volume);
-
-    return SFX_ApplyPitchVariation(sfxDef, midiHandle, static_cast<s16>(pitch_min), static_cast<s16>(pitch_max));
+    const s32 voices = Engine().VoKeyOn(vabIdAndProgram, pitch, static_cast<u16>(leftVol), static_cast<u16>(rightVol));
+    SoundDebug::LogSeqOutput("KEYON %d %d %d %d %d", voices, vabIdAndProgram, pitch, static_cast<u16>(leftVol), static_cast<u16>(rightVol));
+    return voices;
 }
 
-
 // Note: Inlined in psx (SFX_SetPitch_4CA510 + the pitch code of SND_MIDI)
-// pitch: the offset in 1/128 semitones. The PC's SsUtChangePitch ignored the VAB and program, but
-// libsnd's (-ps1_sound) only changes a voice that is playing that VAB, program and note.
-static void SND_SetChannelsPitch(s32 channelsBits, s32 vabId, s32 program, s32 note, s16 pitch)
+// pitch: the offset in 1/128 semitones. libsnd only changes a voice that is playing that VAB, program
+// and note.
+void GameSound::SetChannelsPitch(s32 channelsBits, s32 vabId, s32 program, s32 note, s16 pitch)
 {
     s32 v3 = 0;
     s16 v4 = 0;
@@ -365,68 +387,35 @@ static void SND_SetChannelsPitch(s32 channelsBits, s32 vabId, s32 program, s32 n
         v4 = 127 - (-(s8) pitch & 127);
     }
 
-    for (s16 i = 0; i < kNumChannels; i++)
+    for (s16 i = 0; i < PsxSpu::kNumVoices; i++)
     {
         if ((1 << i) & channelsBits)
         {
-            SsUtChangePitch_4FDF70(i, vabId, program, static_cast<s16>(note), 0, static_cast<s16>(note + v3), v4);
+            SoundDebug::LogSeqOutput("PITCH %d %d %d %d %d %d %d", i, vabId, program, note, 0, note + v3, v4);
+            Engine().UtChangePitch(i, static_cast<s16>(vabId), static_cast<s16>(program), static_cast<s16>(note), 0, static_cast<s16>(note + v3), v4);
         }
     }
 }
 
-static s32 SFX_ApplyPitchVariation(const relive::SfxDefinition& sfxDef, s32 midiHandle, s16 pitch_min, s16 pitch_max)
+s32 GameSound::ApplyPitchVariation(const relive::SfxDefinition& sfxDef, s32 voices, s16 pitch_min, s16 pitch_max)
 {
-    if (!GetMidiVars()->sSFXPitchVariationEnabled())
-    {
-        return 0;
-    }
-
     if (pitch_min || pitch_max)
     {
-        SND_SetChannelsPitch(midiHandle, LastLoadedVabId(), sfxDef.mProgram, sfxDef.mNote, SfxRandom(pitch_min, pitch_max));
+        SetChannelsPitch(voices, LastLoadedVabId(), sfxDef.mProgram, sfxDef.mNote, SfxRandom(pitch_min, pitch_max));
     }
-
-    return midiHandle;
+    return voices;
 }
 
-s32 SND_MIDI(s32 program, s32 vabId, s32 note, s16 vol, s16 min, s16 max)
+s32 GameSound::SfxPlayMono(const relive::SfxDefinition& sfxDef, s32 volume, s32 pitch_min, s32 pitch_max)
 {
     SoundDebug::MusicScope scope;
-    SoundDebug::LogSeqCall("SNDMIDI %d %d %d %d %d %d %d", program, vabId, note, vol, min, max, GetMidiVars()->sSFXPitchVariationEnabled());
-    s32 volClamped = 0;
-    if (vol < 10)
+    SoundDebug::LogSeqCall("SFXM %d %d %d %d %d %d %d %d %d %d %d", sfxDef.mBlockIdx, sfxDef.mProgram, sfxDef.mNote, sfxDef.mDefaultVolume, sfxDef.mPitchMin, sfxDef.mPitchMax,
+        volume, pitch_min, pitch_max, LastLoadedVabId(), kPitchVariationLogged);
+    if (!volume)
     {
-        volClamped = 10;
-    }
-    else
-    {
-        volClamped = vol;
-        if (vol >= 127)
-        {
-            volClamped = 127;
-        }
+        volume = sfxDef.mDefaultVolume;
     }
 
-    // Note: Inlined in psx. The parameters are named the wrong way round: program is the VAB
-    // (the high byte) and vabId the program.
-    const s32 channelBits = MIDI_Play_Single_Note_4CA1B0(vabId | ((s16) program << 8), note << 8, volClamped, volClamped);
-    if (!GetMidiVars()->sSFXPitchVariationEnabled())
-    {
-        return 0;
-    }
-
-    if (min || max)
-    {
-        SND_SetChannelsPitch(channelBits, program, vabId, note, SfxRandom(min, max));
-    }
-    return channelBits;
-}
-
-s32 SFX_SfxDefinition_Play_Stereo(const relive::SfxDefinition& sfxDef, s16 volLeft, s16 volRight, s16 pitch_min, s16 pitch_max)
-{
-    SoundDebug::MusicScope scope;
-    SoundDebug::LogSeqCall("SFXS %d %d %d %d %d %d %d %d %d %d %d %d", sfxDef.mBlockIdx, sfxDef.mProgram, sfxDef.mNote, sfxDef.mDefaultVolume, sfxDef.mPitchMin, sfxDef.mPitchMax,
-        volLeft, volRight, pitch_min, pitch_max, LastLoadedVabId(), GetMidiVars()->sSFXPitchVariationEnabled());
     if (pitch_min == 0x7FFF)
     {
         pitch_min = sfxDef.mPitchMin;
@@ -437,424 +426,400 @@ s32 SFX_SfxDefinition_Play_Stereo(const relive::SfxDefinition& sfxDef, s16 volLe
         pitch_max = sfxDef.mPitchMax;
     }
 
-    if (volLeft < 10)
-    {
-        volLeft = 10;
-    }
-    else if (volLeft >= 127)
-    {
-        volLeft = 127;
-    }
-
-    if (volRight < 10)
-    {
-        volRight = 10;
-    }
-    else if (volRight >= 127)
-    {
-        volRight = 127;
-    }
+    // AO's libsnd clamps to 10, AE's to 1 (checked against the PS1 executables)
+    const s32 minVolume = mConfig.mGame == GameType::eAo ? 10 : 1;
+    volume = std::clamp<s32>(volume, minVolume, 127);
 
     // Note: Inlined in psx
-    auto midiHandle = MIDI_Play_Single_Note_4CA1B0(
-        sfxDef.mProgram | (LastLoadedVabId() << 8),
-        sfxDef.mNote << 8,
-        volLeft,
-        volRight);
-
-    return SFX_ApplyPitchVariation(sfxDef, midiHandle, pitch_min, pitch_max);
+    const s32 voices = PlayNote(sfxDef.mProgram | (LastLoadedVabId() << 8), sfxDef.mNote << 8, volume, volume);
+    return ApplyPitchVariation(sfxDef, voices, static_cast<s16>(pitch_min), static_cast<s16>(pitch_max));
 }
 
-void SND_Stop_Channels_Mask(u32 bitMask)
+s32 GameSound::SfxPlayStereo(const relive::SfxDefinition& sfxDef, s16 volLeft, s16 volRight, s16 pitch_min, s16 pitch_max)
 {
-    for (s32 i = 0; i < 24; i++) // TODO: Constant
+    SoundDebug::MusicScope scope;
+    SoundDebug::LogSeqCall("SFXS %d %d %d %d %d %d %d %d %d %d %d %d", sfxDef.mBlockIdx, sfxDef.mProgram, sfxDef.mNote, sfxDef.mDefaultVolume, sfxDef.mPitchMin, sfxDef.mPitchMax,
+        volLeft, volRight, pitch_min, pitch_max, LastLoadedVabId(), kPitchVariationLogged);
+    if (pitch_min == 0x7FFF)
+    {
+        pitch_min = sfxDef.mPitchMin;
+    }
+
+    if (pitch_max == 0x7FFF)
+    {
+        pitch_max = sfxDef.mPitchMax;
+    }
+
+    volLeft = std::clamp<s16>(volLeft, 10, 127);
+    volRight = std::clamp<s16>(volRight, 10, 127);
+
+    // Note: Inlined in psx
+    const s32 voices = PlayNote(sfxDef.mProgram | (LastLoadedVabId() << 8), sfxDef.mNote << 8, volLeft, volRight);
+    return ApplyPitchVariation(sfxDef, voices, pitch_min, pitch_max);
+}
+
+s32 GameSound::PlayMidi(s32 program, s32 vabId, s32 note, s16 vol, s16 min, s16 max)
+{
+    SoundDebug::MusicScope scope;
+    SoundDebug::LogSeqCall("SNDMIDI %d %d %d %d %d %d %d", program, vabId, note, vol, min, max, kPitchVariationLogged);
+    const s32 volClamped = std::clamp<s32>(vol, 10, 127);
+
+    // Note: Inlined in psx. The parameters are named the wrong way round: program is the VAB
+    // (the high byte) and vabId the program.
+    const s32 voices = PlayNote(vabId | ((s16) program << 8), note << 8, volClamped, volClamped);
+    if (min || max)
+    {
+        SetChannelsPitch(voices, program, vabId, note, SfxRandom(min, max));
+    }
+    return voices;
+}
+
+void GameSound::StopChannelsMask(u32 bitMask)
+{
+    for (s32 i = 0; i < PsxSpu::kNumVoices; i++)
     {
         // Does the index match a bit in the bitmask?
         if ((1 << i) & bitMask)
         {
-            // Turn it off
-            if (PsxSoundEngine* pRec = PsxSoundEngine::Get())
-            {
-                pRec->Record("KEYOFFV %d", i);
-            }
-            GetSpuApiVars()->SsUtKeyOffV(static_cast<s16>(i));
+            Engine().UtKeyOffV(static_cast<s16>(i));
         }
     }
 }
 
-void SND_Stop_All_Seqs()
+// ---- SEQs ----
+
+void GameSound::StopAllSeqs()
 {
-    // TODO: Why is there 16 of these but 32 of sMidiStruct2Ary32_C13400? Seems like they should match in size
-    GetMidiVars()->sSeqsPlaying_count_word() = 0;
-    for (s16 i = 0; i < 16; i++)
+    mSeqsPlayingCount = 0;
+    PsxSoundEngine& engine = Engine();
+    for (s16 i = 0; i < Libsnd::kMaxSeqs; i++)
     {
-        if (GetMidiVars()->sSeq_Ids_word().ids[i] >= 0)
+        if (mOpenSeqs[i] >= 0)
         {
-            if (SsIsEos_4FDA80(i, 0))
+            if (engine.IsEos(i))
             {
-                if (PsxSoundEngine* pRec = PsxSoundEngine::Get())
-                {
-                    pRec->Record("SEQSTOP %d", i);
-                }
-                SsSeqStop(i);
+                engine.SeqStop(i);
             }
-            SsSeqClose_4FD8D0(i);
-            GetMidiVars()->sSeqDataTable()[GetMidiVars()->sSeq_Ids_word().ids[i]].field_A_id_seqOpenId = -1;
-            GetMidiVars()->sSeq_Ids_word().ids[i] = -1;
+            engine.SeqClose(i);
+            mSeqTable[mOpenSeqs[i]].field_A_id_seqOpenId = -1;
+            mOpenSeqs[i] = -1;
         }
     }
 }
 
-
-void SND_Seq_Stop_4CA8E0()
+// Closes the SEQs that have finished
+void GameSound::StopFinishedSeqs()
 {
-    for (s16 i = 0; i < 16; i++)
+    PsxSoundEngine& engine = Engine();
+    for (s16 i = 0; i < Libsnd::kMaxSeqs; i++)
     {
-        if (GetMidiVars()->sSeq_Ids_word().ids[i] >= 0)
+        if (mOpenSeqs[i] >= 0 && !engine.IsEos(i))
         {
-            if (!SsIsEos_4FDA80(i, 0))
-            {
-                SsSeqClose_4FD8D0(i);
-                GetMidiVars()->sSeqDataTable()[GetMidiVars()->sSeq_Ids_word().ids[i]].field_A_id_seqOpenId = -1;
-                GetMidiVars()->sSeq_Ids_word().ids[i] = -1;
-                GetMidiVars()->sSeqsPlaying_count_word()--;
-            }
+            engine.SeqClose(i);
+            mSeqTable[mOpenSeqs[i]].field_A_id_seqOpenId = -1;
+            mOpenSeqs[i] = -1;
+            mSeqsPlayingCount--;
         }
     }
 }
 
-s16 SND_SEQ_PlaySeq(u16 idx, s16 repeatCount, s16 bDontStop)
+bool GameSound::OpenSeq(u16 idx)
+{
+    OpenSeqHandle& rec = mSeqTable[idx];
+    if (rec.field_A_id_seqOpenId >= 0)
+    {
+        return true;
+    }
+
+    // Too many playing: close the ones that are done, and if none where there's no room
+    if (mSeqsPlayingCount >= kMaxPlayingSeqs)
+    {
+        StopFinishedSeqs();
+        if (mSeqsPlayingCount >= kMaxPlayingSeqs)
+        {
+            return false;
+        }
+    }
+
+    rec.field_A_id_seqOpenId = Engine().SeqOpen(rec.field_C_ppSeq_Data.data(), static_cast<u32>(rec.field_C_ppSeq_Data.size()), static_cast<s16>(LastLoadedVabId()));
+    Engine().Record("SEQOPEN %d %d %d %s", rec.field_A_id_seqOpenId, rec.field_4_generated_res_id, LastLoadedVabId(), rec.field_0_mBsqName);
+    if (rec.field_A_id_seqOpenId < 0 || rec.field_A_id_seqOpenId >= Libsnd::kMaxSeqs)
+    {
+        // libsnd couldn't open it
+        rec.field_A_id_seqOpenId = -1;
+        return false;
+    }
+
+    // Index into the IDS via the seq ID and map it to the index
+    mOpenSeqs[rec.field_A_id_seqOpenId] = static_cast<s16>(idx);
+    mSeqsPlayingCount++;
+    return true;
+}
+
+s16 GameSound::SeqPlaySeq(u16 idx, s16 repeatCount, s16 bDontStop)
 {
     SoundDebug::LogSeqOutput("PLAYSEQ %d %d %d", idx, repeatCount, bDontStop);
-    OpenSeqHandle& rec = GetMidiVars()->sSeqDataTable()[idx];
+    OpenSeqHandle& rec = mSeqTable[idx];
     if (rec.field_C_ppSeq_Data.empty())
     {
         return 0;
     }
 
+    PsxSoundEngine& engine = Engine();
     if (rec.field_A_id_seqOpenId < 0)
     {
-        if (GetMidiVars()->sSeqsPlaying_count_word() >= 16)
+        if (!OpenSeq(idx))
         {
-            // Note: Inlined in psx
-            SND_Seq_Stop_4CA8E0();
-            if (GetMidiVars()->sSeqsPlaying_count_word() >= 16)
-            {
-                return 0;
-            }
+            return 0;
         }
-
-        rec.field_A_id_seqOpenId = SsSeqOpen_4FD6D0(rec.field_C_ppSeq_Data.data(), static_cast<u32>(rec.field_C_ppSeq_Data.size()), static_cast<s16>(LastLoadedVabId()));
-        if (PsxSoundEngine* pRec = PsxSoundEngine::Get())
-        {
-            pRec->Record("SEQOPEN %d %d %d %s", rec.field_A_id_seqOpenId, rec.field_4_generated_res_id, LastLoadedVabId(), rec.field_0_mBsqName);
-        }
-
-        GetMidiVars()->sSeq_Ids_word().ids[rec.field_A_id_seqOpenId] = idx;
-        GetMidiVars()->sSeqsPlaying_count_word()++;
     }
-    else if (SsIsEos_4FDA80(rec.field_A_id_seqOpenId, 0))
+    else if (engine.IsEos(rec.field_A_id_seqOpenId))
     {
         if (!bDontStop)
         {
             return 0;
         }
-        if (PsxSoundEngine* pRec = PsxSoundEngine::Get())
-        {
-            pRec->Record("SEQSTOP %d", rec.field_A_id_seqOpenId);
-        }
-        SsSeqStop(rec.field_A_id_seqOpenId);
+        engine.SeqStop(rec.field_A_id_seqOpenId);
     }
 
-    // Clamp vol
-    s16 clampedVol = rec.field_9_volume;
-    if (clampedVol <= 10)
-    {
-        clampedVol = 10;
-    }
-    else
-    {
-        if (clampedVol >= 127)
-        {
-            clampedVol = 127;
-        }
-    }
-
-    SsSeqSetVol(rec.field_A_id_seqOpenId, clampedVol, clampedVol);
-    if (repeatCount)
-    {
-        SsSeqPlay_4FD900(rec.field_A_id_seqOpenId, 1, repeatCount);
-    }
-    else
-    {
-        SsSeqPlay_4FD900(rec.field_A_id_seqOpenId, 1, 0);
-    }
-
+    const s16 clampedVol = std::clamp<s16>(rec.field_9_volume, 10, 127);
+    engine.SeqSetVol(rec.field_A_id_seqOpenId, clampedVol, clampedVol);
+    engine.SeqPlay(rec.field_A_id_seqOpenId, 1, repeatCount);
     return 1;
 }
 
-
-s16 SND_SEQ_Play(u16 idx, s16 repeatCount, s16 volLeft, s16 volRight)
+s16 GameSound::SeqPlay(u16 idx, s16 repeatCount, s16 volLeft, s16 volRight)
 {
     SoundDebug::LogSeqOutput("PLAY %d %d %d %d", idx, repeatCount, volLeft, volRight);
-    OpenSeqHandle& rec = GetMidiVars()->sSeqDataTable()[idx];
+    OpenSeqHandle& rec = mSeqTable[idx];
     if (rec.field_C_ppSeq_Data.empty())
     {
         return 0;
     }
 
-    // SEQ isn't in use
+    PsxSoundEngine& engine = Engine();
     if (rec.field_A_id_seqOpenId < 0)
     {
-        // Too many playing
-        if (GetMidiVars()->sSeqsPlaying_count_word() >= 16)
+        if (!OpenSeq(idx))
         {
-            // Stop any SEQs that are done
-            SND_Seq_Stop_4CA8E0();
-
-            // If none where done then can't continue
-            if (GetMidiVars()->sSeqsPlaying_count_word() >= 16)
-            {
-                return 0;
-            }
-        }
-
-        // Open the SEQ
-        rec.field_A_id_seqOpenId = SsSeqOpen_4FD6D0(rec.field_C_ppSeq_Data.data(), static_cast<u32>(rec.field_C_ppSeq_Data.size()), static_cast<s16>(LastLoadedVabId()));
-        if (PsxSoundEngine* pRec = PsxSoundEngine::Get())
-        {
-            pRec->Record("SEQOPEN %d %d %d %s", rec.field_A_id_seqOpenId, rec.field_4_generated_res_id, LastLoadedVabId(), rec.field_0_mBsqName);
-        }
-
-        // Index into the IDS via the seq ID and map it to the index
-        GetMidiVars()->sSeq_Ids_word().ids[rec.field_A_id_seqOpenId] = idx;
-        GetMidiVars()->sSeqsPlaying_count_word()++;
-    }
-    else if (SsIsEos_4FDA80(rec.field_A_id_seqOpenId, 0))
-    {
-        if (PsxSoundEngine* pRec = PsxSoundEngine::Get())
-        {
-            pRec->Record("SEQSTOP %d", rec.field_A_id_seqOpenId);
-        }
-        SsSeqStop(rec.field_A_id_seqOpenId);
-    }
-
-    // Clamp left
-    s16 clampedVolLeft = 0;
-    if (volLeft < 10)
-    {
-        clampedVolLeft = 10;
-    }
-    else if (volLeft >= 127)
-    {
-        clampedVolLeft = 127;
-    }
-    else
-    {
-        clampedVolLeft = volLeft;
-    }
-
-    // Clamp right
-    s16 clampedVolRight = 0;
-    if (volRight < 10)
-    {
-        clampedVolRight = 10;
-    }
-    else
-    {
-        clampedVolRight = volRight;
-        if (volRight >= 127)
-        {
-            clampedVolRight = 127;
+            return 0;
         }
     }
-
-    SsSeqSetVol(rec.field_A_id_seqOpenId, clampedVolLeft, clampedVolRight);
-
-    if (repeatCount)
+    else if (engine.IsEos(rec.field_A_id_seqOpenId))
     {
-        SsSeqPlay_4FD900(rec.field_A_id_seqOpenId, 1, repeatCount);
-    }
-    else
-    {
-        SsSeqPlay_4FD900(rec.field_A_id_seqOpenId, 1, 0);
+        engine.SeqStop(rec.field_A_id_seqOpenId);
     }
 
+    engine.SeqSetVol(rec.field_A_id_seqOpenId, std::clamp<s16>(volLeft, 10, 127), std::clamp<s16>(volRight, 10, 127));
+    engine.SeqPlay(rec.field_A_id_seqOpenId, 1, repeatCount);
     return 1;
 }
 
-
-s32 SND_SsIsEos_DeInlined(u16 idx)
+s32 GameSound::SeqIsPlaying(u16 idx)
 {
-    OpenSeqHandle* pRec = &GetMidiVars()->sSeqDataTable()[idx];
-    if (pRec->field_A_id_seqOpenId != -1 && !pRec->field_C_ppSeq_Data.empty())
+    OpenSeqHandle& rec = mSeqTable[idx];
+    if (rec.field_A_id_seqOpenId != -1 && !rec.field_C_ppSeq_Data.empty())
     {
-        return SsIsEos_4FDA80(pRec->field_A_id_seqOpenId, 0) != 0;
+        return Engine().IsEos(rec.field_A_id_seqOpenId) != 0;
     }
     return 0;
 }
 
-
-void SND_SEQ_SetVol(s32 idx, s16 volLeft, s16 volRight)
+void GameSound::SeqSetVol(s32 idx, s16 volLeft, s16 volRight)
 {
     SoundDebug::LogSeqOutput("SETVOL %d %d %d", idx & 0xFFFF, volLeft, volRight);
-    u16 limitedIdx = idx & 0xFFFF;
-    if (GetMidiVars()->sSeqDataTable()[limitedIdx].field_A_id_seqOpenId != -1
-        && !GetMidiVars()->sSeqDataTable()[limitedIdx].field_C_ppSeq_Data.empty()
-        && SND_SsIsEos_DeInlined(limitedIdx))
+    const u16 limitedIdx = idx & 0xFFFF;
+    if (SeqIsPlaying(limitedIdx))
     {
-        SsSeqSetVol(GetMidiVars()->sSeqDataTable()[limitedIdx].field_A_id_seqOpenId, volLeft, volRight);
+        Engine().SeqSetVol(mSeqTable[limitedIdx].field_A_id_seqOpenId, volLeft, volRight);
     }
 }
 
-
-void SND_SEQ_Stop(u16 idx)
+void GameSound::SeqStop(u16 idx)
 {
     SoundDebug::LogSeqOutput("STOP %d", idx);
-    if (GetMidiVars()->sSeqDataTable()[idx].field_A_id_seqOpenId != -1 && !GetMidiVars()->sSeqDataTable()[idx].field_C_ppSeq_Data.empty())
+    if (SeqIsPlaying(idx))
     {
-        if (SsIsEos_4FDA80(GetMidiVars()->sSeqDataTable()[idx].field_A_id_seqOpenId, 0))
-        {
-            if (PsxSoundEngine* pRec = PsxSoundEngine::Get())
-            {
-                pRec->Record("SEQSTOP %d", GetMidiVars()->sSeqDataTable()[idx].field_A_id_seqOpenId);
-            }
-            SsSeqStop(GetMidiVars()->sSeqDataTable()[idx].field_A_id_seqOpenId);
-        }
+        Engine().SeqStop(mSeqTable[idx].field_A_id_seqOpenId);
     }
 }
 
-static u32 GetTableIdxForName(const char_type* pName)
+// Stops the music, the ambience, the SEQs, the objects' sounds and every voice
+void GameSound::StopAll()
 {
-    for (s32 i = 0; i < GetMidiVars()->MidiTableSize(); i++)
+    if (mConfig.mEnableMusic)
     {
-        auto curName = GetMidiVars()->sSeqDataTable()[i].field_0_mBsqName;
-        if (strcmp(curName, pName) == 0)
+        mConfig.mEnableMusic(0);
+    }
+    BackgroundMusic::Stop();
+    SND_Reset_Ambiance();
+    StopAllSeqs();
+    for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
+    {
+        BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
+        if (!pObj)
         {
-            return i;
+            break;
+        }
+
+        if (!pObj->GetDead())
+        {
+            pObj->VStopAudio();
         }
     }
-    ALIVE_FATAL("Couldn't find seq name in the table");
+    Engine().UtAllKeyOff();
 }
 
-void SND_Load_Seqs_Impl(OpenSeqHandle* pSeqTable, PathSoundInfo& info, ResourceManagerWrapper& resMan)
+// Starts the music, and the sounds of the objects in the cameras around, again
+void GameSound::Restart(BaseMap& map)
 {
-    if (pSeqTable)
+    if (mConfig.mEnableMusic)
     {
-        GetMidiVars()->sSeqDataTable() = pSeqTable;
+        mConfig.mEnableMusic(1);
+    }
+    BackgroundMusic::Play();
+    map.Start_Sounds_For_Objects_In_Near_Cameras();
+}
 
-        // Generate resource ids from hashing the name if we haven't already
-        if (GetMidiVars()->sNeedToHashSeqNames())
-        {
-            for (s32 i = 0; i < GetMidiVars()->MidiTableSize(); i++)
-            {
-                GetMidiVars()->sSeqDataTable()[i].field_C_ppSeq_Data.clear();
-                GetMidiVars()->sSeqDataTable()[i].field_A_id_seqOpenId = -1;
-                GetMidiVars()->sSeqDataTable()[i].field_4_generated_res_id = ResourceManagerWrapper::SEQ_HashName(GetMidiVars()->sSeqDataTable()[i].field_0_mBsqName);
-            }
-            GetMidiVars()->sNeedToHashSeqNames() = false;
-        }
+// ---- The functions the game calls ----
 
-        //GetMidiVars()->Reclaim_Memory(0);
+void SND_Init(const GameSoundConfig& config)
+{
+    sGameSound = std::make_unique<GameSound>(config);
+}
 
-        // Get a pointer to each SEQ
-        for (const auto& seqName : info.mSeqFiles)
-        {
-            auto buffer = resMan.LoadSoundFile(seqName.c_str(), info.mSoundTheme);
+void SND_Shutdown()
+{
+    if (sGameSound)
+    {
+        sGameSound->Shutdown();
+    }
+}
 
-            // We have to insert into the table at the position that matches the file name
-            GetMidiVars()->sSeqDataTable()[GetTableIdxForName(seqName.c_str())].field_C_ppSeq_Data = buffer;
-        }
+void SND_SsQuit()
+{
+    sGameSound.reset();
+}
+
+void SND_Reset()
+{
+    if (sGameSound)
+    {
+        sGameSound->Reset();
     }
 }
 
 void SND_Pend_Sound_Files(const PathSoundInfo& info, ResourceManagerWrapper& resMan)
 {
-    // Loaded once, by the first SND_Load_VABS
-    const PathSoundInfo& monkInfo = GetMidiVars()->sMonkVh_Vb();
-    if (monkInfo.mVabId < 0)
+    if (sGameSound)
     {
-        resMan.PendSoundFile(monkInfo.mVhFile, monkInfo.mSoundTheme);
-        resMan.PendSoundFile(monkInfo.mVbFile, monkInfo.mSoundTheme);
-    }
-
-    resMan.PendSoundFile(info.mVhFile, info.mSoundTheme);
-    resMan.PendSoundFile(info.mVbFile, info.mSoundTheme);
-    for (const auto& seqName : info.mSeqFiles)
-    {
-        resMan.PendSoundFile(seqName, info.mSoundTheme);
+        sGameSound->PendSoundFiles(info, resMan);
     }
 }
 
-void SND_Load_Seqs(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& bsqFileName, ResourceManagerWrapper& resMan)
+void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& info, s32 reverb, ResourceManagerWrapper& resMan)
 {
-    SND_Load_Seqs_Impl(pSeqTable, *bsqFileName, resMan);
+    if (sGameSound)
+    {
+        sGameSound->LoadVabs(info, reverb, resMan);
+    }
+}
+
+void SND_Load_Seqs(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& info, ResourceManagerWrapper& resMan)
+{
+    if (sGameSound)
+    {
+        sGameSound->LoadSeqs(pSeqTable, *info, resMan);
+    }
 }
 
 s8 SND_Seq_Table_Valid()
 {
-    return GetMidiVars()->sSeqDataTable() != 0;
-}
-
-// So AO can redirect SND_StopAll_4CB060 to its own func when called from SYS_ funcs
-void SND_StopAll_SetCallBack(TSNDStopAll cb)
-{
-    sSNDStopAllCallBack = cb;
+    return sGameSound && sGameSound->SeqTable() != nullptr;
 }
 
 void SND_StopAll()
 {
-    if (sSNDStopAllCallBack)
+    if (sGameSound)
     {
-        sSNDStopAllCallBack();
-    }
-    else
-    {
-        MusicController::static_EnableMusic(false);
-        BackgroundMusic::Stop();
-        SND_Reset_Ambiance();
-        SND_Stop_All_Seqs();
-        for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
-        {
-            BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
-            if (!pObj)
-            {
-                break;
-            }
-
-            if (!pObj->GetDead())
-            {
-                pObj->VStopAudio();
-            }
-        }
-        SsUtAllKeyOff(0);
+        sGameSound->StopAll();
     }
 }
 
-
-// So AO can redirect SND_Restart_4CB0E0 to its own func when called from SYS_ funcs
-void SND_Restart_SetCallBack(TSNDRestart cb)
+void SND_Restart(BaseMap& map)
 {
-    sSNDRestartCallBack = cb;
+    if (sGameSound)
+    {
+        sGameSound->Restart(map);
+    }
 }
 
-void SND_Restart_4CB0E0(BaseMap& map)
+void SND_Stop_All_Seqs()
 {
-    if (sSNDRestartCallBack)
+    if (sGameSound)
     {
-        sSNDRestartCallBack(map);
-    }
-    else
-    {
-        MusicController::static_EnableMusic(true);
-        BackgroundMusic::Play();
-        map.Start_Sounds_For_Objects_In_Near_Cameras();
+        sGameSound->StopAllSeqs();
     }
 }
 
-// Next -> Background music object
+void SND_Stop_Channels_Mask(u32 bitMask)
+{
+    if (sGameSound)
+    {
+        sGameSound->StopChannelsMask(bitMask);
+    }
+}
 
-// Next -> Scoped seq object
+void SND_AllKeyOff()
+{
+    if (sGameSound)
+    {
+        sGameSound->Engine().UtAllKeyOff();
+    }
+}
 
-// Next -> SND_Init_Ambiance, SND_Reset_Ambiance, Start_Sounds_for_TLV, Start_Slig_sounds
-// Stop_slig_sounds_4CBA70 Path::Start_Sounds_For_Objects_In_Camera_4CBAF0, Start_Sounds_For_Objects_In_Near_Cameras
+void SND_SEQ_Stop(u16 idx)
+{
+    if (sGameSound)
+    {
+        sGameSound->SeqStop(idx);
+    }
+}
+
+s16 SND_SEQ_PlaySeq(u16 idx, s16 repeatCount, s16 bDontStop)
+{
+    return sGameSound ? sGameSound->SeqPlaySeq(idx, repeatCount, bDontStop) : 0;
+}
+
+void SND_SEQ_SetVol(s32 idx, s16 volLeft, s16 volRight)
+{
+    if (sGameSound)
+    {
+        sGameSound->SeqSetVol(idx, volLeft, volRight);
+    }
+}
+
+s16 SND_SEQ_Play(u16 idx, s16 repeatCount, s16 volLeft, s16 volRight)
+{
+    return sGameSound ? sGameSound->SeqPlay(idx, repeatCount, volLeft, volRight) : 0;
+}
+
+s32 SND_SsIsEos_DeInlined(u16 idx)
+{
+    return sGameSound ? sGameSound->SeqIsPlaying(idx) : 0;
+}
+
+s32 SFX_SfxDefinition_Play_Stereo(const relive::SfxDefinition& sfxDef, s16 volLeft, s16 volRight, s16 pitch_min, s16 pitch_max)
+{
+    return sGameSound ? sGameSound->SfxPlayStereo(sfxDef, volLeft, volRight, pitch_min, pitch_max) : 0;
+}
+
+s32 SFX_SfxDefinition_Play_Mono(const relive::SfxDefinition& sfxDef, s32 volume, s32 pitch_min, s32 pitch_max)
+{
+    return sGameSound ? sGameSound->SfxPlayMono(sfxDef, volume, pitch_min, pitch_max) : 0;
+}
+
+s32 SND_MIDI(s32 program, s32 vabId, s32 note, s16 vol, s16 min, s16 max)
+{
+    return sGameSound ? sGameSound->PlayMidi(program, vabId, note, vol, min, max) : 0;
+}

@@ -31,7 +31,7 @@ public:
 };
 
 // A port of the PS1 sound library (PsyQ libsnd: the SEQ player and its voice manager) that both
-// games use with -ps1_sound, so the music and sound effects play as the PS1 games played them.
+// games use, so the music and sound effects play as the PS1 games played them.
 //
 // Ported from the MIT licensed libsnd decompilation in the sotn-decomp project
 // (src/main/psxsdk/libsnd, https://github.com/Xeeynamo/sotn-decomp) and checked against the real

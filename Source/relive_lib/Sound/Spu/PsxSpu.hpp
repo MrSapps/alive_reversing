@@ -66,16 +66,6 @@ public:
         mAdsr2 = adsr2;
     }
 
-    u16 Adsr1() const
-    {
-        return mAdsr1;
-    }
-
-    u16 Adsr2() const
-    {
-        return mAdsr2;
-    }
-
     // Starts the attack from level 0
     void KeyOn();
     // Starts the release from the current level
@@ -246,6 +236,11 @@ public:
         {
             voice.mEnvelope.SetMinimumRelease(enable);
         }
+        mReverb.SetDeclick(enable);
+    }
+    bool Declick() const
+    {
+        return mDeclick;
     }
 
     // ENDX: a bit per voice, set when the voice reaches its sample's (loop) end, cleared by key on.
@@ -288,11 +283,6 @@ public:
     void SetInterpolation(Interpolation interpolation)
     {
         mInterpolation = interpolation;
-    }
-
-    Interpolation CurrentInterpolation() const
-    {
-        return mInterpolation;
     }
 
     // Mixes frames 44100 Hz stereo samples into out (left, right, left, ...), overwriting it

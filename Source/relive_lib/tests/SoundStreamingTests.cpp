@@ -1,16 +1,20 @@
 #include <gtest/gtest.h>
 #include "../Sound/SoundGold.hpp"
-#include "../Sound/Sound.hpp"
+#include "../Sound/GameSound.hpp"
 #include "../Sound/SDLSoundSystem.hpp"
-#include "../Sound/SDLSoundBuffer.hpp"
 #include "../GameType.hpp"
 #include <algorithm>
 #include <vector>
 
-// Streams a known signal through a looping sound buffer the way the movie player feeds its
-// audio (Movie.cpp FeedAudio: a 4 s ring the writer keeps up to size-1024 ahead of the read
-// cursor), rendering in device sized chunks, and checks the output is that signal with no
-// gaps, repeats or skips.
+static SDLSoundSystem& Sound()
+{
+    return GameSound::Get()->System();
+}
+
+// Streams a known signal through an audio stream the way the movie player feeds its audio
+// (Movie.cpp FeedAudio: a 4 s ring the writer keeps up to size-1024 ahead of the reader),
+// rendering in device sized chunks, and checks the output is that signal with no gaps, repeats or
+// skips.
 // chunkFrames: the device chunk size, 0 for a mix of sizes like the render thread's
 static void StreamTest(u32 chunkFrames)
 {
@@ -18,30 +22,22 @@ static void StreamTest(u32 chunkFrames)
 
     const u32 rate = 37800;
     const u32 frames = rate * 4;
-    SoundEntry entry = {};
-    ASSERT_EQ(SND_New(&entry, static_cast<s32>(frames), static_cast<s32>(rate), 16, 7), 0);
+    const std::shared_ptr<AudioStream> stream = Sound().CreateStream(rate, 2, frames);
 
     // The signal: a sawtooth of the source frame index, so every output sample says where it
     // came from
     const u32 maxBuffered = frames - 1024;
-    u32 writeOffset = 0;
     u64 submitted = 0;
     bool started = false;
     auto feed = [&]() {
         for (;;)
         {
-            const u32 readOffset = started ? GetSoundAPI().mSND_Get_Sound_Entry_Pos(&entry) : 0;
-            const u32 buffered = started ? (writeOffset >= readOffset ? writeOffset - readOffset : frames - readOffset + writeOffset) : static_cast<u32>(submitted);
+            const u32 buffered = stream->BufferedFrames();
             if (buffered >= maxBuffered)
             {
                 return;
             }
-            const u32 n = std::min({maxBuffered - buffered, frames - writeOffset, 1024u});
-            if (n == 0)
-            {
-                writeOffset = 0;
-                continue;
-            }
+            const u32 n = std::min(maxBuffered - buffered, 1024u);
             std::vector<s16> chunk(n * 2);
             for (u32 i = 0; i < n; i++)
             {
@@ -49,18 +45,17 @@ static void StreamTest(u32 chunkFrames)
                 chunk[i * 2] = v;
                 chunk[i * 2 + 1] = v;
             }
-            ASSERT_GE(GetSoundAPI().mSND_LoadSamples(&entry, writeOffset, reinterpret_cast<u8*>(chunk.data()), n), 0);
-            writeOffset = (writeOffset + n) % frames;
+            ASSERT_EQ(stream->Write(chunk.data(), n), n);
             submitted += n;
             if (!started && submitted >= rate / 5)
             {
-                ASSERT_EQ(SND_PlayEx(&entry, 116, 116, 1.0f, nullptr, 1, 100), 0);
+                stream->Start();
                 started = true;
             }
         }
     };
 
-    // 12 s: three laps of the ring, a frame of feeding then a frame's worth of device chunks
+    // 12 s: a frame of feeding then a frame's worth of device chunks
     for (u32 frame = 0; frame < 12 * 30; frame++)
     {
         feed();
@@ -70,16 +65,17 @@ static void StreamTest(u32 chunkFrames)
         {
             seed = seed * 1103515245u + 12345u;
             const u32 n = chunkFrames ? std::min(chunkFrames, left) : std::min(left, 64u + (seed >> 16) % 2048u);
-            sDSound_BBC344->RenderOffline(n);
+            Sound().RenderOffline(n);
             left -= n;
         }
     }
 
-    const std::vector<StereoSample_S16>& out = sDSound_BBC344->OfflineOutput();
+    const std::vector<StereoSample_S16>& out = Sound().OfflineOutput();
     ASSERT_GT(out.size(), 44100u * 10u);
 
     // The source index advances 37800/44100 a sample, so the output steps up by that times the
-    // volume scale, and drops by 16384 times the scale once a sawtooth period
+    // stream's gain, and drops by 16384 times the gain once a sawtooth period (over a sample or
+    // two, as the output is interpolated between the source frames)
     std::vector<s32> diffs;
     for (size_t i = 44100; i + 1 < out.size(); i++)
     {
@@ -89,12 +85,16 @@ static void StreamTest(u32 chunkFrames)
     std::sort(sorted.begin(), sorted.end());
     const s32 step = sorted[sorted.size() / 2]; // 0 or 1 mostly
     s32 anomalies = 0;
+    s32 drops = 0;
     std::string first;
     for (size_t i = 0; i < diffs.size(); i++)
     {
         const s32 d = diffs[i];
-        const bool wrap = d < -3000; // the sawtooth's drop (16384 times the ~0.3 output scale)
-        if (!wrap && (d < step - 1 || d > step + 2))
+        if (d < -300)
+        {
+            drops++;
+        }
+        else if (d < step - 1 || d > step + 2)
         {
             anomalies++;
             if (anomalies <= 8)
@@ -104,67 +104,78 @@ static void StreamTest(u32 chunkFrames)
         }
     }
     EXPECT_EQ(anomalies, 0) << "discontinuities in the streamed audio:" << first;
+    // 11 s of the period 16384 / 37800 s, one or two samples each
+    EXPECT_GE(drops, 20);
+    EXPECT_LE(drops, 60);
 
-    GetSoundAPI().mSND_Free(&entry);
+    stream->Stop();
 }
 
-TEST(SoundStreaming, LoopingBufferStreamsContinuously)
+TEST(SoundStreaming, StreamsContinuously)
 {
     StreamTest(470);
 }
 
-TEST(SoundStreaming, LoopingBufferStreamsContinuouslyInBigChunks)
+TEST(SoundStreaming, StreamsContinuouslyInBigChunks)
 {
     StreamTest(2048);
 }
 
-TEST(SoundStreaming, LoopingBufferStreamsContinuouslyInMixedChunks)
+TEST(SoundStreaming, StreamsContinuouslyInMixedChunks)
 {
     StreamTest(0);
 }
 
-// A playing buffer that is stopped or freed (a skipped movie) fades out instead of being cut off
-static std::vector<s32> RenderThenEnd(bool free)
+// A loud constant signal, started and rendered for 2000 frames
+static std::shared_ptr<AudioStream> StartConstantStream(u32 rate, u32 channels)
 {
-    SoundGoldSession session(GameType::eAe);
+    const std::shared_ptr<AudioStream> stream = Sound().CreateStream(rate, channels, rate);
+    std::vector<s16> signal(static_cast<size_t>(rate) * channels, 8000);
+    EXPECT_EQ(stream->Write(signal.data(), rate), rate);
+    stream->Start();
+    return stream;
+}
 
-    const u32 rate = 44100;
-    const u32 frames = rate;
-    SoundEntry entry = {};
-    EXPECT_EQ(SND_New(&entry, static_cast<s32>(frames), static_cast<s32>(rate), 16, 7), 0);
-
-    // A loud constant signal
-    std::vector<s16> signal(frames * 2, 8000);
-    EXPECT_GE(GetSoundAPI().mSND_LoadSamples(&entry, 0, reinterpret_cast<u8*>(signal.data()), frames), 0);
-    EXPECT_EQ(SND_PlayEx(&entry, 116, 116, 1.0f, nullptr, 1, 100), 0);
-
-    sDSound_BBC344->RenderOffline(2000);
-    if (free)
-    {
-        GetSoundAPI().mSND_Free(&entry);
-    }
-    else
-    {
-        entry.field_4_pDSoundBuffer->Stop();
-    }
-    sDSound_BBC344->RenderOffline(1000);
-    if (!free)
-    {
-        GetSoundAPI().mSND_Free(&entry);
-        sDSound_BBC344->RenderOffline(1);
-    }
-
-    const std::vector<StereoSample_S16>& out = sDSound_BBC344->OfflineOutput();
+static std::vector<s32> LeftSamples()
+{
     std::vector<s32> left;
-    for (const StereoSample_S16& s : out)
+    for (const StereoSample_S16& s : Sound().OfflineOutput())
     {
         left.push_back(s.left);
     }
     return left;
 }
 
-static void ExpectFadedOut(const std::vector<s32>& left)
+// A stream that starts fades in instead of clicking
+TEST(SoundStreaming, StartFadesIn)
 {
+    SoundGoldSession session(GameType::eAe);
+    const std::shared_ptr<AudioStream> stream = StartConstantStream(44100, 2);
+    Sound().RenderOffline(1000);
+
+    const std::vector<s32> left = LeftSamples();
+    ASSERT_GE(left.size(), 1000u);
+    const s32 level = left[900];
+    ASSERT_GT(level, 500);
+    EXPECT_LT(left[0], level / 10);
+    s32 maxStep = 0;
+    for (size_t i = 1; i < 400; i++)
+    {
+        maxStep = std::max(maxStep, std::abs(left[i] - left[i - 1]));
+    }
+    EXPECT_LT(maxStep, level / 10);
+}
+
+// A playing stream that is stopped (a skipped movie) fades out instead of being cut off
+TEST(SoundStreaming, StoppedStreamFadesOut)
+{
+    SoundGoldSession session(GameType::eAe);
+    const std::shared_ptr<AudioStream> stream = StartConstantStream(44100, 2);
+    Sound().RenderOffline(2000);
+    stream->Stop();
+    Sound().RenderOffline(1000);
+
+    const std::vector<s32> left = LeftSamples();
     ASSERT_GE(left.size(), 3000u);
     const s32 level = left[1900];
     ASSERT_GT(std::abs(level), 500);
@@ -180,12 +191,31 @@ static void ExpectFadedOut(const std::vector<s32>& left)
     EXPECT_EQ(left[2900], 0);
 }
 
-TEST(SoundStreaming, StoppedBufferFadesOut)
+// A mono stream is played on both sides, and at its own rate
+TEST(SoundStreaming, MonoStreamPlaysOnBothSides)
 {
-    ExpectFadedOut(RenderThenEnd(false));
+    SoundGoldSession session(GameType::eAe);
+    const std::shared_ptr<AudioStream> stream = StartConstantStream(18900, 1);
+    Sound().RenderOffline(2000);
+    const std::vector<StereoSample_S16>& out = Sound().OfflineOutput();
+    EXPECT_GT(out[1900].left, 500);
+    EXPECT_EQ(out[1900].left, out[1900].right);
 }
 
-TEST(SoundStreaming, FreedBufferFadesOut)
+// Without data the stream is silent, and plays on when there is some again
+TEST(SoundStreaming, StarvedStreamIsSilentThenResumes)
 {
-    ExpectFadedOut(RenderThenEnd(true));
+    SoundGoldSession session(GameType::eAe);
+    const std::shared_ptr<AudioStream> stream = Sound().CreateStream(44100, 2, 44100);
+    std::vector<s16> signal(2 * 1000, 8000);
+    ASSERT_EQ(stream->Write(signal.data(), 1000), 1000u);
+    stream->Start();
+    Sound().RenderOffline(3000); // Plays the 1000 frames, then has none
+    ASSERT_EQ(stream->Write(signal.data(), 1000), 1000u);
+    Sound().RenderOffline(3000);
+
+    const std::vector<s32> left = LeftSamples();
+    EXPECT_GT(left[900], 500);
+    EXPECT_EQ(left[2500], 0);
+    EXPECT_GT(left[3500], 500);
 }

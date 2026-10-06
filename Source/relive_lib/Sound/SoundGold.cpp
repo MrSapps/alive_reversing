@@ -1,15 +1,15 @@
 #include "../stdafx.h"
 #include "SoundGold.hpp"
 #include "Midi.hpp"
-#include "PsxSpuApi.hpp"
-#include "Sound.hpp"
-#include "SDLSoundBuffer.hpp"
+#include "GameSound.hpp"
 #include "SDLSoundSystem.hpp"
 #include "PsxSoundEngine.hpp"
+#include "VabFile.hpp"
 #include "../BinaryPath.hpp"
 #include "../FatalError.hpp"
 #include "../../AliveLibAE/PathData.hpp"
 #include "../../AliveLibAO/Midi.hpp"
+#include <algorithm>
 #include <cstdarg>
 #include <cstdio>
 
@@ -36,86 +36,59 @@ static std::string Format(const char_type* fmt, ...)
     return buf;
 }
 
-SoundGoldSession::SoundGoldSession(GameType game, bool ps1Sound, PsxSpu::Interpolation interpolation)
+// The tones of a VH file: the header, then 16 tones for each program. Unused slots have no volume.
+static std::vector<VagAtr> ReadTones(const std::vector<u8>& vh, VabHeader& header)
+{
+    std::vector<VagAtr> tones;
+    if (vh.size() < sizeof(VabHeader))
+    {
+        return tones;
+    }
+    memcpy(&header, vh.data(), sizeof(VabHeader));
+    const size_t count = static_cast<size_t>(std::clamp<s32>(header.field_12_num_progs, 0, 128)) * 16;
+    for (size_t i = 0; i < count && sizeof(VabHeader) + (i + 1) * sizeof(VagAtr) <= vh.size(); i++)
+    {
+        VagAtr tone = {};
+        memcpy(&tone, vh.data() + sizeof(VabHeader) + i * sizeof(VagAtr), sizeof(VagAtr));
+        tones.push_back(tone);
+    }
+    return tones;
+}
+
+SoundGoldSession::SoundGoldSession(GameType game, PsxSpu::Interpolation interpolation)
     : mGame(game)
 {
-    if (sDSound_BBC344)
+    if (SDLSoundSystem::Get())
     {
         ALIVE_FATAL("SoundGoldSession: the sound system is already running");
     }
 
     SetGameType(game);
-
-    // Whatever an earlier session left behind would change which voices get picked
-    memset(sSoundBuffers_BBBAB8, 0, sizeof(sSoundBuffers_BBBAB8));
-    sLastNotePlayTime_BBC33C = 0;
     sRandomSeed = 0;
 
-    mOldCreateDS = GetSoundAPI().mSND_CreateDS;
-    GetSoundAPI().mSND_CreateDS = SND_CreateDS_Offline;
-    SDLSoundSystem::SetPs1SoundOnCreate(ps1Sound, interpolation);
+    GameSoundConfig config;
+    config.mGame = game;
+    config.mOffline = true;
+    config.mGaussianInterpolation = interpolation == PsxSpu::Interpolation::Gaussian;
+    SND_Init(config);
 
-    if (game == GameType::eAo)
-    {
-        AO::SND_Init();
-    }
-    else
-    {
-        SND_Init();
-    }
+    // The gold files are the hardware's output
+    GameSound::Get()->Engine().SetDeclick(false);
 
-    // SND_Shutdown leaves the MIDI channel and SEQ state of an earlier session behind, and the
-    // clock starts at 0 again, so the last sequencer update time must be forgotten too
-    IPsxSpuApiVars* pVars = GetSpuApiVars();
-    memset(&pVars->sMidi_Channels(), 0, sizeof(MidiChannels));
-    for (s32 i = 0; i < 32; i++)
-    {
-        memset(&pVars->sMidiSeqSongs(i), 0, sizeof(MIDI_SeqSong));
-    }
-    pVars->sControllerValue() = 0;
-
-    pVars->sLastTime() = 0xFFFFFFFF;
-    pVars->sMidi_WaitUntil() = 0;
-
-    // Only record channels/voices once they change from this
-    mLastChannelState.resize(kNumChannels, "off");
-    if (ps1Sound)
-    {
-        // The gold files are the hardware's output
-        if (PsxSoundEngine* pPs1 = PsxSoundEngine::Get())
-        {
-            pPs1->SetDeclick(false);
-        }
-        mLastVoiceState.resize(PsxSpu::kNumVoices, "off");
-    }
-    else
-    {
-        mLastVoiceState.resize(ALIVE_COUNTOF(sSoundBuffers_BBBAB8), "stopped");
-    }
+    // Only record voices once they change from this
+    mLastVoiceState.resize(PsxSpu::kNumVoices, "off");
 }
 
 SoundGoldSession::~SoundGoldSession()
 {
     SND_Shutdown();
-    GetMidiVars()->sMonkVh_Vb().mSoundTheme.clear();
-
-    GetSoundAPI().mSND_CreateDS = mOldCreateDS;
-    SDLSoundSystem::SetPs1SoundOnCreate(false);
-    SND_Restart_SetCallBack(nullptr);
-    SND_StopAll_SetCallBack(nullptr);
-    SetSpuApiVars(nullptr);
-    SetMidiApiVars(nullptr);
+    SND_SsQuit();
 }
 
-void SoundGoldSession::LoadSoundBlock(ResourceManagerWrapper& resMan, const std::shared_ptr<PathSoundInfo>& info, s32 reverb, const std::string& monkTheme)
+void SoundGoldSession::LoadSoundBlock(ResourceManagerWrapper& resMan, const std::shared_ptr<PathSoundInfo>& info, s32 reverb)
 {
     mInfo = info;
 
-    // The game only loads MONK.VH/VB when mVabId is -1, but it starts as 0 (sMonkVh_Vb's
-    // initialiser) until SND_Shutdown sets it, so the game never loads it before then. Without a
-    // monk theme do the same, as the load would fail.
-    GetMidiVars()->sMonkVh_Vb().mSoundTheme = monkTheme;
-    GetMidiVars()->sMonkVh_Vb().mVabId = monkTheme.empty() ? 0 : -1;
     SND_Pend_Sound_Files(*info, resMan);
 
     // Only what the engine does with the files is recorded, not their names or bytes, so the
@@ -125,11 +98,7 @@ void SoundGoldSession::LoadSoundBlock(ResourceManagerWrapper& resMan, const std:
     SND_Load_VABS(mInfo, reverb, resMan);
     SND_Load_Seqs(SeqTable(mGame), mInfo, resMan);
 
-    if (!monkTheme.empty())
-    {
-        RecordLoadedVab(GetMidiVars()->sMonkVh_Vb().mVabId);
-    }
-    RecordLoadedVab(info->mVabId);
+    RecordLoadedVab(*info);
 
     for (const u16 seqIdx : LoadedSeqs())
     {
@@ -139,19 +108,19 @@ void SoundGoldSession::LoadSoundBlock(ResourceManagerWrapper& resMan, const std:
 
 void SoundGoldSession::Note(const std::string& text)
 {
-    mTrace += Format("t=%u ", SND_GetTicks());
+    mTrace += Format("t=%u ", SDLSoundSystem::GetTicks());
     mTrace += text;
     mTrace += "\n";
 }
 
 void SoundGoldSession::Advance(u32 ms)
 {
-    const u32 end = SND_GetTicks() + ms;
-    while (SND_GetTicks() < end)
+    SDLSoundSystem& sound = GameSound::Get()->System();
+    const u32 end = SDLSoundSystem::GetTicks() + ms;
+    while (SDLSoundSystem::GetTicks() < end)
     {
-        SsSeqCalledTbyT();
         RecordChanges();
-        sDSound_BBC344->RenderOfflineUntil(std::min(SND_GetTicks() + kStepMs, end));
+        sound.RenderOfflineUntil(std::min(SDLSoundSystem::GetTicks() + kStepMs, end));
     }
     RecordChanges();
 }
@@ -164,7 +133,7 @@ s32 SoundGoldSession::VabId() const
 std::vector<u16> SoundGoldSession::LoadedSeqs() const
 {
     std::vector<u16> ret;
-    for (s32 i = 0; i < GetMidiVars()->MidiTableSize(); i++)
+    for (s32 i = 0; i < GameSound::Get()->SeqTableSize(); i++)
     {
         if (!SeqTable(mGame)[i].field_C_ppSeq_Data.empty())
         {
@@ -177,35 +146,34 @@ std::vector<u16> SoundGoldSession::LoadedSeqs() const
 std::vector<s32> SoundGoldSession::Programs() const
 {
     std::vector<s32> ret;
-    const s32 vabId = VabId();
-    if (vabId < 0)
+    if (!mInfo)
     {
         return ret;
     }
 
-    for (s32 prog = 0; prog < 128; prog++)
+    VabHeader header = {};
+    for (const VagAtr& tone : ReadTones(mInfo->mVhFileData, header))
     {
-        for (s32 tone = 0; tone < 16; tone++)
+        if (tone.field_2_vol > 0 && std::find(ret.begin(), ret.end(), tone.field_14_prog) == ret.end())
         {
-            if (GetSpuApiVars()->sConvertedVagTable().table[vabId][prog][tone].field_D_vol > 0)
-            {
-                ret.push_back(prog);
-                break;
-            }
+            ret.push_back(tone.field_14_prog);
         }
     }
+    std::sort(ret.begin(), ret.end());
     return ret;
 }
 
 s32 SoundGoldSession::RootKey(s32 program) const
 {
-    for (s32 tone = 0; tone < 16; tone++)
+    if (mInfo)
     {
-        const Converted_Vag& vag = GetSpuApiVars()->sConvertedVagTable().table[VabId()][program][tone];
-        if (vag.field_D_vol > 0)
+        VabHeader header = {};
+        for (const VagAtr& tone : ReadTones(mInfo->mVhFileData, header))
         {
-            // centre * 256 - 2 * shift, with shift 0-127
-            return (vag.field_A_shift_cen + 255) >> 8;
+            if (tone.field_2_vol > 0 && tone.field_14_prog == program)
+            {
+                return tone.field_4_centre;
+            }
         }
     }
     return 60;
@@ -213,111 +181,63 @@ s32 SoundGoldSession::RootKey(s32 program) const
 
 const std::vector<StereoSample_S16>& SoundGoldSession::Audio() const
 {
-    return sDSound_BBC344->OfflineOutput();
+    return GameSound::Get()->System().OfflineOutput();
 }
 
-void SoundGoldSession::RecordLoadedVab(s32 vabId)
+void SoundGoldSession::RecordLoadedVab(const PathSoundInfo& info)
 {
+    const s32 vabId = info.mVabId;
     if (vabId < 0)
     {
         return;
     }
 
-    IPsxSpuApiVars* pVars = GetSpuApiVars();
-    Note(Format("vab %d progs=%d vags=%d", vabId, pVars->sProgCounts()[vabId], pVars->sVagCounts()[vabId]));
+    VabHeader header = {};
+    const std::vector<VagAtr> tones = ReadTones(info.mVhFileData, header);
+    const s32 vagCount = std::min<s32>(header.field_16_num_vags, 255);
+    Note(Format("vab %d progs=%d vags=%d", vabId, header.field_12_num_progs, vagCount));
 
-    for (s32 prog = 0; prog < 128; prog++)
+    for (size_t i = 0; i < tones.size(); i++)
     {
-        for (s32 tone = 0; tone < 16; tone++)
+        const VagAtr& t = tones[i];
+        if (t.field_2_vol == 0)
         {
-            const Converted_Vag& v = pVars->sConvertedVagTable().table[vabId][prog][tone];
-            if (v.field_D_vol == 0)
-            {
-                continue;
-            }
-            Note(Format("tone vab=%d prog=%d tone=%d vag=%d keys=%d-%d shift_cen=%d vol=%d prio=%d flags=%d adsr=%d,%d,%d,%d pan=%d",
-                vabId, prog, tone, v.field_10_vag, v.field_8_min, v.field_9_max, v.field_A_shift_cen, v.field_D_vol, v.field_E_priority, v.field_C,
-                v.field_0_adsr_attack, v.field_2_adsr_sustain_level, v.field_4_adsr_decay, v.field_6_adsr_release, v.field_11_pad));
+            continue;
         }
+        Note(Format("tone vab=%d prog=%d tone=%d vag=%d keys=%d-%d centre=%d shift=%d vol=%d prio=%d mode=%d adsr=%04x,%04x pan=%d",
+            vabId, t.field_14_prog, static_cast<s32>(i % 16), t.field_16_vag - 1, t.field_6_min, t.field_7_max, t.field_4_centre, t.field_5_shift, t.field_2_vol,
+            t.field_0_priority, t.field_1_mode, static_cast<u16>(t.field_10_adsr1), static_cast<u16>(t.field_12_adsr2), t.field_3_pan));
     }
 
-    for (s32 i = 0; i < pVars->sVagCounts()[vabId]; i++)
+    for (s32 i = 0; i < vagCount; i++)
     {
-        const SoundEntry& e = pVars->sSoundEntryTable16().table[vabId][i];
-        if (!e.field_8_pSoundBuffer)
+        const PsxSoundEngine::SampleInfo sample = GameSound::Get()->Engine().GetSample(vabId, i);
+        if (sample.mPcm.empty())
         {
             Note(Format("sample vab=%d idx=%d none", vabId, i));
             continue;
         }
-        Note(Format("sample vab=%d idx=%d rate=%d bits=%d stereo=%d bytes=%d crc=%08x", vabId, i, e.field_18_sampleRate, e.field_1C_bitsPerSample, e.field_20_isStereo,
-            e.field_C_buffer_size_bytes, Crc32(e.field_8_pSoundBuffer, e.field_C_buffer_size_bytes)));
+        Note(Format("sample vab=%d idx=%d samples=%u loop=%d loopstart=%u crc=%08x", vabId, i, static_cast<u32>(sample.mPcm.size()), sample.mLoop ? 1 : 0, sample.mLoopStart,
+            Crc32(reinterpret_cast<const u8*>(sample.mPcm.data()), sample.mPcm.size() * sizeof(s16))));
     }
 }
 
 void SoundGoldSession::RecordChanges()
 {
-    IPsxSpuApiVars* pVars = GetSpuApiVars();
-    for (s32 i = 0; i < kNumChannels; i++)
+    PsxSoundEngine& engine = GameSound::Get()->Engine();
+    for (s32 i = 0; i < PsxSpu::kNumVoices; i++)
     {
-        const MIDI_Channel& c = pVars->sMidi_Channels().channels[i];
-        const MIDI_ADSR_State& a = c.field_1C_adsr;
-        std::string state;
-        if (a.field_3_state != 0)
+        const PsxSoundEngine::VoiceState v = engine.GetVoiceState(i);
+        std::string state = "off";
+        if (v.mPhase != PsxSpuEnvelope::Phase::Off)
         {
-            state = Format("state=%d vol=%d cvol=%d prio=%d vab=%d prog=%d note=%d freq=%.4f adsr=%d,%d,%d,%d seqch=%d ref=%d loop=%d",
-                a.field_3_state, c.field_8_left_vol, c.field_C_vol, c.field_4_priority, a.field_0_seq_idx, a.field_1_program, a.field_2_note_byte1, static_cast<f64>(c.field_10_freq),
-                a.field_4_attack, a.field_6_sustain, a.field_8_decay, a.field_A_release, a.field_C, a.field_E_ref_count, c.field_18_rightVol);
-        }
-        else
-        {
-            state = "off";
-        }
-
-        if (state != mLastChannelState[i])
-        {
-            Note(Format("ch%d ", i) + state);
-            mLastChannelState[i] = state;
-        }
-    }
-
-    if (PsxSoundEngine* pPs1Sound = PsxSoundEngine::Get())
-    {
-        for (s32 i = 0; i < PsxSpu::kNumVoices; i++)
-        {
-            const PsxSoundEngine::VoiceState v = pPs1Sound->GetVoiceState(i);
-            std::string state = "off";
-            if (v.mPhase != PsxSpuEnvelope::Phase::Off)
-            {
-                state = Format("phase=%d pitch=%04x vol=%d,%d adsr=%04x,%04x reverb=%d seq=%d prog=%d note=%d", static_cast<s32>(v.mPhase), v.mPitch, v.mVolLeft, v.mVolRight, v.mAdsr1,
-                    v.mAdsr2, v.mReverb ? 1 : 0, v.mLibsnd.mSeq, v.mLibsnd.mProgram, v.mLibsnd.mNote);
-            }
-
-            if (state != mLastVoiceState[i])
-            {
-                Note(Format("spu%d ", i) + state);
-                mLastVoiceState[i] = state;
-            }
-        }
-        return;
-    }
-
-    for (s32 i = 0; i < static_cast<s32>(ALIVE_COUNTOF(sSoundBuffers_BBBAB8)); i++)
-    {
-        const SDLSoundBuffer* pVoice = sSoundBuffers_BBBAB8[i].field_0_pDSoundBuffer;
-        std::string state;
-        if (pVoice && pVoice->mState.eStatus == SDLSoundBufferStatus::Playing)
-        {
-            state = Format("sample=%d vol=%d freq=%u pan=%d loop=%d", sSoundBuffers_BBBAB8[i].field_8_sample_idx, pVoice->mState.iVolumeTarget,
-                static_cast<u32>(pVoice->mState.fFrequency * pVoice->mSoundSysFreq), pVoice->mState.iPan, pVoice->mState.bLoop ? 1 : 0);
-        }
-        else
-        {
-            state = "stopped";
+            state = Format("phase=%d pitch=%04x vol=%d,%d adsr=%04x,%04x reverb=%d seq=%d prog=%d note=%d", static_cast<s32>(v.mPhase), v.mPitch, v.mVolLeft, v.mVolRight, v.mAdsr1,
+                v.mAdsr2, v.mReverb ? 1 : 0, v.mLibsnd.mSeq, v.mLibsnd.mProgram, v.mLibsnd.mNote);
         }
 
         if (state != mLastVoiceState[i])
         {
-            Note(Format("voice%d ", i) + state);
+            Note(Format("spu%d ", i) + state);
             mLastVoiceState[i] = state;
         }
     }

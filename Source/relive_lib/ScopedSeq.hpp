@@ -21,5 +21,4 @@ public:
     ~ScopedSeq();
 private:
     s16 mSeqId = 0;
-    s32 mChannelMask = 0;
 };

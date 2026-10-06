@@ -6,7 +6,7 @@
 #include "StringFormatters.hpp"
 #include "Abe.hpp"
 #include "Sfx.hpp"
-#include "../relive_lib/Sound/Sound.hpp"
+#include "../relive_lib/Sound/Midi.hpp"
 #include "MainMenu.hpp"
 #include "../relive_lib/GameObjects/ThrowableArray.hpp"
 #include "QuikSave.hpp"
@@ -17,7 +17,6 @@
 #include "EvilFart.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
 #include "DDCheat.hpp"
-#include "../relive_lib/Sound/Midi.hpp"
 #include "../relive_lib/Engine.hpp"
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
 #include "Engine.hpp"
@@ -439,7 +438,7 @@ void PauseMenu::RestartPath()
 
     mPauseRenderLoop = false;
     SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 3400);
-    GetSoundAPI().mSND_Restart(mMap);
+    SND_Restart(mMap);
 }
 
 const char_type kArrowChar = 3;
@@ -471,7 +470,7 @@ void PauseMenu::Page_Main_Update()
     {
         mPauseRenderLoop = false;
         SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
-        GetSoundAPI().mSND_Restart(mMap);
+        SND_Restart(mMap);
     }
     else if (Input().IsAnyPressed(InputCommands::eUnPause_OrConfirm))
     {
@@ -480,13 +479,13 @@ void PauseMenu::Page_Main_Update()
             case MainPages::ePage_Continue_0:
                 mPauseRenderLoop = false;
                 SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
-                GetSoundAPI().mSND_Restart(mMap);
+                SND_Restart(mMap);
                 return;
 
             case MainPages::ePage_QuickSave_1:
                 mPauseRenderLoop = false;
                 SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
-                GetSoundAPI().mSND_Restart(mMap);
+                SND_Restart(mMap);
                 QuikSave::DoQuicksave(mMap);
                 return;
 
@@ -626,7 +625,7 @@ void PauseMenu::Page_Save_Update()
 
             mPauseRenderLoop = false;
             SFX_Play_Pitch(relive::SoundEffects::PossessEffect, 40, 2400);
-            GetSoundAPI().mSND_Restart(mMap);
+            SND_Restart(mMap);
         }
         else
         {

@@ -10,7 +10,8 @@
 #include "Sound/Midi.hpp"
 #include "Sound/PsxSoundEngine.hpp"
 #include "Sys.hpp"
-#include "Sound/Sound.hpp"
+#include "Sound/SDLSoundSystem.hpp"
+#include "Sound/Midi.hpp"
 #include "../AliveLibAE/GameAutoPlayer.hpp"
 #include "GameObjects/ScreenManager.hpp"
 #include "Renderer/IRenderer.hpp"
@@ -968,16 +969,11 @@ public:
         LOG_INFO("FMV playback %s: finished rendered=%u dropped=%u staleDisplayed=%u invalidDisplayed=%u", mName.c_str(),
             mRenderedFrameCount, mDroppedFrameCount, mStaleFrameDisplayCount, mInvalidDisplayedFrameCount);
 
-        if (mSoundEntry.field_4_pDSoundBuffer)
+        if (mAudioStream)
         {
             SND_StopAll();
-            GetSoundAPI().mSND_Free(&mSoundEntry);
-            mSoundEntry.field_4_pDSoundBuffer = nullptr;
-        }
-
-        if (mReverbDisabled)
-        {
-            gReverbEnabled = mWasReverbEnabled;
+            mAudioStream->Stop();
+            mAudioStream.reset();
         }
     }
 
@@ -997,23 +993,10 @@ public:
         mLastDisplayUpdateMs = SYS_GetTicks();
 
         mHasAudio = mMovie.HasAudio();
-        if (mHasAudio)
+        SDLSoundSystem* pSound = SDLSoundSystem::Get();
+        if (mHasAudio && pSound && mMovie.AudioBitsPerSample() == 16)
         {
-            mWasReverbEnabled = gReverbEnabled;
-            mReverbDisabled = true;
-            gReverbEnabled = false;
-
-            const u32 sampleRate = mMovie.AudioSampleRate();
-            const u32 bitDepth = mMovie.AudioBitsPerSample();
-            const u32 channels = mMovie.AudioChannels();
-            const s32 soundFlags = channels > 1 ? 7 : (bitDepth == 16 ? 2 : 0);
-            const u32 audioBufferSamples = std::max<u32>(sampleRate * 4u, 4096u);
-
-            if (GetSoundAPI().mSND_New(&mSoundEntry, static_cast<s32>(audioBufferSamples), sampleRate, bitDepth, soundFlags) < 0)
-            {
-                mSoundEntry.field_4_pDSoundBuffer = nullptr;
-                mNoAudioOrAudioError = true;
-            }
+            mAudioStream = pSound->CreateStream(mMovie.AudioSampleRate(), mMovie.AudioChannels(), std::max<u32>(mMovie.AudioSampleRate() * 4u, 4096u));
         }
         else
         {
@@ -1104,9 +1087,9 @@ private:
                 return StepResult::eYield;
             }
 
-            // SND_Get_Generated_Audio_Samples() counts samples at the mixer's fixed output rate
-            // (every voice, including this movie's, gets resampled to it - see
-            // SDLSoundBuffer::SetFrequency) - so it must be divided by that device rate here, not
+            // GetGeneratedAudioSamples() counts samples at the mixer's fixed output rate
+            // (every stream, including this movie's, gets resampled to it - see
+            // AudioStream) - so it must be divided by that device rate here, not
             // by the movie's own AudioSampleRate(). AE's DDV audio happens to already be 44100Hz,
             // matching the (also 44100Hz) device rate, which is why this was previously masked;
             // AO's true 18900Hz stream exposed it as frames dropping and audio going out of sync.
@@ -1176,13 +1159,13 @@ private:
     // this is 0 until then.
     u64 AudioSamplesPlayed() const
     {
-        const u64 generated = SND_Get_Generated_Audio_Samples();
+        const u64 generated = SDLSoundSystem::Get()->GetGeneratedAudioSamples();
         return generated > mAudioStartSample ? generated - mAudioStartSample : 0;
     }
 
     u64 AudioClockMs() const
     {
-        return mAudioStarted ? AudioSamplesPlayed() * 1000 / SND_Get_Device_Sample_Rate() : 0;
+        return mAudioStarted ? AudioSamplesPlayed() * 1000 / SDLSoundSystem::Get()->GetDeviceSampleRate() : 0;
     }
 
     // Follows the audio while it plays. The video can outlast the audio by a few seconds, and
@@ -1192,7 +1175,7 @@ private:
         return mMovieClock.Update(mAudioStarted ? std::optional<u64>(AudioClockMs()) : std::nullopt, SYS_GetTicks());
     }
 
-    // Moves decoded audio into the movie's sound buffer as it has room, starting it once enough
+    // Moves decoded audio into the movie's audio stream as it has room, starting it once enough
     // has been buffered.
     void FeedAudio()
     {
@@ -1202,27 +1185,10 @@ private:
             mPendingAudioChunks.push_back(std::move(audioChunk));
         }
 
-        // After the last chunk, queue silence to follow it: the buffer loops and the mixer runs
-        // ahead of the device, so otherwise it plays what's left in the buffer (older audio of
-        // this movie) until the sound is stopped. Written in turn like any chunk, so it can't
-        // overwrite audio that hasn't played yet.
-        if (mAudioStarted && !mAudioPadded && mHasAudio && mPipeline->AudioComplete() && mPendingAudioChunks.empty())
-        {
-            mAudioPadded = true;
-            MkvAudioChunk silence;
-            silence.mBuffer.assign(static_cast<size_t>(mMovie.AudioSampleRate() / 2u) * mBlockAlign, 0);
-            mPendingAudioChunks.push_back(std::move(silence));
-        }
-
         const u32 maxBufferedSamples = mAudioBufferSamples - std::min<u32>(mAudioBufferSamples / 4u, 1024u);
         while (!mNoAudioOrAudioError && mHasAudio && !mPendingAudioChunks.empty())
         {
-            const u32 readOffset = mAudioStarted
-                ? GetSoundAPI().mSND_Get_Sound_Entry_Pos(&mSoundEntry)
-                : 0;
-            const u32 bufferedSamples = mAudioStarted
-                ? (mAudioWriteOffset >= readOffset ? mAudioWriteOffset - readOffset : mAudioBufferSamples - readOffset + mAudioWriteOffset)
-                : mAudioSamplesSubmitted;
+            const u32 bufferedSamples = mAudioStream->BufferedFrames();
             if (bufferedSamples >= maxBufferedSamples)
             {
                 break;
@@ -1236,14 +1202,7 @@ private:
                 continue;
             }
 
-            const u32 bufferSpaceSamples = maxBufferedSamples - bufferedSamples;
-            const u32 samplesUntilBufferEnd = mAudioBufferSamples - mAudioWriteOffset;
-            const u32 samplesToWrite = std::min({pendingSamples, bufferSpaceSamples, samplesUntilBufferEnd});
-            if (samplesToWrite == 0)
-            {
-                mAudioWriteOffset = 0;
-                continue;
-            }
+            const u32 samplesToWrite = std::min(pendingSamples, maxBufferedSamples - bufferedSamples);
 
             u64 audioHash = 1469598103934665603ULL;
             const size_t bytesToWrite = static_cast<size_t>(samplesToWrite) * mBlockAlign;
@@ -1253,19 +1212,17 @@ private:
                 audioHash *= 1099511628211ULL;
             }
 
-            if (GetSoundAPI().mSND_LoadSamples(&mSoundEntry, mAudioWriteOffset, pendingChunk.mBuffer.data(), samplesToWrite) < 0)
-            {
-                mNoAudioOrAudioError = true;
-                break;
-            }
+            // The chunk's bytes are 16 bit samples, in the byte order of this machine
+            std::vector<s16> pcm(bytesToWrite / sizeof(s16));
+            std::memcpy(pcm.data(), pendingChunk.mBuffer.data(), bytesToWrite);
+            const u32 written = mAudioStream->Write(pcm.data(), samplesToWrite);
             ++mAudioWriteCount;
-            LOG_INFO("FMV playback %s: audio write=%u sourceOffset=%lld pts=%llu writeOffset=%u readOffset=%u samples=%u hash=%llu gen=%llu queued=%u",
+            LOG_INFO("FMV playback %s: audio write=%u sourceOffset=%lld pts=%llu buffered=%u samples=%u hash=%llu gen=%llu queued=%u",
                 mName.c_str(), mAudioWriteCount, pendingChunk.mFileOffset,
-                static_cast<unsigned long long>(pendingChunk.mPtsNs), mAudioWriteOffset, readOffset, samplesToWrite,
-                static_cast<unsigned long long>(audioHash), static_cast<unsigned long long>(SND_Get_Generated_Audio_Samples()), SND_Get_Queued_Audio_Samples());
-            mAudioWriteOffset = (mAudioWriteOffset + samplesToWrite) % mAudioBufferSamples;
-            mAudioSamplesSubmitted += samplesToWrite;
-            pendingChunk.mBuffer.erase(pendingChunk.mBuffer.begin(), pendingChunk.mBuffer.begin() + samplesToWrite * mBlockAlign);
+                static_cast<unsigned long long>(pendingChunk.mPtsNs), bufferedSamples, written,
+                static_cast<unsigned long long>(audioHash), static_cast<unsigned long long>(SDLSoundSystem::Get()->GetGeneratedAudioSamples()), SDLSoundSystem::Get()->GetQueuedAudioSamples());
+            mAudioSamplesSubmitted += written;
+            pendingChunk.mBuffer.erase(pendingChunk.mBuffer.begin(), pendingChunk.mBuffer.begin() + written * mBlockAlign);
             if (pendingChunk.mBuffer.empty())
             {
                 mPendingAudioChunks.pop_front();
@@ -1273,24 +1230,21 @@ private:
 
             if (!mAudioStarted && (mAudioSamplesSubmitted >= mMovie.AudioSampleRate() / 5u || mPipeline->AudioComplete()))
             {
-                if (FAILED(SND_PlayEx(&mSoundEntry, 116, 116, 1.0, 0, 1, 100)))
-                {
-                    mNoAudioOrAudioError = true;
-                }
+                mAudioStream->Start();
                 // The sound starts at the mixer's position, which is ahead of the device by what's
                 // queued: count from when the device gets to it, or the audio clock runs early and
                 // the end check below stops the sound before the device has played it all
-                mAudioStartSample = SND_Get_Generated_Audio_Samples() + SND_Get_Queued_Audio_Samples();
-                mAudioStarted = !mNoAudioOrAudioError;
+                mAudioStartSample = SDLSoundSystem::Get()->GetGeneratedAudioSamples() + SDLSoundSystem::Get()->GetQueuedAudioSamples();
+                mAudioStarted = true;
             }
         }
 
         // AudioSamplesPlayed counts at the device's rate, the submitted samples at the movie's
-        const u64 playedMovieSamples = AudioSamplesPlayed() * mMovie.AudioSampleRate() / SND_Get_Device_Sample_Rate();
         if (mAudioStarted && !mAudioFinished && mPipeline->AudioComplete() && mPendingAudioChunks.empty()
-            && playedMovieSamples >= mAudioSamplesSubmitted)
+            && AudioSamplesPlayed() * mMovie.AudioSampleRate() / SDLSoundSystem::Get()->GetDeviceSampleRate() >= mAudioSamplesSubmitted)
         {
             SND_StopAll();
+            mAudioStream->Stop();
             mAudioStarted = false;
             mAudioFinished = true;
             LOG_INFO("FMV playback %s: audio finished samples=%u", mName.c_str(), mAudioSamplesSubmitted);
@@ -1356,22 +1310,16 @@ private:
     Poly_FT4 mPoly = {};
 
     bool mHasAudio = false;
-    SoundEntry mSoundEntry = {};
+    std::shared_ptr<AudioStream> mAudioStream;
     bool mNoAudioOrAudioError = false;
-    bool mReverbDisabled = false;
-    bool mWasReverbEnabled = false;
     std::deque<MkvAudioChunk> mPendingAudioChunks;
     u64 mAudioStartSample = 0;
     u32 mBlockAlign = 0;
     u32 mAudioBufferSamples = 0;
-    u32 mAudioWriteOffset = 0;
     u32 mAudioSamplesSubmitted = 0;
     u32 mAudioWriteCount = 0;
     bool mAudioStarted = false;
     bool mAudioFinished = false;
-    // Silence was written after the last audio, so the looping buffer doesn't replay old audio
-    // before it's stopped
-    bool mAudioPadded = false;
     MovieClock mMovieClock;
 
     u32 mRenderedFrameCount = 0;

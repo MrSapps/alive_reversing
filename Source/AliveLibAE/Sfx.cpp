@@ -6,7 +6,6 @@
 #include <assert.h>
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
 #include "../relive_lib/FixedPoint.hpp"
-#include "../relive_lib/FixedPoint.hpp"
 
 static const relive::SfxDefinition sSligGameSpeakEntries[21] = {
     {0u, 25u, 60u, 127u, 0, 0},

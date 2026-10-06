@@ -3,7 +3,6 @@
 #include "../AliveLibAE/Math.hpp"
 #include "../relive_lib/Sound/Midi.hpp"
 #include "FatalError.hpp"
-#include "Sound/PsxSoundEngine.hpp"
 
 namespace AO {
 
@@ -129,7 +128,7 @@ static const relive::SfxDefinition sSfxEntries[] = {
     {0u, 0u, 72u, 55u, 0, 0},          // GreenTick_2 = 2,
     {0u, 0u, 73u, 55u, 0, 0},          // RedTick_3 = 3,
     {0u, 1u, 57u, 40u, 0, 0},          // ZPop_4 = 4,
-    {0u, 39u, 60u, 127u, -1, 1},       // SligShoot_5 = 5,
+    {0u, 2u, 60u, 127u, -1, 1},        // SligShoot_5 = 5, (the PC moved it to program 39, the PS1 has it in 2)
     {0u, 2u, 64u, 55u, -64, 64},       // BulletShell_6 = 6,
     {0u, 7u, 36u, 127u, 0, 0},         // MenuTransition_7 = 7,
     {0u, 6u, 53u, 127u, 0, 0},         // RingUnknownTrigger_8 = 8,
@@ -1232,15 +1231,7 @@ const relive::SfxDefinition& relive::GetSfx(relive::SoundEffects sfx)
     }
     else
     {
-        const SoundEffect ae = ToAe(sfx);
-        if (ae == SoundEffect::SligShoot_5 && PsxSoundEngine::Get())
-        {
-            // The PC AE moved the slig shot to program 39, the PS1 uses program 2 (checked against
-            // the SFX table in the PS1 executable)
-            static const relive::SfxDefinition sPs1SligShoot = {0, 2, 60, 127, -1, 1};
-            return sPs1SligShoot;
-        }
-        return sSfxEntries[static_cast<u32>(ae)];
+        return sSfxEntries[static_cast<u32>(ToAe(sfx))];
     }
 }
 

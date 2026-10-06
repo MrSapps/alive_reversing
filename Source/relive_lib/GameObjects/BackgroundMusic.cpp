@@ -5,13 +5,13 @@
 #include "../Sound/Midi.hpp"
 #include "BaseMap.hpp"
 
-s16 gBackgroundMusicSeqId = -1;
+static s16 sBackgroundMusicSeqId = -1;
 
 BackgroundMusic::BackgroundMusic(s32 musicId, ResourceManagerWrapper& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     mMusicId = static_cast<s16>(musicId);
-    gBackgroundMusicSeqId = -1;
+    sBackgroundMusicSeqId = -1;
 }
 
 void BackgroundMusic::VUpdate()
@@ -24,24 +24,29 @@ void BackgroundMusic::VUpdate()
         {
             SND_SEQ_PlaySeq(mMusicId, 0, 0);
         }
-        gBackgroundMusicSeqId = mMusicId;
+        sBackgroundMusicSeqId = mMusicId;
     }
     SetDead(true);
+}
+
+s16 BackgroundMusic::CurrentSeqId()
+{
+    return sBackgroundMusicSeqId;
 }
 
 // In order of functions in the orignal game these are not part of this object
 void BackgroundMusic::Stop()
 {
-    if (gBackgroundMusicSeqId >= 0)
+    if (sBackgroundMusicSeqId >= 0)
     {
-        SND_SEQ_Stop(gBackgroundMusicSeqId);
+        SND_SEQ_Stop(sBackgroundMusicSeqId);
     }
 }
 
 void BackgroundMusic::Play()
 {
-    if (gBackgroundMusicSeqId >= 0)
+    if (sBackgroundMusicSeqId >= 0)
     {
-        SND_SEQ_PlaySeq(gBackgroundMusicSeqId, 0, 0);
+        SND_SEQ_PlaySeq(sBackgroundMusicSeqId, 0, 0);
     }
 }

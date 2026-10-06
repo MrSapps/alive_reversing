@@ -164,12 +164,13 @@ void PsxSpuReverb::Reset()
     // DuckStation's SPU playing the same register writes: with the other phase the output differed
     // by 34 dB under the signal, with this by 60 dB (rounding).
     mOddSample = false;
+    mSmoothVolumeLeft = 0;
+    mSmoothVolumeRight = 0;
     SetPreset(Preset::Off);
 }
 
 void PsxSpuReverb::SetPreset(Preset preset)
 {
-    mPreset = preset;
     mRegs = PresetRegisters(preset);
     mWorkAreaWords = PresetWorkAreaBytes(preset) / sizeof(s16);
     // Writing mBASE starts the buffer at the work area's start. The 22050 Hz phase and the
@@ -325,9 +326,19 @@ void PsxSpuReverb::Process(s32 inLeft, s32 inRight, s32& outLeft, s32& outRight)
         outRight = mWetRight[idx];
     }
     // The output volume (the reverb depth) is applied to the 44100 Hz output, so a change takes
-    // effect at once
-    outLeft = Mul(outLeft, mOutputVolumeLeft);
-    outRight = Mul(outRight, mOutputVolumeRight);
+    // effect at once, or over a few ms with declick
+    s32 volumeLeft = mOutputVolumeLeft;
+    s32 volumeRight = mOutputVolumeRight;
+    if (mDeclick)
+    {
+        constexpr s32 kStep = 64;
+        mSmoothVolumeLeft += std::clamp<s32>(volumeLeft - mSmoothVolumeLeft, -kStep, kStep);
+        mSmoothVolumeRight += std::clamp<s32>(volumeRight - mSmoothVolumeRight, -kStep, kStep);
+        volumeLeft = mSmoothVolumeLeft;
+        volumeRight = mSmoothVolumeRight;
+    }
+    outLeft = Mul(outLeft, static_cast<s16>(volumeLeft));
+    outRight = Mul(outRight, static_cast<s16>(volumeRight));
 
     mInputPos = (mInputPos + 1) & (kInputHistory - 1);
     mOddSample = !mOddSample;

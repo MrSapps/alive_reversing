@@ -2,7 +2,6 @@
 #include "PsxRender.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/Psx.hpp"
-#include "../relive_lib/Sound/PsxSpuApi.hpp"
 #include "../relive_lib/Renderer/IRenderer.hpp"
 #include "../relive_lib/FatalError.hpp"
 
@@ -66,8 +65,6 @@ void OrderingTable::DrawOTag()
         BasePrimitive* pOtItem = mOrderingTable[i];
         while (pOtItem)
         {
-            SsSeqCalledTbyT();
-
             switch (pOtItem->mType)
             {
                 case PrimitivesTypes::eScissorRect:

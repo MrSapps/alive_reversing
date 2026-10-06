@@ -1,84 +1,67 @@
 #pragma once
 
-class BaseMap;
-
-#include "../../relive_lib/Function.hpp"
+#include "../Function.hpp"
+#include "../GameType.hpp"
 #include <memory>
+#include <string>
 
-struct OpenSeqHandle;
-
-struct PathSoundInfo;
-struct VabBodyRecord;
+class BaseMap;
 class ResourceManagerWrapper;
+struct OpenSeqHandle;
+struct PathSoundInfo;
 
 namespace relive {
 struct SfxDefinition;
 }
 
-class Camera;
-
-struct SeqIds final
+// What SND_Init starts the sound with
+struct GameSoundConfig final
 {
-    s16 ids[16];
+    GameType mGame = GameType::eAe;
+    // -spu_filter=gaussian: the SPU's own interpolation at every pitch, not the band limited one
+    bool mGaussianInterpolation = false;
+    // No audio device or render thread: audio is only made when asked for and the sound clock is the
+    // length of the audio made (for the sound gold tests and tools)
+    bool mOffline = false;
+    // -dump_audio and -dump_live_audio: write everything rendered to this WAV (empty: no dump)
+    std::string mDumpPath;
+    std::string mLiveDumpPath;
+    // Turns the game's music controller on and off, for SND_StopAll and SND_Restart
+    void (*mEnableMusic)(s16 enable) = nullptr;
 };
 
-class IMidiVars
-{
-public:
-    ~IMidiVars()
-    { }
-    virtual SeqIds& sSeq_Ids_word() = 0;
-    virtual u16& sSnd_ReloadAbeResources() = 0;
-    virtual OpenSeqHandle*& sSeqDataTable() = 0;
-    virtual s16& sSeqsPlaying_count_word() = 0;
-    virtual std::weak_ptr<PathSoundInfo>& sLastLoadedSoundBlockInfo() = 0;
-    virtual s16& sSFXPitchVariationEnabled() = 0;
-    virtual s16& sNeedToHashSeqNames() = 0;
-    virtual PathSoundInfo& sMonkVh_Vb() = 0;
-    virtual s32 MidiTableSize() = 0;
+// The game side of the sound is GameSound (GameSound.hpp): the sound blocks (VAB tones and
+// samples, SEQs) of the current path, and the SEQs and sound effects the game plays on the sound
+// engine. These functions are what the game calls, on the running GameSound; they do nothing
+// before SND_Init and after SND_SsQuit.
 
-    // AE streams sample data from sounds.dat, AO has it in the VB file
-    virtual void SsVabTransBody(ResourceManagerWrapper& resMan, VabBodyRecord* pVabBody, s16 vabId) = 0;
-};
-
-IMidiVars* GetMidiVars();
-// nullptr sets the default (AE) vars back
-void SetMidiApiVars(IMidiVars* pVars);
-
-using TReclaimMemoryFn = void(CC*)(u32);
-using TLoadResourceFileFn = s16(CC*)(const s8*, Camera*);
-using TGetLoadedResourceFn = u8**(CC*) (u32, u32, u16, u16);
-using TSNDRestart = void(CC*)(BaseMap&);
-using TSNDStopAll = void(CC*)();
-
-// So AO can redirect SND_StopAll_4CB060 to its own func when called from SYS_ funcs
-void SND_StopAll_SetCallBack(TSNDStopAll cb);
-
-// So AO can redirect SND_Restart_4CB0E0 to its own func when called from SYS_ funcs
-void SND_Restart_SetCallBack(TSNDRestart cb);
-
-
-void SND_Load_Seqs_Impl(OpenSeqHandle* pSeqTable, PathSoundInfo& info, ResourceManagerWrapper& resMan);
-// Pends the sound files a new level's SND_Load_VABS and SND_Load_Seqs will load (both games)
+// Starts the sound system
+void SND_Init(const GameSoundConfig& config);
+// Stops everything and closes the VABs
+void SND_Shutdown();
+// Ends the sound system: nothing plays after it
+void SND_SsQuit();
+void SND_Reset();
 void SND_Pend_Sound_Files(const PathSoundInfo& info, ResourceManagerWrapper& resMan);
-
-void SND_Stop_All_Seqs();
+void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& info, s32 reverb, ResourceManagerWrapper& resMan);
+void SND_Load_Seqs(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& info, ResourceManagerWrapper& resMan);
+s8 SND_Seq_Table_Valid();
 
 void SND_StopAll();
-void SND_Init();
-void SND_Shutdown();
+void SND_Restart(BaseMap& map);
+void SND_Stop_All_Seqs();
 void SND_Stop_Channels_Mask(u32 bitMask);
-void SND_Reset();
-void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& info, s32 reverb, ResourceManagerWrapper& resMan);
-void SND_Load_Seqs(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& bsqFileName, ResourceManagerWrapper& resMan);
+// SsUtAllKeyOff: every voice plays its release
+void SND_AllKeyOff();
+
 void SND_SEQ_Stop(u16 idx);
-s8 SND_Seq_Table_Valid();
 s16 SND_SEQ_PlaySeq(u16 idx, s16 repeatCount, s16 bDontStop);
 void SND_SEQ_SetVol(s32 idx, s16 volLeft, s16 volRight);
 s16 SND_SEQ_Play(u16 idx, s16 repeatCount, s16 volLeft, s16 volRight);
 s32 SND_SsIsEos_DeInlined(u16 idx);
 s32 SFX_SfxDefinition_Play_Stereo(const relive::SfxDefinition& sfxDef, s16 volLeft, s16 volRight, s16 pitch_min, s16 pitch_max);
 s32 SFX_SfxDefinition_Play_Mono(const relive::SfxDefinition& sfxDef, s32 volume, s32 pitch_min, s32 pitch_max);
+s32 SND_MIDI(s32 program, s32 vabId, s32 note, s16 vol, s16 min, s16 max);
 
 enum SeqId
 {

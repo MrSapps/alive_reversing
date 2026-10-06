@@ -13,7 +13,7 @@
 #include "../relive_lib/BaseGameAutoPlayer.hpp"
 #include "Math.hpp"
 
-MusicController* gMusicController = nullptr;
+static MusicController* sMusicController = nullptr;
 static u32 sMusicControllerBaseTimeStamp = 0;
 static u32 sMusicTime = 0;
 
@@ -322,18 +322,18 @@ const MusicController_Record2 stru_55D008[118] = {
 
 s32 MusicController::Create(ResourceManagerWrapper& resMan, BaseMap& map)
 {
-    if (gMusicController)
+    if (sMusicController)
     {
         return 0;
     }
 
-    gMusicController = relive_new MusicController(resMan, map);
-    if (gMusicController)
+    sMusicController = relive_new MusicController(resMan, map);
+    if (sMusicController)
     {
         MusicController::SetBaseTimeStamp();
         SoundDebug::LogSeqCall("CREATE");
         SoundDebug::MusicScope scope;
-        gMusicController->EnableMusic(false);
+        sMusicController->EnableMusic(false);
     }
     return 1;
 }
@@ -346,25 +346,18 @@ void MusicController::SetBaseTimeStamp()
 void MusicController::UpdateMusicTime()
 {
     const u32 elapsedMs = SoundDebug::MusicTicks(GetGameAutoPlayer().SysGetTicks()) - sMusicControllerBaseTimeStamp;
-    if (PsxSoundEngine::Get())
-    {
-        // Half a unit per vblank
-        sMusicTime = (PsxSoundEngine::kVblankHz * elapsedMs) / 2000;
-    }
-    else
-    {
-        sMusicTime = (3 * elapsedMs) / 100;
-    }
+    // Half a unit per vblank (the PS1 reads its vblank counter shifted right by one)
+    sMusicTime = (PsxSoundEngine::kVblankHz * elapsedMs) / 2000;
 }
 
 void MusicController::Shutdown()
 {
     SoundDebug::MusicScope scope;
     SoundDebug::LogSeqCall("SHUTDOWN");
-    if (gMusicController)
+    if (sMusicController)
     {
-        gMusicController->SetDead(true);
-        gMusicController = nullptr;
+        sMusicController->SetDead(true);
+        sMusicController = nullptr;
         //nullsub_8(); // TODO: Check if PSX stub
         //sub_4FBAD0(dword_5C3028); // Some other likely strange PSX specific thing that does nothing
         //nullsub_27(); // TODO: Check if PSX stub
@@ -399,9 +392,9 @@ MusicController::MusicTypes MusicController::GetMusicType(u16* seq, u16* seq2, u
 
 MusicController::MusicTypes MusicController::static_GetMusicType(u16* seq1, u16* seq2, u32* seqTime)
 {
-    if (gMusicController)
+    if (sMusicController)
     {
-        return gMusicController->GetMusicType(seq1, seq2, seqTime);
+        return sMusicController->GetMusicType(seq1, seq2, seqTime);
     }
     return MusicTypes::eTypeNull;
 }
@@ -442,9 +435,9 @@ MusicController::MusicController(ResourceManagerWrapper& resMan, BaseMap& map)
 MusicController::~MusicController()
 {
     // Whatever is destroyed after this one (a movie stopping all sound as it goes) finds no controller
-    if (gMusicController == this)
+    if (sMusicController == this)
     {
-        gMusicController = nullptr;
+        sMusicController = nullptr;
     }
     if (field_40_flags_and_idx > 0)
     {
@@ -622,14 +615,7 @@ void MusicController::VUpdate()
 
     if (mMusicEnabled)
     {
-        if (PsxSoundEngine::Get())
-        {
-            UpdateMusicPs1();
-        }
-        else
-        {
-            UpdateMusic();
-        }
+        UpdateMusic();
         UpdateAmbiance();
     }
 }
@@ -698,159 +684,14 @@ void MusicController::PlayMusic(MusicTypes typeToSet, const BaseGameObject* pObj
     }
 }
 
-void MusicController::UpdateMusic()
-{
-    s32 idx = 0;
-    const MusicController_Record* pRecord = nullptr;
-
-    if (field_40_flags_and_idx < 0
-        || !SND_SsIsEos_DeInlined(field_40_flags_and_idx)
-        || (mUnPause
-            && (field_42_type == MusicTypes::eChime_2
-                || field_42_type == MusicTypes::eDrumAmbience_3
-                || field_42_type == MusicTypes::eDeathDrumShort_10
-                || field_42_type == MusicTypes::eDeathLong_11
-                || field_42_type == MusicTypes::eSecretAreaShort_12
-                || field_42_type == MusicTypes::eSecretAreaLong_13
-                || field_42_type == MusicTypes::eIntenseChase_7
-                || field_42_type == MusicTypes::eSoftChase_8)))
-    {
-        if (field_40_flags_and_idx > 0)
-        {
-            SND_SEQ_Stop(field_40_flags_and_idx);
-        }
-
-        switch (field_42_type)
-        {
-            case MusicTypes::eChime_2: // Silence/base line only?
-                mAmbientMusicEnabled = false;
-                SetMusicVolumeDelayed(field_22_vol, 0);
-                break;
-            case MusicTypes::eDrumAmbience_3: // The rupture farms screen change random ambiance?
-                if (mUnPause)
-                {
-                    idx = MusicRandom(0, 1);
-                }
-                else
-                {
-                    idx = -1;
-                }
-                mAmbientMusicEnabled = false;
-                SetMusicVolumeDelayed(field_22_vol, 0);
-                break;
-            case MusicTypes::eTension_4:          // danger near music - when slig is near
-            case MusicTypes::eSlogTension_5:      // slog tension
-            case MusicTypes::eSlogChaseTension_6: // slog tension 2?
-                if (field_42_type == MusicTypes::eTension_4)
-                {
-                    pRecord = &tension_55D2D0[static_cast<s32>(MapWrapper::ToAE(field_24_currentLevelID))];
-                }
-                else if (field_42_type == MusicTypes::eSlogTension_5)
-                {
-                    pRecord = &slogTension_55D39C[static_cast<s32>(MapWrapper::ToAE(field_24_currentLevelID))];
-                }
-                else if (field_42_type == MusicTypes::eSlogChaseTension_6)
-                {
-                    pRecord = &slogChaseTension_55D424[static_cast<s32>(MapWrapper::ToAE(field_24_currentLevelID))];
-                }
-                idx = pRecord->field_0_seq_id_idx;
-                mAmbientMusicEnabled = false;
-                mAmbientMusicEnabled = pRecord->field_2_bAmbient_music_enabled == AmbientMusic::eOn ? true : false;
-                SetMusicVolumeDelayed(gSeqData.mSeqs[stru_55D008[pRecord->field_0_seq_id_idx].field_0_idx].field_9_volume, 0);
-                break;
-            case MusicTypes::eIntenseChase_7: // chase music
-                pRecord = &slogChase_55D3E0[static_cast<s32>(MapWrapper::ToAE(field_24_currentLevelID))];
-                idx = pRecord->field_0_seq_id_idx;
-                mAmbientMusicEnabled = false;
-                mAmbientMusicEnabled = pRecord->field_2_bAmbient_music_enabled == AmbientMusic::eOn ? true : false;
-                SetMusicVolumeDelayed(gSeqData.mSeqs[stru_55D008[idx].field_0_idx].field_9_volume, 0);
-                break;
-            case MusicTypes::eSoftChase_8: // slig chase?
-                pRecord = &chase_55D314[static_cast<s32>(MapWrapper::ToAE(field_24_currentLevelID))];
-                idx = pRecord->field_0_seq_id_idx;
-                mAmbientMusicEnabled = false;
-                mAmbientMusicEnabled = pRecord->field_2_bAmbient_music_enabled == AmbientMusic::eOn ? true : false;
-                SetMusicVolumeDelayed(gSeqData.mSeqs[stru_55D008[idx].field_0_idx].field_9_volume, 0);
-                break;
-            case MusicTypes::ePossessed_9: // slig possesed
-                if (mUnPause)
-                {
-                    pRecord = &possessed_55D358[static_cast<s32>(MapWrapper::ToAE(field_24_currentLevelID))];
-                    idx = possessed_55D358[static_cast<s32>(MapWrapper::ToAE(field_24_currentLevelID))].field_0_seq_id_idx;
-                    mAmbientMusicEnabled = false;
-                    mAmbientMusicEnabled = pRecord->field_2_bAmbient_music_enabled == AmbientMusic::eOn ? true : false;
-                    SetMusicVolumeDelayed(gSeqData.mSeqs[stru_55D008[idx].field_0_idx].field_9_volume, 0);
-                }
-                else
-                {
-                    mAmbientMusicEnabled = true;
-                    SetMusicVolumeDelayed(field_20_vol, 30);
-                    mUnknown7 = true;
-                }
-                break;
-            case MusicTypes::eDeathDrumShort_10: // Death jingle s16
-                idx = mUnPause ? 2 : -1;
-                mAmbientMusicEnabled = false;
-                SetMusicVolumeDelayed(field_22_vol, 0);
-                break;
-            case MusicTypes::eDeathLong_11: // Death jingle long
-                idx = mUnPause ? 3 : -1;
-                mAmbientMusicEnabled = false;
-                SetMusicVolumeDelayed(field_22_vol, 0);
-                break;
-            case MusicTypes::eSecretAreaShort_12: // secret area s16
-                idx = mUnPause ? 4 : -1;
-                mAmbientMusicEnabled = false;
-                SetMusicVolumeDelayed(127, 0);
-                break;
-            case MusicTypes::eSecretAreaLong_13: // secret area long
-                idx = mUnPause ? 5 : -1;
-                mAmbientMusicEnabled = false;
-                SetMusicVolumeDelayed(80, 0);
-                break;
-            default: // no change ?
-                SetMusicVolumeDelayed(field_20_vol, 30);
-                mAmbientMusicEnabled = true;
-                break;
-        }
-
-        // Don't play if -1 or 0 (for some reason 0 is special cased)
-        if (idx > 0)
-        {
-            field_40_flags_and_idx = stru_55D008[idx].field_0_idx;
-            field_44 = sMusicTime + stru_55D008[idx].field_2_duration;
-            SND_SEQ_Play(field_40_flags_and_idx, 1, field_50_current_vol, field_50_current_vol);
-        }
-        else
-        {
-            field_40_flags_and_idx = -1;
-            field_44 = 0;
-        }
-
-        if (mUnPause)
-        {
-            mUnPause = false;
-
-            if (mUnknown7)
-            {
-                mUnknown7 = false;
-            }
-            else
-            {
-                mUnknown4 = true;
-            }
-        }
-    }
-}
-
 // The beat period when no music type picks one, per level (from the PS1 executable)
 static const s8 kPs1DefaultBeat[17] = {16, 20, 16, 16, 16, 20, 20, 28, 20, 20, 16, 28, 28, 28, 28, 20, 16};
 
-// The PS1's UpdateMusic (checked against SLES_014.80 0x80046284). Unlike the PC's, it changes the
-// music only when the time since the last change is a multiple of the beat period (set by each
-// music type, from the tables), so a change waits for the next beat; a music type that was just
-// asked for (mUnPause) can also go ahead when it's one of the ones that don't wait.
-void MusicController::UpdateMusicPs1()
+// The PS1's UpdateMusic (checked against SLES_014.80 0x80046284). It changes the music only when
+// the time since the last change is a multiple of the beat period (set by each music type, from
+// the tables), so a change waits for the next beat; a music type that was just asked for (mUnPause)
+// can also go ahead when it's one of the ones that don't wait.
+void MusicController::UpdateMusic()
 {
     const s32 now = static_cast<s32>(sMusicTime);
     const s32 level = static_cast<s32>(MapWrapper::ToAE(field_24_currentLevelID));
@@ -1072,9 +913,9 @@ void MusicController::static_PlayMusic(MusicTypes typeToSet, const BaseGameObjec
 {
     SoundDebug::MusicScope scope;
     SoundDebug::LogSeqCall("MUSIC %d %d %d %d", static_cast<s32>(typeToSet), SoundDebug::ObjectOrdinal(pObj), bFlag4, bFlag0x20);
-    if (gMusicController)
+    if (sMusicController)
     {
-        gMusicController->PlayMusic(typeToSet, pObj, bFlag4, bFlag0x20);
+        sMusicController->PlayMusic(typeToSet, pObj, bFlag4, bFlag0x20);
     }
 }
 
@@ -1082,8 +923,8 @@ void MusicController::static_EnableMusic(s16 bOn)
 {
     SoundDebug::MusicScope scope;
     SoundDebug::LogSeqCall("ENABLE %d", bOn);
-    if (gMusicController)
+    if (sMusicController)
     {
-        gMusicController->EnableMusic(bOn);
+        sMusicController->EnableMusic(bOn);
     }
 }

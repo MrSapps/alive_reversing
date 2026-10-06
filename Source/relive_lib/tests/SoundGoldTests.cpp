@@ -3,7 +3,7 @@
 // in tests/sound_gold. They pin the current behaviour so the sound code and its data formats can
 // be refactored without changing what the games sound like.
 //
-// The ps1_ gold files are the same scenarios played on the emulated PS1 SPU (-ps1_sound).
+// The scenarios are played on the emulated PS1 SPU, and the traces list its voices.
 //
 // A deliberate behaviour change updates the gold files: run the tests with
 // RELIVE_UPDATE_SOUND_GOLD=1 and review the diff. A failing test saves its trace and a WAV of its
@@ -14,7 +14,7 @@
 #include "SoundTestData.hpp"
 #include "Sound/SoundGold.hpp"
 #include "Sound/Midi.hpp"
-#include "Sound/PsxSpuApi.hpp"
+#include "Sound/GameSound.hpp"
 #include "Sound/PsxSoundEngine.hpp"
 #include "BinaryPath.hpp"
 #include "ResourceManagerWrapper.hpp"
@@ -121,17 +121,6 @@ static SoundTestData::Vab LevelVab()
     return vab;
 }
 
-static SoundTestData::Vab MonkVab()
-{
-    using namespace SoundTestData;
-    Vab vab;
-    vab.mId = 0;
-    vab.mSamples = {{Sine(3000, 70.0, 8000), false}};
-    Tone tone;
-    vab.mPrograms = {{0, {tone}}};
-    return vab;
-}
-
 static std::vector<u8> MelodySeq()
 {
     SoundTestData::SeqBuilder seq(480, 500000);
@@ -220,18 +209,14 @@ static std::shared_ptr<PathSoundInfo> WriteTestData(const ScratchDir& dir, GameT
 
     std::vector<u8> soundsDat;
     const SoundTestData::Vab level = LevelVab();
-    const SoundTestData::Vab monk = MonkVab();
     save(themeDir / "TEST.VH", SoundTestData::BuildVh(level));
-    save(themeDir / "MONK.VH", SoundTestData::BuildVh(monk));
     if (game == GameType::eAo)
     {
         save(themeDir / "TEST.VB", SoundTestData::BuildVbAo(level));
-        save(themeDir / "MONK.VB", SoundTestData::BuildVbAo(monk));
     }
     else
     {
         save(themeDir / "TEST.VB", SoundTestData::BuildVbAe(level, soundsDat));
-        save(themeDir / "MONK.VB", SoundTestData::BuildVbAe(monk, soundsDat));
         save(fs::path(dir.Path()) / "sounds.dat", soundsDat);
     }
 
@@ -320,7 +305,7 @@ static void CompareWithGold(const std::string& name, const std::string& trace, c
     }
 }
 
-static void RunGold(GameType game, bool ps1Sound, const std::string& scenario, const std::function<void(SoundGoldSession&)>& play, s32 extraSeqs = 0)
+static void RunGold(GameType game, const std::string& scenario, const std::function<void(SoundGoldSession&)>& play, s32 extraSeqs = 0)
 {
     SetGameType(game);
     ScratchDir dir;
@@ -333,23 +318,19 @@ static void RunGold(GameType game, bool ps1Sound, const std::string& scenario, c
         FileSystem fs;
         ResourceManagerWrapper resMan(fs, "");
 
-        SoundGoldSession session(game, ps1Sound);
-        // Only the SPU has a reverb
-        session.LoadSoundBlock(resMan, info, ps1Sound ? 40 : 0, kTheme);
+        SoundGoldSession session(game);
+        session.LoadSoundBlock(resMan, info, 40);
         play(session);
         trace = session.Trace();
         audio = session.Audio();
     }
 
-    if (ps1Sound)
+    EXPECT_TRUE(std::any_of(audio.begin(), audio.end(), [](const StereoSample_S16& s)
     {
-        EXPECT_TRUE(std::any_of(audio.begin(), audio.end(), [](const StereoSample_S16& s)
-        {
-            return s.left != 0 || s.right != 0;
-        })) << "The SPU played nothing";
-    }
+        return s.left != 0 || s.right != 0;
+    })) << "The SPU played nothing";
 
-    CompareWithGold(std::string(ps1Sound ? "ps1_" : "") + (game == GameType::eAo ? "ao_" : "ae_") + scenario, trace, audio);
+    CompareWithGold(std::string(game == GameType::eAo ? "ao_" : "ae_") + scenario, trace, audio);
 }
 
 static relive::SfxDefinition Sfx(s32 program, s32 note, s16 volume, s16 pitchMin, s16 pitchMax)
@@ -360,12 +341,12 @@ static relive::SfxDefinition Sfx(s32 program, s32 note, s16 volume, s16 pitchMin
 static s32 KeyOn(SoundGoldSession& session, s32 program, s32 note, u16 vol)
 {
     session.Note("key on prog=" + std::to_string(program) + " note=" + std::to_string(note));
-    return SsVoKeyOn_4FCF10((session.VabId() << 8) | program, note << 8, vol, vol);
+    return GameSound::Get()->Engine().VoKeyOn((session.VabId() << 8) | program, note << 8, vol, vol);
 }
 
-static void Sfx(GameType game, bool ps1Sound)
+static void Sfx(GameType game)
 {
-    RunGold(game, ps1Sound, "sfx", [](SoundGoldSession& session)
+    RunGold(game, "sfx", [](SoundGoldSession& session)
     {
         session.Note("sfx stereo prog 0");
         SFX_SfxDefinition_Play_Stereo(Sfx(0, 60, 100, 0, 0), 100, 60, 0, 0);
@@ -391,9 +372,9 @@ static void Sfx(GameType game, bool ps1Sound)
     });
 }
 
-static void Adsr(GameType game, bool ps1Sound)
+static void Adsr(GameType game)
 {
-    RunGold(game, ps1Sound, "adsr", [](SoundGoldSession& session)
+    RunGold(game, "adsr", [](SoundGoldSession& session)
     {
         const s32 attack = KeyOn(session, 1, 64, 100);
         const s32 looped = KeyOn(session, 2, 60, 110);
@@ -414,14 +395,14 @@ static void Adsr(GameType game, bool ps1Sound)
         KeyOn(session, 1, 70, 100);
         session.Advance(300);
         session.Note("all key off");
-        SsUtAllKeyOff(0);
+        SND_AllKeyOff();
         session.Advance(800);
     });
 }
 
-static void Seq(GameType game, bool ps1Sound)
+static void Seq(GameType game)
 {
-    RunGold(game, ps1Sound, "seq", [](SoundGoldSession& session)
+    RunGold(game, "seq", [](SoundGoldSession& session)
     {
         const std::vector<u16> seqs = session.LoadedSeqs();
         ASSERT_EQ(seqs.size(), 2u);
@@ -449,9 +430,9 @@ static void Seq(GameType game, bool ps1Sound)
     });
 }
 
-static void Steal(GameType game, bool ps1Sound)
+static void Steal(GameType game)
 {
-    RunGold(game, ps1Sound, "steal", [](SoundGoldSession& session)
+    RunGold(game, "steal", [](SoundGoldSession& session)
     {
         // More notes than the 24 channels, with different priorities
         const s32 programs[] = {0, 1, 2, 5, 8};
@@ -469,9 +450,9 @@ static void Steal(GameType game, bool ps1Sound)
 
 // A SEQ stopped while it holds a note (e.g. the game stopping the music when Abe dies) must key its
 // voices off: its note offs will never come
-static void StopMidNote(GameType game, bool ps1Sound)
+static void StopMidNote(GameType game)
 {
-    RunGold(game, ps1Sound, "stop_mid_note", [](SoundGoldSession& session)
+    RunGold(game, "stop_mid_note", [](SoundGoldSession& session)
     {
         const std::vector<u16> seqs = session.LoadedSeqs();
         ASSERT_EQ(seqs.size(), 3u);
@@ -486,15 +467,12 @@ static void StopMidNote(GameType game, bool ps1Sound)
         SND_SEQ_Stop(seqs[2]);
         session.Advance(100);
 
-        // The held note (program 2) must be keyed off straight away: off (0) or releasing (4). The
-        // melody is still playing, so its end can't release it by accident.
-        for (s32 i = 0; i < kNumChannels; i++)
+        // The held note (program 2) must be keyed off straight away. The melody is still playing,
+        // so its end can't release it by accident.
+        for (s32 i = 0; i < PsxSpu::kNumVoices; i++)
         {
-            const MIDI_ADSR_State& adsr = GetSpuApiVars()->sMidi_Channels().channels[i].field_1C_adsr;
-            if (adsr.field_1_program == 2)
-            {
-                EXPECT_TRUE(adsr.field_3_state == 0 || adsr.field_3_state == 4) << "MIDI channel " << i << " is still held (state " << static_cast<s32>(adsr.field_3_state) << ")";
-            }
+            const Libsnd::VoiceInfo info = GameSound::Get()->Engine().GetVoiceState(i).mLibsnd;
+            EXPECT_FALSE(info.mProgram == 2 && info.mKeyed) << "Voice " << i << " is still held";
         }
         session.Advance(1500);
     }, 1);
@@ -502,9 +480,9 @@ static void StopMidNote(GameType game, bool ps1Sound)
 
 // With the PS1 sound, SEQ note offs follow libsnd: a note off releases every voice of its SEQ playing
 // that program and note (no reference counts), and never another SEQ's
-static void NoteOffRules(GameType game, bool ps1Sound)
+static void NoteOffRules(GameType game)
 {
-    RunGold(game, ps1Sound, "note_off_rules", [ps1Sound](SoundGoldSession& session)
+    RunGold(game, "note_off_rules", [game](SoundGoldSession& session)
     {
         const std::vector<u16> seqs = session.LoadedSeqs();
         ASSERT_EQ(seqs.size(), 4u);
@@ -512,8 +490,8 @@ static void NoteOffRules(GameType game, bool ps1Sound)
         session.Note("play the held note, then the repeated one");
         SND_SEQ_Play(seqs[2], 1, 100, 100);
         SND_SEQ_Play(seqs[3], 1, 100, 100);
-        const s16 heldSlot = GetMidiVars()->sSeqDataTable()[seqs[2]].field_A_id_seqOpenId;
-        const s16 repeatSlot = GetMidiVars()->sSeqDataTable()[seqs[3]].field_A_id_seqOpenId;
+        const s16 heldSlot = SeqTable(game)[seqs[2]].field_A_id_seqOpenId;
+        const s16 repeatSlot = SeqTable(game)[seqs[3]].field_A_id_seqOpenId;
         // Sounding (keyed on, not released) voices of a SEQ slot
         auto sounding = [](s16 slot)
         {
@@ -530,18 +508,12 @@ static void NoteOffRules(GameType game, bool ps1Sound)
         };
 
         session.Advance(400); // Both strikes of the repeated note are playing
-        if (ps1Sound)
-        {
-            EXPECT_EQ(sounding(heldSlot), 1);
-            EXPECT_EQ(sounding(repeatSlot), 2) << "Each strike should get its own voice";
-        }
+        EXPECT_EQ(sounding(heldSlot), 1);
+        EXPECT_EQ(sounding(repeatSlot), 2) << "Each strike should get its own voice";
 
         session.Advance(250); // Past the repeated note's single note off at 500 ms
-        if (ps1Sound)
-        {
-            EXPECT_EQ(sounding(repeatSlot), 0) << "One note off should release both strikes";
-            EXPECT_EQ(sounding(heldSlot), 1) << "Another SEQ's note off released the held note";
-        }
+        EXPECT_EQ(sounding(repeatSlot), 0) << "One note off should release both strikes";
+        EXPECT_EQ(sounding(heldSlot), 1) << "Another SEQ's note off released the held note";
 
         session.Note("stop");
         SND_Stop_All_Seqs();
@@ -553,7 +525,7 @@ static void NoteOffRules(GameType game, bool ps1Sound)
 // _SsContMainVol does, and SsSeqStop sets it back to 127
 static void ChannelVolume(GameType game)
 {
-    RunGold(game, true, "channel_volume", [](SoundGoldSession& session)
+    RunGold(game, "channel_volume", [](SoundGoldSession& session)
     {
         const std::vector<u16> seqs = session.LoadedSeqs();
         ASSERT_EQ(seqs.size(), 5u);
@@ -599,32 +571,20 @@ static void ChannelVolume(GameType game)
     }, 3);
 }
 
-TEST(SoundGold, AE_Sfx) { Sfx(GameType::eAe, false); }
-TEST(SoundGold, AO_Sfx) { Sfx(GameType::eAo, false); }
-TEST(SoundGold, AE_Adsr) { Adsr(GameType::eAe, false); }
-TEST(SoundGold, AO_Adsr) { Adsr(GameType::eAo, false); }
-TEST(SoundGold, AE_Seq) { Seq(GameType::eAe, false); }
-TEST(SoundGold, AO_Seq) { Seq(GameType::eAo, false); }
-TEST(SoundGold, AE_Steal) { Steal(GameType::eAe, false); }
-TEST(SoundGold, AO_Steal) { Steal(GameType::eAo, false); }
-TEST(SoundGold, PS1_AE_Sfx) { Sfx(GameType::eAe, true); }
-TEST(SoundGold, PS1_AO_Sfx) { Sfx(GameType::eAo, true); }
-TEST(SoundGold, PS1_AE_Adsr) { Adsr(GameType::eAe, true); }
-TEST(SoundGold, PS1_AO_Adsr) { Adsr(GameType::eAo, true); }
-TEST(SoundGold, PS1_AE_Seq) { Seq(GameType::eAe, true); }
-TEST(SoundGold, PS1_AO_Seq) { Seq(GameType::eAo, true); }
-TEST(SoundGold, PS1_AE_Steal) { Steal(GameType::eAe, true); }
-TEST(SoundGold, PS1_AO_Steal) { Steal(GameType::eAo, true); }
-TEST(SoundGold, AE_StopMidNote) { StopMidNote(GameType::eAe, false); }
-TEST(SoundGold, AO_StopMidNote) { StopMidNote(GameType::eAo, false); }
-TEST(SoundGold, PS1_AE_StopMidNote) { StopMidNote(GameType::eAe, true); }
-TEST(SoundGold, PS1_AO_StopMidNote) { StopMidNote(GameType::eAo, true); }
-TEST(SoundGold, AE_NoteOffRules) { NoteOffRules(GameType::eAe, false); }
-TEST(SoundGold, AO_NoteOffRules) { NoteOffRules(GameType::eAo, false); }
-TEST(SoundGold, PS1_AE_NoteOffRules) { NoteOffRules(GameType::eAe, true); }
-TEST(SoundGold, PS1_AO_NoteOffRules) { NoteOffRules(GameType::eAo, true); }
-TEST(SoundGold, PS1_AE_ChannelVolume) { ChannelVolume(GameType::eAe); }
-TEST(SoundGold, PS1_AO_ChannelVolume) { ChannelVolume(GameType::eAo); }
+TEST(SoundGold, AE_Sfx) { Sfx(GameType::eAe); }
+TEST(SoundGold, AO_Sfx) { Sfx(GameType::eAo); }
+TEST(SoundGold, AE_Adsr) { Adsr(GameType::eAe); }
+TEST(SoundGold, AO_Adsr) { Adsr(GameType::eAo); }
+TEST(SoundGold, AE_Seq) { Seq(GameType::eAe); }
+TEST(SoundGold, AO_Seq) { Seq(GameType::eAo); }
+TEST(SoundGold, AE_Steal) { Steal(GameType::eAe); }
+TEST(SoundGold, AO_Steal) { Steal(GameType::eAo); }
+TEST(SoundGold, AE_StopMidNote) { StopMidNote(GameType::eAe); }
+TEST(SoundGold, AO_StopMidNote) { StopMidNote(GameType::eAo); }
+TEST(SoundGold, AE_NoteOffRules) { NoteOffRules(GameType::eAe); }
+TEST(SoundGold, AO_NoteOffRules) { NoteOffRules(GameType::eAo); }
+TEST(SoundGold, AE_ChannelVolume) { ChannelVolume(GameType::eAe); }
+TEST(SoundGold, AO_ChannelVolume) { ChannelVolume(GameType::eAo); }
 
 // The same calls must give the same trace and audio every time
 TEST(SoundGold, Deterministic)
@@ -639,7 +599,7 @@ TEST(SoundGold, Deterministic)
         FileSystem fs;
         ResourceManagerWrapper resMan(fs, "");
         SoundGoldSession session(GameType::eAe);
-        session.LoadSoundBlock(resMan, info, 0, kTheme);
+        session.LoadSoundBlock(resMan, info, 0);
         SND_SEQ_Play(session.LoadedSeqs()[0], 1, 100, 100);
         KeyOn(session, 2, 60, 100);
         session.Advance(1500);

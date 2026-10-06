@@ -3,6 +3,7 @@
 // The game agnostic sound functions (SND_Reset, SND_Load_VABS, SND_Stop_Channels_Mask etc) live here
 #include "../relive_lib/Sound/Midi.hpp"
 
+
 namespace AO {
 
 enum class SeqId : s16
@@ -174,18 +175,30 @@ enum class SeqId : s16
     Unknown_163 = 163,
 };
 
-s16 SND_SEQ_PlaySeq(SeqId idx, s32 repeatCount, s16 bDontStop);
+// AO plays its SEQs by SeqId
+inline s16 SND_SEQ_PlaySeq(SeqId idx, s32 repeatCount, s16 bDontStop)
+{
+    return ::SND_SEQ_PlaySeq(static_cast<u16>(idx), static_cast<s16>(repeatCount), bDontStop);
+}
 
-void SND_SEQ_Stop(SeqId idx);
+inline void SND_SEQ_Stop(SeqId idx)
+{
+    ::SND_SEQ_Stop(static_cast<u16>(idx));
+}
 
-s16 SND_SEQ_Play(SeqId idx, s32 repeatCount, s16 volLeft, s16 volRight);
+inline s16 SND_SEQ_Play(SeqId idx, s32 repeatCount, s16 volLeft, s16 volRight)
+{
+    return ::SND_SEQ_Play(static_cast<u16>(idx), static_cast<s16>(repeatCount), volLeft, volRight);
+}
 
-s16 SND_SsIsEos_DeInlined(SeqId idx);
+inline s16 SND_SsIsEos_DeInlined(SeqId idx)
+{
+    return static_cast<s16>(::SND_SsIsEos_DeInlined(static_cast<u16>(idx)));
+}
 
-void SND_Init();
-
-void SND_SEQ_SetVol(SeqId idx, s16 volLeft, s16 volRight);
-
-void SND_StopAll();
+inline void SND_SEQ_SetVol(SeqId idx, s16 volLeft, s16 volRight)
+{
+    ::SND_SEQ_SetVol(static_cast<u16>(idx), volLeft, volRight);
+}
 
 } // namespace AO

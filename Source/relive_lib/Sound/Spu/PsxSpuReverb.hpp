@@ -50,16 +50,19 @@ public:
     // Loads the preset's registers and work area size and clears the work area, like
     // SpuSetReverbModeType + SpuClearReverbWorkArea
     void SetPreset(Preset preset);
-    Preset CurrentPreset() const
-    {
-        return mPreset;
-    }
 
     // EVOLL/EVOLR, the reverb output volume (libsnd's "depth")
     void SetOutputVolume(s16 left, s16 right)
     {
         mOutputVolumeLeft = left;
         mOutputVolumeRight = right;
+    }
+
+    // With this on a new output volume is moved to over a few ms instead of in a step, which
+    // clicks when the reverb is loud (see PsxSpu::SetDeclick)
+    void SetDeclick(bool enable)
+    {
+        mDeclick = enable;
     }
 
     // ATTR bit 7. Off stops the writes to the work area, but the reads (and so what the work area
@@ -99,8 +102,11 @@ private:
     u32 mBufferAddress = 0;
 
     Registers mRegs = {};
-    Preset mPreset = Preset::Off;
     bool mEnabled = false;
+    bool mDeclick = false;
+    // The output volume used with mDeclick, following the setting
+    s32 mSmoothVolumeLeft = 0;
+    s32 mSmoothVolumeRight = 0;
     s16 mOutputVolumeLeft = 0;
     s16 mOutputVolumeRight = 0;
 

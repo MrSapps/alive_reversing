@@ -15,7 +15,6 @@
 #include "CameraSwapper.hpp"
 #include "../relive_lib/Events.hpp"
 #include "../relive_lib/GameObjects/Particle.hpp"
-#include "../relive_lib/Sound/PsxSpuApi.hpp"
 #include "../relive_lib/Sys.hpp"
 #include "../relive_lib/Camera.hpp"
 #include "Path.hpp"
@@ -513,7 +512,7 @@ void Map::NotifyObjectsOfScreenChange()
 
     if (LevelChanged())
     {
-        SsUtAllKeyOff(0);
+        SND_AllKeyOff();
     }
 
     if (mNextLevel != EReliveLevelIds::eNone)

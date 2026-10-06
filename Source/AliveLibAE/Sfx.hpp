@@ -5,8 +5,6 @@
 enum class CameraPos : s16;
 class BaseAnimatedWithPhysicsGameObject;
 
-s32 SND_MIDI(s32 program, s32 vabId, s32 note, s16 vol, s16 min, s16 max);
-
 enum class SligSpeak : s8
 {
     eNone = -1,

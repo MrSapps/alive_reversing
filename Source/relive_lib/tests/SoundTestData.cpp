@@ -1,5 +1,5 @@
 #include "SoundTestData.hpp"
-#include "Sound/PsxSpuApi.hpp"
+#include "Sound/VabFile.hpp"
 #include <cmath>
 #include <cstring>
 

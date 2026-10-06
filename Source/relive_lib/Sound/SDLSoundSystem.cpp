@@ -1,27 +1,10 @@
 #include "../stdafx.h"
 #include "SDLSoundSystem.hpp"
-#include "SDLSoundBuffer.hpp"
-#include "Reverb.hpp"
+#include "../Sys.hpp"
+#include <algorithm>
 #include <functional>
-#include <cmath>
 
-static bool sPs1SoundOnCreate = false;
-static PsxSpu::Interpolation sPs1SoundInterpolation = PsxSpu::Interpolation::BandLimited;
-
-void SDLSoundSystem::SetPs1SoundOnCreate(bool enable, PsxSpu::Interpolation interpolation)
-{
-    sPs1SoundOnCreate = enable;
-    sPs1SoundInterpolation = interpolation;
-}
-
-static std::string sAudioDumpOnCreate;
-static bool sAudioDumpOffline = true;
-
-void SDLSoundSystem::SetAudioDumpOnCreate(const std::string& wavPath, const std::string& liveWavPath)
-{
-    sAudioDumpOnCreate = wavPath.empty() ? liveWavPath : wavPath;
-    sAudioDumpOffline = !wavPath.empty();
-}
+static SDLSoundSystem* sInstance = nullptr;
 
 static void WriteU32(FILE* f, u32 v)
 {
@@ -33,21 +16,21 @@ static void WriteU16(FILE* f, u16 v)
     fwrite(&v, sizeof(v), 1, f);
 }
 
-void SDLSoundSystem::OpenAudioDump()
+void SDLSoundSystem::OpenAudioDump(const std::string& path)
 {
-    if (sAudioDumpOnCreate.empty())
+    if (path.empty())
     {
         return;
     }
-    mAudioDump = fopen(sAudioDumpOnCreate.c_str(), "wb");
+    mAudioDump = fopen(path.c_str(), "wb");
     if (!mAudioDump)
     {
-        LOG_ERROR("Can't write the audio dump %s", sAudioDumpOnCreate.c_str());
+        LOG_ERROR("Can't write the audio dump %s", path.c_str());
         return;
     }
-    LOG_INFO("Dumping the audio to %s", sAudioDumpOnCreate.c_str());
+    LOG_INFO("Dumping the audio to %s", path.c_str());
     mAudioDumpFrames = 0;
-    mLiveLog = fopen((sAudioDumpOnCreate + ".log").c_str(), "w");
+    mLiveLog = fopen((path + ".log").c_str(), "w");
     if (mLiveLog)
     {
         fprintf(mLiveLog, "# ms event samples ringAvail ok|durationUs\n");
@@ -98,107 +81,159 @@ void SDLSoundSystem::CloseAudioDump()
     LOG_INFO("Audio dump finished: %llu frames", static_cast<unsigned long long>(mAudioDumpFrames));
 }
 
-void SDLSoundSystem::Init(u32 /*sampleRate*/, s32 /*bitsPerSample*/, s32 /*isStereo*/)
+
+SDLSoundSystem::SDLSoundSystem(const Options& options)
 {
-    mCreated = false;
+    sInstance = this;
 
-    if (!sAudioDumpOnCreate.empty() && sAudioDumpOffline)
-    {
-        // No audio device: the audio is rendered a frame at a time by RenderDumpFrame
-        LOG_INFO("-dump_audio: rendering the audio offline, a frame at a time");
-        InitOffline();
-        return;
-    }
-
-    if (!SDL_InitSubSystem(SDL_INIT_AUDIO))
-    {
-        LOG_ERROR("SDL_Init(SDL_INIT_AUDIO) failed %s", SDL_GetError());
-        return;
-    }
-
-    for (s32 i = 0; i < SDL_GetNumAudioDrivers(); i++)
-    {
-        LOG_INFO("SDL Audio Driver %d %s", i, SDL_GetAudioDriver(i));
-    }
+    // A dump to make offline has no audio device: the audio is rendered a frame at a time by DumpFrame
+    const bool offlineDump = !options.mDumpPath.empty();
+    const std::string dumpPath = offlineDump ? options.mDumpPath : options.mLiveDumpPath;
+    mOffline = options.mOffline || offlineDump;
 
     mAudioDeviceSpec.format = SDL_AUDIO_S16;
     mAudioDeviceSpec.channels = 2;
     mAudioDeviceSpec.freq = 44100;
 
-    mAudioStream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &mAudioDeviceSpec, SDLSoundSystem::AudioCallBackStatic, this);
-    if (!mAudioStream)
+    if (!mOffline)
     {
-        LOG_ERROR("Couldn't open SDL audio: %s", SDL_GetError());
-        return;
+        if (!SDL_InitSubSystem(SDL_INIT_AUDIO))
+        {
+            LOG_ERROR("SDL_Init(SDL_INIT_AUDIO) failed %s", SDL_GetError());
+        }
+        else
+        {
+            for (s32 i = 0; i < SDL_GetNumAudioDrivers(); i++)
+            {
+                LOG_INFO("SDL Audio Driver %d %s", i, SDL_GetAudioDriver(i));
+            }
+
+            mAudioStream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &mAudioDeviceSpec, SDLSoundSystem::AudioCallBackStatic, this);
+            if (!mAudioStream)
+            {
+                LOG_ERROR("Couldn't open SDL audio: %s", SDL_GetError());
+            }
+        }
+    }
+    else if (offlineDump)
+    {
+        LOG_INFO("-dump_audio: rendering the audio offline, a frame at a time");
     }
 
-    mAudioDevice = SDL_GetAudioStreamDevice(mAudioStream);
+    if (mAudioStream)
+    {
+        mAudioDevice = SDL_GetAudioStreamDevice(mAudioStream);
 
-    //SDL_SetAudioStreamGain(mAudioStream, 0.0f);
+        LOG_INFO("-----------------------------");
+        LOG_INFO("Audio Device opened, got specs:");
+        LOG_INFO("Channels: %d nFormat: %d nFreq: %d", static_cast<s32>(mAudioDeviceSpec.channels), mAudioDeviceSpec.format, mAudioDeviceSpec.freq);
+        LOG_INFO("Driver: %s", SDL_GetCurrentAudioDriver());
+        LOG_INFO("-----------------------------");
+    }
 
-    LOG_INFO("-----------------------------");
-    LOG_INFO("Audio Device opened, got specs:");
-    LOG_INFO("Channels: %d nFormat: %d nFreq: %d", static_cast<s32>(mAudioDeviceSpec.channels), mAudioDeviceSpec.format, mAudioDeviceSpec.freq);
-    LOG_INFO("Driver: %s", SDL_GetCurrentAudioDriver());
-    LOG_INFO("-----------------------------");
-
-    InitMixer();
-    sLastNotePlayTime_BBC33C = SND_GetTicks();
+    mPs1Sound = std::make_unique<PsxSoundEngine>();
+    mPs1Sound->SetInterpolation(options.mInterpolation);
+    OpenAudioDump(dumpPath);
     mCreated = true;
 
-    // Correctly size the lock free buffer on the main thread before any other threads start
-    // What the mixer may run ahead of the device: this much latency on every sound, against the
-    // slack to absorb a slow chunk of mixing (a frame of 24 voices takes up to ~0.9x real time
-    // in a Debug build)
-    mAudioRingBuffer.resize(2048);
-
-    // The mix is made on its own thread, ahead of the device's callback, so a slow frame of mixing
-    // is absorbed by the ring buffer instead of underrunning the device
-    mRenderAudioThread.reset(new std::thread(std::bind(&SDLSoundSystem::RenderAudioThread, this)));
-
-    SDL_ResumeAudioDevice(mAudioDevice);
-}
-
-void SDLSoundSystem::InitMixer()
-{
-    if (sPs1SoundOnCreate)
+    if (!mOffline)
     {
-        LOG_INFO("PS1 sound: the VAB tones play on the emulated SPU");
-        mPs1Sound = std::make_unique<PsxSoundEngine>();
-        mPs1Sound->SetInterpolation(sPs1SoundInterpolation);
-    }
+        // What the mixer may run ahead of the device: this much latency on every sound, against the
+        // slack to absorb a slow chunk of mixing (a frame of 24 voices takes up to ~0.9x real time
+        // in a Debug build). Sized on the main thread before any other threads start.
+        mAudioRingBuffer.resize(2048);
 
-    Reverb_Init(mAudioDeviceSpec.freq);
-    OpenAudioDump();
+        // The mix is made on its own thread, ahead of the device's callback, so a slow frame of mixing
+        // is absorbed by the ring buffer instead of underrunning the device. Without a device (it
+        // couldn't be opened) the thread plays the part of the device too, so the sound code's clock
+        // and sequencer still run.
+        mRenderAudioThread = std::make_unique<std::thread>(std::bind(&SDLSoundSystem::RenderAudioThread, this));
 
-    GetSoundAPI().SND_InitVolumeTable();
-
-    if (sLoadedSoundsCount_BBC394)
-    {
-        for (s32 i = 0; i < 256; i++)
+        if (mAudioDevice)
         {
-            if (sSoundSamples_BBBF38[i])
-            {
-                GetSoundAPI().mSND_Renew(sSoundSamples_BBBF38[i]);
-                GetSoundAPI().mSND_LoadSamples(sSoundSamples_BBBF38[i], 0, sSoundSamples_BBBF38[i]->field_8_pSoundBuffer, sSoundSamples_BBBF38[i]->field_C_buffer_size_bytes / (u8) sSoundSamples_BBBF38[i]->field_1D_blockAlign);
-                if ((i + 1) == sLoadedSoundsCount_BBC394)
-                    break;
-            }
+            SDL_ResumeAudioDevice(mAudioDevice);
         }
     }
 }
 
-void SDLSoundSystem::InitOffline()
+SDLSoundSystem::~SDLSoundSystem()
 {
-    mOffline = true;
-    mAudioDeviceSpec.format = SDL_AUDIO_S16;
-    mAudioDeviceSpec.channels = 2;
-    mAudioDeviceSpec.freq = 44100;
+    TRACE_ENTRYEXIT;
 
-    InitMixer();
+    if (sInstance == this)
+    {
+        sInstance = nullptr;
+    }
 
-    sLastNotePlayTime_BBC33C = SND_GetTicks();
-    mCreated = true;
+    if (!mOffline)
+    {
+        // Stop the audio call back
+        if (mAudioStream)
+        {
+            SDL_PauseAudioStreamDevice(mAudioStream);
+        }
+
+        // Stop audio rendering thread
+        mRenderAudioThreadQuit = true;
+        if (mRenderAudioThread && mRenderAudioThread->joinable())
+        {
+            mRenderAudioThread->join();
+        }
+    }
+
+    if (mAudioStream)
+    {
+        SDL_DestroyAudioStream(mAudioStream);
+        mAudioStream = nullptr;
+        mAudioDevice = 0;
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
+    }
+
+    CloseAudioDump();
+    mPs1Sound.reset();
+}
+
+SDLSoundSystem* SDLSoundSystem::Get()
+{
+    return sInstance;
+}
+
+u32 SDLSoundSystem::GetTicks()
+{
+    if (sInstance && sInstance->mOffline)
+    {
+        return sInstance->OfflineTicks();
+    }
+    return SYS_GetTicks();
+}
+
+void SDLSoundSystem::WaitUntilTicks(u32 ticks)
+{
+    if (sInstance && sInstance->mOffline)
+    {
+        sInstance->RenderOfflineUntil(ticks);
+        return;
+    }
+
+    while (SYS_GetTicks() < ticks)
+    {
+    }
+}
+
+void SDLSoundSystem::DumpFrame()
+{
+    if (sInstance)
+    {
+        sInstance->RenderDumpFrame();
+    }
+}
+
+std::shared_ptr<AudioStream> SDLSoundSystem::CreateStream(u32 sampleRate, u32 channels, u32 capacityFrames)
+{
+    auto pStream = std::make_shared<AudioStream>(sampleRate, channels, capacityFrames, GetDeviceSampleRate());
+    std::lock_guard<std::mutex> lock(mStreamsMutex);
+    mStreams.push_back(pStream);
+    return pStream;
 }
 
 u32 SDLSoundSystem::OfflineTicks() const
@@ -270,78 +305,6 @@ u32 SDLSoundSystem::GetQueuedAudioSamples() const
     return mOffline ? 0 : static_cast<u32>(mAudioRingBuffer.getAvailableRead());
 }
 
-
-HRESULT SDLSoundSystem::DuplicateSoundBuffer(TSoundBufferType* pDSBufferOriginal, TSoundBufferType** ppDSBufferDuplicate)
-{
-    pDSBufferOriginal->Duplicate(ppDSBufferDuplicate);
-    return S_OK;
-}
-
-HRESULT SDLSoundSystem::CreateSoundBuffer(LPCDSBUFFERDESC pcDSBufferDesc, TSoundBufferType** ppDSBuffer, void* /*pUnkOuter*/)
-{
-    *ppDSBuffer = new SDLSoundBuffer(*pcDSBufferDesc, mAudioDeviceSpec.freq);
-    return S_OK;
-}
-
-
-HRESULT SDLSoundSystem::Release()
-{
-    TRACE_ENTRYEXIT;
-
-    if (mOffline)
-    {
-        // There is no render thread to destroy the released voices, and SND_SsQuit has released
-        // all of them by now
-        for (s32 i = 0; i < MAX_VOICE_COUNT; i++)
-        {
-            SDLSoundBuffer* pVoice = sAE_ActiveVoices[i];
-            if (pVoice)
-            {
-                pVoice->Destroy();
-            }
-        }
-        delete this;
-        return S_OK;
-    }
-
-    if (mCreated)
-    {
-        // Stop the audio call back
-        SDL_PauseAudioStreamDevice(mAudioStream);
-
-        // Stop audio rendering thread
-        mRenderAudioThreadQuit = true;
-        if (mRenderAudioThread && mRenderAudioThread->joinable())
-        {
-            mRenderAudioThread->join();
-        }
-    }
-
-    if (mAudioStream)
-    {
-        SDL_DestroyAudioStream(mAudioStream);
-        mAudioStream = nullptr;
-        mAudioDevice = 0;
-    }
-
-    // Shutdown the sound system
-    SDL_QuitSubSystem(SDL_INIT_AUDIO);
-
-    delete this;
-    return S_OK;
-}
-
-
-SDLSoundSystem::~SDLSoundSystem()
-{
-    TRACE_ENTRYEXIT;
-
-    CloseAudioDump();
-    Reverb_DeInit();
-
-    // TODO: Clean up outstanding samples in sAE_ActiveVoices
-}
-
 void SDLSoundSystem::AudioCallBack(SDL_AudioStream* stream, s32 additionalAmount)
 {
     if (additionalAmount <= 0)
@@ -370,18 +333,26 @@ void SDLSoundSystem::AudioCallBack(SDL_AudioStream* stream, s32 additionalAmount
     mGeneratedAudioSamples.fetch_add(static_cast<u64>(bufferLenSamples), std::memory_order_release);
 }
 
-
 void SDLSoundSystem::RenderAudioThread()
 {
     std::vector<StereoSample_S16> tmpBuffer;
     while (!mRenderAudioThreadQuit)
     {
+        if (!mAudioStream)
+        {
+            // No device: render 10 ms in real time and drop it
+            tmpBuffer.assign(static_cast<size_t>(mAudioDeviceSpec.freq) / 100, StereoSample_S16{});
+            RenderAudio(tmpBuffer.data(), static_cast<s32>(tmpBuffer.size()));
+            mGeneratedAudioSamples.fetch_add(tmpBuffer.size(), std::memory_order_release);
+            SDL_Delay(10);
+            continue;
+        }
+
         const size_t bufferSize = mAudioRingBuffer.getAvailableWrite();
         if (bufferSize > 0)
         {
             const u64 startNs = SDL_GetTicksNS();
-            tmpBuffer.resize(bufferSize);
-            memset(tmpBuffer.data(), 0, tmpBuffer.size() * sizeof(StereoSample_S16));
+            tmpBuffer.assign(bufferSize, StereoSample_S16{});
             RenderAudio(tmpBuffer.data(), static_cast<s32>(tmpBuffer.size()));
             if (!mAudioRingBuffer.write(tmpBuffer.data(), tmpBuffer.size()))
             {
@@ -399,211 +370,26 @@ void SDLSoundSystem::RenderAudioThread()
             SDL_DelayNS(500 * 1000);
         }
     }
-
 }
 
 void SDLSoundSystem::RenderAudio(StereoSample_S16* pSampleBuffer, s32 sampleBufferCount)
 {
-    // Check if our buffer size changes, and if its buffer, then resize the array
-    if (sampleBufferCount > mCurrentSoundBufferSize)
     {
-        mTempSoundBuffer.resize(sampleBufferCount);
-        mNoReverbBuffer.resize(sampleBufferCount);
-        mCurrentSoundBufferSize = sampleBufferCount;
-    }
-
-    if (mTempSoundBuffer.empty())
-    {
-        mTempSoundBuffer.resize(sampleBufferCount);
-        mNoReverbBuffer.resize(sampleBufferCount);
-    }
-
-    memset(mNoReverbBuffer.data(), 0, sampleBufferCount * sizeof(StereoSample_S16));
-
-    for (s32 vi = 0; vi < MAX_VOICE_COUNT; vi++)
-    {
-        SDLSoundBuffer* pVoice = sAE_ActiveVoices[vi];
-        if (pVoice)
+        std::lock_guard<std::mutex> lock(mStreamsMutex);
+        for (const auto& pStream : mStreams)
         {
-            RenderSoundBuffer(*pVoice, pSampleBuffer, sampleBufferCount);
+            pStream->Mix(pSampleBuffer, static_cast<u32>(sampleBufferCount));
         }
+        mStreams.erase(std::remove_if(mStreams.begin(), mStreams.end(), [](const std::shared_ptr<AudioStream>& pStream)
+                                      {
+                                          return pStream->IsFinished();
+                                      }),
+                       mStreams.end());
     }
 
-    // Do Reverb Pass
-    if (gReverbEnabled)
-    {
-        Reverb_Mix(pSampleBuffer, SDL_AUDIO_S16, sampleBufferCount * sizeof(StereoSample_S16), kMixVolume);
-
-        // Mix our no reverb buffer
-        SDL_MixAudio(reinterpret_cast<Uint8*>(pSampleBuffer), reinterpret_cast<Uint8*>(mNoReverbBuffer.data()), SDL_AUDIO_S16, sampleBufferCount * sizeof(StereoSample_S16), kMixVolume);
-    }
-
-    // After the generic reverb: the SPU has its own
-    if (mPs1Sound)
-    {
-        mPs1Sound->Mix(pSampleBuffer, static_cast<u32>(sampleBufferCount));
-    }
+    mPs1Sound->Mix(pSampleBuffer, static_cast<u32>(sampleBufferCount));
 
     WriteAudioDump(pSampleBuffer, sampleBufferCount);
-}
-
-
-// The volume with a stop or release's fade out applied
-static s32 EffectiveVolume(const SDLSoundBuffer& voice)
-{
-    return (voice.mState.iVolume * voice.mState.iFade) / 127;
-}
-
-void SDLSoundSystem::RenderSoundBuffer(SDLSoundBuffer& entry, StereoSample_S16* pSampleBuffer, s32 sampleBufferCount)
-{
-    bool reverbPass = false;
-
-    SDLSoundBuffer* pVoice = &entry;
-
-    if (pVoice == nullptr || !pVoice->mBuffer || pVoice->mBuffer->empty())
-    {
-        return;
-    }
-
-    if (pVoice->mState.bIsReleased)
-    {
-        if (pVoice->mState.eStatus == SDLSoundBufferStatus::Playing && pVoice->mState.iVolume > 0)
-        {
-            // Fade out before it goes: cutting a playing buffer off clicks (a skipped movie)
-            pVoice->mState.bFadingOut = true;
-            pVoice->mState.bFadingIn = false;
-            pVoice->mState.eStatus = SDLSoundBufferStatus::Stopped;
-        }
-        else if (!pVoice->mState.bFadingOut)
-        {
-            pVoice->Destroy(); // TODO: Still correct ??
-            return;
-        }
-    }
-
-    // Clear Temp Sample Buffer
-    memset(mTempSoundBuffer.data(), 0, sampleBufferCount * sizeof(StereoSample_S16));
-
-    Sint16* pVoiceBufferPtr = reinterpret_cast<Sint16*>(pVoice->GetBuffer()->data());
-
-    for (s32 i = 0; i < sampleBufferCount; i++)
-    {
-        if (pVoice->mBuffer->empty() || (pVoice->mState.eStatus != SDLSoundBufferStatus::Playing && !pVoice->mState.bFadingOut) || pVoice->mState.iSampleCount == 0)
-        {
-            break;
-        }
-
-        if (pVoice->mState.iVolume < pVoice->mState.iVolumeTarget)
-        {
-            pVoice->mState.iVolume++;
-        }
-        else if (pVoice->mState.iVolume > pVoice->mState.iVolumeTarget)
-        {
-            pVoice->mState.iVolume--;
-        }
-
-        if (pVoice->mState.iChannels == 2)
-        {
-            reverbPass = true; // Todo: determine this with flags in the sound object itself.
-                               // For Stereo buffers. The only time this is played is for FMV's.
-                               // Right now, unless the playback device is at 44100 hz, it sounds awful.
-                               // TODO: Resampling for stereo
-
-            RenderStereoSample(pVoiceBufferPtr, pVoice, i);
-        }
-        else
-        {
-            reverbPass = true;
-
-            RenderMonoSample(pVoiceBufferPtr, pVoice, i);
-        }
-
-        if (pVoice->mState.bFadingIn && ++pVoice->mState.iFade >= 127)
-        {
-            pVoice->mState.bFadingIn = false;
-            pVoice->mState.iFade = 127;
-        }
-
-        if (pVoice->mState.bFadingOut && --pVoice->mState.iFade <= 0)
-        {
-            pVoice->mState.bFadingOut = false;
-            pVoice->mState.iFade = 127;
-            pVoice->mState.eStatus = SDLSoundBufferStatus::Stopped;
-            break;
-        }
-
-        if (pVoice->mState.fPlaybackPosition >= pVoice->mState.iSampleCount / pVoice->mState.iChannels)
-        {
-            pVoice->mState.fPlaybackPosition = 0;
-            if (!pVoice->mState.bLoop)
-            {
-                pVoice->mState.eStatus = SDLSoundBufferStatus::Stopped;
-            }
-        }
-    }
-
-    if (reverbPass)
-    {
-        SDL_MixAudio(reinterpret_cast<Uint8*>(pSampleBuffer), reinterpret_cast<Uint8*>(mTempSoundBuffer.data()), SDL_AUDIO_S16, sampleBufferCount * sizeof(StereoSample_S16), 0.35f);
-    }
-    else
-    {
-        SDL_MixAudio(reinterpret_cast<Uint8*>(mNoReverbBuffer.data()), reinterpret_cast<Uint8*>(mTempSoundBuffer.data()), SDL_AUDIO_S16, sampleBufferCount * sizeof(StereoSample_S16), 0.35f);
-    }
-}
-
-
-void SDLSoundSystem::RenderMonoSample(Sint16* pVoiceBufferPtr, SDLSoundBuffer* pVoice, s32 i)
-{
-    s32 s = 0;
-
-    switch (mAudioFilterMode)
-    {
-        case AudioFilterMode::NoFilter:
-            s = pVoiceBufferPtr[static_cast<s32>(pVoice->mState.fPlaybackPosition)];
-            break;
-        case AudioFilterMode::Linear:
-            const s16 s1 = pVoiceBufferPtr[static_cast<s32>(pVoice->mState.fPlaybackPosition)];
-            const s16 s2 = pVoiceBufferPtr[(static_cast<s32>(pVoice->mState.fPlaybackPosition) + 1) % pVoice->mState.iSampleCount];
-
-            s = static_cast<s32>((s1 + ((s2 - s1) * (pVoice->mState.fPlaybackPosition - floorf(pVoice->mState.fPlaybackPosition)))));
-            break;
-    }
-
-    s32 leftPan = 10000;
-    s32 rightPan = 10000;
-
-    if (gAudioStereo)
-    {
-        if (pVoice->mState.iPan < 0)
-        {
-            rightPan = 10000 - abs(pVoice->mState.iPan);
-        }
-        else if (pVoice->mState.iPan > 0)
-        {
-            leftPan = 10000 - abs(pVoice->mState.iPan);
-        }
-    }
-    else
-    {
-        s32 r = (leftPan + rightPan) / 2;
-        leftPan = r;
-        rightPan = r;
-    }
-
-    mTempSoundBuffer[i].left = static_cast<s16>((((s * leftPan) / 10000) * EffectiveVolume(*pVoice)) / 127);
-    mTempSoundBuffer[i].right = static_cast<s16>((((s * rightPan) / 10000) * EffectiveVolume(*pVoice)) / 127);
-
-    pVoice->mState.fPlaybackPosition += pVoice->mState.fFrequency;
-}
-
-void SDLSoundSystem::RenderStereoSample(Sint16* pVoiceBufferPtr, SDLSoundBuffer* pVoice, s32 i)
-{
-    StereoSample_S16 pSample = reinterpret_cast<StereoSample_S16*>(pVoiceBufferPtr)[static_cast<s32>(pVoice->mState.fPlaybackPosition)];
-    mTempSoundBuffer[i].left = static_cast<s16>((pSample.left * EffectiveVolume(*pVoice)) / 127);
-    mTempSoundBuffer[i].right = static_cast<s16>((pSample.right * EffectiveVolume(*pVoice)) / 127);
-
-    pVoice->mState.fPlaybackPosition += pVoice->mState.fFrequency;
 }
 
 void SDLSoundSystem::AudioCallBackStatic(void* userdata, SDL_AudioStream* stream, s32 additionalAmount, s32 /*totalAmount*/)

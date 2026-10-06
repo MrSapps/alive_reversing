@@ -72,7 +72,6 @@ CommandLineOptions CommandLineOptions::Parse(const CommandLineParser& clp)
     }
 
     options.mRendererChecks = clp.HasSwitch("-renderer_checks");
-    options.mPs1Sound = clp.HasSwitch("-ps1_sound") || !clp.HasSwitch("-pc_sound");
     options.mSoundDebug = clp.HasSwitch("-sound_debug");
     if (const auto ps1Data = clp.GetValue("-ps1_data"))
     {
@@ -137,12 +136,10 @@ const char* CommandLineOptions::Usage()
            "  -ddnoskip                   Render every frame instead of skipping to keep up\n"
            "  -ddslowload=<ms>            Make each resource take at least this long to load\n"
            "  -renderer_checks            Check for renderer errors as it goes (slower)\n"
-           "  -pc_sound                   Play the sound the way the PC version did, not on the emulated PS1 SPU\n"
-           "                              (the default; -ps1_sound is still accepted)\n"
            "  -sound_debug                Show a window to play music, sound effects and SEQs by hand\n"
            "  -ps1_data=<dir>             Play the PS1's own sound data, read from the LVL files\n"
            "                              below <dir> (a PS1 disc's files), instead of the PC's\n"
-           "  -spu_filter=<name>          With -ps1_sound: hq (default, no aliasing at high notes)\n"
+           "  -spu_filter=<name>          hq (default, no aliasing at high notes)\n"
            "                              or gaussian (the PS1's own, buzzes on some high notes)\n"
            "  -dump_audio=<file.wav>      Save all the audio the game plays to this file, rendered\n"
            "                              offline a frame at a time (no audio device)\n"

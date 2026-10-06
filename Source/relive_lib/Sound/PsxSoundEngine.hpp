@@ -2,7 +2,7 @@
 
 #include "Spu/PsxSpu.hpp"
 #include "Libsnd.hpp"
-#include "SoundSDL.hpp"
+#include "AudioStream.hpp"
 #include "../GameType.hpp"
 #include <array>
 #include <cstdio>
@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-// The PS1 sound output (-ps1_sound), the same for both games: the game's libsnd calls go to the
+// The sound output, the same for both games, as the PS1 had it: the game's libsnd calls go to the
 // libsnd port (Libsnd), which drives the emulated SPU (PsxSpu) playing the PC samples.
 //
 // Like the PS1, where the vsync interrupt ran libsnd's tick, libsnd ticks 50 times a second of
@@ -26,19 +26,13 @@ public:
     PsxSoundEngine();
     ~PsxSoundEngine();
 
-    // The engine of the running sound system, or nullptr when -ps1_sound is off
+    // The engine of the running sound system, or nullptr when there is none
     static PsxSoundEngine* Get();
 
     // The PS1's music clock is a vblank counter (MusicController's RCntCNT3 callback adds 1 per
     // vblank) that both games read shifted right by one, so 30 music units a second on NTSC (the
     // PC's rate) and 25 on PAL. 50 is PAL, 60 NTSC, which is probably the better one to use.
     static constexpr u32 kVblankHz = 50;
-
-    // The PC data lowered some of AO's tone priorities and volumes: the secret area jingle's from 127
-    // to 70, so sound effects (an electric wall's buzz) took its voices. Puts the PS1 values back in
-    // VH data, before SsVabOpenHead reads it. vhFile: the VH's name, e.g. RFSNDFX.VH. A tone only
-    // changes when it is as the PC data has it.
-    static void RestorePs1Tones(GameType game, const std::string& vhFile, std::vector<u8>& vhData);
 
     // SsVabOpenHead: reads the VAB's programs and tones. Stops any voice playing the VAB's old
     // samples.
@@ -85,7 +79,8 @@ public:
     void SetReverbDepth(s32 left, s32 right);
     // SsUtReverbOn/Off
     void SetReverbEnabled(bool enable);
-    // SpuClearReverbWorkArea
+    // SpuClearReverbWorkArea. With declick it waits for the reverb's output volume to have gone
+    // down, so the tail isn't cut off.
     void ClearReverb();
 
     // A voice's registers, envelope phase and what libsnd is playing on it, for the sound gold
@@ -103,6 +98,15 @@ public:
     };
     VoiceState GetVoiceState(s32 voice);
 
+    // A sample of a VAB as SetSample was given it, for the sound gold traces. mPcm is empty if there's none.
+    struct SampleInfo final
+    {
+        std::vector<s16> mPcm;
+        bool mLoop = false;
+        u32 mLoopStart = 0;
+    };
+    SampleInfo GetSample(s32 vabId, s32 vagIdx);
+
     // The sound call recorder (RELIVE_SOUND_RECORD=<file>): logs the libsnd calls the game makes,
     // with the sound clock in ms, one a line. relive_sound_gold -replay plays them on the engine,
     // and build-ps1re's ps1snd on the games' real libsnd (see SOUND_FORMATS.md).
@@ -117,6 +121,9 @@ public:
 private:
     static constexpr s32 kMaxVabs = 4;
     u32 mLongReleaseSamplesLeft = 0;
+    // ClearReverb with declick: the reverb output volume takes up to 512 samples to go down
+    static constexpr u32 kClearReverbDelaySamples = 768;
+    u32 mClearReverbSamplesLeft = 0;
     static constexpr s32 kMaxSamples = 256;
 
     struct Vab final

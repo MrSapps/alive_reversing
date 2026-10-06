@@ -11,8 +11,8 @@ public:
 
     static void Stop();
     static void Play();
+    // The SEQ the current path's background music plays, -1 for none
+    static s16 CurrentSeqId();
 
     s16 mMusicId = 0;
 };
-
-extern s16 gBackgroundMusicSeqId;

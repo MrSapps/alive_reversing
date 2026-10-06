@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../relive_lib/Sound/OpenSeqHandle.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/MapWrapper.hpp"
 #include "../relive_lib/FmvInfo.hpp"
@@ -46,17 +47,6 @@ struct PerLvlData final
     u16 field_C_abe_x_off;
     u16 field_E_abe_y_off;
 };
-
-struct OpenSeqHandle final
-{
-    const char_type* field_0_mBsqName;
-    s32 field_4_generated_res_id; // A hash of the named which matches the resource Id
-    s8 field_8_sound_block_idx;
-    s8 field_9_volume;
-    s16 field_A_id_seqOpenId;
-    std::vector<u8> field_C_ppSeq_Data;
-};
-ALIVE_ASSERT_SIZEOF(OpenSeqHandle, 0x10);
 
 struct SeqHandleTable final
 {

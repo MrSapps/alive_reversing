@@ -22,7 +22,6 @@
 #include "../AliveLibAE/Input.hpp"
 #include "../relive_lib/Psx.hpp"
 #include "../relive_lib/DynamicArray.hpp"
-#include "../relive_lib/Sound/Sound.hpp" // for shut down func
 #include "../relive_lib/Sound/SDLSoundSystem.hpp"
 #include "AmbientSound.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
@@ -75,7 +74,6 @@
 #include "AmbientSound.hpp"
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
 #include "../relive_lib/Events.hpp"
-#include "../AliveLibAO/Sound.hpp"
 #include "../relive_lib/Engine.hpp"
 #include "../AliveLibAO/PathDataExtensions.hpp"
 #include "../AliveLibAO/GameAutoPlayer.hpp"
@@ -298,18 +296,22 @@ void Engine::Init_Sound_DynamicArrays_And_Others()
 
     // SND_Init creates the sound system
     SoundDebug::SetAlwaysShown(mOptions.mSoundDebug);
-    SDLSoundSystem::SetPs1SoundOnCreate(mOptions.mPs1Sound,
-        mOptions.mSpuFilterGaussian ? PsxSpu::Interpolation::Gaussian : PsxSpu::Interpolation::BandLimited);
-    SDLSoundSystem::SetAudioDumpOnCreate(mOptions.mDumpAudio.value_or(""), mOptions.mDumpLiveAudio.value_or(""));
+    GameSoundConfig soundConfig;
+    soundConfig.mGame = mGameType;
+    soundConfig.mGaussianInterpolation = mOptions.mSpuFilterGaussian;
+    soundConfig.mDumpPath = mOptions.mDumpAudio.value_or("");
+    soundConfig.mLiveDumpPath = mOptions.mDumpLiveAudio.value_or("");
     if (mGameType == GameType::eAe)
     {
-        SND_Init();
+        soundConfig.mEnableMusic = MusicController::static_EnableMusic;
+        SND_Init(soundConfig);
         SND_Init_Ambiance();
         MusicController::Create(*mResMan, *mMap);
     }
     else
     {
-        AO::SND_Init();
+        soundConfig.mEnableMusic = AO::MusicController::EnableMusic;
+        SND_Init(soundConfig);
         SND_Init_Ambiance();
         AO::MusicController::Create(*mResMan, *mMap);
     }
@@ -359,7 +361,7 @@ static void DestroyAllObjects()
 void Game_Shutdown()
 {
     Input_DisableInputForPauseMenuAndDebug_4EDDC0();
-    GetSoundAPI().mSND_SsQuit();
+    SND_SsQuit();
     IRenderer::FreeRenderer();
 }
 

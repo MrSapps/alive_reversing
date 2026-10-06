@@ -742,6 +742,64 @@ TEST(PsxSpuReverb, SilentWhenOff)
     EXPECT_GT(PeakAfter(RenderImpulse(PsxSpuReverb::Preset::Off, true, true, 16), 0), 0);
 }
 
+// The reverb depth going to 0 while it is loud (a new level's sounds loading) is a step on the
+// hardware: the output is 0 from the next sample. With declick it eases down.
+struct DepthTo0Result final
+{
+    s32 mJustAfter = 0; // Sum of the output over the 8 samples after the change
+    s32 mLater = 0;     // The output 2000 samples after
+    s32 mBefore = 0;    // The largest output before
+};
+
+static DepthTo0Result DepthGoesTo0(bool declick)
+{
+    PsxSpuReverb reverb;
+    reverb.SetDeclick(declick);
+    reverb.SetPreset(PsxSpuReverb::Preset::Hall);
+    reverb.SetEnabled(true);
+    reverb.SetOutputVolume(PsxSpuReverb::DepthToVolume(127), PsxSpuReverb::DepthToVolume(127));
+
+    // Loud noise in the whole time
+    DepthTo0Result result;
+    u32 seed = 12345;
+    for (u32 i = 0; i < 24000; i++)
+    {
+        seed = seed * 1103515245u + 12345u;
+        const s32 in = static_cast<s32>((seed >> 16) & 0x3FFF) - 0x2000;
+        if (i == 20000)
+        {
+            reverb.SetOutputVolume(0, 0);
+        }
+        s32 outLeft = 0;
+        s32 outRight = 0;
+        reverb.Process(in, in, outLeft, outRight);
+        if (i < 20000)
+        {
+            result.mBefore = std::max(result.mBefore, std::abs(outLeft));
+        }
+        else if (i < 20008)
+        {
+            result.mJustAfter += std::abs(outLeft);
+        }
+        else if (i == 22000)
+        {
+            result.mLater = std::abs(outLeft);
+        }
+    }
+    return result;
+}
+
+TEST(PsxSpuReverb, DeclickEasesTheDepthDown)
+{
+    const DepthTo0Result hardware = DepthGoesTo0(false);
+    EXPECT_GT(hardware.mBefore, 1000);
+    EXPECT_EQ(hardware.mJustAfter, 0);
+
+    const DepthTo0Result eased = DepthGoesTo0(true);
+    EXPECT_GT(eased.mJustAfter, 1000);
+    EXPECT_EQ(eased.mLater, 0);
+}
+
 TEST(PsxSpuReverb, DepthScalesTheOutput)
 {
     PsxSpuReverb full;

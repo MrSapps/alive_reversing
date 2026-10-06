@@ -14,35 +14,9 @@
 
 namespace AO {
 
-MusicController* pMusicController_507B98 = nullptr;
+static MusicController* sMusicController = nullptr;
 
-using TRootCallBackFn = decltype(&MusicController::OnRootCounter);
-
-constexpr auto RCntCNT3 = 0xf2000003; // VSync (VBlank)
-
-// TODO: Move out PSX emu parts
-s32 psx_root_event_507BA0 = 0;
-TRootCallBackFn sRootCounerFn_AC0BE0 = nullptr;
-s32 sMusicTime_507B9C = 0;
-
-
-s32 Psx_Root_Counter_49C280(s32 event, s32 unknown1, s32 unknown2, TRootCallBackFn pFn)
-{
-    if (event == RCntCNT3 && unknown1 == 2 && unknown2 == 4096)
-    {
-        sRootCounerFn_AC0BE0 = pFn;
-    }
-    return 1;
-}
-
-s32 Psx_Root_Counter_Event_Free_49C2B0(s32 event)
-{
-    if (event == RCntCNT3)
-    {
-        sRootCounerFn_AC0BE0 = nullptr;
-    }
-    return 1;
-}
+static s32 sMusicTime = 0;
 
 struct MusicController_Record3_Sub final
 {
@@ -283,32 +257,30 @@ const MusicController_Record2 rec2s_4CD5A8[124] = {
 
 s16 MusicController::Create(ResourceManagerWrapper& resMan, BaseMap& map)
 {
-    if (pMusicController_507B98)
+    if (sMusicController)
     {
         return 0;
     }
 
-    pMusicController_507B98 = relive_new MusicController(resMan, map);
-    if (pMusicController_507B98)
+    sMusicController = relive_new MusicController(resMan, map);
+    if (sMusicController)
     {
         MusicController::SetBaseTimeStamp();
         SoundDebug::LogSeqCall("CREATE");
         SoundDebug::MusicScope scope;
 
-        psx_root_event_507BA0 = Psx_Root_Counter_49C280(RCntCNT3, 2, 4096, MusicController::OnRootCounter);
-
-        if (pMusicController_507B98->field_10_bEnableMusic)
+        if (sMusicController->field_10_bEnableMusic)
         {
-            pMusicController_507B98->field_10_bEnableMusic = 0;
-            if (pMusicController_507B98->field_4C_current_vol)
+            sMusicController->field_10_bEnableMusic = 0;
+            if (sMusicController->field_4C_current_vol)
             {
-                pMusicController_507B98->field_4A_starting_volume = pMusicController_507B98->field_4C_current_vol;
-                pMusicController_507B98->field_4E_vol = 0;
-                pMusicController_507B98->field_2C_music_start_time = GetMusicTime();
-                pMusicController_507B98->field_50_music_volume_change_time = GetMusicTime();
-                pMusicController_507B98->field_48_vol_state = 2;
+                sMusicController->field_4A_starting_volume = sMusicController->field_4C_current_vol;
+                sMusicController->field_4E_vol = 0;
+                sMusicController->field_2C_music_start_time = GetMusicTime();
+                sMusicController->field_50_music_volume_change_time = GetMusicTime();
+                sMusicController->field_48_vol_state = 2;
             }
-            pMusicController_507B98->UpdateVolumeState();
+            sMusicController->UpdateVolumeState();
         }
     }
 
@@ -333,20 +305,13 @@ void MusicController::SetBaseTimeStamp()
 void MusicController::UpdateMusicTime()
 {
     const u32 elapsedMs = SoundDebug::MusicTicks(GetGameAutoPlayer().SysGetTicks()) - sMusicControllerBaseTimeStamp;
-    if (PsxSoundEngine::Get())
-    {
-        // Half a unit per vblank (the PS1 reads its vblank counter shifted right by one)
-        sMusicTime_507B9C = (PsxSoundEngine::kVblankHz * elapsedMs) / 2000;
-    }
-    else
-    {
-        sMusicTime_507B9C = (3 * elapsedMs) / 100;
-    }
+    // Half a unit per vblank (the PS1 reads its vblank counter shifted right by one)
+    sMusicTime = (PsxSoundEngine::kVblankHz * elapsedMs) / 2000;
 }
 
 s32 MusicController::GetMusicTime()
 {
-    return sMusicTime_507B9C;
+    return sMusicTime;
 }
 
 MusicController::MusicController(ResourceManagerWrapper& resMan, BaseMap& map)
@@ -382,9 +347,9 @@ MusicController::MusicController(ResourceManagerWrapper& resMan, BaseMap& map)
 MusicController::~MusicController()
 {
     // Whatever is destroyed after this one (a movie stopping all sound as it goes) finds no controller
-    if (pMusicController_507B98 == this)
+    if (sMusicController == this)
     {
-        pMusicController_507B98 = nullptr;
+        sMusicController = nullptr;
     }
     if (field_38_music_seq != SeqId::None_M1)
     {
@@ -463,9 +428,9 @@ void MusicController::static_PlayMusic(MusicTypes musicType, BaseGameObject* pOb
 {
     SoundDebug::MusicScope scope;
     SoundDebug::LogSeqCall("MUSIC %d %d %d %d", static_cast<s32>(musicType), SoundDebug::ObjectOrdinal(pObj), a3, a4);
-    if (pMusicController_507B98)
+    if (sMusicController)
     {
-        pMusicController_507B98->PlayMusic(musicType, pObj, a3, a4);
+        sMusicController->PlayMusic(musicType, pObj, a3, a4);
     }
 }
 
@@ -473,9 +438,9 @@ void MusicController::ClearObject(BaseGameObject* pObj)
 {
     SoundDebug::MusicScope scope;
     SoundDebug::LogSeqCall("CLEAR %d", SoundDebug::ObjectOrdinal(pObj));
-    if (pMusicController_507B98)
+    if (sMusicController)
     {
-        pMusicController_507B98->DoClearObject(pObj);
+        sMusicController->DoClearObject(pObj);
     }
 }
 
@@ -483,33 +448,33 @@ MusicController::MusicTypes MusicController::GetAbmientAndMusicInfo(SeqId* ambie
 {
     MusicController::UpdateMusicTime();
 
-    if (!pMusicController_507B98)
+    if (!sMusicController)
     {
         return MusicTypes::eTypeNull;
     }
 
     if (ambientSeq)
     {
-        *ambientSeq = pMusicController_507B98->field_26_ambient_seq;
+        *ambientSeq = sMusicController->field_26_ambient_seq;
     }
 
     if (musicSeq)
     {
-        *musicSeq = pMusicController_507B98->field_38_music_seq;
+        *musicSeq = sMusicController->field_38_music_seq;
     }
 
     if (ambientOrMusicDuration)
     {
-        if (pMusicController_507B98->field_3A_type == MusicTypes::eType0)
+        if (sMusicController->field_3A_type == MusicTypes::eType0)
         {
-            *ambientOrMusicDuration = static_cast<u16>(pMusicController_507B98->field_28_amibent_seq_duration - GetMusicTime());
+            *ambientOrMusicDuration = static_cast<u16>(sMusicController->field_28_amibent_seq_duration - GetMusicTime());
         }
         else
         {
-            *ambientOrMusicDuration = static_cast<u16>(pMusicController_507B98->field_3C_music_seq_duration - GetMusicTime());
+            *ambientOrMusicDuration = static_cast<u16>(sMusicController->field_3C_music_seq_duration - GetMusicTime());
         }
     }
-    return pMusicController_507B98->field_3A_type;
+    return sMusicController->field_3A_type;
 }
 
 void MusicController::UpdateVolumeState()
@@ -565,13 +530,10 @@ void MusicController::Shutdown()
 {
     SoundDebug::MusicScope scope;
     SoundDebug::LogSeqCall("SHUTDOWN");
-    if (pMusicController_507B98)
+    if (sMusicController)
     {
-        pMusicController_507B98->SetDead(true);
-        pMusicController_507B98 = nullptr;
-        //nullsub_5();
-        Psx_Root_Counter_Event_Free_49C2B0(psx_root_event_507BA0);
-        //nullsub_6();
+        sMusicController->SetDead(true);
+        sMusicController = nullptr;
     }
 }
 
@@ -579,40 +541,34 @@ void MusicController::EnableMusic(s16 bEnable)
 {
     SoundDebug::MusicScope scope;
     SoundDebug::LogSeqCall("ENABLE %d", bEnable);
-    if (!pMusicController_507B98)
+    if (!sMusicController)
     {
         return;
     }
     MusicController::UpdateMusicTime();
 
-    if (pMusicController_507B98->field_10_bEnableMusic != bEnable)
+    if (sMusicController->field_10_bEnableMusic != bEnable)
     {
-        pMusicController_507B98->field_10_bEnableMusic = bEnable;
+        sMusicController->field_10_bEnableMusic = bEnable;
         if (bEnable)
         {
-            pMusicController_507B98->SetMusicVolumeDelayed(pMusicController_507B98->field_12_target_volume, 0);
+            sMusicController->SetMusicVolumeDelayed(sMusicController->field_12_target_volume, 0);
 
-            pMusicController_507B98->field_3C_music_seq_duration = 0;
-            pMusicController_507B98->field_28_amibent_seq_duration = 0;
-            pMusicController_507B98->field_40_started_time = GetMusicTime();
+            sMusicController->field_3C_music_seq_duration = 0;
+            sMusicController->field_28_amibent_seq_duration = 0;
+            sMusicController->field_40_started_time = GetMusicTime();
 
-            if (pMusicController_507B98->field_3A_type == MusicTypes::eType0 || pMusicController_507B98->field_3A_type == MusicTypes::eIntenseChase_8 || pMusicController_507B98->field_3A_type == MusicTypes::eType11)
+            if (sMusicController->field_3A_type == MusicTypes::eType0 || sMusicController->field_3A_type == MusicTypes::eIntenseChase_8 || sMusicController->field_3A_type == MusicTypes::eType11)
             {
-                pMusicController_507B98->field_44_bTypeChanged = 1;
+                sMusicController->field_44_bTypeChanged = 1;
             }
         }
         else
         {
-            pMusicController_507B98->SetMusicVolumeDelayed(0, 0);
+            sMusicController->SetMusicVolumeDelayed(0, 0);
         }
-        pMusicController_507B98->UpdateVolumeState();
+        sMusicController->UpdateVolumeState();
     }
-}
-
-s32 MusicController::OnRootCounter()
-{
-    sMusicTime_507B9C++;
-    return 0;
 }
 
 void MusicController::PlayMusic(MusicTypes musicType, BaseGameObject* pObj, s16 a4, s16 a5)
@@ -707,12 +663,9 @@ s16 MusicController::SetMusicVolumeDelayed(s16 vol, s16 delay)
         field_4A_starting_volume = field_4C_current_vol;
         ret = (vol <= 0) ? 0 : vol;
 
-        if (PsxSoundEngine::Get())
-        {
-            // The PS1 stores the target itself, so the calls that don't use the result (a new level
-            // and EnableMusic) get their volume too
-            field_4E_vol = ret;
-        }
+        // The PS1 stores the target itself, so the calls that don't use the result (a new level
+        // and EnableMusic) get their volume too
+        field_4E_vol = ret;
 
         field_2C_music_start_time = counterVal;
         field_50_music_volume_change_time = counterVal + delay;

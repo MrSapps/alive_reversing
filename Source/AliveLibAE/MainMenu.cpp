@@ -16,7 +16,6 @@
 #include "MainMenuTransition.hpp"
 #include "Text.hpp"
 #include "../relive_lib/ObjectIds.hpp"
-#include "../relive_lib/Sound/Sound.hpp"
 #include "Abe.hpp"
 #include "PauseMenu.hpp"
 #include "GameEnderController.hpp"
@@ -2873,7 +2872,7 @@ MainMenuController::AfterMovieResult MainMenuController::UpdateAfterMovie()
                 gPsxDisplay.PutCurrentDispEnv();
                 gScreenManager->DecompressCameraToVRam(mMap.mCurrentCameras[0]->mCamRes);
                 gScreenManager->EnableRendering();
-                GetSoundAPI().mSND_Restart(mMap);
+                SND_Restart(mMap);
                 if (afterMovie == AfterMovie::eRestoreMenuSelectStartGame)
                 {
                     field_1FC_button_index = 1; // Select start game

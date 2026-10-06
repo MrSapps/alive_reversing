@@ -49,9 +49,8 @@ public:
     void UpdateVolumeState();
     void PlayMusic(MusicTypes typeToSet, const BaseGameObject* pObj, s16 bFlag4, s8 bFlag0x20);
 
+    // Changes music on a beat grid, as the PS1 does (see the .cpp)
     void UpdateMusic();
-    // -ps1_sound: the PS1's version, which changes music on a beat grid (see the .cpp)
-    void UpdateMusicPs1();
     void UpdateAmbiance();
 
     static void static_PlayMusic(MusicTypes typeToSet, const BaseGameObject* pObj, s16 bFlag4, s8 bFlag0x20);
@@ -88,4 +87,3 @@ private:
 };
 
 
-extern MusicController* gMusicController;

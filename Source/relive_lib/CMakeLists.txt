@@ -2,7 +2,6 @@ project(relive_lib VERSION 0.1 LANGUAGES CXX)
 
 SET(AliveLibSrcAO
    ../AliveLibAO/Midi.hpp
-   ../AliveLibAO/Midi.cpp
    ../AliveLibAO/Math.hpp
    ../AliveLibAO/Math.cpp
    ../AliveLibAO/StringFormatters.hpp
@@ -13,8 +12,6 @@ SET(AliveLibSrcAO
    ../AliveLibAO/PathDataExtensions.cpp
    ../AliveLibAO/Map.hpp
    ../AliveLibAO/Map.cpp
-   ../AliveLibAO/Sound.hpp
-   ../AliveLibAO/Sound.cpp
    ../AliveLibAO/SaveGame.hpp
    ../AliveLibAO/SaveGame.cpp
    ../AliveLibAO/QuikSave.hpp
@@ -396,24 +393,19 @@ SET(renderer_src
 )
 
 SET(sound_src
-    Sound/PsxSpuApi.cpp
     Sound/PsxSoundEngine.hpp
     Sound/PsxSoundEngine.cpp
     Sound/Ps1SoundData.hpp
     Sound/Ps1SoundData.cpp
     Sound/Libsnd.hpp
     Sound/Libsnd.cpp
-    Sound/PsxSpuApi.hpp
+    Sound/OpenSeqHandle.hpp
+    Sound/VabFile.hpp
+    Sound/VabFile.cpp
     Sound/Midi.cpp
     Sound/Midi.hpp
-    Sound/Sound.cpp
-    Sound/Sound.hpp
-    Sound/Reverb.hpp
-    Sound/Reverb.cpp
-    Sound/SoundSDL.hpp
-    Sound/SoundSDL.cpp
-    Sound/SDLSoundBuffer.hpp
-    Sound/SDLSoundBuffer.cpp
+    Sound/AudioStream.hpp
+    Sound/AudioStream.cpp
     Sound/SDLSoundSystem.hpp
     Sound/SDLSoundSystem.cpp
     Sound/SoundGold.hpp

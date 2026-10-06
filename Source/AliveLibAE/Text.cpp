@@ -5,7 +5,6 @@
 #include "../relive_lib/PsxDisplay.hpp"
 #include "Input.hpp"
 #include "../relive_lib/Sound/Midi.hpp"
-#include "../relive_lib/Sound/Sound.hpp"
 #include "GameAutoPlayer.hpp"
 #include "../relive_lib/ResourceManagerWrapper.hpp"
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
@@ -245,7 +244,7 @@ void FullScreenMessage::Close()
 {
     if (SND_Seq_Table_Valid())
     {
-        GetSoundAPI().mSND_Restart(mMap);
+        SND_Restart(mMap);
     }
 
     gDisplayRenderFrame = false;

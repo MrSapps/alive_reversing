@@ -8,7 +8,7 @@
 class FileSystem;
 
 // The PS1 games' own sound data (-ps1_data=<dir>), read straight from their LVL files (the same
-// container as the PC's), so -ps1_sound can play the PS1's VH, VB and SEQ files instead of the PC's.
+// container as the PC's), so -ps1_data can play the PS1's VH, VB and SEQ files instead of the PC's.
 // The PC's samples are the PS1 encoder's input, so they are close but not the same: the PS1's are
 // ADPCM (decoded here), some at lower rates, and a few tones' priorities, volumes and centres
 // differ. Comparing with the real PS1 needs the same data on both sides.

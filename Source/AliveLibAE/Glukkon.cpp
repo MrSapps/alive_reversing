@@ -23,13 +23,12 @@
 #include "../relive_lib/Movie.hpp"
 #include "DDCheat.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
-#include "../relive_lib/Sound/Sound.hpp"
+#include "../relive_lib/Sound/Midi.hpp"
 #include "MainMenu.hpp"
 #include "GameSpeak.hpp"
 #include "../relive_lib/GameObjects/Gibs.hpp"
 #include "../relive_lib/GameObjects/Blood.hpp"
 #include "Bullet.hpp"
-#include "../relive_lib/Sound/Midi.hpp"
 #include "../relive_lib/Grid.hpp"
 #include "../relive_lib/Camera.hpp"
 #include "Path.hpp"
@@ -1718,7 +1717,7 @@ s16 Glukkon::Brain_3_PlayerControlled()
             return Brain_3_PlayerControlled::eBrain3_AutoDepossessGlukkon6;
 
         case Brain_3_PlayerControlled::eBrain3_AutoDepossessGlukkon6:
-            GetSoundAPI().mSND_Restart(mMap);
+            SND_Restart(mMap);
             gScreenManager->EnableRendering();
             field_1D4_timer = MakeTimer(30);
             SfxPlayMono(relive::SoundEffects::PossessEffect, 0);

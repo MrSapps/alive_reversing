@@ -7,7 +7,6 @@
 #include "Engine.hpp"
 #include "Midi.hpp"
 #include "../relive_lib/Sound/Midi.hpp"
-#include "../relive_lib/Sound/PsxSpuApi.hpp"
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
 #include "Abe.hpp"
 #include "QuikSave.hpp"
@@ -690,7 +689,7 @@ void Map::NotifyObjectsOfScreenChange()
     {
         if (LevelChanged())
         {
-            SsUtAllKeyOff(0);
+            SND_AllKeyOff();
         }
 
         // TODO: Re-check this logic

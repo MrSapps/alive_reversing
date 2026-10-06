@@ -1,0 +1,30 @@
+t=0 load seqs=5 reverb=40
+t=0 vab 1 progs=6 vags=4
+t=0 tone vab=1 prog=0 tone=0 vag=0 keys=0-127 centre=60 shift=0 vol=100 prio=7 mode=0 adsr=0000,0000 pan=64
+t=0 tone vab=1 prog=1 tone=0 vag=1 keys=0-59 centre=48 shift=64 vol=100 prio=7 mode=0 adsr=3a8f,5fc5 pan=64
+t=0 tone vab=1 prog=1 tone=1 vag=2 keys=60-127 centre=72 shift=0 vol=90 prio=5 mode=0 adsr=7f00,1fdf pan=64
+t=0 tone vab=1 prog=2 tone=0 vag=2 keys=0-127 centre=60 shift=0 vol=100 prio=7 mode=4 adsr=2a4f,0006 pan=30
+t=0 tone vab=1 prog=4 tone=0 vag=0 keys=0-127 centre=60 shift=0 vol=80 prio=7 mode=0 adsr=0000,0000 pan=64
+t=0 tone vab=1 prog=5 tone=0 vag=3 keys=0-127 centre=60 shift=0 vol=100 prio=10 mode=0 adsr=00ff,1fc0 pan=64
+t=0 tone vab=1 prog=8 tone=0 vag=0 keys=0-127 centre=60 shift=0 vol=60 prio=7 mode=0 adsr=0000,0000 pan=64
+t=0 tone vab=1 prog=8 tone=1 vag=1 keys=0-127 centre=67 shift=0 vol=50 prio=7 mode=0 adsr=4a3f,3fd3 pan=64
+t=0 sample vab=1 idx=0 samples=6000 loop=0 loopstart=0 crc=0a947473
+t=0 sample vab=1 idx=1 samples=3000 loop=0 loopstart=0 crc=57fcd917
+t=0 sample vab=1 idx=2 samples=2205 loop=1 loopstart=0 crc=89daea41
+t=0 sample vab=1 idx=3 samples=1500 loop=0 loopstart=0 crc=3740e660
+t=0 seq 0 D1AMB.SEQ
+t=0 seq 1 D2AMB.SEQ
+t=0 seq 2 E1AMB.SEQ
+t=0 seq 3 E2AMB.SEQ
+t=0 seq 4 E2AMB2.SEQ
+t=0 play the fade
+t=30 spu0 phase=1 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1 seq=0 prog=2 note=60
+t=100 spu0 phase=3 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1 seq=0 prog=2 note=60
+t=510 spu0 phase=3 pitch=1000 vol=975,221 adsr=2a4f,0006 reverb=1 seq=0 prog=2 note=60
+t=1010 spu0 phase=3 pitch=1000 vol=0,0 adsr=2a4f,0006 reverb=1 seq=0 prog=2 note=60
+t=1250 stop and play again
+t=1270 spu0 off
+t=1390 spu0 phase=1 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1 seq=0 prog=2 note=60
+t=1460 spu0 phase=3 pitch=1000 vol=3903,885 adsr=2a4f,0006 reverb=1 seq=0 prog=2 note=60
+t=1600 stop
+t=1610 spu0 off
