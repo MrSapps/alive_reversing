@@ -1072,6 +1072,8 @@ private:
                 LOG_INFO("FMV playback %s: waiting for audio preroll samples=%u pending=%zu", mName.c_str(),
                     mAudioSamplesSubmitted, mPendingAudioChunks.size());
             }
+            // -dump_audio renders the audio a frame at a time, so the clock only moves if it's asked to
+            SDLSoundSystem::DumpFrame();
             return StepResult::eYield;
         }
 
@@ -1111,6 +1113,7 @@ private:
         if (syncOutcome == MovieFrameOutcome::Wait)
         {
             // Ahead of the movie clock, show it on a later tick
+            SDLSoundSystem::DumpFrame();
             return StepResult::eYield;
         }
 
