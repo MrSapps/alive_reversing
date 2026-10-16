@@ -50,7 +50,17 @@ public:
     virtual void VOnAbeInteraction();
     virtual void VOnThrowableHit(BaseGameObject* pFrom);
 
-    void SetTint(const TintEntry* pTintArray, EReliveLevelIds levelId);
+    // The tables end at the credits entry, not a terminator, so the size is what stops a level that
+    // isn't in the table from reading past the end. It gets the last entry.
+    template <size_t N>
+    void SetTint(const TintEntry (&tintTable)[N], EReliveLevelIds levelId)
+    {
+        SetTint(tintTable, N, levelId);
+    }
+    void SetTint(const TintEntry* pTintArray, size_t count, EReliveLevelIds levelId);
+    // For a table whose size isn't known here: it must end with an eNone entry, which a level that
+    // isn't in the table gets
+    void SetTintTerminated(const TintEntry* pTintArray, EReliveLevelIds levelId);
 
     // Note inlined in AO everywhere
     CameraPos Is_In_Current_Camera();

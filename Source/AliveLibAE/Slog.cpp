@@ -2706,7 +2706,7 @@ void Slog::Init()
     mListeningToSligId = Guid{};
     mTargetId = Guid{};
     mBoneId = Guid{};
-    SetTint(&sSlogTints_560A48[0], mMap.mCurrentLevel);
+    SetTint(sSlogTints_560A48, mMap.mCurrentLevel);
     GetAnimation().SetRenderLayer(Layer::eLayer_SlogFleech_34);
 
     if (GetSpriteScale() == FP_FromInteger(1))

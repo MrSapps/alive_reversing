@@ -359,14 +359,26 @@ PSX_RECT BaseAnimatedWithPhysicsGameObject::VGetBoundingRect()
     return rect;
 }
 
-void BaseAnimatedWithPhysicsGameObject::SetTint(const TintEntry* pTintArray, EReliveLevelIds level_id)
+void BaseAnimatedWithPhysicsGameObject::SetTint(const TintEntry* pTintArray, size_t count, EReliveLevelIds level_id)
 {
-    while (pTintArray->field_0_level != level_id)
+    const TintEntry* pEntry = pTintArray;
+    const TintEntry* pEnd = pTintArray + count;
+    while (pEntry->field_0_level != level_id && pEntry->field_0_level != EReliveLevelIds::eNone)
     {
-        if (pTintArray->field_0_level == level_id || pTintArray->field_0_level == EReliveLevelIds::eNone)
+        if (pEntry + 1 == pEnd)
         {
             break;
         }
+        pEntry++;
+    }
+
+    mRGB.SetRGB(pEntry->field_1_r, pEntry->field_2_g, pEntry->field_3_b);
+}
+
+void BaseAnimatedWithPhysicsGameObject::SetTintTerminated(const TintEntry* pTintArray, EReliveLevelIds level_id)
+{
+    while (pTintArray->field_0_level != level_id && pTintArray->field_0_level != EReliveLevelIds::eNone)
+    {
         pTintArray++;
     }
 

@@ -98,7 +98,7 @@ Paramite::Paramite(relive::Path_Paramite* pTlv, const Guid& tlvId, ResourceManag
     LoadAnimations();
     Animation_Init(GetAnimRes(AnimId::Paramite_Idle));
 
-    SetTint(&kParamiteTints_55D73C[0], mMap.mCurrentLevel);
+    SetTint(kParamiteTints_55D73C, mMap.mCurrentLevel);
 
     SetCanBePossessed(true);
     SetCanSetOffExplosives(true);

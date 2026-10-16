@@ -98,7 +98,7 @@ s16 BaseAliveGameObject::SetBaseAnimPaletteTint(const TintEntry* pTintArray, ERe
     // when we hit the end of the tint array
     if (GetGameType() == GameType::eAe)
     {
-        SetTint(pTintArray, level_id);
+        SetTintTerminated(pTintArray, level_id);
     }
     else
     {

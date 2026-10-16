@@ -96,7 +96,7 @@ CrawlingSlig::CrawlingSlig(relive::Path_CrawlingSlig* pTlv, const Guid& guid, Re
     LoadAnimations();
     Animation_Init(GetAnimRes(AnimId::CrawlingSlig_Idle));
 
-    SetTint(&kCrawlingSligTints[0], mMap.mCurrentLevel);
+    SetTint(kCrawlingSligTints, mMap.mCurrentLevel);
 
     SetCanBePossessed(true);
 

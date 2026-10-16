@@ -471,7 +471,7 @@ Abe::Abe(ResourceManagerWrapper& resMan, BaseMap& map) :
     SetCanSetOffExplosives(true);
 
     // Changes Abe's "default" colour depending on the level we are in
-    SetTint(&sAbeTintTable[0], mMap.mCurrentLevel);
+    SetTint(sAbeTintTable, mMap.mCurrentLevel);
 
     GetAnimation().SetSemiTrans(true);
     GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_0);

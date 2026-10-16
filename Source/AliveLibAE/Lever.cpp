@@ -62,7 +62,7 @@ Lever::Lever(relive::Path_Lever* pTlv, const Guid& tlvId, ResourceManagerWrapper
         SetScale(Scale::Fg);
     }
 
-    SetTint(&kLeverTints[0], mMap.mCurrentLevel);
+    SetTint(kLeverTints, mMap.mCurrentLevel);
     mXPos = FP_FromInteger((pTlv->mTopLeftX + pTlv->mBottomRightX) / 2);
     mXPos = FP_FromInteger(SnapToXGrid_AE(GetSpriteScale(), FP_GetExponent(mXPos)));
     mYPos = FP_FromInteger(pTlv->mTopLeftY);

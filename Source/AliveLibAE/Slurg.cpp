@@ -86,7 +86,7 @@ Slurg::Slurg(relive::Path_Slurg* pTlv, const Guid& tlvId, ResourceManagerWrapper
     mMovingTimer = pTlv->mMovingTimer;
     mRngForMovingTimer = pTlv->mMovingTimer;
 
-    SetTint(&sSlurgTints[0], mMap.mCurrentLevel);
+    SetTint(sSlurgTints, mMap.mCurrentLevel);
 
     FP hitX = {};
     FP hitY = {};

@@ -1508,7 +1508,7 @@ void Fleech::Init()
     mScrabOrParamite = Guid{};
     field_15E_lost_target_timer = 0;
 
-    SetTint(&kFleechTints_551844[0], mMap.mCurrentLevel);
+    SetTint(kFleechTints_551844, mMap.mCurrentLevel);
 
     if (GetSpriteScale() == FP_FromInteger(1))
     {

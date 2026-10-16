@@ -172,7 +172,7 @@ Scrab::Scrab(relive::Path_Scrab* pTlv, const Guid& tlvId, relive::Path_ScrabSpaw
         SetUpdateDelay(30);
     }
 
-    SetTint(&sScrabTints_560260[0], mMap.mCurrentLevel);
+    SetTint(sScrabTints_560260, mMap.mCurrentLevel);
 
     SetDoPurpleLightEffect(true);
 

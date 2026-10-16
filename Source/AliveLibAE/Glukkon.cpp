@@ -1961,7 +1961,7 @@ void Glukkon::Init()
 
     SetDrawable(true);
 
-    SetTint(&kGlukkonTints[0], mMap.mCurrentLevel);
+    SetTint(kGlukkonTints, mMap.mCurrentLevel);
     mXPos = FP_FromInteger((mTlvData.mTopLeftX + mTlvData.mBottomRightX) / 2);
     mYPos = FP_FromInteger(mTlvData.mTopLeftY);
 
