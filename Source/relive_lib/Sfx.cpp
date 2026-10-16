@@ -1247,16 +1247,22 @@ relive::SoundEffects relive::RandomSfx(relive::SoundEffects sfx1, relive::SoundE
     }
 }
 
-s32 relive::SFX_Play_Pitch(relive::SoundEffects sfxId, s32 volume, s32 pitch, FP scale)
+s32 relive::SfxPitchVolume(s32 defaultVolume, s32 volume, FP scale)
 {
     if (!volume)
     {
-        volume = relive::GetSfx(sfxId).mDefaultVolume;
+        volume = defaultVolume;
     }
     if (scale == FP_FromDouble(0.5))
     {
-        volume = 2 * relive::GetSfx(sfxId).mDefaultVolume / 3;
+        volume = 2 * volume / 3;
     }
+    return volume;
+}
+
+s32 relive::SFX_Play_Pitch(relive::SoundEffects sfxId, s32 volume, s32 pitch, FP scale)
+{
+    volume = relive::SfxPitchVolume(relive::GetSfx(sfxId).mDefaultVolume, volume, scale);
     return SFX_SfxDefinition_Play_Mono(relive::GetSfx(sfxId), volume, pitch, pitch);
 }
 

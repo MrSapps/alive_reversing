@@ -180,6 +180,10 @@ const SfxDefinition& GetSfx(SoundEffects sfx);
 // Randomly pick sfx1 or sfx2
 SoundEffects RandomSfx(SoundEffects sfx1, SoundEffects sfx2);
 
+// The volume SFX_Play_Pitch plays at: the volume it's given (0 is "not given": the sound's default),
+// scaled down for a half scale (background) object
+s32 SfxPitchVolume(s32 defaultVolume, s32 volume, FP scale);
+
 s32 SFX_Play_Pitch(relive::SoundEffects sfxId, s32 volume, s32 pitch, FP scale = FP_FromInteger(1));
 s32 SfxPlayMono(relive::SoundEffects sfxId, s32 volume, FP scale = FP_FromInteger(1));
 s32 SFX_Play_Stereo(relive::SoundEffects sfxId, s32 leftVol, s32 rightVol, FP scale = FP_FromInteger(1));
