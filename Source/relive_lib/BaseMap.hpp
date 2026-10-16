@@ -242,6 +242,8 @@ public:
     TlvIterator TLV_Get_At(TlvIterator pTlv, FP xpos, FP ypos, FP width, FP height);
     TlvIterator TLV_From_Offset_Lvl_Cam(const Guid& tlvId);
     void Reset_TLVs(u16 pathId);
+    // Every TLV of every loaded path is unspawned again, as if the paths were freshly loaded
+    void Reset_AllLoadedPathTLVs();
     TlvIterator Get_First_TLV_For_Offsetted_Camera(s16 cam_x_idx, s16 cam_y_idx);
 
     // --- Purple light / ambient sound ---

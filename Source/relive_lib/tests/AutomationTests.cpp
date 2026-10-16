@@ -28,12 +28,14 @@ TEST(Automation, ParsesEveryCommand)
         "screenshot out/shot.png\n"
         "dump_state out/state.json\n"
         "dump_objects out/objects.json\n"
+        "switch 100 1\n"
+        "expect_objects eSlamDoor 0\n"
         "quit\n";
 
     std::vector<Automation::Command> commands;
     std::string error;
     ASSERT_TRUE(Parse(script, commands, error)) << error;
-    ASSERT_EQ(commands.size(), 10u);
+    ASSERT_EQ(commands.size(), 12u);
 
     EXPECT_EQ(commands[0].mName, "timeout");
     EXPECT_EQ(commands[0].mLine, 2);
@@ -47,8 +49,8 @@ TEST(Automation, ParsesEveryCommand)
     EXPECT_EQ(commands[4].mLine, 6);
 
     EXPECT_EQ(commands[6].mArgs, (std::vector<std::string>{"out/shot.png"}));
-    EXPECT_EQ(commands[9].mName, "quit");
-    EXPECT_TRUE(commands[9].mArgs.empty());
+    EXPECT_EQ(commands[11].mName, "quit");
+    EXPECT_TRUE(commands[11].mArgs.empty());
 }
 
 TEST(Automation, EmptyScriptHasNoCommands)

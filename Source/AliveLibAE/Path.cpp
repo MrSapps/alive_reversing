@@ -195,14 +195,7 @@ void Path::Reset_TLVs(u16 pathId)
     BinaryPath* pPath = mMap.GetPathResourceBlockPtr(pathId);
     if (pPath)
     {
-        for (auto& cam : pPath->GetCameras())
-        {
-            for (auto& pTlv : cam->mTlvs.mTlvs)
-            {
-                pTlv->mTlvFlags.Clear(relive::TlvFlags::eBit1_Created);
-                pTlv->mTlvFlags.Clear(relive::TlvFlags::eBit2_Destroyed);
-            }
-        }
+        pPath->ClearSpawnedFlags();
     }
 }
 

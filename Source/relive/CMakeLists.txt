@@ -63,3 +63,12 @@ if (NOT WIN32)
     add_test(NAME relive_help COMMAND relive -help)
     set_tests_properties(relive_help PROPERTIES PASS_REGULAR_EXPRESSION "Usage: relive.*-record=<file>")
 endif()
+
+# Drives the real game with an -automation script. Needs converted AE game data: set
+# RELIVE_AE_DATA_DIR to it, otherwise the test passes without running anything.
+set(RELIVE_AE_DATA_DIR "$ENV{RELIVE_AE_DATA_DIR}" CACHE PATH "AE game data directory for the automation tests")
+add_test(NAME automation_restart_path_slam_door
+    COMMAND ${CMAKE_COMMAND}
+        -DRELIVE=$<TARGET_FILE:relive> -DDATA_DIR=${RELIVE_AE_DATA_DIR}
+        -DSCRIPT=${CMAKE_SOURCE_DIR}/Source/relive_lib/tests/automation/restart_path_slam_door.txt
+        -P ${CMAKE_SOURCE_DIR}/Source/relive_lib/tests/automation/run_automation.cmake)

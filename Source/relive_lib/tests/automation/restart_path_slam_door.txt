@@ -1,0 +1,28 @@
+# Mines path 1: open a slam door, restart the path from the pause menu, and the door is back
+# (closed, with its switch off again).
+timeout 120
+start mines 1 6
+wait_frames 40
+expect_objects eSlamDoor 1
+switch 100 1
+wait_frames 80
+expect_objects eSlamDoor 0
+hold pause 3
+wait_frames 20
+# Continue, Quiksave, Controls, Status, Save, Load, Restart Path
+hold down 3
+wait_frames 5
+hold down 3
+wait_frames 5
+hold down 3
+wait_frames 5
+hold down 3
+wait_frames 5
+hold down 3
+wait_frames 5
+hold down 3
+wait_frames 5
+hold confirm 3
+wait_frames 60
+expect_objects eSlamDoor 1
+quit

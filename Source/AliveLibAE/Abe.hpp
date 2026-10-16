@@ -320,6 +320,12 @@ class Bullet;
 class Abe final : public BaseAbe
 {
 public:
+    // Saves the quicksave and the restart path state on the next update, as a continue point does
+    void RequestQuicksave()
+    {
+        mDoQuicksave = true;
+    }
+
     // Pends everything a new Abe needs, which the menus wait for before making him
     static void PendResources(ResourceManagerWrapper& resMan);
 

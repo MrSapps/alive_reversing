@@ -309,6 +309,14 @@ void BaseMap::Reset_TLVs(u16 pathId)
     GetPath().Reset_TLVs(pathId);
 }
 
+void BaseMap::Reset_AllLoadedPathTLVs()
+{
+    for (auto& binaryPath : mLoadedPaths)
+    {
+        binaryPath->ClearSpawnedFlags();
+    }
+}
+
 void BaseMap::Get_map_size(PSX_Point* pPoint)
 {
     *pPoint = GetPath().VGetMapSize();

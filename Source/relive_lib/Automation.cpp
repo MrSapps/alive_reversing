@@ -3,6 +3,7 @@
 #include "Engine.hpp"
 #include "GameType.hpp"
 #include "SoundDebug.hpp"
+#include "SwitchStates.hpp"
 #include "Movie.hpp"
 #include "ResourceManagerWrapper.hpp"
 #include "logger.hpp"
@@ -355,6 +356,16 @@ static bool CheckCommand(const Automation::Command& command, std::string& error)
         return expectArgs(2, "hold <buttons> <frames>") && Automation::ParseButtons(command.mArgs[0], bits, error) && expectNumber(command.mArgs[1], 1);
     }
 
+    if (name == "switch")
+    {
+        return expectArgs(2, "switch <id> <0|1>") && expectNumber(command.mArgs[0], 0) && expectNumber(command.mArgs[1], 0);
+    }
+
+    if (name == "expect_objects")
+    {
+        return expectArgs(2, "expect_objects <type> <count>") && expectNumber(command.mArgs[1], 0);
+    }
+
     if (name == "screenshot")
     {
         return expectArgs(1, "screenshot <file.png>");
@@ -512,6 +523,7 @@ bool Automation::ParseButtons(const std::string& buttons, u32& bits, std::string
         {"speak8", InputCommands::eGameSpeak8},
         {"chant", InputCommands::eChant},
         {"pause", InputCommands::ePause},
+        {"confirm", InputCommands::eUnPause_OrConfirm},
         {"back", InputCommands::eBack},
         {"cheat", InputCommands::eCheatMode},
     };
@@ -620,6 +632,38 @@ bool Automation::RunCommand(const Command& command, BaseMap& map, bool betweenFr
             return true;
         }
         return false;
+    }
+
+    if (name == "switch")
+    {
+        if (!betweenFrames)
+        {
+            return false;
+        }
+        SwitchStates_Set(static_cast<u16>(std::stoi(args[0])), static_cast<s8>(std::stoi(args[1])));
+        return true;
+    }
+
+    if (name == "expect_objects")
+    {
+        s32 count = 0;
+        for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
+        {
+            BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
+            if (!pObj)
+            {
+                break;
+            }
+            if (!pObj->GetDead() && args[0] == TypeName(pObj->Type()))
+            {
+                count++;
+            }
+        }
+        if (count != std::stoi(args[1]))
+        {
+            Fail(command, "expected " + args[1] + " " + args[0] + ", found " + std::to_string(count));
+        }
+        return true;
     }
 
     if (name == "screenshot")
@@ -756,6 +800,8 @@ bool Automation::Start(const Command& command, BaseMap& map, bool betweenFrames)
     if (isAe)
     {
         QuikSave::DoQuicksave(map);
+        // Like touching a continue point, which also saves what restart path goes back to
+        gAbe->RequestQuicksave();
     }
     else
     {

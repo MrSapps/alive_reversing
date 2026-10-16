@@ -182,6 +182,10 @@ public:
 
     TlvIterator TlvById(const Guid& id);
 
+    // Makes every TLV spawnable again, as when the path was freshly loaded: objects that removed
+    // themselves for good (a slam door that opened) leave theirs flagged as spawned
+    void ClearSpawnedFlags();
+
     TlvIterator TlvsForCamera(s32 x, s32 y)
     {
         for (auto& cam : mCameras)

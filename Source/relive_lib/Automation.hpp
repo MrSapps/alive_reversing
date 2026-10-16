@@ -27,7 +27,12 @@ class ResourceManagerWrapper;
 //       Hold these buttons down on pad 1 for that many frames, then release them. Buttons are
 //       joined with +, e.g. hold left+run 20. Names: up, down, left, right, run, action, sneak,
 //       throw, hop, roll (AO) or fart (AE), speak1-speak8 (AE's 1-8 or AO's 4), chant,
-//       pause, back, cheat.
+//       pause, confirm (the menus' OK), back, cheat.
+//   switch <id> <0|1>
+//       Set a switch state, as a lever would.
+//   expect_objects <type> <count>
+//       Fail unless exactly that many live objects have that type name (as dump_objects shows it,
+//       e.g. eSlamDoor).
 //   screenshot <file.png>
 //       The next frame's 640x240 framebuffer, before it's scaled to the window.
 //   dump_state <file.json>

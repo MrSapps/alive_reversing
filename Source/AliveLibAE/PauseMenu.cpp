@@ -409,6 +409,10 @@ void PauseMenu::RestartPath()
 {
     DestroyObjects();
 
+    // Objects that removed themselves for good (e.g. an opened slam door) leave their TLV flagged
+    // as spawned, so unflag them or they won't come back. The paths were once reloaded here
+    mMap.Reset_AllLoadedPathTLVs();
+
     gSwitchStates = QuikSave::gActiveQuicksaveData.mRestartPathSwitchStates;
 
     Abe::CreateFromSaveState(QuikSave::gActiveQuicksaveData.mRestartPathAbeState, mResMan, mMap);

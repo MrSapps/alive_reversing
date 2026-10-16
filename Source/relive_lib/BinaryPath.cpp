@@ -270,3 +270,15 @@ relive::Path_TLV* TlvIterator::GetTlvCheckedImpl(ReliveTypes expectedType)
     }
     return mTlv;
 }
+
+void BinaryPath::ClearSpawnedFlags()
+{
+    for (auto& cam : mCameras)
+    {
+        for (auto& pTlv : cam->mTlvs.mTlvs)
+        {
+            pTlv->mTlvFlags.Clear(relive::TlvFlags::eBit1_Created);
+            pTlv->mTlvFlags.Clear(relive::TlvFlags::eBit2_Destroyed);
+        }
+    }
+}
