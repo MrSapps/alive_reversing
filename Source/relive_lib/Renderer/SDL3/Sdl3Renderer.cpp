@@ -424,10 +424,11 @@ void Sdl3Renderer::SetClip(const Prim_ScissorRect& clipper)
     f32 factorW = static_cast<f32>(GetActiveFbTexture().GetWidth()) / kPsxFramebufferWidth;
     f32 factorH = static_cast<f32>(GetActiveFbTexture().GetHeight()) / kPsxFramebufferHeight;
 
-    rect.x = static_cast<s32>(clipper.mRect.x * factorW);
-    rect.y = static_cast<s32>(clipper.mRect.y * factorH);
-    rect.w = static_cast<s32>(clipper.mRect.w * factorW);
-    rect.h = static_cast<s32>(clipper.mRect.h * factorH);
+    // Scale the edges, not the size, so the right and bottom edges land where the vertices do
+    rect.x = static_cast<s32>(std::floor(clipper.mRect.x * factorW));
+    rect.y = static_cast<s32>(std::floor(clipper.mRect.y * factorH));
+    rect.w = static_cast<s32>(std::ceil((clipper.mRect.x + clipper.mRect.w) * factorW)) - rect.x;
+    rect.h = static_cast<s32>(std::ceil((clipper.mRect.y + clipper.mRect.h) * factorH)) - rect.y;
 
     mClipEnabled = !IRenderer::IsScissorDisabled(clipper);
     mClipRect = rect;
@@ -584,7 +585,7 @@ std::shared_ptr<Sdl3Texture> Sdl3Renderer::PrepareTextureFromPoly(const Poly_FT4
 
             if (camRefTex)
             {
-                std::shared_ptr<Sdl3Texture> fg1Tex = Sdl3Texture::FromMask(mContext, camRefTex, poly.mFg1->mImage.mPixels->data());
+                std::shared_ptr<Sdl3Texture> fg1Tex = Sdl3Texture::FromMask(mContext, camRefTex, poly.mFg1->mImage.mPixels->data(), poly.mFg1->mImage.mWidth, poly.mFg1->mImage.mHeight);
 
                 texture = mTextureCache.Add(poly.mFg1->mUniqueId.Id(), kCamTextureLifetime, fg1Tex);
 
@@ -647,7 +648,7 @@ SDL_FPoint Sdl3Renderer::PointToViewport(const SDL_FPoint& point)
 
 void Sdl3Renderer::ScaleVertices(SDL_Vertex vertices[], s32 numVertices)
 {
-    for (u8 i = 0; i < numVertices; i++)
+    for (s32 i = 0; i < numVertices; i++)
     {
         vertices[i].position = PointToViewport(vertices[i].position);
     }

@@ -10,7 +10,7 @@ class Sdl3Texture final
 public:
     Sdl3Texture(Sdl3Context& context, u32 width, u32 height, SDL_PixelFormat format, SDL_TextureAccess access);
 
-    static std::shared_ptr<Sdl3Texture> FromMask(Sdl3Context& context, std::shared_ptr<Sdl3Texture> srcTex, const u8* maskPixels);
+    static std::shared_ptr<Sdl3Texture> FromMask(Sdl3Context& context, std::shared_ptr<Sdl3Texture> srcTex, const u8* maskPixels, u32 maskWidth, u32 maskHeight);
 
     u32 GetHeight();
     u32 GetWidth();

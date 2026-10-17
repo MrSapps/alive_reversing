@@ -23,7 +23,7 @@ Sdl3Texture::Sdl3Texture(Sdl3Context& context, u32 width, u32 height, SDL_PixelF
     }
 }
 
-std::shared_ptr<Sdl3Texture> Sdl3Texture::FromMask(Sdl3Context& context, std::shared_ptr<Sdl3Texture> srcTex, const u8* maskPixels)
+std::shared_ptr<Sdl3Texture> Sdl3Texture::FromMask(Sdl3Context& context, std::shared_ptr<Sdl3Texture> srcTex, const u8* maskPixels, u32 maskWidth, u32 maskHeight)
 {
     auto resultTex = std::make_shared<Sdl3Texture>(context, srcTex->mWidth, srcTex->mHeight, srcTex->mFormat, SDL_TEXTUREACCESS_TARGET);
 
@@ -34,21 +34,18 @@ std::shared_ptr<Sdl3Texture> Sdl3Texture::FromMask(Sdl3Context& context, std::sh
 
     SDL_LockTexture(maskTex.get(), NULL, (void**) &texPixels, &pitch);
 
-    for (s32 i = 0; i < pitch * static_cast<s32>(srcTex->mHeight); i += 4)
+    // The mask is the size of the original cam, an HD cam texture can be bigger, so each pixel
+    // reads the mask pixel at the same place
+    for (u32 y = 0; y < srcTex->mHeight; y++)
     {
-        s32 r = i;
-        s32 g = i + 1;
-        s32 b = i + 2;
-        s32 a = i + 3;
+        const u32 maskY = static_cast<u32>(static_cast<u64>(y) * maskHeight / srcTex->mHeight);
+        for (u32 x = 0; x < srcTex->mWidth; x++)
+        {
+            const u32 maskX = static_cast<u32>(static_cast<u64>(x) * maskWidth / srcTex->mWidth);
+            const u8* pMask = &maskPixels[(maskY * maskWidth + maskX) * 4];
 
-        // Mask out black pixels
-        if (maskPixels[r] == 0 && maskPixels[g] == 0 && maskPixels[b] == 0)
-        {
-            texPixels[a] = 0;
-        }
-        else
-        {
-            texPixels[a] = 255;
+            // Mask out black pixels
+            texPixels[y * pitch + x * 4 + 3] = (pMask[0] == 0 && pMask[1] == 0 && pMask[2] == 0) ? 0 : 255;
         }
     }
 
