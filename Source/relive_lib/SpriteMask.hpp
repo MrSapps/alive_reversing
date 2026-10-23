@@ -8,7 +8,9 @@
 // semi-transparent sprite alpha 255 is solid: only the pixels below it blend, by their alpha.
 // What else the PSX kept in the sprite's palette entries is in the mask:
 //
-// - R: not used
+// - R: where the pixel's palette entry was in the sprite's palette, 1 to 255 (the entry's index
+//   scaled so the last entry is 255), 0 if it isn't known. The electrocution covers the sprite in
+//   this order, as the original overwrote the palette; a pixel without it goes by its brightness
 // - G: how much the pixel glows, 0 to 255: the sprite's tint (the light it is in) changes it by
 //   the rest (the eyes of the Sligs and Glukkons are 255, an HD sheet can fall off towards the edge)
 // - B: the invisibility effect leaves the pixel alone (the first palette entries, which the
@@ -21,9 +23,9 @@ namespace SpriteMask
 constexpr u8 kGlow = 1 << 1;
 constexpr u8 kKeepVisible = 1 << 2;
 
-inline void Set(u8* pTexel, u8 flags)
+inline void Set(u8* pTexel, u8 flags, u8 paletteRank = 0)
 {
-    pTexel[0] = 0;
+    pTexel[0] = paletteRank;
     pTexel[1] = (flags & kGlow) ? 255 : 0;
     pTexel[2] = (flags & kKeepVisible) ? 255 : 0;
     pTexel[3] = 255;
@@ -40,19 +42,25 @@ inline u8 Glow(const u8* pTexel)
     return pTexel[1];
 }
 
-// The pixel as the renderers use it: the glow in the low byte, 256 if the invisibility leaves it alone
-inline u16 Pack(const u8* pTexel)
+// The pixel as the renderers use it: the glow in the low byte, 256 if the invisibility leaves it
+// alone, the palette rank above that
+inline u32 Pack(const u8* pTexel)
 {
-    return static_cast<u16>(pTexel[1] | (pTexel[2] >= 128 ? 256 : 0));
+    return static_cast<u32>(pTexel[1]) | (pTexel[2] >= 128 ? 256u : 0u) | (static_cast<u32>(pTexel[0]) << 16);
 }
 
-inline u8 PackedGlow(u16 packed)
+inline u8 PackedGlow(u32 packed)
 {
     return static_cast<u8>(packed & 0xFF);
 }
 
-inline bool PackedKeepVisible(u16 packed)
+inline bool PackedKeepVisible(u32 packed)
 {
     return (packed & 256) != 0;
+}
+
+inline u8 PackedPaletteRank(u32 packed)
+{
+    return static_cast<u8>((packed >> 16) & 0xFF);
 }
 } // namespace SpriteMask

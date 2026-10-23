@@ -22,7 +22,7 @@ are per pixel:
 
 | channel | meaning |
 |---|---|
-| R | not used |
+| R | **palette rank**, 1 to 255: where the pixel's palette entry was in the sprite's palette (its index scaled so the last entry is 255), 0 if unknown. The electrocution goes in this order |
 | G | **glow**, 0 to 255: how much the sprite's tint doesn't change the pixel (the Sligs' and Glukkons' eyes are 255, an HD sheet can fall off towards the edge) |
 | B | **keep visible**: the invisibility effect leaves it alone (palette entries 1 to 7, which the original's fade never touched) |
 
@@ -72,8 +72,8 @@ once, a group stays together on as few pages as it can, small groups share one.
   `ResourceManagerWrapper::LoadSheetPage`. An animation without a packed json is used from its
   sheet: a mod or HD pack's animation, and a sheet that doesn't fit on a page.
 
-- The brightness ranks for the sweeps (`luma`) are in the json's attributes, as the sheet is a page
-  now. A sheet of its own has it worked out as it loads.
+- The converted sheets have no `luma`: the sweeps use the palette rank in their masks. A sheet of
+  its own without R has the brightness ranks worked out as it loads.
 - The **page size depends on the GPU**: a page has its mask under it in the same texture, so
   it can be half the biggest texture at most, and it is never more than 2048
   (`DataVersions::SpritePageSizeFor`, 512 at least). `data_version.json` has `sprite_page_size`,
@@ -117,11 +117,13 @@ aren't a tint of the sprite's are approximate.
 
 `PalleteOverwriter` keeps the original's timing exactly: 8 palette entries a step from entry 1,
 over the sprite's real palette depth (the animation's json has `palette_depth`: 16, 64 or 256).
-Its progress is how far through the entries it is. A pixel is covered when its **rank** among the
-sprite's colours is at most that, the rank going by brightness: the original went in palette order,
-which a true colour sprite doesn't have. `SpriteFx::ComputeLuma` works out the brightness at 32
-evenly spaced ranks of the sheet's colours (5 bit colours, so as many as the palette had), so the
-sweep goes at an even pace whatever the sprite looks like. Everything else is as `master`
+Its progress is how far through the entries it is. A pixel is covered when its **rank** is at most
+that. For a converted sprite the rank is the pixel's palette entry, which the conversion writes in
+the mask's R channel, so the sweep goes over the sprite exactly as the original's did. A pixel with
+no R (a mod's or an HD sheet, which has no palette) goes by brightness instead:
+`SpriteFx::ComputeLuma` works out the brightness at 32 evenly spaced ranks of the sheet's colours
+(worked out as the sheet loads, or from `luma` in the json if it has one), so the sweep goes at an
+even pace whatever the sprite looks like. A modder can paint R to choose the order. Everything else is as `master`
 describes: AE's overwriters all go at once (only the last colour is seen), AO's are on the update
 list so the delays work and the white, blue and black bands trail each other, the restore and
 damage order, which targets are restored.

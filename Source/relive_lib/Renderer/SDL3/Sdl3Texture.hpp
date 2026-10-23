@@ -56,7 +56,7 @@ public:
 
 private:
     // A texel as it is drawn, see the GLSL draw_default_ft4 and handle_final_color
-    static RGBA32 ConvertTexel(const RGBA32& texel, u16 mask, const SpriteFx& fx, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode);
+    static RGBA32 ConvertTexel(const RGBA32& texel, u32 mask, const SpriteFx& fx, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode);
     SdlTexturePtr MakeVariant(const SpriteFx& fx, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode, const SpriteRect& rect);
 
 private:
