@@ -81,7 +81,6 @@ void CrawlingSlig::LoadAnimations()
 
 CrawlingSlig::CrawlingSlig(relive::Path_CrawlingSlig* pTlv, const Guid& guid, ResourceManagerWrapper& resMan, BaseMap& map)
     : BaseAliveGameObject(2, resMan, map),
-    field_11C_mPal(std::make_shared<AnimationPal>()),
     mGuid(guid),
     mTlv(*pTlv),
     mSleepingBrain(*this),
@@ -165,8 +164,7 @@ CrawlingSlig::CrawlingSlig(relive::Path_CrawlingSlig* pTlv, const Guid& guid, Re
 
 void CrawlingSlig::VRender(OrderingTable& ot)
 {
-    const s16 eyeIndices[] = {60, 62};
-    renderWithGlowingEyes(ot, this, field_11C_mPal, 64, field_1A4_r, field_1A6_g, field_1A8_b, &eyeIndices[0], ALIVE_COUNTOF(eyeIndices));
+    renderWithGlowingEyes(ot, this);
 }
 
 void CrawlingSlig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)

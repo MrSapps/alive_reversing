@@ -238,7 +238,7 @@ void LCDScreen::VUpdate()
                 mActiveMessage = gLCDMessages.GetMessage(mMap.mCurrentLevel, mMap.mCurrentPath, Math_RandomRange(mMessageRandMinId, mMessageRandMaxId));
 
                 // Change pal
-                mFont.mFontContext->mFntResource.mCurPal = mPal2.mPal;
+                mFont.mFontContext->UseFontSheet(mPal2);
             }
             else
             {
@@ -253,7 +253,7 @@ void LCDScreen::VUpdate()
                 }
 
                 // Change pal
-                mFont.mFontContext->mFntResource.mCurPal = mPal1.mPal;
+                mFont.mFontContext->UseFontSheet(mPal1);
             }
 
             String_FormatString(mActiveMessage, mMessageBuffer, 1);
@@ -396,6 +396,7 @@ void LCDScreen::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManag
         pScreen->mActiveMessage = pScreen->mMessageBuffer + pState->mActiveMessageOffset;
         pScreen->mMessageCutoffPtr = nullptr;
 
-        pScreen->mFont.mFontContext->mFntResource.mCurPal = pScreen->mShowRandomMessage ? pScreen->mPal1.mPal : pScreen->mPal2.mPal;
+        // Unlike AO, true here means message 1/2 is showing (VUpdate clears it for the random message)
+        pScreen->mFont.mFontContext->UseFontSheet(pScreen->mShowRandomMessage ? pScreen->mPal1 : pScreen->mPal2);
     }
 }

@@ -315,15 +315,13 @@ void Animation::Invoke_CallBacks()
 
 s16 Animation::Set_Animation_Data(AnimResource& pAnimRes)
 {
-    auto oldPal = mAnimRes.mCurPal;
+    const SpriteFx oldFx = mAnimRes.mFx;
 
     mAnimRes = pAnimRes;
 
-    // Keep the custom pal that was set
-    if (oldPal)
-    {
-        mAnimRes.mCurPal = oldPal;
-    }
+    // Keep the custom pal and effects that were set: the palette of the original sprite stayed
+    // when its animation changed
+    mAnimRes.mFx = oldFx;
 
     mFrameDelay = pAnimRes.mJsonPtr->mAttributes.mFrameRate;
 
@@ -470,22 +468,21 @@ u32 Animation::MaxHeight()
     return static_cast<u32>(mAnimRes.mJsonPtr->mAttributes.mMaxHeight);
 }
 
-void Animation::LoadPal(std::shared_ptr<AnimationPal>& pal)
-{
-    // Override the pal with another one
-    mAnimRes.mCurPal = pal;
-}
-
 void Animation::LoadPal(const PalResource& pal)
 {
-    // Override the pal with another one
-    mAnimRes.mCurPal = pal.mPal;
+    // Another palette for the sprite: its colours change to the palette's
+    mAnimRes.mFx.SetMatrix(pal.mFx.mMatrix);
 }
 
 void Animation::ReloadPal()
 {
-    // Put the original pal back
-    mAnimRes.mCurPal = mAnimRes.mPngPtr->mPal;
+    // Put the original colours back, and take the effects off
+    mAnimRes.mFx = SpriteFx{};
+}
+
+u32 Animation::PaletteDepth() const
+{
+    return mAnimRes.mJsonPtr->mAttributes.mPaletteDepth;
 }
 
 void Animation::Get_Frame_Offset(s16* pBoundingX, s16* pBoundingY)

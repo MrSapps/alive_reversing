@@ -1,5 +1,6 @@
 #pragma once
 
+#include "GameType.hpp"
 #include <string>
 #include <vector>
 
@@ -35,6 +36,10 @@ public:
     }    
     void EnumerateMods(const std::string& baseDataDirPath);
     const Mod* FindByDirOrModName(const std::string& name) const;
+
+    // The data directory of the mod the command line asked for (by its directory or name), and the
+    // name it is shown with. Fatal if there is no such mod, or it is for the other game.
+    static std::string ActiveModPath(FileSystem& fs, const std::string& modName, GameType gameType, std::string& displayName);
 private:
     std::vector<Mod> mEnumeratedMods;
     FileSystem& mFs;

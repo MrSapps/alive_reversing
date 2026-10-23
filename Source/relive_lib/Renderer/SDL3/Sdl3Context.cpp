@@ -2,7 +2,121 @@
 #include "../../Window.hpp"
 #include "../../FatalError.hpp"
 
+// The textures that are waiting to be reused. A texture goes back here when its SdlTexturePtr is
+// let go of, and the pool is shared so that a texture that outlives the context's members still
+// has somewhere to go.
+struct SdlTexturePoolState final
+{
+    // Like the OpenGL renderer's pool
+    static constexpr std::size_t kMaxPooledBytes = 96 * 1024 * 1024;
+
+    struct Entry final
+    {
+        SDL_Texture* mTexture = nullptr;
+        SDL_PixelFormat mFormat = SDL_PIXELFORMAT_UNKNOWN;
+        SDL_TextureAccess mAccess = SDL_TEXTUREACCESS_STATIC;
+        u32 mWidth = 0;
+        u32 mHeight = 0;
+        std::size_t mBytes = 0;
+        // The frame it was let go of in: SDL has to draw what is queued with a texture before
+        // the texture changes, so it isn't reused until the next frame
+        u32 mFrame = 0;
+    };
+
+    ~SdlTexturePoolState()
+    {
+        Clear();
+    }
+
+    void Clear()
+    {
+        for (const Entry& entry : mFree)
+        {
+            SDL_DestroyTexture(entry.mTexture);
+        }
+        mFree.clear();
+        mFreeBytes = 0;
+    }
+
+    void Give(SDL_Texture* pTexture)
+    {
+        if (!pTexture)
+        {
+            return;
+        }
+
+        if (mClosed)
+        {
+            SDL_DestroyTexture(pTexture);
+            return;
+        }
+
+        const SDL_PropertiesID props = SDL_GetTextureProperties(pTexture);
+        Entry entry;
+        entry.mTexture = pTexture;
+        entry.mFormat = static_cast<SDL_PixelFormat>(SDL_GetNumberProperty(props, SDL_PROP_TEXTURE_FORMAT_NUMBER, SDL_PIXELFORMAT_UNKNOWN));
+        entry.mAccess = static_cast<SDL_TextureAccess>(SDL_GetNumberProperty(props, SDL_PROP_TEXTURE_ACCESS_NUMBER, SDL_TEXTUREACCESS_STATIC));
+        entry.mWidth = static_cast<u32>(SDL_GetNumberProperty(props, SDL_PROP_TEXTURE_WIDTH_NUMBER, 0));
+        entry.mHeight = static_cast<u32>(SDL_GetNumberProperty(props, SDL_PROP_TEXTURE_HEIGHT_NUMBER, 0));
+        entry.mBytes = static_cast<std::size_t>(entry.mWidth) * entry.mHeight * SDL_BYTESPERPIXEL(entry.mFormat);
+        entry.mFrame = mFrame;
+
+        mFree.push_back(entry);
+        mFreeBytes += entry.mBytes;
+
+        // The ones let go of longest ago are given up first
+        while (mFreeBytes > kMaxPooledBytes && !mFree.empty())
+        {
+            mFreeBytes -= mFree.front().mBytes;
+            SDL_DestroyTexture(mFree.front().mTexture);
+            mFree.erase(mFree.begin());
+        }
+    }
+
+    SDL_Texture* Take(SDL_PixelFormat format, SDL_TextureAccess access, u32 width, u32 height)
+    {
+        for (std::size_t i = mFree.size(); i-- > 0;)
+        {
+            const Entry& entry = mFree[i];
+            if (entry.mFormat == format && entry.mAccess == access && entry.mWidth == width && entry.mHeight == height && entry.mFrame != mFrame)
+            {
+                SDL_Texture* pTexture = entry.mTexture;
+                mFreeBytes -= entry.mBytes;
+                mFree.erase(mFree.begin() + static_cast<std::ptrdiff_t>(i));
+                mReuseCount++;
+
+                // What a new texture has: SDL blends the ones with an alpha channel
+                SDL_SetTextureBlendMode(pTexture, SDL_ISPIXELFORMAT_ALPHA(format) ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
+                SDL_SetTextureColorMod(pTexture, 255, 255, 255);
+                SDL_SetTextureAlphaMod(pTexture, 255);
+                return pTexture;
+            }
+        }
+        return nullptr;
+    }
+
+    std::vector<Entry> mFree;
+    std::size_t mFreeBytes = 0;
+    u32 mFrame = 0;
+    u32 mReuseCount = 0;
+    // The renderer is gone: textures are destroyed, not kept
+    bool mClosed = false;
+};
+
+void SdlTextureDeleter::operator()(SDL_Texture* pTexture) const
+{
+    if (mPool)
+    {
+        mPool->Give(pTexture);
+    }
+    else
+    {
+        SDL_DestroyTexture(pTexture);
+    }
+}
+
 Sdl3Context::Sdl3Context(Window& window, bool checks)
+    : mPool(std::make_shared<SdlTexturePoolState>())
 {
     if (checks)
     {
@@ -19,19 +133,33 @@ Sdl3Context::Sdl3Context(Window& window, bool checks)
 
     LOG_INFO("SDL3 renderer name: %s", SDL_GetRendererName(mRenderer.get()));
 
-    const SDL_PixelFormat* pFormats = static_cast<const SDL_PixelFormat*>(
-        SDL_GetPointerProperty(SDL_GetRendererProperties(mRenderer.get()), SDL_PROP_RENDERER_TEXTURE_FORMATS_POINTER, nullptr));
-    for (; pFormats && *pFormats != SDL_PIXELFORMAT_UNKNOWN; pFormats++)
-    {
-        if (*pFormats == SDL_PIXELFORMAT_INDEX8)
-        {
-            mSupportsPaletteTextures = true;
-        }
-    }
-    LOG_INFO("SDL3 renderer palette textures: %s", mSupportsPaletteTextures ? "yes" : "no");
-
     mSupportsBrightVertexColours = ProbeBrightVertexColours();
     LOG_INFO("SDL3 renderer vertex colours above 1: %s", mSupportsBrightVertexColours ? "yes" : "no");
+}
+
+Sdl3Context::~Sdl3Context()
+{
+    LOG_INFO("SDL3 texture pool: %u textures reused, %u waiting", mPool->mReuseCount, static_cast<u32>(mPool->mFree.size()));
+
+    // The textures have to go before the renderer they belong to
+    mPool->Clear();
+    mPool->mClosed = true;
+}
+
+void Sdl3Context::NextFrame()
+{
+    mFrameNumber++;
+    mPool->mFrame = mFrameNumber;
+}
+
+u32 Sdl3Context::PooledTextureCount() const
+{
+    return static_cast<u32>(mPool->mFree.size());
+}
+
+u32 Sdl3Context::ReusedTextureCount() const
+{
+    return mPool->mReuseCount;
 }
 
 // Draws a dark grey texel with vertex colour 2 and checks it comes out twice as bright. SDL passes
@@ -76,7 +204,7 @@ bool Sdl3Context::ProbeBrightVertexColours()
     return supported;
 }
 
-SDL_Renderer* Sdl3Context::GetRenderer()
+SDL_Renderer* Sdl3Context::GetRenderer() const
 {
     return mRenderer.get();
 }
@@ -89,7 +217,12 @@ bool Sdl3Context::IsRenderTargetSupported()
 
 SdlTexturePtr Sdl3Context::CreateTexture(SDL_PixelFormat format, SDL_TextureAccess access, u32 width, u32 height)
 {
-    SdlTexturePtr texture(SDL_CreateTexture(mRenderer.get(), format, access, width, height));
+    if (SDL_Texture* pPooled = mPool->Take(format, access, width, height))
+    {
+        return SdlTexturePtr(pPooled, SdlTextureDeleter{mPool});
+    }
+
+    SdlTexturePtr texture(SDL_CreateTexture(mRenderer.get(), format, access, width, height), SdlTextureDeleter{mPool});
     if (!texture)
     {
         ALIVE_FATAL("SDL_CreateTexture(%ux%u) failed: %s", width, height, SDL_GetError());
@@ -148,7 +281,7 @@ SDL_BlendMode Sdl3Context::SubtractBlendMode()
 
 SDL_BlendMode Sdl3Context::PsxTextureBlendMode()
 {
-    // src + dst * src alpha: see Sdl3Texture::GetTextureUsePalette for what alpha is set to
+    // src + dst * src alpha: see Sdl3Texture::ConvertTexel for what alpha is set to
     return SDL_ComposeCustomBlendMode(
         SDL_BLENDFACTOR_ONE,
         SDL_BLENDFACTOR_SRC_ALPHA,
@@ -227,37 +360,4 @@ void Sdl3Context::SetTextureBlendMode(SDL_Texture* texture, SDL_BlendMode blendM
     {
         ALIVE_FATAL("SDL_SetTextureBlendMode(0x%x) failed: %s", blendMode, SDL_GetError());
     }
-}
-
-SDL_Palette* Sdl3Context::SharedPalette(const PaletteKey& key, const SDL_Color (&colours)[256])
-{
-    // Textures hold their own reference to their palette, so dropping one from here is safe
-    constexpr std::size_t kMaxSharedPalettes = 512;
-
-    auto it = mSharedPalettes.find(key);
-    if (it == mSharedPalettes.end())
-    {
-        if (mSharedPalettes.size() >= kMaxSharedPalettes)
-        {
-            auto leastRecent = mSharedPalettes.begin();
-            for (auto i = mSharedPalettes.begin(); i != mSharedPalettes.end(); ++i)
-            {
-                if (i->second.mLastUsed < leastRecent->second.mLastUsed)
-                {
-                    leastRecent = i;
-                }
-            }
-            mSharedPalettes.erase(leastRecent);
-        }
-
-        SdlPalettePtr palette(SDL_CreatePalette(256));
-        if (!palette || !SDL_SetPaletteColors(palette.get(), colours, 0, 256))
-        {
-            ALIVE_FATAL("Creating an SDL palette failed: %s", SDL_GetError());
-        }
-        it = mSharedPalettes.emplace(key, SharedPaletteEntry{std::move(palette), 0}).first;
-    }
-
-    it->second.mLastUsed = ++mSharedPaletteUseCounter;
-    return it->second.mPalette.get();
 }

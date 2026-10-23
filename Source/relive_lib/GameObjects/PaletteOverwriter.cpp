@@ -1,30 +1,26 @@
 #include "PaletteOverwriter.hpp"
+#include "BaseAliveGameObject.hpp"
+#include "../ObjectIds.hpp"
+#include "../Animation.hpp"
 
-// Overwrites a pallete 8 colours at a time one per update
-PalleteOverwriter::PalleteOverwriter(AnimationPal& pal, const RGBA32& colour, ResourceManagerWrapper& resMan, BaseMap& map)
-    : BaseGameObject(false, 0, resMan, map), mPal(pal)
+PalleteOverwriter::PalleteOverwriter(const Guid& targetId, u32 sweepIndex, u32 kind, u8 r, u8 g, u8 b, bool addToUpdateList, ResourceManagerWrapper& resMan, BaseMap& map)
+    : BaseGameObject(addToUpdateList, 0, resMan, map), mTargetId(targetId), mSweepIndex(sweepIndex), mKind(kind), mR(r), mG(g), mB(b)
 {
     SetType(ReliveTypes::ePalOverwriter);
 
     gObjListDrawables->Push_Back(this);
 
-    //mPal = pal;
-
-    mPalDepth = 256;
-
-    // This object was only ever given 64 color pals in the past, since the VUpdate would overwrite
-    // 8 entries per loop it took 64/8=8 calls to VUpdate to complete the overwrite.
-    // No matter what we have the pal depth set to we have to complete the overwrite in 8 updates, hence
-    // we divide the depth by 8 in order to know how many colours to overwrite per VUpdate to finish in 8 iterations.
-    // The reason we stick to 8 ticks is to keep the gaming logic timing the same without it being changed depending
-    // on what assets are being used.
-    mColoursToUpdatePerIteration = 32;
+    mPalDepth = 64;
+    if (auto pTarget = static_cast<BaseAliveGameObject*>(sObjectIds.Find_Impl(mTargetId)))
+    {
+        // The original sprite's palette: the colours go in a few at a time, so it took as many
+        // updates as the palette had entries
+        mPalDepth = pTarget->GetAnimation().PaletteDepth();
+    }
 
     SetDrawable(true);
 
-    mColour = colour;
-
-    mNumEntriesToOverwrite = mColoursToUpdatePerIteration;
+    mNumEntriesToOverwrite = 8;
     mCurPalIndex = 1;
     mFirstUpdate = true;
     mDone = false;
@@ -42,13 +38,27 @@ void PalleteOverwriter::VScreenChanged()
 
 void PalleteOverwriter::VRender(OrderingTable& /*ot*/)
 {
-    if (!mDone)
+    if (mDone)
     {
-        for (u32 i = mCurPalIndex; i < mCurPalIndex + mNumEntriesToOverwrite; i++)
-        {
-            mPal.mPal[i] = mColour;
-        }
+        return;
     }
+
+    auto pTarget = static_cast<BaseAliveGameObject*>(sObjectIds.Find_Impl(mTargetId));
+    if (!pTarget)
+    {
+        return;
+    }
+
+    // The entries from 1 up to the end of this go are overwritten. Entry 0 is the transparent
+    // colour, the original never touched it.
+    pTarget->GetAnimation().Fx().SetLuma(pTarget->GetAnimation().mAnimRes.mJsonPtr->mAttributes.mLuma);
+    SpriteFx::Sweep& sweep = pTarget->GetAnimation().Fx().mSweeps[mSweepIndex];
+    sweep.mR = mR / 255.0f;
+    sweep.mG = mG / 255.0f;
+    sweep.mB = mB / 255.0f;
+    sweep.mKind = mKind;
+    const f32 entries = static_cast<f32>(mPalDepth > 1 ? mPalDepth - 1 : 1);
+    sweep.mProgress = std::min(1.0f, (mCurPalIndex + mNumEntriesToOverwrite - 1) / entries);
 }
 
 void PalleteOverwriter::VUpdate()
@@ -68,7 +78,7 @@ void PalleteOverwriter::VUpdate()
         return;
     }
 
-    mCurPalIndex += mColoursToUpdatePerIteration;
+    mCurPalIndex += 8;
 
     // Don't go out of bounds (overflow)
     if (mCurPalIndex >= mPalDepth - 1)

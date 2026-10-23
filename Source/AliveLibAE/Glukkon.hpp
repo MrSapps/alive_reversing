@@ -235,7 +235,6 @@ private:
     bool BrainIs(TGlukkonBrainFn fn);
 
 private:
-    std::shared_ptr<AnimationPal> mPal;
     s16 mRed = 0;
     s16 mGreen = 0;
     s16 mBlue = 0;

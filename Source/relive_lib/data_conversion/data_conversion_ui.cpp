@@ -11,12 +11,20 @@
 #include "../../AliveLibAE/PsxRender.hpp"
 #include "GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
 #include "AnimationConverter.hpp"
+#include "SpritePageWriter.hpp"
+#include "Renderer/IRenderer.hpp"
 
 DataConversionUI::DataConversionUI(GameType gameType, ResourceManagerWrapper& resMan, BaseMap& map)
     : BaseGameObject(FALSE, 0, resMan, map)
     , mGameType(gameType)
+    , mSpritePageSize(DataConversion::DataVersions::SpritePageSizeFor(IRenderer::GetRenderer() ? IRenderer::GetRenderer()->MaxTextureSize() : 0))
     , mDataConversion(std::make_unique<DataConversion>())
 {
+    if (!resMan.ModPath().empty())
+    {
+        mModLayers = resMan.SearchPaths();
+    }
+
     mPoly.SetXYWH(0, 0, 640, 240);
     mPoly.SetRGB0(255, 0, 0);
     mPoly.SetRGB1(0, 255, 255);
@@ -29,7 +37,6 @@ DataConversionUI::DataConversionUI(GameType gameType, ResourceManagerWrapper& re
     mFontContext.LoadFontType(FontType::Debug, mResMan);
 
     PalResource palRes;
-    palRes.mPal = mFontContext.mFntResource.mCurPal;
     // 2048 (was 512): VRender now draws the status message plus up to 12 activity-list lines
     // every frame (mFntPolyArray is a single shared, fixed-size array all of that frame's
     // DrawString calls write into via an accumulating offset - see VRender) - 512 was already
@@ -84,7 +91,7 @@ void DataConversionUI::ThreadFunc()
 {
     TRACE_ENTRYEXIT;
 
-    mDataConversion->ConvertAll(mGameType);
+    mDataConversion->ConvertAll(mGameType, mSpritePageSize, mModLayers);
 
     mDone = true;
 }
@@ -248,12 +255,11 @@ bool DataConversionUI::ConversionRequired()
 {
     DataConversion dataConversion;
     DataConversion::DataVersions zeroVersions;
-    if (mGameType == GameType::eAe)
-    {
-        return dataConversion.DataVersionAE().value_or(zeroVersions).AnyConversionRequired();
-    }
-    else
-    {
-        return dataConversion.DataVersionAO().value_or(zeroVersions).AnyConversionRequired();
-    }
+    zeroVersions.mWantedSpritePageSize = mSpritePageSize;
+    const bool gameRequired = mGameType == GameType::eAe
+        ? dataConversion.DataVersionAE(mSpritePageSize).value_or(zeroVersions).AnyConversionRequired()
+        : dataConversion.DataVersionAO(mSpritePageSize).value_or(zeroVersions).AnyConversionRequired();
+
+    // The mod's sprite pages are out of date, or the mod's sheets changed
+    return gameRequired || (!mModLayers.empty() && SpritePageWriter::PagesStale(mModLayers, mSpritePageSize));
 }

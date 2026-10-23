@@ -5,6 +5,7 @@
 #include "../FatalError.hpp"
 #include "AnimationConverter.hpp"
 #include <spng/spng.h>
+#include <cstring>
 
 class PngContext final
 {
@@ -89,51 +90,6 @@ public:
             ALIVE_FATAL("spng_set_ihdr failed");
         }
 
-    }
-
-    spng_plte GetPal()
-    {
-        // Real pal, if any
-        spng_plte plte = {};
-        s32 ret = spng_get_plte(mCtx.ctx, &plte);
-        if (ret)
-        {
-            if (ret == SPNG_ECHUNKAVAIL)
-            {
-                ALIVE_FATAL("PNG has no pal (not an indexed png");
-            }
-            ALIVE_FATAL("Failed to load png pal");
-        }
-        return plte;
-    }
-
-    void SetPal(spng_plte& pal)
-    {
-        s32 ret = spng_set_plte(mCtx.ctx, &pal);
-        if (ret)
-        {
-            ALIVE_FATAL("spng_set_plte failed");
-        }
-    }
-
-    spng_trns GetTrans()
-    {
-        spng_trns trns = {};
-        s32 ret = spng_get_trns(mCtx.ctx, &trns);
-        if (ret && ret != SPNG_ECHUNKAVAIL)
-        {
-            ALIVE_FATAL("spng_get_trns failed");
-        }
-        return trns;
-    }
-
-    void SetTrans(spng_trns& trans)
-    {
-        s32 ret = spng_set_trns(mCtx.ctx, &trans);
-        if (ret)
-        {
-            ALIVE_FATAL("spng_set_trns failed");
-        }
     }
 
     std::size_t ImageSize()
@@ -247,16 +203,17 @@ void PNGFile::Load(FileSystem& fs, const char_type* pFileName, std::vector<u8>& 
     Decode(pFileName, buffer, pixelData, width, height);
 }
 
-void PNGFile::Load(FileSystem& fs, const char_type* pFileName, AnimationPal& pal256, std::vector<u8>& pixelData, u32& width, u32& height)
+bool PNGFile::LoadSprite(FileSystem& fs, const char_type* pFileName, std::vector<u8>& rgba, u32& width, u32& height)
 {
+    rgba.clear();
+
     AutoFILE f = fs.OpenFile(pFileName, "rb");
     if (!f.GetFile())
     {
-        return;
+        return false;
     }
-    
-    PngApi api(PngContext::CtxType::Decode);
 
+    PngApi api(PngContext::CtxType::Decode);
     api.DisableCRC();
     api.LimitChunkSize();
     api.SetFile(f.GetFile());
@@ -265,111 +222,74 @@ void PNGFile::Load(FileSystem& fs, const char_type* pFileName, AnimationPal& pal
     width = ihdr.width;
     height = ihdr.height;
 
-    spng_plte plte = api.GetPal();
-    spng_trns trns = api.GetTrans();
-
-    for (u32 i = 0; i < plte.n_entries; i++)
+    // Whatever the file is (grey, 16 bit, with or without alpha) comes out as 8 bit RGBA
+    std::size_t rgbaSize = 0;
+    if (spng_decoded_image_size(api.mCtx.ctx, SPNG_FMT_RGBA8, &rgbaSize))
     {
-        u8 alpha = 0;
-        spng_plte_entry* color = &plte.entries[i];
-        bool isBlack = color->red == 0 && color->green == 0 && color->blue == 0;
-
-        if (i < trns.n_type3_entries)
-        {
-            alpha = trns.type3_alpha[i];
-        }
-        else
-        {
-            // according to the tRNS spec all remaining alpha entries should be assumed to be 255
-            alpha = 255;
-        }
-
-        if (alpha == 0)
-        {
-            pal256.mPal[i] = {0, 0, 0, 0};
-        }
-        else if (alpha == 255)
-        {
-            pal256.mPal[i] = {
-                color->red,
-                color->green,
-                color->blue,
-                static_cast<u8>(isBlack ? 255 : 0)
-            };
-        }
-        else
-        {
-            pal256.mPal[i] = {
-                color->red,
-                color->green,
-                color->blue,
-                255
-            };
-        }
+        ALIVE_FATAL("Failed to get the decoded size of %s", pFileName);
     }
-
-    if (ihdr.color_type != SPNG_COLOR_TYPE_INDEXED)
+    rgba.resize(rgbaSize);
+    if (spng_decode_image(api.mCtx.ctx, rgba.data(), rgba.size(), SPNG_FMT_RGBA8, 0))
     {
-        ALIVE_FATAL("PNG is not indexed");
+        ALIVE_FATAL("spng_decode_image failed for %s", pFileName);
     }
-
-    std::size_t image_size = api.ImageSize();
-
-    pixelData.resize(image_size);
-    s32 ret = spng_decode_image(api.mCtx.ctx, pixelData.data(), pixelData.size(), SPNG_FMT_PNG, 0);
-    if (ret)
-    {
-        ALIVE_FATAL("spng_decode_image failed");
-    }
+    return true;
 }
 
-void PNGFile::Save(FileSystem& fs, const char_type* pFileName, const AnimationPal& pal256, const std::vector<u8>& pixelData, u32 width, u32 height)
+std::string PNGFile::MaskPathFor(const std::string& sheetPath)
 {
-    // The PNG header uses a var length id string which means we can't just use
-    // a struct to represent it since the alignment is not fixed until after this field.
+    const std::size_t dot = sheetPath.rfind('.');
+    if (dot == std::string::npos)
+    {
+        return sheetPath + "_mask.png";
+    }
+    return sheetPath.substr(0, dot) + "_mask" + sheetPath.substr(dot);
+}
+
+bool PNGFile::LoadMask(FileSystem& fs, const std::string& sheetPath, std::vector<u8>& mask, u32 sheetWidth, u32 sheetHeight)
+{
+    mask.clear();
+
+    const std::string maskPath = MaskPathFor(sheetPath);
+    if (!fs.FileExists(maskPath.c_str()))
+    {
+        return false;
+    }
+
+    u32 width = 0;
+    u32 height = 0;
+    if (!LoadSprite(fs, maskPath.c_str(), mask, width, height))
+    {
+        mask.clear();
+        return false;
+    }
+
+    if (width != sheetWidth || height != sheetHeight)
+    {
+        ALIVE_FATAL("%s is %ux%u but its sheet is %ux%u", maskPath.c_str(), width, height, sheetWidth, sheetHeight);
+    }
+    return true;
+}
+
+void PNGFile::SaveSprite(FileSystem& fs, const char_type* pFileName, const std::vector<u8>& rgba, u32 width, u32 height)
+{
+    if (rgba.size() != static_cast<std::size_t>(width) * height * 4)
+    {
+        ALIVE_FATAL("SaveSprite: %zu bytes for a %ux%u sheet", rgba.size(), width, height);
+    }
+
     AutoFILE f = fs.OpenFile(pFileName, "wb");
-
     PngApi api(PngContext::CtxType::Encode);
-
     api.SetFile(f.GetFile());
 
     spng_ihdr ihdr = {};
     ihdr.width = width;
     ihdr.height = height;
-    ihdr.color_type = SPNG_COLOR_TYPE_INDEXED;
+    ihdr.color_type = SPNG_COLOR_TYPE_TRUECOLOR_ALPHA;
     ihdr.bit_depth = 8;
-
     api.SetHeader(ihdr);
 
-    spng_plte plte = {};
-    spng_trns trns = {};
-    trns.n_type3_entries = 256;
-    plte.n_entries = 256;
-    for (u32 i = 0; i < 256; i++)
-    {
-        const RGBA32* color = &pal256.mPal[i];
-
-        plte.entries[i].red = color->r;
-        plte.entries[i].green = color->g;
-        plte.entries[i].blue = color->b;
-
-        if (color->a == 255) // STP 1
-        {
-            trns.type3_alpha[i] = 127;
-        }
-        else
-        {
-            bool isBlack = color->r == 0 && color->g == 0 && color->b == 0;
-
-            trns.type3_alpha[i] = isBlack ? 0 : 255;
-        }
-    }
-
-    api.SetPal(plte);
-    api.SetTrans(trns);
-
-    s32 ret = spng_encode_image(api.mCtx.ctx, pixelData.data(), pixelData.size(), SPNG_FMT_PNG, SPNG_ENCODE_FINALIZE);
-    if (ret)
+    if (spng_encode_image(api.mCtx.ctx, rgba.data(), rgba.size(), SPNG_FMT_PNG, SPNG_ENCODE_FINALIZE))
     {
         ALIVE_FATAL("spng_encode_image failed");
     }

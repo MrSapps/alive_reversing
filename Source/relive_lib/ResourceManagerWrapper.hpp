@@ -1,6 +1,9 @@
 #pragma once
 
+#include "GameType.hpp"
+
 #include "AnimResources.hpp"
+#include "SpriteFx.hpp"
 #include <mutex>
 #include <memory>
 #include <condition_variable>
@@ -13,7 +16,6 @@ enum class AnimId;
 enum class EReliveLevelIds : s16;
 
 class BinaryPath;
-struct AnimationPal;
 
 class UniqueResId final
 {
@@ -39,12 +41,23 @@ private:
     static std::atomic<u32> mGlobalId;
 };
 
+// A sprite sheet or a font: a true colour image, and its optional mask (SpriteMask.hpp)
 struct PngData final
 {
-    std::shared_ptr<AnimationPal> mPal;
-    std::vector<u8> mPixels;
-    u32 mWidth;
-    u32 mHeight;
+    // The renderers' texture for the sheet is kept by this: the animations on a sprite page share
+    // its PngData, so they share the texture
+    UniqueResId mId;
+    std::vector<u8> mRgba;
+    // The same size as mRgba, or empty if the sheet has no mask
+    std::vector<u8> mMask;
+    u32 mWidth = 0;
+    u32 mHeight = 0;
+
+    bool HasMask() const
+    {
+        return !mMask.empty();
+    }
+
 };
 
 struct Point32 final
@@ -77,13 +90,31 @@ struct PerFrameInfo final
 
 struct AnimAttributes final
 {
-    u32 mFrameRate;
-    bool mFlipX;
-    bool mFlipY;
-    bool mLoop;
-    u32 mLoopStartFrame;
-    u32 mMaxWidth;
-    u32 mMaxHeight;
+    u32 mFrameRate = 0;
+    bool mFlipX = false;
+    bool mFlipY = false;
+    bool mLoop = false;
+    u32 mLoopStartFrame = 0;
+    u32 mMaxWidth = 0;
+    u32 mMaxHeight = 0;
+    // How many entries the original palette had: 16, 64 or 256
+    u32 mPaletteDepth = 64;
+    // The brightness of the colours of the animation, see SpriteFx::mLuma: an even ramp until
+    // the json's (or the sheet's, if the json has none) is set
+    f32 mLuma[SpriteFx::kLumaPoints] = {};
+    bool mHasLuma = false;
+    // The page the sprite sheet is on (animations/pages/abe_0, the png and mask are named like
+    // it), or empty if the animation has a sheet of its own (name.png). The frames' positions are
+    // on that sheet or page.
+    std::string mSheet;
+
+    AnimAttributes()
+    {
+        for (u32 i = 0; i < SpriteFx::kLumaPoints; i++)
+        {
+            mLuma[i] = static_cast<f32>(i) / (SpriteFx::kLumaPoints - 1);
+        }
+    }
 };
 
 class AnimationAttributesAndFrames final
@@ -96,11 +127,16 @@ public:
     std::vector<PerFrameInfo> mFrames;
 };
 
+// What a PalId is now that sprites have no palettes:
+// - for an animation, the change of colours that takes a sprite to the colours of the palette
+// - for a font, the font's sheet in the colours of the palette
 class PalResource final
 {
 public:
     PalId mId = PalId::Default;
-    std::shared_ptr<AnimationPal> mPal;
+    SpriteFx mFx;
+    std::shared_ptr<PngData> mFontSheet;
+    UniqueResId mFontSheetId;
 };
 
 class RgbaData final
@@ -153,7 +189,6 @@ public:
         , mJsonPtr(jsonRes)
         , mPngPtr(pngRes)
     {
-        mCurPal = mPngPtr->mPal;
     }
 
     void Clear()
@@ -168,8 +203,8 @@ public:
     AnimId mId = AnimId::None;
     std::shared_ptr<AnimationAttributesAndFrames> mJsonPtr;
     std::shared_ptr<PngData> mPngPtr;
-    // TODO: weak_ptr
-    std::shared_ptr<AnimationPal> mCurPal;
+    // The colour effects on the sprite
+    SpriteFx mFx;
 };
 
 enum class FontType
@@ -188,16 +223,12 @@ public:
     FontResource(FontType id, std::shared_ptr<PngData>& pngPtr)
         : mId(id), mPngPtr(pngPtr)
     {
-        mCurPal = pngPtr->mPal;
     }
 
     UniqueResId mUniqueId;
     FontType mId = FontType::None;
     // TODO: Font atlas json ptpr
     std::shared_ptr<PngData> mPngPtr;
-
-    // TODO: Really should be a weak_ptr
-    std::shared_ptr<AnimationPal> mCurPal;
 };
 
 
@@ -219,6 +250,22 @@ class ResourceManagerWrapper final
 {
 public:
     ResourceManagerWrapper(FileSystem& fs, const std::string& modPath);
+
+    // The data directories the game looks in for a game and a mod (empty if there is none): the
+    // mod's first, then the game's, then the other game's
+    static std::vector<std::string> BuildSearchPaths(GameType gameType, const std::string& modPath);
+
+    // The data directories the game looks in, the mod's (if there is one) first
+    const std::vector<std::string>& SearchPaths() const
+    {
+        return mSearchPaths;
+    }
+
+    // The active mod's data directory, empty if there isn't one
+    const std::string& ModPath() const
+    {
+        return mModPath;
+    }
 
     // The user's settings - input bindings and display settings - in relive.ini in the game
     // directory (not looked up through the search paths).
@@ -407,6 +454,7 @@ public:
     }
     
     std::vector<std::string> mSearchPaths;
+    std::string mModPath;
 private:
 
     // Returns false if the anim isn't loaded (never was, or was freed). Call with mLoadingMutex
@@ -451,6 +499,17 @@ public:
         u32 mCount = 0;
     };
     std::map<AnimCacheKey, AnimPin> mPinnedAnimations;
+
+    // The sprite pages (SpritePageWriter) that are loaded: kept only as long as an animation on
+    // one is. Loads the page at basePath/page.png (and its mask), or returns nullptr and reports
+    // it missing. Called from the animation loading jobs.
+    std::shared_ptr<PngData> LoadSheetPage(const std::string& basePath, const std::string& page, const std::string& description);
+
+private:
+    std::mutex mSheetPagesMutex;
+    std::map<std::string, std::weak_ptr<PngData>> mSheetPages;
+
+public:
 
     // Pended animations still loading, guarded by mLoadingMutex. mResourceLoaded is signalled
     // each time a pended animation or camera finishes (whether it was found or not).

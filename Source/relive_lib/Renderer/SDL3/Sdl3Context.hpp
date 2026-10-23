@@ -10,27 +10,19 @@
 
 class Window;
 
+// Keeps the textures nobody uses any more, see Sdl3Context::CreateTexture
+struct SdlTexturePoolState;
+
 struct SdlTextureDeleter final
 {
-    void operator()(SDL_Texture* pTexture) const
-    {
-        SDL_DestroyTexture(pTexture);
-    }
+    // The pool the texture goes back to, none if it is destroyed
+    std::shared_ptr<SdlTexturePoolState> mPool;
+
+    void operator()(SDL_Texture* pTexture) const;
 };
 
 // Owns an SDL_Texture
 using SdlTexturePtr = std::unique_ptr<SDL_Texture, SdlTextureDeleter>;
-
-struct SdlPaletteDeleter final
-{
-    void operator()(SDL_Palette* pPalette) const
-    {
-        SDL_DestroyPalette(pPalette);
-    }
-};
-
-// Owns a reference to an SDL_Palette (textures using it hold their own)
-using SdlPalettePtr = std::unique_ptr<SDL_Palette, SdlPaletteDeleter>;
 
 struct SdlRendererDeleter final
 {
@@ -46,29 +38,20 @@ public:
     // checks turns on the validation of SDL's GPU, Vulkan and Direct3D 11 backends, where they
     // have it (SDL's OpenGL backends have none)
     Sdl3Context(Window& window, bool checks);
+    ~Sdl3Context();
 
-    SDL_Renderer* GetRenderer();
+    SDL_Renderer* GetRenderer() const;
     bool IsRenderTargetSupported();
 
-    // Fatal if it fails
+    // Fatal if it fails. A texture that is let go of is kept for the next one of the same size,
+    // format and access (creating one is the expensive part, like the PSX's VRAM that was only
+    // written to), so it still has the pixels it had and the caller has to write what it samples.
+    // Its blend mode and colour are the ones a new texture has.
     SdlTexturePtr CreateTexture(SDL_PixelFormat format, SDL_TextureAccess access, u32 width, u32 height);
 
-    // What a sprite sheet's colours were converted from: see Sdl3Texture::GetTextureUsePalette
-    struct PaletteKey final
-    {
-        u32 mPaletteHash = 0;
-        u32 mShading = 0;
-        u32 mSemiTransAndBlendMode = 0;
-
-        bool operator<(const PaletteKey& other) const
-        {
-            return std::tie(mPaletteHash, mShading, mSemiTransAndBlendMode) < std::tie(other.mPaletteHash, other.mShading, other.mSemiTransAndBlendMode);
-        }
-    };
-
-    // An SDL palette holding these colours, shared by every texture that uses them: SDL's OpenGL
-    // renderer makes a GL texture for each palette
-    SDL_Palette* SharedPalette(const PaletteKey& key, const SDL_Color (&colours)[256]);
+    // How many textures are waiting to be reused, and how many CreateTexture calls reused one
+    u32 PooledTextureCount() const;
+    u32 ReusedTextureCount() const;
 
     // A buffer for converting pixels before they're uploaded, reused so nothing is allocated
     // each time. Only valid until the next call.
@@ -95,13 +78,6 @@ public:
     static SDL_BlendMode GasMaskBlendMode();
     bool SupportsCustomBlendModes();
 
-    // Whether the SDL renderer can draw 8 bit textures through a palette (SDL 3.4's OpenGL
-    // renderers can), so a sprite sheet's colours can be changed without converting its pixels
-    bool SupportsPaletteTextures() const
-    {
-        return mSupportsPaletteTextures;
-    }
-
     // Whether vertex colours above 1 brighten what's drawn, so a sprite can be tinted by its
     // vertex colours instead of converting its colours for each tint
     bool SupportsBrightVertexColours() const
@@ -114,10 +90,7 @@ public:
     static void SetTextureBlendMode(SDL_Texture* texture, SDL_BlendMode blendMode);
 
     // Counts frames, for things that are only valid within one
-    void NextFrame()
-    {
-        mFrameNumber++;
-    }
+    void NextFrame();
     u32 FrameNumber() const
     {
         return mFrameNumber;
@@ -152,15 +125,8 @@ private:
     SDL_Rect mLastClipRect;
     SDL_Texture* mLastFramebuffer;
     std::vector<u32> mScratchPixels;
+    std::shared_ptr<SdlTexturePoolState> mPool;
 
-    struct SharedPaletteEntry final
-    {
-        SdlPalettePtr mPalette;
-        u64 mLastUsed = 0;
-    };
-    std::map<PaletteKey, SharedPaletteEntry> mSharedPalettes;
-    u64 mSharedPaletteUseCounter = 0;
-    bool mSupportsPaletteTextures = false;
     bool mSupportsBrightVertexColours = false;
     u32 mFrameNumber = 0;
     u32 mTextureUploads = 0;

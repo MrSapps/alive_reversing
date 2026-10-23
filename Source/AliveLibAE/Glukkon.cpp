@@ -295,7 +295,6 @@ Glukkon::Glukkon(relive::Path_Glukkon* pTlv, const Guid& tlvId, ResourceManagerW
 
     mTlvId = tlvId;
 
-    mPal = std::make_shared<AnimationPal>();
 
     switch (mTlvData.mGlukkonType)
     {
@@ -332,16 +331,7 @@ Glukkon::Glukkon(relive::Path_Glukkon* pTlv, const Guid& tlvId, ResourceManagerW
 
 void Glukkon::VRender(OrderingTable& ot)
 {
-    s16 eyeIndices[1];
-    if (mTlvData.mGlukkonType == relive::Path_Glukkon::GlukkonTypes::eStoryAslik || mTlvData.mGlukkonType == relive::Path_Glukkon::GlukkonTypes::eStoryPhleg)
-    {
-        eyeIndices[0] = 63;
-    }
-    else
-    {
-        eyeIndices[0] = 62;
-    }
-    renderWithGlowingEyes(ot, this, mPal, 64, mRed, mGreen, mBlue, &eyeIndices[0], ALIVE_COUNTOF(eyeIndices));
+    renderWithGlowingEyes(ot, this);
 }
 
 void Glukkon::VGetSaveState(SerializedObjectData& pSaveBuffer)

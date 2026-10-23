@@ -87,6 +87,25 @@ public:
         return ret;
     }
 
+    // A PSX palette entry as a pixel of a true colour sprite: 0 is transparent. The
+    // semi-transparency bit isn't part of the pixel, it goes in the sheet's mask, see IsSolid
+    static RGBA32 RGBA555ToTrueColour(u16 pixel)
+    {
+        if (pixel == 0)
+        {
+            return {0, 0, 0, 0};
+        }
+
+        const RGBA32 rgba = RGBA555ToRGBA888Components(pixel);
+        return {rgba.r, rgba.g, rgba.b, 255};
+    }
+
+    // A palette entry without the semi-transparency bit: a semi-transparent sprite draws it solid
+    static bool IsSolid(u16 pixel)
+    {
+        return pixel != 0 && (pixel & 0x8000) == 0;
+    }
+
     static u32 RGB565ToRGB888(u16 pixel)
     {
         const u8 r5 = ((pixel >> 11) & 0x1F);

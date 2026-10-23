@@ -28,6 +28,8 @@ public:
         return Renderers::Sdl3;
     }
 
+    u32 MaxTextureSize() const override;
+
 protected:
     void ReadPsxFramebuffer(std::vector<u8>& rgbaPixels, s32& width, s32& height) override;
 

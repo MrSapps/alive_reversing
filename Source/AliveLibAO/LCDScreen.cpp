@@ -241,7 +241,7 @@ void LCDScreen::VUpdate()
                 }
 
                 // Change pal
-                mFont.mFontContext->mFntResource.mCurPal = mPal2.mPal;
+                mFont.mFontContext->UseFontSheet(mPal2);
             }
             else
             {
@@ -261,7 +261,7 @@ void LCDScreen::VUpdate()
                 }
 
                 // Change pal
-                mFont.mFontContext->mFntResource.mCurPal = mPal1.mPal;
+                mFont.mFontContext->UseFontSheet(mPal1);
             }
 
             mActiveMessage = mMessageBuffer;
@@ -389,7 +389,7 @@ void LCDScreen::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManag
         pScreen->mActiveMessage = pScreen->mMessageBuffer + pState->mActiveMessageOffset;
         pScreen->mMessageCutoffPtr = nullptr;
 
-        pScreen->mFont.mFontContext->mFntResource.mCurPal = pScreen->mShowRandomMessage ? pScreen->mPal2.mPal : pScreen->mPal1.mPal;
+        pScreen->mFont.mFontContext->UseFontSheet(pScreen->mShowRandomMessage ? pScreen->mPal2 : pScreen->mPal1);
     }
 }
 

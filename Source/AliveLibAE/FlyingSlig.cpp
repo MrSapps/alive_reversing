@@ -124,7 +124,6 @@ FlyingSlig::FlyingSlig(relive::Path_FlyingSlig* pTlv, const Guid& tlvId, Resourc
 
     Animation_Init(GetAnimRes(AnimId::FlyingSlig_Idle));
 
-    field_1F4_mPal = std::make_shared<AnimationPal>();
 
     GetAnimation().SetFnPtrArray(gFlyingSlig_Anim_Frames_Fns);
 
@@ -547,8 +546,7 @@ void FlyingSlig::VUpdate()
 
 void FlyingSlig::VRender(OrderingTable& ot)
 {
-    const s16 eyeIndices[] = {60, 62};
-    renderWithGlowingEyes(ot, this, field_1F4_mPal, 64, field_27C_r, field_27E_g, field_280_b, &eyeIndices[0], ALIVE_COUNTOF(eyeIndices));
+    renderWithGlowingEyes(ot, this);
 }
 
 void FlyingSlig::sub_4348A0()

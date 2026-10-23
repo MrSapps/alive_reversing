@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include "../../relive_lib/ResourceManagerWrapper.hpp"
+#include "../../relive_lib/SpriteFx.hpp"
 #include "../../relive_lib/data_conversion/rgb_conversion.hpp"
 
 // Everything the render test draws, made in code so that it runs without any game data.
@@ -36,11 +37,19 @@ public:
     // walks around the border, one step per frame.
     AnimResource mTestCard;
 
+    // 48x48 true colour sheet with every alpha in it and a mask (SpriteMask.hpp):
+    // - top: a bar fading in from transparent to opaque orange
+    // - middle: a soft round glow, white fading out to the edge
+    // - bottom, left to right: 3 grey swatches, alpha 255: no mask flag, solid, and glowing. In a semi-transparent
+    //   sprite the first blends and the second stays opaque. The third glows: a tint doesn't change it
+    AnimResource mAlphaCard;
+
     // 16x16 soft dot, semi-transparent colours, for particles and stress tests
     AnimResource mParticle;
 
-    // The test card's palette with the hues rotated, for palette swaps
-    std::vector<std::shared_ptr<AnimationPal>> mPalettes;
+    // The colours' hues rotated through 360 degrees in 64 steps, for palette swaps
+    std::vector<SpriteFx> mHueShifts;
+    static SpriteFx MakeHueShift(f32 degrees);
 
     // A test card with its own texture, so the renderer has to upload it (texture churn test)
     AnimResource MakeUniqueTestCard() const;

@@ -9,7 +9,12 @@
 #include "stdlib.hpp"
 #include "../relive_lib/data_conversion/AnimationConverter.hpp"
 
-#define TRANSITION_FRAMECOUNT 24
+// The original faded the colours of its palette (5 bits per channel) one bit a step, so the fade took
+// at most this many steps
+static constexpr u8 kMaxFadeSteps = 31;
+
+// What a step of the fade takes from every channel: one bit of a 5 bit channel
+static constexpr f32 kFadeStep = 8.0f / 255.0f;
 
 InvisibleEffect::InvisibleEffect(BaseAliveGameObject* pTarget, ResourceManagerWrapper& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
@@ -17,9 +22,6 @@ InvisibleEffect::InvisibleEffect(BaseAliveGameObject* pTarget, ResourceManagerWr
      SetType(ReliveTypes::eInvisibleEffect);
 
     mTargetId = pTarget->mBaseGameObjectId;
-
-    mOldPal.mPal = std::make_shared<AnimationPal>(*pTarget->GetAnimation().mAnimRes.mPngPtr->mPal);
-    mInvisPal.mPal = std::make_shared<AnimationPal>(*pTarget->GetAnimation().mAnimRes.mPngPtr->mPal);
 
     mSemiTrans = false;
     mBlending = false;
@@ -52,7 +54,6 @@ void InvisibleEffect::InstantInvisibility()
 
 void InvisibleEffect::BecomeVisible()
 {
-    mTransitionFrameCount = 0;
     mState = InvisibleState::eBecomeVisible_4;
 }
 
@@ -65,7 +66,6 @@ void InvisibleEffect::ClearInvisibility()
 void InvisibleEffect::BecomeInvisible()
 {
     SetUpdateDelay(1);
-    mTransitionFrameCount = 0;
     mState = InvisibleState::eSetInvisibile_1;
 }
 
@@ -92,11 +92,9 @@ void InvisibleEffect::VUpdate()
         }
         case InvisibleState::eSetInvisibile_1:
         {
-            for (s32 idx2 = 8; idx2 < 256; idx2++)
-            {
-                // Set transparent bit
-                mInvisPal.mPal->mPal[idx2].a = 255;
-            }
+            // The original set the semi-transparency bit on all of the palette's entries
+            // from the 8th, the first few stayed visible. A true colour sprite is all or nothing.
+            pTarget->GetAnimation().Fx().mForceBlend = 1;
 
             pTarget->SetInvisible(true);
 
@@ -114,51 +112,16 @@ void InvisibleEffect::VUpdate()
         }
         case InvisibleState::eBecomeInvisible_2:
         {
-            /* - should never have been possible
-            if (pTarget->mAnim.mPalDepth <= 8)
+            // Every channel loses a bit a step, and with the sprite added to the picture
+            // (blend mode 1) it fades away. When there is nothing left to take it stops.
+            if (mFadeSteps < kMaxFadeSteps)
             {
-                mState = InvisibleState::eSetBlendMode1_0;
-                return;
-            }*/
-
-            if (mTransitionFrameCount < TRANSITION_FRAMECOUNT)
-            {
-                for (s32 idx = 8; idx < 256; idx++)
-                {
-                    // Red
-                    if (mInvisPal.mPal->mPal[idx].r)
-                    {
-                        mInvisPal.mPal->mPal[idx].r = ClampedSub(mInvisPal.mPal->mPal[idx].r, (u8)8);
-                    }
-
-                    // Green
-                    if (mInvisPal.mPal->mPal[idx].g)
-                    {
-                        mInvisPal.mPal->mPal[idx].g = ClampedSub(mInvisPal.mPal->mPal[idx].g, (u8)8);
-                    }
-
-                    // Blue
-                    if (mInvisPal.mPal->mPal[idx].b)
-                    {
-                        mInvisPal.mPal->mPal[idx].b = ClampedSub(mInvisPal.mPal->mPal[idx].b, (u8)8);
-                    }
-
-                    // Semi trans
-                    if (mInvisPal.mPal->mPal[idx].a == 255 && mInvisPal.mPal->mPal[idx].r == 0 && mInvisPal.mPal->mPal[idx].g == 0 && mInvisPal.mPal->mPal[idx].b == 0)
-                    {
-                        mInvisPal.mPal->mPal[idx].a = 0;
-                    }
-                }
-
-                // TODO: Allow setting anim
-                pTarget->GetAnimation().LoadPal(mInvisPal);
+                mFadeSteps++;
+                pTarget->GetAnimation().Fx().mSubtract = mFadeSteps * kFadeStep;
                 SetUpdateDelay(1);
-
-                mTransitionFrameCount++;
             }
             else
             {
-                mTransitionFrameCount = 0;
                 mState = InvisibleState::eSetBlendMode1_0;
             }
 
@@ -166,15 +129,9 @@ void InvisibleEffect::VUpdate()
         }
         case InvisibleState::eUnknown_3:
         {
-            LOG_ERROR("Unreachable case InvisibleState::eUnknown_3 hit");
-            for (s32 i = 8; i < 256; i++)
-            {
-                // Clear transparent bit
-                mInvisPal.mPal->mPal[i].a = 0;
-            }
-            // TODO
-            pTarget->GetAnimation().LoadPal(mInvisPal);
-            //Pal_Set(pTarget->mAnim.mPalVramXY, pTarget->mAnim.mPalDepth, (u8*) field_30_pPal2, &field_34_pal_rect2);
+            // Invisible straight away (when a save is loaded): nothing is left of the colours
+            mFadeSteps = kMaxFadeSteps;
+            pTarget->GetAnimation().Fx().mSubtract = mFadeSteps * kFadeStep;
 
             mIsInvisible = false;
             SetUpdateDelay(1);
@@ -183,47 +140,17 @@ void InvisibleEffect::VUpdate()
         }
         case InvisibleState::eBecomeVisible_4:
         {
-            /* TODO - shouldn't be possible
-            if (pTarget->mAnim.mPalDepth <= 1)
+            // The colours come back a bit a step, slower than they went
+            if (mFadeSteps > 0)
             {
-                mState = InvisibleState::eClearInvisibility_5;
-                return;
-            }*/
-
-            if (mTransitionFrameCount < TRANSITION_FRAMECOUNT)
-            {
-                for (s32 idx4 = 1; idx4 < 256; idx4++)
-                {
-                    if (mOldPal.mPal->mPal[idx4].r ^ mInvisPal.mPal->mPal[idx4].r)
-                    {
-                        mInvisPal.mPal->mPal[idx4].r = ClampedAdd<u8>(mInvisPal.mPal->mPal[idx4].r, 8,  0, mOldPal.mPal->mPal[idx4].r);
-                    }
-
-                    if (mOldPal.mPal->mPal[idx4].g ^ mInvisPal.mPal->mPal[idx4].g)
-                    {
-                        mInvisPal.mPal->mPal[idx4].g = ClampedAdd<u8>(mInvisPal.mPal->mPal[idx4].g, 8, 0, mOldPal.mPal->mPal[idx4].g);
-                    }
-
-                    if (mOldPal.mPal->mPal[idx4].b ^ mInvisPal.mPal->mPal[idx4].b)
-                    {
-                        mInvisPal.mPal->mPal[idx4].b = ClampedAdd<u8>(mInvisPal.mPal->mPal[idx4].b, 8, 0, mOldPal.mPal->mPal[idx4].b);
-                    }
-                }
-
-                // TODO
-                pTarget->GetAnimation().LoadPal(mInvisPal);
-
-                //Pal_Set(pTarget->mAnim.mPalVramXY, pTarget->mAnim.mPalDepth, (u8*) field_30_pPal2, &field_34_pal_rect2);
+                mFadeSteps--;
+                pTarget->GetAnimation().Fx().mSubtract = mFadeSteps * kFadeStep;
 
                 pTarget->GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_1);
                 SetUpdateDelay(5);
-
-                mTransitionFrameCount++;
-                break;
             }
             else
             {
-                mTransitionFrameCount = 0;
                 mState = InvisibleState::eClearInvisibility_5;
             }
 
@@ -231,10 +158,10 @@ void InvisibleEffect::VUpdate()
         }
         case InvisibleState::eClearInvisibility_5:
         {
-            // TODO
-             pTarget->GetAnimation().LoadPal(mOldPal);
-
-            //Pal_Set(pTarget->mAnim.mPalVramXY, pTarget->mAnim.mPalDepth, (u8*) field_24_pPal1, &field_28_pal_rect1);
+            // The sprite's own colours
+            pTarget->GetAnimation().Fx().mSubtract = 0.0f;
+            pTarget->GetAnimation().Fx().mForceBlend = 0;
+            mFadeSteps = 0;
 
             pTarget->GetAnimation().SetSemiTrans(mSemiTrans);
             pTarget->GetAnimation().SetBlending(mBlending);

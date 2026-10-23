@@ -78,16 +78,16 @@ public:
 
     void PushLine(const Line_G4& line, relive::TBlendModes blendMode);
 
-    void PushFont(const Poly_FT4& poly, u32 palIndex, std::shared_ptr<TextureType>& texture);
+    void PushFont(const Poly_FT4& poly, u32 fxIndex, std::shared_ptr<TextureType>& texture);
 
     void PushFG1(const Poly_FT4& poly, std::shared_ptr<TextureType>& texture);
 
     void PushCAM(const Poly_FT4& poly, std::shared_ptr<TextureType>& texture);
 
-    void PushAnim(const Poly_FT4& poly, u32 palIndex, std::shared_ptr<TextureType>& texture);
+    void PushAnim(const Poly_FT4& poly, u32 fxIndex, std::shared_ptr<TextureType>& texture);
 
-    // An animation frame or a font glyph, drawn through palette palIndex
-    void PushSprite(const Poly_FT4& poly, const IRenderer::QuadUVs& uvs, u32 palIndex, std::shared_ptr<TextureType>& texture, u32 textureResId);
+    // An animation frame or a font glyph, with the effects in table row fxIndex
+    void PushSprite(const Poly_FT4& poly, const IRenderer::QuadUVs& uvs, u32 fxIndex, bool hasMask, std::shared_ptr<TextureType>& texture, u32 textureResId);
 
     // A camera or FG1 image, covering the whole frame
     void PushScreenImage(const Poly_FT4& poly, IRenderer::PsxDrawMode drawMode, std::shared_ptr<TextureType>& texture, u32 textureResId);

@@ -111,7 +111,9 @@ TimedMine::TimedMine(relive::Path_TimedMine* pTlv, const Guid& tlvId, ResourceMa
 
     mTlvInfo = tlvId;
     mExplosionTimer = sGnFrame;
-    SetBaseAnimPaletteTint(sTimedMineTint, mMap.mCurrentLevel, PalId::Default); // TODO: Bomb pal removed, check correct
+    // AO's stockyards mines have a palette of their own. AE's code asked for one too, but never
+    // had it loaded.
+    SetBaseAnimPaletteTint(sTimedMineTint, mMap.mCurrentLevel, GetGameType() == GameType::eAo ? PalId::Bomb : PalId::Default);
 
     SetInteractive(true);
 

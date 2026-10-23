@@ -10,7 +10,6 @@ TextDrawer::TextDrawer(ResourceManagerWrapper& resMan)
     mFontContext.LoadFontType(FontType::Debug, resMan);
 
     PalResource pal;
-    pal.mPal = mFontContext.mFntResource.mCurPal;
     mFont.Load(4096, pal, &mFontContext);
 }
 

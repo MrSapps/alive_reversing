@@ -1,25 +1,35 @@
 #include "Sdl3Texture.hpp"
 #include <algorithm>
 #include "FatalError.hpp"
-#include "Renderer/PaletteCache.hpp"
-#include "data_conversion/AnimationConverter.hpp"
 
 Sdl3Texture::Sdl3Texture(Sdl3Context& context, u32 width, u32 height, SDL_PixelFormat format, SDL_TextureAccess access)
     : mContext(context), mFormat(format), mTextureAccess(access), mHeight(height), mWidth(width)
 {
-    // SDL2 does not support palette textures, if we want to store indexed
-    // colour we have to handle that internally (using mIndexedPixels)
-    // TODO: SDL now supports palette textures since version 3.4
-    if (mFormat == SDL_PIXELFORMAT_INDEX8)
-    {
-        mIndexedPixels.resize(mWidth * mHeight);
-    }
-    else
-    {
-        mTexture = mContext.CreateTexture(mFormat, mTextureAccess, mWidth, mHeight);
-        mContext.CountTextureUpload();
+    mTexture = mContext.CreateTexture(mFormat, mTextureAccess, mWidth, mHeight);
+    mContext.CountTextureUpload();
 
-        Sdl3Context::SetTextureBlendMode(mTexture.get(), SDL_BLENDMODE_NONE);
+    Sdl3Context::SetTextureBlendMode(mTexture.get(), SDL_BLENDMODE_NONE);
+}
+
+Sdl3Texture::Sdl3Texture(Sdl3Context& context, u32 width, u32 height, const u8* rgbaPixels, const u8* maskPixels, TrueColourSheet)
+    : mContext(context), mFormat(SDL_PIXELFORMAT_RGBA32), mTextureAccess(SDL_TEXTUREACCESS_STATIC), mHeight(height), mWidth(width)
+{
+    mIsSheet = true;
+    mSheetPixels.assign(rgbaPixels, rgbaPixels + static_cast<std::size_t>(width) * height * 4);
+
+    if (maskPixels)
+    {
+        mMaskPixels.assign(maskPixels, maskPixels + mSheetPixels.size());
+
+        // Texels that glow aren't tinted, which the vertex colours can't do
+        for (std::size_t i = 0; i < mMaskPixels.size(); i += 4)
+        {
+            if (SpriteMask::Get(&mMaskPixels[i]) & SpriteMask::kGlow)
+            {
+                mHasEmissive = true;
+                break;
+            }
+        }
     }
 }
 
@@ -81,23 +91,52 @@ u32 Sdl3Texture::GetWidth()
 
 SDL_Texture* Sdl3Texture::GetTexture()
 {
-    if (mFormat == SDL_PIXELFORMAT_INDEX8)
+    if (mIsSheet)
     {
-        ALIVE_FATAL("%s", "SDL3 use GetTextureUsePalette with INDEX8 tex");
+        ALIVE_FATAL("%s", "SDL3 use GetTextureForSprite with a sprite sheet");
     }
 
     return mTexture.get();
 }
 
-SDL_Texture* Sdl3Texture::GetTextureUsePalette(const std::shared_ptr<AnimationPal>& palette, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode, SDL_FColor& vertexColour)
+u64 Sdl3Texture::VariantKey(const SheetVariant& variant)
+{
+    // Not the effect: it is a lot of bytes to hash for every sprite drawn, and almost always the
+    // same for the sprites of a rect. Variants that differ only in it are compared in full.
+    u64 hash = 1469598103934665603ull;
+    auto mix = [&](u64 value)
+    {
+        hash = (hash ^ value) * 1099511628211ull;
+    };
+    mix(variant.mShading.ToU32());
+    mix(variant.mSemiTrans ? 1 : 0);
+    mix(static_cast<u64>(variant.mBlendMode));
+    mix(static_cast<u32>(variant.mRect.mX));
+    mix(static_cast<u32>(variant.mRect.mY));
+    mix(static_cast<u32>(variant.mRect.mW));
+    mix(static_cast<u32>(variant.mRect.mH));
+    return hash;
+}
+
+bool Sdl3Texture::SameVariant(const SheetVariant& a, const SheetVariant& b)
+{
+    return a.mFx == b.mFx &&
+        a.mShading.ToU32() == b.mShading.ToU32() &&
+        a.mSemiTrans == b.mSemiTrans &&
+        a.mBlendMode == b.mBlendMode &&
+        a.mRect.mX == b.mRect.mX && a.mRect.mY == b.mRect.mY && a.mRect.mW == b.mRect.mW && a.mRect.mH == b.mRect.mH;
+}
+
+SDL_Texture* Sdl3Texture::GetTextureForSprite(const SpriteFx& fx, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode, const SpriteRect& rect, SDL_FColor& vertexColour)
 {
     // A tint makes each colour min(255, colour * tint / 127.5), which is what the texture's colour
     // times a vertex colour of tint / 127.5 comes out as. Half and quarter semi-transparency then
     // scale the colour, and rounding it both before and after the tint makes overlapping sprites
-    // (zap lines) visibly darker, so those tints are still converted into the colours.
+    // (zap lines) visibly darker, so those tints are still converted into the colours. So are
+    // the tints of a sheet with glowing texels, as those aren't tinted.
     const bool shaded = shading.a == 255;
     const bool scaledDown = isSemiTrans && (blendMode == relive::TBlendModes::eBlend_0 || blendMode == relive::TBlendModes::eBlend_3);
-    const bool tintByVertexColour = shaded && !scaledDown && mContext.SupportsBrightVertexColours();
+    const bool tintByVertexColour = shaded && !scaledDown && !mHasEmissive && mContext.SupportsBrightVertexColours();
     vertexColour = {1.0f, 1.0f, 1.0f, 1.0f};
     RGBA32 convertedShading = shading;
     if (tintByVertexColour)
@@ -106,63 +145,90 @@ SDL_Texture* Sdl3Texture::GetTextureUsePalette(const std::shared_ptr<AnimationPa
         convertedShading.a = 0;
     }
 
-    if (mFormat != SDL_PIXELFORMAT_INDEX8)
+    if (!mIsSheet)
     {
-        ALIVE_FATAL("%s", "SDL3 attempt to use palette on non-indexed tex");
+        ALIVE_FATAL("%s", "SDL3 attempt to use a sprite on a texture that isn't a sheet");
     }
 
-    // Hashing the palette is most of the cost of drawing a sprite, so it's done once a frame per
-    // palette. Palettes are only changed between frames, by the game objects' updates.
-    if (palette.get() != mHashedPalette || mHashedFrame != mContext.FrameNumber())
-    {
-        mHashedPalette = palette.get();
-        mHashedFrame = mContext.FrameNumber();
-        mHashedPaletteHash = PaletteCache::HashPalette(palette.get());
-    }
-
-    PaletteVariant key;
-    key.mPaletteHash = mHashedPaletteHash;
+    SheetVariant key;
+    key.mFx = fx;
     // The tint only matters when it's converted into the colours
     key.mShading = convertedShading.a == 255 ? convertedShading : RGBA32{0, 0, 0, 0};
     key.mSemiTrans = isSemiTrans;
     key.mBlendMode = blendMode;
+    key.mRect = rect;
     key.mLastUsed = ++mUseCounter;
 
-    // A sprite sheet is often drawn several ways in one frame (palettes, tints, blend modes),
-    // so a few converted copies are kept rather than converting it again each time
-    for (PaletteVariant& variant : mPaletteVariants)
+    // A sprite is often drawn several ways in one frame (effects, tints, blend modes), so the
+    // converted copies are kept rather than converting it again each time
+    const u64 hash = VariantKey(key);
+    auto range = mVariants.equal_range(hash);
+    for (auto it = range.first; it != range.second; ++it)
     {
-        if (variant.mPaletteHash == key.mPaletteHash &&
-            variant.mShading.ToU32() == key.mShading.ToU32() &&
-            variant.mSemiTrans == key.mSemiTrans &&
-            variant.mBlendMode == key.mBlendMode)
+        if (SameVariant(it->second, key))
         {
-            variant.mLastUsed = key.mLastUsed;
-            return variant.mTexture.get();
+            it->second.mLastUsed = key.mLastUsed;
+            return it->second.mTexture.get();
         }
     }
 
-    if (mPaletteVariants.size() >= MaxPaletteVariants())
-    {
-        auto leastRecent = std::min_element(mPaletteVariants.begin(), mPaletteVariants.end(),
-            [](const PaletteVariant& a, const PaletteVariant& b) { return a.mLastUsed < b.mLastUsed; });
-        mPaletteVariants.erase(leastRecent);
-    }
-
-    key.mTexture = MakePaletteVariant(key.mPaletteHash, *palette, key.mShading, isSemiTrans, blendMode);
+    key.mTexture = MakeVariant(key.mFx, key.mShading, isSemiTrans, blendMode, rect);
+    key.mBytes = static_cast<std::size_t>(VariantTextureSize(rect.mW)) * VariantTextureSize(rect.mH) * 4;
     SDL_Texture* pTexture = key.mTexture.get();
-    mPaletteVariants.push_back(std::move(key));
+    mVariantBytes += key.mBytes;
+    mVariants.emplace(hash, std::move(key));
+    TrimVariants();
     return pTexture;
 }
 
-std::size_t Sdl3Texture::MaxPaletteVariants() const
+void Sdl3Texture::TrimVariants()
 {
-    const std::size_t bytesPerPixel = mContext.SupportsPaletteTextures() ? 1 : 4;
-    const std::size_t variantBytes = static_cast<std::size_t>(mWidth) * mHeight * bytesPerPixel;
-    return std::max(kMinPaletteVariants, kPaletteVariantBudgetBytes / std::max<std::size_t>(variantBytes, 1));
+    if (mVariantBytes <= kVariantBudgetBytes)
+    {
+        return;
+    }
+
+    // The least recently used half goes: dropping one at a time would look for them every time
+    std::vector<u32> lastUsed;
+    lastUsed.reserve(mVariants.size());
+    for (const auto& [hash, variant] : mVariants)
+    {
+        lastUsed.push_back(variant.mLastUsed);
+    }
+    std::nth_element(lastUsed.begin(), lastUsed.begin() + lastUsed.size() / 2, lastUsed.end());
+    const u32 threshold = lastUsed[lastUsed.size() / 2];
+
+    for (auto it = mVariants.begin(); it != mVariants.end();)
+    {
+        // Not the one that was just made
+        if (it->second.mLastUsed < threshold && it->second.mLastUsed != mUseCounter)
+        {
+            mVariantBytes -= it->second.mBytes;
+            it = mVariants.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
 }
 
-RGBA32 Sdl3Texture::ConvertPaletteColour(RGBA32 colour, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode)
+// Where a brightness comes among the sprite's colours, 0 (darkest) to 1, see the GLSL luma_rank
+static f32 LumaRank(const SpriteFx& fx, f32 luma)
+{
+    u32 k = 0;
+    while (k < SpriteFx::kLumaPoints - 2 && luma > fx.mLuma[k + 1])
+    {
+        k++;
+    }
+
+    const f32 lo = fx.mLuma[k];
+    const f32 hi = fx.mLuma[k + 1];
+    const f32 f = hi > lo ? std::min(1.0f, std::max(0.0f, (luma - lo) / (hi - lo))) : (luma > hi ? 1.0f : 0.0f);
+    return (k + f) / (SpriteFx::kLumaPoints - 1);
+}
+
+RGBA32 Sdl3Texture::ConvertTexel(const RGBA32& texel, u8 maskFlags, const SpriteFx& fx, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode)
 {
     // This logic is basically a mirror of the GLSL shader, but in
     // software - see ShaderPsx.cpp, and the blend mode stuff in
@@ -170,102 +236,188 @@ RGBA32 Sdl3Texture::ConvertPaletteColour(RGBA32 colour, const RGBA32& shading, b
     // rounded once at the end: rounding at each step makes semi-transparent sprites a little
     // darker, which adds up where many overlap (zap lines).
 
-    if (colour.ToU32() == 0)
+    if (texel.a == 0)
     {
         return {0, 0, 0, 255};
     }
 
-    f32 rgb[3] = {static_cast<f32>(colour.r), static_cast<f32>(colour.g), static_cast<f32>(colour.b)};
-    const u8 shade[3] = {shading.r, shading.g, shading.b};
+    // What the sheet's mask says about the texel, see SpriteMask.hpp
+    const bool emissive = (maskFlags & SpriteMask::kGlow) != 0;
+    const bool keepVisible = (maskFlags & SpriteMask::kKeepVisible) != 0;
+    bool stp = (maskFlags & SpriteMask::kSolid) == 0;
+    f32 a = texel.a / 255.0f;
 
-    if (shading.a == 255) // Shading required
+    f32 rgb[3] = {texel.r / 255.0f, texel.g / 255.0f, texel.b / 255.0f};
+
+    if (!fx.IsIdentity())
     {
+        // How bright the colour is among the sprite's, before the effects change it
+        const f32 rank = LumaRank(fx, rgb[0] * 0.299f + rgb[1] * 0.587f + rgb[2] * 0.114f);
+        const f32 in[4] = {rgb[0], rgb[1], rgb[2], 1.0f};
+        for (s32 ch = 0; ch < 3; ch++)
+        {
+            f32 v = 0.0f;
+            for (s32 c = 0; c < 4; c++)
+            {
+                v += fx.mMatrix[ch][c] * in[c];
+            }
+            rgb[ch] = std::min(1.0f, std::max(0.0f, v - 0.0f));
+        }
+
+        // The invisibility leaves some of the colours alone
+        if (!keepVisible)
+        {
+            for (s32 ch = 0; ch < 3; ch++)
+            {
+                rgb[ch] = std::min(1.0f, std::max(0.0f, rgb[ch] - fx.mSubtract));
+            }
+
+            if (fx.mForceBlend)
+            {
+                stp = true;
+            }
+        }
+
+        for (const SpriteFx::Sweep& sweep : fx.mSweeps)
+        {
+            if (a > 0.0f && sweep.mProgress > 0.0f && rank <= sweep.mProgress + 0.001f)
+            {
+                if (sweep.mKind == 2)
+                {
+                    // The transparent colour: erased
+                    a = 0.0f;
+                }
+                else
+                {
+                    rgb[0] = sweep.mR;
+                    rgb[1] = sweep.mG;
+                    rgb[2] = sweep.mB;
+                    a = 1.0f;
+                    stp = sweep.mKind == 1;
+                }
+            }
+        }
+
+        if (a == 0.0f)
+        {
+            return {0, 0, 0, 255};
+        }
+    }
+
+    for (f32& channel : rgb)
+    {
+        channel *= 255.0f;
+    }
+
+    if (shading.a == 255 && !emissive) // Shading required
+    {
+        const u8 shade[3] = {shading.r, shading.g, shading.b};
         for (s32 i = 0; i < 3; i++)
         {
             rgb[i] = std::min(255.0f, (rgb[i] * (shade[i] / 255.0f)) / 0.5f);
         }
     }
 
-    f32 scale = 1.0f;
-    u8 alpha = 0;
-    if (isSemiTrans && colour.a == 255)
+    // The colour is what's added, the alpha how much of what's already there stays
+    f32 scale = a;
+    f32 dstFactor = 1.0f - a;
+    if (isSemiTrans && stp)
     {
         switch (blendMode)
         {
             case relive::TBlendModes::eBlend_0: // HALF_DST_ADD_HALF_SRC
-                scale = 0.5f;
-                alpha = 128;
+                scale = 0.5f * a;
+                dstFactor = 1.0f - 0.5f * a;
                 break;
 
             case relive::TBlendModes::eBlend_1: // ONE_DST_ADD_ONE_SRC
-            case relive::TBlendModes::eBlend_2: // ONE_DST_SUB_ONE_SRC
-                alpha = 255;
+                scale = a;
+                dstFactor = 1.0f;
+                break;
+
+            case relive::TBlendModes::eBlend_2: // ONE_DST_SUB_ONE_SRC: taken away by the alpha
+                scale = 1.0f;
+                dstFactor = a;
                 break;
 
             case relive::TBlendModes::eBlend_3: // ONE_DST_ADD_QRT_SRC
-                scale = 0.25f;
-                alpha = 255;
+                scale = 0.25f * a;
+                dstFactor = 1.0f;
                 break;
 
             default:
                 ALIVE_FATAL("SDL3 Invalid blend mode %u", static_cast<u32>(blendMode));
         }
     }
+    else if (blendMode == relive::TBlendModes::eBlend_2)
+    {
+        // Not blended, in a texture that subtracts: leave it
+        scale = 1.0f;
+        dstFactor = 0.0f;
+    }
 
     return {
         static_cast<u8>(rgb[0] * scale + 0.5f),
         static_cast<u8>(rgb[1] * scale + 0.5f),
         static_cast<u8>(rgb[2] * scale + 0.5f),
-        alpha};
+        static_cast<u8>(dstFactor * 255.0f + 0.5f)};
 }
 
-SdlTexturePtr Sdl3Texture::MakePaletteVariant(u32 paletteHash, const AnimationPal& palette, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode)
+SdlTexturePtr Sdl3Texture::MakeVariant(const SpriteFx& fx, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode, const SpriteRect& rect)
 {
-    // Each palette entry is converted once
-    RGBA32 converted[256];
-    for (s32 i = 0; i < 256; i++)
+    SdlTexturePtr texture = mContext.CreateTexture(SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, VariantTextureSize(rect.mW), VariantTextureSize(rect.mH));
+
+    const std::size_t pixelCount = static_cast<std::size_t>(rect.mW) * rect.mH;
+    RGBA32* pPixels = reinterpret_cast<RGBA32*>(mContext.ScratchPixels(pixelCount).data());
+    const RGBA32* pSource = reinterpret_cast<const RGBA32*>(mSheetPixels.data());
+
+    // Sprites are made of a few colours, so each colour is only converted once: the last results
+    // are kept by colour and mask in a small table
+    struct Memo final
     {
-        converted[i] = ConvertPaletteColour(palette.mPal[i], shading, isSemiTrans, blendMode);
+        u32 mSource = 0;
+        u8 mFlags = 0;
+        RGBA32 mResult = {};
+        bool mValid = false;
+    };
+    constexpr u32 kMemoSize = 1024;
+    std::vector<Memo> memo(kMemoSize);
+    const bool hasMask = !mMaskPixels.empty();
+    const RGBA32 transparent = ConvertTexel({0, 0, 0, 0}, 0, fx, shading, isSemiTrans, blendMode);
+    for (s32 y = 0; y < rect.mH; y++)
+    {
+        const std::size_t sheetRow = static_cast<std::size_t>(rect.mY + y) * mWidth + rect.mX;
+        for (s32 x = 0; x < rect.mW; x++)
+        {
+            const std::size_t i = sheetRow + x;
+            RGBA32& out = pPixels[static_cast<std::size_t>(y) * rect.mW + x];
+
+            // Most of a sheet is nothing
+            if (pSource[i].a == 0)
+            {
+                out = transparent;
+                continue;
+            }
+
+            const u32 source = pSource[i].ToU32();
+            const u8 flags = hasMask ? SpriteMask::Get(&mMaskPixels[i * 4]) : 0;
+            Memo& entry = memo[((source ^ (flags * 0x9E3779B1u)) * 2654435761u) >> 22];
+            if (!entry.mValid || entry.mSource != source || entry.mFlags != flags)
+            {
+                entry.mSource = source;
+                entry.mFlags = flags;
+                entry.mResult = ConvertTexel(pSource[i], flags, fx, shading, isSemiTrans, blendMode);
+                entry.mValid = true;
+            }
+            out = entry.mResult;
+        }
     }
 
-    // Static and uploaded in one go: a streaming texture would get a staging buffer of its own
-    SdlTexturePtr texture;
-    if (mContext.SupportsPaletteTextures())
+    // Only the rect is filled in, the rest of the texture is never drawn
+    const SDL_Rect filled = {0, 0, rect.mW, rect.mH};
+    if (!SDL_UpdateTexture(texture.get(), &filled, pPixels, rect.mW * 4))
     {
-        // The pixels go up as they are, and the converted colours become the texture's palette
-        texture = mContext.CreateTexture(SDL_PIXELFORMAT_INDEX8, SDL_TEXTUREACCESS_STATIC, mWidth, mHeight);
-        if (!SDL_UpdateTexture(texture.get(), nullptr, mIndexedPixels.data(), static_cast<s32>(mWidth)))
-        {
-            ALIVE_FATAL("SDL_UpdateTexture failed: %s", SDL_GetError());
-        }
-
-        SDL_Color colours[256];
-        for (s32 i = 0; i < 256; i++)
-        {
-            colours[i] = {converted[i].r, converted[i].g, converted[i].b, converted[i].a};
-        }
-
-        if (!SDL_SetTexturePalette(texture.get(), mContext.SharedPalette({paletteHash, shading.ToU32(), (static_cast<u32>(isSemiTrans) << 8) | static_cast<u32>(blendMode)}, colours)))
-        {
-            ALIVE_FATAL("SDL_SetTexturePalette failed: %s", SDL_GetError());
-        }
-    }
-    else
-    {
-        // Each pixel looked up in the converted palette
-        texture = mContext.CreateTexture(SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, mWidth, mHeight);
-
-        const std::size_t pixelCount = mIndexedPixels.size();
-        RGBA32* pPixels = reinterpret_cast<RGBA32*>(mContext.ScratchPixels(pixelCount).data());
-        for (std::size_t i = 0; i < pixelCount; i++)
-        {
-            pPixels[i] = converted[mIndexedPixels[i]];
-        }
-
-        if (!SDL_UpdateTexture(texture.get(), nullptr, pPixels, static_cast<s32>(mWidth * 4)))
-        {
-            ALIVE_FATAL("SDL_UpdateTexture failed: %s", SDL_GetError());
-        }
+        ALIVE_FATAL("SDL_UpdateTexture failed: %s", SDL_GetError());
     }
     mContext.CountTextureUpload();
 
@@ -295,39 +447,28 @@ void Sdl3Texture::SetTextureBlendMode(SDL_BlendMode blendMode)
 
 void Sdl3Texture::Update(const SDL_Rect* rect, const void* pixels)
 {
-    if (mFormat == SDL_PIXELFORMAT_INDEX8)
-    {
-        memcpy(mIndexedPixels.data(), pixels, mIndexedPixels.size());
+    u32 pitch = 0;
 
-        // Made from the old pixels
-        mPaletteVariants.clear();
+    switch (mFormat)
+    {
+        case SDL_PIXELFORMAT_RGBA32:
+            pitch = mWidth * 4;
+            break;
+
+        case SDL_PIXELFORMAT_RGB565:
+        {
+            pitch = rect ? rect->w * 2 : mWidth * 2;
+            break;
+        }
+
+        default:
+            ALIVE_FATAL("SDL3 - Unsupported texture format %d", mFormat);
+            break;
     }
-    else
+
+    if (!SDL_UpdateTexture(mTexture.get(), rect, pixels, pitch))
     {
-        u32 pitch = 0;
-
-        switch (mFormat)
-        {
-            case SDL_PIXELFORMAT_RGBA32:
-                pitch = mWidth * 4;
-                break;
-
-            case SDL_PIXELFORMAT_RGB565:
-            {
-                pitch = rect ? rect->w * 2 : mWidth * 2;
-                break;
-            }
-
-            default:
-                ALIVE_FATAL("SDL3 - Unsupported texture format %d", mFormat);
-                break;
-        }
-
-        if (!SDL_UpdateTexture(mTexture.get(), rect, pixels, pitch))
-        {
-            ALIVE_FATAL("Sdl3Texture::Update: SDL_UpdateTexture failed (format=%d, %ux%u, pixels=%p): %s",
-                        mFormat, mWidth, mHeight, pixels, SDL_GetError());
-        }
+        ALIVE_FATAL("Sdl3Texture::Update: SDL_UpdateTexture failed (format=%d, %ux%u, pixels=%p): %s",
+                    mFormat, mWidth, mHeight, pixels, SDL_GetError());
     }
 }
-

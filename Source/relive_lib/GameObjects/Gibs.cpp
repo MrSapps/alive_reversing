@@ -150,9 +150,9 @@ Gibs::Gibs(GibType gibType, FP xpos, FP ypos, FP xOff, FP yOff, FP scale, bool b
     const AnimRecord& headGibRec = PerGameAnimRec(headGib);
 
     // TODO: It is assumed all 3 gib parts use the same pal - might not be true for mods
-    if (headGibRec.mPalOverride == PalId::BlindMud)
+    if (headGibRec.mPalOverride == PalId::BlindMudGib)
     {
-        mLoadedPals.push_back(mResMan.LoadPal(PalId::BlindMud));
+        mLoadedPals.push_back(mResMan.LoadPal(PalId::BlindMudGib));
     }
 
     LoadAnimations(headGib, armGib, bodyGib);
@@ -296,9 +296,9 @@ Gibs::Gibs(GibType gibType, FP xpos, FP ypos, FP xOff, FP yOff, FP scale, bool b
             }
         }
 
-        if (headGibRec.mPalOverride == PalId::BlindMud)
+        if (headGibRec.mPalOverride == PalId::BlindMudGib)
         {
-            pPart->mAnimation.LoadPal(GetPalRes(PalId::BlindMud));
+            pPart->mAnimation.LoadPal(GetPalRes(PalId::BlindMudGib));
         }
         else if (gibPal != PalId::Default)
         {

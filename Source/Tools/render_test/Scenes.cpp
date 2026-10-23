@@ -780,8 +780,7 @@ public:
         for (s32 i = 0; i < 32; i++)
         {
             auto card = MakeCard(ctx.mRes.mTestCard, 20 + (i % 16) * 40, kContentTop + 30 + (i / 16) * 50);
-            std::shared_ptr<AnimationPal> pal = ctx.mRes.mPalettes[i * 2];
-            card->mAnim.LoadPal(pal);
+            card->mAnim.Fx() = ctx.mRes.mHueShifts[i * 2];
             mCards.push_back(std::move(card));
         }
 
@@ -790,8 +789,7 @@ public:
 
     void Update(SceneContext& ctx, u32 frame) override
     {
-        std::shared_ptr<AnimationPal> pal = ctx.mRes.mPalettes[frame % ctx.mRes.mPalettes.size()];
-        mCycling->mAnim.LoadPal(pal);
+        mCycling->mAnim.Fx() = ctx.mRes.mHueShifts[frame % ctx.mRes.mHueShifts.size()];
     }
 
     void Render(SceneContext& ctx, OrderingTable& ot) override
@@ -804,6 +802,168 @@ public:
 private:
     std::vector<std::unique_ptr<SceneSprite>> mCards;
     std::unique_ptr<SceneSprite> mCycling;
+};
+
+class TrueColourAlphaScene final : public Scene
+{
+public:
+    const char* Title() const override
+    {
+        return "True colour alpha";
+    }
+
+    const char* Expected() const override
+    {
+        return "Rows: opaque, B0, B1, B2, B3. Cards: alpha bar (transparent on the left), soft glow,\n"
+               "swatches: blends, solid, glows. Opaque row: all 3 alike. Blend rows: 1st blends, 2nd stays\n"
+               "solid. Last card tinted dark: only the glowing swatch ignores the tint";
+    }
+
+    bool IsStatic() const override
+    {
+        return true;
+    }
+
+    void Enter(SceneContext& ctx) override
+    {
+        for (s32 row = 0; row < 5; row++)
+        {
+            for (s32 band = 0; band < 8; band++)
+            {
+                auto card = MakeCard(ctx.mRes.mAlphaCard, 40 + band * 80, kContentTop + 20 + row * 41);
+                ApplyBlend(card->mAnim, kBlendChoices[row]);
+                if (band == 7)
+                {
+                    card->mAnim.SetRGB(40, 40, 40);
+                }
+                mCards.push_back(std::move(card));
+            }
+        }
+    }
+
+    void Render(SceneContext& ctx, OrderingTable& ot) override
+    {
+        ctx.DrawCamera(ot, ctx.mRes.mBandsCam);
+        RenderAll(mCards, ot);
+    }
+
+private:
+    std::vector<std::unique_ptr<SceneSprite>> mCards;
+};
+
+// The effects that went through the sprites' palettes, as the game objects do them
+class PaletteEffectsScene final : public Scene
+{
+public:
+    const char* Title() const override
+    {
+        return "Palette effects";
+    }
+
+    const char* Expected() const override
+    {
+        return "Rows: electrocution AE (blue eats the card, dark parts first), AO (white leads, blue and\n"
+               "black trail and erase it), invisibility (card is added to the picture and fades away).\n"
+               "Bottom: AE, AO and invisibility playing out";
+    }
+
+    void Enter(SceneContext& ctx) override
+    {
+        for (s32 i = 0; i < kStages; i++)
+        {
+            const f32 progress = static_cast<f32>(i) / (kStages - 1);
+
+            // The electrocuted target is drawn at full brightness
+            auto ae = MakeCard(ctx.mRes.mTestCard, 40 + i * 80, kContentTop + 22);
+            ae->mAnim.SetRGB(255, 255, 255);
+            SetSweep(ae->mAnim.Fx(), 0, progress, 64, 64, 248, 1);
+            mCards.push_back(std::move(ae));
+
+            auto ao = MakeCard(ctx.mRes.mTestCard, 40 + i * 80, kContentTop + 66);
+            ao->mAnim.SetRGB(255, 255, 255);
+            SetSweep(ao->mAnim.Fx(), 0, std::min(1.0f, progress * 1.6f), 248, 248, 248, 1);
+            SetSweep(ao->mAnim.Fx(), 1, std::max(0.0f, std::min(1.0f, progress * 1.6f - 0.3f)), 64, 64, 248, 1);
+            SetSweep(ao->mAnim.Fx(), 2, std::max(0.0f, std::min(1.0f, progress * 1.6f - 0.6f)), 0, 0, 0, 2);
+            mCards.push_back(std::move(ao));
+
+            // Invisibility adds the sprite to the picture, and takes a bit off each channel a step
+            auto invisible = MakeCard(ctx.mRes.mTestCard, 40 + i * 80, kContentTop + 110);
+            invisible->mAnim.SetSemiTrans(true);
+            invisible->mAnim.SetBlending(false);
+            invisible->mAnim.SetRGB(127, 127, 127);
+            invisible->mAnim.SetBlendMode(relive::TBlendModes::eBlend_1);
+            invisible->mAnim.Fx().mForceBlend = 1;
+            invisible->mAnim.Fx().mSubtract = std::min(31.0f, 31.0f * progress) * 8.0f / 255.0f;
+            mCards.push_back(std::move(invisible));
+        }
+
+        mAnimatedAe = MakeCard(ctx.mRes.mTestCard, 120, kContentTop + 154);
+        mAnimatedAe->mAnim.SetRGB(255, 255, 255);
+
+        mAnimatedAo = MakeCard(ctx.mRes.mTestCard, 280, kContentTop + 154);
+        mAnimatedAo->mAnim.SetRGB(255, 255, 255);
+
+        mAnimatedInvisible = MakeCard(ctx.mRes.mTestCard, 440, kContentTop + 154);
+        mAnimatedInvisible->mAnim.SetSemiTrans(true);
+        mAnimatedInvisible->mAnim.SetBlending(false);
+        mAnimatedInvisible->mAnim.SetRGB(127, 127, 127);
+        mAnimatedInvisible->mAnim.SetBlendMode(relive::TBlendModes::eBlend_1);
+        mAnimatedInvisible->mAnim.Fx().mForceBlend = 1;
+    }
+
+    void Update(SceneContext& /*ctx*/, u32 frame) override
+    {
+        // 8 entries at a time over a palette of 64: 9 steps, one per frame, then holds
+        const f32 sweep = std::min(1.0f, ((frame % 40) / 4) / 8.0f);
+        SetSweep(mAnimatedAe->mAnim.Fx(), 0, sweep, 64, 64, 248, 1);
+
+        SetSweep(mAnimatedAo->mAnim.Fx(), 0, std::min(1.0f, sweep * 1.6f), 248, 248, 248, 1);
+        SetSweep(mAnimatedAo->mAnim.Fx(), 1, std::max(0.0f, std::min(1.0f, sweep * 1.6f - 0.3f)), 64, 64, 248, 1);
+        SetSweep(mAnimatedAo->mAnim.Fx(), 2, std::max(0.0f, std::min(1.0f, sweep * 1.6f - 0.6f)), 0, 0, 0, 2);
+
+        // Out in 31 steps of 2 frames, back in 31 of 6, which doesn't fit: it's the first part of that
+        const u32 cycle = frame % 120;
+        const u32 steps = cycle < 62 ? cycle / 2 : (cycle < 100 ? 31 - (cycle - 62) / 2 : 0);
+        mAnimatedInvisible->mAnim.Fx().mSubtract = std::min<u32>(31, steps) * 8.0f / 255.0f;
+    }
+
+    void Render(SceneContext& ctx, OrderingTable& ot) override
+    {
+        ctx.DrawCamera(ot, ctx.mRes.mGridCam);
+        for (auto& card : mCards)
+        {
+            UseCardLuma(*card);
+        }
+        UseCardLuma(*mAnimatedAe);
+        UseCardLuma(*mAnimatedAo);
+        RenderAll(mCards, ot);
+        mAnimatedAe->Render(ot);
+        mAnimatedAo->Render(ot);
+        mAnimatedInvisible->Render(ot);
+    }
+
+private:
+    static constexpr s32 kStages = 8;
+
+    static void SetSweep(SpriteFx& fx, u32 index, f32 progress, u8 r, u8 g, u8 b, u32 kind)
+    {
+        fx.mSweeps[index].mProgress = progress;
+        fx.mSweeps[index].mR = r / 255.0f;
+        fx.mSweeps[index].mG = g / 255.0f;
+        fx.mSweeps[index].mB = b / 255.0f;
+        fx.mSweeps[index].mKind = kind;
+    }
+
+    // The sweeps go by the brightness ranks of the card's colours
+    static void UseCardLuma(SceneSprite& card)
+    {
+        card.mAnim.Fx().SetLuma(card.mAnim.mAnimRes.mJsonPtr->mAttributes.mLuma);
+    }
+
+    std::vector<std::unique_ptr<SceneSprite>> mCards;
+    std::unique_ptr<SceneSprite> mAnimatedAe;
+    std::unique_ptr<SceneSprite> mAnimatedAo;
+    std::unique_ptr<SceneSprite> mAnimatedInvisible;
 };
 
 class TextScene final : public Scene
@@ -915,8 +1075,7 @@ private:
         Card card;
         card.mSprite = MakeCard(ctx.mRes.mTestCard, 0, y);
         card.mSprite->mAnim.SetRenderLayer(layer);
-        std::shared_ptr<AnimationPal> pal = ctx.mRes.mPalettes[paletteIdx];
-        card.mSprite->mAnim.LoadPal(pal);
+        card.mSprite->mAnim.Fx() = ctx.mRes.mHueShifts[paletteIdx];
         card.mPhase = phase;
         mCards.push_back(std::move(card));
     }
@@ -1778,5 +1937,8 @@ std::vector<SceneFactory> AllScenes()
         &MakeScene<StressStateChangesScene>,
         &MakeScene<StressPolygonsScene>,
         &MakeScene<TextureChurnScene>,
+        // Added after the rest so the others keep their numbers (and baselines)
+        &MakeScene<TrueColourAlphaScene>,
+        &MakeScene<PaletteEffectsScene>,
     };
 }

@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "TestResources.hpp"
-#include "../../relive_lib/data_conversion/AnimationConverter.hpp"
+#include "../../relive_lib/SpriteMask.hpp"
+#include "../../relive_lib/data_conversion/PaletteFit.hpp"
+#include <array>
 #include "../../relive_lib/AnimResources.hpp"
 #include <algorithm>
 #include <cmath>
@@ -112,6 +114,9 @@ private:
     std::shared_ptr<std::vector<u8>> mPixels;
 };
 
+// The colours of a sheet's palette indices
+using TestPalette = std::array<RGBA32, 256>;
+
 // A sprite sheet of palette indices drawn in code, with its frames side by side
 class RenderTestSheet final
 {
@@ -165,11 +170,28 @@ public:
     }
 
     // Each frame is anchored at its centre, so flipping doesn't move it
-    AnimResource Build(AnimId id, std::shared_ptr<AnimationPal> pal, u32 frameDelay, bool loop) const
+    AnimResource Build(AnimId id, const TestPalette& pal, u32 frameDelay, bool loop) const
     {
         auto png = std::make_shared<PngData>();
-        png->mPal = std::move(pal);
-        png->mPixels = mPixels;
+        // True colour, like the sheets from the data conversion: the palette's semi-transparency
+        // bit goes in the mask
+        png->mRgba.resize(mPixels.size() * 4);
+        std::vector<u8> mask(mPixels.size() * 4);
+        bool anySolid = false;
+        for (std::size_t i = 0; i < mPixels.size(); i++)
+        {
+            const RGBA32& entry = pal[mPixels[i]];
+            const bool transparent = entry.r == 0 && entry.g == 0 && entry.b == 0 && entry.a == 0;
+            const RGBA32 pixel = transparent ? RGBA32{0, 0, 0, 0} : RGBA32{entry.r, entry.g, entry.b, 255};
+            memcpy(&png->mRgba[i * 4], &pixel, 4);
+            const bool solid = !transparent && entry.a != 255;
+            SpriteMask::Set(&mask[i * 4], solid ? SpriteMask::kSolid : 0);
+            anySolid = anySolid || solid;
+        }
+        if (anySolid)
+        {
+            png->mMask = std::move(mask);
+        }
         png->mWidth = mFrameWidth * mFrameCount;
         png->mHeight = mFrameHeight;
 
@@ -194,6 +216,8 @@ public:
             frames->mFrames.push_back(frame);
         }
 
+        SpriteFx::ComputeLuma(png->mRgba, frames->mAttributes.mLuma);
+        frames->mAttributes.mHasLuma = true;
         return AnimResource(id, frames, png);
     }
 
@@ -220,41 +244,41 @@ RGBA32 TestResources::SemiTrans(u8 r, u8 g, u8 b)
     return {r, g, b, 255};
 }
 
-static std::shared_ptr<AnimationPal> MakeTestCardPalette(f32 hueShift)
+static TestPalette MakeTestCardPalette(f32 hueShift)
 {
-    auto pal = std::make_shared<AnimationPal>();
-    pal->mPal[TestResources::eTransparent] = {0, 0, 0, 0};
-    pal->mPal[TestResources::eWhite] = TestResources::Opaque(255, 255, 255);
-    pal->mPal[TestResources::eNearBlack] = TestResources::Opaque(0, 0, 0);
-    pal->mPal[TestResources::eMarker] = TestResources::Opaque(64, 64, 64);
+    TestPalette pal = {};
+    pal[TestResources::eTransparent] = {0, 0, 0, 0};
+    pal[TestResources::eWhite] = TestResources::Opaque(255, 255, 255);
+    pal[TestResources::eNearBlack] = TestResources::Opaque(0, 0, 0);
+    pal[TestResources::eMarker] = TestResources::Opaque(64, 64, 64);
 
     const RenderTestRgb red = HsvToRgb(0.0f + hueShift, 1.0f, 0.85f);
     const RenderTestRgb green = HsvToRgb(120.0f + hueShift, 1.0f, 0.85f);
     const RenderTestRgb blue = HsvToRgb(240.0f + hueShift, 1.0f, 0.85f);
-    pal->mPal[TestResources::eOpaqueRed] = TestResources::Opaque(red.r, red.g, red.b);
-    pal->mPal[TestResources::eOpaqueGreen] = TestResources::Opaque(green.r, green.g, green.b);
-    pal->mPal[TestResources::eOpaqueBlue] = TestResources::Opaque(blue.r, blue.g, blue.b);
-    pal->mPal[TestResources::eSemiRed] = TestResources::SemiTrans(red.r, red.g, red.b);
-    pal->mPal[TestResources::eSemiGreen] = TestResources::SemiTrans(green.r, green.g, green.b);
-    pal->mPal[TestResources::eSemiBlue] = TestResources::SemiTrans(blue.r, blue.g, blue.b);
+    pal[TestResources::eOpaqueRed] = TestResources::Opaque(red.r, red.g, red.b);
+    pal[TestResources::eOpaqueGreen] = TestResources::Opaque(green.r, green.g, green.b);
+    pal[TestResources::eOpaqueBlue] = TestResources::Opaque(blue.r, blue.g, blue.b);
+    pal[TestResources::eSemiRed] = TestResources::SemiTrans(red.r, red.g, red.b);
+    pal[TestResources::eSemiGreen] = TestResources::SemiTrans(green.r, green.g, green.b);
+    pal[TestResources::eSemiBlue] = TestResources::SemiTrans(blue.r, blue.g, blue.b);
 
     for (s32 i = TestResources::eGlowFirst; i <= TestResources::eGlowLast; i++)
     {
         const u8 v = static_cast<u8>(255 * (i - TestResources::eGlowFirst + 1) / (TestResources::eGlowLast - TestResources::eGlowFirst + 1));
-        pal->mPal[i] = TestResources::SemiTrans(v, v, v);
+        pal[i] = TestResources::SemiTrans(v, v, v);
     }
     return pal;
 }
 
 // A glow palette of one colour, for particles
-static std::shared_ptr<AnimationPal> MakeGlowPalette(u8 r, u8 g, u8 b)
+static TestPalette MakeGlowPalette(u8 r, u8 g, u8 b)
 {
-    auto pal = std::make_shared<AnimationPal>();
+    TestPalette pal = {};
     for (s32 i = TestResources::eGlowFirst; i <= TestResources::eGlowLast; i++)
     {
         const s32 step = i - TestResources::eGlowFirst + 1;
         const s32 steps = TestResources::eGlowLast - TestResources::eGlowFirst + 1;
-        pal->mPal[i] = TestResources::SemiTrans(
+        pal[i] = TestResources::SemiTrans(
             static_cast<u8>(r * step / steps),
             static_cast<u8>(g * step / steps),
             static_cast<u8>(b * step / steps));
@@ -471,6 +495,95 @@ static Fg1Resource MakeFg1()
     return fg1;
 }
 
+static AnimResource MakeAlphaCard()
+{
+    constexpr u32 kSize = 48;
+    auto png = std::make_shared<PngData>();
+    png->mWidth = kSize;
+    png->mHeight = kSize;
+    png->mRgba.assign(kSize * kSize * 4, 0);
+    png->mMask.assign(kSize * kSize * 4, 0);
+    for (std::size_t i = 3; i < png->mMask.size(); i += 4)
+    {
+        png->mMask[i] = 255;
+    }
+
+    auto set = [&](u32 x, u32 y, u8 r, u8 g, u8 b, u8 a, u8 maskFlags = 0)
+    {
+        u8* pPixel = &png->mRgba[(y * kSize + x) * 4];
+        pPixel[0] = r;
+        pPixel[1] = g;
+        pPixel[2] = b;
+        pPixel[3] = a;
+        SpriteMask::Set(&png->mMask[(y * kSize + x) * 4], maskFlags);
+    };
+
+    // The bar: alpha 0 to 255 across 44 pixels
+    for (u32 y = 2; y < 12; y++)
+    {
+        for (u32 x = 2; x < 46; x++)
+        {
+            set(x, y, 255, 160, 40, static_cast<u8>(255 * (x - 2) / 43));
+        }
+    }
+
+    // The glow
+    for (u32 y = 14; y < 34; y++)
+    {
+        for (u32 x = 14; x < 34; x++)
+        {
+            const f32 distance = std::hypot(x - 23.5f, y - 23.5f);
+            if (distance < 10.0f)
+            {
+                set(x, y, 255, 255, 255, static_cast<u8>(255 * (1.0f - distance / 10.0f)));
+            }
+        }
+    }
+
+    // The swatches
+    const u8 swatchMasks[3] = {0, SpriteMask::kSolid, SpriteMask::kGlow};
+    for (u32 swatch = 0; swatch < 3; swatch++)
+    {
+        for (u32 y = 36; y < 46; y++)
+        {
+            for (u32 x = 2 + swatch * 15; x < 2 + swatch * 15 + 13; x++)
+            {
+                set(x, y, 190, 190, 190, 255, swatchMasks[swatch]);
+            }
+        }
+    }
+
+    auto frames = std::make_shared<AnimationAttributesAndFrames>();
+    frames->mAttributes.mFrameRate = 1;
+    frames->mAttributes.mLoop = true;
+    frames->mAttributes.mLoopStartFrame = 0;
+    frames->mAttributes.mMaxWidth = kSize;
+    frames->mAttributes.mMaxHeight = kSize;
+
+    PerFrameInfo frame;
+    frame.mXOffset = -static_cast<s32>(kSize / 2);
+    frame.mYOffset = -static_cast<s32>(kSize / 2);
+    frame.mWidth = kSize;
+    frame.mHeight = kSize;
+    frame.mSpriteWidth = kSize;
+    frame.mSpriteHeight = kSize;
+    frames->mFrames.push_back(frame);
+
+    return AnimResource(AnimId::None, frames, png);
+}
+
+SpriteFx TestResources::MakeHueShift(f32 degrees)
+{
+    // The way the data conversion makes a palette swap: the change of colours that takes the test
+    // card's palette to the same palette with its hues rotated
+    const TestPalette from = MakeTestCardPalette(0.0f);
+    const TestPalette to = MakeTestCardPalette(degrees);
+
+    SpriteFx fx;
+    PaletteFit::Fit(from.data(), to.data(), 32, fx.mMatrix);
+    return fx;
+}
+
 TestResources::TestResources(ResourceManagerWrapper& resMan)
 {
     mGridCam = MakeGridCam();
@@ -483,8 +596,10 @@ TestResources::TestResources(ResourceManagerWrapper& resMan)
     constexpr s32 kPaletteCount = 64;
     for (s32 i = 0; i < kPaletteCount; i++)
     {
-        mPalettes.push_back(MakeTestCardPalette(360.0f * i / kPaletteCount));
+        mHueShifts.push_back(MakeHueShift(360.0f * i / kPaletteCount));
     }
+
+    mAlphaCard = MakeAlphaCard();
 
     RenderTestSheet particle(16, 16, 1);
     particle.FillGlow(0, 8.0f);

@@ -2364,9 +2364,10 @@ const char* ToString(EAnimGroup animGroup)
     }
 }
 
-PalRecConversionInfo kPalConversionInfo[17] =
+PalRecConversionInfo kPalConversionInfo[18] =
 {
     { PalId::BlindMud,               false },
+    { PalId::BlindMudGib,            false },
     { PalId::GreenFlash,             false },
     { PalId::BlueRock,               false },
     { PalId::AngryMud,               false },
@@ -2391,6 +2392,8 @@ const char* ToString(PalId pal)
     {
     case PalId::BlindMud:
          return "blind_mud.pal";
+    case PalId::BlindMudGib:
+        return "blind_mud_gib.pal";
     case PalId::GreenFlash:
         return "green_flash.pal";
     case PalId::BlueRock:

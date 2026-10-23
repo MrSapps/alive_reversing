@@ -364,7 +364,7 @@ SET(renderer_src
     Renderer/IRenderer.cpp
     Renderer/FrameStatsOverlay.hpp
     Renderer/FrameStatsOverlay.cpp
-    Renderer/PaletteCache.hpp
+    Renderer/SpriteFxCache.hpp
     Renderer/TextureCache.hpp
     Renderer/OpenGL3/Batcher.hpp
     Renderer/OpenGL3/Batcher.cpp
@@ -552,6 +552,13 @@ SET(data_conversion_src
     data_conversion/PathTlvsAO.hpp
     data_conversion/AnimConversionInfo.hpp
     data_conversion/AnimConversionInfo.cpp
+    SpriteAtlasPacker.cpp
+    SpriteFx.cpp
+    SpriteAtlasPacker.hpp
+    data_conversion/PaletteFit.cpp
+    data_conversion/SpritePageWriter.cpp
+    data_conversion/SpritePageWriter.hpp
+    data_conversion/PaletteFit.hpp
     data_conversion/PNGFile.hpp
     data_conversion/PNGFile.cpp
     data_conversion/AOSaveConverter.hpp
@@ -858,7 +865,10 @@ add_executable(relive_lib_tests
     tests/MovieFrameSyncTests.cpp
     tests/ConversionProgressTests.cpp
     tests/EtaEstimatorTests.cpp
-    tests/PaletteCacheTests.cpp
+    tests/SpriteFxCacheTests.cpp
+    tests/PaletteFitTests.cpp
+    tests/SpriteAtlasPackerTests.cpp
+    tests/SpritePageWriterTests.cpp
     tests/TextureCacheTests.cpp
     tests/BatcherTests.cpp
     tests/SoundTestData.cpp

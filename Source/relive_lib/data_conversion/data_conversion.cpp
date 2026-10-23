@@ -17,9 +17,12 @@
 #include "FG1PngReader.hpp"
 #include "../Collisions.hpp"
 #include "AnimationConverter.hpp"
+#include "SpritePageWriter.hpp"
 #include "relive_tlvs_conversion.hpp"
 #include "Collisions.hpp"
 #include "AnimConversionInfo.hpp"
+#include "PaletteFit.hpp"
+#include "../SpriteMask.hpp"
 #include "PNGFile.hpp"
 #include "AOSaveConverter.hpp"
 #include "AESaveConverter.hpp"
@@ -535,9 +538,7 @@ static void SaveLevelInfoJson(const FileSystem::Path& dataDir, EReliveLevelIds /
     SaveJson(j, fs, pathJsonFile);
 }
 
-extern PalRecConversionInfo kPalConversionInfo[17];
-
-static void ConvertPal(FileSystem& fs, const FileSystem::Path& dataDir, const char* pFileName, const u16* pData, u32 len);
+extern PalRecConversionInfo kPalConversionInfo[18];
 
 static void LogNonConvertedPals(bool isAo)
 {
@@ -554,7 +555,7 @@ static void LogNonConvertedPals(bool isAo)
     }
 }
 
-static void ConvertPals(FileSystem& fs, const FileSystem::Path& dataDir, std::vector<u8>& fileBuffer, LvlReader& lvlReader, bool isAo, ConversionProgress& progress)
+static void ConvertPals(std::vector<u8>& fileBuffer, LvlReader& lvlReader, bool isAo, ConversionProgress& progress)
 {
     for (auto& rec : kPalConversionInfo)
     {
@@ -579,7 +580,8 @@ static void ConvertPals(FileSystem& fs, const FileSystem::Path& dataDir, std::ve
                             u32 palLen = *reinterpret_cast<const u32*>(palData.data());
                             const u16* pPalData = reinterpret_cast<const u16*>(palData.data()) + 2;
 
-                            ConvertPal(fs, dataDir, ToString(rec.mPalId), pPalData, palLen);
+                            // Fitted to the sprite's palette once all the animations are converted
+                            PaletteFit::AddVariantPalette(rec.mPalId, pPalData, palLen);
                             rec.mConverted = true;
 
                             progress.AddCompleted(ConversionCategory::Misc, 1);
@@ -607,6 +609,35 @@ static u32 GetHighestFrameTableOffset(const std::string& bndName, bool isAo)
         }
     }
     return highestFrameTableOffset;
+}
+
+// The palette entries of the AE Sligs and Glukkons that are their glowing eyes: lit up whatever
+// the light the creature is in
+static std::vector<u8> GlowingEyeIndices(EAnimGroup group, const char* banName, bool isAo)
+{
+    if (isAo)
+    {
+        return {};
+    }
+
+    switch (group)
+    {
+        case EAnimGroup::Slig:
+            return {61, 62};
+
+        case EAnimGroup::FlyingSlig:
+        case EAnimGroup::CrawlingSlig:
+            return {60, 62};
+
+        case EAnimGroup::Glukkons:
+        {
+            const std::string ban = banName;
+            return {static_cast<u8>(ban == "ASLIK.BND" || ban == "PHLEG.BND" ? 63 : 62)};
+        }
+
+        default:
+            return {};
+    }
 }
 
 void ConvertAnimations(const FileSystem::Path& dataDir, FileSystem& fs, std::vector<u8>& fileBuffer, LvlReader& lvlReader, EReliveLevelIds reliveLvl, bool isAo, ConversionProgress& progress)
@@ -684,7 +715,12 @@ void ConvertAnimations(const FileSystem::Path& dataDir, FileSystem& fs, std::vec
                             }
                         }
 
-                        AnimationConverter animationConverter(fs, filePath, fixedDetails, res->Data(), isAo);
+                        AnimationConverter animationConverter(fixedDetails, res->Data(), isAo, GlowingEyeIndices(rec.mGroup, animDetails.mBanName, isAo));
+
+                        PaletteFit::AddAnimPalette(rec.mAnimId, isAo, animationConverter.Palette(), animationConverter.PaletteDepth());
+
+                        // The sheet is kept, the pages are made from it once all of them are converted
+                        SpritePageWriter::SaveSheet(fs, filePath, animationConverter.GetSheet());
 
                         // Track what is converted so we know what is missing at the end
                         rec.mConverted = true;
@@ -888,75 +924,189 @@ static void ConvertCamera(ThreadPool& tp, const FileSystem::Path& dataDir, const
     tp.AddJob(std::make_unique<ConvertCameraJob>(tp, dirToSaveConvertedCamIn, jsonFileName, camNameWithoutExtension, camFileData, isAo, progress));
 }
 
-static void ConvertFont(FileSystem& fs, const FileSystem::Path& dataDir, const std::string& fileName, LvlReader& lvlReader, std::vector<u8>& fileBuffer, bool isPauseMenuFont)
+// The palettes the fonts are drawn with that aren't in the font's file. A font is a 4 bit image,
+// so a font drawn with another palette is a sheet of its own.
+static const u8 kMainMenuFontPal[] = {
+    0x00, 0x00, 0x21, 0x84, 0x42, 0x88, 0x63, 0x8C, 0x84, 0x90,
+    0xA5, 0x94, 0xE7, 0x9C, 0x08, 0x21, 0x29, 0x25, 0x4A, 0x29,
+    0x6B, 0x2D, 0x8C, 0x31, 0xAD, 0x35, 0xEF, 0x3D, 0x10, 0x42,
+    0x73, 0x4E};
+
+static const u8 kPauseMenuFontPal[] = {
+    0x00, 0x00, 0x21, 0x84, 0x42, 0x88, 0x63, 0x8C, 0x84, 0x90,
+    0xA5, 0x14, 0xE7, 0x1C, 0x08, 0x21, 0x29, 0x25, 0x4A, 0x29,
+    0x6B, 0x2D, 0x8C, 0x31, 0xAD, 0x35, 0xEF, 0x3D, 0x10, 0x42,
+    0x73, 0x4E};
+
+static const u8 kColourfulMeterFontPal[32] = {
+    0u, 0u, 1u, 128u, 1u, 132u, 32u, 132u, 33u,
+    128u, 32u, 132u, 33u, 132u, 101u, 206u, 101u, 140u,
+    140u, 177u, 19u, 148u, 100u, 206u, 101u, 206u, 215u,
+    152u, 20u, 161u, 24u, 216u};
+
+static const u8 kLcdScreenFontPal1[] = {
+    0x00, 0x00, 0x01, 0x80, 0x01, 0x84, 0x20, 0x84, 0x21, 0x80,
+    0x20, 0x84, 0x21, 0x84, 0x65, 0xCE, 0x65, 0x8C, 0x8C, 0xB1,
+    0x60, 0x8E, 0x64, 0xCE, 0x65, 0xCE, 0xD7, 0x98, 0x14, 0xA1,
+    0x18, 0xD8};
+
+static const u8 kLcdScreenFontPal2[] = {
+    0x00, 0x00, 0x01, 0x80, 0x01, 0x84, 0x20, 0x84, 0x21, 0x80,
+    0x20, 0x84, 0x21, 0x84, 0x05, 0x84, 0x65, 0x8C, 0x8C, 0xB1,
+    0x13, 0x94, 0x64, 0xCE, 0x65, 0xCE, 0xD7, 0x98, 0x14, 0xA1,
+    0x18, 0xD8};
+
+static const u8 kLcdStatusBoardFontPal[] = {
+    0x00, 0x00, 0x01, 0x80, 0x01, 0x84, 0x20, 0x84, 0x21, 0x80,
+    0x20, 0x84, 0x21, 0x84, 0x65, 0xCE, 0x65, 0x8C, 0x8C, 0xB1,
+    0x13, 0x94, 0x64, 0xCE, 0x65, 0xCE, 0xD7, 0x98, 0x14, 0xA1,
+    0x18, 0xD8};
+
+
+
+struct FontPaletteVariant final
+{
+    PalId mPal;
+    const u8* mData; // 16 PSX entries
+};
+
+static const FontPaletteVariant kPauseMenuFontVariants[] = {
+    {PalId::MainMenuFont_MainMenu, kMainMenuFontPal},
+    {PalId::MainMenuFont_PauseMenu, kPauseMenuFontPal},
+};
+
+static const FontPaletteVariant kLcdFontVariants[] = {
+    {PalId::LedFont_ColourfulMeter, kColourfulMeterFontPal},
+    {PalId::LedFont_1, kLcdScreenFontPal1},
+    {PalId::LedFont_2, kLcdScreenFontPal2},
+    {PalId::LedFont_Red, kLcdStatusBoardFontPal},
+};
+
+// The font's pixels (one byte each) in a palette, as a true colour sheet and its mask
+// (SpriteMask.hpp, empty if there is nothing in it)
+static void FontSheet(const std::vector<u8>& indices, const u16* pPal16, std::vector<u8>& rgba, std::vector<u8>& mask)
+{
+    RGBA32 colours[16];
+    u8 flags[16];
+    bool anyFlag = false;
+    for (s32 i = 0; i < 16; i++)
+    {
+        colours[i] = RGBConversion::RGBA555ToTrueColour(pPal16[i]);
+        flags[i] = RGBConversion::IsSolid(pPal16[i]) ? SpriteMask::kSolid : 0;
+        anyFlag = anyFlag || flags[i] != 0;
+    }
+
+    rgba.resize(indices.size() * 4);
+    mask.clear();
+    if (anyFlag)
+    {
+        mask.resize(indices.size() * 4);
+    }
+    for (std::size_t i = 0; i < indices.size(); i++)
+    {
+        memcpy(&rgba[i * 4], &colours[indices[i] & 0xF], 4);
+        if (anyFlag)
+        {
+            SpriteMask::Set(&mask[i * 4], flags[indices[i] & 0xF]);
+        }
+    }
+}
+
+// Saves a font sheet in a palette, and its mask next to it
+static void SaveFontSheet(FileSystem& fs, PNGFile& png, const std::string& path, const std::vector<u8>& indices, const u16* pPal16, u32 width, u32 height)
+{
+    std::vector<u8> rgba;
+    std::vector<u8> mask;
+    FontSheet(indices, pPal16, rgba, mask);
+    png.SaveSprite(fs, path.c_str(), rgba, width, height);
+    if (!mask.empty())
+    {
+        png.SaveSprite(fs, PNGFile::MaskPathFor(path).c_str(), mask, width, height);
+    }
+}
+
+static void ConvertFont(FileSystem& fs, const FileSystem::Path& dataDir, const std::string& fileName, LvlReader& lvlReader, std::vector<u8>& fileBuffer, bool isPauseMenuFont, bool isAo)
 {
     ReadLvlFileInto(lvlReader, fileName.c_str(), fileBuffer);
 
     ChunkedLvlFile camFile(fileBuffer);
 
-     std::optional<LvlFileChunk> font = camFile.ChunkByType(ResourceManagerWrapper::Resource_Font);
-     if (!font)
-     {
-         ALIVE_FATAL("Font missing");
-     }
+    std::optional<LvlFileChunk> font = camFile.ChunkByType(ResourceManagerWrapper::Resource_Font);
+    if (!font)
+    {
+        ALIVE_FATAL("Font missing");
+    }
 
-     auto fontFile = reinterpret_cast<const File_Font*>(font->Data().data());
+    auto fontFile = reinterpret_cast<const File_Font*>(font->Data().data());
 
-     FileSystem::Path path = dataDir;
-     if (isPauseMenuFont)
-     {
-         path.Append("pause_menu_font.png");
-     }
-     else
-     {
-         path.Append("lcd_font.png");
-     }
-     PNGFile png;
-     AnimationPal pal = {};
+    std::vector<u8> newData((fontFile->mWidth / 2) * fontFile->mHeight * 2);
 
-     for (s32 i = 0; i < 16; i++)
-     {
-         RGBA32 pixel = RGBConversion::RGBA555ToRGBA888Components(fontFile->mPalette[i]);
+    // Expand 4bit to 8bit
+    std::size_t src = 0;
+    std::size_t dst = 0;
+    while (dst < newData.size())
+    {
+        newData[dst++] = (fontFile->mPixelBuffer[src] & 0xF);
+        newData[dst++] = ((fontFile->mPixelBuffer[src++] & 0xF0) >> 4);
+    }
 
-         pal.mPal[i].r = pixel.r;
-         pal.mPal[i].g = pixel.g;
-         pal.mPal[i].b = pixel.b;
-         pal.mPal[i].a = pixel.a;
-     }
+    u32 width = fontFile->mWidth;
+    u32 height = fontFile->mHeight;
+    if (!isPauseMenuFont)
+    {
+        // Make it a square texture
+        std::vector<u8> newDataTmp(256 * 256);
+        for (s32 x = 0; x < fontFile->mWidth; x++)
+        {
+            for (s32 y = 0; y < fontFile->mHeight; y++)
+            {
+                const u32 srcIdx = (y * fontFile->mWidth) + x;
+                const u32 dstIdx = (y * 256) + x;
+                newDataTmp[dstIdx] = newData[srcIdx];
+            }
+        }
+        newData = std::move(newDataTmp);
+        width = 256;
+        height = 256;
+    }
 
-     std::vector<u8> newData((fontFile->mWidth / 2) * fontFile->mHeight * 2);
+    PNGFile png;
 
-     // Expand 4bit to 8bit
-     std::size_t src = 0;
-     std::size_t dst = 0;
-     while (dst < newData.size())
-     {
-         newData[dst++] = (fontFile->mPixelBuffer[src] & 0xF);
-         newData[dst++] = ((fontFile->mPixelBuffer[src++] & 0xF0) >> 4);
-     }
+    // In the font's own palette
+    FileSystem::Path path = dataDir;
+    path.Append(isPauseMenuFont ? "pause_menu_font.png" : "lcd_font.png");
+    SaveFontSheet(fs, png, path.GetPath(), newData, fontFile->mPalette, width, height);
 
-     if (!isPauseMenuFont)
-     {
-         // Make it a square texture
-         std::vector<u8> newDataTmp(256 * 256);
-         for (s32 x = 0; x < fontFile->mWidth; x++)
-         {
-             for (s32 y = 0; y < fontFile->mHeight; y++)
-             {
-                 const u32 srcIdx = (y * fontFile->mWidth) + x;
-                 const u32 dstIdx = (y * 256) + x;
-                 newDataTmp[dstIdx] = newData[srcIdx];
-             }
-         }
+    // And in the palettes the game draws it with
+    auto saveVariants = [&](const FontPaletteVariant* pVariants, std::size_t count)
+    {
+        for (std::size_t i = 0; i < count; i++)
+        {
+            std::string variantName = ToString(pVariants[i].mPal);
+            variantName = variantName.substr(0, variantName.size() - 4) + ".png";
+            FileSystem::Path variantPath = dataDir;
+            variantPath.Append(variantName);
 
-         png.Save(fs, path.GetPath().c_str(), pal, newDataTmp, 256, 256);
-     }
-     else
-     {
-         png.Save(fs, path.GetPath().c_str(), pal, newData, fontFile->mWidth, fontFile->mHeight);
-     }
+            u16 palette[16];
+            memcpy(palette, pVariants[i].mData, sizeof(palette));
+            if (isAo && (pVariants[i].mPal == PalId::LedFont_1 || pVariants[i].mPal == PalId::LedFont_2))
+            {
+                // AO's LCD screens' palettes have a different colour here than AE's
+                palette[8] = 0xE739;
+            }
+            SaveFontSheet(fs, png, variantPath.GetPath(), newData, palette, width, height);
+        }
+    };
+    if (isPauseMenuFont)
+    {
+        saveVariants(kPauseMenuFontVariants, ALIVE_COUNTOF(kPauseMenuFontVariants));
+    }
+    else
+    {
+        saveVariants(kLcdFontVariants, ALIVE_COUNTOF(kLcdFontVariants));
+    }
 
-     // TODO: Dump out the atlas for each char
+    // TODO: Dump out the atlas for each char
 }
 
 static bool IsUnusedSaveFile(const std::string& saveName)
@@ -1031,7 +1181,7 @@ static void ConvertFilesInLvl(ThreadPool& tp, const FileSystem::Path& dataDir, F
         {
             if (bConvertLcdFont)
             {
-                ConvertFont(fs, dataDir, fileName, lvlReader, fileBuffer, false);
+                ConvertFont(fs, dataDir, fileName, lvlReader, fileBuffer, false, isAo);
 
                 progress.AddCompleted(ConversionCategory::Misc, 1);
                 progress.ReportItemFinished(fileName);
@@ -1040,7 +1190,7 @@ static void ConvertFilesInLvl(ThreadPool& tp, const FileSystem::Path& dataDir, F
             {
                 if (bConvertMenuFonts)
                 {
-                    ConvertFont(fs, dataDir, fileName, lvlReader, fileBuffer, true);
+                    ConvertFont(fs, dataDir, fileName, lvlReader, fileBuffer, true, isAo);
 
                     progress.AddCompleted(ConversionCategory::Misc, 1);
                     progress.ReportItemFinished(fileName);
@@ -1067,84 +1217,6 @@ static void ConvertFilesInLvl(ThreadPool& tp, const FileSystem::Path& dataDir, F
 }
 
 
-static void SavePal(FileSystem& fs, const AnimationPal& pal, const FileSystem::Path& fileName)
-{
-    AutoFILE f = fs.OpenFile(fileName.GetPath().c_str(), "wb");
-    f.Write(pal.mPal);
-}
-
-static void ConvertPal(FileSystem& fs, const FileSystem::Path& dataDir, const char* pFileName, const u16* pData, u32 len)
-{
-    FileSystem::Path palFilePath = dataDir;
-    palFilePath.Append(pFileName);
-
-    AnimationPal pal;
-    for (u32 i = 0; i < len; i++)
-    {
-        RGBA32 pixel = RGBConversion::RGBA555ToRGBA888Components(pData[i]);
-
-        pal.mPal[i].r = pixel.r;
-        pal.mPal[i].g = pixel.g;
-        pal.mPal[i].b = pixel.b;
-        pal.mPal[i].a = pixel.a;
-    }
-    SavePal(fs, pal, palFilePath);
-}
-
-static void ConvertHardcodedPals(FileSystem& fs, const FileSystem::Path& dataDir, ConversionProgress& progress)
-{
-    const static u8 mainMenuFontPal[] = {
-        0x00, 0x00, 0x21, 0x84, 0x42, 0x88, 0x63, 0x8C, 0x84, 0x90,
-        0xA5, 0x94, 0xE7, 0x9C, 0x08, 0x21, 0x29, 0x25, 0x4A, 0x29,
-        0x6B, 0x2D, 0x8C, 0x31, 0xAD, 0x35, 0xEF, 0x3D, 0x10, 0x42,
-        0x73, 0x4E};
-
-    const static u8 pauseMenuFontPal[] = {
-        0x00, 0x00, 0x21, 0x84, 0x42, 0x88, 0x63, 0x8C, 0x84, 0x90,
-        0xA5, 0x14, 0xE7, 0x1C, 0x08, 0x21, 0x29, 0x25, 0x4A, 0x29,
-        0x6B, 0x2D, 0x8C, 0x31, 0xAD, 0x35, 0xEF, 0x3D, 0x10, 0x42,
-        0x73, 0x4E};
-
-    const static u8 pal_ColourfulMeter[32] = {
-        0u, 0u, 1u, 128u, 1u, 132u, 32u, 132u, 33u,
-        128u, 32u, 132u, 33u, 132u, 101u, 206u, 101u, 140u,
-        140u, 177u, 19u, 148u, 100u, 206u, 101u, 206u, 215u,
-        152u, 20u, 161u, 24u, 216u};
-
-    const static u8 sLCDScreen_Palette[] = {
-        0x00, 0x00, 0x01, 0x80, 0x01, 0x84, 0x20, 0x84, 0x21, 0x80,
-        0x20, 0x84, 0x21, 0x84, 0x65, 0xCE, 0x65, 0x8C, 0x8C, 0xB1,
-        0x60, 0x8E, 0x64, 0xCE, 0x65, 0xCE, 0xD7, 0x98, 0x14, 0xA1,
-        0x18, 0xD8};
-
-    const static u8 sLCDScreen_Palette2[] = {
-        0x00, 0x00, 0x01, 0x80, 0x01, 0x84, 0x20, 0x84, 0x21, 0x80,
-        0x20, 0x84, 0x21, 0x84, 0x05, 0x84, 0x65, 0x8C, 0x8C, 0xB1,
-        0x13, 0x94, 0x64, 0xCE, 0x65, 0xCE, 0xD7, 0x98, 0x14, 0xA1,
-        0x18, 0xD8};
-
-    const static u8 pal_LCDStatusBoard[] = {
-        0x00, 0x00, 0x01, 0x80, 0x01, 0x84, 0x20, 0x84, 0x21, 0x80,
-        0x20, 0x84, 0x21, 0x84, 0x65, 0xCE, 0x65, 0x8C, 0x8C, 0xB1,
-        0x13, 0x94, 0x64, 0xCE, 0x65, 0xCE, 0xD7, 0x98, 0x14, 0xA1,
-        0x18, 0xD8};
-
-
-    ConvertPal(fs, dataDir, ToString(PalId::MainMenuFont_MainMenu), reinterpret_cast<const u16*>(mainMenuFontPal), ALIVE_COUNTOF(mainMenuFontPal) / sizeof(u16));
-
-    ConvertPal(fs, dataDir, ToString(PalId::MainMenuFont_PauseMenu), reinterpret_cast<const u16*>(pauseMenuFontPal), ALIVE_COUNTOF(pauseMenuFontPal) / sizeof(u16));
-
-    ConvertPal(fs, dataDir, ToString(PalId::LedFont_ColourfulMeter), reinterpret_cast<const u16*>(pal_ColourfulMeter), ALIVE_COUNTOF(pal_ColourfulMeter) / sizeof(u16));
-
-    ConvertPal(fs, dataDir, ToString(PalId::LedFont_1), reinterpret_cast<const u16*>(sLCDScreen_Palette), ALIVE_COUNTOF(sLCDScreen_Palette) / sizeof(u16));
-
-    ConvertPal(fs, dataDir, ToString(PalId::LedFont_2), reinterpret_cast<const u16*>(sLCDScreen_Palette2), ALIVE_COUNTOF(sLCDScreen_Palette2) / sizeof(u16));
-
-    ConvertPal(fs, dataDir, ToString(PalId::LedFont_Red), reinterpret_cast<const u16*>(pal_LCDStatusBoard), ALIVE_COUNTOF(pal_LCDStatusBoard) / sizeof(u16));
-
-    progress.AddCompleted(ConversionCategory::Misc, 6);
-    progress.ReportItemFinished("hardcoded_palettes");
-}
 
 // Fast "how much work exists" pre-pass so DataConversionUI can show an accurate percentage from
 // the very first frame, instead of the total only growing as real conversion happens to discover
@@ -1310,22 +1382,34 @@ ConversionProgress::Snapshot DataConversion::ProgressSnapshot() const
     return mProgress.GetSnapshot(17);
 }
 
-std::optional<DataConversion::DataVersions> DataConversion::DataVersionAO()
+std::optional<DataConversion::DataVersions> DataConversion::DataVersionAO(u32 spritePageSize)
 {
     FileSystem::Path dataDir;
     dataDir.Append("relive_data");
     dataDir.Append("ao");
     DataVersions dv;
-    return dv.Load(dataDir) ? std::make_optional(dv) : std::nullopt;
+    if (!dv.Load(dataDir))
+    {
+        return std::nullopt;
+    }
+    dv.mWantedSpritePageSize = spritePageSize;
+    dv.mPagesStale = SpritePageWriter::PagesStale(dataDir, spritePageSize);
+    return dv;
 }
 
-std::optional<DataConversion::DataVersions> DataConversion::DataVersionAE()
+std::optional<DataConversion::DataVersions> DataConversion::DataVersionAE(u32 spritePageSize)
 {
     FileSystem::Path dataDir;
     dataDir.Append("relive_data");
     dataDir.Append("ae");
     DataVersions dv;
-    return dv.Load(dataDir) ? std::make_optional(dv) : std::nullopt;
+    if (!dv.Load(dataDir))
+    {
+        return std::nullopt;
+    }
+    dv.mWantedSpritePageSize = spritePageSize;
+    dv.mPagesStale = SpritePageWriter::PagesStale(dataDir, spritePageSize);
+    return dv;
 }
 
 // relive_data/mods/ (siblings of ao/ae, shared across both games - a mod's own modinfo.json
@@ -1345,10 +1429,10 @@ static void EnsureModsDirExists(FileSystem& fs)
 // Palettes aren't scoped to a single level (ConvertPals tries every level's lvlReader until it
 // finds whichever one happens to contain a given pal's mBanName), so their total is counted once
 // up front here rather than inside ScanLevelForProgressTotals - mirrors LogNonConvertedPals'
-// mBanName check, plus the 6 always-present hardcoded pals ConvertHardcodedPals writes.
+// mBanName check.
 static void ScanPaletteProgressTotal(bool isAo, ConversionProgress& progress)
 {
-    u32 count = 6;
+    u32 count = 0;
     for (auto& rec : kPalConversionInfo)
     {
         const auto palDetails = isAo ? AO::PalRec(rec.mPalId) : PalRec(rec.mPalId);
@@ -1360,9 +1444,10 @@ static void ScanPaletteProgressTotal(bool isAo, ConversionProgress& progress)
     progress.AddToTotal(ConversionCategory::Misc, count);
 }
 
-void DataConversion::ConvertAll(GameType game)
+void DataConversion::ConvertAll(GameType game, u32 spritePageSize, const std::vector<std::string>& modLayers)
 {
     DataVersions zeroVersions;
+    zeroVersions.mWantedSpritePageSize = spritePageSize;
 
 #if 0
     // Dev hack to control which data files to convert (can force reconvert/force skip)
@@ -1372,11 +1457,11 @@ void DataConversion::ConvertAll(GameType game)
 
     if (game == GameType::eAe)
     {
-        ConvertDataAE(DataVersionAE().value_or(zeroVersions));
+        ConvertDataAE(DataVersionAE(spritePageSize).value_or(zeroVersions));
     }
     else
     {
-        ConvertDataAO(DataVersionAO().value_or(zeroVersions));
+        ConvertDataAO(DataVersionAO(spritePageSize).value_or(zeroVersions));
     }
 
     // ConvertDataAE/AO only *dispatch* work onto the thread pool (FMVs, paths, ...), they don't
@@ -1401,7 +1486,15 @@ void DataConversion::ConvertAll(GameType game)
         FileSystem::Path dataDir;
         dataDir.Append("relive_data");
         dataDir.Append(game == GameType::eAe ? "ae" : "ao");
-        DataVersions::LatestVersion().Save(dataDir);
+        DataVersions::LatestVersion(spritePageSize).Save(dataDir);
+
+        // The mod's pages have the game's animations on them too, so they are made once the game's
+        // sheets are final
+        if (!modLayers.empty() && SpritePageWriter::PagesStale(modLayers, spritePageSize))
+        {
+            FileSystem fs;
+            SpritePageWriter::Repack(fs, modLayers, spritePageSize);
+        }
     }
 }
 
@@ -1436,10 +1529,7 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
     }
 
     // TODO: Prob diff data in AO, check me
-    if (dv.ConvertPalettes())
-    {
-        ConvertHardcodedPals(fs, dataDir, mProgress);
-    }
+    PaletteFit::Reset();
 
     std::vector<u8> fileBuffer;
     IterateAOLvls(fs, [&](LvlReader& lvlReader, EReliveLevelIds reliveLvl, AO::LevelIds lvlIdxAsLvl)
@@ -1460,11 +1550,24 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
 
         if (dv.ConvertPalettes())
         {
-            ConvertPals(fs, dataDir, fileBuffer, lvlReader, true, mProgress);
+            ConvertPals(fileBuffer, lvlReader, true, mProgress);
         }
 
         ConvertFilesInLvl<AO::LevelIds, AO::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, true, false, mProgress);
     });
+
+    // The animations' sheets are packed into pages once they are all converted, or again when
+    // the pages are for another GPU or older than a sheet
+    if ((dv.ConvertAnimations() || dv.RepackPages()) && !mThreadPool->IsCancelRequested())
+    {
+        SpritePageWriter::Repack(fs, dataDir, dv.mWantedSpritePageSize);
+    }
+
+    if (dv.ConvertAnimations() && dv.ConvertPalettes() && !mThreadPool->IsCancelRequested())
+    {
+        // All the animations are converted, so the palettes can be fitted to them
+        PaletteFit::Write(fs, dataDir, true);
+    }
 
     if (dv.ConvertSaves())
     {
@@ -1513,10 +1616,7 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
         ConvertFMVs(*mThreadPool, fs, dataDir, false, DataVersions::LatestVersion().mFmvVersion, mProgress);
     }
 
-    if (dv.ConvertPalettes())
-    {
-        ConvertHardcodedPals(fs, dataDir, mProgress);
-    }
+    PaletteFit::Reset();
 
     std::vector<u8> fileBuffer;
     IterateAELvls(fs, [&](LvlReader& lvlReader, EReliveLevelIds reliveLvl, LevelIds lvlIdxAsLvl)
@@ -1537,11 +1637,24 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
 
         if (dv.ConvertPalettes())
         {
-            ConvertPals(fs, dataDir, fileBuffer, lvlReader, false, mProgress);
+            ConvertPals(fileBuffer, lvlReader, false, mProgress);
         }
 
         ConvertFilesInLvl<::LevelIds, ::Path_TLV>(*mThreadPool, dataDir, fs, lvlReader, fileBuffer, lvlIdxAsLvl, reliveLvl, dv, false, false, mProgress);
     });
+
+    // The animations' sheets are packed into pages once they are all converted, or again when
+    // the pages are for another GPU or older than a sheet
+    if ((dv.ConvertAnimations() || dv.RepackPages()) && !mThreadPool->IsCancelRequested())
+    {
+        SpritePageWriter::Repack(fs, dataDir, dv.mWantedSpritePageSize);
+    }
+
+    if (dv.ConvertAnimations() && dv.ConvertPalettes() && !mThreadPool->IsCancelRequested())
+    {
+        // All the animations are converted, so the palettes can be fitted to them
+        PaletteFit::Write(fs, dataDir, false);
+    }
 
     if (dv.ConvertSaves())
     {
@@ -1578,6 +1691,7 @@ void DataConversion::DataVersions::Save(const FileSystem::Path& dataDir) const
         {"save_file_version", mSaveFileVersion},
         {"font_file_version", mFontFileVersion},
         {"demo_file_version", mDemoFileVersion},
+        {"sprite_page_size", mSpritePageSize},
     };
     FileSystem fs;
     FileSystem::Path fileName = dataDir;
@@ -1607,6 +1721,10 @@ bool DataConversion::DataVersions::Load(const FileSystem::Path& dataDir)
             j.at("save_file_version").get_to(dv.mSaveFileVersion);
             j.at("font_file_version").get_to(dv.mFontFileVersion);
             j.at("demo_file_version").get_to(dv.mDemoFileVersion);
+            if (j.contains("sprite_page_size"))
+            {
+                j.at("sprite_page_size").get_to(dv.mSpritePageSize);
+            }
             *this = dv;
         }
         catch (const nlohmann::json::exception&)
