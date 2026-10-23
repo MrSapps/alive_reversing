@@ -162,11 +162,11 @@ public:
         // 9: the pages are packed frame by frame instead of sheet by sheet, so they have far fewer holes.
         // 10: the animations' sheets are kept (animation.png/json, for mods and the Blender add-on) and
         // the pages are made from them, with the packed jsons saying where the frames are on a page.
-        static constexpr u32 kAnimationVersion = 10;
+        static constexpr u32 kAnimationVersion = 11;
         // 9: dropped the redundant "paths" subdir under each level, same as kPathVersion 17.
         static constexpr u32 kCameraVersion = 9;
         static constexpr u32 kSaveFileVersion = 3;
-        static constexpr u32 kFontFileVersion = 3;
+        static constexpr u32 kFontFileVersion = 4;
         static constexpr u32 kDemoFileVersion = 2;
 
         static constexpr char_type kDataVersionFileName[] = "data_version.json";

@@ -982,47 +982,28 @@ static const FontPaletteVariant kLcdFontVariants[] = {
     {PalId::LedFont_Red, kLcdStatusBoardFontPal},
 };
 
-// The font's pixels (one byte each) in a palette, as a true colour sheet and its mask
-// (SpriteMask.hpp, empty if there is nothing in it)
-static void FontSheet(const std::vector<u8>& indices, const u16* pPal16, std::vector<u8>& rgba, std::vector<u8>& mask)
+// The font's pixels (one byte each) in a palette, as a true colour sheet
+static void FontSheet(const std::vector<u8>& indices, const u16* pPal16, std::vector<u8>& rgba)
 {
     RGBA32 colours[16];
-    u8 flags[16];
-    bool anyFlag = false;
     for (s32 i = 0; i < 16; i++)
     {
         colours[i] = RGBConversion::RGBA555ToTrueColour(pPal16[i]);
-        flags[i] = RGBConversion::IsSolid(pPal16[i]) ? SpriteMask::kSolid : 0;
-        anyFlag = anyFlag || flags[i] != 0;
     }
 
     rgba.resize(indices.size() * 4);
-    mask.clear();
-    if (anyFlag)
-    {
-        mask.resize(indices.size() * 4);
-    }
     for (std::size_t i = 0; i < indices.size(); i++)
     {
         memcpy(&rgba[i * 4], &colours[indices[i] & 0xF], 4);
-        if (anyFlag)
-        {
-            SpriteMask::Set(&mask[i * 4], flags[indices[i] & 0xF]);
-        }
     }
 }
 
-// Saves a font sheet in a palette, and its mask next to it
+// Saves a font sheet in a palette
 static void SaveFontSheet(FileSystem& fs, PNGFile& png, const std::string& path, const std::vector<u8>& indices, const u16* pPal16, u32 width, u32 height)
 {
     std::vector<u8> rgba;
-    std::vector<u8> mask;
-    FontSheet(indices, pPal16, rgba, mask);
+    FontSheet(indices, pPal16, rgba);
     png.SaveSprite(fs, path.c_str(), rgba, width, height);
-    if (!mask.empty())
-    {
-        png.SaveSprite(fs, PNGFile::MaskPathFor(path).c_str(), mask, width, height);
-    }
 }
 
 static void ConvertFont(FileSystem& fs, const FileSystem::Path& dataDir, const std::string& fileName, LvlReader& lvlReader, std::vector<u8>& fileBuffer, bool isPauseMenuFont, bool isAo)

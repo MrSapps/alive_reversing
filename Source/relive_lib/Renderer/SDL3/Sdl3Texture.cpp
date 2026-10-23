@@ -24,7 +24,7 @@ Sdl3Texture::Sdl3Texture(Sdl3Context& context, u32 width, u32 height, const u8* 
         // Texels that glow aren't tinted, which the vertex colours can't do
         for (std::size_t i = 0; i < mMaskPixels.size(); i += 4)
         {
-            if (SpriteMask::Get(&mMaskPixels[i]) & SpriteMask::kGlow)
+            if (SpriteMask::Glow(&mMaskPixels[i]) != 0)
             {
                 mHasEmissive = true;
                 break;
@@ -228,7 +228,7 @@ static f32 LumaRank(const SpriteFx& fx, f32 luma)
     return (k + f) / (SpriteFx::kLumaPoints - 1);
 }
 
-RGBA32 Sdl3Texture::ConvertTexel(const RGBA32& texel, u8 maskFlags, const SpriteFx& fx, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode)
+RGBA32 Sdl3Texture::ConvertTexel(const RGBA32& texel, u16 mask, const SpriteFx& fx, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode)
 {
     // This logic is basically a mirror of the GLSL shader, but in
     // software - see ShaderPsx.cpp, and the blend mode stuff in
@@ -242,9 +242,10 @@ RGBA32 Sdl3Texture::ConvertTexel(const RGBA32& texel, u8 maskFlags, const Sprite
     }
 
     // What the sheet's mask says about the texel, see SpriteMask.hpp
-    const bool emissive = (maskFlags & SpriteMask::kGlow) != 0;
-    const bool keepVisible = (maskFlags & SpriteMask::kKeepVisible) != 0;
-    bool stp = (maskFlags & SpriteMask::kSolid) == 0;
+    const f32 glow = SpriteMask::PackedGlow(mask) / 255.0f;
+    const bool keepVisible = SpriteMask::PackedKeepVisible(mask);
+    // Alpha 255 is solid, anything less blends in a semi-transparent sprite
+    bool stp = texel.a < 255;
     f32 a = texel.a / 255.0f;
 
     f32 rgb[3] = {texel.r / 255.0f, texel.g / 255.0f, texel.b / 255.0f};
@@ -309,12 +310,13 @@ RGBA32 Sdl3Texture::ConvertTexel(const RGBA32& texel, u8 maskFlags, const Sprite
         channel *= 255.0f;
     }
 
-    if (shading.a == 255 && !emissive) // Shading required
+    if (shading.a == 255 && glow < 1.0f) // Shading required, less where the texel glows
     {
         const u8 shade[3] = {shading.r, shading.g, shading.b};
         for (s32 i = 0; i < 3; i++)
         {
-            rgb[i] = std::min(255.0f, (rgb[i] * (shade[i] / 255.0f)) / 0.5f);
+            const f32 shaded = std::min(255.0f, (rgb[i] * (shade[i] / 255.0f)) / 0.5f);
+            rgb[i] += (shaded - rgb[i]) * (1.0f - glow);
         }
     }
 
@@ -376,7 +378,7 @@ SdlTexturePtr Sdl3Texture::MakeVariant(const SpriteFx& fx, const RGBA32& shading
     struct Memo final
     {
         u32 mSource = 0;
-        u8 mFlags = 0;
+        u16 mFlags = 0;
         RGBA32 mResult = {};
         bool mValid = false;
     };
@@ -400,7 +402,7 @@ SdlTexturePtr Sdl3Texture::MakeVariant(const SpriteFx& fx, const RGBA32& shading
             }
 
             const u32 source = pSource[i].ToU32();
-            const u8 flags = hasMask ? SpriteMask::Get(&mMaskPixels[i * 4]) : 0;
+            const u16 flags = hasMask ? SpriteMask::Pack(&mMaskPixels[i * 4]) : 0;
             Memo& entry = memo[((source ^ (flags * 0x9E3779B1u)) * 2654435761u) >> 22];
             if (!entry.mValid || entry.mSource != source || entry.mFlags != flags)
             {

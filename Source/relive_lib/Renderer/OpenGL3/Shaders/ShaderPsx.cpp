@@ -96,7 +96,7 @@ vec3 handle_shading(in vec3 texelT)
 // alpha is how much of the texel is there, 0 to 1. stp is the PSX semi-transparency bit: the
 // texel is only blended if the primitive is semi-transparent as well, or it's drawn over the
 // framebuffer like any other (with alpha, so the soft edge of a true colour sprite blends in)
-vec4 handle_final_color(in vec3 rgb, in float alpha, in bool stp, in bool doShading)
+vec4 handle_final_color(in vec3 rgb, in float alpha, in bool stp, in float shadeAmount)
 {
     int blendMode = int(fsFlags.w);
     bool isSemiTrans = int(fsFlags.y) > 0;
@@ -107,9 +107,9 @@ vec4 handle_final_color(in vec3 rgb, in float alpha, in bool stp, in bool doShad
         return vec4(0.0, 0.0, 0.0, 1.0);
     }
 
-    if (doShading)
+    if (shadeAmount > 0.0)
     {
-        rgb = handle_shading(rgb);
+        rgb = mix(rgb, handle_shading(rgb), shadeAmount);
     }
 
     if (isSemiTrans && stp)
@@ -143,7 +143,7 @@ void draw_flat()
 {
     outColor.rgb = fsShadeColor / 255.0;
 
-    outColor = handle_final_color(outColor.rgb, 1.0, true, false);
+    outColor = handle_final_color(outColor.rgb, 1.0, true, 0.0);
 }
 
 // A texel of the sprite sheet in texture unit fsTexIndexing.y
@@ -275,8 +275,9 @@ void draw_default_ft4(bool masked)
     float alpha = texel.a;
 
     vec4 maskTexel = masked ? fetch_sheet(ivec2(fsUV) + ivec2(0, sheet_height() / 2)) : vec4(0.0);
-    bool stp = maskTexel.r < 0.5;
-    bool emissive = maskTexel.g > 0.5;
+    // Alpha 255 is solid, anything less blends in a semi-transparent sprite
+    bool stp = alpha < 0.999;
+    float glow = maskTexel.g;
     bool keepVisible = maskTexel.b > 0.5;
 
     if (fsTexIndexing.x != 0u)
@@ -321,7 +322,7 @@ void draw_default_ft4(bool masked)
         }
     }
 
-    outColor = handle_final_color(rgb, alpha, stp, !emissive);
+    outColor = handle_final_color(rgb, alpha, stp, 1.0 - glow);
 }
 
 void draw_cam()

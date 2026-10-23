@@ -7,6 +7,7 @@
 #include "Animation.hpp"
 #include "PNGFile.hpp"
 #include "../SpriteMask.hpp"
+#include "rgb_conversion.hpp"
 #include <mapbox/shelf-pack.hpp>
 #include <FatalError.hpp>
 #include <algorithm>
@@ -347,10 +348,11 @@ AnimationConverter::AnimationConverter(const AnimRecord& rec, const std::vector<
         decompressionBuffer.resize(decompressionBufferSize);
     }
 
-    // The sheet is true colour: each pixel is its palette entry. What the palette entry said
-    // besides the colour goes in the mask (SpriteMask.hpp): without the semi-transparency (STP)
-    // bit a semi-transparent sprite doesn't blend it, the emissive entries glow, and the first
-    // entries are left alone by the invisibility fade.
+    // The sheet is true colour: each pixel is its palette entry. With the semi-transparency (STP)
+    // bit a semi-transparent sprite blends it and its alpha is RGBConversion::kBlendAlpha, without
+    // it the pixel is solid (alpha 255). The rest of what the entry said goes in the mask
+    // (SpriteMask.hpp): the emissive entries glow, and the first entries are left alone by the
+    // invisibility fade.
     RGBA32 pixelOfIndex[256];
     u8 flagsOfIndex[256] = {};
     for (s32 i = 0; i < 256; i++)
@@ -363,11 +365,7 @@ AnimationConverter::AnimationConverter(const AnimRecord& rec, const std::vector<
             continue;
         }
 
-        pixelOfIndex[i] = {entry.r, entry.g, entry.b, 255};
-        if (entry.a != 255)
-        {
-            flagsOfIndex[i] |= SpriteMask::kSolid;
-        }
+        pixelOfIndex[i] = {entry.r, entry.g, entry.b, entry.a != 255 ? u8(255) : RGBConversion::kBlendAlpha};
         if (i < 8)
         {
             flagsOfIndex[i] |= SpriteMask::kKeepVisible;
