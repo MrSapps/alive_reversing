@@ -87,8 +87,12 @@ public:
         return ret;
     }
 
-    // A PSX palette entry as a pixel of a true colour sprite: 0 is transparent. The
-    // semi-transparency bit isn't part of the pixel, it goes in the sheet's mask, see IsSolid
+    // The alpha of a pixel that blends in a semi-transparent sprite (the palette entry has the
+    // semi-transparency bit). Alpha 255 is solid, see IsSolid
+    static constexpr u8 kBlendAlpha = 254;
+
+    // A PSX palette entry as a pixel of a true colour sprite: 0 is transparent, an entry without
+    // the semi-transparency bit is solid (alpha 255) and one with it blends (kBlendAlpha)
     static RGBA32 RGBA555ToTrueColour(u16 pixel)
     {
         if (pixel == 0)
@@ -97,7 +101,7 @@ public:
         }
 
         const RGBA32 rgba = RGBA555ToRGBA888Components(pixel);
-        return {rgba.r, rgba.g, rgba.b, 255};
+        return {rgba.r, rgba.g, rgba.b, IsSolid(pixel) ? u8(255) : kBlendAlpha};
     }
 
     // A palette entry without the semi-transparency bit: a semi-transparent sprite draws it solid

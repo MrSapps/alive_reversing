@@ -2,6 +2,7 @@
 #include "TestResources.hpp"
 #include "../../relive_lib/SpriteMask.hpp"
 #include "../../relive_lib/data_conversion/PaletteFit.hpp"
+#include "../../relive_lib/data_conversion/rgb_conversion.hpp"
 #include <array>
 #include "../../relive_lib/AnimResources.hpp"
 #include <algorithm>
@@ -173,24 +174,15 @@ public:
     AnimResource Build(AnimId id, const TestPalette& pal, u32 frameDelay, bool loop) const
     {
         auto png = std::make_shared<PngData>();
-        // True colour, like the sheets from the data conversion: the palette's semi-transparency
-        // bit goes in the mask
+        // True colour, like the sheets from the data conversion: an entry without the
+        // semi-transparency bit is solid (alpha 255), one with it blends (RGBConversion::kBlendAlpha)
         png->mRgba.resize(mPixels.size() * 4);
-        std::vector<u8> mask(mPixels.size() * 4);
-        bool anySolid = false;
         for (std::size_t i = 0; i < mPixels.size(); i++)
         {
             const RGBA32& entry = pal[mPixels[i]];
             const bool transparent = entry.r == 0 && entry.g == 0 && entry.b == 0 && entry.a == 0;
-            const RGBA32 pixel = transparent ? RGBA32{0, 0, 0, 0} : RGBA32{entry.r, entry.g, entry.b, 255};
+            const RGBA32 pixel = transparent ? RGBA32{0, 0, 0, 0} : RGBA32{entry.r, entry.g, entry.b, entry.a != 255 ? u8(255) : RGBConversion::kBlendAlpha};
             memcpy(&png->mRgba[i * 4], &pixel, 4);
-            const bool solid = !transparent && entry.a != 255;
-            SpriteMask::Set(&mask[i * 4], solid ? SpriteMask::kSolid : 0);
-            anySolid = anySolid || solid;
-        }
-        if (anySolid)
-        {
-            png->mMask = std::move(mask);
         }
         png->mWidth = mFrameWidth * mFrameCount;
         png->mHeight = mFrameHeight;
@@ -541,14 +533,15 @@ static AnimResource MakeAlphaCard()
     }
 
     // The swatches
-    const u8 swatchMasks[3] = {0, SpriteMask::kSolid, SpriteMask::kGlow};
+    const u8 swatchAlphas[3] = {RGBConversion::kBlendAlpha, 255, RGBConversion::kBlendAlpha};
+    const u8 swatchMasks[3] = {0, 0, SpriteMask::kGlow};
     for (u32 swatch = 0; swatch < 3; swatch++)
     {
         for (u32 y = 36; y < 46; y++)
         {
             for (u32 x = 2 + swatch * 15; x < 2 + swatch * 15 + 13; x++)
             {
-                set(x, y, 190, 190, 190, 255, swatchMasks[swatch]);
+                set(x, y, 190, 190, 190, swatchAlphas[swatch], swatchMasks[swatch]);
             }
         }
     }

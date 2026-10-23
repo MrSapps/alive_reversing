@@ -23,7 +23,7 @@ static AnimationConverter::Sheet MakeSheet(u32 width, u32 height, RGBA32 colour,
         sheet.mMask.resize(sheet.mRgba.size());
         for (std::size_t i = 0; i < sheet.mMask.size(); i += 4)
         {
-            SpriteMask::Set(&sheet.mMask[i], SpriteMask::kSolid);
+            SpriteMask::Set(&sheet.mMask[i], SpriteMask::kKeepVisible);
         }
     }
 
@@ -115,7 +115,7 @@ TEST(SpritePageWriter, SheetsOfAGroupShareAPageAndTheirFramesFollow)
             const RGBA32 pixel = PixelAt(page, width, frame.mSpriteSheetX + x, frame.mSpriteSheetY + y);
             EXPECT_EQ(pixel.ToU32(), colour.ToU32());
             const u8 flags = SpriteMask::Get(&mask[(static_cast<std::size_t>(frame.mSpriteSheetY + y) * width + frame.mSpriteSheetX + x) * 4]);
-            EXPECT_EQ((flags & SpriteMask::kSolid) != 0, solid);
+            EXPECT_EQ((flags & SpriteMask::kKeepVisible) != 0, solid);
         }
     }
 }

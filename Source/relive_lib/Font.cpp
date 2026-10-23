@@ -306,13 +306,9 @@ void FontContext::LoadFontType(FontType resourceID, ResourceManagerWrapper& resM
         // The font in its own palette
         auto fontFile = reinterpret_cast<File_Font*>(sDebugFont);
         RGBA32 colours[16] = {};
-        u8 flags[16] = {};
-        bool anySolid = false;
         for (s32 i = 0; i < fontFile->mPaletteSize && i < 16; i++)
         {
             colours[i] = RGBConversion::RGBA555ToTrueColour(fontFile->mPalette[i]);
-            flags[i] = RGBConversion::IsSolid(fontFile->mPalette[i]) ? SpriteMask::kSolid : 0;
-            anySolid = anySolid || flags[i] != 0;
         }
 
         mFntResource.mPngPtr->mWidth = fontFile->mWidth;
@@ -327,18 +323,6 @@ void FontContext::LoadFontType(FontType resourceID, ResourceManagerWrapper& resM
             memcpy(&mFntResource.mPngPtr->mRgba[(dst + 1) * 4], &colours[(fontFile->mPixelBuffer[src++] & 0xF0) >> 4], 4);
         }
 
-        if (anySolid)
-        {
-            // The palette entries without the semi-transparency bit
-            auto& mask = mFntResource.mPngPtr->mMask;
-            mask.resize(mFntResource.mPngPtr->mRgba.size());
-            src = 0;
-            for (std::size_t dst = 0; dst < static_cast<std::size_t>(fontFile->mWidth) * fontFile->mHeight; dst += 2)
-            {
-                SpriteMask::Set(&mask[dst * 4], flags[fontFile->mPixelBuffer[src] & 0xF]);
-                SpriteMask::Set(&mask[(dst + 1) * 4], flags[(fontFile->mPixelBuffer[src++] & 0xF0) >> 4]);
-            }
-        }
         return;
     }
 

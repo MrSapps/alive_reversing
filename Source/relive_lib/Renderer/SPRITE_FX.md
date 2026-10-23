@@ -9,24 +9,27 @@ file says how each thing the palette did is done now.
 
 The data conversion (`AnimationConverter`) makes each animation's sheet, and each pixel of it from its
 palette entry. The sheets are then packed into pages, see "Sprite pages" below. The
-**alpha is only how much of the pixel is there**: 0 is transparent (the PSX's `0x0000` entry),
-255 is opaque, and anything between is a soft edge. There are no special alpha values.
+**alpha is how much of the pixel is there**: 0 is transparent (the PSX's `0x0000` entry), and
+anything between is a soft edge. In a semi-transparent sprite **alpha 255 is solid**: only a pixel
+below 255 blends, and it blends by its alpha (so an HD particle can fall off smoothly and still
+add up like the PSX's blend modes do). The conversion writes a palette entry with the STP bit as
+`RGBConversion::kBlendAlpha` (254) and one without it as 255, so the original's pixels blend as
+they did, to within 1/255.
 
-What the PSX kept in the palette entry besides the colour goes in an optional **mask** image next to
+What else the PSX kept in the palette entry goes in an optional **mask** image next to
 the sheet (`name.png` has `name_mask.png`, the same size, `SpriteMask.hpp`). Its colour channels
-are flags per pixel:
+are per pixel:
 
 | channel | meaning |
 |---|---|
-| R | **solid**: a semi-transparent sprite doesn't blend the pixel (the palette entry had no STP bit) |
-| G | **glow**: the sprite's tint doesn't change it (the Sligs' and Glukkons' eyes) |
+| R | not used |
+| G | **glow**, 0 to 255: how much the sprite's tint doesn't change the pixel (the Sligs' and Glukkons' eyes are 255, an HD sheet can fall off towards the edge) |
 | B | **keep visible**: the invisibility effect leaves it alone (palette entries 1 to 7, which the original's fade never touched) |
 
-No flag is the default, and a sheet with no mask file has none anywhere. So a custom or HD sheet
-is plain true colour: every pixel blends where the sprite is semi-transparent, takes the tint and
-is faded by invisibility, and its alpha can be anything. The conversion writes a mask when some
-pixel of the sheet has a flag, which is nearly every sheet: about half of the palette entries of
-nearly every animation have no STP bit. Fonts have masks too. Any PNG is loaded as RGBA
+A zero is the default, and a sheet with no mask file has zero everywhere. So a custom or HD sheet
+is plain true colour: every pixel below alpha 255 blends where the sprite is semi-transparent,
+takes the tint and is faded by invisibility. The conversion writes a mask when some
+pixel of the sheet has glow or keep visible. Any PNG is loaded as RGBA
 (`PNGFile::LoadSprite`), including indexed ones.
 
 What a texel adds to the framebuffer (`handle_final_color` in `ShaderPsx.cpp`, mirrored by
