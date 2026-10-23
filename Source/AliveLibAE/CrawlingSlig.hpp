@@ -319,7 +319,6 @@ private:
     void PlatformCollide();
 
 private:
-    std::shared_ptr<AnimationPal> field_11C_mPal;
     Guid mGuid;
     s16 field_1A4_r = 0;
     s16 field_1A6_g = 0;

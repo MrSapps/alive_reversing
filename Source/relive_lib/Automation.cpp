@@ -9,6 +9,9 @@
 #include "logger.hpp"
 #include "Renderer/IRenderer.hpp"
 #include "GameObjects/BaseAliveGameObject.hpp"
+#include "GameObjects/Electrocute.hpp"
+#include "ObjectIds.hpp"
+#include "../AliveLibAE/InvisibleEffect.hpp"
 #include "data_conversion/AnimConversionInfo.hpp"
 #include "data_conversion/EnumSerialization.hpp"
 #include "data_conversion/PNGFile.hpp"
@@ -356,6 +359,26 @@ static bool CheckCommand(const Automation::Command& command, std::string& error)
         return expectArgs(2, "hold <buttons> <frames>") && Automation::ParseButtons(command.mArgs[0], bits, error) && expectNumber(command.mArgs[1], 1);
     }
 
+    if (name == "electrocute")
+    {
+        if (argCount > 1 || (argCount == 1 && command.mArgs[0] != "extra"))
+        {
+            error = "expected: electrocute [extra]";
+            return false;
+        }
+        return true;
+    }
+
+    if (name == "invisible")
+    {
+        if (argCount != 1 || (command.mArgs[0] != "out" && command.mArgs[0] != "in" && command.mArgs[0] != "now"))
+        {
+            error = "expected: invisible <out|in|now>";
+            return false;
+        }
+        return true;
+    }
+
     if (name == "switch")
     {
         return expectArgs(2, "switch <id> <0|1>") && expectNumber(command.mArgs[0], 0) && expectNumber(command.mArgs[1], 0);
@@ -632,6 +655,53 @@ bool Automation::RunCommand(const Command& command, BaseMap& map, bool betweenFr
             return true;
         }
         return false;
+    }
+
+    if (name == "electrocute")
+    {
+        if (!betweenFrames)
+        {
+            return false;
+        }
+        if (!sControlledCharacter)
+        {
+            Fail(command, "there is no controlled character");
+            return true;
+        }
+        relive_new Electrocute(sControlledCharacter, !args.empty(), true, mResMan, map);
+        return true;
+    }
+
+    if (name == "invisible")
+    {
+        if (!betweenFrames)
+        {
+            return false;
+        }
+        if (!sControlledCharacter || GetGameType() != GameType::eAe)
+        {
+            Fail(command, "invisible needs AE and a controlled character");
+            return true;
+        }
+        auto* pEffect = static_cast<InvisibleEffect*>(sObjectIds.Find_Impl(mInvisibleEffectId));
+        if (!pEffect || pEffect->GetDead())
+        {
+            pEffect = relive_new InvisibleEffect(sControlledCharacter, mResMan, map);
+            mInvisibleEffectId = pEffect->mBaseGameObjectId;
+        }
+        if (args[0] == "out")
+        {
+            pEffect->BecomeInvisible();
+        }
+        else if (args[0] == "in")
+        {
+            pEffect->BecomeVisible();
+        }
+        else
+        {
+            pEffect->InstantInvisibility();
+        }
+        return true;
     }
 
     if (name == "switch")

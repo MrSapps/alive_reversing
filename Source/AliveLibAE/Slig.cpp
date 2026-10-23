@@ -323,7 +323,6 @@ Slig::Slig(relive::Path_Slig* pTlv, const Guid& tlvId, ResourceManagerWrapper& r
     LoadAnimations();
     Animation_Init(GetAnimRes(AnimId::Slig_Idle));
 
-    field_178_mPal = std::make_shared<AnimationPal>();
 
     SetType(ReliveTypes::eSlig);
 
@@ -420,8 +419,7 @@ Slig::Slig(relive::Path_Slig* pTlv, const Guid& tlvId, ResourceManagerWrapper& r
     CreateShadow();
 }
 
-void renderWithGlowingEyes(OrderingTable& ot, BaseAliveGameObject* actor, std::shared_ptr<AnimationPal>& pal, s16 palSize, s16& r, s16& g, s16& b,
-                           const s16* eyeColourIndices, s16 eyeColourIndicesSize)
+void renderWithGlowingEyes(OrderingTable& ot, BaseAliveGameObject* actor)
 {
     if (actor->GetAnimation().GetRender())
     {
@@ -441,51 +439,10 @@ void renderWithGlowingEyes(OrderingTable& ot, BaseAliveGameObject* actor, std::s
                 &bShade);
             if (!actor->GetElectrocuted())
             {
-                if (rShade != r || rShade != g || rShade != b)
-                {
-                    r = rShade;
-                    g = rShade;
-                    b = rShade;
-
-                    for (s32 i = 0; i < palSize; i++)
-                    {
-                        u32 auxPalValue = actor->GetAnimation().mAnimRes.mPngPtr->mPal->mPal[i].r;
-                        u8 resultR = static_cast<u8>((auxPalValue * r) >> 7);
-
-                        auxPalValue = actor->GetAnimation().mAnimRes.mPngPtr->mPal->mPal[i].g;
-                        u8 resultG = static_cast<u8>((auxPalValue * g) >> 7);
-
-                        auxPalValue = actor->GetAnimation().mAnimRes.mPngPtr->mPal->mPal[i].b;
-                        u8 resultB = static_cast<u8>((auxPalValue * b) >> 7);
-
-                        pal->mPal[i].a = actor->GetAnimation().mAnimRes.mPngPtr->mPal->mPal[i].a;
-                        pal->mPal[i].r = resultR;
-                        pal->mPal[i].g = resultG;
-                        pal->mPal[i].b = resultB;
-
-                        // We need to check the result here in case it ended
-                        // up as transparent (RGB 0 STP 0)
-                        //
-                        // If the colour in the palette was not transparent
-                        // then we bump the colour slightly to avoid this
-                        // problem
-                        if (
-                            pal->mPal[i].IsTransparent() &&
-                            !actor->GetAnimation().mAnimRes.mPngPtr->mPal->mPal[i].IsTransparent()
-                        )
-                        {
-                            pal->mPal[i].r = 1;
-                        }
-                    }
-                    for (s32 i = 0; i < eyeColourIndicesSize; i++)
-                    {
-                        pal->mPal[eyeColourIndices[i]] = actor->GetAnimation().mAnimRes.mPngPtr->mPal->mPal[eyeColourIndices[i]];
-                    }
-
-                    actor->GetAnimation().LoadPal(pal);
-                }
-
-                actor->GetAnimation().SetRGB(127, 127, 127);
+                // The light the creature is in tints it, but not its eyes (those texels glow, see
+                // SpriteMask.hpp). The original did that by lighting the palette's entries
+                // except the eyes' and drawing with no tint.
+                actor->GetAnimation().SetRGB(rShade, gShade, bShade);
             }
 
             actor->GetAnimation().VRender(
@@ -510,9 +467,7 @@ void renderWithGlowingEyes(OrderingTable& ot, BaseAliveGameObject* actor, std::s
 
 void Slig::VRender(OrderingTable& ot)
 {
-    const s16 eyeIndices[] = {61, 62};
-
-    renderWithGlowingEyes(ot, this, field_178_mPal, 64, field_200_red, field_202_green, field_204_blue, &eyeIndices[0], ALIVE_COUNTOF(eyeIndices));
+    renderWithGlowingEyes(ot, this);
 }
 
 void Slig::VGetSaveState(SerializedObjectData& pSaveBuffer)

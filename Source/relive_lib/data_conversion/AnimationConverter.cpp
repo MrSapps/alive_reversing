@@ -6,8 +6,10 @@
 #include "ResourceManagerWrapper.hpp"
 #include "Animation.hpp"
 #include "PNGFile.hpp"
+#include "../SpriteMask.hpp"
 #include <mapbox/shelf-pack.hpp>
 #include <FatalError.hpp>
+#include <algorithm>
 #include <utility>
 
 inline void to_json(nlohmann::json&  j, const Point32& p)
@@ -58,7 +60,18 @@ inline void to_json(nlohmann::json& j, const AnimAttributes& p)
         {"loop_start_frame", p.mLoopStartFrame},
         {"max_width", p.mMaxWidth},
         {"max_height", p.mMaxHeight},
+        {"palette_depth", p.mPaletteDepth},
     };
+
+    if (p.mHasLuma)
+    {
+        j["luma"] = std::vector<f32>(p.mLuma, p.mLuma + SpriteFx::kLumaPoints);
+    }
+
+    if (!p.mSheet.empty())
+    {
+        j["sheet"] = p.mSheet;
+    }
 }
 
 static bool AttemptHalfSpaceBinPack(std::vector<mapbox::Bin>& myBins, std::vector<mapbox::Bin*>& packed, u32& allocTextureSize)
@@ -114,7 +127,7 @@ static void RoundAoGreenGlow(std::vector<u8>& spriteSheet, u32 sheetWidth, u32 b
     }
 }
 
-AnimationConverter::AnimationConverter(FileSystem& fs, const FileSystem::Path& outputFile, const AnimRecord& rec, const std::vector<u8>& fileData, bool isAoData)
+AnimationConverter::AnimationConverter(const AnimRecord& rec, const std::vector<u8>& fileData, bool isAoData, const std::vector<u8>& emissiveIndices)
     : mFileData(fileData)
     , mIsAoData(isAoData)
 {
@@ -124,7 +137,7 @@ AnimationConverter::AnimationConverter(FileSystem& fs, const FileSystem::Path& o
     const FrameHeader* pFirstFrame = GetFrame(pAnimationHeader, 0);
 
     // Get the CLUT/pal
-    AnimationPal pal;
+    AnimationPal& pal = mPal;
     ConvertPalToPNGFormat(fileData, pFirstFrame->field_0_clut_offset, pal);
 
     // Calculate the size of the nearest power-of-two that will fit all
@@ -334,10 +347,73 @@ AnimationConverter::AnimationConverter(FileSystem& fs, const FileSystem::Path& o
         decompressionBuffer.resize(decompressionBufferSize);
     }
 
-    PNGFile pngFile;
-    pngFile.Save(fs, (outputFile.GetPath() + ".png").c_str(), pal, spriteSheetBuffer, allocTextureSize, allocTextureSize);
+    // The sheet is true colour: each pixel is its palette entry. What the palette entry said
+    // besides the colour goes in the mask (SpriteMask.hpp): without the semi-transparency (STP)
+    // bit a semi-transparent sprite doesn't blend it, the emissive entries glow, and the first
+    // entries are left alone by the invisibility fade.
+    RGBA32 pixelOfIndex[256];
+    u8 flagsOfIndex[256] = {};
+    for (s32 i = 0; i < 256; i++)
+    {
+        const RGBA32& entry = pal.mPal[i];
+        const bool transparent = entry.r == 0 && entry.g == 0 && entry.b == 0 && entry.a == 0;
+        if (transparent)
+        {
+            pixelOfIndex[i] = {0, 0, 0, 0};
+            continue;
+        }
 
-    // Write json file
+        pixelOfIndex[i] = {entry.r, entry.g, entry.b, 255};
+        if (entry.a != 255)
+        {
+            flagsOfIndex[i] |= SpriteMask::kSolid;
+        }
+        if (i < 8)
+        {
+            flagsOfIndex[i] |= SpriteMask::kKeepVisible;
+        }
+    }
+
+    for (const u8 emissiveIndex : emissiveIndices)
+    {
+        if (pixelOfIndex[emissiveIndex].a != 0)
+        {
+            flagsOfIndex[emissiveIndex] |= SpriteMask::kGlow;
+        }
+    }
+
+    if (!isAoData && rec.mId == AnimId::WaterDrop)
+    {
+        // The original game made entry 1 of the water's palette transparent as it ran
+        pixelOfIndex[1] = {0, 0, 0, 0};
+        flagsOfIndex[1] = 0;
+    }
+
+    // Only what the frames use is kept: the sheet was made a power of two to pack them in
+    u32 sheetWidth = 0;
+    u32 sheetHeight = 0;
+    for (const PerFrameInfo& frame : perFrameInfos)
+    {
+        sheetWidth = std::max(sheetWidth, frame.mSpriteSheetX + frame.mSpriteWidth);
+        sheetHeight = std::max(sheetHeight, frame.mSpriteSheetY + frame.mSpriteHeight);
+    }
+
+    std::vector<u8> spriteSheetRgba(static_cast<std::size_t>(sheetWidth) * sheetHeight * 4);
+    std::vector<u8> spriteSheetMask(spriteSheetRgba.size());
+    bool anyFlag = false;
+    for (u32 y = 0; y < sheetHeight; y++)
+    {
+        for (u32 x = 0; x < sheetWidth; x++)
+        {
+            const u8 index = spriteSheetBuffer[static_cast<std::size_t>(y) * allocTextureSize + x];
+            const std::size_t dst = (static_cast<std::size_t>(y) * sheetWidth + x) * 4;
+            memcpy(&spriteSheetRgba[dst], &pixelOfIndex[index], 4);
+            const u8 flags = pixelOfIndex[index].a != 0 ? flagsOfIndex[index] : 0;
+            SpriteMask::Set(&spriteSheetMask[dst], flags);
+            anyFlag = anyFlag || flags != 0;
+        }
+    }
+
     AnimAttributes attributes = {};
     // TODO: Current values are kind of nonsense, map to something sane
 
@@ -359,13 +435,31 @@ AnimationConverter::AnimationConverter(FileSystem& fs, const FileSystem::Path& o
     attributes.mMaxWidth = biggestFrameSize.mMaxW;
     attributes.mMaxHeight = biggestFrameSize.mMaxH;
 
+    // The size of the original palette. The effects that went through the palette entry by entry
+    // take as long as it has entries.
+    attributes.mPaletteDepth = mPalDepth;
+
+    // The brightness of the colours of the sheet, for the effects that go by it
+    SpriteFx::ComputeLuma(spriteSheetRgba, attributes.mLuma);
+    attributes.mHasLuma = true;
+
+    mSheet.mRgba = std::move(spriteSheetRgba);
+    if (anyFlag)
+    {
+        mSheet.mMask = std::move(spriteSheetMask);
+    }
+    mSheet.mWidth = sheetWidth;
+    mSheet.mHeight = sheetHeight;
+    mSheet.mFrames = std::move(perFrameInfos);
+    mSheet.mAttributes = attributes;
+}
+
+std::string AnimationConverter::ToJson(const AnimAttributes& attributes, const std::vector<PerFrameInfo>& frames)
+{
     nlohmann::json animJsonInfo;
     animJsonInfo["attributes"] = attributes;
-    animJsonInfo["frames"] = perFrameInfos;
-
-    const std::string animJsonInfoString = animJsonInfo.dump(4);
-    AutoFILE jsonFile = fs.OpenFile((outputFile.GetPath() + ".json").c_str(), "wb");
-    jsonFile.Write(reinterpret_cast<const u8*>(animJsonInfoString.c_str()), static_cast<u32>(animJsonInfoString.size()));
+    animJsonInfo["frames"] = frames;
+    return animJsonInfo.dump(4);
 }
 
 // Calc the max width and height because the ones in the header are often way too big for some reason
@@ -404,6 +498,7 @@ u16 AnimationConverter::ToPNGPixelFormat(u16 pixel)
 void AnimationConverter::ConvertPalToPNGFormat(const std::vector<u8>& fileData, u32 clutOffset, AnimationPal& pal)
 {
     const u32 clutSize = *reinterpret_cast<const u32*>(fileData.data() + clutOffset);
+    mPalDepth = clutSize;
     const u16* pClutData = reinterpret_cast<const u16*>(fileData.data() + clutOffset + sizeof(u32));
 
     for (u32 i = 0; i < clutSize; i++)

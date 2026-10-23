@@ -150,20 +150,53 @@ public:
         // These 4 TLVs now have mMovie1/2/3 like bird_portal/path_transition instead of a single
         // mMovieName - see DecodeFmvChain_AE/AO.
         static constexpr u32 kPathVersion = 20;
-        static constexpr u32 kPaletteVersion = 1;
+        // 2: not palettes any more but the change of colours from a sprite's palette to it, see
+        // PaletteFit.
+        // 3: the fonts' sheets in each palette have a mask (SpriteMask.hpp) instead of special alphas.
+        static constexpr u32 kPaletteVersion = 3;
         // 5: AO's green glow (DoorLight) has rounded corners, see RoundAoGreenGlow.
-        static constexpr u32 kAnimationVersion = 5;
+        // 6: sprite sheets are true colour PNGs (RGBA), and the animation's json has its palette_depth.
+        // 7: what a palette entry said besides its colour (no STP bit, glowing, left alone by
+        // invisibility) is in a mask image next to the sheet, see SpriteMask.hpp.
+        // 8: the sheets are packed into pages shared by the animations of a group, see SpritePageWriter.
+        // 9: the pages are packed frame by frame instead of sheet by sheet, so they have far fewer holes.
+        // 10: the animations' sheets are kept (animation.png/json, for mods and the Blender add-on) and
+        // the pages are made from them, with the packed jsons saying where the frames are on a page.
+        static constexpr u32 kAnimationVersion = 10;
         // 9: dropped the redundant "paths" subdir under each level, same as kPathVersion 17.
         static constexpr u32 kCameraVersion = 9;
         static constexpr u32 kSaveFileVersion = 3;
-        static constexpr u32 kFontFileVersion = 1;
+        static constexpr u32 kFontFileVersion = 3;
         static constexpr u32 kDemoFileVersion = 2;
 
         static constexpr char_type kDataVersionFileName[] = "data_version.json";
     public:
-        static DataVersions LatestVersion()
+        // The biggest sprite page there is, and the smallest one we make, see SpritePageSizeFor
+        static constexpr u32 kDefaultSpritePageSize = 2048;
+        static constexpr u32 kMinSpritePageSize = 512;
+
+        // The size of the sprite pages for a GPU whose biggest texture is maxTextureSize (0 if
+        // that isn't known). A page has its mask under it, so it is half of that at most.
+        static u32 SpritePageSizeFor(u32 maxTextureSize)
+        {
+            if (maxTextureSize == 0)
+            {
+                return kDefaultSpritePageSize;
+            }
+
+            u32 size = kMinSpritePageSize;
+            while (size * 2 <= kDefaultSpritePageSize && size * 4 <= maxTextureSize)
+            {
+                size *= 2;
+            }
+            return size;
+        }
+
+        static DataVersions LatestVersion(u32 spritePageSize = kDefaultSpritePageSize)
         {
             DataVersions dv;
+            dv.mSpritePageSize = spritePageSize;
+            dv.mWantedSpritePageSize = spritePageSize;
             dv.mFmvVersion = kFmvVersion;
             dv.mPathVersion = kPathVersion;
             dv.mPaletteVersion = kPaletteVersion;
@@ -183,6 +216,12 @@ public:
         u32 mSaveFileVersion = 0;
         u32 mFontFileVersion = 0;
         u32 mDemoFileVersion = 0;
+        // The size of the sprite pages (0 if there aren't any)
+        u32 mSpritePageSize = 0;
+        // The size the pages are wanted at, for the GPU: not saved
+        u32 mWantedSpritePageSize = kDefaultSpritePageSize;
+        // A sheet is newer than the pages (or there are no pages): not saved
+        bool mPagesStale = false;
 
         void Save(const FileSystem::Path& dataDir) const;
 
@@ -208,6 +247,13 @@ public:
             return mAnimationVersion != kAnimationVersion;
         }
 
+        // The pages are made again from the animations' sheets, which doesn't need the game's
+        // files: the GPU wants another page size, or a sheet changed
+        bool RepackPages() const
+        {
+            return !ConvertAnimations() && (mSpritePageSize != mWantedSpritePageSize || mPagesStale);
+        }
+
         bool ConvertCameras() const
         {
             return mCameraVersion != kCameraVersion;
@@ -230,12 +276,14 @@ public:
 
         bool AnyConversionRequired() const
         {
-            return ConvertFmvs() || ConvertPaths() || ConvertPalettes() || ConvertAnimations() || ConvertCameras() || ConvertSaves() || ConvertFonts() || ConvertDemos();
+            return ConvertFmvs() || ConvertPaths() || ConvertPalettes() || ConvertAnimations() || RepackPages() || ConvertCameras() || ConvertSaves() || ConvertFonts() || ConvertDemos();
         }
     };
 
-    std::optional<DataVersions> DataVersionAO();
-    std::optional<DataVersions> DataVersionAE();
+    // The versions of the converted data, if there is any. spritePageSize is the size of sprite
+    // page this GPU wants: the animations are converted again if the data's pages are another size.
+    std::optional<DataVersions> DataVersionAO(u32 spritePageSize = DataVersions::kDefaultSpritePageSize);
+    std::optional<DataVersions> DataVersionAE(u32 spritePageSize = DataVersions::kDefaultSpritePageSize);
 
     void ConvertDataAO(const DataVersions& dv);
     void ConvertDataAE(const DataVersions& dv);
@@ -243,7 +291,10 @@ public:
     // Converts what data_version.json says is out of date (everything without one), waits for
     // the jobs on the thread pool to finish, then updates data_version.json unless it was
     // cancelled. The first run conversion (DataConversionUI) and relive -convert use this.
-    void ConvertAll(GameType game);
+    // modLayers are the data directories of the active mod and the games' (see
+    // SpritePageWriter::Repack), empty if there is no mod: the mod's sprite pages are made once
+    // the game's data is up to date.
+    void ConvertAll(GameType game, u32 spritePageSize = DataVersions::kDefaultSpritePageSize, const std::vector<std::string>& modLayers = {});
 
 private:
     std::unique_ptr<ThreadPool> mThreadPool;

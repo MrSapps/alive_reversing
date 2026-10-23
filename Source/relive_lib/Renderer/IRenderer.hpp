@@ -44,11 +44,14 @@ public: // TODO: Make protected later
     enum class PsxDrawMode : u32
     {
         Flat = 0,
+        // A sprite or a font glyph, from a true colour sheet. paletteIndex is its SpriteFx, 0 for none.
         DefaultFT4 = 1,
         Camera = 2,
         FG1 = 3,
         Gas = 4,
-        ScreenWave = 5
+        ScreenWave = 5,
+        // DefaultFT4 from a sheet that has a mask under it in the texture, see SpriteMask.hpp
+        DefaultFT4Masked = 6
     };
 
     struct PsxVertexData final
@@ -60,7 +63,7 @@ public: // TODO: Make protected later
         u32 isSemiTrans;
         u32 isShaded;
         relive::TBlendModes blendMode;
-        u32 paletteIndex;
+        u32 fxIndex;
         u32 textureUnitIndex;
     };
 
@@ -129,6 +132,13 @@ public:
     // Which renderer this is. Window::CreateWithRenderer falls back to another one if the
     // requested one can't be created.
     virtual Renderers GetType() const = 0;
+
+    // The biggest texture the GPU takes (width and height), 0 if it isn't known. The sprite pages
+    // are made to fit it, see DataConversion::DataVersions::SpritePageSizeFor.
+    virtual u32 MaxTextureSize() const
+    {
+        return 0;
+    }
     static const char* TypeToString(Renderers type);
 
     // What the renderer did in the last frame

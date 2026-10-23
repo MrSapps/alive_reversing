@@ -9,6 +9,7 @@
 #include "data_conversion/data_conversion.hpp"
 #include "data_conversion/AnimConversionInfo.hpp"
 #include "data_conversion/PNGFile.hpp"
+#include "data_conversion/SpritePageWriter.hpp"
 #include "data_conversion/AnimationConverter.hpp"
 
 #include "BinaryPath.hpp"
@@ -22,6 +23,7 @@
 #include <chrono>
 #include <thread>
 #include "IniFile.hpp"
+#include <algorithm>
 
 std::atomic<u32> UniqueResId::mGlobalId{1};
 
@@ -52,7 +54,7 @@ std::string ResourceManagerWrapper::LoadDemoFile(const std::string& fileName)
     return mFs.LoadToString(fileName.c_str());
 }
 
-void ResourceManagerWrapper::AddSearchPaths(const std::string& modPath)
+std::vector<std::string> ResourceManagerWrapper::BuildSearchPaths(GameType gameType, const std::string& modPath)
 {
     // Root of all data
     FileSystem::Path reliveDataPath;
@@ -63,7 +65,7 @@ void ResourceManagerWrapper::AddSearchPaths(const std::string& modPath)
 
     // Where the base dir of the opposite game might be - we check here if primary fails
     FileSystem::Path backupBaseGamePath = reliveDataPath;
-    if (GetGameType() == GameType::eAe)
+    if (gameType == GameType::eAe)
     {
         primaryBaseGamePath.Append("ae");
         backupBaseGamePath.Append("ao");
@@ -74,13 +76,21 @@ void ResourceManagerWrapper::AddSearchPaths(const std::string& modPath)
         backupBaseGamePath.Append("ae");
     }
 
+    std::vector<std::string> paths;
     if (!modPath.empty())
     {
-        mSearchPaths.push_back(modPath);
+        paths.push_back(modPath);
     }
 
-    mSearchPaths.push_back(primaryBaseGamePath.GetPath());
-    mSearchPaths.push_back(backupBaseGamePath.GetPath());
+    paths.push_back(primaryBaseGamePath.GetPath());
+    paths.push_back(backupBaseGamePath.GetPath());
+    return paths;
+}
+
+void ResourceManagerWrapper::AddSearchPaths(const std::string& modPath)
+{
+    mModPath = modPath;
+    mSearchPaths = BuildSearchPaths(GetGameType(), modPath);
 }
 
 
@@ -173,15 +183,21 @@ public:
         FileSystem& fs = mResMan->mFs;
         std::string jsonStr;
         std::string filePath;
+        // The search path the json was found in
+        std::string winningBase;
         std::vector<std::string> searchedJsonPaths;
-        for (const auto& basePath : mResMan->mSearchPaths)
+        std::size_t winningIndex = 0;
+        for (std::size_t i = 0; i < mResMan->mSearchPaths.size(); i++)
         {
+            const std::string& basePath = mResMan->mSearchPaths[i];
             filePath = GetAnimPath(basePath, mAnimId, mThemeName);
             const std::string jsonPath = filePath + ".json";
             searchedJsonPaths.push_back(jsonPath);
             jsonStr = fs.LoadToString(jsonPath.c_str());
             if (!jsonStr.empty())
             {
+                winningBase = basePath;
+                winningIndex = i;
                 break;
             }
         }
@@ -197,30 +213,64 @@ public:
             return;
         }
 
-        const std::string pngPath = filePath + ".png";
-        if (!fs.FileExists(pngPath.c_str()))
+        // The sprite page the animation is on, if it was packed. The first data directory with a
+        // packed json for it wins, but not one below the directory its sheet is in: a mod's pages
+        // have the game's animations on them too, whereas the game's pages have nothing of the
+        // mod's. So a mod's sheet is never drawn from the game's pages, and a mod without pages
+        // uses the game's.
+        std::string pagesBase = winningBase;
+        std::string packedJsonStr;
+        for (std::size_t i = 0; i <= winningIndex && packedJsonStr.empty(); i++)
         {
-            mResMan->ReportMissingResource(Describe(), {pngPath});
-            return;
+            packedJsonStr = fs.LoadToString((GetAnimPath(mResMan->mSearchPaths[i], mAnimId, mThemeName) + SpritePageWriter::kPackedJsonExtension).c_str());
+            if (!packedJsonStr.empty())
+            {
+                pagesBase = mResMan->mSearchPaths[i];
+            }
         }
+        auto pAnimationAttributesAndFrames = std::make_shared<AnimationAttributesAndFrames>(packedJsonStr.empty() ? jsonStr : packedJsonStr);
 
-        auto pPngData = std::make_shared<PngData>();
-        PNGFile pngFile;
-        pPngData->mPal = std::make_shared<AnimationPal>();
-        pngFile.Load(fs, pngPath.c_str(), *pPngData->mPal, pPngData->mPixels, pPngData->mWidth, pPngData->mHeight);
+        std::shared_ptr<PngData> pPngData;
+        if (!pAnimationAttributesAndFrames->mAttributes.mSheet.empty())
+        {
+            // On a sprite page, shared with the other animations of its group
+            pPngData = mResMan->LoadSheetPage(pagesBase, pAnimationAttributesAndFrames->mAttributes.mSheet, Describe());
+            if (!pPngData)
+            {
+                return;
+            }
+        }
+        else
+        {
+            const std::string pngPath = filePath + ".png";
+            if (!fs.FileExists(pngPath.c_str()))
+            {
+                mResMan->ReportMissingResource(Describe(), {pngPath});
+                return;
+            }
 
-        auto pAnimationAttributesAndFrames = std::make_shared<AnimationAttributesAndFrames>(jsonStr);
+            pPngData = std::make_shared<PngData>();
+            PNGFile pngFile;
+            pngFile.LoadSprite(fs, pngPath.c_str(), pPngData->mRgba, pPngData->mWidth, pPngData->mHeight);
+            pngFile.LoadMask(fs, pngPath, pPngData->mMask, pPngData->mWidth, pPngData->mHeight);
+
+            if (!pAnimationAttributesAndFrames->mAttributes.mHasLuma)
+            {
+                // A sheet that isn't from the data conversion (a mod's)
+                SpriteFx::ComputeLuma(pPngData->mRgba, pAnimationAttributesAndFrames->mAttributes.mLuma);
+                pAnimationAttributesAndFrames->mAttributes.mHasLuma = true;
+            }
+        }
 
         AnimResource newRes;
         newRes.mId = mAnimId;
         newRes.mJsonPtr = pAnimationAttributesAndFrames;
         newRes.mPngPtr = pPngData;
-        newRes.mCurPal = newRes.mPngPtr->mPal;
 
         std::unique_lock<std::mutex> lock(mResMan->mLoadingMutex);
 
         const auto key = std::make_pair(mThemeName, mAnimId);
-        mResMan->mLoadedAnimations[key] = {pAnimationAttributesAndFrames, pPngData, {}};
+        mResMan->mLoadedAnimations[key] = {pAnimationAttributesAndFrames, pPngData, pPngData->mId};
 
         // Pinned while it loaded, keep it loaded
         auto pin = mResMan->mPinnedAnimations.find(key);
@@ -279,6 +329,23 @@ inline void from_json(const nlohmann::json& j, AnimAttributes& p)
     j.at("loop_start_frame").get_to(p.mLoopStartFrame);
     j.at("max_width").get_to(p.mMaxWidth);
     j.at("max_height").get_to(p.mMaxHeight);
+    if (j.contains("palette_depth"))
+    {
+        j.at("palette_depth").get_to(p.mPaletteDepth);
+    }
+    if (j.contains("sheet"))
+    {
+        j.at("sheet").get_to(p.mSheet);
+    }
+    if (j.contains("luma"))
+    {
+        const auto& luma = j.at("luma");
+        for (u32 i = 0; i < SpriteFx::kLumaPoints && i < luma.size(); i++)
+        {
+            luma[i].get_to(p.mLuma[i]);
+        }
+        p.mHasLuma = true;
+    }
 }
 
 AnimationAttributesAndFrames::AnimationAttributesAndFrames(const std::string& jsonData)
@@ -293,6 +360,31 @@ AnimationAttributesAndFrames::AnimationAttributesAndFrames(const std::string& js
     }
 
     from_json(j["attributes"], mAttributes);
+}
+
+std::shared_ptr<PngData> ResourceManagerWrapper::LoadSheetPage(const std::string& basePath, const std::string& page, const std::string& description)
+{
+    const std::string pngPath = FileSystem::Path(basePath).Append(page + ".png").GetPath();
+
+    // Animations on a page are loaded at the same time: the first loads it, the others wait for that
+    std::unique_lock<std::mutex> lock(mSheetPagesMutex);
+    if (std::shared_ptr<PngData> loaded = mSheetPages[pngPath].lock())
+    {
+        return loaded;
+    }
+
+    if (!mFs.FileExists(pngPath.c_str()))
+    {
+        ReportMissingResource(description + "'s sprite page", {pngPath});
+        return nullptr;
+    }
+
+    auto pPngData = std::make_shared<PngData>();
+    PNGFile pngFile;
+    pngFile.LoadSprite(mFs, pngPath.c_str(), pPngData->mRgba, pPngData->mWidth, pPngData->mHeight);
+    pngFile.LoadMask(mFs, pngPath, pPngData->mMask, pPngData->mWidth, pPngData->mHeight);
+    mSheetPages[pngPath] = pPngData;
+    return pPngData;
 }
 
 void ResourceManagerWrapper::PendAnimation(AnimId animId, const std::string& theme)
@@ -458,12 +550,37 @@ AnimResource ResourceManagerWrapper::LoadAnimation(AnimId anim, const std::strin
     ALIVE_FATAL("Json or PNG resources have gone out of scope");
 }
 
+// The palettes of the fonts are whole sheets (the font in the palette's colours), the others
+// are the change of colours from the sprite's own palette to this one
+static bool IsFontPal(PalId pal)
+{
+    switch (pal)
+    {
+        case PalId::MainMenuFont_MainMenu:
+        case PalId::MainMenuFont_PauseMenu:
+        case PalId::LedFont_ColourfulMeter:
+        case PalId::LedFont_1:
+        case PalId::LedFont_2:
+        case PalId::LedFont_Red:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
 PalResource ResourceManagerWrapper::LoadPal(PalId pal)
 {
     // TODO: Cache these
     PalResource newRes;
     newRes.mId = pal;
-    newRes.mPal = std::make_shared<AnimationPal>();
+
+    const bool isFont = IsFontPal(pal);
+    std::string fileName = ToString(pal);
+    if (isFont)
+    {
+        fileName = fileName.substr(0, fileName.size() - 4) + ".png";
+    }
 
     FileSystem::Path filePath;
     std::vector<std::string> searchedPaths;
@@ -471,7 +588,7 @@ PalResource ResourceManagerWrapper::LoadPal(PalId pal)
     for (auto& basePath : mSearchPaths)
     {
         filePath = FileSystem::Path(basePath);
-        filePath.Append(ToString(newRes.mId));
+        filePath.Append(fileName);
         searchedPaths.push_back(filePath.GetPath());
         if (mFs.FileExists(filePath.GetPath().c_str()))
         {
@@ -488,13 +605,22 @@ PalResource ResourceManagerWrapper::LoadPal(PalId pal)
         FlushMissingResourceReports();
     }
 
-    auto palData = mFs.LoadToVec(filePath.GetPath().c_str());
-    if (palData.size() != 1024) // 256 RGBA entries
+    if (isFont)
     {
-        ALIVE_FATAL("Bad pal data size %zu but expected 1024", palData.size());
+        newRes.mFontSheet = std::make_shared<PngData>();
+        PNGFile pngFile;
+        pngFile.LoadSprite(mFs, filePath.GetPath().c_str(), newRes.mFontSheet->mRgba, newRes.mFontSheet->mWidth, newRes.mFontSheet->mHeight);
+        pngFile.LoadMask(mFs, filePath.GetPath(), newRes.mFontSheet->mMask, newRes.mFontSheet->mWidth, newRes.mFontSheet->mHeight);
+        return newRes;
     }
 
-    memcpy(newRes.mPal->mPal, palData.data(), palData.size());
+    auto palData = mFs.LoadToVec(filePath.GetPath().c_str());
+    if (palData.size() != sizeof(newRes.mFx.mMatrix))
+    {
+        ALIVE_FATAL("Bad palette data size %zu but expected %zu", palData.size(), sizeof(newRes.mFx.mMatrix));
+    }
+
+    memcpy(newRes.mFx.mMatrix, palData.data(), palData.size());
 
     return newRes;
 }
@@ -828,7 +954,6 @@ private:
         const std::string fontName = FontName(mFontId);
 
         auto pPngData = std::make_shared<PngData>();
-        pPngData->mPal = std::make_shared<AnimationPal>();
         std::vector<std::string> searchedPaths;
         for (const auto& basePath : mResMan->mSearchPaths)
         {
@@ -843,9 +968,10 @@ private:
             }
 
             PNGFile pngFile;
-            pngFile.Load(fs, pngPath.c_str(), *pPngData->mPal, pPngData->mPixels, pPngData->mWidth, pPngData->mHeight);
-            if (!pPngData->mPixels.empty())
+            pngFile.LoadSprite(fs, pngPath.c_str(), pPngData->mRgba, pPngData->mWidth, pPngData->mHeight);
+            if (!pPngData->mRgba.empty())
             {
+                pngFile.LoadMask(fs, pngPath, pPngData->mMask, pPngData->mWidth, pPngData->mHeight);
                 return pPngData;
             }
         }
@@ -901,7 +1027,6 @@ FontResource ResourceManagerWrapper::LoadFont(FontType fontId)
         if (it != mLoadedFonts.end())
         {
             auto pPngData = std::make_shared<PngData>(*it->second);
-            pPngData->mPal = std::make_shared<AnimationPal>(*it->second->mPal);
             return FontResource(fontId, pPngData);
         }
     }

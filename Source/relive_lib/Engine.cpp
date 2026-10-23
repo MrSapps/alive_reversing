@@ -823,28 +823,7 @@ void Engine::Init()
     const std::string& modName = mOptions.mModName;
     if (!modName.empty())
     {
-        LOG_INFO("Set active mod to be %s", modName.c_str());
-
-        FileSystem::Path modsDir;
-        modsDir.Append("relive_data").Append("mods");
-
-        relive::Mods mods(mFs);
-        mods.EnumerateMods(modsDir.GetPath());
-
-        const relive::Mod* pMod = mods.FindByDirOrModName(modName);
-        if (!pMod)
-        {
-            ALIVE_FATAL("Mod \"%s\" was set as the active mod on the command line but doesn't exist", modName.c_str());
-        }
-
-        const char_type* const expectedTargetGame = (mGameType == GameType::eAe) ? "AE" : "AO";
-        if (strcmpi(pMod->mTargetGame.c_str(), expectedTargetGame) != 0)
-        {
-            ALIVE_FATAL("Mod \"%s\" targets \"%s\" but the active game is \"%s\"", modName.c_str(), pMod->mTargetGame.c_str(), expectedTargetGame);
-        }
-
-        mActiveModDisplayName = pMod->mName;
-        activeModPath = modsDir.Append(pMod->mDirectory).GetPath();
+        activeModPath = relive::Mods::ActiveModPath(mFs, modName, mGameType, mActiveModDisplayName);
     }
 
     mResMan = std::make_unique<ResourceManagerWrapper>(mFs, activeModPath);

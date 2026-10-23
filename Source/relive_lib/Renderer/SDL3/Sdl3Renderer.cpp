@@ -230,17 +230,30 @@ void Sdl3Renderer::Draw(const Poly_FT4& poly)
             shading.a = 0;
         }
 
-        const std::shared_ptr<AnimationPal>& pPal = poly.mAnim ? poly.mAnim->mAnimRes.mCurPal : poly.mFont->mFntResource.mCurPal;
         const PngData& png = poly.mAnim ? *poly.mAnim->mAnimRes.mPngPtr : *poly.mFont->mFntResource.mPngPtr;
         const IRenderer::QuadUVs uvs = poly.mAnim ? IRenderer::GetAnimUVs(poly) : IRenderer::GetFontUVs(poly);
 
+        // The part of the sheet that is drawn. Positions are the sprite's own, whatever else is
+        // on the sheet, so the sampling is the same as from the sheet itself.
+        Sdl3Texture::SpriteRect rect;
+        rect.mX = static_cast<s32>(std::floor(std::min(uvs.u0, uvs.u1)));
+        rect.mY = static_cast<s32>(std::floor(std::min(uvs.v0, uvs.v1)));
+        const s32 right = static_cast<s32>(std::ceil(std::max(uvs.u0, uvs.u1)));
+        const s32 bottom = static_cast<s32>(std::ceil(std::max(uvs.v0, uvs.v1)));
+        rect.mX = std::max(rect.mX, 0);
+        rect.mY = std::max(rect.mY, 0);
+        rect.mW = std::max(1, std::min(right, static_cast<s32>(png.mWidth)) - rect.mX);
+        rect.mH = std::max(1, std::min(bottom, static_cast<s32>(png.mHeight)) - rect.mY);
+
+        static const SpriteFx kNoFx;
         SDL_FColor vertexColour = {};
         tex =
-            PrepareTextureFromPoly(poly)->GetTextureUsePalette(
-                pPal,
+            PrepareTextureFromPoly(poly)->GetTextureForSprite(
+                poly.mAnim ? poly.mAnim->mAnimRes.mFx : kNoFx,
                 shading,
                 poly.mSemiTransparent,
                 poly.mBlendMode,
+                rect,
                 vertexColour
             );
         for (SDL_Vertex& vertex : vertices)
@@ -248,10 +261,14 @@ void Sdl3Renderer::Draw(const Poly_FT4& poly)
             vertex.color = vertexColour;
         }
 
-        const f32 u0 = uvs.u0 / png.mWidth;
-        const f32 v0 = uvs.v0 / png.mHeight;
-        const f32 u1 = uvs.u1 / png.mWidth;
-        const f32 v1 = uvs.v1 / png.mHeight;
+        // The texture is a power of two in size, so these (and the position they come out at in
+        // the texture) are exact, as they are on a sheet
+        const f32 textureWidth = static_cast<f32>(Sdl3Texture::VariantTextureSize(rect.mW));
+        const f32 textureHeight = static_cast<f32>(Sdl3Texture::VariantTextureSize(rect.mH));
+        const f32 u0 = (uvs.u0 - rect.mX) / textureWidth;
+        const f32 v0 = (uvs.v0 - rect.mY) / textureHeight;
+        const f32 u1 = (uvs.u1 - rect.mX) / textureWidth;
+        const f32 v1 = (uvs.v1 - rect.mY) / textureHeight;
         vertices[0].tex_coord = {u0, v0};
         vertices[1].tex_coord = {u1, v0};
         vertices[2].tex_coord = {u0, v1};
@@ -614,18 +631,22 @@ std::shared_ptr<Sdl3Texture> Sdl3Renderer::PrepareTextureFromPoly(const Poly_FT4
     }
     else if (poly.mAnim || poly.mFont)
     {
-        // Sprite sheets are kept as 8 bit and drawn through their palette, see Sdl3Texture
+        // Sprite sheets are drawn with the effects on them, see Sdl3Texture
         const u32 id = poly.mAnim ? poly.mAnim->mAnimRes.mUniqueId.Id() : poly.mFont->mFntResource.mUniqueId.Id();
         const PngData& png = poly.mAnim ? *poly.mAnim->mAnimRes.mPngPtr : *poly.mFont->mFntResource.mPngPtr;
         texture = mTextureCache.GetOrAdd(id, kSpriteTextureLifetime, [&]()
         {
-            auto spriteTex = std::make_shared<Sdl3Texture>(mContext, png.mWidth, png.mHeight, SDL_PIXELFORMAT_INDEX8, SDL_TEXTUREACCESS_STREAMING);
-            spriteTex->Update(nullptr, png.mPixels.data());
-            return spriteTex;
+            return std::make_shared<Sdl3Texture>(mContext, png.mWidth, png.mHeight, png.mRgba.data(), png.HasMask() ? png.mMask.data() : nullptr, Sdl3Texture::TrueColourSheet{});
         });
     }
 
     return texture;
+}
+
+u32 Sdl3Renderer::MaxTextureSize() const
+{
+    const SDL_PropertiesID props = SDL_GetRendererProperties(mContext.GetRenderer());
+    return static_cast<u32>(SDL_GetNumberProperty(props, SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER, 0));
 }
 
 SDL_FPoint Sdl3Renderer::PointToViewport(const SDL_FPoint& point)

@@ -117,7 +117,6 @@ s32 DebugFont::DebugFont_Init(ResourceManagerWrapper& resMan)
     mDebugFontContext.LoadFontType(FontType::Debug, resMan);
 
     PalResource palRes;
-    palRes.mPal = mDebugFontContext.mFntResource.mCurPal;
     mDebugFont.Load(512,  palRes, &mDebugFontContext);         
 
     return 0;

@@ -27,9 +27,11 @@ public:
     u32 Get_Frame_Count();
     u32 MaxHeight();
     const PerFrameInfo* Get_FrameHeader(s32 frame);
-    void LoadPal(std::shared_ptr<AnimationPal>& pal);
     void LoadPal(const PalResource& pal);
     void ReloadPal();
+    // How many entries the sprite's original palette had: 16, 64 or 256
+    u32 PaletteDepth() const;
+    SpriteFx& Fx() { return mAnimRes.mFx; }
     void Get_Frame_Rect(PSX_RECT* pRect);
     void Get_Frame_Width_Height(s16* pWidth, s16* pHeight);
     void Get_Frame_Offset(s16* pBoundingX, s16* pBoundingY);

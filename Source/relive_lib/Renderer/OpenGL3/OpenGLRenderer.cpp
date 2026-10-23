@@ -15,6 +15,7 @@
 #include "GLShaderProgram.hpp"
 #include "GLTexture2D.hpp"
 #include "OpenGLRenderer.hpp"
+#include <array>
 #include <cmath>
 
 #define GL_TO_IMGUI_TEX(v) *reinterpret_cast<ImTextureID*>(&v)
@@ -33,6 +34,8 @@ static bool gRenderEnable_G4 = true;
 static bool gRenderEnable_G3 = true;
 static bool gRenderEnable_G2 = true;
 
+static std::array<f32, 16 * 4> SpriteFxTexels(const SpriteFx& fx);
+
 OpenGLRenderer::OpenGLRenderer(Window& window, bool checks)
     : IRenderer(window),
     mContext(window, checks),
@@ -41,7 +44,7 @@ OpenGLRenderer::OpenGLRenderer(Window& window, bool checks)
         GLFramebuffer(kPsxFramebufferWidth, kPsxFramebufferHeight),
         GLFramebuffer(kPsxFramebufferWidth, kPsxFramebufferHeight)
     },
-    mPaletteCache(kAvailablePalettes)
+    mFxCache(kAvailableFx - 1)
 {
     // The batches' vertex layout. The element buffer binding is part of the VAO too.
     GL_VERIFY(glGenVertexArrays(1, &mPsxVao));
@@ -59,7 +62,7 @@ OpenGLRenderer::OpenGLRenderer(Window& window, bool checks)
     GL_VERIFY(glEnableVertexAttribArray(3));
     GL_VERIFY(glVertexAttribIPointer(3, 4, GL_UNSIGNED_INT, sizeof(PsxVertexData), (void*) offsetof(PsxVertexData, drawMode)));
     GL_VERIFY(glEnableVertexAttribArray(4));
-    GL_VERIFY(glVertexAttribIPointer(4, 2, GL_UNSIGNED_INT, sizeof(PsxVertexData), (void*) offsetof(PsxVertexData, paletteIndex)));
+    GL_VERIFY(glVertexAttribIPointer(4, 2, GL_UNSIGNED_INT, sizeof(PsxVertexData), (void*) offsetof(PsxVertexData, fxIndex)));
 
     // The framebuffer quads' vertex layout
     GL_VERIFY(glGenVertexArrays(1, &mQuadVao));
@@ -74,15 +77,10 @@ OpenGLRenderer::OpenGLRenderer(Window& window, bool checks)
     // Enable blending
     GL_VERIFY(glEnable(GL_BLEND));
 
-    // Preload the cache texture with all black
-    const static RGBA32 black[256] = {};
-
-    mPaletteTexture = std::make_shared<GLTexture2D>(kPaletteDepth, kAvailablePalettes, GL_RGBA);
-
-    for (u32 i = 0; i < kAvailablePalettes; i++)
-    {
-        mPaletteTexture->LoadSubImage(0, i, kPaletteDepth, 1, black);
-    }
+    // The table of sprite effects. Row 0 is no effect (a matrix that changes nothing) and the others
+    // are filled as effects are used.
+    mFxTexture = std::make_shared<GLTexture2D>(kFxTexelsPerRow, kAvailableFx, GL_RGBA, GL_RGBA32F);
+    mFxTexture->LoadSubImage(0, 0, kFxTexelsPerRow, 1, SpriteFxTexels(SpriteFx{}).data(), GL_FLOAT);
 
     // Load shaders
     GLShader passthruVS(gShader_PassthruVSH, GL_VERTEX_SHADER);
@@ -104,7 +102,7 @@ OpenGLRenderer::OpenGLRenderer(Window& window, bool checks)
 
     mPsxShader.Use();
     mPsxShader.UniformVec2("vsViewportSize", kPsxFramebufferWidth, kPsxFramebufferHeight);
-    mPsxShader.Uniform1i("texPalette", 0);
+    mPsxShader.Uniform1i("texFx", 0);
     mPsxShader.Uniform1i("texGas", 1);
     mPsxShader.Uniform1i("texCamera", 2);
     mPsxShader.Uniform1i("texFramebuffer", 7);
@@ -118,6 +116,13 @@ OpenGLRenderer::OpenGLRenderer(Window& window, bool checks)
     mPassthruFilterShader.Uniform1i("texTextureData", 0);
     mPassthruFilterShader.UniformVec2("vsViewportSize", kTargetFramebufferWidth, kTargetFramebufferHeight);
     mPassthruFilterShader.UniformVec2("fsTexSize", kPsxFramebufferWidth, kPsxFramebufferHeight);
+}
+
+u32 OpenGLRenderer::MaxTextureSize() const
+{
+    GLint size = 0;
+    GL_VERIFY(glGetIntegerv(GL_MAX_TEXTURE_SIZE, &size));
+    return size > 0 ? static_cast<u32>(size) : 0;
 }
 
 OpenGLRenderer::~OpenGLRenderer()
@@ -352,17 +357,11 @@ void OpenGLRenderer::Draw(const Poly_FT4& poly)
     }
     else if (poly.mAnim)
     {
-        const u32 palIndex = PreparePalette(*poly.mAnim->mAnimRes.mCurPal);
-        mBatcher.PushAnim(poly, palIndex, texture);
+        mBatcher.PushAnim(poly, PrepareFx(poly.mAnim->mAnimRes.mFx), texture);
     }
     else if (poly.mFont)
     {
-        FontResource& fontRes = poly.mFont->mFntResource;
-
-        auto pPal = fontRes.mCurPal;
-        const u32 palIndex = PreparePalette(*pPal);
-
-        mBatcher.PushFont(poly, palIndex, texture);
+        mBatcher.PushFont(poly, 0, texture);
     }
 }
 
@@ -392,30 +391,85 @@ void OpenGLRenderer::Draw(const Poly_G4& poly)
     mBatcher.PushPolyG4(poly, poly.mBlendMode);
 }
 
-u32 OpenGLRenderer::PreparePalette(AnimationPal& pCache)
+// A row of the table of sprite effects, kFxTexelsPerRow RGBA float texels:
+// 0 to 2: the rows of the colour matrix
+// 3: subtract, force blend, 0, 0
+// 4 to 6: the sweeps, colour and progress
+// 7: the kind of each sweep, 0
+// 8 to 15: the brightness at each rank of the sprite's colours, SpriteFx::mLuma
+static std::array<f32, 16 * 4> SpriteFxTexels(const SpriteFx& fx)
 {
-    const PaletteCache::AddResult addRet = mPaletteCache.Add(pCache);
-
-    if (addRet.mAllocated)
+    std::array<f32, 16 * 4> texels = {};
+    for (u32 row = 0; row < 3; row++)
     {
-        // Write palette data
-        mPaletteTexture->LoadSubImage(0, addRet.mIndex, kPaletteDepth, 1, pCache.mPal);
-
-        mStats.mPalUploadCount++;
+        for (u32 col = 0; col < 4; col++)
+        {
+            texels[row * 4 + col] = fx.mMatrix[row][col];
+        }
     }
 
-    return addRet.mIndex;
+    texels[3 * 4 + 0] = fx.mSubtract;
+    texels[3 * 4 + 1] = static_cast<f32>(fx.mForceBlend);
+    for (u32 i = 0; i < SpriteFx::kMaxSweeps; i++)
+    {
+        texels[(4 + i) * 4 + 0] = fx.mSweeps[i].mR;
+        texels[(4 + i) * 4 + 1] = fx.mSweeps[i].mG;
+        texels[(4 + i) * 4 + 2] = fx.mSweeps[i].mB;
+        texels[(4 + i) * 4 + 3] = fx.mSweeps[i].mProgress;
+        texels[7 * 4 + i] = static_cast<f32>(fx.mSweeps[i].mKind);
+    }
+    for (u32 i = 0; i < SpriteFx::kLumaPoints; i++)
+    {
+        texels[8 * 4 + i] = fx.mLuma[i];
+    }
+    return texels;
+}
+
+u32 OpenGLRenderer::PrepareFx(const SpriteFx& fx)
+{
+    if (fx.IsIdentity())
+    {
+        return 0;
+    }
+
+    const SpriteFxCache::AddResult addRet = mFxCache.Add(fx);
+
+    // Row 0 is for no effect
+    const u32 row = addRet.mIndex + 1;
+    if (addRet.mAllocated)
+    {
+        mFxTexture->LoadSubImage(0, row, kFxTexelsPerRow, 1, SpriteFxTexels(fx).data(), GL_FLOAT);
+
+        mStats.mFxUploadCount++;
+    }
+
+    return row;
 }
 
 std::shared_ptr<GLTexture2D> OpenGLRenderer::PrepareTextureFromPoly(const Poly_FT4& poly)
 {
     // Makes a texture of the given format holding pixels, counted in uploadCount
-    auto upload = [](u32 width, u32 height, GLenum format, const void* pixels, u32& uploadCount)
+    auto upload = [this](u32 width, u32 height, GLenum format, const void* pixels, u32& uploadCount)
     {
-        auto texture = std::make_shared<GLTexture2D>(width, height, format);
+        auto texture = mTexturePool.Acquire(width, height, format);
         texture->LoadImage(pixels);
         uploadCount++;
         return texture;
+    };
+
+    // A sprite sheet with its mask (SpriteMask.hpp) under it, in the same texture
+    auto uploadSheet = [&](const PngData& png, u32& uploadCount)
+    {
+        if (!png.HasMask())
+        {
+            return upload(png.mWidth, png.mHeight, GL_RGBA, png.mRgba.data(), uploadCount);
+        }
+
+        std::vector<u8> pixels;
+        pixels.reserve(png.mRgba.size() + png.mMask.size());
+        pixels.insert(pixels.end(), png.mRgba.begin(), png.mRgba.end());
+        pixels.insert(pixels.end(), png.mMask.begin(), png.mMask.end());
+        return upload(png.mWidth, png.mHeight * 2, GL_RGBA, pixels.data(), uploadCount);
     };
 
     if (poly.mFg1)
@@ -434,13 +488,13 @@ std::shared_ptr<GLTexture2D> OpenGLRenderer::PrepareTextureFromPoly(const Poly_F
     {
         const AnimResource& res = poly.mAnim->mAnimRes;
         return mTextureCache.GetOrAdd(res.mUniqueId.Id(), kSpriteTextureLifetime, [&]()
-            { return upload(res.mPngPtr->mWidth, res.mPngPtr->mHeight, GL_RED, res.mPngPtr->mPixels.data(), mStats.mAnimUploadCount); });
+            { return uploadSheet(*res.mPngPtr, mStats.mAnimUploadCount); });
     }
     else if (poly.mFont)
     {
         const FontResource& res = poly.mFont->mFntResource;
         return mTextureCache.GetOrAdd(res.mUniqueId.Id(), kSpriteTextureLifetime, [&]()
-            { return upload(res.mPngPtr->mWidth, res.mPngPtr->mHeight, GL_RED, res.mPngPtr->mPixels.data(), mStats.mFontUploadCount); });
+            { return uploadSheet(*res.mPngPtr, mStats.mFontUploadCount); });
     }
 
     return nullptr;
@@ -561,7 +615,7 @@ void OpenGLRenderer::DecreaseResourceLifetimes()
 {
     mTextureCache.DecreaseResourceLifetimes();
 
-    mPaletteCache.ResetUseFlags();
+    mFxCache.ResetUseFlags();
 }
 
 void OpenGLRenderer::DebugWindow()
@@ -604,7 +658,7 @@ void OpenGLRenderer::DebugWindow()
         ImGui::Text("Cams %d", mStats.mCamUploadCount);
         ImGui::Text("Fg1s %d", mStats.mFg1UploadCount);
         ImGui::Text("Anims %d", mStats.mAnimUploadCount);
-        ImGui::Text("Pals %d", mStats.mPalUploadCount);
+        ImGui::Text("Fx %d", mStats.mFxUploadCount);
         ImGui::Text("Fonts %d", mStats.mFontUploadCount);
         ImGui::Text("Invalidations %d", mStats.mInvalidationsCount);
     }
@@ -628,7 +682,7 @@ void OpenGLRenderer::DrawBatches()
     GL_VERIFY(glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(u32) * mBatcher.mIndices.size(), mBatcher.mIndices.data(), GL_STREAM_DRAW));
 
     // Bind palette texture
-    mPaletteTexture->BindTo(GL_TEXTURE0);
+    mFxTexture->BindTo(GL_TEXTURE0);
 
     // Bind camera (if needed)
     if (mBatcher.mCamTexture && mBatcher.mCamTexture->IsValid())

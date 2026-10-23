@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Types.hpp"
+#include "data_conversion/guid.hpp"
 #include <string>
 #include <vector>
 
@@ -30,6 +31,11 @@ class ResourceManagerWrapper;
 //       pause, confirm (the menus' OK), back, cheat.
 //   switch <id> <0|1>
 //       Set a switch state, as a lever would.
+//   electrocute [extra]
+//       Electrocute the controlled character, as an electric wall does (it dies at the end). extra
+//       adds the third, black sweep: the character is erased (AE: the greeter's and wall's).
+//   invisible <out|in|now>
+//       AE only. Abe's invisibility power: fade out, fade back in, or invisible straight away.
 //   expect_objects <type> <count>
 //       Fail unless exactly that many live objects have that type name (as dump_objects shows it,
 //       e.g. eSlamDoor).
@@ -124,4 +130,6 @@ private:
     // The current command's progress
     s32 mStep = 0;
     u32 mWaitUntilFrame = 0;
+    // The invisibility effect the invisible command made
+    Guid mInvisibleEffectId;
 };

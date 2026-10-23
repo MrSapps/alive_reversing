@@ -17,17 +17,14 @@ Electrocute::Electrocute(BaseAliveGameObject* pTargetObj, bool bExtraOverwriter,
 {
     SetType(ReliveTypes::eElectrocute);
 
-    // Operate on a copy of the palette
-    mPal.mPal = std::make_shared<AnimationPal>(*pTargetObj->GetAnimation().mAnimRes.mPngPtr->mPal);
-    pTargetObj->GetAnimation().LoadPal(mPal);
-
+    // The target has its sprite's colours put back afterwards (the original saved a copy of the
+    // palette for these)
     if (pTargetObj->Type() == ReliveTypes::eFlyingSlig ||
         pTargetObj->Type() == ReliveTypes::eGlukkon ||
         pTargetObj->Type() == ReliveTypes::eAbe ||
         (pTargetObj->Type() == ReliveTypes::eSlig && GetGameType() == GameType::eAe))
     {
-        // Take copy of pal to restore later in DeElectrocuteTarget
-        mOldPal.mPal = std::make_shared<AnimationPal>(*pTargetObj->GetAnimation().mAnimRes.mPngPtr->mPal);
+        mRestoreSprite = true;
     }
 }
 
@@ -46,15 +43,17 @@ void Electrocute::VScreenChanged()
     }
 }
 
-static RGBA32 Pal_Make_Colour(u8 r, u8 g, u8 b, bool bBlend)
+// The colours of the overwriters, as the PSX made them from 8 bit colours (5 bits each)
+static constexpr u8 To5Bit(u8 v)
 {
-    RGBA32 rgba;
-    rgba.r = r;
-    rgba.g = g;
-    rgba.b = b;
-    rgba.a = bBlend ? 255 : 0; // STP bit
-    return rgba;
+    return static_cast<u8>((v >> 3) << 3);
 }
+
+// How a SpriteFx::Sweep's colour is drawn: the semi-transparency bit is set on white and blue
+// (it blends if the sprite is semi-transparent), and black is the transparent colour
+static constexpr u32 kSweepOpaque = 0;
+static constexpr u32 kSweepSemiTrans = 1;
+static constexpr u32 kSweepTransparent = 2;
 
 void Electrocute::VUpdate()
 {
@@ -88,14 +87,21 @@ void Electrocute::VUpdate()
             break;
 
         case States::eAlphaFadeout:
+        {
+            // In AO the overwriters are updated by the game loop, so their update delays work
+            // and the white, blue and black bands trail one another. In AE they were updated by
+            // this object (see below), the delays did nothing, and all go at once: only the last
+            // colour is seen.
+            const bool overwritersUpdated = GetGameType() == GameType::eAo;
+
             mPalOverwriters[0] = relive_new PalleteOverwriter(
-                *mPal.mPal,
-                Pal_Make_Colour(255u, 255, 255, true),
+                mTargetObjId, 0, kSweepSemiTrans,
+                To5Bit(255), To5Bit(255), To5Bit(255), overwritersUpdated,
                 mResMan, mMap);
 
             mPalOverwriters[1] = relive_new PalleteOverwriter(
-                *mPal.mPal,
-                Pal_Make_Colour(64u, 64, 255, true),
+                mTargetObjId, 1, kSweepSemiTrans,
+                To5Bit(64), To5Bit(64), To5Bit(255), overwritersUpdated,
                 mResMan, mMap);
             if (mPalOverwriters[1])
             {
@@ -104,8 +110,9 @@ void Electrocute::VUpdate()
 
             if (mExtraOverwriter)
             {
-                mPalOverwriters[2] = relive_new PalleteOverwriter(*mPal.mPal,
-                    Pal_Make_Colour(0, 0, 0, false),
+                mPalOverwriters[2] = relive_new PalleteOverwriter(
+                    mTargetObjId, 2, kSweepTransparent,
+                    0, 0, 0, overwritersUpdated,
                     mResMan, mMap);
                 if (mPalOverwriters[2])
                 {
@@ -115,12 +122,20 @@ void Electrocute::VUpdate()
 
             mState = States::eHandleDamage;
             break;
+        }
 
         case States::eHandleDamage:
         {
             PalleteOverwriter* pPalOverwriter = mPalOverwriters[mPalOverwritersCount - 1];
             if (pPalOverwriter && pPalOverwriter->mDone)
             {
+                if (GetGameType() == GameType::eAe)
+                {
+                    // AE put the palette back first, then hurt or hid the target. AO hurt it
+                    // first.
+                    RestoreSprite(*pTargetObj);
+                }
+
                 if (mKillTarget)
                 {
                     pTargetObj->VTakeDamage(this);
@@ -146,11 +161,14 @@ void Electrocute::VUpdate()
             break;
     }
 
-    for (auto& pPalOverwriter : mPalOverwriters)
+    if (GetGameType() == GameType::eAe)
     {
-        if (pPalOverwriter)
+        for (auto& pPalOverwriter : mPalOverwriters)
         {
-            pPalOverwriter->VUpdate();
+            if (pPalOverwriter)
+            {
+                pPalOverwriter->VUpdate();
+            }
         }
     }
 }
@@ -168,7 +186,18 @@ void Electrocute::KillPalOverwriters()
 {
     for (auto& pPalOverwriter : mPalOverwriters)
     {
-        relive_delete pPalOverwriter;
+        if (pPalOverwriter)
+        {
+            if (GetGameType() == GameType::eAo)
+            {
+                // In AO the game loop updates them, so it is the one to get rid of them
+                pPalOverwriter->SetDead(true);
+            }
+            else
+            {
+                relive_delete pPalOverwriter;
+            }
+        }
         pPalOverwriter = nullptr;
     }
 }
@@ -181,11 +210,7 @@ bool Electrocute::DeElectrocuteTarget(bool dealDamage)
         if ((GetGameType() == GameType::eAo && pTarget->Type() == ReliveTypes::eAbe) ||
             GetGameType() == GameType::eAe)
         {
-            // Restore old pal
-            if (mOldPal.mPal)
-            {
-                pTarget->GetAnimation().LoadPal(mOldPal);
-            }
+            RestoreSprite(*pTarget);
 
             pTarget->mRGB.SetRGB(mTargetRed, mTargetGreen, mTargetBlue);
             pTarget->SetElectrocuting(false);
@@ -200,6 +225,15 @@ bool Electrocute::DeElectrocuteTarget(bool dealDamage)
         return true;
     }
     return false;
+}
+
+void Electrocute::RestoreSprite(BaseAliveGameObject& target)
+{
+    // Put the sprite's colours back
+    if (mRestoreSprite)
+    {
+        target.GetAnimation().Fx().ClearSweeps();
+    }
 }
 
 bool Electrocute::IsLastOverwriterFinished()

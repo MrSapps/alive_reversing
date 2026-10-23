@@ -3,6 +3,7 @@
 #include "file_system.hpp"
 #include "rgb_conversion.hpp"
 #include "../AnimResources.hpp"
+#include "../ResourceManagerWrapper.hpp"
 #include <vector>
 
 struct AnimationPal final
@@ -101,8 +102,44 @@ public:
         u32 mMaxH = 0;
     };
 
-    AnimationConverter(FileSystem& fs, const FileSystem::Path& outputFile, const AnimRecord& rec, const std::vector<u8>& fileData, bool isAoData);
+    // An animation's frames packed into one sprite sheet: true colour (and the mask of
+    // SpriteMask.hpp, if the sheet has any flags), as small as the frames allow
+    struct Sheet final
+    {
+        std::vector<u8> mRgba;
+        // The same size as mRgba, or empty
+        std::vector<u8> mMask;
+        u32 mWidth = 0;
+        u32 mHeight = 0;
+        // Where the frames are in the sheet
+        std::vector<PerFrameInfo> mFrames;
+        AnimAttributes mAttributes;
+    };
+
+    // emissiveIndices are the palette entries that glow, see SpriteMask.hpp
+    AnimationConverter(const AnimRecord& rec, const std::vector<u8>& fileData, bool isAoData, const std::vector<u8>& emissiveIndices = {});
+
+    Sheet& GetSheet()
+    {
+        return mSheet;
+    }
+
+    // The animation's json: its attributes and frames (where in the sheet they are)
+    static std::string ToJson(const AnimAttributes& attributes, const std::vector<PerFrameInfo>& frames);
     static u16 ToPNGPixelFormat(u16 pixel);
+
+    // The palette of the animation's first frame, which the animation's sprite sheet was made
+    // with, and its number of entries (16, 64 or 256)
+    const AnimationPal& Palette() const
+    {
+        return mPal;
+    }
+
+    u32 PaletteDepth() const
+    {
+        return mPalDepth;
+    }
+
 private:
     // Calc the max width and height because the ones in the header are often way too big for some reason
     // at least for a single animation in a BAN file
@@ -126,4 +163,7 @@ private:
 
     const std::vector<u8>& mFileData;
     bool mIsAoData = false;
+    AnimationPal mPal;
+    u32 mPalDepth = 0;
+    Sheet mSheet;
 };

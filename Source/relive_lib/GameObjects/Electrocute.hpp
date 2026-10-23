@@ -1,7 +1,6 @@
 #pragma once
 
 #include "BaseGameObject.hpp"
-#include "../data_conversion/AnimationConverter.hpp"
 
 class BaseAliveGameObject;
 class PalleteOverwriter;
@@ -27,13 +26,13 @@ public:
 private:
     void KillPalOverwriters();
     bool DeElectrocuteTarget(bool dealDamage);
+    void RestoreSprite(BaseAliveGameObject& target);
 
     bool mExtraOverwriter = false;
     bool mKillTarget = false;
     s16 mPalOverwritersCount = 0;
     PalleteOverwriter* mPalOverwriters[3] = {};
-    PalResource mOldPal;
-    PalResource mPal;
+    bool mRestoreSprite = false;
     enum class States
     {
         eSetNewColour,

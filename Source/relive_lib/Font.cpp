@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "Font.hpp"
+#include "SpriteMask.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/FixedPoint.hpp"
 #include "../relive_lib/FatalError.hpp"
@@ -25,7 +26,7 @@ void AliveFont::Load(s32 maxCharLength, const PalResource& pal, FontContext* fon
     }
 
     mFontContext = fontContext;
-    mFontContext->mFntResource.mCurPal = pal.mPal;
+    mFontContext->UseFontSheet(pal);
     mPolyCount = maxCharLength;
     mFntPolyArray = relive_new Poly_FT4[maxCharLength];
     mLoaded = true;
@@ -283,6 +284,16 @@ const char_type* AliveFont::SliceText(const char_type* text, s32 left, FP scale,
     return text;
 }
 
+void FontContext::UseFontSheet(const PalResource& pal)
+{
+    if (pal.mFontSheet)
+    {
+        // The font in the palette's colours
+        mFntResource.mPngPtr = pal.mFontSheet;
+        mFntResource.mUniqueId = pal.mFontSheetId;
+    }
+}
+
 void FontContext::LoadFontType(FontType resourceID, ResourceManagerWrapper& resMan)
 {
     if (resourceID == FontType::Debug)
@@ -291,31 +302,43 @@ void FontContext::LoadFontType(FontType resourceID, ResourceManagerWrapper& resM
 
         mFntResource.mId = resourceID;
         mFntResource.mPngPtr = std::make_shared<PngData>();
-        mFntResource.mPngPtr->mPal = std::make_shared<AnimationPal>();
 
+        // The font in its own palette
         auto fontFile = reinterpret_cast<File_Font*>(sDebugFont);
-        for (s32 i = 0; i < fontFile->mPaletteSize; i++)
+        RGBA32 colours[16] = {};
+        u8 flags[16] = {};
+        bool anySolid = false;
+        for (s32 i = 0; i < fontFile->mPaletteSize && i < 16; i++)
         {
-            mFntResource.mPngPtr->mPal->mPal[i] = RGBConversion::RGBA555ToRGBA888Components(fontFile->mPalette[i]);
+            colours[i] = RGBConversion::RGBA555ToTrueColour(fontFile->mPalette[i]);
+            flags[i] = RGBConversion::IsSolid(fontFile->mPalette[i]) ? SpriteMask::kSolid : 0;
+            anySolid = anySolid || flags[i] != 0;
         }
-    
-        std::vector<u8> newData(fontFile->mWidth * fontFile->mHeight); // TODO *2 was out of bounds?
-    
-        // Expand 4bit to 8bit
-        std::size_t src = 0;
-        std::size_t dst = 0;
-        while (dst < newData.size())
-        {
-            newData[dst++] = (fontFile->mPixelBuffer[src] & 0xF);
-            newData[dst++] = ((fontFile->mPixelBuffer[src++] & 0xF0) >> 4);
-        }
-        mFntResource.mPngPtr->mPixels = newData;
 
         mFntResource.mPngPtr->mWidth = fontFile->mWidth;
         mFntResource.mPngPtr->mHeight = fontFile->mHeight;
-        mFntResource.mPngPtr->mPixels.resize(fontFile->mWidth * fontFile->mHeight);
-    
-        mFntResource.mCurPal = mFntResource.mPngPtr->mPal;
+        mFntResource.mPngPtr->mRgba.resize(static_cast<std::size_t>(fontFile->mWidth) * fontFile->mHeight * 4);
+
+        // Expand 4bit to 8bit
+        std::size_t src = 0;
+        for (std::size_t dst = 0; dst < static_cast<std::size_t>(fontFile->mWidth) * fontFile->mHeight; dst += 2)
+        {
+            memcpy(&mFntResource.mPngPtr->mRgba[dst * 4], &colours[fontFile->mPixelBuffer[src] & 0xF], 4);
+            memcpy(&mFntResource.mPngPtr->mRgba[(dst + 1) * 4], &colours[(fontFile->mPixelBuffer[src++] & 0xF0) >> 4], 4);
+        }
+
+        if (anySolid)
+        {
+            // The palette entries without the semi-transparency bit
+            auto& mask = mFntResource.mPngPtr->mMask;
+            mask.resize(mFntResource.mPngPtr->mRgba.size());
+            src = 0;
+            for (std::size_t dst = 0; dst < static_cast<std::size_t>(fontFile->mWidth) * fontFile->mHeight; dst += 2)
+            {
+                SpriteMask::Set(&mask[dst * 4], flags[fontFile->mPixelBuffer[src] & 0xF]);
+                SpriteMask::Set(&mask[(dst + 1) * 4], flags[(fontFile->mPixelBuffer[src++] & 0xF0) >> 4]);
+            }
+        }
         return;
     }
 

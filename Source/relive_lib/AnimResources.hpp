@@ -1080,6 +1080,7 @@ enum class PalId
 {
     Default, // Don't override the anims default pal
     BlindMud, // AEResourceID::kMudblindResID
+    BlindMudGib, // the same palette, for the gibs made from Abe's gib sprites
     GreenFlash, // AEResourceID::kGrenflshResID, AOResourceID::kGrenflshAOResID
     BlueRock, // AOResourceID::kAberockAOResID, AEResourceID::kAberockResID
     AngryMud, // AEResourceID::kMudangryResID,

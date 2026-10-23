@@ -2,7 +2,7 @@
 
 #include "../IRenderer.hpp"
 #include "../TextureCache.hpp"
-#include "../PaletteCache.hpp"
+#include "../SpriteFxCache.hpp"
 
 #include <GL/glew.h>
 #include <memory>
@@ -48,6 +48,8 @@ public:
         return Renderers::OpenGL;
     }
 
+    u32 MaxTextureSize() const override;
+
 private:
     static constexpr u32 kSpriteTextureUnitCount = 12;
 
@@ -63,8 +65,10 @@ protected:
     void ReadPsxFramebuffer(std::vector<u8>& rgbaPixels, s32& width, s32& height) override;
 
 private:
-    static constexpr u32 kAvailablePalettes = 256;
-    static constexpr u32 kPaletteDepth = 256;
+    // The table of sprite effects: a row of kFxTexelsPerRow RGBA float texels for each, see
+    // SetFxRow. Row 0 is no effect.
+    static constexpr u32 kAvailableFx = 256;
+    static constexpr u32 kFxTexelsPerRow = 16;
 
     static constexpr u32 kCamTextureLifetime = 300;
     static constexpr u32 kSpriteTextureLifetime = 300;
@@ -81,7 +85,7 @@ private:
         u32 mCamUploadCount = 0;
         u32 mFg1UploadCount = 0;
         u32 mAnimUploadCount = 0;
-        u32 mPalUploadCount = 0;
+        u32 mFxUploadCount = 0;
         u32 mFontUploadCount = 0;
         u32 mInvalidationsCount = 0;
 
@@ -90,14 +94,15 @@ private:
             mCamUploadCount = 0;
             mFg1UploadCount = 0;
             mAnimUploadCount = 0;
-            mPalUploadCount = 0;
+            mFxUploadCount = 0;
             mFontUploadCount = 0;
             mInvalidationsCount = 0;
         }
     };
 
 private:
-    u32 PreparePalette(AnimationPal& pCache);
+    // The row of the table of sprite effects for fx, uploading it if it's new. 0 for no effect.
+    u32 PrepareFx(const SpriteFx& fx);
     std::shared_ptr<GLTexture2D> PrepareTextureFromPoly(const Poly_FT4& poly);
 
     void DrawFramebufferToScreen(s32 x, s32 y, s32 width, s32 height);
@@ -148,9 +153,11 @@ private:
 
     GLBatcher mBatcher;
 
-    PaletteCache mPaletteCache;
+    SpriteFxCache mFxCache;
+    // Before the caches, so it is there while they let go of their textures
+    GLTexturePool mTexturePool;
     TextureCache<std::shared_ptr<GLTexture2D>> mTextureCache;
 
-    std::shared_ptr<GLTexture2D> mPaletteTexture;
+    std::shared_ptr<GLTexture2D> mFxTexture;
     std::shared_ptr<GLTexture2D> mCurGasTexture;
 };

@@ -307,7 +307,6 @@ private:
     FP field_1CC_lever_pull_range_ypos = {};
     PathLine* mNextLine = nullptr;
     PathLine* mPrevLine = nullptr;
-    std::shared_ptr<AnimationPal> field_1F4_mPal;
     s16 field_27C_r = 0;
     s16 field_27E_g = 0;
     s16 field_280_b = 0;

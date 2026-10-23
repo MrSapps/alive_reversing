@@ -37,6 +37,10 @@ private:
     void ThreadFunc();
 
     GameType mGameType = GameType::eAe;
+    // The data directories of the active mod and the games', empty if there is no mod
+    std::vector<std::string> mModLayers;
+    // The size of the sprite pages the GPU takes
+    u32 mSpritePageSize = 0;
     Poly_G4 mPoly;
     // y=208 leaves the bar's border enough clearance from the activity list text drawn just
     // above it. height=12 (taller than the 8px-tall percentage text drawn inside it) gives that

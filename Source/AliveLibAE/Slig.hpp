@@ -451,7 +451,6 @@ private:
     s16 field_15C_force_alive_state = 0;
     s16 field_15E_spotted_possessed_slig = 0;
     GameSpeakListener mListener;
-    std::shared_ptr<AnimationPal> field_178_mPal;
     s16 field_200_red = 0;
     s16 field_202_green = 0;
     s16 field_204_blue = 0;
@@ -474,5 +473,4 @@ private:
 void Animation_OnFrame_Slig(BaseGameObject* pObj, u32&, const IndexedPoint& point, ResourceManagerWrapper& resMan, BaseMap& map);
 void Slig_SoundEffect(SligSfx effect, BaseAliveGameObject* pObj);
 
-void renderWithGlowingEyes(OrderingTable& ot, BaseAliveGameObject* actor, std::shared_ptr<AnimationPal>& pal, s16 palSize, s16& r, s16& g, s16& b,
-                           const s16* eyeColourIndices, s16 eyeColourIndicesSize);
+void renderWithGlowingEyes(OrderingTable& ot, BaseAliveGameObject* actor);

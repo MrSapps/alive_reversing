@@ -36,6 +36,9 @@ public:
 
     void LoadFontType(FontType resourceID, ResourceManagerWrapper& resMan);
 
+    // Draw the font in the colours of pal
+    void UseFontSheet(const PalResource& pal);
+
 };
 
 

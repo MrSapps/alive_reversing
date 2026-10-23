@@ -33,14 +33,8 @@ public:
 private:
     InvisibleState mState = InvisibleState::eSetBlendMode1_0;
 
-    //u16* field_24_pPal1 = nullptr;
-    //PSX_RECT field_28_pal_rect1 = {};
-    //u16* field_30_pPal2 = nullptr;
-    //PSX_RECT field_34_pal_rect2 = {};
-    PalResource mOldPal;
-    PalResource mInvisPal;
-
-    u8 mTransitionFrameCount = 0;
+    // How far the colours have faded
+    u8 mFadeSteps = 0;
 
     Guid mTargetId;
     relive::TBlendModes mOldRenderMode = relive::TBlendModes::eBlend_0;
