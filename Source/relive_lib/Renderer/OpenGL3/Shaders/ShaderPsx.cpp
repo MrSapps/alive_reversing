@@ -284,7 +284,8 @@ void draw_default_ft4(bool masked)
     {
         // How bright the colour is among the sprite's, before the effects change it
         bool anySweep = fx_texel(4).w > 0.0 || fx_texel(5).w > 0.0 || fx_texel(6).w > 0.0;
-        float rank = anySweep ? luma_rank(dot(rgb, vec3(0.299, 0.587, 0.114))) : 0.0;
+        // (the palette order if the mask has it, see SpriteMask.hpp)
+        float rank = maskTexel.r > 0.0 ? maskTexel.r : (anySweep ? luma_rank(dot(rgb, vec3(0.299, 0.587, 0.114))) : 0.0);
 
         vec4 inRgb = vec4(rgb, 1.0);
         rgb = clamp(vec3(dot(fx_texel(0), inRgb), dot(fx_texel(1), inRgb), dot(fx_texel(2), inRgb)), 0.0, 1.0);
@@ -304,7 +305,7 @@ void draw_default_ft4(bool masked)
         for (int i = 0; i < 3; i++)
         {
             vec4 sweep = fx_texel(4 + i);
-            if (alpha > 0.0 && sweep.w > 0.0 && rank <= sweep.w + 0.001)
+            if (alpha > 0.0 && sweep.w > 0.0 && rank <= sweep.w + 0.003)
             {
                 float kind = sweepKinds[i];
                 if (kind > 1.5)

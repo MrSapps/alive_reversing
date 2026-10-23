@@ -228,7 +228,7 @@ static f32 LumaRank(const SpriteFx& fx, f32 luma)
     return (k + f) / (SpriteFx::kLumaPoints - 1);
 }
 
-RGBA32 Sdl3Texture::ConvertTexel(const RGBA32& texel, u16 mask, const SpriteFx& fx, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode)
+RGBA32 Sdl3Texture::ConvertTexel(const RGBA32& texel, u32 mask, const SpriteFx& fx, const RGBA32& shading, bool isSemiTrans, relive::TBlendModes blendMode)
 {
     // This logic is basically a mirror of the GLSL shader, but in
     // software - see ShaderPsx.cpp, and the blend mode stuff in
@@ -253,7 +253,9 @@ RGBA32 Sdl3Texture::ConvertTexel(const RGBA32& texel, u16 mask, const SpriteFx& 
     if (!fx.IsIdentity())
     {
         // How bright the colour is among the sprite's, before the effects change it
-        const f32 rank = LumaRank(fx, rgb[0] * 0.299f + rgb[1] * 0.587f + rgb[2] * 0.114f);
+        // (the palette order if the mask has it, see SpriteMask.hpp)
+        const u8 paletteRank = SpriteMask::PackedPaletteRank(mask);
+        const f32 rank = paletteRank != 0 ? paletteRank / 255.0f : LumaRank(fx, rgb[0] * 0.299f + rgb[1] * 0.587f + rgb[2] * 0.114f);
         const f32 in[4] = {rgb[0], rgb[1], rgb[2], 1.0f};
         for (s32 ch = 0; ch < 3; ch++)
         {
@@ -281,7 +283,7 @@ RGBA32 Sdl3Texture::ConvertTexel(const RGBA32& texel, u16 mask, const SpriteFx& 
 
         for (const SpriteFx::Sweep& sweep : fx.mSweeps)
         {
-            if (a > 0.0f && sweep.mProgress > 0.0f && rank <= sweep.mProgress + 0.001f)
+            if (a > 0.0f && sweep.mProgress > 0.0f && rank <= sweep.mProgress + 0.003f)
             {
                 if (sweep.mKind == 2)
                 {
@@ -378,7 +380,7 @@ SdlTexturePtr Sdl3Texture::MakeVariant(const SpriteFx& fx, const RGBA32& shading
     struct Memo final
     {
         u32 mSource = 0;
-        u16 mFlags = 0;
+        u32 mFlags = 0;
         RGBA32 mResult = {};
         bool mValid = false;
     };
@@ -402,7 +404,7 @@ SdlTexturePtr Sdl3Texture::MakeVariant(const SpriteFx& fx, const RGBA32& shading
             }
 
             const u32 source = pSource[i].ToU32();
-            const u16 flags = hasMask ? SpriteMask::Pack(&mMaskPixels[i * 4]) : 0;
+            const u32 flags = hasMask ? SpriteMask::Pack(&mMaskPixels[i * 4]) : 0;
             Memo& entry = memo[((source ^ (flags * 0x9E3779B1u)) * 2654435761u) >> 22];
             if (!entry.mValid || entry.mSource != source || entry.mFlags != flags)
             {

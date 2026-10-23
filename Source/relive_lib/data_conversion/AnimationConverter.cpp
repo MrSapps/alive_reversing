@@ -355,6 +355,12 @@ AnimationConverter::AnimationConverter(const AnimRecord& rec, const std::vector<
     // invisibility fade.
     RGBA32 pixelOfIndex[256];
     u8 flagsOfIndex[256] = {};
+    // Where each entry is in the palette, scaled so the last is 255 (SpriteMask.hpp)
+    u8 rankOfIndex[256] = {};
+    for (s32 i = 0; i < 256 && mPalDepth > 1; i++)
+    {
+        rankOfIndex[i] = static_cast<u8>(std::min<u32>(255, (255 * static_cast<u32>(i) + (mPalDepth - 1) / 2) / (mPalDepth - 1)));
+    }
     for (s32 i = 0; i < 256; i++)
     {
         const RGBA32& entry = pal.mPal[i];
@@ -398,7 +404,6 @@ AnimationConverter::AnimationConverter(const AnimRecord& rec, const std::vector<
 
     std::vector<u8> spriteSheetRgba(static_cast<std::size_t>(sheetWidth) * sheetHeight * 4);
     std::vector<u8> spriteSheetMask(spriteSheetRgba.size());
-    bool anyFlag = false;
     for (u32 y = 0; y < sheetHeight; y++)
     {
         for (u32 x = 0; x < sheetWidth; x++)
@@ -407,8 +412,7 @@ AnimationConverter::AnimationConverter(const AnimRecord& rec, const std::vector<
             const std::size_t dst = (static_cast<std::size_t>(y) * sheetWidth + x) * 4;
             memcpy(&spriteSheetRgba[dst], &pixelOfIndex[index], 4);
             const u8 flags = pixelOfIndex[index].a != 0 ? flagsOfIndex[index] : 0;
-            SpriteMask::Set(&spriteSheetMask[dst], flags);
-            anyFlag = anyFlag || flags != 0;
+            SpriteMask::Set(&spriteSheetMask[dst], flags, pixelOfIndex[index].a != 0 ? rankOfIndex[index] : 0);
         }
     }
 
@@ -437,15 +441,10 @@ AnimationConverter::AnimationConverter(const AnimRecord& rec, const std::vector<
     // take as long as it has entries.
     attributes.mPaletteDepth = mPalDepth;
 
-    // The brightness of the colours of the sheet, for the effects that go by it
-    SpriteFx::ComputeLuma(spriteSheetRgba, attributes.mLuma);
-    attributes.mHasLuma = true;
+    // (no luma: every pixel has its palette rank in the mask)
 
     mSheet.mRgba = std::move(spriteSheetRgba);
-    if (anyFlag)
-    {
-        mSheet.mMask = std::move(spriteSheetMask);
-    }
+    mSheet.mMask = std::move(spriteSheetMask);
     mSheet.mWidth = sheetWidth;
     mSheet.mHeight = sheetHeight;
     mSheet.mFrames = std::move(perFrameInfos);
