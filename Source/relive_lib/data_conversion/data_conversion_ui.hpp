@@ -15,7 +15,7 @@
 class DataConversionUI final : public BaseGameObject
 {
 public:
-    explicit DataConversionUI(GameType gameType, ResourceManagerWrapper& resMan, BaseMap& map);
+    explicit DataConversionUI(GameType gameType, ResourceManager& resMan, BaseMap& map, bool encodeWebm);
     ~DataConversionUI();
 
     void VUpdate() override;
@@ -23,6 +23,10 @@ public:
     void VRender(OrderingTable& ot) override;
 
     bool ConversionRequired();
+
+    // Only the black background: the last frame of the conversion, so what comes next (the game
+    // loading, with its loading icon) isn't drawn over the finished progress screen
+    void RenderBackground(OrderingTable& ot);
 
     // Lets Engine::Run() (the only thing that owns a DataConversionUI, and so the only thing
     // that can reach one to begin with - deliberately not exposed any more broadly than that,
@@ -41,6 +45,7 @@ private:
     std::vector<std::string> mModLayers;
     // The size of the sprite pages the GPU takes
     u32 mSpritePageSize = 0;
+    bool mEncodeWebm = false;
     Poly_G4 mPoly;
     // y=208 leaves the bar's border enough clearance from the activity list text drawn just
     // above it. height=12 (taller than the 8px-tall percentage text drawn inside it) gives that

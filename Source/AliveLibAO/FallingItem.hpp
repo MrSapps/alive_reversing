@@ -50,7 +50,7 @@ struct FallingItemSaveState final : public SaveStateBase
 class FallingItem final : public ::BaseAliveGameObject
 {
 public:
-    FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~FallingItem();
 
     void LoadAnimations();
@@ -58,7 +58,7 @@ public:
     virtual void VScreenChanged() override;
     virtual void VOnThrowableHit(BaseGameObject* pFrom) override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
     void DamageHitItems();
 

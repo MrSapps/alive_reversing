@@ -38,7 +38,7 @@ struct UXBSaveState final : public SaveStateBase
 class UXB final : public ::BaseAliveGameObject
 {
 public:
-    UXB(relive::Path_UXB* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    UXB(relive::Path_UXB* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~UXB();
 
     void LoadAnimations();
@@ -50,7 +50,7 @@ public:
     virtual void VOnThrowableHit(BaseGameObject* pFrom) override;
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
 private:
     void InitBlinkAnim(Animation* pAnimation);

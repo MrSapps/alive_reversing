@@ -49,7 +49,7 @@ static inline void StopAmbientSeq()
     }
 }
 
-Dove::Dove(AnimId animId, const Guid& tlvId, FP scale, ResourceManagerWrapper& resMan, BaseMap& map)
+Dove::Dove(AnimId animId, const Guid& tlvId, FP scale, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map),
     mDoveState(State::eOnGround_0),
     mKeepInGlobalArray(false),
@@ -97,7 +97,7 @@ Dove::Dove(AnimId animId, const Guid& tlvId, FP scale, ResourceManagerWrapper& r
     bTheOneControllingTheMusic = true;
 }
 
-Dove::Dove(AnimId animId, FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan, BaseMap& map)
+Dove::Dove(AnimId animId, FP xpos, FP ypos, FP scale, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map),
     mDoveState(State::eFlyAway_1),
     mKeepInGlobalArray(true),

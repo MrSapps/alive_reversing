@@ -354,7 +354,7 @@ only the `SND_SEQ_*` wrappers hooked. `ps1music cmp <relive log> <ps1 calls>` di
 
 `relive -ps1_data=<dir>` plays the PS1's VH, VB and SEQ files instead of the PC's, so relive and the
 real PS1 code can be compared on the same data. `Ps1SoundData` indexes every `*.LVL` below `<dir>`
-(a PS1 disc's files; the container is the PC's), `ResourceManagerWrapper::LoadSoundFile` gives its
+(a PS1 disc's files; the container is the PC's), `ResourceManager::LoadSoundFile` gives its
 files where it has them (a SEQ comes from the BSQ of the LVL that holds the theme's VH: a few SEQ
 ids are in several BSQs with different SEQs), and `GameSound::LoadVab` decodes the VB's SPU ADPCM
 (`Ps1SoundData::DecodeVab`: the loop from the block with the loop start flag, a second pass of the

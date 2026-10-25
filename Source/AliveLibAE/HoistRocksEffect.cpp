@@ -19,7 +19,7 @@ void HoistRocksEffect::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::HoistRock3));
 }
 
-HoistRocksEffect::HoistRocksEffect(relive::Path_Hoist* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+HoistRocksEffect::HoistRocksEffect(relive::Path_Hoist* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     mTlvId = tlvId;

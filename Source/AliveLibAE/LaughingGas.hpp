@@ -8,7 +8,7 @@
 class LaughingGas final : public BaseGameObject
 {
 public:
-    LaughingGas(Layer layer, relive::Path_LaughingGas* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    LaughingGas(Layer layer, relive::Path_LaughingGas* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~LaughingGas();
 
     virtual void VScreenChanged() override;

@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "ScreenManager.hpp"
 #include "GameType.hpp"
-#include "ResourceManagerWrapper.hpp"
+#include "ResourceManager.hpp"
 #include "Layer.hpp"
 #include "Primitives.hpp"
 #include "../AliveLibAE/PsxRender.hpp"
@@ -13,7 +13,7 @@ void ScreenManager::DecompressCameraToVRam(CamResource& camRes)
     mCamRes = camRes;
 }
 
-ScreenManager::ScreenManager(CamResource& camRes, FP_Point* pCameraOffset, ResourceManagerWrapper& resMan, BaseMap& map)
+ScreenManager::ScreenManager(CamResource& camRes, FP_Point* pCameraOffset, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     mCamPos = pCameraOffset;

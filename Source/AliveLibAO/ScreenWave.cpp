@@ -13,7 +13,7 @@
 
 namespace AO {
 
-ScreenWave::ScreenWave(FP xpos, FP ypos, Layer layer, FP width, FP speed, s32 radius, ResourceManagerWrapper& resMan, BaseMap& map)
+ScreenWave::ScreenWave(FP xpos, FP ypos, Layer layer, FP width, FP speed, s32 radius, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
     , mLayer(layer)
     , mXPos(xpos)

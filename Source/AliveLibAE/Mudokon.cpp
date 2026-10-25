@@ -430,7 +430,7 @@ static Mud_Emotion TLV_Emo_To_Internal_Emo(relive::Path_Mudokon::Mud_TLV_Emotion
     }
 }
 
-Mudokon::Mudokon(relive::Path_Mudokon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Mudokon::Mudokon(relive::Path_Mudokon* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(18, resMan, map)
 {
     field_11C_bird_portal_id = Guid{};
@@ -629,7 +629,7 @@ void Mudokon::LoadAnimations()
     }
 }
 
-void Mudokon::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void Mudokon::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<MudokonSaveState>();
 

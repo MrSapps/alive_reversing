@@ -38,7 +38,7 @@ void BackgroundGlukkon::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Background_Glukkon_Laugh));
 }
 
-BackgroundGlukkon::BackgroundGlukkon(relive::Path_BackgroundGlukkon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+BackgroundGlukkon::BackgroundGlukkon(relive::Path_BackgroundGlukkon* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : ::BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eBackgroundGlukkon);
@@ -243,7 +243,7 @@ void BackgroundGlukkon::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void BackgroundGlukkon::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void BackgroundGlukkon::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<BackgroundGlukkonSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);

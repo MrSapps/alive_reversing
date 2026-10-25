@@ -15,7 +15,7 @@ namespace AO {
 class ZBall final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    ZBall(relive::Path_ZBall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    ZBall(relive::Path_ZBall* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
 
     virtual void VUpdate() override;
 
@@ -24,7 +24,7 @@ public:
     s16 mSoundPitch = 0;
 
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 };
 
 // mSoundPitch is derived once from the TLV/level at construction and never

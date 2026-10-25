@@ -81,7 +81,7 @@ void Lever::LoadAnimations()
     }
 }
 
-Lever::Lever(relive::Path_Lever* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Lever::Lever(relive::Path_Lever* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eLever);

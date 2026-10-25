@@ -3,7 +3,7 @@
 #include "../Types.hpp"
 #include "../DynamicArray.hpp"
 #include "../data_conversion/guid.hpp"
-#include "../ResourceManagerWrapper.hpp"
+#include "../ResourceManager.hpp"
 #include "../ObjectTypes.hpp"
 
 extern u32 sGnFrame;
@@ -25,7 +25,7 @@ enum class ModalState
 class [[nodiscard]] BaseGameObject
 {
 public:
-    BaseGameObject(s16 bAddToObjectList, s16 resourceArraySize, ResourceManagerWrapper& resMan, BaseMap& map);
+    BaseGameObject(s16 bAddToObjectList, s16 resourceArraySize, ResourceManager& resMan, BaseMap& map);
 
 
     virtual ~BaseGameObject();
@@ -67,7 +67,7 @@ public:
 
     PalResource& GetPalRes(PalId palId);
 
-    ResourceManagerWrapper& GetResMan() const { return mResMan; }
+    ResourceManager& GetResMan() const { return mResMan; }
 
     BaseMap& GetMap() const { return mMap; }
 
@@ -140,7 +140,7 @@ private:
     bool mModal = false;
 
 protected:
-    ResourceManagerWrapper& mResMan;
+    ResourceManager& mResMan;
     BaseMap& mMap;
 };
 

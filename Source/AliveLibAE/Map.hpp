@@ -13,7 +13,7 @@ enum class LevelIds : s16;
 struct PSX_Point;
 enum class EReliveLevelIds : s16;
 class CamResource;
-class ResourceManagerWrapper;
+class ResourceManager;
 
 namespace relive
 {
@@ -31,7 +31,7 @@ ALIVE_ASSERT_SIZEOF(CameraName, 8);
 class Map final : public BaseMap
 {
 public:
-    Map(ResourceManagerWrapper& resMan, relive::Factory& factory);
+    Map(ResourceManager& resMan, relive::Factory& factory);
     ~Map();
 
     s16 GetOverlayId() override;

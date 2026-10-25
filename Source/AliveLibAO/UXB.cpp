@@ -59,7 +59,7 @@ void UXB::PlaySFX(relive::SoundEffects sfxIdx)
     }
 }
 
-UXB::UXB(relive::Path_UXB* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+UXB::UXB(relive::Path_UXB* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eUXB);
@@ -506,7 +506,7 @@ void UXB::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void UXB::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void UXB::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<UXBSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);

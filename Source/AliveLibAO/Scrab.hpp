@@ -145,7 +145,7 @@ public:
         AnimId::Scrab_LegKick,
         AnimId::Scrab_DeathBegin};
 
-    Scrab(relive::Path_Scrab* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    Scrab(relive::Path_Scrab* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~Scrab();
 
     virtual void VRender(OrderingTable& ot) override;
@@ -156,7 +156,7 @@ public:
     virtual void VOnTrapDoorOpen() override;
     virtual bool VOnSameYLevel(BaseAnimatedWithPhysicsGameObject* pOther) override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
     virtual s16 VGetMotion(eMotionType motionType) override
     {
         switch (motionType)

@@ -292,7 +292,7 @@ void MainMenuFade::LoadAnimations()
     }
 }
 
-MainMenuFade::MainMenuFade(s32 xpos, s32 ypos, buttonType buttonType, s32 bDestroyOnDone, ResourceManagerWrapper& resMan, BaseMap& map)
+MainMenuFade::MainMenuFade(s32 xpos, s32 ypos, buttonType buttonType, s32 bDestroyOnDone, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::MainMenuFade);
@@ -368,7 +368,7 @@ void Menu::LoadAnimations()
     }
 }
 
-Menu::Menu(relive::Path_TLV* /*pTlv*/, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Menu::Menu(relive::Path_TLV* /*pTlv*/, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     LoadAnimations();

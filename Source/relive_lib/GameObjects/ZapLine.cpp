@@ -16,7 +16,7 @@ ZapLine::~ZapLine()
     relive_delete[] mSpriteSegmentPositions;
 }
 
-ZapLine::ZapLine(FP xPosSource, FP yPosSource, FP xPosDest, FP yPosDest, s32 aliveTime, ZapLineType type, Layer layer, ResourceManagerWrapper& resMan, BaseMap& map)
+ZapLine::ZapLine(FP xPosSource, FP yPosSource, FP xPosDest, FP yPosDest, s32 aliveTime, ZapLineType type, Layer layer, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eZapLine);

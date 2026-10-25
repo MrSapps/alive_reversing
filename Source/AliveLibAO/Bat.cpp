@@ -25,7 +25,7 @@ void Bat::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Bat_Unknown));
 }
 
-Bat::Bat(relive::Path_Bat* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Bat::Bat(relive::Path_Bat* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eBat);
@@ -340,7 +340,7 @@ void Bat::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void Bat::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void Bat::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<BatSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);

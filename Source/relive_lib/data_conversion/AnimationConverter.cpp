@@ -3,7 +3,7 @@
 #include "nlohmann/json.hpp"
 #include "../Compression.hpp"
 #include "../../AliveLibAE/Compression.hpp" // TODO: combine with common compression files
-#include "ResourceManagerWrapper.hpp"
+#include "ResourceManager.hpp"
 #include "Animation.hpp"
 #include "PNGFile.hpp"
 #include "../SpriteMask.hpp"

@@ -40,7 +40,7 @@ void PullRingRope::LoadAnimations()
     }
 }
 
-PullRingRope::PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+PullRingRope::PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::ePullRingRope);

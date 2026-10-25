@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "QuikSave.hpp"
 #include "../relive_lib/Function.hpp"
-#include "ResourceManagerWrapper.hpp"
+#include "ResourceManager.hpp"
 #include "PathData.hpp"
 #include "Map.hpp"
 #include "Abe.hpp"
@@ -215,7 +215,7 @@ static void ConvertObjectSaveStateDataToJson(nlohmann::json& j, ReliveTypes type
 }
 
 
-static void RestoreObjectState(ReliveTypes type, SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
+static void RestoreObjectState(ReliveTypes type, SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
 {
     switch (type)
     {
@@ -347,7 +347,7 @@ void ConvertObjectsStatesToJson(nlohmann::json& j, const SerializedObjectData& p
     }
 }
 
-void QuikSave::RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManagerWrapper& resMan, BaseMap& map)
+void QuikSave::RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManager& resMan, BaseMap& map)
 {
     pSaveData.mObjectsStateData.ReadRewind();
     while (pSaveData.mObjectsStateData.CanRead())

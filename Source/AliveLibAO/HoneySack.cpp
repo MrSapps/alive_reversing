@@ -24,7 +24,7 @@ void HoneySack::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::HoneySack_FallingToSmashed));
 }
 
-HoneySack::HoneySack(relive::Path_HoneySack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+HoneySack::HoneySack(relive::Path_HoneySack* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eHoneySack);

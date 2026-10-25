@@ -2,11 +2,11 @@
 
 class BaseGameObject;
 struct IndexedPoint;
-class ResourceManagerWrapper;
+class ResourceManager;
 class BaseMap;
 
 namespace AO {
-using TFrameCallBackType = void(*)(BaseGameObject*, u32& pointIdx, const IndexedPoint&, ResourceManagerWrapper& resMan, BaseMap& map);
+using TFrameCallBackType = void(*)(BaseGameObject*, u32& pointIdx, const IndexedPoint&, ResourceManager& resMan, BaseMap& map);
 
 extern TFrameCallBackType gAbe_Anim_Frame_Fns[];
 extern TFrameCallBackType gSlig_Anim_Frame_Fns[];

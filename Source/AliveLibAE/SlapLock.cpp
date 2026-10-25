@@ -23,7 +23,7 @@ void SlapLock::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::SlapLock_Shaking));
 }
 
-SlapLock::SlapLock(relive::Path_SlapLock* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+SlapLock::SlapLock(relive::Path_SlapLock* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eSlapLock);
@@ -104,7 +104,7 @@ SlapLock::~SlapLock()
     mMap.TLV_Reset(mTlvInfo);
 }
 
-void SlapLock::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void SlapLock::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<SlapLockSaveState>();
 

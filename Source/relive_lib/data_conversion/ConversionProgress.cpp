@@ -7,15 +7,17 @@ float ConversionProgress::CategoryWeight(ConversionCategory cat)
     switch (cat)
     {
         case ConversionCategory::Paths:
-            return 0.10f;
-        case ConversionCategory::Animations:
-            return 0.20f;
-        case ConversionCategory::Cameras:
             return 0.15f;
+        case ConversionCategory::Animations:
+            return 0.30f;
+        case ConversionCategory::SpritePages:
+            return 0.10f;
+        case ConversionCategory::Cameras:
+            return 0.30f;
         case ConversionCategory::Misc:
             return 0.05f;
         case ConversionCategory::Fmvs:
-            return 0.50f;
+            return 0.10f;
         default:
             return 0.0f;
     }

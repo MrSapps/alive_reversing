@@ -27,7 +27,7 @@
 #include "AOSaveConverter.hpp"
 #include "AESaveConverter.hpp"
 #include "../BinaryPath.hpp"
-#include "../../relive_lib/ResourceManagerWrapper.hpp"
+#include "../../relive_lib/ResourceManager.hpp"
 #include "fmv_converter.hpp"
 #include "file_system.hpp"
 #include "ThreadPool.hpp"
@@ -134,7 +134,7 @@ static void HashBSQTable(OpenSeqHandle* pTable, s32 size)
     {
         if (pTable[i].field_0_mBsqName)
         {
-            pTable[i].field_4_generated_res_id = ResourceManagerWrapper::SEQ_HashName(pTable[i].field_0_mBsqName);
+            pTable[i].field_4_generated_res_id = ResourceManager::SEQ_HashName(pTable[i].field_0_mBsqName);
         }
     }
 }
@@ -178,7 +178,7 @@ static std::vector<std::string> ConvertBSQ(const FileSystem::Path& dataDir, cons
     for (u32 i = 0u; i < bsq.ChunkCount(); i++)
     {
         const LvlFileChunk& chunk = bsq.ChunkAt(i);
-        if (chunk.Header().mResourceType == ResourceManagerWrapper::Resource_Seq)
+        if (chunk.Header().mResourceType == ResourceManager::Resource_Seq)
         {
             const char_type* pSeqName = nullptr;
             if (isAo)
@@ -214,7 +214,7 @@ static FileSystem::Path LevelDir(const FileSystem::Path& dataDir, LevelIdType lv
 
 // VH/VB/SEQ sound files live under a shared, level-identity-independent sounds/<theme>/ dir
 // (dataDir/sounds/<theme>/...) so a mod can point a path's sound_info at any theme - its own, or
-// one it doesn't have and falls back to the base game's (see ResourceManagerWrapper::
+// one it doesn't have and falls back to the base game's (see ResourceManager::
 // LoadSoundFile) - rather than being forced to duplicate a whole level just to reuse its sounds.
 static FileSystem::Path SoundsThemeDir(const FileSystem::Path& dataDir, const std::string& theme)
 {
@@ -411,7 +411,7 @@ static void ConvertPath(FileSystem& fs, const FileSystem::Path& path, const LvlF
     // Save sound info (per path rather than per LVL) - VH/VB/SEQ all live in a shared
     // sounds/<theme>/ dir (not this path's own level dir - see SoundsThemeDir), so a mod can
     // point a path at any theme, including one it doesn't have a copy of itself (falls back to
-    // the base game's, see ResourceManagerWrapper::LoadSoundFile). The theme is the level a
+    // the base game's, see ResourceManager::LoadSoundFile). The theme is the level a
     // path's sound actually comes from - for AE's combined "ender" paths that's not the same as
     // the path's own level dir, so reuse the same GetLevelIdFromPathId selection sound loading
     // already needs, so an ender path shares its theme with its non-ender counterpart instead of
@@ -510,7 +510,7 @@ static void SaveLevelInfoJson(const FileSystem::Path& dataDir, EReliveLevelIds /
     for (u32 j = 0; j < pathBndFile.ChunkCount(); j++)
     {
         const LvlFileChunk& pathBndChunk = pathBndFile.ChunkAt(j);
-        if (pathBndChunk.Header().mResourceType == ResourceManagerWrapper::Resource_Path)
+        if (pathBndChunk.Header().mResourceType == ResourceManager::Resource_Path)
         {
             nlohmann::json pathInfoObj = nlohmann::json::object();
 
@@ -572,7 +572,7 @@ static void ConvertPals(std::vector<u8>& fileBuffer, LvlReader& lvlReader, bool 
                     for (u32 i = 0; i < palFile.ChunkCount(); i++)
                     {
                         const auto& res = palFile.ChunkAt(i);
-                        if (res.Header().mResourceType == ResourceManagerWrapper::Resource_Palt && static_cast<s32>(res.Header().field_C_id) == palDetails.mResourceId)
+                        if (res.Header().mResourceType == ResourceManager::Resource_Palt && static_cast<s32>(res.Header().field_C_id) == palDetails.mResourceId)
                         {
                             LOG_INFO("Converting PAL: %s", ToString(rec.mPalId));
 
@@ -706,7 +706,7 @@ void ConvertAnimations(const FileSystem::Path& dataDir, FileSystem& fs, std::vec
 
                             if (!skip)
                             {
-                                auto firstAnim = animFile.ChunkByType(ResourceManagerWrapper::ResourceType::Resource_Animation);
+                                auto firstAnim = animFile.ChunkByType(ResourceManager::ResourceType::Resource_Animation);
                                 auto frameTableOffsetFirst = reinterpret_cast<const AnimationFileHeader*>(firstAnim->Data().data())->field_4_frame_table_offset;
                                 auto animHighestFrameTable = GetHighestFrameTableOffset(animDetails.mBanName, isAo);
 
@@ -761,7 +761,7 @@ static void ConvertPathBND(const FileSystem::Path& dataDir, const std::string& f
     {
         const LvlFileChunk& pathBndChunk = pathBndFile.ChunkAt(i);
         
-        if (pathBndChunk.Header().mResourceType != ResourceManagerWrapper::ResourceType::Resource_Pxtd)
+        if (pathBndChunk.Header().mResourceType != ResourceManager::ResourceType::Resource_Pxtd)
         {
             continue;
         }
@@ -793,7 +793,7 @@ static void ConvertPathBND(const FileSystem::Path& dataDir, const std::string& f
         const LvlFileChunk& pathBndChunk = pathBndFile.ChunkAt(j);
         PerPathExtension* pPathExt = nullptr;
 
-        if (pathBndChunk.Header().mResourceType != ResourceManagerWrapper::Resource_Path)
+        if (pathBndChunk.Header().mResourceType != ResourceManager::Resource_Path)
         {
             continue;
         }
@@ -1012,7 +1012,7 @@ static void ConvertFont(FileSystem& fs, const FileSystem::Path& dataDir, const s
 
     ChunkedLvlFile camFile(fileBuffer);
 
-    std::optional<LvlFileChunk> font = camFile.ChunkByType(ResourceManagerWrapper::Resource_Font);
+    std::optional<LvlFileChunk> font = camFile.ChunkByType(ResourceManager::Resource_Font);
     if (!font)
     {
         ALIVE_FATAL("Font missing");
@@ -1259,7 +1259,7 @@ static void ScanLevelForProgressTotals(LvlReader& lvlReader, EReliveLevelIds rel
                 u32 pathCount = 0;
                 for (u32 j = 0; j < pathBndFile.ChunkCount(); j++)
                 {
-                    if (pathBndFile.ChunkAt(j).Header().mResourceType == ResourceManagerWrapper::Resource_Path)
+                    if (pathBndFile.ChunkAt(j).Header().mResourceType == ResourceManager::Resource_Path)
                     {
                         pathCount++;
                     }
@@ -1425,8 +1425,9 @@ static void ScanPaletteProgressTotal(bool isAo, ConversionProgress& progress)
     progress.AddToTotal(ConversionCategory::Misc, count);
 }
 
-void DataConversion::ConvertAll(GameType game, u32 spritePageSize, const std::vector<std::string>& modLayers)
+void DataConversion::ConvertAll(GameType game, u32 spritePageSize, const std::vector<std::string>& modLayers, bool encodeWebm)
 {
+    mEncodeWebm = encodeWebm;
     DataVersions zeroVersions;
     zeroVersions.mWantedSpritePageSize = spritePageSize;
 
@@ -1496,6 +1497,10 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
     {
         ScanPaletteProgressTotal(true, mProgress);
     }
+    if (dv.ConvertAnimations() || dv.RepackPages())
+    {
+        mProgress.AddToTotal(ConversionCategory::SpritePages, SpritePageWriter::kProgressUnits);
+    }
     {
         std::vector<u8> scanFileBuffer;
         IterateAOLvls(fs, [&](LvlReader& lvlReader, EReliveLevelIds reliveLvl, AO::LevelIds /*lvlIdxAsLvl*/)
@@ -1506,7 +1511,14 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
 
     if (dv.ConvertFmvs())
     {
-        ConvertFMVs(*mThreadPool, fs, dataDir, true, DataVersions::LatestVersion().mFmvVersion, mProgress);
+        if (mEncodeWebm)
+        {
+            ConvertFMVs(*mThreadPool, fs, dataDir, true, DataVersions::LatestVersion().mFmvVersion, mProgress);
+        }
+        else
+        {
+            CopyFMVs(*mThreadPool, fs, dataDir, true, mProgress);
+        }
     }
 
     // TODO: Prob diff data in AO, check me
@@ -1541,7 +1553,7 @@ void DataConversion::ConvertDataAO(const DataVersions& dv)
     // the pages are for another GPU or older than a sheet
     if ((dv.ConvertAnimations() || dv.RepackPages()) && !mThreadPool->IsCancelRequested())
     {
-        SpritePageWriter::Repack(fs, dataDir, dv.mWantedSpritePageSize);
+        SpritePageWriter::Repack(fs, dataDir, dv.mWantedSpritePageSize, &mProgress);
     }
 
     if (dv.ConvertAnimations() && dv.ConvertPalettes() && !mThreadPool->IsCancelRequested())
@@ -1584,6 +1596,10 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
     {
         ScanPaletteProgressTotal(false, mProgress);
     }
+    if (dv.ConvertAnimations() || dv.RepackPages())
+    {
+        mProgress.AddToTotal(ConversionCategory::SpritePages, SpritePageWriter::kProgressUnits);
+    }
     {
         std::vector<u8> scanFileBuffer;
         IterateAELvls(fs, [&](LvlReader& lvlReader, EReliveLevelIds reliveLvl, LevelIds /*lvlIdxAsLvl*/)
@@ -1594,7 +1610,14 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
 
     if (dv.ConvertFmvs())
     {
-        ConvertFMVs(*mThreadPool, fs, dataDir, false, DataVersions::LatestVersion().mFmvVersion, mProgress);
+        if (mEncodeWebm)
+        {
+            ConvertFMVs(*mThreadPool, fs, dataDir, false, DataVersions::LatestVersion().mFmvVersion, mProgress);
+        }
+        else
+        {
+            CopyFMVs(*mThreadPool, fs, dataDir, false, mProgress);
+        }
     }
 
     PaletteFit::Reset();
@@ -1628,7 +1651,7 @@ void DataConversion::ConvertDataAE(const DataVersions& dv)
     // the pages are for another GPU or older than a sheet
     if ((dv.ConvertAnimations() || dv.RepackPages()) && !mThreadPool->IsCancelRequested())
     {
-        SpritePageWriter::Repack(fs, dataDir, dv.mWantedSpritePageSize);
+        SpritePageWriter::Repack(fs, dataDir, dv.mWantedSpritePageSize, &mProgress);
     }
 
     if (dv.ConvertAnimations() && dv.ConvertPalettes() && !mThreadPool->IsCancelRequested())

@@ -135,7 +135,7 @@ void QuikSave::LoadActive(BaseMap& map)
 // so it never writes a record here and there's nothing to restore for it;
 // it just comes back however its own VUpdate() naturally spawns it from
 // its TLV.
-void QuikSave::RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManagerWrapper& resMan, BaseMap& map)
+void QuikSave::RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManager& resMan, BaseMap& map)
 {
     pSaveData.mObjectsStateData.ReadRewind();
     while (pSaveData.mObjectsStateData.CanRead())
@@ -336,7 +336,7 @@ void QuikSave::SaveCheckpoint(BaseMap& map)
     map.SaveQuicksaveBlyData(gActiveQuicksaveData.mRestartPathObjectData.mObjectBlyData);
 }
 
-void QuikSave::RestoreCheckpoint(ResourceManagerWrapper& resMan, BaseMap& map)
+void QuikSave::RestoreCheckpoint(ResourceManager& resMan, BaseMap& map)
 {
     // Destroy everything except objects that opt out (Abe included - see
     // Abe's constructor) so the deferred restore below recreates the rest

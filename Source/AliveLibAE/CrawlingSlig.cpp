@@ -79,7 +79,7 @@ void CrawlingSlig::LoadAnimations()
     }
 }
 
-CrawlingSlig::CrawlingSlig(relive::Path_CrawlingSlig* pTlv, const Guid& guid, ResourceManagerWrapper& resMan, BaseMap& map)
+CrawlingSlig::CrawlingSlig(relive::Path_CrawlingSlig* pTlv, const Guid& guid, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(2, resMan, map),
     mGuid(guid),
     mTlv(*pTlv),
@@ -167,7 +167,7 @@ void CrawlingSlig::VRender(OrderingTable& ot)
     renderWithGlowingEyes(ot, this);
 }
 
-void CrawlingSlig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void CrawlingSlig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<CrawlingSligSaveState>();
 

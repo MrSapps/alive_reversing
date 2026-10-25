@@ -32,7 +32,7 @@ DynamicArrayT<BaseGameObject>& PlatformBase::Platforms()
     return *sPlatformsArray;
 }
 
-PlatformBase::PlatformBase(ResourceManagerWrapper& resMan, BaseMap& map)
+PlatformBase::PlatformBase(ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map)
 {
 }

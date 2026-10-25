@@ -2,7 +2,7 @@
 
 #include "Primitives.hpp"
 #include "Layer.hpp"
-#include "ResourceManagerWrapper.hpp"
+#include "ResourceManager.hpp"
 #include "DynamicArray.hpp"
 #include "RGB16.hpp"
 

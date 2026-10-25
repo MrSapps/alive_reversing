@@ -84,7 +84,7 @@ static const relive::SfxDefinition sSlogSFXList[19] = {
     {0u, 12u, 33u, 40u, -127, 0},
 };
 
-Slog::Slog(FP xpos, FP ypos, FP scale, s16 bListenToSligs, s16 chaseDelay, ResourceManagerWrapper& resMan, BaseMap& map)
+Slog::Slog(FP xpos, FP ypos, FP scale, s16 bListenToSligs, s16 chaseDelay, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(5, resMan, map)
 {
     LoadAnimations();
@@ -130,7 +130,7 @@ void Slog::LoadAnimations()
     }
 }
 
-Slog::Slog(relive::Path_Slog* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Slog::Slog(relive::Path_Slog* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(5, resMan, map)
 {
     LoadAnimations();
@@ -298,7 +298,7 @@ void Slog::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void Slog::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void Slog::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<SlogSaveState>();
     auto pTlv = map.TLV_From_Offset_Lvl_Cam(pState->mSlogTlvId).GetTlv<relive::Path_Slog>();

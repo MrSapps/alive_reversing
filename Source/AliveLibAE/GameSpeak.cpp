@@ -59,7 +59,7 @@ GameSpeakEvents Code_LookUp(u32 code, u16 idx, u16 code_len)
 
 GameSpeak* gEventSystem = nullptr;
 
-GameSpeak::GameSpeak(ResourceManagerWrapper& resMan, BaseMap& map)
+GameSpeak::GameSpeak(ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetSurviveDeathReset(true); // Dont destroy on loading save

@@ -11,7 +11,7 @@ enum class MessageType : s32
 class Text final : public BaseGameObject
 {
 public:
-    Text(const char_type* pMessage, s32 renderCount, s32 bShadow, ResourceManagerWrapper& resMan, BaseMap& map);
+    Text(const char_type* pMessage, s32 renderCount, s32 bShadow, ResourceManager& resMan, BaseMap& map);
     ~Text();
 
     virtual void VUpdate() override;
@@ -39,7 +39,7 @@ private:
 class FullScreenMessage final : public BaseGameObject
 {
 public:
-    FullScreenMessage(MessageType messageType, ResourceManagerWrapper& resMan, BaseMap& map);
+    FullScreenMessage(MessageType messageType, ResourceManager& resMan, BaseMap& map);
     ~FullScreenMessage();
 
     virtual ModalState VModalUpdate() override;

@@ -7,6 +7,7 @@
 bool AreMovieSkippingInputsHeld();
 
 class MoviePlayback;
+class FileSystem;
 
 // Plays a movie once it's updated, taking over the main loop (see BaseGameObject::StartModal)
 // until it has finished. Anything waiting on it watches gMovieRefCount go back to 0.
@@ -17,7 +18,7 @@ public:
     virtual ModalState VModalUpdate() override;
     virtual void VScreenChanged() override;
 
-    explicit Movie(const char_type* pName, ResourceManagerWrapper& resMan, BaseMap& map);
+    explicit Movie(const char_type* pName, ResourceManager& resMan, BaseMap& map);
     ~Movie();
 
     static s32 gMovieRefCount;
@@ -26,5 +27,6 @@ private:
     void Finish();
 
     std::string mName;
+    FileSystem& mFs;
     std::unique_ptr<MoviePlayback> mPlayback;
 };

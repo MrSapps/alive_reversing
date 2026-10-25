@@ -8,7 +8,7 @@
 
 static u8 sLeafRandIdx = 8;
 
-Leaf::Leaf(FP xpos, FP ypos, FP xVel, FP yVel, FP scale, ResourceManagerWrapper& resMan, BaseMap& map)
+Leaf::Leaf(FP xpos, FP ypos, FP xVel, FP yVel, FP scale, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     mRGB.SetRGB(100, 100, 100);

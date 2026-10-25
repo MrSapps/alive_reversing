@@ -40,7 +40,7 @@ private:
 };
 
 // Makes dir the current directory until destroyed - for code that uses paths relative to the
-// game directory, such as ResourceManagerWrapper's settings ini.
+// game directory, such as ResourceManager's settings ini.
 class ScopedCurrentDir final
 {
 public:

@@ -13,7 +13,7 @@
 #include "Path.hpp"
 #include "QuikSave.hpp"
 
-FlyingSligSpawner::FlyingSligSpawner(relive::Path_FlyingSligSpawner* pTlv, const Guid& tlvInfo, ResourceManagerWrapper& resMan, BaseMap& map)
+FlyingSligSpawner::FlyingSligSpawner(relive::Path_FlyingSligSpawner* pTlv, const Guid& tlvInfo, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eFlyingSligSpawner);
@@ -33,7 +33,7 @@ FlyingSligSpawner::FlyingSligSpawner(relive::Path_FlyingSligSpawner* pTlv, const
     field_24_spawned_slig_id = Guid{};
 }
 
-void FlyingSligSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void FlyingSligSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<FlyingSligSpawnerSaveState>();
 

@@ -12,7 +12,7 @@ namespace AO {
 class BeeSwarmHole final : public ::BaseGameObject
 {
 public:
-    BeeSwarmHole(relive::Path_BeeSwarmHole* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    BeeSwarmHole(relive::Path_BeeSwarmHole* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
 
     virtual void VUpdate() override;
 
@@ -26,7 +26,7 @@ public:
     u16 field_2A_speed = 0;
 
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 };
 
 // Every field except mStartIntervalTimer is derived once from the TLV in

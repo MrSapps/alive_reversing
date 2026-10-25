@@ -83,7 +83,7 @@ void Slog::LoadAnimations()
     }
 }
 
-Slog::Slog(relive::Path_Slog* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Slog::Slog(relive::Path_Slog* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map)
 {
     LoadAnimations();
@@ -126,7 +126,7 @@ Slog::Slog(relive::Path_Slog* pTlv, const Guid& tlvId, ResourceManagerWrapper& r
     }
 }
 
-Slog::Slog(FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan, BaseMap& map)
+Slog::Slog(FP xpos, FP ypos, FP scale, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map)
 {
     LoadAnimations();
@@ -2707,7 +2707,7 @@ void Slog::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void Slog::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void Slog::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<SlogSaveState>();
 

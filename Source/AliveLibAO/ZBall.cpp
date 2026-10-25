@@ -16,7 +16,7 @@ ZBall* gCenterZBall = nullptr;
 ZBall* gOutZBall = nullptr;
 
 // TODO: Pass the whole object because this decides to read 2 points as a rect
-void Animation_OnFrame_ZBallSmacker(::BaseGameObject* pObj, u32& idx, const IndexedPoint& points, ResourceManagerWrapper&, BaseMap&)
+void Animation_OnFrame_ZBallSmacker(::BaseGameObject* pObj, u32& idx, const IndexedPoint& points, ResourceManager&, BaseMap&)
 {
     auto pZBall = static_cast<ZBall*>(pObj);
     for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
@@ -51,7 +51,7 @@ void Animation_OnFrame_ZBallSmacker(::BaseGameObject* pObj, u32& idx, const Inde
     idx++;
 }
 
-ZBall::ZBall(relive::Path_ZBall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+ZBall::ZBall(relive::Path_ZBall* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eZBall);
@@ -191,7 +191,7 @@ void ZBall::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void ZBall::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void ZBall::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<ZBallSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);

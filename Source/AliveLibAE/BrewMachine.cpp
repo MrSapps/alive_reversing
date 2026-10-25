@@ -5,7 +5,7 @@
 #include "Path.hpp"
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
 
-BrewMachine::BrewMachine(relive::Path_BrewMachine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+BrewMachine::BrewMachine(relive::Path_BrewMachine* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map),
     mTlvInfo(tlvId),
     mMaxBrewCount(pTlv->mBrewCount)

@@ -444,7 +444,7 @@ void MainMenuController::LoadAnimations()
 
 }
 
-MainMenuController::MainMenuController(relive::Path_TLV* /*pTlv*/, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+MainMenuController::MainMenuController(relive::Path_TLV* /*pTlv*/, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     sMainMenuObjectCounter_BB4400++;

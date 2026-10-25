@@ -42,7 +42,7 @@ void Shrykull::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::ShrykullDetransform));
 }
 
-Shrykull::Shrykull(ResourceManagerWrapper& resMan, BaseMap& map)
+Shrykull::Shrykull(ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eShrykull);

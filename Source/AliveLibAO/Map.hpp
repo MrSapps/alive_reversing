@@ -18,7 +18,7 @@ namespace relive
 }
 
 class Camera;
-class ResourceManagerWrapper;
+class ResourceManager;
 
 extern const CameraSwapEffects kPathChangeEffectToInternalScreenChangeEffect[10];
 
@@ -55,7 +55,7 @@ namespace CameraIds::Menu
 class Map final : public BaseMap
 {
 public:
-    Map(ResourceManagerWrapper& resMan, relive::Factory& factory);
+    Map(ResourceManager& resMan, relive::Factory& factory);
 
     s16 GetOverlayId() override;
 

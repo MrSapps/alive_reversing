@@ -61,7 +61,7 @@ void SND_Reset_Ambiance()
     }
 }
 
-void Start_Sounds_for_TLV(CameraPos direction, relive::Path_TLV* pTlv, ResourceManagerWrapper& resMan, BaseMap& map)
+void Start_Sounds_for_TLV(CameraPos direction, relive::Path_TLV* pTlv, ResourceManager& resMan, BaseMap& map)
 {
     bool bDangerMusic = false;
 

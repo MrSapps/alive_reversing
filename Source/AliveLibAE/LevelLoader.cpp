@@ -8,7 +8,7 @@
 #include "Map.hpp"
 #include "stdlib.hpp"
 
-LevelLoader::LevelLoader(relive::Path_LevelLoader* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+LevelLoader::LevelLoader(relive::Path_LevelLoader* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     mBaseGameObjectTlvInfo = tlvId;

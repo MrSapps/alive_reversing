@@ -13,7 +13,7 @@
 #include "../relive_lib/GameObjects/ScreenClipper.hpp"
 #include "../relive_lib/FatalError.hpp"
 
-CameraSwapper::CameraSwapper(CamResource& camRes, ResourceManagerWrapper& resMan, BaseMap& map, bool bPutDispEnv1, const char_type* pFmv1, bool bPutDispEnv2, const char_type* pFmv2, bool bPutDispEnv3, const char_type* pFmv3)
+CameraSwapper::CameraSwapper(CamResource& camRes, ResourceManager& resMan, BaseMap& map, bool bPutDispEnv1, const char_type* pFmv1, bool bPutDispEnv2, const char_type* pFmv2, bool bPutDispEnv3, const char_type* pFmv3)
     : BaseGameObject(true, 0, resMan, map),
     mFmvs{ pFmv1, pFmv2, pFmv3 },
     mPutDispEnv{ bPutDispEnv1, bPutDispEnv2, bPutDispEnv3 }
@@ -36,7 +36,7 @@ CameraSwapper::CameraSwapper(CamResource& camRes, ResourceManagerWrapper& resMan
     mMoviePutDispEnv = mPutDispEnv[0];
 }
 
-CameraSwapper::CameraSwapper(CamResource& camRes, ResourceManagerWrapper& resMan, BaseMap& map, CameraSwapEffects changeEffect, s32 xpos, s32 ypos)
+CameraSwapper::CameraSwapper(CamResource& camRes, ResourceManager& resMan, BaseMap& map, CameraSwapEffects changeEffect, s32 xpos, s32 ypos)
     : BaseGameObject(true, 0, resMan, map),
     mXPosConverted(static_cast<s16>(PsxToPCX(xpos))),
     mYPosConverted(static_cast<s16>(ypos))

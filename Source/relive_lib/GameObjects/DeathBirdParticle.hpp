@@ -5,7 +5,7 @@
 class DeathBirdParticle final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    DeathBirdParticle(FP xpos, FP ypos, s32 startTimer, bool playSound, FP scale, ResourceManagerWrapper& resMan, BaseMap& map);
+    DeathBirdParticle(FP xpos, FP ypos, s32 startTimer, bool playSound, FP scale, ResourceManager& resMan, BaseMap& map);
 
     void LoadAnimations();
 

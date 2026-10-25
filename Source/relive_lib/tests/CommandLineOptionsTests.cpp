@@ -41,6 +41,8 @@ TEST(CommandLineOptions, EveryHelpSpelling)
 TEST(CommandLineOptions, Convert)
 {
     EXPECT_TRUE(Parse({"-convert"}).mConvertOnly);
+    EXPECT_FALSE(Parse({"-convert"}).mEncodeWebm);
+    EXPECT_TRUE(Parse({"-convert", "-encode_webm"}).mEncodeWebm);
     EXPECT_TRUE(Parse({"-AO", "-convert"}).mConvertOnly);
 }
 

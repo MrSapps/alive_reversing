@@ -3,7 +3,7 @@
 #include "file_system.hpp"
 #include "rgb_conversion.hpp"
 #include "../AnimResources.hpp"
-#include "../ResourceManagerWrapper.hpp"
+#include "../ResourceManager.hpp"
 #include <vector>
 
 struct AnimationPal final

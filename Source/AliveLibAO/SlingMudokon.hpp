@@ -180,7 +180,7 @@ public:
         AnimId::Mudokon_Sling_ShootEnd,
         AnimId::Mudokon_Sling_AngryToIdle};
 
-    SlingMudokon(relive::Path_SlingMudokon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    SlingMudokon(relive::Path_SlingMudokon* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~SlingMudokon();
 
     void LoadAnimations();
@@ -188,7 +188,7 @@ public:
     virtual void VScreenChanged() override;
     virtual void VUpdate() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
     virtual void VCallBrain();
     virtual void VCallMotion();

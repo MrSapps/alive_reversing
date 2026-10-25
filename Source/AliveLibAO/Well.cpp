@@ -20,7 +20,7 @@ static s16 Well_NextRandom()
     return gRandomBytes[sWellRndSeed++];
 }
 
-Well::Well(relive::Path_WellBase* pTlv, FP xpos, FP ypos, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Well::Well(relive::Path_WellBase* pTlv, FP xpos, FP ypos, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     mTlvInfo = tlvId;

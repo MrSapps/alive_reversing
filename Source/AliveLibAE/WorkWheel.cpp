@@ -18,7 +18,7 @@ void WorkWheel::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Work_Wheel_Turning));
 }
 
-WorkWheel::WorkWheel(relive::Path_WorkWheel* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+WorkWheel::WorkWheel(relive::Path_WorkWheel* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eWorkWheel);
@@ -87,7 +87,7 @@ WorkWheel::~WorkWheel()
     mMap.TLV_Reset(mTlvInfo);
 }
 
-void WorkWheel::CreateFromSaveState(SerializedObjectData& pState, ResourceManagerWrapper& resMan, BaseMap& map)
+void WorkWheel::CreateFromSaveState(SerializedObjectData& pState, ResourceManager& resMan, BaseMap& map)
 {
     const auto pData = pState.ReadTmpPtr<WorkWheelSaveState>();
 

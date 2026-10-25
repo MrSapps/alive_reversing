@@ -11,7 +11,7 @@
 
 namespace AO {
 
-HoistParticle::HoistParticle(FP xpos, FP ypos, FP scale, AnimId animId, ResourceManagerWrapper& resMan, BaseMap& map)
+HoistParticle::HoistParticle(FP xpos, FP ypos, FP scale, AnimId animId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map), mAnimId(animId)
 {
     mXPos = xpos;
@@ -102,7 +102,7 @@ void HoistParticle::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void HoistParticle::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void HoistParticle::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<HoistParticleSaveState>();
     auto pParticle = relive_new HoistParticle(pState->mXPos, pState->mYPos, pState->mScale, pState->mAnimId, resMan, map);
@@ -125,7 +125,7 @@ HoistRocksEffect::~HoistRocksEffect()
     mMap.TLV_Reset(mTlvId);
 }
 
-HoistRocksEffect::HoistRocksEffect(relive::Path_Hoist* pTlv, const Guid& tlvInfo, ResourceManagerWrapper& resMan, BaseMap& map)
+HoistRocksEffect::HoistRocksEffect(relive::Path_Hoist* pTlv, const Guid& tlvInfo, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map), mTlvId(tlvInfo)
 {
     mTlvXPos = FP_FromInteger(pTlv->mTopLeftX + 12);
@@ -201,7 +201,7 @@ void HoistRocksEffect::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void HoistRocksEffect::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void HoistRocksEffect::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<HoistRocksEffectSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);

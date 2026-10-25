@@ -28,7 +28,7 @@
 
 
 
-Map::Map(ResourceManagerWrapper& resMan, relive::Factory& factory)
+Map::Map(ResourceManager& resMan, relive::Factory& factory)
     : BaseMap(resMan, factory)
     , mPath(*this, factory)
 {

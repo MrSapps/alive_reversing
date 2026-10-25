@@ -25,7 +25,7 @@ struct BackgroundGlukkonSaveState final : public SaveStateBase
 class BackgroundGlukkon final : public ::BaseAliveGameObject
 {
 public:
-    BackgroundGlukkon(relive::Path_BackgroundGlukkon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    BackgroundGlukkon(relive::Path_BackgroundGlukkon* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~BackgroundGlukkon();
 
     void LoadAnimations();
@@ -34,7 +34,7 @@ public:
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
     virtual void VUpdate() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
     Guid mTlvId;
     enum class State

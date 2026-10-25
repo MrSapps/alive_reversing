@@ -5,7 +5,7 @@
 #include "SoundDebug.hpp"
 #include "SwitchStates.hpp"
 #include "Movie.hpp"
-#include "ResourceManagerWrapper.hpp"
+#include "ResourceManager.hpp"
 #include "logger.hpp"
 #include "Renderer/IRenderer.hpp"
 #include "GameObjects/BaseAliveGameObject.hpp"
@@ -465,7 +465,7 @@ Automation::~Automation()
     SoundDebug::SetScriptFrame(false, 0);
 }
 
-Automation::Automation(FileSystem& fs, ResourceManagerWrapper& resMan, std::vector<Command> commands)
+Automation::Automation(FileSystem& fs, ResourceManager& resMan, std::vector<Command> commands)
     : mFs(fs)
     , mResMan(resMan)
     , mCommands(std::move(commands))

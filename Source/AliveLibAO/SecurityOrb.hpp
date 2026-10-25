@@ -26,14 +26,14 @@ struct SecurityOrbSaveState final : public SaveStateBase
 class SecurityOrb final : public ::BaseAliveGameObject
 {
 public:
-    SecurityOrb(relive::Path_SecurityOrb* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    SecurityOrb(relive::Path_SecurityOrb* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~SecurityOrb();
 
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
 private:
     Guid mTlvInfo;

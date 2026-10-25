@@ -2,7 +2,7 @@
 
 enum class CameraPos : s16;
 class ScopedSeq;
-class ResourceManagerWrapper;
+class ResourceManager;
 class BaseMap;
 
 namespace relive
@@ -13,7 +13,7 @@ namespace relive
 void SND_Init_Ambiance();
 void SND_Reset_Ambiance();
 
-void Start_Sounds_for_TLV(CameraPos direction, relive::Path_TLV* pTlv, ResourceManagerWrapper& resMan, BaseMap& map);
+void Start_Sounds_for_TLV(CameraPos direction, relive::Path_TLV* pTlv, ResourceManager& resMan, BaseMap& map);
 void Start_Slig_sounds(CameraPos direction);
 void Stop_slig_sounds(CameraPos direction);
 

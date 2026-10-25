@@ -36,7 +36,7 @@ class MeatSack final : public ::BaseAliveGameObject
 {
 
 public:
-    MeatSack(relive::Path_MeatSack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    MeatSack(relive::Path_MeatSack* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~MeatSack();
 
     void LoadAnimations();
@@ -44,7 +44,7 @@ public:
     virtual void VScreenChanged() override;
     virtual void VUpdate() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
     Guid mTlvId;
     bool mHasBeenHit = false;

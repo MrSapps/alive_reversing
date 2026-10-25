@@ -39,7 +39,7 @@ RollingBall::~RollingBall()
     KillRollingBallShaker();
 }
 
-RollingBall::RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+RollingBall::RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : ::BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eRollingBall);

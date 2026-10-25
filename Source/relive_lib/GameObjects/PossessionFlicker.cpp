@@ -4,7 +4,7 @@
 #include "../relive_lib/ObjectIds.hpp"
 #include "../relive_lib/Function.hpp"
 
-PossessionFlicker::PossessionFlicker(BaseAliveGameObject* pToApplyFlicker, s32 duration, s32 r, s32 g, s32 b, ResourceManagerWrapper& resMan, BaseMap& map)
+PossessionFlicker::PossessionFlicker(BaseAliveGameObject* pToApplyFlicker, s32 duration, s32 r, s32 g, s32 b, ResourceManager& resMan, BaseMap& map)
  : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::ePossessionFlicker);

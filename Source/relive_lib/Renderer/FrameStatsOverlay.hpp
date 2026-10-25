@@ -4,7 +4,7 @@
 #include "../Font.hpp"
 
 class IRenderer;
-class ResourceManagerWrapper;
+class ResourceManager;
 
 // The renderer, frame rate, frame time, draw calls and cached textures, in the top right of the
 // screen (-ddfps, and the render test). The frame time leaves out time spent waiting for the next
@@ -12,7 +12,7 @@ class ResourceManagerWrapper;
 class FrameStatsOverlay final
 {
 public:
-    explicit FrameStatsOverlay(ResourceManagerWrapper& resMan);
+    explicit FrameStatsOverlay(ResourceManager& resMan);
 
     void AddIdleTime(u64 ns)
     {

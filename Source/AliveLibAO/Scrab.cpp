@@ -35,7 +35,7 @@ const TScrabMotionFunction sScrabMotionTable[30] = {
 #undef MAKE_FN
 };
 
-Scrab::Scrab(relive::Path_Scrab* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Scrab::Scrab(relive::Path_Scrab* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : ::BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eScrab);
@@ -3757,7 +3757,7 @@ void Scrab::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void Scrab::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void Scrab::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<ScrabSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);

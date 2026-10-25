@@ -42,12 +42,12 @@ struct LiftMoverSaveState final : public SaveStateBase
 class LiftMover final : public ::BaseGameObject
 {
 public:
-    LiftMover(relive::Path_LiftMover* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    LiftMover(relive::Path_LiftMover* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~LiftMover();
 
     virtual void VUpdate() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
 
     LiftPoint* FindLiftPointWithId(s16 id);
 

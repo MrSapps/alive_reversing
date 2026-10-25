@@ -7,7 +7,7 @@
 #
 # relive itself has no Flatpak-aware notion of a sandboxed data dir yet - it looks for a
 # "relive_data" directory relative to its current working directory (see
-# ResourceManagerWrapper::AddSearchPaths), the same way the AppImage's AppRun script cds into
+# ResourceManager::AddSearchPaths), the same way the AppImage's AppRun script cds into
 # wherever the AppImage sits before exec'ing it. --filesystem=host is granted below so a user's
 # existing relive_data can be reached; run it from the directory containing it, e.g.:
 #   cd /path/with/relive_data && flatpak run io.github.AliveTeam.Relive

@@ -12,7 +12,7 @@
 
 namespace AO {
 
-BeeSwarmHole::BeeSwarmHole(relive::Path_BeeSwarmHole* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+BeeSwarmHole::BeeSwarmHole(relive::Path_BeeSwarmHole* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     mTlvId = tlvId;
@@ -133,7 +133,7 @@ void BeeSwarmHole::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void BeeSwarmHole::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void BeeSwarmHole::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<BeeSwarmHoleSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);

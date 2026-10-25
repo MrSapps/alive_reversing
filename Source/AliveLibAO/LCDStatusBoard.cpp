@@ -21,7 +21,7 @@ LCDStatusBoard::~LCDStatusBoard()
     mMap.TLV_Reset(mTlvId);
 }
 
-LCDStatusBoard::LCDStatusBoard(relive::Path_LCDStatusBoard* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+LCDStatusBoard::LCDStatusBoard(relive::Path_LCDStatusBoard* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     mTlvId = tlvId;

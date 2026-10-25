@@ -11,7 +11,7 @@
 #include "../relive_lib/BaseMap.hpp"
 #include "../relive_lib/GameType.hpp"
 
-InvisibleSwitch::InvisibleSwitch(relive::Path_InvisibleSwitch* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+InvisibleSwitch::InvisibleSwitch(relive::Path_InvisibleSwitch* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     mTlvId = tlvId;

@@ -2,7 +2,7 @@
 #include "BaseGameObject.hpp"
 #include "../AliveLibAE/Map.hpp"
 #include "../AliveLibAO/Map.hpp"
-#include "ResourceManagerWrapper.hpp"
+#include "ResourceManager.hpp"
 #include "ObjectIds.hpp"
 #include "Events.hpp"
 #include "GameType.hpp"
@@ -12,7 +12,7 @@
 
 DynamicArrayT<BaseGameObject>* gBaseGameObjects = nullptr;
 
-BaseGameObject::BaseGameObject(s16 bAddToObjectList, s16 resourceArraySize, ResourceManagerWrapper& resMan, BaseMap& map)
+BaseGameObject::BaseGameObject(s16 bAddToObjectList, s16 resourceArraySize, ResourceManager& resMan, BaseMap& map)
     : mBaseGameObjectResArray(resourceArraySize),
     mResMan(resMan),
     mMap(map)

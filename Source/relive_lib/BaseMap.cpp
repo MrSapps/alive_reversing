@@ -579,7 +579,7 @@ void BaseMap::AddPurpleLight(BaseAnimatedWithPhysicsGameObject* pObj, DynamicArr
 class PurpleLightEffect final : public BaseGameObject
 {
 public:
-    PurpleLightEffect(DynamicArrayT<BaseAnimatedWithPhysicsGameObject>* pObjectsWithLights, DynamicArrayT<Particle>* pPurpleLights, s16 bMakeInvisible, s32 totalFrames, ResourceManagerWrapper& resMan, BaseMap& map)
+    PurpleLightEffect(DynamicArrayT<BaseAnimatedWithPhysicsGameObject>* pObjectsWithLights, DynamicArrayT<Particle>* pPurpleLights, s16 bMakeInvisible, s32 totalFrames, ResourceManager& resMan, BaseMap& map)
         : BaseGameObject(true, 0, resMan, map)
         , mObjectsWithLights(pObjectsWithLights)
         , mPurpleLights(pPurpleLights)
@@ -748,7 +748,7 @@ PurpleLightResult BaseMap::RemoveObjectsWithPurpleLight(s16 bMakeInvisible)
 class FmvCameraChangePass final : public BaseGameObject
 {
 public:
-    FmvCameraChangePass(BaseGameObject* pFmvSwapper, bool bKeepCantKill, ResourceManagerWrapper& resMan, BaseMap& map)
+    FmvCameraChangePass(BaseGameObject* pFmvSwapper, bool bKeepCantKill, ResourceManager& resMan, BaseMap& map)
         : BaseGameObject(true, 0, resMan, map)
         , mFmvSwapper(pFmvSwapper)
         , mKeepCantKill(bKeepCantKill)

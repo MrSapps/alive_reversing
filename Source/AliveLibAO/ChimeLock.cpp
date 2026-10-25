@@ -26,7 +26,7 @@ namespace AO {
 // TODO: Index is always >=1 so first entry is redundant ??
 const s32 dword_4C5054[11] = {0, 1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000};
 
-ChimeLock::ChimeLock(relive::Path_ChimeLock* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+ChimeLock::ChimeLock(relive::Path_ChimeLock* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : ::BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eChimeLock);
@@ -701,7 +701,7 @@ void ChimeLock::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void ChimeLock::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void ChimeLock::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<ChimeLockSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);

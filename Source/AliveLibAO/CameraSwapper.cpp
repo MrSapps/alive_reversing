@@ -19,7 +19,7 @@
 
 namespace AO {
 
-CameraSwapper::CameraSwapper(CamResource& camRes, ResourceManagerWrapper& resMan, BaseMap& map,bool bPutDispEnv1, const char_type* pFmv1, bool bPutDispEnv2, const char_type* pFmv2, bool bPutDispEnv3, const char_type* pFmv3)
+CameraSwapper::CameraSwapper(CamResource& camRes, ResourceManager& resMan, BaseMap& map,bool bPutDispEnv1, const char_type* pFmv1, bool bPutDispEnv2, const char_type* pFmv2, bool bPutDispEnv3, const char_type* pFmv3)
     : BaseGameObject(true, 0, resMan, map)
 {
     mFmvs[0] = pFmv1;
@@ -49,7 +49,7 @@ CameraSwapper::CameraSwapper(CamResource& camRes, ResourceManagerWrapper& resMan
     mMoviePutDispEnv = mPutDispEnv[0];
 }
 
-CameraSwapper::CameraSwapper(CamResource& camRes, ResourceManagerWrapper& resMan, BaseMap& map, CameraSwapEffects changeEffect, s32 xpos, s32 ypos)
+CameraSwapper::CameraSwapper(CamResource& camRes, ResourceManager& resMan, BaseMap& map, CameraSwapEffects changeEffect, s32 xpos, s32 ypos)
     : BaseGameObject(true, 0, resMan, map)
 {
     mYPosConverted = static_cast<s16>(ypos);

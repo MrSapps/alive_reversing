@@ -14,17 +14,17 @@
 #include "../relive_lib/FixedPoint.hpp"
 #include "../relive_lib/Collisions.hpp"
 
-void Animation_OnFrame_Common_Null(BaseGameObject*, u32&, const IndexedPoint&, ResourceManagerWrapper&, BaseMap&)
+void Animation_OnFrame_Common_Null(BaseGameObject*, u32&, const IndexedPoint&, ResourceManager&, BaseMap&)
 {
 
 }
 
-void Animation_OnFrame_Null(BaseGameObject*, u32&, const IndexedPoint&, ResourceManagerWrapper&, BaseMap&)
+void Animation_OnFrame_Null(BaseGameObject*, u32&, const IndexedPoint&, ResourceManager&, BaseMap&)
 {
 
 }
 
-void Animation_OnFrame_Common(BaseGameObject* pObjPtr, u32&, const IndexedPoint& point, ResourceManagerWrapper& resMan, BaseMap&)
+void Animation_OnFrame_Common(BaseGameObject* pObjPtr, u32&, const IndexedPoint& point, ResourceManager& resMan, BaseMap&)
 {
     auto pObj = static_cast<BaseAliveGameObject*>(pObjPtr);
     AnimResource ppAnimData = resMan.LoadAnimation(AnimId::Dust_Particle);
@@ -114,7 +114,7 @@ void Animation_OnFrame_Common(BaseGameObject* pObjPtr, u32&, const IndexedPoint&
     return;
 }
 
-void Animation_OnFrame_FlyingSlig(BaseGameObject* pObjPtr, u32&, const IndexedPoint& point, ResourceManagerWrapper& resMan, BaseMap&)
+void Animation_OnFrame_FlyingSlig(BaseGameObject* pObjPtr, u32&, const IndexedPoint& point, ResourceManager& resMan, BaseMap&)
 {
     auto pObj = static_cast<BaseAliveGameObject*>(pObjPtr);
 
@@ -157,7 +157,7 @@ void Animation_OnFrame_FlyingSlig(BaseGameObject* pObjPtr, u32&, const IndexedPo
     }
 }
 
-void Animation_OnFrame_Slog(BaseGameObject* pObjPtr, u32&, const IndexedPoint& point, ResourceManagerWrapper& resMan, BaseMap&)
+void Animation_OnFrame_Slog(BaseGameObject* pObjPtr, u32&, const IndexedPoint& point, ResourceManager& resMan, BaseMap&)
 {
     auto pSlog = static_cast<Slog*>(pObjPtr);
     auto pTarget = static_cast<BaseAliveGameObject*>(sObjectIds.Find_Impl(pSlog->mTargetId));

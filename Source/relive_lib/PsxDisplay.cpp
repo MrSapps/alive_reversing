@@ -108,7 +108,7 @@ static s32 DebugFont_Open_4F8AB0(u8 xMargin, u8 yMargin, u8 displayWidth, u8 dis
     return idx;
 }
 
-s32 DebugFont::DebugFont_Init(ResourceManagerWrapper& resMan)
+s32 DebugFont::DebugFont_Init(ResourceManager& resMan)
 {
     DebugFont_Reset_4F8B40();
     mDebugTextIdx = DebugFont_Open_4F8AB0(8, 16, static_cast<u8>(gPsxDisplay.mWidth), 200, 600u);
@@ -178,7 +178,7 @@ void DebugFont::PSX_DrawDebugTextBuffers(OrderingTable& ot)
     }
 }
 
-void PsxDisplay::Init(ResourceManagerWrapper& resMan)
+void PsxDisplay::Init(ResourceManager& resMan)
 {
     PSX_VSync(VSyncMode::UncappedFps);
 

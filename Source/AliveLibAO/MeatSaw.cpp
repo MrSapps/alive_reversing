@@ -38,7 +38,7 @@ void MeatSaw::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::MeatSaw_Moving));
 }
 
-MeatSaw::MeatSaw(relive::Path_MeatSaw* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+MeatSaw::MeatSaw(relive::Path_MeatSaw* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eMeatSaw);
@@ -383,7 +383,7 @@ void MeatSaw::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void MeatSaw::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void MeatSaw::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<MeatSawSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);

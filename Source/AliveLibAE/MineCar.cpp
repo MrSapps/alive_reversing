@@ -34,7 +34,7 @@ void MineCar::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Mine_Car_Tread_Move_B));
 }
 
-MineCar::MineCar(relive::Path_MineCar* pTlv, const Guid& tlvId, s32 /*a4*/, s32 /*a5*/, s32 /*a6*/, ResourceManagerWrapper& resMan, BaseMap& map)
+MineCar::MineCar(relive::Path_MineCar* pTlv, const Guid& tlvId, s32 /*a4*/, s32 /*a5*/, s32 /*a6*/, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eMineCar);
@@ -111,7 +111,7 @@ const AnimId sMineCarAnimIdTable[7] = {
     AnimId::Mine_Car_Tread_Move_A,
     AnimId::Mine_Car_Tread_Move_B};
 
-void MineCar::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void MineCar::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<MineCarSaveState>();
     auto pTlv = static_cast<relive::Path_MineCar*>(map.TLV_From_Offset_Lvl_Cam(pState->field_4C_tlvInfo).GetTlv());

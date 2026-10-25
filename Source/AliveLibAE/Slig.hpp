@@ -217,7 +217,7 @@ public:
         AnimId::Slig_LiftDown,
         AnimId::Slig_Beat};
 
-    Slig(relive::Path_Slig* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    Slig(relive::Path_Slig* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~Slig();
 
     void LoadAnimations();
@@ -249,7 +249,7 @@ public:
                 ALIVE_FATAL("Invalid motion type %d", static_cast<s32>(motionType));
         }
     }
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
     static s16 IsAbeEnteringDoor(BaseAliveGameObject* pThis);
 
     bool vUnderGlukkonCommand_4B1760();
@@ -470,7 +470,7 @@ private:
     eSligMotions field_294_next_gamespeak_motion = eSligMotions::Motion_0_StandIdle;
 };
 
-void Animation_OnFrame_Slig(BaseGameObject* pObj, u32&, const IndexedPoint& point, ResourceManagerWrapper& resMan, BaseMap& map);
+void Animation_OnFrame_Slig(BaseGameObject* pObj, u32&, const IndexedPoint& point, ResourceManager& resMan, BaseMap& map);
 void Slig_SoundEffect(SligSfx effect, BaseAliveGameObject* pObj);
 
 void renderWithGlowingEyes(OrderingTable& ot, BaseAliveGameObject* actor);

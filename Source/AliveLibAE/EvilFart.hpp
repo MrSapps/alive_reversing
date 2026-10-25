@@ -46,14 +46,14 @@ struct EvilFartSaveState final : public SaveStateBase
 class EvilFart final : public BaseAliveGameObject
 {
 public:
-    EvilFart(ResourceManagerWrapper& resMan, BaseMap& map);
+    EvilFart(ResourceManager& resMan, BaseMap& map);
 
     virtual void VUpdate() override;
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
     virtual void VPossessed() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
 
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
 private:
     void InputControlFart();

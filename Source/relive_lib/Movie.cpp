@@ -17,6 +17,8 @@
 #include "Renderer/IRenderer.hpp"
 #include "data_conversion/rgb_conversion.hpp"
 #include "data_conversion/file_system.hpp"
+#include "data_conversion/DDVAe.hpp"
+#include "data_conversion/PsxStrDemuxer.hpp"
 
 #include <numeric>
 #include <cstring>
@@ -385,16 +387,42 @@ const u32 MOVIE_SKIPPER_GAMEPAD_INPUTS = (InputCommands::eUnPause_OrConfirm | In
         bool mInitialized = false;
     };
 
-    class WebmMoviePlayer final
+    // Where a movie's packets, pictures and sound come from: the HD webm, or one of the game's own
+    // movie files. The pipeline asks for packets on one thread and decodes them on others.
+    class IMoviePlayer
     {
     public:
-        WebmMoviePlayer() = default;
+        virtual ~IMoviePlayer() = default;
+
+        virtual bool Open(const char_type* pMovieName) = 0;
+        // Reads the headers, false if it can't be played
+        virtual bool Parse() = 0;
+        virtual bool DemuxNext(MkvEncodedPacket& packet) = 0;
+        virtual bool DecodeVideo(const MkvEncodedPacket& packet, MkvVideoFrame& frame) = 0;
+        virtual bool DecodeAudio(const MkvEncodedPacket& packet, std::vector<u8>& pcmOut) = 0;
+        virtual int VideoTrackNumber() const = 0;
+        virtual u32 Width() const = 0;
+        virtual u32 Height() const = 0;
+        virtual bool HasAudio() const = 0;
+        virtual u32 AudioSampleRate() const = 0;
+        virtual u32 AudioChannels() const = 0;
+        virtual u32 AudioBitsPerSample() const = 0;
+    };
+
+    class WebmMoviePlayer final : public IMoviePlayer
+    {
+    public:
+        explicit WebmMoviePlayer(FileSystem& fs)
+            : mFs(fs)
+        {
+        }
+
         ~WebmMoviePlayer()
         {
             Cleanup();
         }
 
-        bool Open(const char_type* pMovieName)
+        bool Open(const char_type* pMovieName) override
         {
             Cleanup();
 
@@ -423,7 +451,7 @@ const u32 MOVIE_SKIPPER_GAMEPAD_INPUTS = (InputCommands::eUnPause_OrConfirm | In
             return false;
         }
 
-        bool DemuxNext(MkvEncodedPacket& packet)
+        bool DemuxNext(MkvEncodedPacket& packet) override
         {
             packet = {};
             if (!mSegment || mParsingComplete)
@@ -527,22 +555,22 @@ const u32 MOVIE_SKIPPER_GAMEPAD_INPUTS = (InputCommands::eUnPause_OrConfirm | In
             return mParsingComplete;
         }
 
-        int VideoTrackNumber() const
+        int VideoTrackNumber() const override
         {
             return mVideoTrackNumber;
         }
 
-        u32 Width() const
+        u32 Width() const override
         {
             return mWidth;
         }
 
-        u32 Height() const
+        u32 Height() const override
         {
             return mHeight;
         }
 
-        bool Parse()
+        bool Parse() override
         {
             if (!mSegment)
             {
@@ -622,27 +650,27 @@ const u32 MOVIE_SKIPPER_GAMEPAD_INPUTS = (InputCommands::eUnPause_OrConfirm | In
             return true;
         }
 
-        u32 AudioSampleRate() const
+        u32 AudioSampleRate() const override
         {
             return mAudioSampleRate;
         }
 
-        u32 AudioChannels() const
+        u32 AudioChannels() const override
         {
             return mAudioChannels;
         }
 
-        u32 AudioBitsPerSample() const
+        u32 AudioBitsPerSample() const override
         {
             return mAudioBitsPerSample;
         }
 
-        bool HasAudio() const
+        bool HasAudio() const override
         {
             return mAudioTrack != nullptr;
         }
 
-        bool DecodeVideo(const MkvEncodedPacket& packet, MkvVideoFrame& frame)
+        bool DecodeVideo(const MkvEncodedPacket& packet, MkvVideoFrame& frame) override
         {
             frame.mPtsNs = packet.mPtsNs;
             frame.mFileOffset = packet.mFileOffset;
@@ -653,7 +681,7 @@ const u32 MOVIE_SKIPPER_GAMEPAD_INPUTS = (InputCommands::eUnPause_OrConfirm | In
         // size isn't knowable up front the way a fixed-format PCM passthrough's is. Non-Vorbis
         // (legacy raw A_PCM) files are passed straight through unchanged for backwards
         // compatibility with any webm converted before Vorbis audio was added.
-        bool DecodeAudio(const MkvEncodedPacket& packet, std::vector<u8>& pcmOut)
+        bool DecodeAudio(const MkvEncodedPacket& packet, std::vector<u8>& pcmOut) override
         {
             pcmOut.clear();
             if (packet.mPayload.empty())
@@ -673,8 +701,7 @@ const u32 MOVIE_SKIPPER_GAMEPAD_INPUTS = (InputCommands::eUnPause_OrConfirm | In
     private:
         bool TryOpenFile(const std::string& path)
         {
-            FileSystem fs;
-            mMovieFile = fs.OpenFile(path.c_str(), "rb");
+            mMovieFile = mFs.OpenFile(path.c_str(), "rb");
             if (!mMovieFile.GetFile())
             {
                 return false;
@@ -765,6 +792,7 @@ const u32 MOVIE_SKIPPER_GAMEPAD_INPUTS = (InputCommands::eUnPause_OrConfirm | In
             mHeight = 240;
         }
 
+        FileSystem& mFs;
         AutoFILE mMovieFile;
         std::unique_ptr<mkvparser::MkvReader> mReader;
         std::unique_ptr<mkvparser::Segment> mSegment;
@@ -788,6 +816,187 @@ const u32 MOVIE_SKIPPER_GAMEPAD_INPUTS = (InputCommands::eUnPause_OrConfirm | In
         bool mIsVorbisAudio = false;
     };
 
+    // Plays one of the game's own movie files: AE's DDV, or AO's PSX STR (also named .DDV). Which one
+    // it is can be told from the first bytes. The pictures and sound are decoded as the file is
+    // demuxed, so a "packet" here already holds the frame's RGBA pixels or its PCM.
+    class LegacyMoviePlayer final : public IMoviePlayer
+    {
+    public:
+        explicit LegacyMoviePlayer(FileSystem& fs)
+            : mFs(fs)
+        {
+        }
+
+        bool Open(const char_type* pMovieName) override
+        {
+            if (!pMovieName || !*pMovieName)
+            {
+                return false;
+            }
+
+            u32 magic = 0;
+            {
+                AutoFILE file = mFs.OpenFile(pMovieName, "rb");
+                if (!file.GetFile() || fread(&magic, sizeof(magic), 1, file.GetFile()) != 1)
+                {
+                    return false;
+                }
+            }
+
+            // A DDV starts with "DDV", a PSX STR with the sector marker of its first sector
+            const u32 kDdvMagic = 0x564444;
+            if (magic == kDdvMagic)
+            {
+                mSource = std::make_unique<relive::DDVAe>(mFs, pMovieName, nullptr);
+            }
+            else
+            {
+                mSource = std::make_unique<relive::PsxStrDemuxer>(mFs, pMovieName);
+            }
+            return true;
+        }
+
+        bool Parse() override
+        {
+            if (!mSource || !mSource->ReadInfo())
+            {
+                return false;
+            }
+
+            mAudioSampleRate = mSource->AudioSampleRate();
+            mAudioChannels = mSource->AudioChannels();
+            mAudioBitsPerSample = mSource->AudioBitsPerSample();
+            mHasAudio = mAudioSampleRate > 0 && mAudioChannels > 0 && mAudioBitsPerSample == 16;
+
+            // A PSX STR has no header, the size is the first picture's. It is kept for the first
+            // DemuxNext.
+            if (mSource->FrameWidth() > 0 && mSource->FrameHeight() > 0)
+            {
+                mWidth = mSource->FrameWidth();
+                mHeight = mSource->FrameHeight();
+            }
+            else
+            {
+                mHaveStepped = true;
+                mHaveFrame = mSource->StepFrame();
+                if (!mHaveFrame)
+                {
+                    return false;
+                }
+                mWidth = mSource->FrameWidth();
+                mHeight = mSource->FrameHeight();
+            }
+            return mWidth > 0 && mHeight > 0;
+        }
+
+        bool DemuxNext(MkvEncodedPacket& packet) override
+        {
+            packet = {};
+            if (mAudioPending)
+            {
+                packet = std::move(mPendingAudioPacket);
+                mAudioPending = false;
+                return true;
+            }
+
+            if (!mHaveStepped)
+            {
+                mHaveFrame = mSource->StepFrame();
+            }
+            mHaveStepped = false;
+            if (!mHaveFrame)
+            {
+                return false;
+            }
+
+            // The pictures are 15 per second, and the sound is counted in samples so it can't drift
+            packet.mPtsNs = static_cast<u64>(mFrameIndex) * 1000000000ULL / kFrameRate;
+            packet.mFileOffset = static_cast<long long>(mFrameIndex);
+            packet.mTrackNumber = kVideoTrack;
+            ComposeFrame(packet.mPayload);
+
+            std::vector<u8> audio = mSource->GetAudioFrames();
+            if (mHasAudio && !audio.empty())
+            {
+                const u32 blockAlign = (mAudioBitsPerSample / 8u) * mAudioChannels;
+                mPendingAudioPacket = {};
+                mPendingAudioPacket.mPtsNs = mAudioSamples * 1000000000ULL / mAudioSampleRate;
+                mPendingAudioPacket.mFileOffset = static_cast<long long>(mFrameIndex);
+                mPendingAudioPacket.mTrackNumber = kAudioTrack;
+                mAudioSamples += audio.size() / blockAlign;
+                mPendingAudioPacket.mPayload = std::move(audio);
+                mAudioPending = true;
+            }
+
+            mFrameIndex++;
+            return true;
+        }
+
+        bool DecodeVideo(const MkvEncodedPacket& packet, MkvVideoFrame& frame) override
+        {
+            frame.mPtsNs = packet.mPtsNs;
+            frame.mFileOffset = packet.mFileOffset;
+            frame.mPixels = packet.mPayload;
+            return !frame.mPixels.empty();
+        }
+
+        bool DecodeAudio(const MkvEncodedPacket& packet, std::vector<u8>& pcmOut) override
+        {
+            pcmOut = packet.mPayload;
+            return !pcmOut.empty();
+        }
+
+        int VideoTrackNumber() const override { return kVideoTrack; }
+        u32 Width() const override { return mWidth; }
+        u32 Height() const override { return mHeight; }
+        bool HasAudio() const override { return mHasAudio; }
+        u32 AudioSampleRate() const override { return mAudioSampleRate; }
+        u32 AudioChannels() const override { return mAudioChannels; }
+        u32 AudioBitsPerSample() const override { return mAudioBitsPerSample; }
+
+    private:
+        static constexpr int kVideoTrack = 1;
+        static constexpr int kAudioTrack = 2;
+        static constexpr u64 kFrameRate = 15;
+
+        // Some PSX STR movies change size part way through. The picture is the size of the first
+        // frame, a different one is put in its top left corner (or cut to fit).
+        void ComposeFrame(std::vector<u8>& out) const
+        {
+            const std::vector<u8>& src = mSource->GetPixels();
+            const u32 srcW = mSource->FrameWidth();
+            const u32 srcH = mSource->FrameHeight();
+            if (srcW == mWidth && srcH == mHeight)
+            {
+                out = src;
+                return;
+            }
+
+            out.assign(static_cast<size_t>(mWidth) * mHeight * sizeof(u32), 0);
+            const u32 copyW = std::min(srcW, mWidth);
+            const u32 copyH = std::min(srcH, mHeight);
+            for (u32 y = 0; y < copyH; ++y)
+            {
+                std::memcpy(out.data() + static_cast<size_t>(y) * mWidth * sizeof(u32), src.data() + static_cast<size_t>(y) * srcW * sizeof(u32), static_cast<size_t>(copyW) * sizeof(u32));
+            }
+        }
+
+        FileSystem& mFs;
+        std::unique_ptr<relive::IFmvSource> mSource;
+        bool mHaveStepped = false;
+        bool mHaveFrame = false;
+        bool mAudioPending = false;
+        MkvEncodedPacket mPendingAudioPacket;
+        u32 mFrameIndex = 0;
+        u64 mAudioSamples = 0;
+        bool mHasAudio = false;
+        u32 mWidth = 640;
+        u32 mHeight = 240;
+        u32 mAudioSampleRate = 0;
+        u32 mAudioChannels = 0;
+        u32 mAudioBitsPerSample = 0;
+    };
+
     using MkvPacketQueue = AVQueue<MkvEncodedPacket, 128u>;
     using MkvVideoQueue = AVQueue<MkvVideoFrame, kMaxBufferedVideoFrames + 1u>;
     using MkvAudioQueue = AVQueue<MkvAudioChunk, 128u>;
@@ -795,7 +1004,7 @@ const u32 MOVIE_SKIPPER_GAMEPAD_INPUTS = (InputCommands::eUnPause_OrConfirm | In
     class MkvMoviePipeline final
     {
     public:
-        MkvMoviePipeline(WebmMoviePlayer& movie, MkvVideoQueue& videoQueue, MkvAudioQueue& audioQueue)
+        MkvMoviePipeline(IMoviePlayer& movie, MkvVideoQueue& videoQueue, MkvAudioQueue& audioQueue)
             : mMovie(movie)
             , mVideoQueue(videoQueue)
             , mAudioQueue(audioQueue)
@@ -902,7 +1111,7 @@ const u32 MOVIE_SKIPPER_GAMEPAD_INPUTS = (InputCommands::eUnPause_OrConfirm | In
             mAudioComplete = true;
         }
 
-        WebmMoviePlayer& mMovie;
+        IMoviePlayer& mMovie;
         MkvVideoQueue& mVideoQueue;
         MkvAudioQueue& mAudioQueue;
         MkvPacketQueue mVideoPackets;
@@ -952,8 +1161,9 @@ static void Render_DDV_Frame(Poly_FT4* poly)
 class MoviePlayback final
 {
 public:
-    explicit MoviePlayback(const std::string& name)
+    MoviePlayback(const std::string& name, FileSystem& fs)
         : mName(name)
+        , mFs(fs)
     {
     }
 
@@ -983,7 +1193,16 @@ public:
     // Returns false if the movie can't be played.
     bool Open()
     {
-        if (!mMovie.Open(mName.c_str()) || !mMovie.Parse())
+        // A webm (the HD movie) is played if there is one, if not the game's own file
+        if (IsWebmName(mName))
+        {
+            mMovie = std::make_unique<WebmMoviePlayer>(mFs);
+        }
+        else
+        {
+            mMovie = std::make_unique<LegacyMoviePlayer>(mFs);
+        }
+        if (!mMovie->Open(mName.c_str()) || !mMovie->Parse())
         {
             return false;
         }
@@ -992,30 +1211,30 @@ public:
         LOG_INFO("FMV playback %s: started", mName.c_str());
         mLastDisplayUpdateMs = SYS_GetTicks();
 
-        mHasAudio = mMovie.HasAudio();
+        mHasAudio = mMovie->HasAudio();
         SDLSoundSystem* pSound = SDLSoundSystem::Get();
-        if (mHasAudio && pSound && mMovie.AudioBitsPerSample() == 16)
+        if (mHasAudio && pSound && mMovie->AudioBitsPerSample() == 16)
         {
-            mAudioStream = pSound->CreateStream(mMovie.AudioSampleRate(), mMovie.AudioChannels(), std::max<u32>(mMovie.AudioSampleRate() * 4u, 4096u));
+            mAudioStream = pSound->CreateStream(mMovie->AudioSampleRate(), mMovie->AudioChannels(), std::max<u32>(mMovie->AudioSampleRate() * 4u, 4096u));
         }
         else
         {
             mNoAudioOrAudioError = true;
         }
 
-        mFmvFrame.mData.mWidth = mMovie.Width();
-        mFmvFrame.mData.mHeight = mMovie.Height();
+        mFmvFrame.mData.mWidth = mMovie->Width();
+        mFmvFrame.mData.mHeight = mMovie->Height();
         mFmvFrame.mData.mPixels = std::make_shared<std::vector<u8>>();
         mFmvFrame.mData.mPixels->resize(mFmvFrame.mData.mWidth * mFmvFrame.mData.mHeight * sizeof(RGBA32));
 
         mPoly.SetXYWH(0, 0, 640, 240);
         mPoly.mCam = &mFmvFrame;
 
-        mBlockAlign = (mMovie.AudioBitsPerSample() / 8u) * mMovie.AudioChannels();
-        mAudioBufferSamples = std::max<u32>(mMovie.AudioSampleRate() * 4u, 4096u);
+        mBlockAlign = (mMovie->AudioBitsPerSample() / 8u) * mMovie->AudioChannels();
+        mAudioBufferSamples = std::max<u32>(mMovie->AudioSampleRate() * 4u, 4096u);
         mAudioFinished = !mHasAudio || mNoAudioOrAudioError;
 
-        mPipeline = std::make_unique<MkvMoviePipeline>(mMovie, mVideoQueue, mAudioQueue);
+        mPipeline = std::make_unique<MkvMoviePipeline>(*mMovie, mVideoQueue, mAudioQueue);
         return true;
     }
 
@@ -1049,6 +1268,18 @@ public:
     }
 
 private:
+    static bool IsWebmName(const std::string& name)
+    {
+        const std::string::size_type dot = name.find_last_of('.');
+        if (dot == std::string::npos)
+        {
+            return true;
+        }
+        std::string ext = name.substr(dot);
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return ext == ".webm" || ext == ".mkv";
+    }
+
     enum class StepResult
     {
         eContinue,
@@ -1231,7 +1462,7 @@ private:
                 mPendingAudioChunks.pop_front();
             }
 
-            if (!mAudioStarted && (mAudioSamplesSubmitted >= mMovie.AudioSampleRate() / 5u || mPipeline->AudioComplete()))
+            if (!mAudioStarted && (mAudioSamplesSubmitted >= mMovie->AudioSampleRate() / 5u || mPipeline->AudioComplete()))
             {
                 mAudioStream->Start();
                 // The sound starts at the mixer's position, which is ahead of the device by what's
@@ -1244,7 +1475,7 @@ private:
 
         // AudioSamplesPlayed counts at the device's rate, the submitted samples at the movie's
         if (mAudioStarted && !mAudioFinished && mPipeline->AudioComplete() && mPendingAudioChunks.empty()
-            && AudioSamplesPlayed() * mMovie.AudioSampleRate() / SDLSoundSystem::Get()->GetDeviceSampleRate() >= mAudioSamplesSubmitted)
+            && AudioSamplesPlayed() * mMovie->AudioSampleRate() / SDLSoundSystem::Get()->GetDeviceSampleRate() >= mAudioSamplesSubmitted)
         {
             SND_StopAll();
             mAudioStream->Stop();
@@ -1297,7 +1528,8 @@ private:
     const std::string mName;
     bool mOpened = false;
 
-    WebmMoviePlayer mMovie;
+    FileSystem& mFs;
+    std::unique_ptr<IMoviePlayer> mMovie;
     MkvVideoQueue mVideoQueue;
     MkvAudioQueue mAudioQueue;
     // Decodes into the queues above on its own threads, so it's declared after them
@@ -1351,8 +1583,9 @@ void Movie::Init()
     ++Movie::gMovieRefCount;
 }
 
-Movie::Movie(const char_type* pName, ResourceManagerWrapper& resMan, BaseMap& map)
+Movie::Movie(const char_type* pName, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
+    , mFs(resMan.Fs())
 {
     mName = resMan.FmvPath(pName);
     Init();
@@ -1391,7 +1624,7 @@ ModalState Movie::VModalUpdate()
             return ModalState::eRunning;
         }
 
-        mPlayback = std::make_unique<MoviePlayback>(mName);
+        mPlayback = std::make_unique<MoviePlayback>(mName, mFs);
         if (!mPlayback->Open())
         {
             Finish();

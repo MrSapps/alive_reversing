@@ -294,7 +294,7 @@ void FontContext::UseFontSheet(const PalResource& pal)
     }
 }
 
-void FontContext::LoadFontType(FontType resourceID, ResourceManagerWrapper& resMan)
+void FontContext::LoadFontType(FontType resourceID, ResourceManager& resMan)
 {
     if (resourceID == FontType::Debug)
     {

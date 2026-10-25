@@ -16,7 +16,7 @@ namespace AO {
 class Claw final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    Claw(ResourceManagerWrapper& resMan, BaseMap& map);
+    Claw(ResourceManager& resMan, BaseMap& map);
 
     void VScreenChanged() override;
 };
@@ -56,7 +56,7 @@ struct SecurityClawSaveState final : public SaveStateBase
 class SecurityClaw final : public ::BaseAliveGameObject
 {
 public:
-    SecurityClaw(relive::Path_SecurityClaw* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    SecurityClaw(relive::Path_SecurityClaw* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~SecurityClaw();
 
     void LoadAnimations();
@@ -66,7 +66,7 @@ public:
     virtual void VUpdate() override;
     virtual void VOnThrowableHit(BaseGameObject* pFrom) override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
     Guid mTlvInfo;
     SecurityClawStates mState = SecurityClawStates::eInit_0;

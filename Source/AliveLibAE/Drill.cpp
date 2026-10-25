@@ -51,7 +51,7 @@ void Drill::LoadAnimations()
     }
 }
 
-Drill::Drill(relive::Path_Drill* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Drill::Drill(relive::Path_Drill* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map),
     mTlvInfo(tlvId)
 {
@@ -225,7 +225,7 @@ Drill::Drill(relive::Path_Drill* pTlv, const Guid& tlvId, ResourceManagerWrapper
     CreateShadow();
 }
 
-void Drill::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
+void Drill::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pData.ReadTmpPtr<DrillSaveState>();
     auto pTlv = static_cast<relive::Path_Drill*>(map.TLV_From_Offset_Lvl_Cam(pState->mDrillTlvId).GetTlv());

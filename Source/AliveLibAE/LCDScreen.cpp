@@ -159,7 +159,7 @@ public:
 };
 static LCDMessages gLCDMessages;
 
-LCDScreen::LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+LCDScreen::LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     mBaseGameObjectTlvInfo = tlvId;
@@ -368,7 +368,7 @@ void LCDScreen::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void LCDScreen::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void LCDScreen::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<LCDScreenSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);

@@ -1,14 +1,16 @@
 #include "SpritePageWriter.hpp"
 #include "PNGFile.hpp"
-#include "../ResourceManagerWrapper.hpp"
+#include "../ResourceManager.hpp"
 #include "../SpriteAtlasPacker.hpp"
 #include "../SpriteMask.hpp"
 #include "../logger.hpp"
+#include "ConversionProgress.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
+#include <functional>
 #include <map>
 #include <tuple>
 
@@ -254,12 +256,29 @@ static void RemoveOldPages(const PageLayer& layer, const LayerFiles& files)
     }
 }
 
-u32 SpritePageWriter::Repack(FileSystem& fs, const FileSystem::Path& dataDir, u32 pageSize)
+u32 SpritePageWriter::Repack(FileSystem& fs, const FileSystem::Path& dataDir, u32 pageSize, ConversionProgress* progress)
 {
-    return Repack(fs, std::vector<std::string>{dataDir.GetPath()}, pageSize);
+    // Whatever way Repack returns, all of its units are reported
+    u32 reported = 0;
+    const auto reportUpTo = [&](u32 units)
+    {
+        if (progress && units > reported)
+        {
+            progress->AddCompleted(ConversionCategory::SpritePages, units - reported);
+            reported = units;
+        }
+    };
+    const u32 pages = RepackLayers(fs, std::vector<std::string>{dataDir.GetPath()}, pageSize, reportUpTo);
+    reportUpTo(kProgressUnits);
+    return pages;
 }
 
 u32 SpritePageWriter::Repack(FileSystem& fs, const std::vector<std::string>& layers, u32 pageSize)
+{
+    return RepackLayers(fs, layers, pageSize, [](u32) {});
+}
+
+u32 SpritePageWriter::RepackLayers(FileSystem& fs, const std::vector<std::string>& layers, u32 pageSize, const std::function<void(u32)>& reportUpTo)
 {
     const auto startTime = std::chrono::steady_clock::now();
     const auto secondsSince = [](std::chrono::steady_clock::time_point since)
@@ -336,6 +355,7 @@ u32 SpritePageWriter::Repack(FileSystem& fs, const std::vector<std::string>& lay
     const auto packTime = std::chrono::steady_clock::now();
     const SpriteAtlasPacker::Result packed = SpriteAtlasPacker::Pack(items, pageSize);
     const double packSeconds = secondsSince(packTime);
+    reportUpTo(10);
 
     // How big each page has to be
     struct Page final
@@ -366,6 +386,13 @@ u32 SpritePageWriter::Repack(FileSystem& fs, const std::vector<std::string>& lay
             page.mFirstGroup = sheets[i].mGroup;
         }
     }
+
+    std::size_t placedSheets = 0;
+    for (const SpriteAtlasPacker::Placement& placement : packed.mPlacements)
+    {
+        placedSheets += placement.mPage != SpriteAtlasPacker::kNoPage ? 1 : 0;
+    }
+    std::size_t sheetsWritten = 0;
 
     std::error_code error;
     std::filesystem::create_directories(outputLayer.mPages, error);
@@ -398,6 +425,8 @@ u32 SpritePageWriter::Repack(FileSystem& fs, const std::vector<std::string>& lay
             }
 
             const RepackSheet& sheet = sheets[i];
+            sheetsWritten++;
+            reportUpTo(10 + 90 * sheetsWritten / std::max<std::size_t>(placedSheets, 1));
             std::vector<u8> sheetRgba;
             std::vector<u8> sheetMask;
             u32 sheetWidth = 0;

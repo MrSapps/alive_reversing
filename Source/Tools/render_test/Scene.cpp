@@ -5,7 +5,7 @@
 #include "../../AliveLibAE/PsxRender.hpp"
 #include <cctype>
 
-TextDrawer::TextDrawer(ResourceManagerWrapper& resMan)
+TextDrawer::TextDrawer(ResourceManager& resMan)
 {
     mFontContext.LoadFontType(FontType::Debug, resMan);
 

@@ -21,7 +21,7 @@ enum class BellHammerStates : u16
 class BellHammer final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    BellHammer(relive::Path_BellHammer* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    BellHammer(relive::Path_BellHammer* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~BellHammer();
 
     void LoadAnimations();
@@ -35,7 +35,7 @@ public:
     bool mSpawnElum = false;
 
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 };
 
 // mSwitchId and position are derived once from the TLV in the constructor

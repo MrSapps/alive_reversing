@@ -23,7 +23,7 @@ namespace AO {
 
 PauseMenu* gPauseMenu = nullptr;
 
-PauseMenu::PauseMenu(ResourceManagerWrapper& resMan, BaseMap& map)
+PauseMenu::PauseMenu(ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::ePauseMenu);

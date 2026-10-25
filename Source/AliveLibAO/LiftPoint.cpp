@@ -104,7 +104,7 @@ void LiftPoint::LoadAnimations()
     }
 }
 
-LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : PlatformBase(resMan, map)
 {
     mBaseGameObjectTlvInfo = tlvId;
@@ -788,7 +788,7 @@ void LiftPoint::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void LiftPoint::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
+void LiftPoint::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pData.ReadTmpPtr<LiftPointSaveState>();
 

@@ -11,7 +11,7 @@
 #include "Path.hpp"
 #include "QuikSave.hpp"
 
-SligSpawner::SligSpawner(relive::Path_Slig* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+SligSpawner::SligSpawner(relive::Path_Slig* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eSligSpawner);
@@ -136,7 +136,7 @@ void SligSpawner::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void SligSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void SligSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<SligSpawnerSaveState>();
     auto pTlv = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv<relive::Path_Slig>();

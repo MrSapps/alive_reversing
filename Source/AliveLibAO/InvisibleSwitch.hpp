@@ -24,13 +24,13 @@ struct InvisibleSwitchSaveState final : public SaveStateBase
 class InvisibleSwitch final : public BaseGameObject
 {
 public:
-    InvisibleSwitch(relive::Path_InvisibleSwitch* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    InvisibleSwitch(relive::Path_InvisibleSwitch* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~InvisibleSwitch();
 
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
 private:
     bool IsAbeUsingDoor() const;

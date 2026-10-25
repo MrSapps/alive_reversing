@@ -22,7 +22,7 @@ static DoorFlame* sFlameControllingTheSound = nullptr;
 class FireBackgroundGlow final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    FireBackgroundGlow(FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan, BaseMap& map)
+    FireBackgroundGlow(FP xpos, FP ypos, FP scale, ResourceManager& resMan, BaseMap& map)
         : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
     {
         SetType(ReliveTypes::eNone);
@@ -123,7 +123,7 @@ ALIVE_ASSERT_SIZEOF(FlameSpark, 0x84);
 class FlameSparks final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    FlameSparks(FP xpos, FP ypos, ResourceManagerWrapper& resMan, BaseMap& map)
+    FlameSparks(FP xpos, FP ypos, ResourceManager& resMan, BaseMap& map)
         : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
     {
         SetType(ReliveTypes::eNone);
@@ -264,7 +264,7 @@ public:
     FP mStartYPos;
 };
 
-DoorFlame::DoorFlame(relive::Path_DoorFlame* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+DoorFlame::DoorFlame(relive::Path_DoorFlame* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eNone);

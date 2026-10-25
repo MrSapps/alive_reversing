@@ -13,7 +13,7 @@ public:
     // targetId is a BaseAliveGameObject, sweepIndex the sweep of its animation's SpriteFx to use.
     // Sweeps with higher indices are over the ones before. addToUpdateList: the object is updated
     // by the game loop (and so has an update delay) rather than by whoever made it.
-    PalleteOverwriter(const Guid& targetId, u32 sweepIndex, u32 kind, u8 r, u8 g, u8 b, bool addToUpdateList, ResourceManagerWrapper& resMan, BaseMap& map);
+    PalleteOverwriter(const Guid& targetId, u32 sweepIndex, u32 kind, u8 r, u8 g, u8 b, bool addToUpdateList, ResourceManager& resMan, BaseMap& map);
     ~PalleteOverwriter();
 
     virtual void VScreenChanged() override;

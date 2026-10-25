@@ -37,7 +37,7 @@ static const TintEntry kClawTints[3] = {
     {EReliveLevelIds::eStockYardsReturn, 80u, 55u, 55u},
     {EReliveLevelIds::eNone, 127u, 127u, 127u}};
 
-Claw::Claw(ResourceManagerWrapper& resMan, BaseMap& map)
+Claw::Claw(ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eClawOrBirdPortalTerminator);
@@ -60,7 +60,7 @@ void SecurityClaw::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Security_Claw_Lower_Close));
 }
 
-SecurityClaw::SecurityClaw(relive::Path_SecurityClaw* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+SecurityClaw::SecurityClaw(relive::Path_SecurityClaw* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : ::BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eSecurityClaw);
@@ -468,7 +468,7 @@ void SecurityClaw::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void SecurityClaw::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void SecurityClaw::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<SecurityClawSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);

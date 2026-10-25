@@ -9,7 +9,7 @@
 #include "PsxRender.hpp"
 #include "GameAutoPlayer.hpp"
 #include "../relive_lib/IniFile.hpp"
-#include "../relive_lib/ResourceManagerWrapper.hpp"
+#include "../relive_lib/ResourceManager.hpp"
 #include <sstream>
 #include <algorithm>
 #include <cmath>
@@ -655,7 +655,7 @@ static void ResetIniBindings(s32 gamepad)
     }
 }
 
-static void NewParseSettingsIni(ResourceManagerWrapper& resMan)
+static void NewParseSettingsIni(ResourceManager& resMan)
 {
     const std::string iniText = resMan.LoadSettingsIniText();
     std::vector<u8> iniBuffer(iniText.begin(), iniText.end());
@@ -717,7 +717,7 @@ static void AddBinding(IniFile::Section& section, const char_type* name, const c
     }
 }
 
-void Input_SaveSettingsIni_Common(ResourceManagerWrapper& resMan)
+void Input_SaveSettingsIni_Common(ResourceManager& resMan)
 {
     s32 prevJoyState = sJoystickEnabled;
 
@@ -766,12 +766,12 @@ void Input_SaveSettingsIni_Common(ResourceManagerWrapper& resMan)
     Input_Init_Names_491870();
 }
 
-void Input_SaveSettingsIni_492840(ResourceManagerWrapper& resMan)
+void Input_SaveSettingsIni_492840(ResourceManager& resMan)
 {
     Input_SaveSettingsIni_Common(resMan);
 }
 
-static void Input_LoadSettingsIni_492D40(ResourceManagerWrapper& resMan)
+static void Input_LoadSettingsIni_492D40(ResourceManager& resMan)
 {
     NewParseSettingsIni(resMan);
 }
@@ -1168,7 +1168,7 @@ void Input_InitJoyStick_460080()
     SDL_free(joysticks);
 }
 
-void Input_Init(ResourceManagerWrapper& resMan)
+void Input_Init(ResourceManager& resMan)
 {
     // This seems so stupid
     strncpy(sGamePadStr_555708, sGamePadStr_55E85C, 32u);

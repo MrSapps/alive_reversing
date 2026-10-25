@@ -23,7 +23,7 @@
 
 #include <algorithm>
 
-AirExplosion::AirExplosion(FP xpos, FP ypos, FP explosionScale, bool bSmall, ResourceManagerWrapper& resMan, BaseMap& map)
+AirExplosion::AirExplosion(FP xpos, FP ypos, FP explosionScale, bool bSmall, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map),
     mExplosionScale(explosionScale),
     mSmallExplosion(bSmall)

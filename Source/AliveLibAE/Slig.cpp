@@ -87,7 +87,7 @@ void Slig_SoundEffect(SligSfx effect, BaseAliveGameObject* pObj)
     }
 }
 
-void Animation_OnFrame_Slig(BaseGameObject* pObj, u32&, const IndexedPoint& point, ResourceManagerWrapper& resMan, BaseMap& /*map*/)
+void Animation_OnFrame_Slig(BaseGameObject* pObj, u32&, const IndexedPoint& point, ResourceManager& resMan, BaseMap& /*map*/)
 {
     auto pSlig = reinterpret_cast<Slig*>(pObj);
 
@@ -312,7 +312,7 @@ void Slig::LoadAnimations()
     }
 }
 
-Slig::Slig(relive::Path_Slig* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Slig::Slig(relive::Path_Slig* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(17, resMan, map)
 {
     if (tlvId.IsValid())
@@ -596,7 +596,7 @@ void Slig::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void Slig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void Slig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<SligSaveState>();
     auto pTlv = map.TLV_From_Offset_Lvl_Cam(pState->field_5C_tlvInfo).GetTlv<relive::Path_Slig>();

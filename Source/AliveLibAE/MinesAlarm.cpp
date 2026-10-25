@@ -11,7 +11,7 @@
 static bool sAlarmExists = false;
 s32 gExplosionTimer = 0;
 
-void MinesAlarm::Create(s32 timer, ResourceManagerWrapper& resMan, BaseMap& map)
+void MinesAlarm::Create(s32 timer, ResourceManager& resMan, BaseMap& map)
 {
     if (!sAlarmExists)
     {
@@ -19,13 +19,13 @@ void MinesAlarm::Create(s32 timer, ResourceManagerWrapper& resMan, BaseMap& map)
     }
 }
 
-void MinesAlarm::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void MinesAlarm::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<MinesAlarmSaveState>();
     relive_new MinesAlarm(pState->mExplosionTimer, resMan, map);
 }
 
-MinesAlarm::MinesAlarm(s32 timer, ResourceManagerWrapper& resMan, BaseMap& map)
+MinesAlarm::MinesAlarm(s32 timer, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eMinesAlarm);

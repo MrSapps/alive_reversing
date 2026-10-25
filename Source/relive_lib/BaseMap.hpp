@@ -11,7 +11,7 @@
 class Guid;
 struct PSX_RECT;
 class Camera;
-class ResourceManagerWrapper;
+class ResourceManager;
 class Particle;
 class BaseAnimatedWithPhysicsGameObject;
 class BaseGameObject;
@@ -117,7 +117,7 @@ public:
 
     // --- Construction ---
 
-    explicit BaseMap(ResourceManagerWrapper& resMan, relive::Factory& factory)
+    explicit BaseMap(ResourceManager& resMan, relive::Factory& factory)
         : mResourceManager(resMan)
         , mFactory(factory)
     {
@@ -131,7 +131,7 @@ public:
 
     // --- Simple queries ---
 
-    ResourceManagerWrapper& GetResourceManager()
+    ResourceManager& GetResourceManager()
     {
         return mResourceManager;
     }
@@ -352,7 +352,7 @@ protected:
     };
     ScreenChangeResume mScreenChangeResume = ScreenChangeResume::eNone;
 
-    ResourceManagerWrapper& mResourceManager;
+    ResourceManager& mResourceManager;
     relive::Factory& mFactory;
     u32 mSoundChannelsMask = 0;
 

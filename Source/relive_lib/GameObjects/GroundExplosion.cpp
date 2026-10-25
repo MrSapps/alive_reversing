@@ -13,7 +13,7 @@
 #include "../GameType.hpp"
 #include "../../AliveLibAO/Midi.hpp"
 
-GroundExplosion::GroundExplosion(FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan, BaseMap& map)
+GroundExplosion::GroundExplosion(FP xpos, FP ypos, FP scale, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eGroundExplosion);

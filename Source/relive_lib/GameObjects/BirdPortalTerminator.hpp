@@ -5,7 +5,7 @@
 class BirdPortalTerminator final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    BirdPortalTerminator(FP xpos, FP ypos, FP scale, relive::Path_BirdPortal::PortalType portalType, ResourceManagerWrapper& resMan, BaseMap& map);
+    BirdPortalTerminator(FP xpos, FP ypos, FP scale, relive::Path_BirdPortal::PortalType portalType, ResourceManager& resMan, BaseMap& map);
 
     void LoadAnimations();
 

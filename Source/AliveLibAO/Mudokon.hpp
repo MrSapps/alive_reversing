@@ -234,7 +234,7 @@ public:
         AnimId::Mudokon_PoisonGasDeath,
         AnimId::None};
 
-    Mudokon(relive::Path_TLV* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    Mudokon(relive::Path_TLV* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~Mudokon();
 
     void LoadAnimations();
@@ -247,7 +247,7 @@ public:
     virtual void VScreenChanged() override;
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
     virtual void VUpdateResBlock();
     virtual s16 VGetMotion(eMotionType motionType) override

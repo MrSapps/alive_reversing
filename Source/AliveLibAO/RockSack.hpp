@@ -34,7 +34,7 @@ struct RockSackSaveState final : public SaveStateBase
 class RockSack final : public ::BaseAliveGameObject
 {
 public:
-    RockSack(relive::Path_RockSack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    RockSack(relive::Path_RockSack* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~RockSack();
 
     void LoadAnimations();
@@ -42,7 +42,7 @@ public:
     virtual void VScreenChanged() override;
     virtual void VUpdate() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
 private:
     Guid mTlvId;

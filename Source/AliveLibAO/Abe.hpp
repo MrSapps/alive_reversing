@@ -435,7 +435,7 @@ class Abe final : public BaseAbe
 {
 public:
     // Pends everything a new Abe needs, which the menus wait for before making him
-    static void PendResources(ResourceManagerWrapper& resMan);
+    static void PendResources(ResourceManager& resMan);
 
     static constexpr AnimId sAbeMotionAnimIds[166] = {
         AnimId::Mudokon_Idle,
@@ -609,7 +609,7 @@ public:
 
     void LoadAnimations();
 
-    Abe(ResourceManagerWrapper& resMan, BaseMap& map);
+    Abe(ResourceManager& resMan, BaseMap& map);
     ~Abe();
 
     virtual void VUpdate() override;
@@ -622,8 +622,8 @@ public:
 
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
     void GetSaveState(AbeSaveState& pSaveState);
-    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map);
-    static void CreateFromSaveState(const AbeSaveState& pData, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
+    static void CreateFromSaveState(const AbeSaveState& pData, ResourceManager& resMan, BaseMap& map);
     virtual s16 VGetMotion(eMotionType motionType) override
     {
         switch (motionType)

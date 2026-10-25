@@ -14,11 +14,11 @@ namespace AO {
 class HoistParticle final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    HoistParticle(FP xpos, FP ypos, FP scale, AnimId animId, ResourceManagerWrapper& resMan, BaseMap& map);
+    HoistParticle(FP xpos, FP ypos, FP scale, AnimId animId, ResourceManager& resMan, BaseMap& map);
 
     virtual void VUpdate() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
     bool mHitGround = false;
 
@@ -56,13 +56,13 @@ struct HoistParticleSaveState final : public SaveStateBase
 class HoistRocksEffect final : public ::BaseGameObject
 {
 public:
-    HoistRocksEffect(relive::Path_Hoist* pTlv, const Guid& tlvInfo, ResourceManagerWrapper& resMan, BaseMap& map);
+    HoistRocksEffect(relive::Path_Hoist* pTlv, const Guid& tlvInfo, ResourceManager& resMan, BaseMap& map);
     ~HoistRocksEffect();
 
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
     FP mTlvXPos = {};
     FP mTlvYPos = {};

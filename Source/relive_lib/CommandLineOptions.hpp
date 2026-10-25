@@ -15,6 +15,9 @@ struct CommandLineOptions final
     bool mShowHelp = false;
     // -convert: convert the game data if it's out of date, without a window, then exit
     bool mConvertOnly = false;
+    // -encode_webm: the data conversion encodes the movies to AV1/Vorbis webm instead of copying the
+    // game's own files
+    bool mEncodeWebm = false;
 
     // AE/-AE or AO/-AO. nullopt if neither is given, or if both are (which is logged).
     std::optional<GameType> mGame;

@@ -16,7 +16,7 @@ namespace AO {
 class Bat final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    Bat(relive::Path_Bat* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    Bat(relive::Path_Bat* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~Bat();
     
     void LoadAnimations();
@@ -49,7 +49,7 @@ public:
     Guid mAttackTarget = {};
 
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 };
 
 // mAttackTarget is deliberately not persisted - it's a transient "who am I

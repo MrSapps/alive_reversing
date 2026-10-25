@@ -8,7 +8,7 @@ namespace AO {
 class BellSong final : public ::BaseGameObject
 {
 public:
-    BellSong(relive::Path_BellsongStone::BellsongTypes type, u32 code, ResourceManagerWrapper& resMan, BaseMap& map);
+    BellSong(relive::Path_BellsongStone::BellsongTypes type, u32 code, ResourceManager& resMan, BaseMap& map);
 
     virtual void VUpdate() override;
 

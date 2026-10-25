@@ -110,7 +110,7 @@ void FlyingSlig::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Vaporize_Particle));
 }
 
-FlyingSlig::FlyingSlig(relive::Path_FlyingSlig* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+FlyingSlig::FlyingSlig(relive::Path_FlyingSlig* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(9, resMan, map)
 {
     LoadAnimations();
@@ -227,7 +227,7 @@ FlyingSlig::FlyingSlig(relive::Path_FlyingSlig* pTlv, const Guid& tlvId, Resourc
     CreateShadow();
 }
 
-void FlyingSlig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void FlyingSlig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pSaveState = pBuffer.ReadTmpPtr<FlyingSligSaveState>();
 

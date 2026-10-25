@@ -6,7 +6,7 @@
 #include "DisplaySettings.hpp"
 
 class BaseMap;
-class ResourceManagerWrapper;
+class ResourceManager;
 class Window;
 
 enum class MessageBoxType
@@ -34,7 +34,7 @@ public:
     // resMan saves the display settings when the F9-F12 hotkeys change them, and reloads the
     // input settings when a joystick is plugged in. Events of pathReloadEventType carry a
     // path JSON file name the editor changed (see the Engine's IPC listener).
-    Sys(Window& window, ResourceManagerWrapper& resMan, u32 pathReloadEventType);
+    Sys(Window& window, ResourceManager& resMan, u32 pathReloadEventType);
 
     Sys(const Sys&) = delete;
     Sys& operator=(const Sys&) = delete;
@@ -67,7 +67,7 @@ private:
     void DisplaySettingsChanged();
 
     Window& mWindow;
-    ResourceManagerWrapper& mResMan;
+    ResourceManager& mResMan;
     const u32 mPathReloadEventType;
     DisplaySettings mDisplaySettings;
     bool mQuitConfirmed = false;

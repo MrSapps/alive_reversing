@@ -27,7 +27,7 @@
 
 namespace AO {
 
-BirdPortal::BirdPortal(relive::Path_BirdPortal* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+BirdPortal::BirdPortal(relive::Path_BirdPortal* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : IBirdPortal(resMan, map)
 {
     mPortalType = pTlv->mPortalType;
@@ -770,7 +770,7 @@ void BirdPortal::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void BirdPortal::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void BirdPortal::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pSaveState = pBuffer.ReadTmpPtr<BirdPortalSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pSaveState->mTlvInfo);

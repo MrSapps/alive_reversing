@@ -12,7 +12,7 @@ Camera::~Camera()
 
 }
 
-void Camera::CreateFG1(ResourceManagerWrapper& resMan, BaseMap& map)
+void Camera::CreateFG1(ResourceManager& resMan, BaseMap& map)
 {
     Fg1Resource fg1Res = resMan.LoadFg1(mLevel, mPath, mCameraNumber);
     if (fg1Res.Any())

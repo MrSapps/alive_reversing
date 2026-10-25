@@ -16,7 +16,7 @@
 #include "../../relive_lib/Engine.hpp"
 #include "BaseMap.hpp"
 
-Spark::Spark(FP xpos, FP ypos, FP scale, s32 count, s32 minAngle, s32 maxAngle, SparkType type, ResourceManagerWrapper& resMan, BaseMap& map)
+Spark::Spark(FP xpos, FP ypos, FP scale, s32 count, s32 minAngle, s32 maxAngle, SparkType type, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetDrawable(true);

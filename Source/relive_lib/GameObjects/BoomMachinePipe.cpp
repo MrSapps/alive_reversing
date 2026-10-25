@@ -4,7 +4,7 @@
 #include "ThrowableArray.hpp"
 #include "Sfx.hpp"
 
-BoomMachinePipe::BoomMachinePipe(FP xpos, FP ypos, FP scale, s16 numGrenades, ResourceManagerWrapper& resMan, BaseMap& map)
+BoomMachinePipe::BoomMachinePipe(FP xpos, FP ypos, FP scale, s16 numGrenades, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     LoadAnimations();

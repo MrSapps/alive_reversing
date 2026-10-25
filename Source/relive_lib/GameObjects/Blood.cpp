@@ -14,7 +14,7 @@
 #undef min
 #undef max
 
-Blood::Blood(FP xpos, FP ypos, FP xOff, FP yOff, FP scale, s32 count, ResourceManagerWrapper& resMan, BaseMap& map)
+Blood::Blood(FP xpos, FP ypos, FP xOff, FP yOff, FP scale, s32 count, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map),
     mTotalBloodCount(count),
     mCurrentBloodCount(count),

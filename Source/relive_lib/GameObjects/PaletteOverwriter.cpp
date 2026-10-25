@@ -3,7 +3,7 @@
 #include "../ObjectIds.hpp"
 #include "../Animation.hpp"
 
-PalleteOverwriter::PalleteOverwriter(const Guid& targetId, u32 sweepIndex, u32 kind, u8 r, u8 g, u8 b, bool addToUpdateList, ResourceManagerWrapper& resMan, BaseMap& map)
+PalleteOverwriter::PalleteOverwriter(const Guid& targetId, u32 sweepIndex, u32 kind, u8 r, u8 g, u8 b, bool addToUpdateList, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(addToUpdateList, 0, resMan, map), mTargetId(targetId), mSweepIndex(sweepIndex), mKind(kind), mR(r), mG(g), mB(b)
 {
     SetType(ReliveTypes::ePalOverwriter);

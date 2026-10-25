@@ -16,7 +16,7 @@ static constexpr u8 kMaxFadeSteps = 31;
 // What a step of the fade takes from every channel: one bit of a 5 bit channel
 static constexpr f32 kFadeStep = 8.0f / 255.0f;
 
-InvisibleEffect::InvisibleEffect(BaseAliveGameObject* pTarget, ResourceManagerWrapper& resMan, BaseMap& map)
+InvisibleEffect::InvisibleEffect(BaseAliveGameObject* pTarget, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
      SetType(ReliveTypes::eInvisibleEffect);

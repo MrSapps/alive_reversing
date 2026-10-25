@@ -22,6 +22,7 @@ enum class ConversionCategory : u8
 {
     Paths,
     Animations,
+    SpritePages,
     Cameras,
     Misc,
     Fmvs,
@@ -42,9 +43,8 @@ struct InProgressItem final
 class ConversionProgress final
 {
 public:
-    // Weights sum to 1.0: paths 10%, animations 20%, cameras 15%, misc (palettes/
-    // saves/fonts/demos) 5%, fmvs 50% - fmvs dominate since they take by far the
-    // longest to convert.
+    // Weights sum to 1.0: paths 15%, animations 30%, sprite pages 10%, cameras 30%, misc
+    // (palettes/saves/fonts/demos) 5%, fmvs 10% - the fmvs are copied, not encoded, so they are quick.
     static float CategoryWeight(ConversionCategory cat);
 
     void AddToTotal(ConversionCategory cat, u32 amount);

@@ -11,7 +11,7 @@ s16 gCreditsControllerExists = false;
 
 constexpr s32 kShowCreditScreenForTicks = 60;
 
-CreditsController::CreditsController(relive::Path_CreditsController* /*pTlv*/, const Guid& /*tlvId*/, ResourceManagerWrapper& resMan, BaseMap& map)
+CreditsController::CreditsController(relive::Path_CreditsController* /*pTlv*/, const Guid& /*tlvId*/, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     mCurrentCamera = mMap.mCurrentCamera;

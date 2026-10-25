@@ -30,7 +30,7 @@ void BaseAnimatedWithPhysicsGameObject::FreeArray()
     gObjListDrawables = nullptr;
 }
 
-BaseAnimatedWithPhysicsGameObject::BaseAnimatedWithPhysicsGameObject(s16 resourceArraySize, ResourceManagerWrapper& resMan, BaseMap& map)
+BaseAnimatedWithPhysicsGameObject::BaseAnimatedWithPhysicsGameObject(s16 resourceArraySize, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, resourceArraySize, resMan, map)
 {
     mDoPurpleLightEffect = false;

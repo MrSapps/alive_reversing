@@ -7,7 +7,7 @@
 #include "../../AliveLibAE/PathData.hpp"
 #include "../FatalError.hpp"
 #include "../Collisions.hpp"
-#include "../ResourceManagerWrapper.hpp"
+#include "../ResourceManager.hpp"
 
 #include "relive_tlvs.hpp"
 
@@ -5246,5 +5246,5 @@ private:
     s32 ConvertObjectSaveStateData(nlohmann::json& j, AETypes type, u32 pathOffset, const u8* pData);
 
     // This tool runs standalone, without a game engine instance, so it owns its own resource manager.
-    ResourceManagerWrapper mResMan;
+    ResourceManager mResMan;
 };

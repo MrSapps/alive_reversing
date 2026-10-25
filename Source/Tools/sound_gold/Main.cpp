@@ -7,7 +7,7 @@
 #include "../../relive_lib/CommandLineParser.hpp"
 #include "../../relive_lib/GameType.hpp"
 #include "../../relive_lib/BinaryPath.hpp"
-#include "../../relive_lib/ResourceManagerWrapper.hpp"
+#include "../../relive_lib/ResourceManager.hpp"
 #include "../../relive_lib/Sound/SoundGold.hpp"
 #include "../../relive_lib/Sound/Midi.hpp"
 #include "../../relive_lib/Sound/GameSound.hpp"
@@ -88,10 +88,10 @@ struct Options final
 };
 
 // Plays one item in a new session so each result stands alone
-static void RenderItem(const Options& options, ResourceManagerWrapper& resMan, const std::string& theme, const std::string& name,
+static void RenderItem(const Options& options, ResourceManager& resMan, const std::string& theme, const std::string& name,
     const std::function<void(SoundGoldSession&)>& play)
 {
-    const ResourceManagerWrapper::SoundThemeInfo& themeInfo = resMan.LoadSoundThemeInfo(theme);
+    const ResourceManager::SoundThemeInfo& themeInfo = resMan.LoadSoundThemeInfo(theme);
     auto info = std::make_shared<PathSoundInfo>();
     info->mVhFile = themeInfo.mVhFile;
     info->mVbFile = themeInfo.mVbFile;
@@ -110,7 +110,7 @@ static void RenderItem(const Options& options, ResourceManagerWrapper& resMan, c
     printf("  %s: %.1f s\n", name.c_str(), static_cast<f64>(session.Audio().size()) / 44100.0);
 }
 
-static void RenderTheme(const Options& options, ResourceManagerWrapper& resMan, const std::string& theme)
+static void RenderTheme(const Options& options, ResourceManager& resMan, const std::string& theme)
 {
     printf("%s\n", theme.c_str());
 
@@ -165,7 +165,7 @@ static void RenderTheme(const Options& options, ResourceManagerWrapper& resMan, 
 
 // Plays a RELIVE_SOUND_RECORD recording on the PS1 sound code (the recorded VAB, SEQ and voice ids are
 // mapped to the ones this run gets)
-static s32 Replay(const Options& options, ResourceManagerWrapper& resMan, const std::string& recPath)
+static s32 Replay(const Options& options, ResourceManager& resMan, const std::string& recPath)
 {
     std::ifstream in(recPath);
     if (!in)
@@ -244,7 +244,7 @@ static s32 Replay(const Options& options, ResourceManagerWrapper& resMan, const 
             std::string vb;
             ss >> id >> theme >> vh >> vb;
             auto info = std::make_shared<PathSoundInfo>();
-            const ResourceManagerWrapper::SoundThemeInfo& themeInfo = resMan.LoadSoundThemeInfo(theme);
+            const ResourceManager::SoundThemeInfo& themeInfo = resMan.LoadSoundThemeInfo(theme);
             info->mVhFile = vh;
             info->mVbFile = vb;
             info->mSeqFiles = themeInfo.mSeqFiles;
@@ -467,7 +467,7 @@ s32 main(s32 argc, char_type** argv)
     std::sort(themes.begin(), themes.end());
 
     FileSystem fs;
-    ResourceManagerWrapper resMan(fs, "");
+    ResourceManager resMan(fs, "");
     if (const std::optional<std::string> replay = args.GetValue("-replay"))
     {
         return Replay(options, resMan, *replay);

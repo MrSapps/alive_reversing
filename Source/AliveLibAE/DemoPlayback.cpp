@@ -8,7 +8,7 @@
 DemoPlayback* gActiveDemoPlayback = nullptr;
 char_type gActiveDemoName[32];
 
-DemoPlayback::DemoPlayback(ResourceManagerWrapper& resMan, BaseMap& map)
+DemoPlayback::DemoPlayback(ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     if (gActiveDemoPlayback)

@@ -4,7 +4,7 @@
 
 
 #include "../../relive_lib/Function.hpp"
-#include "../../relive_lib/ResourceManagerWrapper.hpp"
+#include "../../relive_lib/ResourceManager.hpp"
 
 #include "file_system.hpp"
 #include "RoundUp.hpp"
@@ -74,7 +74,7 @@ ALIVE_ASSERT_SIZEOF_ALWAYS(ResourceHeader, 16);
 class LvlFileChunk final
 {
 public:
-    LvlFileChunk(u32 id, ResourceManagerWrapper::ResourceType resType, std::vector<u8>&& data)
+    LvlFileChunk(u32 id, ResourceManager::ResourceType resType, std::vector<u8>&& data)
         : mData(std::move(data))
     {
         mHeader.field_0_size = static_cast<u32>(mData.size());
@@ -186,7 +186,7 @@ public:
         bool hasEndChunkAtEnd = false;
         if (!mChunks.empty())
         {
-            if (mChunks[mChunks.size() - 1].Header().mResourceType == ResourceManagerWrapper::Resource_End)
+            if (mChunks[mChunks.size() - 1].Header().mResourceType == ResourceManager::Resource_End)
             {
                 hasEndChunkAtEnd = true;
             }
@@ -268,9 +268,9 @@ private:
                 s.Read(tmpData);
             }
 
-            mChunks.emplace_back(resHeader.field_C_id, static_cast<ResourceManagerWrapper::ResourceType>(resHeader.mResourceType), std::move(tmpData));
+            mChunks.emplace_back(resHeader.field_C_id, static_cast<ResourceManager::ResourceType>(resHeader.mResourceType), std::move(tmpData));
 
-            if (resHeader.mResourceType == ResourceManagerWrapper::ResourceType::Resource_End)
+            if (resHeader.mResourceType == ResourceManager::ResourceType::Resource_End)
             {
                 break;
             }

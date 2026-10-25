@@ -31,7 +31,7 @@ void LaughingGas::ResetRandomSeed()
     random_seed = 0;
 }
 
-LaughingGas::LaughingGas(Layer layer, relive::Path_LaughingGas* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+LaughingGas::LaughingGas(Layer layer, relive::Path_LaughingGas* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     gLaughingGasInstanceCount++;

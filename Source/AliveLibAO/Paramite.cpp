@@ -61,7 +61,7 @@ const TParamiteMotionFunction sParamiteMotionTable[] = {
     &Paramite::Motion_25_Death,
 };
 
-Paramite::Paramite(relive::Path_Paramite* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Paramite::Paramite(relive::Path_Paramite* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : ::BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eParamite);
@@ -2579,7 +2579,7 @@ void Paramite::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void Paramite::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void Paramite::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<ParamiteSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);

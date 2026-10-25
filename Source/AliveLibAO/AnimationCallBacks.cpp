@@ -16,7 +16,7 @@
 
 namespace AO {
 
-void Animation_OnFrame_Slig(::BaseGameObject* pObj, u32&, const IndexedPoint& pData, ResourceManagerWrapper& resMan, BaseMap& map)
+void Animation_OnFrame_Slig(::BaseGameObject* pObj, u32&, const IndexedPoint& pData, ResourceManager& resMan, BaseMap& map)
 {
     auto pSlig = static_cast<Slig*>(pObj);
     if (pSlig->UpdateDelay() != 0)
@@ -101,9 +101,9 @@ void Animation_OnFrame_Slig(::BaseGameObject* pObj, u32&, const IndexedPoint& pD
     Dove::All_FlyAway(false);
 }
 
-void Animation_OnFrame_ZBallSmacker(::BaseGameObject* pObj, u32& idx, const IndexedPoint& pData, ResourceManagerWrapper& resMan, BaseMap& map);
+void Animation_OnFrame_ZBallSmacker(::BaseGameObject* pObj, u32& idx, const IndexedPoint& pData, ResourceManager& resMan, BaseMap& map);
 
-void Slog_OnFrame(::BaseGameObject* pObj, u32&, const IndexedPoint& pData, ResourceManagerWrapper& resMan, BaseMap& map)
+void Slog_OnFrame(::BaseGameObject* pObj, u32&, const IndexedPoint& pData, ResourceManager& resMan, BaseMap& map)
 {
     auto pSlog = static_cast<Slog*>(pObj);
 
@@ -156,7 +156,7 @@ static const FP_Point sThrowVelocities[6] = {
     {FP_FromInteger(10), FP_FromInteger(-4)},
     {FP_FromInteger(4), FP_FromInteger(-3)}};
 
-void Abe_OnFrame(::BaseGameObject* pObj, u32&, const IndexedPoint& pData, ResourceManagerWrapper& /*resMan*/, BaseMap& /*map*/)
+void Abe_OnFrame(::BaseGameObject* pObj, u32&, const IndexedPoint& pData, ResourceManager& /*resMan*/, BaseMap& /*map*/)
 {
     auto pAbe = static_cast<Abe*>(pObj);
 

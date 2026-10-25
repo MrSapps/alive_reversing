@@ -11,7 +11,7 @@
 #include "../GameType.hpp"
 #include "BaseMap.hpp"
 
-AbilityRing* AbilityRing::Factory(FP xpos, FP ypos, RingTypes ringType, FP scale, ResourceManagerWrapper& resMan, BaseMap& map)
+AbilityRing* AbilityRing::Factory(FP xpos, FP ypos, RingTypes ringType, FP scale, ResourceManager& resMan, BaseMap& map)
 {
     return relive_new AbilityRing(xpos, ypos, ringType, scale, resMan, map);
 }
@@ -30,7 +30,7 @@ static s32 MinDistance(s32 screenX, s32 screenY, s32 width1, s32 height1, s32 wi
     }
 }
 
-AbilityRing::AbilityRing(FP xpos, FP ypos, RingTypes ringType, FP scale, ResourceManagerWrapper& resMan, BaseMap& map)
+AbilityRing::AbilityRing(FP xpos, FP ypos, RingTypes ringType, FP scale, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map),
     mRingXPos(xpos),
     mRingYPos(ypos)
@@ -567,7 +567,7 @@ void AbilityRing::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void AbilityRing::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void AbilityRing::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<AbilityRingSaveState>();
     auto pRing = relive_new AbilityRing(pState->mRingXPos, pState->mRingYPos, pState->mRingType, pState->mRingScale, resMan, map);

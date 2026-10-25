@@ -74,7 +74,7 @@ void UXB::PlaySFX(relive::SoundEffects sfxIdx)
     }
 }
 
-UXB::UXB(relive::Path_UXB* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+UXB::UXB(relive::Path_UXB* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eUXB);
@@ -523,7 +523,7 @@ void UXB::VGetSaveState(SerializedObjectData& __pSaveBuffer)
     __pSaveBuffer.Write(data);
 }
 
-void UXB::CreateFromSaveState(SerializedObjectData& __pSaveState, ResourceManagerWrapper& resMan, BaseMap& map)
+void UXB::CreateFromSaveState(SerializedObjectData& __pSaveState, ResourceManager& resMan, BaseMap& map)
 {
     const auto pSaveState = __pSaveState.ReadTmpPtr<UXBSaveState>();
 

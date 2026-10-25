@@ -78,7 +78,7 @@ void SlamDoor::LoadAnimations()
     }
 }
 
-SlamDoor::SlamDoor(relive::Path_SlamDoor* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+SlamDoor::SlamDoor(relive::Path_SlamDoor* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map)
 {
     LoadAnimations();
@@ -441,7 +441,7 @@ void SlamDoor::ClearInsideSlamDoor(BaseAliveGameObject* pObj, s16 xPosition, s16
     }
 }
 
-void SlamDoor::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
+void SlamDoor::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
 {
     const auto pSaveState = pData.ReadTmpPtr<SlamDoorSaveState>();
 

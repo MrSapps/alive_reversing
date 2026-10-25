@@ -6,7 +6,7 @@
 class BackgroundAnimation final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    BackgroundAnimation(relive::Path_BackgroundAnimation* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    BackgroundAnimation(relive::Path_BackgroundAnimation* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~BackgroundAnimation();
 
     virtual void VScreenChanged() override;

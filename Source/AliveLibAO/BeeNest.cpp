@@ -12,7 +12,7 @@
 
 namespace AO {
 
-BeeNest::BeeNest(relive::Path_BeeNest* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+BeeNest::BeeNest(relive::Path_BeeNest* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eBeeNest);
@@ -101,7 +101,7 @@ void BeeNest::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void BeeNest::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void BeeNest::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<BeeNestSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);

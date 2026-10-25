@@ -318,7 +318,7 @@ public:
         AnimId::Fleech_DeathByFalling,
         AnimId::Fleech_SleepingWithTongue,
         AnimId::Fleech_Consume};
-    Fleech(relive::Path_Fleech* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    Fleech(relive::Path_Fleech* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~Fleech();
     
     void LoadAnimations();
@@ -331,7 +331,7 @@ public:
     virtual void VOnTrapDoorOpen() override;
     virtual void VOnThrowableHit(BaseGameObject* pFrom) override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
     virtual s16 VGetMotion(eMotionType motionType) override
     {
         switch (motionType)
@@ -478,4 +478,4 @@ private:
     eFleechMotions mNextMotion = eFleechMotions::Motion_0_Sleeping;
 };
 
-void Animation_OnFrame_Fleech(BaseGameObject* pObj, u32&, const IndexedPoint&, ResourceManagerWrapper& resMan, BaseMap& map);
+void Animation_OnFrame_Fleech(BaseGameObject* pObj, u32&, const IndexedPoint&, ResourceManager& resMan, BaseMap& map);

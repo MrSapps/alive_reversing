@@ -112,7 +112,7 @@ std::vector<u8> Ps1SoundData::ReadFile(const std::string& fileName) const
 
 std::vector<u8> Ps1SoundData::ReadSeq(const std::string& seqName, const std::string& vhFile) const
 {
-    const u32 id = static_cast<u32>(ResourceManagerWrapper::SEQ_HashName(seqName.c_str()));
+    const u32 id = static_cast<u32>(ResourceManager::SEQ_HashName(seqName.c_str()));
 
     // The LVL that holds the VH goes first, then every other
     std::string firstLvl;
@@ -155,7 +155,7 @@ std::vector<u8> Ps1SoundData::ReadSeq(const std::string& seqName, const std::str
         for (u32 i = 0; i < bsq.ChunkCount(); i++)
         {
             const LvlFileChunk& chunk = bsq.ChunkAt(i);
-            if (chunk.Header().mResourceType == ResourceManagerWrapper::Resource_Seq && chunk.Id() == id)
+            if (chunk.Header().mResourceType == ResourceManager::Resource_Seq && chunk.Id() == id)
             {
                 return chunk.Data();
             }

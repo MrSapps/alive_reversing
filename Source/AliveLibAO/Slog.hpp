@@ -136,8 +136,8 @@ public:
         AnimId::Slog_Scratch,
         AnimId::Slog_Growl};
 
-    Slog(relive::Path_Slog* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
-    Slog(FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan, BaseMap& map);
+    Slog(relive::Path_Slog* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
+    Slog(FP xpos, FP ypos, FP scale, ResourceManager& resMan, BaseMap& map);
     ~Slog();
 
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
@@ -147,7 +147,7 @@ public:
     virtual void VOnTrapDoorOpen() override;
     virtual void VUpdate() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
     virtual s16 VGetMotion(eMotionType motionType) override
     {
         switch (motionType)

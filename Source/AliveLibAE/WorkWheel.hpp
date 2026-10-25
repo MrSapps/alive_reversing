@@ -35,11 +35,11 @@ public:
     virtual void VStartTurning();
     virtual void VStopTurning(s16 bResetSwitch);
 
-    WorkWheel(relive::Path_WorkWheel* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    WorkWheel(relive::Path_WorkWheel* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~WorkWheel();
 
 public:
-    static void CreateFromSaveState(SerializedObjectData& pState, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pState, ResourceManager& resMan, BaseMap& map);
 
 private:
     Guid mTlvInfo;

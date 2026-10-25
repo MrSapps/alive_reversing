@@ -12,7 +12,7 @@
 static GasEmitter* sMainGasEmitter = nullptr;
 static u32 sGasEmitterAudioMask = 0;
 
-GasEmitter::GasEmitter(relive::Path_GasEmitter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+GasEmitter::GasEmitter(relive::Path_GasEmitter* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eNone);

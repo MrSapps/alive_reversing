@@ -27,7 +27,7 @@ const static PSX_Pos16 sRollingBallShakerScreenOffsets[18] = {
     {0, -1},
     {0, 0}};
 
-RollingBallShaker::RollingBallShaker(ResourceManagerWrapper& resMan, BaseMap& map)
+RollingBallShaker::RollingBallShaker(ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetDrawable(true);

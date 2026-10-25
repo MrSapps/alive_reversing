@@ -27,14 +27,14 @@ struct DoorLightSaveState final : public SaveStateBase
 class DoorLight final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    DoorLight(relive::Path_LightEffect* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    DoorLight(relive::Path_LightEffect* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~DoorLight();
 
     virtual void VScreenChanged() override;
     virtual void VUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
 public:
     Guid mTlvId;

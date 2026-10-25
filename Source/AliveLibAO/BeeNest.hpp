@@ -25,7 +25,7 @@ class BeeSwarm;
 class BeeNest final : public ::BaseGameObject
 {
 public:
-    BeeNest(relive::Path_BeeNest* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    BeeNest(relive::Path_BeeNest* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~BeeNest();
 
     virtual void VScreenChanged() override;
@@ -42,7 +42,7 @@ public:
     Guid mBeeSwarm = {};
 
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 };
 
 // mBeeSwarmX/Y, mSwitchId, mSwarmSize, mTotalChaseTime and mSpeed are all

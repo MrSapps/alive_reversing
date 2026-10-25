@@ -15,7 +15,7 @@ void StatusLight::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Status_Light_Red));
 }
 
-StatusLight::StatusLight(relive::Path_StatusLight* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+StatusLight::StatusLight(relive::Path_StatusLight* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     LoadAnimations();

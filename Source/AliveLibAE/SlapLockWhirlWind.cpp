@@ -11,14 +11,14 @@
 #include "Path.hpp"
 #include "QuikSave.hpp"
 
-void SlapLockWhirlWind::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& /*resMan*/, BaseMap& /*map*/)
+void SlapLockWhirlWind::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& /*resMan*/, BaseMap& /*map*/)
 {
     const auto pSaveState = pBuffer.ReadTmpPtr<SlapLockWhirlWindSaveState>();
     
     SwitchStates_Do_Operation(pSaveState->mSwitchId, relive::reliveSwitchOp::eSetTrue);
 }
 
-SlapLockWhirlWind::SlapLockWhirlWind(s16 doorNumber, s16 switchId, FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan, BaseMap& map)
+SlapLockWhirlWind::SlapLockWhirlWind(s16 doorNumber, s16 switchId, FP xpos, FP ypos, FP scale, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eSlapLock_OrbWhirlWind);

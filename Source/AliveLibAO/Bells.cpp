@@ -20,7 +20,7 @@ void Bells::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::SmallChime_Moving));
 }
 
-Bells::Bells(BellSize bellType, FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan, BaseMap& map)
+Bells::Bells(BellSize bellType, FP xpos, FP ypos, FP scale, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetCanExplode(false);

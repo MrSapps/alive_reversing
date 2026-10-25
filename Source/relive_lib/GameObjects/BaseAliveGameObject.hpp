@@ -17,7 +17,7 @@ class BaseAliveGameObject : public BaseAnimatedWithPhysicsGameObject
 public:
     using BaseAnimatedWithPhysicsGameObject::BaseAnimatedWithPhysicsGameObject;
 
-    explicit BaseAliveGameObject(s16 resourceArraySize, ResourceManagerWrapper& resMan, BaseMap& map);
+    explicit BaseAliveGameObject(s16 resourceArraySize, ResourceManager& resMan, BaseMap& map);
     ~BaseAliveGameObject();
 
 

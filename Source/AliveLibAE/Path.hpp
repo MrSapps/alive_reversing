@@ -8,7 +8,7 @@
 #include "../relive_lib/BasePath.hpp"
 #include "../relive_lib/Psx.hpp"
 
-class ResourceManagerWrapper;
+class ResourceManager;
 class Map;
 
 namespace relive

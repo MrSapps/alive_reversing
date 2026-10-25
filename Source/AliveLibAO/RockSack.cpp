@@ -25,7 +25,7 @@ void RockSack::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::RockSack_HardHit));
 }
 
-RockSack::RockSack(relive::Path_RockSack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+RockSack::RockSack(relive::Path_RockSack* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : ::BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eRockSack);
@@ -204,7 +204,7 @@ void RockSack::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void RockSack::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void RockSack::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<RockSackSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);

@@ -11,7 +11,7 @@
 u8 gTotalMeterBars = 0;
 bool gbDrawMeterCountDown = false;
 
-ColourfulMeter::ColourfulMeter(relive::Path_ColourfulMeter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+ColourfulMeter::ColourfulMeter(relive::Path_ColourfulMeter* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map),
     mTlvInfo(tlvId),
     mTlvX(pTlv->mTopLeftX),

@@ -11,7 +11,7 @@
 #include "../FatalError.hpp"
 #include "../AliveLibAE/QuikSave.hpp"
 
-IBirdPortal::IBirdPortal(ResourceManagerWrapper& resMan, BaseMap& map)
+IBirdPortal::IBirdPortal(ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
 

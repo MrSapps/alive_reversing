@@ -7,7 +7,7 @@
 #include "../../relive_lib/BinaryPath.hpp"
 #include "../../relive_lib/FatalError.hpp"
 #include "../Math.hpp"
-#include "../ResourceManagerWrapper.hpp"
+#include "../ResourceManager.hpp"
 #include "../AmbientSound.hpp"
 #include "../BaseMap.hpp"
 #include "../GameObjects/BackgroundMusic.hpp"
@@ -216,7 +216,7 @@ static void LoadVabBodyAO(PsxSoundEngine& engine, s32 vabId, const std::vector<u
     }
 }
 
-void GameSound::LoadVab(PathSoundInfo& info, ResourceManagerWrapper& resMan)
+void GameSound::LoadVab(PathSoundInfo& info, ResourceManager& resMan)
 {
     // The PS1's own data (-ps1_data), if it has this VAB. It has the PS1's tones and ADPCM samples
     const Ps1SoundData* pPs1Data = resMan.GetPs1SoundData();
@@ -276,7 +276,7 @@ void GameSound::LoadVab(PathSoundInfo& info, ResourceManagerWrapper& resMan)
     }
 }
 
-void GameSound::LoadVabs(std::shared_ptr<PathSoundInfo>& info, s32 reverb, ResourceManagerWrapper& resMan)
+void GameSound::LoadVabs(std::shared_ptr<PathSoundInfo>& info, s32 reverb, ResourceManager& resMan)
 {
     auto oldPtr = mLastLoadedSoundBlockInfo.lock();
     if (oldPtr.get() == info.get())
@@ -296,7 +296,7 @@ void GameSound::LoadVabs(std::shared_ptr<PathSoundInfo>& info, s32 reverb, Resou
     engine.SetReverbEnabled(true);
 }
 
-void GameSound::PendSoundFiles(const PathSoundInfo& info, ResourceManagerWrapper& resMan)
+void GameSound::PendSoundFiles(const PathSoundInfo& info, ResourceManager& resMan)
 {
     resMan.PendSoundFile(info.mVhFile, info.mSoundTheme);
     resMan.PendSoundFile(info.mVbFile, info.mSoundTheme);
@@ -306,7 +306,7 @@ void GameSound::PendSoundFiles(const PathSoundInfo& info, ResourceManagerWrapper
     }
 }
 
-void GameSound::LoadSeqs(OpenSeqHandle* pSeqTable, const PathSoundInfo& info, ResourceManagerWrapper& resMan)
+void GameSound::LoadSeqs(OpenSeqHandle* pSeqTable, const PathSoundInfo& info, ResourceManager& resMan)
 {
     if (!pSeqTable)
     {
@@ -321,7 +321,7 @@ void GameSound::LoadSeqs(OpenSeqHandle* pSeqTable, const PathSoundInfo& info, Re
         {
             mSeqTable[i].field_C_ppSeq_Data.clear();
             mSeqTable[i].field_A_id_seqOpenId = -1;
-            mSeqTable[i].field_4_generated_res_id = ResourceManagerWrapper::SEQ_HashName(mSeqTable[i].field_0_mBsqName);
+            mSeqTable[i].field_4_generated_res_id = ResourceManager::SEQ_HashName(mSeqTable[i].field_0_mBsqName);
         }
         mNeedToHashSeqNames = false;
     }
@@ -709,7 +709,7 @@ void SND_Reset()
     }
 }
 
-void SND_Pend_Sound_Files(const PathSoundInfo& info, ResourceManagerWrapper& resMan)
+void SND_Pend_Sound_Files(const PathSoundInfo& info, ResourceManager& resMan)
 {
     if (sGameSound)
     {
@@ -717,7 +717,7 @@ void SND_Pend_Sound_Files(const PathSoundInfo& info, ResourceManagerWrapper& res
     }
 }
 
-void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& info, s32 reverb, ResourceManagerWrapper& resMan)
+void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& info, s32 reverb, ResourceManager& resMan)
 {
     if (sGameSound)
     {
@@ -725,7 +725,7 @@ void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& info, s32 reverb, ResourceMan
     }
 }
 
-void SND_Load_Seqs(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& info, ResourceManagerWrapper& resMan)
+void SND_Load_Seqs(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& info, ResourceManager& resMan)
 {
     if (sGameSound)
     {

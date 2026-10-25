@@ -460,7 +460,7 @@ s8 Input_IsVKPressed(s32 key)
 // from the MainMenu class
 extern s32 gJoystickAvailable;
 
-void Input_Init(ResourceManagerWrapper& resMan)
+void Input_Init(ResourceManager& resMan)
 {
     ::Input_Init(resMan);
 
@@ -548,7 +548,7 @@ bool InputObject::IsJoyStickAvailable()
 
 u32 dword_508A64 = 0;
 
-s32 Input_SaveSettingsIni(ResourceManagerWrapper& resMan)
+s32 Input_SaveSettingsIni(ResourceManager& resMan)
 {
     // Call AE func both in standalone and DLL
     Input_SaveSettingsIni_Common(resMan);

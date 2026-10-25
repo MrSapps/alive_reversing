@@ -5,7 +5,7 @@
 #include "Abe.hpp"
 
 class BaseMap;
-class ResourceManagerWrapper;
+class ResourceManager;
 
 namespace AO {
 
@@ -57,11 +57,11 @@ public:
     // Restores per-object state (currently just Abe - see the Quicksave
     // comment above) then TLV bly flags. Named to match AE's own
     // QuikSave::RestoreBlyData, which does the same two-part job.
-    static void RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManager& resMan, BaseMap& map);
 
     // Checkpoint snapshot/respawn - see mRestartPath* fields above.
     static void SaveCheckpoint(BaseMap& map);
-    static void RestoreCheckpoint(ResourceManagerWrapper& resMan, BaseMap& map);
+    static void RestoreCheckpoint(ResourceManager& resMan, BaseMap& map);
 
 public:
     static Quicksave gActiveQuicksaveData;

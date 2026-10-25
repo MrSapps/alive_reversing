@@ -33,7 +33,7 @@ void Greeter::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Greeter_Falling));
 }
 
-Greeter::Greeter(relive::Path_Greeter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Greeter::Greeter(relive::Path_Greeter* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eGreeter);
@@ -110,7 +110,7 @@ Greeter::Greeter(relive::Path_Greeter* pTlv, const Guid& tlvId, ResourceManagerW
     mChasing = false;
 }
 
-void Greeter::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void Greeter::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<GreeterSaveState>();
     auto pTlv = static_cast<relive::Path_Greeter*>(map.TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv());

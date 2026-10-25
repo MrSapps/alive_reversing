@@ -15,7 +15,7 @@ namespace relive
 
 struct PathSoundInfo final
 {
-    // Populated at load time (ResourceManagerWrapper::LoadPaths) from sounds/<mSoundTheme>/
+    // Populated at load time (ResourceManager::LoadPaths) from sounds/<mSoundTheme>/
     // sound_info.json, not parsed directly out of this path's own path.json - every path
     // sharing a theme used to carry its own copy of these, so changing sound_theme without
     // also hand-updating them left them pointing at the previous theme's files.
@@ -25,7 +25,7 @@ struct PathSoundInfo final
 
     // Which sounds/<theme>/ directory mVhFile/mVbFile/mSeqFiles live in - not necessarily this
     // path's own level (see data_conversion.cpp's GetLevelIdFromPathId use for AE's combined
-    // "ender" levels). ResourceManagerWrapper::LoadSoundFile resolves against this instead of
+    // "ender" levels). ResourceManager::LoadSoundFile resolves against this instead of
     // the current level, so a mod can reference any theme, including the base game's.
     std::string mSoundTheme;
 

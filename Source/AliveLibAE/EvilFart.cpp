@@ -25,7 +25,7 @@ struct Colour final
 constexpr Colour greenFart = {32, 128, 32};
 constexpr Colour redFart = {128, 38, 32};
 
-EvilFart::EvilFart(ResourceManagerWrapper& resMan, BaseMap& map)
+EvilFart::EvilFart(ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eEvilFart);
@@ -86,7 +86,7 @@ EvilFart::EvilFart(ResourceManagerWrapper& resMan, BaseMap& map)
     mPossessedAliveTimer = 220;
 }
 
-void EvilFart::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void EvilFart::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<EvilFartSaveState>();
 

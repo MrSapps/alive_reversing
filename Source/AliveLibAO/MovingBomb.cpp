@@ -31,7 +31,7 @@ static const TintEntry kMovingBombTints[4] = {
 
 static MovingBomb* sMovingBomb = nullptr;
 
-MovingBomb::MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+MovingBomb::MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : ::BaseAliveGameObject(0, resMan, map)
 {
     SetCanExplode(true);
@@ -512,7 +512,7 @@ void MovingBomb::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void MovingBomb::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void MovingBomb::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<MovingBombSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);

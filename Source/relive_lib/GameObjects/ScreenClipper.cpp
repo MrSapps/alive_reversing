@@ -10,7 +10,7 @@
 
 #include <algorithm>
 
-ScreenClipper::ScreenClipper(PSX_Point xy, PSX_Point wh, Layer layer, ResourceManagerWrapper& resMan, BaseMap& map)
+ScreenClipper::ScreenClipper(PSX_Point xy, PSX_Point wh, Layer layer, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eScreenClipper);
