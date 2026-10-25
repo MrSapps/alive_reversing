@@ -18,7 +18,7 @@
 s16 gFeeco_Restart_KilledMudCount = 0;
 s16 gFeecoRestart_SavedMudCount = 0;
 
-void CreateGameEnderController(ResourceManagerWrapper& resMan, BaseMap& map)
+void CreateGameEnderController(ResourceManager& resMan, BaseMap& map)
 {
     // Exit if it already exists
     for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
@@ -40,7 +40,7 @@ void CreateGameEnderController(ResourceManagerWrapper& resMan, BaseMap& map)
 }
 
 
-void GameEnderController::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void GameEnderController::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     auto pState = pBuffer.ReadTmpPtr<GameEnderControllerSaveState>();
 
@@ -53,7 +53,7 @@ void GameEnderController::CreateFromSaveState(SerializedObjectData& pBuffer, Res
     }
 }
 
-GameEnderController::GameEnderController(ResourceManagerWrapper& resMan, BaseMap& map)
+GameEnderController::GameEnderController(ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eGameEnderController);

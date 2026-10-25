@@ -13,7 +13,7 @@
 class FileSystem;
 class Window;
 class BaseMap;
-class ResourceManagerWrapper;
+class ResourceManager;
 class TestResources;
 
 struct RenderTestOptions final
@@ -124,7 +124,7 @@ private:
     FileSystem& mFs;
     RenderTestOptions mOptions;
 
-    std::unique_ptr<ResourceManagerWrapper> mResMan;
+    std::unique_ptr<ResourceManager> mResMan;
     relive::Factory mFactory;
     std::unique_ptr<BaseMap> mMap;
     std::unique_ptr<TestResources> mRes;

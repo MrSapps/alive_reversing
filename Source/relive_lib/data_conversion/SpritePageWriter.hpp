@@ -2,8 +2,11 @@
 
 #include "AnimationConverter.hpp"
 #include "file_system.hpp"
+#include <functional>
 #include <string>
 #include <vector>
+
+class ConversionProgress;
 
 // The sprite sheets of the animations, and the pages they are packed into.
 //
@@ -40,7 +43,12 @@ public:
 
     // Packs the sheets under dataDir/animations into pages and writes the packed jsons.
     // Returns the number of pages.
-    static u32 Repack(FileSystem& fs, const FileSystem::Path& dataDir, u32 pageSize);
+    //
+    // progress, when given, gets kProgressUnits of the SpritePages category as the work goes: the
+    // caller adds that to the total up front (the packing is only known to be needed, not how long
+    // it takes, before it starts), and Repack always completes all of it, even when it returns early.
+    static constexpr u32 kProgressUnits = 100;
+    static u32 Repack(FileSystem& fs, const FileSystem::Path& dataDir, u32 pageSize, ConversionProgress* progress = nullptr);
 
     // The same for a mod: layers are the data directories of the mod and the game it is for, the
     // mod first, as the game searches them. The animations are the ones the game would use (the
@@ -54,4 +62,7 @@ public:
     // than the oldest page
     static bool PagesStale(const FileSystem::Path& dataDir, u32 pageSize);
     static bool PagesStale(const std::vector<std::string>& layers, u32 pageSize);
+
+private:
+    static u32 RepackLayers(FileSystem& fs, const std::vector<std::string>& layers, u32 pageSize, const std::function<void(u32)>& reportUpTo);
 };

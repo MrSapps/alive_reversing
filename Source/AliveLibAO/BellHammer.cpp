@@ -20,7 +20,7 @@ void BellHammer::LoadAnimations()
 }
 
 
-BellHammer::BellHammer(relive::Path_BellHammer* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+BellHammer::BellHammer(relive::Path_BellHammer* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eBellHammer);
@@ -141,7 +141,7 @@ void BellHammer::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void BellHammer::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void BellHammer::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<BellHammerSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);

@@ -2,17 +2,17 @@
 
 #include "../relive_lib/Function.hpp"
 
-class ResourceManagerWrapper;
+class ResourceManager;
 
 typedef s32 (*t_InputCallback)();
 
 u8 Input_GetInputEnabled_4EDDE0();
 void Input_EnableInput_4EDDD0();
 void Input_InitKeyStateArray_4EDD60();
-void Input_SaveSettingsIni_Common(ResourceManagerWrapper& resMan);
-void Input_SaveSettingsIni_492840(ResourceManagerWrapper& resMan);
+void Input_SaveSettingsIni_Common(ResourceManager& resMan);
+void Input_SaveSettingsIni_492840(ResourceManager& resMan);
 void Input_DisableInputForPauseMenuAndDebug_4EDDC0();
-void Input_Init(ResourceManagerWrapper& resMan);
+void Input_Init(ResourceManager& resMan);
 void Input_SetKeyState(s32 key, s8 bIsDown);
 bool Input_IsVKPressed_4EDD40(s32 key);
 u32 Input_GetLastPressedKey_492610();
@@ -148,7 +148,7 @@ class InputObject final
 public:
     s32 IsDemoPlaying();
     void UnsetDemoPlaying();
-    // demoJson is the demo input file (PLAYBK*.JOY.json), see ResourceManagerWrapper::LoadDemoFile
+    // demoJson is the demo input file (PLAYBK*.JOY.json), see ResourceManager::LoadDemoFile
     void InitDemo(const std::string& demoJson);
     void Update(BaseGameAutoPlayer& gameAutoPlayer);
     static u32 PsxButtonsToKeyboardInput(u32 cmd);

@@ -34,14 +34,14 @@ struct LCDScreenSaveState final : public SaveStateBase
 class LCDScreen final : public BaseGameObject
 {
 public:
-    LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    LCDScreen(relive::Path_LCDScreen* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~LCDScreen();
 
     virtual void VUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VScreenChanged() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
 private:
     Prim_ScissorRect mPrimClippers[2] = {};

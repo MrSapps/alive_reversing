@@ -13,7 +13,7 @@
 namespace AO {
 
 
-SlogSpawner::SlogSpawner(relive::Path_SlogSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+SlogSpawner::SlogSpawner(relive::Path_SlogSpawner* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     mTlvInfo = tlvId;

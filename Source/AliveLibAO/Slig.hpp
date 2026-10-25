@@ -232,7 +232,7 @@ public:
         AnimId::Slig_Beat,
         AnimId::None};
 
-    Slig(relive::Path_Slig* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    Slig(relive::Path_Slig* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~Slig();
 
     void LoadAnimations();
@@ -249,7 +249,7 @@ public:
     virtual bool VIsFacingMe(BaseAnimatedWithPhysicsGameObject* pOther) override;
     virtual bool VOnSameYLevel(BaseAnimatedWithPhysicsGameObject* pOther) override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
     virtual s16 VGetMotion(eMotionType motionType) override
     {
         switch (motionType)

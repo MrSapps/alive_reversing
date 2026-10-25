@@ -151,7 +151,7 @@ enum Brain_5_WaitToSpawn
     eBrain5_ToWalking2
 };
 
-void Glukkon::CreateFromSaveState(SerializedObjectData& pSaveBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void Glukkon::CreateFromSaveState(SerializedObjectData& pSaveBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pSaveState = pSaveBuffer.ReadTmpPtr<GlukkonSaveState>();
     auto pTlv = map.TLV_From_Offset_Lvl_Cam(pSaveState->mTlvId).GetTlv<relive::Path_Glukkon>();
@@ -284,7 +284,7 @@ void Glukkon::LoadAnimations(relive::Path_Glukkon::GlukkonTypes glukkonType)
     }
 }
 
-Glukkon::Glukkon(relive::Path_Glukkon* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Glukkon::Glukkon(relive::Path_Glukkon* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map)
 {
     mTlvData = *pTlv;

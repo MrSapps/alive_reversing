@@ -2,7 +2,7 @@
 
 #include "DisplaySettings.hpp"
 #include "IniFile.hpp"
-#include "ResourceManagerWrapper.hpp"
+#include "ResourceManager.hpp"
 #include "data_conversion/file_system.hpp"
 #include "ScratchDir.hpp"
 
@@ -110,16 +110,16 @@ TEST(DisplaySettings, WriteToReplacesAnExistingDisplaySection)
     EXPECT_EQ(ini.Sections().size(), 1u);
 }
 
-// Persistence through relive.ini (ResourceManagerWrapper's settings ini)
+// Persistence through relive.ini (ResourceManager's settings ini)
 
-// A ResourceManagerWrapper whose settings ini is in a scratch dir.
+// A ResourceManager whose settings ini is in a scratch dir.
 class SettingsIniFixture : public ::testing::Test
 {
 protected:
     ScratchDir mDir;
     ScopedCurrentDir mCurrentDir{mDir.Path()};
     FileSystem mFs;
-    ResourceManagerWrapper mResMan{mFs, ""};
+    ResourceManager mResMan{mFs, ""};
 
     std::string IniPath() const
     {

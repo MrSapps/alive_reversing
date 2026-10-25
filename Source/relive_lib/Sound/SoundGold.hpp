@@ -9,7 +9,7 @@
 #include <vector>
 
 class FileSystem;
-class ResourceManagerWrapper;
+class ResourceManager;
 struct PathSoundInfo;
 
 // Runs the real sound code deterministically and records what it does, so a change to the sound
@@ -33,7 +33,7 @@ public:
 
     // Loads a sound block the way the game's map does (SND_Load_VABS + SND_Load_Seqs), then
     // records the tone tables and samples that got loaded
-    void LoadSoundBlock(ResourceManagerWrapper& resMan, const std::shared_ptr<PathSoundInfo>& info, s32 reverb);
+    void LoadSoundBlock(ResourceManager& resMan, const std::shared_ptr<PathSoundInfo>& info, s32 reverb);
 
     // Adds a line to the trace, e.g. to record which call the caller is about to make
     void Note(const std::string& text);

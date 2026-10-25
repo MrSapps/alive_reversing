@@ -10,7 +10,7 @@ class IniFile;
 class Window;
 
 // The display settings, saved in the [Display] section of relive.ini (see
-// ResourceManagerWrapper::LoadSettingsIni) so they persist between runs. The F9-F12 hotkeys
+// ResourceManager::LoadSettingsIni) so they persist between runs. The F9-F12 hotkeys
 // change them while running (see Sys.cpp), and so can the command line. The renderer is
 // chosen at startup and can't be switched while running.
 struct DisplaySettings final

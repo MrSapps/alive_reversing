@@ -206,7 +206,7 @@ OpenSeqHandle g_SeqTable_4C9E70[165] = {
     {"ALL_8_1.SEQ", 0, 0, 90, -1, {}},
     {nullptr, 0, 0, 0, 0, {}}};
 
-Map::Map(ResourceManagerWrapper& resMan, relive::Factory& factory)
+Map::Map(ResourceManager& resMan, relive::Factory& factory)
     : BaseMap(resMan, factory)
     , mPath(*this, factory)
 {

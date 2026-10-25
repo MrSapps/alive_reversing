@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "ResourceManagerWrapper.hpp"
+#include "ResourceManager.hpp"
 #include "Sound/Ps1SoundData.hpp"
 #include "GameType.hpp"
 #include "Psx.hpp"
@@ -27,34 +27,34 @@
 
 std::atomic<u32> UniqueResId::mGlobalId{1};
 
-ResourceManagerWrapper::ResourceManagerWrapper(FileSystem& fs, const std::string& modPath)
+ResourceManager::ResourceManager(FileSystem& fs, const std::string& modPath)
     : mFs(fs)
     , mThreadPool(std::make_unique<ThreadPool>())
 {
     AddSearchPaths(modPath);
 }
 
-std::string ResourceManagerWrapper::LoadSettingsIniText()
+std::string ResourceManager::LoadSettingsIniText()
 {
     return mFs.LoadToString(kSettingsIniPath);
 }
 
-IniFile ResourceManagerWrapper::LoadSettingsIni()
+IniFile ResourceManager::LoadSettingsIni()
 {
     return IniFile::Parse(LoadSettingsIniText());
 }
 
-bool ResourceManagerWrapper::SaveSettingsIni(const IniFile& ini)
+bool ResourceManager::SaveSettingsIni(const IniFile& ini)
 {
     return ini.Save(mFs, kSettingsIniPath);
 }
 
-std::string ResourceManagerWrapper::LoadDemoFile(const std::string& fileName)
+std::string ResourceManager::LoadDemoFile(const std::string& fileName)
 {
     return mFs.LoadToString(fileName.c_str());
 }
 
-std::vector<std::string> ResourceManagerWrapper::BuildSearchPaths(GameType gameType, const std::string& modPath)
+std::vector<std::string> ResourceManager::BuildSearchPaths(GameType gameType, const std::string& modPath)
 {
     // Root of all data
     FileSystem::Path reliveDataPath;
@@ -87,20 +87,20 @@ std::vector<std::string> ResourceManagerWrapper::BuildSearchPaths(GameType gameT
     return paths;
 }
 
-void ResourceManagerWrapper::AddSearchPaths(const std::string& modPath)
+void ResourceManager::AddSearchPaths(const std::string& modPath)
 {
     mModPath = modPath;
     mSearchPaths = BuildSearchPaths(GetGameType(), modPath);
 }
 
 
-void ResourceManagerWrapper::SetPs1SoundData(std::unique_ptr<Ps1SoundData> pData)
+void ResourceManager::SetPs1SoundData(std::unique_ptr<Ps1SoundData> pData)
 {
     mPs1SoundData = std::move(pData);
 }
 
 // Out of line so unique_ptr<ThreadPool> can be destroyed with an incomplete ThreadPool type
-ResourceManagerWrapper::~ResourceManagerWrapper() = default;
+ResourceManager::~ResourceManager() = default;
 
 static std::string LvlDirName(EReliveLevelIds lvlId)
 {
@@ -154,7 +154,7 @@ private:
     }
 
 public:
-    explicit AnimationLoaderJob(ResourceManagerWrapper* pResMan, AnimId anim, const std::string& themeName)
+    explicit AnimationLoaderJob(ResourceManager* pResMan, AnimId anim, const std::string& themeName)
         : mResMan(pResMan), mAnimId(anim), mThemeName(themeName)
     {
 
@@ -282,7 +282,7 @@ public:
     }
 
 private:
-    ResourceManagerWrapper* mResMan = nullptr;
+    ResourceManager* mResMan = nullptr;
     AnimId mAnimId;
     std::string mThemeName;
 };
@@ -362,7 +362,7 @@ AnimationAttributesAndFrames::AnimationAttributesAndFrames(const std::string& js
     from_json(j["attributes"], mAttributes);
 }
 
-std::shared_ptr<PngData> ResourceManagerWrapper::LoadSheetPage(const std::string& basePath, const std::string& page, const std::string& description)
+std::shared_ptr<PngData> ResourceManager::LoadSheetPage(const std::string& basePath, const std::string& page, const std::string& description)
 {
     const std::string pngPath = FileSystem::Path(basePath).Append(page + ".png").GetPath();
 
@@ -387,7 +387,7 @@ std::shared_ptr<PngData> ResourceManagerWrapper::LoadSheetPage(const std::string
     return pPngData;
 }
 
-void ResourceManagerWrapper::PendAnimation(AnimId animId, const std::string& theme)
+void ResourceManager::PendAnimation(AnimId animId, const std::string& theme)
 {
     {
         std::unique_lock<std::mutex> lock(mLoadingMutex);
@@ -409,7 +409,7 @@ void ResourceManagerWrapper::PendAnimation(AnimId animId, const std::string& the
     mThreadPool->AddJob(std::make_unique<AnimationLoaderJob>(this, animId, theme));
 }
 
-void ResourceManagerWrapper::PinAnim(const AnimCacheKey& key)
+void ResourceManager::PinAnim(const AnimCacheKey& key)
 {
     AnimPin& pin = mPinnedAnimations[key];
     pin.mCount++;
@@ -425,17 +425,17 @@ void ResourceManagerWrapper::PinAnim(const AnimCacheKey& key)
     }
 }
 
-void ResourceManagerWrapper::BeginAnimPins(AnimPins& pins)
+void ResourceManager::BeginAnimPins(AnimPins& pins)
 {
     mActiveAnimPins = &pins;
 }
 
-void ResourceManagerWrapper::EndAnimPins()
+void ResourceManager::EndAnimPins()
 {
     mActiveAnimPins = nullptr;
 }
 
-void ResourceManagerWrapper::UnpinAnims(AnimPins& pins)
+void ResourceManager::UnpinAnims(AnimPins& pins)
 {
     std::unique_lock<std::mutex> lock(mLoadingMutex);
     for (const auto& key : pins)
@@ -450,7 +450,7 @@ void ResourceManagerWrapper::UnpinAnims(AnimPins& pins)
     pins.clear();
 }
 
-void ResourceManagerWrapper::RequestLoadingWait(LoadingIcon icon)
+void ResourceManager::RequestLoadingWait(LoadingIcon icon)
 {
     mLoadingWaitRequested = true;
     if (icon == LoadingIcon::eNow)
@@ -459,7 +459,7 @@ void ResourceManagerWrapper::RequestLoadingWait(LoadingIcon icon)
     }
 }
 
-void ResourceManagerWrapper::EndLoadingWait()
+void ResourceManager::EndLoadingWait()
 {
     mLoadingWaitRequested = false;
     mShowLoadingIconNow = false;
@@ -469,13 +469,13 @@ void ResourceManagerWrapper::EndLoadingWait()
     FlushMissingResourceReports();
 }
 
-bool ResourceManagerWrapper::IsLoading()
+bool ResourceManager::IsLoading()
 {
     std::unique_lock<std::mutex> lock(mLoadingMutex);
     return !mPendingAnimations.empty() || !mPendingCams.empty() || !mPendingFg1s.empty() || !mPendingLevelPaths.empty() || !mPendingSoundFiles.empty() || !mPendingFonts.empty();
 }
 
-std::string ResourceManagerWrapper::FmvPath(const std::string& fmvName)
+std::string ResourceManager::FmvPath(const std::string& fmvName)
 {
     const std::string webmName = relive::FmvNameWithoutExtension(fmvName) + ".webm";
     for (const auto& basePath : mSearchPaths)
@@ -488,10 +488,22 @@ std::string ResourceManagerWrapper::FmvPath(const std::string& fmvName)
             return filePath.GetPath();
         }
     }
+
+    // The game's own movie, as the conversion copied it
+    for (const auto& basePath : mSearchPaths)
+    {
+        FileSystem::Path filePath(basePath);
+        filePath.Append("fmvs");
+        filePath.Append(fmvName);
+        if (mFs.FileExists(filePath.GetPath().c_str()))
+        {
+            return filePath.GetPath();
+        }
+    }
     return fmvName;
 }
 
-void ResourceManagerWrapper::AddAnimation(AnimId anim, std::shared_ptr<AnimationAttributesAndFrames> attributesAndFrames, std::shared_ptr<PngData> png)
+void ResourceManager::AddAnimation(AnimId anim, std::shared_ptr<AnimationAttributesAndFrames> attributesAndFrames, std::shared_ptr<PngData> png)
 {
     std::unique_lock<std::mutex> lock(mLoadingMutex);
     const AnimCacheKey key = std::make_pair(std::string(), anim);
@@ -507,7 +519,7 @@ void ResourceManagerWrapper::AddAnimation(AnimId anim, std::shared_ptr<Animation
     pin.mAnimPng = std::move(png);
 }
 
-AnimResource ResourceManagerWrapper::LoadAnimation(AnimId anim, const std::string& themeName)
+AnimResource ResourceManager::LoadAnimation(AnimId anim, const std::string& themeName)
 {
     const AnimCacheKey key = std::make_pair(themeName, anim);
     AnimResource res;
@@ -569,7 +581,7 @@ static bool IsFontPal(PalId pal)
     }
 }
 
-PalResource ResourceManagerWrapper::LoadPal(PalId pal)
+PalResource ResourceManager::LoadPal(PalId pal)
 {
     // TODO: Cache these
     PalResource newRes;
@@ -659,7 +671,7 @@ static std::string DescribeCam(EReliveLevelIds lvlId, u32 pathNumber, u32 camNum
 class CamLoaderJob final : public IJob
 {
 public:
-    CamLoaderJob(ResourceManagerWrapper* pResMan, EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
+    CamLoaderJob(ResourceManager* pResMan, EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
         : mResMan(pResMan), mLvlId(lvlId), mPathNumber(pathNumber), mCamNumber(camNumber)
     {
 
@@ -705,13 +717,13 @@ private:
         return {};
     }
 
-    ResourceManagerWrapper* mResMan = nullptr;
+    ResourceManager* mResMan = nullptr;
     EReliveLevelIds mLvlId;
     u32 mPathNumber = 0;
     u32 mCamNumber = 0;
 };
 
-void ResourceManagerWrapper::PendCam(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
+void ResourceManager::PendCam(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
 {
     {
         std::unique_lock<std::mutex> lock(mLoadingMutex);
@@ -726,7 +738,7 @@ void ResourceManagerWrapper::PendCam(EReliveLevelIds lvlId, u32 pathNumber, u32 
     mThreadPool->AddJob(std::make_unique<CamLoaderJob>(this, lvlId, pathNumber, camNumber));
 }
 
-CamResource ResourceManagerWrapper::LoadCam(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
+CamResource ResourceManager::LoadCam(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
 {
     const CamCacheKey key = std::make_tuple(lvlId, pathNumber, camNumber);
     {
@@ -761,7 +773,7 @@ CamResource ResourceManagerWrapper::LoadCam(EReliveLevelIds lvlId, u32 pathNumbe
     return mLoadedCams[key];
 }
 
-void ResourceManagerWrapper::FreeCam(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
+void ResourceManager::FreeCam(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
 {
     // A camera still loading is dropped once it's loaded (see CamLoaderJob::Execute). If it's
     // pended again before then, a second job loads it and whichever finishes first is kept.
@@ -774,7 +786,7 @@ void ResourceManagerWrapper::FreeCam(EReliveLevelIds lvlId, u32 pathNumber, u32 
 class Fg1LoaderJob final : public IJob
 {
 public:
-    Fg1LoaderJob(ResourceManagerWrapper* pResMan, EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
+    Fg1LoaderJob(ResourceManager* pResMan, EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
         : mResMan(pResMan), mLvlId(lvlId), mPathNumber(pathNumber), mCamNumber(camNumber)
     {
 
@@ -844,13 +856,13 @@ private:
         return newRes;
     }
 
-    ResourceManagerWrapper* mResMan = nullptr;
+    ResourceManager* mResMan = nullptr;
     EReliveLevelIds mLvlId;
     u32 mPathNumber = 0;
     u32 mCamNumber = 0;
 };
 
-void ResourceManagerWrapper::PendFg1(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
+void ResourceManager::PendFg1(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
 {
     {
         std::unique_lock<std::mutex> lock(mLoadingMutex);
@@ -865,7 +877,7 @@ void ResourceManagerWrapper::PendFg1(EReliveLevelIds lvlId, u32 pathNumber, u32 
     mThreadPool->AddJob(std::make_unique<Fg1LoaderJob>(this, lvlId, pathNumber, camNumber));
 }
 
-Fg1Resource ResourceManagerWrapper::LoadFg1(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
+Fg1Resource ResourceManager::LoadFg1(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
 {
     const CamCacheKey key = std::make_tuple(lvlId, pathNumber, camNumber);
     {
@@ -893,7 +905,7 @@ Fg1Resource ResourceManagerWrapper::LoadFg1(EReliveLevelIds lvlId, u32 pathNumbe
     return mLoadedFg1s[key];
 }
 
-void ResourceManagerWrapper::FreeFg1(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
+void ResourceManager::FreeFg1(EReliveLevelIds lvlId, u32 pathNumber, u32 camNumber)
 {
     // Like FreeCam
     std::unique_lock<std::mutex> lock(mLoadingMutex);
@@ -920,7 +932,7 @@ static std::string FontName(FontType fontId)
 class FontLoaderJob final : public IJob
 {
 public:
-    FontLoaderJob(ResourceManagerWrapper* pResMan, FontType fontId)
+    FontLoaderJob(ResourceManager* pResMan, FontType fontId)
         : mResMan(pResMan), mFontId(fontId)
     {
 
@@ -980,11 +992,11 @@ private:
         return nullptr;
     }
 
-    ResourceManagerWrapper* mResMan = nullptr;
+    ResourceManager* mResMan = nullptr;
     FontType mFontId;
 };
 
-void ResourceManagerWrapper::PendFont(FontType fontId)
+void ResourceManager::PendFont(FontType fontId)
 {
     {
         std::unique_lock<std::mutex> lock(mLoadingMutex);
@@ -998,7 +1010,7 @@ void ResourceManagerWrapper::PendFont(FontType fontId)
     mThreadPool->AddJob(std::make_unique<FontLoaderJob>(this, fontId));
 }
 
-FontResource ResourceManagerWrapper::LoadFont(FontType fontId)
+FontResource ResourceManager::LoadFont(FontType fontId)
 {
     bool pended = false;
     {
@@ -1040,7 +1052,7 @@ FontResource ResourceManagerWrapper::LoadFont(FontType fontId)
 class PathsLoaderJob final : public IJob
 {
 public:
-    PathsLoaderJob(ResourceManagerWrapper* pResMan, EReliveLevelIds lvlId)
+    PathsLoaderJob(ResourceManager* pResMan, EReliveLevelIds lvlId)
         : mResMan(pResMan), mLvlId(lvlId)
     {
 
@@ -1110,7 +1122,7 @@ private:
                     pathBuffer->CreateFromJson(pathJson);
 
                     PathSoundInfo& soundInfo = *pathBuffer->GetSoundInfo();
-                    const ResourceManagerWrapper::SoundThemeInfo& themeInfo = mResMan->LoadSoundThemeInfo(soundInfo.mSoundTheme);
+                    const ResourceManager::SoundThemeInfo& themeInfo = mResMan->LoadSoundThemeInfo(soundInfo.mSoundTheme);
                     soundInfo.mVhFile = themeInfo.mVhFile;
                     soundInfo.mVbFile = themeInfo.mVbFile;
                     soundInfo.mSeqFiles = themeInfo.mSeqFiles;
@@ -1130,11 +1142,11 @@ private:
         return ret;
     }
 
-    ResourceManagerWrapper* mResMan = nullptr;
+    ResourceManager* mResMan = nullptr;
     EReliveLevelIds mLvlId;
 };
 
-void ResourceManagerWrapper::PendPaths(EReliveLevelIds lvlId)
+void ResourceManager::PendPaths(EReliveLevelIds lvlId)
 {
     {
         std::unique_lock<std::mutex> lock(mLoadingMutex);
@@ -1148,7 +1160,7 @@ void ResourceManagerWrapper::PendPaths(EReliveLevelIds lvlId)
     mThreadPool->AddJob(std::make_unique<PathsLoaderJob>(this, lvlId));
 }
 
-std::vector<std::unique_ptr<BinaryPath>> ResourceManagerWrapper::LoadPaths(EReliveLevelIds lvlId)
+std::vector<std::unique_ptr<BinaryPath>> ResourceManager::LoadPaths(EReliveLevelIds lvlId)
 {
     {
         // Still loading on a worker thread, wait for it rather than loading it again
@@ -1199,7 +1211,7 @@ static std::string DescribeSoundFile(const std::string& fileName, const std::str
 class SoundFileLoaderJob final : public IJob
 {
 public:
-    SoundFileLoaderJob(ResourceManagerWrapper* pResMan, const std::string& fileName, const std::string& soundTheme)
+    SoundFileLoaderJob(ResourceManager* pResMan, const std::string& fileName, const std::string& soundTheme)
         : mResMan(pResMan), mFileName(fileName), mSoundTheme(soundTheme)
     {
 
@@ -1249,12 +1261,12 @@ public:
     }
 
 private:
-    ResourceManagerWrapper* mResMan = nullptr;
+    ResourceManager* mResMan = nullptr;
     std::string mFileName;
     std::string mSoundTheme;
 };
 
-void ResourceManagerWrapper::PendSoundFile(const std::string& fileName, const std::string& soundTheme)
+void ResourceManager::PendSoundFile(const std::string& fileName, const std::string& soundTheme)
 {
     {
         std::unique_lock<std::mutex> lock(mLoadingMutex);
@@ -1269,7 +1281,7 @@ void ResourceManagerWrapper::PendSoundFile(const std::string& fileName, const st
     mThreadPool->AddJob(std::make_unique<SoundFileLoaderJob>(this, fileName, soundTheme));
 }
 
-std::vector<u8> ResourceManagerWrapper::LoadSoundFile(const std::string& fileName, const std::string& soundTheme)
+std::vector<u8> ResourceManager::LoadSoundFile(const std::string& fileName, const std::string& soundTheme)
 {
     const SoundFileKey key = std::make_pair(soundTheme, fileName);
     bool pended = false;
@@ -1310,7 +1322,7 @@ std::vector<u8> ResourceManagerWrapper::LoadSoundFile(const std::string& fileNam
     return {};
 }
 
-const ResourceManagerWrapper::SoundThemeInfo& ResourceManagerWrapper::LoadSoundThemeInfo(const std::string& soundTheme)
+const ResourceManager::SoundThemeInfo& ResourceManager::LoadSoundThemeInfo(const std::string& soundTheme)
 {
     // References to std::map entries stay valid after the lock is released
     std::unique_lock<std::mutex> lock(mSoundThemeInfoMutex);
@@ -1344,13 +1356,13 @@ const ResourceManagerWrapper::SoundThemeInfo& ResourceManagerWrapper::LoadSoundT
 }
 
 
-void ResourceManagerWrapper::ReportMissingResource(std::string description, std::vector<std::string> searchedPaths)
+void ResourceManager::ReportMissingResource(std::string description, std::vector<std::string> searchedPaths)
 {
     std::unique_lock<std::mutex> lock(mMissingResourcesMutex);
     mMissingResources.push_back({std::move(description), std::move(searchedPaths)});
 }
 
-void ResourceManagerWrapper::FlushMissingResourceReports()
+void ResourceManager::FlushMissingResourceReports()
 {
     std::vector<MissingResourceReport> reports;
     {
@@ -1380,7 +1392,7 @@ void ResourceManagerWrapper::FlushMissingResourceReports()
 }
 
 
-s32 ResourceManagerWrapper::SEQ_HashName(const char_type* seqFileName)
+s32 ResourceManager::SEQ_HashName(const char_type* seqFileName)
 {
     // Clamp max len
     size_t seqFileNameLength = strlen(seqFileName) - 1;
@@ -1419,7 +1431,7 @@ s32 ResourceManagerWrapper::SEQ_HashName(const char_type* seqFileName)
     return hashId;
 }
 
-bool ResourceManagerWrapper::LookUp(const AnimCacheKey& key, AnimResource& res)
+bool ResourceManager::LookUp(const AnimCacheKey& key, AnimResource& res)
 {
     auto it = mLoadedAnimations.find(key);
     if (it == std::end(mLoadedAnimations))

@@ -16,7 +16,7 @@
 #include "../GameType.hpp"
 #include "BaseMap.hpp"
 
-Grenade::Grenade(FP xpos, FP ypos, s16 numGrenades, bool bBlowUpOnCollision, BaseGameObject* pOwner, ResourceManagerWrapper& resMan, BaseMap& map)
+Grenade::Grenade(FP xpos, FP ypos, s16 numGrenades, bool bBlowUpOnCollision, BaseGameObject* pOwner, ResourceManager& resMan, BaseMap& map)
     : BaseThrowable(resMan, map)
 {
     mBaseThrowableDead = 0;
@@ -593,7 +593,7 @@ bool Grenade::OnCollision_InstantExplode(BaseGameObject* pHit)
     return true;
 }
 
-void Grenade::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void Grenade::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<GrenadeSaveState>();
     auto pGrenade = relive_new Grenade(pState->mXPos, pState->mYPos, pState->mThrowableCount, 0, nullptr, resMan, map);

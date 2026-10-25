@@ -37,7 +37,7 @@ struct UXBSaveState final : public SaveStateBase
 class UXB final : public BaseAliveGameObject
 {
 public:
-    UXB(relive::Path_UXB* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    UXB(relive::Path_UXB* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~UXB();
 
     void LoadAnimations();
@@ -49,7 +49,7 @@ public:
     virtual void VOnThrowableHit(BaseGameObject* pFrom) override;
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
 
-    static void CreateFromSaveState(SerializedObjectData&, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData&, ResourceManager& resMan, BaseMap& map);
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
 
 private:

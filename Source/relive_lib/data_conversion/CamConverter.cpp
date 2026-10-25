@@ -55,7 +55,7 @@ static std::unique_ptr<FG1PngReader> MergeFG1Blocks(const ChunkedLvlFile& camFil
     // For some crazy reason there can be multiple FG1 blocks, here we squash them down into a single
     // image for each "layer".
     std::optional<FG1PngReader> ret;
-    std::optional<LvlFileChunk> anyFG1 = camFile.ChunkByType(ResourceManagerWrapper::Resource_FG1);
+    std::optional<LvlFileChunk> anyFG1 = camFile.ChunkByType(ResourceManager::Resource_FG1);
     if (anyFG1)
     {
         const u8* pFg1Data = anyFG1->Data().data();
@@ -74,7 +74,7 @@ static std::unique_ptr<FG1PngReader> MergeFG1Blocks(const ChunkedLvlFile& camFil
             auto reader = std::make_unique<FG1PngReader>(fg1Format);
             for (u32 i = 0; i < camFile.ChunkCount(); i++)
             {
-                if (camFile.ChunkAt(i).Header().mResourceType == ResourceManagerWrapper::Resource_FG1)
+                if (camFile.ChunkAt(i).Header().mResourceType == ResourceManager::Resource_FG1)
                 {
                     reader->Iterate(reinterpret_cast<const FG1ResourceBlockHeader*>(camFile.ChunkAt(i).Data().data()));
                 }
@@ -146,7 +146,7 @@ static std::vector<u16> StitchAOCamera(const LvlFileChunk& bitsRes)
 
 std::pair<std::unique_ptr<FG1PngReader>, u32> CamConverter::Convert(const ChunkedLvlFile& camFile, const std::string& baseName, bool isAo)
 {
-    std::optional<LvlFileChunk> bitsRes = camFile.ChunkByType(ResourceManagerWrapper::Resource_Bits);
+    std::optional<LvlFileChunk> bitsRes = camFile.ChunkByType(ResourceManager::Resource_Bits);
     if (bitsRes)
     {
         const bool isAoCam = AEcamIsAOCam(*bitsRes);
@@ -170,7 +170,7 @@ std::pair<std::unique_ptr<FG1PngReader>, u32> CamConverter::Convert(const Chunke
             u32 fg1BlocksCount = 0;
             for (u32 i = 0; i < camFile.ChunkCount(); i++)
             {
-                if (camFile.ChunkAt(i).Header().mResourceType == ResourceManagerWrapper::Resource_FG1)
+                if (camFile.ChunkAt(i).Header().mResourceType == ResourceManager::Resource_FG1)
                 {
                     fg1BlocksCount++;
                 }
@@ -184,7 +184,7 @@ std::pair<std::unique_ptr<FG1PngReader>, u32> CamConverter::Convert(const Chunke
 
 CamConverter::CamConverter(const ChunkedLvlFile& camFile, CameraImageAndLayers& outData)
 {
-    std::optional<LvlFileChunk> bitsRes = camFile.ChunkByType(ResourceManagerWrapper::Resource_Bits);
+    std::optional<LvlFileChunk> bitsRes = camFile.ChunkByType(ResourceManager::Resource_Bits);
     if (bitsRes)
     {
         const bool isAO = AEcamIsAOCam(*bitsRes);

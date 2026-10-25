@@ -15,7 +15,7 @@
 
 namespace AO {
 
-Rock::Rock(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan, BaseMap& map)
+Rock::Rock(FP xpos, FP ypos, s16 count, ResourceManager& resMan, BaseMap& map)
     : BaseThrowable(resMan, map)
 {
     SetType(ReliveTypes::eRock);

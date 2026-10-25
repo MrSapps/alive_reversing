@@ -66,7 +66,7 @@ void FallingItem::LoadAnimations()
     }
 }
 
-FallingItem::FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+FallingItem::FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : ::BaseAliveGameObject(0, resMan, map)
 {
     SetCanExplode(true);
@@ -406,7 +406,7 @@ void FallingItem::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void FallingItem::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void FallingItem::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<FallingItemSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);

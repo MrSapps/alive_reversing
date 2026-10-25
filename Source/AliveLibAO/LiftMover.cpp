@@ -12,7 +12,7 @@
 
 namespace AO {
 
-LiftMover::LiftMover(relive::Path_LiftMover* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+LiftMover::LiftMover(relive::Path_LiftMover* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     mTlvId = tlvId;
@@ -236,7 +236,7 @@ void LiftMover::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void LiftMover::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
+void LiftMover::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pData.ReadTmpPtr<LiftMoverSaveState>();
 

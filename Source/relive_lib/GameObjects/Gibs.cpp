@@ -67,7 +67,7 @@ void Gibs::LoadAnimations(AnimId head, AnimId arm, AnimId body)
     mLoadedAnims.push_back(mResMan.LoadAnimation(body));
 }
 
-Gibs::Gibs(GibType gibType, FP xpos, FP ypos, FP xOff, FP yOff, FP scale, bool bMakeSmaller, ResourceManagerWrapper& resMan, BaseMap& map)
+Gibs::Gibs(GibType gibType, FP xpos, FP ypos, FP xOff, FP yOff, FP scale, bool bMakeSmaller, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     AnimId headGib = AnimId::None;

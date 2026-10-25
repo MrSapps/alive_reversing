@@ -25,7 +25,7 @@ static const AnimId sTrainDoorAnimIds[2] =
     AnimId::Door_Train_Closing
 };
 
-Door::Door(ResourceManagerWrapper& resMan, BaseMap& map)
+Door::Door(ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
 }
@@ -36,7 +36,7 @@ void Door::LoadAnimations(const std::string& theme)
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Door_Themed_Open, theme));
 }
 
-Door::Door(relive::Path_Door* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Door::Door(relive::Path_Door* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map),
     mTlvId(tlvId),
     mDoorType(pTlv->mDoorType),
@@ -506,7 +506,7 @@ void TrainDoor::LoadAnimations()
     }
 }
 
-TrainDoor::TrainDoor(relive::Path_TrainDoor* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+TrainDoor::TrainDoor(relive::Path_TrainDoor* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : Door(resMan, map)
 {
     SetType(ReliveTypes::eDoor);

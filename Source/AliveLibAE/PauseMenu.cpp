@@ -273,7 +273,7 @@ void PauseMenu::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::HappyMudIcon));
 }
 
-PauseMenu::PauseMenu(ResourceManagerWrapper& resMan, BaseMap& map)
+PauseMenu::PauseMenu(ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     gQuicksave_SaveNextFrame = false;

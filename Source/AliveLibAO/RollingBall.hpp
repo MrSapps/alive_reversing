@@ -43,14 +43,14 @@ struct RollingBallSaveState final : public SaveStateBase
 class RollingBall final : public ::BaseAliveGameObject
 {
 public:
-    RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~RollingBall();
 
     void LoadAnimations();
 
     virtual void VUpdate() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
     void Accelerate();
     void CrushThingsInTheWay();

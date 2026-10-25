@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "../../relive_lib/ResourceManagerWrapper.hpp"
+#include "../../relive_lib/ResourceManager.hpp"
 #include "../../relive_lib/SpriteFx.hpp"
 #include "../../relive_lib/data_conversion/rgb_conversion.hpp"
 
@@ -16,7 +16,7 @@ class TestResources final
 {
 public:
     // Also adds the animations real game objects load (zap lines, sparks) to resMan
-    explicit TestResources(ResourceManagerWrapper& resMan);
+    explicit TestResources(ResourceManager& resMan);
 
     // Colour gradient with a 40 pixel grid, 1 pixel white border, coloured corner squares
     // (red top left, green top right, blue bottom left, white bottom right) and a 1 pixel

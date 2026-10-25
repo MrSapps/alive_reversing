@@ -20,7 +20,7 @@ namespace AO {
 static s32 sNextDoorLightUpdate = -1;
 static s32 sDoorLightUpdateTimer = 0;
 
-DoorLight::DoorLight(relive::Path_LightEffect* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+DoorLight::DoorLight(relive::Path_LightEffect* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     mTlvId = tlvId;
@@ -224,7 +224,7 @@ void DoorLight::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void DoorLight::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void DoorLight::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<DoorLightSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);

@@ -14,10 +14,11 @@
 #include "SpritePageWriter.hpp"
 #include "Renderer/IRenderer.hpp"
 
-DataConversionUI::DataConversionUI(GameType gameType, ResourceManagerWrapper& resMan, BaseMap& map)
+DataConversionUI::DataConversionUI(GameType gameType, ResourceManager& resMan, BaseMap& map, bool encodeWebm)
     : BaseGameObject(FALSE, 0, resMan, map)
     , mGameType(gameType)
     , mSpritePageSize(DataConversion::DataVersions::SpritePageSizeFor(IRenderer::GetRenderer() ? IRenderer::GetRenderer()->MaxTextureSize() : 0))
+    , mEncodeWebm(encodeWebm)
     , mDataConversion(std::make_unique<DataConversion>())
 {
     if (!resMan.ModPath().empty())
@@ -91,7 +92,7 @@ void DataConversionUI::ThreadFunc()
 {
     TRACE_ENTRYEXIT;
 
-    mDataConversion->ConvertAll(mGameType, mSpritePageSize, mModLayers);
+    mDataConversion->ConvertAll(mGameType, mSpritePageSize, mModLayers, mEncodeWebm);
 
     mDone = true;
 }
@@ -249,6 +250,11 @@ void DataConversionUI::VRender(OrderingTable& ot)
     ot.Add(Layer::eLayer_0, &mPoly);
 
     gFontDrawScreenSpace = false;
+}
+
+void DataConversionUI::RenderBackground(OrderingTable& ot)
+{
+    ot.Add(Layer::eLayer_0, &mPoly);
 }
 
 bool DataConversionUI::ConversionRequired()

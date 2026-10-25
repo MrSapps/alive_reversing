@@ -211,7 +211,7 @@ void Slig::LoadAnimations()
     }
 }
 
-Slig::Slig(relive::Path_Slig* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Slig::Slig(relive::Path_Slig* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : ::BaseAliveGameObject(0, resMan, map)
 {
     field_210_resources = {};
@@ -5576,7 +5576,7 @@ void Slig::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void Slig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void Slig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<SligSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);

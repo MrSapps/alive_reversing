@@ -16,7 +16,7 @@ struct HintFlyParticle;
 class HintFly final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    HintFly(relive::Path_HintFly* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    HintFly(relive::Path_HintFly* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~HintFly();
 
     void InitParticle(HintFlyParticle* pParticle);

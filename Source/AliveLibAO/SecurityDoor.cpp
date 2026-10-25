@@ -31,7 +31,7 @@ SecurityDoor::~SecurityDoor()
     mMap.TLV_Reset(mTlvId, mState + 1);
 }
 
-SecurityDoor::SecurityDoor(relive::Path_SecurityDoor* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+SecurityDoor::SecurityDoor(relive::Path_SecurityDoor* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     LoadAnimations();

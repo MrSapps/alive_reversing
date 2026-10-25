@@ -25,14 +25,14 @@ struct Relive_Path_Teleporter_Data
 class Teleporter final : public BaseGameObject
 {
 public:
-    Teleporter(relive::Path_Teleporter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    Teleporter(relive::Path_Teleporter* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~Teleporter();
 
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;
 
 private:
-    static Electrocute* Create_ElectrocuteEffect(ResourceManagerWrapper& resMan, BaseMap& map);
+    static Electrocute* Create_ElectrocuteEffect(ResourceManager& resMan, BaseMap& map);
     void SpawnRingSparks(Relive_Path_Teleporter_Data* pTlvData);
 
     Guid mTlvId;

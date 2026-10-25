@@ -2,7 +2,7 @@
 
 #include "../relive_lib/Function.hpp"
 
-class ResourceManagerWrapper;
+class ResourceManager;
 
 class BaseGameAutoPlayer;
 
@@ -105,7 +105,7 @@ void Input_GetCurrentKeyStates();
 
 s8 Input_IsVKPressed(s32 key);
 
-void Input_Init(ResourceManagerWrapper& resMan);
+void Input_Init(ResourceManager& resMan);
 
 void Input_DisableInput();
 
@@ -114,7 +114,7 @@ const char_type* Input_GetButtonString_44F1C0(InputCommands inputCommand);
 
 s32 Input_Remap(InputCommands inputCmd);
 
-s32 Input_SaveSettingsIni(ResourceManagerWrapper& resMan);
+s32 Input_SaveSettingsIni(ResourceManager& resMan);
 
 s8 Input_GetLastPressedKey();
 
@@ -134,7 +134,7 @@ public:
 
     static void Shutdown();
 
-    // demoJson is the demo input file (PLAYBK*.JOY.json), see ResourceManagerWrapper::LoadDemoFile
+    // demoJson is the demo input file (PLAYBK*.JOY.json), see ResourceManager::LoadDemoFile
     void InitDemo(const std::string& demoJson);
 
     s32 IsDemoPlaying();

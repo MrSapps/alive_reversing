@@ -15,7 +15,7 @@ struct PlaybackData final
 class DemoPlayback final : public ::BaseGameObject
 {
 public:
-    DemoPlayback(ResourceManagerWrapper& resMan, BaseMap& map);
+    DemoPlayback(ResourceManager& resMan, BaseMap& map);
     ~DemoPlayback();
     
     virtual void VScreenChanged() override;

@@ -15,7 +15,7 @@
 #include "../relive_lib/FixedPoint.hpp"
 #include "QuikSave.hpp"
 
-Rock::Rock(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan, BaseMap& map)
+Rock::Rock(FP xpos, FP ypos, s16 count, ResourceManager& resMan, BaseMap& map)
     : BaseThrowable(resMan, map)
 {
     SetType(ReliveTypes::eRock);
@@ -455,7 +455,7 @@ void Rock::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void Rock::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
+void Rock::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pData.ReadTmpPtr<RockSaveState>();
 

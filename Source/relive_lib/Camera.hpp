@@ -2,7 +2,7 @@
 
 #include "Primitives.hpp"
 #include "MapWrapper.hpp"
-#include "ResourceManagerWrapper.hpp"
+#include "ResourceManager.hpp"
 
 enum class LevelIds : s16;
 class BaseMap;
@@ -12,7 +12,7 @@ class Camera final // TODO: May actually just be "ResourceList" ?
 public:
     Camera();
     ~Camera();
-    void CreateFG1(ResourceManagerWrapper& resMan, BaseMap& map);
+    void CreateFG1(ResourceManager& resMan, BaseMap& map);
 
 public:
     CamResource mCamRes;
@@ -25,5 +25,5 @@ public:
     bool mCamResLoaded = false;
     // The anims this camera's objects need, kept loaded until the camera is freed (see
     // BaseMap::Load_Path_Items)
-    ResourceManagerWrapper::AnimPins mAnimPins;
+    ResourceManager::AnimPins mAnimPins;
 };

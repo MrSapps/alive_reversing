@@ -156,7 +156,7 @@ static Layer OutOfPortalLayer(Layer layer)
     }
 }
 
-ThrowableTotalIndicator::ThrowableTotalIndicator(FP xpos, FP ypos, Layer layer, FP /*scale*/, s32 count, bool bFade, ResourceManagerWrapper& resMan, BaseMap& map)
+ThrowableTotalIndicator::ThrowableTotalIndicator(FP xpos, FP ypos, Layer layer, FP /*scale*/, s32 count, bool bFade, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetDrawable(true);

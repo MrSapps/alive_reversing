@@ -17,7 +17,7 @@ class ScreenWave final : public ::BaseGameObject
 public:
     // width: how wide the ring is. speed: how far it grows each frame. radius: how far it goes,
     // or 0 to go until it has left the screen.
-    ScreenWave(FP xpos, FP ypos, Layer layer, FP width, FP speed, s32 radius, ResourceManagerWrapper& resMan, BaseMap& map);
+    ScreenWave(FP xpos, FP ypos, Layer layer, FP width, FP speed, s32 radius, ResourceManager& resMan, BaseMap& map);
     ~ScreenWave();
 
     virtual void VScreenChanged() override;

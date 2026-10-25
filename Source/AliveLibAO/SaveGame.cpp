@@ -7,7 +7,7 @@
 #include "Input.hpp"
 #include "SaveGame.hpp"
 #include "MusicController.hpp"
-#include "ResourceManagerWrapper.hpp"
+#include "ResourceManager.hpp"
 #include "../relive_lib/GameObjects/GasCountDown.hpp"
 #include "nlohmann/json.hpp"
 #include "../relive_lib/data_conversion/AOSaveSerialization.hpp"

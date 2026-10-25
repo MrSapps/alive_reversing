@@ -73,7 +73,7 @@ void FootSwitch::LoadAnimations()
     }
 }
 
-FootSwitch::FootSwitch(relive::Path_FootSwitch* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+FootSwitch::FootSwitch(relive::Path_FootSwitch* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eFootSwitch);

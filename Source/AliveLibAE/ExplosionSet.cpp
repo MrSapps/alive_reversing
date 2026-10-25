@@ -13,7 +13,7 @@
 ExplosionSet* gExplosionSet = nullptr;
 bool gExplosionSetEnabled = false;
 
-ExplosionSet::ExplosionSet(ResourceManagerWrapper& resMan, BaseMap& map)
+ExplosionSet::ExplosionSet(ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eExplosionSet);

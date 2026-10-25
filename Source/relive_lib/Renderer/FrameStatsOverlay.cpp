@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <cstdio>
 
-FrameStatsOverlay::FrameStatsOverlay(ResourceManagerWrapper& resMan)
+FrameStatsOverlay::FrameStatsOverlay(ResourceManager& resMan)
 {
     mFontContext.LoadFontType(FontType::Debug, resMan);
 

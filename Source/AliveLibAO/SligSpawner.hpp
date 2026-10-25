@@ -3,7 +3,7 @@
 #include "../relive_lib/GameObjects/BaseGameObject.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
 #include "../relive_lib/SaveStateBase.hpp"
-#include "ResourceManagerWrapper.hpp"
+#include "ResourceManager.hpp"
 
 class SerializedObjectData;
 
@@ -23,13 +23,13 @@ struct SligSpawnerSaveState final : public SaveStateBase
 class SligSpawner final : public ::BaseGameObject
 {
 public:
-    SligSpawner(relive::Path_TLV* pTlv, relive::Path_Slig* pTlvData, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    SligSpawner(relive::Path_TLV* pTlv, relive::Path_Slig* pTlvData, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~SligSpawner();
 
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
 private:
     Guid mTlvInfo;

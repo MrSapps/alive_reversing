@@ -33,7 +33,7 @@ static void SetData(Relive_Path_Teleporter_Data& tlvData, const relive::Path_Tel
     tlvData.mElectricY = tlv.mElectricY;
 }
 
-Teleporter::Teleporter(relive::Path_Teleporter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Teleporter::Teleporter(relive::Path_Teleporter* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetData(mTlvData, *pTlv);
@@ -62,7 +62,7 @@ void Teleporter::VScreenChanged()
     mDestroySelf = true;
 }
 
-Electrocute* Teleporter::Create_ElectrocuteEffect(ResourceManagerWrapper& resMan, BaseMap& map)
+Electrocute* Teleporter::Create_ElectrocuteEffect(ResourceManager& resMan, BaseMap& map)
 {
     return relive_new Electrocute(sControlledCharacter, true, false, resMan, map);
 }

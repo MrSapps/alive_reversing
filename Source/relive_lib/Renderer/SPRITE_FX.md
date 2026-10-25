@@ -69,7 +69,7 @@ once, a group stays together on as few pages as it can, small groups share one.
   uses it instead of the json when it is in the same data directory as the json it found, so a
   mod's own sheet of the animation is not affected by the base game's pages. The animations on a
   page share one `PngData` (and so one texture in the renderers):
-  `ResourceManagerWrapper::LoadSheetPage`. An animation without a packed json is used from its
+  `ResourceManager::LoadSheetPage`. An animation without a packed json is used from its
   sheet: a mod or HD pack's animation, and a sheet that doesn't fit on a page.
 
 - The converted sheets have no `luma`: the sweeps use the palette rank in their masks. A sheet of

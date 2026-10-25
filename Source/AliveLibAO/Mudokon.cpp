@@ -138,7 +138,7 @@ static const TintEntry sMudTints_4CD320[] = {
 s16 sAlertedMudCount_507B90 = 0;
 s16 sMudRunningToPortalCount_507B94 = 0;
 
-Mudokon::Mudokon(relive::Path_TLV* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Mudokon::Mudokon(relive::Path_TLV* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : ::BaseAliveGameObject(0, resMan, map)
 {
     field_13E = -1;
@@ -4344,7 +4344,7 @@ void Mudokon::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void Mudokon::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void Mudokon::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<MudokonSaveState>();
     auto pTlv = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv();

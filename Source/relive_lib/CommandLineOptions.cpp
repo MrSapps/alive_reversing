@@ -43,6 +43,7 @@ CommandLineOptions CommandLineOptions::Parse(const CommandLineParser& clp)
     options.mModName = clp.GetValue("-mod").value_or("");
 
     options.mConvertOnly = clp.HasSwitch("-convert");
+    options.mEncodeWebm = clp.HasSwitch("-encode_webm");
     options.mDdCheat = clp.HasSwitch("-ddcheat") || clp.HasSwitch("-it_is_me_your_father");
     options.mShowFps = clp.HasSwitch("-ddfps") || clp.HasSwitch("-show_fps") || clp.HasSwitch("-showfps");
     options.mNoFrameSkip = clp.HasSwitch("-ddnoskip");
@@ -146,6 +147,8 @@ const char* CommandLineOptions::Usage()
            "  -dump_live_audio=<file.wav> Save the audio as it's rendered for the audio device\n"
            "  -convert                    Convert the game data if it's out of date, then exit\n"
            "                              (no window)\n"
+           "  -encode_webm                Encode the movies to AV1 webm when converting the game\n"
+           "                              data, instead of copying the game's own (slow)\n"
            "  -help, --help, -h, /?       Show this and exit\n"
            "\n"
            "The display options also take =true or =false, and are saved to relive.ini.\n"

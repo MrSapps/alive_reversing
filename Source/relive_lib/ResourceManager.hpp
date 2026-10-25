@@ -120,7 +120,7 @@ struct AnimAttributes final
 class AnimationAttributesAndFrames final
 {
 public:
-    // For animations made in code (see ResourceManagerWrapper::AddAnimation)
+    // For animations made in code (see ResourceManager::AddAnimation)
     AnimationAttributesAndFrames() = default;
     explicit AnimationAttributesAndFrames(const std::string& jsonData);
     AnimAttributes mAttributes = {};
@@ -239,17 +239,17 @@ class IniFile;
 
 // Temp adapter interface
 // When the main loop shows the loading icon while waiting, see
-// ResourceManagerWrapper::RequestLoadingWait
+// ResourceManager::RequestLoadingWait
 enum class LoadingIcon
 {
     eIfSlow, // once the wait has taken a while
     eNow,    // straight away, even if nothing is loading
 };
 
-class ResourceManagerWrapper final
+class ResourceManager final
 {
 public:
-    ResourceManagerWrapper(FileSystem& fs, const std::string& modPath);
+    ResourceManager(FileSystem& fs, const std::string& modPath);
 
     // The data directories the game looks in for a game and a mod (empty if there is none): the
     // mod's first, then the game's, then the other game's
@@ -278,7 +278,7 @@ public:
     // A demo's recorded input (PLAYBK*.JOY.json) or starting save (ATTR*.SAV.json), in the game
     // directory. Empty if it's missing.
     std::string LoadDemoFile(const std::string& fileName);
-    ~ResourceManagerWrapper();
+    ~ResourceManager();
 
     // TODO: Remove/unify when both games resource managers are merged into one object
     enum ResourceType : u32
@@ -315,7 +315,11 @@ public:
 
     // == new res manager interface ==
 
+    // The HD webm of the movie if there is one, else the game's own file copied by the data
+    // conversion, else the name as it is (the original file in the working directory)
     std::string FmvPath(const std::string& fmvName);
+
+    FileSystem& Fs() { return mFs; }
 
     // Starts loading anim on a worker thread. Whatever needs it asks the main loop to wait for
     // it with RequestLoadingWait, and uses it with LoadAnimation once that's done.

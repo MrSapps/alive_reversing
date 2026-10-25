@@ -32,7 +32,7 @@ struct ShrykullSaveState final : public SaveStateBase
 class Shrykull final : public ::BaseAliveGameObject
 {
 public:
-    Shrykull(ResourceManagerWrapper& resMan, BaseMap& map);
+    Shrykull(ResourceManager& resMan, BaseMap& map);
     ~Shrykull();
 
     void LoadAnimations();
@@ -41,7 +41,7 @@ public:
     virtual void VScreenChanged() override;
     virtual void VOnThrowableHit(BaseGameObject*) override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
     bool CanElectrocute(BaseGameObject* pObj) const;
     bool CanKill(BaseAnimatedWithPhysicsGameObject* pObj);

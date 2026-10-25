@@ -7,7 +7,7 @@ namespace AO {
 class Honey final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    Honey(FP xpos, FP ypos, ResourceManagerWrapper& resMan, BaseMap& map);
+    Honey(FP xpos, FP ypos, ResourceManager& resMan, BaseMap& map);
 
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;

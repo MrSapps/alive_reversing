@@ -11,7 +11,7 @@ OneShotSwitchIdSetter::~OneShotSwitchIdSetter()
     mMap.TLV_Reset(mTlvId);
 }
 
-OneShotSwitchIdSetter::OneShotSwitchIdSetter(Path_OneShotSwitchIdSetter* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+OneShotSwitchIdSetter::OneShotSwitchIdSetter(Path_OneShotSwitchIdSetter* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     mTlvId = tlvId;

@@ -11,7 +11,7 @@
 #include "Scrab.hpp"
 #include "QuikSave.hpp"
 
-ScrabSpawner::ScrabSpawner(relive::Path_ScrabSpawner* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+ScrabSpawner::ScrabSpawner(relive::Path_ScrabSpawner* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     mTlvId = tlvId;
@@ -35,7 +35,7 @@ ScrabSpawner::ScrabSpawner(relive::Path_ScrabSpawner* pTlv, const Guid& tlvId, R
     field_40_bFindSpawnedScrab = 0;
 }
 
-void ScrabSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void ScrabSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<ScrabSpawnerSaveState>();
     auto pTlv = map.TLV_From_Offset_Lvl_Cam(pState->field_4_tlvInfo).GetTlv<relive::Path_ScrabSpawner>();

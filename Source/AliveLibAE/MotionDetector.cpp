@@ -18,7 +18,7 @@
 #include "../relive_lib/FatalError.hpp"
 #include "Engine.hpp"
 
-MotionDetectorLaser::MotionDetectorLaser(FP xpos, FP ypos, FP scale, Layer layer, ResourceManagerWrapper& resMan, BaseMap& map)
+MotionDetectorLaser::MotionDetectorLaser(FP xpos, FP ypos, FP scale, Layer layer, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eRedLaser);
@@ -33,7 +33,7 @@ MotionDetectorLaser::MotionDetectorLaser(FP xpos, FP ypos, FP scale, Layer layer
 
 // =====================================================================================
 
-MotionDetector::MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tlvId, BaseAnimatedWithPhysicsGameObject* pOwner, ResourceManagerWrapper& resMan, BaseMap& map)
+MotionDetector::MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tlvId, BaseAnimatedWithPhysicsGameObject* pOwner, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eGreeterBody);

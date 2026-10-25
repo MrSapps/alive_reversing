@@ -21,12 +21,12 @@ namespace AO {
 s16 GameEnderController::gRestartRuptureFarmsKilledMuds = 0;
 s16 GameEnderController::gRestartRuptureFarmsSavedMuds = 0;
 
-void GameEnderController::CreateGameEnderController(ResourceManagerWrapper& resMan, BaseMap& map)
+void GameEnderController::CreateGameEnderController(ResourceManager& resMan, BaseMap& map)
 {
     relive_new GameEnderController(resMan, map);
 }
 
-GameEnderController::GameEnderController(ResourceManagerWrapper& resMan, BaseMap& map)
+GameEnderController::GameEnderController(ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eGameEnderController);

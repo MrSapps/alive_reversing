@@ -255,7 +255,7 @@ const MusicController_Record2 rec2s_4CD5A8[124] = {
     {SeqId::Unknown_163, 220},
     {SeqId::Unknown_0, 0}};
 
-s16 MusicController::Create(ResourceManagerWrapper& resMan, BaseMap& map)
+s16 MusicController::Create(ResourceManager& resMan, BaseMap& map)
 {
     if (sMusicController)
     {
@@ -314,7 +314,7 @@ s32 MusicController::GetMusicTime()
     return sMusicTime;
 }
 
-MusicController::MusicController(ResourceManagerWrapper& resMan, BaseMap& map)
+MusicController::MusicController(ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetSurviveDeathReset(true);

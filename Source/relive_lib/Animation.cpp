@@ -5,7 +5,7 @@
 #include "PsxDisplay.hpp"
 #include "Renderer/IRenderer.hpp"
 #include "GameType.hpp"
-#include "ResourceManagerWrapper.hpp"
+#include "ResourceManager.hpp"
 #include "AnimResources.hpp"
 #include <algorithm>
 #include "FatalError.hpp"

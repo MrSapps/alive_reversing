@@ -366,7 +366,7 @@ static const FP_Point sThrowVelocities[9] = {
     {FP_FromInteger(0), FP_FromInteger(0)}};
 
 
-void Animation_OnFrame_Abe(BaseGameObject* pPtr, u32&, const IndexedPoint& point, ResourceManagerWrapper&, BaseMap&)
+void Animation_OnFrame_Abe(BaseGameObject* pPtr, u32&, const IndexedPoint& point, ResourceManager&, BaseMap&)
 {
     auto pAbe = static_cast<Abe*>(pPtr);
 
@@ -424,7 +424,7 @@ void Abe::LoadAnimations()
     }
 }
 
-void Abe::PendResources(ResourceManagerWrapper& resMan)
+void Abe::PendResources(ResourceManager& resMan)
 {
     resMan.PendAnims(sAbeAnimIdTable);
     resMan.PendAnimation(AnimId::ChantOrb_Particle);
@@ -440,7 +440,7 @@ void Abe::PendResources(ResourceManagerWrapper& resMan)
     resMan.PendAnimation(AnimId::SpotLight);
 }
 
-Abe::Abe(ResourceManagerWrapper& resMan, BaseMap& map) :
+Abe::Abe(ResourceManager& resMan, BaseMap& map) :
     BaseAbe(kResourceArraySize, resMan, map)
 {
     SetType(ReliveTypes::eAbe);
@@ -554,13 +554,13 @@ Abe::~Abe()
 }
 
 
-void Abe::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
+void Abe::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
 {
     const AbeSaveState* pSaveState = pData.ReadTmpPtr<AbeSaveState>();
     Abe::CreateFromSaveState(*pSaveState, resMan, map);
 }
 
-void Abe::CreateFromSaveState(const AbeSaveState& pData, ResourceManagerWrapper& resMan, BaseMap& map)
+void Abe::CreateFromSaveState(const AbeSaveState& pData, ResourceManager& resMan, BaseMap& map)
 {
     Abe* pAbe = gAbe;
     if (!gAbe)
@@ -7705,7 +7705,7 @@ void Abe::TryHoist_44ED30()
     }
 }
 
-void Abe::Create_Fart_421D20(ResourceManagerWrapper& resMan, BaseMap& map)
+void Abe::Create_Fart_421D20(ResourceManager& resMan, BaseMap& map)
 {
     relive_new EvilFart(resMan, map);
 }

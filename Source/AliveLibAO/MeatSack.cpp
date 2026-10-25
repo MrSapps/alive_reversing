@@ -20,7 +20,7 @@ void MeatSack::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::MeatSack_Idle));
 }
 
-MeatSack::MeatSack(relive::Path_MeatSack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+MeatSack::MeatSack(relive::Path_MeatSack* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : ::BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eMeatSack);
@@ -153,7 +153,7 @@ void MeatSack::VScreenChanged()
     SetDead(true);
 }
 
-Meat::Meat(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan, BaseMap& map)
+Meat::Meat(FP xpos, FP ypos, s16 count, ResourceManager& resMan, BaseMap& map)
     : BaseThrowable(resMan, map)
 {
     mBaseThrowableDead = 0;
@@ -211,7 +211,7 @@ void MeatSack::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void MeatSack::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void MeatSack::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<MeatSackSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);

@@ -6,7 +6,7 @@
 #include "Input.hpp"
 #include "../relive_lib/Sound/Midi.hpp"
 #include "GameAutoPlayer.hpp"
-#include "../relive_lib/ResourceManagerWrapper.hpp"
+#include "../relive_lib/ResourceManager.hpp"
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
 
 void Text::VUpdate()
@@ -19,7 +19,7 @@ void Text::VScreenChanged()
     // Empty
 }
 
-Text::Text(const char_type* pMessage, s32 renderCount, s32 bShadow, ResourceManagerWrapper& resMan, BaseMap& map)
+Text::Text(const char_type* pMessage, s32 renderCount, s32 bShadow, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetSurviveDeathReset(true);
@@ -132,7 +132,7 @@ void Text::VRender(OrderingTable& ot)
 // MainMenuController::LoadDemo_Update_4D1040 will call with type 2 (trying to display demo skip message when it can't be found?).
 // MainMenuController::ChangeScreenAndIntroLogic_4CF640 will call with type 3 (Shown on boot, says Abe's Exoddus).
 // Only type 2 is used now.
-FullScreenMessage::FullScreenMessage(MessageType messageType, ResourceManagerWrapper& resMan, BaseMap& map)
+FullScreenMessage::FullScreenMessage(MessageType messageType, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetSurviveDeathReset(true);

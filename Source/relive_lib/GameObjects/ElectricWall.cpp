@@ -14,7 +14,7 @@
 
 const static s16 sElecticWallFrames[6] = {0, 6, 10, 18, 22, 0};
 
-ElectricWall::ElectricWall(relive::Path_ElectricWall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+ElectricWall::ElectricWall(relive::Path_ElectricWall* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map),
     mTlvInfo(tlvId),
     mSwitchId(pTlv->mSwitchId),

@@ -16,7 +16,7 @@ public:
         eBlowingUp_2 = 2
     };
 
-    SnoozeParticle(FP xpos, FP ypos, Layer layer, FP scale, ResourceManagerWrapper& resMan, BaseMap& map);
+    SnoozeParticle(FP xpos, FP ypos, Layer layer, FP scale, ResourceManager& resMan, BaseMap& map);
     ~SnoozeParticle();
 
     virtual void VScreenChanged() override;

@@ -20,7 +20,7 @@ void Mine::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Mine));
 }
 
-Mine::Mine(relive::Path_Mine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Mine::Mine(relive::Path_Mine* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eMine);

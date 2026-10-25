@@ -25,7 +25,7 @@ struct BirdPortalSaveState final : public SaveStateBase
 class BirdPortal final : public IBirdPortal
 {
 public:
-    BirdPortal(relive::Path_BirdPortal* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    BirdPortal(relive::Path_BirdPortal* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~BirdPortal();
 
     virtual void VUpdate() override;
@@ -36,7 +36,7 @@ public:
     virtual void VExitPortal() override;
     virtual void VGetMapChange(EReliveLevelIds* level, u16* path, u16* camera, CameraSwapEffects* screenChangeEffect, FmvIds* fmvIds) override;
 
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
 private:
     s16 IsScaredAway();

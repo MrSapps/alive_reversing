@@ -7,7 +7,7 @@
 class ScreenClipper final : public ::BaseGameObject
 {
 public:
-    ScreenClipper(PSX_Point xy, PSX_Point wh, Layer layer, ResourceManagerWrapper& resMan, BaseMap& map);
+    ScreenClipper(PSX_Point xy, PSX_Point wh, Layer layer, ResourceManager& resMan, BaseMap& map);
     ~ScreenClipper();
     
     virtual void VRender(OrderingTable& ot) override;

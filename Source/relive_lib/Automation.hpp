@@ -7,7 +7,7 @@
 
 class BaseMap;
 class FileSystem;
-class ResourceManagerWrapper;
+class ResourceManager;
 
 // Runs a script of commands (-automation=<file>), so a tool or a test can drive the game and see
 // what it's doing without anyone watching it. With SDL_VIDEO_DRIVER=offscreen it needs no display.
@@ -82,7 +82,7 @@ public:
     // false with error saying what's wrong and on which line.
     static bool Parse(const std::string& script, std::vector<Command>& commands, std::string& error);
 
-    Automation(FileSystem& fs, ResourceManagerWrapper& resMan, std::vector<Command> commands);
+    Automation(FileSystem& fs, ResourceManager& resMan, std::vector<Command> commands);
     ~Automation();
 
     enum class Result
@@ -117,7 +117,7 @@ private:
     void Fail(const Command& command, const std::string& why);
 
     FileSystem& mFs;
-    ResourceManagerWrapper& mResMan;
+    ResourceManager& mResMan;
     std::vector<Command> mCommands;
     std::size_t mNextCommand = 0;
     bool mFailed = false;

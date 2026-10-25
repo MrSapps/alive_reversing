@@ -58,7 +58,7 @@ static const char_type* sTeleportLevelNameTable[16] = {
     "Desert Level Ender"
 };
 
-DDCheat::DDCheat(ResourceManagerWrapper& resMan, BaseMap& map)
+DDCheat::DDCheat(ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetSurviveDeathReset(true);

@@ -4,7 +4,7 @@
 #include "stdafx.h"
 #include "Factory.hpp"
 
-#include "ResourceManagerWrapper.hpp"
+#include "ResourceManager.hpp"
 #include "GameType.hpp"
 
 #include "../AliveLibAE/stdlib.hpp"
@@ -173,7 +173,7 @@ static constexpr AnimId kSligGibs[3] = {
     AnimId::Slig_Arm_Gib,
     AnimId::Slig_Body_Gib};
 
-void Factory::HoistAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::HoistAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -208,7 +208,7 @@ void Factory::HoistAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Reso
     }
 }
 
-void Factory::EdgeAO(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper&, BaseMap& map)
+void Factory::EdgeAO(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode loadMode, ResourceManager&, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -220,7 +220,7 @@ void Factory::EdgeAO(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode loadMode, R
     }
 }
 
-void Factory::ShadowZoneAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::ShadowZoneAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -228,7 +228,7 @@ void Factory::ShadowZoneAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode,
     }
 }
 
-void Factory::LiftPointAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::LiftPointAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -337,7 +337,7 @@ void Factory::LiftPointAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, 
     }
 }
 
-void Factory::WellAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::WellAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -351,7 +351,7 @@ void Factory::WellAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Resou
     }
 }
 
-void Factory::DoveAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::DoveAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -394,7 +394,7 @@ void Factory::DoveAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Resou
     }
 }
 
-void Factory::RockSackAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::RockSackAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -413,7 +413,7 @@ void Factory::RockSackAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, R
     }
 }
 
-void Factory::ZBallAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::ZBallAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -427,7 +427,7 @@ void Factory::ZBallAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Reso
     }
 }
 
-void Factory::FallingItemAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::FallingItemAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -465,7 +465,7 @@ void Factory::FallingItemAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     }
 }
 
-void Factory::PullRingRopeAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::PullRingRopeAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -502,7 +502,7 @@ void Factory::PullRingRopeAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
     }
 }
 
-void Factory::BackgroundAnimationAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::BackgroundAnimationAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -512,7 +512,7 @@ void Factory::BackgroundAnimationAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode 
     }
 }
 
-void Factory::HoneyAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::HoneyAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -533,7 +533,7 @@ void Factory::HoneyAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Reso
     }
 }
 
-void Factory::TimedMineAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::TimedMineAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto pTimedMineTlv = static_cast<Path_TimedMine*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
@@ -558,7 +558,7 @@ void Factory::TimedMineAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, 
     }
 }
 
-static void LoadWalkingSligResourcesAO(Factory::LoadMode loadMode, BitField16<AO::SligFlags_DisabledRes> disabledResources, ResourceManagerWrapper& resMan, BaseMap& map)
+static void LoadWalkingSligResourcesAO(Factory::LoadMode loadMode, BitField16<AO::SligFlags_DisabledRes> disabledResources, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == Factory::LoadMode::LoadResourceFromList_1 || loadMode == Factory::LoadMode::LoadResource_2)
     {
@@ -610,7 +610,7 @@ static void LoadWalkingSligResourcesAO(Factory::LoadMode loadMode, BitField16<AO
     }
 }
 
-void Factory::SligAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SligAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto pSligTlv = static_cast<Path_Slig*>(pTlv);
     LoadWalkingSligResourcesAO(loadMode, pSligTlv->mDisabledResourcesAO, resMan, map);
@@ -626,7 +626,7 @@ void Factory::SligAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Resou
 }
 
 
-void Factory::SlogAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SlogAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -638,7 +638,7 @@ void Factory::SlogAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Resou
     }
 }
 
-void Factory::LeverAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::LeverAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -689,7 +689,7 @@ void Factory::LeverAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Reso
     }
 }
 
-void Factory::BellHammerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::BellHammerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -703,7 +703,7 @@ void Factory::BellHammerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode,
     }
 }
 
-void Factory::SecurityOrbAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SecurityOrbAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto pSecurityOrbTlv = static_cast<Path_SecurityOrb*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
@@ -723,7 +723,7 @@ void Factory::SecurityOrbAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     }
 }
 
-void Factory::LiftMudAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::LiftMudAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -735,7 +735,7 @@ void Factory::LiftMudAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Re
     }
 }
 
-void Factory::BeeSwarmHoleAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::BeeSwarmHoleAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -750,7 +750,7 @@ void Factory::BeeSwarmHoleAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
     }
 }
 
-void Factory::HoneySackAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::HoneySackAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -767,7 +767,7 @@ void Factory::HoneySackAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, 
     }
 }
 
-void Factory::AbeStartAO(Path_TLV* pTlv, const Guid& /*tlvId*/, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::AbeStartAO(Path_TLV* pTlv, const Guid& /*tlvId*/, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2 && !gAttract)
     {
@@ -792,7 +792,7 @@ void Factory::AbeStartAO(Path_TLV* pTlv, const Guid& /*tlvId*/, LoadMode loadMod
     }
 }
 
-void Factory::ElumWallAO(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper&, BaseMap& map)
+void Factory::ElumWallAO(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode loadMode, ResourceManager&, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -803,7 +803,7 @@ void Factory::ElumWallAO(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode loadMod
     }
 }
 
-void Factory::SlingMudAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SlingMudAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -816,7 +816,7 @@ void Factory::SlingMudAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, R
     }
 }
 
-void Factory::BeeNestAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::BeeNestAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -828,7 +828,7 @@ void Factory::BeeNestAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Re
     }
 }
 
-void Factory::MineAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::MineAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto pMineTlv = static_cast<Path_Mine*>(pTlv);
 
@@ -851,7 +851,7 @@ void Factory::MineAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Resou
     }
 }
 
-void Factory::UXBAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::UXBAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto pUxbTlv = static_cast<Path_UXB*>(pTlv);
 
@@ -877,7 +877,7 @@ void Factory::UXBAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Resour
     }
 }
 
-void Factory::ParamiteAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::ParamiteAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -888,7 +888,7 @@ void Factory::ParamiteAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, R
     relive_new AO::Paramite(static_cast<Path_Paramite*>(pTlv), tlvId, resMan, map);
 }
 
-void Factory::BatAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::BatAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -902,7 +902,7 @@ void Factory::BatAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Resour
     }
 }
 
-void Factory::RingMudAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::RingMudAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -914,7 +914,7 @@ void Factory::RingMudAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Re
     }
 }
 
-void Factory::BirdPortalAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::BirdPortalAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto pBirdPortalTlv = static_cast<Path_BirdPortal*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
@@ -941,7 +941,7 @@ void Factory::BirdPortalAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode,
     }
 }
 
-void Factory::BellSongStoneAO(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper&, BaseMap& map)
+void Factory::BellSongStoneAO(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode loadMode, ResourceManager&, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -950,7 +950,7 @@ void Factory::BellSongStoneAO(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode lo
 }
 
 
-void Factory::TrapDoorAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::TrapDoorAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -994,7 +994,7 @@ void Factory::TrapDoorAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, R
 }
 
 
-void Factory::RollingBallAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::RollingBallAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1021,7 +1021,7 @@ static TlvIterator FindMatchingSligTLVAO(TlvIterator pTlvIter, Path_SligBound* p
     return TlvIterator::Invalid();
 }
 
-void Factory::SligBoundLeftAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SligBoundLeftAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto pBound = static_cast<Path_SligBound*>(pTlv);
     LoadWalkingSligResourcesAO(loadMode, pBound->mDisabledResourcesAO, resMan, map);
@@ -1051,7 +1051,7 @@ void Factory::SligBoundLeftAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMo
     }
 }
 
-void Factory::RollingBallStopperAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::RollingBallStopperAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1063,7 +1063,7 @@ void Factory::RollingBallStopperAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode l
     }
 }
 
-void Factory::FootSwitchAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::FootSwitchAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1076,7 +1076,7 @@ void Factory::FootSwitchAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode,
     }
 }
 
-void Factory::SecurityClawAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SecurityClawAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto pSecurityClawTlv = static_cast<Path_SecurityClaw*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
@@ -1101,7 +1101,7 @@ void Factory::SecurityClawAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
 }
 
 
-void Factory::MotionDetectorAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::MotionDetectorAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -1114,7 +1114,7 @@ void Factory::MotionDetectorAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadM
     }
 }
 
-void Factory::SligSpawnerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SligSpawnerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto pSligTlv = static_cast<Path_Slig*>(pTlv);
     LoadWalkingSligResourcesAO(loadMode, pSligTlv->mDisabledResourcesAO, resMan, map);
@@ -1129,7 +1129,7 @@ void Factory::SligSpawnerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     }
 }
 
-void Factory::ElectricWallAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::ElectricWallAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -1142,7 +1142,7 @@ void Factory::ElectricWallAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
 }
 
 
-void Factory::LiftMoverAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::LiftMoverAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -1151,7 +1151,7 @@ void Factory::LiftMoverAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, 
 }
 
 
-void Factory::ChimeLockAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::ChimeLockAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -1169,7 +1169,7 @@ void Factory::ChimeLockAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, 
     }
 }
 
-void Factory::ElumAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::ElumAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1184,7 +1184,7 @@ void Factory::ElumAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Resou
 }
 
 
-void Factory::MeatSackAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::MeatSackAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1199,7 +1199,7 @@ void Factory::MeatSackAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, R
 }
 
 
-void Factory::ScrabAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::ScrabAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1210,7 +1210,7 @@ void Factory::ScrabAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Reso
 }
 
 
-void Factory::FlintLockFireAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::FlintLockFireAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1225,12 +1225,12 @@ void Factory::FlintLockFireAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMo
     }
 }
 
-void Factory::SligBoundRightAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SligBoundRightAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     SligBoundLeftAO(pTlv, tlvId, loadMode, resMan, map);
 }
 
-void Factory::InvisibleSwitchAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::InvisibleSwitchAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -1238,7 +1238,7 @@ void Factory::InvisibleSwitchAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode load
     }
 }
 
-void Factory::WorkerMudokonAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::WorkerMudokonAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto pMudTlv = static_cast<Path_Mudokon*>(pTlv);
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
@@ -1277,7 +1277,7 @@ void Factory::WorkerMudokonAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMo
     }
 }
 
-void Factory::DoorFlameAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::DoorFlameAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1290,7 +1290,7 @@ void Factory::DoorFlameAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, 
     }
 }
 
-void Factory::MovingBombAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::MovingBombAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto pMovingBombTlv = static_cast<Path_MovingBomb*>(pTlv);
 
@@ -1312,7 +1312,7 @@ void Factory::MovingBombAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode,
     }
 }
 
-void Factory::MeatSawAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::MeatSawAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1327,7 +1327,7 @@ void Factory::MeatSawAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Re
     }
 }
 
-void Factory::MainMenuControllerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::MainMenuControllerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (AO::gMainMenuInstanceCount == 0)
     {
@@ -1342,7 +1342,7 @@ void Factory::MainMenuControllerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode l
     }
 }
 
-void Factory::HintFlyAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::HintFlyAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -1354,7 +1354,7 @@ void Factory::HintFlyAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Re
     }
 }
 
-void Factory::TimerTriggerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::TimerTriggerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -1363,7 +1363,7 @@ void Factory::TimerTriggerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
 }
 
 
-void Factory::SecurityDoorAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SecurityDoorAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1376,7 +1376,7 @@ void Factory::SecurityDoorAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
     }
 }
 
-void Factory::BoomMachineAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::BoomMachineAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto pBoomMachineTlv = static_cast<Path_BoomMachine*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
@@ -1397,7 +1397,7 @@ void Factory::BoomMachineAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
 }
 
 
-void Factory::LCDScreenAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::LCDScreenAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1408,7 +1408,7 @@ void Factory::LCDScreenAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, 
     }
 }
 
-void Factory::HandStoneAO(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::HandStoneAO(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1421,7 +1421,7 @@ void Factory::HandStoneAO(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode loadMo
 }
 
 
-void Factory::CreditsControllerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::CreditsControllerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -1432,7 +1432,7 @@ void Factory::CreditsControllerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode lo
     }
 }
 
-void Factory::LCDStatusBoardAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::LCDStatusBoardAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1444,7 +1444,7 @@ void Factory::LCDStatusBoardAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadM
 }
 
 
-void Factory::SwitchStateBooleanLogicAO(Path_TLV* /*pTlv*/, const Guid& /*tlvId*/, LoadMode loadMode, ResourceManagerWrapper&, BaseMap&)
+void Factory::SwitchStateBooleanLogicAO(Path_TLV* /*pTlv*/, const Guid& /*tlvId*/, LoadMode loadMode, ResourceManager&, BaseMap&)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -1453,7 +1453,7 @@ void Factory::SwitchStateBooleanLogicAO(Path_TLV* /*pTlv*/, const Guid& /*tlvId*
     }
 }
 
-void Factory::MusicTriggerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::MusicTriggerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -1461,7 +1461,7 @@ void Factory::MusicTriggerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
     }
 }
 
-void Factory::LightEffectAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::LightEffectAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto pPathLightTlv = static_cast<Path_LightEffect*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
@@ -1540,7 +1540,7 @@ void Factory::LightEffectAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
 }
 
 
-void Factory::SlogSpawnerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SlogSpawnerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1553,7 +1553,7 @@ void Factory::SlogSpawnerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
 }
 
 
-void Factory::GasCountDownAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::GasCountDownAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1566,7 +1566,7 @@ void Factory::GasCountDownAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
 
 
 
-void Factory::RingCancelAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper&, BaseMap& map)
+void Factory::RingCancelAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager&, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -1593,7 +1593,7 @@ void Factory::RingCancelAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode,
 }
 
 
-void Factory::GasEmitterAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::GasEmitterAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -1602,7 +1602,7 @@ void Factory::GasEmitterAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode,
 }
 
 
-void Factory::ZzzSpawnerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::ZzzSpawnerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -1611,7 +1611,7 @@ void Factory::ZzzSpawnerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode,
 }
 
 
-void Factory::BackgroundGlukkonAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::BackgroundGlukkonAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1630,7 +1630,7 @@ void Factory::BackgroundGlukkonAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode lo
 }
 
 
-void Factory::KillUnsavedMudsAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper&, BaseMap& map)
+void Factory::KillUnsavedMudsAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager&, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -1648,7 +1648,7 @@ void Factory::KillUnsavedMudsAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode load
 
 // NAMESPACE AO END
 
-void Factory::MainMenuControllerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::MainMenuControllerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (sMainMenuObjectCounter_BB4400 == 0)
     {
@@ -1673,7 +1673,7 @@ void Factory::MainMenuControllerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode l
     }
 }
 
-void Factory::HoistAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::HoistAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     Path_Hoist* pHoistTlv = static_cast<Path_Hoist*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
@@ -1693,7 +1693,7 @@ void Factory::HoistAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Reso
     }
 }
 
-void Factory::EdgeAE(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper&, BaseMap& map)
+void Factory::EdgeAE(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode loadMode, ResourceManager&, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1705,7 +1705,7 @@ void Factory::EdgeAE(Path_TLV* /*pTlv*/, const Guid& tlvId, LoadMode loadMode, R
     }
 }
 
-void Factory::DoorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::DoorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1719,7 +1719,7 @@ void Factory::DoorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Resou
     }
 }
 
-void Factory::ShadowZoneAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::ShadowZoneAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -1727,7 +1727,7 @@ void Factory::ShadowZoneAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode,
     }
 }
 
-void Factory::LiftPointAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::LiftPointAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1832,7 +1832,7 @@ void Factory::LiftPointAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, 
     }
 }
 
-void Factory::WellAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::WellAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1847,7 +1847,7 @@ void Factory::WellAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Resou
     }
 }
 
-void Factory::DoveAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::DoveAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -1880,7 +1880,7 @@ void Factory::DoveAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Resou
     }
 }
 
-void Factory::RockSackAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::RockSackAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1895,7 +1895,7 @@ void Factory::RockSackAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, R
     }
 }
 
-void Factory::FallingItemAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::FallingItemAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1920,7 +1920,7 @@ void Factory::FallingItemAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     }
 }
 
-void Factory::PullRingRopeAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::PullRingRopeAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1935,7 +1935,7 @@ void Factory::PullRingRopeAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
     }
 }
 
-void Factory::TimedMineAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::TimedMineAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto mine_tlv = static_cast<Path_TimedMine*>(pTlv);
 
@@ -1956,7 +1956,7 @@ void Factory::TimedMineAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, 
     }
 }
 
-static void LoadWalkingSligResourcesAE(ResourceManagerWrapper& resMan)
+static void LoadWalkingSligResourcesAE(ResourceManager& resMan)
 {
     resMan.PendAnims(Slig::sSligAnimIdTable);
     resMan.PendAnimation(AnimId::ShootingZFire_Particle);
@@ -1966,7 +1966,7 @@ static void LoadWalkingSligResourcesAE(ResourceManagerWrapper& resMan)
     resMan.PendAnimation(AnimId::ObjectShadow);
 }
 
-void Factory::SligAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SligAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto pSligTlv = static_cast<Path_Slig*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
@@ -1979,12 +1979,12 @@ void Factory::SligAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Resou
     }
 }
 
-static void LoadSlogResourcesAE(ResourceManagerWrapper& resMan)
+static void LoadSlogResourcesAE(ResourceManager& resMan)
 {
     resMan.PendAnims(Slog::sSlogAnimIdTable);
 }
 
-void Factory::SlogAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SlogAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -1996,7 +1996,7 @@ void Factory::SlogAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Resou
     }
 }
 
-void Factory::LeverAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::LeverAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2012,7 +2012,7 @@ void Factory::LeverAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Reso
     }
 }
 
-void Factory::SecurityOrbAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SecurityOrbAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     Path_SecurityOrb* pSecurityOrbTlv = static_cast<Path_SecurityOrb*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
@@ -2032,7 +2032,7 @@ void Factory::SecurityOrbAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     }
 }
 
-void Factory::AbeStartAE(Path_TLV* pTlv,  const Guid& /*tlvId*/, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::AbeStartAE(Path_TLV* pTlv,  const Guid& /*tlvId*/, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2 && !gAttract)
     {
@@ -2053,7 +2053,7 @@ void Factory::AbeStartAE(Path_TLV* pTlv,  const Guid& /*tlvId*/, LoadMode loadMo
     }
 }
 
-void Factory::MineAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::MineAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto mine_tlv = static_cast<Path_Mine*>(pTlv);
 
@@ -2072,7 +2072,7 @@ void Factory::MineAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Resou
     }
 }
 
-void Factory::UXBAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::UXBAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto uxb_tlv = static_cast<Path_UXB*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
@@ -2093,7 +2093,7 @@ void Factory::UXBAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Resour
     }
 }
 
-void Factory::ParamiteAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::ParamiteAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2106,7 +2106,7 @@ void Factory::ParamiteAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, R
     }
 }
 
-void Factory::MovieHandStoneAE(Path_TLV*, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper&, BaseMap& map)
+void Factory::MovieHandStoneAE(Path_TLV*, const Guid& tlvId, LoadMode loadMode, ResourceManager&, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2118,7 +2118,7 @@ void Factory::MovieHandStoneAE(Path_TLV*, const Guid& tlvId, LoadMode loadMode, 
     }
 }
 
-void Factory::BirdPortalAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::BirdPortalAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto pBirdPortalTlv = static_cast<Path_BirdPortal*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
@@ -2148,7 +2148,7 @@ void Factory::BirdPortalAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode,
     }
 }
 
-void Factory::TrapDoorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::TrapDoorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2191,7 +2191,7 @@ static TlvIterator FindMatchingSligTLVAE(TlvIterator pTlvIter, Path_SligBound* p
     return TlvIterator::Invalid();
 }
 
-void Factory::SligBoundLeftAE(Path_TLV* pTlv,  const Guid& /*tlvId*/, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SligBoundLeftAE(Path_TLV* pTlv,  const Guid& /*tlvId*/, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto pBound = static_cast<Path_SligBound*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
@@ -2219,7 +2219,7 @@ void Factory::SligBoundLeftAE(Path_TLV* pTlv,  const Guid& /*tlvId*/, LoadMode l
     }
 }
 
-void Factory::FootSwitchAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::FootSwitchAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2248,14 +2248,14 @@ void Factory::FootSwitchAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode,
     }
 }
 
-void Factory::ChantSuppressor_WithArmsAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::ChantSuppressor_WithArmsAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     // TODO: Most of the code for the chant suppressor with arms is still in the game
     // check if it can be re-added at some point.
     SecurityOrbAE(pTlv, tlvId, loadMode, resMan, map);
 }
 
-void Factory::MotionDetectorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::MotionDetectorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -2268,7 +2268,7 @@ void Factory::MotionDetectorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadM
     }
 }
 
-void Factory::SligSpawnerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SligSpawnerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto pSligTlv = static_cast<Path_Slig*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
@@ -2281,7 +2281,7 @@ void Factory::SligSpawnerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     }
 }
 
-void Factory::ElectricWallAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::ElectricWallAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2293,7 +2293,7 @@ void Factory::ElectricWallAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
     }
 }
 
-void Factory::LiftMoverAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::LiftMoverAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -2301,7 +2301,7 @@ void Factory::LiftMoverAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, 
     }
 }
 
-void Factory::MeatSackAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::MeatSackAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2315,7 +2315,7 @@ void Factory::MeatSackAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, R
     }
 }
 
-void Factory::ScrabAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::ScrabAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2327,12 +2327,12 @@ void Factory::ScrabAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Reso
     }
 }
 
-void Factory::SligBoundRightAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SligBoundRightAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     SligBoundLeftAE(pTlv, tlvId, loadMode, resMan, map);
 }
 
-void Factory::InvisibleSwitchAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::InvisibleSwitchAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -2340,7 +2340,7 @@ void Factory::InvisibleSwitchAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode load
     }
 }
 
-void Factory::MudokonAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::MudokonAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto pMudTlv = static_cast<Path_Mudokon*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
@@ -2354,7 +2354,7 @@ void Factory::MudokonAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Re
     }
 }
 
-void Factory::DoorFlameAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::DoorFlameAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2367,7 +2367,7 @@ void Factory::DoorFlameAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, 
     }
 }
 
-void Factory::MovingBombAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::MovingBombAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto pMovingBombTlv = static_cast<Path_MovingBomb*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
@@ -2383,7 +2383,7 @@ void Factory::MovingBombAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode,
     }
 }
 
-void Factory::TimerTriggerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::TimerTriggerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::ConstructObject_0)
     {
@@ -2391,7 +2391,7 @@ void Factory::TimerTriggerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
     }
 }
 
-void Factory::SecurityDoorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SecurityDoorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2404,7 +2404,7 @@ void Factory::SecurityDoorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
     }
 }
 
-void Factory::BoomMachineAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::BoomMachineAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     auto pTlvBooMachine = static_cast<Path_BoomMachine*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
@@ -2425,7 +2425,7 @@ void Factory::BoomMachineAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     }
 }
 
-void Factory::BackgroundAnimationAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::BackgroundAnimationAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -2433,7 +2433,7 @@ void Factory::BackgroundAnimationAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode 
     }
 }
 
-void Factory::LCDScreenAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::LCDScreenAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2444,7 +2444,7 @@ void Factory::LCDScreenAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, 
     relive_new LCDScreen(static_cast<Path_LCDScreen*>(pTlv), tlvId, resMan, map);
 }
 
-void Factory::HandStoneAE(Path_TLV*, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::HandStoneAE(Path_TLV*, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2456,7 +2456,7 @@ void Factory::HandStoneAE(Path_TLV*, const Guid& tlvId, LoadMode loadMode, Resou
     }
 }
 
-void Factory::CreditsControllerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::CreditsControllerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2 && !gCreditsControllerExists)
     {
@@ -2464,7 +2464,7 @@ void Factory::CreditsControllerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode lo
     }
 }
 
-void Factory::LCDStatusBoardAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::LCDStatusBoardAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2475,7 +2475,7 @@ void Factory::LCDStatusBoardAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadM
     relive_new LCDStatusBoard(static_cast<Path_LCDStatusBoard*>(pTlv), tlvId, resMan, map);
 }
 
-void Factory::WheelSyncerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::WheelSyncerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -2483,7 +2483,7 @@ void Factory::WheelSyncerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     }
 }
 
-void Factory::MusicTriggerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::MusicTriggerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -2491,7 +2491,7 @@ void Factory::MusicTriggerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
     }
 }
 
-void Factory::SlogSpawnerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SlogSpawnerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2503,7 +2503,7 @@ void Factory::SlogSpawnerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     }
 }
 
-void Factory::GasCountDownAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::GasCountDownAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2516,7 +2516,7 @@ void Factory::GasCountDownAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
     }
 }
 
-void Factory::GasEmitterAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::GasEmitterAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -2524,7 +2524,7 @@ void Factory::GasEmitterAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode,
     }
 }
 
-void Factory::ZzzSpawnerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::ZzzSpawnerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -2532,7 +2532,7 @@ void Factory::ZzzSpawnerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode,
     }
 }
 
-void Factory::GlukkonAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::GlukkonAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     Path_Glukkon* pGlukkonTlv = static_cast<Path_Glukkon*>(pTlv);
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
@@ -2590,7 +2590,7 @@ void Factory::GlukkonAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Re
     }
 }
 
-void Factory::WaterAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::WaterAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2603,7 +2603,7 @@ void Factory::WaterAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Reso
     }
 }
 
-void Factory::WorkWheelAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::WorkWheelAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2616,7 +2616,7 @@ void Factory::WorkWheelAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, 
     }
 }
 
-static void Create_LaughingGasAE(Layer layer, Path_TLV* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+static void Create_LaughingGasAE(Layer layer, Path_TLV* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
 {
     if (!gLaughingGasInstanceCount)
     {
@@ -2624,7 +2624,7 @@ static void Create_LaughingGasAE(Layer layer, Path_TLV* pTlv, const Guid& tlvId,
     }
 }
 
-void Factory::LaughingGasAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::LaughingGasAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -2632,7 +2632,7 @@ void Factory::LaughingGasAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     }
 }
 
-static void LoadFlyingSligResourcesAE(ResourceManagerWrapper& resMan)
+static void LoadFlyingSligResourcesAE(ResourceManager& resMan)
 {
     resMan.PendAnims(FlyingSlig::sFlyingSligAnimIdTable);
     resMan.PendAnims(kSligGibs);
@@ -2645,7 +2645,7 @@ static void LoadFlyingSligResourcesAE(ResourceManagerWrapper& resMan)
     resMan.PendAnims(kSlogGibs);
 }
 
-void Factory::FlyingSligAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::FlyingSligAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2657,7 +2657,7 @@ void Factory::FlyingSligAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode,
     }
 }
 
-void Factory::FleechAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::FleechAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2671,7 +2671,7 @@ void Factory::FleechAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Res
     }
 }
 
-void Factory::SlurgAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SlurgAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2685,7 +2685,7 @@ void Factory::SlurgAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Reso
     }
 }
 
-void Factory::SlamDoorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SlamDoorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2713,7 +2713,7 @@ void Factory::SlamDoorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, R
     }
 }
 
-void Factory::LevelLoaderAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::LevelLoaderAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -2721,7 +2721,7 @@ void Factory::LevelLoaderAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     }
 }
 
-void Factory::DemoSpawnPointAE(Path_TLV*, const Guid& /*tlvId*/, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::DemoSpawnPointAE(Path_TLV*, const Guid& /*tlvId*/, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -2735,7 +2735,7 @@ void Factory::DemoSpawnPointAE(Path_TLV*, const Guid& /*tlvId*/, LoadMode loadMo
     }
 }
 
-void Factory::TeleporterAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::TeleporterAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -2743,7 +2743,7 @@ void Factory::TeleporterAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode,
     }
 }
 
-void Factory::SlurgSpawnerAE(Path_TLV* /*pTlv*/,  const Guid& /*tlvId*/, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap&)
+void Factory::SlurgSpawnerAE(Path_TLV* /*pTlv*/,  const Guid& /*tlvId*/, LoadMode loadMode, ResourceManager& resMan, BaseMap&)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2763,7 +2763,7 @@ void Factory::SlurgSpawnerAE(Path_TLV* /*pTlv*/,  const Guid& /*tlvId*/, LoadMod
     }
 }
 
-void Factory::DrillAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::DrillAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2780,7 +2780,7 @@ void Factory::DrillAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Reso
     }
 }
 
-void Factory::ColourfulMeterAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::ColourfulMeterAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2792,7 +2792,7 @@ void Factory::ColourfulMeterAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadM
     }
 }
 
-void Factory::FlyingSligSpawnerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::FlyingSligSpawnerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2804,7 +2804,7 @@ void Factory::FlyingSligSpawnerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode lo
     }
 }
 
-void Factory::MineCarAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::MineCarAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2825,7 +2825,7 @@ void Factory::MineCarAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Re
     }
 }
 
-void Factory::BoneBagAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::BoneBagAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2840,7 +2840,7 @@ void Factory::BoneBagAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Re
     }
 }
 
-void Factory::ExplosionSetAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::ExplosionSetAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2875,7 +2875,7 @@ void Factory::ExplosionSetAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
     }
 }
 
-void Factory::MultiSwitchControllerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::MultiSwitchControllerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
@@ -2883,7 +2883,7 @@ void Factory::MultiSwitchControllerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMod
     }
 }
 
-void Factory::StatusLightAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::StatusLightAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2896,7 +2896,7 @@ void Factory::StatusLightAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     }
 }
 
-void Factory::SlapLockAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SlapLockAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2910,7 +2910,7 @@ void Factory::SlapLockAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, R
     }
 }
 
-void Factory::ParamiteWebLineAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::ParamiteWebLineAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2922,7 +2922,7 @@ void Factory::ParamiteWebLineAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode load
     }
 }
 
-void Factory::AlarmAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::AlarmAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::ConstructObject_0)
     {
@@ -2930,7 +2930,7 @@ void Factory::AlarmAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Reso
     }
 }
 
-void Factory::BrewMachineAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::BrewMachineAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2946,7 +2946,7 @@ void Factory::BrewMachineAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     }
 }
 
-void Factory::ScrabSpawnerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::ScrabSpawnerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2958,7 +2958,7 @@ void Factory::ScrabSpawnerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
     }
 }
 
-void Factory::CrawlingSligAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::CrawlingSligAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2978,7 +2978,7 @@ void Factory::CrawlingSligAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
     }
 }
 
-void Factory::SligGetPantsAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SligGetPantsAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -2992,7 +2992,7 @@ void Factory::SligGetPantsAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
     }
 }
 
-void Factory::SligGetWingsAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::SligGetWingsAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -3006,7 +3006,7 @@ void Factory::SligGetWingsAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMod
     }
 }
 
-void Factory::GreeterAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::GreeterAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -3030,7 +3030,7 @@ void Factory::GreeterAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Re
     }
 }
 
-void Factory::CrawlingSligButtonAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::CrawlingSligButtonAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -3043,7 +3043,7 @@ void Factory::CrawlingSligButtonAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode l
     }
 }
 
-void Factory::GlukkonSwitchAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::GlukkonSwitchAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -3056,7 +3056,7 @@ void Factory::GlukkonSwitchAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMo
     }
 }
 
-void Factory::DoorBlockerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::DoorBlockerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -3069,7 +3069,7 @@ void Factory::DoorBlockerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
     }
 }
 
-void Factory::RollingBallStopperAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::RollingBallStopperAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -3081,7 +3081,7 @@ void Factory::RollingBallStopperAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode l
     }
 }
 
-void Factory::TorturedMudokonAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::TorturedMudokonAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (!pTlv->mTlvSpecificMeaning)
     {
@@ -3100,7 +3100,7 @@ void Factory::TorturedMudokonAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode load
     }
 }
 
-void Factory::TrainDoorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::TrainDoorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -3113,7 +3113,7 @@ void Factory::TrainDoorAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, 
     }
 }
 
-void Factory::RollingBallAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::RollingBallAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
     if (loadMode == LoadMode::LoadResourceFromList_1 || loadMode == LoadMode::LoadResource_2)
     {
@@ -3129,7 +3129,7 @@ void Factory::RollingBallAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
 
 // namespace AE END
 
-void Factory::ConstructTLVObject(Path_TLV* pTlv, const Guid& tlvInfo, LoadMode loadMode, ResourceManagerWrapper& resMan, BaseMap& map)
+void Factory::ConstructTLVObject(Path_TLV* pTlv, const Guid& tlvInfo, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
 #define FACTORY(method, pTlv, tlvInfo, loadMode, resMan, map) \
     if (GetGameType() == GameType::eAo) \

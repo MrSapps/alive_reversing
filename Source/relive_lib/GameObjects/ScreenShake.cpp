@@ -5,7 +5,7 @@
 #include "../relive_lib/PsxDisplay.hpp"
 #include "../relive_lib/Primitives.hpp"
 
-ScreenShake::ScreenShake(bool enableShakeEvent, bool softerShakes, ResourceManagerWrapper& resMan, BaseMap& map)
+ScreenShake::ScreenShake(bool enableShakeEvent, bool softerShakes, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eScreenShake);

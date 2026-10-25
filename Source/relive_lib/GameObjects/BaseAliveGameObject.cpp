@@ -347,7 +347,7 @@ IBirdPortal* BaseAliveGameObject::VIntoBirdPortal(s16 numGridBlocks)
     return nullptr;
 }
 
-BaseAliveGameObject::BaseAliveGameObject(s16 resourceArraySize, ResourceManagerWrapper& resMan, BaseMap& map)
+BaseAliveGameObject::BaseAliveGameObject(s16 resourceArraySize, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(resourceArraySize, resMan, map)
 {
     SetCanBePossessed(false);

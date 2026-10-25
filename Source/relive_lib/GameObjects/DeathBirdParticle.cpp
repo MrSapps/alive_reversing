@@ -12,7 +12,7 @@ void DeathBirdParticle::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::DeathFlare_1));
 }
 
-DeathBirdParticle::DeathBirdParticle(FP xpos, FP ypos, s32 startTimer, bool playSound, FP scale, ResourceManagerWrapper& resMan, BaseMap& map)
+DeathBirdParticle::DeathBirdParticle(FP xpos, FP ypos, s32 startTimer, bool playSound, FP scale, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map),
     mStartTimer(startTimer),
     mPlaySound(playSound)

@@ -54,7 +54,7 @@ struct ChimeLockSaveState final : public SaveStateBase
 class ChimeLock final : public ::BaseAliveGameObject
 {
 public:
-    ChimeLock(relive::Path_ChimeLock* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    ChimeLock(relive::Path_ChimeLock* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~ChimeLock();
 
     virtual void VUpdate() override;
@@ -62,7 +62,7 @@ public:
     virtual void VPossessed() override;
     virtual void VUnPosses() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
 private:
     s16 DoNote(s16 note);

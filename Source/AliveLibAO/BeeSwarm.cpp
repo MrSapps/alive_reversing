@@ -23,7 +23,7 @@ namespace AO {
 s16 gBeeInstanceCount = 0;
 s16 gBeesNearAbe = 0;
 
-BeeSwarm::BeeSwarm(FP xpos, FP ypos, FP speed, s32 numBees, s32 totalChaseTime, ResourceManagerWrapper& resMan, BaseMap& map)
+BeeSwarm::BeeSwarm(FP xpos, FP ypos, FP speed, s32 numBees, s32 totalChaseTime, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eBeeSwarm);

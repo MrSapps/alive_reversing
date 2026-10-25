@@ -57,7 +57,7 @@ public:
 
     void LoadAnimations();
 
-    Slurg(relive::Path_Slurg* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    Slurg(relive::Path_Slurg* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~Slurg();
 
     virtual void VUpdate() override;
@@ -65,7 +65,7 @@ public:
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
     virtual void VOnTlvCollision(TlvIterator tlvIterator) override;
 
-    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
 
 private:
     void GoLeft();

@@ -19,7 +19,7 @@ struct ThrowableArraySaveState final : public SaveStateBase
 class ThrowableArray final : public BaseGameObject
 {
 public:
-    ThrowableArray(ResourceManagerWrapper& resMan, BaseMap& map);
+    ThrowableArray(ResourceManager& resMan, BaseMap& map);
     ~ThrowableArray();
 
     virtual void VUpdate() override;
@@ -27,7 +27,7 @@ public:
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
     virtual void VScreenChanged() override;
 
-    static void CreateFromSaveState(SerializedObjectData& pState, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pState, ResourceManager& resMan, BaseMap& map);
 
     void Remove(s16 count);
     void Add(s16 count);

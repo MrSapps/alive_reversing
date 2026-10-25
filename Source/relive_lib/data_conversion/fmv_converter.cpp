@@ -1062,3 +1062,111 @@ void ConvertFMVs(ThreadPool& tp, FileSystem& fs, const FileSystem::Path& dataDir
         tp.AddJob(std::make_unique<ConvertFmvJob>(fs, info.mName, fmvOutDir, isAo, tp, manifest, progress, info.mScan, info.mFrameCount));
     }
 }
+
+// A copy is whole or not there: written under a temp name and renamed when it has all been written
+static bool CopyFmvFile(FileSystem& fs, const std::string& srcPath, const std::string& dstPath, ThreadPool& tp, ConversionProgress& progress)
+{
+    AutoFILE src = fs.OpenFile(srcPath.c_str(), "rb");
+    if (!src.GetFile())
+    {
+        return false;
+    }
+
+    const std::string tempPath = dstPath + ".tmp";
+    {
+        AutoFILE dst = fs.OpenFile(tempPath.c_str(), "wb");
+        if (!dst.GetFile())
+        {
+            LOG_ERROR("Can't write FMV copy '%s'", tempPath.c_str());
+            return false;
+        }
+
+        std::vector<u8> chunk(256 * 1024);
+        for (;;)
+        {
+            if (tp.IsCancelRequested())
+            {
+                break;
+            }
+
+            const size_t read = fread(chunk.data(), 1, chunk.size(), src.GetFile());
+            if (read == 0)
+            {
+                break;
+            }
+            if (fwrite(chunk.data(), 1, read, dst.GetFile()) != read)
+            {
+                LOG_ERROR("Writing FMV copy '%s' failed", tempPath.c_str());
+                return false;
+            }
+            progress.AddCompleted(ConversionCategory::Fmvs, static_cast<u32>((read + 1023) / 1024));
+        }
+    }
+
+    if (tp.IsCancelRequested())
+    {
+        std::error_code ignored;
+        std::filesystem::remove(tempPath, ignored);
+        return false;
+    }
+
+    std::error_code error;
+    std::filesystem::rename(tempPath, dstPath, error);
+    return !error;
+}
+
+void CopyFMVs(ThreadPool& tp, FileSystem& fs, const FileSystem::Path& dataDir, bool isAo, ConversionProgress& progress)
+{
+    FileSystem::Path fmvOutDir = dataDir;
+    fmvOutDir.Append("fmvs");
+    fs.CreateDirectory(fmvOutDir);
+
+    const std::vector<std::string> movieNames = isAo ? AO::Path_GetAllFmvNames() : ::Path_GetAllFmvNames();
+
+    // Sizes first, so the total is known before any of it is copied. A movie that isn't in the
+    // game's files (a retail FMV can be missing) has no size and is skipped.
+    struct Movie final
+    {
+        std::string mName;
+        std::string mDst;
+        u32 mUnits = 0;
+    };
+    std::vector<Movie> movies;
+    for (const std::string& name : movieNames)
+    {
+        AutoFILE src = fs.OpenFile(name.c_str(), "rb");
+        if (!src.GetFile())
+        {
+            LOG_WARNING("FMV '%s' isn't in the game's files, not copied", name.c_str());
+            continue;
+        }
+        fseek(src.GetFile(), 0, SEEK_END);
+        const long size = ftell(src.GetFile());
+
+        FileSystem::Path dst = fmvOutDir;
+        dst.Append(name);
+
+        Movie movie;
+        movie.mName = name;
+        movie.mDst = dst.GetPath();
+        movie.mUnits = size > 0 ? static_cast<u32>((size + 1023) / 1024) : 1u;
+        progress.AddToTotal(ConversionCategory::Fmvs, movie.mUnits);
+
+        movies.push_back(std::move(movie));
+    }
+
+    for (const Movie& movie : movies)
+    {
+        if (tp.IsCancelRequested())
+        {
+            return;
+        }
+
+        progress.ReportItemStarted(movie.mName);
+        if (!CopyFmvFile(fs, movie.mName, movie.mDst, tp, progress))
+        {
+            LOG_ERROR("FMV '%s' wasn't copied", movie.mName.c_str());
+        }
+        progress.ReportItemFinished(movie.mName);
+    }
+}

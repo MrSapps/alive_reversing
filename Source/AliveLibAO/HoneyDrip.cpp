@@ -5,7 +5,7 @@
 
 namespace AO {
 
-HoneyDrip::HoneyDrip(FP xpos, FP ypos, ResourceManagerWrapper& resMan, BaseMap& map)
+HoneyDrip::HoneyDrip(FP xpos, FP ypos, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     mRGB.SetRGB(128, 128, 128);

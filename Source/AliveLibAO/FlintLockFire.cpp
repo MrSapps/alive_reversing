@@ -78,7 +78,7 @@ FlintLockFire::~FlintLockFire()
     }
 }
 
-FlintLockFire::FlintLockFire(relive::Path_FlintLockFire* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+FlintLockFire::FlintLockFire(relive::Path_FlintLockFire* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eFlintLockFire);

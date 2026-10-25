@@ -78,7 +78,7 @@ void MainMenuTransition::VUpdate()
     }
 }
 
-MainMenuTransition::MainMenuTransition(Layer layer, s32 fadeDirection, s32 bKillWhenDone, s32 speed, relive::TBlendModes blendMode, ResourceManagerWrapper& resMan, BaseMap& map)
+MainMenuTransition::MainMenuTransition(Layer layer, s32 fadeDirection, s32 bKillWhenDone, s32 speed, relive::TBlendModes blendMode, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eFade);

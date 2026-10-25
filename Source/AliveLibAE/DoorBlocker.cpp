@@ -7,7 +7,7 @@
 #include "stdlib.hpp"
 #include "Path.hpp"
 
-DoorBlocker::DoorBlocker(relive::Path_DoorBlocker* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+DoorBlocker::DoorBlocker(relive::Path_DoorBlocker* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map),
     mTlvId(tlvId),
     mSwitchId(pTlv->mSwitchId)

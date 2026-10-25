@@ -54,7 +54,7 @@ static const TintEntry sSlurgTints[16] = {
     {EReliveLevelIds::eBonewerkz_Ender, 102u, 127u, 118u},
     {EReliveLevelIds::eCredits, 102u, 127u, 118u}};
 
-Slurg::Slurg(relive::Path_Slurg* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Slurg::Slurg(relive::Path_Slurg* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map)
 {
     LoadAnimations();
@@ -119,7 +119,7 @@ Slurg::Slurg(relive::Path_Slurg* pTlv, const Guid& tlvId, ResourceManagerWrapper
     CreateShadow();
 }
 
-void Slurg::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
+void Slurg::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pData.ReadTmpPtr<SlurgSaveState>();
     auto pTlv = static_cast<relive::Path_Slurg*>(map.TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv());

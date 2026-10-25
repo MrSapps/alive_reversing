@@ -72,7 +72,7 @@ Rope::~Rope()
     relive_delete[] mRopeAnim;
 }
 
-Rope::Rope(s32 left, s32 top, s32 bottom, FP scale, ResourceManagerWrapper& resMan, BaseMap& map)
+Rope::Rope(s32 left, s32 top, s32 bottom, FP scale, ResourceManager& resMan, BaseMap& map)
     : ::BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eRope);

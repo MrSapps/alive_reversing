@@ -9,7 +9,7 @@ class BaseMap;
 class OrbWhirlWindParticle final
 {
 public:
-    OrbWhirlWindParticle(FP xpos, FP ypos, FP scale, bool isMudokonSpirit, ResourceManagerWrapper& resMan, BaseMap& map);
+    OrbWhirlWindParticle(FP xpos, FP ypos, FP scale, bool isMudokonSpirit, ResourceManager& resMan, BaseMap& map);
     ~OrbWhirlWindParticle();
 
     s32 IsActive();

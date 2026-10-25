@@ -20,7 +20,7 @@ SwitchStateBooleanLogic::~SwitchStateBooleanLogic()
     mMap.TLV_Reset(mTlvId);
 }
 
-SwitchStateBooleanLogic::SwitchStateBooleanLogic(Path_SwitchStateBooleanLogic* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+SwitchStateBooleanLogic::SwitchStateBooleanLogic(Path_SwitchStateBooleanLogic* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     mTlvId = tlvId;

@@ -58,6 +58,7 @@ If the chosen game's files aren't in the directory, the other game is run. If bo
 | `-ps1_data=<dir>` | Play the PS1's own sound data (VH, VB and SEQ files) instead of the PC's, read from the LVL files at any depth below `<dir>`, for example the files of a PS1 disc. The PC's samples are the PS1 encoder's input, so they are close, but not the same. |
 | `-spu_filter=<name>` | How voices played above 44100 Hz are resampled: how voices played above 44100 Hz are resampled. `hq` (default) filters out what would alias. `gaussian` is the PS1's own interpolation, exactly, which buzzes on some bright samples at high notes (for example the end of the secret area jingle). |
 | `-convert` | Convert the game data (into `relive_data`) if it is out of date, as the first run does, then exit without opening a window. For scripts and headless machines. Exit code 1 if the game files are missing. |
+| `-encode_webm` | When the game data is converted, encode the movies to AV1/Vorbis `.webm` files in `relive_data/<game>/fmvs` instead of copying the game's own movie files. The encoding takes a long time. The engine plays either: a `.webm` is played in place of the original movie with the same name. Only applies when the movies are converted (the first run, or after the conversion version changed). |
 | `-help` | Show the command line options and exit (`--help`, `-h` and `/?` also work). |
 
 The display options (`-renderer`, `-fullscreen`, `-keep_aspect_ratio`, `-filter_screen`,
@@ -84,6 +85,69 @@ without anyone watching: start a new game at any camera, wait, take screenshots 
 game's state and objects as JSON. See `Source/relive_lib/Automation.hpp` for the commands. With
 `SDL_VIDEO_DRIVER=offscreen` it needs no display. Display options given with it aren't saved to
 `relive.ini`.
+
+## Mods
+
+A mod is a directory in `relive_data/mods` (it is created by the data conversion). Run it with
+`-mod=<name>` (see [Command Line Options](#command-line-options)); the editor makes them too.
+A mod only contains the files it changes: everything else comes from the game's converted data.
+
+### modinfo.json
+
+The directory must hold a `modinfo.json`, or it isn't seen as a mod:
+
+```json
+{
+  "name": "My Mod",
+  "author": "Me",
+  "target_game": "AE"
+}
+```
+
+- `name`: shown in the window title. `-mod=` takes this or the directory's name.
+- `author`: who made it.
+- `target_game`: `AE` or `AO` (any case). Running the mod with the other game is a fatal error, as
+  is a `-mod=` that matches no mod.
+
+All three are required; a `modinfo.json` that is missing one is skipped.
+
+### Where files are looked for
+
+Each resource is looked for in these data directories, in order, and the first one that has it is
+used, so a mod's file replaces the game's one with the same path:
+
+1. `relive_data/mods/<mod>` (if `-mod` is given)
+2. `relive_data/ae` or `relive_data/ao`, the game being run
+3. the other game's directory
+
+A resource found nowhere is reported as missing, with every path that was tried. The paths in the
+directory are the same as in `relive_data/ae` and `relive_data/ao`:
+
+| Resource | Path (below the data directory) |
+| --- | --- |
+| Animation | `animations/<group>/<name>.json` and `.png` (and `_mask.png`). With a sound theme or other theme, `animations/<group>/<theme>/<name>`. |
+| Animation on a sprite page | `animations/<group>/<name>.packed.json`, written by the conversion, says which page in `animations/pages` it is on |
+| Camera | `levels/<level>/<path>/<camera>.png`, and `<camera>.json` with its foreground layers |
+| Paths of a level | `levels/<level>/level_info.json` and the path jsons it lists |
+| Palette | `<name>.pal` |
+| Font | `<name>.png` |
+| Sound | `sounds/<theme>/<file>` |
+| Movie | `fmvs/<name>.webm`, else `fmvs/<name>.DDV` |
+
+Some details:
+
+- **Sprite sheets and pages.** An animation's `.png` and `.json` are the source. For speed the
+  conversion packs the sheets of a group into pages (`animations/pages`), and the game then reads
+  the `.packed.json` if there is one. A mod's sheet is never drawn from the game's pages, since
+  those don't have it. Running `relive -mod=<name> -convert` makes the mod's own pages (it is also
+  done at the first start), and a mod with no sheets of its own uses the game's. Delete the mod's
+  `animations/pages` and `.packed.json` files to go back to plain sheets.
+- **Movies.** A `.webm` is played in place of the movie with the same name, from any of the
+  directories above, even if the game's own movie file is in a directory earlier in the list. So an
+  HD movie in a mod replaces the original. The movies the conversion copies are the game's own
+  files (AE's DDV, AO's PSX STR, which is also named `.DDV`). `-encode_webm` makes the conversion
+  encode them to webm instead.
+- **Sounds.** `-ps1_data=<dir>` replaces the sound files in all of the above.
 
 ## Contributing
 

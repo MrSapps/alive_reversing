@@ -14,7 +14,7 @@
 s16 gMudokonsInArea = 0;
 s8 gZulagNumber = 0;
 
-LCDStatusBoard::LCDStatusBoard(relive::Path_LCDStatusBoard* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+LCDStatusBoard::LCDStatusBoard(relive::Path_LCDStatusBoard* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     mTlvId = tlvId;

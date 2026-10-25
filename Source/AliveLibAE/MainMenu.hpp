@@ -200,7 +200,7 @@ public:
         AnimId::OptionChantOrb_Particle};
 
 
-    MainMenuController(relive::Path_TLV* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    MainMenuController(relive::Path_TLV* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~MainMenuController();
 
     void LoadAnimations();

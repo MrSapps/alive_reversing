@@ -8,7 +8,7 @@
 #include "../GameType.hpp"
 #include "BaseMap.hpp"
 
-Electrocute::Electrocute(BaseAliveGameObject* pTargetObj, bool bExtraOverwriter, bool bKillTarget, ResourceManagerWrapper& resMan, BaseMap& map)
+Electrocute::Electrocute(BaseAliveGameObject* pTargetObj, bool bExtraOverwriter, bool bKillTarget, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map),
     mTargetObjId(pTargetObj->mBaseGameObjectId),
     mExtraOverwriter(bExtraOverwriter),

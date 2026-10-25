@@ -27,7 +27,7 @@
 #include "../relive_lib/data_conversion/file_system.hpp"
 #include "../relive_lib/data_conversion/data_conversion.hpp"
 #include "../relive_lib/Mods.hpp"
-#include "../relive_lib/ResourceManagerWrapper.hpp"
+#include "../relive_lib/ResourceManager.hpp"
 #include "../relive_lib/GameType.hpp"
 
 #include "../relive_lib/CommandLineParser.hpp"
@@ -369,11 +369,11 @@ s32 main(s32 argc, char_type** argv)
         if (!options.mModName.empty())
         {
             std::string modDisplayName;
-            modLayers = ResourceManagerWrapper::BuildSearchPaths(gameToRun, relive::Mods::ActiveModPath(fs, options.mModName, gameToRun, modDisplayName));
+            modLayers = ResourceManager::BuildSearchPaths(gameToRun, relive::Mods::ActiveModPath(fs, options.mModName, gameToRun, modDisplayName));
         }
 
         DataConversion dataConversion;
-        dataConversion.ConvertAll(gameToRun, DataConversion::DataVersions::kDefaultSpritePageSize, modLayers);
+        dataConversion.ConvertAll(gameToRun, DataConversion::DataVersions::kDefaultSpritePageSize, modLayers, options.mEncodeWebm);
         LOG_INFO("Converted the %s data", gameToRun == GameType::eAo ? "AO" : "AE");
         return 0;
     }

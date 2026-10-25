@@ -17,7 +17,7 @@
 #include "Sound/GameSound.hpp"
 #include "Sound/PsxSoundEngine.hpp"
 #include "BinaryPath.hpp"
-#include "ResourceManagerWrapper.hpp"
+#include "ResourceManager.hpp"
 #include "Sfx.hpp"
 #include "data_conversion/file_system.hpp"
 #include "../AliveLibAE/PathData.hpp"
@@ -193,7 +193,7 @@ static std::vector<u8> FadeSeq()
     return seq.End();
 }
 
-// Writes the synthetic data where ResourceManagerWrapper looks for it. extraSeqs: also load HeldSeq
+// Writes the synthetic data where ResourceManager looks for it. extraSeqs: also load HeldSeq
 // (1), RepeatSeq (2) and FadeSeq (3). Only some scenarios load them, so the others' traces don't change.
 static std::shared_ptr<PathSoundInfo> WriteTestData(const ScratchDir& dir, GameType game, s32 extraSeqs = 0)
 {
@@ -316,7 +316,7 @@ static void RunGold(GameType game, const std::string& scenario, const std::funct
     {
         ScopedCurrentDir cwd(dir.Path());
         FileSystem fs;
-        ResourceManagerWrapper resMan(fs, "");
+        ResourceManager resMan(fs, "");
 
         SoundGoldSession session(game);
         session.LoadSoundBlock(resMan, info, 40);
@@ -597,7 +597,7 @@ TEST(SoundGold, Deterministic)
         const std::shared_ptr<PathSoundInfo> info = WriteTestData(dir, GameType::eAe);
         ScopedCurrentDir cwd(dir.Path());
         FileSystem fs;
-        ResourceManagerWrapper resMan(fs, "");
+        ResourceManager resMan(fs, "");
         SoundGoldSession session(GameType::eAe);
         session.LoadSoundBlock(resMan, info, 0);
         SND_SEQ_Play(session.LoadedSeqs()[0], 1, 100, 100);

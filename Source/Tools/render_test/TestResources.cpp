@@ -577,7 +577,7 @@ SpriteFx TestResources::MakeHueShift(f32 degrees)
     return fx;
 }
 
-TestResources::TestResources(ResourceManagerWrapper& resMan)
+TestResources::TestResources(ResourceManager& resMan)
 {
     mGridCam = MakeGridCam();
     mBandsCam = MakeBandsCam();

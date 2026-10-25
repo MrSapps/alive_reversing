@@ -42,7 +42,7 @@ namespace relive
 class TrapDoor final : public PlatformBase
 {
 public:
-    TrapDoor(relive::Path_TrapDoor* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    TrapDoor(relive::Path_TrapDoor* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~TrapDoor();
 
     void LoadAnimationsAO();
@@ -58,7 +58,7 @@ public:
     virtual void VUpdate() override;
 
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
 
 private:
     void Add_To_Collisions_Array();

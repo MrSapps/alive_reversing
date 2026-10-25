@@ -2,7 +2,7 @@
 
 #include "GameType.hpp"
 #include "Ipc/Ipc.hpp"
-#include "ResourceManagerWrapper.hpp"
+#include "ResourceManager.hpp"
 #include "Factory.hpp"
 
 class FileSystem;
@@ -82,7 +82,7 @@ private:
     bool mLoadingWaitStarted = false;
     u32 mLoadingWaitStartTicks = 0;
     bool mLoadingIconShown = false;
-    std::unique_ptr<ResourceManagerWrapper> mResMan;
+    std::unique_ptr<ResourceManager> mResMan;
     std::unique_ptr<BaseMap> mMap;
     relive::Factory mFactory;
     std::string mActiveModDisplayName;

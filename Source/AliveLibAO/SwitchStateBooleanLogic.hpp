@@ -8,7 +8,7 @@ namespace AO {
 class SwitchStateBooleanLogic final : public ::BaseGameObject
 {
 public:
-    SwitchStateBooleanLogic(Path_SwitchStateBooleanLogic* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    SwitchStateBooleanLogic(Path_SwitchStateBooleanLogic* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~SwitchStateBooleanLogic();
 
     virtual void VScreenChanged() override;

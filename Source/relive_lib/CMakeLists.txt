@@ -646,8 +646,8 @@ SET(relive_lib_src
     Events.cpp
     GameType.hpp
     GameType.cpp
-    ResourceManagerWrapper.hpp
-    ResourceManagerWrapper.cpp
+    ResourceManager.hpp
+    ResourceManager.cpp
     MapWrapper.hpp
     MapWrapper.cpp
     MenuFmv.hpp

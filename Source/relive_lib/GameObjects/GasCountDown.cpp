@@ -18,7 +18,7 @@ bool gDeathGasOn = false;
 constexpr u32 kGasCountDownSwitchIdAO = 70;
 constexpr u32 kGasCountdownTimeAO = 3600;
 
-GasCountDown::GasCountDown(relive::Path_GasCountDown* pTlv, const Guid& tlvInfo, ResourceManagerWrapper& resMan, BaseMap& map)
+GasCountDown::GasCountDown(relive::Path_GasCountDown* pTlv, const Guid& tlvInfo, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetType(ReliveTypes::eGasCountDown);

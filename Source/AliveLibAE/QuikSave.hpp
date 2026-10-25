@@ -52,7 +52,7 @@ public:
     static void RestoreWorldInfo(const Quicksave_WorldInfo& rInfo);
     static void SaveWorldInfo(Quicksave_WorldInfo* pInfo, BaseMap& map);
     static void FindSaves(FileSystem& fs);
-    static void RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManager& resMan, BaseMap& map);
 
 public:
     static SaveFileRec gSaveFileRecords[128];

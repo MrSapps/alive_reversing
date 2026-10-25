@@ -9,7 +9,7 @@ Everything it draws goes through the engine's own code: the ordering table,
 game objects for the effects (`LaughingGas`, `AO::ScreenWave`, `ZapLine`, `ScreenClipper`,
 `ThrowableTotalIndicator`, `ScreenShake`, `Fade`, `Flash`, `DeathGas`, `MainMenuTransition`).
 Cameras, FG1 layers and sprite sheets are generated in code (`TestResources.cpp`). The
-animations the game objects load are added to the resource manager with `ResourceManagerWrapper::AddAnimation`.
+animations the game objects load are added to the resource manager with `ResourceManager::AddAnimation`.
 
 ## Looking at it
 

@@ -6,7 +6,7 @@
 class WheelSyncer final : public BaseGameObject
 {
 public:
-    WheelSyncer(relive::Path_WheelSyncer* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    WheelSyncer(relive::Path_WheelSyncer* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~WheelSyncer();
 
     virtual void VUpdate() override;

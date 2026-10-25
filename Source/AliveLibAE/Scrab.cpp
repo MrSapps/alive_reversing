@@ -89,7 +89,7 @@ void Scrab::LoadAnimations()
     }
 }
 
-Scrab::Scrab(relive::Path_Scrab* pTlv, const Guid& tlvId, relive::Path_ScrabSpawner::SpawnDirection spawnDirection, ResourceManagerWrapper& resMan, BaseMap& map)
+Scrab::Scrab(relive::Path_Scrab* pTlv, const Guid& tlvId, relive::Path_ScrabSpawner::SpawnDirection spawnDirection, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(14, resMan, map)
 {
     SetType(ReliveTypes::eScrab);
@@ -223,7 +223,7 @@ void Scrab::VOnTlvCollision(TlvIterator tlvIterator)
     }
 }
 
-void Scrab::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void Scrab::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<ScrabSaveState>();
 

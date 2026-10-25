@@ -18,7 +18,7 @@ void BackgroundAnimation::VStopAudio()
     }
 }
 
-BackgroundAnimation::BackgroundAnimation(relive::Path_BackgroundAnimation* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+BackgroundAnimation::BackgroundAnimation(relive::Path_BackgroundAnimation* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map),
     mTlvId(tlvId)
 {

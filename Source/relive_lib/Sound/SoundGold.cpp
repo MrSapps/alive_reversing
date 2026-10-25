@@ -85,7 +85,7 @@ SoundGoldSession::~SoundGoldSession()
     SND_SsQuit();
 }
 
-void SoundGoldSession::LoadSoundBlock(ResourceManagerWrapper& resMan, const std::shared_ptr<PathSoundInfo>& info, s32 reverb)
+void SoundGoldSession::LoadSoundBlock(ResourceManager& resMan, const std::shared_ptr<PathSoundInfo>& info, s32 reverb)
 {
     mInfo = info;
 

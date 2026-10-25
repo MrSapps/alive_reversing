@@ -15,7 +15,7 @@
 #include "BaseMap.hpp"
 #include "DisplaySettings.hpp"
 #include "IniFile.hpp"
-#include "ResourceManagerWrapper.hpp"
+#include "ResourceManager.hpp"
 
 static s32 sdl_key_to_win32_vkey(SDL_Scancode key)
 {
@@ -445,7 +445,7 @@ static s32 sdl_key_to_win32_vkey(SDL_Scancode key)
 }
 
 
-Sys::Sys(Window& window, ResourceManagerWrapper& resMan, u32 pathReloadEventType)
+Sys::Sys(Window& window, ResourceManager& resMan, u32 pathReloadEventType)
     : mWindow(window)
     , mResMan(resMan)
     , mPathReloadEventType(pathReloadEventType)

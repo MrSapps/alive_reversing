@@ -42,7 +42,7 @@ RollingBall::~RollingBall()
     KillRollingBallShaker();
 }
 
-RollingBall::RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+RollingBall::RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : ::BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eRollingBall);
@@ -163,7 +163,7 @@ void RollingBall::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void RollingBall::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void RollingBall::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<RollingBallSaveState>();
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);

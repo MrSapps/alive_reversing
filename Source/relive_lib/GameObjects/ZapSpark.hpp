@@ -5,7 +5,7 @@
 class ZapSpark final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    ZapSpark(FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan, BaseMap& map);
+    ZapSpark(FP xpos, FP ypos, FP scale, ResourceManager& resMan, BaseMap& map);
     
     void LoadAnimationsAO();
     void LoadAnimationsAE();

@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "Shadow.hpp"
 #include "GameObjects/ScreenManager.hpp"
-#include "ResourceManagerWrapper.hpp"
+#include "ResourceManager.hpp"
 #include "GameType.hpp"
 #include "Collisions.hpp"
 #include "AnimResources.hpp"
@@ -9,7 +9,7 @@
 #include "GameObjects/BaseAnimatedWithPhysicsGameObject.hpp" // only for the Scale enum
 #include "FixedPoint.hpp"
 
-Shadow::Shadow(ResourceManagerWrapper& resMan, BaseMap& /*map*/)
+Shadow::Shadow(ResourceManager& resMan, BaseMap& /*map*/)
 {
     AnimResource res = resMan.LoadAnimation(AnimId::ObjectShadow);
     mAnim.Init(res, nullptr);

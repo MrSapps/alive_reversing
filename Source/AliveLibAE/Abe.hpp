@@ -327,7 +327,7 @@ public:
     }
 
     // Pends everything a new Abe needs, which the menus wait for before making him
-    static void PendResources(ResourceManagerWrapper& resMan);
+    static void PendResources(ResourceManager& resMan);
 
     static constexpr AnimId sAbeAnimIdTable[130] = {
         AnimId::Mudokon_Idle,
@@ -461,7 +461,7 @@ public:
         AnimId::Mudokon_TurnWheelEnd,
         AnimId::Mudokon_PoisonGasDeath};
 
-    Abe(ResourceManagerWrapper& resMan, BaseMap& map);
+    Abe(ResourceManager& resMan, BaseMap& map);
     ~Abe();
 
     virtual void VUpdate() override;
@@ -499,8 +499,8 @@ public:
     bool IsEnteringOrExitingDoor() const override;
     s32 DoorId() const override;
 
-    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map);
-    static void CreateFromSaveState(const AbeSaveState& pData, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
+    static void CreateFromSaveState(const AbeSaveState& pData, ResourceManager& resMan, BaseMap& map);
 
     bool mShrivel = false;
     bool mReturnToPreviousMotion = false;
@@ -686,7 +686,7 @@ private:
     void PickUpThrowabe_Or_PressBomb_454090(FP fpX, s32 fpY, s32 bStandToCrouch);
     s16 ToLeftRightMovement_44E340();
     void TryHoist_44ED30();
-    static void Create_Fart_421D20(ResourceManagerWrapper& resMan, BaseMap& map);
+    static void Create_Fart_421D20(ResourceManager& resMan, BaseMap& map);
     s16 TryEnterMineCar_4569E0();
     s32 NearDoorIsOpen_44EE10();
     eAbeMotions HandleDoAction_455BD0();
@@ -885,4 +885,4 @@ extern const char_type* const sAbeMotionNames[130];
 
 s32 Environment_SFX(EnvironmentSfx sfxId, s32 volume, s32 pitchMin, BaseAliveGameObject* pAliveObj, BaseMap& map);
 
-void Animation_OnFrame_Abe(BaseGameObject* pPtr, u32&, const IndexedPoint& point, ResourceManagerWrapper& resMan, BaseMap& map);
+void Animation_OnFrame_Abe(BaseGameObject* pPtr, u32&, const IndexedPoint& point, ResourceManager& resMan, BaseMap& map);

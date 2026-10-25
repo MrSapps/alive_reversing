@@ -94,7 +94,7 @@ static bool ParseMusic(const std::string& text, s32& value)
 class SoundDebugOwner final : public BaseGameObject
 {
 public:
-    SoundDebugOwner(ResourceManagerWrapper& resMan, BaseMap& map)
+    SoundDebugOwner(ResourceManager& resMan, BaseMap& map)
         : BaseGameObject(true, 0, resMan, map)
     {
         SetSurviveDeathReset(true);
@@ -209,7 +209,7 @@ bool SoundDebug::Check(const std::string& name, const std::vector<std::string>& 
     return false;
 }
 
-static bool PlayMusic(s32 type, const std::string& owner, s16 flag4, s16 flag20, std::string& error, BaseMap* pMap, ResourceManagerWrapper* pResMan)
+static bool PlayMusic(s32 type, const std::string& owner, s16 flag4, s16 flag20, std::string& error, BaseMap* pMap, ResourceManager* pResMan)
 {
     BaseGameObject* pOwner = nullptr;
     if (owner == "abe")
@@ -246,7 +246,7 @@ static bool PlayMusic(s32 type, const std::string& owner, s16 flag4, s16 flag20,
     return true;
 }
 
-bool SoundDebug::Run(const std::string& name, const std::vector<std::string>& args, std::string& error, BaseMap& map, ResourceManagerWrapper& resMan)
+bool SoundDebug::Run(const std::string& name, const std::vector<std::string>& args, std::string& error, BaseMap& map, ResourceManager& resMan)
 {
     s32 value = 0;
     if (name == "kill_other")

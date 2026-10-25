@@ -42,7 +42,7 @@
 #include "../AliveLibAE/GameAutoPlayer.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/GameObjects/ShadowZone.hpp"
-#include "../relive_lib/ResourceManagerWrapper.hpp"
+#include "../relive_lib/ResourceManager.hpp"
 #include "../AliveLibAE/GameEnderController.hpp"
 #include "../AliveLibAE/ColourfulMeter.hpp"
 #include "../relive_lib/GameObjects/GasCountDown.hpp"
@@ -367,7 +367,7 @@ void Game_Shutdown()
 }
 
 // Draws the loading icon over whatever was shown last and presents it
-static void ShowLoadingIcon(ResourceManagerWrapper& resMan, BaseMap& map)
+static void ShowLoadingIcon(ResourceManager& resMan, BaseMap& map)
 {
     AnimResource res = resMan.LoadAnimation(AnimId::Loading_Icon2);
     auto pParticle = relive_new Particle(FP_FromInteger(0), FP_FromInteger(0), res, resMan, map);
@@ -384,7 +384,7 @@ static void ShowLoadingIcon(ResourceManagerWrapper& resMan, BaseMap& map)
 }
 
 // One main loop iteration spent waiting for loading to finish
-static Sys::PumpResult LoadingTick(Sys& sys, ResourceManagerWrapper& resMan, BaseMap& map, bool showLoadingIcon)
+static Sys::PumpResult LoadingTick(Sys& sys, ResourceManager& resMan, BaseMap& map, bool showLoadingIcon)
 {
     // How many of these there are depends on how long loading takes, so none of it is recorded
     GetGameAutoPlayer().DisableRecorder();
@@ -826,7 +826,7 @@ void Engine::Init()
         activeModPath = relive::Mods::ActiveModPath(mFs, modName, mGameType, mActiveModDisplayName);
     }
 
-    mResMan = std::make_unique<ResourceManagerWrapper>(mFs, activeModPath);
+    mResMan = std::make_unique<ResourceManager>(mFs, activeModPath);
     mResMan->SetDebugLoadDelay(mOptions.mSlowLoadMs);
     if (!mOptions.mPs1DataDir.empty())
     {
@@ -887,7 +887,7 @@ void Engine::Run()
     GetGameAutoPlayer().DisableRecorder();
 
     // TODO: HACK mini loop till Game.cpp is merged
-    DataConversionUI dcu(mGameType, *mResMan, *mMap);
+    DataConversionUI dcu(mGameType, *mResMan, *mMap, mOptions.mEncodeWebm);
     if (dcu.ConversionRequired())
     {
         do
@@ -918,6 +918,10 @@ void Engine::Run()
             gPsxDisplay.RenderOrderingTable();
         }
         while (!dcu.GetDead());
+
+        // Black until the game has loaded, instead of the finished progress screen
+        dcu.RenderBackground(gPsxDisplay.mDrawEnv.mOrderingTable);
+        gPsxDisplay.RenderOrderingTable();
     }
     else
     {

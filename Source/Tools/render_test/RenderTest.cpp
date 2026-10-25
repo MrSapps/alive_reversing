@@ -6,7 +6,7 @@
 #include "../../relive_lib/Events.hpp"
 #include "../../relive_lib/Psx.hpp"
 #include "../../relive_lib/PsxDisplay.hpp"
-#include "../../relive_lib/ResourceManagerWrapper.hpp"
+#include "../../relive_lib/ResourceManager.hpp"
 #include "../../relive_lib/data_conversion/file_system.hpp"
 #include "../../relive_lib/GameObjects/BaseGameObject.hpp"
 #include "../../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
@@ -81,7 +81,7 @@ RenderTest::RenderTest(GameType gameType, FileSystem& fs, const RenderTestOption
 {
     // The same set up as Engine::Init and Engine::Game_Run, less everything that needs game
     // data, sound or input
-    mResMan = std::make_unique<ResourceManagerWrapper>(mFs, "");
+    mResMan = std::make_unique<ResourceManager>(mFs, "");
     if (mGameType == GameType::eAe)
     {
         mMap = std::make_unique<Map>(*mResMan, mFactory);

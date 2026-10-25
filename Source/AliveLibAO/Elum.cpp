@@ -3465,7 +3465,7 @@ u32 dword_4C52F4 = 0x1C92C;
 u32 dword_4C52F8 = 0xC8;
 s16 word_4C52FA = 0;
 
-void Elum::Spawn(const Guid& tlvInfo, ResourceManagerWrapper& resMan, BaseMap& map)
+void Elum::Spawn(const Guid& tlvInfo, ResourceManager& resMan, BaseMap& map)
 {
     relive_new Elum(tlvInfo, resMan, map);
 }
@@ -3481,7 +3481,7 @@ void Elum::LoadAnimations()
     }
 }
 
-Elum::Elum(const Guid& tlvInfo, ResourceManagerWrapper& resMan, BaseMap& map)
+Elum::Elum(const Guid& tlvInfo, ResourceManager& resMan, BaseMap& map)
     : ::BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eElum);
@@ -3626,7 +3626,7 @@ void Elum::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void Elum::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void Elum::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<ElumSaveState>();
 

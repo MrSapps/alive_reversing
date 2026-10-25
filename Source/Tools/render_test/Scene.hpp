@@ -8,7 +8,7 @@
 #include <vector>
 
 class OrderingTable;
-class ResourceManagerWrapper;
+class ResourceManager;
 class BaseMap;
 class TestResources;
 
@@ -16,7 +16,7 @@ class TestResources;
 class TextDrawer final
 {
 public:
-    explicit TextDrawer(ResourceManagerWrapper& resMan);
+    explicit TextDrawer(ResourceManager& resMan);
 
     // Every frame, before anything is drawn: the font's polygons are shared by the whole frame
     void StartFrame()
@@ -57,7 +57,7 @@ private:
 // What scenes build their frames from
 struct SceneContext final
 {
-    ResourceManagerWrapper& mResMan;
+    ResourceManager& mResMan;
     BaseMap& mMap;
     const TestResources& mRes;
     TextDrawer& mText;

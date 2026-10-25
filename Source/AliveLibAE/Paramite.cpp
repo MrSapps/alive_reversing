@@ -88,7 +88,7 @@ void Paramite::LoadAnimations()
     }
 }
 
-Paramite::Paramite(relive::Path_Paramite* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Paramite::Paramite(relive::Path_Paramite* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(16, resMan, map)
 {
     SetType(ReliveTypes::eParamite);
@@ -216,7 +216,7 @@ Paramite::Paramite(relive::Path_Paramite* pTlv, const Guid& tlvId, ResourceManag
     CreateShadow();
 }
 
-void Paramite::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void Paramite::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<ParamiteSaveState>();
     auto pTlv = map.TLV_From_Offset_Lvl_Cam(pState->field_3C_tlvInfo).GetTlv<relive::Path_Paramite>();

@@ -13,7 +13,7 @@ namespace AO {
 class Well final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    Well(relive::Path_WellBase* pTlv, FP xpos, FP ypos, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    Well(relive::Path_WellBase* pTlv, FP xpos, FP ypos, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~Well();
 
     virtual void VUpdate() override;

@@ -7,7 +7,7 @@
 #include "stdlib.hpp"
 #include "Path.hpp"
 
-MultiSwitchController::MultiSwitchController(relive::Path_MultiSwitchController* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+MultiSwitchController::MultiSwitchController(relive::Path_MultiSwitchController* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     mIsOn = false;

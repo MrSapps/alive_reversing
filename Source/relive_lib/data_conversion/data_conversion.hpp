@@ -131,7 +131,8 @@ public:
         // ".DDV.webm" naming bug where the audio codec ID didn't matter yet).
         // 5: AV1 realtime encode speed 8 -> 6: speeds 7/8 drop the chroma residual on some blocks
         //    (flat desaturated squares mid-movie, e.g. GAMEBGN frame 5).
-        static constexpr u32 kFmvVersion = 5;
+        // 6: the movies are copied as the game has them (the engine decodes them), not encoded.
+        static constexpr u32 kFmvVersion = 6;
         // 17: dropped the redundant "paths" subdir under each level (levels/<name>/<pathId>/...
         // instead of levels/<name>/paths/<pathId>/...) and lower-cased "Sounds" to "sounds".
         // 18: moved vh_file/vb_file/seq_files out of every path.json's own sound_info (where
@@ -285,6 +286,9 @@ public:
     std::optional<DataVersions> DataVersionAO(u32 spritePageSize = DataVersions::kDefaultSpritePageSize);
     std::optional<DataVersions> DataVersionAE(u32 spritePageSize = DataVersions::kDefaultSpritePageSize);
 
+    // Whether the movies are encoded to webm (-encode_webm) instead of copied
+    bool mEncodeWebm = false;
+
     void ConvertDataAO(const DataVersions& dv);
     void ConvertDataAE(const DataVersions& dv);
 
@@ -294,7 +298,7 @@ public:
     // modLayers are the data directories of the active mod and the games' (see
     // SpritePageWriter::Repack), empty if there is no mod: the mod's sprite pages are made once
     // the game's data is up to date.
-    void ConvertAll(GameType game, u32 spritePageSize = DataVersions::kDefaultSpritePageSize, const std::vector<std::string>& modLayers = {});
+    void ConvertAll(GameType game, u32 spritePageSize = DataVersions::kDefaultSpritePageSize, const std::vector<std::string>& modLayers = {}, bool encodeWebm = false);
 
 private:
     std::unique_ptr<ThreadPool> mThreadPool;

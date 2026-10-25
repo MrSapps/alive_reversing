@@ -139,7 +139,7 @@ public:
         AnimId::Paramite_Death,
         AnimId::Paramite_Struggle};
 
-    Paramite(relive::Path_Paramite* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    Paramite(relive::Path_Paramite* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~Paramite();
 
     virtual void VRender(OrderingTable& ot) override;
@@ -150,7 +150,7 @@ public:
     virtual void VOnTrapDoorOpen() override;
     virtual void VUpdate() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
     virtual s16 VGetMotion(eMotionType motionType) override
     {
         switch (motionType)

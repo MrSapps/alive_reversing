@@ -1,11 +1,11 @@
 #include "stdafx.h"
 #include "Particle.hpp"
-#include "ResourceManagerWrapper.hpp"
+#include "ResourceManager.hpp"
 #include "GameType.hpp"
 #include "FixedPoint.hpp"
 
 // TODO: Make this the only ctor
-Particle::Particle(FP xpos, FP ypos, AnimResource& res, ResourceManagerWrapper& resMan, BaseMap& map, [[maybe_unused]] bool explosionSizeHack)
+Particle::Particle(FP xpos, FP ypos, AnimResource& res, ResourceManager& resMan, BaseMap& map, [[maybe_unused]] bool explosionSizeHack)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eParticle);
@@ -43,7 +43,7 @@ void Particle::VUpdate()
     }
 }
 
-Particle* New_DestroyOrCreateObject_Particle(FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan, BaseMap& map)
+Particle* New_DestroyOrCreateObject_Particle(FP xpos, FP ypos, FP scale, ResourceManager& resMan, BaseMap& map)
 {
     AnimResource ppRes = resMan.LoadAnimation(AnimId::DeathFlare_2);
 
@@ -72,7 +72,7 @@ Particle* New_DestroyOrCreateObject_Particle(FP xpos, FP ypos, FP scale, Resourc
 }
 
 // Fart/dust cloud particle spawner
-void New_Smoke_Particles(FP xpos, FP ypos, FP scale, s16 count, const RGB16& rgb, ResourceManagerWrapper& resMan, BaseMap& map)
+void New_Smoke_Particles(FP xpos, FP ypos, FP scale, s16 count, const RGB16& rgb, ResourceManager& resMan, BaseMap& map)
 {
     FP velYCounter = {};
     for (s32 i = 0; i < count; i++)
@@ -114,7 +114,7 @@ void New_Smoke_Particles(FP xpos, FP ypos, FP scale, s16 count, const RGB16& rgb
     }
 }
 
-Particle* New_Orb_Particle(FP xpos, FP ypos, FP velX, FP velY, FP scale, Layer layer, const RGB16& rgb, ResourceManagerWrapper& resMan, BaseMap& map)
+Particle* New_Orb_Particle(FP xpos, FP ypos, FP velX, FP velY, FP scale, Layer layer, const RGB16& rgb, ResourceManager& resMan, BaseMap& map)
 {
     AnimResource ppRes = resMan.LoadAnimation(AnimId::ChantOrb_Particle);
     auto pParticle = relive_new Particle(xpos, ypos, ppRes, resMan, map);
@@ -146,17 +146,17 @@ Particle* New_Orb_Particle(FP xpos, FP ypos, FP velX, FP velY, FP scale, Layer l
     return pParticle;
 }
 
-Particle* New_TintShiny_Particle(FP xpos, FP ypos, FP scale, Layer layer, ResourceManagerWrapper& resMan, BaseMap& map)
+Particle* New_TintShiny_Particle(FP xpos, FP ypos, FP scale, Layer layer, ResourceManager& resMan, BaseMap& map)
 {
     return New_Orb_Particle(xpos, ypos, FP_FromInteger(0), FP_FromInteger(0), scale, layer, RGB16{100, 100, 100}, resMan, map);
 }
 
-Particle* New_TintChant_Particle(FP xpos, FP ypos, FP scale, Layer layer, ResourceManagerWrapper& resMan, BaseMap& map)
+Particle* New_TintChant_Particle(FP xpos, FP ypos, FP scale, Layer layer, ResourceManager& resMan, BaseMap& map)
 {
     return New_Orb_Particle(xpos, ypos, FP_FromInteger(0), FP_FromInteger(0), scale, layer, RGB16{128, 128, 128}, resMan, map);
 }
 
-void New_RandomizedChant_Particle(BaseAnimatedWithPhysicsGameObject* pObj, ResourceManagerWrapper& resMan, BaseMap& map)
+void New_RandomizedChant_Particle(BaseAnimatedWithPhysicsGameObject* pObj, ResourceManager& resMan, BaseMap& map)
 {
 	if (GetGameType() == GameType::eAe)
 	{
@@ -172,7 +172,7 @@ void New_RandomizedChant_Particle(BaseAnimatedWithPhysicsGameObject* pObj, Resou
 	}
 }
 
-void New_ShootingZFire_Particle(FP xpos, FP ypos, FP scale, ResourceManagerWrapper& resMan, BaseMap& map)
+void New_ShootingZFire_Particle(FP xpos, FP ypos, FP scale, ResourceManager& resMan, BaseMap& map)
 {
     AnimResource ppRes = resMan.LoadAnimation(AnimId::ShootingZFire_Particle);
     auto pParticle = relive_new Particle(xpos, ypos, ppRes, resMan, map);
@@ -197,7 +197,7 @@ void New_ShootingZFire_Particle(FP xpos, FP ypos, FP scale, ResourceManagerWrapp
     }
 }
 
-void New_ShootingFire_Particle(FP xpos, FP ypos, s8 direction, FP scale, ResourceManagerWrapper& resMan, BaseMap& map)
+void New_ShootingFire_Particle(FP xpos, FP ypos, s8 direction, FP scale, ResourceManager& resMan, BaseMap& map)
 {
     AnimResource ppRes = resMan.LoadAnimation(AnimId::ShootingFire_Particle);
     auto pParticle = relive_new Particle(xpos, ypos, ppRes, resMan, map);

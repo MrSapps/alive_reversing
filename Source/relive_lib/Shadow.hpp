@@ -8,7 +8,7 @@ class BaseMap;
 class Shadow final
 {
 public:
-    Shadow(ResourceManagerWrapper& resMan, BaseMap& map);
+    Shadow(ResourceManager& resMan, BaseMap& map);
     ~Shadow();
 
     // ownerLayer is the layer the owner was drawn on, just before its shadow

@@ -9,8 +9,8 @@ namespace AO {
 class MusicTrigger final : public ::BaseGameObject
 {
 public:
-    MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType type, relive::Path_MusicTrigger::TriggeredBy triggeredBy, s32 switchId, s32 delay, ResourceManagerWrapper& resMan, BaseMap& map);
-    MusicTrigger(relive::Path_MusicTrigger* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType type, relive::Path_MusicTrigger::TriggeredBy triggeredBy, s32 switchId, s32 delay, ResourceManager& resMan, BaseMap& map);
+    MusicTrigger(relive::Path_MusicTrigger* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
 
     void Init(relive::Path_MusicTrigger::MusicTriggerMusicType type, relive::Path_MusicTrigger::TriggeredBy triggeredBy, u16 switchId, s16 delay);
 

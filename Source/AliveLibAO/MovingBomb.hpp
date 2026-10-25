@@ -43,7 +43,7 @@ struct MovingBombSaveState final : public SaveStateBase
 class MovingBomb final : public ::BaseAliveGameObject
 {
 public:
-    MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~MovingBomb();
 
     virtual void VUpdate() override;
@@ -52,7 +52,7 @@ public:
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
     virtual void VScreenChanged() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
     void FollowLine();
     s16 HitObject();

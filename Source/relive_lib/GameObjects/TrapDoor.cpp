@@ -138,7 +138,7 @@ TrapDoor_Data TrapDoor::GetTrapDoorData() const
     }
 }
 
-TrapDoor::TrapDoor(relive::Path_TrapDoor* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+TrapDoor::TrapDoor(relive::Path_TrapDoor* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : PlatformBase(resMan, map)
 {
     SetType(ReliveTypes::eTrapDoor);
@@ -424,7 +424,7 @@ void TrapDoor::Add_To_Collisions_Array()
     PlatformBase::Platforms().Push_Back(this);
 }
 
-void TrapDoor::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
+void TrapDoor::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pData.ReadTmpPtr<TrapDoorSaveState>();
     auto pTlv = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv<relive::Path_TrapDoor>();

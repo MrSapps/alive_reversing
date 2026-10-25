@@ -13,7 +13,7 @@ public:
     
     virtual void VUpdate() override;
 
-    CreditsController(relive::Path_TLV* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    CreditsController(relive::Path_TLV* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~CreditsController();
 
 public:

@@ -20,7 +20,7 @@ void RockSack::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::RockSack_HardHit));
 }
 
-RockSack::RockSack(relive::Path_RockSack* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+RockSack::RockSack(relive::Path_RockSack* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eRockSack);

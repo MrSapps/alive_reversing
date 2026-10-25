@@ -157,7 +157,7 @@ void DDCheat::Menu_Movies()
     DDCheat::DebugStr("\n<- Movie -> %d %d %s \n", sDDCheat_MovieSelectIdx, fmvInfo->mId, fmvInfo->mName);
 }
 
-DDCheat::DDCheat(ResourceManagerWrapper& resMan, BaseMap& map)
+DDCheat::DDCheat(ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetSurviveDeathReset(true);

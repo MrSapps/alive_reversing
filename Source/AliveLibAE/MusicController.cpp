@@ -320,7 +320,7 @@ const MusicController_Record2 stru_55D008[118] = {
     {SeqId::MainMenuAmbient_0, 0u}};
 
 
-s32 MusicController::Create(ResourceManagerWrapper& resMan, BaseMap& map)
+s32 MusicController::Create(ResourceManager& resMan, BaseMap& map)
 {
     if (sMusicController)
     {
@@ -399,7 +399,7 @@ MusicController::MusicTypes MusicController::static_GetMusicType(u16* seq1, u16*
     return MusicTypes::eTypeNull;
 }
 
-MusicController::MusicController(ResourceManagerWrapper& resMan, BaseMap& map)
+MusicController::MusicController(ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetSurviveDeathReset(true);

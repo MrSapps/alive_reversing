@@ -39,7 +39,7 @@ struct MeatSawSaveState final : public SaveStateBase
 class MeatSaw final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    MeatSaw(relive::Path_MeatSaw* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    MeatSaw(relive::Path_MeatSaw* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~MeatSaw();
 
 
@@ -47,7 +47,7 @@ public:
     virtual void VUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
 private:
     void LoadAnimations();

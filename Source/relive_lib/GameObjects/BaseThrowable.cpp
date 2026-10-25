@@ -51,7 +51,7 @@ const AETypes gThrowableFromOverlayIdAE[252] = {
     AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0, AETypes::eNone_0,
     AETypes::eNone_0, AETypes::eNone_0};
 
-static BaseThrowable* Make_Throwable_AO(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan, BaseMap& map)
+static BaseThrowable* Make_Throwable_AO(FP xpos, FP ypos, s16 count, ResourceManager& resMan, BaseMap& map)
 {
     switch (gThrowableFromOverlayIdAO[map.mOverlayId])
     {
@@ -66,7 +66,7 @@ static BaseThrowable* Make_Throwable_AO(FP xpos, FP ypos, s16 count, ResourceMan
     }
 }
 
-static BaseThrowable* Make_Throwable_AE(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan, BaseMap& map)
+static BaseThrowable* Make_Throwable_AE(FP xpos, FP ypos, s16 count, ResourceManager& resMan, BaseMap& map)
 {
     switch (gThrowableFromOverlayIdAE[map.mOverlayId])
     {
@@ -85,7 +85,7 @@ static BaseThrowable* Make_Throwable_AE(FP xpos, FP ypos, s16 count, ResourceMan
     }
 }
 
-BaseThrowable* Make_Throwable(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan, BaseMap& map)
+BaseThrowable* Make_Throwable(FP xpos, FP ypos, s16 count, ResourceManager& resMan, BaseMap& map)
 {
     if (GetGameType() == GameType::eAo)
     {
@@ -97,7 +97,7 @@ BaseThrowable* Make_Throwable(FP xpos, FP ypos, s16 count, ResourceManagerWrappe
     }
 }
 
-BaseThrowable::BaseThrowable(ResourceManagerWrapper& resMan, BaseMap& map)
+BaseThrowable::BaseThrowable(ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map)
 {
 }

@@ -47,7 +47,7 @@ void TimedMine::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::TimedMine_Activated));
 }
 
-TimedMine::TimedMine(relive::Path_TimedMine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+TimedMine::TimedMine(relive::Path_TimedMine* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map)
 {
     if (GetGameType() == GameType::eAe)

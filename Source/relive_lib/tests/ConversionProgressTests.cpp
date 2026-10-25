@@ -34,15 +34,16 @@ TEST(ConversionProgress, MultipleCategoriesWeightedCorrectly)
 {
     ConversionProgress progress;
 
-    progress.AddToTotal(ConversionCategory::Paths, 10); // weight .10
+    progress.AddToTotal(ConversionCategory::Paths, 10); 
     progress.AddCompleted(ConversionCategory::Paths, 10); // 100%
 
-    progress.AddToTotal(ConversionCategory::Fmvs, 100); // weight .50
+    progress.AddToTotal(ConversionCategory::Fmvs, 100); 
     progress.AddCompleted(ConversionCategory::Fmvs, 50); // 50%
 
-    // Only Paths+Fmvs have work: weights .10 and .50, sum .60.
-    // weighted = 1.0*.10 + 0.5*.50 = 0.35, renormalized over .60 -> 0.5833...
-    const float expected = (1.0f * 0.10f + 0.5f * 0.50f) / (0.10f + 0.50f);
+    // Only Paths+Fmvs have work: renormalized over just their weights.
+    const float wPaths = ConversionProgress::CategoryWeight(ConversionCategory::Paths);
+    const float wFmvs = ConversionProgress::CategoryWeight(ConversionCategory::Fmvs);
+    const float expected = (1.0f * wPaths + 0.5f * wFmvs) / (wPaths + wFmvs);
     EXPECT_NEAR(progress.OverallPercent(), expected, 0.0001f);
 }
 
@@ -50,7 +51,7 @@ TEST(ConversionProgress, CategoryWithNoWorkThisRunDoesNotDragDownPercent)
 {
     ConversionProgress progress;
 
-    // Only Fmvs (weight .50) has any work this run - every other category stays at 0/0
+    // Only Fmvs has any work this run - every other category stays at 0/0
     // (dv.ConvertX() was false for them). Once Fmvs finishes, overall should reach 100%, not
     // cap at 50%.
     progress.AddToTotal(ConversionCategory::Fmvs, 20);

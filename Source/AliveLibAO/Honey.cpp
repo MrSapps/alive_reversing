@@ -11,7 +11,7 @@ void Honey::VUpdate()
     // Empty
 }
 
-Honey::Honey(FP xpos, FP ypos, ResourceManagerWrapper& resMan, BaseMap& map)
+Honey::Honey(FP xpos, FP ypos, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eHoney);

@@ -202,15 +202,15 @@ public:
         AnimId::Elum_Knockback,
         AnimId::None};
 
-    static void Spawn(const Guid& tlvInfo, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void Spawn(const Guid& tlvInfo, ResourceManager& resMan, BaseMap& map);
 
     virtual void VUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VScreenChanged() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map);
+    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
-    Elum(const Guid& tlvInfo, ResourceManagerWrapper& resMan, BaseMap& map);
+    Elum(const Guid& tlvInfo, ResourceManager& resMan, BaseMap& map);
     ~Elum();
 
     void LoadAnimations();

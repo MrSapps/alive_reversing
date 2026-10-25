@@ -19,7 +19,7 @@
 #include "QuikSave.hpp"
 #include "../relive_lib/Collisions.hpp"
 
-Meat::Meat(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan, BaseMap& map)
+Meat::Meat(FP xpos, FP ypos, s16 count, ResourceManager& resMan, BaseMap& map)
     : BaseThrowable(resMan, map)
 {
     mBaseThrowableDead = 0;
@@ -52,7 +52,7 @@ Meat::Meat(FP xpos, FP ypos, s16 count, ResourceManagerWrapper& resMan, BaseMap&
     CreateShadow();
 }
 
-void Meat::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void Meat::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<MeatSaveState>();
 

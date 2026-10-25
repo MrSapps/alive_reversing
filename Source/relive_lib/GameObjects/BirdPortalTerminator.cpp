@@ -9,7 +9,7 @@ void BirdPortalTerminator::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::BirdPortal_TerminatorGrow));
 }
 
-BirdPortalTerminator::BirdPortalTerminator(FP xpos, FP ypos, FP scale, relive::Path_BirdPortal::PortalType /*portalType*/, ResourceManagerWrapper& resMan, BaseMap& map)
+BirdPortalTerminator::BirdPortalTerminator(FP xpos, FP ypos, FP scale, relive::Path_BirdPortal::PortalType /*portalType*/, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     // TODO: sort this out

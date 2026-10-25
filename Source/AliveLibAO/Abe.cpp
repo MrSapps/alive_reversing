@@ -527,7 +527,7 @@ void Abe::LoadAnimations()
     }
 }
 
-void Abe::PendResources(ResourceManagerWrapper& resMan)
+void Abe::PendResources(ResourceManager& resMan)
 {
     resMan.PendAnims(sAbeMotionAnimIds);
     // TODO: Hack - should be part of abes anim array
@@ -548,7 +548,7 @@ void Abe::PendResources(ResourceManagerWrapper& resMan)
     resMan.PendAnimation(AnimId::ShrykullDetransform);
 }
 
-Abe::Abe(ResourceManagerWrapper& resMan, BaseMap& map)
+Abe::Abe(ResourceManager& resMan, BaseMap& map)
  : BaseAbe(0, resMan, map)
 {
     SetType(ReliveTypes::eAbe);
@@ -2759,13 +2759,13 @@ void Abe::GetSaveState(AbeSaveState& pSaveState)
     pSaveState.mShadowAtBottom = GetShadow()->mShadowAtBottom;
 }
 
-void Abe::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
+void Abe::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
 {
     const AbeSaveState* pSaveState = pData.ReadTmpPtr<AbeSaveState>();
     Abe::CreateFromSaveState(*pSaveState, resMan, map);
 }
 
-void Abe::CreateFromSaveState(const AbeSaveState& pData, ResourceManagerWrapper& resMan, BaseMap& map)
+void Abe::CreateFromSaveState(const AbeSaveState& pData, ResourceManager& resMan, BaseMap& map)
 {
     Abe* pAbe = gAbe;
     if (!gAbe)

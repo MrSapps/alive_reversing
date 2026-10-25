@@ -80,7 +80,7 @@ static u8 Fleech_NextRandom()
     return gRandomBytes[sFleechRandomIdx_5BC20C++];
 }
 
-Fleech::Fleech(relive::Path_Fleech* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Fleech::Fleech(relive::Path_Fleech* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(2, resMan, map),
     mTlvInfo(tlvId),
     mAttackAngerIncreaser(pTlv->mAttackAngerIncreaser + 2),
@@ -165,7 +165,7 @@ void Fleech::LoadAnimations()
     }
 }
 
-void Fleech::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void Fleech::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<FleechSaveState>();
 
@@ -1479,7 +1479,7 @@ const TintEntry kFleechTints_551844[16] = {
     {EReliveLevelIds::eBonewerkz_Ender, 127u, 127u, 127u},
     {EReliveLevelIds::eCredits, 127u, 127u, 127u}};
 
-void Animation_OnFrame_Fleech(BaseGameObject* pObj, u32&, const IndexedPoint& point, ResourceManagerWrapper&, BaseMap&)
+void Animation_OnFrame_Fleech(BaseGameObject* pObj, u32&, const IndexedPoint& point, ResourceManager&, BaseMap&)
 {
     reinterpret_cast<Fleech*>(pObj)->VOnFrame(point.mPoint);
 }

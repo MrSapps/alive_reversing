@@ -17,7 +17,7 @@ void BoomMachine::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::BoomMachine_Button_On));
 }
 
-BoomMachine::BoomMachine(relive::Path_BoomMachine* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+BoomMachine::BoomMachine(relive::Path_BoomMachine* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map),
     mTlvId(tlvId)
 {

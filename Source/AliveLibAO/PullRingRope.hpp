@@ -11,7 +11,7 @@ namespace AO {
 class PullRingRope final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~PullRingRope();
 
     void LoadAnimations();

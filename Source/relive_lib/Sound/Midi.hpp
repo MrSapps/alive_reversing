@@ -6,7 +6,7 @@
 #include <string>
 
 class BaseMap;
-class ResourceManagerWrapper;
+class ResourceManager;
 struct OpenSeqHandle;
 struct PathSoundInfo;
 
@@ -42,9 +42,9 @@ void SND_Shutdown();
 // Ends the sound system: nothing plays after it
 void SND_SsQuit();
 void SND_Reset();
-void SND_Pend_Sound_Files(const PathSoundInfo& info, ResourceManagerWrapper& resMan);
-void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& info, s32 reverb, ResourceManagerWrapper& resMan);
-void SND_Load_Seqs(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& info, ResourceManagerWrapper& resMan);
+void SND_Pend_Sound_Files(const PathSoundInfo& info, ResourceManager& resMan);
+void SND_Load_VABS(std::shared_ptr<PathSoundInfo>& info, s32 reverb, ResourceManager& resMan);
+void SND_Load_Seqs(OpenSeqHandle* pSeqTable, std::shared_ptr<PathSoundInfo>& info, ResourceManager& resMan);
 s8 SND_Seq_Table_Valid();
 
 void SND_StopAll();

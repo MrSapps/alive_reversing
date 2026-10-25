@@ -19,7 +19,7 @@
 #include "Math.hpp"
 #include "QuikSave.hpp"
 
-Bone::Bone(FP xpos, FP ypos, s16 countId, ResourceManagerWrapper& resMan, BaseMap& map) :
+Bone::Bone(FP xpos, FP ypos, s16 countId, ResourceManager& resMan, BaseMap& map) :
     BaseThrowable(resMan, map),
     mPreviousXPos(xpos),
     mPreviousYPos(ypos)
@@ -48,7 +48,7 @@ void Bone::VTimeToExplodeRandom()
     // Empty
 }
 
-void Bone::CreateFromSaveState(SerializedObjectData& pData, ResourceManagerWrapper& resMan, BaseMap& map)
+void Bone::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pData.ReadTmpPtr<BoneSaveState>();
     

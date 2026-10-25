@@ -46,7 +46,7 @@ void Shrykull::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::ShrykullDetransform));
 }
 
-Shrykull::Shrykull(ResourceManagerWrapper& resMan, BaseMap& map)
+Shrykull::Shrykull(ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eShrykull);
@@ -373,7 +373,7 @@ void Shrykull::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void Shrykull::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManagerWrapper& resMan, BaseMap& map)
+void Shrykull::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<ShrykullSaveState>();
 

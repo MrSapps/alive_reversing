@@ -2,7 +2,7 @@
 
 #include "Math.hpp"
 #include "../relive_lib/Primitives.hpp"
-#include "../relive_lib/ResourceManagerWrapper.hpp"
+#include "../relive_lib/ResourceManager.hpp"
 #include "Layer.hpp"
 
 class OrderingTable;
@@ -34,7 +34,7 @@ public:
     const Font_AtlasEntry* mAtlasArray = nullptr;
     FontResource mFntResource;
 
-    void LoadFontType(FontType resourceID, ResourceManagerWrapper& resMan);
+    void LoadFontType(FontType resourceID, ResourceManager& resMan);
 
     // Draw the font in the colours of pal
     void UseFontSheet(const PalResource& pal);

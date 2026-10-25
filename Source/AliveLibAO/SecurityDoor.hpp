@@ -28,7 +28,7 @@ enum SecurityDoorStates : s16
 class SecurityDoor final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
-    SecurityDoor(relive::Path_SecurityDoor* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map);
+    SecurityDoor(relive::Path_SecurityDoor* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~SecurityDoor();
 
     void LoadAnimations();

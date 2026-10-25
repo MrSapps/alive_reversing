@@ -7,7 +7,7 @@
 class QuitGame final : public BaseGameObject
 {
 public:
-    QuitGame(ResourceManagerWrapper& resMan, BaseMap& map)
+    QuitGame(ResourceManager& resMan, BaseMap& map)
         : BaseGameObject(true, 0, resMan, map)
     {
         SetSurviveDeathReset(true);

@@ -52,7 +52,7 @@ void FallingItem::LoadAnimations()
     }
 }
 
-FallingItem::FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+FallingItem::FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map),
     mTlvId(tlvId),
     mSwitchId(pTlv->mSwitchId),
@@ -104,7 +104,7 @@ FallingItem::FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, Reso
     CreateShadow();
 }
 
- FallingItem::FallingItem(s32 xpos, s32 ypos, s32 scale, s32 id, s32 fallInterval, s32 numItems, s32 bResetIdAfterUse, ResourceManagerWrapper& resMan, BaseMap& map)
+ FallingItem::FallingItem(s32 xpos, s32 ypos, s32 scale, s32 id, s32 fallInterval, s32 numItems, s32 bResetIdAfterUse, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map),
      mTlvId(Guid{}),
      mSwitchId(static_cast<s16>(id)),

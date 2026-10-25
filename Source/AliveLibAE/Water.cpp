@@ -13,7 +13,7 @@
 #include "Map.hpp"
 #include "Path.hpp"
 
-Water::Water(relive::Path_Water* pTlv, const Guid& tlvId, ResourceManagerWrapper& resMan, BaseMap& map)
+Water::Water(relive::Path_Water* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::WaterDrop));

@@ -13,7 +13,7 @@
 // choice, timing and "back to ambience" timeout all run as in the game. A music type is asked for
 // by Abe (the controlled character), as the game objects do.
 class BaseMap;
-class ResourceManagerWrapper;
+class ResourceManager;
 
 class SoundDebug final
 {
@@ -26,7 +26,7 @@ public:
     // music owner is abe (default), other (a second dummy game object, made when first used) or
     // none. kill_other destroys it, so the controller finds its owner dead. False with error if it
     // can't (e.g. no game running)
-    static bool Run(const std::string& name, const std::vector<std::string>& args, std::string& error, BaseMap& map, ResourceManagerWrapper& resMan);
+    static bool Run(const std::string& name, const std::vector<std::string>& args, std::string& error, BaseMap& map, ResourceManager& resMan);
 
     // Forget the second owner, when the game's objects are all destroyed (a new game)
     static void ForgetOwners();

@@ -136,7 +136,7 @@ static CheatEntry sCheatArray[] = {
     {EReliveLevelIds::eNone, GameType::eAo, ALIVE_COUNTOF(sCheatKeyArray_VoiceLocks), sCheatKeyArray_VoiceLocks, 0, &CheatController_Cheat_VoiceLocks},
     {EReliveLevelIds::eNone, GameType::eAe, ALIVE_COUNTOF(sCheatKeyArray_PathSkip), sCheatKeyArray_PathSkip, 0, &CheatController_Cheat_PathSkip}};
 
-CheatController::CheatController(ResourceManagerWrapper& resMan, BaseMap& map)
+CheatController::CheatController(ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
     SetSurviveDeathReset(true);
