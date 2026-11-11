@@ -41,6 +41,39 @@ public:
 
     static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
 
+    // Where it is in its stroke, for the bot. Parked it hurts nothing; out and back it kills what its rectangle
+    // (KillRect) touches.
+    enum class Stroke
+    {
+        eParked,
+        eOut,  // the offset shrinks to 0
+        eBack, // the offset grows to Travel(), then it parks
+    };
+    Stroke GetStroke() const;
+    // Whether it starts another stroke once its pause is over, as the switch is now
+    bool WillStart() const;
+    // The speed of the stroke it is in, or of the next one when parked
+    FP StrokeSpeed() const;
+    FP Offset() const
+    {
+        return mXYOff;
+    }
+    s32 Travel() const
+    {
+        return mDrillDistance;
+    }
+    // Frames until a parked one may start
+    s32 PauseLeft() const;
+    relive::Path_Drill::DrillDirection Direction() const
+    {
+        return mDrillDirection;
+    }
+    PSX_RECT KillRect();
+    const Guid& TlvId() const
+    {
+        return mTlvInfo;
+    }
+
 private:
     void EmitSparks();
     s16 DamageTouchingObjects();

@@ -126,9 +126,66 @@ hash.
   lever from the near side without turning (turning cost the 8 frames that got Abe bitten), wait for them to fry,
   walk out of the lever's stretch and back to turn the walls off, again while Slogs are left. Measured: Slogs
   run exactly as fast as Abe (6.2 px a frame) and pace about 70 px either side of him on their floor.
-- **Mines path 4**: stuck at its start, 26 of 949 cells in reach. Mines sit on the floor in front of two levers
-  and across the way: they have to be blown up with rocks from the rock sack. Then drills (23), blind Mudokons
-  (they need "wait" and leading by voice), lift movers, timer triggers.
+- **Mines path 4, `any`**: through the first two sets of mines, to the drill (2026-11-11, `build-bot/p4.txt`,
+  about 3,900 frames to there, no deaths). Rocks: `GetRocksTask` stands under the sack and jumps (Up), a rock
+  holding the sack's nine falls out, rolls and comes to rest, and is picked up from the cell next to it,
+  crouched, with Action. `BlowMineTask` throws at a mine until it is gone. A mine's cell is a nav cell whose
+  edges wait for a switch of its own (`World::HazardSwitch`, on when the mine's TLV is destroyed), so the
+  planner sees "blow up the mine, then walk through" the way it sees a lever and a door, and the hop over a
+  single mine is still there. Where to throw from is not worked out from how a rock flies: `Domain::ThrowSpots`
+  lists places worth a try, the task tries them, and the bot keeps what set a mine off (tried first from then
+  on, anywhere) and what missed or killed (per mine, never again). Measured: under a ledge 100 px up, an up
+  throw from four cells off hits (five and six fall short); along a floor, a throw at the floor from five
+  cells, a crouched throw from six, a forward throw from ten; under a low ceiling only the crouched throw, from
+  six cells, one mine after another. The blast reaches 113 px either way and 50 up and down
+  (`GroundExplosion.cpp`), and it does not set the next mine off. A rock takes the first mine in its way, so a
+  mine behind another waits for that one: that also keeps the planner from trying every order of a row.
+  The sack gives nothing while Abe has rocks.
+  - **Drills** (`FeatureKind::eSweep`, `EntityKind::eDrill`, `World::mSweeps`, `GoToTask::SweepsClear`): the
+    cells a drill reaches are ordinary floor with a mark. `GameView` reads each live drill every frame through
+    `Drill::GetStroke/Offset/StrokeSpeed/PauseLeft/WillStart/KillRect` into a `SweepAt`, which says where it
+    kills t frames from now (parked, out, back; a pause of unknown length is taken as its shortest). `GoToTask`
+    stops in the last cell before the marked ones and goes when Abe, moved along the edges ahead at measured
+    paces, never has the drill within 9 px of him until he is out the other side. If its lever can be got to
+    without passing a drill, that is pulled first (`GoToTask::StopFor`); a stopped drill's cells are plain floor
+    once its stroke is over. A death right after setting off shifts the timing for the next try
+    (`Bot::SweepLate`: 6 frames later, 6 sooner, 12 later...). No throwing from a drill's cells while it runs.
+    Measured on path 4's drill 203: it kills in a box 26 wide and 21 high, 3 px a frame, 182 frames out and
+    back with no pause, so the only way through is behind it as it goes; a roll is 6.25 px a frame, a walk
+    2.77, a hoist up 100 px about 54 frames. Result: through it first time with no death, lever pulled.
+  - **A miss is taken back** (`Bot::RewindMiss`): the game is put back to before the throw, so the rock isn't
+    lost and what was learnt (that throw at that mine from that cell is no good) stays. A throw that sets off
+    another mine than the one aimed at is kept and not held against the throw. A death within 150 frames of a
+    throw is put down to it. Not from a cell with a live mine within 90 px on the same floor (125 for a throw
+    upwards: the rock comes back down on it), not crouched at the top of a hoist (crouching there climbs
+    down), and from where Abe can get back from before anywhere a drop leads.
+  - **Stalls**: six deaths in one cell give up what was being done there and ban the edge, twenty stop the
+    run; after 600 frames with nothing logged the log says what the bot is at.
+  Where it stops now (`build-bot/p4.txt`, 2026-11-11, about 8,900 frames, no deaths, 89 misses taken back):
+  in the room after the drill (cams 36 and 37), on the 2420 ledge at 3787. Gone by then: all eight mines of
+  the room's first two floors and, as far as the log shows, the three on the 2480 ledge (one hit, two set off
+  on the way). Then `no_plan`, with no goal even tried: nothing is both reachable and wanted
+  (`Domain::Reachable`). **Not established why.** Two candidates, check in this order: (a) the four mines on
+  the 2540 floor before the door at 3425,2520 are never made a goal (the only way to them is a drop off the
+  2480 ledge into the first one's cell; the stuck report's "Blocked" list does not name that edge, so the
+  ledge may not count as in reach, or a fall into a mine's cell is not offered); (b) the path's exit needs
+  door 2562,460, which opens on switch 190: the rescue of a blind Mudokon, and blind Mudokons are not
+  modelled (they walk on until told to wait and fall off ledges). A scenario started in the room
+  (`start mines 4 36 3787 2420` will not have the mines gone, so use a save) would settle it. After that: two
+  more blind Mudokons whose rescue opens doors, drills with no lever in reach (timing only, some jumped
+  through), lift movers, a timer trigger. One sack in the room (3937,2384) hangs over the gap between two
+  ledges and is only got by jumping the gap through it; the bot leaves it alone and goes back past the drill
+  for rocks. `build-bot/research/` has what four read-only passes over the game code found on each of these,
+  on grenades and boom machines, the mine car and path 6's timed escape.
+- **Mines path 1, `save_all`, later the same day** (`build-bot/m1s.txt`, 15,000 frames): 5 rescued, no deaths.
+  The Slig by the orb is shot by a Slig Abe has taken over and sent round by teleporter to the background
+  (`ClearSligTask::RaidStep`): a shot from behind takes whatever is nearest within 25 px of the snapped x over
+  the whole screen, so it leads the target and holds fire while a Mudokon is nearer. #6005, #8005 and #33006
+  all go out through the walkway portal: a Mudokon is only paired with a portal it can walk to, and UXBs by
+  it are turned off first. A possessed Slig says "look out" (speak 7) so working Mudokons duck and a level
+  shot goes over them (`ClearSligTask::ShootLevel`; unit tested, no scene has used it yet). Still to do there:
+  the background Mudokons (Abe through the teleporters), #18009/#18010, #21004/5, #32002/3, the wheel crew.
+  `kill_all` and the full `save_all` run have not been rerun since. What follows is the state before that.
 - **Mines, `save_all` and `kill_all`**: neither finishes path 1 in 16,000 frames (2026-11-11). `save_all`: 2 rescued, none
   lost, 8 rewinds. `kill_all`: 2 rescued (the way needs them), 3 killed by slapping, 7 rewinds. Both stop dying in
   a loop: a rescue or kill that kills Abe three times is given up, and in `save_all` a Mudokon's death rewinds like
@@ -145,8 +202,9 @@ So the first three paths of the Mines are beaten with `any`, the other profiles 
 
 ### Next, in order
 
-1. Mines path 4: rocks (jump under the sack, throw at a mine from out of its blast), then drills as timed
-   hazards, blind Mudokons.
+1. Mines path 4: why there is no goal left in the mine room after the drill (see above), then blind Mudokons
+   (hello, follow me, "wait" before each drop, the way cleared first), the sack that hangs over a gap, and the
+   same timed-hazard reader for meat saws, falling items and motion detectors (`SweepAt` is meant to take them).
 2. Sligs in the way of a Mudokon (#8005 and #33006 on path 1's 1400 floor). There are usually several ways and
    the planner should hold them as alternatives, cheapest first: (a) call the Mudokon from inside an invisible
    zone and lead it off behind the Slig's back; (b) take over a Slig that is easy to get at (another floor of its
@@ -157,6 +215,32 @@ So the first three paths of the Mines are beaten with `any`, the other profiles 
    must be on another floor. From #8005 the floor below is reached by walking east off the end of the 1400
    floor, past the second Slig: that walk east died three times where the same walk west got through, look
    there first.
+   Measured since (2026-11-11), from `SligSpawner.cpp`, `Slig.cpp` and a run: the Slig at #8005 comes from a
+   spawner on switch 66 (the lever that opens the way up there). It is made when Abe comes to its screen with
+   the switch on, and a killed one stays gone: its death clears the switch and only setting it again makes
+   another. So killing it once is enough. Spawners are in the world as Sligs that are there while their switch
+   is on, so the bot sneaks onto that screen and stops in the shadow instead of running in. Chanting from a
+   shadow on the Slig's own floor was tried and taken out: `IsInInvisibleZone` is false for everyone while Abe
+   chants, the Slig panics at the chant, runs off the screen and shoots on its way back, about 2 frames before
+   the takeover (90 frames of chant, then 30 with it on screen) is done.
+
+   What works is the raid (`ClearSligTask::FindRaid` / `RaidStep`, 2026-11-11): when the watching Slig can't be
+   taken over where it is, look for another Slig with no orb on its screen and a teleporter on its floor, go to
+   a cell of its screen on another floor (in Mines path 1 the ledge at 1062..1112,1240 under the well, for the
+   Slig at 812,1140), chant, and steer the Slig: stand in the teleporter, pull its lever (Action, lever a cell
+   in front), come out on the next floor, and so on through every teleporter that leads to a floor not seen yet
+   (switches 116, 112, 114 here). A teleporter moves whoever is controlled (`Teleporter.cpp`). On each floor it
+   shoots what is on it, and from a half scale floor it shoots out of the screen (Down + Throw) at Sligs in
+   front: that bullet takes the nearest thing within a cell of the Slig's x on the whole screen
+   (`Bullet.cpp`), so with Mudokons to save it holds fire while one is within 60 px. With `kill_all` it shoots
+   the Mudokons too, the three behind included. Then it bursts. Stopping on a teleporter is done in single
+   steps (a one frame tap from standing): a walking Slig stops 16 to 21 px after the key is let go.
+   Also measured: the spawned Slig is deleted when Abe goes to a screen with none of its persist or bound
+   markers (the ledge is one), and the spawner then clears switch 66, so the walk to the ledge alone gets rid
+   of it. Runs from the start, seed 1: `kill_all` 17 killed into path 4 (19 rewinds, 13 of them at four
+   Mudokons on path 3 that were given up), `save_all` 8 rescued and none lost into path 4 (10 rewinds).
+   Open: in `save_all` #33006 is still given up (the Slig by the orb was not shot in that run), no unit test
+   for the raid yet, and an action that fails six times over is now left alone for good (`mFailedTotal`).
 3. UXBs: read their pattern and cross on the safe beat, or disarm them.
 4. Pull rings where a wheel shares the cell.
 5. The flying Slig of path 2 (hide from it or time it), trap doors, mine car, teleporters, the timed escape of

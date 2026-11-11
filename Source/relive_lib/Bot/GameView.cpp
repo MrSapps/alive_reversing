@@ -11,6 +11,8 @@
 #include "../../AliveLibAE/Input.hpp"
 #include "../../AliveLibAO/Abe.hpp"
 #include "../../AliveLibAE/Mudokon.hpp"
+#include "../../AliveLibAE/UXB.hpp"
+#include "../../AliveLibAE/Drill.hpp"
 #include "../../AliveLibAE/DDCheat.hpp"
 #include "../../AliveLibAO/Mudokon.hpp"
 #include "../../AliveLibAO/DDCheat.hpp"
@@ -386,6 +388,15 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                 {
                     NavFeature f = MakeFeature(FeatureKind::eHazard, tlv, camera, id);
                     f.mHalf = static_cast<const relive::Path_Mine&>(tlv).mScale == relive::reliveScale::eHalf;
+                    // (a rock gets rid of it)
+                    f.mSwitch = World::HazardSwitch(id);
+                    in.mFeatures.push_back(f);
+                    break;
+                }
+                case ReliveTypes::eDrill:
+                {
+                    NavFeature f = MakeFeature(FeatureKind::eSweep, tlv, camera, id);
+                    f.mHalf = static_cast<const relive::Path_Drill&>(tlv).mScale == relive::reliveScale::eHalf;
                     in.mFeatures.push_back(f);
                     break;
                 }
@@ -502,6 +513,29 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mOp = OpOf(t.mAction);
                     break;
                 }
+                case ReliveTypes::eMine:
+                    e.mKind = EntityKind::eMine;
+                    e.mHalf = static_cast<const relive::Path_Mine&>(tlv).mScale == relive::reliveScale::eHalf;
+                    e.mSwitch = World::HazardSwitch(e.mId);
+                    break;
+                case ReliveTypes::eDrill:
+                {
+                    const auto& t = static_cast<const relive::Path_Drill&>(tlv);
+                    e.mKind = EntityKind::eDrill;
+                    e.mHalf = t.mScale == relive::reliveScale::eHalf;
+                    e.mSwitch = t.mSwitchId;
+                    e.mInputs[0] = t.mDrillBehavior == relive::Path_Drill::DrillBehavior::eToggle ? 1 : (t.mDrillBehavior == relive::Path_Drill::DrillBehavior::eUse ? 2 : 0);
+                    e.mInputs[1] = t.mStartStateOn ? 1 : 0;
+                    // (250 stands for a fifth of a pixel a frame, which the game takes as stopped)
+                    e.mInputs[2] = t.mOffSpeed > 0 && t.mOffSpeed != 250 ? 1 : 0;
+                    break;
+                }
+                case ReliveTypes::eRockSack:
+                    e.mKind = EntityKind::eRockSack;
+                    // (AO's give rocks another way, not done yet)
+                    keep = GetGameType() == GameType::eAe;
+                    e.mHalf = static_cast<const relive::Path_RockSack&>(tlv).mScale == relive::reliveScale::eHalf;
+                    break;
                 case ReliveTypes::ePullRingRope:
                 {
                     const auto& t = static_cast<const relive::Path_PullRingRope&>(tlv);
@@ -535,6 +569,9 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mKind = EntityKind::eBirdPortal;
                     e.mHalf = t.mScale == relive::reliveScale::eHalf;
                     e.mRescuePortal = t.mPortalType == relive::Path_BirdPortal::PortalType::eWorker || t.mPortalType == relive::Path_BirdPortal::PortalType::eShrykull;
+                    // It is only there once the first is on, and gone for good once the second is
+                    e.mInputs[0] = t.mCreatePortalSwitchId;
+                    e.mInputs[1] = t.mDeletePortalSwitchId;
                     break;
                 }
                 case ReliveTypes::eMultiSwitchController:
@@ -580,6 +617,29 @@ static void BuildEntities(BinaryPath& path, World& world)
                     // mState 1: starts asleep. mOp 1: starts facing left.
                     e.mState = t.mStartState == relive::Path_Slig::StartState::Sleeping ? 1 : 0;
                     e.mOp = t.mFacing == relive::reliveXDirection::eLeft ? 1 : 0;
+                    break;
+                }
+                case ReliveTypes::eTeleporter:
+                {
+                    const auto& t = static_cast<const relive::Path_Teleporter&>(tlv);
+                    e.mKind = EntityKind::eTeleporter;
+                    e.mHalf = t.mScale == relive::reliveScale::eHalf;
+                    e.mSwitch = t.mSwitchId;
+                    e.mInputs[0] = t.mDestCamera;
+                    e.mInputs[1] = t.mTeleporterId;
+                    e.mInputs[2] = t.mOtherTeleporterId;
+                    break;
+                }
+                case ReliveTypes::eSligSpawner:
+                {
+                    // Makes its Slig when Abe comes to its screen with the switch on, and again only once that
+                    // one is dead and the switch is set anew (SligSpawner.cpp)
+                    const auto& t = static_cast<const relive::Path_Slig&>(tlv);
+                    e.mKind = EntityKind::eSlig;
+                    e.mHalf = t.mScale == relive::reliveScale::eHalf;
+                    e.mState = t.mStartState == relive::Path_Slig::StartState::Sleeping ? 1 : 0;
+                    e.mOp = t.mFacing == relive::reliveXDirection::eLeft ? 1 : 0;
+                    e.mSwitch = t.mSligSpawnerSwitchId;
                     break;
                 }
                 case ReliveTypes::eSecurityOrb:
@@ -675,8 +735,77 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             const s16 motion = pObj->VGetMotion(eMotionType::eCurrentMotion);
             // Motion_32_Sleeping in AE, Motion_33_Sleeping in AO
             slig.mAsleep = motion == (isAe ? 32 : 33);
+            slig.mMotion = motion;
             world.mSligs.push_back(slig);
         }
+    }
+
+    world.mRocks = isAe && gAbe ? gAbe->mBaseThrowableCount : 0;
+    world.mRocksDown.clear();
+    for (s32 i = 0; isAe && i < gBaseAliveGameObjects->Size(); i++)
+    {
+        BaseAliveGameObject* pObj = gBaseAliveGameObjects->ItemAt(i);
+        // (one that has come to rest can be picked up)
+        if (pObj && !pObj->GetDead() && pObj->Type() == ReliveTypes::eRock && pObj->GetInteractive())
+        {
+            RockAt rock;
+            rock.mX = FP_GetExponent(pObj->mXPos);
+            rock.mY = FP_GetExponent(pObj->mYPos);
+            rock.mHalf = pObj->GetSpriteScale() != FP_FromInteger(1);
+            world.mRocksDown.push_back(rock);
+        }
+    }
+
+    world.mUxbs.clear();
+    for (s32 i = 0; isAe && i < gBaseAliveGameObjects->Size(); i++)
+    {
+        BaseAliveGameObject* pObj = gBaseAliveGameObjects->ItemAt(i);
+        if (pObj && !pObj->GetDead() && pObj->Type() == ReliveTypes::eUXB)
+        {
+            const ::UXB* pUxb = static_cast<::UXB*>(pObj);
+            UxbAt uxb;
+            uxb.mX = FP_GetExponent(pObj->mXPos);
+            uxb.mY = FP_GetExponent(pObj->mYPos);
+            uxb.mHalf = pObj->GetSpriteScale() != FP_FromInteger(1);
+            uxb.mGreen = pUxb->IsGreen();
+            uxb.mOff = pUxb->IsOff();
+            world.mUxbs.push_back(uxb);
+        }
+    }
+
+    world.mSweeps.clear();
+    for (s32 i = 0; isAe && i < gBaseGameObjects->Size(); i++)
+    {
+        BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
+        if (!pObj || pObj->GetDead() || pObj->Type() != ReliveTypes::eDrill)
+        {
+            continue;
+        }
+        ::Drill* pDrill = static_cast<::Drill*>(pObj);
+        SweepAt sweep;
+        for (std::size_t k = 0; k < world.mEntities.size(); k++)
+        {
+            if (world.mEntities[k].mKind == EntityKind::eDrill && pDrill->TlvId() == static_cast<const relive::Path_TLV*>(world.mTlvs[k])->mId)
+            {
+                sweep.mId = world.mEntities[k].mId;
+                world.mEntities[k].mLive = true;
+            }
+        }
+        const PSX_RECT rect = pDrill->KillRect();
+        sweep.mX1 = rect.x;
+        sweep.mY1 = rect.y;
+        sweep.mX2 = rect.w;
+        sweep.mY2 = rect.h;
+        sweep.mHalf = pDrill->GetSpriteScale() != FP_FromInteger(1);
+        sweep.mVertical = pDrill->Direction() == relive::Path_Drill::DrillDirection::eDown;
+        sweep.mSign = pDrill->Direction() == relive::Path_Drill::DrillDirection::eRight ? 1 : -1;
+        sweep.mOffset = pDrill->Offset().fpValue / 256;
+        sweep.mTravel = pDrill->Travel() * 256;
+        sweep.mSpeed = pDrill->StrokeSpeed().fpValue / 256;
+        sweep.mPhase = pDrill->GetStroke() == ::Drill::Stroke::eParked ? 0 : (pDrill->GetStroke() == ::Drill::Stroke::eOut ? 1 : 2);
+        sweep.mPause = pDrill->PauseLeft();
+        sweep.mWillStart = pDrill->WillStart();
+        world.mSweeps.push_back(sweep);
     }
 
     world.mSlogs.clear();
@@ -733,6 +862,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
         match->mLive = true;
         match->mLiveX = x;
         match->mLiveY = y;
+        match->mLiveTop = pObj->VGetBoundingRect().y;
         if (isAe)
         {
             match->mFollowing = static_cast<::Mudokon*>(pObj)->IsFollowingAbe();

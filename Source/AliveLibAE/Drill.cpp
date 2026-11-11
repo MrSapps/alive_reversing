@@ -600,7 +600,47 @@ void Drill::EmitSparks()
     }
 }
 
-s16 Drill::DamageTouchingObjects()
+Drill::Stroke Drill::GetStroke() const
+{
+    switch (mState)
+    {
+        case DrillStates::eGoingDown_1:
+            return Stroke::eOut;
+        case DrillStates::eGoingUp_2:
+            return Stroke::eBack;
+        default:
+            return Stroke::eParked;
+    }
+}
+
+bool Drill::WillStart() const
+{
+    if (!mUseId || (!!SwitchStates_Get(mDrillSwitchId) == mStartOff))
+    {
+        return true;
+    }
+    return !mToggle && FP_GetExponent(mOffSpeed) > 0;
+}
+
+FP Drill::StrokeSpeed() const
+{
+    if (mState != DrillStates::eRestartCycle_0)
+    {
+        return mCurrentSpeed;
+    }
+    return !mUseId || (!!SwitchStates_Get(mDrillSwitchId) == mStartOff) ? mInitialSpeed : mOffSpeed;
+}
+
+s32 Drill::PauseLeft() const
+{
+    if (mToggle || Expired(mOffTimer))
+    {
+        return 0;
+    }
+    return mOffTimer - static_cast<s32>(sGnFrame) + 1;
+}
+
+PSX_RECT Drill::KillRect()
 {
     PSX_RECT drillRect = VGetBoundingRect();
 
@@ -608,6 +648,12 @@ s16 Drill::DamageTouchingObjects()
     {
         drillRect.y += 16;
     }
+    return drillRect;
+}
+
+s16 Drill::DamageTouchingObjects()
+{
+    const PSX_RECT drillRect = KillRect();
 
     BaseAliveGameObject* pFound = nullptr;
     for (s32 i = 0; i < gBaseAliveGameObjects->Size(); i++)

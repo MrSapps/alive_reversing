@@ -25,6 +25,8 @@ struct PathKnowledge final
 {
     NavGraph mNav;
     std::set<s32> mBannedEdges;
+    // Throws at a mine (its id, the cell thrown from, how) that missed or killed Abe: not tried again
+    std::set<std::tuple<u32, s32, s32>> mBadThrows;
 };
 
 enum class BotState : u8
@@ -130,6 +132,43 @@ public:
     // The cell Abe stands in, or -1
     s32 AbeNode() const;
     void BanEdge(s32 edge);
+    // A rock is about to be thrown at a mine: what comes of it is kept. A death before one of the other two is
+    // called is put down to the throw.
+    // Setting off past a drill now. A death soon after is put down to the timing, which the next try shifts.
+    void SweepBegun()
+    {
+        mSweepPending = true;
+        mSweepFrame = mAbe.mFrame;
+    }
+    // Going for a drill's lever: no going for another's on the way there
+    void StoppingSweep()
+    {
+        mSweepStopFrame = static_cast<s32>(mAbe.mFrame);
+    }
+    bool MayStopSweep() const
+    {
+        const s32 since = static_cast<s32>(mAbe.mFrame) - mSweepStopFrame;
+        return since > 600 || since < 0;
+    }
+    // Frames Abe is taken to be later (negative: sooner) past a drill than worked out: what the tries so far taught
+    s32 SweepLate() const;
+    // A throw that missed is taken back (the game put back to before it), so the rock isn't lost: what was
+    // learnt from it stays
+    void WantMissRewind()
+    {
+        mMissRewind = true;
+    }
+    // It is over with nothing learnt from it
+    void ThrowOver()
+    {
+        mThrowPending = false;
+    }
+    void ThrowBegun(u32 mine, const ThrowSpot& spot);
+    void ThrowMissed();
+    void ThrowHit();
+    bool ThrowIsBad(u32 mine, const ThrowSpot& spot) const;
+    // A throw from this far and this level has set a mine off before
+    bool ThrowHasWorked(const ThrowSpot& spot) const;
     // The edge Abe is on his way along (-1: none), so a death can be laid at its door: two and it is banned
     void SetCurrentEdge(s32 edge)
     {
@@ -137,6 +176,20 @@ public:
     }
     NavGraph::EdgeCost EdgeCostFn() const;
     void Log(const std::string& text);
+    // See World::QuietFrames, with the beats this run has seen
+    s32 QuietFrames(s32 x, s32 y, bool half) const;
+    // Its beat has been watched from one end to the other (or far enough to count on)
+    bool KnowsBeat(const SligAt& slig) const
+    {
+        for (const SligBeat& beat : mBeats)
+        {
+            if (beat.mHalf == slig.mHalf && std::abs(beat.mY - slig.mY) <= 45 && slig.mX >= beat.mMinX - 30 && slig.mX <= beat.mMaxX + 30 && beat.mMaxX - beat.mMinX >= 150)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
     // How many tries from the newest checkpoint ended in a death
     s32 Attempt() const
     {
@@ -159,6 +212,7 @@ private:
     void EnsureKnowledge(BaseMap& map);
     void Think(BaseMap& map);
     void OnDeath(BaseMap& map);
+    void RewindMiss(BaseMap& map);
     void MaybeCheckpoint(BaseMap& map);
     void Stuck(const std::string& why);
     // The next task by the profile's goals. False with mState set when there's nothing more to do or no way to.
@@ -187,6 +241,8 @@ private:
     bool mTaskOptional = false;
     // Deaths while at each action
     std::map<std::string, s32> mActionDeaths;
+    // How often each action has failed in all, forgiven or not
+    std::map<std::string, s32> mFailedTotal;
     std::map<std::string, s32> mFailedActions;
     std::string mPlanText;
     std::set<std::pair<s32, s32>> mVisitedPaths;
@@ -196,8 +252,25 @@ private:
     u32 mExploring = 0;
     s8 mLastSwitches[256] = {};
     std::string mLastSligs;
+    s32 mLastAwakeSligs = 0;
     s32 mDeadFrames = 0;
     s32 mStartWaits = 0;
+    bool mThrowPending = false;
+    u32 mThrowFrame = 0;
+    u32 mLastLogFrame = 0;
+    s32 mLastMines = 0;
+    bool mMissRewind = false;
+    s32 mMissRewinds = 0;
+    bool mSweepPending = false;
+    u32 mSweepFrame = 0;
+    s32 mSweepDeaths = 0;
+    s32 mSweepStopFrame = -100000;
+    // Deaths per cell (x, y): the same place over and over is not a matter of luck
+    std::map<std::pair<s32, s32>, s32> mDeathCells;
+    u32 mThrowMine = 0;
+    ThrowSpot mThrowSpot;
+    // (level, cells, kind) of throws that set a mine off
+    std::set<std::tuple<s32, s32, s32>> mThrowHits;
     s32 mCurrentEdge = -1;
     std::map<s32, s32> mEdgeDeaths;
     s32 mLastKilled = 0;
@@ -219,6 +292,10 @@ private:
     std::unique_ptr<Task> mReflex;
     std::map<u32, s32> mReflexTries;
     s32 mSlogTraps = 0;
+    std::vector<SligBeat> mBeats;
+    u32 mForgaveFrame = 0;
+    // Where Abe was when an action last failed: it is left out only while he is still about there
+    std::map<std::string, std::pair<s32, s32>> mFailedWhere;
     std::unique_ptr<Task> MakeReflex();
     bool mGoToPending = false;
     s32 mGoToX = 0;
@@ -234,6 +311,8 @@ private:
         Checkpoint mCheckpoint;
         std::size_t mInputCount = 0;
         s32 mAttempts = 0;
+        // The frame the last try from here died on: the same one again and nothing done from here changes it
+        s32 mLastDeathFrame = -1;
     };
     std::vector<Saved> mCheckpoints;
     bool mRestoring = false;
