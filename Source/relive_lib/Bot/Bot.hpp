@@ -169,6 +169,15 @@ public:
         mThrowPending = false;
     }
     void ThrowBegun(u32 mine, const ThrowSpot& spot);
+    // A motion detector's beam would come over Abe before what the pilot is at is done: he keeps still (or comes
+    // to a stop) until it has gone by
+    bool BeamHolds() const;
+    // Held up by a beam for a long time (a step never fits between its passes): a roll of a few cells right
+    // behind it instead. True if one was begun.
+    bool BeamRoll();
+    s32 mBeamHeld = 0;
+    bool mBeamRolling = false;
+    s32 mBeamToX = 0;
     void ThrowMissed();
     void ThrowHit();
     bool ThrowIsBad(u32 mine, const ThrowSpot& spot) const;

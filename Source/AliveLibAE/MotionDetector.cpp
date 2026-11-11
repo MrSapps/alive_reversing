@@ -180,6 +180,21 @@ void MotionDetector::VScreenChanged()
     }
 }
 
+bool MotionDetector::BeamNow(PSX_RECT& laser, s32& minX, s32& maxX, s32& velX256)
+{
+    MotionDetectorLaser* pLaser = sObjectIds.Find<MotionDetectorLaser>(mLaserId, ReliveTypes::eRedLaser);
+    if (!pLaser || mHasOwner || SwitchStates_Get(mDisableSwitchId))
+    {
+        return false;
+    }
+    laser = pLaser->VGetBoundingRect();
+    minX = FP_GetExponent(mTopLeftX);
+    maxX = FP_GetExponent(mBottomRightX);
+    const s32 speed = std::abs(mSpeed.fpValue) / 256;
+    velX256 = mState == States::eMoveRight_0 || mState == States::eWaitThenMoveRight_3 ? speed : -speed;
+    return true;
+}
+
 s16 MotionDetector::IsInLaser(BaseAliveGameObject* pWho, BaseAliveGameObject* pOwner)
 {
     if (pWho->Type() == ReliveTypes::eAbe)

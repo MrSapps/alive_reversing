@@ -205,12 +205,27 @@ hash.
     where that does nothing tries the others in turn, not straight back the way it came. Started beside the
     car (`build-bot/p5c.txt`) the bot is through path 5 and into path 10 in 1,100 frames. It runs six Mudokons
     over on the way: fine for `any`, wrong for `save_all`.
-  - **Where it stops now**: getting to the car on foot from path 5's door (`build-bot/f4.txt`). The bot goes
-    the long way round by the hoist at 1300 and dies on the 720 floor (three UXBs, a Slig, motion detectors),
-    again and again. The short way is off the left end of the 620 floor onto the 720 floor between the UXBs
-    at 487 to 662, with a motion detector sweeping 425 to 701: it needs the landing among UXBs, their
-    disarming and motion detectors (stand still in the beam). Then path 10, where it gets two of the three
-    half-scale levers with eight deaths and has no plan for the rest.
+  - **Motion detectors** (`World::mBeams`, `World::BeamClear`, `Bot::BeamHolds`, `MotionDetector::BeamNow`):
+    Abe is not seen standing or crouching still, or hanging; anything else under the beam sets the alarm off
+    (`MotionDetector::IsInLaser`), which wakes the Sligs. Before each frame of the pilot the bot works out,
+    frame by frame, whether the beam comes over Abe during what he is about to do (a cell of walking or
+    sneaking is 25 on and 13 frames, a hop 75 and 24, a turn or a crouch 9 in place), and holds the buttons
+    off if it does: walking he stops at the next cell. Held up for 150 frames he hops on or crouches and
+    rolls up to three cells behind the beam when that fits (`Bot::BeamRoll`), but not with a Slig asleep on
+    the screen: of Abe's moves only sneaking makes no noise (walk, roll, hop, run and landing all broadcast
+    `kEventNoise`). After 900 frames held the move fails.
+  - **Where it stops now** (`build-bot/f4.txt`, from path 4's last area): on path 5's 720 floor at 1012,
+    550 short of the car, no deaths, all three Sligs still asleep. The way to the car is the 620 floor, the
+    hoist at 1312 down, then left along the 720 floor (a wall at 650 closes the 620 floor's left end). At 1012
+    Abe is in the middle of a detector that goes 925 to 1075 at 8 a frame with a Slig asleep at 987 under it:
+    no sneaked cell fits between its passes, and anything faster wakes the Slig (tried: the rolls get him
+    to 887 and he is shot). **Next: get rid of the Sligs first.** `ClearSligTask` takes over a Slig that
+    watches the place a task works at, shoots the others on its floor and bursts; it needs to take sleeping
+    ones that lie on the way too, and a place to chant from on the Slig's screen that is off its floor and
+    not next to another sleeper (the 620 floor has one at 962). With no Slig left the alarm wakes nobody
+    and the detectors can be walked through. Not checked: whether the alarm does anything else here.
+    Then path 10, where it gets two of the three half-scale levers with eight deaths and has no plan for
+    the rest.
 - **Mines path 1, `save_all`, later the same day** (`build-bot/m1s.txt`, 15,000 frames): 5 rescued, no deaths.
   The Slig by the orb is shot by a Slig Abe has taken over and sent round by teleporter to the background
   (`ClearSligTask::RaidStep`): a shot from behind takes whatever is nearest within 25 px of the snapped x over

@@ -14,6 +14,7 @@
 #include "../../AliveLibAE/Mudokon.hpp"
 #include "../../AliveLibAE/UXB.hpp"
 #include "../../AliveLibAE/Drill.hpp"
+#include "../../AliveLibAE/MotionDetector.hpp"
 #include "../../AliveLibAE/DDCheat.hpp"
 #include "../../AliveLibAO/Mudokon.hpp"
 #include "../../AliveLibAO/DDCheat.hpp"
@@ -850,6 +851,24 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             uxb.mGreen = pUxb->IsGreen();
             uxb.mOff = pUxb->IsOff();
             world.mUxbs.push_back(uxb);
+        }
+    }
+
+    world.mBeams.clear();
+    for (s32 i = 0; isAe && i < gBaseGameObjects->Size(); i++)
+    {
+        BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
+        ::MotionDetector* pDetector = pObj && !pObj->GetDead() ? dynamic_cast<::MotionDetector*>(pObj) : nullptr;
+        PSX_RECT laser = {};
+        BeamAt beam;
+        if (pDetector && pDetector->BeamNow(laser, beam.mMinX, beam.mMaxX, beam.mVel256))
+        {
+            beam.mX1 = laser.x;
+            beam.mY1 = laser.y;
+            beam.mX2 = laser.w;
+            beam.mY2 = laser.h;
+            beam.mHalf = pDetector->GetSpriteScale() != FP_FromInteger(1);
+            world.mBeams.push_back(beam);
         }
     }
 
