@@ -370,6 +370,21 @@ bool NavGraph::Condition(const NavEdge& edge, s32* switchId, s32* openValue) con
         }
         return true;
     }
+    // Onto a lift's platform at a stop the lift doesn't start at and a lift mover brings it to: once that
+    // mover's switch is on
+    const s32 stop = mNodes[edge.mTo].mLiftStop;
+    if (stop >= 0 && mNodes[edge.mFrom].mLiftStop < 0 && mInput.mFeatures[stop].mSwitch > 1 && !mInput.mFeatures[stop].mA && (edge.mFeature < 0 || mInput.mFeatures[edge.mFeature].mKind != FeatureKind::eBarrier))
+    {
+        if (switchId)
+        {
+            *switchId = mInput.mFeatures[stop].mSwitch;
+        }
+        if (openValue)
+        {
+            *openValue = 1;
+        }
+        return true;
+    }
     if (edge.mFeature < 0)
     {
         return false;
@@ -384,6 +399,12 @@ bool NavGraph::Condition(const NavEdge& edge, s32* switchId, s32* openValue) con
     else if (f.mKind == FeatureKind::eDoor && edge.mKind == EdgeKind::eDoor && f.mStartClosed && f.mSwitch > 1)
     {
         value = 1;
+    }
+    else if (f.mKind == FeatureKind::eTrapDoor)
+    {
+        // Fallen through open, walked on shut
+        const s32 open = f.mStartClosed ? 1 : 0;
+        value = edge.mKind == EdgeKind::eFall ? open : 1 - open;
     }
     else
     {
@@ -553,7 +574,7 @@ void NavGraph::AddEdge(std::vector<NavEdge>& edges, s32 from, s32 to, EdgeKind k
     edges.push_back(e);
 }
 
-void NavGraph::AddRunJumps(std::vector<NavEdge>& edges, s32 from, s32 dir) const
+void NavGraph::AddRunJumps(std::vector<NavEdge>& edges, s32 from, s32 dir, bool overLift) const
 {
     const NavNode& n = mNodes[from];
     const s32 step = GridStep(n.mHalf);
@@ -563,7 +584,7 @@ void NavGraph::AddRunJumps(std::vector<NavEdge>& edges, s32 from, s32 dir) const
     {
         const s32 nx = StepX(x, dir, n.mHalf);
         const s32 node = NodeOnLine(n.mLine, nx);
-        if (node < 0 || std::abs(mNodes[node].mX - nx) > step / 2 || mNodes[node].mHazard || mNodes[node].mLow || WallBetween(x, x + dir * step, n.mY, n.mHalf))
+        if (node < 0 || std::abs(mNodes[node].mX - nx) > step / 2 || mNodes[node].mHazard || mNodes[node].mLow || mNodes[node].mLiftStop >= 0 || WallBetween(x, x + dir * step, n.mY, n.mHalf))
         {
             return;
         }
@@ -574,6 +595,7 @@ void NavGraph::AddRunJumps(std::vector<NavEdge>& edges, s32 from, s32 dir) const
 
     // What is under the flight: a floor to walk on means no jump is needed that far
     bool gap = false;
+    s32 shaft = -1;
     for (s32 k = 1; k <= kRunJumpLedgeCells; k++)
     {
         const s32 nx = StepX(x, dir, n.mHalf);
@@ -585,8 +607,13 @@ void NavGraph::AddRunJumps(std::vector<NavEdge>& edges, s32 from, s32 dir) const
         s32 fy = 0;
         const s32 line = FloorNear(x, y, n.mHalf, 12, &fy);
         const s32 node = line >= 0 ? NodeOnLine(line, x) : -1;
-        const bool floor = node >= 0 && std::abs(mNodes[node].mX - x) <= step / 2;
-        if (k >= kRunJumpCells - 1 && gap)
+        bool floor = node >= 0 && std::abs(mNodes[node].mX - x) <= step / 2;
+        if (overLift && floor && mNodes[node].mLiftStop >= 0)
+        {
+            shaft = mNodes[node].mLiftStop;
+            floor = false;
+        }
+        if (k >= kRunJumpCells - 1 && gap && !overLift)
         {
             // A ledge to catch
             for (std::size_t i = 0; i < mInput.mFeatures.size(); i++)
@@ -612,9 +639,13 @@ void NavGraph::AddRunJumps(std::vector<NavEdge>& edges, s32 from, s32 dir) const
         {
             // Lands and needs a cell or two to stop in
             const s32 after = NodeOnLine(mNodes[node].mLine, StepX(x, dir, n.mHalf));
-            if (after >= 0 && after != node && !mNodes[after].mHazard)
+            // (measured: he slides 50 on from where he comes down)
+            const s32 second = after >= 0 ? NodeOnLine(mNodes[node].mLine, StepX(mNodes[after].mX, dir, n.mHalf)) : -1;
+            const bool mined = second >= 0 && second != after && mNodes[second].mHazard;
+            if (after >= 0 && after != node && !mNodes[after].mHazard && !mined && (!overLift || shaft >= 0))
             {
                 AddEdge(edges, from, node, EdgeKind::eRunJump, kRunJumpCost, -1, dir < 0);
+                edges.back().mShaft = overLift ? shaft : -1;
                 edges.back().mX = takeoff;
             }
             return;
@@ -648,6 +679,17 @@ void NavGraph::Build(const NavInput& input)
             NavLine line;
             line.mX1 = f.mX1 + 4;
             line.mX2 = f.mX2 - 4;
+            line.mY1 = f.mY1;
+            line.mY2 = f.mY1;
+            line.mType = f.mHalf ? kBgFloor : kFloor;
+            mInput.mLines.push_back(line);
+            stopOfLine.push_back(static_cast<s32>(i));
+        }
+        else if (f.mKind == FeatureKind::eTrapDoor)
+        {
+            NavLine line;
+            line.mX1 = f.mX1;
+            line.mX2 = f.mX2;
             line.mY1 = f.mY1;
             line.mY2 = f.mY1;
             line.mType = f.mHalf ? kBgFloor : kFloor;
@@ -698,9 +740,20 @@ void NavGraph::Build(const NavInput& input)
                 // (it kills what its rectangle touches with its middle no more than 3 from it: its width is not
                 // in the path's data, half a cell either side covers what was measured)
                 const s32 tall = half ? 30 : 60;
-                if (f.mKind == FeatureKind::eSweep && f.mHalf == half && x >= f.mX1 - kSweepReach && x <= f.mX2 + kSweepReach && n.mY - tall <= f.mY2 && n.mY >= f.mY1)
+                // (one that comes down kills only who is within 3 of it)
+                const s32 reach = f.mX2 - f.mX1 > f.mY2 - f.mY1 ? kSweepReach : 12;
+                if (f.mKind == FeatureKind::eSweep && f.mHalf == half && x >= f.mX1 - reach && x <= f.mX2 + reach && n.mY - tall <= f.mY2 && n.mY >= f.mY1)
                 {
-                    n.mSweep = static_cast<s32>(&f - mInput.mFeatures.data());
+                    // (measured: its box ends 6 above its rectangle's bottom, and Abe crouched is 34 high)
+                    if (f.mX2 - f.mX1 > f.mY2 - f.mY1 && f.mY2 <= n.mY - tall / 2)
+                    {
+                        n.mSweepHigh = static_cast<s32>(&f - mInput.mFeatures.data());
+                        n.mLow = true;
+                    }
+                    else
+                    {
+                        n.mSweep = static_cast<s32>(&f - mInput.mFeatures.data());
+                    }
                 }
             }
             for (const NavFeature& f : mInput.mFeatures)
@@ -712,7 +765,10 @@ void NavGraph::Build(const NavInput& input)
                     n.mHidden = true;
                 }
             }
-            n.mLiftStop = i >= realLines ? stopOfLine[i - realLines] : -1;
+            const s32 madeBy = i >= realLines ? stopOfLine[i - realLines] : -1;
+            const bool trap = madeBy >= 0 && mInput.mFeatures[madeBy].mKind == FeatureKind::eTrapDoor;
+            n.mLiftStop = trap ? -1 : madeBy;
+            n.mTrapDoor = trap ? madeBy : -1;
             mNodes.push_back(n);
         }
         mLineCount[i] = static_cast<s32>(mNodes.size()) - mLineFirst[i];
@@ -811,17 +867,29 @@ void NavGraph::Build(const NavInput& input)
                 continue;
             }
             AddRunJumps(edges, from, dir);
+            AddRunJumps(edges, from, dir, true);
 
             // A hop over a gap to a ledge on its far side, four cells off: he catches it as he drops
             {
                 s32 x = n.mX;
-                bool gap = true;
+                bool gap = n.mLiftStop < 0;
+                // (a lift's shaft is one while the lift is away)
+                s32 shaft = -1;
                 for (s32 k = 1; k <= 4 && gap; k++)
                 {
                     gap = !WallBetween(x, x + dir * step, n.mY, n.mHalf);
                     x = StepX(x, dir, n.mHalf);
                     s32 gy = 0;
-                    gap = gap && (k == 4 || FloorNear(x, n.mY, n.mHalf, 12, &gy) < 0);
+                    const s32 under = FloorNear(x, n.mY, n.mHalf, 12, &gy);
+                    const s32 at = under >= 0 ? NodeOnLine(under, x) : -1;
+                    if (k < 4 && at >= 0 && mNodes[at].mLiftStop >= 0)
+                    {
+                        shaft = mNodes[at].mLiftStop;
+                    }
+                    else
+                    {
+                        gap = gap && (k == 4 || under < 0);
+                    }
                 }
                 for (std::size_t k = 0; gap && k < mInput.mFeatures.size(); k++)
                 {
@@ -832,6 +900,7 @@ void NavGraph::Build(const NavInput& input)
                         if (to >= 0)
                         {
                             AddEdge(edges, from, to, EdgeKind::eHop, kHopCost + 40, static_cast<s32>(k), left);
+                            edges.back().mShaft = shaft;
                         }
                         break;
                     }
@@ -970,6 +1039,39 @@ void NavGraph::Build(const NavInput& input)
         if (mInput.mFeatures[i].mKind == FeatureKind::eLevelLoader)
         {
             mExits.push_back({-1, static_cast<s32>(i)});
+        }
+    }
+
+    // Onto a trap door only while it is shut. Open, what is on it falls, and so does who steps off the floor
+    // beside it.
+    const std::size_t made = edges.size();
+    for (std::size_t i = 0; i < made; i++)
+    {
+        const s32 trap = mNodes[edges[i].mTo].mTrapDoor;
+        if (trap < 0 || mNodes[edges[i].mFrom].mTrapDoor == trap || edges[i].mFeature >= 0 || (edges[i].mKind != EdgeKind::eWalk && edges[i].mKind != EdgeKind::eRoll))
+        {
+            continue;
+        }
+        edges[i].mFeature = trap;
+        const NavNode& over = mNodes[edges[i].mTo];
+        s32 fy = 0;
+        const s32 below = FloorBelow(over.mX, over.mY + 20, over.mHalf, &fy);
+        if (below >= 0)
+        {
+            AddEdge(edges, edges[i].mFrom, NodeOnLine(below, over.mX), EdgeKind::eFall, kWalkCost + (fy - over.mY) / 6, trap, edges[i].mLeft);
+        }
+    }
+    for (std::size_t i = 0; i < mNodes.size(); i++)
+    {
+        const NavNode& n = mNodes[i];
+        s32 fy = 0;
+        if (n.mTrapDoor >= 0)
+        {
+            const s32 below = FloorBelow(n.mX, n.mY + 20, n.mHalf, &fy);
+            if (below >= 0)
+            {
+                AddEdge(edges, static_cast<s32>(i), NodeOnLine(below, n.mX), EdgeKind::eFall, kWalkCost + (fy - n.mY) / 6, n.mTrapDoor, false);
+            }
         }
     }
 

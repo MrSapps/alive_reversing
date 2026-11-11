@@ -45,7 +45,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         }
         if (step.mKind == TaskStep::Kind::eFailed)
         {
-            bot.Log("couldn't stop the drill: " + step.mWhy);
+            bot.Log(mStop->Name() + " didn't work: " + step.mWhy);
         }
         mStop.reset();
         return Next(bot, "");
@@ -74,8 +74,38 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     {
         // Hanging from a ledge: let go if that's the way down, else climb up
         const bool down = mLastEdge >= 0 && nav.Edges()[mLastEdge].mKind == EdgeKind::eHoistDown;
+        // (here again after a step that failed: crouching at the top of a hoist is climbing down it, so a roll
+        // can't start there)
+        const s32 top = bot.AbeNode();
+        std::vector<s32> on;
+        if (!down && !lastFailed.empty() && ++mHangFails >= 2 && top >= 0 && nav.FindPath(top, mIsGoal, bot.EdgeCostFn(), on) && !on.empty() && nav.Edges()[on[0]].mKind == EdgeKind::eRoll)
+        {
+            bot.Log("no rolling on from the top of the hoist at " + std::to_string(nav.Nodes()[top].mX) + "," + std::to_string(nav.Nodes()[top].mY));
+            bot.BanEdge(on[0]);
+            mHangFails = 0;
+        }
         return TaskStep::Do(Prim::Press(down ? Btn::eDown : Btn::eUp));
     }
+
+    // On a lift that is between two of its stops (a ride that was cut short): it glides on to the next one
+    for (const LiftAt& lift : bot.GetWorld().mLifts)
+    {
+        if (abe.mX < lift.mX1 || abe.mX > lift.mX2 || std::abs(lift.mY - abe.mY) > 6 || mLiftGlide > 150)
+        {
+            continue;
+        }
+        bool atStop = false;
+        for (const NavNode& n : nav.Nodes())
+        {
+            atStop = atStop || (n.mLiftStop >= 0 && n.mX >= lift.mX1 && n.mX <= lift.mX2 && std::abs(n.mY - lift.mY) <= 1);
+        }
+        if (!atStop)
+        {
+            mLiftGlide++;
+            return TaskStep::Do(Prim::Wait(2));
+        }
+    }
+    mLiftGlide = 0;
 
     const s32 cur = bot.AbeNode();
     if (cur < 0)
@@ -137,7 +167,11 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             if (cur != e.mTo)
             {
                 bot.Log("edge " + std::string(EdgeKindName(e.mKind)) + " led to " + std::to_string(nav.Nodes()[cur].mX) + "," + std::to_string(nav.Nodes()[cur].mY) + ", not " + std::to_string(nav.Nodes()[e.mTo].mX) + "," + std::to_string(nav.Nodes()[e.mTo].mY));
-                nav.LearnEdge(mLastEdge, cur);
+                // (a lift ride that stopped at another floor was cut short: it goes where it goes)
+                if (e.mKind != EdgeKind::eLift)
+                {
+                    nav.LearnEdge(mLastEdge, cur);
+                }
             }
         }
         mLastEdge = -1;
@@ -149,7 +183,11 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         if (nav.FindPath(cur, mIsGoal, bot.EdgeCostFn(), path) && !path.empty())
         {
             bot.Log("walk from " + std::to_string(nav.Nodes()[cur].mX) + "," + std::to_string(nav.Nodes()[cur].mY) + " " + lastFailed);
-            bot.BanEdge(path[0]);
+            // (once can be anything: a rewind that left him mid-step)
+            if (bot.NoteBlocked(path[0]))
+            {
+                bot.BanEdge(path[0]);
+            }
         }
     }
 
@@ -241,7 +279,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     }
 
     // Crouched after a roll: up again, unless there's more to roll or no room to stand
-    if (abe.mMove == Move::eCrouch && !nav.Nodes()[cur].mLow && (atGoal || nav.Edges()[path[0]].mKind != EdgeKind::eRoll))
+    if (abe.mMove == Move::eCrouch && !nav.Nodes()[cur].mLow && !(mSweepDuck && !atGoal) && (atGoal || nav.Edges()[path[0]].mKind != EdgeKind::eRoll))
     {
         return TaskStep::Do(Prim::Press(Btn::eUp));
     }
@@ -250,10 +288,36 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         return TaskStep::Done();
     }
 
+    // A Slig awake on a floor the way leads along, and a drill over it that a ring drops: that first
+    if (!mTrapTried)
+    {
+        for (const SligAt& slig : bot.GetWorld().mSligs)
+        {
+            bool onWay = false;
+            for (std::size_t i = 0; i < path.size() && i < 60; i++)
+            {
+                const NavNode& n = nav.Nodes()[nav.Edges()[path[i]].mTo];
+                onWay = onWay || (n.mHalf == slig.mHalf && std::abs(n.mY - slig.mY) <= 45 && std::abs(n.mX - slig.mX) < 700);
+            }
+            u32 ring = 0;
+            u32 drill = 0;
+            if (onWay && !slig.mAsleep && !slig.mPossessed && TrapSligTask::Find(nav, bot.GetWorld(), slig, ring, drill))
+            {
+                mTrapTried = true;
+                bot.Log("a Slig at " + std::to_string(slig.mX) + "," + std::to_string(slig.mY) + " walks under Drill#" + std::to_string(drill) + ": dropping that on it first");
+                mStop = std::make_unique<TrapSligTask>(ring, drill);
+                return Next(bot, "");
+            }
+        }
+    }
+
     // A drill sweeps cells ahead: up to the last one it doesn't reach, then on when all of the way through fits
     // in before it is back
     std::size_t sweepStop = path.size();
     bool sweepWalk = false;
+    std::size_t sweepRoll = 0;
+    const bool wasDucked = mSweepDuck;
+    mSweepDuck = false;
     {
         const World& world = bot.GetWorld();
         std::size_t in = 0;
@@ -295,6 +359,44 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             }
             else if (!SweepsClear(nav, world, path, count, bot.SweepLate()))
             {
+                // Where its stroke is too short to walk under at any time, a roll may fit: it is quicker and
+                // lower. Tried once walking has had its chance.
+                // (so is a stretch that starts with a roll: on rolling through what could be walked)
+                std::size_t lead = 0;
+                while (lead < count && lead < path.size())
+                {
+                    const NavEdge& e = nav.Edges()[path[lead]];
+                    if ((e.mKind != EdgeKind::eWalk && e.mKind != EdgeKind::eRoll) || e.mLeft != nav.Edges()[path[0]].mLeft || nav.Nodes()[e.mTo].mHazard)
+                    {
+                        break;
+                    }
+                    lead++;
+                }
+                const bool walked = lead >= 1 && lead + 1 >= std::min(count, path.size());
+                const bool mustRoll = nav.Edges()[path[0]].mKind == EdgeKind::eRoll && lead > 1;
+                if (walked && !inside && (wasDucked || mustRoll || mSweepWait >= 70))
+                {
+                    mSweepDuck = true;
+                    if (abe.mMove != Move::eCrouch)
+                    {
+                        mSweepWait += 2;
+                        mSteps--;
+                        return abe.Settled() ? TaskStep::Do(Prim::Press(Btn::eDown)) : TaskStep::Do(Prim::Wait(1));
+                    }
+                    if (SweepsClear(nav, world, path, count, bot.SweepLate(), true))
+                    {
+                        bot.Log("rolling through under the drill");
+                        bot.SweepBegun();
+                        mSweepWait = 0;
+                        sweepRoll = lead;
+                    }
+                }
+            }
+            if (sweepRoll > 0 || !world.SweepOf(drill->mId))
+            {
+            }
+            else if (!SweepsClear(nav, world, path, count, bot.SweepLate()))
+            {
                 // (where he is may be no better: then on regardless)
                 const SweepAt* here = inside ? world.SweepOf(drill->mId) : nullptr;
                 const NavNode& n = nav.Nodes()[cur];
@@ -330,6 +432,10 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     const NavEdge& first = nav.Edges()[path[0]];
     mLastFrom = cur;
     bot.SetCurrentEdge(path[0]);
+    if (sweepRoll > 0)
+    {
+        return TaskStep::Do(Prim::MoveTo(nav.Nodes()[nav.Edges()[path[sweepRoll - 1]].mTo].mX, Gait::eRoll));
+    }
     switch (first.mKind)
     {
         case EdgeKind::eRoll:
@@ -373,6 +479,10 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             if (sweepStop <= last)
             {
                 last = sweepStop - 1;
+            }
+            if (sweepRoll > 0)
+            {
+                return TaskStep::Do(Prim::MoveTo(nav.Nodes()[nav.Edges()[path[std::min(last, sweepRoll - 1)]].mTo].mX, Gait::eRoll));
             }
             // Sligs on this floor: quietly near a sleeping one, and past one that is awake only where he can't see
             bool sneak = false;
@@ -560,10 +670,20 @@ const Entity* GoToTask::SweepOver(const NavGraph& nav, const World& world, s32 n
         return nullptr;
     }
     const NavNode& n = nav.Nodes()[node];
-    return world.SweepOver(n.mX, n.mY, n.mHalf);
+    return world.SweepOver(n.mX, n.mY, n.mHalf, n.mLow);
 }
 
-bool GoToTask::SweepsClear(const NavGraph& nav, const World& world, const std::vector<s32>& path, std::size_t count, s32 late)
+const Entity* GoToTask::SweepHigh(const NavGraph& nav, const World& world, s32 node)
+{
+    if (node < 0 || nav.Nodes()[node].mSweepHigh < 0)
+    {
+        return nullptr;
+    }
+    const Entity* drill = world.Find(nav.Input().mFeatures[nav.Nodes()[node].mSweepHigh].mId);
+    return drill && drill->mKind == EntityKind::eDrill && world.SweepLive(*drill) ? drill : nullptr;
+}
+
+bool GoToTask::SweepsClear(const NavGraph& nav, const World& world, const std::vector<s32>& path, std::size_t count, s32 late, bool rolled)
 {
     // Where Abe is frame by frame: along each edge at an even pace for the frames it takes (measured, see
     // BOT_DESIGN.md), give or take kSlack pixels
@@ -581,10 +701,11 @@ bool GoToTask::SweepsClear(const NavGraph& nav, const World& world, const std::v
         const NavEdge& e = nav.Edges()[path[rest ? i - 1 : i]];
         const NavNode& a = nav.Nodes()[rest ? e.mTo : e.mFrom];
         const NavNode& b = nav.Nodes()[e.mTo];
+        const EdgeKind kind = rolled && e.mKind == EdgeKind::eWalk ? EdgeKind::eRoll : e.mKind;
         s32 frames = 12;
         if (!rest)
         {
-            switch (e.mKind)
+            switch (kind)
             {
                 case EdgeKind::eWalk:
                     frames = before == EdgeKind::eWalk ? 9 : 17;
@@ -595,22 +716,27 @@ bool GoToTask::SweepsClear(const NavGraph& nav, const World& world, const std::v
                     break;
                 case EdgeKind::eHoistUp:
                 case EdgeKind::eHoistDown:
-                    // (out of its reach well before he is up)
-                    frames = 40;
+                    // (up from a crouch first; then off the floor, and hanging from the ledge)
+                    frames = 54 + (before == EdgeKind::eRoll ? 8 : 0);
                     break;
                 default:
                     frames = e.mCost;
                     break;
             }
-            before = e.mKind;
+            before = kind;
         }
         const bool climbs = !rest && (e.mKind == EdgeKind::eHoistUp || e.mKind == EdgeKind::eHoistDown);
-        const s32 tall = a.mHalf ? 30 : 60;
+        // (rolled through, or crouched where there is no standing, he is 34 high)
+        const bool down = rest ? (b.mLow || rolled) : kind == EdgeKind::eRoll;
+        const s32 tall = (a.mHalf ? 30 : 60) * (down ? 34 : 60) / 60;
         for (s32 f = 0; f < frames; f++)
         {
             const s32 t = start + f + (late < 0 ? late : 0);
             const s32 x = a.mX + (b.mX - a.mX) * f / frames;
-            const s32 y = climbs ? std::max(a.mY, b.mY) : a.mY + (b.mY - a.mY) * f / frames;
+            // (a hoist: on the lower floor until he jumps, then no lower than he hangs)
+            const s32 onFloor = e.mKind == EdgeKind::eHoistUp ? frames - 40 : 40;
+            const bool hangs = climbs && (e.mKind == EdgeKind::eHoistUp ? f >= onFloor : f < frames - onFloor);
+            const s32 y = climbs ? (hangs ? std::min(a.mY, b.mY) + tall + 4 : std::max(a.mY, b.mY)) : a.mY + (b.mY - a.mY) * f / frames;
             for (const SweepAt& sweep : world.mSweeps)
             {
                 s32 x1 = 0;
@@ -653,6 +779,123 @@ static std::unique_ptr<GoToTask> GoToNode(s32 node)
 DisarmTask::~DisarmTask() = default;
 GetRocksTask::~GetRocksTask() = default;
 BlowMineTask::~BlowMineTask() = default;
+
+RideCarTask::~RideCarTask() = default;
+
+TaskStep RideCarTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const NavGraph& nav = bot.Nav();
+    const World& world = bot.GetWorld();
+    const Entity* car = world.Find(mCar);
+    if (!car || mDest < 0 || mDest >= static_cast<s32>(nav.Nodes().size()))
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    if (++mSteps > 900)
+    {
+        return TaskStep::Failed("the car didn't get there");
+    }
+    const NavNode& dest = nav.Nodes()[mDest];
+    const s32 cell = NavGraph::GridStep(car->mHalf);
+    if (car->mState == 0)
+    {
+        if (mExits > 0)
+        {
+            return TaskStep::Done();
+        }
+        // To it and in: up, standing in its cell
+        const s32 carX = car->mLive ? car->mLiveX : car->CentreX();
+        const s32 carY = car->mLive ? car->mLiveY : car->mY2;
+        const s32 at = nav.NodeAt(carX, carY, car->mHalf, 30);
+        if (at < 0)
+        {
+            return TaskStep::Failed("the car isn't on a floor");
+        }
+        TaskStep step;
+        if (!RunGo(mGo, bot, lastFailed, step))
+        {
+            return step;
+        }
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            return step;
+        }
+        if (bot.AbeNode() != at)
+        {
+            mGo = GoToNode(at);
+            return Next(bot, "");
+        }
+        if (++mEnters > 6)
+        {
+            return TaskStep::Failed("couldn't get into the car");
+        }
+        bot.Log("getting into the mine car at " + std::to_string(carX) + "," + std::to_string(carY));
+        return TaskStep::Do(Prim::Wait(14, Btn::eUp));
+    }
+
+    const s32 x = car->mLiveX;
+    const s32 y = car->mLiveY;
+    const bool moved = std::abs(x - mLastX) + std::abs(y - mLastY) > 2;
+    mLastX = x;
+    mLastY = y;
+    if (std::abs(x - dest.mX) <= cell / 2 + 2 && std::abs(y - dest.mY) <= 12)
+    {
+        if (moved)
+        {
+            return TaskStep::Do(Prim::Wait(6));
+        }
+        if (++mExits > 8)
+        {
+            return TaskStep::Failed("couldn't get out of the car");
+        }
+        bot.Log("out of the mine car at " + std::to_string(x) + "," + std::to_string(y));
+        return TaskStep::Do(Prim::Wait(8, Btn::eAction));
+    }
+    if (moved)
+    {
+        mStill = 0;
+        mDud.clear();
+        mWent = mKey;
+        return TaskStep::Do(Prim::Wait(8, mKey));
+    }
+    if (mKey && ++mStill < 3)
+    {
+        return TaskStep::Do(Prim::Wait(8, mKey));
+    }
+    // It does nothing here: the next way to try. Towards where it is going first, and back the way it came last.
+    if (mKey)
+    {
+        mDud.push_back(mKey);
+    }
+    const u32 towardsX = dest.mX >= x ? Btn::eRight : Btn::eLeft;
+    const u32 awayX = dest.mX >= x ? Btn::eLeft : Btn::eRight;
+    const u32 towardsY = dest.mY >= y ? Btn::eDown : Btn::eUp;
+    const u32 awayY = dest.mY >= y ? Btn::eUp : Btn::eDown;
+    const auto opposite = [](u32 key) -> u32
+    {
+        return key == Btn::eLeft ? Btn::eRight : key == Btn::eRight ? Btn::eLeft : key == Btn::eUp ? Btn::eDown : key == Btn::eDown ? Btn::eUp : 0;
+    };
+    const u32 order[4] = {towardsX, towardsY, awayY, awayX};
+    u32 next = 0;
+    for (s32 pass = 0; pass < 2 && !next; pass++)
+    {
+        for (u32 key : order)
+        {
+            if (!next && std::find(mDud.begin(), mDud.end(), key) == mDud.end() && (pass == 1 || key != opposite(mWent)))
+            {
+                next = key;
+            }
+        }
+    }
+    if (!next)
+    {
+        return TaskStep::Failed("the car goes no way from " + std::to_string(x) + "," + std::to_string(y));
+    }
+    mKey = next;
+    mStill = 0;
+    bot.Log("mine car at " + std::to_string(x) + "," + std::to_string(y) + ": trying " + (next == Btn::eLeft ? "left" : next == Btn::eRight ? "right" : next == Btn::eUp ? "up" : "down"));
+    return TaskStep::Do(Prim::Wait(8, mKey));
+}
 
 TaskStep GetRocksTask::Next(Bot& bot, const std::string& lastFailed)
 {
@@ -728,16 +971,17 @@ TaskStep GetRocksTask::Next(Bot& bot, const std::string& lastFailed)
     {
         return TaskStep::Failed("no floor under the sack");
     }
-    if (cur != under)
-    {
-        mGo = GoToNode(under);
-        return Next(bot, "");
-    }
-    // They take a while to fall, roll and come to rest
+    // They take a while to fall, roll and come to rest (and after a jump through a sack over a gap Abe is no
+    // longer where he jumped from)
     if (mJumps > 0 && mWaits < 30)
     {
         mWaits++;
         return TaskStep::Do(Prim::Wait(10));
+    }
+    if (cur != under)
+    {
+        mGo = GoToNode(under);
+        return Next(bot, "");
     }
     if (mJumps >= 3)
     {
@@ -745,6 +989,20 @@ TaskStep GetRocksTask::Next(Bot& bot, const std::string& lastFailed)
     }
     mJumps++;
     mWaits = 0;
+    s32 from = -1;
+    s32 takeoffX = 0;
+    bool left = false;
+    if (std::abs(nav.Nodes()[under].mX - sack->CentreX()) > cell && Domain::SackJump(nav, *sack, &from, &takeoffX, &left))
+    {
+        // It hangs over a gap: through it with a running jump off the ledge, and down to where the rocks fall
+        if (abe.mFacingLeft != left)
+        {
+            mJumps--;
+            return TaskStep::Do(Prim::Face(left));
+        }
+        bot.Log("running and jumping through the rock sack at " + std::to_string(sack->CentreX()));
+        return TaskStep::Do(Prim::RunJump(takeoffX, left));
+    }
     bot.Log("jumping into the rock sack at " + std::to_string(sack->CentreX()));
     return TaskStep::Do(Prim::Press(Btn::eUp, 30));
 }
@@ -848,12 +1106,26 @@ TaskStep BlowMineTask::Next(Bot& bot, const std::string& lastFailed)
     // From where he can get back from before anywhere else: a drop to a lower ledge is one way, and there may be
     // nothing to throw from down there
     const std::vector<s32> regions = nav.Regions();
-    const s32 here = bot.AbeNode();
-    for (s32 pass = 0; pass < 4 && !spot; pass++)
+    const s32 here = mFrom >= 0 && mFrom < static_cast<s32>(regions.size()) ? mFrom : bot.AbeNode();
+    // (and past a running drill only when there is nowhere else)
+    // Why there was nowhere, for the log: spots thrown from already, not got to, with a mine too near, and
+    // those and the ones with a mine in the way
+    s32 why[4] = {0, 0, 0, 0};
+    for (s32 pass = 0; pass < 8 && !spot; pass++)
     {
         for (const ThrowSpot& s : spots)
         {
-            if (bot.ThrowIsBad(mMine, s) || std::find(mNoWay.begin(), mNoWay.end(), s.mNode) != mNoWay.end() || (pass % 2 == 0 && !bot.ThrowHasWorked(s)) || (pass < 2 && here >= 0 && regions[s.mNode] != regions[here]))
+            if (pass == 7)
+            {
+                why[0] += bot.ThrowIsBad(mMine, s) ? 1 : 0;
+                why[1] += std::find(mNoWay.begin(), mNoWay.end(), s.mNode) != mNoWay.end() ? 1 : 0;
+            }
+            if (bot.ThrowIsBad(mMine, s) || std::find(mNoWay.begin(), mNoWay.end(), s.mNode) != mNoWay.end() || (pass % 2 == 0 && !bot.ThrowHasWorked(s)) || (pass < 4 && here >= 0 && regions[s.mNode] != regions[here]))
+            {
+                continue;
+            }
+            const Entity* drill = s.mDrill ? world.Find(s.mDrill) : nullptr;
+            if ((pass / 2) % 2 == 0 && drill && world.SweepLive(*drill))
             {
                 continue;
             }
@@ -865,12 +1137,14 @@ TaskStep BlowMineTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 blocked = blocked || (other.mKind == EntityKind::eMine && !other.mGone && other.mHalf == at.mHalf && std::abs(other.mY2 - at.mY) <= 50 && std::abs(other.CentreX() - at.mX) < (s.mLevel < 0 ? 125 : 90));
             }
+            why[2] += pass == 7 && blocked ? 1 : 0;
             for (s32 need : s.mNeeds)
             {
                 blocked = blocked || world.Switch(need) == 0;
             }
             if (blocked)
             {
+                why[3] += pass == 7 ? 1 : 0;
                 continue;
             }
             spot = &s;
@@ -879,7 +1153,7 @@ TaskStep BlowMineTask::Next(Bot& bot, const std::string& lastFailed)
     }
     if (!spot || mThrows >= 30)
     {
-        return TaskStep::Failed("nowhere left to throw at the mine from");
+        return TaskStep::Failed("nowhere left to throw at the mine from (" + std::to_string(spots.size()) + " places: " + std::to_string(why[0]) + " missed from, " + std::to_string(why[1]) + " not got to, " + std::to_string(why[2]) + " with a mine too near, " + std::to_string(why[3] - why[2]) + " with a mine in the way, " + std::to_string(mThrows) + " throws)");
     }
     const s32 cur = bot.AbeNode();
     if (cur < 0)
@@ -1051,13 +1325,28 @@ TaskStep UseTask::Next(Bot& bot, const std::string& lastFailed)
             return TaskStep::Do(Prim::Wait(mLookTaps % 2 ? 2 : 6, mLookTaps % 2 ? static_cast<u32>(Btn::eConfirm) : 0u));
         }
     }
+    bool faceLeft = false;
+    const s32 node = Domain::UseNode(bot.Nav(), *entity, &faceLeft, mSide);
+    // Under a drill that goes over his head: stood up only for as long as it is away
+    const Entity* over = bot.AbeNode() == node ? GoToTask::SweepHigh(bot.Nav(), bot.GetWorld(), node) : nullptr;
     if (bot.GetWorld().Switch(entity->mSwitch) == mWant)
     {
+        // A lift it sends for: until that is there
+        for (const NavNode& n : bot.Nav().Nodes())
+        {
+            if (mWant == 1 && mArrived && n.mLiftStop >= 0 && bot.Nav().Input().mFeatures[n.mLiftStop].mSwitch == entity->mSwitch && !bot.GetWorld().LiftAtStop(n.mX, n.mY, false) && ++mLiftWaits < 600)
+            {
+                return TaskStep::Do(Prim::Wait(2));
+            }
+        }
+        if (over && mArrived && ++mDucks < 400)
+        {
+            // (it has its stroke to finish)
+            return bot.Abe().mMove == Move::eCrouch || !bot.Abe().Settled() ? TaskStep::Do(Prim::Wait(2)) : TaskStep::Do(Prim::Press(Btn::eDown));
+        }
         return TaskStep::Done();
     }
 
-    bool faceLeft = false;
-    const s32 node = Domain::UseNode(bot.Nav(), *entity, &faceLeft, mSide);
     if (node < 0)
     {
         return TaskStep::Failed("nowhere to stand");
@@ -1081,6 +1370,26 @@ TaskStep UseTask::Next(Bot& bot, const std::string& lastFailed)
     }
 
     const AbeState& abe = bot.Abe();
+    if (over)
+    {
+        const SweepAt* at = bot.GetWorld().SweepOf(over->mId);
+        const NavNode& n = bot.Nav().Nodes()[node];
+        const s32 tall = n.mHalf ? 30 : 60;
+        // (standing up, the pull, and down again)
+        const s32 need = abe.mMove == Move::eCrouch ? 36 : 28;
+        if (!at || at->Hits(0, need, n.mX - 12, n.mY - tall, n.mX + 12, n.mY))
+        {
+            if (++mDucks > 900)
+            {
+                return TaskStep::Failed("the drill overhead leaves no time to stand up");
+            }
+            return abe.mMove == Move::eCrouch || !abe.Settled() ? TaskStep::Do(Prim::Wait(1)) : TaskStep::Do(Prim::Press(Btn::eDown));
+        }
+        if (abe.mMove == Move::eCrouch)
+        {
+            bot.Log("the drill overhead is away: up to use #" + std::to_string(mEntity));
+        }
+    }
     if (abe.mMove == Move::eHang || abe.mMove == Move::eCrouch)
     {
         return TaskStep::Do(Prim::Press(abe.mMove == Move::eHang ? Btn::eDown : Btn::eUp));
@@ -1109,16 +1418,16 @@ TaskStep UseTask::Next(Bot& bot, const std::string& lastFailed)
 }
 
 // The cells on a Mudokon's floor from minCells to maxCells away from it, either side
-static std::unique_ptr<GoToTask> GoNearMud(const NavGraph& nav, const World& world, s32 mudNode, s32 minHalfCells, s32 maxHalfCells)
+static std::unique_ptr<GoToTask> GoNearMud(const NavGraph& nav, const World& world, s32 mudNode, s32 minHalfCells, s32 maxHalfCells, s32 side = 0)
 {
     const s32 line = nav.Nodes()[mudNode].mLine;
     const s32 mudX = nav.Nodes()[mudNode].mX;
     const s32 half = NavGraph::GridStep(nav.Nodes()[mudNode].mHalf) / 2;
-    return std::make_unique<GoToTask>("to the Mudokon", [&nav, &world, line, mudX, half, minHalfCells, maxHalfCells](s32 n)
+    return std::make_unique<GoToTask>("to the Mudokon", [&nav, &world, line, mudX, half, minHalfCells, maxHalfCells, side](s32 n)
                                       {
                                           const NavNode& node = nav.Nodes()[n];
                                           const s32 dx = std::abs(node.mX - mudX);
-                                          if (node.mLine != line || dx < minHalfCells * half || dx > maxHalfCells * half)
+                                          if (node.mLine != line || dx < minHalfCells * half || dx > maxHalfCells * half || (node.mX - mudX) * side < 0)
                                           {
                                               return false;
                                           }
@@ -1277,7 +1586,8 @@ TaskStep RecruitTask::Next(Bot& bot, const std::string& lastFailed)
     const bool close = mud->mLive && ((mud->mMood == MudMood::eUpset && mSaidHello) || (mud->mMood == MudMood::eWired && mCalm));
     const s32 minHalf = close ? 1 : 3;
     const s32 maxHalf = close ? 3 : 5;
-    if (!sameFloor || dx * 2 < minHalf * cell || dx * 2 > maxHalf * cell)
+    const bool wrongSide = (abe.mX - (mud->mLive ? mud->mLiveX : mud->CentreX())) * mSide < 0;
+    if (!mRemote && (!sameFloor || dx * 2 < minHalf * cell || dx * 2 > maxHalf * cell || wrongSide))
     {
         if (++mCloseIns > 12)
         {
@@ -1296,7 +1606,7 @@ TaskStep RecruitTask::Next(Bot& bot, const std::string& lastFailed)
                 return Next(bot, "");
             }
         }
-        mGo = GoNearMud(nav, bot.GetWorld(), mudNode, minHalf, maxHalf);
+        mGo = GoNearMud(nav, bot.GetWorld(), mudNode, minHalf, maxHalf, mSide);
         return Next(bot, "");
     }
     if (!mud->mLive)
@@ -1350,7 +1660,7 @@ TaskStep RecruitTask::Next(Bot& bot, const std::string& lastFailed)
         mSinceLine = 0;
         mSaidHello = !listening;
         mSaidFollow = listening;
-        return TaskStep::Do(Prim::Press(listening ? bot.SpeakFollow() : bot.SpeakHello(), 6));
+        return TaskStep::Do(Prim::Press(listening ? bot.SpeakFollow() : (mAll ? bot.SpeakAll() : bot.SpeakHello()), 6));
     }
 
     if (HoldForSlig(bot, *mud, mSaidHello ? 45 : 130, mGo, mHeld, step))
@@ -2226,7 +2536,17 @@ TaskStep RescueTask::Next(Bot& bot, const std::string& lastFailed)
         return TaskStep::Do(Prim::Press(Btn::eUp));
     }
 
-    if (!mud->mFollowing && mPhase < 4)
+    if (mud->mBlind && mPhase < 4 && !mBlindThere)
+    {
+        TaskStep lead;
+        if (!LeadBlind(bot, *mud, *portal, lastFailed, lead))
+        {
+            return lead;
+        }
+        mBlindThere = true;
+        bot.Log("the blind Mudokon is on the portal's floor at " + std::to_string(mud->mLiveX));
+    }
+    if (!mud->mFollowing && mPhase < 4 && !mud->mBlind)
     {
         // Not with Abe (yet, or any more): talk it round
         if (!mRecruit)
@@ -2268,6 +2588,21 @@ TaskStep RescueTask::Next(Bot& bot, const std::string& lastFailed)
             }
             mPhase = 3;
             mWaits = 0;
+            if (mud->mBlind)
+            {
+                // It is where it has to be: chanted for from anywhere on the portal's screen that isn't close
+                // enough to scare its birds
+                const NavGraph* g = &bot.Nav();
+                const s32 cam = g->CameraOf(portal->CentreX(), portal->mY2 - 5);
+                const s32 px = portal->CentreX();
+                const s32 py = portal->mY2;
+                mGo = std::make_unique<GoToTask>("to chant from", [g, cam, px, py](s32 n)
+                                                 {
+                                                     const NavNode& at = g->Nodes()[n];
+                                                     return g->CameraOf(at.mX, at.mY - 5) == cam && !at.mHazard && at.mTrapDoor < 0 && (std::abs(at.mX - px) > 110 || std::abs(at.mY - py) > 40);
+                                                 });
+                return Next(bot, "");
+            }
             // Either side of it will do: the one that doesn't mean walking through it (see Bot::EdgeCostFn)
             const s32 side = 3;
             const s32 px = bot.Nav().Nodes()[node].mX < portal->CentreX() ? bot.Nav().Nodes()[node].mX + 2 * side * cell : bot.Nav().Nodes()[node].mX - 2 * side * cell;
@@ -2283,7 +2618,8 @@ TaskStep RescueTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 return TaskStep::Failed("lost the Mudokon");
             }
-            if (std::abs(mud->mLiveX - abe.mX) > 5 * cell && ++mWaits < 40)
+            // (a blind one doesn't come: it runs for the portal from where it is once that opens)
+            if (!mud->mBlind && std::abs(mud->mLiveX - abe.mX) > 5 * cell && ++mWaits < 40)
             {
                 return TaskStep::Do(Prim::Wait(15));
             }
@@ -2318,6 +2654,472 @@ TaskStep RescueTask::Next(Bot& bot, const std::string& lastFailed)
                 return TaskStep::Failed("chanting didn't send the Mudokon through");
             }
             return TaskStep::Do(Prim::Wait(40, Btn::eChant));
+    }
+}
+
+bool TrapSligTask::Find(const NavGraph& nav, const World& world, const SligAt& slig, u32& ring, u32& drill)
+{
+    for (const Entity& d : world.mEntities)
+    {
+        // One that comes down when its switch goes on, to the Slig's floor
+        if (d.mKind != EntityKind::eDrill || d.mInputs[0] != 2 || d.mHalf != slig.mHalf || d.mY2 < slig.mY - 10 || d.mY1 > slig.mY - 40 || d.mX2 - d.mX1 > d.mY2 - d.mY1)
+        {
+            continue;
+        }
+        for (const Entity& r : world.mEntities)
+        {
+            if ((r.mKind != EntityKind::ePullRing && r.mKind != EntityKind::eLever) || r.mSwitch != d.mSwitch)
+            {
+                continue;
+            }
+            const s32 node = Domain::UseNode(nav, r, nullptr);
+            if (node >= 0 && std::abs(nav.Nodes()[node].mY - slig.mY) > 45)
+            {
+                ring = r.mId;
+                drill = d.mId;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+TaskStep TrapSligTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const Entity* ring = world.Find(mRing);
+    const Entity* drill = world.Find(mDrill);
+    if (!ring || !drill)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    TaskStep step;
+    if (!RunGo(mGo, bot, lastFailed, step))
+    {
+        return step;
+    }
+    if (step.mKind == TaskStep::Kind::eFailed)
+    {
+        return step;
+    }
+    // Under any of the drills on that switch
+    s32 x1 = drill->mX1;
+    s32 x2 = drill->mX2;
+    for (const Entity& d : world.mEntities)
+    {
+        if (d.mKind == EntityKind::eDrill && d.mSwitch == drill->mSwitch && d.mHalf == drill->mHalf && std::abs(d.mY2 - drill->mY2) < 20)
+        {
+            x1 = std::min(x1, d.mX1);
+            x2 = std::max(x2, d.mX2);
+        }
+    }
+    const SligAt* slig = nullptr;
+    for (const SligAt& s : world.mSligs)
+    {
+        if (!s.mPossessed && s.mHalf == drill->mHalf && std::abs(s.mY - drill->mY2) <= 45 && std::abs(s.mX - drill->CentreX()) < 900)
+        {
+            slig = &s;
+        }
+    }
+    const s32 node = Domain::UseNode(nav, *ring, nullptr);
+    switch (mPhase)
+    {
+        case 0:
+            if (node < 0)
+            {
+                return TaskStep::Failed("nowhere to pull from");
+            }
+            mPhase = 1;
+            mGo = GoToNode(node);
+            return Next(bot, "");
+
+        case 1: // until it walks in under
+        {
+            if (!slig)
+            {
+                // (not about: its screen isn't this one, or it is gone)
+                return mPulls > 0 ? TaskStep::Done() : TaskStep::Failed("the Slig isn't about");
+            }
+            if (bot.Abe().mMove == Move::eCrouch)
+            {
+                return TaskStep::Do(Prim::Press(Btn::eUp));
+            }
+            if (++mWaits > 1500)
+            {
+                return TaskStep::Failed("the Slig never came under the drill");
+            }
+            // Where it will be when the drill gets down to it: the jump to the ring, the pull, the stroke
+            const s32 lead = 22;
+            const s32 will = slig->mX + (slig->mX - mLastX) * lead;
+            const bool moving = mLastX != 0 && slig->mX != mLastX;
+            const bool standsUnder = mLastX == slig->mX && slig->mX >= x1 + 2 && slig->mX <= x2 - 2;
+            mLastX = slig->mX;
+            if ((moving && will >= x1 + 6 && will <= x2 - 6) || standsUnder)
+            {
+                bot.Log("pulling the ring with the Slig at " + std::to_string(slig->mX));
+                mPhase = 2;
+                mWaits = 0;
+                mPulls++;
+                return TaskStep::Do(Prim::Press(Btn::eUp));
+            }
+            return TaskStep::Do(Prim::Wait(1));
+        }
+
+        default: // did it?
+            if (++mWaits < 70)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            if (!slig)
+            {
+                bot.Log("the drill got the Slig");
+                return TaskStep::Done();
+            }
+            if (mPulls >= 6)
+            {
+                return TaskStep::Failed("the drill kept missing the Slig");
+            }
+            mPhase = 1;
+            mWaits = 0;
+            mLastX = 0;
+            return Next(bot, "");
+    }
+}
+
+TaskStep SendToWheelTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const Entity* mud = world.Find(mMud);
+    const Entity* wheel = world.Find(mWheel);
+    if (!mud || !wheel)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    if (world.Switch(wheel->mSwitch) == 1)
+    {
+        return TaskStep::Done();
+    }
+    if (mud->mGone)
+    {
+        return TaskStep::Failed("the Mudokon is gone");
+    }
+    TaskStep step;
+    if (!RunGo(mGo, bot, lastFailed, step))
+    {
+        return step;
+    }
+    if (step.mKind == TaskStep::Kind::eFailed)
+    {
+        return step;
+    }
+    const s32 mudX = mud->mLive ? mud->mLiveX : mud->CentreX();
+    const bool atWheel = mud->mLive && mudX >= wheel->mX1 - 6 && mudX <= wheel->mX2 + 6 && std::abs(mud->mLiveY - wheel->mY2) < 30;
+    switch (mPhase)
+    {
+        case 0: // to where it is called from
+        {
+            if (atWheel)
+            {
+                mPhase = 3;
+                return Next(bot, "");
+            }
+            const s32 at = bot.AbeNode();
+            if (at < 0 || !Domain::CallSpot(nav, *mud, *wheel, at))
+            {
+                if (++mWaits > 4)
+                {
+                    return TaskStep::Failed("can't get to where the Mudokon is called from");
+                }
+                const NavGraph* g = &nav;
+                const Entity m = *mud;
+                const Entity w = *wheel;
+                mGo = std::make_unique<GoToTask>("to call the Mudokon from", [g, m, w](s32 n)
+                                                 { return Domain::CallSpot(*g, m, w, n); });
+                return Next(bot, "");
+            }
+            bot.Log("calling blind Mudokon#" + std::to_string(mMud) + " at " + std::to_string(mudX) + " over to the wheel at " + std::to_string(wheel->CentreX()));
+            mRecruit = std::make_unique<RecruitTask>(mMud);
+            mRecruit->SetRemote(true);
+            mPhase = 1;
+            return Next(bot, "");
+        }
+
+        case 1: // hello, follow me
+        {
+            const TaskStep talk = mRecruit->Next(bot, lastFailed);
+            if (talk.mKind != TaskStep::Kind::eDone)
+            {
+                return talk;
+            }
+            mRecruit.reset();
+            mPhase = 2;
+            mWaits = 0;
+            mStill = 0;
+            return Next(bot, "");
+        }
+
+        case 2: // on its way
+            mStill = mudX == mLastX ? mStill + 1 : 0;
+            mLastX = mudX;
+            if (atWheel && mStill >= 10)
+            {
+                mPhase = 3;
+                mWaits = 0;
+                return Next(bot, "");
+            }
+            if (++mWaits > 900 || (mStill > 60 && !mud->mFollowing))
+            {
+                return TaskStep::Failed("the Mudokon stopped at " + std::to_string(mudX) + ", not at the wheel");
+            }
+            return TaskStep::Do(Prim::Wait(1));
+
+        default: // work
+            if (++mWaits > 400)
+            {
+                return TaskStep::Failed("the Mudokon doesn't turn the wheel");
+            }
+            if (mWaits % 60 == 1)
+            {
+                bot.Log("work, said to Mudokon#" + std::to_string(mMud) + " at the wheel, state " + std::to_string(mud->mState));
+                return TaskStep::Do(Prim::Wait(2, bot.SpeakWork()));
+            }
+            return TaskStep::Do(Prim::Wait(1));
+    }
+}
+
+bool RescueTask::LeadBlind(Bot& bot, const Entity& mud, const Entity& portal, const std::string& lastFailed, TaskStep& step)
+{
+    const NavGraph& nav = bot.Nav();
+    const World& world = bot.GetWorld();
+    const s32 cell = NavGraph::GridStep(mud.mHalf);
+    if (mUse)
+    {
+        step = mUse->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::ePrim)
+        {
+            return false;
+        }
+        mUse.reset();
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            step = TaskStep::Failed("couldn't open the trap door under the Mudokon: " + step.mWhy);
+            return false;
+        }
+        mBlindPhase = 5;
+        mBlindWaits = 0;
+    }
+    if (mRecruit)
+    {
+        step = mRecruit->Next(bot, lastFailed);
+        if (step.mKind != TaskStep::Kind::eDone)
+        {
+            return false;
+        }
+        mRecruit.reset();
+        mBlindPhase = 2;
+        mBlindWaits = 0;
+    }
+    const s32 mudNode = Domain::UseNode(nav, mud, nullptr);
+    const s32 mudX = mud.mLive ? mud.mLiveX : mud.CentreX();
+
+    switch (mBlindPhase)
+    {
+        case 0: // where to next
+        {
+            if (mudNode < 0)
+            {
+                step = TaskStep::Failed("the blind Mudokon isn't on a floor");
+                return false;
+            }
+            std::vector<s32> way;
+            if (!Domain::BlindWay(nav, world, mudNode, portal, true, way))
+            {
+                step = TaskStep::Failed("no way for the blind Mudokon to the portal's floor");
+                return false;
+            }
+            if (way.empty())
+            {
+                return true;
+            }
+            if (++mBlindTries > 8)
+            {
+                step = TaskStep::Failed("the blind Mudokon doesn't get to the portal");
+                return false;
+            }
+            const s32 found = nav.Edges()[way.back()].mTo;
+            // The first straight stretch of it
+            mBlindDir = 0;
+            mBlindTrap = -1;
+            mBlindRide = -1;
+            mBlindStop = found;
+            for (s32 idx : way)
+            {
+                const NavEdge& e = nav.Edges()[idx];
+                const NavNode& from = nav.Nodes()[e.mFrom];
+                const NavNode& to = nav.Nodes()[e.mTo];
+                if (e.mKind == EdgeKind::eFall && from.mTrapDoor >= 0 && e.mFeature == from.mTrapDoor)
+                {
+                    mBlindStop = e.mFrom;
+                    mBlindTrap = from.mTrapDoor;
+                    break;
+                }
+                if (e.mKind == EdgeKind::eLift)
+                {
+                    // It stands on the lift, and comes along when Abe works it
+                    mBlindStop = e.mFrom;
+                    mBlindRide = e.mTo;
+                    break;
+                }
+                const s32 dir = to.mX > from.mX ? 1 : (to.mX < from.mX ? -1 : 0);
+                if (mBlindDir != 0 && dir != 0 && dir != mBlindDir)
+                {
+                    mBlindStop = e.mFrom;
+                    break;
+                }
+                mBlindDir = mBlindDir ? mBlindDir : dir;
+            }
+            if (mBlindStop == mudNode && mBlindTrap >= 0)
+            {
+                mBlindPhase = 4;
+                return LeadBlind(bot, mud, portal, lastFailed, step);
+            }
+            if (mBlindStop == mudNode && mBlindRide >= 0)
+            {
+                bot.Log("taking the blind Mudokon along on the lift");
+                mBlindPhase = 6;
+                mGo = GoToNode(mBlindRide);
+                return LeadBlind(bot, mud, portal, lastFailed, step);
+            }
+            bot.Log("leading the blind Mudokon from " + std::to_string(mudX) + (mBlindDir < 0 ? " left" : " right") + " to " + std::to_string(nav.Nodes()[mBlindStop].mX) + "," + std::to_string(nav.Nodes()[mBlindStop].mY) + (mBlindTrap >= 0 ? ", a trap door" : ""));
+            mRecruit = std::make_unique<RecruitTask>(mMud);
+            mRecruit->SetSide(mBlindDir);
+            mBlindPhase = 1;
+            mBlindAhead = false;
+            return LeadBlind(bot, mud, portal, lastFailed, step);
+        }
+
+        case 2: // walking: wait is said a cell before where it is to stop
+        {
+            if (!mud.mLive)
+            {
+                step = TaskStep::Failed("lost the blind Mudokon");
+                return false;
+            }
+            // It stops when it walks off the screen with its back to Abe: so on ahead of it, if it has far to go
+            const NavNode& stop = nav.Nodes()[mBlindStop];
+            if (!mBlindAhead)
+            {
+                mBlindAhead = true;
+                if (std::abs(stop.mX - bot.Abe().mX) > 150 && (stop.mX - bot.Abe().mX) * mBlindDir > 0)
+                {
+                    s32 to = mBlindStop;
+                    for (s32 cells = 1; cells <= 3; cells++)
+                    {
+                        const s32 next = nav.NodeAt(nav.StepX(nav.Nodes()[to].mX, mBlindDir, stop.mHalf), stop.mY, stop.mHalf, 8);
+                        if (next < 0 || nav.Nodes()[next].mHazard || nav.Nodes()[next].mTrapDoor >= 0 || nav.Nodes()[next].mLine != stop.mLine)
+                        {
+                            break;
+                        }
+                        to = next;
+                    }
+                    mGo = GoToNode(to);
+                }
+            }
+            if (mGo)
+            {
+                step = mGo->Next(bot, lastFailed);
+                if (step.mKind == TaskStep::Kind::ePrim)
+                {
+                    return false;
+                }
+                mGo.reset();
+            }
+            const s32 ahead = (stop.mX - mudX) * mBlindDir;
+            if (mud.mFollowing && ahead > cell + cell / 2 && ++mBlindWaits < 900)
+            {
+                step = TaskStep::Do(Prim::Wait(1));
+                return false;
+            }
+            mBlindPhase = 3;
+            mBlindWaits = 0;
+            mBlindStill = 0;
+            mBlindLastX = mudX;
+            if (mud.mFollowing)
+            {
+                bot.Log("wait, said to the blind Mudokon at " + std::to_string(mudX));
+                step = TaskStep::Do(Prim::Press(bot.SpeakWait(), 6));
+                return false;
+            }
+            return LeadBlind(bot, mud, portal, lastFailed, step);
+        }
+
+        case 3: // until it stands
+        case 5: // until it has fallen through and stands
+        {
+            mBlindStill = mudX == mBlindLastX && !mud.mFollowing ? mBlindStill + 1 : 0;
+            mBlindLastX = mudX;
+            const bool fallen = mudNode >= 0 && nav.Nodes()[mudNode].mTrapDoor != mBlindTrap;
+            if ((mBlindStill < 20 || (mBlindPhase == 5 && !fallen)) && ++mBlindWaits < 300)
+            {
+                step = TaskStep::Do(Prim::Wait(1));
+                return false;
+            }
+            bot.Log("the blind Mudokon stands at " + std::to_string(mudX) + "," + std::to_string(mud.mLiveY));
+            if (mBlindPhase == 3 && mBlindTrap >= 0 && mudNode >= 0 && nav.Nodes()[mudNode].mTrapDoor == mBlindTrap)
+            {
+                mBlindPhase = 4;
+            }
+            else
+            {
+                mBlindPhase = 0;
+            }
+            return LeadBlind(bot, mud, portal, lastFailed, step);
+        }
+
+        case 6: // on the lift with it
+        {
+            if (mGo)
+            {
+                step = mGo->Next(bot, lastFailed);
+                if (step.mKind == TaskStep::Kind::ePrim)
+                {
+                    return false;
+                }
+                mGo.reset();
+                if (step.mKind == TaskStep::Kind::eFailed)
+                {
+                    return false;
+                }
+            }
+            mBlindPhase = 0;
+            return LeadBlind(bot, mud, portal, lastFailed, step);
+        }
+
+        case 4: // on the trap door: open it
+        {
+            const NavFeature& trap = nav.Input().mFeatures[mBlindTrap];
+            for (const Entity& e : world.mEntities)
+            {
+                if ((e.mKind == EntityKind::eLever || e.mKind == EntityKind::ePullRing) && e.mSwitch == trap.mSwitch && e.mHalf == mud.mHalf)
+                {
+                    const s32 node = Domain::UseNode(nav, e, nullptr);
+                    if (node >= 0 && nav.Nodes()[node].mTrapDoor < 0)
+                    {
+                        bot.Log("opening the trap door under the blind Mudokon with #" + std::to_string(e.mId));
+                        mUse = std::make_unique<UseTask>(e.mId, trap.mStartClosed ? 1 : 0);
+                        return LeadBlind(bot, mud, portal, lastFailed, step);
+                    }
+                }
+            }
+            step = TaskStep::Failed("nothing opens the trap door under the Mudokon");
+            return false;
+        }
+
+        default:
+            step = TaskStep::Failed("lost track of the blind Mudokon");
+            return false;
     }
 }
 
@@ -2399,6 +3201,8 @@ TaskStep WorkTogetherTask::Next(Bot& bot, const std::string& lastFailed)
                     return TaskStep::Failed("the Mudokons won't all come along");
                 }
                 mRecruit = std::make_unique<RecruitTask>(mudId);
+                // (all o' ya: the others on the screen listen too, and one "follow me" brings them all)
+                mRecruit->SetAll(true);
                 mRecruiting = mudId;
             }
             const TaskStep step = mRecruit->Next(bot, lastFailed);
@@ -2467,12 +3271,14 @@ TaskStep WorkTogetherTask::Next(Bot& bot, const std::string& lastFailed)
             return Next(bot, "");
         }
 
-        case 2: // and past the last one
+        case 2: // and past the last one, without stopping: the ones that have stopped at a wheel are not waited
+                // for, and one that catches Abe up standing among the wheels stops behind him, not at a wheel
             mStage = 3;
             mWaits = 0;
             mStill = 0;
             mGo = GoToNode(beyond(farNode, away, 3));
-            mGo->SetLeading(true);
+            // (at a walk: a Mudokon that runs after him doesn't stop at a wheel)
+            mGo->SetTopGait(Gait::eWalk);
             return Next(bot, "");
 
         case 3: // let them settle

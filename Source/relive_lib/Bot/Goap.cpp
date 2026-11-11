@@ -70,7 +70,13 @@ std::vector<bool> Planner::Relevant(const std::vector<Fact>& goal, const std::ve
             {
                 continue;
             }
-            for (const Fact& e : actions[i].mEffects)
+            // (using something up changes how much there is of it)
+            std::vector<Fact> changes = actions[i].mEffects;
+            if (actions[i].mSpend.mKey)
+            {
+                changes.push_back(actions[i].mSpend);
+            }
+            for (const Fact& e : changes)
             {
                 if (keys.count(e.mKey))
                 {
@@ -80,6 +86,10 @@ std::vector<bool> Planner::Relevant(const std::vector<Fact>& goal, const std::ve
                     {
                         keys.insert(p.mKey);
                     }
+                    if (actions[i].mSpend.mKey)
+                    {
+                        keys.insert(actions[i].mSpend.mKey);
+                    }
                     break;
                 }
             }
@@ -88,149 +98,236 @@ std::vector<bool> Planner::Relevant(const std::vector<Fact>& goal, const std::ve
     return relevant;
 }
 
+bool Planner::Can(const State& state, const Action& action)
+{
+    return state.HasAll(action.mPre) && (action.mSpend.mKey == 0 || state.Get(action.mSpend.mKey) >= action.mSpend.mValue);
+}
+
+void Planner::Do(State& state, const Action& action)
+{
+    if (action.mSpend.mKey)
+    {
+        state.Set(action.mSpend.mKey, state.Get(action.mSpend.mKey) - action.mSpend.mValue);
+    }
+    for (const Fact& effect : action.mEffects)
+    {
+        state.Set(effect.mKey, effect.mValue);
+    }
+}
+
 State Planner::Apply(const State& start, const Plan& plan, const std::vector<Action>& actions)
 {
     State state = start;
     for (s32 step : plan.mSteps)
     {
-        for (const Fact& effect : actions[step].mEffects)
-        {
-            state.Set(effect.mKey, effect.mValue);
-        }
+        Do(state, actions[step]);
     }
     return state;
 }
 
-// The actions worth searching with. Costs are worked out as if nothing an action did were ever undone (each fact
-// at the price of the cheapest action that gives it, on top of the dearest thing that action needs): the actions
-// that way to the goal uses, and with them every action that only moves between the facts those touch (the ways
-// back). reachable is false when even so the goal can't be had.
-static std::vector<bool> Support(const State& start, const std::vector<Fact>& goal, const std::vector<Action>& actions, const std::vector<bool>& relevant, bool& reachable)
+// How many states the search for the cheapest plan gets before any plan will do
+static const s32 kCheapestStates = 400;
+// And the search for a cheaper way to what one dear step gives
+static const s32 kImproveStates = 120;
+
+// What a state is still short of, worked out as if nothing done were ever undone: every fact at the price of the
+// cheapest action that gives it, on top of what that action needs. Counting only the dearest thing an action needs
+// gives a number that is never more than the real cost, which a search for the cheapest plan can go by. Counting
+// all it needs (sum) is nearer the truth on a long way and can be over it: that one is for finding any plan fast.
+// Either way the states the goal can't be had from at all are told apart (-1). Something an action uses up counts
+// as there when there is any of it.
+class Estimate final
 {
-    using Key = std::pair<u32, s32>;
-    std::map<Key, s32> price;
-    std::map<Key, s32> giver;
-    const auto priceOf = [&](const Fact& f) -> s32
+public:
+    // more: the goal is also to have more of something counted than that (key 0: no)
+    Estimate(const std::vector<Fact>& goal, const std::vector<Action>& actions, const std::vector<bool>& relevant, bool sum, const Fact& more = {})
+        : mSum(sum)
+        , mMore(more)
     {
-        if (start.Has(f))
+        for (const Fact& g : goal)
         {
-            return 0;
+            mGoal.push_back(Id(g));
         }
-        const auto it = price.find({f.mKey, f.mValue});
-        return it == price.end() ? -1 : it->second;
-    };
-    for (bool more = true; more;)
-    {
-        more = false;
+        if (more.mKey)
+        {
+            mGoal.push_back(Id({more.mKey, kMore}));
+        }
+        std::set<u32> spent;
+        for (std::size_t a = 0; a < actions.size(); a++)
+        {
+            if (relevant[a] && actions[a].mSpend.mKey)
+            {
+                spent.insert(actions[a].mSpend.mKey);
+            }
+        }
         for (std::size_t a = 0; a < actions.size(); a++)
         {
             if (!relevant[a])
             {
                 continue;
             }
-            s32 need = 0;
+            Act act;
+            if (actions[a].mSpend.mKey)
+            {
+                act.mPre.push_back(Id({actions[a].mSpend.mKey, kSome}));
+                // (and using it up is the way to have none)
+                act.mEffects.push_back(Id({actions[a].mSpend.mKey, 0}));
+            }
+            act.mCost = std::max(1, actions[a].mCost);
             for (const Fact& p : actions[a].mPre)
             {
-                const s32 c = priceOf(p);
-                need = c < 0 || need < 0 ? -1 : std::max(need, c);
+                const s32 id = Id(p);
+                if (std::find(act.mPre.begin(), act.mPre.end(), id) == act.mPre.end())
+                {
+                    act.mPre.push_back(id);
+                }
             }
-            if (need < 0)
+            for (const Fact& e : actions[a].mEffects)
+            {
+                act.mEffects.push_back(Id(e));
+                if (e.mValue > 0 && spent.count(e.mKey))
+                {
+                    act.mEffects.push_back(Id({e.mKey, kSome}));
+                }
+                if (more.mKey == e.mKey && e.mValue > more.mValue)
+                {
+                    act.mEffects.push_back(Id({e.mKey, kMore}));
+                }
+            }
+            mActs.push_back(std::move(act));
+        }
+        mNeededBy.resize(mFacts.size());
+        for (std::size_t a = 0; a < mActs.size(); a++)
+        {
+            for (s32 id : mActs[a].mPre)
+            {
+                mNeededBy[id].push_back(static_cast<s32>(a));
+            }
+        }
+        mPrice.resize(mFacts.size());
+        mLeft.resize(mActs.size());
+        mNeeds.resize(mActs.size());
+    }
+
+    // -1: the goal can't be had from this state
+    s32 Of(const State& state)
+    {
+        const s32 kNone = 0x7fffffff;
+        // (sums of sums grow fast: they stop here)
+        const s32 kMost = 1000000000;
+        std::fill(mPrice.begin(), mPrice.end(), kNone);
+        using Item = std::pair<s32, s32>;
+        std::priority_queue<Item, std::vector<Item>, std::greater<Item>> open;
+        for (std::size_t id = 0; id < mFacts.size(); id++)
+        {
+            const Fact& f = mFacts[id];
+            if (f.mValue == kSome ? state.Get(f.mKey) > 0 : (f.mValue == kMore ? state.Get(f.mKey) > mMore.mValue : state.Has(f)))
+            {
+                mPrice[id] = 0;
+                open.push({0, static_cast<s32>(id)});
+            }
+        }
+        const auto give = [&](const Act& act, s32 price)
+        {
+            for (s32 e : act.mEffects)
+            {
+                if (price < mPrice[e])
+                {
+                    mPrice[e] = price;
+                    open.push({price, e});
+                }
+            }
+        };
+        for (std::size_t a = 0; a < mActs.size(); a++)
+        {
+            mLeft[a] = static_cast<s32>(mActs[a].mPre.size());
+            mNeeds[a] = 0;
+            if (mLeft[a] == 0)
+            {
+                give(mActs[a], mActs[a].mCost);
+            }
+        }
+        std::size_t goalsLeft = 0;
+        for (s32 g : mGoal)
+        {
+            goalsLeft += mPrice[g] != 0 ? 1 : 0;
+        }
+        s32 most = 0;
+        s32 all = 0;
+        while (goalsLeft > 0 && !open.empty())
+        {
+            const Item item = open.top();
+            open.pop();
+            if (mPrice[item.second] != item.first)
             {
                 continue;
             }
-            const s32 total = need + std::max(1, actions[a].mCost);
-            for (const Fact& e : actions[a].mEffects)
+            if (item.first > 0 && std::find(mGoal.begin(), mGoal.end(), item.second) != mGoal.end())
             {
-                const s32 had = priceOf(e);
-                if (had < 0 || total < had)
+                most = item.first;
+                all = std::min(kMost, all + item.first);
+                goalsLeft--;
+            }
+            // Facts come out cheapest first: the one that completes what an action needs is the dearest of them
+            for (s32 a : mNeededBy[item.second])
+            {
+                mNeeds[a] = std::min(kMost, mNeeds[a] + item.first);
+                if (--mLeft[a] == 0)
                 {
-                    price[{e.mKey, e.mValue}] = total;
-                    giver[{e.mKey, e.mValue}] = static_cast<s32>(a);
-                    more = true;
+                    give(mActs[a], std::min(kMost, (mSum ? mNeeds[a] : item.first) + mActs[a].mCost));
                 }
             }
         }
+        return goalsLeft > 0 ? -1 : (mSum ? all : most);
     }
 
-    std::vector<bool> use(actions.size(), false);
-    reachable = true;
-    std::vector<Fact> todo = goal;
-    std::set<u32> touched;
-    for (const Fact& f : start.Facts())
+private:
+    struct Act final
     {
-        touched.insert(f.mKey);
-    }
-    while (!todo.empty())
-    {
-        const Fact f = todo.back();
-        todo.pop_back();
-        touched.insert(f.mKey);
-        if (start.Has(f))
-        {
-            continue;
-        }
-        const auto it = giver.find({f.mKey, f.mValue});
-        if (it == giver.end())
-        {
-            reachable = false;
-            return use;
-        }
-        if (!use[it->second])
-        {
-            use[it->second] = true;
-            for (const Fact& p : actions[it->second].mPre)
-            {
-                todo.push_back(p);
-            }
-            for (const Fact& e : actions[it->second].mEffects)
-            {
-                touched.insert(e.mKey);
-            }
-        }
-    }
-    // What those facts are about is all a plan can need to change: an action is of use if every fact it gives is
-    // one of those values or about one of those keys
-    std::set<Key> values;
-    for (std::size_t a = 0; a < actions.size(); a++)
-    {
-        for (const Fact& f : use[a] ? actions[a].mPre : std::vector<Fact>{})
-        {
-            values.insert({f.mKey, f.mValue});
-        }
-        for (const Fact& f : use[a] ? actions[a].mEffects : std::vector<Fact>{})
-        {
-            values.insert({f.mKey, f.mValue});
-        }
-    }
-    for (const Fact& f : start.Facts())
-    {
-        values.insert({f.mKey, f.mValue});
-    }
-    for (const Fact& f : goal)
-    {
-        values.insert({f.mKey, f.mValue});
-    }
-    for (std::size_t a = 0; a < actions.size(); a++)
-    {
-        bool all = relevant[a] && !use[a];
-        for (const Fact& e : actions[a].mEffects)
-        {
-            all = all && (values.count({e.mKey, e.mValue}) || (e.mValue == 0 && touched.count(e.mKey)));
-        }
-        for (const Fact& p : actions[a].mPre)
-        {
-            all = all && (values.count({p.mKey, p.mValue}) || (p.mValue == 0 && touched.count(p.mKey)) || start.Has(p));
-        }
-        if (all)
-        {
-            use[a] = true;
-        }
-    }
-    return use;
-}
+        std::vector<s32> mPre;
+        std::vector<s32> mEffects;
+        s32 mCost = 1;
+    };
+    // The value that stands for "any of it" in a fact about something counted
+    static const s32 kSome = -0x7fffffff;
+    // And for "more of it than mMore says"
+    static const s32 kMore = -0x7ffffffe;
 
-static void Search(const State& start, const std::vector<Fact>& goal, const std::vector<Action>& actions, const std::vector<bool>& relevant, s32 maxExpanded, Plan& plan)
+    s32 Id(const Fact& fact)
+    {
+        const auto it = mIds.find({fact.mKey, fact.mValue});
+        if (it != mIds.end())
+        {
+            return it->second;
+        }
+        mFacts.push_back(fact);
+        mIds[{fact.mKey, fact.mValue}] = static_cast<s32>(mFacts.size()) - 1;
+        return static_cast<s32>(mFacts.size()) - 1;
+    }
+
+    std::map<std::pair<u32, s32>, s32> mIds;
+    std::vector<Fact> mFacts;
+    std::vector<s32> mGoal;
+    std::vector<Act> mActs;
+    std::vector<std::vector<s32>> mNeededBy;
+    std::vector<s32> mPrice;
+    std::vector<s32> mLeft;
+    std::vector<s32> mNeeds;
+    bool mSum = false;
+    Fact mMore;
+};
+
+// greedy: the state that looks nearest the goal first, with little weight on what it cost to get to. Finds a plan of a hundred steps
+// in a few hundred states where the cheapest one can't be found in any number, and it isn't far off the cheapest.
+// counted: what an action uses up is taken away. Without, having any is enough for as many actions as the plan
+// likes, which keeps the states apart only by what matters to the way: see Planner::Find for what is made of it.
+// more: the goal is also to have more of something counted than that (key 0: no).
+static void Search(const State& start, const std::vector<Fact>& goal, const std::vector<Action>& actions, const std::vector<bool>& relevant, s32 maxExpanded, bool greedy, bool counted, const Fact& more, Plan& plan)
 {
+    const auto isGoal = [&](const State& state)
+    {
+        return state.HasAll(goal) && (more.mKey == 0 || state.Get(more.mKey) > more.mValue);
+    };
     struct Node final
     {
         State mState;
@@ -239,27 +336,36 @@ static void Search(const State& start, const std::vector<Fact>& goal, const std:
         s32 mAction = -1;
     };
     std::vector<Node> nodes;
-    std::map<State, s32> best;
-    // Cheapest first, then the one found first
+    // Per state: the cheapest way to it so far, and what it is still short of (-1: the goal can't be had from it)
+    std::map<State, std::pair<s32, s32>> best;
+    // The one that looks cheapest in all first, then the one found first
     using Item = std::pair<s32, s32>;
     std::priority_queue<Item, std::vector<Item>, std::greater<Item>> open;
+    Estimate estimate(goal, actions, relevant, greedy, more);
+    plan.mFound = false;
+    plan.mSteps.clear();
 
-    nodes.push_back({start, 0, -1, -1});
-    best[start] = 0;
-    open.push({0, 0});
-    plan.mExpanded = 0;
     plan.mMiss.clear();
+    plan.mExpanded = 0;
+    const s32 startShort = estimate.Of(start);
+    if (startShort < 0)
+    {
+        return;
+    }
+    nodes.push_back({start, 0, -1, -1});
+    best[start] = {0, startShort};
+    open.push({startShort, 0});
 
     while (!open.empty())
     {
         const Item item = open.top();
         open.pop();
         const s32 idx = item.second;
-        if (nodes[idx].mCost != item.first || best[nodes[idx].mState] != item.first)
+        if (best[nodes[idx].mState].first != nodes[idx].mCost)
         {
             continue;
         }
-        if (nodes[idx].mState.HasAll(goal))
+        if (isGoal(nodes[idx].mState))
         {
             plan.mFound = true;
             plan.mCost = nodes[idx].mCost;
@@ -278,30 +384,211 @@ static void Search(const State& start, const std::vector<Fact>& goal, const std:
 
         for (std::size_t a = 0; a < actions.size(); a++)
         {
-            if (!relevant[a] || !nodes[idx].mState.HasAll(actions[a].mPre))
+            if (!relevant[a] || !Planner::Can(nodes[idx].mState, actions[a]))
             {
                 continue;
             }
             State next = nodes[idx].mState;
-            for (const Fact& e : actions[a].mEffects)
+            if (counted)
             {
-                next.Set(e.mKey, e.mValue);
+                Planner::Do(next, actions[a]);
+            }
+            else
+            {
+                for (const Fact& e : actions[a].mEffects)
+                {
+                    next.Set(e.mKey, e.mValue);
+                }
             }
             if (next == nodes[idx].mState)
             {
                 continue;
             }
             const s32 cost = nodes[idx].mCost + std::max(1, actions[a].mCost);
-            const auto found = best.find(next);
-            if (found != best.end() && found->second <= cost)
+            auto found = best.find(next);
+            if (found == best.end())
+            {
+                found = best.insert({next, {-1, estimate.Of(next)}}).first;
+            }
+            else if (found->second.first >= 0 && found->second.first <= cost)
             {
                 continue;
             }
-            best[next] = cost;
+            if (found->second.second < 0)
+            {
+                continue;
+            }
+            found->second.first = cost;
             nodes.push_back({std::move(next), cost, idx, static_cast<s32>(a)});
-            open.push({cost, static_cast<s32>(nodes.size()) - 1});
+            // (greedy still counts what it cost, a third as much as what is left: of two ways on, the dear one
+            // isn't taken just for being a step further)
+            open.push({greedy ? cost + 3 * std::min(found->second.second, 500000000) : cost + found->second.second, static_cast<s32>(nodes.size()) - 1});
         }
     }
+}
+
+static bool Works(State state, const std::vector<s32>& steps, const std::vector<Action>& actions, const std::vector<Fact>& goal)
+{
+    for (s32 step : steps)
+    {
+        if (!Planner::Can(state, actions[step]))
+        {
+            return false;
+        }
+        Planner::Do(state, actions[step]);
+    }
+    return state.HasAll(goal);
+}
+
+// A plan found by going for what looks nearest takes a dear action where a cheaper one does the same after a
+// little more work (a throw past a running drill, when its lever is at hand). Each step that has a cheaper twin
+// is looked at again: the cheapest way to what it gives that leaves Abe where the step needs him, put in its
+// place if that costs less and the rest of the plan still works after it.
+static void Improve(const State& start, const std::vector<Fact>& goal, const std::vector<Action>& actions, Plan& plan)
+{
+    for (std::size_t i = 0; i < plan.mSteps.size(); i++)
+    {
+        const Action& dear = actions[plan.mSteps[i]];
+        bool twin = false;
+        for (const Action& other : actions)
+        {
+            twin = twin || (other.mEffects == dear.mEffects && std::max(1, other.mCost) < std::max(1, dear.mCost));
+        }
+        if (!twin)
+        {
+            continue;
+        }
+        State before = start;
+        for (std::size_t k = 0; k < i; k++)
+        {
+            Planner::Do(before, actions[plan.mSteps[k]]);
+        }
+        std::vector<Fact> want = dear.mEffects;
+        for (const Fact& p : dear.mPre)
+        {
+            bool changed = false;
+            for (const Fact& e : dear.mEffects)
+            {
+                changed = changed || e.mKey == p.mKey;
+            }
+            if (!changed)
+            {
+                want.push_back(p);
+            }
+        }
+        Plan other;
+        Search(before, want, actions, Planner::Relevant(want, actions), kImproveStates, false, true, {}, other);
+        plan.mExpanded += other.mExpanded;
+        if (!other.mFound || other.mCost >= std::max(1, dear.mCost))
+        {
+            continue;
+        }
+        std::vector<s32> steps(plan.mSteps.begin(), plan.mSteps.begin() + static_cast<std::ptrdiff_t>(i));
+        steps.insert(steps.end(), other.mSteps.begin(), other.mSteps.end());
+        steps.insert(steps.end(), plan.mSteps.begin() + static_cast<std::ptrdiff_t>(i) + 1, plan.mSteps.end());
+        if (Works(start, steps, actions, goal))
+        {
+            plan.mCost += other.mCost - std::max(1, dear.mCost);
+            plan.mSteps = steps;
+            i += other.mSteps.size() - 1;
+        }
+    }
+}
+
+// Any plan, fast. Something that gets used up (rocks) is first planned with as if any of it were enough, and the
+// plan then gone through with the count: where it runs out, the way to more of it is put in from the last place
+// there is one, and the rest planned again from there.
+static void FindAny(const State& start, const std::vector<Fact>& goal, const std::vector<Action>& actions, const std::vector<bool>& relevant, s32 maxExpanded, Plan& plan)
+{
+    Plan whole;
+    State state = start;
+    s32 refillStates = 0;
+    for (s32 round = 0; round < 24; round++)
+    {
+        Plan part;
+        Search(state, goal, actions, relevant, maxExpanded, true, false, {}, part);
+        whole.mExpanded += part.mExpanded;
+        if (!part.mFound)
+        {
+            whole.mMiss = part.mMiss.empty() ? "the goal can't be reached from here with the actions known" : part.mMiss;
+            break;
+        }
+        // Where the count says no
+        std::vector<State> before;
+        State at = state;
+        std::size_t stop = part.mSteps.size();
+        for (std::size_t i = 0; i < part.mSteps.size(); i++)
+        {
+            before.push_back(at);
+            if (!Planner::Can(at, actions[part.mSteps[i]]))
+            {
+                stop = i;
+                break;
+            }
+            Planner::Do(at, actions[part.mSteps[i]]);
+        }
+        const auto take = [&](const Plan& from, std::size_t count)
+        {
+            for (std::size_t i = 0; i < count; i++)
+            {
+                whole.mSteps.push_back(from.mSteps[i]);
+                whole.mCost += std::max(1, actions[from.mSteps[i]].mCost);
+            }
+        };
+        if (stop == part.mSteps.size())
+        {
+            take(part, stop);
+            whole.mFound = true;
+            break;
+        }
+        const u32 key = actions[part.mSteps[stop]].mSpend.mKey;
+        bool mended = false;
+        const std::vector<bool> gives = Planner::Relevant({{key, 1}}, actions);
+        for (std::size_t j = stop + 1; key && j-- > 0 && !mended && refillStates < maxExpanded;)
+        {
+            // (from there, or from further back: with some left, or before a way of no return, there may be a
+            // way that there isn't later)
+            const Fact more{key, before[j].Get(key)};
+            Plan refill;
+            Search(before[j], {}, actions, gives, maxExpanded / 4, true, true, more, refill);
+            whole.mExpanded += refill.mExpanded;
+            refillStates += refill.mExpanded;
+            if (refill.mFound)
+            {
+                take(part, j);
+                take(refill, refill.mSteps.size());
+                state = before[j];
+                for (s32 step : refill.mSteps)
+                {
+                    Planner::Do(state, actions[step]);
+                }
+                mended = true;
+            }
+        }
+        if (!mended)
+        {
+            whole.mMiss = "what the plan uses up runs out, and there is no way to more of it";
+            break;
+        }
+    }
+    if (!whole.mFound && whole.mMiss.empty())
+    {
+        whole.mMiss = "no end to what the plan uses up";
+    }
+    if (!whole.mFound)
+    {
+        whole.mSteps.clear();
+    }
+    else
+    {
+        Improve(start, goal, actions, whole);
+    }
+    plan = whole;
+}
+
+s32 Planner::Short(const State& start, const std::vector<Fact>& goal, const std::vector<Action>& actions)
+{
+    return Estimate(goal, actions, Relevant(goal, actions), true).Of(start);
 }
 
 Plan Planner::Find(const State& start, const std::vector<Fact>& goal, const std::vector<Action>& actions, s32 maxExpanded)
@@ -314,17 +601,12 @@ Plan Planner::Find(const State& start, const std::vector<Fact>& goal, const std:
     }
 
     const std::vector<bool> relevant = Relevant(goal, actions);
-    // With many things that can each be done or not (a floor of mines) the states to search are without number:
-    // first with only the actions a plan would use, and all of them only if that finds nothing
-    bool reachable = false;
-    const std::vector<bool> support = Support(start, goal, actions, relevant, reachable);
-    if (reachable)
+    // The cheapest plan if it is soon found, else any: with many things that can each be done or not (a floor of
+    // mines) the states to search for the cheapest are without number
+    Search(start, goal, actions, relevant, std::min(maxExpanded, kCheapestStates), false, true, {}, plan);
+    if (!plan.mFound && !plan.mMiss.empty())
     {
-        Search(start, goal, actions, support, maxExpanded, plan);
-        if (!plan.mFound && support != relevant)
-        {
-            Search(start, goal, actions, relevant, maxExpanded / 4, plan);
-        }
+        FindAny(start, goal, actions, relevant, maxExpanded, plan);
     }
     if (plan.mFound || !plan.mMiss.empty())
     {

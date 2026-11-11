@@ -50,6 +50,9 @@ struct Action final
     std::vector<Fact> mPre;
     std::vector<Fact> mEffects;
     s32 mCost = 1;
+    // What it uses up of something that is counted (rocks): the fact's key and how many. It needs at least that
+    // many and leaves that many less. Key 0: nothing.
+    Fact mSpend;
     // Whatever the maker of the action wants to find it by
     s32 mTag = 0;
 };
@@ -70,7 +73,15 @@ class Planner final
 public:
     // The cheapest plan from start to a state with every goal fact. Actions that can't help the goal are left out
     // of the search, and equal-cost plans come out the same way every time.
-    static Plan Find(const State& start, const std::vector<Fact>& goal, const std::vector<Action>& actions, s32 maxExpanded = 20000);
+    // That holds for plans found within a few hundred states. A longer one is found by going for what looks nearest
+    // the goal, and can cost somewhat more than the cheapest.
+    static Plan Find(const State& start, const std::vector<Fact>& goal, const std::vector<Action>& actions, s32 maxExpanded = 5000);
+    // Roughly what the goal costs from a state, without searching (it can be over or under): to tell which of
+    // several goals is nearest. -1 if it can't be had.
+    static s32 Short(const State& start, const std::vector<Fact>& goal, const std::vector<Action>& actions);
+    // Whether an action can be done in a state, and the state it leaves
+    static bool Can(const State& state, const Action& action);
+    static void Do(State& state, const Action& action);
     // The state a plan leaves behind
     static State Apply(const State& start, const Plan& plan, const std::vector<Action>& actions);
     // The actions that change a fact some goal fact needs, directly or through another action's needs

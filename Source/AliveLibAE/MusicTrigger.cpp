@@ -156,16 +156,19 @@ void MusicTrigger::CreateFromSaveState(SerializedObjectData& pData, ResourceMana
 {
     const auto pState = pData.ReadTmpPtr<MusicTriggerSaveState>();
     MusicTrigger* pTrigger = nullptr;
-    if (pState->mTlvId.IsValid())
+    auto pTlv = pState->mTlvId.IsValid() ? static_cast<relive::Path_MusicTrigger*>(map.TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv()) : nullptr;
+    if (pTlv)
     {
-        auto pTlv = static_cast<relive::Path_MusicTrigger*>(map.TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv());
         pTrigger = relive_new MusicTrigger(pTlv, pState->mTlvId, resMan, map);
     }
     else
     {
+        // Or one still playing from the path before this one, whose TLV isn't in this path: the state has all
+        // it needs but the rectangle, which nothing can touch from here
         // Made by code (Abe, a door, a mudokon): everything it was made with is in the state
         pTrigger = relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eChime, relive::Path_MusicTrigger::TriggeredBy::eTimer, 0, resMan, map);
     }
+    pTrigger->mTlvId = pState->mTlvId;
     pTrigger->mMusicType = static_cast<MusicController::MusicTypes>(pState->mMusicType);
     pTrigger->mSetMusicToNoneOnDtor = pState->mSetMusicToNoneOnDtor;
     pTrigger->SetUpdateDelay(pState->mUpdateDelay);

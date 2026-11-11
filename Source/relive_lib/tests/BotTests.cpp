@@ -224,6 +224,129 @@ TEST(BotGoap, ActionsThatCannotHelpAreLeftOut)
     EXPECT_LT(plan.mExpanded, 5);
 }
 
+// Whether a plan can be done step by step from a state, and ends with the goal
+static bool PlanWorks(Goap::State state, const Goap::Plan& plan, const std::vector<Goap::Action>& actions, const std::vector<Goap::Fact>& goal)
+{
+    for (s32 step : plan.mSteps)
+    {
+        if (!Goap::Planner::Can(state, actions[step]))
+        {
+            return false;
+        }
+        Goap::Planner::Do(state, actions[step]);
+    }
+    return state.HasAll(goal);
+}
+
+TEST(BotGoap, ALongPlanIsFoundWithoutTryingEveryOrder)
+{
+    // Thirty things to do in any order, all needed: the cheapest order is one of 2^30 sets to look through
+    std::vector<Goap::Action> actions;
+    std::vector<Goap::Fact> goal;
+    for (u32 i = 0; i < 30; i++)
+    {
+        actions.push_back(Act(("mine " + std::to_string(i)).c_str(), {{100 + i, 0}}, {{100 + i, 1}}, 5 + static_cast<s32>(i % 3)));
+        goal.push_back({100 + i, 1});
+    }
+    const Goap::Plan plan = Goap::Planner::Find({}, goal, actions);
+    ASSERT_TRUE(plan.mFound) << plan.mMiss;
+    EXPECT_EQ(plan.mSteps.size(), 30u);
+    EXPECT_LT(plan.mExpanded, 200);
+    EXPECT_TRUE(PlanWorks({}, plan, actions, goal));
+}
+
+TEST(BotGoap, WhatIsUsedUpIsFetchedAgain)
+{
+    // A sack gives two rocks, and only to empty hands. Five mines take three trips to it.
+    const u32 kRocks = 3;
+    std::vector<Goap::Action> actions = {Act("get rocks", {{kRocks, 0}}, {{kRocks, 2}})};
+    std::vector<Goap::Fact> goal;
+    for (u32 i = 0; i < 5; i++)
+    {
+        actions.push_back(Act(("blow up " + std::to_string(i)).c_str(), {}, {{100 + i, 1}}));
+        actions.back().mSpend = {kRocks, 1};
+        goal.push_back({100 + i, 1});
+    }
+    const Goap::Plan plan = Goap::Planner::Find({}, goal, actions);
+    ASSERT_TRUE(plan.mFound) << plan.mMiss;
+    EXPECT_EQ(plan.mSteps.size(), 8u);
+    EXPECT_TRUE(PlanWorks({}, plan, actions, goal));
+}
+
+TEST(BotGoap, MoreIsFetchedBeforeTheWayOfNoReturn)
+{
+    // One rock in hand and the sack here; three mines, two of them only within reach from over there, and no way
+    // back. The rock has to go on the first mine from here, so the sack gives more before crossing. (The thirty
+    // other things make it a plan too long to find the cheapest of.)
+    const u32 kAt = 1, kRocks = 3;
+    Goap::State start;
+    start.Set(kAt, 1);
+    start.Set(kRocks, 1);
+    std::vector<Goap::Action> actions = {
+        Act("get rocks", {{kAt, 1}, {kRocks, 0}}, {{kRocks, 3}}),
+        Act("cross", {{kAt, 1}}, {{kAt, 2}}),
+        Act("blow up 0 from here", {{kAt, 1}}, {{100, 1}}),
+        Act("blow up 0 from there", {{kAt, 2}}, {{100, 1}}),
+        Act("blow up 1", {{kAt, 2}}, {{101, 1}}),
+        Act("blow up 2", {{kAt, 2}}, {{102, 1}}),
+    };
+    for (std::size_t i = 2; i < actions.size(); i++)
+    {
+        actions[i].mSpend = {kRocks, 1};
+    }
+    std::vector<Goap::Fact> goal = {{100, 1}, {101, 1}, {102, 1}};
+    for (u32 i = 0; i < 30; i++)
+    {
+        actions.push_back(Act(("other " + std::to_string(i)).c_str(), {{kAt, 2}, {200 + i, 0}}, {{200 + i, 1}}, 5));
+        goal.push_back({200 + i, 1});
+    }
+    const Goap::Plan plan = Goap::Planner::Find(start, goal, actions);
+    ASSERT_TRUE(plan.mFound) << plan.mMiss;
+    EXPECT_TRUE(PlanWorks(start, plan, actions, goal));
+    EXPECT_LT(plan.mExpanded, 2000);
+}
+
+TEST(BotGoap, ADearStepGivesWayToACheaperWayToTheSame)
+{
+    // A mine can be blown up past a running drill, at a price, or cheaply once the lever next to it has stopped
+    // the drill. Thirty more things to do make it a plan too long to find the cheapest of.
+    std::vector<Goap::Action> actions = {
+        Act("blow up past the drill", {}, {{100, 1}}, 2800),
+        Act("blow up", {{50, 1}}, {{100, 1}}, 300),
+        Act("stop the drill", {{50, 0}}, {{50, 1}}, 150),
+    };
+    std::vector<Goap::Fact> goal = {{100, 1}};
+    for (u32 i = 0; i < 30; i++)
+    {
+        actions.push_back(Act(("other " + std::to_string(i)).c_str(), {{100, 1}, {200 + i, 0}}, {{200 + i, 1}}, 5));
+        goal.push_back({200 + i, 1});
+    }
+    const Goap::Plan plan = Goap::Planner::Find({}, goal, actions);
+    ASSERT_TRUE(plan.mFound) << plan.mMiss;
+    EXPECT_TRUE(PlanWorks({}, plan, actions, goal));
+    for (s32 step : plan.mSteps)
+    {
+        EXPECT_NE(actions[step].mName, "blow up past the drill");
+    }
+    EXPECT_EQ(plan.mCost, 150 + 300 + 30 * 5);
+}
+
+TEST(BotGoap, RunningOutWithNoMoreToBeHadIsNoPlan)
+{
+    const u32 kRocks = 3;
+    Goap::State start;
+    start.Set(kRocks, 1);
+    std::vector<Goap::Action> actions = {
+        Act("blow up 0", {}, {{100, 1}}),
+        Act("blow up 1", {}, {{101, 1}}),
+    };
+    actions[0].mSpend = {kRocks, 1};
+    actions[1].mSpend = {kRocks, 1};
+    const Goap::Plan plan = Goap::Planner::Find(start, {{100, 1}, {101, 1}}, actions);
+    EXPECT_FALSE(plan.mFound);
+    EXPECT_FALSE(plan.mMiss.empty());
+}
+
 TEST(BotGoap, AToggleCanBeUndone)
 {
     // The door is open only with the switch off, and it starts on
@@ -1784,4 +1907,182 @@ TEST(BotSweep, NoThrowingFromWhereADrillComesBy)
     EXPECT_TRUE(hasSpotAt(687));
     world.mSwitches[5] = 1;
     EXPECT_TRUE(hasSpotAt(437));
+}
+
+// ---- Trap doors, drills overhead, blind Mudokons, lift shafts ----
+
+TEST(BotNav, ATrapDoorIsFloorWhileItIsShut)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 200, 100, 0));
+    in.mLines.push_back(Line(250, 100, 400, 100, 0));
+    in.mLines.push_back(Line(0, 200, 400, 200, 0));
+    NavFeature trap = Feature(FeatureKind::eTrapDoor, 200, 100, 250, 120);
+    trap.mSwitch = 7;
+    trap.mStartClosed = true;
+    in.mFeatures.push_back(trap);
+    NavGraph g;
+    g.Build(in);
+    const s32 before = g.NodeAt(187, 100, false);
+    const s32 on = g.NodeAt(212, 100, false);
+    const s32 under = g.NodeAt(212, 200, false);
+    ASSERT_GE(before, 0);
+    ASSERT_GE(on, 0);
+    ASSERT_GE(under, 0);
+    EXPECT_EQ(g.Nodes()[on].mTrapDoor, 0);
+    // Walked onto while its switch is off, fallen through once it is on
+    bool walk = false;
+    bool fall = false;
+    for (const NavEdge& e : g.Edges())
+    {
+        s32 sw = 0;
+        s32 value = -1;
+        if (e.mFrom == before && e.mTo == on && e.mKind == EdgeKind::eWalk)
+        {
+            walk = g.Condition(e, &sw, &value) && sw == 7 && value == 0;
+        }
+        if (e.mFrom == on && e.mTo == under && e.mKind == EdgeKind::eFall)
+        {
+            fall = g.Condition(e, &sw, &value) && sw == 7 && value == 1;
+        }
+    }
+    EXPECT_TRUE(walk);
+    EXPECT_TRUE(fall);
+}
+
+TEST(BotNav, UnderADrillThatGoesOverheadIsRolled)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 800, 100, 0));
+    in.mFeatures.push_back(Feature(FeatureKind::eSweep, 300, 40, 500, 64));
+    NavGraph g;
+    g.Build(in);
+    const s32 under = g.NodeAt(412, 100, false);
+    ASSERT_GE(under, 0);
+    EXPECT_TRUE(g.Nodes()[under].mLow);
+    EXPECT_EQ(g.Nodes()[under].mSweepHigh, 0);
+    EXPECT_EQ(g.Nodes()[under].mSweep, -1);
+    EXPECT_FALSE(g.Nodes()[g.NodeAt(612, 100, false)].mLow);
+
+    // One that comes lower gets him crouched too: its cells are crossed when it is away
+    in.mFeatures[0] = Feature(FeatureKind::eSweep, 300, 70, 500, 94);
+    g.Build(in);
+    EXPECT_EQ(g.Nodes()[g.NodeAt(412, 100, false)].mSweep, 0);
+    EXPECT_EQ(g.Nodes()[g.NodeAt(412, 100, false)].mSweepHigh, -1);
+    EXPECT_FALSE(g.Nodes()[g.NodeAt(412, 100, false)].mLow);
+}
+
+TEST(BotDomain, ABlindMudokonsWayNeedsTheDrillOnItStopped)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 800, 100, 0));
+    NavFeature sweep = Feature(FeatureKind::eSweep, 300, 40, 500, 64);
+    sweep.mId = 9;
+    in.mFeatures.push_back(sweep);
+    NavGraph g;
+    g.Build(in);
+    World world;
+    Entity drill = MakeEntity(EntityKind::eDrill, 9, 300, 40, 500, 64);
+    drill.mSwitch = 5;
+    drill.mInputs[0] = 1;
+    drill.mInputs[1] = 1;
+    world.mEntities.push_back(drill);
+    Entity portal = MakeEntity(EntityKind::eBirdPortal, 20, 700, 80, 724, 104);
+    portal.mRescuePortal = true;
+    const s32 from = g.NodeAt(112, 100, false);
+    std::vector<s32> way;
+    // There is a way once the drill is stopped: not as things are
+    EXPECT_TRUE(Domain::BlindWay(g, world, from, portal, false, way));
+    EXPECT_FALSE(way.empty());
+    EXPECT_FALSE(Domain::BlindWay(g, world, from, portal, true, way));
+    world.mSwitches[5] = 1;
+    ASSERT_TRUE(Domain::BlindWay(g, world, from, portal, true, way));
+    ASSERT_FALSE(way.empty());
+    // It ends where the Mudokon would see the portal open: within a screen of it
+    EXPECT_LT(std::abs(g.Nodes()[g.Edges()[way.back()].mTo].mX - 712), 300);
+    // From there it is there already
+    EXPECT_TRUE(Domain::BlindWay(g, world, g.NodeAt(612, 100, false), portal, true, way));
+    EXPECT_TRUE(way.empty());
+}
+
+TEST(BotDomain, APortalIsStoodByOnItsOwnSideOfAWall)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    in.mLines.push_back(Line(75, 0, 75, 100, 1));
+    NavGraph g;
+    g.Build(in);
+    // Three cells to its left is behind the wall
+    const Entity portal = MakeEntity(EntityKind::eBirdPortal, 20, 125, 80, 149, 104);
+    const s32 node = Domain::UseNode(g, portal, nullptr);
+    ASSERT_GE(node, 0);
+    EXPECT_GT(g.Nodes()[node].mX, 137);
+}
+
+TEST(BotNav, ALiftsShaftIsHoppedWhileTheLiftIsAway)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 300, 100, 0));
+    in.mLines.push_back(Line(375, 100, 700, 100, 0));
+    in.mFeatures.push_back(Feature(FeatureKind::eLiftStop, 300, 100, 375, 124));
+    NavFeature ledge = Feature(FeatureKind::eEdge, 375, 100, 399, 124);
+    ledge.mA = 1;
+    in.mFeatures.push_back(ledge);
+    NavGraph g;
+    g.Build(in);
+    const s32 from = g.NodeAt(287, 100, false);
+    const s32 to = g.NodeAt(387, 100, false);
+    ASSERT_GE(from, 0);
+    ASSERT_GE(to, 0);
+    bool hop = false;
+    for (const NavEdge& e : g.Edges())
+    {
+        hop = hop || (e.mFrom == from && e.mTo == to && e.mKind == EdgeKind::eHop && e.mShaft == 0);
+    }
+    EXPECT_TRUE(hop);
+
+    // The lift is where it starts until it is seen somewhere else
+    World world;
+    EXPECT_TRUE(world.LiftAtStop(337, 100, true));
+    EXPECT_FALSE(world.LiftAtStop(337, 100, false));
+    world.mLiftsSeen.push_back({304, 371, 300});
+    EXPECT_FALSE(world.LiftAtStop(337, 100, true));
+    world.mLifts.push_back({304, 371, 100});
+    EXPECT_TRUE(world.LiftAtStop(337, 100, false));
+}
+
+TEST(BotSweep, ARollFitsUnderADrillWhereAWalkNeverDoes)
+{
+    // A drill that comes down on the cell at 412, with a stroke so short it is never above a standing head
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 800, 100, 0));
+    in.mFeatures.push_back(Feature(FeatureKind::eSweep, 400, 20, 424, 104));
+    NavGraph g;
+    g.Build(in);
+    World world;
+    SweepAt sweep;
+    sweep.mId = 9;
+    sweep.mVertical = true;
+    sweep.mSign = -1;
+    sweep.mTravel = 70 * 256;
+    sweep.mSpeed = 5 * 256;
+    sweep.mPhase = 2;
+    sweep.mOffset = 0;
+    sweep.mX1 = 400;
+    sweep.mX2 = 424;
+    sweep.mY1 = 94;
+    sweep.mY2 = 100;
+    world.mSweeps.push_back(sweep);
+    std::vector<s32> path;
+    ASSERT_TRUE(g.FindPath(g.NodeAt(387, 100, false), g.NodeAt(437, 100, false), [](const NavEdge& e)
+                           { return e.mCost; }, path));
+    bool walks = false;
+    bool rolls = false;
+    for (s32 late = 0; late < 30; late++)
+    {
+        walks = walks || GoToTask::SweepsClear(g, world, path, path.size(), late, false);
+        rolls = rolls || GoToTask::SweepsClear(g, world, path, path.size(), late, true);
+    }
+    EXPECT_FALSE(walks);
+    EXPECT_TRUE(rolls);
 }

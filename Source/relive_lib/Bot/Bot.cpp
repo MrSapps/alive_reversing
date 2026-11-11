@@ -123,6 +123,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<ClearSligTask>(entity, [entity, other]() -> std::unique_ptr<Task>
                                                    { return std::make_unique<RescueTask>(entity, other); });
         }
+        case StepKind::eSend:
+            return std::make_unique<SendToWheelTask>(step.mEntity, step.mOther);
         case StepKind::eExit:
             return std::make_unique<ExitTask>(step.mEdge);
         case StepKind::eTogether:
@@ -136,7 +138,9 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
         case StepKind::eRocks:
             return std::make_unique<GetRocksTask>(step.mEntity);
         case StepKind::eBlow:
-            return std::make_unique<BlowMineTask>(step.mEntity);
+            return std::make_unique<BlowMineTask>(step.mEntity, step.mEdge);
+        case StepKind::eRide:
+            return std::make_unique<RideCarTask>(step.mEntity, step.mEdge);
         case StepKind::eLogic:
             break;
     }
@@ -251,14 +255,77 @@ bool Bot::Replan(BaseMap& map)
         mudIndex++;
     }
 
-    // Is there a way out as things stand? Then nothing is done to a Mudokon that would leave none: some are
-    // needed where they are (to turn a wheel, or because only rescuing them opens the door)
-    const bool wayOut = Goap::Planner::Find(domain.mStart, {{Key::kExited, 1}}, actions).mFound;
+    // The ones that look nearest first: after a few that can be done the rest aren't worth the thinking
+    std::vector<std::pair<s32, std::size_t>> order;
+    std::string unreachable;
+    for (std::size_t i = 0; i < goals.size(); i++)
+    {
+        const s32 est = Goap::Planner::Short(domain.mStart, goals[i].second, actions);
+        if (est < 0)
+        {
+            unreachable += goals[i].first + ": can't be had from here; ";
+            continue;
+        }
+        order.push_back({est, i});
+    }
+    std::stable_sort(order.begin(), order.end());
+
+    // The plan in hand still holds from here (what is left of it can be done as things are and gets its goal):
+    // on with it, without thinking it all out again
+    // (not when a Mudokon can be got at that couldn't be when it was made, and the plan is for something else)
+    const bool keep = mKeptForMudokon || order.size() <= mKeptOpen;
     Goap::Plan best;
     std::string bestGoal;
     std::string misses;
-    for (const auto& goal : goals)
+    for (std::size_t skip = 0; keep && skip < mKeptPlan.size() && !best.mFound; skip++)
     {
+        Goap::Plan kept;
+        Goap::State state = domain.mStart;
+        bool holds = true;
+        for (std::size_t i = skip; i < mKeptPlan.size() && holds; i++)
+        {
+            holds = false;
+            for (std::size_t a = 0; a < actions.size(); a++)
+            {
+                if (actions[a].mName == mKeptPlan[i] && Goap::Planner::Can(state, actions[a]))
+                {
+                    const Goap::State before = state;
+                    Goap::Planner::Do(state, actions[a]);
+                    holds = !(state == before);
+                    kept.mSteps.push_back(static_cast<s32>(a));
+                    kept.mCost += std::max(1, actions[a].mCost);
+                    break;
+                }
+            }
+        }
+        if (holds && !domain.mStart.HasAll(mKeptGoal) && state.HasAll(mKeptGoal))
+        {
+            kept.mFound = true;
+            best = kept;
+            bestGoal = mKeptGoalName;
+        }
+    }
+    const bool keptOn = best.mFound;
+
+    misses += unreachable;
+    const std::size_t openGoals = order.size();
+    if (keptOn)
+    {
+        order.clear();
+    }
+    // Is there a way out as things stand? Then nothing is done to a Mudokon that would leave none: some are
+    // needed where they are (to turn a wheel, or because only rescuing them opens the door)
+    const Goap::Plan leave = keptOn ? Goap::Plan{} : Goap::Planner::Find(domain.mStart, {{Key::kExited, 1}}, actions);
+    const bool wayOut = leave.mFound;
+    s32 plansFound = 0;
+    std::vector<Goap::Fact> bestFacts;
+    for (const auto& entry : order)
+    {
+        if (plansFound >= 3)
+        {
+            break;
+        }
+        const auto& goal = goals[entry.second];
         // Something else has a use for this Mudokon as it is (its rescue sets a switch, or it is one of the hands
         // for a set of wheels): it is left for that, whether or not the whole way out is known yet
         bool wanted = false;
@@ -294,6 +361,8 @@ bool Bot::Replan(BaseMap& map)
             }
             best = plan;
             bestGoal = goal.first;
+            bestFacts = goal.second;
+            plansFound++;
         }
         else if (!plan.mFound)
         {
@@ -302,28 +371,48 @@ bool Bot::Replan(BaseMap& map)
     }
     if (!best.mFound)
     {
-        const Goap::Plan plan = Goap::Planner::Find(domain.mStart, {{Key::kExited, 1}}, actions);
+        const Goap::Plan& plan = leave;
         if (plan.mFound && !plan.mSteps.empty())
         {
             best = plan;
             bestGoal = "Leave the path";
+            bestFacts = {{Key::kExited, 1}};
         }
         else
         {
             // No way out is known yet: change what can be changed, a door it opens may show one. Switches the
             // run has already set once are left alone, so it can't go round in circles.
+            // (the nearest looking first, and the first two that can be done are enough to choose from)
+            std::vector<std::pair<s32, Goap::Fact>> tries;
             for (const Goap::Fact& fact : domain.Reachable())
             {
                 if (fact.mKey < 1000 || fact.mKey >= 1000000 || mExplored.count({mAbe.mPath, fact.mKey}))
                 {
                     continue;
                 }
+                const s32 est = Goap::Planner::Short(domain.mStart, {fact}, actions);
+                if (est >= 0)
+                {
+                    tries.push_back({est, fact});
+                }
+            }
+            std::stable_sort(tries.begin(), tries.end(), [](const std::pair<s32, Goap::Fact>& a, const std::pair<s32, Goap::Fact>& b)
+                             { return a.first < b.first; });
+            for (const auto& entry : tries)
+            {
+                if (plansFound >= 2)
+                {
+                    break;
+                }
+                const Goap::Fact fact = entry.second;
                 const Goap::Plan sub = Goap::Planner::Find(domain.mStart, {fact}, actions);
                 if (sub.mFound && !sub.mSteps.empty() && (!best.mFound || sub.mCost < best.mCost))
                 {
                     best = sub;
                     bestGoal = "Try switch " + std::to_string(fact.mKey - 1000) + "=" + std::to_string(fact.mValue);
+                    bestFacts = {fact};
                     mExploring = fact.mKey;
+                    plansFound++;
                 }
                 else if (!sub.mFound)
                 {
@@ -355,7 +444,7 @@ bool Bot::Replan(BaseMap& map)
             }
         }
     }
-    else
+    else if (!keptOn)
     {
         mExploring = 0;
     }
@@ -365,9 +454,18 @@ bool Bot::Replan(BaseMap& map)
     }
 
     mPlanText.clear();
+    if (!keptOn)
+    {
+        mKeptGoal = bestFacts;
+        mKeptGoalName = bestGoal;
+        mKeptForMudokon = !bestFacts.empty() && bestFacts[0].mKey >= 1000000;
+        mKeptOpen = openGoals;
+    }
+    mKeptPlan.clear();
     for (s32 stepIdx : best.mSteps)
     {
         mPlanText += (mPlanText.empty() ? "" : ", ") + actions[stepIdx].mName;
+        mKeptPlan.push_back(actions[stepIdx].mName);
     }
     const Goap::Action& first = actions[best.mSteps[0]];
     if (first.mName != mTaskAction)
@@ -594,21 +692,21 @@ NavGraph::EdgeCost Bot::EdgeCostFn() const
         // Onto a lift's platform, or riding it: only where the lift is now
         const NavNode& from = know->mNav.Nodes()[e.mFrom];
         const NavNode& to = know->mNav.Nodes()[e.mTo];
-        const NavNode* stop = e.mKind == EdgeKind::eLift ? &from : (to.mLiftStop >= 0 && from.mLiftStop < 0 ? &to : nullptr);
+        // (a ride needs no such check: he is only ever on the platform where the lift is, and a way that rides
+        // it twice has it somewhere else by the second time)
+        const NavNode* stop = to.mLiftStop >= 0 && from.mLiftStop < 0 ? &to : nullptr;
         if (stop)
         {
-            // (one that isn't about yet, its camera not being loaded, is taken to be there)
-            bool known = false;
-            bool here = false;
-            for (const LiftAt& lift : world->mLifts)
+            if (!world->LiftAtStop(stop->mX, stop->mY, know->mNav.Input().mFeatures[stop->mLiftStop].mA != 0))
             {
-                if (stop->mX >= lift.mX1 && stop->mX <= lift.mX2)
-                {
-                    known = true;
-                    here = here || std::abs(lift.mY - stop->mY) <= 4;
-                }
+                return -1;
             }
-            if (known && !here)
+        }
+        // A jump over the shaft of a lift: only while the lift is away
+        if (e.mShaft >= 0)
+        {
+            const NavFeature& shaft = know->mNav.Input().mFeatures[e.mShaft];
+            if (world->LiftAtStop((shaft.mX1 + shaft.mX2) / 2, shaft.mY1, shaft.mA != 0))
             {
                 return -1;
             }
@@ -619,7 +717,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn() const
             return e.mCost + 150;
         }
         // Close by a bird portal its birds fly off, and that is the end of it until the screen comes round again
-        if (e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eRoll)
+        // (however he gets there: a well that throws him out beside it does the same)
         {
             for (const Entity& p : world->mEntities)
             {
@@ -1300,6 +1398,13 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
             for (const SlogAt& slog : mWorld.mSlogs)
             {
                 mTrace += " slog" + std::to_string(slog.mX) + "," + std::to_string(slog.mY) + (slog.mAsleep ? "z" : "");
+            }
+            for (const SweepAt& sweep : mWorld.mSweeps)
+            {
+                if (std::abs(sweep.mX1 - mAbe.mX) < 400 && std::abs(sweep.mY1 - mAbe.mY) < 260)
+                {
+                    mTrace += " drill" + std::to_string(sweep.mX1) + "," + std::to_string(sweep.mY1) + "," + std::to_string(sweep.mX2) + "," + std::to_string(sweep.mY2) + "p" + std::to_string(sweep.mPhase) + " top" + std::to_string(mAbe.mTop);
+                }
             }
             mTrace += "\n";
         }

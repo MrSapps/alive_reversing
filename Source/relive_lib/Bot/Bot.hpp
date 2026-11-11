@@ -132,6 +132,11 @@ public:
     // The cell Abe stands in, or -1
     s32 AbeNode() const;
     void BanEdge(s32 edge);
+    // A walk along an edge got nowhere: true from the second time on
+    bool NoteBlocked(s32 edge)
+    {
+        return ++mBlockedWalks[edge] >= 2;
+    }
     // A rock is about to be thrown at a mine: what comes of it is kept. A death before one of the other two is
     // called is put down to the throw.
     // Setting off past a drill now. A death soon after is put down to the timing, which the next try shifts.
@@ -245,6 +250,13 @@ private:
     std::map<std::string, s32> mFailedTotal;
     std::map<std::string, s32> mFailedActions;
     std::string mPlanText;
+    // The plan being followed, by its actions' names, and what it is for: kept while it still holds (see Replan)
+    std::vector<std::string> mKeptPlan;
+    std::vector<Goap::Fact> mKeptGoal;
+    std::string mKeptGoalName;
+    bool mKeptForMudokon = false;
+    // How many Mudokons could be got at when it was made
+    std::size_t mKeptOpen = 0;
     std::set<std::pair<s32, s32>> mVisitedPaths;
     LevelGraph mLevel;
     // Switches (by path and fact key) that have changed during the run, and the one being tried now
@@ -263,6 +275,7 @@ private:
     s32 mMissRewinds = 0;
     bool mSweepPending = false;
     u32 mSweepFrame = 0;
+    std::map<s32, s32> mBlockedWalks;
     s32 mSweepDeaths = 0;
     s32 mSweepStopFrame = -100000;
     // Deaths per cell (x, y): the same place over and over is not a matter of luck

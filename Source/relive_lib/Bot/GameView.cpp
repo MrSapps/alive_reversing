@@ -1,3 +1,4 @@
+#include <array>
 #include "GameView.hpp"
 #include "../BaseMap.hpp"
 #include "../BinaryPath.hpp"
@@ -239,6 +240,7 @@ AbeState GameView::ReadAbe(BaseMap& map)
     s.mVelYFp = pAbe->mVelY.fpValue;
     s.mFacingLeft = pAbe->GetAnimation().GetFlipX();
     s.mHalfScale = pAbe->GetSpriteScale() != FP_FromInteger(1);
+    s.mTop = pAbe->VGetBoundingRect().y;
     s.mMotion = pAbe->VGetMotion(eMotionType::eCurrentMotion);
     s.mAnimFrame = static_cast<s16>(pAbe->GetAnimation().GetCurrentFrame());
     s.mMove = ClassifyMotion(isAe, s.mMotion);
@@ -275,6 +277,7 @@ static s32 DirOf(s32 grabDirection)
 NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
 {
     NavInput in;
+    std::vector<std::array<s32, 3>> movers;
     const bool isAe = GetGameType() == GameType::eAe;
     in.mIsAe = isAe;
     in.mCamW = isAe ? 375 : 1024;
@@ -438,6 +441,25 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                 {
                     NavFeature f = MakeFeature(FeatureKind::eLiftStop, tlv, camera, id);
                     f.mHalf = static_cast<const relive::Path_LiftPoint&>(tlv).mScale == relive::reliveScale::eHalf;
+                    // (where the lift is to start with)
+                    f.mA = static_cast<const relive::Path_LiftPoint&>(tlv).mIsStartPoint ? 1 : 0;
+                    f.mB = static_cast<const relive::Path_LiftPoint&>(tlv).mLiftPointId;
+                    in.mFeatures.push_back(f);
+                    break;
+                }
+                case ReliveTypes::eLiftMover:
+                {
+                    const auto& t = static_cast<const relive::Path_LiftMover&>(tlv);
+                    movers.push_back({t.mLiftMoverSwitchId, t.mTargetLiftPointId, t.mMoveDirection == relive::Path_LiftMover::YDirection::eUp ? 1 : 0});
+                    break;
+                }
+                case ReliveTypes::eTrapDoor:
+                {
+                    const auto& t = static_cast<const relive::Path_TrapDoor&>(tlv);
+                    NavFeature f = MakeFeature(FeatureKind::eTrapDoor, tlv, camera, id);
+                    f.mHalf = t.mScale == relive::reliveScale::eHalf;
+                    f.mSwitch = t.mSwitchId;
+                    f.mStartClosed = t.mStartState == relive::Path_TrapDoor::StartState::eClosed;
                     in.mFeatures.push_back(f);
                     break;
                 }
@@ -463,6 +485,22 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                 default:
                     break;
             }
+        }
+    }
+    // A lift mover sends its lift all the way up or down once its switch is on: that stop then has the lift
+    for (const std::array<s32, 3>& mover : movers)
+    {
+        NavFeature* end = nullptr;
+        for (NavFeature& f : in.mFeatures)
+        {
+            if (f.mKind == FeatureKind::eLiftStop && f.mB == mover[1] && (!end || (mover[2] ? f.mY1 < end->mY1 : f.mY1 > end->mY1)))
+            {
+                end = &f;
+            }
+        }
+        if (end)
+        {
+            end->mSwitch = mover[0];
         }
     }
     return in;
@@ -530,11 +568,18 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mInputs[2] = t.mOffSpeed > 0 && t.mOffSpeed != 250 ? 1 : 0;
                     break;
                 }
+                case ReliveTypes::eMineCar:
+                    e.mKind = EntityKind::eMineCar;
+                    keep = GetGameType() == GameType::eAe;
+                    e.mHalf = static_cast<const relive::Path_MineCar&>(tlv).mScale == relive::reliveScale::eHalf;
+                    break;
                 case ReliveTypes::eRockSack:
                     e.mKind = EntityKind::eRockSack;
                     // (AO's give rocks another way, not done yet)
                     keep = GetGameType() == GameType::eAe;
                     e.mHalf = static_cast<const relive::Path_RockSack&>(tlv).mScale == relive::reliveScale::eHalf;
+                    // How many rocks it gives
+                    e.mInputs[0] = static_cast<const relive::Path_RockSack&>(tlv).mRockAmount;
                     break;
                 case ReliveTypes::ePullRingRope:
                 {
@@ -542,6 +587,8 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mKind = EntityKind::ePullRing;
                     e.mHalf = t.mScale == relive::reliveScale::eHalf;
                     e.mSwitch = t.mSwitchId;
+                    // (how far under its TLV's top the ring hangs: AE adds the rope's length)
+                    e.mInputs[0] = 24 + t.mRopeLength;
                     e.mOp = OpOf(t.mAction);
                     break;
                 }
@@ -561,6 +608,7 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mHalf = t.mScale == relive::reliveScale::eHalf;
                     e.mSwitch = t.mRescueSwitchId;
                     e.mState = static_cast<s32>(t.mEmotion);
+                    e.mBlind = t.mBlind;
                     break;
                 }
                 case ReliveTypes::eBirdPortal:
@@ -716,6 +764,19 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             if (pLine)
             {
                 world.mLifts.push_back({pLine->mRect.x, pLine->mRect.w, pLine->mRect.y});
+                bool had = false;
+                for (LiftAt& seen : world.mLiftsSeen)
+                {
+                    if (seen.mX1 == pLine->mRect.x)
+                    {
+                        seen = world.mLifts.back();
+                        had = true;
+                    }
+                }
+                if (!had)
+                {
+                    world.mLiftsSeen.push_back(world.mLifts.back());
+                }
             }
         }
     }
@@ -737,6 +798,25 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             slig.mAsleep = motion == (isAe ? 32 : 33);
             slig.mMotion = motion;
             world.mSligs.push_back(slig);
+        }
+    }
+
+    for (s32 i = 0; isAe && i < gBaseAliveGameObjects->Size(); i++)
+    {
+        BaseAliveGameObject* pObj = gBaseAliveGameObjects->ItemAt(i);
+        if (!pObj || pObj->GetDead() || pObj->Type() != ReliveTypes::eMineCar)
+        {
+            continue;
+        }
+        for (Entity& e : world.mEntities)
+        {
+            if (e.mKind == EntityKind::eMineCar)
+            {
+                e.mLive = true;
+                e.mLiveX = FP_GetExponent(pObj->mXPos);
+                e.mLiveY = FP_GetExponent(pObj->mYPos);
+                e.mState = sControlledCharacter == pObj ? 1 : 0;
+            }
         }
     }
 

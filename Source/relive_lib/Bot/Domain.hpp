@@ -39,6 +39,8 @@ enum class StepKind : u8
     eKill,      // slap Mudokon mEntity until it is dead
     eRocks,     // jump into rock sack mEntity and pick up what falls out
     eBlow,      // throw rocks at mine mEntity until it goes off
+    eSend,      // call blind Mudokon mEntity so that it walks to wheel mOther, and tell it to work
+    eRide,      // get into mine car mEntity, drive it to the cell mEdge and get out
 };
 
 // What a planned action means to the bot
@@ -71,6 +73,9 @@ struct ThrowSpot final
     // The switches of the mines that lie between: the rock would set the first of them off instead, so they
     // have to be gone
     std::vector<s32> mNeeds;
+    // A drill that goes to and fro where the rock would fly (its entity), or 0: while it runs the rock mostly
+    // hits it
+    u32 mDrill = 0;
 };
 
 // Who turns which wheel when several have to turn at once
@@ -111,6 +116,19 @@ struct Domain final
     static Domain Build(const NavGraph& nav, const World& world, s32 abeNode, const std::function<bool(s32 edge)>& edgeUsable, bool kills = false);
     // The cell Abe uses a lever, ring or wheel from, or stands at for a portal: -1 if there's none. faceLeft is the way to face.
     // firstSide: for a lever, the side of it tried first (-1 left of it, 1 right)
+    // The way a blind Mudokon can be walked from a cell to where it would see a portal open (on the portal's
+    // floor, no wall between, within a screen): along floors, off their ends, and down through a trap door it
+    // stands on. As edges. strict: only what is open and safe as things are now; else also what a switch would
+    // open or stop.
+    static bool BlindWay(const NavGraph& nav, const World& world, s32 from, const Entity& portal, bool strict, std::vector<s32>& way);
+    // Whether a cell is one to call a blind Mudokon from so that it walks to a wheel: on its screen (it hears
+    // nothing from another) and on the wheel's side of it
+    static bool CallSpot(const NavGraph& nav, const Entity& mud, const Entity& wheel, s32 node);
+    // The drill at a cell (one that comes down on it, or goes overhead), or null
+    // A sack that hangs over a gap, with no floor under it to jump up from: it is hit by a running jump off the
+    // end of a ledge beside it. The cell to start the run from, the take-off cell's x and the way to face.
+    static bool SackJump(const NavGraph& nav, const Entity& sack, s32* from, s32* takeoffX, bool* left);
+    static const Entity* DrillAt(const NavGraph& nav, const World& world, s32 node, bool high);
     static s32 UseNode(const NavGraph& nav, const Entity& entity, bool* faceLeft, s32 firstSide = -1);
     // The wheels a switch logic entity needs turned at once and the nearest Mudokons that can walk to them. False
     // if it isn't that kind of logic or there aren't enough Mudokons. pre gets what the action needs.
