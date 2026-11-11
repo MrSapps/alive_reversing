@@ -20,6 +20,10 @@ const char* EntityKindName(EntityKind kind)
         case EntityKind::eSecurityOrb: return "SecurityOrb";
         case EntityKind::eHandStone: return "HandStone";
         case EntityKind::eLaughingGas: return "LaughingGas";
+        case EntityKind::eTeleporter: return "Teleporter";
+        case EntityKind::eMine: return "Mine";
+        case EntityKind::eRockSack: return "RockSack";
+        case EntityKind::eDrill: return "Drill";
     }
     return "?";
 }
@@ -44,6 +48,16 @@ s32 Domain::UseNode(const NavGraph& nav, const Entity& entity, bool* faceLeft, s
                 {
                     node = nav.NodeAt(x, entity.mY2, entity.mHalf, 30);
                     left = side > 0;
+                    // (a cell nothing leads into is no place to stand, walled off as it is: the other side then)
+                    bool into = false;
+                    for (const NavEdge& e : nav.Edges())
+                    {
+                        into = into || e.mTo == node;
+                    }
+                    if (node >= 0 && i == 0 && !into)
+                    {
+                        node = -1;
+                    }
                 }
             }
             break;
@@ -64,6 +78,19 @@ s32 Domain::UseNode(const NavGraph& nav, const Entity& entity, bool* faceLeft, s
                 }
             }
             break;
+        case EntityKind::eRockSack:
+        {
+            // It hangs over the floor: the cell under it
+            s32 fy = 0;
+            if (nav.FloorBelow(cx, entity.mY1, entity.mHalf, &fy) >= 0 && fy - entity.mY2 <= (entity.mHalf ? 50 : 100))
+            {
+                node = nav.NodeAt(cx, fy, entity.mHalf, 8);
+            }
+            break;
+        }
+        case EntityKind::eMine:
+            node = nav.NodeAt(cx, entity.mY2, entity.mHalf, 30);
+            break;
         case EntityKind::eMudokon:
             // Its own cell: where Abe stands to talk to it is up to the task
             node = nav.NodeAt(entity.mLive ? entity.mLiveX : cx, entity.mLive ? entity.mLiveY : entity.mY2, entity.mHalf, 30);
@@ -76,6 +103,78 @@ s32 Domain::UseNode(const NavGraph& nav, const Entity& entity, bool* faceLeft, s
         *faceLeft = left;
     }
     return node;
+}
+
+std::vector<ThrowSpot> Domain::ThrowSpots(const NavGraph& nav, s32 x, s32 y, bool half, const World* world)
+{
+    struct Try final
+    {
+        ThrowSpot::Kind mKind;
+        s32 mLevel;
+        s32 mCells;
+    };
+    // In the order that has worked in the game: an up throw from four cells off under a ledge (measured on the
+    // Mines' path 4, where five and six fell short), a throw at the floor from five cells along it (the blast
+    // reaches four and a half), a crouched one from six, a forward one from ten
+    static const Try kTries[] = {
+        {ThrowSpot::eUp, -1, 4}, {ThrowSpot::eUp, -1, 5}, {ThrowSpot::eUp, -1, 3}, {ThrowSpot::eLob, -1, 3}, {ThrowSpot::eUp, -1, 6}, {ThrowSpot::eLob, -1, 2}, {ThrowSpot::eUp, -1, 7}, {ThrowSpot::eLob, -1, 4}, {ThrowSpot::eUp, -1, 2},
+        {ThrowSpot::eDown, 0, 5}, {ThrowSpot::eCrouched, 0, 6}, {ThrowSpot::eForward, 0, 10}, {ThrowSpot::eDown, 0, 6}, {ThrowSpot::eCrouched, 0, 7}, {ThrowSpot::eDown, 0, 7}, {ThrowSpot::eCrouched, 0, 8}, {ThrowSpot::eDown, 0, 8}, {ThrowSpot::eCrouched, 0, 9}, {ThrowSpot::eForward, 0, 11}, {ThrowSpot::eForward, 0, 12}, {ThrowSpot::eCrouched, 0, 5}, {ThrowSpot::eDown, 0, 4},
+        {ThrowSpot::eDown, 1, 5}, {ThrowSpot::eDown, 1, 6}, {ThrowSpot::eForward, 1, 8}, {ThrowSpot::eDown, 1, 4}, {ThrowSpot::eDown, 1, 7}, {ThrowSpot::eForward, 1, 7}, {ThrowSpot::eForward, 1, 9}, {ThrowSpot::eDown, 1, 3},
+        // (from above the rock bounces off the ledge's edge and the floor below: what hits is found by trying, and
+        // a miss is taken back, so the list is long)
+        {ThrowSpot::eCrouched, 1, 4}, {ThrowSpot::eCrouched, 1, 5}, {ThrowSpot::eCrouched, 1, 3}, {ThrowSpot::eCrouched, 1, 6}, {ThrowSpot::eDown, 1, 2}, {ThrowSpot::eCrouched, 1, 2}, {ThrowSpot::eCrouched, 1, 7}, {ThrowSpot::eUp, 1, 6}, {ThrowSpot::eUp, 1, 7}, {ThrowSpot::eUp, 1, 5}, {ThrowSpot::eUp, 1, 8}, {ThrowSpot::eForward, 1, 6}, {ThrowSpot::eForward, 1, 10}, {ThrowSpot::eUp, 1, 4}, {ThrowSpot::eCrouched, 1, 8}, {ThrowSpot::eForward, 1, 5},
+    };
+    const s32 scale = half ? 2 : 1;
+    std::vector<ThrowSpot> spots;
+    for (std::size_t i = 0; i < nav.Nodes().size(); i++)
+    {
+        const NavNode& n = nav.Nodes()[i];
+        // (where a mine was is a place to stand once it is gone)
+        // (nor where a drill comes by: a throw takes too long)
+        if (n.mHalf != half || (n.mHazard && n.mClear < 0) || (n.mSweep >= 0 && (!world || world->SweepOver(n.mX, n.mY, n.mHalf))))
+        {
+            continue;
+        }
+        // Crouching at the top of a hoist is climbing down it
+        bool hoistTop = false;
+        for (s32 e = n.mFirstEdge; e < n.mFirstEdge + n.mEdgeCount; e++)
+        {
+            hoistTop = hoistTop || nav.Edges()[e].mKind == EdgeKind::eHoistDown;
+        }
+        const s32 dy = (n.mY - y) * scale;
+        const s32 level = std::abs(dy) <= 10 ? 0 : (dy >= 60 && dy <= 140 ? -1 : (dy <= -60 && dy >= -140 ? 1 : 2));
+        const s32 cells = (std::abs(n.mX - x) * scale + 12) / 25;
+        for (std::size_t k = 0; level != 2 && k < sizeof(kTries) / sizeof(kTries[0]); k++)
+        {
+            // (under a low ceiling there is only the crouched throw)
+            if (kTries[k].mLevel == level && kTries[k].mCells == cells && (!n.mLow || kTries[k].mKind == ThrowSpot::eCrouched) && (!hoistTop || kTries[k].mKind != ThrowSpot::eCrouched))
+            {
+                ThrowSpot spot;
+                spot.mNode = static_cast<s32>(i);
+                spot.mKind = kTries[k].mKind;
+                spot.mOrder = static_cast<s32>(k);
+                spot.mCells = cells;
+                spot.mLevel = level;
+                const s32 step = NavGraph::GridStep(half);
+                if (n.mClear >= 0)
+                {
+                    spot.mNeeds.push_back(nav.Input().mFeatures[n.mClear].mSwitch);
+                }
+                for (s32 c = 1; level == 0 && c < cells; c++)
+                {
+                    const s32 between = nav.NodeAt(n.mX + (x > n.mX ? c : -c) * step, n.mY, half, 8);
+                    if (between >= 0 && nav.Nodes()[between].mClear >= 0)
+                    {
+                        spot.mNeeds.push_back(nav.Input().mFeatures[nav.Nodes()[between].mClear].mSwitch);
+                    }
+                }
+                spots.push_back(spot);
+            }
+        }
+    }
+    std::stable_sort(spots.begin(), spots.end(), [](const ThrowSpot& a, const ThrowSpot& b)
+                     { return a.mOrder < b.mOrder; });
+    return spots;
 }
 
 bool Domain::PlanTogether(const NavGraph& nav, const World& world, const Entity& logic, Team& team, std::vector<Goap::Fact>& pre)
@@ -226,6 +325,10 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
     {
         d.mStart.Set(Key::kRegion, d.mRegions[abeNode] + 1);
     }
+    if (world.mRocks > 0)
+    {
+        d.mStart.Set(Key::kRocks, 1);
+    }
 
     // From region to region
     std::set<std::tuple<s32, s32, s32>> seen;
@@ -341,6 +444,42 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 break;
             }
 
+            case EntityKind::eRockSack:
+            {
+                const s32 node = UseNode(nav, entity, nullptr);
+                if (node >= 0)
+                {
+                    step.mKind = StepKind::eRocks;
+                    add("Get rocks from " + name, {regionFact(node)}, {{Key::kRocks, 1}}, 300, step);
+                }
+                break;
+            }
+
+            case EntityKind::eMine:
+            {
+                if (entity.mGone)
+                {
+                    d.mStart.Set(Key::Switch(entity.mSwitch), 1);
+                    break;
+                }
+                // From any region there is a place to throw from
+                std::set<s32> from;
+                for (const ThrowSpot& spot : ThrowSpots(nav, entity.CentreX(), entity.mY2, entity.mHalf, &world))
+                {
+                    if (from.insert(d.mRegions[spot.mNode]).second)
+                    {
+                        step.mKind = StepKind::eBlow;
+                        std::vector<Goap::Fact> pre{regionFact(spot.mNode), {Key::kRocks, 1}};
+                        for (s32 need : spot.mNeeds)
+                        {
+                            pre.push_back({Key::Switch(need), 1});
+                        }
+                        add("Blow up " + name + " from " + std::to_string(nav.Nodes()[spot.mNode].mX) + "," + std::to_string(nav.Nodes()[spot.mNode].mY), pre, {{Key::Switch(entity.mSwitch), 1}}, 300, step);
+                    }
+                }
+                break;
+            }
+
             case EntityKind::eMudokon:
             {
                 if (entity.mGone)
@@ -361,7 +500,24 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                     kill.mEntity = entity.mId;
                     add("Kill " + name, {regionFact(node), {Key::Mud(entity.mId), 0}}, {{Key::Mud(entity.mId), 2}}, 500, kill);
                 }
-                // The nearest portal it can walk to with Abe
+                // The nearest portal it can walk to with Abe: it walks, drops off ends and rides lifts, and climbs nothing
+                std::vector<bool> walks(nav.Nodes().size(), false);
+                walks[node] = true;
+                for (bool more = true; more;)
+                {
+                    more = false;
+                    for (const NavEdge& edge : nav.Edges())
+                    {
+                        // (a hop along one floor is over something lying on it, which can be dealt with: not a gap)
+                        const bool sameFloor = nav.Nodes()[edge.mFrom].mLine == nav.Nodes()[edge.mTo].mLine;
+                        const bool can = edge.mKind == EdgeKind::eWalk || edge.mKind == EdgeKind::eFall || edge.mKind == EdgeKind::eLift || edge.mKind == EdgeKind::eRoll || ((edge.mKind == EdgeKind::eHop || edge.mKind == EdgeKind::eRunJump) && sameFloor);
+                        if (can && walks[edge.mFrom] && !walks[edge.mTo])
+                        {
+                            walks[edge.mTo] = true;
+                            more = true;
+                        }
+                    }
+                }
                 const Entity* best = nullptr;
                 s32 bestDist = 0;
                 for (const Entity& portal : world.mEntities)
@@ -370,8 +526,13 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                     {
                         continue;
                     }
+                    // Gone for good (the switch that does it is often the rescue it was put there for)
+                    if (portal.mInputs[1] > 1 && world.Switch(portal.mInputs[1]))
+                    {
+                        continue;
+                    }
                     const s32 pnode = UseNode(nav, portal, nullptr);
-                    if (pnode < 0 || d.mRegions[pnode] != d.mRegions[node])
+                    if (pnode < 0 || d.mRegions[pnode] != d.mRegions[node] || !walks[pnode])
                     {
                         continue;
                     }
@@ -393,7 +554,13 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 {
                     effects.push_back({Key::Switch(entity.mSwitch), 1});
                 }
-                add("Rescue " + name + " via BirdPortal#" + std::to_string(best->mId), {regionFact(node), {Key::Mud(entity.mId), 0}}, effects, 400 + bestDist / 4, step);
+                std::vector<Goap::Fact> pre{regionFact(node), {Key::Mud(entity.mId), 0}};
+                if (best->mInputs[0] > 1)
+                {
+                    // The portal isn't there until its switch is on
+                    pre.push_back({Key::Switch(best->mInputs[0]), 1});
+                }
+                add("Rescue " + name + " via BirdPortal#" + std::to_string(best->mId), pre, effects, 400 + bestDist / 4, step);
                 d.mRescuable.push_back(entity.mId);
                 break;
             }

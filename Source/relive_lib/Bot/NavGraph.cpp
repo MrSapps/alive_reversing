@@ -16,6 +16,7 @@ static const s32 kBgWallLeft = 5;
 static const s32 kBgWallRight = 6;
 
 // Rough frames
+static const s32 kSweepReach = 20;
 static const s32 kWalkCost = 6;
 static const s32 kRollCost = 5;
 static const s32 kHopCost = 26;
@@ -356,6 +357,19 @@ s32 NavGraph::BarrierBetween(s32 xa, s32 xb, s32 y, bool half) const
 
 bool NavGraph::Condition(const NavEdge& edge, s32* switchId, s32* openValue) const
 {
+    if (edge.mClear >= 0)
+    {
+        // Into a cell with a mine: open once it is gone, which the world gives as a switch of its own
+        if (switchId)
+        {
+            *switchId = mInput.mFeatures[edge.mClear].mSwitch;
+        }
+        if (openValue)
+        {
+            *openValue = 1;
+        }
+        return true;
+    }
     if (edge.mFeature < 0)
     {
         return false;
@@ -672,13 +686,28 @@ void NavGraph::Build(const NavInput& input)
                 if (f.mKind == FeatureKind::eHazard && f.mHalf == half && x >= f.mX1 - 6 && x <= f.mX2 + 6 && n.mY >= f.mY1 - 10 && n.mY <= f.mY2 + 10)
                 {
                     n.mHazard = true;
+                    if (f.mSwitch > 0)
+                    {
+                        n.mClear = static_cast<s32>(&f - mInput.mFeatures.data());
+                    }
                 }
             }
             n.mLow = CeilingOver(x, n.mY, half);
             for (const NavFeature& f : mInput.mFeatures)
             {
-                // All of him has to be in it
-                if (f.mKind == FeatureKind::eInvisibleZone && x - 12 >= f.mX1 && x + 12 <= f.mX2 && n.mY >= f.mY1 + 40 && n.mY <= f.mY2 + 4)
+                // (it kills what its rectangle touches with its middle no more than 3 from it: its width is not
+                // in the path's data, half a cell either side covers what was measured)
+                const s32 tall = half ? 30 : 60;
+                if (f.mKind == FeatureKind::eSweep && f.mHalf == half && x >= f.mX1 - kSweepReach && x <= f.mX2 + kSweepReach && n.mY - tall <= f.mY2 && n.mY >= f.mY1)
+                {
+                    n.mSweep = static_cast<s32>(&f - mInput.mFeatures.data());
+                }
+            }
+            for (const NavFeature& f : mInput.mFeatures)
+            {
+                // All of him has to be in it, and he is wider than he looks: with 12 either side he was shot in
+                // the edge cells of the Mines' shadows
+                if (f.mKind == FeatureKind::eInvisibleZone && x - (half ? 13 : 25) >= f.mX1 && x + (half ? 13 : 25) <= f.mX2 && n.mY >= f.mY1 + 40 && n.mY <= f.mY2 + 4)
                 {
                     n.mHidden = true;
                 }
@@ -695,7 +724,9 @@ void NavGraph::Build(const NavInput& input)
         const NavNode& n = mNodes[i];
         const s32 from = static_cast<s32>(i);
         const s32 step = GridStep(n.mHalf);
-        if (n.mHazard)
+        // (a cell with a mine in it is floor like any other once the mine is blown up: its edges are made, and
+        // marked below as waiting for that)
+        if (n.mHazard && n.mClear < 0)
         {
             continue;
         }
@@ -716,7 +747,7 @@ void NavGraph::Build(const NavInput& input)
             if (nearLine >= 0)
             {
                 const s32 to = NodeOnLine(nearLine, nx);
-                if (to >= 0 && std::abs(mNodes[to].mX - nx) <= step / 2 && !mNodes[to].mHazard)
+                if (to >= 0 && std::abs(mNodes[to].mX - nx) <= step / 2 && (!mNodes[to].mHazard || mNodes[to].mClear >= 0))
                 {
                     const bool roll = standingWall || n.mLow || mNodes[to].mLow;
                     AddEdge(edges, from, to, roll ? EdgeKind::eRoll : EdgeKind::eWalk, roll ? kRollCost : kWalkCost, BarrierBetween(n.mX, n.mX + dir * step, n.mY, n.mHalf), left);
@@ -767,7 +798,7 @@ void NavGraph::Build(const NavInput& input)
                     if (!deadly)
                     {
                         const s32 to = NodeOnLine(belowLine, nx);
-                        if (to >= 0 && !mNodes[to].mHazard)
+                        if (to >= 0 && (!mNodes[to].mHazard || mNodes[to].mClear >= 0))
                         {
                             AddEdge(edges, from, to, EdgeKind::eFall, 20 + height / 4, -1, left);
                         }
@@ -942,6 +973,11 @@ void NavGraph::Build(const NavInput& input)
         }
     }
 
+    // Into a cell with a mine, or out of one: not until the mine is gone
+    for (NavEdge& e : edges)
+    {
+        e.mClear = mNodes[e.mTo].mClear >= 0 ? mNodes[e.mTo].mClear : mNodes[e.mFrom].mClear;
+    }
     std::stable_sort(edges.begin(), edges.end(), [](const NavEdge& a, const NavEdge& b)
                      { return a.mFrom < b.mFrom; });
     mEdges = std::move(edges);

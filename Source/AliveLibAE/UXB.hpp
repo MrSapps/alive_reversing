@@ -51,6 +51,15 @@ public:
     virtual void VRender(OrderingTable& ot) override;
     virtual void VScreenChanged() override;
     virtual void VOnAbeInteraction() override;
+    // For the bot: a slap now turns it off (its light is on green), and it is off
+    bool IsGreen() const
+    {
+        return mCurrentState != UXBState::eExploding && mCurrentState != UXBState::eDeactivated && mRedBlinkCount == 0;
+    }
+    bool IsOff() const
+    {
+        return mCurrentState == UXBState::eDeactivated;
+    }
     virtual void VOnThrowableHit(BaseGameObject* pFrom) override;
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
 

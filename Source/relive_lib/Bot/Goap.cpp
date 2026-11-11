@@ -101,17 +101,136 @@ State Planner::Apply(const State& start, const Plan& plan, const std::vector<Act
     return state;
 }
 
-Plan Planner::Find(const State& start, const std::vector<Fact>& goal, const std::vector<Action>& actions, s32 maxExpanded)
+// The actions worth searching with. Costs are worked out as if nothing an action did were ever undone (each fact
+// at the price of the cheapest action that gives it, on top of the dearest thing that action needs): the actions
+// that way to the goal uses, and with them every action that only moves between the facts those touch (the ways
+// back). reachable is false when even so the goal can't be had.
+static std::vector<bool> Support(const State& start, const std::vector<Fact>& goal, const std::vector<Action>& actions, const std::vector<bool>& relevant, bool& reachable)
 {
-    Plan plan;
-    if (start.HasAll(goal))
+    using Key = std::pair<u32, s32>;
+    std::map<Key, s32> price;
+    std::map<Key, s32> giver;
+    const auto priceOf = [&](const Fact& f) -> s32
     {
-        plan.mFound = true;
-        return plan;
+        if (start.Has(f))
+        {
+            return 0;
+        }
+        const auto it = price.find({f.mKey, f.mValue});
+        return it == price.end() ? -1 : it->second;
+    };
+    for (bool more = true; more;)
+    {
+        more = false;
+        for (std::size_t a = 0; a < actions.size(); a++)
+        {
+            if (!relevant[a])
+            {
+                continue;
+            }
+            s32 need = 0;
+            for (const Fact& p : actions[a].mPre)
+            {
+                const s32 c = priceOf(p);
+                need = c < 0 || need < 0 ? -1 : std::max(need, c);
+            }
+            if (need < 0)
+            {
+                continue;
+            }
+            const s32 total = need + std::max(1, actions[a].mCost);
+            for (const Fact& e : actions[a].mEffects)
+            {
+                const s32 had = priceOf(e);
+                if (had < 0 || total < had)
+                {
+                    price[{e.mKey, e.mValue}] = total;
+                    giver[{e.mKey, e.mValue}] = static_cast<s32>(a);
+                    more = true;
+                }
+            }
+        }
     }
 
-    const std::vector<bool> relevant = Relevant(goal, actions);
+    std::vector<bool> use(actions.size(), false);
+    reachable = true;
+    std::vector<Fact> todo = goal;
+    std::set<u32> touched;
+    for (const Fact& f : start.Facts())
+    {
+        touched.insert(f.mKey);
+    }
+    while (!todo.empty())
+    {
+        const Fact f = todo.back();
+        todo.pop_back();
+        touched.insert(f.mKey);
+        if (start.Has(f))
+        {
+            continue;
+        }
+        const auto it = giver.find({f.mKey, f.mValue});
+        if (it == giver.end())
+        {
+            reachable = false;
+            return use;
+        }
+        if (!use[it->second])
+        {
+            use[it->second] = true;
+            for (const Fact& p : actions[it->second].mPre)
+            {
+                todo.push_back(p);
+            }
+            for (const Fact& e : actions[it->second].mEffects)
+            {
+                touched.insert(e.mKey);
+            }
+        }
+    }
+    // What those facts are about is all a plan can need to change: an action is of use if every fact it gives is
+    // one of those values or about one of those keys
+    std::set<Key> values;
+    for (std::size_t a = 0; a < actions.size(); a++)
+    {
+        for (const Fact& f : use[a] ? actions[a].mPre : std::vector<Fact>{})
+        {
+            values.insert({f.mKey, f.mValue});
+        }
+        for (const Fact& f : use[a] ? actions[a].mEffects : std::vector<Fact>{})
+        {
+            values.insert({f.mKey, f.mValue});
+        }
+    }
+    for (const Fact& f : start.Facts())
+    {
+        values.insert({f.mKey, f.mValue});
+    }
+    for (const Fact& f : goal)
+    {
+        values.insert({f.mKey, f.mValue});
+    }
+    for (std::size_t a = 0; a < actions.size(); a++)
+    {
+        bool all = relevant[a] && !use[a];
+        for (const Fact& e : actions[a].mEffects)
+        {
+            all = all && (values.count({e.mKey, e.mValue}) || (e.mValue == 0 && touched.count(e.mKey)));
+        }
+        for (const Fact& p : actions[a].mPre)
+        {
+            all = all && (values.count({p.mKey, p.mValue}) || (p.mValue == 0 && touched.count(p.mKey)) || start.Has(p));
+        }
+        if (all)
+        {
+            use[a] = true;
+        }
+    }
+    return use;
+}
 
+static void Search(const State& start, const std::vector<Fact>& goal, const std::vector<Action>& actions, const std::vector<bool>& relevant, s32 maxExpanded, Plan& plan)
+{
     struct Node final
     {
         State mState;
@@ -128,6 +247,8 @@ Plan Planner::Find(const State& start, const std::vector<Fact>& goal, const std:
     nodes.push_back({start, 0, -1, -1});
     best[start] = 0;
     open.push({0, 0});
+    plan.mExpanded = 0;
+    plan.mMiss.clear();
 
     while (!open.empty())
     {
@@ -147,12 +268,12 @@ Plan Planner::Find(const State& start, const std::vector<Fact>& goal, const std:
                 plan.mSteps.push_back(nodes[at].mAction);
             }
             std::reverse(plan.mSteps.begin(), plan.mSteps.end());
-            return plan;
+            return;
         }
         if (++plan.mExpanded > maxExpanded)
         {
             plan.mMiss = "search gave up after " + std::to_string(maxExpanded) + " states";
-            return plan;
+            return;
         }
 
         for (std::size_t a = 0; a < actions.size(); a++)
@@ -180,6 +301,34 @@ Plan Planner::Find(const State& start, const std::vector<Fact>& goal, const std:
             nodes.push_back({std::move(next), cost, idx, static_cast<s32>(a)});
             open.push({cost, static_cast<s32>(nodes.size()) - 1});
         }
+    }
+}
+
+Plan Planner::Find(const State& start, const std::vector<Fact>& goal, const std::vector<Action>& actions, s32 maxExpanded)
+{
+    Plan plan;
+    if (start.HasAll(goal))
+    {
+        plan.mFound = true;
+        return plan;
+    }
+
+    const std::vector<bool> relevant = Relevant(goal, actions);
+    // With many things that can each be done or not (a floor of mines) the states to search are without number:
+    // first with only the actions a plan would use, and all of them only if that finds nothing
+    bool reachable = false;
+    const std::vector<bool> support = Support(start, goal, actions, relevant, reachable);
+    if (reachable)
+    {
+        Search(start, goal, actions, support, maxExpanded, plan);
+        if (!plan.mFound && support != relevant)
+        {
+            Search(start, goal, actions, relevant, maxExpanded / 4, plan);
+        }
+    }
+    if (plan.mFound || !plan.mMiss.empty())
+    {
+        return plan;
     }
 
     // Nothing left to try: say which goal facts nothing gives

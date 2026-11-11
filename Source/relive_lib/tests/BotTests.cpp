@@ -7,6 +7,7 @@
 #include "Bot/Pilot.hpp"
 #include "Bot/Profile.hpp"
 #include "Bot/Task.hpp"
+#include "Bot/World.hpp"
 
 using namespace Bot;
 
@@ -524,6 +525,74 @@ static const NavEdge* FindEdge(const NavGraph& g, s32 from, s32 to, EdgeKind kin
     return nullptr;
 }
 
+TEST(BotNav, AMineCellOpensWhenTheMineIsGone)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 300, 100, 0));
+    NavFeature mineFeature = Feature(FeatureKind::eHazard, 151, 80, 174, 104);
+    mineFeature.mSwitch = World::HazardSwitch(7);
+    in.mFeatures.push_back(mineFeature);
+    NavGraph g;
+    g.Build(in);
+    const s32 mine = g.NodeAt(162, 100, false);
+    ASSERT_GE(mine, 0);
+    EXPECT_TRUE(g.Nodes()[mine].mHazard);
+
+    // Into its cell and out of it there are edges now, each waiting for the mine's switch
+    const NavEdge* in1 = FindEdge(g, g.NodeAt(137, 100, false), mine, EdgeKind::eWalk);
+    const NavEdge* out1 = FindEdge(g, mine, g.NodeAt(187, 100, false), EdgeKind::eWalk);
+    ASSERT_NE(in1, nullptr);
+    ASSERT_NE(out1, nullptr);
+    s32 sw = 0;
+    s32 value = 0;
+    ASSERT_TRUE(g.Condition(*in1, &sw, &value));
+    EXPECT_EQ(sw, World::HazardSwitch(7));
+    EXPECT_EQ(value, 1);
+    EXPECT_TRUE(g.Condition(*out1, nullptr, nullptr));
+    // The cell is a region of its own
+    const std::vector<s32> regions = g.Regions();
+    EXPECT_NE(regions[mine], regions[g.NodeAt(137, 100, false)]);
+    EXPECT_NE(regions[mine], regions[g.NodeAt(187, 100, false)]);
+
+    // While it is there the way is still the hop over it; gone, it is walked through
+    const auto cost = [&g](bool gone)
+    {
+        return [&g, gone](const NavEdge& e) -> s32
+        {
+            return g.Condition(e, nullptr, nullptr) && !gone ? -1 : e.mCost;
+        };
+    };
+    std::vector<s32> path;
+    ASSERT_TRUE(g.FindPath(g.NodeAt(112, 100, false), g.NodeAt(212, 100, false), cost(false), path));
+    s32 hops = 0;
+    for (s32 e : path)
+    {
+        EXPECT_NE(g.Edges()[e].mTo, mine);
+        hops += g.Edges()[e].mKind == EdgeKind::eHop ? 1 : 0;
+    }
+    EXPECT_EQ(hops, 1);
+    ASSERT_TRUE(g.FindPath(g.NodeAt(137, 100, false), g.NodeAt(187, 100, false), cost(true), path));
+    ASSERT_EQ(path.size(), 2u);
+    EXPECT_EQ(g.Edges()[path[0]].mTo, mine);
+}
+
+TEST(BotNav, AHazardThatStaysIsStillNoCell)
+{
+    // A UXB has no switch of its own: nothing leads into its cell
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 300, 100, 0));
+    in.mFeatures.push_back(Feature(FeatureKind::eHazard, 151, 80, 174, 104));
+    NavGraph g;
+    g.Build(in);
+    const s32 uxb = g.NodeAt(162, 100, false);
+    for (const NavEdge& e : g.Edges())
+    {
+        EXPECT_NE(e.mTo, uxb);
+        EXPECT_NE(e.mFrom, uxb);
+        EXPECT_FALSE(g.Condition(e, nullptr, nullptr));
+    }
+}
+
 TEST(BotNav, ALowCeilingIsRolledUnder)
 {
     NavInput in;
@@ -1007,6 +1076,51 @@ TEST(BotTasks, ASlogTrapNeedsWallsAndTheirLeverOnTheFloor)
     EXPECT_FALSE(SlogTrapTask::AnyAwake(world));
 }
 
+TEST(BotTasks, QuietLastsUntilTheSligTurnsAtTheEndOfItsBeat)
+{
+    std::vector<SligAt> sligs(1);
+    sligs[0].mX = 600;
+    sligs[0].mY = 399;
+    sligs[0].mFacingLeft = true;
+    std::vector<SligBeat> beats = {{400, false, 300, 900}};
+
+    // The Mudokon is at 800, Abe's screen is 750 to 1125: the Slig is off it, walking away to 300
+    EXPECT_EQ(World::QuietFrames(sligs, beats, 800, 400, false, 750, 1125), 150);
+    // Still on the screen it would turn to a sound
+    EXPECT_EQ(World::QuietFrames(sligs, beats, 800, 400, false, 375, 1125), 0);
+    // Facing that way it shoots at what the Mudokon says
+    sligs[0].mFacingLeft = false;
+    EXPECT_EQ(World::QuietFrames(sligs, beats, 800, 400, false, 750, 1125), 0);
+    // A beat not seen yet can't be counted on
+    sligs[0].mFacingLeft = true;
+    beats[0].mMinX = 590;
+    beats[0].mMaxX = 610;
+    EXPECT_EQ(World::QuietFrames(sligs, beats, 800, 400, false, 750, 1125), 0);
+    // Another floor, a sleeping Slig, no Slig: all the quiet in the world
+    EXPECT_GT(World::QuietFrames(sligs, beats, 800, 520, false, 750, 1125), 10000);
+    sligs[0].mAsleep = true;
+    EXPECT_GT(World::QuietFrames(sligs, beats, 800, 400, false, 750, 1125), 10000);
+    EXPECT_GT(World::QuietFrames({}, beats, 800, 400, false, 750, 1125), 10000);
+}
+
+TEST(BotTasks, AUxbUnderAHopIsFoundWhileItIsOn)
+{
+    World world;
+    UxbAt uxb;
+    uxb.mX = 1713;
+    uxb.mY = 1400;
+    world.mUxbs.push_back(uxb);
+
+    // Either way over it
+    EXPECT_NE(DisarmTask::Under(world, 1762, 1687, 1400, false), nullptr);
+    EXPECT_NE(DisarmTask::Under(world, 1687, 1762, 1400, false), nullptr);
+    // A hop beside it, one on another floor, and one over it once it is off
+    EXPECT_EQ(DisarmTask::Under(world, 1687, 1612, 1400, false), nullptr);
+    EXPECT_EQ(DisarmTask::Under(world, 1762, 1687, 1500, false), nullptr);
+    world.mUxbs[0].mOff = true;
+    EXPECT_EQ(DisarmTask::Under(world, 1762, 1687, 1400, false), nullptr);
+}
+
 TEST(BotTasks, ASligWatchesItsOwnFloorWhenAwake)
 {
     World world;
@@ -1064,6 +1178,263 @@ TEST(BotTasks, AsASligWalksUpTurnsAndShoots)
     mud.mLiveY = 500;
     EXPECT_FALSE(ClearSligTask::Target(world, me, &mud, x));
     EXPECT_EQ(ClearSligTask::AsSlig(me, nullptr), 0u);
+}
+
+TEST(BotTasks, ASligShootsOverAMudokonThatHasDucked)
+{
+    World world;
+    SligAt me;
+    me.mX = 500;
+    me.mY = 400;
+    me.mPossessed = true;
+    Entity mud = MakeEntity(EntityKind::eMudokon, 7, 600, 380, 624, 400);
+    mud.mLive = true;
+    mud.mLiveX = 612;
+    mud.mLiveY = 400;
+    mud.mLiveTop = 345;
+    world.mEntities.push_back(mud);
+
+    // Standing between the Slig and what it shoots at, it would take the bullet
+    EXPECT_FALSE(ClearSligTask::LevelShotClear(world, me, 800, 0));
+    // Not when it is the one to shoot, behind the target, or on the other side
+    EXPECT_TRUE(ClearSligTask::LevelShotClear(world, me, 800, 7));
+    EXPECT_TRUE(ClearSligTask::LevelShotClear(world, me, 560, 0));
+    EXPECT_TRUE(ClearSligTask::LevelShotClear(world, me, 200, 0));
+    // Ducked, it is under the gun
+    world.mEntities[0].mLiveTop = 398;
+    EXPECT_TRUE(ClearSligTask::LevelShotClear(world, me, 800, 0));
+}
+
+TEST(BotTasks, AShotFromBehindTakesWhatIsNearest)
+{
+    World world;
+    SligAt me;
+    me.mX = 3137;
+    me.mY = 1361;
+    me.mHalf = true;
+    me.mPossessed = true;
+    Entity mud = MakeEntity(EntityKind::eMudokon, 7, 3150, 1380, 3174, 1400);
+    mud.mLive = true;
+    mud.mLiveX = 3162;
+    mud.mLiveY = 1400;
+    world.mEntities.push_back(mud);
+
+    // The Slig in front is nearer than the Mudokon and stays so
+    EXPECT_TRUE(ClearSligTask::BehindShotClear(world, me, 3137, 3137));
+    // Walking off towards the Mudokon, it won't be by the time the shot goes off
+    EXPECT_FALSE(ClearSligTask::BehindShotClear(world, me, 3140, 3160));
+    // Too far to the side to be hit at all
+    EXPECT_FALSE(ClearSligTask::BehindShotClear(world, me, 3037, 3037));
+    // Right behind the Mudokon it is the Mudokon that gets it
+    me.mX = 3162;
+    EXPECT_FALSE(ClearSligTask::BehindShotClear(world, me, 3170, 3170));
+}
+
+TEST(BotTasks, ATeleporterLeadsToAFloorNotSeenYet)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 300, 100, 0));
+    in.mLines.push_back(Line(400, 200, 700, 200, 0));
+    NavGraph g;
+    g.Build(in);
+    World world;
+    Entity a = MakeEntity(EntityKind::eTeleporter, 1, 100, 80, 124, 100);
+    a.mCamera = 1;
+    a.mInputs[0] = 2;
+    a.mInputs[1] = 10;
+    a.mInputs[2] = 11;
+    world.mEntities.push_back(a);
+    Entity b = MakeEntity(EntityKind::eTeleporter, 2, 500, 180, 524, 200);
+    b.mCamera = 2;
+    b.mInputs[0] = 1;
+    b.mInputs[1] = 11;
+    b.mInputs[2] = 10;
+    world.mEntities.push_back(b);
+    const s32 first = g.Nodes()[g.NodeAt(112, 100, false)].mLine;
+    const s32 second = g.Nodes()[g.NodeAt(512, 200, false)].mLine;
+
+    const Entity* dest = nullptr;
+    const Entity* tele = ClearSligTask::NextTeleporter(g, world, 0, 300, 100, false, {first}, &dest);
+    ASSERT_NE(tele, nullptr);
+    EXPECT_EQ(tele->mId, 1u);
+    ASSERT_NE(dest, nullptr);
+    EXPECT_EQ(dest->mId, 2u);
+    // Not back to where it has been, and not one that is off its floor
+    EXPECT_EQ(ClearSligTask::NextTeleporter(g, world, 400, 700, 200, false, {first, second}, nullptr), nullptr);
+    EXPECT_EQ(ClearSligTask::NextTeleporter(g, world, 150, 300, 100, false, {first}, nullptr), nullptr);
+}
+
+TEST(BotDomain, AMudokonIsSentThroughAPortalItCanWalkTo)
+{
+    // Two floors and a hoist between them: Abe gets to both portals, the Mudokon only to the one on its floor,
+    // though the other is nearer
+    NavInput in;
+    in.mLines.push_back(Line(0, 200, 1600, 200, 0));
+    in.mLines.push_back(Line(300, 100, 500, 100, 0));
+    in.mFeatures.push_back(Feature(FeatureKind::eHoist, 350, 100, 374, 195));
+    NavGraph g;
+    g.Build(in);
+    World world;
+    world.mEntities.push_back(MakeEntity(EntityKind::eMudokon, 1002, 400, 180, 424, 200));
+    Entity up = MakeEntity(EntityKind::eBirdPortal, 1003, 400, 80, 424, 100);
+    up.mRescuePortal = true;
+    world.mEntities.push_back(up);
+    Entity along = MakeEntity(EntityKind::eBirdPortal, 1004, 1500, 180, 1524, 200);
+    along.mRescuePortal = true;
+    world.mEntities.push_back(along);
+
+    const Domain domain = Domain::Build(g, world, g.NodeAt(12, 200, false), nullptr);
+    ASSERT_EQ(domain.mRescuable.size(), 1u);
+    bool found = false;
+    for (const DomainStep& step : domain.mSteps)
+    {
+        if (step.mKind == StepKind::eRescue)
+        {
+            found = true;
+            EXPECT_EQ(step.mOther, 1004u);
+        }
+    }
+    EXPECT_TRUE(found);
+}
+
+static NavInput CorridorWithMines()
+{
+    // Six mines in a row: too many to hop or to clear with a running jump
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 800, 100, 0));
+    for (s32 i = 0; i < 6; i++)
+    {
+        NavFeature mine = Feature(FeatureKind::eHazard, 400 + i * 25, 80, 424 + i * 25, 104);
+        mine.mSwitch = World::HazardSwitch(2000 + i);
+        in.mFeatures.push_back(mine);
+    }
+    NavFeature exit = Feature(FeatureKind::eDoor, 700, 80, 724, 104);
+    exit.mDestPath = 2;
+    exit.mDestCamera = 1;
+    in.mFeatures.push_back(exit);
+    return in;
+}
+
+static World WorldWithMines(bool sack)
+{
+    World world;
+    for (u32 i = 0; i < 6; i++)
+    {
+        Entity mine = MakeEntity(EntityKind::eMine, 2000 + i, 400 + i * 25, 80, 424 + i * 25, 104);
+        mine.mSwitch = World::HazardSwitch(mine.mId);
+        world.mEntities.push_back(mine);
+    }
+    if (sack)
+    {
+        world.mEntities.push_back(MakeEntity(EntityKind::eRockSack, 3000, 100, 10, 124, 34));
+    }
+    return world;
+}
+
+TEST(BotDomain, MinesInTheWayAreBlownUpWithRocksFromTheSack)
+{
+    NavGraph g;
+    g.Build(CorridorWithMines());
+    World world = WorldWithMines(true);
+    const Domain domain = Domain::Build(g, world, g.NodeAt(12, 100, false), nullptr);
+    const Goap::Plan plan = Goap::Planner::Find(domain.mStart, {{Key::kExited, 1}}, domain.mActions);
+    ASSERT_TRUE(plan.mFound) << plan.mMiss << "\n" << domain.Text();
+    EXPECT_EQ(domain.mSteps[domain.mActions[plan.mSteps.front()].mTag].mKind, StepKind::eRocks);
+    EXPECT_EQ(domain.mSteps[domain.mActions[plan.mSteps.back()].mTag].mKind, StepKind::eExit);
+    s32 blown = 0;
+    for (s32 step : plan.mSteps)
+    {
+        blown += domain.mSteps[domain.mActions[step].mTag].mKind == StepKind::eBlow ? 1 : 0;
+    }
+    // (the last two can be hopped, so it need not be all six)
+    EXPECT_GE(blown, 4);
+    EXPECT_LE(blown, 6);
+
+    // With rocks in hand the sack is left alone
+    world.mRocks = 4;
+    const Domain armed = Domain::Build(g, world, g.NodeAt(12, 100, false), nullptr);
+    const Goap::Plan armedPlan = Goap::Planner::Find(armed.mStart, {{Key::kExited, 1}}, armed.mActions);
+    ASSERT_TRUE(armedPlan.mFound);
+    EXPECT_EQ(armed.mSteps[armed.mActions[armedPlan.mSteps.front()].mTag].mKind, StepKind::eBlow);
+
+    // And mines that are gone are floor
+    world.mRocks = 0;
+    for (Entity& e : world.mEntities)
+    {
+        e.mGone = e.mKind == EntityKind::eMine;
+    }
+    EXPECT_EQ(world.Switch(World::HazardSwitch(2001)), 1);
+    const Domain clear = Domain::Build(g, world, g.NodeAt(12, 100, false), nullptr);
+    const Goap::Plan clearPlan = Goap::Planner::Find(clear.mStart, {{Key::kExited, 1}}, clear.mActions);
+    ASSERT_TRUE(clearPlan.mFound);
+    for (s32 step : clearPlan.mSteps)
+    {
+        const StepKind kind = clear.mSteps[clear.mActions[step].mTag].mKind;
+        EXPECT_TRUE(kind == StepKind::eCross || kind == StepKind::eExit);
+    }
+}
+
+TEST(BotDomain, NoSackNoWayThroughTheMines)
+{
+    NavGraph g;
+    g.Build(CorridorWithMines());
+    const World world = WorldWithMines(false);
+    const Domain domain = Domain::Build(g, world, g.NodeAt(12, 100, false), nullptr);
+    EXPECT_FALSE(Goap::Planner::Find(domain.mStart, {{Key::kExited, 1}}, domain.mActions).mFound);
+}
+
+TEST(BotDomain, RocksAreThrownFromOutOfTheBlast)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 200, 800, 200, 0));
+    // A low tunnel over the right of it
+    in.mLines.push_back(Line(500, 160, 800, 160, 3));
+    in.mLines.push_back(Line(300, 100, 400, 100, 0));
+    NavGraph g;
+    g.Build(in);
+
+    // On the floor: nothing from nearer than four cells, the first try a throw at the floor from five
+    const std::vector<ThrowSpot> level = Domain::ThrowSpots(g, 312, 200, false);
+    ASSERT_FALSE(level.empty());
+    EXPECT_EQ(level.front().mKind, ThrowSpot::eDown);
+    EXPECT_EQ(level.front().mCells, 5);
+    for (const ThrowSpot& spot : level)
+    {
+        // (the ledge over it is a place to throw down from, too)
+        if (spot.mLevel == 0)
+        {
+            EXPECT_GE(spot.mCells, 4);
+            EXPECT_EQ(g.Nodes()[spot.mNode].mY, 200);
+        }
+    }
+    // On the ledge above: from under it, up
+    const std::vector<ThrowSpot> above = Domain::ThrowSpots(g, 362, 100, false);
+    ASSERT_FALSE(above.empty());
+    EXPECT_EQ(above.front().mKind, ThrowSpot::eUp);
+    EXPECT_EQ(above.front().mLevel, -1);
+    EXPECT_EQ(g.Nodes()[above.front().mNode].mY, 200);
+    // In the tunnel there is no standing up: crouched throws only from in there
+    const std::vector<ThrowSpot> tunnel = Domain::ThrowSpots(g, 762, 200, false);
+    ASSERT_FALSE(tunnel.empty());
+    for (const ThrowSpot& spot : tunnel)
+    {
+        if (g.Nodes()[spot.mNode].mLow)
+        {
+            EXPECT_EQ(spot.mKind, ThrowSpot::eCrouched);
+        }
+    }
+    EXPECT_EQ(tunnel.front().mKind, ThrowSpot::eCrouched);
+}
+
+TEST(BotTasks, AThrowIsAimedWithTheDirectionHeld)
+{
+    EXPECT_EQ(BlowMineTask::AimBits(ThrowSpot::eUp, false), static_cast<u32>(Btn::eUp));
+    EXPECT_EQ(BlowMineTask::AimBits(ThrowSpot::eDown, true), static_cast<u32>(Btn::eDown));
+    // Forward is the way he faces, the lob the other way
+    EXPECT_EQ(BlowMineTask::AimBits(ThrowSpot::eForward, false), static_cast<u32>(Btn::eRight));
+    EXPECT_EQ(BlowMineTask::AimBits(ThrowSpot::eForward, true), static_cast<u32>(Btn::eLeft));
+    EXPECT_EQ(BlowMineTask::AimBits(ThrowSpot::eLob, false), static_cast<u32>(Btn::eLeft));
+    EXPECT_EQ(BlowMineTask::AimBits(ThrowSpot::eCrouched, true), static_cast<u32>(Btn::eLeft));
 }
 
 TEST(BotDomain, ASideTripIsWeighedByWhatIsInReachThere)
@@ -1276,4 +1647,141 @@ TEST(BotPilot, ADeadAbeFailsWhateverIsRunning)
     EXPECT_EQ(pilot.Step(abe.mState, bits), PilotStatus::eFailed);
     EXPECT_EQ(pilot.Why(), "dead");
     EXPECT_EQ(bits, 0u);
+}
+
+// A drill over a floor from x 300 to 500, parked at the left end; it goes out to the right and comes back
+static SweepAt DrillAt(s32 offsetFromRight, s32 phase)
+{
+    SweepAt sweep;
+    sweep.mId = 9;
+    sweep.mSign = -1;
+    sweep.mTravel = 200 * 256;
+    sweep.mOffset = offsetFromRight * 256;
+    sweep.mSpeed = 3 * 256;
+    sweep.mPhase = phase;
+    const s32 x = 500 - offsetFromRight;
+    sweep.mX1 = x - 13;
+    sweep.mX2 = x + 13;
+    sweep.mY1 = 70;
+    sweep.mY2 = 90;
+    return sweep;
+}
+
+TEST(BotSweep, ADrillIsFollowedOutAndBack)
+{
+    // Parked at the left end with nothing to wait for: it sets off at once, to the right
+    const SweepAt sweep = DrillAt(200, 0);
+    s32 x1 = 0;
+    s32 y1 = 0;
+    s32 x2 = 0;
+    s32 y2 = 0;
+    EXPECT_FALSE(sweep.At(0, x1, y1, x2, y2));
+    ASSERT_TRUE(sweep.At(11, x1, y1, x2, y2));
+    EXPECT_EQ(x1, 287 + 30);
+    // At the far end after 200 / 3 frames, and coming back after that
+    ASSERT_TRUE(sweep.At(1 + 67, x1, y1, x2, y2));
+    EXPECT_GE(x1, 487);
+    ASSERT_TRUE(sweep.At(1 + 67 + 30, x1, y1, x2, y2));
+    EXPECT_LT(x1, 487 - 80);
+    // A place near the right end is safe only until it gets there
+    EXPECT_FALSE(sweep.Hits(0, 40, 440, 40, 460, 100));
+    EXPECT_TRUE(sweep.Hits(0, 70, 440, 40, 460, 100));
+    // Higher up it is never reached
+    EXPECT_FALSE(sweep.Hits(0, 300, 440, 0, 460, 60));
+
+    // One that won't start again hurts nothing
+    SweepAt stopped = DrillAt(200, 0);
+    stopped.mWillStart = false;
+    EXPECT_FALSE(stopped.Hits(0, 400, 0, 0, 1000, 1000));
+    // One that waits is safe for as long as it does
+    SweepAt waiting = DrillAt(200, 0);
+    waiting.mPause = 50;
+    EXPECT_FALSE(waiting.Hits(0, 50, 290, 40, 310, 100));
+    EXPECT_TRUE(waiting.Hits(0, 60, 290, 40, 310, 100));
+}
+
+TEST(BotSweep, TheWayPastADrillIsTakenBehindIt)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 800, 100, 0));
+    in.mFeatures.push_back(Feature(FeatureKind::eSweep, 300, 70, 500, 94));
+    NavGraph g;
+    g.Build(in);
+    EXPECT_GE(g.Nodes()[g.NodeAt(312, 100, false)].mSweep, 0);
+    EXPECT_GE(g.Nodes()[g.NodeAt(512, 100, false)].mSweep, 0);
+    EXPECT_LT(g.Nodes()[g.NodeAt(262, 100, false)].mSweep, 0);
+    EXPECT_LT(g.Nodes()[g.NodeAt(537, 100, false)].mSweep, 0);
+
+    World world;
+    Entity drill = MakeEntity(EntityKind::eDrill, 9, 300, 70, 500, 94);
+    drill.mSwitch = 5;
+    drill.mInputs[0] = 1;
+    drill.mInputs[1] = 1;
+    world.mEntities.push_back(drill);
+    EXPECT_EQ(GoToTask::SweepOver(g, world, g.NodeAt(262, 100, false)), nullptr);
+    ASSERT_NE(GoToTask::SweepOver(g, world, g.NodeAt(312, 100, false)), nullptr);
+
+    // Three cells into its reach and out again, at a walk
+    std::vector<s32> path;
+    const s32 from = g.NodeAt(262, 100, false);
+    ASSERT_TRUE(g.FindPath(from, g.NodeAt(337, 100, false), nullptr, path));
+    ASSERT_EQ(path.size(), 3u);
+    // With the drill over those cells but on its way out, faster than he walks: it is gone before he is there
+    world.mSweeps.push_back(DrillAt(170, 1));
+    EXPECT_TRUE(GoToTask::SweepsClear(g, world, path, path.size()));
+    // Near the far end already: back before he is through
+    world.mSweeps[0] = DrillAt(10, 1);
+    world.mSweeps[0].mSpeed = 8 * 256;
+    EXPECT_FALSE(GoToTask::SweepsClear(g, world, path, path.size()));
+    // Well past them and still going away: yes
+    world.mSweeps[0] = DrillAt(60, 1);
+    EXPECT_TRUE(GoToTask::SweepsClear(g, world, path, path.size()));
+    // Coming back and nearly there: no
+    world.mSweeps[0] = DrillAt(120, 2);
+    EXPECT_FALSE(GoToTask::SweepsClear(g, world, path, path.size()));
+    // If Abe is taken to be a good deal later than worked out, the first is no good either way and the second
+    // still is
+    world.mSweeps[0] = DrillAt(60, 1);
+    EXPECT_TRUE(GoToTask::SweepsClear(g, world, path, path.size(), 12));
+
+    // Its switch on stops it (it started on): once parked the cells are floor like any other
+    world.mSweeps[0] = DrillAt(200, 0);
+    world.mSweeps[0].mWillStart = false;
+    world.mSwitches[5] = 1;
+    EXPECT_FALSE(world.SweepRuns(world.mEntities[0]));
+    EXPECT_EQ(GoToTask::SweepOver(g, world, g.NodeAt(312, 100, false)), nullptr);
+    // ...but not while it is still finishing its stroke
+    world.mSweeps[0].mPhase = 2;
+    EXPECT_NE(GoToTask::SweepOver(g, world, g.NodeAt(312, 100, false)), nullptr);
+}
+
+TEST(BotSweep, NoThrowingFromWhereADrillComesBy)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 800, 100, 0));
+    in.mFeatures.push_back(Feature(FeatureKind::eSweep, 300, 70, 500, 94));
+    NavGraph g;
+    g.Build(in);
+    World world;
+    Entity drill = MakeEntity(EntityKind::eDrill, 9, 300, 70, 500, 94);
+    drill.mSwitch = 5;
+    drill.mInputs[0] = 1;
+    drill.mInputs[1] = 1;
+    world.mEntities.push_back(drill);
+    // A mine at 562: five cells to its left is under the drill
+    const auto hasSpotAt = [&](s32 x)
+    {
+        for (const ThrowSpot& spot : Domain::ThrowSpots(g, 562, 100, false, &world))
+        {
+            if (g.Nodes()[spot.mNode].mX == x)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    EXPECT_FALSE(hasSpotAt(437));
+    EXPECT_TRUE(hasSpotAt(687));
+    world.mSwitches[5] = 1;
+    EXPECT_TRUE(hasSpotAt(437));
 }

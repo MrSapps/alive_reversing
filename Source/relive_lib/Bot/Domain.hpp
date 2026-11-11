@@ -15,6 +15,8 @@ namespace Key {
 static const u32 kRegion = 1;
 // The path's exit has been taken
 static const u32 kExited = 2;
+// Abe has rocks to throw
+static const u32 kRocks = 3;
 inline u32 Switch(s32 id)
 {
     return 1000 + static_cast<u32>(id);
@@ -35,6 +37,8 @@ enum class StepKind : u8
     eExit,      // leave the path by exit mEdge (an index into the graph's exits)
     eTogether,  // turn the wheels of switch logic mEntity at once, with Mudokons
     eKill,      // slap Mudokon mEntity until it is dead
+    eRocks,     // jump into rock sack mEntity and pick up what falls out
+    eBlow,      // throw rocks at mine mEntity until it goes off
 };
 
 // What a planned action means to the bot
@@ -44,6 +48,29 @@ struct DomainStep final
     s32 mEdge = -1;
     u32 mEntity = 0;
     u32 mOther = 0;
+};
+
+// A place to throw a rock at something from, and how
+struct ThrowSpot final
+{
+    enum Kind : s32
+    {
+        eUp,       // standing, up held: a high arc that comes down a few cells off
+        eLob,      // standing, back held: nearly straight up and down
+        eForward,  // standing, forward held: far and flat
+        eDown,     // standing, down held: at the floor a few cells ahead, and it skips on
+        eCrouched, // crouched: low and flat
+    };
+    s32 mNode = -1;
+    Kind mKind = eUp;
+    // Tried in this order: the likeliest first
+    s32 mOrder = 0;
+    // How it lies to the target, for telling what worked: cells away, and -1 below it, 0 level, 1 above
+    s32 mCells = 0;
+    s32 mLevel = 0;
+    // The switches of the mines that lie between: the rock would set the first of them off instead, so they
+    // have to be gone
+    std::vector<s32> mNeeds;
 };
 
 // Who turns which wheel when several have to turn at once
@@ -87,6 +114,10 @@ struct Domain final
     static s32 UseNode(const NavGraph& nav, const Entity& entity, bool* faceLeft, s32 firstSide = -1);
     // The wheels a switch logic entity needs turned at once and the nearest Mudokons that can walk to them. False
     // if it isn't that kind of logic or there aren't enough Mudokons. pre gets what the action needs.
+    // Where a rock could be thrown from at something on the floor at (x, y), likeliest first. Nothing is worked
+    // out about how a rock flies: these are the places worth a try, and the bot keeps what it finds
+    // world: to leave out the cells a drill that runs comes by (without it, the cells of any drill)
+    static std::vector<ThrowSpot> ThrowSpots(const NavGraph& nav, s32 x, s32 y, bool half, const World* world = nullptr);
     static bool PlanTogether(const NavGraph& nav, const World& world, const Entity& logic, Team& team, std::vector<Goap::Fact>& pre);
     // Weighs a detour into a path: entryNode is where Abe comes in, leadsOn says which of its exits are a way on
     static SideTrip WeighSideTrip(const NavGraph& nav, const World& world, s32 entryNode, const std::function<bool(const NavFeature&)>& leadsOn);

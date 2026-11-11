@@ -33,6 +33,8 @@ enum class FeatureKind : u8
     eLevelLoader, // the game leaves the path by itself once switch mSwitch is on, mDest*
     eBarrier,     // a slam door, an electric wall...: nothing passes while it is shut. Open when switch mSwitch is
                   // on, or off if mStartClosed is false
+    eSweep,       // a drill goes to and fro in its rectangle: the cells it reaches are crossed when it is out of
+                  // the way (see GoToTask)
 };
 
 // Something in the map that changes where Abe can go. From the path's TLVs, see GameView.
@@ -104,6 +106,8 @@ struct NavEdge final
     bool mLeft = false;
     // A running jump: the cell it takes off from
     s32 mX = 0;
+    // The hazard (its feature) that has to be gone before it can be taken: a mine in the cell it leads into
+    s32 mClear = -1;
 };
 
 // A grid cell of floor Abe can stand on
@@ -114,6 +118,10 @@ struct NavNode final
     s32 mLine = 0;
     bool mHalf = false;
     bool mHazard = false;
+    // The hazard is one that can be got rid of (a mine, with a rock): its feature, or -1
+    s32 mClear = -1;
+    // A drill reaches Abe here (its feature), or -1
+    s32 mSweep = -1;
     // A ceiling too low to stand under
     bool mLow = false;
     // On a lift's platform when it is at this stop (the stop's feature), or -1

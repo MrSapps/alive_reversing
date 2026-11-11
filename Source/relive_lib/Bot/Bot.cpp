@@ -133,6 +133,10 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<ClearSligTask>(entity, [entity]() -> std::unique_ptr<Task>
                                                    { return std::make_unique<KillTask>(entity); }, true);
         }
+        case StepKind::eRocks:
+            return std::make_unique<GetRocksTask>(step.mEntity);
+        case StepKind::eBlow:
+            return std::make_unique<BlowMineTask>(step.mEntity);
         case StepKind::eLogic:
             break;
     }
@@ -157,6 +161,25 @@ bool Bot::Replan(BaseMap& map)
         return true;
     }
 
+    // A mine has gone since the last look: throws that had nothing to hit but the mine in front may work now
+    const s32 mines = BlowMineTask::LiveMines(mWorld);
+    if (mines < mLastMines)
+    {
+        for (auto it = mFailedActions.begin(); it != mFailedActions.end();)
+        {
+            it = it->first.compare(0, 8, "Blow up ") == 0 ? mFailedActions.erase(it) : std::next(it);
+        }
+        // (and the mines given up on are worth another go)
+        for (const Entity& e : mWorld.mEntities)
+        {
+            if (e.mKind == EntityKind::eMine && !e.mGone)
+            {
+                mExplored.erase({mAbe.mPath, Key::Switch(e.mSwitch)});
+            }
+        }
+    }
+    mLastMines = mines;
+
     // A switch tried for the sake of it has changed: don't try it again
     for (s32 i = 0; i < 256; i++)
     {
@@ -175,7 +198,18 @@ bool Bot::Replan(BaseMap& map)
         const auto failed = mFailedActions.find(a.mName);
         if (failed != mFailedActions.end() && failed->second >= 2)
         {
-            continue;
+            // For good if it killed Abe; else until he is somewhere else (no route from one place says
+            // nothing about another)
+            const auto deaths = mActionDeaths.find(a.mName);
+            const auto where = mFailedWhere.find(a.mName);
+            const bool moved = where != mFailedWhere.end() && (std::abs(where->second.first - mAbe.mX) > 400 || std::abs(where->second.second - mAbe.mY) > 150);
+            // (and not for ever: what has failed six times over is left alone)
+            const auto total = mFailedTotal.find(a.mName);
+            if ((deaths != mActionDeaths.end() && deaths->second >= 3) || !moved || (total != mFailedTotal.end() && total->second >= 6))
+            {
+                continue;
+            }
+            mFailedActions.erase(failed);
         }
         const DomainStep& step = domain.mSteps[a.mTag];
         if (step.mKind == StepKind::eExit)
@@ -291,9 +325,31 @@ bool Bot::Replan(BaseMap& map)
                     bestGoal = "Try switch " + std::to_string(fact.mKey - 1000) + "=" + std::to_string(fact.mValue);
                     mExploring = fact.mKey;
                 }
+                else if (!sub.mFound)
+                {
+                    misses += "switch " + std::to_string(fact.mKey - 1000) + ": " + sub.mMiss + "; ";
+                }
             }
             if (!best.mFound)
             {
+                // What failed from somewhere else may work from here: once in a while everything but what
+                // killed Abe gets another go
+                if (!mFailedActions.empty() && mAbe.mFrame - mForgaveFrame > 900)
+                {
+                    mForgaveFrame = mAbe.mFrame;
+                    for (auto it = mFailedActions.begin(); it != mFailedActions.end();)
+                    {
+                        const auto deaths = mActionDeaths.find(it->first);
+                        const auto total = mFailedTotal.find(it->first);
+                        const bool forGood = (deaths != mActionDeaths.end() && deaths->second >= 3) || (total != mFailedTotal.end() && total->second >= 6);
+                        it = forGood ? std::next(it) : mFailedActions.erase(it);
+                    }
+                    Log("no plan: trying again what failed before");
+                    mTask = std::make_unique<GoToTask>("think again", [](s32)
+                                                       { return true; });
+                    mTaskAction.clear();
+                    return true;
+                }
                 Stuck("no_plan: Leave the path: " + plan.mMiss + ". " + domain.Frontier() + (misses.empty() ? "" : " Also no plan for: " + misses));
                 return false;
             }
@@ -483,6 +539,7 @@ void Bot::Log(const std::string& text)
     mLog += text;
     mLog += "\n";
     LOG_INFO("[bot] %s%s", head, text.c_str());
+    mLastLogFrame = mAbe.mFrame;
 }
 
 std::string Bot::InputsText() const
@@ -556,6 +613,22 @@ NavGraph::EdgeCost Bot::EdgeCostFn() const
                 return -1;
             }
         }
+        // Past a drill takes waiting for it, and nerve
+        if (to.mSweep >= 0 && GoToTask::SweepOver(know->mNav, *world, e.mTo))
+        {
+            return e.mCost + 150;
+        }
+        // Close by a bird portal its birds fly off, and that is the end of it until the screen comes round again
+        if (e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eRoll)
+        {
+            for (const Entity& p : world->mEntities)
+            {
+                if (p.mKind == EntityKind::eBirdPortal && p.mRescuePortal && p.mHalf == to.mHalf && std::abs(p.mY2 - to.mY) < 30 && std::abs(p.CentreX() - to.mX) < (to.mHalf ? 37 : 75))
+                {
+                    return e.mCost + 3000;
+                }
+            }
+        }
         return e.mCost;
     };
 }
@@ -568,6 +641,24 @@ s32 Bot::RetryDelay()
     }
     // Longer each time, never the same twice
     return mAttempt * 17 + mRng.Range(0, 12);
+}
+
+s32 Bot::QuietFrames(s32 x, s32 y, bool half) const
+{
+    // The screen Abe is on: as far as the same camera goes either way
+    const NavGraph& nav = mKnow->mNav;
+    const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);
+    s32 x1 = mAbe.mX;
+    s32 x2 = mAbe.mX + 1;
+    while (x1 > mAbe.mX - 2000 && nav.CameraOf(x1 - 25, mAbe.mY - 5) == cam)
+    {
+        x1 -= 25;
+    }
+    while (x2 < mAbe.mX + 2000 && nav.CameraOf(x2 + 25, mAbe.mY - 5) == cam)
+    {
+        x2 += 25;
+    }
+    return World::QuietFrames(mWorld.mSligs, mBeats, x, y, half, x1 - 25, x2 + 25);
 }
 
 Gait Bot::GaitFor(s32 cells)
@@ -671,9 +762,87 @@ void Bot::MaybeCheckpoint(BaseMap& map)
     mAttempt = 0;
 }
 
+s32 Bot::SweepLate() const
+{
+    static const s32 kLate[] = {0, 6, -6, 12, -12, 18, 24, -18};
+    return kLate[mSweepDeaths % 8];
+}
+
+void Bot::ThrowBegun(u32 mine, const ThrowSpot& spot)
+{
+    mThrowPending = true;
+    mThrowFrame = mAbe.mFrame;
+    mThrowMine = mine;
+    mThrowSpot = spot;
+}
+
+void Bot::ThrowMissed()
+{
+    if (mThrowPending && mKnow)
+    {
+        mKnow->mBadThrows.insert(std::make_tuple(mThrowMine, mThrowSpot.mNode, static_cast<s32>(mThrowSpot.mKind)));
+    }
+    mThrowPending = false;
+}
+
+void Bot::ThrowHit()
+{
+    if (mThrowPending)
+    {
+        mThrowHits.insert(std::make_tuple(mThrowSpot.mLevel, mThrowSpot.mCells, static_cast<s32>(mThrowSpot.mKind)));
+    }
+    mThrowPending = false;
+}
+
+bool Bot::ThrowIsBad(u32 mine, const ThrowSpot& spot) const
+{
+    return mKnow && mKnow->mBadThrows.count(std::make_tuple(mine, spot.mNode, static_cast<s32>(spot.mKind))) != 0;
+}
+
+bool Bot::ThrowHasWorked(const ThrowSpot& spot) const
+{
+    return mThrowHits.count(std::make_tuple(spot.mLevel, spot.mCells, static_cast<s32>(spot.mKind))) != 0;
+}
+
 void Bot::OnDeath(BaseMap& map)
 {
     mDeaths++;
+    if (mThrowPending && mAbe.mFrame - mThrowFrame > 300)
+    {
+        mThrowPending = false;
+    }
+    if (mThrowPending || (mThrowFrame != 0 && mAbe.mFrame >= mThrowFrame && mAbe.mFrame - mThrowFrame < 150))
+    {
+        // The blast reached him, or what the rock woke did, or the rock went on to another mine by him
+        Log("a throw at the mine from " + std::to_string(mThrowSpot.mCells) + " cells killed Abe: not from there again");
+        mThrowPending = true;
+        ThrowMissed();
+    }
+    if (mSweepPending && mAbe.mFrame - mSweepFrame < 250)
+    {
+        mSweepDeaths++;
+        Log("the drill got Abe: next time as if he were " + std::to_string(SweepLate()) + " frames later than worked out");
+    }
+    mSweepPending = false;
+    const s32 deathsHere = ++mDeathCells[{mAbe.mX / 25, mAbe.mY / 20}];
+    if (deathsHere == 6 || deathsHere == 12)
+    {
+        // The same place again and again: what he was doing there doesn't work
+        if (mCurrentEdge >= 0 && mKnow)
+        {
+            BanEdge(mCurrentEdge);
+        }
+        if (mTask && !mTaskAction.empty())
+        {
+            mFailedActions[mTaskAction] = 2;
+            Log("giving up on " + mTaskAction + ": Abe has died " + std::to_string(deathsHere) + " times at " + std::to_string(mAbe.mX) + "," + std::to_string(mAbe.mY));
+        }
+    }
+    if (deathsHere >= 20)
+    {
+        Stuck("Abe keeps dying at " + std::to_string(mAbe.mX) + "," + std::to_string(mAbe.mY) + (mTask ? " doing " + mTask->Name() : ""));
+        return;
+    }
     mPilotActive = false;
     mBits = 0;
     if (mCurrentEdge >= 0 && mKnow)
@@ -691,11 +860,18 @@ void Bot::OnDeath(BaseMap& map)
         mFailedActions[mTaskAction] = 2;
         Log("giving up on " + mTaskAction + ": it killed Abe " + std::to_string(mActionDeaths[mTaskAction]) + " times");
     }
+    mMissRewind = false;
     if (mCheckpoints.empty())
     {
         Stuck("died with nothing to go back to");
         return;
     }
+    // Dead on the very frame the last try from here died on: it was settled before this checkpoint
+    if (mCheckpoints.back().mLastDeathFrame == mAbe.mFrame)
+    {
+        mCheckpoints.back().mAttempts = std::max(mCheckpoints.back().mAttempts, kAttemptsPerCheckpoint);
+    }
+    mCheckpoints.back().mLastDeathFrame = mAbe.mFrame;
     // Enough tries from here: what went wrong happened earlier
     while (mCheckpoints.size() > 1 && mCheckpoints.back().mAttempts >= kAttemptsPerCheckpoint)
     {
@@ -710,6 +886,31 @@ void Bot::OnDeath(BaseMap& map)
     saved.mAttempts++;
     mAttempt = saved.mAttempts;
     Log("died (" + std::string(mTask ? mTask->Name() : "no task") + "), back to f=" + std::to_string(saved.mCheckpoint.mFrame) + " try " + std::to_string(mAttempt));
+    mInputs.resize(saved.mInputCount);
+    saved.mCheckpoint.Load(map);
+    mRestoring = true;
+    mRestores++;
+    mLastCheckpointFrame = saved.mCheckpoint.mFrame;
+}
+
+void Bot::RewindMiss(BaseMap& map)
+{
+    mMissRewind = false;
+    // To before the rock left his hand: what was saved since has it gone already
+    while (mCheckpoints.size() > 1 && mCheckpoints.back().mCheckpoint.mFrame > mThrowFrame)
+    {
+        mCheckpoints.pop_back();
+    }
+    if (mCheckpoints.empty() || mCheckpoints.back().mCheckpoint.mFrame > mThrowFrame || mMissRewinds >= 400)
+    {
+        return;
+    }
+    mMissRewinds++;
+    Saved& saved = mCheckpoints.back();
+    Log("taking the missed throw back: to f=" + std::to_string(saved.mCheckpoint.mFrame));
+    mPilotActive = false;
+    mBits = 0;
+    mCurrentEdge = -1;
     mInputs.resize(saved.mInputCount);
     saved.mCheckpoint.Load(map);
     mRestoring = true;
@@ -768,6 +969,24 @@ void Bot::Think(BaseMap& map)
     {
         mGoToPending = false;
         Run(GoToTask::To(*this, mGoToX, mGoToY, mGoToHalf));
+    }
+
+    // Nothing said for a long while: what it is doing, for whoever reads the log
+    if (mAbe.mFrame < mLastLogFrame)
+    {
+        mLastLogFrame = mAbe.mFrame;
+    }
+    if (mState == BotState::eRunning && mAbe.mFrame - mLastLogFrame > 600)
+    {
+        Log(std::string("quiet for a while: task ") + (mTask ? mTask->Name() : "none") + (mReflex ? ", reflex " + mReflex->Name() : "") + ", last did " + mPilot.Current().Text() + (mPilotActive ? "" : " (over)") + (mLastPrimFailed.empty() ? "" : ", which failed: " + mLastPrimFailed) + (mAbe.mTransition ? ", in a transition" : "") + (mRestoring ? ", restoring" : "") + ", abe " + std::to_string(static_cast<s32>(mAbe.mMove)) + " node " + std::to_string(AbeNode()));
+    }
+    if (mMissRewind)
+    {
+        RewindMiss(map);
+        if (mRestoring)
+        {
+            return;
+        }
     }
 
     for (s32 guard = 0; guard < 8 && mState == BotState::eRunning && !mPilotActive; guard++)
@@ -856,6 +1075,8 @@ void Bot::Think(BaseMap& map)
                     // Another way, or the same again if it was a fluke: twice and the action is given up
                     Log("action_failed: " + mTask->Name() + ": " + step.mWhy);
                     mFailedActions[mTaskAction]++;
+                    mFailedTotal[mTaskAction]++;
+                    mFailedWhere[mTaskAction] = {mAbe.mX, mAbe.mY};
                     mTask.reset();
                 }
                 else
@@ -909,6 +1130,30 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         GameView::ReadWorld(map, mWorld);
     }
 
+    // Where the Sligs walk, as it shows
+    for (const SligAt& slig : mWorld.mSligs)
+    {
+        if (slig.mAsleep || slig.mPossessed)
+        {
+            continue;
+        }
+        bool known = false;
+        for (SligBeat& beat : mBeats)
+        {
+            if (beat.mHalf == slig.mHalf && std::abs(beat.mY - slig.mY) <= 45 && slig.mX >= beat.mMinX - 60 && slig.mX <= beat.mMaxX + 60)
+            {
+                beat.mMinX = std::min(beat.mMinX, slig.mX);
+                beat.mMaxX = std::max(beat.mMaxX, slig.mX);
+                known = true;
+                break;
+            }
+        }
+        if (!known)
+        {
+            mBeats.push_back({slig.mY, slig.mHalf, slig.mX, slig.mX});
+        }
+    }
+
     if (mPilotPending)
     {
         mPilot.Start(mPendingPrim, mAbe);
@@ -942,6 +1187,18 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         {
             sligs += slog.mAsleep ? "s" : "S";
         }
+        // A Slig that wasn't there a moment ago (its screen has just come in): whatever Abe was on his way to do
+        // was decided without it, so stop and think again
+        s32 awake = 0;
+        for (const SligAt& slig : mWorld.mSligs)
+        {
+            awake += slig.mAsleep || slig.mPossessed ? 0 : 1;
+        }
+        if (awake > mLastAwakeSligs && mPilotActive && mPilotForTask && mAuto && mAbe.mOnGround)
+        {
+            mPilot.Start(Prim::Wait(8), mAbe);
+        }
+        mLastAwakeSligs = awake;
         if (sligs != mLastSligs)
         {
             std::string slogs;
@@ -1035,6 +1292,10 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
                 {
                     mTrace += " " + std::to_string(e.mLiveX) + ":" + std::to_string(e.mState) + (e.mFollowing ? "f" : "");
                 }
+            }
+            for (const SligAt& slig : mWorld.mSligs)
+            {
+                mTrace += " slig" + std::to_string(slig.mX) + "," + std::to_string(slig.mY) + (slig.mFacingLeft ? "L" : "R") + "m" + std::to_string(slig.mMotion);
             }
             for (const SlogAt& slog : mWorld.mSlogs)
             {
