@@ -76,6 +76,8 @@ struct AbeState final
     s16 mMotion = 0;
     s16 mAnimFrame = 0;
     bool mOnGround = false;
+    // The top of what can be hit of him now (his bounding rectangle)
+    s32 mTop = 0;
     s32 mHealthFp = 0;
     s32 mLevel = 0;
     s32 mPath = 0;

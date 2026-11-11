@@ -23,7 +23,7 @@ what is left, and wins where they differ.
 | Nav graph | `NavGraph` | A cell of floor per grid position. Edges: walk, roll (low ceilings, walls that stop short of the floor), fall (not if deadly), hop (over mines and gaps, and to a ledge four cells off), running jump (to a floor four cells off or a ledge five off), hoist up/down, door, well, lift. `Condition` says which switch an edge waits for (slam door, electric wall, a door that starts shut). Knows AO's gaps between cameras and both games' grids. `LearnEdge` corrects an edge by where it really led. |
 | Regions | `NavGraph::Regions` | Cells Abe can move between freely both ways. Planning is over regions, not cells. |
 | Level graph | `LevelGraph` | Which path leads to which, and how many paths each is from the way out of the level. An exit is only taken if it leads nearer the end, or (when the ending wants Mudokons) once into a path off the way (a secret area) that is worth it: `Domain::WeighSideTrip` builds that path's graph ahead of time and counts the Mudokons Abe could get to from where he would come in, how many of them have a bird portal in reach, and whether there's a way back. `save_all` and `average` go for Mudokons that can be rescued, `kill_all` for any that can be reached, `any` never goes. |
-| Planner | `Goap` | Facts, actions with needs and effects, cheapest plan by forward search with the actions that can't help the goal left out. Deterministic. Says what nothing gives when there's no plan. |
+| Planner | `Goap` | Facts, actions with needs and effects, forward search with the actions that can't help the goal left out. The cheapest plan if 400 states find it (A* on an estimate that is never over: each fact at the price of its cheapest giver on top of the dearest thing that needs). Else any plan, going for the state that looks nearest (the same estimate with needs summed), which finds a hundred steps in a few hundred states; states the goal can't be had from are dropped. What is used up (`Action::mSpend`, rocks) is planned as if any were enough, then the plan is gone through with the count and the way to more put in where it runs out, from as far back as it takes. `Planner::Short` is the estimate alone, to rank goals. Deterministic. Says what nothing gives when there's no plan. `Bot::Replan` keeps following a plan while what is left of it still holds, and plans only the two or three nearest looking goals. |
 | Domain | `Domain` | Builds the planning problem of a path: cross to another region (needs the edge's switch), use a lever/ring/wheel/hand stone, rescue a Mudokon through a portal in its region (sets its rescue switch), kill one (`kill_all` only), switch logic, wheels that must turn together (needs a Mudokon per wheel but one), leave by an exit or a level loader. `Frontier` says what blocks, `Reachable` which switches are worth trying when there's no plan to the exit. |
 | Tasks | `Task`, `Tasks.cpp` | `GoTo` (replans the route after every move, bans edges that go nowhere, sneaks past sleeping Sligs, waits in cover for an awake one to look away, leads Mudokons by ways they can follow), `Use`, `Recruit` (hello, sorry or a slap by mood, follow me), `Rescue`, `WorkTogether`, `Kill`, `Exit`. |
 | Checkpoints | `Checkpoint` | A quicksave the bot owns, taken every ~90 frames when Abe stands still and nothing threatens (no Slig on the screen, no laughing Mudokon in tow). On a death: back to the newest, try again after a (seeded) delay; six deaths from one and it goes back to the one before. Old ones are thinned out, not dropped. The game's own quicksave is left alone. |
@@ -161,22 +161,56 @@ hash.
     down), and from where Abe can get back from before anywhere a drop leads.
   - **Stalls**: six deaths in one cell give up what was being done there and ban the edge, twenty stop the
     run; after 600 frames with nothing logged the log says what the bot is at.
-  Where it stops now (`build-bot/p4.txt`, 2026-11-11, about 8,900 frames, no deaths, 89 misses taken back):
-  in the room after the drill (cams 36 and 37), on the 2420 ledge at 3787. Gone by then: all eight mines of
-  the room's first two floors and, as far as the log shows, the three on the 2480 ledge (one hit, two set off
-  on the way). Then `no_plan`, with no goal even tried: nothing is both reachable and wanted
-  (`Domain::Reachable`). **Not established why.** Two candidates, check in this order: (a) the four mines on
-  the 2540 floor before the door at 3425,2520 are never made a goal (the only way to them is a drop off the
-  2480 ledge into the first one's cell; the stuck report's "Blocked" list does not name that edge, so the
-  ledge may not count as in reach, or a fall into a mine's cell is not offered); (b) the path's exit needs
-  door 2562,460, which opens on switch 190: the rescue of a blind Mudokon, and blind Mudokons are not
-  modelled (they walk on until told to wait and fall off ledges). A scenario started in the room
-  (`start mines 4 36 3787 2420` will not have the mines gone, so use a save) would settle it. After that: two
-  more blind Mudokons whose rescue opens doors, drills with no lever in reach (timing only, some jumped
-  through), lift movers, a timer trigger. One sack in the room (3937,2384) hangs over the gap between two
-  ledges and is only got by jumping the gap through it; the bot leaves it alone and goes back past the drill
-  for rocks. `build-bot/research/` has what four read-only passes over the game code found on each of these,
-  on grenades and boom machines, the mine car and path 6's timed escape.
+  **Path 4 is done with `any`** (`build-bot/p4.txt`, 2026-11-11, later): from its start into path 5 in about
+  15,100 frames, no deaths, 22 missed throws taken back, four minutes of wall time headless. From the
+  Mines' start (`build-bot/m1.txt`) path 5 is reached at f=31,513 with no deaths at all (paths 2, 3 and 4 at
+  9,786, 11,471 and 16,456). What it took after the drill: trap doors, blind Mudokons led a stretch at a time
+  (`RescueTask::LeadBlind`) and sent to a wheel, drills overhead rolled under, lift movers and shafts, pull
+  rings, and the planner below. Three Mudokons die on the way (two to the drill lever 160 starts, one to the
+  Slig trap): fine for `any`, not for `save_all`.
+  - **Planning a path like this one**: 584 actions over 127 regions and a plan of a hundred steps. Searching
+    for the cheapest plan never ended (each decision ran some twenty goals to a 25,000 state limit: minutes).
+    Now: the cheapest if 400 states find it, else a search that goes for what looks nearest; a plan is kept
+    while it holds; rocks are counted (a sack gives nine, and nothing to a hand that has some) by going through
+    the plan with the count and putting a trip to a sack in where it runs out; a dear step (a throw past a
+    running drill) is swapped for a cheaper way to the same when there is one (its lever first).
+  - **Throws**: a spot with a live mine within 90 px of where Abe would stand (125 from below) needs that mine
+    gone, in the plan as in the task. Throws from a ledge above are only offered for a mine with no other spot.
+    A drill whose travel lies between thrower and mine has to be stopped first if a lever stops it. Still
+    found by trying: 23 of 55 throws on path 4 missed, mostly crouched ones from 7 to 9 cells, forward ones
+    from 10 to 12 and the ones from above. **Next: measure each kind of throw's arc once, in grid cells, and
+    keep it as a table**, so a spot is one whose arc has the mine on it and nothing before it, and no throw
+    is tried that can't hit.
+  - **A run to watch has no quick loads in it**: `bot_inputs` writes the buttons of the frames that counted,
+    and `replay` plays them back in a window (`build-bot/m1_replay.txt`). Going back to a checkpoint after a
+    death is a failure to be got rid of, not part of a run; taking back a missed throw should not happen
+    once throws are known beforehand.
+  - **The sack over the gap** (3937,2384, between the 2420 ledges): `Domain::SackJump`, a running jump off
+    the ledge end beside it and down to where the rocks fall. The planner goes to it now, not back to the
+    first one.
+  - **Six wheels at once (path 1)**: "all o' ya" then one "follow me" brings the whole screen
+    (`RecruitTask::SetAll`); then Abe walks past the wheels without stopping. A following Mudokon stops at
+    the first free wheel it walks past (`Mudokon::StopAtWheel`): not if it runs, which it does when Abe runs,
+    and one that catches Abe up standing among the wheels stops behind him. One pass now, 4,500 frames less.
+  - **Throw measurements**: `build-bot/arc.txt` dumps the rock frame by frame for each kind of throw
+    (`build-bot/arc/*.json`), not yet made into the table. The flight is `Rock::InTheAir`: gravity 1.01 a
+    frame (AO 1.0), start speeds (3,-14) back, (10,-10) up, (15,-8) forward, (10,3) down, (10,-4) crouched,
+    a floor halves both speeds and turns it up (under 5 a frame down it falls through instead), a ceiling or
+    wall halves and turns the one; off Abe's screen it goes through floors.
+  - **The mine car** (`EntityKind::eMineCar`, `StepKind::eRide`, `RideCarTask`): a planner action from the
+    car's floor to either end of each car floor that has a floor to get out on; which it can get to is found
+    by driving. A direction held carries the car on round corners, up walls and along ceilings
+    (`build-bot/car.txt` drove path 5 by script: right, right again where it stops under the ceiling, up at
+    3312,600, up again at 2787,335, then it runs to 3937,200). The task holds the way that moves it nearer and
+    where that does nothing tries the others in turn, not straight back the way it came. Started beside the
+    car (`build-bot/p5c.txt`) the bot is through path 5 and into path 10 in 1,100 frames. It runs six Mudokons
+    over on the way: fine for `any`, wrong for `save_all`.
+  - **Where it stops now**: getting to the car on foot from path 5's door (`build-bot/f4.txt`). The bot goes
+    the long way round by the hoist at 1300 and dies on the 720 floor (three UXBs, a Slig, motion detectors),
+    again and again. The short way is off the left end of the 620 floor onto the 720 floor between the UXBs
+    at 487 to 662, with a motion detector sweeping 425 to 701: it needs the landing among UXBs, their
+    disarming and motion detectors (stand still in the beam). Then path 10, where it gets two of the three
+    half-scale levers with eight deaths and has no plan for the rest.
 - **Mines path 1, `save_all`, later the same day** (`build-bot/m1s.txt`, 15,000 frames): 5 rescued, no deaths.
   The Slig by the orb is shot by a Slig Abe has taken over and sent round by teleporter to the background
   (`ClearSligTask::RaidStep`): a shot from behind takes whatever is nearest within 25 px of the snapped x over
@@ -202,9 +236,10 @@ So the first three paths of the Mines are beaten with `any`, the other profiles 
 
 ### Next, in order
 
-1. Mines path 4: why there is no goal left in the mine room after the drill (see above), then blind Mudokons
-   (hello, follow me, "wait" before each drop, the way cleared first), the sack that hangs over a gap, and the
-   same timed-hazard reader for meat saws, falling items and motion detectors (`SweepAt` is meant to take them).
+1. Throw arcs as a measured table (see path 4 above), then Mines path 5: the way to the car on foot
+   (motion detectors, the drop among the UXBs); then path 10
+   (teleporter, half-scale levers) and path 6 (wheels, a 450 frame timer). `save_all` on path 4: the drill
+   lever 160 starts and the Slig trap each kill Mudokons.
 2. Sligs in the way of a Mudokon (#8005 and #33006 on path 1's 1400 floor). There are usually several ways and
    the planner should hold them as alternatives, cheapest first: (a) call the Mudokon from inside an invisible
    zone and lead it off behind the Slig's back; (b) take over a Slig that is easy to get at (another floor of its

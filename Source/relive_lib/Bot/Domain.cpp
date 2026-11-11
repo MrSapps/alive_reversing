@@ -24,8 +24,186 @@ const char* EntityKindName(EntityKind kind)
         case EntityKind::eMine: return "Mine";
         case EntityKind::eRockSack: return "RockSack";
         case EntityKind::eDrill: return "Drill";
+        case EntityKind::eMineCar: return "MineCar";
     }
     return "?";
+}
+
+bool Domain::CallSpot(const NavGraph& nav, const Entity& mud, const Entity& wheel, s32 node)
+{
+    const NavNode& n = nav.Nodes()[node];
+    const s32 mudX = mud.mLive ? mud.mLiveX : mud.CentreX();
+    const s32 mudY = mud.mLive ? mud.mLiveY : mud.mY2;
+    const s32 dir = wheel.CentreX() > mudX ? 1 : -1;
+    return n.mHalf == mud.mHalf && !n.mLow && !n.mHazard && n.mTrapDoor < 0 && n.mSweep < 0 && (n.mX - mudX) * dir > 12 && nav.CameraOf(n.mX, n.mY - 5) == nav.CameraOf(mudX, mudY - 5);
+}
+
+const Entity* Domain::DrillAt(const NavGraph& nav, const World& world, s32 node, bool high)
+{
+    const s32 feature = high ? nav.Nodes()[node].mSweepHigh : nav.Nodes()[node].mSweep;
+    const Entity* drill = feature >= 0 ? world.Find(nav.Input().mFeatures[feature].mId) : nullptr;
+    return drill && drill->mKind == EntityKind::eDrill ? drill : nullptr;
+}
+
+bool Domain::BlindWay(const NavGraph& nav, const World& world, s32 from, const Entity& portal, bool strict, std::vector<s32>& way)
+{
+    way.clear();
+    const s32 at = nav.NodeAt(portal.CentreX(), portal.mY2, portal.mHalf, 30);
+    if (at < 0 || from < 0)
+    {
+        return false;
+    }
+    // Onto a lift's platform, or down or up with it (Abe works it): only where the lift is, or will be brought
+    const auto liftLets = [&](const NavEdge& e, bool now)
+    {
+        const NavNode& a = nav.Nodes()[e.mFrom];
+        const NavNode& b = nav.Nodes()[e.mTo];
+        const NavNode* stop = e.mKind == EdgeKind::eLift ? &a : (b.mLiftStop >= 0 && a.mLiftStop < 0 ? &b : nullptr);
+        if (!stop)
+        {
+            return true;
+        }
+        const NavFeature& f = nav.Input().mFeatures[stop->mLiftStop];
+        return world.LiftAtStop(stop->mX, stop->mY, f.mA != 0) || (!now && (f.mSwitch > 1 || e.mKind == EdgeKind::eLift));
+    };
+    std::vector<bool> goal(nav.Nodes().size(), false);
+    std::vector<s32> open{at};
+    goal[at] = true;
+    while (!open.empty())
+    {
+        const NavNode& n = nav.Nodes()[open.back()];
+        open.pop_back();
+        for (s32 i = n.mFirstEdge; i < n.mFirstEdge + n.mEdgeCount; i++)
+        {
+            const NavEdge& e = nav.Edges()[i];
+            const NavNode& to = nav.Nodes()[e.mTo];
+            // (a mine between it and the portal is no place to send it running from)
+            s32 sw = 0;
+            s32 value = 0;
+            const bool shut = (nav.Condition(e, &sw, &value) && world.Switch(sw) != value) || !liftLets(e, true);
+            if (e.mKind == EdgeKind::eWalk && !goal[e.mTo] && !shut && !(to.mHazard && to.mClear < 0) && to.mY == n.mY && std::abs(to.mX - portal.CentreX()) < 300)
+            {
+                goal[e.mTo] = true;
+                open.push_back(e.mTo);
+            }
+        }
+    }
+    if (goal[from])
+    {
+        return true;
+    }
+    // A drill in the way: not while it runs, and only one a switch stops
+    const auto drillLets = [&](s32 node, bool high)
+    {
+        const Entity* drill = DrillAt(nav, world, node, high);
+        if (!drill)
+        {
+            return true;
+        }
+        return strict ? !world.SweepLive(*drill) : (drill->mInputs[0] == 1 && drill->mInputs[2] == 0);
+    };
+    const auto can = [&](const NavEdge& e)
+    {
+        const NavNode& a = nav.Nodes()[e.mFrom];
+        const NavNode& b = nav.Nodes()[e.mTo];
+        // (it walks upright where Abe has to roll under a drill)
+        const bool under = e.mKind == EdgeKind::eRoll && (a.mSweepHigh >= 0 || b.mSweepHigh >= 0) && (!a.mLow || a.mSweepHigh >= 0) && (!b.mLow || b.mSweepHigh >= 0);
+        // (the hole of an open trap door is not something it can be timed into)
+        if (e.mKind == EdgeKind::eFall && e.mFeature >= 0 && a.mTrapDoor != e.mFeature && nav.Input().mFeatures[e.mFeature].mKind == FeatureKind::eTrapDoor)
+        {
+            return false;
+        }
+        if (!liftLets(e, strict))
+        {
+            return false;
+        }
+        if ((b.mHazard && b.mClear < 0) || (e.mKind != EdgeKind::eWalk && e.mKind != EdgeKind::eFall && e.mKind != EdgeKind::eLift && !under) || !drillLets(e.mTo, false) || !drillLets(e.mTo, true))
+        {
+            return false;
+        }
+        s32 sw = 0;
+        s32 value = 0;
+        if (strict && nav.Condition(e, &sw, &value) && world.Switch(sw) != value)
+        {
+            return e.mKind == EdgeKind::eFall && a.mTrapDoor >= 0 && e.mFeature == a.mTrapDoor;
+        }
+        return true;
+    };
+    std::vector<s32> via(nav.Nodes().size(), -1);
+    std::vector<s32> queue{from};
+    s32 found = -1;
+    for (std::size_t q = 0; q < queue.size() && found < 0; q++)
+    {
+        const NavNode& n = nav.Nodes()[queue[q]];
+        for (s32 i = n.mFirstEdge; i < n.mFirstEdge + n.mEdgeCount && found < 0; i++)
+        {
+            const NavEdge& e = nav.Edges()[i];
+            if (e.mTo != from && via[e.mTo] < 0 && can(e))
+            {
+                via[e.mTo] = i;
+                queue.push_back(e.mTo);
+                found = goal[e.mTo] ? e.mTo : -1;
+            }
+        }
+    }
+    if (found < 0)
+    {
+        return false;
+    }
+    for (s32 n = found; n != from; n = nav.Edges()[via[n]].mFrom)
+    {
+        way.insert(way.begin(), via[n]);
+    }
+    return true;
+}
+
+bool Domain::SackJump(const NavGraph& nav, const Entity& sack, s32* from, s32* takeoffX, bool* left)
+{
+    // (the run-up a running jump takes, see NavGraph::AddRunJumps)
+    const s32 kRunUp = 3;
+    const s32 step = NavGraph::GridStep(sack.mHalf);
+    const s32 scale = sack.mHalf ? 2 : 1;
+    const s32 cx = sack.CentreX();
+    s32 bestDist = 0;
+    bool found = false;
+    for (std::size_t i = 0; i < nav.Nodes().size(); i++)
+    {
+        const NavNode& n = nav.Nodes()[i];
+        // A ledge the sack hangs at head height beside, one to four cells off
+        const s32 dist = std::abs(n.mX - cx);
+        if (n.mHalf != sack.mHalf || n.mHazard || (n.mY - sack.mY2) * scale < 15 || (n.mY - sack.mY2) * scale > 75 || dist * scale < 25 || dist * scale > 100)
+        {
+            continue;
+        }
+        const s32 dir = cx > n.mX ? 1 : -1;
+        // No floor on from it towards the sack, and a floor not far below to come down on
+        s32 fy = 0;
+        if (nav.FloorNear(n.mX + dir * step, n.mY, n.mHalf, 12, &fy) >= 0)
+        {
+            continue;
+        }
+        s32 drop = 0;
+        if (nav.FloorBelow(cx, n.mY + 5, n.mHalf, &fy, &drop) < 0 || drop * scale > 150 || nav.NodeAt(cx, fy, n.mHalf, 8) < 0)
+        {
+            continue;
+        }
+        // Room to get up to speed
+        s32 start = static_cast<s32>(i);
+        for (s32 k = 0; k < kRunUp && start >= 0; k++)
+        {
+            const s32 back = nav.NodeAt(nav.Nodes()[start].mX - dir * step, n.mY, n.mHalf, 8);
+            start = back >= 0 && nav.Nodes()[back].mLine == n.mLine && !nav.Nodes()[back].mHazard && !nav.Nodes()[back].mLow ? back : -1;
+        }
+        if (start >= 0 && (!found || dist < bestDist))
+        {
+            found = true;
+            bestDist = dist;
+            *from = start;
+            *takeoffX = n.mX;
+            *left = dir < 0;
+        }
+    }
+    return found;
 }
 
 s32 Domain::UseNode(const NavGraph& nav, const Entity& entity, bool* faceLeft, s32 firstSide)
@@ -63,21 +241,63 @@ s32 Domain::UseNode(const NavGraph& nav, const Entity& entity, bool* faceLeft, s
             break;
         }
         case EntityKind::ePullRing:
+        {
+            // Under the ring, on the floor he can jump up to it from: he reaches 75 and jumps 22
+            s32 fy = 0;
+            const s32 ringY = entity.mY1 + entity.mInputs[0];
+            if (nav.FloorBelow(cx, ringY, entity.mHalf, &fy) >= 0 && fy - ringY <= (entity.mHalf ? 48 : 96))
+            {
+                node = nav.NodeAt(cx, fy, entity.mHalf, 8);
+            }
+            if (node < 0)
+            {
+                node = nav.NodeAt(cx, entity.mY2, entity.mHalf, 40);
+            }
+            break;
+        }
         case EntityKind::eWorkWheel:
         case EntityKind::eHandStone:
             node = nav.NodeAt(cx, entity.mY2, entity.mHalf, 40);
             break;
         case EntityKind::eBirdPortal:
-            // A few cells off, either side
-            for (s32 cells = 3; cells >= 1 && node < 0; cells--)
+        {
+            // A few cells off, either side, with nothing between it and the portal
+            const s32 at = nav.NodeAt(cx, entity.mY2, entity.mHalf, 30);
+            s32 bestCells = 0;
+            for (s32 side = -1; side <= 1 && at >= 0; side += 2)
             {
-                for (s32 side = -1; side <= 1 && node < 0; side += 2)
+                s32 cur = at;
+                for (s32 cells = 1; cells <= 3; cells++)
                 {
-                    node = nav.NodeAt(cx + side * cells * step, entity.mY2, entity.mHalf, 30);
-                    left = side > 0;
+                    s32 next = -1;
+                    const NavNode& n = nav.Nodes()[cur];
+                    for (s32 i = n.mFirstEdge; i < n.mFirstEdge + n.mEdgeCount && next < 0; i++)
+                    {
+                        const NavEdge& e = nav.Edges()[i];
+                        if (e.mKind == EdgeKind::eWalk && nav.Nodes()[e.mTo].mLine == n.mLine && (nav.Nodes()[e.mTo].mX - n.mX) * side > 0)
+                        {
+                            next = e.mTo;
+                        }
+                    }
+                    if (next < 0)
+                    {
+                        break;
+                    }
+                    cur = next;
+                    if (cells > bestCells)
+                    {
+                        bestCells = cells;
+                        node = cur;
+                        left = side > 0;
+                    }
                 }
             }
+            if (node < 0)
+            {
+                node = at;
+            }
             break;
+        }
         case EntityKind::eRockSack:
         {
             // It hangs over the floor: the cell under it
@@ -85,6 +305,11 @@ s32 Domain::UseNode(const NavGraph& nav, const Entity& entity, bool* faceLeft, s
             if (nav.FloorBelow(cx, entity.mY1, entity.mHalf, &fy) >= 0 && fy - entity.mY2 <= (entity.mHalf ? 50 : 100))
             {
                 node = nav.NodeAt(cx, fy, entity.mHalf, 8);
+            }
+            if (node < 0)
+            {
+                s32 takeoffX = 0;
+                SackJump(nav, entity, &node, &takeoffX, &left);
             }
             break;
         }
@@ -160,12 +385,33 @@ std::vector<ThrowSpot> Domain::ThrowSpots(const NavGraph& nav, s32 x, s32 y, boo
                 {
                     spot.mNeeds.push_back(nav.Input().mFeatures[n.mClear].mSwitch);
                 }
+                // One by where he stands goes off if the rock comes back down on it, and takes him with it
+                for (const NavNode& other : nav.Nodes())
+                {
+                    if (other.mClear >= 0 && other.mHalf == half && std::abs(other.mY - n.mY) * scale <= 50 && std::abs(other.mX - n.mX) * scale < (level < 0 ? 125 : 90) && std::abs(other.mX - x) + std::abs(other.mY - y) > 12)
+                    {
+                        const s32 sw = nav.Input().mFeatures[other.mClear].mSwitch;
+                        if (std::find(spot.mNeeds.begin(), spot.mNeeds.end(), sw) == spot.mNeeds.end())
+                        {
+                            spot.mNeeds.push_back(sw);
+                        }
+                    }
+                }
                 for (s32 c = 1; level == 0 && c < cells; c++)
                 {
                     const s32 between = nav.NodeAt(n.mX + (x > n.mX ? c : -c) * step, n.mY, half, 8);
                     if (between >= 0 && nav.Nodes()[between].mClear >= 0)
                     {
                         spot.mNeeds.push_back(nav.Input().mFeatures[nav.Nodes()[between].mClear].mSwitch);
+                    }
+                }
+                // (a crouched throw along the floor goes under a drill that is overhead)
+                const s32 top = std::min(n.mY, y) - (level == 0 && spot.mKind == ThrowSpot::eCrouched ? 30 : 70) / scale;
+                for (const Entity& drill : world ? world->mEntities : std::vector<Entity>{})
+                {
+                    if (drill.mKind == EntityKind::eDrill && drill.mHalf == half && drill.mX1 <= std::max(n.mX, x) && drill.mX2 >= std::min(n.mX, x) && drill.mY1 <= std::max(n.mY, y) && drill.mY2 >= top)
+                    {
+                        spot.mDrill = drill.mId;
                     }
                 }
                 spots.push_back(spot);
@@ -292,6 +538,12 @@ bool Domain::PlanTogether(const NavGraph& nav, const World& world, const Entity&
     return true;
 }
 
+// What a throw through a running drill is taken to cost over one with nothing in the way: more than going round
+// to its lever
+static const s32 kPastDrillCost = 2500;
+// The games' line type of a floor a mine car runs on
+static const s32 kMineCarFloor = 11;
+
 Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const std::function<bool(s32 edge)>& edgeUsable, bool kills)
 {
     Domain d;
@@ -325,10 +577,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
     {
         d.mStart.Set(Key::kRegion, d.mRegions[abeNode] + 1);
     }
-    if (world.mRocks > 0)
-    {
-        d.mStart.Set(Key::kRocks, 1);
-    }
+    d.mStart.Set(Key::kRocks, world.mRocks);
 
     // From region to region
     std::set<std::tuple<s32, s32, s32>> seen;
@@ -378,8 +627,54 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 {
                     break;
                 }
-                step.mKind = StepKind::eUse;
                 const u32 key = Key::Switch(entity.mSwitch);
+                if (entity.mKind == EntityKind::eWorkWheel)
+                {
+                    // A blind Mudokon on the wheel's floor can be called to it from anywhere on its screen that
+                    // is on the wheel's side of it: it walks until the wheel stops it
+                    for (const Entity& mud : world.mEntities)
+                    {
+                        if (mud.mKind != EntityKind::eMudokon || !mud.mBlind || mud.mGone || mud.mHalf != entity.mHalf)
+                        {
+                            continue;
+                        }
+                        const s32 mudNode = UseNode(nav, mud, nullptr);
+                        bool gets = mudNode >= 0 && nav.Nodes()[mudNode].mLine == nav.Nodes()[node].mLine;
+                        for (s32 cur = mudNode; gets && cur != node;)
+                        {
+                            const NavNode& n = nav.Nodes()[cur];
+                            s32 next = -1;
+                            for (s32 i = n.mFirstEdge; i < n.mFirstEdge + n.mEdgeCount && next < 0; i++)
+                            {
+                                const NavEdge& e = nav.Edges()[i];
+                                const NavNode& to = nav.Nodes()[e.mTo];
+                                if (e.mKind == EdgeKind::eWalk && to.mLine == n.mLine && (to.mX - n.mX) * (nav.Nodes()[node].mX - n.mX) > 0 && !to.mHazard && to.mSweep < 0 && to.mSweepHigh < 0 && !nav.Condition(e, nullptr, nullptr))
+                                {
+                                    next = e.mTo;
+                                }
+                            }
+                            gets = next >= 0;
+                            cur = next;
+                        }
+                        if (!gets || mudNode == node)
+                        {
+                            continue;
+                        }
+                        std::set<s32> from;
+                        for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+                        {
+                            if (CallSpot(nav, mud, entity, static_cast<s32>(n)) && from.insert(d.mRegions[n]).second)
+                            {
+                                DomainStep send;
+                                send.mKind = StepKind::eSend;
+                                send.mEntity = mud.mId;
+                                send.mOther = entity.mId;
+                                add("Send Mudokon#" + std::to_string(mud.mId) + " to " + name + " from " + std::to_string(nav.Nodes()[n].mX) + "," + std::to_string(nav.Nodes()[n].mY), {regionFact(static_cast<s32>(n)), {Key::Mud(mud.mId), 0}, {key, 0}}, {{key, 1}}, 250, send);
+                            }
+                        }
+                    }
+                }
+                step.mKind = StepKind::eUse;
                 if (entity.mOp == 0 || entity.mOp == 2)
                 {
                     add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on", {regionFact(node), {key, 0}}, {{key, 1}}, 150, step);
@@ -444,13 +739,49 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 break;
             }
 
+            case EntityKind::eMineCar:
+            {
+                // From where it stands to either end of each of its floors that has a floor to get out on: which
+                // of them it can get to is found by driving
+                const s32 carX = entity.mLive ? entity.mLiveX : entity.CentreX();
+                const s32 carY = entity.mLive ? entity.mLiveY : entity.mY2;
+                const s32 node = nav.NodeAt(carX, carY, entity.mHalf, 30);
+                if (node < 0)
+                {
+                    break;
+                }
+                const s32 cell = NavGraph::GridStep(entity.mHalf);
+                std::set<s32> to;
+                for (const NavLine& line : nav.Input().mLines)
+                {
+                    if (line.mType != kMineCarFloor)
+                    {
+                        continue;
+                    }
+                    for (s32 end = 0; end < 2; end++)
+                    {
+                        const s32 x = end == 0 ? std::min(line.mX1, line.mX2) + cell / 2 : std::max(line.mX1, line.mX2) - cell / 2;
+                        const s32 dest = nav.NodeAt(x, line.mY1 + (entity.mHalf ? 10 : 20), entity.mHalf, 12);
+                        if (dest < 0 || nav.Nodes()[dest].mHazard || d.mRegions[dest] == d.mRegions[node] || !to.insert(d.mRegions[dest]).second)
+                        {
+                            continue;
+                        }
+                        step.mKind = StepKind::eRide;
+                        step.mEdge = dest;
+                        add("Ride " + name + " to " + std::to_string(nav.Nodes()[dest].mX) + "," + std::to_string(nav.Nodes()[dest].mY), {regionFact(node)}, {regionFact(dest)}, 600 + (std::abs(nav.Nodes()[dest].mX - carX) + std::abs(nav.Nodes()[dest].mY - carY)) / 6, step);
+                    }
+                }
+                break;
+            }
+
             case EntityKind::eRockSack:
             {
                 const s32 node = UseNode(nav, entity, nullptr);
                 if (node >= 0)
                 {
                     step.mKind = StepKind::eRocks;
-                    add("Get rocks from " + name, {regionFact(node)}, {{Key::kRocks, 1}}, 300, step);
+                    // (a sack gives nothing to Abe while he has some)
+                    add("Get rocks from " + name, {regionFact(node), {Key::kRocks, 0}}, {{Key::kRocks, entity.mInputs[0] > 0 ? entity.mInputs[0] : 5}}, 300, step);
                 }
                 break;
             }
@@ -463,18 +794,47 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                     break;
                 }
                 // From any region there is a place to throw from
-                std::set<s32> from;
-                for (const ThrowSpot& spot : ThrowSpots(nav, entity.CentreX(), entity.mY2, entity.mHalf, &world))
+                // A drill that goes where the rock would fly takes most throws: with it stopped first if it can
+                // be, and past it as it runs at a price (by trying, a miss is taken back)
+                std::set<std::pair<s32, u32>> from;
+                const std::vector<ThrowSpot> spots = ThrowSpots(nav, entity.CentreX(), entity.mY2, entity.mHalf, &world);
+                // From a ledge above the rock bounces off the edge and the floor, and what hits is found by
+                // trying: only for a mine there is no other way to
+                bool proven = false;
+                for (const ThrowSpot& spot : spots)
                 {
-                    if (from.insert(d.mRegions[spot.mNode]).second)
+                    proven = proven || spot.mLevel <= 0;
+                }
+                for (const ThrowSpot& spot : spots)
+                {
+                    if (proven && spot.mLevel > 0)
+                    {
+                        continue;
+                    }
+                    const Entity* drill = spot.mDrill ? world.Find(spot.mDrill) : nullptr;
+                    if (drill && !(drill->mInputs[0] == 1 && drill->mInputs[2] == 0 && drill->mSwitch > 1))
+                    {
+                        drill = nullptr;
+                    }
+                    if (from.insert({d.mRegions[spot.mNode], drill ? drill->mId : 0}).second)
                     {
                         step.mKind = StepKind::eBlow;
-                        std::vector<Goap::Fact> pre{regionFact(spot.mNode), {Key::kRocks, 1}};
+                        step.mEdge = spot.mNode;
+                        std::vector<Goap::Fact> pre{regionFact(spot.mNode)};
                         for (s32 need : spot.mNeeds)
                         {
                             pre.push_back({Key::Switch(need), 1});
                         }
-                        add("Blow up " + name + " from " + std::to_string(nav.Nodes()[spot.mNode].mX) + "," + std::to_string(nav.Nodes()[spot.mNode].mY), pre, {{Key::Switch(entity.mSwitch), 1}}, 300, step);
+                        const s32 cost = 300;
+                        const std::string blow = "Blow up " + name + " from " + std::to_string(nav.Nodes()[spot.mNode].mX) + "," + std::to_string(nav.Nodes()[spot.mNode].mY);
+                        if (drill)
+                        {
+                            add(blow + " past Drill#" + std::to_string(drill->mId), pre, {{Key::Switch(entity.mSwitch), 1}}, cost + kPastDrillCost, step);
+                            d.mActions.back().mSpend = {Key::kRocks, 1};
+                            pre.push_back({Key::Switch(drill->mSwitch), drill->mInputs[1] ? 1 : 0});
+                        }
+                        add(blow, pre, {{Key::Switch(entity.mSwitch), 1}}, cost, step);
+                        d.mActions.back().mSpend = {Key::kRocks, 1};
                     }
                 }
                 break;
@@ -520,10 +880,22 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 }
                 const Entity* best = nullptr;
                 s32 bestDist = 0;
+                std::vector<s32> blindWay;
                 for (const Entity& portal : world.mEntities)
                 {
                     if (portal.mKind != EntityKind::eBirdPortal || !portal.mRescuePortal || portal.mHalf != entity.mHalf)
                     {
+                        continue;
+                    }
+                    if (entity.mBlind)
+                    {
+                        // It is walked there a stretch at a time, see RescueTask::LeadBlind
+                        std::vector<s32> way;
+                        if (!(portal.mInputs[1] > 1 && world.Switch(portal.mInputs[1])) && BlindWay(nav, world, node, portal, false, way) && (!best || way.size() < blindWay.size()))
+                        {
+                            best = &portal;
+                            blindWay = way;
+                        }
                         continue;
                     }
                     // Gone for good (the switch that does it is often the rescue it was put there for)
@@ -555,6 +927,51 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                     effects.push_back({Key::Switch(entity.mSwitch), 1});
                 }
                 std::vector<Goap::Fact> pre{regionFact(node), {Key::Mud(entity.mId), 0}};
+                if (entity.mBlind && !blindWay.empty())
+                {
+                    // From where it ends up, with its way open and the drills on it stopped
+                    pre[0] = regionFact(nav.Edges()[blindWay.back()].mTo);
+                    const auto need = [&pre](const Goap::Fact& fact)
+                    {
+                        bool have = false;
+                        for (const Goap::Fact& p : pre)
+                        {
+                            have = have || p == fact;
+                        }
+                        if (!have)
+                        {
+                            pre.push_back(fact);
+                        }
+                    };
+                    for (s32 idx : blindWay)
+                    {
+                        const NavEdge& e = nav.Edges()[idx];
+                        s32 condSwitch = 0;
+                        s32 condValue = 0;
+                        const bool drop = e.mKind == EdgeKind::eFall && nav.Nodes()[e.mFrom].mTrapDoor >= 0 && e.mFeature == nav.Nodes()[e.mFrom].mTrapDoor;
+                        if (!drop && nav.Condition(e, &condSwitch, &condValue))
+                        {
+                            need({Key::Switch(condSwitch), condValue});
+                        }
+                        // (a lift that isn't at the stop it is walked onto: the switch that brings it)
+                        const NavNode& onto = nav.Nodes()[e.mTo];
+                        if (onto.mLiftStop >= 0 && nav.Nodes()[e.mFrom].mLiftStop < 0)
+                        {
+                            const NavFeature& stop = nav.Input().mFeatures[onto.mLiftStop];
+                            if (!world.LiftAtStop(onto.mX, onto.mY, stop.mA != 0) && stop.mSwitch > 1)
+                            {
+                                need({Key::Switch(stop.mSwitch), 1});
+                            }
+                        }
+                        for (s32 high = 0; high < 2; high++)
+                        {
+                            if (const Entity* drill = DrillAt(nav, world, e.mTo, high != 0))
+                            {
+                                need({Key::Switch(drill->mSwitch), drill->mInputs[1] ? 1 : 0});
+                            }
+                        }
+                    }
+                }
                 if (best->mInputs[0] > 1)
                 {
                     // The portal isn't there until its switch is on
@@ -634,6 +1051,15 @@ static Reach MakeReach(const Domain& d)
             for (const Goap::Fact& p : d.mActions[i].mPre)
             {
                 ok = ok && r.Holds(p);
+            }
+            if (d.mActions[i].mSpend.mKey)
+            {
+                bool some = false;
+                for (const auto& f : r.mFacts)
+                {
+                    some = some || (f.first == d.mActions[i].mSpend.mKey && f.second > 0);
+                }
+                ok = ok && some;
             }
             if (!ok)
             {

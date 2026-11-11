@@ -31,6 +31,9 @@ enum class EntityKind : u8
     // takes the switch (0 not at all, 1 runs while it is active, 2 one stroke each time it is), whether it starts
     // on, whether it still runs (slower) when off
     eDrill,
+    // A mine car: Abe gets in with up, and it runs along its own lines (floors, walls, ceilings) over whatever
+    // is in the way. mLiveX, mLiveY: where it is now. mState: 1 while Abe is in it
+    eMineCar,
 };
 
 const char* EntityKindName(EntityKind kind);
@@ -66,6 +69,9 @@ struct Entity final
     bool mHoldOnly = false;
     // A portal Mudokons can be sent through
     bool mRescuePortal = false;
+    // A Mudokon that can't see: told to follow it walks towards Abe and on past him, until it is told to wait,
+    // walks into a wall or falls
+    bool mBlind = false;
 
     // Its TLV says it is gone for good: a Mudokon saved or dead
     bool mGone = false;
@@ -249,11 +255,14 @@ struct World final
     }
     // The drill that reaches Abe standing at a place and runs as things are (or is still on its last stroke), or
     // null. Its width is not in the path's data: 20 either side of its rectangle covers what was measured.
-    const Entity* SweepOver(s32 x, s32 y, bool half) const
+    // crouched: as he is under a low ceiling or a drill that goes over his head
+    const Entity* SweepOver(s32 x, s32 y, bool half, bool crouched = false) const
     {
+        const s32 tall = (half ? 30 : 60) / (crouched ? 2 : 1);
         for (const Entity& e : mEntities)
         {
-            if (e.mKind != EntityKind::eDrill || e.mHalf != half || x < e.mX1 - 20 || x > e.mX2 + 20 || y - (half ? 30 : 60) > e.mY2 || y < e.mY1)
+            const s32 reach = e.mX2 - e.mX1 > e.mY2 - e.mY1 ? 20 : 12;
+            if (e.mKind != EntityKind::eDrill || e.mHalf != half || x < e.mX1 - reach || x > e.mX2 + reach || y - tall > e.mY2 || y < e.mY1)
             {
                 continue;
             }
@@ -264,6 +273,12 @@ struct World final
             }
         }
         return nullptr;
+    }
+    // Whether a drill is moving or will be: as its switch is, or still on its last stroke
+    bool SweepLive(const Entity& drill) const
+    {
+        const SweepAt* live = SweepOf(drill.mId);
+        return SweepRuns(drill) || (live && live->mPhase != 0);
     }
     const SweepAt* SweepOf(u32 id) const
     {
@@ -311,6 +326,24 @@ struct World final
     }
     std::vector<SlogAt> mSlogs;
     std::vector<LiftAt> mLifts;
+    // Where each lift was when it was last about
+    std::vector<LiftAt> mLiftsSeen;
+    // Whether a lift is at one of its stops (a floor at y that x is on). One that isn't about, its screen not
+    // being loaded, is where it was last seen, or failing that where it starts.
+    bool LiftAtStop(s32 x, s32 y, bool startsHere) const
+    {
+        for (const std::vector<LiftAt>* lifts : {&mLifts, &mLiftsSeen})
+        {
+            for (const LiftAt& lift : *lifts)
+            {
+                if (x >= lift.mX1 && x <= lift.mX2)
+                {
+                    return std::abs(lift.mY - y) <= 4;
+                }
+            }
+        }
+        return startsHere;
+    }
     std::vector<SligAt> mSligs;
     std::vector<Entity> mEntities;
     // The TLV of each entity, for the reader of the game only

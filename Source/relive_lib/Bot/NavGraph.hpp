@@ -29,12 +29,15 @@ enum class FeatureKind : u8
     eHazard,      // a mine or the like on the floor: never stood on, hopped over
     ePathExit,    // walking into it leaves the path, mDest*
     eInvisibleZone, // standing wholly inside it Abe isn't seen
-    eLiftStop,    // a floor a lift stops at: its rectangle's top is the floor, as wide as the platform
+    eLiftStop,    // a floor a lift stops at: its rectangle's top is the floor, as wide as the platform. mA: the
+                  // lift starts here, mB its id, mSwitch: a lift mover brings it here once that switch is on
     eLevelLoader, // the game leaves the path by itself once switch mSwitch is on, mDest*
     eBarrier,     // a slam door, an electric wall...: nothing passes while it is shut. Open when switch mSwitch is
                   // on, or off if mStartClosed is false
     eSweep,       // a drill goes to and fro in its rectangle: the cells it reaches are crossed when it is out of
                   // the way (see GoToTask)
+    eTrapDoor,    // floor along its rectangle's top while it is shut. Open while switch mSwitch is on if
+                  // mStartClosed, else while it is off
 };
 
 // Something in the map that changes where Abe can go. From the path's TLVs, see GameView.
@@ -108,6 +111,8 @@ struct NavEdge final
     s32 mX = 0;
     // The hazard (its feature) that has to be gone before it can be taken: a mine in the cell it leads into
     s32 mClear = -1;
+    // The lift stop (its feature) over whose shaft it jumps: only while the lift is away from it
+    s32 mShaft = -1;
 };
 
 // A grid cell of floor Abe can stand on
@@ -122,10 +127,15 @@ struct NavNode final
     s32 mClear = -1;
     // A drill reaches Abe here (its feature), or -1
     s32 mSweep = -1;
+    // A drill goes to and fro over Abe's head here (its feature), or -1: he is safe under it crouched, so the
+    // cell is one to roll through (mLow), and to stand up in only when the drill is away or stopped
+    s32 mSweepHigh = -1;
     // A ceiling too low to stand under
     bool mLow = false;
     // On a lift's platform when it is at this stop (the stop's feature), or -1
     s32 mLiftStop = -1;
+    // On a trap door (its feature), or -1: floor only while it is shut
+    s32 mTrapDoor = -1;
     // In an invisible zone: not seen there
     bool mHidden = false;
     s32 mFirstEdge = 0;
@@ -208,7 +218,8 @@ private:
     // height: how far above the floor to look (0: at standing and at crouching height)
     bool WallBetween(s32 xa, s32 xb, s32 y, bool half, s32 height = 0) const;
     bool CeilingOver(s32 x, s32 y, bool half) const;
-    void AddRunJumps(std::vector<NavEdge>& edges, s32 from, s32 dir) const;
+    // overLift: the jumps there are over a lift's shaft when the lift is away (the edge's feature is the stop)
+    void AddRunJumps(std::vector<NavEdge>& edges, s32 from, s32 dir, bool overLift = false) const;
     s32 BarrierBetween(s32 xa, s32 xb, s32 y, bool half) const;
     const NavFeature* FeatureAt(FeatureKind kind, s32 x, s32 y, bool half, s32* index = nullptr) const;
     void AddEdge(std::vector<NavEdge>& edges, s32 from, s32 to, EdgeKind kind, s32 cost, s32 feature, bool left) const;

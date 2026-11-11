@@ -108,12 +108,50 @@ private:
     s32 mPicks = 0;
 };
 
+// Get into a mine car, drive it to a cell and get out. A direction held carries the car on round corners, up
+// walls and along ceilings, so it is driven by holding the way that moves it nearer and, where that does
+// nothing, trying the others in turn.
+class RideCarTask final : public Task
+{
+public:
+    RideCarTask(u32 car, s32 dest)
+        : mCar(car)
+        , mDest(dest)
+    {
+    }
+    ~RideCarTask() override;
+    std::string Name() const override
+    {
+        return "Ride mine car #" + std::to_string(mCar);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mCar;
+    s32 mDest;
+    std::unique_ptr<GoToTask> mGo;
+    s32 mSteps = 0;
+    s32 mEnters = 0;
+    // The key held, and how many steps it has moved nothing
+    u32 mKey = 0;
+    s32 mStill = 0;
+    s32 mLastX = 0;
+    s32 mLastY = 0;
+    // The keys that did nothing where the car now stands
+    std::vector<u32> mDud;
+    // The way the car last went: not straight back that way while anything else moves it
+    u32 mWent = 0;
+    s32 mExits = 0;
+};
+
 // Throw rocks at a mine until it goes off: from one place after another, keeping what missed and what killed
 class BlowMineTask final : public Task
 {
 public:
-    explicit BlowMineTask(u32 mine)
+    // from: a cell of the stretch of floor the plan throws from (its region), or -1 for where Abe is
+    explicit BlowMineTask(u32 mine, s32 from = -1)
         : mMine(mine)
+        , mFrom(from)
     {
     }
     ~BlowMineTask() override;
@@ -132,6 +170,7 @@ private:
     s32 mLost = 0;
     s32 mLiveBefore = 0;
     u32 mMine;
+    s32 mFrom = -1;
     std::unique_ptr<GoToTask> mGo;
     // Cells that couldn't be got to
     std::vector<s32> mNoWay;
@@ -150,7 +189,10 @@ public:
     // Whether the first `count` edges of a way can be gone now without a drill reaching Abe on any of them: each
     // edge has him in the cell it leaves and the one it leads to for as long as it may take
     // late: frames he is later (or, negative, sooner) than worked out
-    static bool SweepsClear(const NavGraph& nav, const World& world, const std::vector<s32>& path, std::size_t count, s32 late = 0);
+    // The drill that goes over Abe's head at a cell and is moving or will be, or null
+    static const Entity* SweepHigh(const NavGraph& nav, const World& world, s32 node);
+    // rolled: as it goes if the walking of it is rolled, from a crouch
+    static bool SweepsClear(const NavGraph& nav, const World& world, const std::vector<s32>& path, std::size_t count, s32 late = 0, bool rolled = false);
     // The drill that reaches a cell and runs as things are, or null
     static const Entity* SweepOver(const NavGraph& nav, const World& world, s32 node);
     // The lever or ring that stops a drill for good and can be got to from a cell without passing any drill
@@ -202,8 +244,13 @@ private:
     // Pulling the lever that stops the drill in the way
     std::unique_ptr<Task> mStop;
     s32 mStops = 0;
+    bool mTrapTried = false;
     s32 mRetreats = 0;
     bool mLeading = false;
+    // Crouched before a drill, to roll through under it
+    bool mSweepDuck = false;
+    s32 mHangFails = 0;
+    s32 mLiftGlide = 0;
     s32 mLeadWaits = 0;
     std::unique_ptr<DisarmTask> mDisarm;
     s32 mDisarms = 0;
@@ -242,6 +289,8 @@ private:
     s32 mTries = 0;
     bool mLooking = false;
     s32 mLookTaps = 0;
+    s32 mDucks = 0;
+    s32 mLiftWaits = 0;
 };
 
 // Get a Mudokon to follow: go to it, hello, sorry or a slap if its mood needs it, follow me
@@ -259,10 +308,28 @@ public:
         return "Recruit Mudokon#" + std::to_string(mMud);
     }
     TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+    // The side of it to talk from (-1 left, 1 right, 0 either): a blind one walks that way
+    void SetSide(s32 side)
+    {
+        mSide = side;
+    }
+    // Talked to from where Abe is, whatever floor that is: it hears him anywhere on its screen
+    // Hello is said to all of them at once ("all o' ya")
+    void SetAll(bool all)
+    {
+        mAll = all;
+    }
+    void SetRemote(bool remote)
+    {
+        mRemote = remote;
+    }
 
 private:
     u32 mMud;
     bool mCalm;
+    s32 mSide = 0;
+    bool mRemote = false;
+    bool mAll = false;
     std::unique_ptr<GoToTask> mGo;
     std::unique_ptr<DisarmTask> mDisarm;
     s32 mDisarms = 0;
@@ -292,14 +359,86 @@ public:
     TaskStep Next(Bot& bot, const std::string& lastFailed) override;
 
 private:
+    // A blind Mudokon is walked to the portal's floor a straight stretch at a time: talked to from the side it
+    // is to walk to, told to wait where the stretch ends, and dropped through the trap door it stops on.
+    // True once it is there, else step is what to do.
+    bool LeadBlind(Bot& bot, const Entity& mud, const Entity& portal, const std::string& lastFailed, TaskStep& step);
+
     u32 mMud;
     u32 mPortal;
     std::unique_ptr<GoToTask> mGo;
     std::unique_ptr<RecruitTask> mRecruit;
+    std::unique_ptr<UseTask> mUse;
     s32 mRecruits = 0;
     s32 mPhase = 0;
     s32 mWaits = 0;
     s32 mRespawns = 0;
+    bool mBlindThere = false;
+    s32 mBlindPhase = 0;
+    s32 mBlindStop = -1;
+    s32 mBlindDir = 0;
+    s32 mBlindTrap = -1;
+    s32 mBlindRide = -1;
+    s32 mBlindTries = 0;
+    s32 mBlindWaits = 0;
+    s32 mBlindLastX = 0;
+    s32 mBlindStill = 0;
+    bool mBlindAhead = false;
+};
+
+// A Slig walks a floor under a drill that comes down once when its ring is pulled: the ring is pulled as the Slig
+// walks in under it
+class TrapSligTask final : public Task
+{
+public:
+    TrapSligTask(u32 ringId, u32 drillId)
+        : mRing(ringId)
+        , mDrill(drillId)
+    {
+    }
+    std::string Name() const override
+    {
+        return "Drop Drill#" + std::to_string(mDrill) + " on the Slig";
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+    // The ring and the drill to do it with for a Slig, where the ring is pulled from a floor the Slig isn't on
+    static bool Find(const NavGraph& nav, const World& world, const SligAt& slig, u32& ring, u32& drill);
+
+private:
+    u32 mRing;
+    u32 mDrill;
+    std::unique_ptr<GoToTask> mGo;
+    s32 mPhase = 0;
+    s32 mWaits = 0;
+    s32 mPulls = 0;
+    s32 mLastX = 0;
+};
+
+// A blind Mudokon is called from the wheel's side of it, walks until the wheel stops it, and is told to work
+class SendToWheelTask final : public Task
+{
+public:
+    SendToWheelTask(u32 mudId, u32 wheelId)
+        : mMud(mudId)
+        , mWheel(wheelId)
+    {
+    }
+    std::string Name() const override
+    {
+        return "Send Mudokon#" + std::to_string(mMud) + " to wheel #" + std::to_string(mWheel);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mMud;
+    u32 mWheel;
+    std::unique_ptr<GoToTask> mGo;
+    std::unique_ptr<RecruitTask> mRecruit;
+    s32 mPhase = 0;
+    s32 mWaits = 0;
+    s32 mLastX = 0;
+    s32 mStill = 0;
+    s32 mSaid = 0;
 };
 
 // Wheels that only count turned together: Mudokons are brought along, stop at the wheels on the way to Abe's, are
