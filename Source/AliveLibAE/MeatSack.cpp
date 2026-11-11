@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "MeatSack.hpp"
 #include "Map.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
@@ -156,4 +158,26 @@ void MeatSack::VUpdate()
 void MeatSack::VScreenChanged()
 {
     SetDead(true);
+}
+
+void MeatSack::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    MeatSackSaveState data = {};
+    data.mHasBeenHit = mHasBeenHit;
+    data.mMeatAmount = mMeatAmount;
+    data.mPlayWobbleSound = mPlayWobbleSound;
+    pSaveBuffer.Write(data);
+}
+
+void MeatSack::RestoreFromSaveState(const MeatSackSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eMeatSack)
+    {
+        return;
+    }
+    MeatSack* p = static_cast<MeatSack*>(pObj);
+    p->mHasBeenHit = state.mHasBeenHit;
+    p->mMeatAmount = state.mMeatAmount;
+    p->mPlayWobbleSound = state.mPlayWobbleSound;
 }

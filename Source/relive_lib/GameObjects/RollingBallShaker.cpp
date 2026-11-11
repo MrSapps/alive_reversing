@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../ObjectIds.hpp"
+#include "../SerializedObjectData.hpp"
 #include "RollingBallShaker.hpp"
 #include "../Function.hpp"
 #include "../PsxDisplay.hpp"
@@ -53,6 +55,12 @@ void RollingBallShaker::VUpdate()
     }
 }
 
+std::vector<BaseGameObject::NotStateMemory> RollingBallShaker::VNotStateMemory()
+{
+    // What it was last drawn with
+    return {{&mPrimScreenOffset, sizeof(mPrimScreenOffset)}};
+}
+
 void RollingBallShaker::VRender(OrderingTable& ot)
 {
     if (mStopShaking)
@@ -69,4 +77,24 @@ void RollingBallShaker::VRender(OrderingTable& ot)
         mPrimScreenOffset.SetOffset(sRollingBallShakerScreenOffsets[mShakeTableIdx].x, sRollingBallShakerScreenOffsets[mShakeTableIdx].y);
         ot.Add(Layer::eLayer_0, &mPrimScreenOffset);
     }
+}
+
+void RollingBallShaker::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    RollingBallShakerSaveState data = {};
+    data.mShakeTableIdx = mShakeTableIdx;
+    data.mStopShaking = mStopShaking;
+    pSaveBuffer.Write(data);
+}
+
+void RollingBallShaker::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const RollingBallShakerSaveState& state = *pData.ReadTmpPtr<RollingBallShakerSaveState>();
+    RollingBallShaker* p = relive_new RollingBallShaker(resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mShakeTableIdx = state.mShakeTableIdx;
+    p->mStopShaking = state.mStopShaking;
 }

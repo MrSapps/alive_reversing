@@ -131,6 +131,7 @@ UXB::UXB(relive::Path_UXB* pTlv, const Guid& tlvId, ResourceManager& resMan, Bas
         if (pTlv->mStartState == relive::Path_UXB::StartState::eOn)
         {
             mFlashAnim.LoadPal(GetPalRes(PalId::GreenFlash));
+            mFlashPalGreen = true;
 
             mIsRed = 0;
 
@@ -377,12 +378,14 @@ void UXB::VUpdate()
                     if (mRedBlinkCount == 0)
                     {
                         mFlashAnim.LoadPal(GetPalRes(PalId::GreenFlash));
+                        mFlashPalGreen = true;
                         mIsRed = 0;
                     }
                 }
                 else
                 {
                     mFlashAnim.ReloadPal();
+                    mFlashPalGreen = false;
 
                     mIsRed = 1;
 
@@ -519,6 +522,10 @@ void UXB::VGetSaveState(SerializedObjectData& __pSaveBuffer)
     data.mPatternIndex = mPatternIndex;
     data.mRedBlinkCount = mRedBlinkCount;
     data.mIsRed = mIsRed;
+    data.mAnim = GetAnimation().GetSaveState();
+    data.mFlashAnim = mFlashAnim.GetSaveState();
+    data.mFlashAnimId = static_cast<s32>(mFlashAnim.mAnimRes.mId);
+    data.mFlashPalGreen = mFlashPalGreen;
 
     __pSaveBuffer.Write(data);
 }
@@ -549,6 +556,23 @@ void UXB::CreateFromSaveState(SerializedObjectData& __pSaveState, ResourceManage
     if (pSaveState->mIsRed)
     {
         pUXB->mIsRed = 1;
+    }
+
+    pUXB->GetAnimation().RestoreSaveState(pSaveState->mAnim);
+
+    if (pSaveState->mFlashAnim.mValid)
+    {
+        pUXB->mFlashAnim.Set_Animation_Data(pUXB->GetAnimRes(static_cast<AnimId>(pSaveState->mFlashAnimId)));
+        pUXB->mFlashPalGreen = pSaveState->mFlashPalGreen;
+        if (pUXB->mFlashPalGreen)
+        {
+            pUXB->mFlashAnim.LoadPal(pUXB->GetPalRes(PalId::GreenFlash));
+        }
+        else
+        {
+            pUXB->mFlashAnim.ReloadPal();
+        }
+        pUXB->mFlashAnim.RestoreSaveState(pSaveState->mFlashAnim);
     }
 }
 

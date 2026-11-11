@@ -336,6 +336,8 @@ void Bat::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mAttackDurationTimer = mAttackDurationTimer;
     data.mEnemyXPos = mEnemyXPos;
     data.mEnemyYPos = mEnemyYPos;
+    data.mAttackTarget = mAttackTarget;
+    data.mBatLineIdx = mBatLine ? static_cast<s32>(mBatLine - gCollisions->mCollisionArray) + 1 : 0;
 
     pSaveBuffer.Write(data);
 }
@@ -379,15 +381,13 @@ void Bat::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& re
             &hitX,
             &hitY,
             CollisionMask(eTrackLine_8));
+        if (pState->mBatLineIdx > 0)
+        {
+            pBat->mBatLine = gCollisions->Get_Line_At_Idx(static_cast<s16>(pState->mBatLineIdx - 1));
+        }
 
         pBat->mBatState = pState->mBatState;
-        if (pBat->mBatState == BatStates::eAttackTarget_4)
-        {
-            // mAttackTarget isn't restorable (see BatSaveState comment) -
-            // land safely in the "give up and fly off" state instead of
-            // eAttackTarget_4, which would dereference a null target.
-            pBat->mBatState = BatStates::eFlyAwayAndDie_5;
-        }
+        pBat->mAttackTarget = pState->mAttackTarget;
 
         switch (pBat->mBatState)
         {
@@ -396,6 +396,7 @@ void Bat::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& re
                 break;
 
             case BatStates::eFlying_3:
+            case BatStates::eAttackTarget_4:
             case BatStates::eFlyAwayAndDie_5:
                 pBat->GetAnimation().Set_Animation_Data(pBat->GetAnimRes(AnimId::Bat_Flying));
                 break;

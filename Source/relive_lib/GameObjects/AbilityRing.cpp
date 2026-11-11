@@ -227,6 +227,12 @@ AbilityRing::~AbilityRing()
     gObjListDrawables->Remove_Item(this);
 }
 
+std::vector<BaseGameObject::NotStateMemory> AbilityRing::VNotStateMemory()
+{
+    // What the rings were last drawn with
+    return {{mRingPolyBuffer, sizeof(mRingPolyBuffer)}};
+}
+
 void AbilityRing::VRender(OrderingTable& ot)
 {
     if (mMap.Is_Point_In_Current_Camera(
@@ -552,6 +558,31 @@ void AbilityRing::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mRingGreen = mRingGreen;
     data.mRingBlue = mRingBlue;
 
+    data.mFullState = true;
+    data.mRefreshTargetObjId = mRefreshTargetObjId;
+    data.mRingLayer = static_cast<s32>(mRingLayer);
+    data.mRingLeft = mRingLeft;
+    data.mRingSpeed = mRingSpeed;
+    data.mRingScaleX = mRingScaleX;
+    data.mRingScaleY = mRingScaleY;
+    data.mRingThickness = mRingThickness;
+    data.mRingFadeoutDistance = mRingFadeoutDistance;
+    data.mRingScreenX = mRingScreenX;
+    data.mRingScreenY = mRingScreenY;
+    data.mRingScreenXPos = mRingScreenXPos;
+    data.mRingScreenYPos = mRingScreenYPos;
+    data.mRingSemiTrans = mRingSemiTrans;
+    data.mRingLevel = mRingLevel;
+    data.mRingPath = mRingPath;
+    data.mRingTargetObjId = mRingTargetObjId;
+    for (s32 i = 0; i < ALIVE_COUNTOF(mRingCollideRects); i++)
+    {
+        data.mRingCollideRects[i][0] = static_cast<s16>(mRingCollideRects[i].x);
+        data.mRingCollideRects[i][1] = static_cast<s16>(mRingCollideRects[i].y);
+        data.mRingCollideRects[i][2] = static_cast<s16>(mRingCollideRects[i].w);
+        data.mRingCollideRects[i][3] = static_cast<s16>(mRingCollideRects[i].h);
+    }
+
     data.mRingTlvInfo = Guid{};
     if (mRingTargetObjId == Guid{})
     {
@@ -567,18 +598,68 @@ void AbilityRing::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
+AbilityRing::AbilityRing(RestoreTag, ResourceManager& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
+{
+    SetType(ReliveTypes::eAbilityRing);
+    gObjListDrawables->Push_Back(this);
+    SetDrawable(true);
+}
+
 void AbilityRing::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pState = pBuffer.ReadTmpPtr<AbilityRingSaveState>();
-    auto pRing = relive_new AbilityRing(pState->mRingXPos, pState->mRingYPos, pState->mRingType, pState->mRingScale, resMan, map);
-    if (pRing)
+    if (!pState->mFullState)
     {
-        pRing->mRingRed = pState->mRingRed;
-        pRing->mRingGreen = pState->mRingGreen;
-        pRing->mRingBlue = pState->mRingBlue;
-        pRing->mRingRight = pState->mRingRight;
-        pRing->mRingCount = pState->mRingCount;
-        pRing->mRingTargetObjId = pState->mRingTlvInfo;
-        pRing->mRefreshTargetObjId = true;
+        // From the original game's save
+        auto pRing = relive_new AbilityRing(pState->mRingXPos, pState->mRingYPos, pState->mRingType, pState->mRingScale, resMan, map);
+        if (pRing)
+        {
+            pRing->mRingRed = pState->mRingRed;
+            pRing->mRingGreen = pState->mRingGreen;
+            pRing->mRingBlue = pState->mRingBlue;
+            pRing->mRingRight = pState->mRingRight;
+            pRing->mRingCount = pState->mRingCount;
+            pRing->mRingTargetObjId = pState->mRingTlvInfo;
+            pRing->mRefreshTargetObjId = true;
+        }
+        return;
+    }
+
+    AbilityRing* pRing = relive_new AbilityRing(RestoreTag{}, resMan, map);
+    if (!pRing)
+    {
+        return;
+    }
+    pRing->mRingXPos = pState->mRingXPos;
+    pRing->mRingYPos = pState->mRingYPos;
+    pRing->mRingType = pState->mRingType;
+    pRing->mRingRight = pState->mRingRight;
+    pRing->mRingCount = pState->mRingCount;
+    pRing->mRingRed = pState->mRingRed;
+    pRing->mRingGreen = pState->mRingGreen;
+    pRing->mRingBlue = pState->mRingBlue;
+    pRing->mRefreshTargetObjId = pState->mRefreshTargetObjId;
+    pRing->mRingLayer = static_cast<Layer>(pState->mRingLayer);
+    pRing->mRingLeft = pState->mRingLeft;
+    pRing->mRingSpeed = pState->mRingSpeed;
+    pRing->mRingScaleX = pState->mRingScaleX;
+    pRing->mRingScaleY = pState->mRingScaleY;
+    pRing->mRingThickness = pState->mRingThickness;
+    pRing->mRingFadeoutDistance = pState->mRingFadeoutDistance;
+    pRing->mRingScreenX = pState->mRingScreenX;
+    pRing->mRingScreenY = pState->mRingScreenY;
+    pRing->mRingScreenXPos = pState->mRingScreenXPos;
+    pRing->mRingScreenYPos = pState->mRingScreenYPos;
+    pRing->mRingSemiTrans = pState->mRingSemiTrans;
+    pRing->mRingLevel = pState->mRingLevel;
+    pRing->mRingPath = pState->mRingPath;
+    pRing->mRingTargetObjId = pState->mRingTargetObjId;
+    for (s32 i = 0; i < ALIVE_COUNTOF(pRing->mRingCollideRects); i++)
+    {
+        pRing->mRingCollideRects[i].x = pState->mRingCollideRects[i][0];
+        pRing->mRingCollideRects[i].y = pState->mRingCollideRects[i][1];
+        pRing->mRingCollideRects[i].w = pState->mRingCollideRects[i][2];
+        pRing->mRingCollideRects[i].h = pState->mRingCollideRects[i][3];
     }
 }

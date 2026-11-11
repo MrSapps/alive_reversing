@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../ObjectIds.hpp"
+#include "../SerializedObjectData.hpp"
 #include "Mine.hpp"
 #include "../Function.hpp"
 #include "../Events.hpp"
@@ -279,4 +281,28 @@ bool Mine::IsColliding()
         }
     }
     return false;
+}
+
+void Mine::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    MineSaveState data = {};
+    data.mDetonating = mDetonating;
+    data.mExplosionTimer = mExplosionTimer;
+    data.mPersistOffscreen = mPersistOffscreen;
+    data.mFlashAnim = mFlashAnim.GetSaveState();
+    pSaveBuffer.Write(data);
+}
+
+void Mine::RestoreFromSaveState(const MineSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eMine)
+    {
+        return;
+    }
+    Mine* p = static_cast<Mine*>(pObj);
+    p->mDetonating = state.mDetonating;
+    p->mExplosionTimer = state.mExplosionTimer;
+    p->mPersistOffscreen = state.mPersistOffscreen;
+    p->mFlashAnim.RestoreSaveState(state.mFlashAnim);
 }

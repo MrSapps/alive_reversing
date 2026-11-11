@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "MultiSwitchController.hpp"
 #include "Map.hpp"
 #include "../relive_lib/Events.hpp"
@@ -267,4 +269,26 @@ void MultiSwitchController::WaitingForAllOff()
         // TODO: OG bug, why is this always reset ??
         mAllSwitchesOnOrOffTime = 0;
     }
+}
+
+void MultiSwitchController::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    MultiSwitchControllerSaveState data = {};
+    data.mLastSwitchOnTime = mLastSwitchOnTime;
+    data.mAllSwitchesOnOrOffTime = mAllSwitchesOnOrOffTime;
+    data.mIsOn = mIsOn;
+    pSaveBuffer.Write(data);
+}
+
+void MultiSwitchController::RestoreFromSaveState(const MultiSwitchControllerSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    MultiSwitchController* p = static_cast<MultiSwitchController*>(pObj);
+    p->mLastSwitchOnTime = state.mLastSwitchOnTime;
+    p->mAllSwitchesOnOrOffTime = state.mAllSwitchesOnOrOffTime;
+    p->mIsOn = state.mIsOn;
 }

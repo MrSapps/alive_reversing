@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "GameSpeak.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "stdlib.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/GameType.hpp"
@@ -66,6 +67,34 @@ GameSpeak::GameSpeak(ResourceManager& resMan, BaseMap& map)
     mEventBuffer[0] = GameSpeakEvents::eNone;
     SetType(ReliveTypes::eGameSpeak);
     mLastEventIndex = 0;
+}
+
+void GameSpeak::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    GameSpeakSaveState data = {};
+    data.mLastEventFrame = mLastEventFrame;
+    data.mLastEvent = mLastEvent;
+    data.mLastEventIndex = mLastEventIndex;
+    for (s32 i = 0; i < ALIVE_COUNTOF(mEventBuffer); i++)
+    {
+        data.mEventBuffer[i] = mEventBuffer[i];
+    }
+    pSaveBuffer.Write(data);
+}
+
+void GameSpeak::RestoreFromSaveState(const GameSpeakSaveState& state)
+{
+    if (!gEventSystem)
+    {
+        return;
+    }
+    gEventSystem->mLastEventFrame = state.mLastEventFrame;
+    gEventSystem->mLastEvent = state.mLastEvent;
+    gEventSystem->mLastEventIndex = state.mLastEventIndex;
+    for (s32 i = 0; i < ALIVE_COUNTOF(gEventSystem->mEventBuffer); i++)
+    {
+        gEventSystem->mEventBuffer[i] = state.mEventBuffer[i];
+    }
 }
 
 void GameSpeak::VScreenChanged()

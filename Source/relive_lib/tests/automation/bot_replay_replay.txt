@@ -1,0 +1,10 @@
+# See bot_replay_play.txt
+timeout 200
+start mines 1 4 838 1498
+draw 0
+wait_until in_game
+wait_frames 40
+hash_log %OUT%
+replay %INPUTS%
+wait_frames 18
+quit

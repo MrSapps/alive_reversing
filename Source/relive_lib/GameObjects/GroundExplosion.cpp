@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../ObjectIds.hpp"
+#include "../SerializedObjectData.hpp"
 #include "GroundExplosion.hpp"
 #include "../Function.hpp"
 #include "../Events.hpp"
@@ -12,6 +14,10 @@
 #include "BaseAliveGameObject.hpp"
 #include "../GameType.hpp"
 #include "../../AliveLibAO/Midi.hpp"
+#include "../WorldStatic.hpp"
+
+// Alternates between the two explosion sounds on each one
+static WorldStatic<bool> sStaticIdFlip("GroundExplosion.sStaticIdFlip", false);
 
 GroundExplosion::GroundExplosion(FP xpos, FP ypos, FP scale, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
@@ -64,16 +70,26 @@ GroundExplosion::GroundExplosion(FP xpos, FP ypos, FP scale, ResourceManager& re
     if (GetGameType() == GameType::eAe)
     {
         // alternate between Explosion1 and Explosion2 on each call
-        static bool staticIdFlip = false;
-        const u16 explosionSeqId = static_cast<u16>(staticIdFlip ? SeqId::Explosion1_14 : SeqId::Explosion2_15);
+        const u16 explosionSeqId = static_cast<u16>(sStaticIdFlip ? SeqId::Explosion1_14 : SeqId::Explosion2_15);
         SND_SEQ_PlaySeq(explosionSeqId, 1, 1);
-        staticIdFlip = !staticIdFlip;
+        sStaticIdFlip = !sStaticIdFlip;
 
     }
     else
     {
         SND_SEQ_PlaySeq(AO::SeqId::eExplosion1_21, 1, 1);
     }
+}
+
+GroundExplosion::GroundExplosion(RestoreTag, ResourceManager& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
+{
+    SetType(ReliveTypes::eGroundExplosion);
+
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::GroundExplosion));
+    Animation_Init(GetAnimRes(AnimId::GroundExplosion));
+
+    SetApplyShadowZoneColour(false);
 }
 
 void GroundExplosion::VUpdate()
@@ -256,4 +272,22 @@ void GroundExplosion::DealDamageRect(const PSX_RECT* pRect)
             }
         }
     }
+}
+
+void GroundExplosion::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    GroundExplosionSaveState data = {};
+    data.mBombSpriteScale = mBombSpriteScale;
+    pSaveBuffer.Write(data);
+}
+
+void GroundExplosion::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const GroundExplosionSaveState& state = *pData.ReadTmpPtr<GroundExplosionSaveState>();
+    GroundExplosion* p = relive_new GroundExplosion(GroundExplosion::RestoreTag{}, resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mBombSpriteScale = state.mBombSpriteScale;
 }

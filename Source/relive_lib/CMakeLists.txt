@@ -95,8 +95,6 @@ SET(AliveLibSrcAO
    ../AliveLibAO/FootSwitch.cpp
    ../AliveLibAO/FallingItem.hpp
    ../AliveLibAO/FallingItem.cpp
-   ../AliveLibAO/InvisibleSwitch.hpp
-   ../AliveLibAO/InvisibleSwitch.cpp
    ../AliveLibAO/PullRingRope.hpp
    ../AliveLibAO/PullRingRope.cpp
    ../AliveLibAO/BellSong.hpp
@@ -236,8 +234,6 @@ SET(AliveLibAESrc
     ../AliveLibAE/WheelSyncer.cpp
     ../AliveLibAE/LevelLoader.hpp
     ../AliveLibAE/LevelLoader.cpp
-    ../AliveLibAE/InvisibleSwitch.hpp
-    ../AliveLibAE/InvisibleSwitch.cpp
     ../AliveLibAE/Lever.hpp
     ../AliveLibAE/Lever.cpp
     ../AliveLibAE/MultiSwitchController.hpp
@@ -528,6 +524,8 @@ SET(game_objects_src
     GameObjects/AbilityRing.hpp
     GameObjects/Door.cpp
     GameObjects/Door.hpp
+    GameObjects/InvisibleSwitch.hpp
+    GameObjects/InvisibleSwitch.cpp
     GameObjects/BaseAbe.cpp
     GameObjects/BaseAbe.hpp
 )
@@ -626,6 +624,34 @@ SET(relive_lib_src
     CommandLineOptions.cpp
     Automation.hpp
     Automation.cpp
+    StateHash.hpp
+    StateHash.cpp
+    AutomationSpawn.hpp
+    AutomationSpawn.cpp
+    Bot/Bot.hpp
+    Bot/Bot.cpp
+    Bot/BotRng.hpp
+    Bot/GameView.hpp
+    Bot/GameView.cpp
+    Bot/Goap.hpp
+    Bot/Goap.cpp
+    Bot/Domain.hpp
+    Bot/Domain.cpp
+    Bot/Profile.hpp
+    Bot/Profile.cpp
+    Bot/World.hpp
+    Bot/Checkpoint.hpp
+    Bot/Checkpoint.cpp
+    Bot/Task.hpp
+    Bot/Tasks.cpp
+    Bot/LevelGraph.hpp
+    Bot/LevelGraph.cpp
+    Bot/NavGraph.hpp
+    Bot/NavGraph.cpp
+    Bot/Pilot.hpp
+    Bot/Pilot.cpp
+    WorldStatic.hpp
+    WorldStatic.cpp
     SoundDebug.hpp
     SoundDebug.cpp
     BinaryPath.hpp
@@ -860,6 +886,7 @@ add_executable(relive_lib_tests
     tests/CommandLineParserTests.cpp
     tests/CommandLineOptionsTests.cpp
     tests/AutomationTests.cpp
+    tests/BotTests.cpp
     tests/BinaryPathTests.cpp
     tests/SfxTests.cpp
     tests/MovieFrameSyncTests.cpp

@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "Slig.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/Collisions.hpp"
@@ -173,7 +174,7 @@ static const TintEntry sSligTint[16] = {
     {EReliveLevelIds::eBonewerkz_Ender, 102u, 127u, 118u},
     {EReliveLevelIds::eCredits, 102u, 127u, 118u}};
 
-s16 sSligsUnderControlCount_BAF7E8 = 0;
+WorldStatic<s16> sSligsUnderControlCount_BAF7E8("AE.Slig.sSligsUnderControlCount_BAF7E8", 0);
 
 const TSligMotionFn sSligMotionTable[52] = {
     &Slig::Motion_0_StandIdle,
@@ -327,7 +328,6 @@ Slig::Slig(relive::Path_Slig* pTlv, const Guid& tlvId, ResourceManager& resMan, 
     SetType(ReliveTypes::eSlig);
 
     SetPossessed(false);
-    SetRestoredFromQuickSave(false);
     SetCanBePossessed(true);
     SetCanSetOffExplosives(true);
 
@@ -472,11 +472,7 @@ void Slig::VRender(OrderingTable& ot)
 
 void Slig::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     SligSaveState data = {};
 
     data.mType = ReliveTypes::eSlig;
@@ -498,6 +494,11 @@ void Slig::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.field_1E_r = mRGB.r;
     data.field_20_g = mRGB.g;
     data.field_22_b = mRGB.b;
+    data.mTintSaved = true;
+    data.mTint[0] = field_200_red;
+    data.mTint[1] = field_202_green;
+    data.mTint[2] = field_204_blue;
+    data.mListenerLastEventIdx = mListener.LastEventIdx();
 
     if (GetElectrocuting())
     {
@@ -593,7 +594,19 @@ void Slig::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mGlukkonCalledAllOYa = mGlukkonCalledAllOYa;
     data.mHeardGlukkon = mHeardGlukkon;
 
-    pSaveBuffer.Write(data);
+        data.mPreviousMotionSaved = true;
+    data.mPreviousMotion = static_cast<s32>(mPreviousMotion);
+    data.mbMotionChanged = mbMotionChanged;
+    data.mPreventDepossession = mPreventDepossession;
+    data.mNextGameSpeakMotion = static_cast<s32>(field_294_next_gamespeak_motion);
+    data.mInput = mInput;
+    data.mPointsCount = field_290_points_count;
+    for (s32 i = 0; i < ALIVE_COUNTOF(field_268_points); i++)
+    {
+        data.mPointsX[i] = field_268_points[i].x;
+        data.mPointsY[i] = field_268_points[i].y;
+    }
+pSaveBuffer.Write(data);
 }
 
 void Slig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
@@ -631,13 +644,36 @@ void Slig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& r
 
         pSlig->SetScale(pState->field_1C_scale);
 
-        pSlig->field_200_red = pState->field_1E_r;
-        pSlig->field_202_green = pState->field_20_g;
-        pSlig->field_204_blue = pState->field_22_b;
+        if (pState->mTintSaved)
+        {
+            pSlig->field_200_red = pState->mTint[0];
+            pSlig->field_202_green = pState->mTint[1];
+            pSlig->field_204_blue = pState->mTint[2];
+            pSlig->mListener.SetLastEventIdx(pState->mListenerLastEventIdx);
+        }
+        else
+        {
+            pSlig->field_200_red = pState->field_1E_r;
+            pSlig->field_202_green = pState->field_20_g;
+            pSlig->field_204_blue = pState->field_22_b;
+        }
 
         pSlig->mRGB.SetRGB(pState->field_1E_r, pState->field_20_g, pState->field_22_b);
 
         pSlig->mCurrentMotion = pState->field_26_current_motion;
+        if (pState->mPreviousMotionSaved)
+        {
+            pSlig->mPreviousMotion = static_cast<eSligMotions>(pState->mPreviousMotion);
+            pSlig->mbMotionChanged = pState->mbMotionChanged;
+            pSlig->mPreventDepossession = pState->mPreventDepossession;
+            pSlig->field_294_next_gamespeak_motion = static_cast<eSligMotions>(pState->mNextGameSpeakMotion);
+            pSlig->field_290_points_count = pState->mPointsCount;
+            for (s32 i = 0; i < ALIVE_COUNTOF(pSlig->field_268_points); i++)
+            {
+                pSlig->field_268_points[i].x = pState->mPointsX[i];
+                pSlig->field_268_points[i].y = pState->mPointsY[i];
+            }
+        }
         pSlig->GetAnimation().Set_Animation_Data(pSlig->GetAnimRes(pSlig->MotionToAnimId(pState->field_26_current_motion)));
 
 
@@ -659,8 +695,6 @@ void Slig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& r
         pSlig->mNextMotion = pState->field_36_next_motion;
         pSlig->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pState->field_38_last_line_ypos);
 
-        pSlig->SetRestoredFromQuickSave(true);
-
         pSlig->BaseAliveGameObjectCollisionLineType = pState->field_3A_collision_line_type;
         pSlig->mBrainSubState = pState->field_42_brain_sub_state;
         pSlig->field_11E_pitch_min = pState->field_44_pitch_min;
@@ -668,7 +702,7 @@ void Slig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& r
         pSlig->mReturnToPreviousMotion = pState->mReturnToPreviousMotion;
         pSlig->mCheckedIfOffScreen = pState->mCheckedIfOffScreen;
 
-        pSlig->mInput = InputObject::PsxButtonsToKeyboardInput(pState->field_50_input);
+        pSlig->mInput = pState->mPreviousMotionSaved ? pState->mInput : InputObject::PsxButtonsToKeyboardInput(pState->field_50_input);
 
         pSlig->field_12C_timer = pState->field_54_timer;
         pSlig->mFallingVelxScaleFactor = pState->mFallingVelxScaleFactor;
@@ -4554,43 +4588,48 @@ void Slig::HandleDDCheat()
     BaseAliveGameObjectLastLineYPos = mYPos;
 }
 
-void Slig::VUpdate()
+void Slig::VPostRestore()
 {
-    if (GetRestoredFromQuickSave())
+    if (BaseAliveGameObjectCollisionLineType != -1)
     {
-        if (BaseAliveGameObjectCollisionLineType != -1)
-        {
-            gCollisions->Raycast(
-                mXPos,
-                mYPos - FP_FromInteger(20),
-                mXPos,
-                mYPos + FP_FromInteger(20),
-                &BaseAliveGameObjectCollisionLine,
-                &mXPos,
-                &mYPos,
-                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
 
-            if (BaseAliveGameObjectCollisionLine)
+        if (BaseAliveGameObjectCollisionLine)
+        {
+            if (BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eDynamicCollision_32 || BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eBackgroundDynamicCollision_36)
             {
-                if (BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eDynamicCollision_32 || BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eBackgroundDynamicCollision_36)
-                {
-                    const PSX_RECT bRect = VGetBoundingRect();
-                    CheckPlatformCollision(
-                        {bRect.x, static_cast<s16>(bRect.y + 5)},
-                        {bRect.w, static_cast<s16>(bRect.h + 5)},
-                        PlatformBase::Platforms());
-                }
+                const PSX_RECT bRect = VGetBoundingRect();
+                CheckPlatformCollision(
+                    {bRect.x, static_cast<s16>(bRect.y + 5)},
+                    {bRect.w, static_cast<s16>(bRect.h + 5)},
+                    PlatformBase::Platforms());
             }
         }
-        field_208_glukkon_obj_id = BaseGameObject::RefreshId(field_208_glukkon_obj_id);
-        if (BrainIs(&Slig::Brain_4_ListeningToGlukkon))
-        {
-            sSligsUnderControlCount_BAF7E8++;
-        }
-        SetRestoredFromQuickSave(false);
-        BaseAliveGameObjectCollisionLineType = 0;
+    }
+    field_208_glukkon_obj_id = BaseGameObject::RefreshId(field_208_glukkon_obj_id);
+    if (BrainIs(&Slig::Brain_4_ListeningToGlukkon))
+    {
+        sSligsUnderControlCount_BAF7E8++;
     }
 
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
+}
+
+void Slig::VUpdate()
+{
     if (!Input_IsChanting())
     {
         mPreventDepossession &= ~1u;
@@ -5915,7 +5954,7 @@ void Slig::ToPanicTurn()
     SetBrain(&Slig::Brain_12_PanicTurning);
 }
 
-static s16 sSligDelayIdx = 0;
+static WorldStatic<s16> sSligDelayIdx("AE.Slig.sSligDelayIdx", 0);
 static const s16 sSligDelayTable[6] = {0, 6, 10, 8, 4, 12};
 
 s16 Slig::SligStableDelay()
@@ -6582,4 +6621,10 @@ s16 Slig::FindLiftPoint()
     }
 
     return false;
+}
+
+std::vector<BaseGameObject::NotStateMemory> Slig::VNotStateMemory()
+{
+    // The TLV it was made from, with the flags that TLV had then
+    return {{&mSligTlv, sizeof(mSligTlv)}};
 }

@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../ObjectIds.hpp"
+#include "../SerializedObjectData.hpp"
 #include "ElectricWall.hpp"
 #include "../SwitchStates.hpp"
 #include "../Events.hpp"
@@ -198,4 +200,22 @@ void ElectricWall::VUpdate()
             }
         }
     }
+}
+
+void ElectricWall::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    ElectricWallSaveState data = {};
+    data.mSoundTimer = mSoundTimer;
+    pSaveBuffer.Write(data);
+}
+
+void ElectricWall::RestoreFromSaveState(const ElectricWallSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eElectricWall)
+    {
+        return;
+    }
+    ElectricWall* p = static_cast<ElectricWall*>(pObj);
+    p->mSoundTimer = state.mSoundTimer;
 }

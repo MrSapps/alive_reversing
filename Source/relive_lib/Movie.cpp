@@ -1294,6 +1294,13 @@ private:
             return StepResult::eFinished;
         }
 
+        // Before anything it might wait for (the audio to get going, a frame to be decoded), so a movie can always
+        // be skipped
+        if (AreMovieSkippingInputsHeld())
+        {
+            return StepResult::eFinished;
+        }
+
         FeedAudio();
 
         if (mHasAudio && !mAudioStarted && !mAudioFinished && !mNoAudioOrAudioError)
@@ -1653,6 +1660,12 @@ void Movie::Finish()
 
 bool AreMovieSkippingInputsHeld()
 {
+    // A script's or the bot's buttons skip it as a pad's do
+    if ((Input().mAutomationInput & MOVIE_SKIPPER_GAMEPAD_INPUTS) != 0)
+    {
+        return true;
+    }
+
     if (Input().IsJoyStickEnabled())
     {
         return (Input_Read_Pad(sCurrentControllerIndex) & MOVIE_SKIPPER_GAMEPAD_INPUTS) != 0;

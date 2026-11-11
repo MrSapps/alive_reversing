@@ -257,12 +257,14 @@ public:
     ~CrawlingSlig();
 
     virtual void VUpdate() override;
+    virtual void VPostRestore() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VPossessed() override;
     virtual void VOnTrapDoorOpen() override;
     virtual void VOnTlvCollision(TlvIterator tlvIterator) override;
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
     virtual s16 VGetMotion(eMotionType motionType) override
     {
         switch (motionType)

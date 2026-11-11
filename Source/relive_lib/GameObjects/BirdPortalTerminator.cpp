@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../ObjectIds.hpp"
+#include "../SerializedObjectData.hpp"
 #include "BirdPortalTerminator.hpp"
 #include "../GameType.hpp"
 
@@ -45,6 +47,23 @@ BirdPortalTerminator::BirdPortalTerminator(FP xpos, FP ypos, FP scale, relive::P
     mRGB.SetRGB(255, 128, 64);
 }
 
+BirdPortalTerminator::BirdPortalTerminator(RestoreTag, ResourceManager& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
+{
+    if (GetGameType() == GameType::eAe)
+    {
+        SetType(ReliveTypes::eEyeOrbPart);
+    }
+    else
+    {
+        SetType(ReliveTypes::eClawOrBirdPortalTerminator);
+    }
+
+    LoadAnimations();
+    Animation_Init(GetAnimRes(AnimId::BirdPortal_TerminatorGrow));
+    SetApplyShadowZoneColour(false);
+}
+
 void BirdPortalTerminator::VScreenChanged()
 {
     // Staying alive
@@ -60,4 +79,20 @@ void BirdPortalTerminator::Fadeout()
 
     const s16 b = mRGB.b;
     mRGB.b = (b >> 1) + (b >> 2);
+}
+
+void BirdPortalTerminator::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    BirdPortalTerminatorSaveState data = {};
+    pSaveBuffer.Write(data);
+}
+
+void BirdPortalTerminator::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const BirdPortalTerminatorSaveState& state = *pData.ReadTmpPtr<BirdPortalTerminatorSaveState>();
+    BirdPortalTerminator* p = relive_new BirdPortalTerminator(BirdPortalTerminator::RestoreTag{}, resMan, map);
+    if (!p)
+    {
+        return;
+    }
 }

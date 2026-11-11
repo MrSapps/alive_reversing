@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "Well.hpp"
+#include "../relive_lib/WorldStatic.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/GameObjects/Leaf.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
@@ -9,7 +10,7 @@
 #include "Map.hpp"
 #include "Path.hpp"
 
-static u32 sWellRndSeed = 4;
+static WorldStatic<u32> sWellRndSeed("AE.Well.sWellRndSeed", 4);
 
 static s16 Well_NextRandom()
 {

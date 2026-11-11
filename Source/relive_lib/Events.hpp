@@ -1,6 +1,7 @@
 #pragma once
 
 #include "FixedPoint.hpp"
+#include "SaveStateBase.hpp"
 #include "GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
 
 // Note, names taken from Abe's Exoddus PC Demo
@@ -32,6 +33,21 @@ enum class Event : s16
 };
 
 class BaseGameObject;
+
+// The events broadcast that the next frame looks at (they are looked at a frame after they are made) and which of
+// the two buffers that is: part of the world between two frames. The objects are known by their ids.
+struct EventsSaveState final : public SaveStateBase
+{
+    EventsSaveState()
+        : SaveStateBase(ReliveTypes::eEventsState, sizeof(*this))
+    { }
+    s16 mEventsToUse;
+    Guid mEventObjectIds[2][static_cast<u32>(Event::kEventMax)];
+};
+
+EventsSaveState EventsGetSaveState();
+// Once the objects the events name are made
+void EventsRestoreFromSaveState(const EventsSaveState& state);
 
 void EventBroadcast(Event event, BaseGameObject* pObject);
 BaseGameObject* EventGet(Event eventType);

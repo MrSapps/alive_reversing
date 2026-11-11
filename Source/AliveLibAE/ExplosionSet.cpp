@@ -1,4 +1,7 @@
 #include "stdafx.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
+#include "../relive_lib/WorldStatic.hpp"
 #include "ExplosionSet.hpp"
 #include "../relive_lib/Function.hpp"
 #include "stdlib.hpp"
@@ -11,7 +14,7 @@
 #include "../relive_lib/Grid.hpp"
 
 ExplosionSet* gExplosionSet = nullptr;
-bool gExplosionSetEnabled = false;
+WorldStatic<bool> gExplosionSetEnabled("AE.ExplosionSet.gExplosionSetEnabled", false);
 
 ExplosionSet::ExplosionSet(ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
@@ -173,5 +176,54 @@ void ExplosionSet::VUpdate()
             const FP explodeY = FP_FromInteger(Math_RandomRange(mTlvRect.x, xpos));
             relive_new AirExplosion(explodeY, explodeX, mSpriteScale, 0, mResMan, mMap);
         }
+    }
+}
+
+void ExplosionSet::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    ExplosionSetSaveState data = {};
+    data.mScreenShakeIdx = mScreenShakeIdx;
+    data.mScreenShakeIdxModifier = mScreenShakeIdxModifier;
+    data.mStartDelay = mStartDelay;
+    data.mSpacingMultiplicator = mSpacingMultiplicator;
+    data.mIncreasingGridSpacing = mIncreasingGridSpacing;
+    data.mSpawnAssets = mSpawnAssets;
+    data.mFlipX = mFlipX;
+    data.mActive = mActive;
+    data.mTlvDataSaved = true;
+    data.mTlvRectX = mTlvRect.x;
+    data.mTlvRectY = mTlvRect.y;
+    data.mTlvRectW = mTlvRect.w;
+    data.mTlvRectH = mTlvRect.h;
+    data.mSpriteScale = mSpriteScale;
+    data.mSwitchId = mSwitchId;
+    data.mAssetInterval = mAssetInterval;
+    data.mGridSpacing = mGridSpacing;
+    pSaveBuffer.Write(data);
+}
+
+void ExplosionSet::RestoreFromSaveState(const ExplosionSetSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    ExplosionSet* p = static_cast<ExplosionSet*>(pObj);
+    p->mScreenShakeIdx = state.mScreenShakeIdx;
+    p->mScreenShakeIdxModifier = state.mScreenShakeIdxModifier;
+    p->mStartDelay = state.mStartDelay;
+    p->mSpacingMultiplicator = state.mSpacingMultiplicator;
+    p->mIncreasingGridSpacing = state.mIncreasingGridSpacing;
+    p->mSpawnAssets = state.mSpawnAssets;
+    p->mFlipX = state.mFlipX;
+    p->mActive = state.mActive;
+    if (state.mTlvDataSaved)
+    {
+        p->mTlvRect = {state.mTlvRectX, state.mTlvRectY, state.mTlvRectW, state.mTlvRectH};
+        p->mSpriteScale = state.mSpriteScale;
+        p->mSwitchId = state.mSwitchId;
+        p->mAssetInterval = state.mAssetInterval;
+        p->mGridSpacing = state.mGridSpacing;
     }
 }

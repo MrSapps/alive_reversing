@@ -23,6 +23,11 @@ struct QuicksaveWorldInfoBase
     s16 mRescuedMudokons = 0;
     s16 mKilledMudokons = 0;
     s32 mGasTimer = 0;
+    u8 mRandomSeed = 0;
+    // Leaf::GetRandIdx
+    u8 mLeafRandIdx = 0;
+    // Guid::NewGuid's counter, see Guid::GetNextGuidCounter
+    u32 mGuidCounter = 0;
     bool mAbeInvincible = false;
 };
 

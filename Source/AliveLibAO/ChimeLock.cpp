@@ -48,37 +48,42 @@ ChimeLock::ChimeLock(relive::Path_ChimeLock* pTlv, const Guid& tlvId, ResourceMa
         scale = FP_FromInteger(1);
     }
 
-    auto pLeftBell = relive_new Bells(
-        BellSize::eBig,
-        FP_FromInteger(pTlv->mTopLeftX),
-        FP_FromInteger(pTlv->mTopLeftY),
-        scale,
-        mResMan, mMap);
-    if (pLeftBell)
+    // A restore puts the bells back itself, with the ids this keeps
+    if (!mMap.mRestoringObjects)
     {
-        mLeftBell = pLeftBell->mBaseGameObjectId;
-    }
+        auto pLeftBell = relive_new Bells(
+            BellSize::eBig,
+            FP_FromInteger(pTlv->mTopLeftX),
+            FP_FromInteger(pTlv->mTopLeftY),
+            scale,
+            mResMan, mMap);
+        if (pLeftBell)
+        {
+            mLeftBell = pLeftBell->mBaseGameObjectId;
+        }
 
-    auto pCenterBell = relive_new Bells(
-        BellSize::eMedium,
-        FP_FromInteger(pTlv->mTopLeftX),
-        FP_FromInteger(pTlv->mTopLeftY),
-        scale,
-        mResMan, mMap);
-    if (pCenterBell)
-    {
-        mCenterBell = pCenterBell->mBaseGameObjectId;
-    }
+        auto pCenterBell = relive_new Bells(
+            BellSize::eMedium,
+            FP_FromInteger(pTlv->mTopLeftX),
+            FP_FromInteger(pTlv->mTopLeftY),
+            scale,
+            mResMan, mMap);
+        if (pCenterBell)
+        {
+            mCenterBell = pCenterBell->mBaseGameObjectId;
+        }
 
-    auto pRightBell = relive_new Bells(
-        BellSize::eSmall,
-        FP_FromInteger(pTlv->mTopLeftX),
-        FP_FromInteger(pTlv->mTopLeftY),
-        scale,
-        mResMan, mMap);
-    if (pRightBell)
-    {
-        mRightBell = pRightBell->mBaseGameObjectId;
+        auto pRightBell = relive_new Bells(
+            BellSize::eSmall,
+            FP_FromInteger(pTlv->mTopLeftX),
+            FP_FromInteger(pTlv->mTopLeftY),
+            scale,
+            mResMan, mMap);
+        if (pRightBell)
+        {
+            mRightBell = pRightBell->mBaseGameObjectId;
+        }
+
     }
 
     field_124_code1 = pTlv->mCode1;
@@ -659,11 +664,7 @@ void ChimeLock::VPossessed()
 
 void ChimeLock::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     ChimeLockSaveState data = {};
 
     data.mXPos = mXPos;
@@ -697,6 +698,9 @@ void ChimeLock::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mChimeLockNum1 = static_cast<s16>(field_164_ChimeLock_num[1]);
     data.mCanUnpossess = mCanUnpossess;
     data.mHitAllBells = mHitAllBells;
+    data.mLeftBell = mLeftBell;
+    data.mCenterBell = mCenterBell;
+    data.mRightBell = mRightBell;
 
     pSaveBuffer.Write(data);
 }
@@ -746,6 +750,9 @@ void ChimeLock::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManag
         pLock->field_164_ChimeLock_num[1] = static_cast<BellPositions>(pState->mChimeLockNum1);
         pLock->mCanUnpossess = pState->mCanUnpossess;
         pLock->mHitAllBells = pState->mHitAllBells;
+        pLock->mLeftBell = pState->mLeftBell;
+        pLock->mCenterBell = pState->mCenterBell;
+        pLock->mRightBell = pState->mRightBell;
     }
 }
 

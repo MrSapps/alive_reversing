@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "BinaryPath.hpp"
+#include <algorithm>
 #include "FatalError.hpp"
 #include "data_conversion/relive_tlvs_serialization.hpp"
 #include "../AliveLibAO/Path.hpp"
@@ -269,6 +270,20 @@ relive::Path_TLV* TlvIterator::GetTlvCheckedImpl(ReliveTypes expectedType)
         ALIVE_FATAL("Save state TLV id did not resolve back to a TLV of the expected type %d", static_cast<s32>(expectedType));
     }
     return mTlv;
+}
+
+void BinaryPath::ClearResetThisVisitFlags(const std::vector<const relive::Path_TLV*>& except)
+{
+    for (auto& cam : mCameras)
+    {
+        for (auto& pTlv : cam->mTlvs.mTlvs)
+        {
+            if (std::find(except.begin(), except.end(), pTlv.get()) == except.end())
+            {
+                pTlv->mTlvFlags.Clear(relive::TlvFlags::eBit4_ResetThisVisit);
+            }
+        }
+    }
 }
 
 void BinaryPath::ClearSpawnedFlags()

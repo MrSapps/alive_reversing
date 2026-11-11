@@ -28,6 +28,7 @@ public:
     ~FlyingSligSpawner();
     
     virtual void VUpdate() override;
+    virtual void VPostRestore() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
 
 private:
@@ -36,5 +37,4 @@ private:
     s16 field_28_spawner_switch_id = 0;
     relive::Path_TLV* field_2C_tlv_header = {};
     s32 field_3C_bSpawned = 0;
-    s16 field_40_bFirstUpdate = 0;
 };

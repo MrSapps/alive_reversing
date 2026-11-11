@@ -23,6 +23,36 @@ EffectBase::~EffectBase()
     gObjListDrawables->Remove_Item(this);
 }
 
+std::vector<BaseGameObject::NotStateMemory> EffectBase::VNotStateMemory()
+{
+    // What it was last drawn with
+    return {{&mEffectBaseTile, sizeof(mEffectBaseTile)}};
+}
+
+EffectBaseSaveState EffectBase::GetEffectState() const
+{
+    EffectBaseSaveState state = {};
+    state.mBlendMode = static_cast<u32>(mBlendMode);
+    state.mLayer = static_cast<s16>(mEffectBaseLayer);
+    state.mPathId = mEffectBasePathId;
+    state.mLevelId = static_cast<s16>(mEffectBaseLevelId);
+    state.mRed = mEffectBaseRed;
+    state.mGreen = mEffectBaseGreen;
+    state.mBlue = mEffectBaseBlue;
+    state.mSemiTrans = mSemiTrans;
+    return state;
+}
+
+void EffectBase::SetEffectState(const EffectBaseSaveState& state)
+{
+    mEffectBasePathId = state.mPathId;
+    mEffectBaseLevelId = static_cast<EReliveLevelIds>(state.mLevelId);
+    mEffectBaseRed = state.mRed;
+    mEffectBaseGreen = state.mGreen;
+    mEffectBaseBlue = state.mBlue;
+    mSemiTrans = state.mSemiTrans;
+}
+
 void EffectBase::VRender(OrderingTable& ot)
 {
     Poly_G4* pTile = &mEffectBaseTile;

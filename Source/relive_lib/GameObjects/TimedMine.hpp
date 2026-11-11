@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseGameObject.hpp"
+#include "../SaveStateBase.hpp"
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
 #include "../relive_lib/Animation.hpp"
 
@@ -9,9 +10,26 @@ namespace relive
     struct Path_TimedMine;
 }
 
+struct TimedMineSaveState final : public SaveStateBase
+{
+    TimedMineSaveState()
+        : SaveStateBase(ReliveTypes::eTimedMine, sizeof(*this))
+    { }
+    bool mSlappedMine;
+    u16 mTicksUntilExplosion;
+    u32 mExplosionTimer;
+    AnimationSaveState mTickAnim;
+    u32 mOldGnFrame;
+    u32 mSingleTickTimer;
+    bool mStickToLiftPoint;
+};
+
 class TimedMine final : public BaseAliveGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const TimedMineSaveState& state);
+
     TimedMine(relive::Path_TimedMine* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~TimedMine();
 

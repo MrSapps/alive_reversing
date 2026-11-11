@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "GameEnderController.hpp"
 #include "stdlib.hpp"
 #include "DDCheat.hpp"
@@ -15,8 +16,8 @@
 #include "Input.hpp"
 #include "QuikSave.hpp"
 
-s16 gFeeco_Restart_KilledMudCount = 0;
-s16 gFeecoRestart_SavedMudCount = 0;
+WorldStatic<s16> gFeeco_Restart_KilledMudCount("AE.GameEnderController.gFeeco_Restart_KilledMudCount", 0);
+WorldStatic<s16> gFeecoRestart_SavedMudCount("AE.GameEnderController.gFeecoRestart_SavedMudCount", 0);
 
 void CreateGameEnderController(ResourceManager& resMan, BaseMap& map)
 {

@@ -146,6 +146,9 @@ class BaseGameAutoPlayer;
 class InputObject final
 {
 public:
+    // The pads' history is part of the world: a restored world presses and releases what the saved one would have
+    InputObject();
+
     s32 IsDemoPlaying();
     void UnsetDemoPlaying();
     // demoJson is the demo input file (PLAYBK*.JOY.json), see ResourceManager::LoadDemoFile

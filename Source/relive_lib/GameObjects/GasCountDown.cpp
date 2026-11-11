@@ -1,4 +1,7 @@
 #include "stdafx.h"
+#include "../WorldStatic.hpp"
+#include "../ObjectIds.hpp"
+#include "../SerializedObjectData.hpp"
 #include "GasCountDown.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/GameObjects/Alarm.hpp"
@@ -11,8 +14,8 @@
 #include "../relive_lib/GameType.hpp"
 #include "BaseMap.hpp"
 
-s32 gDeathGasTimer = 0;
-bool gDeathGasOn = false;
+WorldStatic<s32> gDeathGasTimer("GasCountDown.gDeathGasTimer", 0);
+WorldStatic<bool> gDeathGasOn("GasCountDown.gDeathGasOn", false);
 
 // hardcoded values for the boardroom in AO
 constexpr u32 kGasCountDownSwitchIdAO = 70;
@@ -190,4 +193,34 @@ void GasCountDown::VRender(OrderingTable& ot)
         FP_FromInteger(1),
         textWidth + mGasXPos,
         gDisableFontFlicker ? 0 : 50);
+}
+
+std::vector<BaseGameObject::NotStateMemory> GasCountDown::VNotStateMemory()
+{
+    // The font and its palette are resources: ids of what was loaded, not state
+    return {{&mFontContext, sizeof(mFontContext)}, {&mFont, sizeof(mFont)}, {&mPal, sizeof(mPal)}};
+}
+
+void GasCountDown::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    GasCountDownSaveState data = {};
+    data.mGasTimeLeftSecs = mGasTimeLeftSecs;
+    data.mGasCountdownTimer = mGasCountdownTimer;
+    data.mGasXPos = mGasXPos;
+    data.mGasYPos = mGasYPos;
+    pSaveBuffer.Write(data);
+}
+
+void GasCountDown::RestoreFromSaveState(const GasCountDownSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eGasCountDown)
+    {
+        return;
+    }
+    GasCountDown* p = static_cast<GasCountDown*>(pObj);
+    p->mGasTimeLeftSecs = state.mGasTimeLeftSecs;
+    p->mGasCountdownTimer = state.mGasCountdownTimer;
+    p->mGasXPos = state.mGasXPos;
+    p->mGasYPos = state.mGasYPos;
 }

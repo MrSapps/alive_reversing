@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
+#include "../relive_lib/WorldStatic.hpp"
 #include "../relive_lib/FatalError.hpp"
 #include "../relive_lib/SaveStateBase.hpp"
 #include "GameSpeak.hpp"
@@ -103,8 +104,7 @@ struct SlogSaveState final : public SaveStateBase
     s32 mGrowlTimer = 0;
     bool bAsleep = false;
     s16 mMovedOffScreen = 0;
-    s16 mBitingTarget = 0;
-};
+    s16 mBitingTarget = 0;};
 
 class Slog final : public ::BaseAliveGameObject
 {
@@ -146,6 +146,11 @@ public:
     virtual void VOnThrowableHit(BaseGameObject* pFrom) override;
     virtual void VOnTrapDoorOpen() override;
     virtual void VUpdate() override;
+    virtual GameSpeakListenerBase* VListener() override
+    {
+        return &mListener;
+    }
+    virtual void VPostRestore() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
     static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
     virtual s16 VGetMotion(eMotionType motionType) override
@@ -252,6 +257,6 @@ private:
     eSlogMotions mNextMotion = eSlogMotions::Motion_0_Idle;
 };
 
-extern s16 sSlogCount;
+extern WorldStatic<s16> sSlogCount;
 
 } // namespace AO

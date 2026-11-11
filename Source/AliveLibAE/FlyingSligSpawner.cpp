@@ -27,7 +27,6 @@ FlyingSligSpawner::FlyingSligSpawner(relive::Path_FlyingSligSpawner* pTlv, const
 
     field_2C_tlv_header = pTlv;
 
-    field_40_bFirstUpdate &= ~2u;
     field_28_spawner_switch_id = pTlv->mSpawnerSwitchId;
     field_3C_bSpawned = 0;
     field_24_spawned_slig_id = Guid{};
@@ -43,7 +42,6 @@ void FlyingSligSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, Resou
     if (pFlyingSligSpawner)
     {
         pFlyingSligSpawner->field_3C_bSpawned = pState->field_8_bSpawned;
-        pFlyingSligSpawner->field_40_bFirstUpdate |= 2u;
         pFlyingSligSpawner->field_24_spawned_slig_id = pState->field_C_spawned_slig_obj_id;
     }
 }
@@ -53,31 +51,30 @@ FlyingSligSpawner::~FlyingSligSpawner()
     mMap.TLV_Reset(mTlvId);
 }
 
-void FlyingSligSpawner::VUpdate()
+void FlyingSligSpawner::VPostRestore()
 {
-    if (field_40_bFirstUpdate & 2)
+    // The save has the TLV the slig was made from, and the slig is known by its id
+    if (field_24_spawned_slig_id != Guid{})
     {
-        // Try to see if we already spawned a Slig on the first update
-        field_40_bFirstUpdate &= ~2;
-        if (field_24_spawned_slig_id != Guid{})
+        for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
         {
-            for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
+            BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
+            if (!pObj)
             {
-                BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
-                if (!pObj)
-                {
-                    break;
-                }
+                break;
+            }
 
-                if (pObj->Type() == ReliveTypes::eFlyingSlig && pObj->mBaseGameObjectTlvInfo == field_24_spawned_slig_id)
-                {
-                    field_24_spawned_slig_id = pObj->mBaseGameObjectId;
-                    break;
-                }
+            if (pObj->Type() == ReliveTypes::eFlyingSlig && pObj->mBaseGameObjectTlvInfo == field_24_spawned_slig_id)
+            {
+                field_24_spawned_slig_id = pObj->mBaseGameObjectId;
+                break;
             }
         }
     }
+}
 
+void FlyingSligSpawner::VUpdate()
+{
     BaseGameObject* pCurrentSlig = sObjectIds.Find_Impl(field_24_spawned_slig_id);
     if (!EventGet(Event::kEventDeathReset) && !GetDead())
     {

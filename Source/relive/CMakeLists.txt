@@ -72,3 +72,43 @@ add_test(NAME automation_restart_path_slam_door
         -DRELIVE=$<TARGET_FILE:relive> -DDATA_DIR=${RELIVE_AE_DATA_DIR}
         -DSCRIPT=${CMAKE_SOURCE_DIR}/Source/relive_lib/tests/automation/restart_path_slam_door.txt
         -P ${CMAKE_SOURCE_DIR}/Source/relive_lib/tests/automation/run_automation.cmake)
+
+# A quicksave restored mid level is the world that was saved, and carries on the same way
+add_test(NAME automation_restore
+    COMMAND ${CMAKE_COMMAND}
+        -DRELIVE=$<TARGET_FILE:relive> -DDATA_DIR=${RELIVE_AE_DATA_DIR}
+        -DSCRIPT=${CMAKE_SOURCE_DIR}/Source/relive_lib/tests/automation/restore.txt
+        -P ${CMAKE_SOURCE_DIR}/Source/relive_lib/tests/automation/run_automation.cmake)
+
+# The same script run twice must hash the whole world the same on every frame
+add_test(NAME automation_determinism
+    COMMAND ${CMAKE_COMMAND}
+        -DRELIVE=$<TARGET_FILE:relive> -DDATA_DIR=${RELIVE_AE_DATA_DIR}
+        -DSCRIPT=${CMAKE_SOURCE_DIR}/Source/relive_lib/tests/automation/determinism.txt
+        -DWORK_DIR=${CMAKE_BINARY_DIR}/determinism
+        -P ${CMAKE_SOURCE_DIR}/Source/relive_lib/tests/automation/run_determinism.cmake)
+
+# The bot (Source/relive_lib/Bot) against the real levels: getting about by its nav graph...
+add_test(NAME bot_goto_ae
+    COMMAND ${CMAKE_COMMAND}
+        -DRELIVE=$<TARGET_FILE:relive> -DDATA_DIR=${RELIVE_AE_DATA_DIR}
+        -DSCRIPT=${CMAKE_SOURCE_DIR}/Source/relive_lib/tests/automation/bot_goto_ae.txt
+        -P ${CMAKE_SOURCE_DIR}/Source/relive_lib/tests/automation/run_automation.cmake)
+
+# ...in AO too, which needs its own data: set RELIVE_AO_DATA_DIR, otherwise the test passes without running
+set(RELIVE_AO_DATA_DIR "$ENV{RELIVE_AO_DATA_DIR}" CACHE PATH "AO game data directory for the automation tests")
+add_test(NAME bot_goto_ao
+    COMMAND ${CMAKE_COMMAND}
+        -DRELIVE=$<TARGET_FILE:relive> -DDATA_DIR=${RELIVE_AO_DATA_DIR} -DGAME_ARGS=-AO
+        -DSCRIPT=${CMAKE_SOURCE_DIR}/Source/relive_lib/tests/automation/bot_goto_ao.txt
+        -P ${CMAKE_SOURCE_DIR}/Source/relive_lib/tests/automation/run_automation.cmake)
+
+# ...and playing a path to its exit, dying on the way, going back and carrying on: the buttons it ends up with
+# replay to the same world with no bot and no death
+add_test(NAME bot_replay
+    COMMAND ${CMAKE_COMMAND}
+        -DRELIVE=$<TARGET_FILE:relive> -DDATA_DIR=${RELIVE_AE_DATA_DIR}
+        -DSCRIPT_PLAY=${CMAKE_SOURCE_DIR}/Source/relive_lib/tests/automation/bot_replay_play.txt
+        -DSCRIPT_REPLAY=${CMAKE_SOURCE_DIR}/Source/relive_lib/tests/automation/bot_replay_replay.txt
+        -DWORK_DIR=${CMAKE_BINARY_DIR}/bot_replay
+        -P ${CMAKE_SOURCE_DIR}/Source/relive_lib/tests/automation/run_bot_replay.cmake)

@@ -137,6 +137,8 @@ struct ParamiteSaveState final : public SaveStateBase
     s16 mAbePath;
     s16 mAbeCamera;
     s16 field_72_input;
+    // The PSX button form above loses keyboard bits
+    s32 mInputRaw;
     s16 field_74_next_brain_ret;
     bool mControlled;
     bool mRunning;
@@ -145,6 +147,14 @@ struct ParamiteSaveState final : public SaveStateBase
     bool mSpawned;
     bool mAlerted;
     bool mCanBePossessed;
+    // False for a save from the original game's, which has neither
+    bool mPreviousMotionSaved;
+    s32 mPreviousMotion;
+    // Set by what the brain heard, said on its next go
+    s32 mGamespeakNextMotion = -1;
+    // field_15C_paramite_xOffset: what the offset of the animation was when it was made
+    bool mParamiteXOffsetSaved = false;
+    s16 mParamiteXOffset = 0;
 };
 
 class Paramite final : public BaseAliveGameObject
@@ -201,6 +211,7 @@ public:
 
     void LoadAnimations();
     virtual void VUpdate() override;
+    virtual void VPostRestore() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual bool VOnSameYLevel(BaseAnimatedWithPhysicsGameObject* pOther) override;
 
@@ -210,6 +221,10 @@ public:
     virtual void VOnTlvCollision(TlvIterator tlvIterator) override;
     virtual void VOnTrapDoorOpen() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    virtual GameSpeakListener* VListener() override
+    {
+        return &mListener;
+    }
     virtual s16 VGetMotion(eMotionType motionType) override
     {
         switch (motionType)

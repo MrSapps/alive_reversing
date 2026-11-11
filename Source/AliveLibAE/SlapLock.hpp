@@ -33,6 +33,8 @@ struct SlapLockSaveState final : public SaveStateBase
     s32 mTimer1;
     Guid mAbilityRingId;
     s32 mShinyParticleTimer;
+    bool mHasGhost;
+    Guid mPossessionFlickerId;
 };
 
 class SlapLock final : public BaseAliveGameObject

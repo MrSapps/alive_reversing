@@ -4,11 +4,18 @@
 #include "../AliveLibAE/Input.hpp"
 #include "../relive_lib/BitField.hpp"
 #include "../relive_lib/BaseGameAutoPlayer.hpp"
+#include "../relive_lib/WorldStatic.hpp"
 #include "nlohmann/json.hpp"
 
 namespace AO {
 
-InputObject sInputObject = {};
+InputObject::InputObject()
+{
+    WorldStatics::Register("AO.Input.pad0", &mPads[0], sizeof(PSX_Pad));
+    WorldStatics::Register("AO.Input.pad1", &mPads[1], sizeof(PSX_Pad));
+}
+
+InputObject sInputObject;
 u16 sCurrentControllerIndex = 0;
 u8 sInputEnabled = 0;
 u32 sLastPressedKey = 0;

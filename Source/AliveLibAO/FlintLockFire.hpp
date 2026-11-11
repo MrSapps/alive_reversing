@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 
 namespace relive
 {
@@ -9,9 +10,23 @@ namespace relive
 
 namespace AO {
 
+struct FlintLockFireSaveState final : public SaveStateBase
+{
+    FlintLockFireSaveState()
+        : SaveStateBase(ReliveTypes::eFlintLockFire, sizeof(*this))
+    { }
+    s32 mState;
+    AnimationSaveState mGourdAnim;
+    AnimationSaveState mFire1Anim;
+    AnimationSaveState mFire2Anim;
+};
+
 class FlintLockFire final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const FlintLockFireSaveState& state);
+
     FlintLockFire(relive::Path_FlintLockFire* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~FlintLockFire();
 

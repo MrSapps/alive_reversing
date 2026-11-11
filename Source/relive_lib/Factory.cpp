@@ -2,6 +2,7 @@
 #include "MapWrapper.hpp"
 #include "../AliveLibAO/Map.hpp"
 #include "stdafx.h"
+#include <algorithm>
 #include "Factory.hpp"
 
 #include "ResourceManager.hpp"
@@ -51,7 +52,6 @@
 #include "../AliveLibAO/Honey.hpp"
 #include "../AliveLibAO/HoneySack.hpp"
 #include "../AliveLibAO/PullRingRope.hpp"
-#include "../AliveLibAO/InvisibleSwitch.hpp"
 #include "../AliveLibAO/FallingItem.hpp"
 #include "../AliveLibAO/FootSwitch.hpp"
 #include "../AliveLibAO/HoistRocksEffect.hpp"
@@ -93,7 +93,7 @@
 #include "../AliveLibAE/StatusLight.hpp"
 #include "../AliveLibAE/WheelSyncer.hpp"
 #include "../AliveLibAE/LevelLoader.hpp"
-#include "../AliveLibAE/InvisibleSwitch.hpp"
+#include "../relive_lib/GameObjects/InvisibleSwitch.hpp"
 #include "../AliveLibAE/Lever.hpp"
 #include "../AliveLibAE/MultiSwitchController.hpp"
 #include "../AliveLibAE/Drill.hpp"
@@ -1034,6 +1034,11 @@ void Factory::SligBoundLeftAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMo
     {
         pBound->mTlvFlags.Clear(TlvFlags::eBit1_Created);
         pBound->mTlvFlags.Clear(TlvFlags::eBit2_Destroyed);
+        if (map.mLoadingFromSave)
+        {
+            // The Sligs a saved game has are made from the save, one made here would be another
+            return;
+        }
 
         for (s16 camX_idx = -2; camX_idx < 3; camX_idx++)
         {
@@ -1178,8 +1183,12 @@ void Factory::ElumAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, Resou
     else
     {
         AO::Elum::Spawn(tlvId, resMan, map);
-        AO::gElum->mXPos = FP_FromInteger(pTlv->mTopLeftX);
-        AO::gElum->mYPos = FP_FromInteger(pTlv->mTopLeftY);
+        // Not for a restore: Elum is where the save has him
+        if (!map.mLoadingFromSave)
+        {
+            AO::gElum->mXPos = FP_FromInteger(pTlv->mTopLeftX);
+            AO::gElum->mYPos = FP_FromInteger(pTlv->mTopLeftY);
+        }
     }
 }
 
@@ -1425,7 +1434,7 @@ void Factory::CreditsControllerAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode lo
 {
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
-        if (!AO::gCreditsControllerExists)
+        if (!AO::gCreditsControllerExists || map.mLoadingFromSave)
         {
             relive_new AO::CreditsController(static_cast<Path_CreditsController*>(pTlv), tlvId, resMan, map);
         }
@@ -1571,6 +1580,12 @@ void Factory::RingCancelAO(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode,
     if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2)
     {
         auto pRingCancel = static_cast<Path_RingCancel*>(pTlv);
+        // Not for a restore: Abe has what the save has, which is after this took its effect
+        if (map.mLoadingFromSave)
+        {
+            map.TLV_Reset(tlvId);
+            return;
+        }
         if (pRingCancel->mRemovesShrykull)
         {
             if (AO::gAbe->mRingPulseTimer)
@@ -2202,6 +2217,11 @@ void Factory::SligBoundLeftAE(Path_TLV* pTlv,  const Guid& /*tlvId*/, LoadMode l
     {
         pBound->mTlvFlags.Clear(TlvFlags::eBit1_Created);
         pBound->mTlvFlags.Clear(TlvFlags::eBit2_Destroyed);
+        if (map.mLoadingFromSave)
+        {
+            // The Sligs a saved game has are made from the save, one made here would be another
+            return;
+        }
 
         for (s16 camX_idx = -2; camX_idx < 3; camX_idx++)
         {
@@ -2458,7 +2478,7 @@ void Factory::HandStoneAE(Path_TLV*, const Guid& tlvId, LoadMode loadMode, Resou
 
 void Factory::CreditsControllerAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
-    if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2 && !gCreditsControllerExists)
+    if (loadMode != LoadMode::LoadResourceFromList_1 && loadMode != LoadMode::LoadResource_2 && (!gCreditsControllerExists || map.mLoadingFromSave))
     {
         relive_new CreditsController(pTlv, tlvId, resMan, map);
     }
@@ -2618,7 +2638,14 @@ void Factory::WorkWheelAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode, 
 
 static void Create_LaughingGasAE(Layer layer, Path_TLV* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
 {
-    if (!gLaughingGasInstanceCount)
+    // A restore has the count of the world it was saved in: this gas is made again if that world had it
+    bool make = !gLaughingGasInstanceCount;
+    if (map.mLoadingFromSave)
+    {
+        const std::vector<Guid>& saved = map.mRestoreObjectOrder;
+        make = std::find(saved.begin(), saved.end(), Guid::FromTlvId(tlvId)) != saved.end();
+    }
+    if (make)
     {
         relive_new LaughingGas(layer, static_cast<Path_LaughingGas*>(pTlv), tlvId, resMan, map);
     }
@@ -3131,6 +3158,9 @@ void Factory::RollingBallAE(Path_TLV* pTlv, const Guid& tlvId, LoadMode loadMode
 
 void Factory::ConstructTLVObject(Path_TLV* pTlv, const Guid& tlvInfo, LoadMode loadMode, ResourceManager& resMan, BaseMap& map)
 {
+    // The ids of what it makes come from the TLV, see Guid::CreationScope
+    Guid::CreationScope idScope(Guid::FromTlvId(tlvInfo));
+
 #define FACTORY(method, pTlv, tlvInfo, loadMode, resMan, map) \
     if (GetGameType() == GameType::eAo) \
     { \

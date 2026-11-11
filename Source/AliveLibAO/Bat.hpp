@@ -52,13 +52,6 @@ public:
     static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 };
 
-// mAttackTarget is deliberately not persisted - it's a transient "who am I
-// currently attacking" reference to another live object, same treatment as
-// Abe's own transient effect ids (Fade/OrbWhirlWind) elsewhere in this
-// codebase. If the bat was mid-attack when saved, it restores into
-// eFlyAwayAndDie_5 instead of eAttackTarget_4, since eAttackTarget_4
-// dereferences mAttackTarget unconditionally in VUpdate() with no null
-// check, and there isn't a stable id to restore it from anyway.
 struct BatSaveState final : public SaveStateBase
 {
     BatSaveState()
@@ -81,6 +74,10 @@ struct BatSaveState final : public SaveStateBase
     s32 mAttackDurationTimer = 0;
     FP mEnemyXPos = {};
     FP mEnemyYPos = {};
+    // The track line it is on, by its place in the lines plus 1 (a raycast from where it is can find another at a join)
+    s32 mBatLineIdx = 0;
+    // Who it is attacking, a stale id stays as in a live game
+    Guid mAttackTarget = {};
 };
 
 } // namespace AO

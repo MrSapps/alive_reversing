@@ -27,11 +27,7 @@ public:
     static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 };
 
-// mSoundPitch is derived once from the TLV/level at construction and never
-// changes; mFrameAbove12 is recomputed every VUpdate() from the current
-// animation frame. The only thing worth persisting is the swing's current
-// animation frame, so the pendulum doesn't visually snap back to its
-// default start position after a reload.
+// mSoundPitch is derived once from the TLV/level at construction and never changes
 struct ZBallSaveState final : public SaveStateBase
 {
     ZBallSaveState()
@@ -39,6 +35,7 @@ struct ZBallSaveState final : public SaveStateBase
     { }
     Guid mTlvInfo;
     s32 mFrame = 0;
+    s16 mFrameAbove12 = 0;
 };
 
 } // namespace AO

@@ -1,4 +1,5 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "../relive_lib/Function.hpp"
 #include "FallingItem.hpp"
 #include "../relive_lib/SerializedObjectData.hpp"
@@ -19,7 +20,7 @@
 
 namespace AO {
 
-static FallingItem* sPrimaryFallingItem = nullptr;
+static WorldStatic<Guid> sPrimaryFallingItemId("AO.FallingItem.sPrimaryFallingItemId", Guid{});
 
 static const FallingItem_Data sFallingItemData[16] = {
     {AnimId::AO_FallingRock_Falling, AnimId::AO_FallingRock_Waiting}, // menu
@@ -117,9 +118,9 @@ FallingItem::FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, Reso
     mAirStreamSndChannels = 0;
 
     // Not sure why this rupture farms primary item hack is required
-    if (!sPrimaryFallingItem && (mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms || mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn))
+    if (!sPrimaryFallingItemId.Get().IsValid() && (mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarms || mMap.mCurrentLevel == EReliveLevelIds::eRuptureFarmsReturn))
     {
-        sPrimaryFallingItem = this;
+        sPrimaryFallingItemId = mBaseGameObjectId;
         mCreatedGnFrame = sGnFrame;
     }
 
@@ -128,9 +129,9 @@ FallingItem::FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, Reso
 
 FallingItem::~FallingItem()
 {
-    if (sPrimaryFallingItem == this)
+    if (sPrimaryFallingItemId.Get() == mBaseGameObjectId)
     {
-        sPrimaryFallingItem = nullptr;
+        sPrimaryFallingItemId = Guid{};
     }
     mMap.TLV_Reset(mTlvId);
 }
@@ -153,7 +154,7 @@ void FallingItem::VUpdate()
     }
 
     // The primary item controls the main sound effects, otherwise there would be a crazy amount of smashing sounds
-    if (sPrimaryFallingItem == this)
+    if (sPrimaryFallingItemId.Get() == mBaseGameObjectId)
     {
         if (!((sGnFrame - mCreatedGnFrame) % 87))
         {
@@ -370,13 +371,15 @@ void FallingItem::VOnThrowableHit(BaseGameObject* /*pFrom*/)
     // Empty
 }
 
+std::vector<BaseGameObject::NotStateMemory> FallingItem::VNotStateMemory()
+{
+    // The channels its sound plays on
+    return {{&mAirStreamSndChannels, sizeof(mAirStreamSndChannels)}};
+}
+
 void FallingItem::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     FallingItemSaveState data = {};
 
     data.mXPos = mXPos;
@@ -400,7 +403,7 @@ void FallingItem::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mStartYPos = mStartYPos;
     data.mFallIntervalTimer = mFallIntervalTimer;
     data.mDoAirStreamSound = mDoAirStreamSound;
-    data.mAirStreamSndChannels = mAirStreamSndChannels;
+    data.mAirStreamSndChannels = 0; // the sound system's channels, not state: the sound is made again
     data.mCreatedGnFrame = mCreatedGnFrame;
 
     pSaveBuffer.Write(data);
@@ -437,7 +440,6 @@ void FallingItem::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMan
         pItem->mStartYPos = pState->mStartYPos;
         pItem->mFallIntervalTimer = pState->mFallIntervalTimer;
         pItem->mDoAirStreamSound = pState->mDoAirStreamSound;
-        pItem->mAirStreamSndChannels = pState->mAirStreamSndChannels;
         pItem->mCreatedGnFrame = pState->mCreatedGnFrame;
     }
 }

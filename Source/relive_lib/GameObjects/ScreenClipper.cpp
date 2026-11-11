@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../ObjectIds.hpp"
+#include "../SerializedObjectData.hpp"
 #include "ScreenClipper.hpp"
 #include "../../AliveLibAE/stdlib.hpp"
 #include "../PsxDisplay.hpp"
@@ -25,6 +27,17 @@ ScreenClipper::ScreenClipper(PSX_Point xy, PSX_Point wh, Layer layer, ResourceMa
     mRect.h = wh.y;
 
     mOtLayer = layer;
+
+    gObjListDrawables->Push_Back(this);
+}
+
+ScreenClipper::ScreenClipper(RestoreTag, ResourceManager& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
+{
+    SetType(ReliveTypes::eScreenClipper);
+
+    SetUpdateDuringCamSwap(true);
+    SetDrawable(true);
 
     gObjListDrawables->Push_Back(this);
 }
@@ -64,4 +77,30 @@ void ScreenClipper::Update_Clip_Rect(PSX_Point xy, PSX_Point wh)
 
     mRect.w = std::max(wh.x, mRect.w);
     mRect.h = std::max(wh.y, mRect.h);
+}
+
+void ScreenClipper::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    ScreenClipperSaveState data = {};
+    data.mRectX = mRect.x;
+    data.mRectY = mRect.y;
+    data.mRectW = mRect.w;
+    data.mRectH = mRect.h;
+    data.mOtLayer = static_cast<s32>(mOtLayer);
+    pSaveBuffer.Write(data);
+}
+
+void ScreenClipper::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const ScreenClipperSaveState& state = *pData.ReadTmpPtr<ScreenClipperSaveState>();
+    ScreenClipper* p = relive_new ScreenClipper(ScreenClipper::RestoreTag{}, resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mRect.x = state.mRectX;
+    p->mRect.y = state.mRectY;
+    p->mRect.w = state.mRectW;
+    p->mRect.h = state.mRectH;
+    p->mOtLayer = static_cast<Layer>(state.mOtLayer);
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 
 struct GibPart final
 {
@@ -29,6 +30,33 @@ enum class GibType : s32
     eElum,
 };
 
+struct GibsSaveState final : public SaveStateBase
+{
+    GibsSaveState()
+        : SaveStateBase(ReliveTypes::eGibs, sizeof(*this))
+    { }
+    // What it was made with
+    s32 mGibType;
+    FP mBaseScale;
+    bool mMakeSmaller;
+    AnimatedObjectSaveState mObject;
+    FP mZ;
+    FP mDz;
+    s32 mAliveTimer;
+    s16 mPartsUsedCount;
+    struct Part final
+    {
+        FP mX;
+        FP mY;
+        FP mZ;
+        FP mDx;
+        FP mDy;
+        FP mDz;
+        AnimationSaveState mAnim;
+    };
+    Part mParts[7];
+};
+
 class Gibs final : public ::BaseAnimatedWithPhysicsGameObject
 {
 public:
@@ -39,8 +67,14 @@ public:
 
     virtual void VUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
 
 private:
+    // What it was made with, to make it again
+    GibType mGibType = GibType::eAbe;
+    FP mBaseScale = {};
     FP mZ = {};
     FP mDz = {};
     s32 mAliveTimer = 0;

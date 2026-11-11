@@ -99,3 +99,23 @@ TEST(Automation, SoundCommands)
     EXPECT_NE(ParseError("seq_play").find("expected"), std::string::npos);
     EXPECT_NE(ParseError("seq_stop 1 2").find("expected"), std::string::npos);
 }
+
+TEST(Automation, ParsesStateHashAndQuicksaveCommands)
+{
+    std::vector<Automation::Command> commands;
+    std::string error;
+    ASSERT_TRUE(Parse("hash_log out/h.txt\nhash_log out/h.txt full\nquicksave\nquickload\n", commands, error)) << error;
+    ASSERT_EQ(commands.size(), 4u);
+
+    ASSERT_TRUE(Parse("hash_mark a\nexpect_hash a\nexpect_hash a ignore Spark Gibs\n", commands, error)) << error;
+    ASSERT_EQ(commands.size(), 3u);
+    EXPECT_FALSE(ParseError("hash_mark\n").empty());
+    EXPECT_FALSE(ParseError("expect_hash\n").empty());
+    EXPECT_FALSE(ParseError("expect_hash a ignore\n").empty());
+    EXPECT_FALSE(ParseError("expect_hash a Spark\n").empty());
+
+    EXPECT_FALSE(ParseError("hash_log\n").empty());
+    EXPECT_FALSE(ParseError("hash_log a.txt everything\n").empty());
+    EXPECT_FALSE(ParseError("quicksave now\n").empty());
+    EXPECT_FALSE(ParseError("quickload now\n").empty());
+}

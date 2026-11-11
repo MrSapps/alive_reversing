@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../SerializedObjectData.hpp"
 #include "TimedMine.hpp"
 #include "../Function.hpp"
 #include "../Events.hpp"
@@ -350,4 +351,34 @@ void TimedMine::VOnAbeInteraction()
         mTickAnim.Set_Animation_Data(GetAnimRes(AnimId::Bomb_Flash));
         SfxPlayMono(relive::SoundEffects::GreenTick, 0);
     }
+}
+
+void TimedMine::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    TimedMineSaveState data = {};
+    data.mSlappedMine = mSlappedMine;
+    data.mTicksUntilExplosion = mTicksUntilExplosion;
+    data.mExplosionTimer = mExplosionTimer;
+    data.mTickAnim = mTickAnim.GetSaveState();
+    data.mOldGnFrame = mOldGnFrame;
+    data.mSingleTickTimer = mSingleTickTimer;
+    data.mStickToLiftPoint = mStickToLiftPoint;
+    pSaveBuffer.Write(data);
+}
+
+void TimedMine::RestoreFromSaveState(const TimedMineSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != (GetGameType() == GameType::eAe ? ReliveTypes::eTimedMine_or_MovingBomb : ReliveTypes::eTimedMine))
+    {
+        return;
+    }
+    TimedMine* p = static_cast<TimedMine*>(pObj);
+    p->mSlappedMine = state.mSlappedMine;
+    p->mTicksUntilExplosion = state.mTicksUntilExplosion;
+    p->mExplosionTimer = state.mExplosionTimer;
+    p->mTickAnim.RestoreSaveState(state.mTickAnim);
+    p->mOldGnFrame = state.mOldGnFrame;
+    p->mSingleTickTimer = state.mSingleTickTimer;
+    p->mStickToLiftPoint = state.mStickToLiftPoint;
 }

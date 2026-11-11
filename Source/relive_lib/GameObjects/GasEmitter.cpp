@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../WorldStatic.hpp"
 #include "GasEmitter.hpp"
 #include "Math.hpp"
 #include "../Sound/Midi.hpp"
@@ -8,8 +9,11 @@
 #include "../relive_lib/GameObjects/GasCountDown.hpp"
 #include "../GameType.hpp"
 #include "BaseMap.hpp"
+#include "SerializedObjectData.hpp"
 
-static GasEmitter* sMainGasEmitter = nullptr;
+// The one that plays the sound
+static WorldStatic<Guid> sMainGasEmitterId("GasEmitter.sMainGasEmitterId", Guid{});
+// The channels its sound plays on are the sound engine's, not part of the state: a restore starts the sound again
 static u32 sGasEmitterAudioMask = 0;
 
 GasEmitter::GasEmitter(relive::Path_GasEmitter* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
@@ -43,9 +47,9 @@ GasEmitter::~GasEmitter()
 {
     mMap.TLV_Reset(mTlvId);
 
-    if (sMainGasEmitter == this)
+    if (sMainGasEmitterId.Get() == mBaseGameObjectId)
     {
-        sMainGasEmitter = 0;
+        sMainGasEmitterId = Guid{};
         SND_Stop_Channels_Mask(sGasEmitterAudioMask);
         sGasEmitterAudioMask = 0;
     }
@@ -53,9 +57,9 @@ GasEmitter::~GasEmitter()
 
 void GasEmitter::VStopAudio()
 {
-    if (sMainGasEmitter == this)
+    if (sMainGasEmitterId.Get() == mBaseGameObjectId)
     {
-        sMainGasEmitter = 0;
+        sMainGasEmitterId = Guid{};
         SND_Stop_Channels_Mask(sGasEmitterAudioMask);
         sGasEmitterAudioMask = 0;
     }
@@ -96,14 +100,39 @@ void GasEmitter::VUpdate()
                 break;
         }
 
-        if (!sMainGasEmitter)
+        if (!sMainGasEmitterId.Get().IsValid())
         {
             SfxPlayMono(relive::SoundEffects::Gas1, 127);
-            sMainGasEmitter = this;
+            sMainGasEmitterId = mBaseGameObjectId;
+            sGasEmitterAudioMask = SfxPlayMono(relive::SoundEffects::Gas2, 127);
+        }
+        else if (sMainGasEmitterId.Get() == mBaseGameObjectId && !sGasEmitterAudioMask)
+        {
             sGasEmitterAudioMask = SfxPlayMono(relive::SoundEffects::Gas2, 127);
         }
     }
 
     // Flip the value
     mDrawFlipper = !mDrawFlipper;
+}
+
+void GasEmitter::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    GasEmitterSaveState data = {};
+    data.mTlvId = mTlvId;
+    data.mEmitPower = mEmitPower;
+    data.mDrawFlipper = mDrawFlipper;
+    pSaveBuffer.Write(data);
+}
+
+void GasEmitter::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const auto pState = pData.ReadTmpPtr<GasEmitterSaveState>();
+    auto pTlv = static_cast<relive::Path_GasEmitter*>(map.TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv());
+    // What played before the restore is not the sound of the restored emitter
+    SND_Stop_Channels_Mask(sGasEmitterAudioMask);
+    sGasEmitterAudioMask = 0;
+    auto pEmitter = relive_new GasEmitter(pTlv, pState->mTlvId, resMan, map);
+    pEmitter->mEmitPower = pState->mEmitPower;
+    pEmitter->mDrawFlipper = pState->mDrawFlipper;
 }

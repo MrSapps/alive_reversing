@@ -8,6 +8,8 @@
 #include "../GameType.hpp"
 #include "../../relive_lib/Engine.hpp"
 #include "BaseMap.hpp"
+#include "../SerializedObjectData.hpp"
+#include "../WorldStatic.hpp"
 
 static const TintEntry sAbeTintTable[21] = {
     {EReliveLevelIds::eMenu, 102u, 102u, 102u},
@@ -53,7 +55,8 @@ static const TintEntry sMudGibTints[19] = {
     {EReliveLevelIds::eStockYardsReturn, 25u, 25u, 25u},
     {EReliveLevelIds::eNone, 87u, 103u, 67u}};
 
-static s16 sGibRandom = 13;
+// Set by the first gibs made, which are the only ones to roll with the other value
+static WorldStatic<s16> sGibRandom("Gibs.sGibRandom", 13);
 
 static FP GibRand(FP scale)
 {
@@ -69,6 +72,8 @@ void Gibs::LoadAnimations(AnimId head, AnimId arm, AnimId body)
 
 Gibs::Gibs(GibType gibType, FP xpos, FP ypos, FP xOff, FP yOff, FP scale, bool bMakeSmaller, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
+    , mGibType(gibType)
+    , mBaseScale(scale)
 {
     AnimId headGib = AnimId::None;
     AnimId armGib = AnimId::None;
@@ -315,6 +320,63 @@ Gibs::~Gibs()
     for (s16 i = 0; i < mPartsUsedCount; i++)
     {
         mGibParts[i].mAnimation.VCleanUp();
+    }
+}
+
+std::vector<BaseGameObject::NotStateMemory> Gibs::VNotStateMemory()
+{
+    // The parts it doesn't use were never given an animation, but each took a number from the resource counter
+    const s32 unused = 7 - mPartsUsedCount;
+    if (unused <= 0)
+    {
+        return {};
+    }
+    return {{&mGibParts[mPartsUsedCount], sizeof(GibPart) * static_cast<std::size_t>(unused)}};
+}
+
+void Gibs::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    GibsSaveState data = {};
+    data.mGibType = static_cast<s32>(mGibType);
+    data.mBaseScale = mBaseScale;
+    data.mMakeSmaller = mMakeSmaller;
+    data.mObject = GetAnimatedState();
+    data.mZ = mZ;
+    data.mDz = mDz;
+    data.mAliveTimer = mAliveTimer;
+    data.mPartsUsedCount = mPartsUsedCount;
+    for (s32 i = 0; i < mPartsUsedCount; i++)
+    {
+        data.mParts[i].mX = mGibParts[i].x;
+        data.mParts[i].mY = mGibParts[i].y;
+        data.mParts[i].mZ = mGibParts[i].z;
+        data.mParts[i].mDx = mGibParts[i].dx;
+        data.mParts[i].mDy = mGibParts[i].dy;
+        data.mParts[i].mDz = mGibParts[i].dz;
+        data.mParts[i].mAnim = mGibParts[i].mAnimation.GetSaveState();
+    }
+    pSaveBuffer.Write(data);
+}
+
+void Gibs::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const auto pState = pData.ReadTmpPtr<GibsSaveState>();
+    // Made as it was, then put where it was. What the constructor rolls is thrown away with the rest of the restore
+    auto pGibs = relive_new Gibs(static_cast<GibType>(pState->mGibType), FP_FromInteger(0), FP_FromInteger(0), FP_FromInteger(0), FP_FromInteger(0), pState->mBaseScale, pState->mMakeSmaller, resMan, map);
+    pGibs->SetAnimatedState(pState->mObject);
+    pGibs->mZ = pState->mZ;
+    pGibs->mDz = pState->mDz;
+    pGibs->mAliveTimer = pState->mAliveTimer;
+    pGibs->mPartsUsedCount = pState->mPartsUsedCount;
+    for (s32 i = 0; i < pGibs->mPartsUsedCount; i++)
+    {
+        pGibs->mGibParts[i].x = pState->mParts[i].mX;
+        pGibs->mGibParts[i].y = pState->mParts[i].mY;
+        pGibs->mGibParts[i].z = pState->mParts[i].mZ;
+        pGibs->mGibParts[i].dx = pState->mParts[i].mDx;
+        pGibs->mGibParts[i].dy = pState->mParts[i].mDy;
+        pGibs->mGibParts[i].dz = pState->mParts[i].mDz;
+        pGibs->mGibParts[i].mAnimation.RestoreSaveState(pState->mParts[i].mAnim);
     }
 }
 

@@ -1,4 +1,6 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "LightEffect.hpp"
 #include "Math.hpp"
 #include "Engine.hpp"
@@ -119,6 +121,30 @@ void LightEffect::VUpdate()
 
         mRGB.SetRGB(rgb, rgb, rgb);
     }
+}
+
+void LightEffect::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    LightEffectSaveState data = {};
+    data.mRnd1 = mRnd1;
+    data.mRnd2 = mRnd2;
+    data.mRnd3 = mRnd3;
+    data.mRnd4 = mRnd4;
+    pSaveBuffer.Write(data);
+}
+
+void LightEffect::RestoreFromSaveState(const LightEffectSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    LightEffect* p = static_cast<LightEffect*>(pObj);
+    p->mRnd1 = state.mRnd1;
+    p->mRnd2 = state.mRnd2;
+    p->mRnd3 = state.mRnd3;
+    p->mRnd4 = state.mRnd4;
 }
 
 } // namespace AO

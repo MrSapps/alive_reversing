@@ -117,7 +117,6 @@ Scrab::Scrab(relive::Path_Scrab* pTlv, const Guid& tlvId, relive::Path_ScrabSpaw
 
     SetCanBePossessed(true);
     SetCanSetOffExplosives(true);
-    SetRestoredFromQuickSave(false);
 
     mPreventDepossession = 0;
     field_16C_input = 0;
@@ -253,6 +252,10 @@ void Scrab::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& 
         pScrab->SetSpriteScale(pState->mSpriteScale);
         pScrab->mRGB.SetRGB(pState->mRingRed, pState->mRingGreen, pState->mRingBlue);
         pScrab->mCurrentMotion = pState->field_28_current_motion;
+        if (pState->mPreviousMotionSaved)
+        {
+            pScrab->mPreviousMotion = static_cast<eScrabMotions>(pState->mPreviousMotion);
+        }
 
         const u32 idx = static_cast<u32>(pState->field_28_current_motion);
         pScrab->GetAnimation().Set_Animation_Data(pScrab->GetAnimRes(sScrabMotionAnimIds[idx]));
@@ -275,7 +278,6 @@ void Scrab::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& 
         pScrab->mNextMotion = pState->field_36_next_motion;
         pScrab->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pState->field_38_last_line_ypos);
         pScrab->field_130_depossession_timer = pState->field_60_depossession_timer;
-        pScrab->SetRestoredFromQuickSave(true);
         pScrab->field_12C_timer = pState->field_5C_timer;
         pScrab->BaseAliveGameObjectCollisionLineType = pState->mLineType;
         pScrab->field_144_tlvInfo = pState->field_44_tlvInfo;
@@ -296,7 +298,7 @@ void Scrab::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& 
         pScrab->mAbeLevel = pState->mAbeLevel;
         pScrab->mAbePath = pState->mAbePath;
         pScrab->mAbeCamera = pState->mAbeCamera;
-        pScrab->field_16C_input = InputObject::PsxButtonsToKeyboardInput(pState->field_84_input);
+        pScrab->field_16C_input = pState->mInputRaw;
         pScrab->mShredPowerActive = pState->field_8C_shred_power_active;
         pScrab->field_194_speak = pState->field_8E_speak;
         pScrab->field_198_max_xpos = pState->field_90_max_xpos;
@@ -307,16 +309,13 @@ void Scrab::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& 
         pScrab->mForceUpdateAnimation = pState->mForceUpdateAnimation;
         pScrab->mRoarRandomly = pState->mRoarRandomly;
         pScrab->mPersistant = pState->mPersistant;
+        pScrab->field_13C_last_ypos = pState->field_13C_last_ypos;
     }
 }
 
 void Scrab::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     ScrabSaveState data = {};
 
     data.mType = ReliveTypes::eScrab;
@@ -403,6 +402,7 @@ void Scrab::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mAbePath = mAbePath;
     data.mAbeCamera = mAbeCamera;
     data.field_84_input = InputObject::KeyboardInputToPsxButtons_45EF70(field_16C_input);
+    data.mInputRaw = field_16C_input;
     data.field_8C_shred_power_active = mShredPowerActive;
     data.field_8E_speak = field_194_speak;
     data.field_90_max_xpos = field_198_max_xpos;
@@ -413,8 +413,11 @@ void Scrab::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mForceUpdateAnimation = mForceUpdateAnimation;
     data.mRoarRandomly = mRoarRandomly;
     data.mPersistant = mPersistant;
+    data.field_13C_last_ypos = field_13C_last_ypos;
 
-    pSaveBuffer.Write(data);
+        data.mPreviousMotionSaved = true;
+    data.mPreviousMotion = static_cast<s32>(mPreviousMotion);
+pSaveBuffer.Write(data);
 }
 
 Scrab::~Scrab()
@@ -570,32 +573,37 @@ void Scrab::HandleDDCheat()
     BaseAliveGameObjectLastLineYPos = mYPos;
 }
 
+void Scrab::VPostRestore()
+{
+    if (BaseAliveGameObjectCollisionLineType == -1)
+    {
+        BaseAliveGameObjectCollisionLine = nullptr;
+    }
+    else
+    {
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+    }
+    mTargetGuid = BaseGameObject::RefreshId(mTargetGuid);
+    mFightTargetId = BaseGameObject::RefreshId(mFightTargetId);
+
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
+}
+
 void Scrab::VUpdate()
 {
-    if (GetRestoredFromQuickSave())
-    {
-        SetRestoredFromQuickSave(false);
-        if (BaseAliveGameObjectCollisionLineType == -1)
-        {
-            BaseAliveGameObjectCollisionLine = nullptr;
-        }
-        else
-        {
-            gCollisions->Raycast(
-                mXPos,
-                mYPos - FP_FromInteger(20),
-                mXPos,
-                mYPos + FP_FromInteger(20),
-                &BaseAliveGameObjectCollisionLine,
-                &mXPos,
-                &mYPos,
-                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
-        }
-        BaseAliveGameObjectCollisionLineType = 0;
-        mTargetGuid = BaseGameObject::RefreshId(mTargetGuid);
-        mFightTargetId = BaseGameObject::RefreshId(mFightTargetId);
-    }
-
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);

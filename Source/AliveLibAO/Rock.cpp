@@ -1,4 +1,6 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Rock.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "../relive_lib/GameObjects/Grenade.hpp"
@@ -68,6 +70,26 @@ Rock::~Rock()
             gThrowableArray->Remove(mBaseThrowableCount >= 1 ? mBaseThrowableCount : 1);
         }
     }
+}
+
+void Rock::VPostRestore()
+{
+    // The line is looked for again where the object is
+    if (mSavedPathLineType != -1)
+    {
+        FP hitX = {};
+        FP hitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(10),
+            mXPos,
+            mYPos + FP_FromInteger(10),
+            &mPathLine,
+            &hitX,
+            &hitY,
+            CollisionMask(static_cast<eLineTypes>(mSavedPathLineType)));
+    }
+    mSavedPathLineType = -1;
 }
 
 void Rock::VUpdate()
@@ -372,6 +394,38 @@ bool Rock::OnCollision(BaseAnimatedWithPhysicsGameObject* pObj)
 void Rock::VTimeToExplodeRandom()
 {
     // Empty ?
+}
+
+void Rock::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    RockSaveState data = {};
+    data.mState = static_cast<s32>(mState);
+    data.mBounceCount = mBounceCount;
+    data.mPreviousXPos = mPreviousXPos;
+    data.mPreviousYPos = mPreviousYPos;
+    data.mShimmerTimer = mShimmerTimer;
+    data.mBaseThrowableCount = mBaseThrowableCount;
+    data.mBaseThrowableDead = mBaseThrowableDead;
+    data.mPathLineType = mPathLine ? static_cast<s32>(mPathLine->mLineType) : -1;
+    pSaveBuffer.Write(data);
+}
+
+void Rock::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const RockSaveState& state = *pData.ReadTmpPtr<RockSaveState>();
+    Rock* p = relive_new Rock(FP_FromInteger(0), FP_FromInteger(0), 0, resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mState = static_cast<RockStates>(state.mState);
+    p->mBounceCount = state.mBounceCount;
+    p->mPreviousXPos = state.mPreviousXPos;
+    p->mPreviousYPos = state.mPreviousYPos;
+    p->mShimmerTimer = state.mShimmerTimer;
+    p->mBaseThrowableCount = state.mBaseThrowableCount;
+    p->mBaseThrowableDead = state.mBaseThrowableDead;
+    p->mSavedPathLineType = state.mPathLineType;
 }
 
 } // namespace AO

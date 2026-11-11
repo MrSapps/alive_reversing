@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 #include "Font.hpp"
 #include "../relive_lib/Primitives.hpp"
 
@@ -11,15 +12,34 @@ namespace relive
     struct Path_ColourfulMeter;
 }
 
+struct ColourfulMeterSaveState final : public SaveStateBase
+{
+    ColourfulMeterSaveState()
+        : SaveStateBase(ReliveTypes::eColourfulMeter, sizeof(*this))
+    { }
+    s16 mPolysToRenderCount;
+    s16 mCount;
+    s16 mMinesAlarmCountdown;
+    s16 mStartingSwitchState;
+    s16 mBarCount;
+    bool mStartFilled;
+    s16 mTextX;
+    s16 mTextY;
+};
+
 class ColourfulMeter final : public BaseGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const ColourfulMeterSaveState& state);
+
     ColourfulMeter(relive::Path_ColourfulMeter* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~ColourfulMeter();
 
     virtual void VScreenChanged() override;
     virtual void VUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
 
 private:
     FontContext mFontContext = {};

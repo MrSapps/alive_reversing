@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "PullRingRope.hpp"
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
 #include "../relive_lib/GameObjects/Rope.hpp"
@@ -272,4 +273,30 @@ bool PullRingRope::VIsNotBeingPulled()
 void PullRingRope::VMarkAsPulled()
 {
     mIsPulled = true;
+}
+
+void PullRingRope::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    PullRingRopeSaveState data = {};
+    data.mStayInStateTicks = mStayInStateTicks;
+    data.mRopeId = mRopeId;
+    data.mRingPullerId = mRingPullerId;
+    data.mState = static_cast<s32>(mState);
+    data.mIsPulled = mIsPulled;
+    pSaveBuffer.Write(data);
+}
+
+void PullRingRope::RestoreFromSaveState(const PullRingRopeSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::ePullRingRope)
+    {
+        return;
+    }
+    PullRingRope* p = static_cast<PullRingRope*>(pObj);
+    p->mStayInStateTicks = state.mStayInStateTicks;
+    p->mRopeId = state.mRopeId;
+    p->mRingPullerId = state.mRingPullerId;
+    p->mState = static_cast<States>(state.mState);
+    p->mIsPulled = state.mIsPulled;
 }

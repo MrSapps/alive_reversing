@@ -14,9 +14,71 @@
 
 DynamicArrayT<BaseGameObject>* gObjListDrawables;
 
+AnimatedObjectSaveState BaseAnimatedWithPhysicsGameObject::GetAnimatedState()
+{
+    AnimatedObjectSaveState state = {};
+    state.mAnim = mAnim.GetSaveState();
+    state.mXPos = mXPos;
+    state.mYPos = mYPos;
+    state.mCurrentPath = mCurrentPath;
+    state.mCurrentLevel = static_cast<s16>(mCurrentLevel);
+    state.mVelX = mVelX;
+    state.mVelY = mVelY;
+    state.mRed = mRGB.r;
+    state.mGreen = mRGB.g;
+    state.mBlue = mRGB.b;
+    state.mYOffset = mYOffset;
+    state.mXOffset = mXOffset;
+    state.mScale = static_cast<s16>(mScale);
+    state.mSpriteScale = mSpriteScale;
+    state.mApplyShadowZoneColour = mApplyShadowZoneColour;
+    state.mDoPurpleLightEffect = mDoPurpleLightEffect;
+    return state;
+}
+
+void BaseAnimatedWithPhysicsGameObject::SetAnimatedState(const AnimatedObjectSaveState& state)
+{
+    mXPos = state.mXPos;
+    mYPos = state.mYPos;
+    mCurrentPath = state.mCurrentPath;
+    mCurrentLevel = static_cast<EReliveLevelIds>(state.mCurrentLevel);
+    mVelX = state.mVelX;
+    mVelY = state.mVelY;
+    mRGB.r = state.mRed;
+    mRGB.g = state.mGreen;
+    mRGB.b = state.mBlue;
+    mYOffset = state.mYOffset;
+    mXOffset = state.mXOffset;
+    mApplyShadowZoneColour = state.mApplyShadowZoneColour;
+    mDoPurpleLightEffect = state.mDoPurpleLightEffect;
+    mScale = static_cast<Scale>(state.mScale);
+    mSpriteScale = state.mSpriteScale;
+    // It may have gone on to another animation than the one the object starts with
+    if (state.mAnim.mValid && static_cast<s32>(mAnim.mAnimRes.mId) != state.mAnim.mAnimId)
+    {
+        const AnimId id = static_cast<AnimId>(state.mAnim.mAnimId);
+        bool loaded = false;
+        for (AnimResource& res : mLoadedAnims)
+        {
+            if (res.mId == id)
+            {
+                mAnim.Set_Animation_Data(res);
+                loaded = true;
+                break;
+            }
+        }
+        if (!loaded)
+        {
+            mLoadedAnims.push_back(mResMan.LoadAnimation(id));
+            mAnim.Set_Animation_Data(mLoadedAnims.back());
+        }
+    }
+    mAnim.RestoreSaveState(state.mAnim);
+}
+
 void BaseAnimatedWithPhysicsGameObject::CreateShadow()
 {
-    mShadow = relive_new Shadow(mResMan, mMap);
+    mShadow = relive_new Shadow(mResMan, mMap, this);
 }
 
 void BaseAnimatedWithPhysicsGameObject::MakeArray()

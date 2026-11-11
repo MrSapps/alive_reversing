@@ -1,9 +1,11 @@
 #pragma once
 
 #include "../relive_lib/Function.hpp"
+#include "../relive_lib/WorldStatic.hpp"
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
 #include "Map.hpp"
 #include "../relive_lib/AnimationUnknown.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 
 class PathLine;
 class BaseAliveGameObject;
@@ -27,11 +29,58 @@ struct BeeSwarmParticles final
     BeeSwarmParticle bees[25];
 };
 
+struct BeeSwarmSaveState final : public SaveStateBase
+{
+    BeeSwarmSaveState()
+        : SaveStateBase(ReliveTypes::eBeeSwarm, sizeof(*this))
+    { }
+    s16 mMaxBeesCount;
+    s16 mCurrentBeesCount;
+    FP mSpawnXPos;
+    FP mSpawnYPos;
+    FP mChaseTargetX;
+    FP mChaseTargetY;
+    FP mSpeed;
+    FP mPosOffset;
+    s16 mSwarmState;
+    s32 mTotalChaseTime;
+    FP mRectX;
+    FP mRectY;
+    FP mRectW;
+    FP mRectH;
+    Guid mChaseTarget;
+    s32 mAliveTimer;
+    s32 mDamageOrPainSoundTimer;
+    s32 mUpdateChaseTimer;
+    // The track line it follows, by its place in the lines plus 1
+    s32 mLineIdx;
+    FP mLineFollowSpeed;
+    struct Bee final
+    {
+        FP mXPos;
+        FP mYPos;
+        s8 mAngle;
+        s8 mAngleSpeed;
+        s32 mTimer;
+        AnimationSaveState mAnim;
+    };
+    Bee mBees[25];
+};
+
 class BeeSwarm final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
+    // For a save: made with none counted, the count comes back with the rest of the variables
+    struct RestoreTag final
+    { };
+    BeeSwarm(RestoreTag, ResourceManager& resMan, BaseMap& map);
+
     BeeSwarm(FP xpos, FP ypos, FP speed, s32 numBees, s32 totalChaseTime, ResourceManager& resMan, BaseMap& map);
     ~BeeSwarm();
+
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
 
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;
@@ -76,7 +125,7 @@ public:
     FP mLineFollowSpeed = {};
 };
 
-extern s16 gBeeInstanceCount;
-extern s16 gBeesNearAbe;
+extern WorldStatic<s16> gBeeInstanceCount;
+extern WorldStatic<s16> gBeesNearAbe;
 
 } // namespace AO

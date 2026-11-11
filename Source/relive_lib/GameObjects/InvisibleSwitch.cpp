@@ -1,19 +1,16 @@
-#include "stdafx_ao.h"
-#include "../relive_lib/Function.hpp"
+#include "stdafx.h"
 #include "InvisibleSwitch.hpp"
-#include "../relive_lib/SerializedObjectData.hpp"
-#include "../AliveLibAE/stdlib.hpp"
-#include "Abe.hpp"
-#include "../relive_lib/SwitchStates.hpp"
-#include "../relive_lib/GameObjects/Alarm.hpp"
-#include "../relive_lib/Events.hpp"
-#include "Engine.hpp"
-#include "Path.hpp"
-#include "../relive_lib/GameType.hpp"
-#include "Map.hpp"
-
-namespace AO {
-
+#include "../Function.hpp"
+#include "../GameObjects/Alarm.hpp"
+#include "../Events.hpp"
+#include "../../AliveLibAE/stdlib.hpp"
+#include "../Engine.hpp"
+#include "../SwitchStates.hpp"
+#include "BaseAbe.hpp"
+#include "../../AliveLibAE/Path.hpp"
+#include "../BaseMap.hpp"
+#include "../GameType.hpp"
+#include "../SerializedObjectData.hpp"
 
 InvisibleSwitch::InvisibleSwitch(relive::Path_InvisibleSwitch* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
@@ -38,8 +35,7 @@ InvisibleSwitch::~InvisibleSwitch()
 
 bool InvisibleSwitch::IsAbeUsingDoor() const
 {
-    return gAbe->mCurrentMotion == eAbeMotions::Motion_157_DoorExit
-        || gAbe->mCurrentMotion == eAbeMotions::Motion_156_DoorEnter;
+    return GetAbe()->IsEnteringOrExitingDoor();
 }
 
 void InvisibleSwitch::VUpdate()
@@ -66,8 +62,8 @@ void InvisibleSwitch::VUpdate()
                     const FP charYPos = sControlledCharacter->mYPos;
                     if (charYPos >= FP_FromInteger(mTlvTopLeft.y) && charYPos <= FP_FromInteger(mTlvBottomRight.y))
                     {
-                        if ((IsAbe(sControlledCharacter) && !IsAbeUsingDoor())
-                            || !IsAbe(sControlledCharacter))
+                        if (((GetAbe() && GetAbe() == sControlledCharacter) && !IsAbeUsingDoor())
+                            || !(GetAbe() && GetAbe() == sControlledCharacter))
                         {
                             // Scale matches ?
                             if (mScale == relive::Path_InvisibleSwitch::InvisibleSwitchScale::eAny
@@ -120,27 +116,17 @@ void InvisibleSwitch::VScreenChanged()
 void InvisibleSwitch::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
     InvisibleSwitchSaveState data = {};
-
     data.mTlvId = mTlvId;
-    data.mState = static_cast<u16>(mState);
     data.mDelayTimer = mDelayTimer;
-
+    data.mState = static_cast<s16>(mState);
     pSaveBuffer.Write(data);
 }
 
-void InvisibleSwitch::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
+void InvisibleSwitch::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
 {
-    const auto pState = pBuffer.ReadTmpPtr<InvisibleSwitchSaveState>();
-    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
-    auto pTlv = tlvIterator.GetTlvChecked<relive::Path_InvisibleSwitch>(ReliveTypes::eInvisibleSwitch);
-
+    const auto pState = pData.ReadTmpPtr<InvisibleSwitchSaveState>();
+    auto pTlv = static_cast<relive::Path_InvisibleSwitch*>(map.TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv());
     auto pSwitch = relive_new InvisibleSwitch(pTlv, pState->mTlvId, resMan, map);
-    if (pSwitch)
-    {
-        pSwitch->mTlvId = pState->mTlvId;
-        pSwitch->mState = static_cast<States>(pState->mState);
-        pSwitch->mDelayTimer = pState->mDelayTimer;
-    }
+    pSwitch->mDelayTimer = pState->mDelayTimer;
+    pSwitch->mState = static_cast<States>(pState->mState);
 }
-
-} // namespace AO

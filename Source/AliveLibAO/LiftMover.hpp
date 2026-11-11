@@ -37,6 +37,7 @@ struct LiftMoverSaveState final : public SaveStateBase
     { }
     Guid mTlvId;
     LiftMoverStates mState = LiftMoverStates::eInactive_0;
+    Guid mTargetLift;
 };
 
 class LiftMover final : public ::BaseGameObject

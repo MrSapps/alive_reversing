@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "GlukkonSwitch.hpp"
 #include "Engine.hpp"
 #include "stdlib.hpp"
@@ -272,4 +274,24 @@ void GlukkonSwitch::VUpdate()
         default:
             return;
     }
+}
+
+void GlukkonSwitch::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    GlukkonSwitchSaveState data = {};
+    data.mState = static_cast<s32>(mState);
+    data.mTimer = mTimer;
+    pSaveBuffer.Write(data);
+}
+
+void GlukkonSwitch::RestoreFromSaveState(const GlukkonSwitchSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eHelpPhone)
+    {
+        return;
+    }
+    GlukkonSwitch* p = static_cast<GlukkonSwitch*>(pObj);
+    p->mState = static_cast<State>(state.mState);
+    p->mTimer = state.mTimer;
 }

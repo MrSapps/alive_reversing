@@ -38,6 +38,7 @@ public:
     void LoadAnimations();
 
     virtual void VUpdate() override;
+    virtual void VPostRestore() override;
     virtual void VScreenChanged() override;
     virtual void VOnThrowableHit(BaseGameObject*) override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;

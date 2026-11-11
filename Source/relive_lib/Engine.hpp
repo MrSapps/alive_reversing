@@ -77,6 +77,12 @@ private:
     std::unique_ptr<Sys> mSys;
     FrameStage mFrameStage = FrameStage::eBegin;
     s32 mFrameObjIdx = 0;
+    // A quicksave restored between frames, see RunFrame, and the random seed to put back after it
+    bool mRestoringBetweenFrames = false;
+    u8 mRestoreSeed = 0;
+    u8 mRestoreLeafRandIdx = 0;
+    std::vector<u8> mRestoreStatics;
+    u32 mRestoreGuidCounter = 0;
     bool mPauseMenuObjectFound = false;
     // The current loading wait, see Game_Loop
     bool mLoadingWaitStarted = false;

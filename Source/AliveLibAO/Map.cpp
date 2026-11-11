@@ -504,8 +504,14 @@ void Map::ContinueLoadCamera()
 
     if (mPendingSaveRestore)
     {
+        // The platforms get the counts they were saved with: the characters made from the save don't add themselves
+        PlatformBase::SetRestoring(true);
+        mRestoringObjects = true;
         QuikSave::RestoreBlyData(*mPendingSaveRestore, mResourceManager, *this);
+        mRestoringObjects = false;
+        PlatformBase::SetRestoring(false);
         mPendingSaveRestore = nullptr;
+        mLoadingFromSave = true;
     }
 
     // Copy camera array and blank out the source
@@ -568,7 +574,27 @@ void Map::FinishLoadCamera()
 
     mPath.Loader(mCamIdxOnX, mCamIdxOnY, relive::Factory::LoadMode::ConstructObject_0, ReliveTypes::eNone); // none = load all
 
-    if (old_current_path != mCurrentPath || old_current_level != mCurrentLevel)
+    for (const auto& afterObjects : mAfterCameraObjects)
+    {
+        afterObjects();
+    }
+    mAfterCameraObjects.clear();
+
+    // What was reset while the last screen was shown is made again by this screen change, but what a saved game found
+    // reset stays so. What this screen change itself resets is not a reset of the game's
+    for (std::unique_ptr<BinaryPath>& pBinPath : GetLoadedPaths())
+    {
+        if (pBinPath)
+        {
+            pBinPath->ClearResetThisVisitFlags(mLoadingFromSave ? mRestoredResetTlvs : std::vector<const relive::Path_TLV*>{});
+        }
+    }
+    mRestoredResetTlvs.clear();
+    mCameraSwapIsRestore = mLoadingFromSave;
+    mLoadingFromSave = false;
+
+    // A restore keeps what it saved: the characters are where they were, not snapped to a line
+    if ((old_current_path != mCurrentPath || old_current_level != mCurrentLevel) && !mCameraSwapIsRestore)
     {
         if (gAbe && mCurrentPath == gAbe->mCurrentPath)
         {
@@ -714,6 +740,7 @@ void Map::VCameraSwapFinished()
     BackgroundMusic::Play();
     MusicController::EnableMusic(1);
     Start_Sounds_For_Objects_In_Near_Cameras();
+    mCameraSwapIsRestore = false;
 }
 
 ScreenChangeResult Map::Handle_PathTransition()

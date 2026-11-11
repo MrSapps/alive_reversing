@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "LaughingGas.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/SwitchStates.hpp"
@@ -9,9 +10,11 @@
 #include <math.h>
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
 #include "BaseMap.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
+#include "../relive_lib/ObjectIds.hpp"
 
-s32 gLaughingGasInstanceCount = 0;
-bool gLaughingGasOn = false;
+WorldStatic<s32> gLaughingGasInstanceCount("AE.LaughingGas.gLaughingGasInstanceCount", 0);
+WorldStatic<bool> gLaughingGasOn("AE.LaughingGas.gLaughingGasOn", false);
 
 static const u32 sRedShift = 11;
 static const u32 sGreenShift = 6;
@@ -34,7 +37,11 @@ void LaughingGas::ResetRandomSeed()
 LaughingGas::LaughingGas(Layer layer, relive::Path_LaughingGas* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
-    gLaughingGasInstanceCount++;
+    // A restore has the count of the world it was saved in, which has this gas in it
+    if (!map.IsRestoring())
+    {
+        gLaughingGasInstanceCount++;
+    }
 
     SetType(ReliveTypes::eLaughingGas);
 
@@ -77,6 +84,43 @@ LaughingGas::~LaughingGas()
     gLaughingGasOn = false;
     gLaughingGasInstanceCount--;
     relive_delete[] mpGasPixels;
+}
+
+void LaughingGas::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    LaughingGasSaveState data = {};
+    data.mAmountOn = mAmountOn;
+    for (s32 i = 0; i < 6; i++)
+    {
+        for (s32 j = 0; j < 6; j++)
+        {
+            data.mGasX[i][j] = mGasX[i][j];
+            data.mGasY[i][j] = mGasY[i][j];
+        }
+    }
+    data.mRandomSeed = random_seed;
+    pSaveBuffer.Write(data);
+}
+
+void LaughingGas::RestoreFromSaveState(const LaughingGasSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eLaughingGas)
+    {
+        return;
+    }
+    LaughingGas* pGas = static_cast<LaughingGas*>(pObj);
+    pGas->mAmountOn = state.mAmountOn;
+    for (s32 i = 0; i < 6; i++)
+    {
+        for (s32 j = 0; j < 6; j++)
+        {
+            pGas->mGasX[i][j] = state.mGasX[i][j];
+            pGas->mGasY[i][j] = state.mGasY[i][j];
+        }
+    }
+    random_seed = state.mRandomSeed;
+    gLaughingGasOn = pGas->CounterOver();
 }
 
 void LaughingGas::VScreenChanged()

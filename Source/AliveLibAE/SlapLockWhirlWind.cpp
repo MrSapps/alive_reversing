@@ -11,11 +11,34 @@
 #include "Path.hpp"
 #include "QuikSave.hpp"
 
-void SlapLockWhirlWind::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& /*resMan*/, BaseMap& /*map*/)
+void SlapLockWhirlWind::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
 {
     const auto pSaveState = pBuffer.ReadTmpPtr<SlapLockWhirlWindSaveState>();
-    
-    SwitchStates_Do_Operation(pSaveState->mSwitchId, relive::reliveSwitchOp::eSetTrue);
+
+    if (!pSaveState->mFullState)
+    {
+        SwitchStates_Do_Operation(pSaveState->mSwitchId, relive::reliveSwitchOp::eSetTrue);
+        return;
+    }
+
+    SlapLockWhirlWind* p = relive_new SlapLockWhirlWind(RestoreTag{}, resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mSwitchId = pSaveState->mSwitchId;
+    p->mDoorX = pSaveState->mDoorX;
+    p->mDoorY = pSaveState->mDoorY;
+    p->mDoorSpriteScale = pSaveState->mDoorSpriteScale;
+    p->mOrbWhirlWindId = pSaveState->mOrbWhirlWindId;
+    p->mState = pSaveState->mState;
+    p->mTimer = pSaveState->mTimer;
+}
+
+SlapLockWhirlWind::SlapLockWhirlWind(RestoreTag, ResourceManager& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
+{
+    SetType(ReliveTypes::eSlapLock_OrbWhirlWind);
 }
 
 SlapLockWhirlWind::SlapLockWhirlWind(s16 doorNumber, s16 switchId, FP xpos, FP ypos, FP scale, ResourceManager& resMan, BaseMap& map)
@@ -84,6 +107,13 @@ void SlapLockWhirlWind::VGetSaveState(SerializedObjectData& pSaveBuffer)
     SlapLockWhirlWindSaveState data = {};
     data.mType = ReliveTypes::eSlapLock_OrbWhirlWind;
     data.mSwitchId = mSwitchId;
+    data.mFullState = true;
+    data.mDoorX = mDoorX;
+    data.mDoorY = mDoorY;
+    data.mDoorSpriteScale = mDoorSpriteScale;
+    data.mOrbWhirlWindId = mOrbWhirlWindId;
+    data.mState = mState;
+    data.mTimer = mTimer;
     pSaveBuffer.Write(data);
 }
 

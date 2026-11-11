@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../ObjectIds.hpp"
+#include "../SerializedObjectData.hpp"
 #include "RollingBallStopper.hpp"
 #include "../SwitchStates.hpp"
 #include "../Collisions.hpp"
@@ -145,4 +147,22 @@ void RollingBallStopper::VUpdate()
             }
             break;
     }
+}
+
+void RollingBallStopper::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    RollingBallStopperSaveState data = {};
+    data.mState = static_cast<s32>(mState);
+    pSaveBuffer.Write(data);
+}
+
+void RollingBallStopper::RestoreFromSaveState(const RollingBallStopperSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eRollingBallStopper)
+    {
+        return;
+    }
+    RollingBallStopper* p = static_cast<RollingBallStopper*>(pObj);
+    p->mState = static_cast<States>(state.mState);
 }

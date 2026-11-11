@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "ParamiteWebLine.hpp"
 #include "../relive_lib/BaseMap.hpp"
 #include "../relive_lib/Function.hpp"
@@ -261,4 +263,32 @@ void ParamiteWebLine::VRender(OrderingTable& ot)
 void ParamiteWebLine::VScreenChanged()
 {
     SetDead(true);
+}
+
+void ParamiteWebLine::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    ParamiteWebLineSaveState data = {};
+    data.field_104_wobble_idx = field_104_wobble_idx;
+    data.field_106_wobble_pos = field_106_wobble_pos;
+    data.field_108_anim_flare = field_108_anim_flare.GetSaveState();
+    data.field_1A0_pulse_position = field_1A0_pulse_position;
+    data.field_1A2_pulse_position_speed = field_1A2_pulse_position_speed;
+    data.field_1A4_delay_counter = field_1A4_delay_counter;
+    pSaveBuffer.Write(data);
+}
+
+void ParamiteWebLine::RestoreFromSaveState(const ParamiteWebLineSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eWebLine)
+    {
+        return;
+    }
+    ParamiteWebLine* p = static_cast<ParamiteWebLine*>(pObj);
+    p->field_104_wobble_idx = state.field_104_wobble_idx;
+    p->field_106_wobble_pos = state.field_106_wobble_pos;
+    p->field_108_anim_flare.RestoreSaveState(state.field_108_anim_flare);
+    p->field_1A0_pulse_position = state.field_1A0_pulse_position;
+    p->field_1A2_pulse_position_speed = state.field_1A2_pulse_position_speed;
+    p->field_1A4_delay_counter = state.field_1A4_delay_counter;
 }

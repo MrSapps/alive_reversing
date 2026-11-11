@@ -8,6 +8,8 @@
 #include "ScreenManager.hpp"
 #include "../PsxDisplay.hpp"
 #include "BirdPortalTerminator.hpp"
+#include "OrbWhirlWind.hpp"
+#include <cstring>
 #include "../FatalError.hpp"
 #include "../AliveLibAE/QuikSave.hpp"
 
@@ -15,6 +17,66 @@ IBirdPortal::IBirdPortal(ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
 
+}
+
+BirdPortalBaseState IBirdPortal::GetBaseState() const
+{
+    BirdPortalBaseState state;
+    std::memset(static_cast<void*>(&state), 0, sizeof(state));
+    state.mFullState = true;
+    state.mDovesExist = mDovesExist;
+    state.mState = static_cast<s32>(mState);
+    state.mTimer = mTimer;
+    state.mReceivedDovesCount = mReceivedDovesCount;
+    state.mMudCountForShrykull = mMudCountForShrykull;
+    state.mHitY = mHitY;
+    state.mThrowableTotalIndicator = mThrowableTotalIndicator;
+    for (u32 i = 0; i < ALIVE_COUNTOF(mDoveIds); i++)
+    {
+        state.mDoveIds[i] = mDoveIds[i];
+    }
+    state.mTerminatorId1 = mTerminatorId1;
+    state.mTerminatorId2 = mTerminatorId2;
+    state.mScreenClipperId1 = mScreenClipperId1;
+    state.mScreenClipperId2 = mScreenClipperId2;
+    state.mOrbWhirlWindId = mOrbWhirlWind ? mOrbWhirlWind->mBaseGameObjectId : Guid{};
+    return state;
+}
+
+void IBirdPortal::SetBaseState(const BirdPortalBaseState& state)
+{
+    mDovesExist = state.mDovesExist;
+    mState = static_cast<PortalStates>(state.mState);
+    mTimer = state.mTimer;
+    // The sound is not restored: the portal starts it again in its update
+    mSfxPlaying = 0;
+    mReceivedDovesCount = state.mReceivedDovesCount;
+    mMudCountForShrykull = state.mMudCountForShrykull;
+    mHitY = state.mHitY;
+    mThrowableTotalIndicator = state.mThrowableTotalIndicator;
+    for (u32 i = 0; i < ALIVE_COUNTOF(mDoveIds); i++)
+    {
+        mDoveIds[i] = state.mDoveIds[i];
+    }
+    mTerminatorId1 = state.mTerminatorId1;
+    mTerminatorId2 = state.mTerminatorId2;
+    mScreenClipperId1 = state.mScreenClipperId1;
+    mScreenClipperId2 = state.mScreenClipperId2;
+    mRestoredOrbWhirlWindId = state.mOrbWhirlWindId;
+}
+
+std::vector<BaseGameObject::NotStateMemory> IBirdPortal::VNotStateMemory()
+{
+    return {{&mSfxPlaying, sizeof(mSfxPlaying)}};
+}
+
+void IBirdPortal::VPostRestoreFromTlv()
+{
+    if (mRestoredOrbWhirlWindId.IsValid())
+    {
+        mOrbWhirlWind = static_cast<OrbWhirlWind*>(sObjectIds.Find_Impl(mRestoredOrbWhirlWindId));
+        mRestoredOrbWhirlWindId = Guid{};
+    }
 }
 
 void IBirdPortal::LoadAnimations()

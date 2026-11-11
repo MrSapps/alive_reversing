@@ -110,6 +110,7 @@ struct FlyingSligSaveState final : public SaveStateBase
     s16 field_A0_bobbing_values_table_index;
     s32 field_A4_bobbing_values_index;
     FP field_A8_bobbing_value;
+    s16 field_15C_voice_pitch_min;
 };
 
 class FlyingSlig final : public BaseAliveGameObject
@@ -148,6 +149,8 @@ public:
     ~FlyingSlig();
 
     virtual void VUpdate() override;
+    virtual void VPostRestore() override;
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VScreenChanged() override;
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;

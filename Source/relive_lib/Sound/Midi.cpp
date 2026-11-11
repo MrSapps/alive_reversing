@@ -349,9 +349,11 @@ void GameSound::LoadSeqs(OpenSeqHandle* pSeqTable, const PathSoundInfo& info, Re
 // ---- Sound effects ----
 
 // Logs the result, for replaying a run on the PS1's sound effect code with the same choices
-static s32 SfxRandom(s32 min, s32 max)
+// The pitch is chosen from numbers of its own: a sound that starts again after a restore (the one an object keeps
+// playing) would otherwise take a number from the game's, which the world that was saved didn't
+s32 GameSound::SfxRandom(s32 min, s32 max)
 {
-    const s32 value = Math_RandomRange(min, max);
+    const s32 value = Math_RandomRangeSeeded(static_cast<s16>(min), static_cast<s16>(max), mSfxRandomSeed);
     SoundDebug::LogSeqOutput("RAND %d %d %d", min, max, value);
     return value;
 }

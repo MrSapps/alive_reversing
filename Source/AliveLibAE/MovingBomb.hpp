@@ -1,15 +1,32 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 
 namespace relive
 {
     struct Path_MovingBomb;
 }
 
+struct MovingBombSaveState final : public SaveStateBase
+{
+    MovingBombSaveState()
+        : SaveStateBase(ReliveTypes::eMovingBomb, sizeof(*this))
+    { }
+    s32 mState;
+    s32 mTimer;
+    FP mSpeed;
+    s32 mChannelMask;
+    bool mPersistOffscreen;
+};
+
 class MovingBomb final : public BaseAliveGameObject
 {
 public:
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const MovingBombSaveState& state);
+
     MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~MovingBomb();
     

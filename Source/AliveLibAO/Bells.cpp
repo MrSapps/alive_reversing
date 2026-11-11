@@ -1,4 +1,6 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../relive_lib/Function.hpp"
 #include "Bells.hpp"
 #include "../AliveLibAE/stdlib.hpp"
@@ -177,6 +179,32 @@ void Bells::Ring()
             GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::SmallChime_Moving));
         }
     }
+}
+
+void Bells::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    BellsSaveState data = {};
+    data.mSmashing = mSmashing;
+    data.mBellPitch = static_cast<s32>(mBellPitch);
+    data.mDoScreenWave = mDoScreenWave;
+    data.mSoundPitchFactor = mSoundPitchFactor;
+    data.mSoundCooldownTimer = mSoundCooldownTimer;
+    pSaveBuffer.Write(data);
+}
+
+void Bells::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const BellsSaveState& state = *pData.ReadTmpPtr<BellsSaveState>();
+    Bells* p = relive_new Bells(state.mBellPitch == 0 ? BellSize::eBig : (state.mBellPitch == 1 ? BellSize::eMedium : BellSize::eSmall), FP_FromInteger(0), FP_FromInteger(0), FP_FromInteger(1), resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mSmashing = state.mSmashing;
+    p->mBellPitch = static_cast<BellPitch>(state.mBellPitch);
+    p->mDoScreenWave = state.mDoScreenWave;
+    p->mSoundPitchFactor = state.mSoundPitchFactor;
+    p->mSoundCooldownTimer = state.mSoundCooldownTimer;
 }
 
 } // namespace AO

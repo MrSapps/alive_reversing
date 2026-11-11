@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 #include "GameSpeak.hpp"
 
 namespace relive
@@ -25,9 +26,26 @@ enum class SecurityDoorStates : s16
     eLaughAtFailure_13 = 13,
 };
 
+struct SecurityDoorSaveState final : public SaveStateBase
+{
+    SecurityDoorSaveState()
+        : SaveStateBase(ReliveTypes::eSecurityDoor, sizeof(*this))
+    { }
+    s32 mState;
+    s16 mCodeLength;
+    s16 mMaxIdx;
+    s16 mBufferStartIdx;
+    s32 mTimer;
+    s16 mMaxIdx2;
+    s32 mPasswordBuffer[16];
+};
+
 class SecurityDoor final : public ::BaseAnimatedWithPhysicsGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const SecurityDoorSaveState& state);
+
     SecurityDoor(relive::Path_SecurityDoor* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~SecurityDoor();
 
@@ -35,6 +53,10 @@ public:
 
     virtual void VScreenChanged() override;
     virtual void VUpdate() override;
+    virtual GameSpeakListener* VListener() override
+    {
+        return &mListener;
+    }
 
 private:
     s16 IsPlayerNear();

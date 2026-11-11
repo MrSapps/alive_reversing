@@ -187,11 +187,7 @@ Meat::Meat(FP xpos, FP ypos, s16 count, ResourceManager& resMan, BaseMap& map)
 
 void MeatSack::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     MeatSackSaveState data = {};
 
     data.mXPos = mXPos;

@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "Fleech.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/SwitchStates.hpp"
@@ -29,8 +30,8 @@
 #include "../relive_lib/FatalError.hpp"
 #include "QuikSave.hpp"
 
-u8 sFleechRandomIdx_5BC20C = 0;
-s16 sFleechCount_5BC20E = 0;
+WorldStatic<u8> sFleechRandomIdx_5BC20C("AE.Fleech.sFleechRandomIdx_5BC20C", 0);
+WorldStatic<s16> sFleechCount_5BC20E("AE.Fleech.sFleechCount_5BC20E", 0);
 
 const TFleechMotionFn sFleechMotionTable[19] = {
     &Fleech::Motion_0_Sleeping,
@@ -193,6 +194,11 @@ void Fleech::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager&
         pFleech->mRGB.SetRGB(pState->mRed, pState->mGreen, pState->mBlue);
 
         pFleech->mCurrentMotion = pState->field_28_current_motion;
+        pFleech->BaseAliveGameObjectCollisionLineIdx = pState->mCollisionLineIdx;
+        if (pState->mPreviousMotionSaved)
+        {
+            pFleech->mPreviousMotion = static_cast<eFleechMotions>(pState->mPreviousMotion);
+        }
         pFleech->GetAnimation().Set_Animation_Data(pFleech->GetAnimRes(sFleechAnimFromMotion[static_cast<u32>(pFleech->mCurrentMotion)]));
         pFleech->GetAnimation().SetCurrentFrame(pState->field_2A_anim_current_frame);
         pFleech->GetAnimation().SetFrameChangeCounter(pState->field_2C_frame_change_counter);
@@ -211,8 +217,6 @@ void Fleech::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager&
         pFleech->mNextMotion = pState->mNextMotion;
 
         pFleech->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pState->mLastLineYPos);
-
-        pFleech->SetRestoredFromQuickSave(true);
 
         pFleech->BaseAliveGameObjectCollisionLineType = pState->mCollisionLineType;
         pFleech->mTlvInfo = pState->mTlvInfo;
@@ -234,7 +238,7 @@ void Fleech::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager&
         pFleech->mPatrolBrain.SetState(pState->mPatrolBrainState);
         pFleech->mChasingAbeBrain.SetState(pState->mChasingAbeBrainState);
         pFleech->mScaredBrain.SetState(pState->mScaredBrainState);
-        pFleech->field_12C_shrivel_timer = pState->field_64_shrivel_timer;
+        pFleech->field_12C_shrivel_timer = pState->field_64_shrivel_timer + static_cast<s32>(sGnFrame);
         pFleech->mReturnToPreviousMotion = pState->mReturnToPreviousMotion;
         sFleechRandomIdx_5BC20C = pState->field_68_fleech_random_idx;
         pFleech->field_130_bDidMapFollowMe = pState->field_6A_bDidMapFollowMe;
@@ -280,11 +284,7 @@ void Fleech::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager&
 
 void Fleech::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     FleechSaveState data = {};
 
     data.mType = ReliveTypes::eFleech;
@@ -420,6 +420,10 @@ void Fleech::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mGoesToSleep = mGoesToSleep;
     data.mPersistant = mPersistant;
 
+    data.mPreviousMotionSaved = true;
+    data.mPreviousMotion = static_cast<s32>(mPreviousMotion);
+    // A line a platform makes is in another place in a restored world: it comes back with the platform, see AliveObjectStateSaveState
+    data.mCollisionLineIdx = (BaseAliveGameObjectCollisionLine && BaseAliveGameObjectCollisionLine->mLineType != eLineTypes::eDynamicCollision_32 && BaseAliveGameObjectCollisionLine->mLineType != eLineTypes::eBackgroundDynamicCollision_36) ? static_cast<s16>(BaseAliveGameObjectCollisionLine - gCollisions->mCollisionArray) + 1 : 0;
     pSaveBuffer.Write(data);
 }
 
@@ -1113,33 +1117,43 @@ Fleech::~Fleech()
     }
 }
 
+void Fleech::VPostRestore()
+{
+    if (BaseAliveGameObjectCollisionLineType == -1)
+    {
+        BaseAliveGameObjectCollisionLine = nullptr;
+    }
+    else if (BaseAliveGameObjectCollisionLineIdx > 0)
+    {
+        BaseAliveGameObjectCollisionLine = gCollisions->Get_Line_At_Idx(BaseAliveGameObjectCollisionLineIdx - 1);
+    }
+    else
+    {
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+    }
+    mFoodObjId = BaseGameObject::RefreshId(mFoodObjId);
+    mScrabOrParamite = BaseGameObject::RefreshId(mScrabOrParamite);
+    BaseAliveGameObject_PlatformId = BaseGameObject::RefreshId(BaseAliveGameObject_PlatformId);
+
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
+    BaseAliveGameObjectCollisionLineIdx = 0;
+}
+
 void Fleech::VUpdate()
 {
-    if (GetRestoredFromQuickSave())
-    {
-        SetRestoredFromQuickSave(false);
-        if (BaseAliveGameObjectCollisionLineType == -1)
-        {
-            BaseAliveGameObjectCollisionLine = nullptr;
-        }
-        else
-        {
-            gCollisions->Raycast(
-                mXPos,
-                mYPos - FP_FromInteger(20),
-                mXPos,
-                mYPos + FP_FromInteger(20),
-                &BaseAliveGameObjectCollisionLine,
-                &mXPos,
-                &mYPos,
-                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
-        }
-        BaseAliveGameObjectCollisionLineType = 0;
-        mFoodObjId = BaseGameObject::RefreshId(mFoodObjId);
-        mScrabOrParamite = BaseGameObject::RefreshId(mScrabOrParamite);
-        BaseAliveGameObject_PlatformId = BaseGameObject::RefreshId(BaseAliveGameObject_PlatformId);
-    }
-
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);
@@ -1193,6 +1207,12 @@ void Fleech::VUpdate()
     {
         SetDead(true);
     }
+}
+
+std::vector<BaseGameObject::NotStateMemory> Fleech::VNotStateMemory()
+{
+    // What the tongue was last drawn with
+    return {{mTonguePolys1, sizeof(mTonguePolys1)}, {mTonguePolys2, sizeof(mTonguePolys2)}};
 }
 
 void Fleech::VRender(OrderingTable& ot)

@@ -1,4 +1,5 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../relive_lib/Function.hpp"
 #include "Meat.hpp"
 #include "../AliveLibAE/stdlib.hpp"
@@ -197,6 +198,26 @@ void Meat::InTheAir()
     }
 }
 
+void Meat::VPostRestore()
+{
+    // The line is looked for again where the object is
+    if (mSavedPathLineType != -1)
+    {
+        FP hitX = {};
+        FP hitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(10),
+            mXPos,
+            mYPos + FP_FromInteger(10),
+            &mPathLine,
+            &hitX,
+            &hitY,
+            CollisionMask(static_cast<eLineTypes>(mSavedPathLineType)));
+    }
+    mSavedPathLineType = -1;
+}
+
 void Meat::VUpdate()
 {
     if (gNumCamSwappers == 0)
@@ -368,6 +389,38 @@ void Meat::VOnTrapDoorOpen()
             mState = 1;
         }
     }
+}
+
+void Meat::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    MeatSaveState data = {};
+    data.mState = mState;
+    data.mPreviousXPos = mPreviousXPos;
+    data.mPreviousYPos = mPreviousYPos;
+    data.mShimmerTimer = mShimmerTimer;
+    data.mDeadTimer = mDeadTimer;
+    data.mBaseThrowableCount = mBaseThrowableCount;
+    data.mBaseThrowableDead = mBaseThrowableDead;
+    data.mPathLineType = mPathLine ? static_cast<s32>(mPathLine->mLineType) : -1;
+    pSaveBuffer.Write(data);
+}
+
+void Meat::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const MeatSaveState& state = *pData.ReadTmpPtr<MeatSaveState>();
+    Meat* p = relive_new Meat(FP_FromInteger(0), FP_FromInteger(0), 0, resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mState = state.mState;
+    p->mPreviousXPos = state.mPreviousXPos;
+    p->mPreviousYPos = state.mPreviousYPos;
+    p->mShimmerTimer = state.mShimmerTimer;
+    p->mDeadTimer = state.mDeadTimer;
+    p->mBaseThrowableCount = state.mBaseThrowableCount;
+    p->mBaseThrowableDead = state.mBaseThrowableDead;
+    p->mSavedPathLineType = state.mPathLineType;
 }
 
 } // namespace AO

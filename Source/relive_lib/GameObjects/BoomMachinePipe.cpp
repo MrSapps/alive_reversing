@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../ObjectIds.hpp"
+#include "../SerializedObjectData.hpp"
 #include "BoomMachinePipe.hpp"
 #include "Grenade.hpp"
 #include "ThrowableArray.hpp"
@@ -110,4 +112,26 @@ void BoomMachinePipe::VUpdate()
         default:
             return;
     }
+}
+
+void BoomMachinePipe::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    BoomMachinePipeSaveState data = {};
+    data.mState = static_cast<s32>(mState);
+    data.mTimer = mTimer;
+    data.mGrenadeCount = mGrenadeCount;
+    pSaveBuffer.Write(data);
+}
+
+void BoomMachinePipe::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const BoomMachinePipeSaveState& state = *pData.ReadTmpPtr<BoomMachinePipeSaveState>();
+    BoomMachinePipe* p = relive_new BoomMachinePipe(FP_FromInteger(0), FP_FromInteger(0), FP_FromInteger(1), 0, resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mState = static_cast<BoomMachinePipeStates>(state.mState);
+    p->mTimer = state.mTimer;
+    p->mGrenadeCount = state.mGrenadeCount;
 }

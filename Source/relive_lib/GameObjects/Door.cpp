@@ -2,6 +2,8 @@
 #include "GameObjects/BaseGameObject.hpp"
 #include "GameType.hpp"
 #include "stdafx.h"
+#include "../ObjectIds.hpp"
+#include "../SerializedObjectData.hpp"
 #include "Door.hpp"
 
 #include "../AliveLibAE/Sfx.hpp"
@@ -274,17 +276,39 @@ void Door::SetDoorPosition(relive::Path_Door* pTlv)
     PSX_RECT camRect = {};
     mMap.Get_Camera_World_Rect(CameraPos::eCamCurrent_0, &camRect);
     FP rayEndY = FP_FromInteger(camRect.h);
+    if (GetGameType() == GameType::eAo)
+    {
+        // AO's camera cell is 480 high with the visible 240 in the middle, so the floor
+        // under a door can be in the void below the visible area (120px).
+        rayEndY += FP_FromInteger(120);
+    }
 
     PathLine* pathLine = nullptr;
-    if (gCollisions->Raycast(
+    const bool fg = GetScale() == Scale::Fg;
+    bool hit = gCollisions->Raycast(
+        tlvXMid,
+        FP_FromInteger(pTlv->mTopLeftY),  // start at TLV top (no lines above)
+        tlvXMid,
+        rayEndY,                          // extend down to camera bottom
+        &pathLine,
+        xOff,
+        yOff,
+        fg ? kFgFloorCeilingOrWalls : kBgFloorCeilingOrWalls);
+    if (!hit && GetGameType() == GameType::eAo)
+    {
+        // Some AO doors are full scale but only have background floor under them (or the reverse)
+        hit = gCollisions->Raycast(
             tlvXMid,
-            FP_FromInteger(pTlv->mTopLeftY),  // start at TLV top (no lines above)
+            FP_FromInteger(pTlv->mTopLeftY),
             tlvXMid,
-            rayEndY,                          // extend down to camera bottom
+            rayEndY,
             &pathLine,
             xOff,
             yOff,
-            (GetScale() == Scale::Fg) ? kFgFloorCeilingOrWalls : kBgFloorCeilingOrWalls))
+            fg ? kBgFloorCeilingOrWalls : kFgFloorCeilingOrWalls);
+    }
+
+    if (hit)
     {        
         // Snap on X
         if (GetGameType() == GameType::eAe)
@@ -557,6 +581,32 @@ void TrainDoor::VUpdate()
             GetAnimation().SetAnimate(true);
             GetAnimation().SetRender(true);
             mCurrentState = relive::Path_Door::DoorStates::eClosed;
+            // The original tells the TLV when the door is destroyed: do it now, so the TLV is as it would be after
+            // the camera is left (a saved game keeps it, and so does the state of a restored world)
+            if (relive::Path_TLV* pTlv = mMap.TLV_From_Offset_Lvl_Cam(mTlvId).GetTlv())
+            {
+                pTlv->mTlvSpecificMeaning = 1;
+            }
         }
     }
+}
+
+void Door::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    DoorSaveState data = {};
+    data.mCurrentState = static_cast<s32>(mCurrentState);
+    data.mDoorId = mDoorId;
+    pSaveBuffer.Write(data);
+}
+
+void Door::RestoreFromSaveState(const DoorSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    Door* p = static_cast<Door*>(pObj);
+    p->mCurrentState = static_cast<relive::Path_Door::DoorStates>(state.mCurrentState);
+    p->mDoorId = state.mDoorId;
 }

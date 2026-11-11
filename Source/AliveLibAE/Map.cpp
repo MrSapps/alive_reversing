@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "Map.hpp"
+#include "../relive_lib/GameObjects/PlatformBase.hpp"
 #include "PathData.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
@@ -315,8 +316,14 @@ void Map::ContinueLoadCamera()
 
     if (mPendingSaveRestore)
     {
+        // The platforms get the counts they were saved with: the characters made from the save don't add themselves
+        PlatformBase::SetRestoring(true);
+        mRestoringObjects = true;
         QuikSave::RestoreBlyData(*mPendingSaveRestore, mResourceManager, *this);
+        mRestoringObjects = false;
+        PlatformBase::SetRestoring(false);
         mPendingSaveRestore = nullptr;
+        mLoadingFromSave = true;
     }
 
     // Copy camera array and blank out the source
@@ -380,13 +387,35 @@ void Map::FinishLoadCamera()
 
     mPath.Loader(mCamIdxOnX, mCamIdxOnY, relive::Factory::LoadMode::ConstructObject_0, ReliveTypes::eNone); // none = load all
 
+    for (const auto& afterObjects : mAfterCameraObjects)
+    {
+        afterObjects();
+    }
+    mAfterCameraObjects.clear();
+
+    // What was reset while the last screen was shown is made again by this screen change, but what a saved game found
+    // reset stays so. What this screen change itself resets is not a reset of the game's
+    for (std::unique_ptr<BinaryPath>& pBinPath : GetLoadedPaths())
+    {
+        if (pBinPath)
+        {
+            pBinPath->ClearResetThisVisitFlags(mLoadingFromSave ? mRestoredResetTlvs : std::vector<const relive::Path_TLV*>{});
+        }
+    }
+    mRestoredResetTlvs.clear();
+    mCameraSwapIsRestore = mLoadingFromSave;
+    mLoadingFromSave = false;
+
     if (prevPathId != mCurrentPath || prevLevelId != mCurrentLevel)
     {
         if (gAbe)
         {
             if (mCurrentPath == gAbe->mCurrentPath)
             {
+                // A restored platform has the count it was saved with, which has Abe in it
+                PlatformBase::SetRestoring(mCameraSwapIsRestore);
                 gAbe->VCheckCollisionLineStillValid(10);
+                PlatformBase::SetRestoring(false);
             }
         }
     }
@@ -538,6 +567,7 @@ void Map::VCameraSwapFinished()
     BackgroundMusic::Play();
     MusicController::static_EnableMusic(1);
     Start_Sounds_For_Objects_In_Near_Cameras();
+    mCameraSwapIsRestore = false;
 }
 
 ScreenChangeResult Map::Handle_PathTransition()

@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "BoneBag.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
 #include "Map.hpp"
@@ -189,4 +191,28 @@ void BoneBag::VUpdate()
 
         mHasBeenHit = true;
     }
+}
+
+void BoneBag::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    BoneBagSaveState data = {};
+    data.mHasBeenHit = mHasBeenHit;
+    data.mPlayWobbleSound = mPlayWobbleSound;
+    data.mForcePlayWobbleSound = mForcePlayWobbleSound;
+    data.mBoneAmount = mBoneAmount;
+    pSaveBuffer.Write(data);
+}
+
+void BoneBag::RestoreFromSaveState(const BoneBagSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eBoneBag)
+    {
+        return;
+    }
+    BoneBag* p = static_cast<BoneBag*>(pObj);
+    p->mHasBeenHit = state.mHasBeenHit;
+    p->mPlayWobbleSound = state.mPlayWobbleSound;
+    p->mForcePlayWobbleSound = state.mForcePlayWobbleSound;
+    p->mBoneAmount = state.mBoneAmount;
 }

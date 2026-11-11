@@ -179,11 +179,7 @@ void RockSack::VUpdate()
 
 void RockSack::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     RockSackSaveState data = {};
 
     data.mXPos = mXPos;

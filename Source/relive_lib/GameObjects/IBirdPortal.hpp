@@ -33,10 +33,37 @@ enum class PortalStates : s16
     FadeoutTerminators_22 = 22,
 };
 
+// What a portal keeps that the TLV it is made from does not give it: its save is made from this in both games
+struct BirdPortalBaseState final
+{
+    // False for a save from the original game's, which has only the state, the muds and, for an idle portal, the doves
+    bool mFullState;
+    bool mDovesExist;
+    s32 mState;
+    s32 mTimer;
+    s16 mReceivedDovesCount;
+    s16 mMudCountForShrykull;
+    FP mHitY;
+    Guid mThrowableTotalIndicator;
+    Guid mDoveIds[6];
+    Guid mTerminatorId1;
+    Guid mTerminatorId2;
+    Guid mScreenClipperId1;
+    Guid mScreenClipperId2;
+    Guid mOrbWhirlWindId;
+};
+
 // Temp glue interface
 class IBirdPortal : public BaseGameObject
 {
 public:
+    BirdPortalBaseState GetBaseState() const;
+    // The objects it names are made by the save too, and the orb is looked up once all are
+    void SetBaseState(const BirdPortalBaseState& state);
+    virtual void VPostRestoreFromTlv() override;
+    // The channels its sound plays on are the sound engine's, a restore starts the sound again
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
+
 
     IBirdPortal(ResourceManager& resMan, BaseMap& map);
 
@@ -104,4 +131,6 @@ protected:
     s16 mCurrentPath = 0;
     s32 mSfxPlaying = 0;
     bool mDovesExist = false;
+    // Only between a restore and VPostRestoreFromTlv
+    Guid mRestoredOrbWhirlWindId;
 };

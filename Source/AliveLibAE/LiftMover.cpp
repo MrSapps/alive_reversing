@@ -214,6 +214,9 @@ void LiftMover::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mType = ReliveTypes::eLiftMover;
     data.mTlvId = mTlvId;
     data.mState = mState;
+    data.mTargetSaved = true;
+    data.mMoving = mMoving;
+    data.mTargetLiftId = mTargetLiftId;
     pSaveBuffer.Write(data);
 }
 
@@ -225,7 +228,12 @@ void LiftMover::CreateFromSaveState(SerializedObjectData& pData, ResourceManager
     auto pLiftMover = relive_new LiftMover(pTlv, pState->mTlvId, resMan, map);
     if (pLiftMover)
     {
-        if (pState->mState != LiftMoverStates::eInactive_0)
+        if (pState->mTargetSaved)
+        {
+            pLiftMover->mMoving = pState->mMoving;
+            pLiftMover->mTargetLiftId = pState->mTargetLiftId;
+        }
+        else if (pState->mState != LiftMoverStates::eInactive_0)
         {
             pLiftMover->mMoving = true;
         }

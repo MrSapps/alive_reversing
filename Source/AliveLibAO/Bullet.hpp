@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 #include "../relive_lib/FixedPoint.hpp"
 #include "../relive_lib/MapWrapper.hpp"
 
@@ -20,9 +21,28 @@ enum class BulletType : s16
     eZBullet_2 = 2
 };
 
+struct BulletSaveState final : public SaveStateBase
+{
+    BulletSaveState()
+        : SaveStateBase(ReliveTypes::eBullet, sizeof(*this))
+    { }
+    s32 mBulletType;
+    Guid mBulletParentId;
+    FP mXPos;
+    FP mYPos;
+    FP mXDistance;
+    s32 mBulletLevel;
+    s16 mBulletPath;
+    FP mSpriteScale;
+    s16 mNumberOfBullets;
+};
+
 class Bullet final : public ::BaseGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
+
     Bullet(::BaseAliveGameObject* pParent, BulletType type, FP xpos, FP ypos, FP xDist, FP scale, s32 numberOfBullets, ResourceManager& resMan, BaseMap& map);
 
     virtual void VUpdate() override;

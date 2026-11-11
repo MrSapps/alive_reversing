@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../relive_lib/WorldStatic.hpp"
+
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
 #include "../relive_lib/SaveStateBase.hpp"
 #include "../relive_lib/FatalError.hpp"
@@ -170,11 +172,16 @@ public:
 
     void LoadAnimations();
     virtual void VUpdate() override;
+    virtual void VPostRestore() override;
     virtual void VOnTrapDoorOpen() override;
     virtual void VOnTlvCollision(TlvIterator tlvIterator) override;
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
     virtual void VOnThrowableHit(BaseGameObject* pFrom) override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    virtual GameSpeakListener* VListener() override
+    {
+        return &mListener;
+    }
     virtual s16 VGetMotion(eMotionType motionType) override
     {
         switch (motionType)
@@ -315,4 +322,4 @@ private:
     eSlogMotions mNextMotion = eSlogMotions::Motion_0_Idle;
 };
 
-extern s16 sSlogCount;
+extern WorldStatic<s16> sSlogCount;

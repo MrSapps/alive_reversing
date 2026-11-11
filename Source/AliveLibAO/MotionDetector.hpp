@@ -2,6 +2,7 @@
 
 
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 #include "../relive_lib/Primitives.hpp"
 
 namespace relive
@@ -26,15 +27,36 @@ public:
     }
 };
 
+struct MotionDetectorSaveState final : public SaveStateBase
+{
+    MotionDetectorSaveState()
+        : SaveStateBase(ReliveTypes::eMotionDetector, sizeof(*this))
+    { }
+    s32 mState;
+    s32 mPauseTimer;
+    bool mDontComeBack;
+    FP mTopLeftX;
+    FP mTopLeftY;
+    FP mBottomRightX;
+    FP mBottomRightY;
+    Guid mLaserId;
+    FP mSpeed;
+    bool mObjectInLaser;
+};
+
 class MotionDetector final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const MotionDetectorSaveState& state);
+
     MotionDetector(relive::Path_MotionDetector* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~MotionDetector();
 
     virtual void VScreenChanged() override;
     virtual void VUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
 
     void SetDontComeBack(bool bDontComeBack);
 

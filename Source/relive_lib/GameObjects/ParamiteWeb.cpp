@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../ObjectIds.hpp"
+#include "../SerializedObjectData.hpp"
 #include "ParamiteWeb.hpp"
 #include "../Function.hpp"
 #include "ShadowZone.hpp"
@@ -106,6 +108,12 @@ void ParamiteWeb::VScreenChanged()
     }
 }
 
+std::vector<BaseGameObject::NotStateMemory> ParamiteWeb::VNotStateMemory()
+{
+    // The segments it draws with
+    return {{&mWebRes, sizeof(mWebRes)}};
+}
+
 void ParamiteWeb::VRender(OrderingTable& ot)
 {
     PSX_Point camCoords = {};
@@ -171,4 +179,30 @@ void ParamiteWeb::VRender(OrderingTable& ot)
             }
         }
     }
+}
+
+void ParamiteWeb::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    ParamiteWebSaveState data = {};
+    data.mSegmentsCount = mSegmentsCount;
+    data.mSegmentLength = mSegmentLength;
+    data.mTtl = mTtl;
+    data.mTtlRemainder = mTtlRemainder;
+    data.mEnabled = mEnabled;
+    pSaveBuffer.Write(data);
+}
+
+void ParamiteWeb::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const ParamiteWebSaveState& state = *pData.ReadTmpPtr<ParamiteWebSaveState>();
+    ParamiteWeb* p = relive_new ParamiteWeb(FP_FromInteger(0), state.mTtl, state.mTtlRemainder, state.mSegmentLength == 15 ? FP_FromInteger(1) : FP_FromDouble(0.5), resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mSegmentsCount = state.mSegmentsCount;
+    p->mSegmentLength = state.mSegmentLength;
+    p->mTtl = state.mTtl;
+    p->mTtlRemainder = state.mTtlRemainder;
+    p->mEnabled = state.mEnabled;
 }

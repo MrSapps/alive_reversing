@@ -17,6 +17,7 @@
 #include "AmbientSound.hpp"
 #include "../data_conversion/relive_tlvs.hpp"
 #include "BaseMap.hpp"
+#include "../SerializedObjectData.hpp"
 
 #undef min
 #undef max
@@ -83,6 +84,37 @@ AirExplosion::AirExplosion(FP xpos, FP ypos, FP explosionScale, bool bSmall, Res
     {
         SND_SEQ_PlaySeq(AO::SeqId::eExplosion1_21, 1, 1);
     }
+}
+
+AirExplosion::AirExplosion(RestoreTag, bool bSmall, ResourceManager& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map),
+    mSmallExplosion(bSmall)
+{
+    SetType(ReliveTypes::eAirExplosion);
+
+    const AnimId id = mSmallExplosion ? AnimId::AirExplosion_Small : AnimId::AirExplosion;
+    mLoadedAnims.push_back(mResMan.LoadAnimation(id));
+    Animation_Init(GetAnimRes(id));
+    SetApplyShadowZoneColour(false);
+}
+
+void AirExplosion::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    AirExplosionSaveState data = {};
+    data.mSmallExplosion = mSmallExplosion;
+    data.mObject = GetAnimatedState();
+    data.mExplosionScale = mExplosionScale;
+    data.mParticleBurstScale = mParticleBurstScale;
+    pSaveBuffer.Write(data);
+}
+
+void AirExplosion::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const auto pState = pData.ReadTmpPtr<AirExplosionSaveState>();
+    auto pExplosion = relive_new AirExplosion(RestoreTag{}, pState->mSmallExplosion, resMan, map);
+    pExplosion->SetAnimatedState(pState->mObject);
+    pExplosion->mExplosionScale = pState->mExplosionScale;
+    pExplosion->mParticleBurstScale = pState->mParticleBurstScale;
 }
 
 void AirExplosion::VUpdate()

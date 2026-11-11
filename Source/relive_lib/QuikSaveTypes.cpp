@@ -71,6 +71,7 @@ void BaseMap::RestoreQuicksaveBlyData(SerializedObjectData& pSaveData)
 
     const u32 flagsTotal = pSaveData.ReadU32();
     u32 readFlagsCount = 0;
+    mRestoredResetTlvs.clear();
     for (auto& binaryPath : GetLoadedPaths())
     {
         for (auto& cam : binaryPath->GetCameras())
@@ -79,6 +80,13 @@ void BaseMap::RestoreQuicksaveBlyData(SerializedObjectData& pSaveData)
             {
                 if (pTlv->mAttribute == relive::QuiksaveAttribute::eClearTlvFlags_1 || pTlv->mAttribute == relive::QuiksaveAttribute::eKeepTlvFlags_2)
                 {
+                    if (readFlagsCount >= flagsTotal)
+                    {
+                        // A path is loaded that the save was made without: it keeps the flags it was loaded with
+                        LOG_WARNING("Save data has no flags for all the loaded TLVs (%d)", flagsTotal);
+                        continue;
+                    }
+
                     const bool isLastTlv = pTlv->mTlvFlags.Get(relive::TlvFlags::eBit3_End_TLV_List);
 
                     pTlv->mTlvFlags.Raw().all = pSaveData.ReadU8();
@@ -91,6 +99,10 @@ void BaseMap::RestoreQuicksaveBlyData(SerializedObjectData& pSaveData)
                     }
 
                     pTlv->mTlvSpecificMeaning = pSaveData.ReadU8();
+                    if (pTlv->mTlvFlags.Get(relive::TlvFlags::eBit4_ResetThisVisit))
+                    {
+                        mRestoredResetTlvs.push_back(pTlv.get());
+                    }
                     readFlagsCount++;
 
                     // Note: We can't check for an exact match because some OG demo saves have flags

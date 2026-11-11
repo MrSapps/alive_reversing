@@ -9,6 +9,7 @@
 #include "Abe.hpp"
 #include "../relive_lib/GameObjects/PossessionFlicker.hpp"
 #include "Engine.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Sfx.hpp"
 #include "../relive_lib/GameObjects/AirExplosion.hpp"
 #include "../relive_lib/GameObjects/ZapLine.hpp"
@@ -250,4 +251,30 @@ void SecurityOrb::VUpdate()
             }
             break;
     }
+}
+
+void SecurityOrb::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    SecurityOrbSaveState data = {};
+    data.mTlvId = mTlvInfo;
+    data.mState = static_cast<s16>(mState);
+    data.mTimer = mTimer;
+    data.mHealth = mHealth;
+    pSaveBuffer.Write(data);
+}
+
+void SecurityOrb::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const auto pState = pData.ReadTmpPtr<SecurityOrbSaveState>();
+    auto pTlv = static_cast<relive::Path_SecurityOrb*>(map.TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv());
+    auto pOrb = relive_new SecurityOrb(pTlv, pState->mTlvId, resMan, map);
+    pOrb->mState = static_cast<States>(pState->mState);
+    pOrb->mTimer = pState->mTimer;
+    pOrb->mHealth = pState->mHealth;
+}
+
+std::vector<BaseGameObject::NotStateMemory> SecurityOrb::VNotStateMemory()
+{
+    // A handle to the sound it is playing
+    return {{&mSoundChannelsMask, sizeof(mSoundChannelsMask)}};
 }

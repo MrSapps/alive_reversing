@@ -32,6 +32,13 @@ struct TrapDoorSaveState final : public SaveStateBase
     TrapDoorState mState;
     s32 mOpenTime;
     Guid mTlvId;
+    // False for a save from the original game's, which has none of the platform's variables
+    bool mPlatformBaseSaved;
+    s32 mPlatformBaseCount;
+    s16 mPlatformBaseXOffset;
+    s16 mPlatformBaseWidthOffset;
+    s16 mPlatformBaseYOffset;
+    s16 mPlatformBaseHeightOffset;
 };
 
 namespace relive
@@ -62,6 +69,7 @@ public:
 
 private:
     void Add_To_Collisions_Array();
+    void Remove_From_Collisions_Array();
     void Open();
     bool InIndustrialLevel();
 

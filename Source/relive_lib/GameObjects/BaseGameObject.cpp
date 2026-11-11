@@ -4,6 +4,18 @@
 #include "../AliveLibAO/Map.hpp"
 #include "ResourceManager.hpp"
 #include "ObjectIds.hpp"
+#include "SaveStateBase.hpp"
+#include "BaseAnimatedWithPhysicsGameObject.hpp"
+#include "BaseAliveGameObject.hpp"
+#include "PlatformBase.hpp"
+#include "SerializedObjectData.hpp"
+#include "ListOrderSaveState.hpp"
+#include "../Animation.hpp"
+#include <cstddef>
+#include <cstring>
+#include "../AliveLibAE/GameSpeak.hpp"
+#include <algorithm>
+#include <map>
 #include "Events.hpp"
 #include "GameType.hpp"
 #include "FatalError.hpp"
@@ -11,6 +23,18 @@
 #include "../../AliveLibAE/Abe.hpp"
 
 DynamicArrayT<BaseGameObject>* gBaseGameObjects = nullptr;
+
+void* BaseGameObject::operator new(std::size_t size)
+{
+    void* ptr = ::operator new(size);
+    std::memset(ptr, 0, size);
+    return ptr;
+}
+
+void BaseGameObject::operator delete(void* ptr)
+{
+    ::operator delete(ptr);
+}
 
 BaseGameObject::BaseGameObject(s16 bAddToObjectList, s16 resourceArraySize, ResourceManager& resMan, BaseMap& map)
     : mBaseGameObjectResArray(resourceArraySize),
@@ -55,7 +79,7 @@ BaseGameObject::~BaseGameObject()
 
     EventCancelForObj(this);
 
-    sObjectIds.Remove(mBaseGameObjectId);
+    sObjectIds.Remove(mBaseGameObjectId, this);
 }
 
 void BaseGameObject::VUpdate()
@@ -108,6 +132,243 @@ void BaseGameObject::VStopAudio()
 void BaseGameObject::VGetSaveState(SerializedObjectData&)
 {
     // Not used in AO yet so needs a default impl
+}
+
+void BaseGameObject::SaveState(SerializedObjectData& pSaveBuffer)
+{
+    const std::size_t startOffset = pSaveBuffer.Size();
+    VGetSaveState(pSaveBuffer);
+    if (pSaveBuffer.Size() - startOffset >= sizeof(SaveStateBase))
+    {
+        pSaveBuffer.OverwriteAt(startOffset + offsetof(SaveStateBase, mObjectId), &mBaseGameObjectId, sizeof(Guid));
+        if (GetIsBaseAliveGameObject())
+        {
+            const Guid pathTlvId = static_cast<BaseAliveGameObject*>(this)->GetPathTlvId();
+            pSaveBuffer.OverwriteAt(startOffset + offsetof(SaveStateBase, mPathTlvId), &pathTlvId, sizeof(Guid));
+            const FP lastLineYPos = static_cast<BaseAliveGameObject*>(this)->BaseAliveGameObjectLastLineYPos;
+            pSaveBuffer.OverwriteAt(startOffset + offsetof(SaveStateBase, mLastLineYPos), &lastLineYPos, sizeof(FP));
+        }
+    }
+
+    // Whatever the object keeps of its own, where its animation is goes with it, so an object whose save
+    // doesn't have that (or has none, e.g. a lever that is made again with the camera) carries on from there
+    AnimationStateSaveState animState;
+    animState.mObjectId = mBaseGameObjectId;
+    animState.mUpdateDelay = UpdateDelay();
+    animState.mUpdatable = mUpdatable;
+    animState.mDrawable = mDrawable;
+    animState.mCanExplode = mCanExplode;
+    animState.mInteractive = mInteractive;
+    animState.mSurviveDeathReset = mSurviveDeathReset;
+    animState.mUpdateDuringCamSwap = mUpdateDuringCamSwap;
+    animState.mCantKill = mCantKill;
+    animState.mChaseCounter = mChaseCounter;
+    if (GetIsBaseAnimatedWithPhysicsObj())
+    {
+        animState.mObject = static_cast<BaseAnimatedWithPhysicsGameObject*>(this)->GetAnimatedState();
+    }
+    // Always written, even when empty: it is also where the object is in the list, see ReorderObjects
+    pSaveBuffer.Write(animState);
+
+    if (GetIsBaseAliveGameObject())
+    {
+        AliveObjectStateSaveState aliveState = static_cast<BaseAliveGameObject*>(this)->GetAliveObjectState();
+        aliveState.mObjectId = mBaseGameObjectId;
+        pSaveBuffer.Write(aliveState);
+    }
+
+    if (GameSpeakListenerBase* pListener = VListener())
+    {
+        GameSpeakListenerSaveState listenerState = {};
+        listenerState.mObjectId = mBaseGameObjectId;
+        listenerState.mLastEventIdx = pListener->LastEventIdx();
+        pSaveBuffer.Write(listenerState);
+    }
+}
+
+GameSpeakListenerBase* BaseGameObject::VListener()
+{
+    return nullptr;
+}
+
+void BaseGameObject::ReorderObjects(const std::vector<Guid>& idsInOrder)
+{
+    std::map<Guid, std::size_t> rank;
+    for (const Guid& id : idsInOrder)
+    {
+        rank.emplace(id, rank.size());
+    }
+
+    std::vector<s32> slots;
+    std::vector<BaseGameObject*> known;
+    for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
+    {
+        BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
+        if (!pObj)
+        {
+            break;
+        }
+        if (rank.find(pObj->mBaseGameObjectId) != rank.end())
+        {
+            slots.push_back(i);
+            known.push_back(pObj);
+        }
+    }
+
+    std::stable_sort(known.begin(), known.end(), [&rank](const BaseGameObject* pLeft, const BaseGameObject* pRight)
+                     { return rank.at(pLeft->mBaseGameObjectId) < rank.at(pRight->mBaseGameObjectId); });
+    for (std::size_t i = 0; i < slots.size(); i++)
+    {
+        gBaseGameObjects->SetAt(slots[i], known[i]);
+    }
+}
+
+void BaseGameObject::ApplySavedHeader(const SaveStateBase& header)
+{
+    if (!header.mObjectId.IsValid())
+    {
+        return;
+    }
+    BaseGameObject* pObj = sObjectIds.Find_Impl(header.mObjectId);
+    if (pObj && pObj->GetIsBaseAliveGameObject())
+    {
+        static_cast<BaseAliveGameObject*>(pObj)->SetPathTlvFromId(header.mPathTlvId);
+        // Not in a save from before it was kept
+        if (header.mLastLineYPos != FP_FromInteger(0))
+        {
+            static_cast<BaseAliveGameObject*>(pObj)->BaseAliveGameObjectLastLineYPos = header.mLastLineYPos;
+        }
+    }
+}
+
+void BaseGameObject::RestoreAnimationState(const AnimationStateSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    pObj->SetUpdateDelay(state.mUpdateDelay);
+    pObj->mUpdatable = state.mUpdatable;
+    pObj->mDrawable = state.mDrawable;
+    pObj->mCanExplode = state.mCanExplode;
+    pObj->mInteractive = state.mInteractive;
+    pObj->mSurviveDeathReset = state.mSurviveDeathReset;
+    pObj->mUpdateDuringCamSwap = state.mUpdateDuringCamSwap;
+    pObj->mCantKill = state.mCantKill;
+    pObj->mChaseCounter = state.mChaseCounter;
+    if (pObj->GetIsBaseAnimatedWithPhysicsObj())
+    {
+        static_cast<BaseAnimatedWithPhysicsGameObject*>(pObj)->SetAnimatedState(state.mObject);
+    }
+}
+
+void BaseGameObject::RestoreAliveObjectState(const AliveObjectStateSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (pObj && pObj->GetIsBaseAliveGameObject())
+    {
+        static_cast<BaseAliveGameObject*>(pObj)->SetAliveObjectState(state);
+    }
+}
+
+void BaseGameObject::RestoreListener(const GameSpeakListenerSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (pObj && pObj->VListener())
+    {
+        pObj->VListener()->SetLastEventIdx(state.mLastEventIdx);
+    }
+}
+
+void BaseGameObject::VPostRestore()
+{
+
+}
+
+std::vector<BaseGameObject::NotStateMemory> BaseGameObject::VNotStateMemory()
+{
+    return {};
+}
+
+void BaseGameObject::VPostRestoreFromTlv()
+{
+
+}
+
+void BaseGameObject::PostRestoreAllFromTlv()
+{
+    for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
+    {
+        BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
+        if (!pObj)
+        {
+            break;
+        }
+        pObj->VPostRestoreFromTlv();
+    }
+}
+
+void BaseGameObject::MarkDrawnObjects()
+{
+    // The last frame's drawing marks everything it drew (Engine::RunFrame), so a saved object that was drawn has it
+    for (s32 i = 0; i < gObjListDrawables->Size(); i++)
+    {
+        BaseGameObject* pDrawable = gObjListDrawables->ItemAt(i);
+        if (!pDrawable)
+        {
+            break;
+        }
+        pDrawable->SetCantKill(!pDrawable->GetDead() && pDrawable->GetDrawable());
+    }
+}
+
+void BaseGameObject::RestoreGuidCounter(u32 counter)
+{
+    for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
+    {
+        BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
+        if (pObj && pObj->mBaseGameObjectId.IsFromCounterAtOrAfter(counter))
+        {
+            // An id takes three values of the counter
+            counter = std::max(counter, pObj->mBaseGameObjectId.CounterValue() + 3);
+        }
+    }
+    Guid::SetNextGuidCounter(counter);
+}
+
+void BaseGameObject::DestroyDeadObjects()
+{
+    for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
+    {
+        BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
+        if (!pObj)
+        {
+            break;
+        }
+        if (pObj->GetDead() && pObj->mChaseCounter == 0)
+        {
+            i = gBaseGameObjects->RemoveAt(i);
+            relive_delete pObj;
+        }
+    }
+}
+
+void BaseGameObject::PostRestoreAll()
+{
+    MarkDrawnObjects();
+
+    PlatformBase::SetRestoring(true);
+    for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
+    {
+        BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
+        if (!pObj)
+        {
+            break;
+        }
+        pObj->VPostRestore();
+    }
+    PlatformBase::SetRestoring(false);
 }
 
 ReliveTypes BaseGameObject::FromAO(AOTypes aoType)
@@ -960,6 +1221,8 @@ Guid BaseGameObject::RefreshId(const Guid& objectId)
                 return pObj->mBaseGameObjectId;
             }
         }
+        // Not any object now: it is what a running game would hold too, the id of one that is gone, which finds nothing
+        return objectId;
     }
     return nullGuid;
 }
@@ -996,4 +1259,168 @@ PalResource& BaseGameObject::GetPalRes(PalId palId)
         }
     }
     ALIVE_FATAL("Pal res %d not found", static_cast<s32>(palId));
+}
+
+template <typename T>
+static void WriteListOrder(SerializedObjectData& pSaveBuffer, DynamicArrayT<T>& list, ListOrderSaveState::List which)
+{
+    ListOrderSaveState state = {};
+    state.mList = which;
+    for (s32 i = 0; i < list.Size() && state.mCount < ListOrderSaveState::kMaxIds; i++)
+    {
+        T* pObj = list.ItemAt(i);
+        if (!pObj)
+        {
+            break;
+        }
+        // The dead are not saved, and are gone by the time the save is restored
+        if (!pObj->GetDead())
+        {
+            state.mIds[state.mCount++] = pObj->mBaseGameObjectId;
+        }
+    }
+    pSaveBuffer.Write(state);
+}
+
+void BaseGameObject::SaveListOrders(SerializedObjectData& pSaveBuffer)
+{
+    WriteListOrder(pSaveBuffer, *gObjListDrawables, ListOrderSaveState::List::eDrawables);
+    WriteListOrder(pSaveBuffer, *gBaseAliveGameObjects, ListOrderSaveState::List::eAliveObjects);
+    WriteListOrder(pSaveBuffer, PlatformBase::Platforms(), ListOrderSaveState::List::ePlatforms);
+
+    ListOrderSaveState animations = {};
+    animations.mList = ListOrderSaveState::List::eAnimations;
+    for (s32 i = 0; i < AnimationBase::gAnimations->Size() && animations.mCount < ListOrderSaveState::kMaxIds; i++)
+    {
+        AnimationBase* pAnim = AnimationBase::gAnimations->ItemAt(i);
+        if (!pAnim)
+        {
+            break;
+        }
+        // The ones that have no owner (a loading icon, say) are left out
+        auto* pAnimation = dynamic_cast<Animation*>(pAnim);
+        BaseGameObject* pOwner = pAnimation ? pAnimation->GetOwner() : nullptr;
+        if (pOwner && !pOwner->GetDead())
+        {
+            const std::ptrdiff_t offset = reinterpret_cast<const u8*>(pAnimation) - reinterpret_cast<const u8*>(pOwner);
+            animations.mOffsets[animations.mCount] = offset >= 0 && offset < 0x10000 ? static_cast<s32>(offset) : -1;
+            animations.mIds[animations.mCount++] = pOwner->mBaseGameObjectId;
+        }
+    }
+    pSaveBuffer.Write(animations);
+}
+
+template <typename T>
+static void ReorderList(DynamicArrayT<T>& list, const std::vector<Guid>& idsInOrder)
+{
+    if (idsInOrder.empty())
+    {
+        return;
+    }
+
+    std::map<Guid, std::size_t> rank;
+    for (const Guid& id : idsInOrder)
+    {
+        rank.emplace(id, rank.size());
+    }
+
+    std::vector<s32> slots;
+    std::vector<T*> known;
+    for (s32 i = 0; i < list.Size(); i++)
+    {
+        T* pObj = list.ItemAt(i);
+        if (!pObj)
+        {
+            break;
+        }
+        if (rank.find(pObj->mBaseGameObjectId) != rank.end())
+        {
+            slots.push_back(i);
+            known.push_back(pObj);
+        }
+    }
+
+    std::stable_sort(known.begin(), known.end(), [&rank](const T* pLeft, const T* pRight)
+                     { return rank.at(pLeft->mBaseGameObjectId) < rank.at(pRight->mBaseGameObjectId); });
+    for (std::size_t i = 0; i < slots.size(); i++)
+    {
+        list.SetAt(slots[i], known[i]);
+    }
+}
+
+void BaseGameObject::ReorderLists(const std::vector<Guid>& drawables, const std::vector<Guid>& aliveObjects, const std::vector<std::pair<Guid, s32>>& animations, const std::vector<Guid>& platforms)
+{
+    ReorderList(*gObjListDrawables, drawables);
+    ReorderList(*gBaseAliveGameObjects, aliveObjects);
+    ReorderList(PlatformBase::Platforms(), platforms);
+
+    if (animations.empty())
+    {
+        return;
+    }
+
+    // An animation is known by its owner and where in it it is. One that isn't in it (-1) is known by being the nth
+    // of its owner without a place: the places are the ones the save has, in order
+    std::map<std::pair<Guid, s32>, std::size_t> placeOfKnown;
+    std::map<Guid, std::vector<std::size_t>> placesOfUnknown;
+    for (std::size_t i = 0; i < animations.size(); i++)
+    {
+        if (animations[i].second >= 0)
+        {
+            placeOfKnown.emplace(animations[i], i);
+        }
+        else
+        {
+            placesOfUnknown[animations[i].first].push_back(i);
+        }
+    }
+
+    std::map<Guid, std::size_t> usedUnknown;
+    std::vector<s32> slots;
+    std::vector<std::pair<std::size_t, AnimationBase*>> known;
+    for (s32 i = 0; i < AnimationBase::gAnimations->Size(); i++)
+    {
+        AnimationBase* pAnim = AnimationBase::gAnimations->ItemAt(i);
+        if (!pAnim)
+        {
+            break;
+        }
+        auto* pAnimation = dynamic_cast<Animation*>(pAnim);
+        BaseGameObject* pOwner = pAnimation ? pAnimation->GetOwner() : nullptr;
+        if (!pOwner)
+        {
+            continue;
+        }
+        const std::ptrdiff_t offset = reinterpret_cast<const u8*>(pAnimation) - reinterpret_cast<const u8*>(pOwner);
+        const s32 key = offset >= 0 && offset < 0x10000 ? static_cast<s32>(offset) : -1;
+        if (key >= 0)
+        {
+            auto it = placeOfKnown.find({pOwner->mBaseGameObjectId, key});
+            if (it != placeOfKnown.end())
+            {
+                slots.push_back(i);
+                known.push_back({it->second, pAnim});
+            }
+        }
+        else
+        {
+            auto it = placesOfUnknown.find(pOwner->mBaseGameObjectId);
+            if (it != placesOfUnknown.end())
+            {
+                std::size_t& next = usedUnknown[pOwner->mBaseGameObjectId];
+                if (next < it->second.size())
+                {
+                    slots.push_back(i);
+                    known.push_back({it->second[next++], pAnim});
+                }
+            }
+        }
+    }
+
+    std::stable_sort(known.begin(), known.end(), [](const auto& left, const auto& right)
+                     { return left.first < right.first; });
+    for (std::size_t i = 0; i < slots.size(); i++)
+    {
+        AnimationBase::gAnimations->SetAt(slots[i], known[i].second);
+    }
 }

@@ -1,4 +1,5 @@
 #include "GameObjects/BaseAbe.hpp"
+#include "../relive_lib/WorldStatic.hpp"
 #include "stdafx_ao.h"
 #include "../relive_lib/Function.hpp"
 #include "Abe.hpp"
@@ -655,37 +656,63 @@ Abe::~Abe()
 const u32 sAbe_xVel_table_4BB118[8] = {262144, 262144, 0, 4294705152, 4294705152, 4294705152, 0, 262144};
 const u32 sAbe_yVel_table_4BB138[8] = {0, 4294705152, 4294705152, 4294705152, 0, 262144, 262144, 262144};
 
-void Abe::VUpdate()
+void Abe::VPostRestore()
 {
-    if (GetRestoredFromQuickSave())
+    if (BaseAliveGameObjectCollisionLineType != -1)
     {
-        SetRestoredFromQuickSave(false);
-
-        if (BaseAliveGameObjectCollisionLineType != -1)
-        {
-            gCollisions->Raycast(
-                mXPos,
-                mYPos - FP_FromInteger(20),
-                mXPos,
-                mYPos + FP_FromInteger(20),
-                &BaseAliveGameObjectCollisionLine,
-                &mXPos,
-                &mYPos,
-                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
-
-            BaseAliveGameObjectCollisionLineType = -1;
-        }
-
-        BaseAliveGameObject_PlatformId = BaseGameObject::RefreshId(BaseAliveGameObject_PlatformId);
-        mFadeId = BaseGameObject::RefreshId(mFadeId);
-        field_15C_pThrowable = BaseGameObject::RefreshId(field_15C_pThrowable);
-        mPullRingRope = BaseGameObject::RefreshId(mPullRingRope);
-        mCircularFadeId = BaseGameObject::RefreshId(mCircularFadeId);
-        mOrbWhirlWindId = BaseGameObject::RefreshId(mOrbWhirlWindId);
-        field_18C_pObjToPossess = BaseGameObject::RefreshId(field_18C_pObjToPossess);
-        mThrowable = BaseGameObject::RefreshId(mThrowable);
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
     }
 
+    BaseAliveGameObject_PlatformId = BaseGameObject::RefreshId(BaseAliveGameObject_PlatformId);
+    mFadeId = BaseGameObject::RefreshId(mFadeId);
+    field_15C_pThrowable = BaseGameObject::RefreshId(field_15C_pThrowable);
+    mPullRingRope = BaseGameObject::RefreshId(mPullRingRope);
+    mCircularFadeId = BaseGameObject::RefreshId(mCircularFadeId);
+    mOrbWhirlWindId = BaseGameObject::RefreshId(mOrbWhirlWindId);
+    field_18C_pObjToPossess = BaseGameObject::RefreshId(field_18C_pObjToPossess);
+    mThrowable = BaseGameObject::RefreshId(mThrowable);
+
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game). The line of a platform
+    // (a lift) is looked for again once the camera has made the platform
+    if (BaseAliveGameObjectCollisionLine || !BaseAliveGameObject_PlatformId.IsValid())
+    {
+        BaseAliveGameObjectCollisionLineType = 0;
+    }
+}
+
+void Abe::VPostRestoreFromTlv()
+{
+    if (BaseAliveGameObjectCollisionLineType != 0 && BaseAliveGameObjectCollisionLineType != -1 && !BaseAliveGameObjectCollisionLine)
+    {
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+    }
+    BaseAliveGameObjectCollisionLineType = 0;
+}
+
+void Abe::VUpdate()
+{
     if (gAbeInvulnerableCheat)
     {
         mHealth = FP_FromInteger(1);
@@ -2632,6 +2659,8 @@ void Abe::GetSaveState(AbeSaveState& pSaveState)
     pSaveState.mGnFrame = field_114_gnFrame;
     pSaveState.mTimer = field_118_timer;
     pSaveState.mRegenHealthTimer = field_11C_regen_health_timer;
+    pSaveState.mXVelSlowBy = field_120_x_vel_slow_by;
+    pSaveState.mSfxPlaying = mSfxPlaying;
     pSaveState.mRollingMotionTimer = field_12C_timer;
     pSaveState.mSay = field_130_say;
     pSaveState.mAutoSayTimer = field_134_auto_say_timer;
@@ -2825,6 +2854,8 @@ void Abe::CreateFromSaveState(const AbeSaveState& pData, ResourceManager& resMan
     gAbe->field_114_gnFrame = pData.mGnFrame;
     gAbe->field_118_timer = pData.mTimer;
     gAbe->field_11C_regen_health_timer = pData.mRegenHealthTimer;
+    gAbe->field_120_x_vel_slow_by = pData.mXVelSlowBy;
+    gAbe->mSfxPlaying = pData.mSfxPlaying;
     gAbe->field_12C_timer = pData.mRollingMotionTimer;
     gAbe->field_130_say = pData.mSay;
     gAbe->field_134_auto_say_timer = pData.mAutoSayTimer;
@@ -2888,8 +2919,6 @@ void Abe::CreateFromSaveState(const AbeSaveState& pData, ResourceManager& resMan
 
     gAbe->GetShadow()->mEnabled = pData.mShadowEnabled;
     gAbe->GetShadow()->mShadowAtBottom = pData.mShadowAtBottom;
-
-    gAbe->SetRestoredFromQuickSave(true);
 }
 
 bool Abe::VTakeDamage(BaseGameObject* pFrom)
@@ -7467,10 +7496,10 @@ void Abe::Motion_87_ToFall()
     Motion_3_Fall();
 }
 
-s32 gCounter_507728 = 0;
+WorldStatic<s32> gCounter_507728("AO.Abe.gCounter_507728", 0);
 u8** gpDemoPlaybackRes_50772C = nullptr;
 s32 sAbeSound_507730 = 0;
-BellSong* sBellSong = nullptr;
+static WorldStatic<Guid> sBellSongId("AO.Abe.sBellSongId", Guid{});
 
 void Abe::Motion_88_HandstoneBegin()
 {
@@ -7580,10 +7609,11 @@ void Abe::Motion_88_HandstoneBegin()
                     }
                     case ReliveTypes::eBellSongStone:
                     {
-                        sBellSong = relive_new BellSong(
+                        BellSong* pNewBellSong = relive_new BellSong(
                             mBellsongStone->mType,
                             Code_Convert(mBellsongStone->mCode1, mBellsongStone->mCode2),
                             mResMan, mMap);
+                        sBellSongId = pNewBellSong->mBaseGameObjectId;
 
                         SwitchStates_Do_Operation(mBellsongStone->mSwitchId, relive::reliveSwitchOp::eSetTrue);
                         field_110_state.stone = StoneStates::eBellSongDone_4;
@@ -7661,9 +7691,13 @@ void Abe::Motion_88_HandstoneBegin()
         }
         case StoneStates::eBellSongDone_4:
         {
-            if (sBellSong->mDone)
+            BellSong* pBellSong = static_cast<BellSong*>(sObjectIds.Find_Impl(sBellSongId));
+            if (!pBellSong || pBellSong->mDone)
             {
-                sBellSong->SetDead(true);
+                if (pBellSong)
+                {
+                    pBellSong->SetDead(true);
+                }
                 auto pCircularFade = static_cast<CircularFade*>(sObjectIds.Find_Impl(mCircularFadeId));
                 pCircularFade->VFadeIn(0, 0);
                 field_110_state.stone = StoneStates::eHandstoneEnd_5;
@@ -9291,7 +9325,7 @@ void Abe::Motion_164_PoisonGasDeath()
 bool Abe::IsEnteringOrExitingDoor() const
 {
     return mCurrentMotion == eAbeMotions::Motion_156_DoorEnter || 
-           gAbe->mCurrentMotion == eAbeMotions::Motion_157_DoorExit;
+           mCurrentMotion == eAbeMotions::Motion_157_DoorExit;
 }
 
 s32 Abe::DoorId() const

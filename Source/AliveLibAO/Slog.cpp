@@ -1,4 +1,5 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "../relive_lib/Function.hpp"
 #include "Slog.hpp"
 #include "../relive_lib/SerializedObjectData.hpp"
@@ -67,8 +68,8 @@ static const TSlogBrainFunction sSlogBrainTable[] = {
     &Slog::Brain_2_ChasingAbe,
     &Slog::Brain_3_Dead};
 
-s16 sSlogCount = 0;
-u8 sSlogRndSeed_9F11C4 = 0;
+WorldStatic<s16> sSlogCount("AO.Slog.sSlogCount", 0);
+WorldStatic<u8> sSlogRndSeed_9F11C4("AO.Slog.sSlogRndSeed_9F11C4", 0);
 
 static u8 Slog_NextRandom()
 {
@@ -301,30 +302,34 @@ void Slog::VOnTlvCollision(TlvIterator tlvIterator)
     }
 }
 
-void Slog::VUpdate()
+void Slog::VPostRestore()
 {
-    if (GetRestoredFromQuickSave())
+    if (BaseAliveGameObjectCollisionLineType != -1)
     {
-        if (BaseAliveGameObjectCollisionLineType != -1)
-        {
-            gCollisions->Raycast(
-                mXPos,
-                mYPos - FP_FromInteger(20),
-                mXPos,
-                mYPos + FP_FromInteger(20),
-                &BaseAliveGameObjectCollisionLine,
-                &mXPos,
-                &mYPos,
-                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
-
-            BaseAliveGameObjectCollisionLineType = -1;
-        }
-
-        mTargetId = BaseGameObject::RefreshId(mTargetId);
-        mListeningToSligId = BaseGameObject::RefreshId(mListeningToSligId);
-        SetRestoredFromQuickSave(false);
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
     }
 
+    mTargetId = BaseGameObject::RefreshId(mTargetId);
+    mListeningToSligId = BaseGameObject::RefreshId(mListeningToSligId);
+
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
+}
+
+void Slog::VUpdate()
+{
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);
@@ -2617,11 +2622,7 @@ void Slog::DelayedResponse(s16 responseIdx)
 
 void Slog::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     SlogSaveState data = {};
 
     data.mBaseTlvId = mBaseGameObjectTlvInfo;
@@ -2646,7 +2647,7 @@ void Slog::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mRender = GetAnimation().GetRender();
     data.mDrawable = GetDrawable();
     data.mHealth = mHealth;
-    data.mPreviousMotion = mCurrentMotion;
+    data.mPreviousMotion = mPreviousMotion;
     data.mNextMotion = mNextMotion;
     data.mLastLineYPos = static_cast<u16>(FP_GetExponent(BaseAliveGameObjectLastLineYPos));
 
@@ -2801,7 +2802,6 @@ void Slog::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& r
         // Guids at this point, not live runtime ids - VUpdate() resolves
         // them via BaseGameObject::RefreshId() once every object has been
         // recreated.
-        pSlog->SetRestoredFromQuickSave(true);
     }
 }
 

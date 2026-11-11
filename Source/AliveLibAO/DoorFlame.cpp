@@ -1,4 +1,5 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "../relive_lib/Function.hpp"
 #include "DoorFlame.hpp"
 #include "../AliveLibAE/stdlib.hpp"
@@ -14,10 +15,11 @@
 #include "Path.hpp"
 #include "../relive_lib/ObjectIds.hpp"
 #include "../relive_lib/Engine.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 
 namespace AO {
 
-static DoorFlame* sFlameControllingTheSound = nullptr;
+static WorldStatic<Guid> sFlameControllingTheSoundId("AO.DoorFlame.sFlameControllingTheSoundId", Guid{});
 
 class FireBackgroundGlow final : public BaseAnimatedWithPhysicsGameObject
 {
@@ -100,7 +102,6 @@ public:
         }
     }
 
-private:
     FP field_E4_xPos;
     FP field_E8_yPos;
     FP field_EC_xOff;
@@ -169,6 +170,17 @@ public:
     }
 
 private:
+    virtual std::vector<NotStateMemory> VNotStateMemory() override
+    {
+        // The animations of the sparks hold the number of the resource they were made with
+        std::vector<NotStateMemory> result;
+        for (auto& spark : mSparks)
+        {
+            result.push_back({&spark.field_14.mAnimRes, sizeof(spark.field_14.mAnimRes)});
+        }
+        return result;
+    }
+
     virtual void VUpdate() override
     {
 
@@ -353,9 +365,9 @@ DoorFlame::~DoorFlame()
 
 void DoorFlame::VStopAudio()
 {
-    if (sFlameControllingTheSound == this)
+    if (sFlameControllingTheSoundId.Get() == mBaseGameObjectId)
     {
-        sFlameControllingTheSound = nullptr;
+        sFlameControllingTheSoundId = Guid{};
         SND_Stop_Channels_Mask(mSoundsMask);
     }
 }
@@ -389,9 +401,9 @@ void DoorFlame::VUpdate()
 
         case States::eEnabled_1:
         {
-            if (!sFlameControllingTheSound)
+            if (!sFlameControllingTheSoundId.Get().IsValid())
             {
-                sFlameControllingTheSound = this;
+                sFlameControllingTheSoundId = mBaseGameObjectId;
                 mSoundsMask = SfxPlayMono(relive::SoundEffects::Fire, 40);
             }
 
@@ -444,6 +456,91 @@ void DoorFlame::VUpdate()
             0))
     {
         SetDead(true);
+    }
+}
+
+void DoorFlame::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    DoorFlameSaveState data = {};
+    data.mState = static_cast<s32>(mState);
+    data.mRandom = mRandom;
+    data.mFireBackgroundGlowId = mFireBackgroundGlowId;
+    data.mFlameSparksId = mFlameSparksId;
+    if (const FlameSparks* pSparks = static_cast<FlameSparks*>(sObjectIds.Find_Impl(mFlameSparksId)))
+    {
+        data.mSparksRender = pSparks->mRender;
+        data.mSparksStartXPos = pSparks->mStartXPos;
+        data.mSparksStartYPos = pSparks->mStartYPos;
+        for (s32 i = 0; i < ALIVE_COUNTOF(pSparks->mSparks); i++)
+        {
+            data.mSparks[i].mX = pSparks->mSparks[i].x;
+            data.mSparks[i].mY = pSparks->mSparks[i].y;
+            data.mSparks[i].mOffX = pSparks->mSparks[i].field_8_off_x;
+            data.mSparks[i].mOffY = pSparks->mSparks[i].field_C_off_y;
+            data.mSparks[i].mRandom64 = pSparks->mSparks[i].field_10_random64;
+            data.mSparks[i].mVisible = pSparks->mSparks[i].field_12_bVisible;
+            data.mSparks[i].mSpriteScale = pSparks->mSparks[i].field_14.mSpriteScale;
+            data.mSparks[i].mAnim = pSparks->mSparks[i].field_14.GetSaveState();
+        }
+    }
+    if (const FireBackgroundGlow* pGlow = static_cast<FireBackgroundGlow*>(sObjectIds.Find_Impl(mFireBackgroundGlowId)))
+    {
+        data.mHasGlow = true;
+        data.mGlowXPos = pGlow->field_E4_xPos;
+        data.mGlowYPos = pGlow->field_E8_yPos;
+        data.mGlowXOff = pGlow->field_EC_xOff;
+        data.mGlowYOff = pGlow->field_F0_yOff;
+    }
+    pSaveBuffer.Write(data);
+}
+
+void DoorFlame::RestoreFromSaveState(const DoorFlameSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    DoorFlame* p = static_cast<DoorFlame*>(pObj);
+    p->mState = static_cast<States>(state.mState);
+    p->mRandom = state.mRandom;
+    p->mFlameSparksId = state.mFlameSparksId;
+
+    if (FlameSparks* pSparks = static_cast<FlameSparks*>(sObjectIds.Find_Impl(p->mFlameSparksId)))
+    {
+        pSparks->mRender = state.mSparksRender;
+        pSparks->mStartXPos = state.mSparksStartXPos;
+        pSparks->mStartYPos = state.mSparksStartYPos;
+        for (s32 i = 0; i < ALIVE_COUNTOF(pSparks->mSparks); i++)
+        {
+            pSparks->mSparks[i].x = state.mSparks[i].mX;
+            pSparks->mSparks[i].y = state.mSparks[i].mY;
+            pSparks->mSparks[i].field_8_off_x = state.mSparks[i].mOffX;
+            pSparks->mSparks[i].field_C_off_y = state.mSparks[i].mOffY;
+            pSparks->mSparks[i].field_10_random64 = state.mSparks[i].mRandom64;
+            pSparks->mSparks[i].field_12_bVisible = state.mSparks[i].mVisible;
+            pSparks->mSparks[i].field_14.mSpriteScale = state.mSparks[i].mSpriteScale;
+            pSparks->mSparks[i].field_14.RestoreSaveState(state.mSparks[i].mAnim);
+        }
+    }
+
+    if (state.mHasGlow)
+    {
+        // Made by the update, with the id it had
+        Guid::CreationScope idScope(state.mFireBackgroundGlowId);
+        FireBackgroundGlow* pGlow = relive_new FireBackgroundGlow(p->mXPos, p->mYPos + FP_FromInteger(4), FP_FromDouble(0.5), p->mResMan, p->mMap);
+        if (pGlow)
+        {
+            p->mFireBackgroundGlowId = pGlow->mBaseGameObjectId;
+            pGlow->field_E4_xPos = state.mGlowXPos;
+            pGlow->field_E8_yPos = state.mGlowYPos;
+            pGlow->field_EC_xOff = state.mGlowXOff;
+            pGlow->field_F0_yOff = state.mGlowYOff;
+        }
+    }
+    else
+    {
+        p->mFireBackgroundGlowId = Guid{};
     }
 }
 

@@ -120,11 +120,7 @@ RollingBall::RollingBall(relive::Path_RollingBall* pTlv, const Guid& tlvId, Reso
 
 void RollingBall::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     RollingBallSaveState data = {};
 
     data.mXPos = mXPos;
@@ -201,33 +197,36 @@ void RollingBall::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMan
         // mRollingBallShakerId above is still the saved tlv-info Guid at
         // this point, not a live runtime id - VUpdate() resolves it via
         // BaseGameObject::RefreshId() once every object has been recreated.
-        pBall->SetRestoredFromQuickSave(true);
     }
+}
+
+void RollingBall::VPostRestore()
+{
+    if (BaseAliveGameObjectCollisionLineType != -1)
+    {
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+    }
+
+    mRollingBallShakerId = BaseGameObject::RefreshId(mRollingBallShakerId);
+
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
 }
 
 void RollingBall::VUpdate()
 {
-    if (GetRestoredFromQuickSave())
-    {
-        if (BaseAliveGameObjectCollisionLineType != -1)
-        {
-            gCollisions->Raycast(
-                mXPos,
-                mYPos - FP_FromInteger(20),
-                mXPos,
-                mYPos + FP_FromInteger(20),
-                &BaseAliveGameObjectCollisionLine,
-                &mXPos,
-                &mYPos,
-                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
-
-            BaseAliveGameObjectCollisionLineType = -1;
-        }
-
-        mRollingBallShakerId = BaseGameObject::RefreshId(mRollingBallShakerId);
-        SetRestoredFromQuickSave(false);
-    }
-
     switch (mState)
     {
         case States::eInactive:
@@ -503,8 +502,12 @@ void RollingBall::KillRollingBallShaker()
     if (mRollingBallShakerId.IsValid())
     {
         auto pShaker = static_cast<RollingBallShaker*>(sObjectIds.Find_Impl(mRollingBallShakerId));
-        pShaker->mStopShaking = true;
-        pShaker->SetDead(true);
+        // It may be gone already, when everything is destroyed at once
+        if (pShaker)
+        {
+            pShaker->mStopShaking = true;
+            pShaker->SetDead(true);
+        }
         mRollingBallShakerId = {};
     }
 }

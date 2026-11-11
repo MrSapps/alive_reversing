@@ -1,4 +1,5 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "../relive_lib/Function.hpp"
 #include "Mudokon.hpp"
 #include "../relive_lib/SerializedObjectData.hpp"
@@ -135,8 +136,8 @@ static const TintEntry sMudTints_4CD320[] = {
     {EReliveLevelIds::eStockYardsReturn, 25u, 25u, 25u},
     {EReliveLevelIds::eNone, 87u, 103u, 67u}};
 
-s16 sAlertedMudCount_507B90 = 0;
-s16 sMudRunningToPortalCount_507B94 = 0;
+WorldStatic<s16> sAlertedMudCount_507B90("AO.Mudokon.sAlertedMudCount_507B90", 0);
+WorldStatic<s16> sMudRunningToPortalCount_507B94("AO.Mudokon.sMudRunningToPortalCount_507B94", 0);
 
 Mudokon::Mudokon(relive::Path_TLV* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : ::BaseAliveGameObject(0, resMan, map)
@@ -346,7 +347,11 @@ Mudokon::Mudokon(relive::Path_TLV* pTlv, const Guid& tlvId, ResourceManager& res
 
     CreateShadow();
 
-    VUpdate();
+    // The first update of a new one is not part of what a restore puts back (it makes a snooze particle, say)
+    if (!mMap.mRestoringObjects)
+    {
+        VUpdate();
+    }
 }
 
 Mudokon::~Mudokon()
@@ -407,30 +412,34 @@ void Mudokon::KillLiftPoint_194()
     }
 }
 
-void Mudokon::VUpdate()
+void Mudokon::VPostRestore()
 {
-    if (GetRestoredFromQuickSave())
+    if (BaseAliveGameObjectCollisionLineType != -1)
     {
-        if (BaseAliveGameObjectCollisionLineType != -1)
-        {
-            gCollisions->Raycast(
-                mXPos,
-                mYPos - FP_FromInteger(20),
-                mXPos,
-                mYPos + FP_FromInteger(20),
-                &BaseAliveGameObjectCollisionLine,
-                &mXPos,
-                &mYPos,
-                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
-
-            BaseAliveGameObjectCollisionLineType = -1;
-        }
-
-        mLiftPointId = BaseGameObject::RefreshId(mLiftPointId);
-        mBirdPortalId = BaseGameObject::RefreshId(mBirdPortalId);
-        SetRestoredFromQuickSave(false);
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
     }
 
+    mLiftPointId = BaseGameObject::RefreshId(mLiftPointId);
+    mBirdPortalId = BaseGameObject::RefreshId(mBirdPortalId);
+
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
+}
+
+void Mudokon::VUpdate()
+{
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);
@@ -4245,11 +4254,7 @@ s16 Mudokon::Brain_15_Choke()
 
 void Mudokon::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     MudokonSaveState data = {};
 
     data.mXPos = mXPos;
@@ -4341,7 +4346,8 @@ void Mudokon::VGetSaveState(SerializedObjectData& pSaveBuffer)
         }
     }
 
-    pSaveBuffer.Write(data);
+        data.mbMotionChanged = mbMotionChanged;
+pSaveBuffer.Write(data);
 }
 
 void Mudokon::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
@@ -4373,6 +4379,7 @@ void Mudokon::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager
         pMud->mRGB.SetRGB(pState->mRed, pState->mGreen, pState->mBlue);
 
         pMud->mCurrentMotion = pState->mCurrentMotion;
+        pMud->mbMotionChanged = pState->mbMotionChanged;
         pMud->GetAnimation().Set_Animation_Data(pMud->GetAnimRes(sMudMotionAnimIds[static_cast<s32>(pState->mCurrentMotion)]));
 
         pMud->GetAnimation().SetCurrentFrame(pState->mCurrentFrame);
@@ -4437,7 +4444,6 @@ void Mudokon::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager
         // Guids at this point, not live runtime ids - VUpdate() resolves
         // them via BaseGameObject::RefreshId() once every object has been
         // recreated.
-        pMud->SetRestoredFromQuickSave(true);
     }
 }
 

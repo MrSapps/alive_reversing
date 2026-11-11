@@ -1,4 +1,5 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../relive_lib/Function.hpp"
 #include "MotionDetector.hpp"
 #include "../AliveLibAE/stdlib.hpp"
@@ -279,6 +280,12 @@ void MotionDetector::VUpdate()
     }
 }
 
+std::vector<::BaseGameObject::NotStateMemory> MotionDetector::VNotStateMemory()
+{
+    // What it was last drawn with
+    return {{&mPrim, sizeof(mPrim)}};
+}
+
 void MotionDetector::VRender(OrderingTable& ot)
 {
     mXPos += FP_FromInteger(11);
@@ -316,6 +323,42 @@ void MotionDetector::VRender(OrderingTable& ot)
         pPrim->SetBlendMode(mObjectInLaser != 0 ? relive::TBlendModes::eBlend_1 : relive::TBlendModes::eBlend_3);
         ot.Add(GetAnimation().GetRenderLayer(), pPrim);
     }
+}
+
+void MotionDetector::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    MotionDetectorSaveState data = {};
+    data.mState = static_cast<s32>(mState);
+    data.mPauseTimer = mPauseTimer;
+    data.mDontComeBack = mDontComeBack;
+    data.mTopLeftX = mTopLeftX;
+    data.mTopLeftY = mTopLeftY;
+    data.mBottomRightX = mBottomRightX;
+    data.mBottomRightY = mBottomRightY;
+    data.mLaserId = mLaserId;
+    data.mSpeed = mSpeed;
+    data.mObjectInLaser = mObjectInLaser;
+    pSaveBuffer.Write(data);
+}
+
+void MotionDetector::RestoreFromSaveState(const MotionDetectorSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    MotionDetector* p = static_cast<MotionDetector*>(pObj);
+    p->mState = static_cast<States>(state.mState);
+    p->mPauseTimer = state.mPauseTimer;
+    p->mDontComeBack = state.mDontComeBack;
+    p->mTopLeftX = state.mTopLeftX;
+    p->mTopLeftY = state.mTopLeftY;
+    p->mBottomRightX = state.mBottomRightX;
+    p->mBottomRightY = state.mBottomRightY;
+    p->mLaserId = state.mLaserId;
+    p->mSpeed = state.mSpeed;
+    p->mObjectInLaser = state.mObjectInLaser;
 }
 
 } // namespace AO

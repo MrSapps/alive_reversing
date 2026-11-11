@@ -1,0 +1,12 @@
+# The bot's nav graph and pilot against the real level: up a hoist, through a well, down again and over two
+# UXBs by hopping. bot_goto fails the script if Abe doesn't end in the cell asked for (or dies on the way).
+timeout 120
+start mines 1 4 925 1398
+draw 0
+wait_until in_game
+wait_frames 40
+bot_goto 1287 1240
+bot_goto 1437 1140
+bot_goto 1537 1400
+bot_goto 1787 1400
+quit

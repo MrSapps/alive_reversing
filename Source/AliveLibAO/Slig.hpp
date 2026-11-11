@@ -157,6 +157,7 @@ struct SligSaveState final : public SaveStateBase
     bool mReturnToPreviousMotion = false;
     bool mCheckedIfOffScreen = false;
     s32 mInput = 0;
+    eSligMotions mNextGameSpeakMotion = eSligMotions::Motion_0_StandIdle; // field_258_next_gamespeak_motion
     s32 mTimer128 = 0;
     Guid mTlvInfo;
     s16 mResIdx = 0;
@@ -171,6 +172,12 @@ struct SligSaveState final : public SaveStateBase
     s16 mShootCount = 0;
     s16 mForceAliveState = 0;
     s16 mSpottedPossessedSlig = 0;
+    // What the Slig was made with, which is the TLV of the bound that made it as often as its own
+    Guid mMadeWithTlvInfo;
+    bool mbMotionChanged = false;
+    // The positions it patrols between (the first is where it was made, which a restore can't tell)
+    PSX_Point mPoints[10] = {};
+    s16 mPointsCount = 0;
 };
 
 class Slig final : public ::BaseAliveGameObject
@@ -240,6 +247,11 @@ public:
 
     virtual void VScreenChanged() override;
     virtual void VUpdate() override;
+    virtual GameSpeakListenerBase* VListener() override
+    {
+        return &mListener;
+    }
+    virtual void VPostRestore() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VOnTrapDoorOpen() override;
     virtual void VUnPosses() override;

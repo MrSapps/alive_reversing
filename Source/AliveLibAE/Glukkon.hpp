@@ -112,6 +112,7 @@ struct GlukkonSaveState final : public SaveStateBase
     Guid mFadeId;
     s16 mCanBePossessed;
     ReliveTypes mCurrentType; // defaults to none until the glukkon gets spawned
+    s16 mCurrentWalkPitch;
 };
 
 class Glukkon final : public BaseAliveGameObject
@@ -150,9 +151,11 @@ public:
     static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
     virtual void VUpdate() override;
+    virtual void VPostRestore() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
     virtual void VScreenChanged() override;
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
     virtual void VPossessed() override;
     virtual void VOnTlvCollision(TlvIterator tlvIterator) override;
     virtual void VOnTrapDoorOpen() override;

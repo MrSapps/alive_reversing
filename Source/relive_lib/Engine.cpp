@@ -1,4 +1,6 @@
 #include "Engine.hpp"
+#include "StateHash.hpp"
+#include "GameObjects/Leaf.hpp"
 #include "relive_config.h"
 #include "Automation.hpp"
 #include "SoundDebug.hpp"
@@ -11,6 +13,7 @@
 #include "Sys.hpp"
 #include "Window.hpp"
 #include "GameObjects/Particle.hpp"
+#include "WorldStatic.hpp"
 #include "../AliveLibAE/PsxRender.hpp"
 
 #include "CommandLineOptions.hpp"
@@ -86,6 +89,7 @@
 #include <FatalError.hpp>
 
 u32 sGnFrame = 0;
+extern u8 sRandomSeed; // Math.cpp
 s16 gNumCamSwappers = 0;
 bool gSkipGameObjectUpdates = false;
 bool gDDCheatOn = false;
@@ -367,24 +371,27 @@ void Game_Shutdown()
 }
 
 // Draws the loading icon over whatever was shown last and presents it
-static void ShowLoadingIcon(ResourceManager& resMan, BaseMap& map)
+static void ShowLoadingIcon(ResourceManager& resMan)
 {
+    // When loading is shown depends on how long it takes, so the icon is not an object: it would take an id from
+    // the counter and a place in the list of objects, which are world state
     AnimResource res = resMan.LoadAnimation(AnimId::Loading_Icon2);
-    auto pParticle = relive_new Particle(FP_FromInteger(0), FP_FromInteger(0), res, resMan, map);
-    pParticle->GetAnimation().SetSemiTrans(false);
-    pParticle->GetAnimation().SetBlending(true);
-    pParticle->GetAnimation().SetRenderLayer(Layer::eLayer_0);
+    Animation anim;
+    anim.Init(res, nullptr);
+    anim.SetSemiTrans(false);
+    anim.SetBlending(true);
+    anim.SetRenderLayer(Layer::eLayer_0);
 
     OrderingTable ot;
-    pParticle->GetAnimation().VRender(320, 220, ot, 0, 0);
+    anim.VRender(320, 220, ot, 0, 0);
     PSX_DrawOTag(ot);
     PSX_PutDispEnv_4F5890();
 
-    pParticle->SetDead(true);
+    anim.VCleanUp();
 }
 
 // One main loop iteration spent waiting for loading to finish
-static Sys::PumpResult LoadingTick(Sys& sys, ResourceManager& resMan, BaseMap& map, bool showLoadingIcon)
+static Sys::PumpResult LoadingTick(Sys& sys, ResourceManager& resMan, bool showLoadingIcon)
 {
     // How many of these there are depends on how long loading takes, so none of it is recorded
     GetGameAutoPlayer().DisableRecorder();
@@ -396,7 +403,7 @@ static Sys::PumpResult LoadingTick(Sys& sys, ResourceManager& resMan, BaseMap& m
 
     if (showLoadingIcon)
     {
-        ShowLoadingIcon(resMan, map);
+        ShowLoadingIcon(resMan);
     }
 
     GetGameAutoPlayer().EnableRecorder();
@@ -427,7 +434,7 @@ void Engine::Game_Loop(BaseMap& map)
 
             if (mResMan->IsLoading() || showLoadingIcon)
             {
-                if (LoadingTick(*mSys, *mResMan, map, showLoadingIcon) == Sys::PumpResult::eQuit)
+                if (LoadingTick(*mSys, *mResMan, showLoadingIcon) == Sys::PumpResult::eQuit)
                 {
                     map.EndAllModals();
                     break;
@@ -520,6 +527,29 @@ void Engine::RunFrame(BaseMap& map)
         if (map.ContinueDirectCameraChange() == ScreenChangeResult::eWaiting)
         {
             return;
+        }
+    }
+
+    // A quicksave restored between frames is only the screen change that makes its objects: no
+    // updates, no drawing and no frame counter step, so the next frame is the one that follows the
+    // saved state. What the objects roll when they are made is thrown away, the same way.
+    if (mFrameStage == FrameStage::eBegin && (map.mPendingSaveRestore || mRestoringBetweenFrames))
+    {
+        if (!mRestoringBetweenFrames)
+        {
+            mRestoringBetweenFrames = true;
+            mRestoreSeed = sRandomSeed;
+            mRestoreLeafRandIdx = Leaf::GetRandIdx();
+            mRestoreStatics = WorldStatics::Snapshot();
+            mRestoreGuidCounter = Guid::GetNextGuidCounter();
+
+            // The objects the restore destroyed go first: the ones it makes take the ids those had
+            mFrameStage = FrameStage::eDestroyObjects;
+            mFrameObjIdx = 0;
+        }
+        else
+        {
+            mFrameStage = FrameStage::eScreenChange;
         }
     }
 
@@ -683,6 +713,87 @@ void Engine::RunFrame(BaseMap& map)
     }
 
     mFrameStage = FrameStage::eBegin;
+
+    if (mRestoringBetweenFrames)
+    {
+        // The camera change can take more than one go
+        if (map.mPendingSaveRestore || map.mCamState != BaseMap::CamChangeStates::eInactive_0)
+        {
+            return;
+        }
+
+        // The camera change leaves a dead camera swapper, which counts until it is destroyed. (A swapper that is
+        // part way through its fade in the saved world counts too, and stays.)
+        if (gNumCamSwappers != 0)
+        {
+            bool anyDestroyable = false;
+            for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
+            {
+                BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
+                if (pObj && pObj->GetDead() && !pObj->GetCantKill() && pObj->mChaseCounter == 0)
+                {
+                    anyDestroyable = true;
+                    break;
+                }
+            }
+            if (anyDestroyable)
+            {
+                mFrameStage = FrameStage::eDestroyObjects;
+                mFrameObjIdx = 0;
+                return;
+            }
+        }
+        mRestoringBetweenFrames = false;
+        sRandomSeed = mRestoreSeed;
+        Leaf::SetRandIdx(mRestoreLeafRandIdx);
+        WorldStatics::RestoreSnapshot(mRestoreStatics);
+        // What the restore made and killed is gone, as in the world that was saved, before the rest is put in order
+        BaseGameObject::DestroyDeadObjects();
+        BaseGameObject::ReorderObjects(map.mRestoreObjectOrder);
+        PlatformBase::SyncLinesAfterRestore();
+        BaseGameObject::ReorderLists(map.mRestoreDrawablesOrder, map.mRestoreAliveOrder, map.mRestoreAnimationsOrder, map.mRestorePlatformsOrder);
+
+        // Objects made with the ids of the save leave the counter where it was. If it moved, either what used the
+        // ids has gone again (the restore's camera swapper) and it goes back, or something was made that the save
+        // doesn't have (a rope its lift made, say) and holds an id from the counter: going back would give the
+        // next object the same id, so it stays, and the world differs from the saved one
+        if (Guid::GetNextGuidCounter() != mRestoreGuidCounter)
+        {
+            std::string made;
+            for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
+            {
+                BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
+                if (pObj && pObj->mBaseGameObjectId.IsFromCounterAtOrAfter(mRestoreGuidCounter))
+                {
+                    made += " " + StateHash::ClassName(*pObj);
+                }
+            }
+            if (made.empty())
+            {
+                Guid::SetNextGuidCounter(mRestoreGuidCounter);
+            }
+            else
+            {
+                LOG_WARNING("A quicksave restore made objects the save doesn't have, so ids from here on differ from the saved game's:%s", made.c_str());
+            }
+        }
+
+        // What the pad held before the restore must not carry over: this is where a frame's end reads it again.
+        // Unless the restore is to go on exactly as the save was, whose pads are already back
+        if (map.mRestoreKeepsInput)
+        {
+            map.mRestoreKeepsInput = false;
+        }
+        else if (GetGameType() == GameType::eAe)
+        {
+            Input().Update(GetGameAutoPlayer());
+        }
+        else
+        {
+            AO::Input().Update(GetGameAutoPlayer());
+        }
+        return;
+    }
 
     if (GetGameType() == GameType::eAe)
     {

@@ -1,0 +1,11 @@
+# AO's side of the nav graph: across the gap between two cameras, up a hoist onto a ledge, on to the next
+# camera, through a door into the background and along it at half scale.
+timeout 120
+start rupture_farms 15 1
+draw 0
+wait_until in_game
+wait_frames 60
+bot_goto 2588 214
+bot_goto 3362 214
+bot_goto 3600 296 half
+quit

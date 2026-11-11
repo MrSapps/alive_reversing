@@ -1,5 +1,6 @@
 #include "BinaryPath.hpp"
 #include "stdafx.h"
+#include "../logger.hpp"
 #include "BaseAliveGameObject.hpp"
 #include "../GameType.hpp"
 #include "../ObjectIds.hpp"
@@ -347,6 +348,108 @@ IBirdPortal* BaseAliveGameObject::VIntoBirdPortal(s16 numGridBlocks)
     return nullptr;
 }
 
+AliveObjectStateSaveState BaseAliveGameObject::GetAliveObjectState() const
+{
+    AliveObjectStateSaveState state = {};
+    state.mbGotShot = mbGotShot;
+    state.mCollectionRectX = mCollectionRect.x;
+    state.mCollectionRectY = mCollectionRect.y;
+    state.mCollectionRectW = mCollectionRect.w;
+    state.mCollectionRectH = mCollectionRect.h;
+    state.mLastAnimFrame = mBaseAliveGameObjectLastAnimFrame;
+    state.mCanBePossessed = mCanBePossessed;
+    state.mPossessed = mPossessed;
+    state.mZappedByShrykull = mZappedByShrykull;
+    state.mCanSetOffExplosives = mCanSetOffExplosives;
+    state.mElectrocuted = mElectrocuted;
+    state.mInvisible = mInvisible;
+    state.mTeleporting = mTeleporting;
+    state.mElectrocuting = mElectrocuting;
+    state.mCanBeesChase = mCanBeesChase;
+    state.mPlatformId = BaseAliveGameObject_PlatformId;
+    state.mHealth = mHealth;
+    state.mCollisionLineSaved = true;
+    state.mCollisionLineIsPlatforms = BaseAliveGameObjectCollisionLine
+        && (BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eDynamicCollision_32 || BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eBackgroundDynamicCollision_36);
+    if (BaseAliveGameObjectCollisionLine)
+    {
+        state.mCollisionLineX = BaseAliveGameObjectCollisionLine->mRect.x;
+        state.mCollisionLineY = BaseAliveGameObjectCollisionLine->mRect.y;
+        state.mCollisionLineW = BaseAliveGameObjectCollisionLine->mRect.w;
+        state.mCollisionLineH = BaseAliveGameObjectCollisionLine->mRect.h;
+        state.mCollisionLineType = static_cast<s16>(BaseAliveGameObjectCollisionLine->mLineType);
+    }
+    state.mCollisionLineIdx = (BaseAliveGameObjectCollisionLine && !state.mCollisionLineIsPlatforms) ? static_cast<s32>(BaseAliveGameObjectCollisionLine - gCollisions->mCollisionArray) + 1 : 0;
+    return state;
+}
+
+void BaseAliveGameObject::SetAliveObjectState(const AliveObjectStateSaveState& state)
+{
+    mbGotShot = state.mbGotShot;
+    mCollectionRect.x = state.mCollectionRectX;
+    mCollectionRect.y = state.mCollectionRectY;
+    mCollectionRect.w = state.mCollectionRectW;
+    mCollectionRect.h = state.mCollectionRectH;
+    mBaseAliveGameObjectLastAnimFrame = state.mLastAnimFrame;
+    mCanBePossessed = state.mCanBePossessed;
+    mPossessed = state.mPossessed;
+    mZappedByShrykull = state.mZappedByShrykull;
+    mCanSetOffExplosives = state.mCanSetOffExplosives;
+    mElectrocuted = state.mElectrocuted;
+    mInvisible = state.mInvisible;
+    mTeleporting = state.mTeleporting;
+    mElectrocuting = state.mElectrocuting;
+    mCanBeesChase = state.mCanBeesChase;
+    BaseAliveGameObject_PlatformId = state.mPlatformId;
+    if (state.mCollisionLineSaved)
+    {
+        // Saved with the line: a save from the original game's has neither
+        mHealth = state.mHealth;
+    }
+    if (state.mCollisionLineSaved)
+    {
+        if (state.mCollisionLineIsPlatforms)
+        {
+            // The lines of the platforms come in the order the platforms were made, which a restore does not keep: it is
+            // the one at the same place. A platform with more than one line has the character on any of them.
+            PathLine* pFound = nullptr;
+            for (s32 i = 0; i < gCollisions->mMaxCount && !pFound; i++)
+            {
+                PathLine* pLine = &gCollisions->mCollisionArray[i];
+                if (static_cast<s16>(pLine->mLineType) == state.mCollisionLineType
+                    && pLine->mRect.x == state.mCollisionLineX && pLine->mRect.y == state.mCollisionLineY
+                    && pLine->mRect.w == state.mCollisionLineW && pLine->mRect.h == state.mCollisionLineH)
+                {
+                    pFound = pLine;
+                }
+            }
+            if (!pFound)
+            {
+                BaseGameObject* pPlatform = sObjectIds.Find_Impl(state.mPlatformId);
+                if (pPlatform)
+                {
+                    pFound = static_cast<PlatformBase*>(pPlatform)->GetPlatformLine();
+                }
+            }
+            BaseAliveGameObjectCollisionLine = pFound;
+        }
+        else
+        {
+            BaseAliveGameObjectCollisionLine = state.mCollisionLineIdx > 0 ? gCollisions->Get_Line_At_Idx(static_cast<s16>(state.mCollisionLineIdx - 1)) : nullptr;
+        }
+    }
+}
+
+Guid BaseAliveGameObject::GetPathTlvId()
+{
+    return BaseAliveGameObjectPathTLV.GetTlv() ? BaseAliveGameObjectPathTLV.GetTlv()->mId : Guid{};
+}
+
+void BaseAliveGameObject::SetPathTlvFromId(const Guid& tlvId)
+{
+    BaseAliveGameObjectPathTLV = tlvId.IsValid() ? mMap.TLV_From_Offset_Lvl_Cam(tlvId) : TlvIterator::Invalid();
+}
+
 BaseAliveGameObject::BaseAliveGameObject(s16 resourceArraySize, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(resourceArraySize, resMan, map)
 {
@@ -356,7 +459,6 @@ BaseAliveGameObject::BaseAliveGameObject(s16 resourceArraySize, ResourceManager&
     SetCanSetOffExplosives(false);
     SetElectrocuted(false);
     SetInvisible(false);
-    SetRestoredFromQuickSave(false);
     SetTeleporting(false);
     SetElectrocuting(false);
 

@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../ObjectIds.hpp"
+#include "../SerializedObjectData.hpp"
 #include "CircularFade.hpp"
 #include "ScreenManager.hpp"
 #include "../PsxDisplay.hpp"
@@ -58,6 +60,12 @@ CircularFade::~CircularFade()
     {
         gNumCamSwappers--;
     }
+}
+
+std::vector<BaseGameObject::NotStateMemory> CircularFade::VNotStateMemory()
+{
+    // What it was last drawn with
+    return {{&mTile1, sizeof(mTile1)}, {&mTile2, sizeof(mTile2)}, {&mTile3, sizeof(mTile3)}, {&mTile4, sizeof(mTile4)}};
 }
 
 void CircularFade::VRender(OrderingTable& ot)
@@ -227,4 +235,55 @@ CircularFade* Make_Circular_Fade(FP xpos, FP ypos, FP scale, bool fadeIn, s8 des
     }
     pCircularFade->SetSurviveDeathReset(surviveDeathReset);
     return pCircularFade;
+}
+
+void CircularFade::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    CircularFadeSaveState data = {};
+    data.mFadeIn = mFadeIn;
+    data.mDone = mDone;
+    data.mDestroyOnDone = mDestroyOnDone;
+    data.mFadeColour = mFadeColour;
+    data.mSpeed = mSpeed;
+    pSaveBuffer.Write(data);
+}
+
+void CircularFade::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const CircularFadeSaveState& state = *pData.ReadTmpPtr<CircularFadeSaveState>();
+
+    // A fade that survives the world being thrown away (the one the controlled character's death makes) is still
+    // there, so it takes the saved state in place instead of being made twice
+    BaseGameObject* pExisting = sObjectIds.Find_Impl(state.mObjectId);
+    if (pExisting && pExisting->Type() == ReliveTypes::eCircularFade)
+    {
+        CircularFade* pFade = static_cast<CircularFade*>(pExisting);
+        if (GetGameType() == GameType::eAe)
+        {
+            // Not done is one of the camera swappers
+            gNumCamSwappers += (state.mDone ? 0 : 1) - (pFade->mDone ? 0 : 1);
+        }
+        pFade->mFadeIn = state.mFadeIn;
+        pFade->mDone = state.mDone;
+        pFade->mDestroyOnDone = state.mDestroyOnDone;
+        pFade->mFadeColour = state.mFadeColour;
+        pFade->mSpeed = state.mSpeed;
+        return;
+    }
+
+    CircularFade* p = relive_new CircularFade(FP_FromInteger(0), FP_FromInteger(0), FP_FromInteger(1), false, 0, resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    // The constructor started a fade, which the camera swapper count has: a fade that was done isn't one
+    if (state.mDone && !p->mDone && GetGameType() == GameType::eAe)
+    {
+        gNumCamSwappers--;
+    }
+    p->mFadeIn = state.mFadeIn;
+    p->mDone = state.mDone;
+    p->mDestroyOnDone = state.mDestroyOnDone;
+    p->mFadeColour = state.mFadeColour;
+    p->mSpeed = state.mSpeed;
 }

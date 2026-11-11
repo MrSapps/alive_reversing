@@ -1,4 +1,7 @@
 #include "stdafx.h"
+#include "../ObjectIds.hpp"
+#include "../SerializedObjectData.hpp"
+#include "../WorldStatic.hpp"
 #include "DeathGas.hpp"
 #include "../Events.hpp"
 #include "../../AliveLibAO/Abe.hpp"
@@ -30,7 +33,7 @@ static Data_Byte sByte3 = {};
 static Data_Byte sByte1 = {};
 static Data_Byte sByte2 = {};
 
-s32 gDeathGasCount = 0;
+WorldStatic<s32> gDeathGasCount("DeathGas.gDeathGasCount", 0);
 
 DeathGas::DeathGas(Layer layer, s32 amount, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map),
@@ -72,6 +75,35 @@ DeathGas::DeathGas(Layer layer, s32 amount, ResourceManager& resMan, BaseMap& ma
             {
                 sByte1.data[i][j][k] = Math_NextRandom();
                 sByte2.data[i][j][k] = (Math_NextRandom() & 3) + 2;
+            }
+        }
+    }
+}
+
+DeathGas::DeathGas(RestoreTag, ResourceManager& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
+{
+    if (GetGameType() == GameType::eAo)
+    {
+        SetType(ReliveTypes::eFade); // wot moment
+    }
+    else
+    {
+        SetType(ReliveTypes::eMainMenuTransistion); // wot moment
+    }
+
+    gObjListDrawables->Push_Back(this);
+    SetDrawable(true);
+
+    for (s32 i = 0; i < 2; i++)
+    {
+        for (s32 k = 0; k < 4; k++)
+        {
+            for (s32 l = 0; l < 4; l++)
+            {
+                Poly_G4* pPoly = &sGasPolys.polys[i][k][l];
+                pPoly->SetSemiTransparent(true);
+                pPoly->SetBlendMode(relive::TBlendModes::eBlend_1);
             }
         }
     }
@@ -246,5 +278,45 @@ void DeathGas::VRender(OrderingTable& ot)
     if (mTotal >= 255)
     {
         mDone = true;
+    }
+}
+
+void DeathGas::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    DeathGasSaveState data = {};
+    data.mLayer = static_cast<s32>(mLayer);
+    data.mAmount = mAmount;
+    data.mTotal = mTotal;
+    data.mDone = mDone;
+    for (s32 i = 0; i < 50; i++)
+    {
+        data.mByte1[i] = sByte1.data[i / 25][(i / 5) % 5][i % 5];
+    }
+    for (s32 i = 0; i < 50; i++)
+    {
+        data.mByte2[i] = sByte2.data[i / 25][(i / 5) % 5][i % 5];
+    }
+    pSaveBuffer.Write(data);
+}
+
+void DeathGas::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const DeathGasSaveState& state = *pData.ReadTmpPtr<DeathGasSaveState>();
+    DeathGas* p = relive_new DeathGas(DeathGas::RestoreTag{}, resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mLayer = static_cast<Layer>(state.mLayer);
+    p->mAmount = state.mAmount;
+    p->mTotal = state.mTotal;
+    p->mDone = state.mDone;
+    for (s32 i = 0; i < 50; i++)
+    {
+        sByte1.data[i / 25][(i / 5) % 5][i % 5] = state.mByte1[i];
+    }
+    for (s32 i = 0; i < 50; i++)
+    {
+        sByte2.data[i / 25][(i / 5) % 5][i % 5] = state.mByte2[i];
     }
 }

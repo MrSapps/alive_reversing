@@ -10,6 +10,7 @@
 #include "GameAutoPlayer.hpp"
 #include "../relive_lib/IniFile.hpp"
 #include "../relive_lib/ResourceManager.hpp"
+#include "../relive_lib/WorldStatic.hpp"
 #include <sstream>
 #include <algorithm>
 #include <cmath>
@@ -39,7 +40,13 @@ s32 sGamepadCapFlags_5C2EF8 = 0;
 
 u8 sInputKeyStates_BD2F60[256] = {};
 u8 sInputEnabled_BBB9D0 = 0;
-InputObject sInputObject = {};
+InputObject::InputObject()
+{
+    WorldStatics::Register("AE.Input.pad0", &mPads[0], sizeof(PSX_Pad));
+    WorldStatics::Register("AE.Input.pad1", &mPads[1], sizeof(PSX_Pad));
+}
+
+InputObject sInputObject;
 u16 sCurrentControllerIndex = 0;
 s16 bLongerTimeoutToNextDemo = 0;
 u32 sLastPressedKey = 0;

@@ -1,12 +1,26 @@
 #pragma once
 
 #include "EffectBase.hpp"
+#include "../SaveStateBase.hpp"
 #include "../Layer.hpp"
 
 enum class FadeOptions
 {
     eFadeOut,
     eFadeIn
+};
+
+struct FadeSaveState final : public SaveStateBase
+{
+    FadeSaveState()
+        : SaveStateBase(ReliveTypes::eFade, sizeof(*this))
+    { }
+    EffectBaseSaveState mEffect;
+    s32 mFadeOption;
+    bool mDestroyOnDone;
+    s32 mSpeed;
+    s32 mFadeColour;
+    bool mDone;
 };
 
 class Fade final : public EffectBase
@@ -18,6 +32,8 @@ public:
     virtual void VScreenChanged() override;
     virtual void VUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
 
 public:
     bool mDone = false;

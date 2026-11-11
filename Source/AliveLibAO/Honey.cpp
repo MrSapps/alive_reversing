@@ -1,4 +1,6 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Honey.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "Path.hpp"
@@ -29,6 +31,24 @@ void Honey::VScreenChanged()
 {
     SetDead(true);
     mMap.TLV_Reset(mTlvInfo);
+}
+
+void Honey::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    HoneySaveState data = {};
+    data.mTlvInfo = mTlvInfo;
+    pSaveBuffer.Write(data);
+}
+
+void Honey::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const HoneySaveState& state = *pData.ReadTmpPtr<HoneySaveState>();
+    Honey* p = relive_new Honey(FP_FromInteger(0), FP_FromInteger(0), resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mTlvInfo = state.mTlvInfo;
 }
 
 } // namespace AO

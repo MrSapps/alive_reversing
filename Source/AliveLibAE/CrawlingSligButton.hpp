@@ -1,13 +1,25 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
 
 enum class SwitchOp : s16;
 
+struct CrawlingSligButtonSaveState final : public SaveStateBase
+{
+    CrawlingSligButtonSaveState()
+        : SaveStateBase(ReliveTypes::eCrawlingSligButton, sizeof(*this))
+    { }
+    bool mInUse;
+};
+
 class CrawlingSligButton final : public ::BaseAnimatedWithPhysicsGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const CrawlingSligButtonSaveState& state);
+
     CrawlingSligButton(relive::Path_CrawlingSligButton* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~CrawlingSligButton();
 

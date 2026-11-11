@@ -26,6 +26,7 @@ struct SecurityOrbSaveState final : public SaveStateBase
 class SecurityOrb final : public ::BaseAliveGameObject
 {
 public:
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
     SecurityOrb(relive::Path_SecurityOrb* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~SecurityOrb();
 

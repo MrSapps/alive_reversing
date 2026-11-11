@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "SecurityDoor.hpp"
 #include "Engine.hpp"
 #include "Abe.hpp"
@@ -310,5 +312,41 @@ void SecurityDoor::VUpdate()
 
         default:
             return;
+    }
+}
+
+void SecurityDoor::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    SecurityDoorSaveState data = {};
+    data.mState = static_cast<s32>(mState);
+    data.mCodeLength = mCodeLength;
+    data.mMaxIdx = mMaxIdx;
+    data.mBufferStartIdx = mBufferStartIdx;
+    data.mTimer = mTimer;
+    data.mMaxIdx2 = mMaxIdx2;
+    for (s32 i = 0; i < 16; i++)
+    {
+        data.mPasswordBuffer[i] = static_cast<s32>(mPasswordBuffer[i]);
+    }
+    pSaveBuffer.Write(data);
+}
+
+void SecurityDoor::RestoreFromSaveState(const SecurityDoorSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    SecurityDoor* p = static_cast<SecurityDoor*>(pObj);
+    p->mState = static_cast<SecurityDoorStates>(state.mState);
+    p->mCodeLength = state.mCodeLength;
+    p->mMaxIdx = state.mMaxIdx;
+    p->mBufferStartIdx = state.mBufferStartIdx;
+    p->mTimer = state.mTimer;
+    p->mMaxIdx2 = state.mMaxIdx2;
+    for (s32 i = 0; i < 16; i++)
+    {
+        p->mPasswordBuffer[i] = static_cast<GameSpeakEvents>(state.mPasswordBuffer[i]);
     }
 }

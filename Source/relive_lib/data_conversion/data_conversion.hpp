@@ -150,7 +150,10 @@ public:
         // 19 assumed, which left multi-movie ids resolving out of range (blank movie name).
         // These 4 TLVs now have mMovie1/2/3 like bird_portal/path_transition instead of a single
         // mMovieName - see DecodeFmvChain_AE/AO.
-        static constexpr u32 kPathVersion = 20;
+        // 21: AO's levels are named after their data folders in the json (paramonia, paramonia_temple,
+        // scrabania, scrabania_temple, monsaic_lines, ...) instead of the engine's old names (forest, desert, lines, ...),
+        // so a level reference, e.g. where a path transition goes, reads the same everywhere.
+        static constexpr u32 kPathVersion = 21;
         // 2: not palettes any more but the change of colours from a sprite's palette to it, see
         // PaletteFit.
         // 3: the fonts' sheets in each palette have a mask (SpriteMask.hpp) instead of special alphas.

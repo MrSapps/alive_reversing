@@ -33,6 +33,25 @@ public:
         ::memcpy(mBuffer.data() + posToWrite, &item, sizeof(T));
     }
 
+    void WriteBytes(const void* pData, std::size_t size)
+    {
+        const auto posToWrite = mBuffer.size();
+        mBuffer.resize(mBuffer.size() + size);
+        if (size)
+        {
+            ::memcpy(mBuffer.data() + posToWrite, pData, size);
+        }
+    }
+
+    // The next size bytes, which stay valid until something is written
+    const u8* ReadBytesTmpPtr(std::size_t size) const
+    {
+        ReadCheck(static_cast<u32>(size));
+        const u8* tmp = mBuffer.data() + mBufferReadPos;
+        mBufferReadPos += static_cast<u32>(size);
+        return tmp;
+    }
+
     template<typename T>
     const T* ReadTmpPtr() const
     {
@@ -84,6 +103,27 @@ public:
     {
         ReadCheck(numBytes);
         mBufferReadPos += numBytes;
+    }
+
+    // The bytes written so far, e.g. to hash them
+    [[nodiscard]] const u8* Data() const
+    {
+        return mBuffer.data();
+    }
+
+    [[nodiscard]] std::size_t Size() const
+    {
+        return mBuffer.size();
+    }
+
+    // Replaces bytes that were already written
+    void OverwriteAt(std::size_t offset, const void* pData, std::size_t size)
+    {
+        if (offset + size > mBuffer.size())
+        {
+            ALIVE_FATAL("Overwrite of %zu bytes at %zu is past the end of the %zu bytes written", size, offset, mBuffer.size());
+        }
+        ::memcpy(mBuffer.data() + offset, pData, size);
     }
 
     bool CanRead() const

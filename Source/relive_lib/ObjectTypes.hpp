@@ -203,7 +203,33 @@ enum class ReliveTypes : s16
     eWell,
     eThrowableArray,
     eDoorLight,
-    eHoistParticle
+    eHoistParticle,
+    eLeaf,
+    // Not an object: what a quicksave keeps of the animation of one that has no save of its own, see AnimationStateSaveState
+    eAnimationState,
+    eSpark,
+    eGibs,
+    eBlood,
+    // Not an object: where an object that listens to the game speak is in the events (GameSpeakListener)
+    eGameSpeakListener,
+    // Not an object: what every character has in common that its own save doesn't need to carry, see AliveObjectStateSaveState
+    eAliveObjectState,
+    // Not an object: the events broadcast for the next frame to look at, see EventsSaveState
+    eEventsState,
+    eBulletShell,
+    eDeathGas,
+    eOrbWhirlWind,
+    eCircularFade,
+    eParamiteWeb,
+    eRollingBallShaker,
+    eBoomMachinePipe,
+    eHoneyDrip,
+    eBellSong,
+    eClaw,
+    // Not an object: the WorldStatic variables a quicksave keeps, see WorldStatics
+    eWorldStatics,
+    // Not an object: the order of one of the lists the objects are in besides the one they update in, see ListOrderSaveState
+    eListOrder
 };
 
 enum class AETypes : s16

@@ -49,6 +49,9 @@ struct ChimeLockSaveState final : public SaveStateBase
     s16 mChimeLockNum1 = 0;
     bool mCanUnpossess = false;
     bool mHitAllBells = false;
+    Guid mLeftBell = {};
+    Guid mCenterBell = {};
+    Guid mRightBell = {};
 };
 
 class ChimeLock final : public ::BaseAliveGameObject

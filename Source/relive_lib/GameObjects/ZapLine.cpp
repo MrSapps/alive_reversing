@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../ObjectIds.hpp"
+#include "../SerializedObjectData.hpp"
 #include "../Function.hpp"
 #include "ZapLine.hpp"
 #include "../../AliveLibAE/stdlib.hpp"
@@ -354,5 +356,93 @@ void ZapLine::VRender(OrderingTable& ot)
                 ot.Add(GetAnimation().GetRenderLayer(), pSprt);
             }
         }
+    }
+}
+
+void ZapLine::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    ZapLineSaveState data = {};
+    data.mState = static_cast<s32>(mState);
+    data.mXPosSrc = mXPosSrc;
+    data.mYPosSrc = mYPosSrc;
+    data.mXPosDst = mXPosDst;
+    data.mYPosDst = mYPosDst;
+    data.mAliveTimer = mAliveTimer;
+    data.mMaxAliveTime = mMaxAliveTime;
+    data.mZapLineType = static_cast<s32>(mZapLineType);
+    for (s32 i = 0; i < 280; i++)
+    {
+        data.mSpriteX[i] = (i < mNumberOfSprites ? mSpritePositions[i].x : static_cast<s16>(0));
+    }
+    for (s32 i = 0; i < 280; i++)
+    {
+        data.mSpriteY[i] = (i < mNumberOfSprites ? mSpritePositions[i].y : static_cast<s16>(0));
+    }
+    for (s32 i = 0; i < 20; i++)
+    {
+        data.mPart1[i] = (i < mNumberOfPiecesPerSegment ? mZapPoints[i].mPart1 : FP_FromInteger(0));
+    }
+    for (s32 i = 0; i < 20; i++)
+    {
+        data.mPart2[i] = (i < mNumberOfPiecesPerSegment ? mZapPoints[i].mPart2 : FP_FromInteger(0));
+    }
+    for (s32 i = 0; i < 20; i++)
+    {
+        data.mPart3[i] = (i < mNumberOfPiecesPerSegment ? mZapPoints[i].mPart3 : FP_FromInteger(0));
+    }
+    for (s32 i = 0; i < 28; i++)
+    {
+        data.mSegmentX[i] = (i < mNumberOfSegments ? mSpriteSegmentPositions[i].x : FP_FromInteger(0));
+    }
+    for (s32 i = 0; i < 28; i++)
+    {
+        data.mSegmentY[i] = (i < mNumberOfSegments ? mSpriteSegmentPositions[i].y : FP_FromInteger(0));
+    }
+    pSaveBuffer.Write(data);
+}
+
+void ZapLine::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const ZapLineSaveState& state = *pData.ReadTmpPtr<ZapLineSaveState>();
+    ZapLine* p = relive_new ZapLine(FP_FromInteger(0), FP_FromInteger(0), FP_FromInteger(0), FP_FromInteger(0), state.mMaxAliveTime, static_cast<ZapLineType>(state.mZapLineType), Layer::eLayer_0, resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mState = static_cast<ZapLineState>(state.mState);
+    p->mXPosSrc = state.mXPosSrc;
+    p->mYPosSrc = state.mYPosSrc;
+    p->mXPosDst = state.mXPosDst;
+    p->mYPosDst = state.mYPosDst;
+    p->mAliveTimer = state.mAliveTimer;
+    p->mMaxAliveTime = state.mMaxAliveTime;
+    p->mZapLineType = static_cast<ZapLineType>(state.mZapLineType);
+    for (s32 i = 0; i < 280; i++)
+    {
+        if (i < p->mNumberOfSprites) p->mSpritePositions[i].x = state.mSpriteX[i];
+    }
+    for (s32 i = 0; i < 280; i++)
+    {
+        if (i < p->mNumberOfSprites) p->mSpritePositions[i].y = state.mSpriteY[i];
+    }
+    for (s32 i = 0; i < 20; i++)
+    {
+        if (i < p->mNumberOfPiecesPerSegment) p->mZapPoints[i].mPart1 = state.mPart1[i];
+    }
+    for (s32 i = 0; i < 20; i++)
+    {
+        if (i < p->mNumberOfPiecesPerSegment) p->mZapPoints[i].mPart2 = state.mPart2[i];
+    }
+    for (s32 i = 0; i < 20; i++)
+    {
+        if (i < p->mNumberOfPiecesPerSegment) p->mZapPoints[i].mPart3 = state.mPart3[i];
+    }
+    for (s32 i = 0; i < 28; i++)
+    {
+        if (i < p->mNumberOfSegments) p->mSpriteSegmentPositions[i].x = state.mSegmentX[i];
+    }
+    for (s32 i = 0; i < 28; i++)
+    {
+        if (i < p->mNumberOfSegments) p->mSpriteSegmentPositions[i].y = state.mSegmentY[i];
     }
 }

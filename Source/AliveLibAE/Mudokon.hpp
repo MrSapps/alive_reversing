@@ -180,6 +180,13 @@ struct MudokonSaveState final : public SaveStateBase
     s16 field_7E_brain_sub_state;
     s32 field_80_timer;
     s32 field_84_response_entry_idx;
+    AnimationSaveState mAnim;
+    // False for a save from the original game's, which has neither
+    bool mPreviousMotionSaved;
+    s32 mPreviousMotion;
+    bool mbMotionChanged;
+    bool mEscaping;
+    s32 mTurningWheelTimer;
 };
 
 class Mudokon final : public BaseAliveGameObject
@@ -253,10 +260,21 @@ public:
     void LoadAnimations();
 
     virtual void VUpdate() override;
+    virtual void VPostRestore() override;
+    virtual void VPostRestoreFromTlv() override;
+    void ResolveTlvLinks();
 
     virtual void VScreenChanged() override;
 
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+
+    virtual GameSpeakListener* VListener() override
+
+    {
+
+        return &mListener;
+
+    }
 
     virtual void VPossessed() override;
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
@@ -282,6 +300,22 @@ public:
 
     static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
+    bool IsFollowingAbe() const
+    {
+        return mFollowingAbe;
+    }
+    s32 BrainState() const
+    {
+        return static_cast<s32>(mBrainState);
+    }
+    s32 BrainSubState() const
+    {
+        return static_cast<s32>(mBrainSubState);
+    }
+    Mud_Emotion Emotion() const
+    {
+        return field_180_emo_tbl;
+    }
 
 private:
 

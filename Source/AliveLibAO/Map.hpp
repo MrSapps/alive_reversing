@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/MapWrapper.hpp"
+#include "../relive_lib/WorldStatic.hpp"
 #include "../relive_lib/FixedPoint.hpp"
 #include "../relive_lib/BaseMap.hpp"
 #include "../relive_lib/Factory.hpp"
@@ -109,4 +110,4 @@ public:
 
 } // namespace AO
 
-extern bool gMap_bDoPurpleLightEffect;
+extern WorldStatic<bool> gMap_bDoPurpleLightEffect;

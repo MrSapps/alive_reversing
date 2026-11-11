@@ -1,4 +1,5 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "../relive_lib/Function.hpp"
 #include "MovingBomb.hpp"
 #include "../relive_lib/SerializedObjectData.hpp"
@@ -29,7 +30,7 @@ static const TintEntry kMovingBombTints[4] = {
     {EReliveLevelIds::eStockYardsReturn, 30u, 30u, 55u},
     {EReliveLevelIds::eNone, 127u, 127u, 127u}};
 
-static MovingBomb* sMovingBomb = nullptr;
+static WorldStatic<Guid> sMovingBombId("AO.MovingBomb.sMovingBombId", Guid{});
 
 MovingBomb::MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : ::BaseAliveGameObject(0, resMan, map)
@@ -113,14 +114,14 @@ MovingBomb::~MovingBomb()
         mMap.TLV_Reset(mTlvId);
     }
 
-    if (sMovingBomb == this)
+    if (sMovingBombId.Get() == mBaseGameObjectId)
     {
         if (mChannelMask)
         {
             SND_Stop_Channels_Mask(mChannelMask);
             mChannelMask = 0;
         }
-        sMovingBomb = nullptr;
+        sMovingBombId = Guid{};
     }
 }
 
@@ -271,28 +272,31 @@ void MovingBomb::FollowLine()
     }
 }
 
-void MovingBomb::VUpdate()
+void MovingBomb::VPostRestore()
 {
-    if (GetRestoredFromQuickSave())
+    if (BaseAliveGameObjectCollisionLineType != -1)
     {
-        if (BaseAliveGameObjectCollisionLineType != -1)
-        {
-            gCollisions->Raycast(
-                mXPos,
-                mYPos - FP_FromInteger(20),
-                mXPos,
-                mYPos + FP_FromInteger(20),
-                &BaseAliveGameObjectCollisionLine,
-                &mXPos,
-                &mYPos,
-                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
-
-            BaseAliveGameObjectCollisionLineType = -1;
-        }
-
-        SetRestoredFromQuickSave(false);
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
     }
 
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
+}
+
+void MovingBomb::VUpdate()
+{
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);
@@ -310,11 +314,11 @@ void MovingBomb::VUpdate()
         }
     }
 
-    if (sMovingBomb == nullptr || sMovingBomb == this)
+    if (!sMovingBombId.Get().IsValid() || sMovingBombId.Get() == mBaseGameObjectId)
     {
         if (GetAnimation().GetCurrentFrame() != 0 && GetAnimation().GetCurrentFrame() != 7)
         {
-            sMovingBomb = this;
+            sMovingBombId = mBaseGameObjectId;
         }
         else
         {
@@ -342,12 +346,12 @@ void MovingBomb::VUpdate()
                 if (mState == States::eWaitABit_4)
                 {
                     mChannelMask = 0;
-                    sMovingBomb = this;
+                    sMovingBombId = mBaseGameObjectId;
                 }
                 else
                 {
                     mChannelMask = SfxPlayMono(relive::SoundEffects::SecurityOrb, 12);
-                    sMovingBomb = this;
+                    sMovingBombId = mBaseGameObjectId;
                 }
             }
         }
@@ -472,13 +476,15 @@ void MovingBomb::VUpdate()
     }
 }
 
+std::vector<BaseGameObject::NotStateMemory> MovingBomb::VNotStateMemory()
+{
+    // The channels its sound plays on
+    return {{&mChannelMask, sizeof(mChannelMask)}};
+}
+
 void MovingBomb::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     MovingBombSaveState data = {};
 
     data.mXPos = mXPos;
@@ -506,7 +512,7 @@ void MovingBomb::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mStartMovingSwitchId = mStartMovingSwitchId;
     data.mMinStopTime = mMinStopTime;
     data.mMaxStopTime = mMaxStopTime;
-    data.mChannelMask = mChannelMask;
+    data.mChannelMask = 0; // the sound system's channels, not state: the sound is made again
     data.mPersistOffscreen = mPersistOffscreen;
 
     pSaveBuffer.Write(data);
@@ -548,7 +554,6 @@ void MovingBomb::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMana
 
         // Arms the VUpdate() block above that re-raycasts the collision
         // line - see BaseAliveGameObjectCollisionLineType above.
-        pBomb->SetRestoredFromQuickSave(true);
     }
 }
 

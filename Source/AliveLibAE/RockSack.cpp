@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "RockSack.hpp"
 #include "../relive_lib/BaseMap.hpp"
 #include "Rock.hpp"
@@ -166,4 +168,28 @@ void RockSack::VUpdate()
             mHasBeenHit = true;
         }
     }
+}
+
+void RockSack::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    RockSackSaveState data = {};
+    data.mHasBeenHit = mHasBeenHit;
+    data.mRockAmount = mRockAmount;
+    data.mPlayWobbleSound = mPlayWobbleSound;
+    data.mForceWobbleSound = mForceWobbleSound;
+    pSaveBuffer.Write(data);
+}
+
+void RockSack::RestoreFromSaveState(const RockSackSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eRockSack)
+    {
+        return;
+    }
+    RockSack* p = static_cast<RockSack*>(pObj);
+    p->mHasBeenHit = state.mHasBeenHit;
+    p->mRockAmount = state.mRockAmount;
+    p->mPlayWobbleSound = state.mPlayWobbleSound;
+    p->mForceWobbleSound = state.mForceWobbleSound;
 }

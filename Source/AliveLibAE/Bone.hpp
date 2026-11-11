@@ -41,6 +41,9 @@ struct BoneSaveState final : public SaveStateBase
     FP mPreviousXPos;
     FP mPreviousYPos;
     s32 mTimeToLiveTimer;
+    // False for a save from the original game's, which has not
+    bool mShimmerTimerSaved;
+    s32 mShimmerTimer;
 };
 
 class Bone final : public BaseThrowable
@@ -58,6 +61,7 @@ public:
     virtual void VTimeToExplodeRandom() override;
     virtual bool VCanBeEaten();
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    virtual void VPostRestore() override;
     virtual s16 VGetCount() override;
     static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
 

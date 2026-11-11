@@ -145,6 +145,7 @@ void Greeter::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager
         pGreeter->field_124_last_turn_time = pState->field_30_last_turn_time;
         pGreeter->field_128_timer = pState->field_34_timer;
         pGreeter->mTimesShot = pState->mTimesShot;
+        pGreeter->field_138_pTlv = pState->mSearchTlvId.IsValid() ? map.TLV_From_Offset_Lvl_Cam(pState->mSearchTlvId) : TlvIterator::Invalid();
         pGreeter->field_12E_bDontSetDestroyed = pState->field_3A_bDontSetDestroyed;
         pGreeter->mChasing = pState->mChasing;
         pGreeter->field_134_speed = pState->field_40_speed;
@@ -161,11 +162,7 @@ void Greeter::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager
 
 void Greeter::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     GreeterSaveState data = {};
 
     data.mType = ReliveTypes::eGreeter;
@@ -192,6 +189,8 @@ void Greeter::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.field_34_timer = field_128_timer;
 
     data.mTimesShot = mTimesShot;
+    // Where the search for the TLV it overlaps carries on from
+    data.mSearchTlvId = field_138_pTlv.GetTlv() ? field_138_pTlv.GetTlv()->mId : Guid{};
     data.field_3A_bDontSetDestroyed = field_12E_bDontSetDestroyed;
     data.mChasing = mChasing;
 

@@ -304,6 +304,11 @@ void TrapDoor::Open()
         }
     }
 
+    Remove_From_Collisions_Array();
+}
+
+void TrapDoor::Remove_From_Collisions_Array()
+{
     Rect_Clear(&mPlatformBaseCollisionLine->mRect);
     mPlatformBaseCollisionLine = nullptr;
     PlatformBase::Platforms().Remove_Item(this);
@@ -435,9 +440,33 @@ void TrapDoor::CreateFromSaveState(SerializedObjectData& pData, ResourceManager&
         pTrapDoor->mStayOpenTimeTimer = pState->mOpenTime;
         pTrapDoor->mState = pState->mState;
 
-        if (pState->mState == TrapDoorState::eClosing || pState->mState == TrapDoorState::eOpening)
+        // The line to stand on is there when it is closed, whatever the switches made the new one
+        if (pState->mState == TrapDoorState::eClosed)
         {
-            pTrapDoor->Open();
+            if (!pTrapDoor->mPlatformBaseCollisionLine)
+            {
+                pTrapDoor->Add_To_Collisions_Array();
+            }
+        }
+        else if (pTrapDoor->mPlatformBaseCollisionLine)
+        {
+            if (pState->mState == TrapDoorState::eClosing || pState->mState == TrapDoorState::eOpening)
+            {
+                pTrapDoor->Open();
+            }
+            else
+            {
+                pTrapDoor->Remove_From_Collisions_Array();
+            }
+        }
+
+        if (pState->mPlatformBaseSaved)
+        {
+            pTrapDoor->mPlatformBaseCount = pState->mPlatformBaseCount;
+            pTrapDoor->mPlatformBaseXOffset = pState->mPlatformBaseXOffset;
+            pTrapDoor->mPlatformBaseWidthOffset = pState->mPlatformBaseWidthOffset;
+            pTrapDoor->mPlatformBaseYOffset = pState->mPlatformBaseYOffset;
+            pTrapDoor->mPlatformBaseHeightOffset = pState->mPlatformBaseHeightOffset;
         }
     }
 }
@@ -450,5 +479,11 @@ void TrapDoor::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mOpenTime = mStayOpenTimeTimer;
     data.mState = mState;
     data.mTlvId = mPlatformBaseTlvInfo;
+    data.mPlatformBaseSaved = true;
+    data.mPlatformBaseCount = mPlatformBaseCount;
+    data.mPlatformBaseXOffset = mPlatformBaseXOffset;
+    data.mPlatformBaseWidthOffset = mPlatformBaseWidthOffset;
+    data.mPlatformBaseYOffset = mPlatformBaseYOffset;
+    data.mPlatformBaseHeightOffset = mPlatformBaseHeightOffset;
     pSaveBuffer.Write(data);
 }

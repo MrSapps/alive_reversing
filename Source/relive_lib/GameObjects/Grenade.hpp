@@ -46,6 +46,9 @@ struct GrenadeSaveState final : public SaveStateBase
     s16 mExplodeCountdown;
     FP mPreviousXPos;
     FP mPreviousYPos;
+    s16 mBaseThrowableDead;
+    Guid mGrenadeOwnerId;
+    Guid mExplosionId;
 };
 
 class Grenade final : public BaseThrowable
@@ -57,6 +60,7 @@ public:
     virtual void VScreenChanged() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
     virtual void VUpdate() override;
+    virtual void VPostRestore() override;
     virtual void VOnTrapDoorOpen() override;
     virtual void VThrow(FP velX, FP velY) override;
     virtual bool VCanThrow() override;
@@ -98,5 +102,7 @@ private:
     bool mBlowUpOnCollision = false;
     bool mExplodeNow = false;
     BaseGameObject* mGrenadeOwner = nullptr;
+    // Only between a save and its restore: the owner may be made after the grenade
+    Guid mGrenadeOwnerRestoreId;
     bool mDoBounceOff = false;
 };

@@ -750,6 +750,15 @@ void BirdPortal::KillTerminators()
     }
 }
 
+void BirdPortal::VPostRestore()
+{
+    // The doves were saved with the ids they had, and have new ones now
+    for (Guid& doveId : mDoveIds)
+    {
+        doveId = RefreshId(doveId);
+    }
+}
+
 void BirdPortal::VGetSaveState(SerializedObjectData& pBuffer)
 {
     BirdPortalSaveState data = {};
@@ -765,8 +774,26 @@ void BirdPortal::VGetSaveState(SerializedObjectData& pBuffer)
     data.mTlvInfo = mTlvInfo;
     data.mState = mState;
     data.mMudCountForShrykull = static_cast<u8>(numMudsForShrykull - mMudCountForShrykull);
+    data.mIdleSaved = true;
+    data.mDovesExist = mDovesExist;
+    data.mTimer = mTimer;
+    for (u32 i = 0; i < ALIVE_COUNTOF(mDoveIds); i++)
+    {
+        data.mDoveIds[i] = mDoveIds[i];
+    }
+    data.mBase = GetBaseState();
 
     pBuffer.Write(data);
+}
+
+void BirdPortal::RestoreFromSaveState(const BirdPortalSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    static_cast<BirdPortal*>(pObj)->SetBaseState(state.mBase);
 }
 
 void BirdPortal::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
@@ -781,7 +808,6 @@ void BirdPortal::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMana
     auto pPortal = relive_new BirdPortal(pTlv, pSaveState->mTlvInfo, resMan, map);
     if (pPortal)
     {
-        pPortal->SetUpdateDelay(1);
         pPortal->mMudCountForShrykull -= pSaveState->mMudCountForShrykull;
 
         const auto savedState = static_cast<PortalStates>(pSaveState->mState);
@@ -799,6 +825,21 @@ void BirdPortal::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMana
                 auto pTerminator2 = static_cast<BaseAnimatedWithPhysicsGameObject*>(sObjectIds.Find_Impl(pPortal->mTerminatorId2));
                 pTerminator1->mYPos -= (FP_FromInteger(45) * pPortal->mSpriteScale);
                 pTerminator2->mYPos += (FP_FromInteger(45) * pPortal->mSpriteScale);
+                break;
+            }
+
+            case PortalStates::IdlePortal_1:
+            {
+                if (pSaveState->mIdleSaved)
+                {
+                    pPortal->mState = PortalStates::IdlePortal_1;
+                    pPortal->mDovesExist = pSaveState->mDovesExist;
+                    pPortal->mTimer = pSaveState->mTimer;
+                    for (u32 i = 0; i < ALIVE_COUNTOF(pPortal->mDoveIds); i++)
+                    {
+                        pPortal->mDoveIds[i] = pSaveState->mDoveIds[i];
+                    }
+                }
                 break;
             }
 

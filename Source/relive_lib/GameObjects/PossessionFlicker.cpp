@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../SerializedObjectData.hpp"
 #include "PossessionFlicker.hpp"
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
 #include "../relive_lib/ObjectIds.hpp"
@@ -38,6 +39,12 @@ PossessionFlicker::PossessionFlicker(BaseAliveGameObject* pToApplyFlicker, s32 d
     pToApplyFlicker->GetAnimation().SetBlendMode(relive::TBlendModes::eBlend_1);
 
     mTimeToFlicker = duration + sGnFrame;
+}
+
+PossessionFlicker::PossessionFlicker(RestoreTag, ResourceManager& resMan, BaseMap& map)
+ : BaseGameObject(true, 0, resMan, map)
+{
+    SetType(ReliveTypes::ePossessionFlicker);
 }
 
 PossessionFlicker::~PossessionFlicker()
@@ -84,4 +91,36 @@ void PossessionFlicker::VUpdate()
         // Flicker to new colour
         pToApplyFlicker->mRGB.SetRGB(mOldRed, mOldGreen, mOldBlue);
     }
+}
+
+void PossessionFlicker::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    PossessionFlickerSaveState data = {};
+    data.mTargetObjId = mTargetObjId;
+    data.mTimeToFlicker = mTimeToFlicker;
+    data.mNewRed = mNewRed;
+    data.mNewGreen = mNewGreen;
+    data.mNewBlue = mNewBlue;
+    data.mOldRed = mOldRed;
+    data.mOldGreen = mOldGreen;
+    data.mOldBlue = mOldBlue;
+    pSaveBuffer.Write(data);
+}
+
+void PossessionFlicker::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const PossessionFlickerSaveState& state = *pData.ReadTmpPtr<PossessionFlickerSaveState>();
+    PossessionFlicker* p = relive_new PossessionFlicker(PossessionFlicker::RestoreTag{}, resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mTargetObjId = state.mTargetObjId;
+    p->mTimeToFlicker = state.mTimeToFlicker;
+    p->mNewRed = state.mNewRed;
+    p->mNewGreen = state.mNewGreen;
+    p->mNewBlue = state.mNewBlue;
+    p->mOldRed = state.mOldRed;
+    p->mOldGreen = state.mOldGreen;
+    p->mOldBlue = state.mOldBlue;
 }

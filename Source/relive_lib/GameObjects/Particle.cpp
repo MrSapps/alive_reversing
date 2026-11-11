@@ -3,11 +3,14 @@
 #include "ResourceManager.hpp"
 #include "GameType.hpp"
 #include "FixedPoint.hpp"
+#include "../SerializedObjectData.hpp"
+#include "AnimResources.hpp"
 
 // TODO: Make this the only ctor
 Particle::Particle(FP xpos, FP ypos, AnimResource& res, ResourceManager& resMan, BaseMap& map, [[maybe_unused]] bool explosionSizeHack)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
 {
+
     SetType(ReliveTypes::eParticle);
 
     //mAnims.push_back(res); // TODO: Might need this 
@@ -41,6 +44,25 @@ void Particle::VUpdate()
     {
         SetDead(true);
     }
+}
+
+void Particle::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    ParticleSaveState data = {};
+    data.mObjectType = Type();
+    data.mObject = GetAnimatedState();
+    data.mScaleAmount = mScaleAmount;
+    pSaveBuffer.Write(data);
+}
+
+void Particle::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const auto pState = pData.ReadTmpPtr<ParticleSaveState>();
+    AnimResource res = resMan.LoadAnimation(static_cast<AnimId>(pState->mObject.mAnim.mAnimId));
+    auto pParticle = relive_new Particle(FP_FromInteger(0), FP_FromInteger(0), res, resMan, map);
+    pParticle->SetType(pState->mObjectType);
+    pParticle->SetAnimatedState(pState->mObject);
+    pParticle->mScaleAmount = pState->mScaleAmount;
 }
 
 Particle* New_DestroyOrCreateObject_Particle(FP xpos, FP ypos, FP scale, ResourceManager& resMan, BaseMap& map)

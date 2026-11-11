@@ -1,4 +1,6 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "GameSpeak.hpp"
 #include "../relive_lib/Function.hpp"
 #include "Engine.hpp"
@@ -185,6 +187,36 @@ s16 GameSpeak::FillBuffer(s32 code, GameSpeakEvents* pBuffer)
 void GameSpeak::VRender(OrderingTable& /*ot*/)
 {
     // Empty
+}
+
+void GameSpeak::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    GameSpeakSaveState data = {};
+    data.mLastEventFrame = mLastEventFrame;
+    data.mLastEvent = static_cast<s32>(mLastEvent);
+    data.mLastEventIndex = mLastEventIndex;
+    for (s32 i = 0; i < 32; i++)
+    {
+        data.mEventBuffer[i] = static_cast<s32>(mEventBuffer[i]);
+    }
+    pSaveBuffer.Write(data);
+}
+
+void GameSpeak::RestoreFromSaveState(const GameSpeakSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    GameSpeak* p = static_cast<GameSpeak*>(pObj);
+    p->mLastEventFrame = state.mLastEventFrame;
+    p->mLastEvent = static_cast<GameSpeakEvents>(state.mLastEvent);
+    p->mLastEventIndex = state.mLastEventIndex;
+    for (s32 i = 0; i < 32; i++)
+    {
+        p->mEventBuffer[i] = static_cast<GameSpeakEvents>(state.mEventBuffer[i]);
+    }
 }
 
 } // namespace AO

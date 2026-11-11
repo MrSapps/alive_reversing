@@ -14,6 +14,7 @@
 #include "../../relive_lib/Engine.hpp"
 #include "../../AliveLibAE/Sfx.hpp"
 #include "BaseMap.hpp"
+#include "../SerializedObjectData.hpp"
 
 struct ParticleBurst_Item final
 {
@@ -36,6 +37,7 @@ ParticleBurst::ParticleBurst(FP xpos, FP ypos, u32 particleCount, FP scale, Burs
 {
     SetType(ReliveTypes::eParticleBurst);
     SetSpriteScale(scale);
+    mRequestedCount = particleCount;
 
     if (GetGameType() == GameType::eAe)
     {
@@ -272,6 +274,49 @@ void ParticleBurst::VUpdate()
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);
+    }
+}
+
+void ParticleBurst::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    ParticleBurstSaveState data = {};
+    data.mRequestedCount = mRequestedCount;
+    data.mBurstType = static_cast<s32>(mType);
+    data.mFineScale = mFineScale;
+    data.mFadeout = mFadeout;
+    data.mScale = GetSpriteScale();
+    data.mObject = GetAnimatedState();
+    data.mParticleCount = mParticleCount;
+    data.mAliveTimer = mAliveTimer;
+    for (s32 i = 0; i < mParticleCount && i < ALIVE_COUNTOF(data.mParticles); i++)
+    {
+        data.mParticles[i].mX = mParticleItems[i].x;
+        data.mParticles[i].mY = mParticleItems[i].y;
+        data.mParticles[i].mZ = mParticleItems[i].field_8_z;
+        data.mParticles[i].mXSpeed = mParticleItems[i].field_C_x_speed;
+        data.mParticles[i].mYSpeed = mParticleItems[i].field_10_y_speed;
+        data.mParticles[i].mZSpeed = mParticleItems[i].field_14_z_speed;
+        data.mParticles[i].mAnim = mParticleItems[i].field_18_animation.GetSaveState();
+    }
+    pSaveBuffer.Write(data);
+}
+
+void ParticleBurst::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const auto pState = pData.ReadTmpPtr<ParticleBurstSaveState>();
+    auto pBurst = relive_new ParticleBurst(FP_FromInteger(0), FP_FromInteger(0), pState->mRequestedCount, pState->mScale, static_cast<BurstType>(pState->mBurstType), resMan, map, pState->mFineScale, pState->mFadeout);
+    pBurst->SetAnimatedState(pState->mObject);
+    pBurst->mParticleCount = pState->mParticleCount;
+    pBurst->mAliveTimer = pState->mAliveTimer;
+    for (s32 i = 0; i < pBurst->mParticleCount && i < ALIVE_COUNTOF(pState->mParticles); i++)
+    {
+        pBurst->mParticleItems[i].x = pState->mParticles[i].mX;
+        pBurst->mParticleItems[i].y = pState->mParticles[i].mY;
+        pBurst->mParticleItems[i].field_8_z = pState->mParticles[i].mZ;
+        pBurst->mParticleItems[i].field_C_x_speed = pState->mParticles[i].mXSpeed;
+        pBurst->mParticleItems[i].field_10_y_speed = pState->mParticles[i].mYSpeed;
+        pBurst->mParticleItems[i].field_14_z_speed = pState->mParticles[i].mZSpeed;
+        pBurst->mParticleItems[i].field_18_animation.RestoreSaveState(pState->mParticles[i].mAnim);
     }
 }
 

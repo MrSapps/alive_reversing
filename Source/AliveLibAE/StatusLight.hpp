@@ -2,10 +2,21 @@
 
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
 
+#include "../relive_lib/SaveStateBase.hpp"
+
 namespace relive
 {
     struct Path_StatusLight;
 }
+
+struct StatusLightSaveState final : public SaveStateBase
+{
+    StatusLightSaveState()
+        : SaveStateBase(ReliveTypes::eStatusLight, sizeof(*this))
+    { }
+    FP mUntweakedXPos;
+    FP mUntweakedYPos;
+};
 
 class StatusLight final : public ::BaseAnimatedWithPhysicsGameObject
 {
@@ -17,6 +28,8 @@ public:
 
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const StatusLightSaveState& state);
 
     bool isLinkedAndDisabled(s16 switchId);
 

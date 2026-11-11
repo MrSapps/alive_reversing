@@ -1,15 +1,35 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseThrowable.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 
 namespace AO {
+
+struct RockSaveState final : public SaveStateBase
+{
+    RockSaveState()
+        : SaveStateBase(ReliveTypes::eRock, sizeof(*this))
+    { }
+    s32 mState;
+    s16 mBounceCount;
+    FP mPreviousXPos;
+    FP mPreviousYPos;
+    s32 mShimmerTimer;
+    s16 mBaseThrowableCount;
+    s16 mBaseThrowableDead;
+    s32 mPathLineType;
+};
 
 class Rock final : public ::BaseThrowable
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
+
     Rock(FP xpos, FP ypos, s16 count, ResourceManager& resMan, BaseMap& map);
     ~Rock();
 
+    virtual void VPostRestore() override;
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;
     virtual void VThrow(FP velX, FP velY) override;
@@ -36,6 +56,8 @@ public:
         eFallingOutOfWorld_5 = 5,
     };
     RockStates mState = RockStates::eNone_0;
+    // Only between a restore and VPostRestore: the type of line it was on
+    s32 mSavedPathLineType = -1;
     PathLine* mPathLine = nullptr;
     s16 mBounceCount = 0;
     FP mPreviousXPos = {};

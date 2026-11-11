@@ -12,6 +12,47 @@ enum class eMotionType
     eNextMotion
 };
 
+// What every character keeps in common that the save of its own class might not carry. The character is the one with
+// SaveStateBase::mObjectId.
+struct AliveObjectStateSaveState final : public SaveStateBase
+{
+    AliveObjectStateSaveState()
+        : SaveStateBase(ReliveTypes::eAliveObjectState, sizeof(*this))
+    { }
+    bool mbGotShot;
+    FP mCollectionRectX;
+    FP mCollectionRectY;
+    FP mCollectionRectW;
+    FP mCollectionRectH;
+    s32 mLastAnimFrame;
+    bool mCanBePossessed;
+    bool mPossessed;
+    bool mZappedByShrykull;
+    bool mCanSetOffExplosives;
+    bool mElectrocuted;
+    bool mInvisible;
+    bool mTeleporting;
+    bool mElectrocuting;
+    bool mCanBeesChase;
+    // What it stands on, if it is made by an object that may be made after it
+    Guid mPlatformId;
+    // The line it stands on, by its place in the lines (plus 1, 0 for none): a raycast from where it is can miss it.
+    // False for a save from the original game's, which has no line to give
+    bool mCollisionLineSaved;
+    s32 mCollisionLineIdx;
+    // The line is one that a platform made while it lives (they come in the order the platforms were made, so the place
+    // in the lines isn't the same in a restored world): it is the line of the platform it stands on
+    bool mCollisionLineIsPlatforms;
+    // Not in the save of a character that doesn't keep its health (a bomb is made again from its TLV)
+    FP mHealth;
+    // Where the line is and what it is, to find it among the ones the platforms make
+    s16 mCollisionLineX;
+    s16 mCollisionLineY;
+    s16 mCollisionLineW;
+    s16 mCollisionLineH;
+    s16 mCollisionLineType;
+};
+
 class BaseAliveGameObject : public BaseAnimatedWithPhysicsGameObject
 {
 public:
@@ -62,8 +103,6 @@ public:
     void SetElectrocuted(bool val) { mElectrocuted = val; }
     bool GetInvisible() const { return mInvisible; }
     void SetInvisible(bool val) { mInvisible = val; }
-    bool GetRestoredFromQuickSave() const { return mRestoredFromQuickSave; }
-    void SetRestoredFromQuickSave(bool val) { mRestoredFromQuickSave = val; }
     bool GetTeleporting() const { return mTeleporting; }
     void SetTeleporting(bool val) { mTeleporting = val; }
     bool GetElectrocuting() const { return mElectrocuting; }
@@ -78,6 +117,13 @@ public:
     FP_RECT mCollectionRect = {};
     s32 mBaseAliveGameObjectLastAnimFrame = 0;
     TlvIterator BaseAliveGameObjectPathTLV = TlvIterator::Invalid();
+
+    AliveObjectStateSaveState GetAliveObjectState() const;
+    void SetAliveObjectState(const AliveObjectStateSaveState& state);
+
+    // The id of the TLV BaseAliveGameObjectPathTLV is at, or none. For saves.
+    Guid GetPathTlvId();
+    void SetPathTlvFromId(const Guid& tlvId);
     Guid BaseAliveGameObject_PlatformId = Guid{};
 
 protected:
@@ -90,7 +136,6 @@ private:
     bool mCanSetOffExplosives = false;
     bool mElectrocuted = false;
     bool mInvisible = false;
-    bool mRestoredFromQuickSave = false;
     bool mTeleporting = false;
     bool mElectrocuting = false;
     bool mCanBeesChase = false;      // AO only: can the bees attack - can be above the value 1 but bee swarm only checks for non zero
@@ -122,6 +167,8 @@ protected:
     BaseAliveGameObject* GetStackedSlapTarget(const Guid& idToFind, ReliveTypes typeToFind, FP xpos, FP ypos); // AE
 public:
     s16 BaseAliveGameObjectCollisionLineType = 0; // AE only, quick save data
+    // Only between a save and its restore: the index in gCollisions of the line plus 1, or 0 for the line the type finds by raycast
+    s16 BaseAliveGameObjectCollisionLineIdx = 0;
 };
 
 extern DynamicArrayT<BaseAliveGameObject>* gBaseAliveGameObjects;

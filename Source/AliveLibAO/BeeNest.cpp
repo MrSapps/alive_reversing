@@ -31,8 +31,11 @@ BeeNest::BeeNest(relive::Path_BeeNest* pTlv, const Guid& tlvId, ResourceManager&
 
     mState = BeeNestStates::eWaitForTrigger_0;
 
-    // The "idle" swarm that hovers around the nest
-    relive_new BeeSwarm(mBeeSwarmX, mBeeSwarmY, FP_FromInteger(0), pTlv->mBeesAmount, 0, resMan, map);
+    // The "idle" swarm that hovers around the nest. A restore has it from the save
+    if (!map.mRestoringObjects)
+    {
+        relive_new BeeSwarm(mBeeSwarmX, mBeeSwarmY, FP_FromInteger(0), pTlv->mBeesAmount, 0, resMan, map);
+    }
 }
 
 BeeNest::~BeeNest()
@@ -97,6 +100,7 @@ void BeeNest::VGetSaveState(SerializedObjectData& pSaveBuffer)
 
     data.mTlvInfo = mTlvInfo;
     data.mState = mState;
+    data.mBeeSwarm = mBeeSwarm;
 
     pSaveBuffer.Write(data);
 }
@@ -110,18 +114,8 @@ void BeeNest::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager
     auto pNest = relive_new BeeNest(pTlv, pState->mTlvInfo, resMan, map);
     if (pNest)
     {
-        if (pState->mState == BeeNestStates::eResetIfDead_1)
-        {
-            // The chase swarm that was active can't be restored (see
-            // BeeNestSaveState comment) - mirror the same cleanup
-            // eResetIfDead_1 itself does when a swarm finishes, so the
-            // trigger switch doesn't stay stuck "on" with nothing chasing.
-            SwitchStates_Set(pNest->mSwitchId, 0);
-        }
-        else
-        {
-            pNest->mState = pState->mState;
-        }
+        pNest->mState = pState->mState;
+        pNest->mBeeSwarm = pState->mBeeSwarm;
     }
 }
 

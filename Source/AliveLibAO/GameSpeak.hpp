@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
+#include "../relive_lib/GameSpeakListenerBase.hpp"
 
 namespace AO {
 
@@ -35,9 +37,23 @@ enum class GameSpeakMatch : s16
     ePartMatch = 2,
 };
 
+struct GameSpeakSaveState final : public SaveStateBase
+{
+    GameSpeakSaveState()
+        : SaveStateBase(ReliveTypes::eGameSpeak, sizeof(*this))
+    { }
+    u32 mLastEventFrame;
+    s32 mLastEvent;
+    s32 mLastEventIndex;
+    s32 mEventBuffer[32];
+};
+
 class GameSpeak final : public ::BaseGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const GameSpeakSaveState& state);
+
     GameSpeak(ResourceManager& resMan, BaseMap& map);
     ~GameSpeak();
 
@@ -60,7 +76,7 @@ public:
     GameSpeakEvents mEventBuffer[32] = {};
 };
 
-class GameSpeakListener final
+class GameSpeakListener final : public GameSpeakListenerBase
 {
 public:
     bool LastEventChanged(GameSpeak& gs)
@@ -90,8 +106,6 @@ public:
         return GameSpeakEvents::eNone;
     }
 
-private:
-    s32 mLastEventIdx = -1;
 };
 
 extern GameSpeak* gEventSystem;

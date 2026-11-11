@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "DoorBlocker.hpp"
 #include "../relive_lib/BaseMap.hpp"
 #include "../relive_lib/SwitchStates.hpp"
@@ -77,4 +79,22 @@ void DoorBlocker::VUpdate()
             mDone = true;
         }
     }
+}
+
+void DoorBlocker::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    DoorBlockerSaveState data = {};
+    data.mDone = mDone;
+    pSaveBuffer.Write(data);
+}
+
+void DoorBlocker::RestoreFromSaveState(const DoorBlockerSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eDoorLock)
+    {
+        return;
+    }
+    DoorBlocker* p = static_cast<DoorBlocker*>(pObj);
+    p->mDone = state.mDone;
 }

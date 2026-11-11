@@ -44,6 +44,12 @@ SligSpawner::~SligSpawner()
     }
 }
 
+std::vector<::BaseGameObject::NotStateMemory> SligSpawner::VNotStateMemory()
+{
+    // The TLV it was made from, with the flags that TLV had then
+    return {{&mPathTlv, sizeof(mPathTlv)}};
+}
+
 void SligSpawner::VScreenChanged()
 {
     if (mMap.LevelChanged() || mMap.PathChanged() || mState == SpawnerStates::eInactive_0)
@@ -54,30 +60,6 @@ void SligSpawner::VScreenChanged()
 
 void SligSpawner::VUpdate()
 {
-    if (mFindSpawnedSlig)
-    {
-        mFindSpawnedSlig = false;
-
-        if (mSpawnedSligId != Guid{})
-        {
-            for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
-            {
-                auto pObj = gBaseGameObjects->ItemAt(i);
-                if (!pObj)
-                {
-                    break;
-                }
-
-                if (pObj->Type() == ReliveTypes::eSlig && pObj->mBaseGameObjectTlvInfo == mSpawnedSligId)
-                {
-                    // Seems redundant ?
-                    mSpawnedSligId = pObj->mBaseGameObjectId;
-                    break;
-                }
-            }
-        }
-    }
-
     const auto pSpawnedSlig = static_cast<Slig*>(sObjectIds.Find_Impl(mSpawnedSligId));
 
     if (EventGet(Event::kEventDeathReset))
@@ -119,12 +101,34 @@ void SligSpawner::VUpdate()
     }
 }
 
+void SligSpawner::VPostRestore()
+{
+    // The save has the TLV the slig was made from, and the slig is known by its id
+    if (mSpawnedSligId != Guid{})
+    {
+        for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
+        {
+            auto pObj = gBaseGameObjects->ItemAt(i);
+            if (!pObj)
+            {
+                break;
+            }
+
+            if (pObj->Type() == ReliveTypes::eSlig && pObj->mBaseGameObjectTlvInfo == mSpawnedSligId)
+            {
+                mSpawnedSligId = pObj->mBaseGameObjectId;
+                break;
+            }
+        }
+    }
+}
+
 void SligSpawner::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
     SligSpawnerSaveState data = {};
     data.mTlvId = mTlvInfo;
     data.mState = mState;
-    data.mSpawnedSligId = Guid{};
+    data.mSpawnedSligId = mSpawnedSligId;
     if (mSpawnedSligId != Guid{})
     {
         BaseGameObject* pSpawnedSlig = sObjectIds.Find_Impl(mSpawnedSligId);
@@ -132,6 +136,7 @@ void SligSpawner::VGetSaveState(SerializedObjectData& pSaveBuffer)
         {
             data.mSpawnedSligId = pSpawnedSlig->mBaseGameObjectTlvInfo;
         }
+        // else: the slig is gone, and the id of it is kept as it is
     }
     pSaveBuffer.Write(data);
 }
@@ -145,6 +150,5 @@ void SligSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMan
     {
         pSpawner->mState = pState->mState;
         pSpawner->mSpawnedSligId = pState->mSpawnedSligId;
-        pSpawner->mFindSpawnedSlig = true;
     }
 }

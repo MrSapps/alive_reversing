@@ -32,6 +32,11 @@ struct UXBSaveState final : public SaveStateBase
     u16 mPatternIndex;
     u16 mRedBlinkCount;
     u16 mIsRed;
+    AnimationSaveState mAnim;
+    // The blinking light is an animation of its own
+    AnimationSaveState mFlashAnim;
+    s32 mFlashAnimId;
+    bool mFlashPalGreen;
 };
 
 class UXB final : public BaseAliveGameObject
@@ -68,4 +73,6 @@ private:
     u16 mPattern = 0;
     u16 mRedBlinkCount = 0;
     u16 mIsRed = 0;
+    // Whether the blinking light has the green palette (loaded) or its own (reloaded)
+    bool mFlashPalGreen = false;
 };

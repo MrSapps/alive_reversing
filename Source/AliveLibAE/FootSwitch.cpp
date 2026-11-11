@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../relive_lib/Function.hpp"
 #include "FootSwitch.hpp"
 #include "../relive_lib/SwitchStates.hpp"
@@ -267,4 +268,28 @@ BaseAliveGameObject* FootSwitch::WhoIsStoodOnMe()
     }
 
     return nullptr;
+}
+
+void FootSwitch::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    FootSwitchSaveState data = {};
+    data.mState = static_cast<s32>(mState);
+    data.mStoodOnMeId = mStoodOnMeId;
+    data.mCreateSparks = mCreateSparks;
+    data.mFindStander = mFindStander;
+    pSaveBuffer.Write(data);
+}
+
+void FootSwitch::RestoreFromSaveState(const FootSwitchSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eFootSwitch)
+    {
+        return;
+    }
+    FootSwitch* p = static_cast<FootSwitch*>(pObj);
+    p->mState = static_cast<States>(state.mState);
+    p->mStoodOnMeId = state.mStoodOnMeId;
+    p->mCreateSparks = state.mCreateSparks;
+    p->mFindStander = state.mFindStander;
 }

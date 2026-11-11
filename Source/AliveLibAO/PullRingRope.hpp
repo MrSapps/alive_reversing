@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
 
 class BaseAliveGameObject;
@@ -8,9 +9,23 @@ class Rope;
 
 namespace AO {
 
+struct PullRingRopeSaveState final : public SaveStateBase
+{
+    PullRingRopeSaveState()
+        : SaveStateBase(ReliveTypes::ePullRingRope, sizeof(*this))
+    { }
+    s32 mStayInStateTicks;
+    Guid mRopeId;
+    Guid mRingPullerId;
+    s32 mState;
+};
+
 class PullRingRope final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const PullRingRopeSaveState& state);
+
     PullRingRope(relive::Path_PullRingRope* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~PullRingRope();
 

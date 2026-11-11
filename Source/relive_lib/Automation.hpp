@@ -2,12 +2,18 @@
 
 #include "Types.hpp"
 #include "data_conversion/guid.hpp"
+#include "StateHash.hpp"
+#include <memory>
+#include <map>
 #include <string>
 #include <vector>
 
 class BaseMap;
 class FileSystem;
 class ResourceManager;
+namespace Bot {
+class Bot;
+}
 
 // Runs a script of commands (-automation=<file>), so a tool or a test can drive the game and see
 // what it's doing without anyone watching it. With SDL_VIDEO_DRIVER=offscreen it needs no display.
@@ -61,6 +67,68 @@ class ResourceManager;
 //   seq_play <index> [<volume> [<repeat>]]
 //       Play a SEQ by its index in the game's SEQ table (volume default 100, repeat 0 = forever,
 //       default 1). seq_stop <index> stops it.
+//   hash_log <file> [full]
+//       From now on, write a line "<game frame> <hash>" for each game frame to the file when the
+//       script ends. The hash covers the whole world (see StateHash.hpp), so two runs of a script
+//       that match line for line are deterministic. full adds a line for each thing hashed, to find
+//       which one first differs.
+//   hash_mark <name>
+//       Remember the whole world (see StateHash.hpp) under that name.
+//   dump_raw <file>
+//       Every object's memory as hex words, to find which bytes differ when a "raw" part of hash_log full does.
+//   expect_hash <name> [ignore <class>...]
+//       Fail unless the world is the one hash_mark <name> saw: the same frame, random seed, camera,
+//       switches and objects (in any order). ignore leaves out objects of those C++ classes (Spark...),
+//       e.g. cosmetic effects a save doesn't keep. The failure says what differs.
+//   restore_check <frames> [<buttons>]
+//       Save, run the frames with the buttons held, restore, check the world is the one that was saved,
+//       run the frames again and check it's what the first run came to. Logs a line for the camera and goes
+//       on whatever happens (expect_restore_checks fails at the end), so a script can sweep many cameras.
+//       Skipped when the controlled character is dead, as a quicksave isn't taken then.
+//   expect_restore_checks
+//       Fail if any restore_check did.
+//   quicksave
+//       Take a quicksave (AE's DoQuicksave, AO's quicksave) into memory.
+//   quickload
+//       Restore the last quicksave and wait for the camera to load. With hash_log, the lines after
+//       it should repeat the ones after the quicksave if a restore is exact.
+//   draw <0|1>
+//       0: run frames without drawing or showing them and without waiting for the frame time (much faster, the
+//       game's state is the same). Screenshots need 1, the default.
+//   bot_do <what> ...
+//       One step of the bot's pilot (see Bot/Pilot.hpp), run until it's done; a failure fails the script.
+//         bot_do wait <frames> [<buttons>]
+//         bot_do move <x> [walk|run|sneak|roll] to the grid cell of world x (roll ends crouched)
+//         bot_do face <left|right>
+//         bot_do press <buttons> [<max frames>] hold until Abe starts something, then let it play out
+//   bot <profile>
+//       The bot plays from here on by a profile: save_all, kill_all, average or any, then options after commas
+//       (seed=<n>, human), e.g. bot save_all,seed=7. See Bot/BOT_DESIGN.md.
+//   bot_wait <max frames>
+//       Until the bot is done or stuck, or that many frames have run. Logs its report.
+//   expect_bot done|stuck|running
+//       Fail unless that is the bot's state.
+//   bot_report <file>
+//       What the bot is doing and sees, in a few lines, with the end of its log.
+//   bot_inputs <file>
+//       The buttons of every frame of the bot's run that counted, to play back.
+//   expect_bot_restores <at least>
+//       Fail unless the bot has gone back to a checkpoint (after a death) that many times.
+//   bot_stop
+//       The bot stops playing and lets go of the buttons.
+//   replay <inputs file>
+//       Hold the buttons a bot_inputs file lists, a line a frame, with no bot: started at the same point of the
+//       same script it gives the same game (see tests/automation/run_bot_replay.cmake). Fails if the game frame
+//       isn't the one the inputs start at.
+//   bot_goto <x> <y> [half]
+//       The bot takes Abe to the floor cell at that world position (half: on a background floor), by its nav graph.
+//       Fails if it can't.
+//   bot_log <file>
+//       The bot's decisions, written when the script ends.
+//   bot_nav_dump <file>
+//       The bot's nav graph of the current path as text: its floors, and every edge that isn't a plain step.
+//   bot_trace <file>
+//       From now on, a line per frame of what Abe does and the buttons held, written when the script ends.
 //   timeout <seconds>
 //       Fail if the script is still running after this long, counted from the start (default 120).
 //   quit
@@ -104,6 +172,8 @@ private:
     // Runs the current command. True once it's done.
     bool RunCommand(const Command& command, BaseMap& map, bool betweenFrames);
     bool Start(const Command& command, BaseMap& map, bool betweenFrames);
+    void DumpRestoreCheckRaw(const char* suffix);
+    bool RestoreCheck(const Command& command, BaseMap& map, bool betweenFrames);
     bool Screenshot(const std::string& path);
     bool WaitUntil(const Command& command, BaseMap& map, bool betweenFrames) const;
     // The InputCommands bits of a +-joined button list, false with error for an unknown name
@@ -112,6 +182,8 @@ public:
 
 private:
     bool SaveText(const std::string& path, const std::string& text);
+    void LogHash(BaseMap& map);
+    void FlushHashLog();
     std::string StateJson(BaseMap& map) const;
     std::string ObjectsJson() const;
     void Fail(const Command& command, const std::string& why);
@@ -130,6 +202,44 @@ private:
     // The current command's progress
     s32 mStep = 0;
     u32 mWaitUntilFrame = 0;
+    // hash_log's file, whether it logs each part, the log so far and the last frame logged
+    std::string mHashLogPath;
+    bool mHashLogFull = false;
+    std::string mHashLog;
+    u32 mHashLoggedFrame = 0;
+    u64 mHashLoggedTotal = 0;
+    // restore_check's progress: the world saved and after the frames run, what differed once restored and
+    // again the frames on, and the counts over a script
+    StateHash mCheckSaved;
+    StateHash mCheckLater;
+    std::string mCheckJson;
+    std::string mCheckAtRestore;
+    std::string mCheckWhere;
+    u32 mCheckButtons = 0;
+    // The controlled character died while it waited: the game puts the last quicksave back, so what is left isn't a
+    // continuation of the world that was saved
+    s32 mCheckDiedMotion = -1;
+    bool mCheckDied = false;
+    // A restore_check that is skipped waits for the world to be quiet again before the script goes on, up to this frame
+    u32 mSettleUntil = 0;
+    bool mSettleRetry = false;
+    bool mCheckRetried = false;
+    s32 mRestoreChecks = 0;
+    s32 mFailedRestoreChecks = 0;
+    // hash_mark's worlds
+    std::map<std::string, StateHash> mHashMarks;
+    // quickload is waiting for the restore to finish; nothing is logged until it has
+    bool mRestoring = false;
+
+    Bot::Bot& TheBot();
+    std::unique_ptr<Bot::Bot> mBot;
+    std::string mBotTracePath;
+    std::string mBotLogPath;
+    // replay's buttons and how far it is through them
+    std::vector<u32> mReplay;
+    std::size_t mReplayAt = 0;
+    u32 mReplayStartFrame = 0;
+
     // The invisibility effect the invisible command made
     Guid mInvisibleEffectId;
 };

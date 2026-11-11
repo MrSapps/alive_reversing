@@ -5,6 +5,7 @@
 #include "../FixedPoint.hpp"
 #include "../GameType.hpp"
 #include "BaseMap.hpp"
+#include "SerializedObjectData.hpp"
 
 static u8 sLeafRandIdx = 8;
 
@@ -123,4 +124,37 @@ void Leaf::VUpdate()
 void Leaf::VScreenChanged()
 {
     SetDead(true);
+}
+
+u8 Leaf::GetRandIdx()
+{
+    return sLeafRandIdx;
+}
+
+void Leaf::SetRandIdx(u8 idx)
+{
+    sLeafRandIdx = idx;
+}
+
+void Leaf::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    LeafSaveState data = {};
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mVelX = mVelX;
+    data.mVelY = mVelY;
+    data.mSpriteScale = GetSpriteScale();
+    data.mHitSomething = mHitSomething;
+    pSaveBuffer.Write(data);
+}
+
+void Leaf::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const auto pState = pData.ReadTmpPtr<LeafSaveState>();
+    // Made still: the sound it plays and the random index it moves on are not what it had. (The index is put back
+    // once every object is made, like the random seed.)
+    auto pLeaf = relive_new Leaf(pState->mXPos, pState->mYPos, FP_FromInteger(0), FP_FromInteger(0), pState->mSpriteScale, resMan, map);
+    pLeaf->mVelX = pState->mVelX;
+    pLeaf->mVelY = pState->mVelY;
+    pLeaf->mHitSomething = pState->mHitSomething;
 }

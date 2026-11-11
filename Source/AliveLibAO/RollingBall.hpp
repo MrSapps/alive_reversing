@@ -49,6 +49,7 @@ public:
     void LoadAnimations();
 
     virtual void VUpdate() override;
+    virtual void VPostRestore() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
     static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 

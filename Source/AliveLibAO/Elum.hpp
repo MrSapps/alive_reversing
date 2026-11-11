@@ -142,8 +142,7 @@ struct ElumSaveState final : public SaveStateBase
     s16 mHoneyYPos = 0;
     bool mChangedPathNotMounted = false;
     bool mCanSpeak = false;
-    bool mChangedPathMounted = false;
-};
+    bool mChangedPathMounted = false;};
 
 class Elum final : public ::BaseAliveGameObject
 {
@@ -205,6 +204,11 @@ public:
     static void Spawn(const Guid& tlvInfo, ResourceManager& resMan, BaseMap& map);
 
     virtual void VUpdate() override;
+    virtual GameSpeakListenerBase* VListener() override
+    {
+        return &mListener;
+    }
+    virtual void VPostRestore() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VScreenChanged() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;

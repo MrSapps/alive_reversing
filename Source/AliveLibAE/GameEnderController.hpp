@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseGameObject.hpp"
+#include "../relive_lib/WorldStatic.hpp"
 #include "../relive_lib/SaveStateBase.hpp"
 
 void CreateGameEnderController(ResourceManager& resMan, BaseMap& map);
@@ -41,5 +42,5 @@ private:
     GameEnderControllerStates mState = GameEnderControllerStates::eInit_0;
 };
 
-extern s16 gFeeco_Restart_KilledMudCount;
-extern s16 gFeecoRestart_SavedMudCount;
+extern WorldStatic<s16> gFeeco_Restart_KilledMudCount;
+extern WorldStatic<s16> gFeecoRestart_SavedMudCount;

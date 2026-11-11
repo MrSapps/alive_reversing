@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "Slurg.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/Shadow.hpp"
@@ -14,9 +15,9 @@
 #include "Math.hpp"
 #include "QuikSave.hpp"
 
-u16 gSlurgStepWatchPointsIdx = 0;
-s8 gSlurgStepWatchPointsCount[2] = {};
-Slurg_Step_Watch_Points gSlurgStepWatchPoints[2] = {};
+WorldStatic<u16> gSlurgStepWatchPointsIdx("AE.Slurg.gSlurgStepWatchPointsIdx", 0);
+WorldStatic<std::array<s8, 2>> gSlurgStepWatchPointsCount("AE.Slurg.gSlurgStepWatchPointsCount", {});
+WorldStatic<std::array<Slurg_Step_Watch_Points, 2>> gSlurgStepWatchPoints("AE.Slurg.gSlurgStepWatchPoints", {});
 
 void Slurg::LoadAnimations()
 {
@@ -147,6 +148,8 @@ void Slurg::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& re
 
     pSlurg->mGoingRight = pState->mGoingRight;
     pSlurg->mMoving = pState->mMoving;
+    pSlurg->mMovingTimer = pState->mMovingTimer;
+    pSlurg->mRngForMovingTimer = pState->mRngForMovingTimer;
 }
 
 Slurg::~Slurg()
@@ -324,11 +327,7 @@ void Slurg::VOnTlvCollision(TlvIterator tlvIterator)
 
 void Slurg::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     SlurgSaveState data = {};
 
     data.mType = ReliveTypes::eSlurg;
@@ -346,6 +345,8 @@ void Slurg::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mSlurgState = mSlurgState;
     data.mGoingRight = mGoingRight;
     data.mMoving = mMoving;
+    data.mMovingTimer = mMovingTimer;
+    data.mRngForMovingTimer = mRngForMovingTimer;
 
     pSaveBuffer.Write(data);
 }

@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "InvisibleEffect.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/GameObjects/PossessionFlicker.hpp"
@@ -38,6 +39,12 @@ InvisibleEffect::InvisibleEffect(BaseAliveGameObject* pTarget, ResourceManager& 
 
     mOldRenderMode = pTarget->GetAnimation().GetBlendMode();
     mState = InvisibleState::eSetBlendMode1_0;
+}
+
+InvisibleEffect::InvisibleEffect(RestoreTag, ResourceManager& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
+{
+    SetType(ReliveTypes::eInvisibleEffect);
 }
 
 InvisibleEffect::~InvisibleEffect()
@@ -189,4 +196,34 @@ void InvisibleEffect::VUpdate()
 void InvisibleEffect::VScreenChanged()
 {
 
+}
+
+void InvisibleEffect::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    InvisibleEffectSaveState data = {};
+    data.mState = static_cast<s32>(mState);
+    data.mFadeSteps = mFadeSteps;
+    data.mTargetId = mTargetId;
+    data.mOldRenderMode = static_cast<s32>(mOldRenderMode);
+    data.mSemiTrans = mSemiTrans;
+    data.mBlending = mBlending;
+    data.mIsInvisible = mIsInvisible;
+    pSaveBuffer.Write(data);
+}
+
+void InvisibleEffect::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const InvisibleEffectSaveState& state = *pData.ReadTmpPtr<InvisibleEffectSaveState>();
+    InvisibleEffect* p = relive_new InvisibleEffect(InvisibleEffect::RestoreTag{}, resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mState = static_cast<InvisibleState>(state.mState);
+    p->mFadeSteps = state.mFadeSteps;
+    p->mTargetId = state.mTargetId;
+    p->mOldRenderMode = static_cast<relive::TBlendModes>(state.mOldRenderMode);
+    p->mSemiTrans = state.mSemiTrans;
+    p->mBlending = state.mBlending;
+    p->mIsInvisible = state.mIsInvisible;
 }

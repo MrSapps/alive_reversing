@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "CrawlingSligButton.hpp"
 #include "../relive_lib/BaseMap.hpp"
 #include "Sfx.hpp"
@@ -115,4 +117,22 @@ void CrawlingSligButton::VUpdate()
         mInUse = false;
         GetAnimation().Set_Animation_Data(GetAnimRes(AnimId::CrawlingSligButton));
     }
+}
+
+void CrawlingSligButton::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    CrawlingSligButtonSaveState data = {};
+    data.mInUse = mInUse;
+    pSaveBuffer.Write(data);
+}
+
+void CrawlingSligButton::RestoreFromSaveState(const CrawlingSligButtonSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eSligButton)
+    {
+        return;
+    }
+    CrawlingSligButton* p = static_cast<CrawlingSligButton*>(pObj);
+    p->mInUse = state.mInUse;
 }
