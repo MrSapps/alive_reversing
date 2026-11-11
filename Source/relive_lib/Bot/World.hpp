@@ -143,6 +143,21 @@ struct UxbAt final
     bool mOff = false;
 };
 
+// A motion detector's beam as it is now: it goes to and fro between two ends and sets the alarm off when it is
+// over something that moves. Abe standing or crouching still is not seen.
+struct BeamAt final
+{
+    s32 mX1 = 0;
+    s32 mY1 = 0;
+    s32 mX2 = 0;
+    s32 mY2 = 0;
+    s32 mMinX = 0;
+    s32 mMaxX = 0;
+    // What it moves a frame, x256, the way it goes
+    s32 mVel256 = 0;
+    bool mHalf = false;
+};
+
 // Something that goes to and fro and kills what it meets on the way (a drill), as it is now. It is parked at one
 // end for a while, goes out to the other and comes straight back.
 struct SweepAt final
@@ -243,6 +258,40 @@ struct World final
     }
     std::vector<UxbAt> mUxbs;
     std::vector<SweepAt> mSweeps;
+    std::vector<BeamAt> mBeams;
+    // Whether Abe can make a move without a motion detector's beam coming over him before it is done: he is at
+    // x, y, the move takes him up to travel on in dir (-1, 0, 1) and lasts so many frames
+    bool BeamClear(s32 x, s32 y, bool half, s32 dir, s32 travel, s32 frames) const
+    {
+        for (const BeamAt& b : mBeams)
+        {
+            if (b.mHalf != half || b.mY1 > y || b.mY2 < y - (half ? 30 : 60))
+            {
+                continue;
+            }
+            // Frame by frame: where he is by then against where the beam is, turning round at its ends
+            // (the beam has to be 8 inside his box to count)
+            const s32 pad = half ? 5 : 10;
+            s32 at256 = b.mX1 * 256;
+            s32 vel = b.mVel256;
+            const s32 width = b.mX2 - b.mX1;
+            for (s32 t = 0; t <= frames; t++)
+            {
+                const s32 ax = x + (frames > 0 ? dir * travel * t / frames : 0);
+                const s32 bx = at256 / 256;
+                if (bx <= ax + pad && bx + width >= ax - pad)
+                {
+                    return false;
+                }
+                at256 += vel;
+                if ((vel > 0 && at256 / 256 + width >= b.mMaxX) || (vel < 0 && at256 / 256 <= b.mMinX))
+                {
+                    vel = -vel;
+                }
+            }
+        }
+        return true;
+    }
     // Whether a drill runs as the switches are now: known from its TLV, so for one that isn't about too
     bool SweepRuns(const Entity& drill) const
     {

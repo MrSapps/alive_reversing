@@ -866,6 +866,169 @@ s32 Bot::SweepLate() const
     return kLate[mSweepDeaths % 8];
 }
 
+bool Bot::BeamRoll()
+{
+    const Prim& prim = mPilot.Current();
+    const bool crouched = mAbe.mMove == Move::eCrouch;
+    // (crouched for the roll, what the task does next is stand him up again: the roll goes where the move that
+    // was held up was going)
+    const bool standsUp = prim.mKind == Prim::Kind::ePress && (prim.mBits & Btn::eUp) && mBeamRolling && crouched;
+    const bool moves = prim.mKind == Prim::Kind::eMoveTo && prim.mGait != Gait::eRoll;
+    if (!mKnow || !(moves || standsUp) || (mAbe.mMove != Move::eIdle && !crouched) || !(mBeamHeld > 150 || (mBeamRolling && crouched)))
+    {
+        return false;
+    }
+    // A roll and a hop are heard (so is a walk: only sneaking isn't), and a Slig asleep on the screen wakes
+    for (const SligAt& slig : mWorld.mSligs)
+    {
+        if (slig.mAsleep && slig.mHalf == mAbe.mHalfScale && mKnow->mNav.CameraOf(slig.mX, slig.mY - 5) == mKnow->mNav.CameraOf(mAbe.mX, mAbe.mY - 5))
+        {
+            mBeamRolling = false;
+            return false;
+        }
+    }
+    if (mBeamRolling && mBeamHeld > 500)
+    {
+        // No roll fits either: as it was
+        mBeamRolling = false;
+        return false;
+    }
+    const NavGraph& nav = mKnow->mNav;
+    const s32 cell = NavGraph::GridStep(mAbe.mHalfScale);
+    const s32 toX = moves ? prim.mX : mBeamToX;
+    const s32 dir = toX > mAbe.mX ? 1 : -1;
+    const s32 here = AbeNode();
+    // As far as the floor is plain and the move wants to go, three cells at most
+    s32 cells = 0;
+    for (s32 k = 1; k <= 3 && here >= 0; k++)
+    {
+        const s32 n = nav.NodeAt(mAbe.mX + dir * k * cell, mAbe.mY, mAbe.mHalfScale, 8);
+        if (n < 0 || nav.Nodes()[n].mHazard || nav.Nodes()[n].mLine != nav.Nodes()[here].mLine || (toX - nav.Nodes()[n].mX) * dir < 0)
+        {
+            break;
+        }
+        cells = k;
+    }
+    if (!crouched)
+    {
+        // Standing: a hop of three cells if that fits (over whatever lies between, onto plain floor), else down
+        // into a crouch to roll from
+        const s32 land = here >= 0 ? nav.NodeAt(mAbe.mX + dir * 3 * cell, mAbe.mY, mAbe.mHalfScale, 8) : -1;
+        const bool onward = land >= 0 && !nav.Nodes()[land].mHazard && nav.Nodes()[land].mLine == nav.Nodes()[here].mLine && (toX - nav.Nodes()[land].mX) * dir >= 0;
+        if (onward && mAbe.mFacingLeft == (dir < 0) && mWorld.BeamClear(mAbe.mX, mAbe.mY, mAbe.mHalfScale, dir, 3 * cell, 24))
+        {
+            Log("hopping on behind the motion detector's beam");
+            mPilot.Start(Prim::Press(Btn::eHop), mAbe);
+            return true;
+        }
+        if (cells >= 1 && mWorld.BeamClear(mAbe.mX, mAbe.mY, mAbe.mHalfScale, 0, 0, 9))
+        {
+            Log("crouching to roll on behind the motion detector's beam");
+            mBeamRolling = true;
+            mBeamToX = toX;
+            mPilot.Start(Prim::Press(Btn::eDown), mAbe);
+            return true;
+        }
+        return false;
+    }
+    for (; cells >= 1; cells--)
+    {
+        if (mWorld.BeamClear(mAbe.mX, mAbe.mY, mAbe.mHalfScale, dir, cells * cell, 4 * cells + (crouched ? 4 : 12)))
+        {
+            Log("rolling " + std::to_string(cells) + " cells behind the motion detector's beam");
+            mBeamRolling = true;
+            mBeamToX = toX;
+            mPilot.Start(Prim::MoveTo(mAbe.mX + dir * cells * cell, Gait::eRoll), mAbe);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Bot::BeamHolds() const
+{
+    if (mWorld.mBeams.empty() || !mAbe.mValid)
+    {
+        return false;
+    }
+    // Only where holding still is a thing he can do: standing, crouched, or walking (he stops at the next cell)
+    const bool still = mAbe.mMove == Move::eIdle || mAbe.mMove == Move::eCrouch;
+    if (!still && mAbe.mMove != Move::eWalk && mAbe.mMove != Move::eSneak)
+    {
+        return false;
+    }
+    const Prim& prim = mPilot.Current();
+    const s32 facing = mAbe.mFacingLeft ? -1 : 1;
+    s32 dir = 0;
+    s32 travel = 0;
+    s32 frames = 12;
+    switch (prim.mKind)
+    {
+        case Prim::Kind::eWait:
+            if (prim.mBits == 0)
+            {
+                return false;
+            }
+            frames = std::max(12, prim.mFrames);
+            break;
+        case Prim::Kind::eMoveTo:
+            dir = prim.mX > mAbe.mX ? 1 : -1;
+            // (a cell at a time: 25 on and about 13 frames to be standing again)
+            travel = prim.mGait == Gait::eRun ? 120 : 25;
+            frames = prim.mGait == Gait::eRun ? 24 : 13;
+            if (prim.mGait == Gait::eRoll)
+            {
+                // (begun by BeamRoll when it fitted: it is let run)
+                return false;
+            }
+            break;
+        case Prim::Kind::eFace:
+            break;
+        case Prim::Kind::ePress:
+            if (mBeamRolling && mAbe.mMove == Move::eCrouch && (prim.mBits & Btn::eUp))
+            {
+                // Crouched to roll on: not stood up again while that may still be done
+                return true;
+            }
+            if (mBeamRolling || mBeamHeld == 0)
+            {
+                // (begun by BeamRoll when it fitted, or already under way)
+                if (!still)
+                {
+                    return false;
+                }
+            }
+            if (prim.mBits & Btn::eHop)
+            {
+                dir = facing;
+                travel = 75;
+                frames = 24;
+            }
+            else
+            {
+                frames = 9;
+            }
+            break;
+        case Prim::Kind::eWalkOff:
+            dir = prim.mFaceLeft ? -1 : 1;
+            travel = 60;
+            frames = 32;
+            break;
+        case Prim::Kind::eRunJump:
+            dir = prim.mFaceLeft ? -1 : 1;
+            travel = 220;
+            frames = 50;
+            break;
+        case Prim::Kind::eLift:
+            return false;
+    }
+    if (mAbe.mHalfScale)
+    {
+        travel /= 2;
+    }
+    return !mWorld.BeamClear(mAbe.mX, mAbe.mY, mAbe.mHalfScale, dir, travel, frames);
+}
+
 void Bot::ThrowBegun(u32 mine, const ThrowSpot& spot)
 {
     mThrowPending = true;
@@ -1319,8 +1482,39 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
     }
 
     mBits = 0;
-    if (mPilotActive)
+    if (mWorld.mBeams.empty())
     {
+        mBeamRolling = false;
+    }
+    if (mPilotActive && mAuto && BeamHolds())
+    {
+        // (nothing held: walking he stops at the next cell, still he stays still)
+        mBeamHeld++;
+        if (mBeamHeld == 60)
+        {
+            Log("keeping still for a motion detector, doing " + mPilot.Current().Text());
+        }
+        if (BeamRoll())
+        {
+            mBeamHeld = 0;
+            mPilotResult = mPilot.Step(mAbe, mBits);
+        }
+        else if (mBeamHeld > 900)
+        {
+            // No move fits between its passes here: what was being done has failed
+            Log("the motion detector leaves no time to get on");
+            mBeamHeld = 0;
+            mPilotActive = false;
+            mPilotResult = PilotStatus::eFailed;
+            if (mPilotForTask)
+            {
+                mLastPrimFailed = "a motion detector leaves no time to get on";
+            }
+        }
+    }
+    else if (mPilotActive)
+    {
+        mBeamHeld = 0;
         mPilotResult = mPilot.Step(mAbe, mBits);
         if (mPilotResult != PilotStatus::eRunning)
         {
@@ -1341,7 +1535,10 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
             Input().mAutomationInput = 0;
             return;
         }
-        if (mPilotActive)
+        if (mPilotActive && mAuto && BeamHolds())
+        {
+        }
+        else if (mPilotActive)
         {
             // The new Prim's first buttons go in this frame
             mPilotResult = mPilot.Step(mAbe, mBits);
