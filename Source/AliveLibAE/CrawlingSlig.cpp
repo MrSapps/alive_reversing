@@ -197,9 +197,6 @@ void CrawlingSlig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMa
         pCrawlingSlig->mCurrentLevel = pState->mCurrentLevel;
         pCrawlingSlig->SetSpriteScale(pState->mSpriteScale);
 
-        pCrawlingSlig->field_1A4_r = pState->mR;
-        pCrawlingSlig->field_1A6_g = pState->mG;
-        pCrawlingSlig->field_1A8_b = pState->mB;
 
         pCrawlingSlig->mRGB.SetRGB(pState->mR, pState->mG, pState->mB);
 
@@ -225,7 +222,6 @@ void CrawlingSlig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMa
         pCrawlingSlig->mCurrentMotion = pState->mCurrentMotion2;
         pCrawlingSlig->mNextMotion = pState->mNextMotion;
         pCrawlingSlig->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pState->mLastLineYPos);
-        pCrawlingSlig->SetRestoredFromQuickSave(true);
         pCrawlingSlig->mMultiUseTimer = pState->mMultiUseTimer;
         pCrawlingSlig->BaseAliveGameObjectCollisionLineType = pState->mCollisionLineType;
         pCrawlingSlig->mGuid = pState->mCrawlingSligTlvId;
@@ -246,13 +242,16 @@ void CrawlingSlig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMa
     }
 }
 
+std::vector<BaseGameObject::NotStateMemory> CrawlingSlig::VNotStateMemory()
+{
+    // The TLV it was made from, with the flags that TLV had then
+    // And the pants or wings it looked up, found again when it needs them
+    return {{&mTlv, sizeof(mTlv)}, {&mTlvHeader, sizeof(mTlvHeader)}};
+}
+
 void CrawlingSlig::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     CrawlingSligSaveState data = {};
 
     data.mType = ReliveTypes::eCrawlingSlig;
@@ -357,6 +356,36 @@ s16 CrawlingSlig::NextRandom()
     return (Math_NextRandom() & 1) == 0;
 }
 
+void CrawlingSlig::VPostRestore()
+{
+    if (BaseAliveGameObjectCollisionLineType == -1)
+    {
+        BaseAliveGameObjectCollisionLine = 0;
+    }
+    else
+    {
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+    }
+    field_1D4_obj_id = RefreshId(field_1D4_obj_id);
+    mTransformedSligId = RefreshId(mTransformedSligId);
+    mSligButtonId = RefreshId(mSligButtonId);
+
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
+}
+
 void CrawlingSlig::VUpdate()
 {
     if (EventGet(Event::kEventDeathReset))
@@ -365,31 +394,6 @@ void CrawlingSlig::VUpdate()
     }
     else
     {
-        if (GetRestoredFromQuickSave())
-        {
-            SetRestoredFromQuickSave(false);
-            if (BaseAliveGameObjectCollisionLineType == -1)
-            {
-                BaseAliveGameObjectCollisionLine = 0;
-            }
-            else
-            {
-                gCollisions->Raycast(
-                    mXPos,
-                    mYPos - FP_FromInteger(20),
-                    mXPos,
-                    mYPos + FP_FromInteger(20),
-                    &BaseAliveGameObjectCollisionLine,
-                    &mXPos,
-                    &mYPos,
-                    CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
-            }
-            BaseAliveGameObjectCollisionLineType = 0;
-            field_1D4_obj_id = RefreshId(field_1D4_obj_id);
-            mTransformedSligId = RefreshId(mTransformedSligId);
-            mSligButtonId = RefreshId(mSligButtonId);
-        }
-
         if (!Input_IsChanting())
         {
             mChanting = false;

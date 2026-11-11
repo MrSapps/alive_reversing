@@ -1,4 +1,5 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../relive_lib/Function.hpp"
 #include "PullRingRope.hpp"
 #include "../AliveLibAE/stdlib.hpp"
@@ -308,6 +309,30 @@ s16 PullRingRope::Pull(BaseAliveGameObject* pFrom)
 bool PullRingRope::vIsNotBeingPulled()
 {
     return mState != States::eBeingPulled_1;
+}
+
+void PullRingRope::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    PullRingRopeSaveState data = {};
+    data.mStayInStateTicks = mStayInStateTicks;
+    data.mRopeId = mRopeId;
+    data.mRingPullerId = mRingPullerId;
+    data.mState = static_cast<s32>(mState);
+    pSaveBuffer.Write(data);
+}
+
+void PullRingRope::RestoreFromSaveState(const PullRingRopeSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    PullRingRope* p = static_cast<PullRingRope*>(pObj);
+    p->mStayInStateTicks = state.mStayInStateTicks;
+    p->mRopeId = state.mRopeId;
+    p->mRingPullerId = state.mRingPullerId;
+    p->mState = static_cast<States>(state.mState);
 }
 
 } // namespace AO

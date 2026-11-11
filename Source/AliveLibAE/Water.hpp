@@ -3,6 +3,7 @@
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 
 struct Water_Res final
 {
@@ -20,6 +21,45 @@ struct Water_Res final
 };
 ALIVE_ASSERT_SIZEOF(Water_Res, 0x78);
 
+// The water the TLV makes again when a save is restored: this puts back where it was, see Water::RestoreSaveState.
+struct WaterSaveState final : public SaveStateBase
+{
+    WaterSaveState()
+        : SaveStateBase(ReliveTypes::eWater, sizeof(*this))
+    { }
+    s16 mState;
+    s16 mParticleCount;
+    s16 mCurrentParticleIdx;
+    s16 mCurrentDrops;
+    s16 mSplashTime;
+    s32 mNotInCameraCount;
+    s32 mWaterDuration;
+    s16 mHitTimeout;
+    // Where it is on the screen, worked out as it is made from where the screen was then
+    s16 mScreenX;
+    s16 mScreenY;
+    s16 mTopLeftX;
+    s16 mTopLeftY;
+    s16 mBottomRightX;
+    s16 mBottomRightY;
+    FP mRadius;
+    FP mCentre;
+    struct Drop final
+    {
+        FP mXPos;
+        FP mYPos;
+        FP mZPos;
+        FP mDeltaX;
+        FP mDeltaY;
+        FP mDeltaZ;
+        s16 mEnabled;
+        s16 mSplashTime;
+        s16 mState;
+    };
+    // The most a Water has, see its constructor
+    Drop mDrops[128];
+};
+
 class Water final : public ::BaseAnimatedWithPhysicsGameObject
 {
 public:
@@ -30,6 +70,9 @@ public:
     virtual void VRender(OrderingTable& ot) override;
     virtual void VScreenChanged() override;
     virtual void VStopAudio() override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
+    static void RestoreSaveState(const WaterSaveState& state);
 
 private:
     void Disable_Water_Particle(s16 idx);

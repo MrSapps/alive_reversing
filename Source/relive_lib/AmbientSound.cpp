@@ -171,7 +171,7 @@ void Start_Sounds_for_TLV(CameraPos direction, relive::Path_TLV* pTlv, ResourceM
             break;
     }
 
-    if (bDangerMusic && GetGameType() == GameType::eAo)
+    if (bDangerMusic && GetGameType() == GameType::eAo && !map.mCameraSwapIsRestore)
     {
         relive_new AO::MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eDrumAmbience, relive::Path_MusicTrigger::TriggeredBy::eTouching, 0, 40, resMan, map);
     }

@@ -107,33 +107,40 @@ void Grenade::VScreenChanged()
     mExplosionId = Guid{};
 }
 
+void Grenade::VPostRestore()
+{
+    if (BaseAliveGameObjectCollisionLineType == -1)
+    {
+        BaseAliveGameObjectCollisionLine = nullptr;
+    }
+    else
+    {
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(10),
+            mXPos,
+            mYPos + FP_FromInteger(10),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+    }
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
+
+    mGrenadeOwner = sObjectIds.Find_Impl(mGrenadeOwnerRestoreId);
+    mGrenadeOwnerRestoreId = Guid{};
+}
+
 void Grenade::VUpdate()
 {
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);
-    }
-
-    if (GetRestoredFromQuickSave())
-    {
-        SetRestoredFromQuickSave(false);
-        if (BaseAliveGameObjectCollisionLineType == -1)
-        {
-            BaseAliveGameObjectCollisionLine = nullptr;
-        }
-        else
-        {
-            gCollisions->Raycast(
-                mXPos,
-                mYPos - FP_FromInteger(10),
-                mXPos,
-                mYPos + FP_FromInteger(10),
-                &BaseAliveGameObjectCollisionLine,
-                &mXPos,
-                &mYPos,
-                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
-        }
-        BaseAliveGameObjectCollisionLineType = 0;
     }
 
     switch (mState)
@@ -620,7 +627,6 @@ void Grenade::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager
     pGrenade->SetDrawable(pState->mDrawable);
     pGrenade->SetInteractive(pState->mInteractive);
 
-    pGrenade->SetRestoredFromQuickSave(true);
     pGrenade->BaseAliveGameObjectCollisionLineType = pState->mCollisionLineType;
     pGrenade->mBaseThrowableCount = pState->mThrowableCount;
     pGrenade->mState = pState->mState;
@@ -632,6 +638,9 @@ void Grenade::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager
     pGrenade->mBlowUpOnCollision = pState->mBlowUpOnCollision;
 
     pGrenade->mExplodeCountdown = pState->mExplodeCountdown;
+    pGrenade->mBaseThrowableDead = pState->mBaseThrowableDead;
+    pGrenade->mExplosionId = pState->mExplosionId;
+    pGrenade->mGrenadeOwnerRestoreId = pState->mGrenadeOwnerId;
 }
 
 void Grenade::VGetSaveState(SerializedObjectData& pSaveBuffer)
@@ -676,6 +685,9 @@ void Grenade::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mBlowUpOnCollision = mBlowUpOnCollision;
 
     data.mExplodeCountdown = mExplodeCountdown;
+    data.mBaseThrowableDead = mBaseThrowableDead;
+    data.mExplosionId = mExplosionId;
+    data.mGrenadeOwnerId = mGrenadeOwner ? mGrenadeOwner->mBaseGameObjectId : Guid{};
 
     pSaveBuffer.Write(data);
 }

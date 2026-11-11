@@ -1,9 +1,23 @@
 #pragma once
 
 #include "../relive_lib/Function.hpp"
+#include "../relive_lib/WorldStatic.hpp"
 #include "../relive_lib/GameObjects/BaseGameObject.hpp"
 #include "../relive_lib/Primitives.hpp"
 #include "../relive_lib/Layer.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
+
+struct LaughingGasSaveState final : public SaveStateBase
+{
+    LaughingGasSaveState()
+        : SaveStateBase(ReliveTypes::eLaughingGas, sizeof(*this))
+    { }
+    FP mAmountOn;
+    f32 mGasX[6][6];
+    f32 mGasY[6][6];
+    // Shared by all the gas there is
+    u32 mRandomSeed;
+};
 
 class LaughingGas final : public BaseGameObject
 {
@@ -14,6 +28,9 @@ public:
     virtual void VScreenChanged() override;
     virtual void VUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    // The camera makes the gas (from its TLV); this puts back what it was doing
+    static void RestoreFromSaveState(const LaughingGasSaveState& state);
 
     // Starts the gas's random numbers again, so it plays out the same way (for the render test)
     static void ResetRandomSeed();
@@ -55,5 +72,5 @@ private:
     s32 mHeightCount = 0;
 };
 
-extern s32 gLaughingGasInstanceCount;
-extern bool gLaughingGasOn;
+extern WorldStatic<s32> gLaughingGasInstanceCount;
+extern WorldStatic<bool> gLaughingGasOn;

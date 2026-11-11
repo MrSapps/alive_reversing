@@ -60,7 +60,7 @@ void SecurityClaw::LoadAnimations()
     mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Security_Claw_Lower_Close));
 }
 
-SecurityClaw::SecurityClaw(relive::Path_SecurityClaw* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
+SecurityClaw::SecurityClaw(relive::Path_SecurityClaw* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map, bool makeClaw)
     : ::BaseAliveGameObject(0, resMan, map)
 {
     SetType(ReliveTypes::eSecurityClaw);
@@ -104,7 +104,7 @@ SecurityClaw::SecurityClaw(relive::Path_SecurityClaw* pTlv, const Guid& tlvId, R
 
     mState = SecurityClawStates::eInit_0;
 
-    auto pClaw = relive_new Claw(resMan, map);
+    auto pClaw = makeClaw ? relive_new Claw(resMan, map) : nullptr;
     if (pClaw)
     {
         pClaw->SetSpriteScale(GetSpriteScale());
@@ -213,17 +213,17 @@ bool SecurityClaw::VTakeDamage(BaseGameObject* pFrom)
     return true;
 }
 
-void SecurityClaw::VUpdate()
+void SecurityClaw::VPostRestore()
 {
-    if (GetRestoredFromQuickSave())
+    for (u32 i = 0; i < mMotionDetectorArrayCount; i++)
     {
-        for (u32 i = 0; i < mMotionDetectorArrayCount; i++)
-        {
-            mMotionDetectorArray[i] = BaseGameObject::RefreshId(mMotionDetectorArray[i]);
-        }
-        SetRestoredFromQuickSave(false);
+        mMotionDetectorArray[i] = BaseGameObject::RefreshId(mMotionDetectorArray[i]);
     }
 
+}
+
+void SecurityClaw::VUpdate()
+{
     auto pClaw = static_cast<Claw*>(sObjectIds.Find_Impl(mClawId));
 
     if (EventGet(Event::kEventDeathReset))
@@ -423,6 +423,11 @@ void SecurityClaw::VUpdate()
     }
 }
 
+std::vector<BaseGameObject::NotStateMemory> SecurityClaw::VNotStateMemory()
+{
+    return {{&mOrbSoundChannels, sizeof(mOrbSoundChannels)}};
+}
+
 void SecurityClaw::VOnThrowableHit(BaseGameObject* /*pFrom*/)
 {
     // Empty
@@ -430,11 +435,7 @@ void SecurityClaw::VOnThrowableHit(BaseGameObject* /*pFrom*/)
 
 void SecurityClaw::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     SecurityClawSaveState data = {};
 
     data.mTlvInfo = mTlvInfo;
@@ -445,11 +446,13 @@ void SecurityClaw::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mClawX = mClawX;
     data.mClawY = mClawY;
     data.mAngle = mAngle;
-    data.mOrbSoundChannels = mOrbSoundChannels;
+    // mOrbSoundChannels is the sound system's channels: not saved, the orb sound is played again within 20 frames
+    data.mOrbSoundChannels = 0;
     data.mDetectorComeBack = mDetectorComeBack;
     data.mTlvTopLeft = mTlvTopLeft;
     data.mTlvBottomRight = mTlvBottomRight;
     data.mAnimLoaded = mAnimLoaded;
+    data.mClawId = mClawId;
 
     data.mMotionDetectorArrayCount = mMotionDetectorArrayCount;
     for (u32 i = 0; i < mMotionDetectorArrayCount; i++)
@@ -474,9 +477,10 @@ void SecurityClaw::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMa
     auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);
     auto pTlv = tlvIterator.GetTlvChecked<relive::Path_SecurityClaw>(ReliveTypes::eSecurityClaw);
 
-    auto pSecClaw = relive_new SecurityClaw(pTlv, pState->mTlvInfo, resMan, map);
+    auto pSecClaw = relive_new SecurityClaw(pTlv, pState->mTlvInfo, resMan, map, false);
     if (pSecClaw)
     {
+        pSecClaw->mClawId = pState->mClawId;
         pSecClaw->mState = pState->mState;
         pSecClaw->mTimer = pState->mTimer;
         pSecClaw->mAlarmSwitchId = pState->mAlarmSwitchId;
@@ -484,7 +488,6 @@ void SecurityClaw::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMa
         pSecClaw->mClawX = pState->mClawX;
         pSecClaw->mClawY = pState->mClawY;
         pSecClaw->mAngle = pState->mAngle;
-        pSecClaw->mOrbSoundChannels = pState->mOrbSoundChannels;
         pSecClaw->mDetectorComeBack = pState->mDetectorComeBack;
         pSecClaw->mTlvTopLeft = pState->mTlvTopLeft;
         pSecClaw->mTlvBottomRight = pState->mTlvBottomRight;
@@ -499,7 +502,22 @@ void SecurityClaw::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMa
         // mMotionDetectorArray above still holds saved tlv-info Guids at
         // this point, not live runtime ids - VUpdate() resolves them via
         // BaseGameObject::RefreshId() once every object has been recreated.
-        pSecClaw->SetRestoredFromQuickSave(true);
+    }
+}
+
+void Claw::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    ClawSaveState data = {};
+    pSaveBuffer.Write(data);
+}
+
+void Claw::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const ClawSaveState& state = *pData.ReadTmpPtr<ClawSaveState>();
+    Claw* p = relive_new Claw(resMan, map);
+    if (!p)
+    {
+        return;
     }
 }
 

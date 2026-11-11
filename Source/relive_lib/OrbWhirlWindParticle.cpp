@@ -4,10 +4,12 @@
 #include "GameObjects/ScreenManager.hpp"
 #include "GameType.hpp"
 #include <algorithm>
+#include <cstring>
+#include "ObjectIds.hpp"
 
-OrbWhirlWindParticle::OrbWhirlWindParticle(FP xpos, FP ypos, FP scale, bool isMudokonSpirit, ResourceManager& resMan, BaseMap& /*map*/)
+OrbWhirlWindParticle::OrbWhirlWindParticle(FP xpos, FP ypos, FP scale, bool isMudokonSpirit, ResourceManager& resMan, BaseMap& /*map*/, BaseGameObject* pOwner)
 {
-    mAnim.Init(resMan.LoadAnimation(AnimId::ChantOrb_Particle), nullptr);
+    mAnim.Init(resMan.LoadAnimation(AnimId::ChantOrb_Particle), pOwner);
 
     mAnim.SetSemiTrans(true);
 
@@ -38,6 +40,86 @@ OrbWhirlWindParticle::OrbWhirlWindParticle(FP xpos, FP ypos, FP scale, bool isMu
     mCurrentScale = scale;
     mRandomScale = FP_FromInteger(Math_RandomRange(7, 10)) / FP_FromInteger(10);
     mRenderAsScale = mCurrentScale * mRandomScale;
+}
+
+OrbWhirlWindParticle::OrbWhirlWindParticle(RestoreTag, ResourceManager& resMan, BaseGameObject* pOwner)
+{
+    mAnim.Init(resMan.LoadAnimation(AnimId::ChantOrb_Particle), pOwner);
+}
+
+OrbWhirlWindParticleState OrbWhirlWindParticle::GetState() const
+{
+    OrbWhirlWindParticleState state;
+    std::memset(static_cast<void*>(&state), 0, sizeof(state));
+    state.mAnim = mAnim.GetSaveState();
+    state.mRingTargetId = mRingTargetObjId ? mRingTargetObjId->mBaseGameObjectId : Guid{};
+    state.mXPosRenderOffset = mXPosRenderOffset;
+    state.mYPosRenderOffset = mYPosRenderOffset;
+    state.mRenderAsScale = mRenderAsScale;
+    state.mRadiusOffsetX = mRadiusOffsetX;
+    state.mYPosIncrement = mYPosIncrement;
+    state.mCurrentScale = mCurrentScale;
+    state.mRandomScale = mRandomScale;
+    state.mScaleOffsetFlyToTarget = mScaleOffsetFlyToTarget;
+    state.mXPosMid = mXPosMid;
+    state.mYPosMid = mYPosMid;
+    state.mRadiusX = mRadiusX;
+    state.mRadiusY = mRadiusY;
+    state.mMoveY = mMoveY;
+    state.mXPos = mXPos;
+    state.mYPos = mYPos;
+    state.mTargetObjScale = mTargetObjScale;
+    state.mXPosOffset = mXPosOffset;
+    state.mYPosOffset = mYPosOffset;
+    state.mXPosOffset2 = mXPosOffset2;
+    state.mYPosOffset2 = mYPosOffset2;
+    state.mScaleOffsetSpinAtTarget = mScaleOffsetSpinAtTarget;
+    state.mState = static_cast<s32>(mState);
+    state.mRenderAngle = mRenderAngle;
+    state.mPositionTimer = mPositionTimer;
+    state.mCounter = mCounter;
+    state.mMaxCounter = mMaxCounter;
+    state.mIsActive = mIsActive;
+    return state;
+}
+
+void OrbWhirlWindParticle::SetState(const OrbWhirlWindParticleState& state)
+{
+    mAnim.RestoreSaveState(state.mAnim);
+    mRestoredRingTargetId = state.mRingTargetId;
+    mXPosRenderOffset = state.mXPosRenderOffset;
+    mYPosRenderOffset = state.mYPosRenderOffset;
+    mRenderAsScale = state.mRenderAsScale;
+    mRadiusOffsetX = state.mRadiusOffsetX;
+    mYPosIncrement = state.mYPosIncrement;
+    mCurrentScale = state.mCurrentScale;
+    mRandomScale = state.mRandomScale;
+    mScaleOffsetFlyToTarget = state.mScaleOffsetFlyToTarget;
+    mXPosMid = state.mXPosMid;
+    mYPosMid = state.mYPosMid;
+    mRadiusX = state.mRadiusX;
+    mRadiusY = state.mRadiusY;
+    mMoveY = state.mMoveY;
+    mXPos = state.mXPos;
+    mYPos = state.mYPos;
+    mTargetObjScale = state.mTargetObjScale;
+    mXPosOffset = state.mXPosOffset;
+    mYPosOffset = state.mYPosOffset;
+    mXPosOffset2 = state.mXPosOffset2;
+    mYPosOffset2 = state.mYPosOffset2;
+    mScaleOffsetSpinAtTarget = state.mScaleOffsetSpinAtTarget;
+    mState = static_cast<State>(state.mState);
+    mRenderAngle = state.mRenderAngle;
+    mPositionTimer = state.mPositionTimer;
+    mCounter = state.mCounter;
+    mMaxCounter = state.mMaxCounter;
+    mIsActive = state.mIsActive;
+}
+
+void OrbWhirlWindParticle::ResolveTarget()
+{
+    mRingTargetObjId = mRestoredRingTargetId.IsValid() ? sObjectIds.Find_Impl(mRestoredRingTargetId) : nullptr;
+    mRestoredRingTargetId = Guid{};
 }
 
 s32 OrbWhirlWindParticle::IsActive()

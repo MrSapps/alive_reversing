@@ -17,7 +17,8 @@ public:
     ~ObjectIds();
     ObjectIds();
     void Insert(TObjectId_KeyType objCount, BaseGameObject* pGameObj);
-    s16 Remove(TObjectId_KeyType idToRemove);
+    // pOnlyIfThis: only if the id is that object's, as another may have taken it since
+    s16 Remove(TObjectId_KeyType idToRemove, BaseGameObject* pOnlyIfThis = nullptr);
 
     // Use the "checked" Find() so the types are verified where possible (i.e its to a specific single derived type
     BaseGameObject* Find_Impl(TObjectId_KeyType idToFind);

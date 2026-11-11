@@ -17,10 +17,14 @@ static MusicController* sMusicController = nullptr;
 static u32 sMusicControllerBaseTimeStamp = 0;
 static u32 sMusicTime = 0;
 
+// Not part of the world (it is not saved or compared): the music is driven by the clock, not the game
+static u8 sMusicRandomSeed = 0;
+
 // Logs the result, for replaying a run on the PS1's MusicController with the same choices
 static s32 MusicRandom(s32 min, s32 max)
 {
-    const s32 value = Math_RandomRange(min, max);
+    // The music has numbers of its own: it runs on the clock, so the game's can't depend on it
+    const s32 value = ::Math_RandomRangeSeeded(static_cast<s16>(min), static_cast<s16>(max), sMusicRandomSeed);
     SoundDebug::LogSeqCall("RAND %d %d %d", min, max, value);
     return value;
 }

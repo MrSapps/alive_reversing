@@ -50,6 +50,7 @@ struct FallingItemSaveState final : public SaveStateBase
 class FallingItem final : public ::BaseAliveGameObject
 {
 public:
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
     FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~FallingItem();
 

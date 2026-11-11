@@ -79,9 +79,8 @@ void Bone::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& res
     pBone->SetDrawable(pState->mDrawable);
     pBone->SetInteractive(pState->mInteractive);
 
-    pBone->SetRestoredFromQuickSave(true);
 
-    pBone->mShimmerTimer = sGnFrame;
+    pBone->mShimmerTimer = pState->mShimmerTimerSaved ? pState->mShimmerTimer : sGnFrame;
 
     pBone->BaseAliveGameObjectCollisionLineType = pState->mCollisionLineType;
     pBone->mBaseThrowableCount = pState->mThrowableCount;
@@ -98,6 +97,29 @@ void Bone::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& res
     {
         pBone->mHitObject = true;
     }
+}
+
+void Bone::VPostRestore()
+{
+    // Found again from the line type the save has, without moving the object: it is where it was saved
+    BaseAliveGameObjectCollisionLine = nullptr;
+    if (BaseAliveGameObjectCollisionLineType != -1)
+    {
+        FP hitX = {};
+        FP hitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(10),
+            mXPos,
+            mYPos + FP_FromInteger(10),
+            &BaseAliveGameObjectCollisionLine,
+            &hitX,
+            &hitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+    }
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
 }
 
 Bone::~Bone()
@@ -262,7 +284,9 @@ void Bone::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mPreviousYPos = mPreviousYPos;
     data.mTimeToLiveTimer = mDeadTimer;
 
-    pSaveBuffer.Write(data);
+        data.mShimmerTimerSaved = true;
+    data.mShimmerTimer = mShimmerTimer;
+pSaveBuffer.Write(data);
 }
 
 void Bone::InTheAir()

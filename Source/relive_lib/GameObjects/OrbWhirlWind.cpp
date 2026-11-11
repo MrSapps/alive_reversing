@@ -3,6 +3,7 @@
 #include "../OrbWhirlWindParticle.hpp"
 #include "../Function.hpp"
 #include "BaseAnimatedWithPhysicsGameObject.hpp"
+#include "../SerializedObjectData.hpp"
 
 OrbWhirlWind::OrbWhirlWind(FP xpos, FP ypos, FP scale, bool bIsMudokonSpirit, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
@@ -23,6 +24,68 @@ OrbWhirlWind::OrbWhirlWind(FP xpos, FP ypos, FP scale, bool bIsMudokonSpirit, Re
     mParticleIdx = 0;
 
     memset(mOrbParticles, 0, sizeof(mOrbParticles));
+}
+
+OrbWhirlWind::OrbWhirlWind(RestoreTag, ResourceManager& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
+{
+    SetType(ReliveTypes::eNone);
+    gObjListDrawables->Push_Back(this);
+    SetDrawable(true);
+    memset(mOrbParticles, 0, sizeof(mOrbParticles));
+}
+
+void OrbWhirlWind::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    OrbWhirlWindSaveState data = {};
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mScale = mScale;
+    data.mParticleSpawnCounter = mParticleSpawnCounter;
+    data.mState = static_cast<s32>(mState);
+    data.mParticleIdx = mParticleIdx;
+    data.mIsMudokonSpirit = mIsMudokonSpirit;
+    for (s32 i = 0; i < mParticleIdx && i < ALIVE_COUNTOF(mOrbParticles); i++)
+    {
+        if (mOrbParticles[i])
+        {
+            data.mParticles[i] = mOrbParticles[i]->GetState();
+        }
+    }
+    pSaveBuffer.Write(data);
+}
+
+void OrbWhirlWind::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const OrbWhirlWindSaveState& state = *pData.ReadTmpPtr<OrbWhirlWindSaveState>();
+    OrbWhirlWind* p = relive_new OrbWhirlWind(RestoreTag{}, resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mXPos = state.mXPos;
+    p->mYPos = state.mYPos;
+    p->mScale = state.mScale;
+    p->mParticleSpawnCounter = state.mParticleSpawnCounter;
+    p->mState = static_cast<ParticlesState>(state.mState);
+    p->mParticleIdx = state.mParticleIdx;
+    p->mIsMudokonSpirit = state.mIsMudokonSpirit;
+    for (s32 i = 0; i < p->mParticleIdx && i < ALIVE_COUNTOF(p->mOrbParticles); i++)
+    {
+        p->mOrbParticles[i] = relive_new OrbWhirlWindParticle(OrbWhirlWindParticle::RestoreTag{}, resMan, p);
+        p->mOrbParticles[i]->SetState(state.mParticles[i]);
+    }
+}
+
+void OrbWhirlWind::VPostRestore()
+{
+    for (s32 i = 0; i < mParticleIdx && i < ALIVE_COUNTOF(mOrbParticles); i++)
+    {
+        if (mOrbParticles[i])
+        {
+            mOrbParticles[i]->ResolveTarget();
+        }
+    }
 }
 
 void OrbWhirlWind::ToSpin(FP xpos, FP ypos, FP scale, BaseGameObject* pObj)
@@ -80,7 +143,7 @@ void OrbWhirlWind::VUpdate()
                 mYPos,
                 mScale,
                 mIsMudokonSpirit,
-                mResMan, mMap);
+                mResMan, mMap, this);
             mOrbParticles[mParticleIdx++] = pParticle;
 
             if (mParticleIdx >= ALIVE_COUNTOF(mOrbParticles))

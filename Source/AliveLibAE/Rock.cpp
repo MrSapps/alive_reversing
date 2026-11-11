@@ -77,34 +77,39 @@ Rock::~Rock()
     }
 }
 
+void Rock::VPostRestore()
+{
+    if (BaseAliveGameObjectCollisionLineType == -1)
+    {
+        BaseAliveGameObjectCollisionLine = nullptr;
+    }
+    else
+    {
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(10),
+            mXPos,
+            mYPos + FP_FromInteger(10),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+    }
+
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
+}
+
 void Rock::VUpdate()
 {
     auto pObj = sObjectIds.Find_Impl(BaseAliveGameObject_PlatformId);
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);
-    }
-
-    if (GetRestoredFromQuickSave())
-    {
-        SetRestoredFromQuickSave(false);
-        if (BaseAliveGameObjectCollisionLineType == -1)
-        {
-            BaseAliveGameObjectCollisionLine = nullptr;
-        }
-        else
-        {
-            gCollisions->Raycast(
-                mXPos,
-                mYPos - FP_FromInteger(10),
-                mXPos,
-                mYPos + FP_FromInteger(10),
-                &BaseAliveGameObjectCollisionLine,
-                &mXPos,
-                &mYPos,
-                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
-        }
-        BaseAliveGameObjectCollisionLineType = 0;
     }
 
     switch (mState)
@@ -452,7 +457,9 @@ void Rock::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mPreviousXPos = mPreviousXPos;
     data.mPreviousYPos = mPreviousYPos;
 
-    pSaveBuffer.Write(data);
+        data.mShimmerTimerSaved = true;
+    data.mShimmerTimer = mShimmerTimer;
+pSaveBuffer.Write(data);
 }
 
 void Rock::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
@@ -486,9 +493,7 @@ void Rock::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& res
     pRock->SetDrawable(pState->mDrawable);
     pRock->SetInteractive(pState->mInteractive);
 
-    pRock->SetRestoredFromQuickSave(true);
-
-    pRock->mShimmerTimer = sGnFrame;
+    pRock->mShimmerTimer = pState->mShimmerTimerSaved ? pState->mShimmerTimer : sGnFrame;
 
     pRock->BaseAliveGameObjectCollisionLineType = pState->mCollisionLineType;
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 
 namespace relive
 {
@@ -14,9 +15,25 @@ enum class TorturedMudokonState : s16
     eReleased_2 = 2
 };
 
+struct TorturedMudokonSaveState final : public SaveStateBase
+{
+    TorturedMudokonSaveState()
+        : SaveStateBase(ReliveTypes::eTorturedMud, sizeof(*this))
+    { }
+    AnimationSaveState mTearsAnim;
+    AnimationSaveState mZapAnim;
+    s32 mFlashColourTimer;
+    s16 mFlashColourCounter;
+    s32 mState;
+    s16 mPainSoundPitch;
+};
+
 class TorturedMudokon final : public ::BaseAnimatedWithPhysicsGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const TorturedMudokonSaveState& state);
+
     TorturedMudokon(relive::Path_TorturedMudokon* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~TorturedMudokon();
     

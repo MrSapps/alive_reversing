@@ -2,8 +2,20 @@
 
 #include "BaseAnimatedWithPhysicsGameObject.hpp"
 #include "../Layer.hpp"
+#include "../SaveStateBase.hpp"
 
 class BaseMap;
+
+struct ParticleSaveState final : public SaveStateBase
+{
+    ParticleSaveState()
+        : SaveStateBase(ReliveTypes::eParticle, sizeof(*this))
+    { }
+    // Not the header type: a BirdPortal sets it on the particles it makes
+    ReliveTypes mObjectType;
+    AnimatedObjectSaveState mObject;
+    FP mScaleAmount;
+};
 
 class Particle final : public BaseAnimatedWithPhysicsGameObject
 {
@@ -11,6 +23,8 @@ public:
     Particle(FP xpos, FP ypos, AnimResource& res, ResourceManager& resMan, BaseMap& map, bool explosionSizeHack = false);
     ~Particle();
     virtual void VUpdate() override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
 public:
     FP mScaleAmount = {};
 };

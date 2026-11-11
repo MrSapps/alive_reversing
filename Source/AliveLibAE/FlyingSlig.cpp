@@ -253,8 +253,7 @@ void FlyingSlig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMana
         pFlyingSlig->field_27E_g = pSaveState->field_1E_oldg;
         pFlyingSlig->field_280_b = pSaveState->field_20_oldb;
 
-        pFlyingSlig->mRGB.SetRGB(pSaveState->field_1C_oldr, pSaveState->field_1E_oldg, pSaveState->field_20_oldb);
-
+        // The colour it is drawn with is in the animation state
         pFlyingSlig->mCurrentMotion = pSaveState->field_24_current_state;
 
         pFlyingSlig->GetAnimation().Set_Animation_Data(pFlyingSlig->GetAnimRes(sFlyingSligAnimIdTable[static_cast<u32>(pFlyingSlig->mCurrentMotion)]));
@@ -275,7 +274,6 @@ void FlyingSlig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMana
         pFlyingSlig->mHealth = pSaveState->field_2C_current_health;
         pFlyingSlig->mCurrentMotion = pSaveState->field_30_current_state;
         pFlyingSlig->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pSaveState->field_34_lastLineYPos);
-        pFlyingSlig->SetRestoredFromQuickSave(true);
         pFlyingSlig->BaseAliveGameObjectCollisionLineType = -1;
 
         if (pSaveState->field_36_line_idx != -1)
@@ -314,6 +312,7 @@ void FlyingSlig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMana
         pFlyingSlig->field_188_ySpeed = pSaveState->field_50_ySpeed;
         pFlyingSlig->field_17D_next_speak = pSaveState->field_54_next_speak;
         pFlyingSlig->field_160_voice_pitch_min = pSaveState->field_56_voice_pitch_min;
+        pFlyingSlig->field_15C_voice_pitch_min = pSaveState->field_15C_voice_pitch_min;
         pFlyingSlig->field_158_obj_id = pSaveState->field_58_obj_id;
         pFlyingSlig->field_18C = pSaveState->field_5C;
         pFlyingSlig->field_190 = pSaveState->field_60;
@@ -338,11 +337,7 @@ void FlyingSlig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMana
 
 void FlyingSlig::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     FlyingSligSaveState data = {};
 
     data.mType = ReliveTypes::eFlyingSlig;
@@ -356,9 +351,9 @@ void FlyingSlig::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.field_16_lvl_number = mCurrentLevel;
     data.field_18_sprite_scale = GetSpriteScale();
 
-    data.field_1C_oldr = mRGB.r;
-    data.field_1E_oldg = mRGB.g;
-    data.field_20_oldb = mRGB.b;
+    data.field_1C_oldr = field_27C_r;
+    data.field_1E_oldg = field_27E_g;
+    data.field_20_oldb = field_280_b;
 
     data.field_22_bAnimFlipX = GetAnimation().GetFlipX();
     data.field_24_current_state = mCurrentMotion;
@@ -402,6 +397,7 @@ void FlyingSlig::VGetSaveState(SerializedObjectData& pSaveBuffer)
 
     data.field_54_next_speak = field_17D_next_speak;
     data.field_56_voice_pitch_min = field_160_voice_pitch_min;
+    data.field_15C_voice_pitch_min = field_15C_voice_pitch_min;
 
     data.field_58_obj_id = Guid{};
     if (field_158_obj_id != Guid{})
@@ -488,45 +484,50 @@ void FlyingSlig::VScreenChanged()
     }
 }
 
-void FlyingSlig::VUpdate()
+std::vector<BaseGameObject::NotStateMemory> FlyingSlig::VNotStateMemory()
 {
-    if (GetRestoredFromQuickSave())
+    // The TLV it was made from, with the flags that TLV had then
+    return {{&field_118_data, sizeof(field_118_data)}};
+}
+
+void FlyingSlig::VPostRestore()
+{
+    if (!IsPossessed())
     {
-        SetRestoredFromQuickSave(false);
-
-        if (!IsPossessed())
+        if (BaseAliveGameObjectCollisionLineType != -1)
         {
-            if (BaseAliveGameObjectCollisionLineType != -1)
-            {
-                const FP savedNextXPos = field_294_nextXPos;
-                const FP savedNextYPos = field_298_nextYPos;
-                // Everything else uses this a a line type, but of course MrSlig uses it as an index
-                BaseAliveGameObjectCollisionLine = gCollisions->Get_Line_At_Idx(BaseAliveGameObjectCollisionLineType);
-                sub_4348A0();
-                field_294_nextXPos = savedNextXPos;
-                field_298_nextYPos = savedNextYPos;
-            }
+            // Everything else uses this a a line type, but of course MrSlig uses it as an index
+            BaseAliveGameObjectCollisionLine = gCollisions->Get_Line_At_Idx(BaseAliveGameObjectCollisionLineType);
+            // Where it is on the line, how fast it goes along it and the rest are in the save
+            SetActiveLine(BaseAliveGameObjectCollisionLine);
         }
+    }
 
-        if (field_158_obj_id != Guid{})
+    if (field_158_obj_id != Guid{})
+    {
+        for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
         {
-            for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
+            BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
+            if (!pObj)
             {
-                BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
-                if (!pObj)
-                {
-                    break;
-                }
+                break;
+            }
 
-                if (pObj->mBaseGameObjectTlvInfo == field_158_obj_id)
-                {
-                    field_158_obj_id = pObj->mBaseGameObjectId;
-                    break;
-                }
+            if (pObj->mBaseGameObjectTlvInfo == field_158_obj_id)
+            {
+                field_158_obj_id = pObj->mBaseGameObjectId;
+                break;
             }
         }
     }
 
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
+}
+
+void FlyingSlig::VUpdate()
+{
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);

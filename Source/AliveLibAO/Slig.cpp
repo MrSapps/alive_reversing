@@ -488,28 +488,31 @@ const u32 sSligVelXTable_4BCA30[] = {262144, 262144, 0, 4294705152, 4294705152, 
 const u32 sSligVelYTable_4BCA50[] = {0, 4294705152, 4294705152, 4294705152, 0, 262144, 262144, 262144};
 
 
-void Slig::VUpdate()
+void Slig::VPostRestore()
 {
-    if (GetRestoredFromQuickSave())
+    if (BaseAliveGameObjectCollisionLineType != -1)
     {
-        if (BaseAliveGameObjectCollisionLineType != -1)
-        {
-            gCollisions->Raycast(
-                mXPos,
-                mYPos - FP_FromInteger(20),
-                mXPos,
-                mYPos + FP_FromInteger(20),
-                &BaseAliveGameObjectCollisionLine,
-                &mXPos,
-                &mYPos,
-                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
-
-            BaseAliveGameObjectCollisionLineType = -1;
-        }
-
-        SetRestoredFromQuickSave(false);
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
     }
 
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
+}
+
+void Slig::VUpdate()
+{
     if (!Input_IsChanting())
     {
         mPreventDepossession &= ~4u;
@@ -5489,11 +5492,7 @@ static const Slig::TBrainFn sSligBrainTable[] = {
 
 void Slig::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     // Sligs created dynamically by SligSpawner aren't tied to their own TLV
     // (field_134_tlvInfo is {}), so there's nothing stable to re-resolve on
     // restore - skip them rather than risk matching an unrelated TLV whose
@@ -5544,12 +5543,14 @@ void Slig::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mReturnToPreviousMotion = mReturnToPreviousMotion;
     data.mCheckedIfOffScreen = mCheckedIfOffScreen;
     data.mInput = mInput;
+    data.mNextGameSpeakMotion = field_258_next_gamespeak_motion;
     data.mTimer128 = field_128_timer;
     // field_134_tlvInfo is wrong for Sligs recreated via SligBoundLeftAO/
     // SligBoundRightAO (AO OG bug: gets set to the bound marker's tlv id,
     // not the Slig's own) - field_174_tlv always points at the Slig's real
     // TLV, so use its id instead.
     data.mTlvInfo = field_174_tlv->mId;
+    data.mMadeWithTlvInfo = field_134_tlvInfo;
     data.mShotMotion = field_13A_shot_motion;
     data.mZoneRect = field_13C_zone_rect;
     data.mAbeLevel = mAbeLevel;
@@ -5572,6 +5573,13 @@ void Slig::VGetSaveState(SerializedObjectData& pSaveBuffer)
         }
         idx++;
     }
+
+    data.mbMotionChanged = mbMotionChanged;
+    for (s32 i = 0; i < ALIVE_COUNTOF(field_1CC_points); i++)
+    {
+        data.mPoints[i] = field_1CC_points[i];
+    }
+    data.mPointsCount = field_1F4_points_count;
 
     pSaveBuffer.Write(data);
 }
@@ -5626,6 +5634,12 @@ void Slig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& r
         pSlig->mRGB.SetRGB(pState->mRed, pState->mGreen, pState->mBlue);
 
         pSlig->mCurrentMotion = pState->mCurrentMotion;
+        pSlig->mbMotionChanged = pState->mbMotionChanged;
+        for (s32 i = 0; i < ALIVE_COUNTOF(pSlig->field_1CC_points); i++)
+        {
+            pSlig->field_1CC_points[i] = pState->mPoints[i];
+        }
+        pSlig->field_1F4_points_count = pState->mPointsCount;
         pSlig->GetAnimation().Set_Animation_Data(pSlig->GetAnimRes(sSligMotionAnimIds[static_cast<s32>(pState->mCurrentMotion)]));
 
         pSlig->GetAnimation().SetCurrentFrame(pState->mCurrentFrame);
@@ -5653,8 +5667,9 @@ void Slig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& r
         pSlig->mReturnToPreviousMotion = pState->mReturnToPreviousMotion;
         pSlig->mCheckedIfOffScreen = pState->mCheckedIfOffScreen;
         pSlig->mInput = static_cast<s16>(pState->mInput);
+        pSlig->field_258_next_gamespeak_motion = pState->mNextGameSpeakMotion;
         pSlig->field_128_timer = pState->mTimer128;
-        pSlig->field_134_tlvInfo = pState->mTlvInfo;
+        pSlig->field_134_tlvInfo = pState->mMadeWithTlvInfo.IsValid() ? pState->mMadeWithTlvInfo : pState->mTlvInfo;
         pSlig->field_13A_shot_motion = pState->mShotMotion;
         pSlig->field_13C_zone_rect = pState->mZoneRect;
         pSlig->mAbeLevel = pState->mAbeLevel;
@@ -5670,7 +5685,6 @@ void Slig::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& r
 
         // Arms the VUpdate() block above that re-raycasts the collision
         // line - see BaseAliveGameObjectCollisionLineType above.
-        pSlig->SetRestoredFromQuickSave(true);
     }
 }
 

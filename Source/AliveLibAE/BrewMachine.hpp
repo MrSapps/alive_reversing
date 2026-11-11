@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 #include "Font.hpp"
 
 namespace relive
@@ -8,14 +9,29 @@ namespace relive
     struct Path_BrewMachine;
 }
 
+struct BrewMachineSaveState final : public SaveStateBase
+{
+    BrewMachineSaveState()
+        : SaveStateBase(ReliveTypes::eBrewMachine, sizeof(*this))
+    { }
+    s16 mRemainingBrewCount;
+    s16 mBrewMachineCamera;
+    s16 mTextX;
+    s16 mTextY;
+};
+
 class BrewMachine final : public ::BaseAnimatedWithPhysicsGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const BrewMachineSaveState& state);
+
     BrewMachine(relive::Path_BrewMachine* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~BrewMachine();
     
     virtual void VUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
     s16 GetRemainingBrewCount() const { return mRemainingBrewCount; }
     void DecreaseRemainingBrewCount() { mRemainingBrewCount--; }
 

@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "Paramite.hpp"
 #include "../relive_lib/Function.hpp"
 #include "stdlib.hpp"
@@ -245,6 +246,15 @@ void Paramite::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManage
     pParamite->mRGB.SetRGB(pState->mR, pState->mG, pState->mB);
 
     pParamite->mCurrentMotion = pState->field_24_current_motion;
+    if (pState->mPreviousMotionSaved)
+    {
+        pParamite->mPreviousMotion = static_cast<eParamiteMotions>(pState->mPreviousMotion);
+        pParamite->mParamiteGamespeakNextMotion = static_cast<eParamiteMotions>(pState->mGamespeakNextMotion);
+    }
+    if (pState->mParamiteXOffsetSaved)
+    {
+        pParamite->field_15C_paramite_xOffset = pState->mParamiteXOffset;
+    }
     pParamite->GetAnimation().Set_Animation_Data(pParamite->GetAnimRes(sParamiteMotionAnimIds[static_cast<u32>(pParamite->mCurrentMotion)]));
 
     pParamite->GetAnimation().SetCurrentFrame(pState->mAnimCurrentFrame);
@@ -264,7 +274,6 @@ void Paramite::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManage
     pParamite->mCurrentMotion = pState->field_30_current_motion;
     pParamite->mNextMotion = pState->field_32_next_motion;
     pParamite->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pState->field_34_last_line_ypos);
-    pParamite->SetRestoredFromQuickSave(true);
     pParamite->BaseAliveGameObjectCollisionLineType = pState->field_36_line_type;
 
     pParamite->mMeatGuid = pState->field_40_meat_id;
@@ -286,7 +295,7 @@ void Paramite::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManage
     pParamite->mAbePath = pState->mAbePath;
     pParamite->mAbeCamera = pState->mAbeCamera;
 
-    pParamite->field_154_input = InputObject::PsxButtonsToKeyboardInput(pState->field_72_input);
+    pParamite->field_154_input = pState->mInputRaw;
     pParamite->field_158_next_brain_ret = pState->field_74_next_brain_ret;
 
     pParamite->mRunning = pState->mRunning;
@@ -312,11 +321,7 @@ static Guid ResolveId(Guid objId)
 
 void Paramite::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     ParamiteSaveState data = {};
 
     data.mType = ReliveTypes::eParamite;
@@ -390,6 +395,7 @@ void Paramite::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mAbeCamera = mAbeCamera;
 
     data.field_72_input = InputObject::KeyboardInputToPsxButtons_45EF70(field_154_input);
+    data.mInputRaw = field_154_input;
     data.field_74_next_brain_ret = field_158_next_brain_ret;
 
     data.mRunning = mRunning;
@@ -399,6 +405,11 @@ void Paramite::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mAlerted = mAlerted;
     data.mCanBePossessed = GetCanBePossessed();
 
+    data.mPreviousMotionSaved = true;
+    data.mPreviousMotion = static_cast<s32>(mPreviousMotion);
+    data.mGamespeakNextMotion = static_cast<s32>(mParamiteGamespeakNextMotion);
+    data.mParamiteXOffsetSaved = true;
+    data.mParamiteXOffset = field_15C_paramite_xOffset;
     pSaveBuffer.Write(data);
 }
 
@@ -5114,46 +5125,50 @@ void Paramite::HandleBrainsAndMotions()
     }
 }
 
-void Paramite::VUpdate()
+void Paramite::VPostRestore()
 {
-    if (GetRestoredFromQuickSave())
+    if (BaseAliveGameObjectCollisionLineType == -1)
     {
-        SetRestoredFromQuickSave(false);
-        if (BaseAliveGameObjectCollisionLineType == -1)
-        {
-            BaseAliveGameObjectCollisionLine = nullptr;
-        }
-        else
-        {
-            gCollisions->Raycast(
-                mXPos,
-                mYPos - FP_FromInteger(20),
-                mXPos,
-                mYPos + FP_FromInteger(20),
-                &BaseAliveGameObjectCollisionLine,
-                &mXPos,
-                &mYPos,
-                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
-        }
+        BaseAliveGameObjectCollisionLine = nullptr;
+    }
+    else
+    {
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+    }
+    mMeatGuid = BaseGameObject::RefreshId(mMeatGuid);
+    mTargetGuid = BaseGameObject::RefreshId(mTargetGuid);
+    mPullRingRopeGuid = BaseGameObject::RefreshId(mPullRingRopeGuid);
 
-        BaseAliveGameObjectCollisionLineType = 0;
-        mMeatGuid = BaseGameObject::RefreshId(mMeatGuid);
-        mTargetGuid = BaseGameObject::RefreshId(mTargetGuid);
-        mPullRingRopeGuid = BaseGameObject::RefreshId(mPullRingRopeGuid);
-
-        if (mWebGuid != Guid{})
+    if (mWebGuid != Guid{})
+    {
+        auto pWeb = relive_new ParamiteWeb(mXPos,
+                                        FP_GetExponent(mYPos) - 20,
+                                        FP_GetExponent(mYPos) - 10,
+                                        GetSpriteScale(), mResMan, mMap);
+        if (pWeb)
         {
-            auto pWeb = relive_new ParamiteWeb(mXPos,
-                                            FP_GetExponent(mYPos) - 20,
-                                            FP_GetExponent(mYPos) - 10,
-                                            GetSpriteScale(), mResMan, mMap);
-            if (pWeb)
-            {
-                mWebGuid = pWeb->mBaseGameObjectId;
-            }
+            mWebGuid = pWeb->mBaseGameObjectId;
         }
     }
 
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
+}
+
+void Paramite::VUpdate()
+{
     if (mHealth > FP_FromInteger(0)
         && mMap.Is_Point_In_Current_Camera(
             mCurrentLevel,
@@ -6060,7 +6075,7 @@ void Paramite::HandleInputRunning()
     }
 }
 
-s16 sParamiteDelayIdx_5C92EC = 0;
+WorldStatic<s16> sParamiteDelayIdx_5C92EC("AE.Paramite.sParamiteDelayIdx_5C92EC", 0);
 
 const s16 sParamiteDelayTable_55D7B8[4] = {0, 5, 10, 0};
 

@@ -59,6 +59,12 @@ struct MineCarSaveState final : public SaveStateBase
     s16 field_62_spawned_camera;
     s16 field_64_throw_item_key1;
     s16 field_66_continue_move_input;
+    // False for a save from the original game's, which works it out from the speed
+    bool mVelxIndexSaved;
+    s16 field_1C4_velx_index;
+    // False for a save from the original game's
+    bool mTreadAnimSaved;
+    AnimationSaveState mTreadAnim;
 };
 
 class MineCar final : public BaseAliveGameObject
@@ -70,6 +76,7 @@ public:
     void LoadAnimations();
 
     virtual void VUpdate() override;
+    virtual void VPostRestore() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VScreenChanged() override;
     virtual void VStopAudio() override;

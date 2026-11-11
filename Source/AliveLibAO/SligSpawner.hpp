@@ -28,6 +28,7 @@ public:
 
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
     static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 

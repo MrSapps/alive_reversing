@@ -41,6 +41,7 @@ struct EvilFartSaveState final : public SaveStateBase
     s16 field_32_padding;
     s32 mUnpossessionTimer;
     s32 mBackToAbeTimer;
+    bool mPossessed;
 };
 
 class EvilFart final : public BaseAliveGameObject

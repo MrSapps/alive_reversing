@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../ObjectIds.hpp"
+#include "../SerializedObjectData.hpp"
 #include "../Function.hpp"
 #include "ZzzSpawner.hpp"
 #include "../../AliveLibAE/stdlib.hpp"
@@ -62,4 +64,22 @@ void ZzzSpawner::VUpdate()
 
         mTimer = MakeTimer(mZzzInterval);
     }
+}
+
+void ZzzSpawner::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    ZzzSpawnerSaveState data = {};
+    data.mTimer = mTimer;
+    pSaveBuffer.Write(data);
+}
+
+void ZzzSpawner::RestoreFromSaveState(const ZzzSpawnerSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    ZzzSpawner* p = static_cast<ZzzSpawner*>(pObj);
+    p->mTimer = state.mTimer;
 }

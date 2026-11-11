@@ -48,6 +48,26 @@ struct AbilityRingSaveState final : public SaveStateBase
     s16 mRingRed;
     s16 mRingGreen;
     s16 mRingBlue;
+    // False for a save made from the original game's: only the fields above are in it, the rest comes from making the ring
+    bool mFullState;
+    bool mRefreshTargetObjId;
+    s32 mRingLayer;
+    FP mRingLeft;
+    FP mRingSpeed;
+    FP mRingScaleX;
+    FP mRingScaleY;
+    FP mRingThickness;
+    s16 mRingFadeoutDistance;
+    s16 mRingScreenX;
+    s16 mRingScreenY;
+    s16 mRingScreenXPos;
+    s16 mRingScreenYPos;
+    s16 mRingSemiTrans;
+    EReliveLevelIds mRingLevel;
+    s16 mRingPath;
+    Guid mRingTargetObjId;
+    // The collision rects of the rings: made as it is drawn, and used by the next update
+    s16 mRingCollideRects[64][4];
 };
 
 struct AbilityRing_PolyBuffer;
@@ -61,12 +81,18 @@ public:
 
     virtual void VUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
     virtual void VScreenChanged() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
 
     static AbilityRing* Factory(FP xpos, FP ypos, RingTypes ringType, FP scale, ResourceManager& resMan, BaseMap& map);
     void SetTarget(BaseGameObject* pTarget);
     static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
+
+    // For a save: made with none of what a ring does, that is in the save
+    struct RestoreTag final
+    { };
+    AbilityRing(RestoreTag, ResourceManager& resMan, BaseMap& map);
 
 private:
     void CollideWithObjects(bool bDealDamage);

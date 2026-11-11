@@ -1,5 +1,8 @@
 #pragma once
 
+#include <functional>
+#include <vector>
+
 #include "MapWrapper.hpp"
 #include "BinaryPath.hpp"
 #include "FixedPoint.hpp"
@@ -234,6 +237,10 @@ public:
     // --- TLVs ---
 
     void TLV_Reset(const Guid& tlvId, s16 hiFlags = -1);
+
+    // Makes the objects of a saved game that the cameras did not: one can live beyond its camera, and one that has no
+    // save of its own (a switch controller) is made again from the TLV its id came from
+    void MakeMissingTlvObjects(const std::vector<Guid>& savedIds);
     void TLV_Persist(const Guid& tlvId, s16 hiFlags = -1);
     void TLV_Delete(const Guid& tlvId, s16 hiFlags = -1);
     void Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bSetDestroyed);
@@ -320,6 +327,31 @@ public:
     // to both. Not to be confused with AO's separate legacy SaveGame restore
     // (see VClearPendingSaveRestore).
     PendingObjectRestoreData* mPendingSaveRestore = nullptr;
+    // The restore that is under way leaves the pads as the save had them, instead of reading them again at its end: for
+    // a restore that carries on exactly where the save was (the player loading, who may still hold a button, doesn't)
+    bool mRestoreKeepsInput = false;
+    // The camera being loaded is a saved game's, not a screen change: see TlvFlags::eBit4_ResetThisVisit
+    bool mLoadingFromSave = false;
+    // The camera swap that finishes next is a restore's: what the world made when it swapped in (a trigger for the music)
+    // is in the save already, so the sounds of the near cameras start without making it again
+    bool mCameraSwapIsRestore = false;
+    // While the objects a save has are being made: what an object does to others while it is made is put right by the save
+    bool mRestoringObjects = false;
+    // Whether what is made now is made by a restore: it is not the game running, so a constructor must not do what the game
+    // does when it makes the object (change a switch or a count, make another object): the save has the result
+    bool IsRestoring() const { return mRestoringObjects || mLoadingFromSave; }
+    // The TLVs a restore found reset, which stay so (the ones the restore resets itself do not), see ResetThisVisit
+    std::vector<const relive::Path_TLV*> mRestoredResetTlvs;
+    // The ids of the objects of the saved game in the order they were in: objects made and taken away while the save
+    // is restored (the camera swapper) move the others, so the order is put back when that is done
+    std::vector<Guid> mRestoreObjectOrder;
+    std::vector<Guid> mRestoreDrawablesOrder;
+    std::vector<Guid> mRestoreAliveOrder;
+    std::vector<std::pair<Guid, s32>> mRestoreAnimationsOrder;
+    std::vector<Guid> mRestorePlatformsOrder;
+    // What a restore has for the objects the camera's TLVs make, which come after the saved ones: run once they are made
+    std::vector<std::function<void()>> mAfterCameraObjects;
+
 
     Camera* mCurrentCameras[5] = {};
     Camera* mPreviousCameras[5] = {};

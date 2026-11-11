@@ -122,7 +122,11 @@ void SlapLock::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManage
         pSlapLock->mState = pState->mState;
         pSlapLock->mTimer1 = pState->mTimer1;
         pSlapLock->mbGotShot = true;
+        // Looked up again by every update, so it is as it was left
+        pSlapLock->mSlapLockTlv = map.TLV_From_Offset_Lvl_Cam(pState->mTlvInfo);
         pSlapLock->mShinyParticleTimer = pState->mShinyParticleTimer;
+        pSlapLock->mHasGhost = pState->mHasGhost;
+        pSlapLock->mPossessionFlickerId = pState->mPossessionFlickerId;
     }
 }
 
@@ -158,6 +162,8 @@ void SlapLock::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mState = mState;
     data.mTimer1 = mTimer1;
     data.mShinyParticleTimer = mShinyParticleTimer;
+    data.mHasGhost = mHasGhost;
+    data.mPossessionFlickerId = mPossessionFlickerId;
     data.mAbilityRingId = Guid{};
 
     if (mAbilityRingId == Guid{})
@@ -185,34 +191,6 @@ void SlapLock::VUpdate()
     }
 
     auto pSlapLockTlv = mSlapLockTlv.GetTlv<relive::Path_SlapLock>();
-    if (GetRestoredFromQuickSave())
-    {
-        SetRestoredFromQuickSave(false);
-
-        if (pSlapLockTlv->mTlvSpecificMeaning)
-        {
-            SwitchStates_Do_Operation(pSlapLockTlv->mTargetTombSwitchId2, relive::reliveSwitchOp::eSetTrue);
-        }
-
-        if (mAbilityRingId != Guid{})
-        {
-            for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
-            {
-                BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
-                if (!pObj)
-                {
-                    break;
-                }
-
-                if (pObj->Type() == ReliveTypes::eAbilityRing && pObj->mBaseGameObjectTlvInfo == mAbilityRingId)
-                {
-                    mAbilityRingId = pObj->mBaseGameObjectId;
-                    break;
-                }
-            }
-        }
-    }
-
     BaseGameObject* pRingObj = sObjectIds.Find_Impl(mAbilityRingId);
     BaseGameObject* pFlickerObj = sObjectIds.Find_Impl(mPossessionFlickerId);
 

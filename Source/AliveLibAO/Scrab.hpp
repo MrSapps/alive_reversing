@@ -107,12 +107,12 @@ struct ScrabSaveState final : public SaveStateBase
     s16 mPauseRightMax = 0;
     s32 mSfxChannelMask = 0;
     s16 mFlags = 0;
-    s32 mBrainStateIdx = 0;
-};
+    s32 mBrainStateIdx = 0;};
 
 class Scrab final : public ::BaseAliveGameObject
 {
 public:
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
     static constexpr AnimId sScrabMotionAnimIds[30] = {
         AnimId::Scrab_Idle,
         AnimId::Scrab_Idle,
@@ -150,6 +150,7 @@ public:
 
     virtual void VRender(OrderingTable& ot) override;
     virtual void VUpdate() override;
+    virtual void VPostRestore() override;
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
     virtual void VOnTlvCollision(TlvIterator tlvIterator) override;
     virtual void VScreenChanged() override;

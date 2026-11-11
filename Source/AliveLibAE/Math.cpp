@@ -84,6 +84,31 @@ u32 Math_FixedPoint_Divide(s32 op1, s32 op2)
     return result;
 }
 
+s16 Math_RandomRangeSeeded(s16 min, s16 max, u8& seed)
+{
+    // The same numbers as Math_RandomRange, from a seed of its own, so who uses them can't move the game's
+    s16 tempMax = max;
+    s16 tempMin = min;
+    if (max < min)
+    {
+        tempMax = min;
+        tempMin = max;
+    }
+    if (tempMax == tempMin)
+    {
+        return tempMax;
+    }
+
+    const s32 rangeSize = tempMax - tempMin;
+    if (rangeSize >= 256)
+    {
+        const s32 randByte = 257 * gRandomBytes[seed++];
+        seed += 1;
+        return static_cast<s16>(tempMin + randByte % (rangeSize + 1));
+    }
+    return static_cast<s16>(tempMin + gRandomBytes[seed++] % (rangeSize + 1));
+}
+
 s16 Math_RandomRange(s16 min, s16 max)
 {
     s16 tempMax = max;

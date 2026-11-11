@@ -20,6 +20,7 @@ struct BirdPortalSaveState final : public SaveStateBase
     PortalStates mState = PortalStates::CreatePortal_0;
     u8 mMudCountForShrykull = 0;
     Guid mTlvInfo;
+    BirdPortalBaseState mBase = {};
 };
 
 class BirdPortal final : public IBirdPortal
@@ -37,6 +38,8 @@ public:
     virtual void VGetMapChange(EReliveLevelIds* level, u16* path, u16* camera, CameraSwapEffects* screenChangeEffect, FmvIds* fmvIds) override;
 
     static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
+    // The portal the camera makes (from its TLV) is put back once the camera has made it
+    static void RestoreFromSaveState(const BirdPortalSaveState& state);
 
 private:
     s16 IsScaredAway();

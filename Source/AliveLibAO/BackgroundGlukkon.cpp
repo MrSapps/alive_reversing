@@ -229,11 +229,7 @@ void BackgroundGlukkon::VUpdate()
 
 void BackgroundGlukkon::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     BackgroundGlukkonSaveState data = {};
 
     data.mTlvId = mTlvId;

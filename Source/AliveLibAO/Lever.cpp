@@ -1,4 +1,6 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../relive_lib/Function.hpp"
 #include "Lever.hpp"
 #include "../AliveLibAE/stdlib.hpp"
@@ -279,6 +281,26 @@ s32 Lever::VPull(s16 bLeftDirection)
         }
     }
     return SwitchStates_Get(mSwitchId);
+}
+
+void Lever::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    LeverSaveState data = {};
+    data.mState = static_cast<s32>(mState);
+    data.mPulledFromLeft = mPulledFromLeft;
+    pSaveBuffer.Write(data);
+}
+
+void Lever::RestoreFromSaveState(const LeverSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    Lever* p = static_cast<Lever*>(pObj);
+    p->mState = static_cast<LeverState>(state.mState);
+    p->mPulledFromLeft = state.mPulledFromLeft;
 }
 
 } // namespace AO

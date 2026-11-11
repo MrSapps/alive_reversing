@@ -21,6 +21,16 @@ struct LiftPointSaveState final : public SaveStateBase
     bool mBottomFloor;
     bool mMoveToFloorLevel;
     bool mKeepOnMiddleFloor;
+    AnimationSaveState mAnim;
+    AnimationSaveState mLiftWheelAnim;
+    AnimationSaveState mPulleyAnim;
+    // False for a save from the original game's, which has none of the platform's variables
+    bool mPlatformBaseSaved;
+    s16 mPlatformBaseXOffset;
+    s16 mPlatformBaseWidthOffset;
+    s16 mPlatformBaseYOffset;
+    s16 mPlatformBaseHeightOffset;
+    s32 mPlatformBaseCount;
 };
 
 class LiftPoint final : public PlatformBase
@@ -34,11 +44,14 @@ public:
     virtual void VRender(OrderingTable& ot) override;
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
 
     static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
 
     void KeepOnMiddleFloor();
+    // Puts the ropes where the lift is: its update does this every frame
+    void SyncRopes();
     bool MovingToFloorLevel() const;
     bool OnTopFloor() const;
     bool OnBottomFloor() const;

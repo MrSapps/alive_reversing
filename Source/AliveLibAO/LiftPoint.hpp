@@ -28,6 +28,18 @@ struct LiftPointSaveState final : public SaveStateBase
     bool mBottomFloor = false;
     bool mMoveToFloorLevel = false;
     bool mKeepOnMiddleFloor = false;
+    bool mIgnoreLiftMover = false;
+    s16 mPlatformBaseXOffset = 0;
+    s16 mPlatformBaseWidthOffset = 0;
+    s16 mPlatformBaseYOffset = 0;
+    s16 mPlatformBaseHeightOffset = 0;
+    s32 mPlatformBaseCount = 0;
+    s16 mLiftPointId = 0;
+    AnimationSaveState mLiftWheelAnim = {};
+    AnimationSaveState mPulleyAnim = {};
+    bool mHasPulley = false;
+    s16 mPulleyXPos = 0;
+    s16 mPulleyYPos = 0;
 };
 
 class LiftPoint final : public ::PlatformBase
@@ -40,6 +52,7 @@ public:
 
     virtual void VRender(OrderingTable& ot) override;
     virtual void VUpdate() override;
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
     virtual void VScreenChanged() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
     static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
@@ -59,6 +72,7 @@ private:
     void StayOnFloor(bool bFloor, relive::Path_LiftPoint* pLiftTlv);
 
     void CreatePulleyIfExists(s16 camX, s16 camY);
+    void InitPulley();
     void RenderPulley(OrderingTable& ot);
 
 public:

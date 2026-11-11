@@ -12,6 +12,10 @@ public:
 
     void GetRenderedSize(PSX_RECT* pRect);
 
+    // The animation it draws is the object's, so there are only its flags to keep
+    AnimationSaveState GetSaveState() const;
+    void RestoreSaveState(const AnimationSaveState& state);
+
 public:
     Poly_FT4 mPoly = {};
     Animation* mAnimPtr = nullptr;

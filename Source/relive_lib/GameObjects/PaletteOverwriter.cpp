@@ -2,6 +2,8 @@
 #include "BaseAliveGameObject.hpp"
 #include "../ObjectIds.hpp"
 #include "../Animation.hpp"
+#include "../SerializedObjectData.hpp"
+#include <cstring>
 
 PalleteOverwriter::PalleteOverwriter(const Guid& targetId, u32 sweepIndex, u32 kind, u8 r, u8 g, u8 b, bool addToUpdateList, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(addToUpdateList, 0, resMan, map), mTargetId(targetId), mSweepIndex(sweepIndex), mKind(kind), mR(r), mG(g), mB(b)
@@ -91,4 +93,51 @@ void PalleteOverwriter::VUpdate()
     {
         mNumEntriesToOverwrite = mPalDepth - mCurPalIndex;
     }
+}
+
+PalOverwriterData PalleteOverwriter::GetData() const
+{
+    PalOverwriterData data;
+    std::memset(static_cast<void*>(&data), 0, sizeof(data));
+    data.mTargetId = mTargetId;
+    data.mSweepIndex = mSweepIndex;
+    data.mKind = mKind;
+    data.mCurPalIndex = mCurPalIndex;
+    data.mNumEntriesToOverwrite = mNumEntriesToOverwrite;
+    data.mPalDepth = mPalDepth;
+    data.mUpdateDelay = UpdateDelay();
+    data.mR = mR;
+    data.mG = mG;
+    data.mB = mB;
+    data.mFirstUpdate = mFirstUpdate;
+    data.mDone = mDone;
+    return data;
+}
+
+PalleteOverwriter* PalleteOverwriter::CreateFromData(const PalOverwriterData& data, bool addToUpdateList, ResourceManager& resMan, BaseMap& map)
+{
+    PalleteOverwriter* p = relive_new PalleteOverwriter(data.mTargetId, data.mSweepIndex, data.mKind, data.mR, data.mG, data.mB, addToUpdateList, resMan, map);
+    if (p)
+    {
+        p->mCurPalIndex = data.mCurPalIndex;
+        p->mNumEntriesToOverwrite = data.mNumEntriesToOverwrite;
+        p->mPalDepth = data.mPalDepth;
+        p->SetUpdateDelay(data.mUpdateDelay);
+        p->mFirstUpdate = data.mFirstUpdate;
+        p->mDone = data.mDone;
+    }
+    return p;
+}
+
+void PalleteOverwriter::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    PalleteOverwriterSaveState data = {};
+    data.mData = GetData();
+    pSaveBuffer.Write(data);
+}
+
+void PalleteOverwriter::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const PalleteOverwriterSaveState& state = *pData.ReadTmpPtr<PalleteOverwriterSaveState>();
+    CreateFromData(state.mData, true, resMan, map);
 }

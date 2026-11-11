@@ -1,4 +1,5 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "BeeSwarm.hpp"
 #include "Map.hpp"
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
@@ -20,8 +21,8 @@
 
 namespace AO {
 
-s16 gBeeInstanceCount = 0;
-s16 gBeesNearAbe = 0;
+WorldStatic<s16> gBeeInstanceCount("AO.BeeSwarm.gBeeInstanceCount", 0);
+WorldStatic<s16> gBeesNearAbe("AO.BeeSwarm.gBeesNearAbe", 0);
 
 BeeSwarm::BeeSwarm(FP xpos, FP ypos, FP speed, s32 numBees, s32 totalChaseTime, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
@@ -72,6 +73,107 @@ BeeSwarm::BeeSwarm(FP xpos, FP ypos, FP speed, s32 numBees, s32 totalChaseTime, 
     mCurrentBeesCount = 0;
     field_D7C_pos_offset = FP_FromInteger(0);
     mYPos = ypos;
+}
+
+BeeSwarm::BeeSwarm(RestoreTag, ResourceManager& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
+{
+    SetType(ReliveTypes::eBeeSwarm);
+    mLoadedAnims.push_back(resMan.LoadAnimation(AnimId::Bee_Swarm));
+    Animation_Init(GetAnimRes(AnimId::Bee_Swarm));
+}
+
+std::vector<BaseGameObject::NotStateMemory> BeeSwarm::VNotStateMemory()
+{
+    // What the bees drew last, and the numbers of the resources of their animations
+    std::vector<NotStateMemory> result;
+    for (BeeSwarmParticle& bee : field_E4_bees.bees)
+    {
+        result.push_back({&bee.field_10_anim.mPoly, sizeof(bee.field_10_anim.mPoly)});
+        result.push_back({&bee.field_10_anim.mAnimRes, sizeof(bee.field_10_anim.mAnimRes)});
+    }
+    return result;
+}
+
+void BeeSwarm::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    BeeSwarmSaveState data = {};
+    data.mMaxBeesCount = mMaxBeesCount;
+    data.mCurrentBeesCount = mCurrentBeesCount;
+    data.mSpawnXPos = field_D68_xpos;
+    data.mSpawnYPos = field_D6C_ypos;
+    data.mChaseTargetX = mChaseTargetX;
+    data.mChaseTargetY = mChaseTargetY;
+    data.mSpeed = field_D78_speed;
+    data.mPosOffset = field_D7C_pos_offset;
+    data.mSwarmState = static_cast<s16>(mSwarmState);
+    data.mTotalChaseTime = mTotalChaseTime;
+    data.mRectX = mRectX;
+    data.mRectY = mRectY;
+    data.mRectW = mRectW;
+    data.mRectH = mRectH;
+    data.mChaseTarget = mChaseTarget;
+    data.mAliveTimer = mAliveTimer;
+    data.mDamageOrPainSoundTimer = field_DA0_do_damage_or_pain_sound_timer;
+    data.mUpdateChaseTimer = field_DA4_update_chase_timer;
+    data.mLineIdx = mLine ? static_cast<s32>(mLine - gCollisions->mCollisionArray) + 1 : 0;
+    data.mLineFollowSpeed = mLineFollowSpeed;
+    for (s32 i = 0; i < 25; i++)
+    {
+        const BeeSwarmParticle& bee = field_E4_bees.bees[i];
+        data.mBees[i].mXPos = bee.mXPos;
+        data.mBees[i].mYPos = bee.mYPos;
+        data.mBees[i].mAngle = bee.field_8_angle;
+        data.mBees[i].mAngleSpeed = bee.field_9_angle_speed;
+        data.mBees[i].mTimer = bee.mTimer;
+        data.mBees[i].mAnim = bee.field_10_anim.GetSaveState();
+    }
+    pSaveBuffer.Write(data);
+}
+
+void BeeSwarm::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const BeeSwarmSaveState& state = *pData.ReadTmpPtr<BeeSwarmSaveState>();
+    BeeSwarm* p = relive_new BeeSwarm(RestoreTag{}, resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mMaxBeesCount = state.mMaxBeesCount;
+    p->mCurrentBeesCount = state.mCurrentBeesCount;
+    p->field_D68_xpos = state.mSpawnXPos;
+    p->field_D6C_ypos = state.mSpawnYPos;
+    p->mChaseTargetX = state.mChaseTargetX;
+    p->mChaseTargetY = state.mChaseTargetY;
+    p->field_D78_speed = state.mSpeed;
+    p->field_D7C_pos_offset = state.mPosOffset;
+    p->mSwarmState = static_cast<BeeSwarmStates>(state.mSwarmState);
+    p->mTotalChaseTime = state.mTotalChaseTime;
+    p->mRectX = state.mRectX;
+    p->mRectY = state.mRectY;
+    p->mRectW = state.mRectW;
+    p->mRectH = state.mRectH;
+    p->mChaseTarget = state.mChaseTarget;
+    p->mAliveTimer = state.mAliveTimer;
+    p->field_DA0_do_damage_or_pain_sound_timer = state.mDamageOrPainSoundTimer;
+    p->field_DA4_update_chase_timer = state.mUpdateChaseTimer;
+    p->mLine = state.mLineIdx > 0 ? gCollisions->Get_Line_At_Idx(static_cast<s16>(state.mLineIdx - 1)) : nullptr;
+    p->mLineFollowSpeed = state.mLineFollowSpeed;
+    for (s32 i = 0; i < 25; i++)
+    {
+        BeeSwarmParticle& bee = p->field_E4_bees.bees[i];
+        bee.mXPos = state.mBees[i].mXPos;
+        bee.mYPos = state.mBees[i].mYPos;
+        bee.field_8_angle = state.mBees[i].mAngle;
+        bee.field_9_angle_speed = state.mBees[i].mAngleSpeed;
+        bee.mTimer = state.mBees[i].mTimer;
+        if (i < state.mCurrentBeesCount)
+        {
+            bee.field_10_anim.mAnimPtr = &p->GetAnimation();
+            bee.field_10_anim.mSpriteScale = p->GetSpriteScale();
+        }
+        bee.field_10_anim.RestoreSaveState(state.mBees[i].mAnim);
+    }
 }
 
 BeeSwarm::~BeeSwarm()

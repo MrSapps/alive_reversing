@@ -24,6 +24,12 @@ SligSpawner::SligSpawner(relive::Path_TLV* pTlv, relive::Path_Slig* pTlvData, co
     mSligSpawnerSwitchId = pTlvData->mSligSpawnerSwitchId;
 }
 
+std::vector<::BaseGameObject::NotStateMemory> SligSpawner::VNotStateMemory()
+{
+    // The TLV it was made from, with the flags that TLV had then
+    return {{&mPathTlv, sizeof(mPathTlv)}};
+}
+
 void SligSpawner::VScreenChanged()
 {
     SetDead(true);

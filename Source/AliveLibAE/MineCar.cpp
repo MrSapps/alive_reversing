@@ -225,8 +225,6 @@ void MineCar::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager
 
         pMineCar->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pState->field_44_last_line_ypos);
 
-        pMineCar->SetRestoredFromQuickSave(true);
-
         pMineCar->BaseAliveGameObjectCollisionLineType = pState->field_46_collision_line_type;
         pMineCar->field_118_tlvInfo = pState->field_4C_tlvInfo;
 
@@ -243,7 +241,15 @@ void MineCar::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager
         pMineCar->field_1D4_previous_input = pState->field_64_throw_item_key1;
         pMineCar->field_1D6_continue_move_input = pState->field_66_continue_move_input;
 
-        if (pMineCar->mVelX < (ScaleToGridSize(FP_FromInteger(1)) / FP_FromInteger(4)))
+        if (pState->mTreadAnimSaved)
+        {
+            pMineCar->mTreadAnim.RestoreSaveState(pState->mTreadAnim);
+        }
+        if (pState->mVelxIndexSaved)
+        {
+            pMineCar->field_1C4_velx_index = pState->field_1C4_velx_index;
+        }
+        else if (pMineCar->mVelX < (ScaleToGridSize(FP_FromInteger(1)) / FP_FromInteger(4)))
         {
             pMineCar->field_1C4_velx_index = 7;
         }
@@ -762,38 +768,44 @@ void MineCar::VGetSaveState(SerializedObjectData& pSaveBuffer)
 
     data.field_64_throw_item_key1 = field_1D4_previous_input;
     data.field_66_continue_move_input = field_1D6_continue_move_input;
+    data.mVelxIndexSaved = true;
+    data.field_1C4_velx_index = field_1C4_velx_index;
+    data.mTreadAnimSaved = true;
+    data.mTreadAnim = mTreadAnim.GetSaveState();
 
     pSaveBuffer.Write(data);
 }
 
-void MineCar::VUpdate()
+void MineCar::VPostRestore()
 {
-    if (GetRestoredFromQuickSave())
+    if (BaseAliveGameObjectCollisionLineType != -1)
     {
-        SetRestoredFromQuickSave(false);
-
-        if (BaseAliveGameObjectCollisionLineType != -1)
-        {
-            gCollisions->Raycast(
-                mXPos,
-                mYPos - FP_FromInteger(20),
-                mXPos,
-                mYPos + FP_FromInteger(20),
-                &BaseAliveGameObjectCollisionLine,
-                &mXPos,
-                &mYPos,
-                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType))
-            );
-
-            BaseAliveGameObjectCollisionLineType = 0;
-        }
-        else
-        {
-            BaseAliveGameObjectCollisionLine = nullptr;
-            BaseAliveGameObjectCollisionLineType = 0;
-        }
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType))
+        );
+    }
+    else
+    {
+        BaseAliveGameObjectCollisionLine = nullptr;
     }
 
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
+}
+
+void MineCar::VUpdate()
+{
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);

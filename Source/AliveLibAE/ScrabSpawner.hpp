@@ -30,6 +30,8 @@ public:
     
     virtual void VUpdate() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    virtual void VPostRestore() override;
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
 
 private:
     Guid mTlvId;
@@ -38,5 +40,4 @@ private:
     relive::Path_TLV field_28_tlv_data = {};
     ScrabSpawnerStates field_38_state = ScrabSpawnerStates::eInactive_0;
     Guid field_3C_spawned_scrab_id;
-    s16 field_40_bFindSpawnedScrab = 0;
 };

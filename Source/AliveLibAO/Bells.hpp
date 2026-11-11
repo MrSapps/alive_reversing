@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 
 namespace AO {
 
@@ -11,9 +12,24 @@ enum class BellSize : s16
     eSmall = 2,
 };
 
+struct BellsSaveState final : public SaveStateBase
+{
+    BellsSaveState()
+        : SaveStateBase(ReliveTypes::eBells, sizeof(*this))
+    { }
+    bool mSmashing;
+    s32 mBellPitch;
+    bool mDoScreenWave;
+    s8 mSoundPitchFactor;
+    s32 mSoundCooldownTimer;
+};
+
 class Bells final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
+
     Bells(BellSize bellSize, FP xpos, FP ypos, FP scale, ResourceManager& resMan, BaseMap& map);
 
     void LoadAnimations();

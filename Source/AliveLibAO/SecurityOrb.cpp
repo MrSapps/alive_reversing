@@ -223,19 +223,21 @@ void SecurityOrb::VUpdate()
     }
 }
 
+std::vector<BaseGameObject::NotStateMemory> SecurityOrb::VNotStateMemory()
+{
+    // The channels its sound plays on
+    return {{&mSoundChannelsMask, sizeof(mSoundChannelsMask)}};
+}
+
 void SecurityOrb::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     SecurityOrbSaveState data = {};
 
     data.mTlvInfo = mTlvInfo;
     data.mState = static_cast<s16>(mState);
     data.mTimer = mTimer;
-    data.mSoundChannelsMask = mSoundChannelsMask;
+    data.mSoundChannelsMask = 0; // the sound system's channels, not state: the sound is made again
 
     pSaveBuffer.Write(data);
 }

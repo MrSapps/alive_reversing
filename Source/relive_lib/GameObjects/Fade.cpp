@@ -3,8 +3,10 @@
 #include "../../AliveLibAE/stdlib.hpp"
 #include "../FatalError.hpp"
 #include "../GameType.hpp"
+#include "../SerializedObjectData.hpp"
+#include "../WorldStatic.hpp"
 
-static bool sIsFadingOut = false;
+static WorldStatic<bool> sIsFadingOut("Fade.sIsFadingOut", false);
 
 Fade::Fade(Layer layer, FadeOptions fade, bool destroyOnDone, s32 speed, relive::TBlendModes abr, ResourceManager& resMan, BaseMap& map)
     : EffectBase(layer, abr, resMan, map)
@@ -84,6 +86,32 @@ void Fade::VUpdate()
             }
         }
     }
+}
+
+void Fade::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    FadeSaveState data = {};
+    // The type of a fade is the game's own
+    data.mType = Type();
+    data.mEffect = GetEffectState();
+    data.mFadeOption = static_cast<s32>(mFadeOption);
+    data.mDestroyOnDone = mDestroyOnDone;
+    data.mSpeed = mSpeed;
+    data.mFadeColour = mFadeColour;
+    data.mDone = mDone;
+    pSaveBuffer.Write(data);
+}
+
+void Fade::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const auto pState = pData.ReadTmpPtr<FadeSaveState>();
+    auto pFade = relive_new Fade(static_cast<Layer>(pState->mEffect.mLayer), FadeOptions::eFadeIn, false, 0, static_cast<relive::TBlendModes>(pState->mEffect.mBlendMode), resMan, map);
+    pFade->SetEffectState(pState->mEffect);
+    pFade->mFadeOption = static_cast<FadeOptions>(pState->mFadeOption);
+    pFade->mDestroyOnDone = pState->mDestroyOnDone;
+    pFade->mSpeed = pState->mSpeed;
+    pFade->mFadeColour = pState->mFadeColour;
+    pFade->mDone = pState->mDone;
 }
 
 void Fade::VRender(OrderingTable& ot)

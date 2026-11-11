@@ -32,7 +32,6 @@ ScrabSpawner::ScrabSpawner(relive::Path_ScrabSpawner* pTlv, const Guid& tlvId, R
     field_38_state = ScrabSpawnerStates::eInactive_0;
 
     field_3C_spawned_scrab_id = Guid{};
-    field_40_bFindSpawnedScrab = 0;
 }
 
 void ScrabSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
@@ -44,7 +43,6 @@ void ScrabSpawner::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceMa
     {
         pScrabSpawner->field_38_state = pState->field_8_state;
         pScrabSpawner->field_3C_spawned_scrab_id = pState->field_C_spawned_scrab_id;
-        pScrabSpawner->field_40_bFindSpawnedScrab = 1;
     }
 }
 
@@ -60,7 +58,7 @@ void ScrabSpawner::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mType = ReliveTypes::eScrabSpawner;
     data.field_4_tlvInfo = mTlvId;
     data.field_8_state = field_38_state;
-    data.field_C_spawned_scrab_id = Guid{};
+    data.field_C_spawned_scrab_id = field_3C_spawned_scrab_id;
 
     if (field_3C_spawned_scrab_id != Guid{})
     {
@@ -73,11 +71,10 @@ void ScrabSpawner::VGetSaveState(SerializedObjectData& pSaveBuffer)
     pSaveBuffer.Write(data);
 }
 
-void ScrabSpawner::VUpdate()
+void ScrabSpawner::VPostRestore()
 {
-    if (field_40_bFindSpawnedScrab)
+    // The save has the TLV info of the scrab it spawned
     {
-        field_40_bFindSpawnedScrab = false;
         if (field_3C_spawned_scrab_id != Guid{})
         {
             for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
@@ -97,7 +94,16 @@ void ScrabSpawner::VUpdate()
             }
         }
     }
+}
 
+std::vector<BaseGameObject::NotStateMemory> ScrabSpawner::VNotStateMemory()
+{
+    // The TLV it was made from, with the flags that TLV had then
+    return {{&field_28_tlv_data, sizeof(field_28_tlv_data)}};
+}
+
+void ScrabSpawner::VUpdate()
+{
     auto pExistingSpawnedScrab = static_cast<Scrab*>(sObjectIds.Find_Impl(field_3C_spawned_scrab_id));
     if (!EventGet(Event::kEventDeathReset) && !(GetDead()))
     {

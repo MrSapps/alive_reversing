@@ -414,6 +414,7 @@ void SlamDoor::VGetSaveState(SerializedObjectData& pSaveBuffer)
 
     data.mType = ReliveTypes::eSlamDoor;
     data.mTlvInfo = mTlvInfo;
+    data.mAnim = GetAnimation().GetSaveState();
 
     pSaveBuffer.Write(data);
 }
@@ -445,5 +446,6 @@ void SlamDoor::CreateFromSaveState(SerializedObjectData& pData, ResourceManager&
 {
     const auto pSaveState = pData.ReadTmpPtr<SlamDoorSaveState>();
 
-    relive_new SlamDoor(static_cast<relive::Path_SlamDoor*>(map.TLV_From_Offset_Lvl_Cam(pSaveState->mTlvInfo).GetTlv()), pSaveState->mTlvInfo, resMan, map);
+    auto pSlamDoor = relive_new SlamDoor(static_cast<relive::Path_SlamDoor*>(map.TLV_From_Offset_Lvl_Cam(pSaveState->mTlvInfo).GetTlv()), pSaveState->mTlvInfo, resMan, map);
+    pSlamDoor->GetAnimation().RestoreSaveState(pSaveState->mAnim);
 }

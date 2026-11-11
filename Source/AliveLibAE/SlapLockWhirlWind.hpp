@@ -10,6 +10,14 @@ struct SlapLockWhirlWindSaveState final : public SaveStateBase
         : SaveStateBase(ReliveTypes::eSlapLock_OrbWhirlWind, sizeof(*this))
     { }
     s16 mSwitchId;
+    // False for a save from the original game's, which has only the switch: it is set and the object is not made again
+    bool mFullState;
+    FP mDoorX;
+    FP mDoorY;
+    FP mDoorSpriteScale;
+    Guid mOrbWhirlWindId;
+    s16 mState;
+    s32 mTimer;
 };
 
 class SlapLockWhirlWind final : public BaseGameObject
@@ -22,6 +30,11 @@ public:
     static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
     s16 SwitchId() const;
+
+    // For a save: nothing is looked for or made, it is all in the save
+    struct RestoreTag final
+    { };
+    SlapLockWhirlWind(RestoreTag, ResourceManager& resMan, BaseMap& map);
 
 private:
     FP mDoorX = {};

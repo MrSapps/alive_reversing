@@ -40,6 +40,9 @@ struct RockSaveState final : public SaveStateBase
     s16 mBounceCount;
     FP mPreviousXPos;
     FP mPreviousYPos;
+    // False for a save from the original game's, which has not
+    bool mShimmerTimerSaved;
+    s32 mShimmerTimer;
 };
 
 class Rock final : public BaseThrowable
@@ -49,6 +52,7 @@ public:
     ~Rock();
     
     virtual void VUpdate() override;
+    virtual void VPostRestore() override;
     virtual void VScreenChanged() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
     virtual void VThrow(FP velX, FP velY) override;

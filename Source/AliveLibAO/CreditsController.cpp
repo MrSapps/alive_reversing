@@ -1,4 +1,5 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "CreditsController.hpp"
 #include "Map.hpp"
 #include "Engine.hpp"
@@ -7,7 +8,7 @@
 
 namespace AO {
 
-s16 gCreditsControllerExists = false;
+WorldStatic<s16> gCreditsControllerExists("AO.CreditsController.gCreditsControllerExists", false);
 
 constexpr s32 kShowCreditScreenForTicks = 60;
 

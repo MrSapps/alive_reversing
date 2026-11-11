@@ -12,6 +12,8 @@
 #include "stdlib.hpp"
 #include "Map.hpp"
 #include "Path.hpp"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 
 Water::Water(relive::Path_Water* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
@@ -535,4 +537,82 @@ void Water::VRender(OrderingTable& ot)
             }
         }
     }
+}
+
+void Water::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    WaterSaveState data = {};
+    data.mState = static_cast<s16>(field_FC_state);
+    data.mParticleCount = field_10C_particle_count;
+    data.mCurrentParticleIdx = field_10E_current_particle_idx;
+    data.mCurrentDrops = field_110_current_drops;
+    data.mSplashTime = field_138_splash_time;
+    data.mNotInCameraCount = field_13C_not_in_camera_count;
+    data.mWaterDuration = field_140_water_duration;
+    data.mHitTimeout = field_148_bHitTimeout;
+    data.mScreenX = field_100_screen_x;
+    data.mScreenY = field_102_screen_y;
+    data.mTopLeftX = static_cast<s16>(field_104_top_left.x);
+    data.mTopLeftY = static_cast<s16>(field_104_top_left.y);
+    data.mBottomRightX = static_cast<s16>(field_108_bottom_right.x);
+    data.mBottomRightY = static_cast<s16>(field_108_bottom_right.y);
+    data.mRadius = field_118_radius;
+    data.mCentre = field_11C_centre;
+    for (s32 i = 0; i < field_124_tlv_data.mMaxDrops && i < 128; i++)
+    {
+        const Water_Res& res = field_F8_pWaterRes[i];
+        data.mDrops[i].mXPos = res.field_0_xpos;
+        data.mDrops[i].mYPos = res.field_4_ypos;
+        data.mDrops[i].mZPos = res.field_8_zpos;
+        data.mDrops[i].mDeltaX = res.field_C_delta_x;
+        data.mDrops[i].mDeltaY = res.field_10_delta_y;
+        data.mDrops[i].mDeltaZ = res.field_14_delta_z;
+        data.mDrops[i].mEnabled = res.field_18_enabled;
+        data.mDrops[i].mSplashTime = res.field_1A_splash_time;
+        data.mDrops[i].mState = res.field_1C_state;
+    }
+    pSaveBuffer.Write(data);
+}
+
+void Water::RestoreSaveState(const WaterSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    Water* pWater = static_cast<Water*>(pObj);
+    pWater->field_FC_state = static_cast<WaterState>(state.mState);
+    pWater->field_10C_particle_count = state.mParticleCount;
+    pWater->field_10E_current_particle_idx = state.mCurrentParticleIdx;
+    pWater->field_110_current_drops = state.mCurrentDrops;
+    pWater->field_138_splash_time = state.mSplashTime;
+    pWater->field_13C_not_in_camera_count = state.mNotInCameraCount;
+    pWater->field_140_water_duration = state.mWaterDuration;
+    pWater->field_100_screen_x = state.mScreenX;
+    pWater->field_102_screen_y = state.mScreenY;
+    pWater->field_104_top_left = {state.mTopLeftX, state.mTopLeftY};
+    pWater->field_108_bottom_right = {state.mBottomRightX, state.mBottomRightY};
+    pWater->field_118_radius = state.mRadius;
+    pWater->field_11C_centre = state.mCentre;
+    pWater->field_148_bHitTimeout = state.mHitTimeout;
+    for (s32 i = 0; i < pWater->field_124_tlv_data.mMaxDrops && i < 128; i++)
+    {
+        Water_Res& res = pWater->field_F8_pWaterRes[i];
+        res.field_0_xpos = state.mDrops[i].mXPos;
+        res.field_4_ypos = state.mDrops[i].mYPos;
+        res.field_8_zpos = state.mDrops[i].mZPos;
+        res.field_C_delta_x = state.mDrops[i].mDeltaX;
+        res.field_10_delta_y = state.mDrops[i].mDeltaY;
+        res.field_14_delta_z = state.mDrops[i].mDeltaZ;
+        res.field_18_enabled = state.mDrops[i].mEnabled;
+        res.field_1A_splash_time = state.mDrops[i].mSplashTime;
+        res.field_1C_state = state.mDrops[i].mState;
+    }
+}
+
+std::vector<BaseGameObject::NotStateMemory> Water::VNotStateMemory()
+{
+    // A handle to the sound it is playing
+    return {{&field_144_sound_channels, sizeof(field_144_sound_channels)}};
 }

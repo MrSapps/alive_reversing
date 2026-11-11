@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "SlurgSpawner.hpp"
 #include "../relive_lib/BaseMap.hpp"
 #include "DDCheat.hpp"
@@ -54,4 +56,24 @@ void SlurgSpawner::VScreenChanged()
 {
     mMap.TLV_Reset(mTlvInfo, mSpawnedCount);
     SetDead(true);
+}
+
+void SlurgSpawner::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    SlurgSpawnerSaveState data = {};
+    data.mSpawnCounter = mSpawnCounter;
+    data.mSpawnedCount = mSpawnedCount;
+    pSaveBuffer.Write(data);
+}
+
+void SlurgSpawner::RestoreFromSaveState(const SlurgSpawnerSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eSlurgSpawner)
+    {
+        return;
+    }
+    SlurgSpawner* p = static_cast<SlurgSpawner*>(pObj);
+    p->mSpawnCounter = state.mSpawnCounter;
+    p->mSpawnedCount = state.mSpawnedCount;
 }

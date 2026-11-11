@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "MotionDetector.hpp"
 #include "stdlib.hpp"
 #include "../relive_lib/ObjectIds.hpp"
@@ -398,6 +399,12 @@ void MotionDetector::VUpdate()
     }
 }
 
+std::vector<BaseGameObject::NotStateMemory> MotionDetector::VNotStateMemory()
+{
+    // What it was last drawn with
+    return {{&mPrims, sizeof(mPrims)}};
+}
+
 void MotionDetector::VRender(OrderingTable& ot)
 {
     BaseAnimatedWithPhysicsGameObject::VRender(ot);
@@ -434,4 +441,44 @@ void MotionDetector::VRender(OrderingTable& ot)
         pPrim->SetBlendMode(mObjectInLaser ? relive::TBlendModes::eBlend_1 : relive::TBlendModes::eBlend_3);
         ot.Add(GetAnimation().GetRenderLayer(), pPrim);
     }
+}
+
+void MotionDetector::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    MotionDetectorSaveState data = {};
+    data.mLaserId = mLaserId;
+    data.mOwnerId = mOwnerId;
+    data.mState = static_cast<s32>(mState);
+    data.mPauseTimer = mPauseTimer;
+    data.mHasOwner = mHasOwner;
+    data.mDontComeBack = mDontComeBack;
+    data.mTopLeftX = mTopLeftX;
+    data.mTopLeftY = mTopLeftY;
+    data.mBottomRightX = mBottomRightX;
+    data.mBottomRightY = mBottomRightY;
+    data.mSpeed = mSpeed;
+    data.mObjectInLaser = mObjectInLaser;
+    pSaveBuffer.Write(data);
+}
+
+void MotionDetector::RestoreFromSaveState(const MotionDetectorSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || (pObj->Type() != ReliveTypes::eRedLaser && pObj->Type() != ReliveTypes::eGreeterBody))
+    {
+        return;
+    }
+    MotionDetector* p = static_cast<MotionDetector*>(pObj);
+    p->mLaserId = state.mLaserId;
+    p->mOwnerId = state.mOwnerId;
+    p->mState = static_cast<States>(state.mState);
+    p->mPauseTimer = state.mPauseTimer;
+    p->mHasOwner = state.mHasOwner;
+    p->mDontComeBack = state.mDontComeBack;
+    p->mTopLeftX = state.mTopLeftX;
+    p->mTopLeftY = state.mTopLeftY;
+    p->mBottomRightX = state.mBottomRightX;
+    p->mBottomRightY = state.mBottomRightY;
+    p->mSpeed = state.mSpeed;
+    p->mObjectInLaser = state.mObjectInLaser;
 }

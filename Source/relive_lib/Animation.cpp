@@ -401,6 +401,96 @@ void Animation::SetCurrentFrame(s32 val)
     mCurrentFrame = std::clamp(val, -1, lastFrame);
 }
 
+static bool sSaveStateWithoutColour = false;
+
+void Animation::SetSaveStateWithoutColour(bool without)
+{
+    sSaveStateWithoutColour = without;
+}
+
+std::vector<Animation::Memory> Animation::RenderOnlyMemory()
+{
+    return {
+        {&mPoly, sizeof(mPoly)},
+        {&mAnimRes, sizeof(mAnimRes)},
+        {&GetRgb(), sizeof(RGB16)},
+        {&mSpriteScale, sizeof(mSpriteScale)},
+    };
+}
+
+AnimationSaveState Animation::GetSaveState() const
+{
+    AnimationSaveState state;
+    // So that the padding is the same every time, saves are compared byte for byte
+    std::memset(static_cast<void*>(&state), 0, sizeof(state));
+    // An animation that was never given one has nothing to keep
+    if (!mAnimRes.mJsonPtr)
+    {
+        return state;
+    }
+    state.mValid = true;
+    GetBaseSaveState(state);
+    state.mFrame = GetCurrentFrame();
+    state.mFrameDelay = GetFrameDelay();
+    state.mSpriteScale = GetSpriteScale();
+    state.mAnimId = static_cast<s32>(mAnimRes.mId);
+    return state;
+}
+
+void Animation::RestoreSaveState(const AnimationSaveState& state)
+{
+    if (!state.mValid || !mAnimRes.mJsonPtr)
+    {
+        return;
+    }
+    SetCurrentFrame(state.mFrame);
+    SetFrameDelay(state.mFrameDelay);
+    RestoreBaseSaveState(state);
+    SetSpriteScale(state.mSpriteScale);
+}
+
+void AnimationBase::GetBaseSaveState(AnimationSaveState& state) const
+{
+    state.mFrameChangeCounter = GetFrameChangeCounter();
+    state.mAnimate = GetAnimate();
+    state.mLoop = GetLoop();
+    state.mFlipX = GetFlipX();
+    state.mRender = GetRender();
+    state.mIsLastFrame = GetIsLastFrame();
+    state.mForwardLoopCompleted = GetForwardLoopCompleted();
+    state.mFlipY = GetFlipY();
+    state.mSwapXY = GetSwapXY();
+    state.mSemiTrans = GetSemiTrans();
+    state.mBlending = GetBlending();
+    state.mLoopBackwards = GetLoopBackwards();
+    state.mIgnorePosOffset = GetIgnorePosOffset();
+    state.mBlendMode = static_cast<s32>(GetBlendMode());
+    state.mRenderLayer = static_cast<s32>(GetRenderLayer());
+    state.mRed = sSaveStateWithoutColour ? 0 : GetRgb().r;
+    state.mGreen = sSaveStateWithoutColour ? 0 : GetRgb().g;
+    state.mBlue = sSaveStateWithoutColour ? 0 : GetRgb().b;
+}
+
+void AnimationBase::RestoreBaseSaveState(const AnimationSaveState& state)
+{
+    SetFrameChangeCounter(state.mFrameChangeCounter);
+    SetAnimate(state.mAnimate);
+    SetLoop(state.mLoop);
+    SetFlipX(state.mFlipX);
+    SetRender(state.mRender);
+    SetIsLastFrame(state.mIsLastFrame);
+    SetForwardLoopCompleted(state.mForwardLoopCompleted);
+    SetFlipY(state.mFlipY);
+    SetSwapXY(state.mSwapXY);
+    SetSemiTrans(state.mSemiTrans);
+    SetBlending(state.mBlending);
+    SetLoopBackwards(state.mLoopBackwards);
+    SetIgnorePosOffset(state.mIgnorePosOffset);
+    SetBlendMode(static_cast<relive::TBlendModes>(state.mBlendMode));
+    SetRenderLayer(static_cast<Layer>(state.mRenderLayer));
+    SetRGB(state.mRed, state.mGreen, state.mBlue);
+}
+
 void Animation::SetFrame(s32 newFrame)
 {
     if (newFrame == -1)

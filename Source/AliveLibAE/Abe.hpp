@@ -275,6 +275,12 @@ struct AbeSaveState final : public SaveStateBase
     s8 bHaveInvisiblity;
     u16 mPrevInput;
     u16 mReleasedButtons;
+    // The two above are the PSX button form, which loses keyboard bits the motions also read
+    s32 mPrevInputRaw;
+    s32 mReleasedButtonsRaw;
+    // A continue point that is touched asks for a quicksave, made on the next update
+    bool mDoQuicksave;
+    s16 mSaveFileId;
     eAbeMotions mKnockdownMotion;
     s16 field_76_padding;
     u32 mRollingMotionTimer;
@@ -313,6 +319,8 @@ struct AbeSaveState final : public SaveStateBase
     bool mMudomoDone;
     bool mShadowEnabled;
     bool mShadowAtBottom;
+    eAbeMotions mPreviousMotion;
+    AnimationSaveState mAnim;
 };
 
 class Bullet;
@@ -465,6 +473,8 @@ public:
     ~Abe();
 
     virtual void VUpdate() override;
+    virtual void VPostRestore() override;
+    virtual void VPostRestoreFromTlv() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VScreenChanged() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
@@ -726,7 +736,7 @@ private:
     s32 mInvisibilityTimer = 0;
     Guid mInvisibleEffectId;
     s8 mHandStoneCamIdx = 0;
-    ReliveTypes mHandStoneType = {};
+    ReliveTypes mHandStoneType = ReliveTypes::eNone;
     s16 mFmvId = 0;
     std::string mFmvName; // Set (only) for eMovieHandStone - mFmvId is reused for an unrelated, never-read value in the eHandStone case.
     s16 mHandStoneCams[3] = {};

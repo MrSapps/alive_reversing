@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include "../Types.hpp"
 #include "../DynamicArray.hpp"
 #include "../data_conversion/guid.hpp"
@@ -10,6 +11,11 @@ extern u32 sGnFrame;
 
 struct BasePrimitive;
 
+struct SaveStateBase;
+struct GameSpeakListenerSaveState;
+struct AliveObjectStateSaveState;
+class GameSpeakListenerBase;
+struct AnimationStateSaveState;
 class SerializedObjectData;
 class OrderingTable;
 class BaseMap;
@@ -25,6 +31,11 @@ enum class ModalState
 class [[nodiscard]] BaseGameObject
 {
 public:
+    // Objects are made zeroed, so the padding between their members is the same in every world: the memory
+    // of two objects in the same state is then the same (StateHash looks at it)
+    static void* operator new(std::size_t size);
+    static void operator delete(void* ptr);
+
     BaseGameObject(s16 bAddToObjectList, s16 resourceArraySize, ResourceManager& resMan, BaseMap& map);
 
 
@@ -39,6 +50,69 @@ public:
     virtual void VStopAudio();
 
     virtual void VGetSaveState(SerializedObjectData& /*pSaveBuffer*/);
+
+    // Saves the object with VGetSaveState, and puts its id in what it wrote (SaveStateBase::mObjectId)
+    void SaveState(SerializedObjectData& pSaveBuffer);
+
+    // Second pass of a quicksave restore, once every saved object has been made: link up to the other
+    // restored objects, e.g. with RefreshId. Objects are made in the order of the save, so the one an
+    // object refers to may not exist yet while it is being made.
+    virtual void VPostRestore();
+
+    // For an object that the camera made again after a restore (not saved, so VPostRestore doesn't reach it): the
+    // state its first update would have put it in, which the object saved was already in
+    virtual void VPostRestoreFromTlv();
+
+    // The listener of an object that listens to the game speak, which is saved with it
+    virtual GameSpeakListenerBase* VListener();
+
+    // Memory inside the object that isn't game state, for comparing worlds (StateHash): what it drew with, handles
+    // to sound or the renderer, the copy of the TLV it was made from (which holds the flags the TLV had then)
+    struct NotStateMemory final
+    {
+        const void* mStart;
+        std::size_t mSize;
+    };
+    virtual std::vector<NotStateMemory> VNotStateMemory();
+
+    // Puts what every saved object has in its header (SaveStateBase) on the object it made
+    static void ApplySavedHeader(const SaveStateBase& header);
+
+    // Puts what every character has in common back on it
+    static void RestoreAliveObjectState(const AliveObjectStateSaveState& state);
+
+    // Puts where a character was in the game speak events back on it
+    static void RestoreListener(const GameSpeakListenerSaveState& state);
+
+    // Puts the animation a save kept for an object that has no save of its own back on the object that was made again
+    static void RestoreAnimationState(const AnimationStateSaveState& state);
+
+    // Puts the objects in the order the ids are in: that is the order they update in, which decides who uses the
+    // random numbers first. Objects that aren't in the list keep their places.
+    static void ReorderObjects(const std::vector<Guid>& idsInOrder);
+
+    // Sets what the last frame's drawing left on every object that is drawn (see Engine::RunFrame)
+    static void MarkDrawnObjects();
+
+    // Calls VPostRestoreFromTlv on every object
+    static void PostRestoreAllFromTlv();
+
+    // Calls VPostRestore on every object
+    static void PostRestoreAll();
+
+    // Writes the order of the lists that objects are in besides the one they update in, see ListOrderSaveState
+    static void SaveListOrders(SerializedObjectData& pSaveBuffer);
+    // Puts those lists in the order of a save
+    static void ReorderLists(const std::vector<Guid>& drawables, const std::vector<Guid>& aliveObjects, const std::vector<std::pair<Guid, s32>>& animations, const std::vector<Guid>& platforms);
+
+    // Destroys the dead objects now, between frames, as the next frame would (those that were drawn as they died
+    // are kept until then). A save leaves the dead out, and the list takes the last object into the place of a
+    // destroyed one: the world that is saved has to have them gone, or it is not in the order the saved one is.
+    static void DestroyDeadObjects();
+
+    // Sets the id counter to what a quickload has, but past the ids that objects living through the load hold (the
+    // fade of a death, say): the next object made would share one
+    static void RestoreGuidCounter(u32 counter);
 
     // Runs one main loop iteration while this object is the active modal, in place of the
     // whole game frame. See StartModal.

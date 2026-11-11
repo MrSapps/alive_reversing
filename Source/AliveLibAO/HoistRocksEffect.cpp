@@ -194,20 +194,4 @@ void HoistRocksEffect::VUpdate()
     }
 }
 
-void HoistRocksEffect::VGetSaveState(SerializedObjectData& pSaveBuffer)
-{
-    HoistRocksEffectSaveState data = {};
-    data.mTlvId = mTlvId;
-    pSaveBuffer.Write(data);
-}
-
-void HoistRocksEffect::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)
-{
-    const auto pState = pBuffer.ReadTmpPtr<HoistRocksEffectSaveState>();
-    auto tlvIterator = map.TLV_From_Offset_Lvl_Cam(pState->mTlvId);
-    auto pTlv = tlvIterator.GetTlvChecked<relive::Path_Hoist>(ReliveTypes::eHoist);
-
-    relive_new HoistRocksEffect(pTlv, pState->mTlvId, resMan, map);
-}
-
 } // namespace AO

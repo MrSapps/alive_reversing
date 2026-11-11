@@ -290,6 +290,10 @@ struct FleechSaveState final : public SaveStateBase
     bool mGoesToSleep;
     bool mPersistant;
     s16 field_B2;
+    // False for a save from the original game's, which has neither
+    bool mPreviousMotionSaved;
+    s32 mPreviousMotion;
+    s16 mCollisionLineIdx;
 };
 
 using TFleechBrainFn = s16 (Fleech::*)();
@@ -324,6 +328,8 @@ public:
     void LoadAnimations();
 
     virtual void VUpdate() override;
+    virtual void VPostRestore() override;
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VScreenChanged() override;
     virtual void VOnTlvCollision(TlvIterator tlvIterator) override;

@@ -50,6 +50,7 @@ struct GreeterSaveState final : public SaveStateBase
     s16 field_46_targetOnLeft;
     s16 field_48_targetOnRight;
     FP mMotionLaserXPos;
+    Guid mSearchTlvId;
 };
 
 class PathLine;

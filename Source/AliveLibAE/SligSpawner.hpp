@@ -30,7 +30,9 @@ public:
 
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    virtual void VPostRestore() override;
 
 private:
     Guid mTlvInfo;
@@ -40,5 +42,4 @@ private:
     relive::Path_TLV mPathTlv = {};
     SpawnerStates mState = SpawnerStates::eInactive_0;
     Guid mSpawnedSligId;
-    bool mFindSpawnedSlig = false;
 };

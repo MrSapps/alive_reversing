@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "Mudokon.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/Shadow.hpp"
@@ -38,7 +39,7 @@
 #include "QuikSave.hpp"
 #include "Path.hpp"
 
-s16 sGoingToBirdPortalMudCount_5C3012 = 0;
+WorldStatic<s16> sGoingToBirdPortalMudCount_5C3012("AE.Mudokon.sGoingToBirdPortalMudCount_5C3012", 0);
 
 enum Brain_0_GiveRings
 {
@@ -450,7 +451,6 @@ Mudokon::Mudokon(relive::Path_Mudokon* pTlv, const Guid& tlvId, ResourceManager&
 
     SetDoPurpleLightEffect(true);
 
-    SetRestoredFromQuickSave(false);
     SetCanSetOffExplosives(true);
 
     SetTint(kMudTints_55C744, mCurrentLevel);
@@ -615,11 +615,15 @@ Mudokon::Mudokon(relive::Path_Mudokon* pTlv, const Guid& tlvId, ResourceManager&
 
     CreateShadow();
 
-    VUpdate();
+    // The first update of a new one is not part of what a restore puts back (it makes a snooze particle, say)
+    if (!mMap.mRestoringObjects)
+    {
+        VUpdate();
+    }
 }
 
-s16 sAlertedMudCount_5C3010 = 0;
-static bool sIsMudStandingUp = false;
+WorldStatic<s16> sAlertedMudCount_5C3010("AE.Mudokon.sAlertedMudCount_5C3010", 0);
+static WorldStatic<bool> sIsMudStandingUp("AE.Mudokon.sIsMudStandingUp", false);
 
 void Mudokon::LoadAnimations()
 {
@@ -635,7 +639,7 @@ void Mudokon::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager
 
     auto pTlv = map.TLV_From_Offset_Lvl_Cam(pState->field_40_tlvInfo).GetTlv<relive::Path_Mudokon>();
 
-    const auto oldCount = sAlertedMudCount_5C3010;
+    const s16 oldCount = sAlertedMudCount_5C3010;
     auto pMud = relive_new Mudokon(pTlv, pState->field_40_tlvInfo, resMan, map);
 
     if (sAlertedMudCount_5C3010 != oldCount)
@@ -668,6 +672,13 @@ void Mudokon::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager
         pMud->mRGB.SetRGB(pState->field_1C_r, pState->field_1E_g, pState->field_20_b);
 
         pMud->mCurrentMotion = pState->field_24_current_motion;
+        if (pState->mPreviousMotionSaved)
+        {
+            pMud->mPreviousMotion = static_cast<eMudMotions>(pState->mPreviousMotion);
+            pMud->mbMotionChanged = pState->mbMotionChanged;
+            pMud->mEscaping = pState->mEscaping;
+            pMud->field_198_turning_wheel_timer = pState->mTurningWheelTimer;
+        }
 
         pMud->GetAnimation().Set_Animation_Data(pMud->GetAnimRes(kMudMotionAnimIds[static_cast<u32>(pMud->mCurrentMotion)]));
 
@@ -678,6 +689,8 @@ void Mudokon::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager
         pMud->GetAnimation().SetRender(pState->field_2A_bAnimRender & 1);
 
         pMud->SetDrawable(pState->field_2B_bDrawable & 1);
+
+        pMud->GetAnimation().RestoreSaveState(pState->mAnim);
 
         if (IsLastFrame(&pMud->GetAnimation()))
         {
@@ -690,7 +703,6 @@ void Mudokon::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager
         pMud->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pState->field_34_lastLineYPos);
 
         pMud->SetCanBePossessed(pState->field_3C_can_be_possessed & 1);
-        pMud->SetRestoredFromQuickSave(true);
 
         pMud->BaseAliveGameObjectCollisionLineType = pState->field_36_line_type;
         pMud->field_11C_bird_portal_id = pState->field_4C_portal_id;
@@ -725,7 +737,7 @@ void Mudokon::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager
         if (pMud->mAlerted)
         {
             sAlertedMudCount_5C3010++;
-            LOG_INFO("Alerted added from save state %d", sAlertedMudCount_5C3010);
+            LOG_INFO("Alerted added from save state %d", static_cast<s16>(sAlertedMudCount_5C3010));
         }
 
         pMud->field_178_brain_sub_state2 = pState->field_70_brain_sub_state2;
@@ -749,11 +761,7 @@ void Mudokon::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager
 
 void Mudokon::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     MudokonSaveState data = {};
 
     data.mType = ReliveTypes::eRingOrLiftMud;
@@ -777,6 +785,7 @@ void Mudokon::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.field_24_current_motion = mCurrentMotion;
     data.field_26_anim_current_frame = static_cast<s16>(GetAnimation().GetCurrentFrame());
     data.field_28_anim_frame_change_counter = static_cast<s16>(GetAnimation().GetFrameChangeCounter());
+    data.mAnim = GetAnimation().GetSaveState();
     data.field_2B_bDrawable = GetDrawable();
     data.field_2A_bAnimRender = GetAnimation().GetRender();
     data.field_2C_health = mHealth;
@@ -854,84 +863,104 @@ void Mudokon::VGetSaveState(SerializedObjectData& pSaveBuffer)
 
     data.field_84_response_entry_idx = GetResponseEntryIdx();
 
-    pSaveBuffer.Write(data);
+        data.mPreviousMotionSaved = true;
+    data.mPreviousMotion = static_cast<s32>(mPreviousMotion);
+    data.mbMotionChanged = mbMotionChanged;
+    data.mEscaping = mEscaping;
+    data.mTurningWheelTimer = field_198_turning_wheel_timer;
+pSaveBuffer.Write(data);
 }
 
-void Mudokon::VUpdate()
+void Mudokon::VPostRestore()
 {
-    if (GetRestoredFromQuickSave())
+    if (BaseAliveGameObjectCollisionLineType != -1)
     {
-        SetRestoredFromQuickSave(false);
-        if (BaseAliveGameObjectCollisionLineType != -1)
-        {
-            gCollisions->Raycast(
-                mXPos,
-                mYPos - FP_FromInteger(20),
-                mXPos,
-                mYPos + FP_FromInteger(20),
-                &BaseAliveGameObjectCollisionLine,
-                &mXPos,
-                &mYPos,
-                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
 
-            if (BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eDynamicCollision_32 ||
-                BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eBackgroundDynamicCollision_36)
-            {
-                const PSX_RECT bRect = VGetBoundingRect();
-                CheckPlatformCollision(
-                    {bRect.x, static_cast<s16>(bRect.y + 5)},
-                    {bRect.w, static_cast<s16>(bRect.h + 5)},
-                    PlatformBase::Platforms());
-            }
+        if (BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eDynamicCollision_32 ||
+            BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eBackgroundDynamicCollision_36)
+        {
+            const PSX_RECT bRect = VGetBoundingRect();
+            CheckPlatformCollision(
+                {bRect.x, static_cast<s16>(bRect.y + 5)},
+                {bRect.w, static_cast<s16>(bRect.h + 5)},
+                PlatformBase::Platforms());
         }
+    }
 
-        BaseAliveGameObjectCollisionLineType = 0;
+    ResolveTlvLinks();
 
-        if (field_11C_bird_portal_id != Guid{})
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
+}
+
+// The bird portal and the wheel are saved as the TLVs they were made from. Each is found by its TLV once it exists, which
+// is when this is called, or later for one the camera makes (VPostRestoreFromTlv). Once found, the id is the object's.
+void Mudokon::ResolveTlvLinks()
+{
+    if (field_11C_bird_portal_id != Guid{})
+    {
+        for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
         {
-            for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
+            BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
+            if (!pObj)
             {
-                BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
-                if (!pObj)
-                {
-                    break;
-                }
-
-                if (pObj->mBaseGameObjectTlvInfo == field_11C_bird_portal_id)
-                {
-                    field_11C_bird_portal_id = pObj->mBaseGameObjectId;
-                    sGoingToBirdPortalMudCount_5C3012++;
-                    mEscaping = true;
-                    if (mBrainState == Mud_Brain_State::Brain_6_Escape && mBrainSubState == 3)
-                    {
-                        static_cast<BirdPortal*>(pObj)->ClipPortal(1);
-                        GetAnimation().SetRenderLayer(GetSpriteScale() != FP_FromInteger(1) ? Layer::eLayer_InBirdPortal_Half_11 : Layer::eLayer_InBirdPortal_30);
-                    }
-                    break;
-                }
+                break;
             }
-        }
 
-        if (field_158_wheel_id != Guid{})
-        {
-            for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
+            if (pObj->mBaseGameObjectTlvInfo == field_11C_bird_portal_id)
             {
-                BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
-                if (!pObj)
+                field_11C_bird_portal_id = pObj->mBaseGameObjectId;
+                sGoingToBirdPortalMudCount_5C3012++;
+                mEscaping = true;
+                if (mBrainState == Mud_Brain_State::Brain_6_Escape && mBrainSubState == 3)
                 {
-                    break;
+                    static_cast<BirdPortal*>(pObj)->ClipPortal(1);
+                    GetAnimation().SetRenderLayer(GetSpriteScale() != FP_FromInteger(1) ? Layer::eLayer_InBirdPortal_Half_11 : Layer::eLayer_InBirdPortal_30);
                 }
-
-                if (pObj->mBaseGameObjectTlvInfo == field_158_wheel_id)
-                {
-                    field_158_wheel_id = pObj->mBaseGameObjectId;
-                    static_cast<WorkWheel*>(pObj)->VStartTurning();
-                    break;
-                }
+                break;
             }
         }
     }
 
+    if (field_158_wheel_id != Guid{})
+    {
+        for (s32 i = 0; i < gBaseGameObjects->Size(); i++)
+        {
+            BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
+            if (!pObj)
+            {
+                break;
+            }
+
+            if (pObj->mBaseGameObjectTlvInfo == field_158_wheel_id)
+            {
+                field_158_wheel_id = pObj->mBaseGameObjectId;
+                static_cast<WorkWheel*>(pObj)->VStartTurning();
+                break;
+            }
+        }
+    }
+}
+
+void Mudokon::VPostRestoreFromTlv()
+{
+    ResolveTlvLinks();
+}
+
+void Mudokon::VUpdate()
+{
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);
@@ -1765,7 +1794,7 @@ const s16 kDelayTable_55CF7C[6] = {
     24,
     30,
 };
-s16 sDelayIdx_5C3014 = 0;
+WorldStatic<s16> sDelayIdx_5C3014("AE.Mudokon.sDelayIdx_5C3014", 0);
 
 s16 Mudokon::Brain_1_Chisel()
 {
@@ -5070,7 +5099,8 @@ s16 Mudokon::Brain_9_Sick()
     // Have Abe make a sad noise when he first sees sick Mudokons.
     if (!mSeenWhileSick && mMap.Is_Point_In_Current_Camera(mCurrentLevel, mCurrentPath, mXPos, mYPos, 0))
     {
-        if (gAbe->mSay == MudSounds::eNone)
+        // Not while the one being made from a save runs its first update: Abe is put back by the save
+        if (gAbe->mSay == MudSounds::eNone && !mMap.mRestoringObjects)
         {
             gAbe->mSay = MudSounds::eSadUgh_28;
             gAbe->mAutoSayTimer = MakeTimer(10);
@@ -6969,7 +6999,7 @@ void Mudokon::AddAlerted()
     {
         mAlerted = true;
         sAlertedMudCount_5C3010++;
-        LOG_INFO("Alert added %d", sAlertedMudCount_5C3010);
+        LOG_INFO("Alert added %d", static_cast<s16>(sAlertedMudCount_5C3010));
     }
 }
 
@@ -6979,7 +7009,7 @@ void Mudokon::RemoveAlerted()
     {
         sAlertedMudCount_5C3010--;
         mAlerted = false;
-        LOG_INFO("Alert removed %d", sAlertedMudCount_5C3010);
+        LOG_INFO("Alert removed %d", static_cast<s16>(sAlertedMudCount_5C3010));
     }
 }
 

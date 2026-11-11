@@ -3,6 +3,78 @@
 #include <nlohmann/json.hpp>
 #include "AESaveConverter.hpp"
 #include "CommonTypesSerialization.hpp"
+#include "../../AliveLibAE/GameSpeak.hpp"
+#include "../GameObjects/BaseAliveGameObject.hpp"
+#include "../Events.hpp"
+#include "../ListOrderSaveState.hpp"
+#include "../GameObjects/BoomMachinePipe.hpp"
+#include "../GameObjects/RollingBallShaker.hpp"
+#include "../GameObjects/ParamiteWeb.hpp"
+#include "../../AliveLibAE/InvisibleEffect.hpp"
+#include "../GameObjects/CircularFade.hpp"
+#include "../GameObjects/ZapLine.hpp"
+#include "../../AliveLibAE/Shrykull.hpp"
+#include "../GameObjects/ScreenClipper.hpp"
+#include "../GameObjects/BirdPortalTerminator.hpp"
+#include "../GameObjects/OrbWhirlWind.hpp"
+#include "../GameObjects/ThrowableTotalIndicator.hpp"
+#include "../GameObjects/DeathGas.hpp"
+#include "../GameObjects/PossessionFlicker.hpp"
+#include "../../AliveLibAE/ExplosionSet.hpp"
+#include "../GameObjects/GroundExplosion.hpp"
+#include "../GameObjects/Electrocute.hpp"
+#include "../GameObjects/PaletteOverwriter.hpp"
+#include "../../AliveLibAE/ColourfulMeter.hpp"
+#include "../../AliveLibAE/Bullet.hpp"
+#include "../GameObjects/BulletShell.hpp"
+#include "../GameObjects/Door.hpp"
+#include "../GameObjects/ElectricWall.hpp"
+#include "../../AliveLibAE/ParamiteWebLine.hpp"
+#include "../../AliveLibAE/PullRingRope.hpp"
+#include "../../AliveLibAE/SligGetPantsAndWings.hpp"
+#include "../GameObjects/GasCountDown.hpp"
+#include "../../AliveLibAE/CrawlingSligButton.hpp"
+#include "../../AliveLibAE/BrewMachine.hpp"
+#include "../../AliveLibAE/LevelLoader.hpp"
+#include "../GameObjects/BackgroundAnimation.hpp"
+#include "../../AliveLibAE/GlukkonSwitch.hpp"
+#include "../../AliveLibAE/TorturedMudokon.hpp"
+#include "../../AliveLibAE/DoorBlocker.hpp"
+#include "../../AliveLibAE/DoorFlame.hpp"
+#include "../../AliveLibAE/StatusLight.hpp"
+#include "../GameObjects/TimedMine.hpp"
+#include "../../AliveLibAE/MovingBomb.hpp"
+#include "../GameObjects/Mine.hpp"
+#include "../../AliveLibAE/BoneBag.hpp"
+#include "../../AliveLibAE/RockSack.hpp"
+#include "../../AliveLibAE/MeatSack.hpp"
+#include "../GameObjects/BoomMachine.hpp"
+#include "../GameObjects/ZzzSpawner.hpp"
+#include "../../AliveLibAE/SlurgSpawner.hpp"
+#include "../../AliveLibAE/SlogSpawner.hpp"
+#include "../GameObjects/RollingBallStopper.hpp"
+#include "../../AliveLibAE/RollingBall.hpp"
+#include "../../AliveLibAE/FootSwitch.hpp"
+#include "../../AliveLibAE/Lever.hpp"
+#include "../../AliveLibAE/MotionDetector.hpp"
+#include "../../AliveLibAE/SecurityDoor.hpp"
+#include "../../AliveLibAE/MultiSwitchController.hpp"
+#include "../../AliveLibAE/Teleporter.hpp"
+#include "../../AliveLibAE/FallingItem.hpp"
+#include "../../AliveLibAE/LaughingGas.hpp"
+#include "../GameObjects/AirExplosion.hpp"
+#include "../GameObjects/Alarm.hpp"
+#include "../GameObjects/Blood.hpp"
+#include "../GameObjects/DeathBirdParticle.hpp"
+#include "../GameObjects/Fade.hpp"
+#include "../GameObjects/Flash.hpp"
+#include "../GameObjects/Gibs.hpp"
+#include "../GameObjects/Particle.hpp"
+#include "../GameObjects/ParticleBurst.hpp"
+#include "../GameObjects/ScreenShake.hpp"
+#include "../GameObjects/Spark.hpp"
+#include "../GameObjects/ZapSpark.hpp"
+#include "../WorldStatic.hpp"
 #include "EnumSerialization.hpp" // needed for some common enum and struct serialization (should probably move those to a different file)
 
 
@@ -58,6 +130,2413 @@ NLOHMANN_JSON_SERIALIZE_ENUM(SpawnerStates, {
     {SpawnerStates::eSligSpawned_1, "slig_spawned"},
 })
 
+inline void to_json(nlohmann::json& j, const AnimationSaveState& p)
+{
+    j = nlohmann::json{
+        {"valid", p.mValid},
+        {"frame", p.mFrame},
+        {"frame_change_counter", p.mFrameChangeCounter},
+        {"frame_delay", p.mFrameDelay},
+        {"animate", p.mAnimate},
+        {"loop", p.mLoop},
+        {"flip_x", p.mFlipX},
+        {"render", p.mRender},
+        {"is_last_frame", p.mIsLastFrame},
+        {"forward_loop_completed", p.mForwardLoopCompleted},
+        {"flip_y", p.mFlipY},
+        {"swap_xy", p.mSwapXY},
+        {"semi_trans", p.mSemiTrans},
+        {"blending", p.mBlending},
+        {"loop_backwards", p.mLoopBackwards},
+        {"ignore_pos_offset", p.mIgnorePosOffset},
+        {"blend_mode", p.mBlendMode},
+        {"render_layer", p.mRenderLayer},
+        {"red", p.mRed},
+        {"green", p.mGreen},
+        {"blue", p.mBlue},
+        {"sprite_scale", p.mSpriteScale},
+        {"anim_id", p.mAnimId},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, AnimationSaveState& p)
+{
+    j.at("valid").get_to(p.mValid);
+    j.at("frame").get_to(p.mFrame);
+    j.at("frame_change_counter").get_to(p.mFrameChangeCounter);
+    j.at("frame_delay").get_to(p.mFrameDelay);
+    j.at("animate").get_to(p.mAnimate);
+    j.at("loop").get_to(p.mLoop);
+    j.at("flip_x").get_to(p.mFlipX);
+    j.at("render").get_to(p.mRender);
+    j.at("is_last_frame").get_to(p.mIsLastFrame);
+    j.at("forward_loop_completed").get_to(p.mForwardLoopCompleted);
+    // A save from before these were kept has none, and its animation is as the object makes it
+    if (!j.contains("blend_mode"))
+    {
+        p.mValid = false;
+        return;
+    }
+    j.at("flip_y").get_to(p.mFlipY);
+    j.at("swap_xy").get_to(p.mSwapXY);
+    j.at("semi_trans").get_to(p.mSemiTrans);
+    j.at("blending").get_to(p.mBlending);
+    j.at("loop_backwards").get_to(p.mLoopBackwards);
+    j.at("ignore_pos_offset").get_to(p.mIgnorePosOffset);
+    j.at("blend_mode").get_to(p.mBlendMode);
+    j.at("render_layer").get_to(p.mRenderLayer);
+    j.at("red").get_to(p.mRed);
+    j.at("green").get_to(p.mGreen);
+    j.at("blue").get_to(p.mBlue);
+    j.at("sprite_scale").get_to(p.mSpriteScale);
+    j.at("anim_id").get_to(p.mAnimId);
+}
+
+inline void to_json(nlohmann::json& j, const HoistRocksEffectSaveState& p)
+{
+    nlohmann::json rocks = nlohmann::json::array();
+    for (const auto& rock : p.mRocks)
+    {
+        rocks.push_back(nlohmann::json{
+            {"state", rock.mState},
+            {"xpos", rock.mXPos},
+            {"ypos", rock.mYPos},
+            {"vely", rock.mVelY},
+            {"anim_id", static_cast<s32>(rock.mAnimId)},
+            {"anim", rock.mAnim},
+        });
+    }
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"timer", p.mTimer},
+        {"rocks", rocks},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, HoistRocksEffectSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("timer").get_to(p.mTimer);
+    for (size_t i = 0; i < 4; i++)
+    {
+        const nlohmann::json& rock = j.at("rocks").at(i);
+        rock.at("state").get_to(p.mRocks[i].mState);
+        rock.at("xpos").get_to(p.mRocks[i].mXPos);
+        rock.at("ypos").get_to(p.mRocks[i].mYPos);
+        rock.at("vely").get_to(p.mRocks[i].mVelY);
+        p.mRocks[i].mAnimId = static_cast<AnimId>(rock.at("anim_id").get<s32>());
+        rock.at("anim").get_to(p.mRocks[i].mAnim);
+    }
+}
+
+inline void to_json(nlohmann::json& j, const InvisibleSwitchSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"tlv_id", p.mTlvId},
+        {"delay_timer", p.mDelayTimer},
+        {"state", p.mState},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, InvisibleSwitchSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("tlv_id").get_to(p.mTlvId);
+    j.at("delay_timer").get_to(p.mDelayTimer);
+    j.at("state").get_to(p.mState);
+}
+
+inline void to_json(nlohmann::json& j, const MusicTriggerSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"tlv_id", p.mTlvId},
+        {"triggered_by_touching", p.mTriggeredByTouching},
+        {"triggered_by_timer", p.mTriggeredByTimer},
+        {"counter", p.mCounter},
+        {"music_type", p.mMusicType},
+        {"set_music_to_none_on_dtor", p.mSetMusicToNoneOnDtor},
+        {"update_delay", p.mUpdateDelay},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, MusicTriggerSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("tlv_id").get_to(p.mTlvId);
+    j.at("triggered_by_touching").get_to(p.mTriggeredByTouching);
+    j.at("triggered_by_timer").get_to(p.mTriggeredByTimer);
+    j.at("counter").get_to(p.mCounter);
+    p.mMusicType = j.value("music_type", 0);
+    p.mSetMusicToNoneOnDtor = j.value("set_music_to_none_on_dtor", false);
+    p.mUpdateDelay = j.value("update_delay", 0);
+}
+
+inline void to_json(nlohmann::json& j, const SecurityOrbSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"tlv_id", p.mTlvId},
+        {"state", p.mState},
+        {"timer", p.mTimer},
+        {"health", p.mHealth},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, SecurityOrbSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("tlv_id").get_to(p.mTlvId);
+    j.at("state").get_to(p.mState);
+    j.at("timer").get_to(p.mTimer);
+    j.at("health").get_to(p.mHealth);
+}
+
+inline void to_json(nlohmann::json& j, const GasEmitterSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"tlv_id", p.mTlvId},
+        {"emit_power", p.mEmitPower},
+        {"draw_flipper", p.mDrawFlipper},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, GasEmitterSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("tlv_id").get_to(p.mTlvId);
+    j.at("emit_power").get_to(p.mEmitPower);
+    j.at("draw_flipper").get_to(p.mDrawFlipper);
+}
+
+inline void to_json(nlohmann::json& j, const LeafSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"xpos", p.mXPos},
+        {"ypos", p.mYPos},
+        {"velx", p.mVelX},
+        {"vely", p.mVelY},
+        {"sprite_scale", p.mSpriteScale},
+        {"hit_something", p.mHitSomething},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, LeafSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("xpos").get_to(p.mXPos);
+    j.at("ypos").get_to(p.mYPos);
+    j.at("velx").get_to(p.mVelX);
+    j.at("vely").get_to(p.mVelY);
+    j.at("sprite_scale").get_to(p.mSpriteScale);
+    j.at("hit_something").get_to(p.mHitSomething);
+}
+
+inline void to_json(nlohmann::json& j, const AnimatedObjectSaveState& p)
+{
+    j = nlohmann::json{
+        {"anim", p.mAnim},
+        {"xpos", p.mXPos},
+        {"ypos", p.mYPos},
+        {"path", p.mCurrentPath},
+        {"level", p.mCurrentLevel},
+        {"vel_x", p.mVelX},
+        {"vel_y", p.mVelY},
+        {"red", p.mRed},
+        {"green", p.mGreen},
+        {"blue", p.mBlue},
+        {"y_offset", p.mYOffset},
+        {"x_offset", p.mXOffset},
+        {"scale", p.mScale},
+        {"sprite_scale", p.mSpriteScale},
+        {"apply_shadow_zone_colour", p.mApplyShadowZoneColour},
+        {"do_purple_light_effect", p.mDoPurpleLightEffect},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, AnimatedObjectSaveState& p)
+{
+    j.at("anim").get_to(p.mAnim);
+    j.at("xpos").get_to(p.mXPos);
+    j.at("ypos").get_to(p.mYPos);
+    j.at("path").get_to(p.mCurrentPath);
+    j.at("level").get_to(p.mCurrentLevel);
+    j.at("vel_x").get_to(p.mVelX);
+    j.at("vel_y").get_to(p.mVelY);
+    j.at("red").get_to(p.mRed);
+    j.at("green").get_to(p.mGreen);
+    j.at("blue").get_to(p.mBlue);
+    j.at("y_offset").get_to(p.mYOffset);
+    j.at("x_offset").get_to(p.mXOffset);
+    j.at("scale").get_to(p.mScale);
+    j.at("sprite_scale").get_to(p.mSpriteScale);
+    j.at("apply_shadow_zone_colour").get_to(p.mApplyShadowZoneColour);
+    j.at("do_purple_light_effect").get_to(p.mDoPurpleLightEffect);
+}
+
+inline void to_json(nlohmann::json& j, const EffectBaseSaveState& p)
+{
+    j = nlohmann::json{
+        {"blend_mode", p.mBlendMode},
+        {"layer", p.mLayer},
+        {"path", p.mPathId},
+        {"level", p.mLevelId},
+        {"red", p.mRed},
+        {"green", p.mGreen},
+        {"blue", p.mBlue},
+        {"semi_trans", p.mSemiTrans},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, EffectBaseSaveState& p)
+{
+    j.at("blend_mode").get_to(p.mBlendMode);
+    j.at("layer").get_to(p.mLayer);
+    j.at("path").get_to(p.mPathId);
+    j.at("level").get_to(p.mLevelId);
+    j.at("red").get_to(p.mRed);
+    j.at("green").get_to(p.mGreen);
+    j.at("blue").get_to(p.mBlue);
+    j.at("semi_trans").get_to(p.mSemiTrans);
+}
+
+inline void to_json(nlohmann::json& j, const SparkSaveState& p)
+{
+    nlohmann::json sparks = nlohmann::json::array();
+    for (s32 i = 0; i < p.mSparkAllocCount && i < 16; i++)
+    {
+        const auto& spark = p.mSparks[i];
+        sparks.push_back(nlohmann::json{{"x0", spark.mX0}, {"y0", spark.mY0}, {"x1", spark.mX1}, {"y1", spark.mY1}, {"ang", spark.mAng}, {"radius", spark.mRadius}, {"len", spark.mLen}});
+    }
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"xpos", p.mXPos},
+        {"ypos", p.mYPos},
+        {"sprite_scale", p.mSpriteScale},
+        {"red", p.mRed},
+        {"green", p.mGreen},
+        {"blue", p.mBlue},
+        {"layer", p.mLayer},
+        {"spark_count", p.mSparkCount},
+        {"spark_alloc_count", p.mSparkAllocCount},
+        {"timer", p.mTimer},
+        {"spark_type", p.mSparkType},
+        {"sparks", sparks},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, SparkSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("xpos").get_to(p.mXPos);
+    j.at("ypos").get_to(p.mYPos);
+    j.at("sprite_scale").get_to(p.mSpriteScale);
+    j.at("red").get_to(p.mRed);
+    j.at("green").get_to(p.mGreen);
+    j.at("blue").get_to(p.mBlue);
+    j.at("layer").get_to(p.mLayer);
+    j.at("spark_count").get_to(p.mSparkCount);
+    j.at("spark_alloc_count").get_to(p.mSparkAllocCount);
+    j.at("timer").get_to(p.mTimer);
+    j.at("spark_type").get_to(p.mSparkType);
+    const nlohmann::json& sparks = j.at("sparks");
+    for (size_t i = 0; i < sparks.size() && i < 16; i++)
+    {
+        const nlohmann::json& spark = sparks.at(i);
+        spark.at("x0").get_to(p.mSparks[i].mX0);
+        spark.at("y0").get_to(p.mSparks[i].mY0);
+        spark.at("x1").get_to(p.mSparks[i].mX1);
+        spark.at("y1").get_to(p.mSparks[i].mY1);
+        spark.at("ang").get_to(p.mSparks[i].mAng);
+        spark.at("radius").get_to(p.mSparks[i].mRadius);
+        spark.at("len").get_to(p.mSparks[i].mLen);
+    }
+}
+
+inline void to_json(nlohmann::json& j, const ParticleSaveState& p)
+{
+    j = nlohmann::json{{"type", p.mType}, {"object_type", p.mObjectType}, {"object", p.mObject}, {"scale_amount", p.mScaleAmount}};
+}
+
+inline void from_json(const nlohmann::json& j, ParticleSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("object_type").get_to(p.mObjectType);
+    j.at("object").get_to(p.mObject);
+    j.at("scale_amount").get_to(p.mScaleAmount);
+}
+
+inline void to_json(nlohmann::json& j, const GibsSaveState& p)
+{
+    nlohmann::json parts = nlohmann::json::array();
+    for (s32 i = 0; i < p.mPartsUsedCount && i < 7; i++)
+    {
+        const auto& part = p.mParts[i];
+        parts.push_back(nlohmann::json{{"x", part.mX}, {"y", part.mY}, {"z", part.mZ}, {"dx", part.mDx}, {"dy", part.mDy}, {"dz", part.mDz}, {"anim", part.mAnim}});
+    }
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"gib_type", p.mGibType},
+        {"base_scale", p.mBaseScale},
+        {"make_smaller", p.mMakeSmaller},
+        {"object", p.mObject},
+        {"z", p.mZ},
+        {"dz", p.mDz},
+        {"alive_timer", p.mAliveTimer},
+        {"parts_used_count", p.mPartsUsedCount},
+        {"parts", parts},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, GibsSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("gib_type").get_to(p.mGibType);
+    j.at("base_scale").get_to(p.mBaseScale);
+    j.at("make_smaller").get_to(p.mMakeSmaller);
+    j.at("object").get_to(p.mObject);
+    j.at("z").get_to(p.mZ);
+    j.at("dz").get_to(p.mDz);
+    j.at("alive_timer").get_to(p.mAliveTimer);
+    j.at("parts_used_count").get_to(p.mPartsUsedCount);
+    const nlohmann::json& parts = j.at("parts");
+    for (size_t i = 0; i < parts.size() && i < 7; i++)
+    {
+        const nlohmann::json& part = parts.at(i);
+        part.at("x").get_to(p.mParts[i].mX);
+        part.at("y").get_to(p.mParts[i].mY);
+        part.at("z").get_to(p.mParts[i].mZ);
+        part.at("dx").get_to(p.mParts[i].mDx);
+        part.at("dy").get_to(p.mParts[i].mDy);
+        part.at("dz").get_to(p.mParts[i].mDz);
+        part.at("anim").get_to(p.mParts[i].mAnim);
+    }
+}
+
+inline void to_json(nlohmann::json& j, const ParticleBurstSaveState& p)
+{
+    nlohmann::json particles = nlohmann::json::array();
+    for (s32 i = 0; i < p.mParticleCount && i < 40; i++)
+    {
+        const auto& particle = p.mParticles[i];
+        particles.push_back(nlohmann::json{{"x", particle.mX}, {"y", particle.mY}, {"z", particle.mZ}, {"x_speed", particle.mXSpeed}, {"y_speed", particle.mYSpeed}, {"z_speed", particle.mZSpeed}, {"anim", particle.mAnim}});
+    }
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"requested_count", p.mRequestedCount},
+        {"burst_type", p.mBurstType},
+        {"fine_scale", p.mFineScale},
+        {"fadeout", p.mFadeout},
+        {"scale", p.mScale},
+        {"object", p.mObject},
+        {"particle_count", p.mParticleCount},
+        {"alive_timer", p.mAliveTimer},
+        {"particles", particles},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, ParticleBurstSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("requested_count").get_to(p.mRequestedCount);
+    j.at("burst_type").get_to(p.mBurstType);
+    j.at("fine_scale").get_to(p.mFineScale);
+    j.at("fadeout").get_to(p.mFadeout);
+    j.at("scale").get_to(p.mScale);
+    j.at("object").get_to(p.mObject);
+    j.at("particle_count").get_to(p.mParticleCount);
+    j.at("alive_timer").get_to(p.mAliveTimer);
+    const nlohmann::json& particles = j.at("particles");
+    for (size_t i = 0; i < particles.size() && i < 40; i++)
+    {
+        const nlohmann::json& particle = particles.at(i);
+        particle.at("x").get_to(p.mParticles[i].mX);
+        particle.at("y").get_to(p.mParticles[i].mY);
+        particle.at("z").get_to(p.mParticles[i].mZ);
+        particle.at("x_speed").get_to(p.mParticles[i].mXSpeed);
+        particle.at("y_speed").get_to(p.mParticles[i].mYSpeed);
+        particle.at("z_speed").get_to(p.mParticles[i].mZSpeed);
+        particle.at("anim").get_to(p.mParticles[i].mAnim);
+    }
+}
+
+inline void to_json(nlohmann::json& j, const BloodSaveState& p)
+{
+    nlohmann::json drops = nlohmann::json::array();
+    for (s32 i = 0; i < p.mCurrentBloodCount && i < 64; i++)
+    {
+        const auto& drop = p.mDrops[i];
+        drops.push_back(nlohmann::json{{"x", drop.mX}, {"y", drop.mY}, {"off_x", drop.mOffX}, {"off_y", drop.mOffY}});
+    }
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"total_blood_count", p.mTotalBloodCount},
+        {"scale", p.mScale},
+        {"object", p.mObject},
+        {"blood_xpos", p.mBloodXPos},
+        {"blood_ypos", p.mBloodYPos},
+        {"rand_seed", p.mRandSeed},
+        {"current_blood_count", p.mCurrentBloodCount},
+        {"update_calls", p.mUpdateCalls},
+        {"ot_layer", p.mOtLayer},
+        {"drops", drops},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, BloodSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("total_blood_count").get_to(p.mTotalBloodCount);
+    j.at("scale").get_to(p.mScale);
+    j.at("object").get_to(p.mObject);
+    j.at("blood_xpos").get_to(p.mBloodXPos);
+    j.at("blood_ypos").get_to(p.mBloodYPos);
+    j.at("rand_seed").get_to(p.mRandSeed);
+    j.at("current_blood_count").get_to(p.mCurrentBloodCount);
+    j.at("update_calls").get_to(p.mUpdateCalls);
+    j.at("ot_layer").get_to(p.mOtLayer);
+    const nlohmann::json& drops = j.at("drops");
+    for (size_t i = 0; i < drops.size() && i < 64; i++)
+    {
+        const nlohmann::json& drop = drops.at(i);
+        drop.at("x").get_to(p.mDrops[i].mX);
+        drop.at("y").get_to(p.mDrops[i].mY);
+        drop.at("off_x").get_to(p.mDrops[i].mOffX);
+        drop.at("off_y").get_to(p.mDrops[i].mOffY);
+    }
+}
+
+inline void to_json(nlohmann::json& j, const DeathBirdParticleSaveState& p)
+{
+    j = nlohmann::json{{"type", p.mType}, {"start_timer", p.mStartTimer}, {"play_sound", p.mPlaySound}, {"scale", p.mScale}, {"object", p.mObject}, {"random", p.mRandom}, {"state", p.mState}};
+}
+
+inline void from_json(const nlohmann::json& j, DeathBirdParticleSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("start_timer").get_to(p.mStartTimer);
+    j.at("play_sound").get_to(p.mPlaySound);
+    j.at("scale").get_to(p.mScale);
+    j.at("object").get_to(p.mObject);
+    j.at("random").get_to(p.mRandom);
+    j.at("state").get_to(p.mState);
+}
+
+inline void to_json(nlohmann::json& j, const ZapSparkSaveState& p)
+{
+    j = nlohmann::json{{"type", p.mType}, {"object", p.mObject}, {"spark_timer", p.mSparkTimer}};
+}
+
+inline void from_json(const nlohmann::json& j, ZapSparkSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("object").get_to(p.mObject);
+    j.at("spark_timer").get_to(p.mSparkTimer);
+}
+
+inline void to_json(nlohmann::json& j, const FlashSaveState& p)
+{
+    j = nlohmann::json{{"type", p.mType}, {"effect", p.mEffect}, {"flash_time", p.mFlashTime}};
+}
+
+inline void from_json(const nlohmann::json& j, FlashSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("effect").get_to(p.mEffect);
+    j.at("flash_time").get_to(p.mFlashTime);
+}
+
+inline void to_json(nlohmann::json& j, const FadeSaveState& p)
+{
+    j = nlohmann::json{{"type", p.mType}, {"effect", p.mEffect}, {"fade_option", p.mFadeOption}, {"destroy_on_done", p.mDestroyOnDone}, {"speed", p.mSpeed}, {"fade_colour", p.mFadeColour}, {"done", p.mDone}};
+}
+
+inline void from_json(const nlohmann::json& j, FadeSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("effect").get_to(p.mEffect);
+    j.at("fade_option").get_to(p.mFadeOption);
+    j.at("destroy_on_done").get_to(p.mDestroyOnDone);
+    j.at("speed").get_to(p.mSpeed);
+    j.at("fade_colour").get_to(p.mFadeColour);
+    j.at("done").get_to(p.mDone);
+}
+
+inline void to_json(nlohmann::json& j, const AlarmSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"effect", p.mEffect},
+        {"is_tlv_alarm", p.mIsTlvAlarm},
+        {"tlv_info", p.mTlvInfo},
+        {"alarm_red", p.mAlarmRed},
+        {"alarm_pause_timer", p.mAlarmPauseTimer},
+        {"alarm_duration_timer", p.mAlarmDurationTimer},
+        {"alarm_state", p.mAlarmState},
+        {"alarm_switch_id", p.mAlarmSwitchId},
+        {"alarm_duration", p.mAlarmDuration},
+        {"drawable", p.mDrawable},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, AlarmSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("effect").get_to(p.mEffect);
+    j.at("is_tlv_alarm").get_to(p.mIsTlvAlarm);
+    j.at("tlv_info").get_to(p.mTlvInfo);
+    j.at("alarm_red").get_to(p.mAlarmRed);
+    j.at("alarm_pause_timer").get_to(p.mAlarmPauseTimer);
+    j.at("alarm_duration_timer").get_to(p.mAlarmDurationTimer);
+    j.at("alarm_state").get_to(p.mAlarmState);
+    j.at("alarm_switch_id").get_to(p.mAlarmSwitchId);
+    j.at("alarm_duration").get_to(p.mAlarmDuration);
+    j.at("drawable").get_to(p.mDrawable);
+}
+
+inline void to_json(nlohmann::json& j, const ScreenShakeSaveState& p)
+{
+    j = nlohmann::json{{"type", p.mType}, {"enable_shake_event", p.mEnableShakeEvent}, {"softer_shakes", p.mSofterShakes}, {"shake_number", p.mShakeNumber}};
+}
+
+inline void from_json(const nlohmann::json& j, ScreenShakeSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("enable_shake_event").get_to(p.mEnableShakeEvent);
+    j.at("softer_shakes").get_to(p.mSofterShakes);
+    j.at("shake_number").get_to(p.mShakeNumber);
+}
+
+inline void to_json(nlohmann::json& j, const AirExplosionSaveState& p)
+{
+    j = nlohmann::json{{"type", p.mType}, {"small_explosion", p.mSmallExplosion}, {"object", p.mObject}, {"explosion_scale", p.mExplosionScale}, {"particle_burst_scale", p.mParticleBurstScale}};
+}
+
+inline void from_json(const nlohmann::json& j, AirExplosionSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("small_explosion").get_to(p.mSmallExplosion);
+    j.at("object").get_to(p.mObject);
+    j.at("explosion_scale").get_to(p.mExplosionScale);
+    j.at("particle_burst_scale").get_to(p.mParticleBurstScale);
+}
+
+inline void to_json(nlohmann::json& j, const LaughingGasSaveState& p)
+{
+    nlohmann::json gasX = nlohmann::json::array();
+    nlohmann::json gasY = nlohmann::json::array();
+    for (s32 i = 0; i < 6; i++)
+    {
+        for (s32 k = 0; k < 6; k++)
+        {
+            gasX.push_back(p.mGasX[i][k]);
+            gasY.push_back(p.mGasY[i][k]);
+        }
+    }
+    j = nlohmann::json{{"type", p.mType}, {"amount_on", p.mAmountOn}, {"gas_x", gasX}, {"gas_y", gasY}, {"random_seed", p.mRandomSeed}};
+}
+
+inline void from_json(const nlohmann::json& j, LaughingGasSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("amount_on").get_to(p.mAmountOn);
+    const nlohmann::json& gasX = j.at("gas_x");
+    const nlohmann::json& gasY = j.at("gas_y");
+    for (s32 i = 0; i < 36 && i < static_cast<s32>(gasX.size()); i++)
+    {
+        p.mGasX[i / 6][i % 6] = gasX.at(i).get<f32>();
+        p.mGasY[i / 6][i % 6] = gasY.at(i).get<f32>();
+    }
+    j.at("random_seed").get_to(p.mRandomSeed);
+}
+
+inline void to_json(nlohmann::json& j, const WorldStaticsSaveState& p)
+{
+    nlohmann::json statics = nlohmann::json::array();
+    for (u32 i = 0; i < p.mCount && i < WorldStaticsSaveState::kMaxStatics; i++)
+    {
+        nlohmann::json data = nlohmann::json::array();
+        for (u32 b = 0; b < p.mStatics[i].mSize && b < WorldStaticsSaveState::kMaxSize; b++)
+        {
+            data.push_back(p.mStatics[i].mData[b]);
+        }
+        statics.push_back(nlohmann::json{{"name_hash", p.mStatics[i].mNameHash}, {"data", data}});
+    }
+    j = nlohmann::json{{"type", p.mType}, {"statics", statics}};
+}
+
+inline void from_json(const nlohmann::json& j, WorldStaticsSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    const nlohmann::json& statics = j.at("statics");
+    p.mCount = 0;
+    for (size_t i = 0; i < statics.size() && i < WorldStaticsSaveState::kMaxStatics; i++)
+    {
+        const nlohmann::json& entry = statics.at(i);
+        entry.at("name_hash").get_to(p.mStatics[i].mNameHash);
+        const nlohmann::json& data = entry.at("data");
+        p.mStatics[i].mSize = static_cast<u32>(data.size());
+        for (size_t b = 0; b < data.size() && b < WorldStaticsSaveState::kMaxSize; b++)
+        {
+            p.mStatics[i].mData[b] = data.at(b).get<u8>();
+        }
+        p.mCount++;
+    }
+}
+
+inline void to_json(nlohmann::json& j, const FallingItemSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"object", p.mObject},
+        {"health", p.mHealth},
+        {"state", p.mState},
+        {"switch_id", p.mSwitchId},
+        {"fall_interval", p.mFallInterval},
+        {"max_falling_items", p.mMaxFallingItems},
+        {"remaining_falling_items", p.mRemainingFallingItems},
+        {"reset_switch_id_after_use", p.mResetSwitchIdAfterUse},
+        {"tlv_x_pos", p.mTlvXPos},
+        {"tlv_y_pos", p.mTlvYPos},
+        {"start_y_pos", p.mStartYPos},
+        {"fall_interval_timer", p.mFallIntervalTimer},
+        {"do_air_stream_sound", p.mDoAirStreamSound},
+        {"hit_drill_or_mine_car", p.mHitDrillOrMineCar},
+        {"air_stream_snd_channels", p.mAirStreamSndChannels},
+        {"created_gn_frame", p.mCreatedGnFrame},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, FallingItemSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("object").get_to(p.mObject);
+    j.at("health").get_to(p.mHealth);
+    j.at("state").get_to(p.mState);
+    j.at("switch_id").get_to(p.mSwitchId);
+    j.at("fall_interval").get_to(p.mFallInterval);
+    j.at("max_falling_items").get_to(p.mMaxFallingItems);
+    j.at("remaining_falling_items").get_to(p.mRemainingFallingItems);
+    j.at("reset_switch_id_after_use").get_to(p.mResetSwitchIdAfterUse);
+    j.at("tlv_x_pos").get_to(p.mTlvXPos);
+    j.at("tlv_y_pos").get_to(p.mTlvYPos);
+    j.at("start_y_pos").get_to(p.mStartYPos);
+    j.at("fall_interval_timer").get_to(p.mFallIntervalTimer);
+    j.at("do_air_stream_sound").get_to(p.mDoAirStreamSound);
+    j.at("hit_drill_or_mine_car").get_to(p.mHitDrillOrMineCar);
+    j.at("air_stream_snd_channels").get_to(p.mAirStreamSndChannels);
+    j.at("created_gn_frame").get_to(p.mCreatedGnFrame);
+}
+
+inline void to_json(nlohmann::json& j, const TeleporterSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"switch_state", p.mSwitchState},
+        {"state", p.mState},
+        {"destroy_self", p.mDestroySelf},
+        {"electrocute_id", p.mElectrocuteId},
+        {"effects_created", p.mEffectsCreated},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, TeleporterSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("switch_state").get_to(p.mSwitchState);
+    j.at("state").get_to(p.mState);
+    j.at("destroy_self").get_to(p.mDestroySelf);
+    j.at("electrocute_id").get_to(p.mElectrocuteId);
+    j.at("effects_created").get_to(p.mEffectsCreated);
+}
+
+inline void to_json(nlohmann::json& j, const MultiSwitchControllerSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"last_switch_on_time", p.mLastSwitchOnTime},
+        {"all_switches_on_or_off_time", p.mAllSwitchesOnOrOffTime},
+        {"is_on", p.mIsOn},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, MultiSwitchControllerSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("last_switch_on_time").get_to(p.mLastSwitchOnTime);
+    j.at("all_switches_on_or_off_time").get_to(p.mAllSwitchesOnOrOffTime);
+    j.at("is_on").get_to(p.mIsOn);
+}
+
+inline void to_json(nlohmann::json& j, const SecurityDoorSaveState& p)
+{
+    nlohmann::json password_buffer_array = nlohmann::json::array();
+    for (s32 i = 0; i < 16; i++)
+    {
+        password_buffer_array.push_back(p.mPasswordBuffer[i]);
+    }
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"state", p.mState},
+        {"code_length", p.mCodeLength},
+        {"max_idx", p.mMaxIdx},
+        {"buffer_start_idx", p.mBufferStartIdx},
+        {"timer", p.mTimer},
+        {"max_idx2", p.mMaxIdx2},
+        {"password_buffer", password_buffer_array},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, SecurityDoorSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("state").get_to(p.mState);
+    j.at("code_length").get_to(p.mCodeLength);
+    j.at("max_idx").get_to(p.mMaxIdx);
+    j.at("buffer_start_idx").get_to(p.mBufferStartIdx);
+    j.at("timer").get_to(p.mTimer);
+    j.at("max_idx2").get_to(p.mMaxIdx2);
+    const nlohmann::json& password_buffer_array = j.at("password_buffer");
+    for (s32 i = 0; i < 16 && i < static_cast<s32>(password_buffer_array.size()); i++)
+    {
+        password_buffer_array.at(i).get_to(p.mPasswordBuffer[i]);
+    }
+}
+
+inline void to_json(nlohmann::json& j, const MotionDetectorSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"laser_id", p.mLaserId},
+        {"owner_id", p.mOwnerId},
+        {"state", p.mState},
+        {"pause_timer", p.mPauseTimer},
+        {"has_owner", p.mHasOwner},
+        {"dont_come_back", p.mDontComeBack},
+        {"top_left_x", p.mTopLeftX},
+        {"top_left_y", p.mTopLeftY},
+        {"bottom_right_x", p.mBottomRightX},
+        {"bottom_right_y", p.mBottomRightY},
+        {"speed", p.mSpeed},
+        {"object_in_laser", p.mObjectInLaser},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, MotionDetectorSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("laser_id").get_to(p.mLaserId);
+    j.at("owner_id").get_to(p.mOwnerId);
+    j.at("state").get_to(p.mState);
+    j.at("pause_timer").get_to(p.mPauseTimer);
+    j.at("has_owner").get_to(p.mHasOwner);
+    j.at("dont_come_back").get_to(p.mDontComeBack);
+    j.at("top_left_x").get_to(p.mTopLeftX);
+    j.at("top_left_y").get_to(p.mTopLeftY);
+    j.at("bottom_right_x").get_to(p.mBottomRightX);
+    j.at("bottom_right_y").get_to(p.mBottomRightY);
+    j.at("speed").get_to(p.mSpeed);
+    j.at("object_in_laser").get_to(p.mObjectInLaser);
+}
+
+inline void to_json(nlohmann::json& j, const LeverSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"state", p.mState},
+        {"pulled_from_left", p.mPulledFromLeft},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, LeverSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("state").get_to(p.mState);
+    j.at("pulled_from_left").get_to(p.mPulledFromLeft);
+}
+
+inline void to_json(nlohmann::json& j, const FootSwitchSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"state", p.mState},
+        {"stood_on_me_id", p.mStoodOnMeId},
+        {"create_sparks", p.mCreateSparks},
+        {"find_stander", p.mFindStander},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, FootSwitchSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("state").get_to(p.mState);
+    j.at("stood_on_me_id").get_to(p.mStoodOnMeId);
+    j.at("create_sparks").get_to(p.mCreateSparks);
+    j.at("find_stander").get_to(p.mFindStander);
+}
+
+inline void to_json(nlohmann::json& j, const RollingBallSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"state", p.mState},
+        {"rolling_ball_shaker_id", p.mRollingBallShakerId},
+        {"max_speed", p.mMaxSpeed},
+        {"acceleration", p.mAcceleration},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, RollingBallSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("state").get_to(p.mState);
+    j.at("rolling_ball_shaker_id").get_to(p.mRollingBallShakerId);
+    j.at("max_speed").get_to(p.mMaxSpeed);
+    j.at("acceleration").get_to(p.mAcceleration);
+}
+
+inline void to_json(nlohmann::json& j, const RollingBallStopperSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"state", p.mState},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, RollingBallStopperSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("state").get_to(p.mState);
+}
+
+inline void to_json(nlohmann::json& j, const SlogSpawnerSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"spawned_slogs_count", p.mSpawnedSlogsCount},
+        {"spawn_timer", p.mSpawnTimer},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, SlogSpawnerSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("spawned_slogs_count").get_to(p.mSpawnedSlogsCount);
+    j.at("spawn_timer").get_to(p.mSpawnTimer);
+}
+
+inline void to_json(nlohmann::json& j, const SlurgSpawnerSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"spawn_counter", p.mSpawnCounter},
+        {"spawned_count", p.mSpawnedCount},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, SlurgSpawnerSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("spawn_counter").get_to(p.mSpawnCounter);
+    j.at("spawned_count").get_to(p.mSpawnedCount);
+}
+
+inline void to_json(nlohmann::json& j, const StatusLightSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"untweaked_x_pos", p.mUntweakedXPos},
+        {"untweaked_y_pos", p.mUntweakedYPos},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, StatusLightSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("untweaked_x_pos").get_to(p.mUntweakedXPos);
+    j.at("untweaked_y_pos").get_to(p.mUntweakedYPos);
+}
+
+inline void to_json(nlohmann::json& j, const ZzzSpawnerSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"timer", p.mTimer},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, ZzzSpawnerSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("timer").get_to(p.mTimer);
+}
+
+inline void to_json(nlohmann::json& j, const BoomMachineSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"pipe_id", p.mPipeId},
+        {"is_button_on", p.mIsButtonOn},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, BoomMachineSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("pipe_id").get_to(p.mPipeId);
+    j.at("is_button_on").get_to(p.mIsButtonOn);
+}
+
+inline void to_json(nlohmann::json& j, const MeatSackSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"has_been_hit", p.mHasBeenHit},
+        {"meat_amount", p.mMeatAmount},
+        {"play_wobble_sound", p.mPlayWobbleSound},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, MeatSackSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("has_been_hit").get_to(p.mHasBeenHit);
+    j.at("meat_amount").get_to(p.mMeatAmount);
+    j.at("play_wobble_sound").get_to(p.mPlayWobbleSound);
+}
+
+inline void to_json(nlohmann::json& j, const RockSackSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"has_been_hit", p.mHasBeenHit},
+        {"rock_amount", p.mRockAmount},
+        {"play_wobble_sound", p.mPlayWobbleSound},
+        {"force_wobble_sound", p.mForceWobbleSound},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, RockSackSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("has_been_hit").get_to(p.mHasBeenHit);
+    j.at("rock_amount").get_to(p.mRockAmount);
+    j.at("play_wobble_sound").get_to(p.mPlayWobbleSound);
+    j.at("force_wobble_sound").get_to(p.mForceWobbleSound);
+}
+
+inline void to_json(nlohmann::json& j, const BoneBagSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"has_been_hit", p.mHasBeenHit},
+        {"play_wobble_sound", p.mPlayWobbleSound},
+        {"force_play_wobble_sound", p.mForcePlayWobbleSound},
+        {"bone_amount", p.mBoneAmount},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, BoneBagSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("has_been_hit").get_to(p.mHasBeenHit);
+    j.at("play_wobble_sound").get_to(p.mPlayWobbleSound);
+    j.at("force_play_wobble_sound").get_to(p.mForcePlayWobbleSound);
+    j.at("bone_amount").get_to(p.mBoneAmount);
+}
+
+inline void to_json(nlohmann::json& j, const MineSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"detonating", p.mDetonating},
+        {"explosion_timer", p.mExplosionTimer},
+        {"persist_offscreen", p.mPersistOffscreen},
+        {"flash_anim", p.mFlashAnim},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, MineSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("detonating").get_to(p.mDetonating);
+    j.at("explosion_timer").get_to(p.mExplosionTimer);
+    j.at("persist_offscreen").get_to(p.mPersistOffscreen);
+    j.at("flash_anim").get_to(p.mFlashAnim);
+}
+
+inline void to_json(nlohmann::json& j, const MovingBombSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"state", p.mState},
+        {"timer", p.mTimer},
+        {"speed", p.mSpeed},
+        {"channel_mask", p.mChannelMask},
+        {"persist_offscreen", p.mPersistOffscreen},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, MovingBombSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("state").get_to(p.mState);
+    j.at("timer").get_to(p.mTimer);
+    j.at("speed").get_to(p.mSpeed);
+    j.at("channel_mask").get_to(p.mChannelMask);
+    j.at("persist_offscreen").get_to(p.mPersistOffscreen);
+}
+
+inline void to_json(nlohmann::json& j, const TimedMineSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"slapped_mine", p.mSlappedMine},
+        {"ticks_until_explosion", p.mTicksUntilExplosion},
+        {"explosion_timer", p.mExplosionTimer},
+        {"tick_anim", p.mTickAnim},
+        {"old_gn_frame", p.mOldGnFrame},
+        {"single_tick_timer", p.mSingleTickTimer},
+        {"stick_to_lift_point", p.mStickToLiftPoint},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, TimedMineSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("slapped_mine").get_to(p.mSlappedMine);
+    j.at("ticks_until_explosion").get_to(p.mTicksUntilExplosion);
+    j.at("explosion_timer").get_to(p.mExplosionTimer);
+    j.at("tick_anim").get_to(p.mTickAnim);
+    j.at("old_gn_frame").get_to(p.mOldGnFrame);
+    j.at("single_tick_timer").get_to(p.mSingleTickTimer);
+    j.at("stick_to_lift_point").get_to(p.mStickToLiftPoint);
+}
+
+inline void to_json(nlohmann::json& j, const DoorFlameSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"frame_count", p.mFrameCount},
+        {"state", p.mState},
+        {"random", p.mRandom},
+        {"sounds_mask", p.mSoundsMask},
+        {"fire_background_glow_id", p.mFireBackgroundGlowId},
+        {"flame_sparks_id", p.mFlameSparksId},
+    };
+    j["sparks_saved"] = p.mSparksSaved;
+    if (p.mSparksSaved)
+    {
+        j["sparks_render"] = p.mSparksRender;
+        j["sparks_start_x"] = p.mSparksStartXPos;
+        j["sparks_start_y"] = p.mSparksStartYPos;
+        nlohmann::json sparks = nlohmann::json::array();
+        for (const auto& spark : p.mSparks)
+        {
+            sparks.push_back(nlohmann::json{
+                {"x", spark.mX},
+                {"y", spark.mY},
+                {"off_x", spark.mOffX},
+                {"off_y", spark.mOffY},
+                {"random64", spark.mRandom64},
+                {"visible", spark.mVisible},
+                {"sprite_scale", spark.mSpriteScale},
+                {"anim", spark.mAnim},
+            });
+        }
+        j["sparks"] = sparks;
+    }
+}
+
+inline void from_json(const nlohmann::json& j, DoorFlameSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("frame_count").get_to(p.mFrameCount);
+    j.at("state").get_to(p.mState);
+    j.at("random").get_to(p.mRandom);
+    j.at("sounds_mask").get_to(p.mSoundsMask);
+    j.at("fire_background_glow_id").get_to(p.mFireBackgroundGlowId);
+    j.at("flame_sparks_id").get_to(p.mFlameSparksId);
+    p.mSparksSaved = j.contains("sparks_saved") && j.at("sparks_saved").get<bool>();
+    if (p.mSparksSaved)
+    {
+        j.at("sparks_render").get_to(p.mSparksRender);
+        j.at("sparks_start_x").get_to(p.mSparksStartXPos);
+        j.at("sparks_start_y").get_to(p.mSparksStartYPos);
+        const auto& sparks = j.at("sparks");
+        for (size_t i = 0; i < sparks.size() && i < ALIVE_COUNTOF(p.mSparks); i++)
+        {
+            sparks.at(i).at("x").get_to(p.mSparks[i].mX);
+            sparks.at(i).at("y").get_to(p.mSparks[i].mY);
+            sparks.at(i).at("off_x").get_to(p.mSparks[i].mOffX);
+            sparks.at(i).at("off_y").get_to(p.mSparks[i].mOffY);
+            sparks.at(i).at("random64").get_to(p.mSparks[i].mRandom64);
+            sparks.at(i).at("visible").get_to(p.mSparks[i].mVisible);
+            sparks.at(i).at("sprite_scale").get_to(p.mSparks[i].mSpriteScale);
+            sparks.at(i).at("anim").get_to(p.mSparks[i].mAnim);
+        }
+    }
+}
+
+inline void to_json(nlohmann::json& j, const DoorBlockerSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"done", p.mDone},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, DoorBlockerSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("done").get_to(p.mDone);
+}
+
+inline void to_json(nlohmann::json& j, const TorturedMudokonSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"tears_anim", p.mTearsAnim},
+        {"zap_anim", p.mZapAnim},
+        {"flash_colour_timer", p.mFlashColourTimer},
+        {"flash_colour_counter", p.mFlashColourCounter},
+        {"state", p.mState},
+        {"pain_sound_pitch", p.mPainSoundPitch},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, TorturedMudokonSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("tears_anim").get_to(p.mTearsAnim);
+    j.at("zap_anim").get_to(p.mZapAnim);
+    j.at("flash_colour_timer").get_to(p.mFlashColourTimer);
+    j.at("flash_colour_counter").get_to(p.mFlashColourCounter);
+    j.at("state").get_to(p.mState);
+    j.at("pain_sound_pitch").get_to(p.mPainSoundPitch);
+}
+
+inline void to_json(nlohmann::json& j, const GlukkonSwitchSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"state", p.mState},
+        {"timer", p.mTimer},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, GlukkonSwitchSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("state").get_to(p.mState);
+    j.at("timer").get_to(p.mTimer);
+}
+
+inline void to_json(nlohmann::json& j, const BackgroundAnimationSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"sound_channels_mask", p.mSoundChannelsMask},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, BackgroundAnimationSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("sound_channels_mask").get_to(p.mSoundChannelsMask);
+}
+
+inline void to_json(nlohmann::json& j, const LevelLoaderSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"state", p.mState},
+        {"fade_id", p.mFadeId},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, LevelLoaderSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("state").get_to(p.mState);
+    j.at("fade_id").get_to(p.mFadeId);
+}
+
+inline void to_json(nlohmann::json& j, const BrewMachineSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"remaining_brew_count", p.mRemainingBrewCount},
+        {"brew_machine_camera", p.mBrewMachineCamera},
+        {"text_x", p.mTextX},
+        {"text_y", p.mTextY},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, BrewMachineSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("remaining_brew_count").get_to(p.mRemainingBrewCount);
+    if (j.contains("brew_machine_camera"))
+    {
+        j.at("brew_machine_camera").get_to(p.mBrewMachineCamera);
+        j.at("text_x").get_to(p.mTextX);
+        j.at("text_y").get_to(p.mTextY);
+    }
+}
+
+inline void to_json(nlohmann::json& j, const CrawlingSligButtonSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"in_use", p.mInUse},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, CrawlingSligButtonSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("in_use").get_to(p.mInUse);
+}
+
+inline void to_json(nlohmann::json& j, const GasCountDownSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"gas_time_left_secs", p.mGasTimeLeftSecs},
+        {"gas_countdown_timer", p.mGasCountdownTimer},
+        {"gas_x_pos", p.mGasXPos},
+        {"gas_y_pos", p.mGasYPos},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, GasCountDownSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("gas_time_left_secs").get_to(p.mGasTimeLeftSecs);
+    j.at("gas_countdown_timer").get_to(p.mGasCountdownTimer);
+    j.at("gas_x_pos").get_to(p.mGasXPos);
+    j.at("gas_y_pos").get_to(p.mGasYPos);
+}
+
+inline void to_json(nlohmann::json& j, const SligGetPantsAndWingsSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"state", p.mState},
+        {"transform_timer", p.mTransformTimer},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, SligGetPantsAndWingsSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("state").get_to(p.mState);
+    j.at("transform_timer").get_to(p.mTransformTimer);
+}
+
+inline void to_json(nlohmann::json& j, const PullRingRopeSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"stay_in_state_ticks", p.mStayInStateTicks},
+        {"rope_id", p.mRopeId},
+        {"ring_puller_id", p.mRingPullerId},
+        {"state", p.mState},
+        {"is_pulled", p.mIsPulled},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, PullRingRopeSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("stay_in_state_ticks").get_to(p.mStayInStateTicks);
+    j.at("rope_id").get_to(p.mRopeId);
+    j.at("ring_puller_id").get_to(p.mRingPullerId);
+    j.at("state").get_to(p.mState);
+    j.at("is_pulled").get_to(p.mIsPulled);
+}
+
+inline void to_json(nlohmann::json& j, const ParamiteWebLineSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"wobble_idx", p.field_104_wobble_idx},
+        {"wobble_pos", p.field_106_wobble_pos},
+        {"anim_flare", p.field_108_anim_flare},
+        {"pulse_position", p.field_1A0_pulse_position},
+        {"pulse_position_speed", p.field_1A2_pulse_position_speed},
+        {"delay_counter", p.field_1A4_delay_counter},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, ParamiteWebLineSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("wobble_idx").get_to(p.field_104_wobble_idx);
+    j.at("wobble_pos").get_to(p.field_106_wobble_pos);
+    j.at("anim_flare").get_to(p.field_108_anim_flare);
+    j.at("pulse_position").get_to(p.field_1A0_pulse_position);
+    j.at("pulse_position_speed").get_to(p.field_1A2_pulse_position_speed);
+    j.at("delay_counter").get_to(p.field_1A4_delay_counter);
+}
+
+inline void to_json(nlohmann::json& j, const ElectricWallSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"sound_timer", p.mSoundTimer},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, ElectricWallSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("sound_timer").get_to(p.mSoundTimer);
+}
+
+inline void to_json(nlohmann::json& j, const DoorSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"current_state", p.mCurrentState},
+        {"door_id", p.mDoorId},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, DoorSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("current_state").get_to(p.mCurrentState);
+    j.at("door_id").get_to(p.mDoorId);
+}
+
+inline void to_json(nlohmann::json& j, const BulletShellSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"floor_bounce_count", p.mFloorBounceCount},
+        {"speed", p.mSpeed},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, BulletShellSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("floor_bounce_count").get_to(p.mFloorBounceCount);
+    j.at("speed").get_to(p.mSpeed);
+}
+
+inline void to_json(nlohmann::json& j, const BulletSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"bullet_type", p.mBulletType},
+        {"bullet_parent_id", p.mBulletParentId},
+        {"x_pos", p.mXPos},
+        {"y_pos", p.mYPos},
+        {"sprite_scale", p.mSpriteScale},
+        {"number_of_bullets", p.mNumberOfBullets},
+        {"x_distance", p.mXDistance},
+        {"bullet_level", p.mBulletLevel},
+        {"bullet_path", p.mBulletPath},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, BulletSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("bullet_type").get_to(p.mBulletType);
+    j.at("bullet_parent_id").get_to(p.mBulletParentId);
+    j.at("x_pos").get_to(p.mXPos);
+    j.at("y_pos").get_to(p.mYPos);
+    j.at("sprite_scale").get_to(p.mSpriteScale);
+    j.at("number_of_bullets").get_to(p.mNumberOfBullets);
+    j.at("x_distance").get_to(p.mXDistance);
+    j.at("bullet_level").get_to(p.mBulletLevel);
+    j.at("bullet_path").get_to(p.mBulletPath);
+}
+
+inline void to_json(nlohmann::json& j, const ColourfulMeterSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"polys_to_render_count", p.mPolysToRenderCount},
+        {"count", p.mCount},
+        {"mines_alarm_countdown", p.mMinesAlarmCountdown},
+        {"starting_switch_state", p.mStartingSwitchState},
+        {"bar_count", p.mBarCount},
+        {"start_filled", p.mStartFilled},
+        {"text_x", p.mTextX},
+        {"text_y", p.mTextY},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, ColourfulMeterSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("polys_to_render_count").get_to(p.mPolysToRenderCount);
+    j.at("count").get_to(p.mCount);
+    j.at("mines_alarm_countdown").get_to(p.mMinesAlarmCountdown);
+    j.at("starting_switch_state").get_to(p.mStartingSwitchState);
+    j.at("bar_count").get_to(p.mBarCount);
+    j.at("start_filled").get_to(p.mStartFilled);
+    j.at("text_x").get_to(p.mTextX);
+    j.at("text_y").get_to(p.mTextY);
+}
+
+inline void to_json(nlohmann::json& j, const PalOverwriterData& p)
+{
+    j = nlohmann::json{
+        {"target_id", p.mTargetId},
+        {"sweep_index", p.mSweepIndex},
+        {"kind", p.mKind},
+        {"cur_pal_index", p.mCurPalIndex},
+        {"num_entries_to_overwrite", p.mNumEntriesToOverwrite},
+        {"pal_depth", p.mPalDepth},
+        {"update_delay", p.mUpdateDelay},
+        {"r", p.mR},
+        {"g", p.mG},
+        {"b", p.mB},
+        {"first_update", p.mFirstUpdate},
+        {"done", p.mDone},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, PalOverwriterData& p)
+{
+    j.at("target_id").get_to(p.mTargetId);
+    j.at("sweep_index").get_to(p.mSweepIndex);
+    j.at("kind").get_to(p.mKind);
+    j.at("cur_pal_index").get_to(p.mCurPalIndex);
+    j.at("num_entries_to_overwrite").get_to(p.mNumEntriesToOverwrite);
+    j.at("pal_depth").get_to(p.mPalDepth);
+    j.at("update_delay").get_to(p.mUpdateDelay);
+    j.at("r").get_to(p.mR);
+    j.at("g").get_to(p.mG);
+    j.at("b").get_to(p.mB);
+    j.at("first_update").get_to(p.mFirstUpdate);
+    j.at("done").get_to(p.mDone);
+}
+
+inline void to_json(nlohmann::json& j, const PalleteOverwriterSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"data", p.mData},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, PalleteOverwriterSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("data").get_to(p.mData);
+}
+
+inline void to_json(nlohmann::json& j, const ElectrocuteSaveState& p)
+{
+    nlohmann::json overwriters = nlohmann::json::array();
+    for (s32 i = 0; i < 3; i++)
+    {
+        overwriters.push_back(nlohmann::json{{"present", p.mHasOverwriter[i]}, {"id", p.mOverwriterIds[i]}, {"data", p.mOverwriters[i]}});
+    }
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"target_obj_id", p.mTargetObjId},
+        {"target_red", p.mTargetRed},
+        {"target_green", p.mTargetGreen},
+        {"target_blue", p.mTargetBlue},
+        {"pal_overwriters_count", p.mPalOverwritersCount},
+        {"state", p.mState},
+        {"extra_overwriter", p.mExtraOverwriter},
+        {"kill_target", p.mKillTarget},
+        {"restore_sprite", p.mRestoreSprite},
+        {"overwriters", overwriters},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, ElectrocuteSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("target_obj_id").get_to(p.mTargetObjId);
+    j.at("target_red").get_to(p.mTargetRed);
+    j.at("target_green").get_to(p.mTargetGreen);
+    j.at("target_blue").get_to(p.mTargetBlue);
+    j.at("pal_overwriters_count").get_to(p.mPalOverwritersCount);
+    j.at("state").get_to(p.mState);
+    j.at("extra_overwriter").get_to(p.mExtraOverwriter);
+    j.at("kill_target").get_to(p.mKillTarget);
+    j.at("restore_sprite").get_to(p.mRestoreSprite);
+    const nlohmann::json& overwriters = j.at("overwriters");
+    for (s32 i = 0; i < 3 && i < static_cast<s32>(overwriters.size()); i++)
+    {
+        overwriters.at(i).at("present").get_to(p.mHasOverwriter[i]);
+        overwriters.at(i).at("id").get_to(p.mOverwriterIds[i]);
+        overwriters.at(i).at("data").get_to(p.mOverwriters[i]);
+    }
+}
+
+inline void to_json(nlohmann::json& j, const GroundExplosionSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"bomb_sprite_scale", p.mBombSpriteScale},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, GroundExplosionSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("bomb_sprite_scale").get_to(p.mBombSpriteScale);
+}
+
+inline void to_json(nlohmann::json& j, const ExplosionSetSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"screen_shake_idx", p.mScreenShakeIdx},
+        {"screen_shake_idx_modifier", p.mScreenShakeIdxModifier},
+        {"start_delay", p.mStartDelay},
+        {"spacing_multiplicator", p.mSpacingMultiplicator},
+        {"increasing_grid_spacing", p.mIncreasingGridSpacing},
+        {"spawn_assets", p.mSpawnAssets},
+        {"flip_x", p.mFlipX},
+        {"active", p.mActive},
+        {"tlv_data_saved", p.mTlvDataSaved},
+        {"tlv_rect_x", p.mTlvRectX},
+        {"tlv_rect_y", p.mTlvRectY},
+        {"tlv_rect_w", p.mTlvRectW},
+        {"tlv_rect_h", p.mTlvRectH},
+        {"sprite_scale", p.mSpriteScale},
+        {"switch_id", p.mSwitchId},
+        {"asset_interval", p.mAssetInterval},
+        {"grid_spacing", p.mGridSpacing},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, ExplosionSetSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("screen_shake_idx").get_to(p.mScreenShakeIdx);
+    j.at("screen_shake_idx_modifier").get_to(p.mScreenShakeIdxModifier);
+    j.at("start_delay").get_to(p.mStartDelay);
+    j.at("spacing_multiplicator").get_to(p.mSpacingMultiplicator);
+    j.at("increasing_grid_spacing").get_to(p.mIncreasingGridSpacing);
+    j.at("spawn_assets").get_to(p.mSpawnAssets);
+    j.at("flip_x").get_to(p.mFlipX);
+    j.at("active").get_to(p.mActive);
+    p.mTlvDataSaved = j.value("tlv_data_saved", false);
+    if (p.mTlvDataSaved)
+    {
+        j.at("tlv_rect_x").get_to(p.mTlvRectX);
+        j.at("tlv_rect_y").get_to(p.mTlvRectY);
+        j.at("tlv_rect_w").get_to(p.mTlvRectW);
+        j.at("tlv_rect_h").get_to(p.mTlvRectH);
+        j.at("sprite_scale").get_to(p.mSpriteScale);
+        j.at("switch_id").get_to(p.mSwitchId);
+        j.at("asset_interval").get_to(p.mAssetInterval);
+        j.at("grid_spacing").get_to(p.mGridSpacing);
+    }
+}
+
+inline void to_json(nlohmann::json& j, const PossessionFlickerSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"target_obj_id", p.mTargetObjId},
+        {"time_to_flicker", p.mTimeToFlicker},
+        {"new_red", p.mNewRed},
+        {"new_green", p.mNewGreen},
+        {"new_blue", p.mNewBlue},
+        {"old_red", p.mOldRed},
+        {"old_green", p.mOldGreen},
+        {"old_blue", p.mOldBlue},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, PossessionFlickerSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("target_obj_id").get_to(p.mTargetObjId);
+    j.at("time_to_flicker").get_to(p.mTimeToFlicker);
+    j.at("new_red").get_to(p.mNewRed);
+    j.at("new_green").get_to(p.mNewGreen);
+    j.at("new_blue").get_to(p.mNewBlue);
+    j.at("old_red").get_to(p.mOldRed);
+    j.at("old_green").get_to(p.mOldGreen);
+    j.at("old_blue").get_to(p.mOldBlue);
+}
+
+inline void to_json(nlohmann::json& j, const DeathGasSaveState& p)
+{
+    nlohmann::json byte1_array = nlohmann::json::array();
+    for (s32 i = 0; i < 50; i++)
+    {
+        byte1_array.push_back(p.mByte1[i]);
+    }
+    nlohmann::json byte2_array = nlohmann::json::array();
+    for (s32 i = 0; i < 50; i++)
+    {
+        byte2_array.push_back(p.mByte2[i]);
+    }
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"layer", p.mLayer},
+        {"amount", p.mAmount},
+        {"total", p.mTotal},
+        {"done", p.mDone},
+        {"byte1", byte1_array},
+        {"byte2", byte2_array},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, DeathGasSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("layer").get_to(p.mLayer);
+    j.at("amount").get_to(p.mAmount);
+    j.at("total").get_to(p.mTotal);
+    j.at("done").get_to(p.mDone);
+    const nlohmann::json& byte1_array = j.at("byte1");
+    for (s32 i = 0; i < 50 && i < static_cast<s32>(byte1_array.size()); i++)
+    {
+        byte1_array.at(i).get_to(p.mByte1[i]);
+    }
+    const nlohmann::json& byte2_array = j.at("byte2");
+    for (s32 i = 0; i < 50 && i < static_cast<s32>(byte2_array.size()); i++)
+    {
+        byte2_array.at(i).get_to(p.mByte2[i]);
+    }
+}
+
+inline void to_json(nlohmann::json& j, const ThrowableTotalIndicatorSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"start_x_pos", p.mStartXPos},
+        {"start_y_pos", p.mStartYPos},
+        {"x_pos", p.mXPos},
+        {"y_pos", p.mYPos},
+        {"speed_x", p.mSpeedX},
+        {"speed_y", p.mSpeedY},
+        {"sprite_scale", p.mSpriteScale},
+        {"ot_layer", p.mOtLayer},
+        {"red", p.mRed},
+        {"green", p.mGreen},
+        {"blue", p.mBlue},
+        {"num_to_show", p.mNumToShow},
+        {"state", p.mState},
+        {"fade", p.mFade},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, ThrowableTotalIndicatorSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("start_x_pos").get_to(p.mStartXPos);
+    j.at("start_y_pos").get_to(p.mStartYPos);
+    j.at("x_pos").get_to(p.mXPos);
+    j.at("y_pos").get_to(p.mYPos);
+    j.at("speed_x").get_to(p.mSpeedX);
+    j.at("speed_y").get_to(p.mSpeedY);
+    j.at("sprite_scale").get_to(p.mSpriteScale);
+    j.at("ot_layer").get_to(p.mOtLayer);
+    j.at("red").get_to(p.mRed);
+    j.at("green").get_to(p.mGreen);
+    j.at("blue").get_to(p.mBlue);
+    j.at("num_to_show").get_to(p.mNumToShow);
+    j.at("state").get_to(p.mState);
+    j.at("fade").get_to(p.mFade);
+}
+
+inline void to_json(nlohmann::json& j, const OrbWhirlWindParticleState& p)
+{
+    j = nlohmann::json{
+        {"anim", p.mAnim},
+        {"ring_target_id", p.mRingTargetId},
+        {"x_pos_render_offset", p.mXPosRenderOffset},
+        {"y_pos_render_offset", p.mYPosRenderOffset},
+        {"render_as_scale", p.mRenderAsScale},
+        {"radius_offset_x", p.mRadiusOffsetX},
+        {"y_pos_increment", p.mYPosIncrement},
+        {"current_scale", p.mCurrentScale},
+        {"random_scale", p.mRandomScale},
+        {"scale_offset_fly_to_target", p.mScaleOffsetFlyToTarget},
+        {"x_pos_mid", p.mXPosMid},
+        {"y_pos_mid", p.mYPosMid},
+        {"radius_x", p.mRadiusX},
+        {"radius_y", p.mRadiusY},
+        {"move_y", p.mMoveY},
+        {"x_pos", p.mXPos},
+        {"y_pos", p.mYPos},
+        {"target_obj_scale", p.mTargetObjScale},
+        {"x_pos_offset", p.mXPosOffset},
+        {"y_pos_offset", p.mYPosOffset},
+        {"x_pos_offset2", p.mXPosOffset2},
+        {"y_pos_offset2", p.mYPosOffset2},
+        {"scale_offset_spin_at_target", p.mScaleOffsetSpinAtTarget},
+        {"state", p.mState},
+        {"render_angle", p.mRenderAngle},
+        {"position_timer", p.mPositionTimer},
+        {"counter", p.mCounter},
+        {"max_counter", p.mMaxCounter},
+        {"is_active", p.mIsActive},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, OrbWhirlWindParticleState& p)
+{
+    j.at("anim").get_to(p.mAnim);
+    j.at("ring_target_id").get_to(p.mRingTargetId);
+    j.at("x_pos_render_offset").get_to(p.mXPosRenderOffset);
+    j.at("y_pos_render_offset").get_to(p.mYPosRenderOffset);
+    j.at("render_as_scale").get_to(p.mRenderAsScale);
+    j.at("radius_offset_x").get_to(p.mRadiusOffsetX);
+    j.at("y_pos_increment").get_to(p.mYPosIncrement);
+    j.at("current_scale").get_to(p.mCurrentScale);
+    j.at("random_scale").get_to(p.mRandomScale);
+    j.at("scale_offset_fly_to_target").get_to(p.mScaleOffsetFlyToTarget);
+    j.at("x_pos_mid").get_to(p.mXPosMid);
+    j.at("y_pos_mid").get_to(p.mYPosMid);
+    j.at("radius_x").get_to(p.mRadiusX);
+    j.at("radius_y").get_to(p.mRadiusY);
+    j.at("move_y").get_to(p.mMoveY);
+    j.at("x_pos").get_to(p.mXPos);
+    j.at("y_pos").get_to(p.mYPos);
+    j.at("target_obj_scale").get_to(p.mTargetObjScale);
+    j.at("x_pos_offset").get_to(p.mXPosOffset);
+    j.at("y_pos_offset").get_to(p.mYPosOffset);
+    j.at("x_pos_offset2").get_to(p.mXPosOffset2);
+    j.at("y_pos_offset2").get_to(p.mYPosOffset2);
+    j.at("scale_offset_spin_at_target").get_to(p.mScaleOffsetSpinAtTarget);
+    j.at("state").get_to(p.mState);
+    j.at("render_angle").get_to(p.mRenderAngle);
+    j.at("position_timer").get_to(p.mPositionTimer);
+    j.at("counter").get_to(p.mCounter);
+    j.at("max_counter").get_to(p.mMaxCounter);
+    j.at("is_active").get_to(p.mIsActive);
+}
+
+inline void to_json(nlohmann::json& j, const OrbWhirlWindSaveState& p)
+{
+    nlohmann::json particles = nlohmann::json::array();
+    for (s32 i = 0; i < p.mParticleIdx && i < 16; i++)
+    {
+        particles.push_back(p.mParticles[i]);
+    }
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"x_pos", p.mXPos},
+        {"y_pos", p.mYPos},
+        {"scale", p.mScale},
+        {"particle_spawn_counter", p.mParticleSpawnCounter},
+        {"state", p.mState},
+        {"particle_idx", p.mParticleIdx},
+        {"is_mudokon_spirit", p.mIsMudokonSpirit},
+        {"particles", particles},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, OrbWhirlWindSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("x_pos").get_to(p.mXPos);
+    j.at("y_pos").get_to(p.mYPos);
+    j.at("scale").get_to(p.mScale);
+    j.at("particle_spawn_counter").get_to(p.mParticleSpawnCounter);
+    j.at("state").get_to(p.mState);
+    j.at("particle_idx").get_to(p.mParticleIdx);
+    j.at("is_mudokon_spirit").get_to(p.mIsMudokonSpirit);
+    const nlohmann::json& particles = j.at("particles");
+    for (s32 i = 0; i < 16 && i < static_cast<s32>(particles.size()); i++)
+    {
+        particles.at(i).get_to(p.mParticles[i]);
+    }
+}
+
+inline void to_json(nlohmann::json& j, const BirdPortalTerminatorSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, BirdPortalTerminatorSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+}
+
+inline void to_json(nlohmann::json& j, const ScreenClipperSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"rect_x", p.mRectX},
+        {"rect_y", p.mRectY},
+        {"rect_w", p.mRectW},
+        {"rect_h", p.mRectH},
+        {"ot_layer", p.mOtLayer},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, ScreenClipperSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("rect_x").get_to(p.mRectX);
+    j.at("rect_y").get_to(p.mRectY);
+    j.at("rect_w").get_to(p.mRectW);
+    j.at("rect_h").get_to(p.mRectH);
+    j.at("ot_layer").get_to(p.mOtLayer);
+}
+
+inline void to_json(nlohmann::json& j, const ShrykullSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"state", p.mState},
+        {"zap_interval_timer", p.mZapIntervalTimer},
+        {"flash_timer", p.mFlashTimer},
+        {"zap_line_id", p.mZapLineId},
+        {"zap_target_id", p.mZapTargetId},
+        {"can_electrocute", p.mCanElectrocute},
+        {"reset_ring_timer", p.mResetRingTimer},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, ShrykullSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("state").get_to(p.mState);
+    j.at("zap_interval_timer").get_to(p.mZapIntervalTimer);
+    j.at("flash_timer").get_to(p.mFlashTimer);
+    j.at("zap_line_id").get_to(p.mZapLineId);
+    j.at("zap_target_id").get_to(p.mZapTargetId);
+    j.at("can_electrocute").get_to(p.mCanElectrocute);
+    j.at("reset_ring_timer").get_to(p.mResetRingTimer);
+}
+
+inline void to_json(nlohmann::json& j, const ZapLineSaveState& p)
+{
+    nlohmann::json sprite_x_array = nlohmann::json::array();
+    for (s32 i = 0; i < 280; i++)
+    {
+        sprite_x_array.push_back(p.mSpriteX[i]);
+    }
+    nlohmann::json sprite_y_array = nlohmann::json::array();
+    for (s32 i = 0; i < 280; i++)
+    {
+        sprite_y_array.push_back(p.mSpriteY[i]);
+    }
+    nlohmann::json part1_array = nlohmann::json::array();
+    for (s32 i = 0; i < 20; i++)
+    {
+        part1_array.push_back(p.mPart1[i]);
+    }
+    nlohmann::json part2_array = nlohmann::json::array();
+    for (s32 i = 0; i < 20; i++)
+    {
+        part2_array.push_back(p.mPart2[i]);
+    }
+    nlohmann::json part3_array = nlohmann::json::array();
+    for (s32 i = 0; i < 20; i++)
+    {
+        part3_array.push_back(p.mPart3[i]);
+    }
+    nlohmann::json segment_x_array = nlohmann::json::array();
+    for (s32 i = 0; i < 28; i++)
+    {
+        segment_x_array.push_back(p.mSegmentX[i]);
+    }
+    nlohmann::json segment_y_array = nlohmann::json::array();
+    for (s32 i = 0; i < 28; i++)
+    {
+        segment_y_array.push_back(p.mSegmentY[i]);
+    }
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"state", p.mState},
+        {"x_pos_src", p.mXPosSrc},
+        {"y_pos_src", p.mYPosSrc},
+        {"x_pos_dst", p.mXPosDst},
+        {"y_pos_dst", p.mYPosDst},
+        {"alive_timer", p.mAliveTimer},
+        {"max_alive_time", p.mMaxAliveTime},
+        {"zap_line_type", p.mZapLineType},
+        {"sprite_x", sprite_x_array},
+        {"sprite_y", sprite_y_array},
+        {"part1", part1_array},
+        {"part2", part2_array},
+        {"part3", part3_array},
+        {"segment_x", segment_x_array},
+        {"segment_y", segment_y_array},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, ZapLineSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("state").get_to(p.mState);
+    j.at("x_pos_src").get_to(p.mXPosSrc);
+    j.at("y_pos_src").get_to(p.mYPosSrc);
+    j.at("x_pos_dst").get_to(p.mXPosDst);
+    j.at("y_pos_dst").get_to(p.mYPosDst);
+    j.at("alive_timer").get_to(p.mAliveTimer);
+    j.at("max_alive_time").get_to(p.mMaxAliveTime);
+    j.at("zap_line_type").get_to(p.mZapLineType);
+    const nlohmann::json& sprite_x_array = j.at("sprite_x");
+    for (s32 i = 0; i < 280 && i < static_cast<s32>(sprite_x_array.size()); i++)
+    {
+        sprite_x_array.at(i).get_to(p.mSpriteX[i]);
+    }
+    const nlohmann::json& sprite_y_array = j.at("sprite_y");
+    for (s32 i = 0; i < 280 && i < static_cast<s32>(sprite_y_array.size()); i++)
+    {
+        sprite_y_array.at(i).get_to(p.mSpriteY[i]);
+    }
+    const nlohmann::json& part1_array = j.at("part1");
+    for (s32 i = 0; i < 20 && i < static_cast<s32>(part1_array.size()); i++)
+    {
+        part1_array.at(i).get_to(p.mPart1[i]);
+    }
+    const nlohmann::json& part2_array = j.at("part2");
+    for (s32 i = 0; i < 20 && i < static_cast<s32>(part2_array.size()); i++)
+    {
+        part2_array.at(i).get_to(p.mPart2[i]);
+    }
+    const nlohmann::json& part3_array = j.at("part3");
+    for (s32 i = 0; i < 20 && i < static_cast<s32>(part3_array.size()); i++)
+    {
+        part3_array.at(i).get_to(p.mPart3[i]);
+    }
+    const nlohmann::json& segment_x_array = j.at("segment_x");
+    for (s32 i = 0; i < 28 && i < static_cast<s32>(segment_x_array.size()); i++)
+    {
+        segment_x_array.at(i).get_to(p.mSegmentX[i]);
+    }
+    const nlohmann::json& segment_y_array = j.at("segment_y");
+    for (s32 i = 0; i < 28 && i < static_cast<s32>(segment_y_array.size()); i++)
+    {
+        segment_y_array.at(i).get_to(p.mSegmentY[i]);
+    }
+}
+
+inline void to_json(nlohmann::json& j, const CircularFadeSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"fade_in", p.mFadeIn},
+        {"done", p.mDone},
+        {"destroy_on_done", p.mDestroyOnDone},
+        {"fade_colour", p.mFadeColour},
+        {"speed", p.mSpeed},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, CircularFadeSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("fade_in").get_to(p.mFadeIn);
+    j.at("done").get_to(p.mDone);
+    j.at("destroy_on_done").get_to(p.mDestroyOnDone);
+    j.at("fade_colour").get_to(p.mFadeColour);
+    j.at("speed").get_to(p.mSpeed);
+}
+
+inline void to_json(nlohmann::json& j, const InvisibleEffectSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"state", p.mState},
+        {"fade_steps", p.mFadeSteps},
+        {"target_id", p.mTargetId},
+        {"old_render_mode", p.mOldRenderMode},
+        {"semi_trans", p.mSemiTrans},
+        {"blending", p.mBlending},
+        {"is_invisible", p.mIsInvisible},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, InvisibleEffectSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("state").get_to(p.mState);
+    j.at("fade_steps").get_to(p.mFadeSteps);
+    j.at("target_id").get_to(p.mTargetId);
+    j.at("old_render_mode").get_to(p.mOldRenderMode);
+    j.at("semi_trans").get_to(p.mSemiTrans);
+    j.at("blending").get_to(p.mBlending);
+    j.at("is_invisible").get_to(p.mIsInvisible);
+}
+
+inline void to_json(nlohmann::json& j, const ParamiteWebSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"segments_count", p.mSegmentsCount},
+        {"segment_length", p.mSegmentLength},
+        {"ttl", p.mTtl},
+        {"ttl_remainder", p.mTtlRemainder},
+        {"enabled", p.mEnabled},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, ParamiteWebSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("segments_count").get_to(p.mSegmentsCount);
+    j.at("segment_length").get_to(p.mSegmentLength);
+    j.at("ttl").get_to(p.mTtl);
+    j.at("ttl_remainder").get_to(p.mTtlRemainder);
+    j.at("enabled").get_to(p.mEnabled);
+}
+
+inline void to_json(nlohmann::json& j, const RollingBallShakerSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"shake_table_idx", p.mShakeTableIdx},
+        {"stop_shaking", p.mStopShaking},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, RollingBallShakerSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("shake_table_idx").get_to(p.mShakeTableIdx);
+    j.at("stop_shaking").get_to(p.mStopShaking);
+}
+
+inline void to_json(nlohmann::json& j, const BoomMachinePipeSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"state", p.mState},
+        {"timer", p.mTimer},
+        {"grenade_count", p.mGrenadeCount},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, BoomMachinePipeSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("state").get_to(p.mState);
+    j.at("timer").get_to(p.mTimer);
+    j.at("grenade_count").get_to(p.mGrenadeCount);
+}
+
+inline void to_json(nlohmann::json& j, const ListOrderSaveState& p)
+{
+    nlohmann::json ids = nlohmann::json::array();
+    for (s32 i = 0; i < p.mCount; i++)
+    {
+        ids.push_back(p.mIds[i]);
+    }
+    nlohmann::json offsets = nlohmann::json::array();
+    for (s32 i = 0; i < p.mCount; i++)
+    {
+        offsets.push_back(p.mOffsets[i]);
+    }
+    j = nlohmann::json{{"type", p.mType}, {"list", static_cast<s32>(p.mList)}, {"ids", ids}, {"offsets", offsets}};
+}
+
+inline void from_json(const nlohmann::json& j, ListOrderSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    p.mList = static_cast<ListOrderSaveState::List>(j.at("list").get<s32>());
+    const nlohmann::json& ids = j.at("ids");
+    p.mCount = 0;
+    for (s32 i = 0; i < static_cast<s32>(ids.size()) && i < ListOrderSaveState::kMaxIds; i++)
+    {
+        ids.at(i).get_to(p.mIds[i]);
+        p.mOffsets[i] = j.contains("offsets") ? j.at("offsets").at(i).get<s32>() : -1;
+        p.mCount++;
+    }
+}
+
+inline void to_json(nlohmann::json& j, const EventsSaveState& p)
+{
+    nlohmann::json ids = nlohmann::json::array();
+    for (s32 i = 0; i < 2; i++)
+    {
+        for (s32 k = 0; k < static_cast<s32>(Event::kEventMax); k++)
+        {
+            ids.push_back(p.mEventObjectIds[i][k]);
+        }
+    }
+    j = nlohmann::json{{"type", p.mType}, {"events_to_use", p.mEventsToUse}, {"event_object_ids", ids}};
+}
+
+inline void from_json(const nlohmann::json& j, EventsSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("events_to_use").get_to(p.mEventsToUse);
+    const nlohmann::json& ids = j.at("event_object_ids");
+    const s32 perBuffer = static_cast<s32>(Event::kEventMax);
+    for (s32 i = 0; i < 2 * perBuffer && i < static_cast<s32>(ids.size()); i++)
+    {
+        ids.at(i).get_to(p.mEventObjectIds[i / perBuffer][i % perBuffer]);
+    }
+}
+
+inline void to_json(nlohmann::json& j, const AliveObjectStateSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"got_shot", p.mbGotShot},
+        {"collection_rect_x", p.mCollectionRectX},
+        {"collection_rect_y", p.mCollectionRectY},
+        {"collection_rect_w", p.mCollectionRectW},
+        {"collection_rect_h", p.mCollectionRectH},
+        {"last_anim_frame", p.mLastAnimFrame},
+        {"can_be_possessed", p.mCanBePossessed},
+        {"possessed", p.mPossessed},
+        {"zapped_by_shrykull", p.mZappedByShrykull},
+        {"can_set_off_explosives", p.mCanSetOffExplosives},
+        {"electrocuted", p.mElectrocuted},
+        {"invisible", p.mInvisible},
+        {"teleporting", p.mTeleporting},
+        {"electrocuting", p.mElectrocuting},
+        {"can_bees_chase", p.mCanBeesChase},
+        {"platform_id", p.mPlatformId},
+        {"collision_line_saved", p.mCollisionLineSaved},
+        {"collision_line_idx", p.mCollisionLineIdx},
+        {"collision_line_is_platforms", p.mCollisionLineIsPlatforms},
+        {"health", p.mHealth},
+        {"collision_line_x", p.mCollisionLineX},
+        {"collision_line_y", p.mCollisionLineY},
+        {"collision_line_w", p.mCollisionLineW},
+        {"collision_line_h", p.mCollisionLineH},
+        {"collision_line_type", p.mCollisionLineType},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, AliveObjectStateSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("got_shot").get_to(p.mbGotShot);
+    j.at("collection_rect_x").get_to(p.mCollectionRectX);
+    j.at("collection_rect_y").get_to(p.mCollectionRectY);
+    j.at("collection_rect_w").get_to(p.mCollectionRectW);
+    j.at("collection_rect_h").get_to(p.mCollectionRectH);
+    j.at("last_anim_frame").get_to(p.mLastAnimFrame);
+    j.at("can_be_possessed").get_to(p.mCanBePossessed);
+    j.at("possessed").get_to(p.mPossessed);
+    j.at("zapped_by_shrykull").get_to(p.mZappedByShrykull);
+    j.at("can_set_off_explosives").get_to(p.mCanSetOffExplosives);
+    j.at("electrocuted").get_to(p.mElectrocuted);
+    j.at("invisible").get_to(p.mInvisible);
+    j.at("teleporting").get_to(p.mTeleporting);
+    j.at("electrocuting").get_to(p.mElectrocuting);
+    j.at("can_bees_chase").get_to(p.mCanBeesChase);
+    if (j.contains("platform_id"))
+    {
+        j.at("platform_id").get_to(p.mPlatformId);
+    }
+    p.mCollisionLineSaved = j.contains("collision_line_saved") && j.at("collision_line_saved").get<bool>();
+    if (p.mCollisionLineSaved)
+    {
+        j.at("collision_line_idx").get_to(p.mCollisionLineIdx);
+        j.at("collision_line_is_platforms").get_to(p.mCollisionLineIsPlatforms);
+        j.at("health").get_to(p.mHealth);
+        j.at("collision_line_x").get_to(p.mCollisionLineX);
+        j.at("collision_line_y").get_to(p.mCollisionLineY);
+        j.at("collision_line_w").get_to(p.mCollisionLineW);
+        j.at("collision_line_h").get_to(p.mCollisionLineH);
+        j.at("collision_line_type").get_to(p.mCollisionLineType);
+    }
+}
+
+inline void to_json(nlohmann::json& j, const GameSpeakSaveState& p)
+{
+    nlohmann::json events = nlohmann::json::array();
+    for (const GameSpeakEvents event : p.mEventBuffer)
+    {
+        events.push_back(static_cast<s32>(event));
+    }
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"last_event_frame", p.mLastEventFrame},
+        {"last_event", static_cast<s32>(p.mLastEvent)},
+        {"last_event_index", p.mLastEventIndex},
+        {"events", events},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, GameSpeakSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("last_event_frame").get_to(p.mLastEventFrame);
+    p.mLastEvent = static_cast<GameSpeakEvents>(j.at("last_event").get<s32>());
+    j.at("last_event_index").get_to(p.mLastEventIndex);
+    const nlohmann::json& events = j.at("events");
+    for (size_t i = 0; i < events.size() && i < 32; i++)
+    {
+        p.mEventBuffer[i] = static_cast<GameSpeakEvents>(events.at(i).get<s32>());
+    }
+}
+
+inline void to_json(nlohmann::json& j, const GameSpeakListenerSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"last_event_idx", p.mLastEventIdx},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, GameSpeakListenerSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("last_event_idx").get_to(p.mLastEventIdx);
+}
+
+inline void to_json(nlohmann::json& j, const SnoozeParticleSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"start_y", p.mStartY},
+        {"xpos", p.mXPos},
+        {"ypos", p.mYPos},
+        {"dest_x", p.mDestX},
+        {"dest_y", p.mDestY},
+        {"sprite_scale", p.mSpriteScale},
+        {"scale_dx", p.mScaleDx},
+        {"ot_layer", static_cast<s32>(p.mOtLayer)},
+        {"r", p.mR},
+        {"g", p.mG},
+        {"b", p.mB},
+        {"idx", p.mIdx},
+        {"blow_up", p.mBlowUp},
+        {"state", p.mState},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, SnoozeParticleSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("start_y").get_to(p.mStartY);
+    j.at("xpos").get_to(p.mXPos);
+    j.at("ypos").get_to(p.mYPos);
+    j.at("dest_x").get_to(p.mDestX);
+    j.at("dest_y").get_to(p.mDestY);
+    j.at("sprite_scale").get_to(p.mSpriteScale);
+    j.at("scale_dx").get_to(p.mScaleDx);
+    p.mOtLayer = static_cast<Layer>(j.at("ot_layer").get<s32>());
+    j.at("r").get_to(p.mR);
+    j.at("g").get_to(p.mG);
+    j.at("b").get_to(p.mB);
+    j.at("idx").get_to(p.mIdx);
+    j.at("blow_up").get_to(p.mBlowUp);
+    j.at("state").get_to(p.mState);
+}
+
+inline void to_json(nlohmann::json& j, const WaterSaveState& p)
+{
+    nlohmann::json drops = nlohmann::json::array();
+    for (const auto& drop : p.mDrops)
+    {
+        drops.push_back(nlohmann::json{
+            {"xpos", drop.mXPos},
+            {"ypos", drop.mYPos},
+            {"zpos", drop.mZPos},
+            {"delta_x", drop.mDeltaX},
+            {"delta_y", drop.mDeltaY},
+            {"delta_z", drop.mDeltaZ},
+            {"enabled", drop.mEnabled},
+            {"splash_time", drop.mSplashTime},
+            {"state", drop.mState},
+        });
+    }
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"state", p.mState},
+        {"particle_count", p.mParticleCount},
+        {"current_particle_idx", p.mCurrentParticleIdx},
+        {"current_drops", p.mCurrentDrops},
+        {"splash_time", p.mSplashTime},
+        {"not_in_camera_count", p.mNotInCameraCount},
+        {"water_duration", p.mWaterDuration},
+        {"hit_timeout", p.mHitTimeout},
+        {"screen_x", p.mScreenX},
+        {"screen_y", p.mScreenY},
+        {"top_left_x", p.mTopLeftX},
+        {"top_left_y", p.mTopLeftY},
+        {"bottom_right_x", p.mBottomRightX},
+        {"bottom_right_y", p.mBottomRightY},
+        {"radius", p.mRadius},
+        {"centre", p.mCentre},
+        {"drops", drops},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, WaterSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("state").get_to(p.mState);
+    j.at("particle_count").get_to(p.mParticleCount);
+    j.at("current_particle_idx").get_to(p.mCurrentParticleIdx);
+    j.at("current_drops").get_to(p.mCurrentDrops);
+    j.at("splash_time").get_to(p.mSplashTime);
+    j.at("not_in_camera_count").get_to(p.mNotInCameraCount);
+    j.at("water_duration").get_to(p.mWaterDuration);
+    j.at("hit_timeout").get_to(p.mHitTimeout);
+    j.at("screen_x").get_to(p.mScreenX);
+    j.at("screen_y").get_to(p.mScreenY);
+    j.at("top_left_x").get_to(p.mTopLeftX);
+    j.at("top_left_y").get_to(p.mTopLeftY);
+    j.at("bottom_right_x").get_to(p.mBottomRightX);
+    j.at("bottom_right_y").get_to(p.mBottomRightY);
+    j.at("radius").get_to(p.mRadius);
+    j.at("centre").get_to(p.mCentre);
+    const nlohmann::json& drops = j.at("drops");
+    for (size_t i = 0; i < drops.size() && i < 128; i++)
+    {
+        const nlohmann::json& drop = drops.at(i);
+        drop.at("xpos").get_to(p.mDrops[i].mXPos);
+        drop.at("ypos").get_to(p.mDrops[i].mYPos);
+        drop.at("zpos").get_to(p.mDrops[i].mZPos);
+        drop.at("delta_x").get_to(p.mDrops[i].mDeltaX);
+        drop.at("delta_y").get_to(p.mDrops[i].mDeltaY);
+        drop.at("delta_z").get_to(p.mDrops[i].mDeltaZ);
+        drop.at("enabled").get_to(p.mDrops[i].mEnabled);
+        drop.at("splash_time").get_to(p.mDrops[i].mSplashTime);
+        drop.at("state").get_to(p.mDrops[i].mState);
+    }
+}
+
+inline void to_json(nlohmann::json& j, const AnimationStateSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"update_delay", p.mUpdateDelay},
+        {"updatable", p.mUpdatable},
+        {"drawable", p.mDrawable},
+        {"can_explode", p.mCanExplode},
+        {"interactive", p.mInteractive},
+        {"survive_death_reset", p.mSurviveDeathReset},
+        {"update_during_cam_swap", p.mUpdateDuringCamSwap},
+        {"cant_kill", p.mCantKill},
+        {"chase_counter", p.mChaseCounter},
+        {"object", p.mObject},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, AnimationStateSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("update_delay").get_to(p.mUpdateDelay);
+    j.at("updatable").get_to(p.mUpdatable);
+    j.at("drawable").get_to(p.mDrawable);
+    j.at("can_explode").get_to(p.mCanExplode);
+    j.at("interactive").get_to(p.mInteractive);
+    j.at("survive_death_reset").get_to(p.mSurviveDeathReset);
+    j.at("update_during_cam_swap").get_to(p.mUpdateDuringCamSwap);
+    j.at("cant_kill").get_to(p.mCantKill);
+    p.mChaseCounter = j.contains("chase_counter") ? j.at("chase_counter").get<u32>() : 0;
+    j.at("object").get_to(p.mObject);
+}
+
 inline void to_json(nlohmann::json& j, const SligSpawnerSaveState& p)
 {
     j = nlohmann::json{
@@ -91,6 +2570,9 @@ inline void to_json(nlohmann::json& j, const LiftMoverSaveState& p)
         {"type", p.mType},
         {"tlv_id", p.mTlvId},
         {"state", p.mState},
+        {"target_saved", p.mTargetSaved},
+        {"moving", p.mMoving},
+        {"target_lift_id", p.mTargetLiftId},
     };
 }
 
@@ -99,6 +2581,12 @@ inline void from_json(const nlohmann::json& j, LiftMoverSaveState& p)
     j.at("type").get_to(p.mType);
     j.at("tlv_id").get_to(p.mTlvId);
     j.at("state").get_to(p.mState);
+    if (j.contains("target_saved") && j.at("target_saved").get<bool>())
+    {
+        p.mTargetSaved = true;
+        j.at("moving").get_to(p.mMoving);
+        j.at("target_lift_id").get_to(p.mTargetLiftId);
+    }
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(BoneStates, {
@@ -135,6 +2623,8 @@ inline void to_json(nlohmann::json& j, const BoneSaveState& p)
         {"initial_xpos", p.mPreviousXPos},
         {"initial_ypos", p.mPreviousYPos},
         {"time_to_live_timer", p.mTimeToLiveTimer},
+        {"shimmer_timer_saved", p.mShimmerTimerSaved},
+        {"shimmer_timer", p.mShimmerTimer},
     };
 }
 
@@ -162,6 +2652,97 @@ inline void from_json(const nlohmann::json& j, BoneSaveState& p)
     j.at("initial_xpos").get_to(p.mPreviousXPos);
     j.at("initial_ypos").get_to(p.mPreviousYPos);
     j.at("time_to_live_timer").get_to(p.mTimeToLiveTimer);
+    if (j.contains("shimmer_timer_saved") && j.at("shimmer_timer_saved").get<bool>())
+    {
+        p.mShimmerTimerSaved = true;
+        j.at("shimmer_timer").get_to(p.mShimmerTimer);
+    }
+}
+
+inline void to_json(nlohmann::json& j, const LCDScreenSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"tlv_id", p.mTlvId},
+        {"message_buffer", std::string(p.mMessageBuffer, strnlen(p.mMessageBuffer, sizeof(p.mMessageBuffer)))},
+        {"message_id1", p.mMessageId1},
+        {"offset_x", p.mOffsetX},
+        {"character_width", p.mCharacterWidth},
+        {"show_random_message", p.mShowRandomMessage},
+        {"play_letter_sound", p.mPlayLetterSound},
+        {"active_message_offset", p.mActiveMessageOffset},
+        {"message_cutoff_offset", p.mMessageCutoffOffset},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, LCDScreenSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("tlv_id").get_to(p.mTlvId);
+    const std::string message = j.at("message_buffer").get<std::string>();
+    memset(p.mMessageBuffer, 0, sizeof(p.mMessageBuffer));
+    memcpy(p.mMessageBuffer, message.data(), std::min(message.size(), sizeof(p.mMessageBuffer) - 1));
+    j.at("message_id1").get_to(p.mMessageId1);
+    j.at("offset_x").get_to(p.mOffsetX);
+    j.at("character_width").get_to(p.mCharacterWidth);
+    j.at("show_random_message").get_to(p.mShowRandomMessage);
+    j.at("play_letter_sound").get_to(p.mPlayLetterSound);
+    j.at("active_message_offset").get_to(p.mActiveMessageOffset);
+    j.at("message_cutoff_offset").get_to(p.mMessageCutoffOffset);
+}
+
+inline void to_json(nlohmann::json& j, const DoveSaveState& p)
+{
+    j = nlohmann::json{
+        {"type", p.mType},
+        {"base_tlv_id", p.mBaseTlvId},
+        {"tlv_info", p.mTlvInfo},
+        {"xpos", p.mXPos},
+        {"ypos", p.mYPos},
+        {"velx", p.mVelX},
+        {"vely", p.mVelY},
+        {"sprite_scale", p.mSpriteScale},
+        {"join_x", p.mJoinX},
+        {"join_y", p.mJoinY},
+        {"current_path", p.mCurrentPath},
+        {"current_level", p.mCurrentLevel},
+        {"anim_id", p.mAnimId},
+        {"anim", p.mAnim},
+        {"keep_in_global_array", p.mKeepInGlobalArray},
+        {"fly_away_counter", p.mFlyAwayCounter},
+        {"dove_state", p.mDoveState},
+        {"join_dead_timer", p.mJoinDeadTimer},
+        {"angle", p.mAngle},
+        {"abe_portal_timer", p.mAbePortalTimer},
+        {"abe_portal_width", p.mAbePortalWidth},
+        {"abe_portal_direction", p.mAbePortalDirection},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, DoveSaveState& p)
+{
+    j.at("type").get_to(p.mType);
+    j.at("base_tlv_id").get_to(p.mBaseTlvId);
+    j.at("tlv_info").get_to(p.mTlvInfo);
+    j.at("xpos").get_to(p.mXPos);
+    j.at("ypos").get_to(p.mYPos);
+    j.at("velx").get_to(p.mVelX);
+    j.at("vely").get_to(p.mVelY);
+    j.at("sprite_scale").get_to(p.mSpriteScale);
+    j.at("join_x").get_to(p.mJoinX);
+    j.at("join_y").get_to(p.mJoinY);
+    j.at("current_path").get_to(p.mCurrentPath);
+    j.at("current_level").get_to(p.mCurrentLevel);
+    j.at("anim_id").get_to(p.mAnimId);
+    j.at("anim").get_to(p.mAnim);
+    j.at("keep_in_global_array").get_to(p.mKeepInGlobalArray);
+    j.at("fly_away_counter").get_to(p.mFlyAwayCounter);
+    j.at("dove_state").get_to(p.mDoveState);
+    j.at("join_dead_timer").get_to(p.mJoinDeadTimer);
+    j.at("angle").get_to(p.mAngle);
+    j.at("abe_portal_timer").get_to(p.mAbePortalTimer);
+    j.at("abe_portal_width").get_to(p.mAbePortalWidth);
+    j.at("abe_portal_direction").get_to(p.mAbePortalDirection);
 }
 
 inline void to_json(nlohmann::json& j, const MinesAlarmSaveState& p)
@@ -351,6 +2932,8 @@ inline void to_json(nlohmann::json & j, const DrillSaveState& p)
         {"off_timer", p.mOffTimer},
         {"state", p.mState},
         {"xyoff", p.mXYOff},
+        {"toggle_start_state_saved", p.mToggleStartStateSaved},
+        {"toggle_start_state_start_on", p.mToggleStartState_StartOn},
     };
 }
 
@@ -361,6 +2944,8 @@ inline void from_json(const nlohmann::json& j, DrillSaveState& p)
     j.at("off_timer").get_to(p.mOffTimer);
     j.at("state").get_to(p.mState);
     j.at("xyoff").get_to(p.mXYOff);
+    p.mToggleStartStateSaved = j.value("toggle_start_state_saved", false);
+    p.mToggleStartState_StartOn = j.value("toggle_start_state_start_on", false);
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(FartStates, {
@@ -396,6 +2981,7 @@ inline void to_json(nlohmann::json& j, const EvilFartSaveState& p)
         {"state", p.mState},
         {"unpossession_timer", p.mUnpossessionTimer},
         {"back_to_abe_timer", p.mBackToAbeTimer},
+        {"possessed", p.mPossessed},
     };
 }
 
@@ -425,6 +3011,10 @@ inline void from_json(const nlohmann::json& j, EvilFartSaveState& p)
     j.at("state").get_to(p.mState);
     j.at("unpossession_timer").get_to(p.mUnpossessionTimer);
     j.at("back_to_abe_timer").get_to(p.mBackToAbeTimer);
+    if (j.contains("possessed"))
+    {
+        j.at("possessed").get_to(p.mPossessed);
+    }
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(eFleechMotions, {
@@ -528,7 +3118,7 @@ inline void to_json(nlohmann::json& j, const FleechSaveState& p)
         {"render", p.mRender},
         {"drawable", p.mDrawable},
         {"health", p.mHealth},
-        {"current_motion", p.mCurrentMotion},
+        {"motion", p.mCurrentMotion},
         {"next_motion", p.mNextMotion},
         {"last_line_y_pos", p.mLastLineYPos},
         {"collision_line_type", p.mCollisionLineType},
@@ -589,6 +3179,9 @@ inline void to_json(nlohmann::json& j, const FleechSaveState& p)
         {"goes_to_sleep", p.mGoesToSleep},
         {"persistant", p.mPersistant},
         {"field_b2", p.field_B2},
+        {"previous_motion_saved", p.mPreviousMotionSaved},
+        {"previous_motion", p.mPreviousMotion},
+        {"collision_line_idx", p.mCollisionLineIdx},
     };
 }
 
@@ -613,7 +3206,7 @@ inline void from_json(const nlohmann::json& j, FleechSaveState& p)
     j.at("render").get_to(p.mRender);
     j.at("drawable").get_to(p.mDrawable);
     j.at("health").get_to(p.mHealth);
-    j.at("current_motion").get_to(p.mCurrentMotion);
+    j.at(j.contains("motion") ? "motion" : "current_motion").get_to(p.mCurrentMotion);
     j.at("next_motion").get_to(p.mNextMotion);
     j.at("last_line_y_pos").get_to(p.mLastLineYPos);
     j.at("collision_line_type").get_to(p.mCollisionLineType);
@@ -674,6 +3267,15 @@ inline void from_json(const nlohmann::json& j, FleechSaveState& p)
     j.at("goes_to_sleep").get_to(p.mGoesToSleep);
     j.at("persistant").get_to(p.mPersistant);
     j.at("field_b2").get_to(p.field_B2);
+    if (j.contains("previous_motion_saved") && j.at("previous_motion_saved").get<bool>())
+    {
+        p.mPreviousMotionSaved = true;
+        j.at("previous_motion").get_to(p.mPreviousMotion);
+    }
+    if (j.contains("collision_line_idx"))
+    {
+        j.at("collision_line_idx").get_to(p.mCollisionLineIdx);
+    }
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(eFlyingSligMotions, {
@@ -727,7 +3329,7 @@ inline void to_json(nlohmann::json& j, const FlyingSligSaveState& p)
         {"anim_render", p.field_2A_bAnimRender},
         {"drawable", p.field_2B_bDrawable},
         {"current_health", p.field_2C_current_health},
-        {"current_state", p.field_30_current_state},
+        {"state", p.field_30_current_state},
         {"last_line_y_pos", p.field_34_lastLineYPos},
         {"line_idx", p.field_36_line_idx},
         {"launch_switch_id", p.field_38_launch_switch_id},
@@ -749,6 +3351,7 @@ inline void to_json(nlohmann::json& j, const FlyingSligSaveState& p)
         {"y_speed", p.field_50_ySpeed},
         {"next_speak", p.field_54_next_speak},
         {"voice_pitch_min", p.field_56_voice_pitch_min},
+        {"voice_pitch_min_15c", p.field_15C_voice_pitch_min},
         {"obj_id", p.field_58_obj_id},
         {"field_5c", p.field_5C},
         {"field_60", p.field_60},
@@ -789,7 +3392,7 @@ inline void from_json(const nlohmann::json& j, FlyingSligSaveState& p)
     j.at("anim_render").get_to(p.field_2A_bAnimRender);
     j.at("drawable").get_to(p.field_2B_bDrawable);
     j.at("current_health").get_to(p.field_2C_current_health);
-    j.at("current_state").get_to(p.field_30_current_state);
+    j.at(j.contains("state") ? "state" : "current_state").get_to(p.field_30_current_state);
     j.at("last_line_y_pos").get_to(p.field_34_lastLineYPos);
     j.at("line_idx").get_to(p.field_36_line_idx);
     j.at("launch_switch_id").get_to(p.field_38_launch_switch_id);
@@ -811,6 +3414,10 @@ inline void from_json(const nlohmann::json& j, FlyingSligSaveState& p)
     j.at("y_speed").get_to(p.field_50_ySpeed);
     j.at("next_speak").get_to(p.field_54_next_speak);
     j.at("voice_pitch_min").get_to(p.field_56_voice_pitch_min);
+    if (j.contains("voice_pitch_min_15c"))
+    {
+        j.at("voice_pitch_min_15c").get_to(p.field_15C_voice_pitch_min);
+    }
     j.at("obj_id").get_to(p.field_58_obj_id);
     j.at("field_5c").get_to(p.field_5C);
     j.at("field_60").get_to(p.field_60);
@@ -880,6 +3487,13 @@ inline void to_json(nlohmann::json& j, const SlapLockWhirlWindSaveState& p)
     j = nlohmann::json{
         {"type", p.mType},
         {"switch_id", p.mSwitchId},
+        {"full_state", p.mFullState},
+        {"door_x", p.mDoorX},
+        {"door_y", p.mDoorY},
+        {"door_sprite_scale", p.mDoorSpriteScale},
+        {"orb_whirl_wind_id", p.mOrbWhirlWindId},
+        {"state", p.mState},
+        {"timer", p.mTimer},
     };
 }
 
@@ -887,6 +3501,16 @@ inline void from_json(const nlohmann::json& j, SlapLockWhirlWindSaveState& p)
 {
     j.at("type").get_to(p.mType);
     j.at("switch_id").get_to(p.mSwitchId);
+    if (j.contains("full_state") && j.at("full_state").get<bool>())
+    {
+        p.mFullState = true;
+        j.at("door_x").get_to(p.mDoorX);
+        j.at("door_y").get_to(p.mDoorY);
+        j.at("door_sprite_scale").get_to(p.mDoorSpriteScale);
+        j.at("orb_whirl_wind_id").get_to(p.mOrbWhirlWindId);
+        j.at("state").get_to(p.mState);
+        j.at("timer").get_to(p.mTimer);
+    }
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(SlapLockStates, {
@@ -911,6 +3535,8 @@ inline void to_json(nlohmann::json& j, const SlapLockSaveState& p)
         {"timer", p.mTimer1},
         {"ability_ring_id", p.mAbilityRingId},
         {"shiny_particle_timer", p.mShinyParticleTimer},
+        {"has_ghost", p.mHasGhost},
+        {"possession_flicker_id", p.mPossessionFlickerId},
     };
 }
 
@@ -924,6 +3550,11 @@ inline void from_json(const nlohmann::json& j, SlapLockSaveState& p)
     j.at("timer").get_to(p.mTimer1);
     j.at("ability_ring_id").get_to(p.mAbilityRingId);
     j.at("shiny_particle_timer").get_to(p.mShinyParticleTimer);
+    if (j.contains("has_ghost"))
+    {
+        j.at("has_ghost").get_to(p.mHasGhost);
+        j.at("possession_flicker_id").get_to(p.mPossessionFlickerId);
+    }
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(GreeterBrainStates, {
@@ -959,6 +3590,7 @@ inline void to_json(nlohmann::json& j, const GreeterSaveState& p)
         {"last_turn_time", p.field_30_last_turn_time},
         {"timer", p.field_34_timer},
         {"times_shot", p.mTimesShot},
+        {"search_tlv_id", p.mSearchTlvId},
         {"dont_set_destroyed", p.field_3A_bDontSetDestroyed},
         {"chasing", p.mChasing},
         {"speed", p.field_40_speed},
@@ -990,6 +3622,10 @@ inline void from_json(const nlohmann::json& j, GreeterSaveState& p)
     j.at("last_turn_time").get_to(p.field_30_last_turn_time);
     j.at("timer").get_to(p.field_34_timer);
     j.at("times_shot").get_to(p.mTimesShot);
+    if (j.contains("search_tlv_id"))
+    {
+        j.at("search_tlv_id").get_to(p.mSearchTlvId);
+    }
     j.at("dont_set_destroyed").get_to(p.field_3A_bDontSetDestroyed);
     j.at("chasing").get_to(p.mChasing);
     j.at("speed").get_to(p.field_40_speed);
@@ -1038,6 +3674,9 @@ inline void to_json(nlohmann::json& j, const GrenadeSaveState& p)
         {"explode_countdown", p.mExplodeCountdown},
         {"previous_xpos", p.mPreviousXPos},
         {"previous_ypos", p.mPreviousYPos},
+        {"throwable_dead", p.mBaseThrowableDead},
+        {"grenade_owner_id", p.mGrenadeOwnerId},
+        {"explosion_id", p.mExplosionId},
     };
 }
 
@@ -1066,6 +3705,12 @@ inline void from_json(const nlohmann::json& j, GrenadeSaveState& p)
     j.at("explode_countdown").get_to(p.mExplodeCountdown);
     j.at("previous_xpos").get_to(p.mPreviousXPos);
     j.at("previous_ypos").get_to(p.mPreviousYPos);
+    if (j.contains("throwable_dead"))
+    {
+        j.at("throwable_dead").get_to(p.mBaseThrowableDead);
+        j.at("grenade_owner_id").get_to(p.mGrenadeOwnerId);
+        j.at("explosion_id").get_to(p.mExplosionId);
+    }
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(GlukkonSpeak, {
@@ -1160,6 +3805,7 @@ inline void to_json(nlohmann::json& j, const GlukkonSaveState& p)
         {"field_88_obj_id", p.mFadeId},
         {"can_be_possessed", p.mCanBePossessed},
         {"current_type", p.mCurrentType},
+        {"current_walk_pitch", p.mCurrentWalkPitch},
     };
 }
 
@@ -1210,6 +3856,10 @@ inline void from_json(const nlohmann::json& j, GlukkonSaveState& p)
     j.at("field_88_obj_id").get_to(p.mFadeId);
     j.at("can_be_possessed").get_to(p.mCanBePossessed);
     j.at("current_type").get_to(p.mCurrentType);
+    if (j.contains("current_walk_pitch"))
+    {
+        j.at("current_walk_pitch").get_to(p.mCurrentWalkPitch);
+    }
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(Mud_Emotion, {
@@ -1343,7 +3993,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM(eAbeMotions, {
     { eAbeMotions::Motion_82_InsideWellExpress_45CC80, "inside_well_express" },
     { eAbeMotions::Motion_83_WellExpressShotOut_45CF70, "well_express_shot_out" },
     { eAbeMotions::Motion_84_FallLandDie_45A420, "fall_land_die" },
-    { eAbeMotions::jMotion_85_Fall_455070, "fall" },
+    { eAbeMotions::jMotion_85_Fall_455070, "jmotion_85_fall" },
     { eAbeMotions::Motion_86_HandstoneBegin, "handstone_begin" },
     { eAbeMotions::Motion_87_HandstoneEnd, "handstone_end" },
     { eAbeMotions::Motion_88_GrenadeMachineUse, "grenade_machine_use" },
@@ -1436,9 +4086,16 @@ inline void to_json(nlohmann::json& j, const AbeSaveState& p)
         {"have_invisibility", p.bHaveInvisiblity},
         {"prev_input", p.mPrevInput},
         {"released_buttons", p.mReleasedButtons},
+        {"prev_input_raw", p.mPrevInputRaw},
+        {"released_buttons_raw", p.mReleasedButtonsRaw},
+        {"do_quicksave", p.mDoQuicksave},
+        {"save_file_id", p.mSaveFileId},
         {"knockdown_motion", p.mKnockdownMotion},
         {"rolling_motion_timer", p.mRollingMotionTimer},
         {"death_fade_out_id", p.mDeathFadeOutId},
+        {"pull_ring_rope_id", p.mPullRingRopeId},
+        {"slappable_or_pickup_id", p.mSlappableOrPickupId},
+        {"work_wheel_id", p.mWorkWheelId},
         {"circular_fade_id", p.mCircularFadeId},
         {"orb_whirlwind_id", p.mOrbWhirlWindId},
         {"possessed_object_id", p.mPossessedObjectId},
@@ -1470,6 +4127,8 @@ inline void to_json(nlohmann::json& j, const AbeSaveState& p)
         {"mudomo_done", p.mMudomoDone},
         {"shadow_enabled", p.mShadowEnabled},
         {"shadow_at_bottom", p.mShadowAtBottom},
+        {"previous_motion", p.mPreviousMotion},
+        {"anim", p.mAnim},
     };
 }
 
@@ -1518,9 +4177,19 @@ inline void from_json(const nlohmann::json& j, AbeSaveState& p)
     j.at("have_invisibility").get_to(p.bHaveInvisiblity);
     j.at("prev_input").get_to(p.mPrevInput);
     j.at("released_buttons").get_to(p.mReleasedButtons);
+    j.at("prev_input_raw").get_to(p.mPrevInputRaw);
+    j.at("released_buttons_raw").get_to(p.mReleasedButtonsRaw);
+    j.at("do_quicksave").get_to(p.mDoQuicksave);
+    j.at("save_file_id").get_to(p.mSaveFileId);
     j.at("knockdown_motion").get_to(p.mKnockdownMotion);
     j.at("rolling_motion_timer").get_to(p.mRollingMotionTimer);
     j.at("death_fade_out_id").get_to(p.mDeathFadeOutId);
+    if (j.contains("pull_ring_rope_id"))
+    {
+        j.at("pull_ring_rope_id").get_to(p.mPullRingRopeId);
+        j.at("slappable_or_pickup_id").get_to(p.mSlappableOrPickupId);
+        j.at("work_wheel_id").get_to(p.mWorkWheelId);
+    }
     j.at("circular_fade_id").get_to(p.mCircularFadeId);
     j.at("orb_whirlwind_id").get_to(p.mOrbWhirlWindId);
     j.at("possessed_object_id").get_to(p.mPossessedObjectId);
@@ -1552,6 +4221,12 @@ inline void from_json(const nlohmann::json& j, AbeSaveState& p)
     j.at("mudomo_done").get_to(p.mMudomoDone);
     j.at("shadow_enabled").get_to(p.mShadowEnabled);
     j.at("shadow_at_bottom").get_to(p.mShadowAtBottom);
+    j.at("previous_motion").get_to(p.mPreviousMotion);
+    // Saves from before the animation was kept don't have it
+    if (j.contains("anim"))
+    {
+        j.at("anim").get_to(p.mAnim);
+    }
 }
 inline void to_json(nlohmann::json& j, const LiftPointSaveState& p)
 {
@@ -1569,6 +4244,15 @@ inline void to_json(nlohmann::json& j, const LiftPointSaveState& p)
         {"bottom_floor", p.mBottomFloor},
         {"move_to_floor_level", p.mMoveToFloorLevel},
         {"keep_on_middle_floor", p.mKeepOnMiddleFloor},
+        {"anim", p.mAnim},
+        {"lift_wheel_anim", p.mLiftWheelAnim},
+        {"pulley_anim", p.mPulleyAnim},
+        {"platform_base_saved", p.mPlatformBaseSaved},
+        {"platform_base_x_offset", p.mPlatformBaseXOffset},
+        {"platform_base_width_offset", p.mPlatformBaseWidthOffset},
+        {"platform_base_y_offset", p.mPlatformBaseYOffset},
+        {"platform_base_height_offset", p.mPlatformBaseHeightOffset},
+        {"platform_base_count", p.mPlatformBaseCount},
     };
 }
 
@@ -1587,6 +4271,22 @@ inline void from_json(const nlohmann::json& j, LiftPointSaveState& p)
     j.at("bottom_floor").get_to(p.mBottomFloor);
     j.at("move_to_floor_level").get_to(p.mMoveToFloorLevel);
     j.at("keep_on_middle_floor").get_to(p.mKeepOnMiddleFloor);
+    // Saves from before these were kept don't have them
+    if (j.contains("anim"))
+    {
+        j.at("anim").get_to(p.mAnim);
+        j.at("lift_wheel_anim").get_to(p.mLiftWheelAnim);
+        j.at("pulley_anim").get_to(p.mPulleyAnim);
+        if (j.contains("platform_base_saved") && j.at("platform_base_saved").get<bool>())
+        {
+            p.mPlatformBaseSaved = true;
+            j.at("platform_base_x_offset").get_to(p.mPlatformBaseXOffset);
+            j.at("platform_base_width_offset").get_to(p.mPlatformBaseWidthOffset);
+            j.at("platform_base_y_offset").get_to(p.mPlatformBaseYOffset);
+            j.at("platform_base_height_offset").get_to(p.mPlatformBaseHeightOffset);
+            j.at("platform_base_count").get_to(p.mPlatformBaseCount);
+        }
+    }
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(MudAction, {
@@ -1795,6 +4495,12 @@ inline void to_json(nlohmann::json& j, const MudokonSaveState& p)
         {"brain_sub_state", p.field_7E_brain_sub_state},
         {"timer", p.field_80_timer},
         {"response_entry_idx", p.field_84_response_entry_idx},
+        {"anim", p.mAnim},
+        {"previous_motion_saved", p.mPreviousMotionSaved},
+        {"previous_motion", p.mPreviousMotion},
+        {"motion_changed", p.mbMotionChanged},
+        {"escaping", p.mEscaping},
+        {"turning_wheel_timer", p.mTurningWheelTimer},
     };
 }
 
@@ -1862,6 +4568,18 @@ inline void from_json(const nlohmann::json& j, MudokonSaveState& p)
     j.at("brain_sub_state").get_to(p.field_7E_brain_sub_state);
     j.at("timer").get_to(p.field_80_timer);
     j.at("response_entry_idx").get_to(p.field_84_response_entry_idx);
+    if (j.contains("anim"))
+    {
+        j.at("anim").get_to(p.mAnim);
+    }
+    if (j.contains("previous_motion_saved") && j.at("previous_motion_saved").get<bool>())
+    {
+        p.mPreviousMotionSaved = true;
+        j.at("previous_motion").get_to(p.mPreviousMotion);
+        j.at("motion_changed").get_to(p.mbMotionChanged);
+        j.at("escaping").get_to(p.mEscaping);
+        j.at("turning_wheel_timer").get_to(p.mTurningWheelTimer);
+    }
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(MeatStates, {
@@ -1896,6 +4614,8 @@ inline void to_json(nlohmann::json& j, const MeatSaveState& p)
         {"previous_xpos", p.mPreviousXPos},
         {"previous_ypos", p.mPreviousYPos},
         {"dead_timer", p.mDeadTimer},
+        {"shimmer_timer_saved", p.mShimmerTimerSaved},
+        {"shimmer_timer", p.mShimmerTimer},
     };
 }
 
@@ -1921,6 +4641,11 @@ inline void from_json(const nlohmann::json& j, MeatSaveState& p)
     j.at("previous_xpos").get_to(p.mPreviousXPos);
     j.at("previous_ypos").get_to(p.mPreviousYPos);
     j.at("dead_timer").get_to(p.mDeadTimer);
+    if (j.contains("shimmer_timer_saved") && j.at("shimmer_timer_saved").get<bool>())
+    {
+        p.mShimmerTimerSaved = true;
+        j.at("shimmer_timer").get_to(p.mShimmerTimer);
+    }
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(MineCarStates, {
@@ -1971,6 +4696,10 @@ inline void to_json(nlohmann::json& j, const MineCarSaveState& p)
         {"spawned_camera", p.field_62_spawned_camera},
         {"throw_item_key1", p.field_64_throw_item_key1},
         {"continue_move_input", p.field_66_continue_move_input},
+        {"velx_index_saved", p.mVelxIndexSaved},
+        {"velx_index", p.field_1C4_velx_index},
+        {"tread_anim_saved", p.mTreadAnimSaved},
+        {"tread_anim", p.mTreadAnim},
     };
 }
 
@@ -2007,9 +4736,20 @@ inline void from_json(const nlohmann::json& j, MineCarSaveState& p)
     j.at("spawned_camera").get_to(p.field_62_spawned_camera);
     j.at("throw_item_key1").get_to(p.field_64_throw_item_key1);
     j.at("continue_move_input").get_to(p.field_66_continue_move_input);
+    if (j.contains("velx_index_saved") && j.at("velx_index_saved").get<bool>())
+    {
+        p.mVelxIndexSaved = true;
+        j.at("velx_index").get_to(p.field_1C4_velx_index);
+    }
+    if (j.contains("tread_anim_saved") && j.at("tread_anim_saved").get<bool>())
+    {
+        p.mTreadAnimSaved = true;
+        j.at("tread_anim").get_to(p.mTreadAnim);
+    }
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(eParamiteMotions, {
+    {eParamiteMotions::eNone_m1, "none"},
     {eParamiteMotions::Motion_0_Idle, "idle"},
     {eParamiteMotions::Motion_1_WalkBegin, "walk_begin"},
     {eParamiteMotions::Motion_2_Walking, "walking"},
@@ -2096,6 +4836,7 @@ inline void to_json(nlohmann::json& j, const ParamiteSaveState& p)
         {"return_path", p.mAbePath},
         {"return_camera", p.mAbeCamera},
         {"input", p.field_72_input},
+        {"input_raw", p.mInputRaw},
         {"next_brain_ret", p.field_74_next_brain_ret},
         {"controlled", p.mControlled},
         {"running", p.mRunning},
@@ -2104,6 +4845,11 @@ inline void to_json(nlohmann::json& j, const ParamiteSaveState& p)
         {"spawned", p.mSpawned},
         {"alerted", p.mAlerted},
         {"can_be_possessed", p.mCanBePossessed},
+        {"previous_motion_saved", p.mPreviousMotionSaved},
+        {"previous_motion", p.mPreviousMotion},
+        {"gamespeak_next_motion", p.mGamespeakNextMotion},
+        {"paramite_x_offset_saved", p.mParamiteXOffsetSaved},
+        {"paramite_x_offset", p.mParamiteXOffset},
     };
 }
 
@@ -2128,7 +4874,7 @@ inline void from_json(const nlohmann::json& j, ParamiteSaveState& p)
     j.at("drawable").get_to(p.mDrawable);
     j.at("health").get_to(p.mHealth);
     j.at("field_30_current_motion").get_to(p.field_30_current_motion);
-    j.at("next_motion").get_to(p.field_30_current_motion);
+    j.at("next_motion").get_to(p.field_32_next_motion);
     j.at("last_line_ypos").get_to(p.field_34_last_line_ypos);
     j.at("line_type").get_to(p.field_36_line_type);
     j.at("tlv_info").get_to(p.field_3C_tlvInfo);
@@ -2146,6 +4892,7 @@ inline void from_json(const nlohmann::json& j, ParamiteSaveState& p)
     j.at("return_path").get_to(p.mAbePath);
     j.at("return_camera").get_to(p.mAbeCamera);
     j.at("input").get_to(p.field_72_input);
+    j.at("input_raw").get_to(p.mInputRaw);
     j.at("next_brain_ret").get_to(p.field_74_next_brain_ret);
     j.at("controlled").get_to(p.mControlled);
     j.at("running").get_to(p.mRunning);
@@ -2154,6 +4901,14 @@ inline void from_json(const nlohmann::json& j, ParamiteSaveState& p)
     j.at("spawned").get_to(p.mSpawned);
     j.at("alerted").get_to(p.mAlerted);
     j.at("can_be_possessed").get_to(p.mCanBePossessed);
+    p.mGamespeakNextMotion = j.value("gamespeak_next_motion", -1);
+    p.mParamiteXOffsetSaved = j.value("paramite_x_offset_saved", false);
+    p.mParamiteXOffset = j.value("paramite_x_offset", static_cast<s16>(0));
+    if (j.contains("previous_motion_saved") && j.at("previous_motion_saved").get<bool>())
+    {
+        p.mPreviousMotionSaved = true;
+        j.at("previous_motion").get_to(p.mPreviousMotion);
+    }
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(PortalStates, {
@@ -2182,6 +4937,52 @@ NLOHMANN_JSON_SERIALIZE_ENUM(PortalStates, {
     {PortalStates::FadeoutTerminators_22, "fadeout_terminators"},
 })
 
+inline void to_json(nlohmann::json& j, const BirdPortalBaseState& p)
+{
+    nlohmann::json doveIds = nlohmann::json::array();
+    for (s32 i = 0; i < 6; i++)
+    {
+        doveIds.push_back(p.mDoveIds[i]);
+    }
+    j = nlohmann::json{
+        {"doves_exist", p.mDovesExist},
+        {"state", p.mState},
+        {"timer", p.mTimer},
+        {"received_doves_count", p.mReceivedDovesCount},
+        {"mud_count_for_shrykull", p.mMudCountForShrykull},
+        {"hit_y", p.mHitY},
+        {"throwable_total_indicator", p.mThrowableTotalIndicator},
+        {"dove_ids", doveIds},
+        {"terminator_id1", p.mTerminatorId1},
+        {"terminator_id2", p.mTerminatorId2},
+        {"screen_clipper_id1", p.mScreenClipperId1},
+        {"screen_clipper_id2", p.mScreenClipperId2},
+        {"orb_whirl_wind_id", p.mOrbWhirlWindId},
+    };
+}
+
+inline void from_json(const nlohmann::json& j, BirdPortalBaseState& p)
+{
+    p.mFullState = true;
+    j.at("doves_exist").get_to(p.mDovesExist);
+    j.at("state").get_to(p.mState);
+    j.at("timer").get_to(p.mTimer);
+    j.at("received_doves_count").get_to(p.mReceivedDovesCount);
+    j.at("mud_count_for_shrykull").get_to(p.mMudCountForShrykull);
+    j.at("hit_y").get_to(p.mHitY);
+    j.at("throwable_total_indicator").get_to(p.mThrowableTotalIndicator);
+    const nlohmann::json& doveIds = j.at("dove_ids");
+    for (s32 i = 0; i < 6 && i < static_cast<s32>(doveIds.size()); i++)
+    {
+        doveIds.at(i).get_to(p.mDoveIds[i]);
+    }
+    j.at("terminator_id1").get_to(p.mTerminatorId1);
+    j.at("terminator_id2").get_to(p.mTerminatorId2);
+    j.at("screen_clipper_id1").get_to(p.mScreenClipperId1);
+    j.at("screen_clipper_id2").get_to(p.mScreenClipperId2);
+    j.at("orb_whirl_wind_id").get_to(p.mOrbWhirlWindId);
+}
+
 inline void to_json(nlohmann::json& j, const BirdPortalSaveState& p)
 {
     j = nlohmann::json{
@@ -2189,6 +4990,11 @@ inline void to_json(nlohmann::json& j, const BirdPortalSaveState& p)
         {"state", p.mState},
         {"mud_count_for_shrykull", p.mMudCountForShrykull},
         {"tlv_info", p.mTlvInfo},
+        {"idle_saved", p.mIdleSaved},
+        {"doves_exist", p.mDovesExist},
+        {"timer", p.mTimer},
+        {"dove_ids", p.mDoveIds},
+        {"base", p.mBase},
     };
 }
 
@@ -2198,6 +5004,18 @@ inline void from_json(const nlohmann::json& j, BirdPortalSaveState& p)
     j.at("state").get_to(p.mState);
     j.at("mud_count_for_shrykull").get_to(p.mMudCountForShrykull);
     j.at("tlv_info").get_to(p.mTlvInfo);
+    // Saves from before the idle portal was saved don't have these
+    p.mIdleSaved = j.value("idle_saved", false);
+    if (p.mIdleSaved)
+    {
+        j.at("doves_exist").get_to(p.mDovesExist);
+        j.at("timer").get_to(p.mTimer);
+        j.at("dove_ids").get_to(p.mDoveIds);
+    }
+    if (j.contains("base"))
+    {
+        j.at("base").get_to(p.mBase);
+    }
 }
 
 inline void to_json(nlohmann::json& j, const ThrowableArraySaveState& p)
@@ -2232,8 +5050,13 @@ NLOHMANN_JSON_SERIALIZE_ENUM(RingTypes, {
     {RingTypes::eHealing_Pulse_14, "healing_pulse"},
 })
 
-inline void to_json(nlohmann::json & j, const AbilityRingSaveState& p)
+inline void to_json(nlohmann::json& j, const AbilityRingSaveState& p)
 {
+    nlohmann::json rects = nlohmann::json::array();
+    for (s32 i = 0; i < 64; i++)
+    {
+        rects.push_back(nlohmann::json::array({p.mRingCollideRects[i][0], p.mRingCollideRects[i][1], p.mRingCollideRects[i][2], p.mRingCollideRects[i][3]}));
+    }
     j = nlohmann::json{
         {"type", p.mType},
         {"ring_xpos", p.mRingXPos},
@@ -2245,7 +5068,25 @@ inline void to_json(nlohmann::json & j, const AbilityRingSaveState& p)
         {"ring_count", p.mRingCount},
         {"ring_red", p.mRingRed},
         {"ring_green", p.mRingGreen},
-        {"ring_red", p.mRingBlue},
+        {"ring_blue", p.mRingBlue},
+        {"full_state", p.mFullState},
+        {"refresh_target_obj_id", p.mRefreshTargetObjId},
+        {"ring_layer", p.mRingLayer},
+        {"ring_left", p.mRingLeft},
+        {"ring_speed", p.mRingSpeed},
+        {"ring_scale_x", p.mRingScaleX},
+        {"ring_scale_y", p.mRingScaleY},
+        {"ring_thickness", p.mRingThickness},
+        {"ring_fadeout_distance", p.mRingFadeoutDistance},
+        {"ring_screen_x", p.mRingScreenX},
+        {"ring_screen_y", p.mRingScreenY},
+        {"ring_screen_x_pos", p.mRingScreenXPos},
+        {"ring_screen_y_pos", p.mRingScreenYPos},
+        {"ring_semi_trans", p.mRingSemiTrans},
+        {"ring_level", p.mRingLevel},
+        {"ring_path", p.mRingPath},
+        {"ring_target_obj_id", p.mRingTargetObjId},
+        {"ring_collide_rects", rects},
     };
 }
 
@@ -2261,7 +5102,36 @@ inline void from_json(const nlohmann::json& j, AbilityRingSaveState& p)
     j.at("ring_count").get_to(p.mRingCount);
     j.at("ring_red").get_to(p.mRingRed);
     j.at("ring_green").get_to(p.mRingGreen);
-    j.at("ring_red").get_to(p.mRingBlue);
+    // Older saves have the red twice
+    j.at(j.contains("ring_blue") ? "ring_blue" : "ring_red").get_to(p.mRingBlue);
+    if (j.contains("full_state") && j.at("full_state").get<bool>())
+    {
+        p.mFullState = true;
+        j.at("refresh_target_obj_id").get_to(p.mRefreshTargetObjId);
+        j.at("ring_layer").get_to(p.mRingLayer);
+        j.at("ring_left").get_to(p.mRingLeft);
+        j.at("ring_speed").get_to(p.mRingSpeed);
+        j.at("ring_scale_x").get_to(p.mRingScaleX);
+        j.at("ring_scale_y").get_to(p.mRingScaleY);
+        j.at("ring_thickness").get_to(p.mRingThickness);
+        j.at("ring_fadeout_distance").get_to(p.mRingFadeoutDistance);
+        j.at("ring_screen_x").get_to(p.mRingScreenX);
+        j.at("ring_screen_y").get_to(p.mRingScreenY);
+        j.at("ring_screen_x_pos").get_to(p.mRingScreenXPos);
+        j.at("ring_screen_y_pos").get_to(p.mRingScreenYPos);
+        j.at("ring_semi_trans").get_to(p.mRingSemiTrans);
+        j.at("ring_level").get_to(p.mRingLevel);
+        j.at("ring_path").get_to(p.mRingPath);
+        j.at("ring_target_obj_id").get_to(p.mRingTargetObjId);
+        const nlohmann::json& rects = j.at("ring_collide_rects");
+        for (s32 i = 0; i < 64 && i < static_cast<s32>(rects.size()); i++)
+        {
+            for (s32 k = 0; k < 4; k++)
+            {
+                rects.at(i).at(k).get_to(p.mRingCollideRects[i][k]);
+            }
+        }
+    }
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(RockStates, {
@@ -2296,6 +5166,8 @@ inline void to_json(nlohmann::json& j, const RockSaveState& p)
         {"volume", p.mBounceCount},
         {"field_30_xpos", p.mPreviousXPos},
         {"field_34_ypos", p.mPreviousYPos},
+        {"shimmer_timer_saved", p.mShimmerTimerSaved},
+        {"shimmer_timer", p.mShimmerTimer},
     };
 }
 
@@ -2321,9 +5193,15 @@ inline void from_json(const nlohmann::json& j, RockSaveState& p)
     j.at("volume").get_to(p.mBounceCount);
     j.at("field_30_xpos").get_to(p.mPreviousXPos);
     j.at("field_34_ypos").get_to(p.mPreviousYPos);
+    if (j.contains("shimmer_timer_saved") && j.at("shimmer_timer_saved").get<bool>())
+    {
+        p.mShimmerTimerSaved = true;
+        j.at("shimmer_timer").get_to(p.mShimmerTimer);
+    }
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(eScrabMotions, {
+    {eScrabMotions::eNone_m1, "none"},
     {eScrabMotions::Motion_0_Stand, "stand"},
     {eScrabMotions::Motion_1_Walk, "walk"},
     {eScrabMotions::Motion_2_Run, "run"},
@@ -2396,7 +5274,7 @@ inline void to_json(nlohmann::json& j, const ScrabSaveState& p)
         {"tlv_info", p.field_44_tlvInfo},
         {"brain_idx", p.field_48_brain_idx},
         {"sub_state", p.mBrainSubState},
-        {"obj_id", p.field_54_obj_id},
+        {"brain_obj_id", p.field_54_obj_id},
         {"target_obj_id", p.field_58_target_obj_id},
         {"timer", p.field_5C_timer},
         {"depossession_timer", p.field_60_depossession_timer},
@@ -2411,6 +5289,7 @@ inline void to_json(nlohmann::json& j, const ScrabSaveState& p)
         {"return_path", p.mAbePath},
         {"return_camera", p.mAbeCamera},
         {"input", p.field_84_input},
+        {"input_raw", p.mInputRaw},
         {"shred_power_active", p.field_8C_shred_power_active},
         {"speak", p.field_8E_speak},
         {"max_xpos", p.field_90_max_xpos},
@@ -2420,6 +5299,9 @@ inline void to_json(nlohmann::json& j, const ScrabSaveState& p)
         {"force_update_animation", p.mForceUpdateAnimation},
         {"roar_randomly", p.mRoarRandomly},
         {"persistant", p.mPersistant},
+        {"last_ypos", p.field_13C_last_ypos},
+        {"previous_motion_saved", p.mPreviousMotionSaved},
+        {"previous_motion", p.mPreviousMotion},
     };
 }
 
@@ -2452,7 +5334,7 @@ inline void from_json(const nlohmann::json& j, ScrabSaveState& p)
     j.at("tlv_info").get_to(p.field_44_tlvInfo);
     j.at("brain_idx").get_to(p.field_48_brain_idx);
     j.at("sub_state").get_to(p.mBrainSubState);
-    j.at("obj_id").get_to(p.field_54_obj_id);
+    j.at(j.contains("brain_obj_id") ? "brain_obj_id" : "obj_id").get_to(p.field_54_obj_id);
     j.at("target_obj_id").get_to(p.field_58_target_obj_id);
     j.at("timer").get_to(p.field_5C_timer);
     j.at("depossession_timer").get_to(p.field_60_depossession_timer);
@@ -2467,6 +5349,7 @@ inline void from_json(const nlohmann::json& j, ScrabSaveState& p)
     j.at("return_path").get_to(p.mAbePath);
     j.at("return_camera").get_to(p.mAbeCamera);
     j.at("input").get_to(p.field_84_input);
+    j.at("input_raw").get_to(p.mInputRaw);
     j.at("shred_power_active").get_to(p.field_8C_shred_power_active);
     j.at("speak").get_to(p.field_8E_speak);
     j.at("max_xpos").get_to(p.field_90_max_xpos);
@@ -2476,6 +5359,15 @@ inline void from_json(const nlohmann::json& j, ScrabSaveState& p)
     j.at("force_update_animation").get_to(p.mForceUpdateAnimation);
     j.at("roar_randomly").get_to(p.mRoarRandomly);
     j.at("persistant").get_to(p.mPersistant);
+    if (j.contains("last_ypos"))
+    {
+        j.at("last_ypos").get_to(p.field_13C_last_ypos);
+    }
+    if (j.contains("previous_motion_saved") && j.at("previous_motion_saved").get<bool>())
+    {
+        p.mPreviousMotionSaved = true;
+        j.at("previous_motion").get_to(p.mPreviousMotion);
+    }
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(ScrabSpawnerStates, {
@@ -2506,6 +5398,7 @@ inline void to_json(nlohmann::json& j, const SlamDoorSaveState& p)
     j = nlohmann::json{
         {"type", p.mType},
         {"tlv_info", p.mTlvInfo},
+        {"anim", p.mAnim},
     };
 }
 
@@ -2513,9 +5406,14 @@ inline void from_json(const nlohmann::json& j, SlamDoorSaveState& p)
 {
     j.at("type").get_to(p.mType);
     j.at("tlv_info").get_to(p.mTlvInfo);
+    if (j.contains("anim"))
+    {
+        j.at("anim").get_to(p.mAnim);
+    }
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(eSligMotions, {
+    {eSligMotions::eNone_m1, "none"},
     {eSligMotions::Motion_0_StandIdle, "stand_idle"},
     {eSligMotions::Motion_1_StandToWalk, "stand_to_walk"},
     {eSligMotions::Motion_2_Walking, "walking"},
@@ -2585,6 +5483,9 @@ inline void to_json(nlohmann::json& j, const SligSaveState& p)
         {"r", p.field_1E_r},
         {"g", p.field_20_g},
         {"b", p.field_22_b},
+        {"tint_saved", p.mTintSaved},
+        {"tint", p.mTint},
+        {"listener_last_event_idx", p.mListenerLastEventIdx},
         {"flipx", p.field_24_bFlipX},
         {"field_26_current_motion", p.field_26_current_motion},
         {"current_frame ", p.field_28_current_frame },
@@ -2627,6 +5528,15 @@ inline void to_json(nlohmann::json& j, const SligSaveState& p)
         {"stopped_for_lever_or_lift", p.mStoppedForLeverOrLift},
         {"glukkon_called_alloya", p.mGlukkonCalledAllOYa},
         {"heard_glukkon", p.mHeardGlukkon},
+        {"previous_motion_saved", p.mPreviousMotionSaved},
+        {"previous_motion", p.mPreviousMotion},
+        {"motion_changed", p.mbMotionChanged},
+        {"prevent_depossession", p.mPreventDepossession},
+        {"next_gamespeak_motion", p.mNextGameSpeakMotion},
+        {"input_raw", p.mInput},
+        {"points_count", p.mPointsCount},
+        {"points_x", p.mPointsX},
+        {"points_y", p.mPointsY},
     };
 }
 
@@ -2644,6 +5554,13 @@ inline void from_json(const nlohmann::json& j, SligSaveState& p)
     j.at("r").get_to(p.field_1E_r);
     j.at("g").get_to(p.field_20_g);
     j.at("b").get_to(p.field_22_b);
+    // Not in a save from before they were kept
+    if (j.contains("tint_saved"))
+    {
+        j.at("tint_saved").get_to(p.mTintSaved);
+        j.at("tint").get_to(p.mTint);
+        j.at("listener_last_event_idx").get_to(p.mListenerLastEventIdx);
+    }
     j.at("flipx").get_to(p.field_24_bFlipX);
     j.at("field_26_current_motion").get_to(p.field_26_current_motion);
     j.at("current_frame ").get_to(p.field_28_current_frame);
@@ -2686,6 +5603,23 @@ inline void from_json(const nlohmann::json& j, SligSaveState& p)
     j.at("stopped_for_lever_or_lift").get_to(p.mStoppedForLeverOrLift);
     j.at("glukkon_called_alloya").get_to(p.mGlukkonCalledAllOYa);
     j.at("heard_glukkon").get_to(p.mHeardGlukkon);
+    if (j.contains("previous_motion_saved") && j.at("previous_motion_saved").get<bool>())
+    {
+        p.mPreviousMotionSaved = true;
+        j.at("previous_motion").get_to(p.mPreviousMotion);
+        j.at("motion_changed").get_to(p.mbMotionChanged);
+        j.at("prevent_depossession").get_to(p.mPreventDepossession);
+        j.at("next_gamespeak_motion").get_to(p.mNextGameSpeakMotion);
+        j.at("input_raw").get_to(p.mInput);
+        j.at("points_count").get_to(p.mPointsCount);
+        const nlohmann::json& pointsX = j.at("points_x");
+        const nlohmann::json& pointsY = j.at("points_y");
+        for (s32 i = 0; i < 10 && i < static_cast<s32>(pointsX.size()); i++)
+        {
+            pointsX.at(i).get_to(p.mPointsX[i]);
+            pointsY.at(i).get_to(p.mPointsY[i]);
+        }
+    }
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(eSlogMotions, {
@@ -2859,6 +5793,8 @@ inline void to_json(nlohmann::json& j, const SlurgSaveState& p)
         {"slurg_state", p.mSlurgState},
         {"going_right", p.mGoingRight},
         {"moving", p.mMoving},
+        {"moving_timer", p.mMovingTimer},
+        {"rng_for_moving_timer", p.mRngForMovingTimer},
     };
 }
 
@@ -2878,6 +5814,11 @@ inline void from_json(const nlohmann::json& j, SlurgSaveState& p)
     j.at("slurg_state").get_to(p.mSlurgState);
     j.at("going_right").get_to(p.mGoingRight);
     j.at("moving").get_to(p.mMoving);
+    if (j.contains("moving_timer"))
+    {
+        j.at("moving_timer").get_to(p.mMovingTimer);
+        j.at("rng_for_moving_timer").get_to(p.mRngForMovingTimer);
+    }
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(TimerTrigger::TimerTriggerStates, {
@@ -2921,6 +5862,12 @@ inline void to_json(nlohmann::json& j, const TrapDoorSaveState& p)
         {"state", p.mState},
         {"open_time", p.mOpenTime},
         {"tlv_id", p.mTlvId},
+        {"platform_base_saved", p.mPlatformBaseSaved},
+        {"platform_base_count", p.mPlatformBaseCount},
+        {"platform_base_x_offset", p.mPlatformBaseXOffset},
+        {"platform_base_width_offset", p.mPlatformBaseWidthOffset},
+        {"platform_base_y_offset", p.mPlatformBaseYOffset},
+        {"platform_base_height_offset", p.mPlatformBaseHeightOffset},
     };
 }
 
@@ -2930,6 +5877,15 @@ inline void from_json(const nlohmann::json& j, TrapDoorSaveState& p)
     j.at("state").get_to(p.mState);
     j.at("open_time").get_to(p.mOpenTime);
     j.at("tlv_id").get_to(p.mTlvId);
+    if (j.contains("platform_base_saved") && j.at("platform_base_saved").get<bool>())
+    {
+        p.mPlatformBaseSaved = true;
+        j.at("platform_base_count").get_to(p.mPlatformBaseCount);
+        j.at("platform_base_x_offset").get_to(p.mPlatformBaseXOffset);
+        j.at("platform_base_width_offset").get_to(p.mPlatformBaseWidthOffset);
+        j.at("platform_base_y_offset").get_to(p.mPlatformBaseYOffset);
+        j.at("platform_base_height_offset").get_to(p.mPlatformBaseHeightOffset);
+    }
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(UXBState, {
@@ -2950,6 +5906,10 @@ inline void to_json(nlohmann::json& j, const UXBSaveState& p)
         {"pattern_index", p.mPatternIndex},
         {"red_blink_count", p.mRedBlinkCount},
         {"is_red", p.mIsRed},
+        {"anim", p.mAnim},
+        {"flash_anim", p.mFlashAnim},
+        {"flash_anim_id", p.mFlashAnimId},
+        {"flash_pal_green", p.mFlashPalGreen},
     };
 }
 
@@ -2963,6 +5923,16 @@ inline void from_json(const nlohmann::json& j, UXBSaveState& p)
     j.at("pattern_index").get_to(p.mPatternIndex);
     j.at("red_blink_count").get_to(p.mRedBlinkCount);
     j.at("is_red").get_to(p.mIsRed);
+    if (j.contains("anim"))
+    {
+        j.at("anim").get_to(p.mAnim);
+    }
+    if (j.contains("flash_anim"))
+    {
+        j.at("flash_anim").get_to(p.mFlashAnim);
+        j.at("flash_anim_id").get_to(p.mFlashAnimId);
+        j.at("flash_pal_green").get_to(p.mFlashPalGreen);
+    }
 }
 
 NLOHMANN_JSON_SERIALIZE_ENUM(WheelStates, {
@@ -3011,6 +5981,9 @@ inline void to_json(nlohmann::json& j, const Quicksave_WorldInfo& p)
         {"visited_barracks", p.mVisitedBarracks},
         {"visited_feeco_ender", p.mVisitedFeecoEnder},
         {"gas_timer", p.mGasTimer},
+        {"random_seed", p.mRandomSeed},
+        {"leaf_rand_idx", p.mLeafRandIdx},
+        {"guid_counter", p.mGuidCounter},
         {"abe_invincible", p.mAbeInvincible},
     };
 }
@@ -3037,6 +6010,10 @@ inline void from_json(const nlohmann::json& j, Quicksave_WorldInfo& p)
     j.at("visited_barracks").get_to(p.mVisitedBarracks);
     j.at("visited_feeco_ender").get_to(p.mVisitedFeecoEnder);
     j.at("gas_timer").get_to(p.mGasTimer);
+    // Saves from before the seed was kept don't have it
+    p.mRandomSeed = j.value("random_seed", static_cast<u8>(0));
+    p.mLeafRandIdx = j.value("leaf_rand_idx", static_cast<u8>(8));
+    p.mGuidCounter = j.value("guid_counter", static_cast<u32>(0));
     j.at("abe_invincible").get_to(p.mAbeInvincible);
 }
 

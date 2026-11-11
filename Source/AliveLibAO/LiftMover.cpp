@@ -232,6 +232,7 @@ void LiftMover::VGetSaveState(SerializedObjectData& pSaveBuffer)
 
     data.mTlvId = mTlvId;
     data.mState = mState;
+    data.mTargetLift = mTargetLift;
 
     pSaveBuffer.Write(data);
 }
@@ -253,6 +254,7 @@ void LiftMover::CreateFromSaveState(SerializedObjectData& pData, ResourceManager
         // should be mid-operation (see the guard added at the top of
         // VUpdate above).
         pLiftMover->mState = pState->mState;
+        pLiftMover->mTargetLift = pState->mTargetLift;
     }
 }
 

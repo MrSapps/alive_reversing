@@ -182,11 +182,9 @@ void Glukkon::CreateFromSaveState(SerializedObjectData& pSaveBuffer, ResourceMan
 
         pGlukkon->mRGB.SetRGB(pSaveState->mRed, pSaveState->mGreen, pSaveState->mBlue);
 
-        pGlukkon->mRed = pSaveState->mRed;
-        pGlukkon->mGreen = pSaveState->mGreen;
-        pGlukkon->mBlue = pSaveState->mBlue;
 
         pGlukkon->mCurrentMotion = pSaveState->mCurrentMotion;
+        pGlukkon->mCurrentWalkPitch = pSaveState->mCurrentWalkPitch;
 
         relive::Path_Glukkon::GlukkonTypes glukType = pGlukkon->mTlvData.mGlukkonType;
         // TODO: This should really be a switch rather than comparing values
@@ -212,7 +210,6 @@ void Glukkon::CreateFromSaveState(SerializedObjectData& pSaveBuffer, ResourceMan
         pGlukkon->mCurrentMotion = pSaveState->mCurrentMotion2;
         pGlukkon->mNextMotion = pSaveState->mNextMotion;
         pGlukkon->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pSaveState->field_38_last_line_ypos);
-        pGlukkon->SetRestoredFromQuickSave(true);
         pGlukkon->field_1D4_timer = pSaveState->field_54_timer;
         pGlukkon->BaseAliveGameObjectCollisionLineType = pSaveState->mLineType;
         pGlukkon->mTlvId = pSaveState->mTlvId;
@@ -334,13 +331,15 @@ void Glukkon::VRender(OrderingTable& ot)
     renderWithGlowingEyes(ot, this);
 }
 
+std::vector<BaseGameObject::NotStateMemory> Glukkon::VNotStateMemory()
+{
+    // The TLV it was made from, with the flags that TLV had then
+    return {{&mTlvData, sizeof(mTlvData)}};
+}
+
 void Glukkon::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     GlukkonSaveState data = {};
 
     data.mType = ReliveTypes::eGlukkon;
@@ -409,7 +408,8 @@ void Glukkon::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mCanBePossessed = GetCanBePossessed();
     data.mCurrentType = Type();
 
-    pSaveBuffer.Write(data);
+        data.mCurrentWalkPitch = mCurrentWalkPitch;
+pSaveBuffer.Write(data);
 }
 
 void Glukkon::Motion_0_Idle()
@@ -2056,42 +2056,48 @@ Glukkon::~Glukkon()
     }
 }
 
+void Glukkon::VPostRestore()
+{
+    if (BaseAliveGameObjectCollisionLineType == -1)
+    {
+        BaseAliveGameObjectCollisionLine = nullptr;
+    }
+    else
+    {
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+
+        if (BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eDynamicCollision_32 || BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eBackgroundDynamicCollision_36)
+        {
+            const PSX_RECT bRect = VGetBoundingRect();
+
+            PSX_Point xy = {bRect.x, bRect.y};
+            PSX_Point wh = {bRect.w, bRect.h};
+            xy.y += 5;
+            wh.y += 5;
+
+            CheckPlatformCollision(xy, wh, PlatformBase::Platforms());
+        }
+    }
+    mFadeId = BaseGameObject::RefreshId(mFadeId);
+
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
+}
+
 void Glukkon::VUpdate()
 {
-    if (GetRestoredFromQuickSave())
-    {
-        SetRestoredFromQuickSave(false);
-        if (BaseAliveGameObjectCollisionLineType == -1)
-        {
-            BaseAliveGameObjectCollisionLine = nullptr;
-        }
-        else
-        {
-            gCollisions->Raycast(
-                mXPos,
-                mYPos - FP_FromInteger(20),
-                mXPos,
-                mYPos + FP_FromInteger(20),
-                &BaseAliveGameObjectCollisionLine,
-                &mXPos,
-                &mYPos,
-                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
-
-            if (BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eDynamicCollision_32 || BaseAliveGameObjectCollisionLine->mLineType == eLineTypes::eBackgroundDynamicCollision_36)
-            {
-                const PSX_RECT bRect = VGetBoundingRect();
-
-                PSX_Point xy = {bRect.x, bRect.y};
-                PSX_Point wh = {bRect.w, bRect.h};
-                xy.y += 5;
-                wh.y += 5;
-
-                CheckPlatformCollision(xy, wh, PlatformBase::Platforms());
-            }
-        }
-        mFadeId = BaseGameObject::RefreshId(mFadeId);
-    }
-
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);

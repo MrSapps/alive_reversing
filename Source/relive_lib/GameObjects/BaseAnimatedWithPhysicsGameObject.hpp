@@ -7,12 +7,58 @@
 #include "../MapWrapper.hpp"
 #include "../Animation.hpp"
 #include "../RGB16.hpp"
+#include "../SaveStateBase.hpp"
 
 namespace relive {
     class Path_TLV;
 }
 
 class Shadow;
+
+// What every animated object made while the game runs (a particle, gibs...) keeps of the part of it that is this
+// base class: where it is, how it moves, how it is drawn and where its animation is. Part of the save of the object.
+struct AnimatedObjectSaveState final
+{
+    AnimationSaveState mAnim;
+    FP mXPos;
+    FP mYPos;
+    s16 mCurrentPath;
+    s16 mCurrentLevel;
+    FP mVelX;
+    FP mVelY;
+    s16 mRed;
+    s16 mGreen;
+    s16 mBlue;
+    s16 mYOffset;
+    s16 mXOffset;
+    s16 mScale;
+    FP mSpriteScale;
+    bool mApplyShadowZoneColour;
+    bool mDoPurpleLightEffect;
+};
+
+// What every object has in common that its own save doesn't need to carry (and one with no save, e.g. a lever that
+// is made again with the camera, can't): how long until it next updates and, for an animated one, what its base class
+// holds: where it is, how it moves, how it is drawn and where its animation is. The object is the one with
+// SaveStateBase::mObjectId.
+struct AnimationStateSaveState final : public SaveStateBase
+{
+    AnimationStateSaveState()
+        : SaveStateBase(ReliveTypes::eAnimationState, sizeof(*this))
+    { }
+    s32 mUpdateDelay;
+    // The flags of BaseGameObject that change while it lives
+    bool mUpdatable;
+    bool mDrawable;
+    bool mCanExplode;
+    bool mInteractive;
+    bool mSurviveDeathReset;
+    bool mUpdateDuringCamSwap;
+    bool mCantKill;
+    // How many bees are after it
+    u32 mChaseCounter;
+    AnimatedObjectSaveState mObject;
+};
 
 enum class CameraPos : s16;
 
@@ -66,6 +112,10 @@ public:
     CameraPos Is_In_Current_Camera();
 
     void Animation_Init(const AnimResource& res);
+
+    AnimatedObjectSaveState GetAnimatedState();
+    // The animation may be another than the one the object starts with, see AnimationSaveState::mAnimId
+    void SetAnimatedState(const AnimatedObjectSaveState& state);
 
 protected:
     void DeathSmokeEffect(bool bPlaySound);

@@ -364,6 +364,7 @@ void LCDScreen::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mShowRandomMessage = mShowRandomMessage;
     data.mPlayLetterSound = mPlayLetterSound;
     data.mActiveMessageOffset = static_cast<s32>(mActiveMessage - mMessageBuffer);
+    data.mMessageCutoffOffset = mMessageCutoffPtr ? static_cast<s32>(mMessageCutoffPtr - mMessageBuffer) : -1;
 
     pSaveBuffer.Write(data);
 }
@@ -394,7 +395,7 @@ void LCDScreen::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManag
         pScreen->mShowRandomMessage = pState->mShowRandomMessage;
         pScreen->mPlayLetterSound = pState->mPlayLetterSound;
         pScreen->mActiveMessage = pScreen->mMessageBuffer + pState->mActiveMessageOffset;
-        pScreen->mMessageCutoffPtr = nullptr;
+        pScreen->mMessageCutoffPtr = pState->mMessageCutoffOffset >= 0 ? pScreen->mMessageBuffer + pState->mMessageCutoffOffset : nullptr;
 
         // Unlike AO, true here means message 1/2 is showing (VUpdate clears it for the random message)
         pScreen->mFont.mFontContext->UseFontSheet(pScreen->mShowRandomMessage ? pScreen->mPal1 : pScreen->mPal2);

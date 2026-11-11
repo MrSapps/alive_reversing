@@ -8,9 +8,15 @@
 
 class OrderingTable;
 
+struct AnimationSaveState;
+
 class AnimationBase
 {
 public:
+    // The flags, blend mode, layer and colour of the animation, which are all the same kind of thing in a save
+    void GetBaseSaveState(AnimationSaveState& state) const;
+    void RestoreBaseSaveState(const AnimationSaveState& state);
+
     static void CreateAnimationArray();
     static void FreeAnimationArray();
 

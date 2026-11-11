@@ -340,6 +340,14 @@ void PauseMenu::VRender(OrderingTable& ot)
     ot.Add(Layer::eLayer_Menu_41, pPolys);
 }
 
+std::vector<BaseGameObject::NotStateMemory> PauseMenu::VNotStateMemory()
+{
+    // The mud icon is drawn in the menu and runs on its own: the menu isn't saved, so it keeps going through a restore
+    // The font and its palette are resources: ids given out in the order things loaded, which isn't the same
+    // from one start of the game to the next
+    return {{&mMudIconAnim, sizeof(mMudIconAnim)}, {&mFontContext, sizeof(mFontContext)}, {&mFont, sizeof(mFont)}, {&mPal, sizeof(mPal)}};
+}
+
 void PauseMenu::VScreenChanged()
 {
     if (mMap.mNextLevel == EReliveLevelIds::eCredits)

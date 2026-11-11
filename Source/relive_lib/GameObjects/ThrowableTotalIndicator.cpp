@@ -1,4 +1,7 @@
 #include "stdafx.h"
+#include "../ObjectIds.hpp"
+#include "../SerializedObjectData.hpp"
+#include "../WorldStatic.hpp"
 #include "ThrowableTotalIndicator.hpp"
 #include "../../relive_lib/Engine.hpp"
 #include "../relive_lib/Events.hpp"
@@ -6,7 +9,7 @@
 #include "../relive_lib/PsxDisplay.hpp"
 #include "../relive_lib/GameType.hpp"
 
-u16 gThrowableIndicatorExists = 0;
+WorldStatic<u16> gThrowableIndicatorExists("ThrowableTotalIndicator.gThrowableIndicatorExists", 0);
 
 struct LinePoint final
 {
@@ -213,6 +216,14 @@ ThrowableTotalIndicator::ThrowableTotalIndicator(FP xpos, FP ypos, Layer layer, 
     }
 }
 
+ThrowableTotalIndicator::ThrowableTotalIndicator(RestoreTag, ResourceManager& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
+{
+    SetDrawable(true);
+    SetType(ReliveTypes::eThrowableTotalIndicator);
+    gObjListDrawables->Push_Back(this);
+}
+
 ThrowableTotalIndicator::~ThrowableTotalIndicator()
 {
     if (GetDrawable())
@@ -341,4 +352,54 @@ void ThrowableTotalIndicator::VRender(OrderingTable& ot)
         pLine->SetBlendMode(relive::TBlendModes::eBlend_1);
         ot.Add(mOtLayer, pLine);
     }
+}
+
+void ThrowableTotalIndicator::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    ThrowableTotalIndicatorSaveState data = {};
+    data.mStartXPos = mStartXPos;
+    data.mStartYPos = mStartYPos;
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mSpeedX = mSpeedX;
+    data.mSpeedY = mSpeedY;
+    data.mSpriteScale = mSpriteScale;
+    data.mOtLayer = static_cast<s32>(mOtLayer);
+    data.mRed = mRGB.r;
+    data.mGreen = mRGB.g;
+    data.mBlue = mRGB.b;
+    data.mNumToShow = mNumToShow;
+    data.mState = static_cast<s32>(mState);
+    data.mFade = mFade;
+    pSaveBuffer.Write(data);
+}
+
+void ThrowableTotalIndicator::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const ThrowableTotalIndicatorSaveState& state = *pData.ReadTmpPtr<ThrowableTotalIndicatorSaveState>();
+    ThrowableTotalIndicator* p = relive_new ThrowableTotalIndicator(ThrowableTotalIndicator::RestoreTag{}, resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mStartXPos = state.mStartXPos;
+    p->mStartYPos = state.mStartYPos;
+    p->mXPos = state.mXPos;
+    p->mYPos = state.mYPos;
+    p->mSpeedX = state.mSpeedX;
+    p->mSpeedY = state.mSpeedY;
+    p->mSpriteScale = state.mSpriteScale;
+    p->mOtLayer = static_cast<Layer>(state.mOtLayer);
+    p->mRGB.r = state.mRed;
+    p->mRGB.g = state.mGreen;
+    p->mRGB.b = state.mBlue;
+    p->mNumToShow = state.mNumToShow;
+    p->mState = static_cast<ThrowableTotalIndicatorState>(state.mState);
+    p->mFade = state.mFade;
+}
+
+std::vector<BaseGameObject::NotStateMemory> ThrowableTotalIndicator::VNotStateMemory()
+{
+    // The lines it drew last
+    return {{&mLines, sizeof(mLines)}};
 }

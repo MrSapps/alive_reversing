@@ -6,6 +6,7 @@
 #include "../FixedPoint.hpp"
 #include "../GameType.hpp"
 #include "BaseMap.hpp"
+#include "../SerializedObjectData.hpp"
 
 void ZapSpark::LoadAnimationsAO()
 {
@@ -88,6 +89,23 @@ void ZapSpark::VUpdate()
     {
         SetDead(true);
     }
+}
+
+void ZapSpark::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    ZapSparkSaveState data = {};
+    data.mObject = GetAnimatedState();
+    data.mSparkTimer = mSparkTimer;
+    pSaveBuffer.Write(data);
+}
+
+void ZapSpark::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const auto pState = pData.ReadTmpPtr<ZapSparkSaveState>();
+    // What it rolls when it is made is all put over
+    auto pSpark = relive_new ZapSpark(FP_FromInteger(0), FP_FromInteger(0), FP_FromInteger(1), resMan, map);
+    pSpark->SetAnimatedState(pState->mObject);
+    pSpark->mSparkTimer = pState->mSparkTimer;
 }
 
 void ZapSpark::VScreenChanged()

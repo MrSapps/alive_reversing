@@ -1,0 +1,13 @@
+# Two runs of this must log the same hash on every frame (see run_determinism.cmake). It walks, runs
+# and jumps so most of Abe's state changes are covered.
+timeout 120
+start mines 1 6
+wait_until in_game
+wait_frames 30
+hash_log %OUT% full
+hold right 60
+hold right+run 120
+hold up 20
+hold left+run 60
+wait_frames 30
+quit

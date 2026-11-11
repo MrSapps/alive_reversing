@@ -1,6 +1,21 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
+#include "../SaveStateBase.hpp"
+
+struct DeathBirdParticleSaveState final : public SaveStateBase
+{
+    DeathBirdParticleSaveState()
+        : SaveStateBase(ReliveTypes::eDeathBird, sizeof(*this))
+    { }
+    // What it was made with
+    s32 mStartTimer;
+    bool mPlaySound;
+    FP mScale;
+    AnimatedObjectSaveState mObject;
+    s8 mRandom;
+    s8 mState;
+};
 
 class DeathBirdParticle final : public BaseAnimatedWithPhysicsGameObject
 {
@@ -10,6 +25,8 @@ public:
     void LoadAnimations();
 
     virtual void VUpdate() override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
 
 private:
     s8 mRandom = 0;

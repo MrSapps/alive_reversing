@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "DoorFlame.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/SwitchStates.hpp"
@@ -161,9 +162,57 @@ public:
         mRender = 0;
     }
 
+    virtual std::vector<NotStateMemory> VNotStateMemory() override
+    {
+        // The animations of the sparks hold the number of the resource they were made with
+        std::vector<NotStateMemory> result;
+        for (auto& spark : mSparks)
+        {
+            result.push_back({&spark.field_14.mAnimRes, sizeof(spark.field_14.mAnimRes)});
+        }
+        return result;
+    }
+
     void SetRenderEnabled(bool bEnable)
     {
         mRender = bEnable;
+    }
+
+    void GetSparksState(DoorFlameSaveState& data) const
+    {
+        data.mSparksSaved = true;
+        data.mSparksRender = mRender;
+        data.mSparksStartXPos = mStartXPos;
+        data.mSparksStartYPos = mStartYPos;
+        for (s32 i = 0; i < ALIVE_COUNTOF(mSparks); i++)
+        {
+            data.mSparks[i].mX = mSparks[i].x;
+            data.mSparks[i].mY = mSparks[i].y;
+            data.mSparks[i].mOffX = mSparks[i].field_8_off_x;
+            data.mSparks[i].mOffY = mSparks[i].field_C_off_y;
+            data.mSparks[i].mRandom64 = mSparks[i].field_10_random64;
+            data.mSparks[i].mVisible = mSparks[i].field_12_bVisible;
+            data.mSparks[i].mSpriteScale = mSparks[i].field_14.mSpriteScale;
+            data.mSparks[i].mAnim = mSparks[i].field_14.GetSaveState();
+        }
+    }
+
+    void SetSparksState(const DoorFlameSaveState& state)
+    {
+        mRender = state.mSparksRender;
+        mStartXPos = state.mSparksStartXPos;
+        mStartYPos = state.mSparksStartYPos;
+        for (s32 i = 0; i < ALIVE_COUNTOF(mSparks); i++)
+        {
+            mSparks[i].x = state.mSparks[i].mX;
+            mSparks[i].y = state.mSparks[i].mY;
+            mSparks[i].field_8_off_x = state.mSparks[i].mOffX;
+            mSparks[i].field_C_off_y = state.mSparks[i].mOffY;
+            mSparks[i].field_10_random64 = state.mSparks[i].mRandom64;
+            mSparks[i].field_12_bVisible = state.mSparks[i].mVisible;
+            mSparks[i].field_14.mSpriteScale = state.mSparks[i].mSpriteScale;
+            mSparks[i].field_14.RestoreSaveState(state.mSparks[i].mAnim);
+        }
     }
 
 private:
@@ -445,6 +494,51 @@ void DoorFlame::VUpdate()
         {
             pFlameSparks->SetDead(true);
             mFlameSparksId = Guid{};
+        }
+    }
+}
+
+std::vector<BaseGameObject::NotStateMemory> DoorFlame::VNotStateMemory()
+{
+    // The channels its sound plays on
+    return {{&mSoundsMask, sizeof(mSoundsMask)}};
+}
+
+void DoorFlame::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    DoorFlameSaveState data = {};
+    data.mFrameCount = mFrameCount;
+    data.mState = static_cast<s32>(mState);
+    data.mRandom = mRandom;
+    data.mSoundsMask = 0; // the sound system's channels, not state: the sound is made again
+    data.mFireBackgroundGlowId = mFireBackgroundGlowId;
+    data.mFlameSparksId = mFlameSparksId;
+    if (const FlameSparks* pSparks = static_cast<FlameSparks*>(sObjectIds.Find_Impl(mFlameSparksId)))
+    {
+        pSparks->GetSparksState(data);
+    }
+    pSaveBuffer.Write(data);
+}
+
+void DoorFlame::RestoreFromSaveState(const DoorFlameSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    DoorFlame* p = static_cast<DoorFlame*>(pObj);
+    p->mFrameCount = state.mFrameCount;
+    p->mState = static_cast<States>(state.mState);
+    p->mRandom = state.mRandom;
+    p->mSoundsMask = state.mSoundsMask;
+    p->mFireBackgroundGlowId = state.mFireBackgroundGlowId;
+    p->mFlameSparksId = state.mFlameSparksId;
+    if (state.mSparksSaved)
+    {
+        if (FlameSparks* pSparks = static_cast<FlameSparks*>(sObjectIds.Find_Impl(p->mFlameSparksId)))
+        {
+            pSparks->SetSparksState(state);
         }
     }
 }

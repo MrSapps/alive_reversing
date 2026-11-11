@@ -1,4 +1,5 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "../relive_lib/Function.hpp"
 #include "Well.hpp"
 #include "Math.hpp"
@@ -13,7 +14,7 @@
 
 namespace AO {
 
-static u8 sWellRndSeed = 4;
+static WorldStatic<u8> sWellRndSeed("AO.Well.sWellRndSeed", 4);
 
 static s16 Well_NextRandom()
 {

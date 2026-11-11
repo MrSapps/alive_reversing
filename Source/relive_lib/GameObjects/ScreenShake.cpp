@@ -4,6 +4,7 @@
 #include "../AliveLibAE/stdlib.hpp"
 #include "../relive_lib/PsxDisplay.hpp"
 #include "../relive_lib/Primitives.hpp"
+#include "../SerializedObjectData.hpp"
 
 ScreenShake::ScreenShake(bool enableShakeEvent, bool softerShakes, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
@@ -40,6 +41,28 @@ void ScreenShake::VUpdate()
     {
         mShakeNumber--;
     }
+}
+
+void ScreenShake::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    ScreenShakeSaveState data = {};
+    data.mEnableShakeEvent = mEnableShakeEvent;
+    data.mSofterShakes = mSofterShakes;
+    data.mShakeNumber = mShakeNumber;
+    pSaveBuffer.Write(data);
+}
+
+std::vector<BaseGameObject::NotStateMemory> ScreenShake::VNotStateMemory()
+{
+    // What it was last drawn with
+    return {{&mScreenOffset, sizeof(mScreenOffset)}};
+}
+
+void ScreenShake::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const auto pState = pData.ReadTmpPtr<ScreenShakeSaveState>();
+    auto pShake = relive_new ScreenShake(pState->mEnableShakeEvent, pState->mSofterShakes, resMan, map);
+    pShake->mShakeNumber = pState->mShakeNumber;
 }
 
 struct ScreenOffset final

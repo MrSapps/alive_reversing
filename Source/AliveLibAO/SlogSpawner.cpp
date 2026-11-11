@@ -1,4 +1,6 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../relive_lib/Function.hpp"
 #include "SlogSpawner.hpp"
 #include "../AliveLibAE/stdlib.hpp"
@@ -69,6 +71,26 @@ void SlogSpawner::VUpdate()
             }
         }
     }
+}
+
+void SlogSpawner::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    SlogSpawnerSaveState data = {};
+    data.mSpawnedSlogsCount = mSpawnedSlogsCount;
+    data.mSpawnTimer = mSpawnTimer;
+    pSaveBuffer.Write(data);
+}
+
+void SlogSpawner::RestoreFromSaveState(const SlogSpawnerSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    SlogSpawner* p = static_cast<SlogSpawner*>(pObj);
+    p->mSpawnedSlogsCount = state.mSpawnedSlogsCount;
+    p->mSpawnTimer = state.mSpawnTimer;
 }
 
 } // namespace AO

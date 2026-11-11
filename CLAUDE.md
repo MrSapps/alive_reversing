@@ -157,6 +157,9 @@ If they are missing, the game shows an error and logs a listing of the directory
 - `Source/relive_lib/Sound` — the sound: an emulated PS1 SPU (`Spu/`) driven by a libsnd port (`Libsnd`),
   `GameSound` (`Midi.cpp`: what the games call, VAB/SEQ loading), `SDLSoundSystem` (device, mixing, movie
   `AudioStream`s). One engine for both games, no separate PC path. See `SOUND_FORMATS.md`.
+- `Source/relive_lib/Bot` — the bot that plays the games (nav graph, planner, checkpoints). Read its
+  `BOT_DESIGN.md` first: it says what is built, what was measured and what is next. Run scripts are in
+  `Source/Tools/bot_runs`.
 - `Source/AliveLibAO`, `Source/AliveLibAE` — game logic for each game
 - `Source/Tools/editor` — Qt level editor
 - `options.cmake` — gameplay and behaviour feature toggles

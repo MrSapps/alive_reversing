@@ -5,6 +5,28 @@
 #include "../FixedPoint.hpp"
 #include "../Layer.hpp"
 #include "../RGB16.hpp"
+#include "../SaveStateBase.hpp"
+
+struct SnoozeParticleSaveState final : public SaveStateBase
+{
+    SnoozeParticleSaveState()
+        : SaveStateBase(ReliveTypes::eSnoozeParticle, sizeof(*this))
+    { }
+    FP mStartY;
+    FP mXPos;
+    FP mYPos;
+    FP mDestX;
+    FP mDestY;
+    FP mSpriteScale;
+    FP mScaleDx;
+    Layer mOtLayer;
+    s16 mR;
+    s16 mG;
+    s16 mB;
+    u16 mIdx;
+    bool mBlowUp;
+    s16 mState;
+};
 
 class SnoozeParticle final : public BaseGameObject
 {
@@ -22,6 +44,9 @@ public:
     virtual void VScreenChanged() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VUpdate() override;
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
 
 private:
     FP mStartY = {};

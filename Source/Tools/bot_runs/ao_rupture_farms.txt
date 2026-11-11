@@ -1,0 +1,10 @@
+# Abe's Oddysee from the start of Rupture Farms
+timeout 100000
+start rupture_farms 15 1
+wait_until in_game
+wait_frames 60
+bot any,seed=1
+bot_wait 200000
+bot_report bot_report.txt
+bot_inputs bot_inputs.txt
+quit

@@ -28,6 +28,10 @@ struct LiftMoverSaveState final : public SaveStateBase
     { }
     Guid mTlvId;
     LiftMoverStates mState;
+    // False for a save from the original game's, which finds its lift again when it first updates
+    bool mTargetSaved;
+    bool mMoving;
+    Guid mTargetLiftId;
 };
 
 class LiftMover final : public BaseGameObject

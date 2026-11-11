@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
 
 class Electrocute;
@@ -22,9 +23,24 @@ struct Relive_Path_Teleporter_Data
     s16 mElectricY;
 };
 
+struct TeleporterSaveState final : public SaveStateBase
+{
+    TeleporterSaveState()
+        : SaveStateBase(ReliveTypes::eTeleporter, sizeof(*this))
+    { }
+    s32 mSwitchState;
+    s32 mState;
+    bool mDestroySelf;
+    Guid mElectrocuteId;
+    bool mEffectsCreated;
+};
+
 class Teleporter final : public BaseGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const TeleporterSaveState& state);
+
     Teleporter(relive::Path_Teleporter* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~Teleporter();
 

@@ -1,0 +1,10 @@
+# Abe's Exoddus from the start of the Mines
+timeout 100000
+start mines 1 4 838 1498
+wait_until in_game
+wait_frames 40
+bot any,seed=1
+bot_wait 200000
+bot_report bot_report.txt
+bot_inputs bot_inputs.txt
+quit

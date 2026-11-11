@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../SerializedObjectData.hpp"
 #include "BoomMachine.hpp"
 #include "../Function.hpp"
 #include "../ObjectIds.hpp"
@@ -48,7 +49,8 @@ BoomMachine::BoomMachine(relive::Path_BoomMachine* pTlv, const Guid& tlvId, Reso
         directedScale = -directedScale;
     }
 
-    auto pPipe = relive_new BoomMachinePipe(
+    // A restore makes the pipe from its own save, and RestoreFromSaveState gives this its id
+    auto pPipe = mMap.mLoadingFromSave ? nullptr : relive_new BoomMachinePipe(
         directedScale * FP_FromInteger(30) + mXPos,
         (GetSpriteScale() * FP_FromInteger(-30)) + mYPos,
         GetSpriteScale(),
@@ -137,4 +139,24 @@ BoomMachine::~BoomMachine()
         pObj->SetDead(true);
     }
     mMap.TLV_Reset(mTlvId);
+}
+
+void BoomMachine::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    BoomMachineSaveState data = {};
+    data.mPipeId = mPipeId;
+    data.mIsButtonOn = mIsButtonOn;
+    pSaveBuffer.Write(data);
+}
+
+void BoomMachine::RestoreFromSaveState(const BoomMachineSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eBoomMachine)
+    {
+        return;
+    }
+    BoomMachine* p = static_cast<BoomMachine*>(pObj);
+    p->mPipeId = state.mPipeId;
+    p->mIsButtonOn = state.mIsButtonOn;
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Function.hpp"
+#include "../SaveStateBase.hpp"
 #include "BaseAnimatedWithPhysicsGameObject.hpp"
 
 struct ZapLineSprites final
@@ -22,9 +23,34 @@ enum class ZapLineType : s16
     eThin_1 = 1   // Used by the Shrykull.
 };
 
+struct ZapLineSaveState final : public SaveStateBase
+{
+    ZapLineSaveState()
+        : SaveStateBase(ReliveTypes::eZapLine, sizeof(*this))
+    { }
+    s32 mState;
+    s16 mXPosSrc;
+    s16 mYPosSrc;
+    s16 mXPosDst;
+    s16 mYPosDst;
+    s16 mAliveTimer;
+    s16 mMaxAliveTime;
+    s32 mZapLineType;
+    s16 mSpriteX[280];
+    s16 mSpriteY[280];
+    FP mPart1[20];
+    FP mPart2[20];
+    FP mPart3[20];
+    FP mSegmentX[28];
+    FP mSegmentY[28];
+};
+
 class ZapLine final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
+
     ZapLine(FP xPosSource, FP yPosSource, FP xPosDest, FP yPosDest, s32 aliveTime, ZapLineType type, Layer layer, ResourceManager& resMan, BaseMap& map);
     ~ZapLine();
 

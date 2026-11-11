@@ -3,6 +3,17 @@
 #include "../relive_lib/GameObjects/BaseGameObject.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
 #include "../relive_lib/FixedPoint.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
+
+struct GasEmitterSaveState final : public SaveStateBase
+{
+    GasEmitterSaveState()
+        : SaveStateBase(ReliveTypes::eGasEmitter, sizeof(*this))
+    { }
+    Guid mTlvId;
+    s32 mEmitPower;
+    bool mDrawFlipper;
+};
 
 class GasEmitter final : public BaseGameObject
 {
@@ -13,6 +24,8 @@ public:
     virtual void VStopAudio() override;
     virtual void VScreenChanged() override;
     virtual void VUpdate() override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
 
 private:
     Guid mTlvId;

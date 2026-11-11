@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../relive_lib/Function.hpp"
 #include "RollingBall.hpp"
 #include "../AliveLibAE/stdlib.hpp"
@@ -371,4 +372,28 @@ void RollingBall::KillRollingBallShaker()
         pShaker->SetDead(true);
         mRollingBallShakerId = {};
     }
+}
+
+void RollingBall::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    RollingBallSaveState data = {};
+    data.mState = static_cast<s32>(mState);
+    data.mRollingBallShakerId = mRollingBallShakerId;
+    data.mMaxSpeed = mMaxSpeed;
+    data.mAcceleration = mAcceleration;
+    pSaveBuffer.Write(data);
+}
+
+void RollingBall::RestoreFromSaveState(const RollingBallSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eRollingBall)
+    {
+        return;
+    }
+    RollingBall* p = static_cast<RollingBall*>(pObj);
+    p->mState = static_cast<States>(state.mState);
+    p->mRollingBallShakerId = state.mRollingBallShakerId;
+    p->mMaxSpeed = state.mMaxSpeed;
+    p->mAcceleration = state.mAcceleration;
 }

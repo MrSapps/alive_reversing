@@ -1,5 +1,7 @@
 #include "stdafx.h"
 #include "StatusLight.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
+#include "../relive_lib/ObjectIds.hpp"
 #include "../relive_lib/Collisions.hpp"
 #include "../relive_lib/SwitchStates.hpp"
 #include "DDCheat.hpp"
@@ -88,6 +90,27 @@ StatusLight::StatusLight(relive::Path_StatusLight* pTlv, const Guid& tlvId, Reso
 bool StatusLight::isLinkedAndDisabled(s16 switchId)
 {
     return !SwitchStates_Get(switchId) && switchId;
+}
+
+void StatusLight::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    StatusLightSaveState data = {};
+    data.mUntweakedXPos = mUntweakedXPos;
+    data.mUntweakedYPos = mUntweakedYPos;
+    pSaveBuffer.Write(data);
+}
+
+void StatusLight::RestoreFromSaveState(const StatusLightSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    // The floor it was put on depends on what was there when the camera made it, which differs from one load to the next
+    StatusLight* p = static_cast<StatusLight*>(pObj);
+    p->mUntweakedXPos = state.mUntweakedXPos;
+    p->mUntweakedYPos = state.mUntweakedYPos;
 }
 
 void StatusLight::VUpdate()

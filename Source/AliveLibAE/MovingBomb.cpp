@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../relive_lib/SerializedObjectData.hpp"
+#include "../relive_lib/WorldStatic.hpp"
 #include "MovingBomb.hpp"
 #include "../relive_lib/Function.hpp"
 #include "Engine.hpp"
@@ -37,7 +39,8 @@ static const TintEntry kMovingBombTints[16] = {
     {EReliveLevelIds::eBonewerkz_Ender, 127u, 127u, 127u},
     {EReliveLevelIds::eCredits, 127u, 127u, 127u}};
 
-static MovingBomb* sMovingBomb = nullptr;
+// The one that plays the sound
+static WorldStatic<Guid> sMovingBombId("AE.MovingBomb.sMovingBombId", Guid{});
 
 MovingBomb::MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAliveGameObject(0, resMan, map)
@@ -121,14 +124,14 @@ MovingBomb::~MovingBomb()
         mMap.TLV_Reset(mTlvId);
     }
 
-    if (sMovingBomb == this)
+    if (sMovingBombId.Get() == mBaseGameObjectId)
     {
         if (mChannelMask)
         {
             SND_Stop_Channels_Mask(mChannelMask);
             mChannelMask = 0;
         }
-        sMovingBomb = nullptr;
+        sMovingBombId = Guid{};
     }
 }
 
@@ -272,11 +275,11 @@ void MovingBomb::VUpdate()
         }
     }
 
-    if (sMovingBomb == nullptr || sMovingBomb == this)
+    if (!sMovingBombId.Get().IsValid() || sMovingBombId.Get() == mBaseGameObjectId)
     {
         if (GetAnimation().GetCurrentFrame() != 0 && GetAnimation().GetCurrentFrame() != 7)
         {
-            sMovingBomb = this;
+            sMovingBombId = mBaseGameObjectId;
         }
         else
         {
@@ -297,19 +300,19 @@ void MovingBomb::VUpdate()
                     {
                         mChannelMask = SfxPlayMono(relive::SoundEffects::SecurityOrb, 80, GetSpriteScale());
                     }
-                    sMovingBomb = this;
+                    sMovingBombId = mBaseGameObjectId;
                 }
                 else
                 {
                     if (mState == States::eWaitABit_4)
                     {
                         mChannelMask = 0;
-                        sMovingBomb = this;
+                        sMovingBombId = mBaseGameObjectId;
                     }
                     else
                     {
                         mChannelMask = SfxPlayMono(relive::SoundEffects::SecurityOrb, 12, GetSpriteScale());
-                        sMovingBomb = this;
+                        sMovingBombId = mBaseGameObjectId;
                     }
                 }
             }
@@ -434,4 +437,36 @@ void MovingBomb::VUpdate()
         default:
             return;
     }
+}
+
+std::vector<BaseGameObject::NotStateMemory> MovingBomb::VNotStateMemory()
+{
+    // The channels its sound plays on
+    return {{&mChannelMask, sizeof(mChannelMask)}};
+}
+
+void MovingBomb::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    MovingBombSaveState data = {};
+    data.mState = static_cast<s32>(mState);
+    data.mTimer = mTimer;
+    data.mSpeed = mSpeed;
+    data.mChannelMask = 0; // the sound system's channels, not state: the sound is made again
+    data.mPersistOffscreen = mPersistOffscreen;
+    pSaveBuffer.Write(data);
+}
+
+void MovingBomb::RestoreFromSaveState(const MovingBombSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eTimedMine_or_MovingBomb)
+    {
+        return;
+    }
+    MovingBomb* p = static_cast<MovingBomb*>(pObj);
+    p->mState = static_cast<States>(state.mState);
+    p->mTimer = state.mTimer;
+    p->mSpeed = state.mSpeed;
+    p->mChannelMask = state.mChannelMask;
+    p->mPersistOffscreen = state.mPersistOffscreen;
 }

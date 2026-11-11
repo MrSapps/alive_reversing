@@ -199,6 +199,12 @@ void PsxDisplay::PutCurrentDispEnv()
 
 void PsxDisplay::RenderOrderingTable()
 {
+    if (mSkipDraw)
+    {
+        mDrawEnv.mOrderingTable.Clear();
+        return;
+    }
+
     // Single buffered rendering
     PSX_Calc_FrameSkip();
 

@@ -2,6 +2,7 @@
 #include "ObjectIds.hpp"
 #include "GameObjects/BaseGameObject.hpp"
 #include "FatalError.hpp"
+#include "logger.hpp"
 
 ObjectIds sObjectIds;
 
@@ -22,13 +23,18 @@ void ObjectIds::Insert(TObjectId_KeyType nextId, BaseGameObject* pGameObj)
         ALIVE_FATAL("Inserting invalid guid");
     }
 
+    auto it = mMap.find(nextId);
+    if (it != std::end(mMap) && it->second != pGameObj)
+    {
+        LOG_ERROR("Object id %s is used by two objects", nextId.ToString().c_str());
+    }
     mMap[nextId] = pGameObj;
 }
 
-s16 ObjectIds::Remove(TObjectId_KeyType idToRemove)
+s16 ObjectIds::Remove(TObjectId_KeyType idToRemove, BaseGameObject* pOnlyIfThis)
 {
     auto it = mMap.find(idToRemove);
-    if (it != std::end(mMap))
+    if (it != std::end(mMap) && (!pOnlyIfThis || it->second == pOnlyIfThis))
     {
         mMap.erase(it);
         return 1;

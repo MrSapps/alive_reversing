@@ -112,6 +112,10 @@ struct SligSaveState final : public SaveStateBase
     s16 field_1E_r;
     s16 field_20_g;
     s16 field_22_b;
+    // field_200_red/green/blue, which are not the colour above: that is set from the shadow zone every update
+    bool mTintSaved;
+    s16 mTint[3];
+    s32 mListenerLastEventIdx;
     s16 field_24_bFlipX;
     eSligMotions field_26_current_motion;
     s16 field_28_current_frame;
@@ -154,6 +158,17 @@ struct SligSaveState final : public SaveStateBase
     bool mStoppedForLeverOrLift;
     bool mGlukkonCalledAllOYa;
     bool mHeardGlukkon;
+    // False for a save from the original game's, which has neither
+    bool mPreviousMotionSaved;
+    s32 mPreviousMotion;
+    bool mbMotionChanged;
+    s16 mPreventDepossession;
+    s32 mNextGameSpeakMotion;
+    // field_50_input is the PSX button form, which loses the keyboard bits the brain also reads
+    s32 mInput;
+    s16 mPointsCount;
+    s16 mPointsX[10];
+    s16 mPointsY[10];
 };
 
 enum class GameSpeakEvents : s16;
@@ -222,6 +237,7 @@ public:
 
     void LoadAnimations();
     virtual void VUpdate() override;
+    virtual void VPostRestore() override;
 
     virtual void VRender(OrderingTable& ot) override;
 
@@ -235,6 +251,11 @@ public:
     virtual bool VIsFacingMe(BaseAnimatedWithPhysicsGameObject* pOther) override;
     virtual bool VOnSameYLevel(BaseAnimatedWithPhysicsGameObject* pOther) override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    virtual GameSpeakListener* VListener() override
+    {
+        return &mListener;
+    }
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
     virtual s16 VGetMotion(eMotionType motionType) override
     {
         switch (motionType)

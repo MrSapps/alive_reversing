@@ -1,10 +1,28 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
+
+struct ShrykullSaveState final : public SaveStateBase
+{
+    ShrykullSaveState()
+        : SaveStateBase(ReliveTypes::eShrykull, sizeof(*this))
+    { }
+    s32 mState;
+    s32 mZapIntervalTimer;
+    s32 mFlashTimer;
+    Guid mZapLineId;
+    Guid mZapTargetId;
+    bool mCanElectrocute;
+    bool mResetRingTimer;
+};
 
 class Shrykull final : public BaseAliveGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
+
     Shrykull(ResourceManager& resMan, BaseMap& map);
     ~Shrykull();
 

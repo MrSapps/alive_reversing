@@ -37,9 +37,36 @@ PlatformBase::PlatformBase(ResourceManager& resMan, BaseMap& map)
 {
 }
 
+static bool sRestoring = false;
+
+void PlatformBase::SetRestoring(bool restoring)
+{
+    sRestoring = restoring;
+}
+
+bool PlatformBase::IsRestoring()
+{
+    return sRestoring;
+}
+
+void PlatformBase::SyncLinesAfterRestore()
+{
+    for (s32 i = 0; i < Platforms().Size(); i++)
+    {
+        PlatformBase* pPlatform = static_cast<PlatformBase*>(Platforms().ItemAt(i));
+        if (pPlatform && pPlatform->mPlatformBaseCount > 0 && pPlatform->mPlatformBaseCollisionLine)
+        {
+            pPlatform->SyncCollisionLinePosition();
+        }
+    }
+}
+
 void PlatformBase::VAdd(BaseAliveGameObject* /*pObj*/)
 {
-    mPlatformBaseCount++;
+    if (!sRestoring)
+    {
+        mPlatformBaseCount++;
+    }
 
     if (mPlatformBaseCollisionLine)
     {
@@ -49,7 +76,10 @@ void PlatformBase::VAdd(BaseAliveGameObject* /*pObj*/)
 
 void PlatformBase::VRemove(BaseAliveGameObject* /*pObj*/)
 {
-    mPlatformBaseCount--;
+    if (!sRestoring)
+    {
+        mPlatformBaseCount--;
+    }
 }
 
 void PlatformBase::AddDynamicCollision(AnimId animId, relive::Path_TLV* pTlv, const Guid& tlvId)

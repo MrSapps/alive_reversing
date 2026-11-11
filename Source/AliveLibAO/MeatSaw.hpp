@@ -34,6 +34,7 @@ struct MeatSawSaveState final : public SaveStateBase
     s32 mIdleTimer = 0;
     s32 mSfxTimer = 0;
     s32 mFrameCountForSfx = 0;
+    AnimationSaveState mMotorAnim = {};
 };
 
 class MeatSaw final : public BaseAnimatedWithPhysicsGameObject

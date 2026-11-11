@@ -291,30 +291,34 @@ bool Paramite::VOnSameYLevel(BaseAnimatedWithPhysicsGameObject* pOther)
     return FP_Abs(pOther->mYPos - mYPos) < (GetSpriteScale() * FP_FromInteger(40));
 }
 
-void Paramite::VUpdate()
+void Paramite::VPostRestore()
 {
-    if (GetRestoredFromQuickSave())
+    if (BaseAliveGameObjectCollisionLineType != -1)
     {
-        if (BaseAliveGameObjectCollisionLineType != -1)
-        {
-            gCollisions->Raycast(
-                mXPos,
-                mYPos - FP_FromInteger(20),
-                mXPos,
-                mYPos + FP_FromInteger(20),
-                &BaseAliveGameObjectCollisionLine,
-                &mXPos,
-                &mYPos,
-                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
-
-            BaseAliveGameObjectCollisionLineType = -1;
-        }
-
-        mMeat = BaseGameObject::RefreshId(mMeat);
-        mParamiteWeb = BaseGameObject::RefreshId(mParamiteWeb);
-        SetRestoredFromQuickSave(false);
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
     }
 
+    mMeat = BaseGameObject::RefreshId(mMeat);
+    mParamiteWeb = BaseGameObject::RefreshId(mParamiteWeb);
+
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
+}
+
+void Paramite::VUpdate()
+{
     if (mHealth > FP_FromInteger(0)
         && mMap.Is_Point_In_Current_Camera(
             mCurrentLevel,
@@ -2490,11 +2494,7 @@ static const Paramite::TParamiteBrain sParamiteBrainTable[] = {
 
 void Paramite::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     ParamiteSaveState data = {};
 
     data.mXPos = mXPos;
@@ -2646,7 +2646,6 @@ void Paramite::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManage
         // mMeat/mParamiteWeb above are still the saved tlv-info Guids at
         // this point, not live runtime ids - VUpdate() resolves them via
         // BaseGameObject::RefreshId() once every object has been recreated.
-        pParamite->SetRestoredFromQuickSave(true);
     }
 }
 

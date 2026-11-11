@@ -15,7 +15,7 @@ namespace AO {
 struct MovingBombSaveState final : public SaveStateBase
 {
     MovingBombSaveState()
-        : SaveStateBase(ReliveTypes::eTimedMine, sizeof(*this))
+        : SaveStateBase(ReliveTypes::eMovingBomb, sizeof(*this))
     { }
     FP mXPos = {};
     FP mYPos = {};
@@ -43,10 +43,12 @@ struct MovingBombSaveState final : public SaveStateBase
 class MovingBomb final : public ::BaseAliveGameObject
 {
 public:
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
     MovingBomb(relive::Path_MovingBomb* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~MovingBomb();
 
     virtual void VUpdate() override;
+    virtual void VPostRestore() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VOnThrowableHit(BaseGameObject* pFrom) override;
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;

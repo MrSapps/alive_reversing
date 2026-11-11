@@ -128,6 +128,9 @@ bool Input_JoyStickAvailable();
 class InputObject final
 {
 public:
+    // The pads' history is part of the world: a restored world presses and releases what the saved one would have
+    InputObject();
+
     void InitPad(u32 padCount);
 
     void Update(BaseGameAutoPlayer& gameAutoPlayer);

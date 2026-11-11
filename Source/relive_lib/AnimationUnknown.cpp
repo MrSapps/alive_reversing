@@ -2,6 +2,7 @@
 #include "AnimationUnknown.hpp"
 #include "PsxDisplay.hpp"
 #include "GameType.hpp"
+#include "Animation.hpp"
 
 void AnimationUnknown::VCleanUp()
 {
@@ -117,3 +118,18 @@ void AnimationUnknown::GetRenderedSize(PSX_RECT* pRect)
     Poly_FT4_Get_Rect(pRect, &mPoly);
 }
 
+
+AnimationSaveState AnimationUnknown::GetSaveState() const
+{
+    AnimationSaveState state;
+    state.mValid = true;
+    GetBaseSaveState(state);
+    state.mSpriteScale = mSpriteScale;
+    return state;
+}
+
+void AnimationUnknown::RestoreSaveState(const AnimationSaveState& state)
+{
+    RestoreBaseSaveState(state);
+    mSpriteScale = state.mSpriteScale;
+}

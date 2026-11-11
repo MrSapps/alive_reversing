@@ -379,6 +379,7 @@ void MeatSaw::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mIdleTimer = mIdleTimer;
     data.mSfxTimer = mSfxTimer;
     data.mFrameCountForSfx = mFrameCountForSfx;
+    data.mMotorAnim = mMotorAnim.GetSaveState();
 
     pSaveBuffer.Write(data);
 }
@@ -401,6 +402,7 @@ void MeatSaw::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager
         pSaw->mIdleTimer = pState->mIdleTimer;
         pSaw->mSfxTimer = pState->mSfxTimer;
         pSaw->mFrameCountForSfx = pState->mFrameCountForSfx;
+        pSaw->mMotorAnim.RestoreSaveState(pState->mMotorAnim);
 
         // The constructor always sets the idle animation - re-apply the
         // moving one if the saw was mid-travel when saved, matching what

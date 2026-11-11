@@ -65,6 +65,12 @@ static const LiftPointCoord sRopeOffsets[16] = {
     {0, 0}, // forest chase
     {2, 1}};// desert escape
 
+std::vector<BaseGameObject::NotStateMemory> LiftPoint::VNotStateMemory()
+{
+    // The pulley's resource is a number made when it was
+    return {{&mPulleyAnim.mAnimRes, sizeof(mPulleyAnim.mAnimRes)}};
+}
+
 void LiftPoint::LoadAnimations()
 {
     switch (mMap.mCurrentLevel)
@@ -204,7 +210,11 @@ LiftPoint::LiftPoint(relive::Path_LiftPoint* pTlv, const Guid& tlvId, ResourceMa
     pRope2->mYPos = FP_FromInteger(FP_GetExponent(mYPos + v29 + (k25 * GetSpriteScale()) + FP_FromInteger(pRope2->mRopeLength)));
     pRope1->mYPos = FP_FromInteger(FP_GetExponent(mYPos + v29 - (k25 * GetSpriteScale()) + FP_FromInteger(pRope1->mRopeLength)));
 
-    CreatePulleyIfExists(0, 0);
+    // A restore has it from the save: the camera it is made in may not be the one it was found in
+    if (!PlatformBase::IsRestoring())
+    {
+        CreatePulleyIfExists(0, 0);
+    }
 
     mLiftPointId = pTlv->mLiftPointId;
     mLiftPointStopType = pTlv->mLiftPointStopType;
@@ -696,6 +706,13 @@ void LiftPoint::CreatePulleyIfExists(s16 camX, s16 camY)
             }
         }
 
+        InitPulley();
+    }
+}
+
+void LiftPoint::InitPulley()
+{
+    {
         // Calculate pulley position
         const FP k13_scaled = FP_FromInteger(13) * GetSpriteScale();
         const FP kM10_scaled = FP_FromInteger(-10) * GetSpriteScale();
@@ -784,6 +801,18 @@ void LiftPoint::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mBottomFloor = mBottomFloor;
     data.mMoveToFloorLevel = mMoveToFloorLevel;
     data.mKeepOnMiddleFloor = mKeepOnMiddleFloor;
+    data.mIgnoreLiftMover = mIgnoreLiftMover;
+    data.mPlatformBaseXOffset = mPlatformBaseXOffset;
+    data.mPlatformBaseWidthOffset = mPlatformBaseWidthOffset;
+    data.mPlatformBaseYOffset = mPlatformBaseYOffset;
+    data.mPlatformBaseHeightOffset = mPlatformBaseHeightOffset;
+    data.mPlatformBaseCount = mPlatformBaseCount;
+    data.mLiftPointId = mLiftPointId;
+    data.mLiftWheelAnim = mLiftWheelAnim.GetSaveState();
+    data.mPulleyAnim = mPulleyAnim.GetSaveState();
+    data.mHasPulley = mHasPulley;
+    data.mPulleyXPos = mPulleyXPos;
+    data.mPulleyYPos = mPulleyYPos;
 
     pSaveBuffer.Write(data);
 }
@@ -800,7 +829,21 @@ void LiftPoint::CreateFromSaveState(SerializedObjectData& pData, ResourceManager
     {
         pLiftPoint->mXPos = pState->mXPos;
         pLiftPoint->mYPos = pState->mYPos;
+        // The line is put where the offsets it was saved with place it
+        pLiftPoint->mPlatformBaseXOffset = pState->mPlatformBaseXOffset;
+        pLiftPoint->mPlatformBaseWidthOffset = pState->mPlatformBaseWidthOffset;
+        pLiftPoint->mPlatformBaseYOffset = pState->mPlatformBaseYOffset;
+        pLiftPoint->mPlatformBaseHeightOffset = pState->mPlatformBaseHeightOffset;
         pLiftPoint->SyncCollisionLinePosition();
+
+        // The pulley is found in the camera the lift is made in, which may not be the one it was before
+        if (pState->mHasPulley && !pLiftPoint->mHasPulley)
+        {
+            pLiftPoint->InitPulley();
+        }
+        // Also without a pulley: the search for one leaves the position of the last TLV it looked at
+        pLiftPoint->mPulleyXPos = pState->mPulleyXPos;
+        pLiftPoint->mPulleyYPos = pState->mPulleyYPos;
 
         Rope* pRope2 = sObjectIds.Find<Rope>(pLiftPoint->mRopeId2, ReliveTypes::eRope);
         Rope* pRope1 = sObjectIds.Find<Rope>(pLiftPoint->mRopeId1, ReliveTypes::eRope);
@@ -824,6 +867,11 @@ void LiftPoint::CreateFromSaveState(SerializedObjectData& pData, ResourceManager
         pLiftPoint->mBottomFloor = pState->mBottomFloor;
         pLiftPoint->mMoveToFloorLevel = pState->mMoveToFloorLevel;
         pLiftPoint->mKeepOnMiddleFloor = pState->mKeepOnMiddleFloor;
+        pLiftPoint->mIgnoreLiftMover = pState->mIgnoreLiftMover;
+        pLiftPoint->mPlatformBaseCount = pState->mPlatformBaseCount;
+        pLiftPoint->mLiftPointId = pState->mLiftPointId;
+        pLiftPoint->mLiftWheelAnim.RestoreSaveState(pState->mLiftWheelAnim);
+        pLiftPoint->mPulleyAnim.RestoreSaveState(pState->mPulleyAnim);
     }
 
     // mTlvId tracks whichever nearby floor-TLV the lift is currently

@@ -126,6 +126,7 @@ void EvilFart::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManage
     pFart->mFartExploded = pState->mFartExploded;
     pFart->mPossessedAliveTimer = pState->mPossessedAliveTimer;
     pFart->mState = pState->mState;
+    pFart->mPossessed = pState->mPossessed;
     pFart->mUnpossessionTimer = pState->mUnpossessionTimer;
     pFart->mBackToAbeTimer = pState->mBackToAbeTimer;
 }
@@ -165,7 +166,8 @@ void EvilFart::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mUnpossessionTimer = mUnpossessionTimer;
     data.mBackToAbeTimer = mBackToAbeTimer;
 
-    pSaveBuffer.Write(data);
+        data.mPossessed = mPossessed;
+pSaveBuffer.Write(data);
 }
 
 void EvilFart::InputControlFart()

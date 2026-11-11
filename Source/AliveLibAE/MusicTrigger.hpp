@@ -4,6 +4,22 @@
 #include "MusicController.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
 #include "../relive_lib/Psx.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
+
+struct MusicTriggerSaveState final : public SaveStateBase
+{
+    MusicTriggerSaveState()
+        : SaveStateBase(ReliveTypes::eMusicTrigger, sizeof(*this))
+    { }
+    Guid mTlvId;
+    bool mTriggeredByTouching;
+    bool mTriggeredByTimer;
+    s32 mCounter;
+    // What a trigger made by code (not a TLV) was made with
+    s32 mMusicType;
+    bool mSetMusicToNoneOnDtor;
+    s32 mUpdateDelay;
+};
 
 class MusicTrigger final : public BaseGameObject
 {
@@ -16,6 +32,8 @@ public:
     
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
 
 private:
     Guid mTlvId;

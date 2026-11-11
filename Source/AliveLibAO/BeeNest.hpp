@@ -47,10 +47,9 @@ public:
 
 // mBeeSwarmX/Y, mSwitchId, mSwarmSize, mTotalChaseTime and mSpeed are all
 // derived once from the TLV in the constructor and never change, so
-// reconstructing from the TLV recovers them for free - only mState is
-// meaningful runtime state. mBeeSwarm (the active chase swarm) isn't
-// restorable since BeeSwarm has no save-state of its own, so a save taken
-// mid-chase (eResetIfDead_1) restores into eWaitForTrigger_0 instead.
+// reconstructing from the TLV recovers them for free. mState and the swarm
+// that chases (a BeeSwarm has its own save state, made again with the id it
+// was saved with) are the runtime state.
 struct BeeNestSaveState final : public SaveStateBase
 {
     BeeNestSaveState()
@@ -58,6 +57,7 @@ struct BeeNestSaveState final : public SaveStateBase
     { }
     Guid mTlvInfo;
     BeeNestStates mState = BeeNestStates::eWaitForTrigger_0;
+    Guid mBeeSwarm;
 };
 
 } // namespace AO

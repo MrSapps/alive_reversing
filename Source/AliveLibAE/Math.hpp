@@ -6,6 +6,8 @@ using FP = FixedPoint;
 u32 Math_FixedPoint_Multiply(s32 op1, s32 op2);
 u32 Math_FixedPoint_Divide(s32 op1, s32 op2);
 s16 Math_RandomRange(s16 min, s16 max);
+// Math_RandomRange from a seed of the caller's own
+s16 Math_RandomRangeSeeded(s16 min, s16 max, u8& seed);
 u8 Math_NextRandom();
 
 FP Math_Cosine(u8 v);

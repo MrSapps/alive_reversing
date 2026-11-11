@@ -19,7 +19,10 @@ struct DrillSaveState final : public SaveStateBase
     Guid mDrillTlvId;
     s32 mOffTimer;
     DrillStates mState;
-    s16 mXYOff;
+    FP mXYOff;
+    // Made from the switch the moment it was loaded; false for a save without it
+    bool mToggleStartStateSaved = false;
+    bool mToggleStartState_StartOn = false;
 };
 
 class Drill final : public ::BaseAnimatedWithPhysicsGameObject
@@ -31,6 +34,7 @@ public:
     void LoadAnimations();
     virtual void VUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
     virtual void VScreenChanged() override;
     virtual void VStopAudio() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;

@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Teleporter.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
@@ -346,4 +347,30 @@ void Teleporter::VUpdate()
         }
         break;
     }
+}
+
+void Teleporter::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    TeleporterSaveState data = {};
+    data.mSwitchState = mSwitchState;
+    data.mState = static_cast<s32>(mState);
+    data.mDestroySelf = mDestroySelf;
+    data.mElectrocuteId = mElectrocuteId;
+    data.mEffectsCreated = mEffectsCreated;
+    pSaveBuffer.Write(data);
+}
+
+void Teleporter::RestoreFromSaveState(const TeleporterSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    Teleporter* p = static_cast<Teleporter*>(pObj);
+    p->mSwitchState = state.mSwitchState;
+    p->mState = static_cast<TeleporterState>(state.mState);
+    p->mDestroySelf = state.mDestroySelf;
+    p->mElectrocuteId = state.mElectrocuteId;
+    p->mEffectsCreated = state.mEffectsCreated;
 }

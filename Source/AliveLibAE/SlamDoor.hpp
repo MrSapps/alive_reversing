@@ -14,6 +14,7 @@ struct SlamDoorSaveState final : public SaveStateBase
         : SaveStateBase(ReliveTypes::eSlamDoor, sizeof(*this))
     { }
     Guid mTlvInfo;
+    AnimationSaveState mAnim;
 };
 
 class SlamDoor final : public BaseAliveGameObject

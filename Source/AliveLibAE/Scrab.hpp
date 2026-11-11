@@ -118,6 +118,8 @@ struct ScrabSaveState final : public SaveStateBase
     s16 mAbePath;
     s16 mAbeCamera;
     s16 field_84_input;
+    // The PSX button form above loses keyboard bits
+    s32 mInputRaw;
     s16 field_8C_shred_power_active;
     GameSpeakEvents field_8E_speak;
     FP field_90_max_xpos;
@@ -127,6 +129,10 @@ struct ScrabSaveState final : public SaveStateBase
     bool mForceUpdateAnimation;
     bool mRoarRandomly;
     bool mPersistant;
+    FP field_13C_last_ypos;
+    // False for a save from the original game's, which has neither
+    bool mPreviousMotionSaved;
+    s32 mPreviousMotion;
 };
 
 class Scrab;
@@ -183,6 +189,7 @@ public:
 
     void LoadAnimations();
     virtual void VUpdate() override;
+    virtual void VPostRestore() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VPossessed() override;
     virtual void VScreenChanged() override;
@@ -190,6 +197,14 @@ public:
     virtual void VOnTlvCollision(TlvIterator tlvIterator) override;
 
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+
+    virtual GameSpeakListener* VListener() override
+
+    {
+
+        return &mListener;
+
+    }
     virtual bool VOnSameYLevel(BaseAnimatedWithPhysicsGameObject* pOther) override;
     virtual void VOnTrapDoorOpen() override;
     virtual s16 VGetMotion(eMotionType motionType) override

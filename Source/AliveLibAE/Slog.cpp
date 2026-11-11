@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "Slog.hpp"
 #include "stdlib.hpp"
 #include "MusicController.hpp"
@@ -28,7 +29,7 @@
 #include "Engine.hpp"
 #include "QuikSave.hpp"
 
-s16 sSlogCount = 0;
+WorldStatic<s16> sSlogCount("AE.Slog.sSlogCount", 0);
 
 const TSlogMotionFn sSlogMotionTable[24] = {
     &Slog::Motion_0_Idle,
@@ -181,18 +182,18 @@ Slog::Slog(relive::Path_Slog* pTlv, const Guid& tlvId, ResourceManager& resMan, 
         mCurrentMotion = eSlogMotions::Motion_0_Idle;
     }
 
-    VUpdate();
+    // The first update of a new one is not part of what a restore puts back (it makes a snooze particle, say)
+    if (!mMap.mRestoringObjects)
+    {
+        VUpdate();
+    }
 }
 
-static u8 sSlogRandomIdx = 0;
+static WorldStatic<u8> sSlogRandomIdx("AE.Slog.sSlogRandomIdx", 0);
 
 void Slog::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     SlogSaveState data = {};
 
     data.mType = ReliveTypes::eSlog;
@@ -356,7 +357,6 @@ void Slog::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& r
         pSlog->mCurrentMotion = pState->mCurrentMotion2;
         pSlog->mNextMotion = pState->mNextMotion;
         pSlog->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pState->mLastLineYPos);
-        pSlog->SetRestoredFromQuickSave(true);
         pSlog->BaseAliveGameObjectCollisionLineType = pState->mCollisionLineType;
         pSlog->mTargetId = pState->mTargetId;
         pSlog->mBrainState = pState->mBrainState;
@@ -2746,33 +2746,38 @@ void Slog::Init()
     VStackOnObjectsOfType(ReliveTypes::eSlog);
 }
 
+void Slog::VPostRestore()
+{
+    if (BaseAliveGameObjectCollisionLineType == -1)
+    {
+        BaseAliveGameObjectCollisionLine = nullptr;
+    }
+    else
+    {
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+    }
+    mTargetId = BaseGameObject::RefreshId(mTargetId);
+    mListeningToSligId = BaseGameObject::RefreshId(mListeningToSligId);
+    mBoneId = BaseGameObject::RefreshId(mBoneId);
+
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
+}
+
 void Slog::VUpdate()
 {
-    if (GetRestoredFromQuickSave())
-    {
-        SetRestoredFromQuickSave(false);
-        if (BaseAliveGameObjectCollisionLineType == -1)
-        {
-            BaseAliveGameObjectCollisionLine = nullptr;
-        }
-        else
-        {
-            gCollisions->Raycast(
-                mXPos,
-                mYPos - FP_FromInteger(20),
-                mXPos,
-                mYPos + FP_FromInteger(20),
-                &BaseAliveGameObjectCollisionLine,
-                &mXPos,
-                &mYPos,
-                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
-        }
-        BaseAliveGameObjectCollisionLineType = 0;
-        mTargetId = BaseGameObject::RefreshId(mTargetId);
-        mListeningToSligId = BaseGameObject::RefreshId(mListeningToSligId);
-        mBoneId = BaseGameObject::RefreshId(mBoneId);
-    }
-
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);

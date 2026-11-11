@@ -85,6 +85,7 @@ public:
 private:
     s32 PlayNote(s32 vabIdAndProgram, s32 pitch, s32 leftVol, s32 rightVol);
     void SetChannelsPitch(s32 channelsBits, s32 vabId, s32 program, s32 note, s16 pitch);
+    s32 SfxRandom(s32 min, s32 max);
     s32 ApplyPitchVariation(const relive::SfxDefinition& sfxDef, s32 voices, s16 pitch_min, s16 pitch_max);
     // Opens the SEQ of table entry idx if it isn't, making room by closing the finished ones. False
     // if there is no room or the entry has no data
@@ -103,6 +104,8 @@ private:
     std::unique_ptr<SDLSoundSystem> mSystem;
     OpenSeqHandle* mSeqTable = nullptr;
     bool mNeedToHashSeqNames = true;
+    // The pitch variation's own random numbers, so each GameSound starts from the same one
+    u8 mSfxRandomSeed = 0;
     // The SEQ table index of each open SEQ, indexed by the number libsnd gave it. -1 for none.
     s16 mOpenSeqs[Libsnd::kMaxSeqs];
     s16 mSeqsPlayingCount = 0;

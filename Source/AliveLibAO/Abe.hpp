@@ -366,6 +366,8 @@ struct AbeSaveState final : public SaveStateBase
     s32 mGnFrame;         // field_114_gnFrame
     s32 mTimer;           // field_118_timer
     s32 mRegenHealthTimer; // field_11C_regen_health_timer
+    FP mXVelSlowBy;        // field_120_x_vel_slow_by
+    bool mSfxPlaying;      // whether the sound of the motion has been played already
     s32 mRollingMotionTimer; // field_12C_timer
     s16 mSay;                // field_130_say
     s32 mAutoSayTimer;       // field_134_auto_say_timer
@@ -613,6 +615,8 @@ public:
     ~Abe();
 
     virtual void VUpdate() override;
+    virtual void VPostRestore() override;
+    virtual void VPostRestoreFromTlv() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VScreenChanged() override;
     virtual void VOnTlvCollision(TlvIterator tlvIterator) override;

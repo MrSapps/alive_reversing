@@ -1,11 +1,25 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
+
+struct MultiSwitchControllerSaveState final : public SaveStateBase
+{
+    MultiSwitchControllerSaveState()
+        : SaveStateBase(ReliveTypes::eMultiSwitchController, sizeof(*this))
+    { }
+    s32 mLastSwitchOnTime;
+    s32 mAllSwitchesOnOrOffTime;
+    bool mIsOn;
+};
 
 class MultiSwitchController final : public BaseGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const MultiSwitchControllerSaveState& state);
+
     MultiSwitchController(relive::Path_MultiSwitchController* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~MultiSwitchController();
 

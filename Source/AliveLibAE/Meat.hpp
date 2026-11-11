@@ -39,6 +39,9 @@ struct MeatSaveState final : public SaveStateBase
     FP mPreviousXPos;
     FP mPreviousYPos;
     s32 mDeadTimer;
+    // False for a save from the original game's, which has not
+    bool mShimmerTimerSaved;
+    s32 mShimmerTimer;
 };
 
 class Meat final : public BaseThrowable
@@ -57,6 +60,7 @@ public:
     virtual s16 VGetCount() override;
     virtual bool VCanEatMe();
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    virtual void VPostRestore() override;
 
     static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 

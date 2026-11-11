@@ -1,4 +1,5 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../relive_lib/Function.hpp"
 #include "HoneySack.hpp"
 #include "Engine.hpp"
@@ -70,11 +71,15 @@ HoneySack::HoneySack(relive::Path_HoneySack* pTlv, const Guid& tlvId, ResourceMa
         mState = State::eDripHoney_0;
         mTimer = MakeTimer(90);
 
-        auto pBeeSwarm = relive_new BeeSwarm(mXPos, mYPos, FP_FromInteger(0), 5, 0, mResMan, mMap);
-        mBeeSwarm = pBeeSwarm->mBaseGameObjectId;
-        if (pBeeSwarm)
+        // A restore has its swarm from the save
+        if (!mMap.mLoadingFromSave)
         {
-            pBeeSwarm->SetSpriteScale(GetSpriteScale());
+            auto pBeeSwarm = relive_new BeeSwarm(mXPos, mYPos, FP_FromInteger(0), 5, 0, mResMan, mMap);
+            mBeeSwarm = pBeeSwarm->mBaseGameObjectId;
+            if (pBeeSwarm)
+            {
+                pBeeSwarm->SetSpriteScale(GetSpriteScale());
+            }
         }
 
         mDripTargetX = FP_FromInteger(0);
@@ -269,6 +274,38 @@ void HoneySack::VUpdate()
         default:
             return;
     }
+}
+
+void HoneySack::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    HoneySackSaveState data = {};
+    data.mState = static_cast<s32>(mState);
+    data.mHitGround = mHitGround;
+    data.mTimer = mTimer;
+    data.mBeeSwarm = mBeeSwarm;
+    data.mDripTargetX = mDripTargetX;
+    data.mDripTargetY = mDripTargetY;
+    data.mObjectYPos = mObjectYPos;
+    data.mChaseTime = mChaseTime;
+    pSaveBuffer.Write(data);
+}
+
+void HoneySack::RestoreFromSaveState(const HoneySackSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    HoneySack* p = static_cast<HoneySack*>(pObj);
+    p->mState = static_cast<State>(state.mState);
+    p->mHitGround = state.mHitGround;
+    p->mTimer = state.mTimer;
+    p->mBeeSwarm = state.mBeeSwarm;
+    p->mDripTargetX = state.mDripTargetX;
+    p->mDripTargetY = state.mDripTargetY;
+    p->mObjectYPos = state.mObjectYPos;
+    p->mChaseTime = state.mChaseTime;
 }
 
 } // namespace AO

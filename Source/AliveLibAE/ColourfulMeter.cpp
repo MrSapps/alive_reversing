@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "ColourfulMeter.hpp"
 #include "../relive_lib/SwitchStates.hpp"
 #include "Map.hpp"
@@ -164,6 +166,12 @@ static const PSX_Point sMeterBarsInfo[kMeterBarsXCount] = {
     {42, 9},
 };
 
+std::vector<BaseGameObject::NotStateMemory> ColourfulMeter::VNotStateMemory()
+{
+    // The font and its palette are resources, and the polys are what it was last drawn with
+    return {{&mFontContext, sizeof(mFontContext)}, {&mFont, sizeof(mFont)}, {&mPal, sizeof(mPal)}, {mPolyG4s, sizeof(mPolyG4s)}};
+}
+
 void ColourfulMeter::VRender(OrderingTable& ot)
 {
     const s16 screenXOff = FP_GetExponent(gScreenManager->CamXPos() + FP_FromInteger(4));
@@ -235,4 +243,36 @@ void ColourfulMeter::VRender(OrderingTable& ot)
             mTextX + textWidth,
             colourRand);
     }
+}
+
+void ColourfulMeter::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    ColourfulMeterSaveState data = {};
+    data.mPolysToRenderCount = mPolysToRenderCount;
+    data.mCount = mCount;
+    data.mMinesAlarmCountdown = mMinesAlarmCountdown;
+    data.mStartingSwitchState = mStartingSwitchState;
+    data.mBarCount = mBarCount;
+    data.mStartFilled = mStartFilled;
+    data.mTextX = mTextX;
+    data.mTextY = mTextY;
+    pSaveBuffer.Write(data);
+}
+
+void ColourfulMeter::RestoreFromSaveState(const ColourfulMeterSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    ColourfulMeter* p = static_cast<ColourfulMeter*>(pObj);
+    p->mPolysToRenderCount = state.mPolysToRenderCount;
+    p->mCount = state.mCount;
+    p->mMinesAlarmCountdown = state.mMinesAlarmCountdown;
+    p->mStartingSwitchState = state.mStartingSwitchState;
+    p->mBarCount = state.mBarCount;
+    p->mStartFilled = state.mStartFilled;
+    p->mTextX = state.mTextX;
+    p->mTextY = state.mTextY;
 }

@@ -1,4 +1,5 @@
 #include "BinaryPath.hpp"
+#include "WorldStatic.hpp"
 #include "stdafx.h"
 #include "BaseMap.hpp"
 #include "Psx.hpp"
@@ -9,6 +10,8 @@
 #include "data_conversion/relive_tlvs.hpp"
 #include "data_conversion/string_util.hpp"
 #include "Camera.hpp"
+#include "ObjectIds.hpp"
+#include "BasePath.hpp"
 #include "Sound/Midi.hpp"
 #include "GameObjects/ScreenManager.hpp"
 #include "GameObjects/Particle.hpp"
@@ -20,7 +23,7 @@
 #include "logger.hpp"
 #include <algorithm>
 
-bool gMap_bDoPurpleLightEffect = false;
+WorldStatic<bool> gMap_bDoPurpleLightEffect("gMap_bDoPurpleLightEffect", false);
 
 // Map Path_ChangeTLV::field_18_wipe to CameraSwapEffects
 const CameraSwapEffects kPathChangeEffectToInternalScreenChangeEffect[10] = {
@@ -422,6 +425,16 @@ CameraPos BaseMap::GetDirection(EReliveLevelIds level, s32 path, FP xpos, FP ypo
 void BaseMap::Create_FG1s()
 {
     Camera* pCamera = mCurrentCameras[0];
+    if (!pCamera)
+    {
+        ALIVE_FATAL("No camera at grid %d,%d of level %d path %d, the player is outside the path's cameras", mCamIdxOnX, mCamIdxOnY, static_cast<s32>(mCurrentLevel), static_cast<s32>(mCurrentPath));
+    }
+
+    // The camera's own layers have ids that come from which camera it is, so loading it again gives the same ones
+    char cameraId[64] = {};
+    snprintf(cameraId, sizeof(cameraId), "{FFFFFFFC-%X-%X-%X}", static_cast<u32>(pCamera->mLevel), static_cast<u32>(pCamera->mPath), static_cast<u32>(pCamera->mCameraNumber));
+    Guid::CreationScope idScope(Guid::FromTlvId(Guid::FromString(cameraId)));
+
     pCamera->CreateFG1(mResourceManager, *this);
 }
 
@@ -447,6 +460,48 @@ ScreenChangeResult BaseMap::ScreenChange_Common()
     SND_Stop_Channels_Mask(mSoundChannelsMask);
     mSoundChannelsMask = 0;
     return ScreenChangeResult::eDone;
+}
+
+void BaseMap::MakeMissingTlvObjects(const std::vector<Guid>& savedIds)
+{
+    for (const Guid& id : savedIds)
+    {
+        if (!id.IsFirstOfTlv() || sObjectIds.Find_Impl(id))
+        {
+            continue;
+        }
+
+        relive::Path_TLV* pFound = nullptr;
+        for (std::unique_ptr<BinaryPath>& pBinPath : GetLoadedPaths())
+        {
+            if (!pBinPath || pFound)
+            {
+                continue;
+            }
+            for (auto& cam : pBinPath->GetCameras())
+            {
+                for (auto& pTlv : cam->mTlvs.mTlvs)
+                {
+                    if (Guid::FromTlvId(pTlv->mId) == id)
+                    {
+                        pFound = pTlv.get();
+                        break;
+                    }
+                }
+                if (pFound)
+                {
+                    break;
+                }
+            }
+        }
+
+        if (pFound)
+        {
+            pFound->mTlvFlags.Set(relive::TlvFlags::eBit1_Created);
+            pFound->mTlvFlags.Set(relive::TlvFlags::eBit2_Destroyed);
+            GetPath().mFactory.ConstructTLVObject(pFound, pFound->mId, relive::Factory::LoadMode::ConstructObject_0, GetResourceManager(), *this);
+        }
+    }
 }
 
 void BaseMap::TLV_Reset(const Guid& tlvId, s16 hiFlags)

@@ -766,8 +766,19 @@ void BirdPortal::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mTlvInfo = mTlvInfo;
     data.mState = mState;
     data.mMudCountForShrykull = static_cast<u8>(numMudsForShrykull - mMudCountForShrykull);
+    data.mBase = GetBaseState();
 
     pSaveBuffer.Write(data);
+}
+
+void BirdPortal::RestoreFromSaveState(const BirdPortalSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    static_cast<BirdPortal*>(pObj)->SetBaseState(state.mBase);
 }
 
 void BirdPortal::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map)

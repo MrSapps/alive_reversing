@@ -3158,28 +3158,31 @@ void Elum::Motion_50_Knockback()
     }
 }
 
-void Elum::VUpdate()
+void Elum::VPostRestore()
 {
-    if (GetRestoredFromQuickSave())
+    if (BaseAliveGameObjectCollisionLineType != -1)
     {
-        if (BaseAliveGameObjectCollisionLineType != -1)
-        {
-            gCollisions->Raycast(
-                mXPos,
-                mYPos - FP_FromInteger(20),
-                mXPos,
-                mYPos + FP_FromInteger(20),
-                &BaseAliveGameObjectCollisionLine,
-                &mXPos,
-                &mYPos,
-                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
-
-            BaseAliveGameObjectCollisionLineType = -1;
-        }
-
-        SetRestoredFromQuickSave(false);
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
     }
 
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
+}
+
+void Elum::VUpdate()
+{
     if (gDDCheat_FlyingEnabled && sControlledCharacter == this)
     {
         VOnTrapDoorOpen();
@@ -3546,18 +3549,18 @@ Elum::Elum(const Guid& tlvInfo, ResourceManager& resMan, BaseMap& map)
 
     mCanSpeak = false;
 
-    relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eSecretAreaShort, relive::Path_MusicTrigger::TriggeredBy::eTouching, 0, 30, mResMan, mMap);
+    // A restore has its trigger from the save
+    if (!map.mRestoringObjects)
+    {
+        relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eSecretAreaShort, relive::Path_MusicTrigger::TriggeredBy::eTouching, 0, 30, mResMan, mMap);
+    }
 
     CreateShadow();
 }
 
 void Elum::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     ElumSaveState data = {};
 
     data.mXPos = mXPos;
@@ -3706,7 +3709,6 @@ void Elum::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& r
 
         // Arms the VUpdate() block above that re-raycasts the collision
         // line - see BaseAliveGameObjectCollisionLineType above.
-        pElum->SetRestoredFromQuickSave(true);
     }
 }
 

@@ -185,6 +185,9 @@ public:
     // Makes every TLV spawnable again, as when the path was freshly loaded: objects that removed
     // themselves for good (a slam door that opened) leave theirs flagged as spawned
     void ClearSpawnedFlags();
+    // The TLVs reset while their camera was loaded are made again by the next screen change
+    // Except the TLVs given
+    void ClearResetThisVisitFlags(const std::vector<const relive::Path_TLV*>& except = {});
 
     TlvIterator TlvsForCamera(s32 x, s32 y)
     {

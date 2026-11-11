@@ -33,6 +33,8 @@ struct UXBSaveState final : public SaveStateBase
     u16 mPatternIndex = 0;
     u16 mRedBlinkCount = 0;
     u16 mIsRed = 0;
+    // The blinking light
+    AnimationSaveState mFlashAnim = {};
 };
 
 class UXB final : public ::BaseAliveGameObject

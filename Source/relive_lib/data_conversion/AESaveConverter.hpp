@@ -12,9 +12,19 @@
 #include "relive_tlvs.hpp"
 
 #include "../../AliveLibAE/SlamDoor.hpp"
+#include "../relive_lib/GameObjects/Leaf.hpp"
+#include "../relive_lib/GameObjects/SnoozeParticle.hpp"
+#include "../GameObjects/InvisibleSwitch.hpp"
+#include "../../AliveLibAE/MusicTrigger.hpp"
+#include "../../AliveLibAE/SecurityOrb.hpp"
+#include "../relive_lib/GameObjects/GasEmitter.hpp"
+#include "../../AliveLibAE/HoistRocksEffect.hpp"
+#include "../../AliveLibAE/Water.hpp"
 #include "../../AliveLibAE/SligSpawner.hpp"
 #include "../../AliveLibAE/LiftMover.hpp"
 #include "../../AliveLibAE/Bone.hpp"
+#include "../relive_lib/GameObjects/Dove.hpp"
+#include "../../AliveLibAE/LCDScreen.hpp"
 #include "../../AliveLibAE/MinesAlarm.hpp"
 #include "../../AliveLibAE/CrawlingSlig.hpp"
 #include "../../AliveLibAE/Drill.hpp"
@@ -1201,7 +1211,7 @@ struct DrillSaveState final
         d.mDrillTlvId = Guid::NewGuidFromTlvInfo(data.mDrillTlvInfo + pathOffset);
         d.mOffTimer = data.mOffTimer;
         d.mState = From(data.mState);
-        d.mXYOff = data.mXYOff;
+        d.mXYOff = FP_FromInteger(data.mXYOff);
         return d;
     }
 

@@ -15,6 +15,7 @@
 #include "../../AliveLibAE/Abe.hpp"
 #include "../../relive_lib/Engine.hpp"
 #include "BaseMap.hpp"
+#include "../SerializedObjectData.hpp"
 
 Spark::Spark(FP xpos, FP ypos, FP scale, s32 count, s32 minAngle, s32 maxAngle, SparkType type, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
@@ -44,6 +45,7 @@ Spark::Spark(FP xpos, FP ypos, FP scale, s32 count, s32 minAngle, s32 maxAngle, 
     mRed = 31;
     mGreen = 31;
 
+    mSparkAllocCount = mSparkCount;
     mSparkRes = relive_new SparkRes[mSparkCount];
     if (mSparkRes)
     {
@@ -107,6 +109,69 @@ Spark::Spark(FP xpos, FP ypos, FP scale, s32 count, s32 minAngle, s32 maxAngle, 
     else
     {
         SetDead(true);
+    }
+}
+
+Spark::Spark(RestoreTag, ResourceManager& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
+{
+    SetDrawable(true);
+    SetType(ReliveTypes::eNone);
+    gObjListDrawables->Push_Back(this);
+}
+
+void Spark::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    SparkSaveState data = {};
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mSpriteScale = mSpriteScale;
+    data.mRed = mRed;
+    data.mGreen = mGreen;
+    data.mBlue = mBlue;
+    data.mLayer = static_cast<s32>(mLayer);
+    data.mSparkCount = mSparkCount;
+    data.mSparkAllocCount = mSparkAllocCount;
+    data.mTimer = mTimer;
+    data.mSparkType = static_cast<s32>(mSparkType);
+    for (s32 i = 0; i < mSparkAllocCount && i < ALIVE_COUNTOF(data.mSparks); i++)
+    {
+        data.mSparks[i].mX0 = mSparkRes[i].mX0;
+        data.mSparks[i].mY0 = mSparkRes[i].mY0;
+        data.mSparks[i].mX1 = mSparkRes[i].mX1;
+        data.mSparks[i].mY1 = mSparkRes[i].mY1;
+        data.mSparks[i].mAng = mSparkRes[i].mAng;
+        data.mSparks[i].mRadius = mSparkRes[i].mRadius;
+        data.mSparks[i].mLen = mSparkRes[i].mLen;
+    }
+    pSaveBuffer.Write(data);
+}
+
+void Spark::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const auto pState = pData.ReadTmpPtr<SparkSaveState>();
+    auto pSpark = relive_new Spark(RestoreTag{}, resMan, map);
+    pSpark->mXPos = pState->mXPos;
+    pSpark->mYPos = pState->mYPos;
+    pSpark->mSpriteScale = pState->mSpriteScale;
+    pSpark->mRed = pState->mRed;
+    pSpark->mGreen = pState->mGreen;
+    pSpark->mBlue = pState->mBlue;
+    pSpark->mLayer = static_cast<Layer>(pState->mLayer);
+    pSpark->mSparkCount = pState->mSparkCount;
+    pSpark->mSparkAllocCount = pState->mSparkAllocCount;
+    pSpark->mTimer = pState->mTimer;
+    pSpark->mSparkType = static_cast<SparkType>(pState->mSparkType);
+    pSpark->mSparkRes = relive_new SparkRes[pSpark->mSparkAllocCount];
+    for (s32 i = 0; i < pSpark->mSparkAllocCount && i < ALIVE_COUNTOF(pState->mSparks); i++)
+    {
+        pSpark->mSparkRes[i].mX0 = pState->mSparks[i].mX0;
+        pSpark->mSparkRes[i].mY0 = pState->mSparks[i].mY0;
+        pSpark->mSparkRes[i].mX1 = pState->mSparks[i].mX1;
+        pSpark->mSparkRes[i].mY1 = pState->mSparks[i].mY1;
+        pSpark->mSparkRes[i].mAng = pState->mSparks[i].mAng;
+        pSpark->mSparkRes[i].mRadius = pState->mSparks[i].mRadius;
+        pSpark->mSparkRes[i].mLen = pState->mSparks[i].mLen;
     }
 }
 

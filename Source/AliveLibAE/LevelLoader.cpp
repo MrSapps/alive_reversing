@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "LevelLoader.hpp"
 #include "../relive_lib/Function.hpp"
 #include "../relive_lib/Events.hpp"
@@ -72,4 +73,24 @@ void LevelLoader::VUpdate()
             }
         }
     }
+}
+
+void LevelLoader::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    LevelLoaderSaveState data = {};
+    data.mState = static_cast<s32>(mState);
+    data.mFadeId = mFadeId;
+    pSaveBuffer.Write(data);
+}
+
+void LevelLoader::RestoreFromSaveState(const LevelLoaderSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    LevelLoader* p = static_cast<LevelLoader*>(pObj);
+    p->mState = static_cast<States>(state.mState);
+    p->mFadeId = state.mFadeId;
 }

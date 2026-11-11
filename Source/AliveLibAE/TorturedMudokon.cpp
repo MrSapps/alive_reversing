@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "TorturedMudokon.hpp"
 #include "../relive_lib/BaseMap.hpp"
 #include "Engine.hpp"
@@ -217,4 +219,32 @@ void TorturedMudokon::VUpdate()
             pTlv->mTlvSpecificMeaning = 1;
         }
     }
+}
+
+void TorturedMudokon::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    TorturedMudokonSaveState data = {};
+    data.mTearsAnim = mTearsAnim.GetSaveState();
+    data.mZapAnim = mZapAnim.GetSaveState();
+    data.mFlashColourTimer = mFlashColourTimer;
+    data.mFlashColourCounter = mFlashColourCounter;
+    data.mState = static_cast<s32>(mState);
+    data.mPainSoundPitch = mPainSoundPitch;
+    pSaveBuffer.Write(data);
+}
+
+void TorturedMudokon::RestoreFromSaveState(const TorturedMudokonSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eTorturedMud)
+    {
+        return;
+    }
+    TorturedMudokon* p = static_cast<TorturedMudokon*>(pObj);
+    p->mTearsAnim.RestoreSaveState(state.mTearsAnim);
+    p->mZapAnim.RestoreSaveState(state.mZapAnim);
+    p->mFlashColourTimer = state.mFlashColourTimer;
+    p->mFlashColourCounter = state.mFlashColourCounter;
+    p->mState = static_cast<TorturedMudokonState>(state.mState);
+    p->mPainSoundPitch = state.mPainSoundPitch;
 }

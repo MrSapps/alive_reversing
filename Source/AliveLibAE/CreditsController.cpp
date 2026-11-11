@@ -1,10 +1,11 @@
 #include "stdafx.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "CreditsController.hpp"
 #include "stdlib.hpp"
 #include "Engine.hpp"
 #include "Map.hpp"
 
-s16 gCreditsControllerExists = false;
+WorldStatic<s16> gCreditsControllerExists("AE.CreditsController.gCreditsControllerExists", false);
 
 constexpr s32 kShowCreditScreenForTicks = 160;
 

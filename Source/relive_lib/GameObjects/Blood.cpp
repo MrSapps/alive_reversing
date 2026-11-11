@@ -10,6 +10,7 @@
 #include <algorithm>
 #include "../GameType.hpp"
 #include "BaseMap.hpp"
+#include "../SerializedObjectData.hpp"
 
 #undef min
 #undef max
@@ -168,6 +169,48 @@ void Blood::VRender(OrderingTable& ot)
 
             ot.Add(mOtLayer, pPoly);
         }
+    }
+}
+
+void Blood::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    BloodSaveState data = {};
+    data.mTotalBloodCount = mTotalBloodCount;
+    data.mScale = GetSpriteScale();
+    data.mObject = GetAnimatedState();
+    data.mBloodXPos = mBloodXPos;
+    data.mBloodYPos = mBloodYPos;
+    data.mRandSeed = mRandSeed;
+    data.mCurrentBloodCount = mCurrentBloodCount;
+    data.mUpdateCalls = mUpdateCalls;
+    data.mOtLayer = static_cast<s16>(mOtLayer);
+    for (s32 i = 0; i < mCurrentBloodCount && i < ALIVE_COUNTOF(data.mDrops); i++)
+    {
+        data.mDrops[i].mX = mBloodParticle[i].x;
+        data.mDrops[i].mY = mBloodParticle[i].y;
+        data.mDrops[i].mOffX = mBloodParticle[i].mOffX;
+        data.mDrops[i].mOffY = mBloodParticle[i].mOffY;
+    }
+    pSaveBuffer.Write(data);
+}
+
+void Blood::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const auto pState = pData.ReadTmpPtr<BloodSaveState>();
+    auto pBlood = relive_new Blood(FP_FromInteger(0), FP_FromInteger(0), FP_FromInteger(0), FP_FromInteger(0), pState->mScale, pState->mTotalBloodCount, resMan, map);
+    pBlood->SetAnimatedState(pState->mObject);
+    pBlood->mBloodXPos = pState->mBloodXPos;
+    pBlood->mBloodYPos = pState->mBloodYPos;
+    pBlood->mRandSeed = pState->mRandSeed;
+    pBlood->mCurrentBloodCount = pState->mCurrentBloodCount;
+    pBlood->mUpdateCalls = pState->mUpdateCalls;
+    pBlood->mOtLayer = static_cast<Layer>(pState->mOtLayer);
+    for (s32 i = 0; i < pBlood->mCurrentBloodCount && i < ALIVE_COUNTOF(pState->mDrops); i++)
+    {
+        pBlood->mBloodParticle[i].x = pState->mDrops[i].mX;
+        pBlood->mBloodParticle[i].y = pState->mDrops[i].mY;
+        pBlood->mBloodParticle[i].mOffX = pState->mDrops[i].mOffX;
+        pBlood->mBloodParticle[i].mOffY = pState->mDrops[i].mOffY;
     }
 }
 

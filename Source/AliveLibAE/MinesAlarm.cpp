@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "MinesAlarm.hpp"
 #include "../relive_lib/Function.hpp"
 #include "ExplosionSet.hpp"
@@ -8,8 +9,8 @@
 #include "Sfx.hpp"
 #include "QuikSave.hpp"
 
-static bool sAlarmExists = false;
-s32 gExplosionTimer = 0;
+static WorldStatic<bool> sAlarmExists("AE.MinesAlarm.sAlarmExists", false);
+WorldStatic<s32> gExplosionTimer("AE.MinesAlarm.gExplosionTimer", 0);
 
 void MinesAlarm::Create(s32 timer, ResourceManager& resMan, BaseMap& map)
 {

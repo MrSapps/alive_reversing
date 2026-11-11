@@ -1,4 +1,6 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "BellSong.hpp"
 #include "Abe.hpp"
 #include "GameSpeak.hpp"
@@ -71,6 +73,32 @@ BellSong::BellSong(relive::Path_BellsongStone::BellsongTypes type, u32 code, Res
     mCodeIdx = 0;
     mDone = false;
     SetUpdateDelay(15);
+}
+
+void BellSong::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    BellSongSaveState data = {};
+    data.mType = static_cast<s32>(mType);
+    data.mCode = mCode;
+    data.mCodeLength = mCodeLength;
+    data.mCodeIdx = mCodeIdx;
+    data.mDone = mDone;
+    pSaveBuffer.Write(data);
+}
+
+void BellSong::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const BellSongSaveState& state = *pData.ReadTmpPtr<BellSongSaveState>();
+    BellSong* p = relive_new BellSong(static_cast<relive::Path_BellsongStone::BellsongTypes>(state.mType), static_cast<u32>(state.mCode), resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mType = static_cast<relive::Path_BellsongStone::BellsongTypes>(state.mType);
+    p->mCode = state.mCode;
+    p->mCodeLength = state.mCodeLength;
+    p->mCodeIdx = state.mCodeIdx;
+    p->mDone = state.mDone;
 }
 
 } // namespace AO

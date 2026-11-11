@@ -1,0 +1,15 @@
+# A quicksave restored in the middle of a level is the world that was saved, and the game carries on from it
+# the same way: everything, the sparks, particles and gibs too, is in the hash.
+timeout 120
+start mines 1 6
+wait_until in_game
+wait_frames 600
+quicksave
+hash_mark saved
+hold right+run 60
+hash_mark later
+quickload
+expect_hash saved
+hold right+run 60
+expect_hash later
+quit

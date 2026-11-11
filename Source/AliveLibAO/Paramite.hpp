@@ -105,8 +105,7 @@ struct ParamiteSaveState final : public SaveStateBase
     bool mDeleteWhenOutOfSight = false;
     Guid mMeatId;
     Guid mParamiteWebId;
-    s32 mBrainStateIdx = 0;
-};
+    s32 mBrainStateIdx = 0;};
 
 class Paramite final : public ::BaseAliveGameObject
 {
@@ -149,6 +148,7 @@ public:
     virtual bool VOnSameYLevel(BaseAnimatedWithPhysicsGameObject* pOther) override;
     virtual void VOnTrapDoorOpen() override;
     virtual void VUpdate() override;
+    virtual void VPostRestore() override;
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
     static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
     virtual s16 VGetMotion(eMotionType motionType) override

@@ -1,5 +1,6 @@
 #include "stdafx_ao.h"
 #include "Path.hpp"
+#include "../relive_lib/ObjectIds.hpp"
 #include "Map.hpp"
 #include "../relive_lib/MapWrapper.hpp"
 #include "../relive_lib/BinaryPath.hpp"
@@ -174,16 +175,19 @@ void Path::Loader(s16 camX, s16 camY, relive::Factory::LoadMode loadMode, Relive
         auto pTlv = tlvIterator.GetTlv();
         if (typeToLoad == ReliveTypes::eNone || typeToLoad == pTlv->mTlvType)
         {
-            if (loadMode != relive::Factory::LoadMode::ConstructObject_0 || !(pTlv->mTlvFlags.Get(relive::TlvFlags::eBit1_Created) || pTlv->mTlvFlags.Get(relive::TlvFlags::eBit2_Destroyed)))
+            // Or already made by the restore, from the object it saved (its flags may say it is to be made again)
+            const bool stayGone = mMap.mLoadingFromSave
+                && (pTlv->mTlvFlags.Get(relive::TlvFlags::eBit4_ResetThisVisit) || sObjectIds.Find_Impl(Guid::FromTlvId(pTlv->mId)));
+            if (loadMode != relive::Factory::LoadMode::ConstructObject_0 || !(pTlv->mTlvFlags.Get(relive::TlvFlags::eBit1_Created) || pTlv->mTlvFlags.Get(relive::TlvFlags::eBit2_Destroyed) || stayGone))
             {
-                // Call the factory to construct the item
-                mFactory.ConstructTLVObject(pTlv, pTlv->mId, loadMode, mMap.GetResourceManager(), mMap);
-
                 if (loadMode == relive::Factory::LoadMode::ConstructObject_0)
                 {
                     pTlv->mTlvFlags.Set(relive::TlvFlags::eBit1_Created);
                     pTlv->mTlvFlags.Set(relive::TlvFlags::eBit2_Destroyed);
                 }
+
+                // Call the factory to construct the item
+                mFactory.ConstructTLVObject(pTlv, pTlv->mId, loadMode, mMap.GetResourceManager(), mMap);
             }
         }
 

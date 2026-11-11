@@ -49,7 +49,17 @@ class QuikSave final
 public:
     static void LoadActive(BaseMap& map);
     static void DoQuicksave(BaseMap& map);
+    // Puts the active quicksave through its json and back, which is how it is saved to a file and loaded from one.
+    // Empty if it came back as it went, or what differs.
+    static std::string RoundTripThroughJson();
+    // Keeps the active quicksave, and puts it back after a later one (e.g. a continue point) has replaced it
+    static void StashActive();
+    static void UnstashActive();
+    // The same for the quicksave a script's start made, which is what dying goes back to
+    static void StashStart();
+    static void UnstashStart();
     static void RestoreWorldInfo(const Quicksave_WorldInfo& rInfo);
+    static void RestoreWorldStatics(const SerializedObjectData& pData);
     static void SaveWorldInfo(Quicksave_WorldInfo* pInfo, BaseMap& map);
     static void FindSaves(FileSystem& fs);
     static void RestoreBlyData(PendingObjectRestoreData& pSaveData, ResourceManager& resMan, BaseMap& map);

@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Abe.hpp"
 #include "Bullet.hpp"
 #include "../relive_lib/Function.hpp"
@@ -404,4 +406,38 @@ void Bullet::PlayBulletSounds(s16 volume)
     SFX_Play_Pitch(relive::SoundEffects::AirStream, volume, 2000);
     SFX_Play_Pitch(relive::SoundEffects::MeatBounce, volume, Math_RandomRange(300, 700));
     SFX_Play_Pitch(relive::SoundEffects::KillEffect, volume, Math_RandomRange(900, 1400));
+}
+
+void Bullet::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    BulletSaveState data = {};
+    data.mBulletType = static_cast<s32>(mBulletType);
+    data.mBulletParentId = mBulletParent ? mBulletParent->mBaseGameObjectId : Guid{};
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mSpriteScale = mSpriteScale;
+    data.mNumberOfBullets = mNumberOfBullets;
+    data.mXDistance = mXDistance;
+    data.mBulletLevel = static_cast<s32>(mBulletLevel);
+    data.mBulletPath = mBulletPath;
+    pSaveBuffer.Write(data);
+}
+
+void Bullet::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const BulletSaveState& state = *pData.ReadTmpPtr<BulletSaveState>();
+    Bullet* p = relive_new Bullet(nullptr, BulletType::eNormalBullet_2, FP_FromInteger(0), FP_FromInteger(0), FP_FromInteger(0), FP_FromInteger(1), 0, resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mBulletType = static_cast<BulletType>(state.mBulletType);
+    p->mBulletParent = static_cast<BaseAliveGameObject*>(sObjectIds.Find_Impl(state.mBulletParentId));
+    p->mXPos = state.mXPos;
+    p->mYPos = state.mYPos;
+    p->mSpriteScale = state.mSpriteScale;
+    p->mNumberOfBullets = state.mNumberOfBullets;
+    p->mXDistance = state.mXDistance;
+    p->mBulletLevel = static_cast<EReliveLevelIds>(state.mBulletLevel);
+    p->mBulletPath = state.mBulletPath;
 }

@@ -1,4 +1,5 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "ZBall.hpp"
 #include "../AliveLibAE/stdlib.hpp"
 #include "../relive_lib/Events.hpp"
@@ -12,8 +13,8 @@
 
 namespace AO {
 
-ZBall* gCenterZBall = nullptr;
-ZBall* gOutZBall = nullptr;
+static WorldStatic<Guid> sCenterZBallId("AO.ZBall.sCenterZBallId", Guid{});
+static WorldStatic<Guid> sOutZBallId("AO.ZBall.sOutZBallId", Guid{});
 
 // TODO: Pass the whole object because this decides to read 2 points as a rect
 void Animation_OnFrame_ZBallSmacker(::BaseGameObject* pObj, u32& idx, const IndexedPoint& points, ResourceManager&, BaseMap&)
@@ -92,13 +93,13 @@ ZBall::ZBall(relive::Path_ZBall* pTlv, const Guid& tlvId, ResourceManager& resMa
         {
             case relive::Path_ZBall::StartPos::eCenter:
                 GetAnimation().SetFrame(6u);
-                gCenterZBall = this;
+                sCenterZBallId = mBaseGameObjectId;
                 mSoundPitch = -800;
                 break;
 
             case relive::Path_ZBall::StartPos::eOut:
                 GetAnimation().SetFrame(0);
-                gOutZBall = this;
+                sOutZBallId = mBaseGameObjectId;
                 mSoundPitch = -400;
                 break;
 
@@ -128,7 +129,7 @@ void ZBall::VUpdate()
         SetDead(true);
     }
 
-    if (gCenterZBall == this || gOutZBall == this)
+    if (sCenterZBallId.Get() == mBaseGameObjectId || sOutZBallId.Get() == mBaseGameObjectId)
     {
         if (GetAnimation().GetCurrentFrame() == 0 || GetAnimation().GetCurrentFrame() == 13)
         {
@@ -136,7 +137,7 @@ void ZBall::VUpdate()
         }
     }
 
-    if (gCenterZBall == this)
+    if (sCenterZBallId.Get() == mBaseGameObjectId)
     {
         if (GetAnimation().GetCurrentFrame() == 3 || GetAnimation().GetCurrentFrame() == 16)
         {
@@ -187,6 +188,7 @@ void ZBall::VGetSaveState(SerializedObjectData& pSaveBuffer)
 
     data.mTlvInfo = mTlvInfo;
     data.mFrame = GetAnimation().GetCurrentFrame();
+    data.mFrameAbove12 = mFrameAbove12;
 
     pSaveBuffer.Write(data);
 }
@@ -202,6 +204,7 @@ void ZBall::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& 
     {
         pZBall->GetAnimation().SetFrame(static_cast<u32>(pState->mFrame));
         pZBall->GetAnimation().VDecode();
+        pZBall->mFrameAbove12 = pState->mFrameAbove12;
     }
 }
 

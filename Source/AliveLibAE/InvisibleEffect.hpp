@@ -1,13 +1,36 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 #include "../relive_lib/Primitives.hpp"
 
 class BaseAliveGameObject;
 
+struct InvisibleEffectSaveState final : public SaveStateBase
+{
+    InvisibleEffectSaveState()
+        : SaveStateBase(ReliveTypes::eInvisibleEffect, sizeof(*this))
+    { }
+    s32 mState;
+    u8 mFadeSteps;
+    Guid mTargetId;
+    s32 mOldRenderMode;
+    bool mSemiTrans;
+    bool mBlending;
+    bool mIsInvisible;
+};
+
 class InvisibleEffect final : public BaseGameObject
 {
 public:
+    // For a save: nothing is looked up, the target is in the save
+    struct RestoreTag final
+    { };
+    InvisibleEffect(RestoreTag, ResourceManager& resMan, BaseMap& map);
+
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
+
     enum class InvisibleState : u16
     {
         eSetBlendMode1_0 = 0,

@@ -1,4 +1,5 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "../relive_lib/Function.hpp"
 #include "HintFly.hpp"
 #include "Math.hpp"
@@ -13,6 +14,8 @@
 #include "Path.hpp"
 #include "Map.hpp"
 #include "HintFlyData.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
+#include "../relive_lib/ObjectIds.hpp"
 
 #ifdef GetMessage
 #undef GetMessage
@@ -54,7 +57,7 @@ struct HintFlyParticle final
     Poly_FT4 mSprt;
 };
 
-u8 sHintFlyRndSeed_4C6AA4 = 37;
+WorldStatic<u8> sHintFlyRndSeed_4C6AA4("AO.HintFly.sHintFlyRndSeed_4C6AA4", 37);
 
 static u8 HintFly_NextRandom()
 {
@@ -502,6 +505,73 @@ void HintFly::VRender(OrderingTable& ot)
         pSprt->SetBlendMode(relive::TBlendModes::eBlend_1);
 
         ot.Add(Layer::eLayer_Above_FG1_39, pSprt);
+    }
+}
+
+void HintFly::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    HintFlySaveState data = {};
+    data.mTimer = mTimer;
+    data.mState = static_cast<s32>(mState);
+    data.mScreenX = mScreenX;
+    data.mScreenY = mScreenY;
+    data.mCounter = mCounter;
+    data.mMsgLength = mMsgLength;
+    data.mMsgIdx = mMsgIdx;
+    data.mHintFlyIdx = mHintFlyIdx;
+    data.mTargetCount = mTargetCount;
+    if (mMsgLength > HintFlySaveState::kMaxParticles)
+    {
+        ALIVE_FATAL("A hint fly with %d particles, a save has room for %d", mMsgLength, HintFlySaveState::kMaxParticles);
+    }
+    for (s32 i = 0; i < mMsgLength && mHintFlyParticle; i++)
+    {
+        const HintFlyParticle& particle = mHintFlyParticle[i];
+        data.mParticles[i].mXPos = particle.mXPos;
+        data.mParticles[i].mYPos = particle.mYPos;
+        data.mParticles[i].mVelX = particle.mVelX;
+        data.mParticles[i].mVelY = particle.mVelY;
+        data.mParticles[i].mTargetX = particle.mTargetX;
+        data.mParticles[i].mTargetY = particle.mTargetY;
+        data.mParticles[i].mSoundPitch = particle.mSoundPitch;
+        data.mParticles[i].mSoundPitchSpeed = particle.mSoundPitchSpeed;
+        data.mParticles[i].mState = particle.mState;
+        data.mParticles[i].mAngle = particle.mAngle;
+        data.mParticles[i].mAngleSpeed = particle.mAngleSpeed;
+    }
+    pSaveBuffer.Write(data);
+}
+
+void HintFly::RestoreFromSaveState(const HintFlySaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    HintFly* p = static_cast<HintFly*>(pObj);
+    p->mTimer = state.mTimer;
+    p->mState = static_cast<State>(state.mState);
+    p->mScreenX = state.mScreenX;
+    p->mScreenY = state.mScreenY;
+    p->mCounter = state.mCounter;
+    p->mMsgIdx = state.mMsgIdx;
+    p->mHintFlyIdx = state.mHintFlyIdx;
+    p->mTargetCount = state.mTargetCount;
+    for (s32 i = 0; i < p->mMsgLength && i < state.mMsgLength && p->mHintFlyParticle; i++)
+    {
+        HintFlyParticle& particle = p->mHintFlyParticle[i];
+        particle.mXPos = state.mParticles[i].mXPos;
+        particle.mYPos = state.mParticles[i].mYPos;
+        particle.mVelX = state.mParticles[i].mVelX;
+        particle.mVelY = state.mParticles[i].mVelY;
+        particle.mTargetX = state.mParticles[i].mTargetX;
+        particle.mTargetY = state.mParticles[i].mTargetY;
+        particle.mSoundPitch = state.mParticles[i].mSoundPitch;
+        particle.mSoundPitchSpeed = state.mParticles[i].mSoundPitchSpeed;
+        particle.mState = state.mParticles[i].mState;
+        particle.mAngle = state.mParticles[i].mAngle;
+        particle.mAngleSpeed = state.mParticles[i].mAngleSpeed;
     }
 }
 

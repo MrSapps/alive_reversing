@@ -114,15 +114,15 @@ bool Shrykull::CanElectrocute(BaseGameObject* pObj) const
     }
 }
 
+void Shrykull::VPostRestore()
+{
+    mZapTargetId = BaseGameObject::RefreshId(mZapTargetId);
+    mZapLineId = BaseGameObject::RefreshId(mZapLineId);
+
+}
+
 void Shrykull::VUpdate()
 {
-    if (GetRestoredFromQuickSave())
-    {
-        mZapTargetId = BaseGameObject::RefreshId(mZapTargetId);
-        mZapLineId = BaseGameObject::RefreshId(mZapLineId);
-        SetRestoredFromQuickSave(false);
-    }
-
     auto pExistingBeingZappedObj = static_cast<BaseAliveGameObject*>(sObjectIds.Find_Impl(mZapTargetId));
     auto pExistingZapLine = static_cast<ZapLine*>(sObjectIds.Find_Impl(mZapLineId));
 
@@ -329,11 +329,7 @@ void Shrykull::VUpdate()
 
 void Shrykull::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     ShrykullSaveState data = {};
 
     data.mXPos = mXPos;
@@ -405,7 +401,6 @@ void Shrykull::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManage
         // at this point, not live runtime ids - VUpdate() resolves them
         // via BaseGameObject::RefreshId() once every object has been
         // recreated.
-        pShrykull->SetRestoredFromQuickSave(true);
     }
 }
 

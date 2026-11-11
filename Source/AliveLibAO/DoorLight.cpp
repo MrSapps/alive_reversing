@@ -1,4 +1,5 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/WorldStatic.hpp"
 #include "../relive_lib/Function.hpp"
 #include "DoorLight.hpp"
 #include "../relive_lib/SerializedObjectData.hpp"
@@ -17,8 +18,8 @@
 
 namespace AO {
 
-static s32 sNextDoorLightUpdate = -1;
-static s32 sDoorLightUpdateTimer = 0;
+static WorldStatic<s32> sNextDoorLightUpdate("AO.DoorLight.sNextDoorLightUpdate", -1);
+static WorldStatic<s32> sDoorLightUpdateTimer("AO.DoorLight.sDoorLightUpdateTimer", 0);
 
 DoorLight::DoorLight(relive::Path_LightEffect* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)

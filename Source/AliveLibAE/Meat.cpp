@@ -82,9 +82,8 @@ void Meat::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& r
     pMeat->SetDrawable(pState->mDrawable);
     pMeat->SetInteractive(pState->mInteractive);
 
-    pMeat->SetRestoredFromQuickSave(true);
 
-    pMeat->mShimmerTimer = sGnFrame;
+    pMeat->mShimmerTimer = pState->mShimmerTimerSaved ? pState->mShimmerTimer : sGnFrame;
     pMeat->BaseAliveGameObjectCollisionLineType = pState->mLineType;
 
     pMeat->mBaseThrowableCount = pState->mThrowableCount;
@@ -94,6 +93,29 @@ void Meat::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& r
     pMeat->mPreviousYPos = pState->mPreviousYPos;
 
     pMeat->mDeadTimer = pState->mDeadTimer;
+}
+
+void Meat::VPostRestore()
+{
+    // Found again from the line type the save has, without moving the object: it is where it was saved
+    mPathLine = nullptr;
+    if (BaseAliveGameObjectCollisionLineType != -1)
+    {
+        FP hitX = {};
+        FP hitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(10),
+            mXPos,
+            mYPos + FP_FromInteger(10),
+            &mPathLine,
+            &hitX,
+            &hitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+    }
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
 }
 
 void Meat::VTimeToExplodeRandom()
@@ -439,7 +461,9 @@ void Meat::VGetSaveState(SerializedObjectData& pSaveBuffer)
 
     data.mDeadTimer = mDeadTimer;
 
-    pSaveBuffer.Write(data);
+        data.mShimmerTimerSaved = true;
+    data.mShimmerTimer = mShimmerTimer;
+pSaveBuffer.Write(data);
 }
 
 bool Meat::VCanEatMe()

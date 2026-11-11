@@ -54,6 +54,9 @@ enum TlvFlags
     eBit1_Created = 0x1,
     eBit2_Destroyed = 0x2,
     eBit3_End_TLV_List = 0x4,
+    // Reset while its camera was loaded, so the camera makes its object again at the next screen change and not
+    // before. A restored save is not a screen change: what the world did not make again stays gone.
+    eBit4_ResetThisVisit = 0x8,
 };
 
 enum class QuiksaveAttribute
@@ -212,7 +215,8 @@ struct Path_Dove final : public Path_TLV
     Path_Dove()
     {
         mTlvType = ReliveTypes::eDove;
-        mAttribute = QuiksaveAttribute::eClearTlvFlags_1;
+        // The doves are saved, so the TLV must not make them again
+        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
     }
     s16 mDoveCount = 0;
     bool mPixelPerfect = false;
@@ -1129,7 +1133,8 @@ struct Path_LCDStatusBoard final : public Path_TLV
     Path_LCDStatusBoard()
     {
         mTlvType = ReliveTypes::eLCDStatusBoard;
-        mAttribute = QuiksaveAttribute::eKeepTlvFlags_2;
+        // No state: made again from the TLV when a save is restored
+        mAttribute = QuiksaveAttribute::eClearTlvFlags_1;
     }
     // AO has no fields
     s16 mNumberOfMuds = 0;

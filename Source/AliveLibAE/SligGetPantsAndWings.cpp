@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "SligGetPantsAndWings.hpp"
 #include "../relive_lib/BaseMap.hpp"
 #include "../relive_lib/Events.hpp"
@@ -97,4 +99,24 @@ void SligGetPantsAndWings::VScreenChanged()
 SligGetPantsAndWings::~SligGetPantsAndWings()
 {
     mMap.TLV_Reset(mTlvInfo, 0);
+}
+
+void SligGetPantsAndWings::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    SligGetPantsAndWingsSaveState data = {};
+    data.mState = static_cast<s32>(mState);
+    data.mTransformTimer = mTransformTimer;
+    pSaveBuffer.Write(data);
+}
+
+void SligGetPantsAndWings::RestoreFromSaveState(const SligGetPantsAndWingsSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eSligGetPantsOrWings)
+    {
+        return;
+    }
+    SligGetPantsAndWings* p = static_cast<SligGetPantsAndWings*>(pObj);
+    p->mState = static_cast<State>(state.mState);
+    p->mTransformTimer = state.mTransformTimer;
 }

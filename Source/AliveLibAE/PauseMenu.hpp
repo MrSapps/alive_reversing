@@ -40,6 +40,7 @@ public:
     virtual ModalState VModalUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VScreenChanged() override;
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
 
     void Init();
 

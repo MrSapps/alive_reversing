@@ -1,4 +1,7 @@
 #include "stdafx.h"
+#include "../ObjectIds.hpp"
+#include "../SerializedObjectData.hpp"
+#include "../WorldStatic.hpp"
 #include "BulletShell.hpp"
 #include "Math.hpp"
 #include "../../AliveLibAE/stdlib.hpp"
@@ -9,7 +12,7 @@
 #include "../GameType.hpp"
 #include "BaseMap.hpp"
 
-static s16 sShellCount = 0;
+static WorldStatic<s16> sShellCount("BulletShell.sShellCount", 0);
 
 BulletShell::BulletShell(FP xpos, FP ypos, bool flipX, FP scale, ResourceManager& resMan, BaseMap& map)
     : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
@@ -57,9 +60,24 @@ BulletShell::BulletShell(FP xpos, FP ypos, bool flipX, FP scale, ResourceManager
 
 }
 
+BulletShell::BulletShell(RestoreTag, ResourceManager& resMan, BaseMap& map)
+    : BaseAnimatedWithPhysicsGameObject(0, resMan, map)
+{
+    SetType(ReliveTypes::eNone);
+    mLoadedAnims.push_back(mResMan.LoadAnimation(AnimId::Bullet_Shell));
+    Animation_Init(GetAnimRes(AnimId::Bullet_Shell));
+    SetApplyShadowZoneColour(false);
+}
+
 BulletShell::~BulletShell()
 {
     sShellCount--;
+}
+
+std::vector<BaseGameObject::NotStateMemory> BulletShell::VNotStateMemory()
+{
+    // The line the last raycast hit: output, it is only looked at in the update that sets it
+    return {{&mLine, sizeof(mLine)}};
 }
 
 void BulletShell::VUpdate()
@@ -128,4 +146,24 @@ void BulletShell::VUpdate()
     {
         SetDead(true);
     }
+}
+
+void BulletShell::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    BulletShellSaveState data = {};
+    data.mFloorBounceCount = mFloorBounceCount;
+    data.mSpeed = mSpeed;
+    pSaveBuffer.Write(data);
+}
+
+void BulletShell::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const BulletShellSaveState& state = *pData.ReadTmpPtr<BulletShellSaveState>();
+    BulletShell* p = relive_new BulletShell(BulletShell::RestoreTag{}, resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mFloorBounceCount = state.mFloorBounceCount;
+    p->mSpeed = state.mSpeed;
 }

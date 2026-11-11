@@ -15,6 +15,7 @@ public:
     virtual void VUpdate() override;
     virtual ModalState VModalUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
 
     struct PauseEntry final
     {

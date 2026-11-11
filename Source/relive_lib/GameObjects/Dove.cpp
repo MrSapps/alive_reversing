@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../WorldStatic.hpp"
 #include "Dove.hpp"
 #include "../Sound/Midi.hpp"
 #include "Math.hpp"
@@ -12,12 +13,13 @@
 #include "ScreenManager.hpp"
 #include "BaseAliveGameObject.hpp"
 #include "BaseMap.hpp"
+#include "../SerializedObjectData.hpp"
 
 static bool bTheOneControllingTheMusic = false;
 static DynamicArrayT<Dove> gDovesArray{10};
-static s32 sAbePortalTimer = 0;
-static s16 sAbePortalWidth = 0;
-static s16 sAbePortalDirection = 0;
+static WorldStatic<s32> sAbePortalTimer("Dove.sAbePortalTimer", 0);
+static WorldStatic<s16> sAbePortalWidth("Dove.sAbePortalWidth", 0);
+static WorldStatic<s16> sAbePortalDirection("Dove.sAbePortalDirection", 0);
 
 void Dove::LoadAnimations()
 {
@@ -204,7 +206,7 @@ void Dove::FlyAway(bool spookedInstantly)
     }
 }
 
-static bool sExtraSeqStarted = false;
+static WorldStatic<bool> sExtraSeqStarted("Dove.sExtraSeqStarted", false);
 
 void Dove::VUpdate()
 {
@@ -324,7 +326,7 @@ void Dove::VUpdate()
                 }
             }
             mAngle += 4;
-            mXPos = ((Math_Sine(mAngle) * FP_FromInteger(sAbePortalWidth)) * GetSpriteScale()) + mJoinX;
+            mXPos = ((Math_Sine(mAngle) * FP_FromInteger(static_cast<s32>(sAbePortalWidth))) * GetSpriteScale()) + mJoinX;
             mYPos = ((Math_Cosine(mAngle) * FP_FromInteger(35)) * GetSpriteScale()) + mJoinY;
             return;
 
@@ -358,6 +360,79 @@ void Dove::VUpdate()
             SetDead(true);
         }
     }
+}
+
+void Dove::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    DoveSaveState data = {};
+
+    data.mBaseTlvId = mBaseGameObjectTlvInfo;
+    data.mTlvInfo = mTlvInfo;
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mVelX = mVelX;
+    data.mVelY = mVelY;
+    data.mSpriteScale = GetSpriteScale();
+    data.mJoinX = mJoinX;
+    data.mJoinY = mJoinY;
+    data.mCurrentPath = mCurrentPath;
+    data.mCurrentLevel = mCurrentLevel;
+    data.mAnimId = static_cast<s32>(GetAnimation().mAnimRes.mId);
+    data.mAnim = GetAnimation().GetSaveState();
+    data.mKeepInGlobalArray = mKeepInGlobalArray;
+    data.mFlyAwayCounter = mFlyAwayCounter;
+    data.mDoveState = static_cast<s16>(mDoveState);
+    data.mJoinDeadTimer = mJoinDeadTimer;
+    data.mAngle = mAngle;
+    data.mAbePortalTimer = sAbePortalTimer;
+    data.mAbePortalWidth = sAbePortalWidth;
+    data.mAbePortalDirection = sAbePortalDirection;
+
+    pSaveBuffer.Write(data);
+}
+
+void Dove::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const auto pState = pData.ReadTmpPtr<DoveSaveState>();
+
+    // The constructors roll random numbers for the dove, all overwritten below. (The generator is put
+    // back once every object is made.)
+    Dove* pDove = nullptr;
+    if (pState->mKeepInGlobalArray)
+    {
+        pDove = relive_new Dove(static_cast<AnimId>(pState->mAnimId), pState->mXPos, pState->mYPos, pState->mSpriteScale, resMan, map);
+    }
+    else
+    {
+        // Made as idle on the ground, then given the animation it had
+        pDove = relive_new Dove(AnimId::Dove_Idle, pState->mTlvInfo, pState->mSpriteScale, resMan, map);
+        if (static_cast<AnimId>(pState->mAnimId) != AnimId::Dove_Idle)
+        {
+            pDove->GetAnimation().Set_Animation_Data(pDove->GetAnimRes(static_cast<AnimId>(pState->mAnimId)));
+        }
+    }
+
+    pDove->mBaseGameObjectTlvInfo = pState->mBaseTlvId;
+    pDove->mTlvInfo = pState->mTlvInfo;
+
+    pDove->mXPos = pState->mXPos;
+    pDove->mYPos = pState->mYPos;
+    pDove->mVelX = pState->mVelX;
+    pDove->mVelY = pState->mVelY;
+    pDove->mCurrentPath = pState->mCurrentPath;
+    pDove->mCurrentLevel = pState->mCurrentLevel;
+
+    pDove->GetAnimation().RestoreSaveState(pState->mAnim);
+
+    pDove->mFlyAwayCounter = pState->mFlyAwayCounter;
+    pDove->mDoveState = static_cast<State>(pState->mDoveState);
+    pDove->mJoinX = pState->mJoinX;
+    pDove->mJoinY = pState->mJoinY;
+    pDove->mJoinDeadTimer = pState->mJoinDeadTimer;
+    pDove->mAngle = pState->mAngle;
+    sAbePortalTimer = pState->mAbePortalTimer;
+    sAbePortalWidth = pState->mAbePortalWidth;
+    sAbePortalDirection = pState->mAbePortalDirection;
 }
 
 void Dove::All_FlyAway(bool spookedInstantly)

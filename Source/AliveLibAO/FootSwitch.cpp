@@ -1,4 +1,5 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "FootSwitch.hpp"
 #include "../relive_lib/SwitchStates.hpp"
 #include "../AliveLibAE/stdlib.hpp"
@@ -43,7 +44,10 @@ FootSwitch::FootSwitch(relive::Path_FootSwitch* pTlv, const Guid& tlvId, Resourc
     mXPos = FP_FromInteger(pTlv->mTopLeftX + 12);
     mYPos = FP_FromInteger(pTlv->mTopLeftY);
 
-    SwitchStates_Set(mSwitchId, 0);
+    if (!map.IsRestoring())
+    {
+        SwitchStates_Set(mSwitchId, 0);
+    }
 
     mTlvId = tlvId;
 }
@@ -138,6 +142,26 @@ void FootSwitch::VScreenChanged()
     }
 
     return nullptr;
+}
+
+void FootSwitch::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    FootSwitchSaveState data = {};
+    data.mState = static_cast<s32>(mState);
+    data.mStoodOnMeId = mStoodOnMeId;
+    pSaveBuffer.Write(data);
+}
+
+void FootSwitch::RestoreFromSaveState(const FootSwitchSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    FootSwitch* p = static_cast<FootSwitch*>(pObj);
+    p->mState = static_cast<States>(state.mState);
+    p->mStoodOnMeId = state.mStoodOnMeId;
 }
 
 } // namespace AO

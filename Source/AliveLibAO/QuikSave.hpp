@@ -6,6 +6,7 @@
 
 class BaseMap;
 class ResourceManager;
+class SerializedObjectData;
 
 namespace AO {
 
@@ -50,8 +51,15 @@ class QuikSave final
 public:
     static void DoQuicksave(BaseMap& map);
     static void LoadActive(BaseMap& map);
+    // Keeps the active quicksave, and puts it back after a later one has replaced it
+    static void StashActive();
+    static void UnstashActive();
+    static void StashStart();
+    static void UnstashStart();
     static void SaveWorldInfo(QuicksaveWorldInfoBase& pInfo, BaseMap& map);
     static void RestoreWorldInfo(const QuicksaveWorldInfoBase& pInfo);
+    // The variables outside any object are put back before the objects are made, since making them changes some
+    static void RestoreWorldStatics(const SerializedObjectData& pData);
 
     // Deferred restore consumed by GoTo_Camera() via BaseMap::mPendingSaveRestore.
     // Restores per-object state (currently just Abe - see the Quicksave

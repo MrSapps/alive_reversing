@@ -1,4 +1,6 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "../relive_lib/Function.hpp"
 #include "FlintLockFire.hpp"
 #include "../AliveLibAE/stdlib.hpp"
@@ -318,6 +320,30 @@ void FlintLockFire::VRender(OrderingTable& ot)
 
         }
     }
+}
+
+void FlintLockFire::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    FlintLockFireSaveState data = {};
+    data.mState = static_cast<s32>(mState);
+    data.mGourdAnim = mGourdAnim.GetSaveState();
+    data.mFire1Anim = mFire1Anim.GetSaveState();
+    data.mFire2Anim = mFire2Anim.GetSaveState();
+    pSaveBuffer.Write(data);
+}
+
+void FlintLockFire::RestoreFromSaveState(const FlintLockFireSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj)
+    {
+        return;
+    }
+    FlintLockFire* p = static_cast<FlintLockFire*>(pObj);
+    p->mState = static_cast<States>(state.mState);
+    p->mGourdAnim.RestoreSaveState(state.mGourdAnim);
+    p->mFire1Anim.RestoreSaveState(state.mFire1Anim);
+    p->mFire2Anim.RestoreSaveState(state.mFire2Anim);
 }
 
 } // namespace AO

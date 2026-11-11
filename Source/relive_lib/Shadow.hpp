@@ -5,10 +5,13 @@
 enum class Scale : s16;
 class BaseMap;
 
+class BaseGameObject;
+
 class Shadow final
 {
 public:
-    Shadow(ResourceManager& resMan, BaseMap& map);
+    // owner: whose shadow it is (the animation list is put back in the order of a save by who owns what)
+    Shadow(ResourceManager& resMan, BaseMap& map, BaseGameObject* owner);
     ~Shadow();
 
     // ownerLayer is the layer the owner was drawn on, just before its shadow

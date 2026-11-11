@@ -1,20 +1,48 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 
 namespace relive
 {
     struct Path_FallingItem;
 }
 
+struct FallingItemSaveState final : public SaveStateBase
+{
+    FallingItemSaveState()
+        : SaveStateBase(ReliveTypes::eFallingItem, sizeof(*this))
+    { }
+    AnimatedObjectSaveState mObject;
+    FP mHealth;
+    s32 mState;
+    s16 mSwitchId;
+    s16 mFallInterval;
+    s16 mMaxFallingItems;
+    s16 mRemainingFallingItems;
+    bool mResetSwitchIdAfterUse;
+    FP mTlvXPos;
+    FP mTlvYPos;
+    FP mStartYPos;
+    s32 mFallIntervalTimer;
+    bool mDoAirStreamSound;
+    bool mHitDrillOrMineCar;
+    s32 mAirStreamSndChannels;
+    s32 mCreatedGnFrame;
+};
+
 class FallingItem final : public BaseAliveGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const FallingItemSaveState& state);
+
     FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     FallingItem(s32 xpos, s32 ypos, s32 scale, s32 id, s32 fallInterval, s32 numItems, s32 bResetIdAfterUse, ResourceManager& resMan, BaseMap& map);
     ~FallingItem();
 
     void LoadAnimations();
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;
     virtual void VOnThrowableHit(BaseGameObject*) override

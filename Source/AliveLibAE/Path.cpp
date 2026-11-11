@@ -4,6 +4,7 @@
 #include "../relive_lib/BinaryPath.hpp"
 #include <assert.h>
 #include "Path.hpp"
+#include "../relive_lib/ObjectIds.hpp"
 #include "Factory.hpp"
 #include "MapWrapper.hpp"
 
@@ -168,7 +169,10 @@ void Path::Loader(s16 xpos, s16 ypos, relive::Factory::LoadMode loadMode, Relive
         auto pPathTLV = tlvIterator.GetTlv();
         if (typeToLoad == ReliveTypes::eNone || typeToLoad == pPathTLV->mTlvType)
         {
-            if (loadMode != relive::Factory::LoadMode::ConstructObject_0 || !(pPathTLV->mTlvFlags.Get(relive::TlvFlags::eBit1_Created) || pPathTLV->mTlvFlags.Get(relive::TlvFlags::eBit2_Destroyed)))
+            // Or already made by the restore, from the object it saved (its flags may say it is to be made again)
+            const bool stayGone = mMap.mLoadingFromSave
+                && (pPathTLV->mTlvFlags.Get(relive::TlvFlags::eBit4_ResetThisVisit) || sObjectIds.Find_Impl(Guid::FromTlvId(pPathTLV->mId)));
+            if (loadMode != relive::Factory::LoadMode::ConstructObject_0 || !(pPathTLV->mTlvFlags.Get(relive::TlvFlags::eBit1_Created) || pPathTLV->mTlvFlags.Get(relive::TlvFlags::eBit2_Destroyed) || stayGone))
             {
                 if (loadMode == relive::Factory::LoadMode::ConstructObject_0)
                 {

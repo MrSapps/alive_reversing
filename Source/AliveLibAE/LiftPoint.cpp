@@ -507,23 +507,7 @@ void LiftPoint::VUpdate()
         MoveObjectsOnLift(mVelX);
     }
 
-    Rope* pRope2 = sObjectIds.Find<Rope>(mRopeId2, ReliveTypes::eRope);
-    pRope2->mBottom = FP_GetExponent((FP_FromInteger(mPlatformBaseCollisionLine->mRect.y) + (FP_FromInteger(25) * GetSpriteScale())));
-
-    Rope* pRope1 = sObjectIds.Find<Rope>(mRopeId1, ReliveTypes::eRope);
-    pRope1->mBottom = FP_GetExponent((FP_FromInteger(mPlatformBaseCollisionLine->mRect.y) + (FP_FromInteger(25) * GetSpriteScale())));
-
-    if (mHasPulley)
-    {
-        pRope2->mTop = FP_GetExponent((FP_FromInteger(mPulleyYPos) + (FP_FromInteger(-19) * GetSpriteScale())));
-        pRope1->mTop = FP_GetExponent((FP_FromInteger(mPulleyYPos) + (FP_FromInteger(-19) * GetSpriteScale())));
-    }
-
-    const FP new_ypos = mYPos * FP_FromDouble(1.5);
-    const FP remaining_rope = FP_FromRaw(FP_GetExponent(new_ypos * GetSpriteScale()) % FP_FromInteger(pRope2->mRopeLength).fpValue);
-
-    pRope2->mYPos = FP_NoFractional((mYPos + remaining_rope) + (FP_FromInteger(25) * GetSpriteScale() + FP_FromInteger(pRope2->mRopeLength)));
-    pRope1->mYPos = FP_NoFractional((mYPos + FP_FromInteger(25) * GetSpriteScale()) + (FP_FromInteger(pRope1->mRopeLength) - remaining_rope));
+    SyncRopes();
 
     mLiftWheelAnim.SetAnimate(true);
     mPulleyAnim.SetAnimate(true);
@@ -710,6 +694,12 @@ void LiftPoint::MoveObjectsOnLift(FP xVelocity)
     }
 }
 
+std::vector<BaseGameObject::NotStateMemory> LiftPoint::VNotStateMemory()
+{
+    // An animation the lift never starts has the number of its resource, made when the object was
+    return {{&mLiftWheelAnim.mAnimRes, sizeof(mLiftWheelAnim.mAnimRes)}, {&mPulleyAnim.mAnimRes, sizeof(mPulleyAnim.mAnimRes)}};
+}
+
 void LiftPoint::VScreenChanged()
 {
     if (mMap.LevelChanged() || mMap.PathChanged())
@@ -834,6 +824,27 @@ LiftPoint::~LiftPoint()
 }
 
 
+void LiftPoint::SyncRopes()
+{
+    Rope* pRope2 = sObjectIds.Find<Rope>(mRopeId2, ReliveTypes::eRope);
+    pRope2->mBottom = FP_GetExponent((FP_FromInteger(mPlatformBaseCollisionLine->mRect.y) + (FP_FromInteger(25) * GetSpriteScale())));
+
+    Rope* pRope1 = sObjectIds.Find<Rope>(mRopeId1, ReliveTypes::eRope);
+    pRope1->mBottom = FP_GetExponent((FP_FromInteger(mPlatformBaseCollisionLine->mRect.y) + (FP_FromInteger(25) * GetSpriteScale())));
+
+    if (mHasPulley)
+    {
+        pRope2->mTop = FP_GetExponent((FP_FromInteger(mPulleyYPos) + (FP_FromInteger(-19) * GetSpriteScale())));
+        pRope1->mTop = FP_GetExponent((FP_FromInteger(mPulleyYPos) + (FP_FromInteger(-19) * GetSpriteScale())));
+    }
+
+    const FP new_ypos = mYPos * FP_FromDouble(1.5);
+    const FP remaining_rope = FP_FromRaw(FP_GetExponent(new_ypos * GetSpriteScale()) % FP_FromInteger(pRope2->mRopeLength).fpValue);
+
+    pRope2->mYPos = FP_NoFractional((mYPos + remaining_rope) + (FP_FromInteger(25) * GetSpriteScale() + FP_FromInteger(pRope2->mRopeLength)));
+    pRope1->mYPos = FP_NoFractional((mYPos + FP_FromInteger(25) * GetSpriteScale()) + (FP_FromInteger(pRope1->mRopeLength) - remaining_rope));
+}
+
 void LiftPoint::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
     LiftPointSaveState data = {};
@@ -852,6 +863,16 @@ void LiftPoint::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mBottomFloor = mBottomFloor;
     data.mMoveToFloorLevel = mMoveToFloorLevel;
     data.mKeepOnMiddleFloor = mKeepOnMiddleFloor;
+    data.mPlatformBaseSaved = true;
+    data.mPlatformBaseXOffset = mPlatformBaseXOffset;
+    data.mPlatformBaseWidthOffset = mPlatformBaseWidthOffset;
+    data.mPlatformBaseYOffset = mPlatformBaseYOffset;
+    data.mPlatformBaseHeightOffset = mPlatformBaseHeightOffset;
+    data.mPlatformBaseCount = mPlatformBaseCount;
+
+    data.mAnim = GetAnimation().GetSaveState();
+    data.mLiftWheelAnim = mLiftWheelAnim.GetSaveState();
+    data.mPulleyAnim = mPulleyAnim.GetSaveState();
 
     pSaveBuffer.Write(data);
 }
@@ -867,19 +888,18 @@ void LiftPoint::CreateFromSaveState(SerializedObjectData& pData, ResourceManager
     {
         pLiftPoint->mXPos = pState->mXPos;
         pLiftPoint->mYPos = pState->mYPos;
+        // The line and the ropes are put where the offsets it was saved with place them
+        if (pState->mPlatformBaseSaved)
+        {
+            pLiftPoint->mPlatformBaseXOffset = pState->mPlatformBaseXOffset;
+            pLiftPoint->mPlatformBaseWidthOffset = pState->mPlatformBaseWidthOffset;
+            pLiftPoint->mPlatformBaseYOffset = pState->mPlatformBaseYOffset;
+            pLiftPoint->mPlatformBaseHeightOffset = pState->mPlatformBaseHeightOffset;
+            pLiftPoint->mPlatformBaseCount = pState->mPlatformBaseCount;
+        }
         pLiftPoint->SyncCollisionLinePosition();
 
-        Rope* pRope2 = sObjectIds.Find<Rope>(pLiftPoint->mRopeId2, ReliveTypes::eRope);
-        Rope* pRope1 = sObjectIds.Find<Rope>(pLiftPoint->mRopeId1, ReliveTypes::eRope);
-
-        pRope2->mBottom = FP_GetExponent(FP_FromInteger(pLiftPoint->mPlatformBaseCollisionLine->mRect.y) + (FP_FromInteger(25) * pLiftPoint->GetSpriteScale()));
-        pRope1->mBottom = FP_GetExponent(FP_FromInteger(pLiftPoint->mPlatformBaseCollisionLine->mRect.y) + (FP_FromInteger(25) * pLiftPoint->GetSpriteScale()));
-
-        if (pLiftPoint->mHasPulley)
-        {
-            pRope2->mTop = FP_GetExponent(FP_FromInteger(pLiftPoint->mPulleyYPos) + FP_FromInteger(-19) * pLiftPoint->GetSpriteScale());
-            pRope1->mTop = FP_GetExponent(FP_FromInteger(pLiftPoint->mPulleyYPos) + FP_FromInteger(-19) * pLiftPoint->GetSpriteScale());
-        }
+        pLiftPoint->SyncRopes();
 
         pLiftPoint->mPlatformBaseTlvInfo = pState->mPlatformId;
         pLiftPoint->mTlvId = pState->mTlvId;
@@ -892,6 +912,10 @@ void LiftPoint::CreateFromSaveState(SerializedObjectData& pData, ResourceManager
         pLiftPoint->mBottomFloor = pState->mBottomFloor;
         pLiftPoint->mMoveToFloorLevel = pState->mMoveToFloorLevel;
         pLiftPoint->mKeepOnMiddleFloor = pState->mKeepOnMiddleFloor;
+
+        pLiftPoint->GetAnimation().RestoreSaveState(pState->mAnim);
+        pLiftPoint->mLiftWheelAnim.RestoreSaveState(pState->mLiftWheelAnim);
+        pLiftPoint->mPulleyAnim.RestoreSaveState(pState->mPulleyAnim);
     }
 
     if (pState->mTlvId == pState->mPlatformId)

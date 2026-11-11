@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseGameObject.hpp"
+#include "../relive_lib/WorldStatic.hpp"
 #include "../relive_lib/SaveStateBase.hpp"
 
 struct MinesAlarmSaveState final : public SaveStateBase
@@ -24,4 +25,4 @@ public:
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
 };
 
-extern s32 gExplosionTimer;
+extern WorldStatic<s32> gExplosionTimer;

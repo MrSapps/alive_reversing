@@ -46,6 +46,13 @@ PauseMenu::~PauseMenu()
     gObjListDrawables->Remove_Item(this);
 }
 
+std::vector<BaseGameObject::NotStateMemory> PauseMenu::VNotStateMemory()
+{
+    // The font and its palette are resources: ids given out in the order things loaded, which isn't the same
+    // from one start of the game to the next
+    return {{&mFontContext, sizeof(mFontContext)}, {&field_E4_font, sizeof(field_E4_font)}, {&mPal, sizeof(mPal)}};
+}
+
 void PauseMenu::VScreenChanged()
 {
     if (mMap.mNextLevel == EReliveLevelIds::eCredits)

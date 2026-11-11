@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseGameObject.hpp"
+#include "../relive_lib/WorldStatic.hpp"
 
 namespace relive
 {
@@ -22,6 +23,6 @@ public:
     s16 mCurrentCamera = 0;
 };
 
-extern s16 gCreditsControllerExists;
+extern WorldStatic<s16> gCreditsControllerExists;
 
 } // namespace AO

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BaseGameObject.hpp"
+#include "../SaveStateBase.hpp"
 #include "../FixedPoint.hpp"
 
 namespace relive
@@ -8,9 +9,20 @@ namespace relive
     struct Path_ZzzSpawner;
 }
 
+struct ZzzSpawnerSaveState final : public SaveStateBase
+{
+    ZzzSpawnerSaveState()
+        : SaveStateBase(ReliveTypes::eZzzSpawner, sizeof(*this))
+    { }
+    s32 mTimer;
+};
+
 class ZzzSpawner final : public BaseGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const ZzzSpawnerSaveState& state);
+
     ZzzSpawner(relive::Path_ZzzSpawner* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~ZzzSpawner();
 

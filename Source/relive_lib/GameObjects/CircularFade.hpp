@@ -1,16 +1,33 @@
 #pragma once
 
 #include "BaseAnimatedWithPhysicsGameObject.hpp"
+#include "../SaveStateBase.hpp"
+
+struct CircularFadeSaveState final : public SaveStateBase
+{
+    CircularFadeSaveState()
+        : SaveStateBase(ReliveTypes::eCircularFade, sizeof(*this))
+    { }
+    bool mFadeIn;
+    bool mDone;
+    bool mDestroyOnDone;
+    s16 mFadeColour;
+    s16 mSpeed;
+};
 
 class CircularFade final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map);
+
     CircularFade(FP xpos, FP ypos, FP scale, bool fadeIn, s8 destroyOnDone, ResourceManager& resMan, BaseMap& map);
     ~CircularFade();
 
     virtual void VScreenChanged() override;
     virtual void VUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
+    virtual std::vector<NotStateMemory> VNotStateMemory() override;
 
     // New virtuals
     virtual void VFadeIn(bool fadeIn, s8 destroyOnDone);

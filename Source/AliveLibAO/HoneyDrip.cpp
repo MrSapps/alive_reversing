@@ -1,4 +1,6 @@
 #include "stdafx_ao.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "HoneyDrip.hpp"
 #include "Sfx.hpp"
 #include "../AliveLibAE/stdlib.hpp"
@@ -35,6 +37,24 @@ void HoneyDrip::VUpdate()
     {
         SetDead(true);
     }
+}
+
+void HoneyDrip::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    HoneyDripSaveState data = {};
+    data.mSoundPlaying = mSoundPlaying;
+    pSaveBuffer.Write(data);
+}
+
+void HoneyDrip::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const HoneyDripSaveState& state = *pData.ReadTmpPtr<HoneyDripSaveState>();
+    HoneyDrip* p = relive_new HoneyDrip(FP_FromInteger(0), FP_FromInteger(0), resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mSoundPlaying = state.mSoundPlaying;
 }
 
 } // namespace AO

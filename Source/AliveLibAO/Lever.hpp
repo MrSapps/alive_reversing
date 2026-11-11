@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
 
 namespace AO {
@@ -12,9 +13,21 @@ enum class LeverState : s16
     eFinished_2 = 2
 };
 
+struct LeverSaveState final : public SaveStateBase
+{
+    LeverSaveState()
+        : SaveStateBase(ReliveTypes::eLever, sizeof(*this))
+    { }
+    s32 mState;
+    bool mPulledFromLeft;
+};
+
 class Lever final : public BaseAnimatedWithPhysicsGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const LeverSaveState& state);
+
     Lever(relive::Path_Lever* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~Lever();
 

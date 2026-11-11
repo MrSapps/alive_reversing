@@ -6,6 +6,7 @@
 #include "../relive_lib/Events.hpp"
 #include "Abe.hpp"
 #include "Engine.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 
 MusicTrigger::MusicTrigger(relive::Path_MusicTrigger* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
@@ -136,4 +137,39 @@ void MusicTrigger::VUpdate()
         mTriggeredByTimer = true;
         mCounter += sGnFrame;
     }
+}
+
+void MusicTrigger::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    MusicTriggerSaveState data = {};
+    data.mTlvId = mTlvId;
+    data.mTriggeredByTouching = mTriggeredByTouching;
+    data.mTriggeredByTimer = mTriggeredByTimer;
+    data.mCounter = mCounter;
+    data.mMusicType = static_cast<s32>(mMusicType);
+    data.mSetMusicToNoneOnDtor = mSetMusicToNoneOnDtor;
+    data.mUpdateDelay = UpdateDelay();
+    pSaveBuffer.Write(data);
+}
+
+void MusicTrigger::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const auto pState = pData.ReadTmpPtr<MusicTriggerSaveState>();
+    MusicTrigger* pTrigger = nullptr;
+    if (pState->mTlvId.IsValid())
+    {
+        auto pTlv = static_cast<relive::Path_MusicTrigger*>(map.TLV_From_Offset_Lvl_Cam(pState->mTlvId).GetTlv());
+        pTrigger = relive_new MusicTrigger(pTlv, pState->mTlvId, resMan, map);
+    }
+    else
+    {
+        // Made by code (Abe, a door, a mudokon): everything it was made with is in the state
+        pTrigger = relive_new MusicTrigger(relive::Path_MusicTrigger::MusicTriggerMusicType::eChime, relive::Path_MusicTrigger::TriggeredBy::eTimer, 0, resMan, map);
+    }
+    pTrigger->mMusicType = static_cast<MusicController::MusicTypes>(pState->mMusicType);
+    pTrigger->mSetMusicToNoneOnDtor = pState->mSetMusicToNoneOnDtor;
+    pTrigger->SetUpdateDelay(pState->mUpdateDelay);
+    pTrigger->mTriggeredByTouching = pState->mTriggeredByTouching;
+    pTrigger->mTriggeredByTimer = pState->mTriggeredByTimer;
+    pTrigger->mCounter = pState->mCounter;
 }

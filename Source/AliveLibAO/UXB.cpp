@@ -502,6 +502,7 @@ void UXB::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mPatternIndex = mPatternIndex;
     data.mRedBlinkCount = mRedBlinkCount;
     data.mIsRed = mIsRed;
+    data.mFlashAnim = mFlashAnim.GetSaveState();
 
     pSaveBuffer.Write(data);
 }
@@ -528,6 +529,16 @@ void UXB::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& re
         pUXB->mPatternIndex = pState->mPatternIndex;
         pUXB->mRedBlinkCount = pState->mRedBlinkCount;
         pUXB->mIsRed = pState->mIsRed ? 1 : 0;
+        if (pState->mFlashAnim.mValid)
+        {
+            // It is the red and green blink, or the flash that comes with the bang
+            const AnimId flashId = static_cast<AnimId>(pState->mFlashAnim.mAnimId);
+            if (pUXB->mFlashAnim.mAnimRes.mId != flashId)
+            {
+                pUXB->mFlashAnim.Set_Animation_Data(pUXB->GetAnimRes(flashId));
+            }
+            pUXB->mFlashAnim.RestoreSaveState(pState->mFlashAnim);
+        }
     }
 }
 

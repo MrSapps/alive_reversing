@@ -614,6 +614,7 @@ void Abe::CreateFromSaveState(const AbeSaveState& pData, ResourceManager& resMan
     {
         gAbe->GetAnimation().SetIsLastFrame(true);
     }
+    gAbe->GetAnimation().RestoreSaveState(pData.mAnim);
 
     // TODO: Pal re-loading
     /*
@@ -629,6 +630,7 @@ void Abe::CreateFromSaveState(const AbeSaveState& pData, ResourceManager& resMan
     gAbe->mHealth = pData.mHealth;
     gAbe->mCurrentMotion = pData.mCurrentMotion2;
     gAbe->mNextMotion = pData.mNextMotion;
+    gAbe->mPreviousMotion = pData.mPreviousMotion;
     gAbe->BaseAliveGameObjectLastLineYPos = FP_FromInteger(pData.mLastLineYPos);
     gAbe->BaseAliveGameObject_PlatformId = pData.mPlatformId;
     gAbe->field_120_state.raw = static_cast<u16>(pData.field_50_state);
@@ -661,6 +663,10 @@ void Abe::CreateFromSaveState(const AbeSaveState& pData, ResourceManager& resMan
 
     gAbe->mPrevInput = InputObject::PsxButtonsToKeyboardInput(pData.mPrevInput);
     gAbe->mReleasedButtons = InputObject::PsxButtonsToKeyboardInput(pData.mReleasedButtons);
+    gAbe->mPrevInput = pData.mPrevInputRaw;
+    gAbe->mReleasedButtons = pData.mReleasedButtonsRaw;
+    gAbe->mDoQuicksave = pData.mDoQuicksave;
+    gAbe->mSaveFileId = pData.mSaveFileId;
     gAbe->mKnockdownMotion = pData.mKnockdownMotion;
     gAbe->mRollingMotionTimer = sGnFrame - pData.mRollingMotionTimer;
 
@@ -798,54 +804,80 @@ void Abe::HandleDDCheat()
     SetActiveCameraDelayedFromDir();
 }
 
+void Abe::VPostRestore()
+{
+    if (BaseAliveGameObjectCollisionLineType != -1)
+    {
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+    }
+
+    BaseAliveGameObject_PlatformId = BaseGameObject::RefreshId(BaseAliveGameObject_PlatformId);
+    mFadeId = BaseGameObject::RefreshId(mFadeId);
+    mCircularFadeId = BaseGameObject::RefreshId(mCircularFadeId);
+    mBirdPortalId = BaseGameObject::RefreshId(mBirdPortalId);
+    mOrbWhirlWindId = BaseGameObject::RefreshId(mOrbWhirlWindId);
+    mPossessedObjectId = BaseGameObject::RefreshId(mPossessedObjectId);
+    mThrowableId = BaseGameObject::RefreshId(mThrowableId);
+    mPullRingRopeId = BaseGameObject::RefreshId(mPullRingRopeId);
+    mSlappableOrPickupId = BaseGameObject::RefreshId(mSlappableOrPickupId);
+    mWorkWheelId = BaseGameObject::RefreshId(mWorkWheelId);
+
+    if (GetInvisible())
+    {
+        if (!mInvisibilityTimer)
+        {
+            mInvisibilityTimer = MakeTimer(2);
+        }
+
+        auto pInvisibleEffect = relive_new InvisibleEffect(this, mResMan, mMap);
+        mInvisibleEffectId = pInvisibleEffect->mBaseGameObjectId;
+        pInvisibleEffect->InstantInvisibility();
+    }
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game). The line of a platform
+    // (a lift) is looked for again once the camera has made the platform
+    if (BaseAliveGameObjectCollisionLine || !BaseAliveGameObject_PlatformId.IsValid())
+    {
+        BaseAliveGameObjectCollisionLineType = 0;
+    }
+}
+
+void Abe::VPostRestoreFromTlv()
+{
+    if (BaseAliveGameObjectCollisionLineType != 0 && BaseAliveGameObjectCollisionLineType != -1 && !BaseAliveGameObjectCollisionLine)
+    {
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
+    }
+    BaseAliveGameObjectCollisionLineType = 0;
+}
+
 void Abe::VUpdate()
 {
     if (gAbeInvincible)
     {
         SetElectrocuted(false);
         mHealth = FP_FromDouble(1.0);
-    }
-
-    if (GetRestoredFromQuickSave())
-    {
-        SetRestoredFromQuickSave(false);
-        if (BaseAliveGameObjectCollisionLineType != -1)
-        {
-            gCollisions->Raycast(
-                mXPos,
-                mYPos - FP_FromInteger(20),
-                mXPos,
-                mYPos + FP_FromInteger(20),
-                &BaseAliveGameObjectCollisionLine,
-                &mXPos,
-                &mYPos,
-                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
-
-            BaseAliveGameObjectCollisionLineType = -1;
-        }
-
-        BaseAliveGameObject_PlatformId = BaseGameObject::RefreshId(BaseAliveGameObject_PlatformId);
-        mFadeId = BaseGameObject::RefreshId(mFadeId);
-        mCircularFadeId = BaseGameObject::RefreshId(mCircularFadeId);
-        mBirdPortalId = BaseGameObject::RefreshId(mBirdPortalId);
-        mOrbWhirlWindId = BaseGameObject::RefreshId(mOrbWhirlWindId);
-        mPossessedObjectId = BaseGameObject::RefreshId(mPossessedObjectId);
-        mThrowableId = BaseGameObject::RefreshId(mThrowableId);
-        mPullRingRopeId = BaseGameObject::RefreshId(mPullRingRopeId);
-        mSlappableOrPickupId = BaseGameObject::RefreshId(mSlappableOrPickupId);
-        mWorkWheelId = BaseGameObject::RefreshId(mWorkWheelId);
-
-        if (GetInvisible())
-        {
-            if (!mInvisibilityTimer)
-            {
-                mInvisibilityTimer = MakeTimer(2);
-            }
-
-            auto pInvisibleEffect = relive_new InvisibleEffect(this, mResMan, mMap);
-            mInvisibleEffectId = pInvisibleEffect->mBaseGameObjectId;
-            pInvisibleEffect->InstantInvisibility();
-        }
     }
 
     if (gAbeInvincible)
@@ -891,7 +923,7 @@ void Abe::VUpdate()
         const FP oldYPos = mYPos;
         InvokeMemberFunction(this, sAbeMotionMachineTable_554910, motion_idx);
 
-        if (GetRestoredFromQuickSave() || mShrivel)
+        if (mShrivel)
         {
             return;
         }
@@ -1313,7 +1345,7 @@ void Abe::VScreenChanged()
         }
     }
 
-    if (mMap.LevelChanged() && !(GetRestoredFromQuickSave()))
+    if (mMap.LevelChanged())
     {
         for (s8& val : gSavedKilledMudsPerZulag.mData)
         {
@@ -1332,6 +1364,7 @@ void Abe::VGetSaveState(SerializedObjectData& pSaveBuffer)
 void Abe::GetSaveState(AbeSaveState& pSaveState)
 {
     pSaveState.mType = ReliveTypes::eAbe;
+    pSaveState.mAnim = GetAnimation().GetSaveState();
     pSaveState.mXPos = mXPos;
     pSaveState.mYPos = mYPos;
     pSaveState.mVelX = mVelX;
@@ -1385,6 +1418,7 @@ void Abe::GetSaveState(AbeSaveState& pSaveState)
     pSaveState.mHealth = mHealth;
     pSaveState.mCurrentMotion2 = mCurrentMotion;
     pSaveState.mNextMotion = mNextMotion;
+    pSaveState.mPreviousMotion = mPreviousMotion;
     pSaveState.mLastLineYPos = FP_GetExponent(BaseAliveGameObjectLastLineYPos);
 
     pSaveState.mIsElectrocuted = GetElectrocuted();
@@ -1426,6 +1460,10 @@ void Abe::GetSaveState(AbeSaveState& pSaveState)
 
     pSaveState.mPrevInput = InputObject::KeyboardInputToPsxButtons_45EF70(mPrevInput);
     pSaveState.mReleasedButtons = InputObject::KeyboardInputToPsxButtons_45EF70(mReleasedButtons);
+    pSaveState.mPrevInputRaw = mPrevInput;
+    pSaveState.mReleasedButtonsRaw = mReleasedButtons;
+    pSaveState.mDoQuicksave = mDoQuicksave;
+    pSaveState.mSaveFileId = mSaveFileId;
 
     pSaveState.mKnockdownMotion = mKnockdownMotion;
     pSaveState.mRollingMotionTimer = sGnFrame - mRollingMotionTimer;

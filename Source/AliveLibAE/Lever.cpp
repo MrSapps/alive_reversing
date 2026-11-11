@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Lever.hpp"
 #include "../relive_lib/Collisions.hpp"
 #include "stdlib.hpp"
@@ -287,4 +289,24 @@ s16 Lever::VPull(s16 bLeftDirection)
     }
 
     return 1;
+}
+
+void Lever::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    LeverSaveState data = {};
+    data.mState = static_cast<s32>(mState);
+    data.mPulledFromLeft = mPulledFromLeft;
+    pSaveBuffer.Write(data);
+}
+
+void Lever::RestoreFromSaveState(const LeverSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eLever)
+    {
+        return;
+    }
+    Lever* p = static_cast<Lever*>(pObj);
+    p->mState = static_cast<LeverState>(state.mState);
+    p->mPulledFromLeft = state.mPulledFromLeft;
 }

@@ -1,4 +1,7 @@
 #include "stdafx.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
+#include "../relive_lib/WorldStatic.hpp"
 #include "FallingItem.hpp"
 #include "../relive_lib/Shadow.hpp"
 #include "../relive_lib/GameObjects/ScreenManager.hpp"
@@ -35,7 +38,8 @@ static const AnimId sFallingItemData[15][2] = {
     {AnimId::AE_FallingRock_Falling, AnimId::AE_FallingRock_Waiting},
     {AnimId::FallingCrate_Falling, AnimId::FallingCrate_Waiting}};
 
-static FallingItem* sPrimaryFallingItem = nullptr;
+// The one that plays the sounds
+static WorldStatic<Guid> sPrimaryFallingItemId("AE.FallingItem.sPrimaryFallingItemId", Guid{});
 
 void FallingItem::LoadAnimations()
 {
@@ -95,9 +99,9 @@ FallingItem::FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, Reso
 
     mStartYPos = mYPos;
 
-    if (!sPrimaryFallingItem)
+    if (!sPrimaryFallingItemId.Get().IsValid())
     {
-        sPrimaryFallingItem = this;
+        sPrimaryFallingItemId = mBaseGameObjectId;
         mCreatedGnFrame = sGnFrame;
     }
 
@@ -145,9 +149,9 @@ FallingItem::FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, Reso
     mXPos = FP_FromInteger(xpos);
     mYPos = FP_FromInteger(ypos);
 
-    if (!sPrimaryFallingItem)
+    if (!sPrimaryFallingItemId.Get().IsValid())
     {
-        sPrimaryFallingItem = this;
+        sPrimaryFallingItemId = mBaseGameObjectId;
         mCreatedGnFrame = sGnFrame;
     }
 
@@ -156,9 +160,9 @@ FallingItem::FallingItem(relive::Path_FallingItem* pTlv, const Guid& tlvId, Reso
 
 FallingItem::~FallingItem()
 {
-    if (sPrimaryFallingItem == this)
+    if (sPrimaryFallingItemId.Get() == mBaseGameObjectId)
     {
-        sPrimaryFallingItem = nullptr;
+        sPrimaryFallingItemId = Guid{};
     }
     mMap.TLV_Reset(mTlvId);
 }
@@ -181,7 +185,7 @@ void FallingItem::VUpdate()
     }
 
     // The primary item controls the main sound effects, otherwise there would be a crazy amount of smashing sounds
-    if (sPrimaryFallingItem == this)
+    if (sPrimaryFallingItemId.Get() == mBaseGameObjectId)
     {
         if (!((sGnFrame - mCreatedGnFrame) % 87))
         {
@@ -453,4 +457,57 @@ void FallingItem::DamageHitItems()
             }
         }
     }
+}
+
+std::vector<BaseGameObject::NotStateMemory> FallingItem::VNotStateMemory()
+{
+    return {{&mAirStreamSndChannels, sizeof(mAirStreamSndChannels)}};
+}
+
+void FallingItem::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    FallingItemSaveState data = {};
+    data.mObject = GetAnimatedState();
+    data.mHealth = mHealth;
+    data.mState = static_cast<s32>(mState);
+    data.mSwitchId = mSwitchId;
+    data.mFallInterval = mFallInterval;
+    data.mMaxFallingItems = mMaxFallingItems;
+    data.mRemainingFallingItems = mRemainingFallingItems;
+    data.mResetSwitchIdAfterUse = mResetSwitchIdAfterUse;
+    data.mTlvXPos = mTlvXPos;
+    data.mTlvYPos = mTlvYPos;
+    data.mStartYPos = mStartYPos;
+    data.mFallIntervalTimer = mFallIntervalTimer;
+    data.mDoAirStreamSound = mDoAirStreamSound;
+    data.mHitDrillOrMineCar = mHitDrillOrMineCar;
+    // The sound channels it plays on are the sound output's, so not kept (a restored one doesn't play its air stream)
+    data.mAirStreamSndChannels = 0;
+    data.mCreatedGnFrame = mCreatedGnFrame;
+    pSaveBuffer.Write(data);
+}
+
+void FallingItem::RestoreFromSaveState(const FallingItemSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eRockSpawner)
+    {
+        return;
+    }
+    FallingItem* p = static_cast<FallingItem*>(pObj);
+    p->SetAnimatedState(state.mObject);
+    p->mHealth = state.mHealth;
+    p->mState = static_cast<State>(state.mState);
+    p->mSwitchId = state.mSwitchId;
+    p->mFallInterval = state.mFallInterval;
+    p->mMaxFallingItems = state.mMaxFallingItems;
+    p->mRemainingFallingItems = state.mRemainingFallingItems;
+    p->mResetSwitchIdAfterUse = state.mResetSwitchIdAfterUse;
+    p->mTlvXPos = state.mTlvXPos;
+    p->mTlvYPos = state.mTlvYPos;
+    p->mStartYPos = state.mStartYPos;
+    p->mFallIntervalTimer = state.mFallIntervalTimer;
+    p->mDoAirStreamSound = state.mDoAirStreamSound;
+    p->mHitDrillOrMineCar = state.mHitDrillOrMineCar;
+    p->mCreatedGnFrame = state.mCreatedGnFrame;
 }

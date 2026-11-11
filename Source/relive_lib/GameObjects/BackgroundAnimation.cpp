@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../ObjectIds.hpp"
+#include "../SerializedObjectData.hpp"
 #include "BackgroundAnimation.hpp"
 #include "../Animation.hpp"
 #include "../Sound/Midi.hpp"
@@ -98,4 +100,28 @@ BackgroundAnimation::~BackgroundAnimation()
     {
         SND_Stop_Channels_Mask(mSoundChannelsMask);
     }
+}
+
+std::vector<BaseGameObject::NotStateMemory> BackgroundAnimation::VNotStateMemory()
+{
+    // The channels its sound plays on
+    return {{&mSoundChannelsMask, sizeof(mSoundChannelsMask)}};
+}
+
+void BackgroundAnimation::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    BackgroundAnimationSaveState data = {};
+    data.mSoundChannelsMask = 0; // the sound system's channels, not state: the sound is made again
+    pSaveBuffer.Write(data);
+}
+
+void BackgroundAnimation::RestoreFromSaveState(const BackgroundAnimationSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eBackgroundAnimation)
+    {
+        return;
+    }
+    BackgroundAnimation* p = static_cast<BackgroundAnimation*>(pObj);
+    p->mSoundChannelsMask = state.mSoundChannelsMask;
 }

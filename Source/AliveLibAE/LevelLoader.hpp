@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 #include "../relive_lib/MapWrapper.hpp"
 
 namespace relive
@@ -8,9 +9,21 @@ namespace relive
     struct Path_LevelLoader;
 }
 
+struct LevelLoaderSaveState final : public SaveStateBase
+{
+    LevelLoaderSaveState()
+        : SaveStateBase(ReliveTypes::eLevelLoader, sizeof(*this))
+    { }
+    s32 mState;
+    Guid mFadeId;
+};
+
 class LevelLoader final : public BaseGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const LevelLoaderSaveState& state);
+
     LevelLoader(relive::Path_LevelLoader* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
 
     virtual void VUpdate() override;

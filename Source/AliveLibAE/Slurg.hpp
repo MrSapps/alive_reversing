@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAliveGameObject.hpp"
+#include "../relive_lib/WorldStatic.hpp"
 #include "../relive_lib/SaveStateBase.hpp"
 
 namespace relive
@@ -48,6 +49,8 @@ struct SlurgSaveState final : public SaveStateBase
     SlurgStates mSlurgState;
     bool mGoingRight; // TODO: double check me
     bool mMoving;
+    s16 mMovingTimer;
+    s16 mRngForMovingTimer;
 };
 
 class Slurg final : public BaseAliveGameObject
@@ -83,6 +86,6 @@ private:
     FP mSlurgSpriteScale = {}; // just use BaseAnimatedWithPhysicsGameObject sprite scale?
 };
 
-extern u16 gSlurgStepWatchPointsIdx;
-extern s8 gSlurgStepWatchPointsCount[2];
-extern Slurg_Step_Watch_Points gSlurgStepWatchPoints[2];
+extern WorldStatic<u16> gSlurgStepWatchPointsIdx;
+extern WorldStatic<std::array<s8, 2>> gSlurgStepWatchPointsCount;
+extern WorldStatic<std::array<Slurg_Step_Watch_Points, 2>> gSlurgStepWatchPoints;

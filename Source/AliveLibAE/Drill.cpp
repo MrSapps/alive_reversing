@@ -230,6 +230,10 @@ void Drill::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& re
     const auto pState = pData.ReadTmpPtr<DrillSaveState>();
     auto pTlv = static_cast<relive::Path_Drill*>(map.TLV_From_Offset_Lvl_Cam(pState->mDrillTlvId).GetTlv());
     auto pDrill = relive_new Drill(pTlv, pState->mDrillTlvId, resMan, map);
+    if (pState->mToggleStartStateSaved)
+    {
+        pDrill->mToggleStartState_StartOn = pState->mToggleStartState_StartOn;
+    }
 
     if (pState->mState != DrillStates::eRestartCycle_0)
     {
@@ -251,7 +255,7 @@ void Drill::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& re
 
     pDrill->mOffTimer = pState->mOffTimer;
     pDrill->mState = pState->mState;
-    pDrill->mXYOff = FP_FromInteger(pState->mXYOff);
+    pDrill->mXYOff = pState->mXYOff;
 }
 
 void Drill::VUpdate()
@@ -502,6 +506,12 @@ void Drill::VStopAudio()
     }
 }
 
+std::vector<BaseGameObject::NotStateMemory> Drill::VNotStateMemory()
+{
+    // Which sound channels it is playing on is the sound output's
+    return {{&mAudioChannelsMask, sizeof(mAudioChannelsMask)}};
+}
+
 void Drill::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
     DrillSaveState data = {};
@@ -509,7 +519,9 @@ void Drill::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mDrillTlvId = mTlvInfo;
     data.mOffTimer = mOffTimer;
     data.mState = mState;
-    data.mXYOff = FP_GetExponent(mXYOff);
+    data.mXYOff = mXYOff;
+    data.mToggleStartStateSaved = true;
+    data.mToggleStartState_StartOn = mToggleStartState_StartOn;
     pSaveBuffer.Write(data);
 }
 

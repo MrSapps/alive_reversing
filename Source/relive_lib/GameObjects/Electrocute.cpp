@@ -7,6 +7,8 @@
 #include "PaletteOverwriter.hpp"
 #include "../GameType.hpp"
 #include "BaseMap.hpp"
+#include "../SerializedObjectData.hpp"
+#include <cstring>
 
 Electrocute::Electrocute(BaseAliveGameObject* pTargetObj, bool bExtraOverwriter, bool bKillTarget, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map),
@@ -26,6 +28,12 @@ Electrocute::Electrocute(BaseAliveGameObject* pTargetObj, bool bExtraOverwriter,
     {
         mRestoreSprite = true;
     }
+}
+
+Electrocute::Electrocute(RestoreTag, ResourceManager& resMan, BaseMap& map)
+    : BaseGameObject(true, 0, resMan, map)
+{
+    SetType(ReliveTypes::eElectrocute);
 }
 
 Electrocute::~Electrocute()
@@ -190,8 +198,17 @@ void Electrocute::KillPalOverwriters()
         {
             if (GetGameType() == GameType::eAo)
             {
-                // In AO the game loop updates them, so it is the one to get rid of them
-                pPalOverwriter->SetDead(true);
+                // In AO the game loop updates them, so it is the one to get rid of them. It may have done so already
+                // when all the objects are destroyed (they are made after this one)
+                bool exists = false;
+                for (s32 i = 0; i < gBaseGameObjects->Size() && !exists; i++)
+                {
+                    exists = gBaseGameObjects->ItemAt(i) == pPalOverwriter;
+                }
+                if (exists)
+                {
+                    pPalOverwriter->SetDead(true);
+                }
             }
             else
             {
@@ -246,4 +263,78 @@ bool Electrocute::IsLastOverwriterFinished()
         }
     }
     return false;
+}
+
+void Electrocute::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    ElectrocuteSaveState data = {};
+    data.mTargetObjId = mTargetObjId;
+    data.mTargetRed = mTargetRed;
+    data.mTargetGreen = mTargetGreen;
+    data.mTargetBlue = mTargetBlue;
+    data.mPalOverwritersCount = mPalOverwritersCount;
+    data.mState = static_cast<s32>(mState);
+    data.mExtraOverwriter = mExtraOverwriter;
+    data.mKillTarget = mKillTarget;
+    data.mRestoreSprite = mRestoreSprite;
+    for (s32 i = 0; i < 3; i++)
+    {
+        data.mHasOverwriter[i] = mPalOverwriters[i] != nullptr;
+        if (mPalOverwriters[i])
+        {
+            data.mOverwriterIds[i] = mPalOverwriters[i]->mBaseGameObjectId;
+            data.mOverwriters[i] = mPalOverwriters[i]->GetData();
+        }
+    }
+    pSaveBuffer.Write(data);
+}
+
+void Electrocute::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const ElectrocuteSaveState& state = *pData.ReadTmpPtr<ElectrocuteSaveState>();
+    Electrocute* p = relive_new Electrocute(RestoreTag{}, resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mTargetObjId = state.mTargetObjId;
+    p->mTargetRed = state.mTargetRed;
+    p->mTargetGreen = state.mTargetGreen;
+    p->mTargetBlue = state.mTargetBlue;
+    p->mPalOverwritersCount = state.mPalOverwritersCount;
+    p->mState = static_cast<States>(state.mState);
+    p->mExtraOverwriter = state.mExtraOverwriter;
+    p->mKillTarget = state.mKillTarget;
+    p->mRestoreSprite = state.mRestoreSprite;
+    for (s32 i = 0; i < 3; i++)
+    {
+        if (!state.mHasOverwriter[i])
+        {
+            continue;
+        }
+        if (GetGameType() == GameType::eAe)
+        {
+            // Not in the list of objects that update, so not saved on their own: made here, with the id they had (they
+            // are drawn, and the drawing goes through them in the order of their ids)
+            Guid::CreationScope idScope(state.mOverwriterIds[i]);
+            p->mPalOverwriters[i] = PalleteOverwriter::CreateFromData(state.mOverwriters[i], false, resMan, map);
+        }
+        else
+        {
+            // Saved on their own, made by now or after this
+            p->mRestoredOverwriterIds[i] = state.mOverwriterIds[i];
+        }
+    }
+}
+
+void Electrocute::VPostRestore()
+{
+    for (s32 i = 0; i < 3; i++)
+    {
+        if (mRestoredOverwriterIds[i].IsValid())
+        {
+            mPalOverwriters[i] = static_cast<PalleteOverwriter*>(sObjectIds.Find_Impl(mRestoredOverwriterIds[i]));
+            mRestoredOverwriterIds[i] = Guid{};
+        }
+    }
 }

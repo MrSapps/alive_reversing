@@ -1,0 +1,22 @@
+# The bot plays the start of Mines path 1 by the "any" profile (down two hoists, a roll under a low ceiling, a hand
+# stone, a running jump to a ledge, up to the first Mudokon) and is killed on the way (electrocute): it has
+# to notice, go back to a checkpoint and carry on. The buttons of the frames that counted are saved, and
+# bot_replay_replay.txt plays them back with no bot and no death: both must end in the same world
+# on every frame they share (see run_bot_replay.cmake), which shows the rewind is exact and the run that counts
+# is death free.
+timeout 200
+start mines 1 4 838 1498
+draw 0
+wait_until in_game
+wait_frames 40
+hash_log %OUT%
+bot any,seed=3
+wait_frames 100
+electrocute
+wait_until camera mines 1 6
+bot_inputs %INPUTS%
+bot_stop
+expect_bot_restores 1
+wait_frames 4
+wait_frames 14
+quit

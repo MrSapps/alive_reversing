@@ -163,6 +163,7 @@ struct MudokonSaveState final : public SaveStateBase
     s16 mS16_1BC = 0;
     s32 mTimer1C0 = 0;
     bool mDoPathTrans = false;
+    bool mbMotionChanged = false;
 };
 
 class Mudokon final : public ::BaseAliveGameObject
@@ -242,6 +243,11 @@ public:
     void KillLiftPoint_194();
 
     virtual void VUpdate() override;
+    virtual GameSpeakListenerBase* VListener() override
+    {
+        return &mListener;
+    }
+    virtual void VPostRestore() override;
     virtual void VOnTrapDoorOpen() override;
     virtual void VOnTlvCollision(TlvIterator tlvIterator) override;
     virtual void VScreenChanged() override;

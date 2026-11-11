@@ -150,30 +150,34 @@ void Scrab::VRender(OrderingTable& ot)
     }
 }
 
-void Scrab::VUpdate()
+void Scrab::VPostRestore()
 {
-    if (GetRestoredFromQuickSave())
+    if (BaseAliveGameObjectCollisionLineType != -1)
     {
-        if (BaseAliveGameObjectCollisionLineType != -1)
-        {
-            gCollisions->Raycast(
-                mXPos,
-                mYPos - FP_FromInteger(20),
-                mXPos,
-                mYPos + FP_FromInteger(20),
-                &BaseAliveGameObjectCollisionLine,
-                &mXPos,
-                &mYPos,
-                CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
-
-            BaseAliveGameObjectCollisionLineType = -1;
-        }
-
-        mScrabTargetId = BaseGameObject::RefreshId(mScrabTargetId);
-        mAbeOrMudTargetId = BaseGameObject::RefreshId(mAbeOrMudTargetId);
-        SetRestoredFromQuickSave(false);
+        // Where it was saved is kept: the line is only looked for
+        FP restoreHitX = {};
+        FP restoreHitY = {};
+        gCollisions->Raycast(
+            mXPos,
+            mYPos - FP_FromInteger(20),
+            mXPos,
+            mYPos + FP_FromInteger(20),
+            &BaseAliveGameObjectCollisionLine,
+            &restoreHitX,
+            &restoreHitY,
+            CollisionMask(static_cast<eLineTypes>(BaseAliveGameObjectCollisionLineType)));
     }
 
+    mScrabTargetId = BaseGameObject::RefreshId(mScrabTargetId);
+    mAbeOrMudTargetId = BaseGameObject::RefreshId(mAbeOrMudTargetId);
+
+
+    // Only holds the line type between a save and its restore (it is 0 in a running game)
+    BaseAliveGameObjectCollisionLineType = 0;
+}
+
+void Scrab::VUpdate()
+{
     if (EventGet(Event::kEventDeathReset))
     {
         SetDead(true);
@@ -3664,13 +3668,15 @@ static const Scrab::TBrainType sScrabBrainTable[] = {
     &Scrab::Brain_WalkAround,
 };
 
+std::vector<BaseGameObject::NotStateMemory> Scrab::VNotStateMemory()
+{
+    // The channels its sound plays on
+    return {{&field_14C, sizeof(field_14C)}};
+}
+
 void Scrab::VGetSaveState(SerializedObjectData& pSaveBuffer)
 {
-    if (GetElectrocuted())
-    {
-        return;
-    }
-
+    // An electrocuted one is saved too: the original left it out, as the electrocution holds a pointer to it
     ScrabSaveState data = {};
 
     data.mXPos = mXPos;
@@ -3739,7 +3745,7 @@ void Scrab::VGetSaveState(SerializedObjectData& pSaveBuffer)
     data.mPauseLeftMax = mPauseLeftMax;
     data.mPauseRightMin = mPauseRightMin;
     data.mPauseRightMax = mPauseRightMax;
-    data.mSfxChannelMask = field_14C;
+    data.mSfxChannelMask = 0; // the sound system's channels, not state: the sound is made again
     data.mFlags = field_188_flags;
 
     data.mBrainStateIdx = 0;
@@ -3823,10 +3829,9 @@ void Scrab::CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& 
         pScrab->SetBrain(sScrabBrainTable[pState->mBrainStateIdx]);
 
         // mScrabTargetId/mAbeOrMudTargetId above are still the saved
-        // tlv-info Guids at this point, not live runtime ids - VUpdate()
+        // tlv-info Guids at this point, not live runtime ids - VPostRestore()
         // resolves them via BaseGameObject::RefreshId() once every object
-        // has been recreated (see GetRestoredFromQuickSave() below).
-        pScrab->SetRestoredFromQuickSave(true);
+        // has been recreated (see VPostRestore()).
     }
 }
 

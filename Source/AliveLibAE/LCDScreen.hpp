@@ -29,6 +29,8 @@ struct LCDScreenSaveState final : public SaveStateBase
     bool mShowRandomMessage = false;
     bool mPlayLetterSound = false;
     s32 mActiveMessageOffset = 0;
+    // Where the text last drawn was cut off in mMessageBuffer, or -1 for none yet
+    s32 mMessageCutoffOffset = -1;
 };
 
 class LCDScreen final : public BaseGameObject

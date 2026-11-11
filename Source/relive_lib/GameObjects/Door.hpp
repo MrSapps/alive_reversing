@@ -1,11 +1,24 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
+#include "../SaveStateBase.hpp"
 #include "../relive_lib/data_conversion/relive_tlvs.hpp"
+
+struct DoorSaveState final : public SaveStateBase
+{
+    DoorSaveState()
+        : SaveStateBase(ReliveTypes::eDoor, sizeof(*this))
+    { }
+    s32 mCurrentState;
+    s16 mDoorId;
+};
 
 class Door : public BaseAnimatedWithPhysicsGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const DoorSaveState& state);
+
     Door(ResourceManager& resMan, BaseMap& map); // Only exists for TrainDoor ctor
     Door(relive::Path_Door* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     ~Door();

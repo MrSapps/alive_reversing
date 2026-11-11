@@ -3,6 +3,7 @@
 #include "GameObjects/BaseGameObject.hpp"
 #include "GameObjects/BaseAnimatedWithPhysicsGameObject.hpp"
 #include "GameType.hpp"
+#include "ObjectIds.hpp"
 
 struct EventsArray final
 {
@@ -26,6 +27,33 @@ void EventBroadcast(Event eventType, BaseGameObject* pObject)
 BaseGameObject* EventGet(Event eventType)
 {
     return sEventPtrs.mEvents[sEventsToUse].mEventPtrs[static_cast<u32>(eventType)];
+}
+
+EventsSaveState EventsGetSaveState()
+{
+    EventsSaveState state = {};
+    state.mEventsToUse = sEventsToUse;
+    for (s32 i = 0; i < 2; i++)
+    {
+        for (s32 j = 0; j < static_cast<s32>(Event::kEventMax); j++)
+        {
+            const BaseGameObject* pObj = sEventPtrs.mEvents[i].mEventPtrs[j];
+            state.mEventObjectIds[i][j] = pObj ? pObj->mBaseGameObjectId : Guid{};
+        }
+    }
+    return state;
+}
+
+void EventsRestoreFromSaveState(const EventsSaveState& state)
+{
+    sEventsToUse = state.mEventsToUse;
+    for (s32 i = 0; i < 2; i++)
+    {
+        for (s32 j = 0; j < static_cast<s32>(Event::kEventMax); j++)
+        {
+            sEventPtrs.mEvents[i].mEventPtrs[j] = state.mEventObjectIds[i][j].IsValid() ? sObjectIds.Find_Impl(state.mEventObjectIds[i][j]) : nullptr;
+        }
+    }
 }
 
 void EventsReset()

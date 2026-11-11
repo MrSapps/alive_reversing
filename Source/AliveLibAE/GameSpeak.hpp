@@ -1,6 +1,9 @@
 #pragma once
 
+#include "../relive_lib/SaveStateBase.hpp"
+
 #include "../relive_lib/GameObjects/BaseGameObject.hpp"
+#include "../relive_lib/GameSpeakListenerBase.hpp"
 
 // NOTE: the order actually matters
 enum class GameSpeakEvents : s16
@@ -56,6 +59,29 @@ enum class GameSpeakMatch : s16
     ePartMatch = 2,
 };
 
+// The events the characters listen to. It is made once and lives through a restore, so a save is put on the one there
+// is, see GameSpeak::RestoreFromSaveState.
+struct GameSpeakSaveState final : public SaveStateBase
+{
+    GameSpeakSaveState()
+        : SaveStateBase(ReliveTypes::eGameSpeak, sizeof(*this))
+    { }
+    u32 mLastEventFrame;
+    GameSpeakEvents mLastEvent;
+    s32 mLastEventIndex;
+    GameSpeakEvents mEventBuffer[32];
+};
+
+// Where a character that listens (GameSpeakListener) is in the events. The character is the one with
+// SaveStateBase::mObjectId, which the camera may make, so this is put on it once all are made.
+struct GameSpeakListenerSaveState final : public SaveStateBase
+{
+    GameSpeakListenerSaveState()
+        : SaveStateBase(ReliveTypes::eGameSpeakListener, sizeof(*this))
+    { }
+    s32 mLastEventIdx;
+};
+
 class GameSpeak final : public BaseGameObject
 {
 public:
@@ -65,6 +91,8 @@ public:
     virtual void VUpdate() override;
     virtual void VRender(OrderingTable& ot) override;
     virtual void VScreenChanged() override;
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const GameSpeakSaveState& state);
 
     void PushEvent(GameSpeakEvents event);
 
@@ -83,7 +111,7 @@ private:
     GameSpeakEvents mEventBuffer[32] = {};
 };
 
-class GameSpeakListener final
+class GameSpeakListener final : public GameSpeakListenerBase
 {
 public:
     bool LastEventChanged(GameSpeak& gs)
@@ -113,8 +141,7 @@ public:
         return GameSpeakEvents::eNone;
     }
 
-private:
-    s32 mLastEventIdx = -1;
+
 };
 
 extern GameSpeak* gEventSystem;

@@ -5,6 +5,7 @@
 #include "Sfx.hpp"
 #include "../../AliveLibAE/Math.hpp"
 #include "../FixedPoint.hpp"
+#include "../SerializedObjectData.hpp"
 
 void DeathBirdParticle::LoadAnimations()
 {
@@ -40,6 +41,27 @@ DeathBirdParticle::DeathBirdParticle(FP xpos, FP ypos, s32 startTimer, bool play
     mXPos = xpos;
     mYPos = ypos;
     mRandom = Math_NextRandom();
+}
+
+void DeathBirdParticle::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    DeathBirdParticleSaveState data = {};
+    data.mStartTimer = mStartTimer;
+    data.mPlaySound = mPlaySound;
+    data.mScale = GetSpriteScale();
+    data.mObject = GetAnimatedState();
+    data.mRandom = mRandom;
+    data.mState = static_cast<s8>(mState);
+    pSaveBuffer.Write(data);
+}
+
+void DeathBirdParticle::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const auto pState = pData.ReadTmpPtr<DeathBirdParticleSaveState>();
+    auto pParticle = relive_new DeathBirdParticle(FP_FromInteger(0), FP_FromInteger(0), pState->mStartTimer, pState->mPlaySound, pState->mScale, resMan, map);
+    pParticle->SetAnimatedState(pState->mObject);
+    pParticle->mRandom = pState->mRandom;
+    pParticle->mState = static_cast<States>(pState->mState);
 }
 
 void DeathBirdParticle::VUpdate()

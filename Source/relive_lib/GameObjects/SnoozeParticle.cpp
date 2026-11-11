@@ -10,6 +10,7 @@
 #include "../Primitives.hpp"
 #include "../../relive_lib/Engine.hpp"
 #include "../GameType.hpp"
+#include "../SerializedObjectData.hpp"
 
 static const s16 xPositionDeltaEntries[36] = {
     1,
@@ -267,4 +268,45 @@ void SnoozeParticle::VRender(OrderingTable& ot)
         pZLine->SetBlendMode(relive::TBlendModes::eBlend_1);
         ot.Add(mOtLayer, pZLine);
     }
+}
+
+void SnoozeParticle::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    SnoozeParticleSaveState data = {};
+    data.mStartY = mStartY;
+    data.mXPos = mXPos;
+    data.mYPos = mYPos;
+    data.mDestX = mDestX;
+    data.mDestY = mDestY;
+    data.mSpriteScale = mSpriteScale;
+    data.mScaleDx = mScaleDx;
+    data.mOtLayer = mOtLayer;
+    data.mR = mRGB.r;
+    data.mG = mRGB.g;
+    data.mB = mRGB.b;
+    data.mIdx = mIdx;
+    data.mBlowUp = mBlowUp;
+    data.mState = static_cast<s16>(mState);
+    pSaveBuffer.Write(data);
+}
+
+void SnoozeParticle::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const auto pState = pData.ReadTmpPtr<SnoozeParticleSaveState>();
+    // The constructor rolls random numbers, all overwritten below. (The generator is put back once every object is made.)
+    auto pParticle = relive_new SnoozeParticle(pState->mXPos, pState->mYPos, pState->mOtLayer, FP_FromInteger(1), resMan, map);
+    pParticle->mStartY = pState->mStartY;
+    pParticle->mDestX = pState->mDestX;
+    pParticle->mDestY = pState->mDestY;
+    pParticle->mSpriteScale = pState->mSpriteScale;
+    pParticle->mScaleDx = pState->mScaleDx;
+    pParticle->mRGB.SetRGB(pState->mR, pState->mG, pState->mB);
+    pParticle->mIdx = pState->mIdx;
+    pParticle->mBlowUp = pState->mBlowUp;
+    pParticle->mState = static_cast<SnoozeParticleState>(pState->mState);
+}
+
+std::vector<BaseGameObject::NotStateMemory> SnoozeParticle::VNotStateMemory()
+{
+    return {{&mG4Line, sizeof(mG4Line)}, {&mG2Lines, sizeof(mG2Lines)}};
 }

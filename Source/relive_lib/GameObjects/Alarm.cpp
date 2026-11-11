@@ -6,9 +6,11 @@
 #include "../GameType.hpp"
 #include "../../relive_lib/Engine.hpp"
 #include "BaseMap.hpp"
+#include "../SerializedObjectData.hpp"
+#include "../ObjectIds.hpp"
 
-s16 gAlarmInstanceCount = 0;
-Guid gAlarmObjId = Guid{}; // Only used in AE to kill the alarm in the last level
+WorldStatic<s16> gAlarmInstanceCount("Alarm.gAlarmInstanceCount", 0);
+WorldStatic<Guid> gAlarmObjId("Alarm.gAlarmObjId", Guid{}); // Only used in AE to kill the alarm in the last level
 
 Alarm::Alarm(relive::Path_Alarm* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : EffectBase(Layer::eLayer_Above_FG1_39, GetGameType() == GameType::eAo ? relive::TBlendModes::eBlend_1 : relive::TBlendModes::eBlend_3, resMan, map)
@@ -51,6 +53,61 @@ Alarm::Alarm(s32 durationTimer, u16 switchId, s32 pauseTimer, Layer layer, Resou
     }
 }
 
+Alarm::Alarm(RestoreTag, Layer layer, ResourceManager& resMan, BaseMap& map)
+    : EffectBase(layer, GetGameType() == GameType::eAo ? relive::TBlendModes::eBlend_1 : relive::TBlendModes::eBlend_3, resMan, map)
+    , mAlarmState(States::eWaitForSwitchEnable)
+{
+    SetType(ReliveTypes::eAlarm);
+}
+
+void Alarm::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    AlarmSaveState data = {};
+    data.mEffect = GetEffectState();
+    data.mIsTlvAlarm = mAlarmTlvInfo != Guid{};
+    data.mTlvInfo = mAlarmTlvInfo;
+    data.mAlarmRed = mAlarmRed;
+    data.mAlarmPauseTimer = mAlarmPauseTimer;
+    data.mAlarmDurationTimer = mAlarmDurationTimer;
+    data.mAlarmState = static_cast<s32>(mAlarmState);
+    data.mAlarmSwitchId = mAlarmSwitchId;
+    data.mAlarmDuration = mAlarmDuration;
+    data.mDrawable = GetDrawable();
+    pSaveBuffer.Write(data);
+}
+
+void Alarm::SetFromSaveState(const AlarmSaveState& state)
+{
+    SetEffectState(state.mEffect);
+    mAlarmTlvInfo = state.mTlvInfo;
+    mAlarmRed = state.mAlarmRed;
+    mAlarmPauseTimer = state.mAlarmPauseTimer;
+    mAlarmDurationTimer = state.mAlarmDurationTimer;
+    mAlarmState = static_cast<States>(state.mAlarmState);
+    mAlarmSwitchId = state.mAlarmSwitchId;
+    mAlarmDuration = state.mAlarmDuration;
+    if (GetDrawable() && !state.mDrawable)
+    {
+        gObjListDrawables->Remove_Item(this);
+        SetDrawable(false);
+    }
+}
+
+void Alarm::CreateFromSaveState(const AlarmSaveState& state, ResourceManager& resMan, BaseMap& map)
+{
+    auto pAlarm = relive_new Alarm(RestoreTag{}, static_cast<Layer>(state.mEffect.mLayer), resMan, map);
+    pAlarm->SetFromSaveState(state);
+}
+
+void Alarm::RestoreFromSaveState(const AlarmSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (pObj && pObj->Type() == ReliveTypes::eAlarm)
+    {
+        static_cast<Alarm*>(pObj)->SetFromSaveState(state);
+    }
+}
+
 Alarm::~Alarm()
 {
     if (mAlarmState != States::eWaitForSwitchEnable)
@@ -58,7 +115,7 @@ Alarm::~Alarm()
         gAlarmInstanceCount--;
     }
 
-    if (gAlarmObjId == mBaseGameObjectId)
+    if (gAlarmObjId.Get() == mBaseGameObjectId)
     {
         gAlarmObjId = Guid{};
     }

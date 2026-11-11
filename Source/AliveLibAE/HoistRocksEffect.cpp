@@ -9,6 +9,8 @@
 #include "../relive_lib/Collisions.hpp"
 #include "Math.hpp"
 #include "../relive_lib/FixedPoint.hpp"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 
 const static s16 sRndValues[12] = {5, 0, 10, 0, 30, 0, 5, 0, 0, 0, 0, 0};
 
@@ -22,6 +24,7 @@ void HoistRocksEffect::LoadAnimations()
 HoistRocksEffect::HoistRocksEffect(relive::Path_Hoist* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map)
     : BaseGameObject(true, 0, resMan, map)
 {
+    SetType(ReliveTypes::eHoist);
     mTlvId = tlvId;
 
     LoadAnimations();
@@ -180,6 +183,46 @@ void HoistRocksEffect::VRender(OrderingTable& ot)
                 0,
                 0);
         }
+    }
+}
+
+void HoistRocksEffect::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    HoistRocksEffectSaveState data = {};
+    data.mTimer = mTimer;
+    for (s32 i = 0; i < 4; i++)
+    {
+        data.mRocks[i].mState = mRocks[i].mState;
+        data.mRocks[i].mXPos = mRocks[i].mXPos;
+        data.mRocks[i].mYPos = mRocks[i].mYPos;
+        data.mRocks[i].mVelY = mRocks[i].mVelY;
+        data.mRocks[i].mAnimId = mRocks[i].mAnim.mAnimRes.mId;
+        data.mRocks[i].mAnim = mRocks[i].mAnim.GetSaveState();
+    }
+    pSaveBuffer.Write(data);
+}
+
+void HoistRocksEffect::RestoreSaveState(const HoistRocksEffectSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eHoist)
+    {
+        return;
+    }
+    HoistRocksEffect* pEffect = static_cast<HoistRocksEffect*>(pObj);
+    pEffect->mTimer = state.mTimer;
+    for (s32 i = 0; i < 4; i++)
+    {
+        HoistRockParticle& rock = pEffect->mRocks[i];
+        rock.mState = state.mRocks[i].mState;
+        rock.mXPos = state.mRocks[i].mXPos;
+        rock.mYPos = state.mRocks[i].mYPos;
+        rock.mVelY = state.mRocks[i].mVelY;
+        if (rock.mAnim.mAnimRes.mId != state.mRocks[i].mAnimId)
+        {
+            rock.mAnim.Set_Animation_Data(pEffect->GetAnimRes(state.mRocks[i].mAnimId));
+        }
+        rock.mAnim.RestoreSaveState(state.mRocks[i].mAnim);
     }
 }
 

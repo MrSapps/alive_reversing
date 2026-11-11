@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../relive_lib/GameObjects/BaseGameObject.hpp"
+#include "../relive_lib/SaveStateBase.hpp"
 
 // it reads the slurg spawned count from the TLV but never updates it.
 // Also it hasn't got quiksave support.
@@ -17,9 +18,21 @@ struct Slurg_Spawner_Path_Data final
     s16 mSwitchId;
 };
 
+struct SlurgSpawnerSaveState final : public SaveStateBase
+{
+    SlurgSpawnerSaveState()
+        : SaveStateBase(ReliveTypes::eSlurgSpawner, sizeof(*this))
+    { }
+    s16 mSpawnCounter;
+    u8 mSpawnedCount;
+};
+
 class SlurgSpawner final : public BaseGameObject
 {
 public:
+    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    static void RestoreFromSaveState(const SlurgSpawnerSaveState& state);
+
     SlurgSpawner(relive::Path_SlurgSpawner* pTlv, const Guid& tlvId, ResourceManager& resMan, BaseMap& map);
     
     virtual void VUpdate() override;

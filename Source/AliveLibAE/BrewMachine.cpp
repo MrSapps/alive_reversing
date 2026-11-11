@@ -1,4 +1,6 @@
 #include "stdafx.h"
+#include "../relive_lib/ObjectIds.hpp"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "BrewMachine.hpp"
 #include "../relive_lib/Events.hpp"
 #include "Map.hpp"
@@ -43,6 +45,12 @@ BrewMachine::BrewMachine(relive::Path_BrewMachine* pTlv, const Guid& tlvId, Reso
     mYPos = FP_FromInteger(pTlv->mTopLeftY);
 
     mBrewMachineCamera = mMap.mCurrentCamera;
+}
+
+std::vector<BaseGameObject::NotStateMemory> BrewMachine::VNotStateMemory()
+{
+    // The font and its palette are resources: ids of what was loaded, not state
+    return {{&mFontContext, sizeof(mFontContext)}, {&mFont, sizeof(mFont)}, {&mPal, sizeof(mPal)}};
 }
 
 BrewMachine::~BrewMachine()
@@ -100,4 +108,28 @@ void BrewMachine::VRender(OrderingTable& ot)
     }
 
     BaseAnimatedWithPhysicsGameObject::VRender(ot);
+}
+
+void BrewMachine::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    BrewMachineSaveState data = {};
+    data.mRemainingBrewCount = mRemainingBrewCount;
+    data.mBrewMachineCamera = mBrewMachineCamera;
+    data.mTextX = mTextX;
+    data.mTextY = mTextY;
+    pSaveBuffer.Write(data);
+}
+
+void BrewMachine::RestoreFromSaveState(const BrewMachineSaveState& state)
+{
+    BaseGameObject* pObj = sObjectIds.Find_Impl(state.mObjectId);
+    if (!pObj || pObj->Type() != ReliveTypes::eBrewMachine)
+    {
+        return;
+    }
+    BrewMachine* p = static_cast<BrewMachine*>(pObj);
+    p->mRemainingBrewCount = state.mRemainingBrewCount;
+    p->mBrewMachineCamera = state.mBrewMachineCamera;
+    p->mTextX = state.mTextX;
+    p->mTextY = state.mTextY;
 }

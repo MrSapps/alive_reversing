@@ -187,6 +187,10 @@ public:
 
     virtual void VScreenChanged() override;
     virtual void VUpdate() override;
+    virtual GameSpeakListenerBase* VListener() override
+    {
+        return &mListener;
+    }
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
     static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 

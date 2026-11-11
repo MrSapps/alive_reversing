@@ -56,6 +56,10 @@ public:
     void PutCurrentDispEnv();
     void RenderOrderingTable();
 
+    // Frames run as usual but nothing is drawn or shown, and no time is waited for: what a bot or a test that only
+    // wants the game's state uses to run fast. The objects still fill the ordering table, so they behave the same.
+    bool mSkipDraw = false;
+
 	s16 mWidth = 0;
 	s16 mHeight = 0;
     PSX_Display_Buffer mDrawEnv = {};

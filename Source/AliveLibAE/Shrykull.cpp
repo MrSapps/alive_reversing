@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../relive_lib/SerializedObjectData.hpp"
 #include "Shrykull.hpp"
 #include "Abe.hpp"
 #include "stdlib.hpp"
@@ -311,4 +312,34 @@ void Shrykull::VUpdate()
         default:
             return;
     }
+}
+
+void Shrykull::VGetSaveState(SerializedObjectData& pSaveBuffer)
+{
+    ShrykullSaveState data = {};
+    data.mState = static_cast<s32>(mState);
+    data.mZapIntervalTimer = mZapIntervalTimer;
+    data.mFlashTimer = mFlashTimer;
+    data.mZapLineId = mZapLineId;
+    data.mZapTargetId = mZapTargetId;
+    data.mCanElectrocute = mCanElectrocute;
+    data.mResetRingTimer = mResetRingTimer;
+    pSaveBuffer.Write(data);
+}
+
+void Shrykull::CreateFromSaveState(SerializedObjectData& pData, ResourceManager& resMan, BaseMap& map)
+{
+    const ShrykullSaveState& state = *pData.ReadTmpPtr<ShrykullSaveState>();
+    Shrykull* p = relive_new Shrykull(resMan, map);
+    if (!p)
+    {
+        return;
+    }
+    p->mState = static_cast<State>(state.mState);
+    p->mZapIntervalTimer = state.mZapIntervalTimer;
+    p->mFlashTimer = state.mFlashTimer;
+    p->mZapLineId = state.mZapLineId;
+    p->mZapTargetId = state.mZapTargetId;
+    p->mCanElectrocute = state.mCanElectrocute;
+    p->mResetRingTimer = state.mResetRingTimer;
 }

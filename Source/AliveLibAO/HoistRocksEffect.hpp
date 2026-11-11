@@ -26,14 +26,6 @@ private:
     AnimId mAnimId = {};
 };
 
-struct HoistRocksEffectSaveState final : public SaveStateBase
-{
-    HoistRocksEffectSaveState()
-        : SaveStateBase(ReliveTypes::eHoist, sizeof(*this))
-    { }
-    Guid mTlvId;
-};
-
 // Not TLV-based - one of these is spawned freely by HoistRocksEffect::VUpdate()
 // for each falling rock chunk, so (like Grenade) it gets its own ReliveTypes
 // tag and is restored generically alongside everything else rather than
@@ -53,6 +45,7 @@ struct HoistParticleSaveState final : public SaveStateBase
     EReliveLevelIds mCurrentLevel = EReliveLevelIds::eNone;
 };
 
+// Has nothing to save: it is made again by the hoist's TLV, and the rocks it dropped are HoistParticles
 class HoistRocksEffect final : public ::BaseGameObject
 {
 public:
@@ -61,8 +54,6 @@ public:
 
     virtual void VUpdate() override;
     virtual void VScreenChanged() override;
-    virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
-    static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
     FP mTlvXPos = {};
     FP mTlvYPos = {};

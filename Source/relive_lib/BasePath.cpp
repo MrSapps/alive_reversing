@@ -107,6 +107,7 @@ void BasePath::Set_TLVData(const Guid& tlvId, s16 hiFlags, s8 bSetCreated, s8 bS
             {
                 pTlv->mTlvFlags.Set(relive::TlvFlags::eBit2_Destroyed, bSetDestroyed & 1);
                 pTlv->mTlvFlags.Set(relive::TlvFlags::eBit1_Created, bSetCreated & 1);
+                pTlv->mTlvFlags.Set(relive::TlvFlags::eBit4_ResetThisVisit, !bSetCreated && !bSetDestroyed);
 
                 if (hiFlags != -1)
                 {
