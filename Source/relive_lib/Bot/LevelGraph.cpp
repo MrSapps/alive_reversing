@@ -1,11 +1,18 @@
 #include "LevelGraph.hpp"
+#include <algorithm>
 
 namespace Bot {
 
-void LevelGraph::Build(s32 level, const std::vector<PathSummary>& paths)
+void LevelGraph::Build(s32 level, const std::vector<PathSummary>& paths, const std::set<s32>& been)
 {
     mLevel = level;
     mPaths = paths;
+    for (PathSummary& p : mPaths)
+    {
+        p.mExits.erase(std::remove_if(p.mExits.begin(), p.mExits.end(), [&](const std::pair<s32, s32>& exit)
+                                      { return exit.first != level && been.count(exit.first) != 0; }),
+                       p.mExits.end());
+    }
     mDistance.clear();
     for (const PathSummary& p : mPaths)
     {

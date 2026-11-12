@@ -3,6 +3,7 @@
 #include "BotRng.hpp"
 #include "Checkpoint.hpp"
 #include "Domain.hpp"
+#include "ThrowArc.hpp"
 #include "Profile.hpp"
 #include "World.hpp"
 #include "GameView.hpp"
@@ -113,6 +114,10 @@ public:
     {
         return mKnow->mNav;
     }
+    const NavGraph& Nav() const
+    {
+        return mKnow->mNav;
+    }
     BotRng& Rng()
     {
         return mRng;
@@ -120,6 +125,50 @@ public:
     const World& GetWorld() const
     {
         return mWorld;
+    }
+    void LockSlapped(u32 id)
+    {
+        mWorld.mLocksSlapped.insert(id);
+        // (one that gives the power: its ring is with him within some 80 frames, wherever he has got to)
+        const Entity* lock = mWorld.Find(id);
+        if (lock && lock->mKind == EntityKind::eSlapLock && lock->mInputs[0] > 0 && !mWorld.mInvisCharge && !mWorld.mInvisible)
+        {
+            mRingDueBy = mAbe.mFrame + 150;
+            mWorld.mInvisComing = true;
+        }
+    }
+    // The power to go invisible is being kept for a step of the plan (not used on Fleeches met before it), and
+    // the time to use it has come: that step is this one or the next
+    bool InvisSaved() const
+    {
+        return mInvisSaved;
+    }
+    bool InvisChantNow() const
+    {
+        return mInvisChantNow;
+    }
+    // The step that wants him unseen is the one after the step at hand
+    bool InvisChantSoon() const
+    {
+        return mInvisChantSoon;
+    }
+    // The thing that step uses (0: it is a crossing, or there is none)
+    u32 UnseenUse() const
+    {
+        return mUnseenUse;
+    }
+    void ScrabKilled(u32 id)
+    {
+        mWorld.mScrabsKilled.insert(id);
+    }
+    void ScrabParked(u32 id, s32 x)
+    {
+        mWorld.mScrabParked[id] = x;
+    }
+    // A Fleech (its entity) a Scrab was made to kill
+    void FleechKilled(u32 id)
+    {
+        mWorld.mFleechKilled.insert(id);
     }
     // The buttons that say hello and follow me in this game
     u32 SpeakHello() const;
@@ -132,6 +181,40 @@ public:
     // The cell Abe stands in, or -1
     s32 AbeNode() const;
     void BanEdge(s32 edge);
+    // The edges a way has to keep to for now, and no others (empty: any). For a stretch that was timed edge by edge.
+    void KeepTo(const std::set<s32>& edges)
+    {
+        mOnlyEdges = edges;
+    }
+    bool KeepsTo() const
+    {
+        return !mOnlyEdges.empty();
+    }
+    // The frame Abe was last where a Scrab that waits before it strikes could see him (0: never). For 210 frames
+    // after that it is still after him, and strikes without waiting (Scrab::Brain_1_ChasingEnemy).
+    u32 SeenByScrabAt() const
+    {
+        return mSeenByScrabAt;
+    }
+    // The ends of a Scrab's beat as seen: the last two places it has stopped at while it was not after him. False
+    // until it has been seen to stop at both.
+    bool ScrabBeat(u32 id, s32& lo, s32& hi) const
+    {
+        const auto it = mScrabBeat.find(id);
+        if (it == mScrabBeat.end() || std::abs(it->second.second - it->second.first) < 100)
+        {
+            return false;
+        }
+        lo = std::min(it->second.first, it->second.second);
+        hi = std::max(it->second.first, it->second.second);
+        return true;
+    }
+    // The frame from which a Scrab has stood where it is (0: not known, or it moves)
+    u32 ScrabStillSince(u32 id) const
+    {
+        const auto it = mScrabStill.find(id);
+        return it == mScrabStill.end() ? 0 : it->second.second;
+    }
     // A walk along an edge got nowhere: true from the second time on
     bool NoteBlocked(s32 edge)
     {
@@ -149,6 +232,11 @@ public:
     void StoppingSweep()
     {
         mSweepStopFrame = static_cast<s32>(mAbe.mFrame);
+    }
+    // The ending played for wants every Mudokon alive
+    bool SavesMudokons() const
+    {
+        return mProfile.mEnding == Ending::eSaveAll;
     }
     bool MayStopSweep() const
     {
@@ -181,14 +269,13 @@ public:
     void ThrowMissed();
     void ThrowHit();
     bool ThrowIsBad(u32 mine, const ThrowSpot& spot) const;
-    // A throw from this far and this level has set a mine off before
-    bool ThrowHasWorked(const ThrowSpot& spot) const;
     // The edge Abe is on his way along (-1: none), so a death can be laid at its door: two and it is banned
     void SetCurrentEdge(s32 edge)
     {
         mCurrentEdge = edge;
     }
-    NavGraph::EdgeCost EdgeCostFn() const;
+    // pastScrabs: without the rule that keeps him off a floor a loose Scrab can get at him on
+    NavGraph::EdgeCost EdgeCostFn(bool pastScrabs = false) const;
     void Log(const std::string& text);
     // See World::QuietFrames, with the beats this run has seen
     s32 QuietFrames(s32 x, s32 y, bool half) const;
@@ -205,6 +292,8 @@ public:
         return mReflexesRun;
     }
     // Its beat has been watched from one end to the other (or far enough to count on)
+    // A Slig whose whole beat is on the screen Abe is on: it is never off it, so there is never quiet there
+    bool BeatStaysOnScreen(const SligAt& slig) const;
     bool KnowsBeat(const SligAt& slig) const
     {
         for (const SligBeat& beat : mBeats)
@@ -280,8 +369,31 @@ private:
     std::size_t mKeptOpen = 0;
     std::set<std::pair<s32, s32>> mVisitedPaths;
     LevelGraph mLevel;
+    // (the reason there was no getting away from a woken Slig is logged once)
+    s32 mFleeWhy = 0;
+    // The levels he has been in: going back to one is not getting on
+    std::set<s32> mLevelsBeen;
     // Switches (by path and fact key) that have changed during the run, and the one being tried now
     std::set<std::pair<s32, u32>> mExplored;
+    // The regions (path, kRegion value) he has stood in, and how often each has been made for
+    std::set<std::pair<s32, s32>> mRegionsBeen;
+    std::map<std::pair<s32, s32>, s32> mRegionTries;
+    std::pair<s32, s32> mRegionGoal{0, 0};
+    // The path in which any path not yet visited became good enough to leave by
+    s32 mNewPathFor = -1;
+    // Where he came into the path he is in. Of two ways out to the same place, the one he has just come in by
+    // is not the one meant (a vault's own door is), until nothing else is left to try (mBackFor: in that path)
+    std::pair<s32, s32> mArrivedKey{-1, -1};
+    s32 mArrivedX = 0;
+    s32 mArrivedY = 0;
+    s32 mBackFor = -1;
+    u32 mRingDueBy = 0;
+    bool mInvisSaved = false;
+    bool mInvisChantNow = false;
+    bool mInvisChantSoon = false;
+    u32 mUnseenUse = 0;
+    // The path for which why no way out is known has been logged
+    s32 mWhyNoWayOut = -1;
     u32 mExploring = 0;
     s8 mLastSwitches[256] = {};
     std::string mLastSligs;
@@ -303,8 +415,8 @@ private:
     std::map<std::pair<s32, s32>, s32> mDeathCells;
     u32 mThrowMine = 0;
     ThrowSpot mThrowSpot;
-    // (level, cells, kind) of throws that set a mine off
-    std::set<std::tuple<s32, s32, s32>> mThrowHits;
+    // Where the rock thrown last was on each frame
+    std::vector<ThrowArc::Point> mThrowSeen;
     s32 mCurrentEdge = -1;
     std::map<s32, s32> mEdgeDeaths;
     s32 mLastKilled = 0;
@@ -377,6 +489,12 @@ private:
     bool mTracing = false;
     std::string mTrace;
     std::string mLog;
+    std::set<s32> mOnlyEdges;
+    u32 mSeenByScrabAt = 0;
+    // By Scrab: where it was last, and the frame it came to stand there (0 while it moves or is not known to have)
+    std::map<u32, std::pair<s32, u32>> mScrabStill;
+    std::set<u32> mScrabMoved;
+    std::map<u32, std::pair<s32, s32>> mScrabBeat;
 };
 
 } // namespace Bot

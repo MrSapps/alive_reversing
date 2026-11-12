@@ -3,6 +3,8 @@
 #include <algorithm>
 
 #include "../Types.hpp"
+#include <map>
+#include <set>
 #include <vector>
 
 namespace Bot {
@@ -20,6 +22,14 @@ enum class EntityKind : u8
     eSecurityOrb,
     // Sets its switch when Abe looks into it
     eHandStone,
+    // A Fleech where the map puts it: mSwitch is the switch that wakes it (0: none)
+    eFleech,
+    // A Scrab where the map puts it: it goes for whoever comes onto its floor
+    eScrab,
+    // A switch in the floor that whoever steps on it sets (mOp: 0 on, 1 off, 2 toggles)
+    eFootSwitch,
+    // A lock with a ghost in it: slapped, the ghost flies off and its switch comes on when it gets where it is going
+    eSlapLock,
     // Laughing gas fills its camera while its switch is on: Mudokons there go wired
     eLaughingGas,
     // Takes whoever is controlled and stands in it to another one when its switch changes. mInputs: the camera
@@ -291,6 +301,34 @@ struct RockAt final
     s32 mX = 0;
     s32 mY = 0;
     bool mHalf = false;
+    // A Fleech: it is going up a hoist (it ends on the top of it whatever he does meanwhile)
+    bool mClimbing = false;
+};
+
+// A Scrab that is about
+struct ScrabAt final
+{
+    // The entity it is (0: not one of the path's)
+    u32 mId = 0;
+    s32 mX = 0;
+    s32 mY = 0;
+    bool mHalf = false;
+    // Abe is in it
+    bool mPossessed = false;
+    // What it is doing (Scrab.hpp: 0 stands, 26 howls)
+    s32 mMotion = 0;
+    bool mFacesLeft = false;
+};
+
+// A Slurg: where it is, its box's sides, and which way it crawls (0: not seen to move yet)
+struct SlurgAt final
+{
+    s32 mX = 0;
+    s32 mY = 0;
+    bool mHalf = false;
+    s32 mX1 = 0;
+    s32 mX2 = 0;
+    s32 mDir = 0;
 };
 
 struct World final
@@ -298,10 +336,18 @@ struct World final
     // Rocks Abe has on him, and those lying about
     s32 mRocks = 0;
     std::vector<RockAt> mRocksDown;
+    // The ones in the air
+    std::vector<RockAt> mRocksFlying;
     // The switch that stands for the hazard with this id (a mine's TLV) being gone: above the game's own 256
     static s32 HazardSwitch(u32 id)
     {
         return 1000 + static_cast<s32>(id);
+    }
+    // A door that opens once all of a set of switches are on (a tasks door) is given a switch of its own that
+    // stands for "all of them are": see Switch()
+    static s32 DoorSwitch(u32 id)
+    {
+        return 600000 + static_cast<s32>(id);
     }
     std::vector<UxbAt> mUxbs;
     std::vector<SweepAt> mSweeps;
@@ -433,6 +479,81 @@ struct World final
     }
     std::vector<SlogAt> mSlogs;
     std::vector<FlierAt> mFliers;
+    // Abe has the power to go invisible (from a slap lock) and has not used it yet; he is invisible now (Fleeches
+    // and the rest take no notice of him: it lasts a few hundred frames); he has had the power in this path
+    bool mInvisCharge = false;
+    bool mInvisible = false;
+    bool mInvisEver = false;
+    // A lock that gives the power has been slapped and its ring is on its way to him (the bot's own note)
+    bool mInvisComing = false;
+    // Slurgs: a step on one bursts it, and the noise wakes every Fleech on the screen. Standing still by one is
+    // safe: it is the feet coming down that do it.
+    std::vector<ScrabAt> mScrabs;
+    // The live Scrab an entity stands for, or null
+    const ScrabAt* ScrabOf(u32 id) const
+    {
+        for (const ScrabAt& scrab : mScrabs)
+        {
+            if (scrab.mId == id && id != 0)
+            {
+                return &scrab;
+            }
+        }
+        return nullptr;
+    }
+    // Slap locks (their entities) slapped in this path: the switch follows when the ghost gets to its tomb
+    // Slap locks that are about and have not been slapped (as the game has it: a slap can land on something else)
+    std::set<u32> mLocksIntact;
+    std::set<u32> mLocksSlapped;
+    // Scrabs (their entities) killed in this path, and where one that was shut in behind a gate was left
+    std::set<u32> mScrabsKilled;
+    std::map<u32, s32> mScrabParked;
+    // Fleeches (their entities) that a Scrab has been made to kill in this path
+    std::set<u32> mFleechKilled;
+    std::vector<SlurgAt> mSlurgs;
+    // Whether a hop or a drop that ends at x (on a floor at y, facing left or not) in so many frames comes down
+    // on one: his feet land nine behind and six ahead of where he ends (measured from the game's footstep
+    // points), a Slurg's box is where the game says it is, and it crawls on half a pixel a frame meanwhile
+    bool SlurgWhereHeLands(s32 x, s32 y, bool half, bool left, s32 frames) const
+    {
+        const s32 lo = x - (left ? 6 : 9) - 3;
+        const s32 hi = x + (left ? 9 : 6) + 3;
+        for (const SlurgAt& slurg : mSlurgs)
+        {
+            if (slurg.mHalf != half || std::abs(slurg.mY - y) * (half ? 2 : 1) > 14)
+            {
+                continue;
+            }
+            // (one whose way is not known yet may go either)
+            const s32 back = slurg.mDir > 0 ? 0 : frames / 2 + 1;
+            const s32 on = slurg.mDir < 0 ? 0 : frames / 2 + 1;
+            if (slurg.mX1 - back <= hi && slurg.mX2 + on >= lo)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+    // Whether a foot put down at x on a floor at y may come down on a Slurg (its box is up to 21 either side of
+    // it, the feet land up to 10 from where he is)
+    bool SlurgBy(s32 x, s32 y, bool half) const
+    {
+        for (const SlurgAt& slurg : mSlurgs)
+        {
+            if (slurg.mHalf == half && std::abs(slurg.mY - y) * (half ? 2 : 1) <= 14 && std::abs(slurg.mX - x) * (half ? 2 : 1) < 34)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+    // Fleeches that are awake (asleep or hanging they are no danger until a noise or their switch wakes them)
+    std::vector<RockAt> mFleechesAwake;
+    // And the ones asleep: a noise within 150 of one (a footstep that is not a sneaking one) angers it, and two
+    // in a row wake it
+    std::vector<RockAt> mFleechesAsleep;
+    // Where the bird portals that are open now are
+    std::vector<RockAt> mPortalsOpen;
     std::vector<LiftAt> mLifts;
     // Where each lift was when it was last about
     std::vector<LiftAt> mLiftsSeen;
@@ -462,7 +583,8 @@ struct World final
     s32 mRescued = 0;
     s32 mKilled = 0;
 
-    s32 Switch(s32 id) const
+    // real: as the game has it now, without counting a slapped lock's switch as on already
+    s32 Switch(s32 id, bool real = false) const
     {
         if (id >= 256)
         {
@@ -472,8 +594,28 @@ struct World final
                 {
                     return e.mGone ? 1 : 0;
                 }
+                if (e.mKind == EntityKind::eSwitchLogic && e.mSwitch == id)
+                {
+                    for (s32 input : e.mInputs)
+                    {
+                        if (input > 1 && !Switch(input, real))
+                        {
+                            return 0;
+                        }
+                    }
+                    return 1;
+                }
             }
             return 0;
+        }
+        // (a slapped lock's switch is as good as on: its ghost is on the way, and where the door it opens is
+        // is the place to wait for it, not where he stands)
+        for (const Entity& e : mEntities)
+        {
+            if (!real && e.mKind == EntityKind::eSlapLock && e.mSwitch == id && id > 1 && mLocksSlapped.count(e.mId) != 0)
+            {
+                return 1;
+            }
         }
         return id >= 0 ? mSwitches[id] : 0;
     }

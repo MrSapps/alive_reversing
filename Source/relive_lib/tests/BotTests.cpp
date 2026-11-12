@@ -7,6 +7,7 @@
 #include "Bot/Pilot.hpp"
 #include "Bot/Profile.hpp"
 #include "Bot/Task.hpp"
+#include "Bot/ThrowArc.hpp"
 #include "Bot/World.hpp"
 
 using namespace Bot;
@@ -1519,17 +1520,16 @@ TEST(BotDomain, RocksAreThrownFromOutOfTheBlast)
     NavGraph g;
     g.Build(in);
 
-    // On the floor: nothing from nearer than four cells, the first try a throw at the floor from five
+    // On the floor: from out of the blast, which reaches four and a half cells
     const std::vector<ThrowSpot> level = Domain::ThrowSpots(g, 312, 200, false);
     ASSERT_FALSE(level.empty());
-    EXPECT_EQ(level.front().mKind, ThrowSpot::eDown);
-    EXPECT_EQ(level.front().mCells, 5);
+    EXPECT_TRUE(level.front().mSure);
     for (const ThrowSpot& spot : level)
     {
         // (the ledge over it is a place to throw down from, too)
         if (spot.mLevel == 0)
         {
-            EXPECT_GE(spot.mCells, 4);
+            EXPECT_GE(spot.mCells, 5);
             EXPECT_EQ(g.Nodes()[spot.mNode].mY, 200);
         }
     }
@@ -1550,6 +1550,79 @@ TEST(BotDomain, RocksAreThrownFromOutOfTheBlast)
         }
     }
     EXPECT_EQ(tunnel.front().mKind, ThrowSpot::eCrouched);
+}
+
+// The flight of a rock as it was measured in the Mines (path 4, thrown from 962,460 to the right, a wall at 1100)
+TEST(BotThrowArc, ARockFliesAsItWasMeasured)
+{
+    NavInput in;
+    in.mLines.push_back(Line(750, 460, 1125, 460, 0));
+    // (the wall stops short of the floor: the crouched throw went under it)
+    in.mLines.push_back(Line(1100, 300, 1100, 400, 2));
+    const auto at = [&](ThrowSpot::Kind kind, s32 frame)
+    {
+        const std::vector<ThrowArc::Point> flight = ThrowArc::Throw(in, 962, 460, false, false, kind).mPoints;
+        return frame < static_cast<s32>(flight.size()) ? std::make_pair(flight[frame].mX, flight[frame].mY) : std::make_pair(-1, -1);
+    };
+    // Up: off the wall, down to the floor, a bounce
+    EXPECT_EQ(at(ThrowSpot::eUp, 0), std::make_pair(973, 405));
+    EXPECT_EQ(at(ThrowSpot::eUp, 10), std::make_pair(1073, 360));
+    EXPECT_EQ(at(ThrowSpot::eUp, 13).first, 1100);
+    EXPECT_EQ(at(ThrowSpot::eUp, 14), std::make_pair(1095, 370));
+    EXPECT_EQ(at(ThrowSpot::eUp, 23), std::make_pair(1050, 452));
+    EXPECT_EQ(at(ThrowSpot::eUp, 24), std::make_pair(1045, 460));
+    EXPECT_EQ(at(ThrowSpot::eUp, 25), std::make_pair(1042, 453));
+    EXPECT_EQ(at(ThrowSpot::eUp, 38), std::make_pair(1010, 460));
+    // Forward
+    EXPECT_EQ(at(ThrowSpot::eForward, 8), std::make_pair(1093, 377));
+    EXPECT_EQ(at(ThrowSpot::eForward, 9), std::make_pair(1100, 377));
+    EXPECT_EQ(at(ThrowSpot::eForward, 21), std::make_pair(1010, 460));
+    // Down: one bounce, and too slow for a second: through the floor
+    EXPECT_EQ(at(ThrowSpot::eDown, 8), std::make_pair(1053, 460));
+    EXPECT_EQ(at(ThrowSpot::eDown, 9), std::make_pair(1058, 455));
+    EXPECT_EQ(at(ThrowSpot::eDown, 18), std::make_pair(1103, 460));
+    EXPECT_EQ(at(ThrowSpot::eDown, 19), std::make_pair(1108, 465));
+    // Crouched: from lower and further forward
+    EXPECT_EQ(at(ThrowSpot::eCrouched, 0), std::make_pair(984, 445));
+    EXPECT_EQ(at(ThrowSpot::eCrouched, 10), std::make_pair(1084, 460));
+    EXPECT_EQ(at(ThrowSpot::eCrouched, 15), std::make_pair(1109, 459));
+    // Lob
+    EXPECT_EQ(at(ThrowSpot::eLob, 31), std::make_pair(1066, 460));
+}
+
+// A mine goes off when the rock's box touches it: up to a dozen pixels over the mine's floor, not higher
+TEST(BotThrowArc, ARockSetsOffTheMineItComesDownOnAndFliesOverTheNearOnes)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 460, 1500, 460, 0));
+    const auto hits = [&](ThrowSpot::Kind kind, s32 mineX, bool left)
+    {
+        const ThrowArc::Point mine{mineX, 460};
+        const ThrowArc::Flight flight = ThrowArc::Throw(in, 512, 460, false, left, kind, &mine);
+        return flight.mHit >= 0 && flight.mSure;
+    };
+    // Crouched: over the mines up to three cells off, onto the ones four to six off
+    EXPECT_FALSE(hits(ThrowSpot::eCrouched, 562, false));
+    EXPECT_FALSE(hits(ThrowSpot::eCrouched, 587, false));
+    EXPECT_TRUE(hits(ThrowSpot::eCrouched, 612, false));
+    EXPECT_TRUE(hits(ThrowSpot::eCrouched, 637, false));
+    EXPECT_TRUE(hits(ThrowSpot::eCrouched, 662, false));
+    // To the left it is the same the other way round
+    EXPECT_TRUE(hits(ThrowSpot::eCrouched, 387, true));
+    // As measured (Mines path 4): thrown crouched from 3587, the rock was at 3679 and fifteen over the floor, then
+    // on the mine at 3687, and came back off its side at half the speed
+    NavInput mines;
+    mines.mLines.push_back(Line(3400, 2280, 3750, 2280, 0));
+    const ThrowArc::Point mine{3687, 2280};
+    const ThrowArc::Flight flight = ThrowArc::Throw(mines, 3587, 2280, false, false, ThrowSpot::eCrouched, &mine);
+    ASSERT_EQ(flight.mHit, 8);
+    EXPECT_EQ(flight.mPoints[7].mX, 3679);
+    EXPECT_EQ(flight.mPoints[7].mY, 2265);
+    EXPECT_EQ(flight.mPoints[8].mX, 3679);
+    EXPECT_EQ(flight.mPoints[8].mY, 2269);
+    EXPECT_EQ(flight.mPoints[9].mX, 3674);
+    // A lob comes down on a mine two cells off
+    EXPECT_TRUE(hits(ThrowSpot::eLob, 612, false) || hits(ThrowSpot::eLob, 587, false) || hits(ThrowSpot::eLob, 637, false));
 }
 
 TEST(BotTasks, AThrowIsAimedWithTheDirectionHeld)
@@ -1772,6 +1845,59 @@ TEST(BotPilot, ADeadAbeFailsWhateverIsRunning)
     abe.mState.mMove = Move::eDead;
     EXPECT_EQ(pilot.Step(abe.mState, bits), PilotStatus::eFailed);
     EXPECT_EQ(pilot.Why(), "dead");
+    EXPECT_EQ(bits, 0u);
+}
+
+// Out of a well with the next move's buttons to hold: nothing while he goes in and flies, the buttons from when
+// his feet touch, and done as soon as he is off (the game goes from the landing straight into the run then)
+TEST(BotPilot, AWellLandsStraightIntoTheRunThatIsNext)
+{
+    FakeAbe abe;
+    Pilot pilot;
+    Prim press = Prim::Press(Btn::eUp);
+    press.mAfter = Btn::eRight | Btn::eRun;
+    pilot.Start(press, abe.mState);
+    u32 bits = 0;
+    EXPECT_EQ(pilot.Step(abe.mState, bits), PilotStatus::eRunning);
+    EXPECT_EQ(bits, static_cast<u32>(Btn::eUp));
+    // Into the well, still on the floor
+    abe.mState.mMotion = 81;
+    abe.mState.mMove = Move::eBusy;
+    EXPECT_EQ(pilot.Step(abe.mState, bits), PilotStatus::eRunning);
+    EXPECT_EQ(bits, 0u);
+    EXPECT_EQ(pilot.Step(abe.mState, bits), PilotStatus::eRunning);
+    EXPECT_EQ(bits, 0u);
+    // Shot out
+    abe.mState.mOnGround = false;
+    EXPECT_EQ(pilot.Step(abe.mState, bits), PilotStatus::eRunning);
+    EXPECT_EQ(bits, 0u);
+    // Down
+    abe.mState.mOnGround = true;
+    EXPECT_EQ(pilot.Step(abe.mState, bits), PilotStatus::eRunning);
+    EXPECT_EQ(bits, static_cast<u32>(Btn::eRight | Btn::eRun));
+    abe.mState.mMove = Move::eRun;
+    EXPECT_EQ(pilot.Step(abe.mState, bits), PilotStatus::eDone);
+    EXPECT_EQ(bits, static_cast<u32>(Btn::eRight | Btn::eRun));
+}
+
+// With nothing to hold he lands, stands up, and only then is it done
+TEST(BotPilot, AWellWithNothingNextEndsStanding)
+{
+    FakeAbe abe;
+    Pilot pilot;
+    pilot.Start(Prim::Press(Btn::eUp), abe.mState);
+    u32 bits = 0;
+    EXPECT_EQ(pilot.Step(abe.mState, bits), PilotStatus::eRunning);
+    abe.mState.mMotion = 81;
+    abe.mState.mMove = Move::eBusy;
+    abe.mState.mOnGround = false;
+    EXPECT_EQ(pilot.Step(abe.mState, bits), PilotStatus::eRunning);
+    abe.mState.mOnGround = true;
+    EXPECT_EQ(pilot.Step(abe.mState, bits), PilotStatus::eRunning);
+    EXPECT_EQ(bits, 0u);
+    abe.mState.mMove = Move::eIdle;
+    EXPECT_EQ(pilot.Step(abe.mState, bits), PilotStatus::eRunning);
+    EXPECT_EQ(pilot.Step(abe.mState, bits), PilotStatus::eDone);
     EXPECT_EQ(bits, 0u);
 }
 
@@ -2265,3 +2391,1270 @@ TEST(BotDomain, TheMineCarNeedsTheDoorsAcrossItsTrackOpen)
     EXPECT_TRUE(ride) << domain.Text();
 }
 
+// ---- What Necrum took (measured on its path 2 and 3) ----
+
+TEST(BotNecrum, AHopOffALedgeEndComesDownFourCellsOutOnAFloorBelow)
+{
+    // As measured: from 662,880 to the left onto the ledge at 960, he ends at 562
+    NavInput in;
+    in.mLines.push_back(Line(650, 880, 850, 880, 0));
+    in.mLines.push_back(Line(475, 960, 575, 960, 0));
+    NavGraph g;
+    g.Build(in);
+    const s32 top = g.NodeAt(662, 880, false);
+    const s32 low = g.NodeAt(562, 960, false);
+    ASSERT_GE(top, 0);
+    ASSERT_GE(low, 0);
+    EXPECT_TRUE(HasEdge(g, top, low, EdgeKind::eHop));
+    // Not off the other end, where there is nothing to come down on
+    for (const NavEdge& e : g.Edges())
+    {
+        EXPECT_FALSE(e.mFrom == g.NodeAt(837, 880, false) && e.mKind == EdgeKind::eHop);
+    }
+}
+
+TEST(BotNecrum, NoHopDownThroughADrill)
+{
+    // The same ledges with a drill between them (the Mines' path 4, off 2537,1400)
+    NavInput in;
+    in.mLines.push_back(Line(650, 880, 850, 880, 0));
+    in.mLines.push_back(Line(475, 960, 575, 960, 0));
+    in.mFeatures.push_back(Feature(FeatureKind::eSweep, 600, 800, 624, 960));
+    NavGraph g;
+    g.Build(in);
+    EXPECT_FALSE(HasEdge(g, g.NodeAt(662, 880, false), g.NodeAt(562, 960, false), EdgeKind::eHop));
+}
+
+TEST(BotNecrum, AHopToALedgeFourCellsOffNeedsAHoistThereToCatch)
+{
+    // As measured: Necrum's path 6, from 1187,360 to 1287,360, where a hoist at the far ledge's end catches him as
+    // he drops short of it. The Mines' path 4, from 2062,1400 at 2162,1400, has none: he went on down.
+    NavInput in;
+    in.mLines.push_back(Line(1050, 360, 1200, 360, 0));
+    in.mLines.push_back(Line(1275, 360, 1350, 360, 0));
+    in.mLines.push_back(Line(900, 460, 1500, 460, 0));
+    {
+        NavGraph g;
+        g.Build(in);
+        EXPECT_FALSE(HasEdge(g, g.NodeAt(1187, 360, false), g.NodeAt(1287, 360, false), EdgeKind::eHop));
+    }
+    NavFeature hoist = Feature(FeatureKind::eHoist, 1275, 360, 1299, 462);
+    hoist.mDir = 1;
+    in.mFeatures.push_back(hoist);
+    NavGraph g;
+    g.Build(in);
+    EXPECT_TRUE(HasEdge(g, g.NodeAt(1187, 360, false), g.NodeAt(1287, 360, false), EdgeKind::eHop));
+}
+
+TEST(BotNecrum, AHopCatchesALedgeTwoCellsOffAndHigher)
+{
+    // As measured: from 487,960 to the left he catches the ledge at 437,880
+    NavInput in;
+    in.mLines.push_back(Line(475, 960, 575, 960, 0));
+    in.mLines.push_back(Line(300, 880, 450, 880, 0));
+    NavFeature edge = Feature(FeatureKind::eEdge, 425, 880, 449, 904);
+    edge.mA = 1;
+    edge.mDir = 0;
+    in.mFeatures.push_back(edge);
+    NavGraph g;
+    g.Build(in);
+    const s32 from = g.NodeAt(487, 960, false);
+    const s32 to = g.NodeAt(437, 880, false);
+    ASSERT_GE(from, 0);
+    ASSERT_GE(to, 0);
+    EXPECT_TRUE(HasEdge(g, from, to, EdgeKind::eHop));
+}
+
+TEST(BotNecrum, AFallThroughAWellInTheAirGoesWhereTheWellThrows)
+{
+    // A shaft with no floor, a well's box in it, and the ledge the well throws to
+    NavInput in;
+    in.mLines.push_back(Line(50, 620, 250, 620, 0));
+    in.mLines.push_back(Line(50, 340, 100, 340, 0));
+    NavFeature hoist = Feature(FeatureKind::eHoist, 50, 620, 74, 644);
+    in.mFeatures.push_back(hoist);
+    NavFeature well = Feature(FeatureKind::eWellLocal, 50, 980, 74, 1004);
+    well.mC = 87;
+    well.mD = 325;
+    in.mFeatures.push_back(well);
+    NavGraph g;
+    g.Build(in);
+    const s32 top = g.NodeAt(62, 620, false);
+    const s32 ledge = g.NodeAt(87, 340, false);
+    ASSERT_GE(top, 0);
+    ASSERT_GE(ledge, 0);
+    EXPECT_TRUE(HasEdge(g, top, ledge, EdgeKind::eHoistDown));
+}
+
+TEST(BotNecrum, AWellGoesOneWayWithItsSwitchOffAndAnotherWithItOn)
+{
+    // An express well that comes back out of itself until switch 100 is on, and then leads to a well on another
+    // screen, which has nowhere to throw him and lets him out two cells to its right
+    NavInput in;
+    in.mLines.push_back(Line(300, 1240, 575, 1240, 0));
+    in.mLines.push_back(Line(650, 980, 1200, 980, 0));
+    NavFeature well = Feature(FeatureKind::eWellExpress, 500, 1220, 524, 1244);
+    well.mB = 1;
+    well.mA = 1;
+    well.mCamera = 6;
+    well.mDestCamera = 6;
+    well.mSwitch = 100;
+    well.mC = 470;
+    well.mD = 1237;
+    well.mOnA = 0;
+    well.mOnDestCamera = 4;
+    in.mFeatures.push_back(well);
+    NavFeature out = Feature(FeatureKind::eWellLocal, 925, 960, 949, 984);
+    out.mCamera = 4;
+    in.mFeatures.push_back(out);
+    NavGraph g;
+    g.Build(in);
+    const s32 at = g.NodeAt(512, 1240, false);
+    const s32 landing = g.NodeAt(987, 980, false);
+    ASSERT_GE(at, 0);
+    ASSERT_GE(landing, 0);
+    const NavEdge* on = FindEdge(g, at, landing, EdgeKind::eWell);
+    ASSERT_NE(on, nullptr);
+    s32 sw = 0;
+    s32 value = 0;
+    EXPECT_TRUE(g.Condition(*on, &sw, &value));
+    EXPECT_EQ(sw, 100);
+    EXPECT_EQ(value, 1);
+    // (off, it shoots him out at its own exit point, two cells from where he stood)
+    const NavEdge* off = FindEdge(g, at, g.NodeAt(462, 1240, false), EdgeKind::eWell);
+    ASSERT_NE(off, nullptr);
+    EXPECT_TRUE(g.Condition(*off, &sw, &value));
+    EXPECT_EQ(value, 0);
+    // And it is no way out of the path
+    EXPECT_TRUE(g.Exits().empty());
+}
+
+TEST(BotNecrum, ABirdPortalOfAbesOwnIsAWayOnceItsSwitchIsOn)
+{
+    // A gap too wide to jump, a portal at its near side made by switch 198, and the portal's exit at the far side
+    NavInput in;
+    in.mLines.push_back(Line(275, 460, 525, 460, 0));
+    in.mLines.push_back(Line(650, 460, 1150, 460, 0));
+    NavFeature portal = Feature(FeatureKind::ePortal, 500, 440, 524, 464);
+    portal.mDir = 0;
+    portal.mSwitch = 198;
+    portal.mCamera = 11;
+    portal.mDestCamera = 11;
+    in.mFeatures.push_back(portal);
+    NavFeature out = Feature(FeatureKind::ePortalExit, 650, 440, 674, 464);
+    out.mCamera = 11;
+    in.mFeatures.push_back(out);
+    NavGraph g;
+    g.Build(in);
+    const s32 far = g.NodeAt(662, 460, false);
+    ASSERT_GE(far, 0);
+    // From two to five cells before it (it is chanted open from where its doves are not scared off), not nearer
+    const NavEdge* through = FindEdge(g, g.NodeAt(412, 460, false), far, EdgeKind::ePortal);
+    ASSERT_NE(through, nullptr);
+    EXPECT_NE(FindEdge(g, g.NodeAt(462, 460, false), far, EdgeKind::ePortal), nullptr);
+    EXPECT_EQ(FindEdge(g, g.NodeAt(487, 460, false), far, EdgeKind::ePortal), nullptr);
+    s32 sw = 0;
+    s32 value = 0;
+    EXPECT_TRUE(g.Condition(*through, &sw, &value));
+    EXPECT_EQ(sw, 198);
+    EXPECT_EQ(value, 1);
+}
+
+TEST(BotNecrum, ATasksDoorIsOpenOnceAllItsHubsAreOn)
+{
+    World world;
+    Entity door;
+    door.mKind = EntityKind::eSwitchLogic;
+    door.mId = 3004;
+    door.mSwitch = World::DoorSwitch(3004);
+    door.mInputs[0] = 100;
+    door.mInputs[1] = 101;
+    world.mEntities.push_back(door);
+    EXPECT_EQ(world.Switch(World::DoorSwitch(3004)), 0);
+    world.mSwitches[100] = 1;
+    EXPECT_EQ(world.Switch(World::DoorSwitch(3004)), 0);
+    world.mSwitches[101] = 1;
+    EXPECT_EQ(world.Switch(World::DoorSwitch(3004)), 1);
+}
+
+TEST(BotNecrum, AWayBackToALevelPlayedIsNoWayOutOfThisOne)
+{
+    // Path 3 leads back to level 1 and on to path 1; only path 5 leaves for a new level
+    std::vector<PathSummary> paths(3);
+    paths[0].mPath = 3;
+    paths[0].mExits = {{1, 1}, {2, 1}};
+    paths[1].mPath = 1;
+    paths[1].mExits = {{2, 5}};
+    paths[2].mPath = 5;
+    paths[2].mExits = {{4, 6}};
+    LevelGraph naive;
+    naive.Build(2, paths);
+    EXPECT_EQ(naive.Distance(3), 0);
+    LevelGraph level;
+    level.Build(2, paths, {1});
+    EXPECT_EQ(level.Distance(5), 0);
+    EXPECT_EQ(level.Distance(1), 1);
+    EXPECT_EQ(level.Distance(3), 2);
+}
+
+TEST(BotNecrum, AFootIsNotPutDownOnASlurg)
+{
+    World world;
+    SlurgAt slurg;
+    slurg.mX = 537;
+    slurg.mY = 460;
+    slurg.mX1 = 527;
+    slurg.mX2 = 558;
+    slurg.mDir = -1;
+    world.mSlurgs.push_back(slurg);
+    // A hop that comes down at 587 in 24 frames is clear of it (it crawls away to the left); one at 512 is
+    // not (it will be there by then), nor one at 562 (its box reaches 558 and the foot comes down at 553)
+    EXPECT_FALSE(world.SlurgWhereHeLands(587, 460, false, false, 24));
+    EXPECT_TRUE(world.SlurgWhereHeLands(512, 460, false, false, 24));
+    EXPECT_TRUE(world.SlurgWhereHeLands(562, 460, false, false, 24));
+    // Its own cell and the ones a step's reach either side; not two cells off, not another floor
+    EXPECT_TRUE(world.SlurgBy(537, 460, false));
+    EXPECT_TRUE(world.SlurgBy(512, 460, false));
+    EXPECT_TRUE(world.SlurgBy(562, 460, false));
+    EXPECT_FALSE(world.SlurgBy(587, 460, false));
+    EXPECT_FALSE(world.SlurgBy(487, 460, false));
+    EXPECT_FALSE(world.SlurgBy(537, 360, false));
+    EXPECT_FALSE(world.SlurgBy(537, 460, true));
+}
+
+TEST(BotNecrum, TheLeverNearestTheDoorIsPulledLastWhereLeversWakeFleeches)
+{
+    // A room: a door on switch 46 that levers 43 (far) and 44 (by the door) open between them, and a Fleech
+    // that 44 wakes
+    NavInput in;
+    in.mLines.push_back(Line(800, 460, 1075, 460, 0));
+    NavFeature door = Feature(FeatureKind::eDoor, 1025, 440, 1049, 464);
+    door.mSwitch = 46;
+    door.mStartClosed = true;
+    in.mFeatures.push_back(door);
+    NavGraph g;
+    g.Build(in);
+    World world;
+    Entity far;
+    far.mKind = EntityKind::eLever;
+    far.mId = 1;
+    far.mX1 = 825;
+    far.mX2 = 902;
+    far.mY1 = 440;
+    far.mY2 = 464;
+    far.mSwitch = 43;
+    Entity near = far;
+    near.mId = 2;
+    near.mX1 = 925;
+    near.mX2 = 1002;
+    near.mSwitch = 44;
+    Entity logic;
+    logic.mKind = EntityKind::eSwitchLogic;
+    logic.mId = 3;
+    logic.mSwitch = 46;
+    logic.mInputs[0] = 43;
+    logic.mInputs[1] = 44;
+    Entity fleech;
+    fleech.mKind = EntityKind::eFleech;
+    fleech.mId = 4;
+    fleech.mSwitch = 44;
+    world.mEntities = {far, near, logic, fleech};
+    EXPECT_TRUE(Domain::PulledFirst(g, world, far).empty());
+    EXPECT_EQ(Domain::PulledFirst(g, world, near), std::vector<s32>{43});
+    // With no Fleech to wake the order does not matter
+    world.mEntities.pop_back();
+    EXPECT_TRUE(Domain::PulledFirst(g, world, near).empty());
+}
+
+// ---- What the Mudanchee vault took ----
+
+TEST(BotVault, AbeKeepsOffAFloorALooseScrabCanGetAtHimOn)
+{
+    // A floor with a gate in the middle (shut until switch 228 is on) and a Scrab to the left of it
+    NavInput in;
+    in.mLines.push_back(Line(2600, 1240, 3275, 1240, 0));
+    NavFeature gate = Feature(FeatureKind::eBarrier, 2926, 1220, 2950, 1244);
+    gate.mSolid = true;
+    gate.mStartClosed = true;
+    gate.mSwitch = 228;
+    in.mFeatures.push_back(gate);
+    NavGraph g;
+    g.Build(in);
+    World world;
+    Entity scrab;
+    scrab.mKind = EntityKind::eScrab;
+    scrab.mId = 1;
+    scrab.mX1 = 2725;
+    scrab.mX2 = 2749;
+    scrab.mY1 = 1220;
+    scrab.mY2 = 1244;
+    world.mEntities.push_back(scrab);
+    // On its side of the gate, not on the other, and not on another floor
+    EXPECT_TRUE(Domain::ScrabReaches(g, world, 2837, 1240, false));
+    EXPECT_FALSE(Domain::ScrabReaches(g, world, 3087, 1240, false));
+    EXPECT_FALSE(Domain::ScrabReaches(g, world, 2837, 1140, false));
+    // With the gate open it gets everywhere
+    world.mSwitches[228] = 1;
+    EXPECT_TRUE(Domain::ScrabReaches(g, world, 3087, 1240, false));
+    // Invisible (or with the power to be) he is not minded; a dead Scrab minds nothing
+    world.mInvisCharge = true;
+    EXPECT_FALSE(Domain::ScrabReaches(g, world, 3087, 1240, false));
+    world.mInvisCharge = false;
+    world.mScrabsKilled.insert(1);
+    EXPECT_FALSE(Domain::ScrabReaches(g, world, 2837, 1240, false));
+}
+
+// A ledge over a floor a Scrab is loose on: the way down is there for the planner, for an Abe who is unseen
+static bool NeedsUnseen(const Goap::Action& a)
+{
+    bool needs = false;
+    for (const Goap::Fact& f : a.mPre)
+    {
+        needs = needs || (f.mKey == Key::kInvisNow && f.mValue == 1);
+    }
+    return needs;
+}
+
+TEST(BotVault, AFloorALooseScrabIsOnIsCrossedOntoOnlyUnseen)
+{
+    NavInput in;
+    in.mLines.push_back(Line(2600, 1140, 2700, 1140, 0));
+    in.mLines.push_back(Line(2600, 1240, 3275, 1240, 0));
+    NavGraph g;
+    g.Build(in);
+    World world;
+    Entity scrab;
+    scrab.mKind = EntityKind::eScrab;
+    scrab.mId = 1;
+    scrab.mX1 = 2925;
+    scrab.mX2 = 2949;
+    scrab.mY1 = 1220;
+    scrab.mY2 = 1244;
+    world.mEntities.push_back(scrab);
+    const s32 ledge = g.NodeAt(2662, 1140, false, 6);
+    ASSERT_GE(ledge, 0);
+    s32 downs = 0;
+    for (const Goap::Action& a : Domain::Build(g, world, ledge, nullptr).mActions)
+    {
+        if (a.mName.rfind("Cross fall", 0) == 0)
+        {
+            downs++;
+            EXPECT_TRUE(NeedsUnseen(a)) << a.mName;
+        }
+    }
+    EXPECT_GT(downs, 0);
+    // The power not yet used does for finding a route, and so does its ring on the way; for the plan it is still
+    // a floor to be unseen on, and its start says he can be
+    world.mInvisComing = true;
+    EXPECT_FALSE(Domain::ScrabReaches(g, world, 2837, 1240, false));
+    EXPECT_TRUE(Domain::ScrabReaches(g, world, 2837, 1240, false, false));
+    const Domain coming = Domain::Build(g, world, ledge, nullptr);
+    EXPECT_EQ(coming.mStart.Get(Key::kInvisNow), 1);
+    // Invisible, it is a floor like any other
+    world.mInvisComing = false;
+    world.mInvisible = true;
+    for (const Goap::Action& a : Domain::Build(g, world, ledge, nullptr).mActions)
+    {
+        EXPECT_FALSE(NeedsUnseen(a)) << a.mName;
+    }
+}
+
+// A Fleech that hangs over a lock has to be dead before the lock is slapped; one that hangs over a floor that is
+// over the lock does not
+TEST(BotVault, AFleechOverAnotherFloorDoesNotGuardALock)
+{
+    for (s32 pass = 0; pass < 2; pass++)
+    {
+        NavInput in;
+        in.mLines.push_back(Line(700, 460, 1084, 460, 0));
+        if (pass == 1)
+        {
+            in.mLines.push_back(Line(700, 380, 1024, 380, 0));
+        }
+        NavGraph g;
+        g.Build(in);
+        World world;
+        Entity lock;
+        lock.mKind = EntityKind::eSlapLock;
+        lock.mId = 1;
+        lock.mX1 = 876;
+        lock.mX2 = 900;
+        lock.mY1 = 440;
+        lock.mY2 = 464;
+        lock.mSwitch = 177;
+        Entity fleech;
+        fleech.mKind = EntityKind::eFleech;
+        fleech.mId = 2;
+        fleech.mX1 = 850;
+        fleech.mX2 = 874;
+        fleech.mY1 = 300;
+        fleech.mY2 = 364;
+        world.mEntities = {lock, fleech};
+        s32 uses = 0;
+        for (const Goap::Action& a : Domain::Build(g, world, g.NodeAt(762, 460, false, 6), nullptr).mActions)
+        {
+            if (a.mName.rfind("Use SlapLock#1", 0) != 0)
+            {
+                continue;
+            }
+            uses++;
+            bool guarded = false;
+            for (const Goap::Fact& f : a.mPre)
+            {
+                guarded = guarded || (f.mKey == Key::Mud(2) && f.mValue == 2);
+            }
+            EXPECT_EQ(guarded, pass == 0) << a.mName;
+        }
+        EXPECT_GT(uses, 0);
+    }
+}
+
+TEST(BotVault, AScrabShutInBehindAGateIsWhereItWasLeft)
+{
+    NavInput in;
+    in.mLines.push_back(Line(438, 1240, 2214, 1240, 0));
+    NavFeature gate = Feature(FeatureKind::eBarrier, 600, 1216, 624, 1240);
+    gate.mSolid = true;
+    gate.mStartClosed = true;
+    gate.mSwitch = 230;
+    in.mFeatures.push_back(gate);
+    NavGraph g;
+    g.Build(in);
+    World world;
+    Entity scrab;
+    scrab.mKind = EntityKind::eScrab;
+    scrab.mId = 7;
+    scrab.mX1 = 1249;
+    scrab.mX2 = 1273;
+    scrab.mY1 = 1220;
+    scrab.mY2 = 1244;
+    world.mEntities.push_back(scrab);
+    EXPECT_TRUE(Domain::ScrabReaches(g, world, 1012, 1240, false));
+    // Walked in behind the gate at 509 and let go there
+    world.mScrabParked[7] = 509;
+    EXPECT_FALSE(Domain::ScrabReaches(g, world, 1012, 1240, false));
+    EXPECT_TRUE(Domain::ScrabReaches(g, world, 562, 1240, false));
+}
+
+TEST(BotVault, APortalIsHoppedIntoFromTwoCellsOffWhereverItsMiddleIs)
+{
+    // The portal's middle is 438, a pixel short of two cells from 487 (the Mudanchee vault's path 7)
+    NavInput in;
+    in.mLines.push_back(Line(378, 360, 675, 360, 0));
+    in.mLines.push_back(Line(1575, 460, 1776, 460, 0));
+    NavFeature portal = Feature(FeatureKind::ePortal, 426, 340, 450, 364);
+    portal.mDir = 1;
+    portal.mSwitch = 1;
+    portal.mCamera = 2;
+    portal.mDestCamera = 4;
+    in.mFeatures.push_back(portal);
+    NavFeature out = Feature(FeatureKind::ePortalExit, 1601, 440, 1626, 460);
+    out.mCamera = 4;
+    in.mFeatures.push_back(out);
+    NavGraph g;
+    g.Build(in);
+    const s32 far = g.NodeAt(1612, 460, false);
+    ASSERT_GE(far, 0);
+    EXPECT_NE(FindEdge(g, g.NodeAt(487, 360, false), far, EdgeKind::ePortal), nullptr);
+    EXPECT_EQ(FindEdge(g, g.NodeAt(462, 360, false), far, EdgeKind::ePortal), nullptr);
+}
+
+TEST(BotVault, ARunningJumpThroughAHoistCatchesTheLedgeOverIt)
+{
+    // A long floor, a ledge 100 over its right end with a hoist up to it that is taken facing right
+    NavInput in;
+    in.mLines.push_back(Line(1000, 460, 1400, 460, 0));
+    in.mLines.push_back(Line(1325, 360, 1550, 360, 0));
+    NavFeature hoist = Feature(FeatureKind::eHoist, 1326, 361, 1350, 463);
+    hoist.mDir = 1;
+    in.mFeatures.push_back(hoist);
+    NavGraph g;
+    g.Build(in);
+    const s32 top = g.NodeAt(1337, 360, false);
+    ASSERT_GE(top, 0);
+    // From where a run is under way, well back along the floor
+    const NavEdge* jump = FindEdge(g, g.NodeAt(1062, 460, false), top, EdgeKind::eRunJump);
+    ASSERT_NE(jump, nullptr);
+    // (dear, so that it is only taken with something after him)
+    EXPECT_GE(jump->mCost, 400);
+    // Not facing the other way
+    EXPECT_EQ(FindEdge(g, g.NodeAt(1387, 460, false), top, EdgeKind::eRunJump), nullptr);
+}
+
+TEST(BotVault, WellsOfAChainThatGoByTheSameSwitchGoTheSameWay)
+{
+    // As in the Mudanchee vault's path 3: a well that with switch 145 on throws to a point over a second well,
+    // which by the same switch throws up to a ledge (and with it off only along the floor)
+    NavInput in;
+    in.mLines.push_back(Line(419, 720, 705, 720, 0));
+    in.mLines.push_back(Line(576, 460, 1830, 460, 0));
+    in.mLines.push_back(Line(500, 80, 648, 80, 0));
+    in.mLines.push_back(Line(550, 640, 623, 640, 0));
+    NavFeature first = Feature(FeatureKind::eWellLocal, 500, 700, 525, 724);
+    first.mSwitch = 145;
+    first.mC = 611;
+    first.mD = 636;
+    first.mOnC = 587;
+    first.mOnD = 407;
+    in.mFeatures.push_back(first);
+    NavFeature second = Feature(FeatureKind::eWellLocal, 577, 440, 601, 464);
+    second.mSwitch = 145;
+    second.mC = 634;
+    second.mD = 455;
+    second.mOnC = 561;
+    second.mOnD = 92;
+    in.mFeatures.push_back(second);
+    NavGraph g;
+    g.Build(in);
+    const s32 at = g.NodeAt(512, 720, false);
+    const s32 ledge = g.NodeAt(562, 80, false);
+    ASSERT_GE(at, 0);
+    ASSERT_GE(ledge, 0);
+    const NavEdge* on = FindEdge(g, at, ledge, EdgeKind::eWell);
+    ASSERT_NE(on, nullptr);
+    s32 sw = 0;
+    s32 value = 0;
+    EXPECT_TRUE(g.Condition(*on, &sw, &value));
+    EXPECT_EQ(sw, 145);
+    EXPECT_EQ(value, 1);
+}
+
+// ---- What the Mudanchee vault's path 5 took ----
+
+// Its first screen: a floor over another, a hoist at each end of the upper one, a Scrab up there and one shut in
+// behind a gate below with the lock, and the gate's lever on the upper floor
+static NavInput ScrabPenScreen()
+{
+    NavInput in;
+    in.mLines.push_back(Line(18, 200, 1083, 200, 0));
+    in.mLines.push_back(Line(100, 100, 948, 100, 0));
+    NavFeature right = Feature(FeatureKind::eHoist, 925, 100, 950, 200);
+    right.mDir = 0;
+    in.mFeatures.push_back(right);
+    NavFeature left = Feature(FeatureKind::eHoist, 100, 100, 124, 202);
+    left.mDir = 1;
+    in.mFeatures.push_back(left);
+    NavFeature gate = Feature(FeatureKind::eBarrier, 200, 180, 224, 204);
+    gate.mSolid = true;
+    gate.mStartClosed = true;
+    gate.mSwitch = 207;
+    in.mFeatures.push_back(gate);
+    return in;
+}
+
+static World ScrabPenWorld()
+{
+    World world;
+    Entity up;
+    up.mKind = EntityKind::eScrab;
+    up.mId = 1;
+    up.mX1 = 501;
+    up.mX2 = 525;
+    up.mY1 = 80;
+    up.mY2 = 104;
+    world.mEntities.push_back(up);
+    Entity pen = up;
+    pen.mId = 2;
+    pen.mX1 = 100;
+    pen.mX2 = 124;
+    pen.mY1 = 180;
+    pen.mY2 = 204;
+    world.mEntities.push_back(pen);
+    Entity lever;
+    lever.mKind = EntityKind::eLever;
+    lever.mId = 3;
+    lever.mX1 = 300;
+    lever.mX2 = 375;
+    lever.mY1 = 80;
+    lever.mY2 = 100;
+    lever.mSwitch = 207;
+    lever.mOp = 2;
+    world.mEntities.push_back(lever);
+    Entity lock;
+    lock.mKind = EntityKind::eSlapLock;
+    lock.mId = 4;
+    lock.mX1 = 151;
+    lock.mX2 = 175;
+    lock.mY1 = 179;
+    lock.mY2 = 203;
+    lock.mSwitch = 219;
+    world.mEntities.push_back(lock);
+    return world;
+}
+
+TEST(BotVault, AScrabChasedOffTheEndOfItsFloorComesDownOnTheOneBelow)
+{
+    NavInput in = ScrabPenScreen();
+    NavGraph g;
+    g.Build(in);
+    // From the hoist at the right end it lands a cell on, on the floor below
+    EXPECT_EQ(Domain::LureLanding(g, g.NodeAt(937, 100, false)), g.NodeAt(962, 200, false));
+    // Not from the middle of the floor
+    EXPECT_EQ(Domain::LureLanding(g, g.NodeAt(512, 100, false)), -1);
+    // And with floor at its height within three cells it jumps the gap instead
+    in.mLines.push_back(Line(990, 100, 1070, 100, 0));
+    NavGraph gap;
+    gap.Build(in);
+    EXPECT_EQ(Domain::LureLanding(gap, gap.NodeAt(937, 100, false)), -1);
+}
+
+TEST(BotVault, AScrabIsOnTheFloorItIsOnNotTheOneTheMapPutItOn)
+{
+    NavGraph g;
+    g.Build(ScrabPenScreen());
+    World world = ScrabPenWorld();
+    EXPECT_TRUE(Domain::ScrabReaches(g, world, 512, 100, false));
+    EXPECT_FALSE(Domain::ScrabReaches(g, world, 512, 200, false));
+    // Lured off its floor, it is on the one below
+    ScrabAt live;
+    live.mId = 1;
+    live.mX = 962;
+    live.mY = 200;
+    world.mScrabs.push_back(live);
+    EXPECT_FALSE(Domain::ScrabReaches(g, world, 512, 100, false));
+    EXPECT_TRUE(Domain::ScrabReaches(g, world, 512, 200, false));
+    // And not past the gate, which is shut: with the one behind it dead, nothing gets at him there
+    world.mScrabsKilled.insert(2);
+    EXPECT_FALSE(Domain::ScrabReaches(g, world, 137, 200, false));
+    EXPECT_TRUE(Domain::GateBetween(g, world, 137, 512, 200, false));
+    world.mSwitches[207] = 1;
+    EXPECT_FALSE(Domain::GateBetween(g, world, 137, 512, 200, false));
+}
+
+TEST(BotVault, ScrabsAreLuredOffALedgeAndShutInBehindAGateToGetAtALock)
+{
+    NavGraph g;
+    g.Build(ScrabPenScreen());
+    const World world = ScrabPenWorld();
+    const s32 abe = g.NodeAt(512, 200, false);
+    ASSERT_GE(abe, 0);
+    const Domain d = Domain::Build(g, world, abe, [](s32)
+                                   { return true; });
+    const Goap::Plan plan = Goap::Planner::Find(d.mStart, {{Key::Switch(219), 1}}, d.mActions);
+    ASSERT_TRUE(plan.mFound);
+    std::vector<std::string> names;
+    for (s32 step : plan.mSteps)
+    {
+        if (d.mSteps[d.mActions[step].mTag].mKind != StepKind::eCross)
+        {
+            names.push_back(d.mActions[step].mName);
+        }
+    }
+    ASSERT_EQ(names.size(), 3u);
+    EXPECT_EQ(names[0], "Lure the Scrabs off the ledge at 937,100");
+    EXPECT_EQ(names[1], "Shut the Scrabs in right of the gate at 212,204 with Lever#3");
+    EXPECT_EQ(names[2], "Use SlapLock#4 sw219 on");
+    EXPECT_EQ(d.mSteps[d.mActions[plan.mSteps[0]].mTag].mKind, StepKind::eScrabLure);
+}
+
+TEST(BotVault, AHopDownOntoAWellGoesWhereTheWellLeads)
+{
+    // As measured in the Mudanchee vault's path 5: off the platform at 312,620 he comes down in the well at 212,
+    // which throws him out at 612
+    NavInput in;
+    in.mLines.push_back(Line(301, 620, 475, 620, 0));
+    in.mLines.push_back(Line(0, 720, 700, 720, 0));
+    NavFeature well = Feature(FeatureKind::eWellLocal, 201, 700, 225, 724);
+    well.mC = 612;
+    well.mD = 716;
+    in.mFeatures.push_back(well);
+    NavGraph g;
+    g.Build(in);
+    const s32 from = g.NodeAt(312, 620, false);
+    const s32 to = g.NodeAt(612, 720, false);
+    ASSERT_GE(from, 0);
+    ASSERT_GE(to, 0);
+    bool found = false;
+    for (const NavEdge& e : g.Edges())
+    {
+        if (e.mFrom == from && e.mTo == to && e.mKind == EdgeKind::eHop)
+        {
+            found = true;
+            // (and it says which well, for what walks the floor the well is in)
+            EXPECT_GE(e.mWell, 0);
+        }
+    }
+    EXPECT_TRUE(found);
+}
+
+// A lock in a room with two Fleeches, as in the Mudanchee vault's path 2: a floor that leads west from the room, a
+// floor over that with a hoist up to it at each end, and a well by the lock that throws him out far away
+static NavInput FleechRoom(bool eastHoist)
+{
+    NavInput in;
+    in.mLines.push_back(Line(430, 700, 1075, 700, 0));
+    in.mLines.push_back(Line(526, 620, 900, 620, 0));
+    in.mLines.push_back(Line(1200, 300, 1500, 300, 0));
+    NavFeature west = Feature(FeatureKind::eHoist, 526, 620, 550, 700);
+    west.mDir = 1;
+    in.mFeatures.push_back(west);
+    if (eastHoist)
+    {
+        NavFeature east = Feature(FeatureKind::eHoist, 876, 620, 900, 700);
+        east.mDir = 0;
+        in.mFeatures.push_back(east);
+    }
+    NavFeature well = Feature(FeatureKind::eWellLocal, 951, 680, 975, 704);
+    well.mC = 1312;
+    well.mD = 296;
+    in.mFeatures.push_back(well);
+    return in;
+}
+
+static World FleechRoomWorld()
+{
+    World world;
+    Entity fleech;
+    fleech.mKind = EntityKind::eFleech;
+    fleech.mId = 1;
+    fleech.mX1 = 901;
+    fleech.mX2 = 925;
+    fleech.mY1 = 679;
+    fleech.mY2 = 703;
+    world.mEntities.push_back(fleech);
+    fleech.mId = 2;
+    fleech.mX1 = 1026;
+    fleech.mX2 = 1050;
+    world.mEntities.push_back(fleech);
+    Entity lock;
+    lock.mKind = EntityKind::eSlapLock;
+    lock.mId = 3;
+    lock.mX1 = 1002;
+    lock.mX2 = 1026;
+    lock.mY1 = 680;
+    lock.mY2 = 704;
+    lock.mSwitch = 124;
+    world.mEntities.push_back(lock);
+    return world;
+}
+
+TEST(BotVault, AFleechCrawlsClimbsAHoistAndFallsButTakesNoWell)
+{
+    NavGraph g;
+    g.Build(FleechRoom(true));
+    const World world = FleechRoomWorld();
+    s32 walked = 0;
+    for (const NavEdge& e : g.Edges())
+    {
+        const s32 frames = Domain::FleechFrames(g, world, e);
+        switch (e.mKind)
+        {
+            case EdgeKind::eWalk:
+                // (a cell every seven frames)
+                EXPECT_EQ(frames, 7);
+                walked++;
+                break;
+            case EdgeKind::eHoistUp:
+                EXPECT_EQ(frames, 40);
+                break;
+            case EdgeKind::eFall:
+            case EdgeKind::eHoistDown:
+                EXPECT_EQ(frames, 21);
+                break;
+            default:
+                EXPECT_EQ(frames, -1) << EdgeKindName(e.mKind);
+                break;
+        }
+    }
+    EXPECT_GT(walked, 0);
+    // From the far end of the floor to the lock: as long as the floor is, and never to where the well leads
+    const s32 lock = g.NodeAt(987, 700, false);
+    const std::vector<s32> times = Domain::FleechTimes(g, world, {lock});
+    EXPECT_EQ(times[g.NodeAt(537, 700, false)], 18 * 7);
+    EXPECT_EQ(times[g.NodeAt(1312, 300, false)], 100000);
+    // (and the other way round: from the lock to there)
+    const std::vector<s32> from = Domain::FleechTimes(g, world, {lock}, -1, true);
+    EXPECT_EQ(from[g.NodeAt(537, 700, false)], 18 * 7);
+    EXPECT_EQ(from[g.NodeAt(1312, 300, false)], 100000);
+}
+
+TEST(BotVault, FleechesAreLedToTheFootOfAHoistAndTheLockGotAtTheOtherWay)
+{
+    NavGraph g;
+    g.Build(FleechRoom(true));
+    const World world = FleechRoomWorld();
+    const NavGraph::EdgeCost any = [](const NavEdge& e) -> s32
+    {
+        return std::max(1, e.mCost);
+    };
+    const s32 lock = g.NodeAt(987, 700, false);
+    const std::vector<s32> homes{g.NodeAt(912, 700, false), g.NodeAt(1037, 700, false)};
+    const Domain::FleechLure lure = Domain::LureFleeches(g, world, homes, lock, any, any);
+    ASSERT_TRUE(lure.mFound);
+    // To the west hoist along the floor, back over the top, and whether to go on is settled at the top's east end
+    EXPECT_EQ(lure.mBait, g.NodeAt(537, 700, false));
+    EXPECT_EQ(lure.mCommit, g.NodeAt(887, 620, false));
+    ASSERT_FALSE(lure.mBack.empty());
+    EXPECT_EQ(g.Edges()[lure.mBack.front()].mKind, EdgeKind::eHoistUp);
+    EXPECT_EQ(g.Edges()[lure.mBack.back()].mTo, lock);
+    // (they lose three frames a cell on him)
+    EXPECT_GE(lure.mLead, 40);
+    // He shows himself along the floor, and leaves by the well
+    ASSERT_FALSE(lure.mOut.empty());
+    EXPECT_EQ(g.Nodes()[g.Edges()[lure.mOut.back()].mTo].mY, 700);
+    ASSERT_FALSE(lure.mAway.empty());
+    EXPECT_EQ(g.Edges()[lure.mAway.back()].mTo, g.NodeAt(1312, 300, false));
+    // From where they would be at the hoist before him there is no such way
+    const Domain::FleechLure late = Domain::LureFleeches(g, world, {g.NodeAt(587, 700, false)}, lock, any, any, -1, g.NodeAt(462, 700, false));
+    EXPECT_FALSE(late.mFound);
+}
+
+TEST(BotVault, ALockFleechesGuardIsPlannedByLeadingThemOff)
+{
+    NavGraph g;
+    g.Build(FleechRoom(true));
+    const World world = FleechRoomWorld();
+    const s32 abe = g.NodeAt(462, 700, false);
+    ASSERT_GE(abe, 0);
+    const Domain d = Domain::Build(g, world, abe, [](s32)
+                                   { return true; });
+    const Goap::Plan plan = Goap::Planner::Find(d.mStart, {{Key::Switch(124), 1}}, d.mActions);
+    ASSERT_TRUE(plan.mFound);
+    std::vector<std::string> names;
+    for (s32 step : plan.mSteps)
+    {
+        if (d.mSteps[d.mActions[step].mTag].mKind != StepKind::eCross)
+        {
+            names.push_back(d.mActions[step].mName);
+        }
+    }
+    ASSERT_EQ(names.size(), 1u);
+    EXPECT_EQ(names[0], "Lead the Fleeches off and use SlapLock#3");
+    EXPECT_EQ(d.mSteps[d.mActions[plan.mSteps.back()].mTag].mKind, StepKind::eFleechLure);
+}
+
+TEST(BotVault, FleechesShutInWithALockAreLetOutFirstToBeLedOff)
+{
+    // No hoist out of the room, and a gate across the floor that a lever at the far end opens
+    NavInput in = FleechRoom(false);
+    NavFeature gate = Feature(FeatureKind::eBarrier, 838, 680, 862, 704);
+    gate.mSolid = true;
+    gate.mStartClosed = true;
+    gate.mSwitch = 121;
+    in.mFeatures.push_back(gate);
+    NavGraph g;
+    g.Build(in);
+    World world = FleechRoomWorld();
+    Entity lever;
+    lever.mKind = EntityKind::eLever;
+    lever.mId = 4;
+    lever.mX1 = 437;
+    lever.mX2 = 512;
+    lever.mY1 = 680;
+    lever.mY2 = 700;
+    lever.mSwitch = 121;
+    lever.mOp = 2;
+    world.mEntities.push_back(lever);
+    const s32 abe = g.NodeAt(462, 700, false);
+    ASSERT_GE(abe, 0);
+    const Domain d = Domain::Build(g, world, abe, [](s32)
+                                   { return true; });
+    const Goap::Plan plan = Goap::Planner::Find(d.mStart, {{Key::Switch(124), 1}}, d.mActions);
+    ASSERT_TRUE(plan.mFound);
+    std::vector<std::string> names;
+    for (s32 step : plan.mSteps)
+    {
+        if (d.mSteps[d.mActions[step].mTag].mKind != StepKind::eCross)
+        {
+            names.push_back(d.mActions[step].mName);
+        }
+    }
+    ASSERT_EQ(names.size(), 2u);
+    EXPECT_EQ(names[0], "Use Lever#4 sw121 on");
+    EXPECT_EQ(names[1], "Lead the Fleeches off and use SlapLock#3");
+}
+
+// The Fleech room with a gate across its floor, a Scrab on the near side of it, the Fleeches asleep on the far side
+// by a lock that gives the power to go unseen, and the gate's lever up on the ledge
+static World ScrabHuntWorld()
+{
+    World world = FleechRoomWorld();
+    for (Entity& e : world.mEntities)
+    {
+        if (e.mKind == EntityKind::eFleech)
+        {
+            e.mInputs[0] = 1;
+        }
+        if (e.mKind == EntityKind::eSlapLock)
+        {
+            e.mInputs[0] = 120;
+        }
+    }
+    Entity scrab;
+    scrab.mKind = EntityKind::eScrab;
+    scrab.mId = 5;
+    scrab.mX1 = 588;
+    scrab.mX2 = 612;
+    scrab.mY1 = 676;
+    scrab.mY2 = 700;
+    world.mEntities.push_back(scrab);
+    Entity lever;
+    lever.mKind = EntityKind::eLever;
+    lever.mId = 4;
+    lever.mX1 = 637;
+    lever.mX2 = 712;
+    lever.mY1 = 600;
+    lever.mY2 = 620;
+    lever.mSwitch = 121;
+    lever.mOp = 2;
+    world.mEntities.push_back(lever);
+    return world;
+}
+
+static NavInput ScrabHuntRoom()
+{
+    NavInput in = FleechRoom(true);
+    NavFeature gate = Feature(FeatureKind::eBarrier, 838, 680, 862, 704);
+    gate.mSolid = true;
+    gate.mStartClosed = true;
+    gate.mSwitch = 121;
+    in.mFeatures.push_back(gate);
+    return in;
+}
+
+TEST(BotVault, AGateBetweenAScrabAndAPlaceIsWhatKeepsItOffOrCouldIfShut)
+{
+    NavGraph g;
+    g.Build(ScrabHuntRoom());
+    World world = ScrabHuntWorld();
+    std::vector<Goap::Fact> keep;
+    std::vector<Goap::Fact> shut;
+    bool canShut = false;
+    // Shut: it does not get to the far side, and the gate staying shut is why
+    EXPECT_FALSE(Domain::ScrabReaches(g, world, 950, 700, false, false, &keep, &shut, &canShut));
+    ASSERT_EQ(keep.size(), 1u);
+    EXPECT_TRUE(keep[0] == (Goap::Fact{Key::Switch(121), 0}));
+    EXPECT_TRUE(shut.empty());
+    // Its own side it has
+    EXPECT_TRUE(Domain::ScrabReaches(g, world, 700, 700, false, false));
+    // Open: it does, and shutting the gate would stop it
+    world.mSwitches[121] = 1;
+    keep.clear();
+    EXPECT_TRUE(Domain::ScrabReaches(g, world, 950, 700, false, false, &keep, &shut, &canShut));
+    EXPECT_TRUE(keep.empty());
+    ASSERT_EQ(shut.size(), 1u);
+    EXPECT_TRUE(shut[0] == (Goap::Fact{Key::Switch(121), 0}));
+    EXPECT_TRUE(canShut);
+    // No gate between it and its own side: nothing to shut
+    EXPECT_TRUE(Domain::ScrabReaches(g, world, 700, 700, false, false, &keep, &shut, &canShut));
+    EXPECT_FALSE(canShut);
+}
+
+TEST(BotVault, FleechesOnAScrabsFloorAreKilledWithItBeforeTheLockTheyLieBy)
+{
+    NavGraph g;
+    g.Build(ScrabHuntRoom());
+    const World world = ScrabHuntWorld();
+    const s32 abe = g.NodeAt(662, 620, false);
+    ASSERT_GE(abe, 0);
+    const Domain d = Domain::Build(g, world, abe, [](s32)
+                                   { return true; });
+    // The hunt: with the gate open and no power in hand (the chant would spend it), both Fleeches dead by it
+    const Goap::Action* hunt = nullptr;
+    const Goap::Action* lock = nullptr;
+    for (const Goap::Action& a : d.mActions)
+    {
+        const DomainStep& step = d.mSteps[a.mTag];
+        hunt = step.mKind == StepKind::eScrabHunt && step.mEntity == 5 && !hunt ? &a : hunt;
+        lock = step.mKind == StepKind::eUse && step.mEntity == 3 && !lock ? &a : lock;
+    }
+    ASSERT_NE(hunt, nullptr);
+    const auto has = [](const std::vector<Goap::Fact>& facts, const Goap::Fact& f)
+    {
+        return std::find(facts.begin(), facts.end(), f) != facts.end();
+    };
+    EXPECT_TRUE(has(hunt->mPre, {Key::Switch(121), 1}));
+    EXPECT_TRUE(has(hunt->mPre, {Key::kInvisNow, 0}));
+    EXPECT_TRUE(has(hunt->mEffects, {Key::Mud(1), 2}));
+    EXPECT_TRUE(has(hunt->mEffects, {Key::Mud(2), 2}));
+    // The lock: the one asleep beside it is its guard now that there is a way to kill it
+    ASSERT_NE(lock, nullptr);
+    EXPECT_TRUE(has(lock->mPre, {Key::Mud(2), 2}));
+    // And the lever that opens the Scrab's gate for the hunt is not held back for the power
+    for (const Goap::Action& a : d.mActions)
+    {
+        const DomainStep& step = d.mSteps[a.mTag];
+        if (step.mKind == StepKind::eUse && step.mEntity == 4)
+        {
+            EXPECT_FALSE(has(a.mPre, {Key::kInvisNow, 1})) << a.mName;
+        }
+    }
+    // Without the Scrab the Fleech asleep on the floor is no guard: the lock is slapped among them
+    World none = world;
+    none.mEntities.erase(std::remove_if(none.mEntities.begin(), none.mEntities.end(), [](const Entity& e)
+                                        { return e.mKind == EntityKind::eScrab; }),
+                         none.mEntities.end());
+    const Domain plain = Domain::Build(g, none, abe, [](s32)
+                                       { return true; });
+    for (const Goap::Action& a : plain.mActions)
+    {
+        const DomainStep& step = plain.mSteps[a.mTag];
+        EXPECT_NE(step.mKind, StepKind::eScrabHunt);
+        if (step.mKind == StepKind::eUse && step.mEntity == 3)
+        {
+            EXPECT_FALSE(has(a.mPre, {Key::Mud(2), 2}));
+        }
+    }
+}
+
+TEST(BotVault, ASwitchThatFollowsAnotherIsSetAndUnsetWithIt)
+{
+    // A timer trigger's output: the lever's switch 121 moves 122 with it, both ways, and there is no step for it
+    NavGraph g;
+    g.Build(ScrabHuntRoom());
+    World world = ScrabHuntWorld();
+    Entity timer;
+    timer.mKind = EntityKind::eSwitchLogic;
+    timer.mId = 9;
+    timer.mInputs[0] = 121;
+    timer.mSwitch = 122;
+    timer.mHoldOnly = true;
+    world.mEntities.push_back(timer);
+    const s32 abe = g.NodeAt(662, 620, false);
+    ASSERT_GE(abe, 0);
+    const Domain d = Domain::Build(g, world, abe, [](s32)
+                                   { return true; });
+    s32 on = 0;
+    s32 off = 0;
+    for (const Goap::Action& a : d.mActions)
+    {
+        const DomainStep& step = d.mSteps[a.mTag];
+        EXPECT_FALSE(step.mKind == StepKind::eLogic && step.mEntity == 9);
+        if (step.mKind == StepKind::eUse && step.mEntity == 4)
+        {
+            const bool setsOn = std::find(a.mEffects.begin(), a.mEffects.end(), Goap::Fact{Key::Switch(121), 1}) != a.mEffects.end();
+            const Goap::Fact with{Key::Switch(122), setsOn ? 1 : 0};
+            EXPECT_TRUE(std::find(a.mEffects.begin(), a.mEffects.end(), with) != a.mEffects.end()) << a.mName;
+            on += setsOn ? 1 : 0;
+            off += setsOn ? 0 : 1;
+        }
+    }
+    EXPECT_GE(on, 1);
+    EXPECT_GE(off, 1);
+}
+
+// The first screen of the sixth Mudanchee vault in small: a Scrab in a pen under a gap in the floor above, Fleeches
+// shut in further on behind a gate with its lever outside, and a hoist up to the floor above beyond that
+static NavInput FleechLeadRoom()
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 460, 1456, 460, 0));
+    in.mLines.push_back(Line(101, 360, 475, 360, 0));
+    in.mLines.push_back(Line(525, 360, 1325, 360, 0));
+    in.mLines.push_back(Line(250, 362, 250, 480, 1));
+    in.mLines.push_back(Line(700, 360, 700, 480, 1));
+    in.mLines.push_back(Line(825, 360, 825, 480, 1));
+    NavFeature up = Feature(FeatureKind::eHoist, 1300, 360, 1324, 466);
+    up.mDir = 0;
+    in.mFeatures.push_back(up);
+    NavFeature start = Feature(FeatureKind::eHoist, 100, 360, 124, 466);
+    start.mDir = 1;
+    in.mFeatures.push_back(start);
+    NavFeature gate = Feature(FeatureKind::eBarrier, 975, 440, 999, 464);
+    gate.mSolid = true;
+    gate.mStartClosed = true;
+    gate.mSwitch = 103;
+    in.mFeatures.push_back(gate);
+    return in;
+}
+
+static World FleechLeadWorld()
+{
+    World world;
+    Entity fleech;
+    fleech.mKind = EntityKind::eFleech;
+    fleech.mY1 = 440;
+    fleech.mY2 = 464;
+    for (u32 i = 0; i < 3; i++)
+    {
+        fleech.mId = 1 + i;
+        fleech.mX1 = 901 + 24 * static_cast<s32>(i);
+        fleech.mX2 = fleech.mX1 + 24;
+        world.mEntities.push_back(fleech);
+    }
+    Entity lever;
+    lever.mKind = EntityKind::eLever;
+    lever.mId = 4;
+    lever.mX1 = 1025;
+    lever.mX2 = 1100;
+    lever.mY1 = 440;
+    lever.mY2 = 460;
+    lever.mSwitch = 103;
+    lever.mOp = 2;
+    world.mEntities.push_back(lever);
+    Entity scrab;
+    scrab.mKind = EntityKind::eScrab;
+    scrab.mId = 5;
+    scrab.mX1 = 427;
+    scrab.mX2 = 452;
+    scrab.mY1 = 442;
+    scrab.mY2 = 462;
+    world.mEntities.push_back(scrab);
+    Entity lock;
+    lock.mKind = EntityKind::eSlapLock;
+    lock.mId = 6;
+    lock.mX1 = 876;
+    lock.mX2 = 900;
+    lock.mY1 = 439;
+    lock.mY2 = 463;
+    lock.mSwitch = 106;
+    lock.mInputs[0] = 120;
+    world.mEntities.push_back(lock);
+    return world;
+}
+
+TEST(BotVault, FleechesLetOutAreLedOverAGapToDropToAScrab)
+{
+    NavGraph g;
+    g.Build(FleechLeadRoom());
+    const World world = FleechLeadWorld();
+    const s32 from = Domain::UseNode(g, world.mEntities[3], nullptr);
+    ASSERT_GE(from, 0);
+    const Domain::FleechLead lead = Domain::LeadFleeches(g, world, from, 103);
+    ASSERT_TRUE(lead.mFound);
+    EXPECT_EQ(lead.mScrab, 5u);
+    EXPECT_EQ(lead.mGroup.size(), 3u);
+    // They come up the hoist after him and along the floor above to its end over the pen
+    bool hoist = false;
+    for (s32 edge : lead.mWay)
+    {
+        hoist = hoist || g.Edges()[edge].mKind == EdgeKind::eHoistUp;
+        EXPECT_GE(Domain::FleechFrames(g, world, g.Edges()[edge], 103), 0);
+    }
+    EXPECT_TRUE(hoist);
+    EXPECT_EQ(g.Nodes()[lead.mDrop].mY, 360);
+    EXPECT_GT(g.Nodes()[lead.mDrop].mX, 525);
+    // He goes on by a hop they cannot make, and they come down in the pen
+    EXPECT_LT(Domain::FleechFrames(g, world, g.Edges()[lead.mOver], 103), 0);
+    EXPECT_EQ(g.Nodes()[lead.mLand].mY, 460);
+    EXPECT_GT(g.Nodes()[lead.mLand].mX, 250);
+    EXPECT_LT(g.Nodes()[lead.mLand].mX, 700);
+    // The Scrab is taken over from across the gap, out of its reach and not right over them
+    EXPECT_EQ(g.Nodes()[lead.mSpot].mY, 360);
+    EXPECT_LT(g.Nodes()[lead.mSpot].mX, 475);
+    EXPECT_FALSE(Domain::ScrabReaches(g, world, g.Nodes()[lead.mSpot].mX, 360, false, false));
+    // With the gate open already there is nothing to let out
+    World open = world;
+    open.mSwitches[103] = 1;
+    EXPECT_FALSE(Domain::LeadFleeches(g, open, from, 103).mFound);
+    // Nor is there anywhere to lead them without the Scrab
+    World none = world;
+    none.mEntities.erase(std::remove_if(none.mEntities.begin(), none.mEntities.end(), [](const Entity& e)
+                                        { return e.mKind == EntityKind::eScrab; }),
+                         none.mEntities.end());
+    EXPECT_FALSE(Domain::LeadFleeches(g, none, from, 103).mFound);
+}
+
+TEST(BotVault, TheLeverThatLetsFleechesOutIsPulledToLeadThemToTheScrab)
+{
+    NavGraph g;
+    g.Build(FleechLeadRoom());
+    const World world = FleechLeadWorld();
+    const s32 abe = g.NodeAt(137, 460, false);
+    ASSERT_GE(abe, 0);
+    const Domain d = Domain::Build(g, world, abe, [](s32)
+                                   { return true; });
+    const auto has = [](const std::vector<Goap::Fact>& facts, const Goap::Fact& f)
+    {
+        return std::find(facts.begin(), facts.end(), f) != facts.end();
+    };
+    const Goap::Action* lead = nullptr;
+    for (const Goap::Action& a : d.mActions)
+    {
+        const DomainStep& step = d.mSteps[a.mTag];
+        lead = step.mKind == StepKind::eFleechLead && step.mEntity == 4 ? &a : lead;
+        // (pulled plainly it wants them dead first)
+        if (step.mKind == StepKind::eUse && step.mEntity == 4 && has(a.mEffects, {Key::Switch(103), 1}))
+        {
+            EXPECT_TRUE(has(a.mPre, {Key::Mud(1), 2})) << a.mName;
+        }
+    }
+    ASSERT_NE(lead, nullptr);
+    // Not with the power in hand: the chant for the Scrab would spend it
+    EXPECT_TRUE(has(lead->mPre, {Key::kInvisNow, 0}));
+    EXPECT_TRUE(has(lead->mEffects, {Key::Switch(103), 1}));
+    for (u32 f = 1; f <= 3; f++)
+    {
+        EXPECT_TRUE(has(lead->mEffects, {Key::Mud(f), 2}));
+    }
+    // And that is how the lock in their pen is got at
+    const Goap::Plan plan = Goap::Planner::Find(d.mStart, {{Key::Switch(106), 1}}, d.mActions);
+    ASSERT_TRUE(plan.mFound);
+    std::vector<std::string> names;
+    for (s32 step : plan.mSteps)
+    {
+        if (d.mSteps[d.mActions[step].mTag].mKind != StepKind::eCross)
+        {
+            names.push_back(d.mActions[step].mName);
+        }
+    }
+    ASSERT_EQ(names.size(), 2u);
+    EXPECT_EQ(names[0], "Let the Fleeches out with Lever#4 and lead them to Scrab#5");
+    EXPECT_EQ(names[1], "Use SlapLock#6 sw106 on");
+}
+
+TEST(BotVault, AThingOnAScrabsFloorUnderALedgeIsUsedUnseen)
+{
+    // A floor with a Scrab that strikes at once, a ledge over it with a hoist down, and a lock on each
+    NavInput in;
+    in.mLines.push_back(Line(0, 460, 700, 460, 0));
+    in.mLines.push_back(Line(200, 360, 300, 360, 0));
+    NavFeature hoist = Feature(FeatureKind::eHoist, 200, 360, 224, 466);
+    hoist.mDir = 1;
+    in.mFeatures.push_back(hoist);
+    NavGraph g;
+    g.Build(in);
+    World world;
+    Entity scrab;
+    scrab.mKind = EntityKind::eScrab;
+    scrab.mId = 1;
+    scrab.mX1 = 500;
+    scrab.mX2 = 524;
+    scrab.mY1 = 440;
+    scrab.mY2 = 460;
+    world.mEntities.push_back(scrab);
+    Entity lock;
+    lock.mKind = EntityKind::eSlapLock;
+    lock.mId = 2;
+    lock.mX1 = 400;
+    lock.mX2 = 424;
+    lock.mY1 = 440;
+    lock.mY2 = 464;
+    lock.mSwitch = 108;
+    world.mEntities.push_back(lock);
+    lock.mId = 3;
+    lock.mX1 = 250;
+    lock.mX2 = 274;
+    lock.mY1 = 340;
+    lock.mY2 = 364;
+    lock.mSwitch = 107;
+    world.mEntities.push_back(lock);
+    const s32 abe = g.NodeAt(237, 360, false);
+    ASSERT_GE(abe, 0);
+    const auto unseen = [&](const World& w, u32 id) -> s32
+    {
+        const Domain d = Domain::Build(g, w, abe, [](s32)
+                                       { return true; });
+        s32 found = -1;
+        for (const Goap::Action& a : d.mActions)
+        {
+            const DomainStep& step = d.mSteps[a.mTag];
+            if (step.mKind == StepKind::eUse && step.mEntity == id)
+            {
+                found = std::find(a.mPre.begin(), a.mPre.end(), Goap::Fact{Key::kInvisNow, 1}) != a.mPre.end() ? 1 : 0;
+            }
+        }
+        return found;
+    };
+    // The one on its floor only unseen; the one on the ledge as he is
+    EXPECT_EQ(unseen(world, 2), 1);
+    EXPECT_EQ(unseen(world, 3), 0);
+    // One that waits before it strikes is run from instead (the crossing is timed against its beat)
+    World waits = world;
+    waits.mEntities[0].mInputs[0] = 40;
+    EXPECT_EQ(unseen(waits, 2), 0);
+    // And with no Scrab there is nothing to hide from
+    World none = world;
+    none.mEntities.erase(none.mEntities.begin());
+    EXPECT_EQ(unseen(none, 2), 0);
+}

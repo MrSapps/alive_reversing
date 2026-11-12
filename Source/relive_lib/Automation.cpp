@@ -577,6 +577,14 @@ static bool CheckCommand(const Automation::Command& command, std::string& error)
         {
             return true;
         }
+        if (what == "runjump" && argCount == 3 && expectNumber(command.mArgs[1], -100000) && (command.mArgs[2] == "left" || command.mArgs[2] == "right"))
+        {
+            return true;
+        }
+        if (what == "walkoff" && argCount == 2 && (command.mArgs[1] == "left" || command.mArgs[1] == "right"))
+        {
+            return true;
+        }
         if (what == "press" && (argCount == 2 || argCount == 3))
         {
             return Automation::ParseButtons(command.mArgs[1], bits, error) && (argCount == 2 || expectNumber(command.mArgs[2], 1));
@@ -1294,6 +1302,14 @@ bool Automation::RunCommand(const Command& command, BaseMap& map, bool betweenFr
             {
                 bot.Do(Bot::Prim::Face(command.mArgs[1] == "left"));
             }
+            else if (what == "runjump")
+            {
+                bot.Do(Bot::Prim::RunJump(std::stoi(command.mArgs[1]), command.mArgs[2] == "left"));
+            }
+            else if (what == "walkoff")
+            {
+                bot.Do(Bot::Prim::WalkOff(command.mArgs[1] == "left"));
+            }
             else
             {
                 ParseButtons(command.mArgs[1], bits, error);
@@ -1957,6 +1973,11 @@ std::string Automation::ObjectsJson() const
             object["sprite_scale"] = ToDouble(pAnimated->GetSpriteScale());
             object["vel_x"] = ToDouble(pAnimated->mVelX);
             object["vel_y"] = ToDouble(pAnimated->mVelY);
+            if (pAnimated->GetAnimation().GetRender())
+            {
+                const PSX_RECT bound = pAnimated->VGetBoundingRect();
+                object["bound"] = {bound.x, bound.y, bound.w, bound.h};
+            }
             if (pAnimated->GetIsBaseAliveGameObject())
             {
                 auto pAlive = static_cast<BaseAliveGameObject*>(pAnimated);

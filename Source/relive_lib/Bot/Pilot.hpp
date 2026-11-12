@@ -25,6 +25,8 @@ struct Prim final
         eWalkOff, // walk off the end of the floor to mFaceLeft and land
         eLift,    // on a lift: ride it to the stop at height mX
         eRunJump, // run to mFaceLeft and jump from the cell of mX, until Abe lands or hangs from a ledge
+        eRunWell, // run to mFaceLeft at the well whose near side is at mX and into it without stopping: the run is
+                  // let go a few pixels short and up held, which takes him in as he slides over it
     };
 
     Kind mKind = Kind::eWait;
@@ -33,13 +35,24 @@ struct Prim final
     bool mFaceLeft = false;
     u32 mBits = 0;
     s32 mFrames = 0;
+    // A move by rolling that is run up to: the cell the roll has to have begun by (0: none). He goes from the
+    // run into the roll without stopping.
+    s32 mRunUp = 0;
+    // A fall or a well: the buttons of the move after it, held as he lands. Both games go from the landing
+    // straight into a walk or a run when a direction is held as his feet touch, and skip the rest of it.
+    u32 mAfter = 0;
+    // A roll from where down is the way to climb down a hoist: he walks at the low ceiling instead, and both
+    // games duck him under it (a wall at his head and none at his knees, where his walk starts)
+    bool mWalkIn = false;
 
     static Prim Wait(s32 frames, u32 bits = 0);
     static Prim MoveTo(s32 x, Gait gait = Gait::eWalk);
+    static Prim RunRoll(s32 rollByX, s32 x);
     static Prim Face(bool left);
     static Prim Press(u32 bits, s32 maxFrames = 12);
     static Prim WalkOff(bool left);
     static Prim RunJump(s32 takeoffX, bool left);
+    static Prim RunWell(s32 nearSideX, bool left);
     static Prim Lift(s32 y);
     std::string Text() const;
 };
@@ -85,13 +98,18 @@ private:
     PilotStatus StepPress(const AbeState& abe, u32& bits);
     PilotStatus StepWalkOff(const AbeState& abe, u32& bits);
     PilotStatus StepRoll(const AbeState& abe, u32& bits);
+    bool LandsInto(const AbeState& abe, u32& bits);
     PilotStatus StepRunJump(const AbeState& abe, u32& bits);
+    PilotStatus StepRunWell(const AbeState& abe, u32& bits);
     PilotStatus StepLift(const AbeState& abe, u32& bits);
 
     Prim mPrim;
     s32 mFrames = 0;
     s32 mPhase = 0;
     s32 mStill = 0;
+    bool mRolled = false;
+    // Seen off the ground in this prim
+    bool mAired = false;
     s32 mStartX = 0;
     s16 mStartMotion = 0;
     s32 mLastX = 0;

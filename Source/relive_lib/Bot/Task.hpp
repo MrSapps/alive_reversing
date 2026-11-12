@@ -207,6 +207,11 @@ public:
     }
     TaskStep Next(Bot& bot, const std::string& lastFailed) override;
     // Never faster than this (Mudokons in tow don't stop at wheels when they have to run to keep up)
+    // Crouched on purpose for a drill that goes over his head, till the way under it is clear
+    bool Ducked() const
+    {
+        return mSweepDuck;
+    }
     // Crouched by a UXB on the way: whoever runs this walk leaves Abe down
     bool Disarming() const
     {
@@ -246,6 +251,19 @@ private:
     bool mWaited = false;
     // Frames spent waiting for a Slig to look the other way
     s32 mHiding = 0;
+    // Chants at a bird portal that has not opened yet
+    s32 mPortalChants = 0;
+    // Steps spent waiting for a Slurg to get out of the way
+    s32 mSlurgWaits = 0;
+    bool mFleechAwakeHere = false;
+    s32 mLandWaits = 0;
+    // Steps spent at a door waiting for a lock's ghost to open it
+    s32 mGhostWaits = 0;
+    bool mChaseLogged = false;
+    s32 mLureWaits = 0;
+    s32 mUnseenWaits = 0;
+    // Chants made to go invisible
+    s32 mInvisChants = 0;
     // Frames spent waiting for a drill to be out of the way
     s32 mSweepWait = 0;
     // Pulling the lever that stops the drill in the way
@@ -286,11 +304,26 @@ public:
     {
         mSide = side;
     }
+    // The side to use it from, whatever side he comes from
+    void FixSide(s32 side)
+    {
+        mSide = side;
+        mSideChosen = true;
+    }
+    // What to hold as he lands, where using it drops him (a lock that opens the trap door he stands on)
+    void SetAfter(u32 bits)
+    {
+        mAfter = bits;
+    }
 
 private:
+    bool mMissLogged = false;
+    s32 mScrabWaits = 0;
     u32 mEntity;
     s32 mWant;
     s32 mSide = -1;
+    bool mSideChosen = false;
+    u32 mAfter = 0;
     std::unique_ptr<GoToTask> mGo;
     bool mArrived = false;
     s32 mTries = 0;
@@ -381,6 +414,9 @@ private:
     s32 mWaits = 0;
     s32 mRespawns = 0;
     bool mBlindThere = false;
+    bool mNoStand = false;
+    // Pulling the lever of a drill that is between a blind Mudokon and its portal
+    std::unique_ptr<UseTask> mDrillStop;
     s32 mBlindPhase = 0;
     s32 mBlindStop = -1;
     s32 mBlindDir = 0;
@@ -501,6 +537,7 @@ private:
     s32 mSlaps = 0;
     s32 mCloseIns = 0;
     s32 mWaits = 0;
+    bool mNoStand = false;
     bool mPause = false;
     s32 mHeld = 0;
 };
@@ -585,6 +622,348 @@ private:
     bool mBehind = false;
 };
 
+// A floor of Scrabs cleared with one of them: taken over from a ledge, it kills the other Scrabs (a howl gives it
+// the power to spin, and what its box is on while it spins dies), stamps on the Fleeches, and is walked over the
+// foot switch that shuts a gate behind it before it is let go
+class ScrabRampageTask final : public Task
+{
+public:
+    ScrabRampageTask(u32 scrab, s32 spot)
+        : mScrab(scrab)
+        , mSpot(spot)
+    {
+    }
+    std::string Name() const override
+    {
+        return "Clear the floor with Scrab #" + std::to_string(mScrab);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mScrab;
+    s32 mSpot;
+    // 0 to the ledge, 1 chant, 2 hunt, 3 to the trap, 4 let go
+    s32 mPhase = 0;
+    s32 mFrames = 0;
+    // The entity of the Scrab he is in
+    u32 mSelf = 0;
+    bool mCharged = false;
+    s32 mAttacks = 0;
+    // Fleeches that got away up a ledge, and runs made at one
+    std::vector<u32> mLeft;
+    s32 mFleechRuns = 0;
+    // 0 not asked for, 1 asked, 2 howling
+    s32 mHowl = 0;
+    s32 mHowlWait = 0;
+    s32 mStamps = 0;
+    s32 mTrapX = 0;
+    s32 mTrapSwitch = 0;
+    std::unique_ptr<GoToTask> mGo;
+};
+
+// A Scrab taken over from a ledge and used on a Fleech: the gate between them opened by the lever at hand, the
+// Scrab walked to the Fleech and made to stamp on it, walked home again and let go, the gate shut
+class ScrabKillTask final : public Task
+{
+public:
+    ScrabKillTask(u32 fleech, u32 scrab, u32 lever)
+        : mFleech(fleech)
+        , mScrab(scrab)
+        , mLever(lever)
+    {
+    }
+    std::string Name() const override
+    {
+        return "Scrab #" + std::to_string(mScrab) + " kills Fleech #" + std::to_string(mFleech);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mFleech;
+    u32 mScrab;
+    u32 mLever;
+    // 0 open the gate, 1 chant, 2 to the Fleech, 3 stamp, 4 home, 5 let go, 6 shut the gate
+    s32 mPhase = 0;
+    s32 mFrames = 0;
+    s32 mStamps = 0;
+    std::unique_ptr<Task> mUse;
+};
+
+// A Scrab taken over from a place on its screen and walked to the Fleeches on the floor of its floor, each stamped
+// on. It is left where a gate can be shut on it with the least in its way: at home, or where the Fleeches were
+// if that stretch has fewer ways on and off it.
+class ScrabHuntTask final : public Task
+{
+public:
+    ScrabHuntTask(u32 scrab, s32 spot)
+        : mScrab(scrab)
+        , mSpot(spot)
+    {
+    }
+    // (the Fleeches led to it: the ones that are by it when it is taken over, not the ones the map puts there)
+    ScrabHuntTask(u32 scrab, s32 spot, std::vector<u32> led)
+        : mScrab(scrab)
+        , mSpot(spot)
+        , mLed(true)
+        , mGroup(std::move(led))
+    {
+    }
+    ~ScrabHuntTask() override;
+    std::string Name() const override
+    {
+        return "Scrab #" + std::to_string(mScrab) + " hunts the Fleeches of its floor";
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mScrab;
+    s32 mSpot;
+    // 0 to the spot, 1 chant, 2 hunt, 3 to where it is left, 4 let go
+    s32 mPhase = 0;
+    s32 mFrames = 0;
+    s32 mStamps = 0;
+    s32 mWaits = 0;
+    s32 mLine = -1;
+    s32 mFloorY = 0;
+    s32 mHomeX = 0;
+    s32 mLeaveX = 0;
+    bool mParked = false;
+    bool mCharged = false;
+    s32 mHowl = 0;
+    s32 mHowlWait = 0;
+    s32 mAttacks = 0;
+    bool mWrong = false;
+    bool mSet = false;
+    bool mLed = false;
+    s32 mNone = 0;
+    std::vector<u32> mGroup;
+    std::unique_ptr<GoToTask> mGo;
+};
+
+// Fleeches let out with a lever and led to a Scrab that is then taken over to kill them (Domain::LeadFleeches).
+// They make for where he is, not along the way he went, and go up a hoist only if they come by it with him
+// above: so he is on its top, got to by another way if there is one, until the first of them starts up it, and
+// then keeps a few cells ahead of them to where they drop.
+class FleechLeadTask final : public Task
+{
+public:
+    explicit FleechLeadTask(u32 lever)
+        : mLever(lever)
+    {
+    }
+    ~FleechLeadTask() override;
+    std::string Name() const override
+    {
+        return "Fleeches let out with #" + std::to_string(mLever) + " and led to a Scrab";
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    void Keep(Bot& bot, const std::set<s32>& edges);
+
+    u32 mLever;
+    // 0 the lever, 1 to the top of the next hoist on their way, 2 there until they come up it, 3 on ahead of them
+    // to where they drop, 4 over, 5 to where he chants from, 6 there until they are down, 7 the Scrab
+    s32 mPhase = 0;
+    Domain::FleechLead mLead;
+    // How many of the way's edges are behind him
+    std::size_t mAt = 0;
+    s32 mWaits = 0;
+    s32 mClear = 0;
+    Bot* mKept = nullptr;
+    std::unique_ptr<UseTask> mUse;
+    std::unique_ptr<GoToTask> mGo;
+    std::unique_ptr<ScrabHuntTask> mHunt;
+};
+
+// The Scrabs of a floor got to run off its end: up the hoist there so that they see him, down again to hang from
+// the ledge while they come at a run (one that hangs is not seen, and they keep running at where he was), and up
+// as they go over. What comes down is loose on the floor below.
+class ScrabLureTask final : public Task
+{
+public:
+    explicit ScrabLureTask(s32 top)
+        : mTop(top)
+    {
+    }
+    ~ScrabLureTask() override;
+    std::string Name() const override
+    {
+        return "Lure the Scrabs off the ledge";
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    s32 mTop;
+    // 0 to the foot of the hoist, 1 up to hang, 2 hanging until they are far off, 3 on top until one runs at him,
+    // 4 hanging until it has gone over, 5 up again
+    s32 mPhase = 0;
+    s32 mFrames = 0;
+    s32 mWaits = 0;
+    s32 mTries = 0;
+    std::unique_ptr<GoToTask> mGo;
+};
+
+// Something Fleeches guard, used while they are away: he shows himself, has them follow him to the foot of a hoist
+// and goes back to the thing by another way (Domain::LureFleeches). From the last place to turn back at, where
+// they are by then decides whether he goes on.
+class FleechLureTask final : public Task
+{
+public:
+    FleechLureTask(u32 entity, s32 value)
+        : mEntity(entity)
+        , mValue(value)
+    {
+    }
+    ~FleechLureTask() override;
+    std::string Name() const override
+    {
+        return "Lead the Fleeches off";
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    void Keep(Bot& bot, const std::set<s32>& edges);
+
+    u32 mEntity;
+    s32 mValue;
+    // 0 the way is worked out, 1 to where they are led to, 2 towards them until they come, 3 back there, 4 to the
+    // last place to turn back at, 5 the thing is used, 6 out of their reach
+    s32 mPhase = 0;
+    Domain::FleechLure mLure;
+    s32 mTarget = -1;
+    // The side of the thing it is used from (-1 its left)
+    s32 mSide = -1;
+    std::size_t mOutAt = 0;
+    s32 mWaits = 0;
+    s32 mTries = 0;
+    u32 mLedAt = 0;
+    std::unique_ptr<GoToTask> mGo;
+    std::unique_ptr<UseTask> mUse;
+    Bot* mKept = nullptr;
+};
+
+// A gate worked by its lever until it is shut with every Scrab of its floor on one side of it. With a Scrab on
+// each side it is opened while both are on his screen: two that see each other fight, and one dies.
+class ScrabPenTask final : public Task
+{
+public:
+    ScrabPenTask(u32 lever, s32 feature, bool left)
+        : mLever(lever)
+        , mFeature(feature)
+        , mLeft(left)
+    {
+    }
+    ~ScrabPenTask() override;
+    std::string Name() const override
+    {
+        return std::string("Shut the Scrabs in ") + (mLeft ? "left" : "right") + " of the gate";
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mLever;
+    s32 mFeature;
+    // The side the Scrabs are to be on
+    bool mLeft;
+    s32 mFrames = 0;
+    s32 mHold = 0;
+    bool mSaid = false;
+    std::unique_ptr<GoToTask> mGo;
+    std::unique_ptr<Task> mUse;
+};
+
+// A way that leads over the floor of a Scrab that waits before it strikes (its attack delay), by a player's
+// rule: from somewhere it can't see him (a ledge, a platform) he waits until it is so far off that he is down,
+// done and out of its sight again before it could be at him, and only then goes. The floor is crossed a stint at
+// a time, from one such place to the next. With an entity, that is used on the way and the nearest safe place
+// made for.
+class ScrabWaryTask final : public Task
+{
+public:
+    ScrabWaryTask(std::string name, s32 goal, u32 entity, s32 value)
+        : mName(std::move(name))
+        , mGoal(goal)
+        , mEntity(entity)
+        , mValue(value)
+    {
+    }
+    ~ScrabWaryTask() override;
+    std::string Name() const override
+    {
+        return mName;
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+    // Whether the way from where Abe is to a cell (or, with an entity, to where that is used from) is one for
+    // this task: he is out of the Scrabs' sight now, the way leads over such a floor, and its first stint can be
+    // done in the time the Scrab gives when it is at the far end of its beat
+    // note: what was found, for the log
+    static bool Wanted(const Bot& bot, s32 goal, u32 entity, std::string* note = nullptr);
+
+private:
+    struct Stint final
+    {
+        // The edges of the way from where he is: mFirst is the first onto the Scrab's floor (-1: none on the way)
+        std::vector<s32> mPath;
+        s32 mFirst = -1;
+        // The cell where he is out of its sight again, or -1 when the stint ends at the thing to use
+        s32 mExit = -1;
+        // Where he is on that floor and how many frames in, and the frames in all
+        std::vector<std::pair<s32, s32>> mAt;
+        s32 mFrames = 0;
+        bool mFound = false;
+        // After the thing is used: the place out of its sight to make for (the one that leaves most time)
+        s32 mRetreat = -1;
+        // The cell it ends at, and for a lock the side it is slapped from (0: as it comes)
+        s32 mTarget = -1;
+        s32 mSide = 0;
+        s32 mSpare = 0;
+        // The edges of the stint, on to where he is out of sight again: the way that was timed
+        std::set<s32> mEdges;
+        // The frames from setting out until it can see him: the turn, the jump, the drop
+        s32 mLead = 0;
+        // The thing is used from a trap door that it opens: the cell on the Scrab's floor he comes down on (-1: no)
+        s32 mDrop = -1;
+        // The first cell of the Scrab's floor he is on (or drops past, into a well in it)
+        s32 mOnto = -1;
+    };
+    // best: as it would be with the Scrabs at the ends of their beats that suit best
+    // face: the way he has to face to use the thing (-1 left, 1 right, 0 any)
+    // drop: the cell he falls to when the thing is used (-1: he stays where he uses it)
+    static Stint Plan(const Bot& bot, s32 cur, s32 target, bool use, s32 face, s32 drop, const std::vector<char>& hot, bool best);
+    // One way, with some edges left out. Plan tries again without the stint of a way whose first stint can't be done
+    // in time even at the best moment: the way with the least of the Scrab's floor may lead through its beat.
+    static Stint PlanOnce(const Bot& bot, s32 cur, s32 target, bool use, s32 face, s32 drop, const std::vector<char>& hot, bool best, const std::set<s32>& banned);
+    // The same for a cell or for an entity, which may have two sides to use it from: the one that leaves most time
+    static Stint PlanFor(const Bot& bot, s32 cur, s32 goal, const Entity* entity, const std::vector<char>& hot, bool best);
+    // The cells a loose Scrab can get at him on. waitingOnly: only those of Scrabs that wait before they strike.
+    static std::vector<char> Hot(const Bot& bot, bool waitingOnly = false);
+    static std::vector<Domain::LooseScrab> Scrabs(const World& world, bool waitingOnly = false);
+    // The frames to spare with the Scrabs where they are (negative: not enough), or with each put at the end
+    // of its beat that suits best
+    // note: where the Scrab is and where it is taken to be by then, for the log
+    // beatKnown: whether every Scrab that counts has been seen to walk its beat from end to end
+    static s32 Spare(const Bot& bot, const Stint& stint, const std::vector<char>& hot, bool best, std::string* note = nullptr, bool* beatKnown = nullptr);
+
+    std::string mName;
+    s32 mGoal;
+    u32 mEntity;
+    s32 mValue;
+    bool mUsed = false;
+    s32 mWaits = 0;
+    bool mSaid = false;
+    u32 mWentAt = 0;
+    s32 mRetreat = -1;
+    // The bot it has told to keep to the stint's edges
+    Bot* mKept = nullptr;
+    // On the way to where a stint starts from, kept to the edges that are out of the Scrabs' sight
+    bool mPrefix = false;
+    s32 mPrefixFails = 0;
+    s32 mDepth = 0;
+    std::unique_ptr<GoToTask> mGo;
+    std::unique_ptr<Task> mUse;
+};
+
 // Stood in an invisible zone until the flying Slig that is about has gone by and is behind him, going away
 class HideTask final : public Task
 {
@@ -662,6 +1041,7 @@ private:
     std::unique_ptr<GoToTask> mGo;
     bool mArrived = false;
     s32 mTries = 0;
+    s32 mGhostWaits = 0;
     s32 mStartPath = -1;
     s32 mStartLevel = -1;
 };

@@ -1,5 +1,6 @@
 #include <array>
 #include "GameView.hpp"
+#include "../GameObjects/IBirdPortal.hpp"
 #include "../BaseMap.hpp"
 #include "../BinaryPath.hpp"
 #include "../Collisions.hpp"
@@ -16,6 +17,7 @@
 #include "../../AliveLibAE/Drill.hpp"
 #include "../../AliveLibAE/MotionDetector.hpp"
 #include "../../AliveLibAE/Slig.hpp"
+#include "../../AliveLibAE/SlapLock.hpp"
 #include "../../AliveLibAE/DDCheat.hpp"
 #include "../../AliveLibAO/Mudokon.hpp"
 #include "../../AliveLibAO/DDCheat.hpp"
@@ -351,7 +353,37 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                     f.mB = t.mTargetDoorId;
                     f.mSwitch = t.mSwitchId;
                     f.mStartClosed = t.mStartState == relive::Path_Door::eClosed;
+                    if (isAe && (t.mDoorType == relive::Path_Door::eTasksDoor || t.mDoorType == relive::Path_Door::eTasksDoorWithSecretMusic))
+                    {
+                        // Opens once all its hubs' switches are on (the door sets its own switch then, but only
+                        // while it is on the screen)
+                        f.mSwitch = World::DoorSwitch(id);
+                        f.mStartClosed = true;
+                    }
                     setDest(f, t.mNextLevel, t.mNextPath, t.mNextCamera);
+                    in.mFeatures.push_back(f);
+                    break;
+                }
+                case ReliveTypes::eBirdPortal:
+                {
+                    const auto& t = static_cast<const relive::Path_BirdPortal&>(tlv);
+                    if (t.mPortalType == relive::Path_BirdPortal::PortalType::eAbe)
+                    {
+                        NavFeature f = MakeFeature(FeatureKind::ePortal, tlv, camera, id);
+                        f.mHalf = t.mScale == relive::reliveScale::eHalf;
+                        f.mDir = t.mEnterSide == relive::Path_BirdPortal::PortalSide::eLeft ? 0 : 1;
+                        f.mSwitch = t.mCreatePortalSwitchId;
+                        f.mA = t.mDeletePortalSwitchId;
+                        setDest(f, t.mExitLevel, t.mExitPath, t.mExitCamera);
+                        in.mFeatures.push_back(f);
+                    }
+                    break;
+                }
+                case ReliveTypes::eBirdPortalExit:
+                {
+                    const auto& t = static_cast<const relive::Path_BirdPortalExit&>(tlv);
+                    NavFeature f = MakeFeature(FeatureKind::ePortalExit, tlv, camera, id);
+                    f.mHalf = t.mScale == relive::reliveScale::eHalf;
                     in.mFeatures.push_back(f);
                     break;
                 }
@@ -364,6 +396,8 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                     // (switch 1 is always on: such a well only ever throws to its "on" place)
                     f.mC = t.mSwitchId == 1 ? t.mOnDestX : t.mOffDestX;
                     f.mD = t.mSwitchId == 1 ? t.mOnDestY : t.mOffDestY;
+                    f.mOnC = t.mOnDestX;
+                    f.mOnD = t.mOnDestY;
                     f.mSwitch = t.mSwitchId;
                     in.mFeatures.push_back(f);
                     break;
@@ -388,7 +422,17 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                     f.mA = t.mOffOtherWellId;
                     f.mB = t.mOtherWellId;
                     f.mSwitch = t.mSwitchId;
+                    // (shot out of it, he is thrown at its own exit point)
+                    f.mC = t.mExitX;
+                    f.mD = t.mExitY;
                     setDest(f, t.mOffDestLevel, t.mOffDestPath, t.mOffDestCamera);
+                    f.mOnA = t.mOnOtherWellId;
+                    f.mOnDestCamera = t.mOnDestCamera;
+                    if (static_cast<s32>(t.mOnDestLevel) != level || t.mOnDestPath != pathId)
+                    {
+                        f.mOnDestLevel = static_cast<s32>(t.mOnDestLevel);
+                        f.mOnDestPath = t.mOnDestPath;
+                    }
                     in.mFeatures.push_back(f);
                     break;
                 }
@@ -432,6 +476,7 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                     f.mHalf = t.mScale == relive::reliveScale::eHalf;
                     f.mSwitch = t.mSwitchId;
                     f.mStartClosed = t.mStartClosed;
+                    f.mSolid = true;
                     in.mFeatures.push_back(f);
                     break;
                 }
@@ -536,6 +581,11 @@ static void BuildEntities(BinaryPath& path, World& world)
     world.mEntities.clear();
     world.mTlvs.clear();
     world.mPath = &path;
+    world.mInvisEver = false;
+    world.mFleechKilled.clear();
+    world.mScrabsKilled.clear();
+    world.mLocksSlapped.clear();
+    world.mScrabParked.clear();
     for (auto& cam : path.GetCameras())
     {
         if (!cam)
@@ -638,6 +688,24 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mInputs[1] = t.mDeletePortalSwitchId;
                     break;
                 }
+                case ReliveTypes::eDoor:
+                {
+                    // A tasks door: "all my hubs are on" as a switch of its own
+                    const auto& t = static_cast<const relive::Path_Door&>(tlv);
+                    keep = GetGameType() == GameType::eAe && (t.mDoorType == relive::Path_Door::eTasksDoor || t.mDoorType == relive::Path_Door::eTasksDoorWithSecretMusic);
+                    e.mKind = EntityKind::eSwitchLogic;
+                    e.mSwitch = World::DoorSwitch(e.mId);
+                    const s16 hubs[8] = {t.mHub1, t.mHub2, t.mHub3, t.mHub4, t.mHub5, t.mHub6, t.mHub7, t.mHub8};
+                    s32 count = 0;
+                    for (s32 i = 0; i < 8 && count < 6; i++)
+                    {
+                        if (hubs[i] > 1)
+                        {
+                            e.mInputs[count++] = hubs[i];
+                        }
+                    }
+                    break;
+                }
                 case ReliveTypes::eMultiSwitchController:
                 {
                     const auto& t = static_cast<const relive::Path_MultiSwitchController&>(tlv);
@@ -664,10 +732,76 @@ static void BuildEntities(BinaryPath& path, World& world)
                     }
                     break;
                 }
+                case ReliveTypes::eTimerTrigger:
+                {
+                    // Its outputs are toggled when its input changes (after a delay) and back when it changes
+                    // back: each is a switch that comes on with the input (the Mudanchee vault's path 4, where
+                    // one lever opens two gates through it)
+                    const auto& t = static_cast<const relive::Path_TimerTrigger&>(tlv);
+                    e.mKind = EntityKind::eSwitchLogic;
+                    e.mInputs[0] = t.mInputSwitchId;
+                    const s16 outs[4] = {t.mOutputSwitchId1, t.mOutputSwitchId2, t.mOutputSwitchId3, t.mOutputSwitchId4};
+                    keep = false;
+                    for (s32 i = 0; i < 4; i++)
+                    {
+                        if (outs[i] > 1 && t.mInputSwitchId > 1)
+                        {
+                            Entity out = e;
+                            out.mId = e.mId ^ (static_cast<u32>(i) << 28);
+                            out.mSwitch = outs[i];
+                            // (it goes off again with its input: see Domain::Build)
+                            out.mHoldOnly = true;
+                            world.mEntities.push_back(out);
+                            world.mTlvs.push_back(&tlv);
+                        }
+                    }
+                    break;
+                }
                 case ReliveTypes::eLaughingGas:
                     e.mKind = EntityKind::eLaughingGas;
                     e.mSwitch = static_cast<const relive::Path_LaughingGas&>(tlv).mLaughingGasSwitchId;
                     break;
+                case ReliveTypes::eFootSwitch:
+                {
+                    const auto& t = static_cast<const relive::Path_FootSwitch&>(tlv);
+                    e.mKind = EntityKind::eFootSwitch;
+                    keep = GetGameType() == GameType::eAe;
+                    e.mHalf = t.mScale == relive::reliveScale::eHalf;
+                    e.mSwitch = t.mSwitchId;
+                    e.mOp = OpOf(t.mAction);
+                    break;
+                }
+                case ReliveTypes::eScrab:
+                    e.mKind = EntityKind::eScrab;
+                    keep = GetGameType() == GameType::eAe;
+                    e.mHalf = static_cast<const relive::Path_Scrab&>(tlv).mScale == relive::reliveScale::eHalf;
+                    // (how long it waits before it goes for what it has caught up with)
+                    e.mInputs[0] = static_cast<const relive::Path_Scrab&>(tlv).mAttackDelay;
+                    // (and how long at least it stands at an end of its beat, by the way it then faces: left, right)
+                    e.mInputs[1] = static_cast<const relive::Path_Scrab&>(tlv).mPauseLeftMin;
+                    e.mInputs[2] = static_cast<const relive::Path_Scrab&>(tlv).mPauseRightMin;
+                    break;
+                case ReliveTypes::eFleech:
+                {
+                    const auto& t = static_cast<const relive::Path_Fleech&>(tlv);
+                    e.mKind = EntityKind::eFleech;
+                    e.mHalf = t.mScale == relive::reliveScale::eHalf;
+                    e.mSwitch = t.mWakeUpSwitchId;
+                    e.mInputs[0] = t.mAsleep ? 1 : 0;
+                    e.mInputs[1] = t.mHanging ? 1 : 0;
+                    break;
+                }
+                case ReliveTypes::eSlapLock:
+                {
+                    const auto& t = static_cast<const relive::Path_SlapLock&>(tlv);
+                    e.mKind = EntityKind::eSlapLock;
+                    e.mHalf = t.mScale == relive::reliveScale::eHalf;
+                    e.mSwitch = t.mHasGhost ? t.mTargetTombSwitchId2 : 0;
+                    e.mInputs[0] = t.mGiveInvisibilityPowerup ? t.mInvisibilityDuration : 0;
+                    // (the switch the slap itself sets: a trap door under him, in the Mudanchee vault's path 5)
+                    e.mInputs[1] = t.mSlapOutputSwitchId;
+                    break;
+                }
                 case ReliveTypes::eHandStone:
                     e.mKind = EntityKind::eHandStone;
                     e.mHalf = static_cast<const relive::Path_HandStone&>(tlv).mScale == relive::reliveScale::eHalf;
@@ -823,6 +957,123 @@ void GameView::ReadWorld(BaseMap& map, World& world)
         }
     }
 
+    world.mInvisCharge = isAe && gAbe && gAbe->mHaveInvisibility != 0;
+    world.mInvisible = isAe && gAbe && gAbe->GetInvisible();
+    world.mInvisEver = world.mInvisEver || world.mInvisCharge || world.mInvisible;
+    world.mScrabs.clear();
+    const std::vector<SlurgAt> slurgsBefore = world.mSlurgs;
+    world.mSlurgs.clear();
+    world.mFleechesAwake.clear();
+    world.mFleechesAsleep.clear();
+    world.mLocksIntact.clear();
+    for (s32 i = 0; isAe && i < gBaseAliveGameObjects->Size(); i++)
+    {
+        BaseAliveGameObject* pObj = gBaseAliveGameObjects->ItemAt(i);
+        if (pObj && !pObj->GetDead() && pObj->Type() == ReliveTypes::eSlapLock && static_cast<const SlapLock*>(pObj)->Intact())
+        {
+            // (which of the path's it is: by where it stands, in the middle of its TLV on its lower edge)
+            for (const Entity& e : world.mEntities)
+            {
+                if (e.mKind == EntityKind::eSlapLock && std::abs(e.CentreX() - FP_GetExponent(pObj->mXPos)) <= 2 && std::abs(e.mY2 - FP_GetExponent(pObj->mYPos)) <= 2)
+                {
+                    world.mLocksIntact.insert(e.mId);
+                }
+            }
+            continue;
+        }
+        // Which of the path's Scrabs it is: by its TLV, since one that is chased off its floor is no longer where
+        // the map put it
+        u32 scrabId = 0;
+        if (pObj && pObj->Type() == ReliveTypes::eScrab)
+        {
+            for (std::size_t k = 0; k < world.mEntities.size(); k++)
+            {
+                if (world.mEntities[k].mKind == EntityKind::eScrab && static_cast<const relive::Path_TLV*>(world.mTlvs[k])->mId == pObj->mBaseGameObjectTlvInfo)
+                {
+                    scrabId = world.mEntities[k].mId;
+                }
+            }
+            // (one that lost a fight lies there a while before its TLV says it is gone)
+            if (scrabId != 0 && pObj->mHealth <= FP_FromInteger(0))
+            {
+                world.mScrabsKilled.insert(scrabId);
+            }
+        }
+        if (!pObj || pObj->GetDead() || pObj->mHealth <= FP_FromInteger(0))
+        {
+            continue;
+        }
+        RockAt at;
+        at.mX = FP_GetExponent(pObj->mXPos);
+        at.mY = FP_GetExponent(pObj->mYPos);
+        at.mHalf = pObj->GetSpriteScale() != FP_FromInteger(1);
+        if (pObj->Type() == ReliveTypes::eScrab)
+        {
+            ScrabAt scrab;
+            scrab.mId = scrabId;
+            scrab.mX = at.mX;
+            scrab.mY = at.mY;
+            scrab.mHalf = at.mHalf;
+            scrab.mPossessed = pObj->GetPossessed();
+            scrab.mMotion = pObj->VGetMotion(eMotionType::eCurrentMotion);
+            scrab.mFacesLeft = pObj->GetAnimation().GetFlipX();
+            world.mScrabs.push_back(scrab);
+        }
+        else if (pObj->Type() == ReliveTypes::eSlurg)
+        {
+            SlurgAt slurg;
+            slurg.mX = at.mX;
+            slurg.mY = at.mY;
+            slurg.mHalf = at.mHalf;
+            const PSX_RECT box = pObj->VGetBoundingRect();
+            slurg.mX1 = box.x;
+            slurg.mX2 = box.w;
+            // Which way it goes: from where it was the frame before (it moves a pixel every other frame)
+            for (const SlurgAt& was : slurgsBefore)
+            {
+                if (was.mHalf == slurg.mHalf && was.mY == slurg.mY && std::abs(was.mX - slurg.mX) <= 2)
+                {
+                    slurg.mDir = slurg.mX > was.mX ? 1 : (slurg.mX < was.mX ? -1 : was.mDir);
+                    break;
+                }
+            }
+            world.mSlurgs.push_back(slurg);
+        }
+        else if (pObj->Type() == ReliveTypes::eFleech)
+        {
+            // (Fleech.hpp: motion 0 is asleep on the floor, 17 asleep hanging by its tongue)
+            const s16 motion = pObj->VGetMotion(eMotionType::eCurrentMotion);
+            if (motion != 0 && motion != 17)
+            {
+                // (11 raises its head to the hoist, 12 climbs)
+                at.mClimbing = motion == 11 || motion == 12;
+                world.mFleechesAwake.push_back(at);
+            }
+            else
+            {
+                world.mFleechesAsleep.push_back(at);
+            }
+        }
+    }
+
+    // Bird portals that are open: one can be gone into
+    world.mPortalsOpen.clear();
+    for (s32 i = 0; isAe && i < gBaseGameObjects->Size(); i++)
+    {
+        BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
+        if (pObj && !pObj->GetDead() && pObj->Type() == ReliveTypes::eBirdPortal)
+        {
+            IBirdPortal* pPortal = static_cast<IBirdPortal*>(pObj);
+            if (pPortal->IsActivePortalState())
+            {
+                RockAt at;
+                at.mX = FP_GetExponent(pPortal->mXPos);
+                at.mY = FP_GetExponent(pPortal->mYPos);
+                world.mPortalsOpen.push_back(at);
+            }
+        }
+    }
+
     world.mFliers.clear();
     for (s32 i = 0; isAe && i < gBaseAliveGameObjects->Size(); i++)
     {
@@ -860,17 +1111,25 @@ void GameView::ReadWorld(BaseMap& map, World& world)
 
     world.mRocks = isAe && gAbe ? gAbe->mBaseThrowableCount : 0;
     world.mRocksDown.clear();
+    world.mRocksFlying.clear();
     for (s32 i = 0; isAe && i < gBaseAliveGameObjects->Size(); i++)
     {
         BaseAliveGameObject* pObj = gBaseAliveGameObjects->ItemAt(i);
-        // (one that has come to rest can be picked up)
-        if (pObj && !pObj->GetDead() && pObj->Type() == ReliveTypes::eRock && pObj->GetInteractive())
+        if (pObj && !pObj->GetDead() && pObj->Type() == ReliveTypes::eRock)
         {
             RockAt rock;
             rock.mX = FP_GetExponent(pObj->mXPos);
             rock.mY = FP_GetExponent(pObj->mYPos);
             rock.mHalf = pObj->GetSpriteScale() != FP_FromInteger(1);
-            world.mRocksDown.push_back(rock);
+            // (one that has come to rest can be picked up)
+            if (pObj->GetInteractive())
+            {
+                world.mRocksDown.push_back(rock);
+            }
+            else if (pObj->GetAnimation().GetRender() && (pObj->mVelX != FP_FromInteger(0) || pObj->mVelY != FP_FromInteger(0)))
+            {
+                world.mRocksFlying.push_back(rock);
+            }
         }
     }
 

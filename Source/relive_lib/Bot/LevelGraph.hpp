@@ -2,6 +2,7 @@
 
 #include "../Types.hpp"
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -20,7 +21,8 @@ struct PathSummary final
 class LevelGraph final
 {
 public:
-    void Build(s32 level, const std::vector<PathSummary>& paths);
+    // been: the levels Abe has been in already. A way back to one of them is no way out of this one.
+    void Build(s32 level, const std::vector<PathSummary>& paths, const std::set<s32>& been = {});
     s32 Level() const
     {
         return mLevel;

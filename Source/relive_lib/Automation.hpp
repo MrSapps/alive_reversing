@@ -100,6 +100,8 @@ class Bot;
 //         bot_do wait <frames> [<buttons>]
 //         bot_do move <x> [walk|run|sneak|roll] to the grid cell of world x (roll ends crouched)
 //         bot_do face <left|right>
+//         bot_do runjump <x> <left|right> run that way and jump from the cell of world x, until he lands or hangs
+//         bot_do walkoff <left|right> walk off the end of the floor that way and land
 //         bot_do press <buttons> [<max frames>] hold until Abe starts something, then let it play out
 //   bot <profile>
 //       The bot plays from here on by a profile: save_all, kill_all, average or any, then options after commas

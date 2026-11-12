@@ -53,6 +53,12 @@ public:
 
     static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
+    // Not slapped yet
+    bool Intact() const
+    {
+        return mState == SlapLockStates::eShaking_0 || mState == SlapLockStates::eIdle_1;
+    }
+
 private:
     void GiveInvisibility();
     void SetInvisibilityTarget();

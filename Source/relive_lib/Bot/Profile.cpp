@@ -49,9 +49,13 @@ bool Profile::Parse(const std::string& text, Profile& profile, std::string& erro
         {
             profile.mSeed = std::stoull(word.substr(5));
         }
+        else if (word.rfind("been=", 0) == 0 && word.size() > 5)
+        {
+            profile.mBeen.push_back(word.substr(5));
+        }
         else
         {
-            error = "unknown profile option '" + word + "' (seed=<n>, human)";
+            error = "unknown profile option '" + word + "' (seed=<n>, human, been=<level>)";
             return false;
         }
     }
@@ -61,7 +65,12 @@ bool Profile::Parse(const std::string& text, Profile& profile, std::string& erro
 std::string Profile::Text() const
 {
     const char* ending = mEnding == Ending::eSaveAll ? "save_all" : mEnding == Ending::eKillAll ? "kill_all" : mEnding == Ending::eAverage ? "average" : "any";
-    return std::string(ending) + ",seed=" + std::to_string(mSeed) + (mHuman ? ",human" : "");
+    std::string text = std::string(ending) + ",seed=" + std::to_string(mSeed) + (mHuman ? ",human" : "");
+    for (const std::string& level : mBeen)
+    {
+        text += ",been=" + level;
+    }
+    return text;
 }
 
 bool Profile::Rescues(u32 index) const

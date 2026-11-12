@@ -650,6 +650,8 @@ SET(relive_lib_src
     Bot/NavGraph.cpp
     Bot/Pilot.hpp
     Bot/Pilot.cpp
+    Bot/ThrowArc.hpp
+    Bot/ThrowArc.cpp
     WorldStatic.hpp
     WorldStatic.cpp
     SoundDebug.hpp
