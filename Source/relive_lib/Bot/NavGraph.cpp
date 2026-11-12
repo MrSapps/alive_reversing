@@ -46,6 +46,7 @@ const char* EdgeKindName(EdgeKind kind)
         case EdgeKind::eDoor: return "door";
         case EdgeKind::eWell: return "well";
         case EdgeKind::eTeleport: return "teleport";
+        case EdgeKind::ePortal: return "portal";
     }
     return "?";
 }
@@ -358,6 +359,19 @@ s32 NavGraph::BarrierBetween(s32 xa, s32 xb, s32 y, bool half) const
 
 bool NavGraph::Condition(const NavEdge& edge, s32* switchId, s32* openValue) const
 {
+    if (edge.mWhen >= 0 && edge.mWell >= 0)
+    {
+        // A well that goes here only while its switch is one way
+        if (switchId)
+        {
+            *switchId = mInput.mFeatures[edge.mWell].mSwitch;
+        }
+        if (openValue)
+        {
+            *openValue = edge.mWhen;
+        }
+        return true;
+    }
     if (edge.mClear >= 0)
     {
         // Into a cell with a mine: open once it is gone, which the world gives as a switch of its own
@@ -399,6 +413,11 @@ bool NavGraph::Condition(const NavEdge& edge, s32* switchId, s32* openValue) con
     }
     else if (f.mKind == FeatureKind::eDoor && edge.mKind == EdgeKind::eDoor && f.mStartClosed && f.mSwitch > 1)
     {
+        value = 1;
+    }
+    else if (f.mKind == FeatureKind::ePortal && edge.mKind == EdgeKind::ePortal && f.mSwitch > 1)
+    {
+        // Not there until its switch is on (a hand stone's, say)
         value = 1;
     }
     else if (f.mKind == FeatureKind::eTrapDoor)
@@ -536,6 +555,158 @@ s32 NavGraph::CameraOf(s32 x, s32 y) const
     return (x / mInput.mCamW) + (y / mInput.mCamH) * 256;
 }
 
+s32 NavGraph::Thrown(s32 x, s32 y, s32 fromX, bool half, s32 depth, s32 knownSwitch, s32 knownValue) const
+{
+    // Which way a well further along goes: by the switch the chain was started with if it is the same one
+    const auto whenOf = [&](const NavFeature& f)
+    {
+        return f.mSwitch == 1 ? 1 : (f.mSwitch > 1 && f.mSwitch == knownSwitch ? knownValue : 0);
+    };
+    // Into another well: the game puts him in the one whose box he is in as he falls
+    for (std::size_t i = 0; depth < 8 && i < mInput.mFeatures.size(); i++)
+    {
+        const NavFeature& f = mInput.mFeatures[i];
+        if ((f.mKind == FeatureKind::eWellLocal || f.mKind == FeatureKind::eWellExpress) && f.mHalf == half && x >= f.mX1 && x <= f.mX2 && y >= f.mY1 - 4 && y <= f.mY2 + 4 && (fromX < f.mX1 || fromX > f.mX2))
+        {
+            return WellOut(static_cast<s32>(i), whenOf(f), depth + 1, knownSwitch, knownValue);
+        }
+    }
+    const s32 step = GridStep(half);
+    if (x == 0 && y == 0)
+    {
+        return -1;
+    }
+    s32 fy = 0;
+    const s32 under = FloorBelow(x, y - 40, half, &fy);
+    // (thrown to a point in the air over a well, he comes down into it: the Mudanchee vault's path 3, from the
+    // well at 512,720 to the one at 589,460)
+    if (depth < 8)
+    {
+        const s32 below = WellInFall(x, y - 60, under >= 0 ? fy + 30 : y + 400, half);
+        if (below >= 0 && (fromX < mInput.mFeatures[below].mX1 || fromX > mInput.mFeatures[below].mX2))
+        {
+            return WellOut(below, whenOf(mInput.mFeatures[below]), depth + 1, knownSwitch, knownValue);
+        }
+    }
+    if (under >= 0 && fy - y < 200)
+    {
+        return NodeOnLine(under, x);
+    }
+    // Nothing under it: he flies on the way he was thrown and drops onto, or catches the edge of, what is next
+    const s32 dir = x < fromX ? -1 : 1;
+    for (s32 k = 1; k <= 4; k++)
+    {
+        const s32 nx = x + dir * k * step;
+        const s32 line = FloorBelow(nx, y - 40, half, &fy);
+        if (line >= 0 && fy - y < 200)
+        {
+            return NodeOnLine(line, nx);
+        }
+    }
+    return under >= 0 ? NodeOnLine(under, x) : -1;
+}
+
+s32 NavGraph::WellOut(s32 featureIdx, s32 when, s32 depth, s32 knownSwitch, s32 knownValue) const
+{
+    const NavFeature& f = mInput.mFeatures[featureIdx];
+    if (depth == 0 && f.mSwitch > 1)
+    {
+        knownSwitch = f.mSwitch;
+        knownValue = when;
+    }
+    const s32 centre = (f.mX1 + f.mX2) / 2;
+    if (f.mKind == FeatureKind::eWellLocal)
+    {
+        const s32 x = when == 1 ? f.mOnC : f.mC;
+        const s32 y = when == 1 ? f.mOnD : f.mD;
+        if (x == 0 && y == 0)
+        {
+            // Nowhere to throw him: he pops out and comes down two cells to its right (Necrum's path 3, the
+            // well at 937,980)
+            s32 fy = 0;
+            const s32 line = FloorBelow(centre + 2 * GridStep(f.mHalf), f.mY1 - 20, f.mHalf, &fy);
+            return line >= 0 ? NodeOnLine(line, centre + 2 * GridStep(f.mHalf)) : -1;
+        }
+        return Thrown(x, y, centre, f.mHalf, depth, knownSwitch, knownValue);
+    }
+    // An express well: he is put in the well it names in the camera it names, and shot out of that one
+    if ((when == 1 ? f.mOnDestPath : f.mDestPath) >= 0)
+    {
+        return -1;
+    }
+    const s32 id = when == 1 ? f.mOnA : f.mA;
+    const s32 camera = when == 1 ? f.mOnDestCamera : f.mDestCamera;
+    for (std::size_t i = 0; i < mInput.mFeatures.size(); i++)
+    {
+        const NavFeature& other = mInput.mFeatures[i];
+        if ((other.mKind != FeatureKind::eWellExpress && other.mKind != FeatureKind::eWellLocal) || other.mB != id || other.mCamera != camera)
+        {
+            continue;
+        }
+        const s32 from = (other.mX1 + other.mX2) / 2;
+        if (other.mKind == FeatureKind::eWellLocal)
+        {
+            if (static_cast<s32>(i) == featureIdx || depth >= 8)
+            {
+                return -1;
+            }
+            return WellOut(static_cast<s32>(i), other.mSwitch == 1 ? 1 : (other.mSwitch > 1 && other.mSwitch == knownSwitch ? knownValue : 0), depth + 1, knownSwitch, knownValue);
+        }
+        if (other.mC == 0 && other.mD == 0)
+        {
+            s32 fy = 0;
+            const s32 line = FloorBelow(from, other.mY1 - 60, other.mHalf, &fy);
+            return line >= 0 ? NodeOnLine(line, from) : -1;
+        }
+        return Thrown(other.mC, other.mD, from, other.mHalf, depth, knownSwitch, knownValue);
+    }
+    return -1;
+}
+
+void NavGraph::AddWellEdges(std::vector<NavEdge>& edges, s32 from, s32 wellIdx, EdgeKind kind, s32 cost, s32 feature, bool left) const
+{
+    const NavFeature& well = mInput.mFeatures[wellIdx];
+    const bool express = well.mKind == FeatureKind::eWellExpress;
+    const s32 off = well.mSwitch == 1 ? -1 : WellOut(wellIdx, 0);
+    const s32 on = well.mSwitch <= 0 ? -1 : WellOut(wellIdx, 1);
+    const bool offOut = express && well.mSwitch != 1 && well.mDestPath >= 0;
+    const bool onOut = express && well.mSwitch > 0 && well.mOnDestPath >= 0;
+    const auto add = [&](s32 to, s32 when)
+    {
+        if (to >= 0 && to != from)
+        {
+            AddEdge(edges, from, to, kind, cost, feature, left);
+            edges.back().mWell = wellIdx;
+            edges.back().mWhen = when;
+        }
+    };
+    if (well.mSwitch <= 1 || (off == on && !offOut && !onOut))
+    {
+        add(well.mSwitch == 1 ? on : off, -1);
+    }
+    else
+    {
+        add(off, 0);
+        add(on, 1);
+    }
+}
+
+s32 NavGraph::WellInFall(s32 x, s32 fromY, s32 toY, bool half) const
+{
+    // (the game asks whether the point he is at is in the well's box on each frame of the fall)
+    s32 best = -1;
+    for (std::size_t i = 0; i < mInput.mFeatures.size(); i++)
+    {
+        const NavFeature& f = mInput.mFeatures[i];
+        // (one on the floor he lands on is the other rule's: there he may drift into it)
+        if ((f.mKind == FeatureKind::eWellLocal || f.mKind == FeatureKind::eWellExpress) && f.mHalf == half && x >= f.mX1 && x <= f.mX2 && f.mY1 > fromY + 30 && f.mY2 < toY - 10 && (best < 0 || f.mY1 < mInput.mFeatures[best].mY1))
+        {
+            best = static_cast<s32>(i);
+        }
+    }
+    return best;
+}
+
 s32 NavGraph::WellLanding(const NavFeature& well) const
 {
     s32 fy = 0;
@@ -593,6 +764,42 @@ void NavGraph::AddRunJumps(std::vector<NavEdge>& edges, s32 from, s32 dir, bool 
     }
     const s32 takeoff = x;
     const s32 y = mNodes[NodeOnLine(n.mLine, takeoff)].mY;
+
+    // Up a hoist without stopping: a running jump that passes through a hoist he faces catches the ledge over
+    // it (Abe's run jump looks for a hoist where he is). Dear, so that it is only taken when the bot makes it
+    // cheap: with something after him (see Bot::EdgeCostFn).
+    for (s32 k = 3; k >= 2 && !overLift; k--)
+    {
+        const s32 hx = takeoff + dir * k * step;
+        s32 hoistIdx = -1;
+        const NavFeature* hoist = FeatureAt(FeatureKind::eHoist, hx, y - 10, n.mHalf, &hoistIdx);
+        if (!hoist || (hoist->mDir != 2 && (hoist->mDir == 0) != (dir < 0)) || WallBetween(takeoff, hx, y, n.mHalf) || BarrierBetween(n.mX, hx, y, n.mHalf) >= 0)
+        {
+            continue;
+        }
+        const s32 top = NodeAt(hx, hoist->mY1, n.mHalf, 12);
+        if (top >= 0 && (y - mNodes[top].mY) * (n.mHalf ? 2 : 1) <= 130)
+        {
+            AddEdge(edges, from, top, EdgeKind::eRunJump, 400, hoistIdx, dir < 0);
+            edges.back().mX = takeoff;
+            // (and from further back along the floor, so that a run that is under way need not stop for it)
+            s32 bx = n.mX;
+            for (s32 back = 1; back <= 14; back++)
+            {
+                const s32 px = StepX(bx, -dir, n.mHalf);
+                const s32 behind = NodeOnLine(n.mLine, px);
+                // (not from the far side of a gate)
+                if (behind < 0 || std::abs(mNodes[behind].mX - px) > step / 2 || mNodes[behind].mHazard || mNodes[behind].mLow || WallBetween(bx, px, n.mY, n.mHalf) || BarrierBetween(bx, px, n.mY, n.mHalf) >= 0)
+                {
+                    break;
+                }
+                AddEdge(edges, behind, top, EdgeKind::eRunJump, 400 + back, hoistIdx, dir < 0);
+                edges.back().mX = takeoff;
+                bx = px;
+            }
+            break;
+        }
+    }
 
     // What is under the flight: a floor to walk on means no jump is needed that far
     bool gap = false;
@@ -820,15 +1027,26 @@ void NavGraph::Build(const NavInput& input)
                 // A well on the floor he comes down on swallows him as he lands in it, however far he fell
                 // (rolled off he drifts a few cells on the way down)
                 bool intoWell = false;
+                // And one he falls through in the air does, floor or no floor
+                const s32 airWell = WellInFall(nx, n.mY, belowLine >= 0 ? fy : n.mY + 2000, n.mHalf);
+                if (airWell >= 0)
+                {
+                    AddWellEdges(edges, from, airWell, EdgeKind::eFall, 60 + kWellCost, -1, left);
+                    intoWell = true;
+                }
                 for (const NavFeature& f : mInput.mFeatures)
                 {
                     if (deadly || intoWell || f.mKind != FeatureKind::eWellLocal || f.mHalf != n.mHalf || f.mY2 < n.mY + 40 || std::abs(f.mY2 - fy) > 10)
                     {
                         continue;
                     }
+                    // (walked off a short drop he comes straight down: measured on the Mines' path 4, off 1712,460 to
+                    // the left, 260 down, where he landed three cells short of the well and died of the fall. Down
+                    // the 780 of path 6's shaft he did drift into the well.)
                     const s32 wx = (f.mX1 + f.mX2) / 2;
-                    const s32 lo = std::min(nx, nx + dir * 3 * step) - step / 2;
-                    const s32 hi = std::max(nx, nx + dir * 3 * step) + step / 2;
+                    const s32 drift = n.mLow || height * (n.mHalf ? 2 : 1) >= 500 ? 3 * step : 0;
+                    const s32 lo = std::min(nx, nx + dir * drift) - step / 2;
+                    const s32 hi = std::max(nx, nx + dir * drift) + step / 2;
                     if (wx >= lo && wx <= hi)
                     {
                         AddEdge(edges, from, WellLanding(f), EdgeKind::eFall, 20 + height / 4 + kWellCost, -1, left);
@@ -870,16 +1088,34 @@ void NavGraph::Build(const NavInput& input)
             AddRunJumps(edges, from, dir);
             AddRunJumps(edges, from, dir, true);
 
-            // A hop over a gap to a ledge on its far side, four cells off: he catches it as he drops
+            // A hop over a gap to a ledge on its far side, two to four cells off: he catches it as he passes or
+            // drops. The game looks for a ledge from his feet to 75 over them, so one that much higher is caught
+            // too (Necrum's path 2, from 487,960 up to 437,880).
+            bool caught = false;
             {
                 s32 x = n.mX;
                 bool gap = n.mLiftStop < 0;
                 // (a lift's shaft is one while the lift is away)
                 s32 shaft = -1;
-                for (s32 k = 1; k <= 4 && gap; k++)
+                for (s32 k = 1; k <= 4 && gap && !caught; k++)
                 {
                     gap = !WallBetween(x, x + dir * step, n.mY, n.mHalf);
                     x = StepX(x, dir, n.mHalf);
+                    for (std::size_t i = 0; gap && k >= 2 && !caught && i < mInput.mFeatures.size(); i++)
+                    {
+                        const NavFeature& f = mInput.mFeatures[i];
+                        const s32 rise = (n.mY - f.mY1) * (n.mHalf ? 2 : 1);
+                        if (f.mKind == FeatureKind::eEdge && f.mA && (f.mAnyScale || f.mHalf == n.mHalf) && (f.mDir == 2 || (f.mDir == 0) == left) && x >= f.mX1 - 2 && x <= f.mX2 + 2 && rise <= 85 && rise >= -40)
+                        {
+                            const s32 to = NodeAt(x, f.mY1, n.mHalf, 12);
+                            if (to >= 0)
+                            {
+                                AddEdge(edges, from, to, EdgeKind::eHop, kHopCost + 40, static_cast<s32>(i), left);
+                                edges.back().mShaft = shaft;
+                            }
+                            caught = true;
+                        }
+                    }
                     s32 gy = 0;
                     const s32 under = FloorNear(x, n.mY, n.mHalf, 12, &gy);
                     const s32 at = under >= 0 ? NodeOnLine(under, x) : -1;
@@ -889,19 +1125,70 @@ void NavGraph::Build(const NavInput& input)
                     }
                     else
                     {
-                        gap = gap && (k == 4 || under < 0);
+                        gap = gap && under < 0;
                     }
                 }
-                for (std::size_t k = 0; gap && k < mInput.mFeatures.size(); k++)
+            }
+
+            // A hop off the end of the floor, down to a floor that is lower: he goes three cells out level, then
+            // drops, drifting on about a cell. Measured in Necrum's path 2 (from 662,880 to 562,960, from 312,880
+            // to 212,980 and from 212,340 to 312,460): where he is each frame from when he starts to drop.
+            if (!caught && n.mLiftStop < 0)
+            {
+                static const s32 kDrop[][2] = {{72, 0}, {80, 6}, {82, 17}, {83, 33}, {88, 51}, {92, 70}, {96, 90}, {100, 110}, {101, 130}};
+                const s32 scale = n.mHalf ? 2 : 1;
+                bool clear = !WallBetween(n.mX, n.mX + dir * step * 4, n.mY, n.mHalf);
+                for (s32 k = 1; k <= 3 && clear; k++)
                 {
-                    const NavFeature& f = mInput.mFeatures[k];
-                    if (f.mKind == FeatureKind::eEdge && f.mA && (f.mAnyScale || f.mHalf == n.mHalf) && (f.mDir == 2 || (f.mDir == 0) == left) && x >= f.mX1 - 2 && x <= f.mX2 + 2 && f.mY1 >= n.mY - 10 && f.mY1 <= n.mY + 40)
+                    s32 gy = 0;
+                    clear = FloorNear(n.mX + dir * k * step, n.mY, n.mHalf, 12, &gy) < 0;
+                }
+                // A ledge at his own height four cells off is what he comes down on instead (Necrum's path 6, from
+                // ledge to ledge at 1187 and 1287: there is a hoist at its end, no edge marker)
+                if (clear)
+                {
+                    s32 gy = 0;
+                    const s32 level = FloorNear(n.mX + dir * 4 * step, n.mY, n.mHalf, 12, &gy);
+                    const s32 to = level >= 0 ? NodeOnLine(level, n.mX + dir * 4 * step) : -1;
+                    if (to >= 0 && std::abs(mNodes[to].mX - (n.mX + dir * 4 * step)) <= step / 2)
                     {
-                        const s32 to = NodeAt(x, f.mY1, n.mHalf, 12);
-                        if (to >= 0)
+                        // (he falls short of it and catches that hoist as he drops. Without one he goes on down:
+                        // the Mines' path 4, from 2062,1400 at 2162,1400, was a death)
+                        s32 hoistIdx = -1;
+                        const NavFeature* hoist = FeatureAt(FeatureKind::eHoist, mNodes[to].mX, mNodes[to].mY + 16, n.mHalf, &hoistIdx);
+                        if (!mNodes[to].mHazard && !mNodes[to].mLow && hoist && (hoist->mDir == 2 || (hoist->mDir == 0) == left))
                         {
-                            AddEdge(edges, from, to, EdgeKind::eHop, kHopCost + 40, static_cast<s32>(k), left);
-                            edges.back().mShaft = shaft;
+                            AddEdge(edges, from, to, EdgeKind::eHop, kHopCost + 10, -1, left);
+                        }
+                        clear = false;
+                    }
+                }
+                for (std::size_t k = 1; clear && k < sizeof(kDrop) / sizeof(kDrop[0]); k++)
+                {
+                    const s32 x = n.mX + dir * kDrop[k][0] / scale;
+                    s32 gy = 0;
+                    const s32 line = FloorBelow(x, n.mY + kDrop[k - 1][1] / scale + 1, n.mHalf, &gy);
+                    if (line >= 0 && gy <= n.mY + kDrop[k][1] / scale)
+                    {
+                        // (he ends in the middle of the cell he comes down in; or in the well that is there, which
+                        // takes him: the Mudanchee vault's path 5, off the platform at 312,620 into the well at 212)
+                        s32 to = NodeAt(x, gy, n.mHalf, 4);
+                        const s32 well = WellInFall(x, n.mY, gy + 30 / scale, n.mHalf);
+                        if (well >= 0)
+                        {
+                            to = WellOut(well, mInput.mFeatures[well].mSwitch == 1 ? 1 : 0, 1);
+                        }
+                        // (not through where a drill goes: the Mines' path 4, off 2537,1400, was two deaths)
+                        bool drill = false;
+                        for (const NavFeature& f : mInput.mFeatures)
+                        {
+                            drill = drill || (f.mKind == FeatureKind::eSweep && f.mX2 >= std::min(n.mX, x) - step && f.mX1 <= std::max(n.mX, x) + step && f.mY2 >= n.mY - 70 / scale && f.mY1 <= gy);
+                        }
+                        if (to >= 0 && to != from && gy - n.mY >= 20 / scale && !mNodes[to].mHazard && !mNodes[to].mLow && !drill)
+                        {
+                            AddEdge(edges, from, to, EdgeKind::eHop, kHopCost + 10, -1, left);
+                            // (the well he falls into, if it is one)
+                            edges.back().mWell = well;
                         }
                         break;
                     }
@@ -960,7 +1247,13 @@ void NavGraph::Build(const NavInput& input)
         {
             s32 fy = 0;
             const s32 below = FloorBelow(n.mX, n.mY + 20, n.mHalf, &fy);
-            if (below >= 0)
+            // (let go over a well he falls into it: Necrum's path 2, down the shaft at 62,620)
+            const s32 airWell = WellInFall(n.mX, n.mY, below >= 0 ? fy : n.mY + 2000, n.mHalf);
+            if (airWell >= 0)
+            {
+                AddWellEdges(edges, from, airWell, EdgeKind::eHoistDown, kHoistCost + 60 + kWellCost, featureIdx, mInput.mFeatures[featureIdx].mDir == 0);
+            }
+            else if (below >= 0)
             {
                 AddEdge(edges, from, NodeOnLine(below, n.mX), EdgeKind::eHoistDown, kHoistCost + (fy - n.mY) / 6, featureIdx, mInput.mFeatures[featureIdx].mDir == 0);
             }
@@ -999,15 +1292,29 @@ void NavGraph::Build(const NavInput& input)
                     }
                 }
             }
-            if (!inPath)
+            // (one that leads into this path but to no door of it is where another comes out, not a way)
+            if (!inPath && door->mDestPath >= 0)
             {
                 mExits.push_back({from, featureIdx});
             }
         }
 
-        if (const NavFeature* well = FeatureAt(FeatureKind::eWellLocal, n.mX, n.mY, n.mHalf, &featureIdx))
+        // A well: where it lets him out with its switch off and with it on (one edge if that is the same place,
+        // or if it has no switch of its own)
+        for (s32 kind = 0; kind < 2; kind++)
         {
-            AddEdge(edges, from, WellLanding(*well), EdgeKind::eWell, kWellCost, featureIdx, false);
+            const NavFeature* well = FeatureAt(kind == 0 ? FeatureKind::eWellLocal : FeatureKind::eWellExpress, n.mX, n.mY, n.mHalf, &featureIdx);
+            if (!well)
+            {
+                continue;
+            }
+            AddWellEdges(edges, from, featureIdx, EdgeKind::eWell, kWellCost, featureIdx, false);
+            const bool offOut = kind == 1 && well->mSwitch != 1 && well->mDestPath >= 0;
+            // Out of the path (as it goes with its switch off: which is how the level's paths are counted)
+            if (offOut)
+            {
+                mExits.push_back({from, featureIdx});
+            }
         }
 
         if (const NavFeature* tele = FeatureAt(FeatureKind::eTeleporter, n.mX, n.mY, n.mHalf, &featureIdx))
@@ -1025,28 +1332,38 @@ void NavGraph::Build(const NavInput& input)
             }
         }
 
-        if (const NavFeature* well = FeatureAt(FeatureKind::eWellExpress, n.mX, n.mY, n.mHalf, &featureIdx))
+        // A bird portal of Abe's own: hopped into from two cells before it on the side it is entered from (the
+        // game takes a hop within two cells of it, facing it, on its floor), out at its exit
+        for (std::size_t k = 0; k < mInput.mFeatures.size(); k++)
         {
-            bool inPath = false;
-            if (well->mDestPath < 0)
+            const NavFeature& portal = mInput.mFeatures[k];
+            if (portal.mKind != FeatureKind::ePortal || portal.mHalf != n.mHalf || portal.mDestPath >= 0 || std::abs(portal.mY2 - n.mY) > 30)
             {
-                for (const NavFeature& other : mInput.mFeatures)
-                {
-                    if ((other.mKind == FeatureKind::eWellExpress || other.mKind == FeatureKind::eWellLocal) && &other != well && other.mB == well->mA && other.mCamera == well->mDestCamera)
-                    {
-                        s32 fy = 0;
-                        const s32 cx = (other.mX1 + other.mX2) / 2;
-                        const s32 line = FloorBelow(cx, other.mY1 - 60, other.mHalf, &fy);
-                        const s32 to = NodeOnLine(line, cx);
-                        AddEdge(edges, from, to, EdgeKind::eWell, kWellCost, featureIdx, false);
-                        inPath = to >= 0;
-                        break;
-                    }
-                }
+                continue;
             }
-            if (!inPath)
+            const s32 px = (portal.mX1 + portal.mX2) / 2;
+            const s32 before = portal.mDir == 0 ? px - n.mX : n.mX - px;
+            // (from up to five cells before it: until it is open nobody may come within three cells of it, or its
+            // doves fly off and it is gone, so it is chanted open from back there and then walked up to)
+            // (in cells: a portal's middle is not always a cell's)
+            const s32 cellsBefore = before >= 0 ? (before + step / 2) / step : -1;
+            if (cellsBefore < 2 || cellsBefore > 5)
             {
-                mExits.push_back({from, featureIdx});
+                continue;
+            }
+            for (const NavFeature& out : mInput.mFeatures)
+            {
+                if (out.mKind == FeatureKind::ePortalExit && out.mCamera == portal.mDestCamera && out.mHalf == portal.mHalf)
+                {
+                    s32 fy = 0;
+                    const s32 cx = (out.mX1 + out.mX2) / 2;
+                    const s32 line = FloorBelow(cx, out.mY1 - 20, out.mHalf, &fy);
+                    if (line >= 0)
+                    {
+                        AddEdge(edges, from, NodeOnLine(line, cx), EdgeKind::ePortal, 3 * kWellCost, static_cast<s32>(k), portal.mDir != 0);
+                    }
+                    break;
+                }
             }
         }
 

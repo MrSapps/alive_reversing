@@ -1,4 +1,5 @@
 #include "Bot.hpp"
+#include "ThrowArc.hpp"
 #include "../BaseMap.hpp"
 #include "../GameType.hpp"
 #include "../logger.hpp"
@@ -50,6 +51,9 @@ void Bot::Start(const Profile& profile)
     mLastCheckpointFrame = 0;
     mFailedActions.clear();
     mStartWaits = 0;
+    // (the level's graph depends on where the profile says the run has been: made again, in case something was
+    // done with the bot before the profile was given, as a script's bot_goto does)
+    mLevel = LevelGraph();
     Log("start profile " + profile.Text());
 }
 
@@ -106,6 +110,16 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
         case StepKind::eCross:
         {
             const s32 to = mKnow->mNav.Edges()[step.mEdge].mTo;
+            std::string note;
+            const bool wary = ScrabWaryTask::Wanted(*this, to, 0, &note);
+            if (!note.empty())
+            {
+                Log(note + (wary ? "" : ": not enough, so by the old way"));
+            }
+            if (wary)
+            {
+                return std::make_unique<ScrabWaryTask>(action.mName, to, 0, 0);
+            }
             return std::make_unique<GoToTask>(action.mName, [to](s32 node)
                                               { return node == to; });
         }
@@ -113,6 +127,16 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
         {
             const u32 entity = step.mEntity;
             const s32 value = action.mEffects[0].mValue;
+            std::string note;
+            const bool wary = ScrabWaryTask::Wanted(*this, -1, entity, &note);
+            if (!note.empty())
+            {
+                Log(note + (wary ? "" : ": not enough, so by the old way"));
+            }
+            if (wary)
+            {
+                return std::make_unique<ScrabWaryTask>(action.mName, -1, entity, value);
+            }
             return std::make_unique<ClearSligTask>(entity, [entity, value]() -> std::unique_ptr<Task>
                                                    { return std::make_unique<UseTask>(entity, value); });
         }
@@ -141,6 +165,20 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<BlowMineTask>(step.mEntity, step.mEdge);
         case StepKind::eRide:
             return std::make_unique<RideCarTask>(step.mEntity, step.mEdge);
+        case StepKind::eScrabRampage:
+            return std::make_unique<ScrabRampageTask>(step.mEntity, step.mEdge);
+        case StepKind::eScrabKill:
+            return std::make_unique<ScrabKillTask>(step.mEntity, step.mOther, static_cast<u32>(step.mEdge));
+        case StepKind::eScrabHunt:
+            return std::make_unique<ScrabHuntTask>(step.mEntity, step.mEdge);
+        case StepKind::eScrabLure:
+            return std::make_unique<ScrabLureTask>(step.mEdge);
+        case StepKind::eFleechLure:
+            return std::make_unique<FleechLureTask>(step.mEntity, 1);
+        case StepKind::eFleechLead:
+            return std::make_unique<FleechLeadTask>(step.mEntity);
+        case StepKind::eScrabPen:
+            return std::make_unique<ScrabPenTask>(step.mEntity, static_cast<s32>(step.mOther), step.mEdge != 0);
         case StepKind::eLogic:
             break;
     }
@@ -194,9 +232,22 @@ bool Bot::Replan(BaseMap& map)
         }
     }
     Domain domain = Domain::Build(mKnow->mNav, mWorld, abeNode, [know](s32 edge)
-                                  { return know->mBannedEdges.count(edge) == 0; }, mProfile.mEnding == Ending::eKillAll);
+                                  {
+                                      if (know->mBannedEdges.count(edge) != 0)
+                                      {
+                                          return false;
+                                      }
+                                      // (onto a floor a loose Scrab can get at him on: Domain::Build wants him unseen for it)
+                                      return true;
+                                  }, mProfile.mEnding == Ending::eKillAll);
     // Actions that keep failing are left out, and so are ways out that lead back to where the run has been
     std::vector<Goap::Action> actions;
+    if (mArrivedKey != std::pair<s32, s32>{mAbe.mLevel, mAbe.mPath})
+    {
+        mArrivedKey = {mAbe.mLevel, mAbe.mPath};
+        mArrivedX = mAbe.mX;
+        mArrivedY = mAbe.mY;
+    }
     for (const Goap::Action& a : domain.mActions)
     {
         const auto failed = mFailedActions.find(a.mName);
@@ -219,6 +270,20 @@ bool Bot::Replan(BaseMap& map)
         if (step.mKind == StepKind::eExit)
         {
             const NavFeature& f = mKnow->mNav.Input().mFeatures[mKnow->mNav.Exits()[step.mEdge].mFeature];
+            // The way he came in, with another way out to the same place: that other one is the one meant
+            if (mBackFor != mAbe.mPath && mKnow->mNav.Exits()[step.mEdge].mNode >= 0 && std::abs((f.mX1 + f.mX2) / 2 - mArrivedX) <= 40 && std::abs(f.mY2 - mArrivedY) <= 40)
+            {
+                bool twin = false;
+                for (const NavExit& other : mKnow->mNav.Exits())
+                {
+                    const NavFeature& g = mKnow->mNav.Input().mFeatures[other.mFeature];
+                    twin = twin || (other.mFeature != mKnow->mNav.Exits()[step.mEdge].mFeature && g.mDestLevel == f.mDestLevel && g.mDestPath == f.mDestPath);
+                }
+                if (twin)
+                {
+                    continue;
+                }
+            }
             bool sideTrip = false;
             if (!ExitAllowed(map, f, &sideTrip))
             {
@@ -383,6 +448,30 @@ bool Bot::Replan(BaseMap& map)
             // No way out is known yet: change what can be changed, a door it opens may show one. Switches the
             // run has already set once are left alone, so it can't go round in circles.
             // (the nearest looking first, and the first two that can be done are enough to choose from)
+            if (mWhyNoWayOut != mAbe.mPath)
+            {
+                mWhyNoWayOut = mAbe.mPath;
+                // (with what can be done here other than cross, to see which need nothing gives)
+                std::string can;
+                for (const Goap::Action& a : actions)
+                {
+                    if (a.mName.rfind("Cross ", 0) == 0)
+                    {
+                        continue;
+                    }
+                    can += "\n  " + a.mName + " needs";
+                    for (const Goap::Fact& f : a.mPre)
+                    {
+                        can += " " + std::to_string(f.mKey) + "=" + std::to_string(f.mValue);
+                    }
+                    can += " gives";
+                    for (const Goap::Fact& f : a.mEffects)
+                    {
+                        can += " " + std::to_string(f.mKey) + "=" + std::to_string(f.mValue);
+                    }
+                }
+                Log("no way out known: " + plan.mMiss + ". " + domain.Frontier() + can);
+            }
             std::vector<std::pair<s32, Goap::Fact>> tries;
             for (const Goap::Fact& fact : domain.Reachable())
             {
@@ -419,6 +508,64 @@ bool Bot::Replan(BaseMap& map)
                     misses += "switch " + std::to_string(fact.mKey - 1000) + ": " + sub.mMiss + "; ";
                 }
             }
+            // Nothing left to switch: somewhere he has not been yet (through a door that is open now, say). The
+            // way out may show from there.
+            mRegionsBeen.insert({mAbe.mPath, domain.mStart.Get(Key::kRegion)});
+            if (!best.mFound)
+            {
+                for (s32 pass = 0; pass < 2 && !best.mFound; pass++)
+                {
+                const bool doorPass = pass == 0;
+                for (s32 region : domain.ReachableRegions())
+                {
+                    const std::pair<s32, s32> key{mAbe.mPath, region};
+                    if (mRegionsBeen.count(key) || mRegionTries[key] >= 3 || plansFound >= 2)
+                    {
+                        continue;
+                    }
+                    // (a cell or two with nothing leading on is no place to look for a way out: the cell a lock
+                    // stands in, beyond the trap door it is slapped from)
+                    {
+                        s32 cells = 0;
+                        for (s32 r : domain.mRegions)
+                        {
+                            cells += r + 1 == region ? 1 : 0;
+                        }
+                        if (cells <= 2)
+                        {
+                            continue;
+                        }
+                    }
+                    const Goap::Fact fact{Key::kRegion, region};
+                    const Goap::Plan sub = Goap::Planner::Find(domain.mStart, {fact}, actions);
+                    // Through a door or a well first: along a floor nothing has led him onto is where what the
+                    // doors were shut against lives (Fleeches, in the Mudanchee vault)
+                    bool byDoor = false;
+                    for (s32 stepIdx : sub.mSteps)
+                    {
+                        const DomainStep& st = domain.mSteps[actions[stepIdx].mTag];
+                        const EdgeKind kind = st.mKind == StepKind::eCross ? mKnow->mNav.Edges()[st.mEdge].mKind : EdgeKind::eWalk;
+                        byDoor = byDoor || kind == EdgeKind::eDoor || kind == EdgeKind::eWell || kind == EdgeKind::ePortal;
+                    }
+                    if (sub.mFound && !sub.mSteps.empty() && byDoor != doorPass)
+                    {
+                        continue;
+                    }
+                    if (sub.mFound && !sub.mSteps.empty() && (!best.mFound || sub.mCost < best.mCost))
+                    {
+                        best = sub;
+                        bestGoal = "Go somewhere new (region " + std::to_string(region) + ")";
+                        bestFacts = {fact};
+                        mRegionGoal = key;
+                        plansFound++;
+                    }
+                }
+                }
+                if (best.mFound)
+                {
+                    mRegionTries[mRegionGoal]++;
+                }
+            }
             if (!best.mFound)
             {
                 // What failed from somewhere else may work from here: once in a while everything but what
@@ -434,6 +581,27 @@ bool Bot::Replan(BaseMap& map)
                         it = forGood ? std::next(it) : mFailedActions.erase(it);
                     }
                     Log("no plan: trying again what failed before");
+                    mTask = std::make_unique<GoToTask>("think again", [](s32)
+                                                       { return true; });
+                    mTaskAction.clear();
+                    return true;
+                }
+                // The way on shut by switches nothing here sets (a hub whose door wants its side paths done): into
+                // a path of this level he has not been in yet
+                if (mNewPathFor != mAbe.mPath)
+                {
+                    mNewPathFor = mAbe.mPath;
+                    Log("no way on from here: any path of this level not yet been in will do");
+                    mTask = std::make_unique<GoToTask>("think again", [](s32)
+                                                       { return true; });
+                    mTaskAction.clear();
+                    return true;
+                }
+                // Nothing at all: back out the way he came in
+                if (mBackFor != mAbe.mPath)
+                {
+                    mBackFor = mAbe.mPath;
+                    Log("no way on from here: back out the way he came in");
                     mTask = std::make_unique<GoToTask>("think again", [](s32)
                                                        { return true; });
                     mTaskAction.clear();
@@ -460,6 +628,53 @@ bool Bot::Replan(BaseMap& map)
         mKeptGoalName = bestGoal;
         mKeptForMudokon = !bestFacts.empty() && bestFacts[0].mKey >= 1000000;
         mKeptOpen = openGoals;
+    }
+    // The power to go invisible, and a step ahead that wants him unseen: kept for that, and used as late as can
+    // be (it lasts some 390 frames and the way from there to safety is about that long): before that step or
+    // the one that leads into it. Not in a path with security orbs: there it is used where it is got (the
+    // screens after have an orb each, the walkthrough's "chant on this screen").
+    mInvisSaved = false;
+    mInvisChantNow = false;
+    mInvisChantSoon = false;
+    mUnseenUse = 0;
+    {
+        bool orbs = false;
+        for (const Entity& e : mWorld.mEntities)
+        {
+            orbs = orbs || (e.mKind == EntityKind::eSecurityOrb && !e.mGone);
+        }
+        std::size_t done = 0;
+        // (the step at hand, if it is a crossing that ends where a Scrab gets at him: that one leads into it)
+        bool leadsIn = false;
+        for (std::size_t i = 0; !orbs && i < best.mSteps.size(); i++)
+        {
+            const Goap::Action& a = actions[best.mSteps[i]];
+            if (done == 0 && domain.mSteps[a.mTag].mKind == StepKind::eCross && mKnow)
+            {
+                const NavNode& to = mKnow->mNav.Nodes()[mKnow->mNav.Edges()[domain.mSteps[a.mTag].mEdge].mTo];
+                leadsIn = Domain::ScrabReaches(mKnow->mNav, mWorld, to.mX, to.mY, to.mHalf, false);
+            }
+            bool unseen = false;
+            for (const Goap::Fact& f : a.mPre)
+            {
+                unseen = unseen || (f.mKey == Key::kInvisNow && f.mValue == 1);
+            }
+            if (unseen)
+            {
+                mInvisSaved = true;
+                // (a crossing: when it is the step at hand, and then where the way goes onto the Scrab's floor,
+                // see GoToTask. Anything else: from the step before it as well, if that one ends on the Scrab's
+                // floor. One that only leads over another Scrab's floor on its way does not: that floor is
+                // crossed by its Scrab's beat, and the power kept for the thing itself.)
+                const bool cross = domain.mSteps[a.mTag].mKind == StepKind::eCross;
+                mInvisChantNow = done == 0 || (!cross && done == 1 && leadsIn);
+                mInvisChantSoon = done <= 1;
+                mUnseenUse = cross ? 0 : domain.mSteps[a.mTag].mEntity;
+                break;
+            }
+            // (what the game does by itself is no step of his)
+            done += domain.mSteps[a.mTag].mKind == StepKind::eLogic ? 0 : 1;
+        }
     }
     mKeptPlan.clear();
     for (s32 stepIdx : best.mSteps)
@@ -621,6 +836,10 @@ bool Bot::ExitAllowed(BaseMap& map, const NavFeature& exit, bool* sideTrip)
         }
         return false;
     }
+    if (mNewPathFor == mAbe.mPath && mVisitedPaths.count({destLevel, destPath}) == 0)
+    {
+        return true;
+    }
     // A level with no way out known: anywhere new
     return here < 0 && there < 0 && mVisitedPaths.count({destLevel, destPath}) == 0;
 }
@@ -729,14 +948,18 @@ void Bot::BanEdge(s32 edge)
     }
 }
 
-NavGraph::EdgeCost Bot::EdgeCostFn() const
+NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs) const
 {
     const PathKnowledge* know = mKnow;
     const World* world = &mWorld;
-    return [know, world](const NavEdge& e) -> s32
+    const std::set<s32>* only = &mOnlyEdges;
+    // (the power to go unseen in hand makes a Scrab's floor a way like any other, unless it is kept for a step of
+    // the plan that is not at hand yet)
+    const bool charged = !(mInvisSaved && !mInvisChantNow);
+    return [know, world, only, pastScrabs, charged](const NavEdge& e) -> s32
     {
         const s32 idx = static_cast<s32>(&e - know->mNav.Edges().data());
-        if (know->mBannedEdges.count(idx))
+        if (know->mBannedEdges.count(idx) || (!only->empty() && !only->count(idx)))
         {
             return -1;
         }
@@ -750,6 +973,23 @@ NavGraph::EdgeCost Bot::EdgeCostFn() const
         // Onto a lift's platform, or riding it: only where the lift is now
         const NavNode& from = know->mNav.Nodes()[e.mFrom];
         const NavNode& to = know->mNav.Nodes()[e.mTo];
+        // Onto a floor a loose Scrab can get at him on
+        // (not on a stretch that was timed against where the Scrab is, nor when such a stretch is looked for)
+        if (!pastScrabs && only->empty() && Domain::ScrabReaches(know->mNav, *world, to.mX, to.mY, to.mHalf, charged) && !Domain::ScrabReaches(know->mNav, *world, from.mX, from.mY, from.mHalf, charged))
+        {
+            return -1;
+        }
+        // A running jump up a hoist: the way to go with a Scrab on his floor after him, and not otherwise
+        if (e.mKind == EdgeKind::eRunJump && e.mFeature >= 0 && know->mNav.Input().mFeatures[e.mFeature].mKind == FeatureKind::eHoist)
+        {
+            for (const ScrabAt& scrab : world->mScrabs)
+            {
+                if (!scrab.mPossessed && scrab.mHalf == from.mHalf && std::abs(scrab.mY - from.mY) <= 30 && std::abs(scrab.mX - from.mX) < 700)
+                {
+                    return 20;
+                }
+            }
+        }
         // (a ride needs no such check: he is only ever on the platform where the lift is, and a way that rides
         // it twice has it somewhere else by the second time)
         const NavNode* stop = to.mLiftStop >= 0 && from.mLiftStop < 0 ? &to : nullptr;
@@ -769,10 +1009,95 @@ NavGraph::EdgeCost Bot::EdgeCostFn() const
                 return -1;
             }
         }
+        // A hop or a running jump along a floor with a drill at work over a cell of it on the way: no (it can only
+        // be timed a cell at a time, which is what walking and rolling are for)
+        // (a jump up to a ledge has its run-up on the floor it starts from)
+        if ((e.mKind == EdgeKind::eRunJump || e.mKind == EdgeKind::eHop) && from.mHalf == to.mHalf)
+        {
+            const s32 cell = NavGraph::GridStep(from.mHalf);
+            for (s32 x = std::min(from.mX, to.mX) + cell; x < std::max(from.mX, to.mX); x += cell)
+            {
+                // (a cell of floor he runs or lands on: a drill down in a gap he jumps is under him)
+                if (know->mNav.NodeAt(x, from.mY, from.mHalf, 10) >= 0 && world->SweepOver(x, from.mY, from.mHalf))
+                {
+                    return -1;
+                }
+            }
+        }
         // Past a drill takes waiting for it, and nerve
         if (to.mSweep >= 0 && GoToTask::SweepOver(know->mNav, *world, e.mTo))
         {
             return e.mCost + 150;
+        }
+        // Down onto a floor in front of a Slig that is awake and faces where he lands: it shoots before he is off
+        // its floor again. Measured in the Mines' path 2 at 837,880, two cells in front of one: shot 37 frames
+        // after he lands, at the hoist one cell on. (One asleep that the landing wakes is another matter: it takes
+        // 96 frames in the Mines' path 10, where the way on is such a landing and a run to a well: Bot::MakeFlee.)
+        if (!to.mHidden && std::abs(to.mY - from.mY) * (to.mHalf ? 2 : 1) > 30 && (e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eHop || e.mKind == EdgeKind::eHoistDown || e.mKind == EdgeKind::eWell))
+        {
+            const s32 scale = to.mHalf ? 2 : 1;
+            // (one not seen yet, its screen not loaded, is where and how the map starts it)
+            std::vector<SligAt> sligs = world->mSligs;
+            for (const Entity& ent : world->mEntities)
+            {
+                if (ent.mKind != EntityKind::eSlig || ent.mGone || ent.mLive)
+                {
+                    continue;
+                }
+                bool seen = false;
+                for (const SligAt& live : world->mSligs)
+                {
+                    seen = seen || (live.mHalf == ent.mHalf && std::abs(live.mY - ent.mY2) <= 45 && std::abs(live.mX - ent.CentreX()) < 400);
+                }
+                if (!seen)
+                {
+                    SligAt at;
+                    at.mX = ent.CentreX();
+                    at.mY = ent.mY2;
+                    at.mHalf = ent.mHalf;
+                    at.mAsleep = ent.mState == 1;
+                    at.mFacingLeft = ent.mOp == 1;
+                    at.mSeen = false;
+                    sligs.push_back(at);
+                }
+            }
+            for (const SligAt& slig : sligs)
+            {
+                if (slig.mPossessed || slig.mHalf != to.mHalf || std::abs(slig.mY - to.mY) * scale > 30)
+                {
+                    continue;
+                }
+                const s32 off = std::abs(slig.mX - to.mX) * scale;
+                if (!slig.mAsleep && off < 250 && (to.mX < slig.mX) == slig.mFacingLeft)
+                {
+                    return -1;
+                }
+            }
+        }
+        // Up a hoist with a Fleech awake on the screen: it is up after him in 25 frames and has him as he hangs.
+        // A well or a door on the same screen is the way to be rid of it. (A running jump up a hoist is a climb
+        // like the other: with only the one made dear, Necrum's path 1 turned back from the hoist to its well.)
+        if (!world->mInvisible && (e.mKind == EdgeKind::eHoistUp || (e.mKind == EdgeKind::eRunJump && e.mFeature >= 0 && know->mNav.Input().mFeatures[e.mFeature].mKind == FeatureKind::eHoist)))
+        {
+            for (const RockAt& f : world->mFleechesAwake)
+            {
+                if (f.mHalf == from.mHalf && know->mNav.CameraOf(f.mX, f.mY - 5) == know->mNav.CameraOf(from.mX, from.mY - 5))
+                {
+                    return e.mCost + 2000;
+                }
+            }
+        }
+        // Coming down from a fall is heard (Abe::Motion_16_LandSoft: not after letting go of a ledge), and a Fleech
+        // asleep close by wakes at it
+        if (!world->mInvisible && (e.mKind == EdgeKind::eFall || (e.mKind == EdgeKind::eHop && to.mY > from.mY + 20)))
+        {
+            for (const RockAt& f : world->mFleechesAsleep)
+            {
+                if (f.mHalf == to.mHalf && std::abs(f.mY - to.mY) <= 90 && std::abs(f.mX - to.mX) < 150)
+                {
+                    return e.mCost + 3000;
+                }
+            }
         }
         // Close by a bird portal its birds fly off, and that is the end of it until the screen comes round again
         // (however he gets there: a well that throws him out beside it does the same)
@@ -817,6 +1142,26 @@ s32 Bot::QuietFrames(s32 x, s32 y, bool half) const
     return World::QuietFrames(mWorld.mSligs, mBeats, x, y, half, x1 - 25, x2 + 25);
 }
 
+bool Bot::BeatStaysOnScreen(const SligAt& slig) const
+{
+    const NavGraph& nav = mKnow->mNav;
+    const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);
+    s32 lo = slig.mBeatMin;
+    s32 hi = slig.mBeatMax;
+    if (hi <= lo)
+    {
+        for (const SligBeat& beat : mBeats)
+        {
+            if (beat.mHalf == slig.mHalf && std::abs(beat.mY - slig.mY) <= 45 && slig.mX >= beat.mMinX - 30 && slig.mX <= beat.mMaxX + 30 && beat.mMaxX - beat.mMinX >= 150)
+            {
+                lo = beat.mMinX;
+                hi = beat.mMaxX;
+            }
+        }
+    }
+    return hi > lo && nav.CameraOf(lo, slig.mY - 5) == cam && nav.CameraOf(hi, slig.mY - 5) == cam && nav.CameraOf(slig.mX, slig.mY - 5) == cam;
+}
+
 Gait Bot::GaitFor(s32 cells)
 {
     // Runs when it's worth it; a person isn't as exact about when that is
@@ -836,7 +1181,19 @@ void Bot::EnsureKnowledge(BaseMap& map)
 {
     if (mLevel.Level() != mAbe.mLevel)
     {
-        mLevel.Build(mAbe.mLevel, GameView::ReadLevel(map));
+        const std::vector<PathSummary> paths = GameView::ReadLevel(map);
+        for (const PathSummary& p : paths)
+        {
+            for (const auto& exit : p.mExits)
+            {
+                if (std::find(mProfile.mBeen.begin(), mProfile.mBeen.end(), GameView::LevelName(exit.first)) != mProfile.mBeen.end())
+                {
+                    mLevelsBeen.insert(exit.first);
+                }
+            }
+        }
+        mLevel.Build(mAbe.mLevel, paths, mLevelsBeen);
+        mLevelsBeen.insert(mAbe.mLevel);
         Log("level graph:\n" + mLevel.Text());
     }
     const std::pair<s32, s32> key{mAbe.mLevel, mAbe.mPath};
@@ -1082,6 +1439,11 @@ bool Bot::BeamHolds() const
             travel = 220;
             frames = 50;
             break;
+        case Prim::Kind::eRunWell:
+            dir = prim.mFaceLeft ? -1 : 1;
+            travel = std::abs(prim.mX - mAbe.mX) + 25;
+            frames = 30;
+            break;
         case Prim::Kind::eLift:
             return false;
     }
@@ -1098,12 +1460,33 @@ void Bot::ThrowBegun(u32 mine, const ThrowSpot& spot)
     mThrowFrame = mAbe.mFrame;
     mThrowMine = mine;
     mThrowSpot = spot;
+    mThrowSeen.clear();
 }
 
 void Bot::ThrowMissed()
 {
     if (mThrowPending && mKnow)
     {
+        // What the table said and what the rock did: the first frame they part is where the table is wrong
+        const Entity* mine = mWorld.Find(mThrowMine);
+        if (mine && mThrowSpot.mNode >= 0 && mThrowSpot.mNode < static_cast<s32>(mKnow->mNav.Nodes().size()))
+        {
+            const NavNode& from = mKnow->mNav.Nodes()[mThrowSpot.mNode];
+            const s32 mineNode = mKnow->mNav.NodeAt(mine->CentreX(), mine->mY2, mine->mHalf, 12);
+            const ThrowArc::Point target{mineNode >= 0 ? mKnow->mNav.Nodes()[mineNode].mX : mine->CentreX(), mineNode >= 0 ? mKnow->mNav.Nodes()[mineNode].mY : mine->mY2};
+            const ThrowArc::Flight flight = ThrowArc::Throw(mKnow->mNav.Input(), from.mX, from.mY, from.mHalf, target.mX < from.mX, mThrowSpot.mKind, &target);
+            std::string text = "missed throw " + std::to_string(static_cast<s32>(mThrowSpot.mKind)) + " from " + std::to_string(from.mX) + "," + std::to_string(from.mY) + " at " + std::to_string(target.mX) + "," + std::to_string(target.mY) + ": to hit on frame " + std::to_string(flight.mHit) + (flight.mSure ? "" : " (not sure)") + "; table";
+            for (std::size_t i = 0; i < flight.mPoints.size() && i < 45; i++)
+            {
+                text += " " + std::to_string(flight.mPoints[i].mX) + "," + std::to_string(flight.mPoints[i].mY);
+            }
+            text += "; game";
+            for (const ThrowArc::Point& p : mThrowSeen)
+            {
+                text += " " + std::to_string(p.mX) + "," + std::to_string(p.mY);
+            }
+            Log(text);
+        }
         mKnow->mBadThrows.insert(std::make_tuple(mThrowMine, mThrowSpot.mNode, static_cast<s32>(mThrowSpot.mKind)));
     }
     mThrowPending = false;
@@ -1111,21 +1494,12 @@ void Bot::ThrowMissed()
 
 void Bot::ThrowHit()
 {
-    if (mThrowPending)
-    {
-        mThrowHits.insert(std::make_tuple(mThrowSpot.mLevel, mThrowSpot.mCells, static_cast<s32>(mThrowSpot.mKind)));
-    }
     mThrowPending = false;
 }
 
 bool Bot::ThrowIsBad(u32 mine, const ThrowSpot& spot) const
 {
     return mKnow && mKnow->mBadThrows.count(std::make_tuple(mine, spot.mNode, static_cast<s32>(spot.mKind))) != 0;
-}
-
-bool Bot::ThrowHasWorked(const ThrowSpot& spot) const
-{
-    return mThrowHits.count(std::make_tuple(spot.mLevel, spot.mCells, static_cast<s32>(spot.mKind))) != 0;
 }
 
 void Bot::OnDeath(BaseMap& map)
@@ -1454,7 +1828,7 @@ std::unique_ptr<Task> Bot::MakeFlee()
     // A Slig awake right next to him on his floor, out in the open (he came down beside one that slept, and the
     // landing woke it): it takes a while to come round and shoot, enough to get off its floor if a way is at
     // hand (a well, a hoist). Chanting there is too slow: measured, he is shot 50 frames before it takes.
-    // (One that waits before it shoots is run from instead, on along the way: see GoToTask.)
+    // (One that waits before it shoots is run from too: the sneak he was at when it woke is not gone on with.)
     if (mAmbushes < 8)
     {
         const NavGraph& nav = mKnow->mNav;
@@ -1464,7 +1838,7 @@ std::unique_ptr<Task> Bot::MakeFlee()
         for (const SligAt& slig : mWorld.mSligs)
         {
             const s32 near = mAbe.mHalfScale ? 100 : 200;
-            if (node < 0 || hidden || slig.mAsleep || slig.mPossessed || slig.mSightDelay >= World::kOutrunDelay || slig.mHalf != mAbe.mHalfScale || std::abs(slig.mY - mAbe.mY) > 45 || std::abs(slig.mX - mAbe.mX) >= near || nav.CameraOf(slig.mX, slig.mY - 5) != cam)
+            if (node < 0 || hidden || slig.mAsleep || slig.mPossessed || slig.mHalf != mAbe.mHalfScale || std::abs(slig.mY - mAbe.mY) > 45 || std::abs(slig.mX - mAbe.mX) >= near || nav.CameraOf(slig.mX, slig.mY - 5) != cam)
             {
                 continue;
             }
@@ -1475,7 +1849,25 @@ std::unique_ptr<Task> Bot::MakeFlee()
                 return std::abs(graph->Nodes()[n].mY - floorY) > 45;
             };
             std::vector<s32> way;
-            if (nav.FindPath(node, away, EdgeCostFn(), way) && way.size() <= 5)
+            // (as far as he runs in the time it takes to shoot: measured on the Mines' path 10, shot 96 frames
+            // after it woke with the well ten cells on, which is 40 frames at a run)
+            // (by the quick ways only: the nearest other floor may be down a hoist, which is no escape)
+            const NavGraph::EdgeCost all = EdgeCostFn();
+            const NavGraph::EdgeCost quickOnly = [&all](const NavEdge& e) -> s32
+            {
+                return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eWell || e.mKind == EdgeKind::eHoistUp ? all(e) : -1;
+            };
+            // (cells are half as long at half scale)
+            const std::size_t most = mAbe.mHalfScale ? 24 : 12;
+            const bool found = nav.FindPath(node, away, quickOnly, way);
+            if (!found || way.size() > most)
+            {
+                if (mFleeWhy++ == 0)
+                {
+                    Log("a Slig is awake next to Abe at " + std::to_string(slig.mX) + "," + std::to_string(slig.mY) + " and there is no quick way off its floor (" + (found ? std::to_string(way.size()) + " steps" : std::string("none")) + ")");
+                }
+            }
+            if (found && way.size() <= most)
             {
                 bool quick = true;
                 for (s32 edge : way)
@@ -1729,6 +2121,12 @@ void Bot::Think(BaseMap& map)
                     Log("action_failed: " + mTask->Name() + ": " + step.mWhy);
                     mFailedActions[mTaskAction]++;
                     mFailedTotal[mTaskAction]++;
+                    // (what will be no different from anywhere else or at any other time: for good, at once)
+                    if (step.mWhy.find("never leaves the screen") != std::string::npos || step.mWhy.find("the exit didn't lead out of the path") != std::string::npos)
+                    {
+                        mFailedActions[mTaskAction] = 2;
+                        mFailedTotal[mTaskAction] = 6;
+                    }
                     mFailedWhere[mTaskAction] = {mAbe.mX, mAbe.mY};
                     mTask.reset();
                 }
@@ -1781,6 +2179,75 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         mIsAe = GetGameType() == GameType::eAe;
         EnsureKnowledge(map);
         GameView::ReadWorld(map, mWorld);
+        // On the floor of a Scrab that waits before it strikes, with nothing between: it has seen him
+        if (mSeenByScrabAt > mAbe.mFrame)
+        {
+            // (the run was taken back to before then)
+            mSeenByScrabAt = mAbe.mFrame;
+        }
+        for (const ScrabAt& scrab : mWorld.mScrabs)
+        {
+            // (how long each has stood: at an end of its beat it stands for a time its TLV gives)
+            // (Scrab.hpp: 0 stands. A shriek or a howl on the way is no stop.)
+            std::pair<s32, u32>& still = mScrabStill[scrab.mId];
+            if (still.first != scrab.mX || still.second > mAbe.mFrame || scrab.mMotion != 0)
+            {
+                // (seen to move: from now on its standing is timed)
+                if (still.first != scrab.mX)
+                {
+                    mScrabMoved.insert(scrab.mId);
+                }
+                still = {scrab.mX, 0};
+            }
+            else if (still.second == 0 && mScrabMoved.count(scrab.mId))
+            {
+                still.second = mAbe.mFrame;
+            }
+            else if (still.second != 0 && mAbe.mFrame - still.second == 8)
+            {
+                // (a stop on its beat, if it is not after him: where it gave up a chase is no end of it. Its beat
+                // lies between the last two places it stopped at: one it has left for another, lured there, is
+                // learnt again from its next two stops. Eight frames in: it stands for a frame or two after a
+                // shriek on its way as well.)
+                if (mSeenByScrabAt == 0 || mAbe.mFrame - mSeenByScrabAt > 330)
+                {
+                    const auto beat = mScrabBeat.find(scrab.mId);
+                    if (beat == mScrabBeat.end())
+                    {
+                        mScrabBeat[scrab.mId] = {scrab.mX, scrab.mX};
+                    }
+                    else if (std::abs(scrab.mX - beat->second.second) > 60)
+                    {
+                        beat->second = {beat->second.second, scrab.mX};
+                    }
+                    else
+                    {
+                        beat->second.second = scrab.mX;
+                    }
+                }
+            }
+        }
+        if (mKnow && mAbe.mValid && mAbe.mMove != Move::eHang)
+        {
+            std::vector<Domain::LooseScrab> scrabs = Domain::LooseScrabs(mWorld, true);
+            const std::vector<Domain::LooseScrab> atOnce = Domain::LooseScrabs(mWorld, false);
+            scrabs.insert(scrabs.end(), atOnce.begin(), atOnce.end());
+            for (const Domain::LooseScrab& scrab : scrabs)
+            {
+                if (scrab.mHalf == mAbe.mHalfScale && std::abs(scrab.mY - mAbe.mY) * (scrab.mHalf ? 2 : 1) < 45 && !Domain::GateBetween(mKnow->mNav, mWorld, scrab.mX, mAbe.mX, scrab.mY, scrab.mHalf) && !Domain::WallBetween(mKnow->mNav, scrab.mX, mAbe.mX, scrab.mY, scrab.mHalf))
+                {
+                    mSeenByScrabAt = mAbe.mFrame;
+                    // (what it does now is the chase, not its beat: that is learnt again after)
+                    mScrabBeat.erase(scrab.mId);
+                }
+            }
+        }
+        mWorld.mInvisComing = mAbe.mFrame < mRingDueBy && !mWorld.mInvisCharge && !mWorld.mInvisible;
+        // Where a thrown rock really went, to hold against where it was to go if it misses
+        if (mThrowPending && !mWorld.mRocksFlying.empty() && mThrowSeen.size() < 60)
+        {
+            mThrowSeen.push_back({mWorld.mRocksFlying[0].mX, mWorld.mRocksFlying[0].mY});
+        }
     }
 
     // The way a flying Slig goes along its track (kept while it waits at an end of it)
@@ -1989,6 +2456,46 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         snprintf(line, sizeof(line), "%u %d %d %s m=%d af=%d %c vx=%d g=%d in=%x cam=%d\n", mAbe.mFrame, mAbe.mX, mAbe.mY, MoveName(mAbe.mMove), mAbe.mMotion, mAbe.mAnimFrame,
                  mAbe.mFacingLeft ? 'L' : 'R', mAbe.mVelXFp / 656, mAbe.mOnGround ? 1 : 0, Input().mAutomationInput, mAbe.mCamera);
         mTrace += line;
+        // (his health while it is down: a Fleech's lick takes 15 in 100 of it)
+        if (mAbe.mHealthFp < 0x10000)
+        {
+            mTrace.pop_back();
+            mTrace += " hp=" + std::to_string(mAbe.mHealthFp * 100 / 0x10000) + "\n";
+        }
+        // The Scrabs near him: where, doing what, facing which way
+        for (const ScrabAt& scrab : mWorld.mScrabs)
+        {
+            if (std::abs(scrab.mX - mAbe.mX) < 700 && std::abs(scrab.mY - mAbe.mY) < 400)
+            {
+                mTrace.pop_back();
+                mTrace += " scrab=" + std::to_string(scrab.mX) + "," + std::to_string(scrab.mY) + ",m" + std::to_string(scrab.mMotion) + (scrab.mFacesLeft ? "L\n" : "R\n");
+            }
+        }
+        // The Fleeches near him (a: awake, s: asleep), and the invisibility he has or can chant for
+        for (s32 pass = 0; pass < 2; pass++)
+        {
+            for (const RockAt& fleech : pass == 0 ? mWorld.mFleechesAwake : mWorld.mFleechesAsleep)
+            {
+                if (std::abs(fleech.mX - mAbe.mX) < 500 && std::abs(fleech.mY - mAbe.mY) < 300)
+                {
+                    mTrace.pop_back();
+                    mTrace += " fl=" + std::to_string(fleech.mX) + "," + std::to_string(fleech.mY) + (pass == 0 ? "a\n" : "s\n");
+                }
+            }
+        }
+        for (const SlurgAt& slurg : mWorld.mSlurgs)
+        {
+            if (std::abs(slurg.mX - mAbe.mX) < 400 && std::abs(slurg.mY - mAbe.mY) < 200)
+            {
+                mTrace.pop_back();
+                mTrace += " sl=" + std::to_string(slurg.mX1) + ".." + std::to_string(slurg.mX2) + (slurg.mDir < 0 ? "L\n" : slurg.mDir > 0 ? "R\n" : "?\n");
+            }
+        }
+        if (mWorld.mInvisCharge || mWorld.mInvisible)
+        {
+            mTrace.pop_back();
+            mTrace += std::string(mWorld.mInvisible ? " invisible" : " ring") + "\n";
+        }
         // The Mudokons on the screen: where and in which brain state
         if (!mWorld.mEntities.empty())
         {

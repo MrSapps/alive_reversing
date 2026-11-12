@@ -19,6 +19,65 @@ std::unique_ptr<GoToTask> GoToTask::To(Bot& bot, s32 x, s32 y, bool half)
                                       { return node == target && target >= 0; });
 }
 
+// What to hold as Abe lands from the fall or the well that is the path's first edge: nothing, but with a Scrab
+// loose on the floor he comes down on, the run that is next. Held as his feet touch it goes straight from the
+// landing into the run, some ten frames sooner than standing up first, and a Scrab leaves no ten frames.
+static u32 LandingBits(const Bot& bot, const NavGraph& nav, const std::vector<s32>& path)
+{
+    // (not on a stretch that was timed, where it ends with the landing: there is something to do there)
+    // (nor unseen: there is nothing to run from)
+    if (path.size() < 2 && (bot.KeepsTo() || bot.GetWorld().mInvisible))
+    {
+        return 0;
+    }
+    // Which way: the way the path goes on, or where it ends with the landing, away from the Scrab
+    s32 way = 0;
+    if (path.size() >= 2)
+    {
+        const NavEdge& next = nav.Edges()[path[1]];
+        if (next.mKind != EdgeKind::eWalk && next.mKind != EdgeKind::eRunJump)
+        {
+            return 0;
+        }
+        way = next.mLeft ? -1 : 1;
+    }
+    const NavNode& down = nav.Nodes()[nav.Edges()[path[0]].mTo];
+    // Whether the walk he would land into ends at a door: that wants him standing at it, and a well that throws
+    // him further than was thought has him run past it (the Mudanchee vault's path 5, its first door)
+    bool toDoor = false;
+    for (std::size_t i = 1; i < path.size(); i++)
+    {
+        const EdgeKind kind = nav.Edges()[path[i]].mKind;
+        if (kind != EdgeKind::eWalk)
+        {
+            toDoor = kind == EdgeKind::eDoor;
+            break;
+        }
+    }
+    s32 nearest = 700;
+    bool loose = false;
+    for (const ScrabAt& scrab : bot.GetWorld().mScrabs)
+    {
+        // (where the way ends with the landing or leads to a door, not from one shut in behind a gate: there is
+        // nothing to run from, and something to do where he lands. Else he runs on as before: the Mudanchee
+        // vault's path 6 is timed to it.)
+        if (!scrab.mPossessed && scrab.mHalf == down.mHalf && std::abs(scrab.mY - down.mY) * (down.mHalf ? 2 : 1) <= 30 && std::abs(scrab.mX - down.mX) < nearest && ((path.size() >= 2 && !toDoor) || !Domain::GateBetween(nav, bot.GetWorld(), scrab.mX, down.mX, down.mY, down.mHalf)))
+        {
+            nearest = std::abs(scrab.mX - down.mX);
+            loose = true;
+            if (path.size() < 2)
+            {
+                way = scrab.mX < down.mX ? 1 : -1;
+            }
+        }
+    }
+    if (!loose || way == 0)
+    {
+        return 0;
+    }
+    return (way < 0 ? Btn::eLeft : Btn::eRight) | Btn::eRun;
+}
+
 TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
 {
     if (mDisarm)
@@ -437,6 +496,224 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     const NavEdge& first = nav.Edges()[path[0]];
     mLastFrom = cur;
     bot.SetCurrentEdge(path[0]);
+    // The power to go invisible, and a Fleech near: one awake on his screen, or one on the floor he is on within
+    // a screen's width. Chanted for until it takes. (Used no sooner: it lasts 600 frames or so and the way past
+    // them is about that long.)
+    {
+        const World& w = bot.GetWorld();
+        const NavNode& from = nav.Nodes()[cur];
+        if (w.mInvisCharge && !w.mInvisible && mInvisChants < 30)
+        {
+            const s32 scale = from.mHalf ? 2 : 1;
+            bool near = false;
+            for (const RockAt& f : w.mFleechesAwake)
+            {
+                near = near || nav.CameraOf(f.mX, f.mY - 5) == nav.CameraOf(from.mX, from.mY - 5);
+            }
+            for (const RockAt& f : w.mFleechesAsleep)
+            {
+                near = near || (f.mHalf == from.mHalf && std::abs(f.mY - from.mY) * scale <= 30 && std::abs(f.mX - from.mX) * scale < 320);
+            }
+            // (kept for a step of the plan that wants him unseen: then, and not for these)
+            if (bot.InvisSaved())
+            {
+                // (or a step sooner with a Fleech awake on his screen: it will not wait)
+                bool awake = false;
+                for (const RockAt& f : w.mFleechesAwake)
+                {
+                    awake = awake || (f.mHalf == from.mHalf && nav.CameraOf(f.mX, f.mY - 5) == nav.CameraOf(from.mX, from.mY - 5));
+                }
+                near = bot.InvisChantNow() || (awake && bot.InvisChantSoon());
+                // (as late as can be: where the way goes onto a floor a Scrab can get at him on, only at the
+                // last cell before it)
+                for (std::size_t i = 0; near && i < path.size(); i++)
+                {
+                    const NavNode& to = nav.Nodes()[nav.Edges()[path[i]].mTo];
+                    if (Domain::ScrabReaches(nav, w, to.mX, to.mY, to.mHalf, false))
+                    {
+                        near = i == 0;
+                        break;
+                    }
+                }
+            }
+            // And whatever the plan says: about to step onto a floor a Scrab can get at him on, from one it cannot
+            {
+                const NavNode& to = nav.Nodes()[first.mTo];
+                // (not on a stretch timed against the Scrab's beat with the power kept for something else)
+                near = near || (!(bot.InvisSaved() && bot.KeepsTo()) && Domain::ScrabReaches(nav, w, to.mX, to.mY, to.mHalf, false) && !Domain::ScrabReaches(nav, w, from.mX, from.mY, from.mHalf, false));
+            }
+            if (near && !abe.Settled())
+            {
+                // (still moving from what went before, a landing with the way on held: stopped for it first)
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            // Kept for a thing a Scrab stands at: not yet (a slap would land on the Scrab, and the power runs out
+            // while he waits by it). From out of its reach he waits for it to go.
+            if (near && bot.InvisSaved() && bot.UnseenUse() != 0 && !Domain::ScrabReaches(nav, w, from.mX, from.mY, from.mHalf, false))
+            {
+                const Entity* thing = w.Find(bot.UnseenUse());
+                for (const ScrabAt& scrab : w.mScrabs)
+                {
+                    if (thing && !scrab.mPossessed && scrab.mHalf == thing->mHalf && std::abs(scrab.mY - thing->mY2) * (thing->mHalf ? 2 : 1) <= 30 && std::abs(scrab.mX - thing->CentreX()) * (thing->mHalf ? 2 : 1) <= 90 && mUnseenWaits < 600)
+                    {
+                        if (mUnseenWaits++ == 0)
+                        {
+                            bot.Log("a Scrab stands at #" + std::to_string(thing->mId) + ": the chant waits until it has gone");
+                        }
+                        mSteps--;
+                        return TaskStep::Do(Prim::Wait(2));
+                    }
+                }
+            }
+            if (near)
+            {
+                if (mInvisChants++ == 0)
+                {
+                    bot.Log(bot.InvisSaved() ? "the step that wants him unseen is next: chanting for it" : "Fleeches ahead and the power to go invisible: chanting for it");
+                }
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+            }
+        }
+    }
+    // A woken Fleech under the ledge he is about to leave, and another climb ahead of him (hanging from a hoist
+    // is where it gets him): not until it has started up after him. It then has to come down again, which is
+    // worth a couple of seconds. (Fleech.cpp: it climbs by the hoists, about 25 frames a floor.)
+    {
+        const NavNode& from = nav.Nodes()[cur];
+        const NavNode& down = nav.Nodes()[first.mTo];
+        const s32 scale = from.mHalf ? 2 : 1;
+        bool climbAhead = false;
+        for (std::size_t i = 1; i < path.size(); i++)
+        {
+            climbAhead = climbAhead || nav.Edges()[path[i]].mKind == EdgeKind::eHoistUp;
+        }
+        const bool leaves = (first.mKind == EdgeKind::eFall || first.mKind == EdgeKind::eHop) && (down.mY - from.mY) * scale > 40;
+        if (leaves && climbAhead && mLureWaits < 150)
+        {
+            bool under = false;
+            bool coming = false;
+            for (const RockAt& f : bot.GetWorld().mFleechesAwake)
+            {
+                if (f.mHalf != from.mHalf || nav.CameraOf(f.mX, f.mY - 5) != nav.CameraOf(from.mX, from.mY - 5) || std::abs(f.mX - from.mX) * scale > 150)
+                {
+                    continue;
+                }
+                // (on the floor below; or off it and on its way up, or up already)
+                under = under || f.mY >= down.mY - 5;
+                coming = coming || f.mY < down.mY - 25 / scale;
+            }
+            if (under && !coming)
+            {
+                if (mLureWaits++ == 0)
+                {
+                    bot.Log("a Fleech awake under this ledge: waiting for it to start up before leaving");
+                }
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+        }
+    }
+    // (where a Scrab that is after him is, for the log)
+    if (!mChaseLogged)
+    {
+        const NavNode& from = nav.Nodes()[cur];
+        std::string where;
+        for (const ScrabAt& scrab : bot.GetWorld().mScrabs)
+        {
+            if (!scrab.mPossessed && scrab.mHalf == from.mHalf && std::abs(scrab.mY - from.mY) <= (first.mKind == EdgeKind::eWell ? 400 : 30) && std::abs(scrab.mX - from.mX) < 700)
+            {
+                where += " " + std::to_string(scrab.mX) + "," + std::to_string(scrab.mY) + " (doing " + std::to_string(scrab.mMotion) + (scrab.mFacesLeft ? ", faces left)" : ", faces right)");
+            }
+        }
+        if (!where.empty())
+        {
+            mChaseLogged = true;
+            bot.Log("a Scrab loose on this floor, at" + where + ", next a " + EdgeKindName(first.mKind));
+        }
+    }
+    // A Slurg where the next step comes down: hopped over if it is just ahead on this floor and the hop comes
+    // down clear of every one of them, else waited for (they crawl half a pixel a frame). Not for ever: after a
+    // long wait it is trodden on.
+    {
+        const World& w = bot.GetWorld();
+        const NavNode& from = nav.Nodes()[cur];
+        const NavNode& next = nav.Nodes()[first.mTo];
+        // (only while there is a Fleech asleep to wake and none awake to get away from)
+        // (one awake on another screen, behind a door he has shut, is nothing to run from)
+        bool awakeHere = false;
+        for (const RockAt& f : w.mFleechesAwake)
+        {
+            // (nor one in the background while he is in the foreground: it goes for nothing of another size)
+            awakeHere = awakeHere || (f.mHalf == from.mHalf && nav.CameraOf(f.mX, f.mY - 5) == nav.CameraOf(from.mX, from.mY - 5));
+        }
+        // (nor is there any waiting once the switch that wakes one of this screen's is on: it is on its way down)
+        for (const Entity& e : w.mEntities)
+        {
+            awakeHere = awakeHere || (e.mKind == EntityKind::eFleech && e.mSwitch > 1 && w.Switch(e.mSwitch) != 0 && nav.CameraOf(e.CentreX(), e.mY2 - 5) == nav.CameraOf(from.mX, from.mY - 5));
+        }
+        mFleechAwakeHere = awakeHere;
+        // A hop or a drop down onto a floor they crawl along: timed for the gap between two of them, however
+        // long that takes to come (the Slurgs of Necrum's path 6 go in file, fifty to seventy-five apart)
+        const s32 scaleOf = from.mHalf ? 2 : 1;
+        const bool lands = (first.mKind == EdgeKind::eHop || first.mKind == EdgeKind::eFall || first.mKind == EdgeKind::eHoistDown) && (next.mY - from.mY) * scaleOf > 20;
+        if (lands && !w.mSlurgs.empty() && !w.mFleechesAsleep.empty() && !awakeHere && !w.mInvisible && mLandWaits < 1500)
+        {
+            // (down a hoist he turns by himself, hangs and lets go: some 45 frames)
+            const s32 frames = first.mKind == EdgeKind::eHop ? 24 : first.mKind == EdgeKind::eHoistDown ? 45 : 34;
+            if (!abe.Settled() || (abe.mFacingLeft != first.mLeft && first.mKind != EdgeKind::eHoistDown) || w.SlurgWhereHeLands(next.mX, next.mY, next.mHalf, first.mLeft, frames))
+            {
+                if (abe.Settled() && abe.mFacingLeft != first.mLeft && first.mKind != EdgeKind::eHoistDown)
+                {
+                    return TaskStep::Do(Prim::Face(first.mLeft));
+                }
+                if (mLandWaits++ == 0)
+                {
+                    bot.Log("Slurgs where he would come down at " + std::to_string(next.mX) + "," + std::to_string(next.mY) + ": waiting for a gap between them");
+                }
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+        }
+        else if (!w.mSlurgs.empty() && !w.mFleechesAsleep.empty() && !awakeHere && !w.mInvisible && w.SlurgBy(next.mX, next.mY, next.mHalf) && mSlurgWaits < 80)
+        {
+            const s32 cell = NavGraph::GridStep(from.mHalf);
+            const s32 scale = from.mHalf ? 2 : 1;
+            const s32 dir = first.mLeft ? -1 : 1;
+            const s32 land = nav.NodeAt(from.mX + dir * 3 * cell, from.mY, from.mHalf, 6);
+            bool hop = first.mKind == EdgeKind::eWalk && path.size() >= 3 && nav.Edges()[path[1]].mKind == EdgeKind::eWalk && nav.Edges()[path[2]].mKind == EdgeKind::eWalk && nav.Edges()[path[2]].mTo == land && land >= 0 && !nav.Nodes()[land].mLow && !from.mLow;
+            for (const SlurgAt& slurg : w.mSlurgs)
+            {
+                // (the feet come down nine behind and six ahead of where he lands, 75 on)
+                const s32 ahead = (slurg.mX - from.mX) * dir * scale;
+                if (slurg.mHalf == from.mHalf && std::abs(slurg.mY - from.mY) * scale <= 14 && ahead > 43 && ahead < 109)
+                {
+                    hop = false;
+                }
+            }
+            if (hop && abe.Settled())
+            {
+                if (abe.mFacingLeft != first.mLeft)
+                {
+                    return TaskStep::Do(Prim::Face(first.mLeft));
+                }
+                bot.Log("a Slurg in the way at " + std::to_string(next.mX) + ": over it");
+                mLastEdge = -1;
+                return TaskStep::Do(Prim::Press(Btn::eHop));
+            }
+            if (mSlurgWaits++ == 0)
+            {
+                bot.Log("a Slurg in the way at " + std::to_string(next.mX) + "," + std::to_string(next.mY) + ": waiting for it to crawl on");
+            }
+            mSteps--;
+            return TaskStep::Do(Prim::Wait(6));
+        }
+        if (!w.SlurgBy(next.mX, next.mY, next.mHalf))
+        {
+            mSlurgWaits = 0;
+        }
+    }
     if (sweepRoll > 0)
     {
         return TaskStep::Do(Prim::MoveTo(nav.Nodes()[nav.Edges()[path[sweepRoll - 1]].mTo].mX, Gait::eRoll));
@@ -450,11 +727,38 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 last++;
             }
+            // Another low stretch the same way within three cells: rolled on to, not stood up for in between,
+            // when there is no time for that (unseen for a while only, or a Fleech awake)
+            while (bot.GetWorld().mInvisible || !bot.GetWorld().mFleechesAwake.empty())
+            {
+                std::size_t j = last + 1;
+                while (j < path.size() && j <= last + 3 && nav.Edges()[path[j]].mKind == EdgeKind::eWalk && nav.Edges()[path[j]].mLeft == first.mLeft)
+                {
+                    j++;
+                }
+                if (j >= path.size() || j == last + 1 || nav.Edges()[path[j]].mKind != EdgeKind::eRoll || nav.Edges()[path[j]].mLeft != first.mLeft)
+                {
+                    break;
+                }
+                last = j;
+                while (last + 1 < path.size() && nav.Edges()[path[last + 1]].mKind == EdgeKind::eRoll && nav.Edges()[path[last + 1]].mLeft == first.mLeft)
+                {
+                    last++;
+                }
+            }
             if (sweepStop <= last)
             {
                 last = sweepStop - 1;
             }
-            return TaskStep::Do(Prim::MoveTo(nav.Nodes()[nav.Edges()[path[last]].mTo].mX, Gait::eRoll));
+            Prim roll = Prim::MoveTo(nav.Nodes()[nav.Edges()[path[last]].mTo].mX, Gait::eRoll);
+            // (at the top of a hoist down climbs down it: the Mudanchee vault's path 8, from 187,880)
+            // (what the games look for under his feet when down is pressed)
+            for (const NavFeature& f : nav.Input().mFeatures)
+            {
+                const NavNode& at = nav.Nodes()[cur];
+                roll.mWalkIn = roll.mWalkIn || (f.mKind == FeatureKind::eHoist && at.mX >= f.mX1 && at.mX <= f.mX2 && at.mY + 16 >= f.mY1 && at.mY + 16 <= f.mY2);
+            }
+            return TaskStep::Do(roll);
         }
 
         case EdgeKind::eRunJump:
@@ -527,7 +831,19 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 {
                     continue;
                 }
-                if (!slig.mAsleep && slig.mSightDelay >= World::kOutrunDelay)
+                // (not past it from its front to behind its back: the wait before it shoots is for what it comes on
+                // as it walks. A footstep behind it alerts it, and alerted it turns and shoots at once. The Mines'
+                // path 1 at 3187,1400: run past, shot 13 frames after it began to turn, a cell short of the shadow.)
+                bool pastIt = false;
+                if (!slig.mAsleep && slig.mFacingLeft == (here.mX < slig.mX))
+                {
+                    for (std::size_t i = 0; i <= last; i++)
+                    {
+                        const s32 x = nav.Nodes()[nav.Edges()[path[i]].mTo].mX;
+                        pastIt = pastIt || ((x < slig.mX) != (here.mX < slig.mX) && !nav.Nodes()[nav.Edges()[path[i]].mTo].mHidden);
+                    }
+                }
+                if (!slig.mAsleep && slig.mSightDelay >= World::kOutrunDelay && !pastIt)
                 {
                     // One that waits before it shoots at what it sees is run from: measured, he is off its screen
                     // and up the next hoist before it has caught up, and it shoots at nothing on the way
@@ -610,15 +926,128 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 last = std::min(last, lastOpen + 1);
             }
             mHiding = 0;
+            // No further than the cell before a Slurg
+            for (std::size_t i = 1; i <= last && mSlurgWaits < 80 && !bot.GetWorld().mFleechesAsleep.empty() && !mFleechAwakeHere && !bot.GetWorld().mInvisible; i++)
+            {
+                const NavNode& cellAt = nav.Nodes()[nav.Edges()[path[i]].mTo];
+                if (bot.GetWorld().SlurgBy(cellAt.mX, cellAt.mY, cellAt.mHalf))
+                {
+                    last = i - 1;
+                    break;
+                }
+            }
             const NavNode& to = nav.Nodes()[nav.Edges()[path[last]].mTo];
             Gait gait = bot.GaitFor(static_cast<s32>(last) + 1);
             if (gait == Gait::eRun && mTopGait != Gait::eRun)
             {
                 gait = mTopGait;
             }
-            if (outrun || mHurry)
+            // A sleeping Fleech within earshot of where he is or is going (150, and a step's length more): quietly
+            for (const RockAt& fleech : bot.GetWorld().mFleechesAsleep)
+            {
+                const s32 reach = (150 + 40) / (here.mHalf ? 2 : 1);
+                bool hears = std::abs(fleech.mX - here.mX) <= reach;
+                for (std::size_t i = 0; i <= last; i++)
+                {
+                    hears = hears || std::abs(fleech.mX - nav.Nodes()[nav.Edges()[path[i]].mTo].mX) <= reach;
+                }
+                sneak = sneak || (hears && fleech.mHalf == here.mHalf && nav.CameraOf(fleech.mX, fleech.mY - 5) == nav.CameraOf(here.mX, here.mY - 5));
+            }
+            // A flying Slig about and no shadow to stand in (the reflex takes him to one if there is): at a run
+            bool flier = false;
+            for (const FlierAt& f : bot.GetWorld().mFliers)
+            {
+                flier = flier || (f.mHalf == here.mHalf && std::abs(f.mY - here.mY) < 220 && std::abs(f.mX - here.mX) < 1000);
+            }
+            // A Fleech awake on his screen: it crawls faster than he walks and slower than he runs
+            bool fleech = false;
+            for (const RockAt& f : bot.GetWorld().mFleechesAwake)
+            {
+                fleech = fleech || (f.mHalf == here.mHalf && nav.CameraOf(f.mX, f.mY - 5) == nav.CameraOf(here.mX, here.mY - 5));
+            }
+            // (invisible, nothing hears or sees him and the clock is running)
+            if (bot.GetWorld().mInvisible)
+            {
+                sneak = false;
+                fleech = true;
+            }
+            if (mFleechAwakeHere)
+            {
+                sneak = false;
+                fleech = true;
+            }
+            // A Scrab loose on his floor: there is only running
+            bool chased = false;
+            for (const ScrabAt& scrab : bot.GetWorld().mScrabs)
+            {
+                if (!scrab.mPossessed && scrab.mHalf == here.mHalf && std::abs(scrab.mY - here.mY) <= 30 && std::abs(scrab.mX - here.mX) < 700)
+                {
+                    // (one shut in behind a gate is no reason to wake the Fleeches he is sneaking by: the
+                    // Mudanchee vault's path 4, where the run to the lock woke the four asleep round it)
+                    if (Domain::GateBetween(nav, bot.GetWorld(), scrab.mX, here.mX, here.mY, here.mHalf))
+                    {
+                        continue;
+                    }
+                    sneak = false;
+                    fleech = true;
+                    chased = true;
+                }
+            }
+            // And no walking the last cells to stop on the right one (a run is left four cells early for that,
+            // twenty frames a Scrab does not give): from the run into a roll, which stops where it is told
+            if (chased)
+            {
+                const s32 way = first.mLeft ? -1 : 1;
+                // Into a well at the end of the run without stopping (the walkthrough of the Mudanchee vault's path
+                // 5: "jumping into the well without stopping to position yourself, you have to do it on the fly")
+                if (last + 1 < path.size() && nav.Edges()[path[last + 1]].mKind == EdgeKind::eWell && nav.Edges()[path[last + 1]].mWell >= 0 && (to.mX - here.mX) * way >= 3 * cell)
+                {
+                    const NavFeature& well = nav.Input().mFeatures[nav.Edges()[path[last + 1]].mWell];
+                    mLastEdge = path[last + 1];
+                    return TaskStep::Do(Prim::RunWell(way > 0 ? well.mX1 : well.mX2, way < 0));
+                }
+                if ((to.mX - here.mX) * way >= 6 * cell)
+                {
+                    return TaskStep::Do(Prim::RunRoll(to.mX - way * 3 * cell, to.mX));
+                }
+            }
+            if (outrun || mHurry || fleech || (flier && !sneak))
             {
                 gait = Gait::eRun;
+                // And if the way goes on under something low, from the run straight into the roll: stopping to
+                // crouch there is where he was shot (the Mines' path 2, at 3287,1240)
+                std::size_t rollEnd = last;
+                while (rollEnd + 1 < path.size() && nav.Edges()[path[rollEnd + 1]].mKind == EdgeKind::eRoll && nav.Edges()[path[rollEnd + 1]].mLeft == first.mLeft)
+                {
+                    rollEnd++;
+                }
+                const s32 dir = first.mLeft ? -1 : 1;
+                if (rollEnd > last && (to.mX - here.mX) * dir >= 5 * cell && nav.Condition(nav.Edges()[path[rollEnd]], nullptr, nullptr) == false)
+                {
+                    return TaskStep::Do(Prim::RunRoll(to.mX - dir * cell, nav.Nodes()[nav.Edges()[path[rollEnd]].mTo].mX));
+                }
+                // Too short a run for that, with Fleeches led a way that is timed against them: crouched at once
+                // and rolled the whole of it (a roll is as quick as a run; walked and then crouched, the 100 px
+                // over the Mudanchee vault's path 2 lock took 72 frames)
+                if (rollEnd > last && fleech && bot.KeepsTo() && nav.Condition(nav.Edges()[path[rollEnd]], nullptr, nullptr) == false)
+                {
+                    // (with three cells to run in, from the run into the roll all the same: no stop to crouch)
+                    if ((to.mX - here.mX) * dir >= 3 * cell)
+                    {
+                        return TaskStep::Do(Prim::RunRoll(to.mX - dir * cell, nav.Nodes()[nav.Edges()[path[rollEnd]].mTo].mX));
+                    }
+                    // (not from over a hoist: down there is the way down it. A cell on first.)
+                    bool overHoist = false;
+                    for (s32 i = here.mFirstEdge; i < here.mFirstEdge + here.mEdgeCount; i++)
+                    {
+                        overHoist = overHoist || nav.Edges()[i].mKind == EdgeKind::eHoistDown;
+                    }
+                    if (overHoist)
+                    {
+                        return TaskStep::Do(Prim::MoveTo(nav.Nodes()[first.mTo].mX, Gait::eWalk));
+                    }
+                    return TaskStep::Do(Prim::MoveTo(nav.Nodes()[nav.Edges()[path[rollEnd]].mTo].mX, Gait::eRoll));
+                }
             }
             else if (sneak)
             {
@@ -633,8 +1062,12 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         }
 
         case EdgeKind::eFall:
+        {
             mLastEdge = path[0];
-            return TaskStep::Do(Prim::WalkOff(first.mLeft));
+            Prim fall = Prim::WalkOff(first.mLeft);
+            fall.mAfter = LandingBits(bot, nav, path);
+            return TaskStep::Do(fall);
+        }
 
         case EdgeKind::eHop:
             if (abe.mFacingLeft != first.mLeft)
@@ -647,12 +1080,78 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         case EdgeKind::eHoistUp:
         case EdgeKind::eDoor:
         case EdgeKind::eWell:
+        {
+            // A door that a slapped lock opens, the ghost not at its tomb yet: here is where to wait for it
+            s32 sw = 0;
+            s32 value = 0;
+            if (nav.Condition(first, &sw, &value) && bot.GetWorld().Switch(sw, true) != value && mGhostWaits < 150)
+            {
+                mGhostWaits++;
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(6));
+            }
             mLastEdge = path[0];
-            return TaskStep::Do(Prim::Press(Btn::eUp));
+            Prim press = Prim::Press(Btn::eUp);
+            if (first.mKind == EdgeKind::eWell)
+            {
+                press.mAfter = LandingBits(bot, nav, path);
+            }
+            return TaskStep::Do(press);
+        }
 
         case EdgeKind::eHoistDown:
             mLastEdge = path[0];
             return TaskStep::Do(Prim::Press(Btn::eDown));
+
+        case EdgeKind::ePortal:
+        {
+            // Chanted open from at least three cells off (nearer, its doves are scared away and it is gone until
+            // the screen is come back to), then hopped into from two cells off: it takes the hop itself
+            const NavFeature& portal = nav.Input().mFeatures[first.mFeature];
+            const s32 px = (portal.mX1 + portal.mX2) / 2;
+            const s32 cell = NavGraph::GridStep(nav.Nodes()[cur].mHalf);
+            const s32 side = portal.mDir == 0 ? -1 : 1;
+            bool open = false;
+            for (const RockAt& at : bot.GetWorld().mPortalsOpen)
+            {
+                open = open || (std::abs(at.mX - px) <= 40 && std::abs(at.mY - portal.mY2) <= 120);
+            }
+            if (!open)
+            {
+                if (std::abs(abe.mX - px) < 3 * cell + cell / 2)
+                {
+                    mSteps--;
+                    return TaskStep::Do(Prim::MoveTo(px + side * 4 * cell, Gait::eWalk));
+                }
+                if (abe.mFacingLeft != first.mLeft)
+                {
+                    return TaskStep::Do(Prim::Face(first.mLeft));
+                }
+                if (++mPortalChants > 40)
+                {
+                    return TaskStep::Failed("the bird portal did not open");
+                }
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+            }
+            if (std::abs(abe.mX - px) > 2 * cell + cell / 2)
+            {
+                mSteps--;
+                return TaskStep::Do(Prim::MoveTo(px + side * 2 * cell, Gait::eWalk));
+            }
+            if (abe.mFacingLeft != first.mLeft)
+            {
+                return TaskStep::Do(Prim::Face(first.mLeft));
+            }
+            if (!abe.Settled())
+            {
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(4));
+            }
+            mPortalChants = 0;
+            mLastEdge = path[0];
+            return TaskStep::Do(Prim::Press(Btn::eHop));
+        }
 
         case EdgeKind::eTeleport:
         {
@@ -777,7 +1276,9 @@ bool GoToTask::SweepsClear(const NavGraph& nav, const World& world, const std::v
             const s32 t = start + f + (late < 0 ? late : 0);
             const s32 x = a.mX + (b.mX - a.mX) * f / frames;
             // (a hoist: on the lower floor until he jumps, then no lower than he hangs)
-            const s32 onFloor = e.mKind == EdgeKind::eHoistUp ? frames - 40 : 40;
+            // (measured in the Mines' path 4 at 2062,1500, a drill along the floor 15 to 35 above it: there 3
+            // frames before the jump starts, and his feet are 23 up 14 frames into it and out of its reach 17 in)
+            const s32 onFloor = e.mKind == EdgeKind::eHoistUp ? frames - 34 : 40;
             const bool hangs = climbs && (e.mKind == EdgeKind::eHoistUp ? f >= onFloor : f < frames - onFloor);
             const s32 y = climbs ? (hangs ? std::min(a.mY, b.mY) + tall + 4 : std::max(a.mY, b.mY)) : a.mY + (b.mY - a.mY) * f / frames;
             for (const SweepAt& sweep : world.mSweeps)
@@ -1143,7 +1644,7 @@ TaskStep BlowMineTask::Next(Bot& bot, const std::string& lastFailed)
         return TaskStep::Do(Prim::Press(Btn::eUp));
     }
 
-    // The place to try next: what has worked before first
+    // The place to throw from: one the rock is sure to hit from first
     const std::vector<ThrowSpot> spots = Domain::ThrowSpots(nav, mine->CentreX(), mine->mY2, mine->mHalf, &bot.GetWorld());
     const ThrowSpot* spot = nullptr;
     // From where he can get back from before anywhere else: a drop to a lower ledge is one way, and there may be
@@ -1163,7 +1664,7 @@ TaskStep BlowMineTask::Next(Bot& bot, const std::string& lastFailed)
                 why[0] += bot.ThrowIsBad(mMine, s) ? 1 : 0;
                 why[1] += std::find(mNoWay.begin(), mNoWay.end(), s.mNode) != mNoWay.end() ? 1 : 0;
             }
-            if (bot.ThrowIsBad(mMine, s) || std::find(mNoWay.begin(), mNoWay.end(), s.mNode) != mNoWay.end() || (pass % 2 == 0 && !bot.ThrowHasWorked(s)) || (pass < 4 && here >= 0 && regions[s.mNode] != regions[here]))
+            if (bot.ThrowIsBad(mMine, s) || std::find(mNoWay.begin(), mNoWay.end(), s.mNode) != mNoWay.end() || (pass % 2 == 0 && !s.mSure) || (pass < 4 && here >= 0 && regions[s.mNode] != regions[here]))
             {
                 continue;
             }
@@ -1174,16 +1675,14 @@ TaskStep BlowMineTask::Next(Bot& bot, const std::string& lastFailed)
             }
             // (a mine in between would take the rock)
             bool blocked = false;
-            // One by where he stands goes off if the rock comes back down on it, and takes him with it
-            const NavNode& at = nav.Nodes()[s.mNode];
-            for (const Entity& other : world.mEntities)
-            {
-                blocked = blocked || (other.mKind == EntityKind::eMine && !other.mGone && other.mHalf == at.mHalf && std::abs(other.mY2 - at.mY) <= 50 && std::abs(other.CentreX() - at.mX) < (s.mLevel < 0 ? 125 : 90));
-            }
             why[2] += pass == 7 && blocked ? 1 : 0;
             for (s32 need : s.mNeeds)
             {
                 blocked = blocked || world.Switch(need) == 0;
+            }
+            for (const std::pair<s32, s32>& open : s.mOpen)
+            {
+                blocked = blocked || world.Switch(open.first) != open.second;
             }
             if (blocked)
             {
@@ -1352,6 +1851,27 @@ TaskStep UseTask::Next(Bot& bot, const std::string& lastFailed)
     {
         return TaskStep::Failed("no such entity");
     }
+    // What it would start a drill over: a Mudokon there is drilled (the Mines' path 4, the lever at 637,1500 with
+    // two blind ones on the ledge over it: they are to be led off first)
+    if (bot.SavesMudokons() && bot.GetWorld().Switch(entity->mSwitch) != mWant)
+    {
+        for (const Entity& drill : bot.GetWorld().mEntities)
+        {
+            if (drill.mKind != EntityKind::eDrill || drill.mSwitch != entity->mSwitch || bot.GetWorld().SweepRuns(drill))
+            {
+                continue;
+            }
+            for (const Entity& mud : bot.GetWorld().mEntities)
+            {
+                const s32 x = mud.mLive ? mud.mLiveX : mud.CentreX();
+                const s32 y = mud.mLive ? mud.mLiveY : mud.mY2;
+                if (mud.mKind == EntityKind::eMudokon && !mud.mGone && mud.mHalf == drill.mHalf && x >= drill.mX1 - 20 && x <= drill.mX2 + 20 && y >= drill.mY1 && y - (mud.mHalf ? 30 : 60) <= drill.mY2)
+                {
+                    return TaskStep::Failed("it starts a drill where a Mudokon stands");
+                }
+            }
+        }
+    }
     if (mLooking)
     {
         // In a hand stone: a tap to go on to its next picture, until Abe is back
@@ -1366,6 +1886,26 @@ TaskStep UseTask::Next(Bot& bot, const std::string& lastFailed)
         else
         {
             return TaskStep::Do(Prim::Wait(mLookTaps % 2 ? 2 : 6, mLookTaps % 2 ? static_cast<u32>(Btn::eConfirm) : 0u));
+        }
+    }
+    // A lock that makes him invisible has no switch: it is done when he has the power
+    // (this lock, slapped by this task: an earlier lock of the path may have given the power before)
+    if (entity->mKind == EntityKind::eSlapLock && entity->mInputs[0] > 0 && entity->mSwitch <= 1 && mTries > 0 && (bot.GetWorld().mInvisCharge || bot.GetWorld().mInvisible))
+    {
+        return bot.Abe().Settled() ? TaskStep::Done() : TaskStep::Do(Prim::Wait(4));
+    }
+    // With a Fleech awake there is no time to walk round a lever: from the side he is on, if it can be
+    if (!mSideChosen)
+    {
+        mSideChosen = true;
+        if (entity->mKind == EntityKind::eLever && !bot.GetWorld().mFleechesAwake.empty())
+        {
+            mSide = bot.Abe().mX > entity->CentreX() ? 1 : -1;
+        }
+        // A lock is slapped from the side he comes to it from (the other may be behind a gate)
+        if (entity->mKind == EntityKind::eSlapLock)
+        {
+            mSide = bot.Abe().mX > entity->CentreX() ? 1 : -1;
         }
     }
     bool faceLeft = false;
@@ -1413,6 +1953,20 @@ TaskStep UseTask::Next(Bot& bot, const std::string& lastFailed)
     }
 
     const AbeState& abe = bot.Abe();
+    // (carried on past a lock's cell by the run he landed into: not slapped from wherever he comes to a stop, facing
+    // away from it. Back to the cell.)
+    if (entity->mKind == EntityKind::eSlapLock && (mTries == 0 || bot.GetWorld().mLocksIntact.count(mEntity) != 0) && (bot.AbeNode() != node || !abe.Settled()))
+    {
+        if (!abe.Settled() && ++mLiftWaits < 160)
+        {
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        if (bot.AbeNode() != node)
+        {
+            mArrived = false;
+        }
+        return TaskStep::Do(Prim::Wait(1));
+    }
     if (over)
     {
         const SweepAt* at = bot.GetWorld().SweepOf(over->mId);
@@ -1437,12 +1991,74 @@ TaskStep UseTask::Next(Bot& bot, const std::string& lastFailed)
     {
         return TaskStep::Do(Prim::Press(abe.mMove == Move::eHang ? Btn::eDown : Btn::eUp));
     }
+    // (a slap that landed on something else, a Scrab that stood at the lock: the lock is as it was, and slapped again)
+    const bool missed = entity->mKind == EntityKind::eSlapLock && mTries > 0 && bot.Abe().Settled() && bot.GetWorld().mLocksIntact.count(mEntity) != 0;
+    if (missed && !mMissLogged)
+    {
+        mMissLogged = true;
+        bot.Log("the slap did not land on lock #" + std::to_string(mEntity) + ": again");
+    }
+    if (entity->mKind == EntityKind::eSlapLock && mTries > 0 && !missed)
+    {
+        // Slapped (it knocks him over): its ghost flies to its tomb by itself and the switch comes on when it
+        // is there. He does not stand and wait for that: in the Mudanchee vaults a slap starts a clock.
+        // (a slap that dropped him through a trap door, with a way to run held as he landed: done as he is off,
+        // with nothing waited for. Whoever asked for that has the next move ready.)
+        if (mAfter != 0 && node >= 0 && bot.Abe().mY > bot.Nav().Nodes()[node].mY + 20)
+        {
+            bot.LockSlapped(mEntity);
+            return TaskStep::Done();
+        }
+        if (!bot.Abe().Settled() && ++mLiftWaits < 80)
+        {
+            return TaskStep::Do(Prim::Wait(2));
+        }
+        if (bot.Abe().mMove == Move::eCrouch)
+        {
+            return TaskStep::Do(Prim::Press(Btn::eUp));
+        }
+        // (the power to go invisible, if it gives that, comes to him as a ring: that he does wait for, unless
+        // the slap has woken Fleeches on his screen: the ring finds him as he goes)
+        bool fleechesUp = false;
+        for (const RockAt& f : bot.GetWorld().mFleechesAwake)
+        {
+            fleechesUp = fleechesUp || bot.Nav().CameraOf(f.mX, f.mY - 5) == bot.Nav().CameraOf(bot.Abe().mX, bot.Abe().mY - 5);
+        }
+        if (entity->mInputs[0] > 0 && !fleechesUp && !bot.GetWorld().mInvisCharge && !bot.GetWorld().mInvisible && ++mLookTaps < 150)
+        {
+            return TaskStep::Do(Prim::Wait(4));
+        }
+        bot.LockSlapped(mEntity);
+        return TaskStep::Done();
+    }
     if (++mTries > 6)
     {
         return TaskStep::Failed("switch " + std::to_string(entity->mSwitch) + " didn't change");
     }
     switch (entity->mKind)
     {
+        case EntityKind::eSlapLock:
+            if (abe.mFacingLeft != faceLeft)
+            {
+                mTries--;
+                return TaskStep::Do(Prim::Face(faceLeft));
+            }
+        {
+            // (not with a Scrab standing at it: the slap would land on that. Unseen he can wait by it.)
+            for (const ScrabAt& scrab : bot.GetWorld().mScrabs)
+            {
+                const s32 scale = entity->mHalf ? 2 : 1;
+                const bool between = (scrab.mX - abe.mX) * (entity->CentreX() - abe.mX) > 0 && std::abs(scrab.mX - abe.mX) <= std::abs(entity->CentreX() - abe.mX) + 40 / scale;
+                if (!scrab.mPossessed && scrab.mHalf == entity->mHalf && std::abs(scrab.mY - entity->mY2) * scale <= 30 && between && ++mScrabWaits < 400)
+                {
+                    mTries--;
+                    return TaskStep::Do(Prim::Wait(2));
+                }
+            }
+            Prim slap = Prim::Press(Btn::eSpeak5);
+            slap.mAfter = mAfter;
+            return TaskStep::Do(slap);
+        }
         case EntityKind::eLever:
             if (abe.mFacingLeft != faceLeft)
             {
@@ -1498,6 +2114,26 @@ static std::unique_ptr<GoToTask> GoNearMud(const NavGraph& nav, const World& wor
                                       });
 }
 
+// A Slig that is awake walks the Mudokon's floor, on the screen Abe is on with it, and its beat never takes it
+// off that screen
+static bool SligNeverLeaves(const Bot& bot, const Entity& mud)
+{
+    const s32 x = mud.mLive ? mud.mLiveX : mud.CentreX();
+    const s32 y = mud.mLive ? mud.mLiveY : mud.mY2;
+    if (std::abs(bot.Abe().mY - y) > 45 || std::abs(bot.Abe().mX - x) > 450)
+    {
+        return false;
+    }
+    for (const SligAt& slig : bot.GetWorld().mSligs)
+    {
+        if (!slig.mAsleep && !slig.mPossessed && slig.mHalf == mud.mHalf && std::abs(slig.mY - y) <= 45 && std::abs(slig.mX - x) < 450 && bot.BeatStaysOnScreen(slig))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 // A Slig walks the floor the Mudokon is on, and shoots at anything said in front of it (the Mudokon's answer
 // too): wait, in a shadow if one is near, until it has its back to them with "need" frames to go before it turns.
 // True when there is a step to do first.
@@ -1509,6 +2145,15 @@ static bool HoldForSlig(Bot& bot, const Entity& mud, s32 need, std::unique_ptr<G
     if (bot.QuietFrames(x, y, mud.mHalf) >= need || held > 3000 || std::abs(bot.Abe().mY - y) > 45 || std::abs(bot.Abe().mX - x) > 450)
     {
         return false;
+    }
+    // One whose beat never takes it off this screen: there is no quiet to wait for, and going to the Mudokon
+    // behind its back does not do. It turns round at a footstep or a word behind it and, alerted, shoots at
+    // once: the wait before it shoots (Slig::RespondToEnemyOrPatrol) is only for what it comes on while it
+    // walks. The Mines' path 1, Mudokon #33006 and the Slig that walks 3012..3287 on one screen: twelve deaths.
+    if (SligNeverLeaves(bot, mud))
+    {
+        step = TaskStep::Failed("a Slig that never leaves the screen walks the Mudokon's floor");
+        return true;
     }
     held += 6;
     const NavGraph& nav = bot.Nav();
@@ -2559,11 +3204,18 @@ TaskStep KillTask::Next(Bot& bot, const std::string& lastFailed)
     {
         return TaskStep::Done();
     }
-    if (abe.mMove == Move::eCrouch)
+    // (crouched on his way where there is no room to stand: the way there knows when he can get up)
+    mNoStand = abe.mMove == Move::eCrouch && (mNoStand || lastFailed.find("no reaction") != std::string::npos);
+    if (abe.mMove == Move::eCrouch && !mNoStand && !(mGo && mGo->Ducked()) && !GoToTask::SweepOver(bot.Nav(), bot.GetWorld(), bot.AbeNode()))
     {
         return TaskStep::Do(Prim::Press(Btn::eUp));
     }
 
+    // (before he is out in the open on his way to it)
+    if (SligNeverLeaves(bot, *mud))
+    {
+        return TaskStep::Failed("a Slig that never leaves the screen walks the Mudokon's floor");
+    }
     TaskStep step;
     if (!RunGo(mGo, bot, lastFailed, step))
     {
@@ -2644,7 +3296,62 @@ TaskStep RescueTask::Next(Bot& bot, const std::string& lastFailed)
     {
         return TaskStep::Done();
     }
-    if (abe.mMove == Move::eCrouch && !(mGo && mGo->Disarming()))
+    // A drill at work between a blind Mudokon and its portal, on the floor it runs along once that opens: stopped
+    // first (the Mines' path 4: one between the drills at 1575, 1650 and 1725, its portal at 1812, their levers
+    // on the ledge over them)
+    if (mDrillStop)
+    {
+        const TaskStep step = mDrillStop->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::ePrim)
+        {
+            return step;
+        }
+        mDrillStop.reset();
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            return TaskStep::Failed("couldn't stop the drill between the Mudokon and its portal: " + step.mWhy);
+        }
+    }
+    if (mud->mBlind && mPhase < 4 && bot.AbeNode() >= 0 && abe.Settled())
+    {
+        const s32 mx = mud->mLive ? mud->mLiveX : mud->CentreX();
+        const s32 my = mud->mLive ? mud->mLiveY : mud->mY2;
+        const s32 px = portal->CentreX();
+        for (const Entity& drill : world.mEntities)
+        {
+            if (drill.mKind != EntityKind::eDrill || drill.mHalf != mud->mHalf || !world.SweepRuns(drill) || std::abs(portal->mY2 - my) > 20 || drill.mX2 < std::min(mx, px) || drill.mX1 > std::max(mx, px) || drill.mY2 < my - (mud->mHalf ? 30 : 60) || drill.mY1 > my)
+            {
+                continue;
+            }
+            // (its lever, by whatever way there is to it: past drills too, which the walk there times)
+            const Entity* lever = nullptr;
+            const s32 want = drill.mInputs[1] ? 1 : 0;
+            for (const Entity& e : world.mEntities)
+            {
+                std::vector<s32> path;
+                const s32 node = (e.mKind == EntityKind::eLever || e.mKind == EntityKind::ePullRing) && e.mSwitch == drill.mSwitch && (e.mOp == 2 || e.mOp == (want ? 0 : 1)) && drill.mInputs[0] == 1 && drill.mInputs[2] == 0 ? Domain::UseNode(bot.Nav(), e, nullptr) : -1;
+                if (node >= 0 && bot.Nav().FindPath(bot.AbeNode(), node, bot.EdgeCostFn(), path))
+                {
+                    lever = &e;
+                    break;
+                }
+            }
+            if (lever)
+            {
+                bot.Log("Drill#" + std::to_string(drill.mId) + " is between the blind Mudokon and its portal: stopping it with " + std::string(EntityKindName(lever->mKind)) + "#" + std::to_string(lever->mId) + " first");
+                mGo.reset();
+                mDrillStop = std::make_unique<UseTask>(lever->mId, want);
+                return Next(bot, "");
+            }
+            if (bot.SavesMudokons())
+            {
+                return TaskStep::Failed("a drill at work between the Mudokon and its portal");
+            }
+        }
+    }
+    // (crouched on his way where there is no room to stand: the way there knows when he can get up)
+    mNoStand = abe.mMove == Move::eCrouch && (mNoStand || lastFailed.find("no reaction") != std::string::npos);
+    if (abe.mMove == Move::eCrouch && !mNoStand && !(mGo && (mGo->Disarming() || mGo->Ducked())) && !GoToTask::SweepOver(bot.Nav(), bot.GetWorld(), bot.AbeNode()))
     {
         return TaskStep::Do(Prim::Press(Btn::eUp));
     }
@@ -3501,6 +4208,752 @@ TaskStep WorkTogetherTask::Next(Bot& bot, const std::string& lastFailed)
     }
 }
 
+TaskStep ScrabRampageTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const Entity* first = world.Find(mScrab);
+    if (!first)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    const s32 floorNode = nav.NodeAt(first->CentreX(), first->mY2, first->mHalf, 30);
+    if (floorNode < 0)
+    {
+        return TaskStep::Failed("the Scrab is on no floor");
+    }
+    const s32 line = nav.Nodes()[floorNode].mLine;
+    const s32 floorY = nav.Nodes()[floorNode].mY;
+    const auto onFloor = [&](const Entity& e)
+    {
+        const s32 at = nav.NodeAt(e.CentreX(), e.mY2, e.mHalf, 30);
+        return at >= 0 && nav.Nodes()[at].mLine == line;
+    };
+    const ScrabAt* me = nullptr;
+    for (const ScrabAt& scrab : world.mScrabs)
+    {
+        me = scrab.mPossessed ? &scrab : me;
+    }
+    if (++mFrames > 9000)
+    {
+        return TaskStep::Failed("the Scrab took too long");
+    }
+    if (mPhase == 0)
+    {
+        if (!mGo)
+        {
+            mGo = GoToNode(mSpot);
+        }
+        TaskStep step;
+        if (!RunGo(mGo, bot, lastFailed, step))
+        {
+            return step;
+        }
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            return step;
+        }
+        mPhase = 1;
+        bot.Log("over the Scrabs' floor: chanting to take one over");
+    }
+    if (mPhase == 1)
+    {
+        if (!me)
+        {
+            return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+        }
+        // Which one it is: the entity it is nearest
+        s32 best = 0;
+        for (const Entity& e : world.mEntities)
+        {
+            if (e.mKind == EntityKind::eScrab && onFloor(e) && !world.mScrabsKilled.count(e.mId) && (mSelf == 0 || std::abs(e.CentreX() - me->mX) < best))
+            {
+                mSelf = e.mId;
+                best = std::abs(e.CentreX() - me->mX);
+            }
+        }
+        bot.Log("in Scrab #" + std::to_string(mSelf) + " at " + std::to_string(me->mX) + "," + std::to_string(me->mY));
+        mPhase = 2;
+        return TaskStep::Do(Prim::Wait(6));
+    }
+    if (mPhase == 4)
+    {
+        if (!me)
+        {
+            bot.Log("out of the Scrab, shut in at " + std::to_string(mTrapX));
+            return TaskStep::Done();
+        }
+        return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+    }
+    if (!me)
+    {
+        return TaskStep::Failed("lost the Scrab");
+    }
+    const auto hold = [&](s32 x, u32 extra, s32 frames) -> TaskStep
+    {
+        return TaskStep::Do(Prim::Wait(frames, static_cast<u32>(x > me->mX ? Btn::eRight : Btn::eLeft) | extra));
+    };
+    if (mPhase == 2)
+    {
+        // What is left to kill, the nearest first: another Scrab that is about or one the map has on this floor
+        // and that has not been seen dead; then the Fleeches
+        const Entity* target = nullptr;
+        for (const Entity& e : world.mEntities)
+        {
+            const bool scrab = e.mKind == EntityKind::eScrab && e.mId != mSelf && !e.mGone && !world.mScrabsKilled.count(e.mId);
+            const bool fleech = e.mKind == EntityKind::eFleech && !e.mGone && !world.mFleechKilled.count(e.mId);
+            if ((scrab || fleech) && onFloor(e) && std::find(mLeft.begin(), mLeft.end(), e.mId) == mLeft.end() && (!target || std::abs(e.CentreX() - me->mX) < std::abs(target->CentreX() - me->mX)))
+            {
+                target = &e;
+            }
+        }
+        if (!target)
+        {
+            // All dead: to the far side of the foot switch that shuts a gate, coming at it through that gate
+            for (const Entity& off : world.mEntities)
+            {
+                if (off.mKind != EntityKind::eFootSwitch || off.mOp != 1 || !onFloor(off))
+                {
+                    continue;
+                }
+                for (const NavFeature& gate : nav.Input().mFeatures)
+                {
+                    if (gate.mKind == FeatureKind::eBarrier && gate.mSolid && gate.mSwitch == off.mSwitch)
+                    {
+                        const s32 gx = (gate.mX1 + gate.mX2) / 2;
+                        mTrapSwitch = off.mSwitch;
+                        mTrapX = off.CentreX() + (off.CentreX() < gx ? -1 : 1) * 40;
+                    }
+                }
+            }
+            if (mTrapSwitch == 0)
+            {
+                return TaskStep::Failed("no gate to shut the Scrab behind");
+            }
+            bot.Log("the floor is clear: the Scrab to " + std::to_string(mTrapX) + " behind the gate of switch " + std::to_string(mTrapSwitch));
+            mPhase = 3;
+            return TaskStep::Do(Prim::Wait(4));
+        }
+        const bool isScrab = target->mKind == EntityKind::eScrab;
+        // Where it is now, if it is about
+        s32 tx = target->CentreX();
+        bool seen = false;
+        if (isScrab)
+        {
+            for (const ScrabAt& other : world.mScrabs)
+            {
+                if (!other.mPossessed && std::abs(other.mY - floorY) <= 30 && (!seen || std::abs(other.mX - me->mX) < std::abs(tx - me->mX)))
+                {
+                    tx = other.mX;
+                    seen = true;
+                }
+            }
+        }
+        else
+        {
+            for (const std::vector<RockAt>* list : {&world.mFleechesAsleep, &world.mFleechesAwake})
+            {
+                for (const RockAt& f : *list)
+                {
+                    if (std::abs(f.mY - floorY) <= 160 && std::abs(f.mX - target->CentreX()) <= 400 && (!seen || std::abs(f.mX - me->mX) < std::abs(tx - me->mX)))
+                    {
+                        tx = f.mX;
+                        seen = true;
+                    }
+                }
+            }
+        }
+        const s32 dist = std::abs(tx - me->mX);
+        if (!seen && dist < 150)
+        {
+            // Where it should be and nothing there: dead
+            bot.Log(std::string(isScrab ? "Scrab #" : "Fleech #") + std::to_string(target->mId) + " is dead");
+            if (isScrab)
+            {
+                bot.ScrabKilled(target->mId);
+            }
+            else
+            {
+                bot.FleechKilled(target->mId);
+            }
+            mCharged = false;
+            return TaskStep::Do(Prim::Wait(10));
+        }
+        // A Fleech that has got up onto a ledge is out of the Scrab's reach for good
+        bool upOut = false;
+        if (!isScrab && seen)
+        {
+            for (const std::vector<RockAt>* list : {&world.mFleechesAsleep, &world.mFleechesAwake})
+            {
+                for (const RockAt& f : *list)
+                {
+                    upOut = upOut || (f.mX == tx && f.mY < floorY - 40);
+                }
+            }
+        }
+        if (upOut)
+        {
+            bot.Log("Fleech #" + std::to_string(target->mId) + " has climbed out of the Scrab's reach: left");
+            mLeft.push_back(target->mId);
+            return TaskStep::Do(Prim::Wait(4));
+        }
+        // (a Fleech that sleeps is come at like a Scrab, with the power and at a run: it wakes as the gate before
+        // it opens and is up the nearest hoist in forty frames. One that is awake and near is stamped on.)
+        if (!isScrab && (dist <= 60 || mFleechRuns >= 2))
+        {
+            if (dist > 8)
+            {
+                return hold(tx, 0, dist > 40 ? 4 : 1);
+            }
+            if (++mStamps > 60)
+            {
+                return TaskStep::Failed("the Scrab could not kill the Fleech");
+            }
+            return TaskStep::Do(Prim::Wait(mStamps % 2 ? 3 : 14, mStamps % 2 ? static_cast<u32>(Btn::eDown) : 0u));
+        }
+        if (!isScrab && mCharged && dist <= 110)
+        {
+            mFleechRuns++;
+        }
+        // Another Scrab: the howl first, from out of its reach, then at it at a run, spinning
+        if (!mCharged)
+        {
+            if (seen && dist < 180)
+            {
+                // (too near to stand and howl: back off)
+                return TaskStep::Do(Prim::Wait(6, static_cast<u32>(tx > me->mX ? Btn::eLeft : Btn::eRight) | Btn::eRun));
+            }
+            if (!seen && dist > 260)
+            {
+                return hold(tx, 0, 4);
+            }
+            if (seen && dist > 320)
+            {
+                return hold(tx, 0, 4);
+            }
+            // (the howl is asked for with a press while it stands, and the power is there when it has howled)
+            if (mHowl == 0)
+            {
+                if (me->mMotion != 0)
+                {
+                    return TaskStep::Do(Prim::Wait(2));
+                }
+                mHowl = 1;
+                bot.Log("the Scrab howls for its power, " + std::to_string(dist) + " from Scrab #" + std::to_string(target->mId));
+                return TaskStep::Do(Prim::Wait(2, Btn::eSpeak1));
+            }
+            if (mHowl == 1)
+            {
+                mHowl = me->mMotion == 26 ? 2 : (++mHowlWait > 20 ? 0 : 1);
+                mHowlWait = mHowl == 1 ? mHowlWait : 0;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            if (me->mMotion != 0 && ++mHowlWait < 80)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            mHowl = 0;
+            mHowlWait = 0;
+            mCharged = true;
+            mAttacks = 0;
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        if (++mAttacks > 40)
+        {
+            mCharged = false;
+            return TaskStep::Do(Prim::Wait(4));
+        }
+        if (dist > 110)
+        {
+            return hold(tx, Btn::eRun, 2);
+        }
+        mCharged = false;
+        return hold(tx, Btn::eRun | Btn::eThrow, 34);
+    }
+    // To the trap: through the gate its other foot switch opens, over the one that shuts it
+    if (std::abs(mTrapX - me->mX) > 12)
+    {
+        return hold(mTrapX, 0, std::abs(mTrapX - me->mX) > 40 ? 4 : 1);
+    }
+    bool shut = true;
+    for (const NavFeature& gate : nav.Input().mFeatures)
+    {
+        if (gate.mKind == FeatureKind::eBarrier && gate.mSolid && gate.mSwitch == mTrapSwitch)
+        {
+            shut = world.Switch(gate.mSwitch) != (gate.mStartClosed ? 1 : 0);
+        }
+    }
+    if (!shut)
+    {
+        return TaskStep::Failed("the gate did not shut behind the Scrab");
+    }
+    bot.ScrabParked(mSelf, me->mX);
+    mPhase = 4;
+    return TaskStep::Do(Prim::Wait(10));
+}
+
+TaskStep ScrabKillTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const Entity* fleech = world.Find(mFleech);
+    const Entity* home = world.Find(mScrab);
+    const Entity* lever = world.Find(mLever);
+    if (!fleech || !home || !lever)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    s32 open = 1;
+    for (const NavFeature& f : nav.Input().mFeatures)
+    {
+        if (f.mKind == FeatureKind::eBarrier && f.mSolid && f.mSwitch == lever->mSwitch)
+        {
+            open = f.mStartClosed ? 1 : 0;
+        }
+    }
+    const ScrabAt* me = nullptr;
+    for (const ScrabAt& scrab : world.mScrabs)
+    {
+        me = scrab.mPossessed ? &scrab : me;
+    }
+    if (++mFrames > 4000)
+    {
+        return TaskStep::Failed("the Scrab took too long");
+    }
+    // Along the floor as the Scrab: walking while a direction is held, and it runs on a little when let go
+    const auto walkTo = [&](s32 x, s32 within, bool& there, bool far = false) -> TaskStep
+    {
+        const s32 dx = x - me->mX;
+        there = std::abs(dx) <= within;
+        return TaskStep::Do(Prim::Wait(there ? 6 : (std::abs(dx) > 40 ? 4 : 1), there ? 0u : static_cast<u32>(dx > 0 ? Btn::eRight : Btn::eLeft)));
+    };
+    switch (mPhase)
+    {
+        case 0:
+        case 6:
+        {
+            const s32 want = mPhase == 0 ? open : 1 - open;
+            if (world.Switch(lever->mSwitch) == want)
+            {
+                mUse.reset();
+                if (mPhase == 6)
+                {
+                    return TaskStep::Done();
+                }
+                mPhase = 1;
+                bot.Log("the gate is open: chanting to take the Scrab over");
+                return TaskStep::Do(Prim::Wait(2));
+            }
+            if (!mUse)
+            {
+                mUse = std::make_unique<UseTask>(mLever, want);
+            }
+            TaskStep step = mUse->Next(bot, lastFailed);
+            if (step.mKind == TaskStep::Kind::eDone)
+            {
+                mUse.reset();
+                return TaskStep::Do(Prim::Wait(2));
+            }
+            return step;
+        }
+        case 1:
+            if (me)
+            {
+                mPhase = 2;
+                bot.Log("in the Scrab at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": to the Fleech at " + std::to_string(fleech->CentreX()));
+                return TaskStep::Do(Prim::Wait(4));
+            }
+            return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+        case 2:
+        case 3:
+        {
+            if (!me)
+            {
+                return TaskStep::Failed("lost the Scrab");
+            }
+            // Where the Fleech is now (awake it runs from the Scrab), or that it is gone
+            const RockAt* at = nullptr;
+            for (const std::vector<RockAt>* list : {&world.mFleechesAsleep, &world.mFleechesAwake})
+            {
+                for (const RockAt& f : *list)
+                {
+                    if (f.mHalf == me->mHalf && std::abs(f.mY - me->mY) <= 160 && std::abs(f.mX - fleech->CentreX()) <= 500 && (!at || std::abs(f.mX - me->mX) < std::abs(at->mX - me->mX)))
+                    {
+                        at = &f;
+                    }
+                }
+            }
+            if (!at)
+            {
+                bot.Log("the Fleech is dead: the Scrab home to " + std::to_string(home->CentreX()));
+                bot.FleechKilled(mFleech);
+                mPhase = 4;
+                return TaskStep::Do(Prim::Wait(4));
+            }
+            bool there = false;
+            const TaskStep walk = walkTo(at->mX, 8, there);
+            if (!there)
+            {
+                return walk;
+            }
+            if (++mStamps > 40)
+            {
+                return TaskStep::Failed("the Scrab could not kill the Fleech");
+            }
+            // (the stamp kills what its box is on, on the tenth frame of it)
+            return TaskStep::Do(Prim::Wait(mStamps % 2 ? 3 : 14, mStamps % 2 ? static_cast<u32>(Btn::eDown) : 0u));
+        }
+        case 4:
+        {
+            if (!me)
+            {
+                return TaskStep::Failed("lost the Scrab");
+            }
+            bool there = false;
+            const TaskStep walk = walkTo(home->CentreX(), 20, there);
+            if (!there)
+            {
+                return walk;
+            }
+            mPhase = 5;
+            return TaskStep::Do(Prim::Wait(10));
+        }
+        case 5:
+            if (!me)
+            {
+                mPhase = 6;
+                bot.Log("out of the Scrab: shutting the gate on it");
+                return TaskStep::Do(Prim::Wait(20));
+            }
+            return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+    }
+    return TaskStep::Failed("lost its place");
+}
+
+ScrabHuntTask::~ScrabHuntTask() = default;
+
+// How many ways on and off its floor the stretch of it about x has, between the gates either side
+static s32 StretchWays(const NavGraph& nav, s32 line, s32 x, s32 y, bool half, s32& lo, s32& hi)
+{
+    lo = -100000;
+    hi = 100000;
+    for (const NavFeature& g : nav.Input().mFeatures)
+    {
+        const s32 gx = (g.mX1 + g.mX2) / 2;
+        if (g.mKind == FeatureKind::eBarrier && g.mSolid && g.mHalf == half && std::abs(g.mY2 - y) * (half ? 2 : 1) <= 30)
+        {
+            lo = gx < x ? std::max(lo, gx) : lo;
+            hi = gx > x ? std::min(hi, gx) : hi;
+        }
+    }
+    s32 ways = 0;
+    for (const NavEdge& e : nav.Edges())
+    {
+        const NavNode& a = nav.Nodes()[e.mFrom];
+        const NavNode& b = nav.Nodes()[e.mTo];
+        const bool off = a.mLine == line && b.mLine != line && a.mX > lo && a.mX < hi;
+        const bool on = b.mLine == line && a.mLine != line && b.mX > lo && b.mX < hi;
+        ways += off || on ? 1 : 0;
+    }
+    return ways;
+}
+
+TaskStep ScrabHuntTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const Entity* home = world.Find(mScrab);
+    if (!home)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    if (++mFrames > 6000)
+    {
+        return TaskStep::Failed("the Scrab took too long");
+    }
+    const s32 scale = home->mHalf ? 2 : 1;
+    if (!mSet)
+    {
+        mSet = true;
+        const ScrabAt* own = world.ScrabOf(mScrab);
+        mHomeX = own ? own->mX : home->CentreX();
+        const s32 under = nav.NodeAt(mHomeX, own ? own->mY : home->mY2, home->mHalf, 30);
+        if (under < 0)
+        {
+            return TaskStep::Failed("the Scrab is on no floor");
+        }
+        mLine = nav.Nodes()[under].mLine;
+        mFloorY = nav.Nodes()[under].mY;
+        for (const Entity& f : world.mEntities)
+        {
+            if (mLed)
+            {
+                break;
+            }
+            const s32 at = f.mKind == EntityKind::eFleech && !f.mGone && f.mInputs[1] == 0 && f.mHalf == home->mHalf && world.mFleechKilled.count(f.mId) == 0 ? nav.NodeAt(f.CentreX(), f.mY2, f.mHalf, 30) : -1;
+            if (at >= 0 && nav.Nodes()[at].mLine == mLine && !Domain::WallBetween(nav, mHomeX, f.CentreX(), mFloorY, home->mHalf))
+            {
+                mGroup.push_back(f.mId);
+            }
+        }
+        if (mGroup.empty())
+        {
+            return TaskStep::Done();
+        }
+        mGo = GoToNode(mSpot);
+    }
+    const ScrabAt* me = nullptr;
+    for (const ScrabAt& scrab : world.mScrabs)
+    {
+        me = scrab.mPossessed ? &scrab : me;
+    }
+    // Along the floor as the Scrab: walking while a direction is held, and it runs on a little when let go
+    const auto walkTo = [&](s32 x, s32 within, bool& there, bool far = false) -> TaskStep
+    {
+        const s32 dx = x - me->mX;
+        there = std::abs(dx) <= within;
+        // (at a run while it is far: it slides on some way when let go)
+        const u32 run = far && std::abs(dx) * scale > 200 ? static_cast<u32>(Btn::eRun) : 0u;
+        return TaskStep::Do(Prim::Wait(there ? 6 : (std::abs(dx) * scale > 40 ? 4 : 1), there ? 0u : static_cast<u32>(dx > 0 ? Btn::eRight : Btn::eLeft) | run));
+    };
+    if (mPhase == 0)
+    {
+        TaskStep step;
+        if (!RunGo(mGo, bot, lastFailed, step))
+        {
+            return step;
+        }
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            return step;
+        }
+        mPhase = 1;
+        bot.Log("on Scrab #" + std::to_string(mScrab) + "'s screen: chanting to take it over when it is the one a chant takes");
+    }
+    if (mPhase == 1)
+    {
+        if (me)
+        {
+            if (me->mId != mScrab)
+            {
+                bot.Log("in Scrab #" + std::to_string(me->mId) + ", not #" + std::to_string(mScrab) + ": letting it go");
+                mWrong = true;
+                mPhase = 4;
+                return TaskStep::Do(Prim::Wait(10));
+            }
+            bot.Log("in Scrab #" + std::to_string(mScrab) + " at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": to the " + std::to_string(mGroup.size()) + " Fleeches of its floor");
+            mPhase = 2;
+            return TaskStep::Do(Prim::Wait(4));
+        }
+        // The one a chant takes (Abe::FindObjectToPossess): on his screen, one of his size before any other, the
+        // nearest of those
+        const AbeState& abe = bot.Abe();
+        const s32 cam = nav.CameraOf(abe.mX, abe.mY - 5);
+        const ScrabAt* takes = nullptr;
+        s64 best = 0;
+        for (const ScrabAt& scrab : world.mScrabs)
+        {
+            if (nav.CameraOf(scrab.mX, scrab.mY - 5) != cam)
+            {
+                continue;
+            }
+            const s64 dx = scrab.mX - abe.mX;
+            const s64 dy = scrab.mY - abe.mY;
+            const s64 dist = dx * dx + dy * dy;
+            const bool mine = scrab.mHalf == abe.mHalfScale;
+            const bool had = takes && takes->mHalf == abe.mHalfScale;
+            if (!takes || (mine && !had) || (mine == had && dist < best))
+            {
+                takes = &scrab;
+                best = dist;
+            }
+        }
+        if (takes && takes->mId == mScrab)
+        {
+            return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+        }
+        if (++mWaits > 150)
+        {
+            return TaskStep::Failed("Scrab #" + std::to_string(mScrab) + " is not the one a chant would take from here");
+        }
+        return TaskStep::Do(Prim::Wait(10));
+    }
+    if (mPhase == 4)
+    {
+        if (me)
+        {
+            return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+        }
+        if (mWrong)
+        {
+            return TaskStep::Failed("took over another Scrab");
+        }
+        if (mParked)
+        {
+            bot.ScrabParked(mScrab, mLeaveX);
+        }
+        bot.Log("out of the Scrab, left at " + std::to_string(mLeaveX) + (mParked ? " for a gate to be shut on it" : ", where it was"));
+        return TaskStep::Done();
+    }
+    if (!me)
+    {
+        return TaskStep::Failed("lost the Scrab");
+    }
+    if (mPhase == 2)
+    {
+        // The nearest Fleech it can walk to (awake they run from it and cower)
+        const RockAt* at = nullptr;
+        for (const std::vector<RockAt>* list : {&world.mFleechesAsleep, &world.mFleechesAwake})
+        {
+            for (const RockAt& f : *list)
+            {
+                if (f.mHalf == me->mHalf && std::abs(f.mY - mFloorY) * scale <= 40 && !Domain::WallBetween(nav, me->mX, f.mX, mFloorY, me->mHalf) && !Domain::GateBetween(nav, world, me->mX, f.mX, mFloorY, me->mHalf) && (!at || std::abs(f.mX - me->mX) < std::abs(at->mX - me->mX)))
+                {
+                    at = &f;
+                }
+            }
+        }
+        bool there = false;
+        if (!at && mLed)
+        {
+            // Led to it: the ones that were by it are the ones there were. None left once it has spun through them
+            // is all of them dead; none before it has is none that came.
+            if (mStamps == 0)
+            {
+                if (++mNone > 150)
+                {
+                    return TaskStep::Failed("no Fleech came to the Scrab");
+                }
+                return TaskStep::Do(Prim::Wait(2));
+            }
+            if (++mNone < 20)
+            {
+                return TaskStep::Do(Prim::Wait(2));
+            }
+            for (u32 id : mGroup)
+            {
+                bot.FleechKilled(id);
+            }
+            mParked = false;
+            mLeaveX = mHomeX;
+            bot.Log("the Fleeches led to it are dead: the Scrab home to " + std::to_string(mLeaveX));
+            mPhase = 3;
+            return TaskStep::Do(Prim::Wait(4));
+        }
+        mNone = 0;
+        if (!at)
+        {
+            // None to be seen: to where the farthest of them was, to be sure of it
+            s32 far = mHomeX;
+            for (u32 id : mGroup)
+            {
+                const Entity* f = world.Find(id);
+                far = f && std::abs(f->CentreX() - mHomeX) > std::abs(far - mHomeX) ? f->CentreX() : far;
+            }
+            const TaskStep walk = walkTo(far, 30 / scale, there);
+            if (!there)
+            {
+                return walk;
+            }
+            for (u32 id : mGroup)
+            {
+                bot.FleechKilled(id);
+            }
+            // Where to leave it
+            s32 lo = 0;
+            s32 hi = 0;
+            const s32 waysHome = StretchWays(nav, mLine, mHomeX, mFloorY, me->mHalf, lo, hi);
+            const s32 waysHere = StretchWays(nav, mLine, me->mX, mFloorY, me->mHalf, lo, hi);
+            // (not where there is something he has still to work: a way out he can take unseen, that he cannot)
+            bool work = false;
+            for (const Entity& e : world.mEntities)
+            {
+                const bool worked = e.mKind == EntityKind::eLever || e.mKind == EntityKind::ePullRing || e.mKind == EntityKind::eWorkWheel || e.mKind == EntityKind::eHandStone || (e.mKind == EntityKind::eSlapLock && world.mLocksSlapped.count(e.mId) == 0);
+                const s32 at = worked && e.mHalf == me->mHalf ? nav.NodeAt(e.CentreX(), e.mY2, e.mHalf, 30) : -1;
+                work = work || (at >= 0 && nav.Nodes()[at].mLine == mLine && e.CentreX() > lo && e.CentreX() < hi);
+            }
+            bool gate = false;
+            for (const NavFeature& g : nav.Input().mFeatures)
+            {
+                const s32 gx = (g.mX1 + g.mX2) / 2;
+                gate = gate || (g.mKind == FeatureKind::eBarrier && g.mSolid && g.mHalf == me->mHalf && std::abs(g.mY2 - mFloorY) * scale <= 30 && gx > std::min(mHomeX, me->mX) && gx < std::max(mHomeX, me->mX));
+            }
+            mParked = gate && !work && waysHere < waysHome;
+            mLeaveX = mParked ? far : mHomeX;
+            bot.Log("the Fleeches are dead: the Scrab " + std::string(mParked ? "left here at " : "home to ") + std::to_string(mLeaveX) + " (ways on and off: " + std::to_string(waysHere) + " here, " + std::to_string(waysHome) + " at home)");
+            mPhase = 3;
+            return TaskStep::Do(Prim::Wait(4));
+        }
+        // Never up to one at a walk: a Fleech with a wall behind it and the Scrab within three cells puts its tongue
+        // out and eats it (Fleech's ScaredBrain, eCornered). The howl first, from out of that reach, for the power
+        // to spin; then at it at a run, spinning through: the spin kills what it touches, one a frame.
+        const s32 dist = std::abs(at->mX - me->mX) * scale;
+        const auto hold = [&](u32 extra, s32 frames, bool away = false) -> TaskStep
+        {
+            return TaskStep::Do(Prim::Wait(frames, static_cast<u32>((at->mX > me->mX) != away ? Btn::eRight : Btn::eLeft) | extra));
+        };
+        if (!mCharged)
+        {
+            if (dist < 150)
+            {
+                return hold(Btn::eRun, 6, true);
+            }
+            if (dist > 280)
+            {
+                return hold(dist > 500 ? static_cast<u32>(Btn::eRun) : 0u, 4);
+            }
+            // (the howl is asked for with a press while it stands, and the power is there when it has howled)
+            if (mHowl == 0)
+            {
+                if (me->mMotion != 0)
+                {
+                    return TaskStep::Do(Prim::Wait(2));
+                }
+                mHowl = 1;
+                bot.Log("the Scrab howls for its power, " + std::to_string(dist / scale) + " from the nearest Fleech at " + std::to_string(at->mX));
+                return TaskStep::Do(Prim::Wait(2, Btn::eSpeak1));
+            }
+            if (mHowl == 1)
+            {
+                mHowl = me->mMotion == 26 ? 2 : (++mHowlWait > 20 ? 0 : 1);
+                mHowlWait = mHowl == 1 ? mHowlWait : 0;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            if (me->mMotion != 0 && ++mHowlWait < 80)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            mHowl = 0;
+            mHowlWait = 0;
+            mCharged = true;
+            mAttacks = 0;
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        if (dist > 110 && ++mAttacks < 80)
+        {
+            return hold(Btn::eRun, 2);
+        }
+        if (++mStamps > 12)
+        {
+            return TaskStep::Failed("the Scrab could not kill the Fleeches");
+        }
+        mCharged = false;
+        return hold(Btn::eRun | Btn::eThrow, 34);
+    }
+    bool there = false;
+    const TaskStep walk = walkTo(mLeaveX, 20 / scale, there, true);
+    if (!there)
+    {
+        if (Domain::GateBetween(nav, world, me->mX, mLeaveX, mFloorY, me->mHalf))
+        {
+            return TaskStep::Failed("a gate shut between the Scrab and where it was to be left");
+        }
+        return walk;
+    }
+    mPhase = 4;
+    return TaskStep::Do(Prim::Wait(10));
+}
+
 TaskStep HideTask::Next(Bot& bot, const std::string& /*lastFailed*/)
 {
     // (clear for a little while, not for a frame: it turns round at the ends of its track)
@@ -3566,17 +5019,1767 @@ TaskStep ExitTask::Next(Bot& bot, const std::string& lastFailed)
         }
         mArrived = true;
     }
+    const NavFeature& f = nav.Input().mFeatures[exit.mFeature];
+    // (a door a slapped lock opens: until its ghost is at its tomb)
+    if (f.mKind == FeatureKind::eDoor && f.mStartClosed && f.mSwitch > 1 && bot.GetWorld().Switch(f.mSwitch, true) == 0 && bot.GetWorld().Switch(f.mSwitch) != 0 && mGhostWaits < 150)
+    {
+        mGhostWaits++;
+        return TaskStep::Do(Prim::Wait(6));
+    }
     if (++mTries > 5)
     {
         return TaskStep::Failed("the exit didn't lead out of the path");
     }
-    const NavFeature& f = nav.Input().mFeatures[exit.mFeature];
     if (f.mKind == FeatureKind::ePathExit)
     {
         // Walking on through it does it
         return TaskStep::Do(Prim::Wait(40, abe.mFacingLeft ? Btn::eLeft : Btn::eRight));
     }
     return TaskStep::Do(Prim::Press(Btn::eUp));
+}
+
+ScrabLureTask::~ScrabLureTask() = default;
+ScrabPenTask::~ScrabPenTask() = default;
+
+TaskStep ScrabLureTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const NavGraph& nav = bot.Nav();
+    const World& world = bot.GetWorld();
+    const AbeState& abe = bot.Abe();
+    const NavNode& top = nav.Nodes()[mTop];
+    s32 foot = -1;
+    bool faceLeft = false;
+    for (const NavEdge& e : nav.Edges())
+    {
+        if (e.mKind == EdgeKind::eHoistUp && e.mTo == mTop)
+        {
+            foot = e.mFrom;
+            faceLeft = e.mLeft;
+        }
+    }
+    if (foot < 0)
+    {
+        return TaskStep::Failed("no hoist up to the ledge");
+    }
+    if (++mFrames > 6000)
+    {
+        return TaskStep::Failed("the Scrabs would not be lured");
+    }
+    // The ones still up there: how near the nearest is, and whether one is coming at a run
+    const s32 zone = Domain::ScrabZone(nav, mTop);
+    s32 upThere = 0;
+    s32 nearest = 100000;
+    bool coming = false;
+    for (const Domain::LooseScrab& scrab : Domain::LooseScrabs(world))
+    {
+        const s32 at = nav.NodeAt(scrab.mX, scrab.mY, scrab.mHalf, 30);
+        if (at < 0 || Domain::ScrabZone(nav, at) != zone)
+        {
+            continue;
+        }
+        upThere++;
+        nearest = std::min(nearest, std::abs(scrab.mX - top.mX));
+        const ScrabAt* live = world.ScrabOf(scrab.mId);
+        // (Scrab.hpp: 2 runs, 10 from a stand into a run, 16 from a walk into one)
+        coming = coming || (live && (live->mMotion == 2 || live->mMotion == 10 || live->mMotion == 16) && live->mFacesLeft == (top.mX < live->mX));
+    }
+    const bool hanging = abe.mMove == Move::eHang;
+    const bool onTop = abe.mMove == Move::eIdle && std::abs(abe.mY - top.mY) <= 5 && std::abs(abe.mX - top.mX) <= 8;
+    switch (mPhase)
+    {
+        case 0:
+        {
+            if (upThere == 0)
+            {
+                return TaskStep::Done();
+            }
+            if (!mGo && bot.AbeNode() != foot)
+            {
+                mGo = GoToNode(foot);
+            }
+            TaskStep step;
+            if (!RunGo(mGo, bot, lastFailed, step))
+            {
+                return step;
+            }
+            if (step.mKind == TaskStep::Kind::eFailed)
+            {
+                return step;
+            }
+            mPhase = 1;
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        case 1:
+            if (hanging)
+            {
+                mPhase = 2;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            if (!abe.Settled())
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            if (++mTries > 8)
+            {
+                return TaskStep::Failed("could not get up to hang from the ledge");
+            }
+            if (abe.mFacingLeft != faceLeft)
+            {
+                return TaskStep::Do(Prim::Face(faceLeft));
+            }
+            return TaskStep::Do(Prim::Press(Btn::eUp));
+        case 2:
+            // Not seen while he hangs (Scrab::CanSeeAbe). Up when the nearest is far enough off for him to be down
+            // again before it is here: measured, the climb takes 21 frames, back down to hang 24, and a Scrab
+            // runs 7.6 pixels a frame
+            if (!hanging)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            if (upThere == 0)
+            {
+                mPhase = 5;
+                return TaskStep::Do(Prim::Press(Btn::eUp));
+            }
+            if (nearest < 300)
+            {
+                return TaskStep::Do(Prim::Wait(2));
+            }
+            bot.Log("up to be seen by the Scrab, " + std::to_string(nearest) + " off");
+            mPhase = 3;
+            mWaits = 0;
+            return TaskStep::Do(Prim::Press(Btn::eUp));
+        case 3:
+            if (!onTop)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            if (upThere == 0)
+            {
+                return TaskStep::Done();
+            }
+            if (coming || nearest < 200 || ++mWaits > 240)
+            {
+                if (!coming && nearest >= 200 && ++mTries > 8)
+                {
+                    return TaskStep::Failed("the Scrab does not come at him");
+                }
+                bot.Log(coming ? "the Scrab comes at a run: down to hang" : "down to hang again");
+                mPhase = 4;
+                mWaits = 0;
+                return TaskStep::Do(Prim::Press(Btn::eDown));
+            }
+            return TaskStep::Do(Prim::Wait(1));
+        case 4:
+            if (!hanging)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            if (upThere == 0)
+            {
+                // Up at once: it lands a cell from where he hangs
+                bot.Log("the Scrab has gone over the edge: up");
+                mPhase = 5;
+                mWaits = 0;
+                return TaskStep::Do(Prim::Press(Btn::eUp));
+            }
+            if (!coming && ++mWaits > 30)
+            {
+                // It gave up, or there is another: again
+                mPhase = 2;
+            }
+            return TaskStep::Do(Prim::Wait(1));
+        default:
+            if (onTop)
+            {
+                if (upThere != 0)
+                {
+                    mPhase = 3;
+                    mWaits = 0;
+                    return TaskStep::Do(Prim::Wait(1));
+                }
+                return TaskStep::Done();
+            }
+            if (hanging && ++mWaits > 40)
+            {
+                mWaits = 0;
+                return TaskStep::Do(Prim::Press(Btn::eUp));
+            }
+            return TaskStep::Do(Prim::Wait(1));
+    }
+}
+
+TaskStep ScrabPenTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const NavGraph& nav = bot.Nav();
+    const World& world = bot.GetWorld();
+    const Entity* lever = world.Find(mLever);
+    if (!lever || mFeature < 0 || mFeature >= static_cast<s32>(nav.Input().mFeatures.size()))
+    {
+        return TaskStep::Failed("no such lever or gate");
+    }
+    const NavFeature& gate = nav.Input().mFeatures[mFeature];
+    const s32 gx = (gate.mX1 + gate.mX2) / 2;
+    const s32 shutValue = gate.mStartClosed ? 0 : 1;
+    const bool shut = world.Switch(gate.mSwitch) == shutValue;
+    if (++mFrames > 9000)
+    {
+        return TaskStep::Failed("the Scrabs never were all on one side of the gate");
+    }
+    if (mUse)
+    {
+        TaskStep step = mUse->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::ePrim)
+        {
+            return step;
+        }
+        mUse.reset();
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            return step;
+        }
+        return TaskStep::Do(Prim::Wait(2));
+    }
+    // At the lever, to be quick with it
+    const s32 at = Domain::UseNode(nav, *lever, nullptr);
+    if (at < 0)
+    {
+        return TaskStep::Failed("no place to pull the lever from");
+    }
+    if (!mGo && bot.AbeNode() != at && bot.Abe().Settled() && std::abs(bot.Abe().mX - nav.Nodes()[at].mX) > 2 * NavGraph::GridStep(nav.Nodes()[at].mHalf))
+    {
+        mGo = GoToNode(at);
+    }
+    {
+        TaskStep step;
+        if (!RunGo(mGo, bot, lastFailed, step))
+        {
+            return step;
+        }
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            return step;
+        }
+    }
+    // The Scrabs of the two stretches the gate parts
+    const s32 cell = NavGraph::GridStep(gate.mHalf);
+    const s32 nl = nav.NodeAt(gate.mX1 - cell / 2, gate.mY2, gate.mHalf, 30);
+    const s32 nr = nav.NodeAt(gate.mX2 + cell / 2, gate.mY2, gate.mHalf, 30);
+    if (nl < 0 || nr < 0)
+    {
+        return TaskStep::Failed("no floor on both sides of the gate");
+    }
+    const s32 zl = Domain::ScrabZone(nav, nl);
+    const s32 zr = Domain::ScrabZone(nav, nr);
+    s32 count = 0;
+    s32 left = 0;
+    s32 right = 0;
+    bool clearOfGate = true;
+    bool onScreen = true;
+    const s32 cam = nav.CameraOf(nav.Nodes()[at].mX, nav.Nodes()[at].mY - 5);
+    for (const Domain::LooseScrab& scrab : Domain::LooseScrabs(world))
+    {
+        const s32 under = nav.NodeAt(scrab.mX, scrab.mY, scrab.mHalf, 30);
+        if (under < 0 || (Domain::ScrabZone(nav, under) != zl && Domain::ScrabZone(nav, under) != zr))
+        {
+            // (one in the air on its way down counts as there, and as not yet where it is wanted)
+            if (scrab.mHalf == gate.mHalf && std::abs(scrab.mY - gate.mY2) <= 120 && under < 0 && std::abs(scrab.mX - gx) < 1200)
+            {
+                count++;
+                clearOfGate = false;
+            }
+            continue;
+        }
+        count++;
+        (scrab.mX < gx ? left : right)++;
+        const ScrabAt* live = world.ScrabOf(scrab.mId);
+        // Far enough from the gate not to be through it before it is shut: the pull takes some 20 frames, and
+        // one that comes this way walks 2.3 pixels a frame or runs 7.6
+        const bool away = live && live->mFacesLeft == (scrab.mX < gx);
+        clearOfGate = clearOfGate && std::abs(scrab.mX - gx) >= (away ? 50 : 220);
+        onScreen = onScreen && nav.CameraOf(scrab.mX, scrab.mY - 5) == cam;
+    }
+    const bool asWanted = mLeft ? right == 0 : left == 0;
+    if (shut)
+    {
+        if (count == 0 || asWanted)
+        {
+            return TaskStep::Done();
+        }
+        // One on each side: opened while both are on his screen they fight, and one is left
+        if (left != 0 && right != 0 && !onScreen && ++mHold < 1500)
+        {
+            if (!mSaid)
+            {
+                mSaid = true;
+                bot.Log("at the lever until the Scrabs on both sides of the gate are on this screen: they fight then");
+            }
+            return TaskStep::Do(Prim::Wait(2));
+        }
+        bot.Log("opening the gate at " + std::to_string(gx) + " with " + std::to_string(left) + " Scrabs left of it and " + std::to_string(right) + " right");
+        mUse = std::make_unique<UseTask>(mLever, 1 - shutValue);
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    if (count != 0 && asWanted && clearOfGate)
+    {
+        bot.Log("shutting the gate at " + std::to_string(gx) + " on " + std::to_string(count) + " Scrabs " + (mLeft ? "left" : "right") + " of it");
+        mUse = std::make_unique<UseTask>(mLever, shutValue);
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    if (count == 0)
+    {
+        return TaskStep::Done();
+    }
+    return TaskStep::Do(Prim::Wait(2));
+}
+
+FleechLureTask::~FleechLureTask()
+{
+    if (mKept)
+    {
+        mKept->KeepTo({});
+    }
+}
+
+void FleechLureTask::Keep(Bot& bot, const std::set<s32>& edges)
+{
+    bot.KeepTo(edges);
+    mKept = edges.empty() ? nullptr : &bot;
+}
+
+// The cell a Fleech is on, or the nearest under it while it climbs or falls
+static s32 FleechNode(const NavGraph& nav, const RockAt& f)
+{
+    const s32 at = nav.NodeAt(f.mX, f.mY, f.mHalf, 30);
+    if (at >= 0)
+    {
+        return at;
+    }
+    s32 best = -1;
+    s32 bestOff = 100000;
+    for (std::size_t i = 0; i < nav.Nodes().size(); i++)
+    {
+        const NavNode& n = nav.Nodes()[i];
+        const s32 off = std::abs(n.mX - f.mX) * 3 + std::abs(n.mY - f.mY);
+        if (n.mHalf == f.mHalf && std::abs(n.mX - f.mX) <= NavGraph::GridStep(f.mHalf) && off < bestOff)
+        {
+            bestOff = off;
+            best = static_cast<s32>(i);
+        }
+    }
+    return best;
+}
+
+// What an edge costs him as the switches stand (own: a switch taken to be on, the one the thing used sets)
+static NavGraph::EdgeCost LureCost(const Bot& bot, s32 own)
+{
+    const NavGraph* nav = &bot.Nav();
+    const World* world = &bot.GetWorld();
+    return [nav, world, own](const NavEdge& e) -> s32
+    {
+        s32 condSwitch = 0;
+        s32 condValue = 0;
+        if (nav->Condition(e, &condSwitch, &condValue) && (condSwitch == own ? 1 : world->Switch(condSwitch)) != condValue)
+        {
+            return -1;
+        }
+        return std::max(1, e.mCost);
+    };
+}
+
+// (frames a Fleech needs to him when he turns back: 150 px, as measured in the Mudanchee vault's path 2, where
+// they come into being that far off as their screen comes on, leaves him the climb with a cell or two in hand.
+// And the climb they have after him counts: one at the foot of the hoist he stands over is 40 frames off.)
+static const s32 kFleechDrawn = 60;
+// (a slap and the turn away from it)
+static const s32 kFleechUse = 52;
+static const s32 kFleechMargin = 5;
+
+TaskStep FleechLureTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const NavGraph& nav = bot.Nav();
+    const World& world = bot.GetWorld();
+    const AbeState& abe = bot.Abe();
+    const Entity* entity = world.Find(mEntity);
+    if (!entity)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    if (mUse)
+    {
+        TaskStep step = mUse->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::ePrim)
+        {
+            return step;
+        }
+        mUse.reset();
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            Keep(bot, {});
+            return step;
+        }
+        mPhase = 6;
+        std::set<s32> edges(mLure.mAway.begin(), mLure.mAway.end());
+        if (mLure.mAway.empty())
+        {
+            Keep(bot, {});
+            return TaskStep::Done();
+        }
+        Keep(bot, edges);
+        mGo = GoToNode(nav.Edges()[mLure.mAway.back()].mTo);
+    }
+    const s32 cur = bot.AbeNode();
+    // The Fleeches that are about, and how long the nearest needs to the cells in zone
+    const auto nearest = [&](const std::vector<s32>& zone) -> s32
+    {
+        const std::vector<s32> times = Domain::FleechTimes(nav, world, zone);
+        s32 least = 100000;
+        for (const RockAt& f : world.mFleechesAwake)
+        {
+            // (one on its way up a hoist gets to the top of it first, whatever he does: measured, 40 frames from
+            // the foot)
+            s32 up = -1;
+            s32 left = 0;
+            for (const NavEdge& e : nav.Edges())
+            {
+                const NavNode& from = nav.Nodes()[e.mFrom];
+                const NavNode& to = nav.Nodes()[e.mTo];
+                if (f.mClimbing && e.mKind == EdgeKind::eHoistUp && from.mHalf == f.mHalf && std::abs(from.mX - f.mX) <= NavGraph::GridStep(f.mHalf) && f.mY <= from.mY + 5 && f.mY >= to.mY - 5 && (up < 0 || from.mY - to.mY < left))
+                {
+                    up = static_cast<s32>(&e - nav.Edges().data());
+                    left = from.mY - to.mY;
+                }
+            }
+            if (up >= 0)
+            {
+                const NavNode& to = nav.Nodes()[nav.Edges()[up].mTo];
+                least = std::min(least, times[nav.Edges()[up].mTo] + 40 * std::max(0, std::min(left, f.mY - to.mY)) / std::max(1, left));
+                continue;
+            }
+            const s32 at = FleechNode(nav, f);
+            if (at >= 0)
+            {
+                least = std::min(least, times[at]);
+            }
+        }
+        return least;
+    };
+    if (mPhase == 2 && mGo && cur >= 0 && nearest(Domain::FleechReach(nav, cur)) <= kFleechDrawn)
+    {
+        // They come: no further
+        mGo.reset();
+    }
+    {
+        TaskStep step;
+        if (!RunGo(mGo, bot, lastFailed, step))
+        {
+            return step;
+        }
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            Keep(bot, {});
+            return step;
+        }
+    }
+    if (cur < 0)
+    {
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    if (mPhase == 0)
+    {
+        mTarget = -1;
+        std::vector<s32> homes;
+        for (const RockAt& f : world.mFleechesAwake)
+        {
+            const s32 at = FleechNode(nav, f);
+            if (at >= 0 && f.mHalf == entity->mHalf)
+            {
+                homes.push_back(at);
+            }
+        }
+        if (homes.empty())
+        {
+            for (const Entity& f : world.mEntities)
+            {
+                const s32 at = f.mKind == EntityKind::eFleech && !f.mGone && !world.mFleechKilled.count(f.mId) && f.mHalf == entity->mHalf ? nav.NodeAt(f.CentreX(), f.mY2, f.mHalf, 30) : -1;
+                if (at >= 0)
+                {
+                    homes.push_back(at);
+                }
+            }
+        }
+        // From the side of it that the way back comes down on (the Mudanchee vault's path 2: used from the well's
+        // side he walked there, turned and was 36 frames longer about it)
+        mLure = Domain::FleechLure();
+        s32 quickest = 0;
+        for (s32 side = -1; side <= 1; side += 2)
+        {
+            const s32 node = Domain::UseNode(nav, *entity, nullptr, side);
+            if (node < 0 || (side == 1 && node == mTarget))
+            {
+                continue;
+            }
+            // (the nearest to the thing first: the way they come is taken from that one)
+            const std::vector<s32> times = Domain::FleechTimes(nav, world, Domain::FleechReach(nav, node));
+            std::sort(homes.begin(), homes.end(), [&](s32 a, s32 b)
+                      { return times[a] < times[b]; });
+            const Domain::FleechLure lure = Domain::LureFleeches(nav, world, homes, node, LureCost(bot, -1), LureCost(bot, entity->mInputs[1] > 1 ? entity->mInputs[1] : -1), -1, cur);
+            s32 frames = 0;
+            for (s32 edge : lure.mBack)
+            {
+                frames += Domain::RunFrames(nav, nav.Edges()[edge]);
+            }
+            if (lure.mFound && (!mLure.mFound || frames < quickest))
+            {
+                mLure = lure;
+                quickest = frames;
+                mTarget = node;
+                mSide = side;
+            }
+        }
+        if (!mLure.mFound)
+        {
+            // (a lever just pulled to let them out has not set its switch yet)
+            if (++mWaits <= 20)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            return TaskStep::Failed("no way to lead the Fleeches off");
+        }
+        mWaits = 0;
+        const NavNode& bait = nav.Nodes()[mLure.mBait];
+        const NavNode& commit = nav.Nodes()[mLure.mCommit];
+        bot.Log("the Fleeches are led to " + std::to_string(bait.mX) + "," + std::to_string(bait.mY) + " and the way back is by " + std::to_string(commit.mX) + "," + std::to_string(commit.mY) + ": " + std::to_string(mLure.mLead) + " frames gained on them");
+        mPhase = 1;
+        mOutAt = 0;
+        if (cur != mLure.mBait)
+        {
+            mGo = GoToNode(mLure.mBait);
+            return TaskStep::Do(Prim::Wait(1));
+        }
+    }
+    if (mPhase == 1)
+    {
+        if (cur != mLure.mBait)
+        {
+            mGo = GoToNode(mLure.mBait);
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        mPhase = 2;
+    }
+    if (mPhase == 2)
+    {
+        if (nearest(Domain::FleechReach(nav, cur)) <= kFleechDrawn)
+        {
+            mPhase = 3;
+            mLedAt = abe.mFrame;
+            bot.Log("the Fleeches come: back the other way");
+        }
+        else if (mOutAt < mLure.mOut.size())
+        {
+            // Towards them a cell or two at a time, so as to stop when they come
+            mOutAt = std::min(mOutAt + 2, mLure.mOut.size());
+            Keep(bot, std::set<s32>(mLure.mOut.begin(), mLure.mOut.end()));
+            mGo = GoToNode(nav.Edges()[mLure.mOut[mOutAt - 1]].mTo);
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        else if (++mWaits > 600)
+        {
+            Keep(bot, {});
+            return TaskStep::Failed("the Fleeches did not come");
+        }
+        else
+        {
+            return TaskStep::Do(Prim::Wait(2));
+        }
+    }
+    if (mPhase == 3)
+    {
+        Keep(bot, {});
+        if (cur != mLure.mBait)
+        {
+            mGo = GoToNode(mLure.mBait);
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        mPhase = 4;
+        if (cur != mLure.mCommit)
+        {
+            Keep(bot, std::set<s32>(mLure.mBack.begin(), mLure.mBack.end()));
+            mGo = GoToNode(mLure.mCommit);
+            return TaskStep::Do(Prim::Wait(1));
+        }
+    }
+    if (mPhase == 4)
+    {
+        if (cur != mLure.mCommit)
+        {
+            Keep(bot, std::set<s32>(mLure.mBack.begin(), mLure.mBack.end()));
+            mGo = GoToNode(mLure.mCommit);
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        // What is left to do, and where they are: the rest of the way, the thing, and into the way out
+        s32 need = kFleechUse;
+        s32 way = 0;
+        s32 out = 0;
+        std::vector<s32> zone = Domain::FleechReach(nav, mTarget);
+        bool rest = false;
+        for (s32 edge : mLure.mBack)
+        {
+            const NavEdge& e = nav.Edges()[edge];
+            rest = rest || e.mFrom == mLure.mCommit;
+            if (rest)
+            {
+                way += Domain::RunFrames(nav, e);
+                if (nav.Nodes()[e.mTo].mLine == nav.Nodes()[mTarget].mLine)
+                {
+                    const std::vector<s32> more = Domain::FleechReach(nav, e.mTo);
+                    zone.insert(zone.end(), more.begin(), more.end());
+                }
+            }
+        }
+        for (s32 edge : mLure.mAway)
+        {
+            const NavEdge& e = nav.Edges()[edge];
+            if (Domain::FleechFrames(nav, world, e) < 0)
+            {
+                // (in a well nothing gets at him)
+                out += 8;
+                break;
+            }
+            out += Domain::RunFrames(nav, e);
+            const std::vector<s32> more = Domain::FleechReach(nav, e.mTo);
+            zone.insert(zone.end(), more.begin(), more.end());
+        }
+        need += way + out;
+        const s32 theirs = nearest(zone);
+        if (theirs < need + kFleechMargin)
+        {
+            // Not yet: here until they are further off (on their way up a hoist they are), as long as they are
+            // not near him here
+            const s32 toHim = nearest(Domain::FleechReach(nav, cur));
+            if (toHim > 45 && ++mWaits < 900)
+            {
+                if (mWaits == 1 || mWaits % 150 == 0)
+                {
+                    bot.Log("waiting for the Fleeches to be further off: they need " + std::to_string(theirs) + " frames to where he will be, he needs " + std::to_string(need) + " there (" + std::to_string(way) + " the way, " + std::to_string(out) + " out), " + std::to_string(toHim) + " to him here");
+                }
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            Keep(bot, {});
+            return TaskStep::Failed("the Fleeches were not far enough behind");
+        }
+        bot.Log("the Fleeches need " + std::to_string(theirs) + " frames to where he will be, he needs " + std::to_string(need) + " there (" + std::to_string(way) + " the way, " + std::to_string(out) + " out)");
+        mPhase = 5;
+        Keep(bot, std::set<s32>(mLure.mBack.begin(), mLure.mBack.end()));
+        mUse = std::make_unique<UseTask>(mEntity, mValue);
+        mUse->FixSide(mSide);
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    Keep(bot, {});
+    bot.Log("out of the Fleeches' reach " + std::to_string(abe.mFrame - mLedAt) + " frames after they came");
+    return TaskStep::Done();
+}
+
+FleechLeadTask::~FleechLeadTask()
+{
+    if (mKept)
+    {
+        mKept->KeepTo({});
+    }
+}
+
+void FleechLeadTask::Keep(Bot& bot, const std::set<s32>& edges)
+{
+    bot.KeepTo(edges);
+    mKept = edges.empty() ? nullptr : &bot;
+}
+
+TaskStep FleechLeadTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const NavGraph& nav = bot.Nav();
+    const World& world = bot.GetWorld();
+    const AbeState& abe = bot.Abe();
+    const Entity* lever = world.Find(mLever);
+    if (!lever)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    if (mHunt)
+    {
+        return mHunt->Next(bot, lastFailed);
+    }
+    if (mPhase == 0 && !mUse)
+    {
+        mLead = Domain::LeadFleeches(nav, world, Domain::UseNode(nav, *lever, nullptr), lever->mSwitch);
+        if (!mLead.mFound)
+        {
+            return TaskStep::Failed("no way to lead the Fleeches to a Scrab");
+        }
+        const NavNode& drop = nav.Nodes()[mLead.mDrop];
+        const NavNode& land = nav.Nodes()[mLead.mLand];
+        const NavNode& spot = nav.Nodes()[mLead.mSpot];
+        bot.Log(std::to_string(mLead.mGroup.size()) + " Fleeches to be led to " + std::to_string(drop.mX) + "," + std::to_string(drop.mY) + ", where they drop to Scrab #" + std::to_string(mLead.mScrab) + " at " + std::to_string(land.mX) + "," + std::to_string(land.mY) + "; it is taken over from " + std::to_string(spot.mX) + "," + std::to_string(spot.mY));
+        mUse = std::make_unique<UseTask>(mLever, 1);
+    }
+    if (mUse)
+    {
+        TaskStep step = mUse->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::ePrim)
+        {
+            return step;
+        }
+        mUse.reset();
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            return step;
+        }
+        mPhase = 1;
+    }
+    {
+        TaskStep step;
+        if (!RunGo(mGo, bot, lastFailed, step))
+        {
+            return step;
+        }
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            Keep(bot, {});
+            return step;
+        }
+    }
+    const s32 cur = bot.AbeNode();
+    if (cur < 0)
+    {
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    const s32 scale = abe.mHalfScale ? 2 : 1;
+    if (mPhase == 1)
+    {
+        // The next hoist they have to come up
+        std::size_t h = mAt;
+        while (h < mLead.mWay.size() && nav.Edges()[mLead.mWay[h]].mKind != EdgeKind::eHoistUp)
+        {
+            h++;
+        }
+        if (h >= mLead.mWay.size())
+        {
+            mPhase = 3;
+            mWaits = 0;
+        }
+        else
+        {
+            const s32 theirs = mLead.mWay[h];
+            const s32 top = nav.Edges()[theirs].mTo;
+            if (cur == top)
+            {
+                Keep(bot, {});
+                mAt = h + 1;
+                mPhase = 2;
+                mWaits = 0;
+                bot.Log("on the top of the hoist they come up: here until the first of them starts up it");
+            }
+            else
+            {
+                // By another way than theirs if there is one that is not much longer: at the foot of it with them
+                // a few cells behind, and hanging from its top, he is within their reach
+                Keep(bot, {});
+                const NavGraph::EdgeCost all = bot.EdgeCostFn(true);
+                const auto frames = [&](bool other) -> s32
+                {
+                    std::vector<s32> way;
+                    s32 total = 0;
+                    return nav.FindPath(cur, top, [&](const NavEdge& e) -> s32
+                                        { return all(e) < 0 || (other && static_cast<s32>(&e - nav.Edges().data()) == theirs) ? -1 : Domain::RunFrames(nav, e); }, way, &total) ? total : -1;
+                };
+                const s32 direct = frames(false);
+                const s32 round = frames(true);
+                if (round >= 0 && (direct < 0 || round <= direct + 120))
+                {
+                    std::set<s32> edges;
+                    for (s32 i = 0; i < static_cast<s32>(nav.Edges().size()); i++)
+                    {
+                        if (i != theirs)
+                        {
+                            edges.insert(i);
+                        }
+                    }
+                    Keep(bot, edges);
+                }
+                mGo = GoToNode(top);
+                return TaskStep::Do(Prim::Wait(1));
+            }
+        }
+    }
+    if (mPhase == 2)
+    {
+        const NavEdge& up = nav.Edges()[mLead.mWay[mAt - 1]];
+        const NavNode& foot = nav.Nodes()[up.mFrom];
+        const NavNode& top = nav.Nodes()[up.mTo];
+        bool coming = false;
+        for (const RockAt& f : world.mFleechesAwake)
+        {
+            if (f.mHalf != top.mHalf)
+            {
+                continue;
+            }
+            const s32 dx = std::abs(f.mX - top.mX) * scale;
+            const bool here = std::abs(f.mY - top.mY) * scale <= 12 && dx <= 150;
+            const bool climbing = dx <= 30 && f.mY > top.mY && (f.mClimbing || f.mY < foot.mY - 8 / scale);
+            coming = coming || here || climbing;
+        }
+        if (!coming && ++mWaits <= 450)
+        {
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        bot.Log(coming ? "the first of them is on its way up: on" : "none of them came up: on all the same");
+        mPhase = 1;
+        mWaits = 0;
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    if (mPhase == 3)
+    {
+        // A few cells ahead of the nearest of them on his floor (or on its way up to it): they are within reach of
+        // him at three cells
+        s32 dist = 100000;
+        for (const RockAt& f : world.mFleechesAwake)
+        {
+            if (f.mHalf == abe.mHalfScale && (std::abs(f.mY - abe.mY) * scale <= 25 || f.mClimbing))
+            {
+                dist = std::min(dist, std::abs(f.mX - abe.mX) * scale);
+            }
+        }
+        if (cur == mLead.mDrop)
+        {
+            if (dist > 150 && ++mWaits <= 600)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            bot.Log("where they drop, the nearest of them " + std::to_string(dist) + " behind: over");
+            Keep(bot, {mLead.mOver});
+            mGo = GoToNode(nav.Edges()[mLead.mOver].mTo);
+            mPhase = 5;
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        if (dist <= 190 || mAt >= mLead.mWay.size())
+        {
+            mAt = std::min(mAt + (dist < 130 ? 6 : 3), mLead.mWay.size());
+            Keep(bot, std::set<s32>(mLead.mWay.begin(), mLead.mWay.end()));
+            mGo = GoToNode(nav.Edges()[mLead.mWay[mAt - 1]].mTo);
+            mWaits = 0;
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        if (++mWaits > 900)
+        {
+            Keep(bot, {});
+            return TaskStep::Failed("the Fleeches did not follow");
+        }
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    if (mPhase == 5)
+    {
+        Keep(bot, {});
+        if (cur != mLead.mSpot)
+        {
+            mGo = GoToNode(mLead.mSpot);
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        mPhase = 6;
+        mWaits = 0;
+        mClear = 0;
+    }
+    // Until none of them is left up here and they are down by the Scrab
+    const NavNode& land = nav.Nodes()[mLead.mLand];
+    bool up = false;
+    s32 down = 0;
+    s32 about = 0;
+    for (const RockAt& f : world.mFleechesAwake)
+    {
+        if (f.mHalf != abe.mHalfScale)
+        {
+            continue;
+        }
+        about++;
+        up = up || f.mClimbing || (std::abs(f.mY - abe.mY) * scale <= 25 && std::abs(f.mX - abe.mX) * scale <= 450);
+        down += std::abs(f.mY - land.mY) * scale <= 15 && std::abs(f.mX - land.mX) * scale <= 250 ? 1 : 0;
+    }
+    mClear = up ? 0 : mClear + 1;
+    if (down > 0 && mClear >= 30)
+    {
+        bot.Log(std::to_string(down) + " of them down by the Scrab and none up here: the Scrab");
+        mHunt = std::make_unique<ScrabHuntTask>(mLead.mScrab, mLead.mSpot, mLead.mGroup);
+        return mHunt->Next(bot, "");
+    }
+    if (about == 0 && mClear >= 60)
+    {
+        // (it has kicked them dead itself)
+        for (u32 id : mLead.mGroup)
+        {
+            bot.FleechKilled(id);
+        }
+        bot.Log("none of them left");
+        return TaskStep::Done();
+    }
+    if (++mWaits > 900)
+    {
+        return TaskStep::Failed("the Fleeches did not drop to the Scrab");
+    }
+    return TaskStep::Do(Prim::Wait(1));
+}
+
+ScrabWaryTask::~ScrabWaryTask()
+{
+    if (mKept)
+    {
+        mKept->KeepTo({});
+    }
+}
+
+std::vector<Domain::LooseScrab> ScrabWaryTask::Scrabs(const World& world, bool waitingOnly)
+{
+    std::vector<Domain::LooseScrab> scrabs = Domain::LooseScrabs(world, true);
+    if (!waitingOnly)
+    {
+        const std::vector<Domain::LooseScrab> atOnce = Domain::LooseScrabs(world, false);
+        scrabs.insert(scrabs.end(), atOnce.begin(), atOnce.end());
+    }
+    return scrabs;
+}
+
+std::vector<char> ScrabWaryTask::Hot(const Bot& bot, bool waitingOnly)
+{
+    const NavGraph& nav = bot.Nav();
+    const World& world = bot.GetWorld();
+    const std::vector<Domain::LooseScrab> scrabs = Scrabs(world, waitingOnly);
+    std::vector<char> hot(nav.Nodes().size(), 0);
+    for (std::size_t i = 0; i < nav.Nodes().size() && !scrabs.empty(); i++)
+    {
+        const NavNode& n = nav.Nodes()[i];
+        for (const Domain::LooseScrab& scrab : scrabs)
+        {
+            if (scrab.mHalf == n.mHalf && std::abs(scrab.mY - n.mY) * (n.mHalf ? 2 : 1) <= 30 && !Domain::GateBetween(nav, world, scrab.mX, n.mX, n.mY, n.mHalf) && !Domain::WallBetween(nav, scrab.mX, n.mX, n.mY, n.mHalf))
+            {
+                hot[i] = 1;
+            }
+        }
+    }
+    return hot;
+}
+
+// The frames an edge takes him on a Scrab's floor, counted from when it can see him, as measured in the Mudanchee
+// vault's path 5 (build-bot/x52.txt): a cell walked is 9 frames and run 4, a turn 13, a hop or a drop down is seen
+// for its last 6 frames and stood up from in 10, through a well and out of the next is 39 to on his feet, up a
+// hoist from a stand is 20 to hanging, a running jump up one 7 after the run. dir: the way he faces (0: not known).
+static s32 WaryFrames(const NavGraph& nav, const std::vector<s32>& path, std::size_t i, s32& dir)
+{
+    const NavEdge& e = nav.Edges()[path[i]];
+    const NavNode& from = nav.Nodes()[e.mFrom];
+    const NavNode& to = nav.Nodes()[e.mTo];
+    const s32 cell = NavGraph::GridStep(from.mHalf);
+    const s32 cells = std::abs(to.mX - from.mX) / std::max(1, cell);
+    s32 way = to.mX > from.mX ? 1 : to.mX < from.mX ? -1 : 0;
+    s32 frames = 0;
+    switch (e.mKind)
+    {
+        case EdgeKind::eWalk:
+        {
+            // (a run of walk edges one way: he runs four cells or more)
+            s32 run = 1;
+            for (std::size_t k = i; k > 0 && nav.Edges()[path[k - 1]].mKind == EdgeKind::eWalk && nav.Edges()[path[k - 1]].mLeft == e.mLeft; k--)
+            {
+                run++;
+            }
+            for (std::size_t k = i + 1; k < path.size() && nav.Edges()[path[k]].mKind == EdgeKind::eWalk && nav.Edges()[path[k]].mLeft == e.mLeft; k++)
+            {
+                run++;
+            }
+            frames = run >= 4 ? 4 : 9;
+            // (and getting going)
+            if (i == 0 || nav.Edges()[path[i - 1]].mKind != EdgeKind::eWalk || nav.Edges()[path[i - 1]].mLeft != e.mLeft)
+            {
+                frames += 3;
+            }
+            break;
+        }
+        case EdgeKind::eFall:
+        case EdgeKind::eHoistDown:
+            // (with the way on held as he lands he is off 7 frames sooner)
+            frames = e.mKind == EdgeKind::eFall && i + 1 < path.size() && (nav.Edges()[path[i + 1]].mKind == EdgeKind::eWalk || nav.Edges()[path[i + 1]].mKind == EdgeKind::eRunJump) ? 9 : 16;
+            break;
+        case EdgeKind::eHoistUp:
+            way = e.mLeft ? -1 : 1;
+            // (and half the climb, for which he still hangs where its box comes by)
+            frames = 30;
+            break;
+        case EdgeKind::eHop:
+            frames = cells > 6 ? 39 : 16;
+            break;
+        case EdgeKind::eRunJump:
+            way = e.mLeft ? -1 : 1;
+            // (measured: the jump is as quick as the run, 7 frames from the take-off to hanging; and half the
+            // climb when it is up to a ledge)
+            frames = 3 + 4 * cells + (to.mY < from.mY - 20 ? 10 : 0);
+            break;
+        case EdgeKind::eWell:
+        {
+            // (from a run of three cells or more he is in it as he gets there: the run is let go 12 pixels short and
+            // the slide takes him in. Else he stops, and the way in is 18 frames.)
+            s32 run = 0;
+            for (std::size_t k = i; k > 0 && nav.Edges()[path[k - 1]].mKind == EdgeKind::eWalk && (k == i || nav.Edges()[path[k - 1]].mLeft == nav.Edges()[path[i - 1]].mLeft); k--)
+            {
+                run++;
+            }
+            way = 0;
+            frames = run >= 3 ? 2 : 24;
+            break;
+        }
+        default:
+            frames = std::max(6, e.mCost);
+            break;
+    }
+    if (way != 0 && dir != 0 && way != dir && e.mKind != EdgeKind::eHoistDown && e.mKind != EdgeKind::eFall)
+    {
+        frames += 13;
+    }
+    if (way != 0)
+    {
+        dir = way;
+    }
+    return frames;
+}
+
+// The same without what went before, for finding a way: the turns are counted when the way is timed
+static s32 WaryCost(const NavGraph& nav, const NavEdge& e)
+{
+    const s32 cell = NavGraph::GridStep(nav.Nodes()[e.mFrom].mHalf);
+    const s32 cells = std::abs(nav.Nodes()[e.mTo].mX - nav.Nodes()[e.mFrom].mX) / std::max(1, cell);
+    switch (e.mKind)
+    {
+        case EdgeKind::eWalk:
+            // (taken to be run)
+            return 5;
+        case EdgeKind::eFall:
+            return 12;
+        case EdgeKind::eHoistDown:
+            return 16;
+        case EdgeKind::eHoistUp:
+            return 30;
+        case EdgeKind::eHop:
+            return cells > 6 ? 39 : 16;
+        case EdgeKind::eRunJump:
+            return 3 + 4 * cells + 10;
+        case EdgeKind::eWell:
+            return 10;
+        default:
+            return std::max(6, e.mCost);
+    }
+}
+
+// A hop or a fall that ends in a well in the floor: the cell of floor the well is in, or -1. He is in reach of what
+// walks that floor for the last frames of the fall.
+static s32 WellFloor(const NavGraph& nav, const NavEdge& e)
+{
+    if ((e.mKind != EdgeKind::eHop && e.mKind != EdgeKind::eFall) || e.mWell < 0)
+    {
+        return -1;
+    }
+    const NavFeature& well = nav.Input().mFeatures[e.mWell];
+    return nav.NodeAt((well.mX1 + well.mX2) / 2, well.mY2, well.mHalf, 30);
+}
+
+ScrabWaryTask::Stint ScrabWaryTask::PlanOnce(const Bot& bot, s32 cur, s32 target, bool use, s32 face, s32 drop, const std::vector<char>& hot, bool best, const std::set<s32>& banned)
+{
+    const NavGraph& nav = bot.Nav();
+    Stint stint;
+    const bool forUse = use;
+    const NavGraph::EdgeCost all = bot.EdgeCostFn(true);
+    const NavGraph::EdgeCost base = [&](const NavEdge& e) -> s32
+    {
+        return banned.count(static_cast<s32>(&e - nav.Edges().data())) ? -1 : all(e);
+    };
+    // By the time it takes, and the less of the Scrab's floor the better
+    const auto onto = [&](const NavEdge& e) -> s32
+    {
+        const s32 well = WellFloor(nav, e);
+        return hot[e.mTo] ? e.mTo : (well >= 0 && hot[well] ? well : -1);
+    };
+    const NavGraph::EdgeCost wary = [&](const NavEdge& e) -> s32
+    {
+        return base(e) < 0 ? -1 : WaryCost(nav, e) * (onto(e) >= 0 ? 10 : 1);
+    };
+    if (cur != target && !nav.FindPath(cur, target, wary, stint.mPath))
+    {
+        return stint;
+    }
+    stint.mFound = true;
+    for (std::size_t i = 0; i < stint.mPath.size() && stint.mFirst < 0; i++)
+    {
+        if (onto(nav.Edges()[stint.mPath[i]]) >= 0)
+        {
+            stint.mFirst = static_cast<s32>(i);
+            stint.mOnto = onto(nav.Edges()[stint.mPath[i]]);
+        }
+    }
+    if (stint.mFirst < 0 && (drop < 0 || !hot[drop]))
+    {
+        return stint;
+    }
+    s32 dir = 0;
+    s32 t = 0;
+    if (stint.mFirst < 0)
+    {
+        // None of its floor on the way, but the thing drops him onto it (measured: he is through the trap door 10
+        // frames after the slap begins, down 11 frames later and on his feet 10 after that; 4 if the way on is held)
+        stint.mDrop = drop;
+        stint.mOnto = drop;
+        stint.mLead = 16 + (face != 0 && (bot.Abe().mFacingLeft ? -1 : 1) != face ? 13 : 0);
+        // (which way he runs from there is held as he lands, so no turn is counted)
+        dir = 0;
+        t = 3;
+        stint.mAt.push_back({nav.Nodes()[drop].mX, t});
+        for (const NavEdge& e : nav.Edges())
+        {
+            if (e.mFrom == target && e.mTo == drop)
+            {
+                stint.mEdges.insert(static_cast<s32>(&e - nav.Edges().data()));
+            }
+        }
+        use = false;
+        target = drop;
+    }
+    else
+    {
+        // Until it can see him (measured): a hop is 17 frames in the air before it is that low, a walk off the
+        // end some 12, down a hoist 36, a well 30; and the turn first if he faces the other way
+        const NavEdge& first = nav.Edges()[stint.mPath[stint.mFirst]];
+        stint.mLead = first.mKind == EdgeKind::eHop ? 17 : first.mKind == EdgeKind::eFall ? 12 : first.mKind == EdgeKind::eHoistDown ? 36 : first.mKind == EdgeKind::eWell ? 30 : 0;
+        if ((first.mKind == EdgeKind::eHop || first.mKind == EdgeKind::eFall) && bot.Abe().mFacingLeft != first.mLeft)
+        {
+            stint.mLead += 13;
+        }
+    }
+    for (std::size_t i = stint.mFirst < 0 ? stint.mPath.size() : static_cast<std::size_t>(stint.mFirst); i < stint.mPath.size(); i++)
+    {
+        const NavEdge& e = nav.Edges()[stint.mPath[i]];
+        const s32 well = WellFloor(nav, e);
+        if (well >= 0 && hot[well] && !hot[e.mTo])
+        {
+            // (down into a well in its floor: in its reach for the last 6 frames of the fall)
+            t += 6;
+            stint.mAt.push_back({nav.Nodes()[well].mX, t});
+        }
+        else if (e.mKind == EdgeKind::eWell && !hot[e.mFrom])
+        {
+            // (onto its floor by a well: he comes out of the well of that floor that leads back the way he came,
+            // which is where it first sees him, and is on his feet where he lands 9 frames later)
+            const NavNode& from = nav.Nodes()[e.mFrom];
+            const NavNode& to = nav.Nodes()[e.mTo];
+            s32 mouth = to.mX;
+            for (const NavEdge& g : nav.Edges())
+            {
+                const NavNode& a = nav.Nodes()[g.mFrom];
+                const NavNode& b = nav.Nodes()[g.mTo];
+                if (g.mKind == EdgeKind::eWell && hot[g.mFrom] && a.mLine == to.mLine && b.mHalf == from.mHalf && std::abs(b.mX - from.mX) <= 60 && std::abs(b.mY - from.mY) <= 20)
+                {
+                    mouth = a.mX;
+                }
+            }
+            stint.mAt.push_back({mouth, t});
+            t += 9;
+            stint.mAt.push_back({to.mX, t});
+            dir = to.mX > mouth ? 1 : to.mX < mouth ? -1 : 0;
+        }
+        else
+        {
+            t += WaryFrames(nav, stint.mPath, i, dir);
+            // (a well takes him where it is, not where it leads)
+            stint.mAt.push_back({nav.Nodes()[e.mKind == EdgeKind::eWell ? e.mFrom : e.mTo].mX, t});
+        }
+        stint.mEdges.insert(stint.mPath[i]);
+        if (!hot[e.mTo])
+        {
+            stint.mExit = e.mTo;
+            break;
+        }
+    }
+    if (stint.mExit < 0)
+    {
+        // It ends on the Scrab's floor: the thing is used (measured: a slap is 36 frames until he can move, and he
+        // has to face it), and a place out of its sight made for. Of the places there are and the ways to them
+        // (with a running jump or without), the one that leaves most time.
+        if (use && face != 0 && dir != face)
+        {
+            t += dir != 0 ? 13 : 0;
+            dir = face;
+        }
+        t += use ? 39 : 0;
+        if (!stint.mAt.empty())
+        {
+            stint.mAt.back().second = t;
+        }
+        std::set<s32> outs;
+        for (const NavEdge& e : nav.Edges())
+        {
+            if (hot[e.mFrom] && !hot[e.mTo])
+            {
+                outs.insert(e.mTo);
+            }
+        }
+        const std::vector<std::pair<s32, s32>> soFar = stint.mAt;
+        const std::set<s32> edgesSoFar = stint.mEdges;
+        s32 bestSpare = -100000;
+        s32 bestFrames = t;
+        // How much there is to a place out of its sight: the cells that can be got to from it without setting foot
+        // on the Scrab's floor. A ledge with nothing but that floor round it is a corner to be caught in.
+        const auto room = [&](s32 from) -> s32
+        {
+            std::vector<char> seen(nav.Nodes().size(), 0);
+            std::vector<s32> open{from};
+            seen[from] = 1;
+            s32 count = 0;
+            while (!open.empty() && count < 40)
+            {
+                const s32 node = open.back();
+                open.pop_back();
+                count++;
+                const NavNode& n = nav.Nodes()[node];
+                for (s32 k = n.mFirstEdge; k < n.mFirstEdge + n.mEdgeCount; k++)
+                {
+                    const NavEdge& e = nav.Edges()[k];
+                    if (!seen[e.mTo] && !hot[e.mTo] && onto(e) < 0 && base(e) >= 0)
+                    {
+                        seen[e.mTo] = 1;
+                        open.push_back(e.mTo);
+                    }
+                }
+            }
+            return count;
+        };
+        for (s32 out : outs)
+        {
+            for (s32 jump = 0; jump < 2; jump++)
+            {
+                std::vector<s32> back;
+                if (!nav.FindPath(target, out, [&](const NavEdge& e) -> s32
+                                  { return (!hot[e.mTo] && e.mTo != out) || base(e) < 0 || (jump == 0 && e.mKind == EdgeKind::eRunJump) ? -1 : WaryCost(nav, e); }, back))
+                {
+                    continue;
+                }
+                Stint trial;
+                trial.mPath = stint.mPath;
+                trial.mFirst = stint.mFirst;
+                trial.mLead = stint.mLead;
+                trial.mDrop = stint.mDrop;
+                trial.mAt = soFar;
+                trial.mEdges = edgesSoFar;
+                s32 tt = t;
+                s32 d = dir;
+                // (off a trap door he lands facing the way he slapped: the turn into the run is 8 frames)
+                if (stint.mDrop >= 0 && !back.empty() && face != 0 && (nav.Edges()[back[0]].mLeft ? -1 : 1) != face)
+                {
+                    tt += 8;
+                }
+                for (std::size_t k = 0; k < back.size(); k++)
+                {
+                    tt += WaryFrames(nav, back, k, d);
+                    trial.mAt.push_back({nav.Nodes()[nav.Edges()[back[k]].mKind == EdgeKind::eWell ? nav.Edges()[back[k]].mFrom : nav.Edges()[back[k]].mTo].mX, tt});
+                    trial.mEdges.insert(back[k]);
+                }
+                trial.mOnto = stint.mOnto;
+                // (ranked as it would be at the best moment, so that the choice does not change with where the Scrab
+                // is while he waits to use a thing and makes for that place after. A crossing that only ends on
+                // its floor goes nowhere after by this plan: there the way out is the one that lies away from
+                // where the Scrab is now. A place with room to go on from before a corner, if both can be done.)
+                s32 spare = Spare(bot, trial, hot, forUse ? true : best);
+                if (spare >= 0 && room(out) >= 20)
+                {
+                    spare += 10000;
+                }
+                if (spare > bestSpare)
+                {
+                    bestSpare = spare;
+                    bestFrames = tt;
+                    stint.mAt = trial.mAt;
+                    stint.mEdges = trial.mEdges;
+                    stint.mRetreat = out;
+                }
+            }
+        }
+        if (stint.mRetreat < 0)
+        {
+            // Nowhere to go after: no stint to plan
+            stint.mFound = false;
+        }
+        t = bestFrames;
+    }
+    stint.mFrames = t;
+    return stint;
+}
+
+ScrabWaryTask::Stint ScrabWaryTask::PlanFor(const Bot& bot, s32 cur, s32 goal, const Entity* entity, const std::vector<char>& hot, bool best)
+{
+    const NavGraph& nav = bot.Nav();
+    Stint out;
+    s32 outRank = -100000;
+    const bool sides = entity && entity->mKind == EntityKind::eSlapLock;
+    for (s32 side = sides ? -1 : 0; side <= (sides ? 1 : 0); side += 2)
+    {
+        bool faceLeft = false;
+        const s32 target = entity ? Domain::UseNode(nav, *entity, &faceLeft, side == 0 ? -1 : side) : goal;
+        // (the cell on that side, not the other one for want of it)
+        if (target < 0 || (sides && (nav.Nodes()[target].mX > entity->CentreX()) != (side > 0)))
+        {
+            continue;
+        }
+        // (a lock whose slap opens the trap door he slaps it from)
+        s32 drop = -1;
+        if (sides && entity->mInputs[1] > 1 && nav.Nodes()[target].mTrapDoor >= 0 && nav.Input().mFeatures[nav.Nodes()[target].mTrapDoor].mSwitch == entity->mInputs[1])
+        {
+            for (const NavEdge& e : nav.Edges())
+            {
+                if (e.mFrom == target && e.mKind == EdgeKind::eFall && nav.Nodes()[e.mTo].mY > nav.Nodes()[target].mY + 20 && std::abs(nav.Nodes()[e.mTo].mX - nav.Nodes()[target].mX) <= 2)
+                {
+                    drop = e.mTo;
+                }
+            }
+        }
+        Stint stint = Plan(bot, cur, target, entity != nullptr, sides ? (faceLeft ? -1 : 1) : 0, drop, hot, best);
+        stint.mTarget = target;
+        stint.mSide = side;
+        stint.mSpare = stint.mFound ? Spare(bot, stint, hot, best) : -100000;
+        // (the side by how it would be at the best moment, so that it does not change with where the Scrab is)
+        const s32 rank = stint.mFound ? Spare(bot, stint, hot, true) : -100000;
+        if (stint.mFound && (!out.mFound || rank > outRank))
+        {
+            out = stint;
+            outRank = rank;
+        }
+    }
+    return out;
+}
+
+s32 ScrabWaryTask::Spare(const Bot& bot, const Stint& stint, const std::vector<char>& hot, bool best, std::string* note, bool* beatKnown)
+{
+    if (beatKnown)
+    {
+        *beatKnown = true;
+    }
+    const NavGraph& nav = bot.Nav();
+    const World& world = bot.GetWorld();
+    if ((stint.mFirst < 0 && stint.mDrop < 0) || stint.mAt.empty())
+    {
+        return 1000;
+    }
+    const NavNode& onto = nav.Nodes()[stint.mOnto >= 0 ? stint.mOnto : nav.Edges()[stint.mPath[stint.mFirst]].mTo];
+    s32 spare = 1000;
+    // (in the background everything is half as far and half as fast)
+    const s32 scale = onto.mHalf ? 2 : 1;
+    for (const Domain::LooseScrab& scrab : Scrabs(world))
+    {
+        if (scrab.mHalf != onto.mHalf || std::abs(scrab.mY - onto.mY) * (onto.mHalf ? 2 : 1) > 30 || Domain::GateBetween(nav, world, scrab.mX, onto.mX, onto.mY, onto.mHalf) || Domain::WallBetween(nav, scrab.mX, onto.mX, onto.mY, onto.mHalf))
+        {
+            continue;
+        }
+        // The ends of its beat (of the floor it can get about on)
+        s32 lo = scrab.mX;
+        s32 hi = scrab.mX;
+        for (std::size_t i = 0; i < nav.Nodes().size(); i++)
+        {
+            const NavNode& n = nav.Nodes()[i];
+            if (hot[i] && n.mHalf == onto.mHalf && std::abs(n.mY - onto.mY) <= 5)
+            {
+                lo = std::min(lo, n.mX);
+                hi = std::max(hi, n.mX);
+            }
+        }
+        // (as seen, once it has been seen to stop at both: its TLVs bound it to less than its floor)
+        {
+            s32 seenLo = 0;
+            s32 seenHi = 0;
+            if (bot.ScrabBeat(scrab.mId, seenLo, seenHi))
+            {
+                lo = seenLo;
+                hi = seenHi;
+            }
+            else if (beatKnown && world.ScrabOf(scrab.mId))
+            {
+                // (one that is not about yet is where its TLV puts it)
+                *beatKnown = false;
+            }
+        }
+        std::vector<s32> places{lo, hi};
+        if (!world.ScrabOf(scrab.mId))
+        {
+            places = {scrab.mX};
+        }
+        else if (!best)
+        {
+            // Where it is, and where it may be by the time it can see him: it runs its beat at the pace it runs at
+            // him. If it faces this way it comes as soon as it has stood out its time at the end of its beat (how
+            // long it has stood there is known once it has been seen to stop); if it faces away it has to get to
+            // the end, turn and stand first.
+            places = {scrab.mX};
+            const ScrabAt* live = world.ScrabOf(scrab.mId);
+            const Entity* tlv = world.Find(scrab.mId);
+            if (live && tlv)
+            {
+                const s32 towards = stint.mAt.front().first < scrab.mX ? -1 : 1;
+                const s32 pause = towards < 0 ? tlv->mInputs[1] : tlv->mInputs[2];
+                const bool atEnd = scrab.mX - lo < 60 / scale || hi - scrab.mX < 60 / scale;
+                s32 free = 0;
+                if (live->mFacesLeft != (towards < 0))
+                {
+                    free = 10 + pause;
+                }
+                else if (atEnd && bot.ScrabStillSince(scrab.mId) != 0)
+                {
+                    free = std::max(0, pause - static_cast<s32>(bot.Abe().mFrame - bot.ScrabStillSince(scrab.mId)));
+                }
+                places[0] += towards * 76 * std::max(0, stint.mLead - free) / (10 * scale);
+                if (note)
+                {
+                    *note += " (the Scrab at " + std::to_string(scrab.mX) + (live->mFacesLeft ? " facing left" : " facing right") + ", taken to be at " + std::to_string(places[0]) + " when it sees him)";
+                }
+            }
+        }
+        s32 bestHere = -1000;
+        for (s32 place : places)
+        {
+            // It runs 7.6 pixels a frame once its delay is over, and kills what its box is on
+            // (and one he comes within a cell and a half of strikes at once, delay or none)
+            // (nor may it come by where he is on its way there: a Scrab at a run kills what its box is on, a
+            // hanging Abe too)
+            s32 least = 1000;
+            const s32 swept1 = std::min(place, scrab.mX) - 100 / scale;
+            const s32 swept2 = std::max(place, scrab.mX) + 100 / scale;
+            // (and where he is between the ends of a long edge, a running jump: every cell of it)
+            std::vector<std::pair<s32, s32>> every;
+            for (std::size_t i = 0; i < stint.mAt.size(); i++)
+            {
+                if (i > 0)
+                {
+                    const std::pair<s32, s32>& a = stint.mAt[i - 1];
+                    const std::pair<s32, s32>& b = stint.mAt[i];
+                    const s32 steps = std::abs(b.first - a.first) * scale / 25;
+                    for (s32 k = 1; k < steps && steps <= 40; k++)
+                    {
+                        every.push_back({a.first + (b.first - a.first) * k / steps, a.second + (b.second - a.second) * k / steps});
+                    }
+                }
+                every.push_back(stint.mAt[i]);
+            }
+            for (const std::pair<s32, s32>& at : every)
+            {
+                // (a hundred pixels off is clear of it: the drop next to one that has just got to the end of its beat)
+                const bool near = best ? std::abs(place - at.first) < 100 / scale : (at.first > swept1 && at.first < swept2);
+                least = std::min(least, near ? -1000 : scrab.mDelay + 3 + std::max(0, std::abs(place - at.first) * scale - 45) * 100 / 735 - at.second);
+            }
+            bestHere = std::max(bestHere, least);
+        }
+        spare = std::min(spare, bestHere);
+    }
+    return spare;
+}
+
+// The frames a stint has to have to spare: this many whenever, or the fewer there are at the best moment of the
+// Scrab's beat (within kWaryNearBest of that, and no fewer than kWaryLeast), for a chase that is made to be close
+static const s32 kWaryMargin = 12;
+static const s32 kWaryLeast = 4;
+static const s32 kWaryNearBest = 5;
+
+ScrabWaryTask::Stint ScrabWaryTask::Plan(const Bot& bot, s32 cur, s32 target, bool use, s32 face, s32 drop, const std::vector<char>& hot, bool best)
+{
+    const NavGraph& nav = bot.Nav();
+    std::set<s32> banned;
+    Stint stint;
+    for (s32 tries = 0; tries < 6; tries++)
+    {
+        stint = PlanOnce(bot, cur, target, use, face, drop, hot, best, banned);
+        if (!stint.mFound || stint.mFirst < 0 || Spare(bot, stint, hot, true) >= kWaryLeast)
+        {
+            break;
+        }
+        // Not in time even at the best moment: another way, without this stretch
+        const std::size_t before = banned.size();
+        for (std::size_t i = static_cast<std::size_t>(stint.mFirst); i < stint.mPath.size(); i++)
+        {
+            banned.insert(stint.mPath[i]);
+            if (!hot[nav.Edges()[stint.mPath[i]].mTo])
+            {
+                break;
+            }
+        }
+        if (banned.size() == before)
+        {
+            break;
+        }
+    }
+    return stint;
+}
+
+bool ScrabWaryTask::Wanted(const Bot& bot, s32 goal, u32 entity, std::string* note)
+{
+    const NavGraph& nav = bot.Nav();
+    const s32 cur = bot.AbeNode();
+    if (cur < 0 || Scrabs(bot.GetWorld()).empty())
+    {
+        return false;
+    }
+    // (no waiting for a Scrab with a Fleech after him: one awake of his size and as near as it follows him from,
+    // Fleech.cpp's 750 by 260. Those of another screen he left behind are not.)
+    // (nor are those that have no way to him)
+    std::vector<s32> times;
+    for (const RockAt& f : bot.GetWorld().mFleechesAwake)
+    {
+        if (f.mHalf == nav.Nodes()[cur].mHalf && std::abs(f.mX - nav.Nodes()[cur].mX) <= 750 && std::abs(f.mY - nav.Nodes()[cur].mY) <= 260)
+        {
+            if (times.empty())
+            {
+                times = Domain::FleechTimes(nav, bot.GetWorld(), {cur});
+            }
+            const s32 at = nav.NodeAt(f.mX, f.mY, f.mHalf, 30);
+            if (at < 0 || times[at] < 100000)
+            {
+                return false;
+            }
+        }
+    }
+    const Entity* e = entity ? bot.GetWorld().Find(entity) : nullptr;
+    const std::vector<char> hot = Hot(bot);
+    if (hot[cur])
+    {
+        return false;
+    }
+    const Stint stint = PlanFor(bot, cur, goal, e, hot, true);
+    if (!stint.mFound || (stint.mFirst < 0 && stint.mDrop < 0))
+    {
+        return false;
+    }
+    // Over the floor of a Scrab that waits before it strikes: this is the way. Over one's that strikes at once:
+    // only where there is no other way (the way he is kept off such floors has been enough elsewhere).
+    const std::vector<char> waits = Hot(bot, true);
+    bool waiting = stint.mDrop >= 0 && waits[stint.mDrop];
+    for (s32 edge : stint.mEdges)
+    {
+        waiting = waiting || waits[nav.Edges()[edge].mTo];
+    }
+    if (!waiting)
+    {
+        std::vector<s32> plain;
+        if (stint.mDrop < 0 && nav.FindPath(cur, stint.mTarget, bot.EdgeCostFn(), plain))
+        {
+            return false;
+        }
+    }
+    if (note)
+    {
+        *note = "over a Scrab's floor: " + std::to_string(stint.mFrames) + " frames on it, " + std::to_string(stint.mSpare) + " to spare at best";
+    }
+    return stint.mSpare >= kWaryLeast;
+}
+
+TaskStep ScrabWaryTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const NavGraph& nav = bot.Nav();
+    const World& world = bot.GetWorld();
+    const AbeState& abe = bot.Abe();
+    if (mUse)
+    {
+        TaskStep step = mUse->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::ePrim)
+        {
+            return step;
+        }
+        mUse.reset();
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            return step;
+        }
+        mUsed = true;
+    }
+    {
+        TaskStep step;
+        const bool going = mGo != nullptr;
+        if (!RunGo(mGo, bot, lastFailed, step))
+        {
+            return step;
+        }
+        const bool wasPrefix = going && mPrefix;
+        if (wasPrefix)
+        {
+            mPrefix = false;
+            bot.KeepTo({});
+            mKept = nullptr;
+        }
+        // (the way out of its sight after the thing is used: where he ended up will do if it is out of its sight.
+        // And a way to where a stint starts that went wrong, a well that led elsewhere: from where he is, again.)
+        const bool safeNow = bot.AbeNode() >= 0 && !Hot(bot)[bot.AbeNode()];
+        if (going && step.mKind == TaskStep::Kind::eFailed && !((mUsed || (wasPrefix && ++mPrefixFails <= 3)) && safeNow))
+        {
+            return step;
+        }
+    }
+    // What comes next is started in the same frame: a frame with nothing held stops a run
+    const auto next = [&]() -> TaskStep
+    {
+        if (++mDepth > 6)
+        {
+            mDepth = 0;
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        const TaskStep step = Next(bot, "");
+        mDepth = 0;
+        return step;
+    };
+    const s32 cur = bot.AbeNode();
+    if (cur < 0)
+    {
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    const std::vector<char> hot = Hot(bot);
+    if (mWentAt != 0 && !hot[cur])
+    {
+        bot.KeepTo({});
+        mKept = nullptr;
+        bot.Log("off the Scrab's floor " + std::to_string(abe.mFrame - mWentAt) + " frames after setting out");
+        mWentAt = 0;
+    }
+    const Entity* entity = mEntity ? world.Find(mEntity) : nullptr;
+    if (mEntity && !entity)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    if (entity ? mUsed : cur == mGoal)
+    {
+        if (!hot[cur] || !entity)
+        {
+            return TaskStep::Done();
+        }
+        // Out of its sight: to the place picked for it, else the nearest way
+        if (mRetreat >= 0 && !hot[mRetreat])
+        {
+            mGo = GoToNode(mRetreat);
+            mRetreat = -1;
+            return next();
+        }
+        std::vector<s32> back;
+        if (!nav.FindPath(cur, [&](s32 n)
+                          { return !hot[n]; }, bot.EdgeCostFn(), back) || back.empty())
+        {
+            return TaskStep::Done();
+        }
+        mGo = GoToNode(nav.Edges()[back.back()].mTo);
+        return next();
+    }
+    const Stint stint = PlanFor(bot, cur, mGoal, entity, hot, false);
+    if (!stint.mFound)
+    {
+        return TaskStep::Failed("no way there that the Scrab leaves time for");
+    }
+    const s32 target = stint.mTarget;
+    const auto go = [&]() -> TaskStep
+    {
+        if (entity)
+        {
+            std::unique_ptr<UseTask> use = std::make_unique<UseTask>(mEntity, mValue);
+            if (stint.mSide != 0)
+            {
+                use->FixSide(stint.mSide);
+            }
+            if (stint.mDrop >= 0 && stint.mAt.size() >= 2)
+            {
+                // Off at a run the way out lies as his feet touch
+                use->SetAfter((stint.mAt[1].first < stint.mAt[0].first ? Btn::eLeft : Btn::eRight) | Btn::eRun);
+            }
+            mUse = std::move(use);
+        }
+        else
+        {
+            mGo = GoToNode(target);
+        }
+        return next();
+    };
+    if (stint.mFirst < 0 && stint.mDrop < 0)
+    {
+        // None of its floor on the way
+        return go();
+    }
+    if (stint.mFirst < 0 && cur != target)
+    {
+        // To the trap door it is used from
+        mGo = GoToNode(target);
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    if (stint.mFirst > 0 && !hot[cur])
+    {
+        // To where the stint starts from, by the way that was found: the quickest might lead over its floor
+        std::set<s32> edges;
+        for (s32 i = 0; i < stint.mFirst; i++)
+        {
+            edges.insert(stint.mPath[i]);
+        }
+        bot.KeepTo(edges);
+        mKept = &bot;
+        mPrefix = true;
+        mGo = GoToNode(nav.Edges()[stint.mPath[stint.mFirst - 1]].mTo);
+        return next();
+    }
+    if (!hot[cur])
+    {
+        const s32 spare = stint.mSpare;
+        // (and it is still after him for 210 frames from when it last saw him)
+        const bool after = bot.SeenByScrabAt() != 0 && abe.mFrame - bot.SeenByScrabAt() < 230;
+        bool beatKnown = false;
+        const s32 atBest = Spare(bot, PlanFor(bot, cur, mGoal, entity, hot, true), hot, true, nullptr, &beatKnown);
+        const bool enough = spare >= kWaryMargin || (beatKnown && spare >= kWaryLeast && spare >= atBest - kWaryNearBest);
+        // Facing the way he will go, so that no turn is in the way when the moment comes
+        if (stint.mFirst >= 0 && abe.Settled() && abe.mMove == Move::eIdle)
+        {
+            const NavEdge& first = nav.Edges()[stint.mPath[stint.mFirst]];
+            if ((first.mKind == EdgeKind::eFall || first.mKind == EdgeKind::eHop) && abe.mFacingLeft != first.mLeft)
+            {
+                return TaskStep::Do(Prim::Face(first.mLeft));
+            }
+        }
+        if (after || !enough)
+        {
+            if (!mSaid)
+            {
+                mSaid = true;
+                bot.Log("waiting for the Scrab to be far enough off: " + std::to_string(stint.mFrames) + " frames on its floor, " + std::to_string(spare) + " to spare now");
+            }
+            if (++mWaits > 4500)
+            {
+                return TaskStep::Failed("the Scrab never was far enough off");
+            }
+            if (mWaits % 150 == 0)
+            {
+                // What it is waiting on, for whoever reads the log
+                std::string note;
+                Spare(bot, stint, hot, false, &note);
+                std::string at;
+                for (const std::pair<s32, s32>& pt : stint.mAt)
+                {
+                    at += " " + std::to_string(pt.first) + "@" + std::to_string(pt.second);
+                }
+                bot.Log("still waiting: " + std::to_string(spare) + " to spare now, " + std::to_string(atBest) + " at best" + (beatKnown ? "" : " (its beat not seen from end to end yet)") + (after ? ", it is still after him" : "") + note + ", he would be at" + at);
+            }
+            return TaskStep::Do(Prim::Wait(2));
+        }
+        std::string note;
+        Spare(bot, stint, hot, false, &note);
+        bot.Log("the Scrab is far enough off: " + std::to_string(stint.mFrames) + " frames on its floor, " + std::to_string(spare) + " to spare" + note);
+        mSaid = false;
+        mWentAt = abe.mFrame;
+        mRetreat = stint.mRetreat;
+        bot.KeepTo(stint.mEdges);
+        mKept = &bot;
+    }
+    if (stint.mExit >= 0)
+    {
+        mGo = GoToNode(stint.mExit);
+        return next();
+    }
+    return go();
 }
 
 } // namespace Bot

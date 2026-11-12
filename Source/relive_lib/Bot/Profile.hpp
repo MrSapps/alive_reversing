@@ -2,6 +2,7 @@
 
 #include "../Types.hpp"
 #include <string>
+#include <vector>
 
 namespace Bot {
 
@@ -15,12 +16,15 @@ enum class Ending : u8
 };
 
 // How a run is to be played: "save_all", "kill_all", "average" or "any", then options after commas:
-// seed=<n> for the bot's random choices, human to make it dawdle and vary like a person (by the seed).
+// seed=<n> for the bot's random choices, human to make it dawdle and vary like a person (by the seed),
+// been=<level> (any number of times) for a level played before a run that starts further on: a way back there is
+// not a way on.
 struct Profile final
 {
     Ending mEnding = Ending::eAny;
     u64 mSeed = 1;
     bool mHuman = false;
+    std::vector<std::string> mBeen;
 
     static bool Parse(const std::string& text, Profile& profile, std::string& error);
     std::string Text() const;

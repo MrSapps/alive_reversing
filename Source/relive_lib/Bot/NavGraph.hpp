@@ -40,6 +40,10 @@ enum class FeatureKind : u8
                   // mStartClosed, else while it is off
     eTeleporter,  // whoever stands in it when its switch mSwitch changes (a lever at it does that) is put in the
                   // one with id mB in camera mDestCamera. mA: its own id
+    ePortal,      // a bird portal Abe goes through himself: there once switch mSwitch is on (always if that is 0 or
+                  // 1), opened by chanting, hopped into from the side mDir (0 from its left, 1 from its right).
+                  // It lets him out at the ePortalExit in camera mDestCamera
+    ePortalExit,
 };
 
 // Something in the map that changes where Abe can go. From the path's TLVs, see GameView.
@@ -60,9 +64,20 @@ struct NavFeature final
     s32 mD = 0;
     s32 mSwitch = 0;
     bool mStartClosed = false;
+    // A barrier that is a wall while it is shut (a slam door): a rock comes back off it
+    bool mSolid = false;
     s32 mDestLevel = -1;
     s32 mDestPath = -1;
     s32 mDestCamera = -1;
+    // A well goes one way while its switch is off and another while it is on. The fields above are for off; these
+    // are for on: the place a local well throws to, or the well an express well leads to (its id, its camera, and
+    // its level and path if that is not this one)
+    s32 mOnA = 0;
+    s32 mOnC = 0;
+    s32 mOnD = 0;
+    s32 mOnDestLevel = -1;
+    s32 mOnDestPath = -1;
+    s32 mOnDestCamera = -1;
     // The camera it is in (its number), and a name that stays the same from run to run
     s32 mCamera = 0;
     u32 mId = 0;
@@ -96,6 +111,7 @@ enum class EdgeKind : u8
     eDoor,
     eWell,
     eTeleport,  // pull the lever of the teleporter he stands in: he is put in the one it leads to
+    ePortal,    // chant the bird portal open and hop into it: he comes out of its exit
 };
 
 const char* EdgeKindName(EdgeKind kind);
@@ -112,6 +128,10 @@ struct NavEdge final
     bool mLeft = false;
     // A running jump: the cell it takes off from
     s32 mX = 0;
+    // An edge that goes through a well (stood in, or fallen into): the well's feature, and the value its switch
+    // has to have for the well to go this way (-1: either)
+    s32 mWell = -1;
+    s32 mWhen = -1;
     // The hazard (its feature) that has to be gone before it can be taken: a mine in the cell it leads into
     s32 mClear = -1;
     // The lift stop (its feature) over whose shaft it jumps: only while the lift is away from it
@@ -229,6 +249,17 @@ private:
     s32 NodeOnLine(s32 line, s32 x) const;
     // The cell a local well throws Abe to: under where it aims, or the ledge just beyond that he catches
     s32 WellLanding(const NavFeature& well) const;
+    // Where Abe ends up thrown at a point from a well at fromX: into the well that is there, or onto the floor
+    // (knownSwitch, knownValue: the switch the first well of a chain was taken with, and its value, for the wells
+    // after it that go by the same one)
+    s32 Thrown(s32 x, s32 y, s32 fromX, bool half, s32 depth, s32 knownSwitch = -1, s32 knownValue = 0) const;
+    // Where a well lets him out, with its switch off (0) or on (1), followed through the wells it leads to and
+    // throws him into: a node, or -1 (nowhere known, or out of the path)
+    s32 WellOut(s32 featureIdx, s32 when, s32 depth = 0, s32 knownSwitch = -1, s32 knownValue = 0) const;
+    // The edges through a well: one, or one for its switch off and one for on if that changes where he comes out
+    void AddWellEdges(std::vector<NavEdge>& edges, s32 from, s32 wellIdx, EdgeKind kind, s32 cost, s32 feature, bool left) const;
+    // The local well a fall straight down at x goes through in the air between two heights: its feature or -1
+    s32 WellInFall(s32 x, s32 fromY, s32 toY, bool half) const;
 
     NavInput mInput;
     std::vector<NavNode> mNodes;

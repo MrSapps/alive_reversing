@@ -19,13 +19,13 @@ what is left, and wins where they differ.
 | part | file | what it does |
 |------|------|--------------|
 | Game view | `GameView` | The only code that knows the two games' classes: Abe's state (both games' motions mapped to one small `Move` set), the path's lines and TLVs as a `NavInput`, the entities as a `World` (Mudokons with mood and brain state, Sligs, lifts, switches), every path of the level as a `PathSummary`. |
-| Pilot | `Pilot` | Turns a `Prim` (wait, move to a cell by walk/run/sneak/roll, face, press-and-let-play-out, walk off an edge, running jump, ride a lift) into pad buttons a frame at a time, by watching what Abe does. |
+| Pilot | `Pilot` | Turns a `Prim` (wait, move to a cell by walk/run/sneak/roll, face, press-and-let-play-out, walk off an edge, running jump, run into a well without stopping, ride a lift) into pad buttons a frame at a time, by watching what Abe does. |
 | Nav graph | `NavGraph` | A cell of floor per grid position. Edges: walk, roll (low ceilings, walls that stop short of the floor), fall (not if deadly), hop (over mines and gaps, and to a ledge four cells off), running jump (to a floor four cells off or a ledge five off), hoist up/down, door, well, lift. `Condition` says which switch an edge waits for (slam door, electric wall, a door that starts shut). Knows AO's gaps between cameras and both games' grids. `LearnEdge` corrects an edge by where it really led. |
 | Regions | `NavGraph::Regions` | Cells Abe can move between freely both ways. Planning is over regions, not cells. |
 | Level graph | `LevelGraph` | Which path leads to which, and how many paths each is from the way out of the level. An exit is only taken if it leads nearer the end, or (when the ending wants Mudokons) once into a path off the way (a secret area) that is worth it: `Domain::WeighSideTrip` builds that path's graph ahead of time and counts the Mudokons Abe could get to from where he would come in, how many of them have a bird portal in reach, and whether there's a way back. `save_all` and `average` go for Mudokons that can be rescued, `kill_all` for any that can be reached, `any` never goes. |
 | Planner | `Goap` | Facts, actions with needs and effects, forward search with the actions that can't help the goal left out. The cheapest plan if 400 states find it (A* on an estimate that is never over: each fact at the price of its cheapest giver on top of the dearest thing that needs). Else any plan, going for the state that looks nearest (the same estimate with needs summed), which finds a hundred steps in a few hundred states; states the goal can't be had from are dropped. What is used up (`Action::mSpend`, rocks) is planned as if any were enough, then the plan is gone through with the count and the way to more put in where it runs out, from as far back as it takes. `Planner::Short` is the estimate alone, to rank goals. Deterministic. Says what nothing gives when there's no plan. `Bot::Replan` keeps following a plan while what is left of it still holds, and plans only the two or three nearest looking goals. |
 | Domain | `Domain` | Builds the planning problem of a path: cross to another region (needs the edge's switch), use a lever/ring/wheel/hand stone, rescue a Mudokon through a portal in its region (sets its rescue switch), kill one (`kill_all` only), switch logic, wheels that must turn together (needs a Mudokon per wheel but one), leave by an exit or a level loader. `Frontier` says what blocks, `Reachable` which switches are worth trying when there's no plan to the exit. |
-| Tasks | `Task`, `Tasks.cpp` | `GoTo` (replans the route after every move, bans edges that go nowhere, sneaks past sleeping Sligs, waits in cover for an awake one to look away, leads Mudokons by ways they can follow), `Use`, `Recruit` (hello, sorry or a slap by mood, follow me), `Rescue`, `WorkTogether`, `Kill`, `Exit`. |
+| Tasks | `Task`, `Tasks.cpp` | `GoTo` (replans the route after every move, bans edges that go nowhere, sneaks past sleeping Sligs, waits in cover for an awake one to look away, leads Mudokons by ways they can follow), `Use`, `Recruit` (hello, sorry or a slap by mood, follow me), `Rescue`, `WorkTogether`, `Kill`, `Exit`; for Scrabs `ScrabRampage`, `ScrabKill`, `ScrabLure` (off the end of their floor), `ScrabPen` (shut in behind a gate) and `ScrabWary` (a floor one walks crossed in timed stints). |
 | Checkpoints | `Checkpoint` | A quicksave the bot owns, taken every ~90 frames when Abe stands still and nothing threatens (no Slig on the screen, no laughing Mudokon in tow). On a death: back to the newest, try again after a (seeded) delay; six deaths from one and it goes back to the one before. Old ones are thinned out, not dropped. The game's own quicksave is left alone. |
 | Bot | `Bot` | Plan, act, replan. Profiles, the committed input log (rewound tries aren't in it), the report, movie skipping, the reflex that slaps a wired Mudokon tagging along. |
 | Profiles | `Profile` | `save_all`, `kill_all`, `average`, `any`, with `seed=<n>` and `human`. |
@@ -291,14 +291,523 @@ hash.
 - **Rupture Farms, `any`**: not rerun since the work above (it was stuck at the start with `no_plan`: 100 of
   415 cells in reach; a running jump and barriers on switches 13 and 14 were next).
 
-So the Mines are beaten with `any` and the other profiles are not past the first path. Each stuck report names what stops it.
+- **Throws are known before they are made** (2026-11-12, later; `ThrowArc`). A rock's flight is worked out
+  frame by frame from where it leaves the hand and how fast (measured per kind of throw: standing from 11
+  ahead and 55 up, crouched from 22 ahead and 15 up), the pull of 1.01 a frame, and the halving bounces off
+  floors, ceilings and walls of the nav lines. What sets a mine off was measured too, and is not the mine's own
+  look-out but the rock's: its box, five lower, touching the mine's, which is while the rock is 1 to 11 over
+  the mine's floor and within 7 to 9 of its middle. The rock comes back off the mine at half speed. Higher than
+  that it flies over, which is why a crouched throw passes the mines three cells off and takes the one four
+  off. `Domain::ThrowSpots` gives only cells from which the flight ends on the mine, with the mines it would
+  meet first and the slam doors it goes through as conditions, the ones that are sure whatever frame the
+  mine's light is at first. Also measured: any blast on the screen knocks a standing Abe over, and he falls on
+  a mine a cell behind him, so no standing throw with a mine within two cells; off his own screen a rock goes
+  through floors; a shut slam door is a wall to a rock. A miss now logs the flight the table gave beside the
+  one the game made (`Bot::ThrowMissed`), which is how the door was found. Result: the Mines from path 1 to
+  Necrum in 39,884 frames, 28 throws, none missed (it was 41,178 with 22 rewound).
+- **Deaths left in that run**: 7 at path 2's flying Slig and 1 at path 10's first sleeper. Path 2: Abe ran to
+  the low part at 3287,1240, stopped, crouched and was shot. Now a flying Slig within a screen or so with no
+  shadow to go to means a run, and a run that leads under something low goes straight into the roll
+  (`Prim::RunRoll`: the roll button is looked for as the run reaches each cell). Path 2 alone, six different
+  arrival times: no deaths. Path 10's is not touched.
+- **Full runs since, seed 1, and what they show: the run is not yet the same from one day's code to the
+  next.** (a) `build-bot/m1.txt`: into Necrum at f=42,012 and on to path 6 at f=47,514, the Mines' only
+  deaths two at a drill on path 4 that a new hop-down edge jumped through (fixed: no hop-down across a
+  drill's column; path 4 alone is 0 deaths, 0 misses again). Path 10's sleeper did not wake. (b)
+  `build-bot/m1b.txt` after that fix: 13 deaths and not out of the Mines. Three at path 10's first sleeper
+  (938,599: woken while Abe sneaks past at 1013, he is shot at 1112 on his way to the well; `MakeFlee` did
+  not get him off the floor), and after those rewinds ten at path 6's timed escape, which the run before
+  did without a death: from the last wheel he was at 3562,1500 when the 450 frames were up. So the escape
+  has no margin and depends on what came before.
+- **Path 10's first sleeper, fixed** (`build-bot/p10.txt` at five arrival times, no deaths; in four the Slig
+  woke). `Bot::MakeFlee` never fired: it left out Sligs that wait before they shoot (the sneak he was at was
+  then never thought over again), looked for the nearest other floor by any edge and gave up if that was not a
+  quick one, and counted five cells, where the well is twenty half-scale cells on. Now: any woken Slig beside
+  him, by walks, wells and hoists up only, as far as 12 cells (24 at half scale), at a run.
+- **The Mines with no death and nothing taken back** (`build-bot/m1b.txt`, seed 1, after the fixes above):
+  from the start of path 1 into Necrum at f=42,003, on through Necrum's path 2 and into path 3 by f=44,710
+  when the run's time was up: 0 deaths, 0 restores, 28 throws, none missed. Paths entered at 10,231 (2),
+  11,855 (3), 17,989 (4), 31,941 (5), 34,212 (10), 36,819 (6). (Path 3 took 6,100 frames here against
+  3,800 measured alone: not looked into.)
+- **Necrum, `any`** (2026-11-12, `build-bot/n2.txt`, `n3.txt`, `n1.txt`, `n6.txt`; runs that start there take
+  `been=mines`, since a way back to a level already played is no way on):
+  - **Path 2**, 1,278 frames, no deaths. New: a hop off a ledge end comes down four cells out on a floor up to
+    130 lower (measured arc); a hop catches a ledge two to four cells off and up to 85 higher; a fall or a
+    let-go from a hoist that passes through a well's box goes where the well throws (`NavGraph::WellInFall`);
+    a bird portal of Abe's own is an edge (`EdgeKind::ePortal`): there once its switch is on (a hand stone's),
+    chanted open from at least three cells off (nearer, its doves fly off and it is gone until the screen is
+    come back to: `BirdPortal::IsScaredAway`), then hopped into from two cells off.
+  - **Path 3** (the hub), 3,092 frames, no deaths, planned in one piece. New: wells go one way with their
+    switch off and another with it on, and an express well puts Abe in the well it names and shoots him out
+    of that one, on through whatever wells he is thrown into (`NavGraph::WellOut`, edges with `mWhen`); a
+    tasks door opens once all its hubs' switches are on (a switch of its own, `World::DoorSwitch`); a door
+    that leads into the path but to no door of it is not an exit.
+  - **Path 1**, 1,091 frames, no deaths. New: slap locks (`EntityKind::eSlapLock`: GameSpeak 5 from the cell
+    beside it, then the ghost has to fly to its tomb before the switch comes on).
+  - **Path 6** (four rooms of levers, Slurgs and Fleeches), 3,929 frames alone, no deaths. What it took,
+    all measured (`build-bot/fl.txt` samples Abe's health and each Fleech's motion every two frames):
+    - A foot coming down on a Slurg bursts it and the noise wakes every Fleech on the screen. While a Fleech
+      sleeps the next cell is waited for or hopped over if a Slurg is in it (`World::SlurgBy`; standing still by
+      one is safe), and a hop or drop down onto a floor they crawl along is timed for the gap between two of
+      them, from each one's real box and the way it is going (`World::SlurgWhereHeLands`).
+    - A footstep within 150 of a sleeping Fleech angers it and two wake it: sneaking there, with the sneak
+      button held through a turn too (he came out of a turn at a walk and that one step woke one).
+    - A Fleech bites only along its own level within three cells, or at Abe hanging from a ledge with it
+      under him within two (`Fleech.cpp`). Each bite is 0.15 of his health, about one every nine frames, and
+      a door gives it all back. It climbs the hoist he used in about 25 frames, so no ledge is safe for long.
+    - So the order of a room's switches is the plan (`Domain::PulledFirst`): what wakes nothing first (the
+      rings), then the levers as a sweep towards the door, the one the door is quickest from last (in frames:
+      a drop off a ledge beats three cells of floor), and from it straight down into the door.
+    - With a Fleech awake, or the switch that wakes one of the screen's on: at a run, no minding Slurgs, a
+      lever from the side he is on.
+    - A Fleech under the ledge he is leaving, with another hoist still to climb: he waits until it has
+      started up after him, so that it has to come down again (it was catching him as he hung).
+    - A hop from a ledge to a ledge at the same height four cells off lands on it (the nav graph had it
+      falling to the floor).
+  - **Path 4**, no deaths (1,616 frames alone). A slap lock that gives the power to go invisible is fetched
+    before anything else when the path has Fleeches (`Key::kInvis`: no exit without it), he chants when a
+    Fleech is awake on his screen or lies on his floor within a screen's width, and runs the rest. Also: a hop
+    catches a ledge two or three cells off at its own height.
+  - **Path 5**, no deaths, into the Mudanchee vault 2,458 frames after the start of path 4.
+  - **All of it in one go** (`build-bot/nall.txt`, from the arrival in path 2): paths 2, 3, 1, 6 and 4 and into
+    path 5 at f=13,965, in path 5 at 14,672 when the run's time was up, 0 deaths, 0 restores.
+- **Mudanchee vault, path 6, `any`** (`build-bot/mv.txt`, with `been=mines,been=necrum`): beaten. From its
+  start to the exit into path 7 in 8,918 frames, 0 deaths, 0 restores. What its four screens took:
+  - Screen 2 (the walkthrough: lock, chant, run right, lever, door before it wears off): a slap lock with a
+    ghost and the power is one action that gives both; a gate that holds a Scrab is opened only with the power
+    in hand (`Key::kInvisNow`).
+  - Screen 3: a Fleech hangs over the next lock behind a gate, and a Scrab is shut in beside it. A lock with a
+    Fleech over it, and a gate with one just behind it, wait for that Fleech to be dead
+    (`Key::Mud(fleech) = 2`), and `ScrabKillTask` makes it so: from the lever on the ledge, open the Scrab's
+    gate, chant until Abe is in the Scrab, walk it to the Fleech, stamp (Down: the tenth frame of the stamp
+    kills what the Scrab's box is on), walk it home, chant to let go, shut the gate.
+  - Screen 4, three Scrabs on one floor between gates that foot switches open (`EntityKind::eFootSwitch`):
+    `ScrabRampageTask`. From the ledge over the one Scrab that can get out to the rest (every shut gate
+    between it and another has its opening foot switch on this Scrab's side), chant into it; for each other
+    Scrab and for the Fleech at the end: howl while standing (GameSpeak 1; the power is there when the howl
+    is over), then at it at a run with Throw held, which is the spin that kills what its box is on for 30
+    frames; a Fleech that sleeps is come at the same way, since it wakes as its gate opens and is up the
+    nearest hoist in forty frames, out of reach. Then the Scrab is walked through the gate one foot switch
+    opens and over the one that shuts it, and let go (`World::mScrabParked`). Measured: the howl asked for
+    while it walks is lost.
+  - Abe keeps off a floor a loose Scrab can get at him on (`Domain::ScrabReaches`: a Scrab on that floor with
+    no shut gate or wall between, not while he is invisible or has the power): for the planner's crossings
+    and for the routes.
+  - With no way out known and no switch left to try, the next goal is a region he has not stood in, through
+    a door or a well before along a floor (`Go somewhere new`): walking onto an unknown floor first cost six
+    deaths to Fleeches.
+- **Mudanchee vault, path 7** (the hub), 791 frames alone, no deaths: up, the bird portal, the well. Its way
+  on (a tasks door to the ender) wants a switch from each of the six vaults, which nothing in it sets, so
+  any path of the level not yet been in is taken (`Bot::mNewPathFor`).
+- **Mudanchee vault 3 (path 3)**, a chase from end to end: beaten with no deaths from the hub
+  (`build-bot/mv7.txt`: in at f=791, back in the hub by 3,100) and in the run from path 6
+  (`build-bot/mv.txt`), which used to lose him nine times at the last leg. What it took:
+  - A slapped lock is done the moment it is slapped (`World::mLocksSlapped`, its switch counted as on): the
+    slap starts a clock here and standing to wait for the ghost got him eaten. He waits for the ghost at
+    the door it opens, and for the ring if the lock gives the power.
+  - Wells that go by one switch go the same way down a chain, and a throw that ends in the air over a well
+    comes down into it (`NavGraph::Thrown`): the chain from 462,200 comes out at 1062,460 as worked out.
+  - A Scrab that waits before it strikes (`attack_delay`, 35 here) is run from, not kept away from. With
+    one on his floor Abe runs, rolls the last cells to a stop (no walking them), and goes up a hoist by a
+    running jump through it, which catches the ledge without stopping (`Abe::Motion_31_RunJumpMid` looks for
+    a hoist; an edge made dear and made cheap only when chased, `Bot::EdgeCostFn`). Measured: standing at
+    the hoist to climb it took 54 frames he did not have.
+  - The last leg, measured frame by frame (the trace has the Scrabs near Abe now: place, motion, facing).
+    The well chain throws him out at the Scrab's feet and on to 1062,460. The Scrab cannot see him above it
+    (`Scrab::CanSeeAbe`: not when he is 45 px or more higher), so it starts its run as he comes down, its
+    `attack_delay` long over. A running Scrab kills what its box touches (`Scrab::KillTarget` from
+    `Motion_2_Run`), a hanging or climbing Abe too. Standing up from the landing first, Abe was 3 frames
+    short of the ledge at 1337; the one run that got away did so because the Scrab happened to shriek (a 1 in
+    16 chance a frame while it stands in its chase).
+  - What a player does and the bot did not: hold the way on while landing. `Abe::Motion_16_LandSoft` goes
+    into the walk or run on its third frame if left or right is held, else plays out (12 frames) and stands.
+    `Prim::mAfter` are the buttons held from when his feet touch after a fall or a well, and the prim is
+    done as soon as he walks or runs (`Pilot::LandsInto`). `GoToTask` asks for it only when a Scrab is loose
+    on the floor he comes down on: the way the path goes on, or away from the Scrab where the path ends
+    with the landing. Ten frames sooner at the ledge, in both runs.
+  Tried and taken out: going down the last well only when the Scrab has just stopped at the near end of its
+  beat (the only places to wait are within the Fleeches' reach). Tried by hand and no use: chanting as he
+  lands. A chasing Scrab does stop and howl for some 48 frames at a chant, but every screen here has a
+  security orb, which zaps him 20 frames after the first chant and puts him on his back for 26.
+- **The door come in by**: a vault has two doors to the hub, the one Abe comes in by and its own, which wants
+  the locks. `Leave the path` took the first. Now, of two ways out to the same place, the one he has just
+  come in by is left out (`Bot::mArrivedX/Y`), until every other fallback has failed (`Bot::mBackFor`).
+- **Mudanchee vault 4 (path 8)**, beaten with no deaths (`build-bot/mv8.txt`, 1,236 frames; `mv7.txt` goes
+  hub, vault 3, hub, vault 4, hub). The walkthrough's way, worked out by hand first (`build-bot/x8.txt`, a
+  script of `bot_goto` and `bot_do` steps) and then left to the planner:
+  - Down to the lock at 212,720 without waking the two Fleeches by it (one hangs, `"hanging": true`). A fall is
+    heard where it lands (`Abe::Motion_16_LandSoft`, not after letting go of a ledge): a fall or a hop down
+    that lands within 150 px of a sleeping Fleech costs 3,000 more (`Bot::EdgeCostFn`), so he goes down the
+    hoist at 262 and lets go, then hops the Slurg (the gate that times a landing for Slurgs waited for ever at
+    a hoist: it wanted him facing the way of the edge, and down a hoist he turns by himself).
+  - The slap wakes them. Measured: a woken Fleech next to him takes 60 to 90 frames to strike. He is on his
+    feet 32 frames after the slap and the well at 89 is four cells past them. No standing to wait for the ring
+    with a Fleech awake on his screen: it finds him as he goes (74 frames after the slap, wherever he is on
+    that screen). `World::mInvisComing` says it is on its way, so the plan made as he gets up can count on it.
+    Up a hoist with a Fleech awake on the screen costs 2,000 more: it is up after him in 25 frames.
+  - The Scrab's floor is walled off from the start (a pillar from 100 to 468): the only way onto it is down
+    through two trap doors from the top, the second a pen with two Fleeches awake in it. A crossing onto a
+    floor a loose Scrab can get at him on is now there for the planner with `Key::kInvisNow` wanted, where it
+    was left out (`Domain::Build`; `Domain::ScrabReaches(..., charged)` says whether the power not yet used
+    counts as cover: yes for a route, no for this).
+  - When to chant: the power lasted 387 frames here and the way from the pen to the door is about that long.
+    With a step ahead that wants him unseen, in a path with no security orbs, the power is not used on
+    Fleeches met before (`Bot::InvisSaved`) and is chanted for when that step is this one or the next
+    (`Bot::InvisChantNow`): in the pen, before the lever that drops him to the Scrab. Chanted for on arriving
+    at the top (95 frames sooner) he was eaten three cells from the door.
+  - A Fleech that hangs over a floor that is over a lock does not guard the lock (it did: no plan).
+  - The way to the door: over a block by a ledge, then two low stretches three cells apart. He rolled the
+    first, stood up, walked, and crouched again; now a roll goes on through up to three cells of open floor to
+    the next low stretch. He rolls under the two Fleeches as the invisibility ends and is through the door
+    with them 100 px behind.
+- **Mudanchee vault 2 (path 5)**, beaten with no deaths from the hub (`build-bot/mvp5.txt`: in at f=805, out
+  by its own door at f=13,728, 0 deaths, 0 restores; its third part alone is `build-bot/s53.txt`). Three screens
+  of Scrabs and nothing else, each worked out by hand first (`build-bot/x5.txt`, `x52.txt`, `x53.txt`). What it
+  took, in the order it comes:
+  - **Where a Scrab is.** A live Scrab is tied to its TLV (`ScrabAt::mId`, by `mBaseGameObjectTlvInfo`), and
+    `Domain::ScrabReaches` asks about the floor it is on now, not the one the map put it on. One that has lost a
+    fight counts as dead from the frame its health is gone. A Scrab shut in behind a gate is no reason to run on
+    landing (`Domain::GateBetween` in `GoToTask`).
+  - **Lured off a ledge** (`ScrabLureTask`, the action `Lure the Scrabs off the ledge at x,y`). The walkthrough:
+    "climb up, immediately press down and hang again until the Scrab runs over to you, pull back up as he falls
+    over the edge". Measured: a hanging Abe is not seen (`Scrab::CanSeeAbe`: only if on its level), a Scrab that
+    has started its run keeps running at where he was, and with no floor within three cells at its height it runs
+    off the end (`Domain::LureLanding` finds such hoist tops and where it comes down). He hangs until the nearest
+    is 300 or more off (the climb is 21 frames, back down to hang 24, a Scrab runs 7.4 pixels a frame), climbs,
+    is seen, goes down to hang as it starts its run, and climbs again the frame it is over the edge: it lands a
+    cell from where he hangs.
+  - **Shut in behind a gate** (`ScrabPenTask`, `Shut the Scrabs in left|right of the gate at x,y with Lever#n`).
+    A gate with a toggle lever that is out of the Scrabs' reach is worked until it is shut with every Scrab of
+    that floor on one side. With a Scrab on each side it is opened while both are on his screen: two Scrabs that
+    see each other fight (`Scrab::FindScrabToFight` wants both on the screen that is up) and one dies; Abe is
+    safe on the floor above for all of it. Tried by hand and not used: slapping the lock during the fight (it
+    worked with 12 frames in hand). Shut in, the Scrab is waited for to be 50 pixels past the gate going away, or
+    220 coming.
+  - **In the planner** a stretch of floor between gates is a `Domain::ScrabZone`, and `Key::ScrabClear(zone)` says
+    no loose Scrab can get at him there. The two actions above give it; whatever is done from a cell a Scrab can
+    reach now (a use, a crossing, an exit) wants it, where there is a way to give it. The first screen's plan:
+    lure, shut in right (which is where they fight), lock, shut in left, door.
+  - **A floor crossed in stints** (`ScrabWaryTask`), for a Scrab that walks a beat under ledges: the second and
+    third screens. From a place it can't see him he waits until it is so far off that he is down, done and out
+    of its sight before it could be at him. The way is found with the Scrab's floor made dear, cut into stints at
+    the places out of its sight, and each stint timed edge by edge from what was measured (a cell run is 4
+    frames, walked 9, a turn 13, a slap 39, a drop seen for 6 frames and stood up from in 10 or 3 with the way on
+    held, up a hoist 20 to hanging and half the climb more); the Scrab is its delay, 3 frames and 7.35 pixels a
+    frame away. While a stint is on, the route is held to the edges that were timed (`Bot::KeepTo`). What it has
+    to know about the Scrab, all measured:
+    - For 210 frames after it last saw him it is still after him and strikes with no delay
+      (`Bot::SeenByScrabAt`): no stint then.
+    - It runs its beat at the pace it runs at him, so where it will be when it sees him (the lead: a turn, a
+      jump, a drop) is not where it is now. Facing away it has to get to the end, turn and stand out its pause
+      (`mPauseLeftMin`/`mPauseRightMin`, read into the entity); facing him it comes once that pause is over
+      (`Bot::ScrabStillSince`).
+    - A Scrab at a run kills what its box is on, a hanging Abe too: it may not come by any cell of the stint on
+      its way (every cell of a long running jump is checked), and a Scrab within a cell and a half strikes at
+      once whatever its delay.
+    - Its beat is what it is seen to do (`Bot::ScrabBeat`: where it has stood for eight frames, not the frame or
+      two after a shriek), since its TLVs bound it to less than its floor, and a Scrab chased out of one cage of
+      bounds walks the next one. The beat is the last two places it stopped at. (Until 2026-11-12 it was the
+      leftmost and rightmost stops, started again by a stop more than 150 px outside them: so a beat wider than
+      150 px was never learnt, and every stint needed the full 12 frames. That stalled a full run on the third
+      screen: the Scrab chased him into the left cage (bounds at 25 and 350), under the trap door of lock #6000,
+      where the most there is to spare is 4 or 5. That is the way the walkthrough gives: "slap the lock when the
+      Scrab is on the left, and run right". `build-bot/x54.txt` sets this up by hand and the bot gets out.)
+    A stint is gone on with 12 frames to spare, or, where the best moment of the beat gives fewer (the third
+    screen is made to be close), within 5 of that best and no fewer than 4. A stint that can't be done even at
+    the best moment is left out and another way looked for. A lock is slapped from the side that leaves most
+    time, and the place made for after is the one with room to go on from (a ledge with nothing but the Scrab's
+    floor round it is a corner), by how it would be at the best moment so that the choice does not change as the
+    Scrab walks.
+  - **A lock that drops him.** The third screen's locks set a switch of their own (`mSlapOutputSwitchId`) that
+    opens the trap door they are slapped from. That is a stint that starts with the slap: he waits on the trap
+    door, slaps, and the way to run is held as he lands (`UseTask::SetAfter`). Measured: through the door 10
+    frames after the slap begins, down 11 later, and 8 more to turn if the way out is behind him.
+  - **Into a well at a run** (`Prim::RunWell`). The walkthrough: "jumping into the well without stopping to
+    position yourself, you have to do it on the fly". `Abe::RunTryEnterWell`: from the fifth frame of the slide
+    that stops a run, with up held, in the well's box. A run can only be stopped at frames 4 and 12 of its
+    sixteen, 50 pixels apart, and the slide is 21 pixels on by its fifth frame: so the way is let go of before
+    the one of those frames that puts the slide over the well. Once the well has him nothing can hurt him
+    (`Abe::CantBeDamaged`). From the first lock's drop to the well is 33 frames; the Scrab is there at 39.
+  - **Down onto a well** from a ledge takes him where the well leads (`NavGraph`: such a hop's edge has the well
+    in `mWell`), and the last frames of that fall count as time on the floor the well is in.
+  - Smaller things: a cell or two with nothing leading on is not somewhere new to go (the cell a lock stands
+    in, past its trap door). Tried and taken out: counting every region a plan was made from as been in. Necrum's
+    path 4 gets on by going "somewhere new" to where it came in while the ring it has slapped for is on its
+    way, and stuck without that. The level's graph is made again
+    when a profile starts (a script's `bot_goto` before it had made it without the profile's `been`).
+  Not good yet: after the first trap-door lock the planner's way back onto the floor is the well that throws him
+  onto the platform over the middle Scrab's beat, where the only stint is a drop into the well below it with the
+  Scrab at the near end: he stood there 4,800 frames for it.
+- **Mudanchee vault 1 (path 2)**, beaten with no deaths, no restores and no bites from the hub
+  (`build-bot/mvp2.txt`, 2026-11-12: in at f=638, out of its own door at f=3,255). Two locks, each with Fleeches
+  by it that nothing in the path can kill: they are led off. Read the walkthrough's vault 1 first.
+  - **How a Fleech chases** (read out of `Fleech.cpp`, then measured in `build-bot/x2b.txt`, `x2c.txt`, hand
+    scripts with the trace's `fl=` and `hp=`): it comes at where he is, not along the way he went, and needs no
+    sight of him. It crawls a cell in seven frames (3.57 px a frame against his 6.24 at a run or a roll; half
+    of both in the background). With him over it, it makes for a hoist within twelve cells ahead of it or
+    eight behind and goes up it (40 frames from the foot to on top, measured; 110 px at most) and otherwise
+    crawls to under him; with him under it, it crawls his way and falls off the end of its floor (more than
+    300 px kills it). No wells, no jumps. It licks along its own floor within three cells, or at him hanging
+    over it, and only one that is on the screen. A lick is 15 in 100 of his health (seven kill, and the
+    health comes back after 180 frames without one). It does not give him up while he is within 750 px and
+    260 px of it at its own scale, and through a well into the background it goes on following his x from the
+    foreground, up and down the nearest hoist (watched for 600 frames): no shaking them off that way. The
+    vault's are `persistant`: they are not unloaded with their screen, but are not there before it has been
+    on once.
+  - **The way that works** is the walkthrough's: get them to follow him away from the lock along a floor, to
+    the foot of a hoist, go up it and back to the lock over another floor. They come up the hoist after him
+    and are behind him by the climb and by what he gains at a run. `Domain::LureFleeches` finds it: of the
+    feet of hoists they can crawl to (`mBait`), the one with a way back to the lock (`mBack`) that starts up
+    the hoist, keeps off the cells they come by, and loses them the most frames (`mLead`: they follow where
+    a Fleech can, and from where one cannot, a jump, they make for the lock as best they may). `mOut` is the
+    way he shows himself (their way, the other way round, to some 150 px from where they would have him),
+    `mCommit` the last place to turn back at (where the last fall or climb of the way back starts) and
+    `mAway` the way out after: to the nearest cell a Fleech at the lock would be 150 frames getting to, a
+    well if there is one (the lock's own switch taken to be on: the second lock turns its well round).
+  - **The planner**: `Lead the Fleeches off and use SlapLock#n` (`StepKind::eFleechLure`, cost 600) beside
+    the plain use, which still wants its guards dead. Where they are shut in with the lock and cannot be led
+    anywhere, the barrier that keeps them in is taken to be open and its switch is asked for first, with the
+    lever's place as where he sets out from: only a place he gets to 45 frames before they do will do (the
+    first choice without that, the foot of the pillar they come by, killed him). So path 2's plan is
+    `[Use Lever#1004, Lead the Fleeches off and use SlapLock#1009, ..., Lead the Fleeches off and use
+    SlapLock#4000, ..., Exit]`. A lever that a lure wants pulled may open its gate onto Fleeches that are awake
+    behind it (not ones asleep or hanging, `mInputs[0]`, `[1]`, and no other lever: with that let go for
+    every lever, path 1 pulled one to see what it did and died).
+  - **The task** (`FleechLureTask`): to `mBait`; along `mOut` two cells at a time until a Fleech needs 60
+    frames or fewer to him (`kFleechDrawn`; with them let out by a lever they are coming already and he just
+    waits); back to `mBait` and along `mBack` to `mCommit`, held to those edges (`Bot::KeepTo`). There the
+    Fleeches as they really are decide it: the frames the nearest needs to any cell he will be within reach
+    on (`Domain::FleechTimes`, by the shortest way a Fleech has; one going up a hoist, `RockAt::mClimbing`,
+    is taken to the top of it first, which is what it does) against what he needs for the rest of the way,
+    the slap and into the way out, with 5 over. Short of that he waits there while they are 45 frames or
+    more from him, for them to start up a hoist, and then gives up. The lock is used from the side the way
+    back comes down on (`UseTask::FixSide`: from the other side of the second lock he was 36 frames longer).
+  - **It is close, and is meant to be.** First lock (#4000, a tunnel under a floor with a hoist at each end):
+    at the commit they needed 112 frames and he 80 by the count; in the game he was in the well 4 frames
+    before the first Fleech landed 25 px from him. Second lock (#1009, half scale): 144 against 89 by the
+    count (in the game 151 from the commit to the well: the fall goes through the lock's well, which throws
+    him out beside it, 40 frames the count leaves out), and he was in the well 13 frames before they landed
+    (2 before the top was crossed from a run into a roll). What saves him both times is the 15 frames and more a Fleech needs to land, turn and put its tongue
+    out; no bite either time (`hp=` in the trace). The count of his frames (`Domain::RunFrames`: a run
+    everywhere, no turns, no well on the way down) is short by 20 to 60 frames and theirs is about right, so
+    the 5 over is not a real margin. A truer count fails the first lock by a few frames, which is how tight
+    the game makes it.
+  - Slapped without leading them off (dropped in beside the second lock, `build-bot/x2a.txt` before the
+    lure): four bites, health at 0.40, alive. Not taken as a way.
+  - On the way: with Fleeches led on a timed way, a floor that goes on under something low is taken from a run
+    straight into the roll with three cells to run in (`Prim::RunRoll`; elsewhere it wants five), and with
+    fewer rolled from its start, but not from over a hoist, where down is the way down it. Walked and then
+    crouched, the 100 px over the second lock took 72 frames; now 36.
+  - Seen with `hp=` and not looked into: in vault 3 (path 3) he is bitten down to 9 in 100 at f=4,215 of
+    `mvp2.txt`, and in vault 4 (path 8) to 39. Both paths count as beaten with no deaths; neither has a bite
+    to spare.
+- **The other two vaults** (`build-bot/mvp1.txt`, `mvp4.txt`: `bot_goto` to the door, up, then the bot). By the
+  doors' flames and the walkthrough's numbers: path 2 is its vault 1, path 5 vault 2, path 3 vault 3, path 8
+  vault 4, path 4 vault 5, path 1 vault 6.
+  - Path 1 (`build-bot/v1.txt`, started at its door): **beaten, out of its second door at f=4,737 with no
+    deaths and nothing taken back** (2026-11-12, late; before it stopped at the door with no plan). The
+    walkthrough: "pull the lever to free the Fleeches. Lead them back across the top. When they drop down to
+    the Scrab, they'll cower in fear. Possess the Scrab and take them out". What it took:
+    - **Fleeches led to a Scrab** (`Domain::LeadFleeches`, the action `Let the Fleeches out with Lever#n and
+      lead them to Scrab#m`, `StepKind::eFleechLead`, cost 1500, `FleechLeadTask`). The planner looks for a hop
+      or running jump they cannot make (`FleechFrames` < 0) with, off the end of the floor it starts from, a
+      fall they can make that lands on a Scrab's floor within six cells of where the map puts it (nearer than
+      that they stay scared, `Fleech.cpp`'s `IsScrabOrParamiteNear`), a way from the lever to there made only
+      of edges they can follow, and a cell on the Scrab's screen beyond the hop, out of its reach and more than
+      three cells from the drop, to chant from. The ones let out are those with a way to the lever once its
+      switch is on and none before. Wants no power to go unseen in hand, gives the switch and the Fleeches
+      dead. Beside the plain use of the lever, which still wants them dead first.
+    - **How they follow, as measured** (`build-bot/exp1.txt`, `exp2.txt`): freed, they are on him in a second
+      (they set out 13 frames into the pull and stood 100 px off: three bites in 40 frames when he waited), so
+      he leaves at once. They make for where he is, not along the way he went: with him over their heads
+      further on they crawl to the wall under him and stay there. A hoist they take only if they come by its
+      cell with him above (`Fleech::TryGetHoist`: one cell ahead of them). So the task: the lever; to the top
+      of the hoist on their way by another way if there is one not much longer (here a running jump to the
+      ledge beyond and a hop back: at the foot of their hoist he is within their reach, and hanging from it
+      too); there until the first of them starts up; then three to six edges at a time while the nearest on his
+      floor is within 190 px, waiting when it is not; at the drop until it is within 150; over; to the chant
+      cell; there until none is left on his floor and one at least is down; then `ScrabHuntTask` with the group
+      given (`mLed`: the ones by the Scrab are the ones there are, and none left after a spin is all dead).
+      One run: lever at f=553, on the hoist top 673, over the gap 883, all three down 973, dead 1279.
+    - **A thing on a Scrab's floor that is reached from a ledge over it** (the last lock, #7002): the ledge and
+      the floor are one region, so no crossing asks for the power. The use itself does now (`kInvisNow`), where
+      a Scrab that strikes at once gets at the cell, the region has cells it does not get at, and there is no
+      gate anywhere along that floor (with one the Scrabs are shut in or lured off first: path 3's test).
+    - **The power kept for that lock**: a Scrab's floor on the way is routed over as if he had no power while
+      it is kept for a later step (`Bot::EdgeCostFn`), so the background Scrab's floor is crossed by its beat
+      (`ScrabWaryTask`), and the chant "from the step before" only counts when that step ends on a Scrab's
+      floor. The chant then waits, out of reach, while a Scrab stands within 90 px of the thing
+      (`Bot::UnseenUse`): this one stands at the lock for 100 to 200 frames each time round.
+    - **A slap that does not land**: the bot took a lock for slapped once he had slapped. Here the slap landed on
+      the Scrab at the lock (and once on the wall, facing away, carried past the cell by the run he landed
+      into), the door stayed shut and the run stood at it for a thousand frames. `World::mLocksIntact` is what
+      the game says (`SlapLock::Intact`, a read-only accessor); `UseTask` slaps again while it is intact, only
+      from the lock's cell and at a stand, and not with a Scrab between him and it.
+    - **Half size**: `ScrabWaryTask::Spare` took distances and the Scrab's speed at full size, so the
+      background Scrab's floor never had time to spare; `LandingBits` took the ledge 30 px over it for its
+      floor and had him run on as he landed, off the end and into it (two deaths).
+    - Left: at the left lock (#5002) the four Fleeches of the pit are on its ledge as he slaps and he leaves
+      through them, health 24 in 100. The background Scrab's floor waited for 630 frames on the way to the
+      last lock (61 frames on it, 5 to spare).
+    - Unit tests: `FleechesLetOutAreLedOverAGapToDropToAScrab`,
+      `TheLeverThatLetsFleechesOutIsPulledToLeadThemToTheScrab`, `AThingOnAScrabsFloorUnderALedgeIsUsedUnseen`.
+  - Path 4 (`mvp4.txt`): **beaten, out of its door at f=9,074 with no deaths** (2026-11-12, night; before it got
+    both locks and died 8 times). What did it is a Scrab taken over to kill Fleeches, made general:
+    - **The planner** (`Domain::Build`, before the entities): for each Scrab, the Fleeches on the floor of its
+      floor (not hanging, no wall between) are a group; `Have Scrab#n kill the Fleeches of its floor from x,y`
+      (`StepKind::eScrabHunt`, cost 900, 3000 from a screen the Scrab is neither on nor at home on) wants every
+      gate between them open, and no power to go unseen in hand (the chant would spend it, so hunts come before
+      the lock). Chanted for from any cell on a screen its floor crosses that is not low, not on a Scrab's floor
+      and that no Scrab gets at. Not on floors with foot switches: those are the rampage's (path 6).
+    - What follows from a Fleech being huntable: one asleep on the floor by a lock that gives the power is its
+      guard again; one within 100 px of the way out has to be dead; a lever that opens a gate a hunt goes
+      through is not held back for the ring.
+    - **Gates and Scrabs as facts** (`Domain::ScrabReaches`, now with what it found): a crossing onto a floor
+      that only a shut gate keeps a Scrab from wants that gate still shut, or him unseen; onto one a Scrab gets
+      at, unseen or with the open gate between them shut. Two actions for the one edge, the one without the
+      power first (of two as good the planner takes the first) and 300 cheaper. This replaced the rule that a
+      lever which opens a Scrab's gate through a timer waits for the ring.
+    - **A timer trigger's outputs follow its input both ways** (`mHoldOnly` on the logic entity, folded into the
+      effects of whatever sets the input; no step of their own): lever #3003 off shuts gates 167 and 168 again,
+      which the plan needs three times.
+    - **The task** (`ScrabHuntTask`): to the cell; waits until the Scrab is the one a chant would take
+      (`Abe::FindObjectToPossess`: on his screen, one of his size before any other, the nearest) and chants;
+      then the nearest Fleech: never walked up to (a Fleech with a wall behind it and the Scrab within three
+      cells eats it, `ScaredBrain` `eCornered`: the first try lost the Scrab that way after one stamp), but the
+      howl from 150 to 280 px for the power, a run, and the spin from 110 px, which kills what it touches, one
+      a frame. One spin took all four both times. Then left: at home, or where the Fleeches were if a gate lies
+      between, that stretch has fewer ways on and off it and nothing he has still to work (a lock) is on it
+      (`mScrabParked`: the foreground Scrab is left by the door, the background one walked home).
+    - A Scrab left shut in counts as one that gets at him wherever no shut gate is between, even one that
+      waits before it strikes (there is nowhere to run to there).
+    - **The ring, as late as can be**: for a crossing, chanted when that crossing is the step at hand and then
+      only at the last cell before the way goes onto a Scrab's floor; and, whatever the plan says, with the
+      ring in hand before any step from a floor no Scrab gets at onto one that one does. A step sooner with a
+      Fleech awake on his screen (path 8 died seven times without that).
+    - On the way: an exit that "didn't lead out of the path" is given up for good (the way-in door of the second
+      screen was tried again each time he came by); the timed Scrab crossing is not given up for Fleeches awake
+      that have no way to him (three deaths); a Scrab behind a shut gate does not make him hurry (it had him
+      run at a well); the run into a well is right at half size (`Pilot::StepRunWell`).
+    - The run: first screen with the Scrab killing the four Fleeches by lock #1008 (no bites there now; the
+      four on the way in over the top are still taken, health 39 in 100), door at f=3,149. Second: lever #4003,
+      lever #3003, Scrab #3002 kills four and is walked home, Scrab #5000 kills two and is left by the door,
+      lever off, lock #4004, lever on, up at the right end, the chant, the run to the door. It was slow,
+      5,900 frames for the second screen; later the same day out of the door at f=7,545 instead of 9,074:
+      the drop next to the foreground Scrab was refused when it stood exactly 100 px off (it turns at 2037 on
+      most rounds and at 2062 on few: 880 frames waited, now 176), a well that brings him onto a Scrab's floor
+      was timed from the far well's place instead of where he comes out, the way off that floor is now the
+      one away from where the Scrab is, and a Scrab that is taken over runs when it has far to go (home in
+      257 frames, not 523). Luring it would not help: it cannot see him on the ledge over it (`CanSeeAbe`:
+      nothing more than 45 px above it), and the other wait is for one of the other size.
+    - Unit tests: `AGateBetweenAScrabAndAPlaceIsWhatKeepsItOffOrCouldIfShut`,
+      `FleechesOnAScrabsFloorAreKilledWithItBeforeTheLockTheyLieBy`, `ASwitchThatFollowsAnotherIsSetAndUnsetWithIt`.
+
+**One run, on the final code** (`build-bot/mall.txt`, seed 1, `any`): from the start of the Mines' path 1,
+through the Mines (Necrum at f=39,847), all of Necrum (the vault at 52,494), the vault's path 6 (out at
+61,118), its hub, vault 3 (in at 61,905), the hub, vault 4 (path 8, in at 64,022) and the hub again, to the
+door of the next vault (path 5) at f=65,428, where the script ends it (`wait_until camera mudanchee_vault 5
+2`): 0 deaths, 0 restores, none of its throws missed. The run before it, with two of vault 4's rules wider
+than they are now, lost him five times: a climb made dear with a Fleech awake turned him back from the hoist
+to Necrum path 1's well (a running jump up it was not made dear alike), and rolling on between low stretches
+everywhere moved the Mines' path 6 escape, which has no margin, by 48 frames.
+
+So the Mines, Necrum and all of the Scrab vault (paths 6, 7, 3, 8, 5, 4, 1 and 2) are beaten with `any` and no
+deaths. One run from the Mines' start through path 5 (`build-bot/mall2.txt`, out of path 5 at f=73,127) is from
+before the work on paths 4 and 1. One run from the vault's start (`build-bot/vall.txt`, 2026-11-12, final code):
+path 6 out at f=8,160, vault 3 in at 8,947, path 8 at 11,064, path 5 at 12,470, path 4 at 21,049, path 1 at
+28,063, path 2 at 32,911, no deaths, nothing taken back; its time limit (3,500 s) cut it off in path 2 at
+f=34,017. What comes after the sixth vault (the hub's middle door, the trial) has not been seen yet. Of the other profiles `kill_all` gets as far as the vault's path 8 with 3 deaths and
+`save_all` sticks in the Mines' path 4 (below). Each stuck report names what stops it.
+
+**All three profiles without a death** (final code, seed 1, headless, 2026-11-12, last runs of the day:
+`build-bot/mall.txt`, `long_save_all.txt`, `long_kill_all.txt`; 11/11 ctest, 110 bot unit tests):
+- `any`: the door of the vault's path 5 at f=64,970, **0 deaths, 0 restores**.
+- `kill_all`: the Mines (paths 1, 2, 3, 4, 5, 10, 6), Necrum, the vault's paths 6, 7 and 8, into path 1 at
+  f=87,484: 30 killed, 6 rescued, **0 deaths, 0 restores**. Stops there with no plan, as `any` does in path 1.
+- `save_all`: the Mines' paths 1, 2, 3 and into 4: 16 rescued, **0 deaths, 0 restores**, stuck with no plan
+  at f=45,864 at the door of path 4's drill room. That room is not solved for `save_all`: the walkthrough
+  leads the two blind Mudokons at 512 and 637,1400 off their ledge from the floor below before Lever#11000
+  (sw160: it starts the drill over that ledge and moves the lift), then lift, ring, well, Lever#8002 (sw158),
+  the three levers (sw153..155) of the drills at 1575, 1650 and 1725, and the portal at 1812,1500. None of that
+  leading is built.
+What the second round of long runs showed and what was done (the first round is under it):
+- Three deaths in `kill_all` at 1562..1637,1500: a running jump up to 1837,1400 with its run-up under the
+  three drills, and the kill task standing Abe up in a cell a drill sweeps. The jump rule below no longer
+  wants both ends at one height, and neither task stands him up where `GoToTask::SweepOver` has a drill.
+- `save_all` at 2137,1500: `hop 2062,1400 -> 2162,1400` fell short and he came down under the drill along the
+  floor. A hop to a ledge at his own height four cells off is only an edge where a hoist at that ledge's end
+  catches him as he drops (Necrum's path 6 has one, this has none):
+  `BotNecrum.AHopToALedgeFourCellsOffNeedsAHoistThereToCatch`.
+- `save_all` at 637,1500: Lever#11000 starts the drill at 400..701,1360 over the two blind Mudokons. With
+  Mudokons to save, `UseTask` fails a lever or ring that would start a drill where a Mudokon stands.
+- `save_all` at 1512,1500: the blind Mudokon #7008 ran for its portal through two drills. `RescueTask` stops
+  a drill at work between a blind Mudokon and its portal with its lever first (`mDrillStop`), and with
+  Mudokons to save fails when no lever can be got to.
+- `kill_all` in the vault's path 8, to and fro at 212..237,980: on the way back up from the secret, a roll had
+  to start at the top of the hoist at 187,880 (and again at 287,720), where down climbs down. Both games duck
+  Abe by themselves when he walks at a wall that is at his head and not at his knees
+  (`Abe::ToLeftRightMovement`): `Prim::mWalkIn` presses the direction there instead of down.
+
+**The other profiles, run on for 140,000 frames** (`build-bot/long_save_all.txt`, `long_kill_all.txt`, seed 1,
+later on 2026-11-12, with the fixes listed under them):
+- `kill_all`: the Mines (paths 1, 2, 3, 4, 5, 10, 6; Necrum at f=59,747), all of Necrum, the vault's paths 6
+  and 7 and into path 8 at f=82,408: 30 killed, 6 rescued, **3 deaths**, all at one place (f≈48,400,
+  1562..1637,1500 in the Mines' path 4, killing the blind Mudokon #7008 among the drills). It then walks to and
+  fro at 212..237,980 in the vault's path 8 on `Cross portal 162,980->862,1140` until the frames run out.
+- `save_all`: stuck in the Mines' path 4 at f=52,573 with 16 rescued, **5 deaths** and 20 restores, all in the
+  drill room with the blind Mudokons (2137,1500 and 637,1500; a blind Mudokon is drilled at 637 and 1512).
+  Neither `Use PullRing#10001` nor `Use Lever#11000` is reached alive, and the portal for #7008 does not open
+  from 1862,1400. Not looked into further: the walkthrough's way through that room has not been read yet.
+- `any` with the same code (`build-bot/mall.txt`): the door of the vault's path 5 at **f=64,970, 0 deaths, 0
+  restores** (458 frames sooner than before).
+What the first long runs showed and what was done:
+- Two deaths each at 2912,3060 in path 4: a running jump from 2937 with its run-up under Drill#27002.
+  `Bot::EdgeCostFn` has no hop or running jump along a floor with a working drill over a cell of that floor on
+  the way (a drill down in a gap he jumps does not count: path 4's way in at 2537..2312,1500 is that).
+- Both stood at 2162,1500 for 90,000 frames pressing up: the kill and rescue tasks stood Abe up whenever he was
+  crouched, under a low ceiling too, and while their own walk had him ducked for a drill. They now leave him
+  down once a press of up got no reaction (`mNoStand`) and while the walk ducks (`GoToTask::Ducked`).
+- A hoist at 2062,1500 with a drill going along the floor 15 to 35 above it: `GoToTask::SweepsClear` had him
+  off the floor 14 frames into the hoist. Measured: 3 frames before the jump starts and out of reach 17 frames
+  into it, so 20.
+
+**The other profiles**, on the final code from the start of the Mines for 30,000 frames
+(`build-bot/prof_save_all.txt`, `prof_kill_all.txt`, seed 1): no deaths in either.
+- `save_all`: in path 2 at f=28,904 with 12 rescued, 0 deaths, 0 restores.
+- `kill_all`: in path 3 at f=28,975 with 14 killed and 2 rescued, 0 deaths, 0 restores.
+They began at 15 and 21 deaths. What it was, and what was done:
+- Twelve deaths each at 853,880 in path 2: out of the well at 812,720 Abe walked off the ledge and came down
+  two cells in front of a Slig on patrol that faced him. `Bot::EdgeCostFn` has no way down (a fall, a hop, a
+  hoist, a well) onto a floor within 250 px in front of a Slig that is awake and faces the landing; a Slig
+  whose screen is not loaded is taken from the map. The five Mudokons behind it are out of reach and left.
+  Tried and taken out, because they moved or broke the `any` run: the same for a Slig asleep close to the
+  landing (the Mines' path 10 goes on by exactly such a landing and a run to a well), and a cost for landing
+  in a sleeping Slig's hearing (1,100 frames more in the Mines, and a death in Necrum the shift brought out).
+- The rest, twelve between them, at one Slig in path 1 that walks 3012..3287 on the 1400 floor and is never
+  off its screen (shoot on sight delay 240). Read in Slig.cpp: that delay is for what it comes on as it walks
+  (`Slig::RespondToEnemyOrPatrol`). A footstep that is not a sneak, or a word, on its screen alerts it
+  (`kEventSuspiciousNoise`, `kEventSpeaking`), and alerted it turns and shoots at once. So:
+  - A Mudokon on the floor of a Slig whose whole beat is on the screen Abe is on with it is left, for good
+    and before he steps out (`Bot::BeatStaysOnScreen`, `SligNeverLeaves` in Tasks.cpp, for the recruiting and
+    the killing tasks): there is never quiet to talk in. Mudokon #33006 is not rescued and not killed.
+  - A Slig that waits before it shoots is still run from, but not run past from its front to behind its back
+    in the open (`pastIt` in `GoToTask`): then he waits in the shadow and goes behind it at a sneak, as for
+    any other Slig. Run past, he was shot 13 frames after it began to turn, a cell short of the next shadow.
+  Tried and taken out: sneaking whenever he goes after a Slig with its back turned (eight deaths in rescues
+  the run gets through at f=5,100), and holding while the Slig is at the end of its beat.
+`any` is as it was to the frame after all of this (f=65,428).
 
 ### Next, in order
 
-1. `save_all` and `kill_all` through the Mines: neither has been rerun. Known wrong for `save_all`: the car
+1. The Mudanchee trial behind the hub's middle door, which the six vaults open: not seen yet. The full run from
+   the Mines again (`mall2.txt`), which has not seen paths 2, 4 and 1. In path 1 the bites at the left lock
+   (health 24 in 100) and the 630 frames waited for the background Scrab; path 4's four bites over the top.
+   The bites in paths 3 and 8. The wait
+   on the platform in path 5's third part. Then the Paramite vaults, untouched. The Mines' path 6
+   escape has no margin.
+   `save_all` and `kill_all` through the Mines: neither has been rerun. Known wrong for `save_all`: the car
    runs Mudokons over in paths 5 and 10 (the walkthrough stops it short and leads them out), path 4 loses
-   three. Then throw arcs as a measured table (22 misses rewound in the full run), path 2's flying Slig (the
-   walkthrough takes it over by chanting), and Necrum.
+   three.
 2. Sligs in the way of a Mudokon (#8005 and #33006 on path 1's 1400 floor). There are usually several ways and
    the planner should hold them as alternatives, cheapest first: (a) call the Mudokon from inside an invisible
    zone and lead it off behind the Slig's back; (b) take over a Slig that is easy to get at (another floor of its

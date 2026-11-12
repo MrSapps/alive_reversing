@@ -1,0 +1,10 @@
+# Abe's Exoddus from the start of the Mudanchee (Scrab) vaults
+timeout 100000
+start mudanchee_vault 6 23 537 200
+wait_until in_game
+wait_frames 40
+bot any,seed=1,been=mines,been=necrum
+bot_wait 200000
+bot_report bot_report.txt
+bot_inputs bot_inputs.txt
+quit

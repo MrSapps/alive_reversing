@@ -21,6 +21,13 @@ Prim Prim::MoveTo(s32 x, Gait gait)
     return p;
 }
 
+Prim Prim::RunRoll(s32 rollByX, s32 x)
+{
+    Prim p = MoveTo(x, Gait::eRoll);
+    p.mRunUp = rollByX;
+    return p;
+}
+
 Prim Prim::Face(bool left)
 {
     Prim p;
@@ -55,6 +62,15 @@ Prim Prim::RunJump(s32 takeoffX, bool left)
     return p;
 }
 
+Prim Prim::RunWell(s32 nearSideX, bool left)
+{
+    Prim p;
+    p.mKind = Kind::eRunWell;
+    p.mX = nearSideX;
+    p.mFaceLeft = left;
+    return p;
+}
+
 Prim Prim::Lift(s32 y)
 {
     Prim p;
@@ -81,6 +97,8 @@ std::string Prim::Text() const
             return "lift to " + std::to_string(mX);
         case Kind::eRunJump:
             return std::string("run jump ") + (mFaceLeft ? "left" : "right") + " from " + std::to_string(mX);
+        case Kind::eRunWell:
+            return std::string("run ") + (mFaceLeft ? "left" : "right") + " into the well at " + std::to_string(mX);
     }
     return "?";
 }
@@ -91,6 +109,8 @@ void Pilot::Start(const Prim& prim, const AbeState& abe)
     mFrames = 0;
     mPhase = 0;
     mStill = 0;
+    mRolled = false;
+    mAired = false;
     mStuck = 0;
     mStartX = abe.mX;
     mLastX = abe.mX;
@@ -166,6 +186,8 @@ PilotStatus Pilot::Step(const AbeState& abe, u32& bits)
 
         case Prim::Kind::eRunJump:
             return StepRunJump(abe, bits);
+        case Prim::Kind::eRunWell:
+            return StepRunWell(abe, bits);
 
         case Prim::Kind::eLift:
             return StepLift(abe, bits);
@@ -196,6 +218,39 @@ PilotStatus Pilot::StepRoll(const AbeState& abe, u32& bits)
         mLastX = abe.mX;
     }
 
+    // The run-up: the roll button is looked for as the run reaches each cell (Abe's run loop), and he goes
+    // down into the roll from there
+    if (mPrim.mRunUp != 0 && !mRolled)
+    {
+        const s32 toRoll2 = (mPrim.mRunUp - abe.mX) * (left ? -1 : 1) * 2;
+        if (abe.mMove == Move::eRoll || abe.mMove == Move::eCrouch || toRoll2 < grid2 * 2)
+        {
+            mRolled = true;
+        }
+        else if (abe.mMove == Move::eRun)
+        {
+            bits = dirBit | Btn::eRun;
+            if (abe.mFacingLeft == left && toRoll2 <= grid2 * 3)
+            {
+                bits |= Btn::eFartOrRoll;
+            }
+            return PilotStatus::eRunning;
+        }
+        else if (abe.mMove == Move::eIdle || abe.mMove == Move::eWalk || abe.mMove == Move::eTurn)
+        {
+            if (mStuck > 40)
+            {
+                return Fail("blocked");
+            }
+            bits = dirBit | Btn::eRun;
+            return PilotStatus::eRunning;
+        }
+        else
+        {
+            return PilotStatus::eRunning;
+        }
+    }
+
     switch (abe.mMove)
     {
         case Move::eIdle:
@@ -203,10 +258,10 @@ PilotStatus Pilot::StepRoll(const AbeState& abe, u32& bits)
             {
                 return PilotStatus::eDone;
             }
-            // Down, as a tap
+            // Down, as a tap (or at the low ceiling, which ducks him)
             if (mPhase == 0)
             {
-                bits = Btn::eDown;
+                bits = mPrim.mWalkIn ? dirBit : static_cast<u32>(Btn::eDown);
             }
             mPhase = 1 - mPhase;
             return PilotStatus::eRunning;
@@ -269,6 +324,73 @@ PilotStatus Pilot::StepLift(const AbeState& abe, u32& bits)
     }
     bits = dy < 0 ? Btn::eUp : Btn::eDown;
     return PilotStatus::eRunning;
+}
+
+PilotStatus Pilot::StepRunWell(const AbeState& abe, u32& bits)
+{
+    // Both games: Abe::RunTryEnterWell, from the fifth frame of the slide he stops a run with, if up is held and he
+    // is in the well's box. The run can only be stopped at two frames of its sixteen (4 and 12, in AE's
+    // Motion_33_RunLoop: 50 pixels apart), and the slide then takes him on: measured, 6 pixels to where it starts,
+    // 21 more by its fifth frame and 45 by its last. So the way to run is let go of before the one of those frames
+    // that puts the slide over the well.
+    if (abe.mTransition)
+    {
+        return PilotStatus::eRunning;
+    }
+    const s32 dir = mPrim.mFaceLeft ? -1 : 1;
+    const s32 nearSide = mPrim.mX;
+    // (half his size in the background: half the well, half the run, half the slide)
+    const s32 half = abe.mHalfScale ? 2 : 1;
+    const s32 farSide = mPrim.mX + dir * 25 / half;
+    if (mPhase == 0)
+    {
+        if (mFrames > 300)
+        {
+            return Fail("never got to the well");
+        }
+        bool letGo = false;
+        if (abe.mMove == Move::eRun && abe.mMotion == 33)
+        {
+            const s32 af = abe.mAnimFrame;
+            const s32 frames = af <= 4 ? 4 - af : af <= 12 ? 12 - af : 20 - af;
+            // Where the slide would start if the run were stopped at the next frame it can be
+            const s32 start = abe.mX + dir * (624 * (frames + 1) / 100) / half;
+            letGo = (start - (nearSide - dir * 42 / half)) * dir >= 0 && (start - (farSide - dir * 24 / half)) * dir <= 0;
+        }
+        else if ((abe.mX - (nearSide - dir * 12 / half)) * dir >= 0)
+        {
+            // (not in a run by the time he is there: up as he stands in it does it too)
+            letGo = true;
+        }
+        if (letGo)
+        {
+            mPhase = 1;
+            mFrames = 0;
+            bits = Btn::eUp;
+            return PilotStatus::eRunning;
+        }
+        bits = (mPrim.mFaceLeft ? Btn::eLeft : Btn::eRight) | Btn::eRun;
+        return PilotStatus::eRunning;
+    }
+    if (mPhase == 1)
+    {
+        bits = Btn::eUp;
+        if (abe.mMove == Move::eBusy || abe.mMove == Move::eAir)
+        {
+            mPhase = 2;
+            mFrames = 0;
+        }
+        else if (mFrames > 60)
+        {
+            return Fail("slid past the well");
+        }
+        return PilotStatus::eRunning;
+    }
+    if (mFrames > 600)
+    {
+        return Fail("did not come out of the well");
+    }
+    return abe.Settled() && mFrames > 4 ? PilotStatus::eDone : PilotStatus::eRunning;
 }
 
 PilotStatus Pilot::StepRunJump(const AbeState& abe, u32& bits)
@@ -391,7 +513,9 @@ PilotStatus Pilot::StepMoveTo(const AbeState& abe, u32& bits)
             return PilotStatus::eRunning;
 
         case Move::eTurn:
-            bits = dirBit;
+            // (with the sneak button too, or he comes out of the turn at a walk: that one loud step woke a
+            // Fleech in Necrum's path 6)
+            bits = dirBit | (mPrim.mGait == Gait::eSneak ? static_cast<u32>(Btn::eSneak) : 0u);
             return PilotStatus::eRunning;
 
         case Move::eWalk:
@@ -475,6 +599,10 @@ PilotStatus Pilot::StepWalkOff(const AbeState& abe, u32& bits)
     {
         return Fail("did not land");
     }
+    if (LandsInto(abe, bits))
+    {
+        return PilotStatus::eDone;
+    }
     if (abe.Settled())
     {
         if (++mStill >= 2)
@@ -487,6 +615,26 @@ PilotStatus Pilot::StepWalkOff(const AbeState& abe, u32& bits)
         mStill = 0;
     }
     return PilotStatus::eRunning;
+}
+
+// Landing from a fall or a well with the next move's buttons held: true once he is off into that move
+bool Pilot::LandsInto(const AbeState& abe, u32& bits)
+{
+    if (mPrim.mAfter == 0)
+    {
+        return false;
+    }
+    if (!abe.mOnGround)
+    {
+        mAired = true;
+        return false;
+    }
+    if (!mAired)
+    {
+        return false;
+    }
+    bits = mPrim.mAfter;
+    return abe.mMove == Move::eRun || abe.mMove == Move::eWalk;
 }
 
 PilotStatus Pilot::StepPress(const AbeState& abe, u32& bits)
@@ -516,6 +664,10 @@ PilotStatus Pilot::StepPress(const AbeState& abe, u32& bits)
     if (mFrames > 1500)
     {
         return Fail("did not settle");
+    }
+    if (!abe.mTransition && LandsInto(abe, bits))
+    {
+        return PilotStatus::eDone;
     }
     if (!abe.mTransition && abe.Settled())
     {
