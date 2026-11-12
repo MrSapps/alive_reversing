@@ -122,7 +122,12 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     }
     mOffGraph = 0;
 
-    // What the last edge really did
+    // What the last edge really did (not after a reflex has moved him: where he is now is its doing)
+    if (bot.Reflexes() != mReflexes)
+    {
+        mReflexes = bot.Reflexes();
+        mLastEdge = -1;
+    }
     if (mLastEdge >= 0)
     {
         const NavEdge& e = nav.Edges()[mLastEdge];
@@ -486,6 +491,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             }
             // Sligs on this floor: quietly near a sleeping one, and past one that is awake only where he can't see
             bool sneak = false;
+            bool outrun = false;
             const NavNode& here = nav.Nodes()[cur];
             const s32 cell = NavGraph::GridStep(here.mHalf);
             for (const SligAt& slig : bot.GetWorld().Threats())
@@ -501,6 +507,11 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 const s32 reach = slig.mAsleep || !slig.mSeen ? 0 : 600;
                 const auto close = [&](s32 x)
                 {
+                    if (slig.mAsleep && slig.mWake > 0)
+                    {
+                        // (what wakes it is a noise this near; two cells more for where a step ends)
+                        return nav.CameraOf(x, here.mY - 5) == sligCam && std::abs(x - slig.mX) <= slig.mWake + 2 * cell;
+                    }
                     return nav.CameraOf(x, here.mY - 5) == sligCam || std::abs(x - slig.mX) < reach;
                 };
                 const auto open = [&](const NavNode& n)
@@ -516,17 +527,24 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 {
                     continue;
                 }
+                if (!slig.mAsleep && slig.mSightDelay >= World::kOutrunDelay)
+                {
+                    // One that waits before it shoots at what it sees is run from: measured, he is off its screen
+                    // and up the next hoist before it has caught up, and it shoots at nothing on the way
+                    outrun = true;
+                    continue;
+                }
                 sneak = true;
                 if (slig.mAsleep)
                 {
                     // Stop before its screen, so whatever has to be put right first (a laughing Mudokon in tow) can be
                     std::size_t firstIn = 0;
-                    while (firstIn <= last && nav.CameraOf(nav.Nodes()[nav.Edges()[path[firstIn]].mTo].mX, here.mY - 5) != sligCam)
+                    while (firstIn <= last && !close(nav.Nodes()[nav.Edges()[path[firstIn]].mTo].mX))
                     {
                         firstIn++;
                     }
                     // (a few cells before it, to have room for that)
-                    if (firstIn > 3 && firstIn <= last && nav.CameraOf(here.mX, here.mY - 5) != sligCam)
+                    if (firstIn > 3 && firstIn <= last && !close(here.mX))
                     {
                         last = firstIn - 4;
                     }
@@ -598,7 +616,11 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 gait = mTopGait;
             }
-            if (sneak)
+            if (outrun || mHurry)
+            {
+                gait = Gait::eRun;
+            }
+            else if (sneak)
             {
                 gait = Gait::eSneak;
             }
@@ -631,6 +653,27 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         case EdgeKind::eHoistDown:
             mLastEdge = path[0];
             return TaskStep::Do(Prim::Press(Btn::eDown));
+
+        case EdgeKind::eTeleport:
+        {
+            // Its lever is a cell to one side of where he stands in it
+            const NavFeature& tele = nav.Input().mFeatures[first.mFeature];
+            const s32 cell = NavGraph::GridStep(nav.Nodes()[cur].mHalf);
+            for (const Entity& e : bot.GetWorld().mEntities)
+            {
+                if (e.mKind == EntityKind::eLever && e.mSwitch == tele.mSwitch && std::abs(e.CentreX() - abe.mX) <= 2 * cell)
+                {
+                    const bool left = e.CentreX() < abe.mX;
+                    if (abe.mFacingLeft != left)
+                    {
+                        return TaskStep::Do(Prim::Face(left));
+                    }
+                    mLastEdge = path[0];
+                    return TaskStep::Do(Prim::Press(Btn::eAction));
+                }
+            }
+            return TaskStep::Failed("no lever at the teleporter");
+        }
     }
     return TaskStep::Failed("unknown edge");
 }
@@ -1412,8 +1455,9 @@ TaskStep UseTask::Next(Bot& bot, const std::string& lastFailed)
             mLooking = true;
             return TaskStep::Do(Prim::Wait(3, Btn::eUp));
         default:
-            // A wheel turns for as long as up is held
-            return TaskStep::Do(Prim::Wait(45, Btn::eUp));
+            // A wheel turns for as long as up is held, and its switch goes on once it has turned for its
+            // time (measured: he is on it 12 frames after up is pressed)
+            return TaskStep::Do(Prim::Wait(entity->mKind == EntityKind::eWorkWheel && entity->mInputs[0] > 0 ? std::min(45, entity->mInputs[0] + 16) : 45, Btn::eUp));
     }
 }
 
@@ -1704,7 +1748,8 @@ const SligAt* ClearSligTask::Watcher(const World& world, s32 x, s32 y, bool half
     for (const SligAt& slig : world.mSligs)
     {
         // On the same floor and within a screen: its beat takes it past
-        if (!slig.mAsleep && slig.mHalf == half && std::abs(slig.mY - y) <= 45 && std::abs(slig.mX - x) < 450)
+        // (one that waits before it shoots gives time for a pull: it is run from, not got rid of)
+        if (!slig.mAsleep && slig.mHalf == half && std::abs(slig.mY - y) <= 45 && std::abs(slig.mX - x) < 450 && slig.mSightDelay < World::kOutrunDelay)
         {
             return &slig;
         }
@@ -1818,13 +1863,25 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
     const World& world = bot.GetWorld();
     const NavGraph& nav = bot.Nav();
     const AbeState& abe = bot.Abe();
-    const Entity* entity = world.Find(mEntity);
-    if (!entity || mGaveUp || mCleared >= 2)
+    const Entity* entity = mAmbush ? nullptr : world.Find(mEntity);
+    if (mAmbush)
+    {
+        if (mGaveUp || mCleared >= 1)
+        {
+            return TaskStep::Done();
+        }
+        if (mPhase == 0)
+        {
+            mPhase = 2;
+            mFrames = 0;
+        }
+    }
+    else if (!entity || mGaveUp || mCleared >= 2)
     {
         return mInner->Next(bot, lastFailed);
     }
-    const s32 x = entity->mLive ? entity->mLiveX : entity->CentreX();
-    const s32 y = entity->mLive ? entity->mLiveY : entity->mY2;
+    const s32 x = !entity ? abe.mX : entity->mLive ? entity->mLiveX : entity->CentreX();
+    const s32 y = !entity ? abe.mY : entity->mLive ? entity->mLiveY : entity->mY2;
     const s32 cam = nav.CameraOf(x, y - 5);
 
     const SligAt* me = nullptr;
@@ -1878,12 +1935,55 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
         mPhase = 0;
         mCleared++;
         mRaid = false;
+        if (mAmbush)
+        {
+            bot.Log("the Slig that woke is gone");
+            return TaskStep::Done();
+        }
         mInner = mMake();
         bot.Log("the Slig watching " + mInner->Name() + " is gone");
         return Next(bot, "");
     }
 
-    const SligAt* slig = Watcher(world, x, y, entity->mHalf);
+    const SligAt* slig = mAmbush ? nullptr : Watcher(world, x, y, entity->mHalf);
+    if (mPhase == 0 && slig)
+    {
+        // Behind its back: its beat is known, and it can't be where it sees the thing before Abe has got there
+        // and done with it
+        s32 camX1 = x;
+        s32 camX2 = x;
+        while (camX1 > x - 2000 && nav.CameraOf(camX1 - 25, y - 5) == cam)
+        {
+            camX1 -= 25;
+        }
+        while (camX2 < x + 2000 && nav.CameraOf(camX2 + 25, y - 5) == cam)
+        {
+            camX2 += 25;
+        }
+        s32 left = 100000;
+        for (const SligAt& other : world.mSligs)
+        {
+            if (!other.mAsleep && !other.mPossessed && other.mHalf == entity->mHalf && std::abs(other.mY - y) <= 45 && std::abs(other.mX - x) < 450)
+            {
+                left = std::min(left, other.FramesUntilSees(x, camX1 - 25, camX2 + 25));
+            }
+        }
+        const s32 need = std::abs(abe.mX - x) * 10 / (entity->mHalf ? 12 : 24) + 40;
+        if (std::abs(abe.mY - y) <= 45 && abe.mHalfScale == entity->mHalf && left >= need)
+        {
+            if (!mBehind)
+            {
+                mBehind = true;
+                bot.Log("the Slig at " + std::to_string(slig->mX) + "," + std::to_string(slig->mY) + " can't see " + mInner->Name() + " for " + std::to_string(left) + " frames, " + std::to_string(need) + " are needed: behind its back");
+            }
+            slig = nullptr;
+        }
+        else if (mBehind)
+        {
+            // (begun: seen through)
+            slig = nullptr;
+        }
+    }
     if (mPhase == 0)
     {
         if (!slig)
@@ -1963,6 +2063,10 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
     }
     // Chant while it is on this screen: it takes a couple of seconds of it being there
     mFrames += 20;
+    if (mAmbush && mFrames > 400)
+    {
+        return TaskStep::Failed("the Slig was not taken over");
+    }
     if (mFrames > 2400)
     {
         mGaveUp = true;
@@ -1980,6 +2084,15 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
             continue;
         }
         here = true;
+    }
+    if (mAmbush && !here)
+    {
+        // (it isn't listed for a moment as it is taken: not given up on at once)
+        if (++mFloorFrames > 25)
+        {
+            return TaskStep::Done();
+        }
+        return TaskStep::Do(Prim::Wait(6));
     }
     return TaskStep::Do(here ? Prim::Wait(20, Btn::eChant) : Prim::Wait(6));
 }
@@ -3386,6 +3499,27 @@ TaskStep WorkTogetherTask::Next(Bot& bot, const std::string& lastFailed)
             return TaskStep::Do(Prim::Wait(2, bot.SpeakWork()));
         }
     }
+}
+
+TaskStep HideTask::Next(Bot& bot, const std::string& /*lastFailed*/)
+{
+    // (clear for a little while, not for a frame: it turns round at the ends of its track)
+    mClear = bot.FlierThreat() ? 0 : mClear + 1;
+    mFrames += 10;
+    if (mClear >= 3)
+    {
+        bot.Log("the flying Slig has gone by after " + std::to_string(mFrames) + " frames");
+        return TaskStep::Done();
+    }
+    if (mFrames % 500 == 0)
+    {
+        bot.Log("still out of the flying Slig's sight: " + bot.FlierWhy());
+    }
+    if (mFrames > 4000)
+    {
+        return TaskStep::Failed("the flying Slig never went by");
+    }
+    return TaskStep::Do(Prim::Wait(10));
 }
 
 TaskStep ExitTask::Next(Bot& bot, const std::string& lastFailed)

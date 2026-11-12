@@ -9,7 +9,7 @@ it can test a plan step for real before committing to it, because a quicksave re
 Premise: quicksave/restore is deterministic (the determinism work on this branch). Everything below
 leans on that.
 
-## Where it stands (2026-11-11)
+## Where it stands (2026-11-12)
 
 The sections after this one are the design as first written. This one is what is built, what was measured and
 what is left, and wins where they differ.
@@ -103,7 +103,7 @@ hash.
 | trap doors, falling items, meat saws, drills | paths 2-4 | yes | **missing** (timed hazards: the retry delay is meant to find the gap) |
 | possession, shooting, security orbs | paths 2, 5, 10 | yes | **missing** |
 | Slogs lured into electric walls | Mines path 3 | no | done (`SlogTrapTask`) |
-| flying Sligs, teleporters, mine car, rock sacks, motion detectors, the timed escape | paths 2-6, 10 | no | **missing** |
+| flying Sligs, teleporters, mine car, rock sacks, motion detectors, the timed escape | paths 2-6, 10 | no | done for `any` (see the Mines below); path 2's flying Slig has no invisible zone to hide in and is still got past by luck |
 | grenades (boom machine), security claws | no | yes | **missing** |
 
 ### How far the levels get
@@ -214,18 +214,62 @@ hash.
     rolls up to three cells behind the beam when that fits (`Bot::BeamRoll`), but not with a Slig asleep on
     the screen: of Abe's moves only sneaking makes no noise (walk, roll, hop, run and landing all broadcast
     `kEventNoise`). After 900 frames held the move fails.
-  - **Where it stops now** (`build-bot/f4.txt`, from path 4's last area): on path 5's 720 floor at 1012,
-    550 short of the car, no deaths, all three Sligs still asleep. The way to the car is the 620 floor, the
-    hoist at 1312 down, then left along the 720 floor (a wall at 650 closes the 620 floor's left end). At 1012
-    Abe is in the middle of a detector that goes 925 to 1075 at 8 a frame with a Slig asleep at 987 under it:
-    no sneaked cell fits between its passes, and anything faster wakes the Slig (tried: the rolls get him
-    to 887 and he is shot). **Next: get rid of the Sligs first.** `ClearSligTask` takes over a Slig that
-    watches the place a task works at, shoots the others on its floor and bursts; it needs to take sleeping
-    ones that lie on the way too, and a place to chant from on the Slig's screen that is off its floor and
-    not next to another sleeper (the 620 floor has one at 962). With no Slig left the alarm wakes nobody
-    and the detectors can be walked through. Not checked: whether the alarm does anything else here.
-    Then path 10, where it gets two of the three half-scale levers with eight deaths and has no plan for
-    the rest.
+  - **Path 5 on foot** (`build-bot/f4.txt`): to the car with no deaths and the three Sligs asleep. What was
+    missing was the beam's wait of 15 frames at each end (`MotionDetector::BeamNow` gives the frames left of
+    it, `BeamAt::mPause`/`mEndPause`), and that it is the beam's middle that goes from end to end: with those a
+    sneaked cell fits between the passes of the fast detector too.
+- **The Mines are beaten with `any`** (2026-11-12, `build-bot/m1.txt`, seed 1): from the start of path 1 into
+  Necrum path 2 in 41,178 frames, 1 death (path 10's first sleeper, below), 22 missed throws rewound, 6
+  rescued, 13 killed. Paths at f=10,258 (2), 11,913 (3), 15,557 (4), 30,563 (5), 32,843 (10), 35,994 (6). The
+  walkthrough in `build-bot/research/ae_100_guide.txt` (its Tunnel 6, Tunnel 7 and Boiler revisited are paths
+  5, 10 and 6) gives the same ways through as what follows; read it before working a screen out from the code.
+- **Mines path 10, `any`** (`build-bot/p10.txt`, about 2,700 frames, no deaths in the run measured alone):
+  - *What wakes a Slig* (`Slig::Brain_34_Sleeping`): a noise by something of its size within its
+    `noise_wake_up_distance` cells (6 here: 75 px at half size), anyone speaking or chanting while it is on the
+    screen, the alarm. Of Abe's moves only sneaking and standing are silent: every landing is a noise, a well's
+    too. `Slig::Beat` gives the bot each Slig's bounds, that distance and its `shoot_on_sight_delay`
+    (`SligAt::mBeatMin/Max`, `mWake`, `mSightDelay`), and Abe sneaks only within earshot of a sleeper, not on
+    its whole screen.
+  - *Out of the well beside three sleepers*: the landing wakes the nearest. Chanting there is too slow
+    (measured twice: shot 95 frames in, a takeover needs 120, and the chant wakes the rest). It walks its beat
+    away from him first, so the lever beyond it is pulled behind its back: `SligAt::FramesUntilSees` (the walk
+    to the end of its beat and back to the lever's screen, and its wait) against the frames Abe needs
+    (`ClearSligTask`, "behind its back").
+  - *Down between two sleepers*: a Slig that waits before it shoots (`World::kOutrunDelay`, 45 frames) is run
+    from, not hidden from or taken over: `GoToTask` runs while one is awake on his floor and screen. They come
+    after him and are stopped by the enemy stoppers under the teleporter's ledge, on a screen with no security
+    orb. `Bot::MakeReflex`: Sligs awake on his screen, none on his level, no orb: take one over from where he
+    stands (`ClearSligTask::Ambush`), shoot the rest, burst. Left there they shoot out of the screen at him
+    the moment he is in front of them at full size (`Slig::ToZShoot`).
+  - *A Slig that wakes beside him and shoots at once* (the first sleeper, woken by the foreground Slig's
+    talk): `Bot::MakeFlee`, at a run to another level if one is five moves off or less (the ledge by the hoist
+    there, from which the reflex above takes it over). The one death of the full run was here, before the flee
+    was let run in mid step; not seen to work since (the Slig did not wake in the runs after).
+  - Sligs that go off the screen are made again asleep, so getting away by the well only starts it over.
+  - *Teleporters for Abe*: `FeatureKind::eTeleporter`, `EdgeKind::eTeleport` from the cell in one to the one it
+    leads to; `GoToTask` faces its lever and presses Action. A local well on switch 1 (always on) throws to its
+    "on" place (`GameView`).
+  - *The car*: `Ride` needs the slam doors across the car's floors open, which is what makes the plan pull the
+    three levers. It runs the four blind Mudokons and the foreground Sligs over: wrong for `save_all` (the
+    walkthrough has the taken-over Slig pull the last lever and shoot the foreground Sligs, and the Mudokons
+    led to the portal).
+- **Mines path 6, `any`** (`build-bot/p6.txt`, about 5,200 frames, no deaths):
+  - The way out is a crawl: a cell under a low ceiling can be an exit (`NavGraph`). Wheels whose switch stays
+    on are turned one after the other; only ones that count while they turn need a Mudokon each (`Domain`).
+    Crossings on foot that follow one another are gone in one run (`Bot::Replan`), and a wheel is held for its
+    activation time and 16 frames, not 45.
+  - *The flying Slig* (`World::mFliers`, `Bot::FlierThreat`, `HideTask`): it goes along its track end to end
+    (measured: up to 6.2 px a frame, 30 to 60 frames at an end, about 900 frames there and back) and goes for
+    Abe when it is on his screen, faces him and he isn't in an invisible zone (`FlyingSlig::CanChase`). The bot
+    goes from one invisible zone to the next: the stretch he is out in the open for (to the next zone on his
+    way; or to the thing to do and back to a zone; or, with no zone after it, on to the next thing for as long
+    as that is within 300 px of the track) has a cost in frames from the nav edges, and he sets out only when
+    the Slig can't be at the end of it before then, and isn't on it. Otherwise he goes to a zone (40 moves or
+    less) and waits. After any reflex the plan is made again from where he stands.
+  - *The timed escape*: the third wheel starts 450 frames; run without stopping it takes about 590 to the way
+    out, so the last 800 px are under the explosions. Those come from one `ExplosionSet` that sweeps each
+    screen left to right at 5 px a frame, with air explosions only behind the sweep, so a run that doesn't stop
+    stays ahead of it. It got out in every run since the stops were taken out.
 - **Mines path 1, `save_all`, later the same day** (`build-bot/m1s.txt`, 15,000 frames): 5 rescued, no deaths.
   The Slig by the orb is shot by a Slig Abe has taken over and sent round by teleporter to the background
   (`ClearSligTask::RaidStep`): a shot from behind takes whatever is nearest within 25 px of the snapped x over
@@ -247,14 +291,14 @@ hash.
 - **Rupture Farms, `any`**: not rerun since the work above (it was stuck at the start with `no_plan`: 100 of
   415 cells in reach; a running jump and barriers on switches 13 and 14 were next).
 
-So the first three paths of the Mines are beaten with `any`, the other profiles not past the first, and the level isn't. Each stuck report names what stops it.
+So the Mines are beaten with `any` and the other profiles are not past the first path. Each stuck report names what stops it.
 
 ### Next, in order
 
-1. Throw arcs as a measured table (see path 4 above), then Mines path 5: the way to the car on foot
-   (motion detectors, the drop among the UXBs); then path 10
-   (teleporter, half-scale levers) and path 6 (wheels, a 450 frame timer). `save_all` on path 4: the drill
-   lever 160 starts and the Slig trap each kill Mudokons.
+1. `save_all` and `kill_all` through the Mines: neither has been rerun. Known wrong for `save_all`: the car
+   runs Mudokons over in paths 5 and 10 (the walkthrough stops it short and leads them out), path 4 loses
+   three. Then throw arcs as a measured table (22 misses rewound in the full run), path 2's flying Slig (the
+   walkthrough takes it over by chanting), and Necrum.
 2. Sligs in the way of a Mudokon (#8005 and #33006 on path 1's 1400 floor). There are usually several ways and
    the planner should hold them as alternatives, cheapest first: (a) call the Mudokon from inside an invisible
    zone and lead it off behind the Slig's back; (b) take over a Slig that is easy to get at (another floor of its
@@ -293,8 +337,7 @@ So the first three paths of the Mines are beaten with `any`, the other profiles 
    for the raid yet, and an action that fails six times over is now left alone for good (`mFailedTotal`).
 3. UXBs: read their pattern and cross on the safe beat, or disarm them.
 4. Pull rings where a wheel shares the cell.
-5. The flying Slig of path 2 (hide from it or time it), trap doors, mine car, teleporters, the timed escape of
-   path 6: as the paths meet them.
+5. The flying Slig of path 2 (take it over, as the walkthrough does), trap doors.
 6. Rupture Farms: rerun, measure AO's jumps, AO's speech buttons.
 7. Endings: `average` is still "every other Mudokon"; check it and `kill_all` against the games' own
    thresholds once a level can be finished.

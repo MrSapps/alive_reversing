@@ -15,6 +15,7 @@
 #include "../../AliveLibAE/UXB.hpp"
 #include "../../AliveLibAE/Drill.hpp"
 #include "../../AliveLibAE/MotionDetector.hpp"
+#include "../../AliveLibAE/Slig.hpp"
 #include "../../AliveLibAE/DDCheat.hpp"
 #include "../../AliveLibAO/Mudokon.hpp"
 #include "../../AliveLibAO/DDCheat.hpp"
@@ -360,9 +361,22 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                     NavFeature f = MakeFeature(FeatureKind::eWellLocal, tlv, camera, id);
                     f.mHalf = t.mScale == relive::reliveScale::eHalf;
                     f.mB = t.mOtherWellId;
-                    f.mC = t.mOffDestX;
-                    f.mD = t.mOffDestY;
+                    // (switch 1 is always on: such a well only ever throws to its "on" place)
+                    f.mC = t.mSwitchId == 1 ? t.mOnDestX : t.mOffDestX;
+                    f.mD = t.mSwitchId == 1 ? t.mOnDestY : t.mOffDestY;
                     f.mSwitch = t.mSwitchId;
+                    in.mFeatures.push_back(f);
+                    break;
+                }
+                case ReliveTypes::eTeleporter:
+                {
+                    const auto& t = static_cast<const relive::Path_Teleporter&>(tlv);
+                    NavFeature f = MakeFeature(FeatureKind::eTeleporter, tlv, camera, id);
+                    f.mHalf = t.mScale == relive::reliveScale::eHalf;
+                    f.mA = t.mTeleporterId;
+                    f.mB = t.mOtherTeleporterId;
+                    f.mSwitch = t.mSwitchId;
+                    f.mDestCamera = t.mDestCamera;
                     in.mFeatures.push_back(f);
                     break;
                 }
@@ -600,6 +614,7 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mHalf = t.mScale == relive::reliveScale::eHalf;
                     e.mSwitch = t.mSwitchId;
                     e.mHoldOnly = t.mTurnOffWhenStopped;
+                    e.mInputs[0] = t.mActivationTime;
                     break;
                 }
                 case ReliveTypes::eMudokon:
@@ -798,7 +813,29 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             // Motion_32_Sleeping in AE, Motion_33_Sleeping in AO
             slig.mAsleep = motion == (isAe ? 32 : 33);
             slig.mMotion = motion;
+            if (isAe)
+            {
+                s32 wakeCells = 0;
+                static_cast<::Slig*>(pObj)->Beat(slig.mBeatMin, slig.mBeatMax, wakeCells, slig.mSightDelay);
+                slig.mWake = wakeCells * (slig.mHalf ? 13 : 25);
+            }
             world.mSligs.push_back(slig);
+        }
+    }
+
+    world.mFliers.clear();
+    for (s32 i = 0; isAe && i < gBaseAliveGameObjects->Size(); i++)
+    {
+        BaseAliveGameObject* pObj = gBaseAliveGameObjects->ItemAt(i);
+        if (pObj && !pObj->GetDead() && pObj->Type() == ReliveTypes::eFlyingSlig && pObj->mHealth > FP_FromInteger(0) && !pObj->GetPossessed())
+        {
+            FlierAt flier;
+            flier.mX = FP_GetExponent(pObj->mXPos);
+            flier.mY = FP_GetExponent(pObj->mYPos);
+            flier.mVelX = pObj->mVelX.fpValue / 256;
+            flier.mVelY = pObj->mVelY.fpValue / 256;
+            flier.mHalf = pObj->GetSpriteScale() != FP_FromInteger(1);
+            world.mFliers.push_back(flier);
         }
     }
 
@@ -861,13 +898,14 @@ void GameView::ReadWorld(BaseMap& map, World& world)
         ::MotionDetector* pDetector = pObj && !pObj->GetDead() ? dynamic_cast<::MotionDetector*>(pObj) : nullptr;
         PSX_RECT laser = {};
         BeamAt beam;
-        if (pDetector && pDetector->BeamNow(laser, beam.mMinX, beam.mMaxX, beam.mVel256))
+        if (pDetector && pDetector->BeamNow(laser, beam.mMinX, beam.mMaxX, beam.mVel256, beam.mPause))
         {
             beam.mX1 = laser.x;
             beam.mY1 = laser.y;
             beam.mX2 = laser.w;
             beam.mY2 = laser.h;
             beam.mHalf = pDetector->GetSpriteScale() != FP_FromInteger(1);
+            beam.mEndPause = ::MotionDetector::kEndPause + 1;
             world.mBeams.push_back(beam);
         }
     }

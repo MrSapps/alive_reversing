@@ -1008,10 +1008,13 @@ TEST(BotDomain, SwitchLogicNeedsAllItsInputs)
 static World TwoWheels()
 {
     World world;
+    // (wheels whose switch is only on while they turn)
     Entity wheelA = MakeEntity(EntityKind::eWorkWheel, 1, 100, 80, 124, 104);
     wheelA.mSwitch = 10;
+    wheelA.mHoldOnly = true;
     Entity wheelB = MakeEntity(EntityKind::eWorkWheel, 2, 150, 80, 174, 104);
     wheelB.mSwitch = 11;
+    wheelB.mHoldOnly = true;
     Entity logic = MakeEntity(EntityKind::eSwitchLogic, 3, 0, 0, 10, 10);
     logic.mSwitch = 5;
     logic.mInputs[0] = 10;
@@ -2086,3 +2089,179 @@ TEST(BotSweep, ARollFitsUnderADrillWhereAWalkNeverDoes)
     EXPECT_FALSE(walks);
     EXPECT_TRUE(rolls);
 }
+
+TEST(BotDomain, WheelsThatStayOnAreTurnedOneAfterTheOther)
+{
+    // Mines path 6: three wheels and a syncer on a slam door, and nobody to help
+    NavGraph g;
+    g.Build(CorridorWithDoor());
+    World world = TwoWheels();
+    world.mEntities[0].mHoldOnly = false;
+    world.mEntities[1].mHoldOnly = false;
+    const Domain domain = Domain::Build(g, world, g.NodeAt(12, 100, false), nullptr);
+    const Goap::Plan plan = Goap::Planner::Find(domain.mStart, {{Key::kExited, 1}}, domain.mActions);
+    ASSERT_TRUE(plan.mFound) << plan.mMiss << "\n" << domain.Text();
+    s32 uses = 0;
+    for (s32 step : plan.mSteps)
+    {
+        uses += domain.mSteps[domain.mActions[step].mTag].mKind == StepKind::eUse ? 1 : 0;
+    }
+    EXPECT_EQ(uses, 2);
+}
+
+TEST(BotNav, ATeleporterIsAWayToTheOneItLeadsTo)
+{
+    // A half size floor with a teleporter that leads to one on the full size floor below (Mines path 10)
+    NavInput in;
+    in.mIsAe = true;
+    in.mLines.push_back(Line(0, 100, 200, 100, 4));
+    in.mLines.push_back(Line(0, 300, 400, 300, 0));
+    NavFeature up = Feature(FeatureKind::eTeleporter, 87, 80, 100, 104);
+    up.mHalf = true;
+    up.mA = 0;
+    up.mB = 1;
+    up.mSwitch = 217;
+    up.mCamera = 26;
+    up.mDestCamera = 26;
+    in.mFeatures.push_back(up);
+    NavFeature down = Feature(FeatureKind::eTeleporter, 300, 280, 324, 304);
+    down.mA = 1;
+    down.mB = 0;
+    down.mSwitch = 218;
+    down.mCamera = 26;
+    down.mDestCamera = 26;
+    in.mFeatures.push_back(down);
+    NavGraph g;
+    g.Build(in);
+
+    const s32 to = g.NodeAt(312, 300, false);
+    ASSERT_GE(to, 0);
+    s32 from = -1;
+    for (const NavEdge& e : g.Edges())
+    {
+        if (e.mKind == EdgeKind::eTeleport && e.mTo == to)
+        {
+            from = e.mFrom;
+        }
+    }
+    ASSERT_GE(from, 0);
+    EXPECT_TRUE(g.Nodes()[from].mHalf);
+    EXPECT_TRUE(up.Contains(g.Nodes()[from].mX, g.Nodes()[from].mY));
+    // And the two floors are one way round joined: there's a route across
+    std::vector<s32> path;
+    EXPECT_TRUE(g.FindPath(g.NodeAt(12, 100, true), to, nullptr, path));
+}
+
+TEST(BotNav, TheWayOutCanBeACrawl)
+{
+    // The floor goes on under a 40 high ceiling, and the path ends in there (Mines path 6)
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 300, 100, 0));
+    in.mLines.push_back(Line(200, 60, 300, 60, 3));
+    in.mLines.push_back(Line(200, 0, 200, 60, 2));
+    NavFeature out = Feature(FeatureKind::ePathExit, 225, 80, 400, 200);
+    out.mAnyScale = true;
+    out.mDestPath = 2;
+    out.mDestLevel = 3;
+    in.mFeatures.push_back(out);
+    NavGraph g;
+    g.Build(in);
+
+    const s32 under = g.NodeAt(237, 100, false);
+    ASSERT_GE(under, 0);
+    EXPECT_TRUE(g.Nodes()[under].mLow);
+    bool found = false;
+    for (const NavExit& x : g.Exits())
+    {
+        found = found || (x.mNode >= 0 && g.Nodes()[x.mNode].mLow && g.Input().mFeatures[x.mFeature].mKind == FeatureKind::ePathExit);
+    }
+    EXPECT_TRUE(found);
+}
+
+TEST(BotTasks, ABeamThatWaitsAtItsEndLeavesTimeForAStep)
+{
+    // A motion detector's beam, 20 wide, that goes between 925 and 1075 at 8 a frame and waits 16 frames at
+    // each end. It has just got to the right end.
+    World world;
+    BeamAt beam;
+    beam.mX1 = 1065;
+    beam.mX2 = 1085;
+    beam.mY1 = 700;
+    beam.mY2 = 720;
+    beam.mMinX = 925;
+    beam.mMaxX = 1075;
+    beam.mVel256 = -8 * 256;
+    beam.mPause = 16;
+    beam.mEndPause = 16;
+    world.mBeams.push_back(beam);
+
+    // A sneaked cell at 1012 (13 frames) is over before it has come back that far
+    EXPECT_TRUE(world.BeamClear(1012, 720, false, -1, 25, 13));
+    // Without the wait it would be on him
+    world.mBeams[0].mPause = 0;
+    EXPECT_FALSE(world.BeamClear(1012, 720, false, -1, 25, 13));
+    // Under it he keeps still whatever it does
+    world.mBeams[0].mPause = 16;
+    EXPECT_FALSE(world.BeamClear(1070, 720, false, -1, 25, 13));
+    // Another floor, another size: not his beam
+    EXPECT_TRUE(world.BeamClear(1070, 500, false, -1, 25, 13));
+    EXPECT_TRUE(world.BeamClear(1070, 720, true, -1, 25, 13));
+}
+
+TEST(BotTasks, ASligCannotShootBeforeItHasWalkedItsBeat)
+{
+    // A half size Slig that walks 1275 to 1550 and waits 85 frames before it shoots at what it sees. The
+    // lever is at 1742, on the screen that starts at 1500.
+    SligAt slig;
+    slig.mHalf = true;
+    slig.mX = 1404;
+    slig.mBeatMin = 1275;
+    slig.mBeatMax = 1550;
+    slig.mSightDelay = 85;
+    // Walking away: to the end of its beat, back to that screen, and its wait (1.2 pixels a frame)
+    slig.mFacingLeft = true;
+    EXPECT_EQ(slig.FramesUntilSees(1742, 1500, 1875), (129 + 225) * 10 / 12 + 85);
+    // Coming: only as far as the screen
+    slig.mFacingLeft = false;
+    EXPECT_EQ(slig.FramesUntilSees(1742, 1500, 1875), 96 * 10 / 12 + 85);
+    // What is on its beat it can come upon at any time, and a beat not known can't be counted on
+    EXPECT_EQ(slig.FramesUntilSees(1400, 1125, 1500), 0);
+    slig.mBeatMin = 0;
+    slig.mBeatMax = 0;
+    EXPECT_EQ(slig.FramesUntilSees(1742, 1500, 1875), 0);
+}
+
+TEST(BotDomain, TheMineCarNeedsTheDoorsAcrossItsTrackOpen)
+{
+    // A floor with the car's own floor 20 over it, a slam door across both, the car on the right of it
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    in.mLines.push_back(Line(0, 80, 400, 80, 11));
+    NavFeature door = Feature(FeatureKind::eBarrier, 200, 80, 224, 104);
+    door.mSwitch = 219;
+    door.mStartClosed = true;
+    in.mFeatures.push_back(door);
+    NavGraph g;
+    g.Build(in);
+    World world;
+    world.mEntities.push_back(MakeEntity(EntityKind::eMineCar, 7, 300, 80, 324, 100));
+    const Domain domain = Domain::Build(g, world, g.NodeAt(312, 100, false), nullptr);
+
+    bool ride = false;
+    for (const Goap::Action& a : domain.mActions)
+    {
+        if (domain.mSteps[a.mTag].mKind != StepKind::eRide)
+        {
+            continue;
+        }
+        ride = true;
+        bool needsDoor = false;
+        for (const Goap::Fact& f : a.mPre)
+        {
+            needsDoor = needsDoor || f == Goap::Fact{Key::Switch(219), 1};
+        }
+        EXPECT_TRUE(needsDoor) << a.mName;
+    }
+    EXPECT_TRUE(ride) << domain.Text();
+}
+

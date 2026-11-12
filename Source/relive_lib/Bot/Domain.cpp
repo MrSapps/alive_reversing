@@ -703,13 +703,14 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                     add("Work together " + name + " sw" + std::to_string(entity.mSwitch), teamPre, {{Key::Switch(entity.mSwitch), entity.mOp == 1 ? 0 : 1}}, 600, step);
                     break;
                 }
-                // Several wheels only count turned at once: without Mudokons for them there's nothing to do
+                // Several wheels that only count while they turn have to be turned at once: without Mudokons for
+                // them there's nothing to do. (Ones that stay on are turned one after the other.)
                 s32 wheelInputs = 0;
                 for (s32 input : entity.mInputs)
                 {
                     for (const Entity& w : world.mEntities)
                     {
-                        wheelInputs += input > 1 && w.mKind == EntityKind::eWorkWheel && w.mSwitch == input ? 1 : 0;
+                        wheelInputs += input > 1 && w.mKind == EntityKind::eWorkWheel && w.mSwitch == input && w.mHoldOnly ? 1 : 0;
                     }
                 }
                 if (wheelInputs >= 2)
@@ -751,6 +752,23 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                     break;
                 }
                 const s32 cell = NavGraph::GridStep(entity.mHalf);
+                // The slam doors and the like across its floors have to be open
+                std::vector<Goap::Fact> open = {regionFact(node)};
+                for (const NavFeature& f : nav.Input().mFeatures)
+                {
+                    if (f.mKind != FeatureKind::eBarrier || f.mHalf != entity.mHalf || f.mSwitch <= 1)
+                    {
+                        continue;
+                    }
+                    for (const NavLine& line : nav.Input().mLines)
+                    {
+                        if (line.mType == kMineCarFloor && line.mY1 >= f.mY1 && line.mY1 <= f.mY2 && f.mX2 >= std::min(line.mX1, line.mX2) && f.mX1 <= std::max(line.mX1, line.mX2))
+                        {
+                            open.push_back({Key::Switch(f.mSwitch), f.mStartClosed ? 1 : 0});
+                            break;
+                        }
+                    }
+                }
                 std::set<s32> to;
                 for (const NavLine& line : nav.Input().mLines)
                 {
@@ -768,7 +786,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                         }
                         step.mKind = StepKind::eRide;
                         step.mEdge = dest;
-                        add("Ride " + name + " to " + std::to_string(nav.Nodes()[dest].mX) + "," + std::to_string(nav.Nodes()[dest].mY), {regionFact(node)}, {regionFact(dest)}, 600 + (std::abs(nav.Nodes()[dest].mX - carX) + std::abs(nav.Nodes()[dest].mY - carY)) / 6, step);
+                        add("Ride " + name + " to " + std::to_string(nav.Nodes()[dest].mX) + "," + std::to_string(nav.Nodes()[dest].mY), open, {regionFact(dest)}, 600 + (std::abs(nav.Nodes()[dest].mX - carX) + std::abs(nav.Nodes()[dest].mY - carY)) / 6, step);
                     }
                 }
                 break;
