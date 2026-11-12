@@ -45,6 +45,7 @@ const char* EdgeKindName(EdgeKind kind)
         case EdgeKind::eHoistDown: return "hoist_down";
         case EdgeKind::eDoor: return "door";
         case EdgeKind::eWell: return "well";
+        case EdgeKind::eTeleport: return "teleport";
     }
     return "?";
 }
@@ -934,6 +935,12 @@ void NavGraph::Build(const NavInput& input)
 
         if (n.mLow)
         {
+            // (the way out of a path can be a crawl: Mines path 6)
+            s32 exitIdx = -1;
+            if (FeatureAt(FeatureKind::ePathExit, n.mX, n.mY, n.mHalf, &exitIdx) || FeatureAt(FeatureKind::ePathExit, n.mX, n.mY - 20, n.mHalf, &exitIdx))
+            {
+                mExits.push_back({from, exitIdx});
+            }
             continue;
         }
 
@@ -1001,6 +1008,21 @@ void NavGraph::Build(const NavInput& input)
         if (const NavFeature* well = FeatureAt(FeatureKind::eWellLocal, n.mX, n.mY, n.mHalf, &featureIdx))
         {
             AddEdge(edges, from, WellLanding(*well), EdgeKind::eWell, kWellCost, featureIdx, false);
+        }
+
+        if (const NavFeature* tele = FeatureAt(FeatureKind::eTeleporter, n.mX, n.mY, n.mHalf, &featureIdx))
+        {
+            for (const NavFeature& other : mInput.mFeatures)
+            {
+                if (other.mKind == FeatureKind::eTeleporter && &other != tele && other.mA == tele->mB && other.mCamera == tele->mDestCamera)
+                {
+                    s32 fy = 0;
+                    const s32 cx = (other.mX1 + other.mX2) / 2;
+                    const s32 line = FloorBelow(cx, other.mY1 - 20, other.mHalf, &fy);
+                    AddEdge(edges, from, NodeOnLine(line, cx), EdgeKind::eTeleport, kWellCost, featureIdx, false);
+                    break;
+                }
+            }
         }
 
         if (const NavFeature* well = FeatureAt(FeatureKind::eWellExpress, n.mX, n.mY, n.mHalf, &featureIdx))

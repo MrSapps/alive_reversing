@@ -216,6 +216,11 @@ public:
     {
         mTopGait = gait;
     }
+    // Run whatever is about: for getting away from what has already seen or heard him
+    void SetHurry(bool hurry)
+    {
+        mHurry = hurry;
+    }
     // With Mudokons in tow: by a way they can come along (they walk and drop off ledges, nothing else), never
     // far ahead of them, never faster than a walk
     void SetLeading(bool leading)
@@ -232,6 +237,8 @@ private:
     std::function<bool(s32)> mIsGoal;
     Gait mTopGait = Gait::eRun;
     s32 mLastEdge = -1;
+    s32 mReflexes = -1;
+    bool mHurry = false;
     s32 mLastFrom = -1;
     s32 mSameSpot = 0;
     s32 mOffGraph = 0;
@@ -511,9 +518,20 @@ public:
         , mInner(mMake())
     {
     }
+    // A Slig that has woken next to Abe (he came down beside it): chant where he stands, shoot what else is on
+    // its floor with it, burst it. Nothing is done after.
+    static std::unique_ptr<ClearSligTask> Ambush()
+    {
+        auto task = std::make_unique<ClearSligTask>(0, []() -> std::unique_ptr<Task>
+        {
+            return nullptr;
+        });
+        task->mAmbush = true;
+        return task;
+    }
     std::string Name() const override
     {
-        return mInner->Name();
+        return mInner ? mInner->Name() : "Take over the Slig that woke";
     }
     TaskStep Next(Bot& bot, const std::string& lastFailed) override;
     // The Slig that would see Abe working at (x, y), or null. Asleep ones and ones not about don't count.
@@ -563,6 +581,23 @@ private:
     s32 mLookOutWait = 0;
     u32 ShootLevel(const World& world, const SligAt& me, s32 targetX, s32 frames);
     bool mGaveUp = false;
+    bool mAmbush = false;
+    bool mBehind = false;
+};
+
+// Stood in an invisible zone until the flying Slig that is about has gone by and is behind him, going away
+class HideTask final : public Task
+{
+public:
+    std::string Name() const override
+    {
+        return "Keep out of the flying Slig's sight";
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    s32 mFrames = 0;
+    s32 mClear = 0;
 };
 
 // Slogs that run Abe down from a floor he can't get at them on: stand where they come down to him, run back

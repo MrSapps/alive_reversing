@@ -445,6 +445,15 @@ private:
     AnimId MotionToAnimId(eSligMotions motion);
 
 public:
+    // For the bot: the ends of its beat (its bounds; both 0 with none) and from how many grid cells off a noise
+    // wakes it, and the frames it waits before it shoots at what it has seen
+    void Beat(s32& minX, s32& maxX, s32& wakeCells, s32& sightDelay) const
+    {
+        sightDelay = mSligTlv.mShootOnSightDelay;
+        minX = field_138_zone_rect.x;
+        maxX = field_138_zone_rect.w;
+        wakeCells = mSligTlv.mNoiseWakeUpDistance;
+    }
     EReliveLevelIds mAbeLevel = EReliveLevelIds::eNone;
     s16 mAbePath = 0;
     s16 mAbeCamera = 0;

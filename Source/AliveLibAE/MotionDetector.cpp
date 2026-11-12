@@ -180,7 +180,7 @@ void MotionDetector::VScreenChanged()
     }
 }
 
-bool MotionDetector::BeamNow(PSX_RECT& laser, s32& minX, s32& maxX, s32& velX256)
+bool MotionDetector::BeamNow(PSX_RECT& laser, s32& minX, s32& maxX, s32& velX256, s32& pause)
 {
     MotionDetectorLaser* pLaser = sObjectIds.Find<MotionDetectorLaser>(mLaserId, ReliveTypes::eRedLaser);
     if (!pLaser || mHasOwner || SwitchStates_Get(mDisableSwitchId))
@@ -192,6 +192,8 @@ bool MotionDetector::BeamNow(PSX_RECT& laser, s32& minX, s32& maxX, s32& velX256
     maxX = FP_GetExponent(mBottomRightX);
     const s32 speed = std::abs(mSpeed.fpValue) / 256;
     velX256 = mState == States::eMoveRight_0 || mState == States::eWaitThenMoveRight_3 ? speed : -speed;
+    const bool waiting = mState == States::eWaitThenMoveLeft_1 || mState == States::eWaitThenMoveRight_3;
+    pause = waiting ? std::max(0, mPauseTimer - static_cast<s32>(sGnFrame) + 1) : 0;
     return true;
 }
 

@@ -192,6 +192,18 @@ public:
     void Log(const std::string& text);
     // See World::QuietFrames, with the beats this run has seen
     s32 QuietFrames(s32 x, s32 y, bool half) const;
+    // Whether a flying Slig is coming Abe's way, is on his screen, or is on the side of him he has to go to
+    bool FlierThreat() const;
+    // Why the last answer of FlierThreat was yes, for the log
+    const std::string& FlierWhy() const
+    {
+        return mFlierWhy;
+    }
+    // How many reflexes (things done at once, between the steps of a task) have run
+    s32 Reflexes() const
+    {
+        return mReflexesRun;
+    }
     // Its beat has been watched from one end to the other (or far enough to count on)
     bool KnowsBeat(const SligAt& slig) const
     {
@@ -314,11 +326,26 @@ private:
     std::unique_ptr<Task> mReflex;
     std::map<u32, s32> mReflexTries;
     s32 mSlogTraps = 0;
+    s32 mAmbushes = 0;
+    // Flying Sligs: which way along its track one was last seen to go (it stops at the ends), where the plan's next
+    // things to do are, and whether one is to be kept out of the sight of where Abe stands now
+    s32 mFlierDir = 0;
+    s32 mFlierAt = -1;
+    std::vector<s32> mPlanNodes;
+    mutable std::string mFlierWhy;
+    // Whether an invisible zone can be got to from a cell on foot in so many moves; way: how, cost: in about
+    // how many frames
+    bool ShadowNear(s32 node, s32 maxEdges, std::vector<s32>* way, s32* cost) const;
+    s32 mFlierHides = 0;
+    s32 mPerchKills = 0;
+    s32 mReflexesRun = 0;
     std::vector<SligBeat> mBeats;
     u32 mForgaveFrame = 0;
     // Where Abe was when an action last failed: it is left out only while he is still about there
     std::map<std::string, std::pair<s32, s32>> mFailedWhere;
     std::unique_ptr<Task> MakeReflex();
+    // The reflex for a Slig that has woken beside Abe: off its floor, if a way is at hand
+    std::unique_ptr<Task> MakeFlee();
     bool mGoToPending = false;
     s32 mGoToX = 0;
     s32 mGoToY = 0;

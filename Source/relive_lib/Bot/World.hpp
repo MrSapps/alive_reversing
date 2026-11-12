@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 #include "../Types.hpp"
 #include <vector>
 
@@ -113,6 +115,48 @@ struct SligAt final
     s32 mMotion = 0;
     // False for one known only from the path's data: its camera isn't loaded, so it is where it starts
     bool mSeen = true;
+    // The ends of its beat, from the bounds set for it (both 0 when not known)
+    s32 mBeatMin = 0;
+    s32 mBeatMax = 0;
+    // Asleep, a noise this near (in x) wakes it; 0 when not known: anywhere on its screen then
+    s32 mWake = 0;
+    // The frames it waits before it shoots at what it has seen
+    s32 mSightDelay = 0;
+    // The frames at least until it could shoot at something at x on its floor, with the screen that is on going from
+    // camX1 to camX2: it has to be on that screen and face that way. 0 when its beat isn't known or x is on it.
+    s32 FramesUntilSees(s32 x, s32 camX1, s32 camX2) const
+    {
+        if (mBeatMax <= mBeatMin || (x >= mBeatMin && x <= mBeatMax))
+        {
+            return 0;
+        }
+        const bool right = x > mBeatMax;
+        // Where it first is on that screen, walking that way
+        const s32 from = right ? std::max(camX1, mBeatMin) : std::min(camX2, mBeatMax);
+        s32 walk = 0;
+        if (right)
+        {
+            walk = mFacingLeft ? (mX - mBeatMin) + std::max(0, from - mBeatMin) : std::max(0, from - mX);
+        }
+        else
+        {
+            walk = !mFacingLeft ? (mBeatMax - mX) + std::max(0, mBeatMax - from) : std::max(0, mX - from);
+        }
+        // (measured at half size: 232 pixels in 202 frames)
+        return (mHalf ? walk * 10 / 12 : walk * 10 / 24) + mSightDelay;
+    }
+};
+
+// A flying Slig that is about. It goes along its track from end to end, and goes for Abe (grenades) when it is on
+// his screen, faces him and he isn't in an invisible zone.
+struct FlierAt final
+{
+    s32 mX = 0;
+    s32 mY = 0;
+    // What it moves a frame, x256 (0 while it waits at an end of its track)
+    s32 mVelX = 0;
+    s32 mVelY = 0;
+    bool mHalf = false;
 };
 
 // A Slog that is about. Awake it runs Abe down wherever he is.
@@ -155,6 +199,9 @@ struct BeamAt final
     s32 mMaxX = 0;
     // What it moves a frame, x256, the way it goes
     s32 mVel256 = 0;
+    // The frames it still waits at an end before it moves, and how long it waits at each
+    s32 mPause = 0;
+    s32 mEndPause = 0;
     bool mHalf = false;
 };
 
@@ -258,6 +305,8 @@ struct World final
     }
     std::vector<UxbAt> mUxbs;
     std::vector<SweepAt> mSweeps;
+    // A Slig that waits at least this many frames before it shoots at what it has seen can be run from
+    static constexpr s32 kOutrunDelay = 45;
     std::vector<BeamAt> mBeams;
     // Whether Abe can make a move without a motion detector's beam coming over him before it is done: he is at
     // x, y, the move takes him up to travel on in dir (-1, 0, 1) and lasts so many frames
@@ -275,6 +324,7 @@ struct World final
             s32 at256 = b.mX1 * 256;
             s32 vel = b.mVel256;
             const s32 width = b.mX2 - b.mX1;
+            s32 pause = b.mPause;
             for (s32 t = 0; t <= frames; t++)
             {
                 const s32 ax = x + (frames > 0 ? dir * travel * t / frames : 0);
@@ -283,10 +333,18 @@ struct World final
                 {
                     return false;
                 }
+                if (pause > 0)
+                {
+                    pause--;
+                    continue;
+                }
                 at256 += vel;
-                if ((vel > 0 && at256 / 256 + width >= b.mMaxX) || (vel < 0 && at256 / 256 <= b.mMinX))
+                // (it is the beam's middle that goes from end to end)
+                const s32 mid = at256 / 256 + width / 2;
+                if ((vel > 0 && mid >= b.mMaxX) || (vel < 0 && mid <= b.mMinX))
                 {
                     vel = -vel;
+                    pause = b.mEndPause;
                 }
             }
         }
@@ -374,6 +432,7 @@ struct World final
         return quiet;
     }
     std::vector<SlogAt> mSlogs;
+    std::vector<FlierAt> mFliers;
     std::vector<LiftAt> mLifts;
     // Where each lift was when it was last about
     std::vector<LiftAt> mLiftsSeen;

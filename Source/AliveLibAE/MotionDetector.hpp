@@ -53,8 +53,10 @@ public:
     virtual void VScreenChanged() override;
 
     // For the bot: where the beam is, the ends it goes between and what it moves a frame (x256, the way it goes
-    // or is about to). False for one that is switched off or belongs to a greeter.
-    bool BeamNow(PSX_RECT& laser, s32& minX, s32& maxX, s32& velX256);
+    // or is about to) and for how many frames more it waits at an end (kEndPause each time). False for one that
+    // is switched off or belongs to a greeter.
+    static constexpr s32 kEndPause = 15;
+    bool BeamNow(PSX_RECT& laser, s32& minX, s32& maxX, s32& velX256, s32& pause);
 
 private:
     s16 IsInLaser(BaseAliveGameObject* pWho, BaseAliveGameObject* pOwner);

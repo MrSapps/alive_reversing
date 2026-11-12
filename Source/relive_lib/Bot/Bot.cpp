@@ -467,12 +467,70 @@ bool Bot::Replan(BaseMap& map)
         mPlanText += (mPlanText.empty() ? "" : ", ") + actions[stepIdx].mName;
         mKeptPlan.push_back(actions[stepIdx].mName);
     }
+    // Where the next two things to do are (the crossings on the way to them don't count)
+    mPlanNodes.clear();
+    for (s32 stepIdx : best.mSteps)
+    {
+        const DomainStep& planStep = domain.mSteps[actions[stepIdx].mTag];
+        if (planStep.mKind == StepKind::eCross || planStep.mKind == StepKind::eLogic)
+        {
+            continue;
+        }
+        if (planStep.mKind == StepKind::eExit && planStep.mEdge >= 0 && planStep.mEdge < static_cast<s32>(mKnow->mNav.Exits().size()))
+        {
+            mPlanNodes.push_back(mKnow->mNav.Exits()[planStep.mEdge].mNode);
+        }
+        else if (const Entity* target = mWorld.Find(planStep.mEntity))
+        {
+            mPlanNodes.push_back(Domain::UseNode(mKnow->mNav, *target, nullptr));
+        }
+        else
+        {
+            mPlanNodes.push_back(-1);
+        }
+        if (mPlanNodes.size() >= 2)
+        {
+            break;
+        }
+    }
     const Goap::Action& first = actions[best.mSteps[0]];
     if (first.mName != mTaskAction)
     {
         Log("goal " + bestGoal + " plan=[" + mPlanText + "]" + (misses.empty() ? "" : " (no plan for: " + misses + ")"));
     }
     mTask = MakeTask(domain, first);
+    // Crossings on foot that follow one another the same way along a floor are gone in one go, not a stop
+    // at each
+    if (mTask && domain.mSteps[first.mTag].mKind == StepKind::eCross && mKnow->mNav.Edges()[domain.mSteps[first.mTag].mEdge].mKind == EdgeKind::eWalk)
+    {
+        const NavGraph& nav = mKnow->mNav;
+        const NavEdge& firstEdge = nav.Edges()[domain.mSteps[first.mTag].mEdge];
+        s32 to = firstEdge.mTo;
+        for (std::size_t i = 1; i < best.mSteps.size(); i++)
+        {
+            const DomainStep& next = domain.mSteps[actions[best.mSteps[i]].mTag];
+            if (next.mKind == StepKind::eLogic)
+            {
+                // (what the game does by itself)
+                continue;
+            }
+            if (next.mKind != StepKind::eCross)
+            {
+                break;
+            }
+            const NavEdge& e = nav.Edges()[next.mEdge];
+            if (e.mKind != EdgeKind::eWalk || e.mLeft != firstEdge.mLeft || nav.Nodes()[e.mTo].mLine != nav.Nodes()[firstEdge.mTo].mLine)
+            {
+                break;
+            }
+            to = e.mTo;
+        }
+        if (to != firstEdge.mTo)
+        {
+            mTask = std::make_unique<GoToTask>(first.mName, [to](s32 node)
+                                               { return node == to; });
+        }
+    }
     mTaskAction = first.mName;
     mTaskOptional = domain.mSteps[first.mTag].mKind == StepKind::eRescue || domain.mSteps[first.mTag].mKind == StepKind::eKill;
     if (!mTask)
@@ -790,6 +848,11 @@ void Bot::EnsureKnowledge(BaseMap& map)
         it = mKnowledge.emplace(key, std::move(know)).first;
         mVisitedPaths.insert(key);
         Log("nav graph for " + GameView::LevelName(mAbe.mLevel) + " " + std::to_string(mAbe.mPath) + ": " + std::to_string(it->second.mNav.Nodes().size()) + " cells, " + std::to_string(it->second.mNav.Edges().size()) + " edges");
+    }
+    if (mKnow && mKnow != &it->second && mPilotActive && mAuto)
+    {
+        // In another path: whatever was held to get here (the way on through an exit) is let go of
+        mPilot.Start(Prim::Wait(1), mAbe);
     }
     mKnow = &it->second;
 }
@@ -1179,11 +1242,273 @@ void Bot::RewindMiss(BaseMap& map)
     mLastCheckpointFrame = saved.mCheckpoint.mFrame;
 }
 
+// How far along a flying Slig's track (its track lines, end to end in the order they are in the path) the place
+// nearest to (x, y) is, and how long the track is. False with no track.
+static bool TrackAt(const NavInput& in, s32 x, s32 y, s32& along, s32& total, s32* off = nullptr)
+{
+    static const s32 kTrackLine = 8;
+    total = 0;
+    s64 best = -1;
+    for (const NavLine& line : in.mLines)
+    {
+        if (line.mType != kTrackLine)
+        {
+            continue;
+        }
+        const s32 lx = line.mX2 - line.mX1;
+        const s32 ly = line.mY2 - line.mY1;
+        const s32 len = std::max(1, std::abs(lx) + std::abs(ly));
+        const s64 sq = static_cast<s64>(lx) * lx + static_cast<s64>(ly) * ly;
+        s64 t1000 = sq == 0 ? 0 : (static_cast<s64>(x - line.mX1) * lx + static_cast<s64>(y - line.mY1) * ly) * 1000 / sq;
+        t1000 = std::max<s64>(0, std::min<s64>(1000, t1000));
+        const s64 px = line.mX1 + lx * t1000 / 1000;
+        const s64 py = line.mY1 + ly * t1000 / 1000;
+        const s64 d = (px - x) * (px - x) + (py - y) * (py - y);
+        if (best < 0 || d < best)
+        {
+            best = d;
+            along = total + static_cast<s32>(len * t1000 / 1000);
+        }
+        total += len;
+    }
+    if (off && best >= 0)
+    {
+        // (how far from the track the place is, as the larger of across and up)
+        s32 far = 0;
+        while (static_cast<s64>(far) * far < best)
+        {
+            far += 25;
+        }
+        *off = far;
+    }
+    return best >= 0;
+}
+
+bool Bot::ShadowNear(s32 node, s32 maxEdges, std::vector<s32>* way, s32* cost) const
+{
+    const NavGraph& nav = mKnow->mNav;
+    const NavGraph* graph = &nav;
+    const auto shadow = [graph](s32 n)
+    {
+        return graph->Nodes()[n].mHidden;
+    };
+    std::vector<s32> path;
+    s32 total = 0;
+    bool near = node >= 0 && nav.FindPath(node, shadow, EdgeCostFn(), path, &total) && static_cast<s32>(path.size()) <= maxEdges;
+    for (s32 edge : path)
+    {
+        const EdgeKind kind = nav.Edges()[edge].mKind;
+        near = near && (kind == EdgeKind::eWalk || kind == EdgeKind::eHoistDown || kind == EdgeKind::eHoistUp || kind == EdgeKind::eFall);
+    }
+    if (near && way)
+    {
+        *way = path;
+    }
+    if (near && cost)
+    {
+        *cost = total;
+    }
+    return near;
+}
+
+bool Bot::FlierThreat() const
+{
+    const NavGraph& nav = mKnow->mNav;
+    const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);
+    const s32 abeNode = AbeNode();
+    for (const FlierAt& flier : mWorld.mFliers)
+    {
+        if (flier.mHalf != mAbe.mHalfScale)
+        {
+            continue;
+        }
+        // On his screen it sees him as soon as it faces him
+        if (nav.CameraOf(flier.mX, flier.mY) == cam)
+        {
+            mFlierWhy = "it is on his screen";
+            return true;
+        }
+        s32 total = 0;
+        s32 at = 0;
+        s32 abeAt = 0;
+        if (abeNode < 0 || !TrackAt(nav.Input(), flier.mX, flier.mY, at, total) || !TrackAt(nav.Input(), mAbe.mX, mAbe.mY - 40, abeAt, total))
+        {
+            continue;
+        }
+        // The frames until it can be at a place on its track: straight there if it is coming, by way of the
+        // end it is making for if not.
+        const s32 dir = mFlierDir;
+        const auto arrives = [at, total, dir](s32 place)
+        {
+            // (measured: 624 pixels of track in 100 frames at its fastest, 30 to 60 frames at an end)
+            const s32 gap = std::abs(place - at);
+            const bool coming = dir == 0 || (place - at) * dir > 0;
+            return coming ? gap / 6 : ((dir > 0 ? total - at : at) * 2 + gap) / 6 + 30;
+        };
+        const auto along = [&nav, &total](s32 node)
+        {
+            s32 place = 0;
+            TrackAt(nav.Input(), nav.Nodes()[node].mX, nav.Nodes()[node].mY - 40, place, total);
+            return place;
+        };
+        // What he is out in the open for next: from here (or the zone he is at) to the next invisible zone on
+        // his way, or to the thing to do and from it to a zone, or, with none after it, on to the thing after
+        // that. It mustn't be anywhere on that stretch before he is through with it.
+        s32 frames = 250;
+        s32 endAt = abeAt;
+        if (!mPlanNodes.empty() && mPlanNodes[0] >= 0)
+        {
+            std::vector<s32> home;
+            const s32 homeLine = ShadowNear(abeNode, 16, &home, nullptr) ? (home.empty() ? nav.Nodes()[abeNode].mLine : nav.Nodes()[nav.Edges()[home.back()].mTo].mLine) : -1;
+            std::vector<s32> route;
+            s32 routeCost = 0;
+            if (nav.FindPath(abeNode, mPlanNodes[0], EdgeCostFn(), route, &routeCost))
+            {
+                bool found = false;
+                s32 gone = 0;
+                for (std::size_t i = 0; i < route.size() && !found; i++)
+                {
+                    const NavEdge& e = nav.Edges()[route[i]];
+                    // Out of reach of its track from here on (the run to the way out): that far is all
+                    s32 place = 0;
+                    s32 off = 0;
+                    TrackAt(nav.Input(), nav.Nodes()[e.mTo].mX, nav.Nodes()[e.mTo].mY - 40, place, total, &off);
+                    if (off > 300)
+                    {
+                        frames = gone;
+                        found = true;
+                        break;
+                    }
+                    endAt = place;
+                    gone += e.mCost;
+                    std::vector<s32> way;
+                    s32 wayCost = 0;
+                    if (ShadowNear(e.mTo, 16, &way, &wayCost))
+                    {
+                        const s32 line = way.empty() ? nav.Nodes()[e.mTo].mLine : nav.Nodes()[nav.Edges()[way.back()].mTo].mLine;
+                        if (line != homeLine)
+                        {
+                            frames = gone + wayCost;
+                            endAt = along(e.mTo);
+                            found = true;
+                        }
+                    }
+                }
+                if (!found)
+                {
+                    // (60: the thing itself)
+                    frames = routeCost + 60;
+                    endAt = along(mPlanNodes[0]);
+                    // Then either back to a zone, or on to the next thing for as long as that is within
+                    // reach of its track: whichever it leaves time for
+                    s32 backCost = 0;
+                    const bool back = ShadowNear(mPlanNodes[0], 40, nullptr, &backCost) && arrives(endAt) >= frames + backCost + 60;
+                    bool onward = false;
+                    std::vector<s32> on;
+                    // (as the map is, whatever is shut now: the thing to do may be what opens the way on)
+                    const NavGraph::EdgeCost plain = [](const NavEdge& e) -> s32
+                    {
+                        return e.mCost;
+                    };
+                    if (!back && mPlanNodes.size() > 1 && mPlanNodes[1] >= 0 && nav.FindPath(mPlanNodes[0], mPlanNodes[1], plain, on))
+                    {
+                        s32 onCost = 0;
+                        s32 onAt = endAt;
+                        for (s32 edge : on)
+                        {
+                            const NavNode& n = nav.Nodes()[nav.Edges()[edge].mTo];
+                            s32 place = 0;
+                            s32 off = 0;
+                            TrackAt(nav.Input(), n.mX, n.mY - 40, place, total, &off);
+                            if (off > 300)
+                            {
+                                break;
+                            }
+                            onCost += nav.Edges()[edge].mCost;
+                            onAt = place;
+                        }
+                        onward = arrives(endAt) >= frames + 60 && arrives(onAt) >= frames + onCost + 60 && (at - abeAt) * (at - onAt) >= 0;
+                    }
+                    if (!back && !onward)
+                    {
+                        mFlierWhy = "at " + std::to_string(at) + " going " + std::to_string(dir) + ", he at " + std::to_string(abeAt) + ": the next thing at " + std::to_string(endAt) + " takes " + std::to_string(frames) + " frames and " + std::to_string(backCost) + " back, it is there in " + std::to_string(arrives(endAt)) + (on.empty() ? ", no way on" : ", way on of " + std::to_string(on.size()));
+                        return true;
+                    }
+                }
+            }
+        }
+        // (where he sets out from he has left at once: only where he ends up counts, which it gets to later
+        // than where he is if it comes from behind him)
+        // On the stretch already (within a few cells of it), it meets him on it
+        if (arrives(endAt) < frames + 60 || (at >= std::min(abeAt, endAt) - 75 && at <= std::max(abeAt, endAt) + 75))
+        {
+            mFlierWhy = "at " + std::to_string(at) + " going " + std::to_string(dir) + ", he at " + std::to_string(abeAt) + ": the stretch to " + std::to_string(endAt) + " takes " + std::to_string(frames) + " frames, it is there in " + std::to_string(arrives(endAt));
+            return true;
+        }
+    }
+    return false;
+}
+
+std::unique_ptr<Task> Bot::MakeFlee()
+{
+    // A Slig awake right next to him on his floor, out in the open (he came down beside one that slept, and the
+    // landing woke it): it takes a while to come round and shoot, enough to get off its floor if a way is at
+    // hand (a well, a hoist). Chanting there is too slow: measured, he is shot 50 frames before it takes.
+    // (One that waits before it shoots is run from instead, on along the way: see GoToTask.)
+    if (mAmbushes < 8)
+    {
+        const NavGraph& nav = mKnow->mNav;
+        const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);
+        const s32 node = AbeNode();
+        const bool hidden = node >= 0 && nav.Nodes()[node].mHidden;
+        for (const SligAt& slig : mWorld.mSligs)
+        {
+            const s32 near = mAbe.mHalfScale ? 100 : 200;
+            if (node < 0 || hidden || slig.mAsleep || slig.mPossessed || slig.mSightDelay >= World::kOutrunDelay || slig.mHalf != mAbe.mHalfScale || std::abs(slig.mY - mAbe.mY) > 45 || std::abs(slig.mX - mAbe.mX) >= near || nav.CameraOf(slig.mX, slig.mY - 5) != cam)
+            {
+                continue;
+            }
+            const NavGraph* graph = &nav;
+            const s32 floorY = mAbe.mY;
+            const auto away = [graph, floorY](s32 n)
+            {
+                return std::abs(graph->Nodes()[n].mY - floorY) > 45;
+            };
+            std::vector<s32> way;
+            if (nav.FindPath(node, away, EdgeCostFn(), way) && way.size() <= 5)
+            {
+                bool quick = true;
+                for (s32 edge : way)
+                {
+                    const EdgeKind kind = nav.Edges()[edge].mKind;
+                    quick = quick && (kind == EdgeKind::eWalk || kind == EdgeKind::eWell || kind == EdgeKind::eHoistUp);
+                }
+                if (quick)
+                {
+                    mAmbushes++;
+                    Log("a Slig is awake next to Abe at " + std::to_string(slig.mX) + "," + std::to_string(slig.mY) + ": off its floor before it shoots");
+                    auto go = std::make_unique<GoToTask>("off the floor of the Slig that woke", away);
+                    // (no creeping: it is awake already, and has him in a second or two)
+                    go->SetHurry(true);
+                    return go;
+                }
+            }
+        }
+    }
+    return nullptr;
+}
+
 std::unique_ptr<Task> Bot::MakeReflex()
 {
-    if (!mAuto || !mAbe.Settled() || !mAbe.mOnGround || mAbe.mTransition)
+    if (!mAuto || !mAbe.mOnGround || mAbe.mTransition)
     {
         return nullptr;
+    }
+    if (!mAbe.Settled())
+    {
+        // In mid step only what can't wait: a Slig that has just woken beside him
+        const bool stepping = mAbe.mMove == Move::eWalk || mAbe.mMove == Move::eSneak || mAbe.mMove == Move::eRun;
+        return stepping ? MakeFlee() : nullptr;
     }
     // Slogs after him, and walls on this floor to fry them with
     if (SlogTrapTask::AnyAwake(mWorld) && mSlogTraps < 6)
@@ -1194,6 +1519,68 @@ std::unique_ptr<Task> Bot::MakeReflex()
             mSlogTraps++;
             Log("Slogs about and electric walls on switch " + std::to_string(setup.mSwitch) + " at " + std::to_string(setup.mX1) + ".." + std::to_string(setup.mX2) + ": luring them into those");
             return std::make_unique<SlogTrapTask>(setup);
+        }
+    }
+    // A flying Slig that is coming, or is where he has to go: into an invisible zone, if one is near on this
+    // floor, and there until it has gone by and is behind him. (It only sees what is on its screen, in front of
+    // it and not in such a zone: FlyingSlig::CanChase.)
+    if (!mWorld.mFliers.empty() && FlierThreat() && mFlierHides < 40)
+    {
+        const NavGraph& nav = mKnow->mNav;
+        const s32 node = AbeNode();
+        if (node >= 0 && nav.Nodes()[node].mHidden)
+        {
+            return std::make_unique<HideTask>();
+        }
+        const NavGraph* graph = &nav;
+        const auto shadow = [graph](s32 n)
+        {
+            return graph->Nodes()[n].mHidden;
+        };
+        std::vector<s32> way;
+        if (ShadowNear(node, 40, &way, nullptr))
+        {
+            mFlierHides++;
+            Log("a flying Slig is about at " + std::to_string(mWorld.mFliers[0].mX) + "," + std::to_string(mWorld.mFliers[0].mY) + ": into the invisible zone " + std::to_string(way.size()) + " cells off until it has gone by");
+            return std::make_unique<GoToTask>("into an invisible zone", shadow);
+        }
+    }
+    if (std::unique_ptr<Task> flee = MakeFlee())
+    {
+        return flee;
+    }
+    // Sligs awake on his screen, all of them on another level than his (they can't see him there), and no
+    // security orb: one is taken over from where he stands, shoots the rest and bursts. Left alone they shoot
+    // out of the screen at him as soon as he is in front of them at full size.
+    if (mPerchKills < 6)
+    {
+        const NavGraph& nav = mKnow->mNav;
+        const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);
+        bool can = mAbe.mMove == Move::eIdle;
+        for (const Entity& e : mWorld.mEntities)
+        {
+            can = can && !(e.mKind == EntityKind::eSecurityOrb && nav.CameraOf(e.mX1, e.mY1) == cam);
+        }
+        s32 below = 0;
+        for (const SligAt& slig : mWorld.mSligs)
+        {
+            if (slig.mPossessed || nav.CameraOf(slig.mX, slig.mY - 5) != cam)
+            {
+                continue;
+            }
+            if (slig.mHalf != mAbe.mHalfScale)
+            {
+                continue;
+            }
+            // (a chant wakes one that sleeps, and one on his own level sees him)
+            can = can && !slig.mAsleep && std::abs(slig.mY - mAbe.mY) > (mAbe.mHalfScale ? 35 : 45);
+            below++;
+        }
+        if (can && below > 0)
+        {
+            mPerchKills++;
+            Log(std::to_string(below) + " Slig(s) awake on this screen and none on Abe's level: taking one over from here");
+            return ClearSligTask::Ambush();
         }
     }
     // Wired Mudokons follow on their own and laugh, which wakes Sligs: a slap sorts them out, where the gas that
@@ -1305,6 +1692,11 @@ void Bot::Think(BaseMap& map)
             }
             Log(std::string(step.mKind == TaskStep::Kind::eDone ? "done: " : "gave up: ") + mReflex->Name() + (step.mWhy.empty() ? "" : ": " + step.mWhy));
             mReflex.reset();
+            mReflexesRun++;
+            // What was being done is planned anew from where he is now
+            mTask.reset();
+            mTaskAction.clear();
+            mKeptPlan.clear();
             continue;
         }
         // A person doesn't press the next button the frame the last move ends
@@ -1391,6 +1783,26 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         GameView::ReadWorld(map, mWorld);
     }
 
+    // The way a flying Slig goes along its track (kept while it waits at an end of it)
+    if (mWorld.mFliers.empty())
+    {
+        mFlierDir = 0;
+        mFlierAt = -1;
+    }
+    else
+    {
+        s32 at = 0;
+        s32 total = 0;
+        if (TrackAt(mKnow->mNav.Input(), mWorld.mFliers[0].mX, mWorld.mFliers[0].mY, at, total))
+        {
+            if (mFlierAt >= 0 && at != mFlierAt)
+            {
+                mFlierDir = at > mFlierAt ? 1 : -1;
+            }
+            mFlierAt = at;
+        }
+    }
+
     // Where the Sligs walk, as it shows
     for (const SligAt& slig : mWorld.mSligs)
     {
@@ -1457,7 +1869,7 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         }
         if (awake > mLastAwakeSligs && mPilotActive && mPilotForTask && mAuto && mAbe.mOnGround)
         {
-            mPilot.Start(Prim::Wait(8), mAbe);
+            mPilot.Start(Prim::Wait(2), mAbe);
         }
         mLastAwakeSligs = awake;
         if (sligs != mLastSligs)

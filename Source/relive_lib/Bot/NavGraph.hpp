@@ -38,6 +38,8 @@ enum class FeatureKind : u8
                   // the way (see GoToTask)
     eTrapDoor,    // floor along its rectangle's top while it is shut. Open while switch mSwitch is on if
                   // mStartClosed, else while it is off
+    eTeleporter,  // whoever stands in it when its switch mSwitch changes (a lever at it does that) is put in the
+                  // one with id mB in camera mDestCamera. mA: its own id
 };
 
 // Something in the map that changes where Abe can go. From the path's TLVs, see GameView.
@@ -93,6 +95,7 @@ enum class EdgeKind : u8
     eHoistDown,
     eDoor,
     eWell,
+    eTeleport,  // pull the lever of the teleporter he stands in: he is put in the one it leads to
 };
 
 const char* EdgeKindName(EdgeKind kind);
