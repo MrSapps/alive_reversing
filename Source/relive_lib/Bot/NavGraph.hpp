@@ -44,6 +44,7 @@ enum class FeatureKind : u8
                   // 1), opened by chanting, hopped into from the side mDir (0 from its left, 1 from its right).
                   // It lets him out at the ePortalExit in camera mDestCamera
     ePortalExit,
+    ePlate,       // a foot switch: stepping on it does mA to switch mSwitch (0 on, 1 off, 2 the other way)
 };
 
 // Something in the map that changes where Abe can go. From the path's TLVs, see GameView.
@@ -136,6 +137,8 @@ struct NavEdge final
     s32 mClear = -1;
     // The lift stop (its feature) over whose shaft it jumps: only while the lift is away from it
     s32 mShaft = -1;
+    // A fall off a floor's end under something too low to walk off under: crouched first, and rolled off
+    bool mCrouched = false;
 };
 
 // A grid cell of floor Abe can stand on
@@ -240,9 +243,14 @@ private:
     bool IsFloor(const NavLine& line, bool half) const;
     // height: how far above the floor to look (0: at standing and at crouching height)
     bool WallBetween(s32 xa, s32 xb, s32 y, bool half, s32 height = 0) const;
+    // A hoist's top is at this cell: down held here climbs down it
+    bool HoistTopAt(const NavNode& n) const;
     bool CeilingOver(s32 x, s32 y, bool half) const;
     // overLift: the jumps there are over a lift's shaft when the lift is away (the edge's feature is the stop)
     void AddRunJumps(std::vector<NavEdge>& edges, s32 from, s32 dir, bool overLift = false) const;
+    // From a ledge too short for that run-up: over a gap to the hoist at the edge of the ledge across, which he
+    // catches and pulls himself up by
+    void AddLedgeCatches(std::vector<NavEdge>& edges, s32 from, s32 dir) const;
     s32 BarrierBetween(s32 xa, s32 xb, s32 y, bool half) const;
     const NavFeature* FeatureAt(FeatureKind kind, s32 x, s32 y, bool half, s32* index = nullptr) const;
     void AddEdge(std::vector<NavEdge>& edges, s32 from, s32 to, EdgeKind kind, s32 cost, s32 feature, bool left) const;

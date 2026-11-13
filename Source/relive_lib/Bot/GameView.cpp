@@ -17,6 +17,7 @@
 #include "../../AliveLibAE/Drill.hpp"
 #include "../../AliveLibAE/MotionDetector.hpp"
 #include "../../AliveLibAE/Slig.hpp"
+#include "../../AliveLibAE/Slog.hpp"
 #include "../../AliveLibAE/SlapLock.hpp"
 #include "../../AliveLibAE/DDCheat.hpp"
 #include "../../AliveLibAO/Mudokon.hpp"
@@ -272,6 +273,16 @@ static NavFeature MakeFeature(FeatureKind kind, const relive::Path_TLV& tlv, s32
     return f;
 }
 
+static s32 OpOf(relive::reliveSwitchOp op)
+{
+    switch (op)
+    {
+        case relive::reliveSwitchOp::eSetTrue: return 0;
+        case relive::reliveSwitchOp::eSetFalse: return 1;
+        default: return 2;
+    }
+}
+
 static s32 DirOf(s32 grabDirection)
 {
     // eFacingLeft, eFacingRight, eFacingAnyDirection in both Path_Hoist and Path_Edge
@@ -469,6 +480,19 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                     in.mFeatures.push_back(f);
                     break;
                 }
+                case ReliveTypes::eFootSwitch:
+                {
+                    if (GetGameType() == GameType::eAe)
+                    {
+                        const auto& t = static_cast<const relive::Path_FootSwitch&>(tlv);
+                        NavFeature f = MakeFeature(FeatureKind::ePlate, tlv, camera, id);
+                        f.mHalf = t.mScale == relive::reliveScale::eHalf;
+                        f.mSwitch = t.mSwitchId;
+                        f.mA = OpOf(t.mAction);
+                        in.mFeatures.push_back(f);
+                    }
+                    break;
+                }
                 case ReliveTypes::eSlamDoor:
                 {
                     const auto& t = static_cast<const relive::Path_SlamDoor&>(tlv);
@@ -566,15 +590,6 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
     return in;
 }
 
-static s32 OpOf(relive::reliveSwitchOp op)
-{
-    switch (op)
-    {
-        case relive::reliveSwitchOp::eSetTrue: return 0;
-        case relive::reliveSwitchOp::eSetFalse: return 1;
-        default: return 2;
-    }
-}
 
 static void BuildEntities(BinaryPath& path, World& world)
 {
@@ -586,6 +601,9 @@ static void BuildEntities(BinaryPath& path, World& world)
     world.mScrabsKilled.clear();
     world.mLocksSlapped.clear();
     world.mScrabParked.clear();
+    world.mScrabBoundsLeft.clear();
+    world.mScrabBoundsRight.clear();
+    world.mSlogSpawners.clear();
     for (auto& cam : path.GetCameras())
     {
         if (!cam)
@@ -771,6 +789,15 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mOp = OpOf(t.mAction);
                     break;
                 }
+                case ReliveTypes::eSlogSpawner:
+                    world.mSlogSpawners.push_back({(tlv.mTopLeftX + tlv.mBottomRightX) / 2, tlv.mBottomRightY, static_cast<const relive::Path_SlogSpawner&>(tlv).mSpawnerSwitchId});
+                    break;
+                case ReliveTypes::eScrabBoundLeft:
+                    world.mScrabBoundsLeft.push_back({(tlv.mTopLeftX + tlv.mBottomRightX) / 2, tlv.mBottomRightY});
+                    break;
+                case ReliveTypes::eScrabBoundRight:
+                    world.mScrabBoundsRight.push_back({(tlv.mTopLeftX + tlv.mBottomRightX) / 2, tlv.mBottomRightY});
+                    break;
                 case ReliveTypes::eScrab:
                     e.mKind = EntityKind::eScrab;
                     keep = GetGameType() == GameType::eAe;
@@ -1205,6 +1232,19 @@ void GameView::ReadWorld(BaseMap& map, World& world)
     }
 
     world.mSlogs.clear();
+    // The switch that where Abe stands is about to set (an invisible switch sets its own a few frames after he
+    // is in it): a Slog that this sets on him is as good as awake
+    s32 soonOn = -1;
+    if (isAe && gAbe)
+    {
+        const s16 ax = static_cast<s16>(FP_GetExponent(gAbe->mXPos));
+        const s16 ay = static_cast<s16>(FP_GetExponent(gAbe->mYPos));
+        if (relive::Path_TLV* pTlv = map.VTLV_Get_At_Of_Type(ax, ay, ax, ay, ReliveTypes::eInvisibleSwitch).GetTlv())
+        {
+            soonOn = static_cast<relive::Path_InvisibleSwitch*>(pTlv)->mSwitchId;
+        }
+    }
+    world.mSoonOn = soonOn;
     for (s32 i = 0; i < gBaseAliveGameObjects->Size(); i++)
     {
         BaseAliveGameObject* pObj = gBaseAliveGameObjects->ItemAt(i);
@@ -1215,6 +1255,9 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             slog.mY = FP_GetExponent(pObj->mYPos);
             // Motion_15_Sleeping in AE, Motion_16_Sleeping in AO
             slog.mAsleep = pObj->VGetMotion(eMotionType::eCurrentMotion) == (isAe ? 15 : 16);
+            slog.mFacesLeft = pObj->GetAnimation().GetFlipX();
+            const s32 anger = isAe ? static_cast<::Slog*>(pObj)->AngerSwitchId() : 0;
+            slog.mWaking = slog.mAsleep && anger > 1 && (SwitchStates_Get(anger) != 0 || anger == soonOn);
             world.mSlogs.push_back(slog);
         }
     }

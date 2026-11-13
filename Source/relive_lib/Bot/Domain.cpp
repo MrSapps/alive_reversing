@@ -973,7 +973,15 @@ bool Domain::WallBetween(const NavGraph& nav, s32 x1, s32 x2, s32 y, bool half)
     for (const NavLine& line : nav.Input().mLines)
     {
         const bool wall = half ? (line.mType == 5 || line.mType == 6) : (line.mType == 1 || line.mType == 2);
-        if (wall && line.mX1 == line.mX2 && line.mX1 > std::min(x1, x2) && line.mX1 < std::max(x1, x2) && std::min(line.mY1, line.mY2) <= y - 20 / scale && std::max(line.mY1, line.mY2) >= y - 5)
+        if (!wall || line.mX1 != line.mX2 || line.mX1 <= std::min(x1, x2) || line.mX1 >= std::max(x1, x2))
+        {
+            continue;
+        }
+        const s32 top = std::min(line.mY1, line.mY2);
+        const s32 bottom = std::max(line.mY1, line.mY2);
+        // (one that stands on the floor, or the side of a block that hangs lower than a Scrab is tall: Scrab.cpp
+        // looks for walls 45 px over its feet. Abe rolls under such a block and the Scrab after him is stopped.)
+        if ((top <= y - 20 / scale && bottom >= y - 5) || (top <= y - 45 / scale && bottom >= y - 45 / scale))
         {
             return true;
         }
@@ -1377,6 +1385,31 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         {
             pre.push_back({Key::Switch(condSwitch), condValue});
         }
+        // A teleporter whose switch is made of others (the Mudanchee trial's last: on when three locks are slapped
+        // and its plate is stood on): those that nothing in it sets have to be on first
+        if (e.mKind == EdgeKind::eTeleport && e.mFeature >= 0)
+        {
+            const NavFeature& tele = nav.Input().mFeatures[e.mFeature];
+            for (const Entity& logic : world.mEntities)
+            {
+                if (logic.mKind != EntityKind::eSwitchLogic || logic.mSwitch != tele.mSwitch || tele.mSwitch <= 1)
+                {
+                    continue;
+                }
+                for (s32 in : logic.mInputs)
+                {
+                    bool own = in <= 1;
+                    for (const Entity& plate : world.mEntities)
+                    {
+                        own = own || (plate.mKind == EntityKind::eFootSwitch && plate.mSwitch == in && plate.CentreX() >= tele.mX1 && plate.CentreX() <= tele.mX2 && plate.mY2 >= tele.mY1 && plate.mY2 <= tele.mY2 + 12);
+                    }
+                    if (!own && std::find(pre.begin(), pre.end(), Goap::Fact{Key::Switch(in), 1}) == pre.end())
+                    {
+                        pre.push_back({Key::Switch(in), 1});
+                    }
+                }
+            }
+        }
         // Onto a floor a loose Scrab can get at him on (off one is fine): only unseen, or with a gate shut
         // between them. And onto one that only a shut gate keeps a Scrab from: with that gate still shut, or unseen.
         std::vector<Goap::Fact> other;
@@ -1441,6 +1474,91 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         }
         add("Cross " + std::string(EdgeKindName(e.mKind)) + " " + std::to_string(nav.Nodes()[e.mFrom].mX) + "," + std::to_string(nav.Nodes()[e.mFrom].mY) + "->" + std::to_string(nav.Nodes()[e.mTo].mX) + "," + std::to_string(nav.Nodes()[e.mTo].mY),
             pre, {regionFact(e.mTo)}, 100 + e.mCost + (both ? unseen(pre) : 0), step);
+        // Or seen, onto the Scrab's floor and straight off it: to a cell of that floor a few along which the
+        // Scrab can't get to (behind a wall, or under a block too low for it), timed against the Scrab
+        // (`ScrabWaryTask`). The Mudanchee trial: "once you land, run and roll to the left".
+        if (unseen(pre) != 0 && !both)
+        {
+            const NavNode& landing = nav.Nodes()[e.mTo];
+            const s32 cell = NavGraph::GridStep(landing.mHalf);
+            s32 through = -1;
+            const auto safe = [&](s32 n)
+            {
+                return !nav.Nodes()[n].mHazard && !ScrabReaches(nav, world, nav.Nodes()[n].mX, nav.Nodes()[n].mY, nav.Nodes()[n].mHalf, false);
+            };
+            // (along its floor, by a teleporter of that floor too, and through a gate a plate before it opens)
+            {
+                std::vector<s32> steps(nav.Nodes().size(), -1);
+                std::vector<s32> queue{e.mTo};
+                steps[e.mTo] = 0;
+                for (std::size_t q = 0; q < queue.size() && through < 0; q++)
+                {
+                    const s32 n = queue[q];
+                    const NavNode& at = nav.Nodes()[n];
+                    if (n != e.mTo && steps[n] <= 30 && safe(n))
+                    {
+                        through = n;
+                        // (past the plate that shuts the gate behind him, if there is one just beyond it)
+                        for (const NavFeature& plate : nav.Input().mFeatures)
+                        {
+                            const s32 px = (plate.mX1 + plate.mX2) / 2;
+                            // (one that works a gate he has come through)
+                            bool gateBefore = false;
+                            for (const NavFeature& gate : nav.Input().mFeatures)
+                            {
+                                const s32 gx = (gate.mX1 + gate.mX2) / 2;
+                                gateBefore = gateBefore || (gate.mKind == FeatureKind::eBarrier && gate.mSwitch == plate.mSwitch && gx > std::min(landing.mX, px) && gx < std::max(landing.mX, px));
+                            }
+                            const s32 past = gateBefore && plate.mKind == FeatureKind::ePlate && plate.mHalf == at.mHalf && std::abs(plate.mY2 - at.mY) <= 30 && std::abs(px - at.mX) <= 5 * cell ?
+                                                 nav.NodeAt(px + (px >= at.mX ? cell : -cell), at.mY, at.mHalf, 5) :
+                                                 -1;
+                            if (past >= 0 && nav.Nodes()[past].mLine == at.mLine && safe(past))
+                            {
+                                through = past;
+                            }
+                        }
+                        break;
+                    }
+                    if (steps[n] >= 30)
+                    {
+                        continue;
+                    }
+                    for (s32 j = at.mFirstEdge; j < at.mFirstEdge + at.mEdgeCount && through < 0; j++)
+                    {
+                        const NavEdge& on = edges[j];
+                        if (nav.Condition(on, nullptr, nullptr))
+                        {
+                            continue;
+                        }
+                        // (off it there by a well or up a ledge)
+                        if ((on.mKind == EdgeKind::eWell || on.mKind == EdgeKind::eHoistUp) && nav.Nodes()[on.mTo].mLine != landing.mLine && steps[n] <= 12 && safe(on.mTo))
+                        {
+                            through = on.mTo;
+                        }
+                        else if ((on.mKind == EdgeKind::eWalk || on.mKind == EdgeKind::eRoll || on.mKind == EdgeKind::eTeleport) && nav.Nodes()[on.mTo].mLine == landing.mLine && steps[on.mTo] < 0)
+                        {
+                            steps[on.mTo] = steps[n] + 1;
+                            queue.push_back(on.mTo);
+                        }
+                    }
+                }
+            }
+            if (through >= 0)
+            {
+                std::vector<Goap::Fact> seenPre;
+                for (const Goap::Fact& f : pre)
+                {
+                    if (!(f == Goap::Fact{Key::kInvisNow, 1}))
+                    {
+                        seenPre.push_back(f);
+                    }
+                }
+                DomainStep timed = step;
+                timed.mOther = static_cast<u32>(through) + 1;
+                add("Cross " + std::string(EdgeKindName(e.mKind)) + " " + std::to_string(nav.Nodes()[e.mFrom].mX) + "," + std::to_string(nav.Nodes()[e.mFrom].mY) + "->" + std::to_string(landing.mX) + "," + std::to_string(landing.mY) + " and on to " + std::to_string(nav.Nodes()[through].mX) + " past the Scrab",
+                    seenPre, {regionFact(through)}, 700 + e.mCost, timed);
+            }
+        }
     }
 
     // The locks Fleeches guard that can be got at by leading them off, worked out first: a lever that lets them
@@ -1844,6 +1962,31 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                             {
                                 pre.push_back({Key::kInvisNow, 1});
                             }
+                        }
+                    }
+                    // At a place a Slig watches, a security orb on its screen (no chant there, so it is not taken
+                    // over): unseen (the Mudanchee trial: "turn invisible and climb up. Go right and slap the 2
+                    // Ghost Locks")
+                    if (node >= 0 && std::find(pre.begin(), pre.end(), Goap::Fact{Key::kInvisNow, 1}) == pre.end() && !(entity.mKind == EntityKind::eSlapLock && entity.mInputs[0] > 0))
+                    {
+                        const NavNode& at = nav.Nodes()[node];
+                        bool watched = false;
+                        for (const SligAt& slig : world.Threats())
+                        {
+                            if (slig.mAsleep || slig.mPossessed || slig.mHalf != at.mHalf || std::abs(slig.mY - at.mY) > 45 || std::abs(slig.mX - at.mX) >= 450)
+                            {
+                                continue;
+                            }
+                            for (const Entity& orb : world.mEntities)
+                            {
+                                // (its screen or the thing's: its beat may cross both)
+                                watched = watched || (orb.mKind == EntityKind::eSecurityOrb && !orb.mGone &&
+                                                      (nav.CameraOf(orb.mX1, orb.mY1) == nav.CameraOf(slig.mX, slig.mY - 5) || nav.CameraOf(orb.mX1, orb.mY1) == nav.CameraOf(at.mX, at.mY - 5)));
+                            }
+                        }
+                        if (watched)
+                        {
+                            pre.push_back({Key::kInvisNow, 1});
                         }
                     }
                     // (one that opens such a gate by way of something else, a timer in the Mudanchee vault's path 4,

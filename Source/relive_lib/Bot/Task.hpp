@@ -253,6 +253,8 @@ private:
     s32 mHiding = 0;
     // Chants at a bird portal that has not opened yet
     s32 mPortalChants = 0;
+    // Tries at a teleporter that goes off when its plate is stood on
+    s32 mPlateSteps = 0;
     // Steps spent waiting for a Slurg to get out of the way
     s32 mSlurgWaits = 0;
     bool mFleechAwakeHere = false;
@@ -264,6 +266,7 @@ private:
     s32 mUnseenWaits = 0;
     // Chants made to go invisible
     s32 mInvisChants = 0;
+    s32 mInvisWaits = 0;
     // Frames spent waiting for a drill to be out of the way
     s32 mSweepWait = 0;
     // Pulling the lever that stops the drill in the way
@@ -898,7 +901,10 @@ public:
     // this task: he is out of the Scrabs' sight now, the way leads over such a floor, and its first stint can be
     // done in the time the Scrab gives when it is at the far end of its beat
     // note: what was found, for the log
-    static bool Wanted(const Bot& bot, s32 goal, u32 entity, std::string* note = nullptr);
+    // (chased: a crossing that is the only way on with something after him; Fleeches awake don't rule it out)
+    // The cells a loose Scrab can get at him on. waitingOnly: only those of Scrabs that wait before they strike.
+    static std::vector<char> Hot(const Bot& bot, bool waitingOnly = false);
+    static bool Wanted(const Bot& bot, s32 goal, u32 entity, std::string* note = nullptr, bool chased = false);
 
 private:
     struct Stint final
@@ -936,8 +942,6 @@ private:
     static Stint PlanOnce(const Bot& bot, s32 cur, s32 target, bool use, s32 face, s32 drop, const std::vector<char>& hot, bool best, const std::set<s32>& banned);
     // The same for a cell or for an entity, which may have two sides to use it from: the one that leaves most time
     static Stint PlanFor(const Bot& bot, s32 cur, s32 goal, const Entity* entity, const std::vector<char>& hot, bool best);
-    // The cells a loose Scrab can get at him on. waitingOnly: only those of Scrabs that wait before they strike.
-    static std::vector<char> Hot(const Bot& bot, bool waitingOnly = false);
     static std::vector<Domain::LooseScrab> Scrabs(const World& world, bool waitingOnly = false);
     // The frames to spare with the Scrabs where they are (negative: not enough), or with each put at the end
     // of its beat that suits best
@@ -977,6 +981,74 @@ public:
 private:
     s32 mFrames = 0;
     s32 mClear = 0;
+};
+
+// Off the floor of a Slog that is after him, by the nearest way that leads away from it. Coming down next to one,
+// the run starts in the air: with the way held as he lands he runs at once, and the landing is nine frames
+// shorter (measured in the Mudanchee trial: the Slog has him on the hoist otherwise).
+class SlogFleeTask final : public Task
+{
+public:
+    SlogFleeTask(s32 refuge, bool left, s32 fromX)
+        : mRefuge(refuge)
+        , mLeft(left)
+        , mFromX(fromX)
+    {
+    }
+    std::string Name() const override
+    {
+        return "Off the Slog's floor";
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    s32 mRefuge = -1;
+    bool mLeft = false;
+    // Where on its floor the way off starts
+    s32 mFromX = 0;
+    s32 mHeld = 0;
+    std::unique_ptr<GoToTask> mGo;
+};
+
+// Slogs gathering behind a gate on Abe's floor that will open (the Mudanchee trial: a spawner behind three timed
+// doors), and a Slig on another floor of his screen with a teleporter that brings it to his: Abe stands behind
+// where it comes out, takes it over, runs it to the teleporter and stands it in front of him, facing the gate. It
+// shoots what comes out, in bursts (held, the recoil walks it back into Abe, who is then in front of the gun),
+// and is burst when no more come.
+class SlogGuardTask final : public Task
+{
+public:
+    struct Setup final
+    {
+        s32 mSligX = 0;
+        s32 mSligY = 0;
+        // Where on the Slig's floor its teleporter takes it, and where on Abe's floor it comes out
+        s32 mPlateX = 0;
+        s32 mArriveX = 0;
+        // 1: the Slogs come from the right
+        s32 mSide = 1;
+        // The cell Abe chants from
+        s32 mStand = -1;
+    };
+    static bool Find(const Bot& bot, Setup& setup);
+    explicit SlogGuardTask(const Setup& setup)
+        : mSetup(setup)
+    {
+    }
+    std::string Name() const override
+    {
+        return "Hold the Slogs off with a Slig";
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    Setup mSetup;
+    std::unique_ptr<GoToTask> mGo;
+    // 0 to the place, 1 chanting, 2 the Slig to its teleporter, 3 to its post, 4 on guard, 5 bursting it
+    s32 mPhase = 0;
+    s32 mFrames = 0;
+    s32 mQuiet = 0;
+    s32 mShot = 0;
 };
 
 // Slogs that run Abe down from a floor he can't get at them on: stand where they come down to him, run back
