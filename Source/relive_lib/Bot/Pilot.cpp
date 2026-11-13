@@ -288,6 +288,14 @@ PilotStatus Pilot::StepRoll(const AbeState& abe, u32& bits)
             }
             return PilotStatus::eRunning;
 
+        case Move::eRun:
+            // Already at a run that way (out of a landing with the way held): down into the roll from it
+            if (abe.mFacingLeft == left && !there)
+            {
+                bits = dirBit | Btn::eRun | Btn::eFartOrRoll;
+            }
+            return PilotStatus::eRunning;
+
         default:
             if (mStuck > 300)
             {

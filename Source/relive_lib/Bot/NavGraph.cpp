@@ -300,6 +300,18 @@ bool NavGraph::CeilingOver(s32 x, s32 y, bool half) const
     return false;
 }
 
+bool NavGraph::HoistTopAt(const NavNode& n) const
+{
+    for (const NavFeature& f : mInput.mFeatures)
+    {
+        if (f.mKind == FeatureKind::eHoist && (f.mAnyScale || f.mHalf == n.mHalf) && n.mX >= f.mX1 - 2 && n.mX <= f.mX2 + 2 && std::abs(f.mY1 - n.mY) <= 12)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool NavGraph::WallBetween(s32 xa, s32 xb, s32 y, bool half, s32 height) const
 {
     const s32 lo = std::min(xa, xb);
@@ -410,6 +422,25 @@ bool NavGraph::Condition(const NavEdge& edge, s32* switchId, s32* openValue) con
     {
         // Shut to start with: open once its switch is on. Else open until it is.
         value = f.mStartClosed ? 1 : 0;
+        // A plate on the floor just before it, on the side he comes from, that opens it as he steps on it: no
+        // condition from that side (the Mudanchee trial: "as you run over the pressure plates, you'll open then
+        // close the gate behind you")
+        const NavNode& from = mNodes[edge.mFrom];
+        const NavNode& to = mNodes[edge.mTo];
+        const s32 gx = (f.mX1 + f.mX2) / 2;
+        const s32 cell = GridStep(from.mHalf);
+        if (f.mSolid && from.mHalf == to.mHalf && edge.mKind == EdgeKind::eWalk)
+        {
+            for (const NavFeature& plate : mInput.mFeatures)
+            {
+                const s32 px = (plate.mX1 + plate.mX2) / 2;
+                if (plate.mKind == FeatureKind::ePlate && plate.mSwitch == f.mSwitch && plate.mHalf == from.mHalf && plate.mA == (value == 1 ? 0 : 1) && std::abs(plate.mY2 - from.mY) <= 30 &&
+                    (px < from.mX) == (to.mX > from.mX) && px != from.mX && std::abs(px - gx) <= 5 * cell && std::abs(px - gx) >= cell)
+                {
+                    return false;
+                }
+            }
+        }
     }
     else if (f.mKind == FeatureKind::eDoor && edge.mKind == EdgeKind::eDoor && f.mStartClosed && f.mSwitch > 1)
     {
@@ -870,6 +901,53 @@ void NavGraph::AddRunJumps(std::vector<NavEdge>& edges, s32 from, s32 dir, bool 
     }
 }
 
+void NavGraph::AddLedgeCatches(std::vector<NavEdge>& edges, s32 from, s32 dir) const
+{
+    // Measured in the Mudanchee trial's last room: from a stand at 37,100 on a ledge that ends at 62, turned, one
+    // cell run and off at 62, he caught the hoist at 187,100 five cells on (the run jump goes as far whatever the
+    // run before it was). The two ledges there are the walkthrough's way to keep clear of the Fleeches: "jump
+    // across to the far ledge, pull up".
+    const NavNode& n = mNodes[from];
+    const s32 step = GridStep(n.mHalf);
+    const s32 takeoff = StepX(n.mX, dir, n.mHalf);
+    const s32 off = NodeOnLine(n.mLine, takeoff);
+    if (off < 0 || std::abs(mNodes[off].mX - takeoff) > step / 2 || mNodes[off].mHazard || mNodes[off].mLow || n.mLow || WallBetween(n.mX, takeoff, n.mY, n.mHalf))
+    {
+        return;
+    }
+    const s32 y = mNodes[off].mY;
+    s32 x = takeoff;
+    for (s32 k = 1; k <= kRunJumpLedgeCells; k++)
+    {
+        const s32 nx = StepX(x, dir, n.mHalf);
+        if (WallBetween(x, x + dir * step, y, n.mHalf) || CeilingOver(nx, y, n.mHalf))
+        {
+            return;
+        }
+        x = nx;
+        s32 fy = 0;
+        const s32 line = FloorNear(x, y, n.mHalf, 12, &fy);
+        const s32 node = line >= 0 ? NodeOnLine(line, x) : -1;
+        const bool floor = node >= 0 && std::abs(mNodes[node].mX - x) <= step / 2;
+        if (k < kRunJumpLedgeCells)
+        {
+            // (nothing under the flight)
+            if (floor)
+            {
+                return;
+            }
+            continue;
+        }
+        s32 hoistIdx = -1;
+        const NavFeature* hoist = FeatureAt(FeatureKind::eHoist, x, y + 16, n.mHalf, &hoistIdx);
+        if (floor && !mNodes[node].mHazard && hoist && (hoist->mDir == 2 || (hoist->mDir == 0) == (dir < 0)) && std::abs(hoist->mY1 - y) <= 12)
+        {
+            AddEdge(edges, from, node, EdgeKind::eRunJump, kRunJumpCost, hoistIdx, dir < 0);
+            edges.back().mX = takeoff;
+        }
+    }
+}
+
 void NavGraph::Build(const NavInput& input)
 {
     mInput = input;
@@ -1017,13 +1095,32 @@ void NavGraph::Build(const NavInput& input)
                     AddEdge(edges, from, to, roll ? EdgeKind::eRoll : EdgeKind::eWalk, roll ? kRollCost : kWalkCost, BarrierBetween(n.mX, n.mX + dir * step, n.mY, n.mHalf), left);
                 }
             }
-            else if (!standingWall || n.mLow)
+            else if (!(standingWall && !n.mLow && HoistTopAt(n)))
             {
+                // (under a block that leaves room to roll, from a cell he can stand in: crouched there first. Not
+                // from the top of a hoist: down there is the way down the hoist.)
+                const bool crouched = standingWall && !n.mLow;
                 // (from under a low ceiling it is rolled off)
                 // Off the end of the floor
                 s32 height = 0;
                 const s32 belowLine = FloorBelow(nx, n.mY + 1, n.mHalf, &fy, &height);
                 bool deadly = belowLine < 0;
+                // (rolled off over a gap he clears it, where a floor two cells further out is under him: measured
+                // in the Mudanchee trial, off 587,360 to the right over the pit and down onto 662,460)
+                if (belowLine < 0 && (n.mLow || crouched))
+                {
+                    s32 farY = 0;
+                    s32 farHeight = 0;
+                    const s32 farX = nx + dir * 2 * step;
+                    const s32 farLine = FloorBelow(farX, n.mY + 1, n.mHalf, &farY, &farHeight);
+                    const s32 out = farLine >= 0 ? NodeOnLine(farLine, farX) : -1;
+                    if (out >= 0 && farHeight * (n.mHalf ? 2 : 1) >= 80 && farHeight * (n.mHalf ? 2 : 1) < 200 && std::abs(mNodes[out].mX - farX) <= step / 2 && !mNodes[out].mHazard &&
+                        !WallBetween(n.mX, farX, n.mY, n.mHalf, n.mHalf ? 10 : 20))
+                    {
+                        AddEdge(edges, from, out, EdgeKind::eFall, 20 + farHeight / 4 + (crouched ? 10 : 0), -1, left);
+                        edges.back().mCrouched = crouched;
+                    }
+                }
                 // A well on the floor he comes down on swallows him as he lands in it, however far he fell
                 // (rolled off he drifts a few cells on the way down)
                 bool intoWell = false;
@@ -1072,10 +1169,21 @@ void NavGraph::Build(const NavInput& input)
                     }
                     if (!deadly)
                     {
-                        const s32 to = NodeOnLine(belowLine, nx);
+                        s32 to = NodeOnLine(belowLine, nx);
+                        // (rolled off he keeps the roll's speed and comes down further out: measured in the
+                        // Mudanchee trial, off 862,360 to the right and 100 down, landing at 937 and not 887)
+                        if ((n.mLow || crouched) && height * (n.mHalf ? 2 : 1) >= 80 && height * (n.mHalf ? 2 : 1) < 200)
+                        {
+                            const s32 out = NodeOnLine(belowLine, nx + dir * 2 * step);
+                            if (out >= 0 && std::abs(mNodes[out].mX - (nx + dir * 2 * step)) <= step / 2 && !WallBetween(nx, nx + dir * 2 * step, fy, n.mHalf, n.mHalf ? 10 : 20))
+                            {
+                                to = out;
+                            }
+                        }
                         if (to >= 0 && (!mNodes[to].mHazard || mNodes[to].mClear >= 0))
                         {
-                            AddEdge(edges, from, to, EdgeKind::eFall, 20 + height / 4, -1, left);
+                            AddEdge(edges, from, to, EdgeKind::eFall, 20 + height / 4 + (crouched ? 10 : 0), -1, left);
+                            edges.back().mCrouched = crouched;
                         }
                     }
                 }
@@ -1087,6 +1195,7 @@ void NavGraph::Build(const NavInput& input)
             }
             AddRunJumps(edges, from, dir);
             AddRunJumps(edges, from, dir, true);
+            AddLedgeCatches(edges, from, dir);
 
             // A hop over a gap to a ledge on its far side, two to four cells off: he catches it as he passes or
             // drops. The game looks for a ledge from his feet to 75 over them, so one that much higher is caught
@@ -1317,7 +1426,17 @@ void NavGraph::Build(const NavInput& input)
             }
         }
 
-        if (const NavFeature* tele = FeatureAt(FeatureKind::eTeleporter, n.mX, n.mY, n.mHalf, &featureIdx))
+        const NavFeature* tele = FeatureAt(FeatureKind::eTeleporter, n.mX, n.mY, n.mHalf, &featureIdx);
+        // (one that a plate in it sets off: from the cells of the plate)
+        for (const NavFeature& plate : mInput.mFeatures)
+        {
+            if (tele && plate.mKind == FeatureKind::ePlate && plate.mSwitch == tele->mSwitch && plate.mHalf == tele->mHalf && (plate.mX1 + plate.mX2) / 2 >= tele->mX1 && (plate.mX1 + plate.mX2) / 2 <= tele->mX2 &&
+                std::abs(plate.mY2 - n.mY) <= 30 && (n.mX < plate.mX1 - 2 || n.mX > plate.mX2 + 2))
+            {
+                tele = nullptr;
+            }
+        }
+        if (tele)
         {
             for (const NavFeature& other : mInput.mFeatures)
             {
@@ -1325,7 +1444,13 @@ void NavGraph::Build(const NavInput& input)
                 {
                     s32 fy = 0;
                     const s32 cx = (other.mX1 + other.mX2) / 2;
-                    const s32 line = FloorBelow(cx, other.mY1 - 20, other.mHalf, &fy);
+                    // (the floor in its box, not one that its top touches: the Mudanchee trial has one right
+                    // under the floor of another)
+                    s32 line = FloorBelow(cx, other.mY1 + 5, other.mHalf, &fy);
+                    if (line < 0 || fy > other.mY2 + 12)
+                    {
+                        line = FloorBelow(cx, other.mY1 - 20, other.mHalf, &fy);
+                    }
                     AddEdge(edges, from, NodeOnLine(line, cx), EdgeKind::eTeleport, kWellCost, featureIdx, false);
                     break;
                 }
@@ -1370,6 +1495,23 @@ void NavGraph::Build(const NavInput& input)
         if (FeatureAt(FeatureKind::ePathExit, n.mX, n.mY, n.mHalf, &featureIdx) || FeatureAt(FeatureKind::ePathExit, n.mX, n.mY - 20, n.mHalf, &featureIdx))
         {
             mExits.push_back({from, featureIdx});
+        }
+        else
+        {
+            // Or one he drops into off the end of a floor (the Mudanchee trial: "drop off the edge")
+            const s32 step = GridStep(n.mHalf);
+            for (s32 dir = -1; dir <= 1; dir += 2)
+            {
+                const s32 next = NodeOnLine(n.mLine, n.mX + dir * step);
+                s32 fy = 0;
+                if ((next < 0 || std::abs(mNodes[next].mX - (n.mX + dir * step)) > step / 2) && !WallBetween(n.mX, n.mX + dir * step, n.mY, n.mHalf) &&
+                    FloorBelow(n.mX + dir * step, n.mY + 20, n.mHalf, &fy) < 0 &&
+                    (FeatureAt(FeatureKind::ePathExit, n.mX + dir * step, n.mY + 80, n.mHalf, &featureIdx) || FeatureAt(FeatureKind::ePathExit, n.mX + dir * step, n.mY + 140, n.mHalf, &featureIdx)))
+                {
+                    mExits.push_back({from, featureIdx});
+                    break;
+                }
+            }
         }
     }
 

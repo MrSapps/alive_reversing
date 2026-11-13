@@ -109,9 +109,19 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
     {
         case StepKind::eCross:
         {
-            const s32 to = mKnow->mNav.Edges()[step.mEdge].mTo;
+            // (or the cell past the Scrab's reach that a crossing onto its floor makes for)
+            const s32 to = step.mOther != 0 ? static_cast<s32>(step.mOther) - 1 : mKnow->mNav.Edges()[step.mEdge].mTo;
             std::string note;
-            const bool wary = ScrabWaryTask::Wanted(*this, to, 0, &note);
+            bool wary = ScrabWaryTask::Wanted(*this, to, 0, &note, step.mOther != 0);
+            // (with Fleeches awake a Scrab's floor is not waited at, unless there is no other way at all)
+            if (!wary && step.mOther == 0 && AbeNode() >= 0)
+            {
+                std::vector<s32> plain;
+                if (!mKnow->mNav.FindPath(AbeNode(), to, EdgeCostFn(), plain))
+                {
+                    wary = ScrabWaryTask::Wanted(*this, to, 0, &note, true);
+                }
+            }
             if (!note.empty())
             {
                 Log(note + (wary ? "" : ": not enough, so by the old way"));
@@ -636,6 +646,7 @@ bool Bot::Replan(BaseMap& map)
     mInvisSaved = false;
     mInvisChantNow = false;
     mInvisChantSoon = false;
+    mInvisAtOnce = false;
     mUnseenUse = 0;
     {
         bool orbs = false;
@@ -676,6 +687,26 @@ bool Bot::Replan(BaseMap& map)
             done += domain.mSteps[a.mTag].mKind == StepKind::eLogic ? 0 : 1;
         }
     }
+    // (in a path with orbs: got and used at once when the step at hand is the one that wants him unseen)
+    if (!mInvisSaved)
+    {
+        for (std::size_t i = 0; i < best.mSteps.size(); i++)
+        {
+            const Goap::Action& a = actions[best.mSteps[i]];
+            if (domain.mSteps[a.mTag].mKind == StepKind::eLogic)
+            {
+                continue;
+            }
+            if (std::find(a.mPre.begin(), a.mPre.end(), Goap::Fact{Key::kInvisNow, 1}) != a.mPre.end())
+            {
+                mInvisSaved = true;
+                mInvisChantNow = true;
+                mInvisChantSoon = true;
+                mInvisAtOnce = true;
+            }
+            break;
+        }
+    }
     mKeptPlan.clear();
     for (s32 stepIdx : best.mSteps)
     {
@@ -713,6 +744,8 @@ bool Bot::Replan(BaseMap& map)
     {
         Log("goal " + bestGoal + " plan=[" + mPlanText + "]" + (misses.empty() ? "" : " (no plan for: " + misses + ")"));
     }
+    // (the task before it gone first: what it held the route to is let go of before the next is looked for)
+    mTask.reset();
     mTask = MakeTask(domain, first);
     // Crossings on foot that follow one another the same way along a floor are gone in one go, not a stop
     // at each
@@ -985,6 +1018,14 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs) const
             for (const ScrabAt& scrab : world->mScrabs)
             {
                 if (!scrab.mPossessed && scrab.mHalf == from.mHalf && std::abs(scrab.mY - from.mY) <= 30 && std::abs(scrab.mX - from.mX) < 700)
+                {
+                    return 20;
+                }
+            }
+            // (or with Fleeches awake and after him: the climb they would catch him on is the slow way)
+            for (const RockAt& f : world->mFleechesAwake)
+            {
+                if (f.mHalf == from.mHalf && std::abs(f.mX - from.mX) <= 750 && std::abs(f.mY - from.mY) <= 260)
                 {
                     return 20;
                 }
@@ -1823,13 +1864,128 @@ bool Bot::FlierThreat() const
     return false;
 }
 
+bool Bot::SlogRefuge(const SlogAt& slog, s32 from, s32& refuge, bool& left, bool& inTime, s32& fromX) const
+{
+    const NavGraph& nav = mKnow->mNav;
+    const NavNode& at = nav.Nodes()[from];
+    const s32 side = slog.mX >= at.mX ? 1 : -1;
+    const s32 floorY = at.mY;
+    const NavGraph::EdgeCost all = EdgeCostFn(true);
+    const NavGraph* graph = &nav;
+    const NavGraph::EdgeCost awayOnly = [&all, graph, side, floorY](const NavEdge& e) -> s32
+    {
+        const NavNode& a = graph->Nodes()[e.mFrom];
+        const NavNode& b = graph->Nodes()[e.mTo];
+        // (not towards it along its floor, and only by what is quick)
+        if (std::abs(b.mY - floorY) <= 45 && (b.mX - a.mX) * side > 0)
+        {
+            return -1;
+        }
+        return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eRoll || e.mKind == EdgeKind::eWell || e.mKind == EdgeKind::eHoistUp || e.mKind == EdgeKind::eTeleport || e.mKind == EdgeKind::eFall ? all(e) : -1;
+    };
+    std::vector<s32> way;
+    if (!nav.FindPath(from, [graph, floorY](s32 n)
+                      { return std::abs(graph->Nodes()[n].mY - floorY) > 45; }, awayOnly, way) || way.empty())
+    {
+        return false;
+    }
+    const NavEdge& last = nav.Edges()[way.back()];
+    refuge = last.mTo;
+    fromX = nav.Nodes()[last.mFrom].mX;
+    // (a way with a roll in it is the pilot's from the start: where the run ends is at the first of those)
+    for (s32 edge : way)
+    {
+        if (nav.Edges()[edge].mKind == EdgeKind::eRoll)
+        {
+            fromX = at.mX;
+            break;
+        }
+    }
+    const s32 dist = std::abs(nav.Nodes()[last.mFrom].mX - at.mX);
+    left = dist > 0 ? nav.Nodes()[last.mFrom].mX < at.mX : side > 0;
+    // He runs 6.2 pixels a frame, and is 14 frames getting off the ground at a hoist, 12 on a teleporter's plate.
+    // The Slog runs some 7, leaps at him from 60 off, and is 24 frames turning when he is behind it (measured in
+    // the Mudanchee trial: 27 to 30 after he came down behind it, then from 118 to 346 in 36 frames).
+    const s32 gap = std::abs(slog.mX - at.mX);
+    const s32 abeFrames = dist * 10 / 62 + (last.mKind == EdgeKind::eHoistUp ? 14 : last.mKind == EdgeKind::eTeleport ? 12 : 4);
+    const bool facesAway = slog.mFacesLeft != (side > 0);
+    const s32 slogFrames = std::max(0, gap + dist - 60) * 10 / 70 + (facesAway ? 24 : 0);
+    inTime = abeFrames + 4 < slogFrames;
+    return true;
+}
+
+std::unique_ptr<Task> Bot::MakeSlogFlee()
+{
+    if (mSlogFlees >= 12)
+    {
+        return nullptr;
+    }
+    const NavGraph& nav = mKnow->mNav;
+    for (const SlogAt& slog : mWorld.mSlogs)
+    {
+        s32 node = -1;
+        if (mAbe.mOnGround)
+        {
+            // One that is up, or about to be, on his floor
+            if ((slog.mAsleep && !slog.mWaking) || std::abs(slog.mY - mAbe.mY) > 30 || std::abs(slog.mX - mAbe.mX) >= 500)
+            {
+                continue;
+            }
+            node = AbeNode();
+        }
+        else
+        {
+            // Coming down next to one, asleep or not: what brings him there may well be what wakes it
+            // (judged where he will come down, a few frames before he does)
+            if (slog.mY <= mAbe.mY || slog.mY - mAbe.mY > 60 || mAbe.mVelYFp <= 0)
+            {
+                continue;
+            }
+            const s32 landX = mAbe.mX + static_cast<s32>(static_cast<s64>(mAbe.mVelXFp) * (slog.mY - mAbe.mY) / mAbe.mVelYFp);
+            if (std::abs(slog.mX - landX) >= 60)
+            {
+                continue;
+            }
+            node = nav.NodeAt(landX, slog.mY, mAbe.mHalfScale, 30);
+        }
+        if (node < 0 || Domain::WallBetween(nav, slog.mX, nav.Nodes()[node].mX, nav.Nodes()[node].mY, mAbe.mHalfScale) ||
+            Domain::GateBetween(nav, mWorld, slog.mX, nav.Nodes()[node].mX, nav.Nodes()[node].mY, mAbe.mHalfScale))
+        {
+            continue;
+        }
+        // (on a floor of its own, a pit between: it does not come over)
+        const s32 slogNode = nav.NodeAt(slog.mX, slog.mY, mAbe.mHalfScale, 30);
+        if (slogNode >= 0 && nav.Nodes()[slogNode].mLine != nav.Nodes()[node].mLine)
+        {
+            continue;
+        }
+        s32 refuge = -1;
+        bool left = false;
+        bool inTime = false;
+        s32 fromX = 0;
+        if (!SlogRefuge(slog, node, refuge, left, inTime, fromX) || (mAbe.mOnGround && inTime && mAbe.mMove == Move::eRun && mAbe.mFacingLeft == left))
+        {
+            // (at a run away from it with time in hand: what he is at is as good)
+            continue;
+        }
+        mSlogFlees++;
+        Log(std::string(mAbe.mOnGround ? "a Slog after him" : "coming down next to a Slog") + " at " + std::to_string(slog.mX) + "," + std::to_string(slog.mY) + ": off its floor to " + std::to_string(nav.Nodes()[refuge].mX) + "," + std::to_string(nav.Nodes()[refuge].mY));
+        return std::make_unique<SlogFleeTask>(refuge, left, fromX);
+    }
+    return nullptr;
+}
+
 std::unique_ptr<Task> Bot::MakeFlee()
 {
+    if (std::unique_ptr<Task> slog = MakeSlogFlee())
+    {
+        return slog;
+    }
     // A Slig awake right next to him on his floor, out in the open (he came down beside one that slept, and the
     // landing woke it): it takes a while to come round and shoot, enough to get off its floor if a way is at
     // hand (a well, a hoist). Chanting there is too slow: measured, he is shot 50 frames before it takes.
     // (One that waits before it shoots is run from too: the sneak he was at when it woke is not gone on with.)
-    if (mAmbushes < 8)
+    if (mAmbushes < 8 && !mWorld.mInvisible)
     {
         const NavGraph& nav = mKnow->mNav;
         const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);
@@ -1892,6 +2048,10 @@ std::unique_ptr<Task> Bot::MakeFlee()
 
 std::unique_ptr<Task> Bot::MakeReflex()
 {
+    if (mAuto && !mAbe.mOnGround && !mAbe.mTransition)
+    {
+        return MakeSlogFlee();
+    }
     if (!mAuto || !mAbe.mOnGround || mAbe.mTransition)
     {
         return nullptr;
@@ -1911,6 +2071,17 @@ std::unique_ptr<Task> Bot::MakeReflex()
             mSlogTraps++;
             Log("Slogs about and electric walls on switch " + std::to_string(setup.mSwitch) + " at " + std::to_string(setup.mX1) + ".." + std::to_string(setup.mX2) + ": luring them into those");
             return std::make_unique<SlogTrapTask>(setup);
+        }
+    }
+    // Slogs gathering behind a gate on his floor, and a Slig that can be brought to it: that shoots them
+    if (mSlogGuards < 3)
+    {
+        SlogGuardTask::Setup setup;
+        if (SlogGuardTask::Find(*this, setup))
+        {
+            mSlogGuards++;
+            Log("Slogs behind a gate on this floor, and a Slig at " + std::to_string(setup.mSligX) + "," + std::to_string(setup.mSligY) + " that a teleporter at " + std::to_string(setup.mPlateX) + " brings here: taking it over to shoot them");
+            return std::make_unique<SlogGuardTask>(setup);
         }
     }
     // A flying Slig that is coming, or is where he has to go: into an invisible zone, if one is near on this
@@ -1948,7 +2119,9 @@ std::unique_ptr<Task> Bot::MakeReflex()
     {
         const NavGraph& nav = mKnow->mNav;
         const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);
-        bool can = mAbe.mMove == Move::eIdle;
+        // (not with the power to go unseen in hand or on its way: the chant would spend that and take no Slig. Nor
+        // unseen: that time is for what the plan has him do unseen.)
+        bool can = mAbe.mMove == Move::eIdle && !mWorld.mInvisCharge && !mWorld.mInvisComing && !mWorld.mInvisible;
         for (const Entity& e : mWorld.mEntities)
         {
             can = can && !(e.mKind == EntityKind::eSecurityOrb && nav.CameraOf(e.mX1, e.mY1) == cam);
@@ -2339,6 +2512,21 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
             mPilot.Start(Prim::Wait(2), mAbe);
         }
         mLastAwakeSligs = awake;
+        // Coming down next to a Slog: what he was waiting out in the air gives way to the run that has to start
+        // as he lands. And one that wakes or comes while he is on his way somewhere is not left until he is there.
+        if (mAuto && mPilotActive && !mReflex && !mAbe.mTransition && mState == BotState::eRunning)
+        {
+            if (std::unique_ptr<Task> flee = MakeSlogFlee())
+            {
+                const TaskStep step = flee->Next(*this, "");
+                if (step.mKind == TaskStep::Kind::ePrim)
+                {
+                    mReflex = std::move(flee);
+                    mPilot.Start(step.mPrim, mAbe);
+                    mPilotForTask = true;
+                }
+            }
+        }
         if (sligs != mLastSligs)
         {
             std::string slogs;
@@ -2456,6 +2644,14 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         snprintf(line, sizeof(line), "%u %d %d %s m=%d af=%d %c vx=%d g=%d in=%x cam=%d\n", mAbe.mFrame, mAbe.mX, mAbe.mY, MoveName(mAbe.mMove), mAbe.mMotion, mAbe.mAnimFrame,
                  mAbe.mFacingLeft ? 'L' : 'R', mAbe.mVelXFp / 656, mAbe.mOnGround ? 1 : 0, Input().mAutomationInput, mAbe.mCamera);
         mTrace += line;
+        // (the move the pilot is making, when it changes)
+        const std::string move = mPilot.Current().Text() + (mPilot.Current().mRunUp != 0 ? " run-up " + std::to_string(mPilot.Current().mRunUp) : "");
+        if (move != mTraceMove)
+        {
+            mTraceMove = move;
+            mTrace.pop_back();
+            mTrace += " [" + move + "]\n";
+        }
         // (his health while it is down: a Fleech's lick takes 15 in 100 of it)
         if (mAbe.mHealthFp < 0x10000)
         {

@@ -175,6 +175,9 @@ struct SlogAt final
     s32 mX = 0;
     s32 mY = 0;
     bool mAsleep = false;
+    // Asleep still, with the switch that sets it on Abe already on
+    bool mWaking = false;
+    bool mFacesLeft = false;
 };
 
 // How far a Slig has been seen to walk on its floor
@@ -504,6 +507,14 @@ struct World final
     // Slap locks (their entities) slapped in this path: the switch follows when the ghost gets to its tomb
     // Slap locks that are about and have not been slapped (as the game has it: a slap can land on something else)
     std::set<u32> mLocksIntact;
+    // The ends the map gives the Scrabs' beats (x, floor y): a Scrab on its beat turns at the nearest either side
+    std::vector<std::pair<s32, s32>> mScrabBoundsLeft;
+    std::vector<std::pair<s32, s32>> mScrabBoundsRight;
+    // Where the map lets Slogs out once a switch is on: x, floor y, the switch
+    std::vector<std::array<s32, 3>> mSlogSpawners;
+    // The switch that where Abe stands is about to set (an invisible switch sets its own a few frames after he
+    // is in it), or -1
+    s32 mSoonOn = -1;
     std::set<u32> mLocksSlapped;
     // Scrabs (their entities) killed in this path, and where one that was shut in behind a gate was left
     std::set<u32> mScrabsKilled;

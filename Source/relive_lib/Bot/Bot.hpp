@@ -148,6 +148,11 @@ public:
         return mInvisChantNow;
     }
     // The step that wants him unseen is the one after the step at hand
+    // The step at hand wants him unseen in a path of security orbs: the power is got and used at once
+    bool InvisAtOnce() const
+    {
+        return mInvisAtOnce;
+    }
     bool InvisChantSoon() const
     {
         return mInvisChantSoon;
@@ -391,6 +396,7 @@ private:
     bool mInvisSaved = false;
     bool mInvisChantNow = false;
     bool mInvisChantSoon = false;
+    bool mInvisAtOnce = false;
     u32 mUnseenUse = 0;
     // The path for which why no way out is known has been logged
     s32 mWhyNoWayOut = -1;
@@ -439,6 +445,8 @@ private:
     std::map<u32, s32> mReflexTries;
     s32 mSlogTraps = 0;
     s32 mAmbushes = 0;
+    s32 mSlogFlees = 0;
+    s32 mSlogGuards = 0;
     // Flying Sligs: which way along its track one was last seen to go (it stops at the ends), where the plan's next
     // things to do are, and whether one is to be kept out of the sight of where Abe stands now
     s32 mFlierDir = 0;
@@ -458,6 +466,11 @@ private:
     std::unique_ptr<Task> MakeReflex();
     // The reflex for a Slig that has woken beside Abe: off its floor, if a way is at hand
     std::unique_ptr<Task> MakeFlee();
+    // Off the floor of a Slog that is after him (or, in the air, that he is coming down next to)
+    std::unique_ptr<Task> MakeSlogFlee();
+    // The nearest way off a Slog's floor that leads away from it, from a cell of that floor; which way it starts,
+    // and whether he would be off before the Slog has him
+    bool SlogRefuge(const SlogAt& slog, s32 from, s32& refuge, bool& left, bool& inTime, s32& fromX) const;
     bool mGoToPending = false;
     s32 mGoToX = 0;
     s32 mGoToY = 0;
@@ -488,6 +501,8 @@ private:
 
     bool mTracing = false;
     std::string mTrace;
+    // The move last written to it (written again only when it changes)
+    std::string mTraceMove;
     std::string mLog;
     std::set<s32> mOnlyEdges;
     u32 mSeenByScrabAt = 0;

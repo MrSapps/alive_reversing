@@ -102,8 +102,30 @@ void ResourceManager::SetPs1SoundData(std::unique_ptr<Ps1SoundData> pData)
 // Out of line so unique_ptr<ThreadPool> can be destroyed with an incomplete ThreadPool type
 ResourceManager::~ResourceManager() = default;
 
+// AE's "ender" levels that share a .lvl file with their main level are converted into the main
+// level's folder (see IterateAELvls in data_conversion.cpp), so their paths and cameras are there.
+static EReliveLevelIds LvlWithData(EReliveLevelIds lvlId)
+{
+    switch (lvlId)
+    {
+        case EReliveLevelIds::eMudancheeVault_Ender:
+            return EReliveLevelIds::eMudancheeVault;
+        case EReliveLevelIds::eMudomoVault_Ender:
+            return EReliveLevelIds::eMudomoVault;
+        case EReliveLevelIds::eFeeCoDepot_Ender:
+            return EReliveLevelIds::eFeeCoDepot;
+        case EReliveLevelIds::eBarracks_Ender:
+            return EReliveLevelIds::eBarracks;
+        case EReliveLevelIds::eBonewerkz_Ender:
+            return EReliveLevelIds::eBonewerkz;
+        default:
+            return lvlId;
+    }
+}
+
 static std::string LvlDirName(EReliveLevelIds lvlId)
 {
+    lvlId = LvlWithData(lvlId);
     if (GetGameType() == GameType::eAe)
     {
         return ToString(MapWrapper::ToAE(lvlId));

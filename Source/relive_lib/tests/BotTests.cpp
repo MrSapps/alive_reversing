@@ -2304,6 +2304,215 @@ TEST(BotNav, TheWayOutCanBeACrawl)
     EXPECT_TRUE(found);
 }
 
+TEST(BotNav, ATeleporterItsPlateSetsOffIsTakenFromThePlate)
+{
+    // The Mudanchee trial: a teleporter three cells wide with a foot switch in the middle of it that sets it
+    // off. Stood beside the plate nothing happens.
+    NavInput in;
+    in.mIsAe = true;
+    in.mLines.push_back(Line(0, 300, 400, 300, 0));
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    NavFeature tele = Feature(FeatureKind::eTeleporter, 100, 220, 175, 304);
+    tele.mA = 0;
+    tele.mB = 1;
+    tele.mSwitch = 195;
+    tele.mCamera = 5;
+    tele.mDestCamera = 5;
+    in.mFeatures.push_back(tele);
+    NavFeature out = Feature(FeatureKind::eTeleporter, 300, 20, 374, 104);
+    out.mA = 1;
+    out.mB = 0;
+    out.mCamera = 5;
+    out.mDestCamera = 5;
+    in.mFeatures.push_back(out);
+    NavFeature plate = Feature(FeatureKind::ePlate, 125, 280, 149, 304);
+    plate.mSwitch = 195;
+    in.mFeatures.push_back(plate);
+    NavGraph g;
+    g.Build(in);
+
+    const s32 to = g.NodeAt(337, 100, false);
+    ASSERT_GE(to, 0);
+    EXPECT_TRUE(HasEdge(g, g.NodeAt(137, 300, false), to, EdgeKind::eTeleport));
+    EXPECT_FALSE(HasEdge(g, g.NodeAt(112, 300, false), to, EdgeKind::eTeleport));
+    EXPECT_FALSE(HasEdge(g, g.NodeAt(162, 300, false), to, EdgeKind::eTeleport));
+}
+
+TEST(BotNav, ATeleporterPutsHimOnTheFloorInItsBox)
+{
+    // The Mudanchee trial: one teleporter right under the floor of the one that leads to it. Where he comes out is
+    // the floor in its box, not the floor its top touches.
+    NavInput in;
+    in.mIsAe = true;
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    in.mLines.push_back(Line(0, 200, 400, 200, 0));
+    NavFeature up = Feature(FeatureKind::eTeleporter, 100, 20, 175, 100);
+    up.mA = 0;
+    up.mB = 1;
+    up.mCamera = 5;
+    up.mDestCamera = 5;
+    in.mFeatures.push_back(up);
+    NavFeature down = Feature(FeatureKind::eTeleporter, 100, 116, 175, 206);
+    down.mA = 1;
+    down.mB = 2;
+    down.mCamera = 5;
+    down.mDestCamera = 5;
+    in.mFeatures.push_back(down);
+    NavGraph g;
+    g.Build(in);
+
+    const s32 from = g.NodeAt(137, 100, false);
+    const s32 to = g.NodeAt(137, 200, false);
+    ASSERT_GE(from, 0);
+    ASSERT_GE(to, 0);
+    EXPECT_TRUE(HasEdge(g, from, to, EdgeKind::eTeleport));
+}
+
+TEST(BotNav, RolledOffOverAGapHeComesDownOnTheFloorBeyond)
+{
+    // The Mudanchee trial: the upper floor ends under a low wall with a pit below its end, and the floor a level
+    // down starts two cells further out. Rolled off he clears the pit (measured: off 587,360, down on 662,460).
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 200, 100, 0));
+    in.mLines.push_back(Line(150, 60, 200, 60, 3));
+    in.mLines.push_back(Line(150, 0, 150, 60, 2));
+    in.mLines.push_back(Line(250, 200, 500, 200, 0));
+    NavGraph g;
+    g.Build(in);
+
+    const s32 under = g.NodeAt(187, 100, false);
+    const s32 beyond = g.NodeAt(262, 200, false);
+    ASSERT_GE(under, 0);
+    ASSERT_GE(beyond, 0);
+    EXPECT_TRUE(g.Nodes()[under].mLow);
+    EXPECT_TRUE(HasEdge(g, under, beyond, EdgeKind::eFall));
+    // (walked off the end of a floor with room to stand he comes straight down, into the pit: no way)
+    NavInput open;
+    open.mLines.push_back(Line(0, 100, 200, 100, 0));
+    open.mLines.push_back(Line(250, 200, 500, 200, 0));
+    NavGraph h;
+    h.Build(open);
+    EXPECT_FALSE(HasEdge(h, h.NodeAt(187, 100, false), h.NodeAt(262, 200, false), EdgeKind::eFall));
+}
+
+TEST(BotNav, TheWayOutCanBeADropOffTheEndOfAFloor)
+{
+    // The Mudanchee trial's first path ends in a drop: the next path begins under the end of the last floor
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 200, 100, 0));
+    NavFeature out = Feature(FeatureKind::ePathExit, 150, 160, 330, 280);
+    out.mAnyScale = true;
+    out.mDestPath = 10;
+    out.mDestLevel = 3;
+    in.mFeatures.push_back(out);
+    NavGraph g;
+    g.Build(in);
+
+    const s32 end = g.NodeAt(187, 100, false);
+    ASSERT_GE(end, 0);
+    s32 exits = 0;
+    for (const NavExit& x : g.Exits())
+    {
+        if (x.mNode >= 0 && g.Input().mFeatures[x.mFeature].mKind == FeatureKind::ePathExit)
+        {
+            exits++;
+            EXPECT_EQ(x.mNode, end);
+        }
+    }
+    EXPECT_EQ(exits, 1);
+}
+
+TEST(BotNav, FromALedgeTheHoistOfTheLedgeAcrossIsCaughtAtARunningJump)
+{
+    // The Mudanchee trial's last room: two ledges a level over the floor, five cells apart, each with a hoist at
+    // its inner end. The left one is three cells long, too short for the run-up a jump to a landing wants.
+    NavInput in;
+    in.mLines.push_back(Line(0, 200, 300, 200, 0));
+    in.mLines.push_back(Line(0, 100, 75, 100, 0));
+    in.mLines.push_back(Line(175, 100, 300, 100, 0));
+    NavFeature left = Feature(FeatureKind::eHoist, 50, 100, 75, 200);
+    left.mDir = 0;
+    in.mFeatures.push_back(left);
+    NavFeature right = Feature(FeatureKind::eHoist, 175, 100, 199, 200);
+    right.mDir = 1;
+    in.mFeatures.push_back(right);
+    NavGraph g;
+    g.Build(in);
+
+    const s32 from = g.NodeAt(37, 100, false);
+    const s32 to = g.NodeAt(187, 100, false);
+    ASSERT_GE(from, 0);
+    ASSERT_GE(to, 0);
+    const NavEdge* over = FindEdge(g, from, to, EdgeKind::eRunJump);
+    ASSERT_NE(over, nullptr);
+    EXPECT_EQ(over->mX, 62);
+    EXPECT_FALSE(over->mLeft);
+    // And back: off at 187 to the hoist at 62
+    const NavEdge* back = FindEdge(g, g.NodeAt(212, 100, false), g.NodeAt(62, 100, false), EdgeKind::eRunJump);
+    ASSERT_NE(back, nullptr);
+    EXPECT_EQ(back->mX, 187);
+    EXPECT_TRUE(back->mLeft);
+    // Not with a hoist that faces the other way at the far end: there is nothing to catch
+    in.mFeatures[1].mDir = 0;
+    NavGraph h;
+    h.Build(in);
+    EXPECT_EQ(FindEdge(h, h.NodeAt(37, 100, false), h.NodeAt(187, 100, false), EdgeKind::eRunJump), nullptr);
+}
+
+TEST(BotVault, ATeleporterMadeOfSwitchesWantsTheOthersOnFirst)
+{
+    // The Mudanchee trial: the teleporter to the last room has a switch that is on when three locks are slapped
+    // and the plate in it is stood on. The plate is his to step on; the locks have to be done before.
+    NavInput in;
+    in.mIsAe = true;
+    in.mLines.push_back(Line(0, 300, 400, 300, 0));
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    NavFeature tele = Feature(FeatureKind::eTeleporter, 100, 220, 175, 304);
+    tele.mA = 0;
+    tele.mB = 1;
+    tele.mSwitch = 197;
+    tele.mCamera = 5;
+    tele.mDestCamera = 5;
+    in.mFeatures.push_back(tele);
+    NavFeature out = Feature(FeatureKind::eTeleporter, 300, 20, 374, 104);
+    out.mA = 1;
+    // (one way: the room it leads to is another part of the path)
+    out.mB = 2;
+    out.mCamera = 5;
+    out.mDestCamera = 5;
+    in.mFeatures.push_back(out);
+    NavGraph g;
+    g.Build(in);
+    World world;
+    Entity logic = MakeEntity(EntityKind::eSwitchLogic, 1, 0, 0, 24, 24);
+    logic.mSwitch = 197;
+    logic.mInputs[0] = 198;
+    logic.mInputs[1] = 154;
+    logic.mInputs[2] = 159;
+    world.mEntities.push_back(logic);
+    Entity plate = MakeEntity(EntityKind::eFootSwitch, 2, 125, 280, 149, 304);
+    plate.mSwitch = 159;
+    world.mEntities.push_back(plate);
+
+    s32 crossings = 0;
+    for (const Goap::Action& a : Domain::Build(g, world, g.NodeAt(12, 300, false), nullptr).mActions)
+    {
+        if (a.mName.rfind("Cross teleport", 0) != 0)
+        {
+            continue;
+        }
+        crossings++;
+        const auto wants = [&a](s32 sw)
+        {
+            return std::find(a.mPre.begin(), a.mPre.end(), Goap::Fact{Key::Switch(sw), 1}) != a.mPre.end();
+        };
+        EXPECT_TRUE(wants(198)) << a.mName;
+        EXPECT_TRUE(wants(154)) << a.mName;
+        EXPECT_FALSE(wants(159)) << a.mName;
+    }
+    EXPECT_GT(crossings, 0);
+}
+
 TEST(BotTasks, ABeamThatWaitsAtItsEndLeavesTimeForAStep)
 {
     // A motion detector's beam, 20 wide, that goes between 925 and 1075 at 8 a frame and waits 16 frames at

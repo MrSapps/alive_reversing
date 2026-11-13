@@ -285,6 +285,11 @@ private:
 public:
     Guid mTargetId;
     bool mBitingTarget = false;
+    // (read by the bot: the switch that sets it on Abe)
+    s16 AngerSwitchId() const
+    {
+        return mAngerSwitchId;
+    }
 
 private:
     eSlogBrains mBrainState = eSlogBrains::Brain_0_ListeningToSlig;
