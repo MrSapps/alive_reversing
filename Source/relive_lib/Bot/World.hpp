@@ -608,6 +608,18 @@ struct World final
     std::vector<LiftAt> mLiftsSeen;
     // Whether a lift is at one of its stops (a floor at y that x is on). One that isn't about, its screen not
     // being loaded, is where it was last seen, or failing that where it starts.
+    // Whether what he carries and throws on this path is meat: its sacks are meat sacks (eRockSack, mInputs[1])
+    bool CarriesMeat() const
+    {
+        for (const Entity& e : mEntities)
+        {
+            if (e.mKind == EntityKind::eRockSack && e.mInputs[1] == 1)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
     bool LiftAtStop(s32 x, s32 y, bool startsHere) const
     {
         for (const std::vector<LiftAt>* lifts : {&mLifts, &mLiftsSeen})

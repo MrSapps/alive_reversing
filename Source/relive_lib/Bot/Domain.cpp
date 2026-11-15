@@ -969,6 +969,30 @@ s32 Domain::ScrabZone(const NavGraph& nav, s32 node)
     return n.mLine * 16 + gates;
 }
 
+bool Domain::ParamitePack(const NavGraph& nav, const World& world, s32 x, s32 y, bool half)
+{
+    if (world.mParamites.empty())
+    {
+        return false;
+    }
+    const s32 at = nav.NodeAt(x, y, half, 12);
+    if (at < 0)
+    {
+        return false;
+    }
+    s32 count = 0;
+    for (const ParamiteAt& p : world.mParamites)
+    {
+        if (p.mPossessed || p.Hidden() || p.mHalf != half)
+        {
+            continue;
+        }
+        const s32 on = nav.NodeAt(p.mX, p.mY, p.mHalf, 30);
+        count += on >= 0 && nav.Nodes()[on].mLine == nav.Nodes()[at].mLine && !WallBetween(nav, p.mX, x, y, half) && !GateBetween(nav, world, p.mX, x, y, half) ? 1 : 0;
+    }
+    return count >= 2;
+}
+
 bool Domain::WebUp(const NavGraph& nav, s32 from, s32 to, s32* webX)
 {
     // Paramite.cpp: one that is played grabs a web (a track line, type 8) within a cell ahead of it as it comes
@@ -1407,7 +1431,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
     {
         d.mStart.Set(Key::kRegion, d.mRegions[abeNode] + 1);
     }
-    d.mStart.Set(Key::kRocks, world.mRocks);
+    d.mStart.Set(world.CarriesMeat() ? Key::kMeat : Key::kRocks, world.mRocks);
     d.mStart.Set(Key::kInvis, world.mInvisEver ? 1 : 0);
     d.mStart.Set(Key::kInvisNow, world.mInvisCharge || world.mInvisible || world.mInvisComing ? 1 : 0);
 
@@ -1864,6 +1888,64 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                         }
                     }
                 }
+                // Paramites on the floor it is used from, with no wall between. Two or more hunt him along it: only
+                // unseen then (the Mudomo vaults' path 10: "turn invisible and run past the Paramites ... quickly
+                // go down and slap the Ghost Lock, then get back up before the invisibility wears off"). One alone
+                // keeps off him until it is cornered, and near it he corners it: that one is drawn off with meat
+                // ("throw some meat behind you to get rid of the Paramite, then slap the Ghost Lock").
+                u32 shy = 0;
+                Goap::Fact shyFact{0, 0};
+                if ((entity.mKind == EntityKind::eSlapLock || entity.mKind == EntityKind::eLever) && node >= 0)
+                {
+                    const NavNode& at = nav.Nodes()[node];
+                    std::vector<u32> pack;
+                    s32 nearest = 100000;
+                    for (const Entity& para : world.mEntities)
+                    {
+                        if (para.mKind != EntityKind::eParamite || para.mGone || para.mHalf != at.mHalf || para.mInputs[0] != 0)
+                        {
+                            continue;
+                        }
+                        s32 px = para.CentreX();
+                        s32 py = para.mY2;
+                        for (const ParamiteAt& live : world.mParamites)
+                        {
+                            if (live.mId == para.mId)
+                            {
+                                px = live.mX;
+                                py = live.mY;
+                            }
+                        }
+                        const s32 on = nav.NodeAt(px, py, para.mHalf, 30);
+                        if (on >= 0 && nav.Nodes()[on].mLine == at.mLine && !WallBetween(nav, px, at.mX, at.mY, at.mHalf) && !GateBetween(nav, world, px, at.mX, at.mY, at.mHalf))
+                        {
+                            pack.push_back(para.mId);
+                            nearest = std::min(nearest, std::abs(px - at.mX));
+                        }
+                    }
+                    if (pack.size() >= 2 || (pack.size() == 1 && nearest <= 250))
+                    {
+                        for (u32 id : pack)
+                        {
+                            guards.push_back({Key::Mud(id), 2});
+                        }
+                        if (pack.size() == 1)
+                        {
+                            shy = pack[0];
+                            shyFact = {Key::Mud(shy), 2};
+                        }
+                    }
+                }
+                // (what it takes with the meat thrown: everything but that Paramite out of the way)
+                const auto withMeat = [&shyFact](std::vector<Goap::Fact> pre)
+                {
+                    pre.erase(std::remove(pre.begin(), pre.end(), shyFact), pre.end());
+                    return pre;
+                };
+                DomainStep meatStep;
+                meatStep.mKind = StepKind::eMeatUse;
+                meatStep.mEntity = entity.mId;
+                meatStep.mOther = shy;
                 // Or led off: got to follow him away from it and come back to by another way (the walkthrough's
                 // way with the first of the Mudanchee vaults)
                 const FleechLure lure = lures.count(entity.mId) ? lures[entity.mId] : FleechLure();
@@ -1873,6 +1955,11 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                     std::vector<Goap::Fact> pre{regionFact(node), {Key::kInvis, 0}};
                     pre.insert(pre.end(), guards.begin(), guards.end());
                     add("Get invisibility from " + name, pre, {{Key::kInvis, 1}, {Key::kInvisNow, 1}}, 150, step);
+                    if (shy)
+                    {
+                        add("Throw meat for Paramite#" + std::to_string(shy) + " and get invisibility from " + name, withMeat(pre), {{Key::kInvis, 1}, {Key::kInvisNow, 1}}, 300, meatStep);
+                        d.mActions.back().mSpend = {Key::kMeat, 1};
+                    }
                 }
                 if (node < 0 || entity.mHoldOnly || entity.mSwitch <= 1)
                 {
@@ -2056,6 +2143,11 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                         gives.push_back({Key::kInvisNow, 1});
                     }
                     add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on", pre, gives, 150, step);
+                    if (shy)
+                    {
+                        add("Throw meat for Paramite#" + std::to_string(shy) + " and use " + name + " sw" + std::to_string(entity.mSwitch) + " on", withMeat(pre), gives, 300, meatStep);
+                        d.mActions.back().mSpend = {Key::kMeat, 1};
+                    }
                     // A lever with a trap door for the cell on its other side: from there too, where that is another
                     // part of the path (he comes down on it, and what the lever does is open it under him. The
                     // Mudomo hub at 3187,1140: "immediately pull the lever beside you or you're lunch".)
@@ -2491,7 +2583,8 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 {
                     step.mKind = StepKind::eRocks;
                     // (a sack gives nothing to Abe while he has some)
-                    add("Get rocks from " + name, {regionFact(node), {Key::kRocks, 0}}, {{Key::kRocks, entity.mInputs[0] > 0 ? entity.mInputs[0] : 5}}, 300, step);
+                    const u32 what = entity.mInputs[1] == 1 ? Key::kMeat : Key::kRocks;
+                    add(std::string(entity.mInputs[1] == 1 ? "Get meat from " : "Get rocks from ") + name, {regionFact(node), {what, 0}}, {{what, entity.mInputs[0] > 0 ? entity.mInputs[0] : 5}}, 300, step);
                 }
                 break;
             }

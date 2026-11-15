@@ -797,6 +797,39 @@ private:
     std::unique_ptr<GoToTask> mGo;
 };
 
+// A lock or lever a lone Paramite keeps by: meat thrown the other way draws it off (it goes for meat on its floor
+// on the screen he is on, with no wall between, and eats for a while: Paramite::FindMeat), and then it is used.
+class MeatLureTask final : public Task
+{
+public:
+    MeatLureTask(u32 entity, u32 paramite, s32 want)
+        : mEntity(entity)
+        , mParamite(paramite)
+        , mWant(want)
+    {
+    }
+    ~MeatLureTask() override;
+    std::string Name() const override
+    {
+        return "Meat for Paramite #" + std::to_string(mParamite) + ", then use #" + std::to_string(mEntity);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mEntity;
+    u32 mParamite;
+    s32 mWant;
+    // 0 to the place to throw from, 1 turn and take the meat in hand, 2 throw, 3 until it is off, 4 use
+    s32 mPhase = 0;
+    s32 mFrames = 0;
+    s32 mSpot = -1;
+    // The side of the thing he throws from (and to): 1 right of it
+    s32 mSide = 0;
+    ThrowSpot::Kind mKind = ThrowSpot::eForward;
+    std::unique_ptr<GoToTask> mGo;
+    std::unique_ptr<UseTask> mUse;
+};
+
 // Fleeches let out with a lever and led to a Scrab that is then taken over to kill them (Domain::LeadFleeches).
 // They make for where he is, not along the way he went, and go up a hoist only if they come by it with him
 // above: so he is on its top, got to by another way if there is one, until the first of them starts up it, and
@@ -1175,6 +1208,10 @@ private:
     bool mArrived = false;
     s32 mTries = 0;
     s32 mGhostWaits = 0;
+    // A bird portal: the way to where it is chanted open from, and the chants made
+    std::unique_ptr<GoToTask> mPortalGo;
+    bool mAtChant = false;
+    s32 mPortalChants = 0;
     s32 mStartPath = -1;
     s32 mStartLevel = -1;
 };

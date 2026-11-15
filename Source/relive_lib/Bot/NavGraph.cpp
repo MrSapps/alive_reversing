@@ -1106,7 +1106,8 @@ void NavGraph::Build(const NavInput& input)
                 const s32 belowLine = FloorBelow(nx, n.mY + 1, n.mHalf, &fy, &height);
                 bool deadly = belowLine < 0;
                 // (rolled off over a gap he clears it, where a floor two cells further out is under him: measured
-                // in the Mudanchee trial, off 587,360 to the right over the pit and down onto 662,460)
+                // in the Mudanchee trial, off 587,360 to the right over the pit and down onto 662,460; and in the
+                // Mudomo vaults' path 10, off 2037,600 to the left and 40 down onto 1962,640)
                 if (belowLine < 0 && (n.mLow || crouched))
                 {
                     s32 farY = 0;
@@ -1114,8 +1115,9 @@ void NavGraph::Build(const NavInput& input)
                     const s32 farX = nx + dir * 2 * step;
                     const s32 farLine = FloorBelow(farX, n.mY + 1, n.mHalf, &farY, &farHeight);
                     const s32 out = farLine >= 0 ? NodeOnLine(farLine, farX) : -1;
-                    if (out >= 0 && farHeight * (n.mHalf ? 2 : 1) >= 80 && farHeight * (n.mHalf ? 2 : 1) < 200 && std::abs(mNodes[out].mX - farX) <= step / 2 && !mNodes[out].mHazard &&
-                        !WallBetween(n.mX, farX, n.mY, n.mHalf, n.mHalf ? 10 : 20))
+                    if (out >= 0 && farHeight * (n.mHalf ? 2 : 1) >= 30 && farHeight * (n.mHalf ? 2 : 1) < 200 && std::abs(mNodes[out].mX - farX) <= step / 2 && !mNodes[out].mHazard &&
+                        // (a wall that comes down to 20 over the floor is rolled under: measured there too)
+                        !WallBetween(n.mX, farX, n.mY, n.mHalf, n.mHalf ? 9 : 19))
                     {
                         AddEdge(edges, from, out, EdgeKind::eFall, 20 + farHeight / 4 + (crouched ? 10 : 0), -1, left);
                         edges.back().mCrouched = crouched;
@@ -1462,12 +1464,21 @@ void NavGraph::Build(const NavInput& input)
         for (std::size_t k = 0; k < mInput.mFeatures.size(); k++)
         {
             const NavFeature& portal = mInput.mFeatures[k];
-            if (portal.mKind != FeatureKind::ePortal || portal.mHalf != n.mHalf || portal.mDestPath >= 0 || std::abs(portal.mY2 - n.mY) > 30)
+            if (portal.mKind != FeatureKind::ePortal || portal.mHalf != n.mHalf || std::abs(portal.mY2 - n.mY) > 30)
             {
                 continue;
             }
             const s32 px = (portal.mX1 + portal.mX2) / 2;
             const s32 before = portal.mDir == 0 ? px - n.mX : n.mX - px;
+            // (one that leads out of the path is a way out of it, from the cell it is hopped into from: ExitTask)
+            if (portal.mDestPath >= 0)
+            {
+                if (before >= 0 && (before + step / 2) / step == 2)
+                {
+                    mExits.push_back({from, static_cast<s32>(k)});
+                }
+                continue;
+            }
             // (from up to five cells before it: until it is open nobody may come within three cells of it, or its
             // doves fly off and it is gone, so it is chanted open from back there and then walked up to)
             // (in cells: a portal's middle is not always a cell's)

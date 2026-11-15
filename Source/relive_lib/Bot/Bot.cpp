@@ -192,6 +192,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<ScrabHuntTask>(step.mEntity, step.mEdge);
         case StepKind::eScrabLure:
             return std::make_unique<ScrabLureTask>(step.mEdge);
+        case StepKind::eMeatUse:
+            return std::make_unique<MeatLureTask>(step.mEntity, step.mOther, action.mEffects[0].mKey == Key::kInvis ? 1 : action.mEffects[0].mValue);
         case StepKind::eParamitePull:
             return std::make_unique<ParamitePullTask>(step.mEntity, step.mOther, step.mEdge);
         case StepKind::eFleechLure:
@@ -529,6 +531,27 @@ bool Bot::Replan(BaseMap& map)
                     misses += "switch " + std::to_string(fact.mKey - 1000) + ": " + sub.mMiss + "; ";
                 }
             }
+            // Nothing left to switch, and a way out of this path into one of the level he has not been in, from
+            // which the level goes on: that before any wandering here (the Mudomo vaults' path 7: its way on, a
+            // bird portal, is only got to by coming back into it through path 10)
+            if (!best.mFound && mNewPathFor != mAbe.mPath && mKnow)
+            {
+                bool onward = false;
+                for (const NavExit& x : mKnow->mNav.Exits())
+                {
+                    const NavFeature& f = mKnow->mNav.Input().mFeatures[x.mFeature];
+                    onward = onward || (f.mDestPath >= 0 && (f.mDestLevel < 0 || f.mDestLevel == mAbe.mLevel) && mVisitedPaths.count({mAbe.mLevel, f.mDestPath}) == 0 && mLevel.Distance(f.mDestPath) >= 0);
+                }
+                if (onward)
+                {
+                    mNewPathFor = mAbe.mPath;
+                    Log("no way on from here: any path of this level not yet been in will do");
+                    mTask = std::make_unique<GoToTask>("think again", [](s32)
+                                                       { return true; });
+                    mTaskAction.clear();
+                    return true;
+                }
+            }
             // Nothing left to switch: somewhere he has not been yet (through a door that is open now, say). The
             // way out may show from there.
             mRegionsBeen.insert({mAbe.mPath, domain.mStart.Get(Key::kRegion)});
@@ -674,7 +697,7 @@ bool Bot::Replan(BaseMap& map)
             if (done == 0 && domain.mSteps[a.mTag].mKind == StepKind::eCross && mKnow)
             {
                 const NavNode& to = mKnow->mNav.Nodes()[mKnow->mNav.Edges()[domain.mSteps[a.mTag].mEdge].mTo];
-                leadsIn = Domain::ScrabReaches(mKnow->mNav, mWorld, to.mX, to.mY, to.mHalf, false);
+                leadsIn = Domain::HuntedAt(mKnow->mNav, mWorld, to.mX, to.mY, to.mHalf);
             }
             bool unseen = false;
             for (const Goap::Fact& f : a.mPre)
@@ -1070,7 +1093,9 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs) const
             // climb is where they get him. Measured in the Mudomo hub at 2137,460.)
             for (const ParamiteAt& para : world->mParamites)
             {
-                if (!world->mInvisible && !para.mPossessed && !para.Hidden() && para.mHalf == from.mHalf && std::abs(para.mY - from.mY) <= 40 && std::abs(para.mX - from.mX) < 700)
+                // (unseen as well: the power runs out, and the climb is what there is no time for. The Mudomo
+                // vaults' path 10.)
+                if (!para.mPossessed && !para.Hidden() && para.mHalf == from.mHalf && std::abs(para.mY - from.mY) <= 40 && std::abs(para.mX - from.mX) < 700)
                 {
                     return 20;
                 }
@@ -1107,6 +1132,20 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs) const
                 if (know->mNav.NodeAt(x, from.mY, from.mHalf, 10) >= 0 && world->SweepOver(x, from.mY, from.mHalf))
                 {
                     return -1;
+                }
+            }
+        }
+        // A hop down onto a floor a pack of Paramites hunts him on, within 150 px of one of them: he lands
+        // standing, and they have him before he is off again. Measured in the Mudomo vaults' path 7, from
+        // 1212,1400 onto 1312,1520 with one at 1212: dead 12 frames after landing. (At 150 he gets away: the
+        // way in's hop from 1687,360.)
+        if (e.mKind == EdgeKind::eHop && to.mY > from.mY + 30 && !world->mInvisible && Domain::ParamitePack(know->mNav, *world, to.mX, to.mY, to.mHalf))
+        {
+            for (const ParamiteAt& para : world->mParamites)
+            {
+                if (!para.mPossessed && !para.Hidden() && para.mHalf == to.mHalf && std::abs(para.mY - to.mY) <= 40 && std::abs(para.mX - to.mX) < 150)
+                {
+                    return e.mCost + 400;
                 }
             }
         }

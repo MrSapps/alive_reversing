@@ -1,6 +1,7 @@
 #include "Task.hpp"
 #include "Bot.hpp"
 #include "Domain.hpp"
+#include "ThrowArc.hpp"
 #include <algorithm>
 #include <cstdlib>
 
@@ -592,7 +593,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 for (std::size_t i = 0; near && i < path.size(); i++)
                 {
                     const NavNode& to = nav.Nodes()[nav.Edges()[path[i]].mTo];
-                    if (Domain::ScrabReaches(nav, w, to.mX, to.mY, to.mHalf, false))
+                    if (Domain::HuntedAt(nav, w, to.mX, to.mY, to.mHalf))
                     {
                         near = i == 0;
                         break;
@@ -603,7 +604,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 const NavNode& to = nav.Nodes()[first.mTo];
                 // (not on a stretch timed against the Scrab's beat with the power kept for something else)
-                near = near || (!(bot.InvisSaved() && bot.KeepsTo()) && Domain::ScrabReaches(nav, w, to.mX, to.mY, to.mHalf, false) && !Domain::ScrabReaches(nav, w, from.mX, from.mY, from.mHalf, false));
+                near = near || (!(bot.InvisSaved() && bot.KeepsTo()) && Domain::HuntedAt(nav, w, to.mX, to.mY, to.mHalf) && !Domain::HuntedAt(nav, w, from.mX, from.mY, from.mHalf));
             }
             // And with the power kept for nothing: onto the floor of any Scrab that is about, one that waits
             // before it strikes as well (the walkthrough's fifth Mudanchee vault: "climb back up to the Scrab's
@@ -1241,6 +1242,40 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 }
                 mSteps--;
                 return TaskStep::Do(Prim::Press(Btn::eDown, 12));
+            }
+            // Down onto a floor a pack of Paramites hunts him on, seen: run off, through every ledge on the way
+            // down, and on. A walk off, or a hop with its landing, leaves him standing a cell or two from them.
+            {
+                s32 falls = 0;
+                s32 count = 0;
+                // (unseen too: the power's clock is running. Only where the way goes on the same way after the
+                // last of them: he comes down at a run.)
+                for (std::size_t i = 0; !first.mCrouched && i < path.size() && i < 12; i++)
+                {
+                    const NavEdge& e = nav.Edges()[path[i]];
+                    if ((e.mKind != EdgeKind::eWalk && e.mKind != EdgeKind::eFall) || e.mLeft != first.mLeft)
+                    {
+                        break;
+                    }
+                    if (e.mKind == EdgeKind::eFall)
+                    {
+                        count++;
+                        const NavNode& to = nav.Nodes()[e.mTo];
+                        const bool on = i + 1 < path.size() && nav.Edges()[path[i + 1]].mLeft == first.mLeft && (nav.Edges()[path[i + 1]].mKind == EdgeKind::eWalk || nav.Edges()[path[i + 1]].mKind == EdgeKind::eRunJump);
+                        if (on && Domain::ParamitePack(nav, bot.GetWorld(), to.mX, to.mY, to.mHalf))
+                        {
+                            falls = count;
+                        }
+                    }
+                }
+                if (falls > 0)
+                {
+                    bot.Log("Paramites on the floor below: off the edge at a run, " + std::to_string(falls) + " down");
+                    mLastEdge = -1;
+                    Prim run = Prim::WalkOff(first.mLeft);
+                    run.mRunOff = falls;
+                    return TaskStep::Do(run);
+                }
             }
             mLastEdge = path[0];
             Prim fall = Prim::WalkOff(first.mLeft);
@@ -2118,10 +2153,34 @@ TaskStep UseTask::Next(Bot& bot, const std::string& lastFailed)
         {
             mSide = bot.Abe().mX > entity->CentreX() ? 1 : -1;
         }
-        // A lock is slapped from the side he comes to it from (the other may be behind a gate)
+        // A lock is slapped from the side he comes to it from (the other may be behind a gate): the one the
+        // way to is shorter, which is not always the side he is on now (the Mudomo vaults' path 10: the lock at
+        // 1037,740 is come to from the left, down from the ledge over it, with no time to walk round it)
         if (entity->mKind == EntityKind::eSlapLock)
         {
             mSide = bot.Abe().mX > entity->CentreX() ? 1 : -1;
+            const s32 here = bot.AbeNode();
+            const s32 nodes[2] = {Domain::UseNode(bot.Nav(), *entity, nullptr, -1), Domain::UseNode(bot.Nav(), *entity, nullptr, 1)};
+            s32 costs[2] = {-1, -1};
+            for (s32 i = 0; i < 2 && here >= 0 && nodes[0] >= 0 && nodes[1] >= 0 && nodes[0] != nodes[1]; i++)
+            {
+                const s32 goal = nodes[i];
+                std::vector<s32> way;
+                s32 total = 0;
+                if (here == goal)
+                {
+                    costs[i] = 0;
+                }
+                else if (bot.Nav().FindPath(here, [goal](s32 n)
+                                            { return n == goal; }, bot.EdgeCostFn(), way, &total))
+                {
+                    costs[i] = total;
+                }
+            }
+            if (costs[0] >= 0 && costs[1] >= 0 && costs[0] != costs[1])
+            {
+                mSide = costs[0] < costs[1] ? -1 : 1;
+            }
         }
     }
     bool faceLeft = false;
@@ -5200,6 +5259,146 @@ TaskStep ParamitePullTask::Next(Bot& bot, const std::string& lastFailed)
     return TaskStep::Failed("lost its place");
 }
 
+MeatLureTask::~MeatLureTask() = default;
+
+TaskStep MeatLureTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const AbeState& abe = bot.Abe();
+    const Entity* entity = world.Find(mEntity);
+    const ParamiteAt* para = nullptr;
+    for (const ParamiteAt& p : world.mParamites)
+    {
+        para = p.mId == mParamite ? &p : para;
+    }
+    const s32 lockNode = entity ? Domain::UseNode(nav, *entity, nullptr) : -1;
+    if (!entity || lockNode < 0)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    if (++mFrames > 1500)
+    {
+        return TaskStep::Failed("the meat took too long");
+    }
+    const NavNode& lock = nav.Nodes()[lockNode];
+    const s32 cell = NavGraph::GridStep(lock.mHalf);
+    switch (mPhase)
+    {
+        case 0:
+        {
+            if (!para)
+            {
+                // (not seen yet: its screen comes in on the way)
+                if (!mGo)
+                {
+                    mGo = GoToNode(lockNode);
+                }
+            }
+            else if (mSpot < 0)
+            {
+                // From the side he comes from, far enough from it that it is not cornered into striking, and
+                // thrown on away from it: the meat has to come down on its floor, on the screen he is on
+                mSide = abe.mX >= para->mX ? 1 : -1;
+                // (as far from the thing as a throw that stays on the screen lets him be: it backs off as he
+                // comes, to the end of its floor by the thing)
+                for (s32 k = 14; k >= 5 && mSpot < 0; k--)
+                {
+                    const s32 x = lock.mX + mSide * k * cell;
+                    const s32 n = nav.NodeAt(x, lock.mY, lock.mHalf, 6);
+                    if (n < 0 || nav.Nodes()[n].mLine != lock.mLine || nav.Nodes()[n].mLow || nav.Nodes()[n].mHazard)
+                    {
+                        continue;
+                    }
+                    for (ThrowSpot::Kind kind : {ThrowSpot::eForward, ThrowSpot::eUp, ThrowSpot::eLob})
+                    {
+                    if (mSpot >= 0)
+                    {
+                        break;
+                    }
+                    const ThrowArc::Flight flight = ThrowArc::Throw(nav.Input(), nav.Nodes()[n].mX, lock.mY, lock.mHalf, mSide < 0, kind);
+                    for (const ThrowArc::Point& p : flight.mPoints)
+                    {
+                        if (p.mY >= lock.mY - 12 && (p.mX - nav.Nodes()[n].mX) * mSide > 0)
+                        {
+                            const s32 land = nav.NodeAt(p.mX, lock.mY, lock.mHalf, 6);
+                            if (land >= 0 && nav.Nodes()[land].mLine == lock.mLine && nav.CameraOf(p.mX, lock.mY - 5) == nav.CameraOf(nav.Nodes()[n].mX, lock.mY - 5))
+                            {
+                                // (Paramite::FindMeat looks for a wall between at the height of its own y above
+                                // its feet, which is nowhere: no wall keeps it from seeing the meat)
+                                mSpot = n;
+                                mKind = kind;
+                                bot.Log("meat for the Paramite at " + std::to_string(para->mX) + "," + std::to_string(para->mY) + ": thrown from " + std::to_string(nav.Nodes()[n].mX) + " to about " + std::to_string(p.mX));
+                            }
+                            bot.Log("meat from " + std::to_string(nav.Nodes()[n].mX) + " kind " + std::to_string(static_cast<s32>(kind)) + " comes down at " + std::to_string(p.mX) + "," + std::to_string(p.mY) + (mSpot >= 0 ? "" : ": no good"));
+                            break;
+                        }
+                    }
+                    }
+                }
+                if (mSpot < 0)
+                {
+                    return TaskStep::Failed("nowhere to throw the meat from");
+                }
+                mGo = GoToNode(mSpot);
+            }
+            TaskStep step;
+            if (!RunGo(mGo, bot, lastFailed, step))
+            {
+                return step;
+            }
+            if (step.mKind == TaskStep::Kind::eFailed)
+            {
+                return step;
+            }
+            if (mSpot < 0)
+            {
+                return para ? TaskStep::Do(Prim::Wait(1)) : TaskStep::Failed("the Paramite is not there");
+            }
+            mPhase = 1;
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        case 1:
+            if (world.mRocks <= 0)
+            {
+                return TaskStep::Failed("no meat");
+            }
+            if (!abe.Settled())
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            if (abe.mFacingLeft != (mSide < 0))
+            {
+                return TaskStep::Do(Prim::Face(mSide < 0));
+            }
+            // (it comes to hand over a few frames, and goes when a direction is held as well)
+            mPhase = 2;
+            return TaskStep::Do(Prim::Wait(8, Btn::eThrow));
+        case 2:
+            mPhase = 3;
+            mFrames = 0;
+            return TaskStep::Do(Prim::Wait(6, Btn::eThrow | BlowMineTask::AimBits(mKind, abe.mFacingLeft)));
+        case 3:
+            // Until it is past him, at the meat
+            if (para && (para->mX - abe.mX) * mSide > cell)
+            {
+                bot.Log("the Paramite is at the meat at " + std::to_string(para->mX) + ": to #" + std::to_string(mEntity));
+                mPhase = 4;
+                mUse = std::make_unique<UseTask>(mEntity, mWant);
+                mUse->FixSide(mSide);
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            if (mFrames > 300)
+            {
+                return TaskStep::Failed("the Paramite did not go for the meat");
+            }
+            return TaskStep::Do(Prim::Wait(1));
+        case 4:
+            return mUse->Next(bot, lastFailed);
+    }
+    return TaskStep::Failed("lost its place");
+}
+
 ScrabHuntTask::~ScrabHuntTask() = default;
 
 // How many ways on and off its floor the stretch of it about x has, between the gates either side
@@ -5900,6 +6099,64 @@ TaskStep ExitTask::Next(Bot& bot, const std::string& lastFailed)
         }
         return TaskStep::Do(Prim::Wait(15));
     }
+    // A bird portal of his own that leads out of the path: chanted open from four cells off or more on its
+    // screen, before he comes any nearer (within three cells its doves fly off and it is gone until the screen
+    // is come back to), and not from a floor Paramites hunt him on. The Mudomo vaults' path 7: "from on the
+    // first ledge, chant to open the bird portal, or else you'll scare the birds away when you climb up".
+    const NavFeature& way = nav.Input().mFeatures[exit.mFeature];
+    if (way.mKind == FeatureKind::ePortal)
+    {
+        const s32 px = (way.mX1 + way.mX2) / 2;
+        bool open = false;
+        for (const RockAt& at : bot.GetWorld().mPortalsOpen)
+        {
+            open = open || (std::abs(at.mX - px) <= 40 && std::abs(at.mY - way.mY2) <= 120);
+        }
+        if (!open && !mArrived)
+        {
+            if (!mAtChant)
+            {
+                if (!mPortalGo)
+                {
+                    const NavGraph* g = &nav;
+                    const World* w = &bot.GetWorld();
+                    const s32 cam = nav.CameraOf(px, way.mY2 - 5);
+                    const bool half = way.mHalf;
+                    mPortalGo = std::make_unique<GoToTask>("to where the bird portal is chanted open from", [g, w, cam, half, px](s32 n)
+                                                           {
+                                                               const NavNode& at = g->Nodes()[n];
+                                                               const s32 cell = NavGraph::GridStep(half);
+                                                               return at.mHalf == half && !at.mLow && !at.mHazard && g->CameraOf(at.mX, at.mY - 5) == cam && std::abs(at.mX - px) >= 4 * cell &&
+                                                                      !Domain::ParamitePack(*g, *w, at.mX, at.mY, at.mHalf);
+                                                           });
+                }
+                TaskStep step;
+                if (!RunGo(mPortalGo, bot, lastFailed, step))
+                {
+                    return step;
+                }
+                if (step.mKind == TaskStep::Kind::eFailed)
+                {
+                    return step;
+                }
+                mAtChant = true;
+                bot.Log("chanting the bird portal at " + std::to_string(px) + "," + std::to_string(way.mY2) + " open from here");
+            }
+            if (!abe.Settled())
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            if (abe.mFacingLeft != (px < abe.mX))
+            {
+                return TaskStep::Do(Prim::Face(px < abe.mX));
+            }
+            if (++mPortalChants > 40)
+            {
+                return TaskStep::Failed("the bird portal did not open");
+            }
+            return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+        }
+    }
     if (!mArrived)
     {
         if (!mGo)
@@ -5950,6 +6207,21 @@ TaskStep ExitTask::Next(Bot& bot, const std::string& lastFailed)
             }
         }
         return TaskStep::Do(Prim::Wait(40, abe.mFacingLeft ? Btn::eLeft : Btn::eRight));
+    }
+    if (f.mKind == FeatureKind::ePortal)
+    {
+        // (hopped into from two cells off, facing it: it takes the hop itself)
+        if (!abe.Settled())
+        {
+            mTries--;
+            return TaskStep::Do(Prim::Wait(2));
+        }
+        if (abe.mFacingLeft != (f.mDir != 0))
+        {
+            mTries--;
+            return TaskStep::Do(Prim::Face(f.mDir != 0));
+        }
+        return TaskStep::Do(Prim::Press(Btn::eHop));
     }
     return TaskStep::Do(Prim::Press(Btn::eUp));
 }
