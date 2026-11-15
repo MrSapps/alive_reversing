@@ -939,12 +939,23 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             }
             // Sligs on this floor: quietly near a sleeping one, and past one that is awake only where he can't see
             bool sneak = false;
+            bool overhead = false;
             bool outrun = false;
             const NavNode& here = nav.Nodes()[cur];
             const s32 cell = NavGraph::GridStep(here.mHalf);
             for (const SligAt& slig : bot.GetWorld().Threats())
             {
                 // A sleeping one hears steps on any floor of its screen; one that is awake sees along its own
+                // (AO: one awake in the background of his screen, or on a catwalk over his floor, hears him run by
+                // and shoots at him. Rupture Farms' path 18, first screen: shot at 490,315 by the one in the
+                // background at 375,235. By it he goes quietly.)
+                if (!bot.IsAe() && !slig.mPossessed && !slig.mAsleep && nav.CameraOf(slig.mX, slig.mY - 5) == nav.CameraOf(here.mX, here.mY - 5) &&
+                    (slig.mHalf != here.mHalf || (std::abs(slig.mY - here.mY) > 45 && std::abs(slig.mY - here.mY) <= 130)))
+                {
+                    sneak = true;
+                    overhead = true;
+                    continue;
+                }
                 if (slig.mPossessed || (!slig.mAsleep && (slig.mHalf != here.mHalf || std::abs(slig.mY - here.mY) > 45)))
                 {
                     continue;
@@ -1360,6 +1371,16 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             if (mQuiet && !bot.GetWorld().mInvisible)
             {
                 return TaskStep::Do(Prim::MoveTo(to.mX, Gait::eSneak));
+            }
+            // (under a Slig that is awake overhead: quietly, as far as its screen goes, whatever else says run)
+            if (overhead)
+            {
+                std::size_t end = 0;
+                while (end < last && nav.CameraOf(nav.Nodes()[nav.Edges()[path[end + 1]].mTo].mX, here.mY - 5) == nav.CameraOf(here.mX, here.mY - 5))
+                {
+                    end++;
+                }
+                return TaskStep::Do(Prim::MoveTo(nav.Nodes()[nav.Edges()[path[end]].mTo].mX, Gait::eSneak));
             }
             if (outrun || mHurry || fleech || (flier && !sneak))
             {
