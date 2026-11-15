@@ -801,6 +801,44 @@ private:
     std::unique_ptr<GoToTask> mGo;
 };
 
+// A Paramite taken over and walked to every ring it can get to (Domain::ParamiteTour, by Domain::ParamiteRoute:
+// floors, webs, hops and drops), each pulled, and let go under the last.
+class ParamiteTourTask final : public Task
+{
+public:
+    ParamiteTourTask(u32 paramite, s32 spot)
+        : mParamite(paramite)
+        , mSpot(spot)
+    {
+    }
+    ~ParamiteTourTask() override;
+    std::string Name() const override
+    {
+        return "Paramite #" + std::to_string(mParamite) + " pulls the rings it can get to";
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mParamite;
+    s32 mSpot;
+    // 0 to the spot, 1 chant, 2 on its way to the next ring, 3 pull, 4 let go, 5 himself again
+    s32 mPhase = 0;
+    s32 mFrames = 0;
+    s32 mPulls = 0;
+    s32 mPulled = 0;
+    s32 mWait = 0;
+    u32 mRing = 0;
+    s32 mWas = 0;
+    // The leg under way: its kind (-1 none), where it ends, its web, and the frames it has had
+    s32 mLeg = -1;
+    s32 mLegTo = -1;
+    s32 mLegX = 0;
+    s32 mLegFrames = 0;
+    // The frames spent after Fleeches
+    s32 mHunt = 0;
+    std::unique_ptr<GoToTask> mGo;
+};
+
 // A lock or lever a lone Paramite keeps by: meat thrown the other way draws it off (it goes for meat on its floor
 // on the screen he is on, with no wall between, and eats for a while: Paramite::FindMeat), and then it is used.
 class MeatLureTask final : public Task

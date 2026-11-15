@@ -5348,6 +5348,416 @@ TaskStep ParamitePullTask::Next(Bot& bot, const std::string& lastFailed)
     return TaskStep::Failed("lost its place");
 }
 
+ParamiteTourTask::~ParamiteTourTask() = default;
+
+TaskStep ParamiteTourTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const ParamiteAt* me = nullptr;
+    for (const ParamiteAt& paramite : world.mParamites)
+    {
+        me = paramite.mPossessed ? &paramite : me;
+    }
+    if (++mFrames > 6000)
+    {
+        return TaskStep::Failed("the Paramite took too long");
+    }
+    switch (mPhase)
+    {
+        case 0:
+        {
+            if (!mGo)
+            {
+                mGo = GoToNode(mSpot);
+            }
+            TaskStep step;
+            if (!RunGo(mGo, bot, lastFailed, step))
+            {
+                return step;
+            }
+            if (step.mKind == TaskStep::Kind::eFailed)
+            {
+                return step;
+            }
+            mPhase = 1;
+            mFrames = 0;
+            bot.Log("chanting to take over a Paramite for the rings it can get to");
+            return TaskStep::Do(Prim::Wait(2));
+        }
+        case 1:
+            if (me)
+            {
+                mPhase = 2;
+                mFrames = 0;
+                return TaskStep::Do(Prim::Wait(4));
+            }
+            if (mFrames > 400)
+            {
+                return TaskStep::Failed("no Paramite was taken over");
+            }
+            return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+        case 2:
+        case 3:
+        {
+            if (!me)
+            {
+                return TaskStep::Failed("lost the Paramite");
+            }
+            // (what goes wrong while he is in it: it is let go first, and the step fails if no ring was pulled)
+            const auto giveUp = [&](const std::string& why)
+            {
+                bot.Log("the Paramite's round ends: " + why);
+                mPhase = 4;
+                mFrames = 0;
+                return TaskStep::Do(Prim::Wait(4));
+            };
+            const s32 cell = NavGraph::GridStep(me->mHalf);
+            const u32 left = Btn::eLeft;
+            const u32 right = Btn::eRight;
+            // (a pull under way, and what a pull sets going: a lift takes a moment)
+            const Entity* ring = mRing ? world.Find(mRing) : nullptr;
+            if (mPhase == 3 && ring && world.Switch(ring->mSwitch) != mWas)
+            {
+                mPulled++;
+                bot.Log("ring #" + std::to_string(mRing) + " is pulled");
+                mRing = 0;
+                mPhase = 2;
+                mWait = 60;
+                mLeg = -1;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            if (mWait > 0)
+            {
+                mWait--;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            // On a web (Paramite.hpp: 38 grabs it, 35 hangs, 36 and 37 climb, 39 and 34 step off): up or down it
+            // as the leg says, and with no leg up
+            if (me->mMotion == 35 || me->mMotion == 36 || me->mMotion == 37)
+            {
+                // (walked off an end into one on the way down counts as the way down)
+                const bool down = mLeg >= 0 && mLegTo >= 0 && nav.Nodes()[mLegTo].mY > me->mY + 12;
+                if (++mLegFrames > 900)
+                {
+                    return giveUp("the Paramite got no further on its web");
+                }
+                return TaskStep::Do(Prim::Wait(2, down ? Btn::eDown : Btn::eUp));
+            }
+            if (me->mMotion == 38 || me->mMotion == 39 || me->mMotion == 34 || me->mMotion == 11 || me->mMotion == 17 || me->mMotion == 5 || me->mMotion == 15)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            const s32 at = nav.NodeAt(me->mX, me->mY, me->mHalf, 13);
+            // Fleeches awake on its level that it can walk to: after the nearest, and eaten (down, with no web
+            // there, eats what is a cell ahead of it: Paramite.cpp, Motion_40_Eating). The walkthrough of the first
+            // Mudomo vault: "running up to them and eating them all by repeatedly pressing down". Left alone they
+            // go for him where he stands chanting (measured there: bitten to 69 in 100 by the time it was let go).
+            {
+                const RockAt* prey = nullptr;
+                for (const RockAt& f : world.mFleechesAwake)
+                {
+                    if (f.mHalf != me->mHalf || std::abs(f.mY - me->mY) > 20 || std::abs(f.mX - me->mX) > 700 || Domain::WallBetween(nav, me->mX, f.mX, me->mY, me->mHalf) || Domain::GateBetween(nav, world, me->mX, f.mX, me->mY, me->mHalf))
+                    {
+                        continue;
+                    }
+                    // (floor all the way to it)
+                    bool floor = true;
+                    for (s32 x = std::min(me->mX, f.mX); floor && x <= std::max(me->mX, f.mX); x += cell)
+                    {
+                        floor = Domain::ParamiteFloor(nav, world, x, me->mY, me->mHalf) >= 0;
+                    }
+                    // (the one nearest to him where he stands chanting on that floor: those are after him, and
+                    // the ones that run from it can wait)
+                    const s32 from = std::abs(bot.Abe().mY - me->mY) <= 20 ? bot.Abe().mX : me->mX;
+                    if (floor && (!prey || std::abs(f.mX - from) < std::abs(prey->mX - from)))
+                    {
+                        prey = &f;
+                    }
+                }
+                const bool onFloor = me->mMotion <= 4 || (me->mMotion >= 7 && me->mMotion <= 10) || me->mMotion == 40;
+                if (prey && onFloor && at >= 0 && mHunt < 2500)
+                {
+                    mHunt++;
+                    mLeg = -1;
+                    const s32 dx = prey->mX - me->mX;
+                    if (mHunt % 25 == 1)
+                    {
+                        bot.Log("Paramite at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + " motion " + std::to_string(me->mMotion) + " after the Fleech at " + std::to_string(prey->mX) + " (" + std::to_string(mHunt) + ")");
+                    }
+                    const u32 toward = dx > 0 ? right : left;
+                    // (from a run it bites its way through all of them it touches, a frame at a time: Motion_31,
+                    // had with the action button while the run is held. One at a time with a few of them at it
+                    // costs it its life: each of their hits takes 0.15 of it. Measured in the first Mudomo vault:
+                    // eating at four of them against the wall, it was dead in 40 frames.)
+                    // (only with floor for six cells past the Fleech: a run is not stopped by the end of a floor,
+                    // and it went off the end of the first vault's top floor after one, down two floors to where
+                    // there was no way back to its ring. Near an end it walks up and eats.)
+                    bool room = true;
+                    for (s32 k = 1; room && k <= 6; k++)
+                    {
+                        const s32 x = prey->mX + (dx > 0 ? k : -k) * cell;
+                        // (a wall past it is as good as floor: it stops the run. Against a wall is where they
+                        // stand and fight, several at once.)
+                        if (Domain::WallBetween(nav, prey->mX, x, me->mY, me->mHalf))
+                        {
+                            break;
+                        }
+                        room = Domain::ParamiteFloor(nav, world, x, me->mY, me->mHalf) >= 0;
+                    }
+                    // (nor with him in the way of the run: what it bites at a run it bites whoever it is. Measured
+                    // in the first vault: dead at 1728 with the Fleeches between him and the wall.)
+                    {
+                        const AbeState& abe = bot.Abe();
+                        const s32 lo = std::min(me->mX, prey->mX + (dx > 0 ? 6 : -6) * cell) - cell;
+                        const s32 hi = std::max(me->mX, prey->mX + (dx > 0 ? 6 : -6) * cell) + cell;
+                        if (abe.mHalfScale == me->mHalf && std::abs(abe.mY - me->mY) <= 40 && abe.mX >= lo && abe.mX <= hi)
+                        {
+                            room = false;
+                        }
+                    }
+                    const u32 run = room ? static_cast<u32>(Btn::eRun) : 0u;
+                    // (and nothing held with the floor's end two cells ahead, four at a run: a Fleech that goes
+                    // off the end is not followed)
+                    {
+                        const bool fast = me->mMotion == 3 || me->mMotion == 9 || me->mMotion == 31;
+                        bool edge = false;
+                        for (s32 k = 1; k <= (fast ? 5 : 2); k++)
+                        {
+                            const s32 x = me->mX + (dx > 0 ? k : -k) * cell;
+                            if (Domain::WallBetween(nav, me->mX, x, me->mY, me->mHalf))
+                            {
+                                break;
+                            }
+                            edge = edge || Domain::ParamiteFloor(nav, world, x, me->mY, me->mHalf) < 0;
+                        }
+                        if (edge && (dx < 0) == me->mFacesLeft)
+                        {
+                            if (me->mMotion == 0 && std::abs(dx) <= cell * 7 / 4)
+                            {
+                                return TaskStep::Do(Prim::Wait(12, Btn::eDown));
+                            }
+                            // (it is let be, and the way gone on with)
+                            if (me->mMotion == 0)
+                            {
+                                mHunt += 50;
+                                prey = nullptr;
+                            }
+                            else
+                            {
+                                return TaskStep::Do(Prim::Wait(1));
+                            }
+                        }
+                    }
+                    if (prey)
+                    {
+                    if (me->mMotion == 31)
+                    {
+                        return TaskStep::Do(Prim::Wait(1, room ? toward | run : 0u));
+                    }
+                    if (me->mMotion != 0 && me->mMotion != 40)
+                    {
+                        if (std::abs(dx) > cell && (dx < 0) == me->mFacesLeft)
+                        {
+                            const bool running = me->mMotion == 3 || me->mMotion == 9;
+                            if (running && !room)
+                            {
+                                // (out of the run)
+                                return TaskStep::Do(Prim::Wait(1));
+                            }
+                            const u32 bite = running && std::abs(dx) <= 5 * cell ? static_cast<u32>(Btn::eAction) : 0u;
+                            return TaskStep::Do(Prim::Wait(1, toward | (std::abs(dx) > 3 * cell || running ? run : 0u) | bite));
+                        }
+                        return TaskStep::Do(Prim::Wait(1));
+                    }
+                    if ((dx < 0) != me->mFacesLeft)
+                    {
+                        return TaskStep::Do(Prim::Wait(1, toward));
+                    }
+                    if (std::abs(dx) > cell * 7 / 4)
+                    {
+                        return TaskStep::Do(Prim::Wait(2, toward | (std::abs(dx) > 3 * cell ? run : 0u)));
+                    }
+                    return TaskStep::Do(Prim::Wait(12, Btn::eDown));
+                    }
+                }
+            }
+            // The leg under way
+            if (mLeg >= 0 && at != mLegTo)
+            {
+                if (++mLegFrames > 900)
+                {
+                    return giveUp("the Paramite got no further on its way");
+                }
+                const NavNode& to = nav.Nodes()[mLegTo];
+                switch (mLeg)
+                {
+                    case Domain::ParaLeg::eWalk:
+                    {
+                        const s32 dx = to.mX - me->mX;
+                        if (std::abs(to.mY - me->mY) > 30)
+                        {
+                            // (not on that floor any more: think again)
+                            mLeg = -1;
+                            return TaskStep::Do(Prim::Wait(1));
+                        }
+                        // (at a walk up to Fleeches that sleep: they wake as it comes by, and from a walk it is
+                        // stopped among them and eats them where they come down. At a run it was carried on
+                        // past them, and they were off to where he stands before it had turned.)
+                        bool sleepers = false;
+                        for (const RockAt& f : world.mFleechesAsleep)
+                        {
+                            const s32 ahead = (f.mX - me->mX) * (dx > 0 ? 1 : -1);
+                            sleepers = sleepers || (f.mHalf == me->mHalf && std::abs(f.mY - me->mY) < 150 && ahead > -2 * cell && ahead < 14 * cell);
+                        }
+                        if (std::abs(dx) > 8 * cell && !sleepers)
+                        {
+                            return TaskStep::Do(Prim::Wait(2, (dx > 0 ? right : left) | Btn::eRun));
+                        }
+                        if (std::abs(dx) > cell + cell / 2)
+                        {
+                            return TaskStep::Do(Prim::Wait(2, dx > 0 ? right : left));
+                        }
+                        if (me->mMotion != 0)
+                        {
+                            return TaskStep::Do(Prim::Wait(1));
+                        }
+                        if (std::abs(dx) > cell / 2)
+                        {
+                            return TaskStep::Do(Prim::Wait(2, dx > 0 ? right : left));
+                        }
+                        mLeg = -1;
+                        return TaskStep::Do(Prim::Wait(1));
+                    }
+                    case Domain::ParaLeg::eWebUp:
+                    {
+                        // (grabbed from a jump within a cell of it, facing it)
+                        const s32 dx = mLegX - me->mX;
+                        if (me->mMotion != 0)
+                        {
+                            return TaskStep::Do(Prim::Wait(1));
+                        }
+                        if (std::abs(dx) < 2)
+                        {
+                            return TaskStep::Do(Prim::Wait(2, me->mFacesLeft ? right : left));
+                        }
+                        if (std::abs(dx) > cell || (dx < 0) != me->mFacesLeft)
+                        {
+                            return TaskStep::Do(Prim::Wait(2, dx > 0 ? right : left));
+                        }
+                        return TaskStep::Do(Prim::Wait(3, Btn::eUp));
+                    }
+                    case Domain::ParaLeg::eWebDown:
+                    case Domain::ParaLeg::eFall:
+                    {
+                        // (it walks off the end into the web and has hold of it; or off the end and down)
+                        const s32 toX = mLeg == Domain::ParaLeg::eWebDown ? mLegX : to.mX;
+                        const s32 dx = toX - me->mX;
+                        if (std::abs(me->mY - to.mY) <= 12)
+                        {
+                            mLeg = -1;
+                            return TaskStep::Do(Prim::Wait(1));
+                        }
+                        return TaskStep::Do(Prim::Wait(2, dx >= 0 ? right : left));
+                    }
+                    default:
+                    {
+                        // A hop: from a stand, facing the way, with no way held
+                        const s32 dx = to.mX - me->mX;
+                        if (me->mMotion != 0)
+                        {
+                            return TaskStep::Do(Prim::Wait(1));
+                        }
+                        if ((dx < 0) != me->mFacesLeft)
+                        {
+                            return TaskStep::Do(Prim::Wait(1, dx > 0 ? right : left));
+                        }
+                        if (std::abs(dx) <= cell)
+                        {
+                            mLeg = -1;
+                            return TaskStep::Do(Prim::Wait(1));
+                        }
+                        return TaskStep::Do(Prim::Wait(2, Btn::eHop));
+                    }
+                }
+            }
+            mLeg = -1;
+            if (me->mMotion != 0)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            if (at < 0)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            // The next ring, and the way to it
+            if (!mRing)
+            {
+                const std::vector<u32> tour = Domain::ParamiteTour(nav, world, at);
+                if (tour.empty())
+                {
+                    bot.Log(std::to_string(mPulled) + " rings pulled and no more to get to: letting the Paramite go at " + std::to_string(me->mX) + "," + std::to_string(me->mY));
+                    mPhase = 4;
+                    mFrames = 0;
+                    return TaskStep::Do(Prim::Wait(4));
+                }
+                mRing = tour[0];
+                mWas = world.Switch(world.Find(mRing)->mSwitch);
+                mPulls = 0;
+                bot.Log("the Paramite at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + " goes for ring #" + std::to_string(mRing) + " at " + std::to_string(world.Find(mRing)->CentreX()));
+            }
+            ring = world.Find(mRing);
+            const s32 under = Domain::UseNode(nav, *ring, nullptr);
+            if (at != under || std::abs(ring->CentreX() - me->mX) > cell / 2)
+            {
+                std::vector<Domain::ParaLeg> legs;
+                if (at == under)
+                {
+                    // (under it but not straight under)
+                    const s32 dx = ring->CentreX() - me->mX;
+                    return TaskStep::Do(Prim::Wait(2, dx > 0 ? right : left));
+                }
+                if (!Domain::ParamiteRoute(nav, world, at, under, &legs) || legs.empty())
+                {
+                    return giveUp("no way for the Paramite to ring #" + std::to_string(mRing));
+                }
+                mLeg = legs[0].mKind;
+                mLegTo = legs[0].mTo;
+                mLegX = legs[0].mX;
+                mLegFrames = 0;
+                static const char* const kNames[] = {"walk", "web up", "web down", "hop", "drop"};
+                bot.Log(std::string("Paramite: ") + kNames[mLeg] + " to " + std::to_string(nav.Nodes()[mLegTo].mX) + "," + std::to_string(nav.Nodes()[mLegTo].mY));
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            mPhase = 3;
+            if (++mPulls > 8)
+            {
+                return giveUp("the Paramite could not pull ring #" + std::to_string(mRing));
+            }
+            // (up jumps it at the ring; it hangs on a moment and the switch is set as it lets go)
+            return TaskStep::Do(Prim::Wait(mPulls % 2 ? 3 : 40, mPulls % 2 ? static_cast<u32>(Btn::eUp) : 0u));
+        }
+        case 4:
+            if (!me)
+            {
+                mPhase = 5;
+                mFrames = 0;
+                return TaskStep::Do(Prim::Wait(2));
+            }
+            if (me->mMotion != 0 && me->mMotion != 29 && mFrames < 60)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            return TaskStep::Do(Prim::Wait(me->mMotion == 29 ? 2 : 20, Btn::eChant));
+        default:
+            if (!bot.Abe().Settled() && mFrames < 200)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            return mPulled > 0 ? TaskStep::Done() : TaskStep::Failed("no ring was pulled");
+    }
+}
+
 MeatLureTask::~MeatLureTask() = default;
 
 TaskStep MeatLureTask::Next(Bot& bot, const std::string& lastFailed)
