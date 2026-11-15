@@ -1205,9 +1205,19 @@ void GameView::ReadWorld(BaseMap& map, World& world)
     world.mRocks = isAe && gAbe ? gAbe->mBaseThrowableCount : 0;
     world.mRocksDown.clear();
     world.mRocksFlying.clear();
+    world.mFallers.clear();
     for (s32 i = 0; isAe && i < gBaseAliveGameObjects->Size(); i++)
     {
         BaseAliveGameObject* pObj = gBaseAliveGameObjects->ItemAt(i);
+        if (pObj && !pObj->GetDead() && pObj->Type() == ReliveTypes::eRockSpawner)
+        {
+            RockAt faller;
+            faller.mX = FP_GetExponent(pObj->mXPos);
+            faller.mY = FP_GetExponent(pObj->mYPos);
+            faller.mHalf = pObj->GetSpriteScale() != FP_FromInteger(1);
+            faller.mChasing = pObj->mVelY > FP_FromInteger(0);
+            world.mFallers.push_back(faller);
+        }
         if (pObj && !pObj->GetDead() && (pObj->Type() == ReliveTypes::eRock || pObj->Type() == ReliveTypes::eMeat))
         {
             RockAt rock;

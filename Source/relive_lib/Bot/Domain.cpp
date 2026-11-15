@@ -1067,6 +1067,21 @@ bool Domain::ParamiteRoute(const NavGraph& nav, const World& world, s32 from, s3
         ParaLeg::Kind mKind;
         s32 mX;
     };
+    // (Paramite.cpp looks for walls 20 over its feet, 10 at half its size: lower than a Scrab, so it goes under
+    // blocks that stop one. The Mudomo vault's path 5, under the block at 1268 that hangs to 19 over the floor.)
+    const auto wall = [&](s32 x1, s32 x2, s32 y)
+    {
+        const s32 at = y - 20 / scale;
+        for (const NavLine& line : nav.Input().mLines)
+        {
+            const bool is = half ? (line.mType == 5 || line.mType == 6) : (line.mType == 1 || line.mType == 2);
+            if (is && line.mX1 == line.mX2 && line.mX1 > std::min(x1, x2) && line.mX1 < std::max(x1, x2) && std::min(line.mY1, line.mY2) <= at && std::max(line.mY1, line.mY2) >= at)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
     const auto standable = [&](s32 n)
     {
         if (n < 0 || nav.Nodes()[n].mHalf != half)
@@ -1091,29 +1106,54 @@ bool Domain::ParamiteRoute(const NavGraph& nav, const World& world, s32 from, s3
         }
         return false;
     };
+    const auto rocky = [&](s32 n)
+    {
+        for (const RockAt& r : world.mFallers)
+        {
+            if (r.mHalf == half && std::abs(r.mX - nav.Nodes()[n].mX) <= 40 / scale)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
     const auto ways = [&](s32 n, std::vector<Way>& out)
     {
         const NavNode& a = nav.Nodes()[n];
         for (s32 dir = -1; dir <= 1; dir += 2)
         {
             const s32 nx = a.mX + dir * cell;
-            if (WallBetween(nav, a.mX, nx, a.mY, half) || GateBetween(nav, world, a.mX, nx, a.mY, half))
+            if (wall(a.mX, nx, a.mY) || GateBetween(nav, world, a.mX, nx, a.mY, half))
             {
                 continue;
             }
             const s32 next = nav.NodeAt(nx, a.mY, half, 6);
-            if (standable(next) && std::abs(nav.Nodes()[next].mX - nx) <= cell / 2)
+            const bool on = standable(next) && std::abs(nav.Nodes()[next].mX - nx) <= cell / 2;
+            if (on)
             {
-                out.push_back({next, 1, ParaLeg::eWalk, 0});
-                continue;
+                // (not to stand by where rocks fall, if it can be helped: one beside the gap they fall into is
+                // under them. The sixth Mudomo vault: dead at 1378 by the rocks at 1393.)
+                out.push_back({next, rocky(next) ? 40 : 1, ParaLeg::eWalk, 0});
             }
-            // No floor on: a hop to the fourth cell, or off the end to what is under it
+            // A gap within three cells: a hop to the fourth cell
+            bool gap = !on;
+            for (s32 k = 2; k <= 3 && !gap; k++)
+            {
+                const s32 gx = a.mX + dir * k * cell;
+                const s32 g = nav.NodeAt(gx, a.mY, half, 6);
+                gap = !(standable(g) && std::abs(nav.Nodes()[g].mX - gx) <= cell / 2);
+            }
             const s32 hx = a.mX + dir * 4 * cell;
             const s32 over = nav.NodeAt(hx, a.mY, half, 8);
-            if (standable(over) && std::abs(nav.Nodes()[over].mX - hx) <= cell / 2 && !WallBetween(nav, a.mX, hx, a.mY, half) && !GateBetween(nav, world, a.mX, hx, a.mY, half))
+            if (gap && standable(over) && std::abs(nav.Nodes()[over].mX - hx) <= cell / 2 && !wall(a.mX, hx, a.mY) && !GateBetween(nav, world, a.mX, hx, a.mY, half))
             {
-                out.push_back({over, 6, ParaLeg::eHop, 0});
+                out.push_back({over, rocky(over) ? 45 : 6, ParaLeg::eHop, 0});
             }
+            if (on)
+            {
+                continue;
+            }
+            // No floor on: off the end to what is under it
             s32 fy = 0;
             s32 height = 0;
             if (nav.FloorBelow(nx, a.mY + 1, half, &fy, &height) >= 0 && height * scale < 170)
@@ -1142,8 +1182,17 @@ bool Domain::ParamiteRoute(const NavGraph& nav, const World& world, s32 from, s3
             // the floor within 50 under it)
             s32 over = nav.NodeAt(x - cell / 2, top, half, 20);
             over = standable(over) && std::abs(nav.Nodes()[over].mX - x) <= cell ? over : nav.NodeAt(x + cell / 2, top, half, 20);
-            s32 fy = 0;
-            s32 under = nav.FloorBelow(x, bottom - 25, half, &fy) >= 0 && fy - bottom <= 50 / scale ? nav.NodeAt(x, fy, half, 13) : -1;
+            // (a web at the very end of the floor under it: looked for half a cell to either side as well)
+            s32 fy = 1000000;
+            for (s32 off : {0, -cell / 2, cell / 2})
+            {
+                s32 y = 0;
+                if (nav.FloorBelow(x + off, bottom - 25, half, &y) >= 0 && y < fy)
+                {
+                    fy = y;
+                }
+            }
+            s32 under = fy - bottom <= 50 / scale ? nav.NodeAt(x, fy, half, 13) : -1;
             if (!standable(over) || !standable(under) || std::abs(nav.Nodes()[over].mX - x) > cell || nav.Nodes()[over].mY >= nav.Nodes()[under].mY)
             {
                 continue;
@@ -2605,7 +2654,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                         {
                             // (one that walks its floor, or one that comes down a web when a switch is set, which
                             // his coming on its screen does: one that is spawned is not there to be taken over)
-                            if (para.mKind != EntityKind::eParamite || para.mGone || para.mHalf != entity.mHalf || (para.mInputs[0] != 0 && (para.mInputs[0] != 1 || para.mInputs[1] == 0)))
+                            if (para.mKind != EntityKind::eParamite || para.mGone || para.mHalf != entity.mHalf || (para.mInputs[0] != 0 && para.mInputs[1] == 0))
                             {
                                 continue;
                             }
@@ -2653,7 +2702,10 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                             }
                             // (on the ring's floor, or on one with a web up to it)
                             const bool level = nav.Nodes()[at].mLine == under.mLine && !WallBetween(nav, px, under.mX, under.mY, under.mHalf) && !GateBetween(nav, world, px, under.mX, under.mY, under.mHalf);
-                            if (!level && !WebUp(nav, at, node, nullptr))
+                            // (or one it can be walked to by a longer way: webs down, hops, other screens. Those
+                            // are for the round of all its rings, below.)
+                            const bool routed = !level && !WebUp(nav, at, node, nullptr);
+                            if (routed && !ParamiteRoute(nav, world, at, node, nullptr))
                             {
                                 continue;
                             }
@@ -2711,7 +2763,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                                 // to lower the lift ... climb down the web at the end. Pull the ring above the
                                 // platform on the right")
                                 const std::vector<u32> tour = ParamiteTour(nav, world, at);
-                                if (tour.size() >= 2 && tour[0] == entity.mId)
+                                if ((tour.size() >= 2 || routed) && !tour.empty() && tour[0] == entity.mId)
                                 {
                                     std::vector<Goap::Fact> tourPre{regionFact(static_cast<s32>(n)), {Key::kInvisNow, 0}};
                                     std::vector<Goap::Fact> tourGives;
@@ -2726,6 +2778,10 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                                     DomainStep all = pull;
                                     all.mKind = StepKind::eParamiteTour;
                                     add("Have Paramite#" + std::to_string(para.mId) + " pull " + names + " from " + std::to_string(spot.mX) + "," + std::to_string(spot.mY), tourPre, tourGives, 500 + 100 * static_cast<s32>(tour.size()), all);
+                                    continue;
+                                }
+                                if (routed)
+                                {
                                     continue;
                                 }
                                 add("Have Paramite#" + std::to_string(para.mId) + " pull " + name + " from " + std::to_string(spot.mX) + "," + std::to_string(spot.mY), pullPre, gives, 700, pull);

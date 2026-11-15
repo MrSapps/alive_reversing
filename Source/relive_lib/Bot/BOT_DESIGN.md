@@ -880,7 +880,7 @@ bite him dead. Nothing is done about the Fleeches while he waits.
 Open: a wait for a lift and the rest have no unit tests yet; the Mudomo vaults themselves (path 8 on) are
 untouched: a taken over Paramite has to eat Fleeches, talk to another, and pull several rings in one go.
 
-**The Mudomo vaults** (from the hub, path 8; the guide's numbering in brackets). Four of six beaten so far,
+**The Mudomo vaults** (from the hub, path 8; the guide's numbering in brackets). Five of six beaten so far,
 each from its door back to the hub with 0 deaths:
 
 - Path 12 (vault 3), `v3.txt`: f=1,386. The drop down the shaft at 437,460 goes into the well at 437,1500,
@@ -919,8 +919,12 @@ each from its door back to the hub with 0 deaths:
   walking, hopping or falling into it, or from a jump up beside it; at its top it steps off half a cell to a
   side onto a floor within 20, at its foot onto the floor within 50 under it; down eats a Fleech or Slurg a
   cell ahead; a Fleech's hit costs it 0.15 of its life; a fall of over 180 kills it.
-- Not beaten: paths 11 and 5 (vaults 2 and 6), then the trial (path 13: a first try got three screens into
-  its chase).
+- Path 5 (vault 6), `p5.txt`: f=2,784. The Paramite of the background, which the lever lets down its web,
+  makes the round of three rings by sixteen legs to the first: webs at the very ends of floors, hops from a
+  cell back so as not to stand under the rocks that fall into each gap (`World::mFallers`: a hop is begun as
+  a rock has gone by under its feet), under a block that hangs to 19 over the floor (a Paramite looks for
+  walls 20 over its feet, 10 at half size: `ParamiteRoute` has its own wall test).
+- Not beaten: path 11 (vault 2), then the trial (path 13: a first try got three screens into its chase).
 
 Not built, from the user: with one Paramite the meat can also be thrown past it into the next screen and the
 Paramite walked into that screen (it backs off from him), where it then finds the meat. The fallback for when

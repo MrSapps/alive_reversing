@@ -373,6 +373,9 @@ struct World final
     std::vector<RockAt> mRocksDown;
     // The ones in the air
     std::vector<RockAt> mRocksFlying;
+    // The rocks that fall over and over where the level drops them (FallingItem): where each is now, mChasing
+    // while it is coming down
+    std::vector<RockAt> mFallers;
     // The switch that stands for the hazard with this id (a mine's TLV) being gone: above the game's own 256
     static s32 HazardSwitch(u32 id)
     {

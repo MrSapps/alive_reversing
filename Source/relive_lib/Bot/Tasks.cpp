@@ -5637,9 +5637,10 @@ TaskStep ParamiteTourTask::Next(Bot& bot, const std::string& lastFailed)
                         {
                             return TaskStep::Do(Prim::Wait(1));
                         }
-                        if (std::abs(dx) < 2)
+                        // (a web at the very end of its floor: it is a pixel from it there, and that will do)
+                        if (dx == 0)
                         {
-                            return TaskStep::Do(Prim::Wait(2, me->mFacesLeft ? right : left));
+                            return TaskStep::Do(Prim::Wait(3, Btn::eUp));
                         }
                         if (std::abs(dx) > cell || (dx < 0) != me->mFacesLeft)
                         {
@@ -5676,6 +5677,27 @@ TaskStep ParamiteTourTask::Next(Bot& bot, const std::string& lastFailed)
                         {
                             mLeg = -1;
                             return TaskStep::Do(Prim::Wait(1));
+                        }
+                        // Rocks that fall into the gap: off as one has gone by under its feet (the walkthrough
+                        // of the sixth Mudomo vault: "jump across the gaps between falling rocks"). The next is
+                        // at least its wait and its fall away, and the hop is over the gap in half its 14 frames.
+                        {
+                            bool rocks = false;
+                            bool gone = false;
+                            for (const RockAt& r : world.mFallers)
+                            {
+                                if (r.mHalf != me->mHalf || r.mX < std::min(me->mX, to.mX) - cell / 2 || r.mX > std::max(me->mX, to.mX) + cell / 2 || std::abs(r.mY - me->mY) > 400)
+                                {
+                                    continue;
+                                }
+                                rocks = true;
+                                gone = gone || (r.mChasing && r.mY > me->mY + 8 && r.mY < me->mY + 60);
+                            }
+                            if (rocks && !gone && ++mWaitRock < 600)
+                            {
+                                return TaskStep::Do(Prim::Wait(1));
+                            }
+                            mWaitRock = 0;
                         }
                         return TaskStep::Do(Prim::Wait(2, Btn::eHop));
                     }
