@@ -978,8 +978,57 @@ In one run, `full.txt` (from the Scrab vaults' path 7: the Scrab trial, Necrum, 
 hub, the six vaults, the Mudomo trial, Necrum's end): Feeco Depot's path 1 at f=31,828, 0 deaths, with the
 healing power as the game gives it. It stops there (Feeco is untouched: at 2312,884, with nothing known to do).
 
+**Feeco Depot** (2026-11-15, `build-bot/f1.txt`: from its first screen with the healing power, `bot any`):
+Terminal 1 (path 1), Terminal 2 (path 7) and the Main Lobby (path 2), out of the lobby's door to path 9 at
+f=8,324. Terminals 1 and 2 with 0 deaths on seeds 1 to 3 (`f2.txt` is Terminal 2 alone, out at f=3,397); one
+death in the lobby, walking away from a fart left by the mines (at 1212,1240, not looked at yet). It stops in
+path 9, where the ways on (to the Slig Barracks through path 3, to Bonewerkz through path 4) have had nothing
+done for them. What Feeco needed:
+- **The film stone** that opens the first gate is a hand stone to the bot (`eMovieHandStone` with a switch:
+  looked into, it sets it).
+- **Brew and farts** (`FartFlight`, `FartBombTask`, `DrinkTask`; `StepKind::eFartBomb`, `eDrink`; `Key::kBrew`).
+  Up at a Brew machine he drinks, and his next fart is one that goes off: left alone 220 frames later where it
+  was made, or, chanted at, his to fly for 900 frames (EvilFart.cpp: a fifth of a pixel a frame more speed each
+  frame a way is held, up to 4; walls stop it sideways, floors and ceilings up and down; chanting while it
+  stands still sets it off 15 frames later, 60 to each side, 60 up and 30 down). Three uses:
+  - flown from the machine to a mine or a Slig (`Fly a fart from Brew# to ...`): the way through the air is
+    found on a grid of cell middles (`FartFlight::Route`), round every gate and trap door if it can be, else
+    through the ones a switch opens with that switch as what the action waits for. Not with an orb on the
+    machine's screen (it is flown by chanting). Sligs are aimed at where the most of them stand once their
+    screen is the one shown; until a Slig the fart can get to is dead nothing is crossed onto its floor within
+    300 of it. Terminal 1: six farts for the mine at the door, the eight mines and the four Sligs.
+  - drunk and carried (`Drink at Brew#`), then made where a flying Slig can be got at from (`Fly a fart from
+    x,y to FlyingSlig#`): the cells he comes into a region at, out of the Slig's stretch, no orb on the screen.
+    Terminal 2: the floor of its machine has no way down for a fart, so it is drunk there, he drops through
+    the trap door and flies it from the ledge at 637,480.
+  - left by a mine (`Leave a fart by Mine#`): made two cells from it with his back to it, then off to 200
+    away until it has gone. For the lobby, whose machine has an orb over it.
+- **Flying Sligs to get rid of** (`FeatureKind::eDanger`, `EntityKind::eFlier`). In a path with a Brew machine
+  the stretch a flying Slig's track goes along (`Domain::FlierTrack`, down to the floor under it) is not gone
+  into until the Slig is dead: the edges into it wait for a switch the world gives as on once it is
+  (`World::HazardSwitch`). With several over the same corridor it is the highest that is waited for (a Brew is
+  one fart), its stretch is all of theirs, and the way into another's costs 1,500 more. Where the plan finds no
+  way to get a fart flown at one (the Mines' path 2: the machine is past the Slig) it is got by as before.
+  The fart waits at the end of the Slig's track nearest to where it was made (it stops there 30 to 60 frames
+  each time round) and is set off when the Slig will be within 40 of it 15 frames on. **Both of Terminal 2's
+  with one fart:** the two fly as a pair (the low one passes under the high one's left end, 792, as that one
+  stops there, each time round), so the fart is parked between the two tracks and waits, while it has 260
+  frames left, for both to be in the blast. Measured before that was built: with one left alive the corridor is
+  a matter of luck whatever was tried (1 to 15 deaths a run over three seeds). It cruises at his run's pace,
+  an alerted one turns to face him wherever he is, it sees him as soon as it is on his screen and faces him,
+  chases at the same 6 a frame, throws its grenade 70 ahead of itself (where a runner will be) when it is
+  within 15 of him or at a chance of 1 in 16 a frame, and only a wall between them ends the chase
+  (FlyingSlig.cpp).
+- **Running jumps one after the other with no stop** (`NavEdge::mX2`, `mX3`; `Prim::mX2`, `mX3`): where a
+  running jump comes down in the run-up of the next along one floor the two (or three) are also one edge, taken
+  only with a flying Slig about (`Bot::EdgeCostFn`), and run into straight from a walk the same way. A standing
+  hop along a floor costs 30 more then. Built for Terminal 2's corridor, and not what gets him through it now.
+- A hop down off a ledge onto a cell a mine is in is an edge that waits for the mine, in paths with a Brew
+  machine only (Terminal 2's way back from the duct to the door, off 1187,420 onto 1287,460).
+
 **AO, Rupture Farms** (`a1.txt`: from its first screen, `bot any`): paths 15, 16, 18, 19 and 20 with 0 deaths, out
-to the Stockyards at f=5,567 (the milestone's AO half). `a3.txt` is path 18 alone, `a4.txt` paths 19 and 20. In the
+to the Stockyards at f=5,567 (the milestone's AO half; f=6,291 as committed and since: the grenades are
+fetched twice in path 20 when the run comes from path 15, not when it starts at path 19). `a3.txt` is path 18 alone, `a4.txt` paths 19 and 20. In the
 Stockyards he dies at once: nothing there has been looked at. What AO needed so far:
 - A walk goes on from one screen's floor to the next's over the gap between cameras, and the first cell past the
   gap cannot be stopped in (a step back to it is a step back over the gap): crossings on foot the same way are

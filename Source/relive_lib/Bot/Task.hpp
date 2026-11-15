@@ -803,6 +803,68 @@ private:
     std::unique_ptr<GoToTask> mGo;
 };
 
+// A Brew drunk at the machine, to have the fart it gives somewhere else
+class DrinkTask final : public Task
+{
+public:
+    explicit DrinkTask(u32 brew)
+        : mBrew(brew)
+    {
+    }
+    ~DrinkTask() override;
+    std::string Name() const override
+    {
+        return "Drink at #" + std::to_string(mBrew);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mBrew;
+    s32 mDrinks = 0;
+    std::unique_ptr<GoToTask> mGo;
+};
+
+// A Brew drunk at the machine, the fart it gives taken over and flown to a mine or a Slig (FartFlight), and set
+// off there
+class FartBombTask final : public Task
+{
+public:
+    // brew 0: with the Brew he has in him, from the cell "from"
+    FartBombTask(u32 target, u32 brew, s32 from = -1)
+        : mTarget(target)
+        , mBrew(brew)
+        , mFrom(from)
+    {
+    }
+    ~FartBombTask() override;
+    std::string Name() const override
+    {
+        return "Fly a fart to #" + std::to_string(mTarget);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mTarget;
+    u32 mBrew;
+    s32 mFrom;
+    // Where the fart waits for a flying Slig: the end of its track nearest to where it was made
+    s32 mParkX = 0;
+    s32 mParkY = 0;
+    bool mParked = false;
+    // Parked between two flying Sligs' tracks, to get both
+    bool mBoth = false;
+    s32 mSinceBlast = 0;
+    // 0 to the machine and drink, 1 fart, 2 chant, 3 fly, 4 chant it off, 5 wait for Abe
+    s32 mPhase = 0;
+    s32 mFrames = 0;
+    s32 mFarts = 0;
+    s32 mDrinks = 0;
+    s32 mAfter = 0;
+    std::vector<std::pair<s32, s32>> mWay;
+    std::size_t mCorner = 0;
+    std::unique_ptr<GoToTask> mGo;
+};
+
 // A Slig dropped through a trap door: at the door's lever until the Slig is on the door, then the lever.
 class SligDropTask final : public Task
 {

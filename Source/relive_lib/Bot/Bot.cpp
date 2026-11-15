@@ -182,6 +182,10 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<GetRocksTask>(step.mEntity);
         case StepKind::eBlow:
             return std::make_unique<BlowMineTask>(step.mEntity, step.mEdge);
+        case StepKind::eFartBomb:
+            return std::make_unique<FartBombTask>(step.mEntity, step.mOther, step.mEdge);
+        case StepKind::eDrink:
+            return std::make_unique<DrinkTask>(step.mEntity);
         case StepKind::eRide:
             return std::make_unique<RideCarTask>(step.mEntity, step.mEdge);
         case StepKind::eScrabRampage:
@@ -270,15 +274,50 @@ bool Bot::Replan(BaseMap& map)
             mLastSwitches[i] = mWorld.mSwitches[i];
         }
     }
-    Domain domain = Domain::Build(mKnow->mNav, mWorld, abeNode, [know](s32 edge)
-                                  {
-                                      if (know->mBannedEdges.count(edge) != 0)
-                                      {
-                                          return false;
-                                      }
-                                      // (onto a floor a loose Scrab can get at him on: Domain::Build wants him unseen for it)
-                                      return true;
-                                  }, mProfile.mEnding == Ending::eKillAll);
+    const auto allowed = [know](s32 edge)
+    {
+        if (know->mBannedEdges.count(edge) != 0)
+        {
+            return false;
+        }
+        // (running jumps taken together are for the way there, with a flying Slig about: to the plan they are
+        // the same crossings as the jumps one by one)
+        if (know->mNav.Edges()[edge].mX2 != 0)
+        {
+            return false;
+        }
+        // (onto a floor a loose Scrab can get at him on: Domain::Build wants him unseen for it)
+        return true;
+    };
+    Domain domain = Domain::Build(mKnow->mNav, mWorld, abeNode, allowed, mProfile.mEnding == Ending::eKillAll);
+    // A flying Slig that was to be got rid of before its stretch is gone into (FeatureKind::eDanger), with no fart
+    // that can be got flown at it: got by as it is after all. The Mines' path 2 has a Brew machine and a flying
+    // Slig, and the machine is past the Slig.
+    bool passed = false;
+    for (Entity& e : mWorld.mEntities)
+    {
+        if (e.mKind != EntityKind::eFlier || e.mInputs[0] != 1 || mWorld.Switch(e.mSwitch))
+        {
+            continue;
+        }
+        // (no way to get one flown at it from where he is, that is: the plan for just that)
+        bool fart = false;
+        for (const DomainStep& s : domain.mSteps)
+        {
+            fart = fart || (s.mKind == StepKind::eFartBomb && s.mEntity == e.mId);
+        }
+        fart = fart && Goap::Planner::Find(domain.mStart, {{Key::Switch(e.mSwitch), 1}}, domain.mActions).mFound;
+        if (!fart)
+        {
+            Log("no fart can be flown at FlyingSlig#" + std::to_string(e.mId) + ": got by as it is");
+            e.mInputs[0] = 0;
+            passed = true;
+        }
+    }
+    if (passed)
+    {
+        domain = Domain::Build(mKnow->mNav, mWorld, abeNode, allowed, mProfile.mEnding == Ending::eKillAll);
+    }
     // Actions that keep failing are left out, and so are ways out that lead back to where the run has been
     std::vector<Goap::Action> actions;
     if (mArrivedKey != std::pair<s32, s32>{mAbe.mLevel, mAbe.mPath})
@@ -1134,6 +1173,20 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs) const
         {
             return -1;
         }
+        // Running jumps with no stop between: only with a flying Slig about, which gets him where he stops
+        if (e.mX2 != 0)
+        {
+            bool flier = false;
+            const NavNode& at = know->mNav.Nodes()[e.mFrom];
+            for (const FlierAt& f : world->mFliers)
+            {
+                flier = flier || (f.mHalf == at.mHalf && std::abs(f.mY - at.mY) < 220 && std::abs(f.mX - at.mX) < 1000);
+            }
+            if (!flier)
+            {
+                return -1;
+            }
+        }
         // Shut now
         s32 condSwitch = 0;
         s32 condValue = 0;
@@ -1228,6 +1281,20 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs) const
                 if (know->mNav.NodeAt(x, from.mY, from.mHalf, 10) >= 0 && world->SweepOver(x, from.mY, from.mHalf))
                 {
                     return -1;
+                }
+            }
+        }
+        // A standing hop along a floor with a flying Slig about: the stop before it and after is what the Slig
+        // gets him in, so a running jump is the way where there is one (it cruises at his run's pace and comes
+        // after him at about half that. Feeco's path 7: walked and hopped along its corridor he was blown up at
+        // 937,980.)
+        if (e.mKind == EdgeKind::eHop && to.mY == from.mY)
+        {
+            for (const FlierAt& f : world->mFliers)
+            {
+                if (f.mHalf == from.mHalf && std::abs(f.mY - from.mY) < 220 && std::abs(f.mX - from.mX) < 1000)
+                {
+                    return e.mCost + 30;
                 }
             }
         }
@@ -2848,6 +2915,12 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         {
             mTrace.pop_back();
             mTrace += " hp=" + std::to_string(mAbe.mHealthFp * 100 / 0x10000) + "\n";
+        }
+        // The flying Sligs about: where, which way they face and how fast they go
+        for (const FlierAt& flier : mWorld.mFliers)
+        {
+            mTrace.pop_back();
+            mTrace += " fl=" + std::to_string(flier.mX) + "," + std::to_string(flier.mY) + (flier.mFacingLeft ? "L" : "R") + std::to_string(flier.mVelX * 10 / 256) + "\n";
         }
         // The Paramites near him: where, doing what (motion, brain and its state), facing which way
         for (const ParamiteAt& paramite : mWorld.mParamites)
