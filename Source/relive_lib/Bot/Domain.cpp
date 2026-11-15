@@ -2434,6 +2434,12 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                         {
                             continue;
                         }
+                        // (pulled from the other layer than its gate is in, what the gate lets out does not
+                        // get at him: the second Mudomo vault, whose levers are in the background)
+                        if (node >= 0 && nav.Nodes()[node].mHalf != f.mHalf)
+                        {
+                            continue;
+                        }
                         for (const Entity& fl : world.mEntities)
                         {
                             const Goap::Fact dead{Key::Mud(fl.mId), 2};
@@ -3394,6 +3400,159 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         }
         add("Exit " + std::to_string(nav.Nodes()[x.mNode].mX) + "," + std::to_string(nav.Nodes()[x.mNode].mY) + " to path " + std::to_string(f.mDestPath), pre, {{Key::kExited, 1}}, 200, step);
     }
+    // A foot switch that turns a gate over each time it is stepped on (the second Mudomo vault's locks, each
+    // between two of them and two gates: in over one, which shuts him in with the lock, and out over the other):
+    // stepping on it is a thing to do like pulling a lever
+    for (const Entity& plate : world.mEntities)
+    {
+        if (plate.mKind != EntityKind::eFootSwitch || plate.mGone || plate.mOp != 2 || plate.mSwitch <= 1)
+        {
+            continue;
+        }
+        bool gate = false;
+        for (const NavFeature& f : nav.Input().mFeatures)
+        {
+            gate = gate || (f.mKind == FeatureKind::eBarrier && f.mSolid && f.mSwitch == plate.mSwitch);
+        }
+        const s32 on = nav.NodeAt(plate.CentreX(), plate.mY2, plate.mHalf, 30);
+        if (!gate || on < 0)
+        {
+            continue;
+        }
+        const s32 now = world.Switch(plate.mSwitch);
+        DomainStep stepOn;
+        stepOn.mKind = StepKind::eStepOn;
+        stepOn.mEntity = plate.mId;
+        stepOn.mEdge = on;
+        add("Step on FootSwitch#" + std::to_string(plate.mId) + " sw" + std::to_string(plate.mSwitch), {regionFact(on), {Key::Switch(plate.mSwitch), now}}, {{Key::Switch(plate.mSwitch), now ? 0 : 1}, {Key::kPlate, static_cast<s32>(plate.mId)}}, 60, stepOn);
+    }
+    // (and a gate that is shut is opened from the one of them nearest to it: on the way from another he would
+    // step on that one too, and shut it again. Measured there: in and out of the cell at 1287 four times.)
+    for (Goap::Action& a : d.mActions)
+    {
+        const DomainStep& s = d.mSteps[a.mTag];
+        if (s.mKind != StepKind::eCross || s.mEdge < 0 || nav.Edges()[s.mEdge].mFeature < 0)
+        {
+            continue;
+        }
+        const NavFeature& f = nav.Input().mFeatures[nav.Edges()[s.mEdge].mFeature];
+        if (f.mKind != FeatureKind::eBarrier || !f.mSolid || f.mSwitch <= 1 || (world.Switch(f.mSwitch) == 0) != f.mStartClosed)
+        {
+            continue;
+        }
+        const Entity* nearest = nullptr;
+        for (const Entity& plate : world.mEntities)
+        {
+            if (plate.mKind == EntityKind::eFootSwitch && !plate.mGone && plate.mOp == 2 && plate.mSwitch == f.mSwitch && plate.mHalf == f.mHalf && std::abs(plate.mY2 - f.mY2) <= 30 &&
+                (!nearest || std::abs(plate.CentreX() - (f.mX1 + f.mX2) / 2) < std::abs(nearest->CentreX() - (f.mX1 + f.mX2) / 2)))
+            {
+                nearest = &plate;
+            }
+        }
+        if (nearest)
+        {
+            a.mPre.push_back({Key::kPlate, static_cast<s32>(nearest->mId)});
+        }
+    }
+
+    // Fleeches loose on a floor a Paramite walks, with no ring for it to pull: it is taken over and made to eat
+    // them (the walkthrough of the second Mudomo vault: "Possess him, then go right to get the other Paramite.
+    // Have him follow and attack all of the Fleeches, then bring him all the way back to the right"). Until then
+    // nothing is done on those floors and no way is taken onto them.
+    std::vector<Goap::Fact> eatenAll;
+    std::set<s32> linesAll;
+    for (const ParamiteAt& live : world.mParamites)
+    {
+        const s32 at = live.mPossessed || live.Hidden() || live.mId == 0 ? -1 : nav.NodeAt(live.mX, live.mY, live.mHalf, 30);
+        if (at < 0 || !ParamiteTour(nav, world, at).empty())
+        {
+            continue;
+        }
+        std::vector<Goap::Fact> eaten;
+        std::set<s32> lines;
+        for (const Entity& f : world.mEntities)
+        {
+            if (f.mKind != EntityKind::eFleech || f.mGone || f.mInputs[1] != 0 || f.mHalf != live.mHalf || world.mFleechKilled.count(f.mId) != 0)
+            {
+                continue;
+            }
+            const s32 on = nav.NodeAt(f.CentreX(), f.mY2, f.mHalf, 30);
+            if (on >= 0 && ParamiteRoute(nav, world, at, on, nullptr))
+            {
+                eaten.push_back({Key::Mud(f.mId), 2});
+                lines.insert(nav.Nodes()[on].mLine);
+            }
+        }
+        if (eaten.empty())
+        {
+            continue;
+        }
+        for (const Goap::Fact& f : eaten)
+        {
+            if (std::find(eatenAll.begin(), eatenAll.end(), f) == eatenAll.end())
+            {
+                eatenAll.push_back(f);
+            }
+        }
+        linesAll.insert(lines.begin(), lines.end());
+        const s32 cam = nav.CameraOf(live.mX, live.mY - 5);
+        bool watched = false;
+        for (const Entity& o : world.mEntities)
+        {
+            watched = watched || (o.mKind == EntityKind::eSecurityOrb && !o.mGone && nav.CameraOf(o.mX1, o.mY1) == cam);
+        }
+        std::set<s32> from;
+        for (std::size_t n = 0; !watched && n < nav.Nodes().size(); n++)
+        {
+            const NavNode& spot = nav.Nodes()[n];
+            // (from a place on its screen that is not on its floors, and that it is the nearest Paramite to)
+            if (spot.mLow || spot.mHazard || nav.CameraOf(spot.mX, spot.mY - 5) != cam || lines.count(spot.mLine) != 0 || (spot.mHalf == live.mHalf && std::abs(spot.mY - live.mY) * (spot.mHalf ? 2 : 1) <= 45))
+            {
+                continue;
+            }
+            bool nearest = true;
+            for (const ParamiteAt& other : world.mParamites)
+            {
+                const auto far = [&](const ParamiteAt& p)
+                {
+                    return (p.mX - spot.mX) * (p.mX - spot.mX) + (p.mY - spot.mY) * (p.mY - spot.mY);
+                };
+                nearest = nearest && (&other == &live || other.Hidden() || nav.CameraOf(other.mX, other.mY - 5) != cam || far(other) > far(live));
+            }
+            if (!nearest || !from.insert(d.mRegions[n]).second)
+            {
+                continue;
+            }
+            DomainStep clear;
+            clear.mKind = StepKind::eParamiteClear;
+            clear.mOther = live.mId;
+            clear.mEdge = static_cast<s32>(n);
+            add("Have Paramite#" + std::to_string(live.mId) + " eat the Fleeches of its floor from " + std::to_string(spot.mX) + "," + std::to_string(spot.mY), {regionFact(static_cast<s32>(n)), {Key::kInvisNow, 0}}, eaten, 900, clear);
+        }
+    }
+    // What is done on those floors, and the ways onto them, wait for that
+    if (!eatenAll.empty())
+    {
+        for (Goap::Action& a : d.mActions)
+        {
+            const DomainStep& s = d.mSteps[a.mTag];
+            s32 where = -1;
+            if (s.mKind == StepKind::eUse)
+            {
+                const Entity* e = world.Find(s.mEntity);
+                where = e ? UseNode(nav, *e, nullptr) : -1;
+            }
+            else if (s.mKind == StepKind::eCross && s.mEdge >= 0 && linesAll.count(nav.Nodes()[nav.Edges()[s.mEdge].mFrom].mLine) == 0)
+            {
+                where = nav.Edges()[s.mEdge].mTo;
+            }
+            if (where >= 0 && linesAll.count(nav.Nodes()[where].mLine) != 0)
+            {
+                a.mPre.insert(a.mPre.end(), eatenAll.begin(), eatenAll.end());
+            }
+        }
+    }
+
     // Scrabs got out of the way without a Scrab's death: lured off the end of their floor (the Mudanchee vault's
     // path 5: "hang again until the Scrab runs over to you, pull back up as he falls over the edge"), and shut in
     // behind a gate by its lever ("pull the lever when the Scrab moves to the right to trap him by the door").

@@ -613,7 +613,14 @@ s32 NavGraph::Thrown(s32 x, s32 y, s32 fromX, bool half, s32 depth, s32 knownSwi
     // well at 512,720 to the one at 589,460)
     if (depth < 8)
     {
-        const s32 below = WellInFall(x, y - 60, under >= 0 ? fy + 30 : y + 400, half);
+        // (he flies on a little the way he was thrown as he comes down: a well just past the point is fallen into
+        // as well. Measured in the second Mudomo vault's background, thrown to 869,334 and down into the well at
+        // 851..863, 360.)
+        s32 below = -1;
+        for (s32 k = 0; k <= 2 && below < 0; k++)
+        {
+            below = WellInFall(x + (x < fromX ? -k : k) * step / 2, y - 60, under >= 0 ? fy + 30 : y + 400, half);
+        }
         if (below >= 0 && (fromX < mInput.mFeatures[below].mX1 || fromX > mInput.mFeatures[below].mX2))
         {
             return WellOut(below, whenOf(mInput.mFeatures[below]), depth + 1, knownSwitch, knownValue);
@@ -742,7 +749,22 @@ void NavGraph::AddWellEdges(std::vector<NavEdge>& edges, s32 from, s32 wellIdx, 
             edges.back().mWhen = when;
         }
     };
-    if (well.mSwitch <= 1 || (off == on && !offOut && !onOut))
+    // (a well whose switch is set by standing where it is jumped into from: it leads where that sets it to. The
+    // second Mudomo vault's background wells, each in a box that turns it.)
+    s32 zone = -1;
+    for (const NavFeature& z : mInput.mFeatures)
+    {
+        const NavNode& at = mNodes[from];
+        if (z.mKind == FeatureKind::eSwitchZone && z.mSwitch == well.mSwitch && well.mSwitch > 1 && z.mA <= 1 && (z.mAnyScale || z.mHalf == at.mHalf) && at.mX >= z.mX1 && at.mX <= z.mX2 && at.mY - 10 >= z.mY1 && at.mY - 10 <= z.mY2)
+        {
+            zone = z.mA == 0 ? 1 : 0;
+        }
+    }
+    if (zone >= 0 && kind == EdgeKind::eWell)
+    {
+        add(zone == 1 ? on : off, -1);
+    }
+    else if (well.mSwitch <= 1 || (off == on && !offOut && !onOut))
     {
         add(well.mSwitch == 1 ? on : off, -1);
     }

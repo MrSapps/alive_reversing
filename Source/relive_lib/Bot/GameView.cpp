@@ -346,6 +346,17 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                     in.mFeatures.push_back(f);
                     break;
                 }
+                case ReliveTypes::eInvisibleSwitch:
+                {
+                    const auto& t = static_cast<const relive::Path_InvisibleSwitch&>(tlv);
+                    NavFeature f = MakeFeature(FeatureKind::eSwitchZone, tlv, camera, id);
+                    f.mSwitch = t.mSwitchId;
+                    f.mA = t.mAction == relive::reliveSwitchOp::eSetTrue ? 0 : t.mAction == relive::reliveSwitchOp::eSetFalse ? 1 : 2;
+                    f.mHalf = t.mScale == relive::Path_InvisibleSwitch::InvisibleSwitchScale::eHalf;
+                    f.mAnyScale = t.mScale == relive::Path_InvisibleSwitch::InvisibleSwitchScale::eAny;
+                    in.mFeatures.push_back(f);
+                    break;
+                }
                 case ReliveTypes::eEdge:
                 {
                     const auto& t = static_cast<const relive::Path_Edge&>(tlv);

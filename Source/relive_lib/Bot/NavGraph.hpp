@@ -21,6 +21,7 @@ enum class FeatureKind : u8
 {
     eHoist,       // mDir: the way Abe must face (0 left, 1 right, 2 either)
     eEdge,
+    eSwitchZone,  // a box that sets mSwitch as he stands in it (an invisible switch): mA 0 on, 1 off, 2 other
     eDoor,        // mA door id, mB target door id, mDestCamera (and level/path if it leaves the path), mSwitch if it starts closed
     eWellLocal,   // mB its own id, mC, mD: where it throws Abe (world x, y)
     eWellExpress, // mA: the id of the well it comes out of, mB its own id, mDest*

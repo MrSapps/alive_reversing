@@ -26,6 +26,8 @@ static const u32 kInvisNow = 5;
 static const u32 kMeat = 6;
 // Meat lies (or flies) on his screen: what the Paramites that team up over the way out go for instead of him
 static const u32 kPackFed = 7;
+// The foot switch (its entity) he last stepped on to turn a gate over, with nothing done since
+static const u32 kPlate = 8;
 inline u32 Switch(s32 id)
 {
     return 1000 + static_cast<u32>(id);
@@ -67,6 +69,10 @@ enum class StepKind : u8
                 // the ring and let it go
     eMeatUse,   // throw meat to draw Paramite mOther off entity mEntity, then use it
     eFleechLure, // lead the Fleeches that guard entity mEntity off and use it
+    eStepOn,    // onto the cell mEdge, where a foot switch that turns a gate over is
+    eParamiteClear, // take over Paramite mOther from the cell mEdge, have it eat the Fleeches of its floors, call
+                // the other Paramites of those floors to follow it, and leave them all at the end away from
+                // the way out
     eParamiteTour, // take over Paramite mOther from the cell mEdge and have it pull every ring it can get to
                 // (Domain::ParamiteTour), the nearest first, and let it go under the last
     eMeatFeed,  // on the way to the cell mEdge, from the last cell before the level of Paramites that team up:
