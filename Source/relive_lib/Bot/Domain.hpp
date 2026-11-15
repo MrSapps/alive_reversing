@@ -183,6 +183,9 @@ struct Domain final
     static std::vector<LooseScrab> LooseScrabs(const World& world, bool waiting = false);
     // Whether a wall stands on the floor at y between x1 and x2
     static bool WallBetween(const NavGraph& nav, s32 x1, s32 x2, s32 y, bool half);
+    // Whether a Paramite on the floor of the cell from can get up a web to the floor of the cell to (webX: where
+    // the web hangs)
+    static bool WebUp(const NavGraph& nav, s32 from, s32 to, s32* webX);
     // The cell a Scrab chased to the top of a hoist at the end of its floor comes down on when it runs off that
     // end, or -1 if this is no such hoist top (it is not at an end, there is floor to jump to, a wall stops it)
     static s32 LureLanding(const NavGraph& nav, s32 top);

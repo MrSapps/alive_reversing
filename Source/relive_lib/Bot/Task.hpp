@@ -272,6 +272,9 @@ private:
     // Frames waited for a Slog under the ledge to leap up, and whether it was in the air the frame before
     s32 mSlogWaits = 0;
     bool mSlogUp = false;
+    // Frames waited for a lift that is on its way to the stop he would walk onto, and where it was last
+    s32 mLiftComeWaits = 0;
+    s32 mLiftComeY = -100000;
     s32 mUnseenWaits = 0;
     // Chants made to go invisible
     s32 mInvisChants = 0;

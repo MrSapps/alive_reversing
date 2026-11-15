@@ -969,6 +969,51 @@ s32 Domain::ScrabZone(const NavGraph& nav, s32 node)
     return n.mLine * 16 + gates;
 }
 
+bool Domain::WebUp(const NavGraph& nav, s32 from, s32 to, s32* webX)
+{
+    // Paramite.cpp: one that is played grabs a web (a track line, type 8) within a cell ahead of it as it comes
+    // down from a jump, climbs it while up is held, and at its top steps off onto a floor half a cell to a side
+    // that lies within 20 of the top.
+    const NavNode& a = nav.Nodes()[from];
+    const NavNode& b = nav.Nodes()[to];
+    if (a.mHalf != b.mHalf || b.mY >= a.mY)
+    {
+        return false;
+    }
+    const s32 cell = NavGraph::GridStep(a.mHalf);
+    for (const NavLine& l : nav.Input().mLines)
+    {
+        const s32 x = (l.mX1 + l.mX2) / 2;
+        const s32 top = std::min(l.mY1, l.mY2);
+        const s32 bottom = std::max(l.mY1, l.mY2);
+        if (l.mType != 8 || bottom < a.mY - 20 || top > a.mY - 20 || std::abs(b.mY - top) > 20)
+        {
+            continue;
+        }
+        // (the floor at its foot, and the one it steps off onto: half a cell to either side of its top)
+        const s32 under = nav.NodeAt(x, a.mY, a.mHalf, 12);
+        s32 over = nav.NodeAt(x + cell / 2, b.mY, b.mHalf, 12);
+        over = over >= 0 && nav.Nodes()[over].mLine == b.mLine ? over : nav.NodeAt(x - cell / 2, b.mY, b.mHalf, 12);
+        // (floor all the way to its foot: another floor's line at the same height counts, and so does a lift's
+        // platform between the two)
+        bool floor = under >= 0;
+        for (s32 fx = std::min(a.mX, x); floor && fx <= std::max(a.mX, x); fx += cell)
+        {
+            floor = nav.NodeAt(fx, a.mY, a.mHalf, 6) >= 0;
+        }
+        if (!floor || over < 0 || nav.Nodes()[over].mLine != b.mLine || WallBetween(nav, a.mX, x, a.mY, a.mHalf) || WallBetween(nav, nav.Nodes()[over].mX, b.mX, b.mY, b.mHalf))
+        {
+            continue;
+        }
+        if (webX)
+        {
+            *webX = x;
+        }
+        return true;
+    }
+    return false;
+}
+
 bool Domain::WallBetween(const NavGraph& nav, s32 x1, s32 x2, s32 y, bool half)
 {
     const s32 scale = half ? 2 : 1;
@@ -2011,6 +2056,21 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                         gives.push_back({Key::kInvisNow, 1});
                     }
                     add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on", pre, gives, 150, step);
+                    // A lever with a trap door for the cell on its other side: from there too, where that is another
+                    // part of the path (he comes down on it, and what the lever does is open it under him. The
+                    // Mudomo hub at 3187,1140: "immediately pull the lever beside you or you're lunch".)
+                    if (entity.mKind == EntityKind::eLever && node >= 0)
+                    {
+                        const s32 alt = UseNode(nav, entity, nullptr, 1);
+                        if (alt >= 0 && alt != node && nav.Nodes()[alt].mTrapDoor >= 0 && d.mRegions[alt] != d.mRegions[node])
+                        {
+                            std::vector<Goap::Fact> altPre = pre;
+                            altPre[0] = regionFact(alt);
+                            DomainStep other = step;
+                            other.mOther = 1;
+                            add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on from the trap door", altPre, gives, 100, other);
+                        }
+                    }
                     // A lock Fleeches guard: unseen they do not find him at it. The Mudanchee trial's last: its
                     // door takes a while to open after the slap, the Fleeches of its room wake as he comes and
                     // walk their ledges, and take no notice of him unseen, or seen but quiet on the floor below.
@@ -2076,31 +2136,59 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                     {
                         const NavNode& under = nav.Nodes()[node];
                         const s32 scale = under.mHalf ? 2 : 1;
-                        const s32 cam = nav.CameraOf(under.mX, under.mY - 5);
-                        bool orb = false;
-                        for (const Entity& o : world.mEntities)
-                        {
-                            orb = orb || (o.mKind == EntityKind::eSecurityOrb && !o.mGone && nav.CameraOf(o.mX1, o.mY1) == cam);
-                        }
                         for (const Entity& para : world.mEntities)
                         {
-                            // (one that walks its floor: one up a web is not there to be taken over)
-                            if (orb || para.mKind != EntityKind::eParamite || para.mGone || para.mHalf != entity.mHalf || para.mInputs[0] != 0)
+                            // (one that walks its floor, or one that comes down a web when a switch is set, which
+                            // his coming on its screen does: one that is spawned is not there to be taken over)
+                            if (para.mKind != EntityKind::eParamite || para.mGone || para.mHalf != entity.mHalf || (para.mInputs[0] != 0 && (para.mInputs[0] != 1 || para.mInputs[1] == 0)))
                             {
                                 continue;
                             }
                             s32 px = para.CentreX();
                             s32 py = para.mY2;
+                            bool down = para.mInputs[0] == 0;
                             for (const ParamiteAt& live : world.mParamites)
                             {
                                 if (live.mId == para.mId)
                                 {
                                     px = live.mX;
                                     py = live.mY;
+                                    down = !live.Hidden();
                                 }
                             }
-                            const s32 at = nav.NodeAt(px, py, para.mHalf, 30);
-                            if (at < 0 || nav.Nodes()[at].mLine != under.mLine || nav.CameraOf(px, py - 5) != cam || WallBetween(nav, px, under.mX, under.mY, under.mHalf) || GateBetween(nav, world, px, under.mX, under.mY, under.mHalf))
+                            s32 at = nav.NodeAt(px, py, para.mHalf, 30);
+                            if (!down)
+                            {
+                                // (up its web still: the floor it comes down on)
+                                at = -1;
+                                for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+                                {
+                                    const NavNode& below = nav.Nodes()[n];
+                                    if (below.mHalf == para.mHalf && below.mY > py - 10 && std::abs(below.mX - px) <= NavGraph::GridStep(para.mHalf) && (at < 0 || below.mY < nav.Nodes()[at].mY))
+                                    {
+                                        at = static_cast<s32>(n);
+                                    }
+                                }
+                            }
+                            if (at < 0)
+                            {
+                                continue;
+                            }
+                            // (the screen it is on is the one he chants on: the ring may be on another, along its
+                            // floor. The Mudomo vaults' path 7: the ring a screen on from the two below the ledge.)
+                            const s32 cam = nav.CameraOf(px, nav.Nodes()[at].mY - 5);
+                            bool watched = false;
+                            for (const Entity& o : world.mEntities)
+                            {
+                                watched = watched || (o.mKind == EntityKind::eSecurityOrb && !o.mGone && nav.CameraOf(o.mX1, o.mY1) == cam);
+                            }
+                            if (watched)
+                            {
+                                continue;
+                            }
+                            // (on the ring's floor, or on one with a web up to it)
+                            const bool level = nav.Nodes()[at].mLine == under.mLine && !WallBetween(nav, px, under.mX, under.mY, under.mHalf) && !GateBetween(nav, world, px, under.mX, under.mY, under.mHalf);
+                            if (!level && !WebUp(nav, at, node, nullptr))
                             {
                                 continue;
                             }
@@ -2108,7 +2196,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                             for (std::size_t n = 0; n < nav.Nodes().size(); n++)
                             {
                                 const NavNode& spot = nav.Nodes()[n];
-                                if (spot.mLow || spot.mHazard || spot.mHalf || nav.CameraOf(spot.mX, spot.mY - 5) != cam || std::abs(spot.mY - under.mY) * scale <= 45 || !from.insert(d.mRegions[n]).second)
+                                if (spot.mLow || spot.mHazard || spot.mHalf || nav.CameraOf(spot.mX, spot.mY - 5) != cam || (!under.mHalf && std::abs(spot.mY - nav.Nodes()[at].mY) * scale <= 45) || !from.insert(d.mRegions[n]).second)
                                 {
                                     continue;
                                 }
