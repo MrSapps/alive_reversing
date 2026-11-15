@@ -230,6 +230,9 @@ struct Domain final
     static std::vector<u32> ParamiteTour(const NavGraph& nav, const World& world, s32 from);
     // The cell a Paramite can stand in at a place, or -1: floor there, no shut gate in it, and if it is a lift's
     // stop the lift at it
+    // A wall between two places that stops a Paramite: one that spans 20 over its feet, 10 at half size
+    // (Paramite.cpp's WallHit). Lower than what stops a Scrab: it goes under blocks he has to roll under.
+    static bool ParamiteWall(const NavGraph& nav, s32 x1, s32 x2, s32 y, bool half);
     static s32 ParamiteFloor(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, s32 tolerance = 8);
     // A cell on the level of Paramites that team up, by where the level has them (they are only about once he is
     // on their screen): two or more of his size on its screen, one at least on its level. Paramite.cpp,

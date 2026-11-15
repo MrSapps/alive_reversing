@@ -937,7 +937,33 @@ each from its door back to the hub with 0 deaths:
   locks, each between two foot switches that turn its two gates over: `eStepOn` / `StepOnTask`, and a shut
   gate is opened from the switch nearest to it (`Key::kPlate`).
 - All six in one run from the hub, `h8.txt`: paths 12, 4, 11, 9, 5, 3 in that order, 0 deaths, and through
-  the trial's door (path 13) at f=16,059. In the trial he dies three screens into the chase: not worked on yet.
+  the trial's door (path 13) at f=16,059.
+
+**The Mudomo trial** (path 13; `t13.txt` starts at its door): lever to the exit door in 1,900 frames, 0 deaths,
+out into Necrum's path 5. It is one chase of fourteen screens: four Fleeches let loose at the lever, more woken
+on the way, and Paramites that come down behind him on every screen. What it took:
+- Being chased is a state of the path (`Bot::RecentlyChased`, 900 frames after a pack of Paramites or three
+  Fleeches were last after him): everything is run, and the plan's crossings are not stopped at: all that follow
+  one another go in one `GoToTask`, and a thing to use or the way out at their end is gone straight on to
+  (`Bot::Replan`).
+- Moves that run into one another (`GoToTask`, the chased block, and `Pilot`): a run into a roll under a low
+  thing and on under the next ones a few cells apart, in one roll; out of a roll at a run (`Prim::mRunOut`: the
+  run button again past the last low cell) where six cells of floor follow; out of a running jump's landing
+  at a run; a run, a roll and a running jump as one move (`Pilot::StepRunJump` with `mRunUp`: the roll goes two
+  cells at a time and has to end at the take-off, so it is begun an even number of cells before it); a running
+  jump into a hoist where the way goes up one; off the end of a floor at a run.
+- The map (`NavGraph`): a roll off a low end that ends hung from a hoist (or an edge) out and below; a
+  running jump off the last cell of a floor that catches an edge up to 100 higher, three cells on (measured);
+  where a well throws him when there is no floor under the point (he flies on about a cell and a half as he
+  falls: `Thrown`, which `WellLanding` now uses); a hop off a ledge into a well that a switch turns leads
+  either way.
+- A gate that is taken away for good the first time it opens (SlamDoor's delete flag) stays open in his view
+  whatever its switch does after (`World::mGatesGone`): the trial's three under the ring, whose switch a
+  self-closing trap door sets back twenty frames later.
+- A Paramite goes under blocks that stop a Scrab (`Domain::ParamiteWall`), so a pack behind such a block is
+  still after him.
+Forced and left alone: at 2112,620 the low passage ends over a 25 px shaft with a wall beyond it; rolled off he
+bounces off the wall and is 30 frames on his back at the bottom (the walkthrough: "You'll fall down").
 
 Not built, from the user: with one Paramite the meat can also be thrown past it into the next screen and the
 Paramite walked into that screen (it backs off from him), where it then finds the meat. The fallback for when

@@ -1029,6 +1029,20 @@ bool Domain::ParamiteCornered(const NavGraph& nav, const World& world, s32 x, s3
     return false;
 }
 
+bool Domain::ParamiteWall(const NavGraph& nav, s32 x1, s32 x2, s32 y, bool half)
+{
+    const s32 at = y - (half ? 10 : 20);
+    for (const NavLine& line : nav.Input().mLines)
+    {
+        const bool is = half ? (line.mType == 5 || line.mType == 6) : (line.mType == 1 || line.mType == 2);
+        if (is && line.mX1 == line.mX2 && line.mX1 > std::min(x1, x2) && line.mX1 < std::max(x1, x2) && std::min(line.mY1, line.mY2) <= at && std::max(line.mY1, line.mY2) >= at)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 s32 Domain::ParamiteFloor(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, s32 tolerance)
 {
     const s32 n = nav.NodeAt(x, y, half, tolerance);
@@ -1803,7 +1817,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
 
     for (s32 i = 0; i < 256; i++)
     {
-        if (world.mSwitches[i])
+        if (world.mSwitches[i] || world.mGatesGone.count(static_cast<s32>(i)) != 0 ? world.Switch(static_cast<s32>(i), world.mGatesGone.count(static_cast<s32>(i)) == 0) != 0 : false)
         {
             d.mStart.Set(Key::Switch(i), 1);
         }

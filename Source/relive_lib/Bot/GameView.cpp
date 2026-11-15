@@ -514,6 +514,8 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                     f.mSwitch = t.mSwitchId;
                     f.mStartClosed = t.mStartClosed;
                     f.mSolid = true;
+                    // (one that is gone for good once it has opened)
+                    f.mA = t.mDelete ? 1 : 0;
                     in.mFeatures.push_back(f);
                     break;
                 }
@@ -611,6 +613,7 @@ static void BuildEntities(BinaryPath& path, World& world)
     world.mPath = &path;
     world.mInvisEver = false;
     world.mFleechKilled.clear();
+    world.mGatesGone.clear();
     world.mScrabsKilled.clear();
     world.mLocksSlapped.clear();
     world.mScrabParked.clear();

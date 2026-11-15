@@ -170,6 +170,18 @@ public:
     {
         mWorld.mScrabParked[id] = x;
     }
+    // Something has been after him in this path within the last half minute (a pack of Paramites, a crowd of
+    // Fleeches): a path that sets them on him once does it again on the next screen, and there is no walking
+    // anywhere in it
+    void NoteChased()
+    {
+        mChasedFrame = mAbe.mFrame;
+        mChasedPath = mAbe.mPath;
+    }
+    bool RecentlyChased() const
+    {
+        return mChasedFrame != 0 && mChasedPath == mAbe.mPath && mAbe.mFrame - mChasedFrame < 900;
+    }
     // A Fleech (its entity) a Scrab was made to kill
     void FleechKilled(u32 id)
     {
@@ -347,6 +359,8 @@ private:
     // The next task by the profile's goals. False with mState set when there's nothing more to do or no way to.
     bool Replan(BaseMap& map);
     std::unique_ptr<Task> MakeTask(const Domain& domain, const Goap::Action& action);
+    u32 mChasedFrame = 0;
+    s32 mChasedPath = -1;
 
     AbeState mAbe;
     BotRng mRng;
