@@ -56,6 +56,16 @@ public:
 
     static void CreateFromSaveState(SerializedObjectData& pBuffer, ResourceManager& resMan, BaseMap& map);
 
+    // Read only, for the bot: the frames until it goes off by itself, and whether it has gone off
+    s32 FramesLeft() const
+    {
+        return mPossessedAliveTimer;
+    }
+    bool Exploded() const
+    {
+        return mFartExploded;
+    }
+
 private:
     void InputControlFart();
     void ResetFartColour();

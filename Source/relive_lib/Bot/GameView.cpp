@@ -1,5 +1,6 @@
 #include <array>
 #include "GameView.hpp"
+#include "Domain.hpp"
 #include "../GameObjects/IBirdPortal.hpp"
 #include "../BaseMap.hpp"
 #include "../BinaryPath.hpp"
@@ -19,6 +20,7 @@
 #include "../../AliveLibAE/Drill.hpp"
 #include "../../AliveLibAE/MotionDetector.hpp"
 #include "../../AliveLibAE/Slig.hpp"
+#include "../../AliveLibAE/EvilFart.hpp"
 #include "../../AliveLibAE/Slog.hpp"
 #include "../../AliveLibAE/Fleech.hpp"
 #include "../../AliveLibAE/Paramite.hpp"
@@ -296,6 +298,7 @@ static s32 DirOf(s32 grabDirection)
 NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
 {
     NavInput in;
+    s32 brews = 0;
     std::vector<std::array<s32, 3>> movers;
     const bool isAe = GetGameType() == GameType::eAe;
     in.mIsAe = isAe;
@@ -488,6 +491,17 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                     in.mFeatures.push_back(f);
                     break;
                 }
+                case ReliveTypes::eFlyingSlig:
+                {
+                    NavFeature f = MakeFeature(FeatureKind::eDanger, tlv, camera, id);
+                    f.mHalf = static_cast<const relive::Path_FlyingSlig&>(tlv).mScale == relive::reliveScale::eHalf;
+                    f.mSwitch = World::HazardSwitch(id);
+                    in.mFeatures.push_back(f);
+                    break;
+                }
+                case ReliveTypes::eBrewMachine:
+                    brews++;
+                    break;
                 case ReliveTypes::eUXB:
                 {
                     NavFeature f = MakeFeature(FeatureKind::eHazard, tlv, camera, id);
@@ -617,6 +631,65 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
             end->mSwitch = mover[0];
         }
     }
+    // A flying Slig's stretch is what its track goes along, down to the floor under it. Only where a Brew is to
+    // be had is one something to get rid of first (a fart is flown at it): elsewhere it is got by as it is.
+    // One per corridor: with several over the same stretch it is the one that flies highest (a Brew is one
+    // fart), the others are got by.
+    std::vector<NavFeature> kept;
+    for (NavFeature& f : in.mFeatures)
+    {
+        if (f.mKind != FeatureKind::eDanger)
+        {
+            kept.push_back(f);
+            continue;
+        }
+        s32 x1 = 0;
+        s32 y1 = 0;
+        s32 x2 = 0;
+        s32 y2 = 0;
+        if (brews == 0 || GetGameType() != GameType::eAe || !Domain::FlierTrack(in, (f.mX1 + f.mX2) / 2, (f.mY1 + f.mY2) / 2, x1, y1, x2, y2))
+        {
+            continue;
+        }
+        f.mX1 = x1 - 50;
+        f.mX2 = x2 + 50;
+        f.mY1 = y1 - 60;
+        f.mY2 = y2 + 140;
+        kept.push_back(f);
+    }
+    // (mA 1: the one to get rid of. The others' stretches are still not gone into where there is another way.)
+    for (NavFeature& a : kept)
+    {
+        if (a.mKind != FeatureKind::eDanger)
+        {
+            continue;
+        }
+        a.mA = 1;
+        for (const NavFeature& b : kept)
+        {
+            if (&a != &b && b.mKind == FeatureKind::eDanger && a.mHalf == b.mHalf && a.mX1 < b.mX2 && b.mX1 < a.mX2 && a.mY1 < b.mY2 && b.mY1 < a.mY2 && (a.mY1 > b.mY1 || (a.mY1 == b.mY1 && a.mId > b.mId)))
+            {
+                a.mA = 0;
+            }
+        }
+    }
+    // (the one to get rid of stands for the whole corridor: its stretch is all of theirs, so that what waits for
+    // it is the way into the corridor and not a step in the middle of it, where he would stop)
+    for (NavFeature& a : kept)
+    {
+        for (const NavFeature& b : kept)
+        {
+            if (a.mKind == FeatureKind::eDanger && a.mA == 1 && b.mKind == FeatureKind::eDanger && b.mA == 0 && a.mHalf == b.mHalf && a.mX1 < b.mX2 && b.mX1 < a.mX2 && a.mY1 < b.mY2 && b.mY1 < a.mY2)
+            {
+                a.mX1 = std::min(a.mX1, b.mX1);
+                a.mX2 = std::max(a.mX2, b.mX2);
+                a.mY1 = std::min(a.mY1, b.mY1);
+                a.mY2 = std::max(a.mY2, b.mY2);
+            }
+        }
+    }
+    in.mFeatures = std::move(kept);
+    in.mBrew = brews > 0 && GetGameType() == GameType::eAe;
     return in;
 }
 
@@ -686,6 +759,24 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mKind = EntityKind::eMineCar;
                     keep = GetGameType() == GameType::eAe;
                     e.mHalf = static_cast<const relive::Path_MineCar&>(tlv).mScale == relive::reliveScale::eHalf;
+                    break;
+                case ReliveTypes::eFlyingSlig:
+                    e.mKind = EntityKind::eFlier;
+                    e.mSwitch = World::HazardSwitch(e.mId);
+                    keep = GetGameType() == GameType::eAe;
+                    e.mHalf = static_cast<const relive::Path_FlyingSlig&>(tlv).mScale == relive::reliveScale::eHalf;
+                    break;
+                case ReliveTypes::eBrewMachine:
+                    e.mKind = EntityKind::eBrew;
+                    keep = GetGameType() == GameType::eAe;
+                    e.mInputs[0] = static_cast<const relive::Path_BrewMachine&>(tlv).mBrewCount;
+                    break;
+                case ReliveTypes::eMovieHandStone:
+                    // (a stone that shows a film: looked into it sets its switch like the other kind)
+                    e.mKind = EntityKind::eHandStone;
+                    keep = GetGameType() == GameType::eAe && static_cast<const relive::Path_MovieStone&>(tlv).mTriggerSwitchId > 1;
+                    e.mHalf = static_cast<const relive::Path_MovieStone&>(tlv).mScale == relive::reliveScale::eHalf;
+                    e.mSwitch = static_cast<const relive::Path_MovieStone&>(tlv).mTriggerSwitchId;
                     break;
                 case ReliveTypes::eBoomMachine:
                     // AO's gives grenades as a sack gives rocks: up at it, and what drops out of its pipe is
@@ -950,6 +1041,26 @@ static void BuildEntities(BinaryPath& path, World& world)
     }
 }
 
+// Which flying Sligs are to be got rid of before their stretch is gone into (FeatureKind::eDanger with mA 1)
+static void MarkFliers(const NavInput& in, World& world)
+{
+    for (Entity& e : world.mEntities)
+    {
+        if (e.mKind != EntityKind::eFlier)
+        {
+            continue;
+        }
+        e.mInputs[0] = 0;
+        for (const NavFeature& f : in.mFeatures)
+        {
+            if (f.mKind == FeatureKind::eDanger && f.mId == e.mId && f.mA == 1)
+            {
+                e.mInputs[0] = 1;
+            }
+        }
+    }
+}
+
 bool GameView::ReadPath(BaseMap& map, s32 pathId, NavInput& input, World& world)
 {
     BinaryPath* pPath = map.GetPathResourceBlockPtr(static_cast<u32>(pathId));
@@ -959,6 +1070,7 @@ bool GameView::ReadPath(BaseMap& map, s32 pathId, NavInput& input, World& world)
     }
     input = BuildNavInput(*pPath, static_cast<s32>(map.mCurrentLevel), pathId);
     BuildEntities(*pPath, world);
+    MarkFliers(input, world);
     for (std::size_t i = 0; i < world.mEntities.size(); i++)
     {
         const relive::Path_TLV* pTlv = static_cast<const relive::Path_TLV*>(world.mTlvs[i]);
@@ -977,6 +1089,15 @@ void GameView::ReadWorld(BaseMap& map, World& world)
     if (world.mPath != pPath)
     {
         BuildEntities(*pPath, world);
+        bool fliers = false;
+        for (const Entity& e : world.mEntities)
+        {
+            fliers = fliers || e.mKind == EntityKind::eFlier;
+        }
+        if (fliers)
+        {
+            MarkFliers(BuildNavInput(map), world);
+        }
     }
 
     const bool isAe = GetGameType() == GameType::eAe;
@@ -1055,6 +1176,25 @@ void GameView::ReadWorld(BaseMap& map, World& world)
         }
     }
 
+    world.mBrew = isAe && gAbe && gAbe->HasEvilFart();
+    world.mFart = {};
+    for (s32 i = 0; isAe && i < gBaseAliveGameObjects->Size(); i++)
+    {
+        BaseAliveGameObject* pObj = gBaseAliveGameObjects->ItemAt(i);
+        if (pObj && !pObj->GetDead() && pObj->Type() == ReliveTypes::eEvilFart)
+        {
+            const EvilFart* pFart = static_cast<const EvilFart*>(pObj);
+            world.mFart.mLive = true;
+            world.mFart.mX100 = static_cast<s32>(static_cast<s64>(pObj->mXPos.fpValue) * 100 / 65536);
+            world.mFart.mY100 = static_cast<s32>(static_cast<s64>(pObj->mYPos.fpValue) * 100 / 65536);
+            world.mFart.mVelX100 = static_cast<s32>(static_cast<s64>(pObj->mVelX.fpValue) * 100 / 65536);
+            world.mFart.mVelY100 = static_cast<s32>(static_cast<s64>(pObj->mVelY.fpValue) * 100 / 65536);
+            world.mFart.mFlown = sControlledCharacter == pObj;
+            world.mFart.mExploded = pFart->Exploded();
+            world.mFart.mFramesLeft = pFart->FramesLeft();
+            world.mFart.mHalf = pObj->GetSpriteScale() != FP_FromInteger(1);
+        }
+    }
     world.mInvisCharge = isAe && gAbe && gAbe->mHaveInvisibility != 0;
     world.mInvisible = isAe && gAbe && gAbe->GetInvisible();
     {
@@ -1223,6 +1363,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             flier.mVelX = pObj->mVelX.fpValue / 256;
             flier.mVelY = pObj->mVelY.fpValue / 256;
             flier.mHalf = pObj->GetSpriteScale() != FP_FromInteger(1);
+            flier.mFacingLeft = pObj->GetAnimation().GetFlipX();
             world.mFliers.push_back(flier);
         }
     }

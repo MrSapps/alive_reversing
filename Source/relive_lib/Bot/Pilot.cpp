@@ -500,6 +500,20 @@ PilotStatus Pilot::StepRunJump(const AbeState& abe, u32& bits)
     }
     // (on at a run from where he comes down: Prim::mRunOut. The way and the run button held through the landing
     // keep him running; let go, he slides to a stop, which with Paramites a cell behind is the end of him.)
+    if (mPrim.mX2 != 0)
+    {
+        // (and into the next jump from the run he lands in)
+        bits = dirBit | Btn::eRun;
+        if (abe.mOnGround && abe.mMove == Move::eRun && mFrames > 3)
+        {
+            mPrim.mX = mPrim.mX2;
+            mPrim.mX2 = mPrim.mX3;
+            mPrim.mX3 = 0;
+            mPhase = 0;
+            mFrames = 0;
+        }
+        return PilotStatus::eRunning;
+    }
     if (mPrim.mRunOut)
     {
         bits = dirBit | Btn::eRun;

@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include "Bot/BotRng.hpp"
 #include "Bot/Domain.hpp"
+#include "Bot/FartFlight.hpp"
+#include "Bot/GameView.hpp"
 #include "Bot/Goap.hpp"
 #include "Bot/LevelGraph.hpp"
 #include "Bot/NavGraph.hpp"
@@ -4959,4 +4961,886 @@ TEST(BotWorld, ASwitchOfAGateThatIsGoneIsAsItWasSeenExceptWhereTheRealOneIsAsked
     // (others are as they are)
     world.mSwitches[6] = 1;
     EXPECT_EQ(world.Switch(6), 1);
+}
+
+// ---- AO (Rupture Farms) ----
+
+static NavInput AoInput()
+{
+    NavInput in;
+    in.mIsAe = false;
+    in.mCamW = 1024;
+    in.mCamH = 480;
+    return in;
+}
+
+static const ThrowSpot::Kind kAllThrows[] = {ThrowSpot::eUp, ThrowSpot::eLob, ThrowSpot::eForward, ThrowSpot::eDown, ThrowSpot::eCrouched};
+
+TEST(BotThrowArc, AnAoGrenadeFliesAndLiesOutItsFuseOnTheFloor)
+{
+    NavInput in = AoInput();
+    in.mLines.push_back(Line(0, 460, 1500, 460, 0));
+    for (ThrowSpot::Kind kind : kAllThrows)
+    {
+        const ThrowArc::Flight flight = ThrowArc::Throw(in, 512, 460, false, false, kind);
+        // The hand and the 76 frames of the fuse, and nothing hit with no mine to aim at
+        ASSERT_EQ(flight.mPoints.size(), 77u);
+        EXPECT_EQ(flight.mHit, -1);
+        // It comes to rest on the floor, sliding on less and less
+        EXPECT_EQ(flight.mPoints.back().mY, 460);
+        EXPECT_LE(std::abs(flight.mPoints.back().mX - flight.mPoints[flight.mPoints.size() - 2].mX), 1);
+    }
+    // As measured on the floor of the test: a crouched throw lies at 666
+    EXPECT_EQ(ThrowArc::Throw(in, 512, 460, false, false, ThrowSpot::eCrouched).mPoints.back().mX, 666);
+}
+
+TEST(BotThrowArc, AThrowIsAGrenadeInAoAndARockInAe)
+{
+    NavInput in = AoInput();
+    in.mLines.push_back(Line(0, 460, 1500, 460, 0));
+    const ThrowArc::Point rest = ThrowArc::Throw(in, 512, 460, false, false, ThrowSpot::eCrouched).mPoints.back();
+    const ThrowArc::Point mine{rest.mX + 10, 460};
+    // The grenade lies there till its fuse is out, and then it goes off with the mine in reach
+    const ThrowArc::Flight ao = ThrowArc::Throw(in, 512, 460, false, false, ThrowSpot::eCrouched, &mine);
+    EXPECT_EQ(ao.mHit, 76);
+    EXPECT_EQ(ao.mPoints.size(), 77u);
+    // A rock does not: it flies over a mine that far off and is not a fuse's worth of frames in the air
+    in.mIsAe = true;
+    const ThrowArc::Flight ae = ThrowArc::Throw(in, 512, 460, false, false, ThrowSpot::eCrouched, &mine);
+    EXPECT_NE(ae.mHit, 76);
+    EXPECT_NE(ae.mPoints.size(), 77u);
+}
+
+TEST(BotThrowArc, AGrenadeThatLiesWithinFortyFivePixelsOfAMineSetsItOff)
+{
+    NavInput in = AoInput();
+    in.mLines.push_back(Line(0, 460, 1500, 460, 0));
+    const s32 rest = ThrowArc::Throw(in, 512, 460, false, false, ThrowSpot::eCrouched).mPoints.back().mX;
+    const auto hit = [&](s32 mineX)
+    {
+        const ThrowArc::Point mine{mineX, 460};
+        return ThrowArc::Throw(in, 512, 460, false, false, ThrowSpot::eCrouched, &mine).mHit;
+    };
+    EXPECT_EQ(hit(rest + 45), 76);
+    EXPECT_EQ(hit(rest + 46), -1);
+    // Behind it, too: only that the rock never touched it on its way
+    EXPECT_EQ(hit(rest + 1), 76);
+}
+
+TEST(BotThrowArc, AGrenadeIsSureOfAMineOnlyTillThirtySevenPixelsOff)
+{
+    NavInput in = AoInput();
+    in.mLines.push_back(Line(0, 460, 1500, 460, 0));
+    const s32 rest = ThrowArc::Throw(in, 512, 460, false, false, ThrowSpot::eCrouched).mPoints.back().mX;
+    const auto flight = [&](s32 mineX)
+    {
+        const ThrowArc::Point mine{mineX, 460};
+        return ThrowArc::Throw(in, 512, 460, false, false, ThrowSpot::eCrouched, &mine);
+    };
+    EXPECT_GE(flight(rest + 37).mHit, 0);
+    EXPECT_TRUE(flight(rest + 37).mSure);
+    EXPECT_GE(flight(rest + 38).mHit, 0);
+    EXPECT_FALSE(flight(rest + 38).mSure);
+}
+
+TEST(BotThrowArc, AGrenadeReachesAMineOnlyFifteenPixelsAboveOrBelowItsFloor)
+{
+    NavInput in = AoInput();
+    in.mLines.push_back(Line(0, 460, 1500, 460, 0));
+    const s32 rest = ThrowArc::Throw(in, 512, 460, false, false, ThrowSpot::eCrouched).mPoints.back().mX;
+    const auto hit = [&](s32 mineY)
+    {
+        const ThrowArc::Point mine{rest + 10, mineY};
+        return ThrowArc::Throw(in, 512, 460, false, false, ThrowSpot::eCrouched, &mine).mHit;
+    };
+    EXPECT_EQ(hit(460), 76);
+    EXPECT_EQ(hit(445), 76);
+    EXPECT_EQ(hit(444), -1);
+    EXPECT_EQ(hit(475), 76);
+    EXPECT_EQ(hit(476), -1);
+}
+
+TEST(BotThrowArc, AGrenadeThatTouchesAMineOnItsWayDownSetsItOffAtOnce)
+{
+    // The place of the Mines' rock: it comes down on the mine at 3687 on the ninth frame, and does not lie to the end
+    NavInput in = AoInput();
+    in.mLines.push_back(Line(3400, 2280, 3750, 2280, 0));
+    const ThrowArc::Point mine{3687, 2280};
+    const ThrowArc::Flight flight = ThrowArc::Throw(in, 3587, 2280, false, false, ThrowSpot::eCrouched, &mine);
+    EXPECT_EQ(flight.mHit, 8);
+    EXPECT_EQ(flight.mPoints.size(), 9u);
+    EXPECT_TRUE(flight.mSure);
+}
+
+// Which spots to throw a grenade at a mine from the rule says there are, counted the long way round: every cell and
+// throw whose grenade comes to the mine, bar those in the mine's own blast and those the grenade's blast kills
+// (85 either side of where it lies, 70 under to 95 over his feet)
+struct BlastCount final
+{
+    s32 mNearAcross = 0;
+    s32 mKilled = 0;
+    s32 mKept = 0;
+    s32 mWrong = 0;
+};
+
+static BlastCount CountBlastSpots(const NavInput& in, s32 mineX, s32 mineY)
+{
+    NavGraph g;
+    g.Build(in);
+    const std::vector<ThrowSpot> spots = Domain::ThrowSpots(g, mineX, mineY, false);
+    const s32 mineNode = g.NodeAt(mineX, mineY, false, 12);
+    BlastCount count;
+    if (mineNode < 0)
+    {
+        count.mWrong = 1000000;
+        return count;
+    }
+    const s32 mx = g.Nodes()[mineNode].mX;
+    const s32 my = g.Nodes()[mineNode].mY;
+    const ThrowArc::Point target{mx, my};
+    for (std::size_t i = 0; i < g.Nodes().size(); i++)
+    {
+        const NavNode& n = g.Nodes()[i];
+        const s32 dx = std::abs(n.mX - mx);
+        const s32 dy = n.mY - my;
+        if (dx == 0 || dx > 450 || std::abs(dy) > 200 || (dx <= 118 && std::abs(dy) <= 55))
+        {
+            continue;
+        }
+        for (ThrowSpot::Kind kind : kAllThrows)
+        {
+            const ThrowArc::Flight flight = ThrowArc::Throw(in, n.mX, n.mY, false, mx < n.mX, kind, &target);
+            if (flight.mHit < 0)
+            {
+                continue;
+            }
+            const ThrowArc::Point& end = flight.mPoints.back();
+            const bool across = std::abs(end.mX - n.mX) <= 85;
+            const bool killed = across && n.mY - end.mY >= -70 && n.mY - end.mY <= 95;
+            bool present = false;
+            for (const ThrowSpot& spot : spots)
+            {
+                present = present || (spot.mNode == static_cast<s32>(i) && spot.mKind == kind);
+            }
+            count.mNearAcross += across ? 1 : 0;
+            count.mKilled += killed ? 1 : 0;
+            count.mKept += killed ? 0 : 1;
+            count.mWrong += present == killed ? 1 : 0;
+        }
+    }
+    return count;
+}
+
+// (a wall in the way throws the grenade back, so that it lies near him: the only way it comes to a mine more than
+// the mine's own blast away and lies within the grenade's)
+TEST(BotDomain, NoGrenadeIsThrownFromWhereItsOwnBlastReachesAlongTheFloor)
+{
+    NavInput in = AoInput();
+    in.mLines.push_back(Line(0, 300, 640, 300, 0));
+    in.mLines.push_back(Line(490, 100, 490, 300, 2));
+    const BlastCount count = CountBlastSpots(in, 515, 300);
+    EXPECT_GT(count.mKilled, 0);
+    EXPECT_GT(count.mKept, 0);
+    EXPECT_EQ(count.mWrong, 0);
+}
+
+TEST(BotDomain, ALedgeSixtyOverWhereAGrenadeLiesIsInItsBlastAndOneEightyOverIsNot)
+{
+    NavInput in = AoInput();
+    in.mLines.push_back(Line(0, 300, 640, 300, 0));
+    in.mLines.push_back(Line(300, 240, 420, 240, 0));
+    in.mLines.push_back(Line(510, 100, 510, 300, 2));
+    const BlastCount near = CountBlastSpots(in, 515, 300);
+    EXPECT_GT(near.mKilled, 0);
+    EXPECT_EQ(near.mWrong, 0);
+
+    in.mLines[1] = Line(300, 220, 420, 220, 0);
+    const BlastCount far = CountBlastSpots(in, 515, 300);
+    EXPECT_GT(far.mNearAcross, 0);
+    EXPECT_EQ(far.mKilled, 0);
+    EXPECT_EQ(far.mWrong, 0);
+}
+
+TEST(BotDomain, AFloorEightyUnderWhereAGrenadeLiesIsInItsBlastAndOneAHundredAndTwentyUnderIsNot)
+{
+    NavInput in = AoInput();
+    in.mLines.push_back(Line(0, 200, 640, 200, 0));
+    in.mLines.push_back(Line(300, 280, 420, 280, 0));
+    in.mLines.push_back(Line(514, 0, 514, 280, 2));
+    const BlastCount near = CountBlastSpots(in, 515, 200);
+    EXPECT_GT(near.mKilled, 0);
+    EXPECT_EQ(near.mWrong, 0);
+
+    in.mLines[1] = Line(300, 320, 420, 320, 0);
+    in.mLines[2] = Line(514, 0, 514, 320, 2);
+    const BlastCount far = CountBlastSpots(in, 515, 200);
+    EXPECT_GT(far.mNearAcross, 0);
+    EXPECT_EQ(far.mKilled, 0);
+    EXPECT_EQ(far.mWrong, 0);
+}
+
+// ---- AO nav ----
+
+static NavInput TwoLifts(s32 secondX1)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 100, 100, 0));
+    in.mLines.push_back(Line(0, 300, 100, 300, 0));
+    in.mFeatures.push_back(Feature(FeatureKind::eLiftStop, 100, 100, 176, 124));
+    in.mFeatures.push_back(Feature(FeatureKind::eLiftStop, secondX1, 300, secondX1 + 76, 324));
+    return in;
+}
+
+TEST(BotNav, LiftStopsUpToTwoPixelsOffEachOtherAreOneLift)
+{
+    for (s32 x1 : {100, 101, 102})
+    {
+        NavGraph g;
+        g.Build(TwoLifts(x1));
+        const s32 top = g.NodeAt(137, 100, false);
+        const s32 bottom = g.NodeAt(137, 300, false);
+        ASSERT_GE(top, 0);
+        ASSERT_GE(bottom, 0);
+        EXPECT_TRUE(HasEdge(g, top, bottom, EdgeKind::eLift)) << x1;
+        EXPECT_TRUE(HasEdge(g, bottom, top, EdgeKind::eLift)) << x1;
+    }
+}
+
+TEST(BotNav, LiftStopsThreePixelsOrMoreOffEachOtherAreNotOneLift)
+{
+    for (s32 x1 : {103, 130})
+    {
+        NavGraph g;
+        g.Build(TwoLifts(x1));
+        const s32 top = g.NodeAt(137, 100, false);
+        const s32 bottom = g.NodeAt(137, 300, false);
+        ASSERT_GE(top, 0);
+        ASSERT_GE(bottom, 0);
+        EXPECT_FALSE(HasEdge(g, top, bottom, EdgeKind::eLift)) << x1;
+        EXPECT_FALSE(HasEdge(g, bottom, top, EdgeKind::eLift)) << x1;
+    }
+}
+
+// The cell a fall off the right end of the floor at upY (at 287) comes down in, or -1 for no fall
+static s32 FallsTo(bool ae, s32 upY, s32 lowY, s32 lowX2, bool soft = false)
+{
+    NavInput in = AoInput();
+    in.mIsAe = ae;
+    in.mLines.push_back(Line(0, upY, 300, upY, 0));
+    in.mLines.push_back(Line(0, lowY, lowX2, lowY, 0));
+    if (soft)
+    {
+        in.mFeatures.push_back(Feature(FeatureKind::eSoftLanding, 0, lowY - 30, 2000, lowY + 20));
+        in.mFeatures.back().mAnyScale = true;
+    }
+    NavGraph g;
+    g.Build(in);
+    const s32 from = g.NodeAt(287, upY, false);
+    for (const NavEdge& e : g.Edges())
+    {
+        if (e.mFrom == from && e.mKind == EdgeKind::eFall)
+        {
+            return g.Nodes()[e.mTo].mX;
+        }
+    }
+    return -1;
+}
+
+TEST(BotNav, AoWalkedOffALedgeAHundredAndFiftyHighLandsOneCellFurtherOut)
+{
+    // Not to the cell by the ledge's end as AE's does: he keeps the walk's speed down (150 is not high enough)
+    EXPECT_EQ(FallsTo(true, 100, 251, 2000), 312);
+    EXPECT_EQ(FallsTo(false, 100, 250, 2000), 315);
+    EXPECT_EQ(FallsTo(false, 100, 251, 2000), 340);
+    EXPECT_EQ(FallsTo(false, 100, 279, 2000), 340);
+}
+
+TEST(BotNav, AoWalkedOffAHighLedgeLandsFurtherOutTheHigherItIs)
+{
+    // 300 down onto a soft landing: five frames and the rest at 20 pixels a frame, 2.77 pixels each
+    EXPECT_EQ(FallsTo(false, 10, 310, 2000, true), 365);
+    // AE comes straight down
+    EXPECT_EQ(FallsTo(true, 10, 310, 2000, true), 312);
+}
+
+TEST(BotNav, AoWalkedOffALedgeAScreenUpLandsFurtherOutForTheChangeOfScreen)
+{
+    // The same 400 down but over a change of screen (five frames more) and the fall is a little longer
+    EXPECT_EQ(FallsTo(false, 400, 800, 2000, true), 365);
+}
+
+TEST(BotNav, AoWalkedOffALedgeThereIsNoWayDownWhereThereIsNoFloorOutThere)
+{
+    // The floor below ends at 345, which a fall of 160 reaches (340) and at 330 it does not
+    EXPECT_EQ(FallsTo(false, 100, 260, 345), 340);
+    EXPECT_EQ(FallsTo(false, 100, 260, 330), -1);
+    // AE comes down by the ledge's end, where there is floor
+    EXPECT_EQ(FallsTo(true, 100, 260, 330), 312);
+}
+
+// ---- AO saw ----
+
+static NavInput SawRoom(s32 exitX)
+{
+    NavInput in;
+    // The lever's ledge, joined to the floor under it by a hoist, and the saw over the floor
+    in.mLines.push_back(Line(0, 100, 200, 100, 0));
+    in.mLines.push_back(Line(0, 200, 600, 200, 0));
+    in.mFeatures.push_back(Feature(FeatureKind::eHoist, 100, 100, 124, 195));
+    NavFeature saw = Feature(FeatureKind::eSaw, 300, 170, 350, 200);
+    saw.mSwitch = 9;
+    in.mFeatures.push_back(saw);
+    NavFeature exit = Feature(FeatureKind::eDoor, exitX, 80, exitX + 24, 104);
+    exit.mDestPath = 2;
+    exit.mDestCamera = 1;
+    in.mFeatures.push_back(exit);
+    return in;
+}
+
+static World SawWorld()
+{
+    World world;
+    Entity lever = MakeEntity(EntityKind::eLever, 1001, 20, 80, 94, 104);
+    lever.mSwitch = 9;
+    lever.mOp = 2;
+    world.mEntities.push_back(lever);
+    world.mEntities.push_back(MakeEntity(EntityKind::eSlig, 2001, 300, 170, 324, 200));
+    return world;
+}
+
+static bool ExitNeedsSligDead(const Domain& domain, u32 sligId)
+{
+    bool any = false;
+    for (const Goap::Action& a : domain.mActions)
+    {
+        if (domain.mSteps[a.mTag].mKind != StepKind::eExit)
+        {
+            continue;
+        }
+        any = true;
+        bool needs = false;
+        for (const Goap::Fact& f : a.mPre)
+        {
+            needs = needs || (f.mKey == Key::Mud(sligId) && f.mValue == 2);
+        }
+        if (!needs)
+        {
+            return false;
+        }
+    }
+    return any;
+}
+
+TEST(BotDomain, ASligIsSawnWithTheLeverThatBringsTheSawDown)
+{
+    NavInput in = SawRoom(550);
+    // (exit on the floor under the saw)
+    in.mFeatures.back().mY1 = 180;
+    in.mFeatures.back().mY2 = 204;
+    NavGraph g;
+    g.Build(in);
+    const Domain domain = Domain::Build(g, SawWorld(), g.NodeAt(12, 100, false), nullptr);
+    bool drop = false;
+    for (const Goap::Action& a : domain.mActions)
+    {
+        const DomainStep& s = domain.mSteps[a.mTag];
+        if (s.mKind == StepKind::eSligDrop)
+        {
+            drop = true;
+            EXPECT_EQ(s.mEntity, 1001u);
+            EXPECT_EQ(s.mOther, 2001u);
+            ASSERT_EQ(a.mEffects.size(), 1u);
+            EXPECT_EQ(a.mEffects[0].mKey, Key::Mud(2001));
+        }
+    }
+    EXPECT_TRUE(drop) << domain.Text();
+}
+
+TEST(BotDomain, TheWayOutOnTheFloorOfTheSawNeedsTheSligDeadWhenTheWayFromTheLeverGoesAlongIt)
+{
+    NavInput in = SawRoom(550);
+    in.mFeatures.back().mY1 = 180;
+    in.mFeatures.back().mY2 = 204;
+    NavGraph g;
+    g.Build(in);
+    const Domain domain = Domain::Build(g, SawWorld(), g.NodeAt(12, 100, false), nullptr);
+    EXPECT_TRUE(ExitNeedsSligDead(domain, 2001)) << domain.Text();
+}
+
+TEST(BotDomain, TheWayOutOnTheLeversLedgeNeedsNoSligDeadForTheSaw)
+{
+    NavGraph g;
+    g.Build(SawRoom(150));
+    const Domain domain = Domain::Build(g, SawWorld(), g.NodeAt(12, 100, false), nullptr);
+    bool exit = false;
+    for (const Goap::Action& a : domain.mActions)
+    {
+        exit = exit || domain.mSteps[a.mTag].mKind == StepKind::eExit;
+    }
+    ASSERT_TRUE(exit) << domain.Text();
+    EXPECT_FALSE(ExitNeedsSligDead(domain, 2001));
+}
+
+// ---- A fart that is flown (Feeco Depot) ----
+
+// A room 600 wide and 200 high with a wall down its middle that stops 60 short of the ceiling
+static NavInput FartRoom(bool wallToCeiling)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 300, 600, 300, 0));
+    in.mLines.push_back(Line(0, 100, 600, 100, 3));
+    in.mLines.push_back(Line(0, 100, 0, 300, 1));
+    in.mLines.push_back(Line(600, 100, 600, 300, 2));
+    in.mLines.push_back(Line(300, wallToCeiling ? 100 : 160, 300, 300, 1));
+    return in;
+}
+
+static bool WayCrosses(FartFlight::Point from, const std::vector<FartFlight::Point>& corners, const NavLine& line)
+{
+    return FartFlight::Through(from, corners, line);
+}
+
+TEST(BotFart, WithNothingBetweenTheWayIsOneLegStraightThere)
+{
+    std::vector<FartFlight::Point> corners;
+    s32 length = 0;
+    ASSERT_TRUE(FartFlight::Route(FartRoom(false), false, {50, 250}, {250, 200}, 2000, corners, &length));
+    ASSERT_EQ(corners.size(), 1u);
+    EXPECT_EQ(corners[0].mX, 250);
+    EXPECT_EQ(corners[0].mY, 200);
+    EXPECT_EQ(length, 250);
+}
+
+TEST(BotFart, AWallInTheWayIsFlownOverWhereItStopsShortOfTheCeiling)
+{
+    const NavInput in = FartRoom(false);
+    std::vector<FartFlight::Point> corners;
+    s32 length = 0;
+    ASSERT_TRUE(FartFlight::Route(in, false, {50, 250}, {550, 250}, 2000, corners, &length));
+    EXPECT_GE(corners.size(), 3u);
+    EXPECT_EQ(corners.back().mX, 550);
+    EXPECT_FALSE(WayCrosses({50, 250}, corners, in.mLines[4]));
+    // (up over the wall's top at 160 and down again: more than straight across)
+    EXPECT_GT(length, 500 + 2 * 80);
+    bool over = false;
+    for (const FartFlight::Point& p : corners)
+    {
+        over = over || p.mY < 160;
+    }
+    EXPECT_TRUE(over);
+}
+
+TEST(BotFart, AWallFromFloorToCeilingLeavesNoWayAndNeitherDoesAWayTooLong)
+{
+    std::vector<FartFlight::Point> corners;
+    EXPECT_FALSE(FartFlight::Route(FartRoom(true), false, {50, 250}, {550, 250}, 2000, corners));
+    EXPECT_FALSE(FartFlight::Route(FartRoom(false), false, {50, 250}, {550, 250}, 600, corners));
+    // (a floor stops it up and down but not along: under the room's floor there is no getting in)
+    EXPECT_FALSE(FartFlight::Route(FartRoom(false), false, {50, 250}, {50, 350}, 2000, corners));
+}
+
+TEST(BotFart, AWallOfTheOtherScaleIsNothingToIt)
+{
+    NavInput in = FartRoom(true);
+    // (the middle wall as a half scale one: types 5 and 6)
+    in.mLines[4].mType = 5;
+    std::vector<FartFlight::Point> corners;
+    EXPECT_TRUE(FartFlight::Route(in, false, {50, 250}, {550, 250}, 2000, corners));
+    EXPECT_EQ(corners.size(), 1u);
+}
+
+TEST(BotFart, AShutGateIsInTheWayAndAnOpenOneIsNot)
+{
+    NavInput in = FartRoom(false);
+    // A gate in the gap over the wall, on switch 40, shut until it is on
+    NavFeature gate = Feature(FeatureKind::eBarrier, 288, 140, 312, 160);
+    gate.mSwitch = 40;
+    gate.mStartClosed = true;
+    in.mFeatures.push_back(gate);
+    World world;
+    std::vector<s32> which;
+    const std::vector<NavLine> all = FartFlight::Gates(in, false, nullptr, &which);
+    ASSERT_EQ(all.size(), 1u);
+    EXPECT_EQ(which[0], 0);
+    std::vector<FartFlight::Point> corners;
+    EXPECT_FALSE(FartFlight::Route(in, false, {50, 250}, {550, 250}, 2000, corners, nullptr, &all));
+    // Shut in the world as it is: the same. Open: no line for it.
+    EXPECT_EQ(FartFlight::Gates(in, false, &world).size(), 1u);
+    world.mSwitches[40] = 1;
+    const std::vector<NavLine> open = FartFlight::Gates(in, false, &world);
+    EXPECT_TRUE(open.empty());
+    EXPECT_TRUE(FartFlight::Route(in, false, {50, 250}, {550, 250}, 2000, corners, nullptr, &open));
+    // (and the way through says which gate it goes through)
+    EXPECT_TRUE(FartFlight::Through({50, 250}, corners, all[0]));
+}
+
+// The fart as EvilFart.cpp moves it: a fifth of a pixel a frame more each frame a way is held, up to 4, and a
+// fifth less each frame it is not
+static void FlyFart(s32& x100, s32& y100, s32& vx, s32& vy, u32 held)
+{
+    const auto axis = [](s32& v, bool more, bool less)
+    {
+        if (more && v < 400)
+        {
+            v += 20;
+        }
+        if (less && v > -400)
+        {
+            v -= 20;
+        }
+        if (!more && !less)
+        {
+            v += v > 0 ? -20 : (v < 0 ? 20 : 0);
+        }
+    };
+    axis(vx, (held & Btn::eRight) != 0, (held & Btn::eLeft) != 0);
+    axis(vy, (held & Btn::eDown) != 0, (held & Btn::eUp) != 0);
+    x100 += vx;
+    y100 += vy;
+}
+
+TEST(BotFart, SteeredItStopsWhereItIsToWithoutGoingPast)
+{
+    s32 x = 100 * 100;
+    s32 y = 500 * 100;
+    s32 vx = 0;
+    s32 vy = 0;
+    s32 furthest = x;
+    s32 frames = 0;
+    for (; frames < 400; frames++)
+    {
+        const u32 held = FartFlight::Steer(x, y, vx, vy, 600, 380);
+        if (held == 0 && vx == 0 && vy == 0)
+        {
+            break;
+        }
+        FlyFart(x, y, vx, vy, held);
+        furthest = std::max(furthest, x);
+    }
+    // 500 across at up to 4 a frame, with the speeding up and the slowing down: some 150 frames
+    EXPECT_LT(frames, 170);
+    EXPECT_NEAR(x / 100, 600, 1);
+    EXPECT_NEAR(y / 100, 380, 1);
+    EXPECT_LE(furthest, 601 * 100);
+}
+
+TEST(BotFart, AtFullSpeedItCoastsThirtyEightPixels)
+{
+    EXPECT_EQ(FartFlight::Coast(400), 3800);
+    EXPECT_EQ(FartFlight::Coast(-400), 3800);
+    EXPECT_EQ(FartFlight::Coast(20), 0);
+    s32 x = 0;
+    s32 y = 0;
+    s32 vx = 400;
+    s32 vy = 0;
+    while (vx != 0)
+    {
+        FlyFart(x, y, vx, vy, 0);
+    }
+    EXPECT_EQ(x, 3800);
+}
+
+TEST(BotFart, TheBlastReachesSixtyToEachSideSixtyUpAndThirtyDown)
+{
+    const FartFlight::Point at{500, 400};
+    EXPECT_TRUE(FartFlight::Hits(at, 550, 390, 560, 410));
+    EXPECT_FALSE(FartFlight::Hits(at, 561, 390, 580, 410));
+    EXPECT_TRUE(FartFlight::Hits(at, 490, 330, 510, 340));
+    EXPECT_FALSE(FartFlight::Hits(at, 490, 320, 510, 339));
+    EXPECT_TRUE(FartFlight::Hits(at, 490, 430, 510, 450));
+    EXPECT_FALSE(FartFlight::Hits(at, 490, 431, 510, 450));
+}
+
+// A floor with a Brew machine at its left, a mine in the way and the way out beyond it; a wall between them that
+// leaves a gap over it, and a gate in that gap if asked for
+static NavInput BrewCorridor(bool gate)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 300, 800, 300, 0));
+    in.mLines.push_back(Line(0, 100, 800, 100, 3));
+    in.mLines.push_back(Line(0, 100, 0, 300, 1));
+    in.mLines.push_back(Line(800, 100, 800, 300, 2));
+    // (four in a row: too many to hop)
+    for (s32 i = 0; i < 4; i++)
+    {
+        NavFeature mine = Feature(FeatureKind::eHazard, 500 + i * 25, 280, 524 + i * 25, 304);
+        mine.mSwitch = World::HazardSwitch(2000 + i);
+        in.mFeatures.push_back(mine);
+    }
+    NavFeature exit = Feature(FeatureKind::eDoor, 700, 280, 724, 304);
+    exit.mDestPath = 2;
+    exit.mDestCamera = 1;
+    in.mFeatures.push_back(exit);
+    if (gate)
+    {
+        NavFeature g = Feature(FeatureKind::eBarrier, 388, 200, 412, 300);
+        g.mSwitch = 40;
+        g.mStartClosed = true;
+        in.mFeatures.push_back(g);
+        // (and nothing gets over it)
+        in.mLines.push_back(Line(400, 100, 400, 220, 1));
+    }
+    return in;
+}
+
+static World BrewWorld(bool orb)
+{
+    World world;
+    for (u32 i = 0; i < 4; i++)
+    {
+        Entity mine = MakeEntity(EntityKind::eMine, 2000 + i, 500 + i * 25, 280, 524 + i * 25, 304);
+        mine.mSwitch = World::HazardSwitch(mine.mId);
+        world.mEntities.push_back(mine);
+    }
+    Entity brew = MakeEntity(EntityKind::eBrew, 3000, 100, 266, 124, 302);
+    brew.mCamera = 1;
+    world.mEntities.push_back(brew);
+    if (orb)
+    {
+        Entity o = MakeEntity(EntityKind::eSecurityOrb, 3001, 200, 150, 224, 174);
+        o.mCamera = 1;
+        world.mEntities.push_back(o);
+    }
+    return world;
+}
+
+static const Goap::Action* FartAction(const Domain& d, u32 target)
+{
+    for (const Goap::Action& a : d.mActions)
+    {
+        const DomainStep& s = d.mSteps[a.mTag];
+        // (flown from a machine: one left by the mine names no machine)
+        if (s.mKind == StepKind::eFartBomb && s.mEntity == target && s.mOther != 0)
+        {
+            return &a;
+        }
+    }
+    return nullptr;
+}
+
+TEST(BotFart, AMineInTheWayIsBlownUpWithAFartFlownFromTheBrewMachine)
+{
+    NavGraph g;
+    g.Build(BrewCorridor(false));
+    World world = BrewWorld(false);
+    const Domain domain = Domain::Build(g, world, g.NodeAt(12, 300, false), nullptr);
+    const Goap::Plan plan = Goap::Planner::Find(domain.mStart, {{Key::kExited, 1}}, domain.mActions);
+    ASSERT_TRUE(plan.mFound) << plan.mMiss << "\n" << domain.Text();
+    bool flown = false;
+    for (s32 step : plan.mSteps)
+    {
+        const DomainStep& s = domain.mSteps[domain.mActions[step].mTag];
+        flown = flown || (s.mKind == StepKind::eFartBomb && s.mEntity >= 2000 && s.mEntity <= 2003 && s.mOther == 3000);
+    }
+    EXPECT_TRUE(flown) << domain.Text();
+}
+
+TEST(BotFart, WithAnOrbOnTheMachinesScreenNoFartIsFlownFromIt)
+{
+    NavGraph g;
+    g.Build(BrewCorridor(false));
+    World world = BrewWorld(true);
+    const Domain domain = Domain::Build(g, world, g.NodeAt(12, 300, false), nullptr);
+    EXPECT_EQ(FartAction(domain, 2000), nullptr);
+}
+
+TEST(BotFart, AFartThatHasToGoThroughAGateWaitsForTheGatesSwitch)
+{
+    NavGraph g;
+    g.Build(BrewCorridor(true));
+    World world = BrewWorld(false);
+    const Domain domain = Domain::Build(g, world, g.NodeAt(12, 300, false), nullptr);
+    const Goap::Action* fart = FartAction(domain, 2000);
+    ASSERT_NE(fart, nullptr) << domain.Text();
+    const Goap::Fact open{Key::Switch(40), 1};
+    EXPECT_NE(std::find(fart->mPre.begin(), fart->mPre.end(), open), fart->mPre.end());
+    // (with no gate there it waits for nothing but being at the machine with no Brew in him)
+    NavGraph plain;
+    plain.Build(BrewCorridor(false));
+    const Domain free = Domain::Build(plain, world, plain.NodeAt(12, 300, false), nullptr);
+    const Goap::Action* direct = FartAction(free, 2000);
+    ASSERT_NE(direct, nullptr);
+    EXPECT_EQ(std::find(direct->mPre.begin(), direct->mPre.end(), open), direct->mPre.end());
+}
+
+TEST(BotFart, AFlyingSligsTrackIsTheLinesJoinedEndToEndThatGoByIt)
+{
+    NavInput in;
+    // Two tracks: a low one of three lines and a high one of one
+    in.mLines.push_back(Line(100, 500, 300, 520, 8));
+    in.mLines.push_back(Line(300, 520, 600, 510, 8));
+    in.mLines.push_back(Line(600, 510, 900, 515, 8));
+    in.mLines.push_back(Line(400, 420, 800, 430, 8));
+    s32 x1 = 0;
+    s32 y1 = 0;
+    s32 x2 = 0;
+    s32 y2 = 0;
+    std::vector<std::pair<s32, s32>> ends;
+    std::vector<NavLine> lines;
+    ASSERT_TRUE(Domain::FlierTrack(in, 450, 510, x1, y1, x2, y2, &ends, &lines));
+    EXPECT_EQ(x1, 100);
+    EXPECT_EQ(x2, 900);
+    EXPECT_EQ(y1, 500);
+    EXPECT_EQ(y2, 520);
+    EXPECT_EQ(lines.size(), 3u);
+    ASSERT_EQ(ends.size(), 2u);
+    EXPECT_EQ(std::min(ends[0].first, ends[1].first), 100);
+    EXPECT_EQ(std::max(ends[0].first, ends[1].first), 900);
+    ASSERT_TRUE(Domain::FlierTrack(in, 600, 425, x1, y1, x2, y2, &ends));
+    EXPECT_EQ(x1, 400);
+    EXPECT_EQ(x2, 800);
+    // (no track at all: none)
+    NavInput bare;
+    bare.mLines.push_back(Line(0, 300, 800, 300, 0));
+    EXPECT_FALSE(Domain::FlierTrack(bare, 100, 100, x1, y1, x2, y2));
+}
+
+TEST(BotFart, NothingIsCrossedIntoAFlyingSligsStretchUntilItIsGone)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 300, 800, 300, 0));
+    NavFeature zone = Feature(FeatureKind::eDanger, 400, 200, 800, 340);
+    zone.mSwitch = World::HazardSwitch(5000);
+    zone.mA = 1;
+    in.mFeatures.push_back(zone);
+    NavGraph g;
+    g.Build(in);
+    const s32 before = g.NodeAt(387, 300, false);
+    const s32 inside = g.NodeAt(412, 300, false);
+    const s32 further = g.NodeAt(437, 300, false);
+    ASSERT_GE(before, 0);
+    ASSERT_GE(inside, 0);
+    const NavEdge* in1 = FindEdge(g, before, inside, EdgeKind::eWalk);
+    ASSERT_NE(in1, nullptr);
+    s32 sw = 0;
+    s32 value = 0;
+    EXPECT_TRUE(g.Condition(*in1, &sw, &value));
+    EXPECT_EQ(sw, World::HazardSwitch(5000));
+    EXPECT_EQ(value, 1);
+    // (out of it, and along inside it, wait for nothing)
+    EXPECT_FALSE(g.Condition(*FindEdge(g, inside, before, EdgeKind::eWalk), &sw, &value));
+    EXPECT_FALSE(g.Condition(*FindEdge(g, inside, further, EdgeKind::eWalk), &sw, &value));
+    // The world gives the switch as on once the Slig is dead, and all along for one that is not to be got rid of
+    World world;
+    Entity flier = MakeEntity(EntityKind::eFlier, 5000, 600, 240, 624, 264);
+    flier.mSwitch = World::HazardSwitch(5000);
+    flier.mInputs[0] = 1;
+    world.mEntities.push_back(flier);
+    EXPECT_EQ(world.Switch(flier.mSwitch), 0);
+    world.mFleechKilled.insert(5000);
+    EXPECT_EQ(world.Switch(flier.mSwitch), 1);
+    world.mFleechKilled.clear();
+    world.mEntities[0].mInputs[0] = 0;
+    EXPECT_EQ(world.Switch(flier.mSwitch), 1);
+}
+
+TEST(BotFart, TheWayIntoTheStretchOfAFlyingSligThatIsLeftAliveIsADearOne)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 300, 800, 300, 0));
+    NavGraph plain;
+    plain.Build(in);
+    NavFeature zone = Feature(FeatureKind::eDanger, 400, 200, 800, 340);
+    zone.mSwitch = World::HazardSwitch(5000);
+    zone.mA = 0;
+    in.mFeatures.push_back(zone);
+    NavGraph g;
+    g.Build(in);
+    const NavEdge* dear = FindEdge(g, g.NodeAt(387, 300, false), g.NodeAt(412, 300, false), EdgeKind::eWalk);
+    const NavEdge* was = FindEdge(plain, plain.NodeAt(387, 300, false), plain.NodeAt(412, 300, false), EdgeKind::eWalk);
+    ASSERT_NE(dear, nullptr);
+    ASSERT_NE(was, nullptr);
+    EXPECT_EQ(dear->mCost, was->mCost + 1500);
+}
+
+TEST(BotFart, RunningJumpsThatComeDownInTheNextOnesRunUpAreAlsoOneEdge)
+{
+    // Three mines, each a running jump apart
+    NavInput in;
+    in.mLines.push_back(Line(0, 300, 1200, 300, 0));
+    for (s32 x : {300, 325, 475, 650})
+    {
+        in.mFeatures.push_back(Feature(FeatureKind::eHazard, x, 280, x + 24, 304));
+    }
+    NavGraph g;
+    g.Build(in);
+    s32 singles = 0;
+    s32 doubles = 0;
+    s32 triples = 0;
+    for (const NavEdge& e : g.Edges())
+    {
+        if (e.mKind != EdgeKind::eRunJump || e.mLeft)
+        {
+            continue;
+        }
+        singles += e.mX2 == 0 ? 1 : 0;
+        doubles += e.mX2 != 0 && e.mX3 == 0 ? 1 : 0;
+        triples += e.mX3 != 0 ? 1 : 0;
+        if (e.mX2 != 0)
+        {
+            // (each take-off further on than the one before, and the edge ends where its last jump does)
+            EXPECT_GT(e.mX2, e.mX);
+            EXPECT_GT(g.Nodes()[e.mTo].mX, e.mX2);
+        }
+        if (e.mX3 != 0)
+        {
+            EXPECT_GT(e.mX3, e.mX2);
+            EXPECT_GT(g.Nodes()[e.mTo].mX, e.mX3);
+        }
+    }
+    EXPECT_GE(singles, 3);
+    EXPECT_GE(doubles, 1);
+    EXPECT_GE(triples, 1);
+}
+
+TEST(BotFart, AFartIsLeftByAMineFromTwoCellsOffItWithTheBrewHeHasInHim)
+{
+    NavGraph g;
+    g.Build(BrewCorridor(false));
+    // (an orb on the machine's screen: nothing is flown, so a fart left by the mines is what there is)
+    World world = BrewWorld(true);
+    const Domain domain = Domain::Build(g, world, g.NodeAt(12, 300, false), nullptr);
+    const Goap::Action* left = nullptr;
+    for (const Goap::Action& a : domain.mActions)
+    {
+        const DomainStep& s = domain.mSteps[a.mTag];
+        if (s.mKind == StepKind::eFartBomb && s.mEntity == 2000 && s.mOther == 0)
+        {
+            left = &a;
+            // (from the cell two off the first mine, on the side that is floor: the other side is the next mine)
+            EXPECT_EQ(g.Nodes()[s.mEdge].mX, 462);
+        }
+    }
+    ASSERT_NE(left, nullptr) << domain.Text();
+    const Goap::Fact brew{Key::kBrew, 1};
+    EXPECT_NE(std::find(left->mPre.begin(), left->mPre.end(), brew), left->mPre.end());
+    const Goap::Fact spent{Key::kBrew, 0};
+    EXPECT_NE(std::find(left->mEffects.begin(), left->mEffects.end(), spent), left->mEffects.end());
+    // The way out is then: drink, leave farts, go
+    const Goap::Plan plan = Goap::Planner::Find(domain.mStart, {{Key::kExited, 1}}, domain.mActions);
+    ASSERT_TRUE(plan.mFound) << plan.mMiss << "\n" << domain.Text();
+    EXPECT_EQ(domain.mSteps[domain.mActions[plan.mSteps.front()].mTag].mKind, StepKind::eDrink);
+}
+
+TEST(BotFart, AHopDownOntoAMinesCellIsThereOnlyWhereThereIsABrewMachineAndWaitsForTheMine)
+{
+    // A ledge forty over a floor that begins a cell out from it, with a mine where the hop comes down
+    NavInput in;
+    in.mLines.push_back(Line(1175, 420, 1200, 420, 0));
+    in.mLines.push_back(Line(1225, 460, 1400, 460, 0));
+    NavFeature mine = Feature(FeatureKind::eHazard, 1275, 440, 1299, 464);
+    mine.mSwitch = World::HazardSwitch(7005);
+    in.mFeatures.push_back(mine);
+    NavGraph plain;
+    plain.Build(in);
+    EXPECT_EQ(FindEdge(plain, plain.NodeAt(1187, 420, false), plain.NodeAt(1287, 460, false), EdgeKind::eHop), nullptr);
+    in.mBrew = true;
+    NavGraph g;
+    g.Build(in);
+    const NavEdge* hop = FindEdge(g, g.NodeAt(1187, 420, false), g.NodeAt(1287, 460, false), EdgeKind::eHop);
+    ASSERT_NE(hop, nullptr);
+    s32 sw = 0;
+    s32 value = 0;
+    EXPECT_TRUE(g.Condition(*hop, &sw, &value));
+    EXPECT_EQ(sw, World::HazardSwitch(7005));
 }

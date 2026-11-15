@@ -37,6 +37,8 @@ inline u32 Mud(u32 entityId)
 {
     return 1000000 + entityId;
 }
+// He has drunk a Brew: his next fart is one that goes off
+static const u32 kBrew = 9;
 // A stretch of floor (Domain::ScrabZone) has no loose Scrab on it that could get at Abe there
 inline u32 ScrabClear(s32 zone)
 {
@@ -84,6 +86,9 @@ enum class StepKind : u8
     eFleechLead, // let Fleeches out with the lever mEntity, lead them to where they drop to a Scrab and kill them with it
     eScrabPen,  // work lever mEntity so that the gate it moves (feature mOther) is shut with every Scrab of that
                 // floor on one side of it: left of it if mEdge is 1, else right
+    eFartBomb,  // drink at Brew machine mOther, fart, take the fart over and fly it to mine or Slig mEntity. With
+                // no machine (mOther 0): from the cell mEdge with the Brew he has in him, at flying Slig mEntity
+    eDrink,     // drink at Brew machine mEntity
 };
 
 // What a planned action means to the bot
@@ -314,6 +319,9 @@ struct Domain final
     // The switches that have to be on before a lever is pulled, where the order matters (Fleeches: see the .cpp)
     static std::vector<s32> PulledFirst(const NavGraph& nav, const World& world, const Entity& lever);
     static s32 UseNode(const NavGraph& nav, const Entity& entity, bool* faceLeft, s32 firstSide = -1);
+    // The box a flying Slig's track is in: the track lines joined end to end that go by (fx, fy), where the map puts it.
+    // ends: the two ends of that track. False with no track there.
+    static bool FlierTrack(const NavInput& in, s32 fx, s32 fy, s32& x1, s32& y1, s32& x2, s32& y2, std::vector<std::pair<s32, s32>>* ends = nullptr, std::vector<NavLine>* lines = nullptr);
     // The wheels a switch logic entity needs turned at once and the nearest Mudokons that can walk to them. False
     // if it isn't that kind of logic or there aren't enough Mudokons. pre gets what the action needs.
     // Where a rock could be thrown from at something on the floor at (x, y), likeliest first. Nothing is worked

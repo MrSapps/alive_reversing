@@ -537,6 +537,11 @@ public:
     s16 mHaveShrykull = 0;
     s32 mAutoSayTimer = 0;
     s16 mHaveInvisibility = 0;
+    // Read only, for the bot: he has drunk a Brew, so his next fart is one that goes off
+    bool HasEvilFart() const
+    {
+        return mHasEvilFart;
+    }
     // (read only, for the bot: the frame his invisibility runs out at, 0 when it is not running)
     s32 InvisibilityTimer() const
     {

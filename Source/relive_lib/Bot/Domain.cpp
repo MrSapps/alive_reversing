@@ -1,4 +1,5 @@
 #include "Domain.hpp"
+#include "FartFlight.hpp"
 #include "ThrowArc.hpp"
 #include <algorithm>
 #include <cstdlib>
@@ -27,6 +28,8 @@ const char* EntityKindName(EntityKind kind)
         case EntityKind::eTeleporter: return "Teleporter";
         case EntityKind::eMine: return "Mine";
         case EntityKind::eRockSack: return "RockSack";
+        case EntityKind::eBrew: return "Brew";
+        case EntityKind::eFlier: return "FlyingSlig";
         case EntityKind::eDrill: return "Drill";
         case EntityKind::eMineCar: return "MineCar";
         case EntityKind::eParamite: return "Paramite";
@@ -270,6 +273,7 @@ s32 Domain::UseNode(const NavGraph& nav, const Entity& entity, bool* faceLeft, s
         }
         case EntityKind::eWorkWheel:
         case EntityKind::eHandStone:
+        case EntityKind::eBrew:
             node = nav.NodeAt(cx, entity.mY2, entity.mHalf, 40);
             break;
         case EntityKind::eSlapLock:
@@ -352,6 +356,100 @@ s32 Domain::UseNode(const NavGraph& nav, const Entity& entity, bool* faceLeft, s
         *faceLeft = left;
     }
     return node;
+}
+
+bool Domain::FlierTrack(const NavInput& in, s32 fx, s32 fy, s32& x1, s32& y1, s32& x2, s32& y2, std::vector<std::pair<s32, s32>>* ends, std::vector<NavLine>* lines)
+{
+    static const s32 kTrackLine = 8;
+    // The line nearest to it, then every line that shares an end with one already taken
+    std::vector<bool> taken(in.mLines.size(), false);
+    s64 best = -1;
+    s32 first = -1;
+    for (std::size_t i = 0; i < in.mLines.size(); i++)
+    {
+        const NavLine& line = in.mLines[i];
+        if (line.mType != kTrackLine)
+        {
+            continue;
+        }
+        const s64 mx = (line.mX1 + line.mX2) / 2 - fx;
+        const s64 my = (line.mY1 + line.mY2) / 2 - fy;
+        const s64 dist = mx * mx + my * my;
+        if (best < 0 || dist < best)
+        {
+            best = dist;
+            first = static_cast<s32>(i);
+        }
+    }
+    if (first < 0)
+    {
+        return false;
+    }
+    taken[first] = true;
+    for (bool more = true; more;)
+    {
+        more = false;
+        for (std::size_t i = 0; i < in.mLines.size(); i++)
+        {
+            const NavLine& a = in.mLines[i];
+            if (taken[i] || a.mType != kTrackLine)
+            {
+                continue;
+            }
+            for (std::size_t k = 0; k < in.mLines.size() && !taken[i]; k++)
+            {
+                const NavLine& b = in.mLines[k];
+                const auto same = [](s32 px, s32 py, s32 qx, s32 qy)
+                {
+                    return std::abs(px - qx) <= 2 && std::abs(py - qy) <= 2;
+                };
+                if (taken[k] && (same(a.mX1, a.mY1, b.mX1, b.mY1) || same(a.mX1, a.mY1, b.mX2, b.mY2) || same(a.mX2, a.mY2, b.mX1, b.mY1) || same(a.mX2, a.mY2, b.mX2, b.mY2)))
+                {
+                    taken[i] = true;
+                    more = true;
+                }
+            }
+        }
+    }
+    bool any = false;
+    std::vector<std::pair<s32, s32>> points;
+    for (std::size_t i = 0; i < in.mLines.size(); i++)
+    {
+        if (!taken[i])
+        {
+            continue;
+        }
+        const NavLine& line = in.mLines[i];
+        x1 = any ? std::min({x1, line.mX1, line.mX2}) : std::min(line.mX1, line.mX2);
+        x2 = any ? std::max({x2, line.mX1, line.mX2}) : std::max(line.mX1, line.mX2);
+        y1 = any ? std::min({y1, line.mY1, line.mY2}) : std::min(line.mY1, line.mY2);
+        y2 = any ? std::max({y2, line.mY1, line.mY2}) : std::max(line.mY1, line.mY2);
+        any = true;
+        if (lines)
+        {
+            lines->push_back(line);
+        }
+        points.push_back({line.mX1, line.mY1});
+        points.push_back({line.mX2, line.mY2});
+    }
+    if (ends)
+    {
+        // (an end is a point only one of its lines has)
+        ends->clear();
+        for (const std::pair<s32, s32>& p : points)
+        {
+            s32 count = 0;
+            for (const std::pair<s32, s32>& q : points)
+            {
+                count += std::abs(p.first - q.first) <= 2 && std::abs(p.second - q.second) <= 2 ? 1 : 0;
+            }
+            if (count == 1)
+            {
+                ends->push_back(p);
+            }
+        }
+    }
+    return true;
 }
 
 std::vector<ThrowSpot> Domain::ThrowSpots(const NavGraph& nav, s32 x, s32 y, bool half, const World* world)
@@ -1779,6 +1877,10 @@ static const s32 kUnseenUse = 150;
 // What a throw through a running drill is taken to cost over one with nothing in the way: more than going round
 // to its lever
 static const s32 kPastDrillCost = 2500;
+// How far a fart is flown at most (it has 900 frames at up to 4 pixels each), and how near a Slig it can get to
+// nothing is crossed to on that Slig's floor until it is dead
+static const s32 kFartReach = 2600;
+static const s32 kFartSligZone = 300;
 // The games' line type of a floor a mine car runs on
 static const s32 kMineCarFloor = 11;
 
@@ -3506,6 +3608,213 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                     }
                 }
             }
+        }
+    }
+    // A Brew can also be drunk and taken along: the fart it gives is then made where a flying Slig can be got at
+    // from (the cells he comes into a region at, out of that Slig's own stretch and with no orb on the screen),
+    // and until the Slig is dead nothing is crossed into the stretch its track goes along.
+    d.mStart.Set(Key::kBrew, world.mBrew ? 1 : 0);
+    {
+        bool machines = false;
+        for (const Entity& brew : world.mEntities)
+        {
+            const s32 at = brew.mKind == EntityKind::eBrew && !brew.mGone ? UseNode(nav, brew, nullptr) : -1;
+            if (at < 0)
+            {
+                continue;
+            }
+            machines = true;
+            DomainStep drink;
+            drink.mKind = StepKind::eDrink;
+            drink.mEntity = brew.mId;
+            add("Drink at Brew#" + std::to_string(brew.mId), {regionFact(at), {Key::kBrew, 0}}, {{Key::kBrew, 1}}, 150, drink);
+        }
+        const std::size_t crossings = d.mActions.size();
+        for (const Entity& flier : world.mEntities)
+        {
+            s32 x1 = 0;
+            s32 y1 = 0;
+            s32 x2 = 0;
+            s32 y2 = 0;
+            std::vector<std::pair<s32, s32>> ends;
+            if (flier.mKind == EntityKind::eFlier && world.Switch(flier.mSwitch))
+            {
+                d.mStart.Set(Key::Switch(flier.mSwitch), 1);
+            }
+            if (!machines || flier.mKind != EntityKind::eFlier || flier.mGone || world.mFleechKilled.count(flier.mId) != 0 || !FlierTrack(nav.Input(), flier.CentreX(), (flier.mY1 + flier.mY2) / 2, x1, y1, x2, y2, &ends))
+            {
+                continue;
+            }
+            const auto inZone = [&](s32 node)
+            {
+                const NavNode& n = nav.Nodes()[node];
+                return n.mHalf == flier.mHalf && n.mX >= x1 - 50 && n.mX <= x2 + 50 && n.mY >= y1 - 60 && n.mY <= y2 + 140;
+            };
+            const Goap::Fact dead{Key::Switch(flier.mSwitch), 1};
+            const std::vector<NavLine> gates = FartFlight::Gates(nav.Input(), flier.mHalf, nullptr);
+            std::set<s32> regions;
+            for (std::size_t ai = 0; ai < crossings; ai++)
+            {
+                const DomainStep s = d.mSteps[d.mActions[ai].mTag];
+                if (s.mKind != StepKind::eCross || s.mEdge < 0)
+                {
+                    continue;
+                }
+                const s32 node = nav.Edges()[s.mEdge].mTo;
+                const NavNode& n = nav.Nodes()[node];
+                if (n.mHalf != flier.mHalf || inZone(node) || !regions.insert(d.mRegions[node]).second)
+                {
+                    continue;
+                }
+                bool orb = false;
+                for (const Entity& e : world.mEntities)
+                {
+                    orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.CentreX(), (e.mY1 + e.mY2) / 2) == nav.CameraOf(n.mX, n.mY - 20));
+                }
+                std::vector<FartFlight::Point> corners;
+                s32 length = 0;
+                s32 bestLen = -1;
+                for (const std::pair<s32, s32>& end : ends)
+                {
+                    if (!orb && FartFlight::Route(nav.Input(), n.mHalf, {n.mX, n.mY - 28}, {end.first, end.second - 20}, kFartReach / 2, corners, &length, &gates) && (bestLen < 0 || length < bestLen))
+                    {
+                        bestLen = length;
+                    }
+                }
+                if (bestLen < 0)
+                {
+                    regions.erase(d.mRegions[node]);
+                    continue;
+                }
+                DomainStep bomb;
+                bomb.mKind = StepKind::eFartBomb;
+                bomb.mEntity = flier.mId;
+                bomb.mEdge = node;
+                add("Fly a fart from " + std::to_string(n.mX) + "," + std::to_string(n.mY) + " to FlyingSlig#" + std::to_string(flier.mId), {regionFact(node), {Key::kBrew, 1}}, {dead, {Key::kBrew, 0}}, 500 + bestLen / 3, bomb);
+            }
+        }
+    }
+
+    // The fart a Brew gives can also be left by a mine: made two cells from it with his back to it, it hangs there
+    // and goes off 220 frames later, by which time he is well away. For where an orb watches the screen (no
+    // chanting, so no flying it): Feeco's lobby.
+    for (const Entity& mine : world.mEntities)
+    {
+        if (mine.mKind != EntityKind::eMine || mine.mGone)
+        {
+            continue;
+        }
+        bool machines = false;
+        for (const Entity& brew : world.mEntities)
+        {
+            machines = machines || (brew.mKind == EntityKind::eBrew && !brew.mGone);
+        }
+        const s32 cell = NavGraph::GridStep(mine.mHalf);
+        for (s32 side = -1; machines && side <= 1; side += 2)
+        {
+            const s32 stand = nav.NodeAt(mine.CentreX() + side * 2 * cell, mine.mY2, mine.mHalf, 12);
+            const s32 between = nav.NodeAt(mine.CentreX() + side * cell, mine.mY2, mine.mHalf, 12);
+            if (stand < 0 || between < 0 || nav.Nodes()[stand].mHazard || nav.Nodes()[stand].mLine != nav.Nodes()[between].mLine)
+            {
+                continue;
+            }
+            DomainStep drop;
+            drop.mKind = StepKind::eFartBomb;
+            drop.mEntity = mine.mId;
+            drop.mEdge = stand;
+            add("Leave a fart by Mine#" + std::to_string(mine.mId) + " from " + std::to_string(nav.Nodes()[stand].mX) + "," + std::to_string(nav.Nodes()[stand].mY), {regionFact(stand), {Key::kBrew, 1}}, {{Key::Switch(mine.mSwitch), 1}, {Key::kBrew, 0}}, 450, drop);
+        }
+    }
+
+    // A Brew machine: the fart he has after a Brew can be flown through the air to a mine or a Slig and set off
+    // there (FartFlight), from where he drank it. Not with an orb on the machine's screen: it is flown by
+    // chanting. And until a Slig the fart can get to is dead, nothing is crossed onto its floor near it.
+    for (const Entity& brew : world.mEntities)
+    {
+        if (brew.mKind != EntityKind::eBrew || brew.mGone)
+        {
+            continue;
+        }
+        const s32 at = UseNode(nav, brew, nullptr);
+        bool orb = false;
+        for (const Entity& e : world.mEntities)
+        {
+            orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && e.mCamera == brew.mCamera);
+        }
+        if (at < 0 || orb)
+        {
+            continue;
+        }
+        const NavNode& stand = nav.Nodes()[at];
+        const FartFlight::Point from{stand.mX, stand.mY - 28};
+        for (const Entity& target : world.mEntities)
+        {
+            const bool mine = target.mKind == EntityKind::eMine;
+            const bool slig = target.mKind == EntityKind::eSlig && world.mFleechKilled.count(target.mId) == 0;
+            if ((!mine && !slig) || target.mGone || target.mHalf != stand.mHalf)
+            {
+                continue;
+            }
+            const FartFlight::Point to{target.CentreX(), target.mY2 - 25};
+            // (not where the blast, or the mine's own, would get him)
+            if (std::abs(to.mX - stand.mX) < 150 && std::abs(to.mY - stand.mY) < 150)
+            {
+                continue;
+            }
+            // Round every gate and trap door if it can be, else through the ones that can be opened, with them
+            // open first
+            std::vector<FartFlight::Point> corners;
+            s32 length = 0;
+            std::vector<Goap::Fact> pre{regionFact(at), {Key::kBrew, 0}};
+            std::vector<s32> which;
+            const std::vector<NavLine> gates = FartFlight::Gates(nav.Input(), stand.mHalf, nullptr, &which);
+            if (!FartFlight::Route(nav.Input(), stand.mHalf, from, to, kFartReach, corners, &length, &gates))
+            {
+                if (!FartFlight::Route(nav.Input(), stand.mHalf, from, to, kFartReach, corners, &length))
+                {
+                    continue;
+                }
+                bool can = true;
+                for (std::size_t g = 0; g < gates.size(); g++)
+                {
+                    if (FartFlight::Through(from, corners, gates[g]))
+                    {
+                        const NavFeature& f = nav.Input().mFeatures[which[g]];
+                        can = can && f.mSwitch > 1;
+                        pre.push_back({Key::Switch(f.mSwitch), f.mStartClosed ? 1 : 0});
+                    }
+                }
+                if (!can)
+                {
+                    continue;
+                }
+            }
+            DomainStep bomb;
+            bomb.mKind = StepKind::eFartBomb;
+            bomb.mEntity = target.mId;
+            bomb.mOther = brew.mId;
+            const Goap::Fact done = mine ? Goap::Fact{Key::Switch(target.mSwitch), 1} : Goap::Fact{Key::Mud(target.mId), 2};
+            if (slig)
+            {
+                for (Goap::Action& a : d.mActions)
+                {
+                    const DomainStep& s = d.mSteps[a.mTag];
+                    s32 node = -1;
+                    if (s.mKind == StepKind::eExit && s.mEdge >= 0)
+                    {
+                        node = nav.Exits()[s.mEdge].mNode;
+                    }
+                    else if (s.mKind == StepKind::eCross && s.mEdge >= 0)
+                    {
+                        node = nav.Edges()[s.mEdge].mTo;
+                    }
+                    if (node >= 0 && nav.Nodes()[node].mHalf == target.mHalf && std::abs(nav.Nodes()[node].mY - target.mY2) <= 30 && std::abs(nav.Nodes()[node].mX - target.CentreX()) <= kFartSligZone)
+                    {
+                        a.mPre.push_back(done);
+                    }
+                }
+            }
+            add("Fly a fart from " + std::string(EntityKindName(brew.mKind)) + "#" + std::to_string(brew.mId) + " to " + EntityKindName(target.mKind) + "#" + std::to_string(target.mId), pre, {done}, 400 + length / 3, bomb);
         }
     }
     for (const Entity& slig : world.mEntities)

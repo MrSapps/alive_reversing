@@ -648,6 +648,8 @@ SET(relive_lib_src
     Bot/LevelGraph.cpp
     Bot/NavGraph.hpp
     Bot/NavGraph.cpp
+    Bot/FartFlight.hpp
+    Bot/FartFlight.cpp
     Bot/Pilot.hpp
     Bot/Pilot.cpp
     Bot/ThrowArc.hpp

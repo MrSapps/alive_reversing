@@ -2,6 +2,7 @@
 #include "Bot.hpp"
 #include "Domain.hpp"
 #include "ThrowArc.hpp"
+#include "FartFlight.hpp"
 #include <algorithm>
 #include <cstdlib>
 
@@ -957,6 +958,8 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     on++;
                 }
                 jump.mRunOut = bot.RecentlyChased() && first.mFeature < 0 && on >= 7;
+                jump.mX2 = first.mX2;
+                jump.mX3 = first.mX3;
                 return TaskStep::Do(jump);
             }
 
@@ -971,6 +974,17 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             while (last + 1 < path.size() && nav.Edges()[path[last + 1]].mKind == EdgeKind::eWalk && nav.Edges()[path[last + 1]].mLeft == first.mLeft)
             {
                 last++;
+            }
+            // (running jumps with no stop between, which are only there with a flying Slig about: straight into
+            // them from the run, without the stop at the cell the run-up would begin at)
+            if (last + 1 < path.size() && nav.Edges()[path[last + 1]].mKind == EdgeKind::eRunJump && nav.Edges()[path[last + 1]].mX2 != 0 && nav.Edges()[path[last + 1]].mLeft == first.mLeft && sweepStop > last && !led)
+            {
+                const NavEdge& chain = nav.Edges()[path[last + 1]];
+                mLastEdge = path[last + 1];
+                Prim jump = Prim::RunJump(chain.mX, chain.mLeft);
+                jump.mX2 = chain.mX2;
+                jump.mX3 = chain.mX3;
+                return TaskStep::Do(jump);
             }
             if (led)
             {
@@ -5778,6 +5792,416 @@ TaskStep SligDropTask::Next(Bot& bot, const std::string& lastFailed)
     mWas = world.Switch(lever->mSwitch, true);
     mUse = std::make_unique<UseTask>(mLever, world.Switch(lever->mSwitch) ? 0 : 1);
     return TaskStep::Do(Prim::Wait(1));
+}
+
+FartBombTask::~FartBombTask() = default;
+
+TaskStep FartBombTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const Entity* target = world.Find(mTarget);
+    const Entity* brew = mBrew ? world.Find(mBrew) : nullptr;
+    if (!target || (mBrew && !brew) || (!brew && mFrom < 0))
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    const FartAt& fart = world.mFart;
+    const bool isFlier = target->mKind == EntityKind::eFlier;
+    const bool isSlig = target->mKind == EntityKind::eSlig || isFlier;
+    // The flying Sligs of the path that are not dead yet, each with the one about that is on its track (the
+    // nearest to its lines): the one this is for first
+    struct OnTrack final
+    {
+        const Entity* mEntity = nullptr;
+        std::vector<NavLine> mLines;
+        const FlierAt* mLive = nullptr;
+    };
+    std::vector<OnTrack> tracks;
+    std::vector<std::pair<s32, s32>> ends;
+    if (isFlier)
+    {
+        for (s32 pass = 0; pass < 2; pass++)
+        {
+            for (const Entity& e : world.mEntities)
+            {
+                if (e.mKind != EntityKind::eFlier || (pass == 0) != (e.mId == mTarget) || e.mHalf != target->mHalf || (pass == 1 && (e.mGone || world.mFleechKilled.count(e.mId) != 0)))
+                {
+                    continue;
+                }
+                OnTrack t;
+                t.mEntity = &e;
+                s32 x1 = 0;
+                s32 y1 = 0;
+                s32 x2 = 0;
+                s32 y2 = 0;
+                Domain::FlierTrack(nav.Input(), e.CentreX(), (e.mY1 + e.mY2) / 2, x1, y1, x2, y2, pass == 0 ? &ends : nullptr, &t.mLines);
+                tracks.push_back(t);
+            }
+        }
+        const auto off = [](const OnTrack& t, const FlierAt& f)
+        {
+            s32 best = 100000;
+            for (const NavLine& line : t.mLines)
+            {
+                const s64 lx = line.mX2 - line.mX1;
+                const s64 ly = line.mY2 - line.mY1;
+                const s64 sq = lx * lx + ly * ly;
+                s64 t1000 = sq == 0 ? 0 : ((f.mX - line.mX1) * lx + (f.mY - line.mY1) * ly) * 1000 / sq;
+                t1000 = std::max<s64>(0, std::min<s64>(1000, t1000));
+                const s32 far = std::abs(static_cast<s32>(line.mX1 + lx * t1000 / 1000) - f.mX) + std::abs(static_cast<s32>(line.mY1 + ly * t1000 / 1000) - f.mY);
+                best = std::min(best, far);
+            }
+            return best;
+        };
+        for (const FlierAt& f : world.mFliers)
+        {
+            OnTrack* mine = nullptr;
+            s32 best = 60;
+            for (OnTrack& t : tracks)
+            {
+                const s32 far = off(t, f);
+                if (f.mHalf == target->mHalf && far < best)
+                {
+                    best = far;
+                    mine = &t;
+                }
+            }
+            if (mine)
+            {
+                mine->mLive = &f;
+            }
+        }
+    }
+    const FlierAt* flier = !tracks.empty() ? tracks[0].mLive : nullptr;
+    // (a flying Slig's TLV does not say it is dead: it is when the blast has gone off, with its screen still the
+    // one shown, and none is on its track. Any other the same blast got is dead as well.)
+    if (isFlier && fart.mLive && fart.mExploded && mPhase >= 4 && ++mSinceBlast == 20)
+    {
+        for (const OnTrack& t : tracks)
+        {
+            if (!t.mLive && world.mFleechKilled.count(t.mEntity->mId) == 0)
+            {
+                bot.Log("the fart got FlyingSlig#" + std::to_string(t.mEntity->mId));
+                bot.FleechKilled(t.mEntity->mId);
+            }
+        }
+    }
+    // (left by a mine and walked away from, not flown: Domain)
+    const bool drop = !brew && target->mKind == EntityKind::eMine;
+    const bool gone = target->mGone || (isFlier && world.mFleechKilled.count(mTarget) != 0);
+    if (++mFrames > 6000)
+    {
+        return TaskStep::Failed("the fart never got there");
+    }
+    // Abe again, with nothing in the air
+    if (!fart.mLive && mPhase >= 2)
+    {
+        if (mPhase != 5)
+        {
+            mPhase = 5;
+            mAfter = 0;
+        }
+        if (++mAfter < 45 || !bot.Abe().Settled())
+        {
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        if (gone)
+        {
+            bot.Log("the fart got " + std::string(EntityKindName(target->mKind)) + "#" + std::to_string(mTarget));
+            if (isSlig)
+            {
+                bot.FleechKilled(mTarget);
+            }
+            return TaskStep::Done();
+        }
+        if (mFarts >= 4)
+        {
+            return TaskStep::Failed("four farts and it is still there");
+        }
+        bot.Log("the fart did not get " + std::string(EntityKindName(target->mKind)) + "#" + std::to_string(mTarget) + ": another");
+        if (!brew)
+        {
+            return TaskStep::Failed("the fart missed, and that was the Brew he had");
+        }
+        mPhase = 0;
+    }
+    if (gone && !fart.mLive)
+    {
+        if (isSlig)
+        {
+            bot.FleechKilled(mTarget);
+        }
+        return TaskStep::Done();
+    }
+    if (!fart.mLive)
+    {
+        const s32 at = brew ? Domain::UseNode(nav, *brew, nullptr) : mFrom;
+        if (!brew && !world.mBrew)
+        {
+            return TaskStep::Failed("no Brew in him");
+        }
+        if (bot.AbeNode() != at)
+        {
+            TaskStep step;
+            if (!mGo)
+            {
+                mGo = std::make_unique<GoToTask>(brew ? "to the Brew machine" : "to where the fart is made", [at](s32 n)
+                                                 { return n == at; });
+            }
+            if (!RunGo(mGo, bot, lastFailed, step))
+            {
+                return step;
+            }
+            if (step.mKind == TaskStep::Kind::eFailed)
+            {
+                return step;
+            }
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        if (!bot.Abe().Settled())
+        {
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        if (!world.mBrew)
+        {
+            if (++mDrinks > 6)
+            {
+                return TaskStep::Failed("the machine gave no Brew");
+            }
+            return TaskStep::Do(Prim::Wait(3, Btn::eUp));
+        }
+        // (his back to the mine: the fart is made behind him)
+        if (drop && bot.Abe().mFacingLeft != (target->CentreX() > bot.Abe().mX))
+        {
+            return TaskStep::Do(Prim::Face(target->CentreX() > bot.Abe().mX));
+        }
+        mPhase = 1;
+        mSinceBlast = 0;
+        mFarts++;
+        mGo.reset();
+        mWay.clear();
+        return TaskStep::Do(Prim::Wait(2, Btn::eFartOrRoll));
+    }
+    if (drop)
+    {
+        // Off to where neither the fart's blast nor the mine's reaches, and wait for it there
+        mPhase = 2;
+        const s32 fx = fart.mX100 / 100;
+        const s32 fy = fart.mY100 / 100;
+        const s32 mx = target->CentreX();
+        const NavNode& here = nav.Nodes()[std::max(0, bot.AbeNode())];
+        if (bot.AbeNode() >= 0 && (std::abs(here.mX - fx) < 200 || std::abs(here.mX - mx) < 200) && std::abs(here.mY - fy) < 150)
+        {
+            TaskStep step;
+            if (!mGo)
+            {
+                const NavGraph* graph = &nav;
+                mGo = std::make_unique<GoToTask>("away from the fart", [graph, fx, fy, mx](s32 n)
+                                                 {
+                                                     const NavNode& node = graph->Nodes()[n];
+                                                     return (std::abs(node.mX - fx) >= 200 && std::abs(node.mX - mx) >= 200) || std::abs(node.mY - fy) >= 150;
+                                                 });
+            }
+            if (!RunGo(mGo, bot, lastFailed, step))
+            {
+                return step;
+            }
+        }
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    if (!fart.mFlown)
+    {
+        // His to fly once the chant has taken
+        mPhase = 2;
+        return TaskStep::Do(Prim::Wait(1, fart.mExploded ? 0u : static_cast<u32>(Btn::eChant)));
+    }
+    if (fart.mExploded)
+    {
+        mPhase = 5;
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    // The middle of what its blast will be, and where that is to be: at a mine, or at the most Sligs that are
+    // about on the Slig's floor once its screen is the one shown
+    const FartFlight::Point body{fart.mX100 / 100, fart.mY100 / 100 - FartFlight::kBody};
+    FartFlight::Point aim{target->CentreX(), target->mY2 - 25};
+    if (isFlier)
+    {
+        // To the end of its track nearest to where the fart was made, where it stops a while each time
+        if (!mParked)
+        {
+            mParked = true;
+            mParkX = aim.mX;
+            mParkY = aim.mY;
+            s32 best = -1;
+            for (const std::pair<s32, s32>& end : ends)
+            {
+                const s32 far = std::abs(end.first - body.mX) + std::abs(end.second - body.mY);
+                if (best < 0 || far < best)
+                {
+                    best = far;
+                    mParkX = end.first;
+                    mParkY = end.second - 20;
+                }
+            }
+            // With another flying Slig's track going by under or over that end: between the two, so that one
+            // blast has both when the other comes by while this one stops there (Feeco's path 7, where the two
+            // of its corridor meet at 792 each time round)
+            mBoth = false;
+            for (std::size_t k = 1; k < tracks.size(); k++)
+            {
+                for (const NavLine& line : tracks[k].mLines)
+                {
+                    if (mParkX < std::min(line.mX1, line.mX2) || mParkX > std::max(line.mX1, line.mX2) || line.mX1 == line.mX2)
+                    {
+                        continue;
+                    }
+                    const s32 y = line.mY1 + (line.mY2 - line.mY1) * (mParkX - line.mX1) / (line.mX2 - line.mX1) - 20;
+                    if (std::abs(y - mParkY) >= 20 && std::abs(y - mParkY) <= 100 && !mBoth)
+                    {
+                        mBoth = true;
+                        // (a blast reaches further up than down)
+                        mParkY = (mParkY + y) / 2 + (y > mParkY ? 8 : -8);
+                    }
+                }
+            }
+        }
+        aim.mX = mParkX;
+        aim.mY = mParkY;
+    }
+    else if (isSlig)
+    {
+        s32 best = 0;
+        for (const SligAt& s : world.mSligs)
+        {
+            if (!s.mSeen || s.mHalf != target->mHalf || std::abs(s.mY - target->mY2) > 30)
+            {
+                continue;
+            }
+            s32 count = 0;
+            for (const SligAt& o : world.mSligs)
+            {
+                count += o.mSeen && o.mHalf == s.mHalf && std::abs(o.mY - s.mY) <= 30 && std::abs(o.mX - s.mX) <= 40 ? 1 : 0;
+            }
+            if (count > best || (count == best && std::abs(s.mX - body.mX) < std::abs(aim.mX - body.mX)))
+            {
+                best = count;
+                aim.mX = s.mX;
+                aim.mY = s.mY - 25;
+            }
+        }
+    }
+    if (mPhase != 3 && mPhase != 4)
+    {
+        mPhase = 3;
+        std::vector<FartFlight::Point> corners;
+        const std::vector<NavLine> gates = FartFlight::Gates(nav.Input(), target->mHalf, &world);
+        if (!FartFlight::Route(nav.Input(), target->mHalf, body, aim, 3000, corners, nullptr, &gates))
+        {
+            corners.push_back(aim);
+        }
+        mWay.clear();
+        for (const FartFlight::Point& p : corners)
+        {
+            mWay.push_back({p.mX, p.mY});
+        }
+        mCorner = 0;
+        bot.Log("the fart is his: " + std::to_string(mWay.size()) + " legs to " + std::to_string(aim.mX) + "," + std::to_string(aim.mY));
+    }
+    const bool still = fart.mVelX100 == 0 && fart.mVelY100 == 0;
+    const bool last = mCorner + 1 >= mWay.size();
+    const s32 tx = last ? aim.mX : mWay[mCorner].first;
+    const s32 ty = last ? aim.mY : mWay[mCorner].second;
+    const s32 dx = std::abs(tx - body.mX);
+    const s32 dy = std::abs(ty - body.mY);
+    // (a flying Slig: where it will be when the blast goes off)
+    const bool flierNear = flier && std::abs(flier->mX + flier->mVelX * FartFlight::kFuse / 256 - body.mX) <= 40 && std::abs(flier->mY - 20 + flier->mVelY * FartFlight::kFuse / 256 - body.mY) <= 30;
+    bool otherNear = false;
+    for (std::size_t k = 1; k < tracks.size(); k++)
+    {
+        const FlierAt* o = tracks[k].mLive;
+        otherNear = otherNear || (o && std::abs(o->mX + o->mVelX * FartFlight::kFuse / 256 - body.mX) <= 45 && o->mY - 20 + o->mVelY * FartFlight::kFuse / 256 >= body.mY - 75 && o->mY - 20 + o->mVelY * FartFlight::kFuse / 256 <= body.mY + 45);
+    }
+    if (mPhase == 4)
+    {
+        if (isFlier)
+        {
+            return TaskStep::Do(Prim::Wait(1, Btn::eChant));
+        }
+        // Chanted off where it stands: unless what it is for has walked out of its blast meanwhile
+        if (isSlig && dx > 45 && fart.mFramesLeft > 120)
+        {
+            mPhase = 3;
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        return TaskStep::Do(Prim::Wait(1, Btn::eChant));
+    }
+    if (!last && dx <= 10 && dy <= 10)
+    {
+        mCorner++;
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    // There, or as good as (a Slig walks on), or out of time: let go and set it off once it stands
+    if (last && ((dx <= (isFlier ? 10 : (isSlig ? 30 : 8)) && dy <= (isFlier ? 5 : 12)) || fart.mFramesLeft < 60))
+    {
+        // (for both while there is time, then for the one)
+        if (still && isFlier && fart.mFramesLeft >= 60 && (!flierNear || (mBoth && !otherNear && fart.mFramesLeft >= 260)))
+        {
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        if (still)
+        {
+            mPhase = 4;
+            bot.Log("the fart is at " + std::to_string(body.mX) + "," + std::to_string(body.mY) + " with " + std::to_string(fart.mFramesLeft) + " frames left: set off");
+            return TaskStep::Do(Prim::Wait(1, Btn::eChant));
+        }
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    return TaskStep::Do(Prim::Wait(1, FartFlight::Steer(fart.mX100, fart.mY100, fart.mVelX100, fart.mVelY100, tx, ty + FartFlight::kBody)));
+}
+
+DrinkTask::~DrinkTask() = default;
+
+TaskStep DrinkTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const Entity* brew = world.Find(mBrew);
+    if (!brew)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    if (world.mBrew)
+    {
+        return bot.Abe().Settled() ? TaskStep::Done() : TaskStep::Do(Prim::Wait(1));
+    }
+    const s32 at = Domain::UseNode(bot.Nav(), *brew, nullptr);
+    if (bot.AbeNode() != at)
+    {
+        TaskStep step;
+        if (!mGo)
+        {
+            mGo = std::make_unique<GoToTask>("to the Brew machine", [at](s32 n)
+                                             { return n == at; });
+        }
+        if (!RunGo(mGo, bot, lastFailed, step))
+        {
+            return step;
+        }
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            return step;
+        }
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    if (!bot.Abe().Settled())
+    {
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    if (++mDrinks > 6)
+    {
+        return TaskStep::Failed("the machine gave no Brew");
+    }
+    return TaskStep::Do(Prim::Wait(3, Btn::eUp));
 }
 
 StepOnTask::~StepOnTask() = default;

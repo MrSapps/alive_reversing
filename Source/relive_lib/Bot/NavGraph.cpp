@@ -6,6 +6,8 @@
 namespace Bot {
 
 // eLineTypes
+// What going into the stretch of a flying Slig that is left alive costs over the edge's own
+static const s32 kDangerCost = 1500;
 static const s32 kFloor = 0;
 static const s32 kWallLeft = 1;
 static const s32 kWallRight = 2;
@@ -1441,7 +1443,10 @@ void NavGraph::Build(const NavInput& input)
                         {
                             drill = drill || (f.mKind == FeatureKind::eSweep && f.mX2 >= std::min(n.mX, x) - step && f.mX1 <= std::max(n.mX, x) + step && f.mY2 >= n.mY - 70 / scale && f.mY1 <= gy);
                         }
-                        if (to >= 0 && to != from && gy - n.mY >= 20 / scale && !mNodes[to].mHazard && !mNodes[to].mLow && !drill)
+                        // (onto where a mine is only once it is gone: the edge is given that below. Only where
+                        // a Brew is to be had, and mines go a cluster at a time: with rocks, one mine each, such a
+                        // hop sent the plan in the Mines' path 4 after mines in an order that left it stuck.)
+                        if (to >= 0 && to != from && gy - n.mY >= 20 / scale && (!mNodes[to].mHazard || (mInput.mBrew && mNodes[to].mClear >= 0)) && !mNodes[to].mLow && !drill)
                         {
                             AddEdge(edges, from, to, EdgeKind::eHop, kHopCost + 10, -1, left);
                             // (the well he falls into, if it is one)
@@ -1772,10 +1777,82 @@ void NavGraph::Build(const NavInput& input)
                     edges.end());
     }
 
+    // Running jumps along one floor where the first comes down in the run-up of the next: taken together he
+    // never stops between them (he lands running if the way and the run button stay held). Two, and three.
+    {
+        const std::size_t plain = edges.size();
+        for (s32 pass = 0; pass < 2; pass++)
+        {
+            const std::size_t have = edges.size();
+            for (std::size_t i = pass == 0 ? 0 : plain; i < have; i++)
+            {
+                const NavEdge a = edges[i];
+                if (a.mKind != EdgeKind::eRunJump || a.mFeature >= 0 || a.mShaft >= 0 || mNodes[a.mFrom].mY != mNodes[a.mTo].mY || a.mX3 != 0)
+                {
+                    continue;
+                }
+                const s32 dir = a.mLeft ? -1 : 1;
+                const s32 land = mNodes[a.mTo].mX;
+                for (std::size_t k = 0; k < plain; k++)
+                {
+                    const NavEdge b = edges[k];
+                    if (b.mKind != EdgeKind::eRunJump || b.mFeature >= 0 || b.mShaft >= 0 || b.mLeft != a.mLeft || mNodes[b.mFrom].mLine != mNodes[a.mTo].mLine || mNodes[b.mFrom].mY != mNodes[b.mTo].mY)
+                    {
+                        continue;
+                    }
+                    // (floor to run on from where he lands to where the next one's run-up begins)
+                    bool floor = (b.mX - land) * dir >= GridStep(mNodes[a.mTo].mHalf);
+                    for (s32 x = land; floor && (mNodes[b.mFrom].mX - x) * dir > 0; x += dir * GridStep(mNodes[a.mTo].mHalf))
+                    {
+                        const s32 on = NodeOnLine(mNodes[a.mTo].mLine, x);
+                        floor = on >= 0 && std::abs(mNodes[on].mX - x) <= 2 && !mNodes[on].mHazard && !mNodes[on].mLow;
+                    }
+                    if (floor)
+                    {
+                        NavEdge both = a;
+                        both.mTo = b.mTo;
+                        both.mCost = a.mCost + b.mCost - 20;
+                        (a.mX2 == 0 ? both.mX2 : both.mX3) = b.mX;
+                        edges.push_back(both);
+                    }
+                }
+            }
+        }
+    }
+
     // Into a cell with a mine, or out of one: not until the mine is gone
     for (NavEdge& e : edges)
     {
         e.mClear = mNodes[e.mTo].mClear >= 0 ? mNodes[e.mTo].mClear : mNodes[e.mFrom].mClear;
+        // Into a flying Slig's stretch from outside it: not until the Slig is gone
+        s32 danger = -1;
+        for (std::size_t fi = 0; e.mClear < 0 && fi < mInput.mFeatures.size(); fi++)
+        {
+            const NavFeature& f = mInput.mFeatures[fi];
+            const auto in = [&f](const NavNode& n)
+            {
+                return n.mHalf == f.mHalf && n.mX >= f.mX1 && n.mX <= f.mX2 && n.mY >= f.mY1 && n.mY <= f.mY2;
+            };
+            if (f.mKind == FeatureKind::eDanger && in(mNodes[e.mTo]) && !in(mNodes[e.mFrom]))
+            {
+                // (one that is got by as it is, mA 0: its switch is on all along, and the way in is a dear one.
+                // Where the way goes into both kinds at once it is the one to get rid of that the edge waits for.)
+                if (f.mA)
+                {
+                    e.mClear = static_cast<s32>(fi);
+                    break;
+                }
+                if (danger < 0)
+                {
+                    danger = static_cast<s32>(fi);
+                    e.mCost += kDangerCost;
+                }
+            }
+        }
+        if (e.mClear < 0)
+        {
+            e.mClear = danger;
+        }
     }
     std::stable_sort(edges.begin(), edges.end(), [](const NavEdge& a, const NavEdge& b)
                      { return a.mFrom < b.mFrom; });

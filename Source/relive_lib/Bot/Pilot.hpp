@@ -53,6 +53,9 @@ struct Prim final
     // A roll that ends in a run: the run button again once he is past the last cell of it, so that the roll
     // comes up into the run at its end, and done as he runs (no stop to crouch and stand up)
     bool mRunOut = false;
+    // A running jump: where the next ones take off, on at a run from each landing (0: none)
+    s32 mX2 = 0;
+    s32 mX3 = 0;
     // A roll from where down is the way to climb down a hoist: he walks at the low ceiling instead, and both
     // games duck him under it (a wall at his head and none at his knees, where his walk starts)
     bool mWalkIn = false;

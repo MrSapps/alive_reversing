@@ -47,6 +47,8 @@ enum class FeatureKind : u8
                   // 1), opened by chanting, hopped into from the side mDir (0 from its left, 1 from its right).
                   // It lets him out at the ePortalExit in camera mDestCamera
     ePortalExit,
+    eDanger,      // the stretch a flying Slig that can be got rid of goes along: nothing is crossed into it until
+                  // the Slig is gone, which the world gives as switch mSwitch
     ePlate,       // a foot switch: stepping on it does mA to switch mSwitch (0 on, 1 off, 2 the other way)
 };
 
@@ -100,6 +102,8 @@ struct NavInput final
     s32 mCamH = 260;
     std::vector<NavLine> mLines;
     std::vector<NavFeature> mFeatures;
+    // The path has a Brew machine: mines go a cluster at a time there (a fart's blast is wide), not one by one
+    bool mBrew = false;
 };
 
 enum class EdgeKind : u8
@@ -132,6 +136,10 @@ struct NavEdge final
     bool mLeft = false;
     // A running jump: the cell it takes off from
     s32 mX = 0;
+    // Running jumps one after the other with no stop between: where the second and the third take off (0: none).
+    // Only for when something is after him (Bot::EdgeCostFn).
+    s32 mX2 = 0;
+    s32 mX3 = 0;
     // An edge that goes through a well (stood in, or fallen into): the well's feature, and the value its switch
     // has to have for the well to go this way (-1: either)
     s32 mWell = -1;

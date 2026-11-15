@@ -49,6 +49,11 @@ enum class EntityKind : u8
     // A Paramite where the map puts it. mInputs: how it comes (0 walks its floor, 1 and 2 down a web when its
     // switch comes on), that switch, whether it hisses before it goes for him
     eParamite,
+    // A SoulStorm Brew machine: up at it and he drinks one, and the next fart is one that goes off (and can be
+    // flown, FartFlight). mInputs: how many Brews it has to start with
+    eBrew,
+    // A flying Slig where the map puts it (FlierAt is one that is about)
+    eFlier,
 };
 
 const char* EntityKindName(EntityKind kind);
@@ -172,6 +177,7 @@ struct FlierAt final
     s32 mVelX = 0;
     s32 mVelY = 0;
     bool mHalf = false;
+    bool mFacingLeft = false;
 };
 
 // A Slog that is about. Awake it runs Abe down wherever he is.
@@ -368,8 +374,27 @@ struct SlurgAt final
     s32 mDir = 0;
 };
 
+// The fart that goes off, while there is one
+struct FartAt final
+{
+    bool mLive = false;
+    // In hundredths of a pixel, as are its speeds a frame
+    s32 mX100 = 0;
+    s32 mY100 = 0;
+    s32 mVelX100 = 0;
+    s32 mVelY100 = 0;
+    // Abe flies it
+    bool mFlown = false;
+    bool mExploded = false;
+    s32 mFramesLeft = 0;
+    bool mHalf = false;
+};
+
 struct World final
 {
+    // He has drunk a Brew: his next fart goes off
+    bool mBrew = false;
+    FartAt mFart;
     // Rocks Abe has on him, and those lying about
     s32 mRocks = 0;
     std::vector<RockAt> mRocksDown;
@@ -671,6 +696,11 @@ struct World final
                 if (e.mKind == EntityKind::eMine && e.mSwitch == id)
                 {
                     return e.mGone ? 1 : 0;
+                }
+                if (e.mKind == EntityKind::eFlier && e.mSwitch == id)
+                {
+                    // (mInputs[0] 0: one that is not to be got rid of, see FeatureKind::eDanger)
+                    return e.mGone || mFleechKilled.count(e.mId) != 0 || e.mInputs[0] == 0 ? 1 : 0;
                 }
                 if (e.mKind == EntityKind::eSwitchLogic && e.mSwitch == id)
                 {
