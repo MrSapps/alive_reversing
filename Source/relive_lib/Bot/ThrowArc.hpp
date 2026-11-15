@@ -50,9 +50,20 @@ public:
     // 113 by 50 about the mine, and it is where Abe stands that has to be in it.
     static const s32 kBlastX = 118;
     static const s32 kBlastY = 55;
+    // AO's grenade: the frames it flies and lies before it goes off (its fuse is 90 from when the throw is
+    // begun), and how near a mine its blast sets it off and kills (the game's box grows to 60 either side, 60 up
+    // and 30 down, and it is the boxes that have to touch)
+    static const s32 kFuse = 76;
+    static const s32 kGrenadeReach = 45;
+    static const s32 kGrenadeKillX = 85;
+    static const s32 kGrenadeKillUp = 70;
+    static const s32 kGrenadeKillDown = 95;
 
 private:
     static Flight Fly(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, const Point* mine, bool sure);
+    // AO's grenade: thrown like the rock, but it comes to rest and goes off when its fuse has run down, and its
+    // blast sets off the mines in it. mHit is then the last frame.
+    static Flight FlyGrenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, const Point* mine);
 };
 
 } // namespace Bot

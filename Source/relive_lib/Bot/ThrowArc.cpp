@@ -89,6 +89,10 @@ static ThrowArc::Point Whole(double x, double y)
 ThrowArc::Flight ThrowArc::Throw(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, const Point* mine)
 {
     // A frame on which the rock is sure to set the mine off, whatever came of the frames it only may have
+    if (!in.mIsAe)
+    {
+        return FlyGrenade(in, x, y, half, left, kind, mine);
+    }
     Flight flight = Fly(in, x, y, half, left, kind, mine, true);
     if (mine && flight.mHit < 0)
     {
@@ -202,6 +206,93 @@ ThrowArc::Flight ThrowArc::Fly(const NavInput& in, s32 x, s32 y, bool half, bool
             }
         }
         flight.mPoints.push_back(Whole(px, py));
+    }
+    return flight;
+}
+
+// Grenade.cpp: a pixel a frame faster down each frame with no limit; off a floor it comes down on at half the
+// speed both ways, and to rest on it when it is slower than one down; off a wall at half the speed back; through
+// a floor it comes up under. At rest it slides on, half as fast each frame. A mine it touches goes off at once
+// (Mine::VOnThrowableHit); else it goes off itself at the end of its fuse, and the mines its blast reaches with it.
+ThrowArc::Flight ThrowArc::FlyGrenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, const Point* mine)
+{
+    Flight flight;
+    const ThrowStart& start = kThrows[static_cast<s32>(kind)];
+    const double scale = half ? 0.5 : 1.0;
+    const s32 floorType = half ? eBgFloor : eFloor;
+    const s32 wallLeft = half ? eBgWallLeft : eWallLeft;
+    const s32 wallRight = half ? eBgWallRight : eWallRight;
+    double velX = (left ? -start.mVelX : start.mVelX) * scale;
+    double velY = start.mVelY * scale;
+    double px = x + (left ? -start.mX : start.mX) * scale;
+    double py = y + start.mY * scale;
+    double hitX = 0.0;
+    double hitY = 0.0;
+    if (FirstCrossed(in, x, py, px, py, wallLeft, wallRight, &hitX, &hitY))
+    {
+        px = hitX;
+        velX = -velX;
+    }
+    flight.mPoints.push_back(Whole(px, py));
+    bool resting = false;
+    for (s32 frame = 0; frame < kFuse; frame++)
+    {
+        if (resting)
+        {
+            velX /= 2.0;
+            px += velX;
+        }
+        else
+        {
+            const double fromX = px;
+            const double fromY = py;
+            velY += 1.0;
+            px += velX;
+            py += velY;
+            const NavLine* line = velY > 0.0 ? FirstCrossed(in, fromX, fromY, px, py, floorType, floorType, &hitX, &hitY) : nullptr;
+            if (line)
+            {
+                py = hitY;
+                if (velY < 1.0 + 1e-9)
+                {
+                    resting = true;
+                    velY = 0.0;
+                }
+                else
+                {
+                    velY = -velY / 2.0;
+                    velX /= 2.0;
+                }
+            }
+            else
+            {
+                line = FirstCrossed(in, fromX, fromY, px, py, wallLeft, wallRight, &hitX, &hitY);
+                if (line && ((line->mType == wallLeft && velX < 0.0) || (line->mType == wallRight && velX > 0.0)))
+                {
+                    velX = -velX / 2.0;
+                    px = hitX;
+                    py = hitY;
+                }
+            }
+            if (mine && Touches(Whole(px, py), mine->mX, mine->mY, half, true))
+            {
+                flight.mPoints.push_back(Whole(px, py));
+                flight.mHit = static_cast<s32>(flight.mPoints.size()) - 1;
+                flight.mSure = true;
+                return flight;
+            }
+        }
+        flight.mPoints.push_back(Whole(px, py));
+    }
+    if (mine)
+    {
+        const s32 dx = std::abs(static_cast<s32>(px) - mine->mX) * (half ? 2 : 1);
+        const s32 dy = std::abs(static_cast<s32>(py) - mine->mY) * (half ? 2 : 1);
+        if (dx <= kGrenadeReach && dy <= 15)
+        {
+            flight.mHit = static_cast<s32>(flight.mPoints.size()) - 1;
+            flight.mSure = resting && dx <= kGrenadeReach - 8;
+        }
     }
     return flight;
 }

@@ -104,7 +104,7 @@ hash.
 | possession, shooting, security orbs | paths 2, 5, 10 | yes | **missing** |
 | Slogs lured into electric walls | Mines path 3 | no | done (`SlogTrapTask`) |
 | flying Sligs, teleporters, mine car, rock sacks, motion detectors, the timed escape | paths 2-6, 10 | no | done for `any` (see the Mines below); path 2's flying Slig has no invisible zone to hide in and is still got past by luck |
-| grenades (boom machine), security claws | no | yes | **missing** |
+| grenades (boom machine), security claws | no | yes | grenades at mines: done (path 20); the claw counts as an orb |
 
 ### How far the levels get
 
@@ -288,8 +288,8 @@ hash.
   there is an orb. So it has never run in the real game, only its `Watcher` rule is unit tested. The intended
   way is to call the Mudokon from inside an invisible zone. The secret area (path 7) is weighed and skipped: 12
   Mudokons there, none in reach of what the bot models (trap doors, a cage emptied by chanting from outside).
-- **Rupture Farms, `any`**: not rerun since the work above (it was stuck at the start with `no_plan`: 100 of
-  415 cells in reach; a running jump and barriers on switches 13 and 14 were next).
+- **Rupture Farms, `any`**: beaten from its first screen to the Stockyards with 0 deaths (2026-11-15; see
+  "AO, Rupture Farms" below).
 
 - **Throws are known before they are made** (2026-11-12, later; `ThrowArc`). A rock's flight is worked out
   frame by frame from where it leaves the hand and how fast (measured per kind of throw: standing from 11
@@ -978,9 +978,9 @@ In one run, `full.txt` (from the Scrab vaults' path 7: the Scrab trial, Necrum, 
 hub, the six vaults, the Mudomo trial, Necrum's end): Feeco Depot's path 1 at f=31,828, 0 deaths, with the
 healing power as the game gives it. It stops there (Feeco is untouched: at 2312,884, with nothing known to do).
 
-**AO, Rupture Farms** (`a1.txt`: from its first screen, `bot any`): paths 15, 16, 18 and 19 with 0 deaths, into path 20
-at f=4,730, the last before the Stockyards, where no way out is known yet: three mines lie on the way and the
-boom machine's grenade is what clears them (not built). `a3.txt` is path 18 alone. What AO needed so far:
+**AO, Rupture Farms** (`a1.txt`: from its first screen, `bot any`): paths 15, 16, 18, 19 and 20 with 0 deaths, out
+to the Stockyards at f=5,567 (the milestone's AO half). `a3.txt` is path 18 alone, `a4.txt` paths 19 and 20. In the
+Stockyards he dies at once: nothing there has been looked at. What AO needed so far:
 - A walk goes on from one screen's floor to the next's over the gap between cameras, and the first cell past the
   gap cannot be stopped in (a step back to it is a step back over the gap): crossings on foot the same way are
   merged across it (`Bot::Replan`), and nothing but the walk on starts from that cell (`NavGraph::Build`).
@@ -1008,6 +1008,22 @@ boom machine's grenade is what clears them (not built). `a3.txt` is path 18 alon
   awake he goes only as it walks away from him with the time for it: what it has left to walk at 2.7 a frame
   and its wait have to cover his way at a sneak's 2.5 (path 18's fourth screen, two invisible zones on a
   Slig's beat: begun as it stood at its beat's end, it turned on him between them).
+- Grenades (path 20: three mines on the only way to the way out, a boom machine two screens down a lift).
+  To the planner a grenade is a rock and the boom machine a rock sack (`GameView`): up at it, and what drops
+  out of its pipe is picked up crouched, as `GetRocksTask` does for rocks. What differs is the flight, so AO
+  has its own (`ThrowArc::FlyGrenade`, from Grenade.cpp): a pixel a frame faster down, off floors and walls at
+  half the speed, to rest when it comes down slower than one, through a floor it comes up under. A mine it
+  touches goes off at once; else it goes off itself when its fuse has run down (90 frames from when the throw
+  is begun) and every mine within 45 of it goes with it. A spot its own blast reaches is no spot
+  (`Domain::ThrowSpots`). Here: thrown down from the ledge over the mines it comes off the wall, drops through
+  the cell-wide slot between wall and ledge and lies among the three, and one grenade takes them all.
+- A lift's stops count as one lift when they are within two pixels of each other across (454 and 455 here).
+- Walked off a ledge in AO he keeps the walk's speed all the way down, so a long fall lands well out
+  (`NavGraph`: no fall edge where there is no floor there; he went down the lift's shaft past the floor the
+  graph had him land on).
+- The landing off path 20's last hoist wakes the Slig across the lift's shaft, four cells from the way out: he
+  is out before it shoots as things are (a rule to run from a Slig that has seen him was tried and taken out:
+  a run of two cells is slower than the walk, and it got him shot at path 16's end).
 - AO's security claw counts as AE's orb (no chanting on its screen), and the reflex that takes over a Slig
   that woke is off in AO: the chant took none and left him standing in it for 800 frames.
 
