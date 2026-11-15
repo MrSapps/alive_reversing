@@ -38,6 +38,10 @@ struct Prim final
     // A move by rolling that is run up to: the cell the roll has to have begun by (0: none). He goes from the
     // run into the roll without stopping.
     s32 mRunUp = 0;
+    // A run from a stand that ends in a slide: let go of, he slides two cells from the next cell but one and
+    // stands (measured: four cells in 27 frames, six in 35, against 40 and more walked). For a number of cells
+    // that is even and at least four, with nothing to wait for on the way.
+    bool mSlide = false;
     // A fall or a well: the buttons of the move after it, held as he lands. Both games go from the landing
     // straight into a walk or a run when a direction is held as his feet touch, and skip the rest of it.
     u32 mAfter = 0;
@@ -107,6 +111,7 @@ private:
     s32 mFrames = 0;
     s32 mPhase = 0;
     s32 mStill = 0;
+    bool mSliding = false;
     bool mRolled = false;
     // Seen off the ground in this prim
     bool mAired = false;

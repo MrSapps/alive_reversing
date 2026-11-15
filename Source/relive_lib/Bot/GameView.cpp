@@ -18,6 +18,8 @@
 #include "../../AliveLibAE/MotionDetector.hpp"
 #include "../../AliveLibAE/Slig.hpp"
 #include "../../AliveLibAE/Slog.hpp"
+#include "../../AliveLibAE/Fleech.hpp"
+#include "../../AliveLibAE/Paramite.hpp"
 #include "../../AliveLibAE/SlapLock.hpp"
 #include "../../AliveLibAE/DDCheat.hpp"
 #include "../../AliveLibAO/Mudokon.hpp"
@@ -790,7 +792,7 @@ static void BuildEntities(BinaryPath& path, World& world)
                     break;
                 }
                 case ReliveTypes::eSlogSpawner:
-                    world.mSlogSpawners.push_back({(tlv.mTopLeftX + tlv.mBottomRightX) / 2, tlv.mBottomRightY, static_cast<const relive::Path_SlogSpawner&>(tlv).mSpawnerSwitchId});
+                    world.mSlogSpawners.push_back({(tlv.mTopLeftX + tlv.mBottomRightX) / 2, tlv.mBottomRightY, static_cast<const relive::Path_SlogSpawner&>(tlv).mSpawnerSwitchId, static_cast<const relive::Path_SlogSpawner&>(tlv).mMaxSlogs});
                     break;
                 case ReliveTypes::eScrabBoundLeft:
                     world.mScrabBoundsLeft.push_back({(tlv.mTopLeftX + tlv.mBottomRightX) / 2, tlv.mBottomRightY});
@@ -808,6 +810,17 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mInputs[1] = static_cast<const relive::Path_Scrab&>(tlv).mPauseLeftMin;
                     e.mInputs[2] = static_cast<const relive::Path_Scrab&>(tlv).mPauseRightMin;
                     break;
+                case ReliveTypes::eParamite:
+                {
+                    const auto& t = static_cast<const relive::Path_Paramite&>(tlv);
+                    e.mKind = EntityKind::eParamite;
+                    keep = GetGameType() == GameType::eAe;
+                    e.mHalf = t.mScale == relive::reliveScale::eHalf;
+                    e.mInputs[0] = static_cast<s32>(t.mEntranceType);
+                    e.mInputs[1] = t.mSurpriseWebSwitchId;
+                    e.mInputs[2] = t.mHissBeforeAttack ? 1 : 0;
+                    break;
+                }
                 case ReliveTypes::eFleech:
                 {
                     const auto& t = static_cast<const relive::Path_Fleech&>(tlv);
@@ -824,6 +837,12 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mKind = EntityKind::eSlapLock;
                     e.mHalf = t.mScale == relive::reliveScale::eHalf;
                     e.mSwitch = t.mHasGhost ? t.mTargetTombSwitchId2 : 0;
+                    // (one whose ghost goes nowhere: the switch the slap sets is all it does. The Mudanchee
+                    // trial's last, which turns off the electric walls.)
+                    if (e.mSwitch <= 1 && t.mSlapOutputSwitchId > 1 && !t.mGiveInvisibilityPowerup)
+                    {
+                        e.mSwitch = t.mSlapOutputSwitchId;
+                    }
                     e.mInputs[0] = t.mGiveInvisibilityPowerup ? t.mInvisibilityDuration : 0;
                     // (the switch the slap itself sets: a trap door under him, in the Mudanchee vault's path 5)
                     e.mInputs[1] = t.mSlapOutputSwitchId;
@@ -986,8 +1005,25 @@ void GameView::ReadWorld(BaseMap& map, World& world)
 
     world.mInvisCharge = isAe && gAbe && gAbe->mHaveInvisibility != 0;
     world.mInvisible = isAe && gAbe && gAbe->GetInvisible();
+    {
+        const s32 timer = world.mInvisible ? gAbe->InvisibilityTimer() - static_cast<s32>(sGnFrame) : 0;
+        if (!world.mInvisible || timer > 0)
+        {
+            world.mInvisFadeAt = 0;
+            world.mInvisLeft = world.mInvisible ? timer + 140 : 0;
+        }
+        else
+        {
+            if (world.mInvisFadeAt == 0)
+            {
+                world.mInvisFadeAt = sGnFrame;
+            }
+            world.mInvisLeft = std::max(0, 140 - static_cast<s32>(sGnFrame - world.mInvisFadeAt));
+        }
+    }
     world.mInvisEver = world.mInvisEver || world.mInvisCharge || world.mInvisible;
     world.mScrabs.clear();
+    world.mParamites.clear();
     const std::vector<SlurgAt> slurgsBefore = world.mSlurgs;
     world.mSlurgs.clear();
     world.mFleechesAwake.clear();
@@ -1046,6 +1082,27 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             scrab.mFacesLeft = pObj->GetAnimation().GetFlipX();
             world.mScrabs.push_back(scrab);
         }
+        else if (pObj->Type() == ReliveTypes::eParamite)
+        {
+            const ::Paramite* game = static_cast<const ::Paramite*>(pObj);
+            ParamiteAt paramite;
+            for (std::size_t k = 0; k < world.mEntities.size(); k++)
+            {
+                if (world.mEntities[k].mKind == EntityKind::eParamite && static_cast<const relive::Path_TLV*>(world.mTlvs[k])->mId == pObj->mBaseGameObjectTlvInfo)
+                {
+                    paramite.mId = world.mEntities[k].mId;
+                }
+            }
+            paramite.mX = at.mX;
+            paramite.mY = at.mY;
+            paramite.mHalf = at.mHalf;
+            paramite.mPossessed = pObj->GetPossessed();
+            paramite.mMotion = pObj->VGetMotion(eMotionType::eCurrentMotion);
+            paramite.mFacesLeft = pObj->GetAnimation().GetFlipX();
+            paramite.mBrain = game->BrainIndex();
+            paramite.mSub = game->BrainSubState();
+            world.mParamites.push_back(paramite);
+        }
         else if (pObj->Type() == ReliveTypes::eSlurg)
         {
             SlurgAt slurg;
@@ -1074,6 +1131,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             {
                 // (11 raises its head to the hoist, 12 climbs)
                 at.mClimbing = motion == 11 || motion == 12;
+                at.mChasing = isAe && static_cast<::Fleech*>(pObj)->IsChasingAbe();
                 world.mFleechesAwake.push_back(at);
             }
             else
@@ -1256,6 +1314,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             // Motion_15_Sleeping in AE, Motion_16_Sleeping in AO
             slog.mAsleep = pObj->VGetMotion(eMotionType::eCurrentMotion) == (isAe ? 15 : 16);
             slog.mFacesLeft = pObj->GetAnimation().GetFlipX();
+            slog.mMotion = pObj->VGetMotion(eMotionType::eCurrentMotion);
             const s32 anger = isAe ? static_cast<::Slog*>(pObj)->AngerSwitchId() : 0;
             slog.mWaking = slog.mAsleep && anger > 1 && (SwitchStates_Get(anger) != 0 || anger == soonOn);
             world.mSlogs.push_back(slog);

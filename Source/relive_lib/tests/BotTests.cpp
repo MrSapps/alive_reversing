@@ -3002,7 +3002,8 @@ TEST(BotVault, AFleechOverAnotherFloorDoesNotGuardALock)
         s32 uses = 0;
         for (const Goap::Action& a : Domain::Build(g, world, g.NodeAt(762, 460, false, 6), nullptr).mActions)
         {
-            if (a.mName.rfind("Use SlapLock#1", 0) != 0)
+            // (the way past the guard unseen is another action, with its own test)
+            if (a.mName.rfind("Use SlapLock#1", 0) != 0 || a.mName.find("unseen") != std::string::npos)
             {
                 continue;
             }
@@ -3335,6 +3336,47 @@ static World FleechRoomWorld()
     lock.mSwitch = 124;
     world.mEntities.push_back(lock);
     return world;
+}
+
+TEST(BotVault, ALockFleechesGuardIsAlsoSlappedUnseenWhileThePowerLasts)
+{
+    // The Mudanchee trial's last lock: its Fleeches take no notice of him unseen. So besides the way that wants
+    // them dead there is one that wants him unseen, and it is only offered while there is time left for it.
+    NavGraph g;
+    g.Build(FleechRoom(true));
+    World world = FleechRoomWorld();
+    const s32 from = g.NodeAt(587, 700, false);
+    const auto unseen = [&](const Domain& d) -> const Goap::Action*
+    {
+        for (const Goap::Action& a : d.mActions)
+        {
+            if (a.mName.size() > 10 && a.mName.compare(a.mName.size() - 10, 10, " on unseen") == 0)
+            {
+                return &a;
+            }
+        }
+        return nullptr;
+    };
+    {
+        const Domain d = Domain::Build(g, world, from, nullptr);
+        const Goap::Action* a = unseen(d);
+        ASSERT_NE(a, nullptr);
+        EXPECT_NE(std::find(a->mPre.begin(), a->mPre.end(), Goap::Fact{Key::kInvisNow, 1}), a->mPre.end());
+        EXPECT_EQ(std::find(a->mPre.begin(), a->mPre.end(), Goap::Fact{Key::Mud(1), 2}), a->mPre.end());
+        EXPECT_EQ(std::find(a->mPre.begin(), a->mPre.end(), Goap::Fact{Key::Mud(2), 2}), a->mPre.end());
+    }
+    // Unseen already and most of it gone: not enough for the way there, the slap and the way off
+    world.mInvisible = true;
+    world.mInvisLeft = 100;
+    {
+        const Domain d = Domain::Build(g, world, from, nullptr);
+        EXPECT_EQ(unseen(d), nullptr);
+    }
+    world.mInvisLeft = 200;
+    {
+        const Domain d = Domain::Build(g, world, from, nullptr);
+        EXPECT_NE(unseen(d), nullptr);
+    }
 }
 
 TEST(BotVault, AFleechCrawlsClimbsAHoistAndFallsButTakesNoWell)

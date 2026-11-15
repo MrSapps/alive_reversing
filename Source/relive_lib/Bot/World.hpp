@@ -46,6 +46,9 @@ enum class EntityKind : u8
     // A mine car: Abe gets in with up, and it runs along its own lines (floors, walls, ceilings) over whatever
     // is in the way. mLiveX, mLiveY: where it is now. mState: 1 while Abe is in it
     eMineCar,
+    // A Paramite where the map puts it. mInputs: how it comes (0 walks its floor, 1 and 2 down a web when its
+    // switch comes on), that switch, whether it hisses before it goes for him
+    eParamite,
 };
 
 const char* EntityKindName(EntityKind kind);
@@ -178,6 +181,8 @@ struct SlogAt final
     // Asleep still, with the switch that sets it on Abe already on
     bool mWaking = false;
     bool mFacesLeft = false;
+    // The game's motion number
+    s32 mMotion = 0;
 };
 
 // How far a Slig has been seen to walk on its floor
@@ -306,6 +311,9 @@ struct RockAt final
     bool mHalf = false;
     // A Fleech: it is going up a hoist (it ends on the top of it whatever he does meanwhile)
     bool mClimbing = false;
+    // A Fleech: it is after him (awake it may only be walking its beat: Fleech.cpp's patrol brain takes no notice
+    // of him until he is on its level in its sight, or makes a noise within six cells of it)
+    bool mChasing = false;
 };
 
 // A Scrab that is about
@@ -321,6 +329,30 @@ struct ScrabAt final
     // What it is doing (Scrab.hpp: 0 stands, 26 howls)
     s32 mMotion = 0;
     bool mFacesLeft = false;
+};
+
+// A Paramite that is about. Alone on its screen it keeps away from Abe and only goes for him cornered; with
+// another on the screen they come for him (Paramite.cpp).
+struct ParamiteAt final
+{
+    // The entity it is (0: not one of the path's)
+    u32 mId = 0;
+    s32 mX = 0;
+    s32 mY = 0;
+    bool mHalf = false;
+    // Abe is in it
+    bool mPossessed = false;
+    s32 mMotion = 0;
+    bool mFacesLeft = false;
+    // Its brain (Paramite::BrainIndex: 0 patrol, 2 after him, 3 and 9 not down its web yet, 5 after meat,
+    // 8 following a possessed one) and the state of it
+    s32 mBrain = 0;
+    s32 mSub = 0;
+    // Up its web still: not there to be met or taken over
+    bool Hidden() const
+    {
+        return mBrain == 3 || mBrain == 9;
+    }
 };
 
 // A Slurg: where it is, its box's sides, and which way it crawls (0: not seen to move yet)
@@ -486,12 +518,18 @@ struct World final
     // and the rest take no notice of him: it lasts a few hundred frames); he has had the power in this path
     bool mInvisCharge = false;
     bool mInvisible = false;
+    // The frames of it that are left (0 when he is not): what is left on its timer and the 140 he takes to come
+    // back into sight after (measured: the timer out at f=1727, seen again at 1869)
+    s32 mInvisLeft = 0;
+    // The frame its timer ran out at (0: it has not)
+    u32 mInvisFadeAt = 0;
     bool mInvisEver = false;
     // A lock that gives the power has been slapped and its ring is on its way to him (the bot's own note)
     bool mInvisComing = false;
     // Slurgs: a step on one bursts it, and the noise wakes every Fleech on the screen. Standing still by one is
     // safe: it is the feet coming down that do it.
     std::vector<ScrabAt> mScrabs;
+    std::vector<ParamiteAt> mParamites;
     // The live Scrab an entity stands for, or null
     const ScrabAt* ScrabOf(u32 id) const
     {
@@ -511,7 +549,7 @@ struct World final
     std::vector<std::pair<s32, s32>> mScrabBoundsLeft;
     std::vector<std::pair<s32, s32>> mScrabBoundsRight;
     // Where the map lets Slogs out once a switch is on: x, floor y, the switch
-    std::vector<std::array<s32, 3>> mSlogSpawners;
+    std::vector<std::array<s32, 4>> mSlogSpawners;
     // The switch that where Abe stands is about to set (an invisible switch sets its own a few frames after he
     // is in it), or -1
     s32 mSoonOn = -1;

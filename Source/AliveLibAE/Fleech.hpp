@@ -418,6 +418,11 @@ private:
 
 public:
     void VOnFrame(const Point32& point);
+    // (read only, for the bot: whether it is after Abe or only walks its beat)
+    bool IsChasingAbe() const
+    {
+        return mCurrentBrain && mCurrentBrain->VGetBrain() == IFleechBrain::EBrainTypes::ChasingAbe;
+    }
 
 private:
     Guid mTlvInfo;

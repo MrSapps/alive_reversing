@@ -183,6 +183,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<ScrabHuntTask>(step.mEntity, step.mEdge);
         case StepKind::eScrabLure:
             return std::make_unique<ScrabLureTask>(step.mEdge);
+        case StepKind::eParamitePull:
+            return std::make_unique<ParamitePullTask>(step.mEntity, step.mOther, step.mEdge);
         case StepKind::eFleechLure:
             return std::make_unique<FleechLureTask>(step.mEntity, 1);
         case StepKind::eFleechLead:
@@ -789,6 +791,30 @@ bool Bot::Replan(BaseMap& map)
             mFailedActions[first.mName] = 2;
             mLogicWaits = 0;
         }
+        // (where the step after it is, if that is the way out: a door a slapped lock opens is waited for at the
+        // door, got to quietly. Where he slapped it is where what guards it finds him.)
+        s32 waitAt = -1;
+        for (std::size_t i = 1; i < best.mSteps.size() && waitAt < 0; i++)
+        {
+            const DomainStep& next = domain.mSteps[actions[best.mSteps[i]].mTag];
+            if (next.mKind == StepKind::eLogic)
+            {
+                continue;
+            }
+            if (next.mKind == StepKind::eExit && next.mEdge >= 0 && next.mEdge < static_cast<s32>(mKnow->mNav.Exits().size()))
+            {
+                waitAt = mKnow->mNav.Exits()[next.mEdge].mNode;
+            }
+            break;
+        }
+        if (waitAt >= 0 && waitAt != abeNode && !mWorld.mFleechesAwake.empty())
+        {
+            std::unique_ptr<GoToTask> go = std::make_unique<GoToTask>("wait for " + first.mName + " at the way out", [waitAt](s32 node)
+                                                                      { return node == waitAt; });
+            go->SetQuiet(true);
+            mTask = std::move(go);
+            return true;
+        }
         mTask = std::make_unique<GoToTask>("wait for " + first.mName, [](s32)
                                            { return true; });
         mPilot.Start(Prim::Wait(15), mAbe);
@@ -1022,10 +1048,11 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs) const
                     return 20;
                 }
             }
-            // (or with Fleeches awake and after him: the climb they would catch him on is the slow way)
+            // (or with Fleeches awake and after him: the climb they would catch him on is the slow way. Unseen
+            // nothing is after him.)
             for (const RockAt& f : world->mFleechesAwake)
             {
-                if (f.mHalf == from.mHalf && std::abs(f.mX - from.mX) <= 750 && std::abs(f.mY - from.mY) <= 260)
+                if (!world->mInvisible && f.mHalf == from.mHalf && std::abs(f.mX - from.mX) <= 750 && std::abs(f.mY - from.mY) <= 260)
                 {
                     return 20;
                 }
@@ -1963,9 +1990,9 @@ std::unique_ptr<Task> Bot::MakeSlogFlee()
         bool left = false;
         bool inTime = false;
         s32 fromX = 0;
-        if (!SlogRefuge(slog, node, refuge, left, inTime, fromX) || (mAbe.mOnGround && inTime && mAbe.mMove == Move::eRun && mAbe.mFacingLeft == left))
+        if (!SlogRefuge(slog, node, refuge, left, inTime, fromX) || (mAbe.mOnGround && inTime && (mAbe.mMove == Move::eRun || mAbe.mMove == Move::eRoll) && mAbe.mFacingLeft == left))
         {
-            // (at a run away from it with time in hand: what he is at is as good)
+            // (at a run away from it with time in hand, or a roll, which is as quick: what he is at is as good)
             continue;
         }
         mSlogFlees++;
@@ -2658,6 +2685,15 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
             mTrace.pop_back();
             mTrace += " hp=" + std::to_string(mAbe.mHealthFp * 100 / 0x10000) + "\n";
         }
+        // The Paramites near him: where, doing what (motion, brain and its state), facing which way
+        for (const ParamiteAt& paramite : mWorld.mParamites)
+        {
+            if (std::abs(paramite.mX - mAbe.mX) < 800 && std::abs(paramite.mY - mAbe.mY) < 400)
+            {
+                mTrace.pop_back();
+                mTrace += " para=" + std::to_string(paramite.mX) + "," + std::to_string(paramite.mY) + ",m" + std::to_string(paramite.mMotion) + ",b" + std::to_string(paramite.mBrain) + "." + std::to_string(paramite.mSub) + (paramite.mPossessed ? "P" : "") + (paramite.mFacesLeft ? "L\n" : "R\n");
+            }
+        }
         // The Scrabs near him: where, doing what, facing which way
         for (const ScrabAt& scrab : mWorld.mScrabs)
         {
@@ -2675,7 +2711,7 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
                 if (std::abs(fleech.mX - mAbe.mX) < 500 && std::abs(fleech.mY - mAbe.mY) < 300)
                 {
                     mTrace.pop_back();
-                    mTrace += " fl=" + std::to_string(fleech.mX) + "," + std::to_string(fleech.mY) + (pass == 0 ? "a\n" : "s\n");
+                    mTrace += " fl=" + std::to_string(fleech.mX) + "," + std::to_string(fleech.mY) + (pass == 0 ? (fleech.mChasing ? "c\n" : "a\n") : "s\n");
                 }
             }
         }
@@ -2690,7 +2726,7 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         if (mWorld.mInvisCharge || mWorld.mInvisible)
         {
             mTrace.pop_back();
-            mTrace += std::string(mWorld.mInvisible ? " invisible" : " ring") + "\n";
+            mTrace += (mWorld.mInvisible ? " invisible" + std::to_string(mWorld.mInvisLeft) : std::string(" ring")) + "\n";
         }
         // The Mudokons on the screen: where and in which brain state
         if (!mWorld.mEntities.empty())
@@ -2709,7 +2745,7 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
             }
             for (const SlogAt& slog : mWorld.mSlogs)
             {
-                mTrace += " slog" + std::to_string(slog.mX) + "," + std::to_string(slog.mY) + (slog.mAsleep ? "z" : "");
+                mTrace += " slog" + std::to_string(slog.mX) + "," + std::to_string(slog.mY) + (slog.mAsleep ? "z" : "") + "m" + std::to_string(slog.mMotion) + (slog.mFacesLeft ? "L" : "R");
             }
             for (const SweepAt& sweep : mWorld.mSweeps)
             {

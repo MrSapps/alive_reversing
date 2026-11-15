@@ -368,6 +368,18 @@ private:
     void UpdateSlurgWatchPoints();
     GameSpeakEvents LastSpeak();
 
+public:
+    // (read only, for the bot: which brain it is in, as in sParamiteBrainTable: 0 patrol, 2 after its target,
+    // 3 hidden up its web, 5 after meat, 6 possessed, 8 told what to do, 9 not come yet; and the state of it)
+    s32 BrainIndex() const
+    {
+        return mBrainState == &Paramite::Brain_0_Patrol ? 0 : mBrainState == &Paramite::Brain_1_Death ? 1 : mBrainState == &Paramite::Brain_2_ChasingAbe ? 2 : mBrainState == &Paramite::Brain_3_SurpriseWeb ? 3 : mBrainState == &Paramite::Brain_5_SpottedMeat ? 5 : mBrainState == &Paramite::Brain_6_Possessed ? 6 : mBrainState == &Paramite::Brain_7_DeathDrop ? 7 : mBrainState == &Paramite::Brain_8_ControlledByGameSpeak ? 8 : mBrainState == &Paramite::Brain_9_ParamiteSpawn ? 9 : 4;
+    }
+    s32 BrainSubState() const
+    {
+        return mBrainSubState;
+    }
+
 private:
     Guid mMeatGuid;
     Guid mWebGuid;

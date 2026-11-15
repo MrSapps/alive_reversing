@@ -537,6 +537,11 @@ public:
     s16 mHaveShrykull = 0;
     s32 mAutoSayTimer = 0;
     s16 mHaveInvisibility = 0;
+    // (read only, for the bot: the frame his invisibility runs out at, 0 when it is not running)
+    s32 InvisibilityTimer() const
+    {
+        return mInvisibilityTimer;
+    }
     s16 mInvisibilityDuration = 0;
     eAbeMotions mPreviousMotion = eAbeMotions::Motion_0_Idle_44EEB0;
     eAbeMotions mCurrentMotion = eAbeMotions::Motion_0_Idle_44EEB0;
