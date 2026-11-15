@@ -4465,3 +4465,498 @@ TEST(BotNav, RolledOffALowEndOverAGapHeClearsItToTheFloorFortyDown)
     step.Build(shallow);
     EXPECT_EQ(FindEdge(step, step.NodeAt(387, 100, false), step.NodeAt(462, 120, false), EdgeKind::eFall), nullptr);
 }
+
+// ---- A Paramite that is played: its way, its floors, its rings ----
+
+static bool HasLeg(const std::vector<Domain::ParaLeg>& legs, Domain::ParaLeg::Kind kind)
+{
+    for (const Domain::ParaLeg& leg : legs)
+    {
+        if (leg.mKind == kind)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+TEST(BotParamite, AWalkAlongOneFloorIsOneLeg)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    NavGraph g;
+    g.Build(in);
+    const World world;
+    std::vector<Domain::ParaLeg> legs;
+    ASSERT_TRUE(Domain::ParamiteRoute(g, world, g.NodeAt(12, 100, false), g.NodeAt(312, 100, false), &legs));
+    ASSERT_EQ(legs.size(), 1u);
+    EXPECT_EQ(legs[0].mKind, Domain::ParaLeg::eWalk);
+    EXPECT_EQ(legs[0].mTo, g.NodeAt(312, 100, false));
+}
+
+TEST(BotParamite, AWebIsClimbedDownFromTheLedgeAndUpFromTheFloor)
+{
+    // A ledge too high to fall from (210), so the web is the way down
+    NavInput in;
+    in.mLines.push_back(Line(0, 460, 400, 460, 0));
+    in.mLines.push_back(Line(100, 250, 250, 250, 0));
+    in.mLines.push_back(Line(250, 250, 250, 440, 8));
+    NavGraph g;
+    g.Build(in);
+    const World world;
+    const s32 ledge = g.NodeAt(212, 250, false);
+    const s32 floor = g.NodeAt(212, 460, false);
+    ASSERT_GE(ledge, 0);
+    ASSERT_GE(floor, 0);
+    std::vector<Domain::ParaLeg> down;
+    ASSERT_TRUE(Domain::ParamiteRoute(g, world, ledge, floor, &down));
+    EXPECT_TRUE(HasLeg(down, Domain::ParaLeg::eWebDown));
+    EXPECT_FALSE(HasLeg(down, Domain::ParaLeg::eWebUp));
+    for (const Domain::ParaLeg& leg : down)
+    {
+        if (leg.mKind == Domain::ParaLeg::eWebDown)
+        {
+            EXPECT_EQ(leg.mX, 250);
+        }
+    }
+    std::vector<Domain::ParaLeg> up;
+    ASSERT_TRUE(Domain::ParamiteRoute(g, world, floor, ledge, &up));
+    EXPECT_TRUE(HasLeg(up, Domain::ParaLeg::eWebUp));
+    // Without the web there is no way up at all
+    in.mLines.pop_back();
+    NavGraph none;
+    none.Build(in);
+    EXPECT_FALSE(Domain::ParamiteRoute(none, world, none.NodeAt(212, 460, false), none.NodeAt(212, 250, false), nullptr));
+}
+
+TEST(BotParamite, AGapOfThreeCellsIsHoppedToTheFourthAndOneOfFourIsNot)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 100, 100, 0));
+    in.mLines.push_back(Line(175, 100, 300, 100, 0));
+    NavGraph g;
+    g.Build(in);
+    const World world;
+    std::vector<Domain::ParaLeg> legs;
+    ASSERT_TRUE(Domain::ParamiteRoute(g, world, g.NodeAt(12, 100, false), g.NodeAt(212, 100, false), &legs));
+    ASSERT_TRUE(HasLeg(legs, Domain::ParaLeg::eHop));
+    for (const Domain::ParaLeg& leg : legs)
+    {
+        if (leg.mKind == Domain::ParaLeg::eHop)
+        {
+            EXPECT_EQ(leg.mTo, g.NodeAt(187, 100, false));
+        }
+    }
+    // One cell wider and the fourth cell is no floor
+    in.mLines[1] = Line(200, 100, 325, 100, 0);
+    NavGraph wide;
+    wide.Build(in);
+    EXPECT_FALSE(Domain::ParamiteRoute(wide, world, wide.NodeAt(12, 100, false), wide.NodeAt(212, 100, false), nullptr));
+}
+
+TEST(BotParamite, ADropOffTheEndOfAFloorIsAFallOnlyUnderOneHundredAndSeventy)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 200, 100, 0));
+    in.mLines.push_back(Line(0, 250, 400, 250, 0));
+    NavGraph g;
+    g.Build(in);
+    const World world;
+    std::vector<Domain::ParaLeg> legs;
+    ASSERT_TRUE(Domain::ParamiteRoute(g, world, g.NodeAt(12, 100, false), g.NodeAt(312, 250, false), &legs));
+    EXPECT_TRUE(HasLeg(legs, Domain::ParaLeg::eFall));
+    // 200 down is too far for it
+    in.mLines[1] = Line(0, 300, 400, 300, 0);
+    NavGraph deep;
+    deep.Build(in);
+    EXPECT_FALSE(Domain::ParamiteRoute(deep, world, deep.NodeAt(12, 100, false), deep.NodeAt(312, 300, false), nullptr));
+}
+
+TEST(BotParamite, ABlockThatStopsShortOfItsWallHeightIsWalkedUnderAndAWallToTheFloorIsNot)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    // Down to 21 over the floor: under the 20 it looks at
+    in.mLines.push_back(Line(200, 0, 200, 79, 1));
+    NavGraph g;
+    g.Build(in);
+    const World world;
+    EXPECT_TRUE(Domain::ParamiteRoute(g, world, g.NodeAt(12, 100, false), g.NodeAt(387, 100, false), nullptr));
+    EXPECT_FALSE(Domain::ParamiteWall(g, 100, 300, 100, false));
+    in.mLines[1] = Line(200, 0, 200, 100, 1);
+    NavGraph wall;
+    wall.Build(in);
+    EXPECT_FALSE(Domain::ParamiteRoute(wall, world, wall.NodeAt(12, 100, false), wall.NodeAt(387, 100, false), nullptr));
+    EXPECT_TRUE(Domain::ParamiteWall(wall, 100, 300, 100, false));
+}
+
+TEST(BotParamite, ABlockHangingFortyOverTheFloorStopsAScrabButNotAParamite)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    in.mLines.push_back(Line(200, 0, 200, 60, 1));
+    NavGraph g;
+    g.Build(in);
+    // (a Scrab looks 45 over its feet, a Paramite 20)
+    EXPECT_TRUE(Domain::WallBetween(g, 100, 300, 100, false));
+    EXPECT_FALSE(Domain::ParamiteWall(g, 100, 300, 100, false));
+    // Not a wall that is not between the two places
+    EXPECT_FALSE(Domain::WallBetween(g, 250, 300, 100, false));
+}
+
+TEST(BotParamite, ALiftsStopIsFloorForAParamiteOnlyWhileTheLiftIsAtIt)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 300, 400, 300, 0));
+    in.mFeatures.push_back(Feature(FeatureKind::eLiftStop, 100, 100, 200, 110));
+    NavGraph g;
+    g.Build(in);
+    const s32 stop = g.NodeAt(137, 100, false);
+    ASSERT_GE(stop, 0);
+    ASSERT_GE(g.Nodes()[stop].mLiftStop, 0);
+    World world;
+    EXPECT_EQ(Domain::ParamiteFloor(g, world, 137, 100, false), -1);
+    LiftAt away;
+    away.mX1 = 100;
+    away.mX2 = 200;
+    away.mY = 300;
+    world.mLifts.push_back(away);
+    EXPECT_EQ(Domain::ParamiteFloor(g, world, 137, 100, false), -1);
+    world.mLifts[0].mY = 100;
+    EXPECT_EQ(Domain::ParamiteFloor(g, world, 137, 100, false), stop);
+    // (a plain floor needs no lift)
+    EXPECT_GE(Domain::ParamiteFloor(g, world, 337, 300, false), 0);
+}
+
+TEST(BotParamite, ACellInsideAShutGateIsNoFloorForAParamite)
+{
+    NavGraph g;
+    g.Build(FleechPenRoom());
+    World world;
+    EXPECT_EQ(Domain::ParamiteFloor(g, world, 212, 100, false), -1);
+    EXPECT_GE(Domain::ParamiteFloor(g, world, 162, 100, false), 0);
+    // Open, the cell is floor
+    world.mSwitches[60] = 1;
+    EXPECT_GE(Domain::ParamiteFloor(g, world, 212, 100, false), 0);
+}
+
+static Entity TourRing(u32 id, s32 centreX, s32 sw)
+{
+    Entity ring = MakeEntity(EntityKind::ePullRing, id, centreX - 12, 40, centreX + 12, 64);
+    ring.mSwitch = sw;
+    return ring;
+}
+
+TEST(BotParamite, RingsComeNearestFirstEachFromTheOneBefore)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    NavGraph g;
+    g.Build(in);
+    World world;
+    world.mEntities.push_back(TourRing(1, 312, 5));
+    world.mEntities.push_back(TourRing(2, 112, 6));
+    world.mEntities.push_back(TourRing(3, 212, 7));
+    const std::vector<u32> tour = Domain::ParamiteTour(g, world, g.NodeAt(12, 100, false));
+    ASSERT_EQ(tour.size(), 3u);
+    EXPECT_EQ(tour[0], 2u);
+    EXPECT_EQ(tour[1], 3u);
+    EXPECT_EQ(tour[2], 1u);
+    // From the far end the order is the other way round
+    const std::vector<u32> back = Domain::ParamiteTour(g, world, g.NodeAt(387, 100, false));
+    ASSERT_EQ(back.size(), 3u);
+    EXPECT_EQ(back[0], 1u);
+}
+
+TEST(BotParamite, ARingWhoseSwitchIsOnOrBehindAShutGateIsLeftOutOfTheTour)
+{
+    NavGraph g;
+    g.Build(FleechPenRoom());
+    World world;
+    world.mEntities.push_back(TourRing(1, 62, 5));
+    world.mEntities.push_back(TourRing(2, 112, 6));
+    world.mEntities.push_back(TourRing(3, 312, 7));
+    world.mSwitches[5] = 1;
+    // (ring 1 is pulled already, ring 3 is past the gate that is shut)
+    std::vector<u32> tour = Domain::ParamiteTour(g, world, g.NodeAt(12, 100, false));
+    ASSERT_EQ(tour.size(), 1u);
+    EXPECT_EQ(tour[0], 2u);
+    // With the gate open it is gone to as well
+    world.mSwitches[60] = 1;
+    tour = Domain::ParamiteTour(g, world, g.NodeAt(12, 100, false));
+    ASSERT_EQ(tour.size(), 2u);
+    EXPECT_EQ(tour[1], 3u);
+}
+
+// ---- Rolling off and jumping to ledges ----
+
+TEST(BotNav, RolledOffALowEndHeCatchesALedgeOutAndBelowThatFacesTheWayHeGoes)
+{
+    // A drill over the end of the floor keeps him low there; no floor under what is past it
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    in.mLines.push_back(Line(480, 200, 700, 200, 0));
+    in.mFeatures.push_back(Feature(FeatureKind::eSweep, 300, 40, 420, 64));
+    NavFeature ledge = Feature(FeatureKind::eEdge, 470, 200, 495, 224);
+    ledge.mDir = 1;
+    in.mFeatures.push_back(ledge);
+    NavGraph g;
+    g.Build(in);
+    const s32 end = g.NodeAt(387, 100, false);
+    const s32 hung = g.NodeAt(487, 200, false);
+    ASSERT_GE(end, 0);
+    ASSERT_GE(hung, 0);
+    ASSERT_TRUE(g.Nodes()[end].mLow);
+    EXPECT_NE(FindEdge(g, end, hung, EdgeKind::eFall), nullptr);
+    // A ledge that is caught the other way round is not
+    in.mFeatures[1].mDir = 0;
+    NavGraph other;
+    other.Build(in);
+    EXPECT_EQ(FindEdge(other, other.NodeAt(387, 100, false), other.NodeAt(487, 200, false), EdgeKind::eFall), nullptr);
+    // And a hoist that faces him is caught the same
+    in.mFeatures[1].mKind = FeatureKind::eHoist;
+    in.mFeatures[1].mDir = 1;
+    NavGraph hoist;
+    hoist.Build(in);
+    EXPECT_NE(FindEdge(hoist, hoist.NodeAt(387, 100, false), hoist.NodeAt(487, 200, false), EdgeKind::eFall), nullptr);
+}
+
+TEST(BotNav, OffTheLastCellOfAFloorARunningJumpCatchesAnEdgeUpToAHundredHigher)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 100, 100, 0));
+    in.mLines.push_back(Line(140, 40, 300, 40, 0));
+    NavFeature ledge = Feature(FeatureKind::eEdge, 147, 40, 171, 64);
+    ledge.mDir = 1;
+    in.mFeatures.push_back(ledge);
+    NavGraph g;
+    g.Build(in);
+    const s32 from = g.NodeAt(62, 100, false);
+    const s32 top = g.NodeAt(162, 40, false);
+    ASSERT_GE(from, 0);
+    ASSERT_GE(top, 0);
+    const NavEdge* jump = FindEdge(g, from, top, EdgeKind::eRunJump);
+    ASSERT_NE(jump, nullptr) << g.Text();
+    // (off the last cell, 87)
+    EXPECT_EQ(jump->mX, 87);
+    // 150 up is out of its reach
+    NavInput high;
+    high.mLines.push_back(Line(0, 100, 100, 100, 0));
+    high.mLines.push_back(Line(140, -50, 300, -50, 0));
+    NavFeature far = Feature(FeatureKind::eEdge, 147, -50, 171, -26);
+    far.mDir = 1;
+    high.mFeatures.push_back(far);
+    NavGraph none;
+    none.Build(high);
+    EXPECT_EQ(FindEdge(none, none.NodeAt(62, 100, false), none.NodeAt(162, -50, false), EdgeKind::eRunJump), nullptr);
+}
+
+// ---- Wells ----
+
+// A floor with a well on it that throws to (x, y), and what is under that place
+static NavInput ThrowRoom(s32 x, s32 y)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 300, 200, 300, 0));
+    NavFeature well = Feature(FeatureKind::eWellLocal, 100, 276, 124, 300);
+    well.mC = x;
+    well.mD = y;
+    in.mFeatures.push_back(well);
+    return in;
+}
+
+TEST(BotNav, ThrownToAPointWellOverAFloorHeComesDownACellAndAHalfOn)
+{
+    NavInput in = ThrowRoom(330, 400);
+    in.mLines.push_back(Line(250, 500, 700, 500, 0));
+    NavGraph g;
+    g.Build(in);
+    const s32 well = g.NodeAt(112, 300, false);
+    ASSERT_GE(well, 0);
+    // 100 over the floor he flies on to the right, from 337 to 362
+    EXPECT_NE(FindWellEdge(g, well, g.NodeAt(362, 500, false)), nullptr);
+    EXPECT_EQ(FindWellEdge(g, well, g.NodeAt(337, 500, false)), nullptr);
+    // Only 40 over it he comes straight down
+    NavInput low = ThrowRoom(330, 460);
+    low.mLines.push_back(Line(250, 500, 700, 500, 0));
+    NavGraph near;
+    near.Build(low);
+    EXPECT_NE(FindWellEdge(near, near.NodeAt(112, 300, false), near.NodeAt(337, 500, false)), nullptr);
+    EXPECT_EQ(FindWellEdge(near, near.NodeAt(112, 300, false), near.NodeAt(362, 500, false)), nullptr);
+}
+
+TEST(BotNav, ThrownToAPointWithNoFloorUnderItHeDriftsOnlyAsFarAsTheFallLetsHim)
+{
+    // Far below a cell on; a ledge three cells on and 20 lower than the point
+    NavInput in = ThrowRoom(330, 400);
+    in.mLines.push_back(Line(345, 900, 700, 900, 0));
+    in.mLines.push_back(Line(395, 420, 500, 420, 0));
+    NavGraph g;
+    g.Build(in);
+    const s32 well = g.NodeAt(112, 300, false);
+    ASSERT_GE(well, 0);
+    EXPECT_NE(FindWellEdge(g, well, g.NodeAt(362, 900, false)), nullptr);
+    EXPECT_EQ(FindWellEdge(g, well, g.NodeAt(412, 420, false)), nullptr);
+    // With only the ledge, 20 of fall is not time to get three cells on
+    in.mLines.erase(in.mLines.begin() + 1);
+    NavGraph shallow;
+    shallow.Build(in);
+    EXPECT_EQ(FindWellEdge(shallow, shallow.NodeAt(112, 300, false), shallow.NodeAt(412, 420, false)), nullptr);
+}
+
+// A way out through an express well that is open only with its switch on
+static NavInput OnlyWithSwitchWellRoom(s32 onDestPath)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    NavFeature well = Feature(FeatureKind::eWellExpress, 100, 76, 124, 100);
+    well.mSwitch = 9;
+    well.mOnDestPath = onDestPath;
+    well.mOnDestCamera = 1;
+    in.mFeatures.push_back(well);
+    return in;
+}
+
+TEST(BotNav, AWellThatLeadsOutOfThePathOnlyWithItsSwitchOnIsAnExit)
+{
+    NavGraph g;
+    g.Build(OnlyWithSwitchWellRoom(4));
+    ASSERT_FALSE(g.Exits().empty());
+    EXPECT_EQ(g.Input().mFeatures[g.Exits()[0].mFeature].mKind, FeatureKind::eWellExpress);
+    NavGraph stays;
+    stays.Build(OnlyWithSwitchWellRoom(-1));
+    EXPECT_TRUE(stays.Exits().empty());
+}
+
+TEST(BotNav, TheExitThroughAWellThatIsOpenOnlyWithItsSwitchOnWaitsForTheSwitch)
+{
+    NavGraph g;
+    g.Build(OnlyWithSwitchWellRoom(4));
+    const Domain d = Domain::Build(g, World(), g.NodeAt(12, 100, false), nullptr);
+    bool found = false;
+    for (const Goap::Action& a : d.mActions)
+    {
+        if (a.mName.compare(0, 5, "Exit ") == 0)
+        {
+            found = true;
+            EXPECT_NE(std::find(a.mPre.begin(), a.mPre.end(), Goap::Fact{Key::Switch(9), 1}), a.mPre.end());
+        }
+    }
+    EXPECT_TRUE(found);
+}
+
+TEST(BotNav, AWellWhoseSwitchIsSetByTheZoneHeStandsInGoesWhereThatSetsItTo)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 200, 100, 0));
+    in.mLines.push_back(Line(250, 300, 400, 300, 0));
+    NavFeature well = Feature(FeatureKind::eWellLocal, 100, 76, 124, 100);
+    well.mSwitch = 7;
+    well.mC = 287;
+    well.mD = 300;
+    well.mOnC = 362;
+    well.mOnD = 300;
+    in.mFeatures.push_back(well);
+    NavGraph both;
+    both.Build(in);
+    const s32 from = both.NodeAt(112, 100, false);
+    const s32 off = both.NodeAt(287, 300, false);
+    const s32 on = both.NodeAt(362, 300, false);
+    ASSERT_GE(from, 0);
+    // Without a zone it goes by the switch: one edge for each value
+    const NavEdge* byOff = FindWellEdge(both, from, off);
+    const NavEdge* byOn = FindWellEdge(both, from, on);
+    ASSERT_NE(byOff, nullptr);
+    ASSERT_NE(byOn, nullptr);
+    EXPECT_EQ(byOff->mWhen, 0);
+    EXPECT_EQ(byOn->mWhen, 1);
+    // A zone that turns it on, where he stands: the one edge, to where on leads, whatever the switch is
+    NavFeature zone = Feature(FeatureKind::eSwitchZone, 100, 80, 124, 95);
+    zone.mSwitch = 7;
+    zone.mA = 0;
+    in.mFeatures.push_back(zone);
+    NavGraph set;
+    set.Build(in);
+    const NavEdge* only = FindWellEdge(set, from, on);
+    ASSERT_NE(only, nullptr);
+    EXPECT_EQ(only->mWhen, -1);
+    EXPECT_EQ(FindWellEdge(set, from, off), nullptr);
+    // And one that turns it off sends him to the other place
+    in.mFeatures.back().mA = 1;
+    NavGraph unset;
+    unset.Build(in);
+    EXPECT_NE(FindWellEdge(unset, from, off), nullptr);
+    EXPECT_EQ(FindWellEdge(unset, from, on), nullptr);
+}
+
+// ---- Foot switches that turn a gate over ----
+
+static World PlateWorld()
+{
+    World world;
+    // The nearer to the gate (centre 212) is id 3, the one beyond it id 4
+    Entity near = MakeEntity(EntityKind::eFootSwitch, 3, 150, 90, 174, 104);
+    near.mSwitch = 60;
+    near.mOp = 2;
+    world.mEntities.push_back(near);
+    Entity far = MakeEntity(EntityKind::eFootSwitch, 4, 340, 90, 364, 104);
+    far.mSwitch = 60;
+    far.mOp = 2;
+    world.mEntities.push_back(far);
+    return world;
+}
+
+TEST(BotVault, AToggleFootSwitchOfAGatesSwitchIsSteppedOnAndTheShutGateWantsTheNearestOne)
+{
+    NavGraph g;
+    g.Build(FleechPenRoom());
+    const World world = PlateWorld();
+    const Domain d = Domain::Build(g, world, g.NodeAt(12, 100, false), nullptr);
+    s32 steps = 0;
+    s32 gateCrossings = 0;
+    for (const Goap::Action& a : d.mActions)
+    {
+        if (a.mName.compare(0, 18, "Step on FootSwitch") == 0)
+        {
+            steps++;
+        }
+        const DomainStep& step = d.mSteps[a.mTag];
+        if (step.mKind != StepKind::eCross || g.Edges()[step.mEdge].mFeature < 0 || g.Input().mFeatures[g.Edges()[step.mEdge].mFeature].mKind != FeatureKind::eBarrier)
+        {
+            continue;
+        }
+        gateCrossings++;
+        EXPECT_NE(std::find(a.mPre.begin(), a.mPre.end(), Goap::Fact{Key::kPlate, 3}), a.mPre.end()) << a.mName;
+        EXPECT_EQ(std::find(a.mPre.begin(), a.mPre.end(), Goap::Fact{Key::kPlate, 4}), a.mPre.end()) << a.mName;
+    }
+    EXPECT_EQ(steps, 2);
+    EXPECT_GT(gateCrossings, 0);
+    // A plate that sets rather than turns over (mOp 0) is no such step, and the crossing wants none
+    World sets = world;
+    sets.mEntities[0].mOp = 0;
+    sets.mEntities[1].mOp = 0;
+    const Domain e = Domain::Build(g, sets, g.NodeAt(12, 100, false), nullptr);
+    for (const Goap::Action& a : e.mActions)
+    {
+        EXPECT_NE(a.mName.compare(0, 18, "Step on FootSwitch"), 0) << a.mName;
+        for (const Goap::Fact& f : a.mPre)
+        {
+            EXPECT_NE(f.mKey, Key::kPlate) << a.mName;
+        }
+    }
+}
+
+// ---- Switches of gates that are gone ----
+
+TEST(BotWorld, ASwitchOfAGateThatIsGoneIsAsItWasSeenExceptWhereTheRealOneIsAsked)
+{
+    World world;
+    world.mSwitches[5] = 0;
+    EXPECT_EQ(world.Switch(5), 0);
+    world.mGatesGone[5] = 1;
+    EXPECT_EQ(world.Switch(5), 1);
+    EXPECT_EQ(world.Switch(5, true), 0);
+    // (others are as they are)
+    world.mSwitches[6] = 1;
+    EXPECT_EQ(world.Switch(6), 1);
+}
