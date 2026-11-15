@@ -10,6 +10,7 @@
 #include "LevelGraph.hpp"
 #include "NavGraph.hpp"
 #include "Pilot.hpp"
+#include "SligCycle.hpp"
 #include "Task.hpp"
 #include <map>
 #include <memory>
@@ -168,6 +169,21 @@ public:
     {
         // (or he has just become unseen, and the frame's note of it is not made yet)
         return mInvisRun || (mWorld.mInvisible && !mWasInvisible && mInvisCross);
+    }
+    // A sortie is on (ClearSligTask): while the Slig of a floor is off his screen and walking away, the way
+    // along it is taken at a run or a roll with nothing held back for it. Set a few frames at a time.
+    void Dash(u32 untilFrame)
+    {
+        mDashUntil = untilFrame;
+    }
+    bool Dashing() const
+    {
+        return mAbe.mFrame <= mDashUntil && mDashUntil - mAbe.mFrame < 10;
+    }
+    // What the Sligs that shoot from the background of his screen have been seen to do
+    const SligCycle& GetSligCycle() const
+    {
+        return mSligCycle;
     }
     u32 UnseenUse() const
     {
@@ -371,6 +387,10 @@ private:
     void OnDeath(BaseMap& map);
     void RewindMiss(BaseMap& map);
     void MaybeCheckpoint(BaseMap& map);
+    // AE: hurt, between two things to do, and nothing about that could hurt him more where he stands: he waits
+    // for his health to come back (180 frames after the last shot) before he goes on. A shot takes a third.
+    bool Resting();
+    s32 mRestFrames = 0;
     void Stuck(const std::string& why);
     // The next task by the profile's goals. False with mState set when there's nothing more to do or no way to.
     bool Replan(BaseMap& map);
@@ -441,6 +461,8 @@ private:
     bool mInvisCross = false;
     bool mInvisRun = false;
     bool mWasInvisible = false;
+    SligCycle mSligCycle;
+    u32 mDashUntil = 0;
     bool mHoldInvis = false;
     // The frame the power to go unseen was last seen in hand (0: never)
     u32 mChargeFrame = 0;

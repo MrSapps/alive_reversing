@@ -265,6 +265,20 @@ private:
     bool mWaited = false;
     // Frames spent waiting for a Slig to look the other way
     s32 mHiding = 0;
+    // AE, a screen with Sligs that shoot from its background: the next move between its covers, if there is one
+    // to make now
+    bool ZWatched(Bot& bot, const NavGraph& nav, const std::vector<s32>& path, s32 cur, TaskStep& step);
+    bool ZMove(Bot& bot, const NavGraph& nav, const std::vector<s32>& path, s32 cur, std::size_t far, TaskStep& step);
+    // The frames waited in cover for them with no period known, and what was last said of it
+    s32 mZWaits = 0;
+    s32 mZSaid = -1;
+    std::string mZWhat;
+    // The next roll as last worked out: for which cell, cover and periods, the frame to make it on and where to
+    s32 mZFrom = -1;
+    s32 mZPeriods = 0;
+    s32 mZFar = 0;
+    s32 mZGo = 0;
+    s32 mZTo = 0;
     // Chants at a bird portal that has not opened yet
     s32 mPortalChants = 0;
     // Tries at a teleporter that goes off when its plate is stood on
@@ -656,6 +670,23 @@ private:
     s32 mPerchWaits = 0;
     s32 mPerchStand = 0;
     Bot* mHeld = nullptr;
+    // A sortie, when the Slig can't be taken over (a security orb) but leaves the thing's screen on its beat: to
+    // a place out of its sight right by the thing (a ledge over its floor, a shadow), out to the thing once the
+    // Slig has walked off the screen, and back there. 0 not looked at, 1 to that place, 2 waiting there, 3 out
+    // to the thing, 4 back, 5 done
+    TaskStep Sortie(Bot& bot, const std::string& lastFailed, s32 x, s32 y, bool half);
+    s32 mSortie = 0;
+    s32 mSortieNode = -1;
+    s32 mSortieWaits = 0;
+
+public:
+    // An awake Slig of the floor at (x, y) as it is to someone on that screen (AE): 0 nothing to him (asleep,
+    // taken over, another floor), 1 on the screen, 2 off it but coming or standing, 3 off it and walking away:
+    // it neither sees nor hears what is on the screen until it is back
+    static s32 SligAbout(const NavGraph& nav, const SligAt& slig, s32 x, s32 y, bool half);
+    // The place for a sortie to the thing at node `use`: the nearest cell by it (three moves at most) that a
+    // Slig on that floor doesn't see, on that screen. -1: none.
+    static s32 Haven(const NavGraph& nav, const NavGraph::EdgeCost& cost, s32 use);
 };
 
 // A floor of Scrabs cleared with one of them: taken over from a ledge, it kills the other Scrabs (a howl gives it

@@ -1583,6 +1583,60 @@ void Bot::Stuck(const std::string& why)
     Log("STUCK: " + why);
 }
 
+bool Bot::Resting()
+{
+    if (!mIsAe || mAbe.mHealthFp >= 0x10000)
+    {
+        mRestFrames = 0;
+        return false;
+    }
+    const s32 at = AbeNode();
+    if (mAbe.mHealthFp <= 0 || !mAbe.Settled() || !mAbe.mOnGround || mWorld.mInvisible || mRestFrames > 400 || !mKnow || at < 0)
+    {
+        return false;
+    }
+    const NavGraph& nav = mKnow->mNav;
+    const NavNode& here = nav.Nodes()[at];
+    const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);
+    for (const SligAt& slig : mWorld.mSligs)
+    {
+        if (slig.mPossessed || slig.mAsleep)
+        {
+            continue;
+        }
+        const bool onScreen = nav.CameraOf(slig.mX, slig.mY - 5) == cam;
+        // (one in the background sees him anywhere on its screen out of cover; one on his floor, out of the
+        // shadow, and it is on his screen before long from the next)
+        if (slig.mZShoot ? onScreen && !here.mZCover : slig.mHalf == mAbe.mHalfScale && std::abs(slig.mY - mAbe.mY) <= 45 && !here.mHidden && (onScreen || std::abs(slig.mX - mAbe.mX) < 600))
+        {
+            return false;
+        }
+    }
+    for (const SlogAt& slog : mWorld.mSlogs)
+    {
+        if (!slog.mAsleep && std::abs(slog.mX - mAbe.mX) < 600 && std::abs(slog.mY - mAbe.mY) < 260)
+        {
+            return false;
+        }
+    }
+    for (const FlierAt& flier : mWorld.mFliers)
+    {
+        if (nav.CameraOf(flier.mX, flier.mY - 5) == cam)
+        {
+            return false;
+        }
+    }
+    if (!mWorld.mScrabs.empty() || !mWorld.mParamites.empty() || !mWorld.mFleechesAwake.empty())
+    {
+        return false;
+    }
+    if (mRestFrames++ == 0)
+    {
+        Log("hurt: waits where nothing sees him for his health to come back");
+    }
+    return true;
+}
+
 void Bot::MaybeCheckpoint(BaseMap& map)
 {
     // Standing or crouched only: a save taken hanging from a ledge or holding a lift's rope didn't come back right
@@ -2555,6 +2609,10 @@ void Bot::Think(BaseMap& map)
                 mState = BotState::eDone;
                 return;
             }
+            if (Resting())
+            {
+                return;
+            }
             if (!Replan(map) || mPilotActive)
             {
                 return;
@@ -2682,6 +2740,26 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
                     mWorld.mGatesGone[f.mSwitch] = mWorld.Switch(f.mSwitch, true);
                 }
             }
+        }
+        // The Sligs that shoot from the background of his screen: watched, to know when they look away
+        {
+            std::vector<SligCycle::Seen> seen;
+            s32 key = -1;
+            for (const SligAt& slig : mWorld.mSligs)
+            {
+                if (slig.mZShoot && !slig.mPossessed && mKnow && mKnow->mNav.CameraOf(slig.mX, slig.mY - 5) == mKnow->mNav.CameraOf(mAbe.mX, mAbe.mY - 5))
+                {
+                    SligCycle::Seen s;
+                    s.mX = slig.mX;
+                    s.mFacingLeft = slig.mFacingLeft;
+                    // (Slig.hpp: Motion_5_TurnAroundStanding)
+                    s.mBlind = slig.mMotion == 5;
+                    s.mMotion = slig.mMotion;
+                    seen.push_back(s);
+                    key = mAbe.mPath * 65536 + mKnow->mNav.CameraOf(slig.mX, slig.mY - 5);
+                }
+            }
+            mSligCycle.Observe(mAbe.mFrame, key, seen);
         }
         // On the floor of a Scrab that waits before it strikes, with nothing between: it has seen him
         if (mSeenByScrabAt > mAbe.mFrame)

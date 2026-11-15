@@ -8,6 +8,7 @@
 #include "Bot/NavGraph.hpp"
 #include "Bot/Pilot.hpp"
 #include "Bot/Profile.hpp"
+#include "Bot/SligCycle.hpp"
 #include "Bot/Task.hpp"
 #include "Bot/ThrowArc.hpp"
 #include "Bot/World.hpp"
@@ -6274,4 +6275,380 @@ TEST(BotNav, AHopCatchesALedgeHighOverHisFloorWithFloorStillUnderHim)
     const s32 lowTop = low.NodeAt(87, 60, false);
     ASSERT_GE(lowTop, 0);
     EXPECT_FALSE(HasEdge(low, low.NodeAt(37, 100, false), lowTop, EdgeKind::eHop)) << low.Text();
+}
+
+// A Slig that walks a beat: stands `pauseLeft` frames at its left end facing left, turns for 12 (blind), walks
+// right a pixel a frame, stands `pauseRight` at the right end, turns, walks back
+static SligCycle::Seen BeatAt(s32 frame, s32 minX, s32 maxX, s32 pauseLeft, s32 pauseRight, s32 phase)
+{
+    const s32 walk = maxX - minX;
+    const s32 period = pauseLeft + 12 + walk + pauseRight + 12 + walk;
+    s32 t = (frame + phase) % period;
+    SligCycle::Seen s;
+    if (t < pauseLeft)
+    {
+        s.mX = minX;
+        s.mFacingLeft = true;
+        return s;
+    }
+    t -= pauseLeft;
+    if (t < 12)
+    {
+        s.mX = minX;
+        s.mFacingLeft = t < 6;
+        s.mBlind = true;
+        return s;
+    }
+    t -= 12;
+    if (t < walk)
+    {
+        s.mX = minX + t;
+        return s;
+    }
+    t -= walk;
+    if (t < pauseRight)
+    {
+        s.mX = maxX;
+        return s;
+    }
+    t -= pauseRight;
+    if (t < 12)
+    {
+        s.mX = maxX;
+        s.mFacingLeft = t >= 6;
+        s.mBlind = true;
+        return s;
+    }
+    t -= 12;
+    s.mX = maxX - t;
+    s.mFacingLeft = true;
+    return s;
+}
+
+TEST(BotSligCycle, ASligOnABeatIsKnownOnceItHasComeRoundAndThenToldAhead)
+{
+    SligCycle cycle;
+    // Two out of step, the same period: 30 + 12 + 80 + 20 + 12 + 80 = 234
+    const auto at = [](s32 frame)
+    {
+        return std::vector<SligCycle::Seen>{BeatAt(frame, 500, 580, 30, 20, 0), BeatAt(frame, 520, 600, 20, 30, 70)};
+    };
+    s32 knownAt = -1;
+    for (s32 f = 1; f <= 500; f++)
+    {
+        cycle.Observe(static_cast<u32>(f), 7, at(f));
+        if (cycle.Known() && knownAt < 0)
+        {
+            knownAt = f;
+        }
+    }
+    // Once each has been seen to go round twice
+    EXPECT_EQ(knownAt, 2 * 234);
+    EXPECT_EQ(cycle.Period(0), 234);
+    EXPECT_EQ(cycle.Period(1), 234);
+    for (s32 ahead = 0; ahead < 600; ahead += 7)
+    {
+        EXPECT_TRUE(cycle.Ahead(0, ahead) == at(500 + ahead)[0]) << ahead;
+        EXPECT_TRUE(cycle.Ahead(1, ahead) == at(500 + ahead)[1]) << ahead;
+    }
+    // One that stands still the whole time tells nothing
+    SligCycle still;
+    for (s32 f = 1; f <= 500; f++)
+    {
+        still.Observe(static_cast<u32>(f), 7, {SligCycle::Seen{}});
+    }
+    EXPECT_FALSE(still.Known());
+    // Put off its beat, it has to be watched round again; a frame missed or another screen and all of it is
+    SligCycle::Seen off = at(501)[0];
+    off.mX += 3;
+    cycle.Observe(501, 7, {off, at(501)[1]});
+    EXPECT_FALSE(cycle.Known());
+    EXPECT_EQ(cycle.Period(1), 234);
+    // (and not by the first stretch that looks the same: the whole period has to)
+    for (s32 f = 502; f < 501 + 2 * 234; f++)
+    {
+        cycle.Observe(static_cast<u32>(f), 7, at(f));
+        EXPECT_FALSE(cycle.Known()) << f;
+    }
+    cycle.Observe(501 + 2 * 234, 7, at(501 + 2 * 234));
+    EXPECT_TRUE(cycle.Known());
+    cycle.Observe(503 + 2 * 234, 7, at(503));
+    EXPECT_EQ(cycle.Watched(), 1);
+    cycle.Observe(504 + 2 * 234, 8, at(504));
+    EXPECT_EQ(cycle.Watched(), 1);
+}
+
+// Cells 25 apart from 625 down to 475: cover at both ends, the open between
+static std::vector<SligCycle::Cell> OpenBetweenCovers()
+{
+    std::vector<SligCycle::Cell> cells;
+    for (s32 x = 625; x >= 475; x -= 25)
+    {
+        cells.push_back({x, x == 625 || x == 475});
+    }
+    return cells;
+}
+
+// Plays a crossing out a move at a time against what the Sligs really do (`at`), asking again after each roll as
+// the task does. Gives how many of them saw him, or -1 if he never got there.
+static s32 PlayCrossing(const std::function<std::vector<SligCycle::Seen>(s32)>& at, s32 from, std::vector<s32>* stops = nullptr)
+{
+    SligCycle cycle;
+    for (s32 f = 1; f <= from; f++)
+    {
+        cycle.Observe(static_cast<u32>(f), 1, at(f));
+    }
+    std::vector<SligCycle::Cell> cells = OpenBetweenCovers();
+    const auto covered = [](s32 x, bool)
+    {
+        return x >= 625 || x <= 475;
+    };
+    u32 seen = 0;
+    s32 frame = from;
+    const auto step = [&](s32 x, bool cover)
+    {
+        frame++;
+        const std::vector<SligCycle::Seen> now = at(frame);
+        cycle.Observe(static_cast<u32>(frame), 1, now);
+        for (std::size_t i = 0; i < now.size() && !cover; i++)
+        {
+            if (!now[i].mBlind && (now[i].mFacingLeft ? x <= now[i].mX : x >= now[i].mX))
+            {
+                seen |= 1u << i;
+            }
+        }
+    };
+    for (s32 tries = 0; tries < 20 && cells.size() > 1; tries++)
+    {
+        const SligCycle::Move move = cycle.Cross(cells, covered);
+        for (s32 f = 0; f < move.mDelay; f++)
+        {
+            step(cells[0].mX, cells[0].mCover);
+        }
+        step(cells[0].mX, cells[0].mCover);
+        for (s32 x = cells[0].mX - 6; x > cells[move.mTo].mX; x -= 6)
+        {
+            step(x, covered(x, true));
+        }
+        for (s32 f = 0; f <= SligCycle::kRollEnd; f++)
+        {
+            step(cells[move.mTo].mX, cells[move.mTo].mCover);
+        }
+        if (stops)
+        {
+            stops->push_back(cells[move.mTo].mX);
+        }
+        cells.erase(cells.begin(), cells.begin() + move.mTo);
+    }
+    return cells.size() == 1 ? static_cast<s32>(seen == 0 ? 0 : (seen & 1) + ((seen >> 1) & 1) + ((seen >> 2) & 1)) : -1;
+}
+
+TEST(BotSligCycle, TheOpenIsCrossedWhenNoneLooks)
+{
+    // One Slig on a beat over the open, 500 to 580. He has to pass under it, so it sees him unless that is while
+    // it turns at its left end: right of it while it still faces left, left of it once it faces right
+    const auto one = [](s32 frame)
+    {
+        return std::vector<SligCycle::Seen>{BeatAt(frame, 500, 580, 30, 20, 0)};
+    };
+    SligCycle cycle;
+    for (s32 f = 1; f <= 500; f++)
+    {
+        cycle.Observe(static_cast<u32>(f), 1, one(f));
+    }
+    ASSERT_TRUE(cycle.Known());
+    const SligCycle::Move move = cycle.Cross(OpenBetweenCovers(), [](s32 x, bool)
+                                             { return x >= 625 || x <= 475; });
+    EXPECT_EQ(move.mSpotters, 0);
+    EXPECT_GT(move.mDelay, 0);
+    // (and it works out, from whenever he starts to look)
+    for (s32 from = 500; from < 740; from += 37)
+    {
+        EXPECT_EQ(PlayCrossing(one, from), 0) << from;
+    }
+    // In cover all the way there is nothing to wait for
+    const SligCycle::Move hidden = cycle.Cross(OpenBetweenCovers(), [](s32, bool)
+                                               { return true; });
+    EXPECT_EQ(hidden.mSpotters, 0);
+    EXPECT_EQ(hidden.mDelay, 0);
+    EXPECT_EQ(hidden.mTo, 6);
+}
+
+TEST(BotSligCycle, ASligThatWalksHisWayIsNotRolledPast)
+{
+    // One that walks left from 600 to 470 (past the far cover) a pixel a frame and stands there a long time. He
+    // rolls six a frame: setting out behind it he would pass it and be seen. He waits until it is far enough on.
+    const auto slow = [](s32 frame)
+    {
+        return std::vector<SligCycle::Seen>{BeatAt(frame, 470, 600, 100, 100, 100 + 12 + 130 + 100 + 12)};
+    };
+    // (1028: it is on its way left, in the middle of the open)
+    ASSERT_TRUE(slow(1028)[0].mFacingLeft);
+    ASSERT_GT(slow(1028)[0].mX, 500);
+    std::vector<s32> stops;
+    EXPECT_EQ(PlayCrossing(slow, 1028, &stops), 0);
+    ASSERT_FALSE(stops.empty());
+    EXPECT_EQ(stops.back(), 475);
+    // With a second one that always looks his way there is no way unseen: the best is with only that one
+    const auto two = [&](s32 frame)
+    {
+        SligCycle::Seen stare;
+        stare.mX = 300;
+        // (it has to be seen to do something to be known: it shifts a pixel to and fro)
+        stare.mX += (frame / 50) % 2;
+        return std::vector<SligCycle::Seen>{slow(frame)[0], stare};
+    };
+    EXPECT_EQ(PlayCrossing(two, 1028), 1);
+}
+
+TEST(BotNav, ACellIsCoverFromTheBackgroundOnlyWithAllOfHimInside)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 200, 375, 200, 0));
+    // (a rock 44 wide: one cell of it holds him standing, 26 wide and 53 high)
+    NavFeature rock = Feature(FeatureKind::eZCover, 143, 140, 187, 202);
+    rock.mAnyScale = true;
+    in.mFeatures.push_back(rock);
+    NavGraph g;
+    g.Build(in);
+    EXPECT_TRUE(g.Nodes()[g.NodeAt(162, 200, false)].mZCover);
+    EXPECT_FALSE(g.Nodes()[g.NodeAt(137, 200, false)].mZCover);
+    EXPECT_FALSE(g.Nodes()[g.NodeAt(187, 200, false)].mZCover);
+    // Rolling his box is 37 wide, further ahead of him than behind: in it for less of the way
+    EXPECT_TRUE(g.ZCovered(170, 200, -24, 13, 34));
+    EXPECT_FALSE(g.ZCovered(162, 200, -24, 13, 34));
+    // Too low a cover is none to one who stands
+    NavInput low = in;
+    low.mFeatures[0].mY1 = 160;
+    NavGraph h;
+    h.Build(low);
+    EXPECT_FALSE(h.Nodes()[h.NodeAt(162, 200, false)].mZCover);
+    EXPECT_TRUE(h.ZCovered(162, 200, -13, 13, 34));
+}
+
+// A floor, a ledge over it from 100 on with a hoist up to its end, and something that shuts in the ledge's
+// second cell
+static NavInput LedgeWithFence(s32 hoistDir, bool solid)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 200, 370, 200, 0));
+    in.mLines.push_back(Line(100, 100, 300, 100, 0));
+    NavFeature hoist = Feature(FeatureKind::eHoist, 100, 100, 124, 195);
+    hoist.mDir = hoistDir;
+    in.mFeatures.push_back(hoist);
+    NavFeature fence = Feature(FeatureKind::eBarrier, 125, 60, 149, 104);
+    fence.mSwitch = 7;
+    fence.mStartClosed = true;
+    fence.mSolid = solid;
+    in.mFeatures.push_back(fence);
+    return in;
+}
+
+TEST(BotNav, APullUpOntoALedgeBesideAnElectricWallWaitsForItToBeOff)
+{
+    // Facing the wall as he comes up he reaches into its cell: only with it off
+    NavGraph g;
+    g.Build(LedgeWithFence(1, false));
+    const NavEdge* up = FindEdge(g, g.NodeAt(112, 200, false), g.NodeAt(112, 100, false), EdgeKind::eHoistUp);
+    ASSERT_NE(up, nullptr);
+    s32 gate = 0;
+    s32 open = 0;
+    ASSERT_TRUE(g.Condition(*up, &gate, &open));
+    EXPECT_EQ(gate, 7);
+    EXPECT_EQ(open, 1);
+    // (so the cell up there is not of a piece with the floor below)
+    World world;
+    const Domain d = Domain::Build(g, world, g.NodeAt(12, 200, false), nullptr);
+    EXPECT_NE(d.mRegions[g.NodeAt(112, 200, false)], d.mRegions[g.NodeAt(112, 100, false)]);
+    // Facing away from it there is nothing to it
+    NavGraph away;
+    away.Build(LedgeWithFence(0, false));
+    up = FindEdge(away, away.NodeAt(112, 200, false), away.NodeAt(112, 100, false), EdgeKind::eHoistUp);
+    ASSERT_NE(up, nullptr);
+    EXPECT_FALSE(away.Condition(*up, nullptr, nullptr));
+    // Nor to a door that is only shut: that hurts nobody
+    NavGraph door;
+    door.Build(LedgeWithFence(1, true));
+    up = FindEdge(door, door.NodeAt(112, 200, false), door.NodeAt(112, 100, false), EdgeKind::eHoistUp);
+    ASSERT_NE(up, nullptr);
+    EXPECT_FALSE(door.Condition(*up, nullptr, nullptr));
+}
+
+TEST(BotSligWatch, AWayOntoAFloorASligWalksIsDearerThanOneThatKeepsOffIt)
+{
+    // A ledge (0..100 at 100) over a floor a Slig walks (at 200)
+    NavGraph g;
+    g.Build(WatchedFloor(false));
+    World world = WatchedWorld(false);
+    const s32 ledge = g.NodeAt(87, 100, false);
+    const s32 floor = g.NodeAt(112, 200, false);
+    ASSERT_GE(ledge, 0);
+    ASSERT_GE(floor, 0);
+    EXPECT_LT(Domain::SligBeat(g, world, ledge), 0);
+    EXPECT_EQ(Domain::SligBeat(g, world, floor), g.Nodes()[floor].mLine);
+    const auto downCost = [&](const World& w)
+    {
+        const Domain d = Domain::Build(g, w, ledge, nullptr);
+        s32 cost = -1;
+        for (const Goap::Action& a : d.mActions)
+        {
+            if (d.mSteps[a.mTag].mKind == StepKind::eCross && g.Nodes()[g.Edges()[d.mSteps[a.mTag].mEdge].mTo].mY == 200)
+            {
+                cost = cost < 0 ? a.mCost : std::min(cost, a.mCost);
+            }
+        }
+        return cost;
+    };
+    const s32 watched = downCost(world);
+    // Not with the Slig gone, nor with one asleep
+    world.mEntities[0].mGone = true;
+    const s32 gone = downCost(world);
+    world.mEntities[0].mGone = false;
+    world.mEntities[0].mState = 1;
+    const s32 asleep = downCost(world);
+    ASSERT_GT(gone, 0);
+    EXPECT_EQ(watched, gone + Domain::kSligBeatCost);
+    EXPECT_EQ(asleep, gone);
+}
+
+TEST(BotSligWatch, ASligOffTheScreenAndWalkingAwayIsNothingToASortie)
+{
+    NavGraph g;
+    g.Build(WatchedFloor(true));
+    SligAt slig;
+    slig.mX = 300;
+    slig.mY = 200;
+    // On his screen
+    EXPECT_EQ(ClearSligTask::SligAbout(g, slig, 112, 200, false), 1);
+    // Off it: walking away, and standing or coming
+    slig.mX = 400;
+    slig.mMotion = 2;
+    EXPECT_EQ(ClearSligTask::SligAbout(g, slig, 112, 200, false), 3);
+    slig.mMotion = 0;
+    EXPECT_EQ(ClearSligTask::SligAbout(g, slig, 112, 200, false), 2);
+    slig.mMotion = 2;
+    slig.mFacingLeft = true;
+    EXPECT_EQ(ClearSligTask::SligAbout(g, slig, 112, 200, false), 2);
+    // Another floor, asleep or taken over: nothing to him
+    slig.mY = 100;
+    EXPECT_EQ(ClearSligTask::SligAbout(g, slig, 112, 200, false), 0);
+    slig.mY = 200;
+    slig.mAsleep = true;
+    EXPECT_EQ(ClearSligTask::SligAbout(g, slig, 112, 200, false), 0);
+    // The place to make a sortie from: the nearest cell by the thing that its floor's Slig doesn't see. Here the
+    // shadow (150..250: the cells 187 and 212 are wholly in it) for a thing at 262, and none for one too far
+    // from it
+    const auto plain = [](const NavEdge& e) -> s32
+    {
+        return e.mCost + 1;
+    };
+    const s32 haven = ClearSligTask::Haven(g, plain, g.NodeAt(262, 200, false));
+    ASSERT_GE(haven, 0);
+    EXPECT_TRUE(g.Nodes()[haven].mHidden);
+    EXPECT_EQ(g.Nodes()[haven].mX, 212);
+    EXPECT_LT(ClearSligTask::Haven(g, plain, g.NodeAt(337, 200, false)), 0);
+    // With no shadow there is nowhere on that floor
+    NavGraph bare;
+    bare.Build(WatchedFloor(false));
+    EXPECT_LT(ClearSligTask::Haven(bare, plain, bare.NodeAt(262, 200, false)), 0);
 }

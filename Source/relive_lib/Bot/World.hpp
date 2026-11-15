@@ -146,6 +146,8 @@ struct SligAt final
     s32 mWake = 0;
     // The frames it waits before it shoots at what it has seen
     s32 mSightDelay = 0;
+    // AE: it shoots from the background into the foreground (see SligCycle)
+    bool mZShoot = false;
     // The frames at least until it could shoot at something at x on its floor, with the screen that is on going from
     // camX1 to camX2: it has to be on that screen and face that way. 0 when its beat isn't known or x is on it.
     s32 FramesUntilSees(s32 x, s32 camX1, s32 camX2) const

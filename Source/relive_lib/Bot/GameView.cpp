@@ -557,6 +557,16 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                     in.mFeatures.push_back(f);
                     break;
                 }
+                case ReliveTypes::eZSligCover:
+                {
+                    if (isAe)
+                    {
+                        NavFeature f = MakeFeature(FeatureKind::eZCover, tlv, camera, id);
+                        f.mAnyScale = true;
+                        in.mFeatures.push_back(f);
+                    }
+                    break;
+                }
                 case ReliveTypes::eLiftPoint:
                 {
                     NavFeature f = MakeFeature(FeatureKind::eLiftStop, tlv, camera, id);
@@ -1208,6 +1218,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
                 static_cast<::Slig*>(pObj)->Beat(slig.mBeatMin, slig.mBeatMax, wakeCells, slig.mSightDelay);
                 slig.mBeatPause = static_cast<::Slig*>(pObj)->BeatPause();
                 slig.mWake = wakeCells * (slig.mHalf ? 13 : 25);
+                slig.mZShoot = slig.mHalf && static_cast<::Slig*>(pObj)->CanZShoot();
             }
             else
             {

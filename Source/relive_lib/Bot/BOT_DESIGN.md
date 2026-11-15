@@ -1095,6 +1095,72 @@ The other way on, to Bonewerkz through path 9's lower half and path 4, is untouc
 - A hop down off a ledge onto a cell a mine is in is an edge that waits for the mine, in paths with a Brew
   machine only (Terminal 2's way back from the duct to the door, off 1187,420 onto 1287,460).
 
+**The Slig Barracks** (2026-11-15, `build-bot/b1.txt`: path 1 from the door Feeco's train leaves him at, with
+the healing power, `bot any`). Begun, not beaten: the first two screens of its first path with no deaths, and
+stopped on the third. The level is thirteen paths (the walkthrough's block 0, four blocks off a hub, the war
+room) and wants things not built yet: see "What the Barracks still wants" below. What these screens took:
+- **Sligs in the background that shoot out of the screen** (path 1's second screen: three of them on one
+  beat, out of step). Slig.cpp, its idle, walking and paused brains: one shoots when Abe is on its screen, at
+  full size, in front of it (his x at or past its own the way it faces) and not wholly inside a Z cover
+  (`z_slig_cover`: his box inside the TLV's). It does not look while it turns. The shots (three or four) are
+  aimed at his x less two frames of his speed and 16 for each shot still to come, towards the Slig, so one of
+  a burst hits him standing; a hit takes 0.34 of his health and he dies of the third; 180 frames after the
+  last, all of it is back (Abe.cpp).
+  - `FeatureKind::eZCover`, `NavNode::mZCover` (standing, 26 wide and 53 high, he is wholly in one),
+    `NavGraph::ZCovered` for his box crouched (26 by 34) and rolling (37 wide, 24 of it ahead of him:
+    measured). The rock is one cell of cover.
+  - `SligCycle` (owned by `Bot`, fed every frame): what each such Slig of his screen does is written down as
+    it is seen, and its period is known once the whole of the last period is what the one before it was (a
+    shorter match is found by chance after one has stopped to shoot; its motion is part of what is compared
+    for the same reason). From then what it does next is what it did a period ago. Nothing of the game's Slig
+    is modelled: the bot watches, as a player does. Measured there: 171, 170 and 170 frames, so the three
+    drift against each other a frame a round.
+  - `SligCycle::Cross`: the way through the open between two covers as rolls from cell to cell with waits
+    between (crouched, so a roll starts the frame after it is asked for), found over frames, cells and the
+    set of Sligs that have seen him: the fewest that see him, and of those the soonest done. Only its first
+    move is made; it is asked again where that ends. `GoToTask::ZWatched` / `ZMove`: along such a screen he
+    goes from cover to cover, watches from cover until the periods are known (two rounds), sets out only at
+    full health, and not at all if more than two would see him. Only where he is in cover or the way ahead
+    has some: the Mudanchee trial's last room has such a Slig over a floor that is run along and dropped
+    off with Slogs behind him, and waiting there killed him. Measured: there is no moment when none of
+    the three looks on the way to the rock (two see him at best, one shot lands, 180 frames in the rock's
+    cover until it is over), and one when none does on the way on from it.
+- **Hurt, he rests** (`Bot::Resting`, AE): between two things to do, with nothing on his floor or screen
+  that could hurt him more, he waits for his health to come back before he goes on.
+- **A roll is heard all over the screen** (Abe's `Motion_23_RollLoop` is a suspicious noise every frame; a
+  walking Slig turns to it at once). Under a low ceiling in a shadow, with a Slig awake on that floor and
+  screen: no further than the shadow's last cell, and out of it only when the Slig is off the screen and not
+  about to be back (`ClearSligTask::SligAbout`: 1 on the screen, 2 off it but standing or coming, 3 off it and
+  walking away, when it neither sees nor hears what is on the screen).
+- **A sortie** (`ClearSligTask::Sortie`, `Haven`; `Bot::Dash`): a thing to use on a floor a Slig walks, when
+  the Slig can't be taken over (a security orb on the screen) but leaves the screen on its beat. A place out
+  of its sight right by the thing is found (three moves at most: a ledge over the floor, a shadow), by the
+  map with the gates as they will be once the thing is used. If it can be got to first he waits there;
+  if the thing itself opens the way to it (here: the lever turns off the electric wall by the ledge), he goes
+  there after. While a sortie is on and the Slig has walked off the screen, the way along its floor is rolled
+  on from the shadow without standing up, or run. Path 1's second screen, measured: the Slig is off the
+  screen for 59 frames and shoots 84 after it left; the roll from the shadow takes 39, standing up 8, the
+  lever 18, the hoist 15 to the hang and 23 more to the top, so he is hit as he climbs: twice in the run
+  that is kept, one hit short of dying. That margin is the game's (the walkthrough has the same moves), but
+  it is thin: see below.
+- **A pull-up beside an electric wall** (`NavEdge::mFence`): pulled up onto a ledge (a hoist, a hop or a
+  running jump that catches one) he reaches into the cell ahead, and an electric wall there fries him (its box
+  is 4 either side of its middle, ElectricWall.cpp). Such an edge waits for the wall's switch.
+- **A floor a Slig walks is dear to step onto** (`Domain::SligBeat`, `kSligBeatCost` 400 on a crossing onto
+  it from off it or from another Slig's): with the wall off, the way on is along the ledge, not back down.
+
+**What the Barracks still wants** (from the walkthrough and the paths' TLVs; nothing of it is built):
+- Path 1, third screen: a Slig that stands and listens (start state `listening`, sight delay 0, turns to
+  noise) on a three-cell ledge. The way is a roll off the upper ledge that ends hung from its ledge's end
+  (falling with speed past an `edge` he grabs it), up when it has turned away, a run past it and up the hoist
+  behind it to the lift's lever. Today the bot goes to and fro on the upper ledge: the rule against landing
+  in front of a Slig that faces the landing refuses the fall while it faces left, the route flips to the
+  other way round, and flips back when the Slig turns. Then a lift, two more Sligs to pass by hanging and
+  running, a well, and a flying Slig to take over that kills Sligs with grenades and pulls a lever for him.
+- A flying Slig as a thing he flies himself (grenades, levers), a Glukkon taken over and its orders to Sligs
+  (the war room), crawling Sligs and their button, grenades thrown from a boom machine on a count,
+  Greeters, laughing gas, flying mines to time, a Shrykull.
+
 **AO, Rupture Farms** (`a1.txt`: from its first screen, `bot any`): paths 15, 16, 18, 19 and 20 with 0 deaths, out
 to the Stockyards at f=5,567 (the milestone's AO half; f=6,291 as committed and since: the grenades are
 fetched twice in path 20 when the run comes from path 15, not when it starts at path 19). `a3.txt` is path 18 alone, `a4.txt` paths 19 and 20. In the

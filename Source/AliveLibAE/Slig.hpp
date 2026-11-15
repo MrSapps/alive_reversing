@@ -454,6 +454,11 @@ public:
         maxX = field_138_zone_rect.w;
         wakeCells = mSligTlv.mNoiseWakeUpDistance;
     }
+    // For the bot: it shoots from the background at what is in front of it nearer the player
+    bool CanZShoot() const
+    {
+        return mSligTlv.mCanZShoot;
+    }
     // For the bot: the frames at least that it stands at an end of its beat before it turns
     s32 BeatPause() const
     {

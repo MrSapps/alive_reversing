@@ -388,6 +388,19 @@ bool NavGraph::Condition(const NavEdge& edge, s32* switchId, s32* openValue) con
         }
         return true;
     }
+    if (edge.mFence >= 0)
+    {
+        const NavFeature& fence = mInput.mFeatures[edge.mFence];
+        if (switchId)
+        {
+            *switchId = fence.mSwitch;
+        }
+        if (openValue)
+        {
+            *openValue = fence.mStartClosed ? 1 : 0;
+        }
+        return true;
+    }
     if (edge.mClear >= 0)
     {
         // Into a cell with a mine: open once it is gone, which the world gives as a switch of its own
@@ -588,6 +601,18 @@ s32 NavGraph::NodeAt(s32 x, s32 y, bool half, s32 yTolerance) const
 s32 NavGraph::CameraOf(s32 x, s32 y) const
 {
     return (x / mInput.mCamW) + (y / mInput.mCamH) * 256;
+}
+
+bool NavGraph::ZCovered(s32 x, s32 y, s32 lo, s32 hi, s32 tall) const
+{
+    for (const NavFeature& f : mInput.mFeatures)
+    {
+        if (f.mKind == FeatureKind::eZCover && x + lo >= f.mX1 && x + hi <= f.mX2 && y - tall >= f.mY1 && y - 1 <= f.mY2)
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 s32 NavGraph::Thrown(s32 x, s32 y, s32 fromX, bool half, s32 depth, s32 knownSwitch, s32 knownValue) const
@@ -1145,6 +1170,7 @@ void NavGraph::Build(const NavInput& input)
                     n.mHidden = true;
                 }
             }
+            n.mZCover = !half && ZCovered(x, n.mY, -13, 13, 53);
             const s32 madeBy = i >= realLines ? stopOfLine[i - realLines] : -1;
             const bool trap = madeBy >= 0 && mInput.mFeatures[madeBy].mKind == FeatureKind::eTrapDoor;
             n.mLiftStop = trap ? -1 : madeBy;
@@ -1858,6 +1884,30 @@ void NavGraph::Build(const NavInput& input)
         if (e.mClear < 0)
         {
             e.mClear = danger;
+        }
+    }
+    // Pulled up onto a ledge (a hoist, a hop or a running jump that catches one) he reaches into the cell ahead:
+    // with an electric wall there, only while that is off
+    for (NavEdge& e : edges)
+    {
+        const NavNode& a = mNodes[e.mFrom];
+        const NavNode& b = mNodes[e.mTo];
+        s32 dir = 0;
+        if (e.mKind == EdgeKind::eHoistUp && e.mFeature >= 0 && mInput.mFeatures[e.mFeature].mDir != 2)
+        {
+            dir = mInput.mFeatures[e.mFeature].mDir == 0 ? -1 : 1;
+        }
+        else if ((e.mKind == EdgeKind::eHop || e.mKind == EdgeKind::eRunJump) && b.mY < a.mY - 20)
+        {
+            dir = e.mLeft ? -1 : 1;
+        }
+        if (dir != 0)
+        {
+            const s32 fence = BarrierBetween(b.mX, b.mX + dir * GridStep(b.mHalf), b.mY, b.mHalf);
+            if (fence >= 0 && !mInput.mFeatures[fence].mSolid)
+            {
+                e.mFence = fence;
+            }
         }
     }
     std::stable_sort(edges.begin(), edges.end(), [](const NavEdge& a, const NavEdge& b)
