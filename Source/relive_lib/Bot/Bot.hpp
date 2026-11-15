@@ -195,6 +195,15 @@ public:
     {
         return !mOnlyEdges.empty();
     }
+    // The power to go unseen is not chanted for on the way: the task at hand does that itself, where it wants it
+    void HoldInvis(bool hold)
+    {
+        mHoldInvis = hold;
+    }
+    bool HoldsInvis() const
+    {
+        return mHoldInvis;
+    }
     // The frame Abe was last where a Scrab that waits before it strikes could see him (0: never). For 210 frames
     // after that it is still after him, and strikes without waiting (Scrab::Brain_1_ChasingEnemy).
     u32 SeenByScrabAt() const
@@ -397,6 +406,7 @@ private:
     bool mInvisChantNow = false;
     bool mInvisChantSoon = false;
     bool mInvisAtOnce = false;
+    bool mHoldInvis = false;
     u32 mUnseenUse = 0;
     // The path for which why no way out is known has been logged
     s32 mWhyNoWayOut = -1;

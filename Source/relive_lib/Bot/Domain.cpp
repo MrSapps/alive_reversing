@@ -29,6 +29,8 @@ const char* EntityKindName(EntityKind kind)
         case EntityKind::eRockSack: return "RockSack";
         case EntityKind::eDrill: return "Drill";
         case EntityKind::eMineCar: return "MineCar";
+        case EntityKind::eParamite: return "Paramite";
+        case EntityKind::eFootSwitch: return "FootSwitch";
     }
     return "?";
 }
@@ -1298,6 +1300,9 @@ bool Domain::PlanTogether(const NavGraph& nav, const World& world, const Entity&
     return true;
 }
 
+// The frames of the power to go unseen that a lock guarded by Fleeches is slapped and left with
+static const s32 kUnseenUse = 150;
+
 // What a throw through a running drill is taken to cost over one with nothing in the way: more than going round
 // to its lever
 static const s32 kPastDrillCost = 2500;
@@ -1964,6 +1969,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                             }
                         }
                     }
+                    bool watchedOrb = false;
                     // At a place a Slig watches, a security orb on its screen (no chant there, so it is not taken
                     // over): unseen (the Mudanchee trial: "turn invisible and climb up. Go right and slap the 2
                     // Ghost Locks")
@@ -1984,9 +1990,12 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                                                       (nav.CameraOf(orb.mX1, orb.mY1) == nav.CameraOf(slig.mX, slig.mY - 5) || nav.CameraOf(orb.mX1, orb.mY1) == nav.CameraOf(at.mX, at.mY - 5)));
                             }
                         }
+                        // (taking it over from the next screen, which has no orb, was tried: its beat has it
+                        // there some 50 frames at a time, and a chant needs more)
                         if (watched)
                         {
                             pre.push_back({Key::kInvisNow, 1});
+                            watchedOrb = true;
                         }
                     }
                     // (one that opens such a gate by way of something else, a timer in the Mudanchee vault's path 4,
@@ -2002,6 +2011,25 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                         gives.push_back({Key::kInvisNow, 1});
                     }
                     add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on", pre, gives, 150, step);
+                    // A lock Fleeches guard: unseen they do not find him at it. The Mudanchee trial's last: its
+                    // door takes a while to open after the slap, the Fleeches of its room wake as he comes and
+                    // walk their ledges, and take no notice of him unseen, or seen but quiet on the floor below.
+                    // (with enough of the power's time left for the way there, the slap and the way down: some
+                    // 170 frames, measured there)
+                    if (!guards.empty() && !watchedOrb && !(entity.mKind == EntityKind::eSlapLock && entity.mInputs[0] > 0) &&
+                        (world.mInvisCharge || world.mInvisComing || !world.mInvisible || world.mInvisLeft >= kUnseenUse))
+                    {
+                        std::vector<Goap::Fact> unseenPre;
+                        for (const Goap::Fact& f : pre)
+                        {
+                            if (std::find(guards.begin(), guards.end(), f) == guards.end())
+                            {
+                                unseenPre.push_back(f);
+                            }
+                        }
+                        unseenPre.push_back({Key::kInvisNow, 1});
+                        add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on unseen", unseenPre, gives, 450, step);
+                    }
                     if (lure.mFound)
                     {
                         DomainStep lead;
@@ -2039,6 +2067,60 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                                 leadGives.push_back({Key::Mud(f), 2});
                             }
                             add("Let the Fleeches out with " + name + " and lead them to Scrab#" + std::to_string(led.mScrab), leadPre, leadGives, 1500, lead);
+                        }
+                    }
+                    // Or a Paramite of the floor under a ring pulls it: taken over from a place on its screen that is
+                    // not on its level (alone it keeps off him, but cornered it strikes), where no orb stops the
+                    // chant. The Mudomo vaults' way with every ring that hangs over a pit.
+                    if (entity.mKind == EntityKind::ePullRing)
+                    {
+                        const NavNode& under = nav.Nodes()[node];
+                        const s32 scale = under.mHalf ? 2 : 1;
+                        const s32 cam = nav.CameraOf(under.mX, under.mY - 5);
+                        bool orb = false;
+                        for (const Entity& o : world.mEntities)
+                        {
+                            orb = orb || (o.mKind == EntityKind::eSecurityOrb && !o.mGone && nav.CameraOf(o.mX1, o.mY1) == cam);
+                        }
+                        for (const Entity& para : world.mEntities)
+                        {
+                            // (one that walks its floor: one up a web is not there to be taken over)
+                            if (orb || para.mKind != EntityKind::eParamite || para.mGone || para.mHalf != entity.mHalf || para.mInputs[0] != 0)
+                            {
+                                continue;
+                            }
+                            s32 px = para.CentreX();
+                            s32 py = para.mY2;
+                            for (const ParamiteAt& live : world.mParamites)
+                            {
+                                if (live.mId == para.mId)
+                                {
+                                    px = live.mX;
+                                    py = live.mY;
+                                }
+                            }
+                            const s32 at = nav.NodeAt(px, py, para.mHalf, 30);
+                            if (at < 0 || nav.Nodes()[at].mLine != under.mLine || nav.CameraOf(px, py - 5) != cam || WallBetween(nav, px, under.mX, under.mY, under.mHalf) || GateBetween(nav, world, px, under.mX, under.mY, under.mHalf))
+                            {
+                                continue;
+                            }
+                            std::set<s32> from;
+                            for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+                            {
+                                const NavNode& spot = nav.Nodes()[n];
+                                if (spot.mLow || spot.mHazard || spot.mHalf || nav.CameraOf(spot.mX, spot.mY - 5) != cam || std::abs(spot.mY - under.mY) * scale <= 45 || !from.insert(d.mRegions[n]).second)
+                                {
+                                    continue;
+                                }
+                                DomainStep pull;
+                                pull.mKind = StepKind::eParamitePull;
+                                pull.mEntity = entity.mId;
+                                pull.mOther = para.mId;
+                                pull.mEdge = static_cast<s32>(n);
+                                // (not with the power to go unseen in hand: the chant would spend it)
+                                std::vector<Goap::Fact> pullPre{regionFact(static_cast<s32>(n)), {key, 0}, {Key::kInvisNow, 0}};
+                                add("Have Paramite#" + std::to_string(para.mId) + " pull " + name + " from " + std::to_string(spot.mX) + "," + std::to_string(spot.mY), pullPre, gives, 700, pull);
+                            }
                         }
                     }
                 }

@@ -59,6 +59,8 @@ enum class StepKind : u8
                 // stamp on them, then leave it where a gate can be shut on it and let it go
     eScrabLure, // get the Scrabs of a floor to run off its end: up the hoist to the cell mEdge, seen, down to hang
                 // from it while they run at him and over the edge, and up again
+    eParamitePull, // take over Paramite mOther from the cell mEdge, walk it under pull ring mEntity, have it pull
+                // the ring and let it go
     eFleechLure, // lead the Fleeches that guard entity mEntity off and use it
     eFleechLead, // let Fleeches out with the lever mEntity, lead them to where they drop to a Scrab and kill them with it
     eScrabPen,  // work lever mEntity so that the gate it moves (feature mOther) is shut with every Scrab of that

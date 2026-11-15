@@ -511,13 +511,13 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         const NavNode& from = nav.Nodes()[cur];
         // (the rings of the lock just slapped still on their way to him, and the step at hand wants him unseen:
         // they are waited for here, where it is safe to chant)
-        if (w.mInvisComing && !w.mInvisCharge && !w.mInvisible && bot.InvisAtOnce() && mInvisWaits < 120)
+        if (w.mInvisComing && !w.mInvisCharge && !w.mInvisible && bot.InvisAtOnce() && mInvisWaits < 120 && !bot.HoldsInvis())
         {
             mInvisWaits++;
             mSteps--;
             return TaskStep::Do(Prim::Wait(2));
         }
-        if (w.mInvisCharge && !w.mInvisible && mInvisChants < 30)
+        if (w.mInvisCharge && !w.mInvisible && mInvisChants < 30 && !bot.HoldsInvis())
         {
             const s32 scale = from.mHalf ? 2 : 1;
             bool near = false;
@@ -636,6 +636,48 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 {
                     bot.Log("a Fleech awake under this ledge: waiting for it to start up before leaving");
                 }
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+        }
+    }
+    // A Slog awake under the ledge he is about to leave: it leaps up at him, 24 frames at a time in which it does
+    // nothing else, and he is down and at a run in as many. So he faces the way he goes and leaves as it leaps.
+    // (Slog.cpp: under him it leaps or looks up by turns; once he is within 50 pixels of its floor it comes for him
+    // at once if it stands idle. Measured in the Mudanchee trial: left as it stood, it had him as he landed.)
+    {
+        const NavNode& from = nav.Nodes()[cur];
+        const NavNode& down = nav.Nodes()[first.mTo];
+        const s32 scale = from.mHalf ? 2 : 1;
+        const bool leaves = (first.mKind == EdgeKind::eFall || first.mKind == EdgeKind::eHop) && (down.mY - from.mY) * scale > 40;
+        const SlogAt* under = nullptr;
+        for (const SlogAt& slog : bot.GetWorld().mSlogs)
+        {
+            // (not in flight from another: that run is not stopped for this one)
+            if (leaves && !mHurry && (mSlogWaits > 0 || abe.Settled()) && !slog.mAsleep && from.mHalf == abe.mHalfScale && std::abs(slog.mY - down.mY) * scale <= 30 && std::abs(slog.mX - from.mX) * scale <= 80 && std::abs(slog.mX - down.mX) * scale <= 200)
+            {
+                under = &slog;
+            }
+        }
+        if (under && mSlogWaits < 400)
+        {
+            // (Motion_19_JumpUpwards)
+            const bool up = under->mMotion == 19;
+            const bool begins = up && !mSlogUp;
+            mSlogUp = up;
+            if (mSlogWaits++ == 0)
+            {
+                bot.Log("a Slog awake under this ledge: leaving as it leaps up");
+                // (not on the leap it is in the middle of)
+                mSlogUp = true;
+            }
+            if (first.mKind == EdgeKind::eHop && abe.Settled() && abe.mFacingLeft != first.mLeft)
+            {
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(1, first.mLeft ? Btn::eLeft : Btn::eRight));
+            }
+            if (!begins || !abe.Settled())
+            {
                 mSteps--;
                 return TaskStep::Do(Prim::Wait(1));
             }
@@ -1065,6 +1107,10 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     return TaskStep::Do(Prim::RunRoll(to.mX - way * 3 * cell, to.mX));
                 }
             }
+            if (mQuiet && !bot.GetWorld().mInvisible)
+            {
+                return TaskStep::Do(Prim::MoveTo(to.mX, Gait::eSneak));
+            }
             if (outrun || mHurry || fleech || (flier && !sneak))
             {
                 gait = Gait::eRun;
@@ -1112,7 +1158,28 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 // (the pace the timing was worked out for)
                 gait = Gait::eWalk;
             }
-            return TaskStep::Do(Prim::MoveTo(to.mX, gait));
+            s32 moveX = to.mX;
+            // (and on to the plate of a teleporter that is next, if it is the cell after: stopped for at the
+            // edge of its box and walked onto it is 11 frames more)
+            if (bot.GetWorld().mInvisible && last + 1 < path.size() && nav.Edges()[path[last + 1]].mKind == EdgeKind::eTeleport && nav.Edges()[path[last + 1]].mFeature >= 0)
+            {
+                const NavFeature& tele = nav.Input().mFeatures[nav.Edges()[path[last + 1]].mFeature];
+                for (const Entity& e : bot.GetWorld().mEntities)
+                {
+                    if (e.mKind == EntityKind::eFootSwitch && e.mHalf == tele.mHalf && tele.Contains(e.CentreX(), std::min(e.mY2 - 2, tele.mY2)) && e.mY2 <= tele.mY2 + 12 &&
+                        (e.CentreX() - to.mX) * (first.mLeft ? -1 : 1) > 0 && std::abs(e.CentreX() - to.mX) <= cell + 2 && nav.NodeAt(e.CentreX(), to.mY, to.mHalf, 5) >= 0)
+                    {
+                        moveX = nav.Nodes()[nav.NodeAt(e.CentreX(), to.mY, to.mHalf, 5)].mX;
+                    }
+                }
+            }
+            Prim move = Prim::MoveTo(moveX, gait);
+            // Unseen the clock is running: a stretch of four cells or six from a stand is run and slid to a stop
+            {
+                const s32 cells = std::abs(moveX - abe.mX) / cell;
+                move.mSlide = gait == Gait::eRun && bot.GetWorld().mInvisible && abe.mMove == Move::eIdle && abe.Settled() && std::abs(abe.mX - here.mX) <= 2 && cells >= 4 && cells <= 8 && cells % 2 == 0;
+            }
+            return TaskStep::Do(move);
         }
 
         case EdgeKind::eFall:
@@ -1411,6 +1478,14 @@ static std::unique_ptr<GoToTask> GoToNode(s32 node)
 {
     return std::make_unique<GoToTask>("GoTo node", [node](s32 n)
                                       { return n == node; });
+}
+
+ClearSligTask::~ClearSligTask()
+{
+    if (mHeld)
+    {
+        mHeld->HoldInvis(false);
+    }
 }
 
 DisarmTask::~DisarmTask() = default;
@@ -2722,6 +2797,179 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
             slig = nullptr;
         }
     }
+    // Unseen it watches nothing
+    if (mPhase == 0 && world.mInvisible && mPerch == 0)
+    {
+        slig = nullptr;
+    }
+    // With the power to go unseen in hand, or its rings on their way: used as late as can be. It lasts some 440
+    // frames, and what the Mudanchee trial has him do unseen takes all of them. So to the last cell of the way
+    // that is off the Slig's level, there until its back is turned for long enough, then on to the last cell
+    // before its beat and unseen from there.
+    if (mPhase == 0 && (slig || mPerch != 0) && mPerch != 5 && entity)
+    {
+        const auto release = [&]()
+        {
+            bot.HoldInvis(false);
+            mHeld = nullptr;
+            mGo.reset();
+            mPerch = 5;
+        };
+        if (mPerch == 0)
+        {
+            const s32 useNode = Domain::UseNode(nav, *entity, nullptr);
+            std::vector<s32> way;
+            mPerchNode = -1;
+            mFootNode = bot.AbeNode();
+            if ((world.mInvisCharge || world.mInvisComing) && !world.mInvisible && slig->mBeatMax > slig->mBeatMin && bot.AbeNode() >= 0 && useNode >= 0 &&
+                std::abs(abe.mY - slig->mY) > 45 && nav.FindPath(bot.AbeNode(), useNode, bot.EdgeCostFn(), way))
+            {
+                s32 frames = 0;
+                for (s32 edge : way)
+                {
+                    const NavEdge& e = nav.Edges()[edge];
+                    const NavNode& to = nav.Nodes()[e.mTo];
+                    const bool level = to.mHalf == slig->mHalf && std::abs(to.mY - slig->mY) <= 45;
+                    // (it turns a cell and a half short of the ends of its zone: measured, at 1437 and 1637 in
+                    // a zone from 1400 to 1676)
+                    if (level && to.mX >= slig->mBeatMin + 30 && to.mX <= slig->mBeatMax - 30)
+                    {
+                        break;
+                    }
+                    // (measured: a hoist is 60 frames, a hop with the turn to it 40, a cell walked 9)
+                    const s32 cells = std::max(1, std::abs(to.mX - nav.Nodes()[e.mFrom].mX) / NavGraph::GridStep(to.mHalf));
+                    frames += e.mKind == EdgeKind::eHoistUp ? 60 : e.mKind == EdgeKind::eHop ? 40 : e.mKind == EdgeKind::eWalk ? 9 * cells : 2 * Domain::RunFrames(nav, e);
+                    if (level)
+                    {
+                        mPerchNode = e.mTo;
+                        mPerchFrames = frames;
+                    }
+                    else if (mPerchNode < 0)
+                    {
+                        mFootNode = e.mTo;
+                        frames = 0;
+                    }
+                }
+            }
+            if (mPerchNode < 0)
+            {
+                mPerch = 5;
+            }
+            else
+            {
+                bot.HoldInvis(true);
+                mHeld = &bot;
+                mPerch = 1;
+                mPerchWaits = 0;
+                mGo = GoToNode(mFootNode);
+                bot.Log("the power to go unseen is kept until " + std::to_string(nav.Nodes()[mPerchNode].mX) + "," + std::to_string(nav.Nodes()[mPerchNode].mY) + ", the last cell before the Slig's beat (" + std::to_string(slig->mBeatMin) + " to " + std::to_string(slig->mBeatMax) + "): to " +
+                        std::to_string(nav.Nodes()[mFootNode].mX) + "," + std::to_string(nav.Nodes()[mFootNode].mY) + " first");
+            }
+        }
+        if (mPerch == 1 || mPerch == 3)
+        {
+            TaskStep step;
+            if (!RunGo(mGo, bot, lastFailed, step))
+            {
+                return step;
+            }
+            if (step.mKind == TaskStep::Kind::eFailed)
+            {
+                bot.Log("not got there: " + step.mWhy);
+                release();
+            }
+            else
+            {
+                mPerch++;
+            }
+        }
+        if (mPerch == 2)
+        {
+            // Until it can't see that cell for as long as the way there and the chant take
+            const NavNode& perch = nav.Nodes()[mPerchNode];
+            s32 perchX1 = perch.mX;
+            s32 perchX2 = perch.mX;
+            const s32 perchCam = nav.CameraOf(perch.mX, perch.mY - 5);
+            while (perchX1 > perch.mX - 2000 && nav.CameraOf(perchX1 - 25, perch.mY - 5) == perchCam)
+            {
+                perchX1 -= 25;
+            }
+            while (perchX2 < perch.mX + 2000 && nav.CameraOf(perchX2 + 25, perch.mY - 5) == perchCam)
+            {
+                perchX2 += 25;
+            }
+            const SligAt* watcher = slig ? slig : Watcher(world, x, y, entity->mHalf);
+            // (it sees him there when it is on that screen and faces him. It walks 2.7 pixels a frame and is some
+            // 10 frames turning: measured.)
+            s32 left = 0;
+            if (watcher)
+            {
+                const s32 turnLo = watcher->mBeatMin + 37;
+                const s32 turnHi = watcher->mBeatMax - 37;
+                const bool perchLeft = perch.mX < watcher->mX;
+                if (watcher->mFacingLeft == perchLeft)
+                {
+                    // Coming this way: when it is on his screen
+                    left = perchLeft ? std::max(0, watcher->mX - (perchX2 + 25)) * 10 / 27 : std::max(0, (perchX1 - 25) - watcher->mX) * 10 / 27;
+                }
+                else if (perchLeft)
+                {
+                    left = (std::max(0, turnHi - watcher->mX) + std::max(0, turnHi - (perchX2 + 25))) * 10 / 27 + 10;
+                }
+                else
+                {
+                    left = (std::max(0, watcher->mX - turnLo) + std::max(0, (perchX1 - 25) - turnLo)) * 10 / 27 + 10;
+                }
+            }
+            // (and the chant: he is unseen some 15 frames into it)
+            const s32 need = mPerchFrames + 25;
+            // (and the rings there by then)
+            if (!watcher || left < need || !world.mInvisCharge)
+            {
+                if (++mPerchWaits > 900)
+                {
+                    bot.Log("the Slig's back was never turned for long enough: unseen from here");
+                    release();
+                }
+                else
+                {
+                    return TaskStep::Do(Prim::Wait(1));
+                }
+            }
+            else
+            {
+                bot.Log("the Slig can't see " + std::to_string(perch.mX) + "," + std::to_string(perch.mY) + " for " + std::to_string(left) + " frames, " + std::to_string(need) + " are needed: there now");
+                mPerch = 3;
+                mGo = GoToNode(mPerchNode);
+                mGo->SetHurry(true);
+                TaskStep step;
+                if (!RunGo(mGo, bot, lastFailed, step))
+                {
+                    return step;
+                }
+            }
+        }
+        if (mPerch == 4)
+        {
+            if (!world.mInvisible && world.mInvisCharge && ++mPerchWaits < 1100)
+            {
+                return TaskStep::Do(Prim::Wait(1, Btn::eChant));
+            }
+            // (on his feet again first: what comes next is a run from a stand)
+            // (the chant's own motion shows a frame or two after the button)
+            if (world.mInvisible && (++mPerchStand <= 3 || abe.mMove != Move::eIdle || !abe.Settled()) && mPerchStand < 60)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            bot.Log("unseen from " + std::to_string(abe.mX) + "," + std::to_string(abe.mY));
+            release();
+            return mInner->Next(bot, "");
+        }
+        if (mPerch == 5 && world.mInvisible)
+        {
+            slig = nullptr;
+        }
+    }
     if (mPhase == 0)
     {
         if (!slig)
@@ -2743,8 +2991,9 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
             return node.mHalf == half && std::abs(node.mY - sligY) > 45 && graph->CameraOf(node.mX, node.mY - 5) == cam;
         };
         // Only a spot close by: a long way round leads past whatever else is about
+        // (and not with the power to go unseen in hand: the chant would spend that and take no Slig)
         std::vector<s32> way;
-        bool close = !orb && bot.AbeNode() >= 0 && nav.FindPath(bot.AbeNode(), spot, bot.EdgeCostFn(), way);
+        bool close = !orb && !world.mInvisCharge && !world.mInvisComing && !world.mInvisible && bot.AbeNode() >= 0 && nav.FindPath(bot.AbeNode(), spot, bot.EdgeCostFn(), way);
         for (s32 edge : way)
         {
             close = close && std::abs(nav.Nodes()[nav.Edges()[edge].mTo].mX - x) < 600;
@@ -4723,6 +4972,129 @@ TaskStep ScrabKillTask::Next(Bot& bot, const std::string& lastFailed)
     return TaskStep::Failed("lost its place");
 }
 
+TaskStep ParamitePullTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const Entity* ring = world.Find(mRing);
+    if (!ring)
+    {
+        return TaskStep::Failed("no such ring");
+    }
+    if (mWas < 0)
+    {
+        mWas = world.Switch(ring->mSwitch);
+    }
+    const ParamiteAt* me = nullptr;
+    for (const ParamiteAt& paramite : world.mParamites)
+    {
+        me = paramite.mPossessed ? &paramite : me;
+    }
+    if (++mFrames > 3000)
+    {
+        return TaskStep::Failed("the Paramite took too long");
+    }
+    const bool pulled = world.Switch(ring->mSwitch) != mWas;
+    switch (mPhase)
+    {
+        case 0:
+        {
+            if (!mGo)
+            {
+                mGo = GoToNode(mSpot);
+            }
+            TaskStep step;
+            if (!RunGo(mGo, bot, lastFailed, step))
+            {
+                return step;
+            }
+            if (step.mKind == TaskStep::Kind::eFailed)
+            {
+                return step;
+            }
+            mPhase = 1;
+            mFrames = 0;
+            bot.Log("chanting to take over a Paramite for the ring at " + std::to_string(ring->CentreX()) + "," + std::to_string(ring->mY1));
+            return TaskStep::Do(Prim::Wait(2));
+        }
+        case 1:
+            if (me)
+            {
+                mPhase = 2;
+                bot.Log("in the Paramite at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": under the ring at " + std::to_string(ring->CentreX()));
+                return TaskStep::Do(Prim::Wait(4));
+            }
+            if (mFrames > 400)
+            {
+                return TaskStep::Failed("no Paramite was taken over");
+            }
+            return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+        case 2:
+        case 3:
+        {
+            if (pulled)
+            {
+                bot.Log("the ring is pulled: letting the Paramite go");
+                mPhase = 4;
+                mFrames = 0;
+                return TaskStep::Do(Prim::Wait(4));
+            }
+            if (!me)
+            {
+                return TaskStep::Failed("lost the Paramite");
+            }
+            // (Paramite.hpp: motion 0 stands. It walks a cell at a time while a way is held and stops on the
+            // next one when let go; the ring has to be straight over it.)
+            const s32 dx = ring->CentreX() - me->mX;
+            const s32 cell = NavGraph::GridStep(me->mHalf);
+            if (std::abs(dx) > cell + cell / 2)
+            {
+                return TaskStep::Do(Prim::Wait(2, dx > 0 ? Btn::eRight : Btn::eLeft));
+            }
+            if (me->mMotion != 0)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            if (std::abs(dx) > cell / 2)
+            {
+                return TaskStep::Do(Prim::Wait(2, dx > 0 ? Btn::eRight : Btn::eLeft));
+            }
+            if (mPhase == 2)
+            {
+                mPhase = 3;
+                bot.Log("the Paramite is under the ring at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": up at it");
+            }
+            if (++mPulls > 8)
+            {
+                return TaskStep::Failed("the Paramite could not pull the ring");
+            }
+            // (up jumps it at the ring; it hangs on a moment and the switch is set as it lets go)
+            return TaskStep::Do(Prim::Wait(mPulls % 2 ? 3 : 40, mPulls % 2 ? static_cast<u32>(Btn::eUp) : 0u));
+        }
+        case 4:
+            if (!me)
+            {
+                mPhase = 5;
+                mFrames = 0;
+                return TaskStep::Do(Prim::Wait(2));
+            }
+            // (on its feet first: it is let go from a stand, the chant held for a second)
+            if (me->mMotion != 0 && mFrames < 60)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+        case 5:
+            // (he takes no input until he is out of the chant)
+            if (!bot.Abe().Settled() && mFrames < 200)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            return pulled ? TaskStep::Done() : TaskStep::Failed("the ring was not pulled");
+    }
+    return TaskStep::Failed("lost its place");
+}
+
 ScrabHuntTask::~ScrabHuntTask() = default;
 
 // How many ways on and off its floor the stretch of it about x has, between the gates either side
@@ -5067,7 +5439,7 @@ bool SlogGuardTask::Find(const Bot& bot, Setup& setup)
         }
     }
     // Or the place they are let out of, its switch on or about to be
-    for (const std::array<s32, 3>& spawner : world.mSlogSpawners)
+    for (const std::array<s32, 4>& spawner : world.mSlogSpawners)
     {
         if (std::abs(spawner[1] - at.mY) <= 30 && std::abs(spawner[0] - at.mX) < 700 && spawner[2] > 1 && (world.Switch(spawner[2]) != 0 || world.mSoonOn == spawner[2]) &&
             Domain::GateBetween(nav, world, spawner[0], at.mX, at.mY, at.mHalf))
@@ -5163,6 +5535,12 @@ TaskStep SlogGuardTask::Next(Bot& bot, const std::string& lastFailed)
     {
         if (mPhase == 5)
         {
+            // (he is a good two seconds coming out of the chant, and takes no input until then: what is asked of
+            // him before that goes nowhere and is taken for a way that is shut)
+            if (!bot.Abe().Settled() && ++mBack < 200)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
             return TaskStep::Done();
         }
         return TaskStep::Failed("the Slig is gone");
@@ -5209,6 +5587,35 @@ TaskStep SlogGuardTask::Next(Bot& bot, const std::string& lastFailed)
             nearest = gap;
         }
     }
+    // How many the spawner on this floor has in it, and how many have come out (each is seen where it comes out
+    // before it runs: SlogSpawner.cpp makes them a good many frames apart)
+    s32 holds = 0;
+    {
+        s32 atSpawner = 0;
+        for (const std::array<s32, 4>& spawner : world.mSlogSpawners)
+        {
+            if (std::abs(spawner[1] - floorY) > 30 || (spawner[0] - abe.mX) * mSetup.mSide <= 0 || std::abs(spawner[0] - abe.mX) > 900)
+            {
+                continue;
+            }
+            holds = spawner[3];
+            for (const SlogAt& slog : world.mSlogs)
+            {
+                atSpawner += std::abs(slog.mY - floorY) <= 30 && std::abs(slog.mX - spawner[0]) <= 30 ? 1 : 0;
+            }
+        }
+        if (mAtSpawner < 0)
+        {
+            // (the ones that came out before he looked: all that are up on that side of him)
+            for (const SlogAt& slog : world.mSlogs)
+            {
+                mCameOut += !slog.mAsleep && std::abs(slog.mY - floorY) <= 30 && (slog.mX - abe.mX) * mSetup.mSide > 0 && std::abs(slog.mX - abe.mX) <= 900 ? 1 : 0;
+            }
+            mAtSpawner = atSpawner;
+        }
+        mCameOut += std::max(0, atSpawner - mAtSpawner);
+        mAtSpawner = atSpawner;
+    }
     const u32 forward = mSetup.mSide > 0 ? Btn::eRight : Btn::eLeft;
     const bool facing = me->mFacingLeft == (mSetup.mSide < 0);
     const s32 short_ = (post - me->mX) * mSetup.mSide;
@@ -5250,9 +5657,11 @@ TaskStep SlogGuardTask::Next(Bot& bot, const std::string& lastFailed)
             return TaskStep::Do(Prim::Wait(4, forward));
         }
         mQuiet = any ? 0 : mQuiet + 4;
-        if ((mShot > 0 && mQuiet > 160) || mFrames > 4000)
+        // (all the spawner holds have come out and none is left: no more will. Else a good while with none.)
+        const bool allOut = holds > 0 && mCameOut >= holds && mQuiet > 12;
+        if ((mShot > 0 && (mQuiet > 160 || allOut)) || mFrames > 4000)
         {
-            bot.Log("no more Slogs: " + std::to_string(mShot) + " bursts shot, the Slig is burst");
+            bot.Log("no more Slogs: " + std::to_string(mShot) + " bursts shot, " + std::to_string(mCameOut) + " seen to come out of " + std::to_string(holds) + ", the Slig is burst");
             mPhase = 5;
             mFrames = 0;
         }
@@ -5275,6 +5684,48 @@ TaskStep SlogFleeTask::Next(Bot& bot, const std::string& lastFailed)
     // At a run, the way held from the air on, until the way off is a couple of cells ahead: the rest is the
     // pilot's (which would walk a stretch this short from a standstill)
     const s32 ahead = mLeft ? abe.mX - mFromX : mFromX - abe.mX;
+    // A teleporter a foot switch sets off: run over, not stopped on. It takes him from wherever he is by then, and
+    // the stop is what the Slog catches him in (the Mudanchee trial: stopped a cell short of the plate out of a
+    // run that looks every other cell, a step to the plate, and bitten there).
+    if (mThrough < 0)
+    {
+        mThrough = 0;
+        const NavGraph& nav = bot.Nav();
+        for (const NavEdge& e : nav.Edges())
+        {
+            if (e.mTo != mRefuge || e.mKind != EdgeKind::eTeleport || std::abs(nav.Nodes()[e.mFrom].mX - mFromX) > 2)
+            {
+                continue;
+            }
+            const NavNode& plate = nav.Nodes()[e.mFrom];
+            for (const Entity& thing : bot.GetWorld().mEntities)
+            {
+                if (thing.mKind == EntityKind::eFootSwitch && thing.mHalf == plate.mHalf && plate.mX >= thing.mX1 && plate.mX <= thing.mX2 && std::abs(thing.mY2 - plate.mY) <= 30)
+                {
+                    mThrough = 1;
+                }
+            }
+        }
+    }
+    if (mThrough == 1 && !mGo)
+    {
+        const NavNode& there = bot.Nav().Nodes()[mRefuge];
+        const bool taken = std::abs(abe.mY - there.mY) <= 30 && std::abs(abe.mX - there.mX) <= 40;
+        // (the run kept up until it has: some 13 frames after the switch, measured, and what he arrives in is what
+        // he was in)
+        if (!taken && ahead > -150 && ++mHeld < 260)
+        {
+            return TaskStep::Do(Prim::Wait(1, (mLeft ? Btn::eLeft : Btn::eRight) | Btn::eRun));
+        }
+        if (taken)
+        {
+            // (still at a run there: what comes next goes on from it. A stop would cost what the run over the
+            // plate saved.)
+            return TaskStep::Done();
+        }
+        // (past it and still here: the old way, back to the plate)
+        mThrough = 0;
+    }
     // (a run looks at what is held every other cell, and with nothing held there slides two cells to a stop: so
     // let go once the look four cells short is past, for the one two cells short. Measured: let go a frame after
     // that one he ran on to the next and stood two cells too far.)
@@ -7020,8 +7471,10 @@ ScrabWaryTask::Stint ScrabWaryTask::Plan(const Bot& bot, s32 cur, s32 target, bo
         }
     }
     // A way that will do at its best moment, but not now: if another that sets out from here will do now, that is
-    // the one (the Mudanchee trial: the Fleeches at him on the ledge leave no time to wait for the first)
-    if (!best && stint.mFound && stint.mFirst >= 0 && Spare(bot, stint, hot, false) < kWaryLeast)
+    // the one (the Mudanchee trial: the Fleeches at him on the ledge leave no time to wait for the first). Only
+    // with something after him where he waits: else the wait costs nothing, and the other way may be a crossing
+    // to another ledge that gets him no nearer (Mudanchee vault path 5: to and fro over the floor for ever).
+    if (!best && !bot.GetWorld().mFleechesAwake.empty() && stint.mFound && stint.mFirst >= 0 && Spare(bot, stint, hot, false) < kWaryLeast)
     {
         // (leaving out only the step that goes on from where each came onto its floor, as below)
         std::set<s32> others;

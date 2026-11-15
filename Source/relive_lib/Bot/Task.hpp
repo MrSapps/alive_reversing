@@ -222,6 +222,11 @@ public:
         mTopGait = gait;
     }
     // Run whatever is about: for getting away from what has already seen or heard him
+    // Seen, every step of it is sneaked: for a wait with Fleeches about that have taken no notice of him
+    void SetQuiet(bool quiet)
+    {
+        mQuiet = quiet;
+    }
     void SetHurry(bool hurry)
     {
         mHurry = hurry;
@@ -241,6 +246,7 @@ private:
     std::string mName;
     std::function<bool(s32)> mIsGoal;
     Gait mTopGait = Gait::eRun;
+    bool mQuiet = false;
     s32 mLastEdge = -1;
     s32 mReflexes = -1;
     bool mHurry = false;
@@ -263,6 +269,9 @@ private:
     s32 mGhostWaits = 0;
     bool mChaseLogged = false;
     s32 mLureWaits = 0;
+    // Frames waited for a Slog under the ledge to leap up, and whether it was in the air the frame before
+    s32 mSlogWaits = 0;
+    bool mSlogUp = false;
     s32 mUnseenWaits = 0;
     // Chants made to go invisible
     s32 mInvisChants = 0;
@@ -569,6 +578,7 @@ public:
         task->mAmbush = true;
         return task;
     }
+    ~ClearSligTask() override;
     std::string Name() const override
     {
         return mInner ? mInner->Name() : "Take over the Slig that woke";
@@ -623,6 +633,15 @@ private:
     bool mGaveUp = false;
     bool mAmbush = false;
     bool mBehind = false;
+    // The power to go unseen kept for the last cell before the Slig's beat: 0 not looked at, 1 to the last cell
+    // off its level, 2 waiting there for its back, 3 to that cell, 4 chanting, 5 done with
+    s32 mPerch = 0;
+    s32 mPerchNode = -1;
+    s32 mFootNode = -1;
+    s32 mPerchFrames = 0;
+    s32 mPerchWaits = 0;
+    s32 mPerchStand = 0;
+    Bot* mHeld = nullptr;
 };
 
 // A floor of Scrabs cleared with one of them: taken over from a ledge, it kills the other Scrabs (a howl gives it
@@ -740,6 +759,38 @@ private:
     bool mLed = false;
     s32 mNone = 0;
     std::vector<u32> mGroup;
+    std::unique_ptr<GoToTask> mGo;
+};
+
+// A ring only a Paramite gets to (it hangs over a floor Abe has no way onto, or one he would not come back from):
+// a Paramite of that floor is taken over from a place on its screen that is not on its level, walked under the
+// ring, made to jump at it (up: it hangs on and the ring's switch is set as it lets go), and let go. It lives.
+// (the walkthrough's way through the Mudomo vaults: "possess the Paramite below you and have him pull the ring,
+// then release him")
+class ParamitePullTask final : public Task
+{
+public:
+    ParamitePullTask(u32 ring, u32 paramite, s32 spot)
+        : mRing(ring)
+        , mParamite(paramite)
+        , mSpot(spot)
+    {
+    }
+    std::string Name() const override
+    {
+        return "Paramite #" + std::to_string(mParamite) + " pulls ring #" + std::to_string(mRing);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mRing;
+    u32 mParamite;
+    s32 mSpot;
+    // 0 to the spot, 1 chant, 2 under the ring, 3 pull, 4 let go, 5 himself again
+    s32 mPhase = 0;
+    s32 mFrames = 0;
+    s32 mPulls = 0;
+    s32 mWas = -1;
     std::unique_ptr<GoToTask> mGo;
 };
 
@@ -1007,6 +1058,8 @@ private:
     // Where on its floor the way off starts
     s32 mFromX = 0;
     s32 mHeld = 0;
+    // The way off is a teleporter set off by a foot switch: -1 not looked at yet, 1 run over without a stop
+    s32 mThrough = -1;
     std::unique_ptr<GoToTask> mGo;
 };
 
@@ -1049,6 +1102,11 @@ private:
     s32 mFrames = 0;
     s32 mQuiet = 0;
     s32 mShot = 0;
+    // Slogs seen to come out of the spawner, and how many stood at it the last time he looked
+    s32 mCameOut = 0;
+    s32 mAtSpawner = -1;
+    // Frames waited for Abe to be himself again after the Slig burst
+    s32 mBack = 0;
 };
 
 // Slogs that run Abe down from a floor he can't get at them on: stand where they come down to him, run back

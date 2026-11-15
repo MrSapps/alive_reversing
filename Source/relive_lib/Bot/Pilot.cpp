@@ -109,6 +109,7 @@ void Pilot::Start(const Prim& prim, const AbeState& abe)
     mFrames = 0;
     mPhase = 0;
     mStill = 0;
+    mSliding = false;
     mRolled = false;
     mAired = false;
     mStuck = 0;
@@ -509,6 +510,11 @@ PilotStatus Pilot::StepMoveTo(const AbeState& abe, u32& bits)
             {
                 bits |= Btn::eSneak;
             }
+            else if (mPrim.mGait == Gait::eRun && mPrim.mSlide && mFrames < 30 && abe.mFacingLeft == left)
+            {
+                bits |= Btn::eRun;
+                mSliding = true;
+            }
             else if (mPrim.mGait == Gait::eRun && dist2 > mKin.mRunLeave2 * grid2 / 2 + grid2)
             {
                 bits |= Btn::eRun;
@@ -524,6 +530,12 @@ PilotStatus Pilot::StepMoveTo(const AbeState& abe, u32& bits)
             // (with the sneak button too, or he comes out of the turn at a walk: that one loud step woke a
             // Fleech in Necrum's path 6)
             bits = dirBit | (mPrim.mGait == Gait::eSneak ? static_cast<u32>(Btn::eSneak) : 0u);
+            // (and with the run button for a run that starts with the turn: he goes from the turn into the run)
+            if (mPrim.mGait == Gait::eRun && mPrim.mSlide && mFrames < 30)
+            {
+                bits |= Btn::eRun;
+                mSliding = true;
+            }
             return PilotStatus::eRunning;
 
         case Move::eWalk:
@@ -549,6 +561,17 @@ PilotStatus Pilot::StepMoveTo(const AbeState& abe, u32& bits)
         case Move::eRun:
         {
             const bool movingLeft = abe.mFacingLeft;
+            if (mSliding)
+            {
+                // (held until a little under four cells are left: let go of then, the slide starts two cells
+                // short of where he is to stand. Measured: let go of 3.5 cells short it does, 2.8 short he runs
+                // two cells further.)
+                if (movingLeft == left && std::abs(dx) * 10 > 36 * (grid2 / 2))
+                {
+                    bits = dirBit | Btn::eRun;
+                }
+                return PilotStatus::eRunning;
+            }
             if (movingLeft == left && dist2 > mKin.mRunLeave2 * grid2 / 2)
             {
                 bits = dirBit | Btn::eRun;
