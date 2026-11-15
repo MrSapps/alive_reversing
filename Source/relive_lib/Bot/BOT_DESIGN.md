@@ -1149,14 +1149,41 @@ room) and wants things not built yet: see "What the Barracks still wants" below.
 - **A floor a Slig walks is dear to step onto** (`Domain::SligBeat`, `kSligBeatCost` 400 on a crossing onto
   it from off it or from another Slig's): with the wall off, the way on is along the ledge, not back down.
 
+**A Slig that stands guard** (path 1's third and fourth screens; `b1.txt` is at 0 deaths to f=2,982). It
+stands where it is put and turns by a wait the game draws (30 to 60 frames, 9 for the turn), shoots at once
+what is in front of it on its floor, and turns to any noise made on its screen (Slig.cpp: every step, run,
+roll, hop and landing of Abe's is one; a sneak, a pull up a ledge and a jump up a hoist are not). Measured:
+- Hung from the end of its floor he is not seen (the game compares the two boxes' heights, and his is under
+  the floor). Hung in front of one that walks the floor below he is: shot dead at 2137,1400.
+- A turn sees nothing; but at its fifth frame, if he is going through the Slig the way it faced, it stays as
+  it was (Brain_19 and Brain_22, `ToggleFlipX`). On its own cell he is seen as he gets there: a sneak ends a
+  pixel or two past the cell and is put back.
+- Third screen (guard at 2137,1739, the hoist behind it at 2162): rolled off the ledge above he ends hung at
+  2087 (`NavEdge::mHung`: such a fall is no landing in front of it). Up as it begins to turn its back
+  (`GoToTask::Sentry`, `TurnsFrom`, `UpBehind`: 24 frames, and no other Slig about to see: the one that walks
+  the floor below shot him from 1912 as he came up). Then a running jump from the stand that catches the
+  hoist in the third cell (`GoToTask::JumpUpPastGuard`: where the way is three cells' walk to a hoist
+  with such a guard on it; not an edge of the map), hung 11 frames after the run began, and up at once: one hit, as the
+  walkthrough has it. Paused two frames hung there he is dead.
+- Fourth screen (guard on the trap door at 1962,1400 between the hoist at 1987 and the well at 1912): hung
+  at 1987, up as it turns away, and through it at a run into the well without stopping (`Prim::RunWell`: the
+  run is heard, it turns to it, and he is in the well, where nothing hurts him, 12 frames after the run
+  began). Not hit. The walkthrough's way (over it by the ledge at 2137, the lever at 2187 that drops it
+  through the trap door, back over it) was tried by script and killed him every time after the drop: the
+  Slig then walks 1962..2112 on the floor the way back goes over, hears every jump, and sneaked behind it
+  he is some 15 frames short. So that lever is left alone while the Slig is there (Domain: a lever whose
+  timer opens a trap door under a Slig), and it is pulled from 2212, not from the cell its slam door is in
+  (`Domain::UseNode`).
+- A lift let go of between two stops stays there in AE (the ride up from 2087,1660 was cut short where the
+  screen changes): GoToTask rides on to the stop the way goes from.
+- No unit tests: the wait hung under a guard, the run into the well past it, the lift ridden on, the flee
+  that now goes where its quick way ends (`Bot::MakeFlee`). The rule that a second fall between the same
+  two cells also ends hung is not caught by its test when broken.
+
 **What the Barracks still wants** (from the walkthrough and the paths' TLVs; nothing of it is built):
-- Path 1, third screen: a Slig that stands and listens (start state `listening`, sight delay 0, turns to
-  noise) on a three-cell ledge. The way is a roll off the upper ledge that ends hung from its ledge's end
-  (falling with speed past an `edge` he grabs it), up when it has turned away, a run past it and up the hoist
-  behind it to the lift's lever. Today the bot goes to and fro on the upper ledge: the rule against landing
-  in front of a Slig that faces the landing refuses the fall while it faces left, the route flips to the
-  other way round, and flips back when the Slig turns. Then a lift, two more Sligs to pass by hanging and
-  running, a well, and a flying Slig to take over that kills Sligs with grenades and pulls a lever for him.
+- Path 1 from its fifth screen on (the first four are done, see below): a flying Slig to take over that kills
+  the Sligs above with grenades and pulls a lever for him, a Slig a trap door drops, the wheels of path 13.
+  The bot first dies there at about f=3,200 of `b1.txt`.
 - A flying Slig as a thing he flies himself (grenades, levers), a Glukkon taken over and its orders to Sligs
   (the war room), crawling Sligs and their button, grenades thrown from a boom machine on a count,
   Greeters, laughing gas, flying mines to time, a Shrykull.

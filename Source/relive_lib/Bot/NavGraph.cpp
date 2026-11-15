@@ -1254,6 +1254,7 @@ void NavGraph::Build(const NavInput& input)
                         {
                             AddEdge(edges, from, ledge, EdgeKind::eFall, 50 + drop / 4, -1, left);
                             edges.back().mCrouched = crouched;
+                            edges.back().mHung = true;
                         }
                     }
                 }
@@ -1886,6 +1887,14 @@ void NavGraph::Build(const NavInput& input)
             e.mClear = danger;
         }
     }
+    // A fall that ends hung from a ledge does so however he went off: the other falls between the same two cells
+    for (NavEdge& e : edges)
+    {
+        for (std::size_t i = 0; e.mKind == EdgeKind::eFall && !e.mHung && i < edges.size(); i++)
+        {
+            e.mHung = edges[i].mHung && edges[i].mFrom == e.mFrom && edges[i].mTo == e.mTo;
+        }
+    }
     // Pulled up onto a ledge (a hoist, a hop or a running jump that catches one) he reaches into the cell ahead:
     // with an electric wall there, only while that is off
     for (NavEdge& e : edges)
@@ -2058,7 +2067,7 @@ std::string NavGraph::Text() const
         {
             continue;
         }
-        out += std::string(EdgeKindName(e.mKind)) + " " + std::to_string(a.mX) + "," + std::to_string(a.mY) + " -> " + std::to_string(b.mX) + "," + std::to_string(b.mY) + (e.mFeature >= 0 ? " f" + std::to_string(e.mFeature) : "") + "\n";
+        out += std::string(EdgeKindName(e.mKind)) + " " + std::to_string(a.mX) + "," + std::to_string(a.mY) + " -> " + std::to_string(b.mX) + "," + std::to_string(b.mY) + (e.mFeature >= 0 ? " f" + std::to_string(e.mFeature) : "") + (e.mHung ? " hung" : "") + "\n";
     }
     for (const NavExit& x : mExits)
     {
