@@ -2,6 +2,7 @@
 
 #include "BotRng.hpp"
 #include "Checkpoint.hpp"
+#include "Lookahead.hpp"
 #include "Domain.hpp"
 #include "ThrowArc.hpp"
 #include "Profile.hpp"
@@ -39,9 +40,98 @@ enum class BotState : u8
     eStuck,   // it can't go on: see Why()
 };
 
+// What the bot remembers of the run so far: what it has seen of the world, where it has been, what it has found
+// to work and not. Looking ahead, it is put back with a save (see Lookahead): what a try that was taken back showed
+// did not happen. What it learns from failing (a throw that misses, where he keeps dying) is not here: that stays.
+struct BotMemory
+{
+    s32 mRestFrames = 0;
+    u32 mChasedFrame = 0;
+    s32 mChasedPath = -1;
+    World mWorld;
+    // How often each action has failed in all, forgiven or not
+    std::map<std::string, s32> mFailedTotal;
+    std::map<std::string, s32> mFailedActions;
+    // The plan being followed, by its actions' names, and what it is for: kept while it still holds (see Replan)
+    std::vector<std::string> mKeptPlan;
+    std::vector<Goap::Fact> mKeptGoal;
+    std::string mKeptGoalName;
+    bool mKeptForMudokon = false;
+    // How many Mudokons could be got at when it was made
+    std::size_t mKeptOpen = 0;
+    std::set<std::pair<s32, s32>> mVisitedPaths;
+    LevelGraph mLevel;
+    // (the reason there was no getting away from a woken Slig is logged once)
+    s32 mFleeWhy = 0;
+    // The levels he has been in: going back to one is not getting on
+    std::set<s32> mLevelsBeen;
+    // Switches (by path and fact key) that have changed during the run, and the one being tried now
+    std::set<std::pair<s32, u32>> mExplored;
+    // The regions (path, kRegion value) he has stood in, and how often each has been made for
+    std::set<std::pair<s32, s32>> mRegionsBeen;
+    std::map<std::pair<s32, s32>, s32> mRegionTries;
+    std::pair<s32, s32> mRegionGoal{0, 0};
+    // The path in which any path not yet visited became good enough to leave by
+    s32 mNewPathFor = -1;
+    // Where he came into the path he is in. Of two ways out to the same place, the one he has just come in by
+    // is not the one meant (a vault's own door is), until nothing else is left to try (mBackFor: in that path)
+    std::pair<s32, s32> mArrivedKey{-1, -1};
+    s32 mArrivedX = 0;
+    s32 mArrivedY = 0;
+    s32 mBackFor = -1;
+    // How often each path (level, path) has been backed out of
+    std::map<std::pair<s32, s32>, s32> mBackOuts;
+    u32 mRingDueBy = 0;
+    bool mInvisSaved = false;
+    bool mInvisChantNow = false;
+    bool mInvisChantSoon = false;
+    bool mInvisAtOnce = false;
+    bool mInvisCross = false;
+    bool mInvisRun = false;
+    bool mWasInvisible = false;
+    SligCycle mSligCycle;
+    u32 mDashUntil = 0;
+    bool mHoldInvis = false;
+    // The frame the power to go unseen was last seen in hand (0: never)
+    u32 mChargeFrame = 0;
+    u32 mUnseenUse = 0;
+    // The path for which why no way out is known has been logged
+    s32 mWhyNoWayOut = -1;
+    u32 mExploring = 0;
+    std::string mLastSligs;
+    s32 mLastAwakeSligs = 0;
+    s32 mLastMines = 0;
+    std::map<s32, s32> mBlockedWalks;
+    s32 mLastKilled = 0;
+    s32 mLastRescued = 0;
+    // What each path off the way was found to be worth, by path
+    std::map<s32, SideTrip> mSideTrips;
+    s32 mLogicWaits = 0;
+    std::map<u32, s32> mReflexTries;
+    s32 mSlogTraps = 0;
+    s32 mAmbushes = 0;
+    s32 mSlogFlees = 0;
+    s32 mSlogGuards = 0;
+    // Flying Sligs: which way along its track one was last seen to go (it stops at the ends), where the plan's next
+    // things to do are, and whether one is to be kept out of the sight of where Abe stands now
+    s32 mFlierDir = 0;
+    s32 mFlierAt = -1;
+    s32 mFlierHides = 0;
+    s32 mPerchKills = 0;
+    std::vector<SligBeat> mBeats;
+    u32 mForgaveFrame = 0;
+    // Where Abe was when an action last failed: it is left out only while he is still about there
+    std::map<std::string, std::pair<s32, s32>> mFailedWhere;
+    u32 mSeenByScrabAt = 0;
+    // By Scrab: where it was last, and the frame it came to stand there (0 while it moves or is not known to have)
+    std::map<u32, std::pair<s32, u32>> mScrabStill;
+    std::set<u32> mScrabMoved;
+    std::map<u32, std::pair<s32, s32>> mScrabBeat;
+};
+
 // Plays the game: see BOT_DESIGN.md. Updated once per main loop iteration, like Automation, and only ever acts
 // between frames by choosing the pad buttons for the next one.
-class Bot final
+class Bot final : private BotMemory
 {
 public:
     Bot();
@@ -390,13 +480,10 @@ private:
     // AE: hurt, between two things to do, and nothing about that could hurt him more where he stands: he waits
     // for his health to come back (180 frames after the last shot) before he goes on. A shot takes a third.
     bool Resting();
-    s32 mRestFrames = 0;
     void Stuck(const std::string& why);
     // The next task by the profile's goals. False with mState set when there's nothing more to do or no way to.
     bool Replan(BaseMap& map);
     std::unique_ptr<Task> MakeTask(const Domain& domain, const Goap::Action& action);
-    u32 mChasedFrame = 0;
-    s32 mChasedPath = -1;
 
     AbeState mAbe;
     BotRng mRng;
@@ -411,7 +498,6 @@ private:
     u32 mBits = 0;
     bool mWasDriving = false;
 
-    World mWorld;
     Profile mProfile;
     bool mAuto = false;
     // What the current task was planned as, and how often a planned action has failed
@@ -420,70 +506,17 @@ private:
     bool mTaskOptional = false;
     // Deaths while at each action
     std::map<std::string, s32> mActionDeaths;
-    // How often each action has failed in all, forgiven or not
-    std::map<std::string, s32> mFailedTotal;
-    std::map<std::string, s32> mFailedActions;
     std::string mPlanText;
-    // The plan being followed, by its actions' names, and what it is for: kept while it still holds (see Replan)
-    std::vector<std::string> mKeptPlan;
-    std::vector<Goap::Fact> mKeptGoal;
-    std::string mKeptGoalName;
-    bool mKeptForMudokon = false;
-    // How many Mudokons could be got at when it was made
-    std::size_t mKeptOpen = 0;
-    std::set<std::pair<s32, s32>> mVisitedPaths;
-    LevelGraph mLevel;
-    // (the reason there was no getting away from a woken Slig is logged once)
-    s32 mFleeWhy = 0;
-    // The levels he has been in: going back to one is not getting on
-    std::set<s32> mLevelsBeen;
-    // Switches (by path and fact key) that have changed during the run, and the one being tried now
-    std::set<std::pair<s32, u32>> mExplored;
-    // The regions (path, kRegion value) he has stood in, and how often each has been made for
-    std::set<std::pair<s32, s32>> mRegionsBeen;
-    std::map<std::pair<s32, s32>, s32> mRegionTries;
-    std::pair<s32, s32> mRegionGoal{0, 0};
-    // The path in which any path not yet visited became good enough to leave by
-    s32 mNewPathFor = -1;
-    // Where he came into the path he is in. Of two ways out to the same place, the one he has just come in by
-    // is not the one meant (a vault's own door is), until nothing else is left to try (mBackFor: in that path)
-    std::pair<s32, s32> mArrivedKey{-1, -1};
-    s32 mArrivedX = 0;
-    s32 mArrivedY = 0;
-    s32 mBackFor = -1;
-    // How often each path (level, path) has been backed out of
-    std::map<std::pair<s32, s32>, s32> mBackOuts;
-    u32 mRingDueBy = 0;
-    bool mInvisSaved = false;
-    bool mInvisChantNow = false;
-    bool mInvisChantSoon = false;
-    bool mInvisAtOnce = false;
-    bool mInvisCross = false;
-    bool mInvisRun = false;
-    bool mWasInvisible = false;
-    SligCycle mSligCycle;
-    u32 mDashUntil = 0;
-    bool mHoldInvis = false;
-    // The frame the power to go unseen was last seen in hand (0: never)
-    u32 mChargeFrame = 0;
-    u32 mUnseenUse = 0;
-    // The path for which why no way out is known has been logged
-    s32 mWhyNoWayOut = -1;
-    u32 mExploring = 0;
     s8 mLastSwitches[256] = {};
-    std::string mLastSligs;
-    s32 mLastAwakeSligs = 0;
     s32 mDeadFrames = 0;
     s32 mStartWaits = 0;
     bool mThrowPending = false;
     u32 mThrowFrame = 0;
     u32 mLastLogFrame = 0;
-    s32 mLastMines = 0;
     bool mMissRewind = false;
     s32 mMissRewinds = 0;
     bool mSweepPending = false;
     u32 mSweepFrame = 0;
-    std::map<s32, s32> mBlockedWalks;
     s32 mSweepDeaths = 0;
     s32 mSweepStopFrame = -100000;
     // Deaths per cell (x, y): the same place over and over is not a matter of luck
@@ -494,13 +527,8 @@ private:
     std::vector<ThrowArc::Point> mThrowSeen;
     s32 mCurrentEdge = -1;
     std::map<s32, s32> mEdgeDeaths;
-    s32 mLastKilled = 0;
-    s32 mLastRescued = 0;
     // Whether the run may take an exit to that path now
     bool ExitAllowed(BaseMap& map, const NavFeature& exit, bool* sideTrip);
-    // What each path off the way was found to be worth, by path
-    std::map<s32, SideTrip> mSideTrips;
-    s32 mLogicWaits = 0;
     // The human option's last dawdle, so two don't follow each other
     bool mDawdled = false;
     bool mSkipPulse = false;
@@ -511,27 +539,12 @@ private:
     std::unique_ptr<Task> mTask;
     // Something that can't wait, done before the task goes on: a wired Mudokon tagging along slapped out of it
     std::unique_ptr<Task> mReflex;
-    std::map<u32, s32> mReflexTries;
-    s32 mSlogTraps = 0;
-    s32 mAmbushes = 0;
-    s32 mSlogFlees = 0;
-    s32 mSlogGuards = 0;
-    // Flying Sligs: which way along its track one was last seen to go (it stops at the ends), where the plan's next
-    // things to do are, and whether one is to be kept out of the sight of where Abe stands now
-    s32 mFlierDir = 0;
-    s32 mFlierAt = -1;
     std::vector<s32> mPlanNodes;
     mutable std::string mFlierWhy;
     // Whether an invisible zone can be got to from a cell on foot in so many moves; way: how, cost: in about
     // how many frames
     bool ShadowNear(s32 node, s32 maxEdges, std::vector<s32>* way, s32* cost) const;
-    s32 mFlierHides = 0;
-    s32 mPerchKills = 0;
     s32 mReflexesRun = 0;
-    std::vector<SligBeat> mBeats;
-    u32 mForgaveFrame = 0;
-    // Where Abe was when an action last failed: it is left out only while he is still about there
-    std::map<std::string, std::pair<s32, s32>> mFailedWhere;
     std::unique_ptr<Task> MakeReflex();
     // The reflex for a Slig that has woken beside Abe: off its floor, if a way is at hand
     std::unique_ptr<Task> MakeFlee();
@@ -556,6 +569,16 @@ private:
         s32 mAttempts = 0;
         // The frame the last try from here died on: the same one again and nothing done from here changes it
         s32 mLastDeathFrame = -1;
+        // Looking ahead: the tries made from here, and the bot's dice as they were
+        Lookahead::Stretch mStretch;
+        u64 mRng = 0;
+        // What he pressed, a frame at a time, in the first try from here, up to where it failed: the later tries
+        // press the same, begun later
+        std::vector<u32> mPressed;
+        bool mHasPressed = false;
+        // What the bot remembered then (see BotMemory), and the edges it had ruled out, by path
+        BotMemory mMemory;
+        std::map<std::pair<s32, s32>, std::set<s32>> mBanned;
     };
     std::vector<Saved> mCheckpoints;
     bool mRestoring = false;
@@ -563,6 +586,26 @@ private:
     s32 mDeaths = 0;
     s32 mRestores = 0;
     u32 mLastCheckpointFrame = 0;
+    // Looking ahead (see Lookahead): the frames still to hold back in the try under way, his health a frame ago,
+    // whether the try has just failed, how many have, how many since a save was last taken further on than any
+    // before, and whether being hurt is put up with for now (nothing got through unhurt)
+    s32 mHold = 0;
+    // The buttons of the try under way that are still to be pressed (see Saved::mPressed), and how far it is
+    std::vector<u32> mRepeat;
+    std::size_t mRepeatAt = 0;
+    s32 mLastHealthFp = 0;
+    u32 mLastHurtFrame = 0;
+    bool mTryFailed = false;
+    s32 mTries = 0;
+    s32 mTriesSince = 0;
+    s32 mTryFrames = 0;
+    bool mTolerant = false;
+    // How many saves it has gone back since it last got somewhere new
+    s32 mPops = 0;
+    s32 mTolerantSaves = 0;
+    // Where the last saves were taken: one somewhere new is the tries having got him on
+    std::vector<std::tuple<s32, s32, s32>> mSavePlaces;
+    void TryFailed(BaseMap& map, const std::string& what);
 
     std::vector<u32> mInputs;
     u32 mInputsStartFrame = 0;
@@ -574,11 +617,6 @@ private:
     std::string mTraceMove;
     std::string mLog;
     std::set<s32> mOnlyEdges;
-    u32 mSeenByScrabAt = 0;
-    // By Scrab: where it was last, and the frame it came to stand there (0 while it moves or is not known to have)
-    std::map<u32, std::pair<s32, u32>> mScrabStill;
-    std::set<u32> mScrabMoved;
-    std::map<u32, std::pair<s32, s32>> mScrabBeat;
 };
 
 } // namespace Bot

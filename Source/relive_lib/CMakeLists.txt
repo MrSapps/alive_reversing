@@ -653,6 +653,8 @@ SET(relive_lib_src
     Bot/Pilot.hpp
     Bot/SligCycle.hpp
     Bot/SligCycle.cpp
+    Bot/Lookahead.hpp
+    Bot/Lookahead.cpp
     Bot/Pilot.cpp
     Bot/ThrowArc.hpp
     Bot/ThrowArc.cpp

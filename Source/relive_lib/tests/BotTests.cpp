@@ -5,6 +5,7 @@
 #include "Bot/GameView.hpp"
 #include "Bot/Goap.hpp"
 #include "Bot/LevelGraph.hpp"
+#include "Bot/Lookahead.hpp"
 #include "Bot/NavGraph.hpp"
 #include "Bot/Pilot.hpp"
 #include "Bot/Profile.hpp"
@@ -84,6 +85,12 @@ TEST(BotProfile, ParsesEndingsAndOptions)
     EXPECT_EQ(p.mSeed, 42u);
     EXPECT_TRUE(p.mHuman);
     EXPECT_EQ(p.Text(), "kill_all,seed=42,human");
+    EXPECT_FALSE(p.mLook);
+
+    Profile looking;
+    ASSERT_TRUE(Profile::Parse("any,look", looking, error)) << error;
+    EXPECT_TRUE(looking.mLook);
+    EXPECT_EQ(looking.Text(), "any,seed=1,look");
 
     ASSERT_TRUE(Profile::Parse("average", p, error));
     EXPECT_EQ(p.mEnding, Ending::eAverage);
@@ -6978,4 +6985,147 @@ TEST(BotDomain, ALeverWhoseTimerOpensATrapDoorUnderASligIsLeftAloneWhileTheSligI
     world.mEntities[1].mLiveY = 100;
     const Domain up = Domain::Build(g, world, g.NodeAt(12, 200, false), nullptr);
     EXPECT_NE(up.mStart.Get(Key::Mud(2001)), 2);
+}
+
+TEST(BotLookahead, TheDelaysGoFromCoarseToFineAndNoneComesTwice)
+{
+    std::set<s32> seen;
+    for (s32 i = 0; i < Bot::Lookahead::Count(); i++)
+    {
+        const s32 delay = Bot::Lookahead::Delay(i);
+        ASSERT_GE(delay, 0) << i;
+        ASSERT_LT(delay, Bot::Lookahead::kWindow) << i;
+        ASSERT_EQ(delay % Bot::Lookahead::kFinest, 0) << i;
+        ASSERT_TRUE(seen.insert(delay).second) << "delay " << delay << " twice";
+    }
+    // (every 8th frame of the window, so all of them)
+    ASSERT_EQ(static_cast<s32>(seen.size()), Bot::Lookahead::kWindow / Bot::Lookahead::kFinest);
+    ASSERT_EQ(Bot::Lookahead::Delay(Bot::Lookahead::Count()), -1);
+    ASSERT_EQ(Bot::Lookahead::Delay(-1), -1);
+    // The first pass is the coarse one, straight on first; the next halves it
+    ASSERT_EQ(Bot::Lookahead::Delay(0), 0);
+    ASSERT_EQ(Bot::Lookahead::Delay(1), 32);
+    ASSERT_EQ(Bot::Lookahead::Delay(9), 288);
+    ASSERT_EQ(Bot::Lookahead::Delay(10), 16);
+    ASSERT_EQ(Bot::Lookahead::Delay(11), 48);
+    ASSERT_EQ(Bot::Lookahead::Delay(20), 8);
+    ASSERT_EQ(Bot::Lookahead::Delay(39), 312);
+}
+
+// (a try's failure for these: so long after the save, each at a place of its own unless said otherwise)
+static s32 FailedSomewhereElse(Bot::Lookahead::Stretch& stretch, s32 frames)
+{
+    static s32 place = 0;
+    return Bot::Lookahead::Failed(stretch, frames, ++place);
+}
+
+TEST(BotLookahead, ATryThatFailedOnceItHadBegunIsFollowedByTheNextDelay)
+{
+    Bot::Lookahead::Stretch stretch;
+    ASSERT_EQ(stretch.mDelay, 0);
+    // (straight on, hurt 100 frames in; then held back 32 and hurt 33 in: a frame after it began)
+    ASSERT_EQ(FailedSomewhereElse(stretch, 100), 32);
+    ASSERT_EQ(stretch.mDelay, 32);
+    ASSERT_EQ(FailedSomewhereElse(stretch, 33), 64);
+    ASSERT_EQ(stretch.mCeiling, Bot::Lookahead::kWindow + 1);
+    // All of them fail: each is given once, then there is none
+    s32 given = 3;
+    while (FailedSomewhereElse(stretch, 1000) >= 0)
+    {
+        given++;
+    }
+    ASSERT_EQ(given, Bot::Lookahead::Count());
+    ASSERT_EQ(FailedSomewhereElse(stretch, 1000), -1);
+}
+
+TEST(BotLookahead, HurtWhileItStillHeldBackRulesOutEveryDelayThatLong)
+{
+    Bot::Lookahead::Stretch stretch;
+    ASSERT_EQ(FailedSomewhereElse(stretch, 200), 32);
+    ASSERT_EQ(FailedSomewhereElse(stretch, 200), 64);
+    // Holding back 64, hurt 50 frames in: he had done nothing yet, so 50 and over is no use. The rest of the
+    // coarse pass is passed over
+    ASSERT_EQ(FailedSomewhereElse(stretch, 50), 16);
+    ASSERT_EQ(stretch.mCeiling, 50);
+    std::vector<s32> rest;
+    for (s32 delay = FailedSomewhereElse(stretch, 60); delay >= 0; delay = FailedSomewhereElse(stretch, 60))
+    {
+        rest.push_back(delay);
+    }
+    ASSERT_EQ(rest, (std::vector<s32>{48, 8, 24, 40}));
+    // (hurt on the very frame it was to begin counts as while it held back)
+    Bot::Lookahead::Stretch other;
+    ASSERT_EQ(FailedSomewhereElse(other, 100), 32);
+    ASSERT_EQ(FailedSomewhereElse(other, 32), 16);
+    ASSERT_EQ(other.mCeiling, 32);
+}
+
+TEST(BotLookahead, BegunAgainEveryDelayIsTriedOnceMoreButForTheOnesKnownTooLong)
+{
+    Bot::Lookahead::Stretch stretch;
+    ASSERT_EQ(FailedSomewhereElse(stretch, 200), 32);
+    ASSERT_EQ(FailedSomewhereElse(stretch, 24), 16);
+    while (FailedSomewhereElse(stretch, 200) >= 0)
+    {
+    }
+    ASSERT_EQ(Bot::Lookahead::Again(stretch), 0);
+    ASSERT_EQ(stretch.mRounds, 1);
+    ASSERT_EQ(stretch.mDelay, 0);
+    std::vector<s32> again;
+    for (s32 delay = FailedSomewhereElse(stretch, 200); delay >= 0; delay = FailedSomewhereElse(stretch, 200))
+    {
+        again.push_back(delay);
+    }
+    // (24 itself is too long: he was hurt 24 frames in while he held back)
+    ASSERT_EQ(again, (std::vector<s32>{16, 8}));
+}
+
+TEST(BotLookahead, TriesThatFailAlikeHoweverLateTheyBeganAreNotAMatterOfWhen)
+{
+    // Each fails 40 frames after it began (a frame's difference is nothing), at the same place: after the
+    // sixth there is no more to try
+    Bot::Lookahead::Stretch stretch;
+    ASSERT_EQ(Bot::Lookahead::Failed(stretch, 40, 7), 32);
+    ASSERT_EQ(Bot::Lookahead::Failed(stretch, 32 + 41, 7), 64);
+    ASSERT_EQ(Bot::Lookahead::Failed(stretch, 64 + 39, 7), 96);
+    ASSERT_EQ(Bot::Lookahead::Failed(stretch, 96 + 40, 7), 128);
+    ASSERT_EQ(Bot::Lookahead::Failed(stretch, 128 + 40, 7), 160);
+    ASSERT_EQ(Bot::Lookahead::Failed(stretch, 160 + 40, 7), -1);
+    ASSERT_EQ(Bot::Lookahead::Failed(stretch, 160 + 40, 7), -1);
+
+    // One that failed elsewhere, or two frames sooner after it began: it does depend on when, and the count
+    // is from the next one (the first try, which the bot played itself, often fails unlike the rest)
+    Bot::Lookahead::Stretch elsewhere;
+    Bot::Lookahead::Stretch sooner;
+    for (s32 i = 0; i < 5; i++)
+    {
+        ASSERT_EQ(Bot::Lookahead::Failed(elsewhere, elsewhere.mDelay + 40, i == 2 ? 8 : 7), 32 * (i + 1));
+        ASSERT_EQ(Bot::Lookahead::Failed(sooner, sooner.mDelay + (i == 2 ? 38 : 40), 7), 32 * (i + 1));
+    }
+    // (the sixth try is only the third alike in a row: the ninth is the sixth)
+    for (s32 i = 5; i < 8; i++)
+    {
+        ASSERT_EQ(Bot::Lookahead::Failed(elsewhere, elsewhere.mDelay + 40, 7), 32 * (i + 1));
+        ASSERT_EQ(Bot::Lookahead::Failed(sooner, sooner.mDelay + 40, 7), 32 * (i + 1));
+    }
+    ASSERT_EQ(Bot::Lookahead::Failed(elsewhere, elsewhere.mDelay + 40, 7), -1);
+    ASSERT_EQ(Bot::Lookahead::Failed(sooner, sooner.mDelay + 40, 7), -1);
+
+    // Hurt while it still held back says nothing about what it would have done
+    Bot::Lookahead::Stretch held;
+    for (s32 i = 0; i < 5; i++)
+    {
+        ASSERT_GE(Bot::Lookahead::Failed(held, held.mDelay + 40, 7), 0);
+    }
+    ASSERT_EQ(held.mDelay, 160);
+    ASSERT_GE(Bot::Lookahead::Failed(held, 150, 7), 0);
+
+    // Begun again with something ruled out, it is counted anew
+    Bot::Lookahead::Stretch again;
+    for (s32 i = 0; i < 5; i++)
+    {
+        ASSERT_GE(Bot::Lookahead::Failed(again, again.mDelay + 40, 7), 0);
+    }
+    ASSERT_EQ(Bot::Lookahead::Again(again), 0);
+    ASSERT_EQ(Bot::Lookahead::Failed(again, 40, 7), 32);
 }

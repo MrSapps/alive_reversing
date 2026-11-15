@@ -27,6 +27,7 @@ what is left, and wins where they differ.
 | Domain | `Domain` | Builds the planning problem of a path: cross to another region (needs the edge's switch), use a lever/ring/wheel/hand stone, rescue a Mudokon through a portal in its region (sets its rescue switch), kill one (`kill_all` only), switch logic, wheels that must turn together (needs a Mudokon per wheel but one), leave by an exit or a level loader. `Frontier` says what blocks, `Reachable` which switches are worth trying when there's no plan to the exit. |
 | Tasks | `Task`, `Tasks.cpp` | `GoTo` (replans the route after every move, bans edges that go nowhere, sneaks past sleeping Sligs, waits in cover for an awake one to look away, leads Mudokons by ways they can follow), `Use`, `Recruit` (hello, sorry or a slap by mood, follow me), `Rescue`, `WorkTogether`, `Kill`, `Exit`; for Scrabs `ScrabRampage`, `ScrabKill`, `ScrabLure` (off the end of their floor), `ScrabPen` (shut in behind a gate) and `ScrabWary` (a floor one walks crossed in timed stints). |
 | Checkpoints | `Checkpoint` | A quicksave the bot owns, taken every ~90 frames when Abe stands still and nothing threatens (no Slig on the screen, no laughing Mudokon in tow). On a death: back to the newest, try again after a (seeded) delay; six deaths from one and it goes back to the one before. Old ones are thinned out, not dropped. The game's own quicksave is left alone. |
+| Look-ahead | `Lookahead`, `Bot::TryFailed` | With the `look` option: from each save the same moves are tried begun later and later against the game itself until one gets to the next save unhurt; what failed is taken back and is not in the run's inputs. See "Look-ahead" under Architecture. |
 | Bot | `Bot` | Plan, act, replan. Profiles, the committed input log (rewound tries aren't in it), the report, movie skipping, the reflex that slaps a wired Mudokon tagging along. |
 | Profiles | `Profile` | `save_all`, `kill_all`, `average`, `any`, with `seed=<n>` and `human`. |
 
@@ -1406,6 +1407,56 @@ remembers what it tried. A restore is one `Push/Pop` call, nothing else in the b
 
 Budget: a restore costs a camera load. Headless and unthrottled that's milliseconds, so a run can
 afford thousands. Each run has a restore budget; running out is a stuck condition.
+
+### Look-ahead (the `look` option)
+
+What the planner cannot work out is *when*: a Slig's turn, a patrol, a burst from the background. Each of those
+had a hand-written tactic, and each tactic took a session and still let him be hit. With `look` the bot finds the
+moment by trying it against the game itself, from a save, and taking back what fails. Nothing of the game is
+modelled or copied. The tries are not in the inputs a run leaves (`bot_inputs`), so a replay shows only the one
+that worked.
+
+- **A try** is the game run on from a save. It has failed when Abe is hurt (health lower than the frame
+  before), dead, or (`save_all`) a Mudokon is. It has worked when the next save is taken.
+- **Saves** (`Bot::MaybeCheckpoint`) are taken as before when he is at rest, and with `look` also hanging from
+  a ledge and with Sligs awake on the screen (every 30 frames there, not 90), but not hurt nor within 60 frames
+  of being hurt. A save nothing gets on from costs little: see the ceiling below.
+- **The first try from a save** is the bot playing as it would without `look`. What it pressed, up to where
+  it failed, is kept (`Saved::mPressed`). **Every later try** holds still for a delay and then presses the same,
+  frame for frame; where the first try failed the bot takes over again and plans from what it finds. So a
+  later try is the same thing begun later, and a tactic's own waiting is not done twice. (Restarting the task
+  after the delay was tried first and does not work: the task waits for the Slig again and comes out at the
+  same point of its beat every time.)
+- **The delays** (`Lookahead`, unit tested apart from the game): 0, then every 32nd frame up to 320, then
+  the ones half way between, down to every 8th: 40 in all. Hurt while he still held back and every delay
+  that long or longer is ruled out without being tried (`Stretch::mCeiling`): a save taken where he is
+  about to be shot is used up in five or six tries.
+- **Out of delays**, the try that got to this save from the one before has failed too: that save's next
+  delay, at most two saves back (`kPopsPerObstacle`). If nothing gets through unhurt from there either, being
+  hurt is put up with until he has got to two places he had not saved at before (`mTolerant`); then only dying
+  fails a try. So do 6,000 frames of failed tries (or 600 tries) without a save somewhere new; hurt put up with,
+  60,000 more frames of tries that die is stuck.
+- **The bot's memory is put back with the save** (`BotMemory`, a base of `Bot`: what it has seen of the world,
+  where it has been, what it found to work and not, the edges ruled out; and its dice, `Saved::mRng`). A try
+  that is taken back did not happen. Without this, what a failed try had seen stayed believed: a gate it had
+  opened was planned through, a path it had died in counted as been in, and both trials ended with no plan.
+  What is learnt from failing as such (throws that miss, a drill's timing) is not in it and stays.
+- **Tries that fail alike are not a matter of when** (`Lookahead::kAlike`): six that began at different
+  moments and each failed as long after it began, at the same place, end the save's tries.
+
+Measured (2026-11-15, Debug, headless, `build-bot/la/*l.txt` are the standing runs with `look`):
+| Run | Without `look` | With `look` |
+|---|---|---|
+| Barracks `b1` | 0 deaths to f=2,982, hurt 3 times on the way, dies at f=3,195 | 245 tries, hurt put up with twice (the first guard, as before; screen five), stuck on screen five at f=3,701 where the moves are not built; 40 s |
+| Scrab trial `tr1` | 0 deaths, hurt by Fleeches | through it and on into the next vault; 101 tries, hurt put up with 5 times; 34 s for 14,400 frames |
+| Mudomo trial `t13` | 0 deaths | through it and on; 25 tries, hurt put up with twice; 50 s |
+| AO Rupture Farms `a1` | 14 deaths, Stockyards at f=5,567 | 70 tries and no death in the first 3,573 frames (the script's frame count ran out in path 18) |
+The walker's floor of the Barracks (two hits before) is crossed unhurt: the tries found the moment the
+hand-written timing had not. The first guard is not: no moment makes that jump unhurt, which is what led to
+the next point.
+
+What it does not do yet: change *what* is done (the gait, another way), only when. Where no moment works for
+the move the planner chose, it ends up hurt as it did before.
 
 ### Navigation
 

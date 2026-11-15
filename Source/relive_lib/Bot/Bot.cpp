@@ -13,6 +13,15 @@ static const u32 kModalInput = 0x80000000u;
 static const s32 kMaxCheckpoints = 8;
 static const s32 kAttemptsPerCheckpoint = 6;
 static const u32 kCheckpointEveryFrames = 90;
+// Looking ahead: how often a save is taken with a Slig awake on the screen, and how many tries may fail without a
+// save somewhere new before being hurt is put up with (and as many again before it is given up)
+static const u32 kCheckpointEveryFramesWatched = 30;
+static const s32 kTriesPerObstacle = 600;
+// The same in frames of the game played in tries that failed: for a way through unhurt, and for one at all
+static const s32 kFramesPerObstacle = 6000;
+static const s32 kFramesPerObstacleDying = 60000;
+// and how many saves it goes back for a way through unhurt before that
+static const s32 kPopsPerObstacle = 2;
 
 Bot::Bot() = default;
 
@@ -50,6 +59,18 @@ void Bot::Start(const Profile& profile)
     mCheckpoints.clear();
     mLastCheckpointFrame = 0;
     mFailedActions.clear();
+    mHold = 0;
+    mLastHealthFp = 0;
+    mLastHurtFrame = 0;
+    mTryFailed = false;
+    mTries = 0;
+    mTriesSince = 0;
+    mTolerant = false;
+    mSavePlaces.clear();
+    mPops = 0;
+    mTryFrames = 0;
+    mRepeat.clear();
+    mRepeatAt = 0;
     mStartWaits = 0;
     // (the level's graph depends on where the profile says the run has been: made again, in case something was
     // done with the bot before the profile was given, as a script's bot_goto does)
@@ -1086,7 +1107,7 @@ bool Bot::ExitAllowed(BaseMap& map, const NavFeature& exit, bool* sideTrip)
 std::string Bot::Report() const
 {
     std::string out = "bot f=" + std::to_string(mAbe.mFrame) + " " + GameView::LevelName(mAbe.mLevel) + "/" + std::to_string(mAbe.mPath) + "/" + std::to_string(mAbe.mCamera) + " profile=" + mProfile.Text()
-                    + " state=" + (mState == BotState::eDone ? "done" : mState == BotState::eStuck ? "stuck" : mState == BotState::eRunning ? "running" : "idle") + " deaths=" + std::to_string(mDeaths) + " restores=" + std::to_string(mRestores)
+                    + " state=" + (mState == BotState::eDone ? "done" : mState == BotState::eStuck ? "stuck" : mState == BotState::eRunning ? "running" : "idle") + " deaths=" + std::to_string(mDeaths) + " restores=" + std::to_string(mRestores) + (mProfile.mLook ? " tries=" + std::to_string(mTries) : "")
                     + " rescued=" + std::to_string(mWorld.mRescued) + " killed=" + std::to_string(mWorld.mKilled) + "\n";
     if (!mWhy.empty())
     {
@@ -1478,7 +1499,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs) const
 
 s32 Bot::RetryDelay()
 {
-    if (mAttempt <= 0)
+    if (mAttempt <= 0 || mProfile.mLook)
     {
         return 0;
     }
@@ -1641,11 +1662,29 @@ bool Bot::Resting()
 void Bot::MaybeCheckpoint(BaseMap& map)
 {
     // Standing or crouched only: a save taken hanging from a ledge or holding a lift's rope didn't come back right
-    if ((mAbe.mMove != Move::eIdle && mAbe.mMove != Move::eCrouch) || !mAbe.mOnGround || mAbe.mTransition || !Checkpoint::CanSave(map))
+    // (looking ahead it is taken hanging too, and with Sligs about: a save nothing gets on from is found out by
+    // the tries from it, and the one before it gone back to)
+    const bool look = mAuto && mProfile.mLook;
+    const bool hung = look && mAbe.mMove == Move::eHang;
+    if (!hung && ((mAbe.mMove != Move::eIdle && mAbe.mMove != Move::eCrouch) || !mAbe.mOnGround))
     {
         return;
     }
-    if (!mCheckpoints.empty() && mAbe.mFrame - mLastCheckpointFrame < kCheckpointEveryFrames)
+    if (mAbe.mTransition || mHold > 0 || !Checkpoint::CanSave(map))
+    {
+        return;
+    }
+    bool watched = false;
+    for (const SligAt& slig : mWorld.mSligs)
+    {
+        watched = watched || (look && !slig.mPossessed && !slig.mAsleep && mKnow->mNav.CameraOf(slig.mX, slig.mY - 5) == mKnow->mNav.CameraOf(mAbe.mX, mAbe.mY - 5));
+    }
+    if (!mCheckpoints.empty() && mAbe.mFrame - mLastCheckpointFrame < (watched ? kCheckpointEveryFramesWatched : kCheckpointEveryFrames))
+    {
+        return;
+    }
+    // (but not hurt, nor just after: what hurt him may not be done)
+    if (look && !mTolerant && (mAbe.mHealthFp < 0x10000 || (mLastHurtFrame != 0 && mAbe.mFrame - mLastHurtFrame < 60)))
     {
         return;
     }
@@ -1662,7 +1701,7 @@ void Bot::MaybeCheckpoint(BaseMap& map)
     // Nor with one asleep there (what wakes it may already be on its way), nor with a laughing Mudokon in tow
     for (const SligAt& slig : mWorld.mSligs)
     {
-        if (!slig.mPossessed && mKnow->mNav.CameraOf(slig.mX, slig.mY - 5) == mKnow->mNav.CameraOf(mAbe.mX, mAbe.mY - 5))
+        if (!look && !slig.mPossessed && mKnow->mNav.CameraOf(slig.mX, slig.mY - 5) == mKnow->mNav.CameraOf(mAbe.mX, mAbe.mY - 5))
         {
             return;
         }
@@ -1691,9 +1730,38 @@ void Bot::MaybeCheckpoint(BaseMap& map)
     Saved saved;
     saved.mCheckpoint.Save(map);
     saved.mInputCount = mInputs.size();
+    saved.mRng = mRng.State();
+    if (look)
+    {
+        saved.mMemory = *this;
+        for (const auto& know : mKnowledge)
+        {
+            saved.mBanned[know.first] = know.second.mBannedEdges;
+        }
+    }
     mCheckpoints.push_back(std::move(saved));
     mLastCheckpointFrame = mAbe.mFrame;
     mAttempt = 0;
+    if (look)
+    {
+        const std::tuple<s32, s32, s32> place(mAbe.mX / 25, mAbe.mY / 20, static_cast<s32>(mAbe.mMove));
+        if (std::find(mSavePlaces.begin(), mSavePlaces.end(), place) == mSavePlaces.end())
+        {
+            mTriesSince = 0;
+            mTryFrames = 0;
+            mPops = 0;
+            mSavePlaces.push_back(place);
+            if (mSavePlaces.size() > 12)
+            {
+                mSavePlaces.erase(mSavePlaces.begin());
+            }
+            if (mTolerant && ++mTolerantSaves >= 2)
+            {
+                mTolerant = false;
+                Log("got on: being hurt is a failed try again");
+            }
+        }
+    }
 }
 
 s32 Bot::SweepLate() const
@@ -1918,9 +1986,140 @@ bool Bot::ThrowIsBad(u32 mine, const ThrowSpot& spot) const
     return mKnow && mKnow->mBadThrows.count(std::make_tuple(mine, spot.mNode, static_cast<s32>(spot.mKind))) != 0;
 }
 
+void Bot::TryFailed(BaseMap& map, const std::string& what)
+{
+    mTryFailed = false;
+    mTries++;
+    mTriesSince++;
+    mPilotActive = false;
+    mBits = 0;
+    mMissRewind = false;
+    mHold = 0;
+    if (mCheckpoints.empty())
+    {
+        Stuck(what + " with nothing to go back to");
+        return;
+    }
+    const s32 frames = static_cast<s32>(mAbe.mFrame - mCheckpoints.back().mCheckpoint.mFrame);
+    mCurrentEdge = -1;
+    const std::string doing = mTask ? mTask->Name() : "no task";
+    // Too many without getting anywhere new: no more going back for a way through unhurt
+    mTryFrames += frames;
+    const bool spent = mTriesSince > kTriesPerObstacle || mTryFrames > (mTolerant ? kFramesPerObstacleDying : kFramesPerObstacle);
+    if (spent)
+    {
+        mTriesSince = 0;
+        mTryFrames = 0;
+        if (mTolerant)
+        {
+            Stuck("no try gets on, hurt or not (" + what + " doing " + doing + ")");
+            return;
+        }
+    }
+    // What was pressed in a try the bot played itself is what the later tries from that save press
+    const auto pressed = [this](std::size_t from, std::size_t to)
+    {
+        std::vector<u32> out;
+        for (std::size_t i = from; i < to && i < mInputs.size(); i++)
+        {
+            if ((mInputs[i] & kModalInput) == 0)
+            {
+                out.push_back(mInputs[i]);
+            }
+        }
+        return out;
+    };
+    if (!mCheckpoints.back().mHasPressed)
+    {
+        mCheckpoints.back().mPressed = pressed(mCheckpoints.back().mInputCount, mInputs.size());
+        mCheckpoints.back().mHasPressed = true;
+    }
+    s32 delay = -1;
+    std::string givenUp;
+    for (;;)
+    {
+        Saved& saved = mCheckpoints.back();
+        delay = Lookahead::Failed(saved.mStretch, static_cast<s32>(mAbe.mFrame - saved.mCheckpoint.mFrame), (mAbe.mX / 25) * 4096 + mAbe.mY / 20);
+        if (delay >= 0 && !spent)
+        {
+            break;
+        }
+        // Begun at every moment and none got through.
+        // The same optional thing every time: the run goes on without it
+        if (mTask && mTaskOptional && !mTaskAction.empty() && mFailedActions[mTaskAction] < 2 && saved.mStretch.mRounds < 2)
+        {
+            givenUp = mTaskAction;
+            Log("giving up on " + mTaskAction + ": no try at it got through");
+            saved.mHasPressed = false;
+            delay = Lookahead::Again(saved.mStretch);
+            break;
+        }
+        // Or it went wrong before this save: the try that got here from the one before has failed too. A save or
+        // two back, no further: if nothing gets through unhurt from there either, hurt is the best there is
+        const bool back = mCheckpoints.size() > 1 && (mTolerant || (mPops < kPopsPerObstacle && !spent));
+        if (back)
+        {
+            // (what the bot pressed from the save before to get here, and then from here)
+            Saved& before = mCheckpoints[mCheckpoints.size() - 2];
+            if (!before.mHasPressed)
+            {
+                before.mPressed = pressed(before.mInputCount, saved.mInputCount);
+                before.mPressed.insert(before.mPressed.end(), saved.mPressed.begin(), saved.mPressed.end());
+                before.mHasPressed = true;
+            }
+            mCheckpoints.pop_back();
+            mPops++;
+            continue;
+        }
+        if (!mTolerant)
+        {
+            mTolerant = true;
+            mTolerantSaves = 0;
+            mTriesSince = 0;
+            mTryFrames = 0;
+            mPops = 0;
+            saved.mStretch = Lookahead::Stretch();
+            saved.mHasPressed = false;
+            delay = 0;
+            Log("nothing gets through unhurt: being hurt is put up with for now");
+            break;
+        }
+        Stuck("no try gets on from the oldest save (" + what + " doing " + doing + ")");
+        return;
+    }
+    Saved& saved = mCheckpoints.back();
+    Log("try failed (" + what + ", " + doing + ") " + std::to_string(frames) + " frames in: back to f=" + std::to_string(saved.mCheckpoint.mFrame) + ", holding back " + std::to_string(delay));
+    mHold = delay;
+    // (a try the bot plays itself, straight on, has nothing to repeat)
+    mRepeat = saved.mHasPressed && saved.mStretch.mDelay > 0 ? saved.mPressed : std::vector<u32>();
+    mRepeatAt = 0;
+    mRng.SetState(saved.mRng);
+    static_cast<BotMemory&>(*this) = saved.mMemory;
+    for (auto& know : mKnowledge)
+    {
+        const auto banned = saved.mBanned.find(know.first);
+        know.second.mBannedEdges = banned == saved.mBanned.end() ? std::set<s32>() : banned->second;
+    }
+    mKeptPlan.clear();
+    if (!givenUp.empty())
+    {
+        mFailedActions[givenUp] = 2;
+    }
+    mLastHealthFp = 0;
+    mInputs.resize(saved.mInputCount);
+    saved.mCheckpoint.Load(map);
+    mRestoring = true;
+    mRestores++;
+    mLastCheckpointFrame = saved.mCheckpoint.mFrame;
+}
+
 void Bot::OnDeath(BaseMap& map)
 {
-    mDeaths++;
+    const bool look = mAuto && mProfile.mLook;
+    if (!look)
+    {
+        mDeaths++;
+    }
     if (mThrowPending && mAbe.mFrame - mThrowFrame > 300)
     {
         mThrowPending = false;
@@ -1938,6 +2137,11 @@ void Bot::OnDeath(BaseMap& map)
         Log("the drill got Abe: next time as if he were " + std::to_string(SweepLate()) + " frames later than worked out");
     }
     mSweepPending = false;
+    if (look)
+    {
+        TryFailed(map, "died");
+        return;
+    }
     const s32 deathsHere = ++mDeathCells[{mAbe.mX / 25, mAbe.mY / 20}];
     if (deathsHere == 6 || deathsHere == 12)
     {
@@ -2574,6 +2778,14 @@ void Bot::Think(BaseMap& map)
     {
         Log(std::string("quiet for a while: task ") + (mTask ? mTask->Name() : "none") + (mReflex ? ", reflex " + mReflex->Name() : "") + ", last did " + mPilot.Current().Text() + (mPilotActive ? "" : " (over)") + (mLastPrimFailed.empty() ? "" : ", which failed: " + mLastPrimFailed) + (mAbe.mTransition ? ", in a transition" : "") + (mRestoring ? ", restoring" : "") + ", abe " + std::to_string(static_cast<s32>(mAbe.mMove)) + " node " + std::to_string(AbeNode()));
     }
+    if (mTryFailed)
+    {
+        TryFailed(map, "hurt");
+        if (mRestoring || mState != BotState::eRunning)
+        {
+            return;
+        }
+    }
     if (mMissRewind)
     {
         RewindMiss(map);
@@ -2607,6 +2819,23 @@ void Bot::Think(BaseMap& map)
                 mStartWaits++;
                 return;
             }
+        }
+        // Looking ahead: this try begins a little later than the last
+        if (mHold > 0)
+        {
+            mHold--;
+            return;
+        }
+        // Then the same buttons as the first try, to where that failed; from there it is played on as it comes
+        if (mRepeatAt < mRepeat.size())
+        {
+            mBits = mRepeat[mRepeatAt++];
+            return;
+        }
+        if (!mRepeat.empty())
+        {
+            mRepeat.clear();
+            mBits = 0;
         }
         if (!mTask)
         {
@@ -2888,6 +3117,22 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         }
     }
 
+    // Looking ahead, hurt is as good as dead: the try is over
+    if (mAuto && mProfile.mLook && mState == BotState::eRunning && mAbe.mValid)
+    {
+        if (mLastHealthFp > 0 && mAbe.mHealthFp > 0 && mAbe.mHealthFp < mLastHealthFp)
+        {
+            mLastHurtFrame = mAbe.mFrame;
+            if (!mTolerant && !mCheckpoints.empty())
+            {
+                mTryFailed = true;
+                mPilotActive = false;
+                mBits = 0;
+            }
+        }
+        mLastHealthFp = mAbe.mHealthFp;
+    }
+
     if (mPilotPending)
     {
         mPilot.Start(mPendingPrim, mAbe);
@@ -2916,6 +3161,11 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
     {
         Log("a Mudokon died (killed " + std::to_string(mWorld.mKilled) + ")");
         mLastKilled = mWorld.mKilled;
+        if (mProfile.mLook)
+        {
+            TryFailed(map, "a Mudokon died");
+            return;
+        }
         OnDeath(map);
         mDeaths--;
         return;
