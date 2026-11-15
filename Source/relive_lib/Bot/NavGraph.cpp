@@ -1660,6 +1660,15 @@ void NavGraph::Build(const NavInput& input)
                     mExits.push_back({from, featureIdx});
                     break;
                 }
+                // (or one that begins a cell or two past the last cell of his floor, at his height: walked on
+                // into. AO's Rupture Farms, path 16: the floor at 214 goes on past the screen's last cell at 6759
+                // into the box at 6768 that leads to path 18.)
+                if ((next < 0 || std::abs(mNodes[next].mX - (n.mX + dir * step)) > step / 2) && !WallBetween(n.mX, n.mX + dir * 2 * step, n.mY, n.mHalf) &&
+                    (FeatureAt(FeatureKind::ePathExit, n.mX + dir * step, n.mY - 20, n.mHalf, &featureIdx) || FeatureAt(FeatureKind::ePathExit, n.mX + dir * 2 * step, n.mY - 20, n.mHalf, &featureIdx)))
+                {
+                    mExits.push_back({from, featureIdx});
+                    break;
+                }
             }
         }
     }
@@ -1722,6 +1731,24 @@ void NavGraph::Build(const NavInput& input)
         {
             trapFall(static_cast<s32>(i), n, n.mTrapDoor, false);
         }
+    }
+
+    // AO: the first cell past the gap between two cameras is come into at a walk and not stopped in (a step back
+    // to it is a step back over the gap: he comes out of the gap half a cell off the cells), so nothing but the
+    // walk on starts from it. Rupture Farms' path 16: the running jump up from 2288,315 was never got to; the one
+    // from 2313 is.
+    {
+        std::set<s32> entered;
+        for (const NavEdge& e : edges)
+        {
+            if (e.mKind == EdgeKind::eWalk && std::abs(mNodes[e.mTo].mX - mNodes[e.mFrom].mX) > 3 * GridStep(mNodes[e.mFrom].mHalf))
+            {
+                entered.insert(e.mTo);
+            }
+        }
+        edges.erase(std::remove_if(edges.begin(), edges.end(), [&](const NavEdge& e)
+                                   { return entered.count(e.mFrom) != 0 && e.mKind != EdgeKind::eWalk; }),
+                    edges.end());
     }
 
     // Into a cell with a mine, or out of one: not until the mine is gone

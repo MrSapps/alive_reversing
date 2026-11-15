@@ -3419,6 +3419,63 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         }
         add("Exit " + std::to_string(nav.Nodes()[x.mNode].mX) + "," + std::to_string(nav.Nodes()[x.mNode].mY) + " to path " + std::to_string(f.mDestPath), pre, {{Key::kExited, 1}}, 200, step);
     }
+    // A Slig that walks over a trap door a lever opens: the lever is pulled as it is on the door, and until it
+    // has gone down nothing is crossed onto its floor near there (AO's Rupture Farms, path 16: the Slig at
+    // 3600,313 that walks over the trap door at 3539, and the lever on the ledge over it)
+    for (const Entity& lever : world.mEntities)
+    {
+        if (lever.mKind != EntityKind::eLever || lever.mGone || lever.mSwitch <= 1)
+        {
+            continue;
+        }
+        const s32 at = UseNode(nav, lever, nullptr);
+        for (std::size_t fi = 0; at >= 0 && fi < nav.Input().mFeatures.size(); fi++)
+        {
+            const NavFeature& door = nav.Input().mFeatures[fi];
+            if (door.mKind != FeatureKind::eTrapDoor || door.mSwitch != lever.mSwitch)
+            {
+                continue;
+            }
+            const s32 dx = (door.mX1 + door.mX2) / 2;
+            for (const Entity& slig : world.mEntities)
+            {
+                if (slig.mKind != EntityKind::eSlig || slig.mGone || world.mFleechKilled.count(slig.mId) != 0 || slig.mState == 1 || slig.mHalf != door.mHalf || std::abs(slig.mY2 - door.mY1) > 40 || std::abs(slig.CentreX() - dx) > 250 || std::abs(nav.Nodes()[at].mY - door.mY1) < 40)
+                {
+                    continue;
+                }
+                DomainStep drop;
+                drop.mKind = StepKind::eSligDrop;
+                drop.mEntity = lever.mId;
+                drop.mOther = slig.mId;
+                drop.mEdge = static_cast<s32>(fi);
+                const Goap::Fact down{Key::Mud(slig.mId), 2};
+                add("Drop Slig#" + std::to_string(slig.mId) + " through the trap door at " + std::to_string(dx) + "," + std::to_string(door.mY1) + " with Lever#" + std::to_string(lever.mId), {regionFact(at)}, {down}, 400, drop);
+                for (Goap::Action& a : d.mActions)
+                {
+                    const DomainStep& s = d.mSteps[a.mTag];
+                    if (s.mKind != StepKind::eCross || s.mEdge < 0)
+                    {
+                        continue;
+                    }
+                    const NavNode& from = nav.Nodes()[nav.Edges()[s.mEdge].mFrom];
+                    const NavNode& to = nav.Nodes()[nav.Edges()[s.mEdge].mTo];
+                    if (to.mHalf == door.mHalf && std::abs(to.mY - door.mY1) <= 30 && std::abs(to.mX - dx) <= 450 && std::abs(from.mY - door.mY1) > 30)
+                    {
+                        a.mPre.push_back(down);
+                    }
+                }
+            }
+        }
+    }
+    for (const Entity& slig : world.mEntities)
+    {
+        // (gone, or dropped through a trap door: World::mFleechKilled holds whatever was got rid of that way)
+        if (slig.mKind == EntityKind::eSlig && (slig.mGone || world.mFleechKilled.count(slig.mId) != 0))
+        {
+            d.mStart.Set(Key::Mud(slig.mId), 2);
+        }
+    }
+
     // A foot switch that turns a gate over each time it is stepped on (the second Mudomo vault's locks, each
     // between two of them and two gates: in over one, which shuts him in with the lock, and out over the other):
     // stepping on it is a thing to do like pulling a lever

@@ -978,6 +978,25 @@ In one run, `full.txt` (from the Scrab vaults' path 7: the Scrab trial, Necrum, 
 hub, the six vaults, the Mudomo trial, Necrum's end): Feeco Depot's path 1 at f=31,828, 0 deaths, with the
 healing power as the game gives it. It stops there (Feeco is untouched: at 2312,884, with nothing known to do).
 
+**AO, Rupture Farms** (`a1.txt`: from its first screen, `bot any`): paths 15 and 16 with 0 deaths, into path 18
+at f=3,316, where he is shot from the balcony over the first screen (not worked on: path 18, 19 and 20 are
+between here and the Stockyards). What AO needed so far:
+- A walk goes on from one screen's floor to the next's over the gap between cameras, and the first cell past the
+  gap cannot be stopped in (a step back to it is a step back over the gap): crossings on foot the same way are
+  merged across it (`Bot::Replan`), and nothing but the walk on starts from that cell (`NavGraph::Build`).
+- A way out that begins a cell or two past the last cell of a floor is walked on into (`NavGraph`, `ExitTask`).
+- `eSligDrop` / `SligDropTask`: a Slig that walks over a trap door a lever opens is dropped through it. The
+  lever is pulled so that the door opens as the Slig is on it: by the Slig's pace and the frames the pull
+  takes, measured on the first pull (34 in AO). Until it is down nothing is crossed onto its floor there.
+- AO's security claw counts as AE's orb (no chanting on its screen), and the reflex that takes over a Slig
+  that woke is off in AO: the chant took none and left him standing in it for 800 frames.
+
+**Known wrong, not from this work**: the Mines from the start (`m1.txt`) no longer gets through: two deaths in
+path 4 at a running jump on the way to lever 11000 (f=29,403), and in path 10 the Sligs at 1300 and 1404,339
+are awake as he comes out of the well, the levers then want him unseen and nothing is left to do (f=35,165).
+The same on the commit before the AO changes; `mall2.botlog` of 11-12 got through to path 6. Path 3 takes
+2,400 frames more than it did then, so everything after it meets the Sligs at another moment. Not looked into.
+
 Not built, from the user: with one Paramite the meat can also be thrown past it into the next screen and the
 Paramite walked into that screen (it backs off from him), where it then finds the meat. The fallback for when
 no throw from a safe cell lands on his own screen.

@@ -200,6 +200,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<FleechLureTask>(step.mEntity, 1);
         case StepKind::eParamiteTour:
             return std::make_unique<ParamiteTourTask>(step.mOther, step.mEdge);
+        case StepKind::eSligDrop:
+            return std::make_unique<SligDropTask>(step.mEntity, step.mOther, step.mEdge);
         case StepKind::eStepOn:
         {
             return std::make_unique<StepOnTask>(step.mEntity, step.mEdge);
@@ -815,7 +817,10 @@ bool Bot::Replan(BaseMap& map)
                 break;
             }
             const NavEdge& e = nav.Edges()[next.mEdge];
-            if (e.mKind != EdgeKind::eWalk || e.mLeft != firstEdge.mLeft || nav.Nodes()[e.mTo].mLine != nav.Nodes()[firstEdge.mTo].mLine)
+            // (in AO a walk goes on from one screen's floor to the next's over the gap between cameras, and the
+            // first cell past the gap is no place to stop: a step back from it is a step back over the gap.
+            // Rupture Farms' path 15, to and fro between 7783 and 8437 for a thousand frames.)
+            if (e.mKind != EdgeKind::eWalk || e.mLeft != firstEdge.mLeft || (mIsAe && nav.Nodes()[e.mTo].mLine != nav.Nodes()[firstEdge.mTo].mLine))
             {
                 break;
             }
@@ -2280,7 +2285,8 @@ std::unique_ptr<Task> Bot::MakeReflex()
         const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);
         // (not with the power to go unseen in hand or on its way: the chant would spend that and take no Slig. Nor
         // unseen: that time is for what the plan has him do unseen.)
-        bool can = mAbe.mMove == Move::eIdle && !mWorld.mInvisCharge && !mWorld.mInvisComing && !mWorld.mInvisible;
+        // (AE only: in AO's Rupture Farms the chant took no Slig and he stood in it for 800 frames)
+        bool can = mIsAe && mAbe.mMove == Move::eIdle && !mWorld.mInvisCharge && !mWorld.mInvisComing && !mWorld.mInvisible;
         for (const Entity& e : mWorld.mEntities)
         {
             can = can && !(e.mKind == EntityKind::eSecurityOrb && nav.CameraOf(e.mX1, e.mY1) == cam);
