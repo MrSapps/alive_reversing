@@ -200,6 +200,12 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<FleechLureTask>(step.mEntity, 1);
         case StepKind::eParamiteTour:
             return std::make_unique<ParamiteTourTask>(step.mOther, step.mEdge);
+        case StepKind::eStepOn:
+        {
+            return std::make_unique<StepOnTask>(step.mEntity, step.mEdge);
+        }
+        case StepKind::eParamiteClear:
+            return std::make_unique<ParamiteTourTask>(step.mOther, step.mEdge, true);
         case StepKind::eMeatFeed:
             return std::make_unique<MeatFeedTask>(step.mEdge);
         case StepKind::eFleechPen:

@@ -5348,6 +5348,59 @@ TaskStep ParamitePullTask::Next(Bot& bot, const std::string& lastFailed)
     return TaskStep::Failed("lost its place");
 }
 
+StepOnTask::~StepOnTask() = default;
+
+TaskStep StepOnTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const Entity* plate = world.Find(mPlate);
+    if (!plate)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    if (mWas < 0)
+    {
+        mWas = world.Switch(plate->mSwitch, true);
+    }
+    if (world.Switch(plate->mSwitch, true) != mWas)
+    {
+        return TaskStep::Done();
+    }
+    TaskStep step;
+    if (!RunGo(mGo, bot, lastFailed, step))
+    {
+        return step;
+    }
+    if (step.mKind == TaskStep::Kind::eFailed)
+    {
+        return step;
+    }
+    if (++mWaits > 40)
+    {
+        return TaskStep::Failed("the foot switch did nothing");
+    }
+    const s32 on = mOn;
+    if (bot.AbeNode() == on && mPhase == 0)
+    {
+        // (on it already: a cell off it, on the same floor, and back)
+        mPhase = 1;
+        const NavGraph* g = &nav;
+        const s32 cell = NavGraph::GridStep(nav.Nodes()[on].mHalf);
+        mGo = std::make_unique<GoToTask>("off the foot switch", [g, on, cell](s32 n)
+                                         { return n != on && g->Nodes()[n].mLine == g->Nodes()[on].mLine && std::abs(g->Nodes()[n].mX - g->Nodes()[on].mX) <= cell + 2; });
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    if (bot.AbeNode() != on)
+    {
+        mPhase = 2;
+        mGo = std::make_unique<GoToTask>("onto the foot switch", [on](s32 n)
+                                         { return n == on; });
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    return TaskStep::Do(Prim::Wait(1));
+}
+
 ParamiteTourTask::~ParamiteTourTask() = default;
 
 TaskStep ParamiteTourTask::Next(Bot& bot, const std::string& lastFailed)
@@ -5716,6 +5769,143 @@ TaskStep ParamiteTourTask::Next(Bot& bot, const std::string& lastFailed)
             if (!mRing)
             {
                 const std::vector<u32> tour = Domain::ParamiteTour(nav, world, at);
+                if (tour.empty() && mClear && !mParked)
+                {
+                    // (said in turn, a second apart)
+                    if (mSay > 0)
+                    {
+                        const u32 word = mSay == 1 ? Btn::eSpeak1 : mSay == 2 ? Btn::eSpeak2 : Btn::eSpeak3;
+                        const bool stay = mSay == 3;
+                        mSay = mSay == 1 ? 2 : 0;
+                        mWait = 45;
+                        mParked = stay;
+                        return TaskStep::Do(Prim::Wait(3, word));
+                    }
+                    // To where each Fleech of these floors is kept, the nearest first: the ones that are there
+                    // come at it or run, and are hunted as they are seen
+                    s32 next = -1;
+                    s32 nextCost = 0;
+                    for (const Entity& f : world.mEntities)
+                    {
+                        if (f.mKind != EntityKind::eFleech || f.mGone || f.mInputs[1] != 0 || f.mHalf != me->mHalf || mBeenTo.count(f.mId) != 0)
+                        {
+                            continue;
+                        }
+                        const s32 on = nav.NodeAt(f.CentreX(), f.mY2, f.mHalf, 30);
+                        s32 cost = 0;
+                        if (on < 0 || !Domain::ParamiteRoute(nav, world, at, on, nullptr, &cost))
+                        {
+                            mBeenTo.insert(f.mId);
+                            continue;
+                        }
+                        if (cost <= 3)
+                        {
+                            mBeenTo.insert(f.mId);
+                            continue;
+                        }
+                        if (next < 0 || cost < nextCost)
+                        {
+                            next = on;
+                            nextCost = cost;
+                        }
+                    }
+                    // Then the other Paramites of these floors: up to each, hello, come on
+                    if (next < 0)
+                    {
+                        for (const Entity& p : world.mEntities)
+                        {
+                            if (p.mKind != EntityKind::eParamite || p.mGone || p.mHalf != me->mHalf || p.mId == mParamite || mCalled.count(p.mId) != 0)
+                            {
+                                continue;
+                            }
+                            s32 px = p.CentreX();
+                            s32 py = p.mY2;
+                            bool seen = false;
+                            for (const ParamiteAt& live : world.mParamites)
+                            {
+                                if (live.mId == p.mId && !live.mPossessed)
+                                {
+                                    px = live.mX;
+                                    py = live.mY;
+                                    seen = !live.Hidden();
+                                }
+                            }
+                            const s32 on = nav.NodeAt(px, py, p.mHalf, 30);
+                            s32 cost = 0;
+                            if (on < 0 || !Domain::ParamiteRoute(nav, world, at, on, nullptr, &cost))
+                            {
+                                mCalled.insert(p.mId);
+                                continue;
+                            }
+                            if (cost <= 5)
+                            {
+                                mCalled.insert(p.mId);
+                                if (seen && std::abs(py - me->mY) <= 20)
+                                {
+                                    if ((px < me->mX) != me->mFacesLeft)
+                                    {
+                                        mCalled.erase(p.mId);
+                                        return TaskStep::Do(Prim::Wait(1, px < me->mX ? left : right));
+                                    }
+                                    bot.Log("the Paramite at " + std::to_string(me->mX) + " calls the one at " + std::to_string(px) + " to come with it");
+                                    mSay = 1;
+                                    return TaskStep::Do(Prim::Wait(1));
+                                }
+                                continue;
+                            }
+                            next = on;
+                            break;
+                        }
+                    }
+                    // Then to the end of the floor away from the way out, and stay
+                    if (next < 0)
+                    {
+                        s32 ends[2] = {at, at};
+                        for (s32 dir = 0; dir < 2; dir++)
+                        {
+                            for (s32 k = 1; k < 400; k++)
+                            {
+                                const s32 n = Domain::ParamiteFloor(nav, world, me->mX + (dir ? k : -k) * cell, me->mY, me->mHalf);
+                                if (n < 0 || Domain::WallBetween(nav, me->mX, nav.Nodes()[n].mX, me->mY, me->mHalf))
+                                {
+                                    break;
+                                }
+                                ends[dir] = n;
+                            }
+                        }
+                        s32 out = nav.Nodes()[at].mX;
+                        for (const NavExit& x : nav.Exits())
+                        {
+                            out = x.mNode >= 0 ? nav.Nodes()[x.mNode].mX : out;
+                        }
+                        const s32 park = std::abs(nav.Nodes()[ends[0]].mX - out) > std::abs(nav.Nodes()[ends[1]].mX - out) ? ends[0] : ends[1];
+                        if (std::abs(nav.Nodes()[park].mX - me->mX) <= 2 * cell)
+                        {
+                            bot.Log("the Paramite is at the end of its floor at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": stay, and it is let go");
+                            mSay = 3;
+                            mPulled++;
+                            for (const Entity& f : world.mEntities)
+                            {
+                                if (f.mKind == EntityKind::eFleech && mBeenTo.count(f.mId) != 0)
+                                {
+                                    bot.FleechKilled(f.mId);
+                                }
+                            }
+                            return TaskStep::Do(Prim::Wait(1));
+                        }
+                        next = park;
+                    }
+                    std::vector<Domain::ParaLeg> legs;
+                    if (!Domain::ParamiteRoute(nav, world, at, next, &legs) || legs.empty())
+                    {
+                        return TaskStep::Do(Prim::Wait(1));
+                    }
+                    mLeg = legs[0].mKind;
+                    mLegTo = legs[0].mTo;
+                    mLegX = legs[0].mX;
+                    mLegFrames = 0;
+                    return TaskStep::Do(Prim::Wait(1));
+                }
                 if (tour.empty())
                 {
                     bot.Log(std::to_string(mPulled) + " rings pulled and no more to get to: letting the Paramite go at " + std::to_string(me->mX) + "," + std::to_string(me->mY));

@@ -801,14 +801,42 @@ private:
     std::unique_ptr<GoToTask> mGo;
 };
 
+// Onto a foot switch's cell so that its switch turns over: off it first if he stands on it.
+class StepOnTask final : public Task
+{
+public:
+    StepOnTask(u32 plate, s32 on)
+        : mPlate(plate)
+        , mOn(on)
+    {
+    }
+    ~StepOnTask() override;
+    std::string Name() const override
+    {
+        return "Step on foot switch #" + std::to_string(mPlate);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mPlate;
+    s32 mOn;
+    s32 mPhase = 0;
+    s32 mWas = -1;
+    s32 mWaits = 0;
+    std::unique_ptr<GoToTask> mGo;
+};
+
 // A Paramite taken over and walked to every ring it can get to (Domain::ParamiteTour, by Domain::ParamiteRoute:
 // floors, webs, hops and drops), each pulled, and let go under the last.
 class ParamiteTourTask final : public Task
 {
 public:
-    ParamiteTourTask(u32 paramite, s32 spot)
+    // clear: no rings; the Fleeches of its floors eaten, the other Paramites there called along, and all of them
+    // left at the end of the floor away from the way out
+    ParamiteTourTask(u32 paramite, s32 spot, bool clear = false)
         : mParamite(paramite)
         , mSpot(spot)
+        , mClear(clear)
     {
     }
     ~ParamiteTourTask() override;
@@ -838,6 +866,14 @@ private:
     s32 mHunt = 0;
     // The frames waited at a gap for a falling rock to go by
     s32 mWaitRock = 0;
+    bool mClear = false;
+    // Clearing: the Fleeches (their entities) whose places it has been to, the Paramites it has called, what it
+    // is saying (0 nothing, then hello, come on, and stay at the end), and where it goes next (-1 none)
+    std::set<u32> mBeenTo;
+    std::set<u32> mCalled;
+    s32 mSay = 0;
+    s32 mGoal = -1;
+    bool mParked = false;
     std::unique_ptr<GoToTask> mGo;
 };
 

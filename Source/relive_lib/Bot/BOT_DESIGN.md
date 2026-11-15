@@ -880,7 +880,7 @@ bite him dead. Nothing is done about the Fleeches while he waits.
 Open: a wait for a lift and the rest have no unit tests yet; the Mudomo vaults themselves (path 8 on) are
 untouched: a taken over Paramite has to eat Fleeches, talk to another, and pull several rings in one go.
 
-**The Mudomo vaults** (from the hub, path 8; the guide's numbering in brackets). Five of six beaten so far,
+**The Mudomo vaults** (from the hub, path 8; the guide's numbering in brackets). All six beaten, one at a time,
 each from its door back to the hub with 0 deaths:
 
 - Path 12 (vault 3), `v3.txt`: f=1,386. The drop down the shaft at 437,460 goes into the well at 437,1500,
@@ -924,7 +924,20 @@ each from its door back to the hub with 0 deaths:
   cell back so as not to stand under the rocks that fall into each gap (`World::mFallers`: a hop is begun as
   a rock has gone by under its feet), under a block that hangs to 19 over the floor (a Paramite looks for
   walls 20 over its feet, 10 at half size: `ParamiteRoute` has its own wall test).
-- Not beaten: path 11 (vault 2), then the trial (path 13: a first try got three screens into its chase).
+- Path 11 (vault 2), `p11.txt` (in by the hub's door: there is no start at half size): out at f=3,612. The
+  levers are in the background and their gates in the foreground: what a gate lets out does not guard a lever
+  worked from the other layer. The background wells are a chain of eight, each in an invisible switch's box
+  that turns it (`FeatureKind::eSwitchZone`: a well jumped into from inside such a box leads where the box
+  sets it), and thrown to a point he flies on into a well just past it (`NavGraph::Thrown`). Then
+  `eParamiteClear` (the tour task with no rings): a Paramite taken over to go to where each Fleech of its
+  floors is kept and eat what it meets, call the other Paramites along (hello, come on) and stay at the end of
+  the floor away from the way out. As measured both Paramites die at it, one after the other, and the floor
+  is left clear of Fleeches and of Paramites: it works, but not the way it was meant to (the parking and the
+  calling have not been seen to run). Nothing is done on a floor with loose Fleeches until then. Then the two
+  locks, each between two foot switches that turn its two gates over: `eStepOn` / `StepOnTask`, and a shut
+  gate is opened from the switch nearest to it (`Key::kPlate`).
+- All six in one run from the hub, `h8.txt`: paths 12, 4, 11, 9, 5, 3 in that order, 0 deaths, and through
+  the trial's door (path 13) at f=16,059. In the trial he dies three screens into the chase: not worked on yet.
 
 Not built, from the user: with one Paramite the meat can also be thrown past it into the next screen and the
 Paramite walked into that screen (it backs off from him), where it then finds the meat. The fallback for when
