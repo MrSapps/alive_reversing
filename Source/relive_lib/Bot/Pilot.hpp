@@ -45,6 +45,11 @@ struct Prim final
     // A fall or a well: the buttons of the move after it, held as he lands. Both games go from the landing
     // straight into a walk or a run when a direction is held as his feet touch, and skip the rest of it.
     u32 mAfter = 0;
+    // A walk off the end of the floor that is a run through this many falls without a stop, done as he lands
+    // from the last of them still running (0: a walk off one edge). With something after him on the floor he
+    // comes down on: measured in the Mudomo vaults' path 7, from 1187,1400 down two ledges to 1345,1520 in 34
+    // frames, against 100 and more a ledge at a time.
+    s32 mRunOff = 0;
     // A roll from where down is the way to climb down a hoist: he walks at the low ceiling instead, and both
     // games duck him under it (a wall at his head and none at his knees, where his walk starts)
     bool mWalkIn = false;

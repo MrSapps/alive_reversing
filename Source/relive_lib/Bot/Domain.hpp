@@ -22,6 +22,8 @@ static const u32 kRocks = 3;
 static const u32 kInvis = 4;
 // He has that power in hand now, or is invisible
 static const u32 kInvisNow = 5;
+// Abe has meat to throw (what a path's sacks give is the one or the other)
+static const u32 kMeat = 6;
 inline u32 Switch(s32 id)
 {
     return 1000 + static_cast<u32>(id);
@@ -61,6 +63,7 @@ enum class StepKind : u8
                 // from it while they run at him and over the edge, and up again
     eParamitePull, // take over Paramite mOther from the cell mEdge, walk it under pull ring mEntity, have it pull
                 // the ring and let it go
+    eMeatUse,   // throw meat to draw Paramite mOther off entity mEntity, then use it
     eFleechLure, // lead the Fleeches that guard entity mEntity off and use it
     eFleechLead, // let Fleeches out with the lever mEntity, lead them to where they drop to a Scrab and kill them with it
     eScrabPen,  // work lever mEntity so that the gate it moves (feature mOther) is shut with every Scrab of that
@@ -183,6 +186,14 @@ struct Domain final
     static std::vector<LooseScrab> LooseScrabs(const World& world, bool waiting = false);
     // Whether a wall stands on the floor at y between x1 and x2
     static bool WallBetween(const NavGraph& nav, s32 x1, s32 x2, s32 y, bool half);
+    // Whether two or more Paramites are on the floor at x, y with no wall between them and there: together they
+    // hunt him along it, faster than he runs (alone one keeps off him)
+    static bool ParamitePack(const NavGraph& nav, const World& world, s32 x, s32 y, bool half);
+    // Whether a loose Scrab or a pack of Paramites gets at him at x, y if he is seen
+    static bool HuntedAt(const NavGraph& nav, const World& world, s32 x, s32 y, bool half)
+    {
+        return ScrabReaches(nav, world, x, y, half, false) || ParamitePack(nav, world, x, y, half);
+    }
     // Whether a Paramite on the floor of the cell from can get up a web to the floor of the cell to (webX: where
     // the web hangs)
     static bool WebUp(const NavGraph& nav, s32 from, s32 to, s32* webX);

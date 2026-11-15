@@ -666,6 +666,14 @@ static void BuildEntities(BinaryPath& path, World& world)
                     // How many rocks it gives
                     e.mInputs[0] = static_cast<const relive::Path_RockSack&>(tlv).mRockAmount;
                     break;
+                case ReliveTypes::eMeatSack:
+                    // (a sack like the other: what it gives is meat)
+                    e.mKind = EntityKind::eRockSack;
+                    keep = GetGameType() == GameType::eAe;
+                    e.mHalf = static_cast<const relive::Path_MeatSack&>(tlv).mScale == relive::reliveScale::eHalf;
+                    e.mInputs[0] = static_cast<const relive::Path_MeatSack&>(tlv).mMeatAmount;
+                    e.mInputs[1] = 1;
+                    break;
                 case ReliveTypes::ePullRingRope:
                 {
                     const auto& t = static_cast<const relive::Path_PullRingRope&>(tlv);
@@ -1200,7 +1208,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
     for (s32 i = 0; isAe && i < gBaseAliveGameObjects->Size(); i++)
     {
         BaseAliveGameObject* pObj = gBaseAliveGameObjects->ItemAt(i);
-        if (pObj && !pObj->GetDead() && pObj->Type() == ReliveTypes::eRock)
+        if (pObj && !pObj->GetDead() && (pObj->Type() == ReliveTypes::eRock || pObj->Type() == ReliveTypes::eMeat))
         {
             RockAt rock;
             rock.mX = FP_GetExponent(pObj->mXPos);
@@ -1399,7 +1407,7 @@ std::vector<PathSummary> GameView::ReadLevel(BaseMap& map)
         const NavInput in = BuildNavInput(*path, static_cast<s32>(map.mCurrentLevel), summary.mPath);
         for (const NavFeature& f : in.mFeatures)
         {
-            if (f.mDestPath >= 0 && (f.mKind == FeatureKind::eDoor || f.mKind == FeatureKind::eWellExpress || f.mKind == FeatureKind::ePathExit || f.mKind == FeatureKind::eLevelLoader))
+            if (f.mDestPath >= 0 && (f.mKind == FeatureKind::eDoor || f.mKind == FeatureKind::eWellExpress || f.mKind == FeatureKind::ePathExit || f.mKind == FeatureKind::eLevelLoader || f.mKind == FeatureKind::ePortal))
             {
                 summary.mExits.push_back({f.mDestLevel, f.mDestPath});
             }

@@ -842,6 +842,48 @@ Unit tests: `BotParamite.AWebLeadsFromTheFloorAtItsFootToTheOneByItsTop`,
 `BotParamite.AParamiteThatCanGetUnderARingIsHadToPullIt`. None yet for the Slog leap wait, the foot switch
 teleporter, the spawner count, the trap door lever or the lift wait.
 
+**Meat** (2026-11-15, the Mudomo vaults' path 10): a meat sack is a rock sack that gives meat
+(`Entity::mInputs[1]`, `World::CarriesMeat`, `Key::kMeat`). A lock or lever with one Paramite alone within 250 px
+on its floor is only used after meat is thrown (`StepKind::eMeatUse`, `MeatLureTask`): from five cells or more on
+the side he comes from, thrown on away from it so that it lands on its floor on the screen he is on
+(`Paramite::FindMeat` only sees meat on the current screen; its wall test is made at a height where there is no
+wall). It runs past him to the meat and eats for `meat_eating_time`. Measured at the lock at 1612,720: thrown
+from 1937, slapped with no death. With two or more Paramites on the floor (`Domain::ParamitePack`) the thing is
+only used unseen, and the chant comes before he steps onto their floor (`Domain::HuntedAt`).
+**Paths 7 and 10, and the bird portal to the vaults' hub (path 8)**: beaten, 0 deaths, in one run from the
+pillar of path 10 (`build-bot/n10.txt`: path 7 at f=2,045, path 8 at f=2,367). Path 7's ring was pulled first
+try by the same action as the way in's (the Paramite walks a screen and a half through eleven sleeping
+Fleeches, which a Paramite does not wake: Fleech.cpp). What path 10 and the way out took:
+- Rolled off a low end over a gap he clears it for drops from 40 down (was 80), and a wall that ends 20 over
+  the floor does not stop the roll (measured: off 2037,600 onto 1962,640).
+- The lock on the trio's floor at 1037,740: slapped unseen. The power (330 frames from the chant) is chanted for
+  on the last cell before the first pack's floor; unseen too, a running jump that catches a hoist is cheap with
+  Paramites on his floor; a lock is slapped from the side the way to it is shorter (`UseTask`). He is off
+  their floor with 8 frames of it left, which is no margin. Before those two he was 50 frames short.
+- A bird portal of his own that leads to another path is an exit (`NavGraph`, `ExitTask`): chanted open from
+  four cells off or more on its screen, from a floor no pack hunts him on, then hopped into from two cells.
+- Down onto a pack's floor seen: off the edge at a run through every ledge on the way (`Prim::mRunOff`), and a
+  hop that lands within 150 px of one of them costs 400 more. Measured from the door at 1187,1400: the hop to
+  1312,1520 was death 12 frames after landing, a ledge at a time took 100 frames and lived one try in six, the
+  run is on the pack's floor at 1345 after 34 frames and gets away.
+One run from the way in's start (`build-bot/mh1.txt`, 2026-11-15): path 7 at f=3,820, path 10 at 5,691, path 7
+again, the vaults' hub (path 8) at f=8,418, 0 deaths. For that the level's map counts a bird portal to another
+path as a way between paths (`GameView::ReadLevel`), and with no way out of a path known an exit into a path not
+been in yet, from which the level goes on, is taken before any wandering (`Bot.cpp`, "any path of this level
+not yet been in will do": without it he went to and fro through path 7's door for 570 frames first).
+Known weak: the 8 frames above. The run off the edge does not happen at the first pit (the fall is the last
+edge of that crossing, so nothing says the way goes on the same way).
+Also weak, seen once in the long chain from the Scrab vaults (`vall`, f=37,800; the same room is clean from
+`tr1` and `tr6`): in the trial's last room he lands on the ledge at 1712,840 with the Scrab below stood still
+at 1762 facing right, no crossing is found (spare -1000) for 100 frames and the two Fleeches on the ledge
+bite him dead. Nothing is done about the Fleeches while he waits.
+Open: a wait for a lift and the rest have no unit tests yet; the Mudomo vaults themselves (path 8 on) are
+untouched: a taken over Paramite has to eat Fleeches, talk to another, and pull several rings in one go.
+
+Not built, from the user: with one Paramite the meat can also be thrown past it into the next screen and the
+Paramite walked into that screen (it backs off from him), where it then finds the meat. The fallback for when
+no throw from a safe cell lands on his own screen.
+
 ### Next, in order
 
 1. The Mudomo (Paramite) vaults from path 7 on: Fleeches killed with a Paramite, meat thrown to draw one off,

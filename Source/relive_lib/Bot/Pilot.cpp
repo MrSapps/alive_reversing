@@ -599,6 +599,30 @@ PilotStatus Pilot::StepWalkOff(const AbeState& abe, u32& bits)
     {
         return PilotStatus::eRunning;
     }
+    if (mPrim.mRunOff > 0)
+    {
+        // (mStill: in the air the frame before; mPhase: the falls landed from)
+        bits = (mPrim.mFaceLeft ? Btn::eLeft : Btn::eRight) | Btn::eRun;
+        const bool air = abe.mMove == Move::eAir || !abe.mOnGround;
+        if (air)
+        {
+            mStill = 1;
+        }
+        else if (mStill)
+        {
+            mStill = 0;
+            mPhase++;
+        }
+        if (mPhase >= mPrim.mRunOff)
+        {
+            return PilotStatus::eDone;
+        }
+        if (mFrames > 300)
+        {
+            return Fail("did not run off");
+        }
+        return PilotStatus::eRunning;
+    }
     if (mPhase == 0)
     {
         if (abe.mMove == Move::eAir || !abe.mOnGround)
