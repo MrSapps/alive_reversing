@@ -67,6 +67,8 @@ enum class StepKind : u8
                 // the ring and let it go
     eMeatUse,   // throw meat to draw Paramite mOther off entity mEntity, then use it
     eFleechLure, // lead the Fleeches that guard entity mEntity off and use it
+    eParamiteTour, // take over Paramite mOther from the cell mEdge and have it pull every ring it can get to
+                // (Domain::ParamiteTour), the nearest first, and let it go under the last
     eMeatFeed,  // on the way to the cell mEdge, from the last cell before the level of Paramites that team up:
                 // throw meat onto their level away from the way, and wait until they are off after it
     eFleechPen, // pull lever mEntity, which wakes Fleeches, lead them over the top to behind the gate (feature
@@ -197,6 +199,32 @@ struct Domain final
     static bool ParamitePack(const NavGraph& nav, const World& world, s32 x, s32 y, bool half);
     // A Paramite on its own that he would have against the end of its floor there: it turns on him
     static bool ParamiteCornered(const NavGraph& nav, const World& world, s32 x, s32 y, bool half);
+    // A stretch of the way of a Paramite that is played: along floors to a cell, up or down a web (mX: the
+    // web's), a hop over a gap of up to three cells, or off the end of a floor to the one under it
+    struct ParaLeg final
+    {
+        enum Kind : u8
+        {
+            eWalk,
+            eWebUp,
+            eWebDown,
+            eHop,
+            eFall,
+        };
+        Kind mKind = eWalk;
+        s32 mTo = -1;
+        s32 mX = 0;
+    };
+    // The way from one cell to another for a Paramite that is played (Paramite.cpp: it walks off the ends of
+    // floors, grabs a web it walks, hops or falls into, climbs it while up or down is held and steps off at its
+    // ends, and hops four cells). A lift's stop is floor only while the lift is at it. cost: in cells, about.
+    static bool ParamiteRoute(const NavGraph& nav, const World& world, s32 from, s32 to, std::vector<ParaLeg>* legs, s32* cost = nullptr);
+    // The rings a Paramite at a cell can be walked to and has not pulled, the nearest first and each next from
+    // the one before
+    static std::vector<u32> ParamiteTour(const NavGraph& nav, const World& world, s32 from);
+    // The cell a Paramite can stand in at a place, or -1: floor there, no shut gate in it, and if it is a lift's
+    // stop the lift at it
+    static s32 ParamiteFloor(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, s32 tolerance = 8);
     // A cell on the level of Paramites that team up, by where the level has them (they are only about once he is
     // on their screen): two or more of his size on its screen, one at least on its level. Paramite.cpp,
     // AnotherParamiteNear: with another on the screen, one that finds him on its level goes for him and the

@@ -880,7 +880,7 @@ bite him dead. Nothing is done about the Fleeches while he waits.
 Open: a wait for a lift and the rest have no unit tests yet; the Mudomo vaults themselves (path 8 on) are
 untouched: a taken over Paramite has to eat Fleeches, talk to another, and pull several rings in one go.
 
-**The Mudomo vaults** (from the hub, path 8; the guide's numbering in brackets). Three of six beaten so far,
+**The Mudomo vaults** (from the hub, path 8; the guide's numbering in brackets). Four of six beaten so far,
 each from its door back to the hub with 0 deaths:
 
 - Path 12 (vault 3), `v3.txt`: f=1,386. The drop down the shaft at 437,460 goes into the well at 437,1500,
@@ -904,12 +904,23 @@ each from its door back to the hub with 0 deaths:
   floor at a run where the way goes on down (landing further out than the fall was drawn counts as there).
   The way out is a roll off the low end at 1912,980 that ends hung from the exit's ledge 220 below and three
   cells out: a fall edge to a ledge whose `edge` box faces the way he goes (`NavGraph::Build`).
-- Path 9 (vault 1), `p9.txt`: the first lock and both rings of the first screen (the chant takes the nearest
-  Paramite on his screen, `Abe::FindObjectToPossess`, so a ring is only offered from a place its Paramite is
-  the nearest to). Then nothing: the Paramite has to be walked on over three screens, eat Fleeches, climb
-  webs and pull two more rings.
-- Not beaten: paths 9, 11, 5 (vaults 1, 2, 6), then the trial (path 13). All three need a Paramite taken over
-  and played across screens for more than one ring.
+- Path 9 (vault 1), `p9.txt`: f=3,306. `eParamiteTour` / `ParamiteTourTask`: one Paramite taken over and
+  walked to every ring it can get to (`Domain::ParamiteTour`), by `Domain::ParamiteRoute`: floors, webs up and
+  down, a hop of four cells over a gap, a drop off a floor's end; a lift's stop is floor only while the lift is
+  at it (`Domain::ParamiteFloor`). Here: its own ring, down, three screens left, up the web to the ring that
+  lowers the lift, on over two gaps, down a 240 web, up another to the ring that raises the second lift, and
+  let go there, on a ledge off his way. Fleeches awake on its level are hunted, the nearest to him first:
+  the running bite (action at a run, Motion_31) where there is floor or a wall past them and he is not in its
+  way (it kills him too), else walked up to and eaten (down). It walks up to sleeping ones, so that it is
+  among them when they wake. The chant takes the nearest Paramite on his screen (`Abe::FindObjectToPossess`),
+  so a tour or a ring is only offered from a place its Paramite is the nearest to.
+  The control sheet of a played Paramite (from Paramite.cpp): walk stops a cell after the way is let go, a run
+  two; neither stops at a floor's end; hop from a stand with no way held, four cells; a web is grabbed by
+  walking, hopping or falling into it, or from a jump up beside it; at its top it steps off half a cell to a
+  side onto a floor within 20, at its foot onto the floor within 50 under it; down eats a Fleech or Slurg a
+  cell ahead; a Fleech's hit costs it 0.15 of its life; a fall of over 180 kills it.
+- Not beaten: paths 11 and 5 (vaults 2 and 6), then the trial (path 13: a first try got three screens into
+  its chase).
 
 Not built, from the user: with one Paramite the meat can also be thrown past it into the next screen and the
 Paramite walked into that screen (it backs off from him), where it then finds the meat. The fallback for when

@@ -1029,6 +1029,232 @@ bool Domain::ParamiteCornered(const NavGraph& nav, const World& world, s32 x, s3
     return false;
 }
 
+s32 Domain::ParamiteFloor(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, s32 tolerance)
+{
+    const s32 n = nav.NodeAt(x, y, half, tolerance);
+    const s32 cell = NavGraph::GridStep(half);
+    if (n < 0 || std::abs(nav.Nodes()[n].mX - x) > cell / 2 + 1 || GateBetween(nav, world, nav.Nodes()[n].mX - cell / 2, nav.Nodes()[n].mX + cell / 2, nav.Nodes()[n].mY, half))
+    {
+        return -1;
+    }
+    if (nav.Nodes()[n].mLiftStop < 0)
+    {
+        return n;
+    }
+    for (const LiftAt& lift : world.mLifts)
+    {
+        if (nav.Nodes()[n].mX >= lift.mX1 && nav.Nodes()[n].mX <= lift.mX2 && std::abs(lift.mY - nav.Nodes()[n].mY) <= 6)
+        {
+            return n;
+        }
+    }
+    return -1;
+}
+
+bool Domain::ParamiteRoute(const NavGraph& nav, const World& world, s32 from, s32 to, std::vector<ParaLeg>* legs, s32* cost)
+{
+    if (from < 0 || to < 0)
+    {
+        return false;
+    }
+    const bool half = nav.Nodes()[from].mHalf;
+    const s32 cell = NavGraph::GridStep(half);
+    const s32 scale = half ? 2 : 1;
+    struct Way final
+    {
+        s32 mTo;
+        s32 mCost;
+        ParaLeg::Kind mKind;
+        s32 mX;
+    };
+    const auto standable = [&](s32 n)
+    {
+        if (n < 0 || nav.Nodes()[n].mHalf != half)
+        {
+            return false;
+        }
+        // (not in a gate that is shut)
+        if (GateBetween(nav, world, nav.Nodes()[n].mX - cell / 2, nav.Nodes()[n].mX + cell / 2, nav.Nodes()[n].mY, half))
+        {
+            return false;
+        }
+        if (nav.Nodes()[n].mLiftStop < 0)
+        {
+            return true;
+        }
+        for (const LiftAt& lift : world.mLifts)
+        {
+            if (nav.Nodes()[n].mX >= lift.mX1 && nav.Nodes()[n].mX <= lift.mX2 && std::abs(lift.mY - nav.Nodes()[n].mY) <= 6)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    const auto ways = [&](s32 n, std::vector<Way>& out)
+    {
+        const NavNode& a = nav.Nodes()[n];
+        for (s32 dir = -1; dir <= 1; dir += 2)
+        {
+            const s32 nx = a.mX + dir * cell;
+            if (WallBetween(nav, a.mX, nx, a.mY, half) || GateBetween(nav, world, a.mX, nx, a.mY, half))
+            {
+                continue;
+            }
+            const s32 next = nav.NodeAt(nx, a.mY, half, 6);
+            if (standable(next) && std::abs(nav.Nodes()[next].mX - nx) <= cell / 2)
+            {
+                out.push_back({next, 1, ParaLeg::eWalk, 0});
+                continue;
+            }
+            // No floor on: a hop to the fourth cell, or off the end to what is under it
+            const s32 hx = a.mX + dir * 4 * cell;
+            const s32 over = nav.NodeAt(hx, a.mY, half, 8);
+            if (standable(over) && std::abs(nav.Nodes()[over].mX - hx) <= cell / 2 && !WallBetween(nav, a.mX, hx, a.mY, half) && !GateBetween(nav, world, a.mX, hx, a.mY, half))
+            {
+                out.push_back({over, 6, ParaLeg::eHop, 0});
+            }
+            s32 fy = 0;
+            s32 height = 0;
+            if (nav.FloorBelow(nx, a.mY + 1, half, &fy, &height) >= 0 && height * scale < 170)
+            {
+                const s32 under = nav.NodeAt(nx, fy, half, 6);
+                if (standable(under))
+                {
+                    out.push_back({under, 4 + height * scale / 25, ParaLeg::eFall, 0});
+                }
+            }
+        }
+        for (const NavLine& l : nav.Input().mLines)
+        {
+            if (l.mType != 8)
+            {
+                continue;
+            }
+            const s32 x = (l.mX1 + l.mX2) / 2;
+            const s32 top = std::min(l.mY1, l.mY2);
+            const s32 bottom = std::max(l.mY1, l.mY2);
+            if (std::abs(x - a.mX) > cell)
+            {
+                continue;
+            }
+            // (at its top it steps off half a cell to a side, onto a floor within 20 of the top; at its foot onto
+            // the floor within 50 under it)
+            s32 over = nav.NodeAt(x - cell / 2, top, half, 20);
+            over = standable(over) && std::abs(nav.Nodes()[over].mX - x) <= cell ? over : nav.NodeAt(x + cell / 2, top, half, 20);
+            s32 fy = 0;
+            s32 under = nav.FloorBelow(x, bottom - 25, half, &fy) >= 0 && fy - bottom <= 50 / scale ? nav.NodeAt(x, fy, half, 13) : -1;
+            if (!standable(over) || !standable(under) || std::abs(nav.Nodes()[over].mX - x) > cell || nav.Nodes()[over].mY >= nav.Nodes()[under].mY)
+            {
+                continue;
+            }
+            const s32 climb = 8 + (bottom - top) * scale / 25;
+            if (n == under)
+            {
+                out.push_back({over, climb, ParaLeg::eWebUp, x});
+            }
+            if (n == over)
+            {
+                out.push_back({under, climb, ParaLeg::eWebDown, x});
+            }
+        }
+    };
+    const std::size_t count = nav.Nodes().size();
+    std::vector<s32> best(count, 1000000);
+    std::vector<s32> prev(count, -1);
+    std::vector<Way> by(count, Way{-1, 0, ParaLeg::eWalk, 0});
+    std::vector<char> done(count, 0);
+    best[from] = 0;
+    for (;;)
+    {
+        s32 at = -1;
+        for (std::size_t i = 0; i < count; i++)
+        {
+            if (!done[i] && best[i] < 1000000 && (at < 0 || best[i] < best[at]))
+            {
+                at = static_cast<s32>(i);
+            }
+        }
+        if (at < 0 || at == to)
+        {
+            break;
+        }
+        done[at] = 1;
+        std::vector<Way> out;
+        ways(at, out);
+        for (const Way& w : out)
+        {
+            if (best[at] + w.mCost < best[w.mTo])
+            {
+                best[w.mTo] = best[at] + w.mCost;
+                prev[w.mTo] = at;
+                by[w.mTo] = w;
+            }
+        }
+    }
+    if (best[to] >= 1000000)
+    {
+        return false;
+    }
+    if (cost)
+    {
+        *cost = best[to];
+    }
+    if (legs)
+    {
+        std::vector<ParaLeg> back;
+        for (s32 n = to; n != from; n = prev[n])
+        {
+            ParaLeg leg;
+            leg.mKind = by[n].mKind;
+            leg.mTo = n;
+            leg.mX = by[n].mX;
+            // (a walk that goes on is one walk)
+            if (leg.mKind == ParaLeg::eWalk && !back.empty() && back.back().mKind == ParaLeg::eWalk)
+            {
+                continue;
+            }
+            back.push_back(leg);
+        }
+        legs->assign(back.rbegin(), back.rend());
+    }
+    return true;
+}
+
+std::vector<u32> Domain::ParamiteTour(const NavGraph& nav, const World& world, s32 from)
+{
+    std::vector<u32> tour;
+    s32 at = from;
+    for (;;)
+    {
+        const Entity* next = nullptr;
+        s32 nextNode = -1;
+        s32 nextCost = 0;
+        for (const Entity& ring : world.mEntities)
+        {
+            if (ring.mKind != EntityKind::ePullRing || ring.mGone || ring.mSwitch <= 1 || world.Switch(ring.mSwitch) != 0 || std::find(tour.begin(), tour.end(), ring.mId) != tour.end())
+            {
+                continue;
+            }
+            const s32 under = UseNode(nav, ring, nullptr);
+            s32 cost = 0;
+            if (under >= 0 && at >= 0 && nav.Nodes()[under].mHalf == nav.Nodes()[at].mHalf && ParamiteRoute(nav, world, at, under, nullptr, &cost) && (!next || cost < nextCost))
+            {
+                next = &ring;
+                nextNode = under;
+                nextCost = cost;
+            }
+        }
+        if (!next)
+        {
+            break;
+        }
+        tour.push_back(next->mId);
+        at = nextNode;
+    }
+    return tour;
+}
+
 bool Domain::PackLevel(const NavGraph& nav, const World& world, s32 node)
 {
     const NavNode& n = nav.Nodes()[node];
@@ -2479,6 +2705,29 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                                 pull.mEdge = static_cast<s32>(n);
                                 // (not with the power to go unseen in hand: the chant would spend it)
                                 std::vector<Goap::Fact> pullPre{regionFact(static_cast<s32>(n)), {key, 0}, {Key::kInvisNow, 0}};
+                                // (more than one that it can be walked to, or one that is not on its own floor's
+                                // way: all of them in one go, and it is left under the last. The walkthrough of the
+                                // first Mudomo vault: "continue left, climb up to the Ghost Lock and pull the ring
+                                // to lower the lift ... climb down the web at the end. Pull the ring above the
+                                // platform on the right")
+                                const std::vector<u32> tour = ParamiteTour(nav, world, at);
+                                if (tour.size() >= 2 && tour[0] == entity.mId)
+                                {
+                                    std::vector<Goap::Fact> tourPre{regionFact(static_cast<s32>(n)), {Key::kInvisNow, 0}};
+                                    std::vector<Goap::Fact> tourGives;
+                                    std::string names;
+                                    for (u32 id : tour)
+                                    {
+                                        const Entity* r = world.Find(id);
+                                        tourPre.push_back({Key::Switch(r->mSwitch), 0});
+                                        tourGives.push_back({Key::Switch(r->mSwitch), 1});
+                                        names += (names.empty() ? "PullRing#" : ", PullRing#") + std::to_string(id);
+                                    }
+                                    DomainStep all = pull;
+                                    all.mKind = StepKind::eParamiteTour;
+                                    add("Have Paramite#" + std::to_string(para.mId) + " pull " + names + " from " + std::to_string(spot.mX) + "," + std::to_string(spot.mY), tourPre, tourGives, 500 + 100 * static_cast<s32>(tour.size()), all);
+                                    continue;
+                                }
                                 add("Have Paramite#" + std::to_string(para.mId) + " pull " + name + " from " + std::to_string(spot.mX) + "," + std::to_string(spot.mY), pullPre, gives, 700, pull);
                             }
                         }
