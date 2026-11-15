@@ -9,7 +9,7 @@ it can test a plan step for real before committing to it, because a quicksave re
 Premise: quicksave/restore is deterministic (the determinism work on this branch). Everything below
 leans on that.
 
-## Where it stands (2026-11-12)
+## Where it stands (2026-11-15)
 
 The sections after this one are the design as first written. This one is what is built, what was measured and
 what is left, and wins where they differ.
@@ -716,7 +716,7 @@ deaths. One run from the Mines' start through path 5 (`build-bot/mall2.txt`, out
 before the work on paths 4 and 1. One run from the vault's start (`build-bot/vall.txt`, 2026-11-12, final code):
 path 6 out at f=8,160, vault 3 in at 8,947, path 8 at 11,064, path 5 at 12,470, path 4 at 21,049, path 1 at
 28,063, path 2 at 32,911, no deaths, nothing taken back; its time limit (3,500 s) cut it off in path 2 at
-f=34,017. What comes after the sixth vault (the hub's middle door, the trial) has not been seen yet. Of the other profiles `kill_all` gets as far as the vault's path 8 with 3 deaths and
+f=34,017. What comes after the sixth vault is below (the trial). Of the other profiles `kill_all` gets as far as the vault's path 8 with 3 deaths and
 `save_all` sticks in the Mines' path 4 (below). Each stuck report names what stops it.
 
 **All three profiles without a death** (final code, seed 1, headless, 2026-11-12, last runs of the day:
@@ -797,10 +797,56 @@ They began at 15 and 21 deaths. What it was, and what was done:
   the run gets through at f=5,100), and holding while the Slig is at the end of its beat.
 `any` is as it was to the frame after all of this (f=65,428).
 
+**The Mudanchee trial and the way to the Paramite vaults** (2026-11-15, `any`, seed 1). One run from the Scrab
+vault's start (`build-bot/vall.txt`): the six vaults, the trial behind the hub's middle door (paths 9, 10 and
+11 of `mudanchee_vault_ender`), out through Necrum and into the Mudomo vaults' way in, 0 deaths. The same from
+the hub's door (`tr1.txt`) and from path 9's end (`tr6.txt`). What the trial took:
+- A Slog under a ledge he has to leave by a hop or a fall: it leaps and looks in turn (Slog.cpp states 15, 16,
+  18) and goes for him once he is within 50 px of its level. `GoToTask` faces the way he will go and leaves as
+  the Slog begins `Motion_19_JumpUpwards` (24 frames it cannot break off).
+- A refuge reached through a teleporter on a foot switch (`SlogFleeTask`, `mThrough`): run over the plate with
+  the run held; the teleporter takes him about 13 frames after the switch, wherever he is by then.
+- A Slog spawner's Slig is burst when all its Slogs are out (`World::mSlogSpawners` carries `mMaxSlogs`), and
+  the task is done only once Abe is on his feet again after the chant.
+- The last lock is slapped unseen (`Use <lock> ... on unseen`, `Bot::HoldInvis`): its Fleeches take no notice.
+- Not modelled: Sligs that shoot from the background (`can_zshoot`). Path 10's shoots about 80 frames after
+  its screen comes in; the bot is through by then.
+
+**The Mudomo vaults' way in (path 1)**: beaten, 0 deaths, the door to path 7 at f=3,820 from the path's start
+(`build-bot/mh1.txt`). It is the walkthrough's way, and all of it came out of general rules:
+- Paramites are in the world (`ParamiteAt`, `World::mParamites`, `EntityKind::eParamite`; `Paramite::BrainIndex`
+  and `BrainSubState` are read-only accessors). Read in Paramite.cpp: it finds Abe on its own level (40 px),
+  same scale, no wall between, whatever the distance. One alone keeps off him and strikes only cornered. With
+  another on its screen it chases: 7.14 px a frame against his 6.24, a running attack from 100 px.
+- With Paramites on his floor a running jump that catches a hoist costs 20 instead of 400 (`Bot::EdgeCostFn`,
+  as for Scrabs and Fleeches). Measured at 2137,460: stopping to climb is where the pair got him, six times;
+  the catch gets him up with 70 px to spare. The same rule carries the last run to the door past five of them.
+- `Have Paramite#P pull PullRing#R from x,y` (`StepKind::eParamitePull`, `ParamitePullTask`): for a ring a
+  Paramite can get under. Abe goes to a cell of the Paramite's screen that is not on its level (any cell if it
+  is of the other size), with no orb on that screen, chants until he is in one, walks it under the ring, jumps
+  it at the ring (up), and lets it go (the chant held from a stand: motion 29 ends as soon as it is let up, so
+  the chant is held through it). The ring may be on another screen of the Paramite's floor.
+- Webs (`Domain::WebUp`): a track line (type 8) whose foot is within 20 of the Paramite's floor and whose top
+  is by the ring's floor. It is grabbed from a jump within a cell of it, facing it, climbed with up held, and
+  left by itself at the top. The floor at its foot may be another line at the same height, a lift's platform
+  between them included. Rings 155, 156 and 159 are all of this kind.
+- Paramites that come down a web when Abe comes on their screen (`surprise_web`) count once their switch is
+  one a screen sets; the task waits until one is down before it chants.
+- A lever with a trap door for the cell on its other side is also offered from the trap door, cheaper
+  (`... on from the trap door`): at 3187,1140 he lands on it between two Paramites that come down their webs,
+  and the walk round to the lever's other side was what killed him, every try. Turned and pulled where he
+  lands, he is through the floor 48 frames after landing.
+- A lift on its way to a stop the route walks onto is waited for (`GoToTask`, `mLiftComeWaits`): the same
+  lever sends one by a timer, and "no route" came before it was there.
+Unit tests: `BotParamite.AWebLeadsFromTheFloorAtItsFootToTheOneByItsTop`,
+`BotParamite.AParamiteThatCanGetUnderARingIsHadToPullIt`. None yet for the Slog leap wait, the foot switch
+teleporter, the spawner count, the trap door lever or the lift wait.
+
 ### Next, in order
 
-1. The Mudanchee trial behind the hub's middle door, which the six vaults open: not seen yet. The full run from
-   the Mines again (`mall2.txt`), which has not seen paths 2, 4 and 1. In path 1 the bites at the left lock
+1. The Mudomo (Paramite) vaults from path 7 on: Fleeches killed with a Paramite, meat thrown to draw one off,
+   locks slapped unseen past Paramites, the bird portal. The full run from the Mines again (`mall2.txt`), which
+   has not seen the Scrab vault's paths 2, 4 and 1 nor the trial. In path 1 the bites at the left lock
    (health 24 in 100) and the 630 frames waited for the background Scrab; path 4's four bites over the top.
    The bites in paths 3 and 8. The wait
    on the platform in path 5's third part. Then the Paramite vaults, untouched. The Mines' path 6

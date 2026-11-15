@@ -3909,3 +3909,119 @@ TEST(BotVault, AThingOnAScrabsFloorUnderALedgeIsUsedUnseen)
     none.mEntities.erase(none.mEntities.begin());
     EXPECT_EQ(unseen(none, 2), 0);
 }
+
+// The Mudomo hub's third ring: a floor with a Paramite on it, a ledge over it with the ring, and a web from the one
+// up to the other
+static NavInput WebRoom(bool web)
+{
+    NavInput in;
+    in.mLines.push_back(Line(3000, 460, 3375, 460, 0));
+    in.mLines.push_back(Line(3125, 340, 3250, 340, 0));
+    if (web)
+    {
+        in.mLines.push_back(Line(3250, 340, 3250, 440, 8));
+    }
+    return in;
+}
+
+static World WebRoomWorld()
+{
+    World world;
+    Entity ring;
+    ring.mKind = EntityKind::ePullRing;
+    ring.mId = 1;
+    ring.mX1 = 3175;
+    ring.mX2 = 3200;
+    ring.mY1 = 250;
+    ring.mY2 = 274;
+    ring.mInputs[0] = 44;
+    ring.mSwitch = 156;
+    world.mEntities.push_back(ring);
+    Entity paramite;
+    paramite.mKind = EntityKind::eParamite;
+    paramite.mId = 2;
+    paramite.mX1 = 3200;
+    paramite.mX2 = 3224;
+    paramite.mY1 = 440;
+    paramite.mY2 = 464;
+    world.mEntities.push_back(paramite);
+    return world;
+}
+
+static s32 ParamitePulls(const Domain& d)
+{
+    s32 count = 0;
+    for (const Goap::Action& a : d.mActions)
+    {
+        count += a.mName.compare(0, 14, "Have Paramite#") == 0 ? 1 : 0;
+    }
+    return count;
+}
+
+TEST(BotParamite, AWebLeadsFromTheFloorAtItsFootToTheOneByItsTop)
+{
+    NavGraph g;
+    g.Build(WebRoom(true));
+    const s32 below = g.NodeAt(3212, 460, false);
+    const s32 above = g.NodeAt(3187, 340, false);
+    ASSERT_GE(below, 0);
+    ASSERT_GE(above, 0);
+    s32 webX = 0;
+    EXPECT_TRUE(Domain::WebUp(g, below, above, &webX));
+    EXPECT_EQ(webX, 3250);
+    // (up only: it is got on from a jump at its foot)
+    EXPECT_FALSE(Domain::WebUp(g, above, below, nullptr));
+    NavGraph none;
+    none.Build(WebRoom(false));
+    EXPECT_FALSE(Domain::WebUp(none, none.NodeAt(3212, 460, false), none.NodeAt(3187, 340, false), nullptr));
+}
+
+TEST(BotParamite, AParamiteThatCanGetUnderARingIsHadToPullIt)
+{
+    // Taken over from a place on its screen that is not on its level, where no orb stops the chant
+    NavGraph g;
+    g.Build(WebRoom(true));
+    World world = WebRoomWorld();
+    const s32 from = g.NodeAt(3137, 340, false);
+    {
+        const Domain d = Domain::Build(g, world, from, nullptr);
+        EXPECT_GT(ParamitePulls(d), 0);
+        for (const Goap::Action& a : d.mActions)
+        {
+            if (a.mName.compare(0, 14, "Have Paramite#") == 0)
+            {
+                // (never from its own floor: cornered it strikes)
+                EXPECT_EQ(a.mName.find(",460"), std::string::npos) << a.mName;
+                EXPECT_NE(std::find(a.mPre.begin(), a.mPre.end(), Goap::Fact{Key::Switch(156), 0}), a.mPre.end());
+            }
+        }
+    }
+    // No web: it cannot get to the ring's floor
+    {
+        NavGraph none;
+        none.Build(WebRoom(false));
+        const Domain d = Domain::Build(none, world, none.NodeAt(3137, 340, false), nullptr);
+        EXPECT_EQ(ParamitePulls(d), 0);
+    }
+    // An orb on the screen: no chant
+    {
+        World orbed = world;
+        Entity orb;
+        orb.mKind = EntityKind::eSecurityOrb;
+        orb.mId = 3;
+        orb.mX1 = 3300;
+        orb.mX2 = 3324;
+        orb.mY1 = 380;
+        orb.mY2 = 404;
+        orbed.mEntities.push_back(orb);
+        const Domain d = Domain::Build(g, orbed, from, nullptr);
+        EXPECT_EQ(ParamitePulls(d), 0);
+    }
+    // One that is spawned later is not there to be taken over
+    {
+        World spawned = world;
+        spawned.mEntities[1].mInputs[0] = 2;
+        const Domain d = Domain::Build(g, spawned, from, nullptr);
+        EXPECT_EQ(ParamitePulls(d), 0);
+    }
+}

@@ -300,6 +300,54 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     }
     if (!atGoal && !led && (!nav.FindPath(cur, mIsGoal, bot.EdgeCostFn(), path) || path.empty()))
     {
+        // With a lift on its way to a stop the way goes onto: that is waited for (one a timer sends, after the
+        // lever that dropped him here: the Mudomo hub at 3187,1260)
+        const NavGraph::EdgeCost all = bot.EdgeCostFn();
+        const World& w = bot.GetWorld();
+        const auto away = [&nav, &w](const NavEdge& e)
+        {
+            const NavNode& to = nav.Nodes()[e.mTo];
+            return to.mLiftStop >= 0 && nav.Nodes()[e.mFrom].mLiftStop < 0 && !w.LiftAtStop(to.mX, to.mY, nav.Input().mFeatures[to.mLiftStop].mA != 0);
+        };
+        std::vector<s32> soon;
+        if (mLiftComeWaits < 400 && nav.FindPath(cur, mIsGoal, [&](const NavEdge& e) -> s32
+                                                 {
+                                                     s32 sw = 0;
+                                                     s32 value = 0;
+                                                     const s32 cost = all(e);
+                                                     return cost < 0 && away(e) && !(nav.Condition(e, &sw, &value) && w.Switch(sw) != value) ? e.mCost : cost;
+                                                 }, soon))
+        {
+            for (s32 idx : soon)
+            {
+                const NavEdge& e = nav.Edges()[idx];
+                if (all(e) >= 0 || !away(e))
+                {
+                    continue;
+                }
+                const NavNode& stop = nav.Nodes()[e.mTo];
+                for (const LiftAt& lift : w.mLifts)
+                {
+                    if (stop.mX >= lift.mX1 && stop.mX <= lift.mX2)
+                    {
+                        const bool moves = mLiftComeY != -100000 && lift.mY != mLiftComeY;
+                        const bool nearer = std::abs(lift.mY - stop.mY) < std::abs(mLiftComeY - stop.mY);
+                        const bool first = mLiftComeY == -100000;
+                        mLiftComeY = lift.mY;
+                        if (first || (moves && nearer))
+                        {
+                            if (mLiftComeWaits == 0)
+                            {
+                                bot.Log("the lift is on its way to " + std::to_string(stop.mX) + "," + std::to_string(stop.mY) + ": waiting for it");
+                            }
+                            mLiftComeWaits += 2;
+                            return TaskStep::Do(Prim::Wait(2));
+                        }
+                    }
+                }
+                break;
+            }
+        }
         return TaskStep::Failed("no route from " + std::to_string(nav.Nodes()[cur].mX) + "," + std::to_string(nav.Nodes()[cur].mY));
     }
     // With Mudokons in tow and a UXB to hop: they can't hop, so it is turned off first
@@ -5028,6 +5076,18 @@ TaskStep ParamitePullTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 return TaskStep::Failed("no Paramite was taken over");
             }
+            // (one that comes down a web as he comes on its screen: not there to be taken over until it is down)
+            {
+                bool down = false;
+                for (const ParamiteAt& paramite : world.mParamites)
+                {
+                    down = down || (paramite.mHalf == ring->mHalf && !paramite.Hidden());
+                }
+                if (!down && mFrames < 300)
+                {
+                    return TaskStep::Do(Prim::Wait(1));
+                }
+            }
             return TaskStep::Do(Prim::Wait(20, Btn::eChant));
         case 2:
         case 3:
@@ -5043,10 +5103,54 @@ TaskStep ParamitePullTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 return TaskStep::Failed("lost the Paramite");
             }
+            const s32 cell = NavGraph::GridStep(me->mHalf);
+            // On a web (Paramite.hpp: 38 grabs it, 35 hangs, 36 climbs, 39 and 34 step off): up to its top
+            if (me->mMotion == 35 || me->mMotion == 36)
+            {
+                return TaskStep::Do(Prim::Wait(2, Btn::eUp));
+            }
+            if (me->mMotion == 38 || me->mMotion == 39 || me->mMotion == 34)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            // The ring over another floor than its own: up the web to it (Domain::WebUp), grabbed from a jump
+            // within a cell of it, facing it
+            const s32 ringNode = Domain::UseNode(nav, *ring, nullptr);
+            const s32 meNode = nav.NodeAt(me->mX, me->mY, me->mHalf, 12);
+            s32 webX = 0;
+            if (mPhase == 2 && ringNode >= 0 && meNode >= 0 && nav.Nodes()[meNode].mLine != nav.Nodes()[ringNode].mLine && Domain::WebUp(nav, meNode, ringNode, &webX))
+            {
+                const s32 to = webX - me->mX;
+                if (me->mMotion != 0)
+                {
+                    return TaskStep::Do(Prim::Wait(1, std::abs(to) > 2 * cell ? static_cast<u32>(to > 0 ? Btn::eRight : Btn::eLeft) : 0u));
+                }
+                if (std::abs(to) < 2)
+                {
+                    // (right under it: a cell back first)
+                    return TaskStep::Do(Prim::Wait(2, me->mFacesLeft ? Btn::eRight : Btn::eLeft));
+                }
+                if (std::abs(to) > cell || (to < 0) != me->mFacesLeft)
+                {
+                    return TaskStep::Do(Prim::Wait(2, to > 0 ? Btn::eRight : Btn::eLeft));
+                }
+                if (++mPulls > 12)
+                {
+                    return TaskStep::Failed("the Paramite could not get on its web");
+                }
+                if (mPulls == 1)
+                {
+                    bot.Log("the Paramite is at its web at " + std::to_string(webX) + " (at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + "): up it");
+                }
+                return TaskStep::Do(Prim::Wait(3, Btn::eUp));
+            }
+            if (mPhase == 2)
+            {
+                mPulls = 0;
+            }
             // (Paramite.hpp: motion 0 stands. It walks a cell at a time while a way is held and stops on the
             // next one when let go; the ring has to be straight over it.)
             const s32 dx = ring->CentreX() - me->mX;
-            const s32 cell = NavGraph::GridStep(me->mHalf);
             if (std::abs(dx) > cell + cell / 2)
             {
                 return TaskStep::Do(Prim::Wait(2, dx > 0 ? Btn::eRight : Btn::eLeft));
@@ -5079,11 +5183,12 @@ TaskStep ParamitePullTask::Next(Bot& bot, const std::string& lastFailed)
                 return TaskStep::Do(Prim::Wait(2));
             }
             // (on its feet first: it is let go from a stand, the chant held for a second)
-            if (me->mMotion != 0 && mFrames < 60)
+            // (Paramite.cpp: motion 29 is the chant under way, which ends as soon as it is let up)
+            if (me->mMotion != 0 && me->mMotion != 29 && mFrames < 60)
             {
                 return TaskStep::Do(Prim::Wait(1));
             }
-            return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+            return TaskStep::Do(Prim::Wait(me->mMotion == 29 ? 2 : 20, Btn::eChant));
         case 5:
             // (he takes no input until he is out of the chant)
             if (!bot.Abe().Settled() && mFrames < 200)

@@ -147,8 +147,17 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             {
                 return std::make_unique<ScrabWaryTask>(action.mName, -1, entity, value);
             }
-            return std::make_unique<ClearSligTask>(entity, [entity, value]() -> std::unique_ptr<Task>
-                                                   { return std::make_unique<UseTask>(entity, value); });
+            // (a lever used from the trap door on its right: Domain)
+            const bool right = step.mOther == 1;
+            return std::make_unique<ClearSligTask>(entity, [entity, value, right]() -> std::unique_ptr<Task>
+                                                   {
+                                                       auto use = std::make_unique<UseTask>(entity, value);
+                                                       if (right)
+                                                       {
+                                                           use->FixSide(1);
+                                                       }
+                                                       return use;
+                                                   });
         }
         case StepKind::eRescue:
         {
@@ -1053,6 +1062,15 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs) const
             for (const RockAt& f : world->mFleechesAwake)
             {
                 if (!world->mInvisible && f.mHalf == from.mHalf && std::abs(f.mX - from.mX) <= 750 && std::abs(f.mY - from.mY) <= 260)
+                {
+                    return 20;
+                }
+            }
+            // (or with Paramites on his floor: two together run him down, faster than he runs, and the stop to
+            // climb is where they get him. Measured in the Mudomo hub at 2137,460.)
+            for (const ParamiteAt& para : world->mParamites)
+            {
+                if (!world->mInvisible && !para.mPossessed && !para.Hidden() && para.mHalf == from.mHalf && std::abs(para.mY - from.mY) <= 40 && std::abs(para.mX - from.mX) < 700)
                 {
                     return 20;
                 }
