@@ -680,7 +680,14 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 under = under || f.mY >= down.mY - 5;
                 coming = coming || f.mY < down.mY - 25 / scale;
             }
-            if (under && !coming)
+            // (not with a crowd of them about: the Mudomo trial, where four are let loose behind him and three more
+            // wake under the ledge. There is only going on.)
+            s32 crowd = 0;
+            for (const RockAt& f : bot.GetWorld().mFleechesAwake)
+            {
+                crowd += f.mHalf == from.mHalf && std::abs(f.mX - from.mX) * scale < 500 ? 1 : 0;
+            }
+            if (under && !coming && crowd <= 2)
             {
                 if (mLureWaits++ == 0)
                 {
@@ -868,6 +875,15 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 last = sweepStop - 1;
             }
+            // (a running jump the same way at the end of the roll: from the roll, with no stop to stand up and
+            // take a run-up. Measured in the Mudomo trial: rolled from 2362 he was off at 2462 and hung from the
+            // ledge at 2537,620.)
+            if (last + 1 < path.size() && nav.Edges()[path[last + 1]].mKind == EdgeKind::eRunJump && nav.Edges()[path[last + 1]].mLeft == first.mLeft && sweepStop > last &&
+                std::abs(nav.Edges()[path[last + 1]].mX - nav.Nodes()[cur].mX) % (2 * NavGraph::GridStep(nav.Nodes()[cur].mHalf)) == 0)
+            {
+                mLastEdge = path[last + 1];
+                return TaskStep::Do(Prim::RunJump(nav.Edges()[path[last + 1]].mX, first.mLeft));
+            }
             Prim roll = Prim::MoveTo(nav.Nodes()[nav.Edges()[path[last]].mTo].mX, Gait::eRoll);
             // (at the top of a hoist down climbs down it: the Mudanchee vault's path 8, from 187,880)
             // (what the games look for under his feet when down is pressed)
@@ -885,7 +901,17 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 return TaskStep::Do(Prim::Face(first.mLeft));
             }
             mLastEdge = path[0];
-            return TaskStep::Do(Prim::RunJump(first.mX, first.mLeft));
+            {
+                Prim jump = Prim::RunJump(first.mX, first.mLeft);
+                // (chased, and six cells of floor to run on where he comes down: on at a run)
+                std::size_t on = 1;
+                while (on < path.size() && nav.Edges()[path[on]].mKind == EdgeKind::eWalk && nav.Edges()[path[on]].mLeft == first.mLeft)
+                {
+                    on++;
+                }
+                jump.mRunOut = bot.RecentlyChased() && first.mFeature < 0 && on >= 7;
+                return TaskStep::Do(jump);
+            }
 
         case EdgeKind::eLift:
             mLastEdge = path[0];
@@ -1145,24 +1171,70 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     chased = true;
                 }
             }
+            bool pack = false;
             // Paramites that are after him (Paramite.cpp, Brain_2_ChasingAbe: a team of them, or one that was
             // set on him) are the same again, and so are ones on their way down a web to be (brain 3, past its
             // wait: the Mudomo vault's path 3, where the first lock's slap lets two down behind him)
             for (const ParamiteAt& p : bot.GetWorld().mParamites)
             {
-                if (!p.mPossessed && (p.mBrain == 2 || (p.mBrain == 3 && p.mSub >= 1)) && p.mHalf == here.mHalf && std::abs(p.mY - here.mY) <= 60 && std::abs(p.mX - here.mX) < 700 &&
-                    !Domain::GateBetween(nav, bot.GetWorld(), p.mX, here.mX, here.mY, here.mHalf) && !Domain::WallBetween(nav, p.mX, here.mX, here.mY, here.mHalf))
+                if (!p.mPossessed && (p.mBrain == 2 || (p.mBrain == 3 && p.mSub >= 3)) && p.mHalf == here.mHalf && std::abs(p.mY - here.mY) <= 60 && std::abs(p.mX - here.mX) < 700 &&
+                    !Domain::GateBetween(nav, bot.GetWorld(), p.mX, here.mX, here.mY, here.mHalf) && !Domain::ParamiteWall(nav, p.mX, here.mX, here.mY, here.mHalf))
                 {
                     sneak = false;
                     fleech = true;
                     chased = true;
+                    pack = true;
                 }
+            }
+            // And so is a crowd of Fleeches that is after him: one or two can be led about, three or more only
+            // run from (the Mudomo trial: four let loose at its lever and more woken on every screen)
+            {
+                s32 after = 0;
+                for (const RockAt& f : bot.GetWorld().mFleechesAwake)
+                {
+                    after += f.mChasing && f.mHalf == here.mHalf && std::abs(f.mX - here.mX) < 500 && std::abs(f.mY - here.mY) < 200 ? 1 : 0;
+                }
+                if (after >= 3)
+                {
+                    sneak = false;
+                    fleech = true;
+                    chased = true;
+                    pack = true;
+                }
+            }
+            // (and once chased in a path, in a hurry for the rest of it: Bot::RecentlyChased)
+            // (a pack or a crowd, that is: a Scrab's chase is timed, and its crossings are their own steps)
+            if (pack)
+            {
+                bot.NoteChased();
+            }
+            else if (bot.RecentlyChased() && !sneak)
+            {
+                fleech = true;
+                chased = true;
             }
             // And no walking the last cells to stop on the right one (a run is left four cells early for that,
             // twenty frames a Scrab does not give): from the run into a roll, which stops where it is told
             if (chased)
             {
                 const s32 way = first.mLeft ? -1 : 1;
+                // Up a hoist at the end of the run: by the running jump into it from here, if there is one, and
+                // not to a stop under it (the walkthrough of the Mudomo trial's last screen: "run right and jump
+                // up to the next door". Stopped under the hoist, three Paramites were on him as he stood up.)
+                if (last + 1 < path.size() && nav.Edges()[path[last + 1]].mKind == EdgeKind::eHoistUp)
+                {
+                    const s32 top = nav.Edges()[path[last + 1]].mTo;
+                    const NavGraph::EdgeCost cost = bot.EdgeCostFn();
+                    for (s32 i = here.mFirstEdge; i < here.mFirstEdge + here.mEdgeCount; i++)
+                    {
+                        const NavEdge& e = nav.Edges()[i];
+                        if (e.mKind == EdgeKind::eRunJump && e.mTo == top && e.mLeft == first.mLeft && cost(e) >= 0)
+                        {
+                            mLastEdge = i;
+                            return TaskStep::Do(Prim::RunJump(e.mX, e.mLeft));
+                        }
+                    }
+                }
                 // Off the end of the floor at the end of the run, where the way goes on down: without stopping
                 // for it (the Mudomo vault's path 3: stopped at the end of the 860 floor to walk off it, the two
                 // Paramites behind him had him)
@@ -1205,9 +1277,80 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 {
                     lowEnd++;
                 }
+                // (and on under the next low thing a few cells on, and the next: one roll under the lot. The
+                // walkthrough of the Mudomo trial: "Duck under the series of rocks. Be sure to let go of the 'Run'
+                // button so you don't stand back up between them")
+                for (bool more = lowEnd > last; more;)
+                {
+                    more = false;
+                    std::size_t j = lowEnd + 1;
+                    while (j < path.size() && j <= lowEnd + 3 && nav.Edges()[path[j]].mKind == EdgeKind::eWalk && nav.Edges()[path[j]].mLeft == first.mLeft)
+                    {
+                        j++;
+                    }
+                    if (j < path.size() && j > lowEnd + 1 && nav.Edges()[path[j]].mKind == EdgeKind::eRoll && nav.Edges()[path[j]].mLeft == first.mLeft)
+                    {
+                        lowEnd = j;
+                        while (lowEnd + 1 < path.size() && nav.Edges()[path[lowEnd + 1]].mKind == EdgeKind::eRoll && nav.Edges()[path[lowEnd + 1]].mLeft == first.mLeft)
+                        {
+                            lowEnd++;
+                        }
+                        more = true;
+                    }
+                }
+                // (and on from there with a running jump the same way: the run-up, the roll under and the jump are
+                // one move. The Mudomo trial: "quickly duck again on the next screen, then immediately jump to the
+                // ledge above". Stood up at the end of the roll to take his run-up, the Paramites had him.)
+                if (lowEnd + 1 < path.size() && nav.Edges()[path[lowEnd + 1]].mKind == EdgeKind::eRunJump && nav.Edges()[path[lowEnd + 1]].mLeft == first.mLeft)
+                {
+                    const s32 takeoff = nav.Edges()[path[lowEnd + 1]].mX;
+                    // (down in the low part already, or nothing low before the jump: the jump's own run-up, which
+                    // is rolled where it has to be. Measured: from a stand at 2362 it rolled under and was off
+                    // at 2462. From a run it does not go down by itself: the run into the roll first, to the
+                    // first low cell.)
+                    if (lowEnd == last ? (takeoff - here.mX) * way >= 3 * cell : (abe.mMove == Move::eCrouch || abe.mMove == Move::eRoll || here.mLow))
+                    {
+                        mLastEdge = path[lowEnd + 1];
+                        Prim jump = Prim::RunJump(takeoff, first.mLeft);
+                        std::size_t on = lowEnd + 2;
+                        while (on < path.size() && nav.Edges()[path[on]].mKind == EdgeKind::eWalk && nav.Edges()[path[on]].mLeft == first.mLeft)
+                        {
+                            on++;
+                        }
+                        jump.mRunOut = nav.Edges()[path[lowEnd + 1]].mFeature < 0 && on >= lowEnd + 8;
+                        return TaskStep::Do(jump);
+                    }
+                    if (lowEnd > last && (to.mX - here.mX) * way >= 3 * cell)
+                    {
+                        // (to a stop an even number of cells before the take-off: a roll goes two cells at a
+                        // time and only comes up into the run at the end of one. Begun at 2387 for the take-off at
+                        // 2462 he rolled on off the end of the floor.)
+                        const s32 low = nav.Nodes()[nav.Edges()[path[last + 1]].mTo].mX;
+                        const s32 pairs = ((takeoff - low) * way + 2 * cell - 1) / (2 * cell);
+                        const s32 stop = takeoff - way * 2 * pairs * cell;
+                        if ((stop - here.mX) * way >= 3 * cell)
+                        {
+                            // (and on through the roll into the jump, with no stop there: Pilot::StepRunJump)
+                            Prim jump = Prim::RunJump(takeoff, first.mLeft);
+                            jump.mRunUp = stop - way * 2 * cell;
+                            mLastEdge = path[lowEnd + 1];
+                            return TaskStep::Do(jump);
+                        }
+                    }
+                }
                 if (lowEnd > last && (to.mX - here.mX) * way >= 3 * cell && nav.Condition(nav.Edges()[path[lowEnd]], nullptr, nullptr) == false)
                 {
-                    return TaskStep::Do(Prim::RunRoll(to.mX - way * cell, nav.Nodes()[nav.Edges()[path[lowEnd]].mTo].mX));
+                    Prim under = Prim::RunRoll(to.mX - way * cell, nav.Nodes()[nav.Edges()[path[lowEnd]].mTo].mX);
+                    // (and out of it at a run where the way goes on along the floor: no stop to stand up)
+                    // (with six cells of floor to run on at least: into a wall two cells on he is knocked down)
+                    std::size_t on = lowEnd + 1;
+                    while (on < path.size() && nav.Edges()[path[on]].mKind == EdgeKind::eWalk && nav.Edges()[path[on]].mLeft == first.mLeft)
+                    {
+                        on++;
+                    }
+                    under.mRunOut = on >= lowEnd + 7;
+                    under.mFaceLeft = first.mLeft;
+                    return TaskStep::Do(under);
                 }
                 if ((to.mX - here.mX) * way >= 6 * cell)
                 {
@@ -1333,6 +1476,20 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     Prim run = Prim::WalkOff(first.mLeft);
                     run.mRunOff = falls;
                     return TaskStep::Do(run);
+                }
+            }
+            // (crouched at the end of a roll, with a wall just past the edge: on his feet first. Rolled off he
+            // bounces off the wall and comes down on his back: 30 frames, measured in the Mudomo trial at 2112,620,
+            // with two Paramites coming down behind him.)
+            if (!first.mCrouched && (abe.mMove == Move::eCrouch || abe.mMove == Move::eRoll))
+            {
+                const NavNode& off = nav.Nodes()[first.mFrom];
+                const s32 cell = NavGraph::GridStep(off.mHalf);
+                // (not from under something low: there he cannot stand, and it is rolled off as it was drawn)
+                if (!off.mLow && Domain::WallBetween(nav, off.mX, off.mX + (first.mLeft ? -3 : 3) * cell, off.mY, off.mHalf))
+                {
+                    // (out of the roll first: it ends crouched when nothing is held)
+                    return TaskStep::Do(abe.mMove == Move::eRoll ? Prim::Wait(1) : Prim::Press(Btn::eUp));
                 }
             }
             mLastEdge = path[0];

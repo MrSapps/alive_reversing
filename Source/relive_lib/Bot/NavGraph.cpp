@@ -628,6 +628,19 @@ s32 NavGraph::Thrown(s32 x, s32 y, s32 fromX, bool half, s32 depth, s32 knownSwi
     }
     if (under >= 0 && fy - y < 200)
     {
+        // (a point well over the floor: he flies on the way he was thrown as he comes down, a cell and a half.
+        // Measured in the Mudomo trial: thrown to 4150,880 from the right he came down at 4112,980, past the gate
+        // that stands at 4150.)
+        if ((fy - y) * (half ? 2 : 1) >= 60)
+        {
+            const s32 nx = x + (x < fromX ? -1 : 1) * 3 * step / 2;
+            s32 ny = 0;
+            const s32 on = FloorBelow(nx, y - 40, half, &ny);
+            if (on >= 0 && std::abs(ny - fy) <= 12)
+            {
+                return NodeOnLine(on, nx);
+            }
+        }
         return NodeOnLine(under, x);
     }
     // Nothing under it: he flies on the way he was thrown and drops onto, or catches the edge of, what is next
@@ -636,7 +649,14 @@ s32 NavGraph::Thrown(s32 x, s32 y, s32 fromX, bool half, s32 depth, s32 knownSwi
     {
         const s32 nx = x + dir * k * step;
         const s32 line = FloorBelow(nx, y - 40, half, &fy);
-        if (line >= 0 && fy - y < 200)
+        // (as far as the fall gives him time to drift: some 3 a frame. Measured in the Mudomo trial: thrown to
+        // 2821,600 with no floor under it, he came down at 2787,880, not on the ledge three cells on at 620.)
+        s32 frames = 0;
+        for (s32 fallen = 0; fallen < std::max(0, fy - y) * (half ? 2 : 1); frames++)
+        {
+            fallen += std::min(20, 2 * (frames + 1));
+        }
+        if (line >= 0 && k * step * (half ? 2 : 1) <= 2 * frames + 25)
         {
             return NodeOnLine(line, nx);
         }
@@ -793,25 +813,8 @@ s32 NavGraph::WellInFall(s32 x, s32 fromY, s32 toY, bool half) const
 
 s32 NavGraph::WellLanding(const NavFeature& well) const
 {
-    s32 fy = 0;
-    const s32 under = FloorBelow(well.mC, well.mD - 40, well.mHalf, &fy);
-    if (under >= 0 && fy - well.mD < 200)
-    {
-        return NodeOnLine(under, well.mC);
-    }
-    // Nothing under it: he flies on the way he was thrown and drops onto, or catches the edge of, what is next
-    const s32 step = GridStep(well.mHalf);
-    const s32 dir = well.mC < (well.mX1 + well.mX2) / 2 ? -1 : 1;
-    for (s32 k = 1; k <= 4; k++)
-    {
-        const s32 x = well.mC + dir * k * step;
-        const s32 line = FloorBelow(x, well.mD - 40, well.mHalf, &fy);
-        if (line >= 0 && fy - well.mD < 200)
-        {
-            return NodeOnLine(line, x);
-        }
-    }
-    return under >= 0 ? NodeOnLine(under, well.mC) : -1;
+    // (where it throws him, by the same rule as a well he jumps into: Thrown)
+    return Thrown(well.mC, well.mD, (well.mX1 + well.mX2) / 2, well.mHalf, 0);
 }
 
 void NavGraph::AddEdge(std::vector<NavEdge>& edges, s32 from, s32 to, EdgeKind kind, s32 cost, s32 feature, bool left) const
@@ -969,6 +972,37 @@ void NavGraph::AddLedgeCatches(std::vector<NavEdge>& edges, s32 from, s32 dir) c
         return;
     }
     const s32 y = mNodes[off].mY;
+    // Up to a ledge: off the last cell of a floor, the jump catches an edge (or a hoist) that faces him two and
+    // a half to three and a half cells on and up to 100 higher (measured in the Mudomo trial: off 2462,720 to
+    // hang from 2537,620, the walkthrough's "immediately jump to the ledge above")
+    {
+        s32 ny = 0;
+        const s32 beyond = FloorNear(takeoff + dir * step, y, n.mHalf, 12, &ny);
+        const s32 scale = n.mHalf ? 2 : 1;
+        for (std::size_t fi = 0; beyond < 0 && fi < mInput.mFeatures.size(); fi++)
+        {
+            const NavFeature& f = mInput.mFeatures[fi];
+            if ((f.mKind != FeatureKind::eEdge && f.mKind != FeatureKind::eHoist) || f.mHalf != n.mHalf || !(f.mDir == 2 || (f.mDir == 0) == (dir < 0)))
+            {
+                continue;
+            }
+            const s32 rise = y - f.mY1;
+            const s32 near = dir > 0 ? f.mX1 - takeoff : takeoff - f.mX2;
+            if (rise * scale < 30 || rise * scale > 110 || near < 2 * step || near > 3 * step + step / 2 || WallBetween(takeoff, dir > 0 ? f.mX1 : f.mX2, y - rise, n.mHalf))
+            {
+                continue;
+            }
+            s32 ly = 0;
+            const s32 lx = (f.mX1 + f.mX2) / 2;
+            const s32 line = FloorNear(lx, f.mY1, n.mHalf, 12, &ly);
+            const s32 ledge = line >= 0 ? NodeOnLine(line, lx) : -1;
+            if (ledge >= 0 && std::abs(mNodes[ledge].mX - lx) <= step && !mNodes[ledge].mHazard)
+            {
+                AddEdge(edges, from, ledge, EdgeKind::eRunJump, kRunJumpCost + 10, static_cast<s32>(fi), dir < 0);
+                edges.back().mX = takeoff;
+            }
+        }
+    }
     s32 x = takeoff;
     for (s32 k = 1; k <= kRunJumpLedgeCells; k++)
     {
@@ -1161,13 +1195,14 @@ void NavGraph::Build(const NavInput& input)
                 // Rolled off with a ledge to catch out and below, facing the way he goes: he ends hung from it (the
                 // walkthrough of the Mudomo vault's path 3: "roll under the rocks at the edge of the screen, then
                 // let yourself fall out the other side to land hanging beside the exit", off 1912,980 to the
-                // ledge at 2000,1200)
+                // ledge at 2000,1200). A hoist that faces the way he goes catches him the same (the Mudomo trial,
+                // off 1687,460 into the hoist at 1765..1800 by the ledge at 620).
                 if (n.mLow || crouched)
                 {
                     const s32 scale = n.mHalf ? 2 : 1;
                     for (const NavFeature& f : mInput.mFeatures)
                     {
-                        if (f.mKind != FeatureKind::eEdge || f.mHalf != n.mHalf || !(f.mDir == 2 || (f.mDir == 0) == (dir < 0)))
+                        if ((f.mKind != FeatureKind::eEdge && f.mKind != FeatureKind::eHoist) || f.mHalf != n.mHalf || !(f.mDir == 2 || (f.mDir == 0) == (dir < 0)))
                         {
                             continue;
                         }
@@ -1369,6 +1404,13 @@ void NavGraph::Build(const NavInput& input)
                         // takes him: the Mudanchee vault's path 5, off the platform at 312,620 into the well at 212)
                         s32 to = NodeAt(x, gy, n.mHalf, 4);
                         const s32 well = WellInFall(x, n.mY, gy + 30 / scale, n.mHalf);
+                        // (one that a switch turns: where it leads either way. The Mudomo trial's last, hopped
+                        // into off the lock's ledge once the lock has turned it to throw him back over the gate.)
+                        if (well >= 0 && mInput.mFeatures[well].mSwitch > 1 && gy - n.mY >= 20 / scale)
+                        {
+                            AddWellEdges(edges, from, well, EdgeKind::eHop, kHopCost + 10, -1, left);
+                            break;
+                        }
                         if (well >= 0)
                         {
                             to = WellOut(well, mInput.mFeatures[well].mSwitch == 1 ? 1 : 0, 1);

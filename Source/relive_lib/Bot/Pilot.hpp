@@ -50,6 +50,9 @@ struct Prim final
     // comes down on: measured in the Mudomo vaults' path 7, from 1187,1400 down two ledges to 1345,1520 in 34
     // frames, against 100 and more a ledge at a time.
     s32 mRunOff = 0;
+    // A roll that ends in a run: the run button again once he is past the last cell of it, so that the roll
+    // comes up into the run at its end, and done as he runs (no stop to crouch and stand up)
+    bool mRunOut = false;
     // A roll from where down is the way to climb down a hoist: he walks at the low ceiling instead, and both
     // games duck him under it (a wall at his head and none at his knees, where his walk starts)
     bool mWalkIn = false;

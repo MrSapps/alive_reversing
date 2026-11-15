@@ -647,9 +647,21 @@ struct World final
     s32 mRescued = 0;
     s32 mKilled = 0;
 
+    // The switches of gates that are taken away for good the first time they open (SlamDoor's delete flag), once
+    // seen at the value that opens them: counted as still at it whatever the switch does after. The Mudomo
+    // trial's three under the ring, whose switch a self-closing trap door sets back twenty frames later.
+    std::map<s32, s32> mGatesGone;
     // real: as the game has it now, without counting a slapped lock's switch as on already
     s32 Switch(s32 id, bool real = false) const
     {
+        if (!real)
+        {
+            const auto gone = mGatesGone.find(id);
+            if (gone != mGatesGone.end())
+            {
+                return gone->second;
+            }
+        }
         if (id >= 256)
         {
             for (const Entity& e : mEntities)

@@ -282,6 +282,17 @@ PilotStatus Pilot::StepRoll(const AbeState& abe, u32& bits)
             return PilotStatus::eRunning;
 
         case Move::eRoll:
+            mRolled = true;
+            // (out of it at a run: Prim::mRunOut)
+            if (mPrim.mRunOut && mPrim.mFaceLeft == abe.mFacingLeft && dist2 * 2 <= grid2)
+            {
+                mPhase = 2;
+            }
+            if (mPrim.mRunOut && mPhase == 2)
+            {
+                bits = (abe.mFacingLeft ? Btn::eLeft : Btn::eRight) | Btn::eRun;
+                return PilotStatus::eRunning;
+            }
             // He stops on the next cell after the button is let go
             if (abe.mFacingLeft == left && dist2 * 4 > grid2 * 5)
             {
@@ -290,6 +301,11 @@ PilotStatus Pilot::StepRoll(const AbeState& abe, u32& bits)
             return PilotStatus::eRunning;
 
         case Move::eRun:
+            if (mPrim.mRunOut && mPhase == 2)
+            {
+                bits = (abe.mFacingLeft ? Btn::eLeft : Btn::eRight) | Btn::eRun;
+                return PilotStatus::eDone;
+            }
             // Already at a run that way (out of a landing with the way held): down into the roll from it
             if (abe.mFacingLeft == left && !there)
             {
@@ -450,6 +466,25 @@ PilotStatus Pilot::StepRunJump(const AbeState& abe, u32& bits)
             // Past it and still on the floor: stop
             return abe.Settled() ? Fail("missed the jump") : PilotStatus::eRunning;
         }
+        // With a roll on the way (mRunUp: a cell before where it is to begin): down into it from the run, on at a
+        // roll with only the way held, and with the run button again over the last two cells, so that the roll
+        // comes up into the run where it ends, at the take-off (a roll goes two cells at a time). Measured in the
+        // Mudomo trial: run from 2137, rolled from 2312 under the rocks at 2375, up at 2462 and off.
+        if (mPrim.mRunUp != 0)
+        {
+            const s32 toRoll2 = (mPrim.mRunUp - abe.mX) * (mPrim.mFaceLeft ? -1 : 1) * 2;
+            if (abe.mMove == Move::eRoll || abe.mMove == Move::eCrouch)
+            {
+                mRolled = true;
+                bits = dirBit | (ahead * 2 <= abe.Grid2() * 5 / 2 ? static_cast<u32>(Btn::eRun) : 0u);
+                return PilotStatus::eRunning;
+            }
+            if (!mRolled && abe.mMove == Move::eRun && abe.mFacingLeft == mPrim.mFaceLeft && toRoll2 <= abe.Grid2() * 3)
+            {
+                bits = dirBit | Btn::eRun | Btn::eFartOrRoll;
+                return PilotStatus::eRunning;
+            }
+        }
         bits = dirBit | Btn::eRun;
         // The run looks for the hop button as it reaches each cell: asked for only on the last stretch before
         // the take-off cell, so he doesn't jump a cell early
@@ -462,6 +497,16 @@ PilotStatus Pilot::StepRunJump(const AbeState& abe, u32& bits)
     if (mFrames > 600)
     {
         return Fail("did not land");
+    }
+    // (on at a run from where he comes down: Prim::mRunOut. The way and the run button held through the landing
+    // keep him running; let go, he slides to a stop, which with Paramites a cell behind is the end of him.)
+    if (mPrim.mRunOut)
+    {
+        bits = dirBit | Btn::eRun;
+        if (abe.mOnGround && abe.mMove == Move::eRun && mFrames > 3)
+        {
+            return PilotStatus::eDone;
+        }
     }
     if (abe.Settled())
     {

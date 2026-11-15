@@ -827,8 +827,69 @@ bool Bot::Replan(BaseMap& map)
                                                { return node == to; });
         }
     }
-    mTaskAction = first.mName;
-    mTaskOptional = domain.mSteps[first.mTag].mKind == StepKind::eRescue || domain.mSteps[first.mTag].mKind == StepKind::eKill;
+    // And with a crowd after him (three Fleeches or more, or Paramites on the hunt) every crossing that follows is
+    // gone in the same go, whatever kind: a stop to think at the end of each is where they have him (the Mudomo
+    // trial: 120 frames lost that way over its first three screens)
+    const Goap::Action* doing = &first;
+    // (not a crossing that is timed against a Scrab, nor with one loose: those are waited at)
+    bool scrabs = false;
+    for (const ScrabAt& scrab : mWorld.mScrabs)
+    {
+        scrabs = scrabs || !scrab.mPossessed;
+    }
+    if (mTask && domain.mSteps[first.mTag].mKind == StepKind::eCross && domain.mSteps[first.mTag].mOther == 0 && !scrabs)
+    {
+        s32 fleeches = 0;
+        bool hunted = false;
+        for (const RockAt& f : mWorld.mFleechesAwake)
+        {
+            fleeches += f.mChasing && f.mHalf == mAbe.mHalfScale && std::abs(f.mX - mAbe.mX) < 600 && std::abs(f.mY - mAbe.mY) < 250 ? 1 : 0;
+        }
+        for (const ParamiteAt& p : mWorld.mParamites)
+        {
+            hunted = hunted || (!p.mPossessed && p.mBrain == 2 && p.mHalf == mAbe.mHalfScale);
+        }
+        if (fleeches >= 3 || hunted || RecentlyChased())
+        {
+            const NavGraph& nav = mKnow->mNav;
+            s32 to = nav.Edges()[domain.mSteps[first.mTag].mEdge].mTo;
+            s32 merged = 0;
+            for (std::size_t i = 1; i < best.mSteps.size(); i++)
+            {
+                const DomainStep& next = domain.mSteps[actions[best.mSteps[i]].mTag];
+                if (next.mKind == StepKind::eLogic)
+                {
+                    continue;
+                }
+                // (a thing to use or the way out at the end of them: that step itself, which goes there by the
+                // same way and does not stop where the last crossing ends)
+                if ((next.mKind == StepKind::eUse || next.mKind == StepKind::eExit) && doing == &first)
+                {
+                    doing = &actions[best.mSteps[i]];
+                    break;
+                }
+                if (next.mKind != StepKind::eCross || next.mOther != 0)
+                {
+                    break;
+                }
+                to = nav.Edges()[next.mEdge].mTo;
+                merged++;
+            }
+            if (doing != &first)
+            {
+                Log("a crowd after him: straight on to " + doing->mName);
+                mTask = MakeTask(domain, *doing);
+            }
+            else if (merged > 0)
+            {
+                Log("a crowd after him: the next " + std::to_string(merged + 1) + " crossings in one go, to " + std::to_string(nav.Nodes()[to].mX) + "," + std::to_string(nav.Nodes()[to].mY));
+                mTask = std::make_unique<GoToTask>(first.mName, [to](s32 node)
+                                                   { return node == to; });
+            }
+        }
+    }
+    mTaskAction = doing->mName;
+    mTaskOptional = domain.mSteps[doing->mTag].mKind == StepKind::eRescue || domain.mSteps[doing->mTag].mKind == StepKind::eKill;
     if (!mTask)
     {
         // A switch that follows from others: it takes the game a moment
@@ -2450,6 +2511,16 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         mIsAe = GetGameType() == GameType::eAe;
         EnsureKnowledge(map);
         GameView::ReadWorld(map, mWorld);
+        if (mKnow)
+        {
+            for (const NavFeature& f : mKnow->mNav.Input().mFeatures)
+            {
+                if (f.mKind == FeatureKind::eBarrier && f.mSolid && f.mA == 1 && f.mSwitch > 1 && mWorld.mGatesGone.count(f.mSwitch) == 0 && (mWorld.Switch(f.mSwitch, true) != 0) == f.mStartClosed)
+                {
+                    mWorld.mGatesGone[f.mSwitch] = mWorld.Switch(f.mSwitch, true);
+                }
+            }
+        }
         // On the floor of a Scrab that waits before it strikes, with nothing between: it has seen him
         if (mSeenByScrabAt > mAbe.mFrame)
         {
