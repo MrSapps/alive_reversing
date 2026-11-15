@@ -1558,7 +1558,9 @@ void NavGraph::Build(const NavInput& input)
             AddWellEdges(edges, from, featureIdx, EdgeKind::eWell, kWellCost, featureIdx, false);
             const bool offOut = kind == 1 && well->mSwitch != 1 && well->mDestPath >= 0;
             // Out of the path (as it goes with its switch off: which is how the level's paths are counted)
-            if (offOut)
+            // (or only with its switch on: Necrum's last well, which the five wheels turn to Feeco)
+            const bool onOut = kind == 1 && well->mSwitch > 1 && well->mDestPath < 0 && well->mOnDestPath >= 0;
+            if (offOut || onOut)
             {
                 mExits.push_back({from, featureIdx});
             }

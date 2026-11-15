@@ -425,6 +425,11 @@ static bool CheckCommand(const Automation::Command& command, std::string& error)
         return true;
     }
 
+    if (name == "healing")
+    {
+        return expectArgs(0, "healing");
+    }
+
     if (name == "switch")
     {
         return expectArgs(2, "switch <id> <0|1>") && expectNumber(command.mArgs[0], 0) && expectNumber(command.mArgs[1], 0);
@@ -967,6 +972,25 @@ bool Automation::RunCommand(const Command& command, BaseMap& map, bool betweenFr
         {
             pEffect->InstantInvisibility();
         }
+        return true;
+    }
+
+    if (name == "healing")
+    {
+        if (!betweenFrames)
+        {
+            return false;
+        }
+        if (!gAbe || GetGameType() != GameType::eAe)
+        {
+            Fail(command, "healing needs AE and Abe");
+            return true;
+        }
+        // (as Abe.cpp does when he comes into Necrum with both trials done)
+        gAbe->mHaveHealing = true;
+        gAbe->mHaveShrykull = 0;
+        gAbe->mHaveInvisibility = 0;
+        gAbe->mRingPulseTimer = static_cast<s32>(sGnFrame) + 200000;
         return true;
     }
 

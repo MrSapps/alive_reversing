@@ -42,6 +42,9 @@ class Bot;
 //       adds the third, black sweep: the character is erased (AE: the greeter's and wall's).
 //   invisible <out|in|now>
 //       AE only. Abe's invisibility power: fade out, fade back in, or invisible straight away.
+//   healing
+//       AE only. Gives Abe the healing power he has in Necrum once both vault trials are done (his chant
+//       then cures sick Mudokons), so that Necrum's last part can be started at without playing the trials.
 //   expect_objects <type> <count>
 //       Fail unless exactly that many live objects have that type name (as dump_objects shows it,
 //       e.g. eSlamDoor).

@@ -965,6 +965,19 @@ on the way, and Paramites that come down behind him on every screen. What it too
 Forced and left alone: at 2112,620 the low passage ends over a 25 px shaft with a wall beyond it; rolled off he
 bounces off the wall and is 30 frames on his back at the bottom (the walkthrough: "You'll fall down").
 
+**Necrum's end, and into Feeco Depot** (`n3.txt`: necrum path 3 from where the trial's movie leaves him, with
+the automation command `healing` for the power both trials give): Feeco Depot's path 1 at f=1,104, 0 deaths.
+The plan is three steps: the bird portal at 2450,960 to the sick Mudokons, `Work together` on the five wheels,
+and the well at 3687,1240, which leads to Feeco only with the wheels' switch on (a well that leads out of the
+path with its switch on is a way out that needs it: `NavGraph` and the exit's precondition in `Domain`). A sick
+Mudokon is chanted at until it is cured before it is spoken to (`RecruitTask`). An engine bug was in the way:
+the movie played on the way to another level was looked for in the list of the level gone to and the game
+stopped with a fatal error (Necrum's NEP1C13.DDV on the way to Feeco); `Path_Get_FMV_Record` now looks in the
+other levels' lists too.
+The long run `full.txt` (from the Scrab vaults' path 7: the Scrab trial, Necrum, Mudomo's paths 1, 7 and 10, the
+hub, the six vaults, the Mudomo trial) got to Necrum's path 3 at f=30,711 with 0 deaths, before the well was
+known as a way out.
+
 Not built, from the user: with one Paramite the meat can also be thrown past it into the next screen and the
 Paramite walked into that screen (it backs off from him), where it then finds the meat. The fallback for when
 no throw from a safe cell lands on his own screen.

@@ -2834,6 +2834,21 @@ TaskStep RecruitTask::Next(Bot& bot, const std::string& lastFailed)
     {
         return TaskStep::Do(Prim::Face(faceLeft));
     }
+    // A sick one hears nothing until it is cured: chanted at, with the power he has in Necrum once both trials
+    // are done (the walkthrough: "Jump through the bird portal and chant to cure your friends"). The chant's rings
+    // go out as long as it is held and cure every sick one they reach.
+    if (mud->mMood == MudMood::eSick)
+    {
+        if (mTalks++ == 0)
+        {
+            bot.Log("Mudokon#" + std::to_string(mMud) + " is sick: chanting to cure it");
+        }
+        if (mTalks > 40)
+        {
+            return TaskStep::Failed("the Mudokon stayed sick");
+        }
+        return TaskStep::Do(Prim::Wait(60, Btn::eChant));
+    }
     // Brain_4_ListeningToAbe: it has stood up and waits to be told what to do
     const bool listening = mud->mState / 100 == 4;
     const bool plain = mud->mMood == MudMood::eNormal || (mud->mMood == MudMood::eWired && !mCalm);
