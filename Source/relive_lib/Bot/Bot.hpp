@@ -182,6 +182,11 @@ public:
     {
         return mChasedFrame != 0 && mChasedPath == mAbe.mPath && mAbe.mFrame - mChasedFrame < 900;
     }
+    // Which game he is in
+    bool IsAe() const
+    {
+        return mIsAe;
+    }
     // A Fleech (its entity) a Scrab was made to kill
     void FleechKilled(u32 id)
     {

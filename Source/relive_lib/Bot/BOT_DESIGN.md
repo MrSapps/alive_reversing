@@ -988,6 +988,13 @@ between here and the Stockyards). What AO needed so far:
 - `eSligDrop` / `SligDropTask`: a Slig that walks over a trap door a lever opens is dropped through it. The
   lever is pulled so that the door opens as the Slig is on it: by the Slig's pace and the frames the pull
   takes, measured on the first pull (34 in AO). Until it is down nothing is crossed onto its floor there.
+- Path 18's first screen is not beaten. A Slig walks a catwalk in the background (half size, `can_zshoot`)
+  between 354 and 527 and shoots into the foreground at whatever it faces on its screen, 50 to 75 frames
+  after it first faces it (Slig.cpp: `VIsFacingMe`, not in an invisible zone, not in a Z cover box, of which
+  this screen has none). Noise is not it: he sneaks by an awake Slig in the background now (`GoToTask`,
+  AO only) and is shot at the same frame. The way by is behind its back: left of it while it faces right,
+  under it as it turns at its right end, and off the screen before it turns again at its left end (some 100
+  frames). Not built.
 - AO's security claw counts as AE's orb (no chanting on its screen), and the reflex that takes over a Slig
   that woke is off in AO: the chant took none and left him standing in it for 800 frames.
 
