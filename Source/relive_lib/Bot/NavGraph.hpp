@@ -49,6 +49,7 @@ enum class FeatureKind : u8
     ePortalExit,
     eDanger,      // the stretch a flying Slig that can be got rid of goes along: nothing is crossed into it until
                   // the Slig is gone, which the world gives as switch mSwitch
+    eZCover,      // AE: wholly inside it Abe isn't seen by the Sligs that shoot from the background
     ePlate,       // a foot switch: stepping on it does mA to switch mSwitch (0 on, 1 off, 2 the other way)
 };
 
@@ -150,6 +151,9 @@ struct NavEdge final
     s32 mShaft = -1;
     // A fall off a floor's end under something too low to walk off under: crouched first, and rolled off
     bool mCrouched = false;
+    // A hoist up that ends facing an electric wall (its feature) in the next cell: only while that is off. He
+    // reaches into it as he pulls himself up and is fried (the Barracks' first path, at 1812,1660).
+    s32 mFence = -1;
 };
 
 // A grid cell of floor Abe can stand on
@@ -175,6 +179,8 @@ struct NavNode final
     s32 mTrapDoor = -1;
     // In an invisible zone: not seen there
     bool mHidden = false;
+    // Standing here he is wholly in a Z cover: the Sligs in the background don't see him
+    bool mZCover = false;
     s32 mFirstEdge = 0;
     s32 mEdgeCount = 0;
 };
@@ -241,6 +247,8 @@ public:
     s32 StepX(s32 x, s32 dir, bool half) const;
     s32 FloorNear(s32 x, s32 y, bool half, s32 tolerance, s32* floorY) const;
     s32 CameraOf(s32 x, s32 y) const;
+    // His box (from x + lo to x + hi, `tall` up from the floor at y) is wholly inside a Z cover
+    bool ZCovered(s32 x, s32 y, s32 lo, s32 hi, s32 tall) const;
 
     std::string Text() const;
     static s32 GridStep(bool half)

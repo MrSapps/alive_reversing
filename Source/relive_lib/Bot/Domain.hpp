@@ -321,6 +321,12 @@ struct Domain final
     // The switches that have to be on before a lever is pulled, where the order matters (Fleeches: see the .cpp)
     static std::vector<s32> PulledFirst(const NavGraph& nav, const World& world, const Entity& lever);
     static s32 UseNode(const NavGraph& nav, const Entity& entity, bool* faceLeft, s32 firstSide = -1);
+    // The floor (its line) an awake Slig of the map walks that the cell is on (one not gone, not asleep, not a
+    // spawner's), or -1
+    static s32 SligBeat(const NavGraph& nav, const World& world, s32 node);
+    // What a crossing onto such a floor from off it (or from another's) costs more than its move: a way that
+    // keeps off it is taken where there is one about as short
+    static const s32 kSligBeatCost = 400;
     // Whether the cell at (x, y) is on a floor a Slig that is awake watches, with no shadow on that floor on its
     // screen to go by: there he is shot wherever he stands, so it is a place to be only unseen. (A Slig sees who
     // is on its floor and its screen.) Only in a path where the power to go unseen is to be had: elsewhere such a

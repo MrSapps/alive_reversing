@@ -652,6 +652,24 @@ bool Domain::SligWatched(const NavGraph& nav, const World& world, s32 x, s32 y, 
     return any;
 }
 
+s32 Domain::SligBeat(const NavGraph& nav, const World& world, s32 node)
+{
+    const NavNode& n = nav.Nodes()[node];
+    for (const Entity& e : world.mEntities)
+    {
+        if (e.mKind != EntityKind::eSlig || e.mGone || e.mHalf != n.mHalf || e.mState == 1 || e.mSwitch > 0 || world.mFleechKilled.count(e.mId) != 0)
+        {
+            continue;
+        }
+        const s32 at = SligNode(nav, e);
+        if (at >= 0 && nav.Nodes()[at].mLine == n.mLine)
+        {
+            return n.mLine;
+        }
+    }
+    return -1;
+}
+
 std::vector<s32> Domain::SligWay(const NavGraph& nav, s32 from, const std::function<bool(s32)>& goal, std::vector<Goap::Fact>* gates, const World* world)
 {
     const std::vector<NavNode>& nodes = nav.Nodes();
@@ -2304,8 +2322,11 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             add("Cross " + std::string(EdgeKindName(e.mKind)) + " " + std::to_string(nav.Nodes()[e.mFrom].mX) + "," + std::to_string(nav.Nodes()[e.mFrom].mY) + "->" + std::to_string(nav.Nodes()[e.mTo].mX) + "," + std::to_string(nav.Nodes()[e.mTo].mY),
                 other, {regionFact(e.mTo)}, 100 + e.mCost + unseen(other), step);
         }
+        // (onto the floor a Slig walks, from off it: dearer, so that a way round it is taken where there is one)
+        const s32 beatTo = sligFloor ? -1 : SligBeat(nav, world, e.mTo);
+        const s32 beat = beatTo >= 0 && beatTo != SligBeat(nav, world, e.mFrom) ? kSligBeatCost : 0;
         add("Cross " + std::string(EdgeKindName(e.mKind)) + " " + std::to_string(nav.Nodes()[e.mFrom].mX) + "," + std::to_string(nav.Nodes()[e.mFrom].mY) + "->" + std::to_string(nav.Nodes()[e.mTo].mX) + "," + std::to_string(nav.Nodes()[e.mTo].mY),
-            pre, {regionFact(e.mTo)}, 100 + e.mCost + (both ? unseen(pre) : 0), step);
+            pre, {regionFact(e.mTo)}, 100 + e.mCost + (both ? unseen(pre) : 0) + beat, step);
         // Or seen, onto the Scrab's floor and straight off it: to a cell of that floor a few along which the
         // Scrab can't get to (behind a wall, or under a block too low for it), timed against the Scrab
         // (`ScrabWaryTask`). The Mudanchee trial: "once you land, run and roll to the left".

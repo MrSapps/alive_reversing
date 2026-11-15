@@ -80,6 +80,211 @@ static u32 LandingBits(const Bot& bot, const NavGraph& nav, const std::vector<s3
     return (way < 0 ? Btn::eLeft : Btn::eRight) | Btn::eRun;
 }
 
+// AE's Sligs in the background of a screen (SligCycle says what they do and when they shoot). The way along such a
+// screen goes from cover to cover: a Z cover he is wholly inside, or the next screen. Through the open between two
+// it is rolled, crouched in the cover first so that the roll starts on the frame it is asked for, and at full
+// health only: there may be no moment when none of them looks (the Barracks' first screen has three out of step),
+// and then it is the one when the fewest do. Their periods are learnt by watching them from the cover.
+bool GoToTask::ZWatched(Bot& bot, const NavGraph& nav, const std::vector<s32>& path, s32 cur, TaskStep& step)
+{
+    const AbeState& abe = bot.Abe();
+    const NavNode& here = nav.Nodes()[cur];
+    if (!bot.IsAe() || here.mHalf || path.empty() || bot.GetWorld().mInvisible)
+    {
+        return false;
+    }
+    const s32 cam = nav.CameraOf(here.mX, here.mY - 5);
+    bool any = false;
+    for (const SligAt& slig : bot.GetWorld().mSligs)
+    {
+        any = any || (slig.mZShoot && !slig.mPossessed && nav.CameraOf(slig.mX, slig.mY - 5) == cam);
+    }
+    const NavEdge& first = nav.Edges()[path[0]];
+    if (!any || mHurry || (first.mKind != EdgeKind::eWalk && first.mKind != EdgeKind::eRoll))
+    {
+        return false;
+    }
+    const auto safe = [&](const NavNode& n)
+    {
+        return n.mZCover || nav.CameraOf(n.mX, n.mY - 5) != cam;
+    };
+    const auto to = [&](std::size_t i) -> const NavNode&
+    {
+        return nav.Nodes()[nav.Edges()[path[i]].mTo];
+    };
+    // The cells ahead on this floor, the same way
+    std::size_t run = 0;
+    while (run < path.size() && (nav.Edges()[path[run]].mKind == EdgeKind::eWalk || nav.Edges()[path[run]].mKind == EdgeKind::eRoll) && nav.Edges()[path[run]].mLeft == first.mLeft)
+    {
+        run++;
+    }
+    std::size_t open = 0;
+    while (open < run && safe(to(open)))
+    {
+        open++;
+    }
+    if (safe(here) && open == run)
+    {
+        return false;
+    }
+    // (with no cover where he is nor on the way ahead there is nothing to go between: as ever then. The
+    // Mudanchee trial's last room has such a Slig over a floor he only runs along and drops off.)
+    bool cover = here.mZCover;
+    for (std::size_t i = 0; i < run; i++)
+    {
+        cover = cover || to(i).mZCover;
+    }
+    if (!cover)
+    {
+        return false;
+    }
+    if (safe(here) && open > 0)
+    {
+        // In cover as far as it goes
+        if (abe.mMove == Move::eCrouch)
+        {
+            return false;
+        }
+        step = TaskStep::Do(Prim::MoveTo(to(open - 1).mX, Gait::eWalk));
+        return true;
+    }
+    // The open ahead, as far as the next cover (or the end of the floor's run)
+    std::size_t far = 0;
+    while (far + 1 < run && !safe(to(far)))
+    {
+        far++;
+    }
+    if (!safe(here))
+    {
+        // Out in it: crouched, and on to that cover as they let him
+        if (abe.mMove == Move::eIdle)
+        {
+            step = TaskStep::Do(Prim::Press(Btn::eDown));
+            return true;
+        }
+        if (abe.mMove != Move::eCrouch)
+        {
+            mSteps--;
+            step = TaskStep::Do(Prim::Wait(1));
+            return true;
+        }
+        return ZMove(bot, nav, path, cur, far, step);
+    }
+    const auto wait = [&](s32 said, const std::string& what)
+    {
+        if (mZSaid != said)
+        {
+            mZSaid = said;
+            bot.Log(what);
+        }
+        mSteps--;
+        step = TaskStep::Do(Prim::Wait(1));
+        return true;
+    };
+    if (!abe.Settled())
+    {
+        return wait(mZSaid, "");
+    }
+    if (abe.mMove == Move::eCrouch && abe.mFacingLeft != first.mLeft)
+    {
+        step = TaskStep::Do(Prim::Press(Btn::eUp));
+        return true;
+    }
+    if (abe.mMove == Move::eIdle && abe.mFacingLeft != first.mLeft)
+    {
+        step = TaskStep::Do(Prim::Face(first.mLeft));
+        return true;
+    }
+    if (abe.mMove == Move::eIdle)
+    {
+        step = TaskStep::Do(Prim::Press(Btn::eDown));
+        return true;
+    }
+    if (abe.mMove != Move::eCrouch)
+    {
+        return wait(mZSaid, "");
+    }
+    if (abe.mHealthFp < 0x10000)
+    {
+        return wait(1, "hurt: in cover from the Sligs in the background until that is over");
+    }
+    const SligCycle& cycle = bot.GetSligCycle();
+    // (a period and the stretch that has to match it, twice over for one that is slow to come round)
+    if (!cycle.Known() && cycle.Watched() < 700)
+    {
+        return wait(2, "watching the Sligs in the background from cover");
+    }
+    return ZMove(bot, nav, path, cur, far, step);
+}
+
+// The next roll of the way through the open to the cell `far` along the path, when it is time for it
+bool GoToTask::ZMove(Bot& bot, const NavGraph& nav, const std::vector<s32>& path, s32 cur, std::size_t far, TaskStep& step)
+{
+    const AbeState& abe = bot.Abe();
+    const NavNode& here = nav.Nodes()[cur];
+    const SligCycle& cycle = bot.GetSligCycle();
+    const bool left = nav.Edges()[path[0]].mLeft;
+    const s32 cam = nav.CameraOf(here.mX, here.mY - 5);
+    s32 periods = 0;
+    for (s32 i = 0; i < cycle.Count(); i++)
+    {
+        periods = periods * 1000 + cycle.Period(i);
+    }
+    const s32 farX = nav.Nodes()[nav.Edges()[path[far]].mTo].mX;
+    // Worked out once for where he is and what is known of them, and kept until it is time
+    if (mZFrom != cur || mZPeriods != periods || mZFar != farX || static_cast<s32>(abe.mFrame) > mZGo)
+    {
+        std::vector<SligCycle::Cell> cells;
+        cells.push_back({here.mX, here.mZCover || nav.CameraOf(here.mX, here.mY - 5) != cam});
+        for (std::size_t i = 0; i <= far; i++)
+        {
+            const NavNode& n = nav.Nodes()[nav.Edges()[path[i]].mTo];
+            cells.push_back({n.mX, n.mZCover || nav.CameraOf(n.mX, n.mY - 5) != cam});
+        }
+        // (measured: rolling, his box is from 24 ahead of him to 13 behind and 34 high; crouched, 13 either side)
+        const SligCycle::Move move = cycle.Cross(cells, [&](s32 x, bool rolling)
+                                                 { return nav.CameraOf(x, here.mY - 5) != cam || nav.ZCovered(x, here.mY, rolling && left ? -24 : -13, rolling && !left ? 24 : 13, 34); });
+        mZFrom = cur;
+        mZPeriods = periods;
+        mZFar = farX;
+        mZGo = static_cast<s32>(abe.mFrame) + move.mDelay;
+        mZTo = cells[move.mTo].mX;
+        if (!cycle.Known() && move.mSpotters > 0)
+        {
+            // No telling what they will do: when none looks as they are now, and after a long wait when no
+            // more than one does
+            mZWaits++;
+            if (move.mSpotters > 1 || mZWaits < 900)
+            {
+                mZGo = static_cast<s32>(abe.mFrame) + 1;
+                mZFrom = -1;
+            }
+        }
+        if (move.mSpotters > 2)
+        {
+            mZGo = static_cast<s32>(abe.mFrame) + 1;
+            mZFrom = -1;
+        }
+        const std::string what = "to the cover at " + std::to_string(farX) + (mZTo != farX ? " by " + std::to_string(mZTo) : "") + " in " + std::to_string(move.mDelay) + " frames: " + (move.mSpotters > 0 ? std::to_string(move.mSpotters) + " of the Sligs in the background see him at best" : "none of the Sligs in the background looks then") + " (periods " + std::to_string(periods) + ")";
+        if (mZWhat != what.substr(0, 28) + std::to_string(mZTo) + std::to_string(move.mSpotters))
+        {
+            mZWhat = what.substr(0, 28) + std::to_string(mZTo) + std::to_string(move.mSpotters);
+            bot.Log(what);
+        }
+    }
+    if (static_cast<s32>(abe.mFrame) < mZGo)
+    {
+        mSteps--;
+        step = TaskStep::Do(Prim::Wait(1));
+        return true;
+    }
+    mZFrom = -1;
+    mZWaits = 0;
+    mZSaid = -1;
+    step = TaskStep::Do(Prim::MoveTo(mZTo, Gait::eRoll));
+    return true;
+}
+
 TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
 {
     if (mDisarm)
@@ -466,6 +671,15 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             return TaskStep::Do(Prim::Wait(10));
         }
         mLeadWaits = 0;
+    }
+
+    if (!atGoal)
+    {
+        TaskStep zStep = TaskStep::Done();
+        if (ZWatched(bot, nav, path, cur, zStep))
+        {
+            return zStep;
+        }
     }
 
     // Crouched after a roll: up again, unless there's more to roll or no room to stand
@@ -999,6 +1213,54 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 last = sweepStop - 1;
             }
+            // A Slig awake on this floor and on his screen, and the roll goes through a shadow and out of it: no
+            // further than the shadow, and out of it once the Slig is off the screen. (A roll is heard all over
+            // the screen: it turns to look, and sees nothing of one who is in the shadow by then. The Barracks'
+            // first path, under the overhang at 1562,1760.)
+            if (bot.IsAe() && !bot.GetWorld().mInvisible)
+            {
+                const NavNode& here = nav.Nodes()[cur];
+                bool watched = false;
+                bool gone = false;
+                for (const SligAt& slig : bot.GetWorld().mSligs)
+                {
+                    // (and one off the screen that stands or comes: it is on it again before long)
+                    const s32 about = ClearSligTask::SligAbout(nav, slig, here.mX, here.mY, here.mHalf);
+                    watched = watched || about == 1 || (about == 2 && std::abs(slig.mX - here.mX) < 600);
+                    gone = gone || about == 3;
+                }
+                std::size_t shade = path.size();
+                for (std::size_t k = 0; k < last && watched; k++)
+                {
+                    if (nav.Nodes()[nav.Edges()[path[k]].mTo].mHidden && !nav.Nodes()[nav.Edges()[path[k + 1]].mTo].mHidden)
+                    {
+                        shade = k;
+                    }
+                }
+                if (shade < last)
+                {
+                    last = shade;
+                }
+                else if (watched && here.mHidden && !nav.Nodes()[first.mTo].mHidden && mHiding < 4000)
+                {
+                    if (mHiding == 0)
+                    {
+                        bot.Log("in the shadow at " + std::to_string(here.mX) + "," + std::to_string(here.mY) + " until the Slig is off the screen");
+                    }
+                    mHiding++;
+                    mSteps--;
+                    return TaskStep::Do(Prim::Wait(1));
+                }
+                // A sortie with the Slig just gone: rolled on along the floor, which is as fast as a run and
+                // has no standing up in it
+                if (bot.Dashing() && !watched && gone)
+                {
+                    while (last + 1 < path.size() && (nav.Edges()[path[last + 1]].mKind == EdgeKind::eWalk || nav.Edges()[path[last + 1]].mKind == EdgeKind::eRoll) && nav.Edges()[path[last + 1]].mLeft == first.mLeft && !nav.Nodes()[nav.Edges()[path[last + 1]].mTo].mHazard)
+                    {
+                        last++;
+                    }
+                }
+            }
             // (a running jump the same way at the end of the roll: from the roll, with no stop to stand up and
             // take a run-up. Measured in the Mudomo trial: rolled from 2362 he was off at 2462 and hung from the
             // ledge at 2537,620.)
@@ -1115,8 +1377,15 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             bool outrun = false;
             const NavNode& here = nav.Nodes()[cur];
             const s32 cell = NavGraph::GridStep(here.mHalf);
+            bool dash = false;
             for (const SligAt& slig : bot.GetWorld().Threats())
             {
+                // A sortie, and this one has walked off his screen: nothing of it to mind until it is back
+                if (bot.IsAe() && bot.Dashing() && slig.mSeen && ClearSligTask::SligAbout(nav, slig, here.mX, here.mY, here.mHalf) == 3)
+                {
+                    dash = true;
+                    continue;
+                }
                 // A sleeping one hears steps on any floor of its screen; one that is awake sees along its own
                 // AO: one awake in the background of his screen shoots into the foreground at what it faces, its
                 // delay after it first faces it (Slig.cpp: VIsFacingMe, no invisible zone, no Z cover). Noise has
@@ -1307,6 +1576,8 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     const s32 away = slig.mX < here.mX ? 1 : -1;
                     // (the second cell of it, so whoever follows a cell behind is in it too)
                     bool edge = false;
+                    // (under something low on the way there it is rolled, all of it: no standing up between)
+                    bool low = false;
                     for (s32 k = 1; k <= 8; k++)
                     {
                         const s32 n = nav.NodeAt(here.mX + away * k * cell, here.mY, here.mHalf, 10);
@@ -1314,11 +1585,12 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                         {
                             break;
                         }
-                        if (nav.Nodes()[n].mHidden && edge)
+                        low = low || nav.Nodes()[n].mLow;
+                        if (nav.Nodes()[n].mHidden && (edge || nav.Nodes()[n].mLow))
                         {
                             mRetreats++;
                             mSteps--;
-                            return TaskStep::Do(Prim::MoveTo(nav.Nodes()[n].mX, Gait::eWalk));
+                            return TaskStep::Do(Prim::MoveTo(nav.Nodes()[n].mX, low ? Gait::eRoll : Gait::eWalk));
                         }
                         edge = nav.Nodes()[n].mHidden;
                     }
@@ -1649,7 +1921,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     return TaskStep::Do(Prim::RunRoll(to.mX - way * 3 * cell, to.mX));
                 }
             }
-            if (mQuiet && !bot.GetWorld().mInvisible)
+            if (mQuiet && !dash && !bot.GetWorld().mInvisible)
             {
                 return TaskStep::Do(Prim::MoveTo(to.mX, Gait::eSneak));
             }
@@ -1680,7 +1952,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 return TaskStep::Do(Prim::MoveTo(to.mX, Gait::eRun));
             }
-            if (outrun || mHurry || fleech || (flier && !sneak))
+            if (outrun || mHurry || fleech || (flier && !sneak) || (dash && !sneak))
             {
                 gait = Gait::eRun;
                 // And if the way goes on under something low, from the run straight into the roll: stopping to
@@ -3387,6 +3659,140 @@ u32 ClearSligTask::ShootLevel(const World& world, const SligAt& me, s32 targetX,
     return targetX < me.mX ? Btn::eLeft : Btn::eRight;
 }
 
+s32 ClearSligTask::SligAbout(const NavGraph& nav, const SligAt& slig, s32 x, s32 y, bool half)
+{
+    if (slig.mAsleep || slig.mPossessed || slig.mHalf != half || std::abs(slig.mY - y) > 45)
+    {
+        return 0;
+    }
+    if (nav.CameraOf(slig.mX, slig.mY - 5) == nav.CameraOf(x, y - 5))
+    {
+        return 1;
+    }
+    // (Slig.hpp: Motion_2_Walking. One that stands off the screen is about to turn, for all that can be told.)
+    const bool away = slig.mX > x ? !slig.mFacingLeft : slig.mFacingLeft;
+    return away && slig.mMotion == 2 ? 3 : 2;
+}
+
+s32 ClearSligTask::Haven(const NavGraph& nav, const NavGraph::EdgeCost& cost, s32 use)
+{
+    const NavNode& at = nav.Nodes()[use];
+    const s32 cam = nav.CameraOf(at.mX, at.mY - 5);
+    std::vector<s32> way;
+    const auto unseen = [&](s32 n)
+    {
+        const NavNode& node = nav.Nodes()[n];
+        return n != use && !node.mHazard && node.mHalf == at.mHalf && nav.CameraOf(node.mX, node.mY - 5) == cam && (node.mHidden || std::abs(node.mY - at.mY) > 45);
+    };
+    if (!nav.FindPath(use, unseen, cost, way) || way.empty() || way.size() > 3)
+    {
+        return -1;
+    }
+    const s32 haven = nav.Edges()[way.back()].mTo;
+    // (and a way back down from it)
+    std::vector<s32> back;
+    return nav.FindPath(haven, use, cost, back) && back.size() <= 4 ? haven : -1;
+}
+
+TaskStep ClearSligTask::Sortie(Bot& bot, const std::string& lastFailed, s32 x, s32 y, bool half)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const AbeState& abe = bot.Abe();
+    // None of that floor's Sligs on its screen or about to be, and one just gone
+    bool clear = true;
+    bool gone = false;
+    for (const SligAt& slig : world.mSligs)
+    {
+        const s32 about = SligAbout(nav, slig, x, y, half);
+        clear = clear && (about == 0 || about == 3);
+        gone = gone || about == 3;
+    }
+    bot.Dash(abe.mFrame + 3);
+    const auto giveUp = [&](const std::string& why)
+    {
+        bot.Log("no sortie: " + why);
+        mSortie = 0;
+        mGaveUp = true;
+        mGo.reset();
+        mInner = mMake();
+        return mInner->Next(bot, "");
+    };
+    const NavNode& haven = nav.Nodes()[mSortieNode];
+    if (mSortie == 1)
+    {
+        if (!mGo)
+        {
+            // A place the thing itself opens the way to is where he goes after it, not before
+            std::vector<s32> way;
+            if (bot.AbeNode() < 0 || !nav.FindPath(bot.AbeNode(), mSortieNode, bot.EdgeCostFn(), way))
+            {
+                mSortie = 3;
+                mInner = mMake();
+                return Sortie(bot, "", x, y, half);
+            }
+            mGo = GoToNode(mSortieNode);
+        }
+        TaskStep step;
+        if (!RunGo(mGo, bot, lastFailed, step))
+        {
+            return step;
+        }
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            return giveUp(step.mWhy);
+        }
+        mSortie = 2;
+        mSortieWaits = 0;
+        bot.Log("out of sight at " + std::to_string(haven.mX) + "," + std::to_string(haven.mY) + ": until the Slig has walked off the screen");
+    }
+    if (mSortie == 2)
+    {
+        if (!clear || !gone)
+        {
+            if (++mSortieWaits > 3000)
+            {
+                return giveUp("the Slig never left the screen");
+            }
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        mSortie = 3;
+        mInner = mMake();
+        bot.Log("the Slig is off the screen: out for " + mInner->Name());
+        TaskStep step = mInner->Next(bot, "");
+        if (step.mKind != TaskStep::Kind::eDone)
+        {
+            return step;
+        }
+    }
+    if (mSortie == 3)
+    {
+        TaskStep step = mInner->Next(bot, lastFailed);
+        if (step.mKind != TaskStep::Kind::eDone)
+        {
+            return step;
+        }
+        mSortie = 4;
+        mGo = GoToNode(mSortieNode);
+        TaskStep back;
+        if (!RunGo(mGo, bot, "", back))
+        {
+            return back;
+        }
+    }
+    if (mSortie == 4)
+    {
+        TaskStep step;
+        if (!RunGo(mGo, bot, lastFailed, step))
+        {
+            return step;
+        }
+    }
+    // (back or not: the thing is used)
+    mSortie = 5;
+    return TaskStep::Done();
+}
+
 TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
 {
     const World& world = bot.GetWorld();
@@ -3474,6 +3880,10 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
         return Next(bot, "");
     }
 
+    if (mSortie > 0 && mSortie < 5 && mPhase == 0 && !mAmbush)
+    {
+        return Sortie(bot, lastFailed, x, y, entity->mHalf);
+    }
     const SligAt* slig = mAmbush ? nullptr : Watcher(world, x, y, entity->mHalf);
     if (mPhase == 0 && slig)
     {
@@ -3733,6 +4143,28 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
             // chants, so a Slig that faces him on his screen and floor shoots, panicking or not. It panics at
             // the chant, runs off the screen and shoots on its way back, about 2 frames before the 90 + 30
             // frames of chanting with it on screen are up.
+            // Not taken over, then: out to the thing while the Slig is off the screen, from right by it
+            const s32 use = bot.IsAe() && mSortie == 0 ? Domain::UseNode(nav, *entity, nullptr) : -1;
+            // (by the map, with the gates as they will be once the thing is used: what else makes a move dear
+            // or barred is for when it is made)
+            const s32 own = entity->mSwitch;
+            mSortieNode = use >= 0 ? Haven(nav, [&nav, &world, own](const NavEdge& e) -> s32
+                                           {
+                                               s32 gate = 0;
+                                               s32 open = 0;
+                                               if (nav.Condition(e, &gate, &open) && (gate == own ? world.Switch(gate) == open : world.Switch(gate) != open))
+                                               {
+                                                   return -1;
+                                               }
+                                               return e.mCost + 1;
+                                           }, use)
+                                   : -1;
+            if (mSortieNode >= 0)
+            {
+                mSortie = 1;
+                bot.Log("a Slig at " + std::to_string(slig->mX) + "," + std::to_string(slig->mY) + " watches " + mInner->Name() + " and can't be taken over: from " + std::to_string(nav.Nodes()[mSortieNode].mX) + "," + std::to_string(nav.Nodes()[mSortieNode].mY) + " while it is off the screen");
+                return Sortie(bot, lastFailed, x, y, entity->mHalf);
+            }
             bot.Log("a Slig at " + std::to_string(slig->mX) + "," + std::to_string(slig->mY) + " watches " + mInner->Name() + ", and there is nowhere near to chant from");
             mGaveUp = true;
             return mInner->Next(bot, lastFailed);
