@@ -801,6 +801,41 @@ private:
     std::unique_ptr<GoToTask> mGo;
 };
 
+// A Slig dropped through a trap door: at the door's lever until the Slig is on the door, then the lever.
+class SligDropTask final : public Task
+{
+public:
+    SligDropTask(u32 lever, u32 slig, s32 door)
+        : mLever(lever)
+        , mSlig(slig)
+        , mDoor(door)
+    {
+    }
+    ~SligDropTask() override;
+    std::string Name() const override
+    {
+        return "Drop Slig #" + std::to_string(mSlig) + " through the trap door";
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mLever;
+    u32 mSlig;
+    s32 mDoor;
+    s32 mFrames = 0;
+    s32 mPulls = 0;
+    s32 mAfter = 0;
+    // Where the Slig was a frame ago, the frames a pull takes to open the door (measured on the first, 16 until
+    // then), and the frame and the switch's value as the pull under way was begun
+    s32 mLastX = 0;
+    s32 mLastFrame = 0;
+    s32 mDelay = 16;
+    s32 mPulledAt = 0;
+    s32 mWas = 0;
+    std::unique_ptr<GoToTask> mGo;
+    std::unique_ptr<UseTask> mUse;
+};
+
 // Onto a foot switch's cell so that its switch turns over: off it first if he stands on it.
 class StepOnTask final : public Task
 {

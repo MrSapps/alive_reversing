@@ -909,6 +909,8 @@ static void BuildEntities(BinaryPath& path, World& world)
                     break;
                 }
                 case ReliveTypes::eSecurityOrb:
+                // (AO's claw does what AE's orb does: whoever chants on its screen is zapped)
+                case ReliveTypes::eSecurityClaw:
                     e.mKind = EntityKind::eSecurityOrb;
                     break;
                 default:

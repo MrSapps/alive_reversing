@@ -5520,6 +5520,116 @@ TaskStep ParamitePullTask::Next(Bot& bot, const std::string& lastFailed)
     return TaskStep::Failed("lost its place");
 }
 
+SligDropTask::~SligDropTask() = default;
+
+TaskStep SligDropTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const Entity* lever = world.Find(mLever);
+    const Entity* slig = world.Find(mSlig);
+    if (!lever || !slig)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    const NavFeature& door = nav.Input().mFeatures[mDoor];
+    if (++mFrames > 3000)
+    {
+        return TaskStep::Failed("the Slig never was on the trap door");
+    }
+    // The lever under way
+    if (mUse)
+    {
+        // (how long the pull takes to set the switch: what the next one is timed by)
+        if (mPulledAt > 0 && world.Switch(lever->mSwitch, true) != mWas)
+        {
+            mDelay = std::max(4, static_cast<s32>(bot.Abe().mFrame) - mPulledAt);
+            mPulledAt = 0;
+        }
+        const TaskStep step = mUse->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::ePrim)
+        {
+            return step;
+        }
+        mUse.reset();
+        mAfter = 60;
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    // Any Slig left on the door's floor by it
+    const SligAt* on = nullptr;
+    bool about = false;
+    for (const SligAt& s : world.mSligs)
+    {
+        if (s.mPossessed || s.mHalf != door.mHalf || std::abs(s.mY - door.mY1) > 30 || std::abs(s.mX - (door.mX1 + door.mX2) / 2) > 400)
+        {
+            continue;
+        }
+        about = true;
+        // (where it will be when the door opens, at the pace it goes now: pulled as it is on the door it has
+        // walked off it by then)
+        // (its pace over the frames since it was last looked at)
+        const s32 frames = std::max(1, static_cast<s32>(bot.Abe().mFrame) - mLastFrame);
+        const s32 pace10 = mLastX != 0 && std::abs(s.mX - mLastX) < 12 * frames ? (s.mX - mLastX) * 10 / frames : 0;
+        const s32 pace = pace10;
+        const s32 then = s.mX + pace10 * mDelay / 10;
+        mLastX = s.mX;
+        mLastFrame = static_cast<s32>(bot.Abe().mFrame);
+        if (pace != 0 && then >= door.mX1 + 4 && then <= door.mX2 - 4)
+        {
+            on = &s;
+        }
+    }
+    if (mAfter > 0)
+    {
+        if (--mAfter > 0)
+        {
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        if (slig->mGone || !about)
+        {
+            bot.Log("the Slig is down the trap door");
+            bot.FleechKilled(mSlig);
+            return TaskStep::Done();
+        }
+    }
+    if (slig->mGone)
+    {
+        return TaskStep::Done();
+    }
+    const s32 at = Domain::UseNode(nav, *lever, nullptr);
+    if (bot.AbeNode() != at)
+    {
+        TaskStep step;
+        if (!mGo)
+        {
+            mGo = std::make_unique<GoToTask>("to the trap door's lever", [at](s32 n)
+                                             { return n == at; });
+        }
+        if (!RunGo(mGo, bot, lastFailed, step))
+        {
+            return step;
+        }
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            return step;
+        }
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    if (!on || !bot.Abe().Settled())
+    {
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    if (++mPulls > 8)
+    {
+        return TaskStep::Failed("the trap door did not take the Slig");
+    }
+    bot.Log("the Slig at " + std::to_string(on->mX) + " will be on the trap door in " + std::to_string(mDelay) + " frames: the lever");
+    mPulledAt = static_cast<s32>(bot.Abe().mFrame);
+    mWas = world.Switch(lever->mSwitch, true);
+    mUse = std::make_unique<UseTask>(mLever, world.Switch(lever->mSwitch) ? 0 : 1);
+    return TaskStep::Do(Prim::Wait(1));
+}
+
 StepOnTask::~StepOnTask() = default;
 
 TaskStep StepOnTask::Next(Bot& bot, const std::string& lastFailed)
@@ -7088,6 +7198,11 @@ TaskStep ExitTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 return TaskStep::Do(Prim::Wait(40, floorRight ? Btn::eLeft : Btn::eRight));
             }
+        }
+        // (one that lies to a side of him: that way)
+        if (abe.mX < f.mX1 || abe.mX > f.mX2)
+        {
+            return TaskStep::Do(Prim::Wait(40, abe.mX > f.mX2 ? Btn::eLeft : Btn::eRight));
         }
         return TaskStep::Do(Prim::Wait(40, abe.mFacingLeft ? Btn::eLeft : Btn::eRight));
     }
