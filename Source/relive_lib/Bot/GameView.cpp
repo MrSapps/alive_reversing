@@ -687,6 +687,15 @@ static void BuildEntities(BinaryPath& path, World& world)
                     keep = GetGameType() == GameType::eAe;
                     e.mHalf = static_cast<const relive::Path_MineCar&>(tlv).mScale == relive::reliveScale::eHalf;
                     break;
+                case ReliveTypes::eBoomMachine:
+                    // AO's gives grenades as a sack gives rocks: up at it, and what drops out of its pipe is
+                    // picked up. To the bot a grenade is a rock that goes off: it sets off the mine it touches
+                    // (Mine::VOnThrowableHit), which is all a rock is thrown for.
+                    e.mKind = EntityKind::eRockSack;
+                    keep = GetGameType() != GameType::eAe;
+                    e.mHalf = static_cast<const relive::Path_BoomMachine&>(tlv).mScale == relive::reliveScale::eHalf;
+                    e.mInputs[0] = static_cast<const relive::Path_BoomMachine&>(tlv).mGrenadeAmount;
+                    break;
                 case ReliveTypes::eRockSack:
                     e.mKind = EntityKind::eRockSack;
                     // (AO's give rocks another way, not done yet)
@@ -1237,7 +1246,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
         }
     }
 
-    world.mRocks = isAe && gAbe ? gAbe->mBaseThrowableCount : 0;
+    world.mRocks = isAe ? (gAbe ? gAbe->mBaseThrowableCount : 0) : (AO::gAbe ? AO::gAbe->field_19C_throwable_count : 0);
     world.mRocksDown.clear();
     world.mRocksFlying.clear();
     world.mFallers.clear();
@@ -1254,7 +1263,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             faller.mChasing = pObj->mVelY > FP_FromInteger(0) || (!isAe && static_cast<s32>(static_cast<AO::FallingItem*>(pObj)->mState) == 2);
             world.mFallers.push_back(faller);
         }
-        if (isAe && pObj && !pObj->GetDead() && (pObj->Type() == ReliveTypes::eRock || pObj->Type() == ReliveTypes::eMeat))
+        if (pObj && !pObj->GetDead() && (isAe ? pObj->Type() == ReliveTypes::eRock || pObj->Type() == ReliveTypes::eMeat : pObj->Type() == ReliveTypes::eGrenade))
         {
             RockAt rock;
             rock.mX = FP_GetExponent(pObj->mXPos);

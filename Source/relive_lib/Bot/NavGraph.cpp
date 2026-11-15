@@ -1304,6 +1304,23 @@ void NavGraph::Build(const NavInput& input)
                                 to = out;
                             }
                         }
+                        // AO: walked off he keeps the walk's 2.77 a frame all the way down, so a long fall lands
+                        // him well out: 20 down a frame after the first five's 45, and some five frames more for
+                        // each screen change. Measured
+                        // in Rupture Farms' path 20: off 340,314 to the right he was at 409 by the floor at 715,
+                        // which ends at 379, and went on down the lift's shaft. No floor there, no way down.
+                        if (!mInput.mIsAe && height >= 150)
+                        {
+                            const s32 rows = FloorDiv(fy, kAoCamH) - FloorDiv(n.mY, kAoCamH);
+                            // (the height is what he falls: what is skipped between screens is not in it)
+                            const s32 frames = 5 + std::max(0, height - 45) / 20 + 5 * rows;
+                            const s32 outX = nx + dir * (frames * 277 / 100);
+                            to = NodeOnLine(belowLine, outX);
+                            if (to >= 0 && std::abs(mNodes[to].mX - outX) > step)
+                            {
+                                to = -1;
+                            }
+                        }
                         if (to >= 0 && (!mNodes[to].mHazard || mNodes[to].mClear >= 0))
                         {
                             AddEdge(edges, from, to, EdgeKind::eFall, 20 + height / 4 + (crouched ? 10 : 0), -1, left);
@@ -1510,6 +1527,7 @@ void NavGraph::Build(const NavInput& input)
         }
 
         // A lift is worked from the middle of its platform
+        // (its stops are one over the other, give or take a pixel: Rupture Farms' path 20 has them at 454 and 455)
         if (n.mLiftStop >= 0)
         {
             const NavFeature& stop = mInput.mFeatures[n.mLiftStop];
@@ -1518,7 +1536,7 @@ void NavGraph::Build(const NavInput& input)
                 for (std::size_t k = 0; k < mNodes.size(); k++)
                 {
                     const NavNode& other = mNodes[k];
-                    if (other.mLiftStop >= 0 && other.mLiftStop != n.mLiftStop && other.mX == n.mX && other.mHalf == n.mHalf && mInput.mFeatures[other.mLiftStop].mX1 == stop.mX1)
+                    if (other.mLiftStop >= 0 && other.mLiftStop != n.mLiftStop && other.mX == n.mX && other.mHalf == n.mHalf && std::abs(mInput.mFeatures[other.mLiftStop].mX1 - stop.mX1) <= 2)
                     {
                         AddEdge(edges, from, static_cast<s32>(k), EdgeKind::eLift, 40 + std::abs(other.mY - n.mY) / 3, n.mLiftStop, other.mY < n.mY);
                     }

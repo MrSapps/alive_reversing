@@ -408,6 +408,15 @@ std::vector<ThrowSpot> Domain::ThrowSpots(const NavGraph& nav, s32 x, s32 y, boo
             {
                 continue;
             }
+            // (AO: nor from where the grenade's own blast reaches him, where it lies when it goes off)
+            if (!nav.Input().mIsAe && !flight.mPoints.empty())
+            {
+                const ThrowArc::Point& end = flight.mPoints.back();
+                if (std::abs(end.mX - n.mX) * scale <= ThrowArc::kGrenadeKillX && (n.mY - end.mY) * scale >= -ThrowArc::kGrenadeKillUp && (n.mY - end.mY) * scale <= ThrowArc::kGrenadeKillDown)
+                {
+                    continue;
+                }
+            }
             ThrowSpot spot;
             spot.mSure = flight.mSure;
             spot.mNode = static_cast<s32>(i);
