@@ -186,6 +186,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<FartBombTask>(step.mEntity, step.mOther, step.mEdge);
         case StepKind::eDrink:
             return std::make_unique<DrinkTask>(step.mEntity);
+        case StepKind::eSligLock:
+            return std::make_unique<SligLockTask>(step.mEntity, step.mOther, static_cast<u32>(step.mEdge));
         case StepKind::eRide:
             return std::make_unique<RideCarTask>(step.mEntity, step.mEdge);
         case StepKind::eScrabRampage:
@@ -760,6 +762,7 @@ bool Bot::Replan(BaseMap& map)
     mInvisChantNow = false;
     mInvisChantSoon = false;
     mInvisAtOnce = false;
+    mInvisCross = false;
     mUnseenUse = 0;
     {
         bool orbs = false;
@@ -794,6 +797,7 @@ bool Bot::Replan(BaseMap& map)
                 mInvisChantNow = done == 0 || (!cross && done == 1 && leadsIn);
                 mInvisChantSoon = done <= 1;
                 mUnseenUse = cross ? 0 : domain.mSteps[a.mTag].mEntity;
+                mInvisCross = cross;
                 break;
             }
             // (what the game does by itself is no step of his)
@@ -816,6 +820,7 @@ bool Bot::Replan(BaseMap& map)
                 mInvisChantNow = true;
                 mInvisChantSoon = true;
                 mInvisAtOnce = true;
+                mInvisCross = domain.mSteps[a.mTag].mKind == StepKind::eCross;
             }
             break;
         }
@@ -1190,7 +1195,10 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs) const
     // (the power to go unseen in hand makes a Scrab's floor a way like any other, unless it is kept for a step of
     // the plan that is not at hand yet)
     const bool charged = !(mInvisSaved && !mInvisChantNow);
-    return [know, world, only, pastScrabs, charged](const NavEdge& e) -> s32
+    const bool chanted = mChargeFrame != 0 && mAbe.mFrame - mChargeFrame < 60;
+    // (unseen for a crossing over a floor Sligs watch: the quick ways are the cheap ones)
+    const bool unseenRun = mWorld.mInvisible && InvisRun();
+    return [know, world, only, pastScrabs, charged, chanted, unseenRun](const NavEdge& e) -> s32
     {
         const s32 idx = static_cast<s32>(&e - know->mNav.Edges().data());
         if (know->mBannedEdges.count(idx) || (!only->empty() && !only->count(idx)))
@@ -1227,9 +1235,23 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs) const
         {
             return -1;
         }
+        // Onto a floor Sligs watch with no shadow to go by (Domain::SligWatched): only unseen
+        // (with the power in hand too, whatever step it is kept for: the chant comes before he is on it,
+        // GoToTask. The Mudanchee trial's last room, where it is kept for the locks on the Sligs' level.)
+        const bool unseenNow = world->mInvisible || world->mInvisCharge || world->mInvisComing || chanted;
+        if (only->empty() && !unseenNow && Domain::SligWatched(know->mNav, *world, to.mX, to.mY, to.mHalf) && !Domain::SligWatched(know->mNav, *world, from.mX, from.mY, from.mHalf))
+        {
+            return -1;
+        }
         // A running jump up a hoist: the way to go with a Scrab on his floor after him, and not otherwise
         if (e.mKind == EdgeKind::eRunJump && e.mFeature >= 0 && know->mNav.Input().mFeatures[e.mFeature].mKind == FeatureKind::eHoist)
         {
+            // (unseen on a floor Sligs watch: the power runs out, and the jump is quicker than the stop and the
+            // climb. Feeco's path 3, up the block at 1312,2020.)
+            if (unseenRun && Domain::SligWatched(know->mNav, *world, from.mX, from.mY, from.mHalf))
+            {
+                return 20;
+            }
             for (const ScrabAt& scrab : world->mScrabs)
             {
                 if (!scrab.mPossessed && scrab.mHalf == from.mHalf && std::abs(scrab.mY - from.mY) <= 30 && std::abs(scrab.mX - from.mX) < 700)
@@ -1311,7 +1333,8 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs) const
         // A walk off a ledge down into a shadow on a floor Sligs are awake on: the landing is heard and they turn
         // to it (Feeco's path 9, off 1037,340: both turned and shot). Let down from his hands at a hoist he lands
         // softly, so that is the way where there is one. (AE's only, as measured.)
-        if (know->mNav.Input().mIsAe && e.mKind == EdgeKind::eFall && to.mY > from.mY + 30)
+        // (unseen it is no matter, and the drop is the quicker of the two)
+        if (know->mNav.Input().mIsAe && !unseenRun && e.mKind == EdgeKind::eFall && to.mY > from.mY + 30)
         {
             bool hoist = false;
             for (s32 i = from.mFirstEdge; i < from.mFirstEdge + from.mEdgeCount; i++)
@@ -1341,6 +1364,12 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs) const
                 }
             }
         }
+        // A hop off the end of a floor, unseen where Sligs watch: the stop to hop is time the power does not give,
+        // so the run off the end is the way where there is one
+        if (e.mKind == EdgeKind::eHop && to.mY > from.mY + 20 && unseenRun && Domain::SligWatched(know->mNav, *world, to.mX, to.mY, to.mHalf))
+        {
+            return e.mCost + 60;
+        }
         // A hop down onto a floor a pack of Paramites hunts him on, within 150 px of one of them: he lands
         // standing, and they have him before he is off again. Measured in the Mudomo vaults' path 7, from
         // 1212,1400 onto 1312,1520 with one at 1212: dead 12 frames after landing. (At 150 he gets away: the
@@ -1364,7 +1393,8 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs) const
         // its floor again. Measured in the Mines' path 2 at 837,880, two cells in front of one: shot 37 frames
         // after he lands, at the hoist one cell on. (One asleep that the landing wakes is another matter: it takes
         // 96 frames in the Mines' path 10, where the way on is such a landing and a run to a well: Bot::MakeFlee.)
-        if (!to.mHidden && std::abs(to.mY - from.mY) * (to.mHalf ? 2 : 1) > 30 && (e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eHop || e.mKind == EdgeKind::eHoistDown || e.mKind == EdgeKind::eWell))
+        // (unseen it is no matter)
+        if (!unseenNow && !to.mHidden && std::abs(to.mY - from.mY) * (to.mHalf ? 2 : 1) > 30 && (e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eHop || e.mKind == EdgeKind::eHoistDown || e.mKind == EdgeKind::eWell))
         {
             const s32 scale = to.mHalf ? 2 : 1;
             // (one not seen yet, its screen not loaded, is where and how the map starts it)
@@ -2776,6 +2806,22 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
     }
 
     // Saving them all: a Mudokon lost is as bad as Abe lost, so back and try again
+    // (when the power to go unseen was last in hand: chanted for, it is gone a few frames before he is unseen)
+    if (mWorld.mInvisCharge)
+    {
+        mChargeFrame = mAbe.mFrame;
+    }
+    // (and whether the power he is unseen by was chanted for a crossing: then it is a run against its clock,
+    // for as long as it lasts, whatever step is at hand by then)
+    if (!mWorld.mInvisible)
+    {
+        mInvisRun = false;
+    }
+    else if (!mWasInvisible)
+    {
+        mInvisRun = mInvisCross;
+    }
+    mWasInvisible = mWorld.mInvisible;
     if (mAuto && mProfile.mEnding == Ending::eSaveAll && mWorld.mKilled > mLastKilled && !mCheckpoints.empty() && mState == BotState::eRunning)
     {
         Log("a Mudokon died (killed " + std::to_string(mWorld.mKilled) + ")");

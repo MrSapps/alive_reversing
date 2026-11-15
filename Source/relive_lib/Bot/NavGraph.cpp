@@ -27,6 +27,8 @@ static const s32 kRunJumpCost = 60;
 static const s32 kRunUpCells = 3;
 static const s32 kRunJumpCells = 4;
 static const s32 kRunJumpLedgeCells = 5;
+// A ledge this far over his floor is caught by a hop that starts with floor still under him
+static const s32 kHighLedge = 60;
 static const s32 kHoistCost = 55;
 static const s32 kDoorCost = 80;
 static const s32 kWellCost = 100;
@@ -1349,6 +1351,10 @@ void NavGraph::Build(const NavInput& input)
                 bool gap = n.mLiftStop < 0;
                 // (a lift's shaft is one while the lift is away)
                 s32 shaft = -1;
+                // (no floor under him so far. A ledge well over his own floor is caught with floor under him
+                // too, two or three cells off: Feeco's path 3, from 787,1500 by the wall up to 837,1420, where
+                // from the end of the floor, one cell off, he goes by under it.)
+                bool bare = true;
                 for (s32 k = 1; k <= 4 && gap && !caught; k++)
                 {
                     gap = !WallBetween(x, x + dir * step, n.mY, n.mHalf);
@@ -1357,7 +1363,7 @@ void NavGraph::Build(const NavInput& input)
                     {
                         const NavFeature& f = mInput.mFeatures[i];
                         const s32 rise = (n.mY - f.mY1) * (n.mHalf ? 2 : 1);
-                        if (f.mKind == FeatureKind::eEdge && f.mA && (f.mAnyScale || f.mHalf == n.mHalf) && (f.mDir == 2 || (f.mDir == 0) == left) && x >= f.mX1 - 2 && x <= f.mX2 + 2 && rise <= 85 && rise >= -40)
+                        if (f.mKind == FeatureKind::eEdge && f.mA && (f.mAnyScale || f.mHalf == n.mHalf) && (f.mDir == 2 || (f.mDir == 0) == left) && x >= f.mX1 - 2 && x <= f.mX2 + 2 && rise <= 85 && rise >= -40 && (bare || (rise >= kHighLedge && k <= 3)))
                         {
                             const s32 to = NodeAt(x, f.mY1, n.mHalf, 12);
                             if (to >= 0)
@@ -1377,7 +1383,7 @@ void NavGraph::Build(const NavInput& input)
                     }
                     else
                     {
-                        gap = gap && under < 0;
+                        bare = bare && under < 0;
                     }
                 }
             }

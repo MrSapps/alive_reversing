@@ -281,6 +281,9 @@ private:
     s32 mSlogWaits = 0;
     bool mSlogUp = false;
     // Frames waited for a lift that is on its way to the stop he would walk onto, and where it was last
+    // Pulling the lever that sends a lift to the stop the way goes onto
+    std::unique_ptr<Task> mLiftCall;
+    s32 mLiftCalls = 0;
     s32 mLiftComeWaits = 0;
     s32 mLiftComeY = -100000;
     s32 mUnseenWaits = 0;
@@ -900,6 +903,68 @@ private:
     s32 mWas = 0;
     std::unique_ptr<GoToTask> mGo;
     std::unique_ptr<UseTask> mUse;
+};
+
+// A Slig lock opened with a Slig: called with the lever of its spawner, taken over from by the lever, walked to
+// the lock (Domain::SligWay: floors, drops, lifts, teleporters whose levers it pulls), shooting the Sligs it
+// walks into, and there it says "Hi" and then the lock's code back to it. It is burst after, unless there is
+// another lock shut that it can get to: then it is left as it is for the step that opens that one.
+class SligLockTask final : public Task
+{
+public:
+    SligLockTask(u32 lock, u32 slig, u32 lever)
+        : mLock(lock)
+        , mSlig(slig)
+        , mLever(lever)
+    {
+    }
+    ~SligLockTask() override;
+    std::string Name() const override
+    {
+        return "Open SligLock#" + std::to_string(mLock) + " with Slig#" + std::to_string(mSlig);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+    // What the Slig at the lock says next (a speak button, or 0: nothing yet). lockState: Entity::mState of the
+    // lock. code: World::mLockCodes. standing: the Slig stands and can speak. hi, said: what it has said this
+    // time round, kept by the caller.
+    static u32 Say(s32 lockState, const std::vector<s32>& code, bool standing, bool& hi, s32& said);
+    // Whether a Slig may walk off a floor's end down to (x, y), going left or right: every other Slig on that
+    // floor and on the screen it lands on is ahead of it there and walks away
+    static bool DropClear(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, bool left);
+    // The game's number for a Slig that walks (Slig.hpp: Motion_2_Walking)
+    static const s32 kSligWalking = 2;
+
+private:
+    u32 mLock;
+    u32 mSlig;
+    u32 mLever;
+    std::unique_ptr<UseTask> mPull;
+    // 0 the lever, 1 the chant, 2 as the Slig
+    s32 mPhase = 0;
+    s32 mFrames = 0;
+    s32 mWaits = 0;
+    s32 mGone = 0;
+    s32 mCalls = 0;
+    s32 mBurst = 0;
+    bool mHi = false;
+    s32 mSaid = 0;
+    s32 mLastState = 0;
+    s32 mTries = 0;
+    // A lift being ridden: the button held and where it stops
+    u32 mRide = 0;
+    s32 mRideY = 0;
+    s32 mRideFrames = 0;
+    bool mTapped = false;
+    s32 mPullTries = 0;
+    s32 mPullWait = 0;
+    s32 mDropWaits = 0;
+    // The frames at most it stands on a floor waiting for that floor's Sligs
+    static const s32 kHoldFrames = 1500;
+    s32 mHold = 0;
+    s32 mShots = 0;
+    s32 mLastNode = -1;
+    s32 mStuck = 0;
+    TaskStep StepTo(const SligAt& me, s32 x);
 };
 
 // Onto a foot switch's cell so that its switch turns over: off it first if he stands on it.

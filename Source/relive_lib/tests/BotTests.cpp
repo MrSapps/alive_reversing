@@ -5896,3 +5896,382 @@ TEST(BotLevel, APathWithNoOtherWayStaysAsItWas)
     // And one the level does not know is not shut
     EXPECT_FALSE(level.Shut(77));
 }
+
+// A lever ledge with a Slig spawner's floor under it on the same screen; that floor goes on through a gate (switch
+// 20) and off its end down to a lower floor with a Slig on it. One Slig lock before the gate (it opens the gate),
+// one on the lower floor.
+static NavInput SligLockRoom()
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 100, 100, 0));
+    in.mLines.push_back(Line(150, 200, 700, 200, 0));
+    in.mLines.push_back(Line(600, 300, 1000, 300, 0));
+    NavFeature gate = Feature(FeatureKind::eBarrier, 400, 180, 424, 204);
+    gate.mSwitch = 20;
+    gate.mStartClosed = true;
+    in.mFeatures.push_back(gate);
+    return in;
+}
+
+static World SligLockWorld()
+{
+    World world;
+    Entity lever = MakeEntity(EntityKind::eLever, 1, 25, 80, 99, 104);
+    lever.mSwitch = 7;
+    lever.mOp = 2;
+    world.mEntities.push_back(lever);
+    Entity spawned = MakeEntity(EntityKind::eSlig, 2, 212, 180, 236, 204);
+    spawned.mSwitch = 7;
+    world.mEntities.push_back(spawned);
+    Entity first = MakeEntity(EntityKind::eSligLock, 3, 300, 150, 350, 204);
+    first.mSwitch = 20;
+    world.mEntities.push_back(first);
+    Entity second = MakeEntity(EntityKind::eSligLock, 4, 900, 250, 975, 304);
+    second.mSwitch = 21;
+    world.mEntities.push_back(second);
+    Entity guard = MakeEntity(EntityKind::eSlig, 5, 800, 280, 824, 304);
+    world.mEntities.push_back(guard);
+    world.mLockCodes[3] = {5, 6, 8};
+    world.mLockCodes[4] = {6, 5, 8};
+    return world;
+}
+
+static const Goap::Action* SligLockAction(const Domain& d, u32 lock)
+{
+    for (const Goap::Action& a : d.mActions)
+    {
+        if (a.mName.find("Open SligLock#" + std::to_string(lock) + " ") == 0)
+        {
+            return &a;
+        }
+    }
+    return nullptr;
+}
+
+static bool HasFact(const std::vector<Goap::Fact>& facts, u32 key, s32 value)
+{
+    return std::find(facts.begin(), facts.end(), Goap::Fact{key, value}) != facts.end();
+}
+
+TEST(BotSligLock, ASligsWayGoesAlongFloorsAndOffTheirEndsAndSaysWhichGatesItNeeds)
+{
+    NavGraph g;
+    g.Build(SligLockRoom());
+    const World world = SligLockWorld();
+    const s32 start = Domain::SligNode(g, world.mEntities[1]);
+    ASSERT_EQ(start, g.NodeAt(212, 200, false));
+    const auto at = [&](std::size_t lock)
+    {
+        return [&g, &world, lock](s32 n)
+        {
+            return Domain::AtSligLock(g, world.mEntities[lock], n);
+        };
+    };
+    // (a Slig the map puts in the air over a floor is not on that floor; one a spawner makes comes down to it)
+    Entity boxed = MakeEntity(EntityKind::eSlig, 9, 212, 120, 236, 144);
+    EXPECT_LT(Domain::SligNode(g, boxed), 0);
+    boxed.mSwitch = 7;
+    EXPECT_EQ(Domain::SligNode(g, boxed), start);
+    // To the first lock: along its floor, nothing shut on the way
+    std::vector<Goap::Fact> gates;
+    const std::vector<s32> near = Domain::SligWay(g, start, at(2), &gates, nullptr);
+    ASSERT_FALSE(near.empty());
+    EXPECT_TRUE(gates.empty());
+    EXPECT_TRUE(Domain::AtSligLock(g, world.mEntities[2], g.Edges()[near.back()].mTo));
+    // To the second: through the gate and off the end of the floor
+    const std::vector<s32> far = Domain::SligWay(g, start, at(3), &gates, nullptr);
+    ASSERT_FALSE(far.empty());
+    ASSERT_EQ(gates.size(), 1u);
+    EXPECT_TRUE(HasFact(gates, Key::Switch(20), 1));
+    bool drops = false;
+    for (s32 idx : far)
+    {
+        drops = drops || g.Edges()[idx].mKind == EdgeKind::eFall;
+    }
+    EXPECT_TRUE(drops);
+    // And none back up: it can't climb
+    const s32 below = g.NodeAt(812, 300, false);
+    ASSERT_GE(below, 0);
+    EXPECT_TRUE(Domain::SligWay(g, below, at(2), &gates, nullptr).empty());
+    // (where it is already there, there is no way to go)
+    EXPECT_TRUE(Domain::SligWay(g, g.NodeAt(312, 200, false), at(2), nullptr, nullptr).empty());
+}
+
+TEST(BotSligLock, AsThingsStandOnlyAnOpenGateIsGoneThrough)
+{
+    NavGraph g;
+    g.Build(SligLockRoom());
+    World world = SligLockWorld();
+    const s32 start = Domain::SligNode(g, world.mEntities[1]);
+    const auto second = [&](s32 n)
+    {
+        return Domain::AtSligLock(g, world.mEntities[3], n);
+    };
+    EXPECT_TRUE(Domain::SligWay(g, start, second, nullptr, &world).empty());
+    world.mSwitches[20] = 1;
+    EXPECT_FALSE(Domain::SligWay(g, start, second, nullptr, &world).empty());
+}
+
+TEST(BotSligLock, ALockIsOpenedWithTheSligItsLeverCalls)
+{
+    NavGraph g;
+    g.Build(SligLockRoom());
+    World world = SligLockWorld();
+    const s32 abe = g.NodeAt(12, 100, false);
+    const Domain d = Domain::Build(g, world, abe, nullptr);
+    const Goap::Action* first = SligLockAction(d, 3);
+    const Goap::Action* second = SligLockAction(d, 4);
+    ASSERT_NE(first, nullptr) << d.Text();
+    ASSERT_NE(second, nullptr) << d.Text();
+    EXPECT_EQ(d.mSteps[first->mTag].mKind, StepKind::eSligLock);
+    EXPECT_EQ(d.mSteps[first->mTag].mEntity, 3u);
+    EXPECT_EQ(d.mSteps[first->mTag].mOther, 2u);
+    EXPECT_EQ(d.mSteps[first->mTag].mEdge, 1);
+    // The first gives its switch and wants nothing but Abe by the lever
+    EXPECT_TRUE(HasFact(first->mEffects, Key::Switch(20), 1));
+    EXPECT_EQ(first->mPre.size(), 1u);
+    EXPECT_FALSE(HasFact(first->mEffects, Key::Mud(5), 2));
+    // The second wants the gate on the Slig's way open, and the Slig it walks into is shot
+    EXPECT_TRUE(HasFact(second->mPre, Key::Switch(20), 1));
+    EXPECT_TRUE(HasFact(second->mEffects, Key::Switch(21), 1));
+    EXPECT_TRUE(HasFact(second->mEffects, Key::Mud(5), 2));
+
+    // One that is open already is not opened again
+    world.mSwitches[20] = 1;
+    EXPECT_EQ(SligLockAction(Domain::Build(g, world, abe, nullptr), 3), nullptr);
+    world.mSwitches[20] = 0;
+    // With an orb on the lever's screen there is no chant, so no Slig to take over
+    World watched = world;
+    watched.mEntities.push_back(MakeEntity(EntityKind::eSecurityOrb, 6, 300, 20, 324, 44));
+    EXPECT_EQ(SligLockAction(Domain::Build(g, watched, abe, nullptr), 3), nullptr);
+    // (an orb on another screen is nothing to it)
+    watched.mEntities.back() = MakeEntity(EntityKind::eSecurityOrb, 6, 800, 20, 824, 44);
+    EXPECT_NE(SligLockAction(Domain::Build(g, watched, abe, nullptr), 3), nullptr);
+    // And a lock whose code is not known is left alone
+    World unknown = world;
+    unknown.mLockCodes.erase(3);
+    EXPECT_EQ(SligLockAction(Domain::Build(g, unknown, abe, nullptr), 3), nullptr);
+}
+
+TEST(BotSligLock, TheSligSaysHiOnceAndThenTheCodeAPartAtATime)
+{
+    const std::vector<s32> code{5, 6, 8};
+    bool hi = false;
+    s32 said = 0;
+    // Idle, and while the lock says its own Hi: nothing
+    EXPECT_EQ(SligLockTask::Say(0, code, true, hi, said), 0u);
+    // It waits for Hi: once, when the Slig can speak
+    EXPECT_EQ(SligLockTask::Say(1, code, false, hi, said), 0u);
+    EXPECT_EQ(SligLockTask::Say(1, code, true, hi, said), static_cast<u32>(Btn::eSpeak1));
+    EXPECT_EQ(SligLockTask::Say(1, code, true, hi, said), 0u);
+    // It says its code: nothing
+    EXPECT_EQ(SligLockTask::Say(2, code, true, hi, said), 0u);
+    // It listens: the code, a part each time the Slig stands again
+    EXPECT_EQ(SligLockTask::Say(3, code, true, hi, said), static_cast<u32>(Btn::eSpeak5));
+    EXPECT_EQ(SligLockTask::Say(3, code, false, hi, said), 0u);
+    EXPECT_EQ(SligLockTask::Say(3, code, true, hi, said), static_cast<u32>(Btn::eSpeak6));
+    EXPECT_EQ(SligLockTask::Say(3, code, true, hi, said), static_cast<u32>(Btn::eSpeak8));
+    EXPECT_EQ(SligLockTask::Say(3, code, true, hi, said), 0u);
+    // It said no: the next time round starts with Hi again and the whole code
+    EXPECT_EQ(SligLockTask::Say(5, code, true, hi, said), 0u);
+    EXPECT_EQ(SligLockTask::Say(1, code, true, hi, said), static_cast<u32>(Btn::eSpeak1));
+    EXPECT_EQ(SligLockTask::Say(3, code, true, hi, said), static_cast<u32>(Btn::eSpeak5));
+}
+
+TEST(BotSligLock, ItDropsOntoAFloorOnlyBehindSligsThatWalkAway)
+{
+    NavGraph g;
+    g.Build(SligLockRoom());
+    World world;
+    // Down to 712,300 going right, with nobody there
+    EXPECT_TRUE(SligLockTask::DropClear(g, world, 712, 300, false, false));
+    SligAt slig;
+    slig.mX = 900;
+    slig.mY = 300;
+    slig.mMotion = SligLockTask::kSligWalking;
+    world.mSligs.push_back(slig);
+    // One ahead that walks away: yes
+    EXPECT_TRUE(SligLockTask::DropClear(g, world, 800, 300, false, false));
+    // One that faces the place: no
+    world.mSligs[0].mFacingLeft = true;
+    EXPECT_FALSE(SligLockTask::DropClear(g, world, 800, 300, false, false));
+    // One that faces away but stands (the end of its beat: it turns next): no
+    world.mSligs[0].mFacingLeft = false;
+    world.mSligs[0].mMotion = 0;
+    EXPECT_FALSE(SligLockTask::DropClear(g, world, 800, 300, false, false));
+    // One behind where it lands, or right next to it: no
+    world.mSligs[0].mMotion = SligLockTask::kSligWalking;
+    world.mSligs[0].mX = 770;
+    EXPECT_FALSE(SligLockTask::DropClear(g, world, 800, 300, false, false));
+    world.mSligs[0].mX = 840;
+    EXPECT_FALSE(SligLockTask::DropClear(g, world, 800, 300, false, false));
+    // One on the next screen sees nothing of it, whichever way it faces
+    world.mSligs[0].mX = 900;
+    world.mSligs[0].mFacingLeft = true;
+    EXPECT_TRUE(SligLockTask::DropClear(g, world, 712, 300, false, false));
+    // Nor does one on another floor, or one that is asleep
+    world.mSligs[0].mX = 730;
+    world.mSligs[0].mY = 200;
+    EXPECT_TRUE(SligLockTask::DropClear(g, world, 712, 300, false, false));
+    world.mSligs[0].mY = 300;
+    world.mSligs[0].mAsleep = true;
+    EXPECT_TRUE(SligLockTask::DropClear(g, world, 712, 300, false, false));
+}
+
+// A ledge over the end of a floor a Slig walks, all on one screen. shadow: with an invisible zone on that floor.
+static NavInput WatchedFloor(bool shadow)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 100, 100, 0));
+    in.mLines.push_back(Line(0, 200, 370, 200, 0));
+    if (shadow)
+    {
+        in.mFeatures.push_back(Feature(FeatureKind::eInvisibleZone, 150, 60, 250, 204));
+    }
+    return in;
+}
+
+static World WatchedWorld(bool lock)
+{
+    World world;
+    world.mEntities.push_back(MakeEntity(EntityKind::eSlig, 1, 250, 180, 274, 204));
+    if (lock)
+    {
+        Entity ghost = MakeEntity(EntityKind::eSlapLock, 2, 25, 80, 49, 104);
+        ghost.mInputs[0] = 95;
+        world.mEntities.push_back(ghost);
+    }
+    return world;
+}
+
+TEST(BotSligWatch, AFloorASligWatchesWithNoShadowOnItIsAPlaceToBeOnlyUnseen)
+{
+    NavGraph g;
+    g.Build(WatchedFloor(false));
+    World world = WatchedWorld(true);
+    std::vector<u32> watchers;
+    EXPECT_TRUE(Domain::SligWatched(g, world, 112, 200, false, &watchers));
+    ASSERT_EQ(watchers.size(), 1u);
+    EXPECT_EQ(watchers[0], 1u);
+    // Not the ledge over it: another floor
+    EXPECT_FALSE(Domain::SligWatched(g, world, 62, 100, false));
+    // Not in a path where the power to go unseen is not to be had: there it is crossed behind the Slig's back
+    EXPECT_FALSE(Domain::SligWatched(g, WatchedWorld(false), 112, 200, false));
+    // (in hand counts as to be had)
+    World charged = WatchedWorld(false);
+    charged.mInvisCharge = true;
+    EXPECT_TRUE(Domain::SligWatched(g, charged, 112, 200, false));
+    // Not with the Slig dead, asleep, or one a spawner has not made
+    world.mEntities[0].mGone = true;
+    EXPECT_FALSE(Domain::SligWatched(g, world, 112, 200, false));
+    world.mEntities[0].mGone = false;
+    world.mEntities[0].mState = 1;
+    EXPECT_FALSE(Domain::SligWatched(g, world, 112, 200, false));
+    world.mEntities[0].mState = 0;
+    world.mEntities[0].mSwitch = 9;
+    EXPECT_FALSE(Domain::SligWatched(g, world, 112, 200, false));
+    // (nor with its switch on: one a spawner makes counts when it is seen on the floor, and then as one
+    // that is not the map's)
+    world.mSwitches[9] = 1;
+    EXPECT_FALSE(Domain::SligWatched(g, world, 112, 200, false));
+    SligAt made;
+    made.mX = 262;
+    made.mY = 200;
+    world.mSligs.push_back(made);
+    bool anon = false;
+    watchers.clear();
+    EXPECT_TRUE(Domain::SligWatched(g, world, 112, 200, false, &watchers, &anon));
+    EXPECT_TRUE(anon);
+    EXPECT_TRUE(watchers.empty());
+    world.mSligs[0].mAsleep = true;
+    EXPECT_FALSE(Domain::SligWatched(g, world, 112, 200, false));
+    // Not with a shadow on that floor on that screen: the way there is from shadow to shadow
+    NavGraph shaded;
+    shaded.Build(WatchedFloor(true));
+    EXPECT_FALSE(Domain::SligWatched(shaded, WatchedWorld(true), 112, 200, false));
+    // And a Slig on the next screen does not see him
+    World next = WatchedWorld(true);
+    next.mEntities[0] = MakeEntity(EntityKind::eSlig, 1, 400, 180, 424, 204);
+    NavInput wide = WatchedFloor(false);
+    wide.mLines[1] = Line(0, 200, 700, 200, 0);
+    NavGraph two;
+    two.Build(wide);
+    EXPECT_FALSE(Domain::SligWatched(two, next, 112, 200, false));
+    EXPECT_TRUE(Domain::SligWatched(two, next, 387, 200, false));
+}
+
+TEST(BotSligWatch, TheWayOntoSuchAFloorIsPlannedUnseenOrWithItsSligsDead)
+{
+    NavGraph g;
+    g.Build(WatchedFloor(false));
+    const s32 abe = g.NodeAt(12, 100, false);
+    const auto crossings = [&](const World& world, s32& unseen, s32& dead, s32& plain)
+    {
+        unseen = 0;
+        dead = 0;
+        plain = 0;
+        const Domain d = Domain::Build(g, world, abe, nullptr);
+        for (const Goap::Action& a : d.mActions)
+        {
+            if (d.mSteps[a.mTag].mKind != StepKind::eCross || g.Nodes()[g.Edges()[d.mSteps[a.mTag].mEdge].mTo].mY != 200)
+            {
+                continue;
+            }
+            if (NeedsUnseen(a))
+            {
+                unseen++;
+            }
+            else if (HasFact(a.mPre, Key::Mud(1), 2))
+            {
+                dead++;
+            }
+            else
+            {
+                plain++;
+            }
+        }
+    };
+    s32 unseen = 0;
+    s32 dead = 0;
+    s32 plain = 0;
+    crossings(WatchedWorld(true), unseen, dead, plain);
+    EXPECT_GE(unseen, 1);
+    EXPECT_EQ(dead, unseen);
+    EXPECT_EQ(plain, 0);
+    // With no power to be had it is a crossing like any other
+    crossings(WatchedWorld(false), unseen, dead, plain);
+    EXPECT_EQ(unseen, 0);
+    EXPECT_EQ(dead, 0);
+    EXPECT_GE(plain, 1);
+}
+
+TEST(BotNav, AHopCatchesALedgeHighOverHisFloorWithFloorStillUnderHim)
+{
+    // Feeco's path 3: from 787,1500 up to the ledge at 837,1420, two cells off. From the last cell of the floor,
+    // one cell off, he goes by under it.
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 75, 100, 0));
+    in.mLines.push_back(Line(75, 20, 150, 20, 0));
+    NavFeature ledge = Feature(FeatureKind::eEdge, 75, 20, 99, 44);
+    ledge.mA = 1;
+    ledge.mDir = 1;
+    in.mFeatures.push_back(ledge);
+    NavGraph g;
+    g.Build(in);
+    const s32 top = g.NodeAt(87, 20, false);
+    ASSERT_GE(top, 0);
+    EXPECT_TRUE(HasEdge(g, g.NodeAt(37, 100, false), top, EdgeKind::eHop)) << g.Text();
+    EXPECT_TRUE(HasEdge(g, g.NodeAt(12, 100, false), top, EdgeKind::eHop)) << g.Text();
+    EXPECT_FALSE(HasEdge(g, g.NodeAt(62, 100, false), top, EdgeKind::eHop)) << g.Text();
+
+    // A ledge only a little over his floor is not caught that way: he lands on his own floor first
+    in.mLines[1] = Line(75, 60, 150, 60, 0);
+    in.mFeatures[0] = Feature(FeatureKind::eEdge, 75, 60, 99, 84);
+    in.mFeatures[0].mA = 1;
+    in.mFeatures[0].mDir = 1;
+    NavGraph low;
+    low.Build(in);
+    const s32 lowTop = low.NodeAt(87, 60, false);
+    ASSERT_GE(lowTop, 0);
+    EXPECT_FALSE(HasEdge(low, low.NodeAt(37, 100, false), lowTop, EdgeKind::eHop)) << low.Text();
+}

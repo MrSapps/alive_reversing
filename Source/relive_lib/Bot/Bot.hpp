@@ -158,6 +158,17 @@ public:
         return mInvisChantSoon;
     }
     // The thing that step uses (0: it is a crossing, or there is none)
+    // The step the power to go unseen is kept for is a crossing (not a thing to be used unseen)
+    bool InvisForCrossing() const
+    {
+        return mInvisCross;
+    }
+    // He is unseen by a chant made for a crossing: the way is run against the power's clock
+    bool InvisRun() const
+    {
+        // (or he has just become unseen, and the frame's note of it is not made yet)
+        return mInvisRun || (mWorld.mInvisible && !mWasInvisible && mInvisCross);
+    }
     u32 UnseenUse() const
     {
         return mUnseenUse;
@@ -427,7 +438,12 @@ private:
     bool mInvisChantNow = false;
     bool mInvisChantSoon = false;
     bool mInvisAtOnce = false;
+    bool mInvisCross = false;
+    bool mInvisRun = false;
+    bool mWasInvisible = false;
     bool mHoldInvis = false;
+    // The frame the power to go unseen was last seen in hand (0: never)
+    u32 mChargeFrame = 0;
     u32 mUnseenUse = 0;
     // The path for which why no way out is known has been logged
     s32 mWhyNoWayOut = -1;

@@ -1,4 +1,4 @@
-# The bot through Feeco Depot from its first screen: Terminal 1, Terminal 2, the Main Lobby.
+# The bot through Feeco Depot from its first screen: Terminal 1, Terminal 2, the Main Lobby, the junction and the way to the Slig Barracks (out at f=16,941).
 # `healing` gives the power the Mudomo and Mudanchee trials give before it in a whole game.
 timeout 100000
 start feeco_depot 1 1
@@ -6,7 +6,7 @@ wait_until in_game
 wait_frames 40
 healing
 bot any,seed=1,been=mines,been=necrum
-bot_wait 9000
+bot_wait 19000
 bot_report bot_report.txt
 bot_inputs bot_inputs.txt
 quit
