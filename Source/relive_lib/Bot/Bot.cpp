@@ -1394,7 +1394,8 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs) const
         // after he lands, at the hoist one cell on. (One asleep that the landing wakes is another matter: it takes
         // 96 frames in the Mines' path 10, where the way on is such a landing and a run to a well: Bot::MakeFlee.)
         // (unseen it is no matter)
-        if (!unseenNow && !to.mHidden && std::abs(to.mY - from.mY) * (to.mHalf ? 2 : 1) > 30 && (e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eHop || e.mKind == EdgeKind::eHoistDown || e.mKind == EdgeKind::eWell))
+        // (hung from the end of its floor he is not seen: GoToTask::Sentry)
+        if (!unseenNow && !to.mHidden && !e.mHung && std::abs(to.mY - from.mY) * (to.mHalf ? 2 : 1) > 30 && (e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eHop || e.mKind == EdgeKind::eHoistDown || e.mKind == EdgeKind::eWell))
         {
             const s32 scale = to.mHalf ? 2 : 1;
             // (one not seen yet, its screen not loaded, is where and how the map starts it)
@@ -2359,7 +2360,8 @@ std::unique_ptr<Task> Bot::MakeFlee()
     // landing woke it): it takes a while to come round and shoot, enough to get off its floor if a way is at
     // hand (a well, a hoist). Chanting there is too slow: measured, he is shot 50 frames before it takes.
     // (One that waits before it shoots is run from too: the sneak he was at when it woke is not gone on with.)
-    if (mAmbushes < 8 && !mWorld.mInvisible)
+    // (hung from the end of its floor he is not seen, and is not on it)
+    if (mAmbushes < 8 && !mWorld.mInvisible && mAbe.mMove != Move::eHang)
     {
         const NavGraph& nav = mKnow->mNav;
         const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);
@@ -2409,7 +2411,11 @@ std::unique_ptr<Task> Bot::MakeFlee()
                 {
                     mAmbushes++;
                     Log("a Slig is awake next to Abe at " + std::to_string(slig.mX) + "," + std::to_string(slig.mY) + ": off its floor before it shoots");
-                    auto go = std::make_unique<GoToTask>("off the floor of the Slig that woke", away);
+                    // (to where that quick way ends: left to find any way off the floor, it took the hoist down
+                    // behind him in the Barracks' first path, with the well three cells on past the guard)
+                    const s32 end = nav.Edges()[way.back()].mTo;
+                    auto go = std::make_unique<GoToTask>("off the floor of the Slig that woke", [end](s32 n)
+                                                         { return n == end; });
                     // (no creeping: it is awake already, and has him in a second or two)
                     go->SetHurry(true);
                     return go;
@@ -2760,6 +2766,12 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
                 }
             }
             mSligCycle.Observe(mAbe.mFrame, key, seen);
+        }
+        // The switch that is being tried for the sake of it has changed, if only for a moment (a trap door that
+        // shuts itself again): it has been tried
+        if (mExploring >= 1000 && mExploring < 1256 && mWorld.mSwitches[mExploring - 1000] != mLastSwitches[mExploring - 1000])
+        {
+            mExplored.insert({mAbe.mPath, mExploring});
         }
         // On the floor of a Scrab that waits before it strikes, with nothing between: it has seen him
         if (mSeenByScrabAt > mAbe.mFrame)

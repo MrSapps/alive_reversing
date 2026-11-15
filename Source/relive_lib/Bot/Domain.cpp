@@ -253,6 +253,32 @@ s32 Domain::UseNode(const NavGraph& nav, const Entity& entity, bool* faceLeft, s
                     {
                         node = -1;
                     }
+                    // (nor, with another side to it, the cell a door stands in: every way into it waits on a
+                    // switch. The Barracks' first path: Lever#7005 at 2187,1500 with the slam door it opens in
+                    // the cell at 2162, pulled from 2212.)
+                    if (node >= 0 && i == 0)
+                    {
+                        // (a door, shut, whose box that cell's middle is in: not an electric wall beside it, which
+                        // the lever by it is there to turn off. The Mines' path 3, the Slogs' trap at 2337,1500.)
+                        bool barred = false;
+                        for (const NavFeature& f : nav.Input().mFeatures)
+                        {
+                            barred = barred || (f.mKind == FeatureKind::eBarrier && f.mSolid && f.mStartClosed && f.mHalf == entity.mHalf && x >= f.mX1 && x <= f.mX2 && entity.mY2 >= f.mY1 - 10 && entity.mY2 <= f.mY2 + 10);
+                        }
+                        // (and no way into it that does not wait on a switch: a gate he can walk up to from one
+                        // side is where its lever is pulled from as ever)
+                        for (const NavEdge& e : nav.Edges())
+                        {
+                            s32 sw = 0;
+                            s32 value = 0;
+                            barred = barred && (e.mTo != node || nav.Condition(e, &sw, &value));
+                        }
+                        const s32 other = nav.NodeAt(leverX - side * step, entity.mY2, entity.mHalf, 30);
+                        if (barred && other >= 0 && leverX - side * step >= entity.mX1 && leverX - side * step <= entity.mX2)
+                        {
+                            node = -1;
+                        }
+                    }
                 }
             }
             break;
@@ -3826,7 +3852,14 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         {
             const NavFeature& door = nav.Input().mFeatures[fi];
             // (or under a meat saw the lever brings down: path 18's second screen)
-            if ((door.mKind != FeatureKind::eTrapDoor && door.mKind != FeatureKind::eSaw) || door.mSwitch != lever.mSwitch)
+            // (the lever's own switch, or one a timer sets off it: the Barracks' first path, where Lever#7005's 157
+            // opens the trap door on 156 the guard by the well stands on)
+            bool sets = door.mSwitch == lever.mSwitch;
+            for (const Entity& logic : world.mEntities)
+            {
+                sets = sets || (door.mKind == FeatureKind::eTrapDoor && logic.mKind == EntityKind::eSwitchLogic && logic.mHoldOnly && logic.mSwitch == door.mSwitch && logic.mInputs[0] == lever.mSwitch);
+            }
+            if ((door.mKind != FeatureKind::eTrapDoor && door.mKind != FeatureKind::eSaw) || !sets)
             {
                 continue;
             }
@@ -3843,10 +3876,23 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 drop.mOther = slig.mId;
                 drop.mEdge = static_cast<s32>(fi);
                 const Goap::Fact down{Key::Mud(slig.mId), 2};
+                // (through a door a timer opens it is not let down at all: see below)
+                if (door.mSwitch == lever.mSwitch)
                 add(std::string(door.mKind == FeatureKind::eSaw ? "Saw Slig#" : "Drop Slig#") + std::to_string(slig.mId) + (door.mKind == FeatureKind::eSaw ? " with the meat saw at " : " through the trap door at ") + std::to_string(dx) + "," + std::to_string(door.mY1) + " with Lever#" + std::to_string(lever.mId), {regionFact(at)}, {down}, 400, drop);
                 for (Goap::Action& a : d.mActions)
                 {
                     const DomainStep& s = d.mSteps[a.mTag];
+                    // (where a timer opens the door, the lever is not pulled while the Slig is there to come
+                    // down: it lands alive on the floor under the door, which is the lever's, and walks it from
+                    // then on. The Barracks' first path: pulled as the guard at 1962,1400 turned its back, with a
+                    // cell sneaked to the hoist at 2187 and up it at once, he got away; but the Slig then
+                    // walks the floor the way on goes over, and every way past it measured there killed him.
+                    // The walkthrough does it; the way past the guard into the well behind it needs no lever.)
+                    if (door.mSwitch != lever.mSwitch && s.mKind == StepKind::eUse && s.mEntity == lever.mId)
+                    {
+                        a.mPre.push_back(down);
+                        continue;
+                    }
                     // (and no way out is taken that goes from the lever along its floor near there: where a
                     // hoist joins the lever's ledge and that floor they are one region, with nothing to cross)
                     // (a saw's only so far: a trap door's floor has always been another region)
@@ -4210,7 +4256,8 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
     for (const Entity& slig : world.mEntities)
     {
         // (gone, or dropped through a trap door: World::mFleechKilled holds whatever was got rid of that way)
-        if (slig.mKind == EntityKind::eSlig && (slig.mGone || world.mFleechKilled.count(slig.mId) != 0))
+        // (or seen on a floor under the one it was put on: down a trap door whoever opened it)
+        if (slig.mKind == EntityKind::eSlig && (slig.mGone || world.mFleechKilled.count(slig.mId) != 0 || (slig.mLive && (slig.mLiveY - slig.mY2) * (slig.mHalf ? 2 : 1) > 60)))
         {
             d.mStart.Set(Key::Mud(slig.mId), 2);
         }

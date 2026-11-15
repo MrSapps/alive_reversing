@@ -85,6 +85,91 @@ static u32 LandingBits(const Bot& bot, const NavGraph& nav, const std::vector<s3
 // it is rolled, crouched in the cover first so that the roll starts on the frame it is asked for, and at full
 // health only: there may be no moment when none of them looks (the Barracks' first screen has three out of step),
 // and then it is the one when the fewest do. Their periods are learnt by watching them from the cover.
+const SligAt* GoToTask::Sentry(const World& world, s32 x, s32 y, bool half)
+{
+    const s32 scale = half ? 2 : 1;
+    const SligAt* best = nullptr;
+    for (const SligAt& slig : world.mSligs)
+    {
+        // (on that floor, not one a step lower; Slig.hpp's motions: 2 walks, 4 runs)
+        if (!slig.mAsleep && !slig.mPossessed && slig.mSeen && slig.mHalf == half && std::abs(slig.mY - y) * scale <= 12 && std::abs(slig.mX - x) * scale <= 250 && slig.mMotion != 2 && slig.mMotion != 4 &&
+            (!best || std::abs(slig.mX - x) < std::abs(best->mX - x)))
+        {
+            best = &slig;
+        }
+    }
+    return best;
+}
+
+s32 GoToTask::JumpUpPastGuard(const NavGraph& nav, const World& world, s32 cell, const NavEdge& hoistUp)
+{
+    if (!nav.Input().mIsAe || hoistUp.mKind != EdgeKind::eHoistUp || hoistUp.mFeature < 0)
+    {
+        return 0;
+    }
+    const NavNode& at = nav.Nodes()[cell];
+    const NavNode& under = nav.Nodes()[hoistUp.mFrom];
+    const NavFeature& hoist = nav.Input().mFeatures[hoistUp.mFeature];
+    const s32 step = NavGraph::GridStep(at.mHalf);
+    const s32 way = under.mX > at.mX ? 1 : -1;
+    if (at.mLine != under.mLine || std::abs(under.mX - at.mX) != 3 * step || (hoist.mDir != 2 && (hoist.mDir == 0) != (way < 0)) || (under.mY - nav.Nodes()[hoistUp.mTo].mY) * (at.mHalf ? 2 : 1) > 130)
+    {
+        return 0;
+    }
+    const SligAt* guard = Sentry(world, at.mX, at.mY, at.mHalf);
+    return guard && (guard->mX - at.mX) * way > 0 ? at.mX + 2 * step * way : 0;
+}
+
+bool GoToTask::TurnsFrom(const SligAt& slig, s32 x)
+{
+    // (5 turns where it stands, and faces the other way when that is done)
+    return slig.mMotion == 5 && (x < slig.mX) == slig.mFacingLeft;
+}
+
+bool GoToTask::UpBehind(const NavGraph& nav, const World& world, s32 ledge, const SligAt** why)
+{
+    const NavNode& at = nav.Nodes()[ledge];
+    const SligAt* guard = Sentry(world, at.mX, at.mY, at.mHalf);
+    if (why)
+    {
+        *why = guard;
+    }
+    if (!guard)
+    {
+        return true;
+    }
+    if (!TurnsFrom(*guard, at.mX))
+    {
+        return false;
+    }
+    const s32 cam = nav.CameraOf(at.mX, at.mY - 5);
+    const s32 step = NavGraph::GridStep(at.mHalf);
+    s32 camX1 = at.mX;
+    s32 camX2 = at.mX;
+    while (camX1 > at.mX - 2000 && nav.CameraOf(camX1 - step, at.mY - 5) == cam)
+    {
+        camX1 -= step;
+    }
+    while (camX2 < at.mX + 2000 && nav.CameraOf(camX2 + step, at.mY - 5) == cam)
+    {
+        camX2 += step;
+    }
+    for (const SligAt& other : world.mSligs)
+    {
+        // (one on a floor a step up or down sees him as he comes up: as near as the game's test of the two
+        // boxes goes)
+        if (&other != guard && !other.mAsleep && !other.mPossessed && other.mHalf == at.mHalf && std::abs(other.mY - at.mY) * (at.mHalf ? 2 : 1) <= 45 && other.FramesUntilSees(at.mX, camX1 - step, camX2 + step) < kUpAndOff)
+        {
+            if (why)
+            {
+                *why = &other;
+            }
+            return false;
+        }
+    }
+    return true;
+}
+
 bool GoToTask::ZWatched(Bot& bot, const NavGraph& nav, const std::vector<s32>& path, s32 cur, TaskStep& step)
 {
     const AbeState& abe = bot.Abe();
@@ -372,6 +457,23 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             bot.BanEdge(on[0]);
             mHangFails = 0;
         }
+        // Up onto a floor a Slig stands guard on: only as it begins to turn its back
+        if (!down && top >= 0 && nav.Input().mIsAe)
+        {
+            const NavNode& ledge = nav.Nodes()[top];
+            const SligAt* guard = nullptr;
+            if (!UpBehind(nav, bot.GetWorld(), top, &guard) && mHangWaits < 3000)
+            {
+                if (!mHangSaid)
+                {
+                    mHangSaid = true;
+                    bot.Log("hung from " + std::to_string(ledge.mX) + "," + std::to_string(ledge.mY) + " under the Slig that stands at " + std::to_string(guard->mX) + ": up as it turns its back, with no other about to see");
+                }
+                mHangWaits++;
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+        }
         return TaskStep::Do(Prim::Press(down ? Btn::eDown : Btn::eUp));
     }
 
@@ -389,6 +491,37 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         }
         if (!atStop)
         {
+            // (AE's stops where it is when the rope is let go: on to the stop the way goes from, the one it is
+            // nearest by when both do. The Barracks' first path: the ride up from 2087,1660 was cut short where
+            // the screen changes, with a Slig to see on the new one.)
+            mLiftStood = lift.mY == mLiftGlideY ? mLiftStood + 1 : 0;
+            mLiftGlideY = lift.mY;
+            if (mLiftStood >= 4)
+            {
+                s32 best = -1;
+                s32 bestCost = 0;
+                for (s32 i = 0; i < static_cast<s32>(nav.Nodes().size()); i++)
+                {
+                    const NavNode& n = nav.Nodes()[i];
+                    std::vector<s32> on;
+                    s32 cost = 0;
+                    if (n.mLiftStop >= 0 && n.mX >= lift.mX1 && n.mX <= lift.mX2 && n.mHalf == abe.mHalfScale && (mIsGoal(i) || nav.FindPath(i, mIsGoal, bot.EdgeCostFn(), on, &cost)))
+                    {
+                        cost += std::abs(n.mY - lift.mY);
+                        if (best < 0 || cost < bestCost)
+                        {
+                            best = i;
+                            bestCost = cost;
+                        }
+                    }
+                }
+                if (best >= 0)
+                {
+                    mLiftStood = 0;
+                    bot.Log("the lift stands between its stops at " + std::to_string(lift.mY) + ": on to " + std::to_string(nav.Nodes()[best].mY));
+                    return TaskStep::Do(Prim::Lift(nav.Nodes()[best].mY));
+                }
+            }
             mLiftGlide++;
             return TaskStep::Do(Prim::Wait(2));
         }
@@ -1366,6 +1499,39 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                         last = k - 1;
                         break;
                     }
+                }
+            }
+            // AE: a Slig that stands guard between him and a hoist three cells on: up it by a running jump
+            if (last + 1 < path.size() && nav.Edges()[path[last]].mTo == nav.Edges()[path[last + 1]].mFrom)
+            {
+                const s32 takeoff = JumpUpPastGuard(nav, bot.GetWorld(), cur, nav.Edges()[path[last + 1]]);
+                if (takeoff != 0)
+                {
+                    bot.Log("past the Slig that stands guard at a running jump from " + std::to_string(takeoff) + " that catches the hoist behind it");
+                    mLastEdge = path[last + 1];
+                    return TaskStep::Do(Prim::RunJump(takeoff, first.mLeft));
+                }
+            }
+            // AE: a Slig that stands guard on this floor between him and a well, its back to him: through it at a
+            // run and into the well without stopping. The run is heard, and it turns to it, which is nine frames it
+            // sees nothing in; by then he is past it and sliding into the well, where nothing hurts him. Measured
+            // in the Barracks' first path, up the hoist at 1987,1400 behind the guard at 1962 with the well at
+            // 1912: in the well 12 frames after the run began, not hit. (Hopped, he lands on the well and stands
+            // there: dead. Walked or sneaked he is in front of it for a second.)
+            if (bot.IsAe() && last + 1 < path.size())
+            {
+                const NavEdge& into = nav.Edges()[path[last + 1]];
+                const NavNode& from = nav.Nodes()[cur];
+                const NavNode& end = nav.Nodes()[nav.Edges()[path[last]].mTo];
+                const s32 way = first.mLeft ? -1 : 1;
+                const SligAt* guard = Sentry(bot.GetWorld(), from.mX, from.mY, from.mHalf);
+                if (into.mKind == EdgeKind::eWell && into.mWell >= 0 && guard && (guard->mX - from.mX) * way > 0 && (end.mX - guard->mX) * way > 0 && (end.mX - from.mX) * way >= 3 * NavGraph::GridStep(from.mHalf) &&
+                    guard->mFacingLeft == first.mLeft)
+                {
+                    const NavFeature& well = nav.Input().mFeatures[into.mWell];
+                    bot.Log("past the Slig that stands at " + std::to_string(guard->mX) + " at a run and into the well at " + std::to_string(end.mX) + " without stopping");
+                    mLastEdge = path[last + 1];
+                    return TaskStep::Do(Prim::RunWell(way > 0 ? well.mX1 : well.mX2, way < 0));
                 }
             }
             // Sligs on this floor: quietly near a sleeping one, and past one that is awake only where he can't see

@@ -154,6 +154,8 @@ struct NavEdge final
     // A hoist up that ends facing an electric wall (its feature) in the next cell: only while that is off. He
     // reaches into it as he pulls himself up and is fried (the Barracks' first path, at 1812,1660).
     s32 mFence = -1;
+    // A fall that ends hung from a ledge under where he went off, not stood on the floor it is the end of
+    bool mHung = false;
 };
 
 // A grid cell of floor Abe can stand on

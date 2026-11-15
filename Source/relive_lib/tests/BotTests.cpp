@@ -6652,3 +6652,330 @@ TEST(BotSligWatch, ASligOffTheScreenAndWalkingAwayIsNothingToASortie)
     bare.Build(WatchedFloor(false));
     EXPECT_LT(ClearSligTask::Haven(bare, plain, bare.NodeAt(262, 200, false)), 0);
 }
+
+// ---- A Slig that stands guard (the Slig Barracks' first path) ----
+
+// A floor (0..370 at 200) with a ledge over its right part (175..300 at 100) and a hoist up to the ledge's end
+static NavInput GuardedLedge(s32 hoistDir)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 200, 370, 200, 0));
+    in.mLines.push_back(Line(175, 100, 300, 100, 0));
+    NavFeature hoist = Feature(FeatureKind::eHoist, 175, 100, 199, 195);
+    hoist.mDir = hoistDir;
+    in.mFeatures.push_back(hoist);
+    return in;
+}
+
+static SligAt GuardAt(s32 x, s32 y, bool facingLeft, s32 motion)
+{
+    SligAt slig;
+    slig.mX = x;
+    slig.mY = y;
+    slig.mFacingLeft = facingLeft;
+    slig.mMotion = motion;
+    return slig;
+}
+
+TEST(BotNav, AFallALedgeCatchesEndsHungHoweverHeWentOff)
+{
+    // (the room of RolledOffALowEndHeCatchesALedgeOutAndBelowThatFacesTheWayHeGoes)
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    in.mLines.push_back(Line(480, 200, 700, 200, 0));
+    in.mFeatures.push_back(Feature(FeatureKind::eSweep, 300, 40, 420, 64));
+    NavFeature ledge = Feature(FeatureKind::eEdge, 470, 200, 495, 224);
+    ledge.mDir = 1;
+    in.mFeatures.push_back(ledge);
+    NavGraph g;
+    g.Build(in);
+    const s32 end = g.NodeAt(387, 100, false);
+    const s32 hung = g.NodeAt(487, 200, false);
+    ASSERT_GE(end, 0);
+    ASSERT_GE(hung, 0);
+    s32 falls = 0;
+    for (const NavEdge& e : g.Edges())
+    {
+        if (e.mKind == EdgeKind::eFall && e.mFrom == end && e.mTo == hung)
+        {
+            falls++;
+            EXPECT_TRUE(e.mHung);
+        }
+    }
+    EXPECT_GE(falls, 1);
+    // A walk off a ledge onto the floor under it is a landing
+    NavInput plain;
+    plain.mLines.push_back(Line(0, 100, 100, 100, 0));
+    plain.mLines.push_back(Line(0, 200, 400, 200, 0));
+    NavGraph p;
+    p.Build(plain);
+    s32 landings = 0;
+    for (const NavEdge& e : p.Edges())
+    {
+        if (e.mKind == EdgeKind::eFall)
+        {
+            landings++;
+            EXPECT_FALSE(e.mHung);
+        }
+    }
+    EXPECT_GE(landings, 1);
+}
+
+TEST(BotSligGuard, TheGuardIsTheNearestSligThatStandsAwakeOnThatFloor)
+{
+    World world;
+    EXPECT_EQ(GoToTask::Sentry(world, 100, 200, false), nullptr);
+    // One that walks its beat is none, nor one a step lower, asleep, taken over or far off
+    world.mSligs.push_back(GuardAt(150, 200, false, 2));
+    world.mSligs.push_back(GuardAt(150, 200, false, 4));
+    world.mSligs.push_back(GuardAt(150, 221, false, 0));
+    world.mSligs.push_back(GuardAt(150, 200, false, 0));
+    world.mSligs.back().mAsleep = true;
+    world.mSligs.push_back(GuardAt(150, 200, false, 0));
+    world.mSligs.back().mPossessed = true;
+    world.mSligs.push_back(GuardAt(360, 200, false, 0));
+    EXPECT_EQ(GoToTask::Sentry(world, 100, 200, false), nullptr);
+    // At half size the cells are half as long
+    world.mSligs.push_back(GuardAt(200, 200, false, 0));
+    world.mSligs.back().mHalf = true;
+    EXPECT_EQ(GoToTask::Sentry(world, 100, 200, false), nullptr);
+    ASSERT_NE(GoToTask::Sentry(world, 100, 200, true), nullptr);
+    EXPECT_EQ(GoToTask::Sentry(world, 60, 200, true), nullptr);
+    // One that stands, or turns where it stands: the nearer of two
+    world.mSligs.push_back(GuardAt(340, 200, true, 0));
+    world.mSligs.push_back(GuardAt(150, 206, true, 5));
+    const SligAt* guard = GoToTask::Sentry(world, 100, 200, false);
+    ASSERT_NE(guard, nullptr);
+    EXPECT_EQ(guard->mX, 150);
+    guard = GoToTask::Sentry(world, 300, 200, false);
+    ASSERT_NE(guard, nullptr);
+    EXPECT_EQ(guard->mX, 340);
+}
+
+TEST(BotSligGuard, ItHasBegunToTurnItsBackOnlyWhileItTurnsFromFacingHim)
+{
+    // He is at 100, it at 150: turned his way it faces left
+    EXPECT_TRUE(GoToTask::TurnsFrom(GuardAt(150, 200, true, 5), 100));
+    EXPECT_FALSE(GoToTask::TurnsFrom(GuardAt(150, 200, true, 0), 100));
+    // (turning from its back to him it comes round to face him)
+    EXPECT_FALSE(GoToTask::TurnsFrom(GuardAt(150, 200, false, 5), 100));
+    EXPECT_TRUE(GoToTask::TurnsFrom(GuardAt(150, 200, false, 5), 200));
+    EXPECT_FALSE(GoToTask::TurnsFrom(GuardAt(150, 200, true, 5), 200));
+}
+
+TEST(BotSligGuard, HungUnderAGuardHeComesUpAsItTurnsAwayWithNoOtherSligAboutToSee)
+{
+    NavGraph g;
+    g.Build(GuardedLedge(1));
+    const s32 ledge = g.NodeAt(262, 200, false);
+    ASSERT_GE(ledge, 0);
+    World world;
+    const SligAt* why = nullptr;
+    // No guard there: up at once
+    EXPECT_TRUE(GoToTask::UpBehind(g, world, ledge, &why));
+    EXPECT_EQ(why, nullptr);
+    // One that faces him, or has its back to him for who knows how much longer: not yet
+    world.mSligs.push_back(GuardAt(312, 200, true, 0));
+    EXPECT_FALSE(GoToTask::UpBehind(g, world, ledge, &why));
+    ASSERT_NE(why, nullptr);
+    EXPECT_EQ(why->mX, 312);
+    world.mSligs[0].mFacingLeft = false;
+    EXPECT_FALSE(GoToTask::UpBehind(g, world, ledge, &why));
+    // As it begins to turn away
+    world.mSligs[0] = GuardAt(312, 200, true, 5);
+    EXPECT_TRUE(GoToTask::UpBehind(g, world, ledge, &why));
+    // Another, on a floor a step lower, whose beat ends short of him: not while it is nearly where it sees him
+    SligAt walker = GuardAt(20, 221, false, 2);
+    walker.mBeatMin = 0;
+    walker.mBeatMax = 40;
+    world.mSligs.push_back(walker);
+    EXPECT_FALSE(GoToTask::UpBehind(g, world, ledge, &why));
+    ASSERT_NE(why, nullptr);
+    EXPECT_EQ(why->mX, 20);
+    // (it has to walk to the far end of its beat and back first: 170 pixels is 70 frames, 130 is 54)
+    world.mSligs[1].mFacingLeft = true;
+    world.mSligs[1].mBeatMax = 170;
+    world.mSligs[1].mX = 170;
+    EXPECT_TRUE(GoToTask::UpBehind(g, world, ledge, &why));
+    world.mSligs[1].mX = 130;
+    EXPECT_FALSE(GoToTask::UpBehind(g, world, ledge, &why));
+    // One asleep, or on another floor altogether, is no matter
+    world.mSligs[1].mAsleep = true;
+    EXPECT_TRUE(GoToTask::UpBehind(g, world, ledge, &why));
+    world.mSligs[1].mAsleep = false;
+    world.mSligs[1].mY = 300;
+    EXPECT_TRUE(GoToTask::UpBehind(g, world, ledge, &why));
+}
+
+TEST(BotSligGuard, PastAGuardTheHoistThreeCellsOnIsCaughtAtARunningJumpFromAStand)
+{
+    NavGraph g;
+    g.Build(GuardedLedge(1));
+    const NavEdge* up = FindEdge(g, g.NodeAt(187, 200, false), g.NodeAt(187, 100, false), EdgeKind::eHoistUp);
+    ASSERT_NE(up, nullptr);
+    const s32 from = g.NodeAt(112, 200, false);
+    World world;
+    // With no guard there it is walked to and jumped up at
+    EXPECT_EQ(GoToTask::JumpUpPastGuard(g, world, from, *up), 0);
+    // One between him and the hoist, or past it: off two cells on
+    world.mSligs.push_back(GuardAt(162, 200, false, 0));
+    EXPECT_EQ(GoToTask::JumpUpPastGuard(g, world, from, *up), 162);
+    world.mSligs[0].mX = 212;
+    EXPECT_EQ(GoToTask::JumpUpPastGuard(g, world, from, *up), 162);
+    // Behind him it is not on the way, and one that walks is not a guard
+    world.mSligs[0].mX = 62;
+    EXPECT_EQ(GoToTask::JumpUpPastGuard(g, world, from, *up), 0);
+    world.mSligs[0] = GuardAt(162, 200, false, 2);
+    EXPECT_EQ(GoToTask::JumpUpPastGuard(g, world, from, *up), 0);
+    world.mSligs[0] = GuardAt(162, 200, false, 0);
+    // Only from three cells off: the run has to be two cells, and the hoist in the next
+    EXPECT_EQ(GoToTask::JumpUpPastGuard(g, world, g.NodeAt(137, 200, false), *up), 0);
+    EXPECT_EQ(GoToTask::JumpUpPastGuard(g, world, g.NodeAt(87, 200, false), *up), 0);
+    // Not to a hoist that is caught the other way round, nor by any other kind of step
+    NavGraph other;
+    other.Build(GuardedLedge(0));
+    const NavEdge* wrong = FindEdge(other, other.NodeAt(187, 200, false), other.NodeAt(187, 100, false), EdgeKind::eHoistUp);
+    ASSERT_NE(wrong, nullptr);
+    EXPECT_EQ(GoToTask::JumpUpPastGuard(other, world, other.NodeAt(112, 200, false), *wrong), 0);
+    const NavEdge* walk = FindEdge(g, g.NodeAt(162, 200, false), g.NodeAt(187, 200, false), EdgeKind::eWalk);
+    ASSERT_NE(walk, nullptr);
+    EXPECT_EQ(GoToTask::JumpUpPastGuard(g, world, from, *walk), 0);
+}
+
+// A lever on a floor (0..400 at 200), its box from 150 to 226: it is pulled from 162 or from 212
+static Entity LeverBetween()
+{
+    Entity lever = MakeEntity(EntityKind::eLever, 1001, 150, 180, 226, 204);
+    lever.mSwitch = 9;
+    return lever;
+}
+
+TEST(BotDomain, ALeverIsPulledFromTheSideThatIsNotTheCellADoorStandsIn)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 200, 400, 200, 0));
+    NavGraph open;
+    open.Build(in);
+    bool left = true;
+    EXPECT_EQ(Domain::UseNode(open, LeverBetween(), &left), open.NodeAt(162, 200, false));
+    EXPECT_FALSE(left);
+    // With a door shut in that cell
+    NavFeature door = Feature(FeatureKind::eBarrier, 150, 150, 174, 204);
+    door.mSwitch = 8;
+    door.mStartClosed = true;
+    door.mSolid = true;
+    in.mFeatures.push_back(door);
+    NavGraph shut;
+    shut.Build(in);
+    EXPECT_EQ(Domain::UseNode(shut, LeverBetween(), &left), shut.NodeAt(212, 200, false));
+    EXPECT_TRUE(left);
+    // (a lever with nowhere else to stand is pulled from there all the same)
+    Entity atEnd = LeverBetween();
+    atEnd.mX2 = 200;
+    EXPECT_EQ(Domain::UseNode(shut, atEnd, &left), shut.NodeAt(162, 200, false));
+}
+
+// A lever on the floor (0..600 at 200) and a trap door in the floor over it (250..400 at 100), with a Slig by the
+// door. The lever's switch 9 opens the door itself, or sets off a timer that does (the door's switch 7).
+static NavInput TrapOverLever(bool timer)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 200, 600, 200, 0));
+    in.mLines.push_back(Line(250, 100, 300, 100, 0));
+    in.mLines.push_back(Line(350, 100, 400, 100, 0));
+    NavFeature trap = Feature(FeatureKind::eTrapDoor, 300, 100, 350, 120);
+    trap.mSwitch = timer ? 7 : 9;
+    trap.mStartClosed = true;
+    in.mFeatures.push_back(trap);
+    return in;
+}
+
+static World TrapWorld(bool timer)
+{
+    World world;
+    Entity lever = MakeEntity(EntityKind::eLever, 1001, 20, 180, 94, 204);
+    lever.mSwitch = 9;
+    lever.mOp = 2;
+    world.mEntities.push_back(lever);
+    world.mEntities.push_back(MakeEntity(EntityKind::eSlig, 2001, 300, 76, 324, 100));
+    if (timer)
+    {
+        Entity logic = MakeEntity(EntityKind::eSwitchLogic, 3001, 500, 20, 524, 44);
+        logic.mInputs[0] = 9;
+        logic.mSwitch = 7;
+        logic.mHoldOnly = true;
+        world.mEntities.push_back(logic);
+    }
+    return world;
+}
+
+static bool UsesNeedSligDown(const Domain& domain, u32 lever, u32 slig, bool* any)
+{
+    bool all = true;
+    *any = false;
+    for (const Goap::Action& a : domain.mActions)
+    {
+        const DomainStep& s = domain.mSteps[a.mTag];
+        if (s.mKind != StepKind::eUse || s.mEntity != lever)
+        {
+            continue;
+        }
+        *any = true;
+        bool needs = false;
+        for (const Goap::Fact& f : a.mPre)
+        {
+            needs = needs || (f.mKey == Key::Mud(slig) && f.mValue == 2);
+        }
+        all = all && needs;
+    }
+    return all;
+}
+
+static bool HasDrop(const Domain& domain)
+{
+    for (const Goap::Action& a : domain.mActions)
+    {
+        if (domain.mSteps[a.mTag].mKind == StepKind::eSligDrop)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+TEST(BotDomain, ALeverWhoseTimerOpensATrapDoorUnderASligIsLeftAloneWhileTheSligIsThere)
+{
+    // The lever's own switch on the door: the Slig is let down by it, and the lever is free to pull
+    NavGraph direct;
+    direct.Build(TrapOverLever(false));
+    const Domain plain = Domain::Build(direct, TrapWorld(false), direct.NodeAt(12, 200, false), nullptr);
+    bool any = false;
+    EXPECT_TRUE(HasDrop(plain)) << plain.Text();
+    EXPECT_FALSE(UsesNeedSligDown(plain, 1001, 2001, &any));
+    EXPECT_TRUE(any);
+    // Through a timer: no letting it down, and no pulling the lever until it is gone
+    NavGraph g;
+    g.Build(TrapOverLever(true));
+    World world = TrapWorld(true);
+    const Domain timed = Domain::Build(g, world, g.NodeAt(12, 200, false), nullptr);
+    EXPECT_FALSE(HasDrop(timed)) << timed.Text();
+    EXPECT_TRUE(UsesNeedSligDown(timed, 1001, 2001, &any));
+    EXPECT_TRUE(any);
+    EXPECT_NE(timed.mStart.Get(Key::Mud(2001)), 2);
+    // A timer that works some other door is nothing to it
+    World elsewhere = TrapWorld(true);
+    elsewhere.mEntities[2].mSwitch = 6;
+    const Domain other = Domain::Build(g, elsewhere, g.NodeAt(12, 200, false), nullptr);
+    EXPECT_FALSE(UsesNeedSligDown(other, 1001, 2001, &any));
+    EXPECT_TRUE(any);
+    // Seen on the floor under the one it was put on, it has come down
+    world.mEntities[1].mLive = true;
+    world.mEntities[1].mLiveX = 312;
+    world.mEntities[1].mLiveY = 199;
+    const Domain down = Domain::Build(g, world, g.NodeAt(12, 200, false), nullptr);
+    EXPECT_EQ(down.mStart.Get(Key::Mud(2001)), 2);
+    // (not while it is seen where it was put)
+    world.mEntities[1].mLiveY = 100;
+    const Domain up = Domain::Build(g, world, g.NodeAt(12, 200, false), nullptr);
+    EXPECT_NE(up.mStart.Get(Key::Mud(2001)), 2);
+}

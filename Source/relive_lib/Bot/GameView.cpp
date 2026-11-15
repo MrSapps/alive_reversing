@@ -1225,6 +1225,18 @@ void GameView::ReadWorld(BaseMap& map, World& world)
                 static_cast<AO::Slig*>(pObj)->Beat(slig.mBeatMin, slig.mBeatMax, slig.mBeatPause);
             }
             world.mSligs.push_back(slig);
+            // (the one of the map it is, and where it is now: one a trap door has let down is off its floor)
+            for (std::size_t k = 0; k < world.mEntities.size(); k++)
+            {
+                Entity& e = world.mEntities[k];
+                if (e.mKind == EntityKind::eSlig && !e.mLive && pObj->mBaseGameObjectTlvInfo == static_cast<const relive::Path_TLV*>(world.mTlvs[k])->mId)
+                {
+                    e.mLive = true;
+                    e.mLiveX = slig.mX;
+                    e.mLiveY = slig.mY;
+                    break;
+                }
+            }
         }
     }
 

@@ -210,6 +210,28 @@ public:
         return mName;
     }
     TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+    // AE: the Slig that stands guard (awake, not on a beat) on the floor at y within ten cells of x, or null. It
+    // turns where it stands, by a wait the game draws, and shoots what it sees in front of it on its floor; what
+    // hangs from the end of its floor it does not see (measured in the Barracks' first path, the guard at 2137,1739:
+    // hung at 2087 for 150 frames with it turned his way).
+    static const SligAt* Sentry(const World& world, s32 x, s32 y, bool half);
+    // It has begun to turn its back to x: from now it looks away for as long as it ever does (there, 9 frames
+    // of the turn and 30 at least stood, against the 24 it takes him to pull himself up)
+    static bool TurnsFrom(const SligAt& slig, s32 x);
+    // Hung from the ledge at that cell with such a guard on its floor: now is when to pull himself up. The guard
+    // has begun to turn its back, and no other Slig comes to where it sees that floor in the frames it takes him
+    // to be up and off it (there, the one whose beat on the floor below ends at 1912: it shot him at 2087,1738 as
+    // he came up). why: the Slig waited for.
+    static bool UpBehind(const NavGraph& nav, const World& world, s32 ledge, const SligAt** why);
+    // From that cell, with such a guard between him and a hoist three cells on that faces him: where the running
+    // jump that catches the hoist takes off (0: no such jump). Measured in the Barracks' first path, from a stand
+    // at 2087,1739 behind the guard at 2137: the run is one he can jump from two cells on (off at 2137, the hop
+    // held from the start), and the jump catches the hoist in the very next cell: hung from 2162,1660 eleven
+    // frames after the run began, where walking there and jumping up at it takes some forty with it a cell off.
+    // The walkthrough's "hoist up and quickly run and jump up to the next ledge above him".
+    static s32 JumpUpPastGuard(const NavGraph& nav, const World& world, s32 cell, const NavEdge& hoistUp);
+    // The frames from hung to up (24) and to off its floor by a running jump (12), and some over
+    static const s32 kUpAndOff = 60;
     // Never faster than this (Mudokons in tow don't stop at wheels when they have to run to keep up)
     // Crouched on purpose for a drill that goes over his head, till the way under it is clear
     bool Ducked() const
@@ -315,7 +337,13 @@ private:
     // Crouched before a drill, to roll through under it
     bool mSweepDuck = false;
     s32 mHangFails = 0;
+    // Hung under a Slig that stands guard: the frames waited for it to turn its back, and whether that was said
+    s32 mHangWaits = 0;
+    bool mHangSaid = false;
     s32 mLiftGlide = 0;
+    // Where the lift was a step ago, and the steps it has stood there between two stops
+    s32 mLiftGlideY = -100000;
+    s32 mLiftStood = 0;
     s32 mLeadWaits = 0;
     std::unique_ptr<DisarmTask> mDisarm;
     s32 mDisarms = 0;
