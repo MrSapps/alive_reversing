@@ -24,6 +24,8 @@ static const u32 kInvis = 4;
 static const u32 kInvisNow = 5;
 // Abe has meat to throw (what a path's sacks give is the one or the other)
 static const u32 kMeat = 6;
+// Meat lies (or flies) on his screen: what the Paramites that team up over the way out go for instead of him
+static const u32 kPackFed = 7;
 inline u32 Switch(s32 id)
 {
     return 1000 + static_cast<u32>(id);
@@ -65,6 +67,10 @@ enum class StepKind : u8
                 // the ring and let it go
     eMeatUse,   // throw meat to draw Paramite mOther off entity mEntity, then use it
     eFleechLure, // lead the Fleeches that guard entity mEntity off and use it
+    eMeatFeed,  // on the way to the cell mEdge, from the last cell before the level of Paramites that team up:
+                // throw meat onto their level away from the way, and wait until they are off after it
+    eFleechPen, // pull lever mEntity, which wakes Fleeches, lead them over the top to behind the gate (feature
+                // mOther) that one foot switch opens and another shuts, and shut it on them
     eFleechLead, // let Fleeches out with the lever mEntity, lead them to where they drop to a Scrab and kill them with it
     eScrabPen,  // work lever mEntity so that the gate it moves (feature mOther) is shut with every Scrab of that
                 // floor on one side of it: left of it if mEdge is 1, else right
@@ -189,10 +195,24 @@ struct Domain final
     // Whether two or more Paramites are on the floor at x, y with no wall between them and there: together they
     // hunt him along it, faster than he runs (alone one keeps off him)
     static bool ParamitePack(const NavGraph& nav, const World& world, s32 x, s32 y, bool half);
+    // A Paramite on its own that he would have against the end of its floor there: it turns on him
+    static bool ParamiteCornered(const NavGraph& nav, const World& world, s32 x, s32 y, bool half);
+    // A cell on the level of Paramites that team up, by where the level has them (they are only about once he is
+    // on their screen): two or more of his size on its screen, one at least on its level. Paramite.cpp,
+    // AnotherParamiteNear: with another on the screen, one that finds him on its level goes for him and the
+    // others with it, over a gap as well (measured: the Mudomo vault's path 4, up the hoist at 862,400 between
+    // two of them a lift shaft apart, dead 20 frames later).
+    static bool PackLevel(const NavGraph& nav, const World& world, s32 node);
+    // A lever that wakes Fleeches, with a gate on its floor that one foot switch beyond it opens and one on the
+    // lever's side of it shuts: the Fleeches follow him to the first and are shut in as he comes back over the
+    // second (the walkthrough's way with the fifth Mudomo vault: "Walk right off the top level onto the pressure
+    // plate, which drops the gate. Once the Fleeches are coming down to meet you, run left over the other pressure
+    // plate to trap them"). gate: its feature. open, shut: the cells of the two switches. group: the Fleeches.
+    static bool FleechPen(const NavGraph& nav, const World& world, const Entity& lever, s32* gate, s32* open, s32* shut, std::vector<u32>* group);
     // Whether a loose Scrab or a pack of Paramites gets at him at x, y if he is seen
     static bool HuntedAt(const NavGraph& nav, const World& world, s32 x, s32 y, bool half)
     {
-        return ScrabReaches(nav, world, x, y, half, false) || ParamitePack(nav, world, x, y, half);
+        return ScrabReaches(nav, world, x, y, half, false) || ParamitePack(nav, world, x, y, half) || ParamiteCornered(nav, world, x, y, half);
     }
     // Whether a Paramite on the floor of the cell from can get up a web to the floor of the cell to (webX: where
     // the web hangs)

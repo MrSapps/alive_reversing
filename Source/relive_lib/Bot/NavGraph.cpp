@@ -646,12 +646,38 @@ s32 NavGraph::WellOut(s32 featureIdx, s32 when, s32 depth, s32 knownSwitch, s32 
         knownValue = when;
     }
     const s32 centre = (f.mX1 + f.mX2) / 2;
+    // Shot out of a well that names no place he pops up two cells to its right, and a hoist that reaches down into
+    // that rise catches him: he ends hung from the floor at its top (the Mudomo vault's path 12: the well at
+    // 437,1500 is the only way up to the lock's ledge at 487,1380, whose hoist ends 40 over the floor below)
+    const auto caught = [&](const NavFeature& well, s32 from) -> s32
+    {
+        const s32 px = from + 2 * GridStep(well.mHalf);
+        const s32 scale = well.mHalf ? 2 : 1;
+        for (const NavFeature& h : mInput.mFeatures)
+        {
+            if (h.mKind == FeatureKind::eHoist && h.mHalf == well.mHalf && px >= h.mX1 && px <= h.mX2 && h.mY1 < well.mY1 && h.mY2 >= well.mY1 - 100 / scale && h.mY2 < well.mY2 - 10 / scale)
+            {
+                s32 hy = 0;
+                const s32 line = FloorNear(px, h.mY1, well.mHalf, 12, &hy);
+                if (line >= 0)
+                {
+                    return NodeOnLine(line, px);
+                }
+            }
+        }
+        return -1;
+    };
     if (f.mKind == FeatureKind::eWellLocal)
     {
         const s32 x = when == 1 ? f.mOnC : f.mC;
         const s32 y = when == 1 ? f.mOnD : f.mD;
         if (x == 0 && y == 0)
         {
+            const s32 hung = caught(f, centre);
+            if (hung >= 0)
+            {
+                return hung;
+            }
             // Nowhere to throw him: he pops out and comes down two cells to its right (Necrum's path 3, the
             // well at 937,980)
             s32 fy = 0;
@@ -685,6 +711,11 @@ s32 NavGraph::WellOut(s32 featureIdx, s32 when, s32 depth, s32 knownSwitch, s32 
         }
         if (other.mC == 0 && other.mD == 0)
         {
+            const s32 hung = caught(other, from);
+            if (hung >= 0)
+            {
+                return hung;
+            }
             s32 fy = 0;
             const s32 line = FloorBelow(from, other.mY1 - 60, other.mHalf, &fy);
             return line >= 0 ? NodeOnLine(line, from) : -1;
@@ -1359,7 +1390,17 @@ void NavGraph::Build(const NavInput& input)
             s32 fy = 0;
             const s32 below = FloorBelow(n.mX, n.mY + 20, n.mHalf, &fy);
             // (let go over a well he falls into it: Necrum's path 2, down the shaft at 62,620)
-            const s32 airWell = WellInFall(n.mX, n.mY, below >= 0 ? fy : n.mY + 2000, n.mHalf);
+            s32 airWell = WellInFall(n.mX, n.mY, below >= 0 ? fy : n.mY + 2000, n.mHalf);
+            // (and straight down into one that stands on the floor under him, its box reaching well up from that
+            // floor: the Mudomo vault's path 12, down the shaft at 437,460 into the well at 437,1500)
+            for (std::size_t i = 0; airWell < 0 && below >= 0 && i < mInput.mFeatures.size(); i++)
+            {
+                const NavFeature& w = mInput.mFeatures[i];
+                if ((w.mKind == FeatureKind::eWellLocal || w.mKind == FeatureKind::eWellExpress) && w.mHalf == n.mHalf && n.mX >= w.mX1 && n.mX <= w.mX2 && w.mY1 > n.mY + 30 && w.mY1 <= fy - 15 && w.mY2 >= fy - 5)
+                {
+                    airWell = static_cast<s32>(i);
+                }
+            }
             if (airWell >= 0)
             {
                 AddWellEdges(edges, from, airWell, EdgeKind::eHoistDown, kHoistCost + 60 + kWellCost, featureIdx, mInput.mFeatures[featureIdx].mDir == 0);
@@ -1536,6 +1577,35 @@ void NavGraph::Build(const NavInput& input)
 
     // Onto a trap door only while it is shut. Open, what is on it falls, and so does who steps off the floor
     // beside it.
+    // (and with a well under it he falls into that: the Mudomo vault's path 12, where the lock that opens the trap
+    // door at 687,660 also turns the well under it to the door's ledge)
+    const auto trapFall = [&](s32 from, const NavNode& over, s32 trap, bool left)
+    {
+        s32 fy = 0;
+        const s32 below = FloorBelow(over.mX, over.mY + 20, over.mHalf, &fy);
+        const s32 well = WellInFall(over.mX, over.mY - 20, below >= 0 ? fy : over.mY + 2000, over.mHalf);
+        if (well >= 0)
+        {
+            const NavFeature& w = mInput.mFeatures[well];
+            if (w.mSwitch > 1 && w.mSwitch == mInput.mFeatures[trap].mSwitch)
+            {
+                const s32 to = WellOut(well, 1);
+                if (to >= 0 && to != from)
+                {
+                    AddEdge(edges, from, to, EdgeKind::eFall, kWalkCost + kWellCost, trap, left);
+                    edges.back().mWell = well;
+                }
+            }
+            else
+            {
+                AddWellEdges(edges, from, well, EdgeKind::eFall, kWalkCost + kWellCost, trap, left);
+            }
+        }
+        else if (below >= 0)
+        {
+            AddEdge(edges, from, NodeOnLine(below, over.mX), EdgeKind::eFall, kWalkCost + (fy - over.mY) / 6, trap, left);
+        }
+    };
     const std::size_t made = edges.size();
     for (std::size_t i = 0; i < made; i++)
     {
@@ -1545,25 +1615,15 @@ void NavGraph::Build(const NavInput& input)
             continue;
         }
         edges[i].mFeature = trap;
-        const NavNode& over = mNodes[edges[i].mTo];
-        s32 fy = 0;
-        const s32 below = FloorBelow(over.mX, over.mY + 20, over.mHalf, &fy);
-        if (below >= 0)
-        {
-            AddEdge(edges, edges[i].mFrom, NodeOnLine(below, over.mX), EdgeKind::eFall, kWalkCost + (fy - over.mY) / 6, trap, edges[i].mLeft);
-        }
+        const NavNode over = mNodes[edges[i].mTo];
+        trapFall(edges[i].mFrom, over, trap, edges[i].mLeft);
     }
     for (std::size_t i = 0; i < mNodes.size(); i++)
     {
         const NavNode& n = mNodes[i];
-        s32 fy = 0;
         if (n.mTrapDoor >= 0)
         {
-            const s32 below = FloorBelow(n.mX, n.mY + 20, n.mHalf, &fy);
-            if (below >= 0)
-            {
-                AddEdge(edges, static_cast<s32>(i), NodeOnLine(below, n.mX), EdgeKind::eFall, kWalkCost + (fy - n.mY) / 6, n.mTrapDoor, false);
-            }
+            trapFall(static_cast<s32>(i), n, n.mTrapDoor, false);
         }
     }
 

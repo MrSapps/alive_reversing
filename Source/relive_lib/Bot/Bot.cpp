@@ -198,6 +198,10 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<ParamitePullTask>(step.mEntity, step.mOther, step.mEdge);
         case StepKind::eFleechLure:
             return std::make_unique<FleechLureTask>(step.mEntity, 1);
+        case StepKind::eMeatFeed:
+            return std::make_unique<MeatFeedTask>(step.mEdge);
+        case StepKind::eFleechPen:
+            return std::make_unique<FleechPenTask>(step.mEntity);
         case StepKind::eFleechLead:
             return std::make_unique<FleechLeadTask>(step.mEntity);
         case StepKind::eScrabPen:
@@ -212,10 +216,12 @@ bool Bot::Replan(BaseMap& map)
 {
     const PathKnowledge* know = mKnow;
     const s32 abeNode = AbeNode();
-    if (abeNode < 0)
+    if (abeNode < 0 || (mAbe.mMove == Move::eAir && !mAbe.mOnGround))
     {
-        // In the air, on a lift, mid door: look again shortly
-        if (++mLogicWaits > 60)
+        // In the air (out of a bird portal as well, which leaves him at a floor's height before he has landed), on
+        // a lift, mid door: look again shortly
+        // (out of a bird portal he hangs in the air for a second or two)
+        if (++mLogicWaits > (abeNode < 0 ? 60 : 400))
         {
             Stuck("no_plan: Abe isn't on a floor the nav graph knows, at " + std::to_string(mAbe.mX) + "," + std::to_string(mAbe.mY));
             return false;
@@ -545,7 +551,7 @@ bool Bot::Replan(BaseMap& map)
                 if (onward)
                 {
                     mNewPathFor = mAbe.mPath;
-                    Log("no way on from here: any path of this level not yet been in will do");
+                    Log("no way on from here: any path of this level not yet been in will do (" + leave.mMiss + ". " + domain.Frontier() + ")");
                     mTask = std::make_unique<GoToTask>("think again", [](s32)
                                                        { return true; });
                     mTaskAction.clear();

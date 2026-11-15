@@ -106,6 +106,10 @@ private:
     s32 mJumps = 0;
     s32 mWaits = 0;
     s32 mPicks = 0;
+    // Meat with a Paramite on the sack's level: what the first sack drops is left for it, and the meat to keep
+    // is had from another sack of that level while it eats (mBaitX: the first sack)
+    bool mBaited = false;
+    s32 mBaitX = 0;
 };
 
 // Get into a mine car, drive it to a cell and get out. A direction held carries the car on round corners, up
@@ -826,6 +830,67 @@ private:
     // The side of the thing he throws from (and to): 1 right of it
     s32 mSide = 0;
     ThrowSpot::Kind mKind = ThrowSpot::eForward;
+    std::unique_ptr<GoToTask> mGo;
+    std::unique_ptr<UseTask> mUse;
+};
+
+// Meat thrown for Paramites that team up on the way to a cell (Domain::PackLevel): from the last cell of the way
+// before their level, onto their level on the side the way does not go, and then until they are off after it.
+class MeatFeedTask final : public Task
+{
+public:
+    explicit MeatFeedTask(s32 target)
+        : mTarget(target)
+    {
+    }
+    ~MeatFeedTask() override;
+    std::string Name() const override
+    {
+        return "Meat for the Paramites on the way";
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    s32 mTarget;
+    // 0 to the place to throw from, 1 turn and take the meat in hand, 2 throw, 3 until they are off
+    s32 mPhase = 0;
+    s32 mFrames = 0;
+    s32 mSpot = -1;
+    // Where the way comes onto their level, and the way it goes on from there (-1 left)
+    s32 mOnto = -1;
+    s32 mDir = 0;
+    bool mLeft = false;
+    ThrowSpot::Kind mKind = ThrowSpot::eUp;
+    std::unique_ptr<GoToTask> mGo;
+};
+
+// A lever that wakes Fleeches pulled, and they shut in behind a gate two foot switches work (Domain::FleechPen):
+// to the switch beyond the gate that opens it, by the way over the top with them after him, a cell off it toward
+// the gate until all of them have come down on that side, and back through the gate over the switch that shuts it.
+class FleechPenTask final : public Task
+{
+public:
+    explicit FleechPenTask(u32 lever)
+        : mLever(lever)
+    {
+    }
+    ~FleechPenTask() override;
+    std::string Name() const override
+    {
+        return "Lever #" + std::to_string(mLever) + ", and its Fleeches shut in";
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mLever;
+    // 0 the lever, 1 to the switch that opens the gate, 2 until they are all on his side of it, 3 back through it
+    s32 mPhase = 0;
+    s32 mFrames = 0;
+    s32 mWaits = 0;
+    s32 mGate = -1;
+    s32 mOpen = -1;
+    s32 mShut = -1;
+    std::vector<u32> mGroup;
     std::unique_ptr<GoToTask> mGo;
     std::unique_ptr<UseTask> mUse;
 };
