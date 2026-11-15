@@ -39,6 +39,8 @@ enum class FeatureKind : u8
                   // the way (see GoToTask)
     eTrapDoor,    // floor along its rectangle's top while it is shut. Open while switch mSwitch is on if
                   // mStartClosed, else while it is off
+    eSaw,         // AO's meat saw that comes down once each time switch mSwitch is set: what stands under it then
+                  // dies. Nothing to the graph: see Domain's Slig drop
     eTeleporter,  // whoever stands in it when its switch mSwitch changes (a lever at it does that) is put in the
                   // one with id mB in camera mDestCamera. mA: its own id
     ePortal,      // a bird portal Abe goes through himself: there once switch mSwitch is on (always if that is 0 or

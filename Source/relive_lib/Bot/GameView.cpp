@@ -12,6 +12,8 @@
 #include "../../AliveLibAE/Abe.hpp"
 #include "../../AliveLibAE/Input.hpp"
 #include "../../AliveLibAO/Abe.hpp"
+#include "../../AliveLibAO/FallingItem.hpp"
+#include "../../AliveLibAO/Slig.hpp"
 #include "../../AliveLibAE/Mudokon.hpp"
 #include "../../AliveLibAE/UXB.hpp"
 #include "../../AliveLibAE/Drill.hpp"
@@ -552,6 +554,19 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                     movers.push_back({t.mLiftMoverSwitchId, t.mTargetLiftPointId, t.mMoveDirection == relive::Path_LiftMover::YDirection::eUp ? 1 : 0});
                     break;
                 }
+                case ReliveTypes::eMeatSaw:
+                {
+                    // (the one a switch brings down once; those that go by themselves aren't modelled yet)
+                    const auto& t = static_cast<const relive::Path_MeatSaw&>(tlv);
+                    if (t.mType == relive::Path_MeatSaw::Type::eSwitchId && t.mSwitchId > 1 && t.mStartState == relive::Path_MeatSaw::StartState::eOff)
+                    {
+                        NavFeature f = MakeFeature(FeatureKind::eSaw, tlv, camera, id);
+                        f.mHalf = t.mScale == relive::reliveScale::eHalf;
+                        f.mSwitch = t.mSwitchId;
+                        in.mFeatures.push_back(f);
+                    }
+                    break;
+                }
                 case ReliveTypes::eTrapDoor:
                 {
                     const auto& t = static_cast<const relive::Path_TrapDoor&>(tlv);
@@ -1023,6 +1038,10 @@ void GameView::ReadWorld(BaseMap& map, World& world)
                 static_cast<::Slig*>(pObj)->Beat(slig.mBeatMin, slig.mBeatMax, wakeCells, slig.mSightDelay);
                 slig.mWake = wakeCells * (slig.mHalf ? 13 : 25);
             }
+            else
+            {
+                static_cast<AO::Slig*>(pObj)->Beat(slig.mBeatMin, slig.mBeatMax, slig.mBeatPause);
+            }
             world.mSligs.push_back(slig);
         }
     }
@@ -1222,7 +1241,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
     world.mRocksDown.clear();
     world.mRocksFlying.clear();
     world.mFallers.clear();
-    for (s32 i = 0; isAe && i < gBaseAliveGameObjects->Size(); i++)
+    for (s32 i = 0; i < gBaseAliveGameObjects->Size(); i++)
     {
         BaseAliveGameObject* pObj = gBaseAliveGameObjects->ItemAt(i);
         if (pObj && !pObj->GetDead() && pObj->Type() == ReliveTypes::eRockSpawner)
@@ -1231,10 +1250,11 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             faller.mX = FP_GetExponent(pObj->mXPos);
             faller.mY = FP_GetExponent(pObj->mYPos);
             faller.mHalf = pObj->GetSpriteScale() != FP_FromInteger(1);
-            faller.mChasing = pObj->mVelY > FP_FromInteger(0);
+            // (AO's: on its way down, or set off and waiting out its delay, state 2)
+            faller.mChasing = pObj->mVelY > FP_FromInteger(0) || (!isAe && static_cast<s32>(static_cast<AO::FallingItem*>(pObj)->mState) == 2);
             world.mFallers.push_back(faller);
         }
-        if (pObj && !pObj->GetDead() && (pObj->Type() == ReliveTypes::eRock || pObj->Type() == ReliveTypes::eMeat))
+        if (isAe && pObj && !pObj->GetDead() && (pObj->Type() == ReliveTypes::eRock || pObj->Type() == ReliveTypes::eMeat))
         {
             RockAt rock;
             rock.mX = FP_GetExponent(pObj->mXPos);

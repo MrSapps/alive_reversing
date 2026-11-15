@@ -429,6 +429,14 @@ public:
     s16 field_138_res_idx = 0;
     eSligMotions field_13A_shot_motion = eSligMotions::Motion_0_StandIdle;
     PSX_RECT field_13C_zone_rect = {};
+    // For the bot: the ends of its beat (its bounds; both 0 with none) and the frames at least that it stands at
+    // an end before it turns
+    void Beat(s32& minX, s32& maxX, s32& pause) const
+    {
+        minX = field_13C_zone_rect.x;
+        maxX = field_13C_zone_rect.w;
+        pause = field_174_tlv ? std::min<s32>(field_174_tlv->mPauseLeftMin, field_174_tlv->mPauseRightMin) : 0;
+    }
     EReliveLevelIds mAbeLevel = EReliveLevelIds::eNone;
     s16 mAbePath = 0;
     s16 mAbeCamera = 0;

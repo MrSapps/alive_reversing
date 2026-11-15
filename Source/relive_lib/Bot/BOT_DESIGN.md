@@ -978,9 +978,9 @@ In one run, `full.txt` (from the Scrab vaults' path 7: the Scrab trial, Necrum, 
 hub, the six vaults, the Mudomo trial, Necrum's end): Feeco Depot's path 1 at f=31,828, 0 deaths, with the
 healing power as the game gives it. It stops there (Feeco is untouched: at 2312,884, with nothing known to do).
 
-**AO, Rupture Farms** (`a1.txt`: from its first screen, `bot any`): paths 15 and 16 with 0 deaths, into path 18
-at f=3,316, where he is shot from the balcony over the first screen (not worked on: path 18, 19 and 20 are
-between here and the Stockyards). What AO needed so far:
+**AO, Rupture Farms** (`a1.txt`: from its first screen, `bot any`): paths 15, 16, 18 and 19 with 0 deaths, into path 20
+at f=4,730, the last before the Stockyards, where no way out is known yet: three mines lie on the way and the
+boom machine's grenade is what clears them (not built). `a3.txt` is path 18 alone. What AO needed so far:
 - A walk goes on from one screen's floor to the next's over the gap between cameras, and the first cell past the
   gap cannot be stopped in (a step back to it is a step back over the gap): crossings on foot the same way are
   merged across it (`Bot::Replan`), and nothing but the walk on starts from that cell (`NavGraph::Build`).
@@ -988,13 +988,26 @@ between here and the Stockyards). What AO needed so far:
 - `eSligDrop` / `SligDropTask`: a Slig that walks over a trap door a lever opens is dropped through it. The
   lever is pulled so that the door opens as the Slig is on it: by the Slig's pace and the frames the pull
   takes, measured on the first pull (34 in AO). Until it is down nothing is crossed onto its floor there.
-- Path 18's first screen is not beaten. A Slig walks a catwalk in the background (half size, `can_zshoot`)
-  between 354 and 527 and shoots into the foreground at whatever it faces on its screen, 50 to 75 frames
-  after it first faces it (Slig.cpp: `VIsFacingMe`, not in an invisible zone, not in a Z cover box, of which
-  this screen has none). Noise is not it: he sneaks by an awake Slig in the background now (`GoToTask`,
-  AO only) and is shot at the same frame. The way by is behind its back: left of it while it faces right,
-  under it as it turns at its right end, and off the screen before it turns again at its left end (some 100
-  frames). Not built.
+- A Slig in the background (half size, `can_zshoot`: path 18's first screen) shoots into the foreground at
+  whatever it faces on its screen, its delay after it first faces it (Slig.cpp: `VIsFacingMe`, no invisible
+  zone, no Z cover). Noise is not it and bullet walls don't stop it. Its three shots are aimed behind where he
+  runs (Bullet.cpp: his x less two frames of his speed, and 32, 16 and 0 towards the Slig), so they hit one who
+  runs towards it or stands and miss one who runs away from it. `GoToTask`: he doesn't start towards one that
+  faces him or is turning, keeps a cell and a half behind it as it walks ahead of him, and goes past it at a
+  run when it stands at the end of its beat, so that it is behind him when it shoots.
+- `FeatureKind::eSaw`: a meat saw that a lever brings down once. `eSligDrop` takes it like the trap door: the
+  lever is pulled so that the Slig is under it as it is down (6 frames after its switch is set). Where a hoist
+  joins the lever's ledge and the Slig's floor they are one region with nothing to cross, so the way out
+  itself needs the Slig dead when the way from the lever to it goes along that floor (path 18's second screen).
+- A step over a camera gap that leaves fewer than four cells to its end is walked, not run (he came out of it
+  at speed and off the ledge's end), and nothing stops in the first cell past a gap: one cell on (`GoToTask`).
+- Things that fall from the ceiling (Rupture Farms' meat) are in `World::mFallers` for AO too, and nothing is
+  begun that goes under one that is on its way down or set off (path 16: the switch box sets it off again
+  each time he comes down into it after a hop).
+- An AO Slig's beat and its wait at each end are read (`AO::Slig::Beat`). From cover to cover past one that is
+  awake he goes only as it walks away from him with the time for it: what it has left to walk at 2.7 a frame
+  and its wait have to cover his way at a sneak's 2.5 (path 18's fourth screen, two invisible zones on a
+  Slig's beat: begun as it stood at its beat's end, it turned on him between them).
 - AO's security claw counts as AE's orb (no chanting on its screen), and the reflex that takes over a Slig
   that woke is off in AO: the chant took none and left him standing in it for 800 frames.
 

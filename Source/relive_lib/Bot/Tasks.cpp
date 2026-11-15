@@ -843,6 +843,41 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     {
         return TaskStep::Do(Prim::MoveTo(nav.Nodes()[nav.Edges()[path[sweepRoll - 1]].mTo].mX, Gait::eRoll));
     }
+    // AO: nothing is begun that takes him under a thing that is on its way down from the ceiling, or set off and
+    // about to be (Rupture Farms' meat, path 16: the switch box he is in sets it off again each time he comes
+    // down into it, as after the hop before). It comes down some 70 wide. Where he is under it already he goes on.
+    if (!bot.IsAe())
+    {
+        const NavNode& here = nav.Nodes()[cur];
+        const s32 way = first.mLeft ? -1 : 1;
+        const s32 far = nav.Nodes()[first.mTo].mX + (first.mKind == EdgeKind::eWalk ? way * 4 * NavGraph::GridStep(here.mHalf) : 0);
+        for (const RockAt& r : bot.GetWorld().mFallers)
+        {
+            if (r.mChasing && r.mHalf == here.mHalf && r.mY < here.mY && here.mY - r.mY < 450 && std::abs(r.mX - here.mX) > 70 && r.mX >= std::min(here.mX, far) - 70 && r.mX <= std::max(here.mX, far) + 70)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+        }
+    }
+    // (AO: he doesn't roll out towards a Slig in the background that faces him or is turning, or to nearer than a
+    // cell and a half behind one: see the walk below)
+    if (first.mKind == EdgeKind::eRoll && !bot.IsAe())
+    {
+        const NavNode& here = nav.Nodes()[cur];
+        const s32 way = first.mLeft ? -1 : 1;
+        for (const SligAt& slig : bot.GetWorld().Threats())
+        {
+            if (slig.mPossessed || slig.mAsleep || slig.mHalf == here.mHalf || nav.CameraOf(slig.mX, slig.mY - 5) != nav.CameraOf(here.mX, here.mY - 5) || (slig.mX - here.mX) * way <= 0)
+            {
+                continue;
+            }
+            const bool facesHim = slig.mMotion == 5 || slig.mFacingLeft == (here.mX < slig.mX);
+            if (facesHim || (nav.Nodes()[first.mTo].mX - (slig.mX - way * 40)) * way > 0)
+            {
+                return TaskStep::Do(Prim::Wait(3));
+            }
+        }
+    }
     switch (first.mKind)
     {
         case EdgeKind::eRoll:
@@ -949,23 +984,61 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 return TaskStep::Do(Prim::MoveTo(nav.Nodes()[nav.Edges()[path[std::min(last, sweepRoll - 1)]].mTo].mX, Gait::eRoll));
             }
+            // AO: a step from one screen's floor to the next's (the game puts him across what lies between) that
+            // leaves fewer than four cells to where this ends is no place for a run: he comes out of it at
+            // speed with no room to stop, and off a ledge's end. Up to it as ever, and over it at a walk.
+            if (!bot.IsAe())
+            {
+                const s32 step = NavGraph::GridStep(nav.Nodes()[cur].mHalf);
+                for (std::size_t k = 0; k <= last; k++)
+                {
+                    const NavEdge& e = nav.Edges()[path[k]];
+                    if (std::abs(nav.Nodes()[e.mTo].mX - nav.Nodes()[e.mFrom].mX) > 3 * step && last - k < 4)
+                    {
+                        if (k == 0)
+                        {
+                            return TaskStep::Do(Prim::MoveTo(nav.Nodes()[nav.Edges()[path[last]].mTo].mX, Gait::eWalk));
+                        }
+                        last = k - 1;
+                        break;
+                    }
+                }
+            }
             // Sligs on this floor: quietly near a sleeping one, and past one that is awake only where he can't see
             bool sneak = false;
             bool overhead = false;
+            bool zRun = false;
+            bool zHold = false;
+            s32 trailX = 0;
             bool outrun = false;
             const NavNode& here = nav.Nodes()[cur];
             const s32 cell = NavGraph::GridStep(here.mHalf);
             for (const SligAt& slig : bot.GetWorld().Threats())
             {
                 // A sleeping one hears steps on any floor of its screen; one that is awake sees along its own
-                // (AO: one awake in the background of his screen, or on a catwalk over his floor, hears him run by
-                // and shoots at him. Rupture Farms' path 18, first screen: shot at 490,315 by the one in the
-                // background at 375,235. By it he goes quietly.)
-                if (!bot.IsAe() && !slig.mPossessed && !slig.mAsleep && nav.CameraOf(slig.mX, slig.mY - 5) == nav.CameraOf(here.mX, here.mY - 5) &&
-                    (slig.mHalf != here.mHalf || (std::abs(slig.mY - here.mY) > 45 && std::abs(slig.mY - here.mY) <= 130)))
+                // AO: one awake in the background of his screen shoots into the foreground at what it faces, its
+                // delay after it first faces it (Slig.cpp: VIsFacingMe, no invisible zone, no Z cover). Noise has
+                // nothing to do with it and bullet walls don't stop it. Its three shots are aimed behind where
+                // he runs (Bullet.cpp: his x less two frames of his speed, and 32, 16 and 0 towards the Slig),
+                // so they hit one who runs towards it or stands, and miss one who runs away from it. The way
+                // by: behind its back while it walks ahead of him, and past it at a run when it stands at the
+                // end of its beat, so that it is behind him when it shoots. He doesn't start towards one that
+                // faces him. Rupture Farms' path 18, first screen.
+                if (!bot.IsAe() && !slig.mPossessed && !slig.mAsleep && slig.mHalf != here.mHalf && nav.CameraOf(slig.mX, slig.mY - 5) == nav.CameraOf(here.mX, here.mY - 5))
                 {
-                    sneak = true;
-                    overhead = true;
+                    const s32 way = first.mLeft ? -1 : 1;
+                    const bool facesHim = slig.mMotion == 5 || slig.mFacingLeft == (here.mX < slig.mX);
+                    const bool ahead = (slig.mX - here.mX) * way > 0;
+                    if (!ahead || (!facesHim && slig.mMotion == 0 && std::abs(slig.mX - here.mX) <= 3 * cell))
+                    {
+                        zRun = true;
+                    }
+                    else
+                    {
+                        overhead = true;
+                        zHold = facesHim;
+                        trailX = slig.mX - way * 40;
+                    }
                     continue;
                 }
                 if (slig.mPossessed || (!slig.mAsleep && (slig.mHalf != here.mHalf || std::abs(slig.mY - here.mY) > 45)))
@@ -1060,6 +1133,20 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     const s32 x = nav.Nodes()[nav.Edges()[path[i]].mTo].mX;
                     behind = behind && (slig.mFacingLeft ? x > slig.mX + cell / 2 : x < slig.mX - cell / 2);
                 }
+                // AO: behind its back is behind it as it walks away from him, and with the time for it. It turns
+                // at the end of its beat, two cells short of the bound, after its wait there: what it has left to
+                // walk at 2.7 a frame and that wait have to cover his way to the next cover at a sneak's 2.5.
+                // He is the slower, so he stays behind it. Path 18's fourth screen: begun as it stood at its
+                // beat's end, it turned with him between the two invisible zones.
+                if (!bot.IsAe() && slig.mBeatMax > slig.mBeatMin)
+                {
+                    const s32 way = first.mLeft ? -1 : 1;
+                    const s32 left = slig.mFacingLeft ? slig.mX - (slig.mBeatMin + 2 * cell) : (slig.mBeatMax - 2 * cell) - slig.mX;
+                    const s32 need = (static_cast<s32>(lastOpen) + 2) * cell * 10 / 25 + 12;
+                    // (ahead of him and going his way, or behind him and going the other)
+                    const bool away = slig.mFacingLeft == first.mLeft ? (slig.mX - here.mX) * way > cell / 2 : (here.mX - slig.mX) * way > cell / 2;
+                    behind = away && std::max(0, left) * 10 / 27 + slig.mBeatPause >= need;
+                }
                 const bool safeHere = !open(here);
                 // (one not about yet can't be watched: nothing to wait for)
                 if (!behind && safeHere && slig.mSeen && mHiding < 1500)
@@ -1101,6 +1188,18 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 {
                     last = i - 1;
                     break;
+                }
+            }
+            // AO: the first cell of the next screen is no place to stop: he comes onto it in the middle of a step
+            // and is past it before he can, and turning back for it puts him on the last screen again (path
+            // 18's fourth screen: to and fro between the two until the Slig came). One cell on.
+            if (!bot.IsAe() && last + 1 < path.size())
+            {
+                const NavEdge& over = nav.Edges()[path[last]];
+                const NavEdge& on = nav.Edges()[path[last + 1]];
+                if (std::abs(nav.Nodes()[over.mTo].mX - nav.Nodes()[over.mFrom].mX) > 3 * NavGraph::GridStep(nav.Nodes()[cur].mHalf) && on.mKind == EdgeKind::eWalk && on.mLeft == first.mLeft)
+                {
+                    last++;
                 }
             }
             const NavNode& to = nav.Nodes()[nav.Edges()[path[last]].mTo];
@@ -1384,15 +1483,32 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 return TaskStep::Do(Prim::MoveTo(to.mX, Gait::eSneak));
             }
-            // (under a Slig that is awake overhead: quietly, as far as its screen goes, whatever else says run)
-            if (overhead)
+            // (behind a Slig in the background: no nearer than a cell and a half behind it; in front of it: at a run)
+            if (overhead && !zRun)
             {
-                std::size_t end = 0;
-                while (end < last && nav.CameraOf(nav.Nodes()[nav.Edges()[path[end + 1]].mTo].mX, here.mY - 5) == nav.CameraOf(here.mX, here.mY - 5))
+                const s32 way = first.mLeft ? -1 : 1;
+                if (zHold)
                 {
-                    end++;
+                    return TaskStep::Do(Prim::Wait(3));
                 }
-                return TaskStep::Do(Prim::MoveTo(nav.Nodes()[nav.Edges()[path[end]].mTo].mX, Gait::eSneak));
+                std::size_t end = path.size();
+                for (std::size_t k = 0; k <= last; k++)
+                {
+                    if ((nav.Nodes()[nav.Edges()[path[k]].mTo].mX - trailX) * way <= 0)
+                    {
+                        end = k;
+                    }
+                }
+                if (end == path.size())
+                {
+                    return TaskStep::Do(Prim::Wait(3));
+                }
+                const s32 x = nav.Nodes()[nav.Edges()[path[end]].mTo].mX;
+                return TaskStep::Do(Prim::MoveTo(x, (x - here.mX) * way > 4 * cell ? Gait::eRun : Gait::eWalk));
+            }
+            if (zRun)
+            {
+                return TaskStep::Do(Prim::MoveTo(to.mX, Gait::eRun));
             }
             if (outrun || mHurry || fleech || (flier && !sneak))
             {
@@ -5604,7 +5720,8 @@ TaskStep SligDropTask::Next(Bot& bot, const std::string& lastFailed)
         const s32 frames = std::max(1, static_cast<s32>(bot.Abe().mFrame) - mLastFrame);
         const s32 pace10 = mLastX != 0 && std::abs(s.mX - mLastX) < 12 * frames ? (s.mX - mLastX) * 10 / frames : 0;
         const s32 pace = pace10;
-        const s32 then = s.mX + pace10 * mDelay / 10;
+        // (a meat saw is down far enough to kill some 6 frames after its switch is set, and for as long again)
+        const s32 then = s.mX + pace10 * (mDelay + (door.mKind == FeatureKind::eSaw ? 6 : 0)) / 10;
         mLastX = s.mX;
         mLastFrame = static_cast<s32>(bot.Abe().mFrame);
         if (pace != 0 && then >= door.mX1 + 4 && then <= door.mX2 - 4)
@@ -5620,7 +5737,7 @@ TaskStep SligDropTask::Next(Bot& bot, const std::string& lastFailed)
         }
         if (slig->mGone || !about)
         {
-            bot.Log("the Slig is down the trap door");
+            bot.Log(door.mKind == FeatureKind::eSaw ? "the Slig is under the saw" : "the Slig is down the trap door");
             bot.FleechKilled(mSlig);
             return TaskStep::Done();
         }

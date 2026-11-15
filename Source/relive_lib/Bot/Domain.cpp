@@ -3441,7 +3441,8 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         for (std::size_t fi = 0; at >= 0 && fi < nav.Input().mFeatures.size(); fi++)
         {
             const NavFeature& door = nav.Input().mFeatures[fi];
-            if (door.mKind != FeatureKind::eTrapDoor || door.mSwitch != lever.mSwitch)
+            // (or under a meat saw the lever brings down: path 18's second screen)
+            if ((door.mKind != FeatureKind::eTrapDoor && door.mKind != FeatureKind::eSaw) || door.mSwitch != lever.mSwitch)
             {
                 continue;
             }
@@ -3458,10 +3459,32 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 drop.mOther = slig.mId;
                 drop.mEdge = static_cast<s32>(fi);
                 const Goap::Fact down{Key::Mud(slig.mId), 2};
-                add("Drop Slig#" + std::to_string(slig.mId) + " through the trap door at " + std::to_string(dx) + "," + std::to_string(door.mY1) + " with Lever#" + std::to_string(lever.mId), {regionFact(at)}, {down}, 400, drop);
+                add(std::string(door.mKind == FeatureKind::eSaw ? "Saw Slig#" : "Drop Slig#") + std::to_string(slig.mId) + (door.mKind == FeatureKind::eSaw ? " with the meat saw at " : " through the trap door at ") + std::to_string(dx) + "," + std::to_string(door.mY1) + " with Lever#" + std::to_string(lever.mId), {regionFact(at)}, {down}, 400, drop);
                 for (Goap::Action& a : d.mActions)
                 {
                     const DomainStep& s = d.mSteps[a.mTag];
+                    // (and no way out is taken that goes from the lever along its floor near there: where a
+                    // hoist joins the lever's ledge and that floor they are one region, with nothing to cross)
+                    // (a saw's only so far: a trap door's floor has always been another region)
+                    if (door.mKind == FeatureKind::eSaw && s.mKind == StepKind::eExit && s.mEdge >= 0)
+                    {
+                        std::vector<s32> way;
+                        if (nav.FindPath(at, nav.Exits()[s.mEdge].mNode, [](const NavEdge& e) -> s32
+                                         { return e.mCost; },
+                                         way))
+                        {
+                            for (const s32 e : way)
+                            {
+                                const NavNode& to = nav.Nodes()[nav.Edges()[e].mTo];
+                                if (to.mHalf == door.mHalf && std::abs(to.mY - door.mY1) <= 30 && std::abs(to.mX - dx) <= 450)
+                                {
+                                    a.mPre.push_back(down);
+                                    break;
+                                }
+                            }
+                        }
+                        continue;
+                    }
                     if (s.mKind != StepKind::eCross || s.mEdge < 0)
                     {
                         continue;

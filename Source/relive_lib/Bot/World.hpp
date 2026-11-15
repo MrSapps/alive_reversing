@@ -131,6 +131,8 @@ struct SligAt final
     // The ends of its beat, from the bounds set for it (both 0 when not known)
     s32 mBeatMin = 0;
     s32 mBeatMax = 0;
+    // The frames at least that it stands at an end of its beat before it turns (AO's; 0 when not known)
+    s32 mBeatPause = 0;
     // Asleep, a noise this near (in x) wakes it; 0 when not known: anywhere on its screen then
     s32 mWake = 0;
     // The frames it waits before it shoots at what it has seen
