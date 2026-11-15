@@ -2531,7 +2531,16 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                         }
                         // (taking it over from the next screen, which has no orb, was tried: its beat has it
                         // there some 50 frames at a time, and a chant needs more)
-                        if (watched)
+                        // (only where the power to go unseen is to be had: in a path with no lock that gives it
+                        // there is nothing to wait for, and the thing is used as it always was. The Mines' path
+                        // 10: the Slig by the well at 1404,339 wakes as he lands, and with this asked for the
+                        // levers there were never pulled.)
+                        bool power = world.mInvisCharge || world.mInvisible || world.mInvisComing;
+                        for (const Entity& lock : world.mEntities)
+                        {
+                            power = power || (lock.mKind == EntityKind::eSlapLock && lock.mInputs[0] > 0);
+                        }
+                        if (watched && power)
                         {
                             pre.push_back({Key::kInvisNow, 1});
                             watchedOrb = true;

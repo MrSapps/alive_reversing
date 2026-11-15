@@ -1203,6 +1203,22 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs) const
         // A hop or a running jump along a floor with a drill at work over a cell of it on the way: no (it can only
         // be timed a cell at a time, which is what walking and rolling are for)
         // (a jump up to a ledge has its run-up on the floor it starts from)
+        // (nor a running jump whose flight goes through where a drill travels: in the gap it jumps, the drill
+        // that goes up and down there is not under him but in his way. The Mines' path 4, from 2562,1400 over
+        // the gap at 2487: drilled in the air.)
+        if (e.mKind == EdgeKind::eRunJump && from.mHalf == to.mHalf)
+        {
+            const s32 cell = NavGraph::GridStep(from.mHalf);
+            const s32 scale = from.mHalf ? 2 : 1;
+            for (const NavFeature& f : know->mNav.Input().mFeatures)
+            {
+                if (f.mKind == FeatureKind::eSweep && f.mHalf == from.mHalf && f.mX2 > std::min(from.mX, to.mX) + cell / 2 && f.mX1 < std::max(from.mX, to.mX) - cell / 2 &&
+                    f.mY2 >= std::min(from.mY, to.mY) - 60 / scale && f.mY1 <= std::max(from.mY, to.mY))
+                {
+                    return -1;
+                }
+            }
+        }
         if ((e.mKind == EdgeKind::eRunJump || e.mKind == EdgeKind::eHop) && from.mHalf == to.mHalf)
         {
             const s32 cell = NavGraph::GridStep(from.mHalf);
