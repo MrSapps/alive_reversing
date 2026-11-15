@@ -3394,6 +3394,11 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         {
             pre.push_back({Key::Switch(f.mSwitch), 1});
         }
+        // (a well that leads out only with its switch on)
+        if (f.mKind == FeatureKind::eWellExpress && f.mSwitch > 1 && f.mDestPath < 0 && f.mOnDestPath >= 0)
+        {
+            pre.push_back({Key::Switch(f.mSwitch), 1});
+        }
         // Fleeches asleep by the way out that a Scrab can be had to kill: dead first (they wake as he comes up)
         for (const Entity& fl : world.mEntities)
         {

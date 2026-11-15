@@ -1100,6 +1100,20 @@ relive::FmvInfoEntry* Path_Get_FMV_Record(EReliveLevelIds lvlId, const std::stri
         }
     }
 
+    // A movie that is played on the way from one level to another is listed with the level it is left from,
+    // and the caller has the one that is gone to (Necrum's well to Feeco: NEP1C13.DDV is in Necrum's list).
+    // The names are the files' own, so the same name in another level's list is the same movie.
+    for (const auto& path : sPathData_559660.paths)
+    {
+        for (size_t i = 0; i < path.mFmvArray.mCount; i++)
+        {
+            if (path.mFmvArray.mArray[i].mName && fmvName == path.mFmvArray.mArray[i].mName)
+            {
+                return const_cast<relive::FmvInfoEntry*>(&path.mFmvArray.mArray[i]);
+            }
+        }
+    }
+
     ALIVE_FATAL("FMV record '%s' not found for lvl %d", fmvName.c_str(), static_cast<s32>(MapWrapper::ToAE(lvlId)));
 }
 
