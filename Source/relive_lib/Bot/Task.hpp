@@ -836,6 +836,8 @@ private:
     s32 mLegFrames = 0;
     // The frames spent after Fleeches
     s32 mHunt = 0;
+    // The frames waited at a gap for a falling rock to go by
+    s32 mWaitRock = 0;
     std::unique_ptr<GoToTask> mGo;
 };
 
