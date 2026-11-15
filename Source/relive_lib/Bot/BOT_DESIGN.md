@@ -974,9 +974,9 @@ Mudokon is chanted at until it is cured before it is spoken to (`RecruitTask`). 
 the movie played on the way to another level was looked for in the list of the level gone to and the game
 stopped with a fatal error (Necrum's NEP1C13.DDV on the way to Feeco); `Path_Get_FMV_Record` now looks in the
 other levels' lists too.
-The long run `full.txt` (from the Scrab vaults' path 7: the Scrab trial, Necrum, Mudomo's paths 1, 7 and 10, the
-hub, the six vaults, the Mudomo trial) got to Necrum's path 3 at f=30,711 with 0 deaths, before the well was
-known as a way out.
+In one run, `full.txt` (from the Scrab vaults' path 7: the Scrab trial, Necrum, Mudomo's paths 1, 7 and 10, the
+hub, the six vaults, the Mudomo trial, Necrum's end): Feeco Depot's path 1 at f=31,828, 0 deaths, with the
+healing power as the game gives it. It stops there (Feeco is untouched: at 2312,884, with nothing known to do).
 
 Not built, from the user: with one Paramite the meat can also be thrown past it into the next screen and the
 Paramite walked into that screen (it backs off from him), where it then finds the meat. The fallback for when
