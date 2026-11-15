@@ -896,10 +896,22 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         }
 
         case EdgeKind::eRunJump:
-            if (abe.mFacingLeft != first.mLeft)
+        {
+            // A run-up of one cell: only out of a turn does he run at once (from a stand facing the way he is not
+            // at a run by the take-off, and goes off the end without the jump: the Mines' path 4, off 2537,1400
+            // into the drill's pit, twice). So he is turned away first, and the jump's own run turns him back.
+            const bool shortRun = std::abs(first.mX - abe.mX) * (nav.Nodes()[cur].mHalf ? 2 : 1) <= 38;
+            if (shortRun && abe.mMove == Move::eIdle && abe.mFacingLeft == first.mLeft && !mJumpTurned)
+            {
+                mJumpTurned = true;
+                return TaskStep::Do(Prim::Face(!first.mLeft));
+            }
+            if (abe.mFacingLeft != first.mLeft && !(shortRun && mJumpTurned))
             {
                 return TaskStep::Do(Prim::Face(first.mLeft));
             }
+            mJumpTurned = false;
+        }
             mLastEdge = path[0];
             {
                 Prim jump = Prim::RunJump(first.mX, first.mLeft);

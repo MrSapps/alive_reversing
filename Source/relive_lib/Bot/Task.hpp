@@ -254,6 +254,8 @@ private:
     s32 mLastEdge = -1;
     s32 mReflexes = -1;
     bool mHurry = false;
+    // Turned away from a running jump with a one-cell run-up, so that its run starts out of the turn
+    bool mJumpTurned = false;
     s32 mLastFrom = -1;
     s32 mSameSpot = 0;
     s32 mOffGraph = 0;

@@ -1029,7 +1029,10 @@ void NavGraph::AddLedgeCatches(std::vector<NavEdge>& edges, s32 from, s32 dir) c
         const NavFeature* hoist = FeatureAt(FeatureKind::eHoist, x, y + 16, n.mHalf, &hoistIdx);
         if (floor && !mNodes[node].mHazard && hoist && (hoist->mDir == 2 || (hoist->mDir == 0) == (dir < 0)) && std::abs(hoist->mY1 - y) <= 12)
         {
-            AddEdge(edges, from, node, EdgeKind::eRunJump, kRunJumpCost, hoistIdx, dir < 0);
+            // (dear: he ends hung from the ledge and has to pull himself up, some 60 frames more than a jump that
+            // lands, and it is the way only where there is no other. The Mines' path 6: chosen over stepping off
+            // and dropping, it cost the 40 frames the timed escape does not have.)
+            AddEdge(edges, from, node, EdgeKind::eRunJump, kRunJumpCost + 150, hoistIdx, dir < 0);
             edges.back().mX = takeoff;
         }
     }

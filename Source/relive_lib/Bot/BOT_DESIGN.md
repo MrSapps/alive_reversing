@@ -998,11 +998,18 @@ between here and the Stockyards). What AO needed so far:
 - AO's security claw counts as AE's orb (no chanting on its screen), and the reflex that takes over a Slig
   that woke is off in AO: the chant took none and left him standing in it for 800 frames.
 
-**Known wrong, not from this work**: the Mines from the start (`m1.txt`) no longer gets through: two deaths in
-path 4 at a running jump on the way to lever 11000 (f=29,403), and in path 10 the Sligs at 1300 and 1404,339
-are awake as he comes out of the well, the levers then want him unseen and nothing is left to do (f=35,165).
-The same on the commit before the AO changes; `mall2.botlog` of 11-12 got through to path 6. Path 3 takes
-2,400 frames more than it did then, so everything after it meets the Sligs at another moment. Not looked into.
+**The Mines from the start again** (`m1.txt`): all of it and into Necrum's path 3 at f=42,663, 0 deaths. It
+had stopped getting through some time after the run of 11-12 (`mall2.botlog`), from three things:
+- Path 4: a running jump from 2562,1400 over the gap at 2487, where a drill goes up and down. With a run-up
+  of one cell the jump was not even made (he ran off the end); made, he was drilled in the air. A running jump
+  whose flight goes through where a drill travels is not taken (`Bot::EdgeCostFn`), and a jump with a one-cell
+  run-up is begun out of a turn (`GoToTask`: only then is he at a run by the take-off).
+- Path 10: a lever by an awake Slig under an orb was only to be used unseen (a rule from the Scrab vaults),
+  which in a path with no lock that gives the power is never. It is asked for only where the power can be had.
+- Path 6: after the last wheel a running jump to the ledge at 1662,880 and a pull up were planned in place of
+  the step off and the drop, 40 frames the timed escape does not have. The run of 11-12 only kept off that
+  jump because an earlier failure had banned it. A jump that ends hung from a ledge costs 150 more.
+Left as it was: path 3's "Trap the Slogs" fails three to five times before it works (1,300 frames each).
 
 Not built, from the user: with one Paramite the meat can also be thrown past it into the next screen and the
 Paramite walked into that screen (it backs off from him), where it then finds the meat. The fallback for when
