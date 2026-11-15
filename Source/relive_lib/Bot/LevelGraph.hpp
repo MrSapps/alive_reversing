@@ -30,10 +30,17 @@ public:
     // How many paths away the way out of the level is: 0 for a path with an exit to another level, -1 if there's
     // no way from it
     s32 Distance(s32 path) const;
+    // The ways towards the level's end this path has can't be taken as things are (Feeco's lobby: its door to the
+    // executive offices, and the one to the path that leads to the Brewery, are behind gates the level's other
+    // ends open): they are no ways on any more, and the distances are measured again without them. False, and
+    // nothing changed, if it had none or there is no other way from it.
+    bool Shut(s32 path);
     s32 Mudokons(s32 path) const;
     std::string Text() const;
 
 private:
+    void Measure();
+    std::set<s32> mShut;
     s32 mLevel = -1;
     std::vector<PathSummary> mPaths;
     std::map<s32, s32> mDistance;

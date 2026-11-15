@@ -3726,6 +3726,56 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         }
     }
 
+    // And under a Slig that stands on a floor a little over his (Feeco's lobby: the one on the platform by the
+    // door at 2162,900, from the floor 80 under it): the blast reaches 60 up from 28 over his feet. Until it is
+    // dead nothing is crossed onto its floor near it, as with one a fart is flown at.
+    for (const Entity& slig : world.mEntities)
+    {
+        bool machines = false;
+        for (const Entity& brew : world.mEntities)
+        {
+            machines = machines || (brew.mKind == EntityKind::eBrew && !brew.mGone);
+        }
+        if (!machines || slig.mKind != EntityKind::eSlig || slig.mGone || slig.mSwitch > 1 || world.mFleechKilled.count(slig.mId) != 0)
+        {
+            continue;
+        }
+        s32 fy = 0;
+        const s32 feet = slig.mY2 - 4;
+        if (nav.FloorBelow(slig.CentreX(), feet + 20, slig.mHalf, &fy) < 0 || fy - feet < 30 || fy - feet > 84)
+        {
+            continue;
+        }
+        const s32 stand = nav.NodeAt(slig.CentreX(), fy, slig.mHalf, 14);
+        if (stand < 0 || nav.Nodes()[stand].mHazard)
+        {
+            continue;
+        }
+        const Goap::Fact dead{Key::Mud(slig.mId), 2};
+        for (Goap::Action& a : d.mActions)
+        {
+            const DomainStep& s = d.mSteps[a.mTag];
+            s32 node = -1;
+            if (s.mKind == StepKind::eExit && s.mEdge >= 0)
+            {
+                node = nav.Exits()[s.mEdge].mNode;
+            }
+            else if (s.mKind == StepKind::eCross && s.mEdge >= 0)
+            {
+                node = nav.Edges()[s.mEdge].mTo;
+            }
+            if (node >= 0 && nav.Nodes()[node].mHalf == slig.mHalf && std::abs(nav.Nodes()[node].mY - feet) <= 30 && std::abs(nav.Nodes()[node].mX - slig.CentreX()) <= kFartSligZone)
+            {
+                a.mPre.push_back(dead);
+            }
+        }
+        DomainStep drop;
+        drop.mKind = StepKind::eFartBomb;
+        drop.mEntity = slig.mId;
+        drop.mEdge = stand;
+        add("Leave a fart under Slig#" + std::to_string(slig.mId) + " from " + std::to_string(nav.Nodes()[stand].mX) + "," + std::to_string(nav.Nodes()[stand].mY), {regionFact(stand), {Key::kBrew, 1}}, {dead, {Key::kBrew, 0}}, 450, drop);
+    }
+
     // A Brew machine: the fart he has after a Brew can be flown through the air to a mine or a Slig and set off
     // there (FartFlight), from where he drank it. Not with an orb on the machine's screen: it is flown by
     // chanting. And until a Slig the fart can get to is dead, nothing is crossed onto its floor near it.

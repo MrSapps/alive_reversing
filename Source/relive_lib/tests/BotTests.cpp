@@ -5844,3 +5844,55 @@ TEST(BotFart, AHopDownOntoAMinesCellIsThereOnlyWhereThereIsABrewMachineAndWaitsF
     EXPECT_TRUE(g.Condition(*hop, &sw, &value));
     EXPECT_EQ(sw, World::HazardSwitch(7005));
 }
+
+// A lobby (2) with its own door out of the level and one to a path (5) that leaves it too, both of which can be
+// shut; and a junction (9) that leads to the paths 3 and 4, which leave the level
+static LevelGraph LobbyLevel()
+{
+    std::vector<PathSummary> paths(5);
+    paths[0].mPath = 2;
+    paths[0].mExits = {{12, 11}, {5, 5}, {5, 9}};
+    paths[1].mPath = 5;
+    paths[1].mExits = {{9, 16}, {5, 2}};
+    paths[2].mPath = 9;
+    paths[2].mExits = {{5, 3}, {5, 4}, {5, 2}};
+    paths[3].mPath = 3;
+    paths[3].mExits = {{6, 1}, {5, 9}};
+    paths[4].mPath = 4;
+    paths[4].mExits = {{8, 1}, {5, 9}};
+    LevelGraph level;
+    level.Build(5, paths);
+    return level;
+}
+
+TEST(BotLevel, APathWhoseWayOutOfTheLevelIsShutIsMeasuredByItsOtherWays)
+{
+    LevelGraph level = LobbyLevel();
+    EXPECT_EQ(level.Distance(2), 0);
+    EXPECT_EQ(level.Distance(9), 1);
+    // Its own door out is not to be had: one path away, through 5
+    EXPECT_TRUE(level.Shut(2));
+    EXPECT_EQ(level.Distance(2), 1);
+    // Nor is the door to 5: two away, through the junction
+    EXPECT_TRUE(level.Shut(2));
+    EXPECT_EQ(level.Distance(2), 2);
+    EXPECT_EQ(level.Distance(9), 1);
+    EXPECT_EQ(level.Distance(5), 0);
+}
+
+TEST(BotLevel, APathWithNoOtherWayStaysAsItWas)
+{
+    LevelGraph level = LobbyLevel();
+    EXPECT_TRUE(level.Shut(2));
+    EXPECT_TRUE(level.Shut(2));
+    // From the junction the ways on are to 3 and 4: with them shut there is only the way back to the lobby, which
+    // leads nowhere but here. Nothing changes.
+    EXPECT_FALSE(level.Shut(9));
+    EXPECT_EQ(level.Distance(9), 1);
+    EXPECT_EQ(level.Distance(2), 2);
+    // (3's own way out shut, it is two from the end: back through the junction to 4)
+    EXPECT_TRUE(level.Shut(3));
+    EXPECT_EQ(level.Distance(3), 2);
+    // And one the level does not know is not shut
+    EXPECT_FALSE(level.Shut(77));
+}

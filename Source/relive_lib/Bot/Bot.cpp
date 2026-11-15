@@ -325,6 +325,11 @@ bool Bot::Replan(BaseMap& map)
         mArrivedKey = {mAbe.mLevel, mAbe.mPath};
         mArrivedX = mAbe.mX;
         mArrivedY = mAbe.mY;
+        // (out of the path he backed out of: it may be come into again, by another way, and backed out of again)
+        if (mBackFor != mAbe.mPath)
+        {
+            mBackFor = -1;
+        }
     }
     for (const Goap::Action& a : domain.mActions)
     {
@@ -361,6 +366,12 @@ bool Bot::Replan(BaseMap& map)
                 {
                     continue;
                 }
+            }
+            // (backing out: the way he came in, wherever in the level it leads)
+            if (mBackFor == mAbe.mPath && mKnow->mNav.Exits()[step.mEdge].mNode >= 0 && std::abs((f.mX1 + f.mX2) / 2 - mArrivedX) <= 40 && std::abs(f.mY2 - mArrivedY) <= 40)
+            {
+                actions.push_back(a);
+                continue;
             }
             bool sideTrip = false;
             if (!ExitAllowed(map, f, &sideTrip))
@@ -586,6 +597,17 @@ bool Bot::Replan(BaseMap& map)
                     misses += "switch " + std::to_string(fact.mKey - 1000) + ": " + sub.mMiss + "; ";
                 }
             }
+            // Nothing left to switch, and the way out of the level this path has is not to be had: the level
+            // goes on through its other paths (Feeco's lobby, whose own way out is behind gates that the ends
+            // of two other paths open)
+            if (!best.mFound && mLevel.Shut(mAbe.mPath))
+            {
+                Log("the way out of the level from this path is shut: on through the level's other paths (" + std::to_string(mLevel.Distance(mAbe.mPath)) + " away)");
+                mTask = std::make_unique<GoToTask>("think again", [](s32)
+                                                   { return true; });
+                mTaskAction.clear();
+                return true;
+            }
             // Nothing left to switch, and a way out of this path into one of the level he has not been in, from
             // which the level goes on: that before any wandering here (the Mudomo vaults' path 7: its way on, a
             // bird portal, is only got to by coming back into it through path 10)
@@ -697,8 +719,10 @@ bool Bot::Replan(BaseMap& map)
                     return true;
                 }
                 // Nothing at all: back out the way he came in
-                if (mBackFor != mAbe.mPath)
+                // (three times at most from one path: he can come into it again by another door)
+                if (mBackFor != mAbe.mPath && mBackOuts[{mAbe.mLevel, mAbe.mPath}] < 3)
                 {
+                    mBackOuts[{mAbe.mLevel, mAbe.mPath}]++;
                     mBackFor = mAbe.mPath;
                     Log("no way on from here: back out the way he came in");
                     mTask = std::make_unique<GoToTask>("think again", [](s32)
@@ -1281,6 +1305,25 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs) const
                 if (know->mNav.NodeAt(x, from.mY, from.mHalf, 10) >= 0 && world->SweepOver(x, from.mY, from.mHalf))
                 {
                     return -1;
+                }
+            }
+        }
+        // A walk off a ledge down into a shadow on a floor Sligs are awake on: the landing is heard and they turn
+        // to it (Feeco's path 9, off 1037,340: both turned and shot). Let down from his hands at a hoist he lands
+        // softly, so that is the way where there is one. (AE's only, as measured.)
+        if (know->mNav.Input().mIsAe && e.mKind == EdgeKind::eFall && to.mY > from.mY + 30)
+        {
+            bool hoist = false;
+            for (s32 i = from.mFirstEdge; i < from.mFirstEdge + from.mEdgeCount; i++)
+            {
+                const NavEdge& other = know->mNav.Edges()[i];
+                hoist = hoist || (other.mKind == EdgeKind::eHoistDown && know->mNav.Nodes()[other.mTo].mLine == to.mLine);
+            }
+            for (const SligAt& s : world->mSligs)
+            {
+                if (hoist && !s.mAsleep && !s.mPossessed && s.mHalf == to.mHalf && std::abs(s.mY - to.mY) <= 30 && std::abs(s.mX - to.mX) <= 700)
+                {
+                    return e.mCost + 300;
                 }
             }
         }
