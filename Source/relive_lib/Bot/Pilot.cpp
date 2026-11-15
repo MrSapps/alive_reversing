@@ -327,6 +327,28 @@ PilotStatus Pilot::StepLift(const AbeState& abe, u32& bits)
         return PilotStatus::eRunning;
     }
     mStill = 0;
+    // Carried past it: a stop between the ends, which the lift does not stop at while the rope is pulled (Abe.cpp,
+    // MoveLiftUpOrDown: the buttons are looked at on two frames of the pull, some 20 apart at 4 a frame).
+    // With nothing held on one of those within 25 of the stop the lift comes to it by itself (LiftPoint.cpp,
+    // eMiddleFloor). So from then on the rope is let go 20 from it. (The Mudomo vault's path 4, where he went up
+    // and down past the stop at 680 for 1,500 frames.)
+    const s32 side = dy < 0 ? -1 : 1;
+    if (mPhase == 0 && (mLastX == 1 || mLastX == -1) && mLastX != side && std::abs(dy) < 40)
+    {
+        mPhase = 1;
+        mStartX = 0;
+    }
+    mLastX = side;
+    if (mPhase == 1 && std::abs(dy) <= 20)
+    {
+        // (stood still short of it for a second: a pull more)
+        mStartX = abe.mMove == Move::eLiftIdle ? mStartX + 1 : 0;
+        if (mStartX < 30)
+        {
+            return PilotStatus::eRunning;
+        }
+        mStartX = 0;
+    }
     if (abe.mMove == Move::eIdle && ++mStuck > 40)
     {
         return Fail("no lift here");

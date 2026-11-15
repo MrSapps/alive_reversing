@@ -880,6 +880,28 @@ bite him dead. Nothing is done about the Fleeches while he waits.
 Open: a wait for a lift and the rest have no unit tests yet; the Mudomo vaults themselves (path 8 on) are
 untouched: a taken over Paramite has to eat Fleeches, talk to another, and pull several rings in one go.
 
+**The Mudomo vaults** (from the hub, path 8; the guide's numbering in brackets). Two of six beaten so far,
+each from its door back to the hub with 0 deaths:
+
+- Path 12 (vault 3), `v3.txt`: f=1,386. The drop down the shaft at 437,460 goes into the well at 437,1500,
+  which throws him two cells right into a hoist that ends 40 over the floor: he ends hung from the lock's ledge
+  at 487,1380, which nothing else leads to (`NavGraph::WellOut`, `caught`). Fleeches under a lock's floor are
+  not its guards. The Paramite on the 1100 floor has the floor's end three cells behind it and turns on whoever
+  comes up the hoist beside it (`Domain::ParamiteCornered`, from `Brain_Patrol_State_1_IdleForAbe`: it backs
+  off within six cells and strikes with the end within two): with lock 112's power in hand he chants first.
+  An open trap door with a well under it drops him into the well (`trapFall` in `NavGraph::Build`).
+- Path 4 (vault 5), `v4.txt`: f=1,890. New steps: `eFleechPen` / `FleechPenTask` (a lever that wakes Fleeches,
+  and a gate one foot switch beyond it opens and one before it shuts: lever from the far side, over the top to
+  the first switch, a cell off it until all are on his side, back over the second: `Domain::FleechPen`);
+  `eMeatFeed` / `MeatFeedTask` and `Key::kPackFed` (Paramites that team up over the way out, by where the
+  level has them, `Domain::PackLevel`: the exit needs meat lying on his screen, thrown from the last cell
+  before their level onto it on the side the way does not go; only in a path with meat and no lock that makes
+  him invisible); `GetRocksTask` leaves the first sack's meat for a Paramite of that level and takes the meat
+  to keep from the other sack; `Pilot::StepLift` lets go of the rope 20 from a stop it was carried past (a
+  middle stop). Sleeping Fleeches on the next screen are sneaked up to from before they can be seen.
+- Not beaten: paths 9, 11, 3, 5 (vaults 1, 2, 4, 6), then the trial (path 13). Vaults 1, 2 and 6 need a Paramite
+  taken over and played for more than one ring.
+
 Not built, from the user: with one Paramite the meat can also be thrown past it into the next screen and the
 Paramite walked into that screen (it backs off from him), where it then finds the meat. The fallback for when
 no throw from a safe cell lands on his own screen.

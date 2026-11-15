@@ -993,6 +993,112 @@ bool Domain::ParamitePack(const NavGraph& nav, const World& world, s32 x, s32 y,
     return count >= 2;
 }
 
+bool Domain::ParamiteCornered(const NavGraph& nav, const World& world, s32 x, s32 y, bool half)
+{
+    // Paramite.cpp, Brain_Patrol_State_1_IdleForAbe: one on its own backs off from him while he is within six
+    // cells of it, and turns on him ("HittingAbe") once the end of its floor is within two cells behind it. So a
+    // place on its floor with less than those eight cells between it and the end on the Paramite's side is one
+    // where it has nowhere left to go (measured: the Mudomo vault's path 12, up the hoist at 587,1100 with the
+    // Paramite at 637 and the floor ending at 750: dead 36 frames later).
+    const s32 at = nav.NodeAt(x, y, half, 12);
+    if (at < 0 || nav.Nodes()[at].mLine < 0)
+    {
+        return false;
+    }
+    const NavLine& line = nav.Input().mLines[nav.Nodes()[at].mLine];
+    const s32 lo = std::min(line.mX1, line.mX2);
+    const s32 hi = std::max(line.mX1, line.mX2);
+    const s32 cell = NavGraph::GridStep(half);
+    for (const ParamiteAt& p : world.mParamites)
+    {
+        if (p.mPossessed || p.Hidden() || p.mHalf != half)
+        {
+            continue;
+        }
+        const s32 on = nav.NodeAt(p.mX, p.mY, p.mHalf, 30);
+        if (on < 0 || nav.Nodes()[on].mLine != nav.Nodes()[at].mLine || WallBetween(nav, p.mX, x, y, half) || GateBetween(nav, world, p.mX, x, y, half))
+        {
+            continue;
+        }
+        const s32 room = p.mX >= x ? hi - x : x - lo;
+        if (room < 8 * cell)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Domain::PackLevel(const NavGraph& nav, const World& world, s32 node)
+{
+    const NavNode& n = nav.Nodes()[node];
+    const s32 cam = nav.CameraOf(n.mX, n.mY - 5);
+    s32 count = 0;
+    s32 level = 0;
+    for (const Entity& e : world.mEntities)
+    {
+        if (e.mKind != EntityKind::eParamite || e.mGone || e.mHalf != n.mHalf || nav.CameraOf(e.CentreX(), e.mY2 - 5) != cam)
+        {
+            continue;
+        }
+        count++;
+        level += std::abs(e.mY2 - n.mY) * (n.mHalf ? 2 : 1) <= 30 ? 1 : 0;
+    }
+    return count >= 2 && level >= 1;
+}
+
+bool Domain::FleechPen(const NavGraph& nav, const World& world, const Entity& lever, s32* gate, s32* open, s32* shut, std::vector<u32>* group)
+{
+    std::vector<u32> woken;
+    for (const Entity& f : world.mEntities)
+    {
+        if (f.mKind == EntityKind::eFleech && !f.mGone && world.mFleechKilled.count(f.mId) == 0 && lever.mSwitch > 1 && f.mSwitch == lever.mSwitch && f.mHalf == lever.mHalf)
+        {
+            woken.push_back(f.mId);
+        }
+    }
+    if (woken.empty())
+    {
+        return false;
+    }
+    for (std::size_t fi = 0; fi < nav.Input().mFeatures.size(); fi++)
+    {
+        const NavFeature& g = nav.Input().mFeatures[fi];
+        if (g.mKind != FeatureKind::eBarrier || !g.mSolid || g.mSwitch <= 1 || g.mSwitch == lever.mSwitch || !g.mStartClosed || g.mHalf != lever.mHalf)
+        {
+            continue;
+        }
+        const s32 gx = (g.mX1 + g.mX2) / 2;
+        const Entity* on = nullptr;
+        const Entity* off = nullptr;
+        for (const Entity& e : world.mEntities)
+        {
+            if (e.mKind == EntityKind::eFootSwitch && e.mSwitch == g.mSwitch && e.mHalf == g.mHalf && std::abs(e.mY2 - g.mY2) <= 30)
+            {
+                on = e.mOp == 0 ? &e : on;
+                off = e.mOp == 1 ? &e : off;
+            }
+        }
+        const bool leverLeft = lever.CentreX() < gx;
+        if (!on || !off || (on->CentreX() < gx) == leverLeft || (off->CentreX() < gx) != leverLeft)
+        {
+            continue;
+        }
+        const s32 a = nav.NodeAt(on->CentreX(), on->mY2, g.mHalf, 30);
+        const s32 b = nav.NodeAt(off->CentreX(), off->mY2, g.mHalf, 30);
+        if (a < 0 || b < 0)
+        {
+            continue;
+        }
+        *gate = static_cast<s32>(fi);
+        *open = a;
+        *shut = b;
+        *group = woken;
+        return true;
+    }
+    return false;
+}
+
 bool Domain::WebUp(const NavGraph& nav, s32 from, s32 to, s32* webX)
 {
     // Paramite.cpp: one that is played grabs a web (a track line, type 8) within a cell ahead of it as it comes
@@ -1875,6 +1981,12 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                             {
                                 continue;
                             }
+                            // (nor one that is under the lock's floor altogether: on the floor below, or hung
+                            // from the underside of this one. The Mudomo vault's path 12)
+                            if (node >= 0 && f.mY1 >= nav.Nodes()[node].mY - 5)
+                            {
+                                continue;
+                            }
                             // (not one with a floor between it and the lock: it hangs over that floor)
                             bool floorBetween = false;
                             for (const NavNode& n : nav.Nodes())
@@ -2151,6 +2263,41 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                     // A lever with a trap door for the cell on its other side: from there too, where that is another
                     // part of the path (he comes down on it, and what the lever does is open it under him. The
                     // Mudomo hub at 3187,1140: "immediately pull the lever beside you or you're lunch".)
+                    if (entity.mKind == EntityKind::eLever && node >= 0)
+                    {
+                        s32 penGate = -1;
+                        s32 penOpen = -1;
+                        s32 penShut = -1;
+                        std::vector<u32> penGroup;
+                        if (FleechPen(nav, world, entity, &penGate, &penOpen, &penShut, &penGroup))
+                        {
+                            std::vector<Goap::Fact> penPre;
+                            std::vector<Goap::Fact> penGives = gives;
+                            for (const Goap::Fact& f : pre)
+                            {
+                                bool ofGroup = false;
+                                for (u32 id : penGroup)
+                                {
+                                    ofGroup = ofGroup || (f.mKey == Key::Mud(id) && f.mValue == 2);
+                                }
+                                if (!ofGroup)
+                                {
+                                    penPre.push_back(f);
+                                }
+                            }
+                            for (u32 id : penGroup)
+                            {
+                                penGives.push_back({Key::Mud(id), 2});
+                            }
+                            penGives.push_back(regionFact(penShut));
+                            DomainStep pen;
+                            pen.mKind = StepKind::eFleechPen;
+                            pen.mEntity = entity.mId;
+                            pen.mOther = static_cast<u32>(penGate);
+                            const NavFeature& pg = nav.Input().mFeatures[penGate];
+                            add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on and shut its Fleeches in behind the gate at " + std::to_string((pg.mX1 + pg.mX2) / 2) + "," + std::to_string(pg.mY2), penPre, penGives, 700, pen);
+                        }
+                    }
                     if (entity.mKind == EntityKind::eLever && node >= 0)
                     {
                         const s32 alt = UseNode(nav, entity, nullptr, 1);
@@ -2784,6 +2931,80 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         }
     }
 
+    // Paramites that team up over the way out, in a path that has meat and no lock that makes him invisible: meat
+    // is thrown for them first (the walkthrough's way with the fifth Mudomo vault: "At the top, toss the meat up
+    // to the right, then climb up left and run to the exit"). The way out is barred when no way to it keeps off
+    // their level, from where he is or from where its part of the path is come into.
+    std::vector<char> packAt;
+    {
+        bool invisLock = false;
+        s32 paramites = 0;
+        for (const Entity& e : world.mEntities)
+        {
+            invisLock = invisLock || (e.mKind == EntityKind::eSlapLock && e.mInputs[0] > 0);
+            paramites += e.mKind == EntityKind::eParamite && !e.mGone ? 1 : 0;
+        }
+        if (world.CarriesMeat() && !invisLock && paramites >= 2 && !world.mInvisible && !world.mInvisCharge)
+        {
+            packAt.resize(nav.Nodes().size(), 0);
+            for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+            {
+                packAt[n] = PackLevel(nav, world, static_cast<s32>(n)) ? 1 : 0;
+            }
+        }
+        bool meatOut = false;
+        if (abeNode >= 0)
+        {
+            const s32 cam = nav.CameraOf(nav.Nodes()[abeNode].mX, nav.Nodes()[abeNode].mY - 5);
+            for (const RockAt& r : world.mRocksDown)
+            {
+                meatOut = meatOut || nav.CameraOf(r.mX, r.mY - 5) == cam;
+            }
+            for (const RockAt& r : world.mRocksFlying)
+            {
+                meatOut = meatOut || nav.CameraOf(r.mX, r.mY - 5) == cam;
+            }
+        }
+        d.mStart.Set(Key::kPackFed, meatOut ? 1 : 0);
+    }
+    const auto packBars = [&](s32 target) -> bool
+    {
+        if (packAt.empty())
+        {
+            return false;
+        }
+        const s32 region = d.mRegions[target];
+        std::vector<char> ok(nav.Nodes().size(), 0);
+        ok[target] = 1;
+        for (bool changed = true; changed;)
+        {
+            changed = false;
+            for (const NavEdge& e : nav.Edges())
+            {
+                if (ok[e.mTo] && !ok[e.mFrom] && !packAt[e.mFrom] && d.mRegions[e.mFrom] == region)
+                {
+                    ok[e.mFrom] = 1;
+                    changed = true;
+                }
+            }
+        }
+        if (abeNode >= 0 && d.mRegions[abeNode] == region)
+        {
+            return !ok[abeNode];
+        }
+        bool entries = false;
+        bool open = false;
+        for (const NavEdge& e : nav.Edges())
+        {
+            if (d.mRegions[e.mTo] == region && d.mRegions[e.mFrom] != region)
+            {
+                entries = true;
+                open = open || ok[e.mTo];
+            }
+        }
+        return entries && !open;
+    };
+
     for (std::size_t i = 0; i < nav.Exits().size(); i++)
     {
         DomainStep step;
@@ -2823,6 +3044,15 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             {
                 pre.push_back({Key::Mud(fl.mId), 2});
             }
+        }
+        if (packBars(x.mNode))
+        {
+            pre.push_back({Key::kPackFed, 1});
+            DomainStep feed;
+            feed.mKind = StepKind::eMeatFeed;
+            feed.mEdge = x.mNode;
+            add("Throw meat for the Paramites on the way to the exit at " + std::to_string(nav.Nodes()[x.mNode].mX) + "," + std::to_string(nav.Nodes()[x.mNode].mY), {regionFact(x.mNode), {Key::kMeat, 1}}, {{Key::kPackFed, 1}}, 300, feed);
+            d.mActions.back().mSpend = {Key::kMeat, 1};
         }
         add("Exit " + std::to_string(nav.Nodes()[x.mNode].mX) + "," + std::to_string(nav.Nodes()[x.mNode].mY) + " to path " + std::to_string(f.mDestPath), pre, {{Key::kExited, 1}}, 200, step);
     }

@@ -1070,6 +1070,23 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 }
                 sneak = sneak || (hears && fleech.mHalf == here.mHalf && nav.CameraOf(fleech.mX, fleech.mY - 5) == nav.CameraOf(here.mX, here.mY - 5));
             }
+            // (and one asleep on the next screen, which is not there to be seen until he is on it: by where the
+            // level has it. The Mudomo vault's path 4: the run from 662,1000 to the lever under three of them at
+            // 1012 was begun a screen away and woke them.)
+            for (const Entity& e : bot.GetWorld().mEntities)
+            {
+                if (e.mKind != EntityKind::eFleech || e.mGone || e.mInputs[0] == 0 || e.mHalf != here.mHalf || bot.GetWorld().mFleechKilled.count(e.mId) != 0 ||
+                    nav.CameraOf(e.CentreX(), e.mY2 - 5) == nav.CameraOf(here.mX, here.mY - 5))
+                {
+                    continue;
+                }
+                const s32 reach = (150 + 40) / (here.mHalf ? 2 : 1);
+                for (std::size_t i = 0; i <= last; i++)
+                {
+                    const NavNode& on = nav.Nodes()[nav.Edges()[path[i]].mTo];
+                    sneak = sneak || (std::abs(e.CentreX() - on.mX) <= reach && std::abs(e.mY2 - on.mY) <= 200 / (here.mHalf ? 2 : 1) && nav.CameraOf(e.CentreX(), e.mY2 - 5) == nav.CameraOf(on.mX, on.mY - 5));
+                }
+            }
             // A flying Slig about and no shadow to stand in (the reflex takes him to one if there is): at a run
             bool flier = false;
             for (const FlierAt& f : bot.GetWorld().mFliers)
@@ -1722,10 +1739,41 @@ TaskStep GetRocksTask::Next(Bot& bot, const std::string& lastFailed)
     }
     const s32 cell = NavGraph::GridStep(sack->mHalf);
 
+    // Meat, and a Paramite on the sack's level on this screen: it comes for what falls out (Paramite::FindMeat:
+    // any meat in the air on its screen) and is at it as he picks it up, with the end of the floor behind it:
+    // it turns on him (the Mudomo vault's path 4, at 812,680: dead 30 frames after the meat was in hand). So
+    // what this sack drops is left to it, and the meat to keep is had from another sack of the level while it
+    // eats, if there is one.
+    if (!mBaited && mJumps > 0 && sack->mInputs[1] == 1)
+    {
+        bool paramite = false;
+        for (const ParamiteAt& p : world.mParamites)
+        {
+            paramite = paramite || (!p.mPossessed && !p.Hidden() && p.mHalf == sack->mHalf && std::abs(p.mY - nav.Nodes()[cur].mY) * (sack->mHalf ? 2 : 1) <= 30 && nav.CameraOf(p.mX, p.mY - 5) == nav.CameraOf(abe.mX, abe.mY - 5));
+        }
+        for (const Entity& other : world.mEntities)
+        {
+            if (paramite && other.mKind == EntityKind::eRockSack && other.mInputs[1] == 1 && other.mId != sack->mId && other.mHalf == sack->mHalf && std::abs(other.mY2 - sack->mY2) <= 20 && Domain::UseNode(nav, other, nullptr) >= 0)
+            {
+                bot.Log("a Paramite on the level of the sack at " + std::to_string(sack->CentreX()) + ": its meat is left for it, and the meat to keep had from the sack at " + std::to_string(other.CentreX()));
+                mBaited = true;
+                mBaitX = sack->CentreX();
+                mSack = other.mId;
+                mJumps = 0;
+                mWaits = 0;
+                return Next(bot, "");
+            }
+        }
+    }
     // What fell out, once it lies still: from the cell next to it, crouched, like anything picked up
     const RockAt* rock = nullptr;
     for (const RockAt& r : world.mRocksDown)
     {
+        // (not what was left as bait: that is nearer the sack it fell from)
+        if (mBaited && std::abs(r.mX - mBaitX) < std::abs(r.mX - sack->CentreX()))
+        {
+            continue;
+        }
         if (r.mHalf == sack->mHalf && std::abs(r.mX - sack->CentreX()) < 500 && std::abs(r.mY - nav.Nodes()[cur].mY) < 200)
         {
             rock = &r;
@@ -6228,6 +6276,287 @@ TaskStep ExitTask::Next(Bot& bot, const std::string& lastFailed)
 
 ScrabLureTask::~ScrabLureTask() = default;
 ScrabPenTask::~ScrabPenTask() = default;
+
+FleechPenTask::~FleechPenTask() = default;
+
+MeatFeedTask::~MeatFeedTask() = default;
+
+TaskStep MeatFeedTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const AbeState& abe = bot.Abe();
+    if (++mFrames > 1500)
+    {
+        return TaskStep::Failed("the meat took too long");
+    }
+    switch (mPhase)
+    {
+        case 0:
+        {
+            if (mSpot < 0)
+            {
+                std::vector<s32> path;
+                const s32 cur = bot.AbeNode();
+                if (cur < 0 || !nav.FindPath(cur, mTarget, bot.EdgeCostFn(), path))
+                {
+                    return TaskStep::Failed("no way to where the meat is for");
+                }
+                std::size_t at = path.size();
+                for (std::size_t i = 0; i < path.size() && at == path.size(); i++)
+                {
+                    at = Domain::PackLevel(nav, world, nav.Edges()[path[i]].mTo) ? i : at;
+                }
+                if (at == path.size())
+                {
+                    bot.Log("no Paramites' level on the way: no meat thrown");
+                    return TaskStep::Done();
+                }
+                mSpot = nav.Edges()[path[at]].mFrom;
+                mOnto = nav.Edges()[path[at]].mTo;
+                const NavNode& onto = nav.Nodes()[mOnto];
+                // The way he goes on their level: to where the way leaves it
+                s32 leave = onto.mX;
+                for (std::size_t i = at + 1; i < path.size(); i++)
+                {
+                    const NavNode& to = nav.Nodes()[nav.Edges()[path[i]].mTo];
+                    if (std::abs(to.mY - onto.mY) > 30)
+                    {
+                        break;
+                    }
+                    leave = to.mX;
+                }
+                if (leave == onto.mX)
+                {
+                    leave = nav.Nodes()[mTarget].mX;
+                }
+                mDir = leave < onto.mX ? -1 : 1;
+                // The throw that puts it down on their level, the furthest from the way
+                const NavNode& spot = nav.Nodes()[mSpot];
+                const s32 cell = NavGraph::GridStep(spot.mHalf);
+                s32 best = 0;
+                for (ThrowSpot::Kind kind : {ThrowSpot::eUp, ThrowSpot::eLob, ThrowSpot::eForward})
+                {
+                    const ThrowArc::Flight flight = ThrowArc::Throw(nav.Input(), spot.mX, spot.mY, spot.mHalf, mDir > 0, kind);
+                    for (std::size_t i = 1; i < flight.mPoints.size(); i++)
+                    {
+                        const ThrowArc::Point& p = flight.mPoints[i];
+                        if (p.mY <= flight.mPoints[i - 1].mY)
+                        {
+                            continue;
+                        }
+                        const s32 land = nav.NodeAt(p.mX, p.mY, spot.mHalf, 14);
+                        if (land < 0)
+                        {
+                            continue;
+                        }
+                        const NavNode& on = nav.Nodes()[land];
+                        const s32 off = (on.mX - onto.mX) * -mDir;
+                        bot.Log("meat from " + std::to_string(spot.mX) + "," + std::to_string(spot.mY) + " kind " + std::to_string(static_cast<s32>(kind)) + " comes down at " + std::to_string(on.mX) + "," + std::to_string(on.mY));
+                        if (std::abs(on.mY - onto.mY) * (spot.mHalf ? 2 : 1) <= 20 && nav.CameraOf(on.mX, on.mY - 5) == nav.CameraOf(onto.mX, onto.mY - 5) && off >= 2 * cell && off > best)
+                        {
+                            best = off;
+                            mKind = kind;
+                        }
+                        break;
+                    }
+                }
+                if (best == 0)
+                {
+                    return TaskStep::Failed("no throw puts the meat on the Paramites' level away from the way");
+                }
+                mLeft = mDir > 0;
+                bot.Log("Paramites team up on the level at " + std::to_string(onto.mX) + "," + std::to_string(onto.mY) + ": meat for them from " + std::to_string(spot.mX) + "," + std::to_string(spot.mY) + ", " + std::to_string(best) + " off the way");
+                mGo = GoToNode(mSpot);
+            }
+            TaskStep step;
+            if (!RunGo(mGo, bot, lastFailed, step))
+            {
+                return step;
+            }
+            if (step.mKind == TaskStep::Kind::eFailed)
+            {
+                return step;
+            }
+            mPhase = 1;
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        case 1:
+            if (world.mRocks <= 0)
+            {
+                return TaskStep::Failed("no meat");
+            }
+            if (!abe.Settled())
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            if (abe.mFacingLeft != mLeft)
+            {
+                return TaskStep::Do(Prim::Face(mLeft));
+            }
+            mPhase = 2;
+            return TaskStep::Do(Prim::Wait(8, Btn::eThrow));
+        case 2:
+            mPhase = 3;
+            mFrames = 0;
+            return TaskStep::Do(Prim::Wait(6, Btn::eThrow | BlowMineTask::AimBits(mKind, abe.mFacingLeft)));
+        default:
+        {
+            // Until every one of them on that level is past where he comes onto it, on the meat's side
+            const NavNode& onto = nav.Nodes()[mOnto];
+            const s32 cell = NavGraph::GridStep(onto.mHalf);
+            s32 seen = 0;
+            bool off = true;
+            for (const ParamiteAt& p : world.mParamites)
+            {
+                if (p.mPossessed || p.Hidden() || p.mHalf != onto.mHalf || std::abs(p.mY - onto.mY) * (onto.mHalf ? 2 : 1) > 40 || nav.CameraOf(p.mX, p.mY - 5) != nav.CameraOf(onto.mX, onto.mY - 5))
+                {
+                    continue;
+                }
+                seen++;
+                off = off && (p.mX - onto.mX) * -mDir > cell;
+            }
+            if (seen > 0 && off)
+            {
+                bot.Log("the Paramites are off after the meat: on");
+                return TaskStep::Done();
+            }
+            if (mFrames > 300)
+            {
+                return TaskStep::Failed("the Paramites did not go for the meat");
+            }
+            return TaskStep::Do(Prim::Wait(1));
+        }
+    }
+}
+
+TaskStep FleechPenTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const Entity* lever = world.Find(mLever);
+    if (!lever)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    if (++mFrames > 3000)
+    {
+        return TaskStep::Failed("shutting the Fleeches in took too long");
+    }
+    if (mGate < 0 && !Domain::FleechPen(nav, world, *lever, &mGate, &mOpen, &mShut, &mGroup))
+    {
+        return TaskStep::Failed("no gate to shut the Fleeches in behind");
+    }
+    const NavFeature& gate = nav.Input().mFeatures[mGate];
+    const s32 gx = (gate.mX1 + gate.mX2) / 2;
+    const NavNode& open = nav.Nodes()[mOpen];
+    const NavNode& shut = nav.Nodes()[mShut];
+    const s32 cell = NavGraph::GridStep(gate.mHalf);
+    const bool beyondRight = open.mX > gx;
+    switch (mPhase)
+    {
+        case 0:
+        {
+            if (!mUse)
+            {
+                // (from the side he is off to: they come down where they hang, and that is by the lever)
+                mUse = std::make_unique<UseTask>(mLever, 1);
+                mUse->FixSide(beyondRight ? 1 : -1);
+            }
+            // (pulled, and on his feet again: off, without what else the pull might be waited out for)
+            const bool pulled = world.Switch(lever->mSwitch, true) != 0 && bot.Abe().Settled();
+            const TaskStep step = pulled ? TaskStep::Done() : mUse->Next(bot, lastFailed);
+            if (step.mKind != TaskStep::Kind::eDone)
+            {
+                return step;
+            }
+            mUse.reset();
+            mPhase = 1;
+            mGo = GoToNode(mOpen);
+            bot.Log("the lever is pulled and its Fleeches are awake: to the switch at " + std::to_string(open.mX) + "," + std::to_string(open.mY) + " that opens the gate at " + std::to_string(gx));
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        case 1:
+        {
+            TaskStep step;
+            if (!RunGo(mGo, bot, lastFailed, step))
+            {
+                return step;
+            }
+            if (step.mKind == TaskStep::Kind::eFailed)
+            {
+                return step;
+            }
+            mPhase = 2;
+            mWaits = 0;
+            // (a cell off it toward the gate, so that they come down beyond him)
+            const s32 near = nav.NodeAt(open.mX + (beyondRight ? -cell : cell), open.mY, open.mHalf, 12);
+            if (near >= 0 && std::abs(nav.Nodes()[near].mX - gx) > cell / 2)
+            {
+                mGo = GoToNode(near);
+            }
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        case 2:
+        {
+            TaskStep step;
+            if (!RunGo(mGo, bot, lastFailed, step))
+            {
+                return step;
+            }
+            s32 seen = 0;
+            bool all = true;
+            for (const RockAt& f : world.mFleechesAwake)
+            {
+                if (f.mHalf != gate.mHalf || std::abs(f.mX - gx) > 600 || std::abs(f.mY - gate.mY2) > 300)
+                {
+                    continue;
+                }
+                seen++;
+                all = all && (beyondRight ? f.mX > gx : f.mX < gx);
+            }
+            if (seen == 0 ? ++mWaits < 120 : (!all && ++mWaits < 400))
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            bot.Log(std::to_string(seen) + " Fleeches about, " + (all ? "all" : "not all") + " beyond the gate at " + std::to_string(gx) + ": back through it over the switch at " + std::to_string(shut.mX));
+            mPhase = 3;
+            // (two cells past the switch that shuts it)
+            const s32 past = nav.NodeAt(shut.mX + (beyondRight ? -2 * cell : 2 * cell), shut.mY, shut.mHalf, 12);
+            mGo = GoToNode(past >= 0 ? past : mShut);
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        default:
+        {
+            TaskStep step;
+            if (!RunGo(mGo, bot, lastFailed, step))
+            {
+                return step;
+            }
+            if (step.mKind == TaskStep::Kind::eFailed)
+            {
+                return step;
+            }
+            bool in = world.Switch(gate.mSwitch, true) == 0;
+            for (const RockAt& f : world.mFleechesAwake)
+            {
+                if (f.mHalf == gate.mHalf && std::abs(f.mX - gx) <= 600 && std::abs(f.mY - gate.mY2) <= 300)
+                {
+                    in = in && (beyondRight ? f.mX > gx : f.mX < gx);
+                }
+            }
+            bot.Log(in ? "the gate is shut on the Fleeches" : "the Fleeches are not all behind the gate");
+            for (u32 id : mGroup)
+            {
+                if (in)
+                {
+                    bot.FleechKilled(id);
+                }
+            }
+            return TaskStep::Done();
+        }
+    }
+}
 
 TaskStep ScrabLureTask::Next(Bot& bot, const std::string& lastFailed)
 {
