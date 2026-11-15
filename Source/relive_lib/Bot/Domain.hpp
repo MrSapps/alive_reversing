@@ -89,6 +89,8 @@ enum class StepKind : u8
     eFartBomb,  // drink at Brew machine mOther, fart, take the fart over and fly it to mine or Slig mEntity. With
                 // no machine (mOther 0): from the cell mEdge with the Brew he has in him, at flying Slig mEntity
     eDrink,     // drink at Brew machine mEntity
+    eSligLock,  // call Slig mOther with lever mEdge (an entity id), take it over, walk it to Slig lock mEntity
+                // and say the lock's code with it
 };
 
 // What a planned action means to the bot
@@ -319,6 +321,26 @@ struct Domain final
     // The switches that have to be on before a lever is pulled, where the order matters (Fleeches: see the .cpp)
     static std::vector<s32> PulledFirst(const NavGraph& nav, const World& world, const Entity& lever);
     static s32 UseNode(const NavGraph& nav, const Entity& entity, bool* faceLeft, s32 firstSide = -1);
+    // Whether the cell at (x, y) is on a floor a Slig that is awake watches, with no shadow on that floor on its
+    // screen to go by: there he is shot wherever he stands, so it is a place to be only unseen. (A Slig sees who
+    // is on its floor and its screen.) Only in a path where the power to go unseen is to be had: elsewhere such a
+    // floor is crossed behind the Sligs' backs, as it always was.
+    // watchers: the Sligs (entities) that watch it are added. anon: set when one of them is not one of the map's.
+    static bool SligWatched(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, std::vector<u32>* watchers = nullptr, bool* anon = nullptr);
+    // The way a Slig that Abe has taken over gets from a cell to one of the cells goal says yes to, as edges: it
+    // walks (not under a low ceiling), walks off the end of a floor, rides a lift and takes a teleporter, whose
+    // lever it pulls itself. It can't jump, climb, crouch, or take a well or a door. Empty with no way, or when
+    // it is there.
+    // gates: what has to be open on the way (planning: every gate counts as one that can be opened).
+    // world: with it and no gates, only what is open now is gone through.
+    static std::vector<s32> SligWay(const NavGraph& nav, s32 from, const std::function<bool(s32)>& goal, std::vector<Goap::Fact>* gates, const World* world);
+    // The cell a Slig (or one a spawner makes) is on where the map puts it: the floor under it. -1 if none.
+    static s32 SligNode(const NavGraph& nav, const Entity& slig);
+    // The cells a Slig can say a Slig lock's code from
+    static bool AtSligLock(const NavGraph& nav, const Entity& lock, s32 node);
+    // The Sligs (entities) a Slig on the cells of a way walks into: those on the same stretches of floor, with
+    // no gate or wall between
+    static std::vector<u32> SligsMet(const NavGraph& nav, const World& world, s32 from, const std::vector<s32>& way, u32 self);
     // The box a flying Slig's track is in: the track lines joined end to end that go by (fx, fy), where the map puts it.
     // ends: the two ends of that track. False with no track there.
     static bool FlierTrack(const NavInput& in, s32 fx, s32 fy, s32& x1, s32& y1, s32& x2, s32& y2, std::vector<std::pair<s32, s32>>* ends = nullptr, std::vector<NavLine>* lines = nullptr);

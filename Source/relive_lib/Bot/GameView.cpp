@@ -25,6 +25,8 @@
 #include "../../AliveLibAE/Fleech.hpp"
 #include "../../AliveLibAE/Paramite.hpp"
 #include "../../AliveLibAE/SlapLock.hpp"
+#include "../../AliveLibAE/SecurityDoor.hpp"
+#include "../../AliveLibAE/GameSpeak.hpp"
 #include "../../AliveLibAE/DDCheat.hpp"
 #include "../../AliveLibAO/Mudokon.hpp"
 #include "../../AliveLibAO/DDCheat.hpp"
@@ -542,6 +544,9 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                     f.mHalf = t.mScale == relive::reliveScale::eHalf;
                     f.mSwitch = t.mSwitchId;
                     f.mStartClosed = t.mStartState == relive::Path_ElectricWall::eOn;
+                    // (it is drawn up from where it is put, which can be under the floor it shuts: Feeco's path
+                    // 3 has one at 2059 in the crawl gap of the floor at 2020)
+                    f.mY1 -= 40;
                     in.mFeatures.push_back(f);
                     break;
                 }
@@ -697,6 +702,7 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
 static void BuildEntities(BinaryPath& path, World& world)
 {
     world.mEntities.clear();
+    world.mLockCodes.clear();
     world.mTlvs.clear();
     world.mPath = &path;
     world.mInvisEver = false;
@@ -1021,6 +1027,40 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mState = t.mStartState == relive::Path_Slig::StartState::Sleeping ? 1 : 0;
                     e.mOp = t.mFacing == relive::reliveXDirection::eLeft ? 1 : 0;
                     e.mSwitch = t.mSligSpawnerSwitchId;
+                    break;
+                }
+                case ReliveTypes::eSecurityDoor:
+                {
+                    const auto& t = static_cast<const relive::Path_SecurityDoor&>(tlv);
+                    e.mKind = EntityKind::eSligLock;
+                    keep = GetGameType() == GameType::eAe;
+                    e.mHalf = t.mScale == relive::reliveScale::eHalf;
+                    e.mSwitch = t.mSwitchId;
+                    // Its code, as the game reads it (GameSpeak.cpp), in the buttons a Slig says each part with
+                    // (Slig::GetNextMotionIncGameSpeak)
+                    const u32 code = static_cast<u32>(Code_Convert(static_cast<u16>(t.mCode1), static_cast<u16>(t.mCode2)));
+                    const s16 length = Code_Length(code);
+                    std::vector<s32> buttons;
+                    for (s16 k = 0; keep && k < length; k++)
+                    {
+                        switch (Code_LookUp(code, static_cast<u16>(k), static_cast<u16>(length)))
+                        {
+                            case GameSpeakEvents::eSlig_Hi: buttons.push_back(1); break;
+                            case GameSpeakEvents::eSlig_HereBoy: buttons.push_back(2); break;
+                            case GameSpeakEvents::eSlig_Freeze: buttons.push_back(3); break;
+                            case GameSpeakEvents::eSlig_GetEm: buttons.push_back(4); break;
+                            case GameSpeakEvents::eSlig_BS2: buttons.push_back(5); break;
+                            case GameSpeakEvents::eSlig_BS: buttons.push_back(6); break;
+                            case GameSpeakEvents::eSlig_LookOut: buttons.push_back(7); break;
+                            case GameSpeakEvents::eSlig_Laugh: buttons.push_back(8); break;
+                            // (something a Slig can't say: not one to open)
+                            default: keep = false; break;
+                        }
+                    }
+                    if (keep)
+                    {
+                        world.mLockCodes[e.mId] = buttons;
+                    }
                     break;
                 }
                 case ReliveTypes::eSecurityOrb:
@@ -1437,6 +1477,50 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             uxb.mGreen = pUxb->IsGreen();
             uxb.mOff = pUxb->IsOff();
             world.mUxbs.push_back(uxb);
+        }
+    }
+
+    // Slig locks: what each that is about is doing
+    for (Entity& e : world.mEntities)
+    {
+        if (e.mKind == EntityKind::eSligLock)
+        {
+            e.mState = 0;
+        }
+    }
+    for (s32 i = 0; isAe && i < gBaseGameObjects->Size(); i++)
+    {
+        BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
+        const ::SecurityDoor* pLock = pObj && !pObj->GetDead() ? dynamic_cast<const ::SecurityDoor*>(pObj) : nullptr;
+        if (!pLock)
+        {
+            continue;
+        }
+        const s32 x = FP_GetExponent(pLock->mXPos);
+        const s32 y = FP_GetExponent(pLock->mYPos);
+        for (Entity& e : world.mEntities)
+        {
+            if (e.mKind != EntityKind::eSligLock || x < e.mX1 || x > e.mX2 || y < e.mY1 || y > e.mY2)
+            {
+                continue;
+            }
+            e.mLive = true;
+            switch (pLock->State())
+            {
+                case SecurityDoorStates::eInactive_0: e.mState = 0; break;
+                case SecurityDoorStates::eSayingHi_2:
+                case SecurityDoorStates::eListeningForHi_3: e.mState = 1; break;
+                case SecurityDoorStates::eWaitingToSayPassword_4:
+                case SecurityDoorStates::ePreparingToSayPassword_5:
+                case SecurityDoorStates::eSayingPassword_6:
+                case SecurityDoorStates::ePausing_7: e.mState = 2; break;
+                case SecurityDoorStates::eListeningForPassword_9:
+                case SecurityDoorStates::eCheckingIfPasswordMatches_10: e.mState = 3; break;
+                case SecurityDoorStates::eSuccess_11:
+                case SecurityDoorStates::eSuccessChime_1: e.mState = 4; break;
+                case SecurityDoorStates::eFailure_12:
+                case SecurityDoorStates::eLaughAtFailure_13: e.mState = 5; break;
+            }
         }
     }
 

@@ -57,6 +57,11 @@ public:
     {
         return &mListener;
     }
+    // What it is doing now (read only: for the bot, which can't hear it)
+    SecurityDoorStates State() const
+    {
+        return mState;
+    }
 
 private:
     s16 IsPlayerNear();

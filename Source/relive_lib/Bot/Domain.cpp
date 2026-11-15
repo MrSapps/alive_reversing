@@ -26,6 +26,7 @@ const char* EntityKindName(EntityKind kind)
         case EntityKind::eScrab: return "Scrab";
         case EntityKind::eLaughingGas: return "LaughingGas";
         case EntityKind::eTeleporter: return "Teleporter";
+        case EntityKind::eSligLock: return "SligLock";
         case EntityKind::eMine: return "Mine";
         case EntityKind::eRockSack: return "RockSack";
         case EntityKind::eBrew: return "Brew";
@@ -588,6 +589,233 @@ std::vector<ThrowSpot> Domain::ThrowSpots(const NavGraph& nav, s32 x, s32 y, boo
     std::stable_sort(spots.begin(), spots.end(), [](const ThrowSpot& a, const ThrowSpot& b)
                      { return a.mOrder < b.mOrder; });
     return spots;
+}
+
+bool Domain::SligWatched(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, std::vector<u32>* watchers, bool* anon)
+{
+    bool power = world.mInvisCharge || world.mInvisible || world.mInvisComing;
+    for (const Entity& e : world.mEntities)
+    {
+        power = power || (e.mKind == EntityKind::eSlapLock && e.mInputs[0] > 0);
+    }
+    const s32 node = power ? nav.NodeAt(x, y, half, 12) : -1;
+    if (node < 0 || nav.Nodes()[node].mHidden)
+    {
+        return false;
+    }
+    const std::vector<NavNode>& nodes = nav.Nodes();
+    const s32 cam = nav.CameraOf(x, y - 5);
+    const s32 line = nodes[node].mLine;
+    for (const NavNode& n : nodes)
+    {
+        if (n.mHidden && n.mLine == line && n.mHalf == half && nav.CameraOf(n.mX, n.mY - 5) == cam)
+        {
+            return false;
+        }
+    }
+    bool any = false;
+    for (const Entity& e : world.mEntities)
+    {
+        // (one that starts asleep is another matter. One a spawner makes counts when it is seen there, below:
+        // its switch says little, the Mudanchee trial's last room has one on with no Slig on the floor)
+        if (e.mKind != EntityKind::eSlig || e.mGone || e.mHalf != half || e.mState == 1 || e.mSwitch > 0 || world.mFleechKilled.count(e.mId) != 0)
+        {
+            continue;
+        }
+        const s32 at = SligNode(nav, e);
+        if (at >= 0 && nodes[at].mLine == line && nav.CameraOf(nodes[at].mX, nodes[at].mY - 5) == cam)
+        {
+            any = true;
+            if (watchers && std::find(watchers->begin(), watchers->end(), e.mId) == watchers->end())
+            {
+                watchers->push_back(e.mId);
+            }
+        }
+    }
+    for (const SligAt& s : world.mSligs)
+    {
+        if (s.mPossessed || s.mAsleep || s.mHalf != half || nav.CameraOf(s.mX, s.mY - 5) != cam)
+        {
+            continue;
+        }
+        const s32 at = nav.NodeAt(s.mX, s.mY, half, 12);
+        if (at >= 0 && nodes[at].mLine == line && !any)
+        {
+            // (one that has walked here from another screen, or one a spawner made)
+            any = true;
+            if (anon)
+            {
+                *anon = true;
+            }
+        }
+    }
+    return any;
+}
+
+std::vector<s32> Domain::SligWay(const NavGraph& nav, s32 from, const std::function<bool(s32)>& goal, std::vector<Goap::Fact>* gates, const World* world)
+{
+    const std::vector<NavNode>& nodes = nav.Nodes();
+    const std::vector<NavEdge>& edges = nav.Edges();
+    if (from < 0 || from >= static_cast<s32>(nodes.size()) || goal(from))
+    {
+        return {};
+    }
+    static const s32 kShut = 100000;
+    std::vector<s32> cost(nodes.size(), -1);
+    std::vector<s32> via(nodes.size(), -1);
+    std::set<std::pair<s32, s32>> open;
+    cost[from] = 0;
+    open.insert({0, from});
+    s32 found = -1;
+    while (!open.empty())
+    {
+        const s32 at = open.begin()->second;
+        const s32 c = open.begin()->first;
+        open.erase(open.begin());
+        if (goal(at))
+        {
+            found = at;
+            break;
+        }
+        for (s32 k = 0; k < nodes[at].mEdgeCount; k++)
+        {
+            const s32 idx = nodes[at].mFirstEdge + k;
+            const NavEdge& e = edges[idx];
+            const bool takes = e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eLift || e.mKind == EdgeKind::eTeleport;
+            if (!takes || nodes[e.mTo].mLow || nodes[e.mTo].mHazard || e.mCrouched)
+            {
+                continue;
+            }
+            s32 extra = 0;
+            s32 switchId = 0;
+            s32 openValue = 0;
+            // (a teleporter goes when its lever is pulled: no gate)
+            if (e.mKind != EdgeKind::eTeleport && nav.Condition(e, &switchId, &openValue))
+            {
+                if (world && !gates)
+                {
+                    if (world->Switch(switchId) != openValue)
+                    {
+                        continue;
+                    }
+                }
+                else
+                {
+                    extra = kShut;
+                }
+            }
+            const s32 next = c + std::max(1, e.mCost) + extra;
+            if (cost[e.mTo] < 0 || next < cost[e.mTo])
+            {
+                if (cost[e.mTo] >= 0)
+                {
+                    open.erase({cost[e.mTo], e.mTo});
+                }
+                cost[e.mTo] = next;
+                via[e.mTo] = idx;
+                open.insert({next, e.mTo});
+            }
+        }
+    }
+    std::vector<s32> way;
+    for (s32 at = found; at >= 0 && via[at] >= 0; at = edges[via[at]].mFrom)
+    {
+        way.push_back(via[at]);
+    }
+    std::reverse(way.begin(), way.end());
+    for (s32 idx : way)
+    {
+        s32 switchId = 0;
+        s32 openValue = 0;
+        if (gates && edges[idx].mKind != EdgeKind::eTeleport && nav.Condition(edges[idx], &switchId, &openValue))
+        {
+            const Goap::Fact need{Key::Switch(switchId), openValue};
+            if (std::find(gates->begin(), gates->end(), need) == gates->end())
+            {
+                gates->push_back(need);
+            }
+        }
+    }
+    return way;
+}
+
+s32 Domain::SligNode(const NavGraph& nav, const Entity& slig)
+{
+    s32 best = -1;
+    const std::vector<NavNode>& nodes = nav.Nodes();
+    const s32 scale = slig.mHalf ? 2 : 1;
+    for (std::size_t n = 0; n < nodes.size(); n++)
+    {
+        const NavNode& at = nodes[n];
+        // (one a spawner makes comes down from where the spawner is to the floor under it; one the map puts
+        // somewhere stands there, and with no floor there it is on none: the Slig in the box over the Mudanchee
+        // trial's last room is not on the floor 60 under it)
+        const s32 drop = slig.mSwitch > 0 ? 180 : 20;
+        if (at.mHalf != slig.mHalf || std::abs(at.mX - slig.CentreX()) > NavGraph::GridStep(slig.mHalf) / 2 || at.mY < slig.mY2 - 8 || (at.mY - slig.mY2) * scale > drop)
+        {
+            continue;
+        }
+        if (best < 0 || at.mY < nodes[best].mY)
+        {
+            best = static_cast<s32>(n);
+        }
+    }
+    return best;
+}
+
+bool Domain::AtSligLock(const NavGraph& nav, const Entity& lock, s32 node)
+{
+    // (SecurityDoor::IsPlayerNear: whoever is controlled, inside its box)
+    const NavNode& at = nav.Nodes()[node];
+    return at.mHalf == lock.mHalf && at.mX >= lock.mX1 + 4 && at.mX <= lock.mX2 - 4 && at.mY >= lock.mY1 && at.mY <= lock.mY2;
+}
+
+std::vector<u32> Domain::SligsMet(const NavGraph& nav, const World& world, s32 from, const std::vector<s32>& way, u32 self)
+{
+    const std::vector<NavNode>& nodes = nav.Nodes();
+    const std::vector<NavEdge>& edges = nav.Edges();
+    std::vector<char> on(nodes.size(), 0);
+    std::vector<s32> todo;
+    const auto take = [&](s32 n)
+    {
+        if (!on[n])
+        {
+            on[n] = 1;
+            todo.push_back(n);
+        }
+    };
+    take(from);
+    for (s32 idx : way)
+    {
+        take(edges[idx].mTo);
+    }
+    while (!todo.empty())
+    {
+        const s32 at = todo.back();
+        todo.pop_back();
+        for (s32 k = 0; k < nodes[at].mEdgeCount; k++)
+        {
+            const NavEdge& e = edges[nodes[at].mFirstEdge + k];
+            if (e.mKind == EdgeKind::eWalk && !nav.Condition(e, nullptr, nullptr))
+            {
+                take(e.mTo);
+            }
+        }
+    }
+    std::vector<u32> met;
+    for (const Entity& e : world.mEntities)
+    {
+        if (e.mKind != EntityKind::eSlig || e.mGone || e.mId == self || e.mSwitch > 0)
+        {
+            continue;
+        }
+        const s32 node = SligNode(nav, e);
+        if (node >= 0 && on[node])
+        {
+            met.push_back(e.mId);
+        }
+    }
+    return met;
 }
 
 bool Domain::ScrabReaches(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, bool charged, std::vector<Goap::Fact>* keep, std::vector<Goap::Fact>* shut, bool* canShut)
@@ -2047,6 +2275,30 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         {
             std::swap(pre, other);
         }
+        // From or onto a floor Sligs watch with no shadow to go by (SligWatched): unseen, or with those Sligs dead
+        bool sligFloor = false;
+        {
+            const NavNode& from = nav.Nodes()[e.mFrom];
+            const NavNode& to = nav.Nodes()[e.mTo];
+            std::vector<u32> watchers;
+            bool anon = false;
+            const bool wf = SligWatched(nav, world, from.mX, from.mY, from.mHalf, &watchers, &anon);
+            const bool wt = SligWatched(nav, world, to.mX, to.mY, to.mHalf, &watchers, &anon);
+            if ((wf || wt) && unseen(pre) == 0 && !both)
+            {
+                sligFloor = true;
+                if (!anon && !watchers.empty())
+                {
+                    std::vector<Goap::Fact> dead = pre;
+                    for (u32 id : watchers)
+                    {
+                        dead.push_back({Key::Mud(id), 2});
+                    }
+                    add("Cross " + std::string(EdgeKindName(e.mKind)) + " " + std::to_string(from.mX) + "," + std::to_string(from.mY) + "->" + std::to_string(to.mX) + "," + std::to_string(to.mY), dead, {regionFact(e.mTo)}, 100 + e.mCost, step);
+                }
+                pre.push_back({Key::kInvisNow, 1});
+            }
+        }
         if (both)
         {
             add("Cross " + std::string(EdgeKindName(e.mKind)) + " " + std::to_string(nav.Nodes()[e.mFrom].mX) + "," + std::to_string(nav.Nodes()[e.mFrom].mY) + "->" + std::to_string(nav.Nodes()[e.mTo].mX) + "," + std::to_string(nav.Nodes()[e.mTo].mY),
@@ -2057,7 +2309,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         // Or seen, onto the Scrab's floor and straight off it: to a cell of that floor a few along which the
         // Scrab can't get to (behind a wall, or under a block too low for it), timed against the Scrab
         // (`ScrabWaryTask`). The Mudanchee trial: "once you land, run and roll to the left".
-        if (unseen(pre) != 0 && !both)
+        if (unseen(pre) != 0 && !both && !sligFloor)
         {
             const NavNode& landing = nav.Nodes()[e.mTo];
             const s32 cell = NavGraph::GridStep(landing.mHalf);
@@ -3774,6 +4026,73 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         drop.mEntity = slig.mId;
         drop.mEdge = stand;
         add("Leave a fart under Slig#" + std::to_string(slig.mId) + " from " + std::to_string(nav.Nodes()[stand].mX) + "," + std::to_string(nav.Nodes()[stand].mY), {regionFact(stand), {Key::kBrew, 1}}, {dead, {Key::kBrew, 0}}, 450, drop);
+    }
+
+    // A Slig lock: a Slig that Abe has taken over says its code back to it. The Slig is one a spawner makes when
+    // its lever is pulled, taken over from by the lever (on its screen, with no orb there), and walked to the
+    // lock (SligWay): what is shut on its way has to be open first, and the Sligs it walks into it shoots.
+    // (Feeco's path 3: "pull the lever to summon a Slig, then possess him. Walk him right. Say Hi to the Slig
+    // Lock, then repeat after it".)
+    for (const Entity& lock : world.mEntities)
+    {
+        if (lock.mKind != EntityKind::eSligLock || lock.mSwitch <= 1 || world.Switch(lock.mSwitch) != 0 || world.mLockCodes.count(lock.mId) == 0)
+        {
+            continue;
+        }
+        for (const Entity& slig : world.mEntities)
+        {
+            if (slig.mKind != EntityKind::eSlig || slig.mGone || slig.mSwitch <= 1 || slig.mHalf != lock.mHalf)
+            {
+                continue;
+            }
+            const s32 start = SligNode(nav, slig);
+            if (start < 0)
+            {
+                continue;
+            }
+            for (const Entity& lever : world.mEntities)
+            {
+                if (lever.mKind != EntityKind::eLever || lever.mSwitch != slig.mSwitch)
+                {
+                    continue;
+                }
+                const s32 stand = UseNode(nav, lever, nullptr);
+                if (stand < 0)
+                {
+                    continue;
+                }
+                const s32 cam = nav.CameraOf(nav.Nodes()[stand].mX, nav.Nodes()[stand].mY - 5);
+                bool orb = false;
+                for (const Entity& e : world.mEntities)
+                {
+                    orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.mX1, e.mY1) == cam);
+                }
+                if (orb || nav.CameraOf(nav.Nodes()[start].mX, nav.Nodes()[start].mY - 5) != cam)
+                {
+                    continue;
+                }
+                std::vector<Goap::Fact> pre{regionFact(stand)};
+                const std::vector<s32> way = SligWay(nav, start, [&](s32 n)
+                                                     { return AtSligLock(nav, lock, n); }, &pre, nullptr);
+                if (way.empty() && !AtSligLock(nav, lock, start))
+                {
+                    continue;
+                }
+                // (what it opens itself is no gate on its way)
+                pre.erase(std::remove(pre.begin(), pre.end(), Goap::Fact{Key::Switch(lock.mSwitch), 1}), pre.end());
+                std::vector<Goap::Fact> gives{{Key::Switch(lock.mSwitch), 1}};
+                for (u32 met : SligsMet(nav, world, start, way, slig.mId))
+                {
+                    gives.push_back({Key::Mud(met), 2});
+                }
+                DomainStep step;
+                step.mKind = StepKind::eSligLock;
+                step.mEntity = lock.mId;
+                step.mOther = slig.mId;
+                step.mEdge = static_cast<s32>(lever.mId);
+                add("Open SligLock#" + std::to_string(lock.mId) + " sw" + std::to_string(lock.mSwitch) + " with Slig#" + std::to_string(slig.mId) + " called by Lever#" + std::to_string(lever.mId), pre, gives, 600 + 20 * static_cast<s32>(way.size()), step);
+            }
+        }
     }
 
     // A Brew machine: the fart he has after a Brew can be flown through the air to a mine or a Slig and set off

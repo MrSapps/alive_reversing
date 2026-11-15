@@ -54,6 +54,10 @@ enum class EntityKind : u8
     eBrew,
     // A flying Slig where the map puts it (FlierAt is one that is about)
     eFlier,
+    // A lock that opens for a Slig that says its code back to it (AE's security door). mSwitch is what it sets.
+    // World::mLockCodes has the code. mState, while it is about: 0 idle, 1 waits for "Hi", 2 says its code,
+    // 3 waits for the code, 4 open, 5 said no
+    eSligLock,
 };
 
 const char* EntityKindName(EntityKind kind);
@@ -635,6 +639,8 @@ struct World final
     std::vector<RockAt> mPortalsOpen;
     std::vector<LiftAt> mLifts;
     // Where each lift was when it was last about
+    // What a Slig has to say to each Slig lock, in turn: the numbers of the speak buttons (1 to 8)
+    std::map<u32, std::vector<s32>> mLockCodes;
     std::vector<LiftAt> mLiftsSeen;
     // Whether a lift is at one of its stops (a floor at y that x is on). One that isn't about, its screen not
     // being loaded, is where it was last seen, or failing that where it starts.

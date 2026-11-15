@@ -96,6 +96,20 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         mDisarm.reset();
         return Next(bot, "");
     }
+    if (mLiftCall)
+    {
+        const TaskStep step = mLiftCall->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::ePrim)
+        {
+            return step;
+        }
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            bot.Log("couldn't call the lift: " + step.mWhy);
+        }
+        mLiftCall.reset();
+        return Next(bot, "");
+    }
 
     if (mStop)
     {
@@ -350,8 +364,62 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 }
                 break;
             }
+            // A lift that is at its other stop, with a lever by the way that sends it to this one (a lift mover):
+            // the lever is pulled. (Feeco's path 3, where a Slig has ridden it down: "using the lever to summon
+            // the lift back up".)
+            for (s32 idx : soon)
+            {
+                const NavEdge& e = nav.Edges()[idx];
+                if (all(e) >= 0 || !away(e) || mLiftCalls >= 2)
+                {
+                    continue;
+                }
+                const NavNode& stop = nav.Nodes()[e.mTo];
+                const s32 moverSwitch = nav.Input().mFeatures[stop.mLiftStop].mSwitch;
+                for (const Entity& lever : w.mEntities)
+                {
+                    if (moverSwitch <= 1 || lever.mKind != EntityKind::eLever || lever.mSwitch != moverSwitch || w.Switch(moverSwitch) != 0)
+                    {
+                        continue;
+                    }
+                    const s32 at = Domain::UseNode(nav, lever, nullptr);
+                    std::vector<s32> toLever;
+                    if (at >= 0 && (at == cur || nav.FindPath(cur, [at](s32 n)
+                                                              { return n == at; }, all, toLever)))
+                    {
+                        mLiftCalls++;
+                        mLiftComeWaits = 0;
+                        mLiftComeY = -100000;
+                        bot.Log("the lift is away from " + std::to_string(stop.mX) + "," + std::to_string(stop.mY) + ": calling it with Lever#" + std::to_string(lever.mId));
+                        mLiftCall = std::make_unique<UseTask>(lever.mId, 1);
+                        return Next(bot, "");
+                    }
+                }
+                break;
+            }
         }
-        return TaskStep::Failed("no route from " + std::to_string(nav.Nodes()[cur].mX) + "," + std::to_string(nav.Nodes()[cur].mY));
+        // (what stops it, for the log: the edges out of what can be got to that the cost function refuses)
+        std::string why;
+        {
+            std::vector<char> got(nav.Nodes().size(), 0);
+            std::vector<s32> none;
+            nav.FindPath(cur, [&got](s32 n)
+                         {
+                             got[n] = 1;
+                             return false;
+                         }, all, none);
+            s32 listed = 0;
+            for (const NavEdge& e : nav.Edges())
+            {
+                if (got[e.mFrom] && !got[e.mTo] && all(e) < 0 && listed < 6)
+                {
+                    listed++;
+                    why += std::string(listed == 1 ? " (refused: " : ", ") + EdgeKindName(e.mKind) + " " + std::to_string(nav.Nodes()[e.mFrom].mX) + "," + std::to_string(nav.Nodes()[e.mFrom].mY) + "->" + std::to_string(nav.Nodes()[e.mTo].mX) + "," + std::to_string(nav.Nodes()[e.mTo].mY);
+                }
+            }
+            why += listed ? ")" : "";
+        }
+        return TaskStep::Failed("no route from " + std::to_string(nav.Nodes()[cur].mX) + "," + std::to_string(nav.Nodes()[cur].mY) + why);
     }
     // With Mudokons in tow and a UXB to hop: they can't hop, so it is turned off first
     if (mLeading && !led && !atGoal && mDisarms < 4)
@@ -592,15 +660,35 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 near = bot.InvisChantNow() || (awake && bot.InvisChantSoon());
                 // (as late as can be: where the way goes onto a floor a Scrab can get at him on, only at the
                 // last cell before it)
+                // (the same before a floor Sligs watch that has no shadow; and no chant on a screen with a
+                // security orb, so it is the last cell before that floor whose screen has none. Feeco's path 3:
+                // "climb to the upper ledge, then chant to become invisible and start running left".)
+                const auto orbAt = [&nav, &w](const NavNode& at)
+                {
+                    for (const Entity& orb : w.mEntities)
+                    {
+                        if (orb.mKind == EntityKind::eSecurityOrb && !orb.mGone && nav.CameraOf(orb.mX1, orb.mY1) == nav.CameraOf(at.mX, at.mY - 5))
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+                // (a stretch walked in one go is not stopped in for this: with one such cell left, here)
+                s32 laterFree = 0;
                 for (std::size_t i = 0; near && i < path.size(); i++)
                 {
                     const NavNode& to = nav.Nodes()[nav.Edges()[path[i]].mTo];
-                    if (Domain::HuntedAt(nav, w, to.mX, to.mY, to.mHalf))
+                    // (for a crossing only: a thing used unseen by a Slig has its own timing, ClearSligTask)
+                    const bool watched = bot.InvisForCrossing() && Domain::SligWatched(nav, w, to.mX, to.mY, to.mHalf);
+                    if (watched || Domain::HuntedAt(nav, w, to.mX, to.mY, to.mHalf))
                     {
-                        near = i == 0;
+                        near = i == 0 || (watched && laterFree <= 1);
                         break;
                     }
+                    laterFree += orbAt(to) ? 0 : 1;
                 }
+                near = near && !(bot.InvisForCrossing() && orbAt(from));
             }
             // And whatever the plan says: about to step onto a floor a Scrab can get at him on, from one it cannot
             {
@@ -1319,6 +1407,22 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             }
             // A Scrab loose on his floor: there is only running
             bool chased = false;
+            bool unseenChase = false;
+            // (and unseen with a floor Sligs watch on the way: the power runs out, so it is run like a chase,
+            // with no stop for a roll, a drop or a climb. Feeco's path 3 gives 235 frames for a way that takes
+            // about that.)
+            // (when it is a crossing the power is for: a thing used unseen keeps the pace it was timed at)
+            for (std::size_t k = 0; bot.GetWorld().mInvisible && bot.InvisRun() && !chased && k < path.size(); k++)
+            {
+                const NavNode& ahead = nav.Nodes()[nav.Edges()[path[k]].mTo];
+                if (Domain::SligWatched(nav, bot.GetWorld(), ahead.mX, ahead.mY, ahead.mHalf))
+                {
+                    sneak = false;
+                    fleech = true;
+                    chased = true;
+                    unseenChase = true;
+                }
+            }
             for (const ScrabAt& scrab : bot.GetWorld().mScrabs)
             {
                 // (or one in the air over his floor, on its way down to it: the Mudanchee trial's first, let in by
@@ -1418,8 +1522,12 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 // Off the end of the floor at the end of the run, where the way goes on down: without stopping
                 // for it (the Mudomo vault's path 3: stopped at the end of the 860 floor to walk off it, the two
                 // Paramites behind him had him)
+                // (with nothing after him, only where the way goes on the same way below: run off, he comes down a
+                // cell or two further out, and back from there is time lost. The Mudanchee trial's last room,
+                // off 1762,360 for the teleporter behind him: 33 frames, and the power was gone at the lock.)
+                const bool onTheSameWay = last + 2 < path.size() && nav.Edges()[path[last + 2]].mLeft == first.mLeft && (nav.Edges()[path[last + 2]].mKind == EdgeKind::eWalk || nav.Edges()[path[last + 2]].mKind == EdgeKind::eRoll || nav.Edges()[path[last + 2]].mKind == EdgeKind::eRunJump);
                 if (last + 1 < path.size() && nav.Edges()[path[last + 1]].mKind == EdgeKind::eFall && nav.Edges()[path[last + 1]].mLeft == first.mLeft && !nav.Edges()[path[last + 1]].mCrouched &&
-                    !first.mCrouched && first.mKind == EdgeKind::eWalk)
+                    !first.mCrouched && first.mKind == EdgeKind::eWalk && (!unseenChase || onTheSameWay))
                 {
                     bot.Log("chased: off the end of the floor at a run");
                     Prim run = Prim::WalkOff(first.mLeft);
@@ -1518,7 +1626,11 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                         }
                     }
                 }
-                if (lowEnd > last && (to.mX - here.mX) * way >= 3 * cell && nav.Condition(nav.Edges()[path[lowEnd]], nullptr, nullptr) == false)
+                // (through a gate only if it is one that stands open now: Feeco's path 3, the gap its fence is in)
+                s32 gateSwitch = 0;
+                s32 gateOpen = 0;
+                const bool gated = nav.Condition(nav.Edges()[path[lowEnd]], &gateSwitch, &gateOpen);
+                if (lowEnd > last && (to.mX - here.mX) * way >= 3 * cell && (!gated || bot.GetWorld().Switch(gateSwitch) == gateOpen))
                 {
                     Prim under = Prim::RunRoll(to.mX - way * cell, nav.Nodes()[nav.Edges()[path[lowEnd]].mTo].mX);
                     // (and out of it at a run where the way goes on along the floor: no stop to stand up)
@@ -6280,6 +6392,435 @@ TaskStep DrinkTask::Next(Bot& bot, const std::string& lastFailed)
         return TaskStep::Failed("the machine gave no Brew");
     }
     return TaskStep::Do(Prim::Wait(3, Btn::eUp));
+}
+
+SligLockTask::~SligLockTask() = default;
+
+u32 SligLockTask::Say(s32 lockState, const std::vector<s32>& code, bool standing, bool& hi, s32& said)
+{
+    static const u32 kButtons[] = {Btn::eSpeak1, Btn::eSpeak2, Btn::eSpeak3, Btn::eSpeak4, Btn::eSpeak5, Btn::eSpeak6, Btn::eSpeak7, Btn::eSpeak8};
+    if (lockState == 1)
+    {
+        // It has said "Hi" and waits for one back (SecurityDoor.cpp: 150 frames)
+        said = 0;
+        if (!hi && standing)
+        {
+            hi = true;
+            return Btn::eSpeak1;
+        }
+        return 0;
+    }
+    hi = false;
+    if (lockState != 3)
+    {
+        // (idle, saying its code, open or saying no: nothing to say, and the next time round starts anew)
+        said = 0;
+        return 0;
+    }
+    // It has said its code and waits for it: one part after the other, each as soon as the Slig can speak again
+    if (standing && said < static_cast<s32>(code.size()) && code[said] >= 1 && code[said] <= 8)
+    {
+        return kButtons[code[said++] - 1];
+    }
+    return 0;
+}
+
+bool SligLockTask::DropClear(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, bool left)
+{
+    const s32 cam = nav.CameraOf(x, y - 5);
+    for (const SligAt& s : world.mSligs)
+    {
+        // (a Slig sees what is on its screen: one on the next screen is shot as it comes onto this one)
+        if (s.mPossessed || s.mAsleep || s.mHalf != half || std::abs(s.mY - y) > 45 || nav.CameraOf(s.mX, s.mY - 5) != cam)
+        {
+            continue;
+        }
+        // Each has to be ahead of where it lands (it lands facing the way it walked off), a couple of cells off
+        // at least, and walking away: one that stands is at the end of its beat and about to turn
+        const bool ahead = left ? s.mX < x - 60 : s.mX > x + 60;
+        if (!ahead || s.mFacingLeft != left || s.mMotion != kSligWalking)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+TaskStep SligLockTask::StepTo(const SligAt& me, s32 x)
+{
+    // Walking, it comes to a stop a cell or two after the key is let go: the last bit is single steps, each a
+    // tap from standing
+    const s32 grid = NavGraph::GridStep(me.mHalf);
+    const bool left = x < me.mX;
+    if (std::abs(x - me.mX) > 3 * grid)
+    {
+        return TaskStep::Do(Prim::Wait(2, left ? Btn::eLeft : Btn::eRight));
+    }
+    if (me.mMotion != 0 || mTapped)
+    {
+        mTapped = false;
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    mTapped = true;
+    return TaskStep::Do(Prim::Wait(1, left ? Btn::eLeft : Btn::eRight));
+}
+
+TaskStep SligLockTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const Entity* lock = world.Find(mLock);
+    const Entity* slig = world.Find(mSlig);
+    const Entity* lever = world.Find(mLever);
+    const auto code = world.mLockCodes.find(mLock);
+    if (!lock || !slig || !lever || code == world.mLockCodes.end())
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    const SligAt* me = nullptr;
+    for (const SligAt& s : world.mSligs)
+    {
+        if (s.mPossessed)
+        {
+            me = &s;
+        }
+    }
+    const bool open = world.Switch(lock->mSwitch) != 0;
+    if (!me)
+    {
+        if (mPhase >= 2)
+        {
+            // It was his and is gone: burst, or shot
+            if (!bot.Abe().Settled() && mWaits++ < 200)
+            {
+                return TaskStep::Do(Prim::Wait(2));
+            }
+            return open ? TaskStep::Done() : TaskStep::Failed("the Slig was lost before the lock opened");
+        }
+        if (open)
+        {
+            return TaskStep::Done();
+        }
+        if (mPull)
+        {
+            const TaskStep step = mPull->Next(bot, lastFailed);
+            if (step.mKind == TaskStep::Kind::ePrim || step.mKind == TaskStep::Kind::eFailed)
+            {
+                return step;
+            }
+            mPull.reset();
+            mPhase = 1;
+            return TaskStep::Do(Prim::Wait(2));
+        }
+        // (the chant takes one on his screen)
+        bool about = false;
+        for (const SligAt& s : world.mSligs)
+        {
+            about = about || (!s.mPossessed && s.mHalf == slig->mHalf && nav.CameraOf(s.mX, s.mY - 5) == nav.CameraOf(bot.Abe().mX, bot.Abe().mY - 5));
+        }
+        if (!about)
+        {
+            // (it isn't listed for a moment as it is taken: not given up on at once)
+            if (mPhase == 1 && mFrames > 0 && mGone++ < 45)
+            {
+                return TaskStep::Do(Prim::Wait(2));
+            }
+            // The lever makes a Slig while its switch is off (the spawner puts it back when its Slig dies)
+            if (!world.Switch(slig->mSwitch))
+            {
+                if (++mCalls > 6)
+                {
+                    return TaskStep::Failed("six Sligs called and none taken over");
+                }
+                bot.Log("calling a Slig with Lever#" + std::to_string(lever->mId));
+                mPull = std::make_unique<UseTask>(lever->mId, 1);
+                mFrames = 0;
+                mGone = 0;
+                mWaits = 0;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            mPhase = 1;
+            if (++mWaits > 150)
+            {
+                return TaskStep::Failed("no Slig came");
+            }
+            return TaskStep::Do(Prim::Wait(2));
+        }
+        mPhase = 1;
+        mGone = 0;
+        if (!bot.Abe().Settled() && mFrames == 0)
+        {
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        // (two frames at a time: the chant held on after the Slig is his is the chant that bursts it)
+        mFrames += 2;
+        if (mFrames > 900)
+        {
+            return TaskStep::Failed("the Slig wouldn't be taken over");
+        }
+        return TaskStep::Do(Prim::Wait(2, Btn::eChant));
+    }
+
+    if (mPhase < 2)
+    {
+        bot.Log("the Slig is his, at " + std::to_string(me->mX) + "," + std::to_string(me->mY));
+        mWaits = 0;
+    }
+    mPhase = 2;
+    const std::vector<NavNode>& nodes = nav.Nodes();
+    const std::vector<NavEdge>& edges = nav.Edges();
+    if (mRide != 0)
+    {
+        if (std::abs(me->mY - mRideY) > 3 && mRideFrames < 600)
+        {
+            mRideFrames += 2;
+            return TaskStep::Do(Prim::Wait(2, mRide));
+        }
+        mRide = 0;
+    }
+    if (mPullWait > 0)
+    {
+        mPullWait -= 2;
+        return TaskStep::Do(Prim::Wait(2));
+    }
+    const s32 node = nav.NodeAt(me->mX, me->mY, me->mHalf, 20);
+    if (node < 0)
+    {
+        // In the air, or between cells
+        return TaskStep::Do(Prim::Wait(2));
+    }
+    if (node != mLastNode)
+    {
+        mLastNode = node;
+        mStuck = 0;
+    }
+    else if (++mStuck > 1500)
+    {
+        return TaskStep::Failed("the Slig got no further than " + std::to_string(me->mX) + "," + std::to_string(me->mY));
+    }
+    const auto goalOf = [&nav](const Entity& which)
+    {
+        return [&nav, &which](s32 n)
+        {
+            return Domain::AtSligLock(nav, which, n);
+        };
+    };
+    if (open)
+    {
+        // Another lock it can get to from here with what is open now: left to the step that opens that one
+        for (const Entity& other : world.mEntities)
+        {
+            if (other.mKind == EntityKind::eSligLock && other.mId != mLock && other.mSwitch > 1 && world.Switch(other.mSwitch) == 0 && world.mLockCodes.count(other.mId) != 0 &&
+                !Domain::SligWay(nav, node, goalOf(other), nullptr, &world).empty())
+            {
+                bot.Log("the Slig is kept for SligLock#" + std::to_string(other.mId));
+                return TaskStep::Done();
+            }
+        }
+        mBurst += 20;
+        if (mBurst > 600)
+        {
+            return TaskStep::Failed("the Slig wouldn't burst");
+        }
+        return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+    }
+
+    // Other Sligs on its floor. A shot takes the nearest thing in its line anywhere on the screen (Bullet.cpp),
+    // and these shoot a Slig that is not their own as soon as they face it: so it does not go to them. It
+    // stands where it came onto their floor, faces the way they come from and shoots each as it comes onto the
+    // screen. (The walkthrough: "shoot the walking Sligs before they shoot you".)
+    {
+        const s32 cam = nav.CameraOf(me->mX, me->mY - 5);
+        const SligAt* target = nullptr;
+        for (const SligAt& s : world.mSligs)
+        {
+            if (s.mPossessed || s.mHalf != me->mHalf || std::abs(s.mY - me->mY) > 45 || nav.CameraOf(s.mX, s.mY - 5) != cam)
+            {
+                continue;
+            }
+            const s32 other = nav.NodeAt(s.mX, me->mY, me->mHalf, 45);
+            if (other >= 0 && nodes[other].mLine == nodes[node].mLine && (!target || std::abs(s.mX - me->mX) < std::abs(target->mX - me->mX)))
+            {
+                target = &s;
+            }
+        }
+        if (target)
+        {
+            const bool left = target->mX < me->mX;
+            if (me->mFacingLeft != left)
+            {
+                return TaskStep::Do(Prim::Wait(2, left ? Btn::eLeft : Btn::eRight));
+            }
+            mShots++;
+            return TaskStep::Do(Prim::Wait(2, Btn::eThrow));
+        }
+        const std::vector<u32> onFloor = Domain::SligsMet(nav, world, node, {}, mSlig);
+        if (!onFloor.empty() && mHold < kHoldFrames)
+        {
+            if (mHold == 0)
+            {
+                bot.Log("the Slig holds " + std::to_string(me->mX) + "," + std::to_string(me->mY) + " until the " + std::to_string(onFloor.size()) + " Sligs of this floor have come to it");
+            }
+            mHold += 2;
+            mStuck = 0;
+            // (facing where they are)
+            s32 sum = 0;
+            for (u32 id : onFloor)
+            {
+                const Entity* e = world.Find(id);
+                sum += e && e->CentreX() < me->mX ? -1 : 1;
+            }
+            // At the end of the floor away from them, so that they come from one side only (and it is out from
+            // under the flying Sligs of Feeco's path 3, whose grenades got it three cells further in: the
+            // walkthrough's "wait on the left side on the ground")
+            s32 end = node;
+            for (bool more = true; more;)
+            {
+                more = false;
+                for (s32 k = 0; k < nodes[end].mEdgeCount; k++)
+                {
+                    const NavEdge& back = edges[nodes[end].mFirstEdge + k];
+                    if (back.mKind == EdgeKind::eWalk && !nodes[back.mTo].mLow && !nodes[back.mTo].mHazard && nodes[back.mTo].mLine == nodes[end].mLine && (nodes[back.mTo].mX < nodes[end].mX) == (sum > 0) && !nav.Condition(back, nullptr, nullptr))
+                    {
+                        end = back.mTo;
+                        more = true;
+                        break;
+                    }
+                }
+            }
+            if (std::abs(nodes[end].mX - me->mX) > 3)
+            {
+                return StepTo(*me, nodes[end].mX);
+            }
+            if (me->mMotion == 0 && me->mFacingLeft != (sum < 0))
+            {
+                return TaskStep::Do(Prim::Wait(2, sum < 0 ? Btn::eLeft : Btn::eRight));
+            }
+            return TaskStep::Do(Prim::Wait(2));
+        }
+    }
+
+    if (Domain::AtSligLock(nav, *lock, node))
+    {
+        if (lock->mState == 5 && mLastState != 5 && ++mTries > 4)
+        {
+            return TaskStep::Failed("the lock said no five times");
+        }
+        if (lock->mState != mLastState)
+        {
+            bot.Log("SligLock#" + std::to_string(mLock) + ": " + (lock->mState == 1 ? "it says Hi" : lock->mState == 2 ? "it says its code" : lock->mState == 3 ? "it listens" : lock->mState == 4 ? "it opens" : lock->mState == 5 ? "it says no" : "it is quiet"));
+        }
+        mLastState = lock->mState;
+        const u32 say = Say(lock->mState, code->second, me->mMotion == 0, mHi, mSaid);
+        return TaskStep::Do(Prim::Wait(2, say));
+    }
+
+    const std::vector<s32> way = Domain::SligWay(nav, node, goalOf(*lock), nullptr, &world);
+    if (way.empty())
+    {
+        return TaskStep::Failed("the Slig has no way to the lock from " + std::to_string(me->mX) + "," + std::to_string(me->mY));
+    }
+    const NavEdge& e = edges[way[0]];
+    const NavNode& from = nodes[node];
+    const NavNode& to = nodes[e.mTo];
+    if (e.mKind == EdgeKind::eLift)
+    {
+        if (std::abs(me->mX - from.mX) > 3)
+        {
+            return StepTo(*me, from.mX);
+        }
+        if (me->mMotion != 0)
+        {
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        mRide = to.mY > from.mY ? Btn::eDown : Btn::eUp;
+        mRideY = to.mY;
+        mRideFrames = 0;
+        bot.Log("the Slig rides the lift at " + std::to_string(from.mX) + " to " + std::to_string(to.mY));
+        return TaskStep::Do(Prim::Wait(2, mRide));
+    }
+    if (e.mKind == EdgeKind::eTeleport)
+    {
+        if (std::abs(me->mX - from.mX) > 3)
+        {
+            return StepTo(*me, from.mX);
+        }
+        if (me->mMotion != 0)
+        {
+            return TaskStep::Do(Prim::Wait(2));
+        }
+        if (mPullTries >= 6)
+        {
+            return TaskStep::Failed("the teleporter at " + std::to_string(from.mX) + "," + std::to_string(from.mY) + " didn't take the Slig");
+        }
+        // Its lever is a cell in front of the Slig, on one side or the other
+        const s32 switchId = e.mFeature >= 0 ? nav.Input().mFeatures[e.mFeature].mSwitch : 0;
+        bool faceLeft = me->mFacingLeft;
+        for (const Entity& l : world.mEntities)
+        {
+            if (l.mKind == EntityKind::eLever && l.mSwitch == switchId && l.mHalf == me->mHalf && std::abs(l.mY2 - me->mY) <= 30)
+            {
+                faceLeft = l.CentreX() < me->mX;
+            }
+        }
+        if (mPullTries % 2 == 1)
+        {
+            faceLeft = !faceLeft;
+        }
+        if (me->mFacingLeft != faceLeft)
+        {
+            return TaskStep::Do(Prim::Wait(2, faceLeft ? Btn::eLeft : Btn::eRight));
+        }
+        mPullTries++;
+        mPullWait = 60;
+        bot.Log("the Slig pulls the lever of the teleporter at " + std::to_string(from.mX) + "," + std::to_string(from.mY));
+        return TaskStep::Do(Prim::Wait(3, Btn::eAction));
+    }
+    mPullTries = 0;
+    if (e.mKind == EdgeKind::eFall)
+    {
+        // Down onto a floor with Sligs on it: when none of them faces where it lands (the walkthrough: "shoot the
+        // walking Sligs before they shoot you (wait until their backs are turned)")
+        if (me->mMotion != 0)
+        {
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        if (!DropClear(nav, world, to.mX, to.mY, to.mHalf, to.mX < me->mX) && mDropWaits < 2400)
+        {
+            mStuck = 0;
+            if (mDropWaits++ == 0)
+            {
+                bot.Log("the Slig waits at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + " until no Slig below faces it");
+            }
+            return TaskStep::Do(Prim::Wait(2));
+        }
+        return TaskStep::Do(Prim::Wait(2, to.mX < me->mX ? Btn::eLeft : Btn::eRight));
+    }
+    // A walk: on through the cells that follow the same way. Where it has to stand at the end of them (a lift, a
+    // teleporter), the last of it is single steps.
+    const bool left = to.mX < from.mX;
+    s32 stopX = to.mX;
+    bool mustStop = false;
+    for (std::size_t i = 1; i < way.size(); i++)
+    {
+        const NavEdge& next = edges[way[i]];
+        // (and before it walks off a floor's end: it may have to wait there)
+        if (next.mKind == EdgeKind::eLift || next.mKind == EdgeKind::eTeleport || next.mKind == EdgeKind::eFall)
+        {
+            mustStop = true;
+            break;
+        }
+        if (next.mKind != EdgeKind::eWalk || (nodes[next.mTo].mX < nodes[next.mFrom].mX) != left)
+        {
+            break;
+        }
+        stopX = nodes[next.mTo].mX;
+    }
+    if (mustStop)
+    {
+        return StepTo(*me, stopX);
+    }
+    return TaskStep::Do(Prim::Wait(2, left ? Btn::eLeft : Btn::eRight));
 }
 
 StepOnTask::~StepOnTask() = default;

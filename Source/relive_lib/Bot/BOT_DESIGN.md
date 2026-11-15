@@ -980,11 +980,61 @@ healing power as the game gives it. It stops there (Feeco is untouched: at 2312,
 
 **Feeco Depot** (2026-11-15, `build-bot/f1.txt`: from its first screen with the healing power, `bot any`):
 Terminal 1 (path 1), Terminal 2 (path 7), the Main Lobby (path 2) and the junction (path 9), into the path to
-the Slig Barracks (path 3) at f=10,578 with 0 deaths. `f2.txt` is Terminal 2 alone (out at f=3,397, 0 deaths on
-seeds 1 to 3), `f3.txt` from the lobby, `f9.txt` path 9 from its ledge. It stops in path 3 at 2162,2020 with no
-plan: nothing of that path has been looked at (the walkthrough: a ghost lock for the power to go unseen, a lever
-that summons a Slig to take over, two Slig locks that want a code spoken, a teleporter, flying Sligs, a lift).
-The other way on, to Bonewerkz through path 9's lower half and path 4, is untouched too. What Feeco needed:
+the Slig Barracks (path 3) at f=10,578, and through it into the Slig Barracks at f=16,941, with 0 deaths. `f2.txt` is Terminal 2 alone (out at f=3,397, 0 deaths on
+seeds 1 to 3), `f3.txt` from the lobby, `f9.txt` path 9 from its ledge, `f4.txt` path 3 from its door (into the
+Slig Barracks at f=6,377, 0 deaths), `f5.txt` path 3 from the lever's ledge.
+The other way on, to Bonewerkz through path 9's lower half and path 4, is untouched. What Feeco needed:
+- **Path 3, the way to the Slig Barracks** (the walkthrough: a ghost lock for the power to go unseen, a lever
+  that summons a Slig to take over, two Slig locks that want a code said back, a teleporter, flying Sligs, a
+  lift):
+  - **Slig locks** (`EntityKind::eSligLock`, `StepKind::eSligLock`, `SligLockTask`; AE's security door). The
+    lock says "Hi" to whoever is controlled inside its box, waits 150 frames for a Slig's "Hi", says its code
+    with 30 frames between the parts, and then wants the same back, the first part within 60 frames
+    (SecurityDoor.cpp). `World::mLockCodes` has each code as the speak buttons a Slig says it with, read with
+    the game's own `Code_Convert` / `Code_LookUp`; what the lock is doing is read from it
+    (`SecurityDoor::State`, a read-only accessor: the bot can't hear). `SligLockTask::Say` is what is said when.
+  - **The Slig** is one a spawner makes when its lever is pulled (the spawner puts its switch back when its
+    Slig dies, so the lever calls another). It is taken over from by the lever: on its screen, with no orb
+    there. The chant is held two frames at a time: held on after the Slig is his, it is the chant that bursts
+    it. For a moment as it is taken it is not listed at all, which is not it dying.
+  - **Its way** (`Domain::SligWay`) is over the same graph as Abe's with the edges a Slig can take: walks (not
+    under a low ceiling), off the ends of floors, lifts, and teleporters whose lever it pulls itself. Gates on
+    the way are what the action waits for: the second lock's action wants the first lock's switch, which is how
+    the two come in the right order. The Sligs on the stretches of floor it walks (`Domain::SligsMet`) are
+    given as dead by the action, and Abe's own way after goes over their floor.
+  - **Other Sligs on its floor** shoot a Slig that is not their own as soon as they face it on their screen
+    (no delay here), and a shot takes the nearest thing in its line anywhere on the screen (Bullet.cpp). So
+    it stops at the end of the floor above (single steps: it walks a cell or two on after the key is let go),
+    waits until every Slig on the screen below is ahead of where it lands and walks away
+    (`SligLockTask::DropClear`), drops, and holds the end of their floor away from them, facing them, shooting
+    each as it comes onto the screen, until the map's Sligs of that floor are all gone. Walked towards them it
+    lost every time; held three cells in from the end the flying Sligs' grenades got it (the walkthrough's
+    "wait on the left side on the ground").
+  - A Slig that has opened its lock is left as it is when another lock that is shut can be got to from where
+    it stands (the next step of the plan opens that one with it); else it is burst.
+  - **A floor Sligs watch that has no shadow** (`Domain::SligWatched`: a Slig awake on that floor and that
+    screen, no invisible zone on that floor on that screen), in a path where the power to go unseen is to be
+    had. The map's Sligs count where the map puts them (one in a box over a floor is not on it: the Mudanchee
+    trial's last room), a spawner's only when it is seen there: crossings from or onto it want him unseen, or those Sligs dead (two actions for the one edge); the
+    route does not go onto it seen (`Bot::EdgeCostFn`); and the chant is at the last cell before it whose
+    screen has no security orb (`GoToTask`: the path's three Slig screens each have one, so it is on the ledge
+    by the lift, a screen before). Elsewhere such floors are crossed behind the Sligs' backs as they always
+    were.
+  - **The run** is 235 frames of the power for a way that takes about 230: off the ledge at a run, a running
+    jump up the hoist of the Sligs' block, off its far end at a run, and from the run into the roll through
+    the gap the fence was in. Unseen with such a floor on the way it is run like a chase (`chased` in
+    `GoToTask`: no stop for a drop, a climb or a roll); a drop is taken rather than let down from the hands; a
+    hop off a floor's end costs 60 more than the run off it; a roll is gone into from the run through a gate
+    that stands open now (it was only through no gate at all). All of that only while he is unseen by a chant
+    made for a crossing (`Bot::InvisRun`): a thing used unseen by a Slig keeps the timing it had (the
+    Mudanchee trial's locks, where a run off the ledge cost 33 frames and the power was gone at the last
+    lock), and a run off an end is only taken where the way goes on the same way below.
+  - The fence is in a crawl gap, put 39 under the floor it shuts (`GameView`: its box reaches 40 up).
+  - A hop catches a ledge 60 or more over his own floor with floor still under him, two or three cells off
+    (`NavGraph`: the red ledge at 837,1420 from 787,1500 by the wall; from 812 he goes by under it).
+  - **A lift that is at its other stop** with a lever by the way that sends it here (a lift mover): the lever is
+    pulled (`GoToTask`, `mLiftCall`). The Slig has ridden it down; Abe calls it back up.
+  - "no route" in the log says which edges out of what he can get to were refused.
 - **Which path the level goes on through** (`LevelGraph::Shut`). The lobby has a door out of the level itself
   (to the executive offices) and one to the path that leads to the Brewery, both behind gates that the ends of
   other paths open. With no plan for the way on and nothing left to switch, the ways towards the end the path
