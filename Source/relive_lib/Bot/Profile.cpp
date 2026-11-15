@@ -45,6 +45,10 @@ bool Profile::Parse(const std::string& text, Profile& profile, std::string& erro
         {
             profile.mHuman = true;
         }
+        else if (word == "look")
+        {
+            profile.mLook = true;
+        }
         else if (word.rfind("seed=", 0) == 0 && word.size() > 5 && word.find_first_not_of("0123456789", 5) == std::string::npos && word.size() < 24)
         {
             profile.mSeed = std::stoull(word.substr(5));
@@ -65,7 +69,7 @@ bool Profile::Parse(const std::string& text, Profile& profile, std::string& erro
 std::string Profile::Text() const
 {
     const char* ending = mEnding == Ending::eSaveAll ? "save_all" : mEnding == Ending::eKillAll ? "kill_all" : mEnding == Ending::eAverage ? "average" : "any";
-    std::string text = std::string(ending) + ",seed=" + std::to_string(mSeed) + (mHuman ? ",human" : "");
+    std::string text = std::string(ending) + ",seed=" + std::to_string(mSeed) + (mHuman ? ",human" : "") + (mLook ? ",look" : "");
     for (const std::string& level : mBeen)
     {
         text += ",been=" + level;

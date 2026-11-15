@@ -17,6 +17,7 @@ enum class Ending : u8
 
 // How a run is to be played: "save_all", "kill_all", "average" or "any", then options after commas:
 // seed=<n> for the bot's random choices, human to make it dawdle and vary like a person (by the seed),
+// look to try what it is about to do against the game and take back what gets him hurt,
 // been=<level> (any number of times) for a level played before a run that starts further on: a way back there is
 // not a way on.
 struct Profile final
@@ -24,6 +25,8 @@ struct Profile final
     Ending mEnding = Ending::eAny;
     u64 mSeed = 1;
     bool mHuman = false;
+    // Tries are made from each save, and what fails taken back, until one gets on unhurt (see Lookahead)
+    bool mLook = false;
     std::vector<std::string> mBeen;
 
     static bool Parse(const std::string& text, Profile& profile, std::string& error);
