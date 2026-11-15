@@ -880,7 +880,7 @@ bite him dead. Nothing is done about the Fleeches while he waits.
 Open: a wait for a lift and the rest have no unit tests yet; the Mudomo vaults themselves (path 8 on) are
 untouched: a taken over Paramite has to eat Fleeches, talk to another, and pull several rings in one go.
 
-**The Mudomo vaults** (from the hub, path 8; the guide's numbering in brackets). Two of six beaten so far,
+**The Mudomo vaults** (from the hub, path 8; the guide's numbering in brackets). Three of six beaten so far,
 each from its door back to the hub with 0 deaths:
 
 - Path 12 (vault 3), `v3.txt`: f=1,386. The drop down the shaft at 437,460 goes into the well at 437,1500,
@@ -899,8 +899,17 @@ each from its door back to the hub with 0 deaths:
   him invisible); `GetRocksTask` leaves the first sack's meat for a Paramite of that level and takes the meat
   to keep from the other sack; `Pilot::StepLift` lets go of the rope 20 from a stop it was carried past (a
   middle stop). Sleeping Fleeches on the next screen are sneaked up to from before they can be seen.
-- Not beaten: paths 9, 11, 3, 5 (vaults 1, 2, 4, 6), then the trial (path 13). Vaults 1, 2 and 6 need a Paramite
-  taken over and played for more than one ring.
+- Path 3 (vault 4), `p3.txt`: f=675. Paramites that are after him (brain 2, or on their way down a web) are
+  run from like a Scrab: run into roll under the rocks, into the well without stopping, and off the end of a
+  floor at a run where the way goes on down (landing further out than the fall was drawn counts as there).
+  The way out is a roll off the low end at 1912,980 that ends hung from the exit's ledge 220 below and three
+  cells out: a fall edge to a ledge whose `edge` box faces the way he goes (`NavGraph::Build`).
+- Path 9 (vault 1), `p9.txt`: the first lock and both rings of the first screen (the chant takes the nearest
+  Paramite on his screen, `Abe::FindObjectToPossess`, so a ring is only offered from a place its Paramite is
+  the nearest to). Then nothing: the Paramite has to be walked on over three screens, eat Fleeches, climb
+  webs and pull two more rings.
+- Not beaten: paths 9, 11, 5 (vaults 1, 2, 6), then the trial (path 13). All three need a Paramite taken over
+  and played across screens for more than one ring.
 
 Not built, from the user: with one Paramite the meat can also be thrown past it into the next screen and the
 Paramite walked into that screen (it backs off from him), where it then finds the meat. The fallback for when

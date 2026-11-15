@@ -4025,3 +4025,443 @@ TEST(BotParamite, AParamiteThatCanGetUnderARingIsHadToPullIt)
         EXPECT_EQ(ParamitePulls(d), 0);
     }
 }
+
+// A floor 400 wide with Paramites seen on it
+static NavInput ParamiteFloor(bool wall)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    if (wall)
+    {
+        in.mLines.push_back(Line(125, 40, 125, 100, 1));
+    }
+    return in;
+}
+
+static ParamiteAt SeenParamite(s32 x, s32 brain)
+{
+    ParamiteAt p;
+    p.mId = 1;
+    p.mX = x;
+    p.mY = 100;
+    p.mBrain = brain;
+    return p;
+}
+
+TEST(BotParamite, ALoneParamiteWithLessThanEightCellsBehindItHasHimCornered)
+{
+    NavGraph g;
+    g.Build(ParamiteFloor(false));
+    World world;
+    world.mParamites.push_back(SeenParamite(100, 0));
+    // Its side of the floor ends 162 back from him: under the eight cells (200) it needs
+    EXPECT_TRUE(Domain::ParamiteCornered(g, world, 162, 100, false));
+    // 237 back is room enough
+    EXPECT_FALSE(Domain::ParamiteCornered(g, world, 237, 100, false));
+    // (a Paramite to his right is backed off to the right end instead)
+    World right;
+    right.mParamites.push_back(SeenParamite(300, 0));
+    EXPECT_TRUE(Domain::ParamiteCornered(g, right, 237, 100, false));
+    EXPECT_FALSE(Domain::ParamiteCornered(g, right, 12, 100, false));
+    // Up its web it is not there, and one that is possessed is not a threat
+    World hidden;
+    hidden.mParamites.push_back(SeenParamite(100, 3));
+    EXPECT_FALSE(Domain::ParamiteCornered(g, hidden, 162, 100, false));
+    World possessed = world;
+    possessed.mParamites[0].mPossessed = true;
+    EXPECT_FALSE(Domain::ParamiteCornered(g, possessed, 162, 100, false));
+}
+
+TEST(BotParamite, AWallBetweenAParamiteAndHimTakesItsCornerAway)
+{
+    NavGraph g;
+    g.Build(ParamiteFloor(true));
+    World world;
+    world.mParamites.push_back(SeenParamite(50, 0));
+    EXPECT_FALSE(Domain::ParamiteCornered(g, world, 162, 100, false));
+    EXPECT_FALSE(Domain::ParamitePack(g, world, 237, 100, false));
+    // Without the wall the same place is a corner
+    NavGraph open;
+    open.Build(ParamiteFloor(false));
+    EXPECT_TRUE(Domain::ParamiteCornered(open, world, 162, 100, false));
+}
+
+TEST(BotParamite, TwoSeenParamitesOnHisFloorMakeAPackButOneDoesNot)
+{
+    NavGraph g;
+    g.Build(ParamiteFloor(false));
+    World world;
+    world.mParamites.push_back(SeenParamite(50, 0));
+    EXPECT_FALSE(Domain::ParamitePack(g, world, 237, 100, false));
+    world.mParamites.push_back(SeenParamite(300, 0));
+    EXPECT_TRUE(Domain::ParamitePack(g, world, 237, 100, false));
+    // One of the two up its web is not seen
+    World hidden = world;
+    hidden.mParamites[1].mBrain = 9;
+    EXPECT_FALSE(Domain::ParamitePack(g, hidden, 237, 100, false));
+    // Nor are two that are on another floor
+    NavInput in = ParamiteFloor(false);
+    in.mLines.push_back(Line(0, 300, 400, 300, 0));
+    NavGraph two;
+    two.Build(in);
+    World below = world;
+    below.mParamites[0].mY = 300;
+    below.mParamites[1].mY = 300;
+    EXPECT_FALSE(Domain::ParamitePack(two, below, 237, 100, false));
+}
+
+TEST(BotVault, AFleechEntirelyUnderALocksFloorIsNoGuardOfIt)
+{
+    NavGraph g;
+    g.Build(FleechRoom(true));
+    World world = FleechRoomWorld();
+    const s32 abe = g.NodeAt(462, 700, false);
+    ASSERT_GE(abe, 0);
+    const auto guarded = [&](const World& w, u32 fleech) -> bool
+    {
+        const Domain d = Domain::Build(g, w, abe, [](s32)
+                                       { return true; });
+        for (const Goap::Action& a : d.mActions)
+        {
+            const DomainStep& step = d.mSteps[a.mTag];
+            if (step.mKind == StepKind::eUse && step.mEntity == 3 && std::find(a.mPre.begin(), a.mPre.end(), Goap::Fact{Key::Mud(fleech), 2}) != a.mPre.end())
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    EXPECT_TRUE(guarded(world, 2));
+    // The same Fleech hung from the underside of the lock's floor
+    world.mEntities[1].mY1 = 705;
+    world.mEntities[1].mY2 = 729;
+    EXPECT_FALSE(guarded(world, 2));
+}
+
+TEST(BotNav, ABirdPortalToAnotherPathIsAWayOutFromTwoCellsBeforeIt)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    NavFeature portal = Feature(FeatureKind::ePortal, 160, 80, 184, 104);
+    portal.mDir = 0;
+    portal.mDestPath = 5;
+    portal.mDestCamera = 2;
+    in.mFeatures.push_back(portal);
+    NavGraph g;
+    g.Build(in);
+    ASSERT_EQ(g.Exits().size(), 1u);
+    // (hopped into from two cells to its left)
+    EXPECT_EQ(g.Exits()[0].mNode, g.NodeAt(112, 100, false));
+    // One that stays in the path is no exit
+    in.mFeatures[0].mDestPath = -1;
+    NavGraph local;
+    local.Build(in);
+    EXPECT_TRUE(local.Exits().empty());
+}
+
+static NavInput PackCorridor()
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 370, 100, 0));
+    NavFeature exit = Feature(FeatureKind::eDoor, 346, 80, 370, 104);
+    exit.mDestPath = 2;
+    exit.mDestCamera = 1;
+    in.mFeatures.push_back(exit);
+    return in;
+}
+
+static World PackWorld(s32 paramites, bool meat, bool invisLock)
+{
+    World world;
+    if (meat)
+    {
+        Entity sack = MakeEntity(EntityKind::eRockSack, 3000, 20, 80, 44, 104);
+        sack.mInputs[1] = 1;
+        world.mEntities.push_back(sack);
+    }
+    for (s32 i = 0; i < paramites; i++)
+    {
+        world.mEntities.push_back(MakeEntity(EntityKind::eParamite, 10 + i, 150 + i * 60, 80, 174 + i * 60, 104));
+    }
+    if (invisLock)
+    {
+        Entity lock = MakeEntity(EntityKind::eSlapLock, 4000, 60, 80, 84, 104);
+        lock.mInputs[0] = 1;
+        world.mEntities.push_back(lock);
+    }
+    return world;
+}
+
+// (the exit's preconditions, or none if it is not offered; and whether meat is thrown for the pack)
+static bool PackExitNeedsFeeding(const World& world, bool* throws)
+{
+    NavGraph g;
+    g.Build(PackCorridor());
+    const Domain d = Domain::Build(g, world, g.NodeAt(12, 100, false), nullptr);
+    bool fed = false;
+    *throws = false;
+    for (const Goap::Action& a : d.mActions)
+    {
+        if (a.mName.compare(0, 5, "Exit ") == 0)
+        {
+            fed = std::find(a.mPre.begin(), a.mPre.end(), Goap::Fact{Key::kPackFed, 1}) != a.mPre.end();
+        }
+        *throws = *throws || a.mName.compare(0, 24, "Throw meat for the Param") == 0;
+    }
+    return fed;
+}
+
+TEST(BotParamite, AWayOutPastTwoParamitesOnItsLevelWantsMeatThrownFirst)
+{
+    bool throws = false;
+    EXPECT_TRUE(PackExitNeedsFeeding(PackWorld(2, true, false), &throws));
+    EXPECT_TRUE(throws);
+}
+
+TEST(BotParamite, OneParamiteOrNoMeatOrAGhostLockLeavesTheWayOutAlone)
+{
+    bool throws = true;
+    // (one alone is cornered and left, not fed)
+    EXPECT_FALSE(PackExitNeedsFeeding(PackWorld(1, true, false), &throws));
+    EXPECT_FALSE(throws);
+    EXPECT_FALSE(PackExitNeedsFeeding(PackWorld(2, false, false), &throws));
+    EXPECT_FALSE(throws);
+    // (he runs past them unseen instead)
+    EXPECT_FALSE(PackExitNeedsFeeding(PackWorld(2, true, true), &throws));
+    EXPECT_FALSE(throws);
+}
+
+TEST(BotParamite, ParamitesOnAnotherFloorOfTheScreenAreNotOnTheWaysLevel)
+{
+    NavInput in = PackCorridor();
+    in.mLines.push_back(Line(0, 220, 370, 220, 0));
+    NavGraph g;
+    g.Build(in);
+    World world = PackWorld(2, true, false);
+    const s32 up = g.NodeAt(162, 100, false);
+    const s32 down = g.NodeAt(162, 220, false);
+    ASSERT_GE(up, 0);
+    ASSERT_GE(down, 0);
+    EXPECT_TRUE(Domain::PackLevel(g, world, up));
+    EXPECT_FALSE(Domain::PackLevel(g, world, down));
+    world.mEntities.pop_back();
+    EXPECT_FALSE(Domain::PackLevel(g, world, up));
+}
+
+// A floor cut by a gate that starts shut: a lever on the left whose switch wakes a Fleech, and a foot switch at
+// each end of the floor that works the gate (the one beyond it sets, the other clears, unless they are swapped)
+static NavInput FleechPenRoom()
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    NavFeature gate = Feature(FeatureKind::eBarrier, 200, 80, 224, 104);
+    gate.mSwitch = 60;
+    gate.mStartClosed = true;
+    gate.mSolid = true;
+    in.mFeatures.push_back(gate);
+    return in;
+}
+
+static World FleechPenWorld(bool sameSide)
+{
+    World world;
+    world.mEntities.push_back(MakeEntity(EntityKind::eLever, 1, 25, 80, 99, 104));
+    world.mEntities.back().mSwitch = 50;
+    world.mEntities.push_back(MakeEntity(EntityKind::eFleech, 2, 300, 80, 324, 104));
+    world.mEntities.back().mSwitch = 50;
+    Entity on = MakeEntity(EntityKind::eFootSwitch, 3, 340, 90, 364, 104);
+    on.mSwitch = 60;
+    on.mOp = 0;
+    world.mEntities.push_back(on);
+    Entity off = MakeEntity(EntityKind::eFootSwitch, 4, 100, 90, 124, 104);
+    off.mSwitch = 60;
+    off.mOp = 1;
+    if (sameSide)
+    {
+        off.mX1 = 240;
+        off.mX2 = 264;
+    }
+    world.mEntities.push_back(off);
+    return world;
+}
+
+TEST(BotVault, AFleechPenNeedsOneFootSwitchEachSideOfTheGate)
+{
+    NavGraph g;
+    g.Build(FleechPenRoom());
+    const World world = FleechPenWorld(false);
+    s32 gate = -1;
+    s32 open = -1;
+    s32 shut = -1;
+    std::vector<u32> group;
+    ASSERT_TRUE(Domain::FleechPen(g, world, world.mEntities[0], &gate, &open, &shut, &group));
+    EXPECT_EQ(g.Input().mFeatures[gate].mSwitch, 60);
+    EXPECT_EQ(open, g.NodeAt(352, 100, false));
+    EXPECT_EQ(shut, g.NodeAt(112, 100, false));
+    ASSERT_EQ(group.size(), 1u);
+    EXPECT_EQ(group[0], 2u);
+    // Both on the lever's side: nothing beyond the gate to open it from
+    const World same = FleechPenWorld(true);
+    EXPECT_FALSE(Domain::FleechPen(g, same, same.mEntities[0], &gate, &open, &shut, &group));
+    // A lever that wakes no Fleech has no pen
+    World calm = world;
+    calm.mEntities[1].mSwitch = 51;
+    EXPECT_FALSE(Domain::FleechPen(g, calm, calm.mEntities[0], &gate, &open, &shut, &group));
+}
+
+TEST(BotVault, ALeverThatWakesFleechesIsOfferedWithTheGateShutBehindThem)
+{
+    NavGraph g;
+    g.Build(FleechPenRoom());
+    const auto offered = [&](const World& w) -> bool
+    {
+        const Domain d = Domain::Build(g, w, g.NodeAt(12, 100, false), nullptr);
+        for (const Goap::Action& a : d.mActions)
+        {
+            if (a.mName.find("and shut its Fleeches in behind the gate") != std::string::npos)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    EXPECT_TRUE(offered(FleechPenWorld(false)));
+    EXPECT_FALSE(offered(FleechPenWorld(true)));
+}
+
+static const NavEdge* FindWellEdge(const NavGraph& g, s32 from, s32 to)
+{
+    for (const NavEdge& e : g.Edges())
+    {
+        if (e.mFrom == from && e.mTo == to && e.mWell >= 0)
+        {
+            return &e;
+        }
+    }
+    return nullptr;
+}
+
+// A well that names no place to throw him to, on a floor with a ledge up and to its right whose hoist ends above
+// the floor but reaches into the rise
+static NavInput RiseRoom(bool hoist)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 724, 400, 724, 0));
+    in.mLines.push_back(Line(250, 600, 400, 600, 0));
+    in.mFeatures.push_back(Feature(FeatureKind::eWellLocal, 201, 700, 225, 724));
+    if (hoist)
+    {
+        in.mFeatures.push_back(Feature(FeatureKind::eHoist, 250, 600, 275, 690));
+    }
+    return in;
+}
+
+TEST(BotNav, AWellThatNamesNoPlaceLeavesHimHungFromAHoistInItsRise)
+{
+    NavGraph g;
+    g.Build(RiseRoom(true));
+    const s32 well = g.NodeAt(212, 724, false);
+    const s32 ledge = g.NodeAt(262, 600, false);
+    ASSERT_GE(well, 0);
+    ASSERT_GE(ledge, 0);
+    EXPECT_NE(FindWellEdge(g, well, ledge), nullptr);
+    // Without the hoist he comes down on the floor, two cells to the right
+    NavGraph none;
+    none.Build(RiseRoom(false));
+    EXPECT_EQ(FindWellEdge(none, well, none.NodeAt(262, 600, false)), nullptr);
+    EXPECT_NE(FindWellEdge(none, well, none.NodeAt(262, 724, false)), nullptr);
+}
+
+TEST(BotNav, LettingGoDownAHoistOntoAWellOnTheFloorBelowGoesWhereTheWellLeads)
+{
+    // The well stands on the floor under the hoist, its box reaching well up from it
+    NavInput in;
+    in.mLines.push_back(Line(150, 100, 400, 100, 0));
+    in.mLines.push_back(Line(0, 400, 400, 400, 0));
+    in.mFeatures.push_back(Feature(FeatureKind::eHoist, 200, 100, 224, 400));
+    NavFeature well = Feature(FeatureKind::eWellLocal, 200, 340, 224, 404);
+    well.mC = 337;
+    well.mD = 396;
+    in.mFeatures.push_back(well);
+    NavGraph g;
+    g.Build(in);
+    const s32 top = g.NodeAt(212, 100, false);
+    ASSERT_GE(top, 0);
+    const NavEdge* out = FindEdge(g, top, g.NodeAt(337, 400, false), EdgeKind::eHoistDown);
+    ASSERT_NE(out, nullptr);
+    EXPECT_GE(out->mWell, 0);
+    // (not straight down to the floor under him)
+    EXPECT_EQ(FindEdge(g, top, g.NodeAt(212, 400, false), EdgeKind::eHoistDown), nullptr);
+    // A well beside the shaft is not one he lands in
+    in.mFeatures[1].mX1 = 300;
+    in.mFeatures[1].mX2 = 324;
+    NavGraph apart;
+    apart.Build(in);
+    EXPECT_NE(FindEdge(apart, top, apart.NodeAt(212, 400, false), EdgeKind::eHoistDown), nullptr);
+}
+
+TEST(BotNav, AnOpenTrapDoorOverAWellItsSwitchTurnsDropsHimWhereTheWellThrowsHimWhileItIsOn)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 200, 100, 0));
+    in.mLines.push_back(Line(250, 100, 400, 100, 0));
+    in.mLines.push_back(Line(250, 300, 400, 300, 0));
+    in.mLines.push_back(Line(0, 400, 400, 400, 0));
+    NavFeature trap = Feature(FeatureKind::eTrapDoor, 200, 100, 250, 120);
+    trap.mSwitch = 7;
+    trap.mStartClosed = true;
+    in.mFeatures.push_back(trap);
+    // (it names no place with its switch off; with it on it throws him onto the floor between)
+    NavFeature well = Feature(FeatureKind::eWellLocal, 205, 200, 230, 224);
+    well.mSwitch = 7;
+    well.mOnC = 337;
+    well.mOnD = 296;
+    in.mFeatures.push_back(well);
+    NavGraph g;
+    g.Build(in);
+    const s32 on = g.NodeAt(212, 100, false);
+    const s32 thrown = g.NodeAt(337, 300, false);
+    const s32 under = g.NodeAt(212, 400, false);
+    ASSERT_GE(on, 0);
+    ASSERT_GE(thrown, 0);
+    ASSERT_GE(under, 0);
+    const NavEdge* fall = FindEdge(g, on, thrown, EdgeKind::eFall);
+    ASSERT_NE(fall, nullptr);
+    EXPECT_GE(fall->mWell, 0);
+    EXPECT_EQ(FindEdge(g, on, under, EdgeKind::eFall), nullptr);
+    // (and it is only open with the switch on)
+    s32 sw = 0;
+    s32 value = -1;
+    EXPECT_TRUE(g.Condition(*fall, &sw, &value));
+    EXPECT_EQ(sw, 7);
+    EXPECT_EQ(value, 1);
+}
+
+TEST(BotNav, RolledOffALowEndOverAGapHeClearsItToTheFloorFortyDown)
+{
+    // A drill that comes over the end of the floor keeps him rolling, and the next floor starts two cells out
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    in.mLines.push_back(Line(450, 140, 700, 140, 0));
+    in.mFeatures.push_back(Feature(FeatureKind::eSweep, 300, 40, 420, 64));
+    NavGraph g;
+    g.Build(in);
+    const s32 end = g.NodeAt(387, 100, false);
+    const s32 over = g.NodeAt(462, 140, false);
+    ASSERT_GE(end, 0);
+    ASSERT_GE(over, 0);
+    EXPECT_TRUE(g.Nodes()[end].mLow);
+    EXPECT_NE(FindEdge(g, end, over, EdgeKind::eFall), nullptr);
+    // Standing upright he walks off the end into the gap instead
+    NavInput tall = in;
+    tall.mFeatures.clear();
+    NavGraph upright;
+    upright.Build(tall);
+    EXPECT_EQ(FindEdge(upright, upright.NodeAt(387, 100, false), upright.NodeAt(462, 140, false), EdgeKind::eFall), nullptr);
+    // A drop of 20 is a step down, not one that carries him that far
+    NavInput shallow = in;
+    shallow.mLines[1] = Line(450, 120, 700, 120, 0);
+    NavGraph step;
+    step.Build(shallow);
+    EXPECT_EQ(FindEdge(step, step.NodeAt(387, 100, false), step.NodeAt(462, 120, false), EdgeKind::eFall), nullptr);
+}
