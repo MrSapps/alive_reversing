@@ -2431,11 +2431,44 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                             {
                                 continue;
                             }
+                            // (the chant takes the nearest on his screen, Abe::FindObjectToPossess: from a place
+                            // that this one is the nearest to. The Mudomo vault's path 9, two of them on ledges
+                            // either side of the door: from under the left one the right one's ring was never got)
+                            const auto nearest = [&](const NavNode& spot)
+                            {
+                                const auto far = [&](s32 x, s32 y)
+                                {
+                                    return (x - spot.mX) * (x - spot.mX) + (y - spot.mY) * (y - spot.mY);
+                                };
+                                const s32 own = far(px, py);
+                                for (const Entity& o : world.mEntities)
+                                {
+                                    if (o.mKind != EntityKind::eParamite || o.mGone || o.mId == para.mId || o.mHalf != para.mHalf)
+                                    {
+                                        continue;
+                                    }
+                                    s32 ox = o.CentreX();
+                                    s32 oy = o.mY2;
+                                    for (const ParamiteAt& live : world.mParamites)
+                                    {
+                                        if (live.mId == o.mId)
+                                        {
+                                            ox = live.mX;
+                                            oy = live.mY;
+                                        }
+                                    }
+                                    if (nav.CameraOf(ox, oy - 5) == cam && far(ox, oy) <= own)
+                                    {
+                                        return false;
+                                    }
+                                }
+                                return true;
+                            };
                             std::set<s32> from;
                             for (std::size_t n = 0; n < nav.Nodes().size(); n++)
                             {
                                 const NavNode& spot = nav.Nodes()[n];
-                                if (spot.mLow || spot.mHazard || spot.mHalf || nav.CameraOf(spot.mX, spot.mY - 5) != cam || (!under.mHalf && std::abs(spot.mY - nav.Nodes()[at].mY) * scale <= 45) || !from.insert(d.mRegions[n]).second)
+                                if (spot.mLow || spot.mHazard || spot.mHalf || nav.CameraOf(spot.mX, spot.mY - 5) != cam || (!under.mHalf && std::abs(spot.mY - nav.Nodes()[at].mY) * scale <= 45) || !nearest(spot) || !from.insert(d.mRegions[n]).second)
                                 {
                                     continue;
                                 }

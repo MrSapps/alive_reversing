@@ -133,7 +133,8 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     if (abe.mMove == Move::eHang)
     {
         // Hanging from a ledge: let go if that's the way down, else climb up
-        bool down = mLastEdge >= 0 && nav.Edges()[mLastEdge].mKind == EdgeKind::eHoistDown;
+        // (not where the way down a hoist ends hung from the ledge it leads to: thrown there by a well under it)
+        bool down = mLastEdge >= 0 && nav.Edges()[mLastEdge].mKind == EdgeKind::eHoistDown && bot.AbeNode() != nav.Edges()[mLastEdge].mTo;
         // (or caught hold of it in a fall past it, with the way on down from its top: the Mudanchee trial, rolled
         // off the well's ledge at 1337,340 into the hoist at 1412)
         if (!down && bot.AbeNode() >= 0)
@@ -1144,11 +1145,51 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     chased = true;
                 }
             }
+            // Paramites that are after him (Paramite.cpp, Brain_2_ChasingAbe: a team of them, or one that was
+            // set on him) are the same again, and so are ones on their way down a web to be (brain 3, past its
+            // wait: the Mudomo vault's path 3, where the first lock's slap lets two down behind him)
+            for (const ParamiteAt& p : bot.GetWorld().mParamites)
+            {
+                if (!p.mPossessed && (p.mBrain == 2 || (p.mBrain == 3 && p.mSub >= 1)) && p.mHalf == here.mHalf && std::abs(p.mY - here.mY) <= 60 && std::abs(p.mX - here.mX) < 700 &&
+                    !Domain::GateBetween(nav, bot.GetWorld(), p.mX, here.mX, here.mY, here.mHalf) && !Domain::WallBetween(nav, p.mX, here.mX, here.mY, here.mHalf))
+                {
+                    sneak = false;
+                    fleech = true;
+                    chased = true;
+                }
+            }
             // And no walking the last cells to stop on the right one (a run is left four cells early for that,
             // twenty frames a Scrab does not give): from the run into a roll, which stops where it is told
             if (chased)
             {
                 const s32 way = first.mLeft ? -1 : 1;
+                // Off the end of the floor at the end of the run, where the way goes on down: without stopping
+                // for it (the Mudomo vault's path 3: stopped at the end of the 860 floor to walk off it, the two
+                // Paramites behind him had him)
+                if (last + 1 < path.size() && nav.Edges()[path[last + 1]].mKind == EdgeKind::eFall && nav.Edges()[path[last + 1]].mLeft == first.mLeft && !nav.Edges()[path[last + 1]].mCrouched &&
+                    !first.mCrouched && first.mKind == EdgeKind::eWalk)
+                {
+                    bot.Log("chased: off the end of the floor at a run");
+                    Prim run = Prim::WalkOff(first.mLeft);
+                    run.mRunOff = 1;
+                    mLastEdge = -1;
+                    // (at a run he comes down further out than the walk off that the fall was drawn as: where
+                    // the fall's end is what he was making for, anywhere on its floor past it will do, and not
+                    // back to it with them behind him)
+                    const s32 end = nav.Edges()[path[last + 1]].mTo;
+                    if (mIsGoal(end))
+                    {
+                        const std::function<bool(s32)> was = mIsGoal;
+                        const NavGraph* g = &nav;
+                        const s32 line = nav.Nodes()[end].mLine;
+                        const s32 endX = nav.Nodes()[end].mX;
+                        mIsGoal = [was, g, line, endX, way](s32 n)
+                        {
+                            return was(n) || (n >= 0 && g->Nodes()[n].mLine == line && (g->Nodes()[n].mX - endX) * way > 0 && (g->Nodes()[n].mX - endX) * way <= 150);
+                        };
+                    }
+                    return TaskStep::Do(run);
+                }
                 // Into a well at the end of the run without stopping (the walkthrough of the Mudanchee vault's path
                 // 5: "jumping into the well without stopping to position yourself, you have to do it on the fly")
                 if (last + 1 < path.size() && nav.Edges()[path[last + 1]].mKind == EdgeKind::eWell && nav.Edges()[path[last + 1]].mWell >= 0 && (to.mX - here.mX) * way >= 3 * cell)

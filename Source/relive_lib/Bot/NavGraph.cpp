@@ -1136,6 +1136,37 @@ void NavGraph::Build(const NavInput& input)
                 s32 height = 0;
                 const s32 belowLine = FloorBelow(nx, n.mY + 1, n.mHalf, &fy, &height);
                 bool deadly = belowLine < 0;
+                // Rolled off with a ledge to catch out and below, facing the way he goes: he ends hung from it (the
+                // walkthrough of the Mudomo vault's path 3: "roll under the rocks at the edge of the screen, then
+                // let yourself fall out the other side to land hanging beside the exit", off 1912,980 to the
+                // ledge at 2000,1200)
+                if (n.mLow || crouched)
+                {
+                    const s32 scale = n.mHalf ? 2 : 1;
+                    for (const NavFeature& f : mInput.mFeatures)
+                    {
+                        if (f.mKind != FeatureKind::eEdge || f.mHalf != n.mHalf || !(f.mDir == 2 || (f.mDir == 0) == (dir < 0)))
+                        {
+                            continue;
+                        }
+                        const s32 drop = f.mY1 - n.mY;
+                        const s32 lo = std::min(nx + dir * step, nx + dir * 4 * step) - step / 2;
+                        const s32 hi = std::max(nx + dir * step, nx + dir * 4 * step) + step / 2;
+                        if (drop * scale < 60 || drop * scale > 300 || f.mX2 < lo || f.mX1 > hi || (belowLine >= 0 && fy <= f.mY1 + 10))
+                        {
+                            continue;
+                        }
+                        s32 ly = 0;
+                        const s32 lx = (f.mX1 + f.mX2) / 2 + dir * step / 2;
+                        const s32 ledgeLine = FloorNear(lx, f.mY1, n.mHalf, 12, &ly);
+                        const s32 ledge = ledgeLine >= 0 ? NodeOnLine(ledgeLine, lx) : -1;
+                        if (ledge >= 0 && std::abs(mNodes[ledge].mX - lx) <= step && !mNodes[ledge].mHazard)
+                        {
+                            AddEdge(edges, from, ledge, EdgeKind::eFall, 50 + drop / 4, -1, left);
+                            edges.back().mCrouched = crouched;
+                        }
+                    }
+                }
                 // (rolled off over a gap he clears it, where a floor two cells further out is under him: measured
                 // in the Mudanchee trial, off 587,360 to the right over the pit and down onto 662,460; and in the
                 // Mudomo vaults' path 10, off 2037,600 to the left and 40 down onto 1962,640)
