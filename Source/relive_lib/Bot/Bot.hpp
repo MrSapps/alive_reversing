@@ -420,6 +420,8 @@ private:
     s32 mArrivedX = 0;
     s32 mArrivedY = 0;
     s32 mBackFor = -1;
+    // How often each path (level, path) has been backed out of
+    std::map<std::pair<s32, s32>, s32> mBackOuts;
     u32 mRingDueBy = 0;
     bool mInvisSaved = false;
     bool mInvisChantNow = false;

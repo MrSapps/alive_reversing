@@ -454,6 +454,11 @@ public:
         maxX = field_138_zone_rect.w;
         wakeCells = mSligTlv.mNoiseWakeUpDistance;
     }
+    // For the bot: the frames at least that it stands at an end of its beat before it turns
+    s32 BeatPause() const
+    {
+        return mSligTlv.mPauseLeftMin < mSligTlv.mPauseRightMin ? mSligTlv.mPauseLeftMin : mSligTlv.mPauseRightMin;
+    }
     EReliveLevelIds mAbeLevel = EReliveLevelIds::eNone;
     s16 mAbePath = 0;
     s16 mAbeCamera = 0;

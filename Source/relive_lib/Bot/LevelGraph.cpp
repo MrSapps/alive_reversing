@@ -13,12 +13,61 @@ void LevelGraph::Build(s32 level, const std::vector<PathSummary>& paths, const s
                                       { return exit.first != level && been.count(exit.first) != 0; }),
                        p.mExits.end());
     }
+    mShut.clear();
+    Measure();
+}
+
+bool LevelGraph::Shut(s32 path)
+{
+    const s32 here = Distance(path);
+    if (here < 0)
+    {
+        return false;
+    }
+    // Its ways towards the end: out of the level, or into a path that is nearer to the end than it is
+    const std::vector<PathSummary> was = mPaths;
+    const std::set<s32> wasShut = mShut;
+    bool any = false;
+    for (PathSummary& p : mPaths)
+    {
+        if (p.mPath != path)
+        {
+            continue;
+        }
+        if (here == 0 && mShut.insert(path).second)
+        {
+            any = true;
+        }
+        const std::size_t before = p.mExits.size();
+        p.mExits.erase(std::remove_if(p.mExits.begin(), p.mExits.end(), [&](const std::pair<s32, s32>& exit)
+                                      { return exit.first == mLevel && here > 0 && Distance(exit.second) >= 0 && Distance(exit.second) < here; }),
+                       p.mExits.end());
+        any = any || p.mExits.size() != before;
+    }
+    if (any)
+    {
+        Measure();
+    }
+    if (any && Distance(path) > 0)
+    {
+        return true;
+    }
+    // (no other way from it: it stays as it was)
+    mPaths = was;
+    mShut = wasShut;
+    Measure();
+    return false;
+}
+
+void LevelGraph::Measure()
+{
+    const s32 level = mLevel;
     mDistance.clear();
     for (const PathSummary& p : mPaths)
     {
         for (const auto& exit : p.mExits)
         {
-            if (exit.first != level)
+            if (exit.first != level && mShut.count(p.mPath) == 0)
             {
                 mDistance[p.mPath] = 0;
             }

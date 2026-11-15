@@ -1166,6 +1166,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             {
                 s32 wakeCells = 0;
                 static_cast<::Slig*>(pObj)->Beat(slig.mBeatMin, slig.mBeatMax, wakeCells, slig.mSightDelay);
+                slig.mBeatPause = static_cast<::Slig*>(pObj)->BeatPause();
                 slig.mWake = wakeCells * (slig.mHalf ? 13 : 25);
             }
             else

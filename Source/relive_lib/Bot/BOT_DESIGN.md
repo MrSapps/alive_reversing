@@ -979,11 +979,29 @@ hub, the six vaults, the Mudomo trial, Necrum's end): Feeco Depot's path 1 at f=
 healing power as the game gives it. It stops there (Feeco is untouched: at 2312,884, with nothing known to do).
 
 **Feeco Depot** (2026-11-15, `build-bot/f1.txt`: from its first screen with the healing power, `bot any`):
-Terminal 1 (path 1), Terminal 2 (path 7) and the Main Lobby (path 2), out of the lobby's door to path 9 at
-f=8,324. Terminals 1 and 2 with 0 deaths on seeds 1 to 3 (`f2.txt` is Terminal 2 alone, out at f=3,397); one
-death in the lobby, walking away from a fart left by the mines (at 1212,1240, not looked at yet). It stops in
-path 9, where the ways on (to the Slig Barracks through path 3, to Bonewerkz through path 4) have had nothing
-done for them. What Feeco needed:
+Terminal 1 (path 1), Terminal 2 (path 7), the Main Lobby (path 2) and the junction (path 9), into the path to
+the Slig Barracks (path 3) at f=10,578 with 0 deaths. `f2.txt` is Terminal 2 alone (out at f=3,397, 0 deaths on
+seeds 1 to 3), `f3.txt` from the lobby, `f9.txt` path 9 from its ledge. It stops in path 3 at 2162,2020 with no
+plan: nothing of that path has been looked at (the walkthrough: a ghost lock for the power to go unseen, a lever
+that summons a Slig to take over, two Slig locks that want a code spoken, a teleporter, flying Sligs, a lift).
+The other way on, to Bonewerkz through path 9's lower half and path 4, is untouched too. What Feeco needed:
+- **Which path the level goes on through** (`LevelGraph::Shut`). The lobby has a door out of the level itself
+  (to the executive offices) and one to the path that leads to the Brewery, both behind gates that the ends of
+  other paths open. With no plan for the way on and nothing left to switch, the ways towards the end the path
+  has are struck out and the distances measured again: the lobby is then two paths from the end, through the
+  junction. Backing out of a path is by the way he came in wherever it leads, and a path can be backed out of
+  three times (it is come into again by another door: the junction's ledge first, then its background floor
+  for the lever that turns the fence off, then the ledge again).
+- **Down into a shadow past Sligs** (path 9, AE only). The drop off a hoist is seen and its landing heard by
+  every Slig on that screen (AE: a noise is heard on the screen it is made on), so it waits until each Slig
+  awake on that floor walks away and is off the screen (`GoToTask`, `mDropWait`); walking off the ledge instead
+  costs 300 more where there is a hoist. From cover to cover a Slig that stands or turns has not got its back
+  to him; and a Slig that walks ahead of him the way he goes, or is a screen off and will not be on his before
+  he is across, is as good as one with its back turned (the two there get out of step, and are never both
+  facing away). Tried and dropped: AO's rule with the beat's ends alone (7 deaths for 3).
+- **A fart left under a Slig** on a platform up to 84 over his floor (`Leave a fart under Slig#`): the lobby's
+  guard by the door at 2162,900, which killed him six times before the door was left alone. Not seen to work
+  yet: the plan takes the other doors.
 - **The film stone** that opens the first gate is a hand stone to the bot (`eMovieHandStone` with a switch:
   looked into, it sets it).
 - **Brew and farts** (`FartFlight`, `FartBombTask`, `DrinkTask`; `StepKind::eFartBomb`, `eDrink`; `Key::kBrew`).
@@ -1002,7 +1020,8 @@ done for them. What Feeco needed:
     Terminal 2: the floor of its machine has no way down for a fart, so it is drunk there, he drops through
     the trap door and flies it from the ledge at 637,480.
   - left by a mine (`Leave a fart by Mine#`): made two cells from it with his back to it, then off to 200
-    away until it has gone. For the lobby, whose machine has an orb over it.
+    away until it has gone, and up off any ledge he hangs from (hung over it his legs are in the blast). For
+    the lobby, whose machine has an orb over it.
 - **Flying Sligs to get rid of** (`FeatureKind::eDanger`, `EntityKind::eFlier`). In a path with a Brew machine
   the stretch a flying Slig's track goes along (`Domain::FlierTrack`, down to the floor under it) is not gone
   into until the Slig is dead: the edges into it wait for a switch the world gives as on once it is

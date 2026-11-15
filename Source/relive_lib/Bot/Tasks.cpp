@@ -1152,6 +1152,49 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 // walk at 2.7 a frame and that wait have to cover his way to the next cover at a sneak's 2.5.
                 // He is the slower, so he stays behind it. Path 18's fourth screen: begun as it stood at its
                 // beat's end, it turned with him between the two invisible zones.
+                // (AE: tried the same with its beat's ends, Feeco's path 9, and it was worse, 7 deaths for 3. What
+                // it has there instead: one that stands or turns has not got its back to him, it is about to
+                // have its front. One that stood at its beat's end turned as he came out of the shadow at 737
+                // for the one at 637, two cells in the open.)
+                if (bot.IsAe() && (slig.mMotion == 0 || slig.mMotion == 5))
+                {
+                    behind = false;
+                }
+                // And two more ways of being out of its sight for as long as the way to the next cover takes (at a
+                // sneak's 2.5 a frame), where its beat is known: it walks ahead of him the way he goes, at 2.77,
+                // with enough of its beat left (the cells in front of it are behind it by the time he is in
+                // them); or it is on another screen than his whole way and will not be on one of them before he
+                // is across (AE: it sees what is on its own screen). Feeco's path 9 with its two Sligs out of
+                // step: never both with their backs to him, but one leads him while the other is a screen off.
+                if (bot.IsAe() && !behind && slig.mBeatMax > slig.mBeatMin)
+                {
+                    const s32 way = first.mLeft ? -1 : 1;
+                    const s32 need = (static_cast<s32>(lastOpen) + 2) * cell * 10 / 25 + 12;
+                    const bool walking = slig.mMotion != 0 && slig.mMotion != 5;
+                    const s32 left = slig.mFacingLeft ? slig.mX - slig.mBeatMin : slig.mBeatMax - slig.mX;
+                    if (walking && slig.mFacingLeft == first.mLeft && (slig.mX - here.mX) * way > cell / 2 && std::max(0, left) * 100 / 277 + slig.mBeatPause >= need)
+                    {
+                        behind = true;
+                    }
+                    const s32 camW = nav.Input().mCamW;
+                    const s32 farX = nav.Nodes()[nav.Edges()[path[std::min(last, lastOpen + 1)]].mTo].mX;
+                    const s32 lo = std::min(here.mX, farX) / camW;
+                    const s32 hi = std::max(here.mX, farX) / camW;
+                    const s32 at = slig.mX / camW;
+                    if (at < lo || at > hi)
+                    {
+                        // (coming: as far as the edge of the nearest of his screens. Going: its beat's end, its
+                        // wait there and the way back first.)
+                        const s32 edge = at > hi ? (hi + 1) * camW : lo * camW;
+                        const bool coming = slig.mFacingLeft == (at > hi);
+                        const s32 frames = coming ? std::abs(slig.mX - edge) * 100 / 277
+                                                  : (std::max(0, left) * 2 + std::abs(slig.mX - edge)) * 100 / 277 + slig.mBeatPause;
+                        if (frames >= need)
+                        {
+                            behind = true;
+                        }
+                    }
+                }
                 if (!bot.IsAe() && slig.mBeatMax > slig.mBeatMin)
                 {
                     const s32 way = first.mLeft ? -1 : 1;
@@ -1163,7 +1206,8 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 }
                 const bool safeHere = !open(here);
                 // (one not about yet can't be watched: nothing to wait for)
-                if (!behind && safeHere && slig.mSeen && mHiding < 1500)
+                // (AE's are waited out for longer: two out of step come right only once in a while)
+                if (!behind && safeHere && slig.mSeen && mHiding < (bot.IsAe() ? 4000 : 1500))
                 {
                     mHiding += 6;
                     mSteps--;
@@ -1692,8 +1736,37 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         }
 
         case EdgeKind::eHoistDown:
+        {
+            // Down into a shadow on a floor Sligs walk: he is seen as he drops and lands (not wholly in the
+            // shadow until he stands in it), and the landing is heard by every Slig on that screen (AE: a noise
+            // is heard on the screen it is made on, Events.cpp), which turns to it. So only while every Slig
+            // awake on that floor is walking away from where he comes down and is off that screen. Feeco's
+            // path 9, off the ledge at 1037,340: let down as the two came his way he was shot as he landed, and
+            // let down behind their backs the nearer one, still on his screen, turned and shot.
+            const NavNode& land = nav.Nodes()[first.mTo];
+            // (AE's only: AO's Rupture Farms got through as it was, and did not with this)
+            if (nav.Input().mIsAe && land.mHidden && mDropWait < 1500)
+            {
+                for (const SligAt& s : bot.GetWorld().mSligs)
+                {
+                    if (s.mAsleep || s.mPossessed || s.mHalf != land.mHalf || std::abs(s.mY - land.mY) > 30 || std::abs(s.mX - land.mX) > 700)
+                    {
+                        continue;
+                    }
+                    const bool away = s.mFacingLeft == (s.mX < land.mX);
+                    const bool room = nav.CameraOf(s.mX, s.mY - 5) != nav.CameraOf(land.mX, land.mY - 5);
+                    if (!away || !room)
+                    {
+                        mDropWait += 2;
+                        mSteps--;
+                        return TaskStep::Do(Prim::Wait(2));
+                    }
+                }
+            }
+            mDropWait = 0;
             mLastEdge = path[0];
             return TaskStep::Do(Prim::Press(Btn::eDown));
+        }
 
         case EdgeKind::ePortal:
         {
@@ -5888,7 +5961,7 @@ TaskStep FartBombTask::Next(Bot& bot, const std::string& lastFailed)
         }
     }
     // (left by a mine and walked away from, not flown: Domain)
-    const bool drop = !brew && target->mKind == EntityKind::eMine;
+    const bool drop = !brew && (target->mKind == EntityKind::eMine || target->mKind == EntityKind::eSlig);
     const bool gone = target->mGone || (isFlier && world.mFleechKilled.count(mTarget) != 0);
     if (++mFrames > 6000)
     {
@@ -5972,7 +6045,7 @@ TaskStep FartBombTask::Next(Bot& bot, const std::string& lastFailed)
             return TaskStep::Do(Prim::Wait(3, Btn::eUp));
         }
         // (his back to the mine: the fart is made behind him)
-        if (drop && bot.Abe().mFacingLeft != (target->CentreX() > bot.Abe().mX))
+        if (drop && target->mKind == EntityKind::eMine && bot.Abe().mFacingLeft != (target->CentreX() > bot.Abe().mX))
         {
             return TaskStep::Do(Prim::Face(target->CentreX() > bot.Abe().mX));
         }
@@ -6007,6 +6080,11 @@ TaskStep FartBombTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 return step;
             }
+        }
+        // (hung from a ledge over it his legs are in the blast: up. Feeco's lobby, at 1212,1240.)
+        if (bot.Abe().mMove == Move::eHang)
+        {
+            return TaskStep::Do(Prim::Wait(3, Btn::eUp));
         }
         return TaskStep::Do(Prim::Wait(1));
     }
