@@ -8082,6 +8082,82 @@ TEST(BotGrenadeTargets, ASligOnAFloorWithNoShadowUnderAnOrbIsOneForAGrenadeFromW
     EXPECT_EQ(lit[0].mSlig, 12007u);
 }
 
+TEST(BotGrenadeTargets, AnOrbIsGotByAGrenadeHeldUntilItGoesOffInTheAirByIt)
+{
+    // The Barracks' path 7, its top left: a floor at 100 with an orb at 450,40 over it. A grenade that lay on
+    // that floor under it went off and the orb was still there.
+    EXPECT_FALSE(Domain::BlastGetsOrb(435, 100, 450, 40, false));
+    EXPECT_TRUE(Domain::BlastGetsOrb(435, 70, 450, 40, false));
+    EXPECT_TRUE(Domain::BlastGetsOrb(450, 30, 450, 40, false));
+    EXPECT_FALSE(Domain::BlastGetsOrb(450, 20, 450, 40, false));
+    EXPECT_FALSE(Domain::BlastGetsOrb(495, 60, 450, 40, false));
+    // (at half scale all of it is half as far)
+    EXPECT_FALSE(Domain::BlastGetsOrb(475, 60, 450, 40, true));
+    EXPECT_TRUE(Domain::BlastGetsOrb(465, 50, 450, 40, true));
+
+    NavInput in;
+    in.mLines.push_back(Line(300, 100, 700, 100, 0));
+    NavFeature shadow;
+    shadow.mKind = FeatureKind::eInvisibleZone;
+    shadow.mX1 = 525;
+    shadow.mY1 = 40;
+    shadow.mX2 = 600;
+    shadow.mY2 = 104;
+    in.mFeatures.push_back(shadow);
+    World world;
+    world.mEntities.push_back(MakeEntity(EntityKind::eRockSack, 13002, 675, 68, 699, 104));
+    world.mEntities.back().mInputs[1] = 2;
+    world.mEntities.push_back(MakeEntity(EntityKind::eSecurityOrb, 12020, 450, 40, 474, 64));
+    const std::vector<Domain::OrbTarget> targets = Domain::OrbTargets(in, world);
+    ASSERT_EQ(targets.size(), 1u);
+    EXPECT_EQ(targets[0].mOrb, 12020u);
+    ASSERT_FALSE(targets[0].mShots.empty());
+    // From the shadow first
+    EXPECT_TRUE(targets[0].mShots[0].mHidden);
+    EXPECT_EQ(targets[0].mShots[0].mX, 562);
+    for (const Domain::OrbShot& shot : targets[0].mShots)
+    {
+        EXPECT_EQ(shot.mY, 100);
+        // Held, and it goes off where the flight has it that many frames sooner: in the air by the orb, and not
+        // by him
+        EXPECT_GE(shot.mHold, 4);
+        const ThrowArc::Flight flight = ThrowArc::Grenade(in, shot.mX, shot.mY, false, shot.mFaceLeft, shot.mKind, ThrowArc::kFuse - shot.mHold);
+        EXPECT_EQ(flight.mPoints.size(), static_cast<std::size_t>(ThrowArc::kFuse - shot.mHold) + 1);
+        EXPECT_EQ(flight.mPoints.back().mX, shot.mAtX);
+        EXPECT_EQ(flight.mPoints.back().mY, shot.mAtY);
+        EXPECT_LT(shot.mAtY, 100);
+        EXPECT_TRUE(Domain::BlastGetsOrb(shot.mAtX, shot.mAtY, 450, 40, false));
+        EXPECT_GE(std::abs(shot.mAtX - shot.mX), static_cast<s32>(ThrowArc::kGrenadeKillX));
+        EXPECT_EQ(shot.mFaceLeft, shot.mX > 450);
+        EXPECT_EQ(shot.mHidden, shot.mX == 562);
+    }
+    // Not from where he would be in the blast: an orb a hundred over a floor at 300, and a grenade lobbed from 83
+    // to the side of it is by it 24 frames on, 91 over the floor
+    NavInput low;
+    low.mLines.push_back(Line(300, 300, 700, 300, 0));
+    World over = world;
+    over.mEntities[1] = MakeEntity(EntityKind::eSecurityOrb, 12020, 600, 200, 624, 224);
+    const ThrowArc::Flight lob = ThrowArc::Grenade(low, 512, 300, false, false, ThrowSpot::eLob, 24);
+    EXPECT_TRUE(Domain::BlastGetsOrb(lob.mPoints.back().mX, lob.mPoints.back().mY, 600, 200, false));
+    const std::vector<Domain::OrbTarget> far = Domain::OrbTargets(low, over);
+    ASSERT_EQ(far.size(), 1u);
+    ASSERT_FALSE(far[0].mShots.empty());
+    for (const Domain::OrbShot& shot : far[0].mShots)
+    {
+        EXPECT_TRUE(std::abs(shot.mAtX - shot.mX) >= static_cast<s32>(ThrowArc::kGrenadeKillX) || std::abs(shot.mAtY - shot.mY) >= static_cast<s32>(ThrowArc::kGrenadeKillDown) + 30);
+    }
+    // None with no machine in the path, of an orb that is gone, or in AO
+    World noMachine = world;
+    noMachine.mEntities[0].mInputs[1] = 0;
+    EXPECT_TRUE(Domain::OrbTargets(in, noMachine).empty());
+    World gone = world;
+    gone.mEntities[1].mGone = true;
+    EXPECT_TRUE(Domain::OrbTargets(in, gone).empty());
+    NavInput ao = in;
+    ao.mIsAe = false;
+    EXPECT_TRUE(Domain::OrbTargets(ao, world).empty());
+}
+
 TEST(BotGrenadeTargets, AGrenadeOfAesComesBackDownOffAFloorItFliesUpUnder)
 {
     // Lobbed from under the top floor: up under it and down again, not onto it

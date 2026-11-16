@@ -214,7 +214,7 @@ ThrowArc::Flight ThrowArc::Fly(const NavInput& in, s32 x, s32 y, bool half, bool
 // speed both ways, and to rest on it when it is slower than one down; off a wall at half the speed back; through
 // a floor it comes up under. At rest it slides on, half as fast each frame. A mine it touches goes off at once
 // (Mine::VOnThrowableHit); else it goes off itself at the end of its fuse, and the mines its blast reaches with it.
-ThrowArc::Flight ThrowArc::FlyGrenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, const Point* mine)
+ThrowArc::Flight ThrowArc::FlyGrenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, const Point* mine, s32 fuse)
 {
     Flight flight;
     const ThrowStart& start = kThrows[static_cast<s32>(kind)];
@@ -235,7 +235,7 @@ ThrowArc::Flight ThrowArc::FlyGrenade(const NavInput& in, s32 x, s32 y, bool hal
     }
     flight.mPoints.push_back(Whole(px, py));
     bool resting = false;
-    for (s32 frame = 0; frame < kFuse; frame++)
+    for (s32 frame = 0; frame < fuse; frame++)
     {
         if (resting)
         {
@@ -306,9 +306,9 @@ ThrowArc::Flight ThrowArc::FlyGrenade(const NavInput& in, s32 x, s32 y, bool hal
     return flight;
 }
 
-ThrowArc::Flight ThrowArc::Grenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind)
+ThrowArc::Flight ThrowArc::Grenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, s32 fuse)
 {
-    return FlyGrenade(in, x, y, half, left, kind, nullptr);
+    return FlyGrenade(in, x, y, half, left, kind, nullptr, fuse);
 }
 
 // The rock's box, five lower, on the mine's (measured: the rock's is 4 or 5 either side of it and 9 or 10 to 2

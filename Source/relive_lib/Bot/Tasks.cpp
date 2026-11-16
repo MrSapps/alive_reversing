@@ -4438,6 +4438,132 @@ TaskStep GrenadeSligTask::Next(Bot& bot, const std::string& lastFailed)
     return TaskStep::Do(Prim::Wait(8, Btn::eThrow));
 }
 
+GrenadeOrbTask::~GrenadeOrbTask() = default;
+
+TaskStep GrenadeOrbTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const NavGraph& nav = bot.Nav();
+    const World& world = bot.GetWorld();
+    const AbeState& abe = bot.Abe();
+    const Entity* orb = world.Find(mOrb);
+    if (!orb)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    if (orb->mGone)
+    {
+        // Let the blast die down, and up off his knees
+        if (mSettle++ < 4)
+        {
+            return TaskStep::Do(Prim::Wait(10));
+        }
+        if (abe.mMove == Move::eCrouch)
+        {
+            return TaskStep::Do(Prim::Press(Btn::eUp));
+        }
+        bot.Log("the grenade got SecurityOrb#" + std::to_string(mOrb));
+        return TaskStep::Done();
+    }
+    if (mPhase == 2)
+    {
+        mWait += 5;
+        if (abe.mMove == Move::eIdle)
+        {
+            return TaskStep::Do(Prim::Press(Btn::eDown));
+        }
+        if (mWait < 130)
+        {
+            return TaskStep::Do(Prim::Wait(5));
+        }
+        bot.Log("the grenade did not get SecurityOrb#" + std::to_string(mOrb));
+        return TaskStep::Failed("the grenade missed");
+    }
+    if (world.mRocks <= 0 && mPhase == 0)
+    {
+        return TaskStep::Failed("no grenade");
+    }
+    if (mPhase == 1)
+    {
+        mPhase = 2;
+        mWait = 0;
+        return TaskStep::Do(Prim::Wait(6, Btn::eThrow | BlowMineTask::AimBits(mKind, abe.mFacingLeft)));
+    }
+    TaskStep step;
+    if (!RunGo(mGo, bot, lastFailed, step))
+    {
+        return step;
+    }
+    if (step.mKind == TaskStep::Kind::eFailed)
+    {
+        mNoWay.push_back(mGoNode);
+    }
+    const s32 cur = bot.AbeNode();
+    if (cur < 0 || abe.mMove == Move::eHang)
+    {
+        if (++mLost > 60)
+        {
+            return TaskStep::Failed("off the nav graph");
+        }
+        return TaskStep::Do(abe.mMove == Move::eHang ? Prim::Press(Btn::eUp) : Prim::Wait(4));
+    }
+    mLost = 0;
+    const Domain::OrbShot* shot = nullptr;
+    const std::vector<Domain::OrbTarget> targets = Domain::OrbTargets(nav.Input(), world);
+    const std::vector<s32> regions = nav.Regions();
+    const s32 want = mFrom >= 0 && mFrom < static_cast<s32>(regions.size()) ? regions[mFrom] : -1;
+    s32 node = -1;
+    s32 best = 0;
+    for (const Domain::OrbTarget& t : targets)
+    {
+        if (t.mOrb != mOrb)
+        {
+            continue;
+        }
+        // The cell to throw from: on the stretch of floor planned, where he isn't seen first, the nearest
+        for (const Domain::OrbShot& s : t.mShots)
+        {
+            const s32 n = nav.NodeAt(s.mX, s.mY, orb->mHalf, 12);
+            if (n < 0 || (want >= 0 && regions[n] != want) || std::find(mNoWay.begin(), mNoWay.end(), n) != mNoWay.end())
+            {
+                continue;
+            }
+            const s32 score = (s.mHidden ? 0 : 100000) + std::abs(s.mX - abe.mX) + std::abs(s.mY - abe.mY);
+            if (node < 0 || score < best)
+            {
+                node = n;
+                best = score;
+                shot = &s;
+            }
+        }
+    }
+    if (!shot)
+    {
+        return TaskStep::Failed("nowhere to throw a grenade at the orb from");
+    }
+    if (cur != node)
+    {
+        mGoNode = node;
+        mGo = GoToNode(node);
+        return Next(bot, "");
+    }
+    if (!abe.Settled())
+    {
+        return TaskStep::Do(Prim::Wait(2));
+    }
+    if (abe.mMove == Move::eCrouch)
+    {
+        return TaskStep::Do(Prim::Press(Btn::eUp));
+    }
+    if (abe.mFacingLeft != shot->mFaceLeft)
+    {
+        return TaskStep::Do(Prim::Face(shot->mFaceLeft));
+    }
+    mPhase = 1;
+    mKind = shot->mKind;
+    bot.Log("a grenade for SecurityOrb#" + std::to_string(mOrb) + " (at " + std::to_string(orb->mX1) + "," + std::to_string(orb->mY1) + "): from " + std::to_string(abe.mX) + "," + std::to_string(abe.mY) + ", throw " + std::to_string(static_cast<s32>(mKind)) + " held " + std::to_string(shot->mHold) + " frames, to go off at " + std::to_string(shot->mAtX) + "," + std::to_string(shot->mAtY));
+    return TaskStep::Do(Prim::Wait(8 + shot->mHold, Btn::eThrow));
+}
+
 const UxbAt* DisarmTask::Under(const World& world, s32 fromX, s32 toX, s32 y, bool half)
 {
     const s32 lo = std::min(fromX, toX);
@@ -5718,7 +5844,7 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
         bool orb = false;
         for (const Entity& e : world.mEntities)
         {
-            orb = orb || (e.mKind == EntityKind::eSecurityOrb && nav.CameraOf(e.mX1, e.mY1) == cam);
+            orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.mX1, e.mY1) == cam);
         }
         const s32 sligY = slig->mY;
         const bool half = slig->mHalf;
@@ -5896,7 +6022,7 @@ bool ClearSligTask::FindRaid(Bot& bot, std::function<bool(s32)>& spot) const
         bool orb = false;
         for (const Entity& o : world.mEntities)
         {
-            orb = orb || (o.mKind == EntityKind::eSecurityOrb && nav.CameraOf(o.mX1, o.mY1) == cam);
+            orb = orb || (o.mKind == EntityKind::eSecurityOrb && !o.mGone && nav.CameraOf(o.mX1, o.mY1) == cam);
         }
         const s32 line = LineAt(nav, x, y, e.mHalf);
         if (orb || line < 0)

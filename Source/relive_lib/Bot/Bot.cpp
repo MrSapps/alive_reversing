@@ -218,6 +218,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<DrinkTask>(step.mEntity);
         case StepKind::eGrenade:
             return std::make_unique<GrenadeSligTask>(step.mEntity, step.mEdge);
+        case StepKind::eGrenadeOrb:
+            return std::make_unique<GrenadeOrbTask>(step.mEntity, step.mEdge);
         case StepKind::eFlierBomb:
             return std::make_unique<FlierBombTask>(step.mEntity, step.mEdge);
         case StepKind::eFlierPull:
@@ -2757,7 +2759,9 @@ std::unique_ptr<Task> Bot::MakeFlee()
     // (One that waits before it shoots is run from too: the sneak he was at when it woke is not gone on with.)
     // (hung from the end of its floor he is not seen, and is not on it)
     // (not in a try that sneaks every step: that try is to get by the Slig unheard, and a run from it is heard)
-    if (mAmbushes < 8 && !mWorld.mInvisible && mAbe.mMove != Move::eHang && !(mProfile.mLook && mVary == Lookahead::Way::eQuiet))
+    // (not at a boom machine: its noise turns the Slig, and the run off its screen that the task is at then is
+    // the way out)
+    if (mAmbushes < 8 && !mWorld.mInvisible && mAbe.mMove != Move::eHang && !(mProfile.mLook && mVary == Lookahead::Way::eQuiet) && !dynamic_cast<const GetRocksTask*>(mTask.get()))
     {
         const NavGraph& nav = mKnow->mNav;
         const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);
@@ -2921,7 +2925,7 @@ std::unique_ptr<Task> Bot::MakeReflex()
         bool can = mIsAe && mAbe.mMove == Move::eIdle && !mWorld.mInvisCharge && !mWorld.mInvisComing && !mWorld.mInvisible;
         for (const Entity& e : mWorld.mEntities)
         {
-            can = can && !(e.mKind == EntityKind::eSecurityOrb && nav.CameraOf(e.mX1, e.mY1) == cam);
+            can = can && !(e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.mX1, e.mY1) == cam);
         }
         s32 below = 0;
         for (const SligAt& slig : mWorld.mSligs)

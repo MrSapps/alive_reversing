@@ -1506,9 +1506,25 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
       onto a floor a Slig walks goes before one that does (only that: by frames, the Mudanchee trial went
       from no deaths to twenty-two). So he hoists up at 887 onto the other ledge.
     - A thing a Slig watches under an orb, in a path with a boom machine: used once that orb is gone
-      (`World::Switch` of the orb's own switch). Nothing gives that yet: a grenade that goes off on the
-      floor under the orb at 450,40 (40 to 60 over it) leaves it, and the walkthrough's throw "on the fifth
-      beep", to go off in the air, is not built.
+      (`World::Switch` of the orb's own switch). A grenade that goes off on the floor under the orb at
+      450,40 (60 over it) leaves it; one held in the hand and thrown late goes off in the air by it
+      (`Domain::OrbTargets`, `GrenadeOrbTask`, the walkthrough's throw "on the fifth beep"): the fuse is 90
+      frames from when he takes it in his hand (Grenade.cpp), so held `mHold` frames longer it flies that
+      many fewer of the same flight (`ThrowArc::Grenade`'s `fuse`). `Domain::BlastGetsOrb` is where it has
+      to be then (within 40 to the side, from 10 over to 35 under: from what was seen, not the game's
+      boxes). From 537,100: lobbed, held 36 frames, off at 427,70, and the orb was gone (f=7,418). The two
+      Sligs under it are then taken over from the ledge one after the other, the lever pulled and the third
+      wheel turned at f=8,388 (one death on the way, the one at the hoist at 887). Three places took an orb
+      that was gone for one that was there (`UseTask`, the perch reflex).
+    - The boom machine's noise is the grenade's own bounces (Grenade.cpp: noise and "speaking" each time
+      it comes down), not the button: the Slig turns when it first lands, 16 to 27 frames after the button,
+      while he is still at the machine (24 frames). In the run that works the Slig says "What?" first; from
+      a cold start at the top it shot at once, 13 times. Not solved: nothing he can do is fast enough then.
+    - What is left, the right side: four naked Sligs asleep in a pen between two slam doors (switch 187)
+      with their button at 1313,204, the locker for guns at 1162, the orb at 1175,40, the wheel at 1412.
+      A naked Slig that is taken over presses the button (CrawlingSlig.cpp `HandleCommon`: up at a
+      `CrawlingSligButton`), and at a locker it gets its gun and stays his. Not built: the button as a
+      thing of the map, and the task.
     - A Slig that has only just come to stand with its back to all of his way, and stands for long
       (`Slig::BeatPause`: the least it stands at an end of its beat; `GoToTask::Stood` keeps since when),
       is gone behind as one that walks away is: the one by the boom machine walks two cells and stands 120
