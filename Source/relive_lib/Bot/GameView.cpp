@@ -750,6 +750,7 @@ static void BuildEntities(BinaryPath& path, World& world)
     world.mInvisEver = false;
     world.mFleechKilled.clear();
     world.mNoBomb.clear();
+    world.mNoFlier.clear();
     world.mGatesGone.clear();
     world.mScrabsKilled.clear();
     world.mLocksSlapped.clear();
@@ -1416,6 +1417,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
                 s32 wakeCells = 0;
                 static_cast<::Slig*>(pObj)->Beat(slig.mBeatMin, slig.mBeatMax, wakeCells, slig.mSightDelay);
                 slig.mBeatPause = static_cast<::Slig*>(pObj)->BeatPause();
+                slig.mPanics = static_cast<::Slig*>(pObj)->PanicsAtAChant();
                 slig.mWake = wakeCells * (slig.mHalf ? 13 : 25);
                 slig.mZShoot = slig.mHalf && static_cast<::Slig*>(pObj)->CanZShoot();
                 static_cast<::Slig*>(pObj)->ZShootTiming(slig.mZShootDelay, slig.mZShots);
@@ -1490,6 +1492,17 @@ void GameView::ReadWorld(BaseMap& map, World& world)
     for (s32 i = 0; isAe && i < gBaseAliveGameObjects->Size(); i++)
     {
         BaseAliveGameObject* pObj = gBaseAliveGameObjects->ItemAt(i);
+        if (pObj && !pObj->GetDead() && pObj->Type() == ReliveTypes::eSecurityOrb && !world.mOrbBoxKnown)
+        {
+            const PSX_RECT rect = pObj->VGetBoundingRect();
+            const s32 scale = pObj->GetSpriteScale() != FP_FromInteger(1) ? 2 : 1;
+            world.mOrbBox[0] = (rect.x - FP_GetExponent(pObj->mXPos)) * scale;
+            world.mOrbBox[1] = (rect.y - FP_GetExponent(pObj->mYPos)) * scale;
+            world.mOrbBox[2] = (rect.w - FP_GetExponent(pObj->mXPos)) * scale;
+            world.mOrbBox[3] = (rect.h - FP_GetExponent(pObj->mYPos)) * scale;
+            world.mOrbBoxKnown = true;
+            LOG_INFO("bot: a security orb's box is %d,%d to %d,%d about it", world.mOrbBox[0], world.mOrbBox[1], world.mOrbBox[2], world.mOrbBox[3]);
+        }
         if (pObj && !pObj->GetDead() && pObj->Type() == ReliveTypes::eCrawlingSlig && pObj->mHealth > FP_FromInteger(0))
         {
             if (pObj == sControlledCharacter)
@@ -1716,6 +1729,12 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             rock.mY = FP_GetExponent(pObj->mYPos);
             rock.mHalf = pObj->GetSpriteScale() != FP_FromInteger(1);
             // (one that has come to rest can be picked up)
+            if (pObj->Type() == ReliveTypes::eGrenade && !world.mGrenadeBoxSeen && !pObj->GetInteractive() && pObj->GetAnimation().GetRender())
+            {
+                const PSX_RECT rect = pObj->VGetBoundingRect();
+                world.mGrenadeBoxSeen = true;
+                LOG_INFO("bot: a grenade's box is %d,%d to %d,%d about it", rect.x - rock.mX, rect.y - rock.mY, rect.w - rock.mX, rect.h - rock.mY);
+            }
             if (pObj->GetInteractive())
             {
                 world.mRocksDown.push_back(rock);

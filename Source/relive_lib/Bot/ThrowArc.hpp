@@ -39,7 +39,19 @@ public:
     // there. AE's comes back down off a floor it flies up under; AO's goes through it.
     // fuse: the frames it flies for. Held in the hand before it is thrown its fuse runs on, so it flies for that
     // many fewer and may go off in the air.
-    static Flight Grenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, s32 fuse = kFuse);
+    // off: the boxes of the things it comes back off (BoxOf). A grenade does not go through what a blast can hurt
+    // (Grenade::OnCollision_BounceOff): met within 12 of a side it is put back where it was and sent back along
+    // at half the speed, else put back and sent back up or down at half the speed; each frame it is on the box.
+    struct Box final
+    {
+        s32 mX1 = 0;
+        s32 mY1 = 0;
+        s32 mX2 = 0;
+        s32 mY2 = 0;
+    };
+    // The box of a security orb at (x, y), from what its box is about it at full scale (World::mOrbBox)
+    static Box BoxOf(s32 orbX, s32 orbY, bool half, const s32* about);
+    static Flight Grenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, s32 fuse = kFuse, const std::vector<Box>* off = nullptr);
 
     // Whether a rock there sets off a mine at (x, floor y): sure is on any frame of the mine's light, not sure is
     // on some
@@ -73,7 +85,7 @@ private:
     // blast sets off the mines in it. mHit is then the last frame.
     // at: where it is put
     static bool LandsOn(const NavLine& floor, double fromY, double toY, double* at = nullptr);
-    static Flight FlyGrenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, const Point* mine, s32 fuse = kFuse);
+    static Flight FlyGrenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, const Point* mine, s32 fuse = kFuse, const std::vector<Box>* off = nullptr);
 };
 
 } // namespace Bot

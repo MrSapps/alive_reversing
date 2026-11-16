@@ -2172,6 +2172,11 @@ std::string NavGraph::Text() const
         const NavNode& b = mNodes[mLineFirst[i] + mLineCount[i] - 1];
         out += "floor" + std::to_string(i) + (a.mHalf ? " bg" : " fg") + " x " + std::to_string(a.mX) + ".." + std::to_string(b.mX) + " y " + std::to_string(a.mY) + (a.mY != b.mY ? ".." + std::to_string(b.mY) : "") + " cells " + std::to_string(mLineCount[i]) + "\n";
     }
+    // (all of the path's lines, as the game has them: what is thrown or flown meets the ones that are no floor)
+    for (const NavLine& line : mInput.mLines)
+    {
+        out += "line type " + std::to_string(line.mType) + " " + std::to_string(line.mX1) + "," + std::to_string(line.mY1) + " " + std::to_string(line.mX2) + "," + std::to_string(line.mY2) + "\n";
+    }
     for (const NavEdge& e : mEdges)
     {
         const NavNode& a = mNodes[e.mFrom];

@@ -470,6 +470,11 @@ public:
     {
         return mSligTlv.mPauseLeftMin < mSligTlv.mPauseRightMin ? mSligTlv.mPauseLeftMin : mSligTlv.mPauseRightMin;
     }
+    // For the bot: at a chant it runs for it (it has a time set to panic for)
+    bool PanicsAtAChant() const
+    {
+        return mSligTlv.mPanicTimeout != 0;
+    }
     EReliveLevelIds mAbeLevel = EReliveLevelIds::eNone;
     s16 mAbePath = 0;
     s16 mAbeCamera = 0;
