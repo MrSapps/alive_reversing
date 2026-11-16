@@ -302,6 +302,14 @@ static s32 DirOf(s32 grabDirection)
     return grabDirection;
 }
 
+// A UXB whose object is not about: off, by what its TLV keeps of it (UXB.cpp: its state is kept there as "not as it
+// starts")
+static bool UxbOff(const relive::Path_TLV& tlv)
+{
+    const auto& t = static_cast<const relive::Path_UXB&>(tlv);
+    return (t.mStartState == relive::Path_UXB::StartState::eOn) == (tlv.mTlvSpecificMeaning != 0);
+}
+
 NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
 {
     NavInput in;
@@ -520,6 +528,11 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                 {
                     NavFeature f = MakeFeature(FeatureKind::eHazard, tlv, camera, id);
                     f.mHalf = static_cast<const relive::Path_UXB&>(tlv).mScale == relive::reliveScale::eHalf;
+                    // (a slap turns it off, in AE where the bot does that: then it is floor)
+                    if (GetGameType() == GameType::eAe)
+                    {
+                        f.mSwitch = World::HazardSwitch(id);
+                    }
                     in.mFeatures.push_back(f);
                     break;
                 }
@@ -588,6 +601,11 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                     // (where the lift is to start with)
                     f.mA = static_cast<const relive::Path_LiftPoint&>(tlv).mIsStartPoint ? 1 : 0;
                     f.mB = static_cast<const relive::Path_LiftPoint&>(tlv).mLiftPointId;
+                    // (the end of the ride: he cannot take the lift on past it, though a lift mover can)
+                    {
+                        const auto type = static_cast<const relive::Path_LiftPoint&>(tlv).mLiftPointStopType;
+                        f.mC = type == relive::Path_LiftPoint::LiftPointStopType::eTopFloor ? 1 : (type == relive::Path_LiftPoint::LiftPointStopType::eBottomFloor ? 2 : 0);
+                    }
                     in.mFeatures.push_back(f);
                     break;
                 }
@@ -767,6 +785,15 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mHalf = t.mScale == relive::reliveScale::eHalf;
                     e.mSwitch = t.mSwitchId;
                     e.mOp = OpOf(t.mAction);
+                    break;
+                }
+                case ReliveTypes::eUXB:
+                {
+                    const auto& t = static_cast<const relive::Path_UXB&>(tlv);
+                    e.mKind = EntityKind::eUxb;
+                    keep = GetGameType() == GameType::eAe;
+                    e.mHalf = t.mScale == relive::reliveScale::eHalf;
+                    e.mSwitch = World::HazardSwitch(e.mId);
                     break;
                 }
                 case ReliveTypes::eMine:
@@ -1204,6 +1231,7 @@ bool GameView::ReadPath(BaseMap& map, s32 pathId, NavInput& input, World& world)
     {
         const relive::Path_TLV* pTlv = static_cast<const relive::Path_TLV*>(world.mTlvs[i]);
         world.mEntities[i].mGone = pTlv->mTlvFlags.Get(relive::eBit2_Destroyed) && !pTlv->mTlvFlags.Get(relive::eBit1_Created);
+        world.mEntities[i].mGone = world.mEntities[i].mGone || (world.mEntities[i].mKind == EntityKind::eUxb && UxbOff(*pTlv));
     }
     MarkFlierTargets(input, world);
     MarkGrenadeTargets(input, world);
@@ -1245,6 +1273,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
         const relive::Path_TLV* pTlv = static_cast<const relive::Path_TLV*>(world.mTlvs[i]);
         // Both are set while its object is about: gone for good is destroyed and not there
         e.mGone = pTlv->mTlvFlags.Get(relive::eBit2_Destroyed) && !pTlv->mTlvFlags.Get(relive::eBit1_Created);
+        e.mGone = e.mGone || (e.mKind == EntityKind::eUxb && UxbOff(*pTlv));
         e.mLive = false;
         e.mFollowing = false;
         e.mMood = MudMood::eNormal;
@@ -1601,6 +1630,14 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             uxb.mGreen = pUxb->IsGreen();
             uxb.mOff = pUxb->IsOff();
             world.mUxbs.push_back(uxb);
+            // (and the one of the map it is: as it is now, not as its TLV last had it)
+            for (Entity& e : world.mEntities)
+            {
+                if (e.mKind == EntityKind::eUxb && e.mHalf == uxb.mHalf && uxb.mX >= e.mX1 - 6 && uxb.mX <= e.mX2 + 6 && uxb.mY >= e.mY1 - 10 && uxb.mY <= e.mY2 + 10)
+                {
+                    e.mGone = uxb.mOff;
+                }
+            }
         }
     }
 
@@ -1938,6 +1975,7 @@ NavInput GameView::BuildNavInput(BaseMap& map)
     {
         const relive::Path_TLV* pTlv = static_cast<const relive::Path_TLV*>(things.mTlvs[i]);
         things.mEntities[i].mGone = pTlv->mTlvFlags.Get(relive::eBit2_Destroyed) && !pTlv->mTlvFlags.Get(relive::eBit1_Created);
+        things.mEntities[i].mGone = things.mEntities[i].mGone || (things.mEntities[i].mKind == EntityKind::eUxb && UxbOff(*pTlv));
     }
     MarkFlierTargets(in, things);
     MarkGrenadeTargets(in, things);

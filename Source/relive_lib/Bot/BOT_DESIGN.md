@@ -102,7 +102,7 @@ hash.
 | killing Mudokons (for `kill_all`) | - | - | by slapping, where the way out doesn't need the Mudokon. Not by Sligs, mines or drops. |
 | skip movies | yes | yes | done |
 | pull rings | Mines path 1 (a wheel is on the same cell) | yes | **not working**: up turns the wheel instead |
-| UXBs' timing, disarming | Mines path 1, 5 | yes | **missing**: hopped over, which went wrong once in a full run |
+| UXBs' timing, disarming | Mines path 1, 5 | yes | AE: turned off where the way goes through one, hopped over otherwise (see "UXBs turned off"). AO: hopped over |
 | trap doors, falling items, meat saws, drills | paths 2-4 | yes | **missing** (timed hazards: the retry delay is meant to find the gap) |
 | possession, shooting, security orbs | paths 2, 5, 10 | yes | **missing** |
 | Slogs lured into electric walls | Mines path 3 | no | done (`SlogTrapTask`) |
@@ -1367,15 +1367,18 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
     after the take-off, 3 hung under the ledge, 23 pulling up with his box over the ledge long before he
     stands. Up from a crouch 9, round 12; a running jump with a one cell run-up starts turned away (10) and
     comes round in 5. A level running jump is still a guess (its cost in frames, a wide box).
-  - The map: a trap door is hopped over like a gap, shut or open (AE only: in Rupture Farms it did not
-    work, not looked into); and nothing falls through a trap door
-    into a death drop (path 5 has a floor under its death drop).
+  - The map: a trap door is hopped over like a gap while it is open and walked over while it is shut (the
+    hop carries the trap door's switch as its condition, as the walk onto it and the fall through it do, so
+    a plan that shuts or opens it on the way counts what comes after with it as it will then be). In both
+    games: hopped whatever the switch said, it broke Rupture Farms' paths 15 and 16; with the condition AO
+    reaches the Stockyards 171 frames sooner. Nothing falls through a trap door into a death drop (path 5
+    has a floor under its death drop).
   - `build-bot/la/blk5.txt`, from the block's door: past the first two mines, the lift, the first lever
     (which brings the third lift up), over the open trap doors with the mines in their gaps, up and back
     over the top to the second lever (the trap doors shut), down and back across them, with 0 deaths, by
-    f=1,704 (`Source/Tools/bot_runs/ae_barracks_workers_campus.txt`). Then stuck: what is next is the Mudokon
-    to lead over the trap doors and the screen of UXBs, which the bot does not turn off yet. `BombStep` is
-    only tested in the game.
+    f=1,704 (`Source/Tools/bot_runs/ae_barracks_workers_campus.txt`). `BombStep` is only tested in the game.
+    (That was the run before UXBs were turned off: `any` now leaves the second lever alone, it is only
+    for the Mudokon. See the UXBs below.)
   - The mine's box: it changes with its animation, 18 to 25 wide. Told ahead with the box it had at the
     moment of looking, he hopped off beside a shaft as the box grew by 5 and was blown up; so the boxes of
     late are kept too, the frames after which they come round found, and the box it will have then used. Until
@@ -1384,8 +1387,52 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
   - The Mines (`m1`): its last path now hops its trap doors where it walked them, 15 frames sooner at the
     last run to the door, and dies once there under the explosion set (falling rocks and blasts, nothing the
     bot times: before, it came through by when it happened to get there). The retry gets through.
+- **UXBs turned off** (AE; `UXB.cpp`: a slap while its light is green turns it off, and its TLV keeps
+  "not as it starts" for when its screen is gone). A UXB is an `EntityKind::eUxb` whose switch
+  (`World::HazardSwitch`) is on once it is off or has gone off; its cell is a hazard with that switch to
+  clear it, as a mine's is, so the ways through it are there once it is off and the hops over it are there
+  anyway. `Domain` gives "Turn off UXB#n from x,y" from the cell on either side of it on its floor (one
+  with a UXB of its own once that is off); `DisarmTask`, which before only ran for Mudokons in tow, does it,
+  going to that cell first since the UXB is not about until its screen is. A UXB's switch is never tried
+  "to see what it does". Only tested in the game: `DisarmTask`.
+  What came with it, each found on the way through path 5 from the lift down:
+  - A lift is ridden no further than a stop that ends the ride that way (`Path_LiftPoint`'s top floor and
+    bottom floor, `NavFeature::mC`): the lift the first lever brings up from 1500 to 980 goes down no lower
+    than 1158 with him on it. And `World::LiftAtStop` goes by the stop's ends, not a point: the lift at
+    3900..3976 was taken for the one at 3850..3926 under it.
+  - Every cell he has stood on counts as "been" for its region (`Bot::mCellsBeen`): the cells of a trap door
+    are a region of their own once it is shut, and "somewhere new" took him back over them and off a ledge
+    there was no way back from.
+  - A hop to a ledge: by where he has begun to drop the ledge is out of reach by as much as he has dropped
+    (level for three cells, 51 down by 88 out). From 3637,1500 at the ledge 80 up that ends 88 off he fell
+    past it, twice.
+  - A running jump ends at the ledge it catches on its way up (`NavGraph::CatchesUp`: 30 to 110 up, its near
+    end two to three and a half cells and 4 from the take-off), not at one beyond it: off 3637,1500 he was
+    hung from the edge that ends at 3549, 80 up, 12 frames later, where the map had him land on the floor
+    under it.
+  - A Slig that wakes does not stop the run-up of a running jump (he ran on off the end of the ledge). A
+    running jump that ends hung from a ledge at its own height is in `Bodies` as measured (16 frames
+    through the air, up to 31 over the take-off and 15 under it at the catch, then hung and up in 26 with
+    his box down to 70 under the ledge), so the flying mine that goes round under the ledge at 2137,1660 is
+    waited for. The Slig asleep under it wakes at the run, and is taken over and got rid of from the ledge
+    (the reflex there was already).
+  - A Slig walked into a flying mine (`ClearSligTask::IntoMine`, started by `BombStep` once a walk): where a
+    mine is in the way and one Slig is on the floor it comes down to, he chants from where the blast does
+    not reach (60 to either side of the mine and 60 over it: he keeps 130 off), with the Slig asleep or on
+    another floor and no orb on the screen, and walks the Slig at the mine. Both are gone. The
+    walkthrough's way with that screen ("possess the sleeping Slig. Use him to blow up the Flying Mine"),
+    done from the left ledge before the jump: from the right one the blast would reach him. Only tested
+    in the game.
+  - `build-bot/la/blk5.txt`, from the block's door, 0 deaths: the first lever f=834, the lever that brings
+    the fourth lift f=1,153, the running jump to the UXBs' middle ledge and its UXB off f=1,520, over it to
+    the far ledge f=1,575, through the door, the Slig walked into the mine f=2,432, over to the right ledge
+    and up, at 2112,1380 f=2,745, and along to the three UXBs by the laughing gas. Then it goes to and fro: the way on is up the lift at
+    1362,1500 past two screens of Sligs and flying mines to the lift at 1237,840, and the planner takes
+    that lift's lower stop (960, where it is not) for a way the walker then refuses. From a lift's platform
+    there is no hop to a ledge yet (`gap = n.mLiftStop < 0`), which the walkthrough's way up there starts
+    with. Left to wander it also takes the hoist at 2687,2179 down 320 into the secret area and dies.
 - **Blocks 2, 3 and 4** (first tries from inside their doors, scratch runs): block 2 (path 5, the workers'
-  campus), past its first flying mines (above), wants UXBs turned off, a Slig taken over to blow up a mine,
+  campus), past its first flying mines and its UXBs (above), wants the lifts past the Sligs and mines,
   and three Mudokons rescued at once for a Shrykull that clears the way to the wheel (switch 125). Block 3
   (path 7), whose door shuts behind him, is the one he starts on: a wheel (switch 177), then a Slig lock
   with a Slig called by a lever, where he dies six times and gives up. Block 4 (path 9) not looked at again.

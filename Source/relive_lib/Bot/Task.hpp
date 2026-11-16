@@ -60,10 +60,12 @@ class GoToTask;
 class DisarmTask final : public Task
 {
 public:
-    DisarmTask(s32 x, s32 y, bool half)
+    // stand: the cell to do it from (-1: either side of it)
+    DisarmTask(s32 x, s32 y, bool half, s32 stand = -1)
         : mX(x)
         , mY(y)
         , mHalf(half)
+        , mStand(stand)
     {
     }
     ~DisarmTask() override;
@@ -79,6 +81,7 @@ private:
     s32 mX;
     s32 mY;
     bool mHalf;
+    s32 mStand;
     std::unique_ptr<GoToTask> mGo;
     bool mWasGreen = true;
     s32 mFrames = 0;
@@ -431,6 +434,9 @@ private:
     s32 mBombWatch = 0;
     s32 mBombWait = 0;
     bool mBombDuck = false;
+    // A Slig taken over and walked into a flying mine that is in the way (once a walk)
+    std::unique_ptr<Task> mBombSlig;
+    bool mBombSligTried = false;
     // The cell he is set to go on from when the mines were out of the way, and until when
     s32 mBombUp = -1;
     u32 mBombUpAt = 0;
@@ -733,10 +739,19 @@ public:
         task->mAmbush = true;
         return task;
     }
+    // A Slig on the floor a flying mine comes down to: chant where he stands (out of reach of the blast), and
+    // walk it into the mine. Both are gone. (The walkthrough's way with the Barracks' workers' campus: "possess
+    // the sleeping Slig. Use him to blow up the Flying Mine.")
+    static std::unique_ptr<ClearSligTask> IntoMine(u32 mine)
+    {
+        std::unique_ptr<ClearSligTask> task = Ambush();
+        task->mMine = mine;
+        return task;
+    }
     ~ClearSligTask() override;
     std::string Name() const override
     {
-        return mInner ? mInner->Name() : "Take over the Slig that woke";
+        return mInner ? mInner->Name() : mMine ? "Walk a Slig into the flying mine" : "Take over the Slig that woke";
     }
     TaskStep Next(Bot& bot, const std::string& lastFailed) override;
     // The Slig that would see Abe working at (x, y), or null. Asleep ones and ones not about don't count.
@@ -787,6 +802,9 @@ private:
     u32 ShootLevel(const World& world, const SligAt& me, s32 targetX, s32 frames);
     bool mGaveUp = false;
     bool mAmbush = false;
+    // The flying mine the Slig is walked into (0: none), and the frames it has been walked for
+    u32 mMine = 0;
+    s32 mMineFrames = 0;
     bool mBehind = false;
     // The power to go unseen kept for the last cell before the Slig's beat: 0 not looked at, 1 to the last cell
     // off its level, 2 waiting there for its back, 3 to that cell, 4 chanting, 5 done with

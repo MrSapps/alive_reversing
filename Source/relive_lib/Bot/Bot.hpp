@@ -70,6 +70,9 @@ struct BotMemory
     std::set<std::pair<s32, u32>> mExplored;
     // The regions (path, kRegion value) he has stood in, and how often each has been made for
     std::set<std::pair<s32, s32>> mRegionsBeen;
+    // The cells (path, node) he has stood on: the region of each counts as been in, whatever it was then (a
+    // trap door's cells are a region of their own once it is shut, and he may have walked over them)
+    std::set<std::pair<s32, s32>> mCellsBeen;
     std::map<std::pair<s32, s32>, s32> mRegionTries;
     std::pair<s32, s32> mRegionGoal{0, 0};
     // The path in which any path not yet visited became good enough to leave by
