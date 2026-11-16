@@ -450,6 +450,10 @@ struct World final
         return 600000 + static_cast<s32>(id);
     }
     std::vector<UxbAt> mUxbs;
+    // AE's crawling Sligs that are about and alive (naked ones: at a locker they come by a gun and are Sligs)
+    std::vector<RockAt> mCrawlers;
+    // The lockers of the path at which one of those comes by wings: a flying Slig may come to be there
+    std::vector<RockAt> mWingLockers;
     std::vector<SweepAt> mSweeps;
     // A Slig that waits at least this many frames before it shoots at what it has seen can be run from
     static constexpr s32 kOutrunDelay = 45;

@@ -96,6 +96,7 @@ enum class StepKind : u8
     eFlierBomb, // from the cell mEdge take over the flying Slig that spawner mEntity makes and throw its grenades
                 // at the Sligs it can get at (Domain::FlierTargets)
     eFlierPull, // from the cell mEdge take over the flying Slig that spawner mEntity makes and pull lever mOther
+    eFlierLock, // the same, and fly it to Slig lock mOther and say the lock's code back to it
                 // with it
     eGrenade,   // throw a grenade at Slig mEntity from the stretch of floor of the cell mEdge
                 // (Domain::GrenadeTargets)

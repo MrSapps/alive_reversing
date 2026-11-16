@@ -4229,8 +4229,15 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         }
         // The cells he can get to without going onto the floor of any of those Sligs
         const std::vector<FlierTarget> targets = FlierTargets(nav.Input(), world, spawner);
-        const auto guarded = [&nav, &targets](s32 node)
+        // (where he stands on the floor of one of them there is no bombing it from, but a lever or a lock the
+        // flying Slig is wanted for is another matter: then nothing is kept off)
+        bool onTheirs = false;
+        const auto guarded = [&nav, &targets, &onTheirs](s32 node)
         {
+            if (onTheirs)
+            {
+                return false;
+            }
             for (const FlierTarget& target : targets)
             {
                 if (OnFlierTargetsFloor(nav, target, node))
@@ -4241,10 +4248,11 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             return false;
         };
         std::vector<u8> reach(nav.Nodes().size(), 0);
-        if (abeNode < 0 || guarded(abeNode))
+        if (abeNode < 0)
         {
             continue;
         }
+        onTheirs = guarded(abeNode);
         std::vector<s32> open{abeNode};
         reach[abeNode] = 1;
         while (!open.empty())
@@ -4262,6 +4270,13 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             }
             for (const NavEdge& edge : nav.Edges())
             {
+                // (not through what is shut as things are: the place to take it over from is one he can get to now)
+                s32 sw = 0;
+                s32 value = 0;
+                if (edge.mFrom == at && !reach[edge.mTo] && nav.Condition(edge, &sw, &value) && world.Switch(sw) != value)
+                {
+                    continue;
+                }
                 if (edge.mFrom == at && !reach[edge.mTo] && !guarded(edge.mTo))
                 {
                     reach[edge.mTo] = 1;
@@ -4285,6 +4300,10 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         const std::string from = " with the flying Slig of FlierSpawner#" + std::to_string(spawner.mId) + " from " + std::to_string(nav.Nodes()[spot].mX) + "," + std::to_string(nav.Nodes()[spot].mY);
         for (const FlierTarget& target : targets)
         {
+            if (onTheirs)
+            {
+                break;
+            }
             // (its floor is a stretch nothing is crossed into until it is dead: GameView::BuildNavInput)
             const Goap::Fact dead{Key::Switch(World::HazardSwitch(target.mSlig)), 1};
             if (!target.mShots.empty())
@@ -4350,6 +4369,29 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 const std::vector<Goap::Fact> effects = d.mActions[ai].mEffects;
                 add("Have the flying Slig of FlierSpawner#" + std::to_string(spawner.mId) + " pull " + name.substr(4), pre, effects, 700, pull);
             }
+        }
+        // A Slig lock it can fly into the box of: it says the code back as one that walks does. (The Barracks'
+        // Slig bunks: "possess the flying Slig... Talk to the Slig Lock".)
+        for (const Entity& lock : world.mEntities)
+        {
+            if (lock.mKind != EntityKind::eSligLock || lock.mSwitch <= 1 || world.Switch(lock.mSwitch) != 0 || world.mLockCodes.count(lock.mId) == 0 || lock.mHalf != spawner.mHalf ||
+                std::abs(lock.CentreX() - fromX) + std::abs((lock.mY1 + lock.mY2) / 2 - fromY) > kFlierReach)
+            {
+                continue;
+            }
+            std::vector<std::pair<s32, s32>> corners;
+            if (!FlierWay(nav.Input(), spawner.mHalf, fromX, fromY, lock.CentreX(), (lock.mY1 + lock.mY2) / 2, &shut, corners))
+            {
+                continue;
+            }
+            // (dear: the wait for it to come by, the chant, the flight and the talk were 870 frames there, and a
+            // lock a Slig can walk to is the one to do first)
+            DomainStep speak;
+            speak.mKind = StepKind::eFlierLock;
+            speak.mEntity = spawner.mId;
+            speak.mOther = lock.mId;
+            speak.mEdge = spot;
+            add("Open SligLock#" + std::to_string(lock.mId) + " sw" + std::to_string(lock.mSwitch) + " with the flying Slig of FlierSpawner#" + std::to_string(spawner.mId), {regionFact(spot)}, {{Key::Switch(lock.mSwitch), 1}}, 1500, speak);
         }
     }
 
@@ -5013,13 +5055,6 @@ std::string Domain::Text() const
 s32 Domain::FlierSpot(const NavGraph& nav, const World& world, const Entity& spawner, const std::vector<u8>& reach)
 {
     const s32 cam = nav.CameraOf(spawner.CentreX(), (spawner.mY1 + spawner.mY2) / 2);
-    for (const Entity& e : world.mEntities)
-    {
-        if (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.mX1, e.mY1) == cam)
-        {
-            return -1;
-        }
-    }
     // Where he isn't seen, if there is such a cell; else the cell furthest from the track it flies along (the
     // Barracks' path 1: the ledge at 2187,860, which is where the walkthrough takes it over from)
     s32 x1 = 0;
@@ -5028,12 +5063,66 @@ s32 Domain::FlierSpot(const NavGraph& nav, const World& world, const Entity& spa
     s32 y2 = 0;
     std::vector<NavLine> track;
     FlierTrack(nav.Input(), spawner.CentreX(), (spawner.mY1 + spawner.mY2) / 2, x1, y1, x2, y2, nullptr, &track);
+    // A flying Slig that is there already flies a track of its own, and is taken over from any screen that
+    // goes through: the one where he is furthest from it. (The Barracks' path 7: the one at 1424,598 comes down
+    // to 838 over the floor at 980, and the walkthrough has him "go right all the way and possess" it there;
+    // from the ledge at 620 by its lock, 40 under its track, it had him every time.)
+    std::set<s32> cams{cam};
+    // (and the one its spawner makes, or one that has come by its wings on that track, where that track goes)
+    for (const NavLine& line : track)
+    {
+        cams.insert(nav.CameraOf(line.mX1, line.mY1));
+        cams.insert(nav.CameraOf(line.mX2, line.mY2));
+    }
+    for (const Entity& flier : world.mEntities)
+    {
+        if (flier.mKind != EntityKind::eFlier || flier.mGone || flier.mHalf != spawner.mHalf)
+        {
+            continue;
+        }
+        std::vector<NavLine> own;
+        FlierTrack(nav.Input(), flier.CentreX(), (flier.mY1 + flier.mY2) / 2, x1, y1, x2, y2, nullptr, &own);
+        for (const NavLine& line : own)
+        {
+            cams.insert(nav.CameraOf(line.mX1, line.mY1));
+            cams.insert(nav.CameraOf(line.mX2, line.mY2));
+            track.push_back(line);
+        }
+    }
+    // (and one that is about, wherever it has come from: a naked Slig that came by wings at a locker. Where it
+    // is counts as its track. The Barracks' path 7: the one that hangs at 1417,828 over the floor at 980.)
+    for (const FlierAt& f : world.mFliers)
+    {
+        if (f.mHalf == spawner.mHalf)
+        {
+            cams.insert(nav.CameraOf(f.mX, f.mY - 20));
+            track.push_back(NavLine{f.mX, f.mY, f.mX, f.mY, 8});
+        }
+    }
+    // (or is still to come by them: the screen of the locker for wings is one a flying Slig comes to be on. He
+    // waits there for it, as the walkthrough has it: "he'll be back and you'll get him then".)
+    for (const RockAt& locker : world.mWingLockers)
+    {
+        cams.insert(nav.CameraOf(locker.mX, locker.mY - 20));
+        track.push_back(NavLine{locker.mX, locker.mY - 40, locker.mX, locker.mY - 40, 8});
+    }
+    for (const Entity& e : world.mEntities)
+    {
+        if (e.mKind == EntityKind::eSecurityOrb && !e.mGone)
+        {
+            cams.erase(nav.CameraOf(e.mX1, e.mY1));
+        }
+    }
+    if (cams.empty())
+    {
+        return -1;
+    }
     s32 best = -1;
     s64 bestFar = -1;
     for (std::size_t n = 0; n < nav.Nodes().size(); n++)
     {
         const NavNode& node = nav.Nodes()[n];
-        if (!reach[n] || node.mHazard || node.mLow || node.mHalf != spawner.mHalf || node.mTrapDoor >= 0 || node.mLiftStop >= 0 || nav.CameraOf(node.mX, node.mY - 5) != cam)
+        if (!reach[n] || node.mHazard || node.mLow || node.mHalf != spawner.mHalf || node.mTrapDoor >= 0 || node.mLiftStop >= 0 || cams.count(nav.CameraOf(node.mX, node.mY - 5)) == 0)
         {
             continue;
         }
@@ -5111,6 +5200,18 @@ bool Domain::FlierWay(const NavInput& in, bool half, s32 fromX, s32 fromY, s32 t
                 beside.mType = 1;
                 more.push_back(beside);
             }
+        }
+    }
+    // Where it starts may be nearer a wall than it flies by one (where its spawner puts it, by the wall of its
+    // shaft: the Barracks' path 7, at 1436 with the wall at 1453): from there it comes away from the wall first
+    for (const NavLine& line : in.mLines)
+    {
+        const bool flat = std::abs(line.mX2 - line.mX1) >= std::abs(line.mY2 - line.mY1);
+        const s32 wallTypes[] = {half ? 5 : 1, half ? 6 : 2, half ? 18 : 17};
+        if (!flat && std::find(std::begin(wallTypes), std::end(wallTypes), line.mType) != std::end(wallTypes) && fromY >= std::min(line.mY1, line.mY2) && fromY <= std::max(line.mY1, line.mY2) &&
+            std::abs(fromX - line.mX1) <= kFlierSide)
+        {
+            fromX = line.mX1 + (fromX < line.mX1 ? -(kFlierSide + 1) : kFlierSide + 1);
         }
     }
     std::vector<FartFlight::Point> way;

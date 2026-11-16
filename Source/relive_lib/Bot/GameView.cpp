@@ -757,6 +757,7 @@ static void BuildEntities(BinaryPath& path, World& world)
     world.mScrabBoundsLeft.clear();
     world.mScrabBoundsRight.clear();
     world.mSlogSpawners.clear();
+    world.mWingLockers.clear();
     for (auto& cam : path.GetCameras())
     {
         if (!cam)
@@ -768,6 +769,13 @@ static void BuildEntities(BinaryPath& path, World& world)
         for (auto& upTlv : cam->mTlvs.mTlvs)
         {
             const relive::Path_TLV& tlv = *upTlv;
+            if (tlv.mTlvType == ReliveTypes::eSligGetWings)
+            {
+                RockAt locker;
+                locker.mX = (tlv.mTopLeftX + tlv.mBottomRightX) / 2;
+                locker.mY = tlv.mBottomRightY;
+                world.mWingLockers.push_back(locker);
+            }
             Entity e;
             e.mId = static_cast<u32>(camera) * 1000 + idx++;
             e.mCamera = camera;
@@ -1396,6 +1404,19 @@ void GameView::ReadWorld(BaseMap& map, World& world)
     world.mFleechesAwake.clear();
     world.mFleechesAsleep.clear();
     world.mLocksIntact.clear();
+    world.mCrawlers.clear();
+    for (s32 i = 0; isAe && i < gBaseAliveGameObjects->Size(); i++)
+    {
+        BaseAliveGameObject* pObj = gBaseAliveGameObjects->ItemAt(i);
+        if (pObj && !pObj->GetDead() && pObj->Type() == ReliveTypes::eCrawlingSlig && pObj->mHealth > FP_FromInteger(0))
+        {
+            RockAt crawler;
+            crawler.mX = FP_GetExponent(pObj->mXPos);
+            crawler.mY = FP_GetExponent(pObj->mYPos);
+            crawler.mHalf = pObj->GetSpriteScale() != FP_FromInteger(1);
+            world.mCrawlers.push_back(crawler);
+        }
+    }
     for (s32 i = 0; isAe && i < gBaseAliveGameObjects->Size(); i++)
     {
         BaseAliveGameObject* pObj = gBaseAliveGameObjects->ItemAt(i);

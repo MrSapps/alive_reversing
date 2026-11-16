@@ -102,6 +102,8 @@ struct BotMemory
     u32 mUnseenUse = 0;
     // The path for which why no way out is known has been logged
     s32 mWhyNoWayOut = -1;
+    // (and how many things there were to do other than cross when that was last said: said again when it changes)
+    s32 mWhyCount = -1;
     u32 mExploring = 0;
     std::string mLastSligs;
     s32 mLastAwakeSligs = 0;

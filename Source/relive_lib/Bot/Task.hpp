@@ -1092,16 +1092,18 @@ class FlierBombTask final : public Task
 {
 public:
     // lever: not for the Sligs, but to pull that lever with it
-    FlierBombTask(u32 spawner, s32 spot, u32 lever = 0)
+    // lock: nor for a lever, but to say that Slig lock's code back to it
+    FlierBombTask(u32 spawner, s32 spot, u32 lever = 0, u32 lock = 0)
         : mSpawner(spawner)
         , mSpot(spot)
         , mLever(lever)
+        , mLock(lock)
     {
     }
     ~FlierBombTask() override;
     std::string Name() const override
     {
-        return mLever ? "Pull #" + std::to_string(mLever) + " with the flying Slig of #" + std::to_string(mSpawner) : "Bomb the Sligs with the flying Slig of #" + std::to_string(mSpawner);
+        return mLock ? "Open SligLock#" + std::to_string(mLock) + " with the flying Slig of #" + std::to_string(mSpawner) : mLever ? "Pull #" + std::to_string(mLever) + " with the flying Slig of #" + std::to_string(mSpawner) : "Bomb the Sligs with the flying Slig of #" + std::to_string(mSpawner);
     }
     TaskStep Next(Bot& bot, const std::string& lastFailed) override;
 
@@ -1109,6 +1111,11 @@ private:
     u32 mSpawner;
     s32 mSpot;
     u32 mLever;
+    u32 mLock;
+    // What it has said to the lock so far (SligLockTask::Say)
+    bool mHi = false;
+    s32 mSaid = 0;
+    s32 mLockState = -1;
     // What the lever's switch was when this began
     bool mLeverKnown = false;
     s32 mLeverWas = 0;
