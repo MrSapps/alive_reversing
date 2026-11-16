@@ -2763,7 +2763,9 @@ std::unique_ptr<Task> Bot::MakeFlee()
     // (not in a try that sneaks every step: that try is to get by the Slig unheard, and a run from it is heard)
     // (not at a boom machine: its noise turns the Slig, and the run off its screen that the task is at then is
     // the way out)
-    if (mAmbushes < 8 && !mWorld.mInvisible && mAbe.mMove != Move::eHang && !(mProfile.mLook && mVary == Lookahead::Way::eQuiet) && !dynamic_cast<const GetRocksTask*>(mTask.get()))
+    // (nor with a grenade thrown from a shadow: the Slig it is for turns to its noise, and out of the shadow is
+    // into its sight. The Barracks' path 7: shot as he left the shadow at 562 for this.)
+    if (mAmbushes < 8 && !mWorld.mInvisible && mAbe.mMove != Move::eHang && !(mProfile.mLook && mVary == Lookahead::Way::eQuiet) && !dynamic_cast<const GetRocksTask*>(mTask.get()) && !dynamic_cast<const GrenadeSligTask*>(mTask.get()) && !dynamic_cast<const GrenadeOrbTask*>(mTask.get()))
     {
         const NavGraph& nav = mKnow->mNav;
         const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);
@@ -2942,6 +2944,15 @@ std::unique_ptr<Task> Bot::MakeReflex()
             }
             // (a chant wakes one that sleeps, and one on his own level sees him)
             can = can && !slig.mAsleep && std::abs(slig.mY - mAbe.mY) > (mAbe.mHalfScale ? 35 : 45);
+            // (nor one on a beat that goes on off the screen, that panics: at the chant it runs, off the screen
+            // and back, and is never on it long enough to be taken. The Barracks' path 7: three chants under the
+            // Slig of 1012 to 1262, 200 frames each, and it ran its beat at 6 a frame for as long after. One
+            // that has come after him off its beat is taken: the Mines' path 10, at 2683,599.)
+            if (slig.mPanics && slig.mBeatMax > slig.mBeatMin && slig.mX >= slig.mBeatMin && slig.mX <= slig.mBeatMax)
+            {
+                const s32 cell = NavGraph::GridStep(slig.mHalf);
+                can = can && nav.CameraOf(slig.mBeatMin + 2 * cell, slig.mY - 5) == cam && nav.CameraOf(slig.mBeatMax - 2 * cell, slig.mY - 5) == cam;
+            }
             below++;
         }
         if (can && below > 0)
@@ -3677,6 +3688,10 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
             for (const SligAt& slig : mWorld.mSligs)
             {
                 mTrace += " slig" + std::to_string(slig.mX) + "," + std::to_string(slig.mY) + (slig.mFacingLeft ? "L" : "R") + "m" + std::to_string(slig.mMotion);
+            }
+            if (mWorld.mFlown.mLive)
+            {
+                mTrace += " flown" + std::to_string(mWorld.mFlown.mX100 / 100) + "," + std::to_string(mWorld.mFlown.mY100 / 100);
             }
             for (const FlierAt& flier : mWorld.mFliers)
             {

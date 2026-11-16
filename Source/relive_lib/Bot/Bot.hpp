@@ -324,6 +324,11 @@ public:
     {
         mWorld.mNoBomb.insert(id);
     }
+    // A spawner of flying Sligs (its entity) that he waited at and none came
+    void NoFlier(u32 id)
+    {
+        mWorld.mNoFlier.insert(id);
+    }
     void FleechKilled(u32 id)
     {
         mWorld.mFleechKilled.insert(id);

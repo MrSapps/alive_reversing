@@ -4365,7 +4365,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
     }
     for (const Entity& spawner : world.mEntities)
     {
-        if (spawner.mKind != EntityKind::eFlierSpawner)
+        if (spawner.mKind != EntityKind::eFlierSpawner || world.mNoFlier.count(spawner.mId) != 0)
         {
             continue;
         }
@@ -5507,6 +5507,15 @@ std::vector<Domain::GrenadeTarget> Domain::GrenadeTargets(const NavInput& in, co
         {
             continue;
         }
+        // (the orbs that are there turn a grenade back)
+        std::vector<ThrowArc::Box> off;
+        for (const Entity& e : world.mEntities)
+        {
+            if (e.mKind == EntityKind::eSecurityOrb && !e.mGone && e.mHalf == slig.mHalf)
+            {
+                off.push_back(ThrowArc::BoxOf(e.mX1, e.mY1, e.mHalf, world.mOrbBox));
+            }
+        }
         GrenadeTarget target;
         target.mSlig = slig.mId;
         target.mFloorY = floor->mY1;
@@ -5546,20 +5555,21 @@ std::vector<Domain::GrenadeTarget> Domain::GrenadeTargets(const NavInput& in, co
                 {
                     continue;
                 }
-                for (s32 way = 0; way < 6; way++)
+                // (and thrown down: flat, under an orb the others come back off)
+                for (s32 way = 0; way < 8; way++)
                 {
                     GrenadeShot shot;
                     shot.mX = x;
                     shot.mY = line.mY1;
                     shot.mFaceLeft = way % 2 == 1;
-                    shot.mKind = way / 2 == 0 ? ThrowSpot::eLob : way / 2 == 1 ? ThrowSpot::eUp : ThrowSpot::eForward;
+                    shot.mKind = way / 2 == 0 ? ThrowSpot::eLob : way / 2 == 1 ? ThrowSpot::eUp : way / 2 == 2 ? ThrowSpot::eForward : ThrowSpot::eDown;
                     // Where it goes off, and from a little to either side of the cell's middle much the same:
                     // he does not stand to the pixel
                     bool good = true;
                     s32 ends[3] = {};
                     for (s32 k = 0; k < 3 && good; k++)
                     {
-                        const ThrowArc::Flight flight = ThrowArc::Grenade(in, x + (k - 1) * 2, line.mY1, slig.mHalf, shot.mFaceLeft, shot.mKind);
+                        const ThrowArc::Flight flight = ThrowArc::Grenade(in, x + (k - 1) * 2, line.mY1, slig.mHalf, shot.mFaceLeft, shot.mKind, ThrowArc::kFuse, &off);
                         const ThrowArc::Point& end = flight.mPoints.back();
                         good = !flight.mUnder && std::abs(end.mY - target.mFloorY) <= 3 && end.mX >= target.mX1 && end.mX <= target.mX2;
                         ends[k] = end.mX;
@@ -5671,6 +5681,15 @@ std::vector<Domain::OrbTarget> Domain::OrbTargets(const NavInput& in, const Worl
         {
             continue;
         }
+        // (it comes back off the orb itself, and off the others there are)
+        std::vector<ThrowArc::Box> off;
+        for (const Entity& e : world.mEntities)
+        {
+            if (e.mKind == EntityKind::eSecurityOrb && !e.mGone && e.mHalf == orb.mHalf)
+            {
+                off.push_back(ThrowArc::BoxOf(e.mX1, e.mY1, e.mHalf, world.mOrbBox));
+            }
+        }
         OrbTarget target;
         target.mOrb = orb.mId;
         const s32 floorType = orb.mHalf ? 4 : 0;
@@ -5686,7 +5705,9 @@ std::vector<Domain::OrbTarget> Domain::OrbTargets(const NavInput& in, const Worl
             const s32 hi = std::min(std::max(line.mX1, line.mX2), orb.mX1 + 300);
             for (s32 x = (lo / cell) * cell + cell / 2; x + cell / 2 <= hi; x += cell)
             {
-                if (x - cell / 2 < lo)
+                // (from the orb's own screen: off it the orb is not there to be blown up. The Barracks' path 7:
+                // four grenades from 887 and 987 went off by the orb at 1175 on the next screen, and it stayed.)
+                if (x - cell / 2 < lo || x / in.mCamW != orb.mX1 / in.mCamW || (line.mY1 - 5) / in.mCamH != orb.mY1 / in.mCamH)
                 {
                     continue;
                 }
@@ -5700,9 +5721,9 @@ std::vector<Domain::OrbTarget> Domain::OrbTargets(const NavInput& in, const Worl
                     const ThrowSpot::Kind kind = way / 2 == 0 ? ThrowSpot::eLob : way / 2 == 1 ? ThrowSpot::eUp : ThrowSpot::eForward;
                     // (held longer it flies for fewer frames of the same flight)
                     const ThrowArc::Flight flights[3] = {
-                        ThrowArc::Grenade(in, x - 2, line.mY1, orb.mHalf, left, kind),
-                        ThrowArc::Grenade(in, x, line.mY1, orb.mHalf, left, kind),
-                        ThrowArc::Grenade(in, x + 2, line.mY1, orb.mHalf, left, kind)};
+                        ThrowArc::Grenade(in, x - 2, line.mY1, orb.mHalf, left, kind, ThrowArc::kFuse, &off),
+                        ThrowArc::Grenade(in, x, line.mY1, orb.mHalf, left, kind, ThrowArc::kFuse, &off),
+                        ThrowArc::Grenade(in, x + 2, line.mY1, orb.mHalf, left, kind, ThrowArc::kFuse, &off)};
                     if (flights[0].mUnder || flights[1].mUnder || flights[2].mUnder)
                     {
                         continue;

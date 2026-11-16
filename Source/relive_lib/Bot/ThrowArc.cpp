@@ -247,7 +247,13 @@ bool ThrowArc::LandsOn(const NavLine& floor, double fromY, double toY, double* a
 // speed both ways, and to rest on it when it is slower than one down; off a wall at half the speed back; through
 // a floor it comes up under. At rest it slides on, half as fast each frame. A mine it touches goes off at once
 // (Mine::VOnThrowableHit); else it goes off itself at the end of its fuse, and the mines its blast reaches with it.
-ThrowArc::Flight ThrowArc::FlyGrenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, const Point* mine, s32 fuse)
+ThrowArc::Box ThrowArc::BoxOf(s32 orbX, s32 orbY, bool half, const s32* about)
+{
+    const s32 scale = half ? 2 : 1;
+    return {orbX + about[0] / scale, orbY + about[1] / scale, orbX + about[2] / scale, orbY + about[3] / scale};
+}
+
+ThrowArc::Flight ThrowArc::FlyGrenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, const Point* mine, s32 fuse, const std::vector<Box>* off)
 {
     Flight flight;
     const ThrowStart& start = kThrows[static_cast<s32>(kind)];
@@ -337,6 +343,29 @@ ThrowArc::Flight ThrowArc::FlyGrenade(const NavInput& in, s32 x, s32 y, bool hal
                     py = hitY;
                 }
             }
+            // (its own box, read from the game: 2 left to 4 right and from 10 to 2 over where it is; looked for 5
+            // lower, Grenade.cpp. Boxes that only touch are taken not to: the orb's box is of one frame of its
+            // turning, and in the Barracks' path 1 a grenade lobbed from 387,1240 that by these numbers just
+            // touches the orb at 451,1099 went on to the ledge)
+            for (std::size_t b = 0; off && b < off->size(); b++)
+            {
+                const Box& box = (*off)[b];
+                if (std::floor(px + 4.0 * scale) <= box.mX1 || std::floor(px - 2.0 * scale) >= box.mX2 || std::floor(py + 3.0 * scale) <= box.mY1 || std::floor(py - 5.0 * scale) >= box.mY2)
+                {
+                    continue;
+                }
+                if (fromX < box.mX1 + 12 * scale || fromX > box.mX2 - 12 * scale)
+                {
+                    px = fromX;
+                    velX = -velX / 2.0;
+                }
+                else
+                {
+                    py = fromY;
+                    velY = -velY / 2.0;
+                }
+                break;
+            }
             if (mine && Touches(Whole(px, py), mine->mX, mine->mY, half, true))
             {
                 flight.mPoints.push_back(Whole(px, py));
@@ -360,9 +389,9 @@ ThrowArc::Flight ThrowArc::FlyGrenade(const NavInput& in, s32 x, s32 y, bool hal
     return flight;
 }
 
-ThrowArc::Flight ThrowArc::Grenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, s32 fuse)
+ThrowArc::Flight ThrowArc::Grenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, s32 fuse, const std::vector<Box>* off)
 {
-    return FlyGrenade(in, x, y, half, left, kind, nullptr, fuse);
+    return FlyGrenade(in, x, y, half, left, kind, nullptr, fuse, off);
 }
 
 // The rock's box, five lower, on the mine's (measured: the rock's is 4 or 5 either side of it and 9 or 10 to 2

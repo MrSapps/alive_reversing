@@ -160,6 +160,8 @@ struct SligAt final
     s32 mBeatMax = 0;
     // The frames at least that it stands at an end of its beat before it turns (AO's; 0 when not known)
     s32 mBeatPause = 0;
+    // AE: at a chant it runs up and down its beat (it has a time set to panic for)
+    bool mPanics = false;
     // Asleep, a noise this near (in x) wakes it; 0 when not known: anywhere on its screen then
     s32 mWake = 0;
     // The frames it waits before it shoots at what it has seen
@@ -472,6 +474,12 @@ struct World final
     bool mCrawlerLeft = false;
     // The lockers of the path at which one of those comes by wings: a flying Slig may come to be there
     std::vector<RockAt> mWingLockers;
+    // The box of a security orb about where it is (left, top, right, bottom, at full scale), from the first one
+    // seen: what is thrown comes back off it (ThrowArc::BoxOf)
+    bool mOrbBoxKnown = false;
+    // (a grenade's own box has been written to the log once)
+    bool mGrenadeBoxSeen = false;
+    s32 mOrbBox[4] = {-14, -36, 15, -10};
     std::vector<SweepAt> mSweeps;
     // A Slig that waits at least this many frames before it shoots at what it has seen can be run from
     static constexpr s32 kOutrunDelay = 45;
@@ -647,6 +655,9 @@ struct World final
     // Fleeches (their entities) that a Scrab has been made to kill in this path
     // Sligs a flying Slig was to get rid of (Domain::FlierTargets) whose grenades did not get them
     std::set<u32> mNoBomb;
+    // Spawners of flying Sligs (their entities) that gave none when he waited for one: nothing is planned with
+    // a flying Slig of theirs after
+    std::set<u32> mNoFlier;
     std::set<u32> mFleechKilled;
     std::vector<SlurgAt> mSlurgs;
     // AE: the flying mines there are now (see BombCycle)

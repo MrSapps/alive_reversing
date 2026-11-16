@@ -7777,6 +7777,30 @@ static World FlierColumnWorld()
     return world;
 }
 
+TEST(BotFlierTargets, NothingIsPlannedWithAFlyingSligOfASpawnerThatGaveNoneWhenWaitedFor)
+{
+    NavGraph g;
+    g.Build(FlierColumn());
+    World world = FlierColumnWorld();
+    const auto fliers = [&g](const World& w)
+    {
+        const Domain domain = Domain::Build(g, w, g.NodeAt(12, 700, false), nullptr);
+        s32 count = 0;
+        for (const DomainStep& step : domain.mSteps)
+        {
+            count += step.mKind == StepKind::eFlierBomb || step.mKind == StepKind::eFlierPull || step.mKind == StepKind::eFlierLock ? 1 : 0;
+        }
+        return count;
+    };
+    EXPECT_GT(fliers(world), 0);
+    world.mNoFlier.insert(2001);
+    EXPECT_EQ(fliers(world), 0);
+    // (another spawner's is none of that one's)
+    world.mNoFlier.clear();
+    world.mNoFlier.insert(2002);
+    EXPECT_GT(fliers(world), 0);
+}
+
 TEST(BotFlierTargets, ASligUnderASecurityOrbIsOneForTheFlyingSligWithThePlacesToThrowFrom)
 {
     const NavInput in = FlierColumn();
@@ -8128,7 +8152,9 @@ TEST(BotGrenadeTargets, AnOrbIsGotByAGrenadeHeldUntilItGoesOffInTheAirByIt)
         // Held, and it goes off where the flight has it that many frames sooner: in the air by the orb, and not
         // by him
         EXPECT_GE(shot.mHold, 4);
-        const ThrowArc::Flight flight = ThrowArc::Grenade(in, shot.mX, shot.mY, false, shot.mFaceLeft, shot.mKind, ThrowArc::kFuse - shot.mHold);
+        // (it comes back off the orb itself)
+        const std::vector<ThrowArc::Box> off{ThrowArc::BoxOf(450, 40, false, world.mOrbBox)};
+        const ThrowArc::Flight flight = ThrowArc::Grenade(in, shot.mX, shot.mY, false, shot.mFaceLeft, shot.mKind, ThrowArc::kFuse - shot.mHold, &off);
         EXPECT_EQ(flight.mPoints.size(), static_cast<std::size_t>(ThrowArc::kFuse - shot.mHold) + 1);
         EXPECT_EQ(flight.mPoints.back().mX, shot.mAtX);
         EXPECT_EQ(flight.mPoints.back().mY, shot.mAtY);
@@ -8138,17 +8164,31 @@ TEST(BotGrenadeTargets, AnOrbIsGotByAGrenadeHeldUntilItGoesOffInTheAirByIt)
         EXPECT_EQ(shot.mFaceLeft, shot.mX > 450);
         EXPECT_EQ(shot.mHidden, shot.mX == 562);
     }
-    // Not from where he would be in the blast: an orb a hundred over a floor at 300, and a grenade lobbed from 83
+    // Not from where he would be in the blast: an orb a hundred over a floor at 500, and a grenade lobbed from 83
     // to the side of it is by it 24 frames on, 91 over the floor
     NavInput low;
-    low.mLines.push_back(Line(300, 300, 700, 300, 0));
+    low.mLines.push_back(Line(300, 500, 1000, 500, 0));
     World over = world;
-    over.mEntities[1] = MakeEntity(EntityKind::eSecurityOrb, 12020, 600, 200, 624, 224);
-    const ThrowArc::Flight lob = ThrowArc::Grenade(low, 512, 300, false, false, ThrowSpot::eLob, 24);
-    EXPECT_TRUE(Domain::BlastGetsOrb(lob.mPoints.back().mX, lob.mPoints.back().mY, 600, 200, false));
+    over.mEntities[1] = MakeEntity(EntityKind::eSecurityOrb, 12020, 600, 400, 624, 424);
+    const ThrowArc::Flight lob = ThrowArc::Grenade(low, 512, 500, false, false, ThrowSpot::eLob, 24);
+    EXPECT_TRUE(Domain::BlastGetsOrb(lob.mPoints.back().mX, lob.mPoints.back().mY, 600, 400, false));
     const std::vector<Domain::OrbTarget> far = Domain::OrbTargets(low, over);
     ASSERT_EQ(far.size(), 1u);
     ASSERT_FALSE(far[0].mShots.empty());
+    // (nor from the floor of the screen under the orb's: the same, an orb at 200 and the floor at 300)
+    World above = world;
+    above.mEntities[1] = MakeEntity(EntityKind::eSecurityOrb, 12020, 600, 200, 624, 224);
+    NavInput lower;
+    lower.mLines.push_back(Line(300, 300, 1000, 300, 0));
+    for (const Domain::OrbTarget& target : Domain::OrbTargets(lower, above))
+    {
+        EXPECT_TRUE(target.mShots.empty());
+    }
+    // (and from the orb's own screen, 375 to 750: off it the orb is not there to be blown up)
+    for (const Domain::OrbShot& shot : far[0].mShots)
+    {
+        EXPECT_EQ(shot.mX / 375, 1);
+    }
     for (const Domain::OrbShot& shot : far[0].mShots)
     {
         EXPECT_TRUE(std::abs(shot.mAtX - shot.mX) >= static_cast<s32>(ThrowArc::kGrenadeKillX) || std::abs(shot.mAtY - shot.mY) >= static_cast<s32>(ThrowArc::kGrenadeKillDown) + 30);
@@ -8318,6 +8358,89 @@ TEST(BotGrenadeTargets, AGrenadeOfAesLiesWhereItComesDownIfItIsPutOnTheFloorToTh
     EXPECT_EQ(far.mPoints[21].mY, 99);
     EXPECT_GT(far.mPoints.back().mX, 1119);
     EXPECT_EQ(far.mPoints.back().mY, 100);
+}
+
+TEST(BotGrenadeTargets, AGrenadeComesBackOffASecurityOrbAndOneThrownFlatGoesUnderIt)
+{
+    // The Barracks' path 7, its top left: the ledge he throws from, the one across with the Slig at 462, the wall
+    // behind it, and the orb at 450,40 between (its box read from the game: 14 left to 15 right, 36 to 10 over
+    // where it is). Traced: a grenade lobbed from 537,100 came down past the orb, stopped going left at 457 and
+    // lay at 462, not at the 435 it would have got to.
+    NavInput in;
+    in.mLines.push_back(Line(525, 100, 899, 100, 0));
+    in.mLines.push_back(Line(400, 100, 500, 100, 0));
+    in.mLines.push_back(Line(425, 20, 425, 217, 1));
+    World world;
+    const std::vector<ThrowArc::Box> off{ThrowArc::BoxOf(450, 40, false, world.mOrbBox)};
+    EXPECT_EQ(off[0].mX1, 436);
+    EXPECT_EQ(off[0].mY1, 4);
+    EXPECT_EQ(off[0].mX2, 465);
+    EXPECT_EQ(off[0].mY2, 30);
+    const ThrowArc::Flight free = ThrowArc::Grenade(in, 537, 100, false, true, ThrowSpot::eLob);
+    EXPECT_LT(free.mPoints.back().mX, 445);
+    const ThrowArc::Flight lob = ThrowArc::Grenade(in, 537, 100, false, true, ThrowSpot::eLob, ThrowArc::kFuse, &off);
+    EXPECT_GE(lob.mPoints.back().mX, 455);
+    EXPECT_LE(lob.mPoints.back().mX, 465);
+    EXPECT_EQ(lob.mPoints.back().mY, 100);
+    s32 least = 9999;
+    for (const ThrowArc::Point& at : lob.mPoints)
+    {
+        least = std::min(least, at.mX);
+    }
+    EXPECT_GE(least, 455);
+    // Thrown down it goes under the orb and lies further off, by the Slig
+    const ThrowArc::Flight flat = ThrowArc::Grenade(in, 537, 100, false, true, ThrowSpot::eDown, ThrowArc::kFuse, &off);
+    EXPECT_GE(flat.mPoints.back().mX, 425);
+    EXPECT_LE(flat.mPoints.back().mX, 452);
+    EXPECT_EQ(flat.mPoints.back().mY, 100);
+    // And that is the throw for the Slig there: from 537, down
+    world.mEntities.push_back(MakeEntity(EntityKind::eRockSack, 1000, 601, 68, 625, 104));
+    world.mEntities.back().mInputs[1] = 2;
+    world.mEntities.push_back(MakeEntity(EntityKind::eSlig, 1017, 462, 80, 486, 104));
+    world.mEntities.push_back(MakeEntity(EntityKind::eSecurityOrb, 1002, 450, 40, 474, 64));
+    const std::vector<Domain::GrenadeTarget> targets = Domain::GrenadeTargets(in, world);
+    ASSERT_EQ(targets.size(), 1u);
+    bool down = false;
+    for (const Domain::GrenadeShot& shot : targets[0].mShots)
+    {
+        down = down || (shot.mX == 537 && shot.mKind == ThrowSpot::eDown && shot.mFaceLeft);
+        // (none lobbed from there: that one is the one that comes back)
+        EXPECT_FALSE(shot.mX == 537 && shot.mKind == ThrowSpot::eLob);
+    }
+    EXPECT_TRUE(down);
+    // Up under an orb it comes down again off the orb's underside: thrown from 600,300 it is at 641,221 and
+    // then 651,215 on its way up to 200, and an orb at 642,224 has its box down to 214 there
+    NavInput flatFloor;
+    flatFloor.mLines.push_back(Line(300, 300, 900, 300, 0));
+    const std::vector<ThrowArc::Box> over{ThrowArc::BoxOf(642, 224, false, world.mOrbBox)};
+    s32 top = 9999;
+    s32 topFree = 9999;
+    for (const ThrowArc::Point& at : ThrowArc::Grenade(flatFloor, 600, 300, false, false, ThrowSpot::eUp, ThrowArc::kFuse, &over).mPoints)
+    {
+        top = std::min(top, at.mY);
+    }
+    for (const ThrowArc::Point& at : ThrowArc::Grenade(flatFloor, 600, 300, false, false, ThrowSpot::eUp).mPoints)
+    {
+        topFree = std::min(topFree, at.mY);
+    }
+    EXPECT_GE(top, over[0].mY2);
+    // (on its way down from the frame it is put back under it)
+    const ThrowArc::Flight hit = ThrowArc::Grenade(flatFloor, 600, 300, false, false, ThrowSpot::eUp, ThrowArc::kFuse, &over);
+    const ThrowArc::Flight miss = ThrowArc::Grenade(flatFloor, 600, 300, false, false, ThrowSpot::eUp);
+    std::size_t first = 0;
+    while (first + 1 < hit.mPoints.size() && first < miss.mPoints.size() && hit.mPoints[first].mY == miss.mPoints[first].mY && hit.mPoints[first].mX == miss.mPoints[first].mX)
+    {
+        first++;
+    }
+    ASSERT_LT(first + 1, hit.mPoints.size());
+    EXPECT_GT(hit.mPoints[first + 1].mY, hit.mPoints[first].mY);
+    // (and down from there to the floor)
+    EXPECT_EQ(ThrowArc::Grenade(flatFloor, 600, 300, false, false, ThrowSpot::eUp, ThrowArc::kFuse, &over).mPoints.back().mY, 300);
+    EXPECT_LT(topFree, over[0].mY2);
+    // (at half scale the box is half as big about the orb)
+    const ThrowArc::Box small = ThrowArc::BoxOf(450, 40, true, world.mOrbBox);
+    EXPECT_EQ(small.mX1, 443);
+    EXPECT_EQ(small.mY2, 35);
 }
 
 TEST(BotGrenadeTargets, AGrenadeOfAesComesBackDownOffAFloorItFliesUpUnder)

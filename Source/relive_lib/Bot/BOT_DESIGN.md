@@ -1562,53 +1562,51 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
         button at f=11,919 (this time the naked Slig he had did get to the locker), the two armed Sligs
         bombed by f=13,666, the fourth wheel at f=13,881, the door to the hub at f=14,350. One death, at the
         hoist at 887.
-      - Not robust yet: the run above comes through on its timing. Run on from the Rifle Range and the
-        workers' campus (`blk10.txt`) he comes into the block at other frames and it fails. What was found,
-        tried and is kept as `build-bot/la/wip_block3_robust.patch` (not in the tree: with it the run from
-        the door no longer comes through, see the last point):
-        - The flying Slig is lost. It waits for a Slig's back 170 under its level, the way up through that
-          level takes 60 frames, and the Slig at 837,620 has its back turned for 60 (it walks two cells
-          and stands 36). And one that only shows its back when the flying Slig comes may be about to
-          turn. In the patch: it waits as near under the level as it is unseen, and where a Slig shows
-          only its back it waits until that one has faced it and turned again (all of the time is then
-          ahead). With that it is not lost in either run. A spawner that gives no flying Slig when waited
-          for is kept (`World::mNoFlier`) and nothing is planned with one of its after: without that he
-          waited for good.
-        - The boom machine's getaway is not luck: Slig.cpp `Brain_15_Idle` has the Slig turn at the
-          grenade's noise by way of "What?", which is slow (shot at +58 from the button, and he is off
-          the screen at +52 if he does not slow to stand), but when its own time to turn comes first it
-          turns, sees him and shoots at once. In the patch: into the shadow by the machine first, out to
-          the button only as the Slig turns its back, and on two cells past the screen's edge at a run.
-          That worked each time it was tried.
-        - The throw at the Slig under the first orb from 537,100, the one cell of that ledge that is in
-          the shadow (562 is not: shot there). The grenade does not go where the model has it (435): it
-          comes back off something at about 457 over the top of the screen (traced: x stops at 457
-          between y -36 and 9, then drifts right) and lies at 462, 75 from him, and its blast kills him
-          standing. He lived through it in the runs that worked because he was down; but 537 is the end
-          of the ledge, where down is also the way down off it, and in other runs he turned and hung
-          there in the Slig's sight. Not solved. Ways: find what the grenade comes back off (a wall the
-          model does not have, or the top of the map) so the throw is known to be too near; or throw
-          crouched (`ThrowSpot::eCrouched`: by the model it lands at 445, 92 away), rolled into 537 from
-          562 so that he never stands there.
-        - The flee from a Slig awake by him is not for a grenade throw from a shadow (it walked him out of
-          it), nor for the boom machine's getaway.
+      - Made to come through at other timings (2026-11-16): from its door with no deaths (out to the hub
+        at f=11,798), and run on from the Rifle Range and the workers' campus (`blk10.txt`) with no deaths
+        in all three (out of this block at f=23,705; it then stops in block 4, which is not taught). What
+        it took:
+        - The flying Slig was lost. It waited for a Slig's back 170 under its level, the way up through
+          that level takes 60 frames, and the Slig at 837,620 has its back turned for 60. Now it waits as
+          near under the level as it is unseen, and where a Slig shows only its back it waits until that
+          one has faced it and turned again (`FlierBombTask`). A spawner that gives no flying Slig when
+          waited for is kept (`World::mNoFlier`) and nothing is planned with one of its after.
+        - A grenade comes back off a security orb (`Grenade::OnCollision_BounceOff`: off anything that can
+          explode). `ThrowArc::Grenade` takes the orbs' boxes (`ThrowArc::BoxOf`; an orb's box is read from
+          the game once one is seen, `World::mOrbBox`: 14 left to 15 right, 36 to 10 over where it is):
+          hit from the side it goes back at half the speed, from under or over the same up and down. Boxes
+          that only touch do not count (the Barracks' path 1 throw just touches and goes on). That is why
+          the lob from 537,100 at the Slig under the first orb lay at 462, 75 from him, and killed him.
+          `GrenadeTargets` now also throws down (flat: under the orb, to 442), and `OrbTargets` flies its
+          throws with the boxes too, so one that would go off by him is not chosen.
+        - An orb is only there to be blown up while its screen is the one shown: four grenades from 887 and
+          987 went off by the orb at 1175 on the next screen and it stayed. `OrbTargets` gives only cells
+          of the orb's own screen.
+        - Up a hoist onto a floor a Slig walks (`GoToTask`, AE): not while one can be on the screen he
+          comes up on with its face to him within 90 frames (its beat's ends from the game, turning two
+          cells short of them, 2.75 a frame or 6.25 running); given up after 300 frames.
+        - No chant to take over a Slig whose beat goes on off the screen (`Bot::MakeReflex`, the perch):
+          it runs off and back and is never taken, and runs its beat for long after, which leaves no time
+          to get from the hoist into the shadow.
+        - The boom machine with a Slig that stands guard (`GetRocksTask`): into the shadow by the machine
+          first, out to the button only as the Slig turns its back (Slig.cpp `Brain_15_Idle`: the
+          grenade's noise turns it by way of "What?", which is slow, but its own turn sees him and shoots
+          at once), then back into that same shadow at a walk (the next screen was the other Slig's: shot
+          there at the near end of its beat). He is all in the shadow before it has looked. Out again for
+          the grenade when it has turned its back again, sneaked all the way by the task itself (left to
+          `GoToTask` he was walked back three cells, and a walk is heard: it turned at once), and with it
+          in hand back into the shadow.
+        - The flee from a Slig awake by him is off for `GetRocksTask` and the two grenade tasks.
+        - Still luck: the Slig by the machine stands with its back turned for a time the game draws anew
+          each turn (seen 65 and 140 frames), and the way out for the grenade and its picking up is about
+          80. It came through in each run since; not known to.
     - A Slig that has only just come to stand with its back to all of his way, and stands for long
       (`Slig::BeatPause`: the least it stands at an end of its beat; `GoToTask::Stood` keeps since when),
       is gone behind as one that walks away is: the one by the boom machine walks two cells and stands 120
       frames and more each way. And one that stands with its back to him is not run from (`Bot::MakeFlee`).
-    - The boom machine with a Slig on its floor and screen (`GetRocksTask`): the way off the screen faced
-      first, the button, and off at a run before the Slig has turned (it turned 27 frames after the
-      button, and shot him in a shadow he had been seen going into); back by stealth for the grenade; and
-      with it in hand into the nearest shadow.
     - `GrenadeSligTask` takes the beat the game gives a Slig only if the Slig is in it (two with the same
       number for their bounds are each given the other's).
-    - `build-bot/la/blk7.txt` now: at the top at f=6,133 with no deaths, one death there (shot across the
-      gap from the ledge at 987 as he walks the other ledge: the hoist up is not timed against that Slig),
-      the grenade in hand at f=6,862, the Slig on the far left ledge got with it at f=7,037. Then nothing
-      to do there (the orb), and he leaves by a suite's door into path 15 and dies there.
-  Left for the top: the orb by a grenade in the air, then the two Sligs under it taken over, the lever
-  (189), wheel 190; on the right the other orb, a naked Slig taken over to press the button at 1301,180,
-  the Sligs that come armed after, wheel 250; and the way out by the tasks door at 1051,179.
+  Left in block 3: its Mudokons and its four suites.
 - **Block 4** (path 9: first try from inside its door, a scratch run).
   (path 7), whose door shuts behind him, is the one he starts on: a wheel (switch 177), then a Slig lock
   with a Slig called by a lever, where he dies six times and gives up. Block 4 (path 9) not looked at again.

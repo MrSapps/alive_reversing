@@ -106,6 +106,19 @@ public:
 private:
     // A boom machine's button has been pressed with a Slig about: off its screen first
     bool mRetreat = false;
+    // At a boom machine a Slig guards: in the shadow by it until the Slig turns its back, then out
+    bool mPrimed = false;
+    bool mHid = false;
+    bool mGuardSeen = false;
+    bool mGuardAway = false;
+    s32 mHidFrames = 0;
+    // Where that shadow is, to go back into once the button is pressed
+    s32 mHideX = 0;
+    // Out of it again for the grenade: whether he has left, and the watch on the Slig's back until he does
+    bool mOut = false;
+    bool mOutSeen = false;
+    bool mOutAway = false;
+    s32 mOutFrames = 0;
     s32 mRetreatX = 0;
     // The grenade is in hand and he has been sent into the nearest shadow
     bool mShade = false;
@@ -492,6 +505,8 @@ private:
     s32 mLandWaits = 0;
     // Steps spent at a door waiting for a lock's ghost to open it
     s32 mGhostWaits = 0;
+    // Steps spent under a hoist until the Slig that walks the floor over it has its back to him
+    s32 mSligWaits = 0;
     bool mChaseLogged = false;
     s32 mLureWaits = 0;
     // Frames waited for a Slog under the ledge to leap up, and whether it was in the air the frame before
@@ -1191,6 +1206,10 @@ public:
     TaskStep Next(Bot& bot, const std::string& lastFailed) override;
 
 private:
+    // A Slig on a level the way goes through was seen to face this way (its back since is all ahead), and the
+    // frames waited for one that only showed its back
+    bool mSawFace = false;
+    s32 mBackWait = 0;
     u32 mSpawner;
     s32 mSpot;
     u32 mLever;
