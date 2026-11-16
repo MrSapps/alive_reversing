@@ -238,6 +238,37 @@ private:
     s32 mLandX = 0;
 };
 
+// Hold a grenade and throw it late, so that it goes off in the air by a security orb (Domain::OrbTargets)
+class GrenadeOrbTask final : public Task
+{
+public:
+    // from: a cell of the stretch of floor the plan throws from
+    GrenadeOrbTask(u32 orb, s32 from)
+        : mOrb(orb)
+        , mFrom(from)
+    {
+    }
+    ~GrenadeOrbTask() override;
+    std::string Name() const override
+    {
+        return "Burst a grenade by SecurityOrb#" + std::to_string(mOrb);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mOrb;
+    s32 mFrom;
+    std::unique_ptr<GoToTask> mGo;
+    s32 mGoNode = -1;
+    std::vector<s32> mNoWay;
+    // 0 to the place, 1 the grenade is in his hand, 2 thrown
+    s32 mPhase = 0;
+    s32 mWait = 0;
+    s32 mSettle = 0;
+    s32 mLost = 0;
+    ThrowSpot::Kind mKind = ThrowSpot::eUp;
+};
+
 // Walk, hop, climb... to a cell the goal accepts, by the nav graph
 class GoToTask final : public Task
 {

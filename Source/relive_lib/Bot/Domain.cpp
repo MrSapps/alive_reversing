@@ -4291,6 +4291,25 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             d.mActions.back().mSpend = {Key::kRocks, 1};
         }
     }
+    for (const OrbTarget& target : OrbTargets(nav.Input(), world))
+    {
+        const Entity* orb = world.Find(target.mOrb);
+        std::set<s32> from;
+        for (const OrbShot& shot : target.mShots)
+        {
+            const s32 node = orb ? nav.NodeAt(shot.mX, shot.mY, orb->mHalf, 12) : -1;
+            if (node < 0 || !from.insert(d.mRegions[node]).second)
+            {
+                continue;
+            }
+            DomainStep toss;
+            toss.mKind = StepKind::eGrenadeOrb;
+            toss.mEntity = target.mOrb;
+            toss.mEdge = node;
+            add("Burst a grenade by SecurityOrb#" + std::to_string(target.mOrb) + " from " + std::to_string(shot.mX) + "," + std::to_string(shot.mY), {regionFact(node)}, {{Key::Switch(World::HazardSwitch(target.mOrb)), 1}}, shot.mHidden ? 450 : 700, toss);
+            d.mActions.back().mSpend = {Key::kRocks, 1};
+        }
+    }
     for (const Entity& spawner : world.mEntities)
     {
         if (spawner.mKind != EntityKind::eFlierSpawner)
@@ -5471,6 +5490,129 @@ std::vector<Domain::GrenadeTarget> Domain::GrenadeTargets(const NavInput& in, co
             }
         }
         std::stable_sort(target.mShots.begin(), target.mShots.end(), [](const GrenadeShot& a, const GrenadeShot& b)
+                         { return a.mHidden && !b.mHidden; });
+        if (!target.mShots.empty())
+        {
+            targets.push_back(target);
+        }
+    }
+    return targets;
+}
+
+bool Domain::BlastGetsOrb(s32 atX, s32 atY, s32 orbX, s32 orbY, bool half)
+{
+    const s32 scale = half ? 2 : 1;
+    const s32 dx = std::abs(atX - orbX) * scale;
+    const s32 dy = (atY - orbY) * scale;
+    return dx <= 40 && dy >= -10 && dy <= 35;
+}
+
+std::vector<Domain::OrbTarget> Domain::OrbTargets(const NavInput& in, const World& world)
+{
+    std::vector<OrbTarget> targets;
+    if (!in.mIsAe)
+    {
+        return targets;
+    }
+    // (as NavGraph has it: all of him in the zone)
+    const auto hidden = [&in](s32 x, s32 y, bool half)
+    {
+        for (const NavFeature& f : in.mFeatures)
+        {
+            if (f.mKind == FeatureKind::eInvisibleZone && x - (half ? 13 : 25) >= f.mX1 && x + (half ? 13 : 25) <= f.mX2 && y >= f.mY1 + 40 && y <= f.mY2 + 4)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    for (const Entity& orb : world.mEntities)
+    {
+        if (orb.mKind != EntityKind::eSecurityOrb || orb.mGone)
+        {
+            continue;
+        }
+        bool machine = false;
+        for (const Entity& e : world.mEntities)
+        {
+            machine = machine || (e.mKind == EntityKind::eRockSack && e.mInputs[1] == 2 && !e.mGone && e.mHalf == orb.mHalf);
+        }
+        if (!machine)
+        {
+            continue;
+        }
+        OrbTarget target;
+        target.mOrb = orb.mId;
+        const s32 floorType = orb.mHalf ? 4 : 0;
+        const s32 cell = NavGraph::GridStep(orb.mHalf);
+        const s32 scale = orb.mHalf ? 2 : 1;
+        for (const NavLine& line : in.mLines)
+        {
+            if (line.mType != floorType || line.mY1 != line.mY2 || std::abs(line.mY1 - orb.mY1) > 200)
+            {
+                continue;
+            }
+            const s32 lo = std::max(std::min(line.mX1, line.mX2), orb.mX1 - 300);
+            const s32 hi = std::min(std::max(line.mX1, line.mX2), orb.mX1 + 300);
+            for (s32 x = (lo / cell) * cell + cell / 2; x + cell / 2 <= hi; x += cell)
+            {
+                if (x - cell / 2 < lo)
+                {
+                    continue;
+                }
+                // The throw from this cell that goes off nearest the orb, and does so a little sooner or later
+                // and from a little to either side too
+                OrbShot bestShot;
+                s32 bestOff = -1;
+                for (s32 way = 0; way < 6; way++)
+                {
+                    const bool left = way % 2 == 1;
+                    const ThrowSpot::Kind kind = way / 2 == 0 ? ThrowSpot::eLob : way / 2 == 1 ? ThrowSpot::eUp : ThrowSpot::eForward;
+                    // (held longer it flies for fewer frames of the same flight)
+                    const ThrowArc::Flight flights[3] = {
+                        ThrowArc::Grenade(in, x - 2, line.mY1, orb.mHalf, left, kind),
+                        ThrowArc::Grenade(in, x, line.mY1, orb.mHalf, left, kind),
+                        ThrowArc::Grenade(in, x + 2, line.mY1, orb.mHalf, left, kind)};
+                    if (flights[0].mUnder || flights[1].mUnder || flights[2].mUnder)
+                    {
+                        continue;
+                    }
+                    for (s32 hold = 4; hold <= ThrowArc::kFuse - 8; hold += 2)
+                    {
+                        bool good = true;
+                        for (s32 k = 0; k < 9 && good; k++)
+                        {
+                            const ThrowArc::Point& end = flights[k % 3].mPoints[ThrowArc::kFuse - hold + (k / 3 - 1) * 2];
+                            good = BlastGetsOrb(end.mX, end.mY, orb.mX1, orb.mY1, orb.mHalf);
+                        }
+                        const ThrowArc::Point at = flights[1].mPoints[ThrowArc::kFuse - hold];
+                        // (not from where it goes off by him: his box is in the blast 85 from it, and under it)
+                        if (!good || (std::abs(at.mX - x) * scale < ThrowArc::kGrenadeKillX && std::abs(at.mY - line.mY1) * scale < ThrowArc::kGrenadeKillDown + 30))
+                        {
+                            continue;
+                        }
+                        const s32 off = std::abs(at.mX - orb.mX1) + std::abs(at.mY - (orb.mY1 + 12 / scale));
+                        if (bestOff < 0 || off < bestOff)
+                        {
+                            bestOff = off;
+                            bestShot.mX = x;
+                            bestShot.mY = line.mY1;
+                            bestShot.mFaceLeft = left;
+                            bestShot.mKind = kind;
+                            bestShot.mHold = hold;
+                            bestShot.mAtX = at.mX;
+                            bestShot.mAtY = at.mY;
+                        }
+                    }
+                }
+                if (bestOff >= 0)
+                {
+                    bestShot.mHidden = hidden(x, line.mY1, orb.mHalf);
+                    target.mShots.push_back(bestShot);
+                }
+            }
+        }
+        std::stable_sort(target.mShots.begin(), target.mShots.end(), [](const OrbShot& a, const OrbShot& b)
                          { return a.mHidden && !b.mHidden; });
         if (!target.mShots.empty())
         {

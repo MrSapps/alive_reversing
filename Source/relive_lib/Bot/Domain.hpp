@@ -100,6 +100,8 @@ enum class StepKind : u8
                 // with it
     eGrenade,   // throw a grenade at Slig mEntity from the stretch of floor of the cell mEdge
                 // (Domain::GrenadeTargets)
+    eGrenadeOrb, // hold a grenade and throw it late from the cell mEdge, to go off in the air by security orb
+                 // mEntity (Domain::OrbTargets)
 };
 
 // What a planned action means to the bot
@@ -220,6 +222,33 @@ struct Domain final
         std::vector<GrenadeShot> mShots;
     };
     static std::vector<GrenadeTarget> GrenadeTargets(const NavInput& in, const World& world);
+    // A security orb that a grenade is to go off by. An orb hangs over the floor, higher than the blast of a
+    // grenade that lies on it reaches (AirExplosion.cpp: 60 up from 5 over the grenade), so the grenade has to
+    // go off in the air: its fuse (Grenade.cpp: 90 frames) runs from when he takes it in his hand, and he holds
+    // it for some of that before he throws. (The walkthrough: "Throw the grenade forward on the fifth beep to
+    // blow up the Chant Protector".)
+    struct OrbShot final
+    {
+        // The cell thrown from (its middle, its floor), and how
+        s32 mX = 0;
+        s32 mY = 0;
+        bool mFaceLeft = false;
+        ThrowSpot::Kind mKind = ThrowSpot::eUp;
+        // The frames it is held for longer than a throw at once
+        s32 mHold = 0;
+        // Where it goes off
+        s32 mAtX = 0;
+        s32 mAtY = 0;
+        bool mHidden = false;
+    };
+    struct OrbTarget final
+    {
+        u32 mOrb = 0;
+        std::vector<OrbShot> mShots;
+    };
+    static std::vector<OrbTarget> OrbTargets(const NavInput& in, const World& world);
+    // Whether a grenade that goes off there gets an orb at (x, y): by what was seen, one 55 under it did not
+    static bool BlastGetsOrb(s32 atX, s32 atY, s32 orbX, s32 orbY, bool half);
     // How near where a grenade goes off a Slig is sure to be in its blast (the blast is 60 to each side and a
     // Slig 24), and how far from it a cell has to be to throw from (ThrowArc::kGrenadeKillX)
     static const s32 kGrenadeSure = 60;

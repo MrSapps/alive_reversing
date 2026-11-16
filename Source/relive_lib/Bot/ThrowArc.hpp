@@ -37,7 +37,9 @@ public:
 
     // A grenade thrown from a cell, to where it lies when its fuse has run down (the last point): it goes off
     // there. AE's comes back down off a floor it flies up under; AO's goes through it.
-    static Flight Grenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind);
+    // fuse: the frames it flies for. Held in the hand before it is thrown its fuse runs on, so it flies for that
+    // many fewer and may go off in the air.
+    static Flight Grenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, s32 fuse = kFuse);
 
     // Whether a rock there sets off a mine at (x, floor y): sure is on any frame of the mine's light, not sure is
     // on some
@@ -69,7 +71,7 @@ private:
     static Flight Fly(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, const Point* mine, bool sure);
     // AO's grenade: thrown like the rock, but it comes to rest and goes off when its fuse has run down, and its
     // blast sets off the mines in it. mHit is then the last frame.
-    static Flight FlyGrenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, const Point* mine);
+    static Flight FlyGrenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, const Point* mine, s32 fuse = kFuse);
 };
 
 } // namespace Bot
