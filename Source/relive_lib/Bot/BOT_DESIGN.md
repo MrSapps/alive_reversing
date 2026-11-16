@@ -1562,11 +1562,36 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
         button at f=11,919 (this time the naked Slig he had did get to the locker), the two armed Sligs
         bombed by f=13,666, the fourth wheel at f=13,881, the door to the hub at f=14,350. One death, at the
         hoist at 887.
-      - Not robust yet. Run on from the Rifle Range and the workers' campus (`blk10.txt`) he comes into the
-        block at other frames, the flying Slig is shot by a Slig in the middle as it comes onto its level
-        ("waiting for its back" is said three frames too late), no other comes, and he waits for one for
-        good: a flying Slig that is lost has to end that step, and the Sligs then be bombed with the boom
-        machine's grenades. And the getaway from the boom machine is luck (above).
+      - Not robust yet: the run above comes through on its timing. Run on from the Rifle Range and the
+        workers' campus (`blk10.txt`) he comes into the block at other frames and it fails. What was found,
+        tried and is kept as `build-bot/la/wip_block3_robust.patch` (not in the tree: with it the run from
+        the door no longer comes through, see the last point):
+        - The flying Slig is lost. It waits for a Slig's back 170 under its level, the way up through that
+          level takes 60 frames, and the Slig at 837,620 has its back turned for 60 (it walks two cells
+          and stands 36). And one that only shows its back when the flying Slig comes may be about to
+          turn. In the patch: it waits as near under the level as it is unseen, and where a Slig shows
+          only its back it waits until that one has faced it and turned again (all of the time is then
+          ahead). With that it is not lost in either run. A spawner that gives no flying Slig when waited
+          for is kept (`World::mNoFlier`) and nothing is planned with one of its after: without that he
+          waited for good.
+        - The boom machine's getaway is not luck: Slig.cpp `Brain_15_Idle` has the Slig turn at the
+          grenade's noise by way of "What?", which is slow (shot at +58 from the button, and he is off
+          the screen at +52 if he does not slow to stand), but when its own time to turn comes first it
+          turns, sees him and shoots at once. In the patch: into the shadow by the machine first, out to
+          the button only as the Slig turns its back, and on two cells past the screen's edge at a run.
+          That worked each time it was tried.
+        - The throw at the Slig under the first orb from 537,100, the one cell of that ledge that is in
+          the shadow (562 is not: shot there). The grenade does not go where the model has it (435): it
+          comes back off something at about 457 over the top of the screen (traced: x stops at 457
+          between y -36 and 9, then drifts right) and lies at 462, 75 from him, and its blast kills him
+          standing. He lived through it in the runs that worked because he was down; but 537 is the end
+          of the ledge, where down is also the way down off it, and in other runs he turned and hung
+          there in the Slig's sight. Not solved. Ways: find what the grenade comes back off (a wall the
+          model does not have, or the top of the map) so the throw is known to be too near; or throw
+          crouched (`ThrowSpot::eCrouched`: by the model it lands at 445, 92 away), rolled into 537 from
+          562 so that he never stands there.
+        - The flee from a Slig awake by him is not for a grenade throw from a shadow (it walked him out of
+          it), nor for the boom machine's getaway.
     - A Slig that has only just come to stand with its back to all of his way, and stands for long
       (`Slig::BeatPause`: the least it stands at an end of its beat; `GoToTask::Stood` keeps since when),
       is gone behind as one that walks away is: the one by the boom machine walks two cells and stands 120
