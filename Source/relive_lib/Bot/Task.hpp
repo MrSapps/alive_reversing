@@ -104,6 +104,11 @@ public:
     TaskStep Next(Bot& bot, const std::string& lastFailed) override;
 
 private:
+    // A boom machine's button has been pressed with a Slig about: off its screen first
+    bool mRetreat = false;
+    s32 mRetreatX = 0;
+    // The grenade is in hand and he has been sent into the nearest shadow
+    bool mShade = false;
     u32 mSack;
     std::unique_ptr<GoToTask> mGo;
     s32 mJumps = 0;
@@ -361,6 +366,15 @@ private:
     bool mWaited = false;
     // Frames spent waiting for a Slig to look the other way
     s32 mHiding = 0;
+    // A Slig that stands (where, and the way it faces): the frame it was first seen to, and the last it was
+    struct Stood final
+    {
+        s32 mX = 0;
+        bool mLeft = false;
+        u32 mSince = 0;
+        u32 mLast = 0;
+    };
+    std::vector<Stood> mStood;
     // AE, a screen with Sligs that shoot from its background: the next move between its covers, if there is one
     // to make now
     bool ZWatched(Bot& bot, const NavGraph& nav, const std::vector<s32>& path, s32 cur, TaskStep& step);

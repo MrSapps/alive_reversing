@@ -1500,11 +1500,32 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
     (`NavGraph::AddLedgeCatches`: off 1012,720, three cells long, to the edge at 887,720): the way up the
     middle. With it he is at the top (862,200) at f=6,133 with no deaths, the second wheel turned at
     f=4,778 on the way.
-  - `build-bot/la/blk7.txt` now: both locks, wheels 177 and 180, the middle climbed, no deaths to
-    f=6,133; then three deaths at the top, where the Sligs of the upper floor (one walks 1012..1262 at 100)
-    are under orbs and the lever, the boom machine and the last two wheels are.
-  After that: the boom machine's grenades for the orbs up top, a naked Slig taken over to press the button
-  at 1301,180, wheels 250 and 190.
+  - The top (wheels 190 on the left, 250 on the right), begun:
+    - Between two regions the planner takes one way for each thing that shuts it. It was the first in the
+      list, which from 862,200 was a running jump onto the ledge the Slig walks; now one that does not come
+      onto a floor a Slig walks goes before one that does (only that: by frames, the Mudanchee trial went
+      from no deaths to twenty-two). So he hoists up at 887 onto the other ledge.
+    - A thing a Slig watches under an orb, in a path with a boom machine: used once that orb is gone
+      (`World::Switch` of the orb's own switch). Nothing gives that yet: a grenade that goes off on the
+      floor under the orb at 450,40 (40 to 60 over it) leaves it, and the walkthrough's throw "on the fifth
+      beep", to go off in the air, is not built.
+    - A Slig that has only just come to stand with its back to all of his way, and stands for long
+      (`Slig::BeatPause`: the least it stands at an end of its beat; `GoToTask::Stood` keeps since when),
+      is gone behind as one that walks away is: the one by the boom machine walks two cells and stands 120
+      frames and more each way. And one that stands with its back to him is not run from (`Bot::MakeFlee`).
+    - The boom machine with a Slig on its floor and screen (`GetRocksTask`): the way off the screen faced
+      first, the button, and off at a run before the Slig has turned (it turned 27 frames after the
+      button, and shot him in a shadow he had been seen going into); back by stealth for the grenade; and
+      with it in hand into the nearest shadow.
+    - `GrenadeSligTask` takes the beat the game gives a Slig only if the Slig is in it (two with the same
+      number for their bounds are each given the other's).
+    - `build-bot/la/blk7.txt` now: at the top at f=6,133 with no deaths, one death there (shot across the
+      gap from the ledge at 987 as he walks the other ledge: the hoist up is not timed against that Slig),
+      the grenade in hand at f=6,862, the Slig on the far left ledge got with it at f=7,037. Then nothing
+      to do there (the orb), and he leaves by a suite's door into path 15 and dies there.
+  Left for the top: the orb by a grenade in the air, then the two Sligs under it taken over, the lever
+  (189), wheel 190; on the right the other orb, a naked Slig taken over to press the button at 1301,180,
+  the Sligs that come armed after, wheel 250; and the way out by the tasks door at 1051,179.
 - **Block 4** (path 9: first try from inside its door, a scratch run).
   (path 7), whose door shuts behind him, is the one he starts on: a wheel (switch 177), then a Slig lock
   with a Slig called by a lever, where he dies six times and gives up. Block 4 (path 9) not looked at again.

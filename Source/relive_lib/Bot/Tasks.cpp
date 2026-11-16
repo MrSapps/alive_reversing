@@ -2268,9 +2268,36 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 // it has there instead: one that stands or turns has not got its back to him, it is about to
                 // have its front. One that stood at its beat's end turned as he came out of the shadow at 737
                 // for the one at 637, two cells in the open.)
+                // (unless it has only just come to stand with its back to all of his way, and stands for long:
+                // BeatPause is the least it stands at an end of its beat. The Barracks' path 7: the one by the
+                // boom machine walks two cells and stands 120 frames and more each way, never anything else.)
+                Stood* stood = nullptr;
+                if (slig.mMotion == 0)
+                {
+                    const u32 now = bot.Abe().mFrame;
+                    for (Stood& s : mStood)
+                    {
+                        if (s.mX == slig.mX && s.mLeft == slig.mFacingLeft)
+                        {
+                            stood = &s;
+                        }
+                    }
+                    if (!stood)
+                    {
+                        mStood.push_back({slig.mX, slig.mFacingLeft, now, now});
+                        stood = &mStood.back();
+                    }
+                    if (now - stood->mLast > 12)
+                    {
+                        stood->mSince = now;
+                    }
+                    stood->mLast = now;
+                }
                 if (bot.IsAe() && (slig.mMotion == 0 || slig.mMotion == 5))
                 {
-                    behind = false;
+                    const s32 need = (static_cast<s32>(lastOpen) + 2) * cell * 10 / 25 + 12;
+                    const bool long_ = behind && stood && stood->mSince != stood->mLast && slig.mBeatPause - static_cast<s32>(stood->mLast - stood->mSince) >= need + 12;
+                    behind = long_;
                 }
                 // And two more ways of being out of its sight for as long as the way to the next cover takes (at a
                 // sneak's 2.5 a frame), where its beat is known: it walks ahead of him the way he goes, at 2.77,
@@ -3826,7 +3853,45 @@ TaskStep GetRocksTask::Next(Bot& bot, const std::string& lastFailed)
     }
     if (world.mRocks > 0)
     {
+        // Picked up out in the open with a Slig awake on that floor and screen: into the nearest shadow before
+        // anything else (the walkthrough: "crouch over it to pick it up, and stand and sneak back to the shadows")
+        const s32 at = bot.AbeNode();
+        if (sack->mInputs[1] == 2 && at >= 0 && !nav.Nodes()[at].mHidden && !mShade)
+        {
+            bool sligs = false;
+            for (const SligAt& slig : world.mSligs)
+            {
+                sligs = sligs || (!slig.mAsleep && !slig.mPossessed && slig.mHalf == abe.mHalfScale && std::abs(slig.mY - abe.mY) <= 45 && nav.CameraOf(slig.mX, slig.mY - 5) == nav.CameraOf(abe.mX, abe.mY - 5));
+            }
+            s32 best = -1;
+            for (std::size_t n = 0; sligs && n < nav.Nodes().size(); n++)
+            {
+                const NavNode& node = nav.Nodes()[n];
+                if (node.mLine == nav.Nodes()[at].mLine && node.mHidden && !node.mHazard && std::abs(node.mX - abe.mX) <= 100 && (best < 0 || std::abs(node.mX - abe.mX) < std::abs(nav.Nodes()[best].mX - abe.mX)))
+                {
+                    best = static_cast<s32>(n);
+                }
+            }
+            mShade = true;
+            if (best >= 0)
+            {
+                if (abe.mMove == Move::eCrouch)
+                {
+                    mShade = false;
+                    return TaskStep::Do(Prim::Press(Btn::eUp));
+                }
+                return TaskStep::Do(Prim::MoveTo(nav.Nodes()[best].mX, Gait::eSneak));
+            }
+        }
         return TaskStep::Done();
+    }
+    if (mRetreat && !mGo)
+    {
+        mRetreat = false;
+        if (mRetreatX != 0)
+        {
+            return TaskStep::Do(Prim::MoveTo(mRetreatX, Gait::eRun));
+        }
     }
     TaskStep step;
     if (!RunGo(mGo, bot, lastFailed, step))
@@ -3950,6 +4015,42 @@ TaskStep GetRocksTask::Next(Bot& bot, const std::string& lastFailed)
         }
         bot.Log("running and jumping through the rock sack at " + std::to_string(sack->CentreX()));
         return TaskStep::Do(Prim::RunJump(takeoffX, left));
+    }
+    // A boom machine with a Slig awake on its floor and screen: the button and off that screen at once, at a run
+    // (the machine is heard: it turns to look, and shoots what it has seen even into a shadow). The walkthrough
+    // of the Barracks' Slig bunks: "hit the button and run and roll to the right, stopping as soon as you cross
+    // to the next screen. Sneak back."
+    if (sack->mInputs[1] == 2)
+    {
+        const s32 cam = nav.CameraOf(abe.mX, abe.mY - 5);
+        for (const SligAt& slig : world.mSligs)
+        {
+            mRetreat = mRetreat || (!slig.mAsleep && !slig.mPossessed && slig.mHalf == abe.mHalfScale && std::abs(slig.mY - abe.mY) <= 45 && nav.CameraOf(slig.mX, slig.mY - 5) == cam);
+        }
+        if (mRetreat)
+        {
+            // (to the nearest cell of his floor on another screen, faced before the button is pressed: a turn
+            // after it is ten frames the Slig's own turn does not leave)
+            s32 best = -1;
+            for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+            {
+                const NavNode& node = nav.Nodes()[n];
+                if (node.mLine == nav.Nodes()[cur].mLine && !node.mHazard && nav.CameraOf(node.mX, node.mY - 5) != cam &&
+                    (best < 0 || std::abs(node.mX - abe.mX) < std::abs(nav.Nodes()[best].mX - abe.mX)))
+                {
+                    best = static_cast<s32>(n);
+                }
+            }
+            mRetreatX = best >= 0 ? nav.Nodes()[best].mX : 0;
+            if (best >= 0 && abe.mFacingLeft != (mRetreatX < abe.mX))
+            {
+                mRetreat = false;
+                mJumps--;
+                return TaskStep::Do(Prim::Face(mRetreatX < abe.mX));
+            }
+            bot.Log("the button of the boom machine at " + std::to_string(sack->CentreX()) + ", and off its screen to " + std::to_string(mRetreatX) + " before the Slig there has turned");
+            return TaskStep::Do(Prim::Press(Btn::eUp, 6));
+        }
     }
     bot.Log("jumping into the rock sack at " + std::to_string(sack->CentreX()));
     return TaskStep::Do(Prim::Press(Btn::eUp, 30));
@@ -4291,8 +4392,11 @@ TaskStep GrenadeSligTask::Next(Bot& bot, const std::string& lastFailed)
     }
     // The throw from here that goes off where the Slig will be by then
     const Domain::GrenadeShot* shot = nullptr;
-    const s32 beatMin = live && live->mBeatMax > live->mBeatMin ? live->mBeatMin : target->mX1;
-    const s32 beatMax = live && live->mBeatMax > live->mBeatMin ? live->mBeatMax : target->mX2;
+    // (its beat as the game gives it, if it is in it: two Sligs of a path with the same number for their bounds
+    // are each given the other's. The Barracks' path 7: the one that stands at 462 was said to walk 1000..1275.)
+    const bool beat = live && live->mBeatMax > live->mBeatMin && live->mX >= live->mBeatMin - 30 && live->mX <= live->mBeatMax + 30;
+    const s32 beatMin = beat ? live->mBeatMin : target->mX1;
+    const s32 beatMax = beat ? live->mBeatMax : target->mX2;
     const s32 then = live ? SligIn(live->mX, live->mFacingLeft, beatMin, beatMax, kAhead) : slig->CentreX();
     for (const Domain::GrenadeShot& s : target->mShots)
     {
@@ -4303,6 +4407,18 @@ TaskStep GrenadeSligTask::Next(Bot& bot, const std::string& lastFailed)
     }
     if (!shot)
     {
+        if (mHeld == 0)
+        {
+            std::string lands;
+            for (const Domain::GrenadeShot& g : target->mShots)
+            {
+                if (nav.NodeAt(g.mX, g.mY, slig->mHalf, 12) == node)
+                {
+                    lands += " " + std::to_string(g.mLandX);
+                }
+            }
+            bot.Log("a grenade from " + std::to_string(abe.mX) + "," + std::to_string(abe.mY) + " goes off at" + lands + "; Slig#" + std::to_string(mSlig) + (live ? " will be at " + std::to_string(then) + " (it walks " + std::to_string(beatMin) + ".." + std::to_string(beatMax) + ")" : " is not about") + ": waiting");
+        }
         if (++mHeld > 400)
         {
             bot.Log("Slig#" + std::to_string(mSlig) + " never comes to where a grenade from " + std::to_string(abe.mX) + "," + std::to_string(abe.mY) + " goes off");
