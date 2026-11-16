@@ -3,6 +3,7 @@
 #include "Goap.hpp"
 #include "NavGraph.hpp"
 #include "World.hpp"
+#include "FlierFlight.hpp"
 #include <functional>
 #include <string>
 #include <utility>
@@ -91,6 +92,10 @@ enum class StepKind : u8
     eDrink,     // drink at Brew machine mEntity
     eSligLock,  // call Slig mOther with lever mEdge (an entity id), take it over, walk it to Slig lock mEntity
                 // and say the lock's code with it
+    eFlierBomb, // from the cell mEdge take over the flying Slig that spawner mEntity makes and throw its grenades
+                // at the Sligs it can get at (Domain::FlierTargets)
+    eFlierPull, // from the cell mEdge take over the flying Slig that spawner mEntity makes and pull lever mOther
+                // with it
 };
 
 // What a planned action means to the bot
@@ -168,6 +173,34 @@ struct Domain final
 
     // edgeUsable: false for edges that turned out not to work. abeNode: where Abe is.
     // kills: with the actions that kill a Mudokon
+    // A Slig that a flying Slig Abe has taken over can throw a grenade at: one he can't take over himself (a
+    // security orb on its screen), with a place in the air off its level to throw from that can be flown to
+    // from where the flying Slig is made. Where it stands and its floor, and those places, the likeliest first.
+    struct FlierTarget final
+    {
+        u32 mSlig = 0;
+        s32 mX = 0;
+        s32 mFloorY = 0;
+        // The places to throw from that can be flown to as things are
+        std::vector<FlierFlight::Shot> mShots;
+        // With none: the switches (and what each has to be) that open the way to one
+        std::vector<std::pair<s32, s32>> mNeeds;
+    };
+    static std::vector<FlierTarget> FlierTargets(const NavInput& in, const World& world, const Entity& spawner);
+    // A way through the air for a flying Slig (FartFlight::Route) that keeps to the screens the path has:
+    // those with something of its floors and walls in them. Past the last screen there is nothing to stop a
+    // way on the grid, and nothing to fly in either.
+    static bool FlierWay(const NavInput& in, bool half, s32 fromX, s32 fromY, s32 toX, s32 toY, const std::vector<NavLine>* shut, std::vector<std::pair<s32, s32>>& corners);
+    // How near such a Slig, along its floor and up or down from it, a cell is one it shoots him in
+    static const s32 kFlierTargetX = 250;
+    static const s32 kFlierTargetY = 30;
+    // Where Abe takes the flying Slig of a spawner over from: of the cells he can get to (reach, by cell), one on
+    // its screen where he isn't seen, or else the one furthest from its track. With no security orb on that
+    // screen. -1: none.
+    static s32 FlierSpot(const NavGraph& nav, const World& world, const Entity& spawner, const std::vector<u8>& reach);
+    // Whether a cell is on that Slig's floor, near enough for it to shoot him there
+    static bool OnFlierTargetsFloor(const NavGraph& nav, const FlierTarget& target, s32 node);
+
     static Domain Build(const NavGraph& nav, const World& world, s32 abeNode, const std::function<bool(s32 edge)>& edgeUsable, bool kills = false);
     // The cell Abe uses a lever, ring or wheel from, or stands at for a portal: -1 if there's none. faceLeft is the way to face.
     // firstSide: for a lever, the side of it tried first (-1 left of it, 1 right)

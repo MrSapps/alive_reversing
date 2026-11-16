@@ -352,6 +352,10 @@ bool NavGraph::WallBetween(s32 xa, s32 xb, s32 y, bool half, s32 height) const
     return false;
 }
 
+// How near an electric wall's beam (to either side, and under where the map puts it) a cell is one it kills him in
+static const s32 kBeamReach = 16;
+static const s32 kBeamUnder = 30;
+
 s32 NavGraph::BarrierBetween(s32 xa, s32 xb, s32 y, bool half) const
 {
     const s32 lo = std::min(xa, xb);
@@ -1916,6 +1920,22 @@ void NavGraph::Build(const NavInput& input)
             if (fence >= 0 && !mInput.mFeatures[fence].mSolid)
             {
                 e.mFence = fence;
+            }
+        }
+    }
+    // An electric wall kills what its beam touches: four pixels to each side of where the map puts it, which is
+    // its left edge, up from the floor it stands on. Put on the line between two cells it gets him in either,
+    // his box being 13 to each side (the Slig Barracks' path 1: the walls at 2000 and 2075 on the floor at 380,
+    // their boxes read from the game). Into such a cell only while the wall is off.
+    for (NavEdge& e : edges)
+    {
+        const NavNode& b = mNodes[e.mTo];
+        for (std::size_t i = 0; e.mFence < 0 && i < mInput.mFeatures.size(); i++)
+        {
+            const NavFeature& f = mInput.mFeatures[i];
+            if (f.mKind == FeatureKind::eBarrier && f.mBeam && (f.mAnyScale || f.mHalf == b.mHalf) && std::abs(b.mX - f.mX1) <= kBeamReach && b.mY >= f.mY1 && b.mY <= f.mY2 + kBeamUnder)
+            {
+                e.mFence = static_cast<s32>(i);
             }
         }
     }

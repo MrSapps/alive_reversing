@@ -6948,6 +6948,512 @@ TaskStep FartBombTask::Next(Bot& bot, const std::string& lastFailed)
     return TaskStep::Do(Prim::Wait(1, FartFlight::Steer(fart.mX100, fart.mY100, fart.mVelX100, fart.mVelY100, tx, ty + FartFlight::kBody)));
 }
 
+FlierBombTask::~FlierBombTask() = default;
+
+// How far back from where it threw the flying Slig goes while the grenade is in the air, and how far out from
+// where it waits it comes in from
+static const s32 kFlierBack = 35;
+static const s32 kFlierRunIn = 25;
+// The speed it is flown at, in hundredths of a pixel a frame each way
+static const s32 kFlierPace = 300;
+// How near where the grenade comes down the Slig has to be when it does: the blast is 30 to each side, and the
+// Slig's own box 24 on top of that
+static const s32 kFlierBlast = 45;
+
+TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const Entity* spawner = world.Find(mSpawner);
+    if (!spawner)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    // (found anew every so often and when one is dead: a way through the air for every place to throw from is
+    // a lot to look for)
+    if (mTargetsIn <= 0 || mKilled != world.mFleechKilled.size() || mState == 4)
+    {
+        mTargets = Domain::FlierTargets(nav.Input(), world, *spawner);
+        mTargetsIn = 30;
+        mKilled = world.mFleechKilled.size();
+    }
+    mTargetsIn--;
+    std::vector<Domain::FlierTarget> targets = mTargets;
+    // (the ones that can be got at as things are, and have not been given up on)
+    targets.erase(std::remove_if(targets.begin(), targets.end(), [this](const Domain::FlierTarget& t)
+                                 { return t.mShots.empty() || std::find(mGivenUp.begin(), mGivenUp.end(), t.mSlig) != mGivenUp.end(); }),
+                  targets.end());
+    const FlownAt& flown = world.mFlown;
+    if (++mFrames > 15000)
+    {
+        return TaskStep::Failed("the Sligs are still there after 15000 frames");
+    }
+    // With a lever to pull: that is all it is for, and it is done when the lever's switch has changed
+    const Entity* lever = mLever ? world.Find(mLever) : nullptr;
+    if (mLever && !lever)
+    {
+        return TaskStep::Failed("no such lever");
+    }
+    if (lever && !mLeverKnown)
+    {
+        mLeverKnown = true;
+        mLeverWas = world.Switch(lever->mSwitch);
+    }
+    const bool nothingLeft = lever ? world.Switch(lever->mSwitch) != mLeverWas : targets.empty();
+    if (!flown.mLive)
+    {
+        // Abe: before it is his, or after it is gone
+        if (mPhase == 2 || mPhase == 3)
+        {
+            if (mPhase == 2)
+            {
+                mLost++;
+                bot.Log("the flying Slig is gone: " + std::to_string(mLost) + " lost");
+            }
+            mPhase = 4;
+            mAfter = 0;
+            mState = 0;
+            mWay.clear();
+        }
+        if (mPhase == 4)
+        {
+            if (++mAfter < 45 || !bot.Abe().Settled())
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            mPhase = 0;
+        }
+        if (nothingLeft)
+        {
+            return mGivenUp.empty() ? TaskStep::Done() : TaskStep::Failed("the flying Slig's grenades don't get every Slig");
+        }
+        if (mLost > 8)
+        {
+            return TaskStep::Failed("nine flying Sligs lost and the Sligs are still there");
+        }
+        if (bot.AbeNode() != mSpot)
+        {
+            TaskStep step;
+            if (!mGo)
+            {
+                mGo = GoToNode(mSpot);
+            }
+            if (!RunGo(mGo, bot, lastFailed, step))
+            {
+                return step;
+            }
+            if (step.mKind == TaskStep::Kind::eFailed)
+            {
+                return step;
+            }
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        // (come up the hoist to it he may hang from it still, out of the flying Slig's sight: up, there is no
+        // chanting from a ledge's edge)
+        if (bot.Abe().mMove == Move::eHang)
+        {
+            return TaskStep::Do(Prim::Wait(3, Btn::eUp));
+        }
+        if (!bot.Abe().Settled() && mPhase != 1)
+        {
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        // One on his screen to chant at (the spawner makes it as he stands here)
+        const s32 cam = nav.CameraOf(bot.Abe().mX, bot.Abe().mY - 5);
+        bool about = false;
+        for (const FlierAt& f : world.mFliers)
+        {
+            about = about || nav.CameraOf(f.mX, f.mY - 20) == cam;
+        }
+        // (the chant is kept up a while when it flies off the screen: it comes round again, and a chant begun
+        // anew each time is never done before it is gone)
+        if (!about && (mPhase != 1 || ++mAway > 300))
+        {
+            mPhase = 0;
+            if (++mWaits > 3000)
+            {
+                return TaskStep::Failed("no flying Slig came to be taken over");
+            }
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        if (about)
+        {
+            mAway = 0;
+        }
+        if (mPhase != 1)
+        {
+            mPhase = 1;
+            bot.Log("a flying Slig is about: chanting to take it over");
+        }
+        return TaskStep::Do(Prim::Wait(1, Btn::eChant));
+    }
+
+    // The flying Slig
+    mWaits = 0;
+    if (mPhase != 2 && mPhase != 3)
+    {
+        mPhase = 2;
+        mState = 0;
+        bot.Log("in the flying Slig at " + std::to_string(flown.mX100 / 100) + "," + std::to_string(flown.mY100 / 100) + ": " + (lever ? "Lever#" + std::to_string(mLever) + " to pull" : std::to_string(targets.size()) + " Sligs to get"));
+        // (the chant let go first, or it would burst)
+        return TaskStep::Do(Prim::Wait(2));
+    }
+    const s32 bx = flown.mX100 / 100;
+    const s32 by = flown.mY100 / 100;
+    const bool still = flown.mVelX100 == 0 && flown.mVelY100 == 0;
+    if (nothingLeft || mPhase == 3)
+    {
+        if (mPhase != 3)
+        {
+            mPhase = 3;
+            bot.Log(std::string(lever ? "the lever is pulled" : "no Slig left for it") + ": bursting the flying Slig");
+        }
+        return TaskStep::Do(Prim::Wait(1, Btn::eChant));
+    }
+    const Domain::FlierTarget* target = nullptr;
+    for (const Domain::FlierTarget& t : targets)
+    {
+        if (t.mSlig == mTarget)
+        {
+            target = &t;
+        }
+    }
+    // A lever is pulled like a grenade is thrown: flown to a place by it, facing it, and action there. From its
+    // left first, then from its right (FlierFlight::LeverPull).
+    FlierFlight::Shot pull;
+    if (lever)
+    {
+        pull = FlierFlight::LeverPull(lever->CentreX(), lever->mY2 - 4, mShot % 2 == 1);
+        if (mShot >= 8)
+        {
+            return TaskStep::Failed("the flying Slig does not get the lever pulled");
+        }
+    }
+    else if (!target)
+    {
+        if (mTarget != 0)
+        {
+            bot.Log("the grenade got Slig#" + std::to_string(mTarget));
+        }
+        // The nearest next
+        for (const Domain::FlierTarget& t : targets)
+        {
+            if (!target || std::abs(t.mX - bx) + std::abs(t.mFloorY - by) < std::abs(target->mX - bx) + std::abs(target->mFloorY - by))
+            {
+                target = &t;
+            }
+        }
+        mTarget = target->mSlig;
+        mShot = 0;
+        mRounds = 0;
+        mState = 0;
+        mLegFrames = 0;
+        mHasLastSlig = false;
+    }
+    // The Slig itself, if it is to be seen: it walks its floor
+    const SligAt* live = nullptr;
+    for (const SligAt& s : world.mSligs)
+    {
+        if (target && s.mSeen && !s.mPossessed && s.mHalf == flown.mHalf && std::abs(s.mY - target->mFloorY) <= 25 && std::abs(s.mX - target->mX) <= 150 && (!live || std::abs(s.mX - target->mX) < std::abs(live->mX - target->mX)))
+        {
+            live = &s;
+        }
+    }
+    if (target && mShot >= target->mShots.size())
+    {
+        mShot = 0;
+        if (++mRounds >= 3)
+        {
+            bot.Log("no grenade gets Slig#" + std::to_string(mTarget) + ": left");
+            mGivenUp.push_back(mTarget);
+            bot.NoBomb(mTarget);
+            mTarget = 0;
+            return TaskStep::Do(Prim::Wait(1));
+        }
+    }
+    const FlierFlight::Shot& shot = target ? target->mShots[mShot] : pull;
+    const s32 fuse = shot.mFrames;
+    // What is held now is not seen in its speed until the frame after next (measured: the run in to where it
+    // waits went 10 pixels too far with each frame's buttons chosen for the speed it had then). So the buttons
+    // are chosen for where it will be once the ones held last frame have had their effect. keep: never the
+    // button that would turn it round (the way it is not to face).
+    const u32 pending = mLastHeld;
+    mLastHeld = 0;
+    const auto steerTo = [this, &flown, pending](s32 x, s32 y, u32 never = 0)
+    {
+        s32 velX = flown.mVelX100;
+        s32 velY = flown.mVelY100;
+        FlierFlight::Step(velX, velY, pending);
+        mLastHeld = FlierFlight::Steer(flown.mX100 + velX, flown.mY100 + velY, velX, velY, x, y) & ~never;
+        // (never faster than three pixels a frame: at its top speed it is past a corner before it has turned,
+        // and off what it flies into it bounces as fast as it came. Measured in the Barracks' path 1, where
+        // it went to and fro for good in a pocket between two floors.)
+        if (velX > kFlierPace)
+        {
+            mLastHeld &= ~static_cast<u32>(Btn::eRight);
+        }
+        if (velX < -kFlierPace)
+        {
+            mLastHeld &= ~static_cast<u32>(Btn::eLeft);
+        }
+        if (velY > kFlierPace)
+        {
+            mLastHeld &= ~static_cast<u32>(Btn::eDown);
+        }
+        if (velY < -kFlierPace)
+        {
+            mLastHeld &= ~static_cast<u32>(Btn::eUp);
+        }
+        return TaskStep::Do(Prim::Wait(1, mLastHeld));
+    };
+    if (mFrames % 300 == 0)
+    {
+        bot.Log("the flying Slig is at " + std::to_string(bx) + "," + std::to_string(by) + " going " + std::to_string(flown.mVelX100) + "," + std::to_string(flown.mVelY100) + ", state " + std::to_string(mState) + (lever ? " for the lever from " : " for Slig#" + std::to_string(mTarget) + " from ") + std::to_string(shot.mX) + "," + std::to_string(shot.mY));
+    }
+    if (mState == 4)
+    {
+        // Thrown: back to where it waited (and back from where the grenade comes down: the blast reaches the
+        // flying Slig where it threw from) until it has gone off, then whether the Slig is still there
+        // (dead is when the map says so, which is when what is left of it is gone: that it is not to be seen
+        // is not enough, a Slig of a screen that is not the one shown isn't either)
+        if (lever)
+        {
+            // (pulled: it goes to the lever by itself and pulls. Still not after three seconds: again)
+            if (++mSince > 90)
+            {
+                bot.Log("the lever is not pulled from " + std::to_string(shot.mX) + "," + std::to_string(shot.mY) + ": again");
+                mShot++;
+                mState = 0;
+                mLegFrames = 0;
+            }
+            // (pressed again every few frames while it hangs there: the game takes the press only on a frame
+            // it is in its idle motion, which is some frames after it has come to rest)
+            if (mSince % 6 == 0 && still && flown.mMotion == 0 && flown.mFacingLeft == shot.mFaceLeft && std::abs(shot.mX - bx) <= 8 && std::abs(shot.mY - by) <= 8)
+            {
+                return TaskStep::Do(Prim::Wait(1, Btn::eAction));
+            }
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        if (++mSince > fuse + 25 && (live || mSince > fuse + 150))
+        {
+            bot.Log("the grenade from " + std::to_string(shot.mX) + "," + std::to_string(shot.mY) + " did not get Slig#" + std::to_string(mTarget) + (live ? " (it is at " + std::to_string(live->mX) + "," + std::to_string(live->mY) + ", motion " + std::to_string(live->mMotion) + ")" : " (it is not to be seen)") + ": from somewhere else");
+            mShot++;
+            mState = 0;
+            mLegFrames = 0;
+        }
+        return steerTo(shot.mWaitX + (shot.mFaceLeft ? kFlierBack : -kFlierBack), shot.mWaitY);
+    }
+    // A Slig shoots what is on its level and in front of it
+    const auto seenAt = [&world, &flown, bx](s32 y)
+    {
+        for (const SligAt& s : world.mSligs)
+        {
+            if (s.mSeen && !s.mAsleep && !s.mPossessed && s.mHalf == flown.mHalf && y <= s.mY + FlierFlight::kLevelUnder && y >= s.mY - FlierFlight::kLevelOver && s.mFacingLeft == (bx < s.mX))
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    if (mState == 3)
+    {
+        // Up (or down) to where it throws from, and thrown the moment it is there
+        // (when it can: not in the frames it ends its climb in, when the game takes no notice of the button)
+        const s32 fromX = shot.mX + (shot.mFaceLeft ? -mNearer : mNearer);
+        if (lever)
+        {
+            // (action, at rest: the game looks for a lever only then)
+            if (std::abs(fromX - bx) <= 6 && std::abs(shot.mY - by) <= 6 && still && flown.mMotion == 0 && flown.mFacingLeft == shot.mFaceLeft)
+            {
+                bot.Log("at " + std::to_string(bx) + "," + std::to_string(by) + " (motion " + std::to_string(flown.mMotion) + ", facing " + (flown.mFacingLeft ? "left" : "right") + "): action, for Lever#" + std::to_string(mLever) + " at " + std::to_string(lever->CentreX()) + "," + std::to_string(lever->mY2 - 4));
+                mState = 4;
+                mSince = 0;
+                return TaskStep::Do(Prim::Wait(1, Btn::eAction));
+            }
+            // (turned the other way, or past it: out and in again)
+            if (++mSince > 90 || (still && flown.mMotion == 0 && flown.mFacingLeft != shot.mFaceLeft))
+            {
+                mState = 0;
+                mLegFrames = 0;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            // (never a press the other way than it faces: that turns it round, and a lever is only pulled
+            // facing it)
+            return steerTo(fromX, shot.mY, shot.mFaceLeft ? Btn::eRight : Btn::eLeft);
+        }
+        if (std::abs(fromX - bx) <= 4 && std::abs(shot.mY - by) <= 3 && flown.mFacingLeft == shot.mFaceLeft && flown.mCanThrow)
+        {
+            bot.Log("at " + std::to_string(bx) + "," + std::to_string(by) + ": a grenade for Slig#" + std::to_string(mTarget) + ", to come down at " + std::to_string(shot.mLandX + bx - shot.mX) + " in " + std::to_string(fuse) + " frames");
+            mState = 4;
+            mSince = 0;
+            return TaskStep::Do(Prim::Wait(1, Btn::eThrow));
+        }
+        if (++mSince > 90)
+        {
+            mState = 0;
+            mLegFrames = 0;
+        }
+        return steerTo(fromX, shot.mY);
+    }
+    // The way to where it waits is found anew every so often from where it is: it drifts as it is taken over, and
+    // off a straight leg it can come up under a ledge it then pushes at for good
+    if (mState == 1 && ++mLegFrames >= 40)
+    {
+        mState = 0;
+    }
+    if (mState == 0)
+    {
+        const std::vector<NavLine> gates = FartFlight::Gates(nav.Input(), flown.mHalf, &world);
+        // (to a little way out from where it waits: it faces the way it flies, so it is to come to that place
+        // flying at the Slig)
+        if (!Domain::FlierWay(nav.Input(), flown.mHalf, bx, by, shot.mWaitX + (shot.mFaceLeft ? kFlierRunIn : -kFlierRunIn), shot.mWaitY, &gates, mWay))
+        {
+            bot.Log("no way through the air from " + std::to_string(bx) + "," + std::to_string(by) + " to " + std::to_string(shot.mWaitX) + "," + std::to_string(shot.mWaitY));
+            mShot++;
+            mLegFrames = 0;
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        mCorner = 0;
+        mState = 1;
+        if (mLegFrames == 0)
+        {
+            mHeld = 0;
+            mStuck = 0;
+            bot.Log((target ? "Slig#" + std::to_string(mTarget) + " at " + std::to_string(target->mX) + "," + std::to_string(target->mFloorY) : "Lever#" + std::to_string(mLever)) + ": " + std::to_string(mWay.size()) + " legs to " + std::to_string(shot.mWaitX) + "," + std::to_string(shot.mWaitY) + ", to throw from " + std::to_string(shot.mX) + "," + std::to_string(shot.mY));
+        }
+        mLegFrames = 0;
+    }
+    if (mState == 1)
+    {
+        // (the last leg is the run in to where it waits)
+        const bool last = mCorner >= mWay.size();
+        const s32 tx = last ? shot.mWaitX : mWay[mCorner].first;
+        const s32 ty = last ? shot.mWaitY : mWay[mCorner].second;
+        // (the last corner is where the run in begins: from rest there, so that it comes to the place slowly
+        // and the right way round)
+        const bool runIn = mCorner + 1 == mWay.size();
+        if (!last && std::abs(tx - bx) <= (runIn ? 5 : 10) && std::abs(ty - by) <= (runIn ? 5 : 10) && (!runIn || still))
+        {
+            mCorner++;
+            mLegFrames = 0;
+            mRunInFrames = 0;
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        if (last || runIn)
+        {
+            mLegFrames = 0;
+        }
+        if (last && ++mRunInFrames > 90)
+        {
+            // (not there after three seconds: past it, or turned round. Out and in again)
+            mState = 0;
+            mLegFrames = 1;
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        // (a little past it will do: it is not steered back, which would turn it round)
+        if (last && still && std::abs(tx - bx) <= 6 && std::abs(ty - by) <= 3)
+        {
+            mState = 2;
+            mSince = 0;
+            mHeld = 0;
+            mHasLastSlig = false;
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        // Off every Slig's level now, the next leg is not begun while it leads onto the level of one that faces
+        // this way: it waits where it is for its back
+        if (!seenAt(by) && mHeld < 600)
+        {
+            bool onto = false;
+            for (s32 k = 1; k <= 10 && !onto; k++)
+            {
+                onto = seenAt(by + (ty - by) * k / 10);
+            }
+            if (onto)
+            {
+                if (mHeld++ == 0)
+                {
+                    bot.Log("a Slig faces this way on the level the way goes through: waiting at " + std::to_string(bx) + "," + std::to_string(by) + " for its back");
+                }
+                return steerTo(bx, by);
+            }
+        }
+        mHeld = 0;
+        // Pushing at something (the end of a ledge its side is under): along to where it is going first
+        if (std::abs(bx - mLastX) + std::abs(by - mLastY) <= 1)
+        {
+            mStuck++;
+        }
+        else
+        {
+            mStuck = 0;
+        }
+        mLastX = bx;
+        mLastY = by;
+        if (mStuck > 25)
+        {
+            mUnstick = 25;
+            mStuck = 0;
+            bot.Log("the flying Slig is held at " + std::to_string(bx) + "," + std::to_string(by) + ": along first");
+        }
+        if (mUnstick > 0 && !last)
+        {
+            mUnstick--;
+            return steerTo(std::abs(tx - bx) > 20 ? tx : bx + (shot.mFaceLeft ? -40 : 40), by);
+        }
+        if (last)
+        {
+            // (on the run in never a press the other way than it is to face: that turns it round)
+            return steerTo(tx, ty, shot.mFaceLeft ? Btn::eRight : Btn::eLeft);
+        }
+        return steerTo(tx, ty);
+    }
+    // Where it waits: facing the Slig, until nothing sees it where it throws from and the grenade would come
+    // down where the Slig will be
+    if (std::abs(shot.mWaitX - bx) > 6 || std::abs(shot.mWaitY - by) > 6)
+    {
+        mState = 0;
+        mLegFrames = 1;
+        return steerTo(shot.mWaitX, shot.mWaitY);
+    }
+    if (flown.mFacingLeft != shot.mFaceLeft)
+    {
+        // (it turns by flying that way: out and in again)
+        mState = 0;
+        mLegFrames = 1;
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    if (lever)
+    {
+        mNearer = 0;
+        mState = 3;
+        mSince = 0;
+        return steerTo(shot.mX, shot.mY);
+    }
+    // (the frames it takes from here to there are a few more for the Slig to walk in)
+    const s32 rise = std::abs(shot.mY - shot.mWaitY) / 4 + (shot.mY != shot.mWaitY ? 4 : 0);
+    s32 sligX = target->mX;
+    if (live)
+    {
+        sligX = live->mX + (mHasLastSlig ? (live->mX - mLastSligX) * (fuse + rise) : 0);
+        mLastSligX = live->mX;
+        mHasLastSlig = true;
+    }
+    // (not for its back: it is on the Slig's level for the few frames it takes to go up, throw and come down
+    // again, which is less than a Slig takes to turn and shoot. Measured in the Barracks' path 1: thrown at
+    // once it was not shot at, waiting for a back it never got one long enough.)
+    // (from nearer the Slig if it stands further on than the grenade comes down)
+    const s32 further = shot.mFaceLeft ? shot.mLandX - sligX : sligX - shot.mLandX;
+    mNearer = std::max(0, std::min(shot.mNearer, further));
+    const s32 lands = shot.mLandX + (shot.mFaceLeft ? -mNearer : mNearer);
+    if (++mSince < 600 && std::abs(sligX - lands) > kFlierBlast)
+    {
+        return steerTo(shot.mWaitX, shot.mWaitY);
+    }
+    mState = 3;
+    mSince = 0;
+    return steerTo(shot.mX + (shot.mFaceLeft ? -mNearer : mNearer), shot.mY);
+}
+
 DrinkTask::~DrinkTask() = default;
 
 TaskStep DrinkTask::Next(Bot& bot, const std::string& lastFailed)

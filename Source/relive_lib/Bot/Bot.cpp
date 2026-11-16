@@ -19,6 +19,7 @@ static const u32 kCheckpointEveryFramesWatched = 30;
 static const s32 kTriesPerObstacle = 600;
 // The same in frames of the game played in tries that failed: for a way through unhurt, and for one at all
 static const s32 kFramesPerObstacle = 6000;
+static const u32 kFramesClearOfAnObstacle = 900;
 static const s32 kFramesPerObstacleDying = 60000;
 // and how many saves it goes back for a way through unhurt before that
 static const s32 kPopsPerObstacle = 2;
@@ -66,8 +67,10 @@ void Bot::Start(const Profile& profile)
     mTries = 0;
     mTriesSince = 0;
     mTolerant = false;
+    mVary = Lookahead::Way::eSame;
+    mTryingAgain = false;
     mSavePlaces.clear();
-    mPops = 0;
+    mPopFloor = 0;
     mTryFrames = 0;
     mRepeat.clear();
     mRepeatAt = 0;
@@ -207,6 +210,10 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<FartBombTask>(step.mEntity, step.mOther, step.mEdge);
         case StepKind::eDrink:
             return std::make_unique<DrinkTask>(step.mEntity);
+        case StepKind::eFlierBomb:
+            return std::make_unique<FlierBombTask>(step.mEntity, step.mEdge);
+        case StepKind::eFlierPull:
+            return std::make_unique<FlierBombTask>(step.mEntity, step.mEdge, step.mOther);
         case StepKind::eSligLock:
             return std::make_unique<SligLockTask>(step.mEntity, step.mOther, static_cast<u32>(step.mEdge));
         case StepKind::eRide:
@@ -1599,6 +1606,22 @@ void Bot::EnsureKnowledge(BaseMap& map)
 
 void Bot::Stuck(const std::string& why)
 {
+    // Looking ahead, nothing left to do is a try that failed, like one he was hurt in: what led here is taken
+    // back and done another way, for as long as there is one
+    if (mAuto && mProfile.mLook && !mCheckpoints.empty() && mState == BotState::eRunning)
+    {
+        Log("this try ends with nothing to do: " + why);
+        mTryWhy = "nothing to do";
+        mTryFailed = true;
+        mPilotActive = false;
+        mBits = 0;
+        return;
+    }
+    StuckNow(why);
+}
+
+void Bot::StuckNow(const std::string& why)
+{
     mState = BotState::eStuck;
     mWhy = why;
     mTask.reset();
@@ -1744,16 +1767,26 @@ void Bot::MaybeCheckpoint(BaseMap& map)
     mAttempt = 0;
     if (look)
     {
-        const std::tuple<s32, s32, s32> place(mAbe.mX / 25, mAbe.mY / 20, static_cast<s32>(mAbe.mMove));
-        if (std::find(mSavePlaces.begin(), mSavePlaces.end(), place) == mSavePlaces.end())
+        // Somewhere no save of this run was taken yet: the tries have got him on. (Every place is kept: with only
+        // the last few, ground gone over again from a save further back looked new, and the tries never ran out.)
+        // Ground he has been over before is got on along too, when it is a good while since a try failed
+        if (!mTolerant && mTriesSince > 0 && mAbe.mFrame - mLastTryFrame >= kFramesClearOfAnObstacle)
         {
             mTriesSince = 0;
             mTryFrames = 0;
-            mPops = 0;
-            mSavePlaces.push_back(place);
-            if (mSavePlaces.size() > 12)
+            mPopFloor = 0;
+        }
+        const std::tuple<s32, s32, s32, s32> place(mAbe.mLevel * 1000 + mAbe.mPath, mAbe.mX / 25, mAbe.mY / 20, static_cast<s32>(mAbe.mMove));
+        if (mSavePlaces.insert(place).second)
+        {
+            mTriesSince = 0;
+            mTryFrames = 0;
+            mPopFloor = 0;
+            if (mTryingAgain && ++mVarySaves >= 2)
             {
-                mSavePlaces.erase(mSavePlaces.begin());
+                Log("that try got on" + std::string(mVary == Lookahead::Way::eAgain ? " (planned anew)" : mVary == Lookahead::Way::eQuiet ? " (sneaking)" : mVary == Lookahead::Way::eFast ? " (running)" : ""));
+                mTryingAgain = false;
+                mVary = Lookahead::Way::eSame;
             }
             if (mTolerant && ++mTolerantSaves >= 2)
             {
@@ -1997,11 +2030,17 @@ void Bot::TryFailed(BaseMap& map, const std::string& what)
     mHold = 0;
     if (mCheckpoints.empty())
     {
-        Stuck(what + " with nothing to go back to");
+        StuckNow(what + " with nothing to go back to");
         return;
     }
     const s32 frames = static_cast<s32>(mAbe.mFrame - mCheckpoints.back().mCheckpoint.mFrame);
     mCurrentEdge = -1;
+    // The first failure since he last got on: from here it goes back two saves at most (the saves a try takes on
+    // its way are gone back over freely: they are no further back than where it began)
+    if (mPopFloor == 0)
+    {
+        mPopFloor = mCheckpoints.size() > static_cast<std::size_t>(kPopsPerObstacle) ? mCheckpoints.size() - kPopsPerObstacle : 1;
+    }
     const std::string doing = mTask ? mTask->Name() : "no task";
     // Too many without getting anywhere new: no more going back for a way through unhurt
     mTryFrames += frames;
@@ -2012,7 +2051,7 @@ void Bot::TryFailed(BaseMap& map, const std::string& what)
         mTryFrames = 0;
         if (mTolerant)
         {
-            Stuck("no try gets on, hurt or not (" + what + " doing " + doing + ")");
+            StuckNow("no try gets on, hurt or not (" + what + " doing " + doing + ")");
             return;
         }
     }
@@ -2040,6 +2079,11 @@ void Bot::TryFailed(BaseMap& map, const std::string& what)
     {
         Saved& saved = mCheckpoints.back();
         delay = Lookahead::Failed(saved.mStretch, static_cast<s32>(mAbe.mFrame - saved.mCheckpoint.mFrame), (mAbe.mX / 25) * 4096 + mAbe.mY / 20);
+        if (delay < 0 && !spent)
+        {
+            // No moment gets that through: something else at each moment
+            delay = Lookahead::NextWay(saved.mStretch);
+        }
         if (delay >= 0 && !spent)
         {
             break;
@@ -2056,7 +2100,7 @@ void Bot::TryFailed(BaseMap& map, const std::string& what)
         }
         // Or it went wrong before this save: the try that got here from the one before has failed too. A save or
         // two back, no further: if nothing gets through unhurt from there either, hurt is the best there is
-        const bool back = mCheckpoints.size() > 1 && (mTolerant || (mPops < kPopsPerObstacle && !spent));
+        const bool back = mCheckpoints.size() > 1 && (mTolerant || (mCheckpoints.size() > mPopFloor && !spent));
         if (back)
         {
             // (what the bot pressed from the save before to get here, and then from here)
@@ -2068,7 +2112,6 @@ void Bot::TryFailed(BaseMap& map, const std::string& what)
                 before.mHasPressed = true;
             }
             mCheckpoints.pop_back();
-            mPops++;
             continue;
         }
         if (!mTolerant)
@@ -2077,21 +2120,25 @@ void Bot::TryFailed(BaseMap& map, const std::string& what)
             mTolerantSaves = 0;
             mTriesSince = 0;
             mTryFrames = 0;
-            mPops = 0;
+            mPopFloor = 0;
             saved.mStretch = Lookahead::Stretch();
             saved.mHasPressed = false;
             delay = 0;
             Log("nothing gets through unhurt: being hurt is put up with for now");
             break;
         }
-        Stuck("no try gets on from the oldest save (" + what + " doing " + doing + ")");
+        StuckNow("no try gets on from the oldest save (" + what + " doing " + doing + ")");
         return;
     }
     Saved& saved = mCheckpoints.back();
-    Log("try failed (" + what + ", " + doing + ") " + std::to_string(frames) + " frames in: back to f=" + std::to_string(saved.mCheckpoint.mFrame) + ", holding back " + std::to_string(delay));
     mHold = delay;
+    mLastTryFrame = saved.mCheckpoint.mFrame + static_cast<u32>(delay);
     // (a try the bot plays itself, straight on, has nothing to repeat)
-    mRepeat = saved.mHasPressed && saved.mStretch.mDelay > 0 ? saved.mPressed : std::vector<u32>();
+    mRepeat = saved.mHasPressed && saved.mStretch.mDelay > 0 && Lookahead::Repeats(saved.mStretch.mWay) ? saved.mPressed : std::vector<u32>();
+    mVary = saved.mStretch.mWay;
+    mVarySaves = 0;
+    mTryingAgain = true;
+    Log("try failed (" + what + ", " + doing + ") " + std::to_string(frames) + " frames in: back to f=" + std::to_string(saved.mCheckpoint.mFrame) + ", holding back " + std::to_string(delay) + (mVary == Lookahead::Way::eAgain ? ", planned anew" : mVary == Lookahead::Way::eQuiet ? ", sneaking" : mVary == Lookahead::Way::eFast ? ", running" : ""));
     mRepeatAt = 0;
     mRng.SetState(saved.mRng);
     static_cast<BotMemory&>(*this) = saved.mMemory;
@@ -2589,9 +2636,13 @@ std::unique_ptr<Task> Bot::MakeFlee()
             // after it woke with the well ten cells on, which is 40 frames at a run)
             // (by the quick ways only: the nearest other floor may be down a hoist, which is no escape)
             const NavGraph::EdgeCost all = EdgeCostFn();
-            const NavGraph::EdgeCost quickOnly = [&all](const NavEdge& e) -> s32
+            // (looking ahead a door is one too: he is gone through it sooner than he is up a hoist, and the
+            // tries find the moment. The Barracks' path 1: the door at 2037,380, a cell on from where he ran
+            // back from the Slig at 2187 every time.)
+            const bool doors = mProfile.mLook;
+            const NavGraph::EdgeCost quickOnly = [&all, doors](const NavEdge& e) -> s32
             {
-                return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eWell || e.mKind == EdgeKind::eHoistUp ? all(e) : -1;
+                return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eWell || e.mKind == EdgeKind::eHoistUp || (doors && e.mKind == EdgeKind::eDoor) ? all(e) : -1;
             };
             // (cells are half as long at half scale)
             const std::size_t most = mAbe.mHalfScale ? 24 : 12;
@@ -2609,7 +2660,7 @@ std::unique_ptr<Task> Bot::MakeFlee()
                 for (s32 edge : way)
                 {
                     const EdgeKind kind = nav.Edges()[edge].mKind;
-                    quick = quick && (kind == EdgeKind::eWalk || kind == EdgeKind::eWell || kind == EdgeKind::eHoistUp);
+                    quick = quick && (kind == EdgeKind::eWalk || kind == EdgeKind::eWell || kind == EdgeKind::eHoistUp || (doors && kind == EdgeKind::eDoor));
                 }
                 if (quick)
                 {
@@ -2780,7 +2831,9 @@ void Bot::Think(BaseMap& map)
     }
     if (mTryFailed)
     {
-        TryFailed(map, "hurt");
+        const std::string what = mTryWhy.empty() ? "hurt" : mTryWhy;
+        mTryWhy.clear();
+        TryFailed(map, what);
         if (mRestoring || mState != BotState::eRunning)
         {
             return;
@@ -3135,6 +3188,18 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
 
     if (mPilotPending)
     {
+        // A try that goes about it another way: every step of it sneaked, or run
+        if (mPendingPrim.mKind == Prim::Kind::eMoveTo && !mPendingPrim.mSlide && mPendingPrim.mRunUp == 0 && mPendingPrim.mGait != Gait::eRoll)
+        {
+            if (mVary == Lookahead::Way::eQuiet)
+            {
+                mPendingPrim.mGait = Gait::eSneak;
+            }
+            else if (mVary == Lookahead::Way::eFast)
+            {
+                mPendingPrim.mGait = Gait::eRun;
+            }
+        }
         mPilot.Start(mPendingPrim, mAbe);
         mPilotPending = false;
         mPilotActive = true;

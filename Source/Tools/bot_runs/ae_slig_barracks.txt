@@ -1,13 +1,16 @@
-# The bot in the Slig Barracks from the door Feeco's train leaves him at. Begun, not beaten: the first two screens of
-# path 1 with no deaths (past the three Sligs in the background, the lever under the Slig that walks its floor),
-# then it stops on the third. See BOT_DESIGN.md, "The Slig Barracks".
+# The bot in the Slig Barracks from the door Feeco's train leaves him at, looking ahead (the look option: what
+# gets him hurt is taken back and tried another way, and only the try that worked is in the run it leaves).
+# Begun, not beaten: path 1 to the door at its top. Past the three Sligs in the background and the guards, up the
+# well; there it takes over the flying Slig, bombs the three Sligs it can get at, pulls the lever that turns the
+# electric walls off and opens the door, and climbs to the door's floor, where the last Slig still has him.
+# See BOT_DESIGN.md, "The Slig Barracks" and "A flying Slig that he flies".
 timeout 100000
 start barracks 1 3 937 420
 wait_until in_game
 wait_frames 40
 healing
-bot any,seed=1,been=mines,been=necrum
-bot_wait 2600
+bot any,look,seed=1,been=mines,been=necrum
+bot_wait 60000
 bot_report bot_report.txt
 bot_inputs bot_inputs.txt
 quit

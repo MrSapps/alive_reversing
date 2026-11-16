@@ -157,6 +157,10 @@ public:
     virtual void VPossessed() override;
     void VSetMotion(eFlyingSligMotions newMotion);
     virtual void VGetSaveState(SerializedObjectData& pSaveBuffer) override;
+    // Read only, for the bot: whether throw pressed now would throw a grenade (the wait since the last one is
+    // over and it is in a motion it throws from)
+    bool GrenadeReady() const;
+
     virtual s16 VGetMotion(eMotionType motionType) override
     {
         switch (motionType)
@@ -237,7 +241,7 @@ private:
     void ToPossesed();
     void vUpdateAnimRes_4350A0();
     void PatrolDelay();
-    s16 CanThrowGrenade();
+    s16 CanThrowGrenade() const;
     void ToLaunchingGrenade();
     void HandlePlayerControls();
     ReliveTypes FindLeftOrRightBound(FP xOrY, FP wOrH);

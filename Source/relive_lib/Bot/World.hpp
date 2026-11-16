@@ -54,6 +54,9 @@ enum class EntityKind : u8
     eBrew,
     // A flying Slig where the map puts it (FlierAt is one that is about)
     eFlier,
+    // What makes a flying Slig while its switch mSwitch is on, and another once that one is dead and the switch
+    // has come on again
+    eFlierSpawner,
     // A lock that opens for a Slig that says its code back to it (AE's security door). mSwitch is what it sets.
     // World::mLockCodes has the code. mState, while it is about: 0 idle, 1 waits for "Hi", 2 says its code,
     // 3 waits for the code, 4 open, 5 said no
@@ -184,6 +187,24 @@ struct FlierAt final
     s32 mVelY = 0;
     bool mHalf = false;
     bool mFacingLeft = false;
+};
+
+// The flying Slig Abe has taken over and flies (see FlierFlight): its own point and speed in hundredths of a
+// pixel (it is drawn under that point, and bobbing)
+struct FlownAt final
+{
+    bool mLive = false;
+    s32 mX100 = 0;
+    s32 mY100 = 0;
+    s32 mVelX100 = 0;
+    s32 mVelY100 = 0;
+    bool mHalf = false;
+    bool mFacingLeft = false;
+    // Throw pressed now would throw a grenade: not while it turns or ends a climb, nor for a second or so after
+    // the last one
+    bool mCanThrow = false;
+    // The game's motion number (0: idle, the only one a lever is pulled from)
+    s32 mMotion = 0;
 };
 
 // A Slog that is about. Awake it runs Abe down wherever he is.
@@ -401,6 +422,7 @@ struct World final
     // He has drunk a Brew: his next fart goes off
     bool mBrew = false;
     FartAt mFart;
+    FlownAt mFlown;
     // Rocks Abe has on him, and those lying about
     s32 mRocks = 0;
     std::vector<RockAt> mRocksDown;
@@ -594,6 +616,8 @@ struct World final
     std::set<u32> mScrabsKilled;
     std::map<u32, s32> mScrabParked;
     // Fleeches (their entities) that a Scrab has been made to kill in this path
+    // Sligs a flying Slig was to get rid of (Domain::FlierTargets) whose grenades did not get them
+    std::set<u32> mNoBomb;
     std::set<u32> mFleechKilled;
     std::vector<SlurgAt> mSlurgs;
     // Whether a hop or a drop that ends at x (on a floor at y, facing left or not) in so many frames comes down
@@ -704,6 +728,12 @@ struct World final
                 if (e.mKind == EntityKind::eMine && e.mSwitch == id)
                 {
                     return e.mGone ? 1 : 0;
+                }
+                // (a Slig that a flying Slig is to get rid of: Domain::FlierTargets)
+                if (e.mKind == EntityKind::eSlig && HazardSwitch(e.mId) == id)
+                {
+                    // (or the grenades did not get it: its floor is then gone onto as any Slig's is)
+                    return e.mGone || mFleechKilled.count(e.mId) != 0 || mNoBomb.count(e.mId) != 0 ? 1 : 0;
                 }
                 if (e.mKind == EntityKind::eFlier && e.mSwitch == id)
                 {

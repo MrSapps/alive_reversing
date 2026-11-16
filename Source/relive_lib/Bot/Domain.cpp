@@ -8,6 +8,14 @@
 
 namespace Bot {
 
+// How far from its spawner, along and up or down together, a Slig or a lever is one for the flying Slig
+static const s32 kFlierReach = 1200;
+// How far to each side of its point a flying Slig is, for what it flies past (17, and a little)
+static const s32 kFlierSide = 20;
+// How far over and under its point it is, for the floors it flies in beside
+static const s32 kFlierOver = 24;
+static const s32 kFlierUnder = 8;
+
 const char* EntityKindName(EntityKind kind)
 {
     switch (kind)
@@ -31,6 +39,7 @@ const char* EntityKindName(EntityKind kind)
         case EntityKind::eRockSack: return "RockSack";
         case EntityKind::eBrew: return "Brew";
         case EntityKind::eFlier: return "FlyingSlig";
+        case EntityKind::eFlierSpawner: return "FlierSpawner";
         case EntityKind::eDrill: return "Drill";
         case EntityKind::eMineCar: return "MineCar";
         case EntityKind::eParamite: return "Paramite";
@@ -4095,6 +4104,150 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         add("Leave a fart under Slig#" + std::to_string(slig.mId) + " from " + std::to_string(nav.Nodes()[stand].mX) + "," + std::to_string(nav.Nodes()[stand].mY), {regionFact(stand), {Key::kBrew, 1}}, {dead, {Key::kBrew, 0}}, 450, drop);
     }
 
+    // Sligs he can't take over (a security orb on their screen) that a flying Slig can get at: the one a spawner
+    // makes is taken over from a cell of its screen where he isn't seen, flown to a place off each Slig's level
+    // and its grenades thrown at them. Until one is dead nothing is crossed onto its floor near it
+    // (FeatureKind::eDanger). (The Slig Barracks' path 1: "possess the flying Slig. Fly him upwards and blow up
+    // the Sligs there".)
+    for (const Entity& slig : world.mEntities)
+    {
+        if (slig.mKind == EntityKind::eSlig && world.Switch(World::HazardSwitch(slig.mId)))
+        {
+            d.mStart.Set(Key::Switch(World::HazardSwitch(slig.mId)), 1);
+        }
+    }
+    for (const Entity& spawner : world.mEntities)
+    {
+        if (spawner.mKind != EntityKind::eFlierSpawner)
+        {
+            continue;
+        }
+        // The cells he can get to without going onto the floor of any of those Sligs
+        const std::vector<FlierTarget> targets = FlierTargets(nav.Input(), world, spawner);
+        const auto guarded = [&nav, &targets](s32 node)
+        {
+            for (const FlierTarget& target : targets)
+            {
+                if (OnFlierTargetsFloor(nav, target, node))
+                {
+                    return true;
+                }
+            }
+            return false;
+        };
+        std::vector<u8> reach(nav.Nodes().size(), 0);
+        if (abeNode < 0 || guarded(abeNode))
+        {
+            continue;
+        }
+        std::vector<s32> open{abeNode};
+        reach[abeNode] = 1;
+        while (!open.empty())
+        {
+            const s32 at = open.back();
+            open.pop_back();
+            // (the cells of a region are walked between without an edge)
+            for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+            {
+                if (!reach[n] && d.mRegions[n] == d.mRegions[at] && !guarded(static_cast<s32>(n)))
+                {
+                    reach[n] = 1;
+                    open.push_back(static_cast<s32>(n));
+                }
+            }
+            for (const NavEdge& edge : nav.Edges())
+            {
+                if (edge.mFrom == at && !reach[edge.mTo] && !guarded(edge.mTo))
+                {
+                    reach[edge.mTo] = 1;
+                    open.push_back(edge.mTo);
+                }
+            }
+        }
+        const s32 spot = FlierSpot(nav, world, spawner, reach);
+        if (spot < 0)
+        {
+            continue;
+        }
+        // One step for those that can be got at as things are, and one for each that something has to be opened
+        // for first
+        std::vector<Goap::Fact> gives;
+        std::string names;
+        DomainStep bomb;
+        bomb.mKind = StepKind::eFlierBomb;
+        bomb.mEntity = spawner.mId;
+        bomb.mEdge = spot;
+        const std::string from = " with the flying Slig of FlierSpawner#" + std::to_string(spawner.mId) + " from " + std::to_string(nav.Nodes()[spot].mX) + "," + std::to_string(nav.Nodes()[spot].mY);
+        for (const FlierTarget& target : targets)
+        {
+            // (its floor is a stretch nothing is crossed into until it is dead: GameView::BuildNavInput)
+            const Goap::Fact dead{Key::Switch(World::HazardSwitch(target.mSlig)), 1};
+            if (!target.mShots.empty())
+            {
+                gives.push_back(dead);
+                names += " #" + std::to_string(target.mSlig);
+                continue;
+            }
+            std::vector<Goap::Fact> pre{regionFact(spot)};
+            for (const std::pair<s32, s32>& need : target.mNeeds)
+            {
+                pre.push_back({Key::Switch(need.first), need.second});
+            }
+            add("Bomb Slig #" + std::to_string(target.mSlig) + from + " once the way to it is open", pre, {dead}, 800, bomb);
+        }
+        if (!gives.empty())
+        {
+            add("Bomb Sligs" + names + from, {regionFact(spot)}, gives, 800, bomb);
+        }
+        // A lever it can fly to it pulls for him: what his own pull of it needs and gives, but for where he
+        // stands. (The Barracks' path 1: "the right lever deactivates the electric walls and opens the door",
+        // on a floor he can't get to.)
+        std::vector<s32> which;
+        const std::vector<NavLine> shut = FartFlight::Gates(nav.Input(), spawner.mHalf, &world, &which);
+        const s32 fromX = spawner.CentreX();
+        const s32 fromY = (spawner.mY1 + spawner.mY2) / 2;
+        for (const Entity& lever : world.mEntities)
+        {
+            if (lever.mKind != EntityKind::eLever || lever.mGone || lever.mSwitch <= 1 || lever.mHalf != spawner.mHalf || std::abs(lever.CentreX() - fromX) + std::abs(lever.mY2 - fromY) > kFlierReach)
+            {
+                continue;
+            }
+            bool way = false;
+            for (s32 side = 0; side < 2 && !way; side++)
+            {
+                const FlierFlight::Shot pull = FlierFlight::LeverPull(lever.CentreX(), lever.mY2 - 4, side == 1);
+                std::vector<std::pair<s32, s32>> corners;
+                way = FlierWay(nav.Input(), spawner.mHalf, fromX, fromY, pull.mX, pull.mY, &shut, corners);
+            }
+            const std::string own = "Use " + std::string(EntityKindName(lever.mKind)) + "#" + std::to_string(lever.mId) + " sw" + std::to_string(lever.mSwitch) + " o";
+            const std::size_t count = d.mActions.size();
+            for (std::size_t ai = 0; way && ai < count; ai++)
+            {
+                const DomainStep own_step = d.mSteps[d.mActions[ai].mTag];
+                const std::string name = d.mActions[ai].mName;
+                if (own_step.mKind != StepKind::eUse || own_step.mEntity != lever.mId || (name != own + "n" && name != own + "ff"))
+                {
+                    continue;
+                }
+                std::vector<Goap::Fact> pre{regionFact(spot)};
+                for (const Goap::Fact& fact : d.mActions[ai].mPre)
+                {
+                    if (fact.mKey != Key::kRegion)
+                    {
+                        pre.push_back(fact);
+                    }
+                }
+                DomainStep pull;
+                pull.mKind = StepKind::eFlierPull;
+                pull.mEntity = spawner.mId;
+                pull.mOther = lever.mId;
+                pull.mEdge = spot;
+                const std::vector<Goap::Fact> effects = d.mActions[ai].mEffects;
+                add("Have the flying Slig of FlierSpawner#" + std::to_string(spawner.mId) + " pull " + name.substr(4), pre, effects, 700, pull);
+            }
+        }
+    }
+
     // A Slig lock: a Slig that Abe has taken over says its code back to it. The Slig is one a spawner makes when
     // its lever is pulled, taken over from by the lever (on its screen, with no orb there), and walked to the
     // lock (SligWay): what is shut on its way has to be open first, and the Sligs it walks into it shoots.
@@ -4750,6 +4903,267 @@ std::string Domain::Text() const
         out += "\n";
     }
     return out;
+}
+
+s32 Domain::FlierSpot(const NavGraph& nav, const World& world, const Entity& spawner, const std::vector<u8>& reach)
+{
+    const s32 cam = nav.CameraOf(spawner.CentreX(), (spawner.mY1 + spawner.mY2) / 2);
+    for (const Entity& e : world.mEntities)
+    {
+        if (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.mX1, e.mY1) == cam)
+        {
+            return -1;
+        }
+    }
+    // Where he isn't seen, if there is such a cell; else the cell furthest from the track it flies along (the
+    // Barracks' path 1: the ledge at 2187,860, which is where the walkthrough takes it over from)
+    s32 x1 = 0;
+    s32 y1 = 0;
+    s32 x2 = 0;
+    s32 y2 = 0;
+    std::vector<NavLine> track;
+    FlierTrack(nav.Input(), spawner.CentreX(), (spawner.mY1 + spawner.mY2) / 2, x1, y1, x2, y2, nullptr, &track);
+    s32 best = -1;
+    s64 bestFar = -1;
+    for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+    {
+        const NavNode& node = nav.Nodes()[n];
+        if (!reach[n] || node.mHazard || node.mLow || node.mHalf != spawner.mHalf || node.mTrapDoor >= 0 || node.mLiftStop >= 0 || nav.CameraOf(node.mX, node.mY - 5) != cam)
+        {
+            continue;
+        }
+        if (node.mHidden)
+        {
+            return static_cast<s32>(n);
+        }
+        s64 far = 1000000;
+        for (const NavLine& line : track)
+        {
+            const s64 lx = line.mX2 - line.mX1;
+            const s64 ly = line.mY2 - line.mY1;
+            const s64 sq = lx * lx + ly * ly;
+            s64 t1000 = sq == 0 ? 0 : ((node.mX - line.mX1) * lx + (node.mY - 40 - line.mY1) * ly) * 1000 / sq;
+            t1000 = std::max<s64>(0, std::min<s64>(1000, t1000));
+            const s64 dx = line.mX1 + lx * t1000 / 1000 - node.mX;
+            const s64 dy = line.mY1 + ly * t1000 / 1000 - (node.mY - 40);
+            far = std::min(far, dx * dx + dy * dy);
+        }
+        if (far > bestFar)
+        {
+            bestFar = far;
+            best = static_cast<s32>(n);
+        }
+    }
+    return best;
+}
+
+bool Domain::OnFlierTargetsFloor(const NavGraph& nav, const FlierTarget& target, s32 node)
+{
+    const NavNode& n = nav.Nodes()[node];
+    return std::abs(n.mY - target.mFloorY) <= kFlierTargetY && std::abs(n.mX - target.mX) <= kFlierTargetX;
+}
+
+bool Domain::FlierWay(const NavInput& in, bool half, s32 fromX, s32 fromY, s32 toX, s32 toY, const std::vector<NavLine>* shut, std::vector<std::pair<s32, s32>>& corners)
+{
+    corners.clear();
+    // It is 17 to each side of its point: every floor and ceiling as much longer at each end, every wall there
+    // again as far to each side, so that the way keeps its sides clear of their ends (measured in the Barracks'
+    // path 1: flown up past the end of a ledge with its point two pixels clear of it, it hung under the ledge)
+    std::vector<NavLine> more;
+    if (shut)
+    {
+        more = *shut;
+    }
+    for (const NavLine& line : in.mLines)
+    {
+        const bool flat = std::abs(line.mX2 - line.mX1) >= std::abs(line.mY2 - line.mY1);
+        const s32 floorTypes[] = {half ? 4 : 0, half ? 7 : 3, half ? 18 : 17, half ? 36 : 32};
+        const s32 wallTypes[] = {half ? 5 : 1, half ? 6 : 2, half ? 18 : 17};
+        if (flat && std::find(std::begin(floorTypes), std::end(floorTypes), line.mType) != std::end(floorTypes))
+        {
+            NavLine wide = line;
+            (wide.mX1 < wide.mX2 ? wide.mX1 : wide.mX2) -= kFlierSide;
+            (wide.mX1 < wide.mX2 ? wide.mX2 : wide.mX1) += kFlierSide;
+            wide.mType = 0;
+            more.push_back(wide);
+            // (and it is 23 over its point and 8 under: not in sideways past the end of a floor at the floor's
+            // own height. Between the ends of two floors 26 apart, one 20 higher than the other, the way went
+            // on the grid and the flying Slig did not.)
+            // (a little nearer the floor's end than the floor is made longer by: where a grenade is thrown
+            // from under the end of a floor it is right at that)
+            const s32 lo = std::min(wide.mX1, wide.mX2);
+            const s32 hi = std::max(wide.mX1, wide.mX2);
+            more.push_back(NavLine{lo + 3, (lo == wide.mX1 ? wide.mY1 : wide.mY2) - kFlierUnder, lo + 3, (lo == wide.mX1 ? wide.mY1 : wide.mY2) + kFlierOver, 1});
+            more.push_back(NavLine{hi - 3, (hi == wide.mX1 ? wide.mY1 : wide.mY2) - kFlierUnder, hi - 3, (hi == wide.mX1 ? wide.mY1 : wide.mY2) + kFlierOver, 1});
+        }
+        else if (!flat && std::find(std::begin(wallTypes), std::end(wallTypes), line.mType) != std::end(wallTypes))
+        {
+            for (const s32 side : {-kFlierSide, kFlierSide})
+            {
+                NavLine beside = line;
+                beside.mX1 += side;
+                beside.mX2 += side;
+                beside.mType = 1;
+                more.push_back(beside);
+            }
+        }
+    }
+    std::vector<FartFlight::Point> way;
+    if (!FartFlight::Route(in, half, FartFlight::Point{fromX, fromY}, FartFlight::Point{toX, toY}, 2000, way, nullptr, &more))
+    {
+        return false;
+    }
+    std::set<std::pair<s32, s32>> screens;
+    for (const NavLine& line : in.mLines)
+    {
+        // (its ends, each a pixel in along it: a floor that ends on the side of a screen is not in the next one)
+        const s32 dx = line.mX2 > line.mX1 ? 1 : line.mX2 < line.mX1 ? -1 : 0;
+        const s32 dy = line.mY2 > line.mY1 ? 1 : line.mY2 < line.mY1 ? -1 : 0;
+        screens.insert({(line.mX1 + dx) / in.mCamW, (line.mY1 + dy) / in.mCamH});
+        screens.insert({(line.mX2 - dx) / in.mCamW, (line.mY2 - dy) / in.mCamH});
+    }
+    for (const FartFlight::Point& p : way)
+    {
+        if (screens.count({p.mX / in.mCamW, p.mY / in.mCamH}) == 0)
+        {
+            return false;
+        }
+        corners.push_back({p.mX, p.mY});
+    }
+    return true;
+}
+
+std::vector<Domain::FlierTarget> Domain::FlierTargets(const NavInput& in, const World& world, const Entity& spawner)
+{
+    std::vector<FlierTarget> targets;
+    const FartFlight::Point from{spawner.CentreX(), (spawner.mY1 + spawner.mY2) / 2};
+    // What is shut as things are (gates, electric walls, trap doors), and which feature each is
+    std::vector<s32> which;
+    const std::vector<NavLine> shut = FartFlight::Gates(in, spawner.mHalf, &world, &which);
+    const auto screen = [&in](s32 x, s32 y)
+    {
+        return std::make_pair(x / in.mCamW, y / in.mCamH);
+    };
+    for (const Entity& slig : world.mEntities)
+    {
+        if (slig.mKind != EntityKind::eSlig || slig.mGone || slig.mSwitch > 1 || slig.mHalf != spawner.mHalf || world.mFleechKilled.count(slig.mId) != 0)
+        {
+            continue;
+        }
+        bool orb = false;
+        for (const Entity& e : world.mEntities)
+        {
+            orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && screen(e.mX1, e.mY1) == screen(slig.CentreX(), slig.mY1));
+        }
+        // The floor it stands on: the first under the top of where the map puts it
+        s32 floorY = -1;
+        s32 floorX1 = 0;
+        s32 floorX2 = 0;
+        for (const NavLine& line : in.mLines)
+        {
+            if (line.mType == (slig.mHalf ? 4 : 0) && std::min(line.mX1, line.mX2) <= slig.CentreX() && std::max(line.mX1, line.mX2) >= slig.CentreX() && line.mX1 != line.mX2)
+            {
+                const s32 y = line.mY1 + (line.mY2 - line.mY1) * (slig.CentreX() - line.mX1) / (line.mX2 - line.mX1);
+                if (y >= slig.mY1 + 5 && (floorY < 0 || y < floorY))
+                {
+                    floorY = y;
+                    floorX1 = std::min(line.mX1, line.mX2);
+                    floorX2 = std::max(line.mX1, line.mX2);
+                }
+            }
+        }
+        // (and within a flight of the spawner: a way through the air is not looked for to the other end of the path)
+        if (!orb || floorY < 0 || floorY - slig.mY1 > 60 || std::abs(slig.CentreX() - from.mX) + std::abs(floorY - from.mY) > kFlierReach)
+        {
+            continue;
+        }
+        FlierTarget target;
+        target.mSlig = slig.mId;
+        target.mX = slig.CentreX();
+        target.mFloorY = floorY;
+        bool needsKnown = false;
+        for (const FlierFlight::Shot& shot : FlierFlight::Shots(target.mX, floorY, floorX1, floorX2))
+        {
+            // Nothing of the path in the grenade's way until it comes down, nor in the flying Slig's way there.
+            // What is shut and a switch opens (a trap door the grenade would be thrown up under, an electric
+            // wall on the way or right by the place: one that is on also gets a flying Slig that only comes
+            // near it) is to be open first.
+            bool can = world.mNoBomb.count(slig.mId) == 0;
+            std::vector<u8> gateNeeded(shut.size(), 0);
+            s32 px = shot.mX;
+            s32 py = shot.mY - FlierFlight::kGrenadeUp;
+            for (s32 frame = 1; can && frame < shot.mFrames; frame++)
+            {
+                s32 gx = 0;
+                s32 gy = 0;
+                FlierFlight::GrenadeAt(shot.mX, shot.mY, shot.mFaceLeft, frame, gx, gy);
+                can = FartFlight::Open(in, slig.mHalf, FartFlight::Point{px, py}, FartFlight::Point{gx, gy});
+                for (std::size_t g = 0; can && g < shut.size(); g++)
+                {
+                    const std::vector<NavLine> one{shut[g]};
+                    gateNeeded[g] = gateNeeded[g] || !FartFlight::Open(in, slig.mHalf, FartFlight::Point{px, py}, FartFlight::Point{gx, gy}, &one);
+                }
+                px = gx;
+                py = gy;
+            }
+            // (and on the Slig's screen: the game has only the screen the flying Slig is on, and a grenade from
+            // the next one finds no Slig. Its box is drawn from 23 over its point.)
+            can = can && screen(shot.mX, shot.mY - 25) == screen(slig.CentreX(), slig.mY1) && screen(shot.mWaitX, shot.mWaitY - 25) == screen(slig.CentreX(), slig.mY1);
+            // (and from where it waits to where it throws nothing in its way, with its sides: under a floor that
+            // goes on over the place it would wait at, it does not get up to throw)
+            for (const s32 side : {-kFlierSide, 0, kFlierSide})
+            {
+                can = can && FartFlight::Open(in, slig.mHalf, FartFlight::Point{shot.mWaitX + side, shot.mWaitY}, FartFlight::Point{shot.mX + side, shot.mY - kFlierSide});
+            }
+            std::vector<std::pair<s32, s32>> corners;
+            if (can && !FlierWay(in, slig.mHalf, from.mX, from.mY, shot.mWaitX, shot.mWaitY, &shut, corners))
+            {
+                can = FlierWay(in, slig.mHalf, from.mX, from.mY, shot.mWaitX, shot.mWaitY, nullptr, corners);
+                std::vector<FartFlight::Point> way;
+                for (const std::pair<s32, s32>& corner : corners)
+                {
+                    way.push_back({corner.first, corner.second});
+                }
+                for (std::size_t g = 0; can && g < shut.size(); g++)
+                {
+                    gateNeeded[g] = gateNeeded[g] || FartFlight::Through(from, way, shut[g]);
+                }
+            }
+            std::vector<std::pair<s32, s32>> needs;
+            for (std::size_t g = 0; can && g < shut.size(); g++)
+            {
+                const NavFeature& f = in.mFeatures[which[g]];
+                const bool near = f.mKind == FeatureKind::eBarrier && std::abs(shut[g].mX1 - shot.mX) <= 45 && std::min(shot.mY, shot.mWaitY) <= shut[g].mY2 + 40 && std::max(shot.mY, shot.mWaitY) >= shut[g].mY1 - 20;
+                if (near || gateNeeded[g])
+                {
+                    can = f.mSwitch > 1;
+                    needs.push_back({f.mSwitch, f.mStartClosed ? 1 : 0});
+                }
+            }
+            if (!can)
+            {
+                continue;
+            }
+            if (needs.empty())
+            {
+                target.mShots.push_back(shot);
+            }
+            else if (!needsKnown)
+            {
+                needsKnown = true;
+                target.mNeeds = needs;
+            }
+        }
+        if (!target.mShots.empty())
+        {
+            target.mNeeds.clear();
+        }
+        if (!target.mShots.empty() || needsKnown)
+        {
+            targets.push_back(target);
+        }
+    }
+    return targets;
 }
 
 } // namespace Bot

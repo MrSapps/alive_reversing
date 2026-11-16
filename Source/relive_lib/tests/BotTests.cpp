@@ -6,6 +6,7 @@
 #include "Bot/Goap.hpp"
 #include "Bot/LevelGraph.hpp"
 #include "Bot/Lookahead.hpp"
+#include "Bot/FlierFlight.hpp"
 #include "Bot/NavGraph.hpp"
 #include "Bot/Pilot.hpp"
 #include "Bot/Profile.hpp"
@@ -7034,8 +7035,10 @@ TEST(BotLookahead, ATryThatFailedOnceItHadBegunIsFollowedByTheNextDelay)
     {
         given++;
     }
-    ASSERT_EQ(given, Bot::Lookahead::Count());
+    // (of the same buttons again: every coarsest step of the window)
+    ASSERT_EQ(given, Bot::Lookahead::kWindow / Bot::Lookahead::kCoarsest);
     ASSERT_EQ(FailedSomewhereElse(stretch, 1000), -1);
+    ASSERT_EQ(stretch.mWay, Bot::Lookahead::Way::eSame);
 }
 
 TEST(BotLookahead, HurtWhileItStillHeldBackRulesOutEveryDelayThatLong)
@@ -7045,39 +7048,53 @@ TEST(BotLookahead, HurtWhileItStillHeldBackRulesOutEveryDelayThatLong)
     ASSERT_EQ(FailedSomewhereElse(stretch, 200), 64);
     // Holding back 64, hurt 50 frames in: he had done nothing yet, so 50 and over is no use. The rest of the
     // coarse pass is passed over
-    ASSERT_EQ(FailedSomewhereElse(stretch, 50), 16);
+    ASSERT_EQ(FailedSomewhereElse(stretch, 50), -1);
     ASSERT_EQ(stretch.mCeiling, 50);
-    std::vector<s32> rest;
-    for (s32 delay = FailedSomewhereElse(stretch, 60); delay >= 0; delay = FailedSomewhereElse(stretch, 60))
+    // and so is it of whatever else is tried
+    std::vector<std::pair<Bot::Lookahead::Way, s32>> rest;
+    for (s32 delay = Bot::Lookahead::NextWay(stretch); delay >= 0; delay = Bot::Lookahead::NextWay(stretch))
     {
-        rest.push_back(delay);
+        for (; delay >= 0; delay = FailedSomewhereElse(stretch, 60))
+        {
+            rest.push_back({stretch.mWay, delay});
+        }
     }
-    ASSERT_EQ(rest, (std::vector<s32>{48, 8, 24, 40}));
+    using Way = Bot::Lookahead::Way;
+    ASSERT_EQ(rest, (std::vector<std::pair<Way, s32>>{{Way::eFine, 16}, {Way::eFine, 48}, {Way::eFine, 8}, {Way::eFine, 24}, {Way::eFine, 40}, {Way::eAgain, 32}, {Way::eQuiet, 0}, {Way::eQuiet, 32}, {Way::eFast, 0}, {Way::eFast, 32}}));
     // (hurt on the very frame it was to begin counts as while it held back)
     Bot::Lookahead::Stretch other;
     ASSERT_EQ(FailedSomewhereElse(other, 100), 32);
-    ASSERT_EQ(FailedSomewhereElse(other, 32), 16);
+    ASSERT_EQ(FailedSomewhereElse(other, 32), -1);
     ASSERT_EQ(other.mCeiling, 32);
+    ASSERT_EQ(Bot::Lookahead::NextWay(other), 16);
+    ASSERT_EQ(other.mWay, Way::eFine);
 }
 
 TEST(BotLookahead, BegunAgainEveryDelayIsTriedOnceMoreButForTheOnesKnownTooLong)
 {
     Bot::Lookahead::Stretch stretch;
     ASSERT_EQ(FailedSomewhereElse(stretch, 200), 32);
-    ASSERT_EQ(FailedSomewhereElse(stretch, 24), 16);
-    while (FailedSomewhereElse(stretch, 200) >= 0)
-    {
-    }
+    ASSERT_EQ(FailedSomewhereElse(stretch, 24), -1);
+    ASSERT_EQ(Bot::Lookahead::NextWay(stretch), 16);
+    ASSERT_EQ(stretch.mWay, Bot::Lookahead::Way::eFine);
     ASSERT_EQ(Bot::Lookahead::Again(stretch), 0);
     ASSERT_EQ(stretch.mRounds, 1);
     ASSERT_EQ(stretch.mDelay, 0);
-    std::vector<s32> again;
-    for (s32 delay = FailedSomewhereElse(stretch, 200); delay >= 0; delay = FailedSomewhereElse(stretch, 200))
-    {
-        again.push_back(delay);
-    }
-    // (24 itself is too long: he was hurt 24 frames in while he held back)
-    ASSERT_EQ(again, (std::vector<s32>{16, 8}));
+    ASSERT_EQ(stretch.mWay, Bot::Lookahead::Way::eSame);
+    // (24 itself is too long: he was hurt 24 frames in while he held back. No coarse step is under that)
+    ASSERT_EQ(FailedSomewhereElse(stretch, 200), -1);
+    ASSERT_EQ(Bot::Lookahead::NextWay(stretch), 16);
+    ASSERT_EQ(stretch.mWay, Bot::Lookahead::Way::eFine);
+    ASSERT_EQ(FailedSomewhereElse(stretch, 200), 8);
+    ASSERT_EQ(FailedSomewhereElse(stretch, 200), -1);
+    ASSERT_EQ(Bot::Lookahead::NextWay(stretch), 0);
+    ASSERT_EQ(stretch.mWay, Bot::Lookahead::Way::eQuiet);
+    ASSERT_EQ(FailedSomewhereElse(stretch, 200), -1);
+    ASSERT_EQ(Bot::Lookahead::NextWay(stretch), 0);
+    ASSERT_EQ(stretch.mWay, Bot::Lookahead::Way::eFast);
+    ASSERT_EQ(FailedSomewhereElse(stretch, 200), -1);
+    ASSERT_EQ(Bot::Lookahead::NextWay(stretch), -1);
+    ASSERT_EQ(Bot::Lookahead::NextWay(stretch), -1);
 }
 
 TEST(BotLookahead, TriesThatFailAlikeHoweverLateTheyBeganAreNotAMatterOfWhen)
@@ -7092,6 +7109,8 @@ TEST(BotLookahead, TriesThatFailAlikeHoweverLateTheyBeganAreNotAMatterOfWhen)
     ASSERT_EQ(Bot::Lookahead::Failed(stretch, 128 + 40, 7), 160);
     ASSERT_EQ(Bot::Lookahead::Failed(stretch, 160 + 40, 7), -1);
     ASSERT_EQ(Bot::Lookahead::Failed(stretch, 160 + 40, 7), -1);
+    // (and that is the end of the same thing begun later, however the next one fails)
+    ASSERT_EQ(Bot::Lookahead::Failed(stretch, 500, 99), -1);
 
     // One that failed elsewhere, or two frames sooner after it began: it does depend on when, and the count
     // is from the next one (the first try, which the bot played itself, often fails unlike the rest)
@@ -7118,7 +7137,18 @@ TEST(BotLookahead, TriesThatFailAlikeHoweverLateTheyBeganAreNotAMatterOfWhen)
         ASSERT_GE(Bot::Lookahead::Failed(held, held.mDelay + 40, 7), 0);
     }
     ASSERT_EQ(held.mDelay, 160);
-    ASSERT_GE(Bot::Lookahead::Failed(held, 150, 7), 0);
+    ASSERT_EQ(Bot::Lookahead::Failed(held, 150, 7), -1);
+    ASSERT_EQ(held.mAlike, 5);
+    ASSERT_EQ(held.mCeiling, 150);
+
+    // Nor do tries that did something else count with these
+    Bot::Lookahead::Stretch other;
+    for (s32 i = 0; i < 5; i++)
+    {
+        ASSERT_GE(Bot::Lookahead::Failed(other, other.mDelay + 40, 7), 0);
+    }
+    ASSERT_EQ(Bot::Lookahead::NextWay(other), 16);
+    ASSERT_EQ(Bot::Lookahead::Failed(other, 16 + 40, 7), 48);
 
     // Begun again with something ruled out, it is counted anew
     Bot::Lookahead::Stretch again;
@@ -7128,4 +7158,518 @@ TEST(BotLookahead, TriesThatFailAlikeHoweverLateTheyBeganAreNotAMatterOfWhen)
     }
     ASSERT_EQ(Bot::Lookahead::Again(again), 0);
     ASSERT_EQ(Bot::Lookahead::Failed(again, 40, 7), 32);
+}
+
+TEST(BotLookahead, WhenNoMomentGetsItThroughSomethingElseIsTriedAtEachMoment)
+{
+    using Way = Bot::Lookahead::Way;
+    // Every try fails, each somewhere else: what is tried, in order
+    Bot::Lookahead::Stretch stretch;
+    std::vector<std::pair<Way, s32>> tried;
+    s32 delay = FailedSomewhereElse(stretch, 1000);
+    for (;;)
+    {
+        if (delay < 0)
+        {
+            delay = Bot::Lookahead::NextWay(stretch);
+            if (delay < 0)
+            {
+                break;
+            }
+        }
+        ASSERT_EQ(stretch.mDelay, delay);
+        tried.push_back({stretch.mWay, delay});
+        delay = FailedSomewhereElse(stretch, 1000);
+    }
+    const s32 coarse = Bot::Lookahead::kWindow / Bot::Lookahead::kCoarsest;
+    // The same buttons, at the coarse moments and then the ones in between; planned anew (not straight on again
+    // for either: the first try was that); sneaked and run, straight on too
+    ASSERT_EQ(static_cast<s32>(tried.size()), (coarse - 1) * 2 + coarse * 2 + Bot::Lookahead::Count() - coarse);
+    ASSERT_EQ(tried[0], (std::pair<Way, s32>{Way::eSame, 32}));
+    ASSERT_EQ(tried[coarse - 2], (std::pair<Way, s32>{Way::eSame, 288}));
+    const s32 all = Bot::Lookahead::Count();
+    ASSERT_EQ(tried[coarse - 1], (std::pair<Way, s32>{Way::eFine, 16}));
+    ASSERT_EQ(tried[all - 2], (std::pair<Way, s32>{Way::eFine, 312}));
+    ASSERT_EQ(tried[all - 1], (std::pair<Way, s32>{Way::eAgain, 32}));
+    ASSERT_EQ(tried[all + coarse - 2], (std::pair<Way, s32>{Way::eQuiet, 0}));
+    ASSERT_EQ(tried[all + 2 * coarse - 3], (std::pair<Way, s32>{Way::eQuiet, 288}));
+    ASSERT_EQ(tried[all + 2 * coarse - 2], (std::pair<Way, s32>{Way::eFast, 0}));
+    ASSERT_EQ(tried.back(), (std::pair<Way, s32>{Way::eFast, 288}));
+    ASSERT_EQ(Bot::Lookahead::NextWay(stretch), -1);
+    // Only the tries with the same buttons press what the first try pressed
+    ASSERT_TRUE(Bot::Lookahead::Repeats(Way::eSame));
+    ASSERT_TRUE(Bot::Lookahead::Repeats(Way::eFine));
+    ASSERT_FALSE(Bot::Lookahead::Repeats(Way::eAgain));
+    ASSERT_FALSE(Bot::Lookahead::Repeats(Way::eQuiet));
+    ASSERT_FALSE(Bot::Lookahead::Repeats(Way::eFast));
+}
+
+// One frame of a flying Slig that is flown, as FlierFlight has it: its speed changed by what is held, then moved
+static void FlyAFrame(s32& x, s32& y, s32& velX, s32& velY, u32 held)
+{
+    Bot::FlierFlight::Step(velX, velY, held);
+    x += velX;
+    y += velY;
+}
+
+TEST(BotFlierFlight, AHeldDirectionSpeedsItUpAndTheFasterItGoesTheMoreItLoses)
+{
+    s32 velX = 0;
+    s32 velY = 0;
+    // From rest: 0.7 of a pixel a frame more each frame, and nothing lost under one pixel a frame
+    Bot::FlierFlight::Step(velX, velY, Bot::Btn::eRight);
+    ASSERT_EQ(velX, 70);
+    Bot::FlierFlight::Step(velX, velY, Bot::Btn::eRight);
+    ASSERT_EQ(velX, 140);
+    // At one whole pixel a frame it loses a quarter of its speed, at two an eighth
+    Bot::FlierFlight::Step(velX, velY, Bot::Btn::eRight);
+    ASSERT_EQ(velX, 140 + 70 - 35);
+    Bot::FlierFlight::Step(velX, velY, Bot::Btn::eRight);
+    ASSERT_EQ(velX, 175 + 70 - 43);
+    Bot::FlierFlight::Step(velX, velY, Bot::Btn::eRight);
+    ASSERT_EQ(velX, 202 + 70 - 25);
+    ASSERT_EQ(velY, 0);
+    // Held on, it never gets to six pixels a frame: there it is cut to 5.5
+    s32 top = 0;
+    for (s32 i = 0; i < 100; i++)
+    {
+        Bot::FlierFlight::Step(velX, velY, Bot::Btn::eRight);
+        top = std::max(top, velX);
+    }
+    ASSERT_GE(top, 550);
+    ASSERT_LT(top, 600);
+    // The other way it slows down faster than it sped up, and then goes that way
+    const s32 before = velX;
+    Bot::FlierFlight::Step(velX, velY, Bot::Btn::eLeft);
+    ASSERT_LT(velX, before - 70);
+    for (s32 i = 0; i < 100; i++)
+    {
+        Bot::FlierFlight::Step(velX, velY, Bot::Btn::eLeft);
+    }
+    ASSERT_LE(velX, -500);
+    ASSERT_GT(velX, -600);
+}
+
+TEST(BotFlierFlight, UpAndDownGoWithLeftAndRightAtSevenTenthsEachAndUpAndLeftWin)
+{
+    const s32 diagonal = Bot::FlierFlight::kSpeedUp * 707 / 1000;
+    struct Case final
+    {
+        u32 mHeld;
+        s32 mX;
+        s32 mY;
+    };
+    const Case cases[] = {
+        {Bot::Btn::eUp, 0, -70},
+        {Bot::Btn::eDown, 0, 70},
+        {Bot::Btn::eLeft, -70, 0},
+        {Bot::Btn::eRight, 70, 0},
+        {Bot::Btn::eUp | Bot::Btn::eLeft, -diagonal, -diagonal},
+        {Bot::Btn::eUp | Bot::Btn::eRight, diagonal, -diagonal},
+        {Bot::Btn::eDown | Bot::Btn::eLeft, -diagonal, diagonal},
+        {Bot::Btn::eDown | Bot::Btn::eRight, diagonal, diagonal},
+        // (both of a pair held: the game asks for up before down and left before right)
+        {Bot::Btn::eUp | Bot::Btn::eDown, 0, -70},
+        {Bot::Btn::eLeft | Bot::Btn::eRight, -70, 0},
+        {0, 0, 0},
+    };
+    for (const Case& c : cases)
+    {
+        s32 velX = 0;
+        s32 velY = 0;
+        Bot::FlierFlight::Step(velX, velY, c.mHeld);
+        ASSERT_EQ(velX, c.mX) << c.mHeld;
+        ASSERT_EQ(velY, c.mY) << c.mHeld;
+    }
+}
+
+TEST(BotFlierFlight, LetGoItStopsDeadUnderAPixelAFrameAndCoastsFromOver)
+{
+    s32 velX = 90;
+    s32 velY = -30;
+    Bot::FlierFlight::Step(velX, velY, 0);
+    ASSERT_EQ(velX, 0);
+    ASSERT_EQ(velY, 0);
+    s32 dx = 1;
+    s32 dy = 1;
+    Bot::FlierFlight::Rest(90, -30, dx, dy);
+    ASSERT_EQ(dx, 0);
+    ASSERT_EQ(dy, 0);
+
+    // From its top speed: what Rest says is what a flight with nothing held comes to
+    velX = 550;
+    velY = 0;
+    Bot::FlierFlight::Rest(velX, velY, dx, dy);
+    s32 x = 0;
+    s32 y = 0;
+    s32 frames = 0;
+    while (velX != 0 || velY != 0)
+    {
+        FlyAFrame(x, y, velX, velY, 0);
+        frames++;
+    }
+    ASSERT_EQ(dx, x);
+    ASSERT_EQ(dy, 0);
+    // (about twenty frames and fifty pixels)
+    ASSERT_GT(frames, 12);
+    ASSERT_LT(frames, 30);
+    ASSERT_GT(x, 3000);
+    ASSERT_LT(x, 7000);
+    // And up and to the left as far the other way
+    Bot::FlierFlight::Rest(-389, -389, dx, dy);
+    ASSERT_LT(dx, -2000);
+    ASSERT_EQ(dx, dy);
+}
+
+TEST(BotFlierFlight, SteeredItComesToRestAtThePlaceAskedFor)
+{
+    struct Case final
+    {
+        s32 mX;
+        s32 mY;
+        s32 mFrames;
+    };
+    // (pixels from where it starts, and the frames it may take)
+    const Case cases[] = {{200, -150, 90}, {-300, 0, 90}, {0, 260, 80}, {3, 0, 12}, {-40, 35, 40}, {0, 0, 2}};
+    for (const Case& c : cases)
+    {
+        s32 x = 100000;
+        s32 y = 50000;
+        s32 velX = 0;
+        s32 velY = 0;
+        const s32 tx = 1000 + c.mX;
+        const s32 ty = 500 + c.mY;
+        s32 there = -1;
+        for (s32 frame = 0; frame < 200; frame++)
+        {
+            FlyAFrame(x, y, velX, velY, Bot::FlierFlight::Steer(x, y, velX, velY, tx, ty));
+            const bool at = velX == 0 && velY == 0 && std::abs(x - tx * 100) <= Bot::FlierFlight::kNear && std::abs(y - ty * 100) <= Bot::FlierFlight::kNear;
+            if (at && there < 0)
+            {
+                there = frame;
+            }
+            // (and there it stays)
+            ASSERT_TRUE(at || there < 0) << c.mX << "," << c.mY << " left at " << frame;
+            // It lets go in time: never more than three pixels past the place
+            ASSERT_LE((x - tx * 100) * (c.mX >= 0 ? 1 : -1), 300) << c.mX << "," << c.mY << " at " << frame;
+            ASSERT_LE((y - ty * 100) * (c.mY >= 0 ? 1 : -1), 300) << c.mX << "," << c.mY << " at " << frame;
+        }
+        ASSERT_GE(there, 0) << c.mX << "," << c.mY;
+        ASSERT_LE(there, c.mFrames) << c.mX << "," << c.mY;
+        ASSERT_EQ(velX, 0);
+        ASSERT_EQ(velY, 0);
+        ASSERT_LE(std::abs(x - tx * 100), Bot::FlierFlight::kNear);
+        ASSERT_LE(std::abs(y - ty * 100), Bot::FlierFlight::kNear);
+    }
+}
+
+TEST(BotFlierFlight, ItsGrenadeRisesALittleAndComesDownFurtherOffTheFurtherItFalls)
+{
+    // Thrown 5 over the Slig's point at 6 up, a pixel a frame slower each frame: level with the Slig again on
+    // the twelfth frame, 90 under it on the twenty-first
+    ASSERT_EQ(Bot::FlierFlight::GrenadeFrames(0), 12);
+    ASSERT_EQ(Bot::FlierFlight::GrenadeFrames(1), 12);
+    ASSERT_EQ(Bot::FlierFlight::GrenadeFrames(2), 13);
+    ASSERT_EQ(Bot::FlierFlight::GrenadeFrames(90), 21);
+    ASSERT_EQ(Bot::FlierFlight::GrenadeFrames(100), 21);
+    ASSERT_EQ(Bot::FlierFlight::GrenadeFrames(101), 22);
+    // (5.7 pixels a frame along)
+    ASSERT_EQ(Bot::FlierFlight::GrenadeReach(90), 21 * 570 / 100);
+    ASSERT_EQ(Bot::FlierFlight::GrenadeReach(0), 12 * 570 / 100);
+}
+
+TEST(BotFlierFlight, ItThrowsFromOffTheSligsLevelToEitherSideSoThatTheGrenadeComesDownOnIt)
+{
+    // A Slig in the middle of a wide floor: from over its head only
+    const std::vector<Bot::FlierFlight::Shot> shots = Bot::FlierFlight::Shots(1000, 700, 800, 1200);
+    ASSERT_EQ(shots.size(), 6u);
+    for (std::size_t i = 0; i < shots.size(); i++)
+    {
+        const Bot::FlierFlight::Shot& shot = shots[i];
+        // Over the Slig's head, facing it, as far to the side as the grenade goes while it falls to the floor
+        ASSERT_LE(shot.mY, 700 - Bot::FlierFlight::kOver);
+        ASSERT_EQ(shot.mFaceLeft, shot.mX > 1000);
+        const s32 reach = Bot::FlierFlight::GrenadeReach(700 - shot.mY);
+        ASSERT_EQ(shot.mX + (shot.mFaceLeft ? -reach : reach), 1000);
+        ASSERT_EQ(shot.mLandX, 1000);
+        ASSERT_EQ(shot.mFrames, Bot::FlierFlight::GrenadeFrames(700 - shot.mY));
+        // (from the right, then from the left, at each height: the lowest first)
+        ASSERT_EQ(shot.mFaceLeft, i % 2 == 0);
+        ASSERT_EQ(shot.mY, 700 - Bot::FlierFlight::kOver - 20 * static_cast<s32>(i / 2));
+    }
+}
+
+TEST(BotFlierFlight, NearAnEndOfItsFloorTheGrenadeIsFirstThrownUpOverThatEndFromUnderIt)
+{
+    // The grenade is over a floor 12 over the Slig's point from its fourth frame, and comes down on it on the
+    // tenth
+    ASSERT_EQ(Bot::FlierFlight::GrenadeFrames(-Bot::FlierFlight::kUnder), 10);
+    // (20 over the Slig's point is as high as it gets, on its fifth and sixth frames: down from there on the
+    // seventh)
+    ASSERT_EQ(Bot::FlierFlight::GrenadeFrames(-20), 7);
+    // A Slig on a ledge from 950 to 1040, near both ends: from under the right end, then the left, then from
+    // over its head
+    const std::vector<Bot::FlierFlight::Shot> shots = Bot::FlierFlight::Shots(1000, 700, 950, 1040);
+    ASSERT_EQ(shots.size(), 8u);
+    ASSERT_EQ(shots[0].mX, 1040 + Bot::FlierFlight::kOut);
+    ASSERT_EQ(shots[0].mY, 700 + Bot::FlierFlight::kUnder);
+    ASSERT_TRUE(shots[0].mFaceLeft);
+    ASSERT_EQ(shots[0].mFrames, 10);
+    // (57 pixels along in ten frames: 17 in from the end)
+    ASSERT_EQ(shots[0].mLandX, 1040 + Bot::FlierFlight::kOut - 57);
+    ASSERT_EQ(shots[1].mX, 950 - Bot::FlierFlight::kOut);
+    ASSERT_EQ(shots[1].mY, 700 + Bot::FlierFlight::kUnder);
+    ASSERT_FALSE(shots[1].mFaceLeft);
+    ASSERT_EQ(shots[1].mLandX, 950 - Bot::FlierFlight::kOut + 57);
+    ASSERT_EQ(shots[2].mY, 700 - Bot::FlierFlight::kOver);
+    // From under the floor it may throw from nearer, up to 20 out from the end: its side is 17 from its point.
+    // From over the Slig's head there is one place.
+    ASSERT_EQ(shots[0].mNearer, Bot::FlierFlight::kOut - Bot::FlierFlight::kOutLeast);
+    ASSERT_EQ(shots[1].mNearer, 20);
+    ASSERT_EQ(shots[2].mNearer, 0);
+    ASSERT_EQ(shots[0].mWaitX, shots[0].mX);
+    ASSERT_EQ(shots[0].mWaitY, 700 + Bot::FlierFlight::kWaitUnder);
+    ASSERT_EQ(shots[2].mWaitX, shots[2].mX);
+    ASSERT_EQ(shots[2].mWaitY, shots[2].mY);
+
+    // Only the end it is near (90 at most)
+    ASSERT_EQ(Bot::FlierFlight::Shots(1000, 700, 900, 1090).size(), 7u);
+    ASSERT_TRUE(Bot::FlierFlight::Shots(1000, 700, 900, 1090)[0].mFaceLeft);
+    ASSERT_EQ(Bot::FlierFlight::Shots(1000, 700, 910, 1091).size(), 7u);
+    ASSERT_FALSE(Bot::FlierFlight::Shots(1000, 700, 910, 1091)[0].mFaceLeft);
+    ASSERT_EQ(Bot::FlierFlight::Shots(1000, 700, 909, 1091).size(), 6u);
+    // And not onto a floor too short for the grenade to come down on
+    ASSERT_EQ(Bot::FlierFlight::Shots(1000, 700, 990, 1006).size(), 6u);
+    ASSERT_EQ(Bot::FlierFlight::Shots(1000, 700, 990, 1007).size(), 8u);
+}
+
+// A column of three screens (375 by 260 each): a floor along the bottom one, where a flying Slig spawner is, and
+// on the middle one a ledge from 0 to 240 at 440 with a Slig at 200 and a security orb
+static NavInput FlierColumn()
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 700, 375, 700, 0));
+    in.mLines.push_back(Line(0, 440, 240, 440, 0));
+    in.mLines.push_back(Line(300, 100, 375, 100, 0));
+    return in;
+}
+
+static World FlierColumnWorld()
+{
+    World world;
+    world.mEntities.push_back(MakeEntity(EntityKind::eFlierSpawner, 2001, 188, 600, 212, 624));
+    world.mEntities.push_back(MakeEntity(EntityKind::eSlig, 1001, 188, 420, 212, 444));
+    world.mEntities.push_back(MakeEntity(EntityKind::eSecurityOrb, 1002, 300, 300, 324, 324));
+    return world;
+}
+
+TEST(BotFlierTargets, ASligUnderASecurityOrbIsOneForTheFlyingSligWithThePlacesToThrowFrom)
+{
+    const NavInput in = FlierColumn();
+    World world = FlierColumnWorld();
+    const std::vector<Domain::FlierTarget> targets = Domain::FlierTargets(in, world, world.mEntities[0]);
+    ASSERT_EQ(targets.size(), 1u);
+    EXPECT_EQ(targets[0].mSlig, 1001u);
+    EXPECT_EQ(targets[0].mX, 200);
+    EXPECT_EQ(targets[0].mFloorY, 440);
+    EXPECT_TRUE(targets[0].mNeeds.empty());
+    // From under the right end of its ledge (it is 40 from it; the left end is too far), then from over its head
+    // to either side at three heights
+    ASSERT_EQ(targets[0].mShots.size(), 7u);
+    EXPECT_EQ(targets[0].mShots[0].mX, 240 + FlierFlight::kOut);
+    EXPECT_EQ(targets[0].mShots[0].mY, 440 + FlierFlight::kUnder);
+    EXPECT_TRUE(targets[0].mShots[0].mFaceLeft);
+    EXPECT_EQ(targets[0].mShots[1].mY, 440 - FlierFlight::kOver);
+
+    // Not one he can take over himself (no orb on its screen), one that is dead, one the grenades did not get,
+    // or one further from the spawner than a flight
+    World noOrb = FlierColumnWorld();
+    noOrb.mEntities[2].mY1 = 30;
+    noOrb.mEntities[2].mY2 = 54;
+    EXPECT_TRUE(Domain::FlierTargets(in, noOrb, noOrb.mEntities[0]).empty());
+    World gone = FlierColumnWorld();
+    gone.mEntities[1].mGone = true;
+    EXPECT_TRUE(Domain::FlierTargets(in, gone, gone.mEntities[0]).empty());
+    World killed = FlierColumnWorld();
+    killed.mFleechKilled.insert(1001);
+    EXPECT_TRUE(Domain::FlierTargets(in, killed, killed.mEntities[0]).empty());
+    World given = FlierColumnWorld();
+    given.mNoBomb.insert(1001);
+    EXPECT_TRUE(Domain::FlierTargets(in, given, given.mEntities[0]).empty());
+    World far = FlierColumnWorld();
+    far.mEntities[0].mX1 += 1100;
+    far.mEntities[0].mX2 += 1100;
+    EXPECT_TRUE(Domain::FlierTargets(in, far, far.mEntities[0]).empty());
+    // (a Slig a spawner makes is not there to be thrown at)
+    World spawned = FlierColumnWorld();
+    spawned.mEntities[1].mSwitch = 40;
+    EXPECT_TRUE(Domain::FlierTargets(in, spawned, spawned.mEntities[0]).empty());
+}
+
+TEST(BotFlierTargets, AGrenadeIsNotThrownUpUnderATrapDoorThatIsShut)
+{
+    // A trap door from the end of the ledge on: the grenade thrown from under the end would come up under it
+    NavInput in = FlierColumn();
+    NavFeature door;
+    door.mKind = FeatureKind::eTrapDoor;
+    door.mX1 = 240;
+    door.mY1 = 440;
+    door.mX2 = 300;
+    door.mY2 = 460;
+    door.mSwitch = 50;
+    door.mStartClosed = true;
+    in.mFeatures.push_back(door);
+    World world = FlierColumnWorld();
+    std::vector<Domain::FlierTarget> targets = Domain::FlierTargets(in, world, world.mEntities[0]);
+    ASSERT_EQ(targets.size(), 1u);
+    for (const FlierFlight::Shot& shot : targets[0].mShots)
+    {
+        EXPECT_LE(shot.mY, 440 - FlierFlight::kOver);
+    }
+    EXPECT_EQ(targets[0].mShots.size(), 6u);
+    // Open, it is
+    world.mSwitches[50] = 1;
+    targets = Domain::FlierTargets(in, world, world.mEntities[0]);
+    ASSERT_EQ(targets.size(), 1u);
+    ASSERT_EQ(targets[0].mShots.size(), 7u);
+    EXPECT_EQ(targets[0].mShots[0].mY, 440 + FlierFlight::kUnder);
+}
+
+TEST(BotFlierTargets, WithAnElectricWallByTheOnlyPlaceToThrowFromTheWallIsToBeOffFirst)
+{
+    // A ceiling over the ledge's screen keeps the flying Slig from over the Slig's head: the place under the end
+    // of the ledge is the only one. An electric wall stands 20 from it.
+    NavInput in = FlierColumn();
+    in.mLines.push_back(Line(0, 400, 375, 400, 3));
+    NavFeature wall;
+    wall.mKind = FeatureKind::eBarrier;
+    wall.mX1 = 288;
+    wall.mY1 = 440;
+    wall.mX2 = 312;
+    wall.mY2 = 520;
+    wall.mSwitch = 50;
+    wall.mStartClosed = true;
+    in.mFeatures.push_back(wall);
+    World world = FlierColumnWorld();
+    std::vector<Domain::FlierTarget> targets = Domain::FlierTargets(in, world, world.mEntities[0]);
+    ASSERT_EQ(targets.size(), 1u);
+    EXPECT_TRUE(targets[0].mShots.empty());
+    ASSERT_EQ(targets[0].mNeeds.size(), 1u);
+    EXPECT_EQ(targets[0].mNeeds[0], (std::pair<s32, s32>{50, 1}));
+    // Off: thrown from there as things are
+    world.mSwitches[50] = 1;
+    targets = Domain::FlierTargets(in, world, world.mEntities[0]);
+    ASSERT_EQ(targets.size(), 1u);
+    EXPECT_EQ(targets[0].mShots.size(), 1u);
+    EXPECT_TRUE(targets[0].mNeeds.empty());
+    // A wall no switch turns off: no place at all, and the Slig is not one for the flying Slig
+    in.mFeatures[0].mSwitch = 0;
+    world.mSwitches[50] = 0;
+    EXPECT_TRUE(Domain::FlierTargets(in, world, world.mEntities[0]).empty());
+    // And one far from the place is nothing to it
+    in.mFeatures[0].mSwitch = 50;
+    in.mFeatures[0].mX1 = 340;
+    in.mFeatures[0].mX2 = 364;
+    targets = Domain::FlierTargets(in, world, world.mEntities[0]);
+    ASSERT_EQ(targets.size(), 1u);
+    EXPECT_EQ(targets[0].mShots.size(), 1u);
+}
+
+TEST(BotFlierTargets, AWayThroughTheAirKeepsToTheScreensThePathHas)
+{
+    const NavInput in = FlierColumn();
+    std::vector<std::pair<s32, s32>> corners;
+    // Up the column, round the end of the ledge
+    ASSERT_TRUE(Domain::FlierWay(in, false, 200, 600, 100, 300, nullptr, corners));
+    ASSERT_FALSE(corners.empty());
+    EXPECT_EQ(corners.back(), (std::pair<s32, s32>{100, 300}));
+    // To the screen beside the bottom one, where the path has nothing: no
+    EXPECT_FALSE(Domain::FlierWay(in, false, 200, 600, 500, 600, nullptr, corners));
+    EXPECT_TRUE(corners.empty());
+    // With something of the path there, it does
+    NavInput wider = in;
+    wider.mLines.push_back(Line(375, 700, 750, 700, 0));
+    EXPECT_TRUE(Domain::FlierWay(wider, false, 200, 600, 500, 600, nullptr, corners));
+    // Not through what is shut
+    const std::vector<NavLine> shut{Line(300, 500, 300, 700, 1)};
+    EXPECT_FALSE(Domain::FlierWay(wider, false, 200, 600, 500, 600, &shut, corners));
+}
+
+TEST(BotFlierFlight, ALeverIsPulledFromACellAndABitToEitherSideOfItFacingIt)
+{
+    // The lever stands at 2137 on the floor at 460. From its left the flying Slig faces right, 46 from it and 23
+    // over the floor; from its right it faces left. It waits where it pulls from.
+    const Bot::FlierFlight::Shot left = Bot::FlierFlight::LeverPull(2137, 460, false);
+    EXPECT_EQ(left.mX, 2137 - Bot::FlierFlight::kLeverAlong);
+    EXPECT_EQ(left.mY, 460 - Bot::FlierFlight::kLeverOver);
+    EXPECT_FALSE(left.mFaceLeft);
+    EXPECT_EQ(left.mWaitX, left.mX);
+    EXPECT_EQ(left.mWaitY, left.mY);
+    EXPECT_EQ(left.mNearer, 0);
+    const Bot::FlierFlight::Shot right = Bot::FlierFlight::LeverPull(2137, 460, true);
+    EXPECT_EQ(right.mX, 2137 + 46);
+    EXPECT_EQ(right.mY, 437);
+    EXPECT_TRUE(right.mFaceLeft);
+    EXPECT_EQ(right.mWaitX, right.mX);
+    EXPECT_EQ(right.mWaitY, right.mY);
+}
+
+TEST(BotFlierTargets, AWayThroughTheAirKeepsTheFlyingSligsSidesClearOfTheEndsOfFloors)
+{
+    // A room from 400 to 775 with a ledge from 400 to 600 at 300
+    NavInput in;
+    in.mLines.push_back(Line(400, 500, 775, 500, 0));
+    in.mLines.push_back(Line(400, 20, 775, 20, 3));
+    in.mLines.push_back(Line(400, 20, 400, 500, 1));
+    in.mLines.push_back(Line(775, 20, 775, 500, 2));
+    in.mLines.push_back(Line(400, 300, 600, 300, 0));
+    std::vector<std::pair<s32, s32>> corners;
+    // Straight up five pixels past the end of the ledge its point is clear of it and its side is not: round, then
+    ASSERT_TRUE(Domain::FlierWay(in, false, 605, 400, 605, 200, nullptr, corners));
+    EXPECT_GT(corners.size(), 1u);
+    s32 out = 0;
+    for (const std::pair<s32, s32>& corner : corners)
+    {
+        out = std::max(out, corner.first);
+    }
+    EXPECT_GE(out, 620);
+    // (25 past it, it goes straight up)
+    ASSERT_TRUE(Domain::FlierWay(in, false, 625, 400, 625, 200, nullptr, corners));
+    EXPECT_EQ(corners.size(), 1u);
+
+    // With a floor 20 under the ledge there is no flying in under the ledge from beside it: it is 31 high
+    in.mLines.push_back(Line(400, 320, 775, 320, 0));
+    EXPECT_FALSE(Domain::FlierWay(in, false, 700, 310, 560, 310, nullptr, corners));
+    // (along beside the ledge's end at that height it does fly)
+    EXPECT_TRUE(Domain::FlierWay(in, false, 700, 310, 640, 310, nullptr, corners));
+}
+
+TEST(BotFlierTargets, APlaceToThrowFromIsOneItCanGetUpToAndOnTheSligsOwnScreen)
+{
+    // A floor from 250 to 300 at 460, between where it would wait under the end of the Slig's ledge (476) and
+    // where it would throw from (452): from over the Slig's head only
+    NavInput in = FlierColumn();
+    in.mLines.push_back(Line(250, 460, 300, 460, 0));
+    World world = FlierColumnWorld();
+    std::vector<Domain::FlierTarget> targets = Domain::FlierTargets(in, world, world.mEntities[0]);
+    ASSERT_EQ(targets.size(), 1u);
+    EXPECT_EQ(targets[0].mShots.size(), 6u);
+    for (const FlierFlight::Shot& shot : targets[0].mShots)
+    {
+        EXPECT_LE(shot.mY, 440 - FlierFlight::kOver);
+    }
+
+    // A Slig on a ledge at 300, 40 under the top of its screen: over its head is the next screen, where a
+    // grenade thrown finds no Slig. From under the end of the ledge only.
+    NavInput high;
+    high.mLines.push_back(Line(0, 700, 375, 700, 0));
+    high.mLines.push_back(Line(0, 300, 240, 300, 0));
+    high.mLines.push_back(Line(300, 100, 375, 100, 0));
+    World top = FlierColumnWorld();
+    top.mEntities[1].mY1 = 280;
+    top.mEntities[1].mY2 = 304;
+    targets = Domain::FlierTargets(high, top, top.mEntities[0]);
+    ASSERT_EQ(targets.size(), 1u);
+    ASSERT_EQ(targets[0].mShots.size(), 1u);
+    EXPECT_EQ(targets[0].mShots[0].mY, 300 + FlierFlight::kUnder);
 }

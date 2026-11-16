@@ -24,9 +24,23 @@ public:
     static s32 Delay(s32 index);
     static s32 Count();
 
+    // What a try does once it begins. When no moment gets the same thing through, another thing is tried at
+    // each moment: the order they come in.
+    enum class Way : u8
+    {
+        eSame,  // the buttons of the first try again, frame for frame (every coarsest step of the window)
+        eFine,  // the same, at the moments between the coarse ones
+        eAgain, // planned anew from what is found at that moment (the coarse moments, as for the next two)
+        eQuiet, // planned anew, and every step of the way sneaked
+        eFast,  // planned anew, and every step of the way run
+    };
+    // Whether a try that way presses what the first try pressed
+    static bool Repeats(Way way);
+
     struct Stretch final
     {
-        // The delay of the try under way (the first is to play straight on), and the next to try
+        // What the try under way does and its delay (the first is to play straight on), and the next to try
+        Way mWay = Way::eSame;
         s32 mDelay = 0;
         s32 mNext = 1;
         // A try held back this long or longer fails: one was hurt that many frames in while it still held back,
@@ -42,10 +56,13 @@ public:
     };
 
     // The try under way failed that many frames after the save, at that place (any number that tells places
-    // apart). The delay of the next try, or -1 when there is none left or none worth making: kAlike tries in a row, each
-    // begun at another moment, that all failed as long after they began and at the same place would fail
-    // whenever they began.
+    // apart). The delay of the next try that does the same thing, or -1 when there is none left or none worth
+    // making: kAlike tries in a row, each begun at another moment, that all failed as long after they began and at
+    // the same place would fail whenever they began.
     static s32 Failed(Stretch& stretch, s32 frames, s32 place);
+    // No moment got that through: on to the next thing to try (stretch.mWay). Its first delay, or -1 when
+    // everything has been tried.
+    static s32 NextWay(Stretch& stretch);
     // Something was ruled out: every delay is worth trying once more (what is known to be too long still is)
     static s32 Again(Stretch& stretch);
 };

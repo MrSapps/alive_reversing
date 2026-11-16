@@ -305,6 +305,10 @@ public:
         return mIsAe;
     }
     // A Fleech (its entity) a Scrab was made to kill
+    void NoBomb(u32 id)
+    {
+        mWorld.mNoBomb.insert(id);
+    }
     void FleechKilled(u32 id)
     {
         mWorld.mFleechKilled.insert(id);
@@ -596,15 +600,26 @@ private:
     s32 mLastHealthFp = 0;
     u32 mLastHurtFrame = 0;
     bool mTryFailed = false;
+    // What it failed by, when not by his being hurt
+    std::string mTryWhy;
     s32 mTries = 0;
     s32 mTriesSince = 0;
     s32 mTryFrames = 0;
     bool mTolerant = false;
-    // How many saves it has gone back since it last got somewhere new
-    s32 mPops = 0;
+    // How many saves there have to be left when it goes back one: two fewer than at the first failure since it
+    // last got somewhere new (0: none has failed since)
+    std::size_t mPopFloor = 0;
     s32 mTolerantSaves = 0;
+    // What the try under way does differently from how the bot would play it (Lookahead::Way), whether it is a
+    // try again at all, and how many saves somewhere new there have been since
+    Lookahead::Way mVary = Lookahead::Way::eSame;
+    bool mTryingAgain = false;
+    s32 mVarySaves = 0;
+    void StuckNow(const std::string& why);
     // Where the last saves were taken: one somewhere new is the tries having got him on
-    std::vector<std::tuple<s32, s32, s32>> mSavePlaces;
+    std::set<std::tuple<s32, s32, s32, s32>> mSavePlaces;
+    // The frame the try under way began to do something
+    u32 mLastTryFrame = 0;
     void TryFailed(BaseMap& map, const std::string& what);
 
     std::vector<u32> mInputs;

@@ -73,6 +73,8 @@ struct NavFeature final
     bool mStartClosed = false;
     // A barrier that is a wall while it is shut (a slam door): a rock comes back off it
     bool mSolid = false;
+    // A barrier that kills what touches it (an electric wall): its beam is at mX1
+    bool mBeam = false;
     s32 mDestLevel = -1;
     s32 mDestPath = -1;
     s32 mDestCamera = -1;

@@ -16,6 +16,10 @@ Change the profile on the `bot` line: `save_all`, `kill_all`, `average` or `any`
 different run of the same profile and `,human` for a bot that dawdles and varies like a person. The same
 profile and seed always give the same run.
 
+`,look` makes it look ahead: whatever gets Abe hurt or killed is taken back (a save put back, which the script
+shows as it happens) and tried at another moment or another way, and only the try that worked is in the
+`bot_inputs` it leaves. Watch such a run by replaying its inputs. It takes several times as long to make.
+
 When the bot stops, `bot_report` writes what it was doing, what it saw and why it stopped (`done`, or
 `STUCK: no_plan / action_failed ...`), and `bot_inputs` the buttons of the run, which the `replay` command
 plays back without the bot.

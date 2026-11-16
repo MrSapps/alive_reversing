@@ -2290,7 +2290,12 @@ void FlyingSlig::PatrolDelay()
     SetBrain(&FlyingSlig::Brain_5_Idle);
 }
 
-s16 FlyingSlig::CanThrowGrenade()
+bool FlyingSlig::GrenadeReady() const
+{
+    return static_cast<s32>(sGnFrame) > field_150_grenade_delay && CanThrowGrenade();
+}
+
+s16 FlyingSlig::CanThrowGrenade() const
 {
     return mCurrentMotion == eFlyingSligMotions::Motion_0_Idle ||
         mCurrentMotion == eFlyingSligMotions::Motion_1_HorizontalMovement ||

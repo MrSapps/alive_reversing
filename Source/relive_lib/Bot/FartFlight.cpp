@@ -68,6 +68,11 @@ static bool Clear(const NavInput& in, bool half, const std::vector<NavLine>* mor
     return true;
 }
 
+bool FartFlight::Open(const NavInput& in, bool half, Point from, Point to, const std::vector<NavLine>* more)
+{
+    return Clear(in, half, more, from.mX, from.mY, to.mX, to.mY);
+}
+
 bool FartFlight::Route(const NavInput& in, bool half, Point from, Point to, s32 maxLen, std::vector<Point>& corners, s32* length, const std::vector<NavLine>* more)
 {
     corners.clear();
