@@ -6826,6 +6826,28 @@ TEST(BotSligCycle, ALeapIsMadeWhenTheFewestSeeHimOnIt)
     const SligCycle::Move hidden = cycle.Through(way(0), shooters, 600);
     EXPECT_EQ(hidden.mSpotters, 0);
     EXPECT_EQ(hidden.mDelay, 0);
+    // With something else that has to let him go too (flying mines over the same stretch): the first wait both
+    // allow, which is a later one
+    const std::function<bool(s32)> later = [&move](s32 delay)
+    {
+        return delay > move.mDelay + 20 && delay % 2 == 0;
+    };
+    const SligCycle::Move both = cycle.Through(quick, shooters, 600, &later);
+    EXPECT_EQ(both.mSpotters, 0);
+    EXPECT_GT(both.mDelay, move.mDelay + 20);
+    EXPECT_EQ(both.mDelay % 2, 0);
+    // (in cover all the way as well: not before it is let)
+    const std::function<bool(s32)> from50 = [](s32 delay)
+    {
+        return delay >= 50;
+    };
+    EXPECT_EQ(cycle.Through(way(0), shooters, 600, &from50).mDelay, 50);
+    // And with no wait let at all there is none: 99
+    const std::function<bool(s32)> never = [](s32)
+    {
+        return false;
+    };
+    EXPECT_EQ(cycle.Through(quick, shooters, 600, &never).mSpotters, 99);
 }
 
 // A floor, a ledge over it from 100 on with a hoist up to its end, and something that shuts in the ledge's
@@ -9223,4 +9245,63 @@ TEST(BotMines, WhereHeIsFrameByFrameOfARunningJumpThatEndsHungFromALedgeIsAsMeas
     EXPECT_EQ(bodies[run + 16 + 7].mUp, 36);
     EXPECT_EQ(bodies[run + 16 + 19].mDown, 11);
     EXPECT_EQ(bodies[run + 16 + 25].mUp, 53);
+}
+
+TEST(BotNav, FromALiftsPlatformALedgeIsHoppedTo)
+{
+    // The Barracks' path 5: off the lift at 1362,960 to the ledge at 1437,900, the walkthrough's "hop right and
+    // hoist up". (He is only ever on the platform where the lift is.)
+    NavInput in;
+    in.mLines.push_back(Line(0, 200, 100, 200, 0));
+    in.mLines.push_back(Line(225, 140, 325, 140, 0));
+    in.mFeatures.push_back(Feature(FeatureKind::eLiftStop, 100, 200, 176, 224));
+    in.mFeatures.push_back(Feature(FeatureKind::eLiftStop, 100, 500, 176, 524));
+    NavFeature ledge = Feature(FeatureKind::eEdge, 225, 140, 249, 164);
+    ledge.mA = 1;
+    ledge.mDir = 1;
+    in.mFeatures.push_back(ledge);
+    NavGraph g;
+    g.Build(in);
+    const s32 on = g.NodeAt(162, 200, false);
+    const s32 up = g.NodeAt(237, 140, false);
+    ASSERT_GE(on, 0);
+    ASSERT_GE(up, 0);
+    ASSERT_GE(g.Nodes()[on].mLiftStop, 0);
+    EXPECT_NE(FindEdge(g, on, up, EdgeKind::eHop), nullptr) << g.Text();
+}
+
+TEST(BotMines, WhereHeIsFrameByFrameOfARideOnALiftIsAsMeasured)
+{
+    // The Barracks' path 5, the lift at 1362 from 1260 up: 7 frames until it moves, then 4 a frame
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 100, 100, 0));
+    in.mLines.push_back(Line(0, 300, 100, 300, 0));
+    in.mFeatures.push_back(Feature(FeatureKind::eLiftStop, 100, 100, 176, 124));
+    in.mFeatures.push_back(Feature(FeatureKind::eLiftStop, 100, 300, 176, 324));
+    NavGraph g;
+    g.Build(in);
+    const NavEdge* up = FindEdge(g, g.NodeAt(137, 300, false), g.NodeAt(137, 100, false), EdgeKind::eLift);
+    ASSERT_NE(up, nullptr);
+    const std::vector<GoToTask::Body> bodies = BodiesOf(g, up, false);
+    ASSERT_EQ(bodies.size(), 7u + 50u);
+    EXPECT_EQ(bodies[0].mY, 300);
+    EXPECT_EQ(bodies[6].mY, 300);
+    EXPECT_EQ(bodies[7].mY, 300);
+    EXPECT_EQ(bodies[8].mY, 296);
+    EXPECT_EQ(bodies[32].mY, 200);
+    EXPECT_EQ(bodies[56].mY, 104);
+    for (const GoToTask::Body& b : bodies)
+    {
+        EXPECT_EQ(b.mX, 137);
+        EXPECT_EQ(b.mBack, 23);
+        EXPECT_EQ(b.mFront, 23);
+        EXPECT_EQ(b.mUp, 55);
+    }
+    // (and down)
+    const NavEdge* down = FindEdge(g, g.NodeAt(137, 100, false), g.NodeAt(137, 300, false), EdgeKind::eLift);
+    ASSERT_NE(down, nullptr);
+    const std::vector<GoToTask::Body> lower = BodiesOf(g, down, false);
+    ASSERT_EQ(lower.size(), 57u);
+    EXPECT_EQ(lower[6].mY, 100);
+    EXPECT_EQ(lower[32].mY, 200);
 }

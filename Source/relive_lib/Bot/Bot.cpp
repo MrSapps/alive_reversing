@@ -3160,7 +3160,15 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         {
             for (const NavFeature& f : mKnow->mNav.Input().mFeatures)
             {
-                if (f.mKind == FeatureKind::eBarrier && f.mSolid && f.mA == 1 && f.mSwitch > 1 && mWorld.mGatesGone.count(f.mSwitch) == 0 && (mWorld.Switch(f.mSwitch, true) != 0) == f.mStartClosed)
+                // (not where a door of the path waits for the same switch: that has to be seen as it is. The
+                // Barracks' path 5: switch 125 is a gate's by the laughing gas, and the wheel's that opens the
+                // way out, which he turned and took for not turned.)
+                bool doors = false;
+                for (const NavFeature& g : mKnow->mNav.Input().mFeatures)
+                {
+                    doors = doors || (g.mKind == FeatureKind::eDoor && g.mSwitch == f.mSwitch && f.mSwitch > 1);
+                }
+                if (!doors && f.mKind == FeatureKind::eBarrier && f.mSolid && f.mA == 1 && f.mSwitch > 1 && mWorld.mGatesGone.count(f.mSwitch) == 0 && (mWorld.Switch(f.mSwitch, true) != 0) == f.mStartClosed)
                 {
                     mWorld.mGatesGone[f.mSwitch] = mWorld.Switch(f.mSwitch, true);
                 }

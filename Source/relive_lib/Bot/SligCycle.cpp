@@ -109,13 +109,17 @@ u32 SligCycle::SeenBy(s32 x, s32 frames) const
     return mask;
 }
 
-SligCycle::Move SligCycle::Through(const std::vector<Cell>& track, const std::vector<Shooter>& shooters, s32 within) const
+SligCycle::Move SligCycle::Through(const std::vector<Cell>& track, const std::vector<Shooter>& shooters, s32 within, const std::function<bool(s32 delay)>* ok) const
 {
     Move out;
     out.mSpotters = 99;
     const s32 n = static_cast<s32>(track.size());
     for (s32 delay = 0; delay <= within && out.mSpotters > 0; delay++)
     {
+        if (ok && !(*ok)(delay))
+        {
+            continue;
+        }
         // The frame each of them first sees him on
         s32 first[5] = {-1, -1, -1, -1, -1};
         for (s32 t = 0; t < n; t++)

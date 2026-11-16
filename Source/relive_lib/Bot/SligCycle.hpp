@@ -103,7 +103,9 @@ public:
     static const s32 kTrackSlack = 3;
     // (or that far either side of where it has him: a hop carries him a few past where it lands)
     static const s32 kTrackAside = 8;
-    Move Through(const std::vector<Cell>& track, const std::vector<Shooter>& shooters, s32 within) const;
+    // ok: only waits it says yes to are looked at (something else that has to let him go then too: flying mines
+    // over the same stretch). With none of them, mSpotters is 99.
+    Move Through(const std::vector<Cell>& track, const std::vector<Shooter>& shooters, s32 within, const std::function<bool(s32 delay)>* ok = nullptr) const;
     // Which of them (a bit each) see him at x that many frames from now
     u32 SeenBy(s32 x, s32 frames) const;
 

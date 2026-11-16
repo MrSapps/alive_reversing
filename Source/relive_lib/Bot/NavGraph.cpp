@@ -1398,7 +1398,9 @@ void NavGraph::Build(const NavInput& input)
             bool caught = false;
             {
                 s32 x = n.mX;
-                bool gap = n.mLiftStop < 0;
+                // (from a lift's platform too: he is only ever on it where the lift is. The Barracks' path 5, off the
+                // lift at 1362,960 to the ledge at 1437,900: the walkthrough's "hop right and hoist up".)
+                bool gap = true;
                 // (a lift's shaft is one while the lift is away)
                 s32 shaft = -1;
                 // (no floor under him so far. A ledge well over his own floor is caught with floor under him

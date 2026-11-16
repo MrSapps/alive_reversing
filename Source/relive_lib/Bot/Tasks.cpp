@@ -230,7 +230,8 @@ bool GoToTask::ZWatched(Bot& bot, const NavGraph& nav, const std::vector<s32>& p
     {
         mZCoverCur = -1;
     }
-    if (any && !mHurry && (first.mKind == EdgeKind::eHop || first.mKind == EdgeKind::eFall || first.mKind == EdgeKind::eHoistDown || first.mKind == EdgeKind::eHoistUp || first.mKind == EdgeKind::eRunJump))
+    // (a ride on a lift out of a cover as well: the Barracks' path 5, up the shaft between two of them)
+    if (any && !mHurry && (first.mKind == EdgeKind::eHop || first.mKind == EdgeKind::eFall || first.mKind == EdgeKind::eHoistDown || first.mKind == EdgeKind::eHoistUp || first.mKind == EdgeKind::eRunJump || first.mKind == EdgeKind::eLift))
     {
         return nav.Nodes()[cur].mZCover && ZLeap(bot, nav, path, cur, 0, step);
     }
@@ -548,6 +549,12 @@ bool GoToTask::ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
                 add(from, *at, std::max(6, std::abs(at->mX - from.mX) / 6));
                 add(*at, *at, at->mY < from.mY - 20 ? 30 : 8);
                 break;
+            case EdgeKind::eLift:
+                // (measured in the Barracks' path 5: 7 frames until it moves, then 4 a frame)
+                add(from, from, 7);
+                add(from, *at, std::max(1, std::abs(at->mY - from.mY) / 4));
+                add(*at, *at, 4);
+                break;
             default:
                 add(from, from, 12);
                 add(*at, *at, 22);
@@ -632,7 +639,23 @@ bool GoToTask::ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
         }
         // (within a while with none of them looking, or else when the fewest do: two at most, as he is at full
         // health)
-        SligCycle::Move move = cycle.Through(track, shooters, 600);
+        // (and with flying mines over the same stretch, only when those let him too)
+        const BombCycle& mines = bot.GetBombCycle();
+        const std::function<bool(s32)> minesLet = [&](s32 delay)
+        {
+            return BombsClear(nav, mines, path, lead + 1, rolled, 0, delay);
+        };
+        const std::function<bool(s32)>* let = mines.Any() ? &minesLet : nullptr;
+        SligCycle::Move move = cycle.Through(track, shooters, 600, let);
+        if (move.mSpotters == 99)
+        {
+            // (no time the mines leave in that while: looked at again later)
+            mZPlanned = static_cast<s32>(abe.mFrame);
+            mZFrom = cur;
+            mZPeriods = periods;
+            mZGo = static_cast<s32>(abe.mFrame) + 600;
+            return wait(3, "out of the cover: the flying mines leave no time for it yet");
+        }
         if (move.mSpotters > 0 && !mZSettle && !mZAvoid.count(path[lead]))
         {
             // Shot at on this one whenever it is made: another way out of the cover, if there is one
@@ -654,7 +677,7 @@ bool GoToTask::ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
         // is in a long while, and never three)
         if (move.mSpotters > 1)
         {
-            const SligCycle::Move later = cycle.Through(track, shooters, 2400);
+            const SligCycle::Move later = cycle.Through(track, shooters, 2400, let);
             if (later.mSpotters < move.mSpotters)
             {
                 move = later;
@@ -681,6 +704,16 @@ bool GoToTask::ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
         step = TaskStep::Do(Prim::Wait(1));
         return true;
     }
+    // (with flying mines over the same stretch: when both let him. Looked at again a frame on.)
+    if (bot.GetBombCycle().Any() && mZBombWait < 300 && !BombsClear(nav, bot.GetBombCycle(), path, lead + 1, rolled, 0))
+    {
+        mZBombWait++;
+        mZFrom = -1;
+        mSteps--;
+        step = TaskStep::Do(Prim::Wait(1));
+        return true;
+    }
+    mZBombWait = 0;
     mZFrom = -1;
     mZSaid = -1;
     mZLeapt = true;
@@ -1356,8 +1389,15 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         }
     }
 
+    // (nor where he has come to is under a flying mine's track, clear of it only crouched: he stays down, and
+    // what comes next starts from a crouch. The Barracks' path 5, by the UXB at 537,720.)
+    if (atGoal && abe.mMove == Move::eCrouch && MinesOverhead(bot, cur))
+    {
+        return TaskStep::Done();
+    }
     // Crouched after a roll: up again, unless there's more to roll or no room to stand
-    if (abe.mMove == Move::eCrouch && !nav.Nodes()[cur].mLow && !((mSweepDuck || mBombDuck) && !atGoal) && (atGoal || (nav.Edges()[path[0]].mKind != EdgeKind::eRoll && !nav.Edges()[path[0]].mCrouched)))
+    // (up from under a mine's track is for BombStep, which times it)
+    if (abe.mMove == Move::eCrouch && !nav.Nodes()[cur].mLow && !((mSweepDuck || mBombDuck) && !atGoal) && !MinesOverhead(bot, cur) && (atGoal || (nav.Edges()[path[0]].mKind != EdgeKind::eRoll && !nav.Edges()[path[0]].mCrouched)))
     {
         return TaskStep::Do(Prim::Press(Btn::eUp));
     }
@@ -3052,6 +3092,10 @@ void GoToTask::Bodies(const NavGraph& nav, const std::vector<s32>& path, std::si
                     // (up from a crouch first; then off the floor, and hanging from the ledge)
                     frames = 54 + (before == EdgeKind::eRoll ? 8 : 0);
                     break;
+                case EdgeKind::eLift:
+                    // (measured in the Barracks' path 5: 7 frames until it moves, then 4 a frame)
+                    frames = 7 + std::max(1, std::abs(b.mY - a.mY) * (a.mHalf ? 2 : 1) / 4);
+                    break;
                 default:
                     frames = e.mCost;
                     break;
@@ -3169,6 +3213,13 @@ void GoToTask::Bodies(const NavGraph& nav, const std::vector<s32>& path, std::si
                     body.mUp = k < 12 ? -5 : k < 16 ? 20 : k < 28 ? 36 : 53;
                     body.mDown = k < 12 ? 65 : k < 16 ? 70 : k < 28 ? 34 : 11;
                 }
+            }
+            else if (!last && kind == EdgeKind::eLift)
+            {
+                body.mX = a.mX;
+                body.mY = f < 7 ? a.mY : a.mY + (b.mY - a.mY) * (f - 7) / (frames - 7);
+                body.mBack = 23;
+                body.mFront = 23;
             }
             else if (catches)
             {
@@ -3349,6 +3400,12 @@ bool GoToTask::BombsClear(const NavGraph& nav, const BombCycle& bombs, const std
 
 // Flying mines on the way: from one place none of them ever reaches (standing, or crouched) to the next in one go,
 // when all of that fits in between them. True with the step to take while he waits.
+bool GoToTask::MinesOverhead(Bot& bot, s32 node)
+{
+    bool duck = false;
+    return node >= 0 && bot.GetBombCycle().Any() && BombStop(bot.Nav(), bot.GetBombCycle(), node, duck) && duck;
+}
+
 bool GoToTask::BombStep(Bot& bot, s32 cur, const std::vector<s32>& path, std::size_t& stop, std::size_t& roll, TaskStep& step)
 {
     const NavGraph& nav = bot.Nav();
@@ -4310,9 +4367,11 @@ TaskStep DisarmTask::Next(Bot& bot, const std::string& lastFailed)
         }
         return TaskStep::Failed("the UXB isn't there");
     }
+    // (under a flying mine's track he stays down throughout: up is into the mine)
+    const bool mines = GoToTask::MinesOverhead(bot, bot.AbeNode());
     if (uxb->mOff)
     {
-        if (abe.mMove == Move::eCrouch)
+        if (abe.mMove == Move::eCrouch && !mines)
         {
             return TaskStep::Do(Prim::Press(Btn::eUp));
         }
@@ -4367,8 +4426,8 @@ TaskStep DisarmTask::Next(Bot& bot, const std::string& lastFailed)
     }
     if (abe.mFacingLeft != faceLeft)
     {
-        // Crouched the wrong way round: up and turn
-        return TaskStep::Do(Prim::Press(Btn::eUp));
+        // Crouched the wrong way round: up and turn (round where he crouches, under a mine)
+        return TaskStep::Do(Prim::Press(mines ? (faceLeft ? Btn::eLeft : Btn::eRight) : Btn::eUp));
     }
     // The slap lands half a dozen frames after the button: on the frame its light goes green there is time
     mFrames++;

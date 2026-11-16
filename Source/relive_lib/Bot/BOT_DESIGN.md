@@ -1423,17 +1423,27 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
     walkthrough's way with that screen ("possess the sleeping Slig. Use him to blow up the Flying Mine"),
     done from the left ledge before the jump: from the right one the blast would reach him. Only tested
     in the game.
-  - `build-bot/la/blk5.txt`, from the block's door, 0 deaths: the first lever f=834, the lever that brings
-    the fourth lift f=1,153, the running jump to the UXBs' middle ledge and its UXB off f=1,520, over it to
-    the far ledge f=1,575, through the door, the Slig walked into the mine f=2,432, over to the right ledge
-    and up, at 2112,1380 f=2,745, and along to the three UXBs by the laughing gas. Then it goes to and fro: the way on is up the lift at
-    1362,1500 past two screens of Sligs and flying mines to the lift at 1237,840, and the planner takes
-    that lift's lower stop (960, where it is not) for a way the walker then refuses. From a lift's platform
-    there is no hop to a ledge yet (`gap = n.mLiftStop < 0`), which the walkthrough's way up there starts
-    with. Left to wander it also takes the hoist at 2687,2179 down 320 into the secret area and dies.
-- **Blocks 2, 3 and 4** (first tries from inside their doors, scratch runs): block 2 (path 5, the workers'
-  campus), past its first flying mines and its UXBs (above), wants the lifts past the Sligs and mines,
-  and three Mudokons rescued at once for a Shrykull that clears the way to the wheel (switch 125). Block 3
+  - The lifts past the Sligs in the background (the two screens over the lift at 1362,1500): a ride on a lift
+    out of a cover is a leap as a hop or a hoist is (`GoToTask::ZLeap`, its track 7 frames until the lift
+    moves and then 4 a frame, as measured; `Bodies` has it the same for the mines). The two flying mines
+    that cross that shaft have to let him go on the same frame: `SligCycle::Through` takes what else has to
+    say yes to a wait (`BombsClear` that many frames on), since the times none of the Sligs looks and the
+    times the mines are away seldom meet and looking at one after the other never found one. From a lift's
+    platform a ledge is hopped to (the walkthrough's "hop right and hoist up" off the lift at 1362,960).
+  - The wheel (switch 125) was turned and taken for not turned: the gate by the laughing gas, which is gone
+    for good once it has opened, has the same switch, and `World::mGatesGone` kept that switch at the value
+    it had then for everything. Not where a door of the path waits for the same switch.
+  - Under a flying mine's track that is clear of him only crouched (`GoToTask::MinesOverhead`: the floor at
+    720 by the way out, with the last UXB on it) he stays down: at the end of a walk, through the slap
+    (turned round where he crouches), and up only when `BombStep` has timed it.
+  - **`build-bot/la/blk5.txt`, from the block's door to the hub with 0 deaths, f=4,884**: the first lever
+    f=834, the lever that brings the fourth lift f=1,153, the UXBs' middle ledge and its UXB off f=1,520,
+    through the door, the Slig walked into the mine f=2,432, up the lift past the first screen of Sligs and
+    mines (one burst taken, 203 frames waited for), the hops up to the second lift, the top at about
+    f=4,450, the UXB on the wheel off f=4,620, the wheel f=4,668, the UXB by the way out, and out. `any`
+    rescues none of its seven Mudokons and leaves its secret area alone. Left to wander it once took the
+    hoist at 2687,2179 down 320 into the secret area and died: not looked into.
+- **Blocks 3 and 4** (first tries from inside their doors, scratch runs).
   (path 7), whose door shuts behind him, is the one he starts on: a wheel (switch 177), then a Slig lock
   with a Slig called by a lever, where he dies six times and gives up. Block 4 (path 9) not looked at again.
 - The hub and its four blocks, then the war room: a Glukkon taken over and its orders to Sligs, crawling
