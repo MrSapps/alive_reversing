@@ -186,6 +186,50 @@ private:
     s32 mThrows = 0;
 };
 
+// A grenade from a boom machine thrown at a Slig he can't take over (Domain::GrenadeTargets): to a cell to throw
+// from, there until the Slig is where the grenade will go off, thrown, and down on his knees until it has (who
+// stands by a blast is thrown over, and that is heard).
+class GoToTask;
+class GrenadeSligTask final : public Task
+{
+public:
+    // from: a cell of the stretch of floor the plan throws from
+    GrenadeSligTask(u32 slig, s32 from)
+        : mSlig(slig)
+        , mFrom(from)
+    {
+    }
+    ~GrenadeSligTask() override;
+    std::string Name() const override
+    {
+        return "Throw a grenade at Slig#" + std::to_string(mSlig);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+    // Where a Slig that walks its beat (from x, that way, between those ends) is so many frames on
+    static s32 SligIn(s32 x, bool left, s32 beatMin, s32 beatMax, s32 frames);
+    // A Slig walks this far in a hundred frames
+    static constexpr s32 kPace = 220;
+    // The frames from the throw begun until the Slig is to be where the grenade goes off
+    static constexpr s32 kAhead = 86;
+
+private:
+    u32 mSlig;
+    s32 mFrom;
+    std::unique_ptr<GoToTask> mGo;
+    s32 mGoNode = -1;
+    std::vector<s32> mNoWay;
+    // 0 to the place and until the moment, 1 the grenade is in his hand, 2 thrown
+    s32 mPhase = 0;
+    s32 mWait = 0;
+    s32 mHeld = 0;
+    s32 mSettle = 0;
+    s32 mLost = 0;
+    // The throw chosen: how, and where it goes off
+    ThrowSpot::Kind mKind = ThrowSpot::eUp;
+    s32 mLandX = 0;
+};
+
 // Walk, hop, climb... to a cell the goal accepts, by the nav graph
 class GoToTask final : public Task
 {

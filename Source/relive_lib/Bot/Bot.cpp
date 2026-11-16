@@ -210,6 +210,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<FartBombTask>(step.mEntity, step.mOther, step.mEdge);
         case StepKind::eDrink:
             return std::make_unique<DrinkTask>(step.mEntity);
+        case StepKind::eGrenade:
+            return std::make_unique<GrenadeSligTask>(step.mEntity, step.mEdge);
         case StepKind::eFlierBomb:
             return std::make_unique<FlierBombTask>(step.mEntity, step.mEdge);
         case StepKind::eFlierPull:

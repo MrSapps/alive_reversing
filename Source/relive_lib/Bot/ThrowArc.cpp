@@ -249,8 +249,17 @@ ThrowArc::Flight ThrowArc::FlyGrenade(const NavInput& in, s32 x, s32 y, bool hal
             velY += 1.0;
             px += velX;
             py += velY;
-            const NavLine* line = velY > 0.0 ? FirstCrossed(in, fromX, fromY, px, py, floorType, floorType, &hitX, &hitY) : nullptr;
-            if (line)
+            // (AE's comes back down off a floor it flies up under, as fast along; AO's goes through it)
+            // (going up from a floor it has just come back off, it is not under that floor)
+            const NavLine* line = velY > 0.0 ? FirstCrossed(in, fromX, fromY, px, py, floorType, floorType, &hitX, &hitY) : in.mIsAe ? FirstCrossed(in, fromX, fromY - 0.01, px, py, floorType, floorType, &hitX, &hitY) : nullptr;
+            if (line && velY <= 0.0)
+            {
+                px = hitX;
+                py = hitY + 0.01;
+                velY = -velY / 2.0;
+                flight.mUnder = true;
+            }
+            else if (line)
             {
                 py = hitY;
                 if (velY < 1.0 + 1e-9)
@@ -295,6 +304,11 @@ ThrowArc::Flight ThrowArc::FlyGrenade(const NavInput& in, s32 x, s32 y, bool hal
         }
     }
     return flight;
+}
+
+ThrowArc::Flight ThrowArc::Grenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind)
+{
+    return FlyGrenade(in, x, y, half, left, kind, nullptr);
 }
 
 // The rock's box, five lower, on the mine's (measured: the rock's is 4 or 5 either side of it and 9 or 10 to 2

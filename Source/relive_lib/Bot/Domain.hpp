@@ -96,6 +96,8 @@ enum class StepKind : u8
                 // at the Sligs it can get at (Domain::FlierTargets)
     eFlierPull, // from the cell mEdge take over the flying Slig that spawner mEntity makes and pull lever mOther
                 // with it
+    eGrenade,   // throw a grenade at Slig mEntity from the stretch of floor of the cell mEdge
+                // (Domain::GrenadeTargets)
 };
 
 // What a planned action means to the bot
@@ -187,6 +189,36 @@ struct Domain final
         std::vector<std::pair<s32, s32>> mNeeds;
     };
     static std::vector<FlierTarget> FlierTargets(const NavInput& in, const World& world, const Entity& spawner);
+    // A Slig that a grenade from a boom machine is thrown at: one he can't take over (a security orb on its
+    // screen) on a floor with no shadow to go by it in, in a path with such a machine. The stretch of its floor
+    // that is on its screen, and where a grenade thrown comes to lie on that stretch (ThrowArc::Grenade): from
+    // a cell of another floor, far enough from where it goes off, the cells he isn't seen in first.
+    struct GrenadeShot final
+    {
+        // The cell thrown from (its middle, its floor), and how
+        s32 mX = 0;
+        s32 mY = 0;
+        bool mFaceLeft = false;
+        ThrowSpot::Kind mKind = ThrowSpot::eUp;
+        // Where it goes off
+        s32 mLandX = 0;
+        // He isn't seen in that cell (an invisible zone)
+        bool mHidden = false;
+    };
+    struct GrenadeTarget final
+    {
+        u32 mSlig = 0;
+        s32 mFloorY = 0;
+        s32 mX1 = 0;
+        s32 mX2 = 0;
+        std::vector<GrenadeShot> mShots;
+    };
+    static std::vector<GrenadeTarget> GrenadeTargets(const NavInput& in, const World& world);
+    // How near where a grenade goes off a Slig is sure to be in its blast (the blast is 60 to each side and a
+    // Slig 24), and how far from it a cell has to be to throw from (ThrowArc::kGrenadeKillX)
+    static const s32 kGrenadeSure = 60;
+    // How far up or down from such a Slig's floor a cell counts as on it
+    static const s32 kGrenadeFloorY = 30;
     // A way through the air for a flying Slig (FartFlight::Route) that keeps to the screens the path has:
     // those with something of its floors and walls in them. Past the last screen there is nothing to stop a
     // way on the grid, and nothing to fly in either.

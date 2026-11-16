@@ -3026,6 +3026,181 @@ TaskStep BlowMineTask::Next(Bot& bot, const std::string& lastFailed)
     return TaskStep::Do(Prim::Wait(6, Btn::eThrow | AimBits(spot->mKind, abe.mFacingLeft)));
 }
 
+GrenadeSligTask::~GrenadeSligTask() = default;
+
+s32 GrenadeSligTask::SligIn(s32 x, bool left, s32 beatMin, s32 beatMax, s32 frames)
+{
+    if (beatMax <= beatMin)
+    {
+        return x;
+    }
+    // Along its beat and back: where it is on the way there and back again
+    const s32 length = beatMax - beatMin;
+    x = std::max(beatMin, std::min(beatMax, x));
+    s32 at = left ? 2 * length - (x - beatMin) : x - beatMin;
+    at = (at + frames * kPace / 100) % (2 * length);
+    return beatMin + (at <= length ? at : 2 * length - at);
+}
+
+TaskStep GrenadeSligTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const NavGraph& nav = bot.Nav();
+    const World& world = bot.GetWorld();
+    const AbeState& abe = bot.Abe();
+    const Entity* slig = world.Find(mSlig);
+    if (!slig)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    if (slig->mGone)
+    {
+        // Let the blast die down, and up off his knees
+        if (mSettle++ < 4)
+        {
+            return TaskStep::Do(Prim::Wait(10));
+        }
+        if (abe.mMove == Move::eCrouch)
+        {
+            return TaskStep::Do(Prim::Press(Btn::eUp));
+        }
+        bot.Log("the grenade got Slig#" + std::to_string(mSlig));
+        return TaskStep::Done();
+    }
+    const SligAt* live = nullptr;
+    for (const SligAt& s : world.mSligs)
+    {
+        if (s.mSeen && !s.mPossessed && s.mHalf == slig->mHalf && std::abs(s.mY - slig->mY2) <= 40 && std::abs(s.mX - slig->CentreX()) <= 300 && (!live || std::abs(s.mX - slig->CentreX()) < std::abs(live->mX - slig->CentreX())))
+        {
+            live = &s;
+        }
+    }
+    if (mPhase == 2)
+    {
+        // Down before it goes off
+        mWait += 5;
+        if (abe.mMove == Move::eIdle)
+        {
+            return TaskStep::Do(Prim::Press(Btn::eDown));
+        }
+        if (mWait < 130)
+        {
+            return TaskStep::Do(Prim::Wait(5));
+        }
+        bot.Log("the grenade that was to go off at " + std::to_string(mLandX) + " did not get Slig#" + std::to_string(mSlig) + (live ? " (it is at " + std::to_string(live->mX) + ")" : ""));
+        return TaskStep::Failed("the grenade missed");
+    }
+    if (world.mRocks <= 0 && mPhase == 0)
+    {
+        return TaskStep::Failed("no grenade");
+    }
+    if (mPhase == 1)
+    {
+        mPhase = 2;
+        mWait = 0;
+        return TaskStep::Do(Prim::Wait(6, Btn::eThrow | BlowMineTask::AimBits(mKind, abe.mFacingLeft)));
+    }
+    TaskStep step;
+    if (!RunGo(mGo, bot, lastFailed, step))
+    {
+        return step;
+    }
+    if (step.mKind == TaskStep::Kind::eFailed)
+    {
+        mNoWay.push_back(mGoNode);
+    }
+    const s32 cur = bot.AbeNode();
+    if (cur < 0 || abe.mMove == Move::eHang)
+    {
+        if (++mLost > 60)
+        {
+            return TaskStep::Failed("off the nav graph");
+        }
+        return TaskStep::Do(abe.mMove == Move::eHang ? Prim::Press(Btn::eUp) : Prim::Wait(4));
+    }
+    mLost = 0;
+    const Domain::GrenadeTarget* target = nullptr;
+    const std::vector<Domain::GrenadeTarget> targets = Domain::GrenadeTargets(nav.Input(), world);
+    for (const Domain::GrenadeTarget& t : targets)
+    {
+        if (t.mSlig == mSlig)
+        {
+            target = &t;
+        }
+    }
+    if (!target)
+    {
+        return TaskStep::Failed("nowhere to throw a grenade at the Slig from");
+    }
+    // The cell to throw from: on the stretch of floor planned, where he isn't seen first, the nearest of those
+    const std::vector<s32> regions = nav.Regions();
+    const s32 want = mFrom >= 0 && mFrom < static_cast<s32>(regions.size()) ? regions[mFrom] : -1;
+    s32 node = -1;
+    s32 best = 0;
+    for (const Domain::GrenadeShot& shot : target->mShots)
+    {
+        const s32 n = nav.NodeAt(shot.mX, shot.mY, slig->mHalf, 12);
+        if (n < 0 || (want >= 0 && regions[n] != want) || std::find(mNoWay.begin(), mNoWay.end(), n) != mNoWay.end())
+        {
+            continue;
+        }
+        const s32 score = (shot.mHidden ? 0 : 100000) + std::abs(shot.mX - abe.mX) + std::abs(shot.mY - abe.mY);
+        if (node < 0 || score < best)
+        {
+            node = n;
+            best = score;
+        }
+    }
+    if (node < 0)
+    {
+        return TaskStep::Failed("no place left to throw a grenade at the Slig from");
+    }
+    if (cur != node)
+    {
+        mGoNode = node;
+        mGo = GoToNode(node);
+        return Next(bot, "");
+    }
+    if (!abe.Settled())
+    {
+        return TaskStep::Do(Prim::Wait(2));
+    }
+    if (abe.mMove == Move::eCrouch)
+    {
+        return TaskStep::Do(Prim::Press(Btn::eUp));
+    }
+    // The throw from here that goes off where the Slig will be by then
+    const Domain::GrenadeShot* shot = nullptr;
+    const s32 beatMin = live && live->mBeatMax > live->mBeatMin ? live->mBeatMin : target->mX1;
+    const s32 beatMax = live && live->mBeatMax > live->mBeatMin ? live->mBeatMax : target->mX2;
+    const s32 then = live ? SligIn(live->mX, live->mFacingLeft, beatMin, beatMax, kAhead) : slig->CentreX();
+    for (const Domain::GrenadeShot& s : target->mShots)
+    {
+        if (nav.NodeAt(s.mX, s.mY, slig->mHalf, 12) == node && live && std::abs(then - s.mLandX) <= Domain::kGrenadeSure - 15 && (!shot || std::abs(then - s.mLandX) < std::abs(then - shot->mLandX)))
+        {
+            shot = &s;
+        }
+    }
+    if (!shot)
+    {
+        if (++mHeld > 400)
+        {
+            bot.Log("Slig#" + std::to_string(mSlig) + " never comes to where a grenade from " + std::to_string(abe.mX) + "," + std::to_string(abe.mY) + " goes off");
+            mNoWay.push_back(node);
+            mHeld = 0;
+        }
+        return TaskStep::Do(Prim::Wait(2));
+    }
+    if (abe.mFacingLeft != shot->mFaceLeft)
+    {
+        return TaskStep::Do(Prim::Face(shot->mFaceLeft));
+    }
+    mPhase = 1;
+    mKind = shot->mKind;
+    mLandX = shot->mLandX;
+    bot.Log("a grenade for Slig#" + std::to_string(mSlig) + " (at " + std::to_string(live->mX) + ", to be at " + std::to_string(then) + "): from " + std::to_string(abe.mX) + "," + std::to_string(abe.mY) + ", throw " + std::to_string(static_cast<s32>(mKind)) + ", to go off at " + std::to_string(mLandX));
+    return TaskStep::Do(Prim::Wait(8, Btn::eThrow));
+}
+
 const UxbAt* DisarmTask::Under(const World& world, s32 fromX, s32 toX, s32 y, bool half)
 {
     const s32 lo = std::min(fromX, toX);
