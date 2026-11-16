@@ -755,6 +755,11 @@ struct World final
                 {
                     return e.mGone ? 1 : 0;
                 }
+                // (a security orb that a grenade has got: the switch that stands for it being gone)
+                if (e.mKind == EntityKind::eSecurityOrb && HazardSwitch(e.mId) == id)
+                {
+                    return e.mGone ? 1 : 0;
+                }
                 if (e.mKind == EntityKind::ePantsLocker && e.mSwitch == id)
                 {
                     for (const Entity& c : mEntities)

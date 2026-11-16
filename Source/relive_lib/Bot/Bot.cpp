@@ -2770,6 +2770,13 @@ std::unique_ptr<Task> Bot::MakeFlee()
             {
                 continue;
             }
+            // (not one that stands with its back to him: he has come up behind it on purpose, and a run from
+            // there is what turns it round. The Barracks' path 7: at the boom machine, 150 behind the Slig that
+            // stands at 462 for 120 frames each way.)
+            if (mIsAe && slig.mMotion == 0 && slig.mFacingLeft == (mAbe.mX > slig.mX))
+            {
+                continue;
+            }
             const NavGraph* graph = &nav;
             const s32 floorY = mAbe.mY;
             const auto away = [graph, floorY](s32 n)

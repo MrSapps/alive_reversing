@@ -2272,8 +2272,33 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
     d.mStart.Set(Key::kInvisNow, world.mInvisCharge || world.mInvisible || world.mInvisComing ? 1 : 0);
 
     // From region to region
-    std::set<std::tuple<s32, s32, s32>> seen;
+    // (one way for each pair of regions and each thing that shuts it: the first there is, but one that does not
+    // come onto a floor a Slig walks before one that does. The Barracks' path 7: of the ways up from 862,200 the
+    // first in the list was a running jump onto the ledge the Slig walks, and the hoist beside it onto the
+    // other ledge was never looked at.)
     const std::vector<NavEdge>& edges = nav.Edges();
+    std::map<std::tuple<s32, s32, s32>, std::pair<s32, std::size_t>> cheapest;
+    for (std::size_t i = 0; i < edges.size(); i++)
+    {
+        const NavEdge& e = edges[i];
+        const s32 rf = d.mRegions[e.mFrom];
+        const s32 rt = d.mRegions[e.mTo];
+        if (rf == rt || (edgeUsable && !edgeUsable(static_cast<s32>(i))))
+        {
+            continue;
+        }
+        const bool barrier = nav.Condition(e, nullptr, nullptr);
+        const s32 beatTo = SligBeat(nav, world, e.mTo);
+        // (only that counts: among ways that are alike in it the first stays the one, as it always was. With
+        // the cheapest by frames the Mudanchee trial went from no deaths to twenty-two.)
+        const s32 cost = beatTo >= 0 && beatTo != SligBeat(nav, world, e.mFrom) ? 1 : 0;
+        const auto key = std::make_tuple(rf, rt, barrier ? e.mFeature : -1);
+        const auto found = cheapest.find(key);
+        if (found == cheapest.end() || cost < found->second.first)
+        {
+            cheapest[key] = {cost, i};
+        }
+    }
     for (std::size_t i = 0; i < edges.size(); i++)
     {
         const NavEdge& e = edges[i];
@@ -2286,7 +2311,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         s32 condSwitch = 0;
         s32 condValue = 0;
         const bool barrier = nav.Condition(e, &condSwitch, &condValue);
-        if (!seen.insert(std::make_tuple(rf, rt, barrier ? e.mFeature : -1)).second)
+        if (cheapest[std::make_tuple(rf, rt, barrier ? e.mFeature : -1)].second != i)
         {
             continue;
         }
@@ -2984,6 +3009,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                     {
                         const NavNode& at = nav.Nodes()[node];
                         bool watched = false;
+                        std::set<u32> orbs;
                         for (const SligAt& slig : world.Threats())
                         {
                             if (slig.mAsleep || slig.mPossessed || slig.mHalf != at.mHalf || std::abs(slig.mY - at.mY) > 45 || std::abs(slig.mX - at.mX) >= 450)
@@ -2992,6 +3018,11 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                             }
                             for (const Entity& orb : world.mEntities)
                             {
+                                if (orb.mKind == EntityKind::eSecurityOrb && !orb.mGone &&
+                                    (nav.CameraOf(orb.mX1, orb.mY1) == nav.CameraOf(slig.mX, slig.mY - 5) || nav.CameraOf(orb.mX1, orb.mY1) == nav.CameraOf(at.mX, at.mY - 5)))
+                                {
+                                    orbs.insert(orb.mId);
+                                }
                                 // (its screen or the thing's: its beat may cross both)
                                 watched = watched || (orb.mKind == EntityKind::eSecurityOrb && !orb.mGone &&
                                                       (nav.CameraOf(orb.mX1, orb.mY1) == nav.CameraOf(slig.mX, slig.mY - 5) || nav.CameraOf(orb.mX1, orb.mY1) == nav.CameraOf(at.mX, at.mY - 5)));
@@ -3008,10 +3039,26 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                         {
                             power = power || (lock.mKind == EntityKind::eSlapLock && lock.mInputs[0] > 0);
                         }
+                        // (or, in a path with a boom machine, with that orb blown up first: then the Sligs are taken
+                        // over as anywhere. The walkthrough of the Barracks' Slig bunks: "throw the grenade forward on
+                        // the fifth beep to blow up the Chant Protector along with the Slig. Possess and kill the
+                        // bottom Sligs, then go down to pull the lever".)
+                        bool boom = false;
+                        for (const Entity& machine : world.mEntities)
+                        {
+                            boom = boom || (machine.mKind == EntityKind::eRockSack && machine.mInputs[1] == 2 && !machine.mGone);
+                        }
                         if (watched && power)
                         {
                             pre.push_back({Key::kInvisNow, 1});
                             watchedOrb = true;
+                        }
+                        else if (watched && boom)
+                        {
+                            for (u32 orb : orbs)
+                            {
+                                pre.push_back({Key::Switch(World::HazardSwitch(orb)), 1});
+                            }
                         }
                     }
                     // (one that opens such a gate by way of something else, a timer in the Mudanchee vault's path 4,
@@ -4213,6 +4260,13 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
     // dead nothing is crossed onto its floor (FeatureKind::eDanger). (The Barracks' path 1: "From the shadows on
     // the far left, toss the grenade to the middle ledge... Stand on the middle ledge and toss it to the Slig at
     // the top".)
+    for (const Entity& orb : world.mEntities)
+    {
+        if (orb.mKind == EntityKind::eSecurityOrb && orb.mGone)
+        {
+            d.mStart.Set(Key::Switch(World::HazardSwitch(orb.mId)), 1);
+        }
+    }
     for (const GrenadeTarget& target : GrenadeTargets(nav.Input(), world))
     {
         const Entity* slig = world.Find(target.mSlig);
@@ -4229,7 +4283,11 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             toss.mEntity = target.mSlig;
             toss.mEdge = node;
             // (from where he isn't seen before anywhere else)
-            add("Throw a grenade at Slig#" + std::to_string(target.mSlig) + " from " + std::to_string(shot.mX) + "," + std::to_string(shot.mY), {regionFact(node)}, {{Key::Switch(World::HazardSwitch(target.mSlig)), 1}}, shot.mHidden ? 400 : 600, toss);
+            // (a security orb over that floor is not got with it: tried in the Barracks' path 7, where the one at
+            // 450,40 hangs 40 to 60 over the floor the grenade went off on at 435 and was still there. The
+            // walkthrough has it thrown "on the fifth beep", to go off in the air by the orb: not built.)
+            const std::vector<Goap::Fact> blown{{Key::Switch(World::HazardSwitch(target.mSlig)), 1}};
+            add("Throw a grenade at Slig#" + std::to_string(target.mSlig) + " from " + std::to_string(shot.mX) + "," + std::to_string(shot.mY), {regionFact(node)}, blown, shot.mHidden ? 400 : 600, toss);
             d.mActions.back().mSpend = {Key::kRocks, 1};
         }
     }
