@@ -8335,14 +8335,36 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
         mLeverKnown = true;
         mLeverWas = world.Switch(lever->mSwitch);
     }
-    // With a Slig lock: done when that is open
-    const Entity* lock = mLock ? world.Find(mLock) : nullptr;
+    // The one flying Slig does all a flying Slig is wanted for before it is burst (there may be no other): sent
+    // for the Sligs, a Slig lock that is shut and near is opened first; sent for a lock, the Sligs are bombed
+    // after. (The walkthrough of the Barracks' Slig bunks: "Talk to the Slig Lock... then fly your Slig all
+    // the way to the bottom, then left, then up the middle of this area. Kill the Sligs along the way".)
+    if (!mLock && !mLever && flown.mLive)
+    {
+        for (const Entity& e : world.mEntities)
+        {
+            if (!mLock && e.mKind == EntityKind::eSligLock && e.mSwitch > 1 && world.Switch(e.mSwitch) == 0 && world.mLockCodes.count(e.mId) != 0 && e.mHalf == flown.mHalf &&
+                std::abs(e.CentreX() - flown.mX100 / 100) + std::abs((e.mY1 + e.mY2) / 2 - flown.mY100 / 100) <= 1200)
+            {
+                std::vector<std::pair<s32, s32>> corners;
+                const std::vector<NavLine> gatesNow = FartFlight::Gates(nav.Input(), flown.mHalf, &world);
+                if (Domain::FlierWay(nav.Input(), flown.mHalf, flown.mX100 / 100, flown.mY100 / 100, e.CentreX(), (e.mY1 + e.mY2) / 2, &gatesNow, corners))
+                {
+                    mLock = e.mId;
+                    bot.Log("SligLock#" + std::to_string(e.mId) + " is shut and the flying Slig can get to it: that first");
+                }
+            }
+        }
+    }
+    // With a Slig lock: that until it is open
+    const Entity* lockEntity = mLock ? world.Find(mLock) : nullptr;
     const auto code = world.mLockCodes.find(mLock);
-    if (mLock && (!lock || code == world.mLockCodes.end()))
+    if (mLock && (!lockEntity || code == world.mLockCodes.end()))
     {
         return TaskStep::Failed("no such lock");
     }
-    const bool nothingLeft = lock ? world.Switch(lock->mSwitch) != 0 : lever ? world.Switch(lever->mSwitch) != mLeverWas : targets.empty();
+    const Entity* lock = lockEntity && world.Switch(lockEntity->mSwitch) == 0 ? lockEntity : nullptr;
+    const bool nothingLeft = mLock ? !lock && targets.empty() : lever ? world.Switch(lever->mSwitch) != mLeverWas : targets.empty();
     if (!flown.mLive)
     {
         // Abe: before it is his, or after it is gone
@@ -8566,6 +8588,118 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
     if (mFrames % 300 == 0)
     {
         bot.Log("the flying Slig is at " + std::to_string(bx) + "," + std::to_string(by) + " going " + std::to_string(flown.mVelX100) + "," + std::to_string(flown.mVelY100) + ", state " + std::to_string(mState) + (lever ? " for the lever from " : " for Slig#" + std::to_string(mTarget) + " from ") + std::to_string(shot.mX) + "," + std::to_string(shot.mY));
+    }
+    // Another flying Slig on its screen, on the way to a lock: that one bombs the one he flies as soon as it
+    // faces it (CanChase: on the screen shown and facing what he controls; measured in the Barracks' path 7,
+    // lost 58 frames after it came up into the other's shaft). So it keeps behind the other, a hundred off at its
+    // height, and where there is no getting behind it stays where it is with its own height to the other's;
+    // and it throws when its grenade would meet the other on its way (thrown 5 over its point at 5.7 a frame
+    // along and 6 up, a pixel a frame more down each frame), no nearer than its blast leaves it alone.
+    if (lock)
+    {
+        const s32 myCam = nav.CameraOf(bx, by - 20);
+        const FlierAt* foe = nullptr;
+        for (const FlierAt& f : world.mFliers)
+        {
+            if (f.mHalf == flown.mHalf && nav.CameraOf(f.mX, f.mY - 20) == myCam &&
+                (!foe || std::abs(f.mX - bx) + std::abs(f.mY - by) < std::abs(foe->mX - bx) + std::abs(foe->mY - by)))
+            {
+                foe = &f;
+            }
+        }
+        if (foe)
+        {
+            if (flown.mCanThrow && flown.mFacingLeft == (foe->mX < bx))
+            {
+                for (s32 t = 3; t <= 18; t++)
+                {
+                    s32 gx = 0;
+                    s32 gy = 0;
+                    FlierFlight::GrenadeAt(bx, by, flown.mFacingLeft, t, gx, gy);
+                    const s32 fx = foe->mX + foe->mVelX * t / 256;
+                    const s32 fy = foe->mY + foe->mVelY * t / 256;
+                    if (std::abs(gx - fx) <= 16 && gy >= fy - 22 && gy <= fy + 8 && std::abs(fx - bx) >= 50)
+                    {
+                        mFoeThrown++;
+                        mFoeSaid = 3;
+                        bot.Log("another flying Slig at " + std::to_string(foe->mX) + "," + std::to_string(foe->mY) + ": a grenade from " + std::to_string(bx) + "," + std::to_string(by) + " to meet it in " + std::to_string(t) + " frames");
+                        return TaskStep::Do(Prim::Wait(1, Btn::eThrow));
+                    }
+                }
+            }
+            // (the way to the lock is found anew when it is gone)
+            mState = 0;
+            mLegFrames = 0;
+            const bool east = foe->mFacingLeft;
+            const bool behind = (bx > foe->mX) == east;
+            const u32 towards = foe->mX < bx ? Btn::eLeft : Btn::eRight;
+            if (behind)
+            {
+                const s32 px = foe->mX + (east ? 100 : -100);
+                std::vector<std::pair<s32, s32>> corners;
+                const std::vector<NavLine> gatesNow = FartFlight::Gates(nav.Input(), flown.mHalf, &world);
+                if (std::abs(px - bx) + std::abs(foe->mY - by) > 12 && Domain::FlierWay(nav.Input(), flown.mHalf, bx, by, px, foe->mY, &gatesNow, corners))
+                {
+                    if (mFoeSaid != 1)
+                    {
+                        mFoeSaid = 1;
+                        bot.Log("another flying Slig at " + std::to_string(foe->mX) + "," + std::to_string(foe->mY) + ": behind it, to " + std::to_string(px) + "," + std::to_string(foe->mY));
+                    }
+                    return corners.empty() ? steerTo(px, foe->mY) : steerTo(corners[0].first, corners[0].second);
+                }
+            }
+            // In front of it, and it is not coming at him (then it is waited for with a grenade, at about its
+            // height): back off its screen, and round to come onto it from behind where it was
+            const bool coming = (foe->mVelX > 0) == (bx > foe->mX) && foe->mVelX != 0;
+            if (!behind && !coming && mHasSafe)
+            {
+                if (mFoeSaid != 4)
+                {
+                    mFoeSaid = 4;
+                    bot.Log("another flying Slig at " + std::to_string(foe->mX) + "," + std::to_string(foe->mY) + " facing " + (foe->mFacingLeft ? "left" : "right") + ": in front of it at " + std::to_string(bx) + "," + std::to_string(by) + ", back to " + std::to_string(mSafeX) + "," + std::to_string(mSafeY));
+                }
+                mFoeX = foe->mX;
+                mFoeLeft = foe->mFacingLeft;
+                mFoeRound = true;
+                mFoeRoundFrames = 0;
+                return steerTo(mSafeX, mSafeY);
+            }
+            if (mFoeSaid != 2)
+            {
+                mFoeSaid = 2;
+                bot.Log("another flying Slig at " + std::to_string(foe->mX) + "," + std::to_string(foe->mY) + (behind ? ": no way behind it, staying at " : ": coming at him, waited for at ") + std::to_string(bx) + "," + std::to_string(by));
+            }
+            // (where it is, about the other's height if that is a way off, and facing it)
+            if (still && flown.mMotion == 0 && flown.mFacingLeft != (foe->mX < bx) && std::abs(foe->mX - bx) > 30)
+            {
+                return TaskStep::Do(Prim::Wait(1, towards));
+            }
+            return steerTo(bx, std::abs(foe->mX - bx) >= 45 ? foe->mY - 15 : by);
+        }
+        mFoeSaid = 0;
+        if (!mFoeRound)
+        {
+            mSafeX = bx;
+            mSafeY = by;
+            mHasSafe = true;
+        }
+        else
+        {
+            // Off its screen: along to the column just behind where it was, and on from there
+            const s32 column = mFoeX + (mFoeLeft ? 3 : -3);
+            std::vector<std::pair<s32, s32>> corners;
+            const std::vector<NavLine> gatesNow = FartFlight::Gates(nav.Input(), flown.mHalf, &world);
+            if (++mFoeRoundFrames > 400 || (std::abs(column - bx) <= 4 && still) || !Domain::FlierWay(nav.Input(), flown.mHalf, bx, by, column, mSafeY, &gatesNow, corners))
+            {
+                mFoeRound = false;
+                mState = 0;
+                mLegFrames = 0;
+            }
+            else
+            {
+                return corners.empty() ? steerTo(column, mSafeY) : steerTo(corners[0].first, corners[0].second);
+            }
+        }
     }
     if (mState == 4)
     {
@@ -9106,6 +9240,16 @@ TaskStep SligLockTask::Next(Bot& bot, const std::string& lastFailed)
             mShot += 2;
             const bool left = targetX < me->mX;
             return TaskStep::Do(Prim::Wait(2, me->mFacingLeft == left ? static_cast<u32>(Btn::eThrow) : static_cast<u32>(left ? Btn::eLeft : Btn::eRight)));
+        }
+        // The lock open: before it is burst, after the naked ones of its floor that are further off (they are on
+        // their way to the locker, and he has to come along this floor after)
+        for (const RockAt& crawler : world.mCrawlers)
+        {
+            if (open && mShot < 1500 && crawler.mHalf == me->mHalf && std::abs(crawler.mY - me->mY) <= 20 && std::abs(crawler.mX - me->mX) > 300 && std::abs(crawler.mX - me->mX) <= 700 && clear(crawler.mX))
+            {
+                mShot += 2;
+                return TaskStep::Do(Prim::Wait(2, crawler.mX < me->mX ? Btn::eLeft : Btn::eRight));
+            }
         }
     }
     const s32 node = nav.NodeAt(me->mX, me->mY, me->mHalf, 20);

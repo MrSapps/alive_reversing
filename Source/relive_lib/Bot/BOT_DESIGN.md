@@ -1472,13 +1472,37 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
     (its spawner's track, one that is about, a locker for wings: `World::mWingLockers`), for the cell
     furthest from all of that. From the ledge at 620 by the lock he was killed six times, 40 under the track
     of the flying Slig that lives up there; from 1137,980, with the one that has come by its wings hanging
-    at 1417,828, it is his. The step costs 1,500, so that a lock a Slig walks to is done first (that Slig
-    is what clears the armed ones off the floor he has to go along).
-  - One run with all of that: the second lock open at f=2,986, the second wheel (180) turned at f=3,512,
-    one death (before the lockers counted, at the ledge by the lock). The run after it, with no deaths:
-    his flying Slig met the one that lives by the lock on its way up and was lost, and no other came (the
-    walkthrough: "fly up and kill the other Slig"; and for another, the lever at 1200,700 and off the
-    edge to the left). Not built: a flying Slig as something to bomb or to keep clear of, and that lever.
+    at 1417,828, it is his.
+  - Why the first lock comes first is in the plan, not in a cost: the floor by a locker for guns is kept off
+    (`GameView`'s `MarkLockers`: a `FeatureKind::eDanger` 380 to either side of the locker, as for a Slig a
+    grenade is to get) while a naked Slig that is awake can get to that locker, or an armed one is about by
+    it (`World::Switch` of the locker's own switch: `EntityKind::eCrawler` has its panic switch, its locker
+    and what is shut between them; `EntityKind::ePantsLocker`). "Open SligLock with Slig" gives that
+    switch where the Slig's way goes along that floor, since it shoots them as it goes (and after the lock
+    is open it goes after the naked ones further off before it is burst); to the Slig itself such a floor
+    is not shut (`Domain::SligWay`). The place the flying Slig is taken over from is on that floor, so the
+    plan is the first lock, then the second.
+  - Another flying Slig (the one of the map lives on the screen of the second lock, and is only made when
+    that screen is first shown: with the one he flies) bombs his as soon as it faces it on the screen
+    shown (`FlyingSlig::CanChase`). In `FlierBombTask`, on the way to a lock: in front of another that is
+    not coming at him it goes back off that screen and round to the column just behind where the other
+    was; behind it, it keeps a hundred off at its height (or stays where it is with no way there); and it
+    throws when the grenade would meet the other on its way, the blast no nearer than 50. There: back at
+    f=2,092, behind it from f=2,162, two grenades at f=2,303, the other gone.
+  - One flying Slig does all a flying Slig is wanted for before it is burst: sent for the Sligs it opens a
+    lock it can get to first, sent for a lock it bombs the Sligs after (there is no second one to be had).
+    So after the lock it goes down the shaft, left along the bottom and up the middle, as the walkthrough
+    has it, and bombs the three Sligs under the orbs there (f=3,775, 4,094, 4,278). For that
+    `Domain::FlierWay` looks again with everything a little to one side where its grid finds no way: the
+    shaft between the floor's end at 1400 and the wall at 1450 leaves its point ten pixels, between two of
+    the grid's columns.
+  - A running jump off a short ledge catches the edge of the ledge across as it does a hoist
+    (`NavGraph::AddLedgeCatches`: off 1012,720, three cells long, to the edge at 887,720): the way up the
+    middle. With it he is at the top (862,200) at f=6,133 with no deaths, the second wheel turned at
+    f=4,778 on the way.
+  - `build-bot/la/blk7.txt` now: both locks, wheels 177 and 180, the middle climbed, no deaths to
+    f=6,133; then three deaths at the top, where the Sligs of the upper floor (one walks 1012..1262 at 100)
+    are under orbs and the lever, the boom machine and the last two wheels are.
   After that: the boom machine's grenades for the orbs up top, a naked Slig taken over to press the button
   at 1301,180, wheels 250 and 190.
 - **Block 4** (path 9: first try from inside its door, a scratch run).

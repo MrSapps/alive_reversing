@@ -9305,3 +9305,101 @@ TEST(BotMines, WhereHeIsFrameByFrameOfARideOnALiftIsAsMeasured)
     EXPECT_EQ(lower[6].mY, 100);
     EXPECT_EQ(lower[32].mY, 200);
 }
+
+TEST(BotNav, OffAShortLedgeARunningJumpCatchesTheEdgeOfTheLedgeAcross)
+{
+    // The Barracks' path 7 (the ledges at 720 in its middle): a ledge three cells long, a gap five cells wide and
+    // the edge of the ledge across, which faces him. With one cell of run he is hung from it.
+    NavInput in;
+    in.mLines.push_back(Line(300, 200, 375, 200, 0));
+    in.mLines.push_back(Line(75, 200, 200, 200, 0));
+    NavFeature edge = Feature(FeatureKind::eEdge, 175, 200, 205, 224);
+    edge.mA = 1;
+    edge.mDir = 0;
+    in.mFeatures.push_back(edge);
+    {
+        NavGraph g;
+        g.Build(in);
+        const s32 from = g.NodeAt(337, 200, false);
+        const s32 to = g.NodeAt(187, 200, false);
+        ASSERT_GE(from, 0);
+        ASSERT_GE(to, 0);
+        const NavEdge* jump = FindEdge(g, from, to, EdgeKind::eRunJump);
+        ASSERT_NE(jump, nullptr) << g.Text();
+        EXPECT_EQ(jump->mX, 312);
+        EXPECT_EQ(jump->mFeature, 0);
+        EXPECT_TRUE(jump->mLeft);
+    }
+    // An edge that is only caught going the other way is none
+    in.mFeatures[0].mDir = 1;
+    {
+        NavGraph g;
+        g.Build(in);
+        EXPECT_EQ(FindEdge(g, g.NodeAt(337, 200, false), g.NodeAt(187, 200, false), EdgeKind::eRunJump), nullptr) << g.Text();
+    }
+    // Nor one a cell further off
+    in.mFeatures[0].mDir = 0;
+    in.mFeatures[0].mX1 = 150;
+    in.mFeatures[0].mX2 = 180;
+    {
+        NavGraph g;
+        g.Build(in);
+        for (const NavEdge& e : g.Edges())
+        {
+            EXPECT_FALSE(e.mKind == EdgeKind::eRunJump && g.Nodes()[e.mFrom].mX >= 300 && g.Nodes()[e.mTo].mX < 300) << g.Text();
+        }
+    }
+}
+
+TEST(BotDomain, TheFloorByALockerForGunsIsKeptOffWhileANakedSligThatIsAwakeCanGetToIt)
+{
+    // The Barracks' Slig bunks: naked Sligs with a panic switch, a locker along their floor, and something shut
+    // between one of them and it
+    World world;
+    Entity locker = MakeEntity(EntityKind::ePantsLocker, 7000, 500, 80, 524, 104);
+    locker.mSwitch = World::HazardSwitch(locker.mId);
+    world.mEntities.push_back(locker);
+    Entity asleep = MakeEntity(EntityKind::eCrawler, 7001, 100, 80, 124, 104);
+    asleep.mInputs[0] = 38;
+    asleep.mInputs[1] = 7000;
+    world.mEntities.push_back(asleep);
+    Entity penned = MakeEntity(EntityKind::eCrawler, 7002, 800, 80, 824, 104);
+    penned.mInputs[0] = 1;
+    penned.mInputs[1] = 7000;
+    penned.mInputs[2] = 79;
+    penned.mInputs[3] = 1;
+    world.mEntities.push_back(penned);
+    const s32 sw = World::HazardSwitch(7000);
+    // Asleep, and the one that is always awake shut in: clear
+    EXPECT_EQ(world.Switch(sw), 1);
+    // The panic switch on: not clear, until that one is gone
+    world.mSwitches[38] = 1;
+    EXPECT_EQ(world.Switch(sw), 0);
+    world.mEntities[1].mGone = true;
+    EXPECT_EQ(world.Switch(sw), 1);
+    // What shut the other in open: not clear, until that one is gone
+    world.mSwitches[79] = 1;
+    EXPECT_EQ(world.Switch(sw), 0);
+    world.mEntities[2].mGone = true;
+    EXPECT_EQ(world.Switch(sw), 1);
+    // An armed Slig about by the locker, awake and not his: not clear
+    SligAt slig;
+    slig.mX = 700;
+    slig.mY = 100;
+    world.mSligs.push_back(slig);
+    EXPECT_EQ(world.Switch(sw), 0);
+    world.mSligs[0].mX = 512 + World::kLockerReach + 1;
+    EXPECT_EQ(world.Switch(sw), 1);
+    world.mSligs[0].mX = 700;
+    world.mSligs[0].mPossessed = true;
+    EXPECT_EQ(world.Switch(sw), 1);
+    world.mSligs[0].mPossessed = false;
+    world.mSligs[0].mY = 200;
+    EXPECT_EQ(world.Switch(sw), 1);
+    // (one of another locker's is nothing to this one)
+    Entity other = MakeEntity(EntityKind::eCrawler, 7003, 300, 80, 324, 104);
+    other.mInputs[0] = 1;
+    other.mInputs[1] = 7999;
+    world.mEntities.push_back(other);
+    EXPECT_EQ(world.Switch(sw), 1);
+}

@@ -1084,6 +1084,31 @@ void NavGraph::AddLedgeCatches(std::vector<NavEdge>& edges, s32 from, s32 dir) c
             AddEdge(edges, from, node, EdgeKind::eRunJump, kRunJumpCost + 150, hoistIdx, dir < 0);
             edges.back().mX = takeoff;
         }
+        // The edge of a ledge that faces him does the same (the Barracks' path 7: off the ledge at 1012,720, three
+        // cells long, to the edge of the one at 887, which is the walkthrough's way up the middle there)
+        for (std::size_t i = 0; floor && !mNodes[node].mHazard && !hoist && i < mInput.mFeatures.size(); i++)
+        {
+            const NavFeature& f = mInput.mFeatures[i];
+            if (f.mKind == FeatureKind::eEdge && f.mA && (f.mAnyScale || f.mHalf == n.mHalf) && (f.mDir == 2 || (f.mDir == 0) == (dir < 0)) && x >= f.mX1 - 2 && x <= f.mX2 + 2 && std::abs(f.mY1 - y) <= 12)
+            {
+                bool there = false;
+                for (const NavEdge& e : edges)
+                {
+                    there = there || (e.mFrom == from && e.mTo == node && e.mKind == EdgeKind::eRunJump);
+                }
+                // (nor beyond a ledge the same jump catches higher up on its way)
+                for (const NavFeature& up : mInput.mFeatures)
+                {
+                    there = there || (&up != &f && CatchesUp(up, takeoff, y, n.mHalf, dir));
+                }
+                if (!there)
+                {
+                    AddEdge(edges, from, node, EdgeKind::eRunJump, kRunJumpCost + 150, static_cast<s32>(i), dir < 0);
+                    edges.back().mX = takeoff;
+                }
+                break;
+            }
+        }
     }
 }
 

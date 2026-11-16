@@ -37,6 +37,8 @@ const char* EntityKindName(EntityKind kind)
         case EntityKind::eSligLock: return "SligLock";
         case EntityKind::eMine: return "Mine";
         case EntityKind::eUxb: return "UXB";
+        case EntityKind::eCrawler: return "Crawler";
+        case EntityKind::ePantsLocker: return "Locker";
         case EntityKind::eRockSack: return "RockSack";
         case EntityKind::eBrew: return "Brew";
         case EntityKind::eFlier: return "FlyingSlig";
@@ -744,7 +746,9 @@ std::vector<s32> Domain::SligWay(const NavGraph& nav, s32 from, const std::funct
             s32 switchId = 0;
             s32 openValue = 0;
             // (a teleporter goes when its lever is pulled: no gate)
-            if (e.mKind != EdgeKind::eTeleport && nav.Condition(e, &switchId, &openValue))
+            // (nor is a floor Abe is kept off for what is on it shut to a Slig: it shoots what it meets there)
+            const bool danger = e.mClear >= 0 && nav.Input().mFeatures[e.mClear].mKind == FeatureKind::eDanger;
+            if (e.mKind != EdgeKind::eTeleport && !danger && nav.Condition(e, &switchId, &openValue))
             {
                 if (world && !gates)
                 {
@@ -3567,6 +3571,14 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 break;
             }
 
+            case EntityKind::ePantsLocker:
+                // (the floor by it is clear as things are)
+                if (world.Switch(entity.mSwitch))
+                {
+                    d.mStart.Set(Key::Switch(entity.mSwitch), 1);
+                }
+                break;
+
             case EntityKind::eUxb:
             {
                 if (entity.mGone)
@@ -4384,14 +4396,12 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             {
                 continue;
             }
-            // (dear: the wait for it to come by, the chant, the flight and the talk were 870 frames there, and a
-            // lock a Slig can walk to is the one to do first)
             DomainStep speak;
             speak.mKind = StepKind::eFlierLock;
             speak.mEntity = spawner.mId;
             speak.mOther = lock.mId;
             speak.mEdge = spot;
-            add("Open SligLock#" + std::to_string(lock.mId) + " sw" + std::to_string(lock.mSwitch) + " with the flying Slig of FlierSpawner#" + std::to_string(spawner.mId), {regionFact(spot)}, {{Key::Switch(lock.mSwitch), 1}}, 1500, speak);
+            add("Open SligLock#" + std::to_string(lock.mId) + " sw" + std::to_string(lock.mSwitch) + " with the flying Slig of FlierSpawner#" + std::to_string(spawner.mId), {regionFact(spot)}, {{Key::Switch(lock.mSwitch), 1}}, 900, speak);
         }
     }
 
@@ -4448,6 +4458,23 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 // (what it opens itself is no gate on its way)
                 pre.erase(std::remove(pre.begin(), pre.end(), Goap::Fact{Key::Switch(lock.mSwitch), 1}), pre.end());
                 std::vector<Goap::Fact> gives{{Key::Switch(lock.mSwitch), 1}};
+                // (the naked Sligs and the armed ones on the floor it walks it shoots: the floor by a locker
+                // for guns that its way goes along is clear after)
+                for (const Entity& locker : world.mEntities)
+                {
+                    bool along = false;
+                    for (s32 edge : way)
+                    {
+                        const NavNode& n = nav.Nodes()[nav.Edges()[edge].mTo];
+                        along = along || (n.mHalf == locker.mHalf && std::abs(n.mY - locker.mY2) <= 30 && std::abs(n.mX - locker.CentreX()) <= World::kLockerReach);
+                    }
+                    if (locker.mKind == EntityKind::ePantsLocker && along)
+                    {
+                        gives.push_back({Key::Switch(locker.mSwitch), 1});
+                        // (and that floor is no gate on its way: it is what clears it)
+                        pre.erase(std::remove(pre.begin(), pre.end(), Goap::Fact{Key::Switch(locker.mSwitch), 1}), pre.end());
+                    }
+                }
                 for (u32 met : SligsMet(nav, world, start, way, slig.mId))
                 {
                     gives.push_back({Key::Mud(met), 2});
@@ -5217,7 +5244,39 @@ bool Domain::FlierWay(const NavInput& in, bool half, s32 fromX, s32 fromY, s32 t
     std::vector<FartFlight::Point> way;
     if (!FartFlight::Route(in, half, FartFlight::Point{fromX, fromY}, FartFlight::Point{toX, toY}, 2000, way, nullptr, &more))
     {
-        return false;
+        // The way is looked for on a grid 25 wide, and a gap it fits through with little to spare may lie
+        // between two of the grid's columns: looked for again with everything a little to one side. (The
+        // Barracks' path 7: down the shaft between the end of the floor at 1400 and the wall at 1450, which
+        // leaves its point ten pixels, 1420 to 1430: the walkthrough's "fly your Slig all the way to the bottom".)
+        bool found = false;
+        for (const s32 shift : {12, 6, 18})
+        {
+            NavInput moved = in;
+            for (NavLine& line : moved.mLines)
+            {
+                line.mX1 += shift;
+                line.mX2 += shift;
+            }
+            std::vector<NavLine> movedMore = more;
+            for (NavLine& line : movedMore)
+            {
+                line.mX1 += shift;
+                line.mX2 += shift;
+            }
+            if (FartFlight::Route(moved, half, FartFlight::Point{fromX + shift, fromY}, FartFlight::Point{toX + shift, toY}, 2000, way, nullptr, &movedMore))
+            {
+                for (FartFlight::Point& p : way)
+                {
+                    p.mX -= shift;
+                }
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+        {
+            return false;
+        }
     }
     std::set<std::pair<s32, s32>> screens;
     for (const NavLine& line : in.mLines)
