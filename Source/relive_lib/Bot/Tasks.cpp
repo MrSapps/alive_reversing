@@ -4274,7 +4274,26 @@ TaskStep GrenadeSligTask::Next(Bot& bot, const std::string& lastFailed)
     {
         return TaskStep::Failed("no such entity");
     }
-    if (slig->mGone)
+    // (a locker for guns stands for the Sligs that came by theirs at it: one fewer of them is this grenade's work)
+    const bool locker = slig->mKind == EntityKind::ePantsLocker;
+    const SligAt* live = nullptr;
+    s32 about = 0;
+    for (const SligAt& s : world.mSligs)
+    {
+        if (s.mSeen && !s.mPossessed && s.mHalf == slig->mHalf && std::abs(s.mY - slig->mY2) <= 40 && std::abs(s.mX - slig->CentreX()) <= (locker ? 600 : 300))
+        {
+            about++;
+            if (!live || std::abs(s.mX - slig->CentreX()) < std::abs(live->mX - slig->CentreX()))
+            {
+                live = &s;
+            }
+        }
+    }
+    if (locker && mAbout < 0)
+    {
+        mAbout = about;
+    }
+    if (locker ? (about < mAbout && mPhase == 2) || about == 0 : slig->mGone)
     {
         // Let the blast die down, and up off his knees
         if (mSettle++ < 4)
@@ -4285,21 +4304,18 @@ TaskStep GrenadeSligTask::Next(Bot& bot, const std::string& lastFailed)
         {
             return TaskStep::Do(Prim::Press(Btn::eUp));
         }
-        bot.Log("the grenade got Slig#" + std::to_string(mSlig));
+        bot.Log(locker ? "the grenade got a Slig by Locker#" + std::to_string(mSlig) + ": " + std::to_string(about) + " left" : "the grenade got Slig#" + std::to_string(mSlig));
         return TaskStep::Done();
-    }
-    const SligAt* live = nullptr;
-    for (const SligAt& s : world.mSligs)
-    {
-        if (s.mSeen && !s.mPossessed && s.mHalf == slig->mHalf && std::abs(s.mY - slig->mY2) <= 40 && std::abs(s.mX - slig->CentreX()) <= 300 && (!live || std::abs(s.mX - slig->CentreX()) < std::abs(live->mX - slig->CentreX())))
-        {
-            live = &s;
-        }
     }
     if (mPhase == 2)
     {
         // Down before it goes off
         mWait += 5;
+        for (const RockAt& r : world.mRocksFlying)
+        {
+            mSeenX = r.mX;
+            mSeenY = r.mY;
+        }
         if (abe.mMove == Move::eIdle)
         {
             return TaskStep::Do(Prim::Press(Btn::eDown));
@@ -4308,7 +4324,7 @@ TaskStep GrenadeSligTask::Next(Bot& bot, const std::string& lastFailed)
         {
             return TaskStep::Do(Prim::Wait(5));
         }
-        bot.Log("the grenade that was to go off at " + std::to_string(mLandX) + " did not get Slig#" + std::to_string(mSlig) + (live ? " (it is at " + std::to_string(live->mX) + ")" : ""));
+        bot.Log("the grenade that was to go off at " + std::to_string(mLandX) + " did not get Slig#" + std::to_string(mSlig) + " (it was last seen on its way at " + std::to_string(mSeenX) + "," + std::to_string(mSeenY) + ")" + (live ? " (it is at " + std::to_string(live->mX) + ")" : ""));
         return TaskStep::Failed("the grenade missed");
     }
     if (world.mRocks <= 0 && mPhase == 0)
@@ -4358,18 +4374,23 @@ TaskStep GrenadeSligTask::Next(Bot& bot, const std::string& lastFailed)
     const s32 want = mFrom >= 0 && mFrom < static_cast<s32>(regions.size()) ? regions[mFrom] : -1;
     s32 node = -1;
     s32 best = 0;
-    for (const Domain::GrenadeShot& shot : target->mShots)
+    // (one that stands: from where a grenade goes off by where it stands, if there is such a place; a wait
+    // anywhere else is for nothing)
+    for (s32 pass = live && live->mMotion == 0 ? 0 : 1; pass < 2 && node < 0; pass++)
     {
-        const s32 n = nav.NodeAt(shot.mX, shot.mY, slig->mHalf, 12);
-        if (n < 0 || (want >= 0 && regions[n] != want) || std::find(mNoWay.begin(), mNoWay.end(), n) != mNoWay.end())
+        for (const Domain::GrenadeShot& shot : target->mShots)
         {
-            continue;
-        }
-        const s32 score = (shot.mHidden ? 0 : 100000) + std::abs(shot.mX - abe.mX) + std::abs(shot.mY - abe.mY);
-        if (node < 0 || score < best)
-        {
-            node = n;
-            best = score;
+            const s32 n = nav.NodeAt(shot.mX, shot.mY, slig->mHalf, 12);
+            if (n < 0 || (want >= 0 && regions[n] != want) || std::find(mNoWay.begin(), mNoWay.end(), n) != mNoWay.end() || (pass == 0 && std::abs(live->mX - shot.mLandX) > Domain::kGrenadeSure - 15))
+            {
+                continue;
+            }
+            const s32 score = (shot.mHidden ? 0 : 100000) + std::abs(shot.mX - abe.mX) + std::abs(shot.mY - abe.mY);
+            if (node < 0 || score < best)
+            {
+                node = n;
+                best = score;
+            }
         }
     }
     if (node < 0)
@@ -4397,7 +4418,8 @@ TaskStep GrenadeSligTask::Next(Bot& bot, const std::string& lastFailed)
     const bool beat = live && live->mBeatMax > live->mBeatMin && live->mX >= live->mBeatMin - 30 && live->mX <= live->mBeatMax + 30;
     const s32 beatMin = beat ? live->mBeatMin : target->mX1;
     const s32 beatMax = beat ? live->mBeatMax : target->mX2;
-    const s32 then = live ? SligIn(live->mX, live->mFacingLeft, beatMin, beatMax, kAhead) : slig->CentreX();
+    // (one that stands is taken to stay: the ones from a locker stand about)
+    const s32 then = live && locker && live->mMotion == 0 ? live->mX : live ? SligIn(live->mX, live->mFacingLeft, beatMin, beatMax, kAhead) : slig->CentreX();
     for (const Domain::GrenadeShot& s : target->mShots)
     {
         if (nav.NodeAt(s.mX, s.mY, slig->mHalf, 12) == node && live && std::abs(then - s.mLandX) <= Domain::kGrenadeSure - 15 && (!shot || std::abs(then - s.mLandX) < std::abs(then - shot->mLandX)))
@@ -4436,6 +4458,145 @@ TaskStep GrenadeSligTask::Next(Bot& bot, const std::string& lastFailed)
     mLandX = shot->mLandX;
     bot.Log("a grenade for Slig#" + std::to_string(mSlig) + " (at " + std::to_string(live->mX) + ", to be at " + std::to_string(then) + "): from " + std::to_string(abe.mX) + "," + std::to_string(abe.mY) + ", throw " + std::to_string(static_cast<s32>(mKind)) + ", to go off at " + std::to_string(mLandX));
     return TaskStep::Do(Prim::Wait(8, Btn::eThrow));
+}
+
+CrawlerButtonTask::~CrawlerButtonTask() = default;
+
+TaskStep CrawlerButtonTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const NavGraph& nav = bot.Nav();
+    const World& world = bot.GetWorld();
+    const Entity* button = world.Find(mButton);
+    if (!button)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    const SligAt* me = nullptr;
+    for (const SligAt& s : world.mSligs)
+    {
+        if (s.mPossessed)
+        {
+            me = &s;
+        }
+    }
+    const bool pressed = mPresses > 0 && world.Switch(button->mSwitch) != (mWas ? 1 : 0);
+    if (me)
+    {
+        // It has its gun: the naked ones of its floor, and any that came by a gun before it, then burst
+        s32 targetX = 0;
+        bool target = mShot < 1500 && ClearSligTask::Target(world, *me, nullptr, targetX) && std::abs(targetX - me->mX) <= 380 && Domain::FloorOpen(nav.Input(), world, targetX, me->mX, me->mY, me->mHalf);
+        for (const RockAt& crawler : world.mCrawlers)
+        {
+            if (!target && mShot < 1500 && crawler.mHalf == me->mHalf && std::abs(crawler.mY - me->mY) <= 20 && std::abs(crawler.mX - me->mX) <= 500 && std::abs(crawler.mX - me->mX) >= 30 && Domain::FloorOpen(nav.Input(), world, crawler.mX, me->mX, me->mY, me->mHalf))
+            {
+                target = true;
+                targetX = crawler.mX;
+            }
+        }
+        if (target)
+        {
+            mShot += 2;
+            mQuiet = 0;
+            const bool left = targetX < me->mX;
+            return TaskStep::Do(Prim::Wait(2, me->mFacingLeft == left ? static_cast<u32>(Btn::eThrow) : static_cast<u32>(left ? Btn::eLeft : Btn::eRight)));
+        }
+        if ((mQuiet += 2) < 60)
+        {
+            return TaskStep::Do(Prim::Wait(2));
+        }
+        return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+    }
+    if (world.mCrawlerMine)
+    {
+        if (++mCrawled > 1500)
+        {
+            return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+        }
+        s32 toX = button->CentreX();
+        if (pressed)
+        {
+            // To a locker for guns of this floor, if the way to one is open now
+            const Entity* locker = nullptr;
+            for (const Entity& e : world.mEntities)
+            {
+                if (e.mKind == EntityKind::ePantsLocker && e.mHalf == button->mHalf && std::abs(e.mY2 - button->mY2) <= 20 && Domain::FloorOpen(nav.Input(), world, e.CentreX(), world.mCrawlerX, world.mCrawlerY, e.mHalf) &&
+                    (!locker || std::abs(e.CentreX() - world.mCrawlerX) < std::abs(locker->CentreX() - world.mCrawlerX)))
+                {
+                    locker = &e;
+                }
+            }
+            if (!locker || mPresses > 8)
+            {
+                return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+            }
+            toX = locker->CentreX();
+        }
+        // (what it was told to do last, done with)
+        if (mPressWait > 0)
+        {
+            mPressWait -= 2;
+            return TaskStep::Do(Prim::Wait(2));
+        }
+        const s32 dx = toX - world.mCrawlerX;
+        // (it goes a cell at a time, and on into the next if a way is held as it comes to the end of one: let go
+        // half a cell before)
+        if (std::abs(dx) > 14)
+        {
+            mMoved = true;
+            return TaskStep::Do(Prim::Wait(2, dx < 0 ? Btn::eLeft : Btn::eRight));
+        }
+        // (up counts on the frame it is first held, and only while it lies still: CrawlingSlig.cpp HandleCommon)
+        if (mMoved)
+        {
+            mMoved = false;
+            mPressWait = 24;
+            return TaskStep::Do(Prim::Wait(2));
+        }
+        if (!pressed && mPresses == 0)
+        {
+            mWas = world.Switch(button->mSwitch) != 0;
+        }
+        mPresses++;
+        if (!mSaid || pressed)
+        {
+            mSaid = !pressed;
+            bot.Log(std::string("the naked Slig at ") + std::to_string(world.mCrawlerX) + "," + std::to_string(world.mCrawlerY) + (pressed ? ": at the locker for its gun" : ": at the button"));
+        }
+        mPressWait = 40;
+        return TaskStep::Do(Prim::Wait(3, Btn::eUp));
+    }
+    // Abe
+    if (pressed)
+    {
+        return TaskStep::Done();
+    }
+    TaskStep step;
+    if (!RunGo(mGo, bot, lastFailed, step))
+    {
+        return step;
+    }
+    if (step.mKind == TaskStep::Kind::eFailed)
+    {
+        return step;
+    }
+    if (!Domain::CrawlerFor(nav.Input(), world, *button))
+    {
+        return TaskStep::Failed("no naked Slig that can get to the button");
+    }
+    if (bot.AbeNode() != mFrom)
+    {
+        if (bot.AbeNode() < 0)
+        {
+            return TaskStep::Do(Prim::Wait(4));
+        }
+        mGo = GoToNode(mFrom);
+        return Next(bot, "");
+    }
+    if ((mChanted += 20) > 900)
+    {
+        return TaskStep::Failed("the chant took no naked Slig");
+    }
+    return TaskStep::Do(Prim::Wait(20, Btn::eChant));
 }
 
 GrenadeOrbTask::~GrenadeOrbTask() = default;
@@ -4493,7 +4654,7 @@ TaskStep GrenadeOrbTask::Next(Bot& bot, const std::string& lastFailed)
     {
         return step;
     }
-    if (step.mKind == TaskStep::Kind::eFailed)
+    if (step.mKind == TaskStep::Kind::eFailed && mGoNode >= 0)
     {
         mNoWay.push_back(mGoNode);
     }

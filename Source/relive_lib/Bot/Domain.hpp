@@ -100,6 +100,8 @@ enum class StepKind : u8
                 // with it
     eGrenade,   // throw a grenade at Slig mEntity from the stretch of floor of the cell mEdge
                 // (Domain::GrenadeTargets)
+    eCrawlerButton, // from the cell mEdge take over a naked Slig and press the button mEntity with it
+                    // (Domain::CrawlerFor)
     eGrenadeOrb, // hold a grenade and throw it late from the cell mEdge, to go off in the air by security orb
                  // mEntity (Domain::OrbTargets)
 };
@@ -219,6 +221,9 @@ struct Domain final
         s32 mFloorY = 0;
         s32 mX1 = 0;
         s32 mX2 = 0;
+        // All of its floor
+        s32 mLineX1 = 0;
+        s32 mLineX2 = 0;
         std::vector<GrenadeShot> mShots;
     };
     static std::vector<GrenadeTarget> GrenadeTargets(const NavInput& in, const World& world);
@@ -247,6 +252,11 @@ struct Domain final
         std::vector<OrbShot> mShots;
     };
     static std::vector<OrbTarget> OrbTargets(const NavInput& in, const World& world);
+    // Whether a naked Slig is on the floor of a button for them with nothing shut between the two: taken over,
+    // it crawls there and presses it. x: where such a one is.
+    static bool CrawlerFor(const NavInput& in, const World& world, const Entity& button, s32* x = nullptr);
+    // Nothing solid that is shut between two places of a floor (a slam door)
+    static bool FloorOpen(const NavInput& in, const World& world, s32 x1, s32 x2, s32 y, bool half);
     // Whether a grenade that goes off there gets an orb at (x, y): by what was seen, one 55 under it did not
     static bool BlastGetsOrb(s32 atX, s32 atY, s32 orbX, s32 orbY, bool half);
     // How near where a grenade goes off a Slig is sure to be in its blast (the blast is 60 to each side and a

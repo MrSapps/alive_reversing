@@ -8158,6 +8158,130 @@ TEST(BotGrenadeTargets, AnOrbIsGotByAGrenadeHeldUntilItGoesOffInTheAirByIt)
     EXPECT_TRUE(Domain::OrbTargets(ao, world).empty());
 }
 
+TEST(BotGrenadeTargets, ASligWhoseFloorGoesOnUnderAnOrbsScreenAndTheOnesFromALockerAreOnesForAGrenade)
+{
+    // The Barracks' path 7, its top right: a ledge from one screen on into the next, which has the orb, and a
+    // Slig that starts on the first of them: chanted at it runs off under the orb
+    NavInput in;
+    in.mLines.push_back(Line(987, 100, 1387, 100, 0));
+    in.mLines.push_back(Line(537, 100, 887, 100, 0));
+    in.mLines.push_back(Line(862, 200, 1462, 200, 0));
+    World world;
+    world.mEntities.push_back(MakeEntity(EntityKind::eRockSack, 1000, 601, 68, 625, 104));
+    world.mEntities.back().mInputs[1] = 2;
+    world.mEntities.push_back(MakeEntity(EntityKind::eSlig, 2006, 1012, 80, 1036, 104));
+    world.mEntities.push_back(MakeEntity(EntityKind::eSecurityOrb, 3007, 1175, 40, 1199, 64));
+    std::vector<Domain::GrenadeTarget> targets = Domain::GrenadeTargets(in, world);
+    ASSERT_EQ(targets.size(), 1u);
+    EXPECT_EQ(targets[0].mSlig, 2006u);
+    EXPECT_EQ(targets[0].mFloorY, 100);
+    // (thrown onto the stretch on its own screen; all of its floor is told too)
+    EXPECT_EQ(targets[0].mX1, 987);
+    EXPECT_EQ(targets[0].mX2, 1125);
+    EXPECT_EQ(targets[0].mLineX1, 987);
+    EXPECT_EQ(targets[0].mLineX2, 1387);
+    // Not with the orb a screen further on than its floor goes, on the screen under, or gone
+    World further = world;
+    further.mEntities[2] = MakeEntity(EntityKind::eSecurityOrb, 3007, 1550, 40, 1574, 64);
+    EXPECT_TRUE(Domain::GrenadeTargets(in, further).empty());
+    World under = world;
+    under.mEntities[2] = MakeEntity(EntityKind::eSecurityOrb, 3007, 1175, 300, 1199, 324);
+    EXPECT_TRUE(Domain::GrenadeTargets(in, under).empty());
+    World gone = world;
+    gone.mEntities[2].mGone = true;
+    EXPECT_TRUE(Domain::GrenadeTargets(in, gone).empty());
+
+    // A locker for guns on the floor under, with a Slig about by it that came by its gun there: the locker stands
+    // for it, anywhere along that floor, with no orb
+    World armed = gone;
+    Entity locker = MakeEntity(EntityKind::ePantsLocker, 3004, 1150, 180, 1174, 204);
+    locker.mSwitch = World::HazardSwitch(locker.mId);
+    armed.mEntities.push_back(locker);
+    EXPECT_TRUE(Domain::GrenadeTargets(in, armed).empty());
+    SligAt slig;
+    slig.mX = 1062;
+    slig.mY = 200;
+    armed.mSligs.push_back(slig);
+    targets = Domain::GrenadeTargets(in, armed);
+    ASSERT_EQ(targets.size(), 1u);
+    EXPECT_EQ(targets[0].mSlig, 3004u);
+    EXPECT_EQ(targets[0].mFloorY, 200);
+    EXPECT_EQ(targets[0].mX1, 862);
+    EXPECT_EQ(targets[0].mX2, 1462);
+    // Not one that is his, asleep, on another floor or far off along it
+    armed.mSligs[0].mPossessed = true;
+    EXPECT_TRUE(Domain::GrenadeTargets(in, armed).empty());
+    armed.mSligs[0].mPossessed = false;
+    armed.mSligs[0].mAsleep = true;
+    EXPECT_TRUE(Domain::GrenadeTargets(in, armed).empty());
+    armed.mSligs[0].mAsleep = false;
+    armed.mSligs[0].mY = 100;
+    EXPECT_TRUE(Domain::GrenadeTargets(in, armed).empty());
+    armed.mSligs[0].mY = 200;
+    armed.mSligs[0].mX = 1162 + 601;
+    EXPECT_TRUE(Domain::GrenadeTargets(in, armed).empty());
+}
+
+TEST(BotDomain, ANakedSligCanGetToAButtonOnItsFloorWithNothingShutBetween)
+{
+    NavInput in;
+    in.mLines.push_back(Line(1100, 200, 1462, 200, 0));
+    NavFeature door = Feature(FeatureKind::eBarrier, 1212, 160, 1224, 204);
+    door.mSolid = true;
+    door.mSwitch = 187;
+    door.mStartClosed = true;
+    in.mFeatures.push_back(door);
+    World world;
+    Entity button = MakeEntity(EntityKind::eSligButton, 3000, 1301, 180, 1325, 204);
+    button.mSwitch = 187;
+    world.mEntities.push_back(button);
+    // The door shut: not through it, on either side of it yes
+    EXPECT_FALSE(Domain::FloorOpen(in, world, 1162, 1312, 200, false));
+    EXPECT_TRUE(Domain::FloorOpen(in, world, 1237, 1312, 200, false));
+    EXPECT_TRUE(Domain::FloorOpen(in, world, 1112, 1187, 200, false));
+    // (nor is one of the other scale, or on another level, in the way)
+    EXPECT_TRUE(Domain::FloorOpen(in, world, 1162, 1312, 200, true));
+    EXPECT_TRUE(Domain::FloorOpen(in, world, 1162, 1312, 100, false));
+    // No naked Slig: none for the button
+    EXPECT_FALSE(Domain::CrawlerFor(in, world, world.mEntities[0]));
+    // One about beyond the door: none; one on the button's side: that one
+    RockAt out;
+    out.mX = 1162;
+    out.mY = 200;
+    world.mCrawlers.push_back(out);
+    EXPECT_FALSE(Domain::CrawlerFor(in, world, world.mEntities[0]));
+    RockAt pen;
+    pen.mX = 1262;
+    pen.mY = 200;
+    world.mCrawlers.push_back(pen);
+    s32 x = 0;
+    EXPECT_TRUE(Domain::CrawlerFor(in, world, world.mEntities[0], &x));
+    EXPECT_EQ(x, 1262);
+    // (not one on another level or of the other scale)
+    world.mCrawlers[1].mY = 100;
+    EXPECT_FALSE(Domain::CrawlerFor(in, world, world.mEntities[0]));
+    world.mCrawlers[1].mY = 200;
+    world.mCrawlers[1].mHalf = true;
+    EXPECT_FALSE(Domain::CrawlerFor(in, world, world.mEntities[0]));
+    world.mCrawlers[1].mHalf = false;
+    // The door open: the one beyond it too (it is the first found)
+    world.mSwitches[187] = 1;
+    EXPECT_TRUE(Domain::FloorOpen(in, world, 1162, 1312, 200, false));
+    EXPECT_TRUE(Domain::CrawlerFor(in, world, world.mEntities[0], &x));
+    EXPECT_EQ(x, 1162);
+    world.mSwitches[187] = 0;
+    // None about (their screen is not there): the ones of the map, where it has them; but not while he has one
+    world.mCrawlers.clear();
+    world.mEntities.push_back(MakeEntity(EntityKind::eCrawler, 3005, 1225, 180, 1249, 204));
+    EXPECT_TRUE(Domain::CrawlerFor(in, world, world.mEntities[0], &x));
+    EXPECT_EQ(x, 1237);
+    world.mCrawlerMine = true;
+    EXPECT_FALSE(Domain::CrawlerFor(in, world, world.mEntities[0]));
+    world.mCrawlerMine = false;
+    world.mEntities[1].mGone = true;
+    EXPECT_FALSE(Domain::CrawlerFor(in, world, world.mEntities[0]));
+}
+
 TEST(BotGrenadeTargets, AGrenadeOfAesComesBackDownOffAFloorItFliesUpUnder)
 {
     // Lobbed from under the top floor: up under it and down again, not onto it

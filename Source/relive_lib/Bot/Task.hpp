@@ -233,9 +233,47 @@ private:
     s32 mHeld = 0;
     s32 mSettle = 0;
     s32 mLost = 0;
+    // For a locker: the Sligs about by it when this began
+    s32 mAbout = -1;
+    // Where the grenade thrown was last seen on its way
+    s32 mSeenX = 0;
+    s32 mSeenY = 0;
     // The throw chosen: how, and where it goes off
     ThrowSpot::Kind mKind = ThrowSpot::eUp;
     s32 mLandX = 0;
+};
+
+// Take over a naked Slig, crawl it to the button for its kind and press it. Then, with a locker for guns on that
+// floor: to the locker, where it comes by a gun and is still his, the other naked ones of the floor shot with it
+// before they come by theirs; and burst.
+class CrawlerButtonTask final : public Task
+{
+public:
+    CrawlerButtonTask(u32 button, s32 from)
+        : mButton(button)
+        , mFrom(from)
+    {
+    }
+    ~CrawlerButtonTask() override;
+    std::string Name() const override
+    {
+        return "Press SligButton#" + std::to_string(mButton) + " with a naked Slig";
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mButton;
+    s32 mFrom;
+    std::unique_ptr<GoToTask> mGo;
+    s32 mChanted = 0;
+    s32 mCrawled = 0;
+    s32 mPresses = 0;
+    s32 mPressWait = 0;
+    bool mMoved = true;
+    s32 mShot = 0;
+    s32 mQuiet = 0;
+    bool mWas = false;
+    bool mSaid = false;
 };
 
 // Hold a grenade and throw it late, so that it goes off in the air by a security orb (Domain::OrbTargets)

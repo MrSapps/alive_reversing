@@ -1072,6 +1072,16 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mInputs[0] = t.mPanicSwitchId;
                     break;
                 }
+                case ReliveTypes::eCrawlingSligButton:
+                {
+                    const auto& t = static_cast<const relive::Path_CrawlingSligButton&>(tlv);
+                    e.mKind = EntityKind::eSligButton;
+                    keep = GetGameType() == GameType::eAe;
+                    e.mHalf = t.mScale == relive::reliveScale::eHalf;
+                    e.mSwitch = t.mSwitchId;
+                    e.mOp = OpOf(t.mAction);
+                    break;
+                }
                 case ReliveTypes::eSligGetPants:
                 {
                     const auto& t = static_cast<const relive::Path_SligGetPants&>(tlv);
@@ -1476,11 +1486,20 @@ void GameView::ReadWorld(BaseMap& map, World& world)
     world.mFleechesAsleep.clear();
     world.mLocksIntact.clear();
     world.mCrawlers.clear();
+    world.mCrawlerMine = false;
     for (s32 i = 0; isAe && i < gBaseAliveGameObjects->Size(); i++)
     {
         BaseAliveGameObject* pObj = gBaseAliveGameObjects->ItemAt(i);
         if (pObj && !pObj->GetDead() && pObj->Type() == ReliveTypes::eCrawlingSlig && pObj->mHealth > FP_FromInteger(0))
         {
+            if (pObj == sControlledCharacter)
+            {
+                world.mCrawlerMine = true;
+                world.mCrawlerX = FP_GetExponent(pObj->mXPos);
+                world.mCrawlerY = FP_GetExponent(pObj->mYPos);
+                world.mCrawlerLeft = pObj->GetAnimation().GetFlipX();
+                continue;
+            }
             RockAt crawler;
             crawler.mX = FP_GetExponent(pObj->mXPos);
             crawler.mY = FP_GetExponent(pObj->mYPos);

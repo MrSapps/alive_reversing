@@ -73,6 +73,9 @@ enum class EntityKind : u8
     // that is awake can get to it and no armed one is about by it: until then nothing is crossed onto the
     // floor by it (GameView's MarkLockers)
     ePantsLocker,
+    // AE's button for naked Sligs (CrawlingSligButton): one of them that is taken over presses it. mSwitch,
+    // mOp as a lever's.
+    eSligButton,
 };
 
 const char* EntityKindName(EntityKind kind);
@@ -462,6 +465,11 @@ struct World final
     std::vector<UxbAt> mUxbs;
     // AE's crawling Sligs that are about and alive (naked ones: at a locker they come by a gun and are Sligs)
     std::vector<RockAt> mCrawlers;
+    // The naked Slig he has taken over (it is not among mCrawlers), where it is and the way it faces
+    bool mCrawlerMine = false;
+    s32 mCrawlerX = 0;
+    s32 mCrawlerY = 0;
+    bool mCrawlerLeft = false;
     // The lockers of the path at which one of those comes by wings: a flying Slig may come to be there
     std::vector<RockAt> mWingLockers;
     std::vector<SweepAt> mSweeps;
