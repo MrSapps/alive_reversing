@@ -39,6 +39,7 @@ const char* EntityKindName(EntityKind kind)
         case EntityKind::eUxb: return "UXB";
         case EntityKind::eCrawler: return "Crawler";
         case EntityKind::ePantsLocker: return "Locker";
+        case EntityKind::eSligButton: return "SligButton";
         case EntityKind::eRockSack: return "RockSack";
         case EntityKind::eBrew: return "Brew";
         case EntityKind::eFlier: return "FlyingSlig";
@@ -4267,7 +4268,8 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             d.mStart.Set(Key::Switch(World::HazardSwitch(orb.mId)), 1);
         }
     }
-    for (const GrenadeTarget& target : GrenadeTargets(nav.Input(), world))
+    const std::vector<GrenadeTarget> grenadeTargets = GrenadeTargets(nav.Input(), world);
+    for (const GrenadeTarget& target : grenadeTargets)
     {
         const Entity* slig = world.Find(target.mSlig);
         std::set<s32> from;
@@ -4291,6 +4293,48 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             d.mActions.back().mSpend = {Key::kRocks, 1};
         }
     }
+    // A button for naked Sligs with one of them on its floor: taken over from a cell of its screen that is not
+    // on that floor, once no orb is over that screen. (The walkthrough of the Barracks' Slig bunks: "possess a
+    // naked Slig, move him in front of the green button controlling the slam doors and hold up".)
+    for (const Entity& button : world.mEntities)
+    {
+        s32 crawlerX = 0;
+        if (button.mKind != EntityKind::eSligButton || button.mSwitch <= 1 || !CrawlerFor(nav.Input(), world, button, &crawlerX))
+        {
+            continue;
+        }
+        const s32 now = world.Switch(button.mSwitch);
+        const s32 after = button.mOp == 0 ? 1 : button.mOp == 1 ? 0 : (now ? 0 : 1);
+        if (now == after)
+        {
+            continue;
+        }
+        const s32 cam = nav.CameraOf(crawlerX, button.mY2 - 5);
+        std::vector<Goap::Fact> orbs;
+        for (const Entity& orb : world.mEntities)
+        {
+            if (orb.mKind == EntityKind::eSecurityOrb && !orb.mGone && nav.CameraOf(orb.mX1, orb.mY1) == cam)
+            {
+                orbs.push_back({Key::Switch(World::HazardSwitch(orb.mId)), 1});
+            }
+        }
+        std::set<s32> from;
+        for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+        {
+            const NavNode& node = nav.Nodes()[n];
+            if (node.mHalf != button.mHalf || node.mHazard || std::abs(node.mY - button.mY2) <= 45 || nav.CameraOf(node.mX, node.mY - 5) != cam || !from.insert(d.mRegions[n]).second)
+            {
+                continue;
+            }
+            DomainStep press;
+            press.mKind = StepKind::eCrawlerButton;
+            press.mEntity = button.mId;
+            press.mEdge = static_cast<s32>(n);
+            std::vector<Goap::Fact> pre{regionFact(static_cast<s32>(n)), {Key::Switch(button.mSwitch), now}};
+            pre.insert(pre.end(), orbs.begin(), orbs.end());
+            add("Press SligButton#" + std::to_string(button.mId) + " sw" + std::to_string(button.mSwitch) + " with a naked Slig taken over from " + std::to_string(node.mX) + "," + std::to_string(node.mY), pre, {{Key::Switch(button.mSwitch), after}}, 900, press);
+        }
+    }
     for (const OrbTarget& target : OrbTargets(nav.Input(), world))
     {
         const Entity* orb = world.Find(target.mOrb);
@@ -4306,7 +4350,16 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             toss.mKind = StepKind::eGrenadeOrb;
             toss.mEntity = target.mOrb;
             toss.mEdge = node;
-            add("Burst a grenade by SecurityOrb#" + std::to_string(target.mOrb) + " from " + std::to_string(shot.mX) + "," + std::to_string(shot.mY), {regionFact(node)}, {{Key::Switch(World::HazardSwitch(target.mOrb)), 1}}, shot.mHidden ? 450 : 700, toss);
+            // (a Slig a grenade is for on the floor it is thrown from: that one first)
+            std::vector<Goap::Fact> pre{regionFact(node)};
+            for (const GrenadeTarget& slig : grenadeTargets)
+            {
+                if (slig.mFloorY == shot.mY && shot.mX >= slig.mLineX1 && shot.mX <= slig.mLineX2)
+                {
+                    pre.push_back({Key::Switch(World::HazardSwitch(slig.mSlig)), 1});
+                }
+            }
+            add("Burst a grenade by SecurityOrb#" + std::to_string(target.mOrb) + " from " + std::to_string(shot.mX) + "," + std::to_string(shot.mY), pre, {{Key::Switch(World::HazardSwitch(target.mOrb)), 1}}, shot.mHidden ? 450 : 700, toss);
             d.mActions.back().mSpend = {Key::kRocks, 1};
         }
     }
@@ -5400,18 +5453,31 @@ std::vector<Domain::GrenadeTarget> Domain::GrenadeTargets(const NavInput& in, co
     };
     for (const Entity& slig : world.mEntities)
     {
-        if (slig.mKind != EntityKind::eSlig || slig.mGone || slig.mSwitch > 1 || world.mFleechKilled.count(slig.mId) != 0)
+        // A locker for guns with Sligs about on its floor that came by theirs at it: they are thrown at as one
+        // of the map is, the locker standing for them (its switch is on again when none is left). They are not
+        // taken over: chanted at they run off along their floor. (The walkthrough of the Barracks' Slig bunks:
+        // "the Sligs move from screen to screen so you can't possess them. You'll just have to go and keep
+        // getting grenades and toss them down to the Sligs until all are dead".)
+        bool lockerSligs = false;
+        if (slig.mKind == EntityKind::ePantsLocker)
+        {
+            for (const SligAt& s : world.mSligs)
+            {
+                lockerSligs = lockerSligs || (s.mSeen && !s.mAsleep && !s.mPossessed && s.mHalf == slig.mHalf && std::abs(s.mY - slig.mY2) <= 20 && std::abs(s.mX - slig.CentreX()) <= 600);
+            }
+        }
+        if (!lockerSligs && (slig.mKind != EntityKind::eSlig || slig.mGone || slig.mSwitch > 1 || world.mFleechKilled.count(slig.mId) != 0))
         {
             continue;
         }
         bool machine = false;
-        bool orb = false;
+        bool orb = lockerSligs;
         for (const Entity& e : world.mEntities)
         {
             machine = machine || (e.mKind == EntityKind::eRockSack && e.mInputs[1] == 2 && !e.mGone && e.mHalf == slig.mHalf);
             orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && screen(e.mX1, e.mY1) == screen(slig.CentreX(), slig.mY1));
         }
-        if (!machine || !orb)
+        if (!machine)
         {
             continue;
         }
@@ -5429,12 +5495,32 @@ std::vector<Domain::GrenadeTarget> Domain::GrenadeTargets(const NavInput& in, co
         {
             continue;
         }
+        // (or an orb over a screen its floor goes on into: chanted at, it runs off to there. The Barracks' path
+        // 7, the one on the ledge 987..1387 with the orb at 1175: "the Sligs move from screen to screen so you
+        // can't possess them".)
+        for (const Entity& e : world.mEntities)
+        {
+            orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && e.mHalf == slig.mHalf && e.mY1 / in.mCamH == (floor->mY1 - 5) / in.mCamH &&
+                          e.mX1 / in.mCamW >= std::min(floor->mX1, floor->mX2) / in.mCamW && e.mX1 / in.mCamW <= std::max(floor->mX1, floor->mX2) / in.mCamW);
+        }
+        if (!orb)
+        {
+            continue;
+        }
         GrenadeTarget target;
         target.mSlig = slig.mId;
         target.mFloorY = floor->mY1;
         const s32 camX = (slig.CentreX() / in.mCamW) * in.mCamW;
+        target.mLineX1 = std::min(floor->mX1, floor->mX2);
+        target.mLineX2 = std::max(floor->mX1, floor->mX2);
         target.mX1 = std::max(std::min(floor->mX1, floor->mX2), camX);
         target.mX2 = std::min(std::max(floor->mX1, floor->mX2), camX + in.mCamW);
+        // (the ones from a locker go where they will along their floor)
+        if (lockerSligs)
+        {
+            target.mX1 = target.mLineX1;
+            target.mX2 = target.mLineX2;
+        }
         // A shadow on it: gone by unseen, as such floors always were
         bool shadow = false;
         const s32 cell = NavGraph::GridStep(slig.mHalf);
@@ -5497,6 +5583,50 @@ std::vector<Domain::GrenadeTarget> Domain::GrenadeTargets(const NavInput& in, co
         }
     }
     return targets;
+}
+
+bool Domain::FloorOpen(const NavInput& in, const World& world, s32 x1, s32 x2, s32 y, bool half)
+{
+    for (const NavFeature& f : in.mFeatures)
+    {
+        if (f.mKind == FeatureKind::eBarrier && f.mSolid && f.mHalf == half && f.mX2 >= std::min(x1, x2) && f.mX1 <= std::max(x1, x2) && f.mY1 <= y && f.mY2 >= y - 40 &&
+            f.mSwitch > 1 && (world.Switch(f.mSwitch) != 0) != f.mStartClosed)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool Domain::CrawlerFor(const NavInput& in, const World& world, const Entity& button, s32* x)
+{
+    // (the ones about; and the ones of the map whose screen is not: they are where the map has them)
+    for (const RockAt& crawler : world.mCrawlers)
+    {
+        if (crawler.mHalf == button.mHalf && std::abs(crawler.mY - button.mY2) <= 20 && FloorOpen(in, world, crawler.mX, button.CentreX(), crawler.mY, crawler.mHalf))
+        {
+            if (x)
+            {
+                *x = crawler.mX;
+            }
+            return true;
+        }
+    }
+    if (world.mCrawlers.empty() && !world.mCrawlerMine)
+    {
+        for (const Entity& e : world.mEntities)
+        {
+            if (e.mKind == EntityKind::eCrawler && !e.mGone && e.mHalf == button.mHalf && std::abs(e.mY2 - button.mY2) <= 20 && FloorOpen(in, world, e.CentreX(), button.CentreX(), button.mY2, e.mHalf))
+            {
+                if (x)
+                {
+                    *x = e.CentreX();
+                }
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 bool Domain::BlastGetsOrb(s32 atX, s32 atY, s32 orbX, s32 orbY, bool half)

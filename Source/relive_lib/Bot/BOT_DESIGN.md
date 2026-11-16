@@ -1520,11 +1520,30 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
       it comes down), not the button: the Slig turns when it first lands, 16 to 27 frames after the button,
       while he is still at the machine (24 frames). In the run that works the Slig says "What?" first; from
       a cold start at the top it shot at once, 13 times. Not solved: nothing he can do is fast enough then.
-    - What is left, the right side: four naked Sligs asleep in a pen between two slam doors (switch 187)
-      with their button at 1313,204, the locker for guns at 1162, the orb at 1175,40, the wheel at 1412.
-      A naked Slig that is taken over presses the button (CrawlingSlig.cpp `HandleCommon`: up at a
-      `CrawlingSligButton`), and at a locker it gets its gun and stays his. Not built: the button as a
-      thing of the map, and the task.
+    - The right side: four naked Sligs in a pen between two slam doors (switch 187) with their button at
+      1313,204, the locker for guns at 1162, the orb at 1175,40, the wheel at 1412, and a Slig on the ledge
+      over them (987..1387 at 100, it walks 1012..1262). What is built, in the order the run does it:
+      - The Slig on the ledge is one for a grenade though no orb is over the screen it starts on: its floor
+        goes on under the orb's screen, and chanted at it runs off to there (seen: taken over neither by the
+        reflex nor by a chant begun as it came onto the screen). `Domain::GrenadeTargets` takes an orb over
+        any screen its floor is on. Bombed from 887,100 across the gap at f=8,985.
+      - The orb from that ledge (`Burst a grenade` needs the Sligs a grenade is for on the floor thrown from
+        gone first): two misses from 1037,100 (said to go off at 1154,68; why is not known), got from
+        1262,100 at f=10,671.
+      - `EntityKind::eSligButton`, `Domain::CrawlerFor`, `CrawlerButtonTask` ("Press SligButton with a naked
+        Slig"): from a cell of the pen's screen off its floor, once no orb is over it, he chants and has the
+        nearest naked Slig; it crawls a cell at a time (and on into the next if a way is still held at the
+        end of one: let go half a cell before), and up counts only on the frame it is first held while it
+        lies still (CrawlingSlig.cpp `HandleCommon`). The doors open at f=11,055. Then to the locker, where
+        it would come by a gun and still be his: but the other three are awake at once and nearer, get
+        theirs first and shoot it, as the walkthrough says.
+      - Those three are then ones for grenades, the locker standing for them (`GrenadeTargets`: a locker
+        with armed Sligs within 600 of it on its floor; `GrenadeSligTask` is done when one fewer is about).
+        They are not taken over (the reflex tries twice and gives up). Two of them come to stand at
+        1062,200, under the ledge. Not solved: a grenade from 662,100 that the model has bounce on to 1092
+        lands at 968,200 and stays there (traced), as one does that touches a thing a blast can hurt
+        (`Grenade::OnCollision_BounceOff`): what it is is not known yet. So the fourth wheel and the door
+        out are not reached.
     - A Slig that has only just come to stand with its back to all of his way, and stands for long
       (`Slig::BeatPause`: the least it stands at an end of its beat; `GoToTask::Stood` keeps since when),
       is gone behind as one that walks away is: the one by the boom machine walks two cells and stands 120

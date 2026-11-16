@@ -218,6 +218,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<DrinkTask>(step.mEntity);
         case StepKind::eGrenade:
             return std::make_unique<GrenadeSligTask>(step.mEntity, step.mEdge);
+        case StepKind::eCrawlerButton:
+            return std::make_unique<CrawlerButtonTask>(step.mEntity, step.mEdge);
         case StepKind::eGrenadeOrb:
             return std::make_unique<GrenadeOrbTask>(step.mEntity, step.mEdge);
         case StepKind::eFlierBomb:
@@ -3675,6 +3677,18 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
             for (const SligAt& slig : mWorld.mSligs)
             {
                 mTrace += " slig" + std::to_string(slig.mX) + "," + std::to_string(slig.mY) + (slig.mFacingLeft ? "L" : "R") + "m" + std::to_string(slig.mMotion);
+            }
+            for (const FlierAt& flier : mWorld.mFliers)
+            {
+                mTrace += " flier" + std::to_string(flier.mX) + "," + std::to_string(flier.mY);
+            }
+            for (const RockAt& crawler : mWorld.mCrawlers)
+            {
+                mTrace += " crawl" + std::to_string(crawler.mX) + "," + std::to_string(crawler.mY);
+            }
+            for (const RockAt& rock : mWorld.mRocksFlying)
+            {
+                mTrace += " fly" + std::to_string(rock.mX) + "," + std::to_string(rock.mY);
             }
             for (const SlogAt& slog : mWorld.mSlogs)
             {
