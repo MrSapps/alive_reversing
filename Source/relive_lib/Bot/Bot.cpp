@@ -1217,7 +1217,7 @@ void Bot::BanEdge(s32 edge)
     }
 }
 
-NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs) const
+NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen) const
 {
     const PathKnowledge* know = mKnow;
     const World* world = &mWorld;
@@ -1228,7 +1228,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs) const
     const bool chanted = mChargeFrame != 0 && mAbe.mFrame - mChargeFrame < 60;
     // (unseen for a crossing over a floor Sligs watch: the quick ways are the cheap ones)
     const bool unseenRun = mWorld.mInvisible && InvisRun();
-    return [know, world, only, pastScrabs, charged, chanted, unseenRun](const NavEdge& e) -> s32
+    const auto base = [know, world, only, pastScrabs, charged, chanted, unseenRun](const NavEdge& e) -> s32
     {
         const s32 idx = static_cast<s32>(&e - know->mNav.Edges().data());
         if (know->mBannedEdges.count(idx) || (!only->empty() && !only->count(idx)))
@@ -1503,6 +1503,36 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs) const
             }
         }
         return e.mCost;
+    };
+    // Sligs that shoot from the background: a cell they see him on costs more than one in cover, and one on
+    // their beat (seen whichever way they face) more again, so that of two ways the one with less of the open in
+    // it is gone
+    bool zSligs = false;
+    for (const SligAt& slig : mWorld.mSligs)
+    {
+        zSligs = zSligs || (slig.mZShoot && !slig.mPossessed);
+    }
+    if (!inTheOpen || !zSligs || mWorld.mInvisible)
+    {
+        return base;
+    }
+    return [know, world, base](const NavEdge& e) -> s32
+    {
+        s32 cost = base(e);
+        const NavNode& to = know->mNav.Nodes()[e.mTo];
+        if (cost < 0 || to.mHalf || to.mZLow || to.mZCover)
+        {
+            return cost;
+        }
+        const s32 cam = know->mNav.CameraOf(to.mX, to.mY - 5);
+        for (const SligAt& slig : world->mSligs)
+        {
+            if (slig.mZShoot && !slig.mPossessed && know->mNav.CameraOf(slig.mX, slig.mY - 5) == cam)
+            {
+                cost += to.mX >= slig.mBeatMin && to.mX <= slig.mBeatMax ? 90 : 30;
+            }
+        }
+        return cost;
     };
 }
 
@@ -3408,6 +3438,12 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         {
             mTrace.pop_back();
             mTrace += " hp=" + std::to_string(mAbe.mHealthFp * 100 / 0x10000) + "\n";
+        }
+        // (what of him the Sligs in the background have to see none of, while there are such)
+        if (!mWorld.mSligs.empty() && mWorld.mSligs[0].mZShoot)
+        {
+            mTrace.pop_back();
+            mTrace += " box=" + std::to_string(mAbe.mBoxX1 - mAbe.mX) + "," + std::to_string(mAbe.mTop - mAbe.mY) + "," + std::to_string(mAbe.mBoxX2 - mAbe.mX) + "," + std::to_string(mAbe.mBoxBottom - mAbe.mY) + "\n";
         }
         // The flying Sligs about: where, which way they face and how fast they go
         for (const FlierAt& flier : mWorld.mFliers)

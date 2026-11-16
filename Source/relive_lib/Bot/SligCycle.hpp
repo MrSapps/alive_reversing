@@ -13,7 +13,8 @@ namespace Bot {
 // Such a Slig (AE's Slig.cpp, its idle, walking and paused brains) shoots at Abe when he is on its screen in front
 // of it (his x at or past its own, the way it faces), nearer the player than it is, and not wholly inside a Z
 // cover. It does not look while it turns. Each shot it lands takes a third of his health, which comes back 180
-// frames after the last.
+// frames after the last. Once it has seen him it shoots, and being in cover by then does not help: only the shot
+// that would kill him is stopped by a cover (and that one gives him all his health back).
 class SligCycle final
 {
 public:
@@ -83,6 +84,26 @@ public:
     // followed behind its back, no nearer than it has got). `covered` says whether he is in cover at x, rolling
     // or crouched. Only its first move is given: it is asked again from where that ends.
     Move Cross(const std::vector<Cell>& cells, const std::function<bool(s32 x, bool rolling)>& covered) const;
+    // A way he can't stop on (a hop, a drop, a hoist) from one cover to the next: where he is on each frame of it.
+    // One that sees him on it shoots, and what it shoots finds him wherever he has got to by then (Abe.cpp's
+    // BulletDamage: a cover only stops the bullet that would kill him), and it shoots again if he is still in the
+    // open when that burst is over: mAfter frames before it fires, kShotFrame to the first bullet, kShotGap between
+    // those of a burst and before it looks again. The frames to wait before the way, no more than `within`, so
+    // that the fewest bursts are shot at him, and of those the soonest. mSpotters is that number of bursts (the
+    // last bullet of one finds him, and the one before it can: they are aimed 16 short of him for each still to
+    // come); mTo is not used.
+    struct Shooter final
+    {
+        s32 mAfter = 0;
+        s32 mTimes = 1;
+    };
+    static const s32 kShotFrame = 14;
+    static const s32 kShotGap = 12;
+    // (a frame of the track is taken as seen if he would be within that many frames either side of it)
+    static const s32 kTrackSlack = 3;
+    // (or that far either side of where it has him: a hop carries him a few past where it lands)
+    static const s32 kTrackAside = 8;
+    Move Through(const std::vector<Cell>& track, const std::vector<Shooter>& shooters, s32 within) const;
     // Which of them (a bit each) see him at x that many frames from now
     u32 SeenBy(s32 x, s32 frames) const;
 

@@ -427,7 +427,8 @@ public:
         mCurrentEdge = edge;
     }
     // pastScrabs: without the rule that keeps him off a floor a loose Scrab can get at him on
-    NavGraph::EdgeCost EdgeCostFn(bool pastScrabs = false) const;
+    // (`inTheOpen`: with what the Sligs in the background see of a way added to it, for the way GoToTask goes)
+    NavGraph::EdgeCost EdgeCostFn(bool pastScrabs = false, bool inTheOpen = false) const;
     void Log(const std::string& text);
     // See World::QuietFrames, with the beats this run has seen
     s32 QuietFrames(s32 x, s32 y, bool half) const;

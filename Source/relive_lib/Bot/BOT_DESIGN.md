@@ -1103,9 +1103,10 @@ the healing power, `bot any`). Begun, not beaten: the first two screens of its f
 stopped on the third. The level is thirteen paths (the walkthrough's block 0, four blocks off a hub, the war
 room) and wants things not built yet: see "What the Barracks still wants" below. What these screens took:
 - **Sligs in the background that shoot out of the screen** (path 1's second screen: three of them on one
-  beat, out of step). Slig.cpp, its idle, walking and paused brains: one shoots when Abe is on its screen, at
-  full size, in front of it (his x at or past its own the way it faces) and not wholly inside a Z cover
-  (`z_slig_cover`: his box inside the TLV's). It does not look while it turns. The shots (three or four) are
+  beat, out of step; see also the rifle range under "What the Barracks still wants": a cover does not stop a
+  bullet once he has been seen). Slig.cpp, its idle, walking and paused brains: one shoots when Abe is on its
+  screen, at full size, in front of it (his x at or past its own the way it faces) and not wholly inside a Z
+  cover (`z_slig_cover`: his box inside the TLV's). It does not look while it turns. The shots (three or four) are
   aimed at his x less two frames of his speed and 16 for each shot still to come, towards the Slig, so one of
   a burst hits him standing; a hit takes 0.34 of his health and he dies of the third; 180 frames after the
   last, all of it is back (Abe.cpp).
@@ -1279,9 +1280,47 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
   (the lift), and Abe's wheel is the free one furthest from there. A leading `GoToTask` goes by lift too, and
   waits on it until the ones that follow stand on it. The plan there: the lever, `Work together`, the exit.
   Not done: the six Mudokons are not rescued (the portal is there once the wheels have turned).
-- **The hub, path 2** (`b3n.txt` goes on into it): the centre door wants four switches, one from each block.
-  He reads the hand stone and takes a well to a block; in path 10 he is shot by the Sligs in the background on
-  the first try.
+- **The hub, path 2** (`b3n.txt` goes on into it): the centre door wants four switches, one from each block
+  (116 the rifle range's lever, 125 a wheel behind the workers' campus, 108 and 218 two more doors that each
+  want switches of their own). He reads the hand stone and takes a well to a block. Nothing tells him yet that
+  a block's switch is what he is in it for: put down inside a block's door, his goal is to leave the path, and
+  the open door behind him is the way he takes.
+- **Block 1, the rifle range, path 10: begun, not beaten** (`ae_barracks_rifle_range.txt`, from its door, no look:
+  through three of its six screens, then shot on the fourth at f=5,199). Fourteen Sligs in the background, two
+  or three a screen, and the way goes up and down between covers by hops, drops and hoists, which
+  `GoToTask::ZWatched` only timed along one floor. What was found and built:
+  - A cover does not stop a bullet: Abe.cpp's `BulletDamage` takes the 0.34 first, and only for the bullet that
+    would kill him looks whether he is in a cover (and then gives him all his health back). So what counts is
+    being *seen*, not where he is when the burst comes. `SligCycle::Cross` already counted it that way.
+  - A cover belongs to a screen: the game looks for it among the TLVs of the camera the top of him is in, so
+    one of the next screen that reaches over the edge is none (`NavFeature::mCell`, `NavGraph::ZCovered`).
+  - `NavNode::mZLow`: a cover he is only in crouched (the space under the boom machine). It is a place to
+    stop and wait in on a roll, and to heal in.
+  - `GoToTask::ZLeap`: the way out of a cover by a hop, a drop, a hoist or a running jump, with the cells of
+    floor before it (rolled from a crouch, walked from standing) and the steps after it into the next cover,
+    as one track of where he is on each frame (measured: roll 1+4 a cell+1, up from a crouch 9, turn 13, step
+    3+9 a cell, hop 11 on the spot, 12 in the air, 10 to land, hoist up 40, down 34; his box 14 either side
+    standing, up to 26 walking or in the air). `SligCycle::Through` finds the wait before it with the fewest
+    bursts shot at him (each Slig's `z_shoot_delay` read from the game: `SligAt::mZShootDelay`), worked out
+    again every 40 frames while he waits. Where the leap lands with no cover on the way on, a cover a step or
+    two aside is where it goes (behind the boom machine, between the hoist up and the hop on).
+  - With a burst in it at best, the other leaps out of that cover are tried (`mZAvoid`, no further round than
+    150 of cost), and the one with the fewest is made; two bursts are only taken when 2,400 frames ahead hold
+    nothing better, three never. Hurt, he stays in a cover until it is over, whatever the way on is.
+  - `Bot::EdgeCostFn(…, inTheOpen)`, for the way `GoToTask` goes and nothing else (the planner's costs are
+    as they were): a cell the Sligs of its screen see him on costs 30 more for each of them, 90 on its
+    beat, so the way with less of the open in it is the one gone (the hoist by the boom machine, not the one
+    under the left Slig's beat).
+  - Left: he is hit on most stretches (the hoist by the boom machine takes 83 frames in the open and both
+    Sligs of that screen look within any 83; a player takes the same hits or is quicker than the track
+    allows), and it is slow (5,000 frames for three screens: each hit is 180 frames of healing and a cycle to
+    learn again). The fourth screen's hop from 1437,380 lands at 1362, not the 1337 the graph has. Then the
+    lift down past the last two Sligs, the lever, and the six Mudokons (an orb to blow up with the boom
+    machine's grenade first). `ZLeap` and the rest of `GoToTask` here are only tested in the game.
+- **Blocks 2, 3 and 4** (first tries from inside their doors, scratch runs): in blocks 2 and 4
+  (paths 5 and 9) he leaves by the door he came in by, as above. Block 3 (path 7), whose door shuts behind
+  him, is the one he starts on: a wheel (switch 177), then a Slig lock with a Slig called by a lever, where he
+  dies six times and gives up.
 - The hub and its four blocks, then the war room: a Glukkon taken over and its orders to Sligs, crawling
   Sligs and their button, an orb blown up with a grenade (then its Sligs taken over), grenades thrown on a
   count, Greeters, laughing gas, flying mines to time, Slig voice locks, ghost locks, a Shrykull.
