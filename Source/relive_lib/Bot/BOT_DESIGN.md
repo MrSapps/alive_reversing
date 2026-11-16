@@ -1443,7 +1443,23 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
     f=4,450, the UXB on the wheel off f=4,620, the wheel f=4,668, the UXB by the way out, and out. `any`
     rescues none of its seven Mudokons and leaves its secret area alone. Left to wander it once took the
     hoist at 2687,2179 down 320 into the secret area and died: not looked into.
-- **Blocks 3 and 4** (first tries from inside their doors, scratch runs).
+- **Block 3, the Slig bunks, path 7: begun** (`build-bot/la/blk7.txt`, from its door). Its way out (the door
+  at 1051,179, a tasks door) wants four wheels: 177 (at 524,860), 180 (1175,600), 250 (1400,180) and 190
+  (425,180). What works: the first wheel; the lever at 400,860 that calls a Slig, with a step off the end of
+  the floor before that Slig shoots (`Bot::MakeFlee` takes a drop for a quick way off a floor, as the
+  walkthrough has it: "immediately run right to fall to the lower level"); the Slig taken over from the
+  floor below and kept for the lock (the reflex that takes over and bursts a Slig on another level leaves it
+  alone while a `SligLockTask` runs); on its way it shoots another Slig of its floor from 380 off, before
+  that one shoots it (`SligLockTask`, measured: one newly armed at 1087 shot it at 889 five frames after it
+  stood); the Slig lock at 1125,930 open at f=1,575 with the first Slig called.
+  Not yet: the four naked Sligs asleep under the first wheel crawl to the lockers at 1075,960 and come back
+  armed, one after the other, and shoot him as he goes right (19 deaths). The walkthrough has them chase him
+  through the electric wall at 800,980, turned on with the lever beside it as they come. The bot knows
+  nothing of crawling Sligs yet (`CrawlingSlig.cpp`, `SligGetPants`): an entity, where they are, and a trap
+  as `SlogTrapTask` is for Slogs. After that: the flying Slig taken over for the second lock (1249,564) and
+  flown round to kill the Sligs up the middle, wheel 180; the boom machine's grenades for the orbs up top,
+  a naked Slig taken over to press the button at 1301,180, wheels 250 and 190.
+- **Block 4** (path 9: first try from inside its door, a scratch run).
   (path 7), whose door shuts behind him, is the one he starts on: a wheel (switch 177), then a Slig lock
   with a Slig called by a lever, where he dies six times and gives up. Block 4 (path 9) not looked at again.
 - The hub and its four blocks, then the war room: a Glukkon taken over and its orders to Sligs, crawling

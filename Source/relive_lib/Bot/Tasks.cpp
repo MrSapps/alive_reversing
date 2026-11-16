@@ -9023,6 +9023,20 @@ TaskStep SligLockTask::Next(Bot& bot, const std::string& lastFailed)
         mPullWait -= 2;
         return TaskStep::Do(Prim::Wait(2));
     }
+    // Another Slig on its floor shoots it on sight: that one first, before the way to the lock and before it
+    // is burst (the walkthrough of the Barracks' Slig bunks: "talk to the Slig Lock, then shoot the other
+    // Sligs")
+    {
+        s32 targetX = 0;
+        // (from as far as it would shoot from: measured there, one that had just come by its gun at 1087 shot
+        // the one he had at 889 five frames after it stood)
+        if (mShot < 1500 && ClearSligTask::Target(world, *me, nullptr, targetX) && std::abs(targetX - me->mX) <= 380)
+        {
+            mShot += 2;
+            const bool left = targetX < me->mX;
+            return TaskStep::Do(Prim::Wait(2, me->mFacingLeft == left ? static_cast<u32>(Btn::eThrow) : static_cast<u32>(left ? Btn::eLeft : Btn::eRight)));
+        }
+    }
     const s32 node = nav.NodeAt(me->mX, me->mY, me->mHalf, 20);
     if (node < 0)
     {

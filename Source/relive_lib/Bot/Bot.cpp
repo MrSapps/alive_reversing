@@ -2777,9 +2777,17 @@ std::unique_ptr<Task> Bot::MakeFlee()
             // tries find the moment. The Barracks' path 1: the door at 2037,380, a cell on from where he ran
             // back from the Slig at 2187 every time.)
             const bool doors = mProfile.mLook;
-            const NavGraph::EdgeCost quickOnly = [&all, doors](const NavEdge& e) -> s32
+            // (a step off the end of the floor is the quickest of all: 6 frames and he is falling. Not one that
+            // ends hung from a ledge or in a well. The Barracks' path 7: the Slig the lever at 400,860 calls
+            // comes down a cell from him, and the walkthrough's "immediately run right to fall to the lower
+            // level".)
+            const auto drop = [](const NavEdge& e)
             {
-                return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eWell || e.mKind == EdgeKind::eHoistUp || (doors && e.mKind == EdgeKind::eDoor) ? all(e) : -1;
+                return e.mKind == EdgeKind::eFall && !e.mHung && e.mWell < 0;
+            };
+            const NavGraph::EdgeCost quickOnly = [&all, doors, &drop](const NavEdge& e) -> s32
+            {
+                return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eWell || e.mKind == EdgeKind::eHoistUp || drop(e) || (doors && e.mKind == EdgeKind::eDoor) ? all(e) : -1;
             };
             // (cells are half as long at half scale)
             const std::size_t most = mAbe.mHalfScale ? 24 : 12;
@@ -2797,7 +2805,7 @@ std::unique_ptr<Task> Bot::MakeFlee()
                 for (s32 edge : way)
                 {
                     const EdgeKind kind = nav.Edges()[edge].mKind;
-                    quick = quick && (kind == EdgeKind::eWalk || kind == EdgeKind::eWell || kind == EdgeKind::eHoistUp || (doors && kind == EdgeKind::eDoor));
+                    quick = quick && (kind == EdgeKind::eWalk || kind == EdgeKind::eWell || kind == EdgeKind::eHoistUp || drop(nav.Edges()[edge]) || (doors && kind == EdgeKind::eDoor));
                 }
                 if (quick)
                 {
@@ -2887,7 +2895,8 @@ std::unique_ptr<Task> Bot::MakeReflex()
     // Sligs awake on his screen, all of them on another level than his (they can't see him there), and no
     // security orb: one is taken over from where he stands, shoots the rest and bursts. Left alone they shoot
     // out of the screen at him as soon as he is in front of them at full size.
-    if (mPerchKills < 6)
+    // (not a Slig he has called for a lock: that one is the task's to take over and keep)
+    if (mPerchKills < 6 && !dynamic_cast<const SligLockTask*>(mTask.get()))
     {
         const NavGraph& nav = mKnow->mNav;
         const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);

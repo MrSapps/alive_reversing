@@ -1186,6 +1186,8 @@ public:
     static const s32 kSligWalking = 2;
 
 private:
+    // Frames it has spent on other Sligs of its floor
+    s32 mShot = 0;
     u32 mLock;
     u32 mSlig;
     u32 mLever;
