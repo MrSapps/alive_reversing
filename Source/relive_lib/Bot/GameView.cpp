@@ -21,6 +21,7 @@
 #include "../../AliveLibAE/MotionDetector.hpp"
 #include "../../AliveLibAE/Slig.hpp"
 #include "../../AliveLibAE/EvilFart.hpp"
+#include "../../AliveLibAE/FlyingSlig.hpp"
 #include "../../AliveLibAE/Slog.hpp"
 #include "../../AliveLibAE/Fleech.hpp"
 #include "../../AliveLibAE/Paramite.hpp"
@@ -544,6 +545,7 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                     f.mHalf = t.mScale == relive::reliveScale::eHalf;
                     f.mSwitch = t.mSwitchId;
                     f.mStartClosed = t.mStartState == relive::Path_ElectricWall::eOn;
+                    f.mBeam = true;
                     // (it is drawn up from where it is put, which can be under the floor it shuts: Feeco's path
                     // 3 has one at 2059 in the crawl gap of the floor at 2020)
                     f.mY1 -= 40;
@@ -717,6 +719,7 @@ static void BuildEntities(BinaryPath& path, World& world)
     world.mPath = &path;
     world.mInvisEver = false;
     world.mFleechKilled.clear();
+    world.mNoBomb.clear();
     world.mGatesGone.clear();
     world.mScrabsKilled.clear();
     world.mLocksSlapped.clear();
@@ -781,6 +784,12 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mSwitch = World::HazardSwitch(e.mId);
                     keep = GetGameType() == GameType::eAe;
                     e.mHalf = static_cast<const relive::Path_FlyingSlig&>(tlv).mScale == relive::reliveScale::eHalf;
+                    break;
+                case ReliveTypes::eFlyingSligSpawner:
+                    e.mKind = EntityKind::eFlierSpawner;
+                    e.mSwitch = static_cast<const relive::Path_FlyingSligSpawner&>(tlv).mSpawnerSwitchId;
+                    keep = GetGameType() == GameType::eAe;
+                    e.mHalf = static_cast<const relive::Path_FlyingSligSpawner&>(tlv).mScale == relive::reliveScale::eHalf;
                     break;
                 case ReliveTypes::eBrewMachine:
                     e.mKind = EntityKind::eBrew;
@@ -1111,6 +1120,42 @@ static void MarkFliers(const NavInput& in, World& world)
     }
 }
 
+// The floors of the Sligs a flying Slig is to get rid of (Domain::FlierTargets): nothing is crossed onto one near
+// its Slig until that is dead
+static void MarkFlierTargets(NavInput& in, const World& world)
+{
+    for (const Entity& spawner : world.mEntities)
+    {
+        if (spawner.mKind != EntityKind::eFlierSpawner)
+        {
+            continue;
+        }
+        bool orb = false;
+        for (const Entity& e : world.mEntities)
+        {
+            orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && e.mX1 / in.mCamW == spawner.CentreX() / in.mCamW && e.mY1 / in.mCamH == spawner.mY1 / in.mCamH);
+        }
+        if (orb)
+        {
+            continue;
+        }
+        for (const Domain::FlierTarget& target : Domain::FlierTargets(in, world, spawner))
+        {
+            NavFeature f;
+            f.mKind = FeatureKind::eDanger;
+            f.mX1 = target.mX - Domain::kFlierTargetX;
+            f.mX2 = target.mX + Domain::kFlierTargetX;
+            f.mY1 = target.mFloorY - Domain::kFlierTargetY;
+            f.mY2 = target.mFloorY + Domain::kFlierTargetY;
+            f.mHalf = spawner.mHalf;
+            f.mA = 1;
+            f.mId = target.mSlig;
+            f.mSwitch = World::HazardSwitch(target.mSlig);
+            in.mFeatures.push_back(f);
+        }
+    }
+}
+
 bool GameView::ReadPath(BaseMap& map, s32 pathId, NavInput& input, World& world)
 {
     BinaryPath* pPath = map.GetPathResourceBlockPtr(static_cast<u32>(pathId));
@@ -1126,6 +1171,7 @@ bool GameView::ReadPath(BaseMap& map, s32 pathId, NavInput& input, World& world)
         const relive::Path_TLV* pTlv = static_cast<const relive::Path_TLV*>(world.mTlvs[i]);
         world.mEntities[i].mGone = pTlv->mTlvFlags.Get(relive::eBit2_Destroyed) && !pTlv->mTlvFlags.Get(relive::eBit1_Created);
     }
+    MarkFlierTargets(input, world);
     return true;
 }
 
@@ -1412,6 +1458,25 @@ void GameView::ReadWorld(BaseMap& map, World& world)
                 at.mY = FP_GetExponent(pPortal->mYPos);
                 world.mPortalsOpen.push_back(at);
             }
+        }
+    }
+
+    world.mFlown = FlownAt();
+    for (s32 i = 0; isAe && i < gBaseAliveGameObjects->Size(); i++)
+    {
+        BaseAliveGameObject* pObj = gBaseAliveGameObjects->ItemAt(i);
+        if (pObj && !pObj->GetDead() && pObj->Type() == ReliveTypes::eFlyingSlig && pObj->mHealth > FP_FromInteger(0) && pObj->GetPossessed() && sControlledCharacter == pObj)
+        {
+            const auto* pFlier = static_cast<const FlyingSlig*>(pObj);
+            world.mFlown.mLive = true;
+            world.mFlown.mX100 = static_cast<s32>(static_cast<s64>(pFlier->field_294_nextXPos.fpValue) * 100 / 65536);
+            world.mFlown.mY100 = static_cast<s32>(static_cast<s64>(pFlier->field_298_nextYPos.fpValue) * 100 / 65536);
+            world.mFlown.mVelX100 = static_cast<s32>(static_cast<s64>(pObj->mVelX.fpValue) * 100 / 65536);
+            world.mFlown.mVelY100 = static_cast<s32>(static_cast<s64>(pObj->mVelY.fpValue) * 100 / 65536);
+            world.mFlown.mHalf = pObj->GetSpriteScale() != FP_FromInteger(1);
+            world.mFlown.mFacingLeft = pObj->GetAnimation().GetFlipX();
+            world.mFlown.mCanThrow = pFlier->GrenadeReady();
+            world.mFlown.mMotion = pObj->VGetMotion(eMotionType::eCurrentMotion);
         }
     }
 
@@ -1739,7 +1804,17 @@ NavInput GameView::BuildNavInput(BaseMap& map)
     {
         return {};
     }
-    return BuildNavInput(*pPath, static_cast<s32>(map.mCurrentLevel), map.mCurrentPath);
+    NavInput in = BuildNavInput(*pPath, static_cast<s32>(map.mCurrentLevel), map.mCurrentPath);
+    // (with the things of the path as the map has them, apart from the world the bot keeps)
+    World things;
+    BuildEntities(*pPath, things);
+    for (std::size_t i = 0; i < things.mEntities.size(); i++)
+    {
+        const relive::Path_TLV* pTlv = static_cast<const relive::Path_TLV*>(things.mTlvs[i]);
+        things.mEntities[i].mGone = pTlv->mTlvFlags.Get(relive::eBit2_Destroyed) && !pTlv->mTlvFlags.Get(relive::eBit1_Created);
+    }
+    MarkFlierTargets(in, things);
+    return in;
 }
 
 } // namespace Bot

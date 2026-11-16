@@ -35,6 +35,62 @@ s32 Lookahead::Delay(s32 index)
     return -1;
 }
 
+bool Lookahead::Repeats(Way way)
+{
+    return way == Way::eSame || way == Way::eFine;
+}
+
+// The delays a way is tried at: [first, end) of Delay()
+static s32 FirstOf(Lookahead::Way way)
+{
+    switch (way)
+    {
+        case Lookahead::Way::eSame:
+        case Lookahead::Way::eAgain:
+            // (the try the bot played itself was both of these, straight on)
+            return 1;
+        case Lookahead::Way::eFine:
+            return Lookahead::kWindow / Lookahead::kCoarsest;
+        default:
+            return 0;
+    }
+}
+
+static s32 EndOf(Lookahead::Way way)
+{
+    return way == Lookahead::Way::eFine ? Lookahead::Count() : Lookahead::kWindow / Lookahead::kCoarsest;
+}
+
+static s32 NextDelay(Lookahead::Stretch& stretch)
+{
+    while (stretch.mNext < EndOf(stretch.mWay))
+    {
+        const s32 delay = Lookahead::Delay(stretch.mNext++);
+        if (delay < stretch.mCeiling)
+        {
+            stretch.mDelay = delay;
+            return delay;
+        }
+    }
+    return -1;
+}
+
+s32 Lookahead::NextWay(Stretch& stretch)
+{
+    while (stretch.mWay != Way::eFast)
+    {
+        stretch.mWay = static_cast<Way>(static_cast<s32>(stretch.mWay) + 1);
+        stretch.mNext = FirstOf(stretch.mWay);
+        stretch.mAlike = 0;
+        const s32 delay = NextDelay(stretch);
+        if (delay >= 0)
+        {
+            return delay;
+        }
+    }
+    return -1;
+}
+
 s32 Lookahead::Failed(Stretch& stretch, s32 frames, s32 place)
 {
     if (frames <= stretch.mDelay)
@@ -57,30 +113,18 @@ s32 Lookahead::Failed(Stretch& stretch, s32 frames, s32 place)
         }
         if (stretch.mAlike >= kAlike)
         {
-            stretch.mNext = Count();
+            stretch.mNext = EndOf(stretch.mWay);
             return -1;
         }
     }
-    for (;;)
-    {
-        const s32 delay = Delay(stretch.mNext);
-        if (delay < 0)
-        {
-            return -1;
-        }
-        stretch.mNext++;
-        if (delay < stretch.mCeiling)
-        {
-            stretch.mDelay = delay;
-            return delay;
-        }
-    }
+    return NextDelay(stretch);
 }
 
 s32 Lookahead::Again(Stretch& stretch)
 {
     stretch.mRounds++;
     stretch.mAlike = 0;
+    stretch.mWay = Way::eSame;
     stretch.mNext = 1;
     stretch.mDelay = 0;
     return 0;

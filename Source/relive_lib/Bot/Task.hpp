@@ -964,6 +964,77 @@ private:
     std::unique_ptr<UseTask> mUse;
 };
 
+// Sligs he can't take over, got rid of with a flying Slig: from a cell where he isn't seen he takes over the one
+// its spawner makes, flies it (FlierFlight) to a place off each Slig's level and throws a grenade at it, then
+// bursts it. A flying Slig that is shot is not the end: the spawner makes another as he stands there.
+class FlierBombTask final : public Task
+{
+public:
+    // lever: not for the Sligs, but to pull that lever with it
+    FlierBombTask(u32 spawner, s32 spot, u32 lever = 0)
+        : mSpawner(spawner)
+        , mSpot(spot)
+        , mLever(lever)
+    {
+    }
+    ~FlierBombTask() override;
+    std::string Name() const override
+    {
+        return mLever ? "Pull #" + std::to_string(mLever) + " with the flying Slig of #" + std::to_string(mSpawner) : "Bomb the Sligs with the flying Slig of #" + std::to_string(mSpawner);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mSpawner;
+    s32 mSpot;
+    u32 mLever;
+    // What the lever's switch was when this began
+    bool mLeverKnown = false;
+    s32 mLeverWas = 0;
+    std::unique_ptr<GoToTask> mGo;
+    // 0 Abe to the cell, 1 chanting, 2 flying, 3 bursting it, 4 Abe again
+    s32 mPhase = 0;
+    s32 mFrames = 0;
+    s32 mWaits = 0;
+    s32 mAfter = 0;
+    s32 mLost = 0;
+    // The Sligs to get (Domain::FlierTargets), the frames until they are looked for again, and how many things
+    // were known dead when they last were
+    std::vector<Domain::FlierTarget> mTargets;
+    s32 mTargetsIn = 0;
+    std::size_t mKilled = 0;
+    // The frames the flying Slig has been off his screen while he chants
+    s32 mAway = 0;
+    // The Slig it is after, which of the places to throw from, how often all of them have been gone through,
+    // and the Sligs given up on
+    u32 mTarget = 0;
+    std::size_t mShot = 0;
+    s32 mRounds = 0;
+    std::vector<u32> mGivenUp;
+    // 0 the way to where it waits to be found, 1 on the way, 2 waiting there for the moment, 3 to where it
+    // throws from, 4 thrown: waiting for it to go off
+    s32 mState = 0;
+    s32 mStuck = 0;
+    s32 mUnstick = 0;
+    s32 mLastX = 0;
+    s32 mLastY = 0;
+    s32 mSince = 0;
+    s32 mHeld = 0;
+    // How much nearer the Slig than the place to throw from it throws this time (FlierFlight::Shot::mNearer)
+    s32 mNearer = 0;
+    // The direction buttons it held last frame
+    u32 mLastHeld = 0;
+    // The frames it has been on the run in to where it waits
+    s32 mRunInFrames = 0;
+    // The frames since the way to where it throws from was last found
+    s32 mLegFrames = 0;
+    std::vector<std::pair<s32, s32>> mWay;
+    std::size_t mCorner = 0;
+    // Where the Slig was a frame ago: where it will be when the grenade comes down
+    s32 mLastSligX = 0;
+    bool mHasLastSlig = false;
+};
+
 // A Slig lock opened with a Slig: called with the lever of its spawner, taken over from by the lever, walked to
 // the lock (Domain::SligWay: floors, drops, lifts, teleporters whose levers it pulls), shooting the Sligs it
 // walks into, and there it says "Hi" and then the lock's code back to it. It is burst after, unless there is

@@ -655,6 +655,8 @@ SET(relive_lib_src
     Bot/SligCycle.cpp
     Bot/Lookahead.hpp
     Bot/Lookahead.cpp
+    Bot/FlierFlight.hpp
+    Bot/FlierFlight.cpp
     Bot/Pilot.cpp
     Bot/ThrowArc.hpp
     Bot/ThrowArc.cpp

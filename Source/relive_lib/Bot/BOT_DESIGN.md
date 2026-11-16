@@ -28,6 +28,7 @@ what is left, and wins where they differ.
 | Tasks | `Task`, `Tasks.cpp` | `GoTo` (replans the route after every move, bans edges that go nowhere, sneaks past sleeping Sligs, waits in cover for an awake one to look away, leads Mudokons by ways they can follow), `Use`, `Recruit` (hello, sorry or a slap by mood, follow me), `Rescue`, `WorkTogether`, `Kill`, `Exit`; for Scrabs `ScrabRampage`, `ScrabKill`, `ScrabLure` (off the end of their floor), `ScrabPen` (shut in behind a gate) and `ScrabWary` (a floor one walks crossed in timed stints). |
 | Checkpoints | `Checkpoint` | A quicksave the bot owns, taken every ~90 frames when Abe stands still and nothing threatens (no Slig on the screen, no laughing Mudokon in tow). On a death: back to the newest, try again after a (seeded) delay; six deaths from one and it goes back to the one before. Old ones are thinned out, not dropped. The game's own quicksave is left alone. |
 | Look-ahead | `Lookahead`, `Bot::TryFailed` | With the `look` option: from each save the same moves are tried begun later and later against the game itself until one gets to the next save unhurt; what failed is taken back and is not in the run's inputs. See "Look-ahead" under Architecture. |
+| A flying Slig flown | `FlierFlight`, `FlierBombTask`, `Domain::FlierTargets` | Taken over from where he is safe, flown to throw grenades at the Sligs he can't take over and to pull a lever he can't get to. The Barracks' path 1: three Sligs and the door's lever. |
 | Bot | `Bot` | Plan, act, replan. Profiles, the committed input log (rewound tries aren't in it), the report, movie skipping, the reflex that slaps a wired Mudokon tagging along. |
 | Profiles | `Profile` | `save_all`, `kill_all`, `average`, `any`, with `seed=<n>` and `human`. |
 
@@ -1181,13 +1182,52 @@ roll, hop and landing of Abe's is one; a sneak, a pull up a ledge and a jump up 
   that now goes where its quick way ends (`Bot::MakeFlee`). The rule that a second fall between the same
   two cells also ends hung is not caught by its test when broken.
 
-**What the Barracks still wants** (from the walkthrough and the paths' TLVs; nothing of it is built):
-- Path 1 from its fifth screen on (the first four are done, see below): a flying Slig to take over that kills
-  the Sligs above with grenades and pulls a lever for him, a Slig a trap door drops, the wheels of path 13.
-  The bot first dies there at about f=3,200 of `b1.txt`.
-- A flying Slig as a thing he flies himself (grenades, levers), a Glukkon taken over and its orders to Sligs
-  (the war room), crawling Sligs and their button, grenades thrown from a boom machine on a count,
-  Greeters, laughing gas, flying mines to time, a Shrykull.
+**A flying Slig that he flies** (2026-11-15; the Barracks' path 1, its fifth to seventh screens: "possess the
+flying Slig. Fly him upwards and blow up the Sligs there ... the right lever deactivates the electric walls and
+opens the door"). `build-bot/la/fs2.txt` starts him on the ledge it is taken over from, with `look`.
+- **What the game does** (FlyingSlig.cpp, taken over): a held direction adds 0.7 of a pixel a frame to its
+  speed (0.49 each way on a diagonal); it loses a quarter of a pixel a frame for each whole pixel a frame of
+  its speed, and stops dead under one when nothing is held; its speed is cut to 5.5. It bounces off what it
+  flies into. What is held now shows in its speed the frame after next. Throw sends a grenade the way it faces,
+  from 5 over its point at 5 to 6.4 along and 6 up, that goes off where it first comes down (a small blast: 30
+  to each side); not in the frames it turns or ends a climb, when the game takes no notice of the button
+  (`FlyingSlig::GrenadeReady`, read only). Action, at rest in its idle motion and facing a lever one to two
+  cells ahead, takes it to the lever and pulls. Chant bursts it. Its box is 25 to each side of its point, from
+  23 over it to 8 under (read from the game with `dump_objects`); it is drawn 20 under its point, bobbing.
+- **A Slig shoots it** when it is on the Slig's level and in front of it: its point from 46 over the Slig's
+  floor to 5 under. Off that, it is not seen.
+- **`FlierFlight`** (apart from the game, unit tested and mutation checked): a frame of its speed, how far it
+  coasts, the buttons that leave it nearest a place if let go a frame on (`Steer`), the grenade's flight, and
+  the places to throw from at a Slig (`Shots`): first from just under an end of the Slig's floor, 40 out from
+  it, where nothing on that floor sees it (it waits 36 under the floor, goes up to 12 under, throws, and comes
+  down again; the grenade goes up over the edge and comes down 17 to 37 in, the nearer the Slig the further out
+  it throws from), then from 60 and more over the Slig's head to either side.
+- **`Domain::FlierTargets`**: the Sligs of screens with a security orb (he can't take those over himself) that
+  have such a place, on their own screen (the game has only the screen the flying Slig is on: a grenade from
+  the next one finds no Slig), with nothing in the grenade's way and a way through the air to it from the
+  spawner (`Domain::FlierWay`: `FartFlight::Route` kept to the screens the path has, every floor made longer
+  by the flying Slig's width and shut off sideways at its own height). What is shut on the way and a switch
+  opens is to be open first. The floor of each is a stretch nothing is crossed into until it is dead
+  (`FeatureKind::eDanger`, as for the flying Sligs a fart gets rid of).
+- **The plan's steps**: `Bomb Sligs #.. with the flying Slig of FlierSpawner#..` and `Have the flying Slig
+  ... pull Lever#..` (what his own pull of the lever needs and gives, for a lever he can't get to), both
+  `FlierBombTask`: to the cell of the spawner's screen furthest from its track (where he isn't seen, if there
+  is such a cell), chant while one is about, fly it, burst it. A flying Slig that is lost is not the end: the
+  spawner makes another as he stands there.
+- **Measured** (`fs2.txt`): the three Sligs it can get at bombed by f=1,124 with one flying Slig, each with
+  the first grenade (the map's own word that a Slig is gone is what counts: that it is not to be seen is not
+  enough); the lever pulled with a second by f=1,647; Abe up two screens to the door's floor by f=2,129.
+- **Not done**: the Slig on the floor by the door (#11013) and the one on the trap door (#11011). The first
+  shoots him at the door whatever moment he comes (467 tries). The walkthrough drops the second with the left
+  lever and bombs it, then bombs the first from its own level when its back is turned: neither is built. A
+  flying Slig that is made as he climbs past its switch again goes for him too.
+- **An electric wall's beam** is four pixels to each side of where the map puts it and stands up from its
+  floor (boxes read from the game): into the cells beside it only while it is off (`NavFeature::mBeam`).
+
+**What the Barracks still wants** (from the walkthrough and the paths' TLVs):
+- Path 1's last Sligs (above), the wheels of path 13.
+- A Glukkon taken over and its orders to Sligs (the war room), crawling Sligs and their button, grenades
+  thrown from a boom machine on a count, Greeters, laughing gas, flying mines to time, a Shrykull.
 
 **AO, Rupture Farms** (`a1.txt`: from its first screen, `bot any`): paths 15, 16, 18, 19 and 20 with 0 deaths, out
 to the Stockyards at f=5,567 (the milestone's AO half; f=6,291 as committed and since: the grenades are
@@ -1422,41 +1462,58 @@ that worked.
   a ledge and with Sligs awake on the screen (every 30 frames there, not 90), but not hurt nor within 60 frames
   of being hurt. A save nothing gets on from costs little: see the ceiling below.
 - **The first try from a save** is the bot playing as it would without `look`. What it pressed, up to where
-  it failed, is kept (`Saved::mPressed`). **Every later try** holds still for a delay and then presses the same,
-  frame for frame; where the first try failed the bot takes over again and plans from what it finds. So a
-  later try is the same thing begun later, and a tactic's own waiting is not done twice. (Restarting the task
-  after the delay was tried first and does not work: the task waits for the Slig again and comes out at the
-  same point of its beat every time.)
-- **The delays** (`Lookahead`, unit tested apart from the game): 0, then every 32nd frame up to 320, then
-  the ones half way between, down to every 8th: 40 in all. Hurt while he still held back and every delay
-  that long or longer is ruled out without being tried (`Stretch::mCeiling`): a save taken where he is
-  about to be shot is used up in five or six tries.
-- **Out of delays**, the try that got to this save from the one before has failed too: that save's next
-  delay, at most two saves back (`kPopsPerObstacle`). If nothing gets through unhurt from there either, being
-  hurt is put up with until he has got to two places he had not saved at before (`mTolerant`); then only dying
-  fails a try. So do 6,000 frames of failed tries (or 600 tries) without a save somewhere new; hurt put up with,
+  it failed, is kept (`Saved::mPressed`).
+- **Every later try** holds still for a delay and then does one of five things (`Lookahead::Way`), in this
+  order:
+  1. *the same buttons*, frame for frame, at every 32nd frame up to 320 (where the first try failed the bot
+     takes over again and plans from what it finds): the same thing begun later, with a tactic's own waiting
+     not done twice;
+  2. the same at the moments between, down to every 8th;
+  3. *planned anew* from what is found at that moment (the coarse moments, as for the next two);
+  4. planned anew with every step sneaked;
+  5. planned anew with every step run.
+  Hurt while he still held back and every delay that long or longer is ruled out without being tried, whatever
+  is done after it (`Stretch::mCeiling`): a save taken where he is about to be shot is used up in a few tries.
+  Six tries of one kind that began at different moments and each failed as long after it began, at the same
+  place, end that kind (`Lookahead::kAlike`).
+- **A try with nothing left to do has failed too** (`Bot::Stuck` with `look`): what led there is taken back
+  and done another way while there is one. The same buttons played blind can leave a tactic half done (the
+  power to go unseen spent early, in the second vault), and the plan then ends where no plan is.
+- **Out of things to try**, the try that got to this save from the one before has failed too: that save's
+  next try, down to two saves under the one the first failure was from (`mPopFloor`; the saves a try takes on
+  its own way are gone back over freely). If nothing gets through unhurt from there either, being hurt is put
+  up with until he has got to two places he had not saved at before (`mTolerant`); then only dying fails a
+  try. So do 6,000 frames of failed tries (or 600 tries) without a save somewhere new; hurt put up with,
   60,000 more frames of tries that die is stuck.
+- **Somewhere new** is a place no save of the run was taken at (`mSavePlaces`: all of them; with only the
+  last dozen kept, ground gone over again from a save further back counted as new and the tries never ran
+  out), or 900 frames with no try failed.
 - **The bot's memory is put back with the save** (`BotMemory`, a base of `Bot`: what it has seen of the world,
   where it has been, what it found to work and not, the edges ruled out; and its dice, `Saved::mRng`). A try
   that is taken back did not happen. Without this, what a failed try had seen stayed believed: a gate it had
   opened was planned through, a path it had died in counted as been in, and both trials ended with no plan.
   What is learnt from failing as such (throws that miss, a drill's timing) is not in it and stays.
-- **Tries that fail alike are not a matter of when** (`Lookahead::kAlike`): six that began at different
-  moments and each failed as long after it began, at the same place, end the save's tries.
+- **A replay is the run** (checked 2026-11-15 with `build-bot/la/rp_play.txt`, `rp_replay.txt`, `rp_cmp.py`):
+  the Barracks from its first screen with 102 tries, its buttons played back with no bot, gives the same
+  world (`hash_log`) on each of the 17,613 frames. That covers saves taken hanging and with Sligs awake.
 
-Measured (2026-11-15, Debug, headless, `build-bot/la/*l.txt` are the standing runs with `look`):
+Measured (2026-11-15, Debug, headless, `build-bot/la/*l.txt` are the standing runs with `look`; a run's
+frame count includes its tries):
 | Run | Without `look` | With `look` |
 |---|---|---|
-| Barracks `b1` | 0 deaths to f=2,982, hurt 3 times on the way, dies at f=3,195 | 245 tries, hurt put up with twice (the first guard, as before; screen five), stuck on screen five at f=3,701 where the moves are not built; 40 s |
-| Scrab trial `tr1` | 0 deaths, hurt by Fleeches | through it and on into the next vault; 101 tries, hurt put up with 5 times; 34 s for 14,400 frames |
-| Mudomo trial `t13` | 0 deaths | through it and on; 25 tries, hurt put up with twice; 50 s |
-| AO Rupture Farms `a1` | 14 deaths, Stockyards at f=5,567 | 70 tries and no death in the first 3,573 frames (the script's frame count ran out in path 18) |
-The walker's floor of the Barracks (two hits before) is crossed unhurt: the tries found the moment the
-hand-written timing had not. The first guard is not: no moment makes that jump unhurt, which is what led to
-the next point.
+| Scrab trial `tr1` | 0 deaths, hurt by Fleeches | through it, the next vault, Necrum and Feeco and into the Barracks (f=62,717) with no death: 588 tries, hurt put up with 14 times |
+| Mudomo trial `t13` | 0 deaths | through it and on into the Mudanchee vault (f=13,785): 424 tries, hurt put up with 4 times |
+| AO Rupture Farms `a1` | 14 deaths, Stockyards at f=5,567 | to the Stockyards at f=5,591 with no death (1,363 tries, 27 put up with) with the kinds of try in another order; with this order see below |
+Of the tries that got on in those runs most were the same buttons at another moment; one each was planned
+anew and sneaked. No obstacle of the Barracks' first screens is got through unhurt by another gait that is
+not by another moment: the first standing guard costs a hit whatever is done.
 
-What it does not do yet: change *what* is done (the gait, another way), only when. Where no moment works for
-the move the planner chose, it ends up hurt as it did before.
+Not good yet:
+- AO's path 18 with the order above: stuck at f=4,555 after 403 tries. Hurt is dead in AO, so every obstacle
+  is one to be got through whole; the run above that got through had the three kinds of planning anew before
+  the moments between.
+- A try that fails takes a second or two of game time, and a run with hundreds of them takes minutes.
+- `Bot::TryFailed` and what hangs off it have no unit tests: only `Lookahead` has (mutation checked).
 
 ### Navigation
 

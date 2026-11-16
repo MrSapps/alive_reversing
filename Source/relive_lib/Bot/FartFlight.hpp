@@ -43,6 +43,8 @@ public:
     // The gates and trap doors of the path a fart can't get through as lines for Route: all of them, or with a
     // world only those that are shut in it. features: which feature of the path each is.
     static std::vector<NavLine> Gates(const NavInput& in, bool half, const World* world, std::vector<s32>* features = nullptr);
+    // Nothing of the path, nor of more, is between two points
+    static bool Open(const NavInput& in, bool half, Point from, Point to, const std::vector<NavLine>* more = nullptr);
     // Whether a way (from, then its corners) goes through a line
     static bool Through(Point from, const std::vector<Point>& corners, const NavLine& line);
 
