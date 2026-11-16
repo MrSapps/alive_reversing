@@ -8335,7 +8335,14 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
         mLeverKnown = true;
         mLeverWas = world.Switch(lever->mSwitch);
     }
-    const bool nothingLeft = lever ? world.Switch(lever->mSwitch) != mLeverWas : targets.empty();
+    // With a Slig lock: done when that is open
+    const Entity* lock = mLock ? world.Find(mLock) : nullptr;
+    const auto code = world.mLockCodes.find(mLock);
+    if (mLock && (!lock || code == world.mLockCodes.end()))
+    {
+        return TaskStep::Failed("no such lock");
+    }
+    const bool nothingLeft = lock ? world.Switch(lock->mSwitch) != 0 : lever ? world.Switch(lever->mSwitch) != mLeverWas : targets.empty();
     if (!flown.mLive)
     {
         // Abe: before it is his, or after it is gone
@@ -8442,14 +8449,14 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
         if (mPhase != 3)
         {
             mPhase = 3;
-            bot.Log(std::string(lever ? "the lever is pulled" : "no Slig left for it") + ": bursting the flying Slig");
+            bot.Log(std::string(lock ? "the lock is open" : lever ? "the lever is pulled" : "no Slig left for it") + ": bursting the flying Slig");
         }
         return TaskStep::Do(Prim::Wait(1, Btn::eChant));
     }
     const Domain::FlierTarget* target = nullptr;
     for (const Domain::FlierTarget& t : targets)
     {
-        if (t.mSlig == mTarget)
+        if (t.mSlig == mTarget && !lock && !lever)
         {
             target = &t;
         }
@@ -8457,7 +8464,21 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
     // A lever is pulled like a grenade is thrown: flown to a place by it, facing it, and action there. From its
     // left first, then from its right (FlierFlight::LeverPull).
     FlierFlight::Shot pull;
-    if (lever)
+    if (lock)
+    {
+        // (in the middle of its box, come at from one side and then from the other)
+        pull.mX = lock->CentreX();
+        pull.mY = (lock->mY1 + lock->mY2) / 2;
+        pull.mFaceLeft = mShot % 2 == 0;
+        pull.mLandX = pull.mX;
+        pull.mWaitX = pull.mX;
+        pull.mWaitY = pull.mY;
+        if (mShot >= 8)
+        {
+            return TaskStep::Failed("the flying Slig does not get to the lock");
+        }
+    }
+    else if (lever)
     {
         pull = FlierFlight::LeverPull(lever->CentreX(), lever->mY2 - 4, mShot % 2 == 1);
         if (mShot >= 8)
@@ -8596,6 +8617,30 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
         // Up (or down) to where it throws from, and thrown the moment it is there
         // (when it can: not in the frames it ends its climb in, when the game takes no notice of the button)
         const s32 fromX = shot.mX + (shot.mFaceLeft ? -mNearer : mNearer);
+        if (lock)
+        {
+            // In its box and at rest: it says "Hi", and then the code back to it
+            const bool in = bx >= lock->mX1 + 6 && bx <= lock->mX2 - 6 && by >= lock->mY1 + 2 && by <= lock->mY2 - 2;
+            if (in && std::abs(shot.mX - bx) <= 25 && std::abs(shot.mY - by) <= 12)
+            {
+                if (lock->mState != mLockState)
+                {
+                    mLockState = lock->mState;
+                    bot.Log("SligLock#" + std::to_string(mLock) + ": state " + std::to_string(lock->mState) + ", the flying Slig at " + std::to_string(bx) + "," + std::to_string(by));
+                }
+                mSince = 0;
+                const u32 say = SligLockTask::Say(lock->mState, code->second, still && flown.mMotion == 0, mHi, mSaid);
+                return TaskStep::Do(Prim::Wait(2, say));
+            }
+            if (++mSince > 300)
+            {
+                mShot++;
+                mState = 0;
+                mLegFrames = 0;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            return steerTo(shot.mX, shot.mY);
+        }
         if (lever)
         {
             // (action, at rest: the game looks for a lever only then)
@@ -8758,7 +8803,7 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
         mLegFrames = 1;
         return TaskStep::Do(Prim::Wait(1));
     }
-    if (lever)
+    if (lever || lock)
     {
         mNearer = 0;
         mState = 3;
@@ -9025,12 +9070,38 @@ TaskStep SligLockTask::Next(Bot& bot, const std::string& lastFailed)
     }
     // Another Slig on its floor shoots it on sight: that one first, before the way to the lock and before it
     // is burst (the walkthrough of the Barracks' Slig bunks: "talk to the Slig Lock, then shoot the other
-    // Sligs")
+    // Sligs"). And the naked ones that crawl along its floor to a locker for a gun: shot before they get there.
     {
+        // (nothing shut between them: a slam door stops the shot)
+        const auto clear = [&](s32 x)
+        {
+            for (const NavFeature& f : nav.Input().mFeatures)
+            {
+                if (f.mKind == FeatureKind::eBarrier && f.mSolid && f.mHalf == me->mHalf && f.mX2 >= std::min(x, me->mX) && f.mX1 <= std::max(x, me->mX) && f.mY1 <= me->mY && f.mY2 >= me->mY - 40 &&
+                    f.mSwitch > 1 && (world.Switch(f.mSwitch) != 0) != f.mStartClosed)
+                {
+                    return false;
+                }
+            }
+            return true;
+        };
         s32 targetX = 0;
+        bool target = false;
         // (from as far as it would shoot from: measured there, one that had just come by its gun at 1087 shot
         // the one he had at 889 five frames after it stood)
-        if (mShot < 1500 && ClearSligTask::Target(world, *me, nullptr, targetX) && std::abs(targetX - me->mX) <= 380)
+        if (mShot < 1500 && ClearSligTask::Target(world, *me, nullptr, targetX) && std::abs(targetX - me->mX) <= 380 && clear(targetX))
+        {
+            target = true;
+        }
+        for (const RockAt& crawler : world.mCrawlers)
+        {
+            if (!target && mShot < 1500 && crawler.mHalf == me->mHalf && std::abs(crawler.mY - me->mY) <= 20 && std::abs(crawler.mX - me->mX) <= 300 && std::abs(crawler.mX - me->mX) >= 30 && clear(crawler.mX))
+            {
+                target = true;
+                targetX = crawler.mX;
+            }
+        }
+        if (target)
         {
             mShot += 2;
             const bool left = targetX < me->mX;

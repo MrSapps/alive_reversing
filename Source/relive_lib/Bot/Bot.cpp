@@ -222,6 +222,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<FlierBombTask>(step.mEntity, step.mEdge);
         case StepKind::eFlierPull:
             return std::make_unique<FlierBombTask>(step.mEntity, step.mEdge, step.mOther);
+        case StepKind::eFlierLock:
+            return std::make_unique<FlierBombTask>(step.mEntity, step.mEdge, 0, step.mOther);
         case StepKind::eSligLock:
             return std::make_unique<SligLockTask>(step.mEntity, step.mOther, static_cast<u32>(step.mEdge));
         case StepKind::eRide:
@@ -597,9 +599,15 @@ bool Bot::Replan(BaseMap& map)
             // No way out is known yet: change what can be changed, a door it opens may show one. Switches the
             // run has already set once are left alone, so it can't go round in circles.
             // (the nearest looking first, and the first two that can be done are enough to choose from)
-            if (mWhyNoWayOut != mAbe.mPath)
+            s32 others = 0;
+            for (const Goap::Action& a : actions)
+            {
+                others += a.mName.rfind("Cross ", 0) == 0 ? 0 : 1;
+            }
+            if (mWhyNoWayOut != mAbe.mPath || mWhyCount != others)
             {
                 mWhyNoWayOut = mAbe.mPath;
+                mWhyCount = others;
                 // (with what can be done here other than cross, to see which need nothing gives)
                 std::string can;
                 for (const Goap::Action& a : actions)

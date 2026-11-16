@@ -1452,13 +1452,35 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
   alone while a `SligLockTask` runs); on its way it shoots another Slig of its floor from 380 off, before
   that one shoots it (`SligLockTask`, measured: one newly armed at 1087 shot it at 889 five frames after it
   stood); the Slig lock at 1125,930 open at f=1,575 with the first Slig called.
-  Not yet: the four naked Sligs asleep under the first wheel crawl to the lockers at 1075,960 and come back
-  armed, one after the other, and shoot him as he goes right (19 deaths). The walkthrough has them chase him
-  through the electric wall at 800,980, turned on with the lever beside it as they come. The bot knows
-  nothing of crawling Sligs yet (`CrawlingSlig.cpp`, `SligGetPants`): an entity, where they are, and a trap
-  as `SlogTrapTask` is for Slogs. After that: the flying Slig taken over for the second lock (1249,564) and
-  flown round to kill the Sligs up the middle, wheel 180; the boom machine's grenades for the orbs up top,
-  a naked Slig taken over to press the button at 1301,180, wheels 250 and 190.
+  - The naked Sligs (`CrawlingSlig.cpp`; `World::mCrawlers`, those about and alive). The four asleep under
+    the first wheel wake when he goes through the box at 718..742 (their panic switch, 238), crawl to the
+    lockers at 1075,960 and come back armed; the three penned behind the first lock's wall (always awake)
+    come out when that opens, and the one on the floor over them comes by wings at the locker at 1300,860.
+    The walkthrough zaps the first four in the electric wall at 800,980 (its lever sets it on, and the box
+    he stands in sets it off again five frames later: a zap is a pull as they are in it). The bot does not:
+    the Slig he has called for the lock shoots them, naked (a bullet does kill one) or armed, from as far as
+    300 and 380, with nothing shut between (`SligLockTask`). With that the first lock is open at f=1,575
+    with the first Slig called and no deaths.
+  - The second lock (1249..1375 by 564..615, switch 181) is for a flying Slig: `StepKind::eFlierLock`,
+    "Open SligLock#n with the flying Slig of FlierSpawner#m", done by `FlierBombTask` as it pulls a lever:
+    flown into the middle of the lock's box, and there it says "Hi" and the code back
+    (`SligLockTask::Say`). What it took: `Domain::FlierWay` comes away from a wall first where the flight
+    starts nearer one than it flies by (the spawner at 1436 by the wall of its shaft at 1453: no way was
+    found to anywhere); the cells to take it over from are ones he can get to as things are, not through
+    what is shut; where he stands on the floor of a Slig the flying Slig could bomb, the lever and the lock
+    are still planned; and `Domain::FlierSpot` looks at every screen a flying Slig is or may come to be on
+    (its spawner's track, one that is about, a locker for wings: `World::mWingLockers`), for the cell
+    furthest from all of that. From the ledge at 620 by the lock he was killed six times, 40 under the track
+    of the flying Slig that lives up there; from 1137,980, with the one that has come by its wings hanging
+    at 1417,828, it is his. The step costs 1,500, so that a lock a Slig walks to is done first (that Slig
+    is what clears the armed ones off the floor he has to go along).
+  - One run with all of that: the second lock open at f=2,986, the second wheel (180) turned at f=3,512,
+    one death (before the lockers counted, at the ledge by the lock). The run after it, with no deaths:
+    his flying Slig met the one that lives by the lock on its way up and was lost, and no other came (the
+    walkthrough: "fly up and kill the other Slig"; and for another, the lever at 1200,700 and off the
+    edge to the left). Not built: a flying Slig as something to bomb or to keep clear of, and that lever.
+  After that: the boom machine's grenades for the orbs up top, a naked Slig taken over to press the button
+  at 1301,180, wheels 250 and 190.
 - **Block 4** (path 9: first try from inside its door, a scratch run).
   (path 7), whose door shuts behind him, is the one he starts on: a wheel (switch 177), then a Slig lock
   with a Slig called by a lever, where he dies six times and gives up. Block 4 (path 9) not looked at again.
