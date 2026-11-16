@@ -7060,14 +7060,14 @@ TEST(BotLookahead, HurtWhileItStillHeldBackRulesOutEveryDelayThatLong)
         }
     }
     using Way = Bot::Lookahead::Way;
-    ASSERT_EQ(rest, (std::vector<std::pair<Way, s32>>{{Way::eFine, 16}, {Way::eFine, 48}, {Way::eFine, 8}, {Way::eFine, 24}, {Way::eFine, 40}, {Way::eAgain, 32}, {Way::eQuiet, 0}, {Way::eQuiet, 32}, {Way::eFast, 0}, {Way::eFast, 32}}));
+    ASSERT_EQ(rest, (std::vector<std::pair<Way, s32>>{{Way::eAgain, 32}, {Way::eQuiet, 0}, {Way::eQuiet, 32}, {Way::eFast, 0}, {Way::eFast, 32}, {Way::eFine, 16}, {Way::eFine, 48}, {Way::eFine, 8}, {Way::eFine, 24}, {Way::eFine, 40}}));
     // (hurt on the very frame it was to begin counts as while it held back)
     Bot::Lookahead::Stretch other;
     ASSERT_EQ(FailedSomewhereElse(other, 100), 32);
     ASSERT_EQ(FailedSomewhereElse(other, 32), -1);
     ASSERT_EQ(other.mCeiling, 32);
-    ASSERT_EQ(Bot::Lookahead::NextWay(other), 16);
-    ASSERT_EQ(other.mWay, Way::eFine);
+    ASSERT_EQ(Bot::Lookahead::NextWay(other), 0);
+    ASSERT_EQ(other.mWay, Way::eQuiet);
 }
 
 TEST(BotLookahead, BegunAgainEveryDelayIsTriedOnceMoreButForTheOnesKnownTooLong)
@@ -7075,23 +7075,23 @@ TEST(BotLookahead, BegunAgainEveryDelayIsTriedOnceMoreButForTheOnesKnownTooLong)
     Bot::Lookahead::Stretch stretch;
     ASSERT_EQ(FailedSomewhereElse(stretch, 200), 32);
     ASSERT_EQ(FailedSomewhereElse(stretch, 24), -1);
-    ASSERT_EQ(Bot::Lookahead::NextWay(stretch), 16);
-    ASSERT_EQ(stretch.mWay, Bot::Lookahead::Way::eFine);
+    ASSERT_EQ(Bot::Lookahead::NextWay(stretch), 0);
+    ASSERT_EQ(stretch.mWay, Bot::Lookahead::Way::eQuiet);
     ASSERT_EQ(Bot::Lookahead::Again(stretch), 0);
     ASSERT_EQ(stretch.mRounds, 1);
     ASSERT_EQ(stretch.mDelay, 0);
     ASSERT_EQ(stretch.mWay, Bot::Lookahead::Way::eSame);
     // (24 itself is too long: he was hurt 24 frames in while he held back. No coarse step is under that)
     ASSERT_EQ(FailedSomewhereElse(stretch, 200), -1);
-    ASSERT_EQ(Bot::Lookahead::NextWay(stretch), 16);
-    ASSERT_EQ(stretch.mWay, Bot::Lookahead::Way::eFine);
-    ASSERT_EQ(FailedSomewhereElse(stretch, 200), 8);
-    ASSERT_EQ(FailedSomewhereElse(stretch, 200), -1);
     ASSERT_EQ(Bot::Lookahead::NextWay(stretch), 0);
     ASSERT_EQ(stretch.mWay, Bot::Lookahead::Way::eQuiet);
     ASSERT_EQ(FailedSomewhereElse(stretch, 200), -1);
     ASSERT_EQ(Bot::Lookahead::NextWay(stretch), 0);
     ASSERT_EQ(stretch.mWay, Bot::Lookahead::Way::eFast);
+    ASSERT_EQ(FailedSomewhereElse(stretch, 200), -1);
+    ASSERT_EQ(Bot::Lookahead::NextWay(stretch), 16);
+    ASSERT_EQ(stretch.mWay, Bot::Lookahead::Way::eFine);
+    ASSERT_EQ(FailedSomewhereElse(stretch, 200), 8);
     ASSERT_EQ(FailedSomewhereElse(stretch, 200), -1);
     ASSERT_EQ(Bot::Lookahead::NextWay(stretch), -1);
     ASSERT_EQ(Bot::Lookahead::NextWay(stretch), -1);
@@ -7147,8 +7147,8 @@ TEST(BotLookahead, TriesThatFailAlikeHoweverLateTheyBeganAreNotAMatterOfWhen)
     {
         ASSERT_GE(Bot::Lookahead::Failed(other, other.mDelay + 40, 7), 0);
     }
-    ASSERT_EQ(Bot::Lookahead::NextWay(other), 16);
-    ASSERT_EQ(Bot::Lookahead::Failed(other, 16 + 40, 7), 48);
+    ASSERT_EQ(Bot::Lookahead::NextWay(other), 32);
+    ASSERT_EQ(Bot::Lookahead::Failed(other, 32 + 40, 7), 64);
 
     // Begun again with something ruled out, it is counted anew
     Bot::Lookahead::Stretch again;
@@ -7182,19 +7182,17 @@ TEST(BotLookahead, WhenNoMomentGetsItThroughSomethingElseIsTriedAtEachMoment)
         delay = FailedSomewhereElse(stretch, 1000);
     }
     const s32 coarse = Bot::Lookahead::kWindow / Bot::Lookahead::kCoarsest;
-    // The same buttons, at the coarse moments and then the ones in between; planned anew (not straight on again
-    // for either: the first try was that); sneaked and run, straight on too
+    // The same buttons and planned anew, at the coarse moments (not straight on again for either: the first try
+    // was that); sneaked and run, straight on too; last the same buttons at the moments in between
     ASSERT_EQ(static_cast<s32>(tried.size()), (coarse - 1) * 2 + coarse * 2 + Bot::Lookahead::Count() - coarse);
     ASSERT_EQ(tried[0], (std::pair<Way, s32>{Way::eSame, 32}));
     ASSERT_EQ(tried[coarse - 2], (std::pair<Way, s32>{Way::eSame, 288}));
-    const s32 all = Bot::Lookahead::Count();
-    ASSERT_EQ(tried[coarse - 1], (std::pair<Way, s32>{Way::eFine, 16}));
-    ASSERT_EQ(tried[all - 2], (std::pair<Way, s32>{Way::eFine, 312}));
-    ASSERT_EQ(tried[all - 1], (std::pair<Way, s32>{Way::eAgain, 32}));
-    ASSERT_EQ(tried[all + coarse - 2], (std::pair<Way, s32>{Way::eQuiet, 0}));
-    ASSERT_EQ(tried[all + 2 * coarse - 3], (std::pair<Way, s32>{Way::eQuiet, 288}));
-    ASSERT_EQ(tried[all + 2 * coarse - 2], (std::pair<Way, s32>{Way::eFast, 0}));
-    ASSERT_EQ(tried.back(), (std::pair<Way, s32>{Way::eFast, 288}));
+    ASSERT_EQ(tried[coarse - 1], (std::pair<Way, s32>{Way::eAgain, 32}));
+    ASSERT_EQ(tried[2 * coarse - 2], (std::pair<Way, s32>{Way::eQuiet, 0}));
+    ASSERT_EQ(tried[3 * coarse - 3], (std::pair<Way, s32>{Way::eQuiet, 288}));
+    ASSERT_EQ(tried[3 * coarse - 2], (std::pair<Way, s32>{Way::eFast, 0}));
+    ASSERT_EQ(tried[4 * coarse - 2], (std::pair<Way, s32>{Way::eFine, 16}));
+    ASSERT_EQ(tried.back(), (std::pair<Way, s32>{Way::eFine, 312}));
     ASSERT_EQ(Bot::Lookahead::NextWay(stretch), -1);
     // Only the tries with the same buttons press what the first try pressed
     ASSERT_TRUE(Bot::Lookahead::Repeats(Way::eSame));

@@ -29,10 +29,10 @@ public:
     enum class Way : u8
     {
         eSame,  // the buttons of the first try again, frame for frame (every coarsest step of the window)
-        eFine,  // the same, at the moments between the coarse ones
         eAgain, // planned anew from what is found at that moment (the coarse moments, as for the next two)
         eQuiet, // planned anew, and every step of the way sneaked
         eFast,  // planned anew, and every step of the way run
+        eFine,  // the buttons of the first try again, at the moments between the coarse ones
     };
     // Whether a try that way presses what the first try pressed
     static bool Repeats(Way way);
