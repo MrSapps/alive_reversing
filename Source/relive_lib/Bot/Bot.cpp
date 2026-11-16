@@ -19,7 +19,7 @@ static const u32 kCheckpointEveryFramesWatched = 30;
 static const s32 kTriesPerObstacle = 600;
 // The same in frames of the game played in tries that failed: for a way through unhurt, and for one at all
 static const s32 kFramesPerObstacle = 6000;
-static const u32 kFramesClearOfAnObstacle = 900;
+static const s32 kPopsPerObstacleDying = 8;
 static const s32 kFramesPerObstacleDying = 60000;
 // and how many saves it goes back for a way through unhurt before that
 static const s32 kPopsPerObstacle = 2;
@@ -1768,14 +1768,9 @@ void Bot::MaybeCheckpoint(BaseMap& map)
     if (look)
     {
         // Somewhere no save of this run was taken yet: the tries have got him on. (Every place is kept: with only
-        // the last few, ground gone over again from a save further back looked new, and the tries never ran out.)
-        // Ground he has been over before is got on along too, when it is a good while since a try failed
-        if (!mTolerant && mTriesSince > 0 && mAbe.mFrame - mLastTryFrame >= kFramesClearOfAnObstacle)
-        {
-            mTriesSince = 0;
-            mTryFrames = 0;
-            mPopFloor = 0;
-        }
+        // the last few, ground gone over again from a save further back looked new, and the tries never ran out.
+        // Nor is a long while with no try failed getting on: a tactic that waits out a Slig's beat before each
+        // go at it waited 1,700 frames each time, and went at the Barracks' second screen for 50,000 frames.)
         const std::tuple<s32, s32, s32, s32> place(mAbe.mLevel * 1000 + mAbe.mPath, mAbe.mX / 25, mAbe.mY / 20, static_cast<s32>(mAbe.mMove));
         if (mSavePlaces.insert(place).second)
         {
@@ -2100,7 +2095,7 @@ void Bot::TryFailed(BaseMap& map, const std::string& what)
         }
         // Or it went wrong before this save: the try that got here from the one before has failed too. A save or
         // two back, no further: if nothing gets through unhurt from there either, hurt is the best there is
-        const bool back = mCheckpoints.size() > 1 && (mTolerant || (mCheckpoints.size() > mPopFloor && !spent));
+        const bool back = mCheckpoints.size() > 1 && mCheckpoints.size() > mPopFloor && (mTolerant || !spent);
         if (back)
         {
             // (what the bot pressed from the save before to get here, and then from here)
@@ -2120,7 +2115,9 @@ void Bot::TryFailed(BaseMap& map, const std::string& what)
             mTolerantSaves = 0;
             mTriesSince = 0;
             mTryFrames = 0;
-            mPopFloor = 0;
+            // (with hurt put up with it goes back further, but not to the start of the run: what took minutes to get
+            // through is not played over for a Slig at the end of it)
+            mPopFloor = mCheckpoints.size() > static_cast<std::size_t>(kPopsPerObstacleDying) ? mCheckpoints.size() - kPopsPerObstacleDying : 1;
             saved.mStretch = Lookahead::Stretch();
             saved.mHasPressed = false;
             delay = 0;
@@ -2132,7 +2129,6 @@ void Bot::TryFailed(BaseMap& map, const std::string& what)
     }
     Saved& saved = mCheckpoints.back();
     mHold = delay;
-    mLastTryFrame = saved.mCheckpoint.mFrame + static_cast<u32>(delay);
     // (a try the bot plays itself, straight on, has nothing to repeat)
     mRepeat = saved.mHasPressed && saved.mStretch.mDelay > 0 && Lookahead::Repeats(saved.mStretch.mWay) ? saved.mPressed : std::vector<u32>();
     mVary = saved.mStretch.mWay;
@@ -2612,7 +2608,8 @@ std::unique_ptr<Task> Bot::MakeFlee()
     // hand (a well, a hoist). Chanting there is too slow: measured, he is shot 50 frames before it takes.
     // (One that waits before it shoots is run from too: the sneak he was at when it woke is not gone on with.)
     // (hung from the end of its floor he is not seen, and is not on it)
-    if (mAmbushes < 8 && !mWorld.mInvisible && mAbe.mMove != Move::eHang)
+    // (not in a try that sneaks every step: that try is to get by the Slig unheard, and a run from it is heard)
+    if (mAmbushes < 8 && !mWorld.mInvisible && mAbe.mMove != Move::eHang && !(mProfile.mLook && mVary == Lookahead::Way::eQuiet))
     {
         const NavGraph& nav = mKnow->mNav;
         const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);

@@ -618,8 +618,6 @@ private:
     void StuckNow(const std::string& why);
     // Where the last saves were taken: one somewhere new is the tries having got him on
     std::set<std::tuple<s32, s32, s32, s32>> mSavePlaces;
-    // The frame the try under way began to do something
-    u32 mLastTryFrame = 0;
     void TryFailed(BaseMap& map, const std::string& what);
 
     std::vector<u32> mInputs;

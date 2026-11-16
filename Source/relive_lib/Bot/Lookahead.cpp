@@ -77,7 +77,7 @@ static s32 NextDelay(Lookahead::Stretch& stretch)
 
 s32 Lookahead::NextWay(Stretch& stretch)
 {
-    while (stretch.mWay != Way::eFast)
+    while (stretch.mWay != Way::eFine)
     {
         stretch.mWay = static_cast<Way>(static_cast<s32>(stretch.mWay) + 1);
         stretch.mNext = FirstOf(stretch.mWay);
