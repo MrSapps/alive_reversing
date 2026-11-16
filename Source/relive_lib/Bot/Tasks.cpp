@@ -294,16 +294,25 @@ bool GoToTask::ZWatched(Bot& bot, const NavGraph& nav, const std::vector<s32>& p
     }
     if (!safe(here) && mZLeapt && far < 3 && safe(to(far)) && abe.mMove != Move::eCrouch)
     {
-        // Landed a step or two short of the cover the leap was timed for: straight into it
-        step = TaskStep::Do(Prim::MoveTo(to(far).mX, Gait::eWalk));
-        return true;
+        // Landed a step or two short of the cover the leap was timed for: straight into it, as far as he can
+        // walk (under a low one he rolls the rest, below)
+        std::size_t walk = 0;
+        while (walk <= far && nav.Edges()[path[walk]].mKind == EdgeKind::eWalk)
+        {
+            walk++;
+        }
+        if (walk > 0)
+        {
+            step = TaskStep::Do(Prim::MoveTo(to(walk - 1).mX, Gait::eWalk));
+            return true;
+        }
     }
     // (under a low cover he is only out of sight crouched)
     const bool hid = safe(here) || (here.mZLow && abe.mMove == Move::eCrouch);
     // A hop, a drop or a hoist at the end of the floor ahead with no cover before it: all of it at once, timed
     // from here. A cell or two from a cover he stands in are walked, more is rolled.
     const bool leapNext = run < path.size() && far + 1 == run && !safe(to(far)) && !to(far).mZLow &&
-                          (nav.Edges()[path[run]].mKind == EdgeKind::eHop || nav.Edges()[path[run]].mKind == EdgeKind::eFall || nav.Edges()[path[run]].mKind == EdgeKind::eHoistDown || nav.Edges()[path[run]].mKind == EdgeKind::eHoistUp);
+                          (nav.Edges()[path[run]].mKind == EdgeKind::eHop || nav.Edges()[path[run]].mKind == EdgeKind::eFall || nav.Edges()[path[run]].mKind == EdgeKind::eHoistDown || nav.Edges()[path[run]].mKind == EdgeKind::eHoistUp || nav.Edges()[path[run]].mKind == EdgeKind::eRunJump);
     if (hid && leapNext && here.mZCover && run <= 2 && abe.mMove != Move::eCrouch)
     {
         return ZLeap(bot, nav, path, cur, run, step);
@@ -311,6 +320,17 @@ bool GoToTask::ZWatched(Bot& bot, const NavGraph& nav, const std::vector<s32>& p
     if (!hid)
     {
         // Out in it: crouched, and on to that cover as they let him
+        // (not where down is the way down a hoist: a step on first. The rifle range's fourth screen, 1362,420.)
+        bool hoist = false;
+        for (const NavEdge& e : nav.Edges())
+        {
+            hoist = hoist || (e.mFrom == cur && e.mKind == EdgeKind::eHoistDown);
+        }
+        if (abe.mMove == Move::eIdle && hoist && abe.Settled())
+        {
+            step = TaskStep::Do(Prim::MoveTo(to(0).mX, Gait::eWalk));
+            return true;
+        }
         if (abe.mMove == Move::eIdle)
         {
             step = TaskStep::Do(Prim::Press(Btn::eDown));
@@ -348,6 +368,17 @@ bool GoToTask::ZWatched(Bot& bot, const NavGraph& nav, const std::vector<s32>& p
     {
         step = TaskStep::Do(Prim::Face(first.mLeft));
         return true;
+    }
+    // (on a lift, or at the top of a hoist, down is no crouch: walked from there. The rifle range's last screen,
+    // off the lift at 612,480: he held on to the lift for good.)
+    bool noCrouch = here.mLiftStop >= 0;
+    for (const NavEdge& e : nav.Edges())
+    {
+        noCrouch = noCrouch || (e.mFrom == cur && e.mKind == EdgeKind::eHoistDown);
+    }
+    if (abe.mMove == Move::eIdle && noCrouch)
+    {
+        return ZWalk(bot, nav, path, cur, far, step);
     }
     if (abe.mMove == Move::eIdle)
     {
@@ -454,7 +485,7 @@ bool GoToTask::ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
         // 11 on the spot, 12 in the air and 10 to land; a hoist up 40 and one down 34, where he stands
         const s32 cam = nav.CameraOf(here.mX, here.mY - 5);
         std::vector<SligCycle::Cell> track;
-        // (what of him has to be in a cover, as measured: 14 either side and 53 high standing, up to 26 either
+        // (what of him has to be in a cover, as measured: 14 either side and 52 high standing, up to 26 either
         // side and 55 high as he walks or is in the air, 24 ahead, 13 behind and 34 high rolling)
         const auto add = [&](const NavNode& a, const NavNode& b, s32 frames, bool roll = false)
         {
@@ -465,7 +496,7 @@ bool GoToTask::ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
                 const bool left = b.mX < a.mX;
                 const bool still = &a == &b;
                 const s32 side = still ? 14 : 26;
-                track.push_back({x, nav.CameraOf(x, y - 5) != cam || nav.ZCovered(x, y, roll ? (left ? -24 : -13) : -side, roll ? (left ? 13 : 24) : side, roll ? 34 : still ? 53 : 55)});
+                track.push_back({x, nav.CameraOf(x, y - 5) != cam || nav.ZCovered(x, y, roll ? (left ? -24 : -13) : -side, roll ? (left ? 13 : 24) : side, roll ? 34 : still ? 52 : 55)});
             }
         };
         const auto cells = [](const NavNode& a, const NavNode& b)
@@ -523,9 +554,28 @@ bool GoToTask::ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
                 break;
         }
         const NavNode& landed = *at;
-        for (std::size_t i = lead + 1; i < path.size() && i < lead + 4 && nav.Edges()[path[i]].mKind == EdgeKind::eWalk && !at->mZCover && nav.CameraOf(at->mX, at->mY - 5) == cam; i++)
+        // On along the floor into the next cover: walked, and where the cover is too low to stand under, rolled
+        // into from the last cell he can stand in (the rifle range's fourth screen: the cutout he hops down
+        // for is four cells on from where he lands, and the last of them is under it)
+        const NavNode* walked = at;
+        bool rolls = false;
+        for (std::size_t i = lead + 1; i < path.size() && i < lead + 7 && !at->mZCover && nav.CameraOf(at->mX, at->mY - 5) == cam; i++)
         {
-            at = &nav.Nodes()[nav.Edges()[path[i]].mTo];
+            const NavEdge& on = nav.Edges()[path[i]];
+            if (on.mKind == EdgeKind::eWalk && !rolls)
+            {
+                at = &nav.Nodes()[on.mTo];
+                walked = at;
+            }
+            else if (on.mKind == EdgeKind::eRoll)
+            {
+                rolls = true;
+                at = &nav.Nodes()[on.mTo];
+            }
+            else
+            {
+                break;
+            }
         }
         mZSideX = 0;
         mZSideAt = -1;
@@ -546,14 +596,25 @@ bool GoToTask::ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
                     }
                 }
             }
+            walked = at;
         }
         if (at != &landed)
         {
             // (the cover it was timed for is where he goes when he has landed, whatever the way is then)
-            add(landed, landed, 3);
-            add(landed, *at, 9 * cells(landed, *at));
-            mZSideX = at->mX;
-            mZSideAt = leap.mTo;
+            if (walked != &landed)
+            {
+                add(landed, landed, 3);
+                add(landed, *walked, 9 * cells(landed, *walked));
+                mZSideX = walked->mX;
+                mZSideAt = leap.mTo;
+            }
+            if (walked != at)
+            {
+                // (down into a crouch 11, then the roll)
+                add(*walked, *walked, 11 + 1);
+                add(*walked, *at, 4 * cells(*walked, *at), true);
+                add(*at, *at, 1, true);
+            }
         }
         else if (inOpen)
         {
@@ -631,6 +692,86 @@ bool GoToTask::ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
     return false;
 }
 
+bool GoToTask::ZWalk(Bot& bot, const NavGraph& nav, const std::vector<s32>& path, s32 cur, std::size_t far, TaskStep& step)
+{
+    const AbeState& abe = bot.Abe();
+    const NavNode& here = nav.Nodes()[cur];
+    const SligCycle& cycle = bot.GetSligCycle();
+    const NavNode& end = nav.Nodes()[nav.Edges()[path[far]].mTo];
+    const auto wait = [&](s32 said, const std::string& what)
+    {
+        if (mZSaid != said)
+        {
+            mZSaid = said;
+            bot.Log(what);
+        }
+        mSteps--;
+        step = TaskStep::Do(Prim::Wait(1));
+        return true;
+    };
+    if (abe.mHealthFp < 0x10000)
+    {
+        return wait(1, "hurt: in cover from the Sligs in the background until that is over");
+    }
+    if (!cycle.Known() && (cycle.Watched() < 700 || static_cast<s32>(abe.mFrame) - mZArrived < 700))
+    {
+        return wait(2, "watching the Sligs in the background from cover");
+    }
+    if (mZFrom != cur || static_cast<s32>(abe.mFrame) > mZGo || static_cast<s32>(abe.mFrame) - mZPlanned >= 40)
+    {
+        // (a step takes 3 frames to begin and 9 a cell; walking his box is up to 26 either side and 55 high)
+        const s32 cam = nav.CameraOf(here.mX, here.mY - 5);
+        std::vector<SligCycle::Cell> track;
+        for (s32 f = 0; f < 3; f++)
+        {
+            track.push_back({here.mX, nav.ZCovered(here.mX, here.mY, -14, 14, 52)});
+        }
+        const s32 frames = 9 * std::max(1, std::abs(end.mX - here.mX) / NavGraph::GridStep(here.mHalf));
+        for (s32 f = 1; f <= frames; f++)
+        {
+            const s32 x = here.mX + (end.mX - here.mX) * f / frames;
+            track.push_back({x, nav.CameraOf(x, here.mY - 5) != cam || nav.ZCovered(x, here.mY, -26, 26, 55)});
+        }
+        std::vector<SligCycle::Shooter> shooters;
+        for (const SligAt& slig : bot.GetWorld().mSligs)
+        {
+            if (slig.mZShoot && !slig.mPossessed && nav.CameraOf(slig.mX, slig.mY - 5) == cam)
+            {
+                shooters.push_back({slig.mZShootDelay, slig.mZShots});
+            }
+        }
+        SligCycle::Move move = cycle.Through(track, shooters, 600);
+        if (move.mSpotters > 1)
+        {
+            const SligCycle::Move later = cycle.Through(track, shooters, 2400);
+            if (later.mSpotters < move.mSpotters)
+            {
+                move = later;
+            }
+        }
+        mZPlanned = static_cast<s32>(abe.mFrame);
+        mZFrom = cur;
+        mZGo = static_cast<s32>(abe.mFrame) + move.mDelay;
+        const std::string what = "out of the cover walking to " + std::to_string(end.mX) + ": " + (move.mSpotters > 0 ? std::to_string(move.mSpotters) + " bursts at him from the Sligs in the background at best" : "none of the Sligs in the background sees him then") + " in " + std::to_string(move.mDelay) + " frames (" + std::to_string(track.size()) + " frames of it)";
+        if (what.substr(0, 60) != mZWhat || move.mDelay == 0)
+        {
+            mZWhat = what.substr(0, 60);
+            bot.Log(what);
+        }
+    }
+    if (static_cast<s32>(abe.mFrame) < mZGo)
+    {
+        mSteps--;
+        step = TaskStep::Do(Prim::Wait(1));
+        return true;
+    }
+    mZFrom = -1;
+    mZSaid = -1;
+    mZLeapt = true;
+    step = TaskStep::Do(Prim::MoveTo(end.mX, Gait::eWalk));
+    return true;
+}
+
 // The next roll of the way through the open to the cell `far` along the path, when it is time for it
 bool GoToTask::ZMove(Bot& bot, const NavGraph& nav, const std::vector<s32>& path, s32 cur, std::size_t far, TaskStep& step)
 {
@@ -663,7 +804,14 @@ bool GoToTask::ZMove(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
         mZFar = farX;
         mZGo = static_cast<s32>(abe.mFrame) + move.mDelay;
         mZTo = cells[move.mTo].mX;
-        if (!cycle.Known() && move.mSpotters > 0)
+        // (out in the open there is nothing to wait for: they see him where he is as well as on the way. The
+        // rifle range's fourth screen: crouched a cell short of the cutout until he was shot dead.)
+        const bool exposed = !here.mZCover && !here.mZLow;
+        if (exposed)
+        {
+            mZGo = static_cast<s32>(abe.mFrame);
+        }
+        else if (!cycle.Known() && move.mSpotters > 0)
         {
             // No telling what they will do: when none looks as they are now, and after a long wait when no
             // more than one does
@@ -674,7 +822,7 @@ bool GoToTask::ZMove(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
                 mZFrom = -1;
             }
         }
-        if (move.mSpotters > 2)
+        if (move.mSpotters > 2 && !exposed)
         {
             mZGo = static_cast<s32>(abe.mFrame) + 1;
             mZFrom = -1;

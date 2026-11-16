@@ -1565,19 +1565,40 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen) const
     {
         s32 cost = base(e);
         const NavNode& to = know->mNav.Nodes()[e.mTo];
-        if (cost < 0 || to.mHalf || to.mZLow || to.mZCover)
+        if (cost < 0 || to.mHalf)
         {
             return cost;
         }
-        const s32 cam = know->mNav.CameraOf(to.mX, to.mY - 5);
-        for (const SligAt& slig : world->mSligs)
+        const auto seen = [&](s32 x, s32 y)
         {
-            if (slig.mZShoot && !slig.mPossessed && know->mNav.CameraOf(slig.mX, slig.mY - 5) == cam)
+            s32 sum = 0;
+            const s32 cam = know->mNav.CameraOf(x, y - 5);
+            for (const SligAt& slig : world->mSligs)
             {
-                cost += to.mX >= slig.mBeatMin && to.mX <= slig.mBeatMax ? 90 : 30;
+                if (slig.mZShoot && !slig.mPossessed && know->mNav.CameraOf(slig.mX, slig.mY - 5) == cam)
+                {
+                    sum += x >= slig.mBeatMin && x <= slig.mBeatMax ? 90 : 30;
+                }
+            }
+            return sum;
+        };
+        // (a running jump or a hop is as much of the open as the cells it goes over: the rifle range's fourth
+        // screen, where one long running jump past two covers looked cheaper than the rolls between them)
+        if (e.mKind == EdgeKind::eRunJump || e.mKind == EdgeKind::eHop)
+        {
+            const NavNode& from = know->mNav.Nodes()[e.mFrom];
+            const s32 cell = NavGraph::GridStep(from.mHalf);
+            const s32 cells = std::abs(to.mX - from.mX) / cell;
+            for (s32 k = 1; k < cells; k++)
+            {
+                cost += seen(from.mX + (to.mX < from.mX ? -k : k) * cell, from.mY);
             }
         }
-        return cost;
+        if (to.mZLow || to.mZCover)
+        {
+            return cost;
+        }
+        return cost + seen(to.mX, to.mY);
     };
 }
 
