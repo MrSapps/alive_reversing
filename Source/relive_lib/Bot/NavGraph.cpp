@@ -1510,6 +1510,7 @@ void NavGraph::Build(const NavInput& input)
             if (hopLine >= 0 && !mNodes[std::max(0, NodeOnLine(hopLine, hx))].mLow && !WallBetween(n.mX, n.mX + dir * step * 3, n.mY, n.mHalf))
             {
                 bool needed = false;
+                bool overTrap = false;
                 for (s32 k = 1; k <= 2; k++)
                 {
                     const s32 mx = k == 1 ? nx : StepX(nx, dir, n.mHalf);
@@ -1520,8 +1521,15 @@ void NavGraph::Build(const NavInput& input)
                     {
                         needed = true;
                     }
+                    else if (mNodes[mid].mTrapDoor >= 0)
+                    {
+                        overTrap = true;
+                    }
                 }
                 const s32 to = NodeOnLine(hopLine, hx);
+                // (a trap door is a gap while it is open: hopped over, from floor to floor, it makes no odds which
+                // it is. AE only: measured there, and in Rupture Farms' paths 15 and 16 it did not work.)
+                needed = needed || (mInput.mIsAe && overTrap && to >= 0 && n.mTrapDoor < 0 && mNodes[to].mTrapDoor < 0);
                 if (needed && to >= 0 && std::abs(mNodes[to].mX - hx) <= step / 2 && !mNodes[to].mHazard)
                 {
                     AddEdge(edges, from, to, EdgeKind::eHop, kHopCost, BarrierBetween(n.mX, n.mX + dir * step * 3, n.mY, n.mHalf), left);
@@ -1782,7 +1790,18 @@ void NavGraph::Build(const NavInput& input)
         }
         else if (below >= 0)
         {
-            AddEdge(edges, from, NodeOnLine(below, over.mX), EdgeKind::eFall, kWalkCost + (fy - over.mY) / 6, trap, left);
+            // (not into a death drop. How far down it is is no matter: Rupture Farms' path 16 is left through one,
+            // a screen and more down)
+            const s32 step = GridStep(over.mHalf);
+            bool deadly = false;
+            for (const NavFeature& f : mInput.mFeatures)
+            {
+                deadly = deadly || (f.mKind == FeatureKind::eDeathDrop && over.mX >= f.mX1 - step && over.mX <= f.mX2 + step && f.mY1 <= fy && f.mY2 >= over.mY);
+            }
+            if (!deadly)
+            {
+                AddEdge(edges, from, NodeOnLine(below, over.mX), EdgeKind::eFall, kWalkCost + (fy - over.mY) / 6, trap, left);
+            }
         }
     };
     const std::size_t made = edges.size();

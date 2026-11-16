@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <cmath>
 #include "Bot/BotRng.hpp"
 #include "Bot/Domain.hpp"
 #include "Bot/FartFlight.hpp"
@@ -10,6 +11,7 @@
 #include "Bot/NavGraph.hpp"
 #include "Bot/Pilot.hpp"
 #include "Bot/Profile.hpp"
+#include "Bot/BombCycle.hpp"
 #include "Bot/SligCycle.hpp"
 #include "Bot/Task.hpp"
 #include "Bot/ThrowArc.hpp"
@@ -8116,4 +8118,785 @@ TEST(BotGrenadeTargets, NotThrownFromWhereItComesUpUnderAFloorNorFromWhereItsBla
     ASSERT_LT(nearBy.mPoints.back().mX - 387, static_cast<s32>(ThrowArc::kGrenadeKillX));
     // (and with nowhere else to throw from it is not one for a grenade at all)
     EXPECT_TRUE(Domain::GrenadeTargets(high, over).empty());
+}
+
+// ---- Flying mines ----
+
+// A mine as MovingBomb.cpp has it go: round a closed track, from a stand half a pixel a frame faster each frame
+// up to its pace, on from one line to the next with what is left of the step
+struct TestMine final
+{
+    std::vector<s32> mXs;
+    std::vector<s32> mYs;
+    double mPace = 6.734;
+    double mSpeed = 0.0;
+    double mAlong = 0.0;
+    // Its box changes with its animation, which comes round every 8 frames
+    bool mPulses = false;
+    s32 mTick = 0;
+
+    double Length() const
+    {
+        double length = 0.0;
+        for (std::size_t i = 0; i + 1 < mXs.size(); i++)
+        {
+            length += std::hypot(static_cast<double>(mXs[i + 1] - mXs[i]), static_cast<double>(mYs[i + 1] - mYs[i]));
+        }
+        return length;
+    }
+    void Step()
+    {
+        mSpeed = std::min(mPace, mSpeed + 0.5);
+        mAlong = std::fmod(mAlong + mSpeed, Length());
+        mTick++;
+    }
+    BombCycle::Seen Seen(u32 id) const
+    {
+        double left = mAlong;
+        double x = static_cast<double>(mXs[0]);
+        double y = static_cast<double>(mYs[0]);
+        for (std::size_t i = 0; i + 1 < mXs.size(); i++)
+        {
+            const double dx = static_cast<double>(mXs[i + 1] - mXs[i]);
+            const double dy = static_cast<double>(mYs[i + 1] - mYs[i]);
+            const double side = std::hypot(dx, dy);
+            if (left <= side)
+            {
+                x = static_cast<double>(mXs[i]) + dx * left / side;
+                y = static_cast<double>(mYs[i]) + dy * left / side;
+                break;
+            }
+            left -= side;
+        }
+        BombCycle::Seen seen;
+        seen.mId = id;
+        seen.mX = static_cast<s32>(x * 256.0);
+        seen.mY = static_cast<s32>(y * 256.0);
+        seen.mLeft = mPulses ? -9 - mTick % 8 : -11;
+        seen.mTop = mPulses ? -24 - (mTick % 8) / 2 : -26;
+        seen.mRight = mPulses ? 14 - (mTick % 8) / 2 : 13;
+        seen.mBottom = -4;
+        return seen;
+    }
+};
+
+// The second mine of the Barracks' path 5: round a box 125 wide and 120 high
+static TestMine BoxMine()
+{
+    TestMine mine;
+    mine.mXs = {3875, 4000, 4000, 3875, 3875};
+    mine.mYs = {340, 340, 460, 460, 340};
+    return mine;
+}
+
+static bool SameBox(const BombCycle::Box& box, const BombCycle::Seen& seen, s32 within)
+{
+    return std::abs(box.mX1 - (seen.mX / 256 + seen.mLeft)) <= within && std::abs(box.mY1 - (seen.mY / 256 + seen.mTop)) <= within && std::abs(box.mX2 - (seen.mX / 256 + seen.mRight)) <= within && std::abs(box.mY2 - (seen.mY / 256 + seen.mBottom)) <= within;
+}
+
+TEST(BotMines, AMineIsToldAheadOnceItHasBeenWatchedRoundItsTrack)
+{
+    BombCycle cycle;
+    TestMine mine = BoxMine();
+    s32 knownAt = -1;
+    u32 frame = 0;
+    for (frame = 1; frame <= 200; frame++)
+    {
+        mine.Step();
+        cycle.Observe(frame, 5, {mine.Seen(7)});
+        if (cycle.Known(7) && knownAt < 0)
+        {
+            knownAt = static_cast<s32>(frame);
+        }
+    }
+    frame--;
+    // A lap is 490 pixels at 6.734 a frame: not known before it is up to its pace and has been round once since
+    const s32 lap = 490 * 1000 / 6734;
+    EXPECT_GT(knownAt, lap);
+    EXPECT_LT(knownAt, lap + 40);
+    EXPECT_NEAR(cycle.Lap256(7), 490.0 / 6.734 * 256.0, 100.0);
+    EXPECT_EQ(cycle.Count(), 1);
+    // Where it will be, for laps to come (a lap is no whole number of frames, so this is more than what it did a
+    // lap ago)
+    for (s32 ahead = 0; ahead <= 400; ahead += 7)
+    {
+        TestMine then = mine;
+        for (s32 i = 0; i < ahead; i++)
+        {
+            then.Step();
+        }
+        BombCycle::Box box;
+        ASSERT_TRUE(cycle.At(7, ahead, box));
+        EXPECT_TRUE(SameBox(box, then.Seen(7), 3)) << ahead << ": " << box.mX1 << "," << box.mY1 << " for " << then.Seen(7).mX / 256 - 11 << "," << then.Seen(7).mY / 256 - 26;
+    }
+    // A place on its way is met when it is there and not before; one at the other scale never
+    const BombCycle::Box onTop{3930, 300, 3950, 345};
+    s32 wrong = 0;
+    s32 met = 0;
+    TestMine then = mine;
+    for (s32 ahead = 0; ahead <= 150; ahead++)
+    {
+        const BombCycle::Seen seen = then.Seen(7);
+        const BombCycle::Box real{seen.mX / 256 + seen.mLeft, seen.mY / 256 + seen.mTop, seen.mX / 256 + seen.mRight, seen.mY / 256 + seen.mBottom};
+        wrong += cycle.Hits(false, ahead, onTop) != real.Meets(onTop) ? 1 : 0;
+        met += real.Meets(onTop) ? 1 : 0;
+        EXPECT_FALSE(cycle.Hits(true, ahead, onTop));
+        then.Step();
+    }
+    EXPECT_GT(met, 8);
+    EXPECT_LT(met, 40);
+    // (a frame either side of when it comes and goes, at most)
+    EXPECT_LE(wrong, 4);
+    // And how long until then
+    const s32 next = cycle.Next(false, onTop, 0, 200);
+    ASSERT_GE(next, 0);
+    EXPECT_TRUE(cycle.Hits(false, next, onTop));
+    EXPECT_FALSE(next > 0 && cycle.Hits(false, next - 1, onTop));
+    EXPECT_EQ(cycle.Next(false, BombCycle::Box{3930, 380, 3950, 420}, 0, 200), -1);
+    // There is no telling of one that isn't there
+    BombCycle::Box none;
+    EXPECT_FALSE(cycle.At(8, 0, none));
+    EXPECT_FALSE(cycle.Known(8));
+}
+
+TEST(BotMines, ItsBoxChangesWithItsAnimationAndThatIsToldAheadToo)
+{
+    BombCycle cycle;
+    TestMine mine = BoxMine();
+    mine.mPulses = true;
+    u32 frame = 0;
+    // Seen for a few frames only: as wide as it has been so far, whenever
+    for (frame = 1; frame <= 6; frame++)
+    {
+        mine.Step();
+        cycle.Observe(frame, 5, {mine.Seen(7)});
+    }
+    {
+        BombCycle::Box box;
+        ASSERT_TRUE(cycle.At(7, 0, box));
+        const s32 x = mine.Seen(7).mX / 256;
+        const s32 y = mine.Seen(7).mY / 256;
+        EXPECT_EQ(box.mX1, x - 15);
+        EXPECT_EQ(box.mX2, x + 14);
+        EXPECT_EQ(box.mY1, y - 27);
+        EXPECT_EQ(box.mY2, y - 4);
+    }
+    for (; frame <= 200; frame++)
+    {
+        mine.Step();
+        cycle.Observe(frame, 5, {mine.Seen(7)});
+    }
+    ASSERT_TRUE(cycle.Known(7));
+    // Round its track and round its animation: the box it will have then, not the one it has now
+    s32 differs = 0;
+    for (s32 ahead = 0; ahead <= 300; ahead++)
+    {
+        TestMine then = mine;
+        for (s32 i = 0; i < ahead; i++)
+        {
+            then.Step();
+        }
+        BombCycle::Box box;
+        ASSERT_TRUE(cycle.At(7, ahead, box));
+        const BombCycle::Seen real = then.Seen(7);
+        EXPECT_TRUE(SameBox(box, real, 3)) << ahead;
+        // (how wide it is, to the pixel)
+        EXPECT_EQ(box.mX2 - box.mX1, real.mRight - real.mLeft) << ahead;
+        EXPECT_EQ(box.mY2 - box.mY1, real.mBottom - real.mTop) << ahead;
+        differs += real.mLeft != mine.Seen(7).mLeft ? 1 : 0;
+    }
+    EXPECT_GT(differs, 200);
+    // Not seen for a while, its animation is anywhere: as wide as it gets again, until that has come round twice
+    for (s32 i = 0; i < 5; i++)
+    {
+        mine.Step();
+    }
+    frame += 5;
+    cycle.Observe(frame, 5, {mine.Seen(7)});
+    for (s32 i = 0; i < 10; i++)
+    {
+        mine.Step();
+        cycle.Observe(++frame, 5, {mine.Seen(7)});
+    }
+    {
+        BombCycle::Box box;
+        ASSERT_TRUE(cycle.At(7, 3, box));
+        EXPECT_EQ(box.mX2 - box.mX1, 14 + 16);
+    }
+    for (s32 i = 0; i < 20; i++)
+    {
+        mine.Step();
+        cycle.Observe(++frame, 5, {mine.Seen(7)});
+    }
+    {
+        TestMine then = mine;
+        for (s32 i = 0; i < 3; i++)
+        {
+            then.Step();
+        }
+        BombCycle::Box box;
+        ASSERT_TRUE(cycle.At(7, 3, box));
+        EXPECT_EQ(box.mX2 - box.mX1, then.Seen(7).mRight - then.Seen(7).mLeft);
+    }
+}
+
+TEST(BotMines, ALapOnceWatchedIsKeptWhileTheMineIsOutOfSight)
+{
+    BombCycle cycle;
+    TestMine mine = BoxMine();
+    u32 frame = 0;
+    for (frame = 1; frame <= 200; frame++)
+    {
+        mine.Step();
+        cycle.Observe(frame, 5, {mine.Seen(7)});
+    }
+    ASSERT_TRUE(cycle.Known(7));
+    const s32 lap = cycle.Lap256(7);
+    // Frames missed (a rewind): where it is on its lap is found again, and how it moves a frame later
+    for (s32 i = 0; i < 30; i++)
+    {
+        mine.Step();
+    }
+    frame += 30;
+    cycle.Observe(frame, 5, {mine.Seen(7)});
+    EXPECT_FALSE(cycle.Known(7));
+    EXPECT_EQ(cycle.Lap256(7), lap);
+    mine.Step();
+    cycle.Observe(++frame, 5, {mine.Seen(7)});
+    EXPECT_TRUE(cycle.Known(7));
+    {
+        TestMine then = mine;
+        for (s32 i = 0; i < 100; i++)
+        {
+            then.Step();
+        }
+        BombCycle::Box box;
+        ASSERT_TRUE(cycle.At(7, 100, box));
+        EXPECT_TRUE(SameBox(box, then.Seen(7), 3));
+    }
+    // Its screen gone, it is gone; back, it starts from a stand where it was put: on the lap that is known, but
+    // not at its pace yet
+    for (s32 i = 0; i < 50; i++)
+    {
+        cycle.Observe(++frame, 5, {});
+    }
+    EXPECT_EQ(cycle.Count(), 0);
+    EXPECT_FALSE(cycle.Known(7));
+    EXPECT_FALSE(cycle.Hits(false, 0, BombCycle::Box{3800, 300, 4100, 500}));
+    TestMine back = BoxMine();
+    back.mAlong = 50.0;
+    cycle.Observe(++frame, 5, {back.Seen(7)});
+    EXPECT_FALSE(cycle.Known(7));
+    s32 knownAfter = -1;
+    for (s32 i = 1; i <= 40; i++)
+    {
+        back.Step();
+        cycle.Observe(++frame, 5, {back.Seen(7)});
+        if (cycle.Known(7) && knownAfter < 0)
+        {
+            knownAfter = i;
+        }
+    }
+    // (half a pixel a frame faster each frame up to 6.734: 14 frames)
+    EXPECT_GE(knownAfter, 9);
+    EXPECT_LE(knownAfter, 15);
+    EXPECT_EQ(cycle.Lap256(7), lap);
+    {
+        TestMine then = back;
+        for (s32 i = 0; i < 100; i++)
+        {
+            then.Step();
+        }
+        BombCycle::Box box;
+        ASSERT_TRUE(cycle.At(7, 100, box));
+        EXPECT_TRUE(SameBox(box, then.Seen(7), 3));
+    }
+    // One that keeps still is known as soon as it has for a while: it is where it is
+    TestMine parked = BoxMine();
+    parked.mPace = 0.0;
+    BombCycle still;
+    for (u32 f = 1; f <= static_cast<u32>(BombCycle::kStill); f++)
+    {
+        still.Observe(f, 5, {parked.Seen(9)});
+        EXPECT_FALSE(still.Known(9));
+    }
+    still.Observe(static_cast<u32>(BombCycle::kStill) + 1, 5, {parked.Seen(9)});
+    EXPECT_TRUE(still.Known(9));
+    EXPECT_TRUE(still.Hits(false, 500, BombCycle::Box{3870, 320, 3880, 330}));
+    EXPECT_FALSE(still.Hits(false, 500, BombCycle::Box{3900, 320, 3910, 330}));
+    // Another path: all of it forgotten
+    cycle.Observe(++frame, 6, {back.Seen(7)});
+    EXPECT_EQ(cycle.Lap256(7), 0);
+}
+
+// The track of BoxMine as the map has it (OGData::eLineTypes: 8 is a track), and a mine put on its top side
+static NavInput BoxTrack()
+{
+    NavInput in;
+    in.mLines.push_back(Line(3875, 340, 4000, 340, 8));
+    in.mLines.push_back(Line(4000, 340, 4000, 460, 8));
+    in.mLines.push_back(Line(4000, 460, 3875, 460, 8));
+    in.mLines.push_back(Line(3875, 460, 3875, 340, 8));
+    in.mFeatures.push_back(Feature(FeatureKind::eFlyingMine, 3925, 330, 3950, 350));
+    return in;
+}
+
+TEST(BotMines, WhereAMineCanEverBeIsItsTrackOnTheMap)
+{
+    NavInput in = BoxTrack();
+    // (a floor line through it is no track; a mine by no track stays where it is put; one on a track that does
+    // not come round has all of it both ways)
+    in.mLines.push_back(Line(3800, 335, 4100, 335, 0));
+    in.mFeatures.push_back(Feature(FeatureKind::eFlyingMine, 3000, 100, 3025, 120));
+    in.mLines.push_back(Line(2000, 100, 2100, 100, 8));
+    in.mLines.push_back(Line(2100, 100, 2100, 200, 8));
+    in.mLines.push_back(Line(2100, 200, 2200, 200, 8));
+    in.mFeatures.push_back(Feature(FeatureKind::eFlyingMine, 2090, 140, 2110, 160));
+    NavFeature small = Feature(FeatureKind::eFlyingMine, 3925, 330, 3950, 350);
+    small.mHalf = true;
+    in.mFeatures.push_back(small);
+    const std::vector<BombCycle::Track> tracks = BombCycle::Tracks(in);
+    ASSERT_EQ(tracks.size(), 4u);
+    EXPECT_EQ(tracks[0].mXs, (std::vector<s32>{3875, 4000, 4000, 3875, 3875}));
+    EXPECT_EQ(tracks[0].mYs, (std::vector<s32>{340, 340, 460, 460, 340}));
+    EXPECT_FALSE(tracks[0].mHalf);
+    EXPECT_EQ(tracks[1].mXs, (std::vector<s32>{3000}));
+    EXPECT_EQ(tracks[1].mYs, (std::vector<s32>{100}));
+    EXPECT_EQ(tracks[2].mXs, (std::vector<s32>{2000, 2100, 2100, 2200}));
+    EXPECT_EQ(tracks[2].mYs, (std::vector<s32>{100, 100, 200, 200}));
+    EXPECT_TRUE(tracks[3].mHalf);
+
+    BombCycle cycle;
+    EXPECT_FALSE(cycle.Any());
+    cycle.SetTracks(5, tracks);
+    EXPECT_TRUE(cycle.HasTracks(5));
+    cycle.Observe(1, 5, {});
+    EXPECT_TRUE(cycle.Any());
+    // Its box is from 11 left of where it is to 13 right, and from 26 to 4 above: a place just clear of that on
+    // each side is never met, one a pixel nearer is
+    const auto ever = [&cycle](s32 x1, s32 y1, s32 x2, s32 y2)
+    {
+        return cycle.Ever(false, BombCycle::Box{x1, y1, x2, y2});
+    };
+    EXPECT_TRUE(ever(3930, 300, 3950, 320));
+    EXPECT_FALSE(ever(3930, 337, 3950, 420));
+    EXPECT_TRUE(ever(3930, 336, 3950, 420));
+    EXPECT_FALSE(ever(3930, 300, 3950, 313));
+    EXPECT_TRUE(ever(3930, 300, 3950, 314));
+    EXPECT_FALSE(ever(4014, 380, 4030, 400));
+    EXPECT_TRUE(ever(4013, 380, 4030, 400));
+    EXPECT_FALSE(ever(3840, 380, 3863, 400));
+    EXPECT_TRUE(ever(3840, 380, 3864, 400));
+    // (the one that stays put, and the track that does not come round)
+    EXPECT_TRUE(ever(2990, 80, 3010, 90));
+    EXPECT_TRUE(ever(2150, 180, 2160, 190));
+    EXPECT_FALSE(ever(2150, 80, 2160, 90));
+    // Half the size at the other scale
+    EXPECT_TRUE(cycle.Ever(true, BombCycle::Box{4005, 380, 4030, 400}));
+    EXPECT_FALSE(cycle.Ever(true, BombCycle::Box{4007, 380, 4030, 400}));
+    // No mine on it yet: its screen has not loaded
+    const BombCycle::Box onTop{3930, 300, 3950, 345};
+    EXPECT_TRUE(cycle.Missing(false, onTop));
+    EXPECT_FALSE(cycle.Watching(false, onTop));
+    EXPECT_FALSE(cycle.Missing(false, BombCycle::Box{3930, 380, 3950, 420}));
+    // One there, and watched: not known until it has been round
+    TestMine mine = BoxMine();
+    u32 frame = 1;
+    for (s32 i = 0; i < 30; i++)
+    {
+        mine.Step();
+        cycle.Observe(++frame, 5, {mine.Seen(7)});
+    }
+    EXPECT_FALSE(cycle.Missing(false, onTop));
+    EXPECT_TRUE(cycle.Watching(false, onTop));
+    EXPECT_FALSE(cycle.Watching(false, BombCycle::Box{3930, 380, 3950, 420}));
+    EXPECT_FALSE(cycle.Watching(true, onTop));
+    for (s32 i = 0; i < 100; i++)
+    {
+        mine.Step();
+        cycle.Observe(++frame, 5, {mine.Seen(7)});
+    }
+    EXPECT_FALSE(cycle.Missing(false, onTop));
+    EXPECT_FALSE(cycle.Watching(false, onTop));
+    EXPECT_TRUE(ever(3930, 300, 3950, 320));
+    // Out of sight again (its lap is kept): none on the track
+    cycle.Observe(++frame, 5, {});
+    EXPECT_TRUE(cycle.Missing(false, onTop));
+    EXPECT_FALSE(cycle.Watching(false, onTop));
+    EXPECT_TRUE(ever(3930, 300, 3950, 320));
+    // The tracks are another path's: nothing of them here
+    cycle.Observe(++frame, 6, {});
+    EXPECT_FALSE(cycle.Any());
+    EXPECT_FALSE(cycle.Ever(false, onTop));
+    EXPECT_FALSE(cycle.Missing(false, onTop));
+}
+
+static std::vector<GoToTask::Body> BodiesOf(const NavGraph& g, const NavEdge* edge, bool rest)
+{
+    std::vector<s32> path{static_cast<s32>(edge - g.Edges().data())};
+    std::vector<GoToTask::Body> out;
+    GoToTask::Bodies(g, path, 0, 1, false, rest, out);
+    return out;
+}
+
+TEST(BotMines, WhereHeIsFrameByFrameOfAHopAndAFallIsAsMeasured)
+{
+    // A hop over a gap: 10 frames where he stands (leaning back, then far forward), 5 through the air, 9 landing
+    {
+        NavInput in;
+        in.mLines.push_back(Line(0, 100, 200, 100, 0));
+        in.mLines.push_back(Line(250, 100, 400, 100, 0));
+        NavGraph g;
+        g.Build(in);
+        const NavEdge* hop = FindEdge(g, g.NodeAt(187, 100, false), g.NodeAt(262, 100, false), EdgeKind::eHop);
+        ASSERT_NE(hop, nullptr);
+        const std::vector<GoToTask::Body> at = BodiesOf(g, hop, false);
+        ASSERT_EQ(at.size(), 24u);
+        for (std::size_t i = 0; i < 24; i++)
+        {
+            EXPECT_EQ(at[i].mX, i < 10 ? 187 : i < 15 ? 187 + 15 * (static_cast<s32>(i) - 9) : 262) << i;
+            EXPECT_EQ(at[i].mY, 100) << i;
+        }
+        // (his box: 23 behind and 19 ahead at first, 45 ahead as he goes off, trailing in the air, 26 landing)
+        const BombCycle::Box lean = GoToTask::BombBody(at[0]);
+        EXPECT_EQ(lean.mX1, 187 - 23);
+        EXPECT_EQ(lean.mX2, 187 + 19);
+        EXPECT_EQ(lean.mY1, 100 - 55 - 1);
+        EXPECT_EQ(lean.mY2, 99);
+        const BombCycle::Box off = GoToTask::BombBody(at[9]);
+        EXPECT_EQ(off.mX1, 187 - 14);
+        EXPECT_EQ(off.mX2, 187 + 45);
+        const BombCycle::Box air = GoToTask::BombBody(at[14]);
+        EXPECT_EQ(air.mX1, 262 - 44);
+        EXPECT_EQ(air.mX2, 262 + 9);
+        const BombCycle::Box land = GoToTask::BombBody(at[20]);
+        EXPECT_EQ(land.mX1, 262 - 26);
+        EXPECT_EQ(land.mX2, 262 + 26);
+        // And a moment standing where it ends: 14 to either side and 53 high
+        const std::vector<GoToTask::Body> rested = BodiesOf(g, hop, true);
+        ASSERT_EQ(rested.size(), 36u);
+        const BombCycle::Box stood = GoToTask::BombBody(rested[30]);
+        EXPECT_EQ(stood.mX1, 262 - 14);
+        EXPECT_EQ(stood.mX2, 262 + 14);
+        EXPECT_EQ(stood.mY1, 100 - 53 - 1);
+        // The other way his box is the other way round
+        const NavEdge* back = FindEdge(g, g.NodeAt(262, 100, false), g.NodeAt(187, 100, false), EdgeKind::eHop);
+        ASSERT_NE(back, nullptr);
+        const BombCycle::Box backOff = GoToTask::BombBody(BodiesOf(g, back, false)[9]);
+        EXPECT_EQ(backOff.mX1, 262 - 45);
+        EXPECT_EQ(backOff.mX2, 262 + 14);
+    }
+    // A hop down 100 (the Barracks' path 5, off 4337,340 to the left): level for those 5, then down faster and
+    // faster for 6, a cell further out
+    {
+        NavInput in;
+        in.mLines.push_back(Line(4325, 340, 4525, 340, 0));
+        in.mLines.push_back(Line(4025, 440, 4250, 440, 0));
+        NavGraph g;
+        g.Build(in);
+        const NavEdge* hop = FindEdge(g, g.NodeAt(4337, 340, false), g.NodeAt(4237, 440, false), EdgeKind::eHop);
+        ASSERT_NE(hop, nullptr) << g.Text();
+        const std::vector<GoToTask::Body> at = BodiesOf(g, hop, false);
+        ASSERT_EQ(at.size(), 30u);
+        EXPECT_EQ(at[9].mX, 4337);
+        EXPECT_EQ(at[14].mX, 4262);
+        EXPECT_EQ(at[14].mY, 340);
+        EXPECT_EQ(at[15].mY, 345);
+        EXPECT_EQ(at[17].mY, 340 + (90 + 207) / 10);
+        EXPECT_LT(at[17].mX, 4262);
+        EXPECT_GT(at[17].mX, 4237);
+        EXPECT_EQ(at[20].mX, 4237);
+        EXPECT_EQ(at[20].mY, 440);
+        EXPECT_EQ(at[29].mY, 440);
+    }
+    // Walked off an edge: 6 frames on the floor, down 0.9 t squared, 10 on his feet again
+    {
+        NavInput in;
+        in.mLines.push_back(Line(0, 100, 200, 100, 0));
+        in.mLines.push_back(Line(0, 200, 400, 200, 0));
+        NavGraph g;
+        g.Build(in);
+        const NavEdge* fall = FindEdge(g, g.NodeAt(187, 100, false), g.NodeAt(212, 200, false), EdgeKind::eFall);
+        ASSERT_NE(fall, nullptr) << g.Text();
+        const std::vector<GoToTask::Body> at = BodiesOf(g, fall, false);
+        ASSERT_EQ(at.size(), 27u);
+        EXPECT_EQ(at[5].mY, 100);
+        EXPECT_EQ(at[5].mX, 199);
+        EXPECT_EQ(at[10].mX, 212);
+        EXPECT_EQ(at[11].mY, 100 + 9 * 25 / 10);
+        EXPECT_EQ(at[16].mY, 190);
+        EXPECT_EQ(at[17].mY, 200);
+        EXPECT_EQ(at[26].mY, 200);
+        // (wider and higher in the air)
+        EXPECT_EQ(GoToTask::BombBody(at[11]).mX1, at[11].mX - 35);
+        EXPECT_EQ(GoToTask::BombBody(at[11]).mY1, at[11].mY - 64 - 1);
+        EXPECT_EQ(GoToTask::BombBody(at[20]).mX1, 212 - 26);
+    }
+    // A hop up to a ledge: off as any hop, 3 level and 6 up to it, 3 hung under it on the side he came from, then
+    // 23 pulling himself up, his box over the ledge long before he stands on it
+    {
+        NavInput in;
+        in.mLines.push_back(Line(475, 960, 575, 960, 0));
+        in.mLines.push_back(Line(300, 880, 450, 880, 0));
+        NavFeature edge = Feature(FeatureKind::eEdge, 425, 880, 449, 904);
+        edge.mA = 1;
+        edge.mDir = 0;
+        in.mFeatures.push_back(edge);
+        NavGraph g;
+        g.Build(in);
+        const NavEdge* hop = FindEdge(g, g.NodeAt(487, 960, false), g.NodeAt(437, 880, false), EdgeKind::eHop);
+        ASSERT_NE(hop, nullptr) << g.Text();
+        const std::vector<GoToTask::Body> at = BodiesOf(g, hop, false);
+        ASSERT_EQ(at.size(), 45u);
+        EXPECT_EQ(at[9].mX, 487);
+        EXPECT_EQ(at[12].mX, 487 - 19);
+        EXPECT_EQ(at[12].mY, 960);
+        EXPECT_EQ(at[18].mX, 448);
+        EXPECT_EQ(at[18].mY, 889);
+        const BombCycle::Box hung = GoToTask::BombBody(at[20]);
+        EXPECT_EQ(hung.mX1, 437 - 6);
+        EXPECT_EQ(hung.mX2, 437 + 27);
+        EXPECT_EQ(hung.mY1, 880 + 4);
+        EXPECT_EQ(hung.mY2, 880 + 64);
+        const BombCycle::Box pulling = GoToTask::BombBody(at[30]);
+        EXPECT_EQ(pulling.mY1, 880 - 37);
+        EXPECT_EQ(pulling.mY2, 880 + 33);
+        const BombCycle::Box up = GoToTask::BombBody(at[44]);
+        EXPECT_EQ(up.mY1, 880 - 54);
+        EXPECT_EQ(up.mY2, 880 + 10);
+    }
+}
+
+// A floor with a mine that goes up and down through it at 400: down to `bottom`
+static TestMine ShaftMine(s32 bottom)
+{
+    TestMine mine;
+    mine.mXs = {400, 409, 409, 400, 400};
+    mine.mYs = {-60, -60, bottom, bottom, -60};
+    mine.mPace = 3.5;
+    return mine;
+}
+
+static BombCycle Watched(TestMine& mine, u32& frame)
+{
+    BombCycle cycle;
+    BombCycle::Track track;
+    track.mXs = mine.mXs;
+    track.mYs = mine.mYs;
+    cycle.SetTracks(5, {track});
+    for (frame = 1; frame <= 300; frame++)
+    {
+        mine.Step();
+        cycle.Observe(frame, 5, {mine.Seen(7)});
+    }
+    frame--;
+    return cycle;
+}
+
+TEST(BotMines, TheWayIsGoneFromOnePlaceNoMineReachesToTheNextWhenAllOfItFitsInBetween)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 800, 100, 0));
+    NavGraph g;
+    g.Build(in);
+    TestMine mine = ShaftMine(79);
+    u32 frame = 0;
+    BombCycle cycle = Watched(mine, frame);
+    ASSERT_TRUE(cycle.Known(7));
+    // The two cells it comes down through are no place to wait, standing or crouched; the ones either side are
+    bool duck = true;
+    EXPECT_TRUE(GoToTask::BombStop(g, cycle, g.NodeAt(362, 100, false), duck));
+    EXPECT_FALSE(duck);
+    EXPECT_FALSE(GoToTask::BombStop(g, cycle, g.NodeAt(387, 100, false), duck));
+    EXPECT_FALSE(GoToTask::BombStop(g, cycle, g.NodeAt(412, 100, false), duck));
+    EXPECT_TRUE(GoToTask::BombStop(g, cycle, g.NodeAt(437, 100, false), duck));
+    EXPECT_FALSE(duck);
+    // One that stops 15 higher goes over a crouched man
+    {
+        TestMine high = ShaftMine(64);
+        u32 f = 0;
+        const BombCycle over = Watched(high, f);
+        EXPECT_TRUE(GoToTask::BombStop(g, over, g.NodeAt(387, 100, false), duck));
+        EXPECT_TRUE(duck);
+        EXPECT_TRUE(GoToTask::BombStop(g, over, g.NodeAt(362, 100, false), duck));
+        EXPECT_FALSE(duck);
+        // (and one rolled under: any time)
+        std::vector<s32> under;
+        ASSERT_TRUE(g.FindPath(g.NodeAt(362, 100, false), g.NodeAt(437, 100, false), nullptr, under));
+        for (s32 later = 0; later < 90; later++)
+        {
+            EXPECT_TRUE(GoToTask::BombsClear(g, over, under, under.size(), true, 0, later)) << later;
+        }
+    }
+
+    // Through: three cells at a walk and a moment at the end, 47 frames in which it has to be up out of the way
+    std::vector<s32> path;
+    ASSERT_TRUE(g.FindPath(g.NodeAt(362, 100, false), g.NodeAt(437, 100, false), nullptr, path));
+    ASSERT_EQ(path.size(), 3u);
+    std::vector<GoToTask::Body> bodies;
+    GoToTask::Bodies(g, path, 0, path.size(), false, true, bodies);
+    ASSERT_EQ(bodies.size(), 47u);
+    // (and the two frames it takes him to start on it, standing where he is)
+    {
+        GoToTask::Body standing;
+        standing.mX = 362;
+        standing.mY = 100;
+        bodies.insert(bodies.begin(), 2, standing);
+    }
+    s32 clear = 0;
+    s32 firstClear = -1;
+    for (s32 later = 0; later < 85; later++)
+    {
+        const bool now = GoToTask::BombsClear(g, cycle, path, path.size(), false, 0, later);
+        clear += now ? 1 : 0;
+        firstClear = now && firstClear < 0 ? later : firstClear;
+        // What it says is so: the mine as it then goes meets him on no frame of the way, or does on one
+        TestMine then = mine;
+        for (s32 i = 0; i < later; i++)
+        {
+            then.Step();
+        }
+        // (or he a frame later than that)
+        bool met = false;
+        bool metLate = false;
+        for (const GoToTask::Body& body : bodies)
+        {
+            const BombCycle::Seen seen = then.Seen(7);
+            const BombCycle::Box real{seen.mX / 256 + seen.mLeft, seen.mY / 256 + seen.mTop, seen.mX / 256 + seen.mRight, seen.mY / 256 + seen.mBottom};
+            met = met || real.Meets(GoToTask::BombBody(body));
+            then.Step();
+            const BombCycle::Seen next = then.Seen(7);
+            const BombCycle::Box after{next.mX / 256 + next.mLeft, next.mY / 256 + next.mTop, next.mX / 256 + next.mRight, next.mY / 256 + next.mBottom};
+            metLate = metLate || after.Meets(GoToTask::BombBody(body));
+        }
+        if (now)
+        {
+            EXPECT_FALSE(met) << later;
+            EXPECT_FALSE(metLate) << later;
+        }
+        else
+        {
+            EXPECT_TRUE(met || metLate) << later;
+        }
+    }
+    // (a lap is 85 frames; it is low enough to meet him for some 20 of them, and he is in its way for some 30
+    // of his 47)
+    EXPECT_GT(clear, 15);
+    EXPECT_LT(clear, 45);
+    ASSERT_GE(firstClear, 0);
+    // Standing where he is first, it is as if it were that much later
+    for (s32 later = 0; later < 60; later += 3)
+    {
+        EXPECT_EQ(GoToTask::BombsClear(g, cycle, path, path.size(), false, 20, later), GoToTask::BombsClear(g, cycle, path, path.size(), false, 0, later + 20)) << later;
+    }
+    // And what it says of later is what it says then
+    for (s32 later = 1; later <= 40; later++)
+    {
+        const bool said = GoToTask::BombsClear(g, cycle, path, path.size(), false, 0, later);
+        BombCycle then = cycle;
+        TestMine moved = mine;
+        for (s32 i = 0; i < later; i++)
+        {
+            moved.Step();
+            then.Observe(frame + 1 + static_cast<u32>(i), 5, {moved.Seen(7)});
+        }
+        if (then.Known(7))
+        {
+            EXPECT_EQ(GoToTask::BombsClear(g, then, path, path.size(), false, 0, 0), said) << later;
+        }
+    }
+    // Only the first cell of it: the mine is no matter there
+    EXPECT_TRUE(GoToTask::BombsClear(g, cycle, std::vector<s32>{}, 0, false, 0, 0));
+}
+
+TEST(BotNav, AnOpenTrapDoorIsHoppedOverAndNotFallenThroughIntoADeathDrop)
+{
+    // The Barracks' path 5: floors with trap doors between them, open until a lever shuts them, a death drop
+    // under all of it and a floor below that (which nobody comes down to alive)
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 200, 100, 0));
+    in.mLines.push_back(Line(250, 100, 400, 100, 0));
+    in.mLines.push_back(Line(0, 240, 400, 240, 0));
+    NavFeature trap = Feature(FeatureKind::eTrapDoor, 200, 100, 250, 120);
+    trap.mSwitch = 7;
+    trap.mStartClosed = false;
+    in.mFeatures.push_back(trap);
+    {
+        NavGraph g;
+        g.Build(in);
+        const s32 before = g.NodeAt(187, 100, false);
+        const s32 after = g.NodeAt(262, 100, false);
+        const s32 on = g.NodeAt(212, 100, false);
+        ASSERT_GE(on, 0);
+        ASSERT_EQ(g.Nodes()[on].mTrapDoor, 0);
+        // Over it either way, whatever its switch says
+        const NavEdge* hop = FindEdge(g, before, after, EdgeKind::eHop);
+        ASSERT_NE(hop, nullptr) << g.Text();
+        s32 sw = 0;
+        s32 value = -1;
+        EXPECT_FALSE(g.Condition(*hop, &sw, &value));
+        EXPECT_NE(FindEdge(g, after, before, EdgeKind::eHop), nullptr);
+        // (not from on it, nor onto it)
+        EXPECT_EQ(FindEdge(g, on, g.NodeAt(287, 100, false), EdgeKind::eHop), nullptr);
+        EXPECT_EQ(FindEdge(g, g.NodeAt(162, 100, false), g.NodeAt(237, 100, false), EdgeKind::eHop), nullptr);
+        // Through it there is the floor below
+        EXPECT_NE(FindEdge(g, before, g.NodeAt(212, 240, false), EdgeKind::eFall), nullptr) << g.Text();
+        EXPECT_NE(FindEdge(g, on, g.NodeAt(212, 240, false), EdgeKind::eFall), nullptr);
+    }
+    // (AO: not hopped over. It was not measured there. A trap door two of its cells wide, wherever those are.)
+    {
+        NavInput flat = AoInput();
+        flat.mLines.push_back(Line(0, 100, 2000, 100, 0));
+        NavGraph cells;
+        cells.Build(flat);
+        std::vector<s32> xs;
+        for (const NavNode& n : cells.Nodes())
+        {
+            xs.push_back(n.mX);
+        }
+        std::sort(xs.begin(), xs.end());
+        ASSERT_GE(xs.size(), 12u);
+        const s32 left = (xs[4] + xs[5]) / 2;
+        const s32 right = (xs[6] + xs[7]) / 2;
+        NavInput ao = AoInput();
+        ao.mLines.push_back(Line(0, 100, left, 100, 0));
+        ao.mLines.push_back(Line(right, 100, 2000, 100, 0));
+        NavFeature door = Feature(FeatureKind::eTrapDoor, left, 100, right, 120);
+        door.mSwitch = 7;
+        ao.mFeatures.push_back(door);
+        NavGraph g;
+        g.Build(ao);
+        ASSERT_GE(g.NodeAt(xs[5], 100, false), 0);
+        ASSERT_GE(g.Nodes()[g.NodeAt(xs[5], 100, false)].mTrapDoor, 0) << g.Text();
+        ASSERT_GE(g.Nodes()[g.NodeAt(xs[6], 100, false)].mTrapDoor, 0);
+        ASSERT_LT(g.Nodes()[g.NodeAt(xs[4], 100, false)].mTrapDoor, 0);
+        ASSERT_LT(g.Nodes()[g.NodeAt(xs[7], 100, false)].mTrapDoor, 0);
+        for (const NavEdge& e : g.Edges())
+        {
+            EXPECT_NE(e.mKind, EdgeKind::eHop) << g.Nodes()[e.mFrom].mX << " to " << g.Nodes()[e.mTo].mX;
+        }
+    }
+    // With a death drop between: no way down through it
+    in.mFeatures.push_back(Feature(FeatureKind::eDeathDrop, 100, 180, 400, 204));
+    {
+        NavGraph g;
+        g.Build(in);
+        const s32 before = g.NodeAt(187, 100, false);
+        const s32 on = g.NodeAt(212, 100, false);
+        EXPECT_EQ(FindEdge(g, before, g.NodeAt(212, 240, false), EdgeKind::eFall), nullptr);
+        EXPECT_EQ(FindEdge(g, on, g.NodeAt(212, 240, false), EdgeKind::eFall), nullptr);
+        EXPECT_EQ(FindEdge(g, on, g.NodeAt(237, 240, false), EdgeKind::eFall), nullptr);
+        EXPECT_NE(FindEdge(g, before, g.NodeAt(262, 100, false), EdgeKind::eHop), nullptr);
+    }
+    // However far down the floor below is, without one (Rupture Farms' path 16 is left so)
+    {
+        NavInput deep;
+        deep.mLines.push_back(Line(0, 100, 200, 100, 0));
+        deep.mLines.push_back(Line(250, 100, 400, 100, 0));
+        deep.mLines.push_back(Line(0, 400, 400, 400, 0));
+        deep.mFeatures.push_back(trap);
+        NavGraph g;
+        g.Build(deep);
+        EXPECT_NE(FindEdge(g, g.NodeAt(212, 100, false), g.NodeAt(212, 400, false), EdgeKind::eFall), nullptr);
+    }
 }

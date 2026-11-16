@@ -1343,7 +1343,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     }
 
     // Crouched after a roll: up again, unless there's more to roll or no room to stand
-    if (abe.mMove == Move::eCrouch && !nav.Nodes()[cur].mLow && !(mSweepDuck && !atGoal) && (atGoal || (nav.Edges()[path[0]].mKind != EdgeKind::eRoll && !nav.Edges()[path[0]].mCrouched)))
+    if (abe.mMove == Move::eCrouch && !nav.Nodes()[cur].mLow && !((mSweepDuck || mBombDuck) && !atGoal) && (atGoal || (nav.Edges()[path[0]].mKind != EdgeKind::eRoll && !nav.Edges()[path[0]].mCrouched)))
     {
         return TaskStep::Do(Prim::Press(Btn::eUp));
     }
@@ -1490,6 +1490,14 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 bot.SweepBegun();
             }
             mSweepWait = 0;
+        }
+    }
+    if (bot.GetBombCycle().Any())
+    {
+        TaskStep step;
+        if (BombStep(bot, cur, path, sweepStop, sweepRoll, step))
+        {
+            return step;
         }
     }
 
@@ -2996,27 +3004,25 @@ const Entity* GoToTask::SweepHigh(const NavGraph& nav, const World& world, s32 n
     return drill && drill->mKind == EntityKind::eDrill && world.SweepLive(*drill) ? drill : nullptr;
 }
 
-bool GoToTask::SweepsClear(const NavGraph& nav, const World& world, const std::vector<s32>& path, std::size_t count, s32 late, bool rolled)
+void GoToTask::Bodies(const NavGraph& nav, const std::vector<s32>& path, std::size_t first, std::size_t count, bool rolled, bool rest, std::vector<Body>& out)
 {
     // Where Abe is frame by frame: along each edge at an even pace for the frames it takes (measured, see
-    // BOT_DESIGN.md), give or take kSlack pixels
-    const s32 kSlack = 9;
-    s32 start = late > 0 ? late : 0;
+    // BOT_DESIGN.md)
     EdgeKind before = EdgeKind::eDoor;
-    for (std::size_t i = 0; i <= count && i <= path.size(); i++)
+    for (std::size_t i = first; i <= first + count && i <= path.size(); i++)
     {
         // (and a moment in the last cell, where what comes next starts)
-        const bool rest = i == count || i == path.size();
-        if (rest && i == 0)
+        const bool last = i == first + count || i == path.size();
+        if (last && (i == first || !rest))
         {
             break;
         }
-        const NavEdge& e = nav.Edges()[path[rest ? i - 1 : i]];
-        const NavNode& a = nav.Nodes()[rest ? e.mTo : e.mFrom];
+        const NavEdge& e = nav.Edges()[path[last ? i - 1 : i]];
+        const NavNode& a = nav.Nodes()[last ? e.mTo : e.mFrom];
         const NavNode& b = nav.Nodes()[e.mTo];
         const EdgeKind kind = rolled && e.mKind == EdgeKind::eWalk ? EdgeKind::eRoll : e.mKind;
         s32 frames = 12;
-        if (!rest)
+        if (!last)
         {
             switch (kind)
             {
@@ -3038,34 +3044,461 @@ bool GoToTask::SweepsClear(const NavGraph& nav, const World& world, const std::v
             }
             before = kind;
         }
-        const bool climbs = !rest && (e.mKind == EdgeKind::eHoistUp || e.mKind == EdgeKind::eHoistDown);
+        const bool climbs = !last && (e.mKind == EdgeKind::eHoistUp || e.mKind == EdgeKind::eHoistDown);
+        const s32 scale = a.mHalf ? 2 : 1;
+        const bool grabs = !last && (kind == EdgeKind::eHop || kind == EdgeKind::eRunJump) && (a.mY - b.mY) * scale > 20;
+        // (measured in the Barracks' path 5: he walks off an edge in 6 frames, falls 0.9 t squared and is 10 on
+        // his feet again; a hop is 10 where he stands, 5 level through the air at 15 a frame, then down 3 t + 2.3 t squared, and 9
+        // landing)
+        const bool falls = !last && kind == EdgeKind::eFall && e.mWell < 0 && !e.mHung;
+        const bool hops = !last && kind == EdgeKind::eHop && e.mWell < 0 && !grabs;
+        s32 air = 0;
+        // (a jump up to a ledge, measured there too: run to where he takes off at 6.25 a frame, or the 10 of a
+        // hop where he stands; 3 level through the air, 6 up to the ledge, 3 hung from it and 23 pulling himself up)
+        const s32 run = kind == EdgeKind::eRunJump ? std::max(1, std::abs(a.mX - e.mX) * scale * 4 / 25) : 10;
+        if (grabs)
+        {
+            frames = run + 35;
+        }
+        else if (falls)
+        {
+            while (9 * air * air < 10 * (b.mY - a.mY) * scale)
+            {
+                air++;
+            }
+            frames = 6 + air + 10;
+        }
+        else if (hops)
+        {
+            // (10 where he stands, 5 level through the air, and then down)
+            s32 drop = 0;
+            while (30 * drop + 23 * drop * drop < 10 * (b.mY - a.mY) * scale)
+            {
+                drop++;
+            }
+            air = 15 + drop;
+            frames = air + 9;
+        }
         // (rolled through, or crouched where there is no standing, he is 34 high)
-        const bool down = rest ? (b.mLow || rolled) : kind == EdgeKind::eRoll;
+        const bool down = last ? (b.mLow || rolled) : kind == EdgeKind::eRoll;
         const s32 tall = (a.mHalf ? 30 : 60) * (down ? 34 : 60) / 60;
         for (s32 f = 0; f < frames; f++)
         {
-            const s32 t = start + f + (late < 0 ? late : 0);
-            const s32 x = a.mX + (b.mX - a.mX) * f / frames;
+            Body body;
+            body.mX = a.mX + (b.mX - a.mX) * f / frames;
             // (a hoist: on the lower floor until he jumps, then no lower than he hangs)
             // (measured in the Mines' path 4 at 2062,1500, a drill along the floor 15 to 35 above it: there 3
             // frames before the jump starts, and his feet are 23 up 14 frames into it and out of its reach 17 in)
             const s32 onFloor = e.mKind == EdgeKind::eHoistUp ? frames - 34 : 40;
             const bool hangs = climbs && (e.mKind == EdgeKind::eHoistUp ? f >= onFloor : f < frames - onFloor);
-            const s32 y = climbs ? (hangs ? std::min(a.mY, b.mY) + tall + 4 : std::max(a.mY, b.mY)) : a.mY + (b.mY - a.mY) * f / frames;
-            for (const SweepAt& sweep : world.mSweeps)
+            body.mY = climbs ? (hangs ? std::min(a.mY, b.mY) + tall + 4 : std::max(a.mY, b.mY)) : a.mY + (b.mY - a.mY) * f / frames;
+            body.mTall = tall;
+            body.mHalf = a.mHalf;
+            body.mLeft = e.mLeft;
+            // His box about his feet, as it was measured doing each of these (the Barracks' path 5)
+            const bool low = down;
+            body.mUp = low ? 34 : 55;
+            body.mBack = last ? 14 : low ? 24 : 26;
+            body.mFront = body.mBack;
+            if (last)
             {
-                s32 x1 = 0;
-                s32 y1 = 0;
-                s32 x2 = 0;
-                s32 y2 = 0;
-                if (sweep.mHalf == a.mHalf && sweep.At(t < 0 ? 0 : t, x1, y1, x2, y2) && x + 3 + kSlack >= x1 && x - 3 - kSlack <= x2 && y >= y1 && y - tall <= y2)
+                body.mUp = low ? 34 : 53;
+            }
+            else if (climbs)
+            {
+                body.mBack = 25;
+                body.mFront = 25;
+            }
+            else if (grabs)
+            {
+                const s32 dir = b.mX < a.mX ? -1 : 1;
+                const s32 off = kind == EdgeKind::eRunJump ? e.mX : a.mX;
+                const s32 k = f - run;
+                body.mY = a.mY;
+                if (k < 0)
                 {
-                    return false;
+                    body.mX = a.mX + (off - a.mX) * f / run;
+                    body.mBack = kind == EdgeKind::eRunJump ? 25 : f < 5 ? 23 : f < 9 ? 20 : 14;
+                    body.mFront = kind == EdgeKind::eRunJump ? 27 : f < 5 ? 19 : f < 9 ? 30 : 45;
+                }
+                else if (k < 3)
+                {
+                    body.mX = off + dir * 13 * (k + 1) / (2 * scale);
+                    body.mBack = 20;
+                    body.mFront = 27;
+                }
+                else if (k < 9)
+                {
+                    const s32 from = off + dir * 19 / scale;
+                    body.mX = from + (b.mX - dir * 11 / scale - from) * (k - 2) / 6;
+                    body.mY = a.mY + (b.mY + 9 / scale - a.mY) * (k - 2) / 6;
+                    body.mUp = 68;
+                    body.mBack = 23;
+                    body.mFront = 33;
+                }
+                else
+                {
+                    // (hung under the ledge on the side he came from, then up over it)
+                    body.mX = b.mX;
+                    body.mY = b.mY;
+                    body.mBack = k < 12 ? 27 : 22;
+                    body.mFront = k < 12 ? 6 : 18;
+                    body.mUp = k < 12 ? -5 : k < 16 ? 20 : k < 28 ? 36 : 53;
+                    body.mDown = k < 12 ? 65 : k < 16 ? 70 : k < 28 ? 34 : 11;
                 }
             }
+            else if (falls)
+            {
+                const bool flies = f >= 6 && f < 6 + air;
+                body.mX = f < 10 ? a.mX + (b.mX - a.mX) * f / 10 : b.mX;
+                body.mY = f < 6 ? a.mY : std::min(b.mY, a.mY + 9 * (f - 6) * (f - 6) / (10 * scale));
+                body.mUp = flies ? 64 : 59;
+                body.mBack = flies ? 35 : 26;
+                body.mFront = body.mBack;
+            }
+            else if (hops)
+            {
+                // (he leans back, then forward, where he stands before he is off; in the air he trails behind)
+                const s32 off = 10;
+                const s32 dir = b.mX < a.mX ? -1 : 1;
+                const s32 span = std::abs(b.mX - a.mX);
+                const s32 level = std::min(span, 15 * 5 / scale);
+                body.mX = a.mX;
+                body.mY = a.mY;
+                if (f < off)
+                {
+                    body.mBack = f < 5 ? 23 : f < 9 ? 20 : 14;
+                    body.mFront = f < 5 ? 19 : f < 9 ? 30 : 45;
+                }
+                else if (f < off + 5)
+                {
+                    const s32 k = f - off;
+                    body.mX = a.mX + dir * level * (k + 1) / 5;
+                    body.mBack = std::min(44, 25 + 10 * k);
+                    body.mFront = std::max(6, 37 - 7 * k);
+                }
+                else if (f < air)
+                {
+                    const s32 t = f - off - 5 + 1;
+                    body.mX = a.mX + dir * (level + (span - level) * t / (air - off - 5));
+                    body.mY = std::min(b.mY, a.mY + (30 * t + 23 * t * t) / (10 * scale));
+                    body.mUp = 64;
+                    body.mBack = 35;
+                    body.mFront = 35;
+                }
+                else
+                {
+                    body.mX = b.mX;
+                    body.mY = b.mY;
+                    body.mBack = 26;
+                    body.mFront = 26;
+                }
+            }
+            else if (kind != EdgeKind::eWalk && kind != EdgeKind::eRoll)
+            {
+                body.mUp = 68;
+                body.mBack = 35;
+                body.mFront = 35;
+            }
+            out.push_back(body);
         }
-        start += frames;
     }
+}
+
+bool GoToTask::SweepsClear(const NavGraph& nav, const World& world, const std::vector<s32>& path, std::size_t count, s32 late, bool rolled)
+{
+    // (where he is, give or take kSlack pixels)
+    const s32 kSlack = 9;
+    std::vector<Body> bodies;
+    Bodies(nav, path, 0, count, rolled, true, bodies);
+    for (std::size_t k = 0; k < bodies.size(); k++)
+    {
+        const Body& body = bodies[k];
+        const s32 t = static_cast<s32>(k) + late;
+        for (const SweepAt& sweep : world.mSweeps)
+        {
+            s32 x1 = 0;
+            s32 y1 = 0;
+            s32 x2 = 0;
+            s32 y2 = 0;
+            if (sweep.mHalf == body.mHalf && sweep.At(t < 0 ? 0 : t, x1, y1, x2, y2) && body.mX + 3 + kSlack >= x1 && body.mX - 3 - kSlack <= x2 && body.mY >= y1 && body.mY - body.mTall <= y2)
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+BombCycle::Box GoToTask::BombBody(const Body& body)
+{
+    const s32 scale = body.mHalf ? 2 : 1;
+    const s32 left = (body.mLeft ? body.mFront : body.mBack) / scale;
+    const s32 right = (body.mLeft ? body.mBack : body.mFront) / scale;
+    return BombCycle::Box{body.mX - left, body.mY - body.mUp / scale - 1, body.mX + right, body.mY - 1 + body.mDown / scale};
+}
+
+bool GoToTask::BombStop(const NavGraph& nav, const BombCycle& bombs, s32 node, bool& duck)
+{
+    const NavNode& n = nav.Nodes()[node];
+    Body body;
+    body.mX = n.mX;
+    body.mY = n.mY;
+    body.mHalf = n.mHalf;
+    body.mUp = n.mLow ? 34 : 53;
+    duck = false;
+    if (!bombs.Ever(n.mHalf, BombBody(body)))
+    {
+        return true;
+    }
+    if (n.mLow || n.mLiftStop >= 0)
+    {
+        return false;
+    }
+    body.mUp = 34;
+    duck = !bombs.Ever(n.mHalf, BombBody(body));
+    return duck;
+}
+
+bool GoToTask::BombsClear(const NavGraph& nav, const BombCycle& bombs, const std::vector<s32>& path, std::size_t count, bool rolled, s32 delay, s32 later)
+{
+    std::vector<Body> bodies;
+    // (what he is asked to do he starts on two frames later: measured)
+    delay += 2;
+    if (!path.empty())
+    {
+        // (up from a crouch first)
+        const NavNode& n = nav.Nodes()[nav.Edges()[path[0]].mFrom];
+        Body body;
+        body.mX = n.mX;
+        body.mY = n.mY;
+        body.mHalf = n.mHalf;
+        body.mUp = 56;
+        bodies.assign(static_cast<std::size_t>(delay), body);
+    }
+    Bodies(nav, path, 0, count, rolled, true, bodies);
+    for (std::size_t k = 0; k < bodies.size(); k++)
+    {
+        const BombCycle::Box box = BombBody(bodies[k]);
+        // (or a frame later than worked out)
+        for (s32 slip = 0; slip <= 1; slip++)
+        {
+            if (bombs.Hits(bodies[k].mHalf, std::max(0, later + static_cast<s32>(k) + slip), box))
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+// Flying mines on the way: from one place none of them ever reaches (standing, or crouched) to the next in one go,
+// when all of that fits in between them. True with the step to take while he waits.
+bool GoToTask::BombStep(Bot& bot, s32 cur, const std::vector<s32>& path, std::size_t& stop, std::size_t& roll, TaskStep& step)
+{
+    const NavGraph& nav = bot.Nav();
+    const BombCycle& bombs = bot.GetBombCycle();
+    const AbeState& abe = bot.Abe();
+    mBombDuck = false;
+    // The first edge of the way one of them crosses at some time
+    std::vector<Body> bodies;
+    const std::size_t far = std::min<std::size_t>(path.size(), 24);
+    std::size_t in = 0;
+    for (; in < far; in++)
+    {
+        bodies.clear();
+        Bodies(nav, path, in, 1, false, in + 1 == path.size(), bodies);
+        bool hot = false;
+        for (const Body& b : bodies)
+        {
+            hot = hot || bombs.Ever(b.mHalf, BombBody(b));
+        }
+        if (hot)
+        {
+            break;
+        }
+    }
+    if (in == far)
+    {
+        return false;
+    }
+    const NavNode& here = nav.Nodes()[cur];
+    // The last place before it that none reaches: up to there as ever
+    bool duck = false;
+    bool found = false;
+    std::size_t at = in;
+    for (;; at--)
+    {
+        if (BombStop(nav, bombs, at == 0 ? cur : nav.Edges()[path[at - 1]].mTo, duck))
+        {
+            found = true;
+            break;
+        }
+        if (at == 0)
+        {
+            break;
+        }
+    }
+    if (!found)
+    {
+        // (in their way already: on)
+        return false;
+    }
+    if (at > 0)
+    {
+        stop = std::min(stop, at);
+        return false;
+    }
+    // From here to the next such place
+    std::size_t count = 1;
+    bool endDuck = false;
+    while (count < path.size() && count < 40 && !BombStop(nav, bombs, nav.Edges()[path[count - 1]].mTo, endDuck))
+    {
+        count++;
+    }
+    const bool crouched = abe.mMove == Move::eCrouch && !here.mLow;
+    bool go = false;
+    // What he does before he is off (measured): up from a crouch in 9, round in 12; and a running jump with a
+    // run-up of a cell starts turned away (10 to turn if he isn't) and comes round in 5 as it starts
+    s32 before = crouched ? 9 : 0;
+    {
+        const NavEdge& e = nav.Edges()[path[0]];
+        const bool faces = abe.mFacingLeft == e.mLeft;
+        if (e.mKind == EdgeKind::eRunJump)
+        {
+            const bool shortRun = std::abs(e.mX - here.mX) * (here.mHalf ? 2 : 1) <= 38;
+            before += shortRun ? (faces ? 15 : 5) : (faces ? 0 : 12);
+        }
+        else if (!faces && (e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eHop))
+        {
+            before += 12;
+        }
+    }
+    // A mine of that stretch not seen for a lap yet, or not there yet: watched from here
+    bodies.clear();
+    Bodies(nav, path, 0, count, false, true, bodies);
+    bool watching = false;
+    bool missing = false;
+    for (const Body& b : bodies)
+    {
+        watching = watching || bombs.Watching(b.mHalf, BombBody(b));
+        missing = missing || bombs.Missing(b.mHalf, BombBody(b));
+    }
+    missing = missing && mBombWatch < 90;
+    if (watching || missing)
+    {
+        if (mBombWatch == 0 || (watching && mBombWatch < 1000))
+        {
+            bot.Log("flying mines on the way: watching where they go");
+            mBombWatch = 1000;
+        }
+        mBombWatch += missing && !watching ? 1 : 0;
+    }
+    else if (crouched)
+    {
+        std::size_t lead = 0;
+        while (lead < count)
+        {
+            const NavEdge& e = nav.Edges()[path[lead]];
+            if ((e.mKind != EdgeKind::eWalk && e.mKind != EdgeKind::eRoll) || e.mLeft != nav.Edges()[path[0]].mLeft || nav.Nodes()[e.mTo].mHazard)
+            {
+                break;
+            }
+            lead++;
+        }
+        if (lead == count && BombsClear(nav, bombs, path, count, true, 0))
+        {
+            bot.Log("rolling on under the flying mines");
+            roll = count;
+            go = true;
+        }
+        else if ((mBombUp == cur && abe.mFrame < mBombUpAt) || BombsClear(nav, bombs, path, count, false, before))
+        {
+            // Up first: what comes next is done standing
+            if (mBombUp != cur || abe.mFrame >= mBombUpAt)
+            {
+                mBombUp = cur;
+                mBombUpAt = abe.mFrame + static_cast<u32>(before) + 6;
+            }
+            if (mBombWait > 0)
+            {
+                bot.Log("the flying mines are out of the way for " + std::to_string(count) + " edges: up and on");
+            }
+            mBombWait = 0;
+            mSteps--;
+            step = TaskStep::Do(Prim::Press(Btn::eUp));
+            return true;
+        }
+    }
+    else if (mBombUp == cur && abe.mFrame < mBombUpAt)
+    {
+        // (set to go: no second thoughts)
+        go = true;
+    }
+    else
+    {
+        go = BombsClear(nav, bombs, path, count, false, before);
+        if (go && before > 0)
+        {
+            mBombUp = cur;
+            mBombUpAt = abe.mFrame + static_cast<u32>(before) + 6;
+        }
+    }
+    if (go)
+    {
+        if (mBombWait > 0)
+        {
+            bot.Log("the flying mines are out of the way for " + std::to_string(count) + " edges: on");
+        }
+        stop = std::min(stop, count);
+        mBombWait = 0;
+        return false;
+    }
+    // Whether it ever will be: the mines as they will be for the next 600 frames
+    if (!watching && !missing && mBombWait == 0)
+    {
+        bool ever = false;
+        for (s32 later = 1; later <= 600 && !ever; later++)
+        {
+            ever = BombsClear(nav, bombs, path, count, false, before, later) || (duck && BombsClear(nav, bombs, path, count, true, 0, later));
+        }
+        if (!ever)
+        {
+            // (another way, then)
+            bot.Log("the flying mines never leave the time for that");
+            bot.BanEdge(path[0]);
+            mSteps--;
+            step = TaskStep::Do(Prim::Wait(1));
+            return true;
+        }
+    }
+    if (mBombWait > 1500)
+    {
+        bot.BanEdge(path[0]);
+        step = TaskStep::Failed("the flying mines leave no time to get through");
+        return true;
+    }
+    if (!watching && !missing && mBombWait++ == 0)
+    {
+        std::string way;
+        for (std::size_t i = 0; i < count; i++)
+        {
+            const NavEdge& e = nav.Edges()[path[i]];
+            way += std::string(" ") + EdgeKindName(e.mKind) + ">" + std::to_string(nav.Nodes()[e.mTo].mX) + "," + std::to_string(nav.Nodes()[e.mTo].mY);
+        }
+        bot.Log(std::string("flying mines cross the way ahead: waiting") + (duck ? " crouched" : "") + " for them to be out of the way (" + std::to_string(count) + " edges:" + way + ", " + std::to_string(bodies.size()) + " frames)");
+    }
+    mSteps--;
+    if (duck)
+    {
+        mBombDuck = true;
+        if (abe.mMove != Move::eCrouch)
+        {
+            step = abe.Settled() ? TaskStep::Do(Prim::Press(Btn::eDown)) : TaskStep::Do(Prim::Wait(1));
+            return true;
+        }
+    }
+    step = TaskStep::Do(Prim::Wait(1));
     return true;
 }
 

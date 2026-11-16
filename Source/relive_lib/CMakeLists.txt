@@ -652,6 +652,8 @@ SET(relive_lib_src
     Bot/FartFlight.cpp
     Bot/Pilot.hpp
     Bot/SligCycle.hpp
+    Bot/BombCycle.hpp
+    Bot/BombCycle.cpp
     Bot/SligCycle.cpp
     Bot/Lookahead.hpp
     Bot/Lookahead.cpp
