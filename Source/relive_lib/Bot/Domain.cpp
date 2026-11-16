@@ -2079,10 +2079,38 @@ bool Domain::PlanTogether(const NavGraph& nav, const World& world, const Entity&
         return false;
     }
 
-    // Mudokons walk and drop off ledges, nothing more
+    // The wheels a Mudokon stands at already are its own: it is in the team as it stands
+    std::vector<const Entity*> manned;
+    std::vector<const Entity*> free;
+    for (const Entity* w : wheels)
+    {
+        const Entity* at = nullptr;
+        for (const Entity& e : world.mEntities)
+        {
+            const s32 x = e.mLive ? e.mLiveX : e.CentreX();
+            const s32 y = e.mLive ? e.mLiveY : e.mY2;
+            const bool taken = std::find(manned.begin(), manned.end(), &e) != manned.end();
+            if (!at && !taken && e.mKind == EntityKind::eMudokon && !e.mGone && !e.mBlind && x >= w->mX1 && x <= w->mX2 && std::abs(y - w->mY2) < 30)
+            {
+                at = &e;
+            }
+        }
+        if (at)
+        {
+            manned.push_back(at);
+        }
+        else
+        {
+            free.push_back(w);
+        }
+        team.mWheels.push_back(w->mId);
+    }
+
+    // The rest but one are for Mudokons brought along: they walk, drop off ledges and ride a lift Abe works,
+    // nothing more
     const NavGraph::EdgeCost mudCost = [](const NavEdge& e)
     {
-        return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eFall ? e.mCost : -1;
+        return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eLift ? e.mCost : -1;
     };
     struct Candidate final
     {
@@ -2091,10 +2119,10 @@ bool Domain::PlanTogether(const NavGraph& nav, const World& world, const Entity&
         std::vector<s32> mPath;
     };
     std::vector<Candidate> candidates;
-    const s32 firstWheel = UseNode(nav, *wheels[0], nullptr);
+    const s32 firstWheel = UseNode(nav, free.empty() ? *wheels[0] : *free[0], nullptr);
     for (const Entity& e : world.mEntities)
     {
-        if (e.mKind != EntityKind::eMudokon || e.mGone)
+        if (e.mKind != EntityKind::eMudokon || e.mGone || free.size() < 2 || std::find(manned.begin(), manned.end(), &e) != manned.end())
         {
             continue;
         }
@@ -2107,22 +2135,38 @@ bool Domain::PlanTogether(const NavGraph& nav, const World& world, const Entity&
     }
     std::stable_sort(candidates.begin(), candidates.end(), [](const Candidate& a, const Candidate& b)
                      { return a.mCost < b.mCost; });
-    if (candidates.size() + 1 < wheels.size())
+    if (candidates.size() + 1 < free.size())
     {
         return false;
     }
-    candidates.resize(wheels.size() - 1);
+    candidates.resize(free.empty() ? 0 : free.size() - 1);
 
-    // Abe's wheel: the one furthest from where the Mudokons come from, so they pass the others first
-    const s32 fromX = candidates[0].mMud->CentreX();
-    const Entity* abeWheel = wheels[0];
-    for (const Entity* w : wheels)
+    // Where the ones brought come onto the wheels' floor: where they stand, or where the last drop or lift of
+    // their way lets them off
+    const Entity* abeWheel = free.empty() ? wheels[0] : free[0];
+    team.mFromX = abeWheel->CentreX();
+    if (!candidates.empty())
     {
-        if (std::abs(w->CentreX() - fromX) > std::abs(abeWheel->CentreX() - fromX))
+        team.mFromX = candidates[0].mMud->CentreX();
+        for (s32 edge : candidates[0].mPath)
+        {
+            const NavEdge& e = nav.Edges()[edge];
+            team.mFromX = e.mKind == EdgeKind::eWalk ? team.mFromX : nav.Nodes()[e.mTo].mX;
+        }
+    }
+    // Abe's wheel: the one furthest from there, so they pass the others first
+    for (const Entity* w : free)
+    {
+        if (std::abs(w->CentreX() - team.mFromX) > std::abs(abeWheel->CentreX() - team.mFromX))
         {
             abeWheel = w;
         }
-        team.mWheels.push_back(w->mId);
+        team.mFree.push_back(w->mId);
+    }
+    for (const Entity* mud : manned)
+    {
+        team.mMuds.push_back(mud->mId);
+        pre.push_back({Key::Mud(mud->mId), 0});
     }
     team.mAbeWheel = abeWheel->mId;
     for (const Candidate& c : candidates)

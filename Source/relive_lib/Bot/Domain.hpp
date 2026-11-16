@@ -147,6 +147,10 @@ struct Team final
     std::vector<u32> mMuds;
     // The one left for Abe: the last on the Mudokons' way
     u32 mAbeWheel = 0;
+    // The wheels no Mudokon stood at when it was planned, and where the Mudokons brought to them come onto
+    // their floor
+    std::vector<u32> mFree;
+    s32 mFromX = 0;
 };
 
 // What a path off the way has for a run that wants Mudokons, seen from where Abe would come into it

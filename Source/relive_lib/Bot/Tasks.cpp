@@ -650,8 +650,31 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     {
         const NavGraph::EdgeCost all = bot.EdgeCostFn();
         led = nav.FindPath(cur, mIsGoal, [&all](const NavEdge& e) -> s32
-                           { return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eFall ? all(e) : -1; }, path)
+                           { return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eLift ? all(e) : -1; }, path)
            && !path.empty();
+    }
+    if (led && nav.Edges()[path[0]].mKind == EdgeKind::eLift)
+    {
+        // A lift takes whoever stands on it: the ones that follow are waited for until they do
+        bool off = false;
+        for (const LiftAt& lift : bot.GetWorld().mLifts)
+        {
+            if (abe.mX < lift.mX1 || abe.mX > lift.mX2 || std::abs(lift.mY - abe.mY) > 10)
+            {
+                continue;
+            }
+            for (const Entity& e : bot.GetWorld().mEntities)
+            {
+                off = off || (e.mKind == EntityKind::eMudokon && e.mLive && e.mFollowing && (e.mLiveX < lift.mX1 || e.mLiveX > lift.mX2 || std::abs(e.mLiveY - lift.mY) > 10));
+            }
+        }
+        if (off && mLeadWaits < 60)
+        {
+            mLeadWaits++;
+            mSteps--;
+            return TaskStep::Do(Prim::Wait(10));
+        }
+        mLeadWaits = 0;
     }
     if (!atGoal && !led && (!nav.FindPath(cur, mIsGoal, bot.EdgeCostFn(), path) || path.empty()))
     {
@@ -5879,14 +5902,13 @@ TaskStep WorkTogetherTask::Next(Bot& bot, const std::string& lastFailed)
     }
 
     const Entity* farWheel = world.Find(mTeam.mAbeWheel);
-    const Entity* firstMud = world.Find(mTeam.mMuds[0]);
-    if (!farWheel || !firstMud)
+    if (!farWheel)
     {
         return TaskStep::Failed("no wheel");
     }
     const s32 farNode = Domain::UseNode(nav, *farWheel, nullptr);
     const s32 cell = NavGraph::GridStep(farWheel->mHalf);
-    const s32 away = farWheel->CentreX() >= firstMud->CentreX() ? 1 : -1;
+    const s32 away = farWheel->CentreX() >= mTeam.mFromX ? 1 : -1;
     // A cell up to so many on from a wheel, by plain floor
     const auto beyond = [&](s32 fromNode, s32 dir, s32 cells)
     {
@@ -5907,8 +5929,14 @@ TaskStep WorkTogetherTask::Next(Bot& bot, const std::string& lastFailed)
     {
         case 1: // to the side they come from, a little before the first wheel
         {
+            // (with a Mudokon at every wheel already there is nobody to lead along them)
+            if (mTeam.mFree.size() < 2)
+            {
+                mStage = 4;
+                return Next(bot, "");
+            }
             const Entity* nearWheel = farWheel;
-            for (u32 id : mTeam.mWheels)
+            for (u32 id : mTeam.mFree)
             {
                 const Entity* wheel = world.Find(id);
                 if (wheel && (wheel->CentreX() - nearWheel->CentreX()) * away < 0)

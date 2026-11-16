@@ -95,7 +95,7 @@ hash.
 | lifts | yes | yes | done in AE (one lift, three stops); lift movers, AO: not tried |
 | rescue: hello, follow me, lead, chant | yes | yes | done in AE (AO's speech buttons differ) |
 | sad / angry / wired Mudokons | Mines path 1 | no | done |
-| wheels turned together by Mudokons | Mines path 1 (2 and 6 wheels) | no | done |
+| wheels turned together by Mudokons | Mines path 1 (2 and 6 wheels), Barracks path 13 (4, Mudokons at two, one brought by lift) | no | done |
 | leading Mudokons down ledges and past a sleeping Slig | Mines path 1 | yes | done |
 | sleeping Sligs: sneak, no talking on their screen | yes | yes | done |
 | patrolling Sligs: wait in an invisible zone, go behind their back | Mines path 1 | shadows in AO | first version: it got through, sometimes after deaths |
@@ -1270,11 +1270,18 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
   worked out beyond its width. `GrenadeSligTask` is only tested in the game, but for `SligIn`.
 
 **What the Barracks still wants** (from the walkthrough and the paths' TLVs):
-- **Path 13, the next room** (measured: `b2l.txt` goes on into it and stops there): four wheels that have to
-  turn at once (a multi switch, 60 frames), two Mudokons at work by two of them, four more a lift ride down
-  behind electric walls a lever turns off. `Domain::PlanTogether` only counts Mudokons that can walk to the
-  wheels, so it makes no team: he turns the two free wheels one after the other and gets nowhere. Wanted:
-  Mudokons brought up on a lift as part of a team.
+- **Path 13, the wheel room: done** (`b3n.txt`, from its door, without look: out to the hub, path 2, at
+  f=1,604 with 0 deaths). Four wheels that have to go on within 60 frames of each other (a multi switch: the
+  wheels themselves stay on), two Mudokons standing at two of them, four more a lift ride down behind electric
+  walls a lever turns off. `Domain::PlanTogether` now takes a Mudokon that stands at a wheel as that wheel's
+  (`Team::mFree` is the rest), and the ones brought to the others walk, drop and ride a lift; what their way
+  needs (the walls' switch) is what the action needs. `Team::mFromX` is where they come onto the wheels' floor
+  (the lift), and Abe's wheel is the free one furthest from there. A leading `GoToTask` goes by lift too, and
+  waits on it until the ones that follow stand on it. The plan there: the lever, `Work together`, the exit.
+  Not done: the six Mudokons are not rescued (the portal is there once the wheels have turned).
+- **The hub, path 2** (`b3n.txt` goes on into it): the centre door wants four switches, one from each block.
+  He reads the hand stone and takes a well to a block; in path 10 he is shot by the Sligs in the background on
+  the first try.
 - The hub and its four blocks, then the war room: a Glukkon taken over and its orders to Sligs, crawling
   Sligs and their button, an orb blown up with a grenade (then its Sligs taken over), grenades thrown on a
   count, Greeters, laughing gas, flying mines to time, Slig voice locks, ghost locks, a Shrykull.
