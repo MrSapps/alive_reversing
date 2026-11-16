@@ -1176,7 +1176,9 @@ void NavGraph::Build(const NavInput& input)
                     n.mHidden = true;
                 }
             }
-            n.mZCover = !half && ZCovered(x, n.mY, -13, 13, 53);
+            // (standing still his box is 52 high: the rifle range's cutout at 1262,420 is a cover that begins
+            // just 52 over its floor)
+            n.mZCover = !half && ZCovered(x, n.mY, -13, 13, 52);
             n.mZLow = !half && ZCovered(x, n.mY, -13, 13, 34);
             const s32 madeBy = i >= realLines ? stopOfLine[i - realLines] : -1;
             const bool trap = madeBy >= 0 && mInput.mFeatures[madeBy].mKind == FeatureKind::eTrapDoor;

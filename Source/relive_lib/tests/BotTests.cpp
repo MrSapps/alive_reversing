@@ -6716,7 +6716,7 @@ TEST(BotNav, ACellIsCoverFromTheBackgroundOnlyWithAllOfHimInside)
 {
     NavInput in;
     in.mLines.push_back(Line(0, 200, 375, 200, 0));
-    // (a rock 44 wide: one cell of it holds him standing, 26 wide and 53 high)
+    // (a rock 44 wide: one cell of it holds him standing, 26 wide and 52 high)
     NavFeature rock = Feature(FeatureKind::eZCover, 143, 140, 187, 202);
     rock.mAnyScale = true;
     in.mFeatures.push_back(rock);
@@ -6728,6 +6728,16 @@ TEST(BotNav, ACellIsCoverFromTheBackgroundOnlyWithAllOfHimInside)
     // Rolling his box is 37 wide, further ahead of him than behind: in it for less of the way
     EXPECT_TRUE(g.ZCovered(170, 200, -24, 13, 34));
     EXPECT_FALSE(g.ZCovered(162, 200, -24, 13, 34));
+    // One that begins just 52 over the floor still holds him; a unit lower it does not
+    NavInput just = in;
+    just.mFeatures[0].mY1 = 148;
+    NavGraph j;
+    j.Build(just);
+    EXPECT_TRUE(j.Nodes()[j.NodeAt(162, 200, false)].mZCover);
+    just.mFeatures[0].mY1 = 149;
+    NavGraph k;
+    k.Build(just);
+    EXPECT_FALSE(k.Nodes()[k.NodeAt(162, 200, false)].mZCover);
     // Too low a cover is none to one who stands
     NavInput low = in;
     low.mFeatures[0].mY1 = 160;

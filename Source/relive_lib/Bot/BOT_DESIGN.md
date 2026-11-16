@@ -1284,11 +1284,21 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
   Not done: the six Mudokons are not rescued (the portal is there once the wheels have turned).
 - **The hub, path 2** (`b3n.txt` goes on into it): the centre door wants four switches, one from each block
   (116 the rifle range's lever, 125 a wheel behind the workers' campus, 108 and 218 two more doors that each
-  want switches of their own). He reads the hand stone and takes a well to a block. Nothing tells him yet that
-  a block's switch is what he is in it for: put down inside a block's door, his goal is to leave the path, and
-  the open door behind him is the way he takes.
-- **Block 1, the rifle range, path 10: begun, not beaten** (`ae_barracks_rifle_range.txt`, from its door, no look:
-  through three of its six screens, then shot on the fourth at f=5,199). Fourteen Sligs in the background, two
+  want switches of their own). He reads the hand stone and takes a well to a block. What he is in a block
+  for comes from the level graph: `GameView::ReadLevel` reads for each path the switches its things set
+  (`PathSummary::mSets`: levers, wheels, a tasks door's own switch) and the ones its shut doors want
+  (`mWants`, a tasks door's through the logic that stands for its hubs). `LevelGraph::Wanted` is what the doors
+  on the way on of other paths want (only paths no farther from the level's end than his: in the Mines' last
+  path a lever sets what a door four paths back wanted, and that sent him off), `Errands` what of it a path
+  sets, `ErrandExits` the ways out of a path that lead to such a switch without going through the path
+  whose door it is for. In `Bot`: a wanted switch that can be set here is the goal before "Leave the path";
+  while one is open here and no plan sets it he looks for a way (switches, regions) instead of leaving, and
+  gives it up only when that runs out (`mErrandsLeft`, also for one he left the path without setting);
+  `ExitAllowed` takes the ways `ErrandExits` gives and no others while there are any. From the rifle
+  range's door the hub now sends him on into the workers' campus by itself.
+- **Block 1, the rifle range, path 10: its lever pulled and out of its door with 0 deaths**
+  (`ae_barracks_rifle_range.txt`, from its door, no look: out at f=6,463, hit ten times on the way, never twice
+  without healing between). Its six Mudokons are not rescued. Fourteen Sligs in the background, two
   or three a screen, and the way goes up and down between covers by hops, drops and hoists, which
   `GoToTask::ZWatched` only timed along one floor. What was found and built:
   - A cover does not stop a bullet: Abe.cpp's `BulletDamage` takes the 0.34 first, and only for the bullet that
@@ -1313,16 +1323,28 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
     as they were): a cell the Sligs of its screen see him on costs 30 more for each of them, 90 on its
     beat, so the way with less of the open in it is the one gone (the hoist by the boom machine, not the one
     under the left Slig's beat).
+  - The last three screens took: where a hop off a ledge onto a lower floor lands, worked out between the
+    frames it meets the floor in (three cells out for a drop of 40, not four); his box standing still is 52
+    high, not 53 (the cutout at 1262,420 begins exactly 52 over its floor); the walk after a leap goes on up
+    to six cells into the next cover, and where that cover is too low to stand under the last of it is
+    rolled, all of it in the leap's track; a running jump at the end of a roll out of a cover is a leap too;
+    out in the open a roll into cover is not waited for (he sat crouched a cell short of the cutout until
+    he was dead); where down is no crouch (on a lift, at the top of a hoist) he steps on or walks, timed
+    the same way (`GoToTask::ZWalk`); and a hop or running jump costs the open cells it goes over, not just
+    the one it ends on (one long running jump past two covers had looked cheaper than the rolls between).
   - Left: he is hit on most stretches (the hoist by the boom machine takes 83 frames in the open and both
     Sligs of that screen look within any 83; a player takes the same hits or is quicker than the track
-    allows), and it is slow (5,000 frames for three screens: each hit is 180 frames of healing and a cycle to
-    learn again). The fourth screen's hop from 1437,380 lands at 1362, not the 1337 the graph has. Then the
-    lift down past the last two Sligs, the lever, and the six Mudokons (an orb to blow up with the boom
-    machine's grenade first). `ZLeap` and the rest of `GoToTask` here are only tested in the game.
-- **Blocks 2, 3 and 4** (first tries from inside their doors, scratch runs): in blocks 2 and 4
-  (paths 5 and 9) he leaves by the door he came in by, as above. Block 3 (path 7), whose door shuts behind
+    allows), and it is slow (each hit is 180 frames of healing and a cycle to learn again). The six
+    Mudokons (an orb to blow up with the boom machine's grenade first, then the Sligs taken over).
+    `ZLeap`, `ZWalk` and the rest of `GoToTask` here are only tested in the game.
+- **Blocks 2, 3 and 4** (first tries from inside their doors, scratch runs): in block 2 (path 5, the
+  workers' campus) he now stays for its wheel (switch 125) and dies at once to the flying mines: moving
+  bombs on a track (`MovingBomb.cpp`: they stop at stoppers for a random time, and go off when their box
+  meets his) are nothing the bot knows yet, and are the first thing blocks 2 and 4 want. The walkthrough's
+  way through block 2 also wants UXBs turned off, a Slig taken over to blow up a mine, and three Mudokons
+  rescued at once for a Shrykull that clears the way to the wheel. Block 3 (path 7), whose door shuts behind
   him, is the one he starts on: a wheel (switch 177), then a Slig lock with a Slig called by a lever, where he
-  dies six times and gives up.
+  dies six times and gives up. Block 4 (path 9) not looked at again.
 - The hub and its four blocks, then the war room: a Glukkon taken over and its orders to Sligs, crawling
   Sligs and their button, an orb blown up with a grenade (then its Sligs taken over), grenades thrown on a
   count, Greeters, laughing gas, flying mines to time, Slig voice locks, ghost locks, a Shrykull.

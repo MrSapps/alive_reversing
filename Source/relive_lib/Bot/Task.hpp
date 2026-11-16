@@ -335,6 +335,8 @@ private:
     // to make now
     bool ZWatched(Bot& bot, const NavGraph& nav, const std::vector<s32>& path, s32 cur, TaskStep& step);
     bool ZMove(Bot& bot, const NavGraph& nav, const std::vector<s32>& path, s32 cur, std::size_t far, TaskStep& step);
+    // The same walked, from a cover he can't crouch in (on a lift, at the top of a hoist: down is something else there)
+    bool ZWalk(Bot& bot, const NavGraph& nav, const std::vector<s32>& path, s32 cur, std::size_t far, TaskStep& step);
     // The way out of a cover is a hop, a drop or a hoist: it waits there for the frame to make it on
     // (`lead`: the cells of floor before it, rolled if he is crouched and walked if he stands)
     bool ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path, s32 cur, std::size_t lead, TaskStep& step);
