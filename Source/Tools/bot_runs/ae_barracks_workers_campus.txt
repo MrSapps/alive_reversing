@@ -1,9 +1,8 @@
-# The bot in the Slig Barracks' second block, the workers' campus (path 5), from the hub's door into it.
-# Not done. With no deaths: past the first flying mines, the lever that brings the third lift up, down it and
-# the lever that brings the fourth, down that to the screen of UXBs (a running jump to the middle ledge, its UXB
-# turned off, over it to the far ledge), through the door, past the sleeping Slig and the flying mine (the Slig
-# taken over from the left ledge and walked into the mine, f=2,432), and up and along to the UXBs by the
-# laughing gas at about f=3,100. Then it goes to and fro: the lifts past the Sligs and mines are next.
+# The bot through the Slig Barracks' second block, the workers' campus (path 5): from the hub's door into it to
+# the hub again by its other door, with no deaths (f=4,884). Past the flying mines, two levers for the lifts,
+# the screen of UXBs (one turned off, hopped over), the sleeping Slig walked into the flying mine, up the lift
+# past the Sligs in the background and the mines that cross its shaft, the hops up to the second lift, the UXB
+# on the wheel turned off, the wheel, the UXB by the way out. Its seven Mudokons are not rescued.
 # See BOT_DESIGN.md, "What the Barracks still wants", flying mines and UXBs turned off.
 timeout 2400
 start barracks 5 1 4400 338
@@ -11,7 +10,8 @@ wait_until in_game
 wait_frames 40
 healing
 bot any,seed=1,been=mines,been=necrum
-bot_wait 3400
+wait_until camera barracks 2 1
+bot_wait 60
 bot_report bot_report.txt
 bot_inputs bot_inputs.txt
 quit

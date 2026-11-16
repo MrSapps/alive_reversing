@@ -264,6 +264,8 @@ public:
     static BombCycle::Box BombBody(const Body& body);
     // A cell no flying mine ever reaches him at: standing, or (duck) only crouched
     static bool BombStop(const NavGraph& nav, const BombCycle& bombs, s32 node, bool& duck);
+    // A flying mine's track goes over that cell, clear of him only while he is crouched there
+    static bool MinesOverhead(Bot& bot, s32 node);
     // Whether the first `count` edges of a way can be gone now without a flying mine meeting him
     // delay: frames he stands where he is first; later: as it will be that many frames from now
     static bool BombsClear(const NavGraph& nav, const BombCycle& bombs, const std::vector<s32>& path, std::size_t count, bool rolled, s32 delay, s32 later = 0);
@@ -370,6 +372,8 @@ private:
     bool ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path, s32 cur, std::size_t lead, TaskStep& step);
     // Such a way was made and the cover it was for is not reached yet
     bool mZLeapt = false;
+    // Frames such a way has been held back for flying mines over it
+    s32 mZBombWait = 0;
     // Where such a way lands with another to make from there, and the cover a step or two aside of it to go to
     // first (0: none)
     s32 mZSideAt = -1;
