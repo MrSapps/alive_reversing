@@ -1112,6 +1112,19 @@ private:
     s32 mSpot;
     u32 mLever;
     u32 mLock;
+    // For a lock: what was last said of another flying Slig on its screen (0 nothing, 1 behind it, 2 keeping
+    // back, 3 thrown), and the grenades thrown at such
+    s32 mFoeSaid = 0;
+    s32 mFoeThrown = 0;
+    // Where it last was with no other on its screen (to go back to out of the other's sight), and the other as
+    // last seen from in front: its place, the way it faced, and whether it is to be come at from behind
+    s32 mSafeX = 0;
+    s32 mSafeY = 0;
+    bool mHasSafe = false;
+    s32 mFoeX = 0;
+    bool mFoeLeft = false;
+    bool mFoeRound = false;
+    s32 mFoeRoundFrames = 0;
     // What it has said to the lock so far (SligLockTask::Say)
     bool mHi = false;
     s32 mSaid = 0;

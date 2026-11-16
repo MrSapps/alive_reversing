@@ -1063,6 +1063,24 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mHalf = static_cast<const relive::Path_HandStone&>(tlv).mScale == relive::reliveScale::eHalf;
                     e.mSwitch = static_cast<const relive::Path_HandStone&>(tlv).mTriggerSwitchId;
                     break;
+                case ReliveTypes::eCrawlingSlig:
+                {
+                    const auto& t = static_cast<const relive::Path_CrawlingSlig&>(tlv);
+                    e.mKind = EntityKind::eCrawler;
+                    keep = GetGameType() == GameType::eAe;
+                    e.mHalf = t.mScale == relive::reliveScale::eHalf;
+                    e.mInputs[0] = t.mPanicSwitchId;
+                    break;
+                }
+                case ReliveTypes::eSligGetPants:
+                {
+                    const auto& t = static_cast<const relive::Path_SligGetPants&>(tlv);
+                    e.mKind = EntityKind::ePantsLocker;
+                    keep = GetGameType() == GameType::eAe;
+                    e.mHalf = t.mScale == relive::reliveScale::eHalf;
+                    e.mSwitch = World::HazardSwitch(e.mId);
+                    break;
+                }
                 case ReliveTypes::eSlig:
                 {
                     const auto& t = static_cast<const relive::Path_Slig&>(tlv);
@@ -1204,6 +1222,58 @@ static void MarkFlierTargets(NavInput& in, const World& world)
     }
 }
 
+// The floor by a locker for guns that naked Sligs crawl to: nothing is crossed onto it while one that is awake
+// can get there, or an armed one is about by it (World::Switch of the locker's switch). Which locker each naked
+// Slig goes to, and what is shut between them, is put on the Slig. (The Barracks' Slig bunks: the four he wakes
+// on his way to the first wheel come back along the floor at 980 with guns, and what clears it is the Slig he
+// calls for the first lock.)
+static void MarkLockers(NavInput& in, World& world)
+{
+    for (const Entity& locker : world.mEntities)
+    {
+        if (locker.mKind != EntityKind::ePantsLocker)
+        {
+            continue;
+        }
+        bool any = false;
+        for (Entity& crawler : world.mEntities)
+        {
+            if (crawler.mKind != EntityKind::eCrawler || crawler.mHalf != locker.mHalf || std::abs(crawler.mY2 - locker.mY2) > 30)
+            {
+                continue;
+            }
+            any = true;
+            crawler.mInputs[1] = static_cast<s32>(locker.mId);
+            const s32 lo = std::min(crawler.CentreX(), locker.CentreX());
+            const s32 hi = std::max(crawler.CentreX(), locker.CentreX());
+            for (const NavFeature& f : in.mFeatures)
+            {
+                if (f.mKind == FeatureKind::eBarrier && f.mSwitch > 1 && f.mHalf == locker.mHalf && f.mX1 < hi && f.mX2 > lo && f.mY1 <= locker.mY2 + 4 && f.mY2 >= locker.mY2 - 40)
+                {
+                    crawler.mInputs[2] = f.mSwitch;
+                    crawler.mInputs[3] = f.mStartClosed ? 1 : 0;
+                    break;
+                }
+            }
+        }
+        if (!any)
+        {
+            continue;
+        }
+        NavFeature f;
+        f.mKind = FeatureKind::eDanger;
+        f.mX1 = locker.CentreX() - World::kLockerReach;
+        f.mX2 = locker.CentreX() + World::kLockerReach;
+        f.mY1 = locker.mY2 - 60;
+        f.mY2 = locker.mY2 + 6;
+        f.mHalf = locker.mHalf;
+        f.mA = 1;
+        f.mId = locker.mId;
+        f.mSwitch = locker.mSwitch;
+        in.mFeatures.push_back(f);
+    }
+}
+
 // The floors of the Sligs a grenade is to be thrown at (Domain::GrenadeTargets): nothing is crossed onto one
 // until its Slig is dead
 static void MarkGrenadeTargets(NavInput& in, const World& world)
@@ -1243,6 +1313,7 @@ bool GameView::ReadPath(BaseMap& map, s32 pathId, NavInput& input, World& world)
     }
     MarkFlierTargets(input, world);
     MarkGrenadeTargets(input, world);
+    MarkLockers(input, world);
     return true;
 }
 
@@ -2000,6 +2071,7 @@ NavInput GameView::BuildNavInput(BaseMap& map)
     }
     MarkFlierTargets(in, things);
     MarkGrenadeTargets(in, things);
+    MarkLockers(in, things);
     return in;
 }
 

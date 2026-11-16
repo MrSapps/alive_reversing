@@ -65,6 +65,14 @@ enum class EntityKind : u8
     // AE's UXB: a slap while its light is green turns it off, and then it is floor. mSwitch is the switch the
     // world gives as on once it is off (or has gone off); mGone says that
     eUxb,
+    // AE's naked Slig that crawls to a locker for a gun (or wings) once its panic switch mInputs[0] is on (1:
+    // from the start). mInputs[1]: the locker for guns on its floor (its entity), mInputs[2] and [3]: a switch
+    // that has to be at that value for nothing to be shut between them (0: nothing is)
+    eCrawler,
+    // A locker a naked Slig comes by a gun at. mSwitch: the switch the world gives as on while no naked Slig
+    // that is awake can get to it and no armed one is about by it: until then nothing is crossed onto the
+    // floor by it (GameView's MarkLockers)
+    ePantsLocker,
 };
 
 const char* EntityKindName(EntityKind kind);
@@ -439,6 +447,8 @@ struct World final
     // while it is coming down
     std::vector<RockAt> mFallers;
     // The switch that stands for the hazard with this id (a mine's TLV) being gone: above the game's own 256
+    // How far to either side of a locker for guns its floor is kept off (an armed Slig shoots from that far)
+    static const s32 kLockerReach = 380;
     static s32 HazardSwitch(u32 id)
     {
         return 1000 + static_cast<s32>(id);
@@ -744,6 +754,30 @@ struct World final
                 if ((e.mKind == EntityKind::eMine || e.mKind == EntityKind::eUxb) && e.mSwitch == id)
                 {
                     return e.mGone ? 1 : 0;
+                }
+                if (e.mKind == EntityKind::ePantsLocker && e.mSwitch == id)
+                {
+                    for (const Entity& c : mEntities)
+                    {
+                        if (c.mKind != EntityKind::eCrawler || c.mGone || c.mInputs[1] != static_cast<s32>(e.mId))
+                        {
+                            continue;
+                        }
+                        const bool awake = c.mInputs[0] <= 1 ? c.mInputs[0] == 1 : Switch(c.mInputs[0], true) != 0;
+                        const bool open = c.mInputs[2] <= 1 || (Switch(c.mInputs[2], true) != 0) == (c.mInputs[3] != 0);
+                        if (awake && open)
+                        {
+                            return 0;
+                        }
+                    }
+                    for (const SligAt& s : mSligs)
+                    {
+                        if (!s.mPossessed && !s.mAsleep && s.mHalf == e.mHalf && std::abs(s.mY - e.mY2) <= 30 && std::abs(s.mX - e.CentreX()) <= kLockerReach)
+                        {
+                            return 0;
+                        }
+                    }
+                    return 1;
                 }
                 // (a Slig that a flying Slig is to get rid of: Domain::FlierTargets)
                 if (e.mKind == EntityKind::eSlig && HazardSwitch(e.mId) == id)
