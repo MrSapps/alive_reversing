@@ -5634,7 +5634,7 @@ bool Domain::BlastGetsOrb(s32 atX, s32 atY, s32 orbX, s32 orbY, bool half)
     const s32 scale = half ? 2 : 1;
     const s32 dx = std::abs(atX - orbX) * scale;
     const s32 dy = (atY - orbY) * scale;
-    return dx <= 40 && dy >= -10 && dy <= 35;
+    return dx <= 40 && dy >= -50 && dy <= 50;
 }
 
 std::vector<Domain::OrbTarget> Domain::OrbTargets(const NavInput& in, const World& world)

@@ -8032,8 +8032,8 @@ TEST(BotGrenadeTargets, ASligOnAFloorWithNoShadowUnderAnOrbIsOneForAGrenadeFromW
     EXPECT_EQ(targets[0].mX1, 499);
     EXPECT_EQ(targets[0].mX2, 725);
     // The top floor: from the left end of the middle ledge only (from under the floor it would come back down),
-    // lobbed or thrown far
-    ASSERT_EQ(targets[0].mShots.size(), 2u);
+    // lobbed, thrown up or thrown far (it lies where it first comes down: AE's does not bounce on)
+    ASSERT_EQ(targets[0].mShots.size(), 3u);
     for (const Domain::GrenadeShot& shot : targets[0].mShots)
     {
         EXPECT_EQ(shot.mX, 462);
@@ -8043,16 +8043,20 @@ TEST(BotGrenadeTargets, ASligOnAFloorWithNoShadowUnderAnOrbIsOneForAGrenadeFromW
         EXPECT_GE(shot.mLandX - shot.mX, static_cast<s32>(ThrowArc::kGrenadeKillX));
     }
     EXPECT_EQ(targets[0].mShots[0].mKind, ThrowSpot::eLob);
-    EXPECT_EQ(targets[0].mShots[1].mKind, ThrowSpot::eForward);
+    EXPECT_EQ(targets[0].mShots[1].mKind, ThrowSpot::eUp);
+    EXPECT_EQ(targets[0].mShots[2].mKind, ThrowSpot::eForward);
     // The middle ledge: from the shadow on the ground first
     EXPECT_EQ(targets[1].mSlig, 12006u);
     ASSERT_FALSE(targets[1].mShots.empty());
     EXPECT_TRUE(targets[1].mShots[0].mHidden);
     EXPECT_EQ(targets[1].mShots[0].mX, 387);
     EXPECT_EQ(targets[1].mShots[0].mY, 1240);
+    EXPECT_FALSE(targets[1].mShots.back().mHidden);
     for (std::size_t i = 1; i < targets[1].mShots.size(); i++)
     {
-        EXPECT_FALSE(targets[1].mShots[i].mHidden);
+        // (the ones from a shadow first, and all of those from there)
+        EXPECT_TRUE(targets[1].mShots[i - 1].mHidden || !targets[1].mShots[i].mHidden);
+        EXPECT_EQ(targets[1].mShots[i].mHidden, targets[1].mShots[i].mY == 1240 && targets[1].mShots[i].mX - 25 >= 349 && targets[1].mShots[i].mX + 25 <= 467);
         EXPECT_GE(targets[1].mShots[i].mLandX, 450);
         EXPECT_LE(targets[1].mShots[i].mLandX, 525);
     }
@@ -8089,7 +8093,10 @@ TEST(BotGrenadeTargets, AnOrbIsGotByAGrenadeHeldUntilItGoesOffInTheAirByIt)
     EXPECT_FALSE(Domain::BlastGetsOrb(435, 100, 450, 40, false));
     EXPECT_TRUE(Domain::BlastGetsOrb(435, 70, 450, 40, false));
     EXPECT_TRUE(Domain::BlastGetsOrb(450, 30, 450, 40, false));
-    EXPECT_FALSE(Domain::BlastGetsOrb(450, 20, 450, 40, false));
+    EXPECT_TRUE(Domain::BlastGetsOrb(450, -10, 450, 40, false));
+    EXPECT_FALSE(Domain::BlastGetsOrb(450, -11, 450, 40, false));
+    EXPECT_TRUE(Domain::BlastGetsOrb(435, 90, 450, 40, false));
+    EXPECT_FALSE(Domain::BlastGetsOrb(435, 91, 450, 40, false));
     EXPECT_FALSE(Domain::BlastGetsOrb(495, 60, 450, 40, false));
     // (at half scale all of it is half as far)
     EXPECT_FALSE(Domain::BlastGetsOrb(475, 60, 450, 40, true));
@@ -8280,6 +8287,37 @@ TEST(BotDomain, ANakedSligCanGetToAButtonOnItsFloorWithNothingShutBetween)
     world.mCrawlerMine = false;
     world.mEntities[1].mGone = true;
     EXPECT_FALSE(Domain::CrawlerFor(in, world, world.mEntities[0]));
+}
+
+TEST(BotGrenadeTargets, AGrenadeOfAesLiesWhereItComesDownIfItIsPutOnTheFloorToTheLastBit)
+{
+    // The Barracks' path 7: thrown up and along from 662,100 over a gap onto the floor at 200. Traced in the
+    // game: at 968,200 thirty frames on, and it slid to 970 and lay there.
+    NavInput in;
+    in.mLines.push_back(Line(537, 100, 887, 100, 0));
+    in.mLines.push_back(Line(862, 200, 1462, 200, 0));
+    const ThrowArc::Flight flight = ThrowArc::Grenade(in, 662, 100, false, false, ThrowSpot::eUp);
+    EXPECT_EQ(flight.mPoints[29].mX, 963);
+    EXPECT_EQ(flight.mPoints[29].mY, 190);
+    EXPECT_EQ(flight.mPoints[30].mX, 968);
+    EXPECT_EQ(flight.mPoints[30].mY, 200);
+    EXPECT_EQ(flight.mPoints.back().mX, 970);
+    EXPECT_EQ(flight.mPoints.back().mY, 200);
+    EXPECT_FALSE(flight.mUnder);
+    // AO's bounces on
+    NavInput ao = in;
+    ao.mIsAe = false;
+    EXPECT_GT(ThrowArc::Grenade(ao, 662, 100, false, false, ThrowSpot::eUp).mPoints.back().mX, 1050);
+    // And AE's too when it is not put on the floor to the last bit (the game works that out in 256ths, cut off):
+    // thrown far from 687,100 onto the ledge across at 100, 13 down in the frame it meets it with 5 to go. Traced:
+    // it was still on its way along that ledge at 1119.
+    in.mLines.push_back(Line(987, 100, 1387, 100, 0));
+    const ThrowArc::Flight far = ThrowArc::Grenade(in, 687, 100, false, false, ThrowSpot::eForward);
+    EXPECT_EQ(far.mPoints[20].mY, 95);
+    // (six 256ths over it)
+    EXPECT_EQ(far.mPoints[21].mY, 99);
+    EXPECT_GT(far.mPoints.back().mX, 1119);
+    EXPECT_EQ(far.mPoints.back().mY, 100);
 }
 
 TEST(BotGrenadeTargets, AGrenadeOfAesComesBackDownOffAFloorItFliesUpUnder)

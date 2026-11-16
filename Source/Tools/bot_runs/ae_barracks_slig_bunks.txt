@@ -1,0 +1,21 @@
+# The bot through the Slig Barracks' third block, the Slig bunks (path 7): from the hub's door into it, its four
+# wheels turned, and out to the hub by the door at its top (f=14,350, one death, at the hoist onto the top
+# ledge). The first wheel; a Slig called by a lever and kept for the first Slig lock; the flying Slig taken over
+# for the second lock and to bomb the three Sligs in the middle; the second wheel; up the middle; the boom
+# machine's grenades for the Slig under the first orb, the Slig on the far ledge and (held, to go off in the
+# air) the orb; the two Sligs under it taken over, the lever, the third wheel; the second orb; a naked Slig
+# taken over to press the button of the pen; the Sligs that come by guns bombed; the fourth wheel.
+# Its Mudokons and its four suites are left. Run from the Rifle Range through the workers' campus first it lost
+# the flying Slig to a Slig in the middle and waited for another that did not come.
+# See BOT_DESIGN.md, "What the Barracks still wants", block 3.
+timeout 3400
+start barracks 7 7 1050 978
+wait_until in_game
+wait_frames 40
+healing
+bot any,seed=1,been=mines,been=necrum
+wait_until camera barracks 2 1
+bot_wait 60
+bot_report bot_report.txt
+bot_inputs bot_inputs.txt
+quit
