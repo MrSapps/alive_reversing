@@ -2727,6 +2727,21 @@ TEST(BotNecrum, AHopOffALedgeEndComesDownFourCellsOutOnAFloorBelow)
     }
 }
 
+TEST(BotNecrum, AHopDownAShortDropComesDownACellNearer)
+{
+    // As measured in the Barracks' rifle range: from 1437,380 to the left onto the floor at 420 that ends at 1362, he
+    // ends in that last cell (he meets the floor at 1350, between where the frames before and after have him)
+    NavInput in;
+    in.mLines.push_back(Line(1425, 380, 1475, 380, 0));
+    in.mLines.push_back(Line(1250, 420, 1375, 420, 0));
+    NavGraph g;
+    g.Build(in);
+    const s32 top = g.NodeAt(1437, 380, false);
+    ASSERT_GE(top, 0);
+    EXPECT_TRUE(HasEdge(g, top, g.NodeAt(1362, 420, false), EdgeKind::eHop)) << g.Text();
+    EXPECT_FALSE(HasEdge(g, top, g.NodeAt(1337, 420, false), EdgeKind::eHop));
+}
+
 TEST(BotNecrum, NoHopDownThroughADrill)
 {
     // The same ledges with a drill between them (the Mines' path 4, off 2537,1400)
@@ -5927,20 +5942,21 @@ TEST(BotFart, AFartIsLeftByAMineFromTwoCellsOffItWithTheBrewHeHasInHim)
 
 TEST(BotFart, AHopDownOntoAMinesCellIsThereOnlyWhereThereIsABrewMachineAndWaitsForTheMine)
 {
-    // A ledge forty over a floor that begins a cell out from it, with a mine where the hop comes down
+    // A ledge forty over a floor that begins a cell out from it, with a mine where the hop comes down: three cells
+    // out (as measured in Feeco's Terminal 2, off 1187,420: he ends at 1262,460)
     NavInput in;
     in.mLines.push_back(Line(1175, 420, 1200, 420, 0));
     in.mLines.push_back(Line(1225, 460, 1400, 460, 0));
-    NavFeature mine = Feature(FeatureKind::eHazard, 1275, 440, 1299, 464);
+    NavFeature mine = Feature(FeatureKind::eHazard, 1250, 440, 1274, 464);
     mine.mSwitch = World::HazardSwitch(7005);
     in.mFeatures.push_back(mine);
     NavGraph plain;
     plain.Build(in);
-    EXPECT_EQ(FindEdge(plain, plain.NodeAt(1187, 420, false), plain.NodeAt(1287, 460, false), EdgeKind::eHop), nullptr);
+    EXPECT_EQ(FindEdge(plain, plain.NodeAt(1187, 420, false), plain.NodeAt(1262, 460, false), EdgeKind::eHop), nullptr);
     in.mBrew = true;
     NavGraph g;
     g.Build(in);
-    const NavEdge* hop = FindEdge(g, g.NodeAt(1187, 420, false), g.NodeAt(1287, 460, false), EdgeKind::eHop);
+    const NavEdge* hop = FindEdge(g, g.NodeAt(1187, 420, false), g.NodeAt(1262, 460, false), EdgeKind::eHop);
     ASSERT_NE(hop, nullptr);
     s32 sw = 0;
     s32 value = 0;
@@ -5981,6 +5997,99 @@ TEST(BotLevel, APathWhoseWayOutOfTheLevelIsShutIsMeasuredByItsOtherWays)
     EXPECT_EQ(level.Distance(2), 2);
     EXPECT_EQ(level.Distance(9), 1);
     EXPECT_EQ(level.Distance(5), 0);
+}
+
+// A hub (2) whose door out of the level wants a switch from each of the paths around it: 10 sets its own, 9 leads on
+// to 14 which sets it, 7 sets a switch nothing wants, 1 is where he came from, and 12 is a side room of 10
+static LevelGraph HubLevel()
+{
+    std::vector<PathSummary> paths(6);
+    paths[5].mPath = 12;
+    paths[5].mExits = {{6, 10}};
+    // (its door back wants what 7 sets: 7 is nearer the level's end, he is past that door when he is there)
+    paths[5].mWants = {{6, 10, 77}};
+    paths[0].mPath = 2;
+    paths[0].mExits = {{6, 1}, {6, 10}, {6, 9}, {6, 7}, {13, 11}};
+    paths[0].mWants = {{13, 11, 116}, {13, 11, 218}};
+    paths[1].mPath = 10;
+    paths[1].mExits = {{6, 2}, {6, 12}};
+    paths[1].mSets = {116, 30};
+    // (its own door back wants the same switch)
+    paths[1].mWants = {{6, 2, 116}};
+    paths[2].mPath = 9;
+    paths[2].mExits = {{6, 14}, {6, 2}};
+    paths[2].mSets = {208};
+    // (a door further in, away from the level's end, wants one of the hub's too: that is not a way on)
+    paths[2].mWants = {{6, 14, 116}};
+    paths[3].mPath = 14;
+    paths[3].mExits = {{6, 2}};
+    paths[3].mSets = {218};
+    paths[3].mWants = {{6, 2, 208}};
+    paths[4].mPath = 7;
+    paths[4].mExits = {{6, 2}};
+    paths[4].mSets = {77};
+    LevelGraph level;
+    level.Build(6, paths);
+    return level;
+}
+
+TEST(BotLevel, ASwitchADoorOfAnotherPathWantsIsWhatASidePathIsFor)
+{
+    const LevelGraph level = HubLevel();
+    // In 10: the hub wants 116 and 218, 14's door wants 208 (its own door's want is no one else's)
+    EXPECT_EQ(level.Wanted(10), (std::vector<s32>{116, 208, 218}));
+    // (in the hub nothing is: its own door's are not "elsewhere", and the doors of the paths around it are
+    // farther from the level's end than it is)
+    EXPECT_TRUE(level.Wanted(2).empty());
+    EXPECT_EQ(level.Wanted(12), (std::vector<s32>{116, 208, 218}));
+    EXPECT_EQ(level.Errands(10), (std::vector<s32>{116}));
+    EXPECT_EQ(level.Errands(9), (std::vector<s32>{208}));
+    EXPECT_EQ(level.Errands(14), (std::vector<s32>{218}));
+    EXPECT_TRUE(level.Errands(7).empty());
+    EXPECT_TRUE(level.Errands(2).empty());
+}
+
+TEST(BotLevel, FromAHubTheWaysToWhatItsDoorWantsAreTheWaysOut)
+{
+    const LevelGraph level = HubLevel();
+    std::set<std::pair<s32, s32>> done;
+    const auto open = [&done](s32 path, s32 sw)
+    {
+        return done.count({path, sw}) == 0;
+    };
+    // 10 sets one, 9 sets one for 14 and leads to 14; not 7 (nothing wanted there) and not back to 1
+    EXPECT_EQ(level.ErrandExits(2, open), (std::set<s32>{9, 10}));
+    done.insert({10, 116});
+    EXPECT_EQ(level.ErrandExits(2, open), (std::set<s32>{9}));
+    // In 9 with its own done: on to 14, not back through the hub whose door it is for
+    done.insert({9, 208});
+    EXPECT_EQ(level.ErrandExits(2, open), (std::set<s32>{9}));
+    EXPECT_EQ(level.ErrandExits(9, open), (std::set<s32>{14}));
+    done.insert({14, 218});
+    EXPECT_TRUE(level.ErrandExits(2, open).empty());
+    EXPECT_TRUE(level.ErrandExits(9, open).empty());
+    // From the path before the hub nothing is seen through it
+    done.clear();
+    EXPECT_TRUE(level.ErrandExits(1, open).empty());
+    EXPECT_TRUE(level.ErrandExits(7, open).empty());
+    // What is to be set where he is is not a reason to go out and come back in
+    EXPECT_TRUE(level.ErrandExits(10, open).empty());
+}
+
+TEST(BotLevel, ADoorBackToALevelHeHasBeenInWantsNothing)
+{
+    std::vector<PathSummary> paths(2);
+    paths[0].mPath = 2;
+    paths[0].mExits = {{13, 11}, {6, 10}, {4, 3}};
+    paths[0].mWants = {{4, 3, 50}};
+    paths[1].mPath = 10;
+    paths[1].mExits = {{6, 2}};
+    paths[1].mSets = {50};
+    LevelGraph level;
+    level.Build(6, paths);
+    EXPECT_EQ(level.Errands(10), (std::vector<s32>{50}));
+    level.Build(6, paths, {4});
+    EXPECT_TRUE(level.Errands(10).empty());
 }
 
 TEST(BotLevel, APathWithNoOtherWayStaysAsItWas)

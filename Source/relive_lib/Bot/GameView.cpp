@@ -1809,6 +1809,23 @@ std::vector<PathSummary> GameView::ReadLevel(BaseMap& map)
                 summary.mExits.push_back({f.mDestLevel, f.mDestPath});
             }
         }
+        World things;
+        BuildEntities(*path, things);
+        const auto sets = [&summary](s32 sw)
+        {
+            if (sw > 1 && sw < 256 && std::find(summary.mSets.begin(), summary.mSets.end(), sw) == summary.mSets.end())
+            {
+                summary.mSets.push_back(sw);
+            }
+        };
+        for (const Entity& e : things.mEntities)
+        {
+            const bool setter = e.mKind == EntityKind::eLever || e.mKind == EntityKind::ePullRing || e.mKind == EntityKind::eWorkWheel || e.mKind == EntityKind::eSwitchLogic || e.mKind == EntityKind::eHandStone || e.mKind == EntityKind::eFootSwitch || e.mKind == EntityKind::eSlapLock;
+            if (setter)
+            {
+                sets(e.mSwitch);
+            }
+        }
         for (auto& cam : path->GetCameras())
         {
             if (!cam)
@@ -1818,6 +1835,52 @@ std::vector<PathSummary> GameView::ReadLevel(BaseMap& map)
             for (auto& tlv : cam->mTlvs.mTlvs)
             {
                 summary.mMudokons += tlv->mTlvType == ReliveTypes::eMudokon ? 1 : 0;
+                // (a tasks door sets its own switch once all its hubs are on)
+                if (tlv->mTlvType == ReliveTypes::eDoor && GetGameType() == GameType::eAe)
+                {
+                    const auto& t = static_cast<const relive::Path_Door&>(*tlv);
+                    if (t.mDoorType == relive::Path_Door::eTasksDoor || t.mDoorType == relive::Path_Door::eTasksDoorWithSecretMusic)
+                    {
+                        sets(t.mSwitchId);
+                    }
+                }
+            }
+        }
+        // What its shut doors want: their switch, or what the logic that sets it takes
+        for (const NavFeature& f : in.mFeatures)
+        {
+            if (f.mKind != FeatureKind::eDoor || f.mDestPath < 0 || !f.mStartClosed || f.mSwitch <= 1)
+            {
+                continue;
+            }
+            std::vector<s32> todo{f.mSwitch};
+            for (s32 depth = 0; depth < 12 && !todo.empty(); depth++)
+            {
+                const s32 sw = todo.back();
+                todo.pop_back();
+                bool logic = false;
+                for (const Entity& e : things.mEntities)
+                {
+                    if (e.mKind == EntityKind::eSwitchLogic && e.mSwitch == sw && !e.mHoldOnly)
+                    {
+                        logic = true;
+                        for (const s32 input : e.mInputs)
+                        {
+                            if (input > 1)
+                            {
+                                todo.push_back(input);
+                            }
+                        }
+                    }
+                }
+                if (!logic && sw < 256)
+                {
+                    PathSummary::Want want;
+                    want.mLevel = f.mDestLevel < 0 ? static_cast<s32>(map.mCurrentLevel) : f.mDestLevel;
+                    want.mPath = f.mDestPath;
+                    want.mSwitch = sw;
+                    summary.mWants.push_back(want);
+                }
             }
         }
         out.push_back(summary);

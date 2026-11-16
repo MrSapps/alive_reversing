@@ -555,10 +555,32 @@ bool Bot::Replan(BaseMap& map)
             misses += goal.first + ": " + plan.mMiss + "; ";
         }
     }
+    // What a door of another path wants and can be set here: that is what he is in this path for
+    for (const s32 sw : best.mFound ? std::vector<s32>() : mLevel.Wanted(mAbe.mPath))
+    {
+        const std::vector<Goap::Fact> facts{{Key::Switch(sw), 1}};
+        if (mWorld.Switch(sw) != 0 || mErrandsLeft.count({mAbe.mPath, sw}) != 0)
+        {
+            continue;
+        }
+        const Goap::Plan plan = Goap::Planner::Find(domain.mStart, facts, actions);
+        if (plan.mFound && !plan.mSteps.empty() && (!best.mFound || plan.mCost < best.mCost))
+        {
+            best = plan;
+            bestGoal = "Set switch " + std::to_string(sw) + " for a door of another path";
+            bestFacts = facts;
+        }
+    }
+    // (and while one of them is still to be set here, the way out is not what he wants: he looks for a way to it)
+    bool errandOpen = false;
+    for (const s32 sw : mLevel.Errands(mAbe.mPath))
+    {
+        errandOpen = errandOpen || (mWorld.Switch(sw) == 0 && mErrandsLeft.count({mAbe.mPath, sw}) == 0);
+    }
     if (!best.mFound)
     {
         const Goap::Plan& plan = leave;
-        if (plan.mFound && !plan.mSteps.empty())
+        if (plan.mFound && !plan.mSteps.empty() && !errandOpen)
         {
             best = plan;
             bestGoal = "Leave the path";
@@ -632,7 +654,7 @@ bool Bot::Replan(BaseMap& map)
             // Nothing left to switch, and the way out of the level this path has is not to be had: the level
             // goes on through its other paths (Feeco's lobby, whose own way out is behind gates that the ends
             // of two other paths open)
-            if (!best.mFound && mLevel.Shut(mAbe.mPath))
+            if (!best.mFound && !errandOpen && mLevel.Shut(mAbe.mPath))
             {
                 Log("the way out of the level from this path is shut: on through the level's other paths (" + std::to_string(mLevel.Distance(mAbe.mPath)) + " away)");
                 mTask = std::make_unique<GoToTask>("think again", [](s32)
@@ -643,7 +665,7 @@ bool Bot::Replan(BaseMap& map)
             // Nothing left to switch, and a way out of this path into one of the level he has not been in, from
             // which the level goes on: that before any wandering here (the Mudomo vaults' path 7: its way on, a
             // bird portal, is only got to by coming back into it through path 10)
-            if (!best.mFound && mNewPathFor != mAbe.mPath && mKnow)
+            if (!best.mFound && !errandOpen && mNewPathFor != mAbe.mPath && mKnow)
             {
                 bool onward = false;
                 for (const NavExit& x : mKnow->mNav.Exits())
@@ -718,6 +740,21 @@ bool Bot::Replan(BaseMap& map)
                 {
                     mRegionTries[mRegionGoal]++;
                 }
+            }
+            if (!best.mFound && errandOpen)
+            {
+                // No way to what the door elsewhere wants: that is given up, and the path is left like any other
+                for (const s32 sw : mLevel.Errands(mAbe.mPath))
+                {
+                    if (mWorld.Switch(sw) == 0 && mErrandsLeft.insert({mAbe.mPath, sw}).second)
+                    {
+                        Log("no way to set switch " + std::to_string(sw) + " for the door of another path: given up (" + misses + ")");
+                    }
+                }
+                mTask = std::make_unique<GoToTask>("think again", [](s32)
+                                                   { return true; });
+                mTaskAction.clear();
+                return true;
             }
             if (!best.mFound)
             {
@@ -1044,6 +1081,14 @@ bool Bot::ExitAllowed(BaseMap& map, const NavFeature& exit, bool* sideTrip)
     if (destLevel != mAbe.mLevel)
     {
         return true;
+    }
+    // A door elsewhere wants a switch that is got at through one of the ways out of here (a hub and the paths
+    // around it): that way, and no other while there is one
+    const std::set<s32> errands = mLevel.ErrandExits(mAbe.mPath, [this](s32 path, s32 sw)
+                                                     { return mWorld.Switch(sw) == 0 && mErrandsLeft.count({path, sw}) == 0; });
+    if (!errands.empty())
+    {
+        return errands.count(destPath) != 0;
     }
     const s32 here = mLevel.Distance(mAbe.mPath);
     const s32 there = mLevel.Distance(destPath);
@@ -1618,6 +1663,18 @@ void Bot::EnsureKnowledge(BaseMap& map)
         mLevelsBeen.insert(mAbe.mLevel);
         Log("level graph:\n" + mLevel.Text());
     }
+    if (mErrandPath != mAbe.mPath)
+    {
+        // What the path he has left could have set for a door elsewhere and has not: given up
+        for (const s32 sw : mErrandPath >= 0 ? mLevel.Errands(mErrandPath) : std::vector<s32>())
+        {
+            if (mWorld.Switch(sw) == 0 && mErrandsLeft.insert({mErrandPath, sw}).second)
+            {
+                Log("left path " + std::to_string(mErrandPath) + " with switch " + std::to_string(sw) + " not set");
+            }
+        }
+        mErrandPath = mAbe.mPath;
+    }
     const std::pair<s32, s32> key{mAbe.mLevel, mAbe.mPath};
     auto it = mKnowledge.find(key);
     if (it == mKnowledge.end())
@@ -2166,6 +2223,8 @@ void Bot::TryFailed(BaseMap& map, const std::string& what)
     mVary = saved.mStretch.mWay;
     mVarySaves = 0;
     mTryingAgain = true;
+    // (back in an earlier path, perhaps: that is no leaving of the one he was in)
+    mErrandPath = -1;
     Log("try failed (" + what + ", " + doing + ") " + std::to_string(frames) + " frames in: back to f=" + std::to_string(saved.mCheckpoint.mFrame) + ", holding back " + std::to_string(delay) + (mVary == Lookahead::Way::eAgain ? ", planned anew" : mVary == Lookahead::Way::eQuiet ? ", sneaking" : mVary == Lookahead::Way::eFast ? ", running" : ""));
     mRepeatAt = 0;
     mRng.SetState(saved.mRng);
@@ -2278,6 +2337,8 @@ void Bot::OnDeath(BaseMap& map)
     }
     saved.mAttempts++;
     mAttempt = saved.mAttempts;
+    // (back in an earlier path, perhaps: that is no leaving of the one he was in)
+    mErrandPath = -1;
     Log("died (" + std::string(mTask ? mTask->Name() : "no task") + "), back to f=" + std::to_string(saved.mCheckpoint.mFrame) + " try " + std::to_string(mAttempt));
     mInputs.resize(saved.mInputCount);
     saved.mCheckpoint.Load(map);
