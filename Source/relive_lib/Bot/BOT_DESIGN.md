@@ -1096,7 +1096,9 @@ The other way on, to Bonewerkz through path 9's lower half and path 4, is untouc
   only with a flying Slig about (`Bot::EdgeCostFn`), and run into straight from a walk the same way. A standing
   hop along a floor costs 30 more then. Built for Terminal 2's corridor, and not what gets him through it now.
 - A hop down off a ledge onto a cell a mine is in is an edge that waits for the mine, in paths with a Brew
-  machine only (Terminal 2's way back from the duct to the door, off 1187,420 onto 1287,460).
+  machine only. (Built for Terminal 2's way back from the duct to the door, off 1187,420, taken then to come down
+  at 1287,460 where a mine is. Measured since: a hop down a drop of 40 comes down three cells out, at 1262,460,
+  beside that mine. Where a dropping hop lands is now worked out between the frames it meets the floor in.)
 
 **The Slig Barracks** (2026-11-15, `build-bot/b1.txt`: path 1 from the door Feeco's train leaves him at, with
 the healing power, `bot any`). Begun, not beaten: the first two screens of its first path with no deaths, and

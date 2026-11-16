@@ -106,6 +106,10 @@ struct BotMemory
     s32 mLastRescued = 0;
     // What each path off the way was found to be worth, by path
     std::map<s32, SideTrip> mSideTrips;
+    // A switch a door of another path wants that he left its path without setting (path, switch): no reason to
+    // go there again. And the path he was last in, to tell when he leaves one.
+    std::set<std::pair<s32, s32>> mErrandsLeft;
+    s32 mErrandPath = -1;
     s32 mLogicWaits = 0;
     std::map<u32, s32> mReflexTries;
     s32 mSlogTraps = 0;

@@ -1457,11 +1457,16 @@ void NavGraph::Build(const NavInput& input)
                 }
                 for (std::size_t k = 1; clear && k < sizeof(kDrop) / sizeof(kDrop[0]); k++)
                 {
-                    const s32 x = n.mX + dir * kDrop[k][0] / scale;
+                    s32 x = n.mX + dir * kDrop[k][0] / scale;
                     s32 gy = 0;
                     const s32 line = FloorBelow(x, n.mY + kDrop[k - 1][1] / scale + 1, n.mHalf, &gy);
                     if (line >= 0 && gy <= n.mY + kDrop[k][1] / scale)
                     {
+                        // (how far out he is when he gets to that floor: between the two frames it is met in. The
+                        // Barracks' rifle range, from 1437,380 down to the floor that ends at 1362,420: he came
+                        // down in its last cell, 1350 and not the 1349 of the frame after)
+                        const s32 fell = (gy - n.mY) * scale - kDrop[k - 1][1];
+                        x = n.mX + dir * (kDrop[k - 1][0] + (kDrop[k][0] - kDrop[k - 1][0]) * fell / (kDrop[k][1] - kDrop[k - 1][1])) / scale;
                         // (he ends in the middle of the cell he comes down in; or in the well that is there, which
                         // takes him: the Mudanchee vault's path 5, off the platform at 312,620 into the well at 212)
                         s32 to = NodeAt(x, gy, n.mHalf, 4);
