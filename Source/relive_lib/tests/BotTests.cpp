@@ -1060,6 +1060,100 @@ TEST(BotDomain, WheelsTurnedTogetherNeedAMudokonEach)
     EXPECT_EQ(team.mAbeWheel, 2u);
 }
 
+TEST(BotDomain, AMudokonAtAWheelAlreadyHasIt)
+{
+    NavGraph g;
+    g.Build(CorridorWithDoor());
+    World world = TwoWheels();
+    // One stands at the first wheel: the other wheel is Abe's, and nobody has to be brought
+    world.mEntities.push_back(MakeEntity(EntityKind::eMudokon, 4, 100, 80, 124, 100));
+    Team team;
+    std::vector<Goap::Fact> pre;
+    ASSERT_TRUE(Domain::PlanTogether(g, world, world.mEntities[2], team, pre));
+    ASSERT_EQ(team.mMuds.size(), 1u);
+    EXPECT_EQ(team.mMuds[0], 4u);
+    ASSERT_EQ(team.mFree.size(), 1u);
+    EXPECT_EQ(team.mFree[0], 2u);
+    EXPECT_EQ(team.mAbeWheel, 2u);
+    ASSERT_EQ(pre.size(), 1u);
+    EXPECT_EQ(pre[0], (Goap::Fact{Key::Mud(4), 0}));
+
+    // One at that place on a floor far below is at no wheel, and has no way up
+    world.mEntities.back().mY1 = 280;
+    world.mEntities.back().mY2 = 300;
+    EXPECT_FALSE(Domain::PlanTogether(g, world, world.mEntities[2], team, pre));
+    // And one that is gone turns nothing
+    world.mEntities.back().mY1 = 80;
+    world.mEntities.back().mY2 = 100;
+    world.mEntities.back().mGone = true;
+    EXPECT_FALSE(Domain::PlanTogether(g, world, world.mEntities[2], team, pre));
+}
+
+// Three wheels on a floor a lift's shaft goes through, a Mudokon at the middle one, and another on the floor below
+// behind a wall a switch opens (the Slig Barracks' wheel room)
+static NavInput WheelsOverALift()
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 300, 100, 0));
+    in.mLines.push_back(Line(375, 100, 700, 100, 0));
+    in.mLines.push_back(Line(0, 300, 300, 300, 0));
+    in.mLines.push_back(Line(375, 300, 700, 300, 0));
+    in.mFeatures.push_back(Feature(FeatureKind::eLiftStop, 300, 100, 375, 124));
+    in.mFeatures.push_back(Feature(FeatureKind::eLiftStop, 300, 300, 375, 324));
+    NavFeature wall = Feature(FeatureKind::eBarrier, 100, 280, 124, 304);
+    wall.mSwitch = 7;
+    wall.mStartClosed = true;
+    in.mFeatures.push_back(wall);
+    return in;
+}
+
+TEST(BotDomain, MudokonsForTheWheelsComeUpByLift)
+{
+    NavGraph g;
+    g.Build(WheelsOverALift());
+    World world;
+    Entity wheelA = MakeEntity(EntityKind::eWorkWheel, 1, 100, 80, 124, 104);
+    wheelA.mSwitch = 10;
+    Entity wheelB = MakeEntity(EntityKind::eWorkWheel, 2, 500, 80, 524, 104);
+    wheelB.mSwitch = 11;
+    Entity wheelC = MakeEntity(EntityKind::eWorkWheel, 5, 150, 80, 174, 104);
+    wheelC.mSwitch = 12;
+    Entity logic = MakeEntity(EntityKind::eSwitchLogic, 3, 0, 0, 10, 10);
+    logic.mSwitch = 5;
+    logic.mInputs[0] = 10;
+    logic.mInputs[1] = 11;
+    logic.mInputs[2] = 12;
+    world.mEntities = {wheelA, wheelB, logic, wheelC};
+    world.mEntities.push_back(MakeEntity(EntityKind::eMudokon, 6, 150, 80, 174, 100));
+    Team team;
+    std::vector<Goap::Fact> pre;
+    // Two wheels without a Mudokon and one pair of hands
+    EXPECT_FALSE(Domain::PlanTogether(g, world, world.mEntities[2], team, pre));
+
+    world.mEntities.push_back(MakeEntity(EntityKind::eMudokon, 4, 25, 280, 49, 300));
+    ASSERT_TRUE(Domain::PlanTogether(g, world, world.mEntities[2], team, pre));
+    // The one at its wheel, then the one brought
+    ASSERT_EQ(team.mMuds.size(), 2u);
+    EXPECT_EQ(team.mMuds[0], 6u);
+    EXPECT_EQ(team.mMuds[1], 4u);
+    EXPECT_EQ(team.mWheels.size(), 3u);
+    ASSERT_EQ(team.mFree.size(), 2u);
+    EXPECT_EQ(team.mFree[0], 1u);
+    EXPECT_EQ(team.mFree[1], 2u);
+    // It comes onto the wheels' floor off the lift, and Abe's wheel is the one further from there
+    EXPECT_GT(team.mFromX, 300);
+    EXPECT_LT(team.mFromX, 375);
+    EXPECT_EQ(team.mAbeWheel, 1u);
+    // The wall between it and the lift has to be open
+    EXPECT_NE(std::find(pre.begin(), pre.end(), Goap::Fact{Key::Switch(7), 1}), pre.end());
+    EXPECT_NE(std::find(pre.begin(), pre.end(), Goap::Fact{Key::Mud(4), 0}), pre.end());
+    EXPECT_NE(std::find(pre.begin(), pre.end(), Goap::Fact{Key::Mud(6), 0}), pre.end());
+
+    // Without the one at its wheel: three wheels, and only two pairs of hands
+    world.mEntities[4].mGone = true;
+    EXPECT_FALSE(Domain::PlanTogether(g, world, world.mEntities[2], team, pre));
+}
+
 TEST(BotDomain, AMudokonBehindTheDoorCannotHelpOpenIt)
 {
     NavGraph g;
