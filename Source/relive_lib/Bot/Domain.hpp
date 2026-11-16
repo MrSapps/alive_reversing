@@ -58,6 +58,7 @@ enum class StepKind : u8
     eKill,      // slap Mudokon mEntity until it is dead
     eRocks,     // jump into rock sack mEntity and pick up what falls out
     eBlow,      // throw rocks at mine mEntity until it goes off
+    eDisarm,    // turn UXB mEntity off with a slap, crouched in the cell mEdge beside it
     eSend,      // call blind Mudokon mEntity so that it walks to wheel mOther, and tell it to work
     eRide,      // get into mine car mEntity, drive it to the cell mEdge and get out
     eScrabRampage, // take over a Scrab of the floor Scrab mEntity is on from the cell mEdge, kill every other Scrab

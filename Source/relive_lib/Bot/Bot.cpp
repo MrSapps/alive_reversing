@@ -206,6 +206,12 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<GetRocksTask>(step.mEntity);
         case StepKind::eBlow:
             return std::make_unique<BlowMineTask>(step.mEntity, step.mEdge);
+        case StepKind::eDisarm:
+        {
+            const Entity* uxb = mWorld.Find(step.mEntity);
+            const NavNode& stand = mKnow->mNav.Nodes()[step.mEdge];
+            return std::make_unique<DisarmTask>(uxb ? uxb->CentreX() : stand.mX, stand.mY, stand.mHalf, step.mEdge);
+        }
         case StepKind::eFartBomb:
             return std::make_unique<FartBombTask>(step.mEntity, step.mOther, step.mEdge);
         case StepKind::eDrink:
@@ -622,6 +628,16 @@ bool Bot::Replan(BaseMap& map)
                 {
                     continue;
                 }
+                // (a UXB is turned off where the way goes through it, not to see what that does: it does nothing else)
+                bool uxb = false;
+                for (const Entity& e : mWorld.mEntities)
+                {
+                    uxb = uxb || (e.mKind == EntityKind::eUxb && Key::Switch(e.mSwitch) == fact.mKey);
+                }
+                if (uxb)
+                {
+                    continue;
+                }
                 const s32 est = Goap::Planner::Short(domain.mStart, {fact}, actions);
                 if (est >= 0)
                 {
@@ -686,6 +702,13 @@ bool Bot::Replan(BaseMap& map)
             // Nothing left to switch: somewhere he has not been yet (through a door that is open now, say). The
             // way out may show from there.
             mRegionsBeen.insert({mAbe.mPath, domain.mStart.Get(Key::kRegion)});
+            for (auto it = mCellsBeen.lower_bound({mAbe.mLevel * 1000 + mAbe.mPath, 0}); it != mCellsBeen.end() && it->first == mAbe.mLevel * 1000 + mAbe.mPath; ++it)
+            {
+                if (it->second < static_cast<s32>(domain.mRegions.size()))
+                {
+                    mRegionsBeen.insert({mAbe.mPath, domain.mRegions[it->second] + 1});
+                }
+            }
             if (!best.mFound)
             {
                 for (s32 pass = 0; pass < 2 && !best.mFound; pass++)
@@ -799,6 +822,8 @@ bool Bot::Replan(BaseMap& map)
                     mTaskAction.clear();
                     return true;
                 }
+                // (what there was to plan with, for whoever reads the log)
+                Log("the actions there were:\n" + domain.Text());
                 Stuck("no_plan: Leave the path: " + plan.mMiss + ". " + domain.Frontier() + (misses.empty() ? "" : " Also no plan for: " + misses));
                 return false;
             }
@@ -1360,7 +1385,8 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen) const
         const NavNode* stop = to.mLiftStop >= 0 && from.mLiftStop < 0 ? &to : nullptr;
         if (stop)
         {
-            if (!world->LiftAtStop(stop->mX, stop->mY, know->mNav.Input().mFeatures[stop->mLiftStop].mA != 0))
+            const NavFeature& at = know->mNav.Input().mFeatures[stop->mLiftStop];
+            if (!world->LiftAtStop(at.mX1, at.mX2, stop->mY, at.mA != 0))
             {
                 return -1;
             }
@@ -1369,7 +1395,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen) const
         if (e.mShaft >= 0)
         {
             const NavFeature& shaft = know->mNav.Input().mFeatures[e.mShaft];
-            if (world->LiftAtStop((shaft.mX1 + shaft.mX2) / 2, shaft.mY1, shaft.mA != 0))
+            if (world->LiftAtStop(shaft.mX1, shaft.mX2, shaft.mY1, shaft.mA != 0))
             {
                 return -1;
             }
@@ -3166,6 +3192,14 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
             mBombCycle.SetTracks(mAbe.mLevel * 1000 + mAbe.mPath, BombCycle::Tracks(mKnow->mNav.Input()));
         }
         mBombCycle.Observe(mAbe.mFrame, mAbe.mLevel * 1000 + mAbe.mPath, mWorld.mBombs);
+        if (mAbe.mOnGround)
+        {
+            const s32 on = AbeNode();
+            if (on >= 0)
+            {
+                mCellsBeen.insert({mAbe.mLevel * 1000 + mAbe.mPath, on});
+            }
+        }
         // The switch that is being tried for the sake of it has changed, if only for a moment (a trap door that
         // shuts itself again): it has been tried
         if (mExploring >= 1000 && mExploring < 1256 && mWorld.mSwitches[mExploring - 1000] != mLastSwitches[mExploring - 1000])
@@ -3376,7 +3410,10 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         {
             awake += slig.mAsleep || slig.mPossessed ? 0 : 1;
         }
-        if (awake > mLastAwakeSligs && mPilotActive && mPilotForTask && mAuto && mAbe.mOnGround)
+        // (not out of the run-up of a running jump: there he would run on off the end of the floor with no jump.
+        // The Barracks' path 5: the run on the ledge at 1987,1660 woke the Slig under it, and he went off the
+        // ledge's end onto the flying mine below.)
+        if (awake > mLastAwakeSligs && mPilotActive && mPilotForTask && mAuto && mAbe.mOnGround && mPilot.Current().mKind != Prim::Kind::eRunJump)
         {
             mPilot.Start(Prim::Wait(2), mAbe);
         }

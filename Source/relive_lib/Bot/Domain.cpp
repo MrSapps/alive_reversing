@@ -36,6 +36,7 @@ const char* EntityKindName(EntityKind kind)
         case EntityKind::eTeleporter: return "Teleporter";
         case EntityKind::eSligLock: return "SligLock";
         case EntityKind::eMine: return "Mine";
+        case EntityKind::eUxb: return "UXB";
         case EntityKind::eRockSack: return "RockSack";
         case EntityKind::eBrew: return "Brew";
         case EntityKind::eFlier: return "FlyingSlig";
@@ -83,7 +84,7 @@ bool Domain::BlindWay(const NavGraph& nav, const World& world, s32 from, const E
             return true;
         }
         const NavFeature& f = nav.Input().mFeatures[stop->mLiftStop];
-        return world.LiftAtStop(stop->mX, stop->mY, f.mA != 0) || (!now && (f.mSwitch > 1 || e.mKind == EdgeKind::eLift));
+        return world.LiftAtStop(f.mX1, f.mX2, stop->mY, f.mA != 0) || (!now && (f.mSwitch > 1 || e.mKind == EdgeKind::eLift));
     };
     std::vector<bool> goal(nav.Nodes().size(), false);
     std::vector<s32> open{at};
@@ -3566,6 +3567,41 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 break;
             }
 
+            case EntityKind::eUxb:
+            {
+                if (entity.mGone)
+                {
+                    d.mStart.Set(Key::Switch(entity.mSwitch), 1);
+                    break;
+                }
+                // From the cell on either side of it, on its floor. (One with a UXB of its own is stood in once
+                // that is off.)
+                const s32 cell = NavGraph::GridStep(entity.mHalf);
+                const s32 at = nav.NodeAt(entity.CentreX(), entity.mY2, entity.mHalf, 12);
+                for (s32 side = -1; at >= 0 && side <= 1; side += 2)
+                {
+                    const s32 stand = nav.NodeAt(nav.Nodes()[at].mX + side * cell, nav.Nodes()[at].mY, entity.mHalf, 12);
+                    if (stand < 0 || stand == at)
+                    {
+                        continue;
+                    }
+                    const NavNode& on = nav.Nodes()[stand];
+                    if (on.mLow || (on.mHazard && on.mClear < 0) || on.mLine != nav.Nodes()[at].mLine)
+                    {
+                        continue;
+                    }
+                    std::vector<Goap::Fact> pre{regionFact(stand)};
+                    if (on.mClear >= 0)
+                    {
+                        pre.push_back({Key::Switch(nav.Input().mFeatures[on.mClear].mSwitch), 1});
+                    }
+                    step.mKind = StepKind::eDisarm;
+                    step.mEdge = stand;
+                    add("Turn off " + name + " from " + std::to_string(on.mX) + "," + std::to_string(on.mY), pre, {{Key::Switch(entity.mSwitch), 1}}, 260, step);
+                }
+                break;
+            }
+
             case EntityKind::eMine:
             {
                 if (entity.mGone)
@@ -3732,7 +3768,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                         if (onto.mLiftStop >= 0 && nav.Nodes()[e.mFrom].mLiftStop < 0)
                         {
                             const NavFeature& stop = nav.Input().mFeatures[onto.mLiftStop];
-                            if (!world.LiftAtStop(onto.mX, onto.mY, stop.mA != 0) && stop.mSwitch > 1)
+                            if (!world.LiftAtStop(stop.mX1, stop.mX2, onto.mY, stop.mA != 0) && stop.mSwitch > 1)
                             {
                                 need({Key::Switch(stop.mSwitch), 1});
                             }

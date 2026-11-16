@@ -31,7 +31,8 @@ enum class FeatureKind : u8
     ePathExit,    // walking into it leaves the path, mDest*
     eInvisibleZone, // standing wholly inside it Abe isn't seen
     eLiftStop,    // a floor a lift stops at: its rectangle's top is the floor, as wide as the platform. mA: the
-                  // lift starts here, mB its id, mSwitch: a lift mover brings it here once that switch is on
+                  // lift starts here, mB its id, mSwitch: a lift mover brings it here once that switch is on,
+                  // mC: 1 the ride up ends here, 2 the ride down does (only a lift mover takes it on past)
     eLevelLoader, // the game leaves the path by itself once switch mSwitch is on, mDest*
     eBarrier,     // a slam door, an electric wall...: nothing passes while it is shut. Open when switch mSwitch is
                   // on, or off if mStartClosed is false
@@ -278,6 +279,8 @@ private:
     void AddRunJumps(std::vector<NavEdge>& edges, s32 from, s32 dir, bool overLift = false) const;
     // From a ledge too short for that run-up: over a gap to the hoist at the edge of the ledge across, which he
     // catches and pulls himself up by
+    // Whether that edge or hoist is one a running jump off `takeoff` at height y catches on its way up
+    bool CatchesUp(const NavFeature& f, s32 takeoff, s32 y, bool half, s32 dir) const;
     void AddLedgeCatches(std::vector<NavEdge>& edges, s32 from, s32 dir) const;
     s32 BarrierBetween(s32 xa, s32 xb, s32 y, bool half) const;
     const NavFeature* FeatureAt(FeatureKind kind, s32 x, s32 y, bool half, s32* index = nullptr) const;

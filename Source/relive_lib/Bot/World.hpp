@@ -62,6 +62,9 @@ enum class EntityKind : u8
     // World::mLockCodes has the code. mState, while it is about: 0 idle, 1 waits for "Hi", 2 says its code,
     // 3 waits for the code, 4 open, 5 said no
     eSligLock,
+    // AE's UXB: a slap while its light is green turns it off, and then it is floor. mSwitch is the switch the
+    // world gives as on once it is off (or has gone off); mGone says that
+    eUxb,
 };
 
 const char* EntityKindName(EntityKind kind);
@@ -688,13 +691,16 @@ struct World final
         }
         return false;
     }
-    bool LiftAtStop(s32 x, s32 y, bool startsHere) const
+    // x1, x2: the stop's ends. The lift of that shaft is the one that is over the same stretch: another whose
+    // shaft only partly overlaps it, higher up or lower down, is not it (the Barracks' path 5: the lift at
+    // 3900..3976 and the one at 3850..3926 under it)
+    bool LiftAtStop(s32 x1, s32 x2, s32 y, bool startsHere) const
     {
         for (const std::vector<LiftAt>* lifts : {&mLifts, &mLiftsSeen})
         {
             for (const LiftAt& lift : *lifts)
             {
-                if (x >= lift.mX1 && x <= lift.mX2)
+                if (std::abs(lift.mX1 + lift.mX2 - x1 - x2) <= 24)
                 {
                     return std::abs(lift.mY - y) <= 4;
                 }
@@ -731,7 +737,7 @@ struct World final
         {
             for (const Entity& e : mEntities)
             {
-                if (e.mKind == EntityKind::eMine && e.mSwitch == id)
+                if ((e.mKind == EntityKind::eMine || e.mKind == EntityKind::eUxb) && e.mSwitch == id)
                 {
                     return e.mGone ? 1 : 0;
                 }

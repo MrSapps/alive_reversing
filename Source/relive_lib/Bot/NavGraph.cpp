@@ -474,9 +474,9 @@ bool NavGraph::Condition(const NavEdge& edge, s32* switchId, s32* openValue) con
     }
     else if (f.mKind == FeatureKind::eTrapDoor)
     {
-        // Fallen through open, walked on shut
+        // Fallen through and hopped over open, walked on shut
         const s32 open = f.mStartClosed ? 1 : 0;
-        value = edge.mKind == EdgeKind::eFall ? open : 1 - open;
+        value = edge.mKind == EdgeKind::eFall || edge.mKind == EdgeKind::eHop ? open : 1 - open;
     }
     else
     {
@@ -956,7 +956,13 @@ void NavGraph::AddRunJumps(std::vector<NavEdge>& edges, s32 from, s32 dir, bool 
                 if (x >= f.mX1 - 2 && x <= f.mX2 + 2 && f.mY1 >= y - 25 && f.mY1 <= y + 40)
                 {
                     const s32 to = NodeAt(x, f.mY1, n.mHalf, 12);
-                    if (to >= 0 && k == kRunJumpLedgeCells)
+                    // (not one beyond a ledge the same jump catches higher up on its way: that is where he ends)
+                    bool sooner = false;
+                    for (const NavFeature& up : mInput.mFeatures)
+                    {
+                        sooner = sooner || (&up != &f && CatchesUp(up, takeoff, y, n.mHalf, dir));
+                    }
+                    if (to >= 0 && k == kRunJumpLedgeCells && !sooner)
                     {
                         AddEdge(edges, from, to, EdgeKind::eRunJump, kRunJumpCost, static_cast<s32>(i), dir < 0);
                         edges.back().mX = takeoff;
@@ -992,6 +998,21 @@ void NavGraph::AddRunJumps(std::vector<NavEdge>& edges, s32 from, s32 dir, bool 
     }
 }
 
+bool NavGraph::CatchesUp(const NavFeature& f, s32 takeoff, s32 y, bool half, s32 dir) const
+{
+    if ((f.mKind != FeatureKind::eEdge && f.mKind != FeatureKind::eHoist) || f.mHalf != half || !(f.mDir == 2 || (f.mDir == 0) == (dir < 0)))
+    {
+        return false;
+    }
+    const s32 step = GridStep(half);
+    const s32 scale = half ? 2 : 1;
+    const s32 rise = y - f.mY1;
+    const s32 near = dir > 0 ? f.mX1 - takeoff : takeoff - f.mX2;
+    // (three and a half cells and a little: in the Barracks' path 5, off 3637,1500 he caught the edge that ends at
+    // 3549, 80 up, and was hung from it 12 frames after)
+    return rise * scale >= 30 && rise * scale <= 110 && near >= 2 * step && near <= 3 * step + step / 2 + 4 / scale && !WallBetween(takeoff, dir > 0 ? f.mX1 : f.mX2, y - rise, half);
+}
+
 void NavGraph::AddLedgeCatches(std::vector<NavEdge>& edges, s32 from, s32 dir) const
 {
     // Measured in the Mudanchee trial's last room: from a stand at 37,100 on a ledge that ends at 62, turned, one
@@ -1013,17 +1034,10 @@ void NavGraph::AddLedgeCatches(std::vector<NavEdge>& edges, s32 from, s32 dir) c
     {
         s32 ny = 0;
         const s32 beyond = FloorNear(takeoff + dir * step, y, n.mHalf, 12, &ny);
-        const s32 scale = n.mHalf ? 2 : 1;
         for (std::size_t fi = 0; beyond < 0 && fi < mInput.mFeatures.size(); fi++)
         {
             const NavFeature& f = mInput.mFeatures[fi];
-            if ((f.mKind != FeatureKind::eEdge && f.mKind != FeatureKind::eHoist) || f.mHalf != n.mHalf || !(f.mDir == 2 || (f.mDir == 0) == (dir < 0)))
-            {
-                continue;
-            }
-            const s32 rise = y - f.mY1;
-            const s32 near = dir > 0 ? f.mX1 - takeoff : takeoff - f.mX2;
-            if (rise * scale < 30 || rise * scale > 110 || near < 2 * step || near > 3 * step + step / 2 || WallBetween(takeoff, dir > 0 ? f.mX1 : f.mX2, y - rise, n.mHalf))
+            if (!CatchesUp(f, takeoff, y, n.mHalf, dir))
             {
                 continue;
             }
@@ -1401,6 +1415,15 @@ void NavGraph::Build(const NavInput& input)
                         const s32 rise = (n.mY - f.mY1) * (n.mHalf ? 2 : 1);
                         if (f.mKind == FeatureKind::eEdge && f.mA && (f.mAnyScale || f.mHalf == n.mHalf) && (f.mDir == 2 || (f.mDir == 0) == left) && x >= f.mX1 - 2 && x <= f.mX2 + 2 && rise <= 85 && rise >= -40 && (bare || (rise >= kHighLedge && k <= 3)))
                         {
+                            // (by where he has begun to drop, the ledge is out of reach by as much as he has
+                            // dropped: three cells out he is still level, by 88 he is 51 down. The Barracks'
+                            // path 5: from 3637,1500 at the ledge that ends at 3549, 80 up, he fell past it.)
+                            const s32 out = (dir > 0 ? f.mX1 - n.mX : n.mX - f.mX2) * (n.mHalf ? 2 : 1);
+                            const s32 dropped = out <= 76 ? 0 : (out <= 80 ? 6 : (out <= 82 ? 17 : (out <= 83 ? 33 : (out <= 88 ? 51 : 70))));
+                            if (rise + dropped > 85)
+                            {
+                                continue;
+                            }
                             const s32 to = NodeAt(x, f.mY1, n.mHalf, 12);
                             if (to >= 0)
                             {
@@ -1510,7 +1533,7 @@ void NavGraph::Build(const NavInput& input)
             if (hopLine >= 0 && !mNodes[std::max(0, NodeOnLine(hopLine, hx))].mLow && !WallBetween(n.mX, n.mX + dir * step * 3, n.mY, n.mHalf))
             {
                 bool needed = false;
-                bool overTrap = false;
+                s32 overTrap = -1;
                 for (s32 k = 1; k <= 2; k++)
                 {
                     const s32 mx = k == 1 ? nx : StepX(nx, dir, n.mHalf);
@@ -1523,16 +1546,17 @@ void NavGraph::Build(const NavInput& input)
                     }
                     else if (mNodes[mid].mTrapDoor >= 0)
                     {
-                        overTrap = true;
+                        overTrap = mNodes[mid].mTrapDoor;
                     }
                 }
                 const s32 to = NodeOnLine(hopLine, hx);
-                // (a trap door is a gap while it is open: hopped over, from floor to floor, it makes no odds which
-                // it is. AE only: measured there, and in Rupture Farms' paths 15 and 16 it did not work.)
-                needed = needed || (mInput.mIsAe && overTrap && to >= 0 && n.mTrapDoor < 0 && mNodes[to].mTrapDoor < 0);
-                if (needed && to >= 0 && std::abs(mNodes[to].mX - hx) <= step / 2 && !mNodes[to].mHazard)
+                // (a trap door is a gap while it is open, and only then: shut it is floor, and walked over. Hopped
+                // from floor to floor.)
+                const bool trapOnly = !needed && overTrap >= 0 && to >= 0 && n.mTrapDoor < 0 && mNodes[to].mTrapDoor < 0;
+                if ((needed || trapOnly) && to >= 0 && std::abs(mNodes[to].mX - hx) <= step / 2 && !mNodes[to].mHazard)
                 {
-                    AddEdge(edges, from, to, EdgeKind::eHop, kHopCost, BarrierBetween(n.mX, n.mX + dir * step * 3, n.mY, n.mHalf), left);
+                    const s32 barrier = BarrierBetween(n.mX, n.mX + dir * step * 3, n.mY, n.mHalf);
+                    AddEdge(edges, from, to, EdgeKind::eHop, kHopCost, trapOnly && barrier < 0 ? overTrap : barrier, left);
                 }
             }
         }
@@ -1598,6 +1622,19 @@ void NavGraph::Build(const NavInput& input)
                     const NavNode& other = mNodes[k];
                     if (other.mLiftStop >= 0 && other.mLiftStop != n.mLiftStop && other.mX == n.mX && other.mHalf == n.mHalf && std::abs(mInput.mFeatures[other.mLiftStop].mX1 - stop.mX1) <= 2)
                     {
+                        // Not on past a stop that is the end of the ride that way (the Barracks' path 5: the
+                        // lift a lever brings up from 1500 to 980 is ridden down no further than 1158)
+                        const bool down = other.mY > n.mY;
+                        bool ends = stop.mC == (down ? 2 : 1);
+                        for (const NavNode& mid : mNodes)
+                        {
+                            ends = ends || (mid.mLiftStop >= 0 && mid.mX == n.mX && mid.mHalf == n.mHalf && mid.mY > std::min(n.mY, other.mY) && mid.mY < std::max(n.mY, other.mY) &&
+                                            std::abs(mInput.mFeatures[mid.mLiftStop].mX1 - stop.mX1) <= 2 && mInput.mFeatures[mid.mLiftStop].mC == (down ? 2 : 1));
+                        }
+                        if (ends)
+                        {
+                            continue;
+                        }
                         AddEdge(edges, from, static_cast<s32>(k), EdgeKind::eLift, 40 + std::abs(other.mY - n.mY) / 3, n.mLiftStop, other.mY < n.mY);
                     }
                 }

@@ -1,16 +1,17 @@
 # The bot in the Slig Barracks' second block, the workers' campus (path 5), from the hub's door into it.
-# Not done. Past its first flying mines with no deaths: the two by the door, the lift, the lever that brings the
-# third lift up, over the open trap doors with a mine in each gap, up and back over the top to the lever that
-# shuts them, down and back across them (f=1,704). Then stuck: the screen of UXBs is next, and the bot does not
-# turn those off yet.
-# See BOT_DESIGN.md, "What the Barracks still wants", flying mines.
+# Not done. With no deaths: past the first flying mines, the lever that brings the third lift up, down it and
+# the lever that brings the fourth, down that to the screen of UXBs (a running jump to the middle ledge, its UXB
+# turned off, over it to the far ledge), through the door, past the sleeping Slig and the flying mine (the Slig
+# taken over from the left ledge and walked into the mine, f=2,432), and up and along to the UXBs by the
+# laughing gas at about f=3,100. Then it goes to and fro: the lifts past the Sligs and mines are next.
+# See BOT_DESIGN.md, "What the Barracks still wants", flying mines and UXBs turned off.
 timeout 2400
 start barracks 5 1 4400 338
 wait_until in_game
 wait_frames 40
 healing
 bot any,seed=1,been=mines,been=necrum
-bot_wait 3000
+bot_wait 3400
 bot_report bot_report.txt
 bot_inputs bot_inputs.txt
 quit

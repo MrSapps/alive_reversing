@@ -849,6 +849,20 @@ bool GoToTask::ZMove(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
 
 TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
 {
+    if (mBombSlig)
+    {
+        const TaskStep step = mBombSlig->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::ePrim)
+        {
+            return step;
+        }
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            bot.Log("the Slig did not get to the flying mine: " + step.mWhy);
+        }
+        mBombSlig.reset();
+        return Next(bot, "");
+    }
     if (mDisarm)
     {
         const TaskStep step = mDisarm->Next(bot, lastFailed);
@@ -1189,7 +1203,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         const auto away = [&nav, &w](const NavEdge& e)
         {
             const NavNode& to = nav.Nodes()[e.mTo];
-            return to.mLiftStop >= 0 && nav.Nodes()[e.mFrom].mLiftStop < 0 && !w.LiftAtStop(to.mX, to.mY, nav.Input().mFeatures[to.mLiftStop].mA != 0);
+            return to.mLiftStop >= 0 && nav.Nodes()[e.mFrom].mLiftStop < 0 && !w.LiftAtStop(nav.Input().mFeatures[to.mLiftStop].mX1, nav.Input().mFeatures[to.mLiftStop].mX2, to.mY, nav.Input().mFeatures[to.mLiftStop].mA != 0);
         };
         std::vector<s32> soon;
         if (mLiftComeWaits < 400 && nav.FindPath(cur, mIsGoal, [&](const NavEdge& e) -> s32
@@ -3056,9 +3070,18 @@ void GoToTask::Bodies(const NavGraph& nav, const std::vector<s32>& path, std::si
         // (a jump up to a ledge, measured there too: run to where he takes off at 6.25 a frame, or the 10 of a
         // hop where he stands; 3 level through the air, 6 up to the ledge, 3 hung from it and 23 pulling himself up)
         const s32 run = kind == EdgeKind::eRunJump ? std::max(1, std::abs(a.mX - e.mX) * scale * 4 / 25) : 10;
+        // (a running jump over a gap that ends hung from the ledge at its own height, measured there as well, off
+        // 2012,1660 to the ledge at 2137: 16 frames through the air at 7.6 a frame, up to 31 over where he took
+        // off and 15 under it as he catches the ledge, then hung and up as above)
+        const bool catches = !last && kind == EdgeKind::eRunJump && !grabs && e.mFeature >= 0 && std::abs(a.mY - b.mY) * scale <= 20 &&
+                             (nav.Input().mFeatures[e.mFeature].mKind == FeatureKind::eEdge || nav.Input().mFeatures[e.mFeature].mKind == FeatureKind::eHoist);
         if (grabs)
         {
             frames = run + 35;
+        }
+        else if (catches)
+        {
+            frames = run + 16 + 26;
         }
         else if (falls)
         {
@@ -3145,6 +3168,38 @@ void GoToTask::Bodies(const NavGraph& nav, const std::vector<s32>& path, std::si
                     body.mFront = k < 12 ? 6 : 18;
                     body.mUp = k < 12 ? -5 : k < 16 ? 20 : k < 28 ? 36 : 53;
                     body.mDown = k < 12 ? 65 : k < 16 ? 70 : k < 28 ? 34 : 11;
+                }
+            }
+            else if (catches)
+            {
+                const s32 dir = b.mX < a.mX ? -1 : 1;
+                const s32 k = f - run;
+                body.mY = a.mY;
+                if (k < 0)
+                {
+                    body.mX = a.mX + (e.mX - a.mX) * f / run;
+                    body.mBack = 25;
+                    body.mFront = 27;
+                }
+                else if (k < 16)
+                {
+                    const s32 to = b.mX - dir * 11 / scale;
+                    body.mX = e.mX + (to - e.mX) * (k + 1) / 16;
+                    body.mY = a.mY + (k >= 13 ? 15 : (k - 8) * (k - 8) * 31 / 64 - 31) / scale;
+                    body.mUp = 69;
+                    body.mBack = 36;
+                    body.mFront = 23;
+                    body.mDown = 0;
+                }
+                else
+                {
+                    const s32 h = k - 16;
+                    body.mX = b.mX;
+                    body.mY = b.mY;
+                    body.mBack = h < 3 ? 27 : 22;
+                    body.mFront = h < 3 ? 6 : 18;
+                    body.mUp = h < 3 ? -5 : h < 7 ? 20 : h < 19 ? 36 : 53;
+                    body.mDown = h < 3 ? 65 : h < 7 ? 70 : h < 19 ? 34 : 11;
                 }
             }
             else if (falls)
@@ -3377,6 +3432,55 @@ bool GoToTask::BombStep(Bot& bot, s32 cur, const std::vector<s32>& path, std::si
     // A mine of that stretch not seen for a lap yet, or not there yet: watched from here
     bodies.clear();
     Bodies(nav, path, 0, count, false, true, bodies);
+    // Another way with a mine: a Slig on the floor it comes down to, taken over and walked into it. From where
+    // the blast does not reach him (60 to either side of the mine and 60 over it), with nothing to see him
+    // chant: the Slig asleep or on another floor, no orb on his screen, and no other Slig about to be taken
+    // over in its stead.
+    if (!mBombSligTried && abe.mMove == Move::eIdle && !here.mLow)
+    {
+        const World& world = bot.GetWorld();
+        const s32 abeCam = nav.CameraOf(abe.mX, abe.mY - 5);
+        bool orb = false;
+        for (const Entity& e : world.mEntities)
+        {
+            orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.CentreX(), e.mY2 - 5) == abeCam);
+        }
+        s32 sligs = 0;
+        for (const SligAt& s : world.mSligs)
+        {
+            sligs += s.mPossessed ? 0 : 1;
+        }
+        for (const BombCycle::Seen& bomb : world.mBombs)
+        {
+            const s32 bx = bomb.mX / 256;
+            const s32 by = bomb.mY / 256;
+            bool inWay = false;
+            for (const Body& b : bodies)
+            {
+                inWay = inWay || (b.mHalf == bomb.mHalf && std::abs(b.mX - bx) <= 150 && std::abs(b.mY - by) <= 150);
+            }
+            if (!inWay || orb || sligs != 1 || std::abs(abe.mX - bx) < 130)
+            {
+                continue;
+            }
+            for (const SligAt& s : world.mSligs)
+            {
+                const s32 scale = s.mHalf ? 2 : 1;
+                const s32 from = nav.NodeAt(s.mX, s.mY, s.mHalf, 12);
+                const s32 to = nav.NodeAt(bx, s.mY, s.mHalf, 30);
+                if (s.mPossessed || s.mHalf != bomb.mHalf || from < 0 || to < 0 || nav.Nodes()[from].mLine != nav.Nodes()[to].mLine || nav.CameraOf(s.mX, s.mY - 5) != abeCam ||
+                    by > s.mY + 4 || by < s.mY - 62 / scale || std::abs(s.mX - bx) > 400 || !(s.mAsleep || std::abs(s.mY - abe.mY) * scale > 40))
+                {
+                    continue;
+                }
+                mBombSligTried = true;
+                bot.Log("a flying mine in the way with a Slig on its floor: the Slig at " + std::to_string(s.mX) + "," + std::to_string(s.mY) + " taken over and walked into it");
+                mBombSlig = ClearSligTask::IntoMine(bomb.mId);
+                step = mBombSlig->Next(bot, "");
+                return true;
+            }
+        }
+    }
     bool watching = false;
     bool missing = false;
     for (const Body& b : bodies)
@@ -4182,13 +4286,28 @@ TaskStep DisarmTask::Next(Bot& bot, const std::string& lastFailed)
     const UxbAt* uxb = nullptr;
     for (const UxbAt& u : bot.GetWorld().mUxbs)
     {
-        if (std::abs(u.mX - mX) <= 6 && std::abs(u.mY - mY) <= 6)
+        if (u.mHalf == mHalf && std::abs(u.mX - mX) <= 6 && std::abs(u.mY - mY) <= 12)
         {
             uxb = &u;
         }
     }
     if (!uxb)
     {
+        // (its screen may not be there yet: over to where it is done from first)
+        if (mStand >= 0 && bot.AbeNode() != mStand)
+        {
+            TaskStep go;
+            if (!mGo)
+            {
+                const s32 stand = mStand;
+                mGo = std::make_unique<GoToTask>("to the UXB", [stand](s32 n)
+                                                 { return n == stand; });
+            }
+            if (!RunGo(mGo, bot, lastFailed, go) || go.mKind == TaskStep::Kind::eFailed)
+            {
+                return go;
+            }
+        }
         return TaskStep::Failed("the UXB isn't there");
     }
     if (uxb->mOff)
@@ -4211,8 +4330,13 @@ TaskStep DisarmTask::Next(Bot& bot, const std::string& lastFailed)
     }
     // A cell from it, on the side that is nearer by the ways there are
     const s32 cell = NavGraph::GridStep(mHalf);
-    const s32 left = nav.NodeAt(mX - cell, mY, mHalf, 12);
-    const s32 right = nav.NodeAt(mX + cell, mY, mHalf, 12);
+    s32 left = nav.NodeAt(mX - cell, mY, mHalf, 12);
+    s32 right = nav.NodeAt(mX + cell, mY, mHalf, 12);
+    if (mStand >= 0)
+    {
+        left = left == mStand ? left : -1;
+        right = right == mStand ? right : -1;
+    }
     const s32 cur = bot.AbeNode();
     if (cur < 0)
     {
@@ -4359,7 +4483,7 @@ TaskStep UseTask::Next(Bot& bot, const std::string& lastFailed)
         // A lift it sends for: until that is there
         for (const NavNode& n : bot.Nav().Nodes())
         {
-            if (mWant == 1 && mArrived && n.mLiftStop >= 0 && bot.Nav().Input().mFeatures[n.mLiftStop].mSwitch == entity->mSwitch && !bot.GetWorld().LiftAtStop(n.mX, n.mY, false) && ++mLiftWaits < 600)
+            if (mWant == 1 && mArrived && n.mLiftStop >= 0 && bot.Nav().Input().mFeatures[n.mLiftStop].mSwitch == entity->mSwitch && !bot.GetWorld().LiftAtStop(bot.Nav().Input().mFeatures[n.mLiftStop].mX1, bot.Nav().Input().mFeatures[n.mLiftStop].mX2, n.mY, false) && ++mLiftWaits < 600)
             {
                 return TaskStep::Do(Prim::Wait(2));
             }
@@ -5146,6 +5270,18 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
         {
             return RaidStep(bot, *me);
         }
+        // Into the flying mine, while that is there
+        if (mMine != 0 && mMineFrames < 900)
+        {
+            for (const BombCycle::Seen& bomb : world.mBombs)
+            {
+                if (bomb.mId == mMine)
+                {
+                    mMineFrames += 6;
+                    return TaskStep::Do(Prim::Wait(6, bomb.mX / 256 > me->mX ? Btn::eRight : Btn::eLeft));
+                }
+            }
+        }
         // Shoot what it can get at on its floor, then chant again and it bursts
         s32 targetX = 0;
         if (mShootFrames < 1200 && Target(world, *me, mShootIt ? entity : nullptr, targetX))
@@ -5173,7 +5309,7 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
         mRaid = false;
         if (mAmbush)
         {
-            bot.Log("the Slig that woke is gone");
+            bot.Log(mMine ? "the Slig is gone, into the flying mine or burst" : "the Slig that woke is gone");
             return TaskStep::Done();
         }
         mInner = mMake();
@@ -5515,7 +5651,8 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
     const s32 abeCam = nav.CameraOf(abe.mX, abe.mY - 5);
     for (const SligAt& s : world.mSligs)
     {
-        if (s.mAsleep || nav.CameraOf(s.mX, s.mY - 5) != abeCam)
+        // (one asleep is taken over as well as one awake: only looked for where it is wanted)
+        if ((s.mAsleep && mMine == 0) || nav.CameraOf(s.mX, s.mY - 5) != abeCam)
         {
             continue;
         }

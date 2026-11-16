@@ -2279,12 +2279,18 @@ TEST(BotNav, ALiftsShaftIsHoppedWhileTheLiftIsAway)
 
     // The lift is where it starts until it is seen somewhere else
     World world;
-    EXPECT_TRUE(world.LiftAtStop(337, 100, true));
-    EXPECT_FALSE(world.LiftAtStop(337, 100, false));
+    EXPECT_TRUE(world.LiftAtStop(300, 375, 100, true));
+    EXPECT_FALSE(world.LiftAtStop(300, 375, 100, false));
     world.mLiftsSeen.push_back({304, 371, 300});
-    EXPECT_FALSE(world.LiftAtStop(337, 100, true));
+    EXPECT_FALSE(world.LiftAtStop(300, 375, 100, true));
     world.mLifts.push_back({304, 371, 100});
-    EXPECT_TRUE(world.LiftAtStop(337, 100, false));
+    EXPECT_TRUE(world.LiftAtStop(300, 375, 100, false));
+    // (a lift of another shaft that only partly overlaps this one is not this one's)
+    World two;
+    two.mLifts.push_back({354, 421, 100});
+    EXPECT_FALSE(two.LiftAtStop(300, 375, 100, false));
+    EXPECT_TRUE(two.LiftAtStop(300, 375, 100, true));
+    EXPECT_TRUE(two.LiftAtStop(350, 425, 100, false));
 }
 
 TEST(BotSweep, ARollFitsUnderADrillWhereAWalkNeverDoes)
@@ -8829,13 +8835,23 @@ TEST(BotNav, AnOpenTrapDoorIsHoppedOverAndNotFallenThroughIntoADeathDrop)
         const s32 on = g.NodeAt(212, 100, false);
         ASSERT_GE(on, 0);
         ASSERT_EQ(g.Nodes()[on].mTrapDoor, 0);
-        // Over it either way, whatever its switch says
+        // Over it either way, while it is open (its switch off: it starts open); shut it is walked over
         const NavEdge* hop = FindEdge(g, before, after, EdgeKind::eHop);
         ASSERT_NE(hop, nullptr) << g.Text();
         s32 sw = 0;
         s32 value = -1;
-        EXPECT_FALSE(g.Condition(*hop, &sw, &value));
-        EXPECT_NE(FindEdge(g, after, before, EdgeKind::eHop), nullptr);
+        ASSERT_TRUE(g.Condition(*hop, &sw, &value));
+        EXPECT_EQ(sw, 7);
+        EXPECT_EQ(value, 0);
+        const NavEdge* back = FindEdge(g, after, before, EdgeKind::eHop);
+        ASSERT_NE(back, nullptr);
+        ASSERT_TRUE(g.Condition(*back, &sw, &value));
+        EXPECT_EQ(value, 0);
+        const NavEdge* walk = FindEdge(g, before, on, EdgeKind::eWalk);
+        ASSERT_NE(walk, nullptr);
+        ASSERT_TRUE(g.Condition(*walk, &sw, &value));
+        EXPECT_EQ(sw, 7);
+        EXPECT_EQ(value, 1);
         // (not from on it, nor onto it)
         EXPECT_EQ(FindEdge(g, on, g.NodeAt(287, 100, false), EdgeKind::eHop), nullptr);
         EXPECT_EQ(FindEdge(g, g.NodeAt(162, 100, false), g.NodeAt(237, 100, false), EdgeKind::eHop), nullptr);
@@ -8843,7 +8859,7 @@ TEST(BotNav, AnOpenTrapDoorIsHoppedOverAndNotFallenThroughIntoADeathDrop)
         EXPECT_NE(FindEdge(g, before, g.NodeAt(212, 240, false), EdgeKind::eFall), nullptr) << g.Text();
         EXPECT_NE(FindEdge(g, on, g.NodeAt(212, 240, false), EdgeKind::eFall), nullptr);
     }
-    // (AO: not hopped over. It was not measured there. A trap door two of its cells wide, wherever those are.)
+    // (AO the same. A trap door two of its cells wide, wherever those are.)
     {
         NavInput flat = AoInput();
         flat.mLines.push_back(Line(0, 100, 2000, 100, 0));
@@ -8863,6 +8879,7 @@ TEST(BotNav, AnOpenTrapDoorIsHoppedOverAndNotFallenThroughIntoADeathDrop)
         ao.mLines.push_back(Line(right, 100, 2000, 100, 0));
         NavFeature door = Feature(FeatureKind::eTrapDoor, left, 100, right, 120);
         door.mSwitch = 7;
+        door.mStartClosed = true;
         ao.mFeatures.push_back(door);
         NavGraph g;
         g.Build(ao);
@@ -8871,10 +8888,21 @@ TEST(BotNav, AnOpenTrapDoorIsHoppedOverAndNotFallenThroughIntoADeathDrop)
         ASSERT_GE(g.Nodes()[g.NodeAt(xs[6], 100, false)].mTrapDoor, 0);
         ASSERT_LT(g.Nodes()[g.NodeAt(xs[4], 100, false)].mTrapDoor, 0);
         ASSERT_LT(g.Nodes()[g.NodeAt(xs[7], 100, false)].mTrapDoor, 0);
+        // (every hop there is is over it, and only while it is open: its switch on, as it starts shut)
+        s32 hops = 0;
         for (const NavEdge& e : g.Edges())
         {
-            EXPECT_NE(e.mKind, EdgeKind::eHop) << g.Nodes()[e.mFrom].mX << " to " << g.Nodes()[e.mTo].mX;
+            if (e.mKind == EdgeKind::eHop)
+            {
+                hops++;
+                s32 sw = 0;
+                s32 value = -1;
+                EXPECT_TRUE(g.Condition(e, &sw, &value)) << g.Nodes()[e.mFrom].mX << " to " << g.Nodes()[e.mTo].mX;
+                EXPECT_EQ(sw, 7);
+                EXPECT_EQ(value, 1);
+            }
         }
+        EXPECT_EQ(hops, 2);
     }
     // With a death drop between: no way down through it
     in.mFeatures.push_back(Feature(FeatureKind::eDeathDrop, 100, 180, 400, 204));
@@ -8899,4 +8927,300 @@ TEST(BotNav, AnOpenTrapDoorIsHoppedOverAndNotFallenThroughIntoADeathDrop)
         g.Build(deep);
         EXPECT_NE(FindEdge(g, g.NodeAt(212, 100, false), g.NodeAt(212, 400, false), EdgeKind::eFall), nullptr);
     }
+}
+
+TEST(BotNav, ALiftIsRiddenNoFurtherThanTheStopItsRideEndsAt)
+{
+    // The Barracks' path 5: a lift a lever brings up from the bottom of its shaft, past a stop that is the end
+    // of the ride down ("bottom floor"), to the top. He rides it between the top and that stop and no lower.
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 100, 100, 0));
+    in.mLines.push_back(Line(0, 300, 100, 300, 0));
+    in.mLines.push_back(Line(0, 500, 100, 500, 0));
+    NavFeature top = Feature(FeatureKind::eLiftStop, 100, 100, 176, 124);
+    top.mC = 1;
+    NavFeature mid = Feature(FeatureKind::eLiftStop, 100, 300, 176, 324);
+    mid.mC = 2;
+    NavFeature low = Feature(FeatureKind::eLiftStop, 100, 500, 176, 524);
+    low.mC = 2;
+    in.mFeatures = {top, mid, low};
+    {
+        NavGraph g;
+        g.Build(in);
+        const s32 a = g.NodeAt(137, 100, false);
+        const s32 b = g.NodeAt(137, 300, false);
+        const s32 c = g.NodeAt(137, 500, false);
+        EXPECT_TRUE(HasEdge(g, a, b, EdgeKind::eLift)) << g.Text();
+        EXPECT_TRUE(HasEdge(g, b, a, EdgeKind::eLift));
+        EXPECT_FALSE(HasEdge(g, a, c, EdgeKind::eLift));
+        EXPECT_FALSE(HasEdge(g, b, c, EdgeKind::eLift));
+        // (up from the bottom it goes: nothing ends the ride up before the top)
+        EXPECT_TRUE(HasEdge(g, c, b, EdgeKind::eLift));
+        EXPECT_TRUE(HasEdge(g, c, a, EdgeKind::eLift));
+    }
+    // A stop that ends the ride up, in the middle: not on up past it, nor up from it
+    in.mFeatures[1].mC = 1;
+    {
+        NavGraph g;
+        g.Build(in);
+        const s32 a = g.NodeAt(137, 100, false);
+        const s32 b = g.NodeAt(137, 300, false);
+        const s32 c = g.NodeAt(137, 500, false);
+        EXPECT_FALSE(HasEdge(g, c, a, EdgeKind::eLift)) << g.Text();
+        EXPECT_FALSE(HasEdge(g, b, a, EdgeKind::eLift));
+        EXPECT_TRUE(HasEdge(g, c, b, EdgeKind::eLift));
+        EXPECT_TRUE(HasEdge(g, a, b, EdgeKind::eLift));
+        EXPECT_TRUE(HasEdge(g, a, c, EdgeKind::eLift));
+    }
+    // With stops that end nothing it is ridden all the way either way
+    in.mFeatures[0].mC = 0;
+    in.mFeatures[1].mC = 0;
+    in.mFeatures[2].mC = 0;
+    {
+        NavGraph g;
+        g.Build(in);
+        EXPECT_TRUE(HasEdge(g, g.NodeAt(137, 100, false), g.NodeAt(137, 500, false), EdgeKind::eLift));
+        EXPECT_TRUE(HasEdge(g, g.NodeAt(137, 500, false), g.NodeAt(137, 100, false), EdgeKind::eLift));
+    }
+}
+
+// A floor that ends at `end`, a gap, and a ledge `rise` over it whose edge (grabbed going left... right here)
+// starts `out` from the last cell
+static NavInput HopToLedge(s32 out, s32 rise)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 200, 125, 200, 0));
+    in.mLines.push_back(Line(112 + out, 200 - rise, 400, 200 - rise, 0));
+    NavFeature ledge = Feature(FeatureKind::eEdge, 112 + out, 200 - rise, 112 + out + 24, 224 - rise);
+    ledge.mA = 1;
+    ledge.mDir = 1;
+    in.mFeatures.push_back(ledge);
+    return in;
+}
+
+TEST(BotNav, AHopCatchesNoLedgeItHasDroppedBelowTheReachOf)
+{
+    // The Barracks' path 5: from 3637,1500 at the ledge 80 up that ends 88 off he fell past it into the pit. A hop
+    // is level for three cells and then drops: 51 by 88 out.
+    const auto caught = [](s32 out, s32 rise)
+    {
+        NavGraph g;
+        g.Build(HopToLedge(out, rise));
+        const s32 from = g.NodeAt(112, 200, false);
+        for (const NavEdge& e : g.Edges())
+        {
+            if (e.mFrom == from && e.mKind == EdgeKind::eHop && g.Nodes()[e.mTo].mY == 200 - rise)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    // Three cells out (the edge starts 63 off): caught 80 up
+    EXPECT_TRUE(caught(63, 80));
+    // Four cells out (88 off): not 80 up, nor 40; level with him and a little over, yes
+    EXPECT_FALSE(caught(88, 80));
+    EXPECT_FALSE(caught(88, 40));
+    EXPECT_TRUE(caught(88, 30));
+    EXPECT_TRUE(caught(88, 0));
+}
+
+TEST(BotNav, ARunningJumpEndsAtTheLedgeItCatchesOnItsWayUpNotTheOneBeyond)
+{
+    // The Barracks' path 5 (3300 and 1300 off): off 3637,1500 over the pit, a ledge 80 up whose edge ends 88 off
+    // and, under and beyond it, a floor at his own height with an edge of its own. He ends hung from the upper one.
+    NavInput in;
+    in.mLines.push_back(Line(325, 200, 550, 200, 0));
+    in.mLines.push_back(Line(200, 120, 250, 120, 0));
+    in.mLines.push_back(Line(150, 200, 225, 200, 0));
+    NavFeature upper = Feature(FeatureKind::eEdge, 225, 120, 249, 144);
+    upper.mA = 1;
+    upper.mDir = 0;
+    NavFeature lower = Feature(FeatureKind::eEdge, 200, 200, 233, 228);
+    lower.mA = 1;
+    lower.mDir = 0;
+    in.mFeatures = {upper, lower};
+    const auto jumps = [](const NavGraph& g, s32 y)
+    {
+        s32 count = 0;
+        for (const NavEdge& e : g.Edges())
+        {
+            count += e.mKind == EdgeKind::eRunJump && g.Nodes()[e.mFrom].mY == 200 && g.Nodes()[e.mFrom].mX >= 325 && g.Nodes()[e.mTo].mY == y && g.Nodes()[e.mTo].mX < 300 ? 1 : 0;
+        }
+        return count;
+    };
+    {
+        NavGraph g;
+        g.Build(in);
+        ASSERT_GE(g.NodeAt(237, 120, false), 0);
+        ASSERT_GE(g.NodeAt(212, 200, false), 0);
+        EXPECT_GE(jumps(g, 120), 1) << g.Text();
+        EXPECT_EQ(jumps(g, 200), 0) << g.Text();
+        // (off the last cell of the floor, 337: the edge ends 88 from it)
+        const NavEdge* up = FindEdge(g, g.NodeAt(362, 200, false), g.NodeAt(237, 120, false), EdgeKind::eRunJump);
+        ASSERT_NE(up, nullptr) << g.Text();
+        EXPECT_EQ(up->mX, 337);
+    }
+    // An edge that ends 93 off is out of its reach: then it is the lower one the jump ends at
+    in.mFeatures[0].mX2 = 244;
+    {
+        NavGraph g;
+        g.Build(in);
+        EXPECT_EQ(jumps(g, 120), 0) << g.Text();
+        EXPECT_GE(jumps(g, 200), 1) << g.Text();
+    }
+    // As without the upper ledge
+    in.mFeatures = {lower};
+    {
+        NavGraph g;
+        g.Build(in);
+        EXPECT_GE(jumps(g, 200), 1) << g.Text();
+    }
+}
+
+static NavInput CorridorWithUxb()
+{
+    // Six UXBs in a row: too many to hop or to clear with a running jump
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 800, 100, 0));
+    for (s32 i = 0; i < 6; i++)
+    {
+        NavFeature uxb = Feature(FeatureKind::eHazard, 300 + i * 25, 80, 324 + i * 25, 104);
+        uxb.mSwitch = World::HazardSwitch(4000 + i);
+        in.mFeatures.push_back(uxb);
+    }
+    NavFeature exit = Feature(FeatureKind::eDoor, 700, 80, 724, 104);
+    exit.mDestPath = 2;
+    exit.mDestCamera = 1;
+    in.mFeatures.push_back(exit);
+    return in;
+}
+
+TEST(BotDomain, AUxbInTheWayIsTurnedOffFromTheCellBesideItAndIsFloorAfter)
+{
+    NavGraph g;
+    g.Build(CorridorWithUxb());
+    World world;
+    for (u32 i = 0; i < 6; i++)
+    {
+        Entity uxb = MakeEntity(EntityKind::eUxb, 4000 + i, 300 + i * 25, 80, 324 + i * 25, 104);
+        uxb.mSwitch = World::HazardSwitch(uxb.mId);
+        world.mEntities.push_back(uxb);
+    }
+    EXPECT_EQ(world.Switch(World::HazardSwitch(4000)), 0);
+    const s32 start = g.NodeAt(12, 100, false);
+    {
+        const Domain domain = Domain::Build(g, world, start, nullptr);
+        const Goap::Plan plan = Goap::Planner::Find(domain.mStart, {{Key::kExited, 1}}, domain.mActions);
+        ASSERT_TRUE(plan.mFound) << plan.mMiss << "\n" << domain.Text() << g.Text();
+        // The first of them first, from the cell on his side of it
+        const DomainStep* first = nullptr;
+        for (s32 step : plan.mSteps)
+        {
+            const DomainStep& s = domain.mSteps[domain.mActions[step].mTag];
+            if (s.mKind == StepKind::eDisarm && !first)
+            {
+                first = &s;
+            }
+        }
+        ASSERT_NE(first, nullptr) << domain.Text();
+        EXPECT_EQ(first->mEntity, 4000u);
+        EXPECT_EQ(g.Nodes()[first->mEdge].mX, 287);
+        EXPECT_EQ(g.Nodes()[first->mEdge].mY, 100);
+        // From either side of each there is a way to do it; from a cell with a UXB of its own, once that is off
+        s32 ways = 0;
+        bool fromNext = false;
+        for (const Goap::Action& a : domain.mActions)
+        {
+            const DomainStep& s = domain.mSteps[a.mTag];
+            if (s.mKind != StepKind::eDisarm)
+            {
+                continue;
+            }
+            ways++;
+            ASSERT_EQ(a.mEffects.size(), 1u);
+            EXPECT_EQ(a.mEffects[0].mKey, Key::Switch(World::HazardSwitch(s.mEntity)));
+            EXPECT_EQ(a.mEffects[0].mValue, 1);
+            if (s.mEntity == 4000 && g.Nodes()[s.mEdge].mX == 337)
+            {
+                fromNext = true;
+                ASSERT_EQ(a.mPre.size(), 2u);
+                EXPECT_EQ(a.mPre[1].mKey, Key::Switch(World::HazardSwitch(4001)));
+                EXPECT_EQ(a.mPre[1].mValue, 1);
+            }
+            if (s.mEntity == 4000 && g.Nodes()[s.mEdge].mX == 287)
+            {
+                EXPECT_EQ(a.mPre.size(), 1u);
+            }
+        }
+        EXPECT_EQ(ways, 12);
+        EXPECT_TRUE(fromNext);
+    }
+    // Off, they are floor: nothing to turn off, and walked over
+    for (Entity& e : world.mEntities)
+    {
+        e.mGone = true;
+    }
+    EXPECT_EQ(world.Switch(World::HazardSwitch(4000)), 1);
+    {
+        const Domain domain = Domain::Build(g, world, start, nullptr);
+        const Goap::Plan plan = Goap::Planner::Find(domain.mStart, {{Key::kExited, 1}}, domain.mActions);
+        ASSERT_TRUE(plan.mFound) << plan.mMiss;
+        for (const DomainStep& s : domain.mSteps)
+        {
+            EXPECT_NE(s.mKind, StepKind::eDisarm);
+        }
+    }
+    // With no UXB the world knows of (AO, where the bot does not turn them off) there is no way through
+    {
+        World none;
+        const Domain domain = Domain::Build(g, none, start, nullptr);
+        const Goap::Plan plan = Goap::Planner::Find(domain.mStart, {{Key::kExited, 1}}, domain.mActions);
+        EXPECT_FALSE(plan.mFound);
+    }
+}
+
+TEST(BotMines, WhereHeIsFrameByFrameOfARunningJumpThatEndsHungFromALedgeIsAsMeasured)
+{
+    // The Barracks' path 5, off 2012,1660 to the ledge at 2137,1660 with a flying mine going round under it: run to
+    // where he takes off, 16 frames through the air (up to 31 over where he left, 15 under it as he catches the
+    // ledge), then hung under the ledge and up over it in 26
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 100, 100, 0));
+    in.mLines.push_back(Line(200, 100, 300, 100, 0));
+    NavFeature ledge = Feature(FeatureKind::eEdge, 200, 100, 224, 124);
+    ledge.mA = 1;
+    ledge.mDir = 1;
+    in.mFeatures.push_back(ledge);
+    NavGraph g;
+    g.Build(in);
+    const NavEdge* jump = FindEdge(g, g.NodeAt(12, 100, false), g.NodeAt(212, 100, false), EdgeKind::eRunJump);
+    ASSERT_NE(jump, nullptr) << g.Text();
+    ASSERT_EQ(jump->mX, 87);
+    const std::vector<GoToTask::Body> bodies = BodiesOf(g, jump, false);
+    // (the run to the take-off, 75 at 6.25 a frame, then 16 and 26)
+    const std::size_t run = 12;
+    ASSERT_EQ(bodies.size(), run + 16 + 26);
+    EXPECT_EQ(bodies[0].mX, 12);
+    EXPECT_EQ(bodies[6].mX, 49);
+    EXPECT_EQ(bodies[0].mY, 100);
+    EXPECT_EQ(bodies[0].mDown, 0);
+    // In the air: up to 31 over the floor in the middle of it, under it at the end, his box 69 high
+    EXPECT_EQ(bodies[run].mY, 100);
+    EXPECT_EQ(bodies[run + 8].mY, 69);
+    EXPECT_EQ(bodies[run + 15].mY, 115);
+    EXPECT_EQ(bodies[run + 8].mUp, 69);
+    EXPECT_GT(bodies[run + 8].mX, 87);
+    EXPECT_LT(bodies[run + 8].mX, 201);
+    EXPECT_EQ(bodies[run + 15].mX, 201);
+    // Hung: at the ledge, his box from 5 under it to 65 under it, then up
+    EXPECT_EQ(bodies[run + 16].mX, 212);
+    EXPECT_EQ(bodies[run + 16].mY, 100);
+    EXPECT_EQ(bodies[run + 16].mUp, -5);
+    EXPECT_EQ(bodies[run + 16].mDown, 65);
+    EXPECT_EQ(bodies[run + 16 + 3].mDown, 70);
+    EXPECT_EQ(bodies[run + 16 + 7].mDown, 34);
+    EXPECT_EQ(bodies[run + 16 + 7].mUp, 36);
+    EXPECT_EQ(bodies[run + 16 + 19].mDown, 11);
+    EXPECT_EQ(bodies[run + 16 + 25].mUp, 53);
 }
