@@ -807,10 +807,11 @@ static void BuildEntities(BinaryPath& path, World& world)
                     // AO's gives grenades as a sack gives rocks: up at it, and what drops out of its pipe is
                     // picked up. To the bot a grenade is a rock that goes off: it sets off the mine it touches
                     // (Mine::VOnThrowableHit), which is all a rock is thrown for.
+                    // AE's: what it gives is thrown at Sligs (Domain::GrenadeTargets), mInputs[1] 2.
                     e.mKind = EntityKind::eRockSack;
-                    keep = GetGameType() != GameType::eAe;
                     e.mHalf = static_cast<const relive::Path_BoomMachine&>(tlv).mScale == relive::reliveScale::eHalf;
                     e.mInputs[0] = static_cast<const relive::Path_BoomMachine&>(tlv).mGrenadeAmount;
+                    e.mInputs[1] = GetGameType() == GameType::eAe ? 2 : 0;
                     break;
                 case ReliveTypes::eRockSack:
                     e.mKind = EntityKind::eRockSack;
@@ -1156,6 +1157,27 @@ static void MarkFlierTargets(NavInput& in, const World& world)
     }
 }
 
+// The floors of the Sligs a grenade is to be thrown at (Domain::GrenadeTargets): nothing is crossed onto one
+// until its Slig is dead
+static void MarkGrenadeTargets(NavInput& in, const World& world)
+{
+    for (const Domain::GrenadeTarget& target : Domain::GrenadeTargets(in, world))
+    {
+        const Entity* slig = world.Find(target.mSlig);
+        NavFeature f;
+        f.mKind = FeatureKind::eDanger;
+        f.mX1 = target.mX1;
+        f.mX2 = target.mX2;
+        f.mY1 = target.mFloorY - Domain::kGrenadeFloorY;
+        f.mY2 = target.mFloorY + Domain::kGrenadeFloorY;
+        f.mHalf = slig && slig->mHalf;
+        f.mA = 1;
+        f.mId = target.mSlig;
+        f.mSwitch = World::HazardSwitch(target.mSlig);
+        in.mFeatures.push_back(f);
+    }
+}
+
 bool GameView::ReadPath(BaseMap& map, s32 pathId, NavInput& input, World& world)
 {
     BinaryPath* pPath = map.GetPathResourceBlockPtr(static_cast<u32>(pathId));
@@ -1172,6 +1194,7 @@ bool GameView::ReadPath(BaseMap& map, s32 pathId, NavInput& input, World& world)
         world.mEntities[i].mGone = pTlv->mTlvFlags.Get(relive::eBit2_Destroyed) && !pTlv->mTlvFlags.Get(relive::eBit1_Created);
     }
     MarkFlierTargets(input, world);
+    MarkGrenadeTargets(input, world);
     return true;
 }
 
@@ -1533,7 +1556,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             faller.mChasing = pObj->mVelY > FP_FromInteger(0) || (!isAe && static_cast<s32>(static_cast<AO::FallingItem*>(pObj)->mState) == 2);
             world.mFallers.push_back(faller);
         }
-        if (pObj && !pObj->GetDead() && (isAe ? pObj->Type() == ReliveTypes::eRock || pObj->Type() == ReliveTypes::eMeat : pObj->Type() == ReliveTypes::eGrenade))
+        if (pObj && !pObj->GetDead() && (pObj->Type() == ReliveTypes::eGrenade || (isAe && (pObj->Type() == ReliveTypes::eRock || pObj->Type() == ReliveTypes::eMeat))))
         {
             RockAt rock;
             rock.mX = FP_GetExponent(pObj->mXPos);
@@ -1814,6 +1837,7 @@ NavInput GameView::BuildNavInput(BaseMap& map)
         things.mEntities[i].mGone = pTlv->mTlvFlags.Get(relive::eBit2_Destroyed) && !pTlv->mTlvFlags.Get(relive::eBit1_Created);
     }
     MarkFlierTargets(in, things);
+    MarkGrenadeTargets(in, things);
     return in;
 }
 

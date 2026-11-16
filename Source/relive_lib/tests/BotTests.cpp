@@ -7671,3 +7671,163 @@ TEST(BotFlierTargets, APlaceToThrowFromIsOneItCanGetUpToAndOnTheSligsOwnScreen)
     ASSERT_EQ(targets[0].mShots.size(), 1u);
     EXPECT_EQ(targets[0].mShots[0].mY, 300 + FlierFlight::kUnder);
 }
+
+// The Barracks' boom machine rooms (path 1, screen 12): the ground with its shadows, the middle ledge and the
+// top floor with a Slig each, the short platform by the door, and the machine a screen to the left
+static NavInput BoomRooms()
+{
+    NavInput in;
+    in.mLines.push_back(Line(25, 1240, 706, 1240, 0));
+    in.mLines.push_back(Line(450, 1180, 525, 1180, 0));
+    in.mLines.push_back(Line(499, 1120, 725, 1120, 0));
+    in.mLines.push_back(Line(601, 1179, 651, 1179, 0));
+    in.mLines.push_back(Line(700, 1040, 700, 1260, 2));
+    NavFeature shadow;
+    shadow.mKind = FeatureKind::eInvisibleZone;
+    shadow.mX1 = 349;
+    shadow.mY1 = 1178;
+    shadow.mX2 = 467;
+    shadow.mY2 = 1248;
+    in.mFeatures.push_back(shadow);
+    return in;
+}
+
+static World BoomRoomsWorld()
+{
+    World world;
+    world.mEntities.push_back(MakeEntity(EntityKind::eRockSack, 13002, 75, 1208, 99, 1244));
+    world.mEntities.back().mInputs[1] = 2;
+    world.mEntities.push_back(MakeEntity(EntityKind::eSlig, 12007, 550, 1100, 575, 1120));
+    world.mEntities.push_back(MakeEntity(EntityKind::eSlig, 12006, 476, 1160, 500, 1184));
+    world.mEntities.push_back(MakeEntity(EntityKind::eSlig, 12005, 525, 1220, 550, 1240));
+    world.mEntities.push_back(MakeEntity(EntityKind::eSecurityOrb, 12020, 451, 1099, 475, 1123));
+    return world;
+}
+
+TEST(BotGrenadeTargets, ASligOnAFloorWithNoShadowUnderAnOrbIsOneForAGrenadeFromWhereItComesToLieOnItsFloor)
+{
+    const NavInput in = BoomRooms();
+    const World world = BoomRoomsWorld();
+    const std::vector<Domain::GrenadeTarget> targets = Domain::GrenadeTargets(in, world);
+    // Not the one on the ground: there are shadows to go by it in
+    ASSERT_EQ(targets.size(), 2u);
+    EXPECT_EQ(targets[0].mSlig, 12007u);
+    EXPECT_EQ(targets[0].mFloorY, 1120);
+    EXPECT_EQ(targets[0].mX1, 499);
+    EXPECT_EQ(targets[0].mX2, 725);
+    // The top floor: from the left end of the middle ledge only (from under the floor it would come back down),
+    // lobbed or thrown far
+    ASSERT_EQ(targets[0].mShots.size(), 2u);
+    for (const Domain::GrenadeShot& shot : targets[0].mShots)
+    {
+        EXPECT_EQ(shot.mX, 462);
+        EXPECT_EQ(shot.mY, 1180);
+        EXPECT_FALSE(shot.mFaceLeft);
+        EXPECT_GE(shot.mLandX, 499);
+        EXPECT_GE(shot.mLandX - shot.mX, static_cast<s32>(ThrowArc::kGrenadeKillX));
+    }
+    EXPECT_EQ(targets[0].mShots[0].mKind, ThrowSpot::eLob);
+    EXPECT_EQ(targets[0].mShots[1].mKind, ThrowSpot::eForward);
+    // The middle ledge: from the shadow on the ground first
+    EXPECT_EQ(targets[1].mSlig, 12006u);
+    ASSERT_FALSE(targets[1].mShots.empty());
+    EXPECT_TRUE(targets[1].mShots[0].mHidden);
+    EXPECT_EQ(targets[1].mShots[0].mX, 387);
+    EXPECT_EQ(targets[1].mShots[0].mY, 1240);
+    for (std::size_t i = 1; i < targets[1].mShots.size(); i++)
+    {
+        EXPECT_FALSE(targets[1].mShots[i].mHidden);
+        EXPECT_GE(targets[1].mShots[i].mLandX, 450);
+        EXPECT_LE(targets[1].mShots[i].mLandX, 525);
+    }
+
+    // None with no machine in the path, with no orb on the Slig's screen (he takes it over), in AO, or of a
+    // Slig that is dead
+    World noMachine = BoomRoomsWorld();
+    noMachine.mEntities[0].mInputs[1] = 0;
+    EXPECT_TRUE(Domain::GrenadeTargets(in, noMachine).empty());
+    World noOrb = BoomRoomsWorld();
+    noOrb.mEntities[4].mY1 -= 260;
+    EXPECT_TRUE(Domain::GrenadeTargets(in, noOrb).empty());
+    NavInput ao = BoomRooms();
+    ao.mIsAe = false;
+    EXPECT_TRUE(Domain::GrenadeTargets(ao, world).empty());
+    World dead = BoomRoomsWorld();
+    dead.mEntities[1].mGone = true;
+    const std::vector<Domain::GrenadeTarget> left = Domain::GrenadeTargets(in, dead);
+    ASSERT_EQ(left.size(), 1u);
+    EXPECT_EQ(left[0].mSlig, 12006u);
+    // With a shadow on the middle ledge its Slig is gone by unseen
+    NavInput dark = BoomRooms();
+    dark.mFeatures[0].mY1 = 1100;
+    dark.mFeatures[0].mX2 = 500;
+    const std::vector<Domain::GrenadeTarget> lit = Domain::GrenadeTargets(dark, world);
+    ASSERT_EQ(lit.size(), 1u);
+    EXPECT_EQ(lit[0].mSlig, 12007u);
+}
+
+TEST(BotGrenadeTargets, AGrenadeOfAesComesBackDownOffAFloorItFliesUpUnder)
+{
+    // Lobbed from under the top floor: up under it and down again, not onto it
+    const NavInput in = BoomRooms();
+    const ThrowArc::Flight under = ThrowArc::Grenade(in, 512, 1180, false, false, ThrowSpot::eLob);
+    EXPECT_TRUE(under.mUnder);
+    EXPECT_GT(under.mPoints.back().mY, 1120);
+    // From clear of it: onto it, to lie there (it bounces, and is not under the floor for that)
+    const ThrowArc::Flight clear = ThrowArc::Grenade(in, 462, 1180, false, false, ThrowSpot::eLob);
+    EXPECT_FALSE(clear.mUnder);
+    EXPECT_EQ(clear.mPoints.back().mY, 1120);
+    EXPECT_EQ(clear.mPoints.size(), static_cast<std::size_t>(ThrowArc::kFuse) + 1);
+    // AO's goes through
+    NavInput ao = BoomRooms();
+    ao.mIsAe = false;
+    const ThrowArc::Flight through = ThrowArc::Grenade(ao, 512, 1180, false, false, ThrowSpot::eLob);
+    EXPECT_FALSE(through.mUnder);
+    EXPECT_EQ(through.mPoints.back().mY, 1120);
+}
+
+TEST(BotGrenadeTargets, WhereASligThatWalksItsBeatIsSomeFramesOn)
+{
+    // 2.2 a frame: on along its beat, back from the end, and round again
+    EXPECT_EQ(GrenadeSligTask::SligIn(500, false, 500, 700, 50), 610);
+    EXPECT_EQ(GrenadeSligTask::SligIn(650, false, 500, 700, 50), 640);
+    EXPECT_EQ(GrenadeSligTask::SligIn(650, true, 500, 700, 50), 540);
+    EXPECT_EQ(GrenadeSligTask::SligIn(520, true, 500, 700, 50), 590);
+    EXPECT_EQ(GrenadeSligTask::SligIn(600, true, 0, 0, 50), 600);
+}
+
+TEST(BotGrenadeTargets, NotThrownFromWhereItComesUpUnderAFloorNorFromWhereItsBlastReachesHim)
+{
+    // A bit of floor over the way the lob from the shadow takes to the middle ledge: it comes up under that and
+    // still comes down on the ledge, but where is not known well, so it is not thrown from there
+    NavInput in = BoomRooms();
+    const World world = BoomRoomsWorld();
+    in.mLines.push_back(Line(415, 1100, 440, 1100, 0));
+    const ThrowArc::Flight under = ThrowArc::Grenade(in, 387, 1240, false, false, ThrowSpot::eLob);
+    ASSERT_TRUE(under.mUnder);
+    ASSERT_EQ(under.mPoints.back().mY, 1180);
+    for (const Domain::GrenadeTarget& target : Domain::GrenadeTargets(in, world))
+    {
+        for (const Domain::GrenadeShot& shot : target.mShots)
+        {
+            EXPECT_FALSE(target.mSlig == 12006 && shot.mX == 387 && shot.mKind == ThrowSpot::eLob && !shot.mFaceLeft);
+        }
+    }
+
+    // A Slig on a floor high over the ground: lobbed from the ground it comes to lie on that floor less than a
+    // blast from over his head, so not from there
+    NavInput high;
+    high.mLines.push_back(Line(25, 1240, 706, 1240, 0));
+    high.mLines.push_back(Line(440, 1100, 600, 1100, 0));
+    World over;
+    over.mEntities.push_back(MakeEntity(EntityKind::eRockSack, 13002, 75, 1208, 99, 1244));
+    over.mEntities.back().mInputs[1] = 2;
+    over.mEntities.push_back(MakeEntity(EntityKind::eSlig, 12007, 500, 1080, 524, 1100));
+    over.mEntities.push_back(MakeEntity(EntityKind::eSecurityOrb, 12020, 451, 1099, 475, 1123));
+    const ThrowArc::Flight nearBy = ThrowArc::Grenade(high, 387, 1240, false, false, ThrowSpot::eLob);
+    ASSERT_FALSE(nearBy.mUnder);
+    ASSERT_EQ(nearBy.mPoints.back().mY, 1100);
+    ASSERT_LT(nearBy.mPoints.back().mX - 387, static_cast<s32>(ThrowArc::kGrenadeKillX));
+    // (and with nowhere else to throw from it is not one for a grenade at all)
+    EXPECT_TRUE(Domain::GrenadeTargets(high, over).empty());
+}

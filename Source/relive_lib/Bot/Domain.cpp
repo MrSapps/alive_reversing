@@ -3517,7 +3517,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                     step.mKind = StepKind::eRocks;
                     // (a sack gives nothing to Abe while he has some)
                     const u32 what = entity.mInputs[1] == 1 ? Key::kMeat : Key::kRocks;
-                    add(std::string(entity.mInputs[1] == 1 ? "Get meat from " : "Get rocks from ") + name, {regionFact(node), {what, 0}}, {{what, entity.mInputs[0] > 0 ? entity.mInputs[0] : 5}}, 300, step);
+                    add(std::string(entity.mInputs[1] == 1 ? "Get meat from " : entity.mInputs[1] == 2 ? "Get a grenade from " : "Get rocks from ") + name, {regionFact(node), {what, 0}}, {{what, entity.mInputs[0] > 0 ? entity.mInputs[0] : 5}}, 300, step);
                 }
                 break;
             }
@@ -4114,6 +4114,31 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         if (slig.mKind == EntityKind::eSlig && world.Switch(World::HazardSwitch(slig.mId)))
         {
             d.mStart.Set(Key::Switch(World::HazardSwitch(slig.mId)), 1);
+        }
+    }
+    // Sligs he can't take over on a floor with no shadow, in a path with a boom machine: a grenade from it is
+    // thrown onto the floor of each, from each stretch of floor there is a place to throw from on. Until one is
+    // dead nothing is crossed onto its floor (FeatureKind::eDanger). (The Barracks' path 1: "From the shadows on
+    // the far left, toss the grenade to the middle ledge... Stand on the middle ledge and toss it to the Slig at
+    // the top".)
+    for (const GrenadeTarget& target : GrenadeTargets(nav.Input(), world))
+    {
+        const Entity* slig = world.Find(target.mSlig);
+        std::set<s32> from;
+        for (const GrenadeShot& shot : target.mShots)
+        {
+            const s32 node = slig ? nav.NodeAt(shot.mX, shot.mY, slig->mHalf, 12) : -1;
+            if (node < 0 || !from.insert(d.mRegions[node]).second)
+            {
+                continue;
+            }
+            DomainStep toss;
+            toss.mKind = StepKind::eGrenade;
+            toss.mEntity = target.mSlig;
+            toss.mEdge = node;
+            // (from where he isn't seen before anywhere else)
+            add("Throw a grenade at Slig#" + std::to_string(target.mSlig) + " from " + std::to_string(shot.mX) + "," + std::to_string(shot.mY), {regionFact(node)}, {{Key::Switch(World::HazardSwitch(target.mSlig)), 1}}, shot.mHidden ? 400 : 600, toss);
+            d.mActions.back().mSpend = {Key::kRocks, 1};
         }
     }
     for (const Entity& spawner : world.mEntities)
@@ -5031,6 +5056,130 @@ bool Domain::FlierWay(const NavInput& in, bool half, s32 fromX, s32 fromY, s32 t
         corners.push_back({p.mX, p.mY});
     }
     return true;
+}
+
+std::vector<Domain::GrenadeTarget> Domain::GrenadeTargets(const NavInput& in, const World& world)
+{
+    std::vector<GrenadeTarget> targets;
+    if (!in.mIsAe)
+    {
+        return targets;
+    }
+    const auto screen = [&in](s32 x, s32 y)
+    {
+        return std::make_pair(x / in.mCamW, y / in.mCamH);
+    };
+    // (as NavGraph has it: all of him in the zone)
+    const auto hidden = [&in](s32 x, s32 y, bool half)
+    {
+        for (const NavFeature& f : in.mFeatures)
+        {
+            if (f.mKind == FeatureKind::eInvisibleZone && x - (half ? 13 : 25) >= f.mX1 && x + (half ? 13 : 25) <= f.mX2 && y >= f.mY1 + 40 && y <= f.mY2 + 4)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    for (const Entity& slig : world.mEntities)
+    {
+        if (slig.mKind != EntityKind::eSlig || slig.mGone || slig.mSwitch > 1 || world.mFleechKilled.count(slig.mId) != 0)
+        {
+            continue;
+        }
+        bool machine = false;
+        bool orb = false;
+        for (const Entity& e : world.mEntities)
+        {
+            machine = machine || (e.mKind == EntityKind::eRockSack && e.mInputs[1] == 2 && !e.mGone && e.mHalf == slig.mHalf);
+            orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && screen(e.mX1, e.mY1) == screen(slig.CentreX(), slig.mY1));
+        }
+        if (!machine || !orb)
+        {
+            continue;
+        }
+        // The floor it stands on: the first under the top of where the map puts it
+        const s32 floorType = slig.mHalf ? 4 : 0;
+        const NavLine* floor = nullptr;
+        for (const NavLine& line : in.mLines)
+        {
+            if (line.mType == floorType && line.mY1 == line.mY2 && std::min(line.mX1, line.mX2) <= slig.CentreX() && std::max(line.mX1, line.mX2) >= slig.CentreX() && line.mY1 >= slig.mY1 + 5 && line.mY1 - slig.mY1 <= 60 && (!floor || line.mY1 < floor->mY1))
+            {
+                floor = &line;
+            }
+        }
+        if (!floor)
+        {
+            continue;
+        }
+        GrenadeTarget target;
+        target.mSlig = slig.mId;
+        target.mFloorY = floor->mY1;
+        const s32 camX = (slig.CentreX() / in.mCamW) * in.mCamW;
+        target.mX1 = std::max(std::min(floor->mX1, floor->mX2), camX);
+        target.mX2 = std::min(std::max(floor->mX1, floor->mX2), camX + in.mCamW);
+        // A shadow on it: gone by unseen, as such floors always were
+        bool shadow = false;
+        const s32 cell = NavGraph::GridStep(slig.mHalf);
+        for (s32 x = target.mX1 + cell / 2; x < target.mX2 && !shadow; x += cell)
+        {
+            shadow = hidden(x, target.mFloorY, slig.mHalf);
+        }
+        if (shadow)
+        {
+            continue;
+        }
+        for (const NavLine& line : in.mLines)
+        {
+            if (line.mType != floorType || line.mY1 != line.mY2 || &line == floor || std::abs(line.mY1 - target.mFloorY) > 200)
+            {
+                continue;
+            }
+            const s32 lo = std::max(std::min(line.mX1, line.mX2), target.mX1 - 300);
+            const s32 hi = std::min(std::max(line.mX1, line.mX2), target.mX2 + 300);
+            for (s32 x = (lo / cell) * cell + cell / 2; x + cell / 2 <= hi; x += cell)
+            {
+                if (x - cell / 2 < lo)
+                {
+                    continue;
+                }
+                for (s32 way = 0; way < 6; way++)
+                {
+                    GrenadeShot shot;
+                    shot.mX = x;
+                    shot.mY = line.mY1;
+                    shot.mFaceLeft = way % 2 == 1;
+                    shot.mKind = way / 2 == 0 ? ThrowSpot::eLob : way / 2 == 1 ? ThrowSpot::eUp : ThrowSpot::eForward;
+                    // Where it goes off, and from a little to either side of the cell's middle much the same:
+                    // he does not stand to the pixel
+                    bool good = true;
+                    s32 ends[3] = {};
+                    for (s32 k = 0; k < 3 && good; k++)
+                    {
+                        const ThrowArc::Flight flight = ThrowArc::Grenade(in, x + (k - 1) * 2, line.mY1, slig.mHalf, shot.mFaceLeft, shot.mKind);
+                        const ThrowArc::Point& end = flight.mPoints.back();
+                        good = !flight.mUnder && std::abs(end.mY - target.mFloorY) <= 3 && end.mX >= target.mX1 && end.mX <= target.mX2;
+                        ends[k] = end.mX;
+                    }
+                    good = good && std::abs(ends[0] - ends[1]) <= 15 && std::abs(ends[2] - ends[1]) <= 15;
+                    shot.mLandX = ends[1];
+                    if (!good || std::abs(shot.mLandX - x) * (slig.mHalf ? 2 : 1) < ThrowArc::kGrenadeKillX)
+                    {
+                        continue;
+                    }
+                    shot.mHidden = hidden(x, line.mY1, slig.mHalf);
+                    target.mShots.push_back(shot);
+                }
+            }
+        }
+        std::stable_sort(target.mShots.begin(), target.mShots.end(), [](const GrenadeShot& a, const GrenadeShot& b)
+                         { return a.mHidden && !b.mHidden; });
+        if (!target.mShots.empty())
+        {
+            targets.push_back(target);
+        }
+    }
+    return targets;
 }
 
 std::vector<Domain::FlierTarget> Domain::FlierTargets(const NavInput& in, const World& world, const Entity& spawner)

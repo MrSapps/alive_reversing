@@ -29,6 +29,7 @@ what is left, and wins where they differ.
 | Checkpoints | `Checkpoint` | A quicksave the bot owns, taken every ~90 frames when Abe stands still and nothing threatens (no Slig on the screen, no laughing Mudokon in tow). On a death: back to the newest, try again after a (seeded) delay; six deaths from one and it goes back to the one before. Old ones are thinned out, not dropped. The game's own quicksave is left alone. |
 | Look-ahead | `Lookahead`, `Bot::TryFailed` | With the `look` option: from each save the same moves are tried begun later and later against the game itself until one gets to the next save unhurt; what failed is taken back and is not in the run's inputs. See "Look-ahead" under Architecture. |
 | A flying Slig flown | `FlierFlight`, `FlierBombTask`, `Domain::FlierTargets` | Taken over from where he is safe, flown to throw grenades at the Sligs he can't take over and to pull a lever he can't get to. The Barracks' path 1: three Sligs and the door's lever. |
+| Grenades thrown at Sligs | `ThrowArc::Grenade`, `Domain::GrenadeTargets`, `GrenadeSligTask` | One fetched from a boom machine and thrown from another floor onto the floor of a Slig he can't take over or go by unseen | `BotGrenadeTargets.*` (4), mutation checked; the task itself only in the game (`b2l.txt`) |
 | Bot | `Bot` | Plan, act, replan. Profiles, the committed input log (rewound tries aren't in it), the report, movie skipping, the reflex that slaps a wired Mudokon tagging along. |
 | Profiles | `Profile` | `save_all`, `kill_all`, `average`, `any`, with `seed=<n>` and `human`. |
 
@@ -1229,10 +1230,54 @@ opens the door"). `build-bot/la/fs2.txt` starts him on the ledge it is taken ove
 - **An electric wall's beam** is four pixels to each side of where the map puts it and stands up from its
   floor (boxes read from the game): into the cells beside it only while it is off (`NavFeature::mBeam`).
 
+**Grenades from a boom machine, thrown at Sligs** (2026-11-16; the Barracks' path 1, screens 12 and 13: "get
+a grenade ... From the shadows on the far left, toss the grenade to the middle ledge ... Stand on the middle
+ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter the door").
+`build-bot/la/b2l.txt` starts him at the door into those rooms, with `look`.
+- **The rooms**: the door leaves him shut in by a pillar; over it (a hoist, a short platform) and down to the
+  ground, which a Slig walks from 275 to 627 with shadows (invisible zones) most of the way; a ledge at 1180
+  (450 to 525) with a Slig that stands and listens, the top floor at 1120 (499 to 725) with the wheel, the door
+  out and a Slig that walks all of it; a security orb on the screen. The boom machine is a screen to the left,
+  on the ground in a shadow, on the beat of a fourth Slig.
+- **What the game does** (Grenade.cpp, BoomMachine.cpp): up at the machine drops one grenade from its pipe
+  (none while he has one), picked up crouched like a rock. Throw held makes one in his hand with 90 frames to
+  go; a direction with it throws, as a rock is thrown. It falls a pixel a frame faster each frame, comes off a
+  floor at half the speed both ways, and off a floor it flies up under (AE; AO's goes through) back down at
+  half the speed. Each bounce is a noise Sligs hear. The blast is 60 to each side.
+- **`ThrowArc::Grenade`**: that flight, to where it lies when the fuse has run down. One that came up under
+  a floor is marked (`mUnder`): where it goes from there is not trusted.
+- **`Domain::GrenadeTargets`**: in a path with such a machine, the Sligs of a screen with a security orb whose
+  floor has no shadow on that screen (a floor with a shadow is gone by unseen, as always). For each, the cells
+  of other floors a lob, a high throw or a far throw from comes to lie on its floor: from two pixels to
+  either side of the cell's middle as well and much the same place (he does not stand to the pixel), not up
+  under a floor, and no nearer the cell than the blast reaches. Cells he isn't seen in come first. With no
+  such cell the Slig is not one for a grenade. The floor of each is a stretch nothing is crossed into until
+  it is dead (`FeatureKind::eDanger`, as for the flying Slig's).
+- **The plan's steps**: `Get a grenade from RockSack#..` (the machine is a sack that gives one: `GetRocksTask`
+  as it was) and `Throw a grenade at Slig#.. from x,y` (`GrenadeSligTask`), one for each stretch of floor
+  there is a place to throw from on, which uses a grenade up. The plan it makes in those rooms is the
+  walkthrough's: down to the ground, a grenade, the ledge's Slig from the shadow, a grenade, up onto the
+  ledge, the top floor's Slig from the ledge's left end, up, the wheel, the door.
+- **`GrenadeSligTask`**: to the cell, there until the Slig will be within 45 of where a throw from that cell
+  goes off when it does (`SligIn`: along its beat and back at 2.2 a frame, 86 frames on), the throw, and down
+  on his knees. A Slig still there 130 frames on is a miss: the step fails and the plan fetches another.
+- **Measured** (`b2l.txt`, with `look`): out of the door to path 13 at f=3,979, 0 deaths, 254 tries; three
+  grenades fetched for the two Sligs (the first throw at the ledge's Slig was taken back with him dead 59
+  frames in, and the first at the top floor's Slig left him knocked off the ledge). Without `look` he dies
+  on the ground at f=309: the ground's Slig is got by only by tries.
+- **Not good yet**: where a Slig is when the grenade goes off is a guess (it stops to listen at the first
+  bounce; the 86 frames take no account of that), and what the blast does to him where he stands is not
+  worked out beyond its width. `GrenadeSligTask` is only tested in the game, but for `SligIn`.
+
 **What the Barracks still wants** (from the walkthrough and the paths' TLVs):
-- Path 1's last Sligs (above), the wheels of path 13.
-- A Glukkon taken over and its orders to Sligs (the war room), crawling Sligs and their button, grenades
-  thrown from a boom machine on a count, Greeters, laughing gas, flying mines to time, a Shrykull.
+- **Path 13, the next room** (measured: `b2l.txt` goes on into it and stops there): four wheels that have to
+  turn at once (a multi switch, 60 frames), two Mudokons at work by two of them, four more a lift ride down
+  behind electric walls a lever turns off. `Domain::PlanTogether` only counts Mudokons that can walk to the
+  wheels, so it makes no team: he turns the two free wheels one after the other and gets nowhere. Wanted:
+  Mudokons brought up on a lift as part of a team.
+- The hub and its four blocks, then the war room: a Glukkon taken over and its orders to Sligs, crawling
+  Sligs and their button, an orb blown up with a grenade (then its Sligs taken over), grenades thrown on a
+  count, Greeters, laughing gas, flying mines to time, Slig voice locks, ghost locks, a Shrykull.
 
 **AO, Rupture Farms** (`a1.txt`: from its first screen, `bot any`): paths 15, 16, 18, 19 and 20 with 0 deaths, out
 to the Stockyards at f=5,567 (the milestone's AO half; f=6,291 as committed and since: the grenades are

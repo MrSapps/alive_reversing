@@ -27,11 +27,17 @@ public:
         s32 mHit = -1;
         // Whether it goes off whatever frame the mine's light is at (its box is a little wider with the light on)
         bool mSure = false;
+        // A grenade of AE's came up under a floor on its way: where it goes from there is not known well
+        bool mUnder = false;
     };
 
     // A throw from a cell (its middle, its floor). With a mine to aim at (its cell's middle, its floor), the
     // rock bounces off it as it sets it off.
     static Flight Throw(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, const Point* mine = nullptr);
+
+    // A grenade thrown from a cell, to where it lies when its fuse has run down (the last point): it goes off
+    // there. AE's comes back down off a floor it flies up under; AO's goes through it.
+    static Flight Grenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind);
 
     // Whether a rock there sets off a mine at (x, floor y): sure is on any frame of the mine's light, not sure is
     // on some
