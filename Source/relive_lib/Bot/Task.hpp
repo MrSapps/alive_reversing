@@ -239,6 +239,31 @@ public:
     // late: frames he is later (or, negative, sooner) than worked out
     // The drill that goes over Abe's head at a cell and is moving or will be, or null
     static const Entity* SweepHigh(const NavGraph& nav, const World& world, s32 node);
+    // Where he is a frame of a way: his feet, how tall he is then, and whether he is off the floor
+    struct Body final
+    {
+        s32 mX = 0;
+        s32 mY = 0;
+        s32 mTall = 0;
+        bool mHalf = false;
+        // His box about his feet at full scale: how far up, and to the back and the front of the way he goes
+        // (and how far down past them: hung from a ledge)
+        s32 mUp = 53;
+        s32 mDown = 0;
+        s32 mBack = 14;
+        s32 mFront = 14;
+        bool mLeft = false;
+    };
+    // Where he is each frame of `count` edges of a way from the edge `first` on (rest: and for a moment where it
+    // ends), added to out
+    static void Bodies(const NavGraph& nav, const std::vector<s32>& path, std::size_t first, std::size_t count, bool rolled, bool rest, std::vector<Body>& out);
+    // His box as the flying mines are kept clear of
+    static BombCycle::Box BombBody(const Body& body);
+    // A cell no flying mine ever reaches him at: standing, or (duck) only crouched
+    static bool BombStop(const NavGraph& nav, const BombCycle& bombs, s32 node, bool& duck);
+    // Whether the first `count` edges of a way can be gone now without a flying mine meeting him
+    // delay: frames he stands where he is first; later: as it will be that many frames from now
+    static bool BombsClear(const NavGraph& nav, const BombCycle& bombs, const std::vector<s32>& path, std::size_t count, bool rolled, s32 delay, s32 later = 0);
     // rolled: as it goes if the walking of it is rolled, from a crouch
     static bool SweepsClear(const NavGraph& nav, const World& world, const std::vector<s32>& path, std::size_t count, s32 late = 0, bool rolled = false);
     // The drill that reaches a cell and runs as things are, or null
@@ -402,6 +427,14 @@ private:
     bool mLeading = false;
     // Crouched before a drill, to roll through under it
     bool mSweepDuck = false;
+    // Flying mines: frames spent watching them and waiting for them, and crouched where one goes over his head
+    s32 mBombWatch = 0;
+    s32 mBombWait = 0;
+    bool mBombDuck = false;
+    // The cell he is set to go on from when the mines were out of the way, and until when
+    s32 mBombUp = -1;
+    u32 mBombUpAt = 0;
+    bool BombStep(Bot& bot, s32 cur, const std::vector<s32>& path, std::size_t& stop, std::size_t& roll, TaskStep& step);
     s32 mHangFails = 0;
     // Hung under a Slig that stands guard: the frames waited for it to turn its back, and whether that was said
     s32 mHangWaits = 0;

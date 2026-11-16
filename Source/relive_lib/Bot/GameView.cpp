@@ -18,6 +18,7 @@
 #include "../../AliveLibAE/Mudokon.hpp"
 #include "../../AliveLibAE/UXB.hpp"
 #include "../../AliveLibAE/Drill.hpp"
+#include "../../AliveLibAE/MovingBomb.hpp"
 #include "../../AliveLibAE/MotionDetector.hpp"
 #include "../../AliveLibAE/Slig.hpp"
 #include "../../AliveLibAE/EvilFart.hpp"
@@ -494,6 +495,13 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                 {
                     NavFeature f = MakeFeature(FeatureKind::eSweep, tlv, camera, id);
                     f.mHalf = static_cast<const relive::Path_Drill&>(tlv).mScale == relive::reliveScale::eHalf;
+                    in.mFeatures.push_back(f);
+                    break;
+                }
+                case ReliveTypes::eMovingBomb:
+                {
+                    NavFeature f = MakeFeature(FeatureKind::eFlyingMine, tlv, camera, id);
+                    f.mHalf = static_cast<const relive::Path_MovingBomb&>(tlv).mScale == relive::reliveScale::eHalf;
                     in.mFeatures.push_back(f);
                     break;
                 }
@@ -1657,6 +1665,33 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             beam.mEndPause = ::MotionDetector::kEndPause + 1;
             world.mBeams.push_back(beam);
         }
+    }
+
+    world.mBombs.clear();
+    for (s32 i = 0; isAe && i < gBaseAliveGameObjects->Size(); i++)
+    {
+        BaseAliveGameObject* pObj = gBaseAliveGameObjects->ItemAt(i);
+        if (!pObj || pObj->GetDead() || pObj->mHealth <= FP_FromInteger(0) || pObj->Type() != ReliveTypes::eTimedMine_or_MovingBomb)
+        {
+            continue;
+        }
+        // (a timed mine has the same type)
+        const ::MovingBomb* pBomb = dynamic_cast<::MovingBomb*>(pObj);
+        if (!pBomb)
+        {
+            continue;
+        }
+        BombCycle::Seen bomb;
+        bomb.mId = pBomb->TlvId().GetTlvInfo().tlvOffset;
+        bomb.mX = pObj->mXPos.fpValue / 256;
+        bomb.mY = pObj->mYPos.fpValue / 256;
+        const PSX_RECT box = pObj->VGetBoundingRect();
+        bomb.mLeft = box.x - FP_GetExponent(pObj->mXPos);
+        bomb.mTop = box.y - FP_GetExponent(pObj->mYPos);
+        bomb.mRight = box.w - FP_GetExponent(pObj->mXPos);
+        bomb.mBottom = box.h - FP_GetExponent(pObj->mYPos);
+        bomb.mHalf = pObj->GetSpriteScale() != FP_FromInteger(1);
+        world.mBombs.push_back(bomb);
     }
 
     world.mSweeps.clear();

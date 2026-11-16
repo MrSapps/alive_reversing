@@ -3160,6 +3160,12 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
             }
             mSligCycle.Observe(mAbe.mFrame, key, seen);
         }
+        // The flying mines: watched, to know where each will be
+        if (mKnow && !mBombCycle.HasTracks(mAbe.mLevel * 1000 + mAbe.mPath))
+        {
+            mBombCycle.SetTracks(mAbe.mLevel * 1000 + mAbe.mPath, BombCycle::Tracks(mKnow->mNav.Input()));
+        }
+        mBombCycle.Observe(mAbe.mFrame, mAbe.mLevel * 1000 + mAbe.mPath, mWorld.mBombs);
         // The switch that is being tried for the sake of it has changed, if only for a moment (a trap door that
         // shuts itself again): it has been tried
         if (mExploring >= 1000 && mExploring < 1256 && mWorld.mSwitches[mExploring - 1000] != mLastSwitches[mExploring - 1000])
@@ -3522,10 +3528,16 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
             mTrace += " hp=" + std::to_string(mAbe.mHealthFp * 100 / 0x10000) + "\n";
         }
         // (what of him the Sligs in the background have to see none of, while there are such)
-        if (!mWorld.mSligs.empty() && mWorld.mSligs[0].mZShoot)
+        if ((!mWorld.mSligs.empty() && mWorld.mSligs[0].mZShoot) || !mWorld.mBombs.empty())
         {
             mTrace.pop_back();
             mTrace += " box=" + std::to_string(mAbe.mBoxX1 - mAbe.mX) + "," + std::to_string(mAbe.mTop - mAbe.mY) + "," + std::to_string(mAbe.mBoxX2 - mAbe.mX) + "," + std::to_string(mAbe.mBoxBottom - mAbe.mY) + "\n";
+        }
+        // The flying mines about: the box of each
+        for (const BombCycle::Seen& bomb : mWorld.mBombs)
+        {
+            mTrace.pop_back();
+            mTrace += " bm=" + std::to_string(bomb.mX / 256 + bomb.mLeft) + "," + std::to_string(bomb.mY / 256 + bomb.mTop) + "," + std::to_string(bomb.mX / 256 + bomb.mRight) + "," + std::to_string(bomb.mY / 256 + bomb.mBottom) + "\n";
         }
         // The flying Sligs about: where, which way they face and how fast they go
         for (const FlierAt& flier : mWorld.mFliers)

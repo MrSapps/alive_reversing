@@ -36,6 +36,12 @@ public:
     virtual bool VTakeDamage(BaseGameObject* pFrom) override;
     virtual void VScreenChanged() override;
 
+    // The TLV it was made from
+    const Guid& TlvId() const
+    {
+        return mTlvId;
+    }
+
 private:
     void BlowUp();
     void FollowLine();

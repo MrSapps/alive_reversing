@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "../Types.hpp"
+#include "BombCycle.hpp"
 #include <map>
 #include <set>
 #include <vector>
@@ -623,6 +624,8 @@ struct World final
     std::set<u32> mNoBomb;
     std::set<u32> mFleechKilled;
     std::vector<SlurgAt> mSlurgs;
+    // AE: the flying mines there are now (see BombCycle)
+    std::vector<BombCycle::Seen> mBombs;
     // Whether a hop or a drop that ends at x (on a floor at y, facing left or not) in so many frames comes down
     // on one: his feet land nine behind and six ahead of where he ends (measured from the game's footstep
     // points), a Slurg's box is where the game says it is, and it crawls on half a pixel a frame meanwhile

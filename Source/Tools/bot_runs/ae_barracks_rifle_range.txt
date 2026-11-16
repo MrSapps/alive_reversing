@@ -2,7 +2,7 @@
 # Its lever pulled and out of its door into the hub with no deaths (f=6,463): between the covers and out of them
 # by hops, hoists, rolls and running jumps timed against the Sligs in the background, hit on most of the way and
 # healed in cover each time. Its Mudokons are not rescued. The run goes on from the hub into the workers'
-# campus, which is not done: he dies to its flying mines there.
+# campus, which is not done (see ae_barracks_workers_campus.txt).
 # See BOT_DESIGN.md, "What the Barracks still wants", block 1.
 timeout 2400
 start barracks 10 1 2475 478

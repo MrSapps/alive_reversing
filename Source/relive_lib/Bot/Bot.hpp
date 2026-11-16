@@ -12,6 +12,7 @@
 #include "NavGraph.hpp"
 #include "Pilot.hpp"
 #include "SligCycle.hpp"
+#include "BombCycle.hpp"
 #include "Task.hpp"
 #include <map>
 #include <memory>
@@ -90,6 +91,7 @@ struct BotMemory
     bool mInvisRun = false;
     bool mWasInvisible = false;
     SligCycle mSligCycle;
+    BombCycle mBombCycle;
     u32 mDashUntil = 0;
     bool mHoldInvis = false;
     // The frame the power to go unseen was last seen in hand (0: never)
@@ -275,6 +277,10 @@ public:
         return mAbe.mFrame <= mDashUntil && mDashUntil - mAbe.mFrame < 10;
     }
     // What the Sligs that shoot from the background of his screen have been seen to do
+    const BombCycle& GetBombCycle() const
+    {
+        return mBombCycle;
+    }
     const SligCycle& GetSligCycle() const
     {
         return mSligCycle;

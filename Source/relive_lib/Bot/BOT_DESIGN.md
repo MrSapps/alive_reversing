@@ -1337,17 +1337,61 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
     allows), and it is slow (each hit is 180 frames of healing and a cycle to learn again). The six
     Mudokons (an orb to blow up with the boom machine's grenade first, then the Sligs taken over).
     `ZLeap`, `ZWalk` and the rest of `GoToTask` here are only tested in the game.
-- **Blocks 2, 3 and 4** (first tries from inside their doors, scratch runs): in block 2 (path 5, the
-  workers' campus) he now stays for its wheel (switch 125) and dies at once to the flying mines: moving
-  bombs on a track (`MovingBomb.cpp`: they stop at stoppers for a random time, and go off when their box
-  meets his) are nothing the bot knows yet, and are the first thing blocks 2 and 4 want. The walkthrough's
-  way through block 2 also wants UXBs turned off, a Slig taken over to blow up a mine, and three Mudokons
-  rescued at once for a Shrykull that clears the way to the wheel. Block 3 (path 7), whose door shuts behind
-  him, is the one he starts on: a wheel (switch 177), then a Slig lock with a Slig called by a lever, where he
-  dies six times and gives up. Block 4 (path 9) not looked at again.
+- **Flying mines** (`MovingBomb.cpp`; block 2, path 5, has 15, none with a stopper). One goes round a track
+  (collision lines of type 8, end to end) at a fixed pace once it is up to it, from a stand half a pixel a
+  frame faster each frame; it is only there while its screen is (unless it persists), and starts again from
+  where it is put. It goes off when its box (about 11 left to 13 right of where it is, from 26 to 4 above;
+  it changes a little with its animation) meets the box of anything alive at its scale.
+  - `BombCycle` (owned by `Bot`, fed `World::mBombs` every frame). Where a mine can ever be comes from the
+    map: `BombCycle::Tracks` follows the track lines from the one a mine's TLV is put on
+    (`FeatureKind::eFlyingMine`), so the places to wait at are known before its screen has loaded. Where it
+    will be comes from watching: once it is at its pace the places it is at are written down until it passes
+    the first again, going the same way. A lap is no whole number of frames (72.8 for the second one there),
+    so what is told ahead is the place on the lap, found again each frame from where the mine is, plus the
+    frames. A lap is kept while the mine is out of sight and over a rewind; back from a stand it is not
+    trusted until it is at its pace again. Nothing of the game's mine is modelled.
+  - `GoToTask::BombStep`: the way is gone from one cell no track reaches (standing, or only crouched: then
+    he waits crouched) to the next such cell in one go, when every frame of it is clear of every mine as it
+    will then be (`BombsClear`; he may be a frame late). He walks up to the last such cell before the first
+    edge a track crosses. A mine there that has not been round yet is watched from that cell; a track with
+    no mine on it is waited for a moment (its screen may not have loaded), then taken as gone. From a crouch
+    it is a roll if that is clear, else up and on. If no time in the next 600 frames will do, the edge is
+    banned and another way found at once (the drops through the mines' shafts there: a mine is always in
+    the way).
+  - `GoToTask::Bodies` is where he is frame by frame and how big his box is then (`Body`), the same for the
+    drills and the mines. Measured in path 5 (the trace has his box and the mines' when there are any): he
+    stands 14 to either side and 53 high, crouched 34 high, walking up to 26 to either side. A hop is 10
+    frames where he stands (23 behind and 19 ahead, then 45 ahead as he goes), 5 level through the air at 15
+    a frame trailing up to 44 behind, then down 3t + 2.3t squared, and 9 landing. Walked off an edge: 6
+    frames on the floor, down 0.9t squared, 10 on his feet again. A jump up to a ledge: 3 level and 6 up
+    after the take-off, 3 hung under the ledge, 23 pulling up with his box over the ledge long before he
+    stands. Up from a crouch 9, round 12; a running jump with a one cell run-up starts turned away (10) and
+    comes round in 5. A level running jump is still a guess (its cost in frames, a wide box).
+  - The map: a trap door is hopped over like a gap, shut or open (AE only: in Rupture Farms it did not
+    work, not looked into); and nothing falls through a trap door
+    into a death drop (path 5 has a floor under its death drop).
+  - `build-bot/la/blk5.txt`, from the block's door: past the first two mines, the lift, the first lever
+    (which brings the third lift up), over the open trap doors with the mines in their gaps, up and back
+    over the top to the second lever (the trap doors shut), down and back across them, with 0 deaths, by
+    f=1,704 (`Source/Tools/bot_runs/ae_barracks_workers_campus.txt`). Then stuck: what is next is the Mudokon
+    to lead over the trap doors and the screen of UXBs, which the bot does not turn off yet. `BombStep` is
+    only tested in the game.
+  - The mine's box: it changes with its animation, 18 to 25 wide. Told ahead with the box it had at the
+    moment of looking, he hopped off beside a shaft as the box grew by 5 and was blown up; so the boxes of
+    late are kept too, the frames after which they come round found, and the box it will have then used. Until
+    that is known: as wide as it was ever seen. What he is asked to do he starts on two frames later
+    (measured: `BombsClear` counts them in).
+  - The Mines (`m1`): its last path now hops its trap doors where it walked them, 15 frames sooner at the
+    last run to the door, and dies once there under the explosion set (falling rocks and blasts, nothing the
+    bot times: before, it came through by when it happened to get there). The retry gets through.
+- **Blocks 2, 3 and 4** (first tries from inside their doors, scratch runs): block 2 (path 5, the workers'
+  campus), past its first flying mines (above), wants UXBs turned off, a Slig taken over to blow up a mine,
+  and three Mudokons rescued at once for a Shrykull that clears the way to the wheel (switch 125). Block 3
+  (path 7), whose door shuts behind him, is the one he starts on: a wheel (switch 177), then a Slig lock
+  with a Slig called by a lever, where he dies six times and gives up. Block 4 (path 9) not looked at again.
 - The hub and its four blocks, then the war room: a Glukkon taken over and its orders to Sligs, crawling
   Sligs and their button, an orb blown up with a grenade (then its Sligs taken over), grenades thrown on a
-  count, Greeters, laughing gas, flying mines to time, Slig voice locks, ghost locks, a Shrykull.
+  count, Greeters, laughing gas, UXBs, Slig voice locks, ghost locks, a Shrykull.
 
 **AO, Rupture Farms** (`a1.txt`: from its first screen, `bot any`): paths 15, 16, 18, 19 and 20 with 0 deaths, out
 to the Stockyards at f=5,567 (the milestone's AO half; f=6,291 as committed and since: the grenades are
