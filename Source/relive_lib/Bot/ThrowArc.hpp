@@ -71,6 +71,8 @@ private:
     static Flight Fly(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, const Point* mine, bool sure);
     // AO's grenade: thrown like the rock, but it comes to rest and goes off when its fuse has run down, and its
     // blast sets off the mines in it. mHit is then the last frame.
+    // at: where it is put
+    static bool LandsOn(const NavLine& floor, double fromY, double toY, double* at = nullptr);
     static Flight FlyGrenade(const NavInput& in, s32 x, s32 y, bool half, bool left, ThrowSpot::Kind kind, const Point* mine, s32 fuse = kFuse);
 };
 

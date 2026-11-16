@@ -1540,10 +1540,33 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
       - Those three are then ones for grenades, the locker standing for them (`GrenadeTargets`: a locker
         with armed Sligs within 600 of it on its floor; `GrenadeSligTask` is done when one fewer is about).
         They are not taken over (the reflex tries twice and gives up). Two of them come to stand at
-        1062,200, under the ledge. Not solved: a grenade from 662,100 that the model has bounce on to 1092
-        lands at 968,200 and stays there (traced), as one does that touches a thing a blast can hurt
-        (`Grenade::OnCollision_BounceOff`): what it is is not known yet. So the fourth wheel and the door
-        out are not reached.
+        1062,200, under the ledge.
+      - **AE's grenade and the floor** (`ThrowArc::LandsOn`). The model had it bounce on off every floor; a
+        throw from 662,100 that was to end at 1092 lay at 970 (traced: at 968,200 for five frames, then a
+        slide of two), while one from 687,100 onto the ledge across did bounce on. Grenade.cpp sends it up
+        off a floor at half the speed, and the next frame looks for a floor it has come up under along a
+        way that starts where `Collisions::Raycast` put it. That works in 256ths and cuts off twice (how far
+        along the frame's way the floor is met: the 256ths to the floor times the floor's length, over the
+        whole pixels of the frame's way down times that length; then that far along the way). Where the way
+        divides evenly it is put on the floor to the last bit, the way up is taken to start under it, and it
+        is sent down again: there and back until it lies, where it landed. Else it is put a few 256ths over
+        the floor and bounces on. `FlyGrenade` does the same sum and keeps the height the game put it at
+        (the next landing is worked out from there). Both traced throws are unit tests.
+      - `Domain::BlastGetsOrb` is now 40 to the side and 50 over to 50 under: with a grenade that lies where
+        it lands, what got the first orb was one that went off in the air some ten over the floor, while
+        one that lay on that floor 60 under the orb did not. The second orb took five throws (four misses
+        from 887 and 987, said to go off at 1178,79 and 1178,36; got from 1237): the rule is still a guess,
+        the orb's own box is not read.
+      - With that the block is done from its door (`ae_barracks_slig_bunks.txt`): the ledge Slig bombed at
+        f=7,669, the first orb at f=7,987, the third wheel at f=8,963, the second orb at f=11,654, the
+        button at f=11,919 (this time the naked Slig he had did get to the locker), the two armed Sligs
+        bombed by f=13,666, the fourth wheel at f=13,881, the door to the hub at f=14,350. One death, at the
+        hoist at 887.
+      - Not robust yet. Run on from the Rifle Range and the workers' campus (`blk10.txt`) he comes into the
+        block at other frames, the flying Slig is shot by a Slig in the middle as it comes onto its level
+        ("waiting for its back" is said three frames too late), no other comes, and he waits for one for
+        good: a flying Slig that is lost has to end that step, and the Sligs then be bombed with the boom
+        machine's grenades. And the getaway from the boom machine is luck (above).
     - A Slig that has only just come to stand with its back to all of his way, and stands for long
       (`Slig::BeatPause`: the least it stands at an end of its beat; `GoToTask::Stood` keeps since when),
       is gone behind as one that walks away is: the one by the boom machine walks two cells and stands 120

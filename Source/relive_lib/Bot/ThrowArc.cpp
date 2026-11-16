@@ -210,6 +210,39 @@ ThrowArc::Flight ThrowArc::Fly(const NavInput& in, s32 x, s32 y, bool half, bool
     return flight;
 }
 
+// Whether the game puts a thing that comes down from fromY to toY in a frame onto a level floor to the last bit, or
+// a little over it. Collisions::Raycast works in 256ths: how far along its way the floor is met is the 256ths of
+// that way to the floor (times the floor's length) over the whole pixels of the 256ths of the frame's way down
+// (times that length), cut off; and where it is put is that far along, cut off again. Only a way that divides
+// evenly ends on the floor.
+bool ThrowArc::LandsOn(const NavLine& floor, double fromY, double toY, double* at)
+{
+    if (at)
+    {
+        *at = floor.mY1;
+    }
+    const s64 length = static_cast<s64>(floor.mX2) - floor.mX1;
+    if (floor.mY1 != floor.mY2 || length <= 0)
+    {
+        return false;
+    }
+    const s64 y1 = static_cast<s64>(fromY * 65536.0) / 256;
+    const s64 y2 = static_cast<s64>(toY * 65536.0) / 256;
+    const s64 down = y2 - y1;
+    const s64 to = static_cast<s64>(floor.mY1) * 256 - y1;
+    const s64 det = length * down / 256;
+    if (down <= 0 || det == 0)
+    {
+        return false;
+    }
+    const s64 along = length * to / det;
+    if (at)
+    {
+        *at = static_cast<double>(y1 + down * along / 256) / 256.0;
+    }
+    return y1 + down * along / 256 == static_cast<s64>(floor.mY1) * 256;
+}
+
 // Grenade.cpp: a pixel a frame faster down each frame with no limit; off a floor it comes down on at half the
 // speed both ways, and to rest on it when it is slower than one down; off a wall at half the speed back; through
 // a floor it comes up under. At rest it slides on, half as fast each frame. A mine it touches goes off at once
@@ -249,6 +282,8 @@ ThrowArc::Flight ThrowArc::FlyGrenade(const NavInput& in, s32 x, s32 y, bool hal
             velY += 1.0;
             px += velX;
             py += velY;
+            const double py0 = py;
+            double landY = 0.0;
             // (AE's comes back down off a floor it flies up under, as fast along; AO's goes through it)
             // (going up from a floor it has just come back off, it is not under that floor)
             const NavLine* line = velY > 0.0 ? FirstCrossed(in, fromX, fromY, px, py, floorType, floorType, &hitX, &hitY) : in.mIsAe ? FirstCrossed(in, fromX, fromY - 0.01, px, py, floorType, floorType, &hitX, &hitY) : nullptr;
@@ -267,8 +302,27 @@ ThrowArc::Flight ThrowArc::FlyGrenade(const NavInput& in, s32 x, s32 y, bool hal
                     resting = true;
                     velY = 0.0;
                 }
+                else if (in.mIsAe && LandsOn(*line, fromY, py0, &landY))
+                {
+                    // AE's that is put on the floor to the last bit does not come up off it again. It is sent
+                    // up at half the speed; the next frame's way up starts on that floor, which the game takes
+                    // for one it has come up under and sends it down again, onto the floor at once: there and
+                    // back at half the speed each time until it is slower than one down, at the place it landed
+                    // (twice halved along by then). Traced in the Barracks' path 7: thrown from 662,100 it met
+                    // the floor at 968,200, was there for five frames and slid to 970; thrown far from 687,100
+                    // it met the ledge at 1004,100 a little over it and bounced on past 1119.
+                    px = hitX;
+                    velX /= 4.0;
+                    velY = 0.0;
+                    resting = true;
+                }
                 else
                 {
+                    // (AE's: a little over the floor, where the game put it)
+                    if (in.mIsAe)
+                    {
+                        py = landY;
+                    }
                     velY = -velY / 2.0;
                     velX /= 2.0;
                 }

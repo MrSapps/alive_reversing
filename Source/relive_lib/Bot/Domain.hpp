@@ -257,7 +257,9 @@ struct Domain final
     static bool CrawlerFor(const NavInput& in, const World& world, const Entity& button, s32* x = nullptr);
     // Nothing solid that is shut between two places of a floor (a slam door)
     static bool FloorOpen(const NavInput& in, const World& world, s32 x1, s32 x2, s32 y, bool half);
-    // Whether a grenade that goes off there gets an orb at (x, y): by what was seen, one 55 under it did not
+    // Whether a grenade that goes off there gets an orb at (x, y). By what was seen: one that lay on the floor 60
+    // under it did not, one that went off in the air a little over that floor did. The blast is 60 up and 30 down
+    // from 5 over the grenade.
     static bool BlastGetsOrb(s32 atX, s32 atY, s32 orbX, s32 orbY, bool half);
     // How near where a grenade goes off a Slig is sure to be in its blast (the blast is 60 to each side and a
     // Slig 24), and how far from it a cell has to be to throw from (ThrowArc::kGrenadeKillX)
