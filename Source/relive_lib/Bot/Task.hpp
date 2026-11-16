@@ -335,6 +335,26 @@ private:
     // to make now
     bool ZWatched(Bot& bot, const NavGraph& nav, const std::vector<s32>& path, s32 cur, TaskStep& step);
     bool ZMove(Bot& bot, const NavGraph& nav, const std::vector<s32>& path, s32 cur, std::size_t far, TaskStep& step);
+    // The way out of a cover is a hop, a drop or a hoist: it waits there for the frame to make it on
+    // (`lead`: the cells of floor before it, rolled if he is crouched and walked if he stands)
+    bool ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path, s32 cur, std::size_t lead, TaskStep& step);
+    // Such a way was made and the cover it was for is not reached yet
+    bool mZLeapt = false;
+    // Where such a way lands with another to make from there, and the cover a step or two aside of it to go to
+    // first (0: none)
+    s32 mZSideAt = -1;
+    // The cover he is in and the frame he came into it on
+    s32 mZCoverCur = -1;
+    s32 mZArrived = 0;
+    // Leaps out of the cover he is in that would get him shot, left out of the way while another is looked for,
+    // and none other found: the best of them is made
+    std::set<s32> mZAvoid;
+    bool mZSettle = false;
+    s32 mZBest = -1;
+    s32 mZBestBursts = 0;
+    // The frame the leap was last timed on
+    s32 mZPlanned = 0;
+    s32 mZSideX = 0;
     // The frames waited in cover for them with no period known, and what was last said of it
     s32 mZWaits = 0;
     s32 mZSaid = -1;

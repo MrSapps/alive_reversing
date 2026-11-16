@@ -459,6 +459,12 @@ public:
     {
         return mSligTlv.mCanZShoot;
     }
+    // For the bot: the frames it waits before it shoots from the background at what it has seen, and how many times
+    void ZShootTiming(s32& delay, s32& times) const
+    {
+        delay = mSligTlv.mZShootDelay;
+        times = mSligTlv.mNumTimesToShoot;
+    }
     // For the bot: the frames at least that it stands at an end of its beat before it turns
     s32 BeatPause() const
     {

@@ -1,0 +1,14 @@
+# The bot in the Slig Barracks' first block, the rifle range (path 10), from the hub's door into it.
+# Begun, not beaten: through three of its six screens, between the covers and out of them by hops, a hoist and a
+# running jump timed against the Sligs in the background, hit on most of the way; shot on the fourth screen.
+# See BOT_DESIGN.md, "What the Barracks still wants", block 1.
+timeout 2400
+start barracks 10 1 2475 478
+wait_until in_game
+wait_frames 40
+healing
+bot any,seed=1,been=mines,been=necrum
+bot_wait 12000
+bot_report bot_report.txt
+bot_inputs bot_inputs.txt
+quit

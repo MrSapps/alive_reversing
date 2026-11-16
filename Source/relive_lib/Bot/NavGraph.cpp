@@ -611,7 +611,9 @@ bool NavGraph::ZCovered(s32 x, s32 y, s32 lo, s32 hi, s32 tall) const
 {
     for (const NavFeature& f : mInput.mFeatures)
     {
-        if (f.mKind == FeatureKind::eZCover && x + lo >= f.mX1 && x + hi <= f.mX2 && y - tall >= f.mY1 && y - 1 <= f.mY2)
+        // (the game looks for the cover among what belongs to the screen the top of him is on: one of the next
+        // screen that reaches over is none)
+        if (f.mKind == FeatureKind::eZCover && x + lo >= f.mX1 && x + hi <= f.mX2 && y - tall >= f.mY1 && y - 1 <= f.mY2 && (f.mCell < 0 || f.mCell == CameraOf(x, y - tall)))
         {
             return true;
         }
@@ -1175,6 +1177,7 @@ void NavGraph::Build(const NavInput& input)
                 }
             }
             n.mZCover = !half && ZCovered(x, n.mY, -13, 13, 53);
+            n.mZLow = !half && ZCovered(x, n.mY, -13, 13, 34);
             const s32 madeBy = i >= realLines ? stopOfLine[i - realLines] : -1;
             const bool trap = madeBy >= 0 && mInput.mFeatures[madeBy].mKind == FeatureKind::eTrapDoor;
             n.mLiftStop = trap ? -1 : madeBy;

@@ -6626,6 +6626,79 @@ TEST(BotNav, ACellIsCoverFromTheBackgroundOnlyWithAllOfHimInside)
     h.Build(low);
     EXPECT_FALSE(h.Nodes()[h.NodeAt(162, 200, false)].mZCover);
     EXPECT_TRUE(h.ZCovered(162, 200, -13, 13, 34));
+    // but one to him crouched, as the higher one is too
+    EXPECT_TRUE(h.Nodes()[h.NodeAt(162, 200, false)].mZLow);
+    EXPECT_FALSE(h.Nodes()[h.NodeAt(137, 200, false)].mZLow);
+    EXPECT_TRUE(g.Nodes()[g.NodeAt(162, 200, false)].mZLow);
+}
+
+TEST(BotNav, ACoverOfTheNextScreenThatReachesOverIsNone)
+{
+    // (the game looks for the cover among what belongs to the screen he is on)
+    NavInput in;
+    in.mLines.push_back(Line(0, 200, 375, 200, 0));
+    NavFeature rock = Feature(FeatureKind::eZCover, 143, 140, 187, 202);
+    rock.mAnyScale = true;
+    rock.mCell = 1;
+    in.mFeatures.push_back(rock);
+    NavGraph next;
+    next.Build(in);
+    EXPECT_FALSE(next.Nodes()[next.NodeAt(162, 200, false)].mZCover);
+    EXPECT_FALSE(next.ZCovered(162, 200, -13, 13, 34));
+    in.mFeatures[0].mCell = 0;
+    NavGraph own;
+    own.Build(in);
+    EXPECT_TRUE(own.Nodes()[own.NodeAt(162, 200, false)].mZCover);
+}
+
+TEST(BotSligCycle, ALeapIsMadeWhenTheFewestSeeHimOnIt)
+{
+    // One Slig on a beat from 500 to 580, and a way that has him at 450 in the open for a while: it sees him
+    // there whenever it faces left
+    const auto one = [](s32 frame)
+    {
+        return std::vector<SligCycle::Seen>{BeatAt(frame, 500, 580, 30, 20, 0)};
+    };
+    SligCycle cycle;
+    for (s32 f = 1; f <= 700; f++)
+    {
+        cycle.Observe(static_cast<u32>(f), 1, one(f));
+    }
+    ASSERT_TRUE(cycle.Known());
+    const auto way = [](s32 open)
+    {
+        std::vector<SligCycle::Cell> track(5, SligCycle::Cell{475, true});
+        track.insert(track.end(), static_cast<std::size_t>(open), SligCycle::Cell{450, false});
+        track.insert(track.end(), 5, SligCycle::Cell{425, true});
+        return track;
+    };
+    const std::vector<SligCycle::Shooter> shooters{{10, 1}};
+    // Short enough to be made while it faces right: then, and it is not seen
+    const std::vector<SligCycle::Cell> quick = way(30);
+    const SligCycle::Move move = cycle.Through(quick, shooters, 600);
+    EXPECT_EQ(move.mSpotters, 0);
+    s32 seen = 0;
+    s32 seenAtOnce = 0;
+    for (s32 t = 0; t < static_cast<s32>(quick.size()); t++)
+    {
+        const SligCycle::Seen then = one(700 + move.mDelay + t + 1)[0];
+        const SligCycle::Seen now = one(700 + t + 1)[0];
+        seen += !quick[t].mCover && !then.mBlind && then.mFacingLeft ? 1 : 0;
+        seenAtOnce += !quick[t].mCover && !now.mBlind && now.mFacingLeft ? 1 : 0;
+    }
+    EXPECT_EQ(seen, 0);
+    // (frame 700 is the end of its walk left: made at once it would have been)
+    EXPECT_GT(seenAtOnce, 0);
+    EXPECT_GT(move.mDelay, 0);
+    // Longer than it ever faces right for: it shoots, and again while he is still out there
+    const SligCycle::Move slow = cycle.Through(way(300), shooters, 600);
+    EXPECT_GE(slow.mSpotters, 2);
+    // One that only just can't be made unseen: one burst
+    EXPECT_EQ(cycle.Through(way(150), shooters, 600).mSpotters, 1);
+    // In cover all the way there is nothing to wait for
+    const SligCycle::Move hidden = cycle.Through(way(0), shooters, 600);
+    EXPECT_EQ(hidden.mSpotters, 0);
+    EXPECT_EQ(hidden.mDelay, 0);
 }
 
 // A floor, a ledge over it from 100 on with a hoist up to its end, and something that shuts in the ledge's

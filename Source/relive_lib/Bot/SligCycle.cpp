@@ -109,6 +109,60 @@ u32 SligCycle::SeenBy(s32 x, s32 frames) const
     return mask;
 }
 
+SligCycle::Move SligCycle::Through(const std::vector<Cell>& track, const std::vector<Shooter>& shooters, s32 within) const
+{
+    Move out;
+    out.mSpotters = 99;
+    const s32 n = static_cast<s32>(track.size());
+    for (s32 delay = 0; delay <= within && out.mSpotters > 0; delay++)
+    {
+        // The frame each of them first sees him on
+        s32 first[5] = {-1, -1, -1, -1, -1};
+        for (s32 t = 0; t < n; t++)
+        {
+            if (track[t].mCover)
+            {
+                continue;
+            }
+            const u32 mask = SeenBy(track[t].mX, delay + t + 1 - kTrackSlack) | SeenBy(track[t].mX, delay + t + 1 + kTrackSlack) |
+                             SeenBy(track[t].mX - kTrackAside, delay + t + 1) | SeenBy(track[t].mX + kTrackAside, delay + t + 1);
+            for (s32 i = 0; i < 5; i++)
+            {
+                if (first[i] < 0 && (mask & (1u << i)))
+                {
+                    first[i] = t;
+                }
+            }
+        }
+        s32 bursts = 0;
+        for (s32 i = 0; i < 5; i++)
+        {
+            const Shooter shooter = i < static_cast<s32>(shooters.size()) ? shooters[i] : Shooter();
+            const s32 burst = shooter.mAfter + kShotFrame + kShotGap * std::max(shooter.mTimes, 1);
+            for (s32 t = first[i]; t >= 0 && t < n;)
+            {
+                bursts++;
+                // (and again, the next time it sees him after that)
+                s32 next = -1;
+                for (s32 u = t + burst; u < n && next < 0; u++)
+                {
+                    if (!track[u].mCover && (SeenBy(track[u].mX, delay + u + 1) & (1u << i)))
+                    {
+                        next = u;
+                    }
+                }
+                t = next;
+            }
+        }
+        if (bursts < out.mSpotters)
+        {
+            out.mSpotters = bursts;
+            out.mDelay = delay;
+        }
+    }
+    return out;
+}
+
 SligCycle::Move SligCycle::Cross(const std::vector<Cell>& cells, const std::function<bool(s32 x, bool rolling)>& covered) const
 {
     Move out;

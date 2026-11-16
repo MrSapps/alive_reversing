@@ -78,6 +78,10 @@ struct AbeState final
     bool mOnGround = false;
     // The top of what can be hit of him now (his bounding rectangle)
     s32 mTop = 0;
+    // and the rest of it
+    s32 mBoxX1 = 0;
+    s32 mBoxX2 = 0;
+    s32 mBoxBottom = 0;
     s32 mHealthFp = 0;
     s32 mLevel = 0;
     s32 mPath = 0;

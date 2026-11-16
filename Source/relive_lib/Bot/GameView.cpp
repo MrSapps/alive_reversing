@@ -255,6 +255,9 @@ AbeState GameView::ReadAbe(BaseMap& map)
     s.mFacingLeft = pAbe->GetAnimation().GetFlipX();
     s.mHalfScale = pAbe->GetSpriteScale() != FP_FromInteger(1);
     s.mTop = pAbe->VGetBoundingRect().y;
+    s.mBoxX1 = pAbe->VGetBoundingRect().x;
+    s.mBoxX2 = pAbe->VGetBoundingRect().w;
+    s.mBoxBottom = pAbe->VGetBoundingRect().h;
     s.mMotion = pAbe->VGetMotion(eMotionType::eCurrentMotion);
     s.mAnimFrame = static_cast<s16>(pAbe->GetAnimation().GetCurrentFrame());
     s.mMove = ClassifyMotion(isAe, s.mMotion);
@@ -565,6 +568,7 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                     {
                         NavFeature f = MakeFeature(FeatureKind::eZCover, tlv, camera, id);
                         f.mAnyScale = true;
+                        f.mCell = cam->mX + cam->mY * 256;
                         in.mFeatures.push_back(f);
                     }
                     break;
@@ -1288,6 +1292,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
                 slig.mBeatPause = static_cast<::Slig*>(pObj)->BeatPause();
                 slig.mWake = wakeCells * (slig.mHalf ? 13 : 25);
                 slig.mZShoot = slig.mHalf && static_cast<::Slig*>(pObj)->CanZShoot();
+                static_cast<::Slig*>(pObj)->ZShootTiming(slig.mZShootDelay, slig.mZShots);
             }
             else
             {

@@ -89,6 +89,8 @@ struct NavFeature final
     s32 mOnDestCamera = -1;
     // The camera it is in (its number), and a name that stays the same from run to run
     s32 mCamera = 0;
+    // and where that camera is, as NavGraph::CameraOf numbers them (-1: not said)
+    s32 mCell = -1;
     u32 mId = 0;
 
     bool Contains(s32 x, s32 y) const
@@ -185,6 +187,8 @@ struct NavNode final
     bool mHidden = false;
     // Standing here he is wholly in a Z cover: the Sligs in the background don't see him
     bool mZCover = false;
+    // Crouched here he is: under something too low to stand behind
+    bool mZLow = false;
     s32 mFirstEdge = 0;
     s32 mEdgeCount = 0;
 };
