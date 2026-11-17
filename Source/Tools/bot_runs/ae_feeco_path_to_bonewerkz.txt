@@ -1,0 +1,16 @@
+# FeeCo Depot's second visit, from where the war room's door lets him out in the lobby (path 2): Brew and the
+# mines, the fart under the Slig by the door, the bone bag, then path 9's lower part (the walkthrough's "path to
+# Bonewerkz": two pens of Slogs, a trap door on a timer, a bone past a plate) and out by its door into path 4
+# (Terminal 4) at about f=6,600, no deaths. Not run to its end as written here: the scratch run it is taken from
+# went on in path 4 with the bot still on.
+timeout 1500
+start feeco_depot 2 1 1187 1499
+wait_until in_game
+wait_frames 60
+healing
+bot any,seed=1,been=mines,been=necrum,been=barracks
+wait_until camera feeco_depot 4 1
+bot_wait 60
+bot_report bot_report.txt
+bot_inputs bot_inputs.txt
+quit

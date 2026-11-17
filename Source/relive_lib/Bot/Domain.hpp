@@ -102,6 +102,8 @@ enum class StepKind : u8
                 // (Domain::GrenadeTargets)
     eCrawlerButton, // from the cell mEdge take over a naked Slig and press the button mEntity with it
     eSligLever,     // the Glukkon he is in goes to the cell mEdge and has a Slig it calls pull the lever mEntity
+    eTimedDoor,     // use the lever mEntity (to the value mOther) and at once cross the edge mEdge, which a trap door
+                    // that shuts by itself opens for a while
     eFeedSlogs,     // from the cell mEdge throw a bone onto the stretch of floor of the Slog mEntity (mOther: twice
                     // the kind of throw, and one more for a throw to the left; from bit 8 up the switch of a plate
                     // the bone is thrown past)

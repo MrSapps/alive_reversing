@@ -636,6 +636,8 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                     f.mHalf = t.mScale == relive::reliveScale::eHalf;
                     f.mSwitch = t.mSwitchId;
                     f.mStartClosed = t.mStartState == relive::Path_TrapDoor::StartState::eClosed;
+                    // (one that shuts by itself: the frames it stays open, and it puts its switch back)
+                    f.mB = t.mSelfClosing ? std::max<s32>(1, t.mStayOpenTime) : 0;
                     in.mFeatures.push_back(f);
                     break;
                 }

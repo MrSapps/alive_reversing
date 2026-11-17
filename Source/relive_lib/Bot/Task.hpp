@@ -375,6 +375,34 @@ private:
     s32 mOrders = 0;
 };
 
+// A lever, and at once through what the trap door it opens lets through before that shuts by itself
+// (StepKind::eTimedDoor): the lever, then the way to the far end of that edge at a run, with what is quick taken
+// for cheap (Bot::TimedRun)
+class TimedDoorTask final : public Task
+{
+public:
+    TimedDoorTask(u32 lever, s32 want, s32 edge)
+        : mLever(lever)
+        , mWant(want)
+        , mEdge(edge)
+    {
+    }
+    ~TimedDoorTask() override;
+    std::string Name() const override
+    {
+        return "Use #" + std::to_string(mLever) + " and through at once";
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mLever;
+    s32 mWant;
+    s32 mEdge;
+    std::unique_ptr<Task> mUse;
+    std::unique_ptr<GoToTask> mGo;
+    bool mPulled = false;
+};
+
 // A bone thrown to Slogs from over their floor (Domain, StepKind::eFeedSlogs): to the cell, the throw, and until
 // the bone is down among them, or a Slog has gone over the plate it was thrown past
 class FeedSlogsTask final : public Task
@@ -404,6 +432,12 @@ private:
     s32 mPlate;
     std::unique_ptr<GoToTask> mGo;
     bool mInHand = false;
+    // The cell on the Slogs' floor he goes down to from where he throws (-1: none, or not asked yet), and the
+    // way there as it is asked when it would go
+    bool mAsked = false;
+    s32 mDown = -1;
+    std::unique_ptr<GoToTask> mLeap;
+    s32 mLeapWaits = 0;
     // The bones he had before the throw (-1: not thrown yet), and the frames since
     s32 mHad = -1;
     s32 mFrames = 0;
@@ -534,6 +568,11 @@ public:
     {
         mQuiet = quiet;
     }
+    // Frames he spends where he is before the leap out of a cover that is timed by the Sligs in the background
+    void SetZHold(s32 frames)
+    {
+        mZHold = frames;
+    }
     void SetHurry(bool hurry)
     {
         mHurry = hurry;
@@ -614,6 +653,7 @@ private:
     s32 mZPeriods = 0;
     s32 mZFar = 0;
     s32 mZGo = 0;
+    s32 mZHold = 0;
     s32 mZTo = 0;
     // Chants at a bird portal that has not opened yet
     s32 mPortalChants = 0;
