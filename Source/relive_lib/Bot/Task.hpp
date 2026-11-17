@@ -289,6 +289,41 @@ private:
     bool mSaid = false;
 };
 
+// Take over a Glukkon (from the cell mFrom, unless he is in one already), walk it into a voice lock's box and say
+// what the lock wants said: "Hey" to its "Hey", "Do it" to its "What?" (GlukkonSwitch). He stays in the Glukkon.
+class VoiceLockTask final : public Task
+{
+public:
+    VoiceLockTask(u32 lock, s32 from)
+        : mLock(lock)
+        , mFrom(from)
+    {
+    }
+    ~VoiceLockTask() override;
+    std::string Name() const override
+    {
+        return "Answer VoiceLock#" + std::to_string(mLock) + " with a Glukkon";
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mLock;
+    s32 mFrom;
+    std::unique_ptr<GoToTask> mGo;
+    s32 mChanted = 0;
+    s32 mWalked = 0;
+    // Frames in the lock's box since it was come into (or since the last try), and the tries
+    s32 mInBox = 0;
+    s32 mTries = 0;
+    bool mWasKnown = false;
+    bool mWas = false;
+    bool mSaid = false;
+    // Frames waited for a teleporter to take the Glukkon away
+    s32 mLeft = 0;
+    // Frames with no way for it from where it is
+    s32 mLost = 0;
+};
+
 // Hold a grenade and throw it late, so that it goes off in the air by a security orb (Domain::OrbTargets)
 class GrenadeOrbTask final : public Task
 {

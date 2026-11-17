@@ -101,6 +101,7 @@ enum class StepKind : u8
     eGrenade,   // throw a grenade at Slig mEntity from the stretch of floor of the cell mEdge
                 // (Domain::GrenadeTargets)
     eCrawlerButton, // from the cell mEdge take over a naked Slig and press the button mEntity with it
+    eVoiceLock,     // from the cell mEdge (-1: he has one already) take over a Glukkon and answer the voice lock mEntity
                     // (Domain::CrawlerFor)
     eGrenadeOrb, // hold a grenade and throw it late from the cell mEdge, to go off in the air by security orb
                  // mEntity (Domain::OrbTargets)
@@ -256,6 +257,14 @@ struct Domain final
     // Whether a naked Slig is on the floor of a button for them with nothing shut between the two: taken over,
     // it crawls there and presses it. x: where such a one is.
     static bool CrawlerFor(const NavInput& in, const World& world, const Entity& button, s32* x = nullptr);
+    // The way a Glukkon that is taken over has from (x, y) into a voice lock's box: along floors a cell at a time,
+    // off the end of one down to the next (no further than 200), through a teleporter, and in a jump over mines
+    // or a gap of up to three cells. needs: the switches that have to be at a value for it that are not now (a
+    // gate on the way, a teleporter's). nodes: the cells of the way, the first the one it is in; hops: whether
+    // the step into each is a jump.
+    static constexpr s32 kGlukkonJump = 4;
+    static bool GlukkonWay(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, const Entity& lock, std::vector<Goap::Fact>* needs = nullptr, std::vector<s32>* nodes = nullptr,
+                           std::vector<bool>* hops = nullptr);
     // Nothing solid that is shut between two places of a floor (a slam door)
     static bool FloorOpen(const NavInput& in, const World& world, s32 x1, s32 x2, s32 y, bool half);
     // Whether a grenade that goes off there gets an orb at (x, y). By what was seen: one that lay on the floor 60

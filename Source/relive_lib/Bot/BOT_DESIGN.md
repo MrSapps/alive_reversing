@@ -1768,7 +1768,22 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
     trophy room as before, and in the bombing range he stays out of the flying Slig's sight at 1662,1500
     and does not go on (he comes in 5 frames sooner than he did; from its door and from the trophy room's
     the bombing range is still done with no deaths). That fight was never proven at every timing.
-  Left: the Glukkon (taken over, walked, its speech at the voice locks and to Sligs), the gas, the way out.
+  - The war room is the level `barracks_ender`, not `barracks` (same path data): started as `barracks`, the
+    Glukkon's teleporter is a change of level and the Glukkon is gone with it. The run scripts start it as
+    `barracks_ender`; there the dash for the lever of 232 was sneaked and shot, so `Hurry` runs what was to
+    be sneaked too, unless a Slig with a gun is near on that floor with nothing shut between (the Slig bunks),
+    and only for a naked Slig that can get to a locker.
+  - General Dripik: `GlukkonAt` (the live ones), `EntityKind::eVoiceLock` (GlukkonSwitch), and
+    `Domain::GlukkonWay`, the way a Glukkon that is taken over has to a voice lock's box: a cell at a time,
+    off a floor's end down to the next, through a teleporter (a wait on its switch), and a jump of four cells
+    over mines or a gap (measured: 2087 to 1987). A lock with such a way is an action, with the switches the
+    way waits on as what it needs, so the lock before it is what is tried first. `VoiceLockTask` chants from a
+    cell of the Glukkon's screen, walks it along that way, says "Hey" 45 frames after it is in the box and
+    "Do it" 75 after that, and waits out a teleporter. He stays in the Glukkon from one lock to the next
+    (`Bot::Replan` waits while he is in his trance with nothing to be seen that he is in).
+    From the door: the phone (237) answered at f=3,214, the mines jumped, the lock of 231 at f=3,585, no deaths.
+  Left: the Sligs he orders about (into the mines, to the levers of 241 and 242), the last voice lock, the
+  gas, the way out.
 - The hub and its four blocks, then the war room: a Glukkon taken over and its orders to Sligs, crawling
   Sligs and their button, an orb blown up with a grenade (then its Sligs taken over), grenades thrown on a
   count, Greeters, laughing gas, UXBs, Slig voice locks, ghost locks, a Shrykull.

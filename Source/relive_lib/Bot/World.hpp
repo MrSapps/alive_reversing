@@ -76,6 +76,9 @@ enum class EntityKind : u8
     // AE's button for naked Sligs (CrawlingSligButton): one of them that is taken over presses it. mSwitch,
     // mOp as a lever's.
     eSligButton,
+    // AE's voice lock for Glukkons (GlukkonSwitch): one of them that is taken over stands in its box, says "Hey"
+    // to its "Hey" and "Do it" to its "What?", and it toggles mSwitch
+    eVoiceLock,
 };
 
 const char* EntityKindName(EntityKind kind);
@@ -381,6 +384,19 @@ struct RockAt final
     s32 mMotion = 0;
 };
 
+// A Glukkon that is about
+struct GlukkonAt final
+{
+    s32 mX = 0;
+    s32 mY = 0;
+    bool mHalf = false;
+    bool mFacingLeft = false;
+    // Abe is in it
+    bool mPossessed = false;
+    // The game's motion number (Glukkon.hpp: 0 stands)
+    s32 mMotion = 0;
+};
+
 // A Scrab that is about
 struct ScrabAt final
 {
@@ -477,6 +493,8 @@ struct World final
     std::vector<UxbAt> mUxbs;
     // AE's crawling Sligs that are about and alive (naked ones: at a locker they come by a gun and are Sligs)
     std::vector<RockAt> mCrawlers;
+    // AE's Glukkons that are about
+    std::vector<GlukkonAt> mGlukkons;
     // The naked Slig he has taken over (it is not among mCrawlers), where it is and the way it faces
     bool mCrawlerMine = false;
     s32 mCrawlerX = 0;
