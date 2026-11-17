@@ -324,6 +324,11 @@ public:
     {
         mWorld.mNoBomb.insert(id);
     }
+    // Whether an edge of this path's graph is one he was stopped on and keeps off
+    bool Banned(s32 edge) const
+    {
+        return mKnow && mKnow->mBannedEdges.count(edge) != 0;
+    }
     // A spawner of flying Sligs (its entity) that he waited at and none came
     void NoFlier(u32 id)
     {
@@ -448,7 +453,9 @@ public:
     }
     // pastScrabs: without the rule that keeps him off a floor a loose Scrab can get at him on
     // (`inTheOpen`: with what the Sligs in the background see of a way added to it, for the way GoToTask goes)
-    NavGraph::EdgeCost EdgeCostFn(bool pastScrabs = false, bool inTheOpen = false) const;
+    // (pastFacing: with the drops down in front of a Slig that faces the landing let be, to tell a way that is
+    // only shut for now from none)
+    NavGraph::EdgeCost EdgeCostFn(bool pastScrabs = false, bool inTheOpen = false, bool pastFacing = false) const;
     void Log(const std::string& text);
     // See World::QuietFrames, with the beats this run has seen
     s32 QuietFrames(s32 x, s32 y, bool half) const;

@@ -880,6 +880,46 @@ bool GoToTask::ZMove(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
     return true;
 }
 
+s32 GoToTask::SligComes(const Bot& bot, const NavGraph& nav, const NavNode& at)
+{
+    const s32 camW = nav.Input().mCamW;
+    const s32 lo = (at.mX / camW) * camW;
+    const s32 hi = lo + camW - 1;
+    const s32 cell = NavGraph::GridStep(at.mHalf);
+    s32 least = 9999;
+    for (const SligAt& slig : bot.GetWorld().mSligs)
+    {
+        if (slig.mAsleep || slig.mPossessed || !slig.mSeen || slig.mHalf != at.mHalf || std::abs(slig.mY - at.mY) > 10 || slig.mBeatMin >= slig.mBeatMax)
+        {
+            continue;
+        }
+        // (it turns two cells short of its beat's ends)
+        const s32 endLo = slig.mBeatMin + 2 * cell;
+        const s32 endHi = slig.mBeatMax - 2 * cell;
+        if (endHi < lo || endLo > hi || endHi - endLo < 2 * cell)
+        {
+            continue;
+        }
+        // (how far it walks until it is on his screen with its face to him)
+        const auto onto = [lo, hi](s32 x)
+        {
+            return x < lo ? lo - x : x > hi ? x - hi : 0;
+        };
+        const bool toward = slig.mFacingLeft == (slig.mX > at.mX);
+        s32 walk = onto(slig.mX);
+        // (one that stands with its back to it may turn now, for all that can be told: only one that walks
+        // away has the rest of its beat to go first)
+        if (!toward && slig.mMotion != 0 && slig.mMotion != 5)
+        {
+            const s32 end = slig.mFacingLeft ? std::min(slig.mX, endLo) : std::max(slig.mX, endHi);
+            walk = std::abs(end - slig.mX) + onto(end);
+        }
+        // (2.75 a frame; running, as it does for a while after a chant, 6.25)
+        least = std::min(least, walk * 4 / (slig.mMotion == 4 ? 25 : 11));
+    }
+    return least;
+}
+
 TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
 {
     if (mBombSlig)
@@ -909,6 +949,29 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         }
         mDisarm.reset();
         return Next(bot, "");
+    }
+    if (mBack)
+    {
+        const TaskStep step = mBack->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::ePrim)
+        {
+            return step;
+        }
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            bot.Log("not back in the shadow: " + step.mWhy);
+        }
+        mBack.reset();
+        mLedgeToward = false;
+        mLedgeAway = false;
+        return Next(bot, "");
+    }
+    {
+        const s32 at = bot.AbeNode();
+        if (at >= 0 && bot.Nav().Nodes()[at].mHidden)
+        {
+            mSafeNode = at;
+        }
     }
     if (mLiftCall)
     {
@@ -1227,6 +1290,27 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             path.clear();
         }
     }
+    // The way there is a drop down in front of a Slig that faces the landing now, and without it there is none,
+    // or only one far longer: waited for where he is until the Slig has turned or gone. The Barracks' path 9:
+    // out of the tunnel at 712,340 down to the Mudokons, "when the patrolling Slig below has left"; sent round
+    // the other way he rolled back up the tunnel, which the Slig heard each time, and it never walked its beat.
+    if (!atGoal && !led && !zOther && nav.Input().mIsAe && mFacingWaits < 800 && !bot.GetWorld().mSligs.empty() && !bot.GetWorld().mInvisible)
+    {
+        std::vector<s32> now;
+        std::vector<s32> later;
+        s32 costNow = 0;
+        s32 costLater = 0;
+        const bool anyNow = nav.FindPath(cur, mIsGoal, bot.EdgeCostFn(false, true), now, &costNow) && !now.empty();
+        if (nav.FindPath(cur, mIsGoal, bot.EdgeCostFn(false, true, true), later, &costLater) && !later.empty() && (!anyNow || (later[0] != now[0] && costNow > costLater + 300)))
+        {
+            if (mFacingWaits++ == 0)
+            {
+                bot.Log("a Slig faces where the way down lands: waiting at " + std::to_string(nav.Nodes()[cur].mX) + "," + std::to_string(nav.Nodes()[cur].mY) + " for it to turn or go");
+            }
+            mSteps--;
+            return TaskStep::Do(Prim::Wait(3));
+        }
+    }
     if (!atGoal && !led && !zOther && (!nav.FindPath(cur, mIsGoal, bot.EdgeCostFn(false, true), path) || path.empty()))
     {
         // With a lift on its way to a stop the way goes onto: that is waited for (one a timer sends, after the
@@ -1327,6 +1411,13 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 {
                     listed++;
                     why += std::string(listed == 1 ? " (refused: " : ", ") + EdgeKindName(e.mKind) + " " + std::to_string(nav.Nodes()[e.mFrom].mX) + "," + std::to_string(nav.Nodes()[e.mFrom].mY) + "->" + std::to_string(nav.Nodes()[e.mTo].mX) + "," + std::to_string(nav.Nodes()[e.mTo].mY);
+                    // (and what of it is known: Sligs watch where it goes, or a switch has it shut)
+                    s32 sw = 0;
+                    s32 value = 0;
+                    const NavNode& to = nav.Nodes()[e.mTo];
+                    why += Domain::SligWatched(nav, w, to.mX, to.mY, to.mHalf) ? " watched" : "";
+                    why += nav.Condition(e, &sw, &value) && w.Switch(sw) != value ? " shut by " + std::to_string(sw) : "";
+                    why += bot.Banned(static_cast<s32>(&e - nav.Edges().data())) ? " banned" : "";
                 }
             }
             why += listed ? ")" : "";
@@ -1951,6 +2042,20 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     watched = watched || about == 1 || (about == 2 && std::abs(slig.mX - here.mX) < 600);
                     gone = gone || about == 3;
                 }
+                // (the cell he would step out into: on another screen than the Slig, which its beat does not
+                // come onto, it is not seen. The Barracks' path 9: in the tunnel at 1137,340, the last cell of the
+                // screen of the Slig at 1287, he waited 4,000 frames for it to go.)
+                bool watchedNext = false;
+                {
+                    const NavNode& next = nav.Nodes()[first.mTo];
+                    const s32 camW = nav.Input().mCamW;
+                    for (const SligAt& slig : bot.GetWorld().mSligs)
+                    {
+                        const s32 about = ClearSligTask::SligAbout(nav, slig, next.mX, next.mY, next.mHalf);
+                        const bool stays = slig.mBeatMax > slig.mBeatMin && (slig.mBeatMax < (next.mX / camW) * camW || slig.mBeatMin >= (next.mX / camW + 1) * camW);
+                        watchedNext = watchedNext || about == 1 || (about == 2 && std::abs(slig.mX - next.mX) < 600 && !stays);
+                    }
+                }
                 std::size_t shade = path.size();
                 for (std::size_t k = 0; k < last && watched; k++)
                 {
@@ -1963,7 +2068,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 {
                     last = shade;
                 }
-                else if (watched && here.mHidden && !nav.Nodes()[first.mTo].mHidden && mHiding < 4000)
+                else if (watched && watchedNext && here.mHidden && !nav.Nodes()[first.mTo].mHidden && mHiding < 4000)
                 {
                     if (mHiding == 0)
                     {
@@ -2807,6 +2912,35 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
 
         case EdgeKind::eFall:
         {
+            // Down onto a floor a Slig walks: when it cannot be on that screen with its face to where he lands
+            // within 110 frames (SligComes), which is as it walks off it. The Barracks' path 9: out of the
+            // tunnel at 712,340 "when the patrolling Slig below has left".
+            // (and when it is off that screen by the time he lands, 35 frames on: the landing is heard on it.
+            // Dropped behind it as it walked away at 700, it turned at the thud and shot.)
+            bool hears = false;
+            {
+                const NavNode& to = nav.Nodes()[first.mTo];
+                const s32 camW = nav.Input().mCamW;
+                for (const SligAt& slig : bot.GetWorld().mSligs)
+                {
+                    if (slig.mAsleep || slig.mPossessed || slig.mHalf != to.mHalf || std::abs(slig.mY - to.mY) > 10)
+                    {
+                        continue;
+                    }
+                    const bool walks = slig.mMotion != 0 && slig.mMotion != 5;
+                    const s32 then = slig.mX + (walks ? (slig.mFacingLeft ? -96 : 96) : 0);
+                    hears = hears || slig.mX / camW == to.mX / camW || then / camW == to.mX / camW;
+                }
+            }
+            if (nav.Input().mIsAe && !bot.GetWorld().mInvisible && !nav.Nodes()[first.mTo].mHidden && nav.Nodes()[first.mTo].mY > nav.Nodes()[cur].mY + 30 && mFallWaits < 700 && (hears || SligComes(bot, nav, nav.Nodes()[first.mTo]) < 110))
+            {
+                if (mFallWaits++ == 0)
+                {
+                    bot.Log("a Slig walks the floor under " + std::to_string(nav.Nodes()[cur].mX) + "," + std::to_string(nav.Nodes()[cur].mY) + ": down when it has left");
+                }
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(3));
+            }
             // (under something low: down first, and it is rolled off)
             if (first.mCrouched && abe.mMove == Move::eIdle)
             {
@@ -2893,45 +3027,82 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 return TaskStep::Do(Prim::Wait(6));
             }
             // Up onto a floor a Slig walks, where its beat comes onto the screen he comes up on: not when it can be
-            // on that screen and facing him within 90 frames (54 of them the hoist), at the 2.75 a frame it walks
-            // and turning two cells short of its beat's ends. The Barracks' path 7: up at 887,100 as the Slig of
-            // 1012 to 1262 came, he was shot the moment it was on his screen.
-            if (first.mKind == EdgeKind::eHoistUp && nav.Input().mIsAe && mSligWaits < 100)
+            // on that screen and facing him within 90 frames (54 of them the hoist; SligComes). The Barracks'
+            // path 7: up at 887,100 as the Slig of 1012 to 1262 came, he was shot the moment it was on his screen.
+            if (first.mKind == EdgeKind::eHoistUp && nav.Input().mIsAe)
             {
                 const NavNode& top = nav.Nodes()[first.mTo];
+                const NavNode& under = nav.Nodes()[first.mFrom];
                 const s32 camW = nav.Input().mCamW;
-                const s32 lo = (top.mX / camW) * camW;
-                const s32 hi = lo + camW - 1;
-                bool wait = false;
+                const s32 cell = NavGraph::GridStep(top.mHalf);
+                if (mSligWaits < 100 && SligComes(bot, nav, top) < 90)
+                {
+                    mSligWaits++;
+                    mSteps--;
+                    return TaskStep::Do(Prim::Wait(3));
+                }
+                // Up onto a ledge a Slig stands on and turns: as it turns its back, so that all of the time it
+                // stands that way is ahead (its sight is by its box and his: he is in it from the pull up, 30
+                // frames on). And one that stands on that level across a gap: when it has its back to him.
+                // Waited for under the ledge, which is a floor of its own with a Slig of its own: when that one
+                // can be on his screen with its face to him within 75 frames he is off back to the last shadow
+                // he was in, to come again when it has gone. The Barracks' path 9 (the trophy room): the Slig
+                // at 1162,399 stands 90 to 120 with its back to the hoist at 1212 and 150 to 180 the other way,
+                // and the one under it is back every 370.
+                bool ledge = false;
+                bool go = true;
                 for (const SligAt& slig : bot.GetWorld().mSligs)
                 {
-                    if (slig.mAsleep || slig.mPossessed || !slig.mSeen || slig.mHalf != top.mHalf || std::abs(slig.mY - top.mY) > 10 || slig.mBeatMin >= slig.mBeatMax)
+                    if (slig.mAsleep || slig.mPossessed || !slig.mSeen || slig.mHalf != top.mHalf || std::abs(slig.mY - top.mY) > 10 || slig.mX / camW != top.mX / camW)
                     {
                         continue;
                     }
-                    const s32 cell = NavGraph::GridStep(top.mHalf);
-                    const s32 endLo = slig.mBeatMin + 2 * cell;
-                    const s32 endHi = slig.mBeatMax - 2 * cell;
-                    if (endHi < lo || endLo > hi)
+                    if (slig.mBeatMax - slig.mBeatMin - 4 * cell >= 2 * cell)
                     {
                         continue;
                     }
-                    // (how far it walks until it is on his screen with its face to him)
-                    const auto onto = [lo, hi](s32 x)
-                    {
-                        return x < lo ? lo - x : x > hi ? x - hi : 0;
-                    };
                     const bool toward = slig.mFacingLeft == (slig.mX > top.mX);
-                    s32 walk = onto(slig.mX);
-                    if (!toward)
+                    const s32 at = nav.NodeAt(slig.mX, slig.mY, slig.mHalf, 12);
+                    if (at < 0 || nav.Nodes()[at].mLine != top.mLine)
                     {
-                        const s32 end = slig.mFacingLeft ? std::min(slig.mX, endLo) : std::max(slig.mX, endHi);
-                        walk = std::abs(end - slig.mX) + onto(end);
+                        go = go && !toward;
+                        continue;
                     }
-                    // (running, as it does for a while after a chant, it is 6.25 a frame)
-                    wait = wait || walk * 4 < 90 * (slig.mMotion == 4 ? 25 : 11);
+                    ledge = true;
+                    const u32 now = bot.Abe().mFrame;
+                    if (toward)
+                    {
+                        mLedgeToward = true;
+                        mLedgeAway = false;
+                    }
+                    else if (!mLedgeAway)
+                    {
+                        mLedgeAway = true;
+                        mLedgeSince = now;
+                    }
+                    go = go && ((!toward && mLedgeToward && now - mLedgeSince <= 8) || (toward && slig.mMotion == 5));
                 }
-                if (wait)
+                const s32 comes = ledge ? SligComes(bot, nav, under) : 9999;
+                if (ledge && mLedgeWaits < 1500 && (!go || comes < 60))
+                {
+                    if (comes < 75 && mSafeNode >= 0 && mSafeNode != cur && mLedgeRetreats < 12)
+                    {
+                        mLedgeRetreats++;
+                        bot.Log("a Slig is on its way back to this floor (" + std::to_string(comes) + " frames) before the one on the ledge has turned: back to the shadow at " + std::to_string(nav.Nodes()[mSafeNode].mX) + "," + std::to_string(nav.Nodes()[mSafeNode].mY));
+                        const s32 safe = mSafeNode;
+                        mBack = std::make_unique<GoToTask>("back to the shadow", [safe](s32 n)
+                                                           { return n == safe; });
+                        return Next(bot, "");
+                    }
+                    mLedgeWaits++;
+                    mSteps--;
+                    return TaskStep::Do(Prim::Wait(1));
+                }
+                if (ledge)
+                {
+                    bot.Log("the Slig on the ledge turns its back: up at " + std::to_string(top.mX) + "," + std::to_string(top.mY) + " (the one of this floor " + std::to_string(comes) + " frames off)");
+                }
+                else if (!go && mSligWaits < 100)
                 {
                     mSligWaits++;
                     mSteps--;
@@ -3032,6 +3203,15 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
 
         case EdgeKind::eTeleport:
         {
+            // Onto a floor a Slig walks: when it cannot be on that screen with its face to him within 120
+            // frames (SligComes), which is as it leaves. The Barracks' path 9: "use it when the bottom Slig has
+            // left".
+            if (nav.Input().mIsAe && mTeleWaits < 400 && SligComes(bot, nav, nav.Nodes()[first.mTo]) < 120)
+            {
+                mTeleWaits++;
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(3));
+            }
             // Its lever is a cell to one side of where he stands in it
             const NavFeature& tele = nav.Input().mFeatures[first.mFeature];
             const s32 cell = NavGraph::GridStep(nav.Nodes()[cur].mHalf);
@@ -5750,7 +5930,8 @@ s32 ClearSligTask::Haven(const NavGraph& nav, const NavGraph::EdgeCost& cost, s3
     const s32 haven = nav.Edges()[way.back()].mTo;
     // (and a way back down from it)
     std::vector<s32> back;
-    return nav.FindPath(haven, use, cost, back) && back.size() <= 4 ? haven : -1;
+    // (as far as a dozen cells: the Barracks' path 9, from the ledge at 412,360 down and along to the lock at 663)
+    return nav.FindPath(haven, use, cost, back) && back.size() <= 12 ? haven : -1;
 }
 
 TaskStep ClearSligTask::Sortie(Bot& bot, const std::string& lastFailed, s32 x, s32 y, bool half)
@@ -5978,7 +6159,19 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
                 left = std::min(left, other.FramesUntilSees(x, camX1 - 25, camX2 + 25));
             }
         }
-        const s32 need = std::abs(abe.mX - x) * 10 / (entity->mHalf ? 12 : 24) + 40;
+        s32 need = std::abs(abe.mX - x) * 10 / (entity->mHalf ? 12 : 24) + 40;
+        // (and out of its sight again after, where there is somewhere near to be: at a run, and 40 for the climb
+        // or the jump up. The Barracks' path 9: its three locks one after the other left him at the last of
+        // them as the Slig came back.)
+        if (bot.IsAe() && !mBehind)
+        {
+            const s32 use = Domain::UseNode(nav, *entity, nullptr);
+            const s32 haven = use >= 0 ? Haven(nav, bot.EdgeCostFn(false, false, true), use) : -1;
+            if (haven >= 0)
+            {
+                need += std::abs(nav.Nodes()[haven].mX - x) * 10 / (entity->mHalf ? 30 : 60) + 40;
+            }
+        }
         if (std::abs(abe.mY - y) <= 45 && abe.mHalfScale == entity->mHalf && left >= need)
         {
             if (!mBehind)
@@ -5995,7 +6188,8 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
         }
     }
     // Unseen it watches nothing
-    if (mPhase == 0 && world.mInvisible && mPerch == 0)
+    // (and with the power used for this very thing: for as long as it lasts)
+    if (mPhase == 0 && world.mInvisible && (mPerch == 0 || mPerch == 5))
     {
         slig = nullptr;
     }
@@ -6148,6 +6342,11 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
         }
         if (mPerch == 4)
         {
+            // (its rings still on their way to him)
+            if (!world.mInvisible && world.mInvisComing && !world.mInvisCharge && ++mPerchWaits < 300)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
             if (!world.mInvisible && world.mInvisCharge && ++mPerchWaits < 1100)
             {
                 return TaskStep::Do(Prim::Wait(1, Btn::eChant));
@@ -6196,6 +6395,16 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
             close = close && std::abs(nav.Nodes()[nav.Edges()[edge].mTo].mX - x) < 600;
         }
         std::function<bool(s32)> raidSpot;
+        // With the power to go unseen in hand, and on the Slig's own level (no place off it to keep it for):
+        // unseen from where he stands, and the thing done so. The Barracks' path 9: the ring of its first
+        // ghost lock is what the other two are slapped under.
+        if ((world.mInvisCharge || world.mInvisComing) && !world.mInvisible && mPerch != 4)
+        {
+            bot.Log("a Slig at " + std::to_string(slig->mX) + "," + std::to_string(slig->mY) + " watches " + mInner->Name() + ", and the power to go unseen is in hand: unseen from here");
+            mPerch = 4;
+            mPerchWaits = 0;
+            return Next(bot, "");
+        }
         if (close)
         {
             mGo = std::make_unique<GoToTask>("out of the Slig's sight", spot);
