@@ -3021,6 +3021,28 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 mSteps--;
                 return TaskStep::Do(Prim::Press(Btn::eDown, 12));
             }
+            // A well on the floor he comes down on, between the end of this one and where the fall ends: walked off
+            // he drops into it; run off he comes down past it. Measured in the Barracks' war room, off the ledge
+            // at 2162,340: walked, into the well at 2137,461 and thrown back up; run, down at 2112,461. The
+            // walkthrough: "Have Abe RUN off the ledge so that you don't fall into the well".
+            if (!first.mCrouched)
+            {
+                const NavNode& from = nav.Nodes()[cur];
+                const NavNode& to = nav.Nodes()[first.mTo];
+                bool well = false;
+                for (const NavFeature& f : nav.Input().mFeatures)
+                {
+                    const s32 wx = (f.mX1 + f.mX2) / 2;
+                    well = well || ((f.mKind == FeatureKind::eWellLocal || f.mKind == FeatureKind::eWellExpress) && f.mHalf == to.mHalf && std::abs(f.mY2 - to.mY) <= 30 && wx > std::min(from.mX, to.mX) && wx < std::max(from.mX, to.mX));
+                }
+                if (well)
+                {
+                    bot.Log("a well under the end of the floor at " + std::to_string(from.mX) + "," + std::to_string(from.mY) + ": off it at a run");
+                    Prim run = Prim::WalkOff(first.mLeft);
+                    run.mRunOff = 1;
+                    return TaskStep::Do(run);
+                }
+            }
             // Down onto a floor a pack of Paramites hunts him on, seen: run off, through every ledge on the way
             // down, and on. A walk off, or a hop with its landing, leaves him standing a cell or two from them.
             {
@@ -5172,6 +5194,151 @@ TaskStep VoiceLockTask::Next(Bot& bot, const std::string& lastFailed)
         return TaskStep::Failed("the chant took no Glukkon");
     }
     return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+}
+
+// A step of the Glukkon he is in along its way to the cell at (x, y): false when it is there
+static bool GlukkonStep(Bot& bot, const GlukkonAt& me, s32 x, s32 y, s32& lost, TaskStep& step)
+{
+    const NavGraph& nav = bot.Nav();
+    if (std::abs(me.mX - x) <= 5 && std::abs(me.mY - y) <= 12)
+    {
+        return false;
+    }
+    std::vector<s32> nodes;
+    std::vector<bool> hops;
+    if (!Domain::GlukkonWayTo(nav, bot.GetWorld(), me.mX, me.mY, me.mHalf, x - 5, x + 5, y, nullptr, &nodes, &hops) || nodes.size() < 2)
+    {
+        // (in the air, or between cells: it comes to rest first)
+        lost += 2;
+        step = lost > 300 ? TaskStep::Failed("the Glukkon has no way to " + std::to_string(x) + "," + std::to_string(y)) : TaskStep::Do(Prim::Wait(2));
+        return true;
+    }
+    lost = 0;
+    const NavNode& next = nav.Nodes()[nodes[1]];
+    const bool left = next.mX < me.mX;
+    const u32 dir = left ? Btn::eLeft : Btn::eRight;
+    if (hops[1])
+    {
+        // A jump: from a stand in the middle of the cell, with its face that way
+        const NavNode& here = nav.Nodes()[nodes[0]];
+        if (me.mMotion != 0)
+        {
+            step = TaskStep::Do(Prim::Wait(2));
+        }
+        else if (std::abs(me.mX - here.mX) > 4)
+        {
+            step = TaskStep::Do(Prim::Wait(2, me.mX < here.mX ? Btn::eRight : Btn::eLeft));
+        }
+        else if (me.mFacingLeft != left)
+        {
+            step = TaskStep::Do(Prim::Wait(2, dir));
+        }
+        else
+        {
+            bot.Log("the Glukkon at " + std::to_string(me.mX) + "," + std::to_string(me.mY) + ": a jump to " + std::to_string(next.mX));
+            step = TaskStep::Do(Prim::Wait(3, dir | Btn::eHop));
+        }
+        return true;
+    }
+    // (a walk: let go of in the cell before the one it is to stand in, unless the way goes on the same way on
+    // foot: it walks a cell at a time)
+    const bool on = nodes.size() > 2 && !hops[2] && (nav.Nodes()[nodes[2]].mX < next.mX) == left && nav.Nodes()[nodes[2]].mY >= next.mY - 5;
+    step = TaskStep::Do(Prim::Wait(2, on || std::abs(next.mX - me.mX) > 14 ? dir : 0u));
+    return true;
+}
+
+TaskStep SligLeverTask::Next(Bot& bot, const std::string&)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const Entity* lever = world.Find(mLever);
+    if (!lever || mStand < 0)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    if (!mWasKnown)
+    {
+        mWasKnown = true;
+        mWas = world.Switch(lever->mSwitch) != 0;
+    }
+    if ((world.Switch(lever->mSwitch) != 0) != mWas)
+    {
+        return TaskStep::Done();
+    }
+    const GlukkonAt* me = nullptr;
+    for (const GlukkonAt& g : world.mGlukkons)
+    {
+        me = g.mPossessed ? &g : me;
+    }
+    if (!me)
+    {
+        return (mLost += 4) > 600 ? TaskStep::Failed("he is in no Glukkon") : TaskStep::Do(Prim::Wait(4));
+    }
+    if ((mFrames += 2) > 6000)
+    {
+        return TaskStep::Failed("no Slig pulled the lever");
+    }
+    const NavNode& stand = nav.Nodes()[mStand];
+    TaskStep step;
+    if (GlukkonStep(bot, *me, stand.mX, stand.mY, mLost, step))
+    {
+        return step;
+    }
+    if (me->mMotion != 0)
+    {
+        return TaskStep::Do(Prim::Wait(2));
+    }
+    // The Slig of this floor that is nearest
+    const SligAt* slig = nullptr;
+    for (const SligAt& s : world.mSligs)
+    {
+        // (on its screen: one off it does not hear)
+        if (!s.mPossessed && s.mHalf == me->mHalf && std::abs(s.mY - me->mY) <= 20 && nav.CameraOf(s.mX, s.mY - 5) == nav.CameraOf(me->mX, me->mY - 5) && (!slig || std::abs(s.mX - me->mX) < std::abs(slig->mX - me->mX)))
+        {
+            slig = &s;
+        }
+    }
+    if (mQuiet > 0)
+    {
+        mQuiet -= 2;
+        return TaskStep::Do(Prim::Wait(2));
+    }
+    if (!slig)
+    {
+        // None: a call for help makes one
+        mSaid = 1;
+        mQuiet = 150;
+        bot.Log("the Glukkon at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": calls for help");
+        return TaskStep::Do(Prim::Wait(3, Btn::eSpeak7));
+    }
+    // (it hears "Hey" from one that faces it, standing still: Slig::HeardGlukkonToListenTo)
+    if (me->mFacingLeft != (slig->mX < me->mX) && std::abs(slig->mX - me->mX) > 12)
+    {
+        return TaskStep::Do(Prim::Wait(2, slig->mX < me->mX ? Btn::eLeft : Btn::eRight));
+    }
+    if (slig->mMotion != 0)
+    {
+        return TaskStep::Do(Prim::Wait(2));
+    }
+    // "Hey", then "Come here" until it is a cell from the lever, then "Do it"
+    const bool atLever = std::abs(std::abs(slig->mX - lever->CentreX()) - NavGraph::GridStep(me->mHalf)) <= 8;
+    mOrders++;
+    if (mSaid != 2 && mSaid != 3)
+    {
+        mSaid = 2;
+        mQuiet = 50;
+        return TaskStep::Do(Prim::Wait(3, Btn::eSpeak1));
+    }
+    if (!atLever)
+    {
+        mSaid = mOrders % 4 == 0 ? 0 : 3;
+        mQuiet = 60;
+        return TaskStep::Do(Prim::Wait(3, Btn::eSpeak2));
+    }
+    bot.Log("the Glukkon at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": \"Do it\" to the Slig at " + std::to_string(slig->mX));
+    mSaid = 0;
+    mQuiet = 90;
+    return TaskStep::Do(Prim::Wait(3, Btn::eSpeak4));
 }
 
 GrenadeOrbTask::~GrenadeOrbTask() = default;

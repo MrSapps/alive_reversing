@@ -759,6 +759,7 @@ static void BuildEntities(BinaryPath& path, World& world)
     world.mScrabBoundsRight.clear();
     world.mSlogSpawners.clear();
     world.mWingLockers.clear();
+    world.mGlukkonHelp.clear();
     for (auto& cam : path.GetCameras())
     {
         if (!cam)
@@ -770,6 +771,10 @@ static void BuildEntities(BinaryPath& path, World& world)
         for (auto& upTlv : cam->mTlvs.mTlvs)
         {
             const relive::Path_TLV& tlv = *upTlv;
+            if (tlv.mTlvType == ReliveTypes::eGlukkon && static_cast<const relive::Path_Glukkon&>(tlv).mHelpSwitchId > 1)
+            {
+                world.mGlukkonHelp.push_back(static_cast<const relive::Path_Glukkon&>(tlv).mHelpSwitchId);
+            }
             if (tlv.mTlvType == ReliveTypes::eSligGetWings)
             {
                 RockAt locker;

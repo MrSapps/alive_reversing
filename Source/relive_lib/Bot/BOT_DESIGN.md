@@ -1782,8 +1782,19 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
     "Do it" 75 after that, and waits out a teleporter. He stays in the Glukkon from one lock to the next
     (`Bot::Replan` waits while he is in his trance with nothing to be seen that he is in).
     From the door: the phone (237) answered at f=3,214, the mines jumped, the lock of 231 at f=3,585, no deaths.
-  Left: the Sligs he orders about (into the mines, to the levers of 241 and 242), the last voice lock, the
-  gas, the way out.
+  - Sligs ordered about: a lever on a floor that a Slig comes down onto when the Glukkon calls for help
+    (`World::mGlukkonHelp`, the spawner with that switch) is an action, "Have a Slig pull Lever#N", and
+    `SligLeverTask` does it: the Glukkon goes to the cell next to the lever, or the nearest it can get to on
+    the side away from the spawner and out of a mine's blast, says "Help" when no Slig is on its screen and
+    floor, then "Hey", "Come here" until the Slig is a cell from the lever (a Slig on its way stops at a
+    lever), then "Do it". Mines on the Slig's way are not planned for: it walks into one, both are gone, and
+    the next call brings another (five Sligs for the four mines and the lever of 241). `GlukkonWay` knows
+    walls, mines that have to be gone, and a trap door it drops through when its switch opens it: for the
+    lever of 242 it stands on the trap door, next to the lever, and falls with the Slig.
+  - Out of the Glukkon: what Abe is to do next waits until he is himself again (`Bot::Replan`).
+  - A well under the end of a floor he drops off: off it at a run (`GoToTask`, the fall case).
+  **Done from its door**: the last voice lock at f=6,277, out by the door at f=6,628, through path 16 and
+  into FeeCo Depot at f=6,989, no deaths (`ae_barracks_war_room.txt`).
 - The hub and its four blocks, then the war room: a Glukkon taken over and its orders to Sligs, crawling
   Sligs and their button, an orb blown up with a grenade (then its Sligs taken over), grenades thrown on a
   count, Greeters, laughing gas, UXBs, Slig voice locks, ghost locks, a Shrykull.

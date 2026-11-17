@@ -495,6 +495,8 @@ struct World final
     std::vector<RockAt> mCrawlers;
     // AE's Glukkons that are about
     std::vector<GlukkonAt> mGlukkons;
+    // The switches the path's Glukkons set when they call for help (a spawner with one of them makes a Slig then)
+    std::vector<s32> mGlukkonHelp;
     // The naked Slig he has taken over (it is not among mCrawlers), where it is and the way it faces
     bool mCrawlerMine = false;
     s32 mCrawlerX = 0;

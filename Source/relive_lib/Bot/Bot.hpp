@@ -107,6 +107,8 @@ struct BotMemory
     u32 mExploring = 0;
     std::string mLastSligs;
     s32 mLastAwakeSligs = 0;
+    // Waits in a row for a Glukkon he is in to be done with before something of Abe's own is begun (Replan)
+    s32 mGlukkonWaits = 0;
     // Looks in a row at a trance with nothing to be seen that he is in (Replan)
     s32 mTranceWaits = 0;
     // The frame he was last knocked off his feet (AE's knockback motions)

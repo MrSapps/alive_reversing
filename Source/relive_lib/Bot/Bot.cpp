@@ -223,6 +223,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<CrawlerButtonTask>(step.mEntity, step.mEdge);
         case StepKind::eVoiceLock:
             return std::make_unique<VoiceLockTask>(step.mEntity, step.mEdge);
+        case StepKind::eSligLever:
+            return std::make_unique<SligLeverTask>(step.mEntity, step.mEdge);
         case StepKind::eGrenadeOrb:
             return std::make_unique<GrenadeOrbTask>(step.mEntity, step.mEdge);
         case StepKind::eFlierBomb:
@@ -1039,6 +1041,27 @@ bool Bot::Replan(BaseMap& map)
     if (first.mName != mTaskAction)
     {
         Log("goal " + bestGoal + " plan=[" + mPlanText + "]" + (misses.empty() ? "" : " (no plan for: " + misses + ")"));
+    }
+    // In a Glukkon, and the next thing is Abe's to do: waited for until he is himself again (the Glukkon's last
+    // errand may be the end of it: General Dripik, taken off after the last voice lock), then chanted out of
+    {
+        bool inGlukkon = false;
+        for (const GlukkonAt& g : mWorld.mGlukkons)
+        {
+            inGlukkon = inGlukkon || g.mPossessed;
+        }
+        const StepKind kind = domain.mSteps[first.mTag].mKind;
+        if (mIsAe && mAbe.mMotion == 112 && kind != StepKind::eVoiceLock && kind != StepKind::eSligLever && mGlukkonWaits < 120)
+        {
+            mGlukkonWaits++;
+            mTask.reset();
+            mTaskAction.clear();
+            mPilot.Start(Prim::Wait(10, inGlukkon && mGlukkonWaits > 40 ? static_cast<u32>(Btn::eChant) : 0u), mAbe);
+            mPilotActive = true;
+            mPilotForTask = false;
+            return true;
+        }
+        mGlukkonWaits = mAbe.mMotion == 112 ? mGlukkonWaits : 0;
     }
     // (the task before it gone first: what it held the route to is let go of before the next is looked for)
     mTask.reset();

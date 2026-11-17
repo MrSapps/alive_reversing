@@ -101,6 +101,7 @@ enum class StepKind : u8
     eGrenade,   // throw a grenade at Slig mEntity from the stretch of floor of the cell mEdge
                 // (Domain::GrenadeTargets)
     eCrawlerButton, // from the cell mEdge take over a naked Slig and press the button mEntity with it
+    eSligLever,     // the Glukkon he is in goes to the cell mEdge and has a Slig it calls pull the lever mEntity
     eVoiceLock,     // from the cell mEdge (-1: he has one already) take over a Glukkon and answer the voice lock mEntity
                     // (Domain::CrawlerFor)
     eGrenadeOrb, // hold a grenade and throw it late from the cell mEdge, to go off in the air by security orb
@@ -265,6 +266,10 @@ struct Domain final
     static constexpr s32 kGlukkonJump = 4;
     static bool GlukkonWay(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, const Entity& lock, std::vector<Goap::Fact>* needs = nullptr, std::vector<s32>* nodes = nullptr,
                            std::vector<bool>* hops = nullptr);
+    // The same to any cell with its middle in x1..x2 on the floor at toY. A mine on the way has to be gone first
+    // and a trap door it is to drop through open: those are needs as a gate is.
+    static bool GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, s32 x1, s32 x2, s32 toY, std::vector<Goap::Fact>* needs = nullptr, std::vector<s32>* nodes = nullptr,
+                             std::vector<bool>* hops = nullptr);
     // Nothing solid that is shut between two places of a floor (a slam door)
     static bool FloorOpen(const NavInput& in, const World& world, s32 x1, s32 x2, s32 y, bool half);
     // Whether a grenade that goes off there gets an orb at (x, y). By what was seen: one that lay on the floor 60

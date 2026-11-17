@@ -228,6 +228,11 @@ public:
 
     // The cell at a world position standing on a floor near y, or -1
     s32 NodeAt(s32 x, s32 y, bool half, s32 yTolerance = 20) const;
+    // Whether a wall stands between two places of a floor
+    bool Walled(s32 xa, s32 xb, s32 y, bool half) const
+    {
+        return WallBetween(xa, xb, y, half);
+    }
 
     // Edge cost in frames, or negative for one that can't be taken now
     using EdgeCost = std::function<s32(const NavEdge&)>;
