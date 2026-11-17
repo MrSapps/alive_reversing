@@ -5034,6 +5034,147 @@ static World PlateWorld()
     return world;
 }
 
+TEST(BotFlierSight, AFloorCeilingOrWallBetweenTwoPointsBlocksTheSightOfAFlyingSlig)
+{
+    // A wall from 100,0 to 100,50: between points either side of it at 25, not at 80 (under its end), and not
+    // between two on one side of it
+    NavInput in;
+    in.mLines.push_back(Line(100, 0, 100, 50, 1));
+    EXPECT_TRUE(Domain::SightBlocked(in, false, 50, 25, 150, 25));
+    EXPECT_FALSE(Domain::SightBlocked(in, false, 50, 80, 150, 80));
+    EXPECT_FALSE(Domain::SightBlocked(in, false, 20, 25, 80, 25));
+    // (a line of the other scale is none)
+    EXPECT_FALSE(Domain::SightBlocked(in, true, 50, 25, 150, 25));
+    // A line that only stops what flies (17) counts for a grenade's flight, not for sight
+    NavInput fence;
+    fence.mLines.push_back(Line(100, 0, 100, 50, 17));
+    EXPECT_FALSE(Domain::SightBlocked(fence, false, 50, 25, 150, 25));
+    EXPECT_TRUE(Domain::SightBlocked(fence, false, 50, 25, 150, 25, true));
+    // (a floor too: from over it to under it)
+    NavInput floor;
+    floor.mLines.push_back(Line(0, 100, 200, 100, 0));
+    EXPECT_TRUE(Domain::SightBlocked(floor, false, 50, 60, 150, 140));
+    EXPECT_FALSE(Domain::SightBlocked(floor, false, 50, 60, 150, 90));
+}
+
+TEST(BotFlierSight, ATracksStretchesAreJoinedWhenTheirEndsAreAsNearAsAskedFor)
+{
+    // The Barracks' path 14: two stretches of one track with ends 3 apart (808,1442 and 811,1439)
+    NavInput in;
+    in.mLines.push_back(Line(786, 1350, 808, 1442, 8));
+    in.mLines.push_back(Line(811, 1439, 977, 1439, 8));
+    s32 x1 = 0;
+    s32 y1 = 0;
+    s32 x2 = 0;
+    s32 y2 = 0;
+    ASSERT_TRUE(Domain::FlierTrack(in, 790, 1360, x1, y1, x2, y2));
+    EXPECT_EQ(x2, 808);
+    ASSERT_TRUE(Domain::FlierTrack(in, 790, 1360, x1, y1, x2, y2, nullptr, nullptr, 3));
+    EXPECT_EQ(x1, 786);
+    EXPECT_EQ(x2, 977);
+    EXPECT_EQ(y1, 1350);
+    EXPECT_EQ(y2, 1442);
+}
+
+TEST(BotFlierSight, ALeverUnderTheTrackOfAFlyingSligThatIsAboutIsDearForHimButNotOneItsScreenOnlyJustHas)
+{
+    // A floor at 1500 from 400 to 1900 (screens are 375 wide), a flying Slig about on a track from 1186 to 1551
+    // at 1440, and three levers: at 1300 under the middle of it, at 1564 on the next screen (which has 51 of the
+    // track), and at 600 with no track near
+    NavInput in;
+    in.mIsAe = true;
+    in.mLines.push_back(Line(400, 1500, 1900, 1500, 0));
+    in.mLines.push_back(Line(1186, 1440, 1551, 1440, 8));
+    World world;
+    Entity under = MakeEntity(EntityKind::eLever, 11, 1263, 1480, 1337, 1504);
+    under.mSwitch = 30;
+    under.mOp = 2;
+    Entity edge = MakeEntity(EntityKind::eLever, 12, 1527, 1480, 1601, 1504);
+    edge.mSwitch = 31;
+    edge.mOp = 2;
+    Entity off = MakeEntity(EntityKind::eLever, 13, 551, 1480, 627, 1504);
+    off.mSwitch = 32;
+    off.mOp = 2;
+    world.mEntities.push_back(under);
+    world.mEntities.push_back(edge);
+    world.mEntities.push_back(off);
+    FlierAt flier;
+    flier.mX = 1300;
+    flier.mY = 1455;
+    world.mFliers.push_back(flier);
+    NavGraph g;
+    g.Build(in);
+    const auto cost = [&g](const World& w, u32 lever)
+    {
+        const Domain d = Domain::Build(g, w, g.NodeAt(412, 1500, false), nullptr);
+        s32 least = -1;
+        for (const Goap::Action& a : d.mActions)
+        {
+            const DomainStep& step = d.mSteps[a.mTag];
+            if (step.mKind == StepKind::eUse && step.mEntity == lever && (least < 0 || a.mCost < least))
+            {
+                least = a.mCost;
+            }
+        }
+        return least;
+    };
+    const s32 plain = cost(world, 13);
+    ASSERT_GT(plain, 0);
+    EXPECT_EQ(cost(world, 11), plain + 1500);
+    EXPECT_EQ(cost(world, 12), plain);
+    // With no flying Slig about none is dear
+    World quiet = world;
+    quiet.mFliers.clear();
+    EXPECT_EQ(cost(quiet, 11), plain);
+}
+
+TEST(BotFlierSight, ATasksDoorWithLeversForHubsSetsItsOwnSwitchWhenTheyAreAllOn)
+{
+    // The Barracks' path 14: a tasks door (its "all hubs on" a switch of the bot's own, 256 and up) whose own
+    // switch is 218 and whose hubs are 208 and 210, each a lever's
+    NavInput in;
+    in.mIsAe = true;
+    in.mLines.push_back(Line(0, 100, 600, 100, 0));
+    World world;
+    Entity a = MakeEntity(EntityKind::eLever, 1, 88, 80, 112, 104);
+    a.mSwitch = 208;
+    Entity b = MakeEntity(EntityKind::eLever, 2, 288, 80, 312, 104);
+    b.mSwitch = 210;
+    Entity door = MakeEntity(EntityKind::eSwitchLogic, 3, 488, 80, 512, 104);
+    door.mSwitch = World::DoorSwitch(3);
+    door.mState = 218;
+    door.mInputs[0] = 208;
+    door.mInputs[1] = 210;
+    world.mEntities.push_back(a);
+    world.mEntities.push_back(b);
+    world.mEntities.push_back(door);
+    NavGraph g;
+    g.Build(in);
+    const auto gives = [&g](const World& w)
+    {
+        const Domain d = Domain::Build(g, w, g.NodeAt(12, 100, false), nullptr);
+        for (const Goap::Action& act : d.mActions)
+        {
+            if (d.mSteps[act.mTag].mKind == StepKind::eLogic && std::find(act.mEffects.begin(), act.mEffects.end(), Goap::Fact{Key::Switch(218), 1}) != act.mEffects.end())
+            {
+                EXPECT_NE(std::find(act.mPre.begin(), act.mPre.end(), Goap::Fact{Key::Switch(208), 1}), act.mPre.end());
+                EXPECT_NE(std::find(act.mPre.begin(), act.mPre.end(), Goap::Fact{Key::Switch(210), 1}), act.mPre.end());
+                return true;
+            }
+        }
+        return false;
+    };
+    EXPECT_TRUE(gives(world));
+    // Not with a hub that no lever sets (a wheel's, a lock's): those blocks are got through one switch at a time
+    World wheel = world;
+    wheel.mEntities[1].mKind = EntityKind::eWorkWheel;
+    EXPECT_FALSE(gives(wheel));
+    // Nor a logic that is no tasks door (its switch one of the game's)
+    World plain = world;
+    plain.mEntities[2].mSwitch = 99;
+    EXPECT_FALSE(gives(plain));
+}
+
 TEST(BotZone, AZoneThatSetsASwitchWhenHeIsInItIsAThingToDoWhereACellIsInIt)
 {
     // A floor from 0 to 400 at 100, and over 200 to 250 of it a zone that sets switch 77 (the Barracks' path 14:

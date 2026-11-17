@@ -3370,15 +3370,23 @@ void GoToTask::Bodies(const NavGraph& nav, const std::vector<s32>& path, std::si
         // (a running jump over a gap that ends hung from the ledge at its own height, measured there as well, off
         // 2012,1660 to the ledge at 2137: 16 frames through the air at 7.6 a frame, up to 31 over where he took
         // off and 15 under it as he catches the ledge, then hung and up as above)
+        // (a hop over a gap of four cells to a floor at its own height does not reach either: measured in the
+        // Barracks' path 5 from 687,620 to the ledge at 587, he is 15 frames in the air, falls 50 in 4, catches
+        // the ledge and hangs for 37 before he can pull up, 60 deep, where a flying mine goes by under the
+        // ledge with never that long between. Taken for a hop that lands, as it is here still, he got through
+        // on the frame he happened to come at; modelled as it is nothing was clear and he went round by a
+        // worse way. The way out of that path wants finding anew.)
         const bool catches = !last && kind == EdgeKind::eRunJump && !grabs && e.mFeature >= 0 && std::abs(a.mY - b.mY) * scale <= 20 &&
                              (nav.Input().mFeatures[e.mFeature].mKind == FeatureKind::eEdge || nav.Input().mFeatures[e.mFeature].mKind == FeatureKind::eHoist);
+        const s32 flight = 16;
+        const s32 offX = e.mX;
         if (grabs)
         {
             frames = run + 35;
         }
         else if (catches)
         {
-            frames = run + 16 + 26;
+            frames = run + flight + 26;
         }
         else if (falls)
         {
@@ -3481,15 +3489,17 @@ void GoToTask::Bodies(const NavGraph& nav, const std::vector<s32>& path, std::si
                 body.mY = a.mY;
                 if (k < 0)
                 {
-                    body.mX = a.mX + (e.mX - a.mX) * f / run;
+                    body.mX = a.mX + (offX - a.mX) * f / run;
                     body.mBack = 25;
                     body.mFront = 27;
                 }
-                else if (k < 16)
+                else if (k < flight)
                 {
                     const s32 to = b.mX - dir * 11 / scale;
-                    body.mX = e.mX + (to - e.mX) * (k + 1) / 16;
-                    body.mY = a.mY + (k >= 13 ? 15 : (k - 8) * (k - 8) * 31 / 64 - 31) / scale;
+                    // (the running jump's 16 frames of flight, or the hop's 8 over the same shape)
+                    const s32 k16 = k * 16 / flight;
+                    body.mX = offX + (to - offX) * (k + 1) / flight;
+                    body.mY = a.mY + (k16 >= 13 ? 15 : (k16 - 8) * (k16 - 8) * 31 / 64 - 31) / scale;
                     body.mUp = 69;
                     body.mBack = 36;
                     body.mFront = 23;
@@ -3497,7 +3507,7 @@ void GoToTask::Bodies(const NavGraph& nav, const std::vector<s32>& path, std::si
                 }
                 else
                 {
-                    const s32 h = k - 16;
+                    const s32 h = k - flight;
                     body.mX = b.mX;
                     body.mY = b.mY;
                     body.mBack = h < 3 ? 27 : 22;
@@ -9255,6 +9265,13 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
     const bool still = flown.mVelX100 == 0 && flown.mVelY100 == 0;
     if (nothingLeft || mPhase == 3)
     {
+        // (not burst with more for it to do in the plan: the next step finds him in it. The Barracks' path 14:
+        // the levers of 214 and 208 with the one flying Slig the lever of 210 lets out.)
+        if (mPhase != 3 && (lever || lock) && bot.PlanLater("FlierSpawner#" + std::to_string(mSpawner) + " "))
+        {
+            bot.Log(std::string(lock ? "the lock is open" : "the lever is pulled") + ": the flying Slig is kept for what the plan has for it next");
+            return TaskStep::Done();
+        }
         if (mPhase != 3)
         {
             mPhase = 3;
@@ -9381,13 +9398,229 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
     // lost 58 frames after it came up into the other's shaft). So it keeps behind the other, a hundred off at its
     // height, and where there is no getting behind it stays where it is with its own height to the other's;
     // and it throws when its grenade would meet the other on its way (thrown 5 over its point at 5.7 a frame
+    // One on the next screen on the way is waited for from this one: it sees and bombs only what is on the screen
+    // shown, which is the one of the flying Slig he flies (CanChase). So from a place on this screen where a
+    // grenade's flight (FlierFlight::GrenadeAt, followed until it meets a line) comes onto the other's track 70
+    // or more away, and thrown when the other will be where the grenade is. The Barracks' path 14: the one of
+    // 786 to 1071 over the lever of 214, from over the ledge at 697,1385; met on its own screen it won as
+    // often as not.
+    if (lock || lever)
+    {
+        const s32 goalX = lock ? lock->CentreX() : lever->CentreX();
+        const s32 myCam = nav.CameraOf(bx, by - 20);
+        const auto clearTo = [&](s32 x, s32 y, bool left, s32 frames, s32& gx, s32& gy)
+        {
+            s32 lastX = x;
+            s32 lastY = y - 5;
+            for (s32 t = 1; t <= frames; t++)
+            {
+                FlierFlight::GrenadeAt(x, y, left, t, gx, gy);
+                if (Domain::SightBlocked(nav.Input(), flown.mHalf, lastX, lastY, gx, gy, true))
+                {
+                    return false;
+                }
+                lastX = gx;
+                lastY = gy;
+            }
+            return true;
+        };
+        const FlierAt* prey = nullptr;
+        s64 preyKey = 0;
+        std::vector<NavLine> preyTrack;
+        for (const FlierAt& f : world.mFliers)
+        {
+            s32 x1 = 0;
+            s32 y1 = 0;
+            s32 x2 = 0;
+            s32 y2 = 0;
+            std::vector<NavLine> lines;
+            if (f.mHalf != flown.mHalf || nav.CameraOf(f.mX, f.mY - 20) == myCam || std::abs(f.mX - bx) > 500 || std::abs(f.mY - by) > 300 ||
+                !Domain::FlierTrack(nav.Input(), f.mX, f.mY - 15, x1, y1, x2, y2, nullptr, &lines, 3))
+            {
+                continue;
+            }
+            // (its track over the way from here to where he is going)
+            if (x2 + 60 < std::min(bx, goalX) || x1 - 60 > std::max(bx, goalX))
+            {
+                continue;
+            }
+            const s64 key = static_cast<s64>(x1) * 100000 + y1;
+            if (mAmbushed.count(key) == 0 && (!prey || std::abs(f.mX - bx) < std::abs(prey->mX - bx)))
+            {
+                prey = &f;
+                preyKey = key;
+                preyTrack = lines;
+            }
+        }
+        if (prey && mAmbush == 0)
+        {
+            // A place for it: on this screen, a grenade from it on the other's track, on the other's screen
+            const bool left = prey->mX < bx;
+            const s32 camW = nav.Input().mCamW;
+            const s32 edge = left ? (bx / camW) * camW : (bx / camW + 1) * camW - 1;
+            const s32 preyCam = nav.CameraOf(prey->mX, prey->mY - 20);
+            bool found = false;
+            // (the stretch of its track it is on now is one it flies: that one first, then any)
+            std::size_t on = 0;
+            s64 onFar = -1;
+            for (std::size_t i = 0; i < preyTrack.size(); i++)
+            {
+                const NavLine& line = preyTrack[i];
+                const s64 lx = line.mX2 - line.mX1;
+                const s64 ly = line.mY2 - line.mY1;
+                const s64 sq = lx * lx + ly * ly;
+                s64 k = sq == 0 ? 0 : ((prey->mX - line.mX1) * lx + (prey->mY - 15 - line.mY1) * ly) * 1000 / sq;
+                k = std::max<s64>(0, std::min<s64>(1000, k));
+                const s64 dx = line.mX1 + lx * k / 1000 - prey->mX;
+                const s64 dy = line.mY1 + ly * k / 1000 - (prey->mY - 15);
+                if (onFar < 0 || dx * dx + dy * dy < onFar)
+                {
+                    onFar = dx * dx + dy * dy;
+                    on = i;
+                }
+            }
+            for (s32 pass = 0; pass < 2 && !found; pass++)
+            for (s32 back = 5; back <= 110 && !found; back += 5)
+            {
+                for (s32 y = prey->mY - 160; y <= prey->mY + 80 && !found; y += 5)
+                {
+                    const s32 x = left ? edge + back : edge - back;
+                    for (s32 t = 18; t >= 8 && !found; t--)
+                    {
+                        s32 gx = 0;
+                        s32 gy = 0;
+                        if (!clearTo(x, y, left, t, gx, gy) || std::abs(gx - x) < 70 || nav.CameraOf(gx, gy) != preyCam)
+                        {
+                            continue;
+                        }
+                        for (std::size_t li = 0; li < preyTrack.size(); li++)
+                        {
+                            if (pass == 0 && li != on)
+                            {
+                                continue;
+                            }
+                            const NavLine& line = preyTrack[li];
+                            // (the flying Slig is drawn, and hit, some 15 under its track)
+                            const s64 lx = line.mX2 - line.mX1;
+                            const s64 ly = line.mY2 - line.mY1;
+                            const s64 sq = lx * lx + ly * ly;
+                            s64 k = sq == 0 ? 0 : ((gx - line.mX1) * lx + (gy - 15 - line.mY1) * ly) * 1000 / sq;
+                            k = std::max<s64>(0, std::min<s64>(1000, k));
+                            const s64 dx = line.mX1 + lx * k / 1000 - gx;
+                            const s64 dy = line.mY1 + ly * k / 1000 - (gy - 15);
+                            std::vector<std::pair<s32, s32>> corners;
+                            const std::vector<NavLine> gatesNow = FartFlight::Gates(nav.Input(), flown.mHalf, &world);
+                            if (dx * dx + dy * dy <= 100 && Domain::FlierWay(nav.Input(), flown.mHalf, bx, by, x, y, &gatesNow, corners))
+                            {
+                                found = true;
+                                mAmbushX = x;
+                                mAmbushY = y;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            if (found)
+            {
+                mAmbush = 1;
+                mAmbushFrames = 0;
+                mAmbushFromX = bx;
+                mAmbushFromY = by;
+                mAmbushKey = preyKey;
+                bot.Log("another flying Slig at " + std::to_string(prey->mX) + "," + std::to_string(prey->mY) + " on the next screen: waited for from " + std::to_string(mAmbushX) + "," + std::to_string(mAmbushY) + " on this one, with a grenade");
+            }
+            else
+            {
+                mAmbushed.insert(preyKey);
+            }
+        }
+        // (done with: back to where it left its way for this, and on from there. From where it waited the way on
+        // had it pushing at a line by the other's nest for a thousand frames.)
+        if (mAmbush == 3)
+        {
+            if (++mAmbushFrames > 300 || (std::abs(mAmbushFromX - bx) <= 6 && std::abs(mAmbushFromY - by) <= 6))
+            {
+                mAmbush = 0;
+                mState = 0;
+                mLegFrames = 0;
+            }
+            else
+            {
+                std::vector<std::pair<s32, s32>> corners;
+                const std::vector<NavLine> gatesNow = FartFlight::Gates(nav.Input(), flown.mHalf, &world);
+                Domain::FlierWay(nav.Input(), flown.mHalf, bx, by, mAmbushFromX, mAmbushFromY, &gatesNow, corners);
+                return corners.empty() ? steerTo(mAmbushFromX, mAmbushFromY) : steerTo(corners[0].first, corners[0].second);
+            }
+        }
+        if ((mAmbush == 1 || mAmbush == 2) && (!prey || preyKey != mAmbushKey))
+        {
+            // (gone, or on this screen now: what follows deals with that)
+            if (mAmbush == 2 || !prey)
+            {
+                bot.Log("the flying Slig waited for is gone");
+            }
+            mAmbushed.insert(mAmbushKey);
+            mAmbush = 3;
+            mAmbushFrames = 0;
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        if ((mAmbush == 1 || mAmbush == 2) && prey)
+        {
+            const bool left = prey->mX < mAmbushX;
+            if (++mAmbushFrames > 1200)
+            {
+                bot.Log("the flying Slig waited for did not come by in 1200 frames");
+                mAmbushed.insert(mAmbushKey);
+                mAmbush = 3;
+                mAmbushFrames = 0;
+            }
+            else if (std::abs(mAmbushX - bx) > 4 || std::abs(mAmbushY - by) > 4 || !still)
+            {
+                std::vector<std::pair<s32, s32>> corners;
+                const std::vector<NavLine> gatesNow = FartFlight::Gates(nav.Input(), flown.mHalf, &world);
+                Domain::FlierWay(nav.Input(), flown.mHalf, bx, by, mAmbushX, mAmbushY, &gatesNow, corners);
+                return corners.empty() ? steerTo(mAmbushX, mAmbushY) : steerTo(corners[0].first, corners[0].second);
+            }
+            else if (flown.mMotion == 0 && flown.mFacingLeft != left)
+            {
+                return TaskStep::Do(Prim::Wait(1, left ? Btn::eLeft : Btn::eRight));
+            }
+            else
+            {
+                for (s32 t = 8; t <= 18 && flown.mCanThrow && flown.mMotion == 0; t++)
+                {
+                    s32 gx = 0;
+                    s32 gy = 0;
+                    const s32 fx = prey->mX + prey->mVelX * t / 256;
+                    const s32 fy = prey->mY + prey->mVelY * t / 256;
+                    if (clearTo(bx, by, left, t, gx, gy) && std::abs(gx - fx) <= 14 && gy >= fy - 22 && gy <= fy + 8 && std::abs(gx - bx) >= 65)
+                    {
+                        mAmbush = 2;
+                        bot.Log("the other flying Slig at " + std::to_string(prey->mX) + "," + std::to_string(prey->mY) + ": a grenade from " + std::to_string(bx) + "," + std::to_string(by) + " to meet it in " + std::to_string(t) + " frames");
+                        return TaskStep::Do(Prim::Wait(1, Btn::eThrow));
+                    }
+                }
+                return TaskStep::Do(Prim::Wait(1));
+            }
+        }
+    }
     // along and 6 up, a pixel a frame more down each frame), no nearer than its blast leaves it alone.
-    if (lock)
+    // (and on the way to a lever: the Barracks' path 14, where the one over the lever of 214 bombed it as it hung
+    // by that lever)
+    if (lock || lever)
     {
         const s32 myCam = nav.CameraOf(bx, by - 20);
         const FlierAt* foe = nullptr;
         for (const FlierAt& f : world.mFliers)
         {
+            // (on the way to a lever, not one behind it: it is flown away from. The Barracks' path 14: the
+            // one the lever of 214 lets out at 786, with the next lever the other way.)
+            const s32 goal = lever ? lever->CentreX() : bx;
+            if (lever && (f.mX - bx) * (goal - bx) < 0 && std::abs(f.mX - bx) > 60)
+            {
+                continue;
+            }
             if (f.mHalf == flown.mHalf && nav.CameraOf(f.mX, f.mY - 20) == myCam &&
                 (!foe || std::abs(f.mX - bx) + std::abs(f.mY - by) < std::abs(foe->mX - bx) + std::abs(foe->mY - by)))
             {
@@ -9509,6 +9742,12 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             if (mSince % 6 == 0 && still && flown.mMotion == 0 && flown.mFacingLeft == shot.mFaceLeft && std::abs(shot.mX - bx) <= 8 && std::abs(shot.mY - by) <= 8)
             {
                 return TaskStep::Do(Prim::Wait(1, Btn::eAction));
+            }
+            // (turned away from it by the last touch that put it in place: round again. The Barracks' path 14:
+            // at 971 for 967 it was sent a frame left, turned, and hung with its back to the lever.)
+            if (mSince % 6 == 3 && still && flown.mMotion == 0 && flown.mFacingLeft != shot.mFaceLeft && std::abs(shot.mX - bx) <= 8 && std::abs(shot.mY - by) <= 8)
+            {
+                return TaskStep::Do(Prim::Wait(1, shot.mFaceLeft ? Btn::eLeft : Btn::eRight));
             }
             return TaskStep::Do(Prim::Wait(1));
         }
@@ -9729,6 +9968,25 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             }
         }
         mHeld = 0;
+        // (held at the same place a third time: off another way for a bit, see below, and the way found anew from
+        // where that gets it. The Barracks' path 14: taken over at 494,1412 under the cage, it pushed at
+        // 480,1412 for a thousand frames.)
+        if (mEscape > 0)
+        {
+            mEscape--;
+            if (std::abs(mEscapeX - bx) <= 6 && std::abs(mEscapeY - by) <= 6)
+            {
+                mEscape = 0;
+            }
+            if (mEscape == 0)
+            {
+                mState = 0;
+                mLegFrames = 0;
+                mHeldTimes = 0;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            return steerTo(mEscapeX, mEscapeY);
+        }
         // Pushing at something (the end of a ledge its side is under): along to where it is going first
         if (std::abs(bx - mLastX) + std::abs(by - mLastY) <= 1)
         {
@@ -9745,6 +10003,23 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             mUnstick = 25;
             mStuck = 0;
             bot.Log("the flying Slig is held at " + std::to_string(bx) + "," + std::to_string(by) + ": along first");
+            mHeldTimes = std::abs(bx - mHeldX) + std::abs(by - mHeldY) <= 8 ? mHeldTimes + 1 : 1;
+            mHeldX = bx;
+            mHeldY = by;
+            // (a third time: off another way, down first, then down and back, back, up; and the way found anew
+            // from where that gets it. It was under the end of a wall, 500,1400, which its top was against.)
+            if (mHeldTimes >= 3)
+            {
+                static const s32 kWays[4][2] = {{0, 45}, {-40, 40}, {-45, 0}, {0, -45}};
+                const s32 way = shot.mFaceLeft ? -1 : 1;
+                mEscapeX = bx + kWays[mEscapes % 4][0] * way;
+                mEscapeY = by + kWays[mEscapes % 4][1];
+                mEscapes++;
+                mEscape = 40;
+                mUnstick = 0;
+                bot.Log("held there a third time: off to " + std::to_string(mEscapeX) + "," + std::to_string(mEscapeY) + " and on from there");
+                return steerTo(mEscapeX, mEscapeY);
+            }
         }
         if (mUnstick > 0 && !last)
         {

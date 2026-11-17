@@ -926,6 +926,9 @@ static void BuildEntities(BinaryPath& path, World& world)
                     keep = GetGameType() == GameType::eAe && (t.mDoorType == relive::Path_Door::eTasksDoor || t.mDoorType == relive::Path_Door::eTasksDoorWithSecretMusic);
                     e.mKind = EntityKind::eSwitchLogic;
                     e.mSwitch = World::DoorSwitch(e.mId);
+                    // (and with them all on it sets its own switch, Door.cpp: what a door of the hub wants of
+                    // this block)
+                    e.mState = t.mSwitchId;
                     const s16 hubs[8] = {t.mHub1, t.mHub2, t.mHub3, t.mHub4, t.mHub5, t.mHub6, t.mHub7, t.mHub8};
                     s32 count = 0;
                     for (s32 i = 0; i < 8 && count < 6; i++)

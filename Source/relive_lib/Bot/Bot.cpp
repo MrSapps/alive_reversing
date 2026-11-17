@@ -1,4 +1,5 @@
 #include "Bot.hpp"
+#include <array>
 #include "ThrowArc.hpp"
 #include "../BaseMap.hpp"
 #include "../GameType.hpp"
@@ -931,6 +932,35 @@ bool Bot::Replan(BaseMap& map)
             break;
         }
     }
+    // Levers one flying Slig is to pull one after the other: the one that lets another flying Slig out last (it
+    // comes out by that lever, and the one he flies is burst there with nothing more to do; pulled first, the
+    // new one had it on its way to the next). The Barracks' path 14, the levers of 214 and 208: the
+    // walkthrough's "pull the lever to ... release another flying Slig. Blow him and yourself up."
+    {
+        const auto lets = [&](s32 stepIdx)
+        {
+            for (const Goap::Fact& e : actions[stepIdx].mEffects)
+            {
+                for (const Entity& spawner : mWorld.mEntities)
+                {
+                    if (spawner.mKind == EntityKind::eFlierSpawner && spawner.mSwitch > 1 && e.mKey == Key::Switch(spawner.mSwitch))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        };
+        for (std::size_t i = 0; i + 1 < best.mSteps.size(); i++)
+        {
+            const DomainStep& a = domain.mSteps[actions[best.mSteps[i]].mTag];
+            const DomainStep& b = domain.mSteps[actions[best.mSteps[i + 1]].mTag];
+            if (a.mKind == StepKind::eFlierPull && b.mKind == StepKind::eFlierPull && a.mEntity == b.mEntity && lets(best.mSteps[i]) && !lets(best.mSteps[i + 1]))
+            {
+                std::swap(best.mSteps[i], best.mSteps[i + 1]);
+            }
+        }
+    }
     mKeptPlan.clear();
     for (s32 stepIdx : best.mSteps)
     {
@@ -1366,7 +1396,37 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
             powerFirst = !locks.empty();
         }
     }
-    const auto base = [know, world, only, pastScrabs, charged, chanted, unseenRun, powerFirst, pastFacing](const NavEdge& e) -> s32
+    // Where flying Sligs that are about fly (the boxes of their tracks): a climb that ends hung from a ledge by
+    // one is dear, he is still there for a second with it over him. The Barracks' path 14: up to the ledge at
+    // 787,1420, at the end of the track of the one from the spawner at 775, he was bombed; the way under that
+    // ledge is rolled.
+    std::vector<std::array<s32, 5>> flierBoxes;
+    for (const FlierAt& f : mWorld.mFliers)
+    {
+        s32 x1 = 0;
+        s32 y1 = 0;
+        s32 x2 = 0;
+        s32 y2 = 0;
+        if (Domain::FlierTrack(know->mNav.Input(), f.mX, f.mY - 15, x1, y1, x2, y2, nullptr, nullptr, 3))
+        {
+            flierBoxes.push_back({x1, y1, x2, y2, f.mHalf ? 1 : 0});
+        }
+    }
+    // (and of the ones spawners that are on have let out, whose screens have not been seen yet: decided a screen
+    // off, the jump to that ledge was under way before the flying Slig there was to be seen)
+    for (const Entity& spawner : mWorld.mEntities)
+    {
+        s32 x1 = 0;
+        s32 y1 = 0;
+        s32 x2 = 0;
+        s32 y2 = 0;
+        if (spawner.mKind == EntityKind::eFlierSpawner && spawner.mSwitch > 1 && mWorld.Switch(spawner.mSwitch) != 0 && mWorld.mNoFlier.count(spawner.mId) == 0 &&
+            Domain::FlierTrack(know->mNav.Input(), spawner.CentreX(), (spawner.mY1 + spawner.mY2) / 2, x1, y1, x2, y2, nullptr, nullptr, 3))
+        {
+            flierBoxes.push_back({x1, y1, x2, y2, spawner.mHalf ? 1 : 0});
+        }
+    }
+    const auto base = [know, world, only, pastScrabs, charged, chanted, unseenRun, powerFirst, pastFacing, flierBoxes](const NavEdge& e) -> s32
     {
         const s32 idx = static_cast<s32>(&e - know->mNav.Edges().data());
         if (know->mBannedEdges.count(idx) || (!only->empty() && !only->count(idx)))
@@ -1410,6 +1470,18 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
         if (only->empty() && !unseenNow && powerFirst && Domain::SligWatched(know->mNav, *world, to.mX, to.mY, to.mHalf) && !Domain::SligWatched(know->mNav, *world, from.mX, from.mY, from.mHalf))
         {
             return -1;
+        }
+        // (a climb by a flying Slig's track, see flierBoxes: before the ways a jump up a hoist is the quick one)
+        if ((e.mKind == EdgeKind::eRunJump || e.mKind == EdgeKind::eHop) && to.mY < from.mY - 20 && !to.mHidden && !world->mInvisible)
+        {
+            for (const std::array<s32, 5>& box : flierBoxes)
+            {
+                if ((box[4] != 0) == to.mHalf && to.mX >= box[0] - 60 && to.mX <= box[2] + 60 && to.mY >= box[1] - 60 && to.mY <= box[3] + 120)
+                {
+                    // (dearer than what the way round may cost: by a bird portal is 3000 a cell, six cells of it)
+                    return e.mCost + 30000;
+                }
+            }
         }
         // A running jump up a hoist: the way to go with a Scrab on his floor after him, and not otherwise
         if (e.mKind == EdgeKind::eRunJump && e.mFeature >= 0 && know->mNav.Input().mFeatures[e.mFeature].mKind == FeatureKind::eHoist)
@@ -2567,6 +2639,58 @@ bool Bot::FlierThreat() const
         {
             continue;
         }
+        // Not one he only runs by: the next thing to do is on a screen its track does not come onto, and all of
+        // the way there that is on its screens is run along a floor (after no more than a hoist up onto it).
+        // Seen, it is some 30 frames to its first grenade, which comes down 17 later where he was, 90 behind him
+        // by then. The Barracks' path 14: from the shaft at 1437 west along the long floor, under the one of
+        // 1186 to 1551 (run with nothing kept off: no grenade thrown).
+        if (abeNode >= 0 && !mPlanNodes.empty() && mPlanNodes[0] >= 0)
+        {
+            s32 x1 = 0;
+            s32 y1 = 0;
+            s32 x2 = 0;
+            s32 y2 = 0;
+            std::vector<NavLine> lines;
+            std::set<s32> cams;
+            if (Domain::FlierTrack(nav.Input(), flier.mX, flier.mY - 15, x1, y1, x2, y2, nullptr, &lines, 3))
+            {
+                for (const NavLine& line : lines)
+                {
+                    cams.insert(nav.CameraOf(line.mX1, line.mY1));
+                    cams.insert(nav.CameraOf(line.mX2, line.mY2));
+                }
+                // (a screen its track only just comes onto, 60 of it or less, is none of its: Domain has the
+                // same for a lever there)
+                const s32 camW = nav.Input().mCamW;
+                for (auto it = cams.begin(); it != cams.end();)
+                {
+                    const s32 lo = (*it % 256) * camW;
+                    it = std::min(x2, lo + camW - 1) - std::max(x1, lo) <= 60 ? cams.erase(it) : std::next(it);
+                }
+            }
+            const NavNode& thing = nav.Nodes()[mPlanNodes[0]];
+            std::vector<s32> route;
+            if (!cams.empty() && cams.count(nav.CameraOf(thing.mX, thing.mY - 5)) == 0 && nav.FindPath(abeNode, mPlanNodes[0], EdgeCostFn(), route))
+            {
+                bool runs = true;
+                bool begun = false;
+                for (s32 edge : route)
+                {
+                    const NavEdge& e = nav.Edges()[edge];
+                    const NavNode& to = nav.Nodes()[e.mTo];
+                    if (cams.count(nav.CameraOf(to.mX, to.mY - 5)) == 0)
+                    {
+                        continue;
+                    }
+                    runs = runs && (e.mKind == EdgeKind::eWalk || (e.mKind == EdgeKind::eHoistUp && !begun));
+                    begun = true;
+                }
+                if (runs)
+                {
+                    continue;
+                }
+            }
+        }
         // On his screen it sees him as soon as it faces him
         if (nav.CameraOf(flier.mX, flier.mY) == cam)
         {
@@ -3043,6 +3167,15 @@ std::unique_ptr<Task> Bot::MakeReflex()
             return nullptr;
         }
     }
+    // (nor with a flying Slig about within two screens: the slaps are a second each stood still under it. The
+    // Barracks' path 14: bombed at 1487,1500 sorting out the two the slam door at 1589 let through.)
+    for (const FlierAt& f : mWorld.mFliers)
+    {
+        if (f.mHalf == mAbe.mHalfScale && std::abs(f.mX - mAbe.mX) < 750 && std::abs(f.mY - mAbe.mY) < 300)
+        {
+            return nullptr;
+        }
+    }
     for (const Entity& e : mWorld.mEntities)
     {
         if (e.mKind == EntityKind::eMudokon && e.mLive && e.mFollowing && e.mMood == MudMood::eWired && e.mHalf == mAbe.mHalfScale && std::abs(e.mLiveY - mAbe.mY) < 20 && mReflexTries[e.mId] < 3)
@@ -3463,6 +3596,19 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
             else if (mVary == Lookahead::Way::eFast)
             {
                 mPendingPrim.mGait = Gait::eRun;
+            }
+            // (and with a flying Slig within two screens of him what would be walked is run: once it is after him
+            // it bombs where he was some 50 frames before, on its screen or off it. The Barracks' path 14: the
+            // last four cells to the lever of 208 walked in 45 frames, he was bombed as he turned from it.)
+            else if (mPendingPrim.mGait == Gait::eWalk && mIsAe && !mWorld.mInvisible)
+            {
+                for (const FlierAt& f : mWorld.mFliers)
+                {
+                    if (f.mHalf == mAbe.mHalfScale && std::abs(f.mX - mAbe.mX) < 750 && std::abs(f.mY - mAbe.mY) < 300)
+                    {
+                        mPendingPrim.mGait = Gait::eRun;
+                    }
+                }
             }
         }
         mPilot.Start(mPendingPrim, mAbe);
