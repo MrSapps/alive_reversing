@@ -4643,6 +4643,66 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             }
         }
     }
+    // A trap door that shuts by itself and puts its switch back (TrapDoor.cpp: open for its stay-open time, 60
+    // frames in FeeCo's path 9): what it opens is not a thing to cross some time after its lever, but at once,
+    // by the quickest way, as one thing to do. ("Pull the lever before climbing back up. You have to run to make
+    // it through the trapdoor in time.")
+    {
+        std::set<s32> timed;
+        for (const NavFeature& f : nav.Input().mFeatures)
+        {
+            // (AE's: AO's trap doors all shut by themselves, 20 frames on, and are got through as they were)
+            if (nav.Input().mIsAe && f.mKind == FeatureKind::eTrapDoor && f.mB > 0 && f.mSwitch > 1)
+            {
+                timed.insert(f.mSwitch);
+            }
+        }
+        std::vector<Goap::Action> through;
+        for (std::size_t i = 0; !timed.empty() && i < d.mActions.size();)
+        {
+            const DomainStep& step = d.mSteps[d.mActions[i].mTag];
+            s32 sw = 0;
+            s32 open = 0;
+            if (step.mKind == StepKind::eCross && step.mEdge >= 0 && nav.Condition(nav.Edges()[step.mEdge], &sw, &open) && timed.count(sw) != 0 && world.Switch(sw) != open)
+            {
+                through.push_back(d.mActions[i]);
+                d.mActions.erase(d.mActions.begin() + static_cast<std::ptrdiff_t>(i));
+                continue;
+            }
+            i++;
+        }
+        const std::size_t count = d.mActions.size();
+        for (const Goap::Action& cross : through)
+        {
+            const DomainStep crossStep = d.mSteps[cross.mTag];
+            s32 sw = 0;
+            s32 open = 0;
+            nav.Condition(nav.Edges()[crossStep.mEdge], &sw, &open);
+            for (std::size_t i = 0; i < count; i++)
+            {
+                const Goap::Action lever = d.mActions[i];
+                const DomainStep leverStep = d.mSteps[lever.mTag];
+                if (leverStep.mKind != StepKind::eUse || lever.mEffects.empty() || !(lever.mEffects[0] == Goap::Fact{Key::Switch(sw), open}))
+                {
+                    continue;
+                }
+                std::vector<Goap::Fact> pre = lever.mPre;
+                for (const Goap::Fact& fact : cross.mPre)
+                {
+                    if (fact.mKey != Key::kRegion && fact.mKey != Key::Switch(sw))
+                    {
+                        pre.push_back(fact);
+                    }
+                }
+                DomainStep both;
+                both.mKind = StepKind::eTimedDoor;
+                both.mEntity = leverStep.mEntity;
+                both.mEdge = crossStep.mEdge;
+                both.mOther = static_cast<u32>(open);
+                add(lever.mName + " and at once " + cross.mName, pre, cross.mEffects, lever.mCost + cross.mCost, both);
+            }
+        }
+    }
     // Slogs that are awake on a stretch of floor, in a level with bones (GameView's MarkSlogPens): a bone thrown
     // onto it from a cell over it. From 50 or more over their floor: a Slog that can't get at him goes for a bone
     // at once, one he stands by has him first. Where the bone comes to lie is known before it is thrown (ThrowArc:
@@ -5873,6 +5933,17 @@ bool Domain::BoneThrow(const NavGraph& nav, s32 node, s32 x1, s32 x2, s32 floorY
     bool found = false;
     for (s32 side = 0; side < 2; side++)
     {
+        // (not with an electric wall within his arm's reach the way he throws: the arm goes out some 45 past
+        // him, and the wall kills what is within 4 of its beam. FeeCo's path 9, from the cell by the wall.)
+        bool wall = false;
+        for (const NavFeature& f : nav.Input().mFeatures)
+        {
+            wall = wall || (f.mKind == FeatureKind::eBarrier && f.mBeam && f.mHalf == from.mHalf && std::abs(f.mY2 - from.mY) <= 60 && (side == 1 ? f.mX1 < from.mX && f.mX1 > from.mX - 62 : f.mX1 > from.mX && f.mX1 < from.mX + 62));
+        }
+        if (wall)
+        {
+            continue;
+        }
         for (const ThrowSpot::Kind kind : kKinds)
         {
             // (a bone flies as a rock does)
@@ -5889,9 +5960,23 @@ bool Domain::BoneThrow(const NavGraph& nav, s32 node, s32 x1, s32 x2, s32 floorY
             {
                 continue;
             }
+            // (not one that comes down on another floor first: a bone rolls where a rock skips. Off the wall by
+            // the door of FeeCo's path 9 it lay on the ledge and rolled along it for 50 frames. Off a wall in
+            // the air is no matter.)
+            bool touched = false;
+            for (s32 k = 2; k < at && !touched; k++)
+            {
+                touched = flight.mPoints[k - 1].mY > flight.mPoints[k - 2].mY && flight.mPoints[k].mY < flight.mPoints[k - 1].mY;
+            }
+            if (touched)
+            {
+                continue;
+            }
             const ThrowArc::Point& end = flight.mPoints[at];
             const bool goesLeft = flight.mPoints[at - 1].mX > end.mX;
-            if (end.mX < x1 + (goesLeft ? 45 : 12) || end.mX > x2 - (goesLeft ? 12 : 45) || nav.CameraOf(end.mX, floorY - 5) != cam || (wanted && !wanted(end.mX)))
+            // (a stretch ends at a wall, mostly, and the bone comes back off it)
+            (void)goesLeft;
+            if (end.mX < x1 + 15 || end.mX > x2 - 15 || nav.CameraOf(end.mX, floorY - 5) != cam || (wanted && !wanted(end.mX)))
             {
                 continue;
             }

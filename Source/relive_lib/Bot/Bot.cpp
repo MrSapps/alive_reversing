@@ -225,6 +225,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<VoiceLockTask>(step.mEntity, step.mEdge);
         case StepKind::eSligLever:
             return std::make_unique<SligLeverTask>(step.mEntity, step.mEdge);
+        case StepKind::eTimedDoor:
+            return std::make_unique<TimedDoorTask>(step.mEntity, static_cast<s32>(step.mOther), step.mEdge);
         case StepKind::eFeedSlogs:
             return std::make_unique<FeedSlogsTask>(step.mEntity, step.mEdge, step.mOther);
         case StepKind::eGrenadeOrb:
@@ -305,12 +307,16 @@ bool Bot::Replan(BaseMap& map)
         }
         mTranceWaits = in ? 0 : mTranceWaits;
     }
-    if (abeNode < 0 || (mAbe.mMove == Move::eAir && !mAbe.mOnGround))
+    // (in a door, AE's Motion_114_DoorEnter and Motion_115_DoorExit: he is where he was until he is out of it,
+    // and in FeeCo's path 4 that was a cell of the path he had come into)
+    const bool inDoor = mIsAe && (mAbe.mMotion == 114 || mAbe.mMotion == 115);
+    if (abeNode < 0 || inDoor || (mAbe.mMove == Move::eAir && !mAbe.mOnGround))
     {
         // In the air (out of a bird portal as well, which leaves him at a floor's height before he has landed), on
         // a lift, mid door: look again shortly
         // (out of a bird portal he hangs in the air for a second or two)
-        if (++mLogicWaits > (abeNode < 0 ? 60 : 400))
+        // (in a door the wait is the door's, however long the path behind it takes to come)
+        if (!inDoor && ++mLogicWaits > (abeNode < 0 ? 60 : 400))
         {
             Stuck("no_plan: Abe isn't on a floor the nav graph knows, at " + std::to_string(mAbe.mX) + "," + std::to_string(mAbe.mY));
             return false;
@@ -1446,6 +1452,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
     const PathKnowledge* know = mKnow;
     const World* world = &mWorld;
     const std::set<s32>* only = &mOnlyEdges;
+    const bool timedRun = mTimedRun;
     // (the power to go unseen in hand makes a Scrab's floor a way like any other, unless it is kept for a step of
     // the plan that is not at hand yet)
     const bool charged = !(mInvisSaved && !mInvisChantNow);
@@ -1531,7 +1538,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
             flierBoxes.push_back({x1, y1, x2, y2, spawner.mHalf ? 1 : 0});
         }
     }
-    const auto base = [know, world, only, pastScrabs, charged, chanted, unseenRun, powerFirst, pastFacing, flierBoxes](const NavEdge& e) -> s32
+    const auto base = [know, world, only, pastScrabs, charged, chanted, unseenRun, powerFirst, pastFacing, flierBoxes, timedRun](const NavEdge& e) -> s32
     {
         const s32 idx = static_cast<s32>(&e - know->mNav.Edges().data());
         if (know->mBannedEdges.count(idx) || (!only->empty() && !only->count(idx)))
@@ -1591,6 +1598,12 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
         // A running jump up a hoist: the way to go with a Scrab on his floor after him, and not otherwise
         if (e.mKind == EdgeKind::eRunJump && e.mFeature >= 0 && know->mNav.Input().mFeatures[e.mFeature].mKind == FeatureKind::eHoist)
         {
+            // (and through something that shuts by itself: the jump and the pull up are some 40 frames, the
+            // stop under the hoist and the climb twice that)
+            if (timedRun)
+            {
+                return 20;
+            }
             // (unseen on a floor Sligs watch: the power runs out, and the jump is quicker than the stop and the
             // climb. Feeco's path 3, up the block at 1312,2020.)
             if (unseenRun && Domain::SligWatched(know->mNav, *world, from.mX, from.mY, from.mHalf))
@@ -3231,7 +3244,13 @@ std::unique_ptr<Task> Bot::MakeReflex()
             }
             u32 aim = 0;
             s32 frames = 0;
-            if (slogs && lying <= 1 && Domain::BoneThrow(mKnow->mNav, AbeNode(), e.mInputs[2], e.mInputs[3], e.mInputs[4], aim, frames))
+            // (not stood in the open for it under Sligs in the background that shoot)
+            bool shot = false;
+            for (const SligAt& slig : mWorld.mSligs)
+            {
+                shot = shot || (slig.mZShoot && !slig.mPossessed && !at.mZCover && mKnow->mNav.CameraOf(slig.mX, slig.mY - 5) == mKnow->mNav.CameraOf(at.mX, at.mY - 5));
+            }
+            if (slogs && !shot && lying <= 1 && Domain::BoneThrow(mKnow->mNav, AbeNode(), e.mInputs[2], e.mInputs[3], e.mInputs[4], aim, frames))
             {
                 mRefeeds++;
                 Log("on the Slogs' floor with " + std::to_string(lying) + " bone lying and " + std::to_string(mWorld.mRocks) + " in hand (" + std::to_string(later) + " for later): another");

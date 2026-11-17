@@ -491,6 +491,15 @@ public:
     {
         mFlierDash = on;
     }
+    // Through something that shuts by itself (TimedDoorTask): the ways are weighed by how long they take
+    void TimedRun(bool on)
+    {
+        mTimedRun = on;
+    }
+    bool TimedRunOn() const
+    {
+        return mTimedRun;
+    }
     // The cell he waits in for a flying Slig to have gone by (GoToTask, out of a tunnel): not hidden from there
     void FlierTimedAt(s32 node)
     {
@@ -631,6 +640,7 @@ private:
     u32 mPlanEntity = 0;
     bool mFlierDash = false;
     s32 mFlierTimedNode = -1;
+    bool mTimedRun = false;
     // Bones thrown to Slogs on their own floor, beyond the plan's
     s32 mRefeeds = 0;
     // Ways out (level, path, feature) that led to a part of a path with no way on

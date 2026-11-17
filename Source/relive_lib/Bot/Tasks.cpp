@@ -184,6 +184,16 @@ bool GoToTask::ZWatched(Bot& bot, const NavGraph& nav, const std::vector<s32>& p
     {
         any = any || (slig.mZShoot && !slig.mPossessed && nav.CameraOf(slig.mX, slig.mY - 5) == cam);
     }
+    // (with a bone out for Slogs they are not waited for: it is eaten in less time than that. What it was
+    // thrown for was timed by them before it was thrown, FeedSlogsTask.)
+    // (on the Slogs' own floor, that is: over it he still has the time)
+    for (const Entity& e : bot.GetWorld().mEntities)
+    {
+        if (any && e.mKind == EntityKind::eSlog && !e.mGone && e.mInputs[3] > e.mInputs[2] && here.mX >= e.mInputs[2] && here.mX <= e.mInputs[3] && std::abs(here.mY - e.mInputs[4]) <= 10 && bot.GetWorld().Switch(e.mSwitch) != 0)
+        {
+            any = false;
+        }
+    }
     const NavEdge& first = nav.Edges()[path[0]];
     if (any && mZLeapt && mZSideX != 0 && cur == mZSideAt && here.mX != mZSideX)
     {
@@ -505,6 +515,11 @@ bool GoToTask::ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
             return std::max(1, std::abs(a.mX - b.mX) / NavGraph::GridStep(a.mHalf));
         };
         const NavNode* at = &here;
+        // (what he does here first, with the leap to come at once after it: a bone thrown for the Slogs below)
+        if (mZHold > 0)
+        {
+            add(here, here, mZHold);
+        }
         if (lead > 0)
         {
             const NavNode& end = nav.Nodes()[nav.Edges()[path[lead - 1]].mTo];
@@ -1136,7 +1151,8 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     if (!mWaited)
     {
         mWaited = true;
-        const s32 delay = bot.RetryDelay();
+        // (not with a bone out for Slogs: that is eaten meanwhile)
+        const s32 delay = bot.GetWorld().mBones.empty() ? bot.RetryDelay() : 0;
         if (delay > 0)
         {
             return TaskStep::Do(Prim::Wait(delay));
@@ -2886,6 +2902,9 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 fleech = true;
                 chased = true;
             }
+            // (and through something that shuts by itself, TimedDoorTask: the trap door of FeeCo's path 9 was
+            // missed by ten frames, walked to and walked off)
+            chased = chased || bot.TimedRunOn();
             // And no walking the last cells to stop on the right one (a run is left four cells early for that,
             // twenty frames a Scrab does not give): from the run into a roll, which stops where it is told
             if (chased)
@@ -4848,6 +4867,43 @@ TaskStep BlowMineTask::Next(Bot& bot, const std::string& lastFailed)
     return TaskStep::Do(Prim::Wait(6, Btn::eThrow | AimBits(spot->mKind, abe.mFacingLeft)));
 }
 
+TimedDoorTask::~TimedDoorTask()
+{
+}
+
+TaskStep TimedDoorTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    if (!mPulled)
+    {
+        if (!mUse)
+        {
+            mUse = std::make_unique<UseTask>(mLever, mWant);
+        }
+        const TaskStep step = mUse->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::ePrim)
+        {
+            return step;
+        }
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            return step;
+        }
+        mPulled = true;
+        bot.TimedRun(true);
+        const s32 to = bot.Nav().Edges()[mEdge].mTo;
+        mGo = std::make_unique<GoToTask>("through before it shuts", [to](s32 n)
+                                         { return n == to; });
+        mGo->SetHurry(true);
+        bot.Log("the lever is pulled: through to " + std::to_string(bot.Nav().Nodes()[to].mX) + "," + std::to_string(bot.Nav().Nodes()[to].mY) + " before the trap door shuts");
+    }
+    const TaskStep step = mGo->Next(bot, lastFailed);
+    if (step.mKind != TaskStep::Kind::ePrim)
+    {
+        bot.TimedRun(false);
+    }
+    return step;
+}
+
 FeedSlogsTask::~FeedSlogsTask() = default;
 
 TaskStep FeedSlogsTask::Next(Bot& bot, const std::string& lastFailed)
@@ -4876,13 +4932,15 @@ TaskStep FeedSlogsTask::Next(Bot& bot, const std::string& lastFailed)
             }
             mGo.reset();
         }
-        if (world.mRocks <= 0)
+        // (the last one is out of the count once it is in his hand)
+        if (world.mRocks <= 0 && !mInHand)
         {
             return TaskStep::Failed("no bone to throw");
         }
         if (abe.mMove != Move::eIdle && !mInHand)
         {
-            return TaskStep::Do(abe.mMove == Move::eCrouch ? Prim::Press(Btn::eUp) : Prim::Wait(1));
+            // (hung from the cell's edge he is at the cell as far as the way there goes: up)
+            return TaskStep::Do(abe.mMove == Move::eCrouch || abe.mMove == Move::eHang ? Prim::Press(Btn::eUp) : Prim::Wait(1));
         }
         if (abe.mFacingLeft != mLeft && !mInHand)
         {
@@ -4892,12 +4950,49 @@ TaskStep FeedSlogsTask::Next(Bot& bot, const std::string& lastFailed)
         {
             return TaskStep::Do(Prim::Wait(2));
         }
+        // From a cover, with Sligs in the background, and the way down to the Slogs from this very cell: the
+        // bone is eaten in the time a wait for the Sligs takes, so that wait comes first. The way down is asked
+        // when it would go, with the throw's 34 frames before it; then the throw, and down as the bone flies.
+        // (FeeCo's path 9: "Throw down your last bone and run to the exit". Thrown first, he watched the Sligs
+        // from the ledge while the Sloggie ate it.)
+        if (!mInHand && !mAsked)
+        {
+            const NavGraph& nav = bot.Nav();
+            mAsked = true;
+            mDown = -1;
+            for (const NavEdge& e : nav.Edges())
+            {
+                const NavNode& to = nav.Nodes()[e.mTo];
+                if (mPlate <= 1 && nav.Nodes()[mStand].mZCover && e.mFrom == mStand && to.mX >= slog->mInputs[2] && to.mX <= slog->mInputs[3] && std::abs(to.mY - slog->mInputs[4]) <= 10 &&
+                    (e.mKind == EdgeKind::eFall || (mDown < 0 && (e.mKind == EdgeKind::eHoistDown || e.mKind == EdgeKind::eHop))))
+                {
+                    mDown = e.mTo;
+                }
+            }
+            if (mDown >= 0)
+            {
+                const s32 down = mDown;
+                mLeap = std::make_unique<GoToTask>("down to the Slogs", [down](s32 n)
+                                                   { return n == down; });
+                mLeap->SetZHold(34);
+            }
+        }
+        if (!mInHand && mLeap && mLeapWaits < 2000)
+        {
+            const TaskStep ask = mLeap->Next(bot, "");
+            if (ask.mKind == TaskStep::Kind::ePrim && ask.mPrim.mKind == Prim::Kind::eWait && ask.mPrim.mBits == 0)
+            {
+                mLeapWaits++;
+                return ask;
+            }
+            mLeap.reset();
+        }
         // (it comes to hand over a few frames, and goes when a direction is held as well: as a rock does)
         if (!mInHand)
         {
             mInHand = true;
             mHad = -world.mRocks - 1;
-            bot.Log("a bone for the Slogs at " + std::to_string(slog->mInputs[2]) + ".." + std::to_string(slog->mInputs[3]) + " from " + std::to_string(abe.mX) + "," + std::to_string(abe.mY));
+            bot.Log("a bone for the Slogs at " + std::to_string(slog->mInputs[2]) + ".." + std::to_string(slog->mInputs[3]) + " from " + std::to_string(abe.mX) + "," + std::to_string(abe.mY) + ", " + std::to_string(world.mRocks) + " in hand");
             return TaskStep::Do(Prim::Wait(8, Btn::eThrow));
         }
         mInHand = false;
@@ -4905,12 +5000,25 @@ TaskStep FeedSlogsTask::Next(Bot& bot, const std::string& lastFailed)
         mFrames = 0;
         return TaskStep::Do(Prim::Wait(6, Btn::eThrow | BlowMineTask::AimBits(mKind, abe.mFacingLeft)));
     }
+    // Thrown, and the way down is from here: down at once, at a run and without another look at the Sligs
+    if (mDown >= 0 && world.mRocks < mHad)
+    {
+        if (!mGo)
+        {
+            const s32 down = mDown;
+            mGo = std::make_unique<GoToTask>("down to the Slogs", [down](s32 n)
+                                             { return n == down; });
+            mGo->SetHurry(true);
+        }
+        return mGo->Next(bot, lastFailed);
+    }
     // Thrown: until it lies among them (the stretch's switch, World::Switch) and has come to rest
     mFrames++;
     bool down = false;
     for (const RockAt& bone : world.mBones)
     {
-        down = down || (bone.mX >= slog->mInputs[2] && bone.mX <= slog->mInputs[3] && std::abs(bone.mY - slog->mInputs[4]) <= 14);
+        // (or nearly: he is a while on his way down to them himself)
+        down = down || (bone.mX >= slog->mInputs[2] && bone.mX <= slog->mInputs[3] && bone.mY >= slog->mInputs[4] - 70 && bone.mY <= slog->mInputs[4] + 14);
     }
     if (world.mRocks >= mHad && mFrames > 40)
     {
@@ -4918,12 +5026,13 @@ TaskStep FeedSlogsTask::Next(Bot& bot, const std::string& lastFailed)
         mHad = -1;
         return TaskStep::Do(Prim::Wait(1));
     }
-    // (thrown past a plate: until a Slog has gone over it)
+    // (thrown past a plate: until a Slog has gone over it. Waited for where he threw from: in FeeCo's path 9
+    // that ledge is cover from the Sligs of the background, and the way back down from it is not.)
     if (mPlate > 1 ? world.Switch(mPlate) != 0 : down)
     {
         return TaskStep::Done();
     }
-    if (mFrames > (mPlate > 1 ? 200 : 120))
+    if (mFrames > (mPlate > 1 ? 400 : 120))
     {
         return TaskStep::Failed(mPlate > 1 ? "no Slog went over the plate for the bone" : "the bone did not come down among the Slogs");
     }

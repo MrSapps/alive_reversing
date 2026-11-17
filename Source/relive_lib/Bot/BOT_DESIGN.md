@@ -1830,7 +1830,7 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
   - *In the war room*, from the chain, the plan was "off the ledge, then the last lock with the Glukkon",
     and he chanted himself out of the Glukkon for the first step: what a Glukkon he is in does (a voice
     lock, a Slig sent to a lever) is planned from where he stands in his trance only.
-- **FeeCo Depot, the second visit** (`fc2.txt`, from where the war room's door lets him out; in progress):
+- **FeeCo Depot, the second visit** (`fc2.txt`, from where the war room's door lets him out):
   Brew and the mines on the way up by what the first visit taught. The lobby has three ways out into path 9,
   which is three places with nothing between them; two are open and lead nowhere, the third is behind the
   Slig a fart gets (the walkthrough's door to the Bonewerkz). A way out he has come back out of with no way
@@ -1839,29 +1839,54 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
   Slogs kill him: bones are not known yet. What the game does (Slog.cpp): a Slog after him that is 50 or
   more under him goes for a bone that has landed on the screen and eats it for its eating time; all go for
   the same bone, and it is gone when the first is done.
-  - *Bones, as far as they go* (not through the first pen yet: he dies there, down too late after the bone):
+  - **The path to Bonewerkz done** (`fc2.txt`: from the war room's door's landing in the lobby, out of path
+    9 by its door to path 4, Terminal 4, at f=5,993 with no deaths). What it took, as the walkthrough has it:
+    "Stand at the hand panel and throw down a bone to the Sloggies. Walk down, throw down another bone for good
+    measure, and pull the lever before climbing back up. You have to run to make it through the trapdoor in
+    time. ... climb up to the ledge while the Sligs in the background are moving to the right. Toss a bone
+    through the electric wall; the Sloggie will walk over the pressure plate that turns it off. Throw down your
+    last bone and run to the exit."
     - The bone bag is a sack (`mInputs[1]` 3); what it gives is thrown as rocks are. It is not hit while the
       Slig a fart is for stands by it (what is done on that Slig's floor waits for the fart, as its door does),
       and a path with a bag is not left without bones where they can be had (`Bot::Replan`, the goal with
-      the bag's count in it first).
+      the bag's count in it first). Four bones, and four are used.
     - In a level whose sacks give bones (`gThrowableFromOverlayIdAE`), the stretch of floor from wall to wall
       of each Slog that is awake is one nothing is crossed onto until a bone is on it or in the air over it
       (`MarkSlogPens`, `EntityKind::eSlog`, `World::Switch`, `World::mBones`).
     - "Throw a bone to the Slogs at .. from ..": from a cell 50 or more over their floor, the throw that has
       the bone down soonest counting his walk to where he goes down (`Domain::BoneThrow`, by `ThrowArc`: a bone
-      is taken to fly as a rock does, which was wrong from the door's ledge, where it came off the wall and
-      rolled along the ledge for 50 frames). `FeedSlogsTask`: the bone comes to hand, then goes with a
-      direction held.
-    - "Throw a bone past FootSwitch#..": a plate on their floor that anyone sets, between where the Slogs are
-      (as near him as their stretch lets them) and where the bone comes down. Gives the plate's switch only:
-      the bone is eaten by the time he is there. Planned, not yet run.
+      flies as a rock does in the air, but rolls where a rock skips, so a throw that comes down on another
+      floor first is not one; off a wall in the air is no matter). Not from within his arm's reach of an
+      electric wall the way he throws (62): the arm goes into it. `FeedSlogsTask`: the bone comes to hand,
+      then goes with a direction held; done when it is 70 over their floor or lower, so that he is on his
+      way down as it lands. The last bone is out of the count once it is in his hand.
     - On their own floor with one bone or none lying: another, but not the ones the plan has throws for
-      later (`Bot::MakeReflex`). The Slog reflexes (the ledge wait, the flight) leave a Slog with a bone to go
-      for alone (`World::SlogFed`).
+      later, and not stood in the open under Sligs in the background (`Bot::MakeReflex`). The Slog reflexes
+      (the ledge wait, the flight) leave a Slog with a bone to go for alone (`World::SlogFed`), and a try
+      after a death does not hold back with a bone out.
+    - A trap door that shuts by itself (stay-open time, 60 here) is not crossed some time after its lever:
+      `StepKind::eTimedDoor`, "Use Lever#.. and at once Cross ..", `TimedDoorTask`: the lever, then to the far
+      end of that edge at a run with the quick ways cheap (`Bot::TimedRun`: the running jump into the hoist,
+      the run off the floor's end). Measured: lever to the trap door 68 frames; walked up the hoist it was 92
+      and shut.
+    - "Throw a bone past FootSwitch#..": a plate on their floor that anyone sets, between where the Slogs are
+      (as near him as their stretch lets them) and where the bone comes down. Gives the plate's switch only.
+      Waited for where it was thrown from (that ledge is cover from the Sligs of the background).
+    - The last bone and the Sligs in the background: the wait for the Sligs comes before the throw. From a
+      cover, with the way down to the Slogs from that cell, `FeedSlogsTask` asks a `GoToTask` for that way
+      when it would go, with the throw's 34 frames stood there first (`SetZHold`), throws then, and goes down
+      at a run as the bone flies. On the Slogs' own floor with a bone lying the Sligs are not waited for.
     - A bone is not thrown to see what that does, and a kept plan's step that gives nothing it has not
       already is done (it threw all four from the ledge, one after the other).
-  - Next there: down sooner (thrown from the cell he goes down from, and off it as the bone flies), the
-    trap door that the pen's lever opens for 60 frames, the lure, the Sligs in the background by the wall.
+    - Not the electric wall's fault only: what killed him on that ledge was found with a log line in
+      `Abe::VTakeDamage` (taken out again): the wall, 48 from the cell he threw from.
+    - In a door (AE's motions 114 and 115) he is where he was until he is out of it: the plan waits. Coming
+      into path 4 that old place was a cell of the new path, and he planned from it and gave up.
+    - A trap door that shuts by itself is a timed one in AE only: AO's all do (20 frames), and were got
+      through as they were (Rupture Farms went from 14 deaths to 25 with them timed).
+  - Next: Terminal 4 (path 4: Sligs to get by unseen, lifts, two bone bags, Slogs, a slam door), where he
+    takes cover from the Sligs in the background and dies on the way to the first bone bag (987,744); then
+    the train to Bonewerkz.
 - The hub and its four blocks, then the war room: a Glukkon taken over and its orders to Sligs, crawling
   Sligs and their button, an orb blown up with a grenade (then its Sligs taken over), grenades thrown on a
   count, Greeters, laughing gas, UXBs, Slig voice locks, ghost locks, a Shrykull.
