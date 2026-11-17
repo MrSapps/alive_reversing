@@ -1073,7 +1073,7 @@ bool Bot::Replan(BaseMap& map)
         }
         else if (const Entity* target = mWorld.Find(planStep.mEntity))
         {
-            if (mPlanNodes.empty() && planStep.mKind == StepKind::eUse)
+            if (mPlanNodes.empty() && (planStep.mKind == StepKind::eUse || planStep.mKind == StepKind::eTimedDoor))
             {
                 mPlanEntity = target->mId;
             }

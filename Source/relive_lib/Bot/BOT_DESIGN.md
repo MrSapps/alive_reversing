@@ -1884,9 +1884,22 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
       into path 4 that old place was a cell of the new path, and he planned from it and gave up.
     - A trap door that shuts by itself is a timed one in AE only: AO's all do (20 frames), and were got
       through as they were (Rupture Farms went from 14 deaths to 25 with them timed).
-  - Next: Terminal 4 (path 4: Sligs to get by unseen, lifts, two bone bags, Slogs, a slam door), where he
-    takes cover from the Sligs in the background and dies on the way to the first bone bag (987,744); then
-    the train to Bonewerkz.
+    - Sligs in the background that keep no beat (they stand at the ends of their beats for a time that is
+      drawn, and one that has shot is off its beat: `SligCycle` never knows them). The game's rule is that
+      one shoots when it faces him, walking or not (Slig.cpp, `Brain_21_Walking`), so `GoToTask::ZLeap` goes
+      when each has its back to him and cannot face him again before he is through: its walk to the end of
+      its beat at 1.6 a frame, its pause there, its turn. Before, with no beat known after 700 frames, he
+      went as he came. And a leap out of a cover that only hides him crouched is timed with the 11 frames he
+      is up for first.
+    - A trap door that shuts by itself is "the lever and through at once" only where a lever opens it (the
+      Barracks' path 14 has one a zone opens), and the well dash of that path's first screen knows the lever
+      of such a step.
+  - **The chain from the Barracks' hub** (`blk10.txt`) now goes on through FeeCo into Terminal 4 at
+    f=43,642: 5 deaths, the known mine hop, two in the war room at the lever of 232 (f=32,785: from its own
+    door the war room is still done with none, so that is timing, to be found), and two in Terminal 4.
+  - Next: Terminal 4 (path 4: Sligs to get by unseen, lifts, two bone bags, Slogs, a slam door). He hops
+    off the far edge of the first platform (887,380), timed now, and falls to his death past it (1012,752):
+    the walkthrough climbs straight down there and hops over the mines. Then the train to Bonewerkz.
 - The hub and its four blocks, then the war room: a Glukkon taken over and its orders to Sligs, crawling
   Sligs and their button, an orb blown up with a grenade (then its Sligs taken over), grenades thrown on a
   count, Greeters, laughing gas, UXBs, Slig voice locks, ghost locks, a Shrykull.

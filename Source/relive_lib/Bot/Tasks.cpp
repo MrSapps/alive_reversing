@@ -243,7 +243,11 @@ bool GoToTask::ZWatched(Bot& bot, const NavGraph& nav, const std::vector<s32>& p
     // (a ride on a lift out of a cover as well: the Barracks' path 5, up the shaft between two of them)
     if (any && !mHurry && (first.mKind == EdgeKind::eHop || first.mKind == EdgeKind::eFall || first.mKind == EdgeKind::eHoistDown || first.mKind == EdgeKind::eHoistUp || first.mKind == EdgeKind::eRunJump || first.mKind == EdgeKind::eLift))
     {
-        return nav.Nodes()[cur].mZCover && ZLeap(bot, nav, path, cur, 0, step);
+        // (or crouched under a low one: up first, which is 11 frames stood in the open before the leap, timed
+        // with it. FeeCo's path 4, off the far edge of the platform at 887,380: up and off as it came, he was
+        // shot in the air by the Slig that had just turned.)
+        // (low: what hides him crouched where he is, whatever the cell is marked as)
+        return (nav.Nodes()[cur].mZCover || (bot.Abe().mMove == Move::eCrouch && (nav.Nodes()[cur].mZLow || nav.ZCovered(here.mX, here.mY, -13, 13, 34)))) && ZLeap(bot, nav, path, cur, 0, step);
     }
     if (!any || mHurry || (first.mKind != EdgeKind::eWalk && first.mKind != EdgeKind::eRoll))
     {
@@ -437,7 +441,8 @@ bool GoToTask::ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
         return true;
     };
     // (standing: the cover is one he fits in so, and the leap starts on the frame it is asked for)
-    if (lead == 0 && abe.mMove == Move::eCrouch)
+    const bool lowStand = lead == 0 && abe.mMove == Move::eCrouch && !here.mZCover;
+    if (lead == 0 && abe.mMove == Move::eCrouch && !lowStand)
     {
         step = TaskStep::Do(Prim::Press(Btn::eUp));
         return true;
@@ -480,6 +485,41 @@ bool GoToTask::ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
         {
             return wait(2, "watching the Sligs in the background from cover");
         }
+        // Not known, and it may never be: they stand at the ends of their beats for a time that is drawn
+        // (Slig's pause), and one that has shot is off its beat. What is known is the game's rule (Slig.cpp,
+        // Brain_21_Walking and the others): one shoots when it faces him, walking or not. So he goes when each
+        // of them has its back to him and, at 1.6 a frame, has the frames he needs before it can face him
+        // again: its walk to the end of its beat ahead, its pause there and its turn. (The walkthrough, of FeeCo's paths 9 and 4: "while the Sligs in the background are
+        // moving to the right", "all while the Sligs are facing right".)
+        // (what he needs: the cells walked to the leap at 9 each, the throw or the getting up before it, and
+        // some 30 for a hop, a drop or the first of a hoist, until he is in the next cover)
+        const s32 need = 30 + mZHold + (lowStand ? 11 : 0) + 9 * static_cast<s32>(lead);
+        bool clear = true;
+        for (const SligAt& slig : bot.GetWorld().mSligs)
+        {
+            if (!slig.mZShoot || slig.mPossessed || nav.CameraOf(slig.mX, slig.mY - 5) != nav.CameraOf(here.mX, here.mY - 5))
+            {
+                continue;
+            }
+            // (Motion_5_TurnAroundStanding: about to face the other way)
+            const bool away = slig.mFacingLeft != (here.mX < slig.mX) && slig.mMotion != 5;
+            const s32 ahead = slig.mBeatMax > slig.mBeatMin ? (slig.mFacingLeft ? slig.mX - slig.mBeatMin : slig.mBeatMax - slig.mX) : 0;
+            // (and at that end it stands for its pause at the least, then turns, some 10 frames, before it faces
+            // him)
+            clear = clear && away && ahead * 10 / 16 + (slig.mFacingLeft ? slig.mPauseLeft : slig.mPauseRight) + 10 >= need;
+        }
+        if (!clear && mZAwayWaits < 3000)
+        {
+            mZAwayWaits++;
+            return wait(3, "the Sligs in the background keep no beat: off when each walks away with far enough to go");
+        }
+        bot.Log(std::string(clear ? "each of the Sligs in the background walks away with " : "waited long enough for the Sligs in the background to walk away with ") + std::to_string(need) + " frames to go");
+        mZAwayWaits = 0;
+        if (lowStand)
+        {
+            step = TaskStep::Do(Prim::Press(Btn::eUp));
+            return true;
+        }
         return false;
     }
     s32 periods = 0;
@@ -519,6 +559,11 @@ bool GoToTask::ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
         if (mZHold > 0)
         {
             add(here, here, mZHold);
+        }
+        // (up out of the crouch under a low cover: stood there, which the cover does not hide)
+        if (lowStand)
+        {
+            add(here, here, 11);
         }
         if (lead > 0)
         {
@@ -732,6 +777,11 @@ bool GoToTask::ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
     mZFrom = -1;
     mZSaid = -1;
     mZLeapt = true;
+    if (lowStand)
+    {
+        step = TaskStep::Do(Prim::Press(Btn::eUp));
+        return true;
+    }
     if (lead > 0)
     {
         step = TaskStep::Do(Prim::MoveTo(nav.Nodes()[nav.Edges()[path[lead - 1]].mTo].mX, rolled ? Gait::eRoll : Gait::eWalk));
