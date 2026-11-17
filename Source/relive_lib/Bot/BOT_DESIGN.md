@@ -1640,9 +1640,13 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
     unseen by then and it costs 40 frames.
   - Not unit tested: all of it is in the tasks. Its Mudokons (six, and the lever that fries the Sligs) are
     left.
-- **Block 4**, the bombing range (path 14): begun (`ae_barracks_bombing_range.txt`). Its first screen is done
-  with no deaths, and he is down on the long floor at 1412,1500; there he hides from the next flying Slig in
-  the shaft at 1437 and comes no further.
+- **Block 4**, the bombing range (path 14): done from its door, out by its tasks door to the hub at
+  f=3,078 with no deaths (`ae_barracks_bombing_range.txt`). How it goes: the first screen by way of the
+  well; down the two trap doors; through the tunnel to the long floor; the lever of 208 at its east end by
+  himself; west along the floor at a run, under the ledge at a roll; the lever of 210; into the well by it up
+  to the cage; the flying Slig that lever lets out taken over from the cage; with it the one over the lever
+  of 214 bombed from the screen before, that lever pulled, and it is burst; down, up the hoist and out.
+  What it took:
   - The first screen: a flying Slig goes round over the well, the lever and the trap door and never leaves
     (`HideTask` waited for good). Measured: seen, it is 25 frames to its first grenade, which is 17 in the air
     and comes down 93 in front of it; it stops 90 from him. The walkthrough's way (in the well as it throws,
@@ -1653,14 +1657,59 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
     cells of it: to the well at a run, in, and from where it throws him out to the thing (the lever); and for
     as long as that flying Slig is on his screen it is not hidden from again (`Bot::FlierDash`).
   - A zone that sets a switch when he is in it (an invisible switch) is a thing to do
-    (`StepKind::eZone`, `SwitchZoneTask`): the second trap door is opened by one.
-  - Next, from the level's data: the long floor has the flying Slig of 1186 to 1551 (it sees the lever of
-    switch 208 at 1562 only on its 20 frames on that screen), one from the spawner at 775 that the first
-    screen's zone has let out (811 to 1071, over the lever of switch 214), and one the lever of switch 210
-    lets out at 525. Orbs on every screen but the leftmost. The walkthrough: run left along the floor, the
-    lever of 210, into the well by it up to the ledge at 487,1380, take the new flying Slig over from there,
-    bomb the others with it and pull the other levers with it. The takeover, bombing and lever pulling are
-    there (`FlierBombTask`), for Sligs that walk; none of it is planned here yet.
+    (`StepKind::eZone`, `SwitchZoneTask`): the second trap door is opened by one. Unit tested.
+  - The plan. A tasks door with its hubs all on sets its own switch (Door.cpp), which is what the hub's door
+    to the war room wants of the block: the door's logic gives that switch too, so the three levers are one
+    plan and not three tries. Only where every hub is a lever's: the blocks whose hubs are wheels and locks
+    were got through one switch at a time, and planned as one thing the Slig bunks went about it in another
+    order and died (to be mended there, then this limit can go). A lever under the track of a flying Slig
+    that is about, or of one its own switch lets out, is 1,500 dearer for him (not where the track only just
+    comes onto the lever's screen, 60 of it or less: the lever of 208). A spawner that is off with something
+    that turns it on wants that first, and is not asked to pull the lever that turns it on. This path has a
+    track with two ends 3 apart: `FlierTrack` joins at 2 as before and at 3 where these rules ask (at 3
+    everywhere the Slig bunks' flying Slig had other Sligs to bomb, from a deadly place). So: 208 by him,
+    210 by him, 214 by the flying Slig. Of two levers one flying Slig pulls, the one that lets another
+    flying Slig out is last.
+  - The place it is taken over from (`Domain::FlierSpot`): a cell with a floor, ceiling or wall between it
+    and all of the tracks there are by it, and no Slig that walks on its level and screen, first
+    (`SightBlocked`; `FlyingSlig::CanChase` wants a clear line, and the cage at 487,1380 is walled). Other
+    flying Sligs' tracks count only within 1,000 of the spawner (this path has one 1,213 off that gave a
+    place two floors up).
+  - Flying Sligs he only runs by are not hidden from (`Bot::FlierThreat`): the next thing is on a screen its
+    track does not come onto and the way there on its screens is run (after no more than a hoist up). A jump
+    up to a ledge by a flying Slig's track, or by that of one a spawner that is on has let out, is 30,000
+    dearer (he hangs there a second; dearer than the six cells by a bird portal at 3,000 each that the way
+    round costs). No sorting out of wired Mudokons with a flying Slig within 750.
+  - The flying Slig he flies (`FlierBombTask`): faced to the lever again when the last touch into place
+    turned it; kept, not burst, when the plan's next step is for the same one; another flying Slig on the
+    next screen on its way is waited for from this screen, where the other does not see it, at a place from
+    which a grenade's flight comes onto the stretch of track the other is on, and thrown at when the other
+    will be where the grenade is (then back to where it left its way); one behind it on the way to a lever
+    is flown from, not fought; held at one place a third time it is sent down, down and back, back or up
+    for a bit and the way found anew.
+  - Not known to hold at every timing: the flying Slig's fights. The one of 1186 to 1551 is behind a gap
+    under a ceiling where no grenade from the screen before comes onto its track, so nothing is flown
+    there. Mudokons die in this (two or more by grenades): fine for `any`, not for the rescue.
+  - Run on from the trophy room (`blk9t.txt`, the trophy room's first leg told to it) he is back in the hub at
+    f=6,176 with one death: at the lever of 208. He comes down out of the tunnel in the sight of the flying
+    Slig of 1186 to 1551, which is 72 frames from seeing him to its first grenade and bombs on though he is
+    on the next screen by then (once after him it is, on its screen or off it); the five cells to the lever
+    are walked (the run only starts with more than five to go), 59 frames, and the pull is 20. With a flying
+    Slig within 750 what is walked is asked for at a run, which here changes nothing. To be mended: a run
+    over five cells, or the drop timed against where the flying Slig is on its round.
+  - Left: its Mudokons (seven) and its secret.
+- **The whole chain** (`blk10.txt`: Rifle Range, workers' campus, Slig bunks, trophy room, bombing range), last
+  run whole before the lever rule for spawners that are on: no deaths in the Rifle Range; one in the
+  workers' campus (below); one in the Slig bunks (a grenade thrown at the Slig under the first orb from
+  578,100, not looked into); the trophy room clean, out at f=25,250; the bombing range not finished in that
+  run (it planned the lever of 214 for him), since mended and run from the trophy room on as above.
+  - The workers' campus' death is a hop of four cells from 687,620 to the ledge at 587: measured (he made
+    not to be hurt), he does not reach, is 15 frames in the air, falls 50 in 4, catches the ledge and hangs
+    for 37 before he can pull up, 60 deep, where a flying mine goes by under the ledge with never that long
+    between. `GoToTask::Bodies` has it as a hop that lands, and he got through on the frame he came at; a
+    frame's difference upstream (the zone step) and he does not. Modelled as it is, nothing is ever clear
+    there and he went round by a lift, where he died twelve times: so it is left as it was. The end of that
+    path wants another way (the walkthrough's is by the lift to the top and the wheel).
 - The hub and its four blocks, then the war room: a Glukkon taken over and its orders to Sligs, crawling
   Sligs and their button, an orb blown up with a grenade (then its Sligs taken over), grenades thrown on a
   count, Greeters, laughing gas, UXBs, Slig voice locks, ghost locks, a Shrykull.

@@ -467,6 +467,18 @@ public:
     {
         mFlierDash = on;
     }
+    // Whether a step of the plan after the one at hand has this in its name
+    bool PlanLater(const std::string& what) const
+    {
+        for (std::size_t i = 1; i < mKeptPlan.size(); i++)
+        {
+            if (mKeptPlan[i].find(what) != std::string::npos)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
     // Where the next thing to do is (-1: none known), and what it is done to (0: nothing)
     s32 PlanNode() const
     {

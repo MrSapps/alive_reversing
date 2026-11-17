@@ -277,7 +277,13 @@ struct Domain final
     // Where Abe takes the flying Slig of a spawner over from: of the cells he can get to (reach, by cell), one on
     // its screen where he isn't seen, or else the one furthest from its track. With no security orb on that
     // screen. -1: none.
-    static s32 FlierSpot(const NavGraph& nav, const World& world, const Entity& spawner, const std::vector<u8>& reach);
+    // (ownOnly: only where the spawner's own track goes, for one that has still to be turned on. A cell with a
+    // floor, ceiling or wall between it and all of the track is taken first: it is not seen there,
+    // FlyingSlig::IsWallBetween.)
+    static s32 FlierSpot(const NavGraph& nav, const World& world, const Entity& spawner, const std::vector<u8>& reach, bool ownOnly = false);
+    // Whether a floor, ceiling or wall of that scale is between two points
+    // (flying: and the lines that only stop what flies, type 17)
+    static bool SightBlocked(const NavInput& in, bool half, s32 x1, s32 y1, s32 x2, s32 y2, bool flying = false);
     // Whether a cell is on that Slig's floor, near enough for it to shoot him there
     static bool OnFlierTargetsFloor(const NavGraph& nav, const FlierTarget& target, s32 node);
 
@@ -462,7 +468,8 @@ struct Domain final
     static std::vector<u32> SligsMet(const NavGraph& nav, const World& world, s32 from, const std::vector<s32>& way, u32 self);
     // The box a flying Slig's track is in: the track lines joined end to end that go by (fx, fy), where the map puts it.
     // ends: the two ends of that track. False with no track there.
-    static bool FlierTrack(const NavInput& in, s32 fx, s32 fy, s32& x1, s32& y1, s32& x2, s32& y2, std::vector<std::pair<s32, s32>>* ends = nullptr, std::vector<NavLine>* lines = nullptr);
+    // (join: how far apart the ends of two stretches may be and still be one track)
+    static bool FlierTrack(const NavInput& in, s32 fx, s32 fy, s32& x1, s32& y1, s32& x2, s32& y2, std::vector<std::pair<s32, s32>>* ends = nullptr, std::vector<NavLine>* lines = nullptr, s32 join = 2);
     // The wheels a switch logic entity needs turned at once and the nearest Mudokons that can walk to them. False
     // if it isn't that kind of logic or there aren't enough Mudokons. pre gets what the action needs.
     // Where a rock could be thrown from at something on the floor at (x, y), likeliest first. Nothing is worked

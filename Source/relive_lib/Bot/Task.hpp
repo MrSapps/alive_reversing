@@ -1236,6 +1236,26 @@ private:
     // For a lock: what was last said of another flying Slig on its screen (0 nothing, 1 behind it, 2 keeping
     // back, 3 thrown), and the grenades thrown at such
     s32 mFoeSaid = 0;
+    // Another flying Slig on the next screen on the way, waited for from this one with a grenade: 0 none / 1 at the
+    // place or on the way to it / 2 thrown at least once; the place; the frames of it; which track (the first
+    // corner of its box) and the tracks done with
+    s32 mAmbush = 0;
+    s32 mAmbushX = 0;
+    s32 mAmbushY = 0;
+    s32 mAmbushFrames = 0;
+    // (where it left its way for that, to go back to: 3 is on the way back)
+    s32 mAmbushFromX = 0;
+    s32 mAmbushFromY = 0;
+    // Held (pushing at something) at one place: how often there, and the way out along its own track
+    s32 mHeldTimes = 0;
+    s32 mHeldX = 0;
+    s32 mHeldY = 0;
+    s32 mEscape = 0;
+    s32 mEscapeX = 0;
+    s32 mEscapeY = 0;
+    s32 mEscapes = 0;
+    s64 mAmbushKey = 0;
+    std::set<s64> mAmbushed;
     s32 mFoeThrown = 0;
     // Where it last was with no other on its screen (to go back to out of the other's sight), and the other as
     // last seen from in front: its place, the way it faced, and whether it is to be come at from behind
