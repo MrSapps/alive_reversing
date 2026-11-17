@@ -2656,6 +2656,36 @@ TEST(BotTasks, ABeamThatWaitsAtItsEndLeavesTimeForAStep)
     EXPECT_TRUE(world.BeamClear(1070, 720, true, -1, 25, 13));
 }
 
+TEST(BotTasks, ABeamThatIsCarriedAboutMayBeNearerByWhatItsCarrierMoves)
+{
+    // A Greeter's beam, 20 wide, that waits at the end of its sweep 28 from where he stands. The Greeter goes 3
+    // a frame, and which way is its own business.
+    World world;
+    BeamAt beam;
+    beam.mX1 = 1040;
+    beam.mX2 = 1060;
+    beam.mY1 = 700;
+    beam.mY2 = 720;
+    beam.mMinX = 900;
+    beam.mMaxX = 1050;
+    beam.mVel256 = -2 * 256;
+    beam.mPause = 16;
+    beam.mEndPause = 16;
+    world.mBeams.push_back(beam);
+
+    // Fixed where it is, a turn on the spot at 1012 (12 frames) is clear of it
+    EXPECT_TRUE(world.BeamClear(1012, 720, false, 0, 0, 12));
+    // Carried, it may be 36 nearer by the end of the turn: not clear
+    world.mBeams[0].mDrift256 = 3 * 256;
+    EXPECT_FALSE(world.BeamClear(1012, 720, false, 0, 0, 12));
+    // From further off the same turn is
+    EXPECT_TRUE(world.BeamClear(962, 720, false, 0, 0, 12));
+    // and something shorter where he was is: it has not had the time
+    EXPECT_TRUE(world.BeamClear(1012, 720, false, 0, 0, 5));
+    // nor has it at the start of a run away from it, which outpaces it
+    EXPECT_TRUE(world.BeamClear(1012, 720, false, -1, 100, 12));
+}
+
 TEST(BotTasks, ASligCannotShootBeforeItHasWalkedItsBeat)
 {
     // A half size Slig that walks 1275 to 1550 and waits 85 frames before it shoots at what it sees. The

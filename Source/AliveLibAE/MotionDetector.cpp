@@ -180,13 +180,15 @@ void MotionDetector::VScreenChanged()
     }
 }
 
-bool MotionDetector::BeamNow(PSX_RECT& laser, s32& minX, s32& maxX, s32& velX256, s32& pause)
+bool MotionDetector::BeamNow(PSX_RECT& laser, s32& minX, s32& maxX, s32& velX256, s32& pause, s32& ownerX256)
 {
     MotionDetectorLaser* pLaser = sObjectIds.Find<MotionDetectorLaser>(mLaserId, ReliveTypes::eRedLaser);
-    if (!pLaser || mHasOwner || SwitchStates_Get(mDisableSwitchId))
+    if (!pLaser || (mHasOwner ? !GetAnimation().GetRender() : SwitchStates_Get(mDisableSwitchId) != 0))
     {
         return false;
     }
+    // (a greeter on patrol goes 3 a frame, one way or the other: Greeter's eBrain_0_Patrol)
+    ownerX256 = mHasOwner ? 3 * 256 : 0;
     laser = pLaser->VGetBoundingRect();
     minX = FP_GetExponent(mTopLeftX);
     maxX = FP_GetExponent(mBottomRightX);

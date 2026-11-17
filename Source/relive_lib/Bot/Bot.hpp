@@ -107,6 +107,12 @@ struct BotMemory
     u32 mExploring = 0;
     std::string mLastSligs;
     s32 mLastAwakeSligs = 0;
+    // The frame he was last knocked off his feet (AE's knockback motions)
+    u32 mKnockFrame = 0;
+    bool mKnocked = false;
+    // The frame Hurry's naked Slig was last seen on its way
+    u32 mHurryFrame = 0;
+    bool mHurrySeen = false;
     s32 mLastMines = 0;
     std::map<s32, s32> mBlockedWalks;
     s32 mLastKilled = 0;
@@ -463,6 +469,17 @@ public:
     bool FlierThreat() const;
     // A move as it is made with a flying Slig near: run, and keenly
     Prim Keen(Prim prim) const;
+    // A naked Slig on his screen and his floor is on its way to a locker for a gun (its panic switch is on), or
+    // was a moment ago: what there is to do on that floor is done at a run before it has one, or as it has just
+    // come by it (armed, it stands 15 frames and shoots only at what is a cell in front of it: Slig's
+    // Brain_32_Inactive)
+    bool Hurry() const;
+    // He was knocked off his feet within this many frames (an orb's bolt at a chant does that): a move that came
+    // to nothing then says nothing about the way
+    bool KnockedLately(u32 frames) const
+    {
+        return mKnocked && mAbe.mFrame - mKnockFrame <= frames;
+    }
     // A flying Slig that stays on his screen is not hidden from any more, for as long as it is on it: what there is
     // to do is done at a run between its grenades (HideTask)
     void FlierDash(bool on)

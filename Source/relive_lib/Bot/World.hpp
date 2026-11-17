@@ -160,8 +160,13 @@ struct SligAt final
     s32 mBeatMax = 0;
     // The frames at least that it stands at an end of its beat before it turns (AO's; 0 when not known)
     s32 mBeatPause = 0;
+    // AE: the same for the left end of its beat and for the right one
+    s32 mPauseLeft = 0;
+    s32 mPauseRight = 0;
     // AE: at a chant it runs up and down its beat (it has a time set to panic for)
     bool mPanics = false;
+    // AE: it shoots, or is dropping in from a spawner, which it does to shoot (a walk off its floor is too slow then)
+    bool mShootsNow = false;
     // Asleep, a noise this near (in x) wakes it; 0 when not known: anywhere on its screen then
     s32 mWake = 0;
     // The frames it waits before it shoots at what it has seen
@@ -275,6 +280,9 @@ struct BeamAt final
     // The frames it still waits at an end before it moves, and how long it waits at each
     s32 mPause = 0;
     s32 mEndPause = 0;
+    // What the thing that carries it moves a frame at most, x256, either way (AE's Greeter on patrol: it turns
+    // when it likes, so the beam may be that much further either way each frame). 0: it stays where it is.
+    s32 mDrift256 = 0;
     bool mHalf = false;
 };
 
@@ -369,6 +377,8 @@ struct RockAt final
     // A Fleech: it is after him (awake it may only be walking its beat: Fleech.cpp's patrol brain takes no notice
     // of him until he is on its level in its sight, or makes a noise within six cells of it)
     bool mChasing = false;
+    // A naked Slig: the game's motion number (CrawlingSlig.hpp: 9 asleep, 2 wakes, 3 crawls, 1 at a locker's button)
+    s32 mMotion = 0;
 };
 
 // A Scrab that is about
@@ -505,7 +515,8 @@ struct World final
             {
                 const s32 ax = x + (frames > 0 ? dir * travel * t / frames : 0);
                 const s32 bx = at256 / 256;
-                if (bx <= ax + pad && bx + width >= ax - pad)
+                const s32 drift = b.mDrift256 * t / 256;
+                if (bx - drift <= ax + pad && bx + width + drift >= ax - pad)
                 {
                     return false;
                 }
@@ -796,7 +807,18 @@ struct World final
                     }
                     for (const SligAt& s : mSligs)
                     {
-                        if (!s.mPossessed && !s.mAsleep && s.mHalf == e.mHalf && std::abs(s.mY - e.mY2) <= 30 && std::abs(s.mX - e.CentreX()) <= kLockerReach)
+                        // (not one past a gate that is shut and that its beat ends short of: that is another
+                        // stretch of the floor, with its own locker. The Barracks' war room: the one of the locker
+                        // at 1337,981 walks 1262 to 1437, and the locker at 1663 is past the gate at 1537.)
+                        bool elsewhere = false;
+                        for (s32 side = 0; side <= 3; side += 3)
+                        {
+                            const s32 gx = e.mInputs[side];
+                            const bool between = gx != 0 && (gx < e.CentreX()) == (s.mX < gx) && (gx > e.CentreX()) == (s.mX > gx);
+                            const bool shut = gx != 0 && (Switch(e.mInputs[side + 1], true) != 0) != (e.mInputs[side + 2] != 0);
+                            elsewhere = elsewhere || (between && shut && s.mBeatMax > s.mBeatMin && (gx < s.mBeatMin || gx > s.mBeatMax));
+                        }
+                        if (!s.mPossessed && !s.mAsleep && !elsewhere && s.mHalf == e.mHalf && std::abs(s.mY - e.mY2) <= 30 && std::abs(s.mX - e.CentreX()) <= kLockerReach)
                         {
                             return 0;
                         }

@@ -642,6 +642,21 @@ s32 NavGraph::Thrown(s32 x, s32 y, s32 fromX, bool half, s32 depth, s32 knownSwi
     {
         return -1;
     }
+    // Thrown to a point in the box of an edge that faces the way he flies, he catches it and ends hung from its
+    // ledge. Measured in the Barracks' war room: the well at 1262,981, switched on, throws him to 1294,848, and
+    // he hangs from the ledge at 1312,841.
+    for (const NavFeature& e : mInput.mFeatures)
+    {
+        if (e.mKind == FeatureKind::eEdge && e.mA && (e.mAnyScale || e.mHalf == half) && (e.mDir == 2 || (e.mDir == 0) == (x < fromX)) && x >= e.mX1 && x <= e.mX2 && y >= e.mY1 - 4 && y <= e.mY2 + 4)
+        {
+            s32 ey = 0;
+            const s32 line = FloorNear((e.mX1 + e.mX2) / 2, e.mY1, half, 12, &ey);
+            if (line >= 0)
+            {
+                return NodeOnLine(line, (e.mX1 + e.mX2) / 2);
+            }
+        }
+    }
     s32 fy = 0;
     const s32 under = FloorBelow(x, y - 40, half, &fy);
     // (thrown to a point in the air over a well, he comes down into it: the Mudanchee vault's path 3, from the
@@ -904,6 +919,18 @@ void NavGraph::AddRunJumps(std::vector<NavEdge>& edges, s32 from, s32 dir, bool 
         {
             AddEdge(edges, from, top, EdgeKind::eRunJump, 400, hoistIdx, dir < 0);
             edges.back().mX = takeoff;
+            // (and from nearer, down to a cell before the take-off: from a stand with run held he runs at once.
+            // Measured in the Barracks' war room: from 937,1240 he is in the air at 887 ten frames on and hangs
+            // from the ledge over the hoist at 862 four frames after that.)
+            for (s32 near = 1; near < kRunUpCells; near++)
+            {
+                const s32 nearNode = NodeOnLine(n.mLine, n.mX + dir * near * step);
+                if (nearNode >= 0 && std::abs(mNodes[nearNode].mX - (n.mX + dir * near * step)) <= step / 2)
+                {
+                    AddEdge(edges, nearNode, top, EdgeKind::eRunJump, 400, hoistIdx, dir < 0);
+                    edges.back().mX = takeoff;
+                }
+            }
             // (and from further back along the floor, so that a run that is under way need not stop for it)
             s32 bx = n.mX;
             for (s32 back = 1; back <= 14; back++)
@@ -1479,7 +1506,10 @@ void NavGraph::Build(const NavInput& input)
             // to 212,980 and from 212,340 to 312,460): where he is each frame from when he starts to drop.
             if (!caught && n.mLiftStop < 0)
             {
-                static const s32 kDrop[][2] = {{72, 0}, {80, 6}, {82, 17}, {83, 33}, {88, 51}, {92, 70}, {96, 90}, {100, 110}, {101, 130}};
+                // (the last two rows: further down, and only into a well. Measured in the Barracks' war room, off the
+                // tunnel's end at 1937,840 into the well at 2037,981: 99 out at 110 down, 101 out at 130.)
+                static const s32 kDrop[][2] = {{72, 0}, {80, 6}, {82, 17}, {83, 33}, {88, 51}, {92, 70}, {96, 90}, {100, 110}, {101, 130}, {102, 150}, {103, 170}};
+                static const std::size_t kDropFloor = 9;
                 const s32 scale = n.mHalf ? 2 : 1;
                 bool clear = !WallBetween(n.mX, n.mX + dir * step * 4, n.mY, n.mHalf);
                 for (s32 k = 1; k <= 3 && clear; k++)
@@ -1523,6 +1553,10 @@ void NavGraph::Build(const NavInput& input)
                         // takes him: the Mudanchee vault's path 5, off the platform at 312,620 into the well at 212)
                         s32 to = NodeAt(x, gy, n.mHalf, 4);
                         const s32 well = WellInFall(x, n.mY, gy + 30 / scale, n.mHalf);
+                        if (k >= kDropFloor && well < 0)
+                        {
+                            break;
+                        }
                         // (one that a switch turns: where it leads either way. The Mudomo trial's last, hopped
                         // into off the lock's ledge once the lock has turned it to throw him back over the gate.)
                         if (well >= 0 && mInput.mFeatures[well].mSwitch > 1 && gy - n.mY >= 20 / scale)
@@ -1956,6 +1990,7 @@ void NavGraph::Build(const NavInput& input)
         e.mClear = mNodes[e.mTo].mClear >= 0 ? mNodes[e.mTo].mClear : mNodes[e.mFrom].mClear;
         // Into a flying Slig's stretch from outside it: not until the Slig is gone
         s32 danger = -1;
+        s32 rid = -1;
         for (std::size_t fi = 0; e.mClear < 0 && fi < mInput.mFeatures.size(); fi++)
         {
             const NavFeature& f = mInput.mFeatures[fi];
@@ -1967,10 +2002,23 @@ void NavGraph::Build(const NavInput& input)
             {
                 // (one that is got by as it is, mA 0: its switch is on all along, and the way in is a dear one.
                 // Where the way goes into both kinds at once it is the one to get rid of that the edge waits for.)
+                // (of several the node is in, the one it is nearest the middle of: a locker's reaches along its
+                // floor into the next one's)
                 if (f.mA)
                 {
-                    e.mClear = static_cast<s32>(fi);
-                    break;
+                    const NavNode& at = mNodes[e.mTo];
+                    const s32 off = std::abs(at.mX - (f.mX1 + f.mX2) / 2);
+                    bool others = false;
+                    for (const NavFeature& g : mInput.mFeatures)
+                    {
+                        others = others || (g.mKind == FeatureKind::eDanger && g.mA && &g != &f && at.mHalf == g.mHalf && at.mX >= g.mX1 && at.mX <= g.mX2 && at.mY >= g.mY1 && at.mY <= g.mY2 &&
+                                            std::abs(at.mX - (g.mX1 + g.mX2) / 2) < off);
+                    }
+                    if (!others && rid < 0)
+                    {
+                        rid = static_cast<s32>(fi);
+                    }
+                    continue;
                 }
                 if (danger < 0)
                 {
@@ -1978,6 +2026,10 @@ void NavGraph::Build(const NavInput& input)
                     e.mCost += kDangerCost;
                 }
             }
+        }
+        if (rid >= 0)
+        {
+            e.mClear = rid;
         }
         if (e.mClear < 0)
         {

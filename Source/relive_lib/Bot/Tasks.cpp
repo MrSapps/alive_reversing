@@ -880,7 +880,7 @@ bool GoToTask::ZMove(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
     return true;
 }
 
-s32 GoToTask::SligComes(const Bot& bot, const NavGraph& nav, const NavNode& at)
+s32 GoToTask::SligComes(const Bot& bot, const NavGraph& nav, const NavNode& at, bool withStand)
 {
     const s32 camW = nav.Input().mCamW;
     const s32 lo = (at.mX / camW) * camW;
@@ -909,19 +909,55 @@ s32 GoToTask::SligComes(const Bot& bot, const NavGraph& nav, const NavNode& at)
         s32 walk = onto(slig.mX);
         // (one that stands with its back to it may turn now, for all that can be told: only one that walks
         // away has the rest of its beat to go first)
+        s32 stands = 0;
         if (!toward && slig.mMotion != 0 && slig.mMotion != 5)
         {
             const s32 end = slig.mFacingLeft ? std::min(slig.mX, endLo) : std::max(slig.mX, endHi);
             walk = std::abs(end - slig.mX) + onto(end);
+            // (and at that end it stands as long as its beat has it stand there at least, then turns, 9 frames.
+            // The Barracks' war room: the Slig of the floor at 1812 to 1912 stands 120 at its left end, and the
+            // lever of 234 takes 130 frames from the ledge over it and back into the well.)
+            stands = withStand ? (slig.mFacingLeft ? slig.mPauseLeft : slig.mPauseRight) + 9 : 0;
         }
         // (2.75 a frame; running, as it does for a while after a chant, 6.25)
-        least = std::min(least, walk * 4 / (slig.mMotion == 4 ? 25 : 11));
+        least = std::min(least, walk * 4 / (slig.mMotion == 4 ? 25 : 11) + (slig.mMotion == 4 ? 0 : stands));
     }
     return least;
 }
 
+// The Slig that hears what Abe does where he is: awake, on his screen and on his level
+static const SligAt* HushSlig(const Bot& bot)
+{
+    const SligAt* best = nullptr;
+    const AbeState& abe = bot.Abe();
+    for (const SligAt& s : bot.GetWorld().mSligs)
+    {
+        if (!s.mAsleep && !s.mPossessed && s.mSeen && s.mHalf == abe.mHalfScale && std::abs(s.mY - abe.mY) <= 25 && bot.Nav().CameraOf(s.mX, s.mY - 5) == bot.Nav().CameraOf(abe.mX, abe.mY - 5) &&
+            (!best || std::abs(s.mX - abe.mX) < std::abs(best->mX - abe.mX)))
+        {
+            best = &s;
+        }
+    }
+    return best;
+}
+
 TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
 {
+    if (const SligAt* hush = bot.IsAe() ? HushSlig(bot) : nullptr)
+    {
+        const s32 facing = hush->mFacingLeft ? 1 : 0;
+        if (facing != mHushFacing)
+        {
+            mHushKnown = mHushFacing >= 0;
+            mHushFacing = facing;
+            mHushSince = bot.Abe().mFrame;
+        }
+    }
+    else
+    {
+        mHushFacing = -1;
+        mHushKnown = false;
+    }
     if (mBombSlig)
     {
         const TaskStep step = mBombSlig->Next(bot, lastFailed);
@@ -1142,7 +1178,9 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         if (cur == mLastFrom)
         {
             bot.Log("edge " + std::string(EdgeKindName(e.mKind)) + " from " + std::to_string(nav.Nodes()[cur].mX) + "," + std::to_string(nav.Nodes()[cur].mY) + " went nowhere" + (lastFailed.empty() ? "" : ": " + lastFailed));
-            if (++mSameSpot >= 2)
+            // (not one he was knocked down in the middle of: the Barracks' trophy room, where the orb's bolt at
+            // the chant to go unseen knocks him back as he starts for the lock, and the way was banned for it)
+            if (!bot.KnockedLately(80) && ++mSameSpot >= 2)
             {
                 bot.BanEdge(mLastEdge);
                 mSameSpot = 0;
@@ -1196,8 +1234,9 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         if (nav.FindPath(cur, mIsGoal, bot.EdgeCostFn(), path) && !path.empty())
         {
             bot.Log("walk from " + std::to_string(nav.Nodes()[cur].mX) + "," + std::to_string(nav.Nodes()[cur].mY) + " " + lastFailed);
-            // (once can be anything: a rewind that left him mid-step)
-            if (bot.NoteBlocked(path[0]))
+            // (once can be anything: a rewind that left him mid-step. And not one he was knocked down in the
+            // middle of.)
+            if (!bot.KnockedLately(80) && bot.NoteBlocked(path[0]))
             {
                 bot.BanEdge(path[0]);
             }
@@ -1649,6 +1688,37 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     const NavEdge& first = nav.Edges()[path[0]];
     mLastFrom = cur;
     bot.SetCurrentEdge(path[0]);
+    // Hidden, where he can only roll, with a Slig on his level and screen: a Slig that has turned to a noise shoots
+    // at what makes one in front of it, hidden or not (Slig's Brain_23_GetAlerted, "Is a mud being noisy"), and a
+    // roll is one. So he rolls two cells, no more, just after it has turned its back: it turns to that (some ten
+    // frames), finds him still and hidden, and listens out its time. The walkthrough of the Barracks' war room:
+    // "Whenever the top Slig turns away, roll forward a couple of spaces, then wait."
+    if (const SligAt* hush = bot.IsAe() && first.mKind == EdgeKind::eRoll && nav.Nodes()[cur].mHidden && !bot.GetWorld().mInvisible ? HushSlig(bot) : nullptr)
+    {
+        const AbeState& abe = bot.Abe();
+        const bool faces = hush->mFacingLeft == (abe.mX < hush->mX);
+        // (it stands at the end of its beat that long at least once it has turned to it: the two cells, and the
+        // crouch before them, have to be over before that)
+        const s32 pause = hush->mFacingLeft ? hush->mPauseLeft : hush->mPauseRight;
+        const s32 since = static_cast<s32>(abe.mFrame - mHushSince);
+        if (faces || !mHushKnown || since + 35 > pause - 10)
+        {
+            if (!mHushLogged)
+            {
+                bot.Log("hidden at " + std::to_string(abe.mX) + "," + std::to_string(abe.mY) + " with the Slig at " + std::to_string(hush->mX) + " on his level: a roll of two cells each time it has just turned its back");
+                mHushLogged = true;
+            }
+            return TaskStep::Do(Prim::Wait(4));
+        }
+        std::size_t last = 0;
+        if (path.size() > 1 && nav.Edges()[path[1]].mKind == EdgeKind::eRoll && nav.Edges()[path[1]].mLeft == first.mLeft)
+        {
+            last = 1;
+        }
+        // (one burst for each time it turns its back)
+        mHushKnown = false;
+        return TaskStep::Do(Prim::MoveTo(nav.Nodes()[nav.Edges()[path[last]].mTo].mX, Gait::eRoll));
+    }
     // The power to go invisible, and a Fleech near: one awake on his screen, or one on the floor he is on within
     // a screen's width. Chanted for until it takes. (Used no sooner: it lasts 600 frames or so and the way past
     // them is about that long.)
@@ -2932,7 +3002,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     hears = hears || slig.mX / camW == to.mX / camW || then / camW == to.mX / camW;
                 }
             }
-            if (nav.Input().mIsAe && !bot.GetWorld().mInvisible && !nav.Nodes()[first.mTo].mHidden && nav.Nodes()[first.mTo].mY > nav.Nodes()[cur].mY + 30 && mFallWaits < 700 && (hears || SligComes(bot, nav, nav.Nodes()[first.mTo]) < 110))
+            if (nav.Input().mIsAe && !bot.GetWorld().mInvisible && !nav.Nodes()[first.mTo].mHidden && nav.Nodes()[first.mTo].mY > nav.Nodes()[cur].mY + 30 && mFallWaits < 700 && (hears || SligComes(bot, nav, nav.Nodes()[first.mTo], true) < 135))
             {
                 if (mFallWaits++ == 0)
                 {
@@ -5267,6 +5337,29 @@ TaskStep UseTask::Next(Bot& bot, const std::string& lastFailed)
         if (entity->mKind == EntityKind::eLever && !bot.GetWorld().mFleechesAwake.empty())
         {
             mSide = bot.Abe().mX > entity->CentreX() ? 1 : -1;
+        }
+        // One that lets a Slig loose on its screen that comes shooting: from the side where he then faces a
+        // running jump up a hoist, the only way off the floor that is quick enough (the Barracks' war room)
+        for (const Entity& slig : bot.GetWorld().mEntities)
+        {
+            if (entity->mKind != EntityKind::eLever || slig.mKind != EntityKind::eSlig || slig.mGone || slig.mSwitch != entity->mSwitch || slig.mSwitch <= 1 || slig.mInputs[0] != 1 || mWant != 1 ||
+                bot.Nav().CameraOf(slig.CentreX(), slig.mY2) != bot.Nav().CameraOf(entity->CentreX(), entity->mY2 - 5))
+            {
+                continue;
+            }
+            for (s32 side = -1; side <= 1; side += 2)
+            {
+                const s32 at = Domain::UseNode(bot.Nav(), *entity, nullptr, side);
+                for (const NavEdge& e : bot.Nav().Edges())
+                {
+                    // (he faces the lever: left from its right side)
+                    if (e.mFrom == at && e.mKind == EdgeKind::eRunJump && e.mLeft == (side > 0) && e.mFeature >= 0 && bot.Nav().Input().mFeatures[e.mFeature].mKind == FeatureKind::eHoist &&
+                        (bot.Nav().Nodes()[at].mX > entity->CentreX()) == (side > 0))
+                    {
+                        mSide = side;
+                    }
+                }
+            }
         }
         // A lock is slapped from the side he comes to it from (the other may be behind a gate): the one the
         // way to is shorter, which is not always the side he is on now (the Mudomo vaults' path 10: the lock at

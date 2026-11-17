@@ -509,7 +509,8 @@ private:
     s32 mSligWaits = 0;
     // The frames until a Slig that walks the level of this cell can be on its screen with its face to it (9999:
     // none does), from where it is, the way it goes and the ends of its beat
-    static s32 SligComes(const Bot& bot, const NavGraph& nav, const NavNode& at);
+    // (withStand: a Slig that walks away is taken to stand at the end it walks to as long as its beat says at least)
+    static s32 SligComes(const Bot& bot, const NavGraph& nav, const NavNode& at, bool withStand = false);
     // Under a ledge a Slig stands on: whether it has been seen with its face to him, has its back to him now and
     // since which frame, the waits for it to turn, and the times he went back to a shadow from there
     bool mLedgeToward = false;
@@ -526,6 +527,12 @@ private:
     s32 mFacingWaits = 0;
     // Waits over a floor a Slig walks for it to leave before he drops onto it
     s32 mFallWaits = 0;
+    // The Slig on his level and screen that would hear him where he is hidden: the way it faced when last looked
+    // at (-1: none there), the frame it turned that way, and whether that turn was seen (not just found so)
+    s32 mHushFacing = -1;
+    u32 mHushSince = 0;
+    bool mHushKnown = false;
+    bool mHushLogged = false;
     bool mChaseLogged = false;
     s32 mLureWaits = 0;
     // Frames waited for a Slog under the ledge to leap up, and whether it was in the air the frame before

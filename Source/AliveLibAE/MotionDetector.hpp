@@ -54,9 +54,10 @@ public:
 
     // For the bot: where the beam is, the ends it goes between and what it moves a frame (x256, the way it goes
     // or is about to) and for how many frames more it waits at an end (kEndPause each time). False for one that
-    // is switched off or belongs to a greeter.
+    // is switched off, or a greeter's while it is after someone (its beam is not shown then). ownerX256: what a
+    // greeter it belongs to moves a frame at most as it patrols (the beam and its ends move with it), else 0.
     static constexpr s32 kEndPause = 15;
-    bool BeamNow(PSX_RECT& laser, s32& minX, s32& maxX, s32& velX256, s32& pause);
+    bool BeamNow(PSX_RECT& laser, s32& minX, s32& maxX, s32& velX256, s32& pause, s32& ownerX256);
 
 private:
     s16 IsInLaser(BaseAliveGameObject* pWho, BaseAliveGameObject* pOwner);

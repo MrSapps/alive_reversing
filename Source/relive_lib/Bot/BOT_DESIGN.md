@@ -1718,6 +1718,57 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
     frame's difference upstream (the zone step) and he does not. Modelled as it is, nothing is ever clear
     there and he went round by a lift, where he died twelve times: so it is left as it was. The end of that
     path wants another way (the walkthrough's is by the lift to the top and the wheel).
+- **The war room** (path 11), its stealth half (`ae_barracks_war_room.txt`, from its door): all six levers,
+  both tunnels, the hop into the wells and the Greeters' room with no deaths, to the ledge at 2162,340 at
+  f=2,702, where General Dripik is to be taken over (not taught: he stops there). What it took, each read out of the
+  game's code and measured:
+  - The lever of 239 lets a Slig loose that starts out after him (`Slig::Brain_18_StartChasing`): it shoots
+    as it comes, seen or not, and its first shot is 42 frames after the pull begins. A walk to the hoist and
+    the climb take longer from either side. A running jump that goes through a hoist he faces catches the
+    ledge over it (`Abe::Motion_31_RunJumpMid`), and from a stand with run held he runs at once: from the
+    lever's right side he hangs 32 frames after the pull begins. So `NavGraph` has that jump from as near as a
+    cell before the take-off, `UseTask` pulls such a lever from the side that faces one, and `EdgeCostFn`
+    makes it cheap while a Slig shoots or drops in (`SligAt::mShootsNow`).
+  - A naked Slig wakes 15 to 45 frames after its panic switch (random), takes 13 to wake, crawls a cell in
+    8, and is 19 at the locker: armed 65 to 95 frames after Abe crosses the zone at 1237,981. Armed, it
+    stands 15 frames in which it only shoots at what is a cell in front of it (`Brain_32_Inactive`), facing
+    the way it crawled. So the lever of 229 is pulled and the well jumped into at a run (`Bot::Hurry`: run,
+    and slid to a stop, while a naked Slig on his floor is on its way; not broken off when the Slig is
+    there). Under the armed Slig's beat (1262 to 1437, 30 to 60 at each end) the lever cannot be had from
+    either end: worked out, not tried.
+  - A well that throws him to a point in an edge's box leaves him hung from that ledge (`NavGraph::Thrown`).
+  - A locker's danger floor ends at a gate, and an armed Slig counts for the locker its beat reaches.
+  - Hidden is not unheard: a Slig that has turned to a noise shoots at what makes one in front of it, in
+    an invisible zone or not (`Brain_23_GetAlerted`). In the tunnel he can only roll, which is a noise: two
+    cells, just after the Slig has turned its back, then still until it turns away again (`GoToTask`, the
+    hush rule). The walkthrough: "Whenever the top Slig turns away, roll forward a couple of spaces".
+  - A floor that a spawner's Slig comes down on when he walks into its switch's zone is not gone onto
+    (`MarkSpawnTraps`): the floor of the third screen, where the walkthrough goes by the upper tunnel.
+  - A hop off the end of a floor is followed further down when it ends in a well (`NavGraph`, the drop table):
+    off the second tunnel at 1937,840 into the well at 2037,981, thrown on into the next, hung at 2137,881.
+  - `SligComes`, for a drop onto a floor only, counts the least time a Slig that walks away stands at that
+    end of its beat (`SligAt::mPauseLeft`, `mPauseRight`): the lever of 234 is 130 frames from the ledge and
+    back into the well, and its Slig is off that screen 177.
+  - A spawner is not a Slig that stands where its marker is (the rule for a landing a Slig faces).
+  - Greeters: their beam is a motion detector's that its body carries about at 3 a frame either way, so
+    `BeamNow` gives it with that, and `World::BeamClear` takes the beam to be that much nearer each frame
+    (`BeamAt::mDrift256`; unit test, 5 mutants caught). The rest is the rule for a fixed beam.
+  - Where two danger floors overlap, a cell is the one's whose middle it is nearer; and a locker's armed
+    Sligs do not count past a gate that is shut and that their beat ends short of (the live world has the
+    lockers' gates: `MarkLockerGates`).
+  - A real fault in the game's data: General Dripik's and Phleg's animations and gibs were listed under the
+    ender levels, which the conversion skips (they share a LVL), so the game stopped with a fatal error
+    on the Greeters' screen. Listed under the Barracks and Bonewerkz now; `kAnimationVersion` 13.
+  - What these broke on the way and how it showed: the whole chain. A naked Slig armed in mid-chant no
+    longer broke the chant off and began it again (`Hurry`'s exemption was too wide: only a keen run now),
+    which put the Slig bunks 36 frames out and lost a Slig; an orb's bolt that knocks him down as he sets
+    off is not a blocked way (`Bot::KnockedLately`); a Slig a lever calls drops in as a spawner's does and
+    is not one that shoots (`mShootsNow` only under a spawner whose Slig starts out after him).
+  - The chain as it is now (`blk10.txt`): the one known death in the workers' campus, the Slig bunks and the
+    trophy room as before, and in the bombing range he stays out of the flying Slig's sight at 1662,1500
+    and does not go on (he comes in 5 frames sooner than he did; from its door and from the trophy room's
+    the bombing range is still done with no deaths). That fight was never proven at every timing.
+  Left: the Glukkon (taken over, walked, its speech at the voice locks and to Sligs), the gas, the way out.
 - The hub and its four blocks, then the war room: a Glukkon taken over and its orders to Sligs, crawling
   Sligs and their button, an orb blown up with a grenade (then its Sligs taken over), grenades thrown on a
   count, Greeters, laughing gas, UXBs, Slig voice locks, ghost locks, a Shrykull.
