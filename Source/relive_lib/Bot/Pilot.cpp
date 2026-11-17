@@ -596,7 +596,7 @@ PilotStatus Pilot::StepMoveTo(const AbeState& abe, u32& bits)
                 bits |= Btn::eRun;
                 mSliding = true;
             }
-            else if (mPrim.mGait == Gait::eRun && dist2 > mKin.mRunLeave2 * grid2 / 2 + grid2)
+            else if (mPrim.mGait == Gait::eRun && dist2 > mKin.mRunLeave2 * grid2 / 2 + grid2 - (mPrim.mKeen ? 1 : 0))
             {
                 bits |= Btn::eRun;
             }
@@ -617,6 +617,12 @@ PilotStatus Pilot::StepMoveTo(const AbeState& abe, u32& bits)
                 bits |= Btn::eRun;
                 mSliding = true;
             }
+            // (a keen run too, with enough of the way left: let go at the turn's end he comes out of it at a walk
+            // and walks all of it, measured in the Barracks' path 14 from 1412 to 1537)
+            else if (mPrim.mGait == Gait::eRun && mPrim.mKeen && dist2 > mKin.mRunLeave2 * grid2 / 2 + grid2 - 1)
+            {
+                bits |= Btn::eRun;
+            }
             return PilotStatus::eRunning;
 
         case Move::eWalk:
@@ -631,7 +637,7 @@ PilotStatus Pilot::StepMoveTo(const AbeState& abe, u32& bits)
                 {
                     bits |= Btn::eSneak;
                 }
-                else if (mPrim.mGait == Gait::eRun && dist2 > mKin.mRunLeave2 * grid2 / 2 + grid2)
+                else if (mPrim.mGait == Gait::eRun && dist2 > mKin.mRunLeave2 * grid2 / 2 + grid2 - (mPrim.mKeen ? 1 : 0))
                 {
                     bits |= Btn::eRun;
                 }

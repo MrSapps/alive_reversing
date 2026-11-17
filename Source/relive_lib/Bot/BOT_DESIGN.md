@@ -1691,18 +1691,25 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
     under a ceiling where no grenade from the screen before comes onto its track, so nothing is flown
     there. Mudokons die in this (two or more by grenades): fine for `any`, not for the rescue.
   - Run on from the trophy room (`blk9t.txt`, the trophy room's first leg told to it) he is back in the hub at
-    f=6,176 with one death: at the lever of 208. He comes down out of the tunnel in the sight of the flying
-    Slig of 1186 to 1551, which is 72 frames from seeing him to its first grenade and bombs on though he is
-    on the next screen by then (once after him it is, on its screen or off it); the five cells to the lever
-    are walked (the run only starts with more than five to go), 59 frames, and the pull is 20. With a flying
-    Slig within 750 what is walked is asked for at a run, which here changes nothing. To be mended: a run
-    over five cells, or the drop timed against where the flying Slig is on its round.
+    f=4,304 with no deaths. What that took over the run from its door:
+    - A plan in hand is kept while it holds, and this one is made at the door, where no flying Slig is to be
+      had: so it had the lever of 214 for him, and he went for it when the flying Slig could have. A kept
+      plan with 1,500 or more left in it is looked at again, and one 400 cheaper by now is taken
+      (`Bot::Think`). And a spawner counts as on once what turns it on is done, though its switch is not
+      through the timer between them yet.
+    - The lever of 208: he comes down out of the tunnel in the sight of the flying Slig of 1186 to 1551, which
+      is 72 frames from seeing him to its first grenade and bombs on though he is on the next screen by then.
+      The five cells to the lever were walked (59 frames; the run began with more than five cells to go, and
+      out of a turn only with the run button held through it) and the pull is 20: bombed as he turned from it.
+      With a flying Slig within 750 a move is run, begun with five cells to go, the button held through the
+      turn (`Bot::Keen`, `Prim::mKeen`): 43 frames.
+    - The flying Slig he flies to and fro before the way under the ledge at 700 (40 high) and no nearer for
+      2,500 frames: no nearer in 200, it is sent off as when held, and the way found anew.
   - Left: its Mudokons (seven) and its secret.
-- **The whole chain** (`blk10.txt`: Rifle Range, workers' campus, Slig bunks, trophy room, bombing range), last
-  run whole before the lever rule for spawners that are on: no deaths in the Rifle Range; one in the
-  workers' campus (below); one in the Slig bunks (a grenade thrown at the Slig under the first orb from
-  578,100, not looked into); the trophy room clean, out at f=25,250; the bombing range not finished in that
-  run (it planned the lever of 214 for him), since mended and run from the trophy room on as above.
+- **The whole chain** (`blk10.txt`: Rifle Range, workers' campus, Slig bunks, trophy room, bombing range), as last
+  run whole (before the bombing range's last mending): no deaths in the Rifle Range; one in the workers'
+  campus (below); one in the Slig bunks (a grenade thrown at the Slig under the first orb from 578,100, not
+  looked into); the trophy room clean, out at f=25,250. To be run whole again.
   - The workers' campus' death is a hop of four cells from 687,620 to the ledge at 587: measured (he made
     not to be hurt), he does not reach, is 15 frames in the air, falls 50 in 4, catches the ledge and hangs
     for 37 before he can pull up, 60 deep, where a flying mine goes by under the ledge with never that long

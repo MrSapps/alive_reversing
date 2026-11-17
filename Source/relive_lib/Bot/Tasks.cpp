@@ -9987,6 +9987,30 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             }
             return steerTo(mEscapeX, mEscapeY);
         }
+        // (no nearer where it is going in 200 frames, though it moves: to and fro before a gap its top does not
+        // clear. The same way out. The Barracks' path 14: at 670,1480 before the way under the ledge at 700,
+        // 40 high, for 2,500 frames.)
+        {
+            const s32 left = std::abs(shot.mWaitX - bx) + std::abs(shot.mWaitY - by);
+            if (mProgressFrames == 0 || left + 40 < mProgressLeft)
+            {
+                mProgressFrames = 1;
+                mProgressLeft = left;
+            }
+            else if (++mProgressFrames > 200)
+            {
+                static const s32 kWays[4][2] = {{0, 45}, {-40, 40}, {-45, 0}, {0, -45}};
+                const s32 way = shot.mFaceLeft ? -1 : 1;
+                mEscapeX = bx + kWays[mEscapes % 4][0] * way;
+                mEscapeY = by + kWays[mEscapes % 4][1];
+                mEscapes++;
+                mEscape = 40;
+                mUnstick = 0;
+                mProgressFrames = 0;
+                bot.Log("the flying Slig is no nearer in 200 frames at " + std::to_string(bx) + "," + std::to_string(by) + ": off to " + std::to_string(mEscapeX) + "," + std::to_string(mEscapeY) + " and on from there");
+                return steerTo(mEscapeX, mEscapeY);
+            }
+        }
         // Pushing at something (the end of a ledge its side is under): along to where it is going first
         if (std::abs(bx - mLastX) + std::abs(by - mLastY) <= 1)
         {

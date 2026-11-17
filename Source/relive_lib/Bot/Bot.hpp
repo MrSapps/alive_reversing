@@ -461,6 +461,8 @@ public:
     s32 QuietFrames(s32 x, s32 y, bool half) const;
     // Whether a flying Slig is coming Abe's way, is on his screen, or is on the side of him he has to go to
     bool FlierThreat() const;
+    // A move as it is made with a flying Slig near: run, and keenly
+    Prim Keen(Prim prim) const;
     // A flying Slig that stays on his screen is not hidden from any more, for as long as it is on it: what there is
     // to do is done at a run between its grenades (HideTask)
     void FlierDash(bool on)

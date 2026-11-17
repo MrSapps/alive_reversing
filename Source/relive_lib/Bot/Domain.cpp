@@ -4450,11 +4450,20 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         // (a spawner that a switch turns on, off now, with something to do that turns it on: that first)
         bool turnedOn = spawner.mSwitch <= 1 || world.Switch(spawner.mSwitch) != 0;
         bool canTurnOn = false;
+        // (what turns it on done already, its switch not yet through the timer between them: as good as on.
+        // The Barracks' path 14: planned on the frame the lever of 210 was pulled, with 213 still off, the
+        // flying Slig was not to be had and he went for the next lever himself.)
+        bool onItsWay = false;
         for (const Goap::Action& a : d.mActions)
         {
-            canTurnOn = canTurnOn || std::find(a.mEffects.begin(), a.mEffects.end(), Goap::Fact{Key::Switch(spawner.mSwitch), 1}) != a.mEffects.end();
+            if (std::find(a.mEffects.begin(), a.mEffects.end(), Goap::Fact{Key::Switch(spawner.mSwitch), 1}) != a.mEffects.end())
+            {
+                canTurnOn = true;
+                const Goap::Fact& own = a.mEffects.front();
+                onItsWay = onItsWay || (own.mKey != Key::Switch(spawner.mSwitch) && own.mKey >= Key::Switch(0) && own.mKey < Key::Switch(256) && world.Switch(static_cast<s32>(own.mKey - Key::Switch(0))) == own.mValue);
+            }
         }
-        const bool wantsOn = !turnedOn && canTurnOn;
+        const bool wantsOn = !turnedOn && canTurnOn && !onItsWay;
         // The cells he can get to without going onto the floor of any of those Sligs
         const std::vector<FlierTarget> targets = FlierTargets(nav.Input(), world, spawner);
         // (where he stands on the floor of one of them there is no bombing it from, but a lever or a lock the
