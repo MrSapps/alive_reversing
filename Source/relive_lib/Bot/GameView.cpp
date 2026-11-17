@@ -1076,6 +1076,15 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mInputs[0] = t.mPanicSwitchId;
                     break;
                 }
+                case ReliveTypes::eGlukkonSwitch:
+                {
+                    const auto& t = static_cast<const relive::Path_GlukkonSwitch&>(tlv);
+                    e.mKind = EntityKind::eVoiceLock;
+                    keep = GetGameType() == GameType::eAe;
+                    e.mHalf = t.mScale == relive::reliveScale::eHalf;
+                    e.mSwitch = t.mOkSwitchId;
+                    break;
+                }
                 case ReliveTypes::eCrawlingSligButton:
                 {
                     const auto& t = static_cast<const relive::Path_CrawlingSligButton&>(tlv);
@@ -1601,6 +1610,22 @@ void GameView::ReadWorld(BaseMap& map, World& world)
     world.mFleechesAwake.clear();
     world.mFleechesAsleep.clear();
     world.mLocksIntact.clear();
+    world.mGlukkons.clear();
+    for (s32 i = 0; isAe && i < gBaseAliveGameObjects->Size(); i++)
+    {
+        BaseAliveGameObject* pObj = gBaseAliveGameObjects->ItemAt(i);
+        if (pObj && !pObj->GetDead() && pObj->Type() == ReliveTypes::eGlukkon && pObj->mHealth > FP_FromInteger(0))
+        {
+            GlukkonAt glukkon;
+            glukkon.mX = FP_GetExponent(pObj->mXPos);
+            glukkon.mY = FP_GetExponent(pObj->mYPos);
+            glukkon.mHalf = pObj->GetSpriteScale() != FP_FromInteger(1);
+            glukkon.mFacingLeft = pObj->GetAnimation().GetFlipX();
+            glukkon.mPossessed = pObj == sControlledCharacter;
+            glukkon.mMotion = pObj->VGetMotion(eMotionType::eCurrentMotion);
+            world.mGlukkons.push_back(glukkon);
+        }
+    }
     world.mCrawlers.clear();
     world.mCrawlerMine = false;
     for (s32 i = 0; isAe && i < gBaseAliveGameObjects->Size(); i++)

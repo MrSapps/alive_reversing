@@ -5024,6 +5024,156 @@ TaskStep CrawlerButtonTask::Next(Bot& bot, const std::string& lastFailed)
     return TaskStep::Do(Prim::Wait(20, Btn::eChant));
 }
 
+VoiceLockTask::~VoiceLockTask() = default;
+
+TaskStep VoiceLockTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const Entity* lock = world.Find(mLock);
+    if (!lock)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    if (!mWasKnown)
+    {
+        mWasKnown = true;
+        mWas = world.Switch(lock->mSwitch) != 0;
+    }
+    const GlukkonAt* me = nullptr;
+    const GlukkonAt* any = nullptr;
+    for (const GlukkonAt& g : world.mGlukkons)
+    {
+        me = g.mPossessed ? &g : me;
+        any = &g;
+    }
+    if ((world.Switch(lock->mSwitch) != 0) != mWas)
+    {
+        // (a teleporter that it stands in takes it away as its switch changes: done once it is where that goes,
+        // or after a while)
+        bool leaves = false;
+        for (const Entity& tele : world.mEntities)
+        {
+            leaves = leaves || (tele.mKind == EntityKind::eTeleporter && tele.mSwitch == lock->mSwitch && tele.mX1 <= lock->mX2 && tele.mX2 >= lock->mX1 && std::abs(tele.mY2 - lock->mY2) <= 30);
+        }
+        const bool there = me && (me->mX < lock->mX1 - 50 || me->mX > lock->mX2 + 50 || std::abs(me->mY - lock->mY2) > 60) && me->mMotion == 0;
+        if (leaves && !there && (mLeft += 4) < 600)
+        {
+            return TaskStep::Do(Prim::Wait(4));
+        }
+        return TaskStep::Done();
+    }
+    if (me)
+    {
+        const bool inBox = me->mX >= lock->mX1 + 3 && me->mX <= lock->mX2 - 3 && me->mY >= lock->mY1 && me->mY <= lock->mY2 + 4;
+        if (!inBox)
+        {
+            mInBox = 0;
+            if ((mWalked += 2) > 1500)
+            {
+                return TaskStep::Failed("the Glukkon did not get to the voice lock");
+            }
+            // The way there, a cell at a time (Domain::GlukkonWay): where it is now, and the cell after
+            std::vector<s32> nodes;
+            std::vector<bool> hops;
+            if (!Domain::GlukkonWay(bot.Nav(), world, me->mX, me->mY, me->mHalf, *lock, nullptr, &nodes, &hops) || nodes.size() < 2)
+            {
+                // (in the air, or between cells: it comes to rest first)
+                if ((mLost += 2) > 200)
+                {
+                    return TaskStep::Failed("the Glukkon has no way to the voice lock");
+                }
+                return TaskStep::Do(Prim::Wait(2));
+            }
+            mLost = 0;
+            const NavNode& next = bot.Nav().Nodes()[nodes[1]];
+            const bool left = next.mX < me->mX;
+            const u32 dir = left ? Btn::eLeft : Btn::eRight;
+            if (hops[1])
+            {
+                // A jump: from a stand in the middle of the cell, with its face that way
+                const NavNode& here = bot.Nav().Nodes()[nodes[0]];
+                if (me->mMotion != 0)
+                {
+                    return TaskStep::Do(Prim::Wait(2));
+                }
+                if (std::abs(me->mX - here.mX) > 4)
+                {
+                    return TaskStep::Do(Prim::Wait(2, me->mX < here.mX ? Btn::eRight : Btn::eLeft));
+                }
+                if (me->mFacingLeft != left)
+                {
+                    return TaskStep::Do(Prim::Wait(2, dir));
+                }
+                bot.Log("the Glukkon at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": a jump to " + std::to_string(next.mX));
+                return TaskStep::Do(Prim::Wait(3, dir | Btn::eHop));
+            }
+            // (a walk: let go of in the cell before the one it is to stand in, unless the way goes on the same
+            // way on foot: it walks a cell at a time)
+            const bool on = nodes.size() > 2 && !hops[2] && (bot.Nav().Nodes()[nodes[2]].mX < next.mX) == left && bot.Nav().Nodes()[nodes[2]].mY >= next.mY - 5;
+            const s32 dx = next.mX - me->mX;
+            return TaskStep::Do(Prim::Wait(2, on || std::abs(dx) > 14 ? dir : 0u));
+        }
+        if (!mSaid)
+        {
+            mSaid = true;
+            bot.Log("the Glukkon at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": at the voice lock");
+        }
+        // (the lock says "Hey" as he comes into its box and takes his for 150 frames; 30 after it, it says
+        // "What?" and takes "Do it" for 60)
+        mInBox += 3;
+        if (mInBox == 45)
+        {
+            return TaskStep::Do(Prim::Wait(3, Btn::eSpeak1));
+        }
+        if (mInBox == 120)
+        {
+            return TaskStep::Do(Prim::Wait(3, Btn::eSpeak4));
+        }
+        if (mInBox > 300)
+        {
+            mInBox = 0;
+            if (++mTries > 4)
+            {
+                return TaskStep::Failed("the voice lock did not open");
+            }
+        }
+        return TaskStep::Do(Prim::Wait(3));
+    }
+    // Abe
+    if (!any)
+    {
+        // (in his trance with none to be seen: the one he is in is on its way through a teleporter)
+        if (bot.Abe().mMotion == 112 && (mLeft += 4) < 1500)
+        {
+            return TaskStep::Do(Prim::Wait(4));
+        }
+        return TaskStep::Failed("no Glukkon about");
+    }
+    TaskStep step;
+    if (!RunGo(mGo, bot, lastFailed, step))
+    {
+        return step;
+    }
+    if (step.mKind == TaskStep::Kind::eFailed)
+    {
+        return step;
+    }
+    if (mFrom >= 0 && bot.AbeNode() != mFrom)
+    {
+        if (bot.AbeNode() < 0)
+        {
+            return TaskStep::Do(Prim::Wait(4));
+        }
+        mGo = GoToNode(mFrom);
+        return Next(bot, "");
+    }
+    if ((mChanted += 20) > 900)
+    {
+        return TaskStep::Failed("the chant took no Glukkon");
+    }
+    return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+}
+
 GrenadeOrbTask::~GrenadeOrbTask() = default;
 
 TaskStep GrenadeOrbTask::Next(Bot& bot, const std::string& lastFailed)

@@ -40,6 +40,7 @@ const char* EntityKindName(EntityKind kind)
         case EntityKind::eCrawler: return "Crawler";
         case EntityKind::ePantsLocker: return "Locker";
         case EntityKind::eSligButton: return "SligButton";
+        case EntityKind::eVoiceLock: return "VoiceLock";
         case EntityKind::eRockSack: return "RockSack";
         case EntityKind::eBrew: return "Brew";
         case EntityKind::eFlier: return "FlyingSlig";
@@ -227,6 +228,168 @@ bool Domain::SackJump(const NavGraph& nav, const Entity& sack, s32* from, s32* t
         }
     }
     return found;
+}
+
+bool Domain::GlukkonWay(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, const Entity& lock, std::vector<Goap::Fact>* needs, std::vector<s32>* nodes, std::vector<bool>* hops)
+{
+    const s32 start = nav.NodeAt(x, y, half, 12);
+    if (start < 0)
+    {
+        return false;
+    }
+    const s32 step = NavGraph::GridStep(half);
+    const std::size_t count = nav.Nodes().size();
+    struct Came final
+    {
+        s32 mFrom = -1;
+        s32 mCost = -1;
+        bool mHop = false;
+        // The switch the step waits on and the value it wants (0: none)
+        s32 mSwitch = 0;
+        s32 mValue = 0;
+    };
+    std::vector<Came> came(count);
+    came[start].mCost = 0;
+    std::vector<bool> done(count, false);
+    const auto gate = [&](s32 x1, s32 x2, s32 floorY, s32& sw, s32& value)
+    {
+        for (const NavFeature& f : nav.Input().mFeatures)
+        {
+            if (f.mKind == FeatureKind::eBarrier && f.mSolid && f.mSwitch > 1 && f.mHalf == half && f.mX1 < std::max(x1, x2) && f.mX2 > std::min(x1, x2) && f.mY1 <= floorY + 4 && f.mY2 >= floorY - 40)
+            {
+                sw = f.mSwitch;
+                value = f.mStartClosed ? 1 : 0;
+                return true;
+            }
+        }
+        return false;
+    };
+    s32 goal = -1;
+    for (;;)
+    {
+        s32 cur = -1;
+        for (std::size_t n = 0; n < count; n++)
+        {
+            if (!done[n] && came[n].mCost >= 0 && (cur < 0 || came[n].mCost < came[cur].mCost))
+            {
+                cur = static_cast<s32>(n);
+            }
+        }
+        if (cur < 0)
+        {
+            break;
+        }
+        done[cur] = true;
+        const NavNode& at = nav.Nodes()[cur];
+        if (at.mX >= lock.mX1 + 3 && at.mX <= lock.mX2 - 3 && std::abs(at.mY - lock.mY2) <= 30)
+        {
+            goal = cur;
+            break;
+        }
+        const auto relax = [&](s32 to, bool hop, s32 sw, s32 value)
+        {
+            if (to < 0 || done[to] || nav.Nodes()[to].mHazard)
+            {
+                return;
+            }
+            // (a switch that is not as it has to be: dear, so that a way that waits on nothing is the one found)
+            const bool waits = sw > 1 && (world.Switch(sw) != 0) != (value != 0);
+            const s32 cost = came[cur].mCost + 1 + (hop ? 2 : 0) + (waits ? 1000 : 0);
+            if (came[to].mCost < 0 || cost < came[to].mCost)
+            {
+                came[to].mFrom = cur;
+                came[to].mCost = cost;
+                came[to].mHop = hop;
+                came[to].mSwitch = waits ? sw : 0;
+                came[to].mValue = value;
+            }
+        };
+        for (s32 dir = -1; dir <= 1; dir += 2)
+        {
+            const s32 nx = at.mX + dir * step;
+            s32 sw = 0;
+            s32 value = 0;
+            gate(at.mX, nx, at.mY, sw, value);
+            const s32 next = nav.NodeAt(nx, at.mY, half, 12);
+            if (next >= 0 && std::abs(nav.Nodes()[next].mX - nx) <= step / 2 && !nav.Nodes()[next].mHazard)
+            {
+                relax(next, false, sw, value);
+                continue;
+            }
+            // A jump over what is in the way (mines, a gap): it comes down kGlukkonJump cells on
+            for (s32 k = kGlukkonJump; k <= kGlukkonJump && sw == 0; k++)
+            {
+                const s32 lx = at.mX + dir * k * step;
+                const s32 land = nav.NodeAt(lx, at.mY, half, 12);
+                if (land >= 0 && std::abs(nav.Nodes()[land].mX - lx) <= step / 2 && !nav.Nodes()[land].mHazard)
+                {
+                    s32 gsw = 0;
+                    s32 gvalue = 0;
+                    if (!gate(at.mX, lx, at.mY, gsw, gvalue))
+                    {
+                        relax(land, true, 0, 0);
+                    }
+                    break;
+                }
+            }
+            // Off the end of the floor, down to the one under it
+            if (next < 0)
+            {
+                for (s32 down = 30; down <= 200; down += 10)
+                {
+                    const s32 under = nav.NodeAt(nx, at.mY + down * (half ? 1 : 2) / 2, half, 5);
+                    if (under >= 0 && std::abs(nav.Nodes()[under].mX - nx) <= step / 2)
+                    {
+                        relax(under, false, sw, value);
+                        break;
+                    }
+                }
+            }
+        }
+        // A teleporter it stands in takes it to the other one when its switch changes
+        for (const Entity& tele : world.mEntities)
+        {
+            if (tele.mKind != EntityKind::eTeleporter || tele.mHalf != half || at.mX < tele.mX1 || at.mX > tele.mX2 || std::abs(at.mY - tele.mY2) > 30)
+            {
+                continue;
+            }
+            for (const Entity& other : world.mEntities)
+            {
+                if (other.mKind == EntityKind::eTeleporter && other.mId != tele.mId && other.mInputs[1] == tele.mInputs[2])
+                {
+                    // (taken as a wait on its switch being on: it is off until the lock there is answered, and by
+                    // then he is gone from it)
+                    relax(nav.NodeAt(other.CentreX(), other.mY2, half, 30), false, tele.mSwitch, 1);
+                }
+            }
+        }
+    }
+    if (goal < 0)
+    {
+        return false;
+    }
+    std::vector<s32> way;
+    for (s32 n = goal; n >= 0; n = came[n].mFrom)
+    {
+        way.push_back(n);
+    }
+    std::reverse(way.begin(), way.end());
+    for (s32 n : way)
+    {
+        if (needs && came[n].mSwitch > 1)
+        {
+            needs->push_back({Key::Switch(came[n].mSwitch), came[n].mValue});
+        }
+        if (nodes)
+        {
+            nodes->push_back(n);
+        }
+        if (hops)
+        {
+            hops->push_back(came[n].mHop);
+        }
+    }
+    return true;
 }
 
 s32 Domain::UseNode(const NavGraph& nav, const Entity& entity, bool* faceLeft, s32 firstSide)
@@ -4359,6 +4522,62 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             std::vector<Goap::Fact> pre{regionFact(static_cast<s32>(n)), {Key::Switch(button.mSwitch), now}};
             pre.insert(pre.end(), orbs.begin(), orbs.end());
             add("Press SligButton#" + std::to_string(button.mId) + " sw" + std::to_string(button.mSwitch) + " with a naked Slig taken over from " + std::to_string(node.mX) + "," + std::to_string(node.mY), pre, {{Key::Switch(button.mSwitch), after}}, 900, press);
+        }
+    }
+    // A voice lock with a Glukkon on its floor and nothing shut between them: the Glukkon is taken over from a
+    // cell of its screen, once no orb is over that screen, walked into the lock's box, and says what the lock
+    // wants said. One he is in already goes on to it as it is. (The walkthrough of the Barracks' war room: "possess
+    // General Dripik! Move him in front of the Glukkon Phone, say "Hey", then "Do it"".)
+    for (const Entity& lock : world.mEntities)
+    {
+        if (lock.mKind != EntityKind::eVoiceLock || lock.mSwitch <= 1)
+        {
+            continue;
+        }
+        for (const GlukkonAt& glukkon : world.mGlukkons)
+        {
+            std::vector<Goap::Fact> needs;
+            if (glukkon.mHalf != lock.mHalf || !GlukkonWay(nav, world, glukkon.mX, glukkon.mY, glukkon.mHalf, lock, &needs))
+            {
+                continue;
+            }
+            const s32 now = world.Switch(lock.mSwitch);
+            const std::vector<Goap::Fact> gives{{Key::Switch(lock.mSwitch), now ? 0 : 1}};
+            DomainStep say;
+            say.mKind = StepKind::eVoiceLock;
+            say.mEntity = lock.mId;
+            say.mEdge = -1;
+            const std::string what = "Answer VoiceLock#" + std::to_string(lock.mId) + " sw" + std::to_string(lock.mSwitch) + " with the Glukkon";
+            if (glukkon.mPossessed)
+            {
+                std::vector<Goap::Fact> pre{{Key::Switch(lock.mSwitch), now}};
+                pre.insert(pre.end(), needs.begin(), needs.end());
+                add(what, pre, gives, 300, say);
+                continue;
+            }
+            const s32 cam = nav.CameraOf(glukkon.mX, glukkon.mY - 5);
+            std::vector<Goap::Fact> orbs;
+            for (const Entity& orb : world.mEntities)
+            {
+                if (orb.mKind == EntityKind::eSecurityOrb && !orb.mGone && nav.CameraOf(orb.mX1, orb.mY1) == cam)
+                {
+                    orbs.push_back({Key::Switch(World::HazardSwitch(orb.mId)), 1});
+                }
+            }
+            std::set<s32> from;
+            for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+            {
+                const NavNode& node = nav.Nodes()[n];
+                if (node.mHalf != lock.mHalf || node.mHazard || nav.CameraOf(node.mX, node.mY - 5) != cam || !from.insert(d.mRegions[n]).second)
+                {
+                    continue;
+                }
+                say.mEdge = static_cast<s32>(n);
+                std::vector<Goap::Fact> pre{regionFact(static_cast<s32>(n)), {Key::Switch(lock.mSwitch), now}};
+                pre.insert(pre.end(), orbs.begin(), orbs.end());
+                pre.insert(pre.end(), needs.begin(), needs.end());
+                add(what + " taken over from " + std::to_string(node.mX) + "," + std::to_string(node.mY), pre, gives, 600, say);
+            }
         }
     }
     for (const OrbTarget& target : OrbTargets(nav.Input(), world))

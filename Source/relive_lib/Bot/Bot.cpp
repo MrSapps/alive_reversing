@@ -221,6 +221,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<GrenadeSligTask>(step.mEntity, step.mEdge);
         case StepKind::eCrawlerButton:
             return std::make_unique<CrawlerButtonTask>(step.mEntity, step.mEdge);
+        case StepKind::eVoiceLock:
+            return std::make_unique<VoiceLockTask>(step.mEntity, step.mEdge);
         case StepKind::eGrenadeOrb:
             return std::make_unique<GrenadeOrbTask>(step.mEntity, step.mEdge);
         case StepKind::eFlierBomb:
@@ -277,6 +279,28 @@ bool Bot::Replan(BaseMap& map)
 {
     const PathKnowledge* know = mKnow;
     const s32 abeNode = AbeNode();
+    // In his trance (Abe's Motion_112_Chant, with nothing held) and what he is in not to be seen: it is on its way
+    // somewhere (a Glukkon through a teleporter, to another level's copy of the path). Looked at again shortly.
+    if (mIsAe && mAbe.mMotion == 112 && !(mBits & Btn::eChant))
+    {
+        bool in = mWorld.mCrawlerMine;
+        for (const GlukkonAt& g : mWorld.mGlukkons)
+        {
+            in = in || g.mPossessed;
+        }
+        for (const SligAt& s : mWorld.mSligs)
+        {
+            in = in || s.mPossessed;
+        }
+        if (!in && ++mTranceWaits < 150)
+        {
+            mPilot.Start(Prim::Wait(10), mAbe);
+            mPilotActive = true;
+            mPilotForTask = false;
+            return true;
+        }
+        mTranceWaits = in ? 0 : mTranceWaits;
+    }
     if (abeNode < 0 || (mAbe.mMove == Move::eAir && !mAbe.mOnGround))
     {
         // In the air (out of a bird portal as well, which leaves him at a floor's height before he has landed), on
@@ -2659,7 +2683,15 @@ bool Bot::Hurry() const
 
 Prim Bot::Keen(Prim prim) const
 {
-    if (Hurry() && prim.mKind == Prim::Kind::eMoveTo && !prim.mSlide && prim.mRunUp == 0 && (prim.mGait == Gait::eWalk || prim.mGait == Gait::eRun) && !mWorld.mInvisible)
+    // (what was to be sneaked is run too, unless a Slig with a gun is near on his floor with nothing shut between
+    // them: the Barracks' Slig bunks, where one walks the floor the naked ones crawl on)
+    bool hears = false;
+    for (const SligAt& s : mWorld.mSligs)
+    {
+        hears = hears || (!s.mAsleep && !s.mPossessed && s.mHalf == mAbe.mHalfScale && std::abs(s.mY - mAbe.mY) <= 45 && std::abs(s.mX - mAbe.mX) <= 600 && mKnow &&
+                          Domain::FloorOpen(mKnow->mNav.Input(), mWorld, s.mX, mAbe.mX, mAbe.mY, mAbe.mHalfScale));
+    }
+    if (Hurry() && prim.mKind == Prim::Kind::eMoveTo && !prim.mSlide && prim.mRunUp == 0 && (prim.mGait == Gait::eWalk || prim.mGait == Gait::eRun || (prim.mGait == Gait::eSneak && !hears)) && !mWorld.mInvisible)
     {
         const s32 cells = std::abs(prim.mX - mAbe.mX) / NavGraph::GridStep(mAbe.mHalfScale);
         prim.mGait = Gait::eRun;
@@ -3734,14 +3766,22 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
             }
             for (const RockAt& crawler : mWorld.mCrawlers)
             {
-                if (crawler.mHalf == e.mHalf && std::abs(crawler.mY - e.mY2) <= 40 && std::abs(crawler.mX - e.CentreX()) <= 400)
+                // (with a locker on its floor that it can get to: one shut in behind a gate only crawls about. The
+                // Barracks' Slig bunks.)
+                bool locker = false;
+                for (const Entity& l : mWorld.mEntities)
+                {
+                    locker = locker || (l.mKind == EntityKind::ePantsLocker && l.mHalf == crawler.mHalf && std::abs(l.mY2 - crawler.mY) <= 30 && std::abs(l.CentreX() - crawler.mX) <= World::kLockerReach &&
+                                        Domain::FloorOpen(mKnow->mNav.Input(), mWorld, crawler.mX, l.CentreX(), crawler.mY, crawler.mHalf));
+                }
+                if (locker && crawler.mHalf == e.mHalf && std::abs(crawler.mY - e.mY2) <= 40 && std::abs(crawler.mX - e.CentreX()) <= 400)
                 {
                     mHurrySeen = true;
                     mHurryFrame = mAbe.mFrame;
                 }
             }
         }
-        if (awake > mLastAwakeSligs && mPilotActive && mPilotForTask && mAuto && mAbe.mOnGround && mPilot.Current().mKind != Prim::Kind::eRunJump && !(Hurry() && mPilot.Current().mKind == Prim::Kind::eMoveTo && mPilot.Current().mKeen))
+        if (awake > mLastAwakeSligs && mPilotActive && mPilotForTask && mAuto && mAbe.mOnGround && mPilot.Current().mKind != Prim::Kind::eRunJump && !(Hurry() && ((mPilot.Current().mKind == Prim::Kind::eMoveTo && mPilot.Current().mKeen) || mPilot.Current().mKind == Prim::Kind::ePress)))
         {
             mPilot.Start(Prim::Wait(2), mAbe);
         }
@@ -3975,6 +4015,10 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
             for (const FlierAt& flier : mWorld.mFliers)
             {
                 mTrace += " flier" + std::to_string(flier.mX) + "," + std::to_string(flier.mY);
+            }
+            for (const GlukkonAt& glukkon : mWorld.mGlukkons)
+            {
+                mTrace += " gluk" + std::to_string(glukkon.mX) + "," + std::to_string(glukkon.mY) + (glukkon.mFacingLeft ? "L" : "R") + "m" + std::to_string(glukkon.mMotion) + (glukkon.mPossessed ? "*" : "");
             }
             for (const RockAt& crawler : mWorld.mCrawlers)
             {

@@ -107,6 +107,8 @@ struct BotMemory
     u32 mExploring = 0;
     std::string mLastSligs;
     s32 mLastAwakeSligs = 0;
+    // Looks in a row at a trance with nothing to be seen that he is in (Replan)
+    s32 mTranceWaits = 0;
     // The frame he was last knocked off his feet (AE's knockback motions)
     u32 mKnockFrame = 0;
     bool mKnocked = false;
