@@ -102,6 +102,9 @@ enum class StepKind : u8
                 // (Domain::GrenadeTargets)
     eCrawlerButton, // from the cell mEdge take over a naked Slig and press the button mEntity with it
     eSligLever,     // the Glukkon he is in goes to the cell mEdge and has a Slig it calls pull the lever mEntity
+    eFeedSlogs,     // from the cell mEdge throw a bone onto the stretch of floor of the Slog mEntity (mOther: twice
+                    // the kind of throw, and one more for a throw to the left; from bit 8 up the switch of a plate
+                    // the bone is thrown past)
     eVoiceLock,     // from the cell mEdge (-1: he has one already) take over a Glukkon and answer the voice lock mEntity
                     // (Domain::CrawlerFor)
     eGrenadeOrb, // hold a grenade and throw it late from the cell mEdge, to go off in the air by security orb
@@ -489,6 +492,10 @@ struct Domain final
     // Where a rock could be thrown from at something on the floor at (x, y), likeliest first. Nothing is worked
     // out about how a rock flies: these are the places worth a try, and the bot keeps what it finds
     // world: to leave out the cells a drill that runs comes by (without it, the cells of any drill)
+    // A bone thrown from a cell so that it first comes down on the stretch x1..x2 of the floor at floorY, with room
+    // to skip on: the throw (twice its kind, and one more for to the left), the frames it is in the air, and where
+    // it comes down. The soonest of the throws there are; false if none.
+    static bool BoneThrow(const NavGraph& nav, s32 node, s32 x1, s32 x2, s32 floorY, u32& aim, s32& frames, s32* downX = nullptr, const std::function<bool(s32 downX)>& wanted = nullptr);
     static std::vector<ThrowSpot> ThrowSpots(const NavGraph& nav, s32 x, s32 y, bool half, const World* world = nullptr);
     static bool PlanTogether(const NavGraph& nav, const World& world, const Entity& logic, Team& team, std::vector<Goap::Fact>& pre);
     // Weighs a detour into a path: entryNode is where Abe comes in, leadsOn says which of its exits are a way on

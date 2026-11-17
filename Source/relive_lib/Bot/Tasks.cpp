@@ -1982,7 +1982,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         for (const SlogAt& slog : bot.GetWorld().mSlogs)
         {
             // (not in flight from another: that run is not stopped for this one)
-            if (leaves && !mHurry && (mSlogWaits > 0 || abe.Settled()) && !slog.mAsleep && from.mHalf == abe.mHalfScale && std::abs(slog.mY - down.mY) * scale <= 30 && std::abs(slog.mX - from.mX) * scale <= 80 && std::abs(slog.mX - down.mX) * scale <= 200)
+            if (leaves && !mHurry && (mSlogWaits > 0 || abe.Settled()) && !slog.mAsleep && !bot.GetWorld().SlogFed(slog) && from.mHalf == abe.mHalfScale && std::abs(slog.mY - down.mY) * scale <= 30 && std::abs(slog.mX - from.mX) * scale <= 80 && std::abs(slog.mX - down.mX) * scale <= 200)
             {
                 under = &slog;
             }
@@ -4846,6 +4846,88 @@ TaskStep BlowMineTask::Next(Bot& bot, const std::string& lastFailed)
     mPhase = 2;
     mWait = 0;
     return TaskStep::Do(Prim::Wait(6, Btn::eThrow | AimBits(spot->mKind, abe.mFacingLeft)));
+}
+
+FeedSlogsTask::~FeedSlogsTask() = default;
+
+TaskStep FeedSlogsTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const AbeState& abe = bot.Abe();
+    const World& world = bot.GetWorld();
+    const Entity* slog = world.Find(mSlog);
+    if (!slog)
+    {
+        return TaskStep::Failed("no such Slog");
+    }
+    if (mHad < 0)
+    {
+        if (bot.AbeNode() != mStand || !abe.Settled())
+        {
+            if (!mGo)
+            {
+                const s32 stand = mStand;
+                mGo = std::make_unique<GoToTask>("to where the bone is thrown from", [stand](s32 n)
+                                                 { return n == stand; });
+            }
+            const TaskStep step = mGo->Next(bot, lastFailed);
+            if (step.mKind != TaskStep::Kind::eDone)
+            {
+                return step;
+            }
+            mGo.reset();
+        }
+        if (world.mRocks <= 0)
+        {
+            return TaskStep::Failed("no bone to throw");
+        }
+        if (abe.mMove != Move::eIdle && !mInHand)
+        {
+            return TaskStep::Do(abe.mMove == Move::eCrouch ? Prim::Press(Btn::eUp) : Prim::Wait(1));
+        }
+        if (abe.mFacingLeft != mLeft && !mInHand)
+        {
+            return TaskStep::Do(Prim::Face(mLeft));
+        }
+        if (!abe.Settled() && !mInHand)
+        {
+            return TaskStep::Do(Prim::Wait(2));
+        }
+        // (it comes to hand over a few frames, and goes when a direction is held as well: as a rock does)
+        if (!mInHand)
+        {
+            mInHand = true;
+            mHad = -world.mRocks - 1;
+            bot.Log("a bone for the Slogs at " + std::to_string(slog->mInputs[2]) + ".." + std::to_string(slog->mInputs[3]) + " from " + std::to_string(abe.mX) + "," + std::to_string(abe.mY));
+            return TaskStep::Do(Prim::Wait(8, Btn::eThrow));
+        }
+        mInHand = false;
+        mHad = -mHad - 1;
+        mFrames = 0;
+        return TaskStep::Do(Prim::Wait(6, Btn::eThrow | BlowMineTask::AimBits(mKind, abe.mFacingLeft)));
+    }
+    // Thrown: until it lies among them (the stretch's switch, World::Switch) and has come to rest
+    mFrames++;
+    bool down = false;
+    for (const RockAt& bone : world.mBones)
+    {
+        down = down || (bone.mX >= slog->mInputs[2] && bone.mX <= slog->mInputs[3] && std::abs(bone.mY - slog->mInputs[4]) <= 14);
+    }
+    if (world.mRocks >= mHad && mFrames > 40)
+    {
+        // (the throw did not come: once more)
+        mHad = -1;
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    // (thrown past a plate: until a Slog has gone over it)
+    if (mPlate > 1 ? world.Switch(mPlate) != 0 : down)
+    {
+        return TaskStep::Done();
+    }
+    if (mFrames > (mPlate > 1 ? 200 : 120))
+    {
+        return TaskStep::Failed(mPlate > 1 ? "no Slog went over the plate for the bone" : "the bone did not come down among the Slogs");
+    }
+    return TaskStep::Do(Prim::Wait(1));
 }
 
 GrenadeSligTask::~GrenadeSligTask() = default;

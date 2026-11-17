@@ -1838,8 +1838,30 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
   is then planned, fart and all. Behind it (path 9's lower part, the walkthrough's "path to Bonewerkz") four
   Slogs kill him: bones are not known yet. What the game does (Slog.cpp): a Slog after him that is 50 or
   more under him goes for a bone that has landed on the screen and eats it for its eating time; all go for
-  the same bone, and it is gone when the first is done. Next: the bone sack by the door, a bone thrown down
-  from the hand panel's ledge, and the time that buys.
+  the same bone, and it is gone when the first is done.
+  - *Bones, as far as they go* (not through the first pen yet: he dies there, down too late after the bone):
+    - The bone bag is a sack (`mInputs[1]` 3); what it gives is thrown as rocks are. It is not hit while the
+      Slig a fart is for stands by it (what is done on that Slig's floor waits for the fart, as its door does),
+      and a path with a bag is not left without bones where they can be had (`Bot::Replan`, the goal with
+      the bag's count in it first).
+    - In a level whose sacks give bones (`gThrowableFromOverlayIdAE`), the stretch of floor from wall to wall
+      of each Slog that is awake is one nothing is crossed onto until a bone is on it or in the air over it
+      (`MarkSlogPens`, `EntityKind::eSlog`, `World::Switch`, `World::mBones`).
+    - "Throw a bone to the Slogs at .. from ..": from a cell 50 or more over their floor, the throw that has
+      the bone down soonest counting his walk to where he goes down (`Domain::BoneThrow`, by `ThrowArc`: a bone
+      is taken to fly as a rock does, which was wrong from the door's ledge, where it came off the wall and
+      rolled along the ledge for 50 frames). `FeedSlogsTask`: the bone comes to hand, then goes with a
+      direction held.
+    - "Throw a bone past FootSwitch#..": a plate on their floor that anyone sets, between where the Slogs are
+      (as near him as their stretch lets them) and where the bone comes down. Gives the plate's switch only:
+      the bone is eaten by the time he is there. Planned, not yet run.
+    - On their own floor with one bone or none lying: another, but not the ones the plan has throws for
+      later (`Bot::MakeReflex`). The Slog reflexes (the ledge wait, the flight) leave a Slog with a bone to go
+      for alone (`World::SlogFed`).
+    - A bone is not thrown to see what that does, and a kept plan's step that gives nothing it has not
+      already is done (it threw all four from the ledge, one after the other).
+  - Next there: down sooner (thrown from the cell he goes down from, and off it as the bone flies), the
+    trap door that the pen's lever opens for 60 frames, the lure, the Sligs in the background by the wall.
 - The hub and its four blocks, then the war room: a Glukkon taken over and its orders to Sligs, crawling
   Sligs and their button, an orb blown up with a grenade (then its Sligs taken over), grenades thrown on a
   count, Greeters, laughing gas, UXBs, Slig voice locks, ghost locks, a Shrykull.

@@ -24,6 +24,7 @@
 #include "../../AliveLibAE/EvilFart.hpp"
 #include "../../AliveLibAE/FlyingSlig.hpp"
 #include "../../AliveLibAE/Slog.hpp"
+#include "../GameObjects/BaseThrowable.hpp"
 #include "../../AliveLibAE/Fleech.hpp"
 #include "../../AliveLibAE/Paramite.hpp"
 #include "../../AliveLibAE/SlapLock.hpp"
@@ -874,6 +875,21 @@ static void BuildEntities(BinaryPath& path, World& world)
                     // How many rocks it gives
                     e.mInputs[0] = static_cast<const relive::Path_RockSack&>(tlv).mRockAmount;
                     break;
+                case ReliveTypes::eBoneBag:
+                    // (a sack like the other: what it gives is bones, which are thrown as rocks are, set off
+                    // what a rock sets off, and are what a Slog goes for before it goes for him)
+                    e.mKind = EntityKind::eRockSack;
+                    keep = GetGameType() == GameType::eAe;
+                    e.mHalf = static_cast<const relive::Path_BoneBag&>(tlv).mScale == relive::reliveScale::eHalf;
+                    e.mInputs[0] = static_cast<const relive::Path_BoneBag&>(tlv).mBoneAmount;
+                    e.mInputs[1] = 3;
+                    break;
+                case ReliveTypes::eSlog:
+                    e.mKind = EntityKind::eSlog;
+                    keep = GetGameType() == GameType::eAe && !static_cast<const relive::Path_Slog&>(tlv).mAsleep;
+                    e.mSwitch = World::HazardSwitch(e.mId);
+                    e.mInputs[0] = static_cast<const relive::Path_Slog&>(tlv).mBoneEatingTime;
+                    break;
                 case ReliveTypes::eMeatSack:
                     // (a sack like the other: what it gives is meat)
                     e.mKind = EntityKind::eRockSack;
@@ -1005,6 +1021,8 @@ static void BuildEntities(BinaryPath& path, World& world)
                     const auto& t = static_cast<const relive::Path_FootSwitch&>(tlv);
                     e.mKind = EntityKind::eFootSwitch;
                     keep = GetGameType() == GameType::eAe;
+                    // (one that anything stepping on it sets, not Abe alone)
+                    e.mInputs[0] = t.mTriggeredBy == relive::Path_FootSwitch::FootSwitchTriggerBy::eAnyone ? 1 : 0;
                     e.mHalf = t.mScale == relive::reliveScale::eHalf;
                     e.mSwitch = t.mSwitchId;
                     e.mOp = OpOf(t.mAction);
@@ -1339,6 +1357,83 @@ static void MarkLockers(NavInput& in, World& world)
 // out after him: it shoots as it comes, seen or not (Slig::Brain_18_StartChasing), so its floor is not gone onto.
 // (One a lever lets loose is the lever's business: Abe pulls that when he means to.) The Barracks' war room: the
 // floor at 1800 to 1950, 981, under the spawner at 1912 that the zone of switch 233 sets off.
+// In a level whose sacks give bones: the stretch of floor each Slog that is awake has, from wall to wall, is one
+// nothing is crossed onto until a bone lies on it (FeatureKind::eDanger). What the game does (Slog.cpp): a Slog
+// looks for a bone that has landed on the screen shown, at its own height, before it looks at him
+// (Brain_ChasingAbe_State_2_Thinking), walks to it and eats for its eating time; all of a stretch go for the
+// same bone, and it is gone when the first is done. FeeCo's path 9, the walkthrough's "path to Bonewerkz":
+// "Stand at the hand panel and throw down a bone to the Sloggies."
+static void MarkSlogPens(NavInput* in, World& world, bool bones)
+{
+    if (!bones)
+    {
+        return;
+    }
+    const NavInput& lines = *in;
+    for (Entity& e : world.mEntities)
+    {
+        if (e.mKind != EntityKind::eSlog)
+        {
+            continue;
+        }
+        // The floor under it (a Slog is the size the level says and walks the floor Abe does). Line types: 0 a
+        // floor, 1 and 2 walls; 4, 5 and 6 those of the background.
+        const s32 x = e.CentreX();
+        const NavLine* floor = nullptr;
+        for (const NavLine& line : lines.mLines)
+        {
+            if ((line.mType == 0 || line.mType == 4) && std::min(line.mX1, line.mX2) <= x && std::max(line.mX1, line.mX2) >= x && std::abs((line.mY1 + line.mY2) / 2 - e.mY2) <= 20 &&
+                (!floor || line.mType == 0))
+            {
+                floor = &line;
+            }
+        }
+        if (!floor)
+        {
+            continue;
+        }
+        const bool half = floor->mType == 4;
+        const s32 y = (floor->mY1 + floor->mY2) / 2;
+        s32 x1 = std::min(floor->mX1, floor->mX2);
+        s32 x2 = std::max(floor->mX1, floor->mX2);
+        for (const NavLine& line : lines.mLines)
+        {
+            const bool wall = half ? (line.mType == 5 || line.mType == 6) : (line.mType == 1 || line.mType == 2);
+            if (!wall || std::min(line.mY1, line.mY2) > y - 10 || std::max(line.mY1, line.mY2) < y - 10)
+            {
+                continue;
+            }
+            const s32 wx = (line.mX1 + line.mX2) / 2;
+            if (wx < x)
+            {
+                x1 = std::max(x1, wx + 1);
+            }
+            else
+            {
+                x2 = std::min(x2, wx - 1);
+            }
+        }
+        e.mHalf = half;
+        e.mInputs[2] = x1;
+        e.mInputs[3] = x2;
+        e.mInputs[4] = y;
+        if (in && !e.mGone)
+        {
+            NavFeature f;
+            f.mKind = FeatureKind::eDanger;
+            f.mX1 = x1;
+            f.mX2 = x2;
+            f.mY1 = y - 60;
+            f.mY2 = y + 6;
+            f.mHalf = half;
+            f.mA = 1;
+            f.mId = e.mId;
+            f.mSwitch = e.mSwitch;
+            in->mFeatures.push_back(f);
+        }
+    }
+}
+
 static void MarkSpawnTraps(NavInput& in, const World& world)
 {
     for (std::size_t i = 0; i < world.mEntities.size(); i++)
@@ -1435,6 +1530,7 @@ bool GameView::ReadPath(BaseMap& map, s32 pathId, NavInput& input, World& world)
     MarkGrenadeTargets(input, world);
     MarkLockers(input, world);
     MarkSpawnTraps(input, world);
+    MarkSlogPens(&input, world, GetGameType() == GameType::eAe && gThrowableFromOverlayIdAE[map.mOverlayId] == AETypes::eBone_11);
     return true;
 }
 
@@ -1454,13 +1550,26 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             fliers = fliers || e.mKind == EntityKind::eFlier;
         }
         bool lockers = false;
+        bool slogs = false;
         for (const Entity& e : world.mEntities)
         {
             lockers = lockers || e.mKind == EntityKind::ePantsLocker;
+            slogs = slogs || e.mKind == EntityKind::eSlog;
+        }
+        if (slogs && !fliers && !lockers)
+        {
+            NavInput in = BuildNavInput(map);
+            NavInput scratch = in;
+            MarkSlogPens(&scratch, world, GetGameType() == GameType::eAe && gThrowableFromOverlayIdAE[map.mOverlayId] == AETypes::eBone_11);
         }
         if (fliers || lockers)
         {
             const NavInput in = BuildNavInput(map);
+            if (slogs)
+            {
+                NavInput scratch = in;
+                MarkSlogPens(&scratch, world, GetGameType() == GameType::eAe && gThrowableFromOverlayIdAE[map.mOverlayId] == AETypes::eBone_11);
+            }
             if (fliers)
             {
                 MarkFliers(in, world);
@@ -1853,6 +1962,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
     world.mRocks = isAe ? (gAbe ? gAbe->mBaseThrowableCount : 0) : (AO::gAbe ? AO::gAbe->field_19C_throwable_count : 0);
     world.mRocksDown.clear();
     world.mRocksFlying.clear();
+    world.mBones.clear();
     world.mFallers.clear();
     for (s32 i = 0; i < gBaseAliveGameObjects->Size(); i++)
     {
@@ -1867,7 +1977,15 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             faller.mChasing = pObj->mVelY > FP_FromInteger(0) || (!isAe && static_cast<s32>(static_cast<AO::FallingItem*>(pObj)->mState) == 2);
             world.mFallers.push_back(faller);
         }
-        if (pObj && !pObj->GetDead() && (pObj->Type() == ReliveTypes::eGrenade || (isAe && (pObj->Type() == ReliveTypes::eRock || pObj->Type() == ReliveTypes::eMeat))))
+        if (pObj && !pObj->GetDead() && isAe && pObj->Type() == ReliveTypes::eBone && pObj->GetAnimation().GetRender())
+        {
+            RockAt bone;
+            bone.mX = FP_GetExponent(pObj->mXPos);
+            bone.mY = FP_GetExponent(pObj->mYPos);
+            bone.mHalf = pObj->GetSpriteScale() != FP_FromInteger(1);
+            world.mBones.push_back(bone);
+        }
+        if (pObj && !pObj->GetDead() && (pObj->Type() == ReliveTypes::eGrenade || (isAe && (pObj->Type() == ReliveTypes::eRock || pObj->Type() == ReliveTypes::eMeat || pObj->Type() == ReliveTypes::eBone))))
         {
             RockAt rock;
             rock.mX = FP_GetExponent(pObj->mXPos);
@@ -2256,6 +2374,7 @@ NavInput GameView::BuildNavInput(BaseMap& map)
     MarkGrenadeTargets(in, things);
     MarkLockers(in, things);
     MarkSpawnTraps(in, things);
+    MarkSlogPens(&in, things, GetGameType() == GameType::eAe && gThrowableFromOverlayIdAE[map.mOverlayId] == AETypes::eBone_11);
     return in;
 }
 
