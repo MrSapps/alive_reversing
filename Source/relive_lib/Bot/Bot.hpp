@@ -461,6 +461,21 @@ public:
     s32 QuietFrames(s32 x, s32 y, bool half) const;
     // Whether a flying Slig is coming Abe's way, is on his screen, or is on the side of him he has to go to
     bool FlierThreat() const;
+    // A flying Slig that stays on his screen is not hidden from any more, for as long as it is on it: what there is
+    // to do is done at a run between its grenades (HideTask)
+    void FlierDash(bool on)
+    {
+        mFlierDash = on;
+    }
+    // Where the next thing to do is (-1: none known), and what it is done to (0: nothing)
+    s32 PlanNode() const
+    {
+        return mPlanNodes.empty() ? -1 : mPlanNodes[0];
+    }
+    u32 PlanEntity() const
+    {
+        return mPlanEntity;
+    }
     // Why the last answer of FlierThreat was yes, for the log
     const std::string& FlierWhy() const
     {
@@ -572,6 +587,8 @@ private:
     // Something that can't wait, done before the task goes on: a wired Mudokon tagging along slapped out of it
     std::unique_ptr<Task> mReflex;
     std::vector<s32> mPlanNodes;
+    u32 mPlanEntity = 0;
+    bool mFlierDash = false;
     mutable std::string mFlierWhy;
     // Whether an invisible zone can be got to from a cell on foot in so many moves; way: how, cost: in about
     // how many frames

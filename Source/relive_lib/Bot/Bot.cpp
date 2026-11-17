@@ -254,6 +254,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
         {
             return std::make_unique<StepOnTask>(step.mEntity, step.mEdge);
         }
+        case StepKind::eZone:
+            return std::make_unique<SwitchZoneTask>(static_cast<s32>(step.mOther), step.mEdge);
         case StepKind::eParamiteClear:
             return std::make_unique<ParamiteTourTask>(step.mOther, step.mEdge, true);
         case StepKind::eMeatFeed:
@@ -937,6 +939,7 @@ bool Bot::Replan(BaseMap& map)
     }
     // Where the next two things to do are (the crossings on the way to them don't count)
     mPlanNodes.clear();
+    mPlanEntity = 0;
     for (s32 stepIdx : best.mSteps)
     {
         const DomainStep& planStep = domain.mSteps[actions[stepIdx].mTag];
@@ -950,6 +953,10 @@ bool Bot::Replan(BaseMap& map)
         }
         else if (const Entity* target = mWorld.Find(planStep.mEntity))
         {
+            if (mPlanNodes.empty() && planStep.mKind == StepKind::eUse)
+            {
+                mPlanEntity = target->mId;
+            }
             mPlanNodes.push_back(Domain::UseNode(mKnow->mNav, *target, nullptr));
         }
         else
@@ -2939,7 +2946,16 @@ std::unique_ptr<Task> Bot::MakeReflex()
     // A flying Slig that is coming, or is where he has to go: into an invisible zone, if one is near on this
     // floor, and there until it has gone by and is behind him. (It only sees what is on its screen, in front of
     // it and not in such a zone: FlyingSlig::CanChase.)
-    if (!mWorld.mFliers.empty() && FlierThreat() && mFlierHides < 40)
+    if (mFlierDash)
+    {
+        bool here = false;
+        for (const FlierAt& flier : mWorld.mFliers)
+        {
+            here = here || mKnow->mNav.CameraOf(flier.mX, flier.mY) == mKnow->mNav.CameraOf(mAbe.mX, mAbe.mY - 5);
+        }
+        mFlierDash = here;
+    }
+    if (!mWorld.mFliers.empty() && !mFlierDash && FlierThreat() && mFlierHides < 40)
     {
         const NavGraph& nav = mKnow->mNav;
         const s32 node = AbeNode();

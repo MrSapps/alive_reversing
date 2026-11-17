@@ -1,0 +1,15 @@
+# The bot in the Slig Barracks' fourth block's second half, the bombing range (path 14), from its door: NOT DONE.
+# What it does: its first screen (out of the shadow at a run to the well as the flying Slig there never leaves,
+# thrown out by the trap door, the lever, down through that trap door and the one a zone opens under him), up
+# and through the tunnel, down to the long floor at 1412,1500. There it hides from the next flying Slig in the
+# shaft at 1437 and comes no further. No deaths as far as that.
+# See BOT_DESIGN.md, "What the Barracks still wants", block 4.
+timeout 900
+start barracks 14 1 2037 1239
+wait_until in_game
+wait_frames 40
+healing
+bot any,seed=1,been=mines,been=necrum
+bot_wait 1500
+bot_report bot_report.txt
+quit

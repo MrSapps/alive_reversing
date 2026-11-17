@@ -4720,6 +4720,33 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         }
     }
 
+    // A zone that sets a switch when he is in it (an invisible switch): being there is a thing to do like pulling
+    // a lever. The Barracks' path 14: the trap door at 1700,1420 is opened by the zone over it.
+    {
+        std::set<s32> done;
+        for (const NavFeature& f : nav.Input().mFeatures)
+        {
+            if (f.mKind != FeatureKind::eSwitchZone || f.mA != 0 || f.mSwitch <= 1 || world.Switch(f.mSwitch) != 0 || done.count(f.mSwitch) != 0)
+            {
+                continue;
+            }
+            for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+            {
+                const NavNode& node = nav.Nodes()[n];
+                if ((f.mAnyScale || f.mHalf == node.mHalf) && !node.mHazard && node.mX >= f.mX1 && node.mX <= f.mX2 && node.mY - 5 >= f.mY1 && node.mY - 5 <= f.mY2)
+                {
+                    DomainStep zone;
+                    zone.mKind = StepKind::eZone;
+                    zone.mEdge = static_cast<s32>(n);
+                    zone.mOther = static_cast<u32>(f.mSwitch);
+                    add("Walk into the zone of switch " + std::to_string(f.mSwitch) + " at " + std::to_string(node.mX) + "," + std::to_string(node.mY), {regionFact(static_cast<s32>(n)), {Key::Switch(f.mSwitch), 0}}, {{Key::Switch(f.mSwitch), 1}}, 150, zone);
+                    done.insert(f.mSwitch);
+                    break;
+                }
+            }
+        }
+    }
+
     // A foot switch that turns a gate over each time it is stepped on (the second Mudomo vault's locks, each
     // between two of them and two gates: in over one, which shuts him in with the lock, and out over the other):
     // stepping on it is a thing to do like pulling a lever

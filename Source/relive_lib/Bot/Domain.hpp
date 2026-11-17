@@ -104,6 +104,7 @@ enum class StepKind : u8
                     // (Domain::CrawlerFor)
     eGrenadeOrb, // hold a grenade and throw it late from the cell mEdge, to go off in the air by security orb
                  // mEntity (Domain::OrbTargets)
+    eZone,      // into the cell mEdge, which is in a zone that sets switch mOther when he is in it
 };
 
 // What a planned action means to the bot
