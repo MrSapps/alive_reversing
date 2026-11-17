@@ -375,6 +375,40 @@ private:
     s32 mOrders = 0;
 };
 
+// A bone thrown to Slogs from over their floor (Domain, StepKind::eFeedSlogs): to the cell, the throw, and until
+// the bone is down among them, or a Slog has gone over the plate it was thrown past
+class FeedSlogsTask final : public Task
+{
+public:
+    FeedSlogsTask(u32 slog, s32 stand, u32 aim)
+        : mSlog(slog)
+        , mStand(stand)
+        , mKind(static_cast<ThrowSpot::Kind>((aim & 255) / 2))
+        , mLeft(aim % 2 == 1)
+        , mPlate(static_cast<s32>(aim >> 8))
+    {
+    }
+    ~FeedSlogsTask() override;
+    std::string Name() const override
+    {
+        return "Throw a bone to Slog#" + std::to_string(mSlog);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mSlog;
+    s32 mStand;
+    ThrowSpot::Kind mKind;
+    bool mLeft;
+    // The switch of a plate the bone is thrown past, for a Slog to step on (0: none)
+    s32 mPlate;
+    std::unique_ptr<GoToTask> mGo;
+    bool mInHand = false;
+    // The bones he had before the throw (-1: not thrown yet), and the frames since
+    s32 mHad = -1;
+    s32 mFrames = 0;
+};
+
 // Hold a grenade and throw it late, so that it goes off in the air by a security orb (Domain::OrbTargets)
 class GrenadeOrbTask final : public Task
 {

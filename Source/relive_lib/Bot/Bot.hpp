@@ -631,6 +631,8 @@ private:
     u32 mPlanEntity = 0;
     bool mFlierDash = false;
     s32 mFlierTimedNode = -1;
+    // Bones thrown to Slogs on their own floor, beyond the plan's
+    s32 mRefeeds = 0;
     // Ways out (level, path, feature) that led to a part of a path with no way on
     std::set<std::tuple<s32, s32, s32>> mDeadExits;
     mutable std::string mFlierWhy;

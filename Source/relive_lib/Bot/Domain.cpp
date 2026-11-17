@@ -41,6 +41,7 @@ const char* EntityKindName(EntityKind kind)
         case EntityKind::ePantsLocker: return "Locker";
         case EntityKind::eSligButton: return "SligButton";
         case EntityKind::eVoiceLock: return "VoiceLock";
+        case EntityKind::eSlog: return "Slog";
         case EntityKind::eRockSack: return "RockSack";
         case EntityKind::eBrew: return "Brew";
         case EntityKind::eFlier: return "FlyingSlig";
@@ -3852,7 +3853,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                     step.mKind = StepKind::eRocks;
                     // (a sack gives nothing to Abe while he has some)
                     const u32 what = entity.mInputs[1] == 1 ? Key::kMeat : Key::kRocks;
-                    add(std::string(entity.mInputs[1] == 1 ? "Get meat from " : entity.mInputs[1] == 2 ? "Get a grenade from " : "Get rocks from ") + name, {regionFact(node), {what, 0}}, {{what, entity.mInputs[0] > 0 ? entity.mInputs[0] : 5}}, 300, step);
+                    add(std::string(entity.mInputs[1] == 1 ? "Get meat from " : entity.mInputs[1] == 2 ? "Get a grenade from " : entity.mInputs[1] == 3 ? "Get bones from " : "Get rocks from ") + name, {regionFact(node), {what, 0}}, {{what, entity.mInputs[0] > 0 ? entity.mInputs[0] : 5}}, 300, step);
                 }
                 break;
             }
@@ -4470,6 +4471,13 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             {
                 node = nav.Edges()[s.mEdge].mTo;
             }
+            else if (s.mKind == StepKind::eRocks || s.mKind == StepKind::eUse)
+            {
+                // (and what is done standing on its floor: the bone bag by that door, where it shot him six
+                // times over. The walkthrough: the fart, "clear out until it blows", then "hit the Bone Sack".)
+                const Entity* thing = world.Find(s.mEntity);
+                node = thing ? UseNode(nav, *thing, nullptr) : -1;
+            }
             if (node >= 0 && nav.Nodes()[node].mHalf == slig.mHalf && std::abs(nav.Nodes()[node].mY - feet) <= 30 && std::abs(nav.Nodes()[node].mX - slig.CentreX()) <= kFartSligZone)
             {
                 a.mPre.push_back(dead);
@@ -4632,6 +4640,136 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 pre.insert(pre.end(), orbs.begin(), orbs.end());
                 pre.insert(pre.end(), needs.begin(), needs.end());
                 add(what + " taken over from " + std::to_string(node.mX) + "," + std::to_string(node.mY), pre, gives, 600, say);
+            }
+        }
+    }
+    // Slogs that are awake on a stretch of floor, in a level with bones (GameView's MarkSlogPens): a bone thrown
+    // onto it from a cell over it. From 50 or more over their floor: a Slog that can't get at him goes for a bone
+    // at once, one he stands by has him first. Where the bone comes to lie is known before it is thrown (ThrowArc:
+    // a bone flies as a rock does).
+    {
+        std::set<std::pair<s32, s32>> pens;
+        for (const Entity& slog : world.mEntities)
+        {
+            // (as things stand: a bone lies there, or the Slog is no more)
+            if (slog.mKind == EntityKind::eSlog && world.Switch(slog.mSwitch) != 0)
+            {
+                d.mStart.Set(Key::Switch(slog.mSwitch), 1);
+            }
+            if (slog.mKind != EntityKind::eSlog || slog.mGone || slog.mInputs[3] <= slog.mInputs[2] || !pens.insert({slog.mInputs[2], slog.mInputs[4]}).second)
+            {
+                continue;
+            }
+            const s32 x1 = slog.mInputs[2];
+            const s32 x2 = slog.mInputs[3];
+            const s32 floorY = slog.mInputs[4];
+            std::vector<Goap::Fact> fed;
+            for (const Entity& other : world.mEntities)
+            {
+                if (other.mKind == EntityKind::eSlog && other.mInputs[2] == x1 && other.mInputs[3] == x2 && other.mInputs[4] == floorY)
+                {
+                    fed.push_back({Key::Switch(other.mSwitch), 1});
+                }
+            }
+            struct Way final
+            {
+                s32 mFrames = 0;
+                s32 mNode = -1;
+                DomainStep mStep;
+                std::string mWhere;
+            };
+            std::map<s32, Way> quickest;
+            std::map<std::pair<u32, s32>, Way> lures;
+            // The cells he goes down onto their floor from
+            std::vector<s32> entries;
+            for (const NavEdge& edge : nav.Edges())
+            {
+                const NavNode& to = nav.Nodes()[edge.mTo];
+                const NavNode& fromNode = nav.Nodes()[edge.mFrom];
+                if (to.mHalf == slog.mHalf && to.mX >= x1 && to.mX <= x2 && std::abs(to.mY - floorY) <= 10 && fromNode.mY <= floorY - 50)
+                {
+                    entries.push_back(edge.mFrom);
+                }
+            }
+            for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+            {
+                const NavNode& node = nav.Nodes()[n];
+                // (from the stretch's screen or the one next to it: a bone flies on over a screen's edge)
+                if (node.mHalf != slog.mHalf || node.mHazard || node.mLow || node.mY > floorY - 50 || node.mY < floorY - 200 || std::abs(node.mX - (x1 + x2) / 2) > 400)
+                {
+                    continue;
+                }
+                // (the Slogs come as near him as their stretch lets them)
+                const s32 slogsAt = std::max(x1, std::min(x2, node.mX));
+                // (and from there to where he goes down to them: the bone is not there for long)
+                s32 walk = 0;
+                if (!entries.empty())
+                {
+                    walk = 1000000;
+                    for (const s32 entry : entries)
+                    {
+                        walk = d.mRegions[entry] == d.mRegions[n] ? std::min(walk, std::abs(nav.Nodes()[entry].mX - node.mX) / 3) : walk;
+                    }
+                    walk = walk == 1000000 ? 0 : walk;
+                }
+                u32 aim = 0;
+                s32 frames = 0;
+                if (BoneThrow(nav, static_cast<s32>(n), x1, x2, floorY, aim, frames))
+                {
+                    DomainStep feed;
+                    feed.mKind = StepKind::eFeedSlogs;
+                    feed.mEntity = slog.mId;
+                    feed.mEdge = static_cast<s32>(n);
+                    feed.mOther = aim;
+                    auto best = quickest.find(d.mRegions[n]);
+                    if (best == quickest.end() || frames + walk < best->second.mFrames)
+                    {
+                        quickest[d.mRegions[n]] = {frames + walk, static_cast<s32>(n), feed, " the Slogs at " + std::to_string(x1) + ".." + std::to_string(x2) + "," + std::to_string(floorY) + " from " + std::to_string(node.mX) + "," + std::to_string(node.mY)};
+                    }
+                }
+                // A plate on their floor that anything stepping on it sets, between where they are and where
+                // the bone comes down: they go over it for the bone. (FeeCo's path 9: "Toss a bone through the
+                // electric wall; the Sloggie will walk over the pressure plate that turns it off." A bone goes
+                // through an electric wall.) The bone is eaten by the time he is there: this gives the plate's
+                // switch, not the Slogs fed.
+                for (const Entity& plate : world.mEntities)
+                {
+                    const s32 px = plate.CentreX();
+                    if (plate.mKind != EntityKind::eFootSwitch || plate.mGone || plate.mInputs[0] != 1 || plate.mOp != 0 || plate.mSwitch <= 1 || world.Switch(plate.mSwitch) != 0 || plate.mHalf != slog.mHalf || px < x1 || px > x2 ||
+                        std::abs(plate.mY2 - floorY) > 30 || std::abs(px - slogsAt) < 25)
+                    {
+                        continue;
+                    }
+                    const auto past = [px, slogsAt](s32 downX)
+                    {
+                        return (px - slogsAt) * (downX - px) > 0 && std::abs(downX - px) >= 25;
+                    };
+                    if (BoneThrow(nav, static_cast<s32>(n), x1, x2, floorY, aim, frames, nullptr, past))
+                    {
+                        DomainStep lure;
+                        lure.mKind = StepKind::eFeedSlogs;
+                        lure.mEntity = slog.mId;
+                        lure.mEdge = static_cast<s32>(n);
+                        lure.mOther = aim | (static_cast<u32>(plate.mSwitch) << 8);
+                        auto was = lures.find({plate.mId, d.mRegions[n]});
+                        if (was == lures.end() || frames < was->second.mFrames)
+                        {
+                            lures[{plate.mId, d.mRegions[n]}] = {frames, static_cast<s32>(n), lure, " the Slogs at " + std::to_string(x1) + ".." + std::to_string(x2) + "," + std::to_string(floorY) + " from " + std::to_string(node.mX) + "," + std::to_string(node.mY)};
+                        }
+                    }
+                }
+            }
+            for (const auto& entry : quickest)
+            {
+                add("Throw a bone to" + entry.second.mWhere, {regionFact(entry.second.mNode)}, fed, 250, entry.second.mStep);
+                d.mActions.back().mSpend = {Key::kRocks, 1};
+            }
+            for (const auto& entry : lures)
+            {
+                const Entity* plate = world.Find(entry.first.first);
+                const std::vector<Goap::Fact> gives{{Key::Switch(plate->mSwitch), 1}};
+                add("Throw a bone past FootSwitch#" + std::to_string(plate->mId) + " sw" + std::to_string(plate->mSwitch) + " for" + entry.second.mWhere, {regionFact(entry.second.mNode), {Key::Switch(plate->mSwitch), 0}}, gives, 300, entry.second.mStep);
+                d.mActions.back().mSpend = {Key::kRocks, 1};
             }
         }
     }
@@ -5725,6 +5863,48 @@ bool Domain::SightBlocked(const NavInput& in, bool half, s32 x1, s32 y1, s32 x2,
         }
     }
     return false;
+}
+
+bool Domain::BoneThrow(const NavGraph& nav, s32 node, s32 x1, s32 x2, s32 floorY, u32& aim, s32& frames, s32* downX, const std::function<bool(s32 downX)>& wanted)
+{
+    static const ThrowSpot::Kind kKinds[] = {ThrowSpot::eDown, ThrowSpot::eForward, ThrowSpot::eUp, ThrowSpot::eLob};
+    const NavNode& from = nav.Nodes()[node];
+    const s32 cam = nav.CameraOf((x1 + x2) / 2, floorY - 5);
+    bool found = false;
+    for (s32 side = 0; side < 2; side++)
+    {
+        for (const ThrowSpot::Kind kind : kKinds)
+        {
+            // (a bone flies as a rock does)
+            const ThrowArc::Flight flight = ThrowArc::Throw(nav.Input(), from.mX, from.mY, from.mHalf, side == 1, kind);
+            s32 at = -1;
+            for (std::size_t k = 1; k < flight.mPoints.size() && at < 0; k++)
+            {
+                if (flight.mPoints[k].mY >= floorY - 4 && flight.mPoints[k - 1].mY < floorY - 4)
+                {
+                    at = static_cast<s32>(k);
+                }
+            }
+            if (at < 0 || (found && at >= frames))
+            {
+                continue;
+            }
+            const ThrowArc::Point& end = flight.mPoints[at];
+            const bool goesLeft = flight.mPoints[at - 1].mX > end.mX;
+            if (end.mX < x1 + (goesLeft ? 45 : 12) || end.mX > x2 - (goesLeft ? 12 : 45) || nav.CameraOf(end.mX, floorY - 5) != cam || (wanted && !wanted(end.mX)))
+            {
+                continue;
+            }
+            found = true;
+            aim = static_cast<u32>(kind * 2 + side);
+            frames = at;
+            if (downX)
+            {
+                *downX = end.mX;
+            }
+        }
+    }
+    return found;
 }
 
 s32 Domain::FlierSpot(const NavGraph& nav, const World& world, const Entity& spawner, const std::vector<u8>& reach, bool ownOnly)

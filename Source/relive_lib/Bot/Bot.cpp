@@ -225,6 +225,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<VoiceLockTask>(step.mEntity, step.mEdge);
         case StepKind::eSligLever:
             return std::make_unique<SligLeverTask>(step.mEntity, step.mEdge);
+        case StepKind::eFeedSlogs:
+            return std::make_unique<FeedSlogsTask>(step.mEntity, step.mEdge, step.mOther);
         case StepKind::eGrenadeOrb:
             return std::make_unique<GrenadeOrbTask>(step.mEntity, step.mEdge);
         case StepKind::eFlierBomb:
@@ -546,7 +548,9 @@ bool Bot::Replan(BaseMap& map)
                 {
                     const Goap::State before = state;
                     Goap::Planner::Do(state, actions[a]);
-                    holds = !(state == before);
+                    // (a step that gives nothing it does not have already is one that is done: a bone thrown to
+                    // Slogs, with the bone lying there, still spends a bone)
+                    holds = !(state == before) && !before.HasAll(actions[a].mEffects);
                     kept.mSteps.push_back(static_cast<s32>(a));
                     kept.mCost += std::max(1, actions[a].mCost);
                     break;
@@ -583,7 +587,18 @@ bool Bot::Replan(BaseMap& map)
     }
     // Is there a way out as things stand? Then nothing is done to a Mudokon that would leave none: some are
     // needed where they are (to turn a wheel, or because only rescuing them opens the door)
-    const Goap::Plan leave = keptOn ? Goap::Plan{} : Goap::Planner::Find(domain.mStart, {{Key::kExited, 1}}, actions);
+    // (out of a path with a bag of bones he has none of, with them where that can be had: a bag by a way out
+    // is for what is behind it, and there is no coming back for it. Feeco's lobby: "Hit the Bone Sack and pick up
+    // the bones. Enter the door.", and four Slogs behind the door.)
+    Goap::Plan withBones;
+    for (const Entity& bag : mWorld.mEntities)
+    {
+        if (!keptOn && !withBones.mFound && bag.mKind == EntityKind::eRockSack && bag.mInputs[1] == 3 && !bag.mGone && mWorld.mRocks == 0)
+        {
+            withBones = Goap::Planner::Find(domain.mStart, {{Key::kExited, 1}, {Key::kRocks, bag.mInputs[0] > 0 ? bag.mInputs[0] : 5}}, actions);
+        }
+    }
+    const Goap::Plan leave = keptOn ? Goap::Plan{} : withBones.mFound ? withBones : Goap::Planner::Find(domain.mStart, {{Key::kExited, 1}}, actions);
     const bool wayOut = leave.mFound;
     s32 plansFound = 0;
     std::vector<Goap::Fact> bestFacts;
@@ -715,6 +730,8 @@ bool Bot::Replan(BaseMap& map)
                 for (const Entity& e : mWorld.mEntities)
                 {
                     uxb = uxb || (e.mKind == EntityKind::eUxb && Key::Switch(e.mSwitch) == fact.mKey);
+                    // (nor is a bone thrown to Slogs to see what that does: it is eaten, and there are four)
+                    uxb = uxb || (e.mKind == EntityKind::eSlog && Key::Switch(e.mSwitch) == fact.mKey);
                 }
                 if (uxb)
                 {
@@ -3019,6 +3036,11 @@ std::unique_ptr<Task> Bot::MakeSlogFlee()
     for (const SlogAt& slog : mWorld.mSlogs)
     {
         s32 node = -1;
+        // (one with a bone to go for is not after him)
+        if (mWorld.SlogFed(slog))
+        {
+            continue;
+        }
         if (mAbe.mOnGround)
         {
             // One that is up, or about to be, on his floor
@@ -3179,6 +3201,44 @@ std::unique_ptr<Task> Bot::MakeReflex()
     if (!mAuto || !mAbe.mOnGround || mAbe.mTransition)
     {
         return nullptr;
+    }
+    // On the Slogs' own floor, with one bone or none lying there: another, so that they go from one to the next
+    // and not for him between ("Walk down, throw down another bone for good measure"). Not the bones the plan
+    // has throws for later.
+    if (mIsAe && mAbe.Settled() && mAbe.mMove == Move::eIdle && mRefeeds < 8 && AbeNode() >= 0 && !dynamic_cast<const FeedSlogsTask*>(mTask.get()))
+    {
+        s32 later = 0;
+        for (std::size_t i = 1; i < mKeptPlan.size(); i++)
+        {
+            later += mKeptPlan[i].rfind("Throw a bone", 0) == 0 ? 1 : 0;
+        }
+        const NavNode& at = mKnow->mNav.Nodes()[AbeNode()];
+        for (const Entity& e : mWorld.mEntities)
+        {
+            if (e.mKind != EntityKind::eSlog || e.mGone || e.mInputs[3] <= e.mInputs[2] || e.mHalf != at.mHalf || at.mX < e.mInputs[2] || at.mX > e.mInputs[3] || std::abs(at.mY - e.mInputs[4]) > 10 || mWorld.mRocks <= later)
+            {
+                continue;
+            }
+            s32 lying = 0;
+            for (const RockAt& bone : mWorld.mBones)
+            {
+                lying += bone.mX >= e.mInputs[2] && bone.mX <= e.mInputs[3] && bone.mY <= e.mInputs[4] + 10 && bone.mY >= e.mInputs[4] - 140 ? 1 : 0;
+            }
+            bool slogs = false;
+            for (const SlogAt& slog : mWorld.mSlogs)
+            {
+                slogs = slogs || (slog.mX >= e.mInputs[2] - 5 && slog.mX <= e.mInputs[3] + 5 && std::abs(slog.mY - e.mInputs[4]) <= 30);
+            }
+            u32 aim = 0;
+            s32 frames = 0;
+            if (slogs && lying <= 1 && Domain::BoneThrow(mKnow->mNav, AbeNode(), e.mInputs[2], e.mInputs[3], e.mInputs[4], aim, frames))
+            {
+                mRefeeds++;
+                Log("on the Slogs' floor with " + std::to_string(lying) + " bone lying and " + std::to_string(mWorld.mRocks) + " in hand (" + std::to_string(later) + " for later): another");
+                return std::make_unique<FeedSlogsTask>(e.mId, AbeNode(), aim);
+            }
+            break;
+        }
     }
     if (!mAbe.Settled())
     {

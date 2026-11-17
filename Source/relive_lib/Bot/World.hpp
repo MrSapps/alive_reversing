@@ -79,6 +79,8 @@ enum class EntityKind : u8
     // AE's voice lock for Glukkons (GlukkonSwitch): one of them that is taken over stands in its box, says "Hey"
     // to its "Hey" and "Do it" to its "What?", and it toggles mSwitch
     eVoiceLock,
+    eSlog, // a Slog the level puts there. In a level whose sacks give bones: mInputs[2..4] the stretch of floor
+           // it has (x1, x2, the floor's y), kept off until a bone lies on it (GameView's MarkSlogPens)
 };
 
 const char* EntityKindName(EntityKind kind);
@@ -474,6 +476,9 @@ struct World final
     std::vector<RockAt> mRocksDown;
     // The ones in the air
     std::vector<RockAt> mRocksFlying;
+    // Bones that are out of his hands: in the air or lying (a Slog goes for one that has landed before it goes
+    // for him, Slog::FindBone)
+    std::vector<RockAt> mBones;
     // The rocks that fall over and over where the level drops them (FallingItem): where each is now, mChasing
     // while it is coming down
     std::vector<RockAt> mFallers;
@@ -787,6 +792,20 @@ struct World final
     // trial's three under the ring, whose switch a self-closing trap door sets back twenty frames later.
     std::map<s32, s32> mGatesGone;
     // real: as the game has it now, without counting a slapped lock's switch as on already
+    // Whether a Slog is one of a stretch of floor with a bone on it (EntityKind::eSlog): it has eyes for the bone
+    // only
+    bool SlogFed(const SlogAt& slog) const
+    {
+        for (const Entity& e : mEntities)
+        {
+            if (e.mKind == EntityKind::eSlog && !e.mGone && e.mInputs[3] > e.mInputs[2] && slog.mX >= e.mInputs[2] - 5 && slog.mX <= e.mInputs[3] + 5 && slog.mY >= e.mInputs[4] - 60 && slog.mY <= e.mInputs[4] + 10 &&
+                Switch(e.mSwitch) != 0)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
     s32 Switch(s32 id, bool real = false) const
     {
         if (!real)
@@ -809,6 +828,22 @@ struct World final
                 if (e.mKind == EntityKind::eSecurityOrb && HazardSwitch(e.mId) == id)
                 {
                     return e.mGone ? 1 : 0;
+                }
+                // (the Slogs of a stretch of floor: on while a bone is on it, or in the air over it)
+                if (e.mKind == EntityKind::eSlog && HazardSwitch(e.mId) == id)
+                {
+                    if (e.mGone)
+                    {
+                        return 1;
+                    }
+                    for (const RockAt& bone : mBones)
+                    {
+                        if (bone.mX >= e.mInputs[2] && bone.mX <= e.mInputs[3] && bone.mY <= e.mInputs[4] + 10 && bone.mY >= e.mInputs[4] - 140)
+                        {
+                            return 1;
+                        }
+                    }
+                    return 0;
                 }
                 if (e.mKind == EntityKind::ePantsLocker && e.mSwitch == id)
                 {
