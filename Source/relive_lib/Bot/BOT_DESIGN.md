@@ -1795,6 +1795,51 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
   - A well under the end of a floor he drops off: off it at a run (`GoToTask`, the fall case).
   **Done from its door**: the last voice lock at f=6,277, out by the door at f=6,628, through path 16 and
   into FeeCo Depot at f=6,989, no deaths (`ae_barracks_war_room.txt`).
+- **The whole Barracks in one run, timing-proof** (2026-11-17; `blk10.txt`: hub, four blocks, war room, out
+  into FeeCo at f=36,357, one death left, the workers' campus mine hop). The bombing range passed from its own
+  door and failed in the chain, 12 frames later: three things in it were luck. Tried at 6 to 18 different
+  starts each (the same script with its first wait changed), all without a death now:
+  - *The first screen's flying Slig* died 5 times in 8. It dies of the mine by the well (a mine kills what is
+    within 113 of it, `GroundExplosion`), not of its own grenade: it keeps 80 from him within 15, so at the
+    well it hangs 95 to 120 from the mine, and coming after him along its lower run it stops anywhere in
+    those 15, or throws on the way (one frame in 16) and the mine is gone early. Possession is out (an orb).
+    So `HideTask`: to the last cell of the shadow; a call ("Hello", `CanHearAbe`) when the flying Slig is
+    where it will hang over its upper run, past where it keeps from him as he comes down: it stops 15 frames
+    after the call, 40 further on, for 91 to 117 frames, and hears nothing else meanwhile; then to the well,
+    where it comes the long way round its track with its back to him, so from the mine's side, and stops at
+    1648 at the most; and into the well only when its grenade is in the air (the walkthrough's "just as the
+    flying Slig lobs a grenade": he stands in the well's mouth some 30 frames, the grenade flies 17).
+    A track without an upper and a lower run over the well's floor is not known: after three calls that
+    did not stop it there he goes as he did before.
+  - *The flying Slig he flies, against the one over the lever of 214*: the place it waits at for the other
+    was given up six frames after it was found. A track was told by where its box begins, and what
+    `FlierTrack` finds differs with where the flying Slig is on it: two are the same track where their boxes
+    meet. And the other was aimed at straight on from where it was, on a track that turns: `FlierWatch` keeps
+    where a flying Slig was each frame, finds its round (the last 14 frames as they were before), and says
+    where it will be. From either of the two places the grenade meets it now.
+  - *The flying Slig over the long floor* (track 1186 to 1551) is made as he comes onto its screen in the
+    tunnel, hangs 105 frames facing the tunnel's end, then goes round every 146, at 7 a frame to his 6. It
+    sees what is in front of it on its screen and is after him 22 to 29 frames later; run from, its grenades
+    come down where he was, and it is standing that it gets him at. Dropped out at once he was seen falling
+    and lived or died at the lever of 208 by a few frames. Inside the tunnel a cell short of its end he is
+    never seen (in a shadow there). So `GoToTask`: a roll that ends in a fall onto a screen a flying Slig
+    lives on stops a cell short; there he watches it go round (`FlierWatch`) and goes on so that he lands
+    as it is as far off as its round takes it, with its back to him all the way down: the landing's thud
+    stops it there. (Out as it had just gone by under him, it hung over him and had him at the lever.) The
+    wait is 250 to 450 frames. `Bot::FlierTimedAt` keeps the hide reflex off that cell.
+  - *In the war room*, from the chain, the plan was "off the ledge, then the last lock with the Glukkon",
+    and he chanted himself out of the Glukkon for the first step: what a Glukkon he is in does (a voice
+    lock, a Slig sent to a lever) is planned from where he stands in his trance only.
+- **FeeCo Depot, the second visit** (`fc2.txt`, from where the war room's door lets him out; in progress):
+  Brew and the mines on the way up by what the first visit taught. The lobby has three ways out into path 9,
+  which is three places with nothing between them; two are open and lead nowhere, the third is behind the
+  Slig a fart gets (the walkthrough's door to the Bonewerkz). A way out he has come back out of with no way
+  on is a dead end, and not taken again while another leads to the same path (`Bot::mDeadExits`): the third
+  is then planned, fart and all. Behind it (path 9's lower part, the walkthrough's "path to Bonewerkz") four
+  Slogs kill him: bones are not known yet. What the game does (Slog.cpp): a Slog after him that is 50 or
+  more under him goes for a bone that has landed on the screen and eats it for its eating time; all go for
+  the same bone, and it is gone when the first is done. Next: the bone sack by the door, a bone thrown down
+  from the hand panel's ledge, and the time that buys.
 - The hub and its four blocks, then the war room: a Glukkon taken over and its orders to Sligs, crawling
   Sligs and their button, an orb blown up with a grenade (then its Sligs taken over), grenades thrown on a
   count, Greeters, laughing gas, UXBs, Slig voice locks, ghost locks, a Shrykull.

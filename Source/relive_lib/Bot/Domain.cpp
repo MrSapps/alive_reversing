@@ -4599,7 +4599,13 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             const std::string what = "Answer VoiceLock#" + std::to_string(lock.mId) + " sw" + std::to_string(lock.mSwitch) + " with the Glukkon";
             if (glukkon.mPossessed)
             {
+                // (from where he stands in his trance: a step of his own first is the Glukkon let go of. The
+                // Barracks' war room, planned as "off the ledge, then the last lock with the Glukkon".)
                 std::vector<Goap::Fact> pre{{Key::Switch(lock.mSwitch), now}};
+                if (abeNode >= 0)
+                {
+                    pre.push_back(regionFact(abeNode));
+                }
                 pre.insert(pre.end(), needs.begin(), needs.end());
                 add(what, pre, gives, 300, say);
                 continue;
@@ -4702,6 +4708,10 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                     order.mEntity = lever.mId;
                     order.mEdge = stand;
                     std::vector<Goap::Fact> pre{{Key::Switch(lever.mSwitch), now}};
+                    if (abeNode >= 0)
+                    {
+                        pre.push_back(regionFact(abeNode));
+                    }
                     pre.insert(pre.end(), needs.begin(), needs.end());
                     add("Have a Slig pull Lever#" + std::to_string(lever.mId) + " sw" + std::to_string(lever.mSwitch) + " for the Glukkon at " + std::to_string(nav.Nodes()[stand].mX) + "," + std::to_string(nav.Nodes()[stand].mY), pre,
                         {{Key::Switch(lever.mSwitch), after}}, 400, order);
