@@ -324,6 +324,35 @@ private:
     s32 mLost = 0;
 };
 
+// In a Glukkon: go to the cell mStand by a lever, call for help, have the Slig that comes come to it and say "Do
+// it", which has a Slig that listens pull the lever a cell from it
+class SligLeverTask final : public Task
+{
+public:
+    SligLeverTask(u32 lever, s32 stand)
+        : mLever(lever)
+        , mStand(stand)
+    {
+    }
+    std::string Name() const override
+    {
+        return "Have a Slig pull Lever#" + std::to_string(mLever);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mLever;
+    s32 mStand;
+    bool mWasKnown = false;
+    bool mWas = false;
+    s32 mLost = 0;
+    s32 mFrames = 0;
+    // Frames until the next thing is said, and what was said last (0 nothing, 1 help, 2 hey, 3 come here, 4 do it)
+    s32 mQuiet = 0;
+    s32 mSaid = 0;
+    s32 mOrders = 0;
+};
+
 // Hold a grenade and throw it late, so that it goes off in the air by a security orb (Domain::OrbTargets)
 class GrenadeOrbTask final : public Task
 {

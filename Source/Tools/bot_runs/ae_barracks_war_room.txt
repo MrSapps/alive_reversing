@@ -1,12 +1,13 @@
-# The Slig Barracks' war room (path 11) from its door: the six levers of its stealth half, to the ledge General
-# Dripik is taken over from (2162,340, about f=2,700, no deaths). He stops there: the Glukkon is not taught.
+# The Slig Barracks' war room (path 11, level barracks_ender) from its door: the six levers of its stealth half,
+# General Dripik taken over and walked to the three voice locks, out to FeeCo Depot at about f=7,000, no deaths.
 timeout 1500
 start barracks_ender 11 5 962 1139
 wait_until in_game
 wait_frames 60
 healing
 bot any,seed=1,been=mines,been=necrum
-bot_wait 4000
+wait_until camera feeco_depot 2 3
+bot_wait 60
 bot_report bot_report.txt
 bot_inputs bot_inputs.txt
 quit
