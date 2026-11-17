@@ -1706,10 +1706,11 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
     - The flying Slig he flies to and fro before the way under the ledge at 700 (40 high) and no nearer for
       2,500 frames: no nearer in 200, it is sent off as when held, and the way found anew.
   - Left: its Mudokons (seven) and its secret.
-- **The whole chain** (`blk10.txt`: Rifle Range, workers' campus, Slig bunks, trophy room, bombing range), as last
-  run whole (before the bombing range's last mending): no deaths in the Rifle Range; one in the workers'
-  campus (below); one in the Slig bunks (a grenade thrown at the Slig under the first orb from 578,100, not
-  looked into); the trophy room clean, out at f=25,250. To be run whole again.
+- **The whole chain** (`blk10.txt`: Rifle Range, workers' campus, Slig bunks, trophy room, bombing range), run
+  whole at `a683d6919`: through all four blocks and in at the war room's door at f=28,701. One death on the
+  way, in the workers' campus (below); the Slig bunks, the trophy room (out at f=25,800) and the bombing range
+  (out at f=28,462) with none. In the war room (path 11), which is not taught, he dies once at 862,1240 and
+  stops at 862,1140.
   - The workers' campus' death is a hop of four cells from 687,620 to the ledge at 587: measured (he made
     not to be hurt), he does not reach, is 15 frames in the air, falls 50 in 4, catches the ledge and hangs
     for 37 before he can pull up, 60 deep, where a flying mine goes by under the ledge with never that long
