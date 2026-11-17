@@ -4657,6 +4657,17 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 timed.insert(f.mSwitch);
             }
         }
+        // (those a lever opens: one that a zone he walks into opens is crossed as it was. The Barracks' path
+        // 14 has both.)
+        for (auto it = timed.begin(); it != timed.end();)
+        {
+            bool lever = false;
+            for (const Goap::Action& a : d.mActions)
+            {
+                lever = lever || (d.mSteps[a.mTag].mKind == StepKind::eUse && !a.mEffects.empty() && a.mEffects[0].mKey == Key::Switch(*it));
+            }
+            it = lever ? std::next(it) : timed.erase(it);
+        }
         std::vector<Goap::Action> through;
         for (std::size_t i = 0; !timed.empty() && i < d.mActions.size();)
         {

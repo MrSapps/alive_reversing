@@ -654,6 +654,8 @@ private:
     s32 mZFar = 0;
     s32 mZGo = 0;
     s32 mZHold = 0;
+    // With no beat known: the frames waited for each Slig of the background to walk away
+    s32 mZAwayWaits = 0;
     s32 mZTo = 0;
     // Chants at a bird portal that has not opened yet
     s32 mPortalChants = 0;
