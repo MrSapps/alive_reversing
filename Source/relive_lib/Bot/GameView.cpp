@@ -1126,6 +1126,9 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mState = t.mStartState == relive::Path_Slig::StartState::Sleeping ? 1 : 0;
                     e.mOp = t.mFacing == relive::reliveXDirection::eLeft ? 1 : 0;
                     e.mSwitch = t.mSligSpawnerSwitchId;
+                    // (one that starts out after him shoots as it comes, whether it sees him or not:
+                    // Slig::Brain_18_StartChasing)
+                    e.mInputs[0] = t.mStartState == relive::Path_Slig::StartState::Chase ? 1 : 0;
                     break;
                 }
                 case ReliveTypes::eSecurityDoor:
@@ -1241,8 +1244,38 @@ static void MarkFlierTargets(NavInput& in, const World& world)
 // Slig goes to, and what is shut between them, is put on the Slig. (The Barracks' Slig bunks: the four he wakes
 // on his way to the first wheel come back along the floor at 980 with guns, and what clears it is the Slig he
 // calls for the first lock.)
+// For each locker the gate nearest it on its floor to either side (mInputs 0 to 2 for the left one: where it is,
+// its switch, whether it starts shut; 3 to 5 for the right one): see World::Switch, the Sligs that count for a
+// locker
+static void MarkLockerGates(const NavInput& in, World& world)
+{
+    for (Entity& self : world.mEntities)
+    {
+        if (self.mKind != EntityKind::ePantsLocker)
+        {
+            continue;
+        }
+        for (const NavFeature& gate : in.mFeatures)
+        {
+            if (gate.mKind != FeatureKind::eBarrier || gate.mSwitch <= 1 || gate.mHalf != self.mHalf || gate.mY1 > self.mY2 + 4 || gate.mY2 < self.mY2 - 40)
+            {
+                continue;
+            }
+            const s32 gx = (gate.mX1 + gate.mX2) / 2;
+            const s32 side = gx < self.CentreX() ? 0 : 3;
+            if (self.mInputs[side] == 0 || std::abs(gx - self.CentreX()) < std::abs(self.mInputs[side] - self.CentreX()))
+            {
+                self.mInputs[side] = gx;
+                self.mInputs[side + 1] = gate.mSwitch;
+                self.mInputs[side + 2] = gate.mStartClosed ? 1 : 0;
+            }
+        }
+    }
+}
+
 static void MarkLockers(NavInput& in, World& world)
 {
+    MarkLockerGates(in, world);
     for (const Entity& locker : world.mEntities)
     {
         if (locker.mKind != EntityKind::ePantsLocker)
@@ -1288,6 +1321,65 @@ static void MarkLockers(NavInput& in, World& world)
     }
 }
 
+// The beat of a Slig that a spawner lets loose when he walks into the zone of its switch, where that Slig starts
+// out after him: it shoots as it comes, seen or not (Slig::Brain_18_StartChasing), so its floor is not gone onto.
+// (One a lever lets loose is the lever's business: Abe pulls that when he means to.) The Barracks' war room: the
+// floor at 1800 to 1950, 981, under the spawner at 1912 that the zone of switch 233 sets off.
+static void MarkSpawnTraps(NavInput& in, const World& world)
+{
+    for (std::size_t i = 0; i < world.mEntities.size(); i++)
+    {
+        const Entity& spawner = world.mEntities[i];
+        const relive::Path_TLV* pTlv = static_cast<const relive::Path_TLV*>(world.mTlvs[i]);
+        if (spawner.mKind != EntityKind::eSlig || spawner.mSwitch <= 1 || spawner.mInputs[0] != 1 || !pTlv || pTlv->mTlvType != ReliveTypes::eSligSpawner)
+        {
+            continue;
+        }
+        bool zone = false;
+        for (const NavFeature& z : in.mFeatures)
+        {
+            zone = zone || (z.mKind == FeatureKind::eSwitchZone && z.mSwitch == spawner.mSwitch && z.mA == 0);
+        }
+        const s32 boundId = static_cast<const relive::Path_Slig*>(pTlv)->mSligBoundId;
+        const relive::Path_TLV* pLeft = nullptr;
+        const relive::Path_TLV* pRight = nullptr;
+        for (auto& cam : static_cast<BinaryPath*>(const_cast<void*>(world.mPath))->GetCameras())
+        {
+            if (!cam)
+            {
+                continue;
+            }
+            for (auto& upTlv : cam->mTlvs.mTlvs)
+            {
+                const relive::Path_TLV* pOther = upTlv.get();
+                if (pOther->mTlvType == ReliveTypes::eSligBoundLeft && static_cast<const relive::Path_SligBound*>(pOther)->mSligBoundId == boundId)
+                {
+                    pLeft = pOther;
+                }
+                if (pOther->mTlvType == ReliveTypes::eSligBoundRight && static_cast<const relive::Path_SligBound*>(pOther)->mSligBoundId == boundId)
+                {
+                    pRight = pOther;
+                }
+            }
+        }
+        if (!zone || !pLeft || !pRight)
+        {
+            continue;
+        }
+        NavFeature f;
+        f.mKind = FeatureKind::eDanger;
+        f.mX1 = pLeft->mTopLeftX;
+        f.mX2 = pRight->mBottomRightX;
+        f.mY1 = pLeft->mBottomRightY - 60;
+        f.mY2 = pLeft->mBottomRightY + 6;
+        f.mHalf = spawner.mHalf;
+        f.mA = 1;
+        f.mId = spawner.mId;
+        f.mSwitch = World::HazardSwitch(spawner.mId);
+        in.mFeatures.push_back(f);
+    }
+}
+
 // The floors of the Sligs a grenade is to be thrown at (Domain::GrenadeTargets): nothing is crossed onto one
 // until its Slig is dead
 static void MarkGrenadeTargets(NavInput& in, const World& world)
@@ -1328,6 +1420,7 @@ bool GameView::ReadPath(BaseMap& map, s32 pathId, NavInput& input, World& world)
     MarkFlierTargets(input, world);
     MarkGrenadeTargets(input, world);
     MarkLockers(input, world);
+    MarkSpawnTraps(input, world);
     return true;
 }
 
@@ -1346,9 +1439,19 @@ void GameView::ReadWorld(BaseMap& map, World& world)
         {
             fliers = fliers || e.mKind == EntityKind::eFlier;
         }
-        if (fliers)
+        bool lockers = false;
+        for (const Entity& e : world.mEntities)
         {
-            MarkFliers(BuildNavInput(map), world);
+            lockers = lockers || e.mKind == EntityKind::ePantsLocker;
+        }
+        if (fliers || lockers)
+        {
+            const NavInput in = BuildNavInput(map);
+            if (fliers)
+            {
+                MarkFliers(in, world);
+            }
+            MarkLockerGates(in, world);
         }
     }
 
@@ -1420,7 +1523,15 @@ void GameView::ReadWorld(BaseMap& map, World& world)
                 s32 wakeCells = 0;
                 static_cast<::Slig*>(pObj)->Beat(slig.mBeatMin, slig.mBeatMax, wakeCells, slig.mSightDelay);
                 slig.mBeatPause = static_cast<::Slig*>(pObj)->BeatPause();
+                static_cast<::Slig*>(pObj)->BeatPauses(slig.mPauseLeft, slig.mPauseRight);
                 slig.mPanics = static_cast<::Slig*>(pObj)->PanicsAtAChant();
+                // (Motion_6_Shoot; or Motion_7_Falling and Motion_40_LandingSoft under a spawner whose Slig starts
+                // out after him: one a lever calls to be taken over drops in the same way and does not shoot)
+                slig.mShootsNow = motion == 6;
+                for (const Entity& spawner : world.mEntities)
+                {
+                    slig.mShootsNow = slig.mShootsNow || ((motion == 7 || motion == 40) && spawner.mKind == EntityKind::eSlig && spawner.mSwitch > 1 && spawner.mInputs[0] == 1 && std::abs(spawner.CentreX() - slig.mX) <= 40);
+                }
                 slig.mWake = wakeCells * (slig.mHalf ? 13 : 25);
                 slig.mZShoot = slig.mHalf && static_cast<::Slig*>(pObj)->CanZShoot();
                 static_cast<::Slig*>(pObj)->ZShootTiming(slig.mZShootDelay, slig.mZShots);
@@ -1520,6 +1631,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             crawler.mX = FP_GetExponent(pObj->mXPos);
             crawler.mY = FP_GetExponent(pObj->mYPos);
             crawler.mHalf = pObj->GetSpriteScale() != FP_FromInteger(1);
+            crawler.mMotion = pObj->VGetMotion(eMotionType::eCurrentMotion);
             world.mCrawlers.push_back(crawler);
         }
     }
@@ -1825,7 +1937,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
         ::MotionDetector* pDetector = pObj && !pObj->GetDead() ? dynamic_cast<::MotionDetector*>(pObj) : nullptr;
         PSX_RECT laser = {};
         BeamAt beam;
-        if (pDetector && pDetector->BeamNow(laser, beam.mMinX, beam.mMaxX, beam.mVel256, beam.mPause))
+        if (pDetector && pDetector->BeamNow(laser, beam.mMinX, beam.mMaxX, beam.mVel256, beam.mPause, beam.mDrift256))
         {
             beam.mX1 = laser.x;
             beam.mY1 = laser.y;
@@ -2113,6 +2225,7 @@ NavInput GameView::BuildNavInput(BaseMap& map)
     MarkFlierTargets(in, things);
     MarkGrenadeTargets(in, things);
     MarkLockers(in, things);
+    MarkSpawnTraps(in, things);
     return in;
 }
 

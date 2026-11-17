@@ -1512,6 +1512,16 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
                     return 20;
                 }
             }
+            // (or with a Slig that shoots along his floor, or drops onto it from a spawner to do that: the walk to
+            // the hoist and the climb are what its first shot catches him at. The Barracks' war room, the lever at
+            // 912,1240: "Pull the lever from the right side, then run, jump and hoist to the upper level".)
+            for (const SligAt& slig : world->mSligs)
+            {
+                if (slig.mShootsNow && !slig.mPossessed && !world->mInvisible && slig.mHalf == from.mHalf && slig.mY <= from.mY + 30 && slig.mY >= from.mY - 260 && std::abs(slig.mX - from.mX) < 450)
+                {
+                    return 20;
+                }
+            }
             // (or with Fleeches awake and after him: the climb they would catch him on is the slow way. Unseen
             // nothing is after him.)
             for (const RockAt& f : world->mFleechesAwake)
@@ -1656,7 +1666,8 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
             std::vector<SligAt> sligs = world->mSligs;
             for (const Entity& ent : world->mEntities)
             {
-                if (ent.mKind != EntityKind::eSlig || ent.mGone || ent.mLive)
+                // (not a spawner's: there is none there until its switch makes one, and that one is live)
+                if (ent.mKind != EntityKind::eSlig || ent.mGone || ent.mLive || ent.mSwitch > 1)
                 {
                     continue;
                 }
@@ -2641,8 +2652,22 @@ bool Bot::ShadowNear(s32 node, s32 maxEdges, std::vector<s32>* way, s32* cost) c
     return near;
 }
 
+bool Bot::Hurry() const
+{
+    return mHurrySeen && mAbe.mFrame - mHurryFrame <= 90;
+}
+
 Prim Bot::Keen(Prim prim) const
 {
+    if (Hurry() && prim.mKind == Prim::Kind::eMoveTo && !prim.mSlide && prim.mRunUp == 0 && (prim.mGait == Gait::eWalk || prim.mGait == Gait::eRun) && !mWorld.mInvisible)
+    {
+        const s32 cells = std::abs(prim.mX - mAbe.mX) / NavGraph::GridStep(mAbe.mHalfScale);
+        prim.mGait = Gait::eRun;
+        prim.mKeen = true;
+        // (from a stand, an even number of cells: run and slid to a stop, see Prim::mSlide)
+        prim.mSlide = mAbe.mMove == Move::eIdle && mAbe.Settled() && cells >= 4 && cells <= 8 && cells % 2 == 0;
+        return prim;
+    }
     // With a flying Slig within two screens of him what would be walked is run, and a run is begun with five cells
     // to go, not six (Pilot): once it is after him it bombs where he was some 50 frames before, on its screen or
     // off it. The Barracks' path 14: the five cells to the lever of 208 walked in 45 frames, he was bombed as he
@@ -3693,7 +3718,30 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         // (not out of the run-up of a running jump: there he would run on off the end of the floor with no jump.
         // The Barracks' path 5: the run on the ledge at 1987,1660 woke the Slig under it, and he went off the
         // ledge's end onto the flying mine below.)
-        if (awake > mLastAwakeSligs && mPilotActive && mPilotForTask && mAuto && mAbe.mOnGround && mPilot.Current().mKind != Prim::Kind::eRunJump)
+        // (Abe's Motion_71_Knockback and Motion_72_KnockbackGetUp)
+        if (mIsAe && (mAbe.mMotion == 71 || mAbe.mMotion == 72))
+        {
+            mKnocked = true;
+            mKnockFrame = mAbe.mFrame;
+        }
+        // (nor out of a run by a naked Slig that has just come by its gun: that run is what gets him by it)
+        for (const Entity& e : mWorld.mEntities)
+        {
+            if (e.mKind != EntityKind::eCrawler || e.mGone || e.mHalf != mAbe.mHalfScale || std::abs(e.mY2 - mAbe.mY) > 40 || (e.mInputs[0] != 1 && !mWorld.Switch(e.mInputs[0])) ||
+                mKnow->mNav.CameraOf(e.CentreX(), e.mY2 - 5) != mKnow->mNav.CameraOf(mAbe.mX, mAbe.mY - 5))
+            {
+                continue;
+            }
+            for (const RockAt& crawler : mWorld.mCrawlers)
+            {
+                if (crawler.mHalf == e.mHalf && std::abs(crawler.mY - e.mY2) <= 40 && std::abs(crawler.mX - e.CentreX()) <= 400)
+                {
+                    mHurrySeen = true;
+                    mHurryFrame = mAbe.mFrame;
+                }
+            }
+        }
+        if (awake > mLastAwakeSligs && mPilotActive && mPilotForTask && mAuto && mAbe.mOnGround && mPilot.Current().mKind != Prim::Kind::eRunJump && !(Hurry() && mPilot.Current().mKind == Prim::Kind::eMoveTo && mPilot.Current().mKeen))
         {
             mPilot.Start(Prim::Wait(2), mAbe);
         }
@@ -3930,7 +3978,7 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
             }
             for (const RockAt& crawler : mWorld.mCrawlers)
             {
-                mTrace += " crawl" + std::to_string(crawler.mX) + "," + std::to_string(crawler.mY);
+                mTrace += " crawl" + std::to_string(crawler.mX) + "," + std::to_string(crawler.mY) + "m" + std::to_string(crawler.mMotion);
             }
             for (const RockAt& rock : mWorld.mRocksFlying)
             {

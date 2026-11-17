@@ -470,6 +470,12 @@ public:
     {
         return mSligTlv.mPauseLeftMin < mSligTlv.mPauseRightMin ? mSligTlv.mPauseLeftMin : mSligTlv.mPauseRightMin;
     }
+    // For the bot: the frames at least that it stands at the left end of its beat, and at the right one
+    void BeatPauses(s32& left, s32& right) const
+    {
+        left = mSligTlv.mPauseLeftMin;
+        right = mSligTlv.mPauseRightMin;
+    }
     // For the bot: at a chant it runs for it (it has a time set to panic for)
     bool PanicsAtAChant() const
     {
