@@ -507,6 +507,25 @@ private:
     s32 mGhostWaits = 0;
     // Steps spent under a hoist until the Slig that walks the floor over it has its back to him
     s32 mSligWaits = 0;
+    // The frames until a Slig that walks the level of this cell can be on its screen with its face to it (9999:
+    // none does), from where it is, the way it goes and the ends of its beat
+    static s32 SligComes(const Bot& bot, const NavGraph& nav, const NavNode& at);
+    // Under a ledge a Slig stands on: whether it has been seen with its face to him, has its back to him now and
+    // since which frame, the waits for it to turn, and the times he went back to a shadow from there
+    bool mLedgeToward = false;
+    bool mLedgeAway = false;
+    u32 mLedgeSince = 0;
+    s32 mLedgeWaits = 0;
+    s32 mLedgeRetreats = 0;
+    // The last cell he was in that is in a shadow, and the way back to it
+    s32 mSafeNode = -1;
+    std::unique_ptr<GoToTask> mBack;
+    // Waits at a teleporter for the Slig of the floor it goes to to leave
+    s32 mTeleWaits = 0;
+    // Waits for a Slig that faces where a drop on his way lands to turn or go
+    s32 mFacingWaits = 0;
+    // Waits over a floor a Slig walks for it to leave before he drops onto it
+    s32 mFallWaits = 0;
     bool mChaseLogged = false;
     s32 mLureWaits = 0;
     // Frames waited for a Slog under the ledge to leap up, and whether it was in the air the frame before

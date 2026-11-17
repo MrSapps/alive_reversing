@@ -1607,9 +1607,39 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
     - `GrenadeSligTask` takes the beat the game gives a Slig only if the Slig is in it (two with the same
       number for their bounds are each given the other's).
   Left in block 3: its Mudokons and its four suites.
-- **Block 4** (path 9: first try from inside its door, a scratch run).
-  (path 7), whose door shuts behind him, is the one he starts on: a wheel (switch 177), then a Slig lock
-  with a Slig called by a lever, where he dies six times and gives up. Block 4 (path 9) not looked at again.
+- **Block 4**, the trophy room (path 9): done from its door, out into the bombing range (path 14) at about
+  f=1,800 with no deaths (`ae_barracks_trophy_room.txt`). The bombing range is next: he stands in the shadow
+  at 1812,1140 for good, the flying Slig of that screen never off it (`HideTask`). What the trophy room took:
+  - A floor Sligs watch was kept off for the power to go unseen wherever a lock in the path gives it
+    (`Domain::SligWatched`). Here its three ghost locks are past the Sligs. `Bot::EdgeCostFn` now keeps it off
+    only where such a lock can be got to with no watched floor on the way; else the Sligs are got by behind
+    their backs.
+  - The three Sligs by the door (measured over 1,500 frames: the bottom one walks 887 to 1187 and is back
+    every 370; the middle one stands at 1162,399 with its back to the hoist at 1212 for 117 to 124 and the
+    other way for 161 to 184; the top one stands). `GoToTask`: a teleporter onto a floor a Slig walks is used
+    when it cannot be on that screen facing him within 120 frames (`SligComes`: where it is, the way it goes,
+    its beat's ends, 2.75 a frame; one that stands with its back to him may turn now); a hoist up onto a
+    ledge a Slig stands on is taken as that Slig turns its back (its turn seen begun, or its back not 8
+    frames old: `Slig::VOnSameYLevel` has him in its sight from the pull up to the hang from the ledge over,
+    about 80 frames of the 117); and waiting for that under the ledge he is off back to the last shadow he
+    was in when the Slig of his own floor can be back within 75 frames, to come again. That went: back once
+    at f=299, up at f=652.
+  - In a shadow with a Slig on the screen he waited for it to go, though the next cell was on another screen
+    its beat does not come onto (the tunnel at 1137,340: 4,000 frames). Not waited for now.
+  - A drop down in front of a Slig that faces the landing is refused, and with any other way to the same
+    place, however long, that was taken: back up the tunnel, rolled, which the Slig below heard each time and
+    never walked its beat for. Now waited for where he is when there is no other way or only one 300 dearer.
+    And a drop onto a floor a Slig walks waits until it cannot be back within 110 frames and is off that
+    screen by the time he lands (the landing is heard on it: dropped behind it, it turned and shot).
+  - The locks: the first behind the Slig's back (`ClearSligTask`, as before; the time to be out of its sight
+    again after is now counted in, where a place for that is near: `Haven`, its way back allowed a dozen
+    cells). Its ring is what the other two are slapped under: with the power in hand and no place off the
+    Slig's level to keep it for, he goes unseen where he stands, and the Slig is let be for as long as that
+    lasts (it was sent to take over another Slig by teleporter instead, and the power ran out on the way).
+    The orb of that screen knocks him down for the chant (`SecurityOrb`: any chant, 20 frames on); he is
+    unseen by then and it costs 40 frames.
+  - Not unit tested: all of it is in the tasks. Its Mudokons (six, and the lever that fries the Sligs) are
+    left.
 - The hub and its four blocks, then the war room: a Glukkon taken over and its orders to Sligs, crawling
   Sligs and their button, an orb blown up with a grenade (then its Sligs taken over), grenades thrown on a
   count, Greeters, laughing gas, UXBs, Slig voice locks, ghost locks, a Shrykull.

@@ -1299,7 +1299,7 @@ void Bot::BanEdge(s32 edge)
     }
 }
 
-NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen) const
+NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFacing) const
 {
     const PathKnowledge* know = mKnow;
     const World* world = &mWorld;
@@ -1310,7 +1310,56 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen) const
     const bool chanted = mChargeFrame != 0 && mAbe.mFrame - mChargeFrame < 60;
     // (unseen for a crossing over a floor Sligs watch: the quick ways are the cheap ones)
     const bool unseenRun = mWorld.mInvisible && InvisRun();
-    const auto base = [know, world, only, pastScrabs, charged, chanted, unseenRun](const NavEdge& e) -> s32
+    // A floor Sligs watch is kept off for the power to go unseen only where that power can be had first: a
+    // lock that gives it, got to with no watched floor on the way. Where every such lock is past the Sligs
+    // they are got by as anywhere else, behind their backs. The Barracks' path 9 (the trophy room): its three
+    // ghost locks are at the far end, past the three Sligs by the door.
+    bool powerFirst = mWorld.mInvisible || mWorld.mInvisCharge || mWorld.mInvisComing;
+    if (!powerFirst && mOnlyEdges.empty())
+    {
+        const NavGraph& nav = know->mNav;
+        std::vector<s32> locks;
+        for (const Entity& e : mWorld.mEntities)
+        {
+            if (e.mKind == EntityKind::eSlapLock && e.mInputs[0] > 0)
+            {
+                locks.push_back(Domain::UseNode(nav, e, nullptr));
+            }
+        }
+        const s32 start = locks.empty() ? -1 : nav.NodeAt(mAbe.mX, mAbe.mY, mAbe.mHalfScale, 12);
+        if (start >= 0)
+        {
+            std::vector<char> seen(nav.Nodes().size(), 0);
+            std::vector<s32> open{start};
+            seen[start] = 1;
+            while (!open.empty() && !powerFirst)
+            {
+                const s32 at = open.back();
+                open.pop_back();
+                powerFirst = std::find(locks.begin(), locks.end(), at) != locks.end();
+                const NavNode& from = nav.Nodes()[at];
+                for (s32 k = 0; k < from.mEdgeCount; k++)
+                {
+                    const NavEdge& e = nav.Edges()[from.mFirstEdge + k];
+                    const NavNode& to = nav.Nodes()[e.mTo];
+                    s32 sw = 0;
+                    s32 value = 0;
+                    if (seen[e.mTo] || know->mBannedEdges.count(from.mFirstEdge + k) || (nav.Condition(e, &sw, &value) && mWorld.Switch(sw) != value) ||
+                        (Domain::SligWatched(nav, mWorld, to.mX, to.mY, to.mHalf) && !Domain::SligWatched(nav, mWorld, from.mX, from.mY, from.mHalf)))
+                    {
+                        continue;
+                    }
+                    seen[e.mTo] = 1;
+                    open.push_back(e.mTo);
+                }
+            }
+        }
+        else
+        {
+            powerFirst = !locks.empty();
+        }
+    }
+    const auto base = [know, world, only, pastScrabs, charged, chanted, unseenRun, powerFirst, pastFacing](const NavEdge& e) -> s32
     {
         const s32 idx = static_cast<s32>(&e - know->mNav.Edges().data());
         if (know->mBannedEdges.count(idx) || (!only->empty() && !only->count(idx)))
@@ -1351,7 +1400,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen) const
         // (with the power in hand too, whatever step it is kept for: the chant comes before he is on it,
         // GoToTask. The Mudanchee trial's last room, where it is kept for the locks on the Sligs' level.)
         const bool unseenNow = world->mInvisible || world->mInvisCharge || world->mInvisComing || chanted;
-        if (only->empty() && !unseenNow && Domain::SligWatched(know->mNav, *world, to.mX, to.mY, to.mHalf) && !Domain::SligWatched(know->mNav, *world, from.mX, from.mY, from.mHalf))
+        if (only->empty() && !unseenNow && powerFirst && Domain::SligWatched(know->mNav, *world, to.mX, to.mY, to.mHalf) && !Domain::SligWatched(know->mNav, *world, from.mX, from.mY, from.mHalf))
         {
             return -1;
         }
@@ -1508,7 +1557,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen) const
         // 96 frames in the Mines' path 10, where the way on is such a landing and a run to a well: Bot::MakeFlee.)
         // (unseen it is no matter)
         // (hung from the end of its floor he is not seen: GoToTask::Sentry)
-        if (!unseenNow && !to.mHidden && !e.mHung && std::abs(to.mY - from.mY) * (to.mHalf ? 2 : 1) > 30 && (e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eHop || e.mKind == EdgeKind::eHoistDown || e.mKind == EdgeKind::eWell))
+        if (!pastFacing && !unseenNow && !to.mHidden && !e.mHung && std::abs(to.mY - from.mY) * (to.mHalf ? 2 : 1) > 30 && (e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eHop || e.mKind == EdgeKind::eHoistDown || e.mKind == EdgeKind::eWell))
         {
             const s32 scale = to.mHalf ? 2 : 1;
             // (one not seen yet, its screen not loaded, is where and how the map starts it)

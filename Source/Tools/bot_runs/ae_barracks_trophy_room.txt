@@ -1,0 +1,19 @@
+# The bot through the Slig Barracks' fourth block's first half, the trophy room (path 9): from its door past the
+# three Sligs by it (the hoist to the teleporter, down behind the bottom Slig as it leaves, up the ledge as the
+# middle one turns its back, into the tunnel), down to the Mudokons' floor when the Slig there has walked off the
+# screen, its three ghost locks (the first behind the Slig's back, the other two unseen on the first one's ring)
+# and out by the door at 212,460 into the bombing range (path 14) at about f=1,800 with no deaths.
+# The first leg is told to it (bot_goto): started in the room with nothing known of the level it would leave by
+# the door it stands at. Run on from the hub it plans that leg itself.
+# Its Mudokons are left. See BOT_DESIGN.md, "What the Barracks still wants", block 4.
+timeout 900
+start barracks 9 4 1412 459
+wait_until in_game
+wait_frames 40
+healing
+bot_goto 712 340
+bot any,seed=1,been=mines,been=necrum
+wait_until camera barracks 14 1
+bot_wait 60
+bot_report bot_report.txt
+quit
