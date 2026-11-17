@@ -56,6 +56,28 @@ public:
 
 class GoToTask;
 
+// A flying Slig that goes round and round its track: where it was each frame, and from that where it will be.
+// (It turns corners and waits at ends, so where it is going now says little about where it is half a second on;
+// but left alone it does the same round again, to the pixel.)
+class FlierWatch final
+{
+public:
+    // Every frame, with the one watched (nullptr: not to be seen, and what was seen is forgotten)
+    void See(s32 frame, const FlierAt* flier);
+    // Where it is and faces `ahead` frames on. False while it has not been seen to do a round twice.
+    bool Ahead(s32 ahead, s32& x, s32& y, bool& left) const;
+
+private:
+    struct Seen final
+    {
+        s32 mX = 0;
+        s32 mY = 0;
+        bool mLeft = false;
+    };
+    std::vector<Seen> mSeen;
+    s32 mFrame = -1;
+};
+
 // Turn a UXB off: crouch a cell from it, facing it, and slap it as its light turns green
 class DisarmTask final : public Task
 {
@@ -591,6 +613,11 @@ private:
     s32 mFacingWaits = 0;
     // Waits over a floor a Slig walks for it to leave before he drops onto it
     s32 mFallWaits = 0;
+    // The flying Slig of the screen he is about to drop onto out of a tunnel, and the frames waited for it to
+    // have gone by under the tunnel's end
+    FlierWatch mFlierWatch;
+    s32 mFlierWaits = 0;
+    static bool FlierUnderFall(const Bot& bot, const NavGraph& nav, s32 edge);
     // The Slig on his level and screen that would hear him where he is hidden: the way it faced when last looked
     // at (-1: none there), the frame it turned that way, and whether that turn was seen (not just found so)
     s32 mHushFacing = -1;
@@ -1314,6 +1341,7 @@ private:
     s32 mAmbushX = 0;
     s32 mAmbushY = 0;
     s32 mAmbushFrames = 0;
+    FlierWatch mPreyWatch;
     // (where it left its way for that, to go back to: 3 is on the way back)
     s32 mAmbushFromX = 0;
     s32 mAmbushFromY = 0;
@@ -1328,8 +1356,10 @@ private:
     // (and how long it has been no nearer where it is going, and how far that was)
     s32 mProgressFrames = 0;
     s32 mProgressLeft = 0;
-    s64 mAmbushKey = 0;
-    std::set<s64> mAmbushed;
+    // (the box of its track: what is found of a track differs with where the flying Slig is on it, so two are
+    // the same track where their boxes meet)
+    std::array<s32, 4> mAmbushKey{};
+    std::vector<std::array<s32, 4>> mAmbushed;
     s32 mFoeThrown = 0;
     // Where it last was with no other on its screen (to go back to out of the other's sight), and the other as
     // last seen from in front: its place, the way it faced, and whether it is to be come at from behind
@@ -1889,12 +1919,23 @@ private:
     s32 mClear = 0;
     // A flying Slig that never leaves the screen: out at a run instead, into a well on the floor of the next thing
     // to do (in one he can't be hurt, from the jump in until he is down again where it throws him out), and from
-    // there to the thing. 0: not yet; 1: to the well; 2: into it; 3: in it; 4: the thing.
+    // there to the thing. 0: not yet; 1: to the well; 2: into it; 3: in it; 4: the thing. And before the run: 5:
+    // to the last cell out of sight; 6: there, until the flying Slig is where a call stops it over its upper run;
+    // 7: called, until it hangs still. After 1, 8: at the well until its grenade is in the air.
     s32 mDash = 0;
     s32 mDashWell = -1;
     u32 mDashEntity = 0;
     s32 mDashFrames = 0;
     s32 mDashPresses = 0;
+    // Before the run (5 to 7, see HideTask::Next): the last cell of the way that is still out of sight, where the
+    // well throws him out, how often he has called, how long the flying Slig has hung still, and how long he has
+    // stood at the well for its grenade
+    s32 mCallSpot = -1;
+    s32 mDashOut = -1;
+    s32 mCalls = 0;
+    s32 mCallFrames = 0;
+    s32 mHung = 0;
+    s32 mAtWell = 0;
     std::unique_ptr<GoToTask> mGo;
     std::unique_ptr<Task> mUse;
 };

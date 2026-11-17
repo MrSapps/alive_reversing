@@ -395,6 +395,21 @@ bool Bot::Replan(BaseMap& map)
     std::vector<Goap::Action> actions;
     if (mArrivedKey != std::pair<s32, s32>{mAbe.mLevel, mAbe.mPath})
     {
+        // Back out of a path there was no way on in: the way out of this one that led there is a dead end, and
+        // is not taken again while another leads to that path. (Feeco's lobby has three ways up into path 9,
+        // which is three places with nothing between them: two open, the third behind a Slig, and that is the
+        // one to the Bonewerkz.)
+        if (mBackFor == mArrivedKey.second && mArrivedKey.first == mAbe.mLevel && mKnow)
+        {
+            for (const NavExit& x : mKnow->mNav.Exits())
+            {
+                const NavFeature& f = mKnow->mNav.Input().mFeatures[x.mFeature];
+                if (std::abs((f.mX1 + f.mX2) / 2 - mAbe.mX) <= 40 && std::abs(f.mY2 - mAbe.mY) <= 40 && mDeadExits.insert({mAbe.mLevel, mAbe.mPath, x.mFeature}).second)
+                {
+                    Log("the way out at " + std::to_string((f.mX1 + f.mX2) / 2) + "," + std::to_string(f.mY2) + " led nowhere: another one to path " + std::to_string(f.mDestPath) + " first");
+                }
+            }
+        }
         mArrivedKey = {mAbe.mLevel, mAbe.mPath};
         mArrivedX = mAbe.mX;
         mArrivedY = mAbe.mY;
@@ -445,6 +460,19 @@ bool Bot::Replan(BaseMap& map)
             {
                 actions.push_back(a);
                 continue;
+            }
+            if (mDeadExits.count({mAbe.mLevel, mAbe.mPath, mKnow->mNav.Exits()[step.mEdge].mFeature}) != 0)
+            {
+                bool other = false;
+                for (const NavExit& x : mKnow->mNav.Exits())
+                {
+                    const NavFeature& g = mKnow->mNav.Input().mFeatures[x.mFeature];
+                    other = other || (g.mDestLevel == f.mDestLevel && g.mDestPath == f.mDestPath && mDeadExits.count({mAbe.mLevel, mAbe.mPath, x.mFeature}) == 0);
+                }
+                if (other)
+                {
+                    continue;
+                }
             }
             bool sideTrip = false;
             if (!ExitAllowed(map, f, &sideTrip))
@@ -3192,7 +3220,7 @@ std::unique_ptr<Task> Bot::MakeReflex()
         }
         mFlierDash = here;
     }
-    if (!mWorld.mFliers.empty() && !mFlierDash && FlierThreat() && mFlierHides < 40)
+    if (!mWorld.mFliers.empty() && !mFlierDash && AbeNode() != mFlierTimedNode && FlierThreat() && mFlierHides < 40)
     {
         const NavGraph& nav = mKnow->mNav;
         const s32 node = AbeNode();

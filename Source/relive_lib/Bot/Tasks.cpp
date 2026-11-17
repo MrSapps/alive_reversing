@@ -880,6 +880,91 @@ bool GoToTask::ZMove(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
     return true;
 }
 
+void FlierWatch::See(s32 frame, const FlierAt* flier)
+{
+    if (frame == mFrame)
+    {
+        return;
+    }
+    // (a frame missed, or a jump no flying Slig makes: another one, or a load. From the start again.)
+    if (!flier || frame != mFrame + 1 || (!mSeen.empty() && std::abs(flier->mX - mSeen.back().mX) + std::abs(flier->mY - mSeen.back().mY) > 30))
+    {
+        mSeen.clear();
+    }
+    mFrame = frame;
+    if (flier)
+    {
+        if (mSeen.size() >= 2400)
+        {
+            mSeen.erase(mSeen.begin(), mSeen.begin() + 1200);
+        }
+        mSeen.push_back({flier->mX, flier->mY, flier->mFacingLeft});
+    }
+}
+
+bool FlierWatch::Ahead(s32 ahead, s32& x, s32& y, bool& left) const
+{
+    // The round: how far back the last frames were seen before, as they are now. Not from frames it hung still
+    // in (those are alike however far back).
+    const s32 kLast = 14;
+    const s32 count = static_cast<s32>(mSeen.size());
+    if (count < kLast + 40 || ahead < 0)
+    {
+        return false;
+    }
+    const Seen& now = mSeen[count - 1];
+    const Seen& then = mSeen[count - kLast];
+    if (std::abs(now.mX - then.mX) + std::abs(now.mY - then.mY) < 20)
+    {
+        return false;
+    }
+    for (s32 round = 40; round + kLast <= count; round++)
+    {
+        bool same = true;
+        for (s32 i = 0; i < kLast && same; i++)
+        {
+            const Seen& a = mSeen[count - kLast + i];
+            const Seen& b = mSeen[count - kLast + i - round];
+            // (it bobs a pixel or two as it flies)
+            same = std::abs(a.mX - b.mX) <= 3 && std::abs(a.mY - b.mY) <= 4 && a.mLeft == b.mLeft;
+        }
+        if (same)
+        {
+            if (ahead > round)
+            {
+                return false;
+            }
+            const Seen& at = mSeen[count - 1 - round + ahead];
+            x = at.mX;
+            y = at.mY;
+            left = at.mLeft;
+            return true;
+        }
+    }
+    return false;
+}
+
+// Whether that edge is a fall onto a screen a flying Slig lives on
+bool GoToTask::FlierUnderFall(const Bot& bot, const NavGraph& nav, s32 edge)
+{
+    const NavEdge& fall = nav.Edges()[edge];
+    const NavNode& from = nav.Nodes()[fall.mFrom];
+    const NavNode& to = nav.Nodes()[fall.mTo];
+    if (!bot.IsAe() || fall.mKind != EdgeKind::eFall || to.mY <= from.mY + 30)
+    {
+        return false;
+    }
+    const World& world = bot.GetWorld();
+    for (const Entity& e : world.mEntities)
+    {
+        if (e.mKind == EntityKind::eFlier && !e.mGone && world.mFleechKilled.count(e.mId) == 0 && e.mHalf == to.mHalf && nav.CameraOf(e.CentreX(), (e.mY1 + e.mY2) / 2) == nav.CameraOf(to.mX, to.mY - 5))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 s32 GoToTask::SligComes(const Bot& bot, const NavGraph& nav, const NavNode& at, bool withStand)
 {
     const s32 camW = nav.Input().mCamW;
@@ -2095,6 +2180,81 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             if (sweepStop <= last)
             {
                 last = sweepStop - 1;
+            }
+            // Out of a tunnel by a fall at its end, onto a screen a flying Slig lives on. What the game does
+            // (FlyingSlig.cpp), measured in the Barracks' path 14, out of the tunnel at 1437,1400 down to
+            // 1412,1500:
+            // - The flying Slig is made as he comes onto its screen in the tunnel, hangs facing the tunnel for
+            //   105 frames, then goes round its track every 146: along under the tunnel's end and right over the
+            //   floor he comes down on. It sees what is in front of it on its screen; 22 to 29 frames later it is
+            //   after him, at 7 a frame to his 6 at a run, keeps 80 from him and throws. Run from, its grenades
+            //   come down where he was; it is standing (the landing, a turn, a lever) that it gets him at.
+            // - Dropped at once he is seen as he falls, and whether it has him at the lever 125 on turned on a
+            //   few frames (out by f=3,104 or dead, with the start 12 frames later).
+            // - Inside the tunnel, a cell short of its end, it never sees him (500 frames, measured).
+            // So: the roll ends a cell short. There he watches it go round once, and goes on so that he
+            // lands as it is as far off as its round takes it, its back to him all the way down: the thud stops
+            // it there to listen (it hears a landing, and one it has just gone by it hangs over and finds him
+            // at the lever), and from there it is not at him before the lever is pulled and he is off at a run.
+            if (last >= 1 && last + 1 < path.size() && FlierUnderFall(bot, nav, path[last + 1]))
+            {
+                last--;
+                bot.FlierTimedAt(nav.Edges()[path[last]].mTo);
+            }
+            else if (last == 0 && path.size() >= 2 && mFlierWaits < 900 && bot.Abe().mMove == Move::eCrouch && FlierUnderFall(bot, nav, path[1]))
+            {
+                const NavNode& to = nav.Nodes()[nav.Edges()[path[1]].mTo];
+                const FlierAt* flier = nullptr;
+                for (const FlierAt& f : bot.GetWorld().mFliers)
+                {
+                    // (the one of that screen, where it goes off it too)
+                    if (f.mHalf == to.mHalf && std::abs(f.mX - to.mX) <= 500 && std::abs(f.mY - to.mY) <= 260 && (!flier || std::abs(f.mX - to.mX) < std::abs(flier->mX - to.mX)))
+                    {
+                        flier = &f;
+                    }
+                }
+                mFlierWatch.See(bot.Abe().mFrame, flier);
+                // (and it is not hidden from meanwhile: it is on his screen for good, and what he does is timed
+                // by it)
+                bot.FlierDash(flier != nullptr);
+                bot.FlierTimedAt(cur);
+                // (from here he is in the air 27 frames on: the last cell, up, and off the end. Then 26 for
+                // the fall and the landing.)
+                const s32 kToAir = 27;
+                const s32 kDown = 26;
+                bool go = !flier;
+                s32 fx = 0;
+                s32 fy = 0;
+                bool left = false;
+                if (flier && mFlierWatch.Ahead(kToAir + kDown, fx, fy, left))
+                {
+                    // (as far off as its round takes it when he lands, and its back to him all the way down)
+                    const s32 lands = std::abs(fx - to.mX);
+                    s32 far = 0;
+                    for (s32 t = 0; mFlierWatch.Ahead(t, fx, fy, left); t++)
+                    {
+                        far = std::max(far, std::abs(fx - to.mX));
+                    }
+                    go = lands >= far - 20;
+                    for (s32 t = kToAir; t <= kToAir + kDown && go; t++)
+                    {
+                        go = mFlierWatch.Ahead(t, fx, fy, left) && (left ? fx < to.mX : fx > to.mX);
+                    }
+                }
+                if (!go)
+                {
+                    if (mFlierWaits++ == 0)
+                    {
+                        bot.Log("a flying Slig goes round under the tunnel's end at " + std::to_string(nav.Nodes()[first.mTo].mX) + "," + std::to_string(nav.Nodes()[first.mTo].mY) + ": out when it is at the far end of its round");
+                    }
+                    mSteps--;
+                    return TaskStep::Do(Prim::Wait(1));
+                }
+                if (mFlierWaits > 0)
+                {
+                    bot.Log("the flying Slig will be at the far end as he lands: out of the tunnel after " + std::to_string(mFlierWaits) + " frames");
+                    mFlierWaits = 900;
+                }
             }
             // A Slig awake on this floor and on his screen, and the roll goes through a shadow and out of it: no
             // further than the shadow, and out of it once the Slig is off the screen. (A roll is heard all over
@@ -9835,7 +9995,11 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             return true;
         };
         const FlierAt* prey = nullptr;
-        s64 preyKey = 0;
+        std::array<s32, 4> preyKey{};
+        const auto sameTrack = [](const std::array<s32, 4>& a, const std::array<s32, 4>& b)
+        {
+            return a[0] <= b[2] + 10 && b[0] <= a[2] + 10 && a[1] <= b[3] + 10 && b[1] <= a[3] + 10;
+        };
         std::vector<NavLine> preyTrack;
         for (const FlierAt& f : world.mFliers)
         {
@@ -9844,8 +10008,16 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             s32 x2 = 0;
             s32 y2 = 0;
             std::vector<NavLine> lines;
-            if (f.mHalf != flown.mHalf || nav.CameraOf(f.mX, f.mY - 20) == myCam || std::abs(f.mX - bx) > 500 || std::abs(f.mY - by) > 300 ||
-                !Domain::FlierTrack(nav.Input(), f.mX, f.mY - 15, x1, y1, x2, y2, nullptr, &lines, 3))
+            if (f.mHalf != flown.mHalf || nav.CameraOf(f.mX, f.mY - 20) == myCam || !Domain::FlierTrack(nav.Input(), f.mX, f.mY - 15, x1, y1, x2, y2, nullptr, &lines, 3))
+            {
+                continue;
+            }
+            // (near enough to be waited for; and the one that is waited for wherever it is on its track. The
+            // Barracks' path 14: 470 off when the place was found, it flew on to the far end of its track, was
+            // taken for gone six frames later and never waited for again.)
+            const std::array<s32, 4> key{x1, y1, x2, y2};
+            const bool waitedFor = (mAmbush == 1 || mAmbush == 2) && sameTrack(key, mAmbushKey);
+            if (!waitedFor && (std::abs(f.mX - bx) > 500 || std::abs(f.mY - by) > 300))
             {
                 continue;
             }
@@ -9854,8 +10026,12 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             {
                 continue;
             }
-            const s64 key = static_cast<s64>(x1) * 100000 + y1;
-            if (mAmbushed.count(key) == 0 && (!prey || std::abs(f.mX - bx) < std::abs(prey->mX - bx)))
+            bool done = false;
+            for (const std::array<s32, 4>& was : mAmbushed)
+            {
+                done = done || sameTrack(key, was);
+            }
+            if (!done && (!prey || std::abs(f.mX - bx) < std::abs(prey->mX - bx)))
             {
                 prey = &f;
                 preyKey = key;
@@ -9942,7 +10118,7 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             }
             else
             {
-                mAmbushed.insert(preyKey);
+                mAmbushed.push_back(preyKey);
             }
         }
         // (done with: back to where it left its way for this, and on from there. From where it waited the way on
@@ -9963,25 +10139,26 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
                 return corners.empty() ? steerTo(mAmbushFromX, mAmbushFromY) : steerTo(corners[0].first, corners[0].second);
             }
         }
-        if ((mAmbush == 1 || mAmbush == 2) && (!prey || preyKey != mAmbushKey))
+        if ((mAmbush == 1 || mAmbush == 2) && (!prey || !sameTrack(preyKey, mAmbushKey)))
         {
             // (gone, or on this screen now: what follows deals with that)
             if (mAmbush == 2 || !prey)
             {
                 bot.Log("the flying Slig waited for is gone");
             }
-            mAmbushed.insert(mAmbushKey);
+            mAmbushed.push_back(mAmbushKey);
             mAmbush = 3;
             mAmbushFrames = 0;
             return TaskStep::Do(Prim::Wait(1));
         }
+        mPreyWatch.See(bot.Abe().mFrame, mAmbush == 1 || mAmbush == 2 ? prey : nullptr);
         if ((mAmbush == 1 || mAmbush == 2) && prey)
         {
             const bool left = prey->mX < mAmbushX;
             if (++mAmbushFrames > 1200)
             {
                 bot.Log("the flying Slig waited for did not come by in 1200 frames");
-                mAmbushed.insert(mAmbushKey);
+                mAmbushed.push_back(mAmbushKey);
                 mAmbush = 3;
                 mAmbushFrames = 0;
             }
@@ -10002,8 +10179,13 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
                 {
                     s32 gx = 0;
                     s32 gy = 0;
-                    const s32 fx = prey->mX + prey->mVelX * t / 256;
-                    const s32 fy = prey->mY + prey->mVelY * t / 256;
+                    // (where it will be: as it was a round ago, once it has been seen to go round. Straight on
+                    // from where it is it was never where the grenade came down, on a track that turns: 1,200
+                    // frames by the Barracks' lever of 214 without a throw.)
+                    s32 fx = prey->mX + prey->mVelX * t / 256;
+                    s32 fy = prey->mY + prey->mVelY * t / 256;
+                    bool faces = false;
+                    mPreyWatch.Ahead(t, fx, fy, faces);
                     if (clearTo(bx, by, left, t, gx, gy) && std::abs(gx - fx) <= 14 && gy >= fy - 22 && gy <= fy + 8 && std::abs(gx - bx) >= 65)
                     {
                         mAmbush = 2;
@@ -12484,8 +12666,106 @@ TaskStep HideTask::Next(Bot& bot, const std::string& lastFailed)
 {
     const NavGraph& nav = bot.Nav();
     const AbeState& abe = bot.Abe();
+    // The flying Slig of his screen and scale
+    const auto flierHere = [&]() -> const FlierAt*
+    {
+        for (const FlierAt& f : bot.GetWorld().mFliers)
+        {
+            if (bot.AbeNode() >= 0 && f.mHalf == nav.Nodes()[bot.AbeNode()].mHalf && nav.CameraOf(f.mX, f.mY) == nav.CameraOf(abe.mX, abe.mY - 5))
+            {
+                return &f;
+            }
+        }
+        return nullptr;
+    };
+    // Where a call has to stop it for the run to the well. What the game does (FlyingSlig.cpp), measured in the
+    // Barracks' path 14:
+    // - It keeps 80 from him along its track, within 15, and throws when it is there and has turned to him. A mine
+    //   kills what is within 113 of it. At the well it comes to hang over the well's far side from the mine, 95
+    //   to 120 from it: coming along from the mine's side it stops short or glides on a little (1648 at the most,
+    //   the mine at 1537), coming from the other side it may stop anywhere in those 15 and the mine goes off
+    //   without it. And it throws only at what it faces: going his way it faces him the whole way and throws when
+    //   it likes (one in 16 a frame), and such a grenade sets the mine off early.
+    // - So it has to come the long way round its track, away from him first: stopped over its upper run, and
+    //   further along that than where it keeps from him as he comes down (80 short of where the well throws him
+    //   out), it flies off from him along the upper run, down the far end and back along the lower run to the
+    //   well, and he is there before it.
+    // - It hears him speak (CanHearAbe) and stops to listen: 15 frames after the call, some 40 further on, for
+    //   90 frames or more (measured: 91 to 117), and hears nothing else for as long.
+    const s32 kKeeps = 80;
+    const s32 kUpper = 110;
+    const auto hungRight = [&](const FlierAt& f, s32 ahead)
+    {
+        const NavNode& well = nav.Nodes()[mDashWell];
+        const NavNode& out = nav.Nodes()[mDashOut];
+        const s32 side = out.mX > well.mX ? 1 : -1;
+        const s32 along = (f.mX - (out.mX - side * kKeeps)) * side + ahead;
+        return f.mY <= well.mY - kUpper && along >= 5 && along <= 45;
+    };
+    if (mDash == 5)
+    {
+        const TaskStep step = mGo->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::ePrim)
+        {
+            return step;
+        }
+        mDash = 6;
+        mCallFrames = 0;
+    }
+    if (mDash == 6)
+    {
+        const FlierAt* flier = flierHere();
+        const NavNode& well = nav.Nodes()[mDashWell];
+        const s32 side = nav.Nodes()[mDashOut].mX > well.mX ? 1 : -1;
+        // (called when a stop some 40 further on is the right one; with none to be seen, or after three calls
+        // that did not stop it there, he goes as he did)
+        if (flier && mCalls < 3 && ++mCallFrames < 600 && !(flier->mVelX * side > 0 && hungRight(*flier, 40)))
+        {
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        if (flier && mCalls < 3 && mCallFrames < 600)
+        {
+            mCalls++;
+            mDash = 7;
+            mCallFrames = 0;
+            mHung = 0;
+            bot.Log("called to the flying Slig at " + std::to_string(flier->mX) + "," + std::to_string(flier->mY) + ": it stops to listen");
+            return TaskStep::Do(Prim::Wait(3, Btn::eSpeak1));
+        }
+        mDash = 1;
+    }
+    if (mDash == 7)
+    {
+        const FlierAt* flier = flierHere();
+        mHung = flier && flier->mVelX == 0 && flier->mVelY == 0 ? mHung + 1 : 0;
+        mCallFrames++;
+        if (flier && mHung >= 3 && hungRight(*flier, 0))
+        {
+            bot.Log("the flying Slig hangs at " + std::to_string(flier->mX) + "," + std::to_string(flier->mY) + ": to the well, where it comes the long way round");
+            mDash = 1;
+        }
+        else if (!flier || (mHung == 0 && mCallFrames > 40))
+        {
+            // (not stopped where it had to be, and on its round again: called once more)
+            mDash = 6;
+            mCallFrames = 0;
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        else
+        {
+            return TaskStep::Do(Prim::Wait(1));
+        }
+    }
     if (mDash == 1)
     {
+        if (!mGo || mCallSpot >= 0)
+        {
+            const s32 well = mDashWell;
+            mCallSpot = -1;
+            mGo = std::make_unique<GoToTask>("to the well", [well](s32 n)
+                                             { return n == well; });
+            mGo->SetHurry(true);
+        }
         const TaskStep step = mGo->Next(bot, lastFailed);
         if (step.mKind == TaskStep::Kind::ePrim)
         {
@@ -12494,6 +12774,23 @@ TaskStep HideTask::Next(Bot& bot, const std::string& lastFailed)
         if (step.mKind == TaskStep::Kind::eFailed)
         {
             return TaskStep::Failed("not to the well: " + step.mWhy);
+        }
+        mDash = 8;
+        mAtWell = 0;
+    }
+    if (mDash == 8)
+    {
+        // In "just as the flying Slig lobs a grenade" (the walkthrough): he can't be hurt from the jump in on,
+        // and stands in the well's mouth for some 30 frames of it, the grenade 17 in the air. In before it is
+        // thrown he is out of the well and off, and the flying Slig after him, by the time the mine goes off.
+        bool thrown = false;
+        for (const RockAt& rock : bot.GetWorld().mRocksFlying)
+        {
+            thrown = thrown || (std::abs(rock.mX - abe.mX) <= 250 && std::abs(rock.mY - abe.mY) <= 150);
+        }
+        if (!thrown && flierHere() && ++mAtWell < 200)
+        {
+            return TaskStep::Do(Prim::Wait(1));
         }
         mDash = 2;
     }
@@ -12544,6 +12841,7 @@ TaskStep HideTask::Next(Bot& bot, const std::string& lastFailed)
         const s32 thing = bot.PlanNode();
         const Entity* entity = bot.GetWorld().Find(bot.PlanEntity());
         s32 best = -1;
+        s32 bestOut = -1;
         for (const NavEdge& e : nav.Edges())
         {
             if (thing < 0 || !entity || e.mKind != EdgeKind::eWell)
@@ -12561,18 +12859,26 @@ TaskStep HideTask::Next(Bot& bot, const std::string& lastFailed)
                 continue;
             }
             best = e.mFrom;
+            bestOut = e.mTo;
         }
         std::vector<s32> way;
         if (best >= 0 && nav.FindPath(bot.AbeNode(), best, bot.EdgeCostFn(), way))
         {
-            mDash = 1;
+            mDash = 5;
             mDashWell = best;
+            mDashOut = bestOut;
             mDashEntity = entity->mId;
-            const s32 well = best;
-            mGo = std::make_unique<GoToTask>("to the well", [well](s32 n)
-                                             { return n == well; });
-            mGo->SetHurry(true);
-            bot.Log("the flying Slig never leaves this screen: out at a run to the well at " + std::to_string(nav.Nodes()[best].mX) + "," + std::to_string(nav.Nodes()[best].mY) + ", and from where it throws him out to the thing to do");
+            // (first to the last cell of the way that is out of sight: the call holds it some 90 frames, and
+            // from the far end of the shadow the way down is longer than that)
+            s32 spot = bot.AbeNode();
+            for (std::size_t k = 0; k < way.size() && nav.Nodes()[nav.Edges()[way[k]].mTo].mHidden && nav.Nodes()[nav.Edges()[way[k]].mTo].mY == nav.Nodes()[spot].mY; k++)
+            {
+                spot = nav.Edges()[way[k]].mTo;
+            }
+            mCallSpot = spot;
+            mGo = std::make_unique<GoToTask>("to the edge of the shadow", [spot](s32 n)
+                                             { return n == spot; });
+            bot.Log("the flying Slig never leaves this screen: called to from " + std::to_string(nav.Nodes()[spot].mX) + "," + std::to_string(nav.Nodes()[spot].mY) + ", then out at a run to the well at " + std::to_string(nav.Nodes()[best].mX) + "," + std::to_string(nav.Nodes()[best].mY) + ", and from where it throws him out to the thing to do");
             return Next(bot, "");
         }
     }

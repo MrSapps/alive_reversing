@@ -17,6 +17,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <tuple>
 #include <string>
 #include <vector>
 
@@ -490,6 +491,11 @@ public:
     {
         mFlierDash = on;
     }
+    // The cell he waits in for a flying Slig to have gone by (GoToTask, out of a tunnel): not hidden from there
+    void FlierTimedAt(s32 node)
+    {
+        mFlierTimedNode = node;
+    }
     // Whether a step of the plan after the one at hand has this in its name
     bool PlanLater(const std::string& what) const
     {
@@ -624,6 +630,9 @@ private:
     std::vector<s32> mPlanNodes;
     u32 mPlanEntity = 0;
     bool mFlierDash = false;
+    s32 mFlierTimedNode = -1;
+    // Ways out (level, path, feature) that led to a part of a path with no way on
+    std::set<std::tuple<s32, s32, s32>> mDeadExits;
     mutable std::string mFlierWhy;
     // Whether an invisible zone can be got to from a cell on foot in so many moves; way: how, cost: in about
     // how many frames
