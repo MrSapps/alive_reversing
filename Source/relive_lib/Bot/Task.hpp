@@ -1254,6 +1254,9 @@ private:
     s32 mEscapeX = 0;
     s32 mEscapeY = 0;
     s32 mEscapes = 0;
+    // (and how long it has been no nearer where it is going, and how far that was)
+    s32 mProgressFrames = 0;
+    s32 mProgressLeft = 0;
     s64 mAmbushKey = 0;
     std::set<s64> mAmbushed;
     s32 mFoeThrown = 0;

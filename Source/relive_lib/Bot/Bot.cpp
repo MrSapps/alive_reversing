@@ -504,6 +504,19 @@ bool Bot::Replan(BaseMap& map)
             kept.mFound = true;
             best = kept;
             bestGoal = mKeptGoalName;
+            // (a plan with something dear left in it, made when there was no other way: looked at again, and
+            // the way that is 400 cheaper by now is taken. The Barracks' path 14: planned at its door, where no
+            // flying Slig is to be had, the lever under one was his to pull; kept, he went for it when the
+            // flying Slig the lever before it lets out could have.)
+            if (kept.mCost >= 1500)
+            {
+                const Goap::Plan fresh = Goap::Planner::Find(domain.mStart, mKeptGoal, actions);
+                if (fresh.mFound && !fresh.mSteps.empty() && fresh.mCost + 400 < kept.mCost)
+                {
+                    Log("the plan in hand has a cheaper way by now (" + std::to_string(fresh.mCost) + " for " + std::to_string(kept.mCost) + "): that one");
+                    best = fresh;
+                }
+            }
         }
     }
     const bool keptOn = best.mFound;
@@ -2628,6 +2641,26 @@ bool Bot::ShadowNear(s32 node, s32 maxEdges, std::vector<s32>* way, s32* cost) c
     return near;
 }
 
+Prim Bot::Keen(Prim prim) const
+{
+    // With a flying Slig within two screens of him what would be walked is run, and a run is begun with five cells
+    // to go, not six (Pilot): once it is after him it bombs where he was some 50 frames before, on its screen or
+    // off it. The Barracks' path 14: the five cells to the lever of 208 walked in 45 frames, he was bombed as he
+    // turned from it.
+    if (prim.mKind == Prim::Kind::eMoveTo && !prim.mSlide && prim.mRunUp == 0 && (prim.mGait == Gait::eWalk || prim.mGait == Gait::eRun) && mIsAe && !mWorld.mInvisible)
+    {
+        for (const FlierAt& f : mWorld.mFliers)
+        {
+            if (f.mHalf == mAbe.mHalfScale && std::abs(f.mX - mAbe.mX) < 750 && std::abs(f.mY - mAbe.mY) < 300)
+            {
+                prim.mGait = Gait::eRun;
+                prim.mKeen = true;
+            }
+        }
+    }
+    return prim;
+}
+
 bool Bot::FlierThreat() const
 {
     const NavGraph& nav = mKnow->mNav;
@@ -3293,7 +3326,7 @@ void Bot::Think(BaseMap& map)
             mLastPrimFailed.clear();
             if (step.mKind == TaskStep::Kind::ePrim)
             {
-                mPilot.Start(step.mPrim, mAbe);
+                mPilot.Start(Keen(step.mPrim), mAbe);
                 mPilotActive = true;
                 mPilotForTask = true;
                 break;
@@ -3322,7 +3355,7 @@ void Bot::Think(BaseMap& map)
         switch (step.mKind)
         {
             case TaskStep::Kind::ePrim:
-                mPilot.Start(step.mPrim, mAbe);
+                mPilot.Start(Keen(step.mPrim), mAbe);
                 mPilotActive = true;
                 mPilotForTask = true;
                 break;
@@ -3597,21 +3630,8 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
             {
                 mPendingPrim.mGait = Gait::eRun;
             }
-            // (and with a flying Slig within two screens of him what would be walked is run: once it is after him
-            // it bombs where he was some 50 frames before, on its screen or off it. The Barracks' path 14: the
-            // last four cells to the lever of 208 walked in 45 frames, he was bombed as he turned from it.)
-            else if (mPendingPrim.mGait == Gait::eWalk && mIsAe && !mWorld.mInvisible)
-            {
-                for (const FlierAt& f : mWorld.mFliers)
-                {
-                    if (f.mHalf == mAbe.mHalfScale && std::abs(f.mX - mAbe.mX) < 750 && std::abs(f.mY - mAbe.mY) < 300)
-                    {
-                        mPendingPrim.mGait = Gait::eRun;
-                    }
-                }
-            }
         }
-        mPilot.Start(mPendingPrim, mAbe);
+        mPilot.Start(Keen(mPendingPrim), mAbe);
         mPilotPending = false;
         mPilotActive = true;
     }
@@ -3688,7 +3708,7 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
                 if (step.mKind == TaskStep::Kind::ePrim)
                 {
                     mReflex = std::move(flee);
-                    mPilot.Start(step.mPrim, mAbe);
+                    mPilot.Start(Keen(step.mPrim), mAbe);
                     mPilotForTask = true;
                 }
             }

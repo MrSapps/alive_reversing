@@ -42,6 +42,8 @@ struct Prim final
     // stands (measured: four cells in 27 frames, six in 35, against 40 and more walked). For a number of cells
     // that is even and at least four, with nothing to wait for on the way.
     bool mSlide = false;
+    // A run begun with as few as five cells to go (one run, four stopping), not six: with a flying Slig after him
+    bool mKeen = false;
     // A fall or a well: the buttons of the move after it, held as he lands. Both games go from the landing
     // straight into a walk or a run when a direction is held as his feet touch, and skip the rest of it.
     u32 mAfter = 0;
