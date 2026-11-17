@@ -1640,6 +1640,27 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
     unseen by then and it costs 40 frames.
   - Not unit tested: all of it is in the tasks. Its Mudokons (six, and the lever that fries the Sligs) are
     left.
+- **Block 4**, the bombing range (path 14): begun (`ae_barracks_bombing_range.txt`). Its first screen is done
+  with no deaths, and he is down on the long floor at 1412,1500; there he hides from the next flying Slig in
+  the shaft at 1437 and comes no further.
+  - The first screen: a flying Slig goes round over the well, the lever and the trap door and never leaves
+    (`HideTask` waited for good). Measured: seen, it is 25 frames to its first grenade, which is 17 in the air
+    and comes down 93 in front of it; it stops 90 from him. The walkthrough's way (in the well as it throws,
+    so that the mine by the well takes it with it) does not hold: the mine's blast reaches 113 and the Slig
+    stops 115 from it. But he can't be hurt from the jump into a well until he is down again
+    (`Abe::CantBeDamaged`), and this well throws him out by the trap door. So `HideTask`, after 300 frames of
+    a flying Slig on his screen, with the next thing to do on that screen and a well on its floor within six
+    cells of it: to the well at a run, in, and from where it throws him out to the thing (the lever); and for
+    as long as that flying Slig is on his screen it is not hidden from again (`Bot::FlierDash`).
+  - A zone that sets a switch when he is in it (an invisible switch) is a thing to do
+    (`StepKind::eZone`, `SwitchZoneTask`): the second trap door is opened by one.
+  - Next, from the level's data: the long floor has the flying Slig of 1186 to 1551 (it sees the lever of
+    switch 208 at 1562 only on its 20 frames on that screen), one from the spawner at 775 that the first
+    screen's zone has let out (811 to 1071, over the lever of switch 214), and one the lever of switch 210
+    lets out at 525. Orbs on every screen but the leftmost. The walkthrough: run left along the floor, the
+    lever of 210, into the well by it up to the ledge at 487,1380, take the new flying Slig over from there,
+    bomb the others with it and pull the other levers with it. The takeover, bombing and lever pulling are
+    there (`FlierBombTask`), for Sligs that walk; none of it is planned here yet.
 - The hub and its four blocks, then the war room: a Glukkon taken over and its orders to Sligs, crawling
   Sligs and their button, an orb blown up with a grenade (then its Sligs taken over), grenades thrown on a
   count, Greeters, laughing gas, UXBs, Slig voice locks, ghost locks, a Shrykull.

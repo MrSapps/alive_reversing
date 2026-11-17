@@ -1386,6 +1386,30 @@ private:
     std::unique_ptr<GoToTask> mGo;
 };
 
+// Into a cell that is in a zone which sets a switch when he is in it (an invisible switch)
+class SwitchZoneTask final : public Task
+{
+public:
+    SwitchZoneTask(s32 switchId, s32 node)
+        : mSwitch(switchId)
+        , mNode(node)
+    {
+    }
+    ~SwitchZoneTask() override;
+    std::string Name() const override
+    {
+        return "Walk into the zone of switch " + std::to_string(mSwitch);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    s32 mSwitch;
+    s32 mNode;
+    bool mBegun = false;
+    s32 mWaits = 0;
+    std::unique_ptr<GoToTask> mGo;
+};
+
 // A Paramite taken over and walked to every ring it can get to (Domain::ParamiteTour, by Domain::ParamiteRoute:
 // floors, webs, hops and drops), each pulled, and let go under the last.
 class ParamiteTourTask final : public Task
@@ -1769,6 +1793,16 @@ public:
 private:
     s32 mFrames = 0;
     s32 mClear = 0;
+    // A flying Slig that never leaves the screen: out at a run instead, into a well on the floor of the next thing
+    // to do (in one he can't be hurt, from the jump in until he is down again where it throws him out), and from
+    // there to the thing. 0: not yet; 1: to the well; 2: into it; 3: in it; 4: the thing.
+    s32 mDash = 0;
+    s32 mDashWell = -1;
+    u32 mDashEntity = 0;
+    s32 mDashFrames = 0;
+    s32 mDashPresses = 0;
+    std::unique_ptr<GoToTask> mGo;
+    std::unique_ptr<Task> mUse;
 };
 
 // Off the floor of a Slog that is after him, by the nearest way that leads away from it. Coming down next to one,

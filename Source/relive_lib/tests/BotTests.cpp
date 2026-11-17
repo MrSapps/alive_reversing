@@ -5034,6 +5034,63 @@ static World PlateWorld()
     return world;
 }
 
+TEST(BotZone, AZoneThatSetsASwitchWhenHeIsInItIsAThingToDoWhereACellIsInIt)
+{
+    // A floor from 0 to 400 at 100, and over 200 to 250 of it a zone that sets switch 77 (the Barracks' path 14:
+    // the trap door at 1700,1420 is opened by the zone he drops into)
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    NavFeature zone = Feature(FeatureKind::eSwitchZone, 200, 80, 250, 104);
+    zone.mSwitch = 77;
+    zone.mA = 0;
+    in.mFeatures.push_back(zone);
+    NavGraph g;
+    g.Build(in);
+    const World world;
+    const Domain d = Domain::Build(g, world, g.NodeAt(12, 100, false), nullptr);
+    s32 found = 0;
+    for (const Goap::Action& a : d.mActions)
+    {
+        const DomainStep& step = d.mSteps[a.mTag];
+        if (step.mKind != StepKind::eZone)
+        {
+            continue;
+        }
+        found++;
+        EXPECT_EQ(step.mOther, 77u);
+        // (a cell of the floor that is in it)
+        EXPECT_GE(g.Nodes()[step.mEdge].mX, 200);
+        EXPECT_LE(g.Nodes()[step.mEdge].mX, 250);
+        EXPECT_NE(std::find(a.mPre.begin(), a.mPre.end(), Goap::Fact{Key::Switch(77), 0}), a.mPre.end());
+        EXPECT_NE(std::find(a.mEffects.begin(), a.mEffects.end(), Goap::Fact{Key::Switch(77), 1}), a.mEffects.end());
+    }
+    EXPECT_EQ(found, 1);
+    // Not one that is over no cell (up off the floor), one that sets its switch off, or one whose switch is on
+    const auto count = [&world](const NavInput& input, const World& w)
+    {
+        NavGraph graph;
+        graph.Build(input);
+        const Domain domain = Domain::Build(graph, w, graph.NodeAt(12, 100, false), nullptr);
+        s32 n = 0;
+        for (const Goap::Action& a : domain.mActions)
+        {
+            n += domain.mSteps[a.mTag].mKind == StepKind::eZone ? 1 : 0;
+        }
+        return n;
+    };
+    NavInput high = in;
+    high.mFeatures[0].mY1 = 20;
+    high.mFeatures[0].mY2 = 60;
+    EXPECT_EQ(count(high, world), 0);
+    NavInput off = in;
+    off.mFeatures[0].mA = 1;
+    EXPECT_EQ(count(off, world), 0);
+    World on;
+    on.mSwitches[77] = 1;
+    EXPECT_EQ(count(in, on), 0);
+    EXPECT_EQ(count(in, world), 1);
+}
+
 TEST(BotVault, AToggleFootSwitchOfAGatesSwitchIsSteppedOnAndTheShutGateWantsTheNearestOne)
 {
     NavGraph g;

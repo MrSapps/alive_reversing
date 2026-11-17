@@ -10330,6 +10330,35 @@ TaskStep SligLockTask::Next(Bot& bot, const std::string& lastFailed)
 
 StepOnTask::~StepOnTask() = default;
 
+SwitchZoneTask::~SwitchZoneTask() = default;
+
+TaskStep SwitchZoneTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    if (bot.GetWorld().Switch(mSwitch, true) != 0)
+    {
+        return TaskStep::Done();
+    }
+    if (!mBegun)
+    {
+        mBegun = true;
+        mGo = GoToNode(mNode);
+    }
+    TaskStep step;
+    if (!RunGo(mGo, bot, lastFailed, step))
+    {
+        return step;
+    }
+    if (step.mKind == TaskStep::Kind::eFailed)
+    {
+        return step;
+    }
+    if (++mWaits > 40)
+    {
+        return TaskStep::Failed("the zone did not set its switch");
+    }
+    return TaskStep::Do(Prim::Wait(3));
+}
+
 TaskStep StepOnTask::Next(Bot& bot, const std::string& lastFailed)
 {
     const World& world = bot.GetWorld();
@@ -11742,11 +11771,102 @@ TaskStep SlogFleeTask::Next(Bot& bot, const std::string& lastFailed)
     return mGo->Next(bot, lastFailed);
 }
 
-TaskStep HideTask::Next(Bot& bot, const std::string& /*lastFailed*/)
+TaskStep HideTask::Next(Bot& bot, const std::string& lastFailed)
 {
+    const NavGraph& nav = bot.Nav();
+    const AbeState& abe = bot.Abe();
+    if (mDash == 1)
+    {
+        const TaskStep step = mGo->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::ePrim)
+        {
+            return step;
+        }
+        if (step.mKind == TaskStep::Kind::eFailed)
+        {
+            return TaskStep::Failed("not to the well: " + step.mWhy);
+        }
+        mDash = 2;
+    }
+    if (mDash == 2)
+    {
+        mDash = 3;
+        mDashFrames = 0;
+        mDashPresses++;
+        return TaskStep::Do(Prim::Press(Btn::eUp));
+    }
+    if (mDash == 3)
+    {
+        const NavNode& well = nav.Nodes()[mDashWell];
+        const bool out = abe.mOnGround && abe.Settled() && std::abs(abe.mX - well.mX) > NavGraph::GridStep(well.mHalf);
+        if (!out && ++mDashFrames < 200)
+        {
+            // (still stood at it: the press did not take)
+            if (mDashFrames > 12 && abe.mMove == Move::eIdle && bot.AbeNode() == mDashWell && mDashPresses < 4)
+            {
+                mDash = 2;
+            }
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        mDash = 4;
+        mUse = std::make_unique<UseTask>(mDashEntity, 1);
+        bot.Log("out of the well at " + std::to_string(abe.mX) + "," + std::to_string(abe.mY) + ": now " + mUse->Name());
+    }
+    if (mDash == 4)
+    {
+        const TaskStep step = mUse->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::ePrim)
+        {
+            return step;
+        }
+        bot.FlierDash(true);
+        return step.mKind == TaskStep::Kind::eFailed ? TaskStep::Failed(step.mWhy) : TaskStep::Done();
+    }
     // (clear for a little while, not for a frame: it turns round at the ends of its track)
     mClear = bot.FlierThreat() ? 0 : mClear + 1;
     mFrames += 10;
+    // It is on his screen and stays there (its track is all on it): 300 frames of that, and the next thing to do
+    // is on this screen with a well on its floor not six cells from it. The Barracks' path 14 (the bombing
+    // range): the lever at 1612,1240, the well at 1562 that throws him out at 1712, and the flying Slig that
+    // goes round over them. It takes some 25 frames from seeing him to its first grenade, which is 17 in the
+    // air and comes down 93 in front of it: he is in the well by then, and out of it has until the next.
+    if (mClear == 0 && mFrames >= 300 && mFrames % 50 == 0 && bot.AbeNode() >= 0)
+    {
+        const s32 thing = bot.PlanNode();
+        const Entity* entity = bot.GetWorld().Find(bot.PlanEntity());
+        s32 best = -1;
+        for (const NavEdge& e : nav.Edges())
+        {
+            if (thing < 0 || !entity || e.mKind != EdgeKind::eWell)
+            {
+                continue;
+            }
+            const NavNode& from = nav.Nodes()[e.mFrom];
+            const NavNode& to = nav.Nodes()[e.mTo];
+            const NavNode& at = nav.Nodes()[thing];
+            s32 sw = 0;
+            s32 value = 0;
+            if (from.mLine != at.mLine || to.mLine != at.mLine || std::abs(from.mX - at.mX) > 6 * NavGraph::GridStep(at.mHalf) || nav.CameraOf(at.mX, at.mY - 5) != nav.CameraOf(abe.mX, abe.mY - 5) ||
+                (nav.Condition(e, &sw, &value) && bot.GetWorld().Switch(sw) != value))
+            {
+                continue;
+            }
+            best = e.mFrom;
+        }
+        std::vector<s32> way;
+        if (best >= 0 && nav.FindPath(bot.AbeNode(), best, bot.EdgeCostFn(), way))
+        {
+            mDash = 1;
+            mDashWell = best;
+            mDashEntity = entity->mId;
+            const s32 well = best;
+            mGo = std::make_unique<GoToTask>("to the well", [well](s32 n)
+                                             { return n == well; });
+            mGo->SetHurry(true);
+            bot.Log("the flying Slig never leaves this screen: out at a run to the well at " + std::to_string(nav.Nodes()[best].mX) + "," + std::to_string(nav.Nodes()[best].mY) + ", and from where it throws him out to the thing to do");
+            return Next(bot, "");
+        }
+    }
     if (mClear >= 3)
     {
         bot.Log("the flying Slig has gone by after " + std::to_string(mFrames) + " frames");
