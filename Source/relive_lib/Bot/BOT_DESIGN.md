@@ -2530,3 +2530,16 @@ Next: path 7 (Annex 1). Two levers on a MultiSwitchController that counts them o
 delay (it sets them back otherwise); alone he is ~100 frames between them. The game's way: a Mudokon that listens
 pulls a lever a cell from it at "Work" (Mudokon.cpp, Brain_ListeningToAbe_State_11). `WorkTogetherTask` does this for
 wheels, where following Mudokons stop by themselves; at a lever one has to be put on the cell and told to wait.
+
+### Annex 1 so far (2026-11-18, in progress)
+
+- `Domain::PlanTogether` and `WorkTogetherTask::Levers`: levers on a MultiSwitchController whose delay
+  (`Entity::mState`) is 90 frames or less are for Mudokons as wheels are. One is recruited from the levers' floor on
+  its screen (`RecruitTask::SetRemote`), led to the cell its lever is pulled from (he goes a cell past it), told to
+  wait; then Abe's own lever with "Work" said as he pulls.
+- Electric walls that are off across a floor a Slig of the map walks: `ElectricWall sw.. gets Slig#..`
+  (`ZapWaitTask`), and nothing is crossed onto that floor until they have. With this the plan is the levers, not the
+  ledge past the two Sligs.
+- Open: the Mudokon gets to 1012,1240 and the bot does not see it as placed (a bug of the check); and it goes into
+  Brain_6_Escape (a bird portal open near it) with no chant in the trace, as a Slig over it starts to shoot, and is
+  gone 130 frames on, counted killed. Not understood.

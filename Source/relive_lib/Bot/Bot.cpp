@@ -253,6 +253,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<TimedDoorTask>(step.mEntity, static_cast<s32>(step.mOther), step.mEdge);
         case StepKind::eFeedSlogs:
             return std::make_unique<FeedSlogsTask>(step.mEntity, step.mEdge, step.mOther);
+        case StepKind::eZapWait:
+            return std::make_unique<ZapWaitTask>(step.mEntity);
         case StepKind::eDrawSlogs:
             return std::make_unique<DrawSlogsTask>(step.mEntity, step.mEdge);
         case StepKind::eFeedAway:

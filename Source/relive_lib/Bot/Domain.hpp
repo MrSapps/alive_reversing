@@ -112,6 +112,7 @@ enum class StepKind : u8
     eFeedSlogs,     // from the cell mEdge throw a bone onto the stretch of floor of the Slog mEntity (mOther: twice
                     // the kind of throw, and one more for a throw to the left; from bit 8 up the switch of a plate
                     // the bone is thrown past)
+    eZapWait,       // wait where he is until the Slig mEntity has walked into an electric wall that is on
     eDrawSlogs,     // to the cell mEdge, over the stretch of the Slog mEntity and out of its reach, and there until its
                     // Slogs are all after him
     eFeedAway,      // from the cell mEdge throw bones (mOther: the throw as eFeedSlogs; from bit 8 up the cell he then

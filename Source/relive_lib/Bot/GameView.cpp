@@ -973,6 +973,9 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mKind = EntityKind::eSwitchLogic;
                     e.mSwitch = t.mOutputSwitchId;
                     e.mOp = OpOf(t.mAction);
+                    // (the frames its inputs have to come on within: it sets them back when they have not,
+                    // MultiSwitchController::WaitingForAllOn)
+                    e.mState = t.mOnOffDelay;
                     const u16 inputs[6] = {t.mInputSwitchId1, t.mInputSwitchId2, t.mInputSwitchId3, t.mInputSwitchId4, t.mInputSwitchId5, t.mInputSwitchId6};
                     for (s32 i = 0; i < 6; i++)
                     {

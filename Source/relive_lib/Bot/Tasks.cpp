@@ -5088,6 +5088,24 @@ TaskStep TimedDoorTask::Next(Bot& bot, const std::string& lastFailed)
     return step;
 }
 
+TaskStep ZapWaitTask::Next(Bot& bot, const std::string&)
+{
+    const Entity* slig = bot.GetWorld().Find(mSlig);
+    if (!slig || slig->mGone)
+    {
+        return TaskStep::Done();
+    }
+    if (mWaits == 0)
+    {
+        bot.Log("the walls are on across the floor of Slig#" + std::to_string(mSlig) + ": until it has walked into one");
+    }
+    if (++mWaits > 200)
+    {
+        return TaskStep::Failed("the Slig did not walk into the wall");
+    }
+    return TaskStep::Do(Prim::Wait(10));
+}
+
 DrawSlogsTask::~DrawSlogsTask() = default;
 
 TaskStep DrawSlogsTask::Next(Bot& bot, const std::string& lastFailed)
@@ -8820,9 +8838,18 @@ TaskStep WorkTogetherTask::Next(Bot& bot, const std::string& lastFailed)
         std::vector<Goap::Fact> pre;
         if (!Domain::PlanTogether(nav, world, *logic, mTeam, pre))
         {
-            return TaskStep::Failed("not enough Mudokons for the wheels");
+            return TaskStep::Failed("not enough Mudokons for the wheels or levers");
         }
         mPlanned = true;
+    }
+
+    if (!mTeam.mWheels.empty())
+    {
+        const Entity* first = world.Find(mTeam.mWheels[0]);
+        if (first && first->mKind == EntityKind::eLever)
+        {
+            return Levers(bot, lastFailed);
+        }
     }
 
     // The wheel a Mudokon stands at, or null
@@ -9065,6 +9092,194 @@ TaskStep WorkTogetherTask::Next(Bot& bot, const std::string& lastFailed)
             return TaskStep::Do(Prim::Wait(2, bot.SpeakWork()));
         }
     }
+}
+
+TaskStep WorkTogetherTask::Levers(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const AbeState& abe = bot.Abe();
+    const NavGraph& nav = bot.Nav();
+    const Entity* mine = world.Find(mTeam.mAbeWheel);
+    if (!mine || mTeam.mMuds.empty())
+    {
+        return TaskStep::Failed("no lever, or no Mudokon for the other");
+    }
+    // The Mudokons' levers, in the order they come to them, and each one's cell
+    std::vector<const Entity*> theirs;
+    for (u32 id : mTeam.mWheels)
+    {
+        const Entity* lever = world.Find(id);
+        if (lever && id != mTeam.mAbeWheel)
+        {
+            theirs.push_back(lever);
+        }
+    }
+    if (theirs.size() > mTeam.mMuds.size())
+    {
+        return TaskStep::Failed("not enough Mudokons for the levers");
+    }
+    const s32 cell = NavGraph::GridStep(mine->mHalf);
+    const auto standOf = [&](const Entity& lever)
+    {
+        return Domain::UseNode(nav, lever, nullptr);
+    };
+    const auto placed = [&](const Entity& mud, const Entity& lever)
+    {
+        const s32 stand = standOf(lever);
+        return stand >= 0 && mud.mLive && std::abs(mud.mLiveX - nav.Nodes()[stand].mX) <= 8 && std::abs(mud.mLiveY - nav.Nodes()[stand].mY) < 20;
+    };
+    if (mUse)
+    {
+        const TaskStep step = mUse->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::ePrim)
+        {
+            return step;
+        }
+        mUse.reset();
+        mLeverStage = 5;
+        mPlaceWaits = 0;
+    }
+    TaskStep step;
+    if (!RunGo(mGo, bot, lastFailed, step))
+    {
+        return step;
+    }
+    if (step.mKind == TaskStep::Kind::eFailed)
+    {
+        return step;
+    }
+    // Each Mudokon to its lever in turn
+    for (std::size_t i = 0; i < theirs.size() && mLeverStage < 3; i++)
+    {
+        const Entity* mud = world.Find(mTeam.mMuds[i]);
+        if (!mud || mud->mGone)
+        {
+            return TaskStep::Failed("lost a Mudokon");
+        }
+        const s32 stand = standOf(*theirs[i]);
+        if (stand < 0)
+        {
+            return TaskStep::Failed("no cell to pull the lever from");
+        }
+        if (placed(*mud, *theirs[i]) && !mud->mFollowing)
+        {
+            continue;
+        }
+        if (!mud->mFollowing && !placed(*mud, *theirs[i]))
+        {
+            // (talked to from the levers' floor, on its screen: it hears him anywhere on it, and comes down to him)
+            const s32 under = nav.NodeAt(mud->mLive ? mud->mLiveX : mud->CentreX(), nav.Nodes()[stand].mY, mud->mHalf, 60);
+            if (!mRecruit || mRecruiting != mud->mId)
+            {
+                if (++mRecruits > 8)
+                {
+                    return TaskStep::Failed("the Mudokon won't come along");
+                }
+                if (under >= 0 && bot.AbeNode() != under && nav.CameraOf(abe.mX, abe.mY - 5) != nav.CameraOf(mud->mLive ? mud->mLiveX : mud->CentreX(), (mud->mLive ? mud->mLiveY : mud->mY2) - 5))
+                {
+                    mGo = GoToNode(under);
+                    return Levers(bot, "");
+                }
+                mRecruit = std::make_unique<RecruitTask>(mud->mId);
+                mRecruit->SetRemote(true);
+                mRecruiting = mud->mId;
+            }
+            const TaskStep talk = mRecruit->Next(bot, lastFailed);
+            if (talk.mKind == TaskStep::Kind::eDone)
+            {
+                mRecruit.reset();
+                return Levers(bot, "");
+            }
+            return talk;
+        }
+        mRecruit.reset();
+        // It follows: he goes a cell past its cell, on the side away from where it comes, and it stops behind him
+        const s32 from = mud->mLive ? mud->mLiveX : mud->CentreX();
+        const s32 way = nav.Nodes()[stand].mX < from ? -1 : 1;
+        s32 lead = nav.NodeAt(nav.Nodes()[stand].mX + way * cell, nav.Nodes()[stand].mY, mud->mHalf, 8);
+        if (lead < 0)
+        {
+            lead = stand;
+        }
+        if (mLeverStage == 0)
+        {
+            mLeverStage = 1;
+            mPlaceWaits = 0;
+            bot.Log("leading Mudokon#" + std::to_string(mud->mId) + " to " + std::to_string(nav.Nodes()[stand].mX) + "," + std::to_string(nav.Nodes()[stand].mY) + " by Lever#" + std::to_string(theirs[i]->mId));
+            mGo = GoToNode(lead);
+            mGo->SetLeading(true);
+            mGo->SetTopGait(Gait::eWalk);
+            return Levers(bot, "");
+        }
+        if (mLeverStage == 1)
+        {
+            // (until it has come up and stands)
+            const bool still = mud->mLive && mud->mLiveX == mLastMudX;
+            mLastMudX = mud->mLive ? mud->mLiveX : 0;
+            if ((!still || !placed(*mud, *theirs[i])) && ++mPlaceWaits < 60)
+            {
+                return TaskStep::Do(Prim::Wait(10));
+            }
+            if (!placed(*mud, *theirs[i]))
+            {
+                bot.Log("the Mudokon stands at " + std::to_string(mud->mLiveX) + ", not at " + std::to_string(nav.Nodes()[stand].mX));
+                if (++mRounds > 4)
+                {
+                    return TaskStep::Failed("couldn't get the Mudokon to its lever");
+                }
+                mLeverStage = 0;
+                return TaskStep::Do(Prim::Wait(10));
+            }
+            mLeverStage = 2;
+            return TaskStep::Do(Prim::Wait(2, bot.SpeakWait()));
+        }
+        // (told to wait: once it has answered)
+        mLeverStage = 0;
+        if (mud->mFollowing && ++mPlaceWaits < 80)
+        {
+            mLeverStage = 2;
+            return TaskStep::Do(Prim::Wait(10));
+        }
+    }
+    const s32 own = standOf(*mine);
+    if (own < 0)
+    {
+        return TaskStep::Failed("no cell to pull his own lever from");
+    }
+    if (mLeverStage < 3)
+    {
+        mLeverStage = 3;
+        mGo = GoToNode(own);
+        return Levers(bot, "");
+    }
+    if (mLeverStage == 5)
+    {
+        // (pulled: the logic's switch is checked where this was called from; again if it did not take)
+        if (++mPlaceWaits < 6)
+        {
+            return TaskStep::Do(Prim::Wait(10));
+        }
+        if (++mRounds > 6)
+        {
+            return TaskStep::Failed("pulling the levers together didn't do it");
+        }
+        mLeverStage = 3;
+        mTurns = 0;
+    }
+    // All o' ya (one that has stood a while has gone back to not listening), work, and his own lever at once
+    bool listening = true;
+    for (std::size_t i = 0; i < theirs.size(); i++)
+    {
+        const Entity* mud = world.Find(mTeam.mMuds[i]);
+        listening = listening && mud && mud->mLive && mud->mState / 100 == 4;
+    }
+    if (!listening && ++mTurns <= 12)
+    {
+        return mTurns % 2 ? TaskStep::Do(Prim::Press(bot.SpeakAll(), 6)) : TaskStep::Do(Prim::Wait(40));
+    }
+    bot.Log("work: the Mudokon's lever and his own");
+    mUse = std::make_unique<UseTask>(mine->mId, 1);
+    return TaskStep::Do(Prim::Wait(2, bot.SpeakWork()));
 }
 
 TaskStep ScrabRampageTask::Next(Bot& bot, const std::string& lastFailed)
