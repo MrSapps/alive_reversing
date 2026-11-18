@@ -4766,7 +4766,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             {
                 const NavNode& node = nav.Nodes()[n];
                 // (from the stretch's screen or the one next to it: a bone flies on over a screen's edge)
-                if (node.mHalf != slog.mHalf || node.mHazard || node.mLow || node.mY > floorY - 50 || node.mY < floorY - 200 || std::abs(node.mX - (x1 + x2) / 2) > 400)
+                if (node.mHalf != slog.mHalf || node.mHazard || node.mLow || node.mY > floorY - 50 || node.mY < floorY - 200 || node.mX < x1 - 100 || node.mX > x2 + 100)
                 {
                     continue;
                 }
@@ -5940,7 +5940,9 @@ bool Domain::BoneThrow(const NavGraph& nav, s32 node, s32 x1, s32 x2, s32 floorY
 {
     static const ThrowSpot::Kind kKinds[] = {ThrowSpot::eDown, ThrowSpot::eForward, ThrowSpot::eUp, ThrowSpot::eLob};
     const NavNode& from = nav.Nodes()[node];
-    const s32 cam = nav.CameraOf((x1 + x2) / 2, floorY - 5);
+    // (down on the screen he throws from: a Slog goes for a bone on the screen shown, and a stretch may be
+    // screens long. FeeCo's path 4: 26 to 1449.)
+    const s32 cam = nav.CameraOf(from.mX, floorY - 5);
     bool found = false;
     for (s32 side = 0; side < 2; side++)
     {
