@@ -496,9 +496,15 @@ public:
     {
         mTimedRun = on;
     }
+    // In a hurry for the next frames: a bone thrown to Slogs is eaten in that time, and the way on is
+    // through what it keeps them from
+    void RunFor(s32 frames)
+    {
+        mRunUntil = static_cast<s32>(mAbe.mFrame) + frames;
+    }
     bool TimedRunOn() const
     {
-        return mTimedRun;
+        return mTimedRun || static_cast<s32>(mAbe.mFrame) < mRunUntil;
     }
     // The cell he waits in for a flying Slig to have gone by (GoToTask, out of a tunnel): not hidden from there
     void FlierTimedAt(s32 node)
@@ -641,8 +647,10 @@ private:
     bool mFlierDash = false;
     s32 mFlierTimedNode = -1;
     bool mTimedRun = false;
+    s32 mRunUntil = 0;
     // Bones thrown to Slogs on their own floor, beyond the plan's
     s32 mRefeeds = 0;
+    s32 mLooseFeeds = 0;
     // Ways out (level, path, feature) that led to a part of a path with no way on
     std::set<std::tuple<s32, s32, s32>> mDeadExits;
     mutable std::string mFlierWhy;

@@ -3,6 +3,7 @@
 #include "Pilot.hpp"
 #include "Domain.hpp"
 #include "World.hpp"
+#include <array>
 #include <functional>
 #include <memory>
 #include <string>
@@ -416,15 +417,24 @@ public:
         , mPlate(static_cast<s32>(aim >> 8))
     {
     }
+    // Slogs that are loose, on the stretch x1..x2 of the floor at floorY
+    FeedSlogsTask(s32 x1, s32 x2, s32 floorY, s32 stand, u32 aim)
+        : FeedSlogsTask(0, stand, aim)
+    {
+        mDyn = true;
+        mPen = {x1, x2, floorY};
+    }
     ~FeedSlogsTask() override;
     std::string Name() const override
     {
-        return "Throw a bone to Slog#" + std::to_string(mSlog);
+        return mDyn ? "Throw a bone to the Slogs that are loose" : "Throw a bone to Slog#" + std::to_string(mSlog);
     }
     TaskStep Next(Bot& bot, const std::string& lastFailed) override;
 
 private:
     u32 mSlog;
+    bool mDyn = false;
+    std::array<s32, 3> mPen = {};
     s32 mStand;
     ThrowSpot::Kind mKind;
     bool mLeft;

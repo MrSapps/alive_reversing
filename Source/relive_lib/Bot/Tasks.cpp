@@ -5018,11 +5018,15 @@ TaskStep FeedSlogsTask::Next(Bot& bot, const std::string& lastFailed)
 {
     const AbeState& abe = bot.Abe();
     const World& world = bot.GetWorld();
-    const Entity* slog = world.Find(mSlog);
-    if (!slog)
+    const Entity* slog = mDyn ? nullptr : world.Find(mSlog);
+    if (!slog && !mDyn)
     {
         return TaskStep::Failed("no such Slog");
     }
+    // (the stretch: a pen's, or where loose Slogs are)
+    const s32 px1 = slog ? slog->mInputs[2] : mPen[0];
+    const s32 px2 = slog ? slog->mInputs[3] : mPen[1];
+    const s32 py = slog ? slog->mInputs[4] : mPen[2];
     if (mHad < 0)
     {
         if (bot.AbeNode() != mStand || !abe.Settled())
@@ -5071,7 +5075,7 @@ TaskStep FeedSlogsTask::Next(Bot& bot, const std::string& lastFailed)
             for (const NavEdge& e : nav.Edges())
             {
                 const NavNode& to = nav.Nodes()[e.mTo];
-                if (mPlate <= 1 && nav.Nodes()[mStand].mZCover && e.mFrom == mStand && to.mX >= slog->mInputs[2] && to.mX <= slog->mInputs[3] && std::abs(to.mY - slog->mInputs[4]) <= 10 &&
+                if (mPlate <= 1 && nav.Nodes()[mStand].mZCover && e.mFrom == mStand && to.mX >= px1 && to.mX <= px2 && std::abs(to.mY - py) <= 10 &&
                     (e.mKind == EdgeKind::eFall || (mDown < 0 && (e.mKind == EdgeKind::eHoistDown || e.mKind == EdgeKind::eHop))))
                 {
                     mDown = e.mTo;
@@ -5100,7 +5104,7 @@ TaskStep FeedSlogsTask::Next(Bot& bot, const std::string& lastFailed)
         {
             mInHand = true;
             mHad = -world.mRocks - 1;
-            bot.Log("a bone for the Slogs at " + std::to_string(slog->mInputs[2]) + ".." + std::to_string(slog->mInputs[3]) + " from " + std::to_string(abe.mX) + "," + std::to_string(abe.mY) + ", " + std::to_string(world.mRocks) + " in hand");
+            bot.Log("a bone for the Slogs at " + std::to_string(px1) + ".." + std::to_string(px2) + " from " + std::to_string(abe.mX) + "," + std::to_string(abe.mY) + ", " + std::to_string(world.mRocks) + " in hand");
             return TaskStep::Do(Prim::Wait(8, Btn::eThrow));
         }
         mInHand = false;
@@ -5126,7 +5130,7 @@ TaskStep FeedSlogsTask::Next(Bot& bot, const std::string& lastFailed)
     for (const RockAt& bone : world.mBones)
     {
         // (or nearly: he is a while on his way down to them himself)
-        down = down || (bone.mX >= slog->mInputs[2] && bone.mX <= slog->mInputs[3] && bone.mY >= slog->mInputs[4] - 70 && bone.mY <= slog->mInputs[4] + 14);
+        down = down || (bone.mX >= px1 && bone.mX <= px2 && bone.mY >= py - 70 && bone.mY <= py + 14);
     }
     if (world.mRocks >= mHad && mFrames > 40)
     {
@@ -5138,6 +5142,11 @@ TaskStep FeedSlogsTask::Next(Bot& bot, const std::string& lastFailed)
     // that ledge is cover from the Sligs of the background, and the way back down from it is not.)
     if (mPlate > 1 ? world.Switch(mPlate) != 0 : down)
     {
+        // (the bone is eaten in the time the Slog takes: the way on, if it is past them, is run)
+        if (mPlate <= 1 && mDown < 0 && !bot.Nav().Nodes()[mStand].mZCover && world.mSligs.empty())
+        {
+            bot.RunFor(slog ? std::max<s32>(slog->mInputs[0], 30) : 55);
+        }
         return TaskStep::Done();
     }
     if (mFrames > (mPlate > 1 ? 400 : 120))
