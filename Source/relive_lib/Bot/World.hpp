@@ -392,6 +392,9 @@ struct RockAt final
     // A thing that comes down from the ceiling over and over (AE's FallingItem): the frames until it next starts
     // down (0: on its way; -1: not known, or not set to)
     s32 mFallIn = -1;
+    // Its box's sides (a thing that falls: what it hits is what its box meets)
+    s32 mBoxX1 = 0;
+    s32 mBoxX2 = 0;
 };
 
 // A Glukkon that is about

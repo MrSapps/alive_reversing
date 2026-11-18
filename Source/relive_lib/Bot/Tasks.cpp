@@ -2288,6 +2288,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         {
             under = under || (r.mFallIn >= 0 && r.mHalf == here.mHalf && r.mY < here.mY - (here.mHalf ? 30 : 60) && std::abs(r.mX - here.mX) <= (here.mHalf ? 20 : 40));
         }
+        mFallerUnder = under;
         for (const RockAt& r : bot.GetWorld().mFallers)
         {
             const s32 reach = here.mHalf ? 20 : 40;
@@ -2311,6 +2312,18 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             const s32 left = r.mFallIn + fall;
             const bool smashed = mFallerLeft >= 0 && left > mFallerLeft + 10;
             mFallerLeft = left;
+            // (or as good as: stood beside it, his box does not meet its box until some frames after he sets off, and
+            // by then it is down. FallingItem::DamageHitItems: what it hits is what its box meets. Those frames are
+            // what the lever under Bonewerkz' 44-frame crates wants: in under it for the pull, the turn and the
+            // first step out is 36 of them, and set off as it smashes he was under it for the next.)
+            // (five frames after it is down, not sooner: his box is wider at a walk than stood. Two after, he was hit.)
+            const s32 gap = r.mX < here.mX ? abe.mBoxX1 - r.mBoxX2 : r.mBoxX1 - abe.mBoxX2;
+            const s32 enters = 2 + std::max(0, gap) * 10 / (here.mHalf ? 14 : 28);
+            if (mFallerWaits > 0 && r.mBoxX2 > r.mBoxX1 && gap > 0 && gap <= NavGraph::GridStep(here.mHalf) && first.mKind == EdgeKind::eWalk && abe.Settled() && left + 5 <= enters)
+            {
+                bot.Log("it is all but down (in " + std::to_string(left) + ", and he is under it in " + std::to_string(enters) + "): now");
+                break;
+            }
             if (smashed && mFallerWaits > 0)
             {
                 bot.Log("it has smashed: now, with " + std::to_string(left) + " frames of the " + std::to_string(need) + " wanted");
@@ -2340,7 +2353,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 }
                 if (mFallerWaits++ == 0)
                 {
-                    bot.Log("a thing that falls at " + std::to_string(r.mX) + " over the way to " + std::to_string(far) + " (down in " + std::to_string(r.mFallIn + fall) + ", " + std::to_string(need) + " wanted): waiting for it to have smashed");
+                    bot.Log("a thing that falls at " + std::to_string(r.mX) + " over the way to " + std::to_string(far) + " (down in " + std::to_string(r.mFallIn + fall) + ", " + std::to_string(need) + " wanted, its box " + std::to_string(r.mBoxX1) + ".." + std::to_string(r.mBoxX2) + ", his " + std::to_string(abe.mBoxX1) + ".." + std::to_string(abe.mBoxX2) + "): waiting for it to have smashed");
                 }
                 mSteps--;
                 return TaskStep::Do(Prim::Wait(1));
@@ -3438,11 +3451,20 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     }
                 }
             }
+            // (out from under a thing that falls: at a run. "Pull the lever, and run back out.")
+            if (mFallerUnder && bot.IsAe())
+            {
+                gait = Gait::eRun;
+            }
             Prim move = Prim::MoveTo(moveX, gait);
+            // (and into the run from the turn, Abe::Motion_2_StandingTurn's fifth frame with run held: five frames
+            // sooner out than the whole turn and a step, which is what the crates of Bonewerkz' path 3 leave)
+            const bool outFromUnder = mFallerUnder && bot.IsAe() && abe.mMove == Move::eIdle && abe.Settled() && abe.mFacingLeft != first.mLeft;
+
             // Unseen the clock is running: a stretch of four cells or six from a stand is run and slid to a stop
             {
                 const s32 cells = std::abs(moveX - abe.mX) / cell;
-                move.mSlide = gait == Gait::eRun && bot.GetWorld().mInvisible && abe.mMove == Move::eIdle && abe.Settled() && std::abs(abe.mX - here.mX) <= 2 && cells >= 4 && cells <= 8 && cells % 2 == 0;
+                move.mSlide = outFromUnder || (gait == Gait::eRun && bot.GetWorld().mInvisible && abe.mMove == Move::eIdle && abe.Settled() && std::abs(abe.mX - here.mX) <= 2 && cells >= 4 && cells <= 8 && cells % 2 == 0);
             }
             return TaskStep::Do(move);
         }

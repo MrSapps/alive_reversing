@@ -2060,6 +2060,8 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             faller.mX = FP_GetExponent(pObj->mXPos);
             faller.mY = FP_GetExponent(pObj->mYPos);
             faller.mHalf = pObj->GetSpriteScale() != FP_FromInteger(1);
+            faller.mBoxX1 = pObj->VGetBoundingRect().x;
+            faller.mBoxX2 = pObj->VGetBoundingRect().w;
             // (AO's: on its way down, or set off and waiting out its delay, state 2)
             faller.mChasing = pObj->mVelY > FP_FromInteger(0) || (!isAe && static_cast<s32>(static_cast<AO::FallingItem*>(pObj)->mState) == 2);
             if (isAe)
