@@ -654,6 +654,9 @@ private:
     s32 mZFar = 0;
     s32 mZGo = 0;
     s32 mZHold = 0;
+    // The cell a leap ends at under a cover that only hides him crouched (as worked out, and as gone for)
+    s32 mZLowLand = -1;
+    s32 mZCrouchAt = -1;
     // With no beat known: the frames waited for each Slig of the background to walk away
     s32 mZAwayWaits = 0;
     s32 mZTo = 0;

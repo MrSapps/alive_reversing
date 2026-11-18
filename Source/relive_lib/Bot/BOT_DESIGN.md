@@ -1897,9 +1897,22 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
   - **The chain from the Barracks' hub** (`blk10.txt`) now goes on through FeeCo into Terminal 4 at
     f=43,642: 5 deaths, the known mine hop, two in the war room at the lever of 232 (f=32,785: from its own
     door the war room is still done with none, so that is timing, to be found), and two in Terminal 4.
-  - Next: Terminal 4 (path 4: Sligs to get by unseen, lifts, two bone bags, Slogs, a slam door). He hops
-    off the far edge of the first platform (887,380), timed now, and falls to his death past it (1012,752):
-    the walkthrough climbs straight down there and hops over the mines. Then the train to Bonewerkz.
+  - **Terminal 4** (path 4, in progress; `fc2.txt` goes on into it). Its first stretch, the Sligs of the
+    background over the platform and the crates ("Climb up to the raised platform, walk forward and crouch,
+    all while the Sligs are facing right. On the far edge, stand and climb straight down."):
+    - A hoist up is hung from the ledge and then up over it, not stood on it for its 28 frames: a cover that
+      reaches down past the ledge hides him for most of it (`GoToTask::ZLeap`'s track). Taken for stood on the
+      platform all the way up there was no time the two Sligs (rounds of 208 and 172) gave him.
+    - Up on a platform whose cover only hides him crouched: down at once, which is part of what is timed; at
+      the top of a hoist, where down is back down it, a step on first (`mZLowLand`, `mZCrouchAt`).
+    - With a burst at him at best in the next 600 frames, 2,400 are looked through for a time with none.
+    - A plan that only tries what a switch does is dropped once there is a way out.
+    So: up unseen, along crouched, down the far edge by its hoist unseen (he chose that over the hop by
+    himself once the hop was known to cost a burst). Further on he is still hit (four times, not killed) at
+    hops whose best time has a burst in it, gets the bones at 1562,640, and then has no way on: the Slog floor
+    under it is four screens long, and what a bone thrown there buys (a run to the next ledge while they eat:
+    "Throw a bone down and run to the next high ledge") is not known yet. The door to Bonewerkz is at
+    1676,1697, behind the door at 650,660 that the lever of 175 opens. Then the train.
 - The hub and its four blocks, then the war room: a Glukkon taken over and its orders to Sligs, crawling
   Sligs and their button, an orb blown up with a grenade (then its Sligs taken over), grenades thrown on a
   count, Greeters, laughing gas, UXBs, Slig voice locks, ghost locks, a Shrykull.

@@ -536,7 +536,14 @@ bool Bot::Replan(BaseMap& map)
     // The plan in hand still holds from here (what is left of it can be done as things are and gets its goal):
     // on with it, without thinking it all out again
     // (not when a Mudokon can be got at that couldn't be when it was made, and the plan is for something else)
-    const bool keep = mKeptForMudokon || order.size() <= mKeptOpen;
+    // (nor a plan that only tries what a switch does, once there is a way out: FeeCo's path 4, where the bones
+    // he had gone for made the way on, and he went back past the Sligs to try a mine with one)
+    bool keep = mKeptForMudokon || order.size() <= mKeptOpen;
+    if (keep && !mKeptPlan.empty() && mKeptGoalName.rfind("Try switch", 0) == 0 && Goap::Planner::Find(domain.mStart, {{Key::kExited, 1}}, actions).mFound)
+    {
+        Log("there is a way out now: no more of " + mKeptGoalName);
+        keep = false;
+    }
     Goap::Plan best;
     std::string bestGoal;
     std::string misses;
