@@ -2475,3 +2475,14 @@ checks on rupture_farms.
   and virtuals; add a getter rather than a friend.
 - Some goals need the bot to lose something on purpose (die to reset a room, abandon a mud) in
   profiles that allow it. Left until a run needs it.
+
+## Terminal 4's tunnel (2026-11-18, open)
+
+FeeCo lobby to Terminal 4's far left end runs with 0 deaths (`fc2.txt`): a bone per screen from the ledges, loose
+Slogs that come at him get another (`Bot::MakeReflex`, `FeedSlogsTask` with its own stretch). Open: the tunnel roll
+at 387,1240 -> 362,1240 is gated by the half-scale Slog's pen (26..374); the bone thrown into it from the ledge at 362
+draws all the Slogs to the tunnel mouth. The guide: get the Sloggie to chase him back to the previous screen, throw
+another bone there (away from the tunnel) and roll through while they eat. Tried and dropped: pen counts as fed when
+its Slogs are not in it (flickers as they move: the planner offers no throw, then is stuck in the lobby); a bone
+within 120 of a pen counts for it (skips the feeding on the long floor: deaths). Next: a planner action for that
+throw (bone to the right on the Slogs' screen, then the roll), looked at with gdb at the planning frame.
