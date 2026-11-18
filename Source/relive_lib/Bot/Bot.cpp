@@ -2984,6 +2984,23 @@ bool Bot::FlierThreat() const
             }
             const NavNode& thing = nav.Nodes()[mPlanNodes[0]];
             std::vector<s32> route;
+            // (nor one whose track comes onto no screen he is on or goes over on his way: it sees what is on its
+            // screen. Bonewerkz' path 2: hidden eighteen thousand frames at 1687,440 from the one that flies the
+            // mines' floor at 3400,1190.)
+            if (!cams.empty() && cams.count(cam) == 0 && nav.FindPath(abeNode, mPlanNodes[0], EdgeCostFn(), route))
+            {
+                bool touches = false;
+                for (const s32 edge : route)
+                {
+                    const NavNode& to = nav.Nodes()[nav.Edges()[edge].mTo];
+                    touches = touches || cams.count(nav.CameraOf(to.mX, to.mY - 5)) != 0;
+                }
+                if (!touches)
+                {
+                    continue;
+                }
+                route.clear();
+            }
             if (!cams.empty() && cams.count(nav.CameraOf(thing.mX, thing.mY - 5)) == 0 && nav.FindPath(abeNode, mPlanNodes[0], EdgeCostFn(), route))
             {
                 bool runs = true;

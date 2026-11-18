@@ -7357,6 +7357,11 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
         if (mShootFrames < 1200 && Target(world, *me, mShootIt ? entity : nullptr, targetX))
         {
             mShootFrames += 6;
+            // (onto its screen first: a shot stops at the edge of the screen shown)
+            if (nav.CameraOf(me->mX, me->mY - 5) != nav.CameraOf(targetX, me->mY - 5))
+            {
+                return TaskStep::Do(Prim::Wait(6, targetX < me->mX ? Btn::eLeft : Btn::eRight));
+            }
             const u32 hold = ShootLevel(world, *me, targetX, 6);
             return TaskStep::Do(Prim::Wait(6, hold));
         }
@@ -7937,6 +7942,12 @@ TaskStep ClearSligTask::RaidStep(Bot& bot, const SligAt& me)
     }
     if (have && !inFront)
     {
+        // (a shot goes as far as the edge of the screen shown, Bullet.cpp: onto the screen of what it is for first.
+        // Bonewerkz' fourth annex: twenty-four hundred frames of shots at two Sligs a screen on.)
+        if (nav.CameraOf(me.mX, me.mY - 5) != nav.CameraOf(targetX, me.mY - 5))
+        {
+            return TaskStep::Do(Prim::Wait(4, targetX < me.mX ? Btn::eLeft : Btn::eRight));
+        }
         return TaskStep::Do(Prim::Wait(4, ShootLevel(world, me, targetX, 4)));
     }
     if (have)
