@@ -11008,3 +11008,40 @@ TEST(BotNav, ALedgeAcrossAGapIsNotHoppedAtWhereHeIsUnderItsFloorByThenAndThatFlo
     // (a ledge that much lower than his floor he is still over when he gets there)
     EXPECT_TRUE(hops(true, 420));
 }
+
+TEST(BotNav, ARunningJumpOverALiftsShaftTakesItsRunUpOverATrapDoorThatIsShut)
+{
+    // Bonewerkz' path 3: the floor at 379 from the shaft's side at 1966 to 2005, the trap door from 2006 to 2030
+    // at 380, the left lift's bottom stop in the shaft (1927..1966), and the floor at 380 on its far side.
+    NavInput in;
+    in.mIsAe = true;
+    in.mLines.push_back(Line(1890, 380, 1927, 380, 4));
+    in.mLines.push_back(Line(1966, 379, 2005, 379, 4));
+    in.mLines.push_back(Line(2031, 380, 2147, 380, 4));
+    in.mLines.push_back(Line(1800, 560, 2200, 560, 4));
+    NavFeature stop = Feature(FeatureKind::eLiftStop, 1927, 379, 1966, 390);
+    stop.mHalf = true;
+    stop.mId = 6;
+    in.mFeatures.push_back(stop);
+    NavFeature trap = Feature(FeatureKind::eTrapDoor, 2006, 380, 2030, 390);
+    trap.mHalf = true;
+    trap.mSwitch = 231;
+    in.mFeatures.push_back(trap);
+    NavGraph g;
+    g.Build(in);
+    const s32 land = g.NodeAt(1920, 380, true, 4);
+    ASSERT_GE(land, 0);
+    bool jump = false;
+    for (const NavEdge& e : g.Edges())
+    {
+        if (e.mKind == EdgeKind::eRunJump && e.mTo == land && e.mLeft)
+        {
+            jump = true;
+            // (from on the trap door, off the floor's last cell, over the lift's shaft)
+            EXPECT_GT(g.Nodes()[e.mFrom].mX, 2005);
+            EXPECT_EQ(e.mX, g.Nodes()[g.NodeAt(1972, 379, true, 4)].mX);
+            EXPECT_GE(e.mShaft, 0);
+        }
+    }
+    EXPECT_TRUE(jump);
+}

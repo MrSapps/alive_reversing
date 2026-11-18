@@ -918,10 +918,22 @@ void NavGraph::AddRunJumps(std::vector<NavEdge>& edges, s32 from, s32 dir, bool 
     }
     // Room to get up to speed: the cells to the take-off are plain floor
     s32 x = n.mX;
+    s32 runLine = n.mLine;
     for (s32 k = 0; k < kRunUpCells; k++)
     {
         const s32 nx = StepX(x, dir, n.mHalf);
-        const s32 node = NodeOnLine(n.mLine, nx);
+        s32 node = NodeOnLine(n.mLine, nx);
+        // (on over the end of his line onto one that goes on from it at its height: a trap door that is shut and
+        // the floor past it are one floor to run on. Bonewerkz' path 3: "pull the middle lever to close the
+        // trapdoor, then jump over to the left", from 2011,380 on the trap door off the floor's end at 1972,379.
+        // Measured: down at 1921,380 across the left lift's shaft, three cells wide.)
+        if (overLift && (node < 0 || std::abs(mNodes[node].mX - nx) > step / 2))
+        {
+            s32 gy = 0;
+            const s32 other = FloorNear(nx, n.mY, n.mHalf, 3, &gy);
+            node = other >= 0 ? NodeOnLine(other, nx) : -1;
+            runLine = node >= 0 && std::abs(mNodes[node].mX - nx) <= step / 2 ? other : runLine;
+        }
         if (node < 0 || std::abs(mNodes[node].mX - nx) > step / 2 || mNodes[node].mHazard || mNodes[node].mLow || mNodes[node].mLiftStop >= 0 || WallBetween(x, x + dir * step, n.mY, n.mHalf))
         {
             return;
@@ -929,7 +941,7 @@ void NavGraph::AddRunJumps(std::vector<NavEdge>& edges, s32 from, s32 dir, bool 
         x = nx;
     }
     const s32 takeoff = x;
-    const s32 y = mNodes[NodeOnLine(n.mLine, takeoff)].mY;
+    const s32 y = mNodes[NodeOnLine(runLine, takeoff)].mY;
 
     // Up a hoist without stopping: a running jump that passes through a hoist he faces catches the ledge over
     // it (Abe's run jump looks for a hoist where he is). Dear, so that it is only taken when the bot makes it
