@@ -4725,6 +4725,172 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
     // at once, one he stands by has him first. Where the bone comes to lie is known before it is thrown (ThrowArc:
     // a bone flies as a rock does).
     {
+        for (const World::SlogFloor& floor : world.mSlogFloors)
+        {
+            d.mStart.Set(Key::Switch(floor.mSwitch), world.Switch(floor.mSwitch));
+        }
+        // A stretch (x1..x2 of the floor at floorY) that is come onto along the floor only from some region: through
+        // a tunnel, say. A bone thrown onto it from over it is no use from there: he would have to get down and
+        // round to it, and the Slogs come out to where he is as well as he gets in. The bones are thrown away from
+        // the stretch, onto the floor of the screen he stands on, from a cell out of their reach in that region or
+        // in one with a way down into it; he waits by the way in while they eat, and goes as they start on the
+        // last (FeedAwayTask). pen: its Slogs wait where the map put them until they are drawn out after him
+        // first. Gives back the regions this is so for. (Terminal 4: "Go across the top into the cage on the left
+        // to get the Sloggie to chase you back to the previous screen. Throw another bone and roll through the
+        // tunnel".)
+        const auto away = [&](s32 x1, s32 x2, s32 floorY, bool half, s32 eats, const std::vector<Goap::Fact>& gives, const Entity* pen)
+        {
+            std::set<s32> above;
+            std::map<s32, s32> along;
+            const auto on = [&](const NavNode& node)
+            {
+                return node.mHalf == half && node.mX >= x1 && node.mX <= x2 && std::abs(node.mY - floorY) <= 10;
+            };
+            for (std::size_t i = 0; i < nav.Edges().size(); i++)
+            {
+                const NavEdge& edge = nav.Edges()[i];
+                const NavNode& to = nav.Nodes()[edge.mTo];
+                const NavNode& fromNode = nav.Nodes()[edge.mFrom];
+                if (!on(to) || on(fromNode) || fromNode.mHalf != half)
+                {
+                    continue;
+                }
+                if (fromNode.mY <= floorY - 50)
+                {
+                    above.insert(d.mRegions[edge.mFrom]);
+                }
+                else if (std::abs(fromNode.mY - floorY) <= 10 && d.mRegions[edge.mFrom] != d.mRegions[edge.mTo])
+                {
+                    along[d.mRegions[edge.mFrom]] = edge.mFrom;
+                }
+            }
+            std::set<s32> round;
+            if (pen)
+            {
+                d.mStart.Set(Key::SlogsOut(pen->mId), world.SlogsOut(*pen) ? 1 : 0);
+            }
+            for (const auto& way : along)
+            {
+                if (above.count(way.first) != 0)
+                {
+                    continue;
+                }
+                // (the regions he can throw from: that one, and those with a way down into it)
+                std::set<s32> stands{way.first};
+                for (const NavEdge& edge : nav.Edges())
+                {
+                    if (d.mRegions[edge.mTo] == way.first && nav.Nodes()[edge.mFrom].mY <= nav.Nodes()[edge.mTo].mY - 50 && std::abs(nav.Nodes()[edge.mTo].mY - floorY) <= 10 && above.count(d.mRegions[edge.mFrom]) == 0)
+                    {
+                        stands.insert(d.mRegions[edge.mFrom]);
+                    }
+                }
+                round.insert(stands.begin(), stands.end());
+                const NavNode& in = nav.Nodes()[way.second];
+                const s32 penCam = nav.CameraOf((x1 + x2) / 2, floorY - 5);
+                const s32 camW = nav.Input().mCamW;
+                s32 drawAt = -1;
+                s32 throwAt = -1;
+                s32 throwMargin = 0;
+                u32 throwAim = 0;
+                for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+                {
+                    const NavNode& node = nav.Nodes()[n];
+                    if (stands.count(d.mRegions[n]) == 0 || node.mHalf != half || node.mHazard || node.mLow || node.mY > floorY - 50 || node.mY < floorY - 200)
+                    {
+                        continue;
+                    }
+                    // (drawn out from over their own screen: his voice reaches them there)
+                    if (nav.CameraOf(node.mX, node.mY - 5) == penCam && (drawAt < 0 || std::abs(node.mX - in.mX) < std::abs(nav.Nodes()[drawAt].mX - in.mX)))
+                    {
+                        drawAt = static_cast<s32>(n);
+                    }
+                    // The bone as far from the way in as it goes on his screen, off the stretch: what he has is the
+                    // time they take to it from under him, to eat it, and from it to the way in, less his own way
+                    // there
+                    const s32 left = camW > 0 ? (node.mX / camW) * camW : node.mX - 300;
+                    for (s32 far = 300; far >= 100; far -= 50)
+                    {
+                        const auto off = [&](s32 downX)
+                        {
+                            return (downX < x1 - 30 || downX > x2 + 30) && std::abs(downX - in.mX) >= far;
+                        };
+                        u32 aim = 0;
+                        s32 frames = 0;
+                        s32 downX = 0;
+                        if (BoneThrow(nav, static_cast<s32>(n), left, left + (camW > 0 ? camW - 1 : 600), floorY, aim, frames, &downX, off))
+                        {
+                            // (a Slog runs some six pixels a frame; his way is the graph's, off the stretch)
+                            const s32 theirs = std::abs(downX - node.mX) / 6 + eats + std::abs(downX - in.mX) / 6;
+                            std::vector<s32> route;
+                            s32 his = 0;
+                            const NavGraph::EdgeCost plain = [&](const NavEdge& e) -> s32
+                            {
+                                return on(nav.Nodes()[e.mTo]) ? -1 : std::max(1, e.mCost);
+                            };
+                            if (!nav.FindPath(static_cast<s32>(n), way.second, plain, route, &his))
+                            {
+                                break;
+                            }
+                            if (throwAt < 0 || theirs - his > throwMargin)
+                            {
+                                throwAt = static_cast<s32>(n);
+                                throwMargin = theirs - his;
+                                throwAim = aim;
+                            }
+                            break;
+                        }
+                    }
+                }
+                if ((pen && drawAt < 0) || throwAt < 0)
+                {
+                    continue;
+                }
+                const std::string where = " the Slogs' floor at " + std::to_string(x1) + ".." + std::to_string(x2) + "," + std::to_string(floorY);
+                std::vector<Goap::Fact> pre{regionFact(throwAt)};
+                if (pen)
+                {
+                    DomainStep draw;
+                    draw.mKind = StepKind::eDrawSlogs;
+                    draw.mEntity = pen->mId;
+                    draw.mEdge = drawAt;
+                    add("Draw the Slogs out of" + where + " from " + std::to_string(nav.Nodes()[drawAt].mX) + "," + std::to_string(nav.Nodes()[drawAt].mY), {regionFact(drawAt), {Key::SlogsOut(pen->mId), 0}}, {{Key::SlogsOut(pen->mId), 1}}, 150, draw);
+                    pre.push_back({Key::SlogsOut(pen->mId), 1});
+                }
+                // Where he waits by the way in, on his feet and off the stretch: the cell the way in starts from, or
+                // the first one back from it that he can stand in (a tunnel's own cells are low)
+                s32 waitAt = way.second;
+                for (s32 back = 0; back < 6 && nav.Nodes()[waitAt].mLow; back++)
+                {
+                    s32 next = -1;
+                    for (s32 k = 0; k < nav.Nodes()[waitAt].mEdgeCount; k++)
+                    {
+                        const NavEdge& e = nav.Edges()[nav.Nodes()[waitAt].mFirstEdge + k];
+                        const NavNode& to = nav.Nodes()[e.mTo];
+                        if ((e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eRoll) && std::abs(to.mY - floorY) <= 10 && std::abs(to.mX - (x1 + x2) / 2) > std::abs(nav.Nodes()[waitAt].mX - (x1 + x2) / 2))
+                        {
+                            next = e.mTo;
+                        }
+                    }
+                    if (next < 0)
+                    {
+                        break;
+                    }
+                    waitAt = next;
+                }
+                DomainStep feed;
+                feed.mKind = StepKind::eFeedAway;
+                feed.mEntity = pen ? pen->mId : 0;
+                feed.mEdge = throwAt;
+                feed.mOther = throwAim | (static_cast<u32>(waitAt) << 8);
+                add("Throw a bone away from" + where + " from " + std::to_string(nav.Nodes()[throwAt].mX) + "," + std::to_string(nav.Nodes()[throwAt].mY), pre, gives, 250, feed);
+                // (two of them: FeedAwayTask. On one, where one is all he has and a sack gives nothing until it is
+                // gone: the dearer way.)
+                d.mActions.back().mSpend = {Key::kRocks, 2};
+                add("Throw a bone away from" + where + " from " + std::to_string(nav.Nodes()[throwAt].mX) + "," + std::to_string(nav.Nodes()[throwAt].mY) + " (the last)", pre, gives, 900, feed);
+                d.mActions.back().mSpend = {Key::kRocks, 1};
+            }
+            return round;
+        };
         std::set<std::pair<s32, s32>> pens;
         for (const Entity& slog : world.mEntities)
         {
@@ -4768,6 +4934,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                     entries.push_back(edge.mFrom);
                 }
             }
+            const std::set<s32> roundRegions = away(x1, x2, floorY, slog.mHalf, slog.mInputs[0], fed, &slog);
             for (std::size_t n = 0; n < nav.Nodes().size(); n++)
             {
                 const NavNode& node = nav.Nodes()[n];
@@ -4791,7 +4958,9 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 }
                 u32 aim = 0;
                 s32 frames = 0;
-                if (BoneThrow(nav, static_cast<s32>(n), x1, x2, floorY, aim, frames))
+                // (not from a region that comes onto the stretch along the floor only: see above)
+                const bool round = roundRegions.count(d.mRegions[n]) != 0;
+                if (!round && BoneThrow(nav, static_cast<s32>(n), x1, x2, floorY, aim, frames))
                 {
                     DomainStep feed;
                     feed.mKind = StepKind::eFeedSlogs;
@@ -4839,7 +5008,11 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             for (const auto& entry : quickest)
             {
                 add("Throw a bone to" + entry.second.mWhere, {regionFact(entry.second.mNode)}, fed, 250, entry.second.mStep);
-                d.mActions.back().mSpend = {Key::kRocks, 1};
+                // (with them after him he is not down there and back on one: another as he lands, and one more for
+                // what he has to do there. "Throw another bone so that you'll have time to pull the lever and get
+                // back up.")
+                // (what he has, where that is less: "Throw down your last bone and run to the exit")
+                d.mActions.back().mSpend = {Key::kRocks, world.SlogsOut(slog) ? std::max(1, std::min(3, world.mRocks)) : 1};
             }
             for (const auto& entry : lures)
             {
@@ -4848,6 +5021,13 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 add("Throw a bone past FootSwitch#" + std::to_string(plate->mId) + " sw" + std::to_string(plate->mSwitch) + " for" + entry.second.mWhere, {regionFact(entry.second.mNode), {Key::Switch(plate->mSwitch), 0}}, gives, 300, entry.second.mStep);
                 d.mActions.back().mSpend = {Key::kRocks, 1};
             }
+        }
+        // The stretches no Slog starts on: with Slogs after him, come onto along the floor from their own stretch
+        for (const World::SlogFloor& floor : world.mSlogFloors)
+        {
+            // (its own only: he waits by the way onto it, which is no use for what he has to do elsewhere)
+            const std::vector<Goap::Fact> gives{{Key::Switch(floor.mSwitch), 1}};
+            away(floor.mX1, floor.mX2, floor.mFloorY, floor.mHalf, 55, gives, nullptr);
         }
     }
     // A lever on a floor that a Slig comes down onto when a Glukkon he is in calls for help: the Glukkon goes to
@@ -5993,9 +6173,16 @@ bool Domain::BoneThrow(const NavGraph& nav, s32 node, s32 x1, s32 x2, s32 floorY
             }
             const ThrowArc::Point& end = flight.mPoints[at];
             const bool goesLeft = flight.mPoints[at - 1].mX > end.mX;
-            // (a stretch ends at a wall, mostly, and the bone comes back off it)
-            (void)goesLeft;
-            if (end.mX < x1 + 15 || end.mX > x2 - 15 || nav.CameraOf(end.mX, floorY - 5) != cam || (wanted && !wanted(end.mX)))
+            // (and it rolls on the way it flew, a few cells: off the screen it is no bone to them. Terminal 4's cage:
+            // down at 315 and at rest at 407, a screen's edge at 375, and the Slogs had him at the lever.)
+            // (from over the floor it has a few cells of roll in it; thrown along the floor he stands on it rolls
+            // half a screen. Into a wall is no matter: it comes back off it.)
+            const s32 roll = std::abs(from.mY - floorY) <= 10 ? 220 : 100;
+            const s32 rest = end.mX + (goesLeft ? -roll : roll);
+            const s32 camW = std::max(1, nav.Input().mCamW);
+            // (past the stretch's end that way: a wall there stops it, a screen's edge does not)
+            const bool off = goesLeft ? rest < x1 && x1 % camW == 0 : rest > x2 && x2 % camW == camW - 1;
+            if (end.mX < x1 + 15 || end.mX > x2 - 15 || nav.CameraOf(end.mX, floorY - 5) != cam || off || (wanted && !wanted(end.mX)))
             {
                 continue;
             }

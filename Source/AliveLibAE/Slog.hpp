@@ -290,6 +290,11 @@ public:
     {
         return mAngerSwitchId;
     }
+    // (read by the bot: it is after Abe, wherever he goes on its floor, and not waiting where the map put it)
+    bool ChasingAbe() const
+    {
+        return mBrainState == eSlogBrains::Brain_2_ChasingAbe;
+    }
 
 private:
     eSlogBrains mBrainState = eSlogBrains::Brain_0_ListeningToSlig;
