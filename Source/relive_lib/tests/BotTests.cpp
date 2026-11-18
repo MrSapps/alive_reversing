@@ -10304,3 +10304,166 @@ TEST(BotNav, ARunningJumpUpAHoistFromAStandIsThereOnlyWhereTheFloorBehindIsNoRun
     open.Build(StandJumpRoom(false));
     EXPECT_FALSE(HasStandJump(open, open.NodeAt(87, 200, false), open.NodeAt(162, 120, false)));
 }
+
+// A floor two screens long at 200 (a screen is 375 wide), and a ledge at 120 from over the first screen's end to the
+// middle of the second, with a hoist up to it. `pen`: the first screen is a Slog's stretch (the map's Slog 7), come onto along the floor.
+static NavInput TwoScreenFloor(bool pen)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 200, 749, 200, 0));
+    // (the ledge starts over the first screen's last cells, with a wall at its end down to a tunnel's height over
+    // the floor: nothing comes down off it onto the first screen)
+    in.mLines.push_back(Line(325, 120, 600, 120, 0));
+    in.mLines.push_back(Line(325, 40, 325, 160, 1));
+    in.mLines.push_back(Line(325, 40, 325, 160, 2));
+    NavFeature hoist = Feature(FeatureKind::eHoist, 450, 120, 474, 200);
+    hoist.mDir = 2;
+    in.mFeatures.push_back(hoist);
+    if (pen)
+    {
+        NavFeature stretch = Feature(FeatureKind::eDanger, 0, 140, 374, 206);
+        stretch.mA = 1;
+        stretch.mId = 7;
+        stretch.mSwitch = World::HazardSwitch(7);
+        in.mFeatures.push_back(stretch);
+    }
+    return in;
+}
+
+TEST(BotSlogs, ABoneIsNotThrownWhereItWouldRollOffTheScreen)
+{
+    NavGraph g;
+    g.Build(TwoScreenFloor(false));
+    // From the floor itself, along which a bone rolls half a screen (220): whatever throw is taken from any cell of
+    // the first screen, the bone is still on that screen when it has rolled
+    s32 thrown = 0;
+    for (s32 x = 62; x <= 337; x += 25)
+    {
+        const s32 at = g.NodeAt(x, 200, false);
+        ASSERT_GE(at, 0);
+        u32 aim = 0;
+        s32 frames = 0;
+        s32 downX = 0;
+        if (Domain::BoneThrow(g, at, 0, 374, 200, aim, frames, &downX))
+        {
+            thrown++;
+            const s32 rest = downX + (aim % 2 == 1 ? -220 : 220);
+            EXPECT_GE(rest, 0) << "from " << x << " down at " << downX;
+            EXPECT_LE(rest, 374) << "from " << x << " down at " << downX;
+        }
+    }
+    EXPECT_GT(thrown, 0);
+    // (a stretch that ends at a wall short of the screen's edge stops it: more throws do)
+    s32 walled = 0;
+    for (s32 x = 62; x <= 337; x += 25)
+    {
+        u32 aim = 0;
+        s32 frames = 0;
+        walled += Domain::BoneThrow(g, g.NodeAt(x, 200, false), 26, 349, 200, aim, frames) ? 1 : 0;
+    }
+    EXPECT_GT(walled, thrown);
+}
+
+TEST(BotSlogs, AStretchComeOntoAlongTheFloorHasItsSlogsDrawnOutAndTheBoneThrownAwayFromIt)
+{
+    NavGraph g;
+    g.Build(TwoScreenFloor(true));
+    World world = PenWorld();
+    world.mEntities[0].mInputs[4] = 200;
+    world.mEntities[0].mY1 = 180;
+    world.mEntities[0].mY2 = 200;
+    world.mRocks = 2;
+    const s32 abe = g.NodeAt(600, 200, false);
+    ASSERT_GE(abe, 0);
+    Domain domain = Domain::Build(g, world, abe, nullptr);
+    const Goap::Action* draw = ActionNamed(domain, "Draw the Slogs out of");
+    ASSERT_NE(draw, nullptr) << domain.Text();
+    EXPECT_EQ(domain.mSteps[draw->mTag].mKind, StepKind::eDrawSlogs);
+    EXPECT_TRUE(Wants(*draw, Key::SlogsOut(7), 0));
+    EXPECT_TRUE(Gives(*draw, Key::SlogsOut(7), 1));
+    const Goap::Action* away = ActionNamed(domain, "Throw a bone away from");
+    ASSERT_NE(away, nullptr) << domain.Text();
+    EXPECT_EQ(domain.mSteps[away->mTag].mKind, StepKind::eFeedAway);
+    EXPECT_TRUE(Wants(*away, Key::SlogsOut(7), 1));
+    EXPECT_TRUE(Gives(*away, Key::Switch(World::HazardSwitch(7)), 1));
+    // (two bones: one buys too little)
+    EXPECT_EQ(away->mSpend.mValue, 2);
+    // (from over the floor, not from on it)
+    EXPECT_LE(g.Nodes()[domain.mSteps[away->mTag].mEdge].mY, 150);
+    // And no bone thrown onto the stretch from out there: he would have to get round to it
+    EXPECT_EQ(ActionNamed(domain, "Throw a bone to the Slogs at 0..374"), nullptr) << domain.Text();
+    // (already out: said so at the start)
+    world.mEntities[0].mLive = true;
+    world.mEntities[0].mState = 1;
+    domain = Domain::Build(g, world, abe, nullptr);
+    EXPECT_EQ(domain.mStart.Get(Key::SlogsOut(7)), 1);
+}
+
+TEST(BotSlogs, ASlogLooseOnAFloorWithNoStretchIsBaitedUnderAThingThatFallsFromClearOfIt)
+{
+    NavGraph g;
+    g.Build(TwoScreenFloor(false));
+    World world;
+    world.mRocks = 1;
+    const s32 abe = g.NodeAt(600, 120, false);
+    ASSERT_GE(abe, 0);
+    // Nothing after him: nothing loose
+    Domain domain = Domain::Build(g, world, abe, nullptr);
+    EXPECT_EQ(domain.mStart.Get(Key::kSlogLoose), 0);
+    SlogAt slog;
+    slog.mX = 500;
+    slog.mY = 200;
+    slog.mChasing = true;
+    world.mSlogs.push_back(slog);
+    domain = Domain::Build(g, world, abe, nullptr);
+    EXPECT_EQ(domain.mStart.Get(Key::kSlogLoose), 1);
+    // (one that is awake and not after him is not loose on him)
+    world.mSlogs[0].mChasing = false;
+    domain = Domain::Build(g, world, abe, nullptr);
+    EXPECT_EQ(domain.mStart.Get(Key::kSlogLoose), 0);
+    world.mSlogs[0].mChasing = true;
+    domain = Domain::Build(g, world, abe, nullptr);
+    // No thing that falls: nothing to do about it
+    EXPECT_EQ(ActionNamed(domain, "Throw a bone under the falling thing"), nullptr);
+    // One that falls onto its floor just past the ledge's end (the ledge's last cell is within its reach)
+    RockAt faller;
+    faller.mX = 637;
+    faller.mY = 20;
+    faller.mFallIn = 10;
+    world.mFallers.push_back(faller);
+    domain = Domain::Build(g, world, abe, nullptr);
+    const Goap::Action* bait = ActionNamed(domain, "Throw a bone under the falling thing at 637");
+    ASSERT_NE(bait, nullptr) << domain.Text();
+    EXPECT_EQ(domain.mSteps[bait->mTag].mKind, StepKind::eBaitSlog);
+    EXPECT_TRUE(Wants(*bait, Key::kSlogLoose, 1));
+    EXPECT_TRUE(Gives(*bait, Key::kSlogLoose, 0));
+    EXPECT_EQ(bait->mSpend.mValue, 1);
+    // (thrown from the ledge, and from clear of where it comes down)
+    const NavNode& stand = g.Nodes()[domain.mSteps[bait->mTag].mEdge];
+    EXPECT_EQ(stand.mY, 120);
+    EXPECT_GE(std::abs(stand.mX - 637), 60);
+    // (one whose reach the ledge's last cell is in: not thrown under from that cell, though it is the one the
+    // bone would lie nearest from)
+    for (s32 fx = 560; fx <= 700; fx += 5)
+    {
+        world.mFallers[0].mX = fx;
+        domain = Domain::Build(g, world, abe, nullptr);
+        if (const Goap::Action* close = ActionNamed(domain, "Throw a bone under the falling thing at " + std::to_string(fx)))
+        {
+            EXPECT_GE(std::abs(g.Nodes()[domain.mSteps[close->mTag].mEdge].mX - fx), 60) << fx;
+        }
+    }
+    world.mFallers[0].mX = 637;
+    // One that falls once only (no interval known) is no such thing
+    world.mFallers[0].mFallIn = -1;
+    domain = Domain::Build(g, world, abe, nullptr);
+    EXPECT_EQ(ActionNamed(domain, "Throw a bone under the falling thing"), nullptr);
+    // And on a floor with a stretch of Slogs' own the bones are what opens and shuts it: not loose
+    world.mFallers[0].mFallIn = 10;
+    World penned = PenWorld();
+    penned.mEntities[0].mInputs[4] = 200;
+    penned.mSlogs = world.mSlogs;
+    penned.mFallers = world.mFallers;
+    domain = Domain::Build(g, penned, abe, nullptr);
+    EXPECT_EQ(domain.mStart.Get(Key::kSlogLoose), 0);
+}

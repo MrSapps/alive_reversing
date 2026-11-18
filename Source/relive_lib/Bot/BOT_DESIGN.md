@@ -2588,3 +2588,24 @@ and a grenade at Slig#1017 at f=19982 not looked at) and not stuck.
 With these the annex's own way runs from its start to its exit at 1587,921 with 0 deaths (`bw7.txt`). Its two
 secret areas are not gone into. Next: the path after it (12 deaths about 3048..3195,440, then stuck at 3188,320).
 Not under test: this section's rules, and the bait.
+
+### Annex 2 (2026-11-18): Bonewerkz' path 1 from 3188,320 to the door at 3712,340, 0 deaths
+
+Run by `bw7.txt` going on out of the first annex. Two things:
+
+- The Slog asleep at 3300,440 has a wake-up anger of 10: `kLightSleeper` is 10 now (was 2). The Mines and the
+  trials' sleepers are heavier and still run past (m1, tr1, t13 unchanged).
+- Sligs in the background whose beat takes them off the screen are never watched for 700 frames at a stretch, so
+  their round is never known and he sat in the cover at 3437 for 7,600 frames. After `kZWatchMost` (1,500) frames
+  in a cover he goes by what he sees (`GoToTask::ZWatched`, `ZMove`'s no-round branch). He was hit once on the
+  way to the door and lived.
+
+Unit tests added (BotSlogs.*): the bone's roll, the draw-out and throw-away actions, the loose Slog and the bait.
+Mutation check 9 of 10: the one not caught is `kFallerClear`, which the test room's geometry cannot reach. Not
+under unit test, as they want the bot running: the falling things' timing, the hop as a Slig turns its back, the
+sneak and the run from Slurgs, the ledge as a refuge from a Slog, the watch limit.
+
+Next: Annex 3 (path 2): 4 deaths at the mines (Mine#2010) and the mine car (#3001). The guide: "Hop between the
+first two mines from a space behind the first one, and again over the second. Walk right up to the second pair
+and hop over them. Continue right to the mine car. Create some mayhem as you go up, climb out and go through the
+door at the other end."
