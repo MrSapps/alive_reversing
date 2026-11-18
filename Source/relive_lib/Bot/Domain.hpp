@@ -45,6 +45,9 @@ inline u32 Mud(u32 entityId)
 }
 // He has drunk a Brew: his next fart is one that goes off
 static const u32 kBrew = 9;
+// A Slog that is after him is loose on a floor, with no bone to keep it (one that had no stretch of its own: it
+// slept, or came from elsewhere). Nothing comes down onto that floor while it is.
+static const u32 kSlogLoose = 10;
 // A stretch of floor (Domain::ScrabZone) has no loose Scrab on it that could get at Abe there
 inline u32 ScrabClear(s32 zone)
 {
@@ -112,6 +115,9 @@ enum class StepKind : u8
     eFeedSlogs,     // from the cell mEdge throw a bone onto the stretch of floor of the Slog mEntity (mOther: twice
                     // the kind of throw, and one more for a throw to the left; from bit 8 up the switch of a plate
                     // the bone is thrown past)
+    eBaitSlog,      // from the cell mEdge throw a bone (mOther: the throw as eFeedSlogs; from bit 8 up the x of the
+                    // falling thing) so that it lies under a thing that falls over and over, and wait for the Slog that
+                    // is after him to be under it when it comes down
     eZapWait,       // wait where he is until the Slig mEntity has walked into an electric wall that is on
     eDrawSlogs,     // to the cell mEdge, over the stretch of the Slog mEntity and out of its reach, and there until its
                     // Slogs are all after him
