@@ -2537,6 +2537,12 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         {
             pre.push_back({Key::Switch(condSwitch), condValue});
         }
+        // (an edge carries one condition: a fall through a trap door into a Slog pen or a flier's stretch has
+        // that one's too, and it is the pen's that was lost)
+        if (e.mClear >= 0 && nav.Input().mFeatures[e.mClear].mKind == FeatureKind::eDanger && nav.Input().mFeatures[e.mClear].mSwitch != condSwitch)
+        {
+            pre.push_back({Key::Switch(nav.Input().mFeatures[e.mClear].mSwitch), 1});
+        }
         // A teleporter whose switch is made of others (the Mudanchee trial's last: on when three locks are slapped
         // and its plate is stood on): those that nothing in it sets have to be on first
         if (e.mKind == EdgeKind::eTeleport && e.mFeature >= 0)

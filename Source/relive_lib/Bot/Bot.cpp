@@ -1459,7 +1459,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
     const PathKnowledge* know = mKnow;
     const World* world = &mWorld;
     const std::set<s32>* only = &mOnlyEdges;
-    const bool timedRun = mTimedRun;
+    const bool timedRun = TimedRunOn();
     // (the power to go unseen in hand makes a Scrab's floor a way like any other, unless it is kept for a step of
     // the plan that is not at hand yet)
     const bool charged = !(mInvisSaved && !mInvisChantNow);
@@ -3264,6 +3264,43 @@ std::unique_ptr<Task> Bot::MakeReflex()
                 return std::make_unique<FeedSlogsTask>(e.mId, AbeNode(), aim);
             }
             break;
+        }
+    }
+    // Slogs on the floor below the ledge he is on, or on his own, coming for him (loose: the stretch they were
+    // fed on is behind them): another bone for them where they are. ("Throw another bone", at the Sloggie that
+    // chases him back to the previous screen: the guide's Terminal 4.)
+    if (mIsAe && mAbe.Settled() && mAbe.mMove == Move::eIdle && mLooseFeeds < 6 && AbeNode() >= 0 && mWorld.mRocks > 0 && !dynamic_cast<const FeedSlogsTask*>(mTask.get()))
+    {
+        s32 x1 = 0;
+        s32 x2 = 0;
+        s32 fy = 0;
+        s32 count = 0;
+        s32 nearest = 100000;
+        for (const SlogAt& slog : mWorld.mSlogs)
+        {
+            const s32 under = slog.mY - mAbe.mY;
+            if (!slog.mAsleep && !slog.mWaking && under >= -10 && under <= 160 && std::abs(slog.mX - mAbe.mX) <= 350 && !mWorld.SlogFed(slog))
+            {
+                x1 = count == 0 ? slog.mX : std::min(x1, slog.mX);
+                x2 = count == 0 ? slog.mX : std::max(x2, slog.mX);
+                fy = slog.mY;
+                count++;
+                nearest = std::min(nearest, std::abs(slog.mX - mAbe.mX));
+            }
+        }
+        bool lying = false;
+        for (const RockAt& bone : mWorld.mBones)
+        {
+            lying = lying || (bone.mX >= x1 - 60 && bone.mX <= x2 + 60 && bone.mY <= fy + 10 && bone.mY >= fy - 140);
+        }
+        u32 aim = 0;
+        s32 frames = 0;
+        const NavNode& at = mKnow->mNav.Nodes()[AbeNode()];
+        if (count > 0 && nearest <= 220 && !lying && Domain::BoneThrow(mKnow->mNav, AbeNode(), x1 - 150, x2 + 150, fy, aim, frames) && at.mY < fy + 10)
+        {
+            mLooseFeeds++;
+            Log("Slogs loose and coming at " + std::to_string(x1) + ".." + std::to_string(x2) + " with " + std::to_string(mWorld.mRocks) + " bones in hand: another for them");
+            return std::make_unique<FeedSlogsTask>(x1 - 150, x2 + 150, fy, AbeNode(), aim);
         }
     }
     if (!mAbe.Settled())

@@ -1387,7 +1387,8 @@ static void MarkSlogPens(NavInput* in, World& world, bool bones)
         const NavLine* floor = nullptr;
         for (const NavLine& line : lines.mLines)
         {
-            if (line.mType == (e.mHalf ? 4 : 0) && std::min(line.mX1, line.mX2) <= x && std::max(line.mX1, line.mX2) >= x && std::abs((line.mY1 + line.mY2) / 2 - e.mY2) <= 20)
+            if ((line.mType == 0 || line.mType == 4) && std::min(line.mX1, line.mX2) <= x && std::max(line.mX1, line.mX2) >= x && std::abs((line.mY1 + line.mY2) / 2 - e.mY2) <= 20 &&
+                (!floor || line.mType == (e.mHalf ? 4 : 0)))
             {
                 floor = &line;
             }
