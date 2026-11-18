@@ -827,6 +827,9 @@ bool Bot::Replan(BaseMap& map)
                 for (const Entity& e : mWorld.mEntities)
                 {
                     uxb = uxb || (e.mKind == EntityKind::eUxb && Key::Switch(e.mSwitch) == fact.mKey);
+                    // (nor is a mine blown up to see what that does: it is a noise, and it wakes what sleeps. Bonewerkz'
+                    // path 2: the two Sligs of the background slept until a mine went off.)
+                    uxb = uxb || (mIsAe && e.mKind == EntityKind::eMine && Key::Switch(e.mSwitch) == fact.mKey);
                     // (nor is a bone thrown to Slogs to see what that does: it is eaten, and there are four)
                     uxb = uxb || (e.mKind == EntityKind::eSlog && Key::Switch(e.mSwitch) == fact.mKey);
                 }
