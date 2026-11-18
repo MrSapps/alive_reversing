@@ -2605,7 +2605,18 @@ Mutation check 9 of 10: the one not caught is `kFallerClear`, which the test roo
 under unit test, as they want the bot running: the falling things' timing, the hop as a Slig turns its back, the
 sneak and the run from Slurgs, the ledge as a refuge from a Slog, the watch limit.
 
-Next: Annex 3 (path 2): 4 deaths at the mines (Mine#2010) and the mine car (#3001). The guide: "Hop between the
-first two mines from a space behind the first one, and again over the second. Walk right up to the second pair
-and hop over them. Continue right to the mine car. Create some mayhem as you go up, climb out and go through the
-door at the other end."
+### Annex 3 (2026-11-18): path 2 to the door at 1562,1400, 0 deaths
+
+The deaths there were of his own making. With no way out known the explorer blew up a mine to see what that did,
+which woke the two Sligs of the background (they sleep), and he was shot between the mines. A mine is not blown up
+to try a switch now (`Bot::Replan`, with the UXBs), and a Slig asleep is not watched from cover
+(`GoToTask::ZWatched`: fifteen hundred frames went on that). With these he goes to the mine car, rides it up to
+1562,1499, gets out and takes the door. The mines' hops and the motion detectors were all right as they were.
+Not under unit test: both.
+
+Next: Annex 4 (the same path, the floor at 1240 and its background at 1120): 18 deaths at Lever#6006 about
+795..1047,1119. The guide: "Go right, climb to the upper level and crouch, then roll back to the left. Drop down on
+the other side when the awake Slig leaves. Walk left past the door. When the Slig in the background is leaving this
+screen, go back and enter the door. Quickly chant and possess the Slig in the foreground, then teleport him back
+to you. Shoot the other Sligs, go right and pull all three levers, then blow him up. Have Abe return to the
+foreground and go past the deactivated electrical walls to the door on the right."

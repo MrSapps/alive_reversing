@@ -190,7 +190,9 @@ bool GoToTask::ZWatched(Bot& bot, const NavGraph& nav, const std::vector<s32>& p
     bool any = false;
     for (const SligAt& slig : bot.GetWorld().mSligs)
     {
-        any = any || (slig.mZShoot && !slig.mPossessed && nav.CameraOf(slig.mX, slig.mY - 5) == cam);
+        // (not one asleep: it shoots nobody. Bonewerkz' path 2: fifteen hundred frames in a cover watching two
+        // Sligs sleep.)
+        any = any || (slig.mZShoot && !slig.mPossessed && !slig.mAsleep && nav.CameraOf(slig.mX, slig.mY - 5) == cam);
     }
     // (with a bone out for Slogs they are not waited for: it is eaten in less time than that. What it was
     // thrown for was timed by them before it was thrown, FeedSlogsTask.)
