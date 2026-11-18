@@ -2641,5 +2641,19 @@ With this `bw7.txt` runs the first annex's start to the hub over the annexes wit
 
 Not under unit test: the two above, and the fixes of Annexes 3 and 4.
 
-Next: path 3. 21 deaths, the first at Lever#15000 and #15001 about 1170..1248,155 ("chased: off the end of the
-floor at a run" as he comes in at 1375,114).
+### Path 3, begun (2026-11-18)
+
+Half-scale cells (13), levers under crates that fall every 44 frames. Mended so far:
+
+- `Bot::RunFor` is capped at 200 frames and ends with the path: a Slog's eating time is what its map says, and
+  with a long one he came into path 3 still at a run and went off a ledge under the crates.
+- `GoToTask`: nothing is waited for from under a thing that falls (done with the lever at 1170 he stood there for
+  the crates of the next stretch); a thing that comes round too fast for the time ever to be enough is waited for
+  from the cell beside where it comes down, and gone under as it smashes.
+
+Open: Lever#15000 at 1170,159 under the crates of 1161. In from 1183 at a walk 12 frames, the pull 21, the turn 8
+and out some 6: 45 or more against 44. The guide: "stand beside the crate impact point, and smoothly press left,
+pull the lever, and run back out, starting immediately after a crate hits". He walks: a run of one cell does not
+stop on the cell. After six deaths the bot gives the lever up, pulls 15013 and 15001, and is stuck at 1378,40
+(the way on at 2568,99 wants a switch). The rest of the guide's path 3 is Mudokons led past falling crates and
+put to work. Not under unit test: any of this section's rules.
