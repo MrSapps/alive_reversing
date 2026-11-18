@@ -1909,9 +1909,14 @@ ledge and toss it to the Slig at the top ... Climb up, turn the wheel and enter 
     - A plan that only tries what a switch does is dropped once there is a way out.
     So: up unseen, along crouched, down the far edge by its hoist unseen (he chose that over the hop by
     himself once the hop was known to cost a burst). Further on he is still hit (four times, not killed) at
-    hops whose best time has a burst in it, gets the bones at 1562,640, and then has no way on: the Slog floor
-    under it is four screens long, and what a bone thrown there buys (a run to the next ledge while they eat:
-    "Throw a bone down and run to the next high ledge") is not known yet. The door to Bonewerkz is at
+    hops whose best time has a burst in it, and gets the bones at 1562,640. The Slog floor under it is four
+    screens long (26 to 1449): a bone is one that comes down on the screen he throws from, wherever along the
+    stretch that is (`Domain::BoneThrow`), and with that the whole way to the door is planned. He dies on that
+    floor: a bone, down, another, and then all 1,200 of it at a run, caught a third of the way (1053,1240).
+    What a bone buys there is a run to the next ledge while they eat ("Throw a bone down and run to the next
+    high ledge. Repeat"): the way along such a floor has to go from one ledge over it to the next within that
+    time, which is not built. (A dearer cell on a Slog floor did nothing: a hoist up with Slogs awake under it
+    is dear already. Taken out again.) The door to Bonewerkz is at
     1676,1697, behind the door at 650,660 that the lever of 175 opens. Then the train.
 - The hub and its four blocks, then the war room: a Glukkon taken over and its orders to Sligs, crawling
   Sligs and their button, an orb blown up with a grenade (then its Sligs taken over), grenades thrown on a
