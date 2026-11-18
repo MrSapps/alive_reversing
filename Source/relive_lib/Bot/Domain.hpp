@@ -506,6 +506,9 @@ struct Domain final
     // ends: the two ends of that track. False with no track there.
     // (join: how far apart the ends of two stretches may be and still be one track)
     static bool FlierTrack(const NavInput& in, s32 fx, s32 fy, s32& x1, s32& y1, s32& x2, s32& y2, std::vector<std::pair<s32, s32>>* ends = nullptr, std::vector<NavLine>* lines = nullptr, s32 join = 2);
+    // A flying Slig whose track is more than a screen from him and from the cell of the next thing he has to do
+    // (null: nothing): no threat. False where its track isn't found.
+    static bool FlierFar(const NavInput& in, const FlierAt& flier, s32 abeX, s32 abeY, const NavNode* next);
     // The wheels a switch logic entity needs turned at once and the nearest Mudokons that can walk to them. False
     // if it isn't that kind of logic or there aren't enough Mudokons. pre gets what the action needs.
     // Where a rock could be thrown from at something on the floor at (x, y), likeliest first. Nothing is worked

@@ -14,6 +14,8 @@ namespace Bot {
 static const s32 kLightSleeper = 10;
 // The longest he watches Sligs in the background from a cover for their round before going by what he sees
 static const s32 kZWatchMost = 1500;
+// From up pressed under a hoist to hanging from its ledge (measured, AE: ten frames of the crouch, eight in the air)
+static const s32 kHoistToHang = 18;
 
 
 GoToTask::GoToTask(std::string name, std::function<bool(s32 node)> isGoal)
@@ -178,6 +180,156 @@ bool GoToTask::UpBehind(const NavGraph& nav, const World& world, s32 ledge, cons
     return true;
 }
 
+GoToTask::FallerCall GoToTask::Faller(const NavGraph& nav, const World& world, const std::vector<s32>& path, s32 cur, s32 boxX1, s32 boxX2, bool settled, s32& lastLeft, s32 waits)
+{
+    FallerCall call;
+    const NavEdge& first = nav.Edges()[path[0]];
+    const NavNode& here = nav.Nodes()[cur];
+    s32 far = nav.Nodes()[first.mTo].mX;
+    // (as far as the same move goes on: a run is not stopped under it)
+    for (std::size_t k = 1; k < path.size() && k < 6 && nav.Edges()[path[k]].mKind == first.mKind && nav.Edges()[path[k]].mLeft == first.mLeft && (first.mKind == EdgeKind::eWalk || first.mKind == EdgeKind::eRoll); k++)
+    {
+        far = nav.Nodes()[nav.Edges()[path[k]].mTo].mX;
+    }
+    call.mFar = far;
+    // (under one where he stands: nothing is waited for there, whatever else falls on the way. Bonewerkz' path
+    // 3, the lever at 1170 under the crates of 1161: done with it he stood for the crates of the next stretch.)
+    // (under it: his box meets its box, where the game gave its box. It hits what its box meets, and a cell 16
+    // from the 9-wide crates of Bonewerkz' path 3 is clear of them. Within reach of it without one.)
+    const auto over = [&](const RockAt& r, s32 x)
+    {
+        const bool boxed = r.mBoxX2 > r.mBoxX1 && boxX2 > boxX1;
+        return boxed ? (x + (boxX1 - here.mX) - 2 <= r.mBoxX2 && x + (boxX2 - here.mX) + 2 >= r.mBoxX1) : std::abs(x - r.mX) <= (here.mHalf ? 20 : 40);
+    };
+    // (and it comes down as far as the first floor under it: what is under that floor it does not get to. The
+    // crates of 1251 in Bonewerkz' path 3 land on the ledge at 151; the floor at 200 under it is where the hoist
+    // up to that ledge is waited for, and was taken for under them.)
+    const auto lands = [&](const RockAt& r)
+    {
+        s32 fy = 0;
+        return nav.FloorBelow(r.mX, r.mY, r.mHalf, &fy) >= 0 ? fy : 1 << 30;
+    };
+    // (the level he is on, or the one this move takes him up to)
+    const s32 level = std::min(here.mY, nav.Nodes()[first.mTo].mY);
+    for (const RockAt& r : world.mFallers)
+    {
+        call.mUnder = call.mUnder || (r.mFallIn >= 0 && r.mHalf == here.mHalf && r.mY < here.mY - (here.mHalf ? 30 : 60) && over(r, here.mX) && lands(r) >= here.mY - 5);
+    }
+    for (const RockAt& r : world.mFallers)
+    {
+        const s32 reach = here.mHalf ? 20 : 40;
+        if (call.mUnder || r.mFallIn < 0 || r.mHalf != here.mHalf || r.mY >= here.mY - (here.mHalf ? 30 : 60) || here.mY - r.mY > 700 || lands(r) < level - 5 || (over(r, here.mX) && lands(r) >= here.mY - 5) || r.mX < std::min(here.mX, far) - reach || r.mX > std::max(here.mX, far) + reach)
+        {
+            continue;
+        }
+        // (down to his head: 1.8 a frame faster each frame up to 20)
+        // (or to the floor it lands on, where that is over him)
+        const s32 drop = std::max(0, std::min(here.mY - (here.mHalf ? 35 : 70), lands(r)) - r.mY);
+        s32 fall = 0;
+        for (s32 v = 0, d = 0; d < drop; fall++)
+        {
+            v = std::min(20, v + 2);
+            d += v;
+        }
+        // (to past it, or to where he stops if that is under it: then all the way there and what he does there)
+        const bool stops = std::abs(far - r.mX) <= reach;
+        const s32 need = 14 + std::abs((stops ? far : r.mX + (far > here.mX ? reach : -reach)) - here.mX) / 3 + (stops ? 45 : 0) + (first.mKind == EdgeKind::eHoistUp || first.mKind == EdgeKind::eHoistDown ? 30 : 0);
+        // (one that comes round too fast for that ever to be: as it smashes, which is the most there is. "Starting
+        // immediately after a crate hits".)
+        const s32 left = r.mFallIn + fall;
+        const bool smashed = lastLeft >= 0 && left > lastLeft + 10;
+        lastLeft = left;
+        // (or as good as: stood beside it, his box does not meet its box until some frames after he sets off, and
+        // by then it is down. FallingItem::DamageHitItems: what it hits is what its box meets. Those frames are
+        // what the lever under Bonewerkz' 44-frame crates wants: in under it for the pull, the turn and the
+        // first step out is 36 of them, and set off as it smashes he was under it for the next.)
+        // (five frames after it is down, not sooner: his box is wider at a walk than stood. Two after, he was hit.)
+        const s32 gap = r.mX < here.mX ? boxX1 - r.mBoxX2 : r.mBoxX1 - boxX2;
+        const s32 enters = 2 + std::max(0, gap) * 10 / (here.mHalf ? 14 : 28);
+        call.mWhat = &r;
+        call.mLeft = left;
+        call.mNeed = need;
+        call.mEnters = enters;
+        if (waits > 0 && r.mBoxX2 > r.mBoxX1 && gap > 0 && gap <= NavGraph::GridStep(here.mHalf) && first.mKind == EdgeKind::eWalk && settled && left + 5 <= enters)
+        {
+            call.mAllButDown = true;
+            return call;
+        }
+        // (a hoist up from under the floor it lands on, the same: he is 18 frames from pressing up to hanging from
+        // that floor, and under it till then. Hung there four frames after it is down, not later: the pull up is
+        // 24 more, and begun as it smashed he was pulled up into the next one, 44 after. Bonewerkz' path 3, the
+        // hoist at 1248 under the crates of 1251.)
+        if (first.mKind == EdgeKind::eHoistUp && lands(r) < here.mY - 5 && settled && left + 4 <= kHoistToHang && left + 10 >= kHoistToHang)
+        {
+            call.mEnters = kHoistToHang;
+            call.mAllButDown = true;
+            return call;
+        }
+        // (and not as it smashes, there: that is the latest there is)
+        if (smashed && waits > 0 && !(first.mKind == EdgeKind::eHoistUp && lands(r) < here.mY - 5))
+        {
+            call.mSmashed = true;
+            return call;
+        }
+        if (left < need + 8 && waits < 900)
+        {
+            // (waited for from the cell beside where it comes down, not from where he first sees it: "stand
+            // beside the crate impact point ... starting immediately after a crate hits". From two cells off
+            // he was a frame or two late out from under the crates of Bonewerkz' path 3.)
+            call.mKind = FallerCall::eWait;
+            if (first.mKind == EdgeKind::eWalk && settled)
+            {
+                s32 beside = here.mX;
+                for (std::size_t k = 0; k < path.size() && k < 6 && nav.Edges()[path[k]].mKind == EdgeKind::eWalk && nav.Edges()[path[k]].mLeft == first.mLeft; k++)
+                {
+                    const s32 x = nav.Nodes()[nav.Edges()[path[k]].mTo].mX;
+                    if (over(r, x) || (r.mBoxX2 <= r.mBoxX1 && std::abs(x - r.mX) <= reach + 1))
+                    {
+                        break;
+                    }
+                    beside = x;
+                }
+                if (beside != here.mX)
+                {
+                    call.mKind = FallerCall::eBeside;
+                    call.mBeside = beside;
+                }
+            }
+            return call;
+        }
+    }
+    call.mWhat = nullptr;
+    return call;
+}
+
+bool GoToTask::ZShooterAbout(const NavGraph& nav, const World& world, s32 x, s32 y)
+{
+    const s32 cam = nav.CameraOf(x, y - 5);
+    bool any = false;
+    for (const SligAt& slig : world.mSligs)
+    {
+        // (not one asleep: it shoots nobody. Bonewerkz' path 2: fifteen hundred frames in a cover watching two
+        // Sligs sleep.)
+        any = any || (slig.mZShoot && !slig.mPossessed && !slig.mAsleep && nav.CameraOf(slig.mX, slig.mY - 5) == cam);
+    }
+    return any;
+}
+
+bool GoToTask::HopOnBack(bool faces, s32 frame, s32& faced)
+{
+    if (faces)
+    {
+        faced = frame;
+    }
+    // (not while it faces him, nor on a back it has had turned for a while already)
+    return !(faces || faced < 0 || frame - faced > 8);
+}
+
+bool ClearSligTask::ShotReaches(const NavGraph& nav, const SligAt& me, s32 targetX)
+{
+    return nav.CameraOf(me.mX, me.mY - 5) == nav.CameraOf(targetX, me.mY - 5);
+}
+
 bool GoToTask::ZWatched(Bot& bot, const NavGraph& nav, const std::vector<s32>& path, s32 cur, TaskStep& step)
 {
     const AbeState& abe = bot.Abe();
@@ -187,13 +339,7 @@ bool GoToTask::ZWatched(Bot& bot, const NavGraph& nav, const std::vector<s32>& p
         return false;
     }
     const s32 cam = nav.CameraOf(here.mX, here.mY - 5);
-    bool any = false;
-    for (const SligAt& slig : bot.GetWorld().mSligs)
-    {
-        // (not one asleep: it shoots nobody. Bonewerkz' path 2: fifteen hundred frames in a cover watching two
-        // Sligs sleep.)
-        any = any || (slig.mZShoot && !slig.mPossessed && !slig.mAsleep && nav.CameraOf(slig.mX, slig.mY - 5) == cam);
-    }
+    bool any = ZShooterAbout(nav, bot.GetWorld(), here.mX, here.mY);
     // (with a bone out for Slogs they are not waited for: it is eaten in less time than that. What it was
     // thrown for was timed by them before it was thrown, FeedSlogsTask.)
     // (on the Slogs' own floor, that is: over it he still has the time)
@@ -2274,90 +2420,28 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     // falling crates", "After a crate hits, hoist up".)
     if (bot.IsAe())
     {
-        const NavNode& here = nav.Nodes()[cur];
-        s32 far = nav.Nodes()[first.mTo].mX;
-        // (as far as the same move goes on: a run is not stopped under it)
-        for (std::size_t k = 1; k < path.size() && k < 6 && nav.Edges()[path[k]].mKind == first.mKind && nav.Edges()[path[k]].mLeft == first.mLeft && (first.mKind == EdgeKind::eWalk || first.mKind == EdgeKind::eRoll); k++)
+        const FallerCall call = Faller(nav, bot.GetWorld(), path, cur, abe.mBoxX1, abe.mBoxX2, abe.Settled(), mFallerLeft, mFallerWaits);
+        mFallerUnder = call.mUnder;
+        if (call.mKind == FallerCall::eBeside)
         {
-            far = nav.Nodes()[nav.Edges()[path[k]].mTo].mX;
+            return TaskStep::Do(Prim::MoveTo(call.mBeside, Gait::eWalk));
         }
-        // (under one where he stands: nothing is waited for there, whatever else falls on the way. Bonewerkz' path
-        // 3, the lever at 1170 under the crates of 1161: done with it he stood for the crates of the next stretch.)
-        bool under = false;
-        for (const RockAt& r : bot.GetWorld().mFallers)
+        if (call.mKind == FallerCall::eWait)
         {
-            under = under || (r.mFallIn >= 0 && r.mHalf == here.mHalf && r.mY < here.mY - (here.mHalf ? 30 : 60) && std::abs(r.mX - here.mX) <= (here.mHalf ? 20 : 40));
+            if (mFallerWaits++ == 0)
+            {
+                bot.Log("a thing that falls at " + std::to_string(call.mWhat->mX) + " over the way to " + std::to_string(call.mFar) + " (down in " + std::to_string(call.mLeft) + ", " + std::to_string(call.mNeed) + " wanted, its box " + std::to_string(call.mWhat->mBoxX1) + ".." + std::to_string(call.mWhat->mBoxX2) + ", his " + std::to_string(abe.mBoxX1) + ".." + std::to_string(abe.mBoxX2) + "): waiting for it to have smashed");
+            }
+            mSteps--;
+            return TaskStep::Do(Prim::Wait(1));
         }
-        mFallerUnder = under;
-        for (const RockAt& r : bot.GetWorld().mFallers)
+        if (call.mAllButDown)
         {
-            const s32 reach = here.mHalf ? 20 : 40;
-            if (under || r.mFallIn < 0 || r.mHalf != here.mHalf || r.mY >= here.mY - (here.mHalf ? 30 : 60) || here.mY - r.mY > 700 || std::abs(r.mX - here.mX) <= reach || r.mX < std::min(here.mX, far) - reach || r.mX > std::max(here.mX, far) + reach)
-            {
-                continue;
-            }
-            // (down to his head: 1.8 a frame faster each frame up to 20)
-            const s32 drop = std::max(0, here.mY - (here.mHalf ? 35 : 70) - r.mY);
-            s32 fall = 0;
-            for (s32 v = 0, d = 0; d < drop; fall++)
-            {
-                v = std::min(20, v + 2);
-                d += v;
-            }
-            // (to past it, or to where he stops if that is under it: then all the way there and what he does there)
-            const bool stops = std::abs(far - r.mX) <= reach;
-            const s32 need = 14 + std::abs((stops ? far : r.mX + (far > here.mX ? reach : -reach)) - here.mX) / 3 + (stops ? 45 : 0) + (first.mKind == EdgeKind::eHoistUp || first.mKind == EdgeKind::eHoistDown ? 30 : 0);
-            // (one that comes round too fast for that ever to be: as it smashes, which is the most there is. "Starting
-            // immediately after a crate hits".)
-            const s32 left = r.mFallIn + fall;
-            const bool smashed = mFallerLeft >= 0 && left > mFallerLeft + 10;
-            mFallerLeft = left;
-            // (or as good as: stood beside it, his box does not meet its box until some frames after he sets off, and
-            // by then it is down. FallingItem::DamageHitItems: what it hits is what its box meets. Those frames are
-            // what the lever under Bonewerkz' 44-frame crates wants: in under it for the pull, the turn and the
-            // first step out is 36 of them, and set off as it smashes he was under it for the next.)
-            // (five frames after it is down, not sooner: his box is wider at a walk than stood. Two after, he was hit.)
-            const s32 gap = r.mX < here.mX ? abe.mBoxX1 - r.mBoxX2 : r.mBoxX1 - abe.mBoxX2;
-            const s32 enters = 2 + std::max(0, gap) * 10 / (here.mHalf ? 14 : 28);
-            if (mFallerWaits > 0 && r.mBoxX2 > r.mBoxX1 && gap > 0 && gap <= NavGraph::GridStep(here.mHalf) && first.mKind == EdgeKind::eWalk && abe.Settled() && left + 5 <= enters)
-            {
-                bot.Log("it is all but down (in " + std::to_string(left) + ", and he is under it in " + std::to_string(enters) + "): now");
-                break;
-            }
-            if (smashed && mFallerWaits > 0)
-            {
-                bot.Log("it has smashed: now, with " + std::to_string(left) + " frames of the " + std::to_string(need) + " wanted");
-                break;
-            }
-            if (left < need + 8 && mFallerWaits < 900)
-            {
-                // (waited for from the cell beside where it comes down, not from where he first sees it: "stand
-                // beside the crate impact point ... starting immediately after a crate hits". From two cells off
-                // he was a frame or two late out from under the crates of Bonewerkz' path 3.)
-                if (first.mKind == EdgeKind::eWalk && abe.Settled())
-                {
-                    s32 beside = here.mX;
-                    for (std::size_t k = 0; k < path.size() && k < 6 && nav.Edges()[path[k]].mKind == EdgeKind::eWalk && nav.Edges()[path[k]].mLeft == first.mLeft; k++)
-                    {
-                        const s32 x = nav.Nodes()[nav.Edges()[path[k]].mTo].mX;
-                        if (std::abs(x - r.mX) <= reach + 1)
-                        {
-                            break;
-                        }
-                        beside = x;
-                    }
-                    if (beside != here.mX)
-                    {
-                        return TaskStep::Do(Prim::MoveTo(beside, Gait::eWalk));
-                    }
-                }
-                if (mFallerWaits++ == 0)
-                {
-                    bot.Log("a thing that falls at " + std::to_string(r.mX) + " over the way to " + std::to_string(far) + " (down in " + std::to_string(r.mFallIn + fall) + ", " + std::to_string(need) + " wanted, its box " + std::to_string(r.mBoxX1) + ".." + std::to_string(r.mBoxX2) + ", his " + std::to_string(abe.mBoxX1) + ".." + std::to_string(abe.mBoxX2) + "): waiting for it to have smashed");
-                }
-                mSteps--;
-                return TaskStep::Do(Prim::Wait(1));
-            }
+            bot.Log("it is all but down (in " + std::to_string(call.mLeft) + ", and he is under it in " + std::to_string(call.mEnters) + "): now");
+        }
+        else if (call.mSmashed)
+        {
+            bot.Log("it has smashed: now, with " + std::to_string(call.mLeft) + " frames of the " + std::to_string(call.mNeed) + " wanted");
         }
         mFallerWaits = 0;
         mFallerLeft = -1;
@@ -3582,6 +3666,12 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             }
             mLastEdge = path[0];
             Prim fall = Prim::WalkOff(first.mLeft);
+            // (off it at a run from under a thing that falls: the turn into the run and gone, where the turn and
+            // a walk to the edge is under the next one. Bonewerkz' path 3, down off the ledge under the crates.)
+            if (mFallerUnder && bot.IsAe() && !first.mCrouched)
+            {
+                fall.mRunOff = 1;
+            }
             fall.mAfter = LandingBits(bot, nav, path);
             return TaskStep::Do(fall);
         }
@@ -3605,13 +3695,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     {
                         continue;
                     }
-                    const bool faces = slig.mFacingLeft == (to.mX < slig.mX);
-                    if (faces)
-                    {
-                        mHopFaced = static_cast<s32>(abe.mFrame);
-                    }
-                    // (not while it faces him, nor on a back it has had turned for a while already)
-                    wait = wait || faces || mHopFaced < 0 || static_cast<s32>(abe.mFrame) - mHopFaced > 8;
+                    wait = !HopOnBack(slig.mFacingLeft == (to.mX < slig.mX), static_cast<s32>(abe.mFrame), mHopFaced) || wait;
                 }
                 if (wait)
                 {
@@ -8004,7 +8088,7 @@ TaskStep ClearSligTask::RaidStep(Bot& bot, const SligAt& me)
     {
         // (a shot goes as far as the edge of the screen shown, Bullet.cpp: onto the screen of what it is for first.
         // Bonewerkz' fourth annex: twenty-four hundred frames of shots at two Sligs a screen on.)
-        if (nav.CameraOf(me.mX, me.mY - 5) != nav.CameraOf(targetX, me.mY - 5))
+        if (!ShotReaches(nav, me, targetX))
         {
             return TaskStep::Do(Prim::Wait(4, targetX < me.mX ? Btn::eLeft : Btn::eRight));
         }
