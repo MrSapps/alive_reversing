@@ -2254,6 +2254,50 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             }
         }
     }
+    // AE: a thing that comes down from the ceiling over and over, on the stretch he is about to go along (FallingItem:
+    // its interval, then down at up to 20 pixels a frame, and it kills what it meets on the way). Gone under when
+    // he is past it before it is down to his head: just after it has smashed there is the most of that. Where he
+    // is under it already he goes on. (Bonewerkz, path 1: "Hop across the first gap, then the second between
+    // falling crates", "After a crate hits, hoist up".)
+    if (bot.IsAe())
+    {
+        const NavNode& here = nav.Nodes()[cur];
+        s32 far = nav.Nodes()[first.mTo].mX;
+        // (as far as the same move goes on: a run is not stopped under it)
+        for (std::size_t k = 1; k < path.size() && k < 6 && nav.Edges()[path[k]].mKind == first.mKind && nav.Edges()[path[k]].mLeft == first.mLeft && (first.mKind == EdgeKind::eWalk || first.mKind == EdgeKind::eRoll); k++)
+        {
+            far = nav.Nodes()[nav.Edges()[path[k]].mTo].mX;
+        }
+        for (const RockAt& r : bot.GetWorld().mFallers)
+        {
+            const s32 reach = here.mHalf ? 20 : 40;
+            if (r.mFallIn < 0 || r.mHalf != here.mHalf || r.mY >= here.mY - 60 || here.mY - r.mY > 700 || std::abs(r.mX - here.mX) <= reach || r.mX < std::min(here.mX, far) - reach || r.mX > std::max(here.mX, far) + reach)
+            {
+                continue;
+            }
+            // (down to his head: 1.8 a frame faster each frame up to 20)
+            const s32 drop = std::max(0, here.mY - 70 - r.mY);
+            s32 fall = 0;
+            for (s32 v = 0, d = 0; d < drop; fall++)
+            {
+                v = std::min(20, v + 2);
+                d += v;
+            }
+            // (to past it, or to where he stops if that is under it: then all the way there and what he does there)
+            const bool stops = std::abs(far - r.mX) <= reach;
+            const s32 need = 14 + std::abs((stops ? far : r.mX + (far > here.mX ? reach : -reach)) - here.mX) / 3 + (stops ? 45 : 0) + (first.mKind == EdgeKind::eHoistUp || first.mKind == EdgeKind::eHoistDown ? 30 : 0);
+            if (r.mFallIn + fall < need + 8 && mFallerWaits < 900)
+            {
+                if (mFallerWaits++ == 0)
+                {
+                    bot.Log("a thing that falls at " + std::to_string(r.mX) + " over the way to " + std::to_string(far) + " (down in " + std::to_string(r.mFallIn + fall) + ", " + std::to_string(need) + " wanted): waiting for it to have smashed");
+                }
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+        }
+        mFallerWaits = 0;
+    }
     // (AO: he doesn't roll out towards a Slig in the background that faces him or is turning, or to nearer than a
     // cell and a half behind one: see the walk below)
     if (first.mKind == EdgeKind::eRoll && !bot.IsAe())
@@ -3388,6 +3432,38 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             if (abe.mFacingLeft != first.mLeft)
             {
                 return TaskStep::Do(Prim::Face(first.mLeft));
+            }
+            // Down to the level of a Slig that stands on that screen and looks one way and the other: as it turns
+            // its back to where he lands, which is when it is longest before it looks that way again. (It hears
+            // him land: what comes next is to be done at once. Bonewerkz' path 1: "hop from directly over the
+            // lever to the middle of the lift when the Slig faces left, and immediately go down".)
+            if (nav.Input().mIsAe && !bot.GetWorld().mInvisible && nav.Nodes()[first.mTo].mY > nav.Nodes()[cur].mY + 30 && !nav.Nodes()[first.mTo].mHidden && mHopWaits < 600)
+            {
+                const NavNode& to = nav.Nodes()[first.mTo];
+                bool wait = false;
+                for (const SligAt& slig : bot.GetWorld().mSligs)
+                {
+                    if (slig.mAsleep || slig.mPossessed || slig.mHalf != to.mHalf || std::abs(slig.mY - to.mY) > 10 || std::abs(slig.mX - to.mX) > 350 || nav.CameraOf(slig.mX, slig.mY - 5) != nav.CameraOf(to.mX, to.mY - 5))
+                    {
+                        continue;
+                    }
+                    const bool faces = slig.mFacingLeft == (to.mX < slig.mX);
+                    if (faces)
+                    {
+                        mHopFaced = static_cast<s32>(abe.mFrame);
+                    }
+                    // (not while it faces him, nor on a back it has had turned for a while already)
+                    wait = wait || faces || mHopFaced < 0 || static_cast<s32>(abe.mFrame) - mHopFaced > 8;
+                }
+                if (wait)
+                {
+                    if (mHopWaits++ == 0)
+                    {
+                        bot.Log("a Slig stands on the level he hops down to at " + std::to_string(to.mX) + "," + std::to_string(to.mY) + ": as it turns its back");
+                    }
+                    mSteps--;
+                    return TaskStep::Do(Prim::Wait(1));
+                }
             }
             mLastEdge = path[0];
             return TaskStep::Do(Prim::Press(Btn::eHop));

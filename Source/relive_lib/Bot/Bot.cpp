@@ -1692,7 +1692,10 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
             }
         }
         // A running jump up a hoist: the way to go with a Scrab on his floor after him, and not otherwise
-        if (e.mKind == EdgeKind::eRunJump && e.mFeature >= 0 && know->mNav.Input().mFeatures[e.mFeature].mKind == FeatureKind::eHoist)
+        // (not the one from a stand, NavGraph::kStandJumpCost: that is for getting off a Slig's floor, MakeFlee,
+        // and stays dear here. Made cheap with a Scrab about it had him up the ledge of the Scrab trial's last
+        // screen a different way, and the wait for the Scrab that follows was worked out for the old one.)
+        if (e.mKind == EdgeKind::eRunJump && e.mCost != NavGraph::kStandJumpCost && e.mFeature >= 0 && know->mNav.Input().mFeatures[e.mFeature].mKind == FeatureKind::eHoist)
         {
             // (and through something that shuts by itself: the jump and the pull up are some 40 frames, the
             // stop under the hoist and the climb twice that)
@@ -1896,6 +1899,13 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
                     continue;
                 }
                 const s32 off = std::abs(slig.mX - to.mX) * scale;
+                // (a hop down beside one that looks one way and the other is timed to its turn where it
+                // is made, GoToTask: which way it looks now is no matter here, and a way that is there or not by
+                // that has him walk to and fro between two ways)
+                if (e.mKind == EdgeKind::eHop && know->mNav.Input().mIsAe && !slig.mAsleep)
+                {
+                    continue;
+                }
                 if (!slig.mAsleep && off < 250 && (to.mX < slig.mX) == slig.mFacingLeft)
                 {
                     return -1;
@@ -3260,9 +3270,26 @@ std::unique_ptr<Task> Bot::MakeFlee()
             {
                 return e.mKind == EdgeKind::eFall && !e.mHung && e.mWell < 0;
             };
-            const NavGraph::EdgeCost quickOnly = [&all, doors, &drop](const NavEdge& e) -> s32
+            // (and a running jump up a hoist, which is quicker than the hoist: twenty frames from a stand three cells
+            // from it. Bonewerkz' path 1: the Slig his landing wakes, and "run and jump to the middle platform".)
+            const auto leap = [&nav](const NavEdge& e)
             {
-                return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eWell || e.mKind == EdgeKind::eHoistUp || drop(e) || (doors && e.mKind == EdgeKind::eDoor) ? all(e) : -1;
+                return e.mKind == EdgeKind::eRunJump && e.mFeature >= 0 && nav.Input().mFeatures[e.mFeature].mKind == FeatureKind::eHoist;
+            };
+            const NavGraph::EdgeCost quickOnly = [&all, doors, &drop, &leap](const NavEdge& e) -> s32
+            {
+                if (leap(e))
+                {
+                    return all(e) < 0 ? -1 : 20;
+                }
+                // (a lift he stands on is the quickest of all: it takes him off the floor as he stands)
+                if (e.mKind == EdgeKind::eLift)
+                {
+                    return all(e) < 0 ? -1 : 10;
+                }
+                // (and a lift he stands on: it takes him off the floor as he stands. "Hop ... to the middle of the lift when
+                // the Slig faces left, and immediately go down.")
+                return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eWell || e.mKind == EdgeKind::eHoistUp || e.mKind == EdgeKind::eLift || drop(e) || (doors && e.mKind == EdgeKind::eDoor) ? all(e) : -1;
             };
             // (cells are half as long at half scale)
             const std::size_t most = mAbe.mHalfScale ? 24 : 12;
@@ -3280,7 +3307,7 @@ std::unique_ptr<Task> Bot::MakeFlee()
                 for (s32 edge : way)
                 {
                     const EdgeKind kind = nav.Edges()[edge].mKind;
-                    quick = quick && (kind == EdgeKind::eWalk || kind == EdgeKind::eWell || kind == EdgeKind::eHoistUp || drop(nav.Edges()[edge]) || (doors && kind == EdgeKind::eDoor));
+                    quick = quick && (kind == EdgeKind::eWalk || kind == EdgeKind::eWell || kind == EdgeKind::eHoistUp || kind == EdgeKind::eLift || drop(nav.Edges()[edge]) || leap(nav.Edges()[edge]) || (doors && kind == EdgeKind::eDoor));
                 }
                 if (quick)
                 {

@@ -389,6 +389,9 @@ struct RockAt final
     s32 mMotion = 0;
     // A bone: on the screen shown (Slog::FindBone: the only bones a Slog goes for)
     bool mShown = false;
+    // A thing that comes down from the ceiling over and over (AE's FallingItem): the frames until it next starts
+    // down (0: on its way; -1: not known, or not set to)
+    s32 mFallIn = -1;
 };
 
 // A Glukkon that is about
