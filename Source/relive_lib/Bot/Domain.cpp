@@ -2508,7 +2508,18 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         const s32 beatTo = SligBeat(nav, world, e.mTo);
         // (only that counts: among ways that are alike in it the first stays the one, as it always was. With
         // the cheapest by frames the Mudanchee trial went from no deaths to twenty-two.)
-        const s32 cost = beatTo >= 0 && beatTo != SligBeat(nav, world, e.mFrom) ? 1 : 0;
+        // (nor one that starts from where a Slig that is awake stands on his level: the other way to the same
+        // place is the one, where there is one. Bonewerkz' path 1: onto the lift by the hop from the platform, not
+        // along the floor past the Slig.)
+        bool beside = false;
+        for (const SligAt& slig : world.mSligs)
+        {
+            const NavNode& at = nav.Nodes()[e.mFrom];
+            beside = beside || (!slig.mAsleep && !slig.mPossessed && slig.mHalf == at.mHalf && std::abs(slig.mY - at.mY) <= 10 && std::abs(slig.mX - at.mX) <= 200);
+        }
+        // (and of two that are alike the one that ends on a lift's platform where it is worked from)
+        // (what was told apart before stays first: the rest only decides between ways that were alike)
+        const s32 cost = (beatTo >= 0 && beatTo != SligBeat(nav, world, e.mFrom) ? 100 : 0) + (beside ? 4 : 0) + (e.mKind == EdgeKind::eHop && nav.Nodes()[e.mTo].mLiftStop < 0 ? 1 : 0) + (e.mKind == EdgeKind::eRunJump && e.mCost == NavGraph::kStandJumpCost ? 50 : 0);
         const auto key = std::make_tuple(rf, rt, barrier ? e.mFeature : -1);
         const auto found = cheapest.find(key);
         if (found == cheapest.end() || cost < found->second.first)

@@ -887,6 +887,35 @@ void NavGraph::AddRunJumps(std::vector<NavEdge>& edges, s32 from, s32 dir, bool 
 {
     const NavNode& n = mNodes[from];
     const s32 step = GridStep(n.mHalf);
+    // Up a hoist three cells on from a stand: with run held he runs at once, and the jump within the first six
+    // frames catches the ledge. From here whether or not there are cells behind him to run up in (the jumps below
+    // want those, and under a low ceiling or by a wall there are none). Measured in Bonewerkz' path 1: from
+    // 1187,980 on the platform at 1262,900 twenty frames on. (The walkthrough: "sneak to the floor then run and
+    // jump to the middle platform".)
+    // (only where the floor goes on behind him and is no run-up: under a low ceiling, past a wall. At a floor's
+    // end it is as true, and is left out for now: the Fleech rooms' lures are worked out on graphs without it.)
+    bool backed = false;
+    for (s32 k = 1; k <= 2 && !backed; k++)
+    {
+        const s32 bx = n.mX - dir * k * step;
+        const s32 behind = NodeOnLine(n.mLine, bx);
+        backed = behind >= 0 && std::abs(mNodes[behind].mX - bx) <= step / 2 && (mNodes[behind].mLow || mNodes[behind].mHazard || WallBetween(bx, bx + dir * step, n.mY, n.mHalf));
+    }
+    if (!overLift && backed)
+    {
+        const s32 hx = n.mX + dir * 3 * step;
+        s32 hoistIdx = -1;
+        const NavFeature* hoist = FeatureAt(FeatureKind::eHoist, hx, n.mY - 10, n.mHalf, &hoistIdx);
+        if (hoist && (hoist->mDir == 2 || (hoist->mDir == 0) == (dir < 0)) && !WallBetween(n.mX, hx, n.mY, n.mHalf) && BarrierBetween(n.mX, hx, n.mY, n.mHalf) < 0)
+        {
+            const s32 top = NodeAt(hx, hoist->mY1, n.mHalf, 12);
+            if (top >= 0 && (n.mY - mNodes[top].mY) * (n.mHalf ? 2 : 1) <= 130)
+            {
+                AddEdge(edges, from, top, EdgeKind::eRunJump, NavGraph::kStandJumpCost, hoistIdx, dir < 0);
+                edges.back().mX = n.mX + dir * step;
+            }
+        }
+    }
     // Room to get up to speed: the cells to the take-off are plain floor
     s32 x = n.mX;
     for (s32 k = 0; k < kRunUpCells; k++)
@@ -1582,6 +1611,15 @@ void NavGraph::Build(const NavInput& input)
                             AddEdge(edges, from, to, EdgeKind::eHop, kHopCost + 10, -1, left);
                             // (the well he falls into, if it is one)
                             edges.back().mWell = well;
+                            // (and from a cell back, to come down a cell nearer: the hop is over the end of his own
+                            // floor before it drops. Bonewerkz' path 1: "hop from directly over the lever to the
+                            // middle of the lift".)
+                            const s32 back = NodeOnLine(n.mLine, n.mX - dir * step);
+                            const s32 nearer = NodeOnLine(mNodes[to].mLine, mNodes[to].mX - dir * step);
+                            if (well < 0 && back >= 0 && nearer >= 0 && std::abs(mNodes[back].mX - (n.mX - dir * step)) <= step / 2 && std::abs(mNodes[nearer].mX - (mNodes[to].mX - dir * step)) <= step / 2 && !mNodes[back].mHazard && !mNodes[back].mLow && !mNodes[nearer].mHazard && !mNodes[nearer].mLow && mNodes[nearer].mLiftStop >= 0)
+                            {
+                                AddEdge(edges, back, nearer, EdgeKind::eHop, kHopCost + 10, -1, left);
+                            }
                         }
                         break;
                     }

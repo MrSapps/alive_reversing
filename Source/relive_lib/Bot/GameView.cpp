@@ -14,6 +14,7 @@
 #include "../../AliveLibAE/Input.hpp"
 #include "../../AliveLibAO/Abe.hpp"
 #include "../../AliveLibAO/FallingItem.hpp"
+#include "../../AliveLibAE/FallingItem.hpp"
 #include "../../AliveLibAO/Slig.hpp"
 #include "../../AliveLibAE/Mudokon.hpp"
 #include "../../AliveLibAE/UXB.hpp"
@@ -2047,6 +2048,14 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             faller.mHalf = pObj->GetSpriteScale() != FP_FromInteger(1);
             // (AO's: on its way down, or set off and waiting out its delay, state 2)
             faller.mChasing = pObj->mVelY > FP_FromInteger(0) || (!isAe && static_cast<s32>(static_cast<AO::FallingItem*>(pObj)->mState) == 2);
+            if (isAe)
+            {
+                // (FallingItem.cpp: it waits for its switch, then its interval, then falls, and starts over)
+                const ::FallingItem* item = static_cast<const ::FallingItem*>(pObj);
+                const s32 state = static_cast<s32>(item->mState);
+                faller.mChasing = state == 3;
+                faller.mFallIn = state == 3 ? 0 : state == 2 ? std::max(0, item->mFallIntervalTimer - static_cast<s32>(sGnFrame)) : state == 4 || (item->mSwitchId != 0 && SwitchStates_Get(item->mSwitchId)) ? item->mFallInterval : -1;
+            }
             world.mFallers.push_back(faller);
         }
         if (pObj && !pObj->GetDead() && isAe && pObj->Type() == ReliveTypes::eBone && pObj->GetAnimation().GetRender())

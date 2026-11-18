@@ -261,6 +261,10 @@ public:
     // The cell centre one step left (dir -1) or right (1) of a cell: AO skips the gap between two cameras
     s32 StepX(s32 x, s32 dir, bool half) const;
     s32 FloorNear(s32 x, s32 y, bool half, s32 tolerance, s32* floorY) const;
+    // What a running jump up a hoist from a stand costs (AddRunJumps): one more than the others of its kind, by
+    // which it is told from them. It is a way of getting off a floor in a hurry, and not the crossing a plan
+    // names where there is another (Domain).
+    static const s32 kStandJumpCost = 401;
     s32 CameraOf(s32 x, s32 y) const;
     // His box (from x + lo to x + hi, `tall` up from the floor at y) is wholly inside a Z cover
     bool ZCovered(s32 x, s32 y, s32 lo, s32 hi, s32 tall) const;

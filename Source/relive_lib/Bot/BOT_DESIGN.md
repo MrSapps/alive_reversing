@@ -2504,5 +2504,29 @@ What is built on that:
 
 Owed: unit tests for all of the above. Not re-run on this: `b14.txt`, `wr.txt`, `blk9t.txt`, `blk10.txt`.
 
-Next: Bonewerkz path 1. He dies under the falling crates (lever 1002 at 962,459; the hop 987,980->1062,980): AE's
-FallingItem is periodic (fall interval, then down at up to 20 px a frame), and only AO's is waited for so far.
+## Bonewerkz, path 1 (2026-11-18): done, into path 7 where the Annexes start
+
+FeeCo lobby -> path 9 -> Terminal 4 -> Bonewerkz path 1 -> path 7 with 0 deaths (`build-bot/la/fc3.txt`; path 1 alone:
+`bw1.txt`). What it took:
+
+- AE's falling things (FallingItem: its switch, its interval, then down at up to 20 px a frame, over and over):
+  `RockAt::mFallIn`, and `GoToTask` goes under one only when he is past before it is down to his head, which is just
+  after it has smashed. AO's were waited for already.
+- A running jump up a hoist three cells on from a stand (measured: from 1187,980 on the platform at 1262,900 twenty
+  frames on). `NavGraph::AddRunJumps` adds it where the floor goes on behind him but is no run-up (low, hazard, a
+  wall): cost `kStandJumpCost`. It is cheap only as a way off the floor of a Slig that woke (`Bot::MakeFlee`), is not
+  made cheap by a Scrab or a timed run, and is not the crossing a plan names where there is another. Each of
+  those was a regression first: the Fleech rooms' tests, the Scrab trial (tr1), Terminal 4.
+- A hop down to the level of a Slig that looks one way and the other: made as it turns its back (`GoToTask`, eHop);
+  which way it looks is no longer what shuts that hop in `EdgeCostFn` (it had him walk to and fro between two ways).
+- The hop from a cell back that comes down a cell nearer, onto a lift's stop; a lift he stands on is a way off a
+  Slig's floor; of crossings that were alike the plan names the one that does not start beside a Slig that is
+  awake, and of hops the one that ends on a lift's stop.
+
+Owed: unit tests for all of this and for the Slog rules above. Not re-run on this: `b14.txt`, `wr.txt`, `blk9t.txt`,
+`blk10.txt`.
+
+Next: path 7 (Annex 1). Two levers on a MultiSwitchController that counts them only when both are on within its
+delay (it sets them back otherwise); alone he is ~100 frames between them. The game's way: a Mudokon that listens
+pulls a lever a cell from it at "Work" (Mudokon.cpp, Brain_ListeningToAbe_State_11). `WorkTogetherTask` does this for
+wheels, where following Mudokons stop by themselves; at a lever one has to be put on the cell and told to wait.
