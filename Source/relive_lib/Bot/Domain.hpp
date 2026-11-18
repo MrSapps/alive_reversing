@@ -514,7 +514,9 @@ struct Domain final
     // A bone thrown from a cell so that it first comes down on the stretch x1..x2 of the floor at floorY, with room
     // to skip on: the throw (twice its kind, and one more for to the left), the frames it is in the air, and where
     // it comes down. The soonest of the throws there are; false if none.
-    static bool BoneThrow(const NavGraph& nav, s32 node, s32 x1, s32 x2, s32 floorY, u32& aim, s32& frames, s32* downX = nullptr, const std::function<bool(s32 downX)>& wanted = nullptr);
+    // otherScreen: down on a screen that is not the one he throws from is as good (for Slogs that wait behind
+    // something and find the bone when he comes onto their screen)
+    static bool BoneThrow(const NavGraph& nav, s32 node, s32 x1, s32 x2, s32 floorY, u32& aim, s32& frames, s32* downX = nullptr, const std::function<bool(s32 downX)>& wanted = nullptr, bool otherScreen = false);
     static std::vector<ThrowSpot> ThrowSpots(const NavGraph& nav, s32 x, s32 y, bool half, const World* world = nullptr);
     static bool PlanTogether(const NavGraph& nav, const World& world, const Entity& logic, Team& team, std::vector<Goap::Fact>& pre);
     // Weighs a detour into a path: entryNode is where Abe comes in, leadsOn says which of its exits are a way on
