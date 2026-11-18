@@ -1512,6 +1512,16 @@ void NavGraph::Build(const NavInput& input)
                             {
                                 continue;
                             }
+                            // (nor is one caught that he has dropped below by the time he is at it, where its
+                            // floor has a wall for a face: he comes up against the wall under it and goes on down.
+                            // Bonewerkz' path 3, from 1972,379 at the ledge of the floor at 380 that ends at 1927,
+                            // across the left lift's shaft: 16 down by 1931, and down the shaft.)
+                            const s32 feet = n.mY + dropped / (n.mHalf ? 2 : 1);
+                            const s32 face = dir > 0 ? f.mX1 : f.mX2;
+                            if (dropped > 0 && feet > f.mY1 + 4 && WallBetween(face - dir * step / 2, face + dir * step / 2, feet, n.mHalf, 1))
+                            {
+                                continue;
+                            }
                             const s32 to = NodeAt(x, f.mY1, n.mHalf, 12);
                             if (to >= 0)
                             {

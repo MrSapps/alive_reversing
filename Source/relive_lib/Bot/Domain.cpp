@@ -866,7 +866,11 @@ std::vector<ThrowSpot> Domain::ThrowSpots(const NavGraph& nav, s32 x, s32 y, boo
             }
             for (const NavNode& other : nav.Nodes())
             {
-                if (other.mClear < 0 || other.mHalf != half || (other.mX == mineX && other.mY == mineY))
+                // (nor another cell of the same mine: at half scale a mine is over two cells, and the rock that
+                // gets to the nearer of them first has got to the mine. Bonewerkz' path 3: the one at 2584,91 was to
+                // be gone before it could be thrown at, and there was no way out of the path.)
+                if (other.mClear < 0 || other.mHalf != half || (other.mX == mineX && other.mY == mineY) ||
+                    (mineNode >= 0 && nav.Nodes()[mineNode].mClear >= 0 && nav.Input().mFeatures[other.mClear].mSwitch == nav.Input().mFeatures[nav.Nodes()[mineNode].mClear].mSwitch))
                 {
                     continue;
                 }
