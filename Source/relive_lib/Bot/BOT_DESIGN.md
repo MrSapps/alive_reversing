@@ -2566,3 +2566,20 @@ not shut: the Barracks' trophy room has such walls and no way to turn them on. U
 test yet: the falling things' timing, the hop as a Slig turns its back, the bone's roll, the draw-out and
 throw-away actions. Barracks re-run on this: b14 0 deaths, wr 0, blk9t 0, blk10 2 deaths (the workers' mine hop,
 and a grenade at Slig#1017 at f=19982 not looked at) and not stuck.
+
+### Annex 1, past the gate (2026-11-18): to the ledge at 2412
+
+- A Slog the map puts asleep that wakes at the first noise (its TLV's wake-up anger 2 or less;
+  `World::mSlogsAsleepAt`): its screen is crossed at a sneak, three cells at a time with a look between (what is on
+  the next screen is not seen from this one). Heavier sleepers are run past as before: the Mines and the trials.
+  That three-cell rule is for a sneak on a Slog's account only: put on every sneak it broke m1 and tr1.
+- Slurgs on the way of such a sneak: to the cell short of the first, and from there a run. (The level: five
+  Slurgs whose switch 109 is the Slog's anger switch. The chase is not to be had out of.)
+- `Bot::SlogRefuge`: a running jump that catches the ledge over a hoist, away from the Slog, is a way off its
+  floor. He is on the ledge at 2412,1141 with the Slog some 150 behind.
+
+Open (33 deaths in `bw7.txt`, all here): on that ledge the plan goes on and he climbs down to the Slog. The guide:
+"Hit the bone sack, pick up the bone and throw it so that the Slog gets crushed by the falling boxes" (the sack at
+2450,1061 over the ledge, one bone; the falling thing at 2525, interval 15). Wanted: the floor under a Slog that
+is after him shut to coming down onto it whether or not that Slog has a pen (this one slept, and has no entity);
+and an action that baits a Slog under a falling thing. Not under test: this section's rules.

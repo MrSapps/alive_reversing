@@ -3132,6 +3132,12 @@ bool Bot::SlogRefuge(const SlogAt& slog, s32 from, s32& refuge, bool& left, bool
         {
             return -1;
         }
+        // (a running jump that catches the ledge over a hoist, away from it: no stop under the hoist, which is what
+        // the Slog catches him in. Bonewerkz' first annex: "Two screens later, jump and pull up to the ledge".)
+        if (e.mKind == EdgeKind::eRunJump && e.mFeature >= 0 && graph->Input().mFeatures[e.mFeature].mKind == FeatureKind::eHoist)
+        {
+            return (b.mX - a.mX) * side > 0 || all(e) < 0 ? -1 : 20;
+        }
         return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eRoll || e.mKind == EdgeKind::eWell || e.mKind == EdgeKind::eHoistUp || e.mKind == EdgeKind::eTeleport || e.mKind == EdgeKind::eFall ? all(e) : -1;
     };
     std::vector<s32> way;
