@@ -739,6 +739,24 @@ bool Bot::Replan(BaseMap& map)
     {
         errandOpen = errandOpen || (mWorld.Switch(sw) == 0 && mErrandsLeft.count({mAbe.mPath, sw}) == 0);
     }
+    // Electric walls on across the floor of Sligs they have not got yet: that first, whatever else there is to do.
+    // What turned them on may be turned back by the next thing done (Bonewerkz' first annex: "When both Sligs
+    // are vaporized, chant to free him. This will also turn the electric walls back off.")
+    if (!best.mFound)
+    {
+        for (std::size_t i = 0; i < actions.size(); i++)
+        {
+            if (domain.mSteps[actions[i].mTag].mKind == StepKind::eZapWait && Goap::Planner::Can(domain.mStart, actions[i]))
+            {
+                best.mFound = true;
+                best.mSteps = {static_cast<s32>(i)};
+                best.mCost = actions[i].mCost;
+                bestGoal = "Let the walls get the Sligs";
+                bestFacts = actions[i].mEffects;
+                break;
+            }
+        }
+    }
     if (!best.mFound)
     {
         const Goap::Plan& plan = leave;
