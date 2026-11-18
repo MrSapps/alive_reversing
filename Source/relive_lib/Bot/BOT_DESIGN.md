@@ -2662,7 +2662,31 @@ Lever#15000 at 1170,159 under the crates of 1161 (every 44 frames), done:
 - Out from under it by the turn into a run (`Abe::Motion_2_StandingTurn`, frame 4 with run held: `mSlide` on the
   move), five frames sooner than the turn and a step. He runs off the floor's end onto the one under it.
 
-`bw7.txt` now: all three levers of the screen (15000, 15001, 15013), then 19 deaths at the crates over hops and
-running jumps (1248,151 and 1662,59: the rule above is for a walk in only), and stuck at 1998,379: the way on at
-2568,99 wants switch 14014, for which there is no action yet (the guide: Mudokons led past the crates and put to
-work). Not under unit test: any of this section's rules.
+More of the things that fall (`GoToTask::Faller`, the whole decision, apart from the task so it is under test):
+
+- Under it is where his box meets its box, not within a reach of it: a cell 16 from a 9-wide crate is clear,
+  and is where the drop onto the ledge under the crates of 1251 is waited for.
+- It comes down as far as the first floor under it. Under that floor he is not under it (the floor at 200 under
+  the ledge at 151), and the hoist up to that floor is waited for there.
+- That hoist is begun so that he hangs from the ledge four frames after it is down (`kHoistToHang`, 18 from up
+  pressed; the pull up is 24 more): begun as it smashed he was pulled up into the next one, 44 after.
+- Off a ledge from under one at a run (`mRunOff`), as out along a floor: the turn into the run.
+
+`build-bot/la/p3n.txt` starts at path 2's well with its switch (145) set: path 3 in 95 frames, a minute a run.
+`p3l.txt` is the same with `look`. With these the first screen of path 3 is done with no death. Open:
+
+- The twin crates of 1618 and 1671 over the floor at 59 (every 18 frames): 5 deaths. A walk under one takes the
+  18; it is run or hopped ("hop over the impact point of the right-most falling crate, then hop again from where
+  you land past the left-most falling crates and hoist up just in time"), and the second is come to a cycle after
+  the first. With `look` the bot gets through them (43 tries taken back in the whole run).
+- Both runs then end at 512,980 (without `look`: no plan, `Cross walk 1972,379->1959,379 needs switch 5`; with
+  it: a Slig at 562,859, hurt put up with).
+- Annex 4 is not sure: with path 1 taking one crate's round longer (43 frames) the Slig he is in went in among
+  the two it was to shoot and the lever was gone to with one still watching: 3 deaths there in `bw7.txt`, the
+  third try through. `bw7.txt` now: 10 deaths (those 3, the slam door, 5 at the twin crates, 1 at 612,980).
+
+Unit tests (2026-11-18, `BotFallers` 4, `BotHurry`, `BotZ`, `BotHop`, `BotClearSlig`, `BotFliers`, one more in
+`BotSlogs`): mutation checked, 18 of 20 (not caught: a guard that says the same as the one after it, and the
+ledge-over-the-stretch rule of the floor-level throw, which only `fc3.txt` checks). Not under unit test, for
+want of a whole bot in the test binary: the sneak and run past a light sleeper, the ledge refuge from a Slog, the
+watch limit, the explorer leaving mines alone.

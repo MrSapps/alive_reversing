@@ -2953,28 +2953,9 @@ bool Bot::FlierThreat() const
         {
             continue;
         }
-        // Not one whose track is nowhere near him or the next thing he has to do: it sees what is on its screen, and
-        // a screen is 375 by 260. (Bonewerkz' path 2: the one over the mines' floor at 2657..3660,1190, with him
-        // at 1900,360. His place was taken for the near end of its track, and he hid from it for eighteen
-        // thousand frames.)
+        if (Domain::FlierFar(nav.Input(), flier, mAbe.mX, mAbe.mY, !mPlanNodes.empty() && mPlanNodes[0] >= 0 ? &nav.Nodes()[mPlanNodes[0]] : nullptr))
         {
-            s32 x1 = 0;
-            s32 y1 = 0;
-            s32 x2 = 0;
-            s32 y2 = 0;
-            if (Domain::FlierTrack(nav.Input(), flier.mX, flier.mY - 15, x1, y1, x2, y2, nullptr, nullptr, 3))
-            {
-                const s32 camW = std::max(1, nav.Input().mCamW);
-                const auto far = [&](s32 x, s32 y)
-                {
-                    return x < std::min(x1, x2) - camW || x > std::max(x1, x2) + camW || y < std::min(y1, y2) - 260 || y > std::max(y1, y2) + 260;
-                };
-                const bool thingFar = mPlanNodes.empty() || mPlanNodes[0] < 0 || far(nav.Nodes()[mPlanNodes[0]].mX, nav.Nodes()[mPlanNodes[0]].mY);
-                if (far(mAbe.mX, mAbe.mY) && thingFar)
-                {
-                    continue;
-                }
-            }
+            continue;
         }
         // Not one he only runs by: the next thing to do is on a screen its track does not come onto, and all of
         // the way there that is on its screens is run along a floor (after no more than a hoist up onto it).

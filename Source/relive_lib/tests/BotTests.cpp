@@ -10467,3 +10467,338 @@ TEST(BotSlogs, ASlogLooseOnAFloorWithNoStretchIsBaitedUnderAThingThatFallsFromCl
     domain = Domain::Build(g, penned, abe, nullptr);
     EXPECT_EQ(domain.mStart.Get(Key::kSlogLoose), 0);
 }
+
+// ---- What Bonewerkz taught (the things that fall, the Sligs asleep, the shot's reach, the far flier) ----
+
+// A half-scale floor with a thing that falls over and over nine pixels left of a lever's cell, as the crates of
+// Bonewerkz' path 3 are over Lever#15000: its box is 9 wide, his 13
+struct CrateFloor final
+{
+    NavGraph mNav;
+    World mWorld;
+    s32 mLeverX = 0;
+    s32 mStep = 0;
+
+    // ledge: a ledge at 110 over the lever's cell and two cells each side of it, with a hoist up to it there
+    explicit CrateFloor(s32 crateY, s32 fallIn, bool ledge = false)
+    {
+        NavInput in;
+        in.mLines.push_back(Line(0, 160, 400, 160, 4));
+        if (ledge)
+        {
+            NavGraph plain;
+            plain.Build(in);
+            const s32 x = plain.Nodes()[plain.NodeAt(170, 160, true, 8)].mX;
+            const s32 step = NavGraph::GridStep(true);
+            in.mLines.push_back(Line(x - 2 * step - step / 2, 110, x + 2 * step + step / 2, 110, 4));
+            NavFeature hoist = Feature(FeatureKind::eHoist, x - step / 2, 110, x + step / 2, 160);
+            hoist.mHalf = true;
+            in.mFeatures.push_back(hoist);
+        }
+        mNav.Build(in);
+        mStep = NavGraph::GridStep(true);
+        mLeverX = mNav.Nodes()[mNav.NodeAt(170, 160, true, 8)].mX;
+        RockAt crate;
+        crate.mX = mLeverX - 9;
+        crate.mY = crateY;
+        crate.mHalf = true;
+        crate.mFallIn = fallIn;
+        crate.mBoxX1 = crate.mX - 5;
+        crate.mBoxX2 = crate.mX + 4;
+        mWorld.mFallers.push_back(crate);
+    }
+
+    // What it says of the walk from `cells` cells right of the lever's cell to it
+    GoToTask::FallerCall Ask(s32 cells, s32& lastLeft, s32 waits, bool settled = true) const
+    {
+        const s32 x = mLeverX + cells * mStep;
+        const s32 from = mNav.NodeAt(x, 160, true, 2);
+        std::vector<s32> path;
+        EXPECT_TRUE(mNav.FindPath(from, mNav.NodeAt(mLeverX, 160, true, 2), nullptr, path));
+        return GoToTask::Faller(mNav, mWorld, path, from, x - 7, x + 6, settled, lastLeft, waits);
+    }
+};
+
+TEST(BotFallers, AThingThatFallsTooOftenIsWaitedForFromTheCellBesideWhereItComesDown)
+{
+    const CrateFloor room(0, 20);
+    s32 last = -1;
+    // From three cells off: to the cell beside it first (the next one in is under it)
+    GoToTask::FallerCall call = room.Ask(3, last, 0);
+    EXPECT_EQ(call.mKind, GoToTask::FallerCall::eBeside);
+    EXPECT_EQ(call.mBeside, room.mLeverX + room.mStep);
+    EXPECT_FALSE(call.mUnder);
+    // (what it had left is kept for the next asking)
+    EXPECT_EQ(last, call.mLeft);
+    EXPECT_GT(call.mNeed, call.mLeft);
+    // (not while he is still on the move)
+    EXPECT_EQ(room.Ask(3, last, 0, false).mKind, GoToTask::FallerCall::eWait);
+    // There: waited for
+    call = room.Ask(1, last, 0);
+    EXPECT_EQ(call.mKind, GoToTask::FallerCall::eWait);
+    ASSERT_NE(call.mWhat, nullptr);
+    EXPECT_EQ(call.mWhat->mX, room.mLeverX - 9);
+    // A crate 16 left of the lever's cell: his box there is clear of its box, and that is the cell beside it
+    CrateFloor off(0, 20);
+    off.mWorld.mFallers[0].mX -= 7;
+    off.mWorld.mFallers[0].mBoxX1 -= 7;
+    off.mWorld.mFallers[0].mBoxX2 -= 7;
+    last = -1;
+    call = off.Ask(3, last, 0);
+    EXPECT_EQ(call.mKind, GoToTask::FallerCall::eBeside);
+    EXPECT_EQ(call.mBeside, off.mLeverX);
+    // (with no box given for it, the cell before: within reach of it is under it)
+    off.mWorld.mFallers[0].mBoxX1 = 0;
+    off.mWorld.mFallers[0].mBoxX2 = 0;
+    last = -1;
+    EXPECT_EQ(off.Ask(3, last, 0).mBeside, off.mLeverX + off.mStep);
+    // (one that is not set going falls on nobody)
+    CrateFloor still(0, -1);
+    EXPECT_EQ(still.Ask(3, last, 0).mKind, GoToTask::FallerCall::eGo);
+}
+
+TEST(BotFallers, HeSetsOffFromBesideItJustBeforeItIsDownAndNotSooner)
+{
+    // His box is 11 from its box: in under it some 9 frames after he sets off. Four frames from the floor: go.
+    s32 last = 30;
+    CrateFloor low(110, 0);
+    GoToTask::FallerCall call = low.Ask(1, last, 5);
+    EXPECT_EQ(call.mKind, GoToTask::FallerCall::eGo);
+    EXPECT_TRUE(call.mAllButDown);
+    EXPECT_EQ(call.mEnters, 9);
+    EXPECT_LE(call.mLeft + 5, call.mEnters);
+    // (not on the first look at it: he has to have been stood there waiting)
+    last = 30;
+    EXPECT_EQ(low.Ask(1, last, 0).mKind, GoToTask::FallerCall::eWait);
+    // (nor from two cells off: his box is further from it than a cell)
+    last = 30;
+    EXPECT_FALSE(low.Ask(2, last, 5).mAllButDown);
+    // Higher up, with more frames left than that: he would be under it as it lands
+    last = 30;
+    CrateFloor high(60, 0);
+    call = high.Ask(1, last, 5);
+    EXPECT_EQ(call.mKind, GoToTask::FallerCall::eWait);
+    EXPECT_GT(call.mLeft + 5, call.mEnters);
+    // (a box not read from the game says nothing)
+    last = 30;
+    low.mWorld.mFallers[0].mBoxX1 = 0;
+    low.mWorld.mFallers[0].mBoxX2 = 0;
+    EXPECT_FALSE(low.Ask(1, last, 5).mAllButDown);
+}
+
+TEST(BotFallers, HeGoesAsItSmashesAndWaitsForNothingFromUnderOne)
+{
+    // It had 3 frames left and now has all its round again: smashed
+    CrateFloor room(0, 30);
+    s32 last = 3;
+    GoToTask::FallerCall call = room.Ask(1, last, 5);
+    EXPECT_EQ(call.mKind, GoToTask::FallerCall::eGo);
+    EXPECT_TRUE(call.mSmashed);
+    EXPECT_FALSE(call.mAllButDown);
+    // (counting down as before it is no smash)
+    last = call.mLeft + 1;
+    EXPECT_EQ(room.Ask(1, last, 5).mKind, GoToTask::FallerCall::eWait);
+    // Under it (at the lever's cell, on the way back out): go, whatever it has left
+    const s32 x = room.mLeverX;
+    const s32 from = room.mNav.NodeAt(x, 160, true, 2);
+    std::vector<s32> path;
+    ASSERT_TRUE(room.mNav.FindPath(from, room.mNav.NodeAt(x + 3 * room.mStep, 160, true, 2), nullptr, path));
+    last = -1;
+    call = GoToTask::Faller(room.mNav, room.mWorld, path, from, x - 7, x + 6, true, last, 0);
+    EXPECT_TRUE(call.mUnder);
+    EXPECT_EQ(call.mKind, GoToTask::FallerCall::eGo);
+    // (and whatever else falls on the way out: the next crates along are not stood for under these)
+    RockAt next = room.mWorld.mFallers[0];
+    next.mX = x + 2 * room.mStep + 4;
+    room.mWorld.mFallers.push_back(next);
+    last = -1;
+    call = GoToTask::Faller(room.mNav, room.mWorld, path, from, x - 7, x + 6, true, last, 0);
+    EXPECT_TRUE(call.mUnder);
+    EXPECT_EQ(call.mKind, GoToTask::FallerCall::eGo);
+    room.mWorld.mFallers.pop_back();
+    // (two cells from it he is not under it)
+    last = -1;
+    EXPECT_FALSE(room.Ask(2, last, 0).mUnder);
+}
+
+TEST(BotHurry, AHurryLastsAFewSecondsAtMostAndEndsWithThePathItWasAskedIn)
+{
+    EXPECT_EQ(GoToTask::HurryUntil(1000, 60), 1060);
+    // (a Slog's eating time of three hundred is not three hundred frames of running)
+    EXPECT_EQ(GoToTask::HurryUntil(1000, 300), 1200);
+    EXPECT_TRUE(GoToTask::HurryOn(1100, 1200, 5002, 5002));
+    EXPECT_FALSE(GoToTask::HurryOn(1200, 1200, 5002, 5002));
+    EXPECT_FALSE(GoToTask::HurryOn(1100, 1200, 5002, 5003));
+}
+
+TEST(BotZ, ASligAsleepInTheBackgroundIsNotWatched)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 200, 749, 200, 0));
+    NavGraph g;
+    g.Build(in);
+    World world;
+    SligAt slig;
+    slig.mX = 200;
+    slig.mY = 180;
+    slig.mZShoot = true;
+    world.mSligs.push_back(slig);
+    EXPECT_TRUE(GoToTask::ZShooterAbout(g, world, 100, 200));
+    // (on its screen only)
+    EXPECT_FALSE(GoToTask::ZShooterAbout(g, world, 500, 200));
+    world.mSligs[0].mAsleep = true;
+    EXPECT_FALSE(GoToTask::ZShooterAbout(g, world, 100, 200));
+    world.mSligs[0].mAsleep = false;
+    world.mSligs[0].mPossessed = true;
+    EXPECT_FALSE(GoToTask::ZShooterAbout(g, world, 100, 200));
+    world.mSligs[0].mPossessed = false;
+    world.mSligs[0].mZShoot = false;
+    EXPECT_FALSE(GoToTask::ZShooterAbout(g, world, 100, 200));
+}
+
+TEST(BotHop, TheHopDownToASligsLevelIsOnABackItHasJustTurned)
+{
+    // Never seen to face where he lands: its back may have been turned for long already
+    s32 faced = -1;
+    EXPECT_FALSE(GoToTask::HopOnBack(false, 100, faced));
+    EXPECT_FALSE(GoToTask::HopOnBack(false, 5, faced));
+    // It faces there: not now, and that is remembered
+    EXPECT_FALSE(GoToTask::HopOnBack(true, 110, faced));
+    EXPECT_EQ(faced, 110);
+    // It has turned: now
+    EXPECT_TRUE(GoToTask::HopOnBack(false, 112, faced));
+    EXPECT_TRUE(GoToTask::HopOnBack(false, 118, faced));
+    // (too long ago: it turns back before he is down and away)
+    EXPECT_FALSE(GoToTask::HopOnBack(false, 119, faced));
+    EXPECT_EQ(faced, 110);
+}
+
+TEST(BotClearSlig, AShotStopsAtTheEdgeOfTheScreenShown)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 200, 749, 200, 0));
+    NavGraph g;
+    g.Build(in);
+    SligAt me;
+    me.mX = 100;
+    me.mY = 200;
+    EXPECT_TRUE(ClearSligTask::ShotReaches(g, me, 350));
+    EXPECT_FALSE(ClearSligTask::ShotReaches(g, me, 400));
+    me.mX = 380;
+    EXPECT_TRUE(ClearSligTask::ShotReaches(g, me, 400));
+}
+
+TEST(BotFliers, AFlyingSligWhoseTrackIsAScreenAndMoreOffIsNoThreat)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 200, 3000, 200, 0));
+    in.mLines.push_back(Line(1500, 1000, 2500, 1000, 8));
+    FlierAt flier;
+    flier.mX = 2000;
+    flier.mY = 1015;
+    // Him 800 over its track and 700 left of its end, nothing to do near it
+    EXPECT_TRUE(Domain::FlierFar(in, flier, 800, 200, nullptr));
+    NavNode next;
+    next.mX = 600;
+    next.mY = 200;
+    EXPECT_TRUE(Domain::FlierFar(in, flier, 800, 200, &next));
+    // The next thing he has to do is under its track: it is one
+    next.mX = 2000;
+    next.mY = 1100;
+    EXPECT_FALSE(Domain::FlierFar(in, flier, 800, 200, &next));
+    // (or he is within a screen of the track's end himself, either way)
+    EXPECT_FALSE(Domain::FlierFar(in, flier, 1200, 1000, nullptr));
+    EXPECT_TRUE(Domain::FlierFar(in, flier, 1100, 1000, nullptr));
+    EXPECT_FALSE(Domain::FlierFar(in, flier, 2000, 760, nullptr));
+    EXPECT_TRUE(Domain::FlierFar(in, flier, 2000, 730, nullptr));
+    // (a flier with no track found is not said to be far)
+    in.mLines.pop_back();
+    EXPECT_FALSE(Domain::FlierFar(in, flier, 800, 200, nullptr));
+}
+
+TEST(BotSlogs, AStretchWithNoLedgeOverItIsThrownAtFromItsOwnFloor)
+{
+    // The two-screen floor with nothing over it: the bone goes in from the floor, short of the stretch
+    NavInput in;
+    in.mLines.push_back(Line(0, 200, 749, 200, 0));
+    NavFeature stretch = Feature(FeatureKind::eDanger, 0, 140, 374, 206);
+    stretch.mA = 1;
+    stretch.mId = 7;
+    stretch.mSwitch = World::HazardSwitch(7);
+    in.mFeatures.push_back(stretch);
+    NavGraph g;
+    g.Build(in);
+    World world = PenWorld();
+    world.mEntities[0].mInputs[4] = 200;
+    world.mEntities[0].mY1 = 180;
+    world.mEntities[0].mY2 = 200;
+    world.mRocks = 2;
+    const s32 abe = g.NodeAt(600, 200, false);
+    ASSERT_GE(abe, 0);
+    const Domain domain = Domain::Build(g, world, abe, nullptr);
+    const Goap::Action* level = ActionNamed(domain, "Throw a bone to the Slogs at 0..374");
+    ASSERT_NE(level, nullptr) << domain.Text();
+    EXPECT_TRUE(Gives(*level, Key::Switch(World::HazardSwitch(7)), 1));
+    const NavNode& from = g.Nodes()[domain.mSteps[level->mTag].mEdge];
+    EXPECT_EQ(from.mY, 200);
+    EXPECT_GT(from.mX, 374);
+    // (with a ledge over the floor there is none: AStretchComeOntoAlongTheFloor..., thrown away from there instead)
+}
+
+TEST(BotFallers, WhatFallsComesDownAsFarAsTheFirstFloorUnderItAndTheHoistUpThereIsWaitedForFromUnderThatFloor)
+{
+    // The crate lands on the ledge at 110: the floor at 160 under it is walked whatever it does
+    const CrateFloor room(0, 20, true);
+    s32 last = -1;
+    GoToTask::FallerCall call = room.Ask(3, last, 0);
+    EXPECT_EQ(call.mKind, GoToTask::FallerCall::eGo);
+    EXPECT_FALSE(call.mUnder);
+    // Stood under the ledge at the hoist he is not under it, and the hoist up is waited for: it takes him to
+    // where it lands
+    const s32 from = room.mNav.NodeAt(room.mLeverX, 160, true, 2);
+    const s32 top = room.mNav.NodeAt(room.mLeverX, 110, true, 2);
+    ASSERT_GE(top, 0);
+    const NavEdge* up = FindEdge(room.mNav, from, top, EdgeKind::eHoistUp);
+    ASSERT_NE(up, nullptr);
+    const std::vector<s32> path = {static_cast<s32>(up - room.mNav.Edges().data())};
+    last = -1;
+    call = GoToTask::Faller(room.mNav, room.mWorld, path, from, room.mLeverX - 7, room.mLeverX + 6, true, last, 0);
+    EXPECT_FALSE(call.mUnder);
+    EXPECT_EQ(call.mKind, GoToTask::FallerCall::eWait);
+    // (not as it smashes: pulled up from then he is under the next one)
+    last = 2;
+    CrateFloor again(0, 30, true);
+    call = GoToTask::Faller(again.mNav, again.mWorld, path, from, room.mLeverX - 7, room.mLeverX + 6, true, last, 4);
+    EXPECT_EQ(call.mKind, GoToTask::FallerCall::eWait);
+    // Gone up so as to hang from the ledge just after it is down: with 8 to 14 frames left of its fall
+    const auto goes = [&](s32 fallIn)
+    {
+        CrateFloor at(0, fallIn, true);
+        s32 l = -1;
+        const GoToTask::FallerCall c = GoToTask::Faller(at.mNav, at.mWorld, path, from, room.mLeverX - 7, room.mLeverX + 6, true, l, 4);
+        return c.mKind == GoToTask::FallerCall::eGo ? c.mLeft : -1;
+    };
+    s32 first = -1;
+    s32 lastGo = -1;
+    for (s32 in = 30; in >= 0; in--)
+    {
+        const s32 left = goes(in);
+        if (left >= 0)
+        {
+            first = first < 0 ? left : first;
+            lastGo = left;
+        }
+    }
+    // (it is ten frames from the ceiling to the ledge)
+    EXPECT_EQ(first, 14);
+    EXPECT_EQ(lastGo, 10);
+    // (half way down already is too late for this one)
+    CrateFloor late(80, 0, true);
+    last = -1;
+    EXPECT_EQ(GoToTask::Faller(late.mNav, late.mWorld, path, from, room.mLeverX - 7, room.mLeverX + 6, true, last, 4).mKind, GoToTask::FallerCall::eWait);
+    // On the ledge he is under it
+    std::vector<s32> along;
+    ASSERT_TRUE(room.mNav.FindPath(top, room.mNav.NodeAt(room.mLeverX + 2 * room.mStep, 110, true, 2), nullptr, along));
+    last = -1;
+    EXPECT_TRUE(GoToTask::Faller(room.mNav, room.mWorld, along, top, room.mLeverX - 7, room.mLeverX + 6, true, last, 0).mUnder);
+}

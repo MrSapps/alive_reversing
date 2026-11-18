@@ -830,6 +830,51 @@ private:
     FlierWatch mFlierWatch;
     s32 mFlierWaits = 0;
     static bool FlierUnderFall(const Bot& bot, const NavGraph& nav, s32 edge);
+public:
+    // AE: what a thing that falls over and over (FallingItem) says of the way ahead from the cell cur: go, wait
+    // where he is, or walk to the cell beside where it comes down and wait there. His box's sides, whether he
+    // stands settled, the frames it had left when last asked (-1: not asked) and how long he has waited.
+    struct FallerCall final
+    {
+        enum Kind
+        {
+            eGo,
+            eWait,
+            eBeside
+        };
+        Kind mKind = eGo;
+        // He stands under one: nothing is waited for, and he is to be out from under it at a run
+        bool mUnder = false;
+        // Go, because it is down before his box is in under it / because it has just smashed
+        bool mAllButDown = false;
+        bool mSmashed = false;
+        s32 mBeside = 0;
+        s32 mLeft = 0;
+        s32 mNeed = 0;
+        s32 mEnters = 0;
+        s32 mFar = 0;
+        const RockAt* mWhat = nullptr;
+    };
+    static FallerCall Faller(const NavGraph& nav, const World& world, const std::vector<s32>& path, s32 cur, s32 boxX1, s32 boxX2, bool settled, s32& lastLeft, s32 waits);
+    // A Slig in the background of the screen of (x, y) that shoots: awake, not his
+    static bool ZShooterAbout(const NavGraph& nav, const World& world, s32 x, s32 y);
+    // The hop down to a Slig's level: now, on a back it has just turned (it faced him no more than 8 frames ago).
+    // faced: the frame it last faced where he lands, -1 for never seen to
+    static bool HopOnBack(bool faces, s32 frame, s32& faced);
+    // The hurry of Bot::RunFor: the frame it lasts to when asked for at a frame (no longer than a few seconds: a
+    // Slog's eating time is what its map says), and whether it is on (only in the path it was asked in: with three
+    // hundred of it he was still at a run in the next path, off a ledge under falling crates)
+    static s32 HurryUntil(s32 frame, s32 frames)
+    {
+        return frame + std::min(frames, 200);
+    }
+    static bool HurryOn(s32 frame, s32 until, s32 askedPath, s32 path)
+    {
+        return frame < until && askedPath == path;
+    }
+
+
+private:
     // The Slig on his level and screen that would hear him where he is hidden: the way it faced when last looked
     // at (-1: none there), the frame it turned that way, and whether that turn was seen (not just found so)
     s32 mHushFacing = -1;
@@ -1194,6 +1239,8 @@ public:
     TaskStep Next(Bot& bot, const std::string& lastFailed) override;
     // The Slig that would see Abe working at (x, y), or null. Asleep ones and ones not about don't count.
     static const SligAt* Watcher(const World& world, s32 x, s32 y, bool half);
+    // A shot of the Slig he is in gets to x on its floor: it stops at the edge of the screen shown (Bullet.cpp)
+    static bool ShotReaches(const NavGraph& nav, const SligAt& me, s32 targetX);
     // What to hold as the Slig "me" to shoot what is at x on its floor, or 0 when x is null: nothing left to
     // shoot, time to burst
     static u32 AsSlig(const SligAt& me, const s32* x);

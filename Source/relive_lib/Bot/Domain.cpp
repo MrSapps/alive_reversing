@@ -611,6 +611,28 @@ s32 Domain::UseNode(const NavGraph& nav, const Entity& entity, bool* faceLeft, s
     return node;
 }
 
+bool Domain::FlierFar(const NavInput& in, const FlierAt& flier, s32 abeX, s32 abeY, const NavNode* next)
+{
+    // Not one whose track is nowhere near him or the next thing he has to do: it sees what is on its screen, and
+    // a screen is 375 by 260. (Bonewerkz' path 2: the one over the mines' floor at 2657..3660,1190, with him
+    // at 1900,360. His place was taken for the near end of its track, and he hid from it for eighteen
+    // thousand frames.)
+    s32 x1 = 0;
+    s32 y1 = 0;
+    s32 x2 = 0;
+    s32 y2 = 0;
+    if (!FlierTrack(in, flier.mX, flier.mY - 15, x1, y1, x2, y2, nullptr, nullptr, 3))
+    {
+        return false;
+    }
+    const s32 camW = std::max(1, in.mCamW);
+    const auto far = [&](s32 x, s32 y)
+    {
+        return x < std::min(x1, x2) - camW || x > std::max(x1, x2) + camW || y < std::min(y1, y2) - 260 || y > std::max(y1, y2) + 260;
+    };
+    return far(abeX, abeY) && (!next || far(next->mX, next->mY));
+}
+
 bool Domain::FlierTrack(const NavInput& in, s32 fx, s32 fy, s32& x1, s32& y1, s32& x2, s32& y2, std::vector<std::pair<s32, s32>>* ends, std::vector<NavLine>* lines, s32 join)
 {
     static const s32 kTrackLine = 8;
