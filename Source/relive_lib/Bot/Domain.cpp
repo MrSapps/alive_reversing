@@ -5023,6 +5023,10 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         // first. Gives back the regions this is so for. (Terminal 4: "Go across the top into the cage on the left
         // to get the Sloggie to chase you back to the previous screen. Throw another bone and roll through the
         // tunnel".)
+        // (the regions the last call made its actions for)
+        std::set<s32> served;
+        // (and whether the stretch it was for has any way down onto it from over it)
+        bool overAny = false;
         const auto away = [&](s32 x1, s32 x2, s32 floorY, bool half, s32 eats, const std::vector<Goap::Fact>& gives, const Entity* pen)
         {
             std::set<s32> above;
@@ -5050,6 +5054,8 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 }
             }
             std::set<s32> round;
+            served.clear();
+            overAny = !above.empty();
             if (pen)
             {
                 d.mStart.Set(Key::SlogsOut(pen->mId), world.SlogsOut(*pen) ? 1 : 0);
@@ -5168,6 +5174,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 feed.mEdge = throwAt;
                 feed.mOther = throwAim | (static_cast<u32>(waitAt) << 8);
                 add("Throw a bone away from" + where + " from " + std::to_string(nav.Nodes()[throwAt].mX) + "," + std::to_string(nav.Nodes()[throwAt].mY), pre, gives, 250, feed);
+                served.insert(stands.begin(), stands.end());
                 // (two of them: FeedAwayTask. On one, where one is all he has and a sack gives nothing until it is
                 // gone: the dearer way.)
                 d.mActions.back().mSpend = {Key::kRocks, 2};
@@ -5220,11 +5227,22 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 }
             }
             const std::set<s32> roundRegions = away(x1, x2, floorY, slog.mHalf, slog.mInputs[0], fed, &slog);
+            const std::set<s32> awayRegions = served;
+            // (only a stretch with no way down onto it from anywhere: one with a ledge over it is fed from the ledge.
+            // Terminal 4's long floor was thrown at from its own level otherwise, seven deaths.)
+            const bool noLedge = !overAny;
             for (std::size_t n = 0; n < nav.Nodes().size(); n++)
             {
                 const NavNode& node = nav.Nodes()[n];
+                // From their own floor, a cell or two short of the stretch, where it is come onto along the floor only
+                // and there is nowhere over it to draw them out from: the bone lies on their screen when he comes
+                // onto it. (Bonewerkz' path 2, the three behind the slam door by the last door: "Throw down the
+                // bone, then step on the pressure plate. Hurry up and go through the door before the Slogs finish
+                // their snack.")
+                const bool level = noLedge && roundRegions.count(d.mRegions[n]) != 0 && awayRegions.count(d.mRegions[n]) == 0 && node.mHalf == slog.mHalf && !node.mHazard && !node.mLow && std::abs(node.mY - floorY) <= 10 &&
+                                   (node.mX < x1 || node.mX > x2) && node.mX >= x1 - 3 * NavGraph::GridStep(node.mHalf) && node.mX <= x2 + 3 * NavGraph::GridStep(node.mHalf);
                 // (from the stretch's screen or the one next to it: a bone flies on over a screen's edge)
-                if (node.mHalf != slog.mHalf || node.mHazard || node.mLow || node.mY > floorY - 50 || node.mY < floorY - 200 || node.mX < x1 - 100 || node.mX > x2 + 100)
+                if (!level && (node.mHalf != slog.mHalf || node.mHazard || node.mLow || node.mY > floorY - 50 || node.mY < floorY - 200 || node.mX < x1 - 100 || node.mX > x2 + 100))
                 {
                     continue;
                 }
@@ -5245,7 +5263,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 s32 frames = 0;
                 // (not from a region that comes onto the stretch along the floor only: see above)
                 const bool round = roundRegions.count(d.mRegions[n]) != 0;
-                if (!round && BoneThrow(nav, static_cast<s32>(n), x1, x2, floorY, aim, frames))
+                if (level ? BoneThrow(nav, static_cast<s32>(n), x1, x2, floorY, aim, frames, nullptr, nullptr, true) : !round && BoneThrow(nav, static_cast<s32>(n), x1, x2, floorY, aim, frames))
                 {
                     DomainStep feed;
                     feed.mKind = StepKind::eFeedSlogs;
@@ -6407,7 +6425,7 @@ bool Domain::SightBlocked(const NavInput& in, bool half, s32 x1, s32 y1, s32 x2,
     return false;
 }
 
-bool Domain::BoneThrow(const NavGraph& nav, s32 node, s32 x1, s32 x2, s32 floorY, u32& aim, s32& frames, s32* downX, const std::function<bool(s32 downX)>& wanted)
+bool Domain::BoneThrow(const NavGraph& nav, s32 node, s32 x1, s32 x2, s32 floorY, u32& aim, s32& frames, s32* downX, const std::function<bool(s32 downX)>& wanted, bool otherScreen)
 {
     static const ThrowSpot::Kind kKinds[] = {ThrowSpot::eDown, ThrowSpot::eForward, ThrowSpot::eUp, ThrowSpot::eLob};
     const NavNode& from = nav.Nodes()[node];
@@ -6467,7 +6485,7 @@ bool Domain::BoneThrow(const NavGraph& nav, s32 node, s32 x1, s32 x2, s32 floorY
             const s32 camW = std::max(1, nav.Input().mCamW);
             // (past the stretch's end that way: a wall there stops it, a screen's edge does not)
             const bool off = goesLeft ? rest < x1 && x1 % camW == 0 : rest > x2 && x2 % camW == camW - 1;
-            if (end.mX < x1 + 15 || end.mX > x2 - 15 || nav.CameraOf(end.mX, floorY - 5) != cam || off || (wanted && !wanted(end.mX)))
+            if (end.mX < x1 + 15 || end.mX > x2 - 15 || (!otherScreen && nav.CameraOf(end.mX, floorY - 5) != cam) || off || (wanted && !wanted(end.mX)))
             {
                 continue;
             }

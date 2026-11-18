@@ -2624,9 +2624,22 @@ walls and through the door at 1425,1240. Not under unit test.
 
 With this `bw7.txt` runs the first annex's start to the hub over the annexes with 0 deaths (four annexes).
 
-Next: the hub (the floors at 360..720 over x 1500..3000) and Annex 5. He hides from the flying Slig in the zone at
-1687,440, comes out as it goes by, is at 1912,360 when `Bot::FlierThreat` has it back before he is across, and
-goes back: eighteen thousand frames of that. Its track does come there (a guard for one whose track touches no
-screen of his way changed nothing, and is left in). The guide: "Wait for the flying Slig to leave, then enter the
-door on the left." The way out of the path is the express well at 1651,700 (switch 145, its lever at 1787,719
-pulled already, a wall at 1700..1750 between them): to path 3.
+### The rest of path 2 (2026-11-18): out by the express well at 1651,700 into path 3
+
+`bw7.txt` runs from the first annex's start through path 7, path 1 and all of path 2 into path 3, with 1 death
+(at the slam door, below).
+
+- Annex 5 (the background door, the mines' floor, out by the one-way door at 2176,698) the bot did as it was.
+- `Bot::FlierThreat`: a flying Slig whose track is more than a screen from him and from the next thing he has to
+  do is none. His place was taken for the near end of the track of the one over the mines' floor, 800 under him,
+  and he hid from it at 1687,440 for eighteen thousand frames. The hide's log line says why now.
+- Annex 6's end, three Slogs behind the slam door at 2801 by the last door: a bone thrown from their own floor a
+  cell or two short of their stretch (`BoneThrow(.., otherScreen)`), only for a stretch with no way down onto it
+  from anywhere (with a ledge over it the ledge is where it is thrown from: Terminal 4's long floor was thrown at
+  from its own level otherwise). Then the plate (110), the door, the well. First try in the run he was caught as
+  the slam door opened; the second went through. Not made sure.
+
+Not under unit test: the two above, and the fixes of Annexes 3 and 4.
+
+Next: path 3. 21 deaths, the first at Lever#15000 and #15001 about 1170..1248,155 ("chased: off the end of the
+floor at a run" as he comes in at 1375,114).
