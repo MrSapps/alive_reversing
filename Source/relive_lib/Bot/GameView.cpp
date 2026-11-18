@@ -754,6 +754,7 @@ static void BuildEntities(BinaryPath& path, World& world)
     world.mInvisEver = false;
     world.mFleechKilled.clear();
     world.mNoBomb.clear();
+    world.mSlogsAsleepAt.clear();
     world.mNoFlier.clear();
     world.mGatesGone.clear();
     world.mScrabsKilled.clear();
@@ -890,6 +891,16 @@ static void BuildEntities(BinaryPath& path, World& world)
                 case ReliveTypes::eSlog:
                     e.mKind = EntityKind::eSlog;
                     keep = GetGameType() == GameType::eAe && !static_cast<const relive::Path_Slog&>(tlv).mAsleep;
+                    if (GetGameType() == GameType::eAe && static_cast<const relive::Path_Slog&>(tlv).mAsleep)
+                    {
+                        RockAt at;
+                        at.mX = (tlv.mTopLeftX + tlv.mBottomRightX) / 2;
+                        at.mY = tlv.mBottomRightY;
+                        at.mHalf = static_cast<const relive::Path_Slog&>(tlv).mScale == relive::reliveScale::eHalf;
+                        // (how much noise it sleeps through: one a frame of it, Slog.cpp)
+                        at.mMotion = static_cast<const relive::Path_Slog&>(tlv).mWakeUpAnger;
+                        world.mSlogsAsleepAt.push_back(at);
+                    }
                     e.mSwitch = World::HazardSwitch(e.mId);
                     // (a half-scale one is on the background and sees nothing of the foreground: Slog::FindBone
                     // wants the same scale)

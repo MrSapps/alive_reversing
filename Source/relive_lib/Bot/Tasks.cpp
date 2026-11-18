@@ -2628,6 +2628,9 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             }
             // Sligs on this floor: quietly near a sleeping one, and past one that is awake only where he can't see
             bool sneak = false;
+            bool slurgRun = false;
+            bool slogSneak = false;
+            s32 slurgStop = -1;
             bool overhead = false;
             bool zRun = false;
             bool zHold = false;
@@ -2921,6 +2924,73 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     hears = hears || std::abs(fleech.mX - nav.Nodes()[nav.Edges()[path[i]].mTo].mX) <= reach;
                 }
                 sneak = sneak || (hears && fleech.mHalf == here.mHalf && nav.CameraOf(fleech.mX, fleech.mY - 5) == nav.CameraOf(here.mX, here.mY - 5));
+            }
+            // A Slog asleep on the screen he is on or is going onto: quietly. It hears what is on its screen, on any
+            // floor of it (Slog.cpp, Brain_1_Idle: a noise in range a frame adds to what wakes it), and comes down
+            // to him. On a screen that is not loaded yet it is where the map has it. (Bonewerkz' first annex: "Walk
+            // past there, sneaking to the next screen".)
+            if (nav.Input().mIsAe)
+            {
+                const auto onWay = [&](s32 x, s32 y)
+                {
+                    const s32 cam = nav.CameraOf(x, y - 5);
+                    bool on = cam == nav.CameraOf(here.mX, here.mY - 5);
+                    for (std::size_t i = 0; i <= last; i++)
+                    {
+                        const NavNode& at = nav.Nodes()[nav.Edges()[path[i]].mTo];
+                        on = on || cam == nav.CameraOf(at.mX, at.mY - 5);
+                    }
+                    return on;
+                };
+                // (only one that wakes at the first noise, its TLV's wake-up anger: the others sleep through a
+                // run past, and the Mines and the trials are run past them. Shown, it is the live one that says
+                // whether it still sleeps.)
+                for (const RockAt& at : bot.GetWorld().mSlogsAsleepAt)
+                {
+                    if (at.mMotion > 2 || at.mHalf != here.mHalf || !onWay(at.mX, at.mY))
+                    {
+                        continue;
+                    }
+                    const bool shown = nav.CameraOf(at.mX, at.mY - 5) == nav.CameraOf(here.mX, here.mY - 5);
+                    bool asleep = !shown;
+                    for (const SlogAt& slog : bot.GetWorld().mSlogs)
+                    {
+                        asleep = asleep || (shown && slog.mAsleep && std::abs(slog.mX - at.mX) <= 60 && std::abs(slog.mY - at.mY) <= 30);
+                    }
+                    sneak = sneak || asleep;
+                    slogSneak = slogSneak || asleep;
+                }
+                // Slurgs on the way: trodden on they are heard however he goes, so the sneak is as far as the cell
+                // short of the first, and from there it is a run ("Sneak as close to the Slurgs as you can get,
+                // then start running").
+                if (slogSneak)
+                {
+                    const s32 way = first.mLeft ? -1 : 1;
+                    const s32 endX = nav.Nodes()[nav.Edges()[path[last]].mTo].mX;
+                    s32 nearest = 0;
+                    bool any = false;
+                    for (const SlurgAt& slurg : bot.GetWorld().mSlurgs)
+                    {
+                        if (slurg.mHalf == here.mHalf && std::abs(slurg.mY - here.mY) <= 14 && (slurg.mX - here.mX) * way > 0 && (endX - slurg.mX) * way > -34 && (!any || (slurg.mX - nearest) * way < 0))
+                        {
+                            any = true;
+                            nearest = slurg.mX;
+                        }
+                    }
+                    if (any)
+                    {
+                        // (the cell whose far edge is clear of it)
+                        const s32 stop = nearest - way * (34 + cell / 2 + cell);
+                        if ((stop - here.mX) * way <= cell / 2)
+                        {
+                            slurgRun = true;
+                        }
+                        else
+                        {
+                            slurgStop = stop;
+                        }
+                    }
+                }
             }
             // (and one asleep on the next screen, which is not there to be seen until he is on it: by where the
             // level has it. The Mudomo vault's path 4: the run from 662,1000 to the lever under three of them at
@@ -3280,7 +3350,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             }
             else if (sneak)
             {
-                gait = Gait::eSneak;
+                gait = slurgRun ? Gait::eRun : Gait::eSneak;
             }
             else if (sweepWalk)
             {
@@ -3288,6 +3358,21 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 gait = Gait::eWalk;
             }
             s32 moveX = to.mX;
+            // (past a Slog asleep: a few cells at a time, and a look at what is ahead between. What is on the next
+            // screen is not there to be seen from this one: the sneak that began a screen off went through the
+            // Slurgs.)
+            if (slogSneak && !slurgRun && std::abs(moveX - here.mX) > 3 * cell)
+            {
+                moveX = here.mX + (first.mLeft ? -1 : 1) * 3 * cell;
+            }
+            if (sneak && !slurgRun && slurgStop >= 0)
+            {
+                const s32 stopNode = nav.NodeAt(slurgStop, here.mY, here.mHalf, cell);
+                if (stopNode >= 0 && (to.mX - nav.Nodes()[stopNode].mX) * (first.mLeft ? -1 : 1) > 0)
+                {
+                    moveX = nav.Nodes()[stopNode].mX;
+                }
+            }
             // (and on to the plate of a teleporter that is next, if it is the cell after: stopped for at the
             // edge of its box and walked onto it is 11 frames more)
             if (bot.GetWorld().mInvisible && last + 1 < path.size() && nav.Edges()[path[last + 1]].mKind == EdgeKind::eTeleport && nav.Edges()[path[last + 1]].mFeature >= 0)

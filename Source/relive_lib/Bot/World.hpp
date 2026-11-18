@@ -831,6 +831,9 @@ struct World final
         bool mHalf = false;
     };
     std::vector<SlogFloor> mSlogFloors;
+    // Where the map puts Slogs asleep (of the path, whether their screen is loaded or not): a noise on their
+    // screen wakes them (Slog.cpp, Brain_1_Idle), so it is crossed at a sneak
+    std::vector<RockAt> mSlogsAsleepAt;
     static s32 SlogFloorSwitch(s32 floorY, s32 column)
     {
         return 800000 + (floorY / 4 % 2000) * 64 + column % 64;
