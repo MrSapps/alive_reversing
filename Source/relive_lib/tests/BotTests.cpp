@@ -320,6 +320,40 @@ TEST(BotGoap, MoreIsFetchedBeforeTheWayOfNoReturn)
     EXPECT_LT(plan.mExpanded, 2000);
 }
 
+TEST(BotGoap, WhatOpensTheWayBackToMoreIsDoneBeforeTheWayOfNoReturn)
+{
+    // Bonewerkz' path 3: the bag gives one bone to empty hands, two mines are blown up from a floor he only drops
+    // onto, and the way back up from there is a lift that a lever elsewhere brings down. The lever first.
+    const u32 kAt = 1, kRocks = 3, kLift = 50;
+    Goap::State start;
+    start.Set(kAt, 1);
+    std::vector<Goap::Action> actions = {
+        Act("get a bone", {{kAt, 1}, {kRocks, 0}}, {{kRocks, 1}}),
+        Act("drop down", {{kAt, 1}}, {{kAt, 2}}),
+        Act("blow up 0", {{kAt, 2}}, {{100, 1}}),
+        Act("blow up 1", {{kAt, 2}}, {{101, 1}}),
+        Act("up by the lift", {{kAt, 2}, {kLift, 1}}, {{kAt, 1}}),
+        Act("to the lever", {{kAt, 1}}, {{kAt, 3}}),
+        Act("back from the lever", {{kAt, 3}}, {{kAt, 1}}),
+        Act("pull the lever", {{kAt, 3}, {kLift, 0}}, {{kLift, 1}}),
+    };
+    actions[2].mSpend = {kRocks, 1};
+    actions[3].mSpend = {kRocks, 1};
+    std::vector<Goap::Fact> goal = {{100, 1}, {101, 1}};
+    for (u32 i = 0; i < 30; i++)
+    {
+        actions.push_back(Act(("other " + std::to_string(i)).c_str(), {{kAt, 2}, {200 + i, 0}}, {{200 + i, 1}}, 5));
+        goal.push_back({200 + i, 1});
+    }
+    const Goap::Plan plan = Goap::Planner::Find(start, goal, actions);
+    ASSERT_TRUE(plan.mFound) << plan.mMiss;
+    EXPECT_TRUE(PlanWorks(start, plan, actions, goal));
+    // (with no lever there is no plan, and that is said)
+    actions.erase(actions.begin() + 7);
+    const Goap::Plan none = Goap::Planner::Find(start, goal, actions);
+    EXPECT_FALSE(none.mFound);
+}
+
 TEST(BotGoap, ADearStepGivesWayToACheaperWayToTheSame)
 {
     // A mine can be blown up past a running drill, at a price, or cheaply once the lever next to it has stopped
@@ -10935,4 +10969,42 @@ TEST(BotFallers, AWayThatEndsUnderOneTooFastOrJumpsTwoAtOnceIsBarred)
     room.mWorld.mFallersAt.clear();
     room.mWorld.mFallers.clear();
     EXPECT_FALSE(Domain::FallersBar(room.mNav, room.mWorld, e));
+}
+
+TEST(BotNav, ALedgeAcrossAGapIsNotHoppedAtWhereHeIsUnderItsFloorByThenAndThatFloorHasAWallForAFace)
+{
+    // Bonewerkz' path 3 at half scale, the left lift's shaft: a floor that ends at 1927 with its ledge marked, a
+    // gap of three cells, and the floor at 379 that begins at 1966. From its first cell the ledge is 4 cells off.
+    const auto hops = [](bool wall, s32 leftY)
+    {
+        NavInput in;
+        in.mLines.push_back(Line(1800, leftY, 1927, leftY, 4));
+        in.mLines.push_back(Line(1966, 379, 2147, 379, 4));
+        in.mLines.push_back(Line(1700, 560, 2200, 560, 4));
+        if (wall)
+        {
+            in.mLines.push_back(Line(1927, leftY, 1927, 560, 5));
+        }
+        NavFeature edge = Feature(FeatureKind::eEdge, 1914, leftY, 1927, leftY + 12);
+        edge.mHalf = true;
+        edge.mA = 1;
+        edge.mDir = 0;
+        in.mFeatures.push_back(edge);
+        NavGraph g;
+        g.Build(in);
+        for (const NavEdge& e : g.Edges())
+        {
+            if (e.mKind == EdgeKind::eHop && g.Nodes()[e.mFrom].mY == 379 && g.Nodes()[e.mTo].mY == leftY && g.Nodes()[e.mTo].mX < 1927)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    // No wall under the ledge: caught as he drops
+    EXPECT_TRUE(hops(false, 380));
+    // A wall for its face: he is up against it under the ledge
+    EXPECT_FALSE(hops(true, 380));
+    // (a ledge that much lower than his floor he is still over when he gets there)
+    EXPECT_TRUE(hops(true, 420));
 }

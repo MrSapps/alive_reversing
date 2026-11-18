@@ -565,6 +565,89 @@ static void FindAny(const State& start, const std::vector<Fact>& goal, const std
                 mended = true;
             }
         }
+        // No way to more from anywhere on the plan: something that has to be so first, before a way of no return
+        // is taken, may open one. Each thing an action wants that is not so yet is tried: got to first, and from
+        // there the plan made again and gone through as above. (Bonewerkz' path 3: two mines to blow up from a
+        // floor he only drops onto, one bone to be had at a time, and the way back up to the bag is by a lift
+        // that is brought down by a lever on the far side of it. That lever first.)
+        if (!mended && key)
+        {
+            // (a place is not a thing to set up: what many actions give is where he is)
+            std::vector<Fact> wants;
+            for (const Action& a : actions)
+            {
+                for (const Fact& f : a.mPre)
+                {
+                    s32 givers = 0;
+                    for (const Action& g : actions)
+                    {
+                        givers += std::find(g.mEffects.begin(), g.mEffects.end(), f) != g.mEffects.end() ? 1 : 0;
+                    }
+                    if (f.mKey != key && state.Get(f.mKey) != f.mValue && givers > 0 && givers <= 4 && std::find(wants.begin(), wants.end(), f) == wants.end())
+                    {
+                        wants.push_back(f);
+                    }
+                }
+            }
+            for (std::size_t w = 0; w < wants.size() && !mended && refillStates < maxExpanded; w++)
+            {
+                Plan setup;
+                Search(state, {wants[w]}, actions, Planner::Relevant({wants[w]}, actions), maxExpanded / 4, true, false, {}, setup);
+                whole.mExpanded += setup.mExpanded;
+                refillStates += setup.mExpanded;
+                State then = state;
+                bool can = setup.mFound && !setup.mSteps.empty();
+                for (std::size_t i = 0; can && i < setup.mSteps.size(); i++)
+                {
+                    can = Planner::Can(then, actions[setup.mSteps[i]]);
+                    if (can)
+                    {
+                        Planner::Do(then, actions[setup.mSteps[i]]);
+                    }
+                }
+                if (!can)
+                {
+                    continue;
+                }
+                Plan again;
+                Search(then, goal, actions, relevant, maxExpanded, true, false, {}, again);
+                whole.mExpanded += again.mExpanded;
+                refillStates += again.mExpanded / 4;
+                if (!again.mFound)
+                {
+                    continue;
+                }
+                std::vector<State> was;
+                State at2 = then;
+                std::size_t stop2 = again.mSteps.size();
+                for (std::size_t i = 0; i < again.mSteps.size(); i++)
+                {
+                    was.push_back(at2);
+                    if (!Planner::Can(at2, actions[again.mSteps[i]]))
+                    {
+                        stop2 = i;
+                        break;
+                    }
+                    Planner::Do(at2, actions[again.mSteps[i]]);
+                }
+                bool opens = stop2 == again.mSteps.size();
+                for (std::size_t j = stop2 + 1; !opens && j-- > 0 && refillStates < maxExpanded;)
+                {
+                    Plan refill;
+                    Search(was[j], {}, actions, gives, maxExpanded / 4, true, true, Fact{key, was[j].Get(key)}, refill);
+                    whole.mExpanded += refill.mExpanded;
+                    refillStates += refill.mExpanded;
+                    opens = refill.mFound;
+                }
+                if (opens)
+                {
+                    // (that first; the rest is made from there on the next round as it always is)
+                    take(setup, setup.mSteps.size());
+                    state = then;
+                    mended = true;
+                }
+            }
+        }
         if (!mended)
         {
             whole.mMiss = "what the plan uses up runs out, and there is no way to more of it";

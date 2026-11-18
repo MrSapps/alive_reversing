@@ -2692,15 +2692,34 @@ More of the things that fall (`GoToTask::Faller`, the whole decision, apart from
 - `NavGraph`: at half scale a fall of exactly 90 kills (off 1649,59 to 149) and was let through as 89. At full
   scale one of exactly 180 is lived through (Necrum's path 3, off 1187,980, which `m1` has always taken: made
   deadly too, that run stuck there), so only the half-scale one is put right.
-- `p3n.txt` then ends in Secret 24 (512,980, the lift's bottom stop), with no plan out. The way out is right
-  along that floor past ten drills to the well at 1025,860 ("Jump back into the well to exit").
-- The rest of path 3 is not begun: ten Mudokons, three of them led past crates and down a lift, a trap door,
-  four lifts, and ten mines at the way out, which the guide has him clear as a Shrykull (all the Mudokons
-  rescued together first). The bot knows nothing of the Shrykull; it plans to blow the mines up one at a time
-  with bones from the path's one bag.
+- With `look` (`p3l.txt`, 2026-11-18): through the twin crates, 1,059 tries taken back, some 2.5 frames a second,
+  and then at the same end as without it: what was wrong was not when but what, below.
+- The way out of path 3, which there was no plan for until these (the bot was trying switches from its first
+  frame there, and so came to Secret 24 and the lift at its bottom stop):
+  - `NavGraph`, the hop at a ledge across a gap: not where he has dropped under its floor by the time he is at
+    it and that floor has a wall for a face. From 1972,379 at the ledge of the floor that ends at 1927, across
+    the left lift's shaft, he was 16 down by 1931, up against the wall, and went on down the shaft.
+  - `Domain::ThrowSpots`: at half scale a mine is over two cells, and the other cell of the mine thrown at was
+    taken for a mine the rock gets to first: the one at 2584,91 was to be gone before it could be thrown at.
+  - `Goap`, `FindAny`: where what the plan uses up runs out and there is no way to more of it from anywhere on
+    the plan, each thing an action wants that is not so yet is tried as a thing to do first. Here: one bone to be
+    had at a time, two mines blown up from a floor he only drops onto, and the way back up by a lift a lever
+    brings down. (`BotGoap.WhatOpensTheWayBackToMoreIsDoneBeforeTheWayOfNoReturn`.)
+  With these there is a plan from the first frame, and it is done as far as: the six levers, two bones fetched
+  over the twin crates, Mine#11019 and #11005 blown up, the trap door's lever. 6 deaths in `p3n.txt` (5 at the twin
+  crates, which are crossed more often now, 1 at a throw from 1662,59).
+- Open, where it stops (1998,379, "the lift is on its way": it is not):
+  - A lift's place is not known to the plan: "its mover's switch is on" is taken for "it is at that stop". He
+    pulled Lever#10014 (sw5, the left lift down) and then rode that lift up himself.
+  - The guide's way there, "jump over to the left" with the lift up, is no edge: a running jump off 1972,379 at
+    the ledge of 1927,380, three cells of shaft between. `AddLedgeCatches` wants five cells. Abe.cpp
+    (`Motion_31_RunJumpMid`) catches any marked ledge his feet are level with or under as he passes: whether he
+    is that low by then is not measured.
+  - Then the rest: the Mudokons (three led past crates and down a lift), the Shrykull the guide clears the
+    mines by, Secret 24's way out past its drills.
 - Annex 4 is not sure: with path 1 taking one crate's round longer (43 frames) the Slig he is in went in among
   the two it was to shoot and the lever was gone to with one still watching: 3 deaths there in `bw7.txt`, the
-  third try through. `bw7.txt` now: 6 deaths (those 3, the slam door, 2 at the twin crates).
+  third try through. `bw7.txt` now: 10 deaths (those 3, the slam door, 6 on path 3 as in `p3n.txt`).
 
 Unit tests (2026-11-18, `BotFallers` 8, `BotHurry`, `BotZ`, `BotHop`, `BotClearSlig`, `BotFliers`, one more each
 in `BotSlogs` and `BotNav`): mutation checked, 18 of 20 (not caught: a guard that says the same as the one after it, and the
