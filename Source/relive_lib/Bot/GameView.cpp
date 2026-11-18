@@ -1375,6 +1375,8 @@ static void MarkSlogPens(NavInput* in, World& world, bool bones)
         return;
     }
     const NavInput& lines = *in;
+    world.mSlogFloors.clear();
+    std::vector<const NavLine*> floors;
     for (Entity& e : world.mEntities)
     {
         if (e.mKind != EntityKind::eSlog)
@@ -1432,6 +1434,10 @@ static void MarkSlogPens(NavInput* in, World& world, bool bones)
         e.mInputs[2] = x1;
         e.mInputs[3] = x2;
         e.mInputs[4] = y;
+        if (!e.mGone && std::find(floors.begin(), floors.end(), floor) == floors.end())
+        {
+            floors.push_back(floor);
+        }
         if (in && !e.mGone)
         {
             NavFeature f;
@@ -1445,6 +1451,57 @@ static void MarkSlogPens(NavInput* in, World& world, bool bones)
             f.mId = e.mId;
             f.mSwitch = e.mSwitch;
             in->mFeatures.push_back(f);
+        }
+    }
+    // The rest of each such floor, a screen at a time: no Slog starts there, and it is free to walk until one of
+    // them is after him. Then they come along it to wherever he is (Slog.cpp's chasing brain follows him off its
+    // screen), and it is crossed like their own stretch: with them at a bone. (Terminal 4: the floor between the
+    // cage and the next Slogs, on his way back out through the tunnel.)
+    for (const NavLine* floor : floors)
+    {
+        if (lines.mCamW <= 0)
+        {
+            break;
+        }
+        const bool half = floor->mType == 4;
+        const s32 y = (floor->mY1 + floor->mY2) / 2;
+        const s32 fx1 = std::min(floor->mX1, floor->mX2);
+        const s32 fx2 = std::max(floor->mX1, floor->mX2);
+        for (s32 column = fx1 / lines.mCamW; column <= fx2 / lines.mCamW; column++)
+        {
+            const s32 left = column * lines.mCamW;
+            bool pen = false;
+            for (const Entity& e : world.mEntities)
+            {
+                pen = pen || (e.mKind == EntityKind::eSlog && !e.mGone && e.mHalf == half && e.mInputs[4] == y && e.mInputs[3] > e.mInputs[2] && e.mInputs[2] / lines.mCamW == column);
+            }
+            if (pen)
+            {
+                continue;
+            }
+            World::SlogFloor stretch;
+            stretch.mSwitch = World::SlogFloorSwitch(y, column);
+            stretch.mX1 = std::max(fx1, left);
+            stretch.mX2 = std::min(fx2, left + lines.mCamW - 1);
+            stretch.mFloorY = y;
+            stretch.mHalf = half;
+            world.mSlogFloors.push_back(stretch);
+            if (in)
+            {
+                NavFeature f;
+                f.mKind = FeatureKind::eDanger;
+                f.mX1 = stretch.mX1;
+                f.mX2 = stretch.mX2;
+                f.mY1 = y - 60;
+                f.mY2 = y + 6;
+                f.mHalf = half;
+                // (2: shut to what comes onto it along the floor only. Down onto it from a ledge is as it was: they
+                // are under that ledge or they are not, and that is seen from up there.)
+                f.mA = 2;
+                f.mId = 0;
+                f.mSwitch = stretch.mSwitch;
+                in->mFeatures.push_back(f);
+            }
         }
     }
 }
@@ -1998,6 +2055,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             bone.mX = FP_GetExponent(pObj->mXPos);
             bone.mY = FP_GetExponent(pObj->mYPos);
             bone.mHalf = pObj->GetSpriteScale() != FP_FromInteger(1);
+            bone.mShown = map.Is_Point_In_Current_Camera(pObj->mCurrentLevel, pObj->mCurrentPath, pObj->mXPos, pObj->mYPos, 0) != 0;
             world.mBones.push_back(bone);
         }
         if (pObj && !pObj->GetDead() && (pObj->Type() == ReliveTypes::eGrenade || (isAe && (pObj->Type() == ReliveTypes::eRock || pObj->Type() == ReliveTypes::eMeat || pObj->Type() == ReliveTypes::eBone))))
@@ -2202,7 +2260,18 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             slog.mMotion = pObj->VGetMotion(eMotionType::eCurrentMotion);
             const s32 anger = isAe ? static_cast<::Slog*>(pObj)->AngerSwitchId() : 0;
             slog.mWaking = slog.mAsleep && anger > 1 && (SwitchStates_Get(anger) != 0 || anger == soonOn);
+            slog.mChasing = isAe && static_cast<::Slog*>(pObj)->ChasingAbe();
             world.mSlogs.push_back(slog);
+            // (and its entity, the one of its TLV: there, and after him or not)
+            for (std::size_t k = 0; k < world.mEntities.size(); k++)
+            {
+                Entity& e = world.mEntities[k];
+                if (e.mKind == EntityKind::eSlog && static_cast<const relive::Path_TLV*>(world.mTlvs[k])->mId == pObj->mBaseGameObjectTlvInfo)
+                {
+                    e.mLive = true;
+                    e.mState = slog.mChasing ? 1 : 0;
+                }
+            }
         }
     }
 

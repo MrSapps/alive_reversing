@@ -404,6 +404,30 @@ private:
     bool mPulled = false;
 };
 
+// The Slogs of a stretch of floor got to come after him (Domain, StepKind::eDrawSlogs): to a cell over their
+// screen that they can't get at him in, and there until they are all on their way
+class DrawSlogsTask final : public Task
+{
+public:
+    DrawSlogsTask(u32 slog, s32 stand)
+        : mSlog(slog)
+        , mStand(stand)
+    {
+    }
+    ~DrawSlogsTask() override;
+    std::string Name() const override
+    {
+        return "Draw out Slog#" + std::to_string(mSlog);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mSlog;
+    s32 mStand;
+    std::unique_ptr<GoToTask> mGo;
+    s32 mWaits = 0;
+};
+
 // A bone thrown to Slogs from over their floor (Domain, StepKind::eFeedSlogs): to the cell, the throw, and until
 // the bone is down among them, or a Slog has gone over the plate it was thrown past
 class FeedSlogsTask final : public Task
@@ -424,6 +448,11 @@ public:
         mDyn = true;
         mPen = {x1, x2, floorY};
     }
+    // (how long he is in a hurry once the bone is down)
+    void SetRun(s32 frames)
+    {
+        mRun = frames;
+    }
     ~FeedSlogsTask() override;
     std::string Name() const override
     {
@@ -435,6 +464,7 @@ private:
     u32 mSlog;
     bool mDyn = false;
     std::array<s32, 3> mPen = {};
+    s32 mRun = 55;
     s32 mStand;
     ThrowSpot::Kind mKind;
     bool mLeft;
@@ -451,6 +481,45 @@ private:
     // The bones he had before the throw (-1: not thrown yet), and the frames since
     s32 mHad = -1;
     s32 mFrames = 0;
+};
+
+// Bones thrown away from a stretch of floor whose Slogs are out after him (Domain, StepKind::eFeedAway): two, if
+// he has them, from a cell they can't get at him in; then down to the cell by the way onto the stretch, while they
+// are at the first; and there until the first is gone and they turn to the second. A Slog finds a bone on the screen
+// shown only (Slog::FindBone), and the way on leaves this screen: what he has for it is the bone they are at as he
+// goes, so he goes as they start on the last one.
+class FeedAwayTask final : public Task
+{
+public:
+    FeedAwayTask(s32 x1, s32 x2, s32 floorY, s32 stand, u32 aim, s32 waitAt)
+        : mX1(x1)
+        , mX2(x2)
+        , mFloorY(floorY)
+        , mStand(stand)
+        , mAim(aim)
+        , mWaitAt(waitAt)
+    {
+    }
+    ~FeedAwayTask() override;
+    std::string Name() const override
+    {
+        return "Throw bones away from the Slogs";
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    s32 Lying(const Bot& bot) const;
+    s32 mX1;
+    s32 mX2;
+    s32 mFloorY;
+    s32 mStand;
+    u32 mAim;
+    s32 mWaitAt;
+    std::unique_ptr<FeedSlogsTask> mThrow;
+    std::unique_ptr<GoToTask> mGo;
+    s32 mThrown = 0;
+    s32 mWanted = 0;
+    s32 mWaits = 0;
 };
 
 // Hold a grenade and throw it late, so that it goes off in the air by a security orb (Domain::OrbTargets)

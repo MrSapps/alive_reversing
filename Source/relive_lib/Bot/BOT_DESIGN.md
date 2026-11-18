@@ -2476,13 +2476,33 @@ checks on rupture_farms.
 - Some goals need the bot to lose something on purpose (die to reset a room, abandon a mud) in
   profiles that allow it. Left until a run needs it.
 
-## Terminal 4's tunnel (2026-11-18, open)
+## Slogs that are after him (2026-11-18): Terminal 4 done
 
-FeeCo lobby to Terminal 4's far left end runs with 0 deaths (`fc2.txt`): a bone per screen from the ledges, loose
-Slogs that come at him get another (`Bot::MakeReflex`, `FeedSlogsTask` with its own stretch). Open: the tunnel roll
-at 387,1240 -> 362,1240 is gated by the half-scale Slog's pen (26..374); the bone thrown into it from the ledge at 362
-draws all the Slogs to the tunnel mouth. The guide: get the Sloggie to chase him back to the previous screen, throw
-another bone there (away from the tunnel) and roll through while they eat. Tried and dropped: pen counts as fed when
-its Slogs are not in it (flickers as they move: the planner offers no throw, then is stuck in the lobby); a bone
-within 120 of a pen counts for it (skips the feeding on the long floor: deaths). Next: a planner action for that
-throw (bone to the right on the Slogs' screen, then the roll), looked at with gdb at the planning frame.
+FeeCo lobby -> path 9 -> Terminal 4 -> Bonewerkz path 1 with 0 deaths before Bonewerkz (`build-bot/la/fc3.txt`).
+What the game does (Slog.cpp), which the earlier pen rules had wrong:
+
+- A Slog that waits where the map put it (Brain_1_Idle) takes no notice of bones. It is set on him by him within
+  100 px on its floor, a noise, or his voice on its screen (`DrawSlogsTask` says "Hello" from a ledge over it).
+- One that is after him (Brain_2_ChasingAbe, `SlogAt::mChasing`, read through `Slog::ChasingAbe()`) follows him along
+  its floor off its own screen, and goes for a bone on the screen shown wherever it stands itself
+  (`Slog::FindBone`: `RockAt::mShown`). A bone on another screen is none to it.
+- The bone is gone its eating time after the first Slog is at it. Under a ledge 50 or more over it a Slog only leaps.
+
+What is built on that:
+
+- `World::SlogsOut(pen)`: a pen's Slogs are all after him. Its gate is then open while a bone is shown on that floor.
+- A pen come onto along the floor only (a tunnel): `Draw the Slogs out of ...` then `Throw a bone away from ...`
+  (`FeedAwayTask`: two bones as far from the way in as they go on his screen, down to the cell by the way in while
+  they eat the first, on as they start on the last. One bone buys ~150 frames and the dash wants ~140; and once he
+  is off the screen only the bone they are at counts.)
+- The rest of a Slog floor, a screen at a time (`World::SlogFloor`, eDanger with mA 2): shut to what comes onto it
+  along the floor while any Slog is after him and no bone is shown. Down onto it from a ledge is not gated.
+- A throw into a pen whose Slogs are out is budgeted at three bones (or what he has); a throw in a plan is moved
+  to just before the step that wants it; `BoneThrow` allows for the bone's roll (100 px from over the floor, 220
+  along his own floor) so that it does not end off the screen.
+- In a hurry, crossings that follow a one-cell walk in the plan are gone through in one (a run wants a few cells).
+
+Owed: unit tests for all of the above. Not re-run on this: `b14.txt`, `wr.txt`, `blk9t.txt`, `blk10.txt`.
+
+Next: Bonewerkz path 1. He dies under the falling crates (lever 1002 at 962,459; the hop 987,980->1062,980): AE's
+FallingItem is periodic (fall interval, then down at up to 20 px a frame), and only AO's is waited for so far.

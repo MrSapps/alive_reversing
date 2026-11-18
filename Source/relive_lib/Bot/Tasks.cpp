@@ -5012,6 +5012,121 @@ TaskStep TimedDoorTask::Next(Bot& bot, const std::string& lastFailed)
     return step;
 }
 
+DrawSlogsTask::~DrawSlogsTask() = default;
+
+TaskStep DrawSlogsTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const Entity* slog = world.Find(mSlog);
+    if (!slog)
+    {
+        return TaskStep::Failed("no such Slog");
+    }
+    if (world.SlogsOut(*slog))
+    {
+        return TaskStep::Done();
+    }
+    if (bot.AbeNode() != mStand || !bot.Abe().Settled())
+    {
+        if (!mGo)
+        {
+            const s32 stand = mStand;
+            mGo = std::make_unique<GoToTask>("to where the Slogs see him", [stand](s32 n)
+                                             { return n == stand; });
+        }
+        const TaskStep step = mGo->Next(bot, lastFailed);
+        if (step.mKind != TaskStep::Kind::eDone)
+        {
+            return step;
+        }
+        mGo.reset();
+    }
+    if (mWaits == 0)
+    {
+        bot.Log("over the Slogs at " + std::to_string(slog->mInputs[2]) + ".." + std::to_string(slog->mInputs[3]) + ": here until they are after him");
+    }
+    if (mWaits++ > 900)
+    {
+        return TaskStep::Failed("the Slogs did not come after him");
+    }
+    // (what sets a Slog on him from where it waits: him within a few steps on its floor, a noise, or his voice on
+    // its screen, and the voice is the one that reaches it from up here. Slog.cpp, Brain_1_Idle.)
+    if (bot.Abe().Settled() && bot.Abe().mMove == Move::eIdle)
+    {
+        return TaskStep::Do(Prim::Wait(3, Btn::eSpeak1));
+    }
+    return TaskStep::Do(Prim::Wait(1));
+}
+
+FeedAwayTask::~FeedAwayTask() = default;
+
+s32 FeedAwayTask::Lying(const Bot& bot) const
+{
+    s32 count = 0;
+    for (const RockAt& bone : bot.GetWorld().mBones)
+    {
+        count += bone.mShown && bone.mY <= mFloorY + 14 && bone.mY >= mFloorY - 220 ? 1 : 0;
+    }
+    return count;
+}
+
+TaskStep FeedAwayTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    if (mWanted == 0)
+    {
+        mWanted = std::min(2, world.mRocks);
+        if (mWanted <= 0)
+        {
+            return TaskStep::Failed("no bone to throw");
+        }
+    }
+    if (mThrown < mWanted)
+    {
+        if (!mThrow)
+        {
+            mThrow = std::make_unique<FeedSlogsTask>(mX1, mX2, mFloorY, mStand, mAim);
+            mThrow->SetRun(0);
+        }
+        const TaskStep step = mThrow->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::eFailed || step.mKind == TaskStep::Kind::ePrim)
+        {
+            return step;
+        }
+        mThrow.reset();
+        mThrown++;
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    if (bot.AbeNode() != mWaitAt || !bot.Abe().Settled())
+    {
+        if (!mGo)
+        {
+            const s32 to = mWaitAt;
+            mGo = std::make_unique<GoToTask>("down to the way in while they eat", [to](s32 n)
+                                             { return n == to; });
+            bot.Log(std::to_string(mThrown) + " bone(s) away from the stretch: down to " + std::to_string(bot.Nav().Nodes()[to].mX) + "," + std::to_string(bot.Nav().Nodes()[to].mY));
+        }
+        const TaskStep step = mGo->Next(bot, lastFailed);
+        if (step.mKind != TaskStep::Kind::eDone)
+        {
+            return step;
+        }
+        mGo.reset();
+    }
+    const s32 lying = Lying(bot);
+    if (lying == 0)
+    {
+        return TaskStep::Failed("the bones were eaten before he was by the way in");
+    }
+    if (lying > 1 && mWaits++ < 400)
+    {
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    bot.Log("they are on the last bone: on, at a run");
+    bot.RunFor(150);
+    return TaskStep::Done();
+}
+
 FeedSlogsTask::~FeedSlogsTask() = default;
 
 TaskStep FeedSlogsTask::Next(Bot& bot, const std::string& lastFailed)
@@ -5143,9 +5258,13 @@ TaskStep FeedSlogsTask::Next(Bot& bot, const std::string& lastFailed)
     if (mPlate > 1 ? world.Switch(mPlate) != 0 : down)
     {
         // (the bone is eaten in the time the Slog takes: the way on, if it is past them, is run)
-        if (mPlate <= 1 && mDown < 0 && !bot.Nav().Nodes()[mStand].mZCover && world.mSligs.empty())
+        if (mPlate <= 1 && mDown < 0 && !bot.Nav().Nodes()[mStand].mZCover && (mDyn || world.mSligs.empty() || (slog && world.SlogsOut(*slog))))
         {
-            bot.RunFor(slog ? std::max<s32>(slog->mInputs[0], 30) : 55);
+            if (slog || mRun > 0)
+            {
+                // (with them after him, for as long as the bones he has for it last: he is down among them)
+                bot.RunFor(slog ? (world.SlogsOut(*slog) ? 200 : std::max<s32>(slog->mInputs[0], 30)) : mRun);
+            }
         }
         return TaskStep::Done();
     }

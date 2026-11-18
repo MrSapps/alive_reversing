@@ -243,6 +243,9 @@ struct SlogAt final
     s32 mX = 0;
     s32 mY = 0;
     bool mAsleep = false;
+    // After him (Slog.cpp's chasing brain): it comes to where he is along its floor, and goes for a bone on the
+    // screen shown wherever it stands itself. One that is not waits where the map put it until he is near.
+    bool mChasing = false;
     // Asleep still, with the switch that sets it on Abe already on
     bool mWaking = false;
     bool mFacesLeft = false;
@@ -384,6 +387,8 @@ struct RockAt final
     bool mChasing = false;
     // A naked Slig: the game's motion number (CrawlingSlig.hpp: 9 asleep, 2 wakes, 3 crawls, 1 at a locker's button)
     s32 mMotion = 0;
+    // A bone: on the screen shown (Slog::FindBone: the only bones a Slog goes for)
+    bool mShown = false;
 };
 
 // A Glukkon that is about
@@ -794,8 +799,58 @@ struct World final
     // real: as the game has it now, without counting a slapped lock's switch as on already
     // Whether a Slog is one of a stretch of floor with a bone on it (EntityKind::eSlog): it has eyes for the bone
     // only
+    // Whether the Slogs of a stretch (those of the entity's stretch: the same ends and floor) have all left where
+    // the map put them and are after him. They come to where he is, and the stretch is theirs no more.
+    bool SlogsOut(const Entity& pen) const
+    {
+        bool any = false;
+        for (const Entity& e : mEntities)
+        {
+            if (e.mKind == EntityKind::eSlog && !e.mGone && e.mInputs[2] == pen.mInputs[2] && e.mInputs[3] == pen.mInputs[3] && e.mInputs[4] == pen.mInputs[4])
+            {
+                if (!e.mLive || e.mState != 1)
+                {
+                    return false;
+                }
+                any = true;
+            }
+        }
+        return any;
+    }
+    // A screen's stretch of a floor Slogs walk that none of them starts on (GameView's MarkSlogPens): it is theirs as
+    // well once any of them is after him. mSwitch: on while none is, or while they are busy with a bone (Switch).
+    struct SlogFloor final
+    {
+        s32 mSwitch = 0;
+        s32 mX1 = 0;
+        s32 mX2 = 0;
+        s32 mFloorY = 0;
+        bool mHalf = false;
+    };
+    std::vector<SlogFloor> mSlogFloors;
+    static s32 SlogFloorSwitch(s32 floorY, s32 column)
+    {
+        return 800000 + (floorY / 4 % 2000) * 64 + column % 64;
+    }
+    // A bone on the screen shown, on (or coming down onto) the floor at floorY: what every Slog that is after him
+    // on that floor goes for (Slog::FindBone asks where the bone is, not where the Slog is)
+    bool BoneShownOn(s32 floorY, bool half) const
+    {
+        for (const RockAt& bone : mBones)
+        {
+            if (bone.mShown && bone.mHalf == half && bone.mY <= floorY + 10 && bone.mY >= floorY - 140)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
     bool SlogFed(const SlogAt& slog) const
     {
+        if (slog.mChasing && BoneShownOn(slog.mY, false))
+        {
+            return true;
+        }
         for (const Entity& e : mEntities)
         {
             if (e.mKind == EntityKind::eSlog && !e.mGone && e.mInputs[3] > e.mInputs[2] && slog.mX >= e.mInputs[2] - 5 && slog.mX <= e.mInputs[3] + 5 && slog.mY >= e.mInputs[4] - 60 && slog.mY <= e.mInputs[4] + 10 &&
@@ -818,6 +873,18 @@ struct World final
         }
         if (id >= 256)
         {
+            for (const SlogFloor& floor : mSlogFloors)
+            {
+                if (floor.mSwitch == id)
+                {
+                    bool after = false;
+                    for (const SlogAt& slog : mSlogs)
+                    {
+                        after = after || (slog.mChasing && std::abs(slog.mY - floor.mFloorY) <= 30);
+                    }
+                    return !after || BoneShownOn(floor.mFloorY, floor.mHalf) ? 1 : 0;
+                }
+            }
             for (const Entity& e : mEntities)
             {
                 if ((e.mKind == EntityKind::eMine || e.mKind == EntityKind::eUxb) && e.mSwitch == id)
@@ -843,7 +910,10 @@ struct World final
                             return 1;
                         }
                     }
-                    return 0;
+                    // (or its Slogs are all out after him, and busy with a bone on the screen shown: the stretch is
+                    // empty for as long as that bone lasts. Terminal 4: "get the Sloggie to chase you back to the
+                    // previous screen. Throw another bone and roll through the tunnel".)
+                    return SlogsOut(e) && BoneShownOn(e.mInputs[4], e.mHalf) ? 1 : 0;
                 }
                 if (e.mKind == EntityKind::ePantsLocker && e.mSwitch == id)
                 {

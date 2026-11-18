@@ -33,6 +33,11 @@ inline u32 Switch(s32 id)
 {
     return 1000 + static_cast<u32>(id);
 }
+// The Slogs of a stretch of floor (its first Slog's entity) are all out after him (World::SlogsOut)
+inline u32 SlogsOut(u32 entityId)
+{
+    return 5000000 + entityId;
+}
 // A Mudokon is saved (1) or dead (2)
 inline u32 Mud(u32 entityId)
 {
@@ -107,6 +112,11 @@ enum class StepKind : u8
     eFeedSlogs,     // from the cell mEdge throw a bone onto the stretch of floor of the Slog mEntity (mOther: twice
                     // the kind of throw, and one more for a throw to the left; from bit 8 up the switch of a plate
                     // the bone is thrown past)
+    eDrawSlogs,     // to the cell mEdge, over the stretch of the Slog mEntity and out of its reach, and there until its
+                    // Slogs are all after him
+    eFeedAway,      // from the cell mEdge throw bones (mOther: the throw as eFeedSlogs; from bit 8 up the cell he then
+                    // waits in by the way onto the stretch) onto the floor of the Slog mEntity on the screen he stands
+                    // on, away from its stretch: the Slogs that are after him go for them
     eVoiceLock,     // from the cell mEdge (-1: he has one already) take over a Glukkon and answer the voice lock mEntity
                     // (Domain::CrawlerFor)
     eGrenadeOrb, // hold a grenade and throw it late from the cell mEdge, to go off in the air by security orb

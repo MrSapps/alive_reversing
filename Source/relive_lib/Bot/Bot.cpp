@@ -135,7 +135,31 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
         case StepKind::eCross:
         {
             // (or the cell past the Scrab's reach that a crossing onto its floor makes for)
-            const s32 to = step.mOther != 0 ? static_cast<s32>(step.mOther) - 1 : mKnow->mNav.Edges()[step.mEdge].mTo;
+            s32 to = step.mOther != 0 ? static_cast<s32>(step.mOther) - 1 : mKnow->mNav.Edges()[step.mEdge].mTo;
+            // In a hurry (a bone's worth of time among Slogs, a door that shuts): the crossings that follow this one
+            // in the plan are gone through in one, to the far end of the last. Stopped at each he walks: a run
+            // wants a few cells to get going. (Terminal 4's cage: the gate by the lever is two crossings a cell
+            // apart, then the hoist; walked, the Slogs had him under it.)
+            if (TimedRunOn() && step.mOther == 0 && !mKeptPlan.empty() && mKeptPlan[0] == action.mName && (mKnow->mNav.Edges()[step.mEdge].mKind == EdgeKind::eWalk || mKnow->mNav.Edges()[step.mEdge].mKind == EdgeKind::eRoll))
+            {
+                for (std::size_t i = 1; i < mKeptPlan.size() && mKeptPlan[i].rfind("Cross ", 0) == 0; i++)
+                {
+                    const DomainStep* next = nullptr;
+                    for (const Goap::Action& other : domain.mActions)
+                    {
+                        if (other.mName == mKeptPlan[i])
+                        {
+                            next = &domain.mSteps[other.mTag];
+                            break;
+                        }
+                    }
+                    if (!next || next->mKind != StepKind::eCross || next->mOther != 0)
+                    {
+                        break;
+                    }
+                    to = mKnow->mNav.Edges()[next->mEdge].mTo;
+                }
+            }
             std::string note;
             bool wary = ScrabWaryTask::Wanted(*this, to, 0, &note, step.mOther != 0);
             // (with Fleeches awake a Scrab's floor is not waited at, unless there is no other way at all)
@@ -229,6 +253,32 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<TimedDoorTask>(step.mEntity, static_cast<s32>(step.mOther), step.mEdge);
         case StepKind::eFeedSlogs:
             return std::make_unique<FeedSlogsTask>(step.mEntity, step.mEdge, step.mOther);
+        case StepKind::eDrawSlogs:
+            return std::make_unique<DrawSlogsTask>(step.mEntity, step.mEdge);
+        case StepKind::eFeedAway:
+        {
+            // (anywhere on the floor of his screen: where it comes down was worked out when the throw was chosen)
+            const Entity* slog = mWorld.Find(step.mEntity);
+            const NavNode& at = mKnow->mNav.Nodes()[step.mEdge];
+            const s32 camW = mKnow->mNav.Input().mCamW;
+            const s32 left = camW > 0 ? (at.mX / camW) * camW : at.mX - 300;
+            const s32 waitAt = static_cast<s32>(step.mOther >> 8);
+            // (the Slogs' floor: the one he waits on, or the nearest one of theirs under where he waits)
+            const auto FloorUnder = [&](s32 node)
+            {
+                const NavNode& n = mKnow->mNav.Nodes()[node];
+                s32 y = n.mY;
+                for (const World::SlogFloor& floor : mWorld.mSlogFloors)
+                {
+                    if (floor.mHalf == n.mHalf && n.mX >= floor.mX1 && n.mX <= floor.mX2 && floor.mFloorY >= n.mY - 10 && floor.mFloorY <= n.mY + 200)
+                    {
+                        y = floor.mFloorY;
+                    }
+                }
+                return y;
+            };
+            return std::make_unique<FeedAwayTask>(left, left + (camW > 0 ? camW - 1 : 600), slog ? slog->mInputs[4] : FloorUnder(waitAt), step.mEdge, step.mOther & 255, waitAt);
+        }
         case StepKind::eGrenadeOrb:
             return std::make_unique<GrenadeOrbTask>(step.mEntity, step.mEdge);
         case StepKind::eFlierBomb:
@@ -1056,6 +1106,45 @@ bool Bot::Replan(BaseMap& map)
             {
                 std::swap(best.mSteps[i], best.mSteps[i + 1]);
             }
+        }
+    }
+    // A bone for Slogs is eaten in a couple of seconds: thrown just before the step that wants them fed, not where
+    // the search happened to put it. Later by as many steps as do nothing to where he is and want nothing of it.
+    // (Terminal 4: thrown first, with two levers a few floors up to pull before the way down to the Slogs.)
+    for (std::size_t i = best.mSteps.size(); i-- > 0;)
+    {
+        const StepKind kind = domain.mSteps[actions[best.mSteps[i]].mTag].mKind;
+        if (kind != StepKind::eFeedSlogs && kind != StepKind::eFeedAway)
+        {
+            continue;
+        }
+        const std::vector<Goap::Fact>& gives = actions[best.mSteps[i]].mEffects;
+        std::size_t to = i;
+        for (std::size_t j = i + 1; j < best.mSteps.size(); j++)
+        {
+            const Goap::Action& next = actions[best.mSteps[j]];
+            bool stops = false;
+            for (const Goap::Fact& pre : next.mPre)
+            {
+                for (const Goap::Fact& give : gives)
+                {
+                    stops = stops || pre.mKey == give.mKey;
+                }
+            }
+            for (const Goap::Fact& effect : next.mEffects)
+            {
+                stops = stops || effect.mKey == Key::kRegion || effect.mKey == Key::kRocks;
+            }
+            stops = stops || next.mSpend.mKey == Key::kRocks;
+            if (stops)
+            {
+                break;
+            }
+            to = j;
+        }
+        if (to != i)
+        {
+            std::rotate(best.mSteps.begin() + static_cast<std::ptrdiff_t>(i), best.mSteps.begin() + static_cast<std::ptrdiff_t>(i) + 1, best.mSteps.begin() + static_cast<std::ptrdiff_t>(to) + 1);
         }
     }
     mKeptPlan.clear();
@@ -3230,7 +3319,12 @@ std::unique_ptr<Task> Bot::MakeReflex()
         s32 later = 0;
         for (std::size_t i = 1; i < mKeptPlan.size(); i++)
         {
-            later += mKeptPlan[i].rfind("Throw a bone", 0) == 0 ? 1 : 0;
+            later += mKeptPlan[i].rfind("Throw a bone away", 0) == 0 ? 2 : mKeptPlan[i].rfind("Throw a bone", 0) == 0 ? 1 : 0;
+            // (past a sack on the way there are as many again)
+            if (mKeptPlan[i].rfind("Get bones", 0) == 0)
+            {
+                break;
+            }
         }
         const NavNode& at = mKnow->mNav.Nodes()[AbeNode()];
         for (const Entity& e : mWorld.mEntities)
@@ -3279,7 +3373,7 @@ std::unique_ptr<Task> Bot::MakeReflex()
         for (const SlogAt& slog : mWorld.mSlogs)
         {
             const s32 under = slog.mY - mAbe.mY;
-            if (!slog.mAsleep && !slog.mWaking && under >= -10 && under <= 160 && std::abs(slog.mX - mAbe.mX) <= 350 && !mWorld.SlogFed(slog))
+            if (!slog.mAsleep && !slog.mWaking && under >= -10 && under <= 40 && std::abs(slog.mX - mAbe.mX) <= 350 && !mWorld.SlogFed(slog))
             {
                 x1 = count == 0 ? slog.mX : std::min(x1, slog.mX);
                 x2 = count == 0 ? slog.mX : std::max(x2, slog.mX);
