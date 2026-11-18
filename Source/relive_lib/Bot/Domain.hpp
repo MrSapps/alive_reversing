@@ -509,6 +509,12 @@ struct Domain final
     // A flying Slig whose track is more than a screen from him and from the cell of the next thing he has to do
     // (null: nothing): no threat. False where its track isn't found.
     static bool FlierFar(const NavInput& in, const FlierAt& flier, s32 abeX, s32 abeY, const NavNode* next);
+    // AE: that cell is under a thing that falls again sooner than he is through under it at a walk (its box and
+    // his, at a cell's width in 9 frames): no walk goes into it, it is hopped or run under
+    static bool TooFastToWalk(const NavGraph& nav, const World& world, const NavNode& cell);
+    // No way to take with such things about: one that is not a walk and ends in such a cell (he stands there
+    // longer than it gives him), or a jump over two of them at once (gone at the smash of the one he is under the other at its turn)
+    static bool FallersBar(const NavGraph& nav, const World& world, const NavEdge& e);
     // The wheels a switch logic entity needs turned at once and the nearest Mudokons that can walk to them. False
     // if it isn't that kind of logic or there aren't enough Mudokons. pre gets what the action needs.
     // Where a rock could be thrown from at something on the floor at (x, y), likeliest first. Nothing is worked

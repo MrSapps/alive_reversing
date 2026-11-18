@@ -302,6 +302,53 @@ GoToTask::FallerCall GoToTask::Faller(const NavGraph& nav, const World& world, c
     return call;
 }
 
+bool GoToTask::HopsOver(const NavGraph& nav, const World& world, const std::vector<s32>& path)
+{
+    if (path.size() < 3)
+    {
+        return false;
+    }
+    const NavEdge& first = nav.Edges()[path[0]];
+    bool under = false;
+    for (std::size_t k = 0; k < 3; k++)
+    {
+        const NavEdge& e = nav.Edges()[path[k]];
+        if (e.mKind != EdgeKind::eWalk || e.mLeft != first.mLeft || e.mCrouched)
+        {
+            return false;
+        }
+        const NavNode& to = nav.Nodes()[e.mTo];
+        if (k < 2)
+        {
+            under = under || Domain::TooFastToWalk(nav, world, to);
+        }
+        else if (Domain::TooFastToWalk(nav, world, to) || to.mHazard || to.mLow)
+        {
+            return false;
+        }
+    }
+    // (from a cell that is clear of it himself)
+    return under && !Domain::TooFastToWalk(nav, world, nav.Nodes()[first.mFrom]);
+}
+
+s32 GoToTask::StopBefore(const NavGraph& nav, const World& world, const std::vector<s32>& path)
+{
+    const NavEdge& first = nav.Edges()[path[0]];
+    for (std::size_t k = 0; k < path.size() && k < 12; k++)
+    {
+        const NavEdge& e = nav.Edges()[path[k]];
+        if (e.mKind != EdgeKind::eWalk || e.mLeft != first.mLeft)
+        {
+            break;
+        }
+        if (Domain::TooFastToWalk(nav, world, nav.Nodes()[e.mTo]))
+        {
+            return k == 0 || Domain::TooFastToWalk(nav, world, nav.Nodes()[e.mFrom]) ? -1 : nav.Nodes()[e.mFrom].mX;
+        }
+    }
+    return -1;
+}
+
 bool GoToTask::ZShooterAbout(const NavGraph& nav, const World& world, s32 x, s32 y)
 {
     const s32 cam = nav.CameraOf(x, y - 5);
@@ -2422,6 +2469,39 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     {
         const FallerCall call = Faller(nav, bot.GetWorld(), path, cur, abe.mBoxX1, abe.mBoxX2, abe.Settled(), mFallerLeft, mFallerWaits);
         mFallerUnder = call.mUnder;
+        // (a walk that goes in under one too fast to walk under some cells on stops at the cell before it: the
+        // walk to 1649 from 1714 was one move, in under the crates of 1671 with nothing asked at 1688)
+        // (settled or not: the walk is begun as soon as he stands, and was begun past it the frame after a throw)
+        if (first.mKind == EdgeKind::eWalk)
+        {
+            const s32 stop = StopBefore(nav, bot.GetWorld(), path);
+            if (stop >= 0)
+            {
+                return TaskStep::Do(Prim::MoveTo(stop, Gait::eWalk));
+            }
+        }
+        // Over one that is back too soon to be walked under: a hop from here, as it smashes
+        if (abe.Settled() && abe.mMove == Move::eIdle && std::abs(abe.mX - nav.Nodes()[cur].mX) <= 2 && HopsOver(nav, bot.GetWorld(), path))
+        {
+            if (abe.mFacingLeft != first.mLeft)
+            {
+                return TaskStep::Do(Prim::Face(first.mLeft));
+            }
+            if (!call.mSmashed)
+            {
+                if (mFallerWaits++ == 0)
+                {
+                    bot.Log("a thing that falls too often to walk under on the way to " + std::to_string(nav.Nodes()[nav.Edges()[path[2]].mTo].mX) + ": hopped over as it smashes");
+                }
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            bot.Log("it has smashed: the hop over it");
+            mFallerWaits = 0;
+            mFallerLeft = -1;
+            mLastEdge = path[0];
+            return TaskStep::Do(Prim::Press(Btn::eHop));
+        }
         if (call.mKind == FallerCall::eBeside)
         {
             return TaskStep::Do(Prim::MoveTo(call.mBeside, Gait::eWalk));

@@ -798,6 +798,7 @@ private:
     s32 mHopFaced = -1;
     s32 mFallerWaits = 0;
     s32 mFallerLeft = -1;
+    s32 mHopOverAt = -1;
     bool mFallerUnder = false;
     bool mFleechAwakeHere = false;
     s32 mLandWaits = 0;
@@ -857,6 +858,12 @@ public:
     };
     static FallerCall Faller(const NavGraph& nav, const World& world, const std::vector<s32>& path, s32 cur, s32 boxX1, s32 boxX2, bool settled, s32& lastLeft, s32 waits);
     // A Slig in the background of the screen of (x, y) that shoots: awake, not his
+    // The way ahead is a walk in under such a thing and out again within a hop's length (three cells) to a cell
+    // clear of it: it is hopped over from here ("hop over the impact point of the right-most falling crate")
+    static bool HopsOver(const NavGraph& nav, const World& world, const std::vector<s32>& path);
+    // The walk ahead goes in under such a thing some cells on: the cell to stop at before it (the last one clear of
+    // it), where what to do about it is decided. -1: no such thing on the walk, or he is at that cell.
+    static s32 StopBefore(const NavGraph& nav, const World& world, const std::vector<s32>& path);
     static bool ZShooterAbout(const NavGraph& nav, const World& world, s32 x, s32 y);
     // The hop down to a Slig's level: now, on a back it has just turned (it faced him no more than 8 frames ago).
     // faced: the frame it last faced where he lands, -1 for never seen to

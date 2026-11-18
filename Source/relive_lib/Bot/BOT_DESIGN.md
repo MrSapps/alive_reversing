@@ -2675,18 +2675,35 @@ More of the things that fall (`GoToTask::Faller`, the whole decision, apart from
 `build-bot/la/p3n.txt` starts at path 2's well with its switch (145) set: path 3 in 95 frames, a minute a run.
 `p3l.txt` is the same with `look`. With these the first screen of path 3 is done with no death. Open:
 
-- The twin crates of 1618 and 1671 over the floor at 59 (every 18 frames): 5 deaths. A walk under one takes the
-  18; it is run or hopped ("hop over the impact point of the right-most falling crate, then hop again from where
-  you land past the left-most falling crates and hoist up just in time"), and the second is come to a cycle after
-  the first. With `look` the bot gets through them (43 tries taken back in the whole run).
-- Both runs then end at 512,980 (without `look`: no plan, `Cross walk 1972,379->1959,379 needs switch 5`; with
-  it: a Slig at 562,859, hurt put up with).
+- The twin crates of 1618 and 1671 over the floor at 59 (every 18 frames; a walk under one takes 19):
+  - `Domain::TooFastToWalk`: a cell under a thing that is back before he is through under it at a walk.
+    `GoToTask::HopsOver`: such cells within a hop's three cells, a clear cell at each end: hopped over as it
+    smashes ("hop over the impact point of the right-most falling crate"). `GoToTask::StopBefore`: a walk towards
+    them stops at the cell the hop is from.
+  - `Domain::FallersBar`: no way that is not a walk ends in such a cell (the drop off 1597,70 comes down under
+    the crates of 1618 on the floor at 149), and no jump goes over two of them at once (the running jump off
+    1688,59: they are seven frames apart). Dear in `Bot::EdgeCostFn`, and last among a crossing's ways in
+    `Domain::Build`.
+  - `World::mFallersAt`: where the map has them, their screen shown or not (they are only made while it is):
+    what is planned from a screen off knows of them. `World::FallersKnown`.
+  - Left: 2 deaths the second time across (`p3n.txt` f=3209). From 1714 the walk to 1649 is again one move: the
+    way found there reads walk to 1701, to 1688, to 1649, with the two cells under the crates not in it. Not
+    understood yet.
+- `NavGraph`: at half scale a fall of exactly 90 kills (off 1649,59 to 149) and was let through as 89. At full
+  scale one of exactly 180 is lived through (Necrum's path 3, off 1187,980, which `m1` has always taken: made
+  deadly too, that run stuck there), so only the half-scale one is put right.
+- `p3n.txt` then ends in Secret 24 (512,980, the lift's bottom stop), with no plan out. The way out is right
+  along that floor past ten drills to the well at 1025,860 ("Jump back into the well to exit").
+- The rest of path 3 is not begun: ten Mudokons, three of them led past crates and down a lift, a trap door,
+  four lifts, and ten mines at the way out, which the guide has him clear as a Shrykull (all the Mudokons
+  rescued together first). The bot knows nothing of the Shrykull; it plans to blow the mines up one at a time
+  with bones from the path's one bag.
 - Annex 4 is not sure: with path 1 taking one crate's round longer (43 frames) the Slig he is in went in among
   the two it was to shoot and the lever was gone to with one still watching: 3 deaths there in `bw7.txt`, the
-  third try through. `bw7.txt` now: 10 deaths (those 3, the slam door, 5 at the twin crates, 1 at 612,980).
+  third try through. `bw7.txt` now: 6 deaths (those 3, the slam door, 2 at the twin crates).
 
-Unit tests (2026-11-18, `BotFallers` 4, `BotHurry`, `BotZ`, `BotHop`, `BotClearSlig`, `BotFliers`, one more in
-`BotSlogs`): mutation checked, 18 of 20 (not caught: a guard that says the same as the one after it, and the
+Unit tests (2026-11-18, `BotFallers` 8, `BotHurry`, `BotZ`, `BotHop`, `BotClearSlig`, `BotFliers`, one more each
+in `BotSlogs` and `BotNav`): mutation checked, 18 of 20 (not caught: a guard that says the same as the one after it, and the
 ledge-over-the-stretch rule of the floor-level throw, which only `fc3.txt` checks). Not under unit test, for
 want of a whole bot in the test binary: the sneak and run past a light sleeper, the ledge refuge from a Slog, the
 watch limit, the explorer leaving mines alone.

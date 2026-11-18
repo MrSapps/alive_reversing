@@ -755,6 +755,7 @@ static void BuildEntities(BinaryPath& path, World& world)
     world.mFleechKilled.clear();
     world.mNoBomb.clear();
     world.mSlogsAsleepAt.clear();
+    world.mFallersAt.clear();
     world.mNoFlier.clear();
     world.mGatesGone.clear();
     world.mScrabsKilled.clear();
@@ -878,6 +879,23 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mHalf = static_cast<const relive::Path_RockSack&>(tlv).mScale == relive::reliveScale::eHalf;
                     // How many rocks it gives
                     e.mInputs[0] = static_cast<const relive::Path_RockSack&>(tlv).mRockAmount;
+                    break;
+                case ReliveTypes::eFallingItem:
+                    if (GetGameType() == GameType::eAe)
+                    {
+                        // (FallingItem.cpp: it starts at its TLV's left and top, and is made only while its
+                        // screen is shown)
+                        const relive::Path_FallingItem& item = static_cast<const relive::Path_FallingItem&>(tlv);
+                        RockAt at;
+                        at.mX = tlv.mTopLeftX;
+                        at.mY = tlv.mTopLeftY;
+                        at.mHalf = item.mScale == relive::reliveScale::eHalf;
+                        at.mEvery = item.mFallInterval;
+                        at.mFallIn = item.mSwitchId != 0 && SwitchStates_Get(item.mSwitchId) ? item.mFallInterval : -1;
+                        at.mBoxX1 = at.mX - (at.mHalf ? 5 : 10);
+                        at.mBoxX2 = at.mX + (at.mHalf ? 4 : 9);
+                        world.mFallersAt.push_back(at);
+                    }
                     break;
                 case ReliveTypes::eBoneBag:
                     // (a sack like the other: what it gives is bones, which are thrown as rocks are, set off
@@ -2070,6 +2088,7 @@ void GameView::ReadWorld(BaseMap& map, World& world)
                 const ::FallingItem* item = static_cast<const ::FallingItem*>(pObj);
                 const s32 state = static_cast<s32>(item->mState);
                 faller.mChasing = state == 3;
+                faller.mEvery = item->mFallInterval;
                 faller.mFallIn = state == 3 ? 0 : state == 2 ? std::max(0, item->mFallIntervalTimer - static_cast<s32>(sGnFrame)) : state == 4 || (item->mSwitchId != 0 && SwitchStates_Get(item->mSwitchId)) ? item->mFallInterval : -1;
             }
             world.mFallers.push_back(faller);
