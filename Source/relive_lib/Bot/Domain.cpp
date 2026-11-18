@@ -2259,6 +2259,9 @@ std::vector<s32> Domain::PulledFirst(const NavGraph& nav, const World& world, co
     return first;
 }
 
+// What a crossing onto a floor whose Sligs electric walls could get costs more with those Sligs still about
+static const s32 kZapFloorCost = 1500;
+
 // The longest delay of a switch logic's inputs (frames) that takes Mudokons to meet with levers: within more than
 // that he pulls them one after the other himself
 static const s32 kLeversTogether = 90;
@@ -2458,6 +2461,33 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
     }
     const auto add = [&d, &follows, &world](std::string name, std::vector<Goap::Fact> pre, std::vector<Goap::Fact> effects, s32 cost, const DomainStep& step)
     {
+        // (a switch as it is when the action is done: what the action itself wants of it, or of the output of a
+        // logic it is an input of, which is on with its inputs on; else as it is now. An action that is planned
+        // for later is planned in the state the ones before it leave.)
+        const auto stateOf = [&pre, &world](s32 sw)
+        {
+            for (const Goap::Fact& p : pre)
+            {
+                if (p.mKey == Key::Switch(sw))
+                {
+                    return p.mValue;
+                }
+            }
+            for (const Entity& logic : world.mEntities)
+            {
+                if (logic.mKind == EntityKind::eSwitchLogic && logic.mState > 0 && logic.mOp == 2 && std::find(std::begin(logic.mInputs), std::end(logic.mInputs), sw) != std::end(logic.mInputs))
+                {
+                    for (const Goap::Fact& p : pre)
+                    {
+                        if (p.mKey == Key::Switch(logic.mSwitch))
+                        {
+                            return p.mValue;
+                        }
+                    }
+                }
+            }
+            return world.Switch(sw);
+        };
         for (std::size_t i = 0; i < effects.size() && !follows.empty(); i++)
         {
             for (const std::pair<s32, s32>& f : follows)
@@ -2465,7 +2495,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 // (a timer trigger toggles its outputs when its input changes, TimerTrigger.cpp: one that is on
                 // already goes off. Bonewerkz' first annex: the Mudokon's rescue switch toggles the two levers'
                 // switches, which are on by then.)
-                const bool on = world.Switch(f.second) != 0 && world.Switch(f.first) == 0 && effects[i].mValue == 1;
+                const bool on = stateOf(f.second) != 0 && stateOf(f.first) == 0 && effects[i].mValue == 1;
                 const Goap::Fact with{Key::Switch(f.second), on ? 0 : effects[i].mValue};
                 bool have = false;
                 for (const Goap::Fact& e : effects)
@@ -2482,7 +2512,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         // (MultiSwitchController): one thing that sets them all off at once turns its output back.
         for (const Entity& logic : world.mEntities)
         {
-            if (logic.mKind != EntityKind::eSwitchLogic || logic.mState <= 0 || logic.mOp != 2 || logic.mSwitch <= 1 || world.Switch(logic.mSwitch) == 0)
+            if (logic.mKind != EntityKind::eSwitchLogic || logic.mState <= 0 || logic.mOp != 2 || logic.mSwitch <= 1 || stateOf(logic.mSwitch) == 0)
             {
                 continue;
             }
@@ -2730,14 +2760,16 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 }
             }
         }
-        // (onto a floor whose Sligs electric walls are there to get: with those Sligs gone)
+        // (onto a floor whose Sligs electric walls are there to get: with those Sligs gone, or dearly. Dearly and
+        // not never: the walls may be ones he has no way to turn on, as in the Barracks' trophy room.)
+        std::vector<Goap::Fact> zapped;
         {
             const auto zap = zapLines.find(nav.Nodes()[e.mTo].mLine);
             if (zap != zapLines.end())
             {
                 for (const u32 id : zap->second)
                 {
-                    pre.push_back({Key::Mud(id), 2});
+                    zapped.push_back({Key::Mud(id), 2});
                 }
             }
         }
@@ -2786,8 +2818,15 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         // (onto the floor a Slig walks, from off it: dearer, so that a way round it is taken where there is one)
         const s32 beatTo = sligFloor ? -1 : SligBeat(nav, world, e.mTo);
         const s32 beat = beatTo >= 0 && beatTo != SligBeat(nav, world, e.mFrom) ? kSligBeatCost : 0;
+        if (!zapped.empty())
+        {
+            std::vector<Goap::Fact> gone = pre;
+            gone.insert(gone.end(), zapped.begin(), zapped.end());
+            add("Cross " + std::string(EdgeKindName(e.mKind)) + " " + std::to_string(nav.Nodes()[e.mFrom].mX) + "," + std::to_string(nav.Nodes()[e.mFrom].mY) + "->" + std::to_string(nav.Nodes()[e.mTo].mX) + "," + std::to_string(nav.Nodes()[e.mTo].mY),
+                gone, {regionFact(e.mTo)}, 100 + e.mCost + (both ? unseen(pre) : 0) + beat, step);
+        }
         add("Cross " + std::string(EdgeKindName(e.mKind)) + " " + std::to_string(nav.Nodes()[e.mFrom].mX) + "," + std::to_string(nav.Nodes()[e.mFrom].mY) + "->" + std::to_string(nav.Nodes()[e.mTo].mX) + "," + std::to_string(nav.Nodes()[e.mTo].mY),
-            pre, {regionFact(e.mTo)}, 100 + e.mCost + (both ? unseen(pre) : 0) + beat, step);
+            pre, {regionFact(e.mTo)}, 100 + e.mCost + (both ? unseen(pre) : 0) + beat + (zapped.empty() ? 0 : kZapFloorCost), step);
         // Or seen, onto the Scrab's floor and straight off it: to a cell of that floor a few along which the
         // Scrab can't get to (behind a wall, or under a block too low for it), timed against the Scrab
         // (`ScrabWaryTask`). The Mudanchee trial: "once you land, run and roll to the left".
