@@ -9992,3 +9992,315 @@ TEST(BotDomain, TheFloorByALockerForGunsIsKeptOffWhileANakedSligThatIsAwakeCanGe
     world.mEntities.push_back(other);
     EXPECT_EQ(world.Switch(sw), 1);
 }
+
+// A pen: the stretch 0..374 of the floor at 100, with one Slog the map puts there awake
+static World PenWorld()
+{
+    World world;
+    Entity slog = MakeEntity(EntityKind::eSlog, 7, 100, 80, 124, 100);
+    slog.mSwitch = World::HazardSwitch(7);
+    slog.mInputs[0] = 60;
+    slog.mInputs[2] = 0;
+    slog.mInputs[3] = 374;
+    slog.mInputs[4] = 100;
+    world.mEntities.push_back(slog);
+    return world;
+}
+
+TEST(BotSlogs, APenIsOpenWithABoneOnItOrWithItsSlogsOutAtABoneOnTheScreenShown)
+{
+    World world = PenWorld();
+    const s32 sw = world.mEntities[0].mSwitch;
+    EXPECT_EQ(world.Switch(sw), 0);
+    RockAt bone;
+    bone.mX = 200;
+    bone.mY = 100;
+    world.mBones.push_back(bone);
+    EXPECT_EQ(world.Switch(sw), 1);
+    // A bone off the stretch, on the screen shown: nothing to a Slog that waits where the map put it
+    world.mBones[0].mX = 500;
+    world.mBones[0].mShown = true;
+    EXPECT_EQ(world.Switch(sw), 0);
+    EXPECT_FALSE(world.SlogsOut(world.mEntities[0]));
+    // The Slog is out after him: it goes for that bone, and the stretch is empty
+    world.mEntities[0].mLive = true;
+    world.mEntities[0].mState = 1;
+    EXPECT_TRUE(world.SlogsOut(world.mEntities[0]));
+    EXPECT_EQ(world.Switch(sw), 1);
+    // (not for a bone on another screen)
+    world.mBones[0].mShown = false;
+    EXPECT_EQ(world.Switch(sw), 0);
+    // (nor with a second Slog of the stretch still where it was put)
+    world.mBones[0].mShown = true;
+    Entity second = world.mEntities[0];
+    second.mId = 8;
+    second.mSwitch = World::HazardSwitch(8);
+    second.mLive = true;
+    second.mState = 0;
+    world.mEntities.push_back(second);
+    EXPECT_FALSE(world.SlogsOut(world.mEntities[0]));
+    EXPECT_EQ(world.Switch(sw), 0);
+}
+
+TEST(BotSlogs, ASlogThatIsAfterHimIsFedByABoneOnTheScreenShownAndTheFloorBetweenPensIsShutWithoutOne)
+{
+    World world;
+    SlogAt slog;
+    slog.mX = 450;
+    slog.mY = 100;
+    world.mSlogs.push_back(slog);
+    World::SlogFloor floor;
+    floor.mSwitch = World::SlogFloorSwitch(100, 1);
+    floor.mX1 = 375;
+    floor.mX2 = 749;
+    floor.mFloorY = 100;
+    world.mSlogFloors.push_back(floor);
+    // No Slog after him: the stretch is free to walk
+    EXPECT_EQ(world.Switch(floor.mSwitch), 1);
+    EXPECT_FALSE(world.SlogFed(world.mSlogs[0]));
+    world.mSlogs[0].mChasing = true;
+    EXPECT_EQ(world.Switch(floor.mSwitch), 0);
+    RockAt bone;
+    bone.mX = 600;
+    bone.mY = 100;
+    world.mBones.push_back(bone);
+    // (a bone that is not on the screen shown is none)
+    EXPECT_EQ(world.Switch(floor.mSwitch), 0);
+    EXPECT_FALSE(world.SlogFed(world.mSlogs[0]));
+    world.mBones[0].mShown = true;
+    EXPECT_EQ(world.Switch(floor.mSwitch), 1);
+    EXPECT_TRUE(world.SlogFed(world.mSlogs[0]));
+    // (one that waits where the map put it takes no notice of that bone)
+    world.mSlogs[0].mChasing = false;
+    EXPECT_FALSE(world.SlogFed(world.mSlogs[0]));
+    world.mSlogs[0].mChasing = true;
+    // (one on another floor is none either)
+    world.mBones[0].mY = 400;
+    EXPECT_EQ(world.Switch(floor.mSwitch), 0);
+}
+
+// A lever (switch 51) on the corridor's near side; a timer trigger's two outputs (105, 106) that follow it; and a
+// logic that toggles 107 when 105 and 106 change together within its delay
+static World ToggleWorld()
+{
+    World world;
+    Entity lever = MakeEntity(EntityKind::eLever, 1, 50, 80, 124, 104);
+    lever.mSwitch = 51;
+    Entity outA = MakeEntity(EntityKind::eSwitchLogic, 20, 0, 0, 10, 10);
+    outA.mHoldOnly = true;
+    outA.mInputs[0] = 51;
+    outA.mSwitch = 105;
+    Entity outB = outA;
+    outB.mId = 21;
+    outB.mSwitch = 106;
+    Entity logic = MakeEntity(EntityKind::eSwitchLogic, 22, 0, 0, 10, 10);
+    logic.mSwitch = 107;
+    logic.mOp = 2;
+    logic.mState = 30;
+    logic.mInputs[0] = 105;
+    logic.mInputs[1] = 106;
+    world.mEntities = {lever, outA, outB, logic};
+    return world;
+}
+
+static const Goap::Action* ActionNamed(const Domain& domain, const std::string& start)
+{
+    for (const Goap::Action& a : domain.mActions)
+    {
+        if (a.mName.rfind(start, 0) == 0)
+        {
+            return &a;
+        }
+    }
+    return nullptr;
+}
+
+static bool Gives(const Goap::Action& a, u32 key, s32 value)
+{
+    return std::find(a.mEffects.begin(), a.mEffects.end(), Goap::Fact{key, value}) != a.mEffects.end();
+}
+
+static bool Wants(const Goap::Action& a, u32 key, s32 value)
+{
+    return std::find(a.mPre.begin(), a.mPre.end(), Goap::Fact{key, value}) != a.mPre.end();
+}
+
+TEST(BotDomain, ATimerTriggerTogglesItsOutputsAndALogicThatTogglesTurnsItsOutputBack)
+{
+    NavGraph g;
+    g.Build(CorridorWithDoor());
+    World world = ToggleWorld();
+    // Its outputs off: they come on with it, and the logic's output is left alone (it is off)
+    Domain domain = Domain::Build(g, world, g.NodeAt(12, 100, false), nullptr);
+    const Goap::Action* on = ActionNamed(domain, "Use Lever#1 sw51 on");
+    ASSERT_NE(on, nullptr) << domain.Text();
+    EXPECT_TRUE(Gives(*on, Key::Switch(105), 1));
+    EXPECT_TRUE(Gives(*on, Key::Switch(106), 1));
+    EXPECT_FALSE(Gives(*on, Key::Switch(107), 0));
+    // Its outputs on, and the logic's output with them: toggled they go off, both at once, and the output with them
+    world.mSwitches[105] = 1;
+    world.mSwitches[106] = 1;
+    world.mSwitches[107] = 1;
+    domain = Domain::Build(g, world, g.NodeAt(12, 100, false), nullptr);
+    on = ActionNamed(domain, "Use Lever#1 sw51 on");
+    ASSERT_NE(on, nullptr) << domain.Text();
+    EXPECT_TRUE(Gives(*on, Key::Switch(105), 0));
+    EXPECT_TRUE(Gives(*on, Key::Switch(106), 0));
+    EXPECT_TRUE(Gives(*on, Key::Switch(107), 0));
+    EXPECT_FALSE(Gives(*on, Key::Switch(105), 1));
+}
+
+// Two levers (switches 10 and 11) and a logic that wants them within `delay` frames of each other
+static World TwoLevers(s32 delay)
+{
+    World world;
+    Entity leverA = MakeEntity(EntityKind::eLever, 1, 25, 80, 99, 104);
+    leverA.mSwitch = 10;
+    Entity leverB = MakeEntity(EntityKind::eLever, 2, 100, 80, 174, 104);
+    leverB.mSwitch = 11;
+    Entity logic = MakeEntity(EntityKind::eSwitchLogic, 3, 0, 0, 10, 10);
+    logic.mSwitch = 5;
+    logic.mOp = 2;
+    logic.mState = delay;
+    logic.mInputs[0] = 10;
+    logic.mInputs[1] = 11;
+    world.mEntities = {leverA, leverB, logic};
+    return world;
+}
+
+TEST(BotDomain, LeversThatOnlyCountPulledWithinAShortWhileOfEachOtherAreForAMudokonAndHim)
+{
+    NavGraph g;
+    g.Build(CorridorWithDoor());
+    World world = TwoLevers(30);
+    Team team;
+    std::vector<Goap::Fact> pre;
+    // No Mudokon: nobody for the second lever
+    EXPECT_FALSE(Domain::PlanTogether(g, world, world.mEntities[2], team, pre));
+    world.mEntities.push_back(MakeEntity(EntityKind::eMudokon, 4, 300, 80, 324, 100));
+    ASSERT_TRUE(Domain::PlanTogether(g, world, world.mEntities[2], team, pre));
+    EXPECT_EQ(team.mWheels.size(), 2u);
+    ASSERT_EQ(team.mMuds.size(), 1u);
+    EXPECT_EQ(team.mMuds[0], 4u);
+    // (his own is the one furthest from where the Mudokon comes from)
+    EXPECT_EQ(team.mAbeWheel, 1u);
+    const Domain domain = Domain::Build(g, world, g.NodeAt(12, 100, false), nullptr);
+    EXPECT_NE(ActionNamed(domain, "Work together"), nullptr) << domain.Text();
+    // With time enough between them he pulls both himself
+    world.mEntities[2].mState = 200;
+    EXPECT_FALSE(Domain::PlanTogether(g, world, world.mEntities[2], team, pre));
+    // (and a logic with no delay at all is not one of these)
+    world.mEntities[2].mState = 0;
+    EXPECT_FALSE(Domain::PlanTogether(g, world, world.mEntities[2], team, pre));
+}
+
+// A floor at 200 he starts on, and one at 100 over its right half that a Slig walks, with a hoist up to its left
+// end and an electric wall (switch 30, off) across it
+static NavInput ZapRoom()
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 200, 400, 200, 0));
+    in.mLines.push_back(Line(150, 100, 400, 100, 0));
+    NavFeature hoist = Feature(FeatureKind::eHoist, 150, 100, 174, 200);
+    hoist.mDir = 2;
+    in.mFeatures.push_back(hoist);
+    NavFeature wall = Feature(FeatureKind::eBarrier, 250, 60, 274, 100);
+    wall.mBeam = true;
+    wall.mSwitch = 30;
+    in.mFeatures.push_back(wall);
+    return in;
+}
+
+TEST(BotDomain, ElectricWallsAcrossASligsFloorAreTheWayToBeRidOfItAndTheFloorIsDearUntilTheyHave)
+{
+    NavGraph g;
+    g.Build(ZapRoom());
+    World world;
+    world.mEntities.push_back(MakeEntity(EntityKind::eSlig, 9, 325, 76, 349, 100));
+    Domain domain = Domain::Build(g, world, g.NodeAt(12, 200, false), nullptr);
+    const Goap::Action* zap = ActionNamed(domain, "ElectricWall sw30 gets Slig#9");
+    ASSERT_NE(zap, nullptr) << domain.Text();
+    EXPECT_TRUE(Wants(*zap, Key::Switch(30), 1));
+    EXPECT_TRUE(Gives(*zap, Key::Mud(9), 2));
+    EXPECT_EQ(domain.mSteps[zap->mTag].mKind, StepKind::eZapWait);
+    // Along that floor (the wall is where its regions meet): one way with the Slig gone, and one without that
+    // costs more
+    s32 with = -1;
+    s32 without = -1;
+    for (const Goap::Action& a : domain.mActions)
+    {
+        const DomainStep& step = domain.mSteps[a.mTag];
+        if (step.mKind == StepKind::eCross && g.Nodes()[g.Edges()[step.mEdge].mTo].mY == 100)
+        {
+            (Wants(a, Key::Mud(9), 2) ? with : without) = a.mCost;
+        }
+    }
+    ASSERT_GE(with, 0) << domain.Text();
+    ASSERT_GE(without, 0) << domain.Text();
+    EXPECT_GT(without, with + 1000);
+    // The wall on already and the Slig's beat not seen to go through it: nothing to wait for
+    world.mSwitches[30] = 1;
+    domain = Domain::Build(g, world, g.NodeAt(12, 200, false), nullptr);
+    EXPECT_EQ(ActionNamed(domain, "ElectricWall sw30 gets Slig#9"), nullptr);
+    // (seen to: waited for)
+    world.mEntities[0].mLive = true;
+    world.mEntities[0].mLiveX = 337;
+    world.mEntities[0].mLiveY = 100;
+    SligAt slig;
+    slig.mX = 337;
+    slig.mY = 100;
+    slig.mBeatMin = 200;
+    slig.mBeatMax = 380;
+    world.mSligs.push_back(slig);
+    domain = Domain::Build(g, world, g.NodeAt(12, 200, false), nullptr);
+    EXPECT_NE(ActionNamed(domain, "ElectricWall sw30 gets Slig#9"), nullptr) << domain.Text();
+    // (one whose beat stops short of the wall is not)
+    world.mSligs[0].mBeatMin = 300;
+    domain = Domain::Build(g, world, g.NodeAt(12, 200, false), nullptr);
+    EXPECT_EQ(ActionNamed(domain, "ElectricWall sw30 gets Slig#9"), nullptr);
+}
+
+// A floor at 200 with a ledge 80 over its right part and a hoist up to the ledge's left end at 162; `wall`: a
+// wall at 75 that cuts the floor off behind the cell three short of the hoist
+static NavInput StandJumpRoom(bool wall)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 200, 400, 200, 0));
+    in.mLines.push_back(Line(150, 120, 400, 120, 0));
+    NavFeature hoist = Feature(FeatureKind::eHoist, 150, 120, 174, 200);
+    hoist.mDir = 2;
+    in.mFeatures.push_back(hoist);
+    if (wall)
+    {
+        in.mLines.push_back(Line(75, 100, 75, 200, 1));
+    }
+    return in;
+}
+
+static bool HasStandJump(const NavGraph& g, s32 from, s32 to)
+{
+    for (const NavEdge& e : g.Edges())
+    {
+        if (e.mFrom == from && e.mTo == to && e.mKind == EdgeKind::eRunJump && e.mCost == NavGraph::kStandJumpCost)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+TEST(BotNav, ARunningJumpUpAHoistFromAStandIsThereOnlyWhereTheFloorBehindIsNoRunUp)
+{
+    NavGraph walled;
+    walled.Build(StandJumpRoom(true));
+    const s32 from = walled.NodeAt(87, 200, false);
+    const s32 top = walled.NodeAt(162, 120, false);
+    ASSERT_GE(from, 0);
+    ASSERT_GE(top, 0);
+    EXPECT_TRUE(HasStandJump(walled, from, top));
+    // (from three cells short of the hoist, and nowhere else)
+    EXPECT_FALSE(HasStandJump(walled, walled.NodeAt(112, 200, false), top));
+    NavGraph open;
+    open.Build(StandJumpRoom(false));
+    EXPECT_FALSE(HasStandJump(open, open.NodeAt(87, 200, false), open.NodeAt(162, 120, false)));
+}

@@ -2557,3 +2557,12 @@ levers together, both Sligs got, the Mudokon rescued, the ledge lever (128), thr
 Next: past the gate. A Slog asleep at 1550,1140 wakes as he runs under it (8 deaths). The guide: "Walk past there,
 sneaking to the next screen. Sneak as close to the Slurgs as you can get, then start running. Two screens later,
 jump and pull up to the ledge. Hit the bone sack ... throw it so that the Slog gets crushed by the falling boxes."
+
+Since (2026-11-18): the annex's first part is one plan from the start. For that an action's effects through timer
+triggers and toggling logics are worked out in the state the action itself wants (`stateOf` in `Domain::Build`'s
+`add`), not the state now. The floor of Sligs electric walls could get is dear with them about (`kZapFloorCost`),
+not shut: the Barracks' trophy room has such walls and no way to turn them on. Unit tests (mutation-checked, 14 of
+14 caught): BotSlogs.*, BotDomain.ATimerTrigger..., .Levers..., .ElectricWalls..., BotNav.ARunningJump.... Not under
+test yet: the falling things' timing, the hop as a Slig turns its back, the bone's roll, the draw-out and
+throw-away actions. Barracks re-run on this: b14 0 deaths, wr 0, blk9t 0, blk10 2 deaths (the workers' mine hop,
+and a grenade at Slig#1017 at f=19982 not looked at) and not stuck.
