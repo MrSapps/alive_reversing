@@ -2614,9 +2614,19 @@ to try a switch now (`Bot::Replan`, with the UXBs), and a Slig asleep is not wat
 1562,1499, gets out and takes the door. The mines' hops and the motion detectors were all right as they were.
 Not under unit test: both.
 
-Next: Annex 4 (the same path, the floor at 1240 and its background at 1120): 18 deaths at Lever#6006 about
-795..1047,1119. The guide: "Go right, climb to the upper level and crouch, then roll back to the left. Drop down on
-the other side when the awake Slig leaves. Walk left past the door. When the Slig in the background is leaving this
-screen, go back and enter the door. Quickly chant and possess the Slig in the foreground, then teleport him back
-to you. Shoot the other Sligs, go right and pull all three levers, then blow him up. Have Abe return to the
-foreground and go past the deactivated electrical walls to the door on the right."
+### Annex 4 (2026-11-18): 0 deaths, one mend
+
+The bot did the guide's way by itself (into the background by the door, the Slig of the foreground taken over and
+brought through its teleporter), and then had it shoot for 2,400 frames at two Sligs a screen on. A shot goes as
+far as the edge of the screen shown (Bullet.cpp): `ClearSligTask` walks the Slig onto the screen of what it shoots
+at first. It clears them in 260 frames, he pulls the three levers (120, 121, 122), and goes back out past the
+walls and through the door at 1425,1240. Not under unit test.
+
+With this `bw7.txt` runs the first annex's start to the hub over the annexes with 0 deaths (four annexes).
+
+Next: the hub (the floors at 360..720 over x 1500..3000) and Annex 5. He hides from the flying Slig in the zone at
+1687,440, comes out as it goes by, is at 1912,360 when `Bot::FlierThreat` has it back before he is across, and
+goes back: eighteen thousand frames of that. Its track does come there (a guard for one whose track touches no
+screen of his way changed nothing, and is left in). The guide: "Wait for the flying Slig to leave, then enter the
+door on the left." The way out of the path is the express well at 1651,700 (switch 145, its lever at 1787,719
+pulled already, a wall at 1700..1750 between them): to path 3.
