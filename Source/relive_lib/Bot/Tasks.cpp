@@ -8,6 +8,14 @@
 
 namespace Bot {
 
+// The wake-up anger of a Slog asleep (its TLV) up to which its screen is crossed at a sneak: a noise adds one a
+// frame, so one of ten is awake a third of a second into a walk (Bonewerkz' path 1, the Slog at 3300: "Sneak past
+// the Slog")
+static const s32 kLightSleeper = 10;
+// The longest he watches Sligs in the background from a cover for their round before going by what he sees
+static const s32 kZWatchMost = 1500;
+
+
 GoToTask::GoToTask(std::string name, std::function<bool(s32 node)> isGoal)
     : mName(std::move(name))
     , mIsGoal(std::move(isGoal))
@@ -421,7 +429,10 @@ bool GoToTask::ZWatched(Bot& bot, const NavGraph& nav, const std::vector<s32>& p
     }
     const SligCycle& cycle = bot.GetSligCycle();
     // (a period and the stretch that has to match it, twice over for one that is slow to come round)
-    if (!cycle.Known() && cycle.Watched() < 700)
+    // (not for ever: Sligs whose beat takes them off the screen are never watched for long enough at a stretch, and
+    // after a while he goes by what they are doing as he looks. Bonewerkz' path 1, the two over 3275 to 3624: he
+    // sat in the cover at 3437 for seven thousand frames.)
+    if (!cycle.Known() && cycle.Watched() < 700 && static_cast<s32>(abe.mFrame) - mZArrived < kZWatchMost)
     {
         return wait(2, "watching the Sligs in the background from cover");
     }
@@ -869,7 +880,7 @@ bool GoToTask::ZWalk(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
     {
         return wait(1, "hurt: in cover from the Sligs in the background until that is over");
     }
-    if (!cycle.Known() && (cycle.Watched() < 700 || static_cast<s32>(abe.mFrame) - mZArrived < 700))
+    if (!cycle.Known() && (cycle.Watched() < 700 || static_cast<s32>(abe.mFrame) - mZArrived < 700) && static_cast<s32>(abe.mFrame) - mZArrived < kZWatchMost)
     {
         return wait(2, "watching the Sligs in the background from cover");
     }
@@ -2947,7 +2958,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 // whether it still sleeps.)
                 for (const RockAt& at : bot.GetWorld().mSlogsAsleepAt)
                 {
-                    if (at.mMotion > 2 || at.mHalf != here.mHalf || !onWay(at.mX, at.mY))
+                    if (at.mMotion > kLightSleeper || at.mHalf != here.mHalf || !onWay(at.mX, at.mY))
                     {
                         continue;
                     }
