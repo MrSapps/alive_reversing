@@ -542,6 +542,35 @@ private:
     s32 mWaits = 0;
 };
 
+// A bone thrown to lie under a thing that falls over and over, for the Slog that is after him (Domain,
+// StepKind::eBaitSlog): the throw, and then until the thing has come down on the Slog, or the bone is gone
+class BaitSlogTask final : public Task
+{
+public:
+    BaitSlogTask(s32 stand, u32 aim, s32 fallerX, s32 floorY)
+        : mStand(stand)
+        , mAim(aim)
+        , mFallerX(fallerX)
+        , mFloorY(floorY)
+    {
+    }
+    ~BaitSlogTask() override;
+    std::string Name() const override
+    {
+        return "Bait the Slog under the falling thing at " + std::to_string(mFallerX);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    s32 mStand;
+    u32 mAim;
+    s32 mFallerX;
+    s32 mFloorY;
+    std::unique_ptr<FeedSlogsTask> mThrow;
+    bool mThrown = false;
+    s32 mWaits = 0;
+};
+
 // Hold a grenade and throw it late, so that it goes off in the air by a security orb (Domain::OrbTargets)
 class GrenadeOrbTask final : public Task
 {

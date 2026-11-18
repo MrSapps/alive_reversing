@@ -5173,6 +5173,62 @@ TaskStep TimedDoorTask::Next(Bot& bot, const std::string& lastFailed)
     return step;
 }
 
+BaitSlogTask::~BaitSlogTask() = default;
+
+TaskStep BaitSlogTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    bool loose = false;
+    for (const SlogAt& slog : world.mSlogs)
+    {
+        loose = loose || (slog.mChasing && !slog.mAsleep && std::abs(slog.mY - mFloorY) <= 30);
+    }
+    if (!loose)
+    {
+        bot.Log("the Slog is no more");
+        return TaskStep::Done();
+    }
+    if (!mThrown)
+    {
+        if (!mThrow)
+        {
+            mThrow = std::make_unique<FeedSlogsTask>(mFallerX - 80, mFallerX + 80, mFloorY, mStand, mAim);
+            mThrow->SetRun(0);
+        }
+        const TaskStep step = mThrow->Next(bot, lastFailed);
+        if (step.mKind == TaskStep::Kind::ePrim || step.mKind == TaskStep::Kind::eFailed)
+        {
+            return step;
+        }
+        mThrow.reset();
+        mThrown = true;
+    }
+    // (while the bone lasts, and a little after: it may be finished off as the thing comes down)
+    bool bone = false;
+    s32 at = 0;
+    for (const RockAt& b : world.mBones)
+    {
+        if (b.mY >= mFloorY - 140 && b.mY <= mFloorY + 14)
+        {
+            bone = true;
+            at = b.mX;
+        }
+    }
+    if (mWaits++ == 0)
+    {
+        bot.Log("a bone for the Slog under the thing that falls at " + std::to_string(mFallerX));
+    }
+    if ((bone && mWaits < 400) || mWaits < 40)
+    {
+        if (bone && mWaits % 30 == 0)
+        {
+            bot.Log("the bone lies at " + std::to_string(at));
+        }
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    return TaskStep::Failed("the Slog was not under the falling thing when it came down");
+}
+
 TaskStep ZapWaitTask::Next(Bot& bot, const std::string&)
 {
     const Entity* slig = bot.GetWorld().Find(mSlig);

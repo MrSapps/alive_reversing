@@ -2578,8 +2578,13 @@ and a grenade at Slig#1017 at f=19982 not looked at) and not stuck.
 - `Bot::SlogRefuge`: a running jump that catches the ledge over a hoist, away from the Slog, is a way off its
   floor. He is on the ledge at 2412,1141 with the Slog some 150 behind.
 
-Open (33 deaths in `bw7.txt`, all here): on that ledge the plan goes on and he climbs down to the Slog. The guide:
-"Hit the bone sack, pick up the bone and throw it so that the Slog gets crushed by the falling boxes" (the sack at
-2450,1061 over the ledge, one bone; the falling thing at 2525, interval 15). Wanted: the floor under a Slog that
-is after him shut to coming down onto it whether or not that Slog has a pen (this one slept, and has no entity);
-and an action that baits a Slog under a falling thing. Not under test: this section's rules.
+- A Slog that is after him loose on a floor with no stretch of Slogs' own (`Key::kSlogLoose`, `Domain::Build`):
+  nothing comes down onto that floor while it is. Only such a floor: on one with a stretch the bones open and shut
+  it (FeeCo's path 9 was stuck on this otherwise).
+- `Throw a bone under the falling thing at ..` (`StepKind::eBaitSlog`, `BaitSlogTask`): where a thing falls over and
+  over onto that floor, from a cell 60 or more clear of it (he was killed throwing from 38). The plan gets the
+  bone from the sack first by itself. The Slog is crushed on the first try.
+
+With these the annex's own way runs from its start to its exit at 1587,921 with 0 deaths (`bw7.txt`). Its two
+secret areas are not gone into. Next: the path after it (12 deaths about 3048..3195,440, then stuck at 3188,320).
+Not under test: this section's rules, and the bait.

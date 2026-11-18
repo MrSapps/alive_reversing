@@ -2259,6 +2259,10 @@ std::vector<s32> Domain::PulledFirst(const NavGraph& nav, const World& world, co
     return first;
 }
 
+// How far from where a thing falls he stands to throw under it: what it meets on its way down it kills, and it is
+// some 40 either side (he was killed at 38)
+static const s32 kFallerClear = 60;
+
 // What a crossing onto a floor whose Sligs electric walls could get costs more with those Sligs still about
 static const s32 kZapFloorCost = 1500;
 
@@ -2576,6 +2580,86 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
     // (ElectricWall.cpp: what is within four pixels of the beam). Nothing is crossed onto that floor until they
     // have: the path has put the way to be rid of those Sligs there. (Bonewerkz' first annex: "say Work and pull
     // your own lever at the same time. When both Sligs are vaporized ...".)
+    // The floors (their lines) a Slog that is after him is on with no bone to keep it there: not come down onto.
+    // And where a thing falls over and over on to such a floor, a bone thrown under it puts the Slog there for
+    // as long as it eats. (Bonewerkz' first annex: "Hit the bone sack, pick up the bone and throw it so that the
+    // Slog gets crushed by the falling boxes".)
+    std::set<s32> looseLines;
+    for (const SlogAt& slog : world.mSlogs)
+    {
+        const s32 at = slog.mChasing && !slog.mAsleep && !world.SlogFed(slog) ? nav.NodeAt(slog.mX, slog.mY, false, 30) : -1;
+        // (not on a floor with a stretch of Slogs' own: that is shut and opened by its bones. FeeCo's path 9, where
+        // the last bone is thrown down and run from.)
+        bool penned = false;
+        for (const Entity& pen : world.mEntities)
+        {
+            penned = penned || (pen.mKind == EntityKind::eSlog && !pen.mGone && pen.mInputs[3] > pen.mInputs[2] && std::abs(pen.mInputs[4] - slog.mY) <= 30);
+        }
+        if (at >= 0 && !penned)
+        {
+            looseLines.insert(nav.Nodes()[at].mLine);
+        }
+    }
+    d.mStart.Set(Key::kSlogLoose, looseLines.empty() ? 0 : 1);
+    for (const RockAt& faller : world.mFallers)
+    {
+        if (faller.mFallIn < 0 || looseLines.empty())
+        {
+            continue;
+        }
+        for (const s32 line : looseLines)
+        {
+            s32 under = -1;
+            for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+            {
+                const NavNode& node = nav.Nodes()[n];
+                if (node.mLine == line && node.mHalf == faller.mHalf && std::abs(node.mX - faller.mX) <= 25 && node.mY > faller.mY && (under < 0 || std::abs(node.mX - faller.mX) < std::abs(nav.Nodes()[under].mX - faller.mX)))
+                {
+                    under = static_cast<s32>(n);
+                }
+            }
+            if (under < 0)
+            {
+                continue;
+            }
+            const s32 floorY = nav.Nodes()[under].mY;
+            s32 standAt = -1;
+            s32 off = 0;
+            u32 standAim = 0;
+            for (std::size_t n = 0; n < nav.Nodes().size(); n++)
+            {
+                const NavNode& node = nav.Nodes()[n];
+                if (node.mLine == line || node.mHalf != faller.mHalf || node.mHazard || node.mLow || node.mY > floorY - 50 || node.mY < floorY - 200 || std::abs(node.mX - faller.mX) > 200 || std::abs(node.mX - faller.mX) < kFallerClear)
+                {
+                    continue;
+                }
+                u32 aim = 0;
+                s32 frames = 0;
+                s32 downX = 0;
+                const s32 fx = faller.mX;
+                const auto near = [fx](s32 x)
+                {
+                    return std::abs(x - fx) <= 45;
+                };
+                if (BoneThrow(nav, static_cast<s32>(n), fx - 80, fx + 80, floorY, aim, frames, &downX, near) && (standAt < 0 || std::abs(downX - fx) < off))
+                {
+                    standAt = static_cast<s32>(n);
+                    off = std::abs(downX - fx);
+                    standAim = aim;
+                }
+            }
+            if (standAt < 0)
+            {
+                continue;
+            }
+            DomainStep bait;
+            bait.mKind = StepKind::eBaitSlog;
+            bait.mEdge = standAt;
+            bait.mOther = standAim | (static_cast<u32>(faller.mX) << 8);
+            add("Throw a bone under the falling thing at " + std::to_string(faller.mX) + " for the Slog from " + std::to_string(nav.Nodes()[standAt].mX) + "," + std::to_string(nav.Nodes()[standAt].mY), {{Key::kRegion, d.mRegions[standAt] + 1}, {Key::kSlogLoose, 1}}, {{Key::kSlogLoose, 0}}, 300, bait);
+            d.mActions.back().mSpend = {Key::kRocks, 1};
+        }
+    }
     std::map<s32, std::vector<u32>> zapLines;
     {
         std::set<std::pair<u32, s32>> done;
@@ -2759,6 +2843,11 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                     pre = other;
                 }
             }
+        }
+        // (down onto a floor a Slog that is after him is loose on: not while it is)
+        if (looseLines.count(nav.Nodes()[e.mTo].mLine) != 0 && nav.Nodes()[e.mFrom].mLine != nav.Nodes()[e.mTo].mLine)
+        {
+            pre.push_back({Key::kSlogLoose, 0});
         }
         // (onto a floor whose Sligs electric walls are there to get: with those Sligs gone, or dearly. Dearly and
         // not never: the walls may be ones he has no way to turn on, as in the Barracks' trophy room.)

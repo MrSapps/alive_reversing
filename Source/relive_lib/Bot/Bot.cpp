@@ -255,6 +255,20 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<FeedSlogsTask>(step.mEntity, step.mEdge, step.mOther);
         case StepKind::eZapWait:
             return std::make_unique<ZapWaitTask>(step.mEntity);
+        case StepKind::eBaitSlog:
+        {
+            // (the Slogs' floor: the one under the falling thing)
+            const s32 fx = static_cast<s32>(step.mOther >> 8);
+            s32 floorY = mKnow->mNav.Nodes()[step.mEdge].mY + 100;
+            for (const SlogAt& slog : mWorld.mSlogs)
+            {
+                if (slog.mChasing && !slog.mAsleep)
+                {
+                    floorY = slog.mY;
+                }
+            }
+            return std::make_unique<BaitSlogTask>(step.mEdge, step.mOther & 255, fx, floorY);
+        }
         case StepKind::eDrawSlogs:
             return std::make_unique<DrawSlogsTask>(step.mEntity, step.mEdge);
         case StepKind::eFeedAway:
