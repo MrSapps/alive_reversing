@@ -194,6 +194,17 @@ bool GoToTask::ZWatched(Bot& bot, const NavGraph& nav, const std::vector<s32>& p
             any = false;
         }
     }
+    // Landed where the leap was timed to end crouched: down
+    if (any && mZCrouchAt == cur && abe.Settled() && abe.mMove == Move::eIdle)
+    {
+        mZCrouchAt = -1;
+        step = TaskStep::Do(Prim::Press(Btn::eDown));
+        return true;
+    }
+    if (mZCrouchAt >= 0 && mZCrouchAt != cur && cur != mZSideAt && abe.Settled() && abe.mOnGround && abe.mMove != Move::eHang)
+    {
+        mZCrouchAt = -1;
+    }
     const NavEdge& first = nav.Edges()[path[0]];
     if (any && mZLeapt && mZSideX != 0 && cur == mZSideAt && here.mX != mZSideX)
     {
@@ -601,7 +612,16 @@ bool GoToTask::ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
                 break;
             case EdgeKind::eHoistUp:
                 add(from, from, 12);
-                add(*at, *at, 28);
+                // (hung from the ledge, then up over it: his box is from 7 to 72 under the ledge as he hangs
+                // and from 52 over it to it as he stands, measured; a cover that reaches down past the ledge
+                // hides him for most of the way up. FeeCo's path 4, up onto the platform at 812,380: taken for
+                // stood on it all the 28 frames, there was no time the Sligs gave him for it.)
+                for (s32 f = 1; f <= 28; f++)
+                {
+                    const s32 bottom = 72 - 72 * f / 28;
+                    const s32 top = 7 - 59 * f / 28;
+                    track.push_back({at->mX, nav.CameraOf(at->mX, at->mY - 5) != cam || nav.ZCovered(at->mX, at->mY + bottom, -14, 14, bottom - top)});
+                }
                 break;
             case EdgeKind::eRunJump:
                 // (a run of 6 a frame, and up from his hands if it ends hung from a ledge)
@@ -621,12 +641,42 @@ bool GoToTask::ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
                 break;
         }
         const NavNode& landed = *at;
+        // Where he comes to stand is under a cover that hides him crouched: down at once, 11 frames, and that
+        // is the cover the leap was for. ("Climb up to the raised platform, walk forward and crouch, all while
+        // the Sligs are facing right.")
+        bool lowLand = !landed.mZCover && nav.CameraOf(landed.mX, landed.mY - 5) == cam && nav.ZCovered(landed.mX, landed.mY, -13, 13, 34);
+        // (at the top of a hoist down is back down it: a step on along the way first, where that is under
+        // the cover too)
+        bool edge = false;
+        for (const NavEdge& e : nav.Edges())
+        {
+            edge = edge || (e.mFrom == leap.mTo && e.mKind == EdgeKind::eHoistDown);
+        }
+        s32 lowAt = leap.mTo;
+        if (lowLand && edge)
+        {
+            const s32 on = lead + 1 < path.size() && nav.Edges()[path[lead + 1]].mKind == EdgeKind::eWalk ? nav.Edges()[path[lead + 1]].mTo : -1;
+            lowLand = on >= 0 && nav.ZCovered(nav.Nodes()[on].mX, nav.Nodes()[on].mY, -13, 13, 34);
+            if (lowLand)
+            {
+                add(landed, landed, 3);
+                add(landed, nav.Nodes()[on], 9);
+                lowAt = on;
+            }
+        }
+        if (lowLand)
+        {
+            add(nav.Nodes()[lowAt], nav.Nodes()[lowAt], 11);
+            track.push_back({nav.Nodes()[lowAt].mX, true});
+        }
+        mZLowLand = lowLand ? lowAt : -1;
+        const s32 lowStepFrom = lowLand && lowAt != leap.mTo ? leap.mTo : -1;
         // On along the floor into the next cover: walked, and where the cover is too low to stand under, rolled
         // into from the last cell he can stand in (the rifle range's fourth screen: the cutout he hops down
         // for is four cells on from where he lands, and the last of them is under it)
         const NavNode* walked = at;
         bool rolls = false;
-        for (std::size_t i = lead + 1; i < path.size() && i < lead + 7 && !at->mZCover && nav.CameraOf(at->mX, at->mY - 5) == cam; i++)
+        for (std::size_t i = lead + 1; !lowLand && i < path.size() && i < lead + 7 && !at->mZCover && nav.CameraOf(at->mX, at->mY - 5) == cam; i++)
         {
             const NavEdge& on = nav.Edges()[path[i]];
             if (on.mKind == EdgeKind::eWalk && !rolls)
@@ -646,7 +696,12 @@ bool GoToTask::ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
         }
         mZSideX = 0;
         mZSideAt = -1;
-        const bool inOpen = !at->mZCover && nav.CameraOf(at->mX, at->mY - 5) == cam;
+        if (lowStepFrom >= 0)
+        {
+            mZSideX = nav.Nodes()[lowAt].mX;
+            mZSideAt = lowStepFrom;
+        }
+        const bool inOpen = !lowLand && !at->mZCover && nav.CameraOf(at->mX, at->mY - 5) == cam;
         if (inOpen)
         {
             // No cover the way it goes on: one a step or two aside of where the leap lands, if there is one
@@ -735,7 +790,9 @@ bool GoToTask::ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
         // long while)
         // (a burst can take two thirds of his health: with more than one in it, only if that is the best there
         // is in a long while, and never three)
-        if (move.mSpotters > 1)
+        // (and with one in it, if a while longer gives a time with none: two Sligs of different rounds are
+        // both looking away for long enough only now and then. FeeCo's path 4: 208 and 172 frames.)
+        if (move.mSpotters > 0)
         {
             const SligCycle::Move later = cycle.Through(track, shooters, 2400, let);
             if (later.mSpotters < move.mSpotters)
@@ -777,6 +834,7 @@ bool GoToTask::ZLeap(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
     mZFrom = -1;
     mZSaid = -1;
     mZLeapt = true;
+    mZCrouchAt = mZLowLand;
     if (lowStand)
     {
         step = TaskStep::Do(Prim::Press(Btn::eUp));
@@ -839,7 +897,7 @@ bool GoToTask::ZWalk(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
             }
         }
         SligCycle::Move move = cycle.Through(track, shooters, 600);
-        if (move.mSpotters > 1)
+        if (move.mSpotters > 0)
         {
             const SligCycle::Move later = cycle.Through(track, shooters, 2400);
             if (later.mSpotters < move.mSpotters)
