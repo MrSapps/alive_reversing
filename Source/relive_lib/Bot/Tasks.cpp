@@ -2281,15 +2281,22 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         {
             far = nav.Nodes()[nav.Edges()[path[k]].mTo].mX;
         }
+        // (under one where he stands: nothing is waited for there, whatever else falls on the way. Bonewerkz' path
+        // 3, the lever at 1170 under the crates of 1161: done with it he stood for the crates of the next stretch.)
+        bool under = false;
+        for (const RockAt& r : bot.GetWorld().mFallers)
+        {
+            under = under || (r.mFallIn >= 0 && r.mHalf == here.mHalf && r.mY < here.mY - (here.mHalf ? 30 : 60) && std::abs(r.mX - here.mX) <= (here.mHalf ? 20 : 40));
+        }
         for (const RockAt& r : bot.GetWorld().mFallers)
         {
             const s32 reach = here.mHalf ? 20 : 40;
-            if (r.mFallIn < 0 || r.mHalf != here.mHalf || r.mY >= here.mY - 60 || here.mY - r.mY > 700 || std::abs(r.mX - here.mX) <= reach || r.mX < std::min(here.mX, far) - reach || r.mX > std::max(here.mX, far) + reach)
+            if (under || r.mFallIn < 0 || r.mHalf != here.mHalf || r.mY >= here.mY - (here.mHalf ? 30 : 60) || here.mY - r.mY > 700 || std::abs(r.mX - here.mX) <= reach || r.mX < std::min(here.mX, far) - reach || r.mX > std::max(here.mX, far) + reach)
             {
                 continue;
             }
             // (down to his head: 1.8 a frame faster each frame up to 20)
-            const s32 drop = std::max(0, here.mY - 70 - r.mY);
+            const s32 drop = std::max(0, here.mY - (here.mHalf ? 35 : 70) - r.mY);
             s32 fall = 0;
             for (s32 v = 0, d = 0; d < drop; fall++)
             {
@@ -2299,8 +2306,38 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             // (to past it, or to where he stops if that is under it: then all the way there and what he does there)
             const bool stops = std::abs(far - r.mX) <= reach;
             const s32 need = 14 + std::abs((stops ? far : r.mX + (far > here.mX ? reach : -reach)) - here.mX) / 3 + (stops ? 45 : 0) + (first.mKind == EdgeKind::eHoistUp || first.mKind == EdgeKind::eHoistDown ? 30 : 0);
-            if (r.mFallIn + fall < need + 8 && mFallerWaits < 900)
+            // (one that comes round too fast for that ever to be: as it smashes, which is the most there is. "Starting
+            // immediately after a crate hits".)
+            const s32 left = r.mFallIn + fall;
+            const bool smashed = mFallerLeft >= 0 && left > mFallerLeft + 10;
+            mFallerLeft = left;
+            if (smashed && mFallerWaits > 0)
             {
+                bot.Log("it has smashed: now, with " + std::to_string(left) + " frames of the " + std::to_string(need) + " wanted");
+                break;
+            }
+            if (left < need + 8 && mFallerWaits < 900)
+            {
+                // (waited for from the cell beside where it comes down, not from where he first sees it: "stand
+                // beside the crate impact point ... starting immediately after a crate hits". From two cells off
+                // he was a frame or two late out from under the crates of Bonewerkz' path 3.)
+                if (first.mKind == EdgeKind::eWalk && abe.Settled())
+                {
+                    s32 beside = here.mX;
+                    for (std::size_t k = 0; k < path.size() && k < 6 && nav.Edges()[path[k]].mKind == EdgeKind::eWalk && nav.Edges()[path[k]].mLeft == first.mLeft; k++)
+                    {
+                        const s32 x = nav.Nodes()[nav.Edges()[path[k]].mTo].mX;
+                        if (std::abs(x - r.mX) <= reach + 1)
+                        {
+                            break;
+                        }
+                        beside = x;
+                    }
+                    if (beside != here.mX)
+                    {
+                        return TaskStep::Do(Prim::MoveTo(beside, Gait::eWalk));
+                    }
+                }
                 if (mFallerWaits++ == 0)
                 {
                     bot.Log("a thing that falls at " + std::to_string(r.mX) + " over the way to " + std::to_string(far) + " (down in " + std::to_string(r.mFallIn + fall) + ", " + std::to_string(need) + " wanted): waiting for it to have smashed");
@@ -2310,6 +2347,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             }
         }
         mFallerWaits = 0;
+        mFallerLeft = -1;
     }
     // (AO: he doesn't roll out towards a Slig in the background that faces him or is turning, or to nearer than a
     // cell and a half behind one: see the walk below)
@@ -3172,7 +3210,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 if (last + 1 < path.size() && nav.Edges()[path[last + 1]].mKind == EdgeKind::eFall && nav.Edges()[path[last + 1]].mLeft == first.mLeft && !nav.Edges()[path[last + 1]].mCrouched &&
                     !first.mCrouched && first.mKind == EdgeKind::eWalk && (!unseenChase || onTheSameWay))
                 {
-                    bot.Log("chased: off the end of the floor at a run");
+                    bot.Log(std::string("chased: off the end of the floor at a run") + (bot.TimedRunOn() ? " (a timed run)" : bot.RecentlyChased() ? " (chased in this path a while ago)" : ""));
                     Prim run = Prim::WalkOff(first.mLeft);
                     run.mRunOff = 1;
                     mLastEdge = -1;

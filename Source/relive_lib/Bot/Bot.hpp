@@ -500,11 +500,14 @@ public:
     // through what it keeps them from
     void RunFor(s32 frames)
     {
-        mRunUntil = static_cast<s32>(mAbe.mFrame) + frames;
+        // (no longer than a few seconds, and in the path it was asked in: a Slog's eating time is what its map says,
+        // and with three hundred of it he was still at a run in the next path, off a ledge under falling crates)
+        mRunUntil = static_cast<s32>(mAbe.mFrame) + std::min(frames, 200);
+        mRunPath = mAbe.mLevel * 1000 + mAbe.mPath;
     }
     bool TimedRunOn() const
     {
-        return mTimedRun || static_cast<s32>(mAbe.mFrame) < mRunUntil;
+        return mTimedRun || (static_cast<s32>(mAbe.mFrame) < mRunUntil && mRunPath == mAbe.mLevel * 1000 + mAbe.mPath);
     }
     // The cell he waits in for a flying Slig to have gone by (GoToTask, out of a tunnel): not hidden from there
     void FlierTimedAt(s32 node)
@@ -648,6 +651,7 @@ private:
     s32 mFlierTimedNode = -1;
     bool mTimedRun = false;
     s32 mRunUntil = 0;
+    s32 mRunPath = -1;
     // Bones thrown to Slogs on their own floor, beyond the plan's
     s32 mRefeeds = 0;
     s32 mLooseFeeds = 0;
