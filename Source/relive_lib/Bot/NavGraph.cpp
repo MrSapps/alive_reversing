@@ -1422,7 +1422,12 @@ void NavGraph::Build(const NavInput& input)
                             deadly = true;
                         }
                     }
-                    if (height >= (n.mHalf ? kDeadlyFall / 2 : kDeadlyFall) && !FeatureAt(FeatureKind::eSoftLanding, nx, fy - 5, n.mHalf) && !FeatureAt(FeatureKind::eSoftLanding, nx, fy, n.mHalf))
+                    // (at half scale a fall of exactly 90 kills: measured in Bonewerkz' path 3, off 1649,59 to the floor
+                    // at 149. The height above is from a pixel under his floor and let it through as 89. At full
+                    // scale one of exactly 180 is lived through, measured too: Necrum's path 3, off 1187,980 to
+                    // 1160, which the way through that path has always taken. So only the half-scale one is put
+                    // right here.)
+                    if ((n.mHalf ? fy - n.mY >= kDeadlyFall / 2 : height >= kDeadlyFall) && !FeatureAt(FeatureKind::eSoftLanding, nx, fy - 5, n.mHalf) && !FeatureAt(FeatureKind::eSoftLanding, nx, fy, n.mHalf))
                     {
                         deadly = true;
                     }

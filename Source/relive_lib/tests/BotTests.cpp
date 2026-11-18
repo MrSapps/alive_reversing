@@ -10802,3 +10802,137 @@ TEST(BotFallers, WhatFallsComesDownAsFarAsTheFirstFloorUnderItAndTheHoistUpThere
     last = -1;
     EXPECT_TRUE(GoToTask::Faller(room.mNav, room.mWorld, along, top, room.mLeverX - 7, room.mLeverX + 6, true, last, 0).mUnder);
 }
+
+TEST(BotFallers, NoWalkGoesInUnderOneThatIsBackBeforeHeIsThrough)
+{
+    // The 9-wide crate and his box at a walk: some 19 frames through under it
+    CrateFloor room(0, 5);
+    const NavNode& under = room.mNav.Nodes()[room.mNav.NodeAt(room.mLeverX, 160, true, 2)];
+    const NavNode& beside = room.mNav.Nodes()[room.mNav.NodeAt(room.mLeverX + room.mStep, 160, true, 2)];
+    // (how often it falls not known: nothing said)
+    EXPECT_FALSE(Domain::TooFastToWalk(room.mNav, room.mWorld, under));
+    // Every 15 frames (and three of its fall): no
+    room.mWorld.mFallers[0].mEvery = 15;
+    EXPECT_TRUE(Domain::TooFastToWalk(room.mNav, room.mWorld, under));
+    EXPECT_FALSE(Domain::TooFastToWalk(room.mNav, room.mWorld, beside));
+    // (on its way down, nearly at the floor, it is no less so)
+    room.mWorld.mFallers[0].mY = 140;
+    EXPECT_TRUE(Domain::TooFastToWalk(room.mNav, room.mWorld, under));
+    room.mWorld.mFallers[0].mY = 160;
+    EXPECT_TRUE(Domain::TooFastToWalk(room.mNav, room.mWorld, under));
+    room.mWorld.mFallers[0].mY = 0;
+    // Every 23, as over the lever of that path's first screen: walked
+    room.mWorld.mFallers[0].mEvery = 23;
+    EXPECT_FALSE(Domain::TooFastToWalk(room.mNav, room.mWorld, under));
+    // (one that is not set going, or that lands on a ledge over the cell, is nothing)
+    room.mWorld.mFallers[0].mEvery = 15;
+    room.mWorld.mFallers[0].mFallIn = -1;
+    EXPECT_FALSE(Domain::TooFastToWalk(room.mNav, room.mWorld, under));
+    CrateFloor ledge(0, 5, true);
+    ledge.mWorld.mFallers[0].mEvery = 15;
+    EXPECT_FALSE(Domain::TooFastToWalk(ledge.mNav, ledge.mWorld, ledge.mNav.Nodes()[ledge.mNav.NodeAt(ledge.mLeverX, 160, true, 2)]));
+    EXPECT_TRUE(Domain::TooFastToWalk(ledge.mNav, ledge.mWorld, ledge.mNav.Nodes()[ledge.mNav.NodeAt(ledge.mLeverX, 110, true, 2)]));
+}
+
+TEST(BotNav, AFallOfExactlyNinetyAtHalfScaleIsNoWayDownAndOneOfExactlyAHundredAndEightyAtFullScaleIs)
+{
+    const auto falls = [](s32 lowY, s32 type)
+    {
+        NavInput in;
+        in.mLines.push_back(Line(100, 60, 200, 60, type));
+        in.mLines.push_back(Line(0, lowY, 300, lowY, type));
+        NavGraph g;
+        g.Build(in);
+        for (const NavEdge& e : g.Edges())
+        {
+            if (e.mKind == EdgeKind::eFall && g.Nodes()[e.mFrom].mY == 60 && g.Nodes()[e.mTo].mY == lowY)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    // Half scale (measured in Bonewerkz' path 3)
+    EXPECT_TRUE(falls(149, 4));
+    EXPECT_FALSE(falls(150, 4));
+    EXPECT_FALSE(falls(170, 4));
+    // Full scale (measured in Necrum's path 3)
+    EXPECT_TRUE(falls(240, 0));
+    EXPECT_FALSE(falls(241, 0));
+}
+
+TEST(BotFallers, OneTooFastToWalkUnderIsHoppedOverFromACellClearOfIt)
+{
+    CrateFloor room(0, 5);
+    room.mWorld.mFallers[0].mEvery = 15;
+    const auto way = [&room](s32 fromCells, s32 toCells)
+    {
+        std::vector<s32> path;
+        EXPECT_TRUE(room.mNav.FindPath(room.mNav.NodeAt(room.mLeverX + fromCells * room.mStep, 160, true, 2), room.mNav.NodeAt(room.mLeverX + toCells * room.mStep, 160, true, 2), nullptr, path));
+        return path;
+    };
+    // The crate is over the lever's cell and the one left of it: from a cell right of them to two cells left
+    EXPECT_TRUE(GoToTask::HopsOver(room.mNav, room.mWorld, way(1, -2)));
+    EXPECT_TRUE(GoToTask::HopsOver(room.mNav, room.mWorld, way(1, -5)));
+    // (not from further off: the hop would come down under it)
+    EXPECT_FALSE(GoToTask::HopsOver(room.mNav, room.mWorld, way(2, -2)));
+    // (nor on a way that stops under it, or goes the other way)
+    EXPECT_FALSE(GoToTask::HopsOver(room.mNav, room.mWorld, way(1, -1)));
+    EXPECT_FALSE(GoToTask::HopsOver(room.mNav, room.mWorld, way(1, 5)));
+    // A walk from further off stops at the cell the hop is from, and not once there
+    EXPECT_EQ(GoToTask::StopBefore(room.mNav, room.mWorld, way(4, -5)), room.mLeverX + room.mStep);
+    EXPECT_EQ(GoToTask::StopBefore(room.mNav, room.mWorld, way(1, -5)), -1);
+    EXPECT_EQ(GoToTask::StopBefore(room.mNav, room.mWorld, way(4, 2)), -1);
+    // One slow enough to walk under is walked under
+    room.mWorld.mFallers[0].mEvery = 23;
+    EXPECT_FALSE(GoToTask::HopsOver(room.mNav, room.mWorld, way(1, -2)));
+    EXPECT_EQ(GoToTask::StopBefore(room.mNav, room.mWorld, way(4, -5)), -1);
+}
+
+TEST(BotFallers, AWayThatEndsUnderOneTooFastOrJumpsTwoAtOnceIsBarred)
+{
+    CrateFloor room(0, 5);
+    room.mWorld.mFallers[0].mEvery = 15;
+    NavEdge e;
+    e.mKind = EdgeKind::eFall;
+    e.mFrom = room.mNav.NodeAt(room.mLeverX + 3 * room.mStep, 160, true, 2);
+    e.mTo = room.mNav.NodeAt(room.mLeverX, 160, true, 2);
+    EXPECT_TRUE(Domain::FallersBar(room.mNav, room.mWorld, e));
+    // (a walk in under it is not barred: it is hopped over from the cell before, GoToTask::HopsOver)
+    e.mKind = EdgeKind::eWalk;
+    EXPECT_FALSE(Domain::FallersBar(room.mNav, room.mWorld, e));
+    // A hop over the one is the way
+    e.mKind = EdgeKind::eHop;
+    e.mFrom = room.mNav.NodeAt(room.mLeverX + room.mStep, 160, true, 2);
+    e.mTo = room.mNav.NodeAt(room.mLeverX - 2 * room.mStep, 160, true, 2);
+    EXPECT_FALSE(Domain::FallersBar(room.mNav, room.mWorld, e));
+    // A jump over two is not
+    RockAt second = room.mWorld.mFallers[0];
+    second.mX -= 4 * room.mStep;
+    second.mBoxX1 -= 4 * room.mStep;
+    second.mBoxX2 -= 4 * room.mStep;
+    room.mWorld.mFallers.push_back(second);
+    e.mKind = EdgeKind::eRunJump;
+    e.mTo = room.mNav.NodeAt(room.mLeverX - 7 * room.mStep, 160, true, 2);
+    EXPECT_TRUE(Domain::FallersBar(room.mNav, room.mWorld, e));
+    // (whatever they are doing just now: one of them down past his floor is still one jumped over)
+    room.mWorld.mFallers[1].mY = 190;
+    EXPECT_TRUE(Domain::FallersBar(room.mNav, room.mWorld, e));
+    room.mWorld.mFallers[1].mY = 0;
+    // (walked, that stretch is not a jump: only where it ends counts)
+    e.mKind = EdgeKind::eWalk;
+    EXPECT_FALSE(Domain::FallersBar(room.mNav, room.mWorld, e));
+    // The same from the map alone, their screen not shown: what is planned from a screen off knows of them
+    room.mWorld.mFallersAt = room.mWorld.mFallers;
+    room.mWorld.mFallers.clear();
+    e.mKind = EdgeKind::eRunJump;
+    EXPECT_TRUE(Domain::FallersBar(room.mNav, room.mWorld, e));
+    EXPECT_EQ(room.mWorld.FallersKnown().size(), 2u);
+    // (one that is there now is not counted twice)
+    room.mWorld.mFallers.push_back(room.mWorld.mFallersAt[0]);
+    EXPECT_EQ(room.mWorld.FallersKnown().size(), 2u);
+    // (nothing falls: nothing barred)
+    room.mWorld.mFallersAt.clear();
+    room.mWorld.mFallers.clear();
+    EXPECT_FALSE(Domain::FallersBar(room.mNav, room.mWorld, e));
+}

@@ -1728,6 +1728,13 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
                 }
             }
         }
+        // Under a thing that falls again before he is through: dear, so that the hop over where it comes down is
+        // what is taken (Bonewerkz' path 3, the crates of 1618 and 1671 every 18 frames: "hop over the impact
+        // point of the right-most falling crate, then hop again from where you land"). Domain::FallersBar.
+        if (know->mNav.Input().mIsAe && Domain::FallersBar(know->mNav, *world, e))
+        {
+            return e.mCost + 2000;
+        }
         // A running jump up a hoist: the way to go with a Scrab on his floor after him, and not otherwise
         // (not the one from a stand, NavGraph::kStandJumpCost: that is for getting off a Slig's floor, MakeFlee,
         // and stays dear here. Made cheap with a Scrab about it had him up the ledge of the Scrab trial's last

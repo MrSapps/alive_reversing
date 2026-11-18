@@ -633,6 +633,65 @@ bool Domain::FlierFar(const NavInput& in, const FlierAt& flier, s32 abeX, s32 ab
     return far(abeX, abeY) && (!next || far(next->mX, next->mY));
 }
 
+bool Domain::TooFastToWalk(const NavGraph& nav, const World& world, const NavNode& cell)
+{
+    // (half his box, at a walk: a cell wide and a pixel stood, three more ahead of him walking)
+    const s32 step = NavGraph::GridStep(cell.mHalf);
+    const s32 mine = step / 2 + 4;
+    // (wherever it is on its way down just now: asked while it was three frames from the floor the cell was said
+    // to be clear, and that was when the walk under it was chosen)
+    const std::vector<RockAt> fallers = world.FallersKnown();
+    for (const RockAt& r : fallers)
+    {
+        if (r.mEvery <= 0 || r.mFallIn < 0 || r.mBoxX2 <= r.mBoxX1 || r.mHalf != cell.mHalf || r.mY > cell.mY + 5 || cell.mX + mine < r.mBoxX1 || cell.mX - mine > r.mBoxX2)
+        {
+            continue;
+        }
+        s32 fy = 0;
+        if (nav.FloorBelow(r.mX, r.mY, r.mHalf, &fy) >= 0 && fy < cell.mY - 5)
+        {
+            continue;
+        }
+        // (through under it: its width and his at a walk, 9 frames a cell; it is back after its wait and the
+        // few frames of its fall)
+        const s32 through = (r.mBoxX2 - r.mBoxX1 + 2 * mine) * 9 / step;
+        if (through > r.mEvery + 3)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Domain::FallersBar(const NavGraph& nav, const World& world, const NavEdge& e)
+{
+    if (world.mFallers.empty() && world.mFallersAt.empty())
+    {
+        return false;
+    }
+    const NavNode& from = nav.Nodes()[e.mFrom];
+    const NavNode& to = nav.Nodes()[e.mTo];
+    // (not a walk in under one: that is hopped over where it can be, GoToTask::HopsOver, and made dear the way
+    // round by a drop that ends under another was the cheaper)
+    if (e.mKind != EdgeKind::eWalk && TooFastToWalk(nav, world, to))
+    {
+        return true;
+    }
+    if (e.mKind != EdgeKind::eRunJump && e.mKind != EdgeKind::eHop)
+    {
+        return false;
+    }
+    // (wherever each is on its way down just now: counted only while it was over him, the jump was the way again
+    // for the frames one of them was under his floor)
+    s32 over = 0;
+    const std::vector<RockAt> fallers = world.FallersKnown();
+    for (const RockAt& r : fallers)
+    {
+        over += r.mEvery > 0 && r.mFallIn >= 0 && r.mHalf == from.mHalf && std::abs(r.mY - std::min(from.mY, to.mY)) < 200 && r.mX > std::min(from.mX, to.mX) && r.mX < std::max(from.mX, to.mX) ? 1 : 0;
+    }
+    return over >= 2;
+}
+
 bool Domain::FlierTrack(const NavInput& in, s32 fx, s32 fy, s32& x1, s32& y1, s32& x2, s32& y2, std::vector<std::pair<s32, s32>>* ends, std::vector<NavLine>* lines, s32 join)
 {
     static const s32 kTrackLine = 8;
@@ -2762,7 +2821,9 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         }
         // (and of two that are alike the one that ends on a lift's platform where it is worked from)
         // (what was told apart before stays first: the rest only decides between ways that were alike)
-        const s32 cost = (beatTo >= 0 && beatTo != SligBeat(nav, world, e.mFrom) ? 100 : 0) + (beside ? 4 : 0) + (e.mKind == EdgeKind::eHop && nav.Nodes()[e.mTo].mLiftStop < 0 ? 1 : 0) + (e.mKind == EdgeKind::eRunJump && e.mCost == NavGraph::kStandJumpCost ? 50 : 0);
+        const s32 cost = (beatTo >= 0 && beatTo != SligBeat(nav, world, e.mFrom) ? 100 : 0) + (beside ? 4 : 0) + (e.mKind == EdgeKind::eHop && nav.Nodes()[e.mTo].mLiftStop < 0 ? 1 : 0) + (e.mKind == EdgeKind::eRunJump && e.mCost == NavGraph::kStandJumpCost ? 50 : 0) +
+                         // (nor one that things that fall too often bar, FallersBar, where another way gets to the same place)
+                         (nav.Input().mIsAe && FallersBar(nav, world, e) ? 200 : 0);
         const auto key = std::make_tuple(rf, rt, barrier ? e.mFeature : -1);
         const auto found = cheapest.find(key);
         if (found == cheapest.end() || cost < found->second.first)

@@ -395,6 +395,8 @@ struct RockAt final
     // Its box's sides (a thing that falls: what it hits is what its box meets)
     s32 mBoxX1 = 0;
     s32 mBoxX2 = 0;
+    // A thing that falls over and over: the frames it waits between falls (0: not known)
+    s32 mEvery = 0;
 };
 
 // A Glukkon that is about
@@ -837,6 +839,28 @@ struct World final
     // Where the map puts Slogs asleep (of the path, whether their screen is loaded or not): a noise on their
     // screen wakes them (Slog.cpp, Brain_1_Idle), so it is crossed at a sneak
     std::vector<RockAt> mSlogsAsleepAt;
+    // AE: where the map has things that fall over and over (FallingItem), whether their screen is shown or not:
+    // mX, mY where each starts, mEvery its wait, mFallIn -1 while its switch is off, its box's sides as measured
+    // (it is 9 wide at half scale). The ones in mFallers are the ones on the screen shown, with where they are now.
+    std::vector<RockAt> mFallersAt;
+    // All of them: the ones there now, and the map's for the rest
+    std::vector<RockAt> FallersKnown() const
+    {
+        std::vector<RockAt> all = mFallers;
+        for (const RockAt& at : mFallersAt)
+        {
+            bool live = false;
+            for (const RockAt& r : mFallers)
+            {
+                live = live || (r.mHalf == at.mHalf && std::abs(r.mX - at.mX) <= 3);
+            }
+            if (!live)
+            {
+                all.push_back(at);
+            }
+        }
+        return all;
+    }
     static s32 SlogFloorSwitch(s32 floorY, s32 column)
     {
         return 800000 + (floorY / 4 % 2000) * 64 + column % 64;
