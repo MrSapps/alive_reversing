@@ -2456,17 +2456,54 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             follows.push_back({e.mInputs[0], e.mSwitch});
         }
     }
-    const auto add = [&d, &follows](std::string name, std::vector<Goap::Fact> pre, std::vector<Goap::Fact> effects, s32 cost, const DomainStep& step)
+    const auto add = [&d, &follows, &world](std::string name, std::vector<Goap::Fact> pre, std::vector<Goap::Fact> effects, s32 cost, const DomainStep& step)
     {
         for (std::size_t i = 0; i < effects.size() && !follows.empty(); i++)
         {
             for (const std::pair<s32, s32>& f : follows)
             {
-                const Goap::Fact with{Key::Switch(f.second), effects[i].mValue};
-                if (effects[i].mKey == Key::Switch(f.first) && std::find(effects.begin(), effects.end(), with) == effects.end())
+                // (a timer trigger toggles its outputs when its input changes, TimerTrigger.cpp: one that is on
+                // already goes off. Bonewerkz' first annex: the Mudokon's rescue switch toggles the two levers'
+                // switches, which are on by then.)
+                const bool on = world.Switch(f.second) != 0 && world.Switch(f.first) == 0 && effects[i].mValue == 1;
+                const Goap::Fact with{Key::Switch(f.second), on ? 0 : effects[i].mValue};
+                bool have = false;
+                for (const Goap::Fact& e : effects)
+                {
+                    have = have || e.mKey == with.mKey;
+                }
+                if (effects[i].mKey == Key::Switch(f.first) && !have)
                 {
                     effects.push_back(with);
                 }
+            }
+        }
+        // And a switch logic that toggles its output when its inputs all come on, or all go off, within its delay
+        // (MultiSwitchController): one thing that sets them all off at once turns its output back.
+        for (const Entity& logic : world.mEntities)
+        {
+            if (logic.mKind != EntityKind::eSwitchLogic || logic.mState <= 0 || logic.mOp != 2 || logic.mSwitch <= 1 || world.Switch(logic.mSwitch) == 0)
+            {
+                continue;
+            }
+            bool all = true;
+            s32 inputs = 0;
+            for (const s32 input : logic.mInputs)
+            {
+                if (input > 1)
+                {
+                    inputs++;
+                    all = all && std::find(effects.begin(), effects.end(), Goap::Fact{Key::Switch(input), 0}) != effects.end();
+                }
+            }
+            bool have = false;
+            for (const Goap::Fact& e : effects)
+            {
+                have = have || e.mKey == Key::Switch(logic.mSwitch);
+            }
+            if (all && inputs >= 2 && !have)
+            {
+                effects.push_back({Key::Switch(logic.mSwitch), 0});
             }
         }
         Goap::Action a;
@@ -2518,11 +2555,8 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             {
                 continue;
             }
+            // (on already, and the Slig not got yet: the wait for it is what there is to do)
             const s32 shut = wall.mStartClosed ? 0 : 1;
-            if (world.Switch(wall.mSwitch) == shut)
-            {
-                continue;
-            }
             const s32 at = nav.NodeAt((wall.mX1 + wall.mX2) / 2, wall.mY2, wall.mHalf, 30);
             if (at < 0)
             {
@@ -2532,7 +2566,27 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             {
                 // (one the map puts there awake, and not a spawner's)
                 const s32 home = slig.mKind == EntityKind::eSlig && !slig.mGone && slig.mSwitch <= 1 ? nav.NodeAt(slig.CentreX(), slig.mY2, slig.mHalf, 30) : -1;
-                if (home < 0 || nav.Nodes()[home].mLine != nav.Nodes()[at].mLine || !done.insert({slig.mId, wall.mSwitch}).second)
+                if (home < 0 || nav.Nodes()[home].mLine != nav.Nodes()[at].mLine)
+                {
+                    continue;
+                }
+                // (with the wall on already: only a Slig whose beat has been seen to go through where it stands.
+                // One that stops short of it is not waited for. FeeCo's path 9, the wall of switch 50: twelve
+                // waits of two thousand frames.)
+                if (world.Switch(wall.mSwitch) == shut)
+                {
+                    bool through = false;
+                    const s32 wx = (wall.mX1 + wall.mX2) / 2;
+                    for (const SligAt& live : world.mSligs)
+                    {
+                        through = through || (slig.mLive && std::abs(live.mX - slig.mLiveX) <= 8 && std::abs(live.mY - slig.mLiveY) <= 8 && live.mBeatMax > live.mBeatMin && wx >= live.mBeatMin - 12 && wx <= live.mBeatMax + 12);
+                    }
+                    if (!through)
+                    {
+                        continue;
+                    }
+                }
+                if (!done.insert({slig.mId, wall.mSwitch}).second)
                 {
                     continue;
                 }
@@ -4037,7 +4091,10 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                     d.mStart.Set(Key::Mud(entity.mId), 1);
                     break;
                 }
-                const s32 node = UseNode(nav, entity, nullptr);
+                // (where it is now, once it has been led off from where the map put it)
+                const s32 home = UseNode(nav, entity, nullptr);
+                const s32 led = entity.mLive && (std::abs(entity.mLiveX - entity.CentreX()) > 40 || std::abs(entity.mLiveY - entity.mY2) > 20) ? nav.NodeAt(entity.mLiveX, entity.mLiveY, entity.mHalf, 20) : -1;
+                const s32 node = led >= 0 ? led : home;
                 if (node < 0)
                 {
                     break;
@@ -4070,6 +4127,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 }
                 const Entity* best = nullptr;
                 s32 bestDist = 0;
+                std::vector<s32> bestAcross;
                 std::vector<s32> blindWay;
                 for (const Entity& portal : world.mEntities)
                 {
@@ -4094,15 +4152,30 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                         continue;
                     }
                     const s32 pnode = UseNode(nav, portal, nullptr);
-                    if (pnode < 0 || d.mRegions[pnode] != d.mRegions[node] || !walks[pnode])
+                    if (pnode < 0 || !walks[pnode])
                     {
                         continue;
                     }
-                    const s32 dist = std::abs(portal.CentreX() - entity.CentreX()) + std::abs(portal.mY2 - entity.mY2) * 4;
+                    // (in another region: by a way it walks, with what shuts that way open. Bonewerkz' first annex:
+                    // the trap door the levers shut is its bridge to the portal.)
+                    std::vector<s32> across;
+                    if (d.mRegions[pnode] != d.mRegions[node])
+                    {
+                        const NavGraph::EdgeCost mudCost = [](const NavEdge& e)
+                        {
+                            return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eLift ? e.mCost : -1;
+                        };
+                        if (!nav.FindPath(node, pnode, mudCost, across))
+                        {
+                            continue;
+                        }
+                    }
+                    const s32 dist = std::abs(portal.CentreX() - entity.CentreX()) + std::abs(portal.mY2 - entity.mY2) * 4 + (across.empty() ? 0 : 2000);
                     if (!best || dist < bestDist)
                     {
                         best = &portal;
                         bestDist = dist;
+                        bestAcross = across;
                     }
                 }
                 if (!best)
@@ -4166,6 +4239,15 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 {
                     // The portal isn't there until its switch is on
                     pre.push_back({Key::Switch(best->mInputs[0]), 1});
+                }
+                for (const s32 idx : bestAcross)
+                {
+                    s32 condSwitch = 0;
+                    s32 condValue = 0;
+                    if (nav.Condition(nav.Edges()[idx], &condSwitch, &condValue) && std::find(pre.begin(), pre.end(), Goap::Fact{Key::Switch(condSwitch), condValue}) == pre.end())
+                    {
+                        pre.push_back({Key::Switch(condSwitch), condValue});
+                    }
                 }
                 add("Rescue " + name + " via BirdPortal#" + std::to_string(best->mId), pre, effects, 400 + bestDist / 4, step);
                 d.mRescuable.push_back(entity.mId);

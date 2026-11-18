@@ -5099,7 +5099,7 @@ TaskStep ZapWaitTask::Next(Bot& bot, const std::string&)
     {
         bot.Log("the walls are on across the floor of Slig#" + std::to_string(mSlig) + ": until it has walked into one");
     }
-    if (++mWaits > 200)
+    if (++mWaits > 60)
     {
         return TaskStep::Failed("the Slig did not walk into the wall");
     }
@@ -9193,6 +9193,67 @@ TaskStep WorkTogetherTask::Levers(Bot& bot, const std::string& lastFailed)
             return talk;
         }
         mRecruit.reset();
+        // It follows him by where he is along its own floor: on a floor over his it is brought to where that floor
+        // lets it down first, by his going past under there ("have him Follow me to the right down to your
+        // level"). Led straight for the lever it walked the ledge over him, among the Sligs, and was shot.
+        const s32 mudY = mud->mLive ? mud->mLiveY : mud->mY2;
+        if (std::abs(mudY - nav.Nodes()[stand].mY) > 20)
+        {
+            const s32 at = nav.NodeAt(mud->mLive ? mud->mLiveX : mud->CentreX(), mudY, mud->mHalf, 30);
+            std::vector<s32> way;
+            const NavGraph::EdgeCost mudCost = [](const NavEdge& e)
+            {
+                return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eLift ? e.mCost : -1;
+            };
+            s32 past = -1;
+            if (at >= 0 && nav.FindPath(at, stand, mudCost, way))
+            {
+                for (const s32 edge : way)
+                {
+                    const NavEdge& e = nav.Edges()[edge];
+                    if (e.mKind == EdgeKind::eFall)
+                    {
+                        const s32 dir = nav.Nodes()[e.mTo].mX >= nav.Nodes()[e.mFrom].mX ? 1 : -1;
+                        // (as far past as he can get to: a gate may stand a cell or two on)
+                        for (s32 cells = 3; cells >= 0 && past < 0; cells--)
+                        {
+                            const s32 cand = nav.NodeAt(nav.Nodes()[e.mTo].mX + dir * cells * cell, nav.Nodes()[e.mTo].mY, mud->mHalf, 8);
+                            std::vector<s32> there;
+                            if (cand >= 0 && bot.AbeNode() >= 0 && (cand == bot.AbeNode() || nav.FindPath(bot.AbeNode(), cand, bot.EdgeCostFn(), there)))
+                            {
+                                past = cand;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+            if (past < 0)
+            {
+                // (between two floors it is on none: on its way down)
+                if (at < 0 && ++mPlaceWaits <= 400)
+                {
+                    return TaskStep::Do(Prim::Wait(5));
+                }
+                return TaskStep::Failed("no way down for the Mudokon to the levers' floor");
+            }
+            if (bot.AbeNode() != past)
+            {
+                if (mPlaceWaits++ == 0)
+                {
+                    bot.Log("Mudokon#" + std::to_string(mud->mId) + " is on the floor at " + std::to_string(mudY) + ": past where it comes down, to " + std::to_string(nav.Nodes()[past].mX) + "," + std::to_string(nav.Nodes()[past].mY));
+                }
+                mGo = GoToNode(past);
+                mGo->SetLeading(true);
+                mGo->SetTopGait(Gait::eWalk);
+                return Levers(bot, "");
+            }
+            if (++mPlaceWaits > 400)
+            {
+                return TaskStep::Failed("the Mudokon did not come down");
+            }
+            return TaskStep::Do(Prim::Wait(5));
+        }
         // It follows: he goes a cell past its cell, on the side away from where it comes, and it stops behind him
         const s32 from = mud->mLive ? mud->mLiveX : mud->CentreX();
         const s32 way = nav.Nodes()[stand].mX < from ? -1 : 1;

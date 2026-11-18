@@ -2540,6 +2540,20 @@ wheels, where following Mudokons stop by themselves; at a lever one has to be pu
 - Electric walls that are off across a floor a Slig of the map walks: `ElectricWall sw.. gets Slig#..`
   (`ZapWaitTask`), and nothing is crossed onto that floor until they have. With this the plan is the levers, not the
   ledge past the two Sligs.
-- Open: the Mudokon gets to 1012,1240 and the bot does not see it as placed (a bug of the check); and it goes into
-  Brain_6_Escape (a bird portal open near it) with no chant in the trace, as a Slig over it starts to shoot, and is
-  gone 130 frames on, counted killed. Not understood.
+- The Mudokon follows him by where he is along its own floor: on a floor over his it is first brought to where
+  that floor lets it down, by his going past under there. (gdb: it was shot at 1012,1141, on the Sligs' ledge over
+  him. The trace gave only its x.)
+- `Bot::Replan`: walls that are on across the floor of a Slig whose beat goes through them are waited for before
+  anything else ("Let the walls get the Sligs"). Only a beat seen to go through: FeeCo's path 9 has a wall on
+  beside Sligs that stop short of it.
+- A Mudokon is rescued through a portal in another region by a way it walks, with what shuts that way as the
+  action's conditions (the trap door the levers shut); a led Mudokon is planned from where it stands.
+- A timer trigger toggles its outputs (one that is on goes off), and a switch logic that toggles turns its output
+  back when one action sets all its inputs off at once: the rescue switch -> the two levers off -> the walls off.
+
+With these the first part of the annex is one plan and runs with 0 deaths (`build-bot/la/bw7.txt`, camera 5): the
+levers together, both Sligs got, the Mudokon rescued, the ledge lever (128), through the gate at 1450.
+
+Next: past the gate. A Slog asleep at 1550,1140 wakes as he runs under it (8 deaths). The guide: "Walk past there,
+sneaking to the next screen. Sneak as close to the Slurgs as you can get, then start running. Two screens later,
+jump and pull up to the ledge. Hit the bone sack ... throw it so that the Slog gets crushed by the falling boxes."
