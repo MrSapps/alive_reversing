@@ -2708,18 +2708,29 @@ More of the things that fall (`GoToTask::Faller`, the whole decision, apart from
   With these there is a plan from the first frame, and it is done as far as: the six levers, two bones fetched
   over the twin crates, Mine#11019 and #11005 blown up, the trap door's lever. 6 deaths in `p3n.txt` (5 at the twin
   crates, which are crossed more often now, 1 at a throw from 1662,59).
-- Open, where it stops (1998,379, "the lift is on its way": it is not):
-  - A lift's place is not known to the plan: "its mover's switch is on" is taken for "it is at that stop". He
-    pulled Lever#10014 (sw5, the left lift down) and then rode that lift up himself.
-  - The guide's way there, "jump over to the left" with the lift up, is no edge: a running jump off 1972,379 at
-    the ledge of 1927,380, three cells of shaft between. `AddLedgeCatches` wants five cells. Abe.cpp
-    (`Motion_31_RunJumpMid`) catches any marked ledge his feet are level with or under as he passes: whether he
-    is that low by then is not measured.
-  - Then the rest: the Mudokons (three led past crates and down a lift), the Shrykull the guide clears the
-    mines by, Secret 24's way out past its drills.
+- `NavGraph::AddRunJumps`: the run-up of a running jump over a lift's shaft goes on over the end of its line onto
+  one that goes on from it at its height (a trap door that is shut and the floor past it). "Pull the middle lever
+  to close the trapdoor, then jump over to the left": from 2011,380 off 1972,379. Measured with `rj.txt` (the
+  bot stopped there, `bot_do runjump 1972 left`): down at 1921,380, on into the wall at 1901, knocked down
+  for 40 frames, up again unhurt at 1907.
+  **With it `p3n.txt` is out of path 3 and into path 4** (f=7,897): the six levers, two bones, Mine#11005 and
+  #11004, the trap door, the jump, Lever#10014, the way out. 9 deaths: 6 at the twin crates on the later
+  crossings, 2 at the drop off 2542,99 to 2555,160, 1 at a throw from 1662,59 (a cell under a crate).
+- Open in path 3:
+  - The twin crates on any crossing but the first. Tried and taken back: the hop over one begun 3 to 8 frames
+    before it is down instead of as it smashes (worked out from a ten-frame crouch and 18 frames a round): 16
+    deaths for 9. What the frames really are is not measured.
+  - `bw7.txt`, the whole chain, does not get through path 3: 36 deaths, and stuck dying at 1610,149 (the drop
+    off 1597,70 under the crates of 1618, taken once the running jump over them has been ruled out by deaths).
+    It comes to the crates at another moment than `p3n.txt` does.
+  - A lift's place is not known to the plan ("its mover's switch is on" is taken for "it is at that stop"). Not
+    needed for the way out as it is done now.
+  - The Mudokons (the profile here is `any`), the Shrykull, Secret 24.
+- Path 4 (the boilers): in at 87,1235, a hand stone used, stuck at 537,1239 (`Cross door 712,1239->2337,1240`
+  blocked). Not looked at.
 - Annex 4 is not sure: with path 1 taking one crate's round longer (43 frames) the Slig he is in went in among
   the two it was to shoot and the lever was gone to with one still watching: 3 deaths there in `bw7.txt`, the
-  third try through. `bw7.txt` now: 10 deaths (those 3, the slam door, 6 on path 3 as in `p3n.txt`).
+  third try through. `bw7.txt` before path 3: those 3 and the slam door.
 
 Unit tests (2026-11-18, `BotFallers` 8, `BotHurry`, `BotZ`, `BotHop`, `BotClearSlig`, `BotFliers`, one more each
 in `BotSlogs` and `BotNav`): mutation checked, 18 of 20 (not caught: a guard that says the same as the one after it, and the
