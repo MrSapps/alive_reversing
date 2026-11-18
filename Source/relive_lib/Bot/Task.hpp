@@ -798,6 +798,7 @@ private:
     s32 mHopFaced = -1;
     s32 mFallerWaits = 0;
     s32 mFallerLeft = -1;
+    bool mFallerUnder = false;
     bool mFleechAwakeHere = false;
     s32 mLandWaits = 0;
     // Steps spent at a door waiting for a lock's ghost to open it

@@ -2651,9 +2651,18 @@ Half-scale cells (13), levers under crates that fall every 44 frames. Mended so 
   the crates of the next stretch); a thing that comes round too fast for the time ever to be enough is waited for
   from the cell beside where it comes down, and gone under as it smashes.
 
-Open: Lever#15000 at 1170,159 under the crates of 1161. In from 1183 at a walk 12 frames, the pull 21, the turn 8
-and out some 6: 45 or more against 44. The guide: "stand beside the crate impact point, and smoothly press left,
-pull the lever, and run back out, starting immediately after a crate hits". He walks: a run of one cell does not
-stop on the cell. After six deaths the bot gives the lever up, pulls 15013 and 15001, and is stuck at 1378,40
-(the way on at 2568,99 wants a switch). The rest of the guide's path 3 is Mudokons led past falling crates and
-put to work. Not under unit test: any of this section's rules.
+Lever#15000 at 1170,159 under the crates of 1161 (every 44 frames), done:
+
+- `RockAt::mBoxX1/2`: a falling thing's own box, read from the game (`FallingItem::DamageHitItems` hits what its
+  box meets). The crate is 9 wide and meets his by 2 at the lever's cell; the floor ends at 1151, so there is no
+  other side to pull from. Timing it is.
+- Stood in the cell beside it he sets off four frames before it is down ("it is all but down"), not as it
+  smashes: his box is in under it some ten frames after he sets off. Eight before, he was hit on the way in (his
+  box is wider at a walk); at the smash, in the last frame of the turn on the way out.
+- Out from under it by the turn into a run (`Abe::Motion_2_StandingTurn`, frame 4 with run held: `mSlide` on the
+  move), five frames sooner than the turn and a step. He runs off the floor's end onto the one under it.
+
+`bw7.txt` now: all three levers of the screen (15000, 15001, 15013), then 19 deaths at the crates over hops and
+running jumps (1248,151 and 1662,59: the rule above is for a walk in only), and stuck at 1998,379: the way on at
+2568,99 wants switch 14014, for which there is no action yet (the guide: Mudokons led past the crates and put to
+work). Not under unit test: any of this section's rules.
