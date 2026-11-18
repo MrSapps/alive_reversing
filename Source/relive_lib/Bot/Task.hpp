@@ -404,6 +404,26 @@ private:
     bool mPulled = false;
 };
 
+// An electric wall has come on across the floor a Slig walks (Domain, StepKind::eZapWait): where he is, until it
+// has walked into it
+class ZapWaitTask final : public Task
+{
+public:
+    explicit ZapWaitTask(u32 slig)
+        : mSlig(slig)
+    {
+    }
+    std::string Name() const override
+    {
+        return "Wait for the wall to get Slig#" + std::to_string(mSlig);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mSlig;
+    s32 mWaits = 0;
+};
+
 // The Slogs of a stretch of floor got to come after him (Domain, StepKind::eDrawSlogs): to a cell over their
 // screen that they can't get at him in, and there until they are all on their way
 class DrawSlogsTask final : public Task
@@ -1068,6 +1088,13 @@ private:
     s32 mTurns = 0;
     u32 mMine = 0;
     bool mSaidWork = false;
+    // Levers: a Mudokon is led to the cell its lever is pulled from and told to wait there; then Abe's own, with
+    // "Work" said as he pulls
+    TaskStep Levers(Bot& bot, const std::string& lastFailed);
+    std::unique_ptr<Task> mUse;
+    s32 mLeverStage = 0;
+    s32 mPlaceWaits = 0;
+    s32 mLastMudX = 0;
 };
 
 // Slap a Mudokon until it is dead

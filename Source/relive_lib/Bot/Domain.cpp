@@ -2259,6 +2259,10 @@ std::vector<s32> Domain::PulledFirst(const NavGraph& nav, const World& world, co
     return first;
 }
 
+// The longest delay of a switch logic's inputs (frames) that takes Mudokons to meet with levers: within more than
+// that he pulls them one after the other himself
+static const s32 kLeversTogether = 90;
+
 bool Domain::PlanTogether(const NavGraph& nav, const World& world, const Entity& logic, Team& team, std::vector<Goap::Fact>& pre)
 {
     team = {};
@@ -2274,10 +2278,15 @@ bool Domain::PlanTogether(const NavGraph& nav, const World& world, const Entity&
         {
             continue;
         }
+        // (or levers, where they only count pulled within a short while of each other: a Mudokon that listens pulls
+        // the one it stands a cell from when told to work. Mudokon.cpp, Brain_ListeningToAbe_State_11; Bonewerkz'
+        // first annex: "have him stand by the first lever. Hop across to the second lever, say Work and pull
+        // your own lever at the same time".)
+        const bool together = logic.mState > 0 && logic.mState <= kLeversTogether;
         const Entity* wheel = nullptr;
         for (const Entity& e : world.mEntities)
         {
-            if (e.mKind == EntityKind::eWorkWheel && e.mSwitch == input)
+            if ((e.mKind == EntityKind::eWorkWheel || (together && e.mKind == EntityKind::eLever)) && e.mSwitch == input)
             {
                 wheel = &e;
             }
@@ -2312,7 +2321,8 @@ bool Domain::PlanTogether(const NavGraph& nav, const World& world, const Entity&
             const s32 x = e.mLive ? e.mLiveX : e.CentreX();
             const s32 y = e.mLive ? e.mLiveY : e.mY2;
             const bool taken = std::find(manned.begin(), manned.end(), &e) != manned.end();
-            if (!at && !taken && e.mKind == EntityKind::eMudokon && !e.mGone && !e.mBlind && x >= w->mX1 && x <= w->mX2 && std::abs(y - w->mY2) < 30)
+            const bool by = w->mKind == EntityKind::eLever ? std::abs(x - w->CentreX()) <= (w->mHalf ? 20 : 40) : x >= w->mX1 && x <= w->mX2;
+            if (!at && !taken && e.mKind == EntityKind::eMudokon && !e.mGone && !e.mBlind && by && std::abs(y - w->mY2) < 30)
             {
                 at = &e;
             }
@@ -2495,6 +2505,49 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
     // other ledge was never looked at.)
     const std::vector<NavEdge>& edges = nav.Edges();
     std::map<std::tuple<s32, s32, s32>, std::pair<s32, std::size_t>> cheapest;
+    // Electric walls that are off, across a floor a Slig of the map walks: on, they get it as it walks its beat
+    // (ElectricWall.cpp: what is within four pixels of the beam). Nothing is crossed onto that floor until they
+    // have: the path has put the way to be rid of those Sligs there. (Bonewerkz' first annex: "say Work and pull
+    // your own lever at the same time. When both Sligs are vaporized ...".)
+    std::map<s32, std::vector<u32>> zapLines;
+    {
+        std::set<std::pair<u32, s32>> done;
+        for (const NavFeature& wall : nav.Input().mFeatures)
+        {
+            if (wall.mKind != FeatureKind::eBarrier || !wall.mBeam || wall.mSwitch <= 1)
+            {
+                continue;
+            }
+            const s32 shut = wall.mStartClosed ? 0 : 1;
+            if (world.Switch(wall.mSwitch) == shut)
+            {
+                continue;
+            }
+            const s32 at = nav.NodeAt((wall.mX1 + wall.mX2) / 2, wall.mY2, wall.mHalf, 30);
+            if (at < 0)
+            {
+                continue;
+            }
+            for (const Entity& slig : world.mEntities)
+            {
+                // (one the map puts there awake, and not a spawner's)
+                const s32 home = slig.mKind == EntityKind::eSlig && !slig.mGone && slig.mSwitch <= 1 ? nav.NodeAt(slig.CentreX(), slig.mY2, slig.mHalf, 30) : -1;
+                if (home < 0 || nav.Nodes()[home].mLine != nav.Nodes()[at].mLine || !done.insert({slig.mId, wall.mSwitch}).second)
+                {
+                    continue;
+                }
+                std::vector<u32>& line = zapLines[nav.Nodes()[at].mLine];
+                if (std::find(line.begin(), line.end(), slig.mId) == line.end())
+                {
+                    line.push_back(slig.mId);
+                }
+                DomainStep wait;
+                wait.mKind = StepKind::eZapWait;
+                wait.mEntity = slig.mId;
+                add("ElectricWall sw" + std::to_string(wall.mSwitch) + " gets Slig#" + std::to_string(slig.mId), {{Key::Switch(wall.mSwitch), shut}, {Key::Mud(slig.mId), 0}}, {{Key::Mud(slig.mId), 2}}, 50, wait);
+            }
+        }
+    }
     for (std::size_t i = 0; i < edges.size(); i++)
     {
         const NavEdge& e = edges[i];
@@ -2620,6 +2673,17 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 else
                 {
                     pre = other;
+                }
+            }
+        }
+        // (onto a floor whose Sligs electric walls are there to get: with those Sligs gone)
+        {
+            const auto zap = zapLines.find(nav.Nodes()[e.mTo].mLine);
+            if (zap != zapLines.end())
+            {
+                for (const u32 id : zap->second)
+                {
+                    pre.push_back({Key::Mud(id), 2});
                 }
             }
         }
