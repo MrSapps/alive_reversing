@@ -890,6 +890,9 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mKind = EntityKind::eSlog;
                     keep = GetGameType() == GameType::eAe && !static_cast<const relive::Path_Slog&>(tlv).mAsleep;
                     e.mSwitch = World::HazardSwitch(e.mId);
+                    // (a half-scale one is on the background and sees nothing of the foreground: Slog::FindBone
+                    // wants the same scale)
+                    e.mHalf = static_cast<const relive::Path_Slog&>(tlv).mScale == relive::reliveScale::eHalf;
                     e.mInputs[0] = static_cast<const relive::Path_Slog&>(tlv).mBoneEatingTime;
                     break;
                 case ReliveTypes::eMeatSack:
@@ -1384,8 +1387,7 @@ static void MarkSlogPens(NavInput* in, World& world, bool bones)
         const NavLine* floor = nullptr;
         for (const NavLine& line : lines.mLines)
         {
-            if ((line.mType == 0 || line.mType == 4) && std::min(line.mX1, line.mX2) <= x && std::max(line.mX1, line.mX2) >= x && std::abs((line.mY1 + line.mY2) / 2 - e.mY2) <= 20 &&
-                (!floor || line.mType == 0))
+            if (line.mType == (e.mHalf ? 4 : 0) && std::min(line.mX1, line.mX2) <= x && std::max(line.mX1, line.mX2) >= x && std::abs((line.mY1 + line.mY2) / 2 - e.mY2) <= 20)
             {
                 floor = &line;
             }
@@ -1414,6 +1416,16 @@ static void MarkSlogPens(NavInput* in, World& world, bool bones)
             {
                 x2 = std::min(x2, wx - 1);
             }
+        }
+        // A Slog goes for a bone on the screen shown, and Abe is seen from where it stands: the Slogs of one screen
+        // are one pen, which is the stretch of floor on that screen, and a bone thrown from that screen is the
+        // one for it. (FeeCo's path 4: the floor is four screens long, the Slogs of the next screen see him as
+        // he comes onto it, and have had no bone.)
+        if (lines.mCamW > 0)
+        {
+            const s32 left = (x / lines.mCamW) * lines.mCamW;
+            x1 = std::max(x1, left);
+            x2 = std::min(x2, left + lines.mCamW - 1);
         }
         e.mHalf = half;
         e.mInputs[2] = x1;
