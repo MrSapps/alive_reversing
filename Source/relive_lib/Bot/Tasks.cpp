@@ -351,6 +351,26 @@ s32 GoToTask::StopBefore(const NavGraph& nav, const World& world, const std::vec
     return -1;
 }
 
+bool GoToTask::PastDrills(const World& world, s32 x, s32 footY, s32 ledgeY, bool half, bool unknownHits, s32 frames)
+{
+    const s32 tall = half ? 30 : 60;
+    bool any = false;
+    for (const SweepAt& sweep : world.mSweeps)
+    {
+        if (sweep.mHalf != half)
+        {
+            continue;
+        }
+        any = true;
+        if (sweep.Hits(0, frames > 0 ? frames : kHoistPastDrill, x - 12, ledgeY - tall, x + 12, footY))
+        {
+            return true;
+        }
+    }
+    // (one that is known of by the map and not seen: not gone up under)
+    return unknownHits && !any;
+}
+
 bool GoToTask::ZShooterAbout(const NavGraph& nav, const World& world, s32 x, s32 y)
 {
     const s32 cam = nav.CameraOf(x, y - 5);
@@ -3811,30 +3831,41 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             // Up onto a floor a Slig walks, where its beat comes onto the screen he comes up on: not when it can be
             // on that screen and facing him within 90 frames (54 of them the hoist; SligComes). The Barracks'
             // path 7: up at 887,100 as the Slig of 1012 to 1262 came, he was shot the moment it was on his screen.
-            // Up from under a drill that goes by over his head: stood up and up the hoist only when it is away for
-            // as long as that takes (to his feet 8, to the ledge 18, the pull up 24 and a little)
-            if (first.mKind == EdgeKind::eHoistUp)
+            // Up a hoist a drill goes by: over his head where he stands under it, or over the ledge it leads up to.
+            // Only when every drill is clear, for as long as that takes (to his feet 8, to the ledge 18, the pull up
+            // 24 and a little), of all he goes through: from the floor to his height over the ledge. (Bonewerkz' path
+            // 4: the hoist at 662,1239 by the drill of the shaft, and the one at 2837,1760 in the first boiler,
+            // "hoisting up when both horizontal drills are to the left".)
+            if (first.mKind == EdgeKind::eHoistUp && nav.Input().mIsAe)
             {
+                const NavNode& foot = nav.Nodes()[cur];
+                const NavNode& ledge = nav.Nodes()[first.mTo];
                 const Entity* over = SweepHigh(nav, bot.GetWorld(), cur);
-                if (over)
+                // (not where the drill comes to where he stands to wait, on his feet: that is a stretch timed as a
+                // whole, the hoist its last step, and stood there for it he is got. The Mines' path 4, the hoist at
+                // 2062,1500 at the end of the roll under the drill.)
+                bool stoodIn = false;
+                for (const SweepAt& sweep : bot.GetWorld().mSweeps)
                 {
-                    const SweepAt* at = bot.GetWorld().SweepOf(over->mId);
-                    const NavNode& foot = nav.Nodes()[cur];
-                    const NavNode& ledge = nav.Nodes()[first.mTo];
-                    if ((!at || at->Hits(0, kHoistPastDrill, foot.mX - 12, ledge.mY, foot.mX + 12, foot.mY)) && mDrillWaits < 1500)
+                    stoodIn = stoodIn || (!over && sweep.mHalf == foot.mHalf && sweep.Hits(0, 400, foot.mX - 12, foot.mY - (foot.mHalf ? 30 : 60), foot.mX + 12, foot.mY));
+                }
+                if (!stoodIn && PastDrills(bot.GetWorld(), foot.mX, foot.mY, ledge.mY, foot.mHalf, over != nullptr) && mDrillWaits < 1500)
+                {
+                    if (mDrillWaits++ == 0)
                     {
-                        if (mDrillWaits++ == 0)
-                        {
-                            bot.Log("a drill goes by over the hoist at " + std::to_string(foot.mX) + "," + std::to_string(foot.mY) + ": up when it is away");
-                        }
-                        mSteps--;
+                        bot.Log("a drill goes by the hoist at " + std::to_string(foot.mX) + "," + std::to_string(foot.mY) + ": up when it is away");
+                    }
+                    mSteps--;
+                    if (over)
+                    {
                         return abe.mMove == Move::eCrouch || !abe.Settled() ? TaskStep::Do(Prim::Wait(1)) : TaskStep::Do(Prim::Press(Btn::eDown));
                     }
-                    mDrillWaits = 0;
-                    if (abe.mMove == Move::eCrouch)
-                    {
-                        return TaskStep::Do(Prim::Press(Btn::eUp));
-                    }
+                    return TaskStep::Do(Prim::Wait(1));
+                }
+                mDrillWaits = 0;
+                if (over && abe.mMove == Move::eCrouch)
+                {
+                    return TaskStep::Do(Prim::Press(Btn::eUp));
                 }
             }
             if (first.mKind == EdgeKind::eHoistUp && nav.Input().mIsAe)
@@ -6901,6 +6932,34 @@ TaskStep UseTask::Next(Bot& bot, const std::string& lastFailed)
         if (abe.mMove == Move::eCrouch)
         {
             bot.Log("the drill overhead is away: up to use #" + std::to_string(mEntity));
+        }
+    }
+    // A ring he jumps up to through where drills go by: when they are away for the walk to it, the jump and the
+    // pull. Waited for two cells off, on the side away from them: under the ring he is within their reach, and
+    // stood there for them to go he was got by the one that came. (Bonewerkz' first boiler: the ring over the
+    // ledge at 2862,1660, two drills that go along over that ledge's end.)
+    if (entity->mKind == EntityKind::ePullRing && node >= 0 && abe.Settled() && abe.mMove == Move::eIdle)
+    {
+        const NavNode& n = bot.Nav().Nodes()[node];
+        const s32 cell = NavGraph::GridStep(n.mHalf);
+        s32 middle = n.mX;
+        bool any = false;
+        for (const SweepAt& sweep : bot.GetWorld().mSweeps)
+        {
+            if (sweep.mHalf == n.mHalf && sweep.Hits(0, 400, n.mX - 12, n.mY - (n.mHalf ? 50 : 100), n.mX + 12, n.mY))
+            {
+                // (where it goes to and fro: its travel lies the way its sign says from where it is)
+                middle = (sweep.mX1 + sweep.mX2) / 2 - sweep.mSign * (sweep.mTravel / 256) / 2;
+                any = true;
+            }
+        }
+        const s32 awayX = n.mX + (n.mX >= middle ? 2 : -2) * cell;
+        const s32 away = bot.Nav().NodeAt(awayX, n.mY, n.mHalf, 4);
+        const bool here = bot.AbeNode() == node;
+        const bool off = away >= 0 && bot.AbeNode() == away;
+        if (any && away >= 0 && (here || off) && GoToTask::PastDrills(bot.GetWorld(), n.mX, n.mY, n.mY - (n.mHalf ? 20 : 40), n.mHalf, false, 100) && ++mDucks <= 1500)
+        {
+            return here ? TaskStep::Do(Prim::MoveTo(bot.Nav().Nodes()[away].mX, Gait::eWalk)) : TaskStep::Do(Prim::Wait(1));
         }
     }
     if (abe.mMove == Move::eHang || abe.mMove == Move::eCrouch)

@@ -865,6 +865,10 @@ public:
     // The walk ahead goes in under such a thing some cells on: the cell to stop at before it (the last one clear of
     // it), where what to do about it is decided. -1: no such thing on the walk, or he is at that cell.
     static s32 StopBefore(const NavGraph& nav, const World& world, const std::vector<s32>& path);
+    // A hoist up at x from the floor at footY to the ledge at ledgeY: some drill is in what he goes through within
+    // the frames that takes. unknownHits: with no drill to be seen at all, yes (there is one, by the map)
+    // frames: within so many, where it is not the hoist's time
+    static bool PastDrills(const World& world, s32 x, s32 footY, s32 ledgeY, bool half, bool unknownHits, s32 frames = 0);
     static bool ZShooterAbout(const NavGraph& nav, const World& world, s32 x, s32 y);
     // The hop down to a Slig's level: now, on a back it has just turned (it faced him no more than 8 frames ago).
     // faced: the frame it last faced where he lands, -1 for never seen to

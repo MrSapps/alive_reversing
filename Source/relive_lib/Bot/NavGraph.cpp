@@ -953,6 +953,14 @@ void NavGraph::AddRunJumps(std::vector<NavEdge>& edges, s32 from, s32 dir, bool 
         const s32 hx = takeoff + dir * k * step;
         s32 hoistIdx = -1;
         const NavFeature* hoist = FeatureAt(FeatureKind::eHoist, hx, y - 10, n.mHalf, &hoistIdx);
+        // (one whose marker ends short of the floor is caught by the jump all the same, which is where he is in
+        // the air, and by nothing else: from a stand under it there is no hoist. Bonewerkz' first boiler, the
+        // ledge at 2212,1660 over the floor at 1760, marked from 1663 to 1743: "jump up to the ledge at the right
+        // of the next screen".)
+        if (!hoist)
+        {
+            hoist = FeatureAt(FeatureKind::eHoist, hx, y - (n.mHalf ? 13 : 25), n.mHalf, &hoistIdx);
+        }
         if (!hoist || (hoist->mDir != 2 && (hoist->mDir == 0) != (dir < 0)) || WallBetween(takeoff, hx, y, n.mHalf) || BarrierBetween(n.mX, hx, y, n.mHalf) >= 0)
         {
             continue;

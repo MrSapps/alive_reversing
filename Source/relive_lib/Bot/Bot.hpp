@@ -667,7 +667,10 @@ private:
     std::unique_ptr<Task> MakeSlogFlee();
     // The nearest way off a Slog's floor that leads away from it, from a cell of that floor; which way it starts,
     // and whether he would be off before the Slog has him
-    bool SlogRefuge(const SlogAt& slog, s32 from, s32& refuge, bool& left, bool& inTime, s32& fromX) const;
+    bool SlogRefuge(const SlogAt& slog, s32 from, s32& refuge, bool& left, bool& inTime, s32& fromX, s32* lastEdge = nullptr) const;
+    // The running jump at a hoist a run from a Slog was sent to, and the frame it was: cheap for that run
+    s32 mFleeEdge = -1;
+    u32 mFleeFrame = 0;
     bool mGoToPending = false;
     s32 mGoToX = 0;
     s32 mGoToY = 0;

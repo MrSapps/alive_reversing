@@ -11138,3 +11138,52 @@ TEST(BotUse, WhatAClockSetsIsOwedUntilItHasFollowedItsInput)
     world.mEntities[0].mHoldOnly = false;
     EXPECT_EQ(UseTask::ClockOwed(world, 132, 1), 0);
 }
+
+TEST(BotNav, AHoistMarkedShortOfTheFloorIsCaughtByARunningJumpAndNotClimbedFromAStand)
+{
+    // Bonewerkz' first boiler: the floor at 1760, the ledge at 1660 from 2202, its hoist marked 1663..1743
+    NavInput in;
+    in.mIsAe = true;
+    in.mLines.push_back(Line(1441, 1760, 3000, 1760, 0));
+    in.mLines.push_back(Line(2202, 1660, 2502, 1660, 0));
+    NavFeature hoist = Feature(FeatureKind::eHoist, 2200, 1663, 2224, 1743);
+    hoist.mDir = 1;
+    in.mFeatures.push_back(hoist);
+    NavGraph g;
+    g.Build(in);
+    const s32 top = g.NodeAt(2212, 1660, false, 4);
+    const s32 under = g.NodeAt(2212, 1760, false, 4);
+    ASSERT_GE(top, 0);
+    ASSERT_GE(under, 0);
+    EXPECT_EQ(FindEdge(g, under, top, EdgeKind::eHoistUp), nullptr);
+    bool jump = false;
+    for (const NavEdge& e : g.Edges())
+    {
+        jump = jump || (e.mKind == EdgeKind::eRunJump && e.mTo == top && !e.mLeft && g.Nodes()[e.mFrom].mY == 1760);
+    }
+    EXPECT_TRUE(jump);
+}
+
+TEST(BotSweep, AHoistIsGoneUpOnlyWhenNoDrillIsInTheWayForAsLongAsItTakes)
+{
+    // A drill that goes along 300..500 at 70..90 (it is at 500 less its offset, 13 either side), at 3 a frame;
+    // a hoist at 480 from the floor at 200 to the ledge at 100: he goes through 40..200 there
+    World world;
+    // Parked at the left end and off to the right at once: at the hoist within 56 frames
+    world.mSweeps.push_back(DrillAt(200, 0));
+    EXPECT_TRUE(GoToTask::PastDrills(world, 480, 200, 100, false, false));
+    // (not at a hoist it does not come to)
+    EXPECT_FALSE(GoToTask::PastDrills(world, 250, 200, 100, false, false));
+    // (nor one under a ledge it is well over: he goes through 240..400)
+    EXPECT_FALSE(GoToTask::PastDrills(world, 480, 400, 300, false, false));
+    // At the hoist now: no
+    world.mSweeps[0] = DrillAt(20, 2);
+    EXPECT_TRUE(GoToTask::PastDrills(world, 480, 200, 100, false, false));
+    // (a drill at the other scale is not his)
+    world.mSweeps[0].mHalf = true;
+    EXPECT_FALSE(GoToTask::PastDrills(world, 480, 200, 100, false, false));
+    // No drill to be seen: gone up, unless he is under one the map has
+    world.mSweeps.clear();
+    EXPECT_FALSE(GoToTask::PastDrills(world, 480, 200, 100, false, false));
+    EXPECT_TRUE(GoToTask::PastDrills(world, 480, 200, 100, false, true));
+}
