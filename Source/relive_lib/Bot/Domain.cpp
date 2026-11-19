@@ -655,7 +655,9 @@ bool Domain::TooFastToWalk(const NavGraph& nav, const World& world, const NavNod
         // (through under it: its width and his at a walk, 9 frames a cell; it is back after its wait and the
         // few frames of its fall)
         const s32 through = (r.mBoxX2 - r.mBoxX1 + 2 * mine) * 9 / step;
-        if (through > r.mEvery + 3)
+        // (as long as its round is too long: at full scale the crate of 1675 in Bonewerkz' boilers, 19 wide and back
+        // every 18, is 18 to walk under by this, and he was hit)
+        if (through >= r.mEvery + 3)
         {
             return true;
         }
@@ -671,11 +673,23 @@ bool Domain::FallersBar(const NavGraph& nav, const World& world, const NavEdge& 
     }
     const NavNode& from = nav.Nodes()[e.mFrom];
     const NavNode& to = nav.Nodes()[e.mTo];
-    // (not a walk in under one: that is hopped over where it can be, GoToTask::HopsOver, and made dear the way
-    // round by a drop that ends under another was the cheaper)
-    if (e.mKind != EdgeKind::eWalk && TooFastToWalk(nav, world, to))
+    // (not a walk in under one where it can be hopped over, GoToTask::HopsOver: made dear, the way round by a drop
+    // that ends under another was the cheaper. Where there is no clear cell three on to hop to, a walk in is
+    // barred like the rest: a ledge that ends under the crate.)
+    if (TooFastToWalk(nav, world, to))
     {
-        return true;
+        if (e.mKind != EdgeKind::eWalk)
+        {
+            return true;
+        }
+        if (!TooFastToWalk(nav, world, from))
+        {
+            const s32 step = NavGraph::GridStep(from.mHalf);
+            const s32 dir = to.mX > from.mX ? 1 : -1;
+            const s32 over = nav.NodeAt(from.mX + dir * 3 * step, from.mY, from.mHalf, 4);
+            return over < 0 || nav.Nodes()[over].mLine != from.mLine || TooFastToWalk(nav, world, nav.Nodes()[over]);
+        }
+        return false;
     }
     if (e.mKind != EdgeKind::eRunJump && e.mKind != EdgeKind::eHop)
     {

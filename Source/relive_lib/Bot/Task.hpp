@@ -799,6 +799,7 @@ private:
     s32 mFallerWaits = 0;
     s32 mFallerLeft = -1;
     s32 mDrillWaits = 0;
+    s32 mSlogHangs = 0;
     s32 mHopOverAt = -1;
     bool mFallerUnder = false;
     bool mFleechAwakeHere = false;
@@ -869,6 +870,8 @@ public:
     // the frames that takes. unknownHits: with no drill to be seen at all, yes (there is one, by the map)
     // frames: within so many, where it is not the hoist's time
     static bool PastDrills(const World& world, s32 x, s32 footY, s32 ledgeY, bool half, bool unknownHits, s32 frames = 0);
+    // Hung from the ledge at (x, y) for so many frames: to stay hung, for a Slog that is on that floor or asleep by it
+    static bool HungBySlog(const World& world, s32 x, s32 y, bool half, s32 hung);
     static bool ZShooterAbout(const NavGraph& nav, const World& world, s32 x, s32 y);
     // The hop down to a Slig's level: now, on a back it has just turned (it faced him no more than 8 frames ago).
     // faced: the frame it last faced where he lands, -1 for never seen to

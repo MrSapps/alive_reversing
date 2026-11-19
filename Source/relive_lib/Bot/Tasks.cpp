@@ -371,6 +371,33 @@ bool GoToTask::PastDrills(const World& world, s32 x, s32 footY, s32 ledgeY, bool
     return unknownHits && !any;
 }
 
+bool GoToTask::HungBySlog(const World& world, s32 x, s32 y, bool half, s32 hung)
+{
+    // Measured there (`sg.txt`): hung at 1587,1141 the Slog asleep at 1650,1120 woke 5 frames on, was on his
+    // platform at 15, off its end at 50 and on the floor under it at 60; back under him at 115 and had him down
+    // at 135. The pull up is 24.
+    for (const SlogAt& slog : world.mSlogs)
+    {
+        if (std::abs(slog.mX - x) > 250)
+        {
+            continue;
+        }
+        const bool awake = !slog.mAsleep || slog.mWaking;
+        // (awake and about level with the ledge: on it, on its way onto it, or not far off it yet)
+        if (awake && std::abs(slog.mY - y) <= 30 && hung < 200)
+        {
+            return true;
+        }
+        // (asleep within a few cells of it, on a floor about level with it: given the time to wake)
+        if (!awake && std::abs(slog.mY - y) <= 45 && std::abs(slog.mX - x) <= 150 && hung < 30)
+        {
+            return true;
+        }
+    }
+    (void) half;
+    return false;
+}
+
 bool GoToTask::ZShooterAbout(const NavGraph& nav, const World& world, s32 x, s32 y)
 {
     const s32 cam = nav.CameraOf(x, y - 5);
@@ -1516,6 +1543,24 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             bot.Log("no rolling on from the top of the hoist at " + std::to_string(nav.Nodes()[top].mX) + "," + std::to_string(nav.Nodes()[top].mY));
             bot.BanEdge(on[0]);
             mHangFails = 0;
+        }
+        // Hung from the edge of a floor a Slog is on, or one asleep by it that his coming wakes: stayed hung until
+        // it has run past and is down off that floor, then up at once (the one that is down comes back under him
+        // and pulls him off). Bonewerkz' boilers 3 and 4: "Jump and hang from the edge of the left platform. The
+        // Slog will wake up and run past you. Hoist up when he does."
+        if (!down && top >= 0 && nav.Input().mIsAe)
+        {
+            const NavNode& ledge = nav.Nodes()[top];
+            if (HungBySlog(bot.GetWorld(), ledge.mX, ledge.mY, ledge.mHalf, mSlogHangs))
+            {
+                if (mSlogHangs++ == 0)
+                {
+                    bot.Log("hung from " + std::to_string(ledge.mX) + "," + std::to_string(ledge.mY) + " by a Slog on that floor: up when it is down off it");
+                }
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            mSlogHangs = 0;
         }
         // Up onto a floor a Slig stands guard on: only as it begins to turn its back
         if (!down && top >= 0 && nav.Input().mIsAe)

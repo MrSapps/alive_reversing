@@ -2751,12 +2751,25 @@ wheel that sets a 300-frame clock going; the fifth behind a tasks door at the bo
     the drill comes to where he would stand waiting: the Mines' path 4, the hoist at 2062,1500 at the end of the
     roll under a drill, where `m1` died sixteen times with the first cut of this.
   - `UseTask`, a pull ring under drills: waited for two cells off on the side away from them.
-- As far as `p4n.txt` gets: the wheels of boilers 1, 2 and 3, each with its clock waited for. 6 deaths: 4 at the
-  hop off 1587,1141, 1 at a mine in boiler 2, 1 at a door.
-- Open: boiler 4. Its wheel (135) is through the door at 1525,840, over three small platforms with a Slog
-  asleep on the second and the third, each woken by a zone he walks into. The guide: hang from the platform's
-  edge, the Slog runs past and falls to the floor under, pull up then; "throw a bone down first to make this
-  easier". The bot goes up, is run off, and is caught on the floor. Then boiler 5 and the Executive Office.
+- Boilers 3 and 4, done:
+  - `GoToTask::HungBySlog`: hung from the edge of a floor a Slog is on, or one asleep by it, he stays hung until
+    it has run past and is down off that floor, then up at once. Measured with `sg.txt` (hung at 1587,1141 and
+    nothing pressed): the Slog woke 5 frames on, was on his platform at 15, off its end at 50, on the floor under
+    at 60, back under him at 115, and had him down at 135. `MakeSlogFlee` leaves him be while he hangs.
+  - `NavGraph::AddRunJumps`: up a hoist with two cells of run-up where the floor ends there ("then run and jump
+    past the falling crates to reach the door": off 1712,960 at the hoist at 1587). `Domain::TooFastToWalk`
+    takes a round as long as the walk under for too short (`>=`); `FallersBar` bars a walk in under one where
+    there is no clear cell three on to hop to.
+  - `Bot::Replan`, the switches tried when there is no plan: one whose way goes by Slogs that sleep is tried last
+    (the fourth wheel was turned before the third, and the door out of its room wants both).
+- **`p4n.txt` is through path 4** (2026-11-19): the four wheels, the fifth boiler, and out into the Executive
+  Office (`bonewerkz_ender` 14) at f=12,436, 1 death (a mine in boiler 2). `bw7.txt`, from the first annex: into
+  the Executive Office at f=30,967, 5 deaths (Annex 4's three, the slam door, that mine). All of it is still
+  "Try switch": there is no plan for the whole path.
+- Next, the Executive Office: in at 62,199, stuck at 187,199. Four drills that come down at 7 to 9 a frame over
+  a tunnel that is rolled, the well under the third: "wait for an opening and roll to the well, and jump into it
+  right away". `SweepsClear` never says yes there. Then Slogs let out behind a slam door, a Slig, mines, and
+  Director Phleg (a Glukkon, as General Dripik was: Sligs told to pull levers and to kill).
 - Annex 4 is not sure: with path 1 taking one crate's round longer (43 frames) the Slig he is in went in among
   the two it was to shoot and the lever was gone to with one still watching: 3 deaths there in `bw7.txt`, the
   third try through. `bw7.txt` before path 3: those 3 and the slam door.
