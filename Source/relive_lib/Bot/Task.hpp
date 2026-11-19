@@ -367,6 +367,8 @@ private:
     s32 mLeft = 0;
     // Frames with no way for it from where it is
     s32 mLost = 0;
+    // Frames spent having other Sligs shot on the way
+    s32 mKills = 0;
     GlukkonOrders mOrdersGiven;
 };
 
@@ -425,6 +427,8 @@ private:
     static constexpr s32 kLastShots = 50;
     std::unique_ptr<GoToTask> mGo;
     bool mPerched = false;
+    // The gate its lever opens on Sligs that are then shot as they come through (0: none)
+    s32 mGateX = 0;
     bool mStandSet = false;
     GlukkonOrders mOrdersGiven;
     s32 mChanted = 0;
@@ -856,6 +860,8 @@ private:
     s32 mHopWaits = 0;
     // Frames waited in a shadow for the Sligs of its floor to walk away
     s32 mShadowWaits = 0;
+    // For each Slig about (as World::mSligs has them): the frame it last did anything but stand
+    std::vector<s32> mSligMoved;
     s32 mHopFaced = -1;
     s32 mFallerWaits = 0;
     s32 mFallerLeft = -1;

@@ -1463,7 +1463,7 @@ static bool OutToHoist(const NavGraph& nav, const std::vector<s32>& path)
 // A drop or a hop that comes down beside the lever of an open gate across a floor Sligs walk: 0 when there is no such
 // gate by where it lands, 1 when every Slig of that floor on its screen is on the gate's far side and walking away
 // from it (the time to go: the lever shuts it on them), 2 when not yet
-static s32 GateShutsOut(const Bot& bot, const NavGraph& nav, s32 toNode)
+static s32 GateShutsOut(const Bot& bot, const NavGraph& nav, s32 toNode, std::vector<s32>* moved = nullptr)
 {
     const NavNode& to = nav.Nodes()[toNode];
     const World& world = bot.GetWorld();
@@ -1503,7 +1503,24 @@ static s32 GateShutsOut(const Bot& bot, const NavGraph& nav, s32 toNode)
             const bool walksAway = slig.mMotion == 2 && slig.mFacingLeft == (way < 0);
             const s32 then = slig.mX + way * 66;
             const bool room = slig.mBeatMax <= slig.mBeatMin || (way < 0 ? then >= slig.mBeatMin + 10 : then <= slig.mBeatMax - 10);
-            all = all && walksAway && (then - gateX) * way >= 15 && room;
+            // (or one that has only just come to a stand beyond the gate with its back to it: it stands thirty frames
+            // at least before it turns. The two of FeeCo's Executive Offices are as often half a round apart as
+            // together, and waited for to walk away side by side they never did in three thousand frames.)
+            const std::size_t idx = static_cast<std::size_t>(&slig - world.mSligs.data());
+            const s32 now = static_cast<s32>(bot.Abe().mFrame);
+            if (moved)
+            {
+                if (moved->size() <= idx)
+                {
+                    moved->resize(idx + 1, now);
+                }
+                if (slig.mMotion != 0 || (*moved)[idx] > now)
+                {
+                    (*moved)[idx] = now;
+                }
+            }
+            const bool justStood = moved && slig.mMotion == 0 && slig.mFacingLeft == (way < 0) && (slig.mX - gateX) * way >= 15 && now - (*moved)[idx] <= 4;
+            all = all && ((walksAway && (then - gateX) * way >= 15 && room) || justStood);
             walking = walking || walksAway;
         }
         state = any ? (all && walking ? 1 : 2) : state;
@@ -2763,7 +2780,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
     if (nav.Input().mIsAe && !bot.GetWorld().mInvisible && nav.Nodes()[cur].mHidden && mShadowWaits < 2000 &&
         // (the step out to a hoist he then goes up: the walk behind a Slig from shadow to shadow, the hoist in a
         // shadow and the sortie from one have their own timing)
-        first.mKind == EdgeKind::eWalk && !nav.Nodes()[first.mTo].mHidden && OutToHoist(nav, path))
+        first.mKind == EdgeKind::eWalk && !nav.Nodes()[first.mTo].mHidden)
     {
         const NavNode& here = nav.Nodes()[cur];
         const s32 cam = nav.CameraOf(here.mX, here.mY - 5);
@@ -2773,14 +2790,19 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             orb = orb || (o.mKind == EntityKind::eSecurityOrb && !o.mGone && nav.CameraOf(o.mX1, o.mY1) == cam);
         }
         bool wait = false;
+        const bool toHoist = OutToHoist(nav, path);
         for (const SligAt& slig : bot.GetWorld().mSligs)
         {
             if (!orb || slig.mAsleep || slig.mPossessed || slig.mHalf != here.mHalf || std::abs(slig.mY - here.mY) > 10 || nav.CameraOf(slig.mX, slig.mY - 5) != cam)
             {
                 continue;
             }
-            const bool away = slig.mMotion == 2 && slig.mFacingLeft == (slig.mX < here.mX) && std::abs(slig.mX - here.mX) >= 40;
-            wait = wait || !away;
+            // (to a hoist he then goes up: all of them walking away, forty off or more. Otherwise: none with its
+            // face to him or turning, which is the walk behind a Slig from one shadow to the next, and the step
+            // out behind one that stands with its back to him)
+            const bool back = slig.mMotion != 5 && slig.mFacingLeft == (slig.mX < here.mX);
+            const bool away = slig.mMotion == 2 && back && std::abs(slig.mX - here.mX) >= 40;
+            wait = wait || (toHoist ? !away : !back);
         }
         if (wait)
         {
@@ -3905,9 +3927,9 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             // Down beside the lever of an open gate across that floor, with every Slig of it on the gate's far side and
             // walking away: then, for the lever shuts it on them. ("From the left edge, hop right to land beside the
             // lever and pull it, all while the Sligs are at the left side.") They never leave that screen.
-            const s32 gateState = GateShutsOut(bot, nav, first.mTo);
+            const s32 gateState = GateShutsOut(bot, nav, first.mTo, &mSligMoved);
             const bool behindGate = gateState == 1;
-            if (gateState == 2 && mFallWaits < 3000)
+            if (gateState == 2 && mFallWaits < 12000)
             {
                 mFallWaits++;
                 mSteps--;
@@ -4030,7 +4052,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             // (not at a run from Slogs: there is no waiting then, and its back is what there is. The Executive Office
             // of Bonewerkz: "jump over him and keep going".)
             // (down beside the lever of an open gate: as the Sligs are all beyond it, see the drop)
-            if (nav.Input().mIsAe && !bot.GetWorld().mInvisible && GateShutsOut(bot, nav, first.mTo) == 2 && mHopWaits < 3000)
+            if (nav.Input().mIsAe && !bot.GetWorld().mInvisible && GateShutsOut(bot, nav, first.mTo, &mSligMoved) == 2 && mHopWaits < 12000)
             {
                 mHopWaits++;
                 mSteps--;
@@ -6480,6 +6502,23 @@ static bool GlukkonGuard(Bot& bot, const GlukkonAt& me, GlukkonOrders& orders, T
             seen = true;
         }
     }
+    // Or another Slig of its floor, with nothing shut between: shot by the one it has with it, as a Slog is. They are
+    // in Abe's way when he is himself again. ("Get one of the Sligs to kill the other", Phleg's office; "He can
+    // 'Kill 'em' too as long as you're there", Aslik's: left alive, the two of the gate shot Abe on his way back.)
+    // (only when it is told where they come from, as with a lever's Slogs: SligLeverTask, a gate opened on them)
+    if (!seen && spawnX != 0)
+    {
+        const SligAt* with = GlukkonsSlig(bot.Nav(), world, me);
+        for (const SligAt& s : world.mSligs)
+        {
+            if (with && &s != with && !s.mPossessed && !s.mAsleep && s.mHalf == me.mHalf && std::abs(s.mY - me.mY) <= 20 && bot.Nav().CameraOf(s.mX, s.mY - 5) == bot.Nav().CameraOf(me.mX, me.mY - 5) &&
+                Domain::FloorOpen(bot.Nav().Input(), world, s.mX, me.mX, me.mY + 4, me.mHalf) && std::abs(s.mX - with->mX) > 30)
+            {
+                slogX = s.mX;
+                seen = true;
+            }
+        }
+    }
     if (!seen && spawnX == 0)
     {
         return false;
@@ -6592,7 +6631,7 @@ static bool GlukkonGuard(Bot& bot, const GlukkonAt& me, GlukkonOrders& orders, T
     if (!spam || !orders.mLogged)
     {
         orders.mLogged = true;
-        bot.Log("the Glukkon at " + std::to_string(me.mX) + "," + std::to_string(me.mY) + ": \"Kill 'em\", the Slog at " + std::to_string(slogX) + ", to the Slig at " + std::to_string(slig->mX));
+        bot.Log("the Glukkon at " + std::to_string(me.mX) + "," + std::to_string(me.mY) + ": \"Kill 'em\", what is at " + std::to_string(slogX) + ", to the Slig at " + std::to_string(slig->mX));
     }
     orders.mQuiet = 30;
     step = TaskStep::Do(Prim::Wait(3, Btn::eSpeak5));
@@ -6727,6 +6766,44 @@ TaskStep VoiceLockTask::Next(Bot& bot, const std::string& lastFailed)
                     return guard;
                 }
             }
+            // Another Slig of its floor ahead, and the one it has along close behind it: that one shoots it, as it
+            // would a Slog. They are in Abe's way when he is himself again. ("He can 'Kill 'em' too as long as you're
+            // there." FeeCo's Executive Offices: the Slig of the floor under the hand panel, left alive, shot Abe
+            // as he came back onto its screen, where it starts with its face to him.)
+            // (and no step on in front of it until its last order to shoot has run out: gone on at once, Aslik was
+            // shot by it as Phleg had been)
+            {
+                const s32 now = static_cast<s32>(bot.Abe().mFrame);
+                if (mOrdersGiven.mOrderFrame > now)
+                {
+                    mOrdersGiven.mOrderFrame = -1000;
+                }
+                if (now - mOrdersGiven.mOrderFrame <= 50)
+                {
+                    return TaskStep::Do(Prim::Wait(1));
+                }
+            }
+            if (mOrdersGiven.mFollow && mKills < 900)
+            {
+                const SligAt* with = GlukkonsSlig(bot.Nav(), world, *me);
+                if (with && std::abs(with->mX - me->mX) <= 60)
+                {
+                    for (const SligAt& s : world.mSligs)
+                    {
+                        if (&s != with && !s.mPossessed && !s.mAsleep && s.mHalf == me->mHalf && std::abs(s.mY - me->mY) <= 20 && bot.Nav().CameraOf(s.mX, s.mY - 5) == bot.Nav().CameraOf(me->mX, me->mY - 5) &&
+                            Domain::FloorOpen(bot.Nav().Input(), world, s.mX, me->mX, me->mY + 4, me->mHalf) && std::abs(s.mX - with->mX) > 30)
+                        {
+                            TaskStep guard;
+                            mOrdersGiven.mHey = true;
+                            if (GlukkonGuard(bot, *me, mOrdersGiven, guard, s.mX))
+                            {
+                                mKills += 2;
+                                return guard;
+                            }
+                        }
+                    }
+                }
+            }
             std::vector<s32> nodes;
             std::vector<bool> hops;
             std::vector<bool> lifts;
@@ -6742,7 +6819,31 @@ TaskStep VoiceLockTask::Next(Bot& bot, const std::string& lastFailed)
             mLost = 0;
             // A lift on the way, which a Slig has to work: one is told to come along before it sets off ("then make
             // him follow you to the right"). A Slig a screen back does not hear it from the lift.
-            if (!mOrdersGiven.mFollow && std::find(lifts.begin(), lifts.end(), true) != lifts.end())
+            // (or with a Slig by it that listens, which it has along for what Sligs lie ahead: see below)
+            const bool liftOnWay = std::find(lifts.begin(), lifts.end(), true) != lifts.end();
+            const SligAt* near = GlukkonsSlig(bot.Nav(), world, *me);
+            // (only where the way goes on to another screen on which the map has a Slig on its floor under a security
+            // orb: those are the ones Abe cannot take over himself when he comes by. Had along for any way, the Slig
+            // was at the Glukkon's side at the next lever and not at the lever: the Barracks' war room.)
+            bool sligsAhead = false;
+            for (std::size_t i = 1; near && i < nodes.size() && !sligsAhead; i++)
+            {
+                const NavNode& on = bot.Nav().Nodes()[nodes[i]];
+                const s32 cam = bot.Nav().CameraOf(on.mX, on.mY - 5);
+                if (cam == bot.Nav().CameraOf(me->mX, me->mY - 5))
+                {
+                    continue;
+                }
+                bool orb = false;
+                bool slig = false;
+                for (const Entity& e : world.mEntities)
+                {
+                    orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && bot.Nav().CameraOf(e.mX1, e.mY1) == cam);
+                    slig = slig || (e.mKind == EntityKind::eSlig && !e.mGone && e.mHalf == on.mHalf && std::abs(e.mY2 - on.mY) <= 30 && bot.Nav().CameraOf(e.CentreX(), e.mY2 - 5) == cam);
+                }
+                sligsAhead = orb && slig;
+            }
+            if (!mOrdersGiven.mFollow && (liftOnWay || (near && sligsAhead && std::abs(near->mX - me->mX) <= 150)))
             {
                 if (me->mMotion != 0 || mOrdersGiven.mQuiet > 0)
                 {
@@ -6981,6 +7082,29 @@ static bool GlukkonStep(Bot& bot, const GlukkonAt& me, s32 x, s32 y, s32& lost, 
     return true;
 }
 
+// A lever whose switch opens a gate of its floor that is shut now, with Sligs awake beyond it: where the gate is
+static bool GateOnSligs(const NavGraph& nav, const World& world, const Entity& lever, s32& gateX)
+{
+    for (const NavFeature& f : nav.Input().mFeatures)
+    {
+        if (f.mKind != FeatureKind::eBarrier || !f.mSolid || f.mBeam || f.mSwitch != lever.mSwitch || f.mSwitch <= 1 || f.mHalf != lever.mHalf || std::abs(f.mY1 - lever.mY2) > 30 ||
+            (world.Switch(f.mSwitch) != 0) == f.mStartClosed)
+        {
+            continue;
+        }
+        const s32 gx = (f.mX1 + f.mX2) / 2;
+        for (const SligAt& s : world.mSligs)
+        {
+            if (!s.mPossessed && !s.mAsleep && s.mHalf == lever.mHalf && std::abs(s.mY - lever.mY2) <= 30 && (s.mX - gx) * (lever.CentreX() - gx) < 0 && nav.CameraOf(s.mX, s.mY - 5) == nav.CameraOf(gx, lever.mY2 - 5))
+            {
+                gateX = gx;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 TaskStep SligLeverTask::Next(Bot& bot, const std::string& lastFailed)
 {
     const World& world = bot.GetWorld();
@@ -7017,6 +7141,28 @@ TaskStep SligLeverTask::Next(Bot& bot, const std::string& lastFailed)
                 spawnX = world.mSlogSpawners[i][0];
                 spent = spent && i < world.mSlogSpawnersSpent.size() && world.mSlogSpawnersSpent[i];
             }
+        }
+        if (!spawns && mGateX != 0 && me)
+        {
+            // The Sligs the gate was shut on come through it: shot as they come, until none is left
+            const SligAt* with = GlukkonsSlig(nav, world, *me);
+            bool others = false;
+            for (const SligAt& s : world.mSligs)
+            {
+                others = others || (with && &s != with && !s.mPossessed && !s.mAsleep && s.mHalf == me->mHalf && std::abs(s.mY - me->mY) <= 20 && nav.CameraOf(s.mX, s.mY - 5) == nav.CameraOf(me->mX, me->mY - 5) &&
+                                    std::abs(s.mX - with->mX) > 30);
+            }
+            mClear = others ? 0 : mClear + 2;
+            if (with && (others || mClear < 120) && (mFrames += 2) < 3000)
+            {
+                TaskStep guard;
+                return others && GlukkonGuard(bot, *me, mOrdersGiven, guard, mGateX) ? guard : TaskStep::Do(Prim::Wait(2));
+            }
+            if (mClear >= 120)
+            {
+                bot.Log("the Glukkon at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": the Sligs the gate was shut on are dead");
+            }
+            return TaskStep::Done();
         }
         if (!spawns)
         {
@@ -7104,6 +7250,20 @@ TaskStep SligLeverTask::Next(Bot& bot, const std::string& lastFailed)
     {
         mStandSet = true;
         const s32 cell = NavGraph::GridStep(lever->mHalf);
+        // (or one that opens a gate with Sligs behind it: from the side of the lever away from the gate, so that the
+        // Slig that pulls it faces them as they come through, and shoots them as it would Slogs. FeeCo's Executive
+        // Offices: "He can 'Kill 'em' too as long as you're there". Left alive, they shot Abe on his way back.)
+        s32 gateX = 0;
+        if (GateOnSligs(nav, world, *lever, gateX))
+        {
+            const s32 wantX = lever->CentreX() + (gateX < lever->CentreX() ? cell : -cell);
+            const s32 node = nav.NodeAt(wantX, lever->mY2, lever->mHalf, 12);
+            if (node >= 0 && std::abs(nav.Nodes()[node].mX - wantX) <= cell / 2)
+            {
+                mStand = node;
+                mGateX = gateX;
+            }
+        }
         for (const std::array<s32, 4>& sp : world.mSlogSpawners)
         {
             if (sp[2] == lever->mSwitch && std::abs(sp[1] - lever->mY2) <= 30)

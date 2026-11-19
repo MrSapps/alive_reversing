@@ -3053,3 +3053,32 @@ again), on left to the lock at 1687 (teleported to 687), the Security Fone answe
   (`GlukkonGuard`).
 
 Check set: ctest 11/11; m1, tr1, t13 0; a1 14; bw1, blk9t, b14, wr 0; fc3 0; bw7b 29.
+
+### The Executive Offices to their end, and on into Terminal 5 (2026-11-19, `la/fs3.txt`): from the second part
+
+`fs3.txt` (from 1587,1400): the two shadow screens, Aslik, the Security Fone at f=4548, Abe back along the bottom
+to the door at 1562 and the well at 612 (f=5004), out through `feeco_depot_ender` 14 to the depot's hub (f=5401),
+through the door to Terminal 5 (`feeco_depot` 5, f=5930) and into its Greeters (`feeco_depot` 10): 13 deaths, 5 of
+them in the offices.
+
+- **The Sligs a gate was shut on are shot as they come back through it:** the lever that opens it is pulled from
+  the side away from the gate, so the Slig that pulls it faces them, and it is told to shoot as for a lever's
+  Slogs until none is left (`SligLeverTask`, `GateOnSligs`).
+- **A Slig had along for the Sligs ahead:** where the Glukkon's way goes on to another screen on which the map has
+  a Slig on its floor under a security orb, the one by it is told "Come here" first, and on that screen it shoots
+  the Slig there with the Glukkon in its cell (`VoiceLockTask`). Only there: had along for any way, it stood by the
+  Glukkon at the next lever and not at the lever (the Barracks' war room), and called for after Phleg's last
+  Slogs it kept him under the drills. No step on in front of it until its last order has run out (Aslik was shot
+  as Phleg had been).
+- Out of a shadow in general: with no Slig of that floor facing him or turning (to a hoist he then goes up: all
+  walking away, forty off).
+
+**Not sure, and worse from the offices' own start (`fe1.txt`):** 29 and 32 deaths in two runs, the second stuck at
+the gate screen. The flying Sligs' screens are a death each still. And the gate: its two Sligs were half a round
+apart there, never both beyond the gate with their backs to it; he waited ten thousand frames on the platform,
+went at the limit and died, and the ways tried after that were the worse ones. (They walk together when left
+alone, as in `fs3.txt`; something earlier in the whole run puts them apart, likely a noise he makes: "past the
+Slig that stands guard at a running jump".) `bw7b.txt` this time: 17 deaths to the offices and stuck on their
+second screen, the one running jump there ruled out after two deaths at it.
+
+Check set otherwise: ctest 11/11; m1, tr1, t13 0; a1 14; bw1, blk9t, b14, wr 0; fc3 0.
