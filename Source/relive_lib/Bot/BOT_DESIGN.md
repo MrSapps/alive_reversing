@@ -3104,3 +3104,12 @@ three screens of Greeters (path 10).
 
 Check set: as before (ctest 11/11; m1, tr1, t13 0; a1 14; bw1, blk9t, b14, wr 0; fc3 0; bw7b stuck on the
 Executive Offices' flying Sligs with 17 deaths).
+
+**Terminal 5's path 5, what was seen (2026-11-19, `la/t5b.txt` starts at 1037,1160):** he pulls the lever of 155,
+drinks, and flies both of the machine's two Brews (`brew_count` 2) at the flying Slig of the screen above (the
+first missed), which leaves none for anything else; then no plan. What the guide does with them: one fart for the
+Chant Protector at 965..989,310, then that flying Slig taken over from under the crates and its grenades for the
+fourteen mines along the floor at 460 (three screens, an orb on each), then it is burst. Not built: a security orb
+as a fart's target (tried: `build-bot/la/fart_orb_wip.patch`, the action is offered but nothing wants the orb gone
+yet); a flying Slig of the map (not a spawner's) as the one flown; mines as what it bombs (`FlierTargets` is Sligs
+under an orb, from a spawner). After that the four blind Mudokons and the three lifts.
