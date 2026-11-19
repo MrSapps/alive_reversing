@@ -2306,6 +2306,14 @@ private:
     bool mPrefix = false;
     s32 mPrefixFails = 0;
     s32 mDepth = 0;
+    // The teleporter by the landing was gone for once (see Next)
+    bool mTeleTried = false;
+    s32 mTeleDrop = -1;
+    s32 mTeleHeld = 0;
+    s32 mTeleLand = -1;
+    s32 mTeleOut = -1;
+    std::set<s32> mTeleFirst;
+    std::set<s32> mTeleOn;
     std::unique_ptr<GoToTask> mGo;
     std::unique_ptr<Task> mUse;
 };

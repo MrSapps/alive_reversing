@@ -3215,3 +3215,15 @@ stands at its first four drills (525..625, speeds 3 to 5) for ever: no moment is
   every cell by him is under one, and with those all refused there was no way to him.
 - The bisect scripts try a run three times when it leaves no log (the game does not always start in time after
   a build), and `la/verify_pinned.sh` runs the check set from a copy of the binary so that `build/` is free.
+
+**The Mudanchee trial's last screen (2026-11-19, `build-bot/trial/v*.txt`: `tr1.txt` begun 3 to 37 frames later).**
+Begun at other frames than `tr1.txt`'s, three runs of five never got past it (8 to 11 deaths each): waited for on
+either ledge he is eaten by the Fleeches behind him or the one asleep at 1837, and whether the Scrab is out from
+under the drop is the game's dice. The walkthrough does not wait: "Drop to the ground and run left to the
+teleporter, then right." `ScrabWaryTask`: with Fleeches awake and after him, and a teleporter within three cells
+of where a drop off his ledge lands that leads on along the Scrab's floor, he runs to the ledge's end, holds
+there at most 90 frames while the Scrab is within 230 of the landing and not on its way off (and no Fleech is
+within 70 of him), drops, walks onto the plate (run onto it he came out still running the wrong way, into the
+Scrab) and runs on from where it puts him. All six starts now get through: four with no death, two with three.
+Also: the first try from a save is as it was and only later ones begin later (3 frames each); an edge is only
+ruled out after two deaths where there is another way to where it goes.
