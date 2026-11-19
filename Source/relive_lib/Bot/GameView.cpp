@@ -11,6 +11,7 @@
 #include "../GameObjects/BaseAliveGameObject.hpp"
 #include "../data_conversion/EnumSerialization.hpp"
 #include "../../AliveLibAE/Abe.hpp"
+#include "../../AliveLibAE/BrewMachine.hpp"
 #include "../../AliveLibAE/Input.hpp"
 #include "../../AliveLibAO/Abe.hpp"
 #include "../../AliveLibAO/FallingItem.hpp"
@@ -1322,7 +1323,12 @@ static void MarkFlierTargets(NavInput& in, const World& world)
             continue;
         }
         for (const Domain::FlierTarget& target : Domain::FlierTargets(in, world, spawner))
-        {
+        {            // (a mine is no floor to be kept off: it is in the graph as a mine)
+            if (target.mMine)
+            {
+                continue;
+            }
+
             NavFeature f;
             f.mKind = FeatureKind::eDanger;
             f.mX1 = target.mX - Domain::kFlierTargetX;
@@ -1943,6 +1949,23 @@ void GameView::ReadWorld(BaseMap& map, World& world)
             glukkon.mPossessed = pObj == sControlledCharacter;
             glukkon.mMotion = pObj->VGetMotion(eMotionType::eCurrentMotion);
             world.mGlukkons.push_back(glukkon);
+        }
+    }
+    // A Brew machine with none left is as good as gone (Terminal 5's has two)
+    for (s32 i = 0; isAe && i < gBaseGameObjects->Size(); i++)
+    {
+        BaseGameObject* pObj = gBaseGameObjects->ItemAt(i);
+        if (pObj && !pObj->GetDead() && pObj->Type() == ReliveTypes::eBrewMachine && static_cast<BrewMachine*>(pObj)->GetRemainingBrewCount() <= 0)
+        {
+            const s32 x = FP_GetExponent(static_cast<BrewMachine*>(pObj)->mXPos);
+            const s32 y = FP_GetExponent(static_cast<BrewMachine*>(pObj)->mYPos);
+            for (Entity& e : world.mEntities)
+            {
+                if (e.mKind == EntityKind::eBrew && std::abs(e.CentreX() - x) <= 60 && std::abs(e.mY2 - y) <= 80)
+                {
+                    e.mGone = true;
+                }
+            }
         }
     }
     world.mCrawlers.clear();

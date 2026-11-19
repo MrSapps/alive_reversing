@@ -293,6 +293,13 @@ public:
     {
         return mAbe.mFrame <= mGreeterDashUntil;
     }
+    // On his way into the stretch of a flying Slig to take it over: until that frame the edges that wait for
+    // that Slig to be gone (its switch) are open to him
+    void LetDanger(s32 sw, u32 untilFrame)
+    {
+        mDangerLet = sw;
+        mDangerLetUntil = untilFrame;
+    }
     void Dash(u32 untilFrame)
     {
         mDashUntil = untilFrame;
@@ -666,6 +673,8 @@ private:
     // A flying Slig of his size is on his screen in a path with nowhere to be unseen: everything at a run (it gets
     // him where he stands; run from, its grenades come down where he was)
     bool mFlierRun = false;
+    s32 mDangerLet = 0;
+    u32 mDangerLetUntil = 0;
     s32 mRunUntil = 0;
     s32 mRunPath = -1;
     // Bones thrown to Slogs on their own floor, beyond the plan's

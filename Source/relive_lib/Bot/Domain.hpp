@@ -219,6 +219,8 @@ struct Domain final
         u32 mSlig = 0;
         s32 mX = 0;
         s32 mFloorY = 0;
+        // It is a mine, not a Slig: nothing of its floor is kept off for it
+        bool mMine = false;
         // The places to throw from that can be flown to as things are
         std::vector<FlierFlight::Shot> mShots;
         // With none: the switches (and what each has to be) that open the way to one

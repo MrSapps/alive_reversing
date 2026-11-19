@@ -2031,7 +2031,8 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                                                      s32 sw = 0;
                                                      s32 value = 0;
                                                      const s32 cost = all(e);
-                                                     return cost < 0 && away(e) && !(nav.Condition(e, &sw, &value) && w.Switch(sw) != value) ? e.mCost : cost;
+                                                     // (not a drop down a shaft onto the lift at another stop: that is no stop it is waited at)
+                                                     return cost < 0 && away(e) && e.mShaft < 0 && !(nav.Condition(e, &sw, &value) && w.Switch(sw) != value) ? e.mCost : cost;
                                                  }, soon))
         {
             for (s32 idx : soon)
@@ -8713,7 +8714,7 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
     }
     // The lever of an open gate across his floor, with every Slig of that floor on the gate's far side: pulled at
     // once, it shuts the gate on them. (He has come down beside it for that, GoToTask.)
-    if (entity->mKind == EntityKind::eLever)
+    if (entity && entity->mKind == EntityKind::eLever)
     {
         for (const NavFeature& f : nav.Input().mFeatures)
         {
@@ -12132,6 +12133,18 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
         }
         if (bot.AbeNode() != mSpot)
         {
+            // (into the stretch of the flying Slig that is to be had: its own, by the spawner)
+            for (const Entity& flier : world.mEntities)
+            {
+                if (spawner && flier.mKind == EntityKind::eFlier && !flier.mGone && flier.mHalf == spawner->mHalf && world.Switch(flier.mSwitch) == 0 &&
+                    std::abs(flier.CentreX() - spawner->CentreX()) + std::abs((flier.mY1 + flier.mY2) / 2 - (spawner->mY1 + spawner->mY2) / 2) <= 1000)
+                {
+                    bot.LetDanger(flier.mSwitch, bot.Abe().mFrame + 3);
+                    // (and in a hurry: it throws at where he stops)
+                    bot.RunFor(20);
+                    break;
+                }
+            }
             TaskStep step;
             if (!mGo)
             {
@@ -12153,6 +12166,12 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
         {
             return TaskStep::Do(Prim::Wait(3, Btn::eUp));
         }
+        // (rolled in under something to get here: up, there is no chanting crouched. Terminal 5: "roll left under
+        // the crates and stand up".)
+        if (bot.Abe().mMove == Move::eCrouch)
+        {
+            return TaskStep::Do(Prim::Press(Btn::eUp));
+        }
         if (!bot.Abe().Settled() && mPhase != 1)
         {
             return TaskStep::Do(Prim::Wait(1));
@@ -12171,6 +12190,13 @@ TaskStep FlierBombTask::Next(Bot& bot, const std::string& lastFailed)
             mPhase = 0;
             // (one that was lost: the next is not waited for as long. And none to be had from this spawner is
             // kept: what it was wanted for is then done another way, or not)
+            // (a spawner makes one a time, and is off again when that one is dead: with none about there is none
+            // to wait for until its switch is on again, which is the plan's to see to. Terminal 5: lost on the
+            // way to a lever three screens off, and its lever at 1187,460 has to be pulled anew.)
+            if (spawner && spawner->mSwitch > 1 && world.Switch(spawner->mSwitch) == 0 && world.mFliers.empty() && mLost > 0 && mWaits > 90)
+            {
+                return TaskStep::Failed("the flying Slig was lost and its spawner is off again");
+            }
             if (++mWaits > (mLost > 0 ? 900 : 3000))
             {
                 bot.NoFlier(mSpawner);

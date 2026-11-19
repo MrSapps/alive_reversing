@@ -1387,6 +1387,40 @@ void NavGraph::Build(const NavInput& input)
                 {
                     const bool roll = standingWall || n.mLow || mNodes[to].mLow;
                     AddEdge(edges, from, to, roll ? EdgeKind::eRoll : EdgeKind::eWalk, roll ? kRollCost : kWalkCost, BarrierBetween(n.mX, n.mX + dir * step, n.mY, n.mHalf), left);
+                    // Onto a lift's stop with the lift away at a stop below: walked off into the shaft he comes down
+                    // on its platform, where that is no fall to die of. (Terminal 5: the lift at 1975..2051 waits
+                    // at 720, and its top stop at 619 is how the walkthrough gets to "the lower pair of blind
+                    // Mudokons": off the floor at 620.)
+                    if (mNodes[to].mLiftStop >= 0 && n.mLiftStop < 0 && !roll)
+                    {
+                        s32 under = -1;
+                        for (std::size_t k = 0; k < mNodes.size(); k++)
+                        {
+                            const NavNode& other = mNodes[k];
+                            if (other.mLiftStop >= 0 && other.mLiftStop != mNodes[to].mLiftStop && other.mX == mNodes[to].mX && other.mHalf == n.mHalf && other.mY > mNodes[to].mY &&
+                                std::abs(mInput.mFeatures[other.mLiftStop].mX1 - mInput.mFeatures[mNodes[to].mLiftStop].mX1) <= 2 && (under < 0 || other.mY < mNodes[under].mY))
+                            {
+                                under = static_cast<s32>(k);
+                            }
+                        }
+                        if (under >= 0 && (mNodes[under].mY - n.mY) * (n.mHalf ? 2 : 1) < kDeadlyFall)
+                        {
+                            AddEdge(edges, from, under, EdgeKind::eFall, 20 + (mNodes[under].mY - n.mY) / 4, -1, left);
+                            edges.back().mShaft = mNodes[to].mLiftStop;
+                        }
+                        // (or it is the lift's lowest stop, with a floor under the shaft: down to that, the lift
+                        // away up. Terminal 5: "pull the lever twice to make the lift go back up", then "fall to
+                        // the bottom level", the floor at 1240 under the lift that waits at 1160.)
+                        s32 by = 0;
+                        s32 drop = 0;
+                        const s32 belowLine = under < 0 ? FloorBelow(nx, mNodes[to].mY + 13, n.mHalf, &by, &drop) : -1;
+                        const s32 down = belowLine >= 0 ? NodeOnLine(belowLine, nx) : -1;
+                        if (down >= 0 && std::abs(mNodes[down].mX - nx) <= step / 2 && (by - n.mY) * (n.mHalf ? 2 : 1) < kDeadlyFall && !mNodes[down].mHazard)
+                        {
+                            AddEdge(edges, from, down, EdgeKind::eFall, 20 + (by - n.mY) / 4, -1, left);
+                            edges.back().mShaft = mNodes[to].mLiftStop;
+                        }
+                    }
                 }
             }
             else if (!(standingWall && !n.mLow && HoistTopAt(n)))
