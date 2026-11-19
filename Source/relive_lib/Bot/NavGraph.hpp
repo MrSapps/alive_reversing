@@ -189,6 +189,8 @@ struct NavNode final
     s32 mTrapDoor = -1;
     // In an invisible zone: not seen there
     bool mHidden = false;
+    // The same for one who stands still in it (his box is narrower then)
+    bool mHiddenStill = false;
     // Standing here he is wholly in a Z cover: the Sligs in the background don't see him
     bool mZCover = false;
     // Crouched here he is: under something too low to stand behind

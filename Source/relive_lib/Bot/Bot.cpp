@@ -1794,6 +1794,66 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
         {
             return -1;
         }
+        // A jump or a drop that ends on a screen where a Slig is awake under a security orb (it is not
+        // to be taken over, and it turns to what it hears): dear, so that the quiet way down into a shadow is
+        // the one gone. (FeeCo's Executive Offices: "lower yourself down when the bottom Slig is facing right".
+        // Hopped off the ledge, he was shot from the one above as he landed.)
+        // (AE's only: AO's Rupture Farms was four deaths the worse with it)
+        if (know->mNav.Input().mIsAe && (e.mKind == EdgeKind::eHop || e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eRunJump))
+        {
+            const NavGraph& graph = know->mNav;
+            const NavNode& to = graph.Nodes()[e.mTo];
+            const s32 cam = graph.CameraOf(to.mX, to.mY - 5);
+            bool orb = false;
+            for (const Entity& o : world->mEntities)
+            {
+                orb = orb || (o.mKind == EntityKind::eSecurityOrb && !o.mGone && graph.CameraOf(o.mX1, o.mY1) == cam);
+            }
+            bool slig = false;
+            for (const SligAt& sl : world->mSligs)
+            {
+                slig = slig || (!sl.mAsleep && !sl.mPossessed && sl.mHalf == to.mHalf && graph.CameraOf(sl.mX, sl.mY - 5) == cam);
+            }
+            // (into a shadow too: he is seen in the air, and heard as he lands)
+            // (where there is a quiet way down to that floor close by: a hoist to be let down by, within three cells
+            // of where this leaves its floor. With none the jump is the way, as in Bonewerkz' rock sack room,
+            // which was twelve deaths and no plan with this for every jump.)
+            bool quiet = false;
+            const NavNode& off = graph.Nodes()[e.mFrom];
+            for (std::size_t n = 0; orb && slig && !quiet && n < graph.Nodes().size(); n++)
+            {
+                const NavNode& near = graph.Nodes()[n];
+                if (near.mLine != off.mLine || std::abs(near.mX - off.mX) > 3 * NavGraph::GridStep(off.mHalf))
+                {
+                    continue;
+                }
+                for (s32 k = 0; k < near.mEdgeCount; k++)
+                {
+                    const NavEdge& down = graph.Edges()[near.mFirstEdge + k];
+                    quiet = quiet || (down.mKind == EdgeKind::eHoistDown && std::abs(graph.Nodes()[down.mTo].mY - to.mY) <= 10);
+                }
+            }
+            // (or a hoist that comes up or down onto the very floor this ends on: the running jump across to the
+            // ledge at 1737,1400 there, which the hoist under it leads up to from the shadow)
+            for (std::size_t k = 0; orb && slig && !quiet && k < graph.Edges().size(); k++)
+            {
+                const NavEdge& hoist = graph.Edges()[k];
+                quiet = (hoist.mKind == EdgeKind::eHoistUp || hoist.mKind == EdgeKind::eHoistDown) && graph.Nodes()[hoist.mTo].mLine == to.mLine;
+            }
+            // (and only on a screen with shadows on the floor it ends on: there the way is from shadow to shadow.
+            // Without this Bonewerkz' rock sack room was twelve deaths and no plan.)
+            bool shadows = false;
+            for (std::size_t n = 0; orb && slig && quiet && !shadows && n < graph.Nodes().size(); n++)
+            {
+                const NavNode& sh = graph.Nodes()[n];
+                shadows = sh.mHidden && sh.mHalf == to.mHalf && graph.CameraOf(sh.mX, sh.mY - 5) == cam;
+            }
+            quiet = quiet && shadows;
+            if (orb && slig && quiet && !world->mInvisible)
+            {
+                return e.mCost + 4000;
+            }
+        }
         // Running jumps with no stop between: only with a flying Slig about, which gets him where he stops
         if (e.mX2 != 0)
         {
@@ -3536,7 +3596,8 @@ std::unique_ptr<Task> Bot::MakeFlee()
         const NavGraph& nav = mKnow->mNav;
         const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);
         const s32 node = AbeNode();
-        const bool hidden = node >= 0 && nav.Nodes()[node].mHidden;
+        // (or stood still in a cell that hides one who does: to run from there is to come out into its sight)
+        const bool hidden = node >= 0 && (nav.Nodes()[node].mHidden || (nav.Nodes()[node].mHiddenStill && mAbe.mMove == Move::eIdle));
         for (const SligAt& slig : mWorld.mSligs)
         {
             const s32 near = mAbe.mHalfScale ? 100 : 200;
@@ -3550,6 +3611,22 @@ std::unique_ptr<Task> Bot::MakeFlee()
             if (mIsAe && slig.mMotion == 0 && slig.mFacingLeft == (mAbe.mX > slig.mX))
             {
                 continue;
+            }
+            // (nor one that walks away from him on a screen with shadows, while he sneaks after it: that is the way
+            // from one shadow to the next. FeeCo's Executive Offices: "Sneak behind the Slig to the shadow on the
+            // right of the Glukkon transporter". Turned back from it at 1687, he was in its sight when it turned.)
+            if (mIsAe && slig.mMotion == 2 && slig.mFacingLeft == (mAbe.mX > slig.mX) && mAbe.mMove != Move::eRun)
+            {
+                bool shadows = false;
+                const s32 cam = nav.CameraOf(mAbe.mX, mAbe.mY - 5);
+                for (const NavNode& n : nav.Nodes())
+                {
+                    shadows = shadows || (n.mHidden && n.mHalf == mAbe.mHalfScale && std::abs(n.mY - mAbe.mY) <= 30 && nav.CameraOf(n.mX, n.mY - 5) == cam);
+                }
+                if (shadows)
+                {
+                    continue;
+                }
             }
             const NavGraph* graph = &nav;
             const s32 floorY = mAbe.mY;

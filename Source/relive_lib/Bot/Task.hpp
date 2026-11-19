@@ -1390,6 +1390,8 @@ private:
     TaskStep Sortie(Bot& bot, const std::string& lastFailed, s32 x, s32 y, bool half);
     s32 mSortie = 0;
     s32 mSortieNode = -1;
+    // The frame a Slig that stays on the screen last faced where he waits (-1: not seen to yet)
+    s32 mSortieFaced = -1;
     s32 mSortieWaits = 0;
 
 public:
