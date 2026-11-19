@@ -3172,3 +3172,24 @@ f=74,505. What stopped it on the way, each found with the trace or by bisecting:
   the rewind he has no plan (`build-bot/mv8a.txt`).
 The bisect scripts (`build-bot/bis*.sh`) build at -j3 and stop on a failed build: at -j5 under the 3G cap some
 builds were killed and the commit before was tested in their place.
+
+**The brewery's first hub (2026-11-19, `build-bot/br/h1.txt` from the train door at 562,939: out by the well to
+path 23 at f=5,690, no deaths).** By the walkthrough: hello to the Brewmaster, its naked Slig trapped behind the
+gate and taken over, the lift's top Slig shot with it, a Brew, the Chant Protector farted at, the Glukkon to the
+voice locks. What was built:
+- `PantsSligTask` (Domain `ePantsSlig`, "Kill Slig#N with the Slig a Glukkon calls"): a crawling Slig whose panic
+  switch is a Glukkon's help switch, its locker, an open gate on the locker's floor whose lever is off that
+  floor, a lift beyond the gate up to a Slig's floor. He says hello from three cells off the locker and stays
+  until the Glukkon has called (it has to see him: gone at once, it called for nobody), runs to the lever, pulls
+  it once a Slig is 40 past the gate, chants, walks the Slig onto the lift (a cell at a time: the rope is only
+  taken within half a cell of the lift's middle), rides up, holds under the top floor on its screen until the
+  other has its back to the lift (off that screen it does not move at all), shoots, rides down, bursts. What is
+  drunk or used on that Slig's floor waits for it.
+- A fart flown at an orb with the Brew in him, from any region's cell that a fart gets to it from (the machine
+  is at the top of a shaft its lift fills), through gates a switch opens with those open first.
+- A lift stop with a voice lock over it is worked by the Glukkon's own "Hey" and "Do it" there (`VoiceLift`): no
+  Slig is called for such a lift.
+- A lift point that only says where the lift starts (`start_point_only`) is no stop.
+Next: the Zulags' hub is path 23 (doors: Zulag 1 = path 1, 2 = path 2, 3 = path 12, 4 = path 19, 5 = path 14;
+the tasks door to hub 2 wants switches 125, 222, 223, 224, 126). He goes into Zulag 3 first (`br/z3.txt`) and
+stands at its first four drills (525..625, speeds 3 to 5) for ever: no moment is found to roll through them.

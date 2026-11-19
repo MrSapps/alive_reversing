@@ -6387,6 +6387,172 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             add("Fly a fart from " + std::string(EntityKindName(brew.mKind)) + "#" + std::to_string(brew.mId) + " to " + EntityKindName(target.mKind) + "#" + std::to_string(target.mId), pre, {done}, 400 + length / 3, bomb);
         }
     }
+    // And at a security orb with the Brew in him, from wherever a fart gets to it: the machine may be where none
+    // does. (The brewery's first hub: "drink a Brew, then go back down to the bottom ... Fart and possess it, then
+    // blow up the Chant Protector on the screen with the Glukkon". The machine is at the top of the lift's
+    // shaft, which the lift he rode up fills.) Not from the orb's own screen, nor any other orb's: it is flown
+    // by chanting.
+    {
+        bool machines = false;
+        for (const Entity& brew : world.mEntities)
+        {
+            machines = machines || (brew.mKind == EntityKind::eBrew && !brew.mGone);
+        }
+        const std::size_t before = d.mActions.size();
+        for (const Entity& orb : world.mEntities)
+        {
+            if (!machines || orb.mKind != EntityKind::eSecurityOrb || orb.mGone)
+            {
+                continue;
+            }
+            const FartFlight::Point to{orb.CentreX(), orb.mY2 + 14};
+            std::set<s32> regions;
+            for (std::size_t ai = 0; ai < before; ai++)
+            {
+                const DomainStep s2 = d.mSteps[d.mActions[ai].mTag];
+                if (s2.mKind != StepKind::eCross || s2.mEdge < 0)
+                {
+                    continue;
+                }
+                const s32 node = nav.Edges()[s2.mEdge].mTo;
+                const NavNode& n = nav.Nodes()[node];
+                if (n.mHazard || n.mLow || n.mLiftStop >= 0 || regions.count(d.mRegions[node]) != 0 || (std::abs(to.mX - n.mX) < 150 && std::abs(to.mY - n.mY) < 150))
+                {
+                    continue;
+                }
+                bool watched = false;
+                for (const Entity& e : world.mEntities)
+                {
+                    watched = watched || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && nav.CameraOf(e.CentreX(), (e.mY1 + e.mY2) / 2) == nav.CameraOf(n.mX, n.mY - 20));
+                }
+                std::vector<FartFlight::Point> corners;
+                s32 length = 0;
+                // (round every gate if it can be, else through the ones a switch opens, with them open first: "Pull
+                // the lever on the upper ledge again to drop the barrier. Fart and possess it")
+                std::vector<Goap::Fact> pre{regionFact(node), {Key::kBrew, 1}};
+                std::vector<s32> which;
+                const std::vector<NavLine> gates = FartFlight::Gates(nav.Input(), n.mHalf, nullptr, &which);
+                const FartFlight::Point from{n.mX, n.mY - 28};
+                if (watched)
+                {
+                    continue;
+                }
+                if (!FartFlight::Route(nav.Input(), n.mHalf, from, to, kFartReach / 2, corners, &length, &gates))
+                {
+                    if (!FartFlight::Route(nav.Input(), n.mHalf, from, to, kFartReach / 2, corners, &length))
+                    {
+                        continue;
+                    }
+                    bool can = true;
+                    for (std::size_t g = 0; g < gates.size(); g++)
+                    {
+                        if (FartFlight::Through(from, corners, gates[g]))
+                        {
+                            const NavFeature& f = nav.Input().mFeatures[which[g]];
+                            can = can && f.mSwitch > 1;
+                            pre.push_back({Key::Switch(f.mSwitch), f.mStartClosed ? 1 : 0});
+                        }
+                    }
+                    if (!can)
+                    {
+                        continue;
+                    }
+                }
+                regions.insert(d.mRegions[node]);
+                DomainStep bomb;
+                bomb.mKind = StepKind::eFartBomb;
+                bomb.mEntity = orb.mId;
+                bomb.mEdge = node;
+                add("Fly a fart from " + std::to_string(n.mX) + "," + std::to_string(n.mY) + " to SecurityOrb#" + std::to_string(orb.mId), pre, {{Key::Switch(World::HazardSwitch(orb.mId)), 1}, {Key::kBrew, 0}}, 500 + length / 3, bomb);
+            }
+        }
+    }
+    // A Slig on a floor only a lift goes to, where a Glukkon's call for help sends a naked Slig for pants: that
+    // one, come after him through an open gate whose lever is off its floor, is shut in, taken over from the
+    // lever and ridden up the lift to shoot it (PantsSligTask). Until then nothing is drunk or used on that Slig's
+    // floor. (The brewery's first hub: "Say Hi to the Brewmaster Glukkon. He'll call for help and wake the
+    // sleeping naked Slig ... pull the lever once the Slig comes in, trapping him. Possess him ... Ride it all
+    // the way up and shoot the other Slig".)
+    for (const Entity& crawler : world.mEntities)
+    {
+        if (crawler.mKind != EntityKind::eCrawler || crawler.mGone || crawler.mInputs[0] <= 1 || std::find(world.mGlukkonHelp.begin(), world.mGlukkonHelp.end(), crawler.mInputs[0]) == world.mGlukkonHelp.end())
+        {
+            continue;
+        }
+        const Entity* locker = nullptr;
+        for (const Entity& e : world.mEntities)
+        {
+            if (e.mKind == EntityKind::ePantsLocker && !e.mGone && e.mHalf == crawler.mHalf &&
+                (!locker || std::abs(e.CentreX() - crawler.CentreX()) + std::abs(e.mY2 - crawler.mY2) < std::abs(locker->CentreX() - crawler.CentreX()) + std::abs(locker->mY2 - crawler.mY2)))
+            {
+                locker = &e;
+            }
+        }
+        if (!locker)
+        {
+            continue;
+        }
+        const s32 floorY = locker->mY2;
+        const s32 step = NavGraph::GridStep(locker->mHalf);
+        bool added = false;
+        for (const NavFeature& gate : nav.Input().mFeatures)
+        {
+            if (added || gate.mKind != FeatureKind::eBarrier || !gate.mSolid || gate.mBeam || gate.mStartClosed || gate.mSwitch <= 1 || gate.mHalf != locker->mHalf || std::abs(gate.mY2 - floorY) > 30 || world.Switch(gate.mSwitch) != 0)
+            {
+                continue;
+            }
+            const s32 gateX = (gate.mX1 + gate.mX2) / 2;
+            const s32 side = gateX > locker->CentreX() ? 1 : -1;
+            const s32 helloNode = nav.NodeAt(locker->CentreX() + side * 3 * step, floorY, locker->mHalf, 12);
+            for (const Entity& lever : world.mEntities)
+            {
+                const s32 at = lever.mKind == EntityKind::eLever && lever.mSwitch == gate.mSwitch ? UseNode(nav, lever, nullptr) : -1;
+                if (added || at < 0 || helloNode < 0 || std::abs(nav.Nodes()[at].mY - floorY) <= 45)
+                {
+                    continue;
+                }
+                for (const Entity& target : world.mEntities)
+                {
+                    if (added || target.mKind != EntityKind::eSlig || target.mGone || target.mHalf != locker->mHalf || target.mY2 > floorY - 100 || world.mFleechKilled.count(target.mId) != 0)
+                    {
+                        continue;
+                    }
+                    bool lift = false;
+                    for (const NavFeature& f : nav.Input().mFeatures)
+                    {
+                        for (const NavFeature& g : nav.Input().mFeatures)
+                        {
+                            lift = lift || (f.mKind == FeatureKind::eLiftStop && g.mKind == FeatureKind::eLiftStop && std::abs(f.mY1 - floorY) <= 12 && (f.mX1 - gateX) * side > 0 && std::abs(g.mX1 - f.mX1) <= 2 &&
+                                            std::abs(g.mY1 - target.mY2) <= 30);
+                        }
+                    }
+                    if (!lift)
+                    {
+                        continue;
+                    }
+                    const Goap::Fact dead{Key::Mud(target.mId), 2};
+                    // (what is drunk or used on its floor waits for that)
+                    for (Goap::Action& a : d.mActions)
+                    {
+                        const DomainStep& s2 = d.mSteps[a.mTag];
+                        const Entity* thing = s2.mKind == StepKind::eDrink || s2.mKind == StepKind::eUse ? world.Find(s2.mEntity) : nullptr;
+                        if (thing && thing->mHalf == target.mHalf && std::abs(thing->mY2 - target.mY2) <= 30 && std::abs(thing->CentreX() - target.CentreX()) <= 400)
+                        {
+                            a.mPre.push_back(dead);
+                        }
+                    }
+                    DomainStep call;
+                    call.mKind = StepKind::ePantsSlig;
+                    call.mEntity = target.mId;
+                    call.mOther = lever.mId;
+                    call.mEdge = helloNode;
+                    add("Kill Slig#" + std::to_string(target.mId) + " with the Slig a Glukkon calls, from " + std::to_string(nav.Nodes()[helloNode].mX) + "," + std::to_string(nav.Nodes()[helloNode].mY) + " and Lever#" + std::to_string(lever.mId),
+                        {regionFact(helloNode)}, {dead}, 900, call);
+                    added = true;
+                }
+            }
+        }
+    }
     for (const Entity& slig : world.mEntities)
     {
         // (gone, or dropped through a trap door: World::mFleechKilled holds whatever was got rid of that way)

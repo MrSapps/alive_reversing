@@ -250,6 +250,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<VoiceLockTask>(step.mEntity, step.mEdge);
         case StepKind::eSligLever:
             return std::make_unique<SligLeverTask>(step.mEntity, step.mEdge);
+        case StepKind::ePantsSlig:
+            return std::make_unique<PantsSligTask>(step.mEntity, step.mOther, step.mEdge);
         case StepKind::eDrillSlogs:
             return std::make_unique<DrillSlogsTask>(step.mEntity);
         case StepKind::eTimedDoor:
