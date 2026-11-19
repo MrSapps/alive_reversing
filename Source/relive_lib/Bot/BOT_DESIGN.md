@@ -2962,3 +2962,29 @@ f=3793, **20 deaths**, nearly all under the flying Sligs (732,408; 1209,369; 680
 Check set of this state: ctest 11/11; m1, tr1, t13 0 deaths; a1 14; bw1, blk9t, b14, wr 0; fc3 0; `bw7b.txt` (with
 `visited barracks 1`) from the first annex into the Executive Offices at f=38,477, 8 deaths to there and 21 in
 them by its 52,000th frame.
+
+### The Executive Offices' second part (1587,1400), begun (2026-11-19, `la/fs1.txt` starts there)
+
+The shadows and the two Sligs under an orb, by the guide: lowered down the hoist at 1612 "when the bottom Slig is
+facing right", behind it to the shadow at 1737, up the hoist there, the lever from 1762 while the top Slig's back
+is turned, down again and off to the right.
+
+- The power is asked for at a lever a Slig watches under an orb only where there is a way from where he is to a
+  lock that gives it (shut or not): the one lock here is a well back, and with it asked for there was no plan.
+- A jump or a drop that ends on a screen where a Slig is awake under an orb costs 4000 more: hopped off the ledge
+  he was shot from the one above as he landed, and run off it into the shadow likewise.
+- Let down a hoist beside a shadow (the cell next to the landing is one) as onto one; and where the Slig's beat
+  never leaves that screen, as it turns its back at the near end of its beat (measured: 1662 to 1762, a door shut
+  across the beat its bounds give; 78 frames from its turn at 1662 to its turn back).
+- **Measured (`la/fs2.txt`): stood still where he lands, 1612,1500, he is not seen for 400 frames**, with the Slig
+  coming to 1662 to face him each round. It hears him land, turns and looks 95 frames. The game asks for all of
+  his box in the zone (`IsInInvisibleZone`), and stood still it is narrower than the 25 either side the graph
+  asks for a hidden cell (that was measured on the move, in the Mines).
+- **Where it stops now:** landed, he turns and walks for the shadow at 1637 and the run from a Slig "awake next to
+  him" takes him out into its sight. To do: a cell hidden to one who stands still (13 either side) as a place to
+  wait and no cause to run; the walk behind the Slig to 1737 as it goes right; the lever behind the top Slig.
+
+**Not in the tree:** the three changes above (the lock a way leads to, the dear jump or drop under an orb, the
+hoist down beside a shadow) failed the check set: a1 18 deaths (14), bw1 1, wr 12 and stuck with no plan at f=508,
+fc3 1. They are kept as `build-bot/la/stealth_wip.patch` (and a git stash of the same name), to be put back one at
+a time with `wr.txt`, `bw1.txt` and `regress.sh` run after each. The tree is as at the commit before, which passed.
