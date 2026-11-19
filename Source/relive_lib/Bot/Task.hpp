@@ -895,6 +895,8 @@ private:
     s32 mTeleWaits = 0;
     // Waits for a Slig that faces where a drop on his way lands to turn or go
     s32 mFacingWaits = 0;
+    // Waits for a Scrab loose under a ledge he is about to hang from to be gone from under it
+    s32 mScrabUnderWaits = 0;
     // Waits over a floor a Slig walks for it to leave before he drops onto it
     s32 mFallWaits = 0;
     // The flying Slig of the screen he is about to drop onto out of a tunnel, and the frames waited for it to

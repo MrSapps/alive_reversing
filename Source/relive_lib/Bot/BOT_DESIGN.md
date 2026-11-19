@@ -3158,3 +3158,17 @@ and never out).** Two things since the run of 11-12, found by bisecting (`build-
 The full run from the Mines now has no deaths as far as the Scrab vault (in at f=54,691). There: hung from the
 ledge at 2912,1140 over the pen with its Scrab under him and coming (the same path begun by itself is 60 frames
 earlier and clean), then 29 deaths, a rewind of 13,000 frames back into Necrum and no plan. Not fixed yet.
+
+**The Scrab vault in the run from the Mines (2026-11-19).** Paths 6, 7, 1, 2 and 3 with one death, into path 8 at
+f=74,505. What stopped it on the way, each found with the trace or by bisecting:
+- Path 6: hung from the ledge at 2912,1140 with the pen's Scrab under him and coming. `GoToTask`: a hop of four
+  cells over a gap (it comes down short and he catches the edge) waits while a Scrab on a floor just under the
+  ledge is by it or on its way. Not a hop of three, which clears the gap (path 1's, over the pen at 512,460).
+- Path 2: "run off a ledge with a well under its end" (the Barracks' war room, 11-17) is for full size; at half
+  size the run carried him to the next ledge with his Fleeches behind him. And "chased: off the end of the floor
+  at a run" took walk and drop as one, past the chant that goes before a step onto a Scrab's floor: not taken
+  where the drop is onto such a floor with the power in hand (the lock at 2569,460: eight deaths).
+- Path 8, not fixed: the lever of a trap door pulled "and through at once" drops him on the Scrab's floor; after
+  the rewind he has no plan (`build-bot/mv8a.txt`).
+The bisect scripts (`build-bot/bis*.sh`) build at -j3 and stop on a failed build: at -j5 under the 3G cap some
+builds were killed and the commit before was tested in their place.
