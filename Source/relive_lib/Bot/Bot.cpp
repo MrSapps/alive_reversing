@@ -784,7 +784,15 @@ bool Bot::Replan(BaseMap& map)
     bool errandOpen = false;
     for (const s32 sw : mLevel.Errands(mAbe.mPath))
     {
-        errandOpen = errandOpen || (mWorld.Switch(sw) == 0 && mErrandsLeft.count({mAbe.mPath, sw}) == 0);
+        // (not one a tasks door here sets by itself once its hubs are on: the way out through that door is the way
+        // to it, and nothing else is. The Scrab vault's path 8: 176 is its door's own, its hubs two slap locks;
+        // kept from the way out for it, he went trying levers over the Scrab's floor instead.)
+        bool doorsOwn = false;
+        for (const Entity& e : mWorld.mEntities)
+        {
+            doorsOwn = doorsOwn || (e.mKind == EntityKind::eSwitchLogic && e.mSwitch >= 256 && e.mState == sw);
+        }
+        errandOpen = errandOpen || (!doorsOwn && mWorld.Switch(sw) == 0 && mErrandsLeft.count({mAbe.mPath, sw}) == 0);
     }
     // Electric walls on across the floor of Sligs they have not got yet: that first, whatever else there is to do.
     // What turned them on may be turned back by the next thing done (Bonewerkz' first annex: "When both Sligs

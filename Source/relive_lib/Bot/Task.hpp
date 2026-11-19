@@ -736,6 +736,9 @@ public:
     static bool BombsClear(const NavGraph& nav, const BombCycle& bombs, const std::vector<s32>& path, std::size_t count, bool rolled, s32 delay, s32 later = 0);
     // rolled: as it goes if the walking of it is rolled, from a crouch
     static bool SweepsClear(const NavGraph& nav, const World& world, const std::vector<s32>& path, std::size_t count, s32 late = 0, bool rolled = false);
+    // The same for a roll from a crouch where he is, frame by frame as it was measured: for a row of drills that
+    // SweepsClear's margins never find a moment under
+    static bool RollClear(const NavGraph& nav, const World& world, const std::vector<s32>& path, std::size_t count);
     // The drill that reaches a cell and runs as things are, or null
     static const Entity* SweepOver(const NavGraph& nav, const World& world, s32 node);
     // The lever or ring that stops a drill for good and can be got to from a cell without passing any drill
