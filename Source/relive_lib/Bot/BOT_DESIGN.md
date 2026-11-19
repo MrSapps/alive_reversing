@@ -2784,11 +2784,21 @@ wheel that sets a 300-frame clock going; the fifth behind a tasks door at the bo
   and up the hoist at 1637 onto the platform at 100 (f=646), no death on the way in `p5n.txt`. There he stands:
   no plan for what is next, and the drill that his coming up starts (1 a frame from the platform's left end) has
   him 60 frames on.
-- Next: on at once, "jump over him [the Slig at 1799,200] and keep going", the tunnel of 2000..2176, "jump over
-  the mines and pull up immediately" (the hoist at 2412), "walk to the right when the vertical drill is up and
-  jump into the well" (2537,100). Then Director Phleg: a Slig told to pull levers and to kill, four times over,
-  as General Dripik's were. `bw7.txt`: 9 deaths now, 5 of them here (4 at the drills' tunnel on tries after the
-  first, 1 on the platform).
+- On from the platform at once (2026-11-19): at a run from Slogs for as long as they are about (`mFleeing` kept
+  up while one is within 700), every step in a hurry; not down onto their floor right by one of them where there
+  is a way down further off; no wait for a Slog's leap, for a Slig to leave the floor under, or for its back at a
+  hop down. `NavGraph`: a hop off a floor's end is not barred by a drill that goes along over that floor and no
+  lower. With these he is off the platform's far end over the Slig (the hop off 1762,100 to 1862,200) at f=719
+  and run from there, and caught at 1900: the hop lands him stood still, 85 ahead of them.
+- Tried and taken back: a running jump off a floor's end down to a floor under it as an edge of its own
+  (measured with `rd.txt` off 1762,100: level for 102, down at 1887, 125 out, 20 frames from the floor's end and
+  10 more on his feet). With it in every graph `t13` died fifteen times and was stuck, and `fc3` went off to the
+  Barracks. It wants to be made where it is wanted and not everywhere; and the plan's step is to the hop's cell
+  (1862), so it was not taken here anyway.
+- Next: that jump, then the tunnel of 2000..2176, "jump over the mines and pull up immediately" (the hoist at
+  2412), "walk to the right when the vertical drill is up and jump into the well" (2537,100). Then Director
+  Phleg: a Slig told to pull levers and to kill, four times over, as General Dripik's were. `bw7.txt`: 9 deaths,
+  5 of them here (4 at the drills' tunnel on tries after the first, 1 past the Slig).
 - Annex 4 is not sure: with path 1 taking one crate's round longer (43 frames) the Slig he is in went in among
   the two it was to shoot and the lever was gone to with one still watching: 3 deaths there in `bw7.txt`, the
   third try through. `bw7.txt` before path 3: those 3 and the slam door.
