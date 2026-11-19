@@ -37,6 +37,9 @@ class Bot;
 //       pause, confirm (the menus' OK), back, cheat.
 //   switch <id> <0|1>
 //       Set a switch state, as a lever would.
+//   visited <barracks|bonewerkz|feeco_ender> <0|1>
+//       AE: say that the boss of that part has been dealt with (the game's own record, which FeeCo Depot's doors
+//       and electric walls go by), for a script that starts after it.
 //   electrocute [extra]
 //       Electrocute the controlled character, as an electric wall does (it dies at the end). extra
 //       adds the third, black sweep: the character is erased (AE: the greeter's and wall's).
