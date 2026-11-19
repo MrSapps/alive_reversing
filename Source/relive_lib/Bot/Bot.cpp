@@ -847,12 +847,38 @@ bool Bot::Replan(BaseMap& map)
                              { return a.first < b.first; });
             for (const auto& entry : tries)
             {
-                if (plansFound >= 2)
+                // (one more looked at while the best so far goes by Slogs that sleep)
+                if (plansFound >= (best.mFound && best.mCost >= 100000 ? 4 : 2))
                 {
                     break;
                 }
                 const Goap::Fact fact = entry.second;
-                const Goap::Plan sub = Goap::Planner::Find(domain.mStart, {fact}, actions);
+                Goap::Plan sub = Goap::Planner::Find(domain.mStart, {fact}, actions);
+                // (a way that goes by Slogs that sleep is the last to be tried: what it wakes is there for all that
+                // comes after. Bonewerkz' boilers 3 and 4: the fourth's wheel, past the two Slogs on the
+                // platforms, was turned before the third's, and the door out of its room wants both; the way
+                // back to the third was the floor the Slogs were then loose on.)
+                if (sub.mFound && mIsAe)
+                {
+                    bool wakes = false;
+                    for (s32 step : sub.mSteps)
+                    {
+                        const DomainStep& st = domain.mSteps[actions[step].mTag];
+                        if (st.mKind != StepKind::eCross || st.mEdge < 0 || st.mEdge >= static_cast<s32>(mKnow->mNav.Edges().size()))
+                        {
+                            continue;
+                        }
+                        const NavNode& to = mKnow->mNav.Nodes()[mKnow->mNav.Edges()[st.mEdge].mTo];
+                        for (const RockAt& slog : mWorld.mSlogsAsleepAt)
+                        {
+                            wakes = wakes || (slog.mHalf == to.mHalf && std::abs(slog.mX - to.mX) <= 150 && std::abs(slog.mY - to.mY) <= 60);
+                        }
+                    }
+                    if (wakes)
+                    {
+                        sub.mCost += 100000;
+                    }
+                }
                 if (sub.mFound && !sub.mSteps.empty() && (!best.mFound || sub.mCost < best.mCost))
                 {
                     best = sub;
@@ -3247,6 +3273,11 @@ bool Bot::SlogRefuge(const SlogAt& slog, s32 from, s32& refuge, bool& left, bool
 std::unique_ptr<Task> Bot::MakeSlogFlee()
 {
     if (mSlogFlees >= 12)
+    {
+        return nullptr;
+    }
+    // (hung from a ledge he is on no floor of theirs: GoToTask::HungBySlog says when to go up)
+    if (mAbe.mMove == Move::eHang)
     {
         return nullptr;
     }

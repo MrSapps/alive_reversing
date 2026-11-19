@@ -10932,9 +10932,28 @@ TEST(BotFallers, AWayThatEndsUnderOneTooFastOrJumpsTwoAtOnceIsBarred)
     e.mFrom = room.mNav.NodeAt(room.mLeverX + 3 * room.mStep, 160, true, 2);
     e.mTo = room.mNav.NodeAt(room.mLeverX, 160, true, 2);
     EXPECT_TRUE(Domain::FallersBar(room.mNav, room.mWorld, e));
-    // (a walk in under it is not barred: it is hopped over from the cell before, GoToTask::HopsOver)
+    // (a walk in under it from a clear cell is not barred where there is a clear cell three on: it is hopped over
+    // from there, GoToTask::HopsOver)
     e.mKind = EdgeKind::eWalk;
+    e.mFrom = room.mNav.NodeAt(room.mLeverX + room.mStep, 160, true, 2);
+    e.mTo = room.mNav.NodeAt(room.mLeverX, 160, true, 2);
     EXPECT_FALSE(Domain::FallersBar(room.mNav, room.mWorld, e));
+    // (where the floor ends under it there is none, and the walk in is barred)
+    {
+        NavInput in;
+        in.mLines.push_back(Line(room.mLeverX - room.mStep - room.mStep / 2, 160, 400, 160, 4));
+        NavGraph ends;
+        ends.Build(in);
+        NavEdge walk;
+        walk.mKind = EdgeKind::eWalk;
+        walk.mFrom = ends.NodeAt(room.mLeverX + room.mStep, 160, true, 2);
+        walk.mTo = ends.NodeAt(room.mLeverX, 160, true, 2);
+        ASSERT_GE(walk.mFrom, 0);
+        ASSERT_GE(walk.mTo, 0);
+        EXPECT_TRUE(Domain::FallersBar(ends, room.mWorld, walk));
+    }
+    e.mKind = EdgeKind::eFall;
+    e.mFrom = room.mNav.NodeAt(room.mLeverX + 3 * room.mStep, 160, true, 2);
     // A hop over the one is the way
     e.mKind = EdgeKind::eHop;
     e.mFrom = room.mNav.NodeAt(room.mLeverX + room.mStep, 160, true, 2);
@@ -11186,4 +11205,63 @@ TEST(BotSweep, AHoistIsGoneUpOnlyWhenNoDrillIsInTheWayForAsLongAsItTakes)
     world.mSweeps.clear();
     EXPECT_FALSE(GoToTask::PastDrills(world, 480, 200, 100, false, false));
     EXPECT_TRUE(GoToTask::PastDrills(world, 480, 200, 100, false, true));
+}
+
+TEST(BotSlogs, HungFromAPlatformASlogIsOnHeStaysHungUntilItIsDownOffIt)
+{
+    // Bonewerkz' boilers 3 and 4: hung at 1587,1141, a Slog asleep on the next platform at 1650,1120
+    World world;
+    SlogAt slog;
+    slog.mX = 1650;
+    slog.mY = 1120;
+    slog.mAsleep = true;
+    world.mSlogs.push_back(slog);
+    // Asleep by it: given the time to wake, and no longer
+    EXPECT_TRUE(GoToTask::HungBySlog(world, 1587, 1141, false, 0));
+    EXPECT_FALSE(GoToTask::HungBySlog(world, 1587, 1141, false, 30));
+    // (one asleep further off, or on a floor well under, is nothing)
+    world.mSlogs[0].mX = 1775;
+    EXPECT_FALSE(GoToTask::HungBySlog(world, 1587, 1141, false, 0));
+    world.mSlogs[0].mX = 1650;
+    world.mSlogs[0].mY = 1240;
+    EXPECT_FALSE(GoToTask::HungBySlog(world, 1587, 1141, false, 0));
+    // Awake and on his platform, or in the air just off it: hung
+    world.mSlogs[0].mAsleep = false;
+    world.mSlogs[0].mX = 1553;
+    world.mSlogs[0].mY = 1141;
+    EXPECT_TRUE(GoToTask::HungBySlog(world, 1587, 1141, false, 60));
+    world.mSlogs[0].mX = 1611;
+    world.mSlogs[0].mY = 1143;
+    EXPECT_TRUE(GoToTask::HungBySlog(world, 1587, 1141, false, 60));
+    // Down off it: up
+    world.mSlogs[0].mX = 1645;
+    world.mSlogs[0].mY = 1179;
+    EXPECT_FALSE(GoToTask::HungBySlog(world, 1587, 1141, false, 60));
+    world.mSlogs[0].mY = 1240;
+    EXPECT_FALSE(GoToTask::HungBySlog(world, 1587, 1141, false, 60));
+}
+
+TEST(BotNav, ARunningJumpUpAHoistWithTwoCellsOfRunUpWhereTheFloorEndsThere)
+{
+    // Bonewerkz' boilers 3 and 4: the ledge at 960 from 1650 to 1725, the ledge at 860 beyond the gap with its
+    // hoist marked 860..945 at 1575..1599
+    NavInput in;
+    in.mIsAe = true;
+    in.mLines.push_back(Line(1650, 960, 1725, 960, 0));
+    in.mLines.push_back(Line(1525, 860, 1600, 860, 0));
+    in.mLines.push_back(Line(1125, 1240, 1872, 1240, 0));
+    NavFeature hoist = Feature(FeatureKind::eHoist, 1575, 860, 1599, 945);
+    hoist.mDir = 0;
+    in.mFeatures.push_back(hoist);
+    NavGraph g;
+    g.Build(in);
+    const s32 from = g.NodeAt(1712, 960, false, 4);
+    const s32 top = g.NodeAt(1587, 860, false, 4);
+    ASSERT_GE(from, 0);
+    ASSERT_GE(top, 0);
+    const NavEdge* jump = FindEdge(g, from, top, EdgeKind::eRunJump);
+    ASSERT_NE(jump, nullptr);
+    // (off the ledge's last cell, two on from where he stands)
+    EXPECT_EQ(jump->mX, g.Nodes()[g.NodeAt(1662, 960, false, 4)].mX);
+    EXPECT_TRUE(jump->mLeft);
 }

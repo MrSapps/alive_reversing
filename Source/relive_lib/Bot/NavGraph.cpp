@@ -918,6 +918,47 @@ void NavGraph::AddRunJumps(std::vector<NavEdge>& edges, s32 from, s32 dir, bool 
             }
         }
     }
+    // Up a hoist with two cells of run-up, where the floor ends there and there is no third: from a stand with run
+    // held he runs at once and is in the air two cells on (measured in the Barracks' war room, below). Bonewerkz'
+    // boilers 3 and 4: off the ledge at 1712,960, three cells long with a crate that falls on the two nearer its
+    // end, at the hoist at 1587: "then run and jump past the falling crates to reach the door".
+    if (!overLift)
+    {
+        const s32 one = NodeOnLine(n.mLine, n.mX + dir * step);
+        const s32 two = NodeOnLine(n.mLine, n.mX + dir * 2 * step);
+        const s32 three = NodeOnLine(n.mLine, n.mX + dir * 3 * step);
+        const auto plain = [&](s32 node, s32 at)
+        {
+            return node >= 0 && std::abs(mNodes[node].mX - at) <= step / 2 && !mNodes[node].mHazard && !mNodes[node].mLow && mNodes[node].mLiftStop < 0;
+        };
+        if (!n.mLow && plain(one, n.mX + dir * step) && plain(two, n.mX + dir * 2 * step) && !(three >= 0 && std::abs(mNodes[three].mX - (n.mX + dir * 3 * step)) <= step / 2) &&
+            !WallBetween(n.mX, n.mX + dir * 2 * step, n.mY, n.mHalf))
+        {
+            const s32 off = mNodes[two].mX;
+            const s32 oy = mNodes[two].mY;
+            for (s32 k = 3; k >= 2; k--)
+            {
+                const s32 hx = off + dir * k * step;
+                s32 hoistIdx = -1;
+                const NavFeature* hoist = FeatureAt(FeatureKind::eHoist, hx, oy - 10, n.mHalf, &hoistIdx);
+                if (!hoist)
+                {
+                    hoist = FeatureAt(FeatureKind::eHoist, hx, oy - (n.mHalf ? 13 : 25), n.mHalf, &hoistIdx);
+                }
+                if (!hoist || (hoist->mDir != 2 && (hoist->mDir == 0) != (dir < 0)) || WallBetween(off, hx, oy, n.mHalf) || BarrierBetween(n.mX, hx, oy, n.mHalf) >= 0)
+                {
+                    continue;
+                }
+                const s32 top = NodeAt(hx, hoist->mY1, n.mHalf, 12);
+                if (top >= 0 && (oy - mNodes[top].mY) * (n.mHalf ? 2 : 1) <= 130)
+                {
+                    AddEdge(edges, from, top, EdgeKind::eRunJump, 400, hoistIdx, dir < 0);
+                    edges.back().mX = off;
+                    break;
+                }
+            }
+        }
+    }
     // Room to get up to speed: the cells to the take-off are plain floor
     s32 x = n.mX;
     s32 runLine = n.mLine;
