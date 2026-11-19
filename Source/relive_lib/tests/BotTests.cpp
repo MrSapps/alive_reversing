@@ -11286,3 +11286,28 @@ TEST(BotSlogs, AZoneThatSetsSlogsOnHimIsGoneThroughAtARunAwayFromThem)
     world.mEntities[0].mGone = true;
     EXPECT_EQ(SwitchZoneTask::SetsSlogsOn(world, 23, 300, 100), 0);
 }
+
+TEST(BotNav, ARunningJumpOffAFloorsEndDownToAFloorUnderItIsThereAndDear)
+{
+    // Bonewerkz' Executive Office: the platform at 100 that ends at 1775, the floor at 200 under and past it
+    NavInput in;
+    in.mIsAe = true;
+    in.mLines.push_back(Line(1625, 100, 1775, 100, 0));
+    in.mLines.push_back(Line(375, 200, 2600, 200, 0));
+    NavGraph g;
+    g.Build(in);
+    const s32 from = g.NodeAt(1687, 100, false, 4);
+    const s32 land = g.NodeAt(1887, 200, false, 4);
+    ASSERT_GE(from, 0);
+    ASSERT_GE(land, 0);
+    const NavEdge* jump = FindEdge(g, from, land, EdgeKind::eRunJump);
+    ASSERT_NE(jump, nullptr);
+    // (off the platform's last cell, three cells of run-up before it)
+    EXPECT_EQ(jump->mX, g.Nodes()[g.NodeAt(1762, 100, false, 4)].mX);
+    EXPECT_FALSE(jump->mLeft);
+    // (dear: the hop off the same end is what a way is found by when there is time)
+    EXPECT_EQ(jump->mCost, NavGraph::kRunDownCost);
+    const NavEdge* hop = FindEdge(g, g.NodeAt(1762, 100, false, 4), g.NodeAt(1862, 200, false, 4), EdgeKind::eHop);
+    ASSERT_NE(hop, nullptr);
+    EXPECT_LT(hop->mCost, 1000);
+}

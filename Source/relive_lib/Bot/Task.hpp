@@ -872,6 +872,8 @@ public:
     static bool PastDrills(const World& world, s32 x, s32 footY, s32 ledgeY, bool half, bool unknownHits, s32 frames = 0);
     // Hung from the ledge at (x, y) for so many frames: to stay hung, for a Slog that is on that floor or asleep by it
     static bool HungBySlog(const World& world, s32 x, s32 y, bool half, s32 hung);
+    // At a run from Slogs with a drill on its way to the cell he is in: no waiting there
+    static bool DrivenOn(const Bot& bot, s32 node);
     static bool ZShooterAbout(const NavGraph& nav, const World& world, s32 x, s32 y);
     // The hop down to a Slig's level: now, on a back it has just turned (it faced him no more than 8 frames ago).
     // faced: the frame it last faced where he lands, -1 for never seen to

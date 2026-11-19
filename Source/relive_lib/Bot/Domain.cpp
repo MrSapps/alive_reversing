@@ -2841,7 +2841,10 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         // (what was told apart before stays first: the rest only decides between ways that were alike)
         const s32 cost = (beatTo >= 0 && beatTo != SligBeat(nav, world, e.mFrom) ? 100 : 0) + (beside ? 4 : 0) + (e.mKind == EdgeKind::eHop && nav.Nodes()[e.mTo].mLiftStop < 0 ? 1 : 0) + (e.mKind == EdgeKind::eRunJump && e.mCost == NavGraph::kStandJumpCost ? 50 : 0) +
                          // (nor one that things that fall too often bar, FallersBar, where another way gets to the same place)
-                         (nav.Input().mIsAe && FallersBar(nav, world, e) ? 200 : 0);
+                         (nav.Input().mIsAe && FallersBar(nav, world, e) ? 200 : 0) +
+                         // (nor the running jump off a floor's end down to one under it, which is for a run from
+                         // Slogs: the drop off that end, or the hop, stays the one a plan is made with)
+                         (e.mKind == EdgeKind::eRunJump && e.mCost == NavGraph::kRunDownCost ? 50 : 0);
         const auto key = std::make_tuple(rf, rt, barrier ? e.mFeature : -1);
         const auto found = cheapest.find(key);
         if (found == cheapest.end() || cost < found->second.first)

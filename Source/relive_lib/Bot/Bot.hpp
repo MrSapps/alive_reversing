@@ -703,6 +703,8 @@ private:
     std::vector<Saved> mCheckpoints;
     bool mRestoring = false;
     s32 mAttempt = 0;
+    // A checkpoint has just been put back: the switches it changed back are not ones that were tried
+    s32 mSwitchesPutBack = 0;
     s32 mDeaths = 0;
     s32 mRestores = 0;
     u32 mLastCheckpointFrame = 0;
