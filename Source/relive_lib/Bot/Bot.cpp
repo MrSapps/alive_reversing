@@ -2672,6 +2672,7 @@ void Bot::MaybeCheckpoint(BaseMap& map)
     saved.mInputCount = mInputs.size();
     saved.mRng = mRng.State();
     saved.mGatesGone = mWorld.mGatesGone;
+    saved.mPathKey = mAbe.mLevel * 1000 + mAbe.mPath;
     if (look)
     {
         saved.mMemory = *this;
@@ -3155,7 +3156,10 @@ void Bot::OnDeath(BaseMap& map)
     }
     mCheckpoints.back().mLastDeathFrame = mAbe.mFrame;
     // Enough tries from here: what went wrong happened earlier
-    while (mCheckpoints.size() > 1 && mCheckpoints.back().mAttempts >= kAttemptsPerCheckpoint)
+    // (not back into the path before: what the bot knows is not put back with a save, and from a save of another
+    // path it has each time ended with no plan, far from where things went wrong. Necrum from the Scrab vault,
+    // the Executive Office from Phleg's, the vault's path 5 from the trial.)
+    while (mCheckpoints.size() > 1 && mCheckpoints.back().mAttempts >= kAttemptsPerCheckpoint && mCheckpoints[mCheckpoints.size() - 2].mPathKey == mCheckpoints.back().mPathKey)
     {
         mCheckpoints.pop_back();
     }
@@ -3176,6 +3180,10 @@ void Bot::OnDeath(BaseMap& map)
     mRestores++;
     mSwitchesPutBack = 60;
     mLastCheckpointFrame = saved.mCheckpoint.mFrame;
+    // Each try from the same save begins a little later than the one before: begun on the same frame it is the
+    // same try, to the frame he dies on, wherever nothing was learnt from the death. (The Scrab trial's last
+    // ledge: the Scrab stood under it each of thirteen times, as it never did in a run of the trial alone.)
+    mHold = 3 * mAttempt;
 }
 
 void Bot::RewindMiss(BaseMap& map)

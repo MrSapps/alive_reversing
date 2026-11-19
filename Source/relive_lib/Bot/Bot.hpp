@@ -714,6 +714,8 @@ private:
         // The gates taken for gone for good as it was made (World::mGatesGone)
         std::map<s32, s32> mGatesGone;
         Checkpoint mCheckpoint;
+        // The path it was made in (level x 1000 + path)
+        s32 mPathKey = 0;
         std::size_t mInputCount = 0;
         s32 mAttempts = 0;
         // The frame the last try from here died on: the same one again and nothing done from here changes it
