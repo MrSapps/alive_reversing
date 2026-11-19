@@ -11045,3 +11045,96 @@ TEST(BotNav, ARunningJumpOverALiftsShaftTakesItsRunUpOverATrapDoorThatIsShut)
     }
     EXPECT_TRUE(jump);
 }
+
+TEST(BotNav, AHopDownIsNotOntoTheLastPixelsOfAFloorThatEndsThere)
+{
+    // Bonewerkz' path 3 at half scale: off 2503,61 to the right, at the floor at 99 below
+    const auto hops = [](s32 floorEnd)
+    {
+        NavInput in;
+        in.mLines.push_back(Line(2341, 61, 2512, 61, 4));
+        in.mLines.push_back(Line(2496, 99, floorEnd, 99, 4));
+        in.mLines.push_back(Line(2400, 300, 2700, 300, 4));
+        NavGraph g;
+        g.Build(in);
+        for (const NavEdge& e : g.Edges())
+        {
+            if (e.mKind == EdgeKind::eHop && !e.mLeft && g.Nodes()[e.mFrom].mY == 61 && g.Nodes()[e.mTo].mY == 99)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    // The floor goes on past where he comes down: hopped
+    EXPECT_TRUE(hops(2600));
+    // It ends at 2549, where he comes down: not
+    EXPECT_FALSE(hops(2549));
+}
+
+TEST(BotNav, AHoistUpFromUnderADrillThatGoesByOverheadIsAWayAndOneFromUnderACeilingIsNot)
+{
+    // Bonewerkz' path 4: the floor at 1239, the ledge at 1140 over its right end, a hoist up to it, and a drill
+    // that goes along 500..651 at 1160..1184, next to the hoist's cell
+    const auto up = [](bool drill, bool ceiling)
+    {
+        NavInput in;
+        in.mIsAe = true;
+        in.mLines.push_back(Line(479, 1239, 747, 1239, 0));
+        in.mLines.push_back(Line(650, 1140, 750, 1140, 0));
+        if (ceiling)
+        {
+            in.mLines.push_back(Line(600, 1210, 750, 1210, 3));
+        }
+        NavFeature hoist = Feature(FeatureKind::eHoist, 650, 1140, 674, 1240);
+        hoist.mDir = 1;
+        in.mFeatures.push_back(hoist);
+        if (drill)
+        {
+            in.mFeatures.push_back(Feature(FeatureKind::eSweep, 500, 1160, 651, 1184));
+        }
+        NavGraph g;
+        g.Build(in);
+        const s32 foot = g.NodeAt(662, 1239, false, 4);
+        const s32 top = g.NodeAt(662, 1140, false, 4);
+        EXPECT_GE(foot, 0);
+        EXPECT_GE(top, 0);
+        if (drill && !ceiling)
+        {
+            EXPECT_TRUE(g.Nodes()[foot].mLow);
+            EXPECT_GE(g.Nodes()[foot].mSweepHigh, 0);
+        }
+        return FindEdge(g, foot, top, EdgeKind::eHoistUp) != nullptr;
+    };
+    EXPECT_TRUE(up(false, false));
+    EXPECT_TRUE(up(true, false));
+    EXPECT_FALSE(up(false, true));
+    EXPECT_FALSE(up(true, true));
+}
+
+TEST(BotUse, WhatAClockSetsIsOwedUntilItHasFollowedItsInput)
+{
+    World world;
+    Entity clock = MakeEntity(EntityKind::eSwitchLogic, 9, 0, 0, 24, 24);
+    clock.mHoldOnly = true;
+    clock.mInputs[0] = 132;
+    clock.mInputs[5] = 300;
+    clock.mSwitch = 142;
+    world.mEntities.push_back(clock);
+    // The wheel not turned yet: nothing owed
+    EXPECT_EQ(UseTask::ClockOwed(world, 132, 1), 0);
+    world.mSwitches[132] = 1;
+    EXPECT_EQ(UseTask::ClockOwed(world, 132, 1), 300);
+    // (another switch's clock is none of this one's)
+    EXPECT_EQ(UseTask::ClockOwed(world, 133, 1), 0);
+    // It has followed
+    world.mSwitches[142] = 1;
+    EXPECT_EQ(UseTask::ClockOwed(world, 132, 1), 0);
+    // (one with no delay is not waited for, nor a switch made of others that is no clock)
+    world.mSwitches[142] = 0;
+    world.mEntities[0].mInputs[5] = 0;
+    EXPECT_EQ(UseTask::ClockOwed(world, 132, 1), 0);
+    world.mEntities[0].mInputs[5] = 300;
+    world.mEntities[0].mHoldOnly = false;
+    EXPECT_EQ(UseTask::ClockOwed(world, 132, 1), 0);
+}

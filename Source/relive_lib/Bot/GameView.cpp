@@ -401,10 +401,12 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                     f.mStartClosed = t.mStartState == relive::Path_Door::eClosed;
                     if (isAe && (t.mDoorType == relive::Path_Door::eTasksDoor || t.mDoorType == relive::Path_Door::eTasksDoorWithSecretMusic))
                     {
-                        // Opens once all its hubs' switches are on (the door sets its own switch then, but only
-                        // while it is on the screen)
+                        // Its switch is "all its hubs' switches are on" (the door sets its own switch then, but only
+                        // while it is on the screen). One that starts shut opens with that; one that starts open
+                        // shuts with it (Door.cpp: an open door shuts when its switch comes on). Bonewerkz' path 4:
+                        // the door to boilers 3 and 4 is open until both their wheels are turned, and was taken
+                        // for shut until then.
                         f.mSwitch = World::DoorSwitch(id);
-                        f.mStartClosed = true;
                     }
                     setDest(f, t.mNextLevel, t.mNextPath, t.mNextCamera);
                     in.mFeatures.push_back(f);
@@ -1044,6 +1046,9 @@ static void BuildEntities(BinaryPath& path, World& world)
                             out.mSwitch = outs[i];
                             // (it goes off again with its input: see Domain::Build)
                             out.mHoldOnly = true;
+                            // (how long after its input it follows: it is waited for where it was set going,
+                            // UseTask::ClockOwed)
+                            out.mInputs[5] = t.mActivationDelay;
                             world.mEntities.push_back(out);
                             world.mTlvs.push_back(&tlv);
                         }

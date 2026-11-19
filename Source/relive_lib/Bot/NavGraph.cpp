@@ -463,9 +463,11 @@ bool NavGraph::Condition(const NavEdge& edge, s32* switchId, s32* openValue) con
             }
         }
     }
-    else if (f.mKind == FeatureKind::eDoor && edge.mKind == EdgeKind::eDoor && f.mStartClosed && f.mSwitch > 1)
+    else if (f.mKind == FeatureKind::eDoor && edge.mKind == EdgeKind::eDoor && f.mSwitch > 1)
     {
-        value = 1;
+        // (one that starts open is shut by its switch: the doors of Bonewerkz' boilers, each shut by the wheel
+        // turned behind it)
+        value = f.mStartClosed ? 1 : 0;
     }
     else if (f.mKind == FeatureKind::ePortal && edge.mKind == EdgeKind::ePortal && f.mSwitch > 1)
     {
@@ -1624,6 +1626,14 @@ void NavGraph::Build(const NavInput& input)
                         {
                             to = WellOut(well, mInput.mFeatures[well].mSwitch == 1 ? 1 : 0, 1);
                         }
+                        // (nor onto the last pixels of a floor that ends there: he is a pixel or two further out
+                        // than this and goes down past it. Bonewerkz' path 3, off 2503,61 at the floor at 99 that
+                        // ends at 2549: at 2548 as he came to it, past its end, and 99 down to his death.)
+                        s32 past = 0;
+                        if (well < 0 && FloorNear(x + dir * 8 / scale, gy, n.mHalf, 4, &past) < 0)
+                        {
+                            break;
+                        }
                         // (not through where a drill goes: the Mines' path 4, off 2537,1400, was two deaths)
                         bool drill = false;
                         for (const NavFeature& f : mInput.mFeatures)
@@ -1687,7 +1697,12 @@ void NavGraph::Build(const NavInput& input)
             }
         }
 
-        if (n.mLow)
+        // (low only for a drill that goes by over his head, with no ceiling there: he can stand while it is away,
+        // and a hoist up from there is taken then, GoToTask. Bonewerkz' path 4, the boilers' shaft: "cross over
+        // at the bottom ... climbing up the right side of the drills", the hoist at 662,1239 by the drill of
+        // 500..651.)
+        const bool sweptLow = n.mLow && n.mSweepHigh >= 0 && !CeilingOver(n.mX, n.mY, n.mHalf);
+        if (n.mLow && !sweptLow)
         {
             // (the way out of a path can be a crawl: Mines path 6)
             s32 exitIdx = -1;
@@ -1708,6 +1723,10 @@ void NavGraph::Build(const NavInput& input)
             {
                 AddEdge(edges, from, NodeOnLine(above, n.mX), EdgeKind::eHoistUp, kHoistCost, featureIdx, mInput.mFeatures[featureIdx].mDir == 0);
             }
+        }
+        if (sweptLow)
+        {
+            continue;
         }
         // Down: looked for a little under it
         if (FeatureAt(FeatureKind::eHoist, n.mX, n.mY + 16, n.mHalf, &featureIdx))
