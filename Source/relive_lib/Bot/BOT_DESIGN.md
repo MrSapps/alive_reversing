@@ -3144,3 +3144,17 @@ run needs. No unit tests yet for any of this.
 f=41,377), then stuck in Necrum's path 6, the lever rooms with Slurgs and Fleeches, at f=50,636 after 80 deaths
 (bitten at the levers of the third room; alone, `build-bot/n6.txt`: 9 deaths in 4,300 frames). The run of 11-12
 had none there: something since broke it. Not looked into yet.
+
+**Necrum's path 6 again (2026-11-19, `build-bot/n6l.txt`: 0 deaths, out to the Scrab vault at f=6,268; it was 76
+and never out).** Two things since the run of 11-12, found by bisecting (`build-bot/bisect.sh`, `bis.sh`):
+- The running jumps up to the levers' ledges (new on 11-16) were taken a cell from the Fleech that hangs asleep
+  at 912 in the second room: the run woke it (a noise within six cells, `Fleech::IncreaseAnger`) and he was
+  bitten at the third room's levers. `EdgeCostFn`: no running jump that starts within nine cells of a Fleech
+  asleep on that screen, with none awake there. (All of them on the screen was too wide: the Scrab trial's jump
+  over the pit starts 275 from one asleep and has to be made.)
+- "A crowd after him" (11-15) counted Fleeches through walls: the three left behind the third room's door, 125
+  off, had him walk into the ring room under the two that sleep over the rings, where he used to sneak. Not
+  counted with a wall between (`Domain::ParamiteWall`).
+The full run from the Mines now has no deaths as far as the Scrab vault (in at f=54,691). There: hung from the
+ledge at 2912,1140 over the pen with its Scrab under him and coming (the same path begun by itself is 60 frames
+earlier and clean), then 29 deaths, a rewind of 13,000 frames back into Necrum and no plan. Not fixed yet.
