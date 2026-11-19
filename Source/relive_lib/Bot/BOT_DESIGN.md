@@ -3193,3 +3193,25 @@ voice locks. What was built:
 Next: the Zulags' hub is path 23 (doors: Zulag 1 = path 1, 2 = path 2, 3 = path 12, 4 = path 19, 5 = path 14;
 the tasks door to hub 2 wants switches 125, 222, 223, 224, 126). He goes into Zulag 3 first (`br/z3.txt`) and
 stands at its first four drills (525..625, speeds 3 to 5) for ever: no moment is found to roll through them.
+
+**2026-11-19, later: the run from the Mines to the Scrab trial; the brewery's third Zulag begun.**
+- The Scrab vault's path 8 (`build-bot/mv8a.txt`): kept from the way out by "a switch a door of another path
+  wants" (11-16) for 176, which is the exit door's own (a tasks door sets it once its hubs, two slap locks, are
+  on). Such a switch no longer holds him. The run from the Mines (`la/fullgame.txt`) is then through the Mines,
+  Necrum and all eight vault paths with two deaths, into the trial (`mudanchee_vault_ender` 9) at f=92,239.
+  There: 13 deaths on the ledge at 1712,840 past the last pit, waiting for the Scrab under it (4 frames to spare
+  at best, by his own count), then a rewind of 10,000 frames into the path before and no plan. The trial by
+  itself (`tr1.txt`) has none. Not fixed. Rewinds that go back across a path change end stuck each time (Necrum,
+  Bonewerkz, here): to be stopped at the path's own first checkpoint.
+- The brewery's Zulag 3 (path 12, `br/z3.txt`): he rolls under its rows of drills, the row of seven by the frame
+  (`GoToTask::RollClear`: the drill looks for him where it was a frame before, with his box as it is on each
+  frame of a roll, 26 high once it is going; the moments are a frame long, some 100 frames apart, and none is
+  found with SweepsClear's margins). Not stood up on his way to a Mudokon or a wheel with a drill by him. Not
+  stopped to talk under a drill a switch sets going where another cell by the Mudokon is clear. What is left:
+  he still stands under one at 2012 on his first approach; the top Mudokons' "sorry", the levers along the top
+  that slow the drills, and only then the group led back and the two wheels (led back as things are, the
+  Mudokon is drilled).
+- The Mines' path 4 (`build-bot/m4r.txt`): the blind Mudokon stops among drills his levers have put to rest;
+  every cell by him is under one, and with those all refused there was no way to him.
+- The bisect scripts try a run three times when it leaves no log (the game does not always start in time after
+  a build), and `la/verify_pinned.sh` runs the check set from a copy of the binary so that `build/` is free.

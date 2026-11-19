@@ -2312,9 +2312,11 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                         mSteps--;
                         return abe.Settled() ? TaskStep::Do(Prim::Press(Btn::eDown)) : TaskStep::Do(Prim::Wait(1));
                     }
-                    if (SweepsClear(nav, world, path, count, bot.SweepLate(), true))
+                    // (a row of five or more that no moment was found under in 300 frames: by the frame, RollClear)
+                    const bool byFrame = count > 6 && mSweepWait >= 300 && lead + 1 >= count && RollClear(nav, world, path, lead);
+                    if (byFrame || SweepsClear(nav, world, path, count, bot.SweepLate(), true))
                     {
-                        bot.Log("rolling through under the drill");
+                        bot.Log(byFrame ? "rolling through under the row of drills, timed by the frame" : "rolling through under the drill");
                         bot.SweepBegun();
                         mSweepWait = 0;
                         sweepRoll = lead;
@@ -2330,7 +2332,10 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 const SweepAt* here = inside ? world.SweepOf(drill->mId) : nullptr;
                 const NavNode& n = nav.Nodes()[cur];
                 const bool stay = !here || !here->Hits(0, 120, n.mX - 3, n.mY - (n.mHalf ? 30 : 60), n.mX + 3, n.mY);
-                if (stay && mSweepWait < 900)
+                // (a row of them takes longer to line up: the brewery's third Zulag has seven side by side, two of
+                // them never at rest, and the moment to roll under all of them comes about once in 160 frames by
+                // their strokes, but not for sure in 900)
+                if (stay && mSweepWait < (count > 4 ? 4000 : 900))
                 {
                     if (mSweepWait == 0)
                     {
@@ -4826,6 +4831,48 @@ bool GoToTask::SweepsClear(const NavGraph& nav, const World& world, const std::v
             s32 x2 = 0;
             s32 y2 = 0;
             if (sweep.mHalf == body.mHalf && sweep.At(t < 0 ? 0 : t, x1, y1, x2, y2) && body.mX + 3 + kSlack >= x1 && body.mX - 3 - kSlack <= x2 && body.mY >= y1 && body.mY - body.mTall <= y2)
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool GoToTask::RollClear(const NavGraph& nav, const World& world, const std::vector<s32>& path, std::size_t count)
+{
+    if (path.empty() || count == 0)
+    {
+        return false;
+    }
+    // Measured in the brewery's third Zulag (`br/z3.txt`, f=337 on): asked for on frame 0 he is where he was for
+    // two more, then 6.24 a frame; his box is 34 high crouched, 33 on frames 1 and 2, 32 on 3, 28 on 4 and at most
+    // 26 from then until he stops, crouched again. The drill's own test (Drill::DamageTouchingObjects): its box
+    // over his, and his x within 3 of its sides. No margin: under the seven of the brewery's third Zulag the
+    // moments are a frame long, some 100 frames apart.
+    const NavNode& from = nav.Nodes()[nav.Edges()[path[0]].mFrom];
+    const NavNode& to = nav.Nodes()[nav.Edges()[path[std::min(count, path.size()) - 1]].mTo];
+    if (from.mHalf || std::abs(to.mY - from.mY) > 5)
+    {
+        return false;
+    }
+    const s32 dir = to.mX > from.mX ? 1 : -1;
+    const s32 dist = std::abs(to.mX - from.mX);
+    const s32 moving = dist * 100 / 624 + 1;
+    for (s32 k = 0; k <= 2 + moving + 8; k++)
+    {
+        const s32 gone = k <= 2 ? 0 : std::min(dist, (k - 2) * 624 / 100);
+        const s32 x = from.mX + dir * gone;
+        const s32 tall = k == 0 || gone >= dist ? 34 : k <= 2 ? 33 : k == 3 ? 32 : k == 4 ? 28 : 26;
+        for (const SweepAt& sweep : world.mSweeps)
+        {
+            s32 x1 = 0;
+            s32 y1 = 0;
+            s32 x2 = 0;
+            s32 y2 = 0;
+            // (where the drill was the frame before: it looks for him before it moves, and he has moved by then.
+            // Seen: under the drill at 1674, a frame on from where its box was 450 to 456 with his top at 454.)
+            if (k > 0 && sweep.mHalf == from.mHalf && sweep.At(k - 1, x1, y1, x2, y2) && x + 3 >= x1 && x - 3 <= x2 && from.mY >= y1 && from.mY - tall <= y2)
             {
                 return false;
             }
@@ -8488,11 +8535,28 @@ static std::unique_ptr<GoToTask> GoNearMud(const NavGraph& nav, const World& wor
     const s32 line = nav.Nodes()[mudNode].mLine;
     const s32 mudX = nav.Nodes()[mudNode].mX;
     const s32 half = NavGraph::GridStep(nav.Nodes()[mudNode].mHalf) / 2;
-    return std::make_unique<GoToTask>("to the Mudokon", [&nav, &world, line, mudX, half, minHalfCells, maxHalfCells, side](s32 n)
+    // (a cell clear of drills at rest, where there is one: see below)
+    bool clearOne = false;
+    for (const NavNode& node : nav.Nodes())
+    {
+        const s32 dx = std::abs(node.mX - mudX);
+        clearOne = clearOne || (node.mLine == line && dx >= minHalfCells * half && dx <= maxHalfCells * half && (node.mX - mudX) * side >= 0 && !node.mHazard && !GoToTask::DormantDrillOver(world, node.mX, node.mY, node.mHalf));
+    }
+    return std::make_unique<GoToTask>("to the Mudokon", [&nav, &world, line, mudX, half, minHalfCells, maxHalfCells, side, clearOne](s32 n)
                                       {
                                           const NavNode& node = nav.Nodes()[n];
                                           const s32 dx = std::abs(node.mX - mudX);
                                           if (node.mLine != line || dx < minHalfCells * half || dx > maxHalfCells * half || (node.mX - mudX) * side < 0)
+                                          {
+                                              return false;
+                                          }
+                                          // (nor in a cell a drill may come down on that a switch sets going and is at rest
+                                          // now: the brewery's third Zulag, whose Mudokons sit between two pairs of them,
+                                          // worked by the angry ones at the levers over it. Not the ones that run all the
+                                          // time: those are timed, and the Mines' path 4 has its Mudokon among them.)
+                                          // (where every cell by it is under one, as by the Mines' blind Mudokon stopped among
+                                          // drills his levers have put to rest, any will do)
+                                          if (clearOne && GoToTask::DormantDrillOver(world, node.mX, node.mY, node.mHalf))
                                           {
                                               return false;
                                           }
@@ -8643,9 +8707,18 @@ TaskStep RecruitTask::Next(Bot& bot, const std::string& lastFailed)
     {
         return TaskStep::Done();
     }
-    if (abe.mMove == Move::eCrouch)
+    // (by the Mudokon, that is: on his way to it he may be down for a drill he is to roll under. The brewery's
+    // third Zulag: stood up again each time before its first four drills.)
     {
-        return TaskStep::Do(Prim::Press(Btn::eUp));
+        bool drillBy = false;
+        for (const SweepAt& sweep : bot.GetWorld().mSweeps)
+        {
+            drillBy = drillBy || (sweep.mHalf == abe.mHalfScale && std::abs((sweep.mX1 + sweep.mX2) / 2 - abe.mX) < 200 && std::abs(sweep.mY2 - abe.mY) < 200);
+        }
+        if (abe.mMove == Move::eCrouch && (!drillBy || std::abs((mud->mLive ? mud->mLiveX : mud->CentreX()) - abe.mX) < 250))
+        {
+            return TaskStep::Do(Prim::Press(Btn::eUp));
+        }
     }
 
     TaskStep step;
@@ -10839,9 +10912,18 @@ TaskStep WorkTogetherTask::Next(Bot& bot, const std::string& lastFailed)
     {
         return TaskStep::Done();
     }
-    if (abe.mMove == Move::eCrouch)
+    // (not on his way somewhere: he may be down for a drill he is to roll under. The brewery's third Zulag: stood
+    // up again each time before its first four drills, for ever.)
     {
-        return TaskStep::Do(Prim::Press(Btn::eUp));
+        bool drillBy = false;
+        for (const SweepAt& sweep : world.mSweeps)
+        {
+            drillBy = drillBy || (sweep.mHalf == abe.mHalfScale && std::abs((sweep.mX1 + sweep.mX2) / 2 - abe.mX) < 200 && std::abs(sweep.mY2 - abe.mY) < 200);
+        }
+        if (abe.mMove == Move::eCrouch && !(drillBy && (mGo || mRecruit)))
+        {
+            return TaskStep::Do(Prim::Press(Btn::eUp));
+        }
     }
     if (!mPlanned)
     {
