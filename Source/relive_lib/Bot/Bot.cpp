@@ -250,6 +250,12 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<VoiceLockTask>(step.mEntity, step.mEdge);
         case StepKind::eSligLever:
             return std::make_unique<SligLeverTask>(step.mEntity, step.mEdge);
+        case StepKind::eSorry:
+        {
+            auto sorry = std::make_unique<RecruitTask>(step.mEntity);
+            sorry->SetSorryOnly(true);
+            return sorry;
+        }
         case StepKind::ePantsSlig:
             return std::make_unique<PantsSligTask>(step.mEntity, step.mOther, step.mEdge);
         case StepKind::eDrillSlogs:
@@ -2113,6 +2119,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
         // (nor a running jump whose flight goes through where a drill travels: in the gap it jumps, the drill
         // that goes up and down there is not under him but in his way. The Mines' path 4, from 2562,1400 over
         // the gap at 2487: drilled in the air.)
+        bool timedDrill = false;
         if (e.mKind == EdgeKind::eRunJump && from.mHalf == to.mHalf)
         {
             const s32 cell = NavGraph::GridStep(from.mHalf);
@@ -2136,6 +2143,16 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
                 if (!overFloor && f.mKind == FeatureKind::eSweep && f.mHalf == from.mHalf && f.mX2 > std::min(from.mX, to.mX) + cell / 2 && f.mX1 < std::max(from.mX, to.mX) - cell / 2 &&
                     f.mY2 >= std::min(from.mY, to.mY) - 60 / scale && f.mY1 <= std::max(from.mY, to.mY))
                 {
+                    // (one that comes down in the gap between two floors at one height is jumped while it is
+                    // down: GoToTask waits for that. The brewery's third Zulag, "continue left across the top,
+                    // jumping across each gap": every gap of its top has such a drill, its tip at the floors'
+                    // height at the top of its stroke.)
+                    if (know->mNav.Input().mIsAe && f.mY2 - f.mY1 > f.mX2 - f.mX1 && std::abs(from.mY - to.mY) * scale <= 20)
+                    {
+                        timedDrill = true;
+                        (void) timedDrill;
+                        continue;
+                    }
                     return -1;
                 }
             }

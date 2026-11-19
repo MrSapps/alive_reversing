@@ -2475,6 +2475,12 @@ static const s32 kZapFloorCost = 1500;
 // that he pulls them one after the other himself
 static const s32 kLeversTogether = 90;
 
+bool Domain::AngryWorker(const Entity& mud)
+{
+    // (its brain as last seen, once it has been: 8 is the one at the lever. Before that the map's word for it.)
+    return mud.mKind == EntityKind::eMudokon && !mud.mGone && mud.mInputs[3] == 1 && (mud.mState < 100 || mud.mState / 100 == 8);
+}
+
 bool Domain::PlanTogether(const NavGraph& nav, const World& world, const Entity& logic, Team& team, std::vector<Goap::Fact>& pre)
 {
     team = {};
@@ -4349,6 +4355,33 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                                 teamPre.push_back(stopped);
                             }
                         }
+                        // And the ones by them that come down each time a lever is pulled, with a Mudokon at that
+                        // lever pulling it in anger: sorry to him first ("hop across and say Sorry to each of the top
+                        // Mudokons": the Mudokons of that Zulag sit between two pairs of such drills, and Abe was
+                        // drilled talking to them).
+                        for (const Entity& drill : world.mEntities)
+                        {
+                            if (drill.mKind != EntityKind::eDrill || drill.mGone || drill.mInputs[0] != 2 || drill.mSwitch <= 1 || drill.mHalf != wheel->mHalf || std::abs(drill.mY2 - wheel->mY2) > 40 ||
+                                drill.CentreX() < x1 - 100 || drill.CentreX() > x2 + 100)
+                            {
+                                continue;
+                            }
+                            for (const Entity& l : world.mEntities)
+                            {
+                                if (l.mKind != EntityKind::eLever || l.mSwitch != drill.mSwitch)
+                                {
+                                    continue;
+                                }
+                                for (const Entity& mud : world.mEntities)
+                                {
+                                    const Goap::Fact calm{Key::Calm(mud.mId), 1};
+                                    if (AngryWorker(mud) && mud.CentreX() >= l.mX1 - 30 && mud.CentreX() <= l.mX2 + 30 && std::abs(mud.mY2 - l.mY2) < 30 && std::find(teamPre.begin(), teamPre.end(), calm) == teamPre.end())
+                                    {
+                                        teamPre.push_back(calm);
+                                    }
+                                }
+                            }
+                        }
                     }
                     step.mKind = StepKind::eTogether;
                     add("Work together " + name + " sw" + std::to_string(entity.mSwitch), teamPre, {{Key::Switch(entity.mSwitch), entity.mOp == 1 ? 0 : 1}}, 600, step);
@@ -4584,6 +4617,18 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 if (node < 0)
                 {
                     break;
+                }
+                // One that works a lever in anger: sorry stops it (and what its lever runs: see Work together)
+                if (AngryWorker(entity))
+                {
+                    DomainStep sorry;
+                    sorry.mKind = StepKind::eSorry;
+                    sorry.mEntity = entity.mId;
+                    add("Say sorry to " + name, {regionFact(node), {Key::Calm(entity.mId), 0}}, {{Key::Calm(entity.mId), 1}}, 300, sorry);
+                }
+                else if (entity.mInputs[3] == 1)
+                {
+                    d.mStart.Set(Key::Calm(entity.mId), 1);
                 }
                 if (kills && entity.mMood != MudMood::eSick)
                 {

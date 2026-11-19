@@ -53,6 +53,11 @@ inline u32 ScrabClear(s32 zone)
 {
     return 3000000 + static_cast<u32>(zone);
 }
+// A Mudokon that works a lever in anger (the drills of the brewery's third Zulag) has been told sorry
+inline u32 Calm(u32 entityId)
+{
+    return 6000000 + entityId;
+}
 } // namespace Key
 
 enum class StepKind : u8
@@ -111,6 +116,7 @@ enum class StepKind : u8
     eCrawlerButton, // from the cell mEdge take over a naked Slig and press the button mEntity with it
     eSligLever,     // the Glukkon he is in goes to the cell mEdge and has a Slig it calls pull the lever mEntity
     eDrillSlogs,    // pull the lever mEntity to set its drills on the Slogs asleep under them, and again once those are dead
+    eSorry,         // say sorry to the Mudokon mEntity that works a lever in anger, so that it leaves it be
     ePantsSlig,     // kill Slig mEntity with the Slig a Glukkon calls: hello from node mEdge, the gate's lever mOther
     eTimedDoor,     // use the lever mEntity (to the value mOther) and at once cross the edge mEdge, which a trap door
                     // that shuts by itself opens for a while
@@ -534,6 +540,8 @@ struct Domain final
     // something and find the bone when he comes onto their screen)
     static bool BoneThrow(const NavGraph& nav, s32 node, s32 x1, s32 x2, s32 floorY, u32& aim, s32& frames, s32* downX = nullptr, const std::function<bool(s32 downX)>& wanted = nullptr, bool otherScreen = false);
     static std::vector<ThrowSpot> ThrowSpots(const NavGraph& nav, s32 x, s32 y, bool half, const World* world = nullptr);
+    // A Mudokon that pulls the lever by it in anger, and has not been told sorry
+    static bool AngryWorker(const Entity& mud);
     static bool PlanTogether(const NavGraph& nav, const World& world, const Entity& logic, Team& team, std::vector<Goap::Fact>& pre);
     // Weighs a detour into a path: entryNode is where Abe comes in, leadsOn says which of its exits are a way on
     static SideTrip WeighSideTrip(const NavGraph& nav, const World& world, s32 entryNode, const std::function<bool(const NavFeature&)>& leadsOn);
