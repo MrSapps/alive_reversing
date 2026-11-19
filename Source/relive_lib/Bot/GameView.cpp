@@ -1751,6 +1751,20 @@ void GameView::ReadWorld(BaseMap& map, World& world)
     {
         world.mSwitches[i] = gSwitchStates.mData[i];
     }
+    // FeeCo Depot's electric walls by the ways to the executive offices and the brewery: their switches are set by
+    // two doors as their screens are shown, from the game's record of which bosses are dealt with (Door.cpp).
+    // Taken as they will be then: seen from anywhere else those walls looked shut for good.
+    if (isAe && map.mCurrentLevel == EReliveLevelIds::eFeeCoDepot)
+    {
+        if (!gVisitedFeecoEnder)
+        {
+            world.mSwitches[255] = gVisitedBonewerkz ? 1 : world.mSwitches[255];
+            world.mSwitches[254] = gVisitedBarracks ? 1 : world.mSwitches[254];
+        }
+        world.mSwitches[250] = gVisitedBonewerkz ? 1 : world.mSwitches[250];
+        world.mSwitches[251] = gVisitedBarracks ? 1 : world.mSwitches[251];
+        world.mSwitches[253] = gVisitedFeecoEnder ? 1 : world.mSwitches[253];
+    }
     world.mRescued = isAe ? gRescuedMudokons : AO::gRescuedMudokons;
     world.mGasClock = isAe && gDeathGasTimer != 0;
     world.mKilled = isAe ? gKilledMudokons : AO::gKilledMudokons;

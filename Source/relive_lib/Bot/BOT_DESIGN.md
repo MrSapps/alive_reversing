@@ -2920,3 +2920,17 @@ world put back has it after a restore (`mGatesGone` cleared: Phleg walked into t
 been put back to before). From path 4's door (`p4n.txt`) Phleg was lost to the second lever's Slogs and the try
 from the checkpoint before it got through. Mutation check of the new unit tests: 11 of 13 caught; not caught: a
 ride from a lift's middle cell, a parked drill taken as a bar.
+
+### FeeCo Depot for the third time (2026-11-19): through, into the Executive Offices
+
+- The electric walls by the ways to the executive offices and the brewery (switches 250 to 255) are set by two
+  doors as their screens are shown, from the game's record of which bosses are dealt with (`Door.cpp`,
+  `gVisitedBonewerkz` and the like). `GameView` takes them as they will be then: from anywhere else the walls
+  looked shut for good, and he went round the depot's doors until none was left.
+- A script that starts after the Barracks has that record unset: the automation command
+  `visited <barracks|bonewerkz|feeco_ender> <0|1>` sets it. (`bw7b.txt` has `visited barracks 1` now.)
+- `la/fd3.txt` (from the depot's path 2, both visited): in `feeco_depot_ender` 11 at f=461, 0 deaths.
+- **Next: the Executive Offices** (`la/fe1.txt` starts in them): 22 deaths on the first screens, as he climbs the
+  hoist at 795,359 with a flying Slig over it. Half scale, four flying Sligs on tracks over the first three
+  screens, no invisible zone and no Brew machine there: what the bot has for flying Sligs (from zone to zone, or a
+  fart) does not apply. The guide goes by the tunnels.

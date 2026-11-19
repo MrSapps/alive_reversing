@@ -23,6 +23,7 @@
 #include "data_conversion/PNGFile.hpp"
 #include "data_conversion/file_system.hpp"
 #include "../AliveLibAE/Abe.hpp"
+#include "../AliveLibAE/DDCheat.hpp"
 #include "../AliveLibAE/Input.hpp"
 #include "../AliveLibAE/MainMenu.hpp"
 #include "../AliveLibAE/PauseMenu.hpp"
@@ -433,6 +434,12 @@ static bool CheckCommand(const Automation::Command& command, std::string& error)
     if (name == "switch")
     {
         return expectArgs(2, "switch <id> <0|1>") && expectNumber(command.mArgs[0], 0) && expectNumber(command.mArgs[1], 0);
+    }
+
+    if (name == "visited")
+    {
+        // (the first: barracks, bonewerkz, or anything else for feeco_ender)
+        return expectArgs(2, "visited <barracks|bonewerkz|feeco_ender> <0|1>") && expectNumber(command.mArgs[1], 0);
     }
 
     if (name == "expect_objects")
@@ -991,6 +998,28 @@ bool Automation::RunCommand(const Command& command, BaseMap& map, bool betweenFr
         gAbe->mHaveShrykull = 0;
         gAbe->mHaveInvisibility = 0;
         gAbe->mRingPulseTimer = static_cast<s32>(sGnFrame) + 200000;
+        return true;
+    }
+
+    if (name == "visited")
+    {
+        if (!betweenFrames)
+        {
+            return false;
+        }
+        const bool value = std::stoi(args[1]) != 0;
+        if (args[0] == "barracks")
+        {
+            gVisitedBarracks = value;
+        }
+        else if (args[0] == "bonewerkz")
+        {
+            gVisitedBonewerkz = value;
+        }
+        else
+        {
+            gVisitedFeecoEnder = value;
+        }
         return true;
     }
 
