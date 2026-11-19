@@ -1047,6 +1047,34 @@ bool Bot::Replan(BaseMap& map)
                     mTaskAction.clear();
                     return true;
                 }
+                // (with Slogs awake on his floor it is theirs to move: a run from them is what comes next, MakeFlee,
+                // as soon as nothing is between them and him. Bonewerkz' Executive Office: through the sensor
+                // that lets three out behind him there is no plan, the floors ahead being theirs, and that was
+                // the end, before the slam door they were behind was up.)
+                if (mIsAe && (mSlogStuckWaits == 0 || mAbe.mFrame - mSlogStuckFrame < 200))
+                {
+                    for (const SlogAt& slog : mWorld.mSlogs)
+                    {
+                        if ((!slog.mAsleep || slog.mWaking) && std::abs(slog.mY - mAbe.mY) <= 30 && std::abs(slog.mX - mAbe.mX) < 800)
+                        {
+                            if (mSlogStuckWaits++ == 0)
+                            {
+                                mSlogStuckFrame = mAbe.mFrame;
+                                Log("no plan, and Slogs awake on this floor: theirs to move");
+                            }
+                            if (std::unique_ptr<Task> flee = MakeSlogFlee())
+                            {
+                                mTask = std::move(flee);
+                                mTaskAction.clear();
+                                return true;
+                            }
+                            mTask = std::make_unique<GoToTask>("think again", [](s32)
+                                                               { return true; });
+                            mTaskAction.clear();
+                            return true;
+                        }
+                    }
+                }
                 // (what there was to plan with, for whoever reads the log)
                 Log("the actions there were:\n" + domain.Text());
                 Stuck("no_plan: Leave the path: " + plan.mMiss + ". " + domain.Frontier() + (misses.empty() ? "" : " Also no plan for: " + misses));
@@ -1701,7 +1729,18 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
     const auto base = [know, world, only, pastScrabs, charged, chanted, unseenRun, powerFirst, pastFacing, flierBoxes, timedRun, fleeEdge](const NavEdge& e) -> s32
     {
         const s32 idx = static_cast<s32>(&e - know->mNav.Edges().data());
-        if (know->mBannedEdges.count(idx) || (!only->empty() && !only->count(idx)))
+        if (know->mBannedEdges.count(idx))
+        {
+            return -1;
+        }
+        // (the jump at a hoist a run from a Slog was sent to, MakeSlogFlee: before all that follows, which is for
+        // ways taken with time in hand)
+        // (any running jump to where that one goes: he is cells on from where it was found by the time it is taken)
+        if (fleeEdge >= 0 && e.mKind == EdgeKind::eRunJump && e.mTo == know->mNav.Edges()[fleeEdge].mTo)
+        {
+            return 20;
+        }
+        if (!only->empty() && !only->count(idx))
         {
             return -1;
         }
@@ -1761,12 +1800,6 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
         if (know->mNav.Input().mIsAe && Domain::FallersBar(know->mNav, *world, e))
         {
             return e.mCost + 2000;
-        }
-        // (the jump at a hoist a run from a Slog was sent to, MakeSlogFlee)
-        // (any running jump to where that one goes: he is cells on from where it was found by the time it is taken)
-        if (fleeEdge >= 0 && e.mKind == EdgeKind::eRunJump && e.mTo == know->mNav.Edges()[fleeEdge].mTo)
-        {
-            return 20;
         }
         // A running jump up a hoist: the way to go with a Scrab on his floor after him, and not otherwise
         // (not the one from a stand, NavGraph::kStandJumpCost: that is for getting off a Slig's floor, MakeFlee,
@@ -3203,7 +3236,7 @@ bool Bot::SlogRefuge(const SlogAt& slog, s32 from, s32& refuge, bool& left, bool
     const NavGraph* graph = &nav;
     const World* worldNow = &mWorld;
     const s32 startX = at.mX;
-    const NavGraph::EdgeCost awayOnly = [&all, graph, side, floorY, worldNow, startX](const NavEdge& e) -> s32
+    const NavGraph::EdgeCost awayOnly = [this, &all, graph, side, floorY, worldNow, startX](const NavEdge& e) -> s32
     {
         const NavNode& a = graph->Nodes()[e.mFrom];
         const NavNode& b = graph->Nodes()[e.mTo];
@@ -3231,7 +3264,28 @@ bool Bot::SlogRefuge(const SlogAt& slog, s32 from, s32& refuge, bool& left, bool
                 const s32 reach = std::abs(e.mX - startX) * 10 / 62 + 14;
                 return sweep && sweep->Hits(reach, reach + 50, b.mX - 20, b.mY - 60, b.mX + 20, b.mY) ? -1 : 20;
             }
-            return all(e) < 0 ? -1 : 20;
+            // (not by what the pilot's costs say of it otherwise: those are for ways taken with time in hand, and
+            // one of them is that no jump goes where a drill may go by, running or not. Only one he was stopped
+            // on is kept off.)
+            return Banned(static_cast<s32>(&e - graph->Edges().data())) ? -1 : 20;
+        }
+        // (a floor that is the Slogs' while they are after him is no bar to the run from them: it is where he
+        // runs. Bonewerkz' Executive Office: three let out behind him, and four screens of floor to the first
+        // way up.)
+        if ((e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eRoll) && all(e) < 0)
+        {
+            s32 sw = 0;
+            s32 value = 0;
+            if (graph->Condition(e, &sw, &value))
+            {
+                for (const World::SlogFloor& floor : worldNow->mSlogFloors)
+                {
+                    if (floor.mSwitch == sw)
+                    {
+                        return e.mCost;
+                    }
+                }
+            }
         }
         return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eRoll || e.mKind == EdgeKind::eWell || e.mKind == EdgeKind::eHoistUp || e.mKind == EdgeKind::eTeleport || e.mKind == EdgeKind::eFall ? all(e) : -1;
     };
@@ -3342,6 +3396,7 @@ std::unique_ptr<Task> Bot::MakeSlogFlee()
         // floor to the far end of the ledge, into the drill that comes down there.)
         mFleeEdge = lastEdge >= 0 && nav.Edges()[lastEdge].mKind == EdgeKind::eRunJump ? lastEdge : -1;
         mFleeFrame = mAbe.mFrame;
+        mWorld.mFleeing = true;
         return std::make_unique<SlogFleeTask>(refuge, left, fromX);
     }
     return nullptr;
@@ -3916,6 +3971,7 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         mIsAe = GetGameType() == GameType::eAe;
         EnsureKnowledge(map);
         GameView::ReadWorld(map, mWorld);
+        mWorld.mFleeing = mFleeFrame != 0 && mAbe.mFrame - mFleeFrame < 300;
         if (mKnow)
         {
             for (const NavFeature& f : mKnow->mNav.Input().mFeatures)

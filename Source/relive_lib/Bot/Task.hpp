@@ -1811,12 +1811,19 @@ public:
         return "Walk into the zone of switch " + std::to_string(mSwitch);
     }
     TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+    // The zone of that switch sets Slogs on him (it is the switch that angers Slogs the map has awake): the way
+    // to go through it at a run, away from them (-1 left, 1 right), or 0 if it sets none on him
+    static s32 SetsSlogsOn(const World& world, s32 switchId, s32 abeX, s32 abeY);
 
 private:
     s32 mSwitch;
     s32 mNode;
     bool mBegun = false;
     s32 mWaits = 0;
+    // Through it at a run, the way held (-1 left, 1 right; 0: walked to and stood in, 2: not looked at yet), and
+    // the frames run on since it set its switch
+    s32 mRunThrough = 2;
+    s32 mRanOn = 0;
     std::unique_ptr<GoToTask> mGo;
 };
 

@@ -10091,6 +10091,13 @@ TEST(BotSlogs, ASlogThatIsAfterHimIsFedByABoneOnTheScreenShownAndTheFloorBetween
     world.mSlogFloors.push_back(floor);
     // No Slog after him: the stretch is free to walk
     EXPECT_EQ(world.Switch(floor.mSwitch), 1);
+    // (and at a run from one that is after him it is where he runs)
+    world.mSlogs[0].mChasing = true;
+    EXPECT_EQ(world.Switch(floor.mSwitch), 0);
+    world.mFleeing = true;
+    EXPECT_EQ(world.Switch(floor.mSwitch), 1);
+    world.mFleeing = false;
+    world.mSlogs[0].mChasing = false;
     EXPECT_FALSE(world.SlogFed(world.mSlogs[0]));
     world.mSlogs[0].mChasing = true;
     EXPECT_EQ(world.Switch(floor.mSwitch), 0);
@@ -11264,4 +11271,18 @@ TEST(BotNav, ARunningJumpUpAHoistWithTwoCellsOfRunUpWhereTheFloorEndsThere)
     // (off the ledge's last cell, two on from where he stands)
     EXPECT_EQ(jump->mX, g.Nodes()[g.NodeAt(1662, 960, false, 4)].mX);
     EXPECT_TRUE(jump->mLeft);
+}
+
+TEST(BotSlogs, AZoneThatSetsSlogsOnHimIsGoneThroughAtARunAwayFromThem)
+{
+    World world = PenWorld();
+    world.mEntities[0].mInputs[5] = 23;
+    // (the Slog of the stretch is at 112, on the floor at 100)
+    EXPECT_EQ(SwitchZoneTask::SetsSlogsOn(world, 23, 300, 100), 1);
+    EXPECT_EQ(SwitchZoneTask::SetsSlogsOn(world, 23, 50, 100), -1);
+    // (another switch's zone, or Slogs on another floor, or ones that are gone: walked into as ever)
+    EXPECT_EQ(SwitchZoneTask::SetsSlogsOn(world, 24, 300, 100), 0);
+    EXPECT_EQ(SwitchZoneTask::SetsSlogsOn(world, 23, 300, 300), 0);
+    world.mEntities[0].mGone = true;
+    EXPECT_EQ(SwitchZoneTask::SetsSlogsOn(world, 23, 300, 100), 0);
 }

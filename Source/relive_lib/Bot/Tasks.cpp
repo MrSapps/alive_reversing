@@ -1510,6 +1510,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         return TaskStep::Failed("too many steps");
     }
 
+
     // A try after a death holds back a little first: most of what kills is on a timer or a patrol
     if (!mWaited)
     {
@@ -4232,6 +4233,13 @@ void GoToTask::Bodies(const NavGraph& nav, const std::vector<s32>& path, std::si
                 case EdgeKind::eLift:
                     // (measured in the Barracks' path 5: 7 frames until it moves, then 4 a frame)
                     frames = 7 + std::max(1, std::abs(b.mY - a.mY) * (a.mHalf ? 2 : 1) / 4);
+                    break;
+                case EdgeKind::eWell:
+                    // (into a well where he stands: up from a crouch first, then some 14 until he is gone into it.
+                    // Measured in Bonewerkz' Executive Office, `dr.txt`: the well under the third of four drills,
+                    // rolled to from 162,200. Of 45 frames to begin at, 12 in a row got him through; with the
+                    // edge's cost for its frames, as it was, there was never the time.)
+                    frames = 16 + (before == EdgeKind::eRoll ? 8 : 0);
                     break;
                 default:
                     frames = e.mCost;
@@ -12552,11 +12560,58 @@ StepOnTask::~StepOnTask() = default;
 
 SwitchZoneTask::~SwitchZoneTask() = default;
 
+s32 SwitchZoneTask::SetsSlogsOn(const World& world, s32 switchId, s32 abeX, s32 abeY)
+{
+    for (const Entity& e : world.mEntities)
+    {
+        if (e.mKind == EntityKind::eSlog && !e.mGone && e.mInputs[5] == switchId && switchId > 1 && std::abs(e.mY2 - abeY) <= 60)
+        {
+            return abeX >= e.CentreX() ? 1 : -1;
+        }
+    }
+    return 0;
+}
+
 TaskStep SwitchZoneTask::Next(Bot& bot, const std::string& lastFailed)
 {
-    if (bot.GetWorld().Switch(mSwitch, true) != 0)
+    if (bot.GetWorld().Switch(mSwitch, true) != 0 && mRunThrough == 0)
     {
         return TaskStep::Done();
+    }
+    // A zone that sets Slogs on him: through it at a run and on, away from them, with no stop in it. Stood in it
+    // until the plan had nothing more, he was caught 38 on. (Bonewerkz' Executive Office: "stepping through the red
+    // sensor drops the slamdoor behind you and lets out the Slogs. Run right".)
+    if (mRunThrough == 2)
+    {
+        mRunThrough = 0;
+        const s32 from = bot.AbeNode();
+        std::vector<s32> way;
+        const s32 dir = SetsSlogsOn(bot.GetWorld(), mSwitch, bot.Abe().mX, bot.Abe().mY);
+        if (dir != 0 && from >= 0 && bot.Nav().FindPath(from, mNode, bot.EdgeCostFn(), way))
+        {
+            bool straight = true;
+            for (s32 edge : way)
+            {
+                straight = straight && bot.Nav().Edges()[edge].mKind == EdgeKind::eWalk && bot.Nav().Edges()[edge].mLeft == (dir < 0);
+            }
+            if (straight)
+            {
+                mRunThrough = dir;
+                bot.Log("the zone of switch " + std::to_string(mSwitch) + " sets Slogs on him: through it at a run");
+            }
+        }
+    }
+    if (mRunThrough != 0)
+    {
+        if (bot.GetWorld().Switch(mSwitch, true) != 0 && ++mRanOn >= 30)
+        {
+            return TaskStep::Done();
+        }
+        if (++mWaits > 300)
+        {
+            return TaskStep::Failed("the zone did not set its switch");
+        }
+        return TaskStep::Do(Prim::Wait(1, (mRunThrough < 0 ? Btn::eLeft : Btn::eRight) | Btn::eRun));
     }
     if (!mBegun)
     {
