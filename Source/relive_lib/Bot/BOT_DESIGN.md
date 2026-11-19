@@ -3033,3 +3033,23 @@ tricky to time it right." Two Sligs walk 1912..2150 through an open gate at 1987
 
 Check set with this: ctest 11/11 (331 Bot tests); m1, tr1, t13 0 deaths; a1 14; bw1, blk9t, b14, wr 0; fc3 0;
 bw7b 29.
+
+### Vice-President Aslik (2026-11-19, `la/fs3.txt`): to the Security Fone, no death
+
+With what Phleg's office built. From the gate's lever on to 2337,1500, Aslik taken over from there, the voice lock
+at 2535 (teleported to 2187), a call for help, the Slig that comes told "Do it" at the gate's lever (it opens
+again), on left to the lock at 1687 (teleported to 687), the Security Fone answered at f=4213.
+
+- **A teleporter whose switch is a voice lock's is no way of Abe's** (`GameView::BuildNavInput` leaves it out of
+  the graph; the Glukkon's way has it from the world). Taken for one, the well beside the Fone looked in reach and
+  he turned back for it.
+- **A Slig behind a shut gate does not come:** the Glukkon's Slig is the nearest with nothing shut between
+  (`GlukkonsSlig`, `Domain::FloorOpen`); with none, the call for help. The two the gate was shut on were called for
+  eight thousand frames.
+- The gate wanted shut is wanted for going on *away* from it, not for coming back to it.
+- **Where it stops:** Abe, himself again, walks back left for the door the Fone opens (1562,1500) and is shot at
+  2228: the two Sligs are on their screen again with the gate open. The guide: "He can 'Kill 'em' too as long as
+  you're there": Aslik's Slig shoots them before the Fone. The order is given for Slogs only so far
+  (`GlukkonGuard`).
+
+Check set: ctest 11/11; m1, tr1, t13 0; a1 14; bw1, blk9t, b14, wr 0; fc3 0; bw7b 29.

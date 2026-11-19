@@ -6448,7 +6448,10 @@ static const SligAt* GlukkonsSlig(const NavGraph& nav, const World& world, const
     for (const SligAt& s : world.mSligs)
     {
         // (on its screen: one off it does not hear)
-        if (!s.mPossessed && s.mHalf == me.mHalf && std::abs(s.mY - me.mY) <= 20 && nav.CameraOf(s.mX, s.mY - 5) == nav.CameraOf(me.mX, me.mY - 5) && (!slig || std::abs(s.mX - me.mX) < std::abs(slig->mX - me.mX)))
+        // (and with nothing shut between: one behind a gate does not come. FeeCo's Executive Offices: the two the
+        // gate was shut on, called for eight thousand frames, where a call for help brings one down beside him.)
+        if (!s.mPossessed && s.mHalf == me.mHalf && std::abs(s.mY - me.mY) <= 20 && nav.CameraOf(s.mX, s.mY - 5) == nav.CameraOf(me.mX, me.mY - 5) && Domain::FloorOpen(nav.Input(), world, s.mX, me.mX, me.mY + 4, me.mHalf) &&
+            (!slig || std::abs(s.mX - me.mX) < std::abs(slig->mX - me.mX)))
         {
             slig = &s;
         }
@@ -7124,16 +7127,8 @@ TaskStep SligLeverTask::Next(Bot& bot, const std::string& lastFailed)
     {
         return TaskStep::Do(Prim::Wait(2));
     }
-    // The Slig of this floor that is nearest
-    const SligAt* slig = nullptr;
-    for (const SligAt& s : world.mSligs)
-    {
-        // (on its screen: one off it does not hear)
-        if (!s.mPossessed && s.mHalf == me->mHalf && std::abs(s.mY - me->mY) <= 20 && nav.CameraOf(s.mX, s.mY - 5) == nav.CameraOf(me->mX, me->mY - 5) && (!slig || std::abs(s.mX - me->mX) < std::abs(slig->mX - me->mX)))
-        {
-            slig = &s;
-        }
-    }
+    // The Slig of this floor that is nearest, with nothing shut between
+    const SligAt* slig = GlukkonsSlig(nav, world, *me);
     if (mQuiet > 0)
     {
         mQuiet -= 2;
