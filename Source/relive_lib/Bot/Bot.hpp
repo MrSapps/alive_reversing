@@ -505,7 +505,7 @@ public:
     }
     bool TimedRunOn() const
     {
-        return mTimedRun || GoToTask::HurryOn(static_cast<s32>(mAbe.mFrame), mRunUntil, mRunPath, mAbe.mLevel * 1000 + mAbe.mPath);
+        return mTimedRun || mFlierRun || GoToTask::HurryOn(static_cast<s32>(mAbe.mFrame), mRunUntil, mRunPath, mAbe.mLevel * 1000 + mAbe.mPath);
     }
     // The cell he waits in for a flying Slig to have gone by (GoToTask, out of a tunnel): not hidden from there
     void FlierTimedAt(s32 node)
@@ -652,6 +652,9 @@ private:
     bool mFlierDash = false;
     s32 mFlierTimedNode = -1;
     bool mTimedRun = false;
+    // A flying Slig of his size is on his screen in a path with nowhere to be unseen: everything at a run (it gets
+    // him where he stands; run from, its grenades come down where he was)
+    bool mFlierRun = false;
     s32 mRunUntil = 0;
     s32 mRunPath = -1;
     // Bones thrown to Slogs on their own floor, beyond the plan's
@@ -688,6 +691,8 @@ private:
 
     struct Saved final
     {
+        // The gates taken for gone for good as it was made (World::mGatesGone)
+        std::map<s32, s32> mGatesGone;
         Checkpoint mCheckpoint;
         std::size_t mInputCount = 0;
         s32 mAttempts = 0;

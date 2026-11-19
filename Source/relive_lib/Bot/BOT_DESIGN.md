@@ -2934,3 +2934,31 @@ ride from a lift's middle cell, a parked drill taken as a bar.
   hoist at 795,359 with a flying Slig over it. Half scale, four flying Sligs on tracks over the first three
   screens, no invisible zone and no Brew machine there: what the bot has for flying Sligs (from zone to zone, or a
   fart) does not apply. The guide goes by the tunnels.
+
+### FeeCo's Executive Offices (`feeco_depot_ender` 11), first part done (2026-11-19, `la/fe1.txt` starts in them)
+
+`fe1.txt`: from the door, over the three screens of flying Sligs to the luggage lever, back two screens to the
+ghost lock, unseen along the Sligs' floor and into the well at 1805,480: in the second part (1587,1400) at
+f=3793, **20 deaths**, nearly all under the flying Sligs (732,408; 1209,369; 680,408; 1365,379).
+
+- **Flying Sligs with nowhere to be unseen** (no invisible zone, no Brew machine: half size, their tracks along
+  his floors): everything at a run while one that is a threat (`FlierThreat`) is on his screen (`mFlierRun`, as a
+  timed run is). At half size only: at full size the Mines' way out (path 6) went into its explosions three times
+  with it. Open: which of what a timed run changes helps here, and why it hurts there. And it is still a death
+  every screen or so: the way through them is not timed against the Sligs' rounds (measured, the second screen's:
+  285 frames, out to 1069,334 and back, then down the left branch to 798,402 by the hoist and back).
+- **A lever whose switch puts itself back** (the luggage: falling items with `reset_switch_id_after_use`) opens a
+  gate that is deleted. The gates taken for gone for good are kept with each checkpoint and put back with it
+  (`Saved::mGatesGone`): forgotten at every restore, the lever was pulled again after every death; kept through
+  one, Phleg walked into a door that had shut again.
+- **The chant for the power on a screen with a security orb**, where no cell on the way to the watched floor is
+  on a screen without one: at the last cell all the same. The power takes on the chant's first frame; the orb's
+  zap comes 20 frames on and knocks him back, no more (`Abe.cpp`, `SecurityOrb.cpp`). Not chanted, he dropped
+  among the Sligs as he was.
+- **Next, the second part:** the lever at 1750..1825,1380 is watched by a Slig, with an orb on the screen: the bot
+  has it only unseen, and the power is spent. The guide: "When the top Slig turns away, sneak ahead one step, pull
+  the lever, turn and sneak back one step, all before he turns back around", from one shadow to the next.
+
+Check set of this state: ctest 11/11; m1, tr1, t13 0 deaths; a1 14; bw1, blk9t, b14, wr 0; fc3 0; `bw7b.txt` (with
+`visited barracks 1`) from the first annex into the Executive Offices at f=38,477, 8 deaths to there and 21 in
+them by its 52,000th frame.
