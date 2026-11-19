@@ -615,7 +615,9 @@ struct World final
         const s32 tall = (half ? 30 : 60) / (crouched ? 2 : 1);
         for (const Entity& e : mEntities)
         {
-            const s32 reach = e.mX2 - e.mX1 > e.mY2 - e.mY1 ? 20 : 12;
+            // (11, not 12: the middle of the cell beside a drill's is 12 from its box, and that cell is no part of
+            // it. With 12 the hoist a cell from the last drill of the brewery's third Zulag was under it.)
+            const s32 reach = e.mX2 - e.mX1 > e.mY2 - e.mY1 ? 20 : 11;
             if (e.mKind != EntityKind::eDrill || e.mHalf != half || x < e.mX1 - reach || x > e.mX2 + reach || y - tall > e.mY2 || y < e.mY1)
             {
                 continue;

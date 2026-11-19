@@ -3227,3 +3227,20 @@ within 70 of him), drops, walks onto the plate (run onto it he came out still ru
 Scrab) and runs on from where it puts him. All six starts now get through: four with no death, two with three.
 Also: the first try from a save is as it was and only later ones begin later (3 frames each); an edge is only
 ruled out after two deaths where there is another way to where it goes.
+
+**2026-11-19, the bar for now (the user's choice):** the brewery from the Terminal 5 start first; the run from the
+Mines only has to not get stuck (deaths and retries allowed), to be tightened later. That run now gets through
+the Mines, Necrum, the Scrab vault and its trial, and six paths of the Paramite vault, and is stuck in the second
+Mudomo vault (path 11): `build-bot/pv/c4_29.txt` fails there alone (one start of five). What is known of it: the
+Paramite taken over was held at the end of its floor after a Fleech it could not get to (now left alone after 60
+turns with no step made); it walked after Fleeches that keep three cells ahead of its walk (now at a run when
+it gets no nearer); its Fleeches are counted eaten once it has been to where each is kept, alive or not (not
+mended); the second Paramite stays loose on the locks' floor with nothing offered to deal with it once no
+Fleech is left; and the vault's own way, the pressure plates by each lock that shut the Paramites out, is not
+modelled (plates toggle when walked over, which no crossing knows: tried as a guard on the locks, it left no
+plan). No save is taken while a slap lock's ghost is on its way.
+Zulag 3 since: the levers along the top are wanted before any Mudokon is led under their rows (`Work together`
+asks for each row's switch as its lever leaves it); the cell beside a drill is not under it (11, not 12); a
+standing Abe has 4 to spare against a drill, a moving one 9. He gets up the hoist at 637,380, to the first
+lever and pulls it. Next: the gaps along the top each have a drill whose tip is at the platforms' height at the
+top of its stroke, and a running jump through a drill's travel is refused outright: to be timed.

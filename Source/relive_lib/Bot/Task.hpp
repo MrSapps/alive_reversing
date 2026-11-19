@@ -1978,6 +1978,14 @@ private:
     s32 mLegFrames = 0;
     // The frames spent after Fleeches
     s32 mHunt = 0;
+    // A Fleech it could not eat where it stood (its x), left alone for that many turns, and the bites tried
+    s32 mSkipPreyX = -100000;
+    s32 mSkipPreyFor = 0;
+    s32 mEatTries = 0;
+    s32 mHuntLastX = -100000;
+    s32 mHuntStill = 0;
+    s32 mChaseDx = 0;
+    s32 mChaseStill = 0;
     // The frames waited at a gap for a falling rock to go by
     s32 mWaitRock = 0;
     bool mClear = false;
