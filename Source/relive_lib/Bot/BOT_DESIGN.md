@@ -2739,9 +2739,24 @@ wheel that sets a 300-frame clock going; the fifth behind a tasks door at the bo
   open until both their wheels are turned and was taken for shut until then. `NavGraph::Condition`.
 - As far as it gets: the hand stone, up the shaft, boiler 2 (14 mines, its wheel), boiler 3's wheel. There is no
   plan for the whole path yet: it is all "Try switch".
-- Open: boiler 1 (three Slogs set on him by the Slurgs he steps on, and a drill that comes down on the floor he
-  runs along at 2425: 6 deaths at 2412,1760, and the pull ring given up); the hop off 1587,1141 (4 deaths);
-  boiler 4's wheel (half scale, at 1385,869); boiler 5; the Executive Office past it.
+- Boiler 1, done with no death (three Slogs set on him by the Slurgs he steps on, drills all the way):
+  - `NavGraph::AddRunJumps`: a hoist whose marker ends short of the floor is caught by a running jump and by
+    nothing else ("jump up to the ledge at the right of the next screen": the ledge at 2212,1660).
+  - `Bot::SlogRefuge`: that jump is a way off the Slogs' floor though a drill comes by where it ends, if the
+    drill is away while he gets there. `mFleeEdge`: the run there takes that jump (the pilot's own costs took
+    the floor to the ledge's far end, into the drill that comes down at 2425). With `look` alone: 141 tries, none
+    through, since a try only changes when and not which way.
+  - `GoToTask::PastDrills`: a hoist is gone up when no drill is in what he goes through for the 56 frames it
+    takes, at its foot or over its ledge ("hoisting up when both horizontal drills are to the left"). Not where
+    the drill comes to where he would stand waiting: the Mines' path 4, the hoist at 2062,1500 at the end of the
+    roll under a drill, where `m1` died sixteen times with the first cut of this.
+  - `UseTask`, a pull ring under drills: waited for two cells off on the side away from them.
+- As far as `p4n.txt` gets: the wheels of boilers 1, 2 and 3, each with its clock waited for. 6 deaths: 4 at the
+  hop off 1587,1141, 1 at a mine in boiler 2, 1 at a door.
+- Open: boiler 4. Its wheel (135) is through the door at 1525,840, over three small platforms with a Slog
+  asleep on the second and the third, each woken by a zone he walks into. The guide: hang from the platform's
+  edge, the Slog runs past and falls to the floor under, pull up then; "throw a bone down first to make this
+  easier". The bot goes up, is run off, and is caught on the floor. Then boiler 5 and the Executive Office.
 - Annex 4 is not sure: with path 1 taking one crate's round longer (43 frames) the Slig he is in went in among
   the two it was to shoot and the lever was gone to with one still watching: 3 deaths there in `bw7.txt`, the
   third try through. `bw7.txt` before path 3: those 3 and the slam door.
