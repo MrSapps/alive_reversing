@@ -3003,3 +3003,27 @@ slow (two waits run out to their limits, 1500 and 100 frames). It dies there: th
 down to from the small platform at 1962,1420 "while the Sligs are at the left side, raising a slamdoor to prevent
 them from shooting you". And there is no checkpoint anywhere in this part (a Slig is always on the screen), so in
 the whole run a death here goes back to before the flying Sligs: to do, a checkpoint where he stands hidden.
+
+### The Executive Offices' gate screen (cam 6, the lever of switch 17), begun (2026-11-19, `la/fs3.txt`)
+
+"Sneak ahead and pull up to the small platform. From the left edge, hop right to land beside the lever and pull
+it, all while the Sligs are at the left side, raising a slamdoor to prevent them from shooting you. It can be
+tricky to time it right." Two Sligs walk 1912..2150 through an open gate at 1987; the lever is at 2087.
+
+- **A checkpoint where he stands hidden** from Sligs that walk their beat: a path of shadows under an orb has no
+  screen without a Slig, and a death at its end was all of it over again.
+- **The switch nothing asked for:** a switch is tried only if something waits for it, and nothing waits for a gate
+  to shut. On along a floor Sligs walk under an orb, from the side of an open gate that its lever is on, the plan
+  now wants the gate shut first (`Domain`, the crossings). Through that gate on foot from their side is dear (plan
+  and route both); of the ways down beside the lever the one that lands by it is the one planned (the hop to
+  2087, not the drop to 2012: `GateLeverFar`).
+- **When:** the hop or drop waits until every Slig of that floor on the screen is beyond the gate with its back to
+  it and at least one still walking (`GateShutsOut`); the step out of the shadow to the hoist waits until they all
+  walk away, the nearest forty off; no run from a Slig beyond the gate once he is by the lever; and the lever is
+  pulled at once then (`ClearSligTask`).
+- **Not through yet:** 13 deaths in `fs3.txt`. He is still shot leaving the shadow for the hoist on some rounds, and
+  after the hop he is some 40 frames getting to where the lever is pulled from, by when the Sligs are back
+  through the gate.
+
+Check set with this: ctest 11/11 (331 Bot tests); m1, tr1, t13 0 deaths; a1 14; bw1, blk9t, b14, wr 0; fc3 0;
+bw7b 29.

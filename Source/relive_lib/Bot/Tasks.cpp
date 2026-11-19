@@ -1442,6 +1442,68 @@ static const SligAt* HushSlig(const Bot& bot)
     return best;
 }
 
+// The way begins with a walk of up to three cells in the open and then goes up a hoist
+static bool OutToHoist(const NavGraph& nav, const std::vector<s32>& path)
+{
+    for (std::size_t i = 1; i < path.size() && i <= 3; i++)
+    {
+        const NavEdge& e = nav.Edges()[path[i]];
+        if (e.mKind == EdgeKind::eHoistUp)
+        {
+            return true;
+        }
+        if (e.mKind != EdgeKind::eWalk || nav.Nodes()[e.mTo].mHidden)
+        {
+            return false;
+        }
+    }
+    return false;
+}
+
+// A drop or a hop that comes down beside the lever of an open gate across a floor Sligs walk: 0 when there is no such
+// gate by where it lands, 1 when every Slig of that floor on its screen is on the gate's far side and walking away
+// from it (the time to go: the lever shuts it on them), 2 when not yet
+static s32 GateShutsOut(const Bot& bot, const NavGraph& nav, s32 toNode)
+{
+    const NavNode& to = nav.Nodes()[toNode];
+    const World& world = bot.GetWorld();
+    s32 state = 0;
+    for (const NavFeature& f : nav.Input().mFeatures)
+    {
+        if (f.mKind != FeatureKind::eBarrier || !f.mSolid || f.mBeam || f.mStartClosed || f.mSwitch <= 1 || f.mHalf != to.mHalf || std::abs(f.mY1 - to.mY) > 30 || world.Switch(f.mSwitch) != 0)
+        {
+            continue;
+        }
+        const s32 gateX = (f.mX1 + f.mX2) / 2;
+        bool lever = false;
+        for (const Entity& e : world.mEntities)
+        {
+            lever = lever || (e.mKind == EntityKind::eLever && e.mSwitch == f.mSwitch && std::abs(e.mY2 - to.mY) <= 30 && (e.CentreX() - gateX) * (to.mX - gateX) > 0);
+        }
+        if (!lever || std::abs(to.mX - gateX) > 150)
+        {
+            continue;
+        }
+        bool all = true;
+        bool any = false;
+        bool walking = false;
+        for (const SligAt& slig : world.mSligs)
+        {
+            if (slig.mAsleep || slig.mPossessed || slig.mHalf != to.mHalf || std::abs(slig.mY - to.mY) > 10 || nav.CameraOf(slig.mX, slig.mY - 5) != nav.CameraOf(to.mX, to.mY - 5))
+            {
+                continue;
+            }
+            any = true;
+            // (walking away, or stood at the end of its beat with its back to the gate still: the two of FeeCo's
+            // Executive Offices are never both walking away at once)
+            all = all && (slig.mMotion == 2 || slig.mMotion == 0) && (slig.mX - gateX) * (to.mX - gateX) < 0 && slig.mFacingLeft == (slig.mX < gateX) && std::abs(slig.mX - gateX) >= 20;
+            walking = walking || slig.mMotion == 2;
+        }
+        state = any ? (all && walking ? 1 : 2) : state;
+    }
+    return state;
+}
+
 TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
 {
     if (const SligAt* hush = bot.IsAe() ? HushSlig(bot) : nullptr)
@@ -2687,6 +2749,42 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             }
         }
     }
+    // Out of a shadow on a floor Sligs walk under a security orb to a hoist beside it and up: only while every Slig of
+    // that floor on the screen walks away from him, the nearest forty off or more. (FeeCo's Executive Offices, the
+    // screen of the gate: from the shadow of 1853..1963 to the hoist at 1962 and up onto the small platform. Gone
+    // up as they stood at 1912, 75 off, he was shot off the hoist.)
+    if (nav.Input().mIsAe && !bot.GetWorld().mInvisible && nav.Nodes()[cur].mHidden && mShadowWaits < 2000 &&
+        // (the step out to a hoist he then goes up: the walk behind a Slig from shadow to shadow, the hoist in a
+        // shadow and the sortie from one have their own timing)
+        first.mKind == EdgeKind::eWalk && !nav.Nodes()[first.mTo].mHidden && OutToHoist(nav, path))
+    {
+        const NavNode& here = nav.Nodes()[cur];
+        const s32 cam = nav.CameraOf(here.mX, here.mY - 5);
+        bool orb = false;
+        for (const Entity& o : bot.GetWorld().mEntities)
+        {
+            orb = orb || (o.mKind == EntityKind::eSecurityOrb && !o.mGone && nav.CameraOf(o.mX1, o.mY1) == cam);
+        }
+        bool wait = false;
+        for (const SligAt& slig : bot.GetWorld().mSligs)
+        {
+            if (!orb || slig.mAsleep || slig.mPossessed || slig.mHalf != here.mHalf || std::abs(slig.mY - here.mY) > 10 || nav.CameraOf(slig.mX, slig.mY - 5) != cam)
+            {
+                continue;
+            }
+            const bool away = slig.mMotion == 2 && slig.mFacingLeft == (slig.mX < here.mX) && std::abs(slig.mX - here.mX) >= 40;
+            wait = wait || !away;
+        }
+        if (wait)
+        {
+            if (mShadowWaits++ == 0)
+            {
+                bot.Log("in the shadow at " + std::to_string(here.mX) + "," + std::to_string(here.mY) + ": out when the Sligs of this floor all walk away");
+            }
+            mSteps--;
+            return TaskStep::Do(Prim::Wait(1));
+        }
+    }
     switch (first.mKind)
     {
         case EdgeKind::eRoll:
@@ -3797,7 +3895,22 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     hears = hears || slig.mX / camW == to.mX / camW || then / camW == to.mX / camW;
                 }
             }
-            if (nav.Input().mIsAe && !bot.GetWorld().mInvisible && !nav.Nodes()[first.mTo].mHidden && nav.Nodes()[first.mTo].mY > nav.Nodes()[cur].mY + 30 && mFallWaits < 700 && (hears || SligComes(bot, nav, nav.Nodes()[first.mTo], true) < 135))
+            // Down beside the lever of an open gate across that floor, with every Slig of it on the gate's far side and
+            // walking away: then, for the lever shuts it on them. ("From the left edge, hop right to land beside the
+            // lever and pull it, all while the Sligs are at the left side.") They never leave that screen.
+            const s32 gateState = GateShutsOut(bot, nav, first.mTo);
+            const bool behindGate = gateState == 1;
+            if (gateState == 2 && mFallWaits < 3000)
+            {
+                mFallWaits++;
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            if (behindGate && mFallWaits > 0)
+            {
+                bot.Log("the Sligs are all beyond the gate and walking away: down now");
+            }
+            if (!behindGate && nav.Input().mIsAe && !bot.GetWorld().mInvisible && !nav.Nodes()[first.mTo].mHidden && nav.Nodes()[first.mTo].mY > nav.Nodes()[cur].mY + 30 && mFallWaits < 700 && (hears || SligComes(bot, nav, nav.Nodes()[first.mTo], true) < 135))
             {
                 if (mFallWaits++ == 0)
                 {
@@ -3909,7 +4022,14 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             // lever to the middle of the lift when the Slig faces left, and immediately go down".)
             // (not at a run from Slogs: there is no waiting then, and its back is what there is. The Executive Office
             // of Bonewerkz: "jump over him and keep going".)
-            if (nav.Input().mIsAe && !bot.GetWorld().mInvisible && !DrivenOn(bot, cur) && nav.Nodes()[first.mTo].mY > nav.Nodes()[cur].mY + 30 && !nav.Nodes()[first.mTo].mHidden && mHopWaits < 600)
+            // (down beside the lever of an open gate: as the Sligs are all beyond it, see the drop)
+            if (nav.Input().mIsAe && !bot.GetWorld().mInvisible && GateShutsOut(bot, nav, first.mTo) == 2 && mHopWaits < 3000)
+            {
+                mHopWaits++;
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+            if (GateShutsOut(bot, nav, first.mTo) == 0 && nav.Input().mIsAe && !bot.GetWorld().mInvisible && !DrivenOn(bot, cur) && nav.Nodes()[first.mTo].mY > nav.Nodes()[cur].mY + 30 && !nav.Nodes()[first.mTo].mHidden && mHopWaits < 600)
             {
                 const NavNode& to = nav.Nodes()[first.mTo];
                 bool wait = false;
@@ -8262,10 +8382,29 @@ TaskStep ClearSligTask::Sortie(Bot& bot, const std::string& lastFailed, s32 x, s
         bool backs = true;
         bool any = false;
         const s32 havenX = nav.Nodes()[mSortieNode].mX;
+        // (a thing that shuts an open gate of that floor: with every one of them on the far side of the gate from
+        // it, walking away. "All while the Sligs are at the left side, raising a slamdoor to prevent them from
+        // shooting you.")
+        bool gated = false;
+        s32 gateX = 0;
+        const Entity* thing = world.Find(mEntity);
+        for (const NavFeature& f : nav.Input().mFeatures)
+        {
+            if (thing && f.mKind == FeatureKind::eBarrier && f.mSolid && !f.mBeam && !f.mStartClosed && f.mSwitch > 1 && f.mSwitch == thing->mSwitch && f.mHalf == half && std::abs(f.mY1 - y) <= 30)
+            {
+                gated = true;
+                gateX = (f.mX1 + f.mX2) / 2;
+            }
+        }
         for (const SligAt& slig : world.mSligs)
         {
             const s32 about = SligAbout(nav, slig, x, y, half);
-            if (about == 1)
+            if (about == 1 && gated)
+            {
+                any = true;
+                backs = backs && slig.mMotion == 2 && (slig.mX - gateX) * (x - gateX) < 0 && slig.mFacingLeft == (slig.mX < gateX) && std::abs(slig.mX - gateX) >= 20;
+            }
+            else if (about == 1)
             {
                 any = true;
                 backs = backs && slig.mMotion != 5 && slig.mFacingLeft == (slig.mX < havenX);
@@ -8352,6 +8491,31 @@ TaskStep ClearSligTask::Next(Bot& bot, const std::string& lastFailed)
     else if (!entity || mGaveUp || mCleared >= 2)
     {
         return mInner->Next(bot, lastFailed);
+    }
+    // The lever of an open gate across his floor, with every Slig of that floor on the gate's far side: pulled at
+    // once, it shuts the gate on them. (He has come down beside it for that, GoToTask.)
+    if (entity->mKind == EntityKind::eLever)
+    {
+        for (const NavFeature& f : nav.Input().mFeatures)
+        {
+            if (f.mKind != FeatureKind::eBarrier || !f.mSolid || f.mBeam || f.mStartClosed || f.mSwitch != entity->mSwitch || f.mSwitch <= 1 || f.mHalf != abe.mHalfScale || std::abs(f.mY1 - abe.mY) > 30 || world.Switch(f.mSwitch) != 0)
+            {
+                continue;
+            }
+            const s32 gateX = (f.mX1 + f.mX2) / 2;
+            bool beyond = (entity->CentreX() - gateX) * (abe.mX - gateX) > 0;
+            for (const SligAt& slig : world.mSligs)
+            {
+                if (!slig.mAsleep && !slig.mPossessed && slig.mHalf == abe.mHalfScale && std::abs(slig.mY - abe.mY) <= 30 && nav.CameraOf(slig.mX, slig.mY - 5) == nav.CameraOf(abe.mX, abe.mY - 5))
+                {
+                    beyond = beyond && (slig.mX - gateX) * (abe.mX - gateX) < 0;
+                }
+            }
+            if (beyond)
+            {
+                return mInner->Next(bot, lastFailed);
+            }
+        }
     }
     const s32 x = !entity ? abe.mX : entity->mLive ? entity->mLiveX : entity->CentreX();
     const s32 y = !entity ? abe.mY : entity->mLive ? entity->mLiveY : entity->mY2;
