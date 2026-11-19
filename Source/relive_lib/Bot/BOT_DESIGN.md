@@ -2807,12 +2807,23 @@ wheel that sets a 300-frame clock going; the fifth behind a tasks door at the bo
 - As far as it gets: `p4n.txt`, on its first try, through all of it up onto the last platform (2412,100, f=13,226)
   and dead at 2512,100 under the drill over the well. `p5n.txt`, which comes to it at another moment, is bitten
   as he lands at 1887. `bw7.txt` past that and the second tunnel, dead at 2325,200 by the mines.
-- Open: the walk to the well under its drill ("walk to the right when the vertical drill is up and jump into the
-  well": `SweepsClear` let him go and he was drilled); the landing at 1887 made sure; a try after a death here
-  ends with no plan (the Slogs' stretch as the graph has it is not put back with the checkpoint: the slam door is
-  shut again and the stretch is still the wider one. A switch a checkpoint puts back is no longer taken for
-  tried, `mSwitchesPutBack`, which was not all of it). Then Director Phleg.
-  Not under unit test: `DrivenOn`, the crossings gone through in one, `mSwitchesPutBack`.
+- The last platform and its well, done: `GoToTask::DormantDrillOver`, cells a drill reaches that stands still as
+  its switch is are walked a cell at a time (the drills there are set going by his coming up, and the walk to the
+  well was begun as one move before they ran); and where staying put is no better than going on, he goes on as
+  far as the way is clear and no further. (A crash on the way to this: the first of those went in between an
+  `if` and its `else if`, and a null drill was looked into. Two runs' results were read from logs the crash had
+  left stale: a log is to be removed before the run it is read after.)
+- **`p4n.txt` is into Director Phleg's office** (`bonewerkz_ender` 9, f=13,670), the whole of the gauntlet on its
+  first try. `bw7.txt`, from the first annex, is in it at f=31,609 with 24 deaths (Annex 4's six this time, six
+  at the hop off 1712,960 under the crate on the way back out of boilers 3 and 4, the rest in the Executive
+  Office on tries after a first death).
+- Next, the office: he comes out of the well at 112,481 beside Phleg with a Slig awake at 237, goes for the lever
+  on that floor and is shot. The guide: "immediately run right and jump up to the ledge" (the hoist at 287 to the
+  ledge at 381, the hand panel), then Phleg taken over and a Slig told to pull levers and to kill, four times.
+- Open: `p5n.txt` (from the office's door) is still bitten as he lands at 1887; a try after a death in the
+  gauntlet ends with no plan (the Slogs' stretch as the graph has it is not put back with the checkpoint).
+  Not under unit test: `DrivenOn`, the crossings gone through in one, `mSwitchesPutBack`, going on as far as is
+  clear.
 - Annex 4 is not sure: with path 1 taking one crate's round longer (43 frames) the Slig he is in went in among
   the two it was to shoot and the lever was gone to with one still watching: 3 deaths there in `bw7.txt`, the
   third try through. `bw7.txt` before path 3: those 3 and the slam door.
