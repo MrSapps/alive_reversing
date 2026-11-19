@@ -16,6 +16,8 @@ static const s32 kLightSleeper = 10;
 static const s32 kZWatchMost = 1500;
 // From up pressed under a hoist to hanging from its ledge (measured, AE: ten frames of the crouch, eight in the air)
 static const s32 kHoistToHang = 18;
+// From crouched under a hoist to stood on its ledge
+static const s32 kHoistPastDrill = 56;
 
 
 GoToTask::GoToTask(std::string name, std::function<bool(s32 node)> isGoal)
@@ -2499,7 +2501,10 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             bot.Log("it has smashed: the hop over it");
             mFallerWaits = 0;
             mFallerLeft = -1;
-            mLastEdge = path[0];
+            // (no edge is being taken: named as the walk's first step, that step was found to lead three cells on
+            // and was made to, and the next walk that way had no cell under the crates in it. Measured since,
+            // `hp.txt`: begun up to 5 frames after it smashes or 1 to 6 before, the hop is over it unhurt.)
+            mLastEdge = -1;
             return TaskStep::Do(Prim::Press(Btn::eHop));
         }
         if (call.mKind == FallerCall::eBeside)
@@ -3806,6 +3811,32 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             // Up onto a floor a Slig walks, where its beat comes onto the screen he comes up on: not when it can be
             // on that screen and facing him within 90 frames (54 of them the hoist; SligComes). The Barracks'
             // path 7: up at 887,100 as the Slig of 1012 to 1262 came, he was shot the moment it was on his screen.
+            // Up from under a drill that goes by over his head: stood up and up the hoist only when it is away for
+            // as long as that takes (to his feet 8, to the ledge 18, the pull up 24 and a little)
+            if (first.mKind == EdgeKind::eHoistUp)
+            {
+                const Entity* over = SweepHigh(nav, bot.GetWorld(), cur);
+                if (over)
+                {
+                    const SweepAt* at = bot.GetWorld().SweepOf(over->mId);
+                    const NavNode& foot = nav.Nodes()[cur];
+                    const NavNode& ledge = nav.Nodes()[first.mTo];
+                    if ((!at || at->Hits(0, kHoistPastDrill, foot.mX - 12, ledge.mY, foot.mX + 12, foot.mY)) && mDrillWaits < 1500)
+                    {
+                        if (mDrillWaits++ == 0)
+                        {
+                            bot.Log("a drill goes by over the hoist at " + std::to_string(foot.mX) + "," + std::to_string(foot.mY) + ": up when it is away");
+                        }
+                        mSteps--;
+                        return abe.mMove == Move::eCrouch || !abe.Settled() ? TaskStep::Do(Prim::Wait(1)) : TaskStep::Do(Prim::Press(Btn::eDown));
+                    }
+                    mDrillWaits = 0;
+                    if (abe.mMove == Move::eCrouch)
+                    {
+                        return TaskStep::Do(Prim::Press(Btn::eUp));
+                    }
+                }
+            }
             if (first.mKind == EdgeKind::eHoistUp && nav.Input().mIsAe)
             {
                 const NavNode& top = nav.Nodes()[first.mTo];
@@ -6656,6 +6687,19 @@ TaskStep DisarmTask::Next(Bot& bot, const std::string& lastFailed)
     return TaskStep::Do(Prim::Wait(1));
 }
 
+s32 UseTask::ClockOwed(const World& world, s32 sw, s32 want)
+{
+    s32 owed = 0;
+    for (const Entity& e : world.mEntities)
+    {
+        if (e.mKind == EntityKind::eSwitchLogic && e.mHoldOnly && e.mInputs[0] == sw && e.mInputs[5] > 0 && world.Switch(sw, true) == want && world.Switch(e.mSwitch, true) != want)
+        {
+            owed = std::max(owed, e.mInputs[5]);
+        }
+    }
+    return owed;
+}
+
 TaskStep UseTask::Next(Bot& bot, const std::string& lastFailed)
 {
     const Entity* entity = bot.GetWorld().Find(mEntity);
@@ -6785,6 +6829,19 @@ TaskStep UseTask::Next(Bot& bot, const std::string& lastFailed)
         {
             // (it has its stroke to finish)
             return bot.Abe().mMove == Move::eCrouch || !bot.Abe().Settled() ? TaskStep::Do(Prim::Wait(2)) : TaskStep::Do(Prim::Press(Btn::eDown));
+        }
+        // What it sets going by a clock: waited for here, on the clock's screen (gone from it, the clock stops)
+        {
+            const s32 owed = mArrived ? ClockOwed(bot.GetWorld(), entity->mSwitch, mWant) : 0;
+            if (owed > 0 && mClockWaits < owed + 90)
+            {
+                if (mClockWaits == 0)
+                {
+                    bot.Log("#" + std::to_string(mEntity) + " sets a clock of " + std::to_string(owed) + " frames going: waiting here for what it sets");
+                }
+                mClockWaits += 2;
+                return TaskStep::Do(Prim::Wait(2));
+            }
         }
         return TaskStep::Done();
     }

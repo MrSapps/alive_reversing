@@ -798,6 +798,7 @@ private:
     s32 mHopFaced = -1;
     s32 mFallerWaits = 0;
     s32 mFallerLeft = -1;
+    s32 mDrillWaits = 0;
     s32 mHopOverAt = -1;
     bool mFallerUnder = false;
     bool mFleechAwakeHere = false;
@@ -955,6 +956,10 @@ public:
         return "Use #" + std::to_string(mEntity);
     }
     TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+    // The switch he has just set is the input of a clock (TimerTrigger) whose output has not followed yet: how
+    // many frames it takes at most, 0 when nothing is owed. Such a clock runs only while its screen is shown: the
+    // boilers of Bonewerkz, "turn the wheel ... then wait until the door opens".
+    static s32 ClockOwed(const World& world, s32 sw, s32 want);
     // A lever: the side to stand on, if there is room there (-1 left of it, 1 right)
     void SetSide(s32 side)
     {
@@ -986,6 +991,7 @@ private:
     bool mLooking = false;
     s32 mLookTaps = 0;
     s32 mDucks = 0;
+    s32 mClockWaits = 0;
     s32 mLiftWaits = 0;
 };
 

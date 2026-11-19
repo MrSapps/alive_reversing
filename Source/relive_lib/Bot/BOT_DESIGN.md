@@ -2716,18 +2716,32 @@ More of the things that fall (`GoToTask::Faller`, the whole decision, apart from
   **With it `p3n.txt` is out of path 3 and into path 4** (f=7,897): the six levers, two bones, Mine#11005 and
   #11004, the trap door, the jump, Lever#10014, the way out. 9 deaths: 6 at the twin crates on the later
   crossings, 2 at the drop off 2542,99 to 2555,160, 1 at a throw from 1662,59 (a cell under a crate).
-- Open in path 3:
-  - The twin crates on any crossing but the first. Tried and taken back: the hop over one begun 3 to 8 frames
-    before it is down instead of as it smashes (worked out from a ten-frame crouch and 18 frames a round): 16
-    deaths for 9. What the frames really are is not measured.
-  - `bw7.txt`, the whole chain, does not get through path 3: 36 deaths, and stuck dying at 1610,149 (the drop
-    off 1597,70 under the crates of 1618, taken once the running jump over them has been ruled out by deaths).
-    It comes to the crates at another moment than `p3n.txt` does.
-  - A lift's place is not known to the plan ("its mover's switch is on" is taken for "it is at that stop"). Not
-    needed for the way out as it is done now.
-  - The Mudokons (the profile here is `any`), the Shrykull, Secret 24.
-- Path 4 (the boilers): in at 87,1235, a hand stone used, stuck at 537,1239 (`Cross door 712,1239->2337,1240`
-  blocked). Not looked at.
+- Path 3 clean (2026-11-19: `p3n.txt` 0 deaths in it, and `bw7.txt` through it with none):
+  - The twin crates, measured with `hp.txt` (the bot stopped at 1688,59, a quicksave, the hop begun at each of
+    20 frames): unhurt begun up to 5 frames after one smashes or 1 to 6 before the next, hit in between. "As it
+    smashes" was right. What was wrong: the hop over was named as the walk's first edge (`mLastEdge`), found to
+    lead three cells on, and that edge made to lead there: the next walk that way had no cell under the crates
+    in it. No edge is named for it now.
+  - `NavGraph`: no hop down onto the last pixels of a floor that ends there (off 2503,61 at the floor at 99
+    that ends at 2549: past its end and 99 down).
+- Left in path 3: the Mudokons (the profile is `any`), the Shrykull, Secret 24, a lift's place in the plan.
+
+### Path 4, the boilers (2026-11-19, `p4n.txt` starts at its door, a minute a run)
+
+A shaft with ledges up both sides and drills between; four boilers behind doors off its right side, each with a
+wheel that sets a 300-frame clock going; the fifth behind a tasks door at the bottom that wants all four wheels.
+
+- `NavGraph`: a hoist up from a cell that is low only for a drill that goes by overhead. `GoToTask`: up it when
+  the drill is away for the 56 frames that takes (`kHoistPastDrill`). The way up the right side from the bottom.
+- `UseTask::ClockOwed`: what a wheel or lever sets going by a clock (TimerTrigger) is waited for where he is.
+  The clock runs only while its screen is shown: he left, and boiler 2's door never opened.
+- A door that starts open is shut by its switch (Door.cpp), a tasks door too: the door to boilers 3 and 4 is
+  open until both their wheels are turned and was taken for shut until then. `NavGraph::Condition`.
+- As far as it gets: the hand stone, up the shaft, boiler 2 (14 mines, its wheel), boiler 3's wheel. There is no
+  plan for the whole path yet: it is all "Try switch".
+- Open: boiler 1 (three Slogs set on him by the Slurgs he steps on, and a drill that comes down on the floor he
+  runs along at 2425: 6 deaths at 2412,1760, and the pull ring given up); the hop off 1587,1141 (4 deaths);
+  boiler 4's wheel (half scale, at 1385,869); boiler 5; the Executive Office past it.
 - Annex 4 is not sure: with path 1 taking one crate's round longer (43 frames) the Slig he is in went in among
   the two it was to shoot and the lever was gone to with one still watching: 3 deaths there in `bw7.txt`, the
   third try through. `bw7.txt` before path 3: those 3 and the slam door.
