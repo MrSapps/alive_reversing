@@ -3244,3 +3244,12 @@ asks for each row's switch as its lever leaves it); the cell beside a drill is n
 standing Abe has 4 to spare against a drill, a moving one 9. He gets up the hoist at 637,380, to the first
 lever and pulls it. Next: the gaps along the top each have a drill whose tip is at the platforms' height at the
 top of its stroke, and a running jump through a drill's travel is refused outright: to be timed.
+
+**Zulag 3 done (2026-11-19, late):** from its door to the wheels and out, 4 deaths in `build-bot/br/z3.txt`, 2 in
+`la/t5b.txt`. What it took: a running jump over a gap a drill comes down in is no longer refused (AE, floors at
+one height) but begun when `SweepsClear` says the whole jump is clear (`mJumpDrillWaits`); `Say sorry to
+Mudokon#N` (`StepKind::eSorry`, `Key::Calm`, `Domain::AngryWorker`: the map's job `angry_worker`, then its brain as
+last seen) for the ones that pull a lever in anger, wanted by `Work together` when the drills that lever runs
+(`use` drills) are by the Mudokons it takes; `RecruitTask::SetSorryOnly`. Still dies on the first hop over the
+drill tops at 637,380->587,320 (not timed: a hop, not a running jump). Next: Zulag 4 (path 18): the pit of Slogs
+at 1599..1701,720 is to be jumped ("running for the one step you have"), not hopped down into.

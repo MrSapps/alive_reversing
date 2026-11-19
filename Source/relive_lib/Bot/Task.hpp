@@ -1024,6 +1024,8 @@ private:
     s32 mInvisWaits = 0;
     // Frames spent waiting for a drill to be out of the way
     s32 mSweepWait = 0;
+    // Frames waited for a drill in a gap to be clear of a running jump over it
+    s32 mJumpDrillWaits = 0;
     // Pulling the lever that stops the drill in the way
     std::unique_ptr<Task> mStop;
     s32 mStops = 0;
@@ -1143,12 +1145,18 @@ public:
     {
         mRemote = remote;
     }
+    // Done once one that works a lever in anger has left it: no follow me
+    void SetSorryOnly(bool only)
+    {
+        mSorryOnly = only;
+    }
 
 private:
     u32 mMud;
     bool mCalm;
     s32 mSide = 0;
     bool mRemote = false;
+    bool mSorryOnly = false;
     bool mAll = false;
     std::unique_ptr<GoToTask> mGo;
     std::unique_ptr<DisarmTask> mDisarm;

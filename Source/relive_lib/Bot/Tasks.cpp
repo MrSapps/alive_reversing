@@ -3111,6 +3111,29 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             }
             mJumpTurned = false;
         }
+            // Over a gap a drill comes down in, between floors at one height: begun when the whole of the jump is
+            // clear of it (EdgeCostFn lets such a jump be, for this). The brewery's third Zulag, along its top.
+            {
+                const NavNode& a = nav.Nodes()[first.mFrom];
+                const NavNode& b = nav.Nodes()[first.mTo];
+                const s32 cell = NavGraph::GridStep(a.mHalf);
+                bool drill = false;
+                for (const NavFeature& f : nav.Input().mFeatures)
+                {
+                    drill = drill || (f.mKind == FeatureKind::eSweep && f.mHalf == a.mHalf && f.mY2 - f.mY1 > f.mX2 - f.mX1 && f.mX2 > std::min(a.mX, b.mX) + cell / 2 && f.mX1 < std::max(a.mX, b.mX) - cell / 2 &&
+                                      f.mY2 >= std::min(a.mY, b.mY) - 60 / (a.mHalf ? 2 : 1) && f.mY1 <= std::max(a.mY, b.mY));
+                }
+                if (drill && abe.Settled() && mJumpDrillWaits < 3000 && !SweepsClear(nav, bot.GetWorld(), path, 1, bot.SweepLate()))
+                {
+                    if (mJumpDrillWaits++ == 0)
+                    {
+                        bot.Log("a drill in the gap he jumps: waiting for it to be down and out of the way");
+                    }
+                    mSteps--;
+                    return TaskStep::Do(Prim::Wait(1));
+                }
+                mJumpDrillWaits = 0;
+            }
             mLastEdge = path[0];
             {
                 Prim jump = Prim::RunJump(first.mX, first.mLeft);
@@ -8708,6 +8731,10 @@ TaskStep RecruitTask::Next(Bot& bot, const std::string& lastFailed)
         return TaskStep::Failed("the Mudokon is gone");
     }
     if (mud->mFollowing && (!mCalm || mud->mMood == MudMood::eNormal))
+    {
+        return TaskStep::Done();
+    }
+    if (mSorryOnly && !Domain::AngryWorker(*mud))
     {
         return TaskStep::Done();
     }

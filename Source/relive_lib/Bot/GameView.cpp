@@ -994,6 +994,8 @@ static void BuildEntities(BinaryPath& path, World& world)
                     e.mSwitch = t.mRescueSwitchId;
                     e.mState = static_cast<s32>(t.mEmotion);
                     e.mBlind = t.mBlind;
+                    // (one that pulls the lever by it over and over until told sorry: Mudokon.cpp, Brain_8_AngryWorker)
+                    e.mInputs[3] = t.mJob == relive::Path_Mudokon::MudJobs::eAngryWorker ? 1 : 0;
                     break;
                 }
                 case ReliveTypes::eBirdPortal:
