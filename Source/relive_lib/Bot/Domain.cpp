@@ -231,6 +231,35 @@ bool Domain::SackJump(const NavGraph& nav, const Entity& sack, s32* from, s32* t
     return found;
 }
 
+// An edge that comes down from over a floor onto the side of an open gate across it that the gate's lever is on,
+// more than a cell from that lever
+static bool GateLeverFar(const NavGraph& nav, const World& world, const NavEdge& e)
+{
+    const NavNode& from = nav.Nodes()[e.mFrom];
+    const NavNode& to = nav.Nodes()[e.mTo];
+    if (from.mY >= to.mY - 30)
+    {
+        return false;
+    }
+    for (const NavFeature& gate : nav.Input().mFeatures)
+    {
+        if (gate.mKind != FeatureKind::eBarrier || !gate.mSolid || gate.mBeam || gate.mStartClosed || gate.mSwitch <= 1 || gate.mA != 0 || gate.mHalf != to.mHalf || std::abs(gate.mY1 - to.mY) > 10 || world.Switch(gate.mSwitch) != 0)
+        {
+            continue;
+        }
+        const s32 gateX = (gate.mX1 + gate.mX2) / 2;
+        for (const Entity& en : world.mEntities)
+        {
+            if (en.mKind == EntityKind::eLever && en.mSwitch == gate.mSwitch && std::abs(en.mY2 - to.mY) <= 30 && (en.CentreX() - gateX) * (to.mX - gateX) > 0 && std::abs(to.mX - gateX) <= 150 &&
+                std::abs(en.CentreX() - to.mX) > NavGraph::GridStep(to.mHalf) + 5)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 bool Domain::GlukkonWay(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, const Entity& lock, std::vector<Goap::Fact>* needs, std::vector<s32>* nodes, std::vector<bool>* hops, std::vector<bool>* lifts)
 {
     return GlukkonWayTo(nav, world, x, y, half, lock.mX1 + 3, lock.mX2 - 3, lock.mY2, needs, nodes, hops, lifts);
@@ -2919,7 +2948,10 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                          (nav.Input().mIsAe && FallersBar(nav, world, e) ? 200 : 0) +
                          // (nor the running jump off a floor's end down to one under it, which is for a run from
                          // Slogs: the drop off that end, or the hop, stays the one a plan is made with)
-                         (e.mKind == EdgeKind::eRunJump && e.mCost == NavGraph::kRunDownCost ? 50 : 0);
+                         (e.mKind == EdgeKind::eRunJump && e.mCost == NavGraph::kRunDownCost ? 50 : 0) +
+                         // (nor one that comes down more than a cell from the lever of an open gate it is to shut on
+                         // Sligs, where another comes down by it)
+                         (GateLeverFar(nav, world, e) ? 3 : 0);
         const auto key = std::make_tuple(rf, rt, barrier ? e.mFeature : -1);
         const auto found = cheapest.find(key);
         if (found == cheapest.end() || cost < found->second.first)
@@ -2947,6 +2979,64 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         if (barrier)
         {
             pre.push_back({Key::Switch(condSwitch), condValue});
+        }
+        s32 throughGate = 0;
+        // On along a floor that Sligs walk under a security orb (they are not to be taken over), from the side of
+        // an open gate that its lever is on: with the gate shut on them first. (FeeCo's Executive Offices: "hop
+        // right to land beside the lever and pull it, all while the Sligs are at the left side, raising a
+        // slamdoor to prevent them from shooting you".)
+        {
+            const NavNode& from = nav.Nodes()[e.mFrom];
+            const NavNode& to = nav.Nodes()[e.mTo];
+            for (const NavFeature& gate : nav.Input().mFeatures)
+            {
+                // (down onto that floor on the lever's side from over it: the dearer the further from the lever it comes
+                // down, there is no time for a walk. Of the drop to 2012 and the hop to 2087 there, by the lever at
+                // 2087, the hop: dropped, he was shot 65 frames on with the lever a cell away.)
+                if (gate.mKind == FeatureKind::eBarrier && gate.mSolid && !gate.mBeam && !gate.mStartClosed && gate.mSwitch > 1 && gate.mA == 0 && gate.mHalf == to.mHalf && std::abs(gate.mY1 - to.mY) <= 10 && from.mY < to.mY - 30 &&
+                    world.Switch(gate.mSwitch) == 0)
+                {
+                    const s32 gateX = (gate.mX1 + gate.mX2) / 2;
+                    for (const Entity& en : world.mEntities)
+                    {
+                        if (en.mKind == EntityKind::eLever && en.mSwitch == gate.mSwitch && std::abs(en.mY2 - to.mY) <= 30 && (en.CentreX() - gateX) * (to.mX - gateX) > 0 && std::abs(to.mX - gateX) <= 150)
+                        {
+                            throughGate = std::max(throughGate, std::abs(en.CentreX() - to.mX) * 4);
+                        }
+                    }
+                }
+                if (gate.mKind != FeatureKind::eBarrier || !gate.mSolid || gate.mBeam || gate.mStartClosed || gate.mSwitch <= 1 || gate.mA != 0 || gate.mHalf != from.mHalf || std::abs(gate.mY1 - from.mY) > 10 ||
+                    std::abs(to.mY - from.mY) > 10)
+                {
+                    continue;
+                }
+                const s32 gx = (gate.mX1 + gate.mX2) / 2;
+                const s32 cam = nav.CameraOf(gx, from.mY - 5);
+                bool orb = false;
+                bool sligs = false;
+                s32 leverX = 0;
+                bool lever = false;
+                for (const Entity& en : world.mEntities)
+                {
+                    orb = orb || (en.mKind == EntityKind::eSecurityOrb && !en.mGone && nav.CameraOf(en.mX1, en.mY1) == cam);
+                    sligs = sligs || (en.mKind == EntityKind::eSlig && !en.mGone && en.mHalf == from.mHalf && std::abs(en.mY2 - from.mY) <= 30 && nav.CameraOf(en.CentreX(), en.mY2 - 5) == cam);
+                    if (en.mKind == EntityKind::eLever && en.mSwitch == gate.mSwitch && std::abs(en.mY2 - from.mY) <= 30)
+                    {
+                        lever = true;
+                        leverX = en.CentreX();
+                    }
+                }
+                if (orb && sligs && lever && (from.mX - gx) * (leverX - gx) > 0 && (to.mX - gx) * (leverX - gx) > 0)
+                {
+                    pre.push_back({Key::Switch(gate.mSwitch), 1});
+                }
+                // (and through that gate on foot from their side to the lever's: dear, the way to the lever is one
+                // that comes down beside it)
+                if (orb && sligs && lever && (from.mX - gx) * (leverX - gx) <= 0 && (to.mX - gx) * (leverX - gx) > 0)
+                {
+                    throughGate = 3000;
+                }
+            }
         }
         // (an edge carries one condition: a fall through a trap door into a Slog pen or a flier's stretch has
         // that one's too, and it is the pen's that was lost)
@@ -3094,7 +3184,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 gone, {regionFact(e.mTo)}, 100 + e.mCost + (both ? unseen(pre) : 0) + beat, step);
         }
         add("Cross " + std::string(EdgeKindName(e.mKind)) + " " + std::to_string(nav.Nodes()[e.mFrom].mX) + "," + std::to_string(nav.Nodes()[e.mFrom].mY) + "->" + std::to_string(nav.Nodes()[e.mTo].mX) + "," + std::to_string(nav.Nodes()[e.mTo].mY),
-            pre, {regionFact(e.mTo)}, 100 + e.mCost + (both ? unseen(pre) : 0) + beat + (zapped.empty() ? 0 : kZapFloorCost), step);
+            pre, {regionFact(e.mTo)}, 100 + e.mCost + (both ? unseen(pre) : 0) + beat + (zapped.empty() ? 0 : kZapFloorCost) + throughGate, step);
         // Or seen, onto the Scrab's floor and straight off it: to a cell of that floor a few along which the
         // Scrab can't get to (behind a wall, or under a block too low for it), timed against the Scrab
         // (`ScrabWaryTask`). The Mudanchee trial: "once you land, run and roll to the left".

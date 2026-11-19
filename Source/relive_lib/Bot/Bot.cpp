@@ -1798,6 +1798,49 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
         // to be taken over, and it turns to what it hears): dear, so that the quiet way down into a shadow is
         // the one gone. (FeeCo's Executive Offices: "lower yourself down when the bottom Slig is facing right".
         // Hopped off the ledge, he was shot from the one above as he landed.)
+        // Through an open gate on a floor Sligs walk under a security orb, from their side to the side its lever is
+        // on: dear (as the plan has it, Domain: the way to that lever is one that comes down beside it)
+        if (know->mNav.Input().mIsAe && (e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eRoll) && !world->mInvisible)
+        {
+            const NavGraph& graph = know->mNav;
+            const NavNode& from = graph.Nodes()[e.mFrom];
+            const NavNode& to = graph.Nodes()[e.mTo];
+            for (const NavFeature& gate : graph.Input().mFeatures)
+            {
+                if (gate.mKind != FeatureKind::eBarrier || !gate.mSolid || gate.mBeam || gate.mStartClosed || gate.mSwitch <= 1 || gate.mA != 0 || gate.mHalf != from.mHalf || std::abs(gate.mY1 - from.mY) > 10 ||
+                    std::abs(to.mY - from.mY) > 10 || world->Switch(gate.mSwitch) != 0)
+                {
+                    continue;
+                }
+                const s32 gx = (gate.mX1 + gate.mX2) / 2;
+                if (std::abs(from.mX - gx) > 40)
+                {
+                    continue;
+                }
+                const s32 cam = graph.CameraOf(gx, from.mY - 5);
+                bool orb = false;
+                bool sligs = false;
+                bool lever = false;
+                s32 leverX = 0;
+                for (const Entity& en : world->mEntities)
+                {
+                    orb = orb || (en.mKind == EntityKind::eSecurityOrb && !en.mGone && graph.CameraOf(en.mX1, en.mY1) == cam);
+                    if (en.mKind == EntityKind::eLever && en.mSwitch == gate.mSwitch && std::abs(en.mY2 - from.mY) <= 30)
+                    {
+                        lever = true;
+                        leverX = en.CentreX();
+                    }
+                }
+                for (const SligAt& sl : world->mSligs)
+                {
+                    sligs = sligs || (!sl.mAsleep && !sl.mPossessed && sl.mHalf == from.mHalf && std::abs(sl.mY - from.mY) <= 30 && graph.CameraOf(sl.mX, sl.mY - 5) == cam);
+                }
+                if (orb && sligs && lever && (from.mX - gx) * (leverX - gx) <= 0 && (to.mX - gx) * (leverX - gx) > 0)
+                {
+                    return e.mCost + 3000;
+                }
+            }
+        }
         // (AE's only: AO's Rupture Farms was four deaths the worse with it)
         if (know->mNav.Input().mIsAe && (e.mKind == EdgeKind::eHop || e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eRunJump))
         {
@@ -1849,6 +1892,23 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
                 shadows = sh.mHidden && sh.mHalf == to.mHalf && graph.CameraOf(sh.mX, sh.mY - 5) == cam;
             }
             quiet = quiet && shadows;
+            // (not the drop that comes down beside the lever of an open gate across that floor: that is the way to
+            // shut the gate on them, timed by GoToTask)
+            for (const NavFeature& gate : graph.Input().mFeatures)
+            {
+                if (!quiet || gate.mKind != FeatureKind::eBarrier || !gate.mSolid || gate.mBeam || gate.mStartClosed || gate.mSwitch <= 1 || gate.mHalf != to.mHalf || std::abs(gate.mY1 - to.mY) > 30 || world->Switch(gate.mSwitch) != 0)
+                {
+                    continue;
+                }
+                const s32 gx = (gate.mX1 + gate.mX2) / 2;
+                for (const Entity& en : world->mEntities)
+                {
+                    if (en.mKind == EntityKind::eLever && en.mSwitch == gate.mSwitch && std::abs(en.mY2 - to.mY) <= 30 && (en.CentreX() - gx) * (to.mX - gx) > 0 && std::abs(to.mX - gx) <= 150)
+                    {
+                        quiet = false;
+                    }
+                }
+            }
             if (orb && slig && quiet && !world->mInvisible)
             {
                 return e.mCost + 4000;
@@ -2514,7 +2574,11 @@ void Bot::MaybeCheckpoint(BaseMap& map)
     for (const SligAt& slig : mWorld.mSligs)
     {
         // (in a Glukkon he is in his trance where the bot chose to be for it)
-        if (!look && !in && !slig.mPossessed && mKnow->mNav.CameraOf(slig.mX, slig.mY - 5) == mKnow->mNav.CameraOf(mAbe.mX, mAbe.mY - 5))
+        // (nor where he stands hidden from one that walks its beat and has not seen him: a path of shadows under
+        // an orb has no screen without a Slig, and a death at its end was all of it over again)
+        const s32 at = AbeNode();
+        const bool unseen = at >= 0 && mAbe.mMove == Move::eIdle && mKnow->mNav.Nodes()[at].mHidden && (slig.mMotion == 0 || slig.mMotion == 2 || slig.mMotion == 5);
+        if (!look && !in && !unseen && !slig.mPossessed && mKnow->mNav.CameraOf(slig.mX, slig.mY - 5) == mKnow->mNav.CameraOf(mAbe.mX, mAbe.mY - 5))
         {
             return;
         }
@@ -3611,6 +3675,33 @@ std::unique_ptr<Task> Bot::MakeFlee()
             if (mIsAe && slig.mMotion == 0 && slig.mFacingLeft == (mAbe.mX > slig.mX))
             {
                 continue;
+            }
+            // (nor one beyond an open gate whose lever is by him on his side: the lever is what he is there for, and
+            // it shuts the gate on it. FeeCo's Executive Offices: landed beside the lever with both Sligs at the
+            // left side, he ran from them and never pulled it.)
+            if (mIsAe)
+            {
+                bool gateBetween = false;
+                for (const NavFeature& f : nav.Input().mFeatures)
+                {
+                    if (f.mKind != FeatureKind::eBarrier || !f.mSolid || f.mBeam || f.mStartClosed || f.mSwitch <= 1 || f.mHalf != mAbe.mHalfScale || std::abs(f.mY1 - mAbe.mY) > 30 || mWorld.Switch(f.mSwitch) != 0)
+                    {
+                        continue;
+                    }
+                    const s32 gateX = (f.mX1 + f.mX2) / 2;
+                    if ((slig.mX - gateX) * (mAbe.mX - gateX) >= 0)
+                    {
+                        continue;
+                    }
+                    for (const Entity& lever : mWorld.mEntities)
+                    {
+                        gateBetween = gateBetween || (lever.mKind == EntityKind::eLever && lever.mSwitch == f.mSwitch && std::abs(lever.mY2 - mAbe.mY) <= 30 && (lever.CentreX() - gateX) * (mAbe.mX - gateX) > 0 && std::abs(lever.CentreX() - mAbe.mX) <= 150);
+                    }
+                }
+                if (gateBetween)
+                {
+                    continue;
+                }
             }
             // (nor one that walks away from him on a screen with shadows, while he sneaks after it: that is the way
             // from one shadow to the next. FeeCo's Executive Offices: "Sneak behind the Slig to the shadow on the

@@ -854,6 +854,8 @@ private:
     // Steps spent waiting for a Slurg to get out of the way
     s32 mSlurgWaits = 0;
     s32 mHopWaits = 0;
+    // Frames waited in a shadow for the Sligs of its floor to walk away
+    s32 mShadowWaits = 0;
     s32 mHopFaced = -1;
     s32 mFallerWaits = 0;
     s32 mFallerLeft = -1;
