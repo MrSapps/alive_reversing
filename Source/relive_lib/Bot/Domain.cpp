@@ -10,6 +10,8 @@ namespace Bot {
 
 // How far from its spawner, along and up or down together, a Slig or a lever is one for the flying Slig
 static const s32 kFlierReach = 1200;
+// How far to the side of a mine a flying Slig is safe from it going off (56 was not, 108 was)
+static const s32 kMineBlast = 95;
 // How far to each side of its point a flying Slig is, for what it flies past (17, and a little)
 static const s32 kFlierSide = 20;
 // How far over and under its point it is, for the floors it flies in beside
@@ -4978,6 +4980,18 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             {
                 continue;
             }
+            // (not one with a security orb on its screen: the Brew is for the orb, and the flying Slig is taken over
+            // once that is gone. Terminal 5: its machine has two Brews, and both went on the flying Slig under
+            // the Chant Protector, the first one missing.)
+            bool underOrb = false;
+            for (const Entity& e : world.mEntities)
+            {
+                underOrb = underOrb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && e.mCamera == flier.mCamera);
+            }
+            if (underOrb)
+            {
+                continue;
+            }
             const auto inZone = [&](s32 node)
             {
                 const NavNode& n = nav.Nodes()[node];
@@ -5904,7 +5918,21 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 onItsWay = onItsWay || (own.mKey != Key::Switch(spawner.mSwitch) && own.mKey >= Key::Switch(0) && own.mKey < Key::Switch(256) && world.Switch(static_cast<s32>(own.mKey - Key::Switch(0))) == own.mValue);
             }
         }
-        const bool wantsOn = !turnedOn && canTurnOn && !onItsWay;
+        // (nor with a flying Slig of the map's by it to be had: two of them are one too many. Terminal 5: its
+        // spawner on, the one taken over met the other at 20 pixels and the grenade for it burst both.)
+        bool mapFlier = false;
+        const Entity* ownFlier = nullptr;
+        for (const Entity& flier : world.mEntities)
+        {
+            if (!ownFlier && flier.mKind == EntityKind::eFlier && !flier.mGone && flier.mHalf == spawner.mHalf && world.mFleechKilled.count(flier.mId) == 0 && world.Switch(flier.mSwitch) == 0 &&
+                std::abs(flier.CentreX() - spawner.CentreX()) + std::abs((flier.mY1 + flier.mY2) / 2 - (spawner.mY1 + spawner.mY2) / 2) <= 1000)
+            {
+                ownFlier = &flier;
+            }
+            mapFlier = mapFlier || (flier.mKind == EntityKind::eFlier && !flier.mGone && flier.mHalf == spawner.mHalf && world.mFleechKilled.count(flier.mId) == 0 && world.Switch(flier.mSwitch) == 0 &&
+                                    std::abs(flier.CentreX() - spawner.CentreX()) + std::abs((flier.mY1 + flier.mY2) / 2 - (spawner.mY1 + spawner.mY2) / 2) <= 1000);
+        }
+        const bool wantsOn = !turnedOn && canTurnOn && !onItsWay && !mapFlier;
         // The cells he can get to without going onto the floor of any of those Sligs
         const std::vector<FlierTarget> targets = FlierTargets(nav.Input(), world, spawner);
         // (where he stands on the floor of one of them there is no bombing it from, but a lever or a lock the
@@ -5933,6 +5961,8 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         onTheirs = guarded(abeNode);
         std::vector<s32> open{abeNode};
         reach[abeNode] = 1;
+        // (how each cell was come to: the cell before it, and the edge if it was one)
+        std::vector<std::pair<s32, s32>> cameBy(nav.Nodes().size(), {-1, -1});
         while (!open.empty())
         {
             const s32 at = open.back();
@@ -5943,31 +5973,85 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 if (!reach[n] && d.mRegions[n] == d.mRegions[at] && !guarded(static_cast<s32>(n)))
                 {
                     reach[n] = 1;
+                    cameBy[n] = {at, -1};
                     open.push_back(static_cast<s32>(n));
                 }
             }
-            for (const NavEdge& edge : nav.Edges())
+            for (std::size_t ei = 0; ei < nav.Edges().size(); ei++)
             {
+                const NavEdge& edge = nav.Edges()[ei];
                 // (not through what is shut as things are: the place to take it over from is one he can get to now)
+                // (but into the stretch of the flying Slig that is to be taken over: that is where it is had)
                 s32 sw = 0;
                 s32 value = 0;
-                if (edge.mFrom == at && !reach[edge.mTo] && nav.Condition(edge, &sw, &value) && world.Switch(sw) != value)
+                if (edge.mFrom == at && !reach[edge.mTo] && nav.Condition(edge, &sw, &value) && world.Switch(sw) != value && !(ownFlier && sw == ownFlier->mSwitch))
                 {
                     continue;
                 }
                 if (edge.mFrom == at && !reach[edge.mTo] && !guarded(edge.mTo))
                 {
                     reach[edge.mTo] = 1;
+                    cameBy[edge.mTo] = {at, static_cast<s32>(ei)};
                     open.push_back(edge.mTo);
                 }
             }
         }
         // (not by its own track only, though it is off: the Barracks' path 7 has one flying about already by
         // a spawner that is off, and that one is taken over from a screen of its own track)
-        const s32 spot = FlierSpot(nav, world, spawner, reach, false);
+        s32 spot = FlierSpot(nav, world, spawner, reach, false);
+        // (no place for it but on screens with security orbs: from one of those once its orb is gone, where
+        // something here gets rid of that orb. Terminal 5: the Chant Protector over the Brew machine's screen is
+        // blown up with a fart, and the flying Slig taken over from that screen then.)
+        s32 orbGone = 0;
+        if (spot < 0)
+        {
+            for (const Entity& orb : world.mEntities)
+            {
+                if (orb.mKind != EntityKind::eSecurityOrb || orb.mGone || spot >= 0)
+                {
+                    continue;
+                }
+                // (a Brew machine about: a fart is flown at an orb, further on)
+                bool can = false;
+                for (const Entity& brew : world.mEntities)
+                {
+                    can = can || (brew.mKind == EntityKind::eBrew && !brew.mGone);
+                }
+                if (!can)
+                {
+                    continue;
+                }
+                World without = world;
+                for (Entity& e : without.mEntities)
+                {
+                    e.mGone = e.mGone || e.mId == orb.mId;
+                }
+                spot = FlierSpot(nav, without, spawner, reach, false);
+                orbGone = spot >= 0 ? World::HazardSwitch(orb.mId) : 0;
+            }
+        }
         if (spot < 0)
         {
             continue;
+        }
+        // The way to that place goes into the stretch of the flying Slig to be had: he is to be at the way in, the
+        // step goes on from there by itself, and what is done with it sees it gone (it is burst at the end).
+        // Terminal 5: the one under the Chant Protector, whose grenades got him on the mines' floor six times in
+        // a row.
+        std::vector<Goap::Fact> flierGone;
+        s32 wayIn = spot;
+        if (ownFlier)
+        {
+            flierGone.push_back({Key::Switch(ownFlier->mSwitch), 1});
+            for (s32 at = spot; at >= 0 && cameBy[at].first >= 0; at = cameBy[at].first)
+            {
+                s32 sw = 0;
+                s32 value = 0;
+                if (cameBy[at].second >= 0 && nav.Condition(nav.Edges()[cameBy[at].second], &sw, &value) && sw == ownFlier->mSwitch && world.Switch(sw) != value)
+                {
+                    wayIn = cameBy[at].first;
+                }
+            }
         }
         // One step for those that can be got at as things are, and one for each that something has to be opened
         // for first
@@ -5992,16 +6076,36 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 names += " #" + std::to_string(target.mSlig);
                 continue;
             }
-            std::vector<Goap::Fact> pre{regionFact(spot)};
+            std::vector<Goap::Fact> pre{regionFact(wayIn)};
             for (const std::pair<s32, s32>& need : target.mNeeds)
             {
                 pre.push_back({Key::Switch(need.first), need.second});
+            }
+            if (orbGone != 0)
+            {
+                pre.push_back({Key::Switch(orbGone), 1});
+            }
+            if (wantsOn)
+            {
+                pre.push_back({Key::Switch(spawner.mSwitch), 1});
             }
             add("Bomb Slig #" + std::to_string(target.mSlig) + from + " once the way to it is open", pre, {dead}, 800, bomb);
         }
         if (!gives.empty())
         {
-            add("Bomb Sligs" + names + from, {regionFact(spot)}, gives, 800, bomb);
+            std::vector<Goap::Fact> pre{regionFact(wayIn)};
+            if (orbGone != 0)
+            {
+                pre.push_back({Key::Switch(orbGone), 1});
+            }
+            gives.insert(gives.end(), flierGone.begin(), flierGone.end());
+            // (its spawner off, and a lever for it: on first. Terminal 5: each flying Slig that is burst turns
+            // the spawner off again.)
+            if (wantsOn)
+            {
+                pre.push_back({Key::Switch(spawner.mSwitch), 1});
+            }
+            add("Bomb Sligs" + names + from, pre, gives, 800, bomb);
         }
         // A lever it can fly to it pulls for him: what his own pull of it needs and gives, but for where he
         // stands. (The Barracks' path 1: "the right lever deactivates the electric walls and opens the door",
@@ -6033,7 +6137,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 {
                     continue;
                 }
-                std::vector<Goap::Fact> pre{regionFact(spot)};
+                std::vector<Goap::Fact> pre{regionFact(wayIn)};
                 for (const Goap::Fact& fact : d.mActions[ai].mPre)
                 {
                     if (fact.mKey != Key::kRegion)
@@ -6055,7 +6159,12 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                 pull.mEntity = spawner.mId;
                 pull.mOther = lever.mId;
                 pull.mEdge = spot;
-                const std::vector<Goap::Fact> effects = d.mActions[ai].mEffects;
+                std::vector<Goap::Fact> effects = d.mActions[ai].mEffects;
+                effects.insert(effects.end(), flierGone.begin(), flierGone.end());
+                if (orbGone != 0)
+                {
+                    pre.push_back({Key::Switch(orbGone), 1});
+                }
                 add("Have the flying Slig of FlierSpawner#" + std::to_string(spawner.mId) + " pull " + name.substr(4), pre, effects, 700, pull);
             }
         }
@@ -6187,15 +6296,36 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         }
         const NavNode& stand = nav.Nodes()[at];
         const FartFlight::Point from{stand.mX, stand.mY - 28};
+        // (an orb with a flying Slig under it is what the Brew is for: nothing else until that orb is gone. A
+        // machine has only so many: Terminal 5's two went on two mines, and the Chant Protector stayed.)
+        u32 orbFirst = 0;
+        for (const Entity& flier : world.mEntities)
+        {
+            for (const Entity& orbOver : world.mEntities)
+            {
+                if (orbFirst == 0 && flier.mKind == EntityKind::eFlier && !flier.mGone && world.Switch(flier.mSwitch) == 0 && orbOver.mKind == EntityKind::eSecurityOrb && !orbOver.mGone && orbOver.mCamera == flier.mCamera)
+                {
+                    orbFirst = orbOver.mId;
+                }
+            }
+        }
         for (const Entity& target : world.mEntities)
         {
-            const bool mine = target.mKind == EntityKind::eMine;
-            const bool slig = target.mKind == EntityKind::eSlig && world.mFleechKilled.count(target.mId) == 0;
-            if ((!mine && !slig) || target.mGone || target.mHalf != stand.mHalf)
+            if (orbFirst != 0 && target.mId != orbFirst)
             {
                 continue;
             }
-            const FartFlight::Point to{target.CentreX(), target.mY2 - 25};
+            const bool mine = target.mKind == EntityKind::eMine;
+            const bool slig = target.mKind == EntityKind::eSlig && world.mFleechKilled.count(target.mId) == 0;
+            // (or a security orb: gone, he can chant on its screen. Terminal 5: "Fart and possess it, and fly it up
+            // top to blow up the Chant Protector on the screen above".)
+            const bool orbTarget = target.mKind == EntityKind::eSecurityOrb;
+            if ((!mine && !slig && !orbTarget) || target.mGone || (target.mHalf != stand.mHalf && !orbTarget))
+            {
+                continue;
+            }
+            // (an orb hangs: to just under it)
+            const FartFlight::Point to{target.CentreX(), orbTarget ? target.mY2 + 14 : target.mY2 - 25};
             // (not where the blast, or the mine's own, would get him)
             if (std::abs(to.mX - stand.mX) < 150 && std::abs(to.mY - stand.mY) < 150)
             {
@@ -6233,7 +6363,7 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             bomb.mKind = StepKind::eFartBomb;
             bomb.mEntity = target.mId;
             bomb.mOther = brew.mId;
-            const Goap::Fact done = mine ? Goap::Fact{Key::Switch(target.mSwitch), 1} : Goap::Fact{Key::Mud(target.mId), 2};
+            const Goap::Fact done = mine ? Goap::Fact{Key::Switch(target.mSwitch), 1} : orbTarget ? Goap::Fact{Key::Switch(World::HazardSwitch(target.mId)), 1} : Goap::Fact{Key::Mud(target.mId), 2};
             if (slig)
             {
                 for (Goap::Action& a : d.mActions)
@@ -6960,6 +7090,7 @@ s32 Domain::FlierSpot(const NavGraph& nav, const World& world, const Entity& spa
     }
     s32 best = -1;
     s64 bestFar = -1;
+    s32 nearBest = -1;
     for (std::size_t n = 0; n < nav.Nodes().size(); n++)
     {
         const NavNode& node = nav.Nodes()[n];
@@ -6997,6 +7128,33 @@ s32 Domain::FlierSpot(const NavGraph& nav, const World& world, const Entity& spa
         {
             return static_cast<s32>(n);
         }
+        // (else out of the sight of what of them is on his screen: a flying Slig a screen off is no matter.
+        // Terminal 5: "roll left under the crates and stand up. Chant when the flying Slig appears", the pocket at
+        // 887,460 that a track three screens long sees into from far off, under the crates.)
+        bool nearCovered = !track.empty();
+        const s32 own = nav.CameraOf(node.mX, node.mY - 5);
+        for (std::size_t k = 0; k < track.size() && nearCovered; k++)
+        {
+            const NavLine& line = track[k];
+            const s32 half = node.mHalf ? 15 : 30;
+            const std::pair<s32, s32> points[] = {{line.mX1, line.mY1}, {line.mX2, line.mY2}, {(line.mX1 + line.mX2) / 2, (line.mY1 + line.mY2) / 2}};
+            for (const std::pair<s32, s32>& point : points)
+            {
+                nearCovered = nearCovered && (nav.CameraOf(point.first, point.second) != own || SightBlocked(nav.Input(), node.mHalf, point.first, point.second, node.mX, node.mY - half));
+            }
+        }
+        for (const Entity& e : world.mEntities)
+        {
+            nearCovered = nearCovered && !(e.mKind == EntityKind::eSlig && !e.mGone && e.mHalf == node.mHalf && std::abs(e.mY2 - node.mY) <= 45 && nav.CameraOf(e.CentreX(), e.mY2 - 5) == own);
+        }
+        for (const SligAt& slig : world.mSligs)
+        {
+            nearCovered = nearCovered && !(!slig.mPossessed && slig.mHalf == node.mHalf && std::abs(slig.mY - node.mY) <= 45 && nav.CameraOf(slig.mX, slig.mY - 5) == own);
+        }
+        if (nearCovered && nearBest < 0)
+        {
+            nearBest = static_cast<s32>(n);
+        }
         s64 far = 1000000;
         for (const NavLine& line : track)
         {
@@ -7015,13 +7173,13 @@ s32 Domain::FlierSpot(const NavGraph& nav, const World& world, const Entity& spa
             best = static_cast<s32>(n);
         }
     }
-    return best;
+    return nearBest >= 0 ? nearBest : best;
 }
 
 bool Domain::OnFlierTargetsFloor(const NavGraph& nav, const FlierTarget& target, s32 node)
 {
     const NavNode& n = nav.Nodes()[node];
-    return std::abs(n.mY - target.mFloorY) <= kFlierTargetY && std::abs(n.mX - target.mX) <= kFlierTargetX;
+    return !target.mMine && std::abs(n.mY - target.mFloorY) <= kFlierTargetY && std::abs(n.mX - target.mX) <= kFlierTargetX;
 }
 
 bool Domain::FlierWay(const NavInput& in, bool half, s32 fromX, s32 fromY, s32 toX, s32 toY, const std::vector<NavLine>* shut, std::vector<std::pair<s32, s32>>& corners)
@@ -7496,11 +7654,14 @@ std::vector<Domain::FlierTarget> Domain::FlierTargets(const NavInput& in, const 
     };
     for (const Entity& slig : world.mEntities)
     {
-        if (slig.mKind != EntityKind::eSlig || slig.mGone || slig.mSwitch > 1 || slig.mHalf != spawner.mHalf || world.mFleechKilled.count(slig.mId) != 0)
+        // (or a mine: its grenades go off by one as well as by a Slig. Terminal 5: "Use his grenades to blow up all
+        // of the mines on the next screens to the right".)
+        const bool mine = slig.mKind == EntityKind::eMine;
+        if ((slig.mKind != EntityKind::eSlig && !mine) || slig.mGone || (!mine && slig.mSwitch > 1) || slig.mHalf != spawner.mHalf || world.mFleechKilled.count(slig.mId) != 0)
         {
             continue;
         }
-        bool orb = false;
+        bool orb = mine;
         for (const Entity& e : world.mEntities)
         {
             orb = orb || (e.mKind == EntityKind::eSecurityOrb && !e.mGone && screen(e.mX1, e.mY1) == screen(slig.CentreX(), slig.mY1));
@@ -7531,6 +7692,7 @@ std::vector<Domain::FlierTarget> Domain::FlierTargets(const NavInput& in, const 
         target.mSlig = slig.mId;
         target.mX = slig.CentreX();
         target.mFloorY = floorY;
+        target.mMine = mine;
         bool needsKnown = false;
         for (const FlierFlight::Shot& shot : FlierFlight::Shots(target.mX, floorY, floorX1, floorX2))
         {
@@ -7539,6 +7701,16 @@ std::vector<Domain::FlierTarget> Domain::FlierTargets(const NavInput& in, const 
             // wall on the way or right by the place: one that is on also gets a flying Slig that only comes
             // near it) is to be open first.
             bool can = world.mNoBomb.count(slig.mId) == 0;
+            // (a mine sets off the ones by it: not from over another of its row, nor waited by one. Terminal 5:
+            // the grenade for the mine at 1637 was thrown from 1745, and the row's last one at 1712 burst the
+            // flying Slig 56 off it nine frames later.)
+            for (const Entity& other : world.mEntities)
+            {
+                if (mine && other.mKind == EntityKind::eMine && !other.mGone && other.mId != slig.mId && other.mHalf == slig.mHalf && std::abs(other.mY2 - floorY) <= 120)
+                {
+                    can = can && std::abs(other.CentreX() - shot.mX) >= kMineBlast && std::abs(other.CentreX() - shot.mWaitX) >= kMineBlast;
+                }
+            }
             std::vector<u8> gateNeeded(shut.size(), 0);
             s32 px = shot.mX;
             s32 py = shot.mY - FlierFlight::kGrenadeUp;

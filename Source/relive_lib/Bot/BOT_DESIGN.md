@@ -3113,3 +3113,34 @@ fourteen mines along the floor at 460 (three screens, an orb on each), then it i
 as a fart's target (tried: `build-bot/la/fart_orb_wip.patch`, the action is offered but nothing wants the orb gone
 yet); a flying Slig of the map (not a spawner's) as the one flown; mines as what it bombs (`FlierTargets` is Sligs
 under an orb, from a spawner). After that the four blind Mudokons and the three lifts.
+
+**Terminal 5's main part to the brewery (2026-11-19, `la/t5b.txt` from 1037,1160: brewery path 16 at f=8,913, 0
+deaths).** With `any` nobody is led anywhere: the gate before the door (switch 154, the four blind Mudokons'
+rescue switch) is also set by the lever at 1875,720 beside the lower pair, and that is what he pulls. What was
+built for it:
+- A fart flown at a security orb (`Fly a fart from Brew# to SecurityOrb#`), and with a flying Slig under an orb
+  nothing else is farted at until that orb is gone (a machine has only so many Brews: both of this one's went on
+  mines, or on the flying Slig, before). A machine with none left is gone (`BrewMachine::GetRemainingBrewCount`).
+- A flying Slig of the map's under an orb is not farted at but taken over once the orb is gone: `FlierSpot` takes
+  a cell out of sight of what of the tracks is on its own screen (the pocket at 887,460 under the crates), he
+  stands up there if he rolled in, and runs there (`RunFor`) through the Slig's own stretch
+  (`Bot::LetDanger`: the task's way in is let through the edges that wait for that Slig). The spawner is not
+  turned on while that one is to be had; what is done with it gives it gone.
+- Mines as a flying Slig's targets (`FlierTarget::mMine`): only thrown at from where no other mine is within 95
+  (the row's blast got the Slig at 56), so the end mine of each row from outside it.
+- A spawner whose Slig was lost is off again: the step fails at once and the plan pulls its lever again
+  (`Bomb Sligs` now wants the spawner on like the lever pulls did).
+- `NavGraph`: walked off onto a lift's stop with the lift at a stop below, he comes down on it; onto its lowest
+  stop with the lift away up, he comes down on the floor under the shaft (`mShaft` edges: only with the lift
+  away). Not taken as a stop a lift is waited at (the Mudomo hub), nor as a quick way off a woken Slig's floor.
+- Found on the way: `ClearSligTask` read a null entity (a crash in the Mines' path 1 that `regress.sh` did not
+  show: it counts deaths); the running jump up a hoist was the cheap way off a Slig's floor with that Slig
+  between him and the jump's start (Phleg's office come into by its door: `la/p9c.txt`); `mFleeEdge` outlived
+  its path.
+Not built: the walkthrough's way with the four blind Mudokons (the three lifts, the wheels), which a `save_all`
+run needs. No unit tests yet for any of this.
+
+**Full run from the Mines (`la/fullgame.txt`, `any`, seed 1), 2026-11-19:** the Mines with no deaths (Necrum at
+f=41,377), then stuck in Necrum's path 6, the lever rooms with Slurgs and Fleeches, at f=50,636 after 80 deaths
+(bitten at the levers of the third room; alone, `build-bot/n6.txt`: 9 deaths in 4,300 frames). The run of 11-12
+had none there: something since broke it. Not looked into yet.

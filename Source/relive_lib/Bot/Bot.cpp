@@ -468,7 +468,23 @@ bool Bot::Replan(BaseMap& map)
         {
             fart = fart || (s.mKind == StepKind::eFartBomb && s.mEntity == e.mId);
         }
+        // (or it is to be taken over and burst: Terminal 5's, under the Chant Protector a fart is for)
+        for (const Goap::Action& a : domain.mActions)
+        {
+            const StepKind kind = domain.mSteps[a.mTag].mKind;
+            fart = fart || ((kind == StepKind::eFlierBomb || kind == StepKind::eFlierPull) && std::find(a.mEffects.begin(), a.mEffects.end(), Goap::Fact{Key::Switch(e.mSwitch), 1}) != a.mEffects.end());
+        }
         fart = fart && Goap::Planner::Find(domain.mStart, {{Key::Switch(e.mSwitch), 1}}, domain.mActions).mFound;
+        // (nor is one under a security orb, with a Brew to be had: the Brew is for the orb and the flying Slig is
+        // taken over then, from a place that may not be in reach yet)
+        bool underOrb = false;
+        bool brew = false;
+        for (const Entity& o : mWorld.mEntities)
+        {
+            underOrb = underOrb || (o.mKind == EntityKind::eSecurityOrb && !o.mGone && o.mCamera == e.mCamera);
+            brew = brew || (o.mKind == EntityKind::eBrew && !o.mGone);
+        }
+        fart = fart || (underOrb && brew);
         if (!fart)
         {
             Log("no fart can be flown at FlyingSlig#" + std::to_string(e.mId) + ": got by as it is");
@@ -1661,7 +1677,9 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
     const World* world = &mWorld;
     const std::set<s32>* only = &mOnlyEdges;
     const bool timedRun = TimedRunOn();
-    const s32 fleeEdge = mFleeEdge >= 0 && mAbe.mFrame - mFleeFrame < 300 ? mFleeEdge : -1;
+    const s32 abeX = mAbe.mX;
+    const s32 dangerLet = mAbe.mFrame <= mDangerLetUntil && mDangerLetUntil <= mAbe.mFrame + 10 ? mDangerLet : 0;
+    const s32 fleeEdge = mFleeEdge >= 0 && mAbe.mFrame - mFleeFrame < 300 && mFleeEdge < static_cast<s32>(know->mNav.Edges().size()) ? mFleeEdge : -1;
     // (the power to go unseen in hand makes a Scrab's floor a way like any other, unless it is kept for a step of
     // the plan that is not at hand yet)
     const bool charged = !(mInvisSaved && !mInvisChantNow);
@@ -1747,7 +1765,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
             flierBoxes.push_back({x1, y1, x2, y2, spawner.mHalf ? 1 : 0});
         }
     }
-    const auto base = [know, world, only, pastScrabs, charged, chanted, unseenRun, powerFirst, pastFacing, flierBoxes, timedRun, fleeEdge](const NavEdge& e) -> s32
+    const auto base = [know, world, only, pastScrabs, charged, chanted, unseenRun, powerFirst, pastFacing, flierBoxes, timedRun, fleeEdge, dangerLet, abeX](const NavEdge& e) -> s32
     {
         const s32 idx = static_cast<s32>(&e - know->mNav.Edges().data());
         if (know->mBannedEdges.count(idx))
@@ -1931,7 +1949,7 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
         // Shut now
         s32 condSwitch = 0;
         s32 condValue = 0;
-        if (know->mNav.Condition(e, &condSwitch, &condValue) && world->Switch(condSwitch) != condValue)
+        if (know->mNav.Condition(e, &condSwitch, &condValue) && world->Switch(condSwitch) != condValue && !(condSwitch == dangerLet && dangerLet != 0))
         {
             return -1;
         }
@@ -2001,7 +2019,10 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
             // 912,1240: "Pull the lever from the right side, then run, jump and hoist to the upper level".)
             for (const SligAt& slig : world->mSligs)
             {
-                if (slig.mShootsNow && !slig.mPossessed && !world->mInvisible && slig.mHalf == from.mHalf && slig.mY <= from.mY + 30 && slig.mY >= from.mY - 260 && std::abs(slig.mX - from.mX) < 450)
+                // (not with that Slig between him and where the jump starts: Phleg's office, the one woken at 237
+                // with him at 287 under the hoist, and the jump's run-up at 212)
+                const bool between = std::abs(slig.mY - from.mY) <= 30 && (slig.mX - abeX) * (slig.mX - from.mX) <= 0;
+                if (!between && slig.mShootsNow && !slig.mPossessed && !world->mInvisible && slig.mHalf == from.mHalf && slig.mY <= from.mY + 30 && slig.mY >= from.mY - 260 && std::abs(slig.mX - from.mX) < 450)
                 {
                     return 20;
                 }
@@ -2389,6 +2410,9 @@ void Bot::EnsureKnowledge(BaseMap& map)
                 Log("left path " + std::to_string(mErrandPath) + " with switch " + std::to_string(sw) + " not set");
             }
         }
+        // (an edge of the path before is none of this one's: the jump a run from Slogs was sent to in the Executive
+        // Office's path 14 made a jump of Phleg's office, 150 frames on, the way off a woken Slig's floor)
+        mFleeEdge = -1;
         mErrandPath = mAbe.mPath;
     }
     const std::pair<s32, s32> key{mAbe.mLevel, mAbe.mPath};
@@ -3740,7 +3764,8 @@ std::unique_ptr<Task> Bot::MakeFlee()
             // level".)
             const auto drop = [](const NavEdge& e)
             {
-                return e.mKind == EdgeKind::eFall && !e.mHung && e.mWell < 0;
+                // (nor one down a lift's shaft onto the lift below: that is past the Slig as often as not)
+                return e.mKind == EdgeKind::eFall && !e.mHung && e.mWell < 0 && e.mShaft < 0;
             };
             // (and a running jump up a hoist, which is quicker than the hoist: twenty frames from a stand three cells
             // from it. Bonewerkz' path 1: the Slig his landing wakes, and "run and jump to the middle platform".)
