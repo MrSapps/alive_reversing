@@ -314,6 +314,28 @@ private:
 
 // Take over a Glukkon (from the cell mFrom, unless he is in one already), walk it into a voice lock's box and say
 // what the lock wants said: "Hey" to its "Hey", "Do it" to its "What?" (GlukkonSwitch). He stays in the Glukkon.
+// What the Glukkon he is in has told the Sligs of its floor, for the orders that take several: a lift worked for
+// it, a Slog shot for it
+struct GlukkonOrders final
+{
+    // Frames nothing more is said for
+    s32 mQuiet = 0;
+    // "Hey" has been said to the Slig that is to do it
+    bool mHey = false;
+    s32 mSaid = 0;
+    bool mLogged = false;
+    // A Slig has been told to come along ("Come here" once it listens: it follows from then on)
+    bool mFollow = false;
+    s32 mWaited = 0;
+    // The frame the Slig's shots last began, whether the order for after them has been given, and the frame of
+    // the last order to shoot
+    // Frames the Slig has stood still more than two cells behind
+    s32 mBehind = 0;
+    s32 mFireFrame = -1000;
+    bool mFireOrdered = false;
+    s32 mOrderFrame = -1000;
+};
+
 class VoiceLockTask final : public Task
 {
 public:
@@ -345,6 +367,33 @@ private:
     s32 mLeft = 0;
     // Frames with no way for it from where it is
     s32 mLost = 0;
+    GlukkonOrders mOrdersGiven;
+};
+
+class UseTask;
+
+// A lever pulled to set its drills on the Slogs the map has put to sleep under them, and pulled again once those
+// are dead (Domain: eDrillSlogs)
+class DrillSlogsTask final : public Task
+{
+public:
+    explicit DrillSlogsTask(u32 lever)
+        : mLever(lever)
+    {
+    }
+    ~DrillSlogsTask() override;
+    std::string Name() const override
+    {
+        return "Drill the Slogs with #" + std::to_string(mLever);
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mLever;
+    // 0: the lever on, 1: until the Slogs are dead, 2: the lever off
+    s32 mPhase = 0;
+    s32 mWaited = 0;
+    std::unique_ptr<UseTask> mUse;
 };
 
 // In a Glukkon: go to the cell mStand by a lever, call for help, have the Slig that comes come to it and say "Do
@@ -369,6 +418,16 @@ private:
     bool mWasKnown = false;
     bool mWas = false;
     s32 mLost = 0;
+    // Frames with no Slog about since the lever, and how many of them say the lever's Slogs are all dead
+    s32 mClear = 0;
+    static constexpr s32 kSlogsGone = 200;
+    // The frames an order to shoot takes to run out: 33 until the Slig shoots at the latest, and 15 of that
+    static constexpr s32 kLastShots = 50;
+    std::unique_ptr<GoToTask> mGo;
+    bool mPerched = false;
+    bool mStandSet = false;
+    GlukkonOrders mOrdersGiven;
+    s32 mChanted = 0;
     s32 mFrames = 0;
     // Frames until the next thing is said, and what was said last (0 nothing, 1 help, 2 hey, 3 come here, 4 do it)
     s32 mQuiet = 0;

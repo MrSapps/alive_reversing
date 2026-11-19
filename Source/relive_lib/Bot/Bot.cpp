@@ -250,6 +250,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             return std::make_unique<VoiceLockTask>(step.mEntity, step.mEdge);
         case StepKind::eSligLever:
             return std::make_unique<SligLeverTask>(step.mEntity, step.mEdge);
+        case StepKind::eDrillSlogs:
+            return std::make_unique<DrillSlogsTask>(step.mEntity);
         case StepKind::eTimedDoor:
             return std::make_unique<TimedDoorTask>(step.mEntity, static_cast<s32>(step.mOther), step.mEdge);
         case StepKind::eFeedSlogs:
@@ -947,7 +949,10 @@ bool Bot::Replan(BaseMap& map)
                     mRegionsBeen.insert({mAbe.mPath, domain.mRegions[it->second] + 1});
                 }
             }
-            if (!best.mFound)
+            // (not with a gas countdown running: there is no time to look about, and any way out of the path will
+            // do. Bonewerkz' Executive Office: with 400 frames of the gas left he set off back through the door
+            // he had come out of, to the floor he began on.)
+            if (!best.mFound && !mWorld.mGasClock)
             {
                 for (s32 pass = 0; pass < 2 && !best.mFound; pass++)
                 {
@@ -1307,6 +1312,9 @@ bool Bot::Replan(BaseMap& map)
             mGlukkonWaits++;
             mTask.reset();
             mTaskAction.clear();
+            // (let go of on purpose: no loss of it)
+            // (what it was in is done with: taken off by the game after its last errand, or chanted out of. No loss.)
+            mGlukkonLetGo = true;
             mPilot.Start(Prim::Wait(10, inGlukkon && mGlukkonWaits > 40 ? static_cast<u32>(Btn::eChant) : 0u), mAbe);
             mPilotActive = true;
             mPilotForTask = false;
@@ -2366,7 +2374,51 @@ void Bot::MaybeCheckpoint(BaseMap& map)
     // the tries from it, and the one before it gone back to)
     const bool look = mAuto && mProfile.mLook;
     const bool hung = look && mAbe.mMove == Move::eHang;
-    if (!hung && ((mAbe.mMove != Move::eIdle && mAbe.mMove != Move::eCrouch) || !mAbe.mOnGround))
+    // In a Glukkon it is the Glukkon that has to stand, with no Slog awake near it and no drill going over its
+    // floor: those are clocks that run out on it. (The Executive Office of Bonewerkz: four levers, each with its
+    // Slogs and drills, and Director Phleg lost at any of them is the whole office over again.)
+    const GlukkonAt* in = nullptr;
+    for (const GlukkonAt& g : mWorld.mGlukkons)
+    {
+        in = g.mPossessed ? &g : in;
+    }
+    if (in)
+    {
+        if (in->mMotion != 0)
+        {
+            return;
+        }
+        for (const SlogAt& slog : mWorld.mSlogs)
+        {
+            if (!slog.mAsleep && std::abs(slog.mX - in->mX) < 400 && std::abs(slog.mY - in->mY) < 200)
+            {
+                return;
+            }
+        }
+        for (const SweepAt& sweep : mWorld.mSweeps)
+        {
+            if (sweep.mPhase != 0 && sweep.mY2 <= in->mY && sweep.mY2 >= in->mY - 180 && (!sweep.mVertical || std::abs((sweep.mX1 + sweep.mX2) / 2 - in->mX) <= 40))
+            {
+                return;
+            }
+        }
+        // (nor with a Slig at a lever for it, or Slogs still to come out at it)
+        for (const SligAt& slig : mWorld.mSligs)
+        {
+            if (slig.mMotion == 45 && std::abs(slig.mY - in->mY) <= 30 && std::abs(slig.mX - in->mX) < 400)
+            {
+                return;
+            }
+        }
+        for (std::size_t i = 0; i < mWorld.mSlogSpawners.size(); i++)
+        {
+            if (mWorld.Switch(mWorld.mSlogSpawners[i][2]) != 0 && !(i < mWorld.mSlogSpawnersSpent.size() && mWorld.mSlogSpawnersSpent[i]) && std::abs(mWorld.mSlogSpawners[i][1] - in->mY) <= 30)
+            {
+                return;
+            }
+        }
+    }
+    else if (!hung && ((mAbe.mMove != Move::eIdle && mAbe.mMove != Move::eCrouch) || !mAbe.mOnGround))
     {
         return;
     }
@@ -2401,7 +2453,8 @@ void Bot::MaybeCheckpoint(BaseMap& map)
     // Nor with one asleep there (what wakes it may already be on its way), nor with a laughing Mudokon in tow
     for (const SligAt& slig : mWorld.mSligs)
     {
-        if (!look && !slig.mPossessed && mKnow->mNav.CameraOf(slig.mX, slig.mY - 5) == mKnow->mNav.CameraOf(mAbe.mX, mAbe.mY - 5))
+        // (in a Glukkon he is in his trance where the bot chose to be for it)
+        if (!look && !in && !slig.mPossessed && mKnow->mNav.CameraOf(slig.mX, slig.mY - 5) == mKnow->mNav.CameraOf(mAbe.mX, mAbe.mY - 5))
         {
             return;
         }
@@ -3779,7 +3832,9 @@ std::unique_ptr<Task> Bot::MakeReflex()
             }
             below++;
         }
-        if (can && below > 0)
+        // (not with a Glukkon about: the chant takes that, and the Sligs are its to order. The Executive Office of
+        // Bonewerkz: four hundred frames of chant for a Slig, in Director Phleg all the while.)
+        if (can && below > 0 && mWorld.mGlukkons.empty())
         {
             mPerchKills++;
             Log(std::to_string(below) + " Slig(s) awake on this screen and none on Abe's level: taking one over from here");
@@ -3857,6 +3912,29 @@ void Bot::Think(BaseMap& map)
         {
             return;
         }
+    }
+
+    // The Glukkon he was in is no more, and he is out of his trance: what it was for cannot be done now. As a
+    // death of his own: back to the last checkpoint.
+    {
+        bool inGlukkon = false;
+        for (const GlukkonAt& g : mWorld.mGlukkons)
+        {
+            inGlukkon = inGlukkon || g.mPossessed;
+        }
+        if (mInGlukkon && !inGlukkon && mAbe.mMotion != 112 && mGlukkonLetGo)
+        {
+            mInGlukkon = false;
+            mGlukkonLetGo = false;
+        }
+        if (mInGlukkon && !inGlukkon && mWorld.mGlukkons.empty() && mAbe.mMotion != 112 && mAbe.mMove != Move::eDead && mAuto && !mCheckpoints.empty())
+        {
+            mInGlukkon = false;
+            Log("the Glukkon he was in is dead");
+            OnDeath(map);
+            return;
+        }
+        mInGlukkon = inGlukkon || (mInGlukkon && mAbe.mMotion == 112);
     }
 
     for (s32 guard = 0; guard < 8 && mState == BotState::eRunning && !mPilotActive; guard++)
@@ -3999,6 +4077,10 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
             return;
         }
         mRestoring = false;
+        // (the gates taken for gone for good are as the world put back has them: one that opened after the
+        // checkpoint is shut again. Bonewerkz' Executive Office: gone back to before a lever, Director Phleg
+        // walked into the slam door that lever opens, over and over.)
+        mWorld.mGatesGone.clear();
         // The task starts over from the world as it was
         mPilotActive = false;
         mReflex.reset();

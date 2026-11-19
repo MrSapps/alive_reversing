@@ -110,6 +110,7 @@ enum class StepKind : u8
                 // (Domain::GrenadeTargets)
     eCrawlerButton, // from the cell mEdge take over a naked Slig and press the button mEntity with it
     eSligLever,     // the Glukkon he is in goes to the cell mEdge and has a Slig it calls pull the lever mEntity
+    eDrillSlogs,    // pull the lever mEntity to set its drills on the Slogs asleep under them, and again once those are dead
     eTimedDoor,     // use the lever mEntity (to the value mOther) and at once cross the edge mEdge, which a trap door
                     // that shuts by itself opens for a while
     eFeedSlogs,     // from the cell mEdge throw a bone onto the stretch of floor of the Slog mEntity (mOther: twice
@@ -286,12 +287,15 @@ struct Domain final
     // gate on the way, a teleporter's). nodes: the cells of the way, the first the one it is in; hops: whether
     // the step into each is a jump.
     static constexpr s32 kGlukkonJump = 4;
+    // How far ahead a Glukkon's way looks for drills that come to a cell
+    static constexpr s32 kGlukkonDrillAhead = 300;
+    // lifts: whether the step into each is a ride on a lift that a Slig works for it.
     static bool GlukkonWay(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, const Entity& lock, std::vector<Goap::Fact>* needs = nullptr, std::vector<s32>* nodes = nullptr,
-                           std::vector<bool>* hops = nullptr);
+                           std::vector<bool>* hops = nullptr, std::vector<bool>* lifts = nullptr);
     // The same to any cell with its middle in x1..x2 on the floor at toY. A mine on the way has to be gone first
     // and a trap door it is to drop through open: those are needs as a gate is.
     static bool GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, s32 x1, s32 x2, s32 toY, std::vector<Goap::Fact>* needs = nullptr, std::vector<s32>* nodes = nullptr,
-                             std::vector<bool>* hops = nullptr);
+                             std::vector<bool>* hops = nullptr, std::vector<bool>* lifts = nullptr);
     // Nothing solid that is shut between two places of a floor (a slam door)
     static bool FloorOpen(const NavInput& in, const World& world, s32 x1, s32 x2, s32 y, bool half);
     // Whether a grenade that goes off there gets an orb at (x, y). By what was seen: one that lay on the floor 60

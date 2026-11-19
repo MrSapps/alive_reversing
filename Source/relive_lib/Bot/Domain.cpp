@@ -231,12 +231,12 @@ bool Domain::SackJump(const NavGraph& nav, const Entity& sack, s32* from, s32* t
     return found;
 }
 
-bool Domain::GlukkonWay(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, const Entity& lock, std::vector<Goap::Fact>* needs, std::vector<s32>* nodes, std::vector<bool>* hops)
+bool Domain::GlukkonWay(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, const Entity& lock, std::vector<Goap::Fact>* needs, std::vector<s32>* nodes, std::vector<bool>* hops, std::vector<bool>* lifts)
 {
-    return GlukkonWayTo(nav, world, x, y, half, lock.mX1 + 3, lock.mX2 - 3, lock.mY2, needs, nodes, hops);
+    return GlukkonWayTo(nav, world, x, y, half, lock.mX1 + 3, lock.mX2 - 3, lock.mY2, needs, nodes, hops, lifts);
 }
 
-bool Domain::GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, s32 x1, s32 x2, s32 toY, std::vector<Goap::Fact>* needs, std::vector<s32>* nodes, std::vector<bool>* hops)
+bool Domain::GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y, bool half, s32 x1, s32 x2, s32 toY, std::vector<Goap::Fact>* needs, std::vector<s32>* nodes, std::vector<bool>* hops, std::vector<bool>* lifts)
 {
     const s32 start = nav.NodeAt(x, y, half, 12);
     if (start < 0)
@@ -250,6 +250,8 @@ bool Domain::GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y,
         s32 mFrom = -1;
         s32 mCost = -1;
         bool mHop = false;
+        // (a ride on a lift a Slig works for it)
+        bool mLift = false;
         // The switch the step waits on and the value it wants (0: none)
         s32 mSwitch = 0;
         s32 mValue = 0;
@@ -269,6 +271,35 @@ bool Domain::GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y,
             }
         }
         return false;
+    };
+    // The frames until a drill that is going is in a cell (looked at every 60, as far as kGlukkonDrillAhead), or -1
+    std::vector<s32> drillAt(count, -2);
+    const auto drillIn = [&](s32 node)
+    {
+        if (drillAt[node] != -2)
+        {
+            return drillAt[node];
+        }
+        drillAt[node] = -1;
+        const NavNode& n = nav.Nodes()[node];
+        // (measured: Director Phleg died of one that came down on him as its point got to 40 over the floor)
+        const s32 tall = half ? 23 : 45;
+        for (s32 t = 0; t <= kGlukkonDrillAhead && drillAt[node] < 0; t += 60)
+        {
+            for (const SweepAt& sweep : world.mSweeps)
+            {
+                s32 ax = 0;
+                s32 ay = 0;
+                s32 bx = 0;
+                s32 by = 0;
+                if (sweep.mHalf == half && sweep.mPhase != 0 && sweep.At(t, ax, ay, bx, by) && ax < n.mX + step / 2 && bx > n.mX - step / 2 && ay <= n.mY && by >= n.mY - tall)
+                {
+                    drillAt[node] = t;
+                    break;
+                }
+            }
+        }
+        return drillAt[node];
     };
     s32 goal = -1;
     for (;;)
@@ -292,11 +323,21 @@ bool Domain::GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y,
             goal = cur;
             break;
         }
-        const auto relax = [&](s32 to, bool hop, s32 sw, s32 value)
+        const auto relax = [&](s32 to, bool hop, s32 sw, s32 value, bool lift = false)
         {
             if (to < 0 || done[to])
             {
                 return;
+            }
+            // (onto a lift's stop on foot only where the lift is: there is no floor there without it. From another
+            // cell of that stop it is: he is on the lift.)
+            if (!lift && nav.Nodes()[to].mLiftStop >= 0 && nav.Nodes()[to].mLiftStop != at.mLiftStop)
+            {
+                const NavFeature& stop = nav.Input().mFeatures[nav.Nodes()[to].mLiftStop];
+                if (!world.LiftAtStop(stop.mX1, stop.mX2, nav.Nodes()[to].mY, stop.mA != 0))
+                {
+                    return;
+                }
             }
             // (a cell with a mine that is still there: once the mine is gone. Not with a gate to wait on too.)
             if (nav.Nodes()[to].mHazard)
@@ -321,12 +362,22 @@ bool Domain::GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y,
             }
             // (a switch that is not as it has to be: dear, so that a way that waits on nothing is the one found)
             const bool waits = sw > 1 && (world.Switch(sw) != 0) != (value != 0);
-            const s32 cost = came[cur].mCost + 1 + (hop ? 2 : 0) + (waits ? 1000 : 0);
+            // (a cell a drill is in, or soon will be: not gone into; one it comes to later: dear, the dearer the
+            // sooner, so that of two cells of a lift it waits in the one the drill gets to last. Bonewerkz'
+            // Executive Office, measured: on the lift's near cell Director Phleg was drilled 40 frames on, with
+            // 240 more to be had in its far one.)
+            const s32 drill = drillIn(to);
+            if (drill >= 0 && drill <= 60)
+            {
+                return;
+            }
+            const s32 cost = came[cur].mCost + 1 + (hop ? 2 : 0) + (lift ? 30 : 0) + (waits ? 1000 : 0) + (drill > 0 ? (kGlukkonDrillAhead + 60 - drill) / 6 : 0);
             if (came[to].mCost < 0 || cost < came[to].mCost)
             {
                 came[to].mFrom = cur;
                 came[to].mCost = cost;
                 came[to].mHop = hop;
+                came[to].mLift = lift;
                 came[to].mSwitch = waits ? sw : 0;
                 came[to].mValue = value;
             }
@@ -381,6 +432,25 @@ bool Domain::GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y,
                 }
             }
         }
+        // A lift it stands on, worked by a Slig it has told to (Slig.cpp: "Do it" to one that stands in the middle
+        // of a lift at one of its floors): to the lift's other stops. From a cell of the platform that is not its
+        // middle, which is the Slig's. (Bonewerkz' Executive Office: "make him 'Do it' again to work the lift".)
+        if (at.mLiftStop >= 0)
+        {
+            const NavFeature& here = nav.Input().mFeatures[at.mLiftStop];
+            if (std::abs(at.mX - (here.mX1 + here.mX2) / 2) >= step / 2)
+            {
+                for (std::size_t n = 0; n < count; n++)
+                {
+                    const NavNode& other = nav.Nodes()[n];
+                    if (static_cast<s32>(n) != cur && other.mLiftStop >= 0 && other.mHalf == half && std::abs(other.mX - at.mX) <= 2 && std::abs(other.mY - at.mY) > 20 &&
+                        std::abs(nav.Input().mFeatures[other.mLiftStop].mX1 - here.mX1) <= 12)
+                    {
+                        relax(static_cast<s32>(n), false, 0, 0, true);
+                    }
+                }
+            }
+        }
         // Down through a trap door it stands on, when that opens (it is open only a moment: whatever opens it
         // does so while the Glukkon stands there)
         if (at.mTrapDoor >= 0)
@@ -399,7 +469,8 @@ bool Domain::GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y,
         // A teleporter it stands in takes it to the other one when its switch changes
         for (const Entity& tele : world.mEntities)
         {
-            if (tele.mKind != EntityKind::eTeleporter || tele.mHalf != half || at.mX < tele.mX1 || at.mX > tele.mX2 || std::abs(at.mY - tele.mY2) > 30)
+            // (one with no switch is where the other one comes out: it takes nothing back)
+            if (tele.mKind != EntityKind::eTeleporter || tele.mSwitch <= 1 || tele.mHalf != half || at.mX < tele.mX1 || at.mX > tele.mX2 || std::abs(at.mY - tele.mY2) > 30)
             {
                 continue;
             }
@@ -437,6 +508,10 @@ bool Domain::GlukkonWayTo(const NavGraph& nav, const World& world, s32 x, s32 y,
         if (hops)
         {
             hops->push_back(came[n].mHop);
+        }
+        if (lifts)
+        {
+            lifts->push_back(came[n].mLift);
         }
     }
     return true;
@@ -3657,7 +3732,30 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                         gives.push_back({Key::kInvis, 1});
                         gives.push_back({Key::kInvisNow, 1});
                     }
-                    add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on", pre, gives, 150, step);
+                    // (dear on a floor a Glukkon stands on with Sligs awake on its screen: that lever is the Glukkon's to
+                    // have pulled, by one of them. The Executive Office of Bonewerkz: gone for by Abe, he was shot.)
+                    s32 useCost = 150;
+                    if (node >= 0)
+                    {
+                        const NavNode& at = nav.Nodes()[node];
+                        bool glukkon = false;
+                        bool sligs = false;
+                        for (const GlukkonAt& g : world.mGlukkons)
+                        {
+                            glukkon = glukkon || (g.mHalf == at.mHalf && std::abs(g.mY - at.mY) <= 30 && nav.CameraOf(g.mX, g.mY - 5) == nav.CameraOf(at.mX, at.mY - 5));
+                        }
+                        for (const SligAt& slig : world.mSligs)
+                        {
+                            sligs = sligs || (!slig.mAsleep && !slig.mPossessed && slig.mHalf == at.mHalf && nav.CameraOf(slig.mX, slig.mY - 5) == nav.CameraOf(at.mX, at.mY - 5));
+                        }
+                        // (or with Sligs the map puts on that screen: they drop in as he comes)
+                        for (const Entity& e : world.mEntities)
+                        {
+                            sligs = sligs || (e.mKind == EntityKind::eSlig && !e.mGone && e.mHalf == at.mHalf && nav.CameraOf(e.CentreX(), e.mY2 - 5) == nav.CameraOf(at.mX, at.mY - 5));
+                        }
+                        useCost += glukkon && sligs ? 2000 : 0;
+                    }
+                    add("Use " + name + " sw" + std::to_string(entity.mSwitch) + " on", pre, gives, useCost, step);
                     if (shy)
                     {
                         add("Throw meat for Paramite#" + std::to_string(shy) + " and use " + name + " sw" + std::to_string(entity.mSwitch) + " on", withMeat(pre), gives, 300, meatStep);
@@ -4601,6 +4699,16 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         {
             pre.push_back({Key::Switch(f.mSwitch), 1});
         }
+        // (one under a drill that a switch sets going: with that off. He stands there a while going in.)
+        for (const Entity& drill : world.mEntities)
+        {
+            const NavNode& at = nav.Nodes()[x.mNode];
+            if (x.mNode >= 0 && drill.mKind == EntityKind::eDrill && drill.mInputs[0] == 1 && drill.mSwitch > 1 && drill.mHalf == at.mHalf && at.mX >= drill.mX1 - 14 && at.mX <= drill.mX2 + 14 && at.mY >= drill.mY1 &&
+                at.mY <= drill.mY2 + 10)
+            {
+                pre.push_back({Key::Switch(drill.mSwitch), drill.mInputs[1] ? 1 : 0});
+            }
+        }
         // Fleeches asleep by the way out that a Scrab can be had to kill: dead first (they wake as he comes up)
         for (const Entity& fl : world.mEntities)
         {
@@ -4619,7 +4727,10 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
             add("Throw meat for the Paramites on the way to the exit at " + std::to_string(nav.Nodes()[x.mNode].mX) + "," + std::to_string(nav.Nodes()[x.mNode].mY), {regionFact(x.mNode), {Key::kMeat, 1}}, {{Key::kPackFed, 1}}, 300, feed);
             d.mActions.back().mSpend = {Key::kMeat, 1};
         }
-        add("Exit " + std::to_string(nav.Nodes()[x.mNode].mX) + "," + std::to_string(nav.Nodes()[x.mNode].mY) + " to path " + std::to_string(f.mDestPath), pre, {{Key::kExited, 1}}, 200, step);
+        add("Exit " + std::to_string(nav.Nodes()[x.mNode].mX) + "," + std::to_string(nav.Nodes()[x.mNode].mY) + " to path " + std::to_string(f.mDestPath), pre, {{Key::kExited, 1}},
+            // (one that says it leads to this very path, in another level: dear, the last of the ways out to be tried.
+            // Bonewerkz' Executive Office, the door Abe comes out of: it leads back in.)
+            200 + (f.mDestPath >= 0 && f.mDestPath == nav.Input().mPath ? 2000 : 0), step);
     }
     // A Slig that walks over a trap door a lever opens: the lever is pulled as it is on the door, and until it
     // has gone down nothing is crossed onto its floor near there (AO's Rupture Farms, path 16: the Slig at
@@ -5465,7 +5576,17 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
         const s32 leverX = nav.SnapUp(lever.CentreX() - cell / 2, lever.mHalf);
         for (const GlukkonAt& glukkon : world.mGlukkons)
         {
-            if (!spawner || now == after || !glukkon.mPossessed || glukkon.mHalf != lever.mHalf)
+            // (one he is in, or one he can be: the task takes it over first where it is not his yet. The Executive
+            // Office of Bonewerkz: the first thing Director Phleg has done is a lever pulled.)
+            // (a Slig to do it: one that comes down at a call for help, or one that is with the Glukkon now, which
+            // it brings along. The last lever of Bonewerkz' Executive Office has no spawner over it.)
+            bool with = false;
+            for (const SligAt& slig : world.mSligs)
+            {
+                with = with || (glukkon.mPossessed && !slig.mPossessed && !slig.mAsleep && slig.mHalf == glukkon.mHalf && std::abs(slig.mY - glukkon.mY) <= 20 &&
+                                nav.CameraOf(slig.mX, slig.mY - 5) == nav.CameraOf(glukkon.mX, glukkon.mY - 5));
+            }
+            if ((!spawner && !with) || now == after || glukkon.mHalf != lever.mHalf)
             {
                 continue;
             }
@@ -5515,11 +5636,50 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                         pre.push_back(regionFact(abeNode));
                     }
                     pre.insert(pre.end(), needs.begin(), needs.end());
-                    add("Have a Slig pull Lever#" + std::to_string(lever.mId) + " sw" + std::to_string(lever.mSwitch) + " for the Glukkon at " + std::to_string(nav.Nodes()[stand].mX) + "," + std::to_string(nav.Nodes()[stand].mY), pre,
+                    add("Have a Slig pull Lever#" + std::to_string(lever.mId) + " sw" + std::to_string(lever.mSwitch) + (after ? " on" : " off") + " for the Glukkon at " + std::to_string(nav.Nodes()[stand].mX) + "," + std::to_string(nav.Nodes()[stand].mY), pre,
                         {{Key::Switch(lever.mSwitch), after}}, 400, order);
                     added = true;
                 }
             }
+        }
+    }
+    // Drills that a switch sets going, over Slogs the map has put to sleep: on, they kill them where they lie; off
+    // again, their cells can be crossed onto (GameView: MarkDrilledSlogs). One thing to do, at the lever of that
+    // switch: on, until the Slogs are dead, and off. (Bonewerkz' Executive Office: "Stand beside the lever and
+    // pull it twice, once to drill the Slogs and once to turn the drills back off.")
+    {
+        std::map<s32, std::vector<Goap::Fact>> drilled;
+        std::map<s32, s32> offValue;
+        for (const Entity& drill : world.mEntities)
+        {
+            if (drill.mKind != EntityKind::eDrill || drill.mInputs[0] != 1 || drill.mSwitch <= 1)
+            {
+                continue;
+            }
+            const s32 dead = World::HazardSwitch(drill.mId);
+            d.mStart.Set(Key::Switch(dead), world.Switch(dead));
+            if (world.SlogsAsleepUnder(drill) > 0)
+            {
+                drilled[drill.mSwitch].push_back({Key::Switch(dead), 1});
+                offValue[drill.mSwitch] = drill.mInputs[1] ? 1 : 0;
+            }
+        }
+        for (const Entity& lever : world.mEntities)
+        {
+            const auto found = drilled.find(lever.mSwitch);
+            if (lever.mKind != EntityKind::eLever || lever.mGone || lever.mOp != 2 || found == drilled.end())
+            {
+                continue;
+            }
+            const s32 node = UseNode(nav, lever, nullptr);
+            if (node < 0)
+            {
+                continue;
+            }
+            DomainStep twice;
+            twice.mKind = StepKind::eDrillSlogs;
+            twice.mEntity = lever.mId;
+            add("Drill the Slogs asleep under the drills of switch " + std::to_string(lever.mSwitch) + " with Lever#" + std::to_string(lever.mId), {regionFact(node), {Key::Switch(lever.mSwitch), offValue[lever.mSwitch]}}, found->second, 300, twice);
         }
     }
     for (const OrbTarget& target : OrbTargets(nav.Input(), world))

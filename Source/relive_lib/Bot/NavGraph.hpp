@@ -104,6 +104,8 @@ struct NavFeature final
 struct NavInput final
 {
     bool mIsAe = true;
+    // The path it is of (-1: not said)
+    s32 mPath = -1;
     // The size of a camera in world units, to tell which camera a point is in
     s32 mCamW = 375;
     s32 mCamH = 260;
