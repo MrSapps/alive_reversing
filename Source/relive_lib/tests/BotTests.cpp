@@ -11311,3 +11311,27 @@ TEST(BotNav, ARunningJumpOffAFloorsEndDownToAFloorUnderItIsThereAndDear)
     ASSERT_NE(hop, nullptr);
     EXPECT_LT(hop->mCost, 1000);
 }
+
+TEST(BotSweep, ADrillThatStandsStillAsItsSwitchIsIsKnownOfWhereItReaches)
+{
+    World world;
+    Entity drill = MakeEntity(EntityKind::eDrill, 9, 2525, 17, 2549, 80);
+    drill.mSwitch = 201;
+    // (one that runs while its switch is on, and starts off)
+    drill.mInputs[0] = 1;
+    drill.mInputs[1] = 0;
+    world.mEntities.push_back(drill);
+    // Off: it stands, and the cells under it are ones to go a step at a time
+    EXPECT_TRUE(GoToTask::DormantDrillOver(world, 2537, 100, false));
+    EXPECT_TRUE(GoToTask::DormantDrillOver(world, 2512, 100, false));
+    EXPECT_FALSE(GoToTask::DormantDrillOver(world, 2487, 100, false));
+    // (not one over a floor well under it)
+    EXPECT_FALSE(GoToTask::DormantDrillOver(world, 2537, 200, false));
+    // Set going: it is a drill at work, which is timed, and no longer this
+    world.mSwitches[201] = 1;
+    EXPECT_FALSE(GoToTask::DormantDrillOver(world, 2537, 100, false));
+    // (one no switch turns is never this)
+    world.mSwitches[201] = 0;
+    world.mEntities[0].mInputs[0] = 0;
+    EXPECT_FALSE(GoToTask::DormantDrillOver(world, 2537, 100, false));
+}

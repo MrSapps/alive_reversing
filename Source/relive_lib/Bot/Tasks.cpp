@@ -420,6 +420,22 @@ bool GoToTask::DrivenOn(const Bot& bot, s32 node)
     return false;
 }
 
+bool GoToTask::DormantDrillOver(const World& world, s32 x, s32 y, bool half)
+{
+    const s32 tall = half ? 30 : 60;
+    for (const Entity& e : world.mEntities)
+    {
+        // (a cell either side of one that comes down: he was had at 2512, a cell short of the one at 2525..2549)
+        const s32 reach = e.mX2 - e.mX1 > e.mY2 - e.mY1 ? 20 : (half ? 13 : 26);
+        // (one that a switch turns: mInputs[0] is 1 for those)
+        if (e.mKind == EntityKind::eDrill && e.mHalf == half && e.mInputs[0] == 1 && e.mSwitch > 1 && x >= e.mX1 - reach && x <= e.mX2 + reach && y - tall <= e.mY2 && y >= e.mY1 && !world.SweepLive(e))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool GoToTask::ZShooterAbout(const NavGraph& nav, const World& world, s32 x, s32 y)
 {
     const s32 cam = nav.CameraOf(x, y - 5);
@@ -2081,6 +2097,22 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         const Entity* drill = SweepOver(nav, world, cur);
         const bool inside = drill != nullptr;
         const bool ahead = in < path.size() && in < 40;
+        // (cells a drill reaches that stands still as its switch is: a cell at a time, so that it is looked at again
+        // when it has been set going. The Executive Office of Bonewerkz: the drills of the last platform are set
+        // going by his coming up onto it, a few frames on; the walk to the well under one of them was begun as
+        // one move before they ran, and went on into it.)
+        if (nav.Input().mIsAe && !inside && !ahead)
+        {
+            for (std::size_t i = 0; i < path.size() && i < 12; i++)
+            {
+                const NavNode& n = nav.Nodes()[nav.Edges()[path[i]].mTo];
+                if (DormantDrillOver(world, n.mX, n.mY, n.mHalf))
+                {
+                    sweepStop = std::min(sweepStop, std::max<std::size_t>(1, i));
+                    break;
+                }
+            }
+        }
         if (ahead && in > 0 && !inside)
         {
             sweepStop = in;
@@ -2172,6 +2204,18 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 {
                     bot.BanEdge(path[0]);
                     return TaskStep::Failed("the drill leaves no time to get through");
+                }
+                // (where he is is no better, and he goes on: as far as the way is clear and no further, to wait
+                // there for the rest. The Executive Office of Bonewerkz: on the last platform with a drill coming
+                // along it behind him and one that comes down over the well at its end; gone on regardless he
+                // walked into that one.)
+                for (std::size_t k = count; k-- > 1;)
+                {
+                    if (SweepsClear(nav, world, path, k, bot.SweepLate()))
+                    {
+                        sweepStop = std::min(sweepStop, k);
+                        break;
+                    }
                 }
             }
             else
