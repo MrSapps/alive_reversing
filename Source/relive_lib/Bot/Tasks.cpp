@@ -6290,6 +6290,234 @@ TaskStep CrawlerButtonTask::Next(Bot& bot, const std::string& lastFailed)
 
 VoiceLockTask::~VoiceLockTask() = default;
 
+// The Slig of the Glukkon's floor and screen that is nearest it, or null
+static const SligAt* GlukkonsSlig(const NavGraph& nav, const World& world, const GlukkonAt& me)
+{
+    const SligAt* slig = nullptr;
+    for (const SligAt& s : world.mSligs)
+    {
+        // (on its screen: one off it does not hear)
+        if (!s.mPossessed && s.mHalf == me.mHalf && std::abs(s.mY - me.mY) <= 20 && nav.CameraOf(s.mX, s.mY - 5) == nav.CameraOf(me.mX, me.mY - 5) && (!slig || std::abs(s.mX - me.mX) < std::abs(slig->mX - me.mX)))
+        {
+            slig = &s;
+        }
+    }
+    return slig;
+}
+
+// A Slog awake on the Glukkon's floor near it: it has a Slig shoot it ("Kill 'em": Slig.cpp, 25 frames of
+// shooting the way the Slig faces, which is at the Glukkon it follows and so at what comes at it from beyond).
+// Nothing else is done while one is about. False when there is none. (Bonewerkz' Executive Office: "and 'Kill
+// 'em', meaning the Slog".)
+// spawnX: where more Slogs come from one after another (a spawner whose lever has been pulled), or 0. With that
+// the order is given over and over, Slog in sight or not: by the time one is seen it is too late. (Measured: a
+// Slog is on the Glukkon 33 frames after it appears 250 px off, the shots come 15 after the order and the Slig
+// takes the next order 30 after its last shot.)
+static bool GlukkonGuard(Bot& bot, const GlukkonAt& me, GlukkonOrders& orders, TaskStep& step, s32 spawnX = 0)
+{
+    const World& world = bot.GetWorld();
+    s32 slogX = 0;
+    bool seen = false;
+    for (const SlogAt& s : world.mSlogs)
+    {
+        if ((!s.mAsleep || s.mWaking) && std::abs(s.mY - me.mY) <= 30 && std::abs(s.mX - me.mX) < 400 && bot.Nav().CameraOf(s.mX, s.mY - 5) == bot.Nav().CameraOf(me.mX, me.mY - 5))
+        {
+            slogX = s.mX;
+            seen = true;
+        }
+    }
+    if (!seen && spawnX == 0)
+    {
+        return false;
+    }
+    const bool spam = spawnX != 0;
+    slogX = seen ? slogX : spawnX;
+    if (spam)
+    {
+        orders.mQuiet = 0;
+    }
+    if (orders.mQuiet > 0)
+    {
+        orders.mQuiet -= 2;
+        step = TaskStep::Do(Prim::Wait(2));
+        return true;
+    }
+    const SligAt* slig = GlukkonsSlig(bot.Nav(), world, me);
+    if (!slig)
+    {
+        orders.mQuiet = 150;
+        orders.mHey = false;
+        bot.Log("the Glukkon at " + std::to_string(me.mX) + "," + std::to_string(me.mY) + ": a Slog at " + std::to_string(slogX) + " and no Slig: calls for help");
+        step = TaskStep::Do(Prim::Wait(3, Btn::eSpeak7));
+        return true;
+    }
+    // Its shot hits the Glukkon too unless that is less than a cell from where the shot starts (Bullet.cpp), and it
+    // shoots the way it faces: the Glukkon gets it to face the Slog ("Hey" from that side of it turns it), then
+    // stands in the Slig's own cell, where it is heard as well. (Measured: a cell on towards the Slog, Director
+    // Phleg was shot.)
+    if (me.mMotion != 0 || (slig->mMotion != 0 && !spam))
+    {
+        step = TaskStep::Do(Prim::Wait(2));
+        return true;
+    }
+    const bool slogLeft = slogX < slig->mX;
+    const s32 dx = me.mX - slig->mX;
+    if (slig->mFacingLeft != slogLeft)
+    {
+        if (slogLeft ? dx > -20 : dx < 20)
+        {
+            step = TaskStep::Do(Prim::Wait(2, slogLeft ? Btn::eLeft : Btn::eRight));
+            return true;
+        }
+        if (me.mFacingLeft != (slig->mX < me.mX))
+        {
+            step = TaskStep::Do(Prim::Wait(2, slig->mX < me.mX ? Btn::eLeft : Btn::eRight));
+            return true;
+        }
+        orders.mHey = true;
+        orders.mQuiet = 50;
+        step = TaskStep::Do(Prim::Wait(3, Btn::eSpeak1));
+        return true;
+    }
+    // (behind it is as good as in its cell, with his face to it)
+    const bool behind = std::abs(dx) > 12 && (dx > 0) == slogLeft;
+    if (std::abs(dx) > 12 && !behind)
+    {
+        step = TaskStep::Do(Prim::Wait(2, dx > 0 ? Btn::eLeft : Btn::eRight));
+        return true;
+    }
+    if (behind && me.mFacingLeft != (slig->mX < me.mX))
+    {
+        step = TaskStep::Do(Prim::Wait(2, slig->mX < me.mX ? Btn::eLeft : Btn::eRight));
+        return true;
+    }
+    if (!orders.mHey || (!spam && ++orders.mSaid % 6 == 0))
+    {
+        orders.mHey = true;
+        orders.mQuiet = 40;
+        step = TaskStep::Do(Prim::Wait(3, Btn::eSpeak1));
+        return true;
+    }
+    // Over and over: one order for each time it shoots, given once its shots are over, so that it is known by then
+    // whether there is anything left to shoot, and early enough for the Slig to hear it when it next listens.
+    // (Slig.cpp: an order heard, it shoots from 10 frames on to 25, hears nothing until then, says its piece and
+    // listens again. Measured: with an order given 12, 15, 18, 21 or 24 frames after its shots began they began
+    // again 45 after, never sooner; given only once both stood still, 49 after. A Slog that comes out as the
+    // shots end has the Glukkon 31 frames on, from 60 px off. And an order given while the last Slog was still
+    // about had the Slig shoot 45 frames more at nothing, with the drills coming down on Director Phleg.)
+    static constexpr s32 kOrderAfterShots = 24;
+    if (spam)
+    {
+        const s32 now = bot.Abe().mFrame;
+        // (a checkpoint gone back to: those frames are still to come)
+        if (orders.mFireFrame > now || orders.mOrderFrame > now)
+        {
+            orders.mFireFrame = -1000;
+            orders.mOrderFrame = -1000;
+            orders.mFireOrdered = false;
+        }
+        if (slig->mMotion == 6 && now - orders.mFireFrame > 30)
+        {
+            orders.mFireFrame = now;
+            orders.mFireOrdered = false;
+        }
+        const s32 since = now - orders.mFireFrame;
+        if (since < 45 && (orders.mFireOrdered || since < kOrderAfterShots))
+        {
+            step = TaskStep::Do(Prim::Wait(1));
+            return true;
+        }
+        if (since >= 45 && now - orders.mOrderFrame < 20)
+        {
+            step = TaskStep::Do(Prim::Wait(1));
+            return true;
+        }
+        orders.mFireOrdered = true;
+        orders.mOrderFrame = now;
+    }
+    if (!spam || !orders.mLogged)
+    {
+        orders.mLogged = true;
+        bot.Log("the Glukkon at " + std::to_string(me.mX) + "," + std::to_string(me.mY) + ": \"Kill 'em\", the Slog at " + std::to_string(slogX) + ", to the Slig at " + std::to_string(slig->mX));
+    }
+    orders.mQuiet = 30;
+    step = TaskStep::Do(Prim::Wait(3, Btn::eSpeak5));
+    return true;
+}
+
+// A ride on the lift the Glukkon stands on, worked by a Slig: "Hey", "Come here" until the Slig stands in the
+// middle of the platform (it stops on a lift it comes to, Slig.cpp), then "Do it". Always sets a step.
+static void GlukkonRide(Bot& bot, const GlukkonAt& me, s32 hereNode, GlukkonOrders& orders, TaskStep& step)
+{
+    const World& world = bot.GetWorld();
+    const NavGraph& nav = bot.Nav();
+    const NavNode& here = nav.Nodes()[hereNode];
+    if (me.mMotion != 0 || orders.mQuiet > 0)
+    {
+        orders.mQuiet = std::max(0, orders.mQuiet - 2);
+        step = TaskStep::Do(Prim::Wait(2));
+        return;
+    }
+    if (std::abs(me.mX - here.mX) > 4)
+    {
+        step = TaskStep::Do(Prim::Wait(2, me.mX < here.mX ? Btn::eRight : Btn::eLeft));
+        return;
+    }
+    const NavFeature& stop = nav.Input().mFeatures[here.mLiftStop];
+    const s32 mid = (stop.mX1 + stop.mX2) / 2;
+    const SligAt* slig = GlukkonsSlig(nav, world, me);
+    if (!slig)
+    {
+        // (one that follows it is on its way from the screen before: waited for a while)
+        bool coming = false;
+        for (const SligAt& s : world.mSligs)
+        {
+            coming = coming || (!s.mPossessed && s.mHalf == me.mHalf && std::abs(s.mY - me.mY) <= 20 && std::abs(s.mX - me.mX) < 600);
+        }
+        if (coming && orders.mFollow && (orders.mWaited += 2) < 400)
+        {
+            step = TaskStep::Do(Prim::Wait(2));
+            return;
+        }
+        orders.mWaited = 0;
+        orders.mQuiet = 150;
+        orders.mHey = false;
+        bot.Log("the Glukkon at " + std::to_string(me.mX) + "," + std::to_string(me.mY) + ": on the lift with no Slig to work it: calls for help");
+        step = TaskStep::Do(Prim::Wait(3, Btn::eSpeak7));
+        return;
+    }
+    if (me.mFacingLeft != (slig->mX < me.mX) && std::abs(slig->mX - me.mX) > 12)
+    {
+        step = TaskStep::Do(Prim::Wait(2, slig->mX < me.mX ? Btn::eLeft : Btn::eRight));
+        return;
+    }
+    if (slig->mMotion != 0)
+    {
+        step = TaskStep::Do(Prim::Wait(2));
+        return;
+    }
+    if (!orders.mHey)
+    {
+        orders.mHey = true;
+        orders.mQuiet = 50;
+        step = TaskStep::Do(Prim::Wait(3, Btn::eSpeak1));
+        return;
+    }
+    const bool onLift = std::abs(slig->mX - mid) < NavGraph::GridStep(me.mHalf) / 2;
+    orders.mSaid++;
+    if (!onLift)
+    {
+        // ("Hey" again now and then: it stops listening)
+        orders.mHey = orders.mSaid % 4 != 0;
+        orders.mQuiet = 60;
+        step = TaskStep::Do(Prim::Wait(3, Btn::eSpeak2));
+        return;
+    }
+    bot.Log("the Glukkon at " + std::to_string(me.mX) + "," + std::to_string(me.mY) + ": \"Do it\" to the Slig at " + std::to_string(slig->mX) + " on the lift");
+    orders.mQuiet = 150;
+    step = TaskStep::Do(Prim::Wait(3, Btn::eSpeak4));
+}
+
 TaskStep VoiceLockTask::Next(Bot& bot, const std::string& lastFailed)
 {
     const World& world = bot.GetWorld();
@@ -6337,9 +6565,18 @@ TaskStep VoiceLockTask::Next(Bot& bot, const std::string& lastFailed)
                 return TaskStep::Failed("the Glukkon did not get to the voice lock");
             }
             // The way there, a cell at a time (Domain::GlukkonWay): where it is now, and the cell after
+            // (a Slog that comes at it first)
+            {
+                TaskStep guard;
+                if (GlukkonGuard(bot, *me, mOrdersGiven, guard))
+                {
+                    return guard;
+                }
+            }
             std::vector<s32> nodes;
             std::vector<bool> hops;
-            if (!Domain::GlukkonWay(bot.Nav(), world, me->mX, me->mY, me->mHalf, *lock, nullptr, &nodes, &hops) || nodes.size() < 2)
+            std::vector<bool> lifts;
+            if (!Domain::GlukkonWay(bot.Nav(), world, me->mX, me->mY, me->mHalf, *lock, nullptr, &nodes, &hops, &lifts) || nodes.size() < 2)
             {
                 // (in the air, or between cells: it comes to rest first)
                 if ((mLost += 2) > 200)
@@ -6349,6 +6586,48 @@ TaskStep VoiceLockTask::Next(Bot& bot, const std::string& lastFailed)
                 return TaskStep::Do(Prim::Wait(2));
             }
             mLost = 0;
+            // A lift on the way, which a Slig has to work: one is told to come along before it sets off ("then make
+            // him follow you to the right"). A Slig a screen back does not hear it from the lift.
+            if (!mOrdersGiven.mFollow && std::find(lifts.begin(), lifts.end(), true) != lifts.end())
+            {
+                if (me->mMotion != 0 || mOrdersGiven.mQuiet > 0)
+                {
+                    mOrdersGiven.mQuiet = std::max(0, mOrdersGiven.mQuiet - 2);
+                    return TaskStep::Do(Prim::Wait(2));
+                }
+                const SligAt* slig = GlukkonsSlig(bot.Nav(), world, *me);
+                if (!slig)
+                {
+                    mOrdersGiven.mQuiet = 150;
+                    mOrdersGiven.mHey = false;
+                    bot.Log("the Glukkon at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": a lift on the way and no Slig: calls for help");
+                    return TaskStep::Do(Prim::Wait(3, Btn::eSpeak7));
+                }
+                if (me->mFacingLeft != (slig->mX < me->mX) && std::abs(slig->mX - me->mX) > 12)
+                {
+                    return TaskStep::Do(Prim::Wait(2, slig->mX < me->mX ? Btn::eLeft : Btn::eRight));
+                }
+                if (slig->mMotion != 0)
+                {
+                    return TaskStep::Do(Prim::Wait(2));
+                }
+                if (!mOrdersGiven.mHey)
+                {
+                    mOrdersGiven.mHey = true;
+                    mOrdersGiven.mQuiet = 50;
+                    return TaskStep::Do(Prim::Wait(3, Btn::eSpeak1));
+                }
+                bot.Log("the Glukkon at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": \"Come here\" to the Slig at " + std::to_string(slig->mX) + ", to have it along to the lift");
+                mOrdersGiven.mFollow = true;
+                mOrdersGiven.mQuiet = 60;
+                return TaskStep::Do(Prim::Wait(3, Btn::eSpeak2));
+            }
+            if (lifts[1])
+            {
+                TaskStep ride;
+                GlukkonRide(bot, *me, nodes[0], mOrdersGiven, ride);
+                return ride;
+            }
             const NavNode& next = bot.Nav().Nodes()[nodes[1]];
             const bool left = next.mX < me->mX;
             const u32 dir = left ? Btn::eLeft : Btn::eRight;
@@ -6439,16 +6718,70 @@ TaskStep VoiceLockTask::Next(Bot& bot, const std::string& lastFailed)
 }
 
 // A step of the Glukkon he is in along its way to the cell at (x, y): false when it is there
-static bool GlukkonStep(Bot& bot, const GlukkonAt& me, s32 x, s32 y, s32& lost, TaskStep& step)
+static bool GlukkonStep(Bot& bot, const GlukkonAt& me, s32 x, s32 y, s32& lost, GlukkonOrders& orders, TaskStep& step)
 {
     const NavGraph& nav = bot.Nav();
     if (std::abs(me.mX - x) <= 5 && std::abs(me.mY - y) <= 12)
     {
         return false;
     }
+    if (GlukkonGuard(bot, me, orders, step))
+    {
+        return true;
+    }
+    // The Slig it has with it, left behind: one that follows stands a cell behind it, and one that crosses a lift
+    // as it follows stops there for good (Slig.cpp). It is called again from where the Glukkon has got to: off
+    // its screen it does not hear. ("And bring the Slig over the right edge." Measured: gone on alone, Director
+    // Phleg called for help at the next lever and none came.)
+    if (const SligAt* slig = GlukkonsSlig(nav, bot.GetWorld(), me))
+    {
+        const s32 away = std::abs(slig->mX - me.mX);
+        // (once it is being called, until it has been: it answers "Hey", and so does not stand still)
+        if (away <= 2 * NavGraph::GridStep(me.mHalf))
+        {
+            orders.mBehind = 0;
+        }
+        else if (orders.mBehind <= 6)
+        {
+            orders.mBehind = slig->mMotion == 0 ? orders.mBehind + 2 : 0;
+        }
+        if (orders.mBehind > 6)
+        {
+            if (me.mMotion != 0 || orders.mQuiet > 0)
+            {
+                orders.mQuiet = std::max(0, orders.mQuiet - 2);
+                step = TaskStep::Do(Prim::Wait(2));
+                return true;
+            }
+            if (me.mFacingLeft != (slig->mX < me.mX))
+            {
+                step = TaskStep::Do(Prim::Wait(2, slig->mX < me.mX ? Btn::eLeft : Btn::eRight));
+                return true;
+            }
+            if (!orders.mHey)
+            {
+                orders.mHey = true;
+                orders.mQuiet = 50;
+                step = TaskStep::Do(Prim::Wait(3, Btn::eSpeak1));
+                return true;
+            }
+            bot.Log("the Glukkon at " + std::to_string(me.mX) + "," + std::to_string(me.mY) + ": \"Come here\" to the Slig left behind at " + std::to_string(slig->mX));
+            // ("Hey" again if this is not heeded)
+            orders.mHey = false;
+            orders.mBehind = 0;
+            orders.mQuiet = 60;
+            step = TaskStep::Do(Prim::Wait(3, Btn::eSpeak2));
+            return true;
+        }
+    }
+    else
+    {
+        orders.mBehind = 0;
+    }
     std::vector<s32> nodes;
     std::vector<bool> hops;
-    if (!Domain::GlukkonWayTo(nav, bot.GetWorld(), me.mX, me.mY, me.mHalf, x - 5, x + 5, y, nullptr, &nodes, &hops) || nodes.size() < 2)
+    std::vector<bool> lifts;
+    if (!Domain::GlukkonWayTo(nav, bot.GetWorld(), me.mX, me.mY, me.mHalf, x - 5, x + 5, y, nullptr, &nodes, &hops, &lifts) || nodes.size() < 2)
     {
         // (in the air, or between cells: it comes to rest first)
         lost += 2;
@@ -6456,6 +6789,11 @@ static bool GlukkonStep(Bot& bot, const GlukkonAt& me, s32 x, s32 y, s32& lost, 
         return true;
     }
     lost = 0;
+    if (lifts[1])
+    {
+        GlukkonRide(bot, me, nodes[0], orders, step);
+        return true;
+    }
     const NavNode& next = nav.Nodes()[nodes[1]];
     const bool left = next.mX < me.mX;
     const u32 dir = left ? Btn::eLeft : Btn::eRight;
@@ -6489,7 +6827,7 @@ static bool GlukkonStep(Bot& bot, const GlukkonAt& me, s32 x, s32 y, s32& lost, 
     return true;
 }
 
-TaskStep SligLeverTask::Next(Bot& bot, const std::string&)
+TaskStep SligLeverTask::Next(Bot& bot, const std::string& lastFailed)
 {
     const World& world = bot.GetWorld();
     const NavGraph& nav = bot.Nav();
@@ -6503,26 +6841,131 @@ TaskStep SligLeverTask::Next(Bot& bot, const std::string&)
         mWasKnown = true;
         mWas = world.Switch(lever->mSwitch) != 0;
     }
-    if ((world.Switch(lever->mSwitch) != 0) != mWas)
-    {
-        return TaskStep::Done();
-    }
     const GlukkonAt* me = nullptr;
     for (const GlukkonAt& g : world.mGlukkons)
     {
         me = g.mPossessed ? &g : me;
     }
+    if ((world.Switch(lever->mSwitch) != 0) != mWas)
+    {
+        // A lever that sets Slogs on it (a spawner on its switch): the Slig is told to shoot, over and over, from
+        // the moment it is pulled until none has been about for a while. (Bonewerkz' Executive Office: "then
+        // immediately start saying 'Kill 'em' over and over again, until all the Slogs are dead". Measured: the
+        // first is on Director Phleg 40 frames after the lever.)
+        bool spawns = false;
+        bool spent = true;
+        s32 spawnX = 0;
+        for (std::size_t i = 0; i < world.mSlogSpawners.size(); i++)
+        {
+            if (world.mSlogSpawners[i][2] == lever->mSwitch)
+            {
+                spawns = true;
+                spawnX = world.mSlogSpawners[i][0];
+                spent = spent && i < world.mSlogSpawnersSpent.size() && world.mSlogSpawnersSpent[i];
+            }
+        }
+        if (!spawns)
+        {
+            return TaskStep::Done();
+        }
+        if (!me)
+        {
+            // (lost to the Slogs: no lever pulled for it)
+            return (mLost += 4) > 200 ? TaskStep::Failed("the Glukkon is lost to the lever's Slogs") : TaskStep::Do(Prim::Wait(4));
+        }
+        bool about = false;
+        for (const SlogAt& slog : world.mSlogs)
+        {
+            about = about || (std::abs(slog.mY - me->mY) <= 30 && std::abs(slog.mX - me->mX) < 400);
+        }
+        // (all dead: the spawner has let out its last and none is about for a moment; or none for a long while.
+        // Not waited out: what the lever starts besides, drills, comes down on it meanwhile.)
+        mClear = about ? 0 : mClear + 2;
+        // (the last one dead: no more orders, and one that is still to be acted on is let run out: the Slig shoots
+        // 33 frames after it at the latest, for 15. Measured: off at once, a cell in front of the Slig, Director
+        // Phleg was shot by it; after 60 frames whatever, the drill over him had him as he set off.)
+        bool wait = mClear < kSlogsGone;
+        if (spent && !about)
+        {
+            const SligAt* slig = GlukkonsSlig(nav, world, *me);
+            const s32 now = bot.Abe().mFrame;
+            const bool pending = mOrdersGiven.mOrderFrame > mOrdersGiven.mFireFrame && now - mOrdersGiven.mOrderFrame <= kLastShots;
+            wait = slig && (pending || slig->mMotion == 6 || mClear < 4);
+            if (wait)
+            {
+                return TaskStep::Do(Prim::Wait(1));
+            }
+        }
+        if (wait)
+        {
+            TaskStep guard;
+            return GlukkonGuard(bot, *me, mOrdersGiven, guard, spawnX) ? guard : TaskStep::Do(Prim::Wait(2));
+        }
+        bot.Log("the Glukkon at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": no Slog for " + std::to_string(mClear) + " frames" + (spent ? " and no more to come" : "") + ": they are all dead");
+        return TaskStep::Done();
+    }
     if (!me)
     {
+        // (not in one yet. From off its floor, at a run: that floor is its Sligs'. "In the office, immediately run
+        // right and jump up to the ledge." Measured: gone for the lever on it first, he was on the ledge with the
+        // Slig that drops in there still in the air; 17 frames later in the day it was down and shot him.)
+        if (!mPerched && !world.mGlukkons.empty())
+        {
+            const GlukkonAt& g = world.mGlukkons[0];
+            if (!mGo && std::abs(bot.Abe().mY - g.mY) <= 30 && bot.Abe().mMotion != 112)
+            {
+                const s32 floorY = g.mY;
+                const s32 cam = nav.CameraOf(g.mX, g.mY - 5);
+                mGo = std::make_unique<GoToTask>("up off the Glukkon's floor", [&bot, floorY, cam](s32 n)
+                                                 {
+                                                     const NavNode& node = bot.Nav().Nodes()[n];
+                                                     return node.mY <= floorY - 50 && bot.Nav().CameraOf(node.mX, node.mY - 5) == cam;
+                                                 });
+                mGo->SetHurry(true);
+            }
+            TaskStep go;
+            if (!RunGo(mGo, bot, lastFailed, go))
+            {
+                return go;
+            }
+            mPerched = true;
+        }
+        if (!world.mGlukkons.empty() && (mChanted += 20) <= 900)
+        {
+            if (mChanted == 20)
+            {
+                bot.Log("taking over the Glukkon at " + std::to_string(world.mGlukkons[0].mX) + "," + std::to_string(world.mGlukkons[0].mY) + " to have a Slig pull #" + std::to_string(mLever));
+            }
+            return TaskStep::Do(Prim::Wait(20, Btn::eChant));
+        }
         return (mLost += 4) > 600 ? TaskStep::Failed("he is in no Glukkon") : TaskStep::Do(Prim::Wait(4));
     }
     if ((mFrames += 2) > 6000)
     {
         return TaskStep::Failed("no Slig pulled the lever");
     }
+    // (a lever that lets Slogs out: the Glukkon stands on the side of it away from them, where the Slig is to pull
+    // it from. "Standing to the right of the lever and facing left.")
+    if (!mStandSet)
+    {
+        mStandSet = true;
+        const s32 cell = NavGraph::GridStep(lever->mHalf);
+        for (const std::array<s32, 4>& sp : world.mSlogSpawners)
+        {
+            if (sp[2] == lever->mSwitch && std::abs(sp[1] - lever->mY2) <= 30)
+            {
+                const s32 wantX = lever->CentreX() + (sp[0] < lever->CentreX() ? cell : -cell);
+                const s32 node = nav.NodeAt(wantX, lever->mY2, lever->mHalf, 12);
+                if (node >= 0 && std::abs(nav.Nodes()[node].mX - wantX) <= cell / 2)
+                {
+                    mStand = node;
+                }
+            }
+        }
+    }
     const NavNode& stand = nav.Nodes()[mStand];
     TaskStep step;
-    if (GlukkonStep(bot, *me, stand.mX, stand.mY, mLost, step))
+    if (GlukkonStep(bot, *me, stand.mX, stand.mY, mLost, mOrdersGiven, step))
     {
         return step;
     }
@@ -6563,7 +7006,17 @@ TaskStep SligLeverTask::Next(Bot& bot, const std::string&)
         return TaskStep::Do(Prim::Wait(2));
     }
     // "Hey", then "Come here" until it is a cell from the lever, then "Do it"
-    const bool atLever = std::abs(std::abs(slig->mX - lever->CentreX()) - NavGraph::GridStep(me->mHalf)) <= 8;
+    bool atLever = std::abs(std::abs(slig->mX - lever->CentreX()) - NavGraph::GridStep(me->mHalf)) <= 8;
+    // (a lever that lets Slogs out: pulled from the side of it away from where they come, so that the Slig faces
+    // them as it has done, with the Glukkon behind it or in its cell. "Stand at the left edge of the new platform
+    // with the Slig." Measured: pulled from the Slogs' side, its back to them, Director Phleg was eaten.)
+    for (const std::array<s32, 4>& sp : world.mSlogSpawners)
+    {
+        if (sp[2] == lever->mSwitch && std::abs(sp[1] - me->mY) <= 30)
+        {
+            atLever = atLever && (slig->mX < lever->CentreX()) != (sp[0] < lever->CentreX());
+        }
+    }
     mOrders++;
     if (mSaid != 2 && mSaid != 3)
     {
@@ -6577,10 +7030,84 @@ TaskStep SligLeverTask::Next(Bot& bot, const std::string&)
         mQuiet = 60;
         return TaskStep::Do(Prim::Wait(3, Btn::eSpeak2));
     }
+    // (with the Slig in its own cell, which hears it whichever way it faces: its face to where the Slogs will come
+    // from first, which is the way it goes on from here when they are dead, with drills coming down on it.
+    // Measured at the last lever of Bonewerkz' Executive Office: the drills had Director Phleg 30 frames after
+    // the last of 49 Slogs, 12 of which went on turning round.)
+    for (const std::array<s32, 4>& sp : world.mSlogSpawners)
+    {
+        if (sp[2] == lever->mSwitch && std::abs(sp[1] - me->mY) <= 30 && std::abs(slig->mX - me->mX) <= 12 && me->mFacingLeft != (sp[0] < me->mX))
+        {
+            mOrders--;
+            return TaskStep::Do(Prim::Wait(2, sp[0] < me->mX ? Btn::eLeft : Btn::eRight));
+        }
+    }
     bot.Log("the Glukkon at " + std::to_string(me->mX) + "," + std::to_string(me->mY) + ": \"Do it\" to the Slig at " + std::to_string(slig->mX));
     mSaid = 0;
     mQuiet = 90;
+    // (it listens from here on: no "Hey" before what it is told next)
+    mOrdersGiven.mHey = true;
     return TaskStep::Do(Prim::Wait(3, Btn::eSpeak4));
+}
+
+DrillSlogsTask::~DrillSlogsTask() = default;
+
+TaskStep DrillSlogsTask::Next(Bot& bot, const std::string& lastFailed)
+{
+    const World& world = bot.GetWorld();
+    const Entity* lever = world.Find(mLever);
+    if (!lever)
+    {
+        return TaskStep::Failed("no such entity");
+    }
+    // The value its drills go at, and the Slogs still alive under them
+    s32 on = 1;
+    s32 left = 0;
+    for (const Entity& drill : world.mEntities)
+    {
+        if (drill.mKind == EntityKind::eDrill && drill.mInputs[0] == 1 && drill.mSwitch == lever->mSwitch)
+        {
+            on = drill.mInputs[1] ? 0 : 1;
+            left += world.SlogsAsleepUnder(drill);
+        }
+    }
+    const bool going = (world.Switch(lever->mSwitch) != 0) == (on != 0);
+    if (mPhase == 0 && (going || left == 0))
+    {
+        mPhase = 1;
+        mUse.reset();
+    }
+    if (mPhase == 1)
+    {
+        if (left > 0 && going)
+        {
+            if ((mWaited += 2) > 400)
+            {
+                return TaskStep::Failed("the drills did not get the Slogs");
+            }
+            return TaskStep::Do(Prim::Wait(2));
+        }
+        if (left == 0 && mWaited > 0)
+        {
+            bot.Log("the Slogs under the drills of switch " + std::to_string(lever->mSwitch) + " are dead after " + std::to_string(mWaited) + " frames: the lever again");
+        }
+        mPhase = 2;
+    }
+    if (mPhase == 2 && !going)
+    {
+        return left == 0 ? TaskStep::Done() : TaskStep::Failed("the drills are off and Slogs are left");
+    }
+    if (!mUse)
+    {
+        mUse = std::make_unique<UseTask>(mLever, mPhase == 0 ? on : (on ? 0 : 1));
+    }
+    const TaskStep step = mUse->Next(bot, lastFailed);
+    if (step.mKind == TaskStep::Kind::eDone)
+    {
+        mUse.reset();
+        return TaskStep::Do(Prim::Wait(1));
+    }
+    return step;
 }
 
 GrenadeOrbTask::~GrenadeOrbTask() = default;

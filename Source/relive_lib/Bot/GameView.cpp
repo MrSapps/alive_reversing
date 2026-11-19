@@ -19,6 +19,7 @@
 #include "../../AliveLibAE/Mudokon.hpp"
 #include "../../AliveLibAE/UXB.hpp"
 #include "../../AliveLibAE/Drill.hpp"
+#include "../GameObjects/GasCountDown.hpp"
 #include "../../AliveLibAE/MovingBomb.hpp"
 #include "../../AliveLibAE/MotionDetector.hpp"
 #include "../../AliveLibAE/Slig.hpp"
@@ -315,6 +316,7 @@ static bool UxbOff(const relive::Path_TLV& tlv)
 NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
 {
     NavInput in;
+    in.mPath = pathId;
     s32 brews = 0;
     std::vector<std::array<s32, 3>> movers;
     const bool isAe = GetGameType() == GameType::eAe;
@@ -757,6 +759,8 @@ static void BuildEntities(BinaryPath& path, World& world)
     world.mFleechKilled.clear();
     world.mNoBomb.clear();
     world.mSlogsAsleepAt.clear();
+    world.mSlogAsleepTlvs.clear();
+    world.mSlogsAsleepGone.clear();
     world.mFallersAt.clear();
     world.mNoFlier.clear();
     world.mGatesGone.clear();
@@ -766,6 +770,8 @@ static void BuildEntities(BinaryPath& path, World& world)
     world.mScrabBoundsLeft.clear();
     world.mScrabBoundsRight.clear();
     world.mSlogSpawners.clear();
+    world.mSlogSpawnerTlvs.clear();
+    world.mSlogSpawnersSpent.clear();
     world.mWingLockers.clear();
     world.mGlukkonHelp.clear();
     for (auto& cam : path.GetCameras())
@@ -920,6 +926,8 @@ static void BuildEntities(BinaryPath& path, World& world)
                         // (how much noise it sleeps through: one a frame of it, Slog.cpp)
                         at.mMotion = static_cast<const relive::Path_Slog&>(tlv).mWakeUpAnger;
                         world.mSlogsAsleepAt.push_back(at);
+                        world.mSlogAsleepTlvs.push_back(&tlv);
+                        world.mSlogsAsleepGone.push_back(false);
                     }
                     e.mSwitch = World::HazardSwitch(e.mId);
                     // (a half-scale one is on the background and sees nothing of the foreground: Slog::FindBone
@@ -1075,6 +1083,8 @@ static void BuildEntities(BinaryPath& path, World& world)
                 }
                 case ReliveTypes::eSlogSpawner:
                     world.mSlogSpawners.push_back({(tlv.mTopLeftX + tlv.mBottomRightX) / 2, tlv.mBottomRightY, static_cast<const relive::Path_SlogSpawner&>(tlv).mSpawnerSwitchId, static_cast<const relive::Path_SlogSpawner&>(tlv).mMaxSlogs});
+                    world.mSlogSpawnerTlvs.push_back(&tlv);
+                    world.mSlogSpawnersSpent.push_back(false);
                     break;
                 case ReliveTypes::eScrabBoundLeft:
                     world.mScrabBoundsLeft.push_back({(tlv.mTopLeftX + tlv.mBottomRightX) / 2, tlv.mBottomRightY});
@@ -1642,6 +1652,31 @@ static void MarkGrenadeTargets(NavInput& in, const World& world)
     }
 }
 
+// The cells under a drill that a switch sets going, where the map has put Slogs to sleep: nothing is crossed onto
+// them until those Slogs are dead, which is what the drill is there for. (Bonewerkz' Executive Office: "Stand
+// beside the lever and pull it twice, once to drill the Slogs and once to turn the drills back off.")
+static void MarkDrilledSlogs(NavInput& in, const World& world)
+{
+    for (const Entity& drill : world.mEntities)
+    {
+        if (drill.mKind != EntityKind::eDrill || drill.mInputs[0] != 1 || drill.mSwitch <= 1 || world.SlogsAsleepUnder(drill) == 0)
+        {
+            continue;
+        }
+        NavFeature f;
+        f.mKind = FeatureKind::eDanger;
+        f.mX1 = drill.mX1 - 14;
+        f.mX2 = drill.mX2 + 14;
+        f.mY1 = drill.mY2 - 40;
+        f.mY2 = drill.mY2 + 10;
+        f.mHalf = drill.mHalf;
+        f.mA = 1;
+        f.mId = drill.mId;
+        f.mSwitch = World::HazardSwitch(drill.mId);
+        in.mFeatures.push_back(f);
+    }
+}
+
 bool GameView::ReadPath(BaseMap& map, s32 pathId, NavInput& input, World& world)
 {
     BinaryPath* pPath = map.GetPathResourceBlockPtr(static_cast<u32>(pathId));
@@ -1660,6 +1695,7 @@ bool GameView::ReadPath(BaseMap& map, s32 pathId, NavInput& input, World& world)
     }
     MarkFlierTargets(input, world);
     MarkGrenadeTargets(input, world);
+    MarkDrilledSlogs(input, world);
     MarkLockers(input, world);
     MarkSpawnTraps(input, world);
     MarkSlogPens(&input, world, GetGameType() == GameType::eAe && gThrowableFromOverlayIdAE[map.mOverlayId] == AETypes::eBone_11);
@@ -1716,7 +1752,18 @@ void GameView::ReadWorld(BaseMap& map, World& world)
         world.mSwitches[i] = gSwitchStates.mData[i];
     }
     world.mRescued = isAe ? gRescuedMudokons : AO::gRescuedMudokons;
+    world.mGasClock = isAe && gDeathGasTimer != 0;
     world.mKilled = isAe ? gKilledMudokons : AO::gKilledMudokons;
+    for (std::size_t i = 0; i < world.mSlogAsleepTlvs.size(); i++)
+    {
+        const relive::Path_TLV* pTlv = static_cast<const relive::Path_TLV*>(world.mSlogAsleepTlvs[i]);
+        world.mSlogsAsleepGone[i] = pTlv->mTlvFlags.Get(relive::eBit2_Destroyed) && !pTlv->mTlvFlags.Get(relive::eBit1_Created);
+    }
+    for (std::size_t i = 0; i < world.mSlogSpawnerTlvs.size(); i++)
+    {
+        const relive::Path_TLV* pTlv = static_cast<const relive::Path_TLV*>(world.mSlogSpawnerTlvs[i]);
+        world.mSlogSpawnersSpent[i] = pTlv->mTlvFlags.Get(relive::eBit2_Destroyed) && !pTlv->mTlvFlags.Get(relive::eBit1_Created);
+    }
 
     for (std::size_t i = 0; i < world.mEntities.size(); i++)
     {
@@ -2527,6 +2574,7 @@ NavInput GameView::BuildNavInput(BaseMap& map)
     }
     MarkFlierTargets(in, things);
     MarkGrenadeTargets(in, things);
+    MarkDrilledSlogs(in, things);
     MarkLockers(in, things);
     MarkSpawnTraps(in, things);
     MarkSlogPens(&in, things, GetGameType() == GameType::eAe && gThrowableFromOverlayIdAE[map.mOverlayId] == AETypes::eBone_11);

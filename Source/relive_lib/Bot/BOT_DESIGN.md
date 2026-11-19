@@ -2833,3 +2833,90 @@ in `BotSlogs` and `BotNav`): mutation checked, 18 of 20 (not caught: a guard tha
 ledge-over-the-stretch rule of the floor-level throw, which only `fc3.txt` checks). Not under unit test, for
 want of a whole bot in the test binary: the sneak and run past a light sleeper, the ledge refuge from a Slog, the
 watch limit, the explorer leaving mines alone.
+
+### Director Phleg's office (`bonewerkz_ender` 9), done (2026-11-19, `p9n.txt` starts in it, two minutes a run)
+
+`p9n.txt`: the whole office from the well he comes out of to FeeCo Depot's path 2 at f=6300, **1 death** (the hoist
+by the single drill at 2362,900). What it is, from the guide and the path's data: Abe on the ledge by the hand
+panel in Phleg; a lever, two lifts and a Slog on the way to the first voice lock; a teleporter; four levers, each
+of which opens the way on, lets out Slogs at Phleg (15, 7, 25 and 49) and sets drills going down on where he
+stands; the Security Fone, which starts a gas countdown; then Abe through the door by the hand panel, under five
+drills, through a passage that is not shown, a lever pulled twice to drill five sleeping Slogs, and out by a well.
+`la/p9a.txt` starts Abe's part with the gas on, `la/p9b.txt` without, `la/p9d.txt` dumps the drills every 20
+frames.
+
+What a Glukkon has a Slig do (all read in `Slig.cpp`, then measured):
+
+- **A lift.** "Do it" to a Slig in the middle of a lift works it. `Domain::GlukkonWayTo` has rides: from a cell of
+  a stop that is not its middle to that cell of another stop, and it walks onto a stop only where the lift is
+  (from another cell of the same stop it is on the lift). The task says "Come here" until the Slig stands in the
+  middle (it stops on a lift it comes to), then "Do it" (`GlukkonRide`).
+- **A Slig that follows stops on any lift it crosses, for good.** One left more than two cells behind and
+  standing still is called again from where the Glukkon has got to ("Hey", "Come here"): off its screen it does
+  not hear. ("And bring the Slig over the right edge.")
+- **"Kill 'em".** 25 frames of shooting the way the Slig faces. Its shot hits the Glukkon too unless that is
+  *less than* a cell from where the shot starts (`Bullet.cpp`): a cell on towards the Slog, Phleg was shot. So
+  the Slig is got to face the Slogs ("Hey" from that side turns it) and the Glukkon stands in the Slig's own
+  cell, or behind it (`GlukkonGuard`).
+- **A lever that lets Slogs out** (a spawner on its switch) is pulled from the side away from them, so the Slig
+  faces them as it has done ("Stand at the left edge of the new platform with the Slig", "standing to the right
+  of the lever and facing left"); the Glukkon turns its face that way before "Do it" (it goes on that way, and
+  the turn was 12 frames it did not have). Then one order for each time the Slig shoots, 24 frames after its
+  shots began: by then they are over (14 frames) and it is known whether anything is left to shoot, and it is
+  early enough to be the first thing the Slig hears. Measured: with the order 12, 15, 18, 21 or 24 frames after
+  its shots began they began again 45 after, never sooner; given only once both stood still, 49. A Slog is on the
+  Glukkon 31 frames after it comes out 240 px off, and bites from 60 px. The last one dead (the map marks a
+  spawner that has let out all it has: `World::mSlogSpawnersSpent`) and no order still to be acted on, it goes at
+  once: an order given while the last Slog was still about had the Slig shoot 45 frames more at nothing, and the
+  drills had Phleg 30 frames after the last of 49 Slogs.
+- **Drills on a Glukkon's way.** A cell a drill is in, or will be within 60 frames, is not gone into; one it comes
+  to within 300 is dear, the dearer the sooner, so that of a lift's two cells it waits in the one the drill gets
+  to last (on the near one Phleg was drilled 40 frames on, with 240 more to be had on the far one). It dies of a
+  drill whose point is 40 over the floor.
+- The lever of a floor a Glukkon stands on with Sligs awake is dear for Abe (+2000): gone for by him, he was shot.
+  "Have a Slig pull" is offered for a Glukkon he is not in yet (the task takes it over first), and where there is
+  no spawner for a call for help but a Slig is with the Glukkon. Its name says on or off: after the pull the
+  same name was taken for the same step, and the lever was pulled back.
+- A teleporter with no switch is where the other one comes out: the way back through it was planned and waited
+  on for 1500 frames.
+
+In a Glukkon the bot **checkpoints** (the Glukkon standing, no Slog awake near, no drill going over its floor, no
+Slig at a lever, no spawner still letting Slogs out), and a Glukkon lost while he is in it is **a death**: back to
+the checkpoint. Not one it is let go of on purpose, or that the game takes off after its last errand. A task that
+keeps frame numbers across a restore has to see that they are still to come (`GlukkonOrders`).
+
+Abe's part, under the gas (it kills 1020 frames after the Fone; he is in the well with 70 to spare):
+
+- **A transition to another screen of this same path** (a `path_transition` in a camera slot with no camera: the
+  crawl 1887..2237) is no way out: a step into its box ends on the screen it names, as far in as he was into the
+  one he left. He had been rolling to and fro between 1862 and 2262 until the gas.
+- **A door that names this very path of another level** is a door of this path (the ender levels are made of
+  another level's paths): gone into as a way out it led back to the hand panel, 135 frames.
+- **A well whose switch is 1** (always on) is a way out where it leads with it on.
+- **Drills a switch sets going over Slogs the map put to sleep:** nothing is crossed onto those cells until they
+  are dead (`GameView: MarkDrilledSlogs`, the map's own mark of each), one thing does it at the lever
+  (`DrillSlogsTask`: on, until they are dead, off: "pull it twice"), and a way out under such a drill wants its
+  switch off. As two steps and a "what the game does" between them the planner did not find it: off undoes what
+  on was for.
+- **With a gas countdown running nothing new is looked into** (`World::mGasClock`): with 400 frames left he had
+  set off back through the door.
+
+Not sure, and to be watched in the whole chain: each wave is survived by a frame or two where a Slog comes out
+just as the Slig's shots end (the Slig's round is 45 frames, 14 of them shots, and a Slog needs 31); a change of
+timing before the office moves which Slog that is. A Glukkon lost there is now gone back from, to the checkpoint
+before that lever. Not under unit test: `GlukkonGuard`, `GlukkonRide`, the calling of a Slig left behind, the
+checkpoints in a Glukkon, `DrillSlogsTask` (they want a bot and a game), and the rules of 2026-11-19 named above.
+
+Next: FeeCo Depot for the third time. `p9n.txt` runs on through path 2 into path 9 and has no plan at 925,338
+(f=12,816): two Sligs and an orb by the way to the Executive Offices' door.
+
+Check set of 2026-11-19 (`build-bot/la/verify.sh`, its output in `la/verify.out`): ctest 11/11; m1, tr1, t13 0
+deaths; a1 14; bw1, blk9t, b14, wr 0; fc3 0. **`bw7b.txt`, from the first annex: through all of Bonewerkz and
+Phleg's office into FeeCo Depot's path 9 (f=40,515), 8 deaths** (Annex 4 six, the mine at 1937,360, the single
+drill at 2362,896); it has no plan there at 1062,339 (f=42,627). Two things the chain showed that the office's own
+script did not: he is to run for the ledge at once (`SligLeverTask` goes up off the Glukkon's floor at a run before
+it chants: gone for the lever first he was shot 17 frames too late), and a gate taken for gone for good is as the
+world put back has it after a restore (`mGatesGone` cleared: Phleg walked into the slam door of the lever he had
+been put back to before). From path 4's door (`p4n.txt`) Phleg was lost to the second lever's Slogs and the try
+from the checkpoint before it got through. Mutation check of the new unit tests: 11 of 13 caught; not caught: a
+ride from a lift's middle cell, a parked drill taken as a bar.

@@ -11335,3 +11335,322 @@ TEST(BotSweep, ADrillThatStandsStillAsItsSwitchIsIsKnownOfWhereItReaches)
     world.mEntities[0].mInputs[0] = 0;
     EXPECT_FALSE(GoToTask::DormantDrillOver(world, 2537, 100, false));
 }
+
+// A floor, a lift from its end down to a floor that goes on from under it
+static NavInput GlukkonLiftRoom()
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 100, 100, 0));
+    in.mLines.push_back(Line(176, 400, 400, 400, 0));
+    NavFeature top = Feature(FeatureKind::eLiftStop, 100, 100, 176, 124);
+    top.mA = 1;
+    in.mFeatures.push_back(top);
+    in.mFeatures.push_back(Feature(FeatureKind::eLiftStop, 100, 400, 176, 424));
+    return in;
+}
+
+TEST(BotGlukkon, ItsWayGoesDownALiftASligWorksForItFromACellThatIsNotTheMiddle)
+{
+    // (Slig.cpp: told "Do it" in the middle of a lift, a Slig works it. The Glukkon rides beside it.)
+    NavGraph g;
+    g.Build(GlukkonLiftRoom());
+    std::vector<s32> nodes;
+    std::vector<bool> hops;
+    std::vector<bool> lifts;
+    ASSERT_TRUE(Domain::GlukkonWayTo(g, World(), 37, 100, false, 307, 317, 400, nullptr, &nodes, &hops, &lifts));
+    ASSERT_EQ(nodes.size(), lifts.size());
+    s32 rides = 0;
+    for (std::size_t i = 1; i < nodes.size(); i++)
+    {
+        if (lifts[i])
+        {
+            rides++;
+            EXPECT_EQ(g.Nodes()[nodes[i - 1]].mY, 100);
+            EXPECT_EQ(g.Nodes()[nodes[i]].mY, 400);
+            EXPECT_NE(g.Nodes()[nodes[i - 1]].mX, 137);
+            EXPECT_EQ(g.Nodes()[nodes[i - 1]].mX, g.Nodes()[nodes[i]].mX);
+        }
+    }
+    EXPECT_EQ(rides, 1);
+    // (from the middle of the platform, which is the Slig's, it steps aside first)
+    nodes.clear();
+    hops.clear();
+    lifts.clear();
+    ASSERT_TRUE(Domain::GlukkonWayTo(g, World(), 137, 100, false, 307, 317, 400, nullptr, &nodes, &hops, &lifts));
+    ASSERT_GE(lifts.size(), 2u);
+    EXPECT_FALSE(lifts[1]);
+    EXPECT_EQ(g.Nodes()[nodes[1]].mY, 100);
+}
+
+TEST(BotGlukkon, ItDoesNotWalkOntoALiftsStopWhereTheLiftIsNot)
+{
+    // The lift starts at the top: from the floor below there is nothing to stand on at its lower stop
+    NavGraph g;
+    g.Build(GlukkonLiftRoom());
+    EXPECT_FALSE(Domain::GlukkonWayTo(g, World(), 312, 400, false, 30, 40, 100));
+    // (with the lift down there, it is walked onto and ridden up)
+    World world;
+    world.mLifts.push_back({100, 176, 400});
+    EXPECT_TRUE(Domain::GlukkonWayTo(g, world, 312, 400, false, 30, 40, 100));
+    // (and then the upper stop is the one with no lift at it)
+    EXPECT_FALSE(Domain::GlukkonWayTo(g, world, 37, 100, false, 307, 317, 400));
+}
+
+TEST(BotGlukkon, ItDoesNotGoIntoACellADrillIsIn)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 300, 100, 0));
+    NavGraph g;
+    g.Build(in);
+    World world;
+    SweepAt drill;
+    drill.mX1 = 100;
+    drill.mX2 = 124;
+    drill.mY1 = 60;
+    drill.mY2 = 100;
+    drill.mOffset = 100 * 256;
+    drill.mTravel = 200 * 256;
+    drill.mPhase = 1;
+    world.mSweeps.push_back(drill);
+    EXPECT_FALSE(Domain::GlukkonWayTo(g, world, 37, 100, false, 232, 242, 100));
+    // (one that is parked is no bar, nor one well over its head)
+    world.mSweeps[0].mPhase = 0;
+    world.mSweeps[0].mWillStart = false;
+    EXPECT_TRUE(Domain::GlukkonWayTo(g, world, 37, 100, false, 232, 242, 100));
+    // (parked, whether or not it would start again: what it is going to do is the lever's to say)
+    world.mSweeps[0].mWillStart = true;
+    world.mSweeps[0].mSpeed = 256;
+    world.mSweeps[0].mVertical = true;
+    EXPECT_TRUE(Domain::GlukkonWayTo(g, world, 37, 100, false, 232, 242, 100));
+    world.mSweeps[0].mSpeed = 0;
+    world.mSweeps[0].mVertical = false;
+    world.mSweeps[0].mPhase = 1;
+    world.mSweeps[0].mY1 = 0;
+    world.mSweeps[0].mY2 = 40;
+    EXPECT_TRUE(Domain::GlukkonWayTo(g, world, 37, 100, false, 232, 242, 100));
+}
+
+TEST(BotNav, AWellWhoseSwitchIsTheOneAlwaysOnIsAWayOutWhereItLeadsWithItOn)
+{
+    // (Bonewerkz' Executive Office: the well out of it has switch 1)
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    NavFeature well = Feature(FeatureKind::eWellExpress, 100, 76, 124, 100);
+    well.mSwitch = 1;
+    well.mOnDestPath = 4;
+    well.mOnDestCamera = 1;
+    in.mFeatures.push_back(well);
+    NavGraph g;
+    g.Build(in);
+    ASSERT_EQ(g.Exits().size(), 1u);
+    EXPECT_EQ(g.Input().mFeatures[g.Exits()[0].mFeature].mKind, FeatureKind::eWellExpress);
+    in.mFeatures[0].mOnDestPath = -1;
+    NavGraph stays;
+    stays.Build(in);
+    EXPECT_TRUE(stays.Exits().empty());
+}
+
+// A floor across three screens, with a transition at each end of the middle one to the screen beyond it
+static NavInput HiddenPassage()
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 1125, 100, 0));
+    NavFeature right = Feature(FeatureKind::ePathExit, 375, 57, 426, 108);
+    right.mAnyScale = true;
+    right.mDestCamera = 7;
+    in.mFeatures.push_back(right);
+    NavFeature left = Feature(FeatureKind::ePathExit, 699, 57, 750, 108);
+    left.mAnyScale = true;
+    left.mDestCamera = 5;
+    in.mFeatures.push_back(left);
+    // (something of each of those screens, which says where it is)
+    NavFeature seven = Feature(FeatureKind::eZCover, 900, 0, 910, 10);
+    seven.mCamera = 7;
+    seven.mCell = 2;
+    in.mFeatures.push_back(seven);
+    NavFeature five = Feature(FeatureKind::eZCover, 100, 0, 110, 10);
+    five.mCamera = 5;
+    five.mCell = 0;
+    in.mFeatures.push_back(five);
+    return in;
+}
+
+TEST(BotNav, ATransitionToAScreenOfThisPathPutsHimOnThatScreenAndIsNoWayOut)
+{
+    // (Bonewerkz' Executive Office, measured: rolled into at 1862, he was at 2262 the frame after: as far into
+    // the screen it names as he was into the one he left)
+    NavGraph g;
+    g.Build(HiddenPassage());
+    EXPECT_TRUE(g.Exits().empty());
+    const s32 last = g.NodeAt(362, 100, false);
+    const s32 in = g.NodeAt(387, 100, false);
+    const s32 beyond = g.NodeAt(762, 100, false);
+    ASSERT_GE(last, 0);
+    ASSERT_GE(in, 0);
+    ASSERT_GE(beyond, 0);
+    EXPECT_TRUE(HasEdge(g, last, beyond, EdgeKind::eWalk));
+    EXPECT_FALSE(HasEdge(g, last, in, EdgeKind::eWalk));
+    // (and back: from the first cell of that screen into the box at the other end of the passage)
+    EXPECT_TRUE(HasEdge(g, beyond, last, EdgeKind::eWalk));
+    // (a step from one cell of the box to the next is as it was: he is gone by then)
+    EXPECT_TRUE(HasEdge(g, in, g.NodeAt(412, 100, false), EdgeKind::eWalk));
+    // (a step within a screen is as it was)
+    EXPECT_TRUE(HasEdge(g, g.NodeAt(337, 100, false), last, EdgeKind::eWalk));
+}
+
+TEST(BotNav, ATransitionThatLeadsToAnotherPathIsStillAWayOut)
+{
+    NavInput in = HiddenPassage();
+    in.mFeatures[0].mDestPath = 3;
+    in.mFeatures[0].mDestLevel = 2;
+    NavGraph g;
+    g.Build(in);
+    EXPECT_FALSE(g.Exits().empty());
+    EXPECT_TRUE(HasEdge(g, g.NodeAt(362, 100, false), g.NodeAt(387, 100, false), EdgeKind::eWalk));
+}
+
+// Two doors that lead to each other, one of which names its path by number and another level
+static NavInput TwinLevelDoors(s32 path)
+{
+    NavInput in;
+    in.mPath = path;
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    in.mLines.push_back(Line(0, 300, 400, 300, 0));
+    NavFeature a = Feature(FeatureKind::eDoor, 350, 80, 374, 104);
+    a.mA = 1;
+    a.mB = 2;
+    a.mCamera = 1;
+    a.mDestCamera = 2;
+    a.mDestPath = 9;
+    a.mDestLevel = 5;
+    in.mFeatures.push_back(a);
+    NavFeature b = Feature(FeatureKind::eDoor, 50, 280, 74, 304);
+    b.mA = 2;
+    b.mB = 1;
+    b.mCamera = 2;
+    b.mDestCamera = 1;
+    in.mFeatures.push_back(b);
+    return in;
+}
+
+TEST(BotNav, ADoorThatNamesThisVeryPathOfAnotherLevelIsADoorOfThisPath)
+{
+    // (a level that ends in another's paths. Bonewerkz' Executive Office: the door Abe comes out of names
+    // Bonewerkz' path 9, which is the one he is in; gone into as a way out, it led back to the hand panel.)
+    NavGraph g;
+    g.Build(TwinLevelDoors(9));
+    EXPECT_TRUE(g.Exits().empty());
+    EXPECT_TRUE(HasEdge(g, g.NodeAt(362, 100, false), g.NodeAt(62, 300, false), EdgeKind::eDoor));
+    // (of any other path it is the way out it says it is)
+    NavGraph other;
+    other.Build(TwinLevelDoors(3));
+    ASSERT_EQ(other.Exits().size(), 1u);
+    EXPECT_FALSE(HasEdge(other, other.NodeAt(362, 100, false), other.NodeAt(62, 300, false), EdgeKind::eDoor));
+}
+
+// A floor with a lever at its start, and a drill the lever's switch sets going over a Slog put to sleep
+static World DrilledSlogWorld()
+{
+    World world;
+    Entity lever = MakeEntity(EntityKind::eLever, 10, 50, 80, 124, 104);
+    lever.mSwitch = 76;
+    lever.mOp = 2;
+    world.mEntities.push_back(lever);
+    Entity drill = MakeEntity(EntityKind::eDrill, 20, 300, 0, 324, 100);
+    drill.mSwitch = 76;
+    drill.mInputs[0] = 1;
+    world.mEntities.push_back(drill);
+    RockAt slog;
+    slog.mX = 312;
+    slog.mY = 100;
+    world.mSlogsAsleepAt.push_back(slog);
+    world.mSlogsAsleepGone.push_back(false);
+    return world;
+}
+
+TEST(BotSlogs, ADrillOverSlogsAsleepStandsForThemUntilTheyAreDead)
+{
+    World world = DrilledSlogWorld();
+    const Entity& drill = world.mEntities[1];
+    EXPECT_EQ(world.SlogsAsleepUnder(drill), 1);
+    EXPECT_EQ(world.Switch(World::HazardSwitch(drill.mId)), 0);
+    // (one a cell and more to the side of it is not under it, nor one on another floor)
+    world.mSlogsAsleepAt[0].mX = 350;
+    EXPECT_EQ(world.SlogsAsleepUnder(drill), 0);
+    world.mSlogsAsleepAt[0].mX = 312;
+    world.mSlogsAsleepAt[0].mY = 300;
+    EXPECT_EQ(world.SlogsAsleepUnder(drill), 0);
+    world.mSlogsAsleepAt[0].mY = 100;
+    world.mSlogsAsleepGone[0] = true;
+    EXPECT_EQ(world.SlogsAsleepUnder(drill), 0);
+    EXPECT_EQ(world.Switch(World::HazardSwitch(drill.mId)), 1);
+}
+
+TEST(BotSlogs, TheLeverOfDrillsOverSlogsAsleepIsPulledTwiceToBeRidOfThem)
+{
+    // ("Stand beside the lever and pull it twice, once to drill the Slogs and once to turn the drills back off.")
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    NavGraph g;
+    g.Build(in);
+    World world = DrilledSlogWorld();
+    const auto drillAction = [&](const Domain& d) -> const Goap::Action*
+    {
+        for (const Goap::Action& a : d.mActions)
+        {
+            if (a.mName.compare(0, 15, "Drill the Slogs") == 0)
+            {
+                return &a;
+            }
+        }
+        return nullptr;
+    };
+    const Domain d = Domain::Build(g, world, g.NodeAt(12, 100, false), nullptr);
+    const Goap::Action* twice = drillAction(d);
+    ASSERT_NE(twice, nullptr);
+    EXPECT_EQ(d.mSteps[twice->mTag].mKind, StepKind::eDrillSlogs);
+    EXPECT_EQ(d.mSteps[twice->mTag].mEntity, 10u);
+    // (from where the lever is, with the drills off; what it gives is the Slogs dead, and the switch as it was)
+    EXPECT_NE(std::find(twice->mPre.begin(), twice->mPre.end(), Goap::Fact{Key::Switch(76), 0}), twice->mPre.end());
+    ASSERT_EQ(twice->mEffects.size(), 1u);
+    EXPECT_EQ(twice->mEffects[0], (Goap::Fact{Key::Switch(World::HazardSwitch(20)), 1}));
+    // (none with the Slogs dead, nor for a drill no switch turns or one with no Slog under it)
+    World dead = world;
+    dead.mSlogsAsleepGone[0] = true;
+    EXPECT_EQ(drillAction(Domain::Build(g, dead, g.NodeAt(12, 100, false), nullptr)), nullptr);
+    World always = world;
+    always.mEntities[1].mInputs[0] = 0;
+    EXPECT_EQ(drillAction(Domain::Build(g, always, g.NodeAt(12, 100, false), nullptr)), nullptr);
+}
+
+TEST(BotSlogs, AWayOutUnderADrillASwitchSetsGoingWantsThatSwitchOff)
+{
+    NavInput in;
+    in.mLines.push_back(Line(0, 100, 400, 100, 0));
+    NavFeature well = Feature(FeatureKind::eWellExpress, 300, 76, 324, 100);
+    well.mDestPath = 4;
+    well.mDestCamera = 1;
+    in.mFeatures.push_back(well);
+    NavGraph g;
+    g.Build(in);
+    World world = DrilledSlogWorld();
+    const auto exitWants = [&](const World& w)
+    {
+        const Domain d = Domain::Build(g, w, g.NodeAt(12, 100, false), nullptr);
+        for (const Goap::Action& a : d.mActions)
+        {
+            if (a.mName.compare(0, 5, "Exit ") == 0)
+            {
+                return std::find(a.mPre.begin(), a.mPre.end(), Goap::Fact{Key::Switch(76), 0}) != a.mPre.end();
+            }
+        }
+        ADD_FAILURE() << "no exit";
+        return false;
+    };
+    EXPECT_TRUE(exitWants(world));
+    // (a drill that is not over the well is nothing to it)
+    World aside = world;
+    aside.mEntities[1].mX1 = 200;
+    aside.mEntities[1].mX2 = 224;
+    EXPECT_FALSE(exitWants(aside));
+}

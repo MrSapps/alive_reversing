@@ -1871,7 +1871,10 @@ void NavGraph::Build(const NavInput& input)
         if (const NavFeature* door = FeatureAt(FeatureKind::eDoor, n.mX, n.mY, n.mHalf, &featureIdx))
         {
             bool inPath = false;
-            if (door->mDestPath < 0)
+            // (one that names this very path of another level is one of this path's too, where it has the door it
+            // names: a level that ends in another's paths. Bonewerkz' Executive Office, the door Abe comes out of:
+            // gone into as a way out, it led back to the hand panel, 135 frames of the gas's 1000.)
+            if (door->mDestPath < 0 || door->mDestPath == mInput.mPath)
             {
                 for (const NavFeature& other : mInput.mFeatures)
                 {
@@ -1905,7 +1908,10 @@ void NavGraph::Build(const NavInput& input)
             // Out of the path (as it goes with its switch off: which is how the level's paths are counted)
             // (or only with its switch on: Necrum's last well, which the five wheels turn to Feeco)
             const bool onOut = kind == 1 && well->mSwitch > 1 && well->mDestPath < 0 && well->mOnDestPath >= 0;
-            if (offOut || onOut)
+            // (or one whose switch is the one that is always on: where it leads with it on is where it leads.
+            // Bonewerkz' Executive Office, the well out of it.)
+            const bool alwaysOut = kind == 1 && well->mSwitch == 1 && well->mOnDestPath >= 0;
+            if (offOut || onOut || alwaysOut)
             {
                 mExits.push_back({from, featureIdx});
             }
@@ -2250,6 +2256,56 @@ void NavGraph::Build(const NavInput& input)
             }
         }
     }
+    // A transition to another screen of this same path (a passage that is not shown: he goes in at one end and is
+    // put on the screen it names, as far into it as he was into the one he left): a step into its box ends on
+    // that screen. And it is no way out of the path. (Bonewerkz' Executive Office: the crawl from the drills to
+    // the Slogs' lever, 1887 to 2262. Measured: rolled into at 1862, he was at 2262 the frame after.)
+    const auto within = [&](const NavNode& n) -> const NavFeature*
+    {
+        for (const NavFeature& f : mInput.mFeatures)
+        {
+            if (f.mKind == FeatureKind::ePathExit && f.mDestPath < 0 && f.mDestLevel < 0 && f.mDestCamera >= 0 && n.mX >= f.mX1 && n.mX <= f.mX2 && n.mY >= f.mY1 - 4 && n.mY <= f.mY2 + 4)
+            {
+                return &f;
+            }
+        }
+        return nullptr;
+    };
+    for (NavEdge& e : edges)
+    {
+        const NavNode& b = mNodes[e.mTo];
+        const NavFeature* box = within(b);
+        if (!box || within(mNodes[e.mFrom]) == box || (e.mKind != EdgeKind::eWalk && e.mKind != EdgeKind::eRoll))
+        {
+            continue;
+        }
+        s32 cell = -1;
+        for (const NavFeature& f : mInput.mFeatures)
+        {
+            if (f.mCamera == box->mDestCamera && f.mCell >= 0 && &f != box)
+            {
+                cell = f.mCell;
+                break;
+            }
+        }
+        if (cell < 0)
+        {
+            continue;
+        }
+        const s32 x = (cell % 256) * mInput.mCamW + b.mX % mInput.mCamW;
+        const s32 y = (cell / 256) * mInput.mCamH + b.mY % mInput.mCamH;
+        const s32 to = NodeAt(x, y, b.mHalf, 12);
+        if (to >= 0 && std::abs(mNodes[to].mX - x) <= GridStep(b.mHalf) / 2)
+        {
+            e.mTo = to;
+        }
+    }
+    mExits.erase(std::remove_if(mExits.begin(), mExits.end(), [&](const auto& x)
+                                {
+                                    const NavFeature& f = mInput.mFeatures[x.mFeature];
+                                    return f.mKind == FeatureKind::ePathExit && f.mDestPath < 0 && f.mDestLevel < 0 && f.mDestCamera >= 0;
+                                }),
+                 mExits.end());
     std::stable_sort(edges.begin(), edges.end(), [](const NavEdge& a, const NavEdge& b)
                      { return a.mFrom < b.mFrom; });
     mEdges = std::move(edges);

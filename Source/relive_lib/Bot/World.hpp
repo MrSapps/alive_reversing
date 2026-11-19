@@ -502,6 +502,20 @@ struct World final
     {
         return 1000 + static_cast<s32>(id);
     }
+    // How many of the Slogs the map puts to sleep under a drill are still alive
+    s32 SlogsAsleepUnder(const Entity& drill) const
+    {
+        s32 count = 0;
+        for (std::size_t i = 0; i < mSlogsAsleepAt.size(); i++)
+        {
+            const RockAt& at = mSlogsAsleepAt[i];
+            if (!(i < mSlogsAsleepGone.size() && mSlogsAsleepGone[i]) && at.mHalf == drill.mHalf && at.mX >= drill.mX1 - 14 && at.mX <= drill.mX2 + 14 && std::abs(at.mY - drill.mY2) <= 40)
+            {
+                count++;
+            }
+        }
+        return count;
+    }
     // A door that opens once all of a set of switches are on (a tasks door) is given a switch of its own that
     // stands for "all of them are": see Switch()
     static s32 DoorSwitch(u32 id)
@@ -702,6 +716,10 @@ struct World final
     std::vector<std::pair<s32, s32>> mScrabBoundsRight;
     // Where the map lets Slogs out once a switch is on: x, floor y, the switch
     std::vector<std::array<s32, 4>> mSlogSpawners;
+    // For each of those: the path's own record of it (as mTlvs), and whether it has let out all it has (the map
+    // marks it done with then)
+    std::vector<const void*> mSlogSpawnerTlvs;
+    std::vector<bool> mSlogSpawnersSpent;
     // The switch that where Abe stands is about to set (an invisible switch sets its own a few frames after he
     // is in it), or -1
     s32 mSoonOn = -1;
@@ -849,7 +867,12 @@ struct World final
     // He is at a run from Slogs that are after him (Bot::MakeSlogFlee, for a few seconds after): their floors are
     // no bar to him then
     bool mFleeing = false;
+    // A gas countdown is running (AE: it kills all in the path when it is out)
+    bool mGasClock = false;
     std::vector<RockAt> mSlogsAsleepAt;
+    // For each of those: the path's own record of it (as mTlvs), and whether it is dead (the map marks it so)
+    std::vector<const void*> mSlogAsleepTlvs;
+    std::vector<bool> mSlogsAsleepGone;
     // AE: where the map has things that fall over and over (FallingItem), whether their screen is shown or not:
     // mX, mY where each starts, mEvery its wait, mFallIn -1 while its switch is off, its box's sides as measured
     // (it is 9 wide at half scale). The ones in mFallers are the ones on the screen shown, with where they are now.
@@ -940,6 +963,11 @@ struct World final
                 if (e.mKind == EntityKind::eSecurityOrb && HazardSwitch(e.mId) == id)
                 {
                     return e.mGone ? 1 : 0;
+                }
+                // (a drill that a switch sets going, with Slogs put to sleep under it: on once those are all dead)
+                if (e.mKind == EntityKind::eDrill && HazardSwitch(e.mId) == id)
+                {
+                    return SlogsAsleepUnder(e) == 0 ? 1 : 0;
                 }
                 // (the Slogs of a stretch of floor: on while a bone is on it, or in the air over it)
                 if (e.mKind == EntityKind::eSlog && HazardSwitch(e.mId) == id)

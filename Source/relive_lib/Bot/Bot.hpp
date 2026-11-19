@@ -612,6 +612,10 @@ private:
     std::map<std::string, s32> mActionDeaths;
     std::string mPlanText;
     s8 mLastSwitches[256] = {};
+    // He is in a Glukkon (or was a moment ago, and is in his trance still: it is in a teleporter)
+    bool mInGlukkon = false;
+    // The bot chanted him out of it itself: its going is no loss
+    bool mGlukkonLetGo = false;
     s32 mDeadFrames = 0;
     s32 mStartWaits = 0;
     bool mThrowPending = false;
