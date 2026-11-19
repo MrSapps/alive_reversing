@@ -3026,7 +3026,8 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                         leverX = en.CentreX();
                     }
                 }
-                if (orb && sligs && lever && (from.mX - gx) * (leverX - gx) > 0 && (to.mX - gx) * (leverX - gx) > 0)
+                // (on away from the gate: back towards it is no going on)
+                if (orb && sligs && lever && (from.mX - gx) * (leverX - gx) > 0 && (to.mX - gx) * (leverX - gx) > 0 && std::abs(to.mX - gx) > std::abs(from.mX - gx))
                 {
                     pre.push_back({Key::Switch(gate.mSwitch), 1});
                 }

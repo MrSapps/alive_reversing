@@ -319,6 +319,8 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
     in.mPath = pathId;
     s32 brews = 0;
     std::vector<std::array<s32, 3>> movers;
+    // The switches of the path's voice locks (what a Glukkon's "Do it" sets)
+    std::vector<s32> voice;
     const bool isAe = GetGameType() == GameType::eAe;
     in.mIsAe = isAe;
     in.mCamW = isAe ? 375 : 1024;
@@ -452,6 +454,9 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                     in.mFeatures.push_back(f);
                     break;
                 }
+                case ReliveTypes::eGlukkonSwitch:
+                    voice.push_back(static_cast<const relive::Path_GlukkonSwitch&>(tlv).mOkSwitchId);
+                    break;
                 case ReliveTypes::eTeleporter:
                 {
                     const auto& t = static_cast<const relive::Path_Teleporter&>(tlv);
@@ -670,6 +675,13 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
             }
         }
     }
+    // A teleporter whose switch is a voice lock's goes when a Glukkon answers that lock, with the Glukkon: no way of
+    // Abe's (the Glukkon's own way has it from the world's things, Domain::GlukkonWayTo). FeeCo's Executive
+    // Offices: by the teleporter at 1687,1500 the well beside the Security Fone was taken to be in reach, and he
+    // set off back to it.
+    in.mFeatures.erase(std::remove_if(in.mFeatures.begin(), in.mFeatures.end(), [&voice](const NavFeature& f)
+                                      { return f.mKind == FeatureKind::eTeleporter && f.mSwitch > 1 && std::find(voice.begin(), voice.end(), f.mSwitch) != voice.end(); }),
+                       in.mFeatures.end());
     // A lift mover sends its lift all the way up or down once its switch is on: that stop then has the lift
     for (const std::array<s32, 3>& mover : movers)
     {
