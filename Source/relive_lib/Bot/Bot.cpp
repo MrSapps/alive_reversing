@@ -140,7 +140,8 @@ std::unique_ptr<Task> Bot::MakeTask(const Domain& domain, const Goap::Action& ac
             // in the plan are gone through in one, to the far end of the last. Stopped at each he walks: a run
             // wants a few cells to get going. (Terminal 4's cage: the gate by the lever is two crossings a cell
             // apart, then the hoist; walked, the Slogs had him under it.)
-            if (TimedRunOn() && step.mOther == 0 && !mKeptPlan.empty() && mKeptPlan[0] == action.mName && (mKnow->mNav.Edges()[step.mEdge].mKind == EdgeKind::eWalk || mKnow->mNav.Edges()[step.mEdge].mKind == EdgeKind::eRoll))
+            // (at a run from Slogs the same)
+            if ((TimedRunOn() || mWorld.mFleeing) && step.mOther == 0 && !mKeptPlan.empty() && mKeptPlan[0] == action.mName && (mKnow->mNav.Edges()[step.mEdge].mKind == EdgeKind::eWalk || mKnow->mNav.Edges()[step.mEdge].mKind == EdgeKind::eRoll))
             {
                 for (std::size_t i = 1; i < mKeptPlan.size() && mKeptPlan[i].rfind("Cross ", 0) == 0; i++)
                 {
@@ -413,14 +414,26 @@ bool Bot::Replan(BaseMap& map)
     mLastMines = mines;
 
     // A switch tried for the sake of it has changed: don't try it again
+    // (one that a checkpoint put back is as it was before it was tried, and is to be tried again: taken for tried,
+    // there was nothing left to do after a death past the sensor of Bonewerkz' Executive Office, and that was the
+    // end)
     for (s32 i = 0; i < 256; i++)
     {
         if (mWorld.mSwitches[i] != mLastSwitches[i])
         {
-            mExplored.insert({mAbe.mPath, Key::Switch(i)});
+            if (mSwitchesPutBack > 0)
+            {
+                mExplored.erase({mAbe.mPath, Key::Switch(i)});
+            }
+            else
+            {
+                mExplored.insert({mAbe.mPath, Key::Switch(i)});
+            }
             mLastSwitches[i] = mWorld.mSwitches[i];
         }
     }
+    // (the putting back takes a few of his turns to show)
+    mSwitchesPutBack = std::max(0, mSwitchesPutBack - 1);
     const auto allowed = [know](s32 edge)
     {
         if (know->mBannedEdges.count(edge) != 0)
@@ -1753,6 +1766,22 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
                 }
             }
         }
+        // (and at a run from Slogs the running jump off a floor's end down past what is under it is the way down:
+        // NavGraph::kRunDownCost)
+        // (only off a floor a drill is on its way along: where nothing drives him on, the drop and the hop are the
+        // ways down as ever. In Bonewerkz' first boiler he was off the ledge's far end by this jump with the Slogs
+        // still alive under it, fifty-three deaths.)
+        if (world->mFleeing && e.mKind == EdgeKind::eRunJump && e.mCost == NavGraph::kRunDownCost)
+        {
+            const NavNode& off = know->mNav.Nodes()[e.mFrom];
+            for (const SweepAt& sweep : world->mSweeps)
+            {
+                if (sweep.mHalf == off.mHalf && sweep.Hits(0, 250, off.mX - 12, off.mY - (off.mHalf ? 30 : 60), off.mX + 12, off.mY))
+                {
+                    return 20;
+                }
+            }
+        }
         if (!only->empty() && !only->count(idx))
         {
             return -1;
@@ -1905,6 +1934,17 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
                 // (one that goes along over the floor the jump leaves, and no lower, is that floor's: off its end
                 // down to a floor under it he is clear of it. NavGraph: the running jump off 1762,100.)
                 const bool overFloor = to.mY > from.mY + 40 / scale && f.mX2 - f.mX1 > f.mY2 - f.mY1 && f.mY2 < from.mY;
+                // (nor is one that stands still as the switches are: the drills over the ledge of 2412,100 in the
+                // Executive Office of Bonewerkz are set going by his coming up onto it, "jump over the mines and pull
+                // up immediately", and were in the way of the jump up to it while they stood)
+                if (f.mKind == FeatureKind::eSweep)
+                {
+                    const Entity* drill = world->Find(f.mId);
+                    if (drill && drill->mKind == EntityKind::eDrill && !world->SweepLive(*drill))
+                    {
+                        continue;
+                    }
+                }
                 if (!overFloor && f.mKind == FeatureKind::eSweep && f.mHalf == from.mHalf && f.mX2 > std::min(from.mX, to.mX) + cell / 2 && f.mX1 < std::max(from.mX, to.mX) - cell / 2 &&
                     f.mY2 >= std::min(from.mY, to.mY) - 60 / scale && f.mY1 <= std::max(from.mY, to.mY))
                 {
@@ -2792,6 +2832,7 @@ void Bot::TryFailed(BaseMap& map, const std::string& what)
     saved.mCheckpoint.Load(map);
     mRestoring = true;
     mRestores++;
+    mSwitchesPutBack = 60;
     mLastCheckpointFrame = saved.mCheckpoint.mFrame;
 }
 
@@ -2892,6 +2933,7 @@ void Bot::OnDeath(BaseMap& map)
     saved.mCheckpoint.Load(map);
     mRestoring = true;
     mRestores++;
+    mSwitchesPutBack = 60;
     mLastCheckpointFrame = saved.mCheckpoint.mFrame;
 }
 
@@ -2917,6 +2959,7 @@ void Bot::RewindMiss(BaseMap& map)
     saved.mCheckpoint.Load(map);
     mRestoring = true;
     mRestores++;
+    mSwitchesPutBack = 60;
     mLastCheckpointFrame = saved.mCheckpoint.mFrame;
 }
 
@@ -4056,7 +4099,8 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         }
         // The switch that is being tried for the sake of it has changed, if only for a moment (a trap door that
         // shuts itself again): it has been tried
-        if (mExploring >= 1000 && mExploring < 1256 && mWorld.mSwitches[mExploring - 1000] != mLastSwitches[mExploring - 1000])
+        // (not when a checkpoint has just put it back)
+        if (mSwitchesPutBack == 0 && mExploring >= 1000 && mExploring < 1256 && mWorld.mSwitches[mExploring - 1000] != mLastSwitches[mExploring - 1000])
         {
             mExplored.insert({mAbe.mPath, mExploring});
         }

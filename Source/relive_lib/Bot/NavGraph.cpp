@@ -1702,6 +1702,34 @@ void NavGraph::Build(const NavInput& input)
                             AddEdge(edges, from, to, EdgeKind::eHop, kHopCost + 10, -1, left);
                             // (the well he falls into, if it is one)
                             edges.back().mWell = well;
+                            // (and a running jump off the same end, where the floor behind is a run-up: further
+                            // out, and down at a run's pace with no crouch first. Measured in Bonewerkz' Executive
+                            // Office, `rd.txt`, off 1762,100 to the floor at 200: level for 102, down at 1887, 125
+                            // out, 20 frames from where he left the floor; 10 more on his feet. "Jump over him
+                            // and keep going": the Slig that stands at 1787. Dear, kRunDownCost: it is the way only
+                            // at a run from Slogs, Bot::EdgeCostFn. At a jump's own cost it was taken wherever it
+                            // was the shorter, and the Mudomo trial died of it fifteen times.)
+                            if (well < 0 && mInput.mIsAe && !n.mHalf && gy - n.mY >= 60 && gy - n.mY <= 110)
+                            {
+                                const s32 out = gy - n.mY <= 80 ? 120 : 125;
+                                const s32 land = NodeAt(n.mX + dir * out, gy, n.mHalf, 12);
+                                s32 back = from;
+                                bool room = true;
+                                for (s32 k = 1; k <= kRunUpCells && room; k++)
+                                {
+                                    const s32 bx = n.mX - dir * k * step;
+                                    const s32 b = NodeOnLine(n.mLine, bx);
+                                    room = b >= 0 && std::abs(mNodes[b].mX - bx) <= step / 2 && !mNodes[b].mHazard && !mNodes[b].mLow && mNodes[b].mLiftStop < 0;
+                                    back = b;
+                                }
+                                // (not onto a mine, nor into a wall on the way)
+                                if (room && land >= 0 && land != to && !mNodes[land].mHazard && !mNodes[land].mLow && !WallBetween(n.mX, n.mX + dir * out, n.mY, n.mHalf) &&
+                                    !WallBetween(mNodes[land].mX - dir * step, mNodes[land].mX, gy, n.mHalf))
+                                {
+                                    AddEdge(edges, back, land, EdgeKind::eRunJump, kRunDownCost, -1, left);
+                                    edges.back().mX = n.mX;
+                                }
+                            }
                             // (and from a cell back, to come down a cell nearer: the hop is over the end of his own
                             // floor before it drops. Bonewerkz' path 1: "hop from directly over the lever to the
                             // middle of the lift".)

@@ -2790,15 +2790,29 @@ wheel that sets a 300-frame clock going; the fifth behind a tasks door at the bo
   hop down. `NavGraph`: a hop off a floor's end is not barred by a drill that goes along over that floor and no
   lower. With these he is off the platform's far end over the Slig (the hop off 1762,100 to 1862,200) at f=719
   and run from there, and caught at 1900: the hop lands him stood still, 85 ahead of them.
-- Tried and taken back: a running jump off a floor's end down to a floor under it as an edge of its own
-  (measured with `rd.txt` off 1762,100: level for 102, down at 1887, 125 out, 20 frames from the floor's end and
-  10 more on his feet). With it in every graph `t13` died fifteen times and was stuck, and `fc3` went off to the
-  Barracks. It wants to be made where it is wanted and not everywhere; and the plan's step is to the hop's cell
-  (1862), so it was not taken here anyway.
-- Next: that jump, then the tunnel of 2000..2176, "jump over the mines and pull up immediately" (the hoist at
-  2412), "walk to the right when the vertical drill is up and jump into the well" (2537,100). Then Director
-  Phleg: a Slig told to pull levers and to kill, four times over, as General Dripik's were. `bw7.txt`: 9 deaths,
-  5 of them here (4 at the drills' tunnel on tries after the first, 1 past the Slig).
+- The running jump off a floor's end down to a floor under it (`NavGraph::kRunDownCost`, measured with `rd.txt`
+  off 1762,100: level for 102, down at 1887, 125 out, 20 frames from the floor's end and 10 more on his feet).
+  Dear; cheap only at a run from Slogs off a floor a drill is on its way along (`Bot::EdgeCostFn`). Twice wrong
+  before that: as a jump like any other it was taken wherever it was shorter (`t13` fifteen deaths, `fc3` off to
+  the Barracks); cheap at any run from Slogs it took him off the first boiler's ledge with the Slogs alive under
+  it (53 deaths in `p4n.txt`).
+- `GoToTask::DrivenOn`: at a run from Slogs with a drill on its way to the cell he is in there is no wait for a
+  Slog's leap or a Slig's back. Not on a ledge nothing comes along: in the first boiler that wait is what gives
+  the drill under the ledge the time to have the Slogs. At a run from Slogs the crossings that follow one
+  another in the plan are gone through in one (`Bot::MakeTask`), and a jump is not barred by a drill that
+  stands still as the switches are.
+- Measured with `hx.txt` (the bot stopped as he comes up at 1637,100, `bot_do runjump 1762 right` at once): down
+  at 1887 with the nearest Slog 196 behind, at the tunnel of 2000 with it 136 behind. It can be done; what the
+  bot loses it by is frames on the platform.
+- As far as it gets: `p4n.txt`, on its first try, through all of it up onto the last platform (2412,100, f=13,226)
+  and dead at 2512,100 under the drill over the well. `p5n.txt`, which comes to it at another moment, is bitten
+  as he lands at 1887. `bw7.txt` past that and the second tunnel, dead at 2325,200 by the mines.
+- Open: the walk to the well under its drill ("walk to the right when the vertical drill is up and jump into the
+  well": `SweepsClear` let him go and he was drilled); the landing at 1887 made sure; a try after a death here
+  ends with no plan (the Slogs' stretch as the graph has it is not put back with the checkpoint: the slam door is
+  shut again and the stretch is still the wider one. A switch a checkpoint puts back is no longer taken for
+  tried, `mSwitchesPutBack`, which was not all of it). Then Director Phleg.
+  Not under unit test: `DrivenOn`, the crossings gone through in one, `mSwitchesPutBack`.
 - Annex 4 is not sure: with path 1 taking one crate's round longer (43 frames) the Slig he is in went in among
   the two it was to shoot and the lever was gone to with one still watching: 3 deaths there in `bw7.txt`, the
   third try through. `bw7.txt` before path 3: those 3 and the slam door.

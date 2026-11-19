@@ -265,6 +265,8 @@ public:
     // which it is told from them. It is a way of getting off a floor in a hurry, and not the crossing a plan
     // names where there is another (Domain).
     static const s32 kStandJumpCost = 401;
+    // A running jump off a floor's end down to a floor under it: dear, the way only at a run from Slogs
+    static constexpr s32 kRunDownCost = 3400;
     s32 CameraOf(s32 x, s32 y) const;
     // His box (from x + lo to x + hi, `tall` up from the floor at y) is wholly inside a Z cover
     bool ZCovered(s32 x, s32 y, s32 lo, s32 hi, s32 tall) const;
