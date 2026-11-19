@@ -526,7 +526,8 @@ bool GoToTask::ZWatched(Bot& bot, const NavGraph& nav, const std::vector<s32>& p
         mZCoverCur = cur;
     }
     // Hurt and in cover: there until it is over, whatever the way on is
-    if (any && !mHurry && abe.mHealthFp < 0x10000 && abe.Settled() && (here.mZCover || (here.mZLow && abe.mMove == Move::eCrouch)))
+    // (not with a Greeter after him: GreeterGo)
+    if (any && !mHurry && !bot.GreeterGoing() && abe.mHealthFp < 0x10000 && abe.Settled() && (here.mZCover || (here.mZLow && abe.mMove == Move::eCrouch)))
     {
         if (mZSaid != 1)
         {
@@ -1288,6 +1289,62 @@ bool GoToTask::ZMove(Bot& bot, const NavGraph& nav, const std::vector<s32>& path
         mSteps--;
         step = TaskStep::Do(Prim::Wait(1));
         return true;
+    }
+    // A Greeter between him and where this ends: only with its beam beyond it and going on, so that he is by it before
+    // the beam has him and it is behind him when it knows. And from there on with no stop for the beam, nor a
+    // rest in cover: it comes after him. (Terminal 5's last Greeter: "Wait until his beam is on his left side
+    // before doing this, so you'll already be past him when you alert him to your presence." Gone when the
+    // Sligs of the background alone allowed, he was through its beam at the Greeter itself, and crouched in the
+    // cover at the hoist's foot when it had him.)
+    {
+        const s32 dir = left ? -1 : 1;
+        for (const BeamAt& beam : bot.GetWorld().mBeams)
+        {
+            if (beam.mDrift256 == 0 || beam.mHalf != here.mHalf || std::abs(beam.mY2 - here.mY) > 60 || nav.CameraOf(beam.mX1, here.mY - 5) != cam)
+            {
+                continue;
+            }
+            const s32 body = (beam.mMinX + beam.mMaxX) / 2;
+            const s32 at = (beam.mX1 + beam.mX2) / 2;
+            if ((body - here.mX) * dir <= 0)
+            {
+                continue;
+            }
+            // (where it goes on beyond where this ends: with it well beyond that and going away. "Wait for the
+            // Greeter and his beam to be way over on the left, and quickly roll half-way across the screen,
+            // stopping behind the crate." Waited for that long first; where it never is, the way is past it.)
+            // (only for the move that ends at a hoist he then goes up, which is the way off the Greeter's floor: from
+            // cover to cover on its floor the beam's own rule is the one, as it was. With this for those too,
+            // Terminal 5's second screen was seven deaths and no way on.)
+            bool toHoist = false;
+            {
+                const s32 end = nav.NodeAt(mZTo, here.mY, here.mHalf, 8);
+                for (s32 e = 0; end >= 0 && e < nav.Nodes()[end].mEdgeCount; e++)
+                {
+                    toHoist = toHoist || nav.Edges()[nav.Nodes()[end].mFirstEdge + e].mKind == EdgeKind::eHoistUp;
+                }
+            }
+            if (!toHoist)
+            {
+                continue;
+            }
+            const bool beyond = false;
+            const bool past = (mZTo - body) * dir > 0 && (at - body) * dir > 10 && beam.mVel256 * dir > 0;
+            if (!beyond && !past && mGreeterWaits < 6000)
+            {
+                mGreeterWaits++;
+                mZFrom = -1;
+                mSteps--;
+                step = TaskStep::Do(Prim::Wait(1));
+                return true;
+            }
+            mGreeterWaits = 0;
+            if (past)
+            {
+                bot.Log("the Greeter's beam is beyond it at " + std::to_string(at) + " and going on, and the Sligs of the background look away: past it to " + std::to_string(mZTo));
+                bot.GreeterGo(abe.mFrame + 120);
+            }
+        }
     }
     mZFrom = -1;
     mZWaits = 0;

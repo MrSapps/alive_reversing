@@ -4662,7 +4662,7 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
     {
         mBeamRolling = false;
     }
-    if (mPilotActive && mAuto && BeamHolds())
+    if (mPilotActive && mAuto && mAbe.mFrame > mGreeterDashUntil && BeamHolds())
     {
         // (nothing held: walking he stops at the next cell, still he stays still)
         mBeamHeld++;
@@ -4838,6 +4838,10 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
                 {
                     mTrace += " " + std::to_string(e.mLiveX) + ":" + std::to_string(e.mState) + (e.mFollowing ? "f" : "");
                 }
+            }
+            for (const BeamAt& beam : mWorld.mBeams)
+            {
+                mTrace += " beam" + std::to_string(beam.mX1) + ".." + std::to_string(beam.mX2) + "v" + std::to_string(beam.mVel256 / 256) + (beam.mDrift256 ? "g" : "");
             }
             for (const SligAt& slig : mWorld.mSligs)
             {

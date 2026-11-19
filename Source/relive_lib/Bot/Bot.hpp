@@ -284,6 +284,15 @@ public:
     }
     // A sortie is on (ClearSligTask): while the Slig of a floor is off his screen and walking away, the way
     // along it is taken at a run or a roll with nothing held back for it. Set a few frames at a time.
+    // On his way past a Greeter: until that frame nothing is held for a beam, and no rest is taken in cover
+    void GreeterGo(u32 untilFrame)
+    {
+        mGreeterDashUntil = untilFrame;
+    }
+    bool GreeterGoing() const
+    {
+        return mAbe.mFrame <= mGreeterDashUntil;
+    }
     void Dash(u32 untilFrame)
     {
         mDashUntil = untilFrame;
@@ -613,6 +622,8 @@ private:
     std::string mPlanText;
     s8 mLastSwitches[256] = {};
     // He is in a Glukkon (or was a moment ago, and is in his trance still: it is in a teleporter)
+    // Until this frame nothing is held for a beam: he is on a run past a Greeter (GreeterDash)
+    u32 mGreeterDashUntil = 0;
     bool mInGlukkon = false;
     // The bot chanted him out of it itself: its going is no loss
     bool mGlukkonLetGo = false;
