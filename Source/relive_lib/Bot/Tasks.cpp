@@ -1510,6 +1510,12 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         return TaskStep::Failed("too many steps");
     }
 
+    // (at a run from Slogs every step is in a hurry, whoever asked for it)
+    if (bot.GetWorld().mFleeing)
+    {
+        mHurry = true;
+    }
+
 
     // A try after a death holds back a little first: most of what kills is on a timer or a patrol
     if (!mWaited)
@@ -2380,7 +2386,7 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
         for (const SlogAt& slog : bot.GetWorld().mSlogs)
         {
             // (not in flight from another: that run is not stopped for this one)
-            if (leaves && !mHurry && (mSlogWaits > 0 || abe.Settled()) && !slog.mAsleep && !bot.GetWorld().SlogFed(slog) && from.mHalf == abe.mHalfScale && std::abs(slog.mY - down.mY) * scale <= 30 && std::abs(slog.mX - from.mX) * scale <= 80 && std::abs(slog.mX - down.mX) * scale <= 200)
+            if (leaves && !mHurry && !bot.GetWorld().mFleeing && (mSlogWaits > 0 || abe.Settled()) && !slog.mAsleep && !bot.GetWorld().SlogFed(slog) && from.mHalf == abe.mHalfScale && std::abs(slog.mY - down.mY) * scale <= 30 && std::abs(slog.mX - from.mX) * scale <= 80 && std::abs(slog.mX - down.mX) * scale <= 200)
             {
                 under = &slog;
             }
@@ -3836,7 +3842,9 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             // its back to where he lands, which is when it is longest before it looks that way again. (It hears
             // him land: what comes next is to be done at once. Bonewerkz' path 1: "hop from directly over the
             // lever to the middle of the lift when the Slig faces left, and immediately go down".)
-            if (nav.Input().mIsAe && !bot.GetWorld().mInvisible && nav.Nodes()[first.mTo].mY > nav.Nodes()[cur].mY + 30 && !nav.Nodes()[first.mTo].mHidden && mHopWaits < 600)
+            // (not at a run from Slogs: there is no waiting then, and its back is what there is. The Executive Office
+            // of Bonewerkz: "jump over him and keep going".)
+            if (nav.Input().mIsAe && !bot.GetWorld().mInvisible && !bot.GetWorld().mFleeing && nav.Nodes()[first.mTo].mY > nav.Nodes()[cur].mY + 30 && !nav.Nodes()[first.mTo].mHidden && mHopWaits < 600)
             {
                 const NavNode& to = nav.Nodes()[first.mTo];
                 bool wait = false;

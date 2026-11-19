@@ -1740,6 +1740,19 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
         {
             return 20;
         }
+        // At a run from Slogs: not down onto their floor right by one of them (he has just come up off it), where
+        // there is a way down further from them. Bonewerkz' Executive Office: off the platform of 1637 by its far
+        // end, "jump over him and keep going", and not back down the hoist he came up.
+        if (world->mFleeing && know->mNav.Nodes()[e.mTo].mY > know->mNav.Nodes()[e.mFrom].mY + 20)
+        {
+            for (const SlogAt& slog : world->mSlogs)
+            {
+                if ((!slog.mAsleep || slog.mWaking) && std::abs(slog.mY - know->mNav.Nodes()[e.mTo].mY) <= 30 && std::abs(slog.mX - know->mNav.Nodes()[e.mTo].mX) < 150)
+                {
+                    return e.mCost + 5000;
+                }
+            }
+        }
         if (!only->empty() && !only->count(idx))
         {
             return -1;
@@ -1889,7 +1902,10 @@ NavGraph::EdgeCost Bot::EdgeCostFn(bool pastScrabs, bool inTheOpen, bool pastFac
             const s32 scale = from.mHalf ? 2 : 1;
             for (const NavFeature& f : know->mNav.Input().mFeatures)
             {
-                if (f.mKind == FeatureKind::eSweep && f.mHalf == from.mHalf && f.mX2 > std::min(from.mX, to.mX) + cell / 2 && f.mX1 < std::max(from.mX, to.mX) - cell / 2 &&
+                // (one that goes along over the floor the jump leaves, and no lower, is that floor's: off its end
+                // down to a floor under it he is clear of it. NavGraph: the running jump off 1762,100.)
+                const bool overFloor = to.mY > from.mY + 40 / scale && f.mX2 - f.mX1 > f.mY2 - f.mY1 && f.mY2 < from.mY;
+                if (!overFloor && f.mKind == FeatureKind::eSweep && f.mHalf == from.mHalf && f.mX2 > std::min(from.mX, to.mX) + cell / 2 && f.mX1 < std::max(from.mX, to.mX) - cell / 2 &&
                     f.mY2 >= std::min(from.mY, to.mY) - 60 / scale && f.mY1 <= std::max(from.mY, to.mY))
                 {
                     return -1;
@@ -3972,6 +3988,20 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
         EnsureKnowledge(map);
         GameView::ReadWorld(map, mWorld);
         mWorld.mFleeing = mFleeFrame != 0 && mAbe.mFrame - mFleeFrame < 300;
+        // (and for as long as they are still about, wherever they are: up on a ledge over them the run is not over.
+        // Bonewerkz' Executive Office: off their floor at 1637,100, with a drill set going by his coming up and the
+        // way on down past them again.)
+        if (mWorld.mFleeing && mAbe.mFrame - mFleeFrame > 100)
+        {
+            for (const SlogAt& slog : mWorld.mSlogs)
+            {
+                if ((!slog.mAsleep || slog.mWaking) && !mWorld.SlogFed(slog) && std::abs(slog.mX - mAbe.mX) < 700 && std::abs(slog.mY - mAbe.mY) < 260)
+                {
+                    mFleeFrame = mAbe.mFrame - 100;
+                    break;
+                }
+            }
+        }
         if (mKnow)
         {
             for (const NavFeature& f : mKnow->mNav.Input().mFeatures)

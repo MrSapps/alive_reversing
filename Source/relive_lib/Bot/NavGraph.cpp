@@ -1687,7 +1687,12 @@ void NavGraph::Build(const NavInput& input)
                         bool drill = false;
                         for (const NavFeature& f : mInput.mFeatures)
                         {
-                            drill = drill || (f.mKind == FeatureKind::eSweep && f.mX2 >= std::min(n.mX, x) - step && f.mX1 <= std::max(n.mX, x) + step && f.mY2 >= n.mY - 70 / scale && f.mY1 <= gy);
+                            // (one that goes along over the floor he hops off, and no lower, is that floor's: its
+                            // cells are the drill's and are timed as such, and off its end he is clear of it. The
+                            // Executive Office of Bonewerkz: off the platform at 1762,100 over the Slig under it,
+                            // "jump over him and keep going", with the drill of 1549..1825 at 57..81.)
+                            const bool overFloor = f.mX2 - f.mX1 > f.mY2 - f.mY1 && f.mY2 < n.mY && f.mX2 <= std::max(n.mX, x) - step;
+                            drill = drill || (!overFloor && f.mKind == FeatureKind::eSweep && f.mX2 >= std::min(n.mX, x) - step && f.mX1 <= std::max(n.mX, x) + step && f.mY2 >= n.mY - 70 / scale && f.mY1 <= gy);
                         }
                         // (onto where a mine is only once it is gone: the edge is given that below. Only where
                         // a Brew is to be had, and mines go a cluster at a time: with rocks, one mine each, such a
