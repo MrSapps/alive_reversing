@@ -18115,6 +18115,155 @@ TaskStep ScrabWaryTask::Next(Bot& bot, const std::string& lastFailed)
         mGo = GoToNode(nav.Edges()[back.back()].mTo);
         return next();
     }
+    // With Fleeches awake and at his heels there is no waiting for the Scrab at all, and none is needed where a
+    // teleporter stands by the place he comes down at that leads on along the Scrab's floor: the Scrab comes
+    // for him where he lands, and the teleporter puts him behind it. (The Mudanchee trial's last screen: "Drop to
+    // the ground and run left to the teleporter, then right." Waited for on the ledges there he was eaten, or
+    // the Scrab stood under the drop: 9 to 24 deaths in three runs of five.)
+    if (!entity && !hot[cur] && mWentAt == 0 && !mTeleTried)
+    {
+        bool chased = false;
+        for (const RockAt& f : world.mFleechesAwake)
+        {
+            chased = chased || (f.mChasing && f.mHalf == nav.Nodes()[cur].mHalf && std::abs(f.mX - abe.mX) * (f.mHalf ? 2 : 1) <= 500 && std::abs(f.mY - abe.mY) * (f.mHalf ? 2 : 1) <= 260);
+        }
+        const NavGraph::EdgeCost plain = [](const NavEdge& e) -> s32
+        {
+            return e.mKind == EdgeKind::eWalk || e.mKind == EdgeKind::eRoll || e.mKind == EdgeKind::eFall || e.mKind == EdgeKind::eTeleport ? std::max<s32>(1, e.mCost) : -1;
+        };
+        const s32 step = NavGraph::GridStep(nav.Nodes()[cur].mHalf);
+        std::vector<s32> best;
+        for (std::size_t fi = 0; chased && fi < nav.Edges().size(); fi++)
+        {
+            const NavEdge& fall = nav.Edges()[fi];
+            if (fall.mKind != EdgeKind::eFall || nav.Nodes()[fall.mFrom].mLine != nav.Nodes()[cur].mLine || !hot[fall.mTo] || fall.mWell >= 0 || fall.mHung)
+            {
+                continue;
+            }
+            const NavNode& land = nav.Nodes()[fall.mTo];
+            for (std::size_t ti = 0; ti < nav.Edges().size(); ti++)
+            {
+                const NavEdge& tele = nav.Edges()[ti];
+                const NavNode& pad = nav.Nodes()[tele.mFrom];
+                const NavNode& out = nav.Nodes()[tele.mTo];
+                if (tele.mKind != EdgeKind::eTeleport || pad.mLine != land.mLine || std::abs(pad.mX - land.mX) > 3 * step || out.mLine != land.mLine)
+                {
+                    continue;
+                }
+                std::vector<s32> toFall;
+                std::vector<s32> toPad;
+                std::vector<s32> on;
+                if ((cur != fall.mFrom && !nav.FindPath(cur, [&](s32 n) { return n == fall.mFrom; }, plain, toFall)) ||
+                    (fall.mTo != tele.mFrom && !nav.FindPath(fall.mTo, [&](s32 n) { return n == tele.mFrom; }, plain, toPad)) ||
+                    (tele.mTo != mGoal && !nav.FindPath(tele.mTo, [&](s32 n) { return n == mGoal; }, plain, on)))
+                {
+                    continue;
+                }
+                std::vector<s32> way = toFall;
+                way.push_back(static_cast<s32>(fi));
+                way.insert(way.end(), toPad.begin(), toPad.end());
+                way.push_back(static_cast<s32>(ti));
+                way.insert(way.end(), on.begin(), on.end());
+                if (best.empty() || way.size() < best.size())
+                {
+                    best = way;
+                }
+            }
+        }
+        if (!best.empty())
+        {
+            mTeleTried = true;
+            bot.Log("Fleeches at his heels and a teleporter by where he comes down: on at once, to come out behind the Scrab");
+            mWentAt = abe.mFrame;
+            // (onto the teleporter at a walk, to stand in it: run onto it he was a cell past it when it took him,
+            // and came out still running the wrong way, into the Scrab. On from where it puts him at a run.)
+            std::set<s32> toDrop;
+            mTeleFirst.clear();
+            mTeleOn.clear();
+            s32 stage = 0;
+            for (s32 edge : best)
+            {
+                (stage == 0 ? toDrop : stage == 1 ? mTeleFirst : mTeleOn).insert(edge);
+                if (stage == 0 && nav.Edges()[edge].mKind == EdgeKind::eFall)
+                {
+                    stage = 1;
+                    mTeleLand = nav.Edges()[edge].mTo;
+                }
+                else if (nav.Edges()[edge].mKind == EdgeKind::eTeleport)
+                {
+                    stage = 2;
+                    mTeleOut = nav.Edges()[edge].mTo;
+                }
+            }
+            // (to the end of the ledge first: the drop is begun with the Scrab not about to be on him, see below)
+            mTeleDrop = -1;
+            for (s32 edge : toDrop)
+            {
+                if (nav.Edges()[edge].mKind == EdgeKind::eFall)
+                {
+                    mTeleDrop = edge;
+                }
+            }
+            toDrop.erase(mTeleDrop);
+            if (cur != nav.Edges()[mTeleDrop].mFrom)
+            {
+                bot.KeepTo(toDrop);
+                mKept = &bot;
+                mGo = GoToNode(nav.Edges()[mTeleDrop].mFrom);
+                mGo->SetHurry(true);
+                return next();
+            }
+        }
+    }
+    // At the end of the ledge: down, but not into the Scrab's teeth. Landed, turned and on the teleporter's plate
+    // takes him some 32 frames, and the Scrab comes at 7 a frame from the moment he lands: with it nearer than
+    // that and not on its way off he holds a moment, for as long as the Fleeches behind him allow.
+    if (mTeleDrop >= 0 && cur == nav.Edges()[mTeleDrop].mFrom)
+    {
+        const NavNode& land = nav.Nodes()[nav.Edges()[mTeleDrop].mTo];
+        bool near = false;
+        for (const ScrabAt& scrab : world.mScrabs)
+        {
+            const bool away = (scrab.mX > land.mX) == !scrab.mFacesLeft && scrab.mMotion != 0;
+            near = near || (!scrab.mPossessed && scrab.mHalf == land.mHalf && std::abs(scrab.mY - land.mY) <= 30 && std::abs(scrab.mX - land.mX) < 230 && !away);
+        }
+        bool onHim = false;
+        for (const RockAt& f : world.mFleechesAwake)
+        {
+            onHim = onHim || (f.mHalf == nav.Nodes()[cur].mHalf && std::abs(f.mY - abe.mY) <= 30 && std::abs(f.mX - abe.mX) < 70);
+        }
+        if (near && !onHim && ++mTeleHeld < 90)
+        {
+            return TaskStep::Do(Prim::Wait(1));
+        }
+        const s32 drop = mTeleDrop;
+        mTeleDrop = -1;
+        bot.KeepTo({drop});
+        mKept = &bot;
+        mGo = GoToNode(mTeleLand);
+        mGo->SetHurry(true);
+        return next();
+    }
+    // (down: onto the teleporter at a walk)
+    if (mTeleLand >= 0 && cur == mTeleLand)
+    {
+        mTeleLand = -1;
+        bot.KeepTo(mTeleFirst);
+        mKept = &bot;
+        mGo = GoToNode(mTeleOut);
+        mGo->SetTopGait(Gait::eWalk);
+        return next();
+    }
+    // (out of the teleporter: on at a run)
+    if (mTeleOut >= 0 && cur == mTeleOut)
+    {
+        mTeleOut = -1;
+        bot.KeepTo(mTeleOn);
+        mKept = &bot;
+        mGo = GoToNode(mGoal);
+        mGo->SetHurry(true);
+        return next();
+    }
     const Stint stint = PlanFor(bot, cur, mGoal, entity, hot, false);
     if (!stint.mFound)
     {

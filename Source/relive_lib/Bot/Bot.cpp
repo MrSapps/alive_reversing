@@ -3133,7 +3133,22 @@ void Bot::OnDeath(BaseMap& map)
         const EdgeKind kind = mKnow->mNav.Edges()[mCurrentEdge].mKind;
         if ((kind == EdgeKind::eFall || kind == EdgeKind::eHop || kind == EdgeKind::eRunJump) && ++mEdgeDeaths[mCurrentEdge] >= 2)
         {
-            BanEdge(mCurrentEdge);
+            // (where there is another way to where it goes. The only way is tried again, a little later each
+            // time, until the same cell has killed him twenty times: ruled out after two, it left no plan at
+            // all. Bonewerkz' path 2, the hop at 3512,1240; the Scrab trial's last drop.)
+            const NavEdge& dying = mKnow->mNav.Edges()[mCurrentEdge];
+            const s32 dyingEdge = mCurrentEdge;
+            const s32 dyingTo = dying.mTo;
+            const NavGraph::EdgeCost cost = EdgeCostFn();
+            const NavGraph* graph = &mKnow->mNav;
+            std::vector<s32> other;
+            const bool another = graph->FindPath(dying.mFrom, [dyingTo](s32 n)
+                                                 { return n == dyingTo; }, [&cost, graph, dyingEdge](const NavEdge& e) -> s32
+                                                 { return &e == &graph->Edges()[dyingEdge] ? -1 : cost(e); }, other);
+            if (another)
+            {
+                BanEdge(mCurrentEdge);
+            }
         }
         mCurrentEdge = -1;
     }
@@ -3183,7 +3198,8 @@ void Bot::OnDeath(BaseMap& map)
     // Each try from the same save begins a little later than the one before: begun on the same frame it is the
     // same try, to the frame he dies on, wherever nothing was learnt from the death. (The Scrab trial's last
     // ledge: the Scrab stood under it each of thirteen times, as it never did in a run of the trial alone.)
-    mHold = 3 * mAttempt;
+    // (from the second try on: the first is as it always was, with whatever the death taught)
+    mHold = 3 * std::max(0, mAttempt - 1);
 }
 
 void Bot::RewindMiss(BaseMap& map)
