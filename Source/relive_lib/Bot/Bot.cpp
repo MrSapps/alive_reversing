@@ -1323,7 +1323,9 @@ bool Bot::Replan(BaseMap& map)
             inGlukkon = inGlukkon || g.mPossessed;
         }
         const StepKind kind = domain.mSteps[first.mTag].mKind;
-        if (mIsAe && mAbe.mMotion == 112 && kind != StepKind::eVoiceLock && kind != StepKind::eSligLever && mGlukkonWaits < 120)
+        // (in a Glukkon, or just out of one: not chanting for anything else. The Scrab vault's path 2: begun as he
+        // chanted, the leading off of its Fleeches was put off twelve times and then had no way.)
+        if (mIsAe && mAbe.mMotion == 112 && (inGlukkon || mInGlukkon) && kind != StepKind::eVoiceLock && kind != StepKind::eSligLever && mGlukkonWaits < 120)
         {
             mGlukkonWaits++;
             mTask.reset();

@@ -2642,6 +2642,34 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             bot.Log("a Scrab loose on this floor, at" + where + ", next a " + EdgeKindName(first.mKind));
         }
     }
+    // A hop that ends hung from a ledge, with a Scrab loose on a floor just under it: not while the Scrab is by
+    // that ledge or on its way to it. Hung, his feet are in its reach. (The Scrab vault's path 6, in a run from
+    // the Mines: hung at 2912,1140 with the Scrab of the pen under it at 2880 on the floor at 1240 and coming.
+    // Begun 60 frames earlier in a run of that path alone, it was 50 short of him and he was up.)
+    // (a hop of four cells over a gap is one: it comes down short and he catches the edge. One of three clears
+    // it: the Scrab vault's path 1, over the pen at 512,460, where the Scrab is under him whenever he goes.)
+    const bool overGap = first.mKind == EdgeKind::eHop && std::abs(nav.Nodes()[first.mTo].mY - nav.Nodes()[cur].mY) <= 10 &&
+                         std::abs(nav.Nodes()[first.mTo].mX - nav.Nodes()[cur].mX) >= 4 * NavGraph::GridStep(nav.Nodes()[cur].mHalf) &&
+                         nav.NodeAt((nav.Nodes()[first.mTo].mX + nav.Nodes()[cur].mX) / 2, nav.Nodes()[cur].mY, nav.Nodes()[cur].mHalf, 12) < 0;
+    if (overGap && mScrabUnderWaits < 900)
+    {
+        const NavNode& ledge = nav.Nodes()[first.mTo];
+        const s32 scale = ledge.mHalf ? 2 : 1;
+        for (const ScrabAt& scrab : bot.GetWorld().mScrabs)
+        {
+            const s32 off = scrab.mX - ledge.mX;
+            const bool coming = (off < 0) == !scrab.mFacesLeft;
+            if (!scrab.mPossessed && scrab.mHalf == ledge.mHalf && scrab.mY > ledge.mY + 20 && (scrab.mY - ledge.mY) * scale <= 130 && std::abs(off) * scale < (coming ? 450 : 150))
+            {
+                if (mScrabUnderWaits++ == 0)
+                {
+                    bot.Log("a Scrab under the ledge at " + std::to_string(ledge.mX) + "," + std::to_string(ledge.mY) + ": waiting for it to be gone from there");
+                }
+                mSteps--;
+                return TaskStep::Do(Prim::Wait(1));
+            }
+        }
+    }
     // A Slurg where the next step comes down: hopped over if it is just ahead on this floor and the hop comes
     // down clear of every one of them, else waited for (they crawl half a pixel a frame). Not for ever: after a
     // long wait it is trodden on.
@@ -3712,9 +3740,21 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                 // (with nothing after him, only where the way goes on the same way below: run off, he comes down a
                 // cell or two further out, and back from there is time lost. The Mudanchee trial's last room,
                 // off 1762,360 for the teleporter behind him: 33 frames, and the power was gone at the lock.)
+                // (nor down onto a floor a Scrab can get at him on, from one it cannot, with the power to go unseen in
+                // hand and not yet called on: stopped at the end, where it is chanted for before the drop. The Scrab
+                // vault's path 2, off 2462,360 to the lock at 2569,460: run off, he chanted on the Scrab's floor
+                // and it had him, eight times over.)
+                bool chantFirst = false;
+                if (last + 1 < path.size() && nav.Edges()[path[last + 1]].mKind == EdgeKind::eFall)
+                {
+                    const NavNode& top = nav.Nodes()[nav.Edges()[path[last + 1]].mFrom];
+                    const NavNode& down = nav.Nodes()[nav.Edges()[path[last + 1]].mTo];
+                    const World& ww = bot.GetWorld();
+                    chantFirst = !ww.mInvisible && (ww.mInvisCharge || bot.InvisSaved()) && Domain::HuntedAt(nav, ww, down.mX, down.mY, down.mHalf) && !Domain::HuntedAt(nav, ww, top.mX, top.mY, top.mHalf);
+                }
                 const bool onTheSameWay = last + 2 < path.size() && nav.Edges()[path[last + 2]].mLeft == first.mLeft && (nav.Edges()[path[last + 2]].mKind == EdgeKind::eWalk || nav.Edges()[path[last + 2]].mKind == EdgeKind::eRoll || nav.Edges()[path[last + 2]].mKind == EdgeKind::eRunJump);
                 if (last + 1 < path.size() && nav.Edges()[path[last + 1]].mKind == EdgeKind::eFall && nav.Edges()[path[last + 1]].mLeft == first.mLeft && !nav.Edges()[path[last + 1]].mCrouched &&
-                    !first.mCrouched && first.mKind == EdgeKind::eWalk && (!unseenChase || onTheSameWay))
+                    !first.mCrouched && first.mKind == EdgeKind::eWalk && (!unseenChase || onTheSameWay) && !chantFirst)
                 {
                     bot.Log(std::string("chased: off the end of the floor at a run") + (bot.TimedRunOn() ? " (a timed run)" : bot.RecentlyChased() ? " (chased in this path a while ago)" : ""));
                     Prim run = Prim::WalkOff(first.mLeft);
@@ -4022,7 +4062,9 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             // he drops into it; run off he comes down past it. Measured in the Barracks' war room, off the ledge
             // at 2162,340: walked, into the well at 2137,461 and thrown back up; run, down at 2112,461. The
             // walkthrough: "Have Abe RUN off the ledge so that you don't fall into the well".
-            if (!first.mCrouched)
+            // (at full size, where it was measured. At half size the run carries him over to the next ledge: the
+            // Scrab vault's path 2, off 266,320 to 292,320 with its Fleeches behind him and no way on from there.)
+            if (!first.mCrouched && !nav.Nodes()[cur].mHalf)
             {
                 const NavNode& from = nav.Nodes()[cur];
                 const NavNode& to = nav.Nodes()[first.mTo];
