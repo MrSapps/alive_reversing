@@ -2484,6 +2484,7 @@ void Bot::MaybeCheckpoint(BaseMap& map)
     saved.mCheckpoint.Save(map);
     saved.mInputCount = mInputs.size();
     saved.mRng = mRng.State();
+    saved.mGatesGone = mWorld.mGatesGone;
     if (look)
     {
         saved.mMemory = *this;
@@ -3914,6 +3915,27 @@ void Bot::Think(BaseMap& map)
         }
     }
 
+    mFlierRun = false;
+    if (mKnow && mIsAe && !mWorld.mFliers.empty())
+    {
+        bool hidden = false;
+        for (const NavNode& n : mKnow->mNav.Nodes())
+        {
+            hidden = hidden || n.mHidden;
+        }
+        // (one that is a threat as FlierThreat has it: not one he only runs by or that is nowhere near. The Mines'
+        // way out went 800 frames sooner with this for any flying Slig, and into its explosions.)
+        // (and on his screen now: it sees what is on its screen)
+        bool onScreen = false;
+        for (const FlierAt& flier : mWorld.mFliers)
+        {
+            onScreen = onScreen || (flier.mHalf == mAbe.mHalfScale && mKnow->mNav.CameraOf(flier.mX, flier.mY) == mKnow->mNav.CameraOf(mAbe.mX, mAbe.mY - 5));
+        }
+        // (at half size only, which is where it was measured to help: FeeCo's Executive Offices, three screens of
+        // flying Sligs got through. At full size the Mines' way out, path 6, went into its explosions three
+        // times with it. Open: which of what a timed run changes it is that helps there, and why not here.)
+        mFlierRun = mAbe.mHalfScale && !hidden && onScreen && FlierThreat();
+    }
     // The Glukkon he was in is no more, and he is out of his trance: what it was for cannot be done now. As a
     // death of his own: back to the last checkpoint.
     {
@@ -4077,10 +4099,12 @@ void Bot::Update(BaseMap& map, bool betweenFrames)
             return;
         }
         mRestoring = false;
-        // (the gates taken for gone for good are as the world put back has them: one that opened after the
-        // checkpoint is shut again. Bonewerkz' Executive Office: gone back to before a lever, Director Phleg
-        // walked into the slam door that lever opens, over and over.)
-        mWorld.mGatesGone.clear();
+        // (the gates taken for gone for good are as they were when the checkpoint was made: one that opened
+        // after it is shut again, one that was gone by then is gone. Bonewerkz' Executive Office: gone back to
+        // before a lever, Director Phleg walked into the slam door that lever opens, over and over. FeeCo's
+        // Executive Offices: all of them forgotten, the lever whose switch puts itself back was pulled again
+        // after every death.)
+        mWorld.mGatesGone = mCheckpoints.back().mGatesGone;
         // The task starts over from the world as it was
         mPilotActive = false;
         mReflex.reset();

@@ -2334,7 +2334,12 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                     }
                     laterFree += orbAt(to) ? 0 : 1;
                 }
-                near = near && !(bot.InvisForCrossing() && orbAt(from));
+                // (where every cell on the way to that floor is on an orb's screen it is here all the same, at the
+                // last cell: the power takes on the chant's first frame and the orb's zap, 20 frames on, knocks him
+                // back and no more (Abe.cpp, SecurityOrb.cpp). FeeCo's Executive Offices: "Slap it, turn invisible
+                // and drop to the bottom level", lock and orb on one screen. Not chanted, he dropped among the
+                // Sligs as he was.)
+                near = near && !(bot.InvisForCrossing() && orbAt(from) && laterFree > 0);
             }
             // And whatever the plan says: about to step onto a floor a Scrab can get at him on, from one it cannot
             {
