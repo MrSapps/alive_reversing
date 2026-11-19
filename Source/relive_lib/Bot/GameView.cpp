@@ -926,6 +926,8 @@ static void BuildEntities(BinaryPath& path, World& world)
                     // wants the same scale)
                     e.mHalf = static_cast<const relive::Path_Slog&>(tlv).mScale == relive::reliveScale::eHalf;
                     e.mInputs[0] = static_cast<const relive::Path_Slog&>(tlv).mBoneEatingTime;
+                    // (and the switch that sets it on him, SwitchZoneTask)
+                    e.mInputs[5] = static_cast<const relive::Path_Slog&>(tlv).mAngerSwitchId;
                     break;
                 case ReliveTypes::eMeatSack:
                     // (a sack like the other: what it gives is meat)
@@ -1456,6 +1458,26 @@ static void MarkSlogPens(NavInput* in, World& world, bool bones)
             else
             {
                 x2 = std::min(x2, wx - 1);
+            }
+        }
+        // (and by a slam door that is shut: what is behind one is shut in until it opens. Bonewerkz' Executive Office:
+        // three Slogs behind the slam door at 451,200, let out by the sensor a screen on; the floor past the door
+        // was taken for theirs, and there was no way down onto it.)
+        for (const NavFeature& door : lines.mFeatures)
+        {
+            if (door.mKind != FeatureKind::eBarrier || !door.mSolid || door.mHalf != half || door.mSwitch <= 1 || std::abs(door.mY2 - y) > 30 ||
+                (world.Switch(door.mSwitch) != 0) == door.mStartClosed)
+            {
+                continue;
+            }
+            const s32 dx = (door.mX1 + door.mX2) / 2;
+            if (dx < x)
+            {
+                x1 = std::max(x1, door.mX2 + 1);
+            }
+            else
+            {
+                x2 = std::min(x2, door.mX1 - 1);
             }
         }
         // A Slog goes for a bone on the screen shown, and Abe is seen from where it stands: the Slogs of one screen

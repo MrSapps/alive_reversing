@@ -542,6 +542,14 @@ struct World final
             {
                 continue;
             }
+            // (one that does not move, and is carried by nothing, is not waited for: it will be there as long as
+            // he waits, and the way is through it. Bonewerkz' Executive Office: "stepping through the red sensor
+            // drops the slamdoor behind you and lets out the Slogs". Sixty thousand frames kept still in front
+            // of it.)
+            if (b.mVel256 == 0 && b.mDrift256 == 0)
+            {
+                continue;
+            }
             // Frame by frame: where he is by then against where the beam is, turning round at its ends
             // (the beam has to be 8 inside his box to count)
             const s32 pad = half ? 5 : 10;
@@ -838,6 +846,9 @@ struct World final
     std::vector<SlogFloor> mSlogFloors;
     // Where the map puts Slogs asleep (of the path, whether their screen is loaded or not): a noise on their
     // screen wakes them (Slog.cpp, Brain_1_Idle), so it is crossed at a sneak
+    // He is at a run from Slogs that are after him (Bot::MakeSlogFlee, for a few seconds after): their floors are
+    // no bar to him then
+    bool mFleeing = false;
     std::vector<RockAt> mSlogsAsleepAt;
     // AE: where the map has things that fall over and over (FallingItem), whether their screen is shown or not:
     // mX, mY where each starts, mEvery its wait, mFallIn -1 while its switch is off, its box's sides as measured
@@ -915,7 +926,8 @@ struct World final
                     {
                         after = after || (slog.mChasing && std::abs(slog.mY - floor.mFloorY) <= 30);
                     }
-                    return !after || BoneShownOn(floor.mFloorY, floor.mHalf) ? 1 : 0;
+                    // (or he is at a run from them: the floor they are after him on is where he runs)
+                    return !after || mFleeing || BoneShownOn(floor.mFloorY, floor.mHalf) ? 1 : 0;
                 }
             }
             for (const Entity& e : mEntities)

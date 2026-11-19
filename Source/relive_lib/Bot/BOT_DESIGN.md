@@ -2766,10 +2766,29 @@ wheel that sets a 300-frame clock going; the fifth behind a tasks door at the bo
   Office (`bonewerkz_ender` 14) at f=12,436, 1 death (a mine in boiler 2). `bw7.txt`, from the first annex: into
   the Executive Office at f=30,967, 5 deaths (Annex 4's three, the slam door, that mine). All of it is still
   "Try switch": there is no plan for the whole path.
-- Next, the Executive Office: in at 62,199, stuck at 187,199. Four drills that come down at 7 to 9 a frame over
-  a tunnel that is rolled, the well under the third: "wait for an opening and roll to the well, and jump into it
-  right away". `SweepsClear` never says yes there. Then Slogs let out behind a slam door, a Slig, mines, and
-  Director Phleg (a Glukkon, as General Dripik was: Sligs told to pull levers and to kill).
+### The Executive Office (`bonewerkz_ender` 14), begun (2026-11-19, `p5n.txt` starts at its door)
+
+- The tunnel of four drills and the well under the third: `GoToTask::Bodies` took a well for as many frames as
+  its edge costs, and there was never the time. Measured with `dr.txt` (rolled from 162,200, up twice at the
+  well, begun at each of 45 frames): 12 in a row get through. Up from the crouch 8 and 16 into the well now.
+- `MarkSlogPens`: a stretch ends at a slam door that is shut (three Slogs behind the one at 451,200; the floor
+  past it was taken for theirs).
+- `World::BeamClear`: a motion detector's beam that does not move is not waited for ("stepping through the red
+  sensor drops the slamdoor behind you and lets out the Slogs": sixty thousand frames kept still before it).
+- `SwitchZoneTask::SetsSlogsOn`: a zone whose switch sets the map's Slogs on him is gone through at a run and on,
+  away from them. `Bot::Replan`: with no plan and Slogs awake on his floor it is theirs to move, and the run
+  from them is made (`MakeSlogFlee`) and not the end called. `World::mFleeing`: at a run from Slogs their floors
+  are no bar; `SlogRefuge` takes the running jump at a hoist whatever the pilot's costs say of it but a ban.
+  Measured with `tn.txt`: Slogs do come into the tunnel he rolls through; it is no refuge.
+- As far as it gets: through the sensor, four screens of floor and the rolled tunnel with four Slogs behind him,
+  and up the hoist at 1637 onto the platform at 100 (f=646), no death on the way in `p5n.txt`. There he stands:
+  no plan for what is next, and the drill that his coming up starts (1 a frame from the platform's left end) has
+  him 60 frames on.
+- Next: on at once, "jump over him [the Slig at 1799,200] and keep going", the tunnel of 2000..2176, "jump over
+  the mines and pull up immediately" (the hoist at 2412), "walk to the right when the vertical drill is up and
+  jump into the well" (2537,100). Then Director Phleg: a Slig told to pull levers and to kill, four times over,
+  as General Dripik's were. `bw7.txt`: 9 deaths now, 5 of them here (4 at the drills' tunnel on tries after the
+  first, 1 on the platform).
 - Annex 4 is not sure: with path 1 taking one crate's round longer (43 frames) the Slig he is in went in among
   the two it was to shoot and the lever was gone to with one still watching: 3 deaths there in `bw7.txt`, the
   third try through. `bw7.txt` before path 3: those 3 and the slam door.
