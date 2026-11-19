@@ -1333,6 +1333,13 @@ void NavGraph::Build(const NavInput& input)
                 {
                     n.mHidden = true;
                 }
+                // (stood still he is narrower: measured in FeeCo's Executive Offices at 1612,1500, two pixels short
+                // of the shadow of 1589..1662 by the rule above, not seen in 400 frames by the Slig that comes to
+                // 1662 to face him each round)
+                if (f.mKind == FeatureKind::eInvisibleZone && x - (half ? 7 : 13) >= f.mX1 && x + (half ? 7 : 13) <= f.mX2 && n.mY >= f.mY1 + 40 && n.mY <= f.mY2 + 4)
+                {
+                    n.mHiddenStill = true;
+                }
             }
             // (standing still his box is 52 high: the rifle range's cutout at 1262,420 is a cover that begins
             // just 52 over its floor)

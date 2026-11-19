@@ -2984,7 +2984,22 @@ is turned, down again and off to the right.
   him" takes him out into its sight. To do: a cell hidden to one who stands still (13 either side) as a place to
   wait and no cause to run; the walk behind the Slig to 1737 as it goes right; the lever behind the top Slig.
 
-**Not in the tree:** the three changes above (the lock a way leads to, the dear jump or drop under an orb, the
-hoist down beside a shadow) failed the check set: a1 18 deaths (14), bw1 1, wr 12 and stuck with no plan at f=508,
-fc3 1. They are kept as `build-bot/la/stealth_wip.patch` (and a git stash of the same name), to be put back one at
-a time with `wr.txt`, `bw1.txt` and `regress.sh` run after each. The tree is as at the commit before, which passed.
+**In the tree again (2026-11-19, later), each narrowed until the check set passed** (ctest 11/11; m1, tr1, t13 0;
+a1 14; bw1, blk9t, b14, wr 0; fc3 0; bw7b 29, of which 21 are the Executive Offices' first part):
+
+- The dear jump or drop under an orb: AE only (AO's Rupture Farms was four deaths the worse), only where a hoist
+  leads quietly to the floor it ends on (down from within three cells of its take-off, or up or down onto that very
+  floor), and only on a screen with shadows on that floor. For every jump, Bonewerkz' rock sack room was twelve
+  deaths and no plan.
+- `NavNode::mHiddenStill`: a cell that hides one who stands still (13 either side). No run from a Slig "awake next
+  to him" from there while he stands, nor from one that walks away from him on a screen with shadows while he
+  sneaks after it ("Sneak behind the Slig to the shadow on the right of the Glukkon transporter").
+- `ClearSligTask::Sortie`: with a Slig that never leaves the screen, out as it turns its back on where he waits
+  ("When the top Slig turns away, sneak ahead one step, pull the lever, turn and sneak back one step").
+
+`la/fs1.txt` with these: down the hoist behind the bottom Slig, a round waited out in the shadow, behind it to
+1737, up, the lever pulled at f=2366 and back, down again and on to the next screen at 2012,1500 with no death;
+slow (two waits run out to their limits, 1500 and 100 frames). It dies there: the lever of switch 17 is to be hopped
+down to from the small platform at 1962,1420 "while the Sligs are at the left side, raising a slamdoor to prevent
+them from shooting you". And there is no checkpoint anywhere in this part (a Slig is always on the screen), so in
+the whole run a death here goes back to before the flying Sligs: to do, a checkpoint where he stands hidden.

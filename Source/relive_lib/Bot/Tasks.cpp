@@ -4086,7 +4086,17 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
             // let down behind their backs the nearer one, still on his screen, turned and shot.
             const NavNode& land = nav.Nodes()[first.mTo];
             // (AE's only: AO's Rupture Farms got through as it was, and did not with this)
-            if (nav.Input().mIsAe && land.mHidden && mDropWait < 1500)
+            // (or down beside a shadow, the cell next to where he lands being one: the same, he steps into it.
+            // And a Slig whose beat never leaves that screen is waited for at its beat's far end with its back to
+            // him instead: FeeCo's Executive Offices, "lower yourself down when the bottom Slig is facing right",
+            // the hoist at 1612 two pixels short of the shadow of 1589..1662.)
+            bool beside = false;
+            for (s32 k = 0; k < land.mEdgeCount; k++)
+            {
+                const NavEdge& on = nav.Edges()[land.mFirstEdge + k];
+                beside = beside || (on.mKind == EdgeKind::eWalk && nav.Nodes()[on.mTo].mHidden);
+            }
+            if (nav.Input().mIsAe && (land.mHidden || beside) && mDropWait < 1500)
             {
                 for (const SligAt& s : bot.GetWorld().mSligs)
                 {
@@ -4095,7 +4105,16 @@ TaskStep GoToTask::Next(Bot& bot, const std::string& lastFailed)
                         continue;
                     }
                     const bool away = s.mFacingLeft == (s.mX < land.mX);
-                    const bool room = nav.CameraOf(s.mX, s.mY - 5) != nav.CameraOf(land.mX, land.mY - 5);
+                    const s32 landCam = nav.CameraOf(land.mX, land.mY - 5);
+                    const bool stays = s.mBeatMax > s.mBeatMin && nav.CameraOf(s.mBeatMin, s.mY - 5) == landCam && nav.CameraOf(s.mBeatMax, s.mY - 5) == landCam;
+                    // (the way down is 48 frames and the step into the shadow some 20 more: for as long as that it is
+                    // not to look his way again. Measured: let down with it 130 off and walking away, it was at
+                    // its beat's end and back to face him as he landed.)
+                    const s32 camX = (land.mX / nav.Input().mCamW) * nav.Input().mCamW;
+                    // (or as it turns its back at the end of its beat nearest him, wherever that turns out to be: a
+                    // door shut across its beat makes it shorter than its bounds say. Measured there: 1662 to 1762,
+                    // 78 frames from its turn at 1662 to its turn back at 1762.)
+                    const bool room = stays ? (s.FramesUntilSees(land.mX, camX, camX + nav.Input().mCamW) >= 70 || (std::abs(s.mX - land.mX) <= 60 && s.mMotion != 0)) : nav.CameraOf(s.mX, s.mY - 5) != landCam;
                     if (!away || !room)
                     {
                         mDropWait += 2;
@@ -8236,6 +8255,37 @@ TaskStep ClearSligTask::Sortie(Bot& bot, const std::string& lastFailed, s32 x, s
     }
     if (mSortie == 2)
     {
+        // Or, with a Slig that never leaves the screen: as it turns its back on where he waits, which is when it
+        // is longest before it looks that way again. (FeeCo's Executive Offices: "When the top Slig turns away,
+        // sneak ahead one step, pull the lever, turn and sneak back one step, all before he turns back around".
+        // Waited for to leave, it never did, and the lever pulled then was pulled under its eyes.)
+        bool backs = true;
+        bool any = false;
+        const s32 havenX = nav.Nodes()[mSortieNode].mX;
+        for (const SligAt& slig : world.mSligs)
+        {
+            const s32 about = SligAbout(nav, slig, x, y, half);
+            if (about == 1)
+            {
+                any = true;
+                backs = backs && slig.mMotion != 5 && slig.mFacingLeft == (slig.mX < havenX);
+            }
+            else if (about == 2)
+            {
+                backs = false;
+            }
+        }
+        const bool turned = any && backs && mSortieFaced >= 0 && static_cast<s32>(abe.mFrame) - mSortieFaced <= 4;
+        if (any && !backs)
+        {
+            mSortieFaced = static_cast<s32>(abe.mFrame);
+        }
+        if (turned)
+        {
+            clear = true;
+            gone = true;
+            bot.Log("the Slig has turned its back: out now");
+        }
         if (!clear || !gone)
         {
             if (++mSortieWaits > 3000)

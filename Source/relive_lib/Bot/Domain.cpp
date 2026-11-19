@@ -3696,7 +3696,36 @@ Domain Domain::Build(const NavGraph& nav, const World& world, s32 abeNode, const
                         bool power = world.mInvisCharge || world.mInvisible || world.mInvisComing;
                         for (const Entity& lock : world.mEntities)
                         {
-                            power = power || (lock.mKind == EntityKind::eSlapLock && lock.mInputs[0] > 0);
+                            // (one there is a way to from where he is, shut or not: FeeCo's Executive Offices, whose one
+                            // lock is a well back from the lever a Slig watches under an orb, and wells go one way)
+                            if (lock.mKind != EntityKind::eSlapLock || lock.mInputs[0] <= 0 || power)
+                            {
+                                continue;
+                            }
+                            const s32 lockNode = UseNode(nav, lock, nullptr);
+                            if (abeNode < 0 || lockNode < 0)
+                            {
+                                power = true;
+                                continue;
+                            }
+                            std::vector<char> seen(nav.Nodes().size(), 0);
+                            std::vector<s32> open{abeNode};
+                            seen[abeNode] = 1;
+                            while (!open.empty() && !power)
+                            {
+                                const s32 cur = open.back();
+                                open.pop_back();
+                                power = cur == lockNode;
+                                for (s32 k = 0; k < nav.Nodes()[cur].mEdgeCount; k++)
+                                {
+                                    const s32 to = nav.Edges()[nav.Nodes()[cur].mFirstEdge + k].mTo;
+                                    if (!seen[to])
+                                    {
+                                        seen[to] = 1;
+                                        open.push_back(to);
+                                    }
+                                }
+                            }
                         }
                         // (or, in a path with a boom machine, with that orb blown up first: then the Sligs are taken
                         // over as anywhere. The walkthrough of the Barracks' Slig bunks: "throw the grenade forward on
