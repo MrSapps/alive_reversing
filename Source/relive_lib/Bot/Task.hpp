@@ -398,6 +398,39 @@ private:
     std::unique_ptr<UseTask> mUse;
 };
 
+// A Slig on a floor only a lift goes to, got rid of with the Slig a Glukkon calls for: he says hello to the
+// Glukkon from mHello (its alarm sends a naked Slig for pants and after him), goes to the lever of the gate the
+// Slig comes through, shuts it behind it, takes it over from there, rides it up the lift and shoots (Domain:
+// ePantsSlig). The brewery's first hub.
+class PantsSligTask final : public Task
+{
+public:
+    PantsSligTask(u32 target, u32 lever, s32 hello)
+        : mTarget(target)
+        , mLever(lever)
+        , mHello(hello)
+    {
+    }
+    ~PantsSligTask() override;
+    std::string Name() const override
+    {
+        return "Kill Slig #" + std::to_string(mTarget) + " with the Slig a Glukkon calls";
+    }
+    TaskStep Next(Bot& bot, const std::string& lastFailed) override;
+
+private:
+    u32 mTarget;
+    u32 mLever;
+    s32 mHello;
+    // 0 to the hello, 1 to the lever, 2 the wait for the Slig and the pull, 3 the chant, 4 to the lift, 5 up it,
+    // 6 the shooting, 7 back down, 8 the burst, 9 himself again
+    s32 mPhase = 0;
+    s32 mWaits = 0;
+    s32 mShots = 0;
+    std::unique_ptr<GoToTask> mGo;
+    std::unique_ptr<UseTask> mUse;
+};
+
 // In a Glukkon: go to the cell mStand by a lever, call for help, have the Slig that comes come to it and say "Do
 // it", which has a Slig that listens pull the lever a cell from it
 class SligLeverTask final : public Task

@@ -111,6 +111,7 @@ enum class StepKind : u8
     eCrawlerButton, // from the cell mEdge take over a naked Slig and press the button mEntity with it
     eSligLever,     // the Glukkon he is in goes to the cell mEdge and has a Slig it calls pull the lever mEntity
     eDrillSlogs,    // pull the lever mEntity to set its drills on the Slogs asleep under them, and again once those are dead
+    ePantsSlig,     // kill Slig mEntity with the Slig a Glukkon calls: hello from node mEdge, the gate's lever mOther
     eTimedDoor,     // use the lever mEntity (to the value mOther) and at once cross the edge mEdge, which a trap door
                     // that shuts by itself opens for a while
     eFeedSlogs,     // from the cell mEdge throw a bone onto the stretch of floor of the Slog mEntity (mOther: twice

@@ -608,6 +608,13 @@ NavInput GameView::BuildNavInput(BinaryPath& path, s32 level, s32 pathId)
                 }
                 case ReliveTypes::eLiftPoint:
                 {
+                    // (not one that only says where the lift starts: it is no floor, and the lift does not stop
+                    // there again. The brewery's first hub: its lift starts at 820 between the floors at 980 and
+                    // 420, and a ride "to 820" went past it for 2,000 frames.)
+                    if (static_cast<const relive::Path_LiftPoint&>(tlv).mLiftPointStopType == relive::Path_LiftPoint::LiftPointStopType::eStartPointOnly)
+                    {
+                        break;
+                    }
                     NavFeature f = MakeFeature(FeatureKind::eLiftStop, tlv, camera, id);
                     f.mHalf = static_cast<const relive::Path_LiftPoint&>(tlv).mScale == relive::reliveScale::eHalf;
                     // (where the lift is to start with)
