@@ -1494,10 +1494,17 @@ static s32 GateShutsOut(const Bot& bot, const NavGraph& nav, s32 toNode)
                 continue;
             }
             any = true;
-            // (walking away, or stood at the end of its beat with its back to the gate still: the two of FeeCo's
-            // Executive Offices are never both walking away at once)
-            all = all && (slig.mMotion == 2 || slig.mMotion == 0) && (slig.mX - gateX) * (to.mX - gateX) < 0 && slig.mFacingLeft == (slig.mX < gateX) && std::abs(slig.mX - gateX) >= 20;
-            walking = walking || slig.mMotion == 2;
+            // (as they will be when he lands, 24 frames on: beyond the gate and still walking away from it. They
+            // hear him land, and one that is walking takes longer to stop, turn and shoot than one that has just
+            // come to the end of its beat. "Don't wait until the Sligs are quite all the way left." Measured: landed
+            // as they turned at their beat's end, he was hit 13 frames on, a lever's pull begun 6 frames after
+            // landing with its switch still to come.)
+            const s32 way = gateX < to.mX ? -1 : 1;
+            const bool walksAway = slig.mMotion == 2 && slig.mFacingLeft == (way < 0);
+            const s32 then = slig.mX + way * 66;
+            const bool room = slig.mBeatMax <= slig.mBeatMin || (way < 0 ? then >= slig.mBeatMin + 10 : then <= slig.mBeatMax - 10);
+            all = all && walksAway && (then - gateX) * way >= 15 && room;
+            walking = walking || walksAway;
         }
         state = any ? (all && walking ? 1 : 2) : state;
     }

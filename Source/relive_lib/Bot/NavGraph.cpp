@@ -1740,9 +1740,23 @@ void NavGraph::Build(const NavInput& input)
                             // (and from a cell back, to come down a cell nearer: the hop is over the end of his own
                             // floor before it drops. Bonewerkz' path 1: "hop from directly over the lever to the
                             // middle of the lift".)
+                            // (or beside an open gate across the floor it comes down on, that a switch shuts: where its
+                            // lever is. FeeCo's Executive Offices: "From the left edge, hop right to land beside the
+                            // lever", 1962,1420 to 2062,1500, a cell from the gate's lever at 2087.)
+                            const auto byOpenGate = [&](const NavNode& at)
+                            {
+                                for (const NavFeature& f : mInput.mFeatures)
+                                {
+                                    if (f.mKind == FeatureKind::eBarrier && f.mSolid && !f.mBeam && !f.mStartClosed && f.mSwitch > 1 && f.mHalf == at.mHalf && std::abs(f.mY1 - at.mY) <= 10 && std::abs((f.mX1 + f.mX2) / 2 - at.mX) <= 150)
+                                    {
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            };
                             const s32 back = NodeOnLine(n.mLine, n.mX - dir * step);
                             const s32 nearer = NodeOnLine(mNodes[to].mLine, mNodes[to].mX - dir * step);
-                            if (well < 0 && back >= 0 && nearer >= 0 && std::abs(mNodes[back].mX - (n.mX - dir * step)) <= step / 2 && std::abs(mNodes[nearer].mX - (mNodes[to].mX - dir * step)) <= step / 2 && !mNodes[back].mHazard && !mNodes[back].mLow && !mNodes[nearer].mHazard && !mNodes[nearer].mLow && mNodes[nearer].mLiftStop >= 0)
+                            if (well < 0 && back >= 0 && nearer >= 0 && std::abs(mNodes[back].mX - (n.mX - dir * step)) <= step / 2 && std::abs(mNodes[nearer].mX - (mNodes[to].mX - dir * step)) <= step / 2 && !mNodes[back].mHazard && !mNodes[back].mLow && !mNodes[nearer].mHazard && !mNodes[nearer].mLow && (mNodes[nearer].mLiftStop >= 0 || byOpenGate(mNodes[nearer])))
                             {
                                 AddEdge(edges, back, nearer, EdgeKind::eHop, kHopCost + 10, -1, left);
                             }
