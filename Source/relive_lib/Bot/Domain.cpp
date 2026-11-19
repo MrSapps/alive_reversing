@@ -232,7 +232,7 @@ bool Domain::SackJump(const NavGraph& nav, const Entity& sack, s32* from, s32* t
 }
 
 // An edge that comes down from over a floor onto the side of an open gate across it that the gate's lever is on,
-// more than a cell from that lever
+// anywhere but where that lever is pulled from
 static bool GateLeverFar(const NavGraph& nav, const World& world, const NavEdge& e)
 {
     const NavNode& from = nav.Nodes()[e.mFrom];
@@ -251,7 +251,7 @@ static bool GateLeverFar(const NavGraph& nav, const World& world, const NavEdge&
         for (const Entity& en : world.mEntities)
         {
             if (en.mKind == EntityKind::eLever && en.mSwitch == gate.mSwitch && std::abs(en.mY2 - to.mY) <= 30 && (en.CentreX() - gateX) * (to.mX - gateX) > 0 && std::abs(to.mX - gateX) <= 150 &&
-                std::abs(en.CentreX() - to.mX) > NavGraph::GridStep(to.mHalf) + 5)
+                Domain::UseNode(nav, en, nullptr) != e.mTo)
             {
                 return true;
             }

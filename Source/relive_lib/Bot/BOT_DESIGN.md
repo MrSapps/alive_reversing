@@ -3021,9 +3021,15 @@ tricky to time it right." Two Sligs walk 1912..2150 through an open gate at 1987
   it and at least one still walking (`GateShutsOut`); the step out of the shadow to the hoist waits until they all
   walk away, the nearest forty off; no run from a Slig beyond the gate once he is by the lever; and the lever is
   pulled at once then (`ClearSligTask`).
-- **Not through yet:** 13 deaths in `fs3.txt`. He is still shot leaving the shadow for the hoist on some rounds, and
-  after the hop he is some 40 frames getting to where the lever is pulled from, by when the Sligs are back
-  through the gate.
+- **Through on the first try (later the same day):** the hop is from the platform's *left* cell, 1962, and comes
+  down at 2062, which is where the lever is pulled from ("From the left edge, hop right to land beside the lever":
+  a hop from a cell back to land a cell nearer, made beside an open gate as it is onto a lift's platform); and it
+  is begun so that at his landing, 24 frames on, the Sligs are beyond the gate and *still walking away*. They hear
+  him land: landed as they turned at their beat's end he was hit 13 frames on, the lever (whose switch goes at the
+  end of its own animation) not yet over. "Don't wait until the Sligs are quite all the way left."
+- Then he plans to go back the way he came: the teleporters of this part are taken for ways Abe can go
+  (`Cross teleport`, no gate), and by them the well beside the Security Fone looks in reach. They go when a
+  Glukkon answers their voice lock. Next.
 
 Check set with this: ctest 11/11 (331 Bot tests); m1, tr1, t13 0 deaths; a1 14; bw1, blk9t, b14, wr 0; fc3 0;
 bw7b 29.
